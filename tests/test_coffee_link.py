@@ -37,20 +37,15 @@ class TestCoffeeLinkBuilder(unittest.TestCase):
         self.assertIn("coffee-footer", css)
         self.assertIn("margin-top: auto", css)
 
-    def test_page_includes_coffee_and_existing_sections(self):
-
+    def test_public_page_excludes_coffee_keeps_count(self):
         page = status_app.render_html(
             {"title": "RESTORE PRIVACY", "clients_connected": 0}
         ).decode("utf-8")
-        self.assertIn("buy rus a coffee", page)
-        self.assertIn("https://buymeacoffee.com/rgsneddon", page)
-        self.assertIn("coffee-footer", page)
-        # Existing features intact
+        self.assertNotIn("buy rus a coffee", page)
+        self.assertNotIn("buymeacoffee.com", page)
         self.assertIn("fetch('/api/status'", page)
         self.assertIn("setInterval(poll", page)
-        self.assertIn("Download client v0.0.1", page)
-        self.assertIn("Connect via web", page)
-        self.assertIn("releases/download/0.0.1/", page)
+        self.assertIn("RESTORE PRIVACY", page)
 
 
 class TestCoffeeLinkHttp(unittest.TestCase):
@@ -63,7 +58,7 @@ class TestCoffeeLinkHttp(unittest.TestCase):
         self._httpd.shutdown()
         self._httpd.server_close()
 
-    def test_handler_serves_coffee_link_twice(self):
+    def test_handler_serves_minimal_page_twice(self):
         with mock.patch.object(
             status_app,
             "fetch_upstream_status",
@@ -74,10 +69,9 @@ class TestCoffeeLinkHttp(unittest.TestCase):
                     f"http://127.0.0.1:{self._port}/", timeout=5
                 ) as resp:
                     html = resp.read().decode("utf-8")
-                self.assertIn("buy rus a coffee", html)
-                self.assertIn('href="https://buymeacoffee.com/rgsneddon"', html)
                 self.assertIn("fetch('/api/status'", html)
-                self.assertIn("Download client v0.0.1", html)
+                self.assertNotIn("buy rus a coffee", html)
+                self.assertNotIn("Download client v0.0.1", html)
 
 
 if __name__ == "__main__":

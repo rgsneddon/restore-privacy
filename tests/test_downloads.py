@@ -43,17 +43,19 @@ class TestDownloadCatalog(unittest.TestCase):
             self.assertIn(a.url, html)
             self.assertNotIn('href="#"', html)
 
-    def test_status_page_html_includes_downloads(self):
+    def test_status_page_html_excludes_downloads(self):
+        """Public page is title + count only; download catalog still builds offline."""
         page = status_app.render_html(
             {"title": "RESTORE PRIVACY", "clients_connected": 0}
         ).decode("utf-8")
-        self.assertIn("Download client v0.0.1", page)
-        self.assertIn(
-            "https://github.com/rgsneddon/restore-privacy/releases/download/0.0.1/",
-            page,
-        )
-        self.assertIn("restore-privacy-client-0.0.1-windows-x64.zip", page)
-        self.assertIn("restore-privacy-client-0.0.1-android.apk", page)
+        self.assertNotIn("Download client v0.0.1", page)
+        self.assertNotIn("releases/download/", page)
+        self.assertNotIn("restore-privacy-client-0.0.1-windows-x64.zip", page)
+        self.assertNotIn("restore-privacy-client-0.0.1-android.apk", page)
+        # Catalog helper still works for release tooling
+        section = render_download_section_html()
+        self.assertIn("Download client v0.0.1", section)
+        self.assertIn("releases/download/0.0.1/", section)
 
 
 if __name__ == "__main__":

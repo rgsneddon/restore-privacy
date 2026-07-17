@@ -50,19 +50,18 @@ class TestConnectViaWebBuilder(unittest.TestCase):
             self.assertIn("/releases/download/", a["href"])
             self.assertTrue(a["href"].startswith("https://"))
 
-    def test_render_html_includes_connect_and_downloads_and_poll(self):
+    def test_public_page_excludes_connect_section_keeps_poll(self):
         page = status_app.render_html(
             {"title": "RESTORE PRIVACY", "clients_connected": 1}
         ).decode("utf-8")
-        self.assertIn("Connect via web", page)
-        self.assertIn("id=\"connect-via-web\"", page)
-        self.assertIn(HONESTY_LINE.split("(")[0].strip()[:20], page)
-        self.assertIn("Download client v0.0.1", page)
+        # Connect-via-web is not on the public minimal page
+        self.assertNotIn("Connect via web", page)
+        self.assertNotIn("connect-via-web", page)
+        self.assertNotIn("Download client v0.0.1", page)
+        # Live count poll remains
         self.assertIn("fetch('/api/status'", page)
         self.assertIn("setInterval(poll", page)
         self.assertNotIn('http-equiv="refresh"', page.lower())
-        # Honesty: no false full-VPN-in-browser claim
-        self.assertNotIn("your full device vpn is running in this browser tab", page.lower())
 
 
 class TestConnectViaWebHttp(unittest.TestCase):
@@ -75,7 +74,7 @@ class TestConnectViaWebHttp(unittest.TestCase):
         self._httpd.shutdown()
         self._httpd.server_close()
 
-    def test_handler_serves_connect_section_twice(self):
+    def test_handler_serves_minimal_page_twice(self):
         with mock.patch.object(
             status_app,
             "fetch_upstream_status",
@@ -86,12 +85,10 @@ class TestConnectViaWebHttp(unittest.TestCase):
                     f"http://127.0.0.1:{self._port}/", timeout=5
                 ) as resp:
                     html = resp.read().decode("utf-8")
-                self.assertEqual(resp.status if hasattr(resp, "status") else 200, 200)
-                self.assertIn("Connect via web", html)
-                self.assertIn("connect-via-web", html)
-                self.assertIn("releases/download/0.0.1/", html)
+                self.assertIn("RESTORE PRIVACY", html)
                 self.assertIn("fetch('/api/status'", html)
-                self.assertIn("cannot install a full system-wide vpn", html.lower())
+                self.assertNotIn("Connect via web", html)
+                self.assertNotIn("releases/download/", html)
 
 
 if __name__ == "__main__":

@@ -13,13 +13,7 @@ import urllib.error
 import urllib.request
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
-from coffee_link import coffee_link_css, render_coffee_link_html
-from connect_web import (
-    connect_via_web_css,
-    connect_via_web_script,
-    render_connect_via_web_html,
-)
-from downloads import download_css, render_download_section_html
+# Public page surface is title + live client count only (no download/connect chrome).
 
 # Upstream VPN node status (override via env on Render)
 DEFAULT_UPSTREAM = "http://104.156.224.47:8080/api/status"
@@ -139,9 +133,6 @@ def render_html(status: dict, poll_ms: int | None = None) -> bytes:
     .count {{ font-size:1.25rem; opacity:0.9; }}
     .num {{ font-size:3rem; font-weight:700; margin-top:0.4rem; color:#6ee7b7; }}
     .hint {{ margin-top:1rem; font-size:0.85rem; opacity:0.55; }}
-    {download_css()}
-    {connect_via_web_css()}
-    {coffee_link_css()}
   </style>
 </head>
 <body>
@@ -149,9 +140,6 @@ def render_html(status: dict, poll_ms: int | None = None) -> bytes:
   <div class="count">Currently connected clients</div>
   <div class="num" id="clients-connected" data-metric="current">{n}</div>
   <div class="hint">Live count · updates automatically</div>
-  {render_connect_via_web_html()}
-  {render_download_section_html()}
-  {render_coffee_link_html()}
   <script>
 (function () {{
   var el = document.getElementById('clients-connected');
@@ -175,7 +163,6 @@ def render_html(status: dict, poll_ms: int | None = None) -> bytes:
   // Immediate refresh after load so first paint can correct without reload
   setTimeout(poll, 200);
 }})();
-{connect_via_web_script()}
   </script>
 </body>
 </html>
