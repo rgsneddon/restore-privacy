@@ -13,7 +13,9 @@ import urllib.error
 import urllib.request
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
-# Public page surface is title + live client count only (no download/connect chrome).
+from downloads import download_css, render_download_section_html
+
+# Public page: title + live client count + Windows .exe / Android .apk download buttons.
 
 # Upstream VPN node status (override via env on Render)
 DEFAULT_UPSTREAM = "http://104.156.224.47:8080/api/status"
@@ -105,7 +107,7 @@ def fetch_upstream_status() -> dict:
 
 
 def render_html(status: dict, poll_ms: int | None = None) -> bytes:
-    """HTML with live JS poll of /api/status — no full-page meta refresh."""
+    """HTML: title + live client count + Windows .exe / Android .apk downloads."""
     title = status.get("title", "RESTORE PRIVACY")
     n = int(status.get("clients_connected", 0))
     interval = int(poll_ms if poll_ms is not None else POLL_INTERVAL_MS)
@@ -119,6 +121,8 @@ def render_html(status: dict, poll_ms: int | None = None) -> bytes:
         .replace(">", "&gt;")
         .replace('"', "&quot;")
     )
+    downloads_html = render_download_section_html()
+    dl_css = download_css()
     body = f"""<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -128,11 +132,12 @@ def render_html(status: dict, poll_ms: int | None = None) -> bytes:
   <style>
     body {{ margin:0; min-height:100vh; display:flex; flex-direction:column;
            align-items:center; justify-content:center; background:#0b0f14; color:#e8eef5;
-           font-family: system-ui, sans-serif; }}
+           font-family: system-ui, sans-serif; padding: 2rem 0; box-sizing: border-box; }}
     h1 {{ letter-spacing:0.12em; font-weight:600; font-size:clamp(1.6rem, 4vw, 2.2rem); margin:0 0 1.5rem; }}
     .count {{ font-size:1.25rem; opacity:0.9; }}
     .num {{ font-size:3rem; font-weight:700; margin-top:0.4rem; color:#6ee7b7; }}
     .hint {{ margin-top:1rem; font-size:0.85rem; opacity:0.55; }}
+{dl_css}
   </style>
 </head>
 <body>
@@ -140,6 +145,7 @@ def render_html(status: dict, poll_ms: int | None = None) -> bytes:
   <div class="count">Currently connected clients</div>
   <div class="num" id="clients-connected" data-metric="current">{n}</div>
   <div class="hint">Live count · updates automatically</div>
+{downloads_html}
   <script>
 (function () {{
   var el = document.getElementById('clients-connected');
@@ -168,7 +174,6 @@ def render_html(status: dict, poll_ms: int | None = None) -> bytes:
 </html>
 """
     return body.encode("utf-8")
-
 
 class Handler(BaseHTTPRequestHandler):
     def log_message(self, format, *args):  # noqa: A003

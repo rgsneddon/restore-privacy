@@ -71,7 +71,7 @@ class TestCoffeeLinkHttp(unittest.TestCase):
                     html = resp.read().decode("utf-8")
                 self.assertIn("fetch('/api/status'", html)
                 self.assertNotIn("buy rus a coffee", html)
-                self.assertNotIn("Download client v0.0.1", html)
+                self.assertIn("Download client v0.0.2", html)
 
 
 if __name__ == "__main__":

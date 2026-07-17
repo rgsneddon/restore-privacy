@@ -1,4 +1,4 @@
-"""Public status page is title + live client count only (no download links)."""
+"""Public status page: title + live count + Windows .exe / Android .apk downloads."""
 
 from __future__ import annotations
 
@@ -14,10 +14,15 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "status_page"))
 
 import app as status_app  # noqa: E402
+from downloads import (  # noqa: E402
+    ANDROID_APK_FILENAME,
+    WINDOWS_EXE_FILENAME,
+    available_downloads,
+)
 
 
-class TestMinimalPublicPage(unittest.TestCase):
-    def test_render_has_title_and_count_poll_only(self):
+class TestPublicPageWithDownloads(unittest.TestCase):
+    def test_render_has_title_count_poll_and_download_buttons(self):
         html = status_app.render_html(
             {"title": "RESTORE PRIVACY", "clients_connected": 3}
         ).decode("utf-8")
@@ -27,17 +32,21 @@ class TestMinimalPublicPage(unittest.TestCase):
         self.assertIn(">3<", html)
         self.assertIn("fetch('/api/status'", html)
         self.assertIn("setInterval(poll", html)
-        # No installer / download surfaces
-        self.assertNotIn("releases/download/", html)
-        self.assertNotIn("Download client", html)
+        # Download buttons for v0.0.2 exe + apk
+        self.assertIn("Download client v0.0.2", html)
+        self.assertIn(WINDOWS_EXE_FILENAME, html)
+        self.assertIn(ANDROID_APK_FILENAME, html)
+        self.assertIn(".exe", html)
+        self.assertIn(".apk", html)
+        for a in available_downloads():
+            self.assertIn(a.url, html)
+        # No connect-via-web / coffee chrome
         self.assertNotIn("connect-via-web", html)
         self.assertNotIn("Connect via web", html)
         self.assertNotIn("buymeacoffee.com", html)
         self.assertNotIn("buy rus a coffee", html)
-        self.assertNotIn(".apk", html)
-        self.assertNotIn(".zip", html)
 
-    def test_handler_twice_minimal(self):
+    def test_handler_twice_has_downloads(self):
         httpd = ThreadingHTTPServer(("127.0.0.1", 0), status_app.Handler)
         port = httpd.server_address[1]
         threading.Thread(target=httpd.serve_forever, daemon=True).start()
@@ -55,8 +64,10 @@ class TestMinimalPublicPage(unittest.TestCase):
                     self.assertIn("RESTORE PRIVACY", html)
                     self.assertIn("clients-connected", html)
                     self.assertIn("fetch('/api/status'", html)
-                    self.assertNotIn("releases/download/", html)
-                    self.assertNotIn("Download client", html)
+                    self.assertIn("Download client v0.0.2", html)
+                    self.assertIn(WINDOWS_EXE_FILENAME, html)
+                    self.assertIn(ANDROID_APK_FILENAME, html)
+                    self.assertIn("/releases/download/0.0.2/", html)
         finally:
             httpd.shutdown()
             httpd.server_close()

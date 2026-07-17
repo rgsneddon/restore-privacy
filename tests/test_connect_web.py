@@ -57,7 +57,8 @@ class TestConnectViaWebBuilder(unittest.TestCase):
         # Connect-via-web is not on the public minimal page
         self.assertNotIn("Connect via web", page)
         self.assertNotIn("connect-via-web", page)
-        self.assertNotIn("Download client v0.0.1", page)
+        # Public page may show downloads; connect-via-web section stays off
+        self.assertNotIn("connect-via-web", page)
         # Live count poll remains
         self.assertIn("fetch('/api/status'", page)
         self.assertIn("setInterval(poll", page)
@@ -88,7 +89,8 @@ class TestConnectViaWebHttp(unittest.TestCase):
                 self.assertIn("RESTORE PRIVACY", html)
                 self.assertIn("fetch('/api/status'", html)
                 self.assertNotIn("Connect via web", html)
-                self.assertNotIn("releases/download/", html)
+                # Downloads present; connect-via-web section remains off
+                self.assertIn("releases/download/0.0.2/", html)
 
 
 if __name__ == "__main__":
