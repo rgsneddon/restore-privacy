@@ -1,0 +1,19 @@
+# Render Blueprint — Restore Privacy public status page
+# Proxies live client count from the Vultr VPN node UI.
+services:
+  - type: web
+    name: restore-privacy-status
+    runtime: python
+    plan: free
+    rootDir: status_page
+    buildCommand: pip install -r requirements.txt
+    startCommand: python app.py
+    healthCheckPath: /health
+    autoDeploy: true
+    envVars:
+      - key: PYTHON_VERSION
+        value: "3.12.0"
+      - key: RPT_STATUS_UPSTREAM
+        value: http://104.156.224.47:8080/api/status
+      - key: RPT_STATUS_TIMEOUT
+        value: "4"

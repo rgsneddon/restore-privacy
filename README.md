@@ -15,9 +15,25 @@ Custom-built **VPN node** (Restore Privacy Tunnel / RPT). **Not** WireGuard, Ope
 ## Ports
 
 - **UDP 44044** — tunnel
-- **TCP 8080** — status UI
+- **TCP 8080** — status UI (on the Vultr node)
 
-## Deploy (password via env — never commit)
+## Public status page (Render)
+
+The same **RESTORE PRIVACY** + client-count UI can run on [Render](https://render.com) as a free web service. It **proxies** live counts from the Vultr node (`RPT_STATUS_UPSTREAM`) and does not store user data.
+
+| Item | Value |
+|------|--------|
+| App | `status_page/app.py` |
+| Blueprint | `render.yaml` |
+| One-click deploy | https://render.com/deploy?repo=https://github.com/rgsneddon/restore-privacy |
+| Health | `/health` |
+| Expected URL pattern | `https://restore-privacy-status.onrender.com` (name may vary) |
+
+After deploy, open the Render URL — you should see the same title and live count as `http://104.156.224.47:8080/`.
+
+**Note (free tier):** the service may sleep after ~15 minutes idle; the first hit can take 30–90s to wake.
+
+## Deploy node (password via env — never commit)
 
 ```bash
 export RPT_SSH_HOST=104.156.224.47
