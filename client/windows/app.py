@@ -36,6 +36,7 @@ class RetroClientApp:
         self.root.geometry("640x360")
         self.root.configure(bg=WINDOW_BG)
         self.root.minsize(480, 280)
+        self._set_window_icon()
 
         # Dark blue top banner (Windows 3.1-ish title bar)
         self.banner = tk.Frame(self.root, bg=BANNER_BG, height=28)
@@ -99,6 +100,22 @@ class RetroClientApp:
         self._animate_scroll()
         # Auto-connect on launch — primary flow (no Connect button required)
         self.root.after(200, self._auto_connect)
+
+    def _set_window_icon(self) -> None:
+        """Use brand app icon (assets/brand → native/app_icon.*) when present."""
+        native = Path(__file__).resolve().parent / "native"
+        ico = native / "app_icon.ico"
+        png = native / "app_icon.png"
+        try:
+            if ico.is_file():
+                self.root.iconbitmap(default=str(ico))
+            if png.is_file():
+                # iconphoto works well on Windows for taskbar/title bar
+                img = tk.PhotoImage(file=str(png))
+                self.root.iconphoto(True, img)
+                self._icon_photo = img  # keep ref
+        except Exception:
+            pass
 
     def _log(self, line: str) -> None:
         self.output.configure(state=tk.NORMAL)

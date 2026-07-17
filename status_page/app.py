@@ -8,14 +8,66 @@ count dynamically via client-side fetch of /api/status (no full-page refresh).
 from __future__ import annotations
 
 import json
+import mimetypes
 import os
 import urllib.error
 import urllib.request
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from pathlib import Path
 
 from downloads import download_css, render_download_section_html
 
 # Public page: title + BETA note + live client count + Windows .exe / Android .apk downloads.
+
+# Brand static files (favicon/logo) live next to this module
+STATUS_DIR = Path(__file__).resolve().parent
+STATIC_DIR = STATUS_DIR / "static"
+FAVICON_PATH = "/favicon.ico"
+FAVICON_PNG_PATH = "/favicon.png"
+APPLE_TOUCH_PATH = "/apple-touch-icon.png"
+LOGO_PATH = "/logo.png"
+
+# Map URL path → filename under static/
+STATIC_ROUTES: dict[str, str] = {
+    FAVICON_PATH: "favicon.ico",
+    "/favicon.ico": "favicon.ico",
+    FAVICON_PNG_PATH: "favicon.png",
+    APPLE_TOUCH_PATH: "apple-touch-icon.png",
+    LOGO_PATH: "logo.png",
+    "/static/favicon.ico": "favicon.ico",
+    "/static/favicon.png": "favicon.png",
+    "/static/logo.png": "logo.png",
+    "/static/apple-touch-icon.png": "apple-touch-icon.png",
+}
+
+
+def static_file_path(url_path: str) -> Path | None:
+    """Resolve a public static URL to a file under status_page/static/."""
+    name = STATIC_ROUTES.get(url_path)
+    if not name:
+        return None
+    path = (STATIC_DIR / name).resolve()
+    try:
+        path.relative_to(STATIC_DIR.resolve())
+    except ValueError:
+        return None
+    return path if path.is_file() else None
+
+
+def read_static_bytes(url_path: str) -> tuple[bytes, str] | None:
+    path = static_file_path(url_path)
+    if path is None:
+        return None
+    data = path.read_bytes()
+    ctype, _ = mimetypes.guess_type(str(path))
+    if not ctype:
+        if path.suffix.lower() == ".ico":
+            ctype = "image/x-icon"
+        elif path.suffix.lower() == ".png":
+            ctype = "image/png"
+        else:
+            ctype = "application/octet-stream"
+    return data, ctype
 
 BETA_NOTE_TEXT = (
     "BETA - test phase - please report any bugs to https://x.com/rgsneddon"
@@ -145,10 +197,15 @@ def render_html(status: dict, poll_ms: int | None = None) -> bytes:
   <meta charset="utf-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1"/>
   <title>{title_safe}</title>
+  <link rel="icon" href="/favicon.ico" type="image/x-icon"/>
+  <link rel="icon" href="/favicon.png" type="image/png" sizes="32x32"/>
+  <link rel="apple-touch-icon" href="/apple-touch-icon.png"/>
   <style>
     body {{ margin:0; min-height:100vh; display:flex; flex-direction:column;
            align-items:center; justify-content:center; background:#0b0f14; color:#e8eef5;
            font-family: system-ui, sans-serif; padding: 2rem 0; box-sizing: border-box; }}
+    .brand-logo {{ width:96px; height:96px; border-radius:18px; margin:0 0 1rem;
+                   object-fit:cover; box-shadow:0 4px 24px rgba(0,0,0,0.35); }}
     h1 {{ letter-spacing:0.12em; font-weight:600; font-size:clamp(1.6rem, 4vw, 2.2rem); margin:0 0 0.65rem; }}
     .beta-note {{ margin:0 0 1.5rem; max-width:32rem; text-align:center; padding:0 1rem;
                  font-size:0.95rem; opacity:0.85; line-height:1.45; color:#fbbf24; }}
@@ -161,6 +218,7 @@ def render_html(status: dict, poll_ms: int | None = None) -> bytes:
   </style>
 </head>
 <body>
+  <img class="brand-logo" src="/logo.png" width="96" height="96" alt="Restore Privacy logo"/>
   <h1>{title_safe}</h1>
 {render_beta_note_html()}
   <div class="count">Currently connected clients</div>
@@ -217,6 +275,17 @@ class Handler(BaseHTTPRequestHandler):
                 "text/html; charset=utf-8",
                 render_html(fetch_upstream_status()),
             )
+            return
+        static = read_static_bytes(path)
+        if static is not None:
+            data, ctype = static
+            # Favicon/logo can be cached lightly; still no user data
+            self.send_response(200)
+            self.send_header("Content-Type", ctype)
+            self.send_header("Content-Length", str(len(data)))
+            self.send_header("Cache-Control", "public, max-age=3600")
+            self.end_headers()
+            self.wfile.write(data)
             return
         if path in ("/api/status", "/status"):
             status = fetch_upstream_status()
