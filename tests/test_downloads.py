@@ -1,4 +1,4 @@
-"""Tests for shipped status-page download catalog (release 0.0.2)."""
+"""Tests for shipped status-page download catalog (release 0.0.3)."""
 
 from __future__ import annotations
 
@@ -22,8 +22,8 @@ from downloads import (  # noqa: E402
 
 class TestDownloadCatalog(unittest.TestCase):
     def test_version_is_0_0_2(self):
-        self.assertEqual(RELEASE_VERSION, "0.0.2")
-        self.assertEqual(RELEASE_TAG, "0.0.2")
+        self.assertEqual(RELEASE_VERSION, "0.0.3")
+        self.assertEqual(RELEASE_TAG, "0.0.3")
 
     def test_public_assets_are_exe_and_apk_only(self):
         assets = available_downloads()
@@ -35,26 +35,26 @@ class TestDownloadCatalog(unittest.TestCase):
         self.assertEqual(by_plat["windows"].filename, WINDOWS_EXE_FILENAME)
         self.assertTrue(by_plat["android"].filename.endswith(".apk"))
         self.assertEqual(by_plat["android"].filename, ANDROID_APK_FILENAME)
-        self.assertIn("0.0.2", WINDOWS_EXE_FILENAME)
-        self.assertIn("0.0.2", ANDROID_APK_FILENAME)
+        self.assertIn("0.0.3", WINDOWS_EXE_FILENAME)
+        self.assertIn("0.0.3", ANDROID_APK_FILENAME)
 
     def test_available_downloads_have_https_github_release_urls(self):
         assets = available_downloads()
         for a in assets:
             self.assertTrue(a.url.startswith("https://"))
-            self.assertIn("/releases/download/0.0.2/", a.url)
+            self.assertIn("/releases/download/0.0.3/", a.url)
             self.assertIn(a.filename, a.url)
-            self.assertIn("0.0.2", a.filename)
+            self.assertIn("0.0.3", a.filename)
             # URLs come from shipped DownloadAsset.url property, not test-only strings
             expected = (
                 f"https://github.com/rgsneddon/restore-privacy/releases/download/"
-                f"0.0.2/{a.filename}"
+                f"0.0.3/{a.filename}"
             )
             self.assertEqual(a.url, expected)
 
     def test_render_download_section_uses_real_urls(self):
         html = render_download_section_html()
-        self.assertIn("Download client v0.0.2", html)
+        self.assertIn("Download client v0.0.3", html)
         self.assertIn('class="dl"', html)
         self.assertIn("Windows", html)
         self.assertIn("Android", html)
@@ -72,8 +72,8 @@ class TestDownloadCatalog(unittest.TestCase):
         self.assertIn("RESTORE PRIVACY", page)
         self.assertIn("clients-connected", page)
         self.assertIn("fetch('/api/status'", page)
-        self.assertIn("Download client v0.0.2", page)
-        self.assertIn("releases/download/0.0.2/", page)
+        self.assertIn("Download client v0.0.3", page)
+        self.assertIn("releases/download/0.0.3/", page)
         self.assertIn(WINDOWS_EXE_FILENAME, page)
         self.assertIn(ANDROID_APK_FILENAME, page)
         # Catalog-built URLs appear in page
@@ -85,11 +85,11 @@ class TestDownloadCatalog(unittest.TestCase):
 
 
 class TestInstallerPackagingRecipe(unittest.TestCase):
-    """Structural: 0.0.2 build recipe produces the advertised setup .exe name."""
+    """Structural: 0.0.3 build recipe produces the advertised setup .exe name."""
 
     def test_build_script_wires_exe_and_apk_names(self):
-        script = (ROOT / "scripts" / "build_release_0.0.2.py").read_text(encoding="utf-8")
-        self.assertIn('VERSION = "0.0.2"', script)
+        script = (ROOT / "scripts" / "build_release_0.0.3.py").read_text(encoding="utf-8")
+        self.assertIn('VERSION = "0.0.3"', script)
         # Filenames are composed from VERSION in the shipped build script
         self.assertIn("windows-x64-setup.exe", script)
         self.assertIn("android.apk", script)
@@ -112,7 +112,7 @@ class TestInstallerPackagingRecipe(unittest.TestCase):
 
     def test_installer_module_deploys_and_launches(self):
         inst = (ROOT / "client" / "windows" / "installer.py").read_text(encoding="utf-8")
-        self.assertIn("VERSION = \"0.0.2\"", inst)
+        self.assertIn("VERSION = \"0.0.3\"", inst)
         self.assertIn("def install", inst)
         self.assertIn("LOCALAPPDATA", inst)
         self.assertIn("Programs", inst)
