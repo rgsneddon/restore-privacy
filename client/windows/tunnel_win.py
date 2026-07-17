@@ -1,4 +1,4 @@
-"""Windows full-tunnel setup: TUN + routes + start RPT DATA plane."""
+"""Windows full-tunnel: Wintun adapter + default routes + sealed RPT DATA plane."""
 
 from __future__ import annotations
 
@@ -10,7 +10,13 @@ from typing import Optional
 from client.connect import RptClient
 from client.dataplane import RptDataPlane
 from client.full_tunnel import FullTunnelPlan, windows_route_commands
-from client.windows.tun_win import WindowsTun, create_windows_tun, dataplane_enabled
+from client.windows.tun_win import (
+    WindowsTun,
+    create_windows_tun,
+    dataplane_enabled,
+    system_capture_ready,
+    wintun_dll_available,
+)
 
 
 @dataclass
@@ -20,6 +26,7 @@ class WindowsTunnelResult:
     applied_commands: list[str]
     tun: Optional[WindowsTun] = None
     dataplane: Optional[RptDataPlane] = None
+    system_capture: bool = False
 
 
 def is_admin() -> bool:
@@ -52,63 +59,113 @@ def physical_default_gateway() -> Optional[str]:
     return None
 
 
+def apply_routes_for_adapter(plan: FullTunnelPlan, server_host: str) -> tuple[list[str], list[str]]:
+    """Apply full-tunnel dual /1 routes via tunnel gateway; pin server on physical GW.
+
+    Returns (commands, errors).
+    """
+    cmds = windows_route_commands(plan, server_host)
+    gw = physical_default_gateway() or "0.0.0.0"
+    cmds = [c.replace("PHYSICAL_GW", gw) for c in cmds]
+    errors: list[str] = []
+    for cmd in cmds:
+        r = subprocess.run(cmd, shell=True, capture_output=True, text=True)
+        if r.returncode != 0 and r.stderr:
+            errors.append(r.stderr.strip()[:200])
+    return cmds, errors
+
+
 def start_full_tunnel(
     client: RptClient,
     plan: FullTunnelPlan,
     server_host: str,
     dry_run: bool = False,
+    force_queue: bool = False,
+    prefer_system_capture: bool = True,
 ) -> WindowsTunnelResult:
-    """Create TUN, apply full-tunnel routes, start sealed RPT DATA plane IO."""
+    """Create OS TUN (Wintun), assign IP, install full-tunnel routes, start DATA plane."""
     if not client.session:
         return WindowsTunnelResult(False, "no session", [])
 
-    tun = create_windows_tun(client_ip=plan.tunnel_client_ip, name=plan.tunnel_iface or "RPT")
-    # Keep plan iface name consistent with what we create
-    plan.tunnel_iface = tun.name
-
-    addr_cmds = tun.configure_address()
-    cmds = windows_route_commands(plan, server_host)
-    gw = physical_default_gateway() or "0.0.0.0"
-    cmds = [c.replace("PHYSICAL_GW", gw) for c in cmds]
-    all_cmds = addr_cmds + cmds
-
     if dry_run:
+        cmds = windows_route_commands(plan, server_host)
         return WindowsTunnelResult(
             ok=True,
-            message=f"dry-run full tunnel (tun_mode={tun.mode})",
-            applied_commands=all_cmds,
-            tun=tun,
+            message="dry-run full tunnel plan",
+            applied_commands=cmds,
+            system_capture=False,
         )
 
+    # Prefer real Wintun so OS routes can deliver traffic into seal_packet
+    try:
+        tun = create_windows_tun(
+            client_ip=plan.tunnel_client_ip,
+            name=plan.tunnel_iface or "RPT",
+            force_queue=force_queue,
+            prefer_system_capture=prefer_system_capture and not force_queue,
+        )
+    except Exception as exc:
+        # Last resort for unit tests only
+        if force_queue or not prefer_system_capture:
+            tun = create_windows_tun(
+                client_ip=plan.tunnel_client_ip,
+                name=plan.tunnel_iface or "RPT",
+                force_queue=True,
+            )
+        else:
+            return WindowsTunnelResult(
+                False,
+                f"Wintun TUN failed: {exc}. Run as Administrator; wintun.dll must load.",
+                [],
+            )
+
+    plan.tunnel_iface = tun.name
     applied: list[str] = []
-    if is_admin() and tun.mode == "wintun":
-        for cmd in all_cmds:
-            subprocess.run(cmd, shell=True, capture_output=True, text=True)
-            applied.append(cmd)
-        route_msg = "full-tunnel routes applied"
-    else:
-        applied = all_cmds
-        route_msg = (
-            "TUN+dataplane started"
-            + (f" (mode={tun.mode})" )
-            + ("" if is_admin() else "; admin required for system-wide routes")
-        )
 
-    # ALWAYS start sealed DATA plane (criterion: seal/open on real path)
+    # Address on adapter
+    try:
+        applied.extend(tun.configure_address())
+    except Exception as exc:
+        tun.close()
+        return WindowsTunnelResult(False, f"configure_address failed: {exc}", applied)
+
+    # Full-tunnel routes whenever we have a real Wintun adapter and admin rights.
+    # Also attempt routes when admin even if name-based netsh might work.
+    route_msg = "routes skipped"
+    if is_admin() and system_capture_ready(tun):
+        cmds, errs = apply_routes_for_adapter(plan, server_host)
+        applied.extend(cmds)
+        route_msg = "full-tunnel routes applied" + (f" ({len(errs)} warn)" if errs else "")
+    elif is_admin() and tun.mode == "wintun":
+        cmds, errs = apply_routes_for_adapter(plan, server_host)
+        applied.extend(cmds)
+        route_msg = "full-tunnel routes applied"
+    elif is_admin():
+        # Admin but only queue TUN — routes would blackhole; skip
+        route_msg = "admin but no OS TUN — routes not applied (would blackhole)"
+    else:
+        route_msg = "Administrator required for system-wide routes"
+
     plane = RptDataPlane(client)
     plane.start(tun)
 
     if not dataplane_enabled(tun) or not plane.is_running():
         plane.stop()
         tun.close()
-        return WindowsTunnelResult(False, "dataplane failed to start", applied)
+        return WindowsTunnelResult(False, "dataplane failed to start", applied, tun=None)
 
+    capture = system_capture_ready(tun)
+    msg = (
+        f"TUN mode={tun.mode}; {route_msg}; dataplane running (sealed RPT DATA); "
+        f"system_capture={capture}; wintun_dll={wintun_dll_available()}"
+    )
     return WindowsTunnelResult(
         ok=True,
-        message=route_msg + f"; dataplane running (sealed RPT DATA)",
+        message=msg,
         applied_commands=applied,
         tun=tun,
         dataplane=plane,
+        system_capture=capture,
     )
 
 
@@ -117,12 +174,19 @@ def apply_full_tunnel_routes(
     server_host: str,
     dry_run: bool = False,
 ) -> WindowsTunnelResult:
-    """Legacy helper — prefer start_full_tunnel with a live client."""
+    """Apply route table only (adapter must already exist)."""
     cmds = windows_route_commands(plan, server_host)
     gw = physical_default_gateway() or "0.0.0.0"
     cmds = [c.replace("PHYSICAL_GW", gw) for c in cmds]
+    if dry_run or not is_admin():
+        return WindowsTunnelResult(
+            ok=bool(dry_run),
+            message="dry-run or non-admin",
+            applied_commands=cmds,
+        )
+    applied, errs = apply_routes_for_adapter(plan, server_host)
     return WindowsTunnelResult(
-        ok=bool(dry_run or is_admin()),
-        message="routes only (no dataplane) — use start_full_tunnel",
-        applied_commands=cmds,
+        ok=True,
+        message="routes applied" + (f" warnings={errs}" if errs else ""),
+        applied_commands=applied,
     )
