@@ -14,6 +14,9 @@ def build_sysctl_forward_commands() -> list[str]:
     return [
         "sysctl -w net.ipv4.ip_forward=1",
         "sysctl -w net.ipv6.conf.all.forwarding=1",
+        # Loose reverse-path filter so client→WAN replies via NAT work on TUN
+        "sysctl -w net.ipv4.conf.all.rp_filter=2",
+        "sysctl -w net.ipv4.conf.default.rp_filter=2",
     ]
 
 
@@ -30,14 +33,23 @@ def build_nat_masquerade_commands(
 ) -> list[str]:
     wan = wan_iface if wan_iface else "$WAN"
     return [
+        f"sysctl -w net.ipv4.conf.{tunnel_iface}.rp_filter=2 2>/dev/null || true",
         f"iptables -t nat -C POSTROUTING -s {client_net} -o {wan} -j MASQUERADE 2>/dev/null "
         f"|| iptables -t nat -A POSTROUTING -s {client_net} -o {wan} -j MASQUERADE",
+        # Also MASQUERADE any client-net egress not out the tunnel (covers multi-WAN)
+        f"iptables -t nat -C POSTROUTING -s {client_net} ! -o {tunnel_iface} -j MASQUERADE 2>/dev/null "
+        f"|| iptables -t nat -A POSTROUTING -s {client_net} ! -o {tunnel_iface} -j MASQUERADE",
         f"iptables -C FORWARD -i {tunnel_iface} -o {wan} -j ACCEPT 2>/dev/null "
         f"|| iptables -I FORWARD 1 -i {tunnel_iface} -o {wan} -j ACCEPT",
         f"iptables -C FORWARD -i {wan} -o {tunnel_iface} -m state --state RELATED,ESTABLISHED "
         f"-j ACCEPT 2>/dev/null "
         f"|| iptables -I FORWARD 1 -i {wan} -o {tunnel_iface} -m state --state RELATED,ESTABLISHED "
         f"-j ACCEPT",
+        # Accept forward for client net generally (defensive if WAN name changes)
+        f"iptables -C FORWARD -s {client_net} -j ACCEPT 2>/dev/null "
+        f"|| iptables -I FORWARD 1 -s {client_net} -j ACCEPT",
+        f"iptables -C FORWARD -d {client_net} -m state --state RELATED,ESTABLISHED -j ACCEPT 2>/dev/null "
+        f"|| iptables -I FORWARD 1 -d {client_net} -m state --state RELATED,ESTABLISHED -j ACCEPT",
     ]
 
 

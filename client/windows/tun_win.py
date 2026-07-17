@@ -157,12 +157,25 @@ class WintunTun:
             if not hasattr(d, attr):
                 raise WintunError(f"missing Wintun export: {attr}")
 
+    def interface_index(self) -> Optional[int]:
+        """Windows IF index for route … IF <n> (anti-blackhole full-tunnel)."""
+        return resolve_interface_index(self.name)
+
     def configure_address(self) -> list[str]:
-        """Assign IPv4 on the Wintun adapter (point-to-point style /32)."""
+        """Assign IPv4 on the Wintun adapter with on-link gateway 10.88.0.1.
+
+        Using /24 + gateway (not bare /32 alone) so dual /1 routes via the
+        tunnel gateway are reachable and do not blackhole internet traffic.
+        """
+        gateway = "10.88.0.1"
         cmds = [
-            f'netsh interface ip set address name="{self.name}" static {self.client_ip} 255.255.255.255',
+            f'netsh interface ip set address name="{self.name}" '
+            f"static {self.client_ip} 255.255.255.0 {gateway}",
             f'netsh interface ip delete dns name="{self.name}" all',
             f'netsh interface ip add dns name="{self.name}" addr=1.1.1.1 index=1',
+            f'netsh interface ip add dns name="{self.name}" addr=9.9.9.9 index=2',
+            # Ensure adapter is up for routing
+            f'netsh interface set interface name="{self.name}" admin=ENABLED',
         ]
         for c in cmds:
             subprocess.run(c, shell=True, capture_output=True, text=True)
@@ -260,11 +273,17 @@ class WindowsTun:
     def mode(self) -> str:
         return self._mode
 
+    def interface_index(self) -> Optional[int]:
+        if hasattr(self._impl, "interface_index"):
+            return self._impl.interface_index()  # type: ignore[no-any-return]
+        return resolve_interface_index(self.name)
+
     def configure_address(self) -> list[str]:
         if hasattr(self._impl, "configure_address"):
             return self._impl.configure_address()  # type: ignore[no-any-return]
         return [
-            f'netsh interface ip set address name="{self.name}" static {self.client_ip} 255.255.255.255',
+            f'netsh interface ip set address name="{self.name}" '
+            f"static {self.client_ip} 255.255.255.0 10.88.0.1",
         ]
 
     def read_packet(self, max_size: int = 65535) -> Optional[bytes]:
@@ -294,6 +313,48 @@ def create_windows_tun(
         force_queue=force_queue,
         prefer_system_capture=prefer_system_capture,
     )
+
+
+def resolve_interface_index(name: str) -> Optional[int]:
+    """Resolve Windows interface index by adapter name (for route IF binding)."""
+    if sys.platform != "win32":
+        return None
+    # PowerShell Get-NetAdapter is reliable for Wintun names
+    try:
+        out = subprocess.check_output(
+            [
+                "powershell",
+                "-NoProfile",
+                "-NonInteractive",
+                "-Command",
+                f"(Get-NetAdapter -Name '{name}' -ErrorAction SilentlyContinue | "
+                f"Select-Object -First 1).ifIndex",
+            ],
+            text=True,
+            stderr=subprocess.DEVNULL,
+            timeout=15,
+        ).strip()
+        if out.isdigit():
+            return int(out)
+    except Exception:
+        pass
+    # Fallback: netsh show interfaces
+    try:
+        out = subprocess.check_output(
+            ["netsh", "interface", "ipv4", "show", "interfaces"],
+            text=True,
+            stderr=subprocess.DEVNULL,
+            timeout=15,
+        )
+        for line in out.splitlines():
+            # Idx  Met  MTU   State        Name
+            parts = line.split()
+            if len(parts) >= 5 and name.lower() in line.lower():
+                if parts[0].isdigit():
+                    return int(parts[0])
+    except Exception:
+        pass
+    return None
 
 
 def dataplane_enabled(tun: Optional[WindowsTun] = None) -> bool:

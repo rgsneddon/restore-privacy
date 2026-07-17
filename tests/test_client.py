@@ -76,9 +76,11 @@ class TestFullTunnel(unittest.TestCase):
         cfg = android_vpn_builder_config(plan)
         self.assertEqual(cfg["routes"], [{"addr": "0.0.0.0", "prefix": 0}])
         self.assertTrue(cfg["allowAllApps"])
-        cmds = "\n".join(windows_route_commands(plan, "104.156.224.47"))
+        cmds = "\n".join(windows_route_commands(plan, "104.156.224.47", if_index=9))
         self.assertIn("0.0.0.0 mask 128.0.0.0", cmds)
         self.assertIn("128.0.0.0 mask 128.0.0.0", cmds)
+        self.assertIn("IF 9", cmds)
+        self.assertIn("104.156.224.47", cmds)
 
 
 class TestUiTheme(unittest.TestCase):
@@ -132,6 +134,8 @@ class TestUiTheme(unittest.TestCase):
         self.assertIn("fullTunnel", svc)
         self.assertIn("engine.handshake", svc)
         self.assertIn("engine.sealPacket", svc)
+        self.assertIn("inTun.read(buf)", svc)
+        self.assertNotIn("inTun.available()", svc)
         self.assertIn("fun handshake", engine)
         self.assertIn("fun sealPacket", engine)
 

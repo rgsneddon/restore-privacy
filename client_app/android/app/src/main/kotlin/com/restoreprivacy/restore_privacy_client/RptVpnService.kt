@@ -178,33 +178,47 @@ class RptVpnService : VpnService() {
                     session.vpnIp,
                 )
 
+                // Two threads: TUN→UDP and UDP→TUN.
+                // Do NOT use FileInputStream.available() — on Android VPN it often
+                // stays 0 forever and blackholes all internet traffic.
                 val inTun = FileInputStream(pfd.fileDescriptor)
                 val outTun = FileOutputStream(pfd.fileDescriptor)
-                val buf = ByteArray(32767)
-                sock.soTimeout = 50
+                sock.soTimeout = 200
                 val endpoint = InetSocketAddress(host, port)
-                while (running.get()) {
-                    try {
-                        val avail = inTun.available()
-                        if (avail > 0) {
-                            val n = inTun.read(buf)
+                val tunToUdp = thread(name = "rpt-tun-up", isDaemon = true) {
+                    val buf = ByteArray(32767)
+                    while (running.get()) {
+                        try {
+                            val n = inTun.read(buf) // blocking read of VPN packets
                             if (n > 0) {
                                 val frame = engine.sealPacket(buf.copyOf(n))
                                 sock.send(DatagramPacket(frame, frame.size, endpoint))
+                            } else if (n < 0) {
+                                break
                             }
+                        } catch (_: Exception) {
+                            if (!running.get()) break
                         }
-                    } catch (_: Exception) {
-                    }
-                    try {
-                        val pkt = DatagramPacket(buf, buf.size)
-                        sock.receive(pkt)
-                        if (pkt.length > 5 && buf[4] == 0x03.toByte()) {
-                            val plain = engine.openPacket(buf.copyOf(pkt.length))
-                            outTun.write(plain)
-                        }
-                    } catch (_: Exception) {
                     }
                 }
+                val udpToTun = thread(name = "rpt-udp-down", isDaemon = true) {
+                    val buf = ByteArray(65535)
+                    while (running.get()) {
+                        try {
+                            val pkt = DatagramPacket(buf, buf.size)
+                            sock.receive(pkt)
+                            if (pkt.length > 5 && buf[4] == 0x03.toByte()) {
+                                val plain = engine.openPacket(buf.copyOf(pkt.length))
+                                outTun.write(plain)
+                                outTun.flush()
+                            }
+                        } catch (_: Exception) {
+                            if (!running.get()) break
+                        }
+                    }
+                }
+                tunToUdp.join(Long.MAX_VALUE)
+                udpToTun.join(2_000)
                 try {
                     inTun.close()
                 } catch (_: Exception) {
