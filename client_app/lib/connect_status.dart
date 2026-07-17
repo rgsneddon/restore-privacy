@@ -32,3 +32,18 @@ const String kMissingSecretsMessage =
     'Missing admission secrets — place client_ed25519.priv and node_elgamal.pub under app secrets';
 const String kVpnPermissionDeniedMessage =
     'VPN permission denied — grant once for full tunnel';
+
+/// UK public-IP security gate (must match native [UkIpGate] / Python uk_gate).
+const String kUkGateDeniedMessage =
+    'Access denied: Restore Privacy is only available when your public IP '
+    'is located in the United Kingdom. Your current network location is not UK.';
+const String kUkGateLookupFailedMessage =
+    'Access denied: could not verify that your public IP is in the United Kingdom. '
+    'Check your network connection and try again.';
+
+/// True when a channel failure message is the UK location gate.
+bool isUkGateFailureMessage(String message) {
+  final m = message.toLowerCase();
+  return m.contains('access denied') &&
+      (m.contains('united kingdom') || m.contains('uk'));
+}

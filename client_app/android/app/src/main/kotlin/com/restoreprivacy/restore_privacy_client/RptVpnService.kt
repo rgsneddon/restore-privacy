@@ -116,6 +116,16 @@ class RptVpnService : VpnService() {
         val (clientPriv, nodePub) = secrets
 
         worker = thread(name = "rpt-dataplane", isDaemon = true) {
+            // UK public-IP gate before handshake (fail closed with clear notice)
+            val gate = UkIpGate.checkUkPublicIp()
+            if (!gate.allowed) {
+                report(false, gate.message)
+                running.set(false)
+                stopForeground(STOP_FOREGROUND_REMOVE)
+                stopSelf()
+                return@thread
+            }
+
             val sock = DatagramSocket()
             try {
                 protect(sock)
