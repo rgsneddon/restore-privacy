@@ -70,17 +70,18 @@ class TestLicenseAndCredits(unittest.TestCase):
 
 class TestReadmeHowto(unittest.TestCase):
     def test_readme_howto_and_legal_links(self):
+        """Public README: client-user how-to + legal links (operator detail in sundries)."""
         text = _read("README.md")
         lower = text.lower()
-        self.assertIn("how to", lower)
-        # Operational steps
+        self.assertTrue("how to" in lower or "install" in lower)
+        # End-user client path
         self.assertTrue(
-            "python -m client.windows" in text
-            or "restoreprivacy.bat" in lower
+            "restoreprivacy.bat" in lower
             or "download" in lower
+            or "apk" in lower
         )
         self.assertTrue(
-            "flutter" in lower or "android" in lower or "apk" in lower
+            "android" in lower or "apk" in lower or "windows" in lower
         )
         self.assertTrue(
             "0.0.1" in text or "release" in lower or "download" in lower
@@ -89,12 +90,17 @@ class TestReadmeHowto(unittest.TestCase):
         self.assertIn("PRIVACY_POLICY", text)
         self.assertIn("LICENSE", text)
         self.assertTrue("CREDITS" in text or "credit" in lower)
-        # Status / node how-to anchors
+        # User-facing status/downloads OK; operator deploy is not required here
         self.assertTrue(
             "restore-privacy-status.onrender.com" in text
             or "status page" in lower
+            or "download" in lower
         )
-        self.assertTrue("44044" in text or "deploy" in lower or "node" in lower)
+        # Operator material lives in sundries
+        self.assertTrue(
+            (ROOT / "sundries.txt").is_file()
+            or "sundries" in lower
+        )
 
 
 if __name__ == "__main__":

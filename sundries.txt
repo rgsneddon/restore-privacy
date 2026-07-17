@@ -1,0 +1,111 @@
+Restore Privacy — operator / developer sundries
+================================================
+This file holds material that is NOT required for public end users of the
+client app. Public users should follow README.md only.
+
+Contents moved from the public-facing README (ports, status-page hosting,
+node deploy, developer client-app notes, local tests, secrets).
+
+
+1. PORTS
+--------
+  UDP 44044  — RPT tunnel (node listen)
+  TCP 8080   — Node local status UI (title + current client count)
+
+  Client apps connect to the configured RPT endpoint (default product host
+  uses these ports on the operator's server).
+
+
+2. PUBLIC STATUS PAGE (hosting / deploy detail)
+-----------------------------------------------
+  App source:     status_page/
+  Render blueprint: render.yaml
+  One-click deploy: https://render.com/deploy?repo=https://github.com/rgsneddon/restore-privacy
+  Health:         /health
+  Live example:   https://restore-privacy-status.onrender.com/
+
+  The status page proxies live clients_connected from the node upstream
+  (env RPT_STATUS_UPSTREAM, default http://<node>:8080/api/status).
+
+  Free tier note: service may sleep after ~15 minutes idle; first hit can
+  take 30–90s to wake.
+
+  After deploy, the page shows current client count, download links, and
+  Connect via web (honest browser limit + native client actions).
+
+
+3. DEPLOY NODE (operators)
+--------------------------
+  Custom RPT node (not WireGuard/OpenVPN). Tree: node/
+
+  From a machine with SSH (password via environment — never commit):
+
+    export RPT_SSH_HOST=YOUR_SERVER_IP
+    export RPT_SSH_USER=root
+    export RPT_SSH_PASSWORD='...'
+    pip install paramiko cryptography
+    python scripts/deploy_rpt_node.py
+
+  Or on the server after copying node/ to /opt/restore-privacy/node:
+
+    bash /opt/restore-privacy/node/install.sh
+
+  Node properties (operator reference):
+    Admission  — authorized RPT client keys only (ElGamal + Pedersen + Ed25519)
+    Crypto     — custom RPT2 data plane (ChaCha20-Poly1305 after handshake)
+    Relay      — TUN + IP forward + MASQUERADE
+    Privacy    — no user-info / session activity log files by design
+                 (see PRIVACY_POLICY.md)
+
+
+4. CLIENT APPS (developer / from-source)
+----------------------------------------
+  Windows client (source):
+    pip install -r requirements.txt
+    python -m client.windows
+    # Run as Administrator for full system VPN (Wintun)
+
+  Android / Flutter:
+    cd client_app
+    flutter pub get
+    flutter run
+    # or: flutter build apk --release
+
+  iOS / macOS (build on a Mac):
+    client_app/ios/BUILD_ON_MAC.md
+    client_app/macos/BUILD_ON_MAC.md
+
+  Layout:
+    client/       — shared connect path + Windows retro UI
+    client_app/   — Flutter multi-platform scaffolds
+    node/         — server node
+    status_page/  — public status + downloads
+    scripts/      — deploy / release helpers
+
+
+5. LOCAL TESTS (developers)
+---------------------------
+    pip install -r requirements.txt
+    python -m unittest discover -s tests -v
+
+
+6. SECRETS (operators — never commit private keys)
+--------------------------------------------------
+  Public installers do NOT ship private admission keys.
+
+  Operator paths (gitignored examples):
+    ./secrets/client_ed25519.priv
+    ./secrets/node_elgamal.pub
+    /opt/restore-privacy/secrets/   (on the node host)
+
+  Without valid authorized client material, the cryptographic handshake
+  will not admit the client. Treat private keys as credentials.
+
+  Never put root passwords or *.priv files in git or public release zips.
+
+
+7. RELATED LEGAL DOCS
+---------------------
+  PRIVACY_POLICY.md  — full privacy policy
+  LICENSE            — MIT for original project code
+  CREDITS.md         — third-party attributions (Wintun, cryptography, etc.)
