@@ -1,0 +1,189 @@
+"""Product handshake: ElGamal + Pedersen + authorized client Ed25519 only."""
+
+from __future__ import annotations
+
+import hashlib
+import os
+from dataclasses import dataclass
+from typing import Iterable, Set
+
+from cryptography.hazmat.primitives import serialization
+from cryptography.hazmat.primitives.asymmetric.ed25519 import (
+    Ed25519PrivateKey,
+    Ed25519PublicKey,
+)
+from cryptography.hazmat.primitives.ciphers.aead import ChaCha20Poly1305
+
+from .crypto_session import SessionCrypto, derive_session_key
+from .elgamal import (
+    ElGamalCiphertext,
+    ElGamalPrivateKey,
+    ElGamalPublicKey,
+    Q,
+    decrypt,
+    encrypt,
+)
+from .pedersen import (
+    PedersenCommitment,
+    PedersenOpening,
+    commit_bytes,
+    open_verified,
+)
+from .protocol import pack_client_hello, pack_server_hello, parse_client_hello
+
+
+def ed25519_pub_raw(pub: Ed25519PublicKey) -> bytes:
+    return pub.public_bytes(
+        encoding=serialization.Encoding.Raw,
+        format=serialization.PublicFormat.Raw,
+    )
+
+
+def ed25519_priv_raw(priv: Ed25519PrivateKey) -> bytes:
+    return priv.private_bytes(
+        encoding=serialization.Encoding.Raw,
+        format=serialization.PrivateFormat.Raw,
+        encryption_algorithm=serialization.NoEncryption(),
+    )
+
+
+def load_ed25519_pub(raw: bytes) -> Ed25519PublicKey:
+    return Ed25519PublicKey.from_public_bytes(raw)
+
+
+def generate_client_admission_keypair() -> tuple[Ed25519PrivateKey, Ed25519PublicKey]:
+    priv = Ed25519PrivateKey.generate()
+    return priv, priv.public_key()
+
+
+def transcript_for_client_hello(client_pub: bytes, commit: bytes, elgamal_ct: bytes) -> bytes:
+    return b"RPT2-CLIENT-HELLO|" + client_pub + commit + elgamal_ct
+
+
+def hybrid_encrypt(node_pub: ElGamalPublicKey, plaintext: bytes) -> bytes:
+    """ElGamal-wrap a 32-byte key; ChaCha20-Poly1305 seals the bulk payload.
+
+    Wire: elgamal_ct(512) || nonce(12) || aead_ciphertext
+    Returned blob is what goes into the CLIENT_HELLO elgamal_ct field expansion —
+    we store hybrid blob as: for protocol, elgamal field stays 512 (key only),
+    and sealed bulk is appended inside protocol via expanding elgamal field.
+
+    For fixed 512-byte protocol field we only ElGamal-encrypt the 32-byte key,
+    and pack bulk as: we change approach — encrypt only client_nonce(32) with
+    ElGamal (fits), send Pedersen opening in AEAD sealed with key derived from
+    that nonce after... actually opening must be secret until node decrypts.
+
+    Layout inside 512-byte ElGamal plaintext limit (240): client_nonce(32) +
+    message_int(32) + blinding_head(32) is incomplete.
+
+    Hybrid blob exported as bytes replacing elgamal_ct field content:
+    We extend protocol: elgamal_ct field becomes hybrid blob of variable length.
+    """
+    raise NotImplementedError
+
+
+def pack_hybrid(node_pub: ElGamalPublicKey, plaintext: bytes) -> bytes:
+    key = os.urandom(32)
+    ct = encrypt(node_pub, key)
+    nonce = os.urandom(12)
+    sealed = ChaCha20Poly1305(key).encrypt(nonce, plaintext, b"RPT2-HYBRID")
+    return ct.export() + nonce + sealed
+
+
+def open_hybrid(node_priv: ElGamalPrivateKey, blob: bytes) -> bytes:
+    if len(blob) < 512 + 12 + 16:
+        raise ValueError("hybrid blob too short")
+    ct = ElGamalCiphertext.import_bytes(blob[:512])
+    key = decrypt(node_priv, ct)
+    if len(key) != 32:
+        # encode_message may return key with exact bytes
+        key = key[:32] if len(key) >= 32 else key.ljust(32, b"\x00")
+    nonce = blob[512:524]
+    sealed = blob[524:]
+    return ChaCha20Poly1305(key).decrypt(nonce, sealed, b"RPT2-HYBRID")
+
+
+@dataclass
+class HandshakeResult:
+    session_id: bytes
+    crypto: SessionCrypto
+    client_pub: bytes
+    shared_probe: bytes
+
+
+class AdmissionError(Exception):
+    pass
+
+
+class NodeHandshake:
+    def __init__(self, node_elgamal: ElGamalPrivateKey, authorized_client_pubs: Iterable[bytes]):
+        self.node_elgamal = node_elgamal
+        self.authorized: Set[bytes] = set(authorized_client_pubs)
+        if not self.authorized:
+            raise ValueError("authorized client public keys required")
+
+
+def node_complete_hello(
+    node: NodeHandshake,
+    frame: bytes,
+    vpn_ip: str,
+) -> tuple[bytes, HandshakeResult]:
+    client_pub, commit_b, hybrid_b, sig = parse_client_hello(frame)
+    if client_pub not in node.authorized:
+        raise AdmissionError("unauthorized client")
+    pub = load_ed25519_pub(client_pub)
+    try:
+        pub.verify(sig, transcript_for_client_hello(client_pub, commit_b, hybrid_b))
+    except Exception as exc:
+        raise AdmissionError("invalid client signature") from exc
+
+    commit = PedersenCommitment.import_bytes(commit_b)
+    try:
+        opened = open_hybrid(node.node_elgamal, hybrid_b)
+    except Exception as exc:
+        raise AdmissionError("hybrid decrypt failed") from exc
+    if len(opened) < 32 + 288:
+        raise AdmissionError("bad hybrid payload")
+    client_nonce = opened[:32]
+    opening = PedersenOpening.import_bytes(opened[32 : 32 + 288])
+    try:
+        open_verified(commit, opening)
+    except Exception as exc:
+        raise AdmissionError("pedersen verify failed") from exc
+    expected_m = int.from_bytes(hashlib.sha256(client_nonce).digest(), "big") % Q
+    if opening.message % Q != expected_m:
+        raise AdmissionError("pedersen message mismatch")
+
+    session_id = os.urandom(8)
+    server_nonce = os.urandom(32)
+    s_commit, s_opening = commit_bytes(server_nonce)
+    shared = hashlib.sha256(client_nonce + server_nonce + session_id + client_pub).digest()
+    crypto = SessionCrypto(key=derive_session_key(shared, salt=client_nonce[:16]))
+
+    parts = [int(x) for x in vpn_ip.split(".")]
+    plain = server_nonce + s_opening.export() + bytes(parts)
+    aad = b"RPT2-SERVER-HELLO" + session_id
+    nonce, sealed = crypto.seal(plain, aad=aad)
+    reply = pack_server_hello(s_commit.export(), session_id, nonce, sealed)
+    result = HandshakeResult(
+        session_id=session_id,
+        crypto=crypto,
+        client_pub=client_pub,
+        shared_probe=shared,
+    )
+    return reply, result
+
+
+def build_client_hello(
+    client_priv: Ed25519PrivateKey,
+    node_elgamal_pub: ElGamalPublicKey,
+) -> tuple[bytes, bytes, bytes]:
+    client_pub = ed25519_pub_raw(client_priv.public_key())
+    client_nonce = os.urandom(32)
+    commit, opening = commit_bytes(client_nonce)
+    payload = client_nonce + opening.export()
+    hybrid_b = pack_hybrid(node_elgamal_pub, payload)
+    commit_b = commit.export()
+    sig = client_priv.sign(transcript_for_client_hello(client_pub, commit_b, hybrid_b))
+    frame = pack_client_hello(client_pub, commit_b, hybrid_b, sig)
+    return frame, client_nonce, client_pub
