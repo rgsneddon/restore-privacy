@@ -27,6 +27,8 @@ class TestPublicPageWithDownloads(unittest.TestCase):
             {"title": "RESTORE PRIVACY", "clients_connected": 3}
         ).decode("utf-8")
         self.assertIn("RESTORE PRIVACY", html)
+        self.assertIn("BETA - test phase - please report any bugs to", html)
+        self.assertIn("https://x.com/rgsneddon", html)
         self.assertIn("Currently connected clients", html)
         self.assertIn('id="clients-connected"', html)
         self.assertIn(">3<", html)
@@ -62,6 +64,10 @@ class TestPublicPageWithDownloads(unittest.TestCase):
                     ) as resp:
                         html = resp.read().decode("utf-8")
                     self.assertIn("RESTORE PRIVACY", html)
+                    self.assertIn(
+                        "BETA - test phase - please report any bugs to", html
+                    )
+                    self.assertIn("https://x.com/rgsneddon", html)
                     self.assertIn("clients-connected", html)
                     self.assertIn("fetch('/api/status'", html)
                     self.assertIn("Download client v0.0.2", html)

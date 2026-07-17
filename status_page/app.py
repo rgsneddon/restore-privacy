@@ -15,7 +15,23 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 from downloads import download_css, render_download_section_html
 
-# Public page: title + live client count + Windows .exe / Android .apk download buttons.
+# Public page: title + BETA note + live client count + Windows .exe / Android .apk downloads.
+
+BETA_NOTE_TEXT = (
+    "BETA - test phase - please report any bugs to https://x.com/rgsneddon"
+)
+BETA_NOTE_URL = "https://x.com/rgsneddon"
+
+
+def render_beta_note_html() -> str:
+    """Note immediately below the RESTORE PRIVACY headline (bug reports on X)."""
+    return (
+        f'  <p class="beta-note" id="beta-note">'
+        f"BETA - test phase - please report any bugs to "
+        f'<a href="{BETA_NOTE_URL}" rel="noopener noreferrer" target="_blank">'
+        f"{BETA_NOTE_URL}</a></p>"
+    )
+
 
 # Upstream VPN node status (override via env on Render)
 DEFAULT_UPSTREAM = "http://104.156.224.47:8080/api/status"
@@ -133,7 +149,11 @@ def render_html(status: dict, poll_ms: int | None = None) -> bytes:
     body {{ margin:0; min-height:100vh; display:flex; flex-direction:column;
            align-items:center; justify-content:center; background:#0b0f14; color:#e8eef5;
            font-family: system-ui, sans-serif; padding: 2rem 0; box-sizing: border-box; }}
-    h1 {{ letter-spacing:0.12em; font-weight:600; font-size:clamp(1.6rem, 4vw, 2.2rem); margin:0 0 1.5rem; }}
+    h1 {{ letter-spacing:0.12em; font-weight:600; font-size:clamp(1.6rem, 4vw, 2.2rem); margin:0 0 0.65rem; }}
+    .beta-note {{ margin:0 0 1.5rem; max-width:32rem; text-align:center; padding:0 1rem;
+                 font-size:0.95rem; opacity:0.85; line-height:1.45; color:#fbbf24; }}
+    .beta-note a {{ color:#93c5fd; }}
+    .beta-note a:hover {{ color:#bfdbfe; }}
     .count {{ font-size:1.25rem; opacity:0.9; }}
     .num {{ font-size:3rem; font-weight:700; margin-top:0.4rem; color:#6ee7b7; }}
     .hint {{ margin-top:1rem; font-size:0.85rem; opacity:0.55; }}
@@ -142,6 +162,7 @@ def render_html(status: dict, poll_ms: int | None = None) -> bytes:
 </head>
 <body>
   <h1>{title_safe}</h1>
+{render_beta_note_html()}
   <div class="count">Currently connected clients</div>
   <div class="num" id="clients-connected" data-metric="current">{n}</div>
   <div class="hint">Live count · updates automatically</div>
