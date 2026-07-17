@@ -1,0 +1,112 @@
+# Privacy Policy — Restore Privacy
+
+**Last updated:** 17 July 2026  
+**Product:** Restore Privacy Tunnel (RPT) — custom VPN node, client apps, and public status page  
+**Operator / project:** Russell G Sneddon (`rgsneddon`) / public repository [restore-privacy](https://github.com/rgsneddon/restore-privacy)
+
+This policy describes how the **Restore Privacy** software is designed to handle data. It is written for end users and operators. It is **not** legal advice and is not a jurisdiction-specific compliance certificate (e.g. full GDPR/CCPA legal opinion).
+
+---
+
+## 1. Summary
+
+Restore Privacy is a **custom-built encrypted tunnel** (not WireGuard, OpenVPN, or other pre-existing VPN products). The product goal is:
+
+| Commitment | Meaning |
+|------------|---------|
+| **No user-info logs** | The node and status software are configured **not** to write connection, session, access, traffic, accounting, or peer-activity logs to disk. |
+| **No client PII collection** | The public status surface exposes **only** a live **current connected client count** (and a product title)—not identities, IPs, usernames, or per-client lists. |
+| **Tunnel as a relay** | After cryptographic admission, the node forwards encrypted-session traffic; it is not designed as an analytics or advertising platform. |
+
+---
+
+## 2. What we do **not** collect or retain (by design)
+
+Unless an operator **deliberately** changes configuration or hosting outside this software’s defaults, the shipped node and status page are intended **not** to:
+
+- Store **usernames, passwords, email addresses, or account profiles** for tunnel use (tunnel attach uses **cryptographic product keys**, not user accounts).
+- Write **connection logs**, **session logs**, **access logs**, **traffic logs**, or **peer activity logs** for tunnel use.
+- Publish **client IP addresses**, **device identifiers**, or **session identifiers** on the public status page.
+- Keep a **lifetime / cumulative “total clients ever”** counter on the public page (the status metric is **currently connected** sessions only).
+- Bundle **private admission keys** in public GitHub release packages (operators provision secrets separately).
+
+Process stdout/stderr for the node service is configured for **no journal session streams** in the standard install (`StandardOutput=null` / similar).
+
+---
+
+## 3. What processing happens (high level)
+
+### 3.1 VPN node (server)
+
+- Listens for RPT tunnel handshakes and **encrypted** data frames.
+- **Admits** only peers that complete the product handshake with an **authorized client key** (Ed25519 allow-list + ElGamal / Pedersen-based handshake materials).
+- Assigns a temporary tunnel IP and **relays** IP traffic (forwarding + NAT) while the session is active.
+- Holds **in-memory** session state for active tunnels so traffic can be routed and so a **current session count** can be reported.
+- When a session ends, that in-memory state is dropped; it is **not** designed to be written as a durable user history file.
+
+### 3.2 Client applications (Windows, Android; iOS/macOS prep)
+
+- On launch, clients **auto-connect** to the configured RPT node endpoint.
+- They use **local** cryptographic material (when provisioned) to complete admission and establish session keys.
+- Full-tunnel modes (where enabled by the OS and user permissions) route device traffic into the encrypted tunnel.
+- Clients are **not** designed to upload browsing history or identity dossiers to the node as product telemetry.
+
+### 3.3 Public status page (e.g. Render)
+
+- Proxies or displays a **live** `clients_connected` value from the node status API.
+- Updates the number in the browser via **client-side polling** (no requirement to store user history on the page host).
+- May offer **download links** to public GitHub release packages.
+
+### 3.4 Operator-held secrets
+
+- **Node ElGamal private key** and **authorized client private keys** are operational secrets.
+- They live under paths such as `/opt/restore-privacy/secrets/` or local `secrets/` (gitignored)—**not** in the public release zips by design.
+- Possession of authorized client keys allows tunnel use; treat them as credentials.
+
+---
+
+## 4. Limits of this privacy promise
+
+Please understand these **operational limits**:
+
+1. **Hosting and networks.** The VPS provider, CDN, or DNS operator may log IP-level connection metadata under **their** policies (outside this application’s no-log settings).
+2. **Destination sites.** Websites and services you visit through the tunnel have their own privacy policies.
+3. **Device and OS.** Android VPN consent dialogs, Windows admin elevation, crash reporters, or OS network stacks may process data independently of this app.
+4. **Misconfiguration.** If an operator enables verbose logging, reverse proxies with access logs, or third-party monitoring, that can create logs this policy assumes are off.
+5. **Security vs. privacy.** Cryptographic admission keys identify a **product client**, not a named human account—but a key can still be treated as an access secret.
+6. **Open relay risk is reduced by keys, not by accounts.** Unauthorized clients should fail handshake; authorized keys must be protected.
+
+---
+
+## 5. Cookies and tracking
+
+The status page is a minimal static/JS UI. It does **not** use advertising trackers or analytics SDKs in the shipped code. Browser `fetch` of `/api/status` is for the live count only. No account login cookies are required for the tunnel protocol itself.
+
+---
+
+## 6. Children
+
+This software is a network tool for general audiences. It is not directed at children under 13 (or the minimum age in your jurisdiction). Do not provide personal data of children through misconfigured logging or external services.
+
+---
+
+## 7. Changes
+
+We may update this policy as the product evolves. The **Last updated** date at the top will change when material edits are made. Continued use of updated software implies review of the current policy in the repository.
+
+---
+
+## 8. Contact
+
+For privacy questions about this open-source project, open an issue on:
+
+https://github.com/rgsneddon/restore-privacy
+
+Or contact the repository owner via their GitHub profile.
+
+---
+
+## 9. Related documents
+
+- Project license and third-party credits: [`LICENSE`](LICENSE), [`CREDITS.md`](CREDITS.md)
+- How to install and run: [`README.md`](README.md)
