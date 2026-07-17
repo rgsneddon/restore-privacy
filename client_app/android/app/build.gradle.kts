@@ -48,3 +48,28 @@ flutter {
 dependencies {
     implementation("org.bouncycastle:bcprov-jdk18on:1.78.1")
 }
+
+// Inject admission material into APK assets at build time from gitignored repo secrets/.
+// Never commits *.priv — only copies when present on the builder machine.
+// rootProject = client_app/android → ../../secrets = restore_privacy/secrets
+tasks.register("copyRptSecretsToAssets") {
+    doLast {
+        val repoSecrets = rootProject.file("../../secrets")
+        val destDir = file("src/main/assets/secrets")
+        destDir.mkdirs()
+        listOf("client_ed25519.priv", "node_elgamal.pub", "client_ed25519.pub").forEach { name ->
+            val src = rootProject.file("../../secrets/$name")
+            val dest = file("src/main/assets/secrets/$name")
+            if (src.exists()) {
+                src.copyTo(dest, overwrite = true)
+                logger.lifecycle("copyRptSecretsToAssets: injected $name")
+            } else {
+                logger.warn("copyRptSecretsToAssets: missing ${src.absolutePath}")
+            }
+        }
+    }
+}
+
+tasks.named("preBuild").configure {
+    dependsOn("copyRptSecretsToAssets")
+}

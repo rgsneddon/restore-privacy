@@ -6,7 +6,9 @@ import android.app.NotificationManager
 import android.content.Intent
 import android.net.VpnService
 import android.os.Build
+import android.os.Bundle
 import android.os.ParcelFileDescriptor
+import android.os.ResultReceiver
 import java.io.File
 import java.io.FileInputStream
 import java.io.FileOutputStream
@@ -18,14 +20,14 @@ import kotlin.concurrent.thread
 
 /**
  * Full-tunnel VPN service for Restore Privacy Tunnel (RPT2).
- *
- * Performs authorized CLIENT_HELLO (ElGamal+Pedersen+Ed25519), then seals all
- * TUN IP packets as RPT DATA frames (ChaCha20-Poly1305). Not WireGuard/OpenVPN.
+ * Reports handshake/TUN success or failure via [ResultReceiver] — no silent fail.
  */
 class RptVpnService : VpnService() {
     private var tun: ParcelFileDescriptor? = null
     private val running = AtomicBoolean(false)
     private var worker: Thread? = null
+    private var resultReceiver: ResultReceiver? = null
+    private var reported = AtomicBoolean(false)
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         when (intent?.action) {
@@ -34,16 +36,45 @@ class RptVpnService : VpnService() {
                 val port = intent.getIntExtra(EXTRA_PORT, 44044)
                 val fullTunnel = intent.getBooleanExtra(EXTRA_FULL_TUNNEL, true)
                 val session = intent.getStringExtra(EXTRA_SESSION) ?: "Restore Privacy"
-                startForeground(NOTIFICATION_ID, buildNotification(session))
+                resultReceiver = extractReceiver(intent)
+                reported.set(false)
+                try {
+                    startForeground(NOTIFICATION_ID, buildNotification(session, connecting = true))
+                } catch (e: Exception) {
+                    report(false, "Foreground service failed: ${e.message}")
+                    stopSelf()
+                    return START_NOT_STICKY
+                }
                 startTunnel(host, port, fullTunnel, session)
             }
-            ACTION_DISCONNECT -> stopTunnel()
+            ACTION_DISCONNECT -> {
+                stopTunnel()
+            }
         }
         return START_STICKY
     }
 
+    private fun extractReceiver(intent: Intent): ResultReceiver? {
+        return if (Build.VERSION.SDK_INT >= 33) {
+            intent.getParcelableExtra(EXTRA_RECEIVER, ResultReceiver::class.java)
+        } else {
+            @Suppress("DEPRECATION")
+            intent.getParcelableExtra(EXTRA_RECEIVER)
+        }
+    }
+
+    private fun report(ok: Boolean, message: String, vpnIp: String = "") {
+        if (!reported.compareAndSet(false, true)) return
+        val b = Bundle()
+        b.putString(EXTRA_MESSAGE, message)
+        if (vpnIp.isNotEmpty()) b.putString(EXTRA_VPN_IP, vpnIp)
+        try {
+            resultReceiver?.send(if (ok) RESULT_OK else RESULT_ERR, b)
+        } catch (_: Exception) {
+        }
+    }
+
     private fun loadSecrets(): Pair<ByteArray, ByteArray>? {
-        // Prefer app filesDir/secrets (copied at install); fall back to assets
         val dir = File(filesDir, "secrets")
         val privF = File(dir, "client_ed25519.priv")
         val pubF = File(dir, "node_elgamal.pub")
@@ -53,6 +84,13 @@ class RptVpnService : VpnService() {
         return try {
             val priv = assets.open("secrets/client_ed25519.priv").readBytes()
             val pub = assets.open("secrets/node_elgamal.pub").readBytes()
+            // Seed filesDir for later updates
+            try {
+                dir.mkdirs()
+                if (!privF.exists()) privF.writeBytes(priv)
+                if (!pubF.exists()) pubF.writeBytes(pub)
+            } catch (_: Exception) {
+            }
             priv to pub
         } catch (_: Exception) {
             null
@@ -60,10 +98,18 @@ class RptVpnService : VpnService() {
     }
 
     private fun startTunnel(host: String, port: Int, fullTunnel: Boolean, sessionName: String) {
-        if (running.getAndSet(true)) return
+        if (running.getAndSet(true)) {
+            report(false, "VPN already connecting or connected")
+            return
+        }
         val secrets = loadSecrets()
         if (secrets == null) {
             running.set(false)
+            report(
+                false,
+                "Missing admission secrets — place client_ed25519.priv and node_elgamal.pub under app secrets",
+            )
+            stopForeground(STOP_FOREGROUND_REMOVE)
             stopSelf()
             return
         }
@@ -74,8 +120,16 @@ class RptVpnService : VpnService() {
             try {
                 protect(sock)
                 val engine = RptClientEngine(clientPriv, nodePub)
-                val session = engine.handshake(sock, host, port)
-                // Establish TUN with assigned VPN IP (full tunnel routes all traffic)
+                val session = try {
+                    engine.handshake(sock, host, port, timeoutMs = 20000)
+                } catch (e: Exception) {
+                    report(false, "RPT handshake failed: ${e.message ?: e.javaClass.simpleName}")
+                    running.set(false)
+                    stopForeground(STOP_FOREGROUND_REMOVE)
+                    stopSelf()
+                    return@thread
+                }
+
                 val builder = Builder()
                     .setSession(sessionName)
                     .setMtu(1280)
@@ -86,47 +140,71 @@ class RptVpnService : VpnService() {
                     builder.addRoute("0.0.0.0", 0)
                 }
                 try {
+                    // Keep our app off the VPN loop so UDP to node works
                     builder.addDisallowedApplication(packageName)
                 } catch (_: Exception) {
                 }
-                val pfd = builder.establish()
-                if (pfd == null) {
+                val pfd = try {
+                    builder.establish()
+                } catch (e: Exception) {
+                    report(false, "VpnService.establish failed: ${e.message}")
                     running.set(false)
+                    stopForeground(STOP_FOREGROUND_REMOVE)
+                    stopSelf()
+                    return@thread
+                }
+                if (pfd == null) {
+                    report(false, "VpnService.establish returned null — VPN permission or policy blocked TUN")
+                    running.set(false)
+                    stopForeground(STOP_FOREGROUND_REMOVE)
                     stopSelf()
                     return@thread
                 }
                 tun = pfd
+                startForeground(NOTIFICATION_ID, buildNotification(sessionName, connecting = false))
+                report(
+                    true,
+                    "Connected — RPT full tunnel up (VPN IP ${session.vpnIp})",
+                    session.vpnIp,
+                )
+
                 val inTun = FileInputStream(pfd.fileDescriptor)
                 val outTun = FileOutputStream(pfd.fileDescriptor)
                 val buf = ByteArray(32767)
                 sock.soTimeout = 50
                 val endpoint = InetSocketAddress(host, port)
                 while (running.get()) {
-                    // TUN -> seal RPT DATA -> UDP
-                    val avail = inTun.available()
-                    if (avail > 0) {
-                        val n = inTun.read(buf)
-                        if (n > 0) {
-                            val ip = buf.copyOf(n)
-                            val frame = engine.sealPacket(ip)
-                            sock.send(DatagramPacket(frame, frame.size, endpoint))
+                    try {
+                        val avail = inTun.available()
+                        if (avail > 0) {
+                            val n = inTun.read(buf)
+                            if (n > 0) {
+                                val frame = engine.sealPacket(buf.copyOf(n))
+                                sock.send(DatagramPacket(frame, frame.size, endpoint))
+                            }
                         }
+                    } catch (_: Exception) {
                     }
-                    // UDP -> open RPT DATA -> TUN
                     try {
                         val pkt = DatagramPacket(buf, buf.size)
                         sock.receive(pkt)
                         if (pkt.length > 5 && buf[4] == 0x03.toByte()) {
-                            val frame = buf.copyOf(pkt.length)
-                            val plain = engine.openPacket(frame)
+                            val plain = engine.openPacket(buf.copyOf(pkt.length))
                             outTun.write(plain)
                         }
                     } catch (_: Exception) {
                     }
                 }
-                inTun.close()
-                outTun.close()
-            } catch (_: Exception) {
+                try {
+                    inTun.close()
+                } catch (_: Exception) {
+                }
+                try {
+                    outTun.close()
+                } catch (_: Exception) {
+                }
+            } catch (e: Exception) {
+                report(false, "VPN tunnel error: ${e.message ?: e.javaClass.simpleName}")
             } finally {
                 try {
                     sock.close()
@@ -148,7 +226,10 @@ class RptVpnService : VpnService() {
         } catch (_: Exception) {
         }
         tun = null
-        stopForeground(STOP_FOREGROUND_REMOVE)
+        try {
+            stopForeground(STOP_FOREGROUND_REMOVE)
+        } catch (_: Exception) {
+        }
         stopSelf()
     }
 
@@ -157,7 +238,7 @@ class RptVpnService : VpnService() {
         super.onDestroy()
     }
 
-    private fun buildNotification(session: String): Notification {
+    private fun buildNotification(session: String, connecting: Boolean): Notification {
         val channelId = "rpt_vpn"
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             val nm = getSystemService(NotificationManager::class.java)
@@ -165,17 +246,22 @@ class RptVpnService : VpnService() {
                 NotificationChannel(channelId, "Restore Privacy VPN", NotificationManager.IMPORTANCE_LOW),
             )
         }
+        val text = if (connecting) {
+            "Connecting RPT tunnel…"
+        } else {
+            "Full VPN active — no user data retained"
+        }
         return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             Notification.Builder(this, channelId)
                 .setContentTitle(session)
-                .setContentText("Full VPN active — no user data retained")
+                .setContentText(text)
                 .setSmallIcon(android.R.drawable.ic_lock_lock)
                 .build()
         } else {
             @Suppress("DEPRECATION")
             Notification.Builder(this)
                 .setContentTitle(session)
-                .setContentText("Full VPN active — no user data retained")
+                .setContentText(text)
                 .setSmallIcon(android.R.drawable.ic_lock_lock)
                 .build()
         }
@@ -188,6 +274,11 @@ class RptVpnService : VpnService() {
         const val EXTRA_PORT = "port"
         const val EXTRA_FULL_TUNNEL = "fullTunnel"
         const val EXTRA_SESSION = "session"
+        const val EXTRA_RECEIVER = "receiver"
+        const val EXTRA_MESSAGE = "message"
+        const val EXTRA_VPN_IP = "vpnIp"
+        const val RESULT_OK = 0
+        const val RESULT_ERR = 1
         private const val NOTIFICATION_ID = 0x5250
     }
 }

@@ -1,7 +1,6 @@
-import 'dart:async';
-
 import 'package:flutter/services.dart';
 
+import 'connect_status.dart';
 import 'rpt_config.dart';
 
 /// Platform channel to Android VpnService / Windows plugin hooks.
@@ -29,21 +28,16 @@ class VpnController {
         'route': RptConfig.defaultRoute,
         'autoConnect': true,
       });
-      if (result is Map) {
-        final ok = result['ok'] == true;
-        onStatus(result['message']?.toString() ?? (ok ? 'Connected' : 'Failed'));
-        return ok;
-      }
-      onStatus('Connected');
-      return true;
+      final ok = isConnectSuccess(result);
+      onStatus(mapConnectStatusMessage(result));
+      return ok;
     } on PlatformException catch (e) {
-      onStatus('VPN error: ${e.message}');
+      onStatus('VPN error: ${e.message ?? e.code}');
       return false;
     } on MissingPluginException {
-      // Desktop/iOS prep without native plugin yet — surface honest status
       onStatus(
         'Native VPN channel not bound on this platform build; '
-        'RPT full-tunnel plugin will attach on Android/Windows release builds.',
+        'use the Android/Windows release client for full tunnel.',
       );
       return false;
     }
