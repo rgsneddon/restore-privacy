@@ -24,7 +24,7 @@ from client.ui_theme import (
     WINDOW_BG,
     WINDOW_FG,
 )
-from client.windows.tunnel_win import apply_full_tunnel_routes, is_admin
+from client.windows.tunnel_win import is_admin, start_full_tunnel
 
 
 class RetroClientApp:
@@ -95,6 +95,7 @@ class RetroClientApp:
         self.status.pack(fill=tk.X, side=tk.BOTTOM)
 
         self.client = RptClient(status_cb=self._on_status)
+        self._tunnel = None
         self._animate_scroll()
         # Auto-connect on launch — primary flow (no Connect button required)
         self.root.after(200, self._auto_connect)
@@ -130,21 +131,32 @@ class RetroClientApp:
 
         def work() -> None:
             result = self.client.auto_connect_on_launch()
+
             def done() -> None:
                 if result.ok and result.session and result.tunnel_plan:
                     self._log(f"Session OK — VPN IP {result.session.vpn_ip}")
-                    tun = apply_full_tunnel_routes(
+                    # Create TUN + start sealed RPT DATA plane (seal/open on real session)
+                    tun_res = start_full_tunnel(
+                        self.client,
                         result.tunnel_plan,
                         result.session.endpoint.host,
                     )
-                    self._log(tun.message)
-                    for c in tun.applied_commands[:6]:
+                    self._tunnel = tun_res
+                    self._log(tun_res.message)
+                    if tun_res.dataplane and tun_res.dataplane.is_running():
+                        self._log(
+                            f"DATA plane active (tun_mode={getattr(tun_res.tun, 'mode', '?')})"
+                        )
+                    for c in tun_res.applied_commands[:6]:
                         self._log(f"  plan: {c}")
-                    if self.client.state == ConnectState.CONNECTED:
+                    if self.client.state == ConnectState.CONNECTED and tun_res.ok:
                         self.status_var.set(f"CONNECTED — {result.session.vpn_ip}")
+                    else:
+                        self.status_var.set("CONNECTED (session) — check dataplane log")
                 else:
                     self._log(f"ERROR: {result.message}")
                     self.status_var.set("ERROR — see log")
+
             self.root.after(0, done)
 
         threading.Thread(target=work, daemon=True).start()

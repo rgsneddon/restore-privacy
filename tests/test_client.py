@@ -113,7 +113,7 @@ class TestUiTheme(unittest.TestCase):
         self.assertIn("0.0.0.0/0", cfg)
 
     def test_android_vpn_service_full_tunnel(self):
-        svc = (
+        base = (
             ROOT
             / "client_app"
             / "android"
@@ -124,11 +124,16 @@ class TestUiTheme(unittest.TestCase):
             / "com"
             / "restoreprivacy"
             / "restore_privacy_client"
-            / "RptVpnService.kt"
-        ).read_text(encoding="utf-8")
+        )
+        svc = (base / "RptVpnService.kt").read_text(encoding="utf-8")
+        engine = (base / "RptClientEngine.kt").read_text(encoding="utf-8")
         self.assertIn('addRoute("0.0.0.0", 0)', svc)
         self.assertIn("RptVpnService", svc)
         self.assertIn("fullTunnel", svc)
+        self.assertIn("engine.handshake", svc)
+        self.assertIn("engine.sealPacket", svc)
+        self.assertIn("fun handshake", engine)
+        self.assertIn("fun sealPacket", engine)
 
     def test_ios_mac_prep(self):
         self.assertTrue((ROOT / "client_app" / "ios" / "BUILD_ON_MAC.md").is_file())

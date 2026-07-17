@@ -7,6 +7,7 @@ import android.content.Intent
 import android.net.VpnService
 import android.os.Build
 import android.os.ParcelFileDescriptor
+import java.io.File
 import java.io.FileInputStream
 import java.io.FileOutputStream
 import java.net.DatagramPacket
@@ -16,13 +17,10 @@ import java.util.concurrent.atomic.AtomicBoolean
 import kotlin.concurrent.thread
 
 /**
- * Full-tunnel VPN service for Restore Privacy Tunnel (RPT).
+ * Full-tunnel VPN service for Restore Privacy Tunnel (RPT2).
  *
- * Establishes a platform VPN interface that captures **all** device traffic
- * (0.0.0.0/0). UDP RPT dataplane frames are exchanged with the node after the
- * authorized client handshake materials are present under app filesDir/secrets.
- *
- * Not WireGuard / not OpenVPN.
+ * Performs authorized CLIENT_HELLO (ElGamal+Pedersen+Ed25519), then seals all
+ * TUN IP packets as RPT DATA frames (ChaCha20-Poly1305). Not WireGuard/OpenVPN.
  */
 class RptVpnService : VpnService() {
     private var tun: ParcelFileDescriptor? = null
@@ -44,79 +42,97 @@ class RptVpnService : VpnService() {
         return START_STICKY
     }
 
-    private fun startTunnel(host: String, port: Int, fullTunnel: Boolean, session: String) {
-        if (running.getAndSet(true)) return
-        val builder = Builder()
-            .setSession(session)
-            .setMtu(1280)
-            .addAddress("10.88.0.2", 32)
-            .addDnsServer("1.1.1.1")
-            .addDnsServer("9.9.9.9")
-        // Full tunnel: all IPv4 traffic
-        if (fullTunnel) {
-            builder.addRoute("0.0.0.0", 0)
+    private fun loadSecrets(): Pair<ByteArray, ByteArray>? {
+        // Prefer app filesDir/secrets (copied at install); fall back to assets
+        val dir = File(filesDir, "secrets")
+        val privF = File(dir, "client_ed25519.priv")
+        val pubF = File(dir, "node_elgamal.pub")
+        if (privF.isFile && pubF.isFile) {
+            return privF.readBytes() to pubF.readBytes()
         }
-        // Exclude VPN server so handshake UDP is not looped (best-effort)
-        try {
-            builder.addDisallowedApplication(packageName)
+        return try {
+            val priv = assets.open("secrets/client_ed25519.priv").readBytes()
+            val pub = assets.open("secrets/node_elgamal.pub").readBytes()
+            priv to pub
         } catch (_: Exception) {
+            null
         }
+    }
 
-        tun = builder.establish()
-        if (tun == null) {
+    private fun startTunnel(host: String, port: Int, fullTunnel: Boolean, sessionName: String) {
+        if (running.getAndSet(true)) return
+        val secrets = loadSecrets()
+        if (secrets == null) {
             running.set(false)
             stopSelf()
             return
         }
+        val (clientPriv, nodePub) = secrets
 
         worker = thread(name = "rpt-dataplane", isDaemon = true) {
-            val pfd = tun ?: return@thread
-            val inTun = FileInputStream(pfd.fileDescriptor)
-            val outTun = FileOutputStream(pfd.fileDescriptor)
             val sock = DatagramSocket()
             try {
                 protect(sock)
-                sock.connect(InetSocketAddress(host, port))
-                // Send RPT2 magic probe so node sees authorized product client path intent.
-                // Full CRYPTO HELLO uses secrets when present (Python reference client is
-                // authoritative; this service keeps the full-tunnel interface up and relays).
-                val magic = byteArrayOf(0x52, 0x50, 0x54, 0x32) // RPT2
-                sock.send(DatagramPacket(magic, magic.size))
-
+                val engine = RptClientEngine(clientPriv, nodePub)
+                val session = engine.handshake(sock, host, port)
+                // Establish TUN with assigned VPN IP (full tunnel routes all traffic)
+                val builder = Builder()
+                    .setSession(sessionName)
+                    .setMtu(1280)
+                    .addAddress(session.vpnIp, 32)
+                    .addDnsServer("1.1.1.1")
+                    .addDnsServer("9.9.9.9")
+                if (fullTunnel) {
+                    builder.addRoute("0.0.0.0", 0)
+                }
+                try {
+                    builder.addDisallowedApplication(packageName)
+                } catch (_: Exception) {
+                }
+                val pfd = builder.establish()
+                if (pfd == null) {
+                    running.set(false)
+                    stopSelf()
+                    return@thread
+                }
+                tun = pfd
+                val inTun = FileInputStream(pfd.fileDescriptor)
+                val outTun = FileOutputStream(pfd.fileDescriptor)
                 val buf = ByteArray(32767)
+                sock.soTimeout = 50
+                val endpoint = InetSocketAddress(host, port)
                 while (running.get()) {
-                    // TUN -> UDP (raw IP packets will be sealed by full client crypto module)
-                    if (inTun.available() > 0) {
+                    // TUN -> seal RPT DATA -> UDP
+                    val avail = inTun.available()
+                    if (avail > 0) {
                         val n = inTun.read(buf)
                         if (n > 0) {
-                            sock.send(DatagramPacket(buf, n))
+                            val ip = buf.copyOf(n)
+                            val frame = engine.sealPacket(ip)
+                            sock.send(DatagramPacket(frame, frame.size, endpoint))
                         }
                     }
-                    // UDP -> TUN
-                    sock.soTimeout = 50
+                    // UDP -> open RPT DATA -> TUN
                     try {
                         val pkt = DatagramPacket(buf, buf.size)
                         sock.receive(pkt)
-                        if (pkt.length > 0) {
-                            outTun.write(buf, 0, pkt.length)
+                        if (pkt.length > 5 && buf[4] == 0x03.toByte()) {
+                            val frame = buf.copyOf(pkt.length)
+                            val plain = engine.openPacket(frame)
+                            outTun.write(plain)
                         }
                     } catch (_: Exception) {
                     }
                 }
+                inTun.close()
+                outTun.close()
             } catch (_: Exception) {
             } finally {
                 try {
                     sock.close()
                 } catch (_: Exception) {
                 }
-                try {
-                    inTun.close()
-                } catch (_: Exception) {
-                }
-                try {
-                    outTun.close()
-                } catch (_: Exception) {
-                }
+                running.set(false)
             }
         }
     }
@@ -124,7 +140,7 @@ class RptVpnService : VpnService() {
     private fun stopTunnel() {
         running.set(false)
         try {
-            worker?.join(1000)
+            worker?.join(1500)
         } catch (_: Exception) {
         }
         try {
