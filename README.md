@@ -43,6 +43,19 @@ pip install paramiko cryptography
 python scripts/deploy_rpt_node.py
 ```
 
+## Client apps
+
+| Platform | How to run |
+|----------|------------|
+| **Windows** | `python -m client.windows` (retro Win 3.1 UI, auto-connect; admin for full routes) |
+| **Android** | `cd client_app && flutter run` / `flutter build apk` |
+| **iOS / macOS** | Build on a Mac — see `client_app/ios/BUILD_ON_MAC.md` and `client_app/macos/BUILD_ON_MAC.md` |
+
+Copy node secrets into `./secrets/` (gitignored): `client_ed25519.priv`, `node_elgamal.pub`.
+
+Scrolling UI copy (exact):  
+`lightweight vpn to restore your privacy - no user data is retained - your privacy is restored`
+
 ## Local tests
 
 ```bash

@@ -1,10 +1,17 @@
 # Secrets / keys (never commit)
 secrets/
+**/secrets/
 *.pem
 *.key
 !*.pub.example
 .env
 .env.*
+client_app/**/secrets/
+
+# Flutter build artifacts
+client_app/build/
+client_app/.dart_tool/
+client_app/.flutter-plugins-dependencies
 
 # Python
 __pycache__/

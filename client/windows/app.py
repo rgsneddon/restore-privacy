@@ -1,0 +1,163 @@
+#!/usr/bin/env python3
+"""Windows RPT client — Win 3.1 retro CLI window, auto-connect on launch."""
+
+from __future__ import annotations
+
+import sys
+import threading
+import tkinter as tk
+from pathlib import Path
+
+# Repo root on path
+_ROOT = Path(__file__).resolve().parents[2]
+if str(_ROOT) not in sys.path:
+    sys.path.insert(0, str(_ROOT))
+
+from client.connect import ConnectState, RptClient
+from client.ui_theme import (
+    APP_TITLE,
+    BANNER_BG,
+    BANNER_FG,
+    BANNER_TITLE,
+    SCROLLING_PRIVACY_TEXT,
+    STATUS_FG,
+    WINDOW_BG,
+    WINDOW_FG,
+)
+from client.windows.tunnel_win import apply_full_tunnel_routes, is_admin
+
+
+class RetroClientApp:
+    """CLI-style window: dark blue banner, black bg, white text, scrolling privacy line."""
+
+    def __init__(self) -> None:
+        self.root = tk.Tk()
+        self.root.title(APP_TITLE)
+        self.root.geometry("640x360")
+        self.root.configure(bg=WINDOW_BG)
+        self.root.minsize(480, 280)
+
+        # Dark blue top banner (Windows 3.1-ish title bar)
+        self.banner = tk.Frame(self.root, bg=BANNER_BG, height=28)
+        self.banner.pack(fill=tk.X, side=tk.TOP)
+        self.banner.pack_propagate(False)
+        self.banner_label = tk.Label(
+            self.banner,
+            text=BANNER_TITLE,
+            bg=BANNER_BG,
+            fg=BANNER_FG,
+            font=("MS Sans Serif", 10, "bold"),
+            anchor="w",
+            padx=8,
+        )
+        self.banner_label.pack(fill=tk.BOTH, expand=True)
+
+        # Scrolling privacy text strip
+        self.scroll_frame = tk.Frame(self.root, bg=WINDOW_BG, height=22)
+        self.scroll_frame.pack(fill=tk.X)
+        self.scroll_frame.pack_propagate(False)
+        self.scroll_label = tk.Label(
+            self.scroll_frame,
+            text=SCROLLING_PRIVACY_TEXT,
+            bg=WINDOW_BG,
+            fg=WINDOW_FG,
+            font=("Consolas", 10),
+            anchor="w",
+        )
+        self.scroll_label.place(x=0, y=2)
+        self._scroll_x = 640
+        self._scroll_text = SCROLLING_PRIVACY_TEXT + "   ·   "
+
+        # Main CLI output area
+        self.output = tk.Text(
+            self.root,
+            bg=WINDOW_BG,
+            fg=WINDOW_FG,
+            insertbackground=WINDOW_FG,
+            font=("Consolas", 11),
+            relief=tk.FLAT,
+            wrap=tk.WORD,
+            state=tk.DISABLED,
+        )
+        self.output.pack(fill=tk.BOTH, expand=True, padx=6, pady=6)
+
+        self.status_var = tk.StringVar(value="Launching…")
+        self.status = tk.Label(
+            self.root,
+            textvariable=self.status_var,
+            bg=WINDOW_BG,
+            fg=STATUS_FG,
+            font=("Consolas", 9),
+            anchor="w",
+            padx=8,
+            pady=4,
+        )
+        self.status.pack(fill=tk.X, side=tk.BOTTOM)
+
+        self.client = RptClient(status_cb=self._on_status)
+        self._animate_scroll()
+        # Auto-connect on launch — primary flow (no Connect button required)
+        self.root.after(200, self._auto_connect)
+
+    def _log(self, line: str) -> None:
+        self.output.configure(state=tk.NORMAL)
+        self.output.insert(tk.END, line + "\n")
+        self.output.see(tk.END)
+        self.output.configure(state=tk.DISABLED)
+
+    def _on_status(self, msg: str) -> None:
+        def ui() -> None:
+            self.status_var.set(msg)
+            self._log(msg)
+
+        self.root.after(0, ui)
+
+    def _animate_scroll(self) -> None:
+        self._scroll_x -= 2
+        full = self._scroll_text * 3
+        self.scroll_label.configure(text=full)
+        self.scroll_label.place(x=self._scroll_x, y=2)
+        if self._scroll_x < -len(self._scroll_text) * 7:
+            self._scroll_x = self.root.winfo_width() or 640
+        self.root.after(40, self._animate_scroll)
+
+    def _auto_connect(self) -> None:
+        self._log("RESTORE PRIVACY tunnel client")
+        self._log(SCROLLING_PRIVACY_TEXT)
+        self._log("Auto-connect on launch…")
+        if not is_admin():
+            self._log("Note: run as Administrator for full system VPN routes.")
+
+        def work() -> None:
+            result = self.client.auto_connect_on_launch()
+            def done() -> None:
+                if result.ok and result.session and result.tunnel_plan:
+                    self._log(f"Session OK — VPN IP {result.session.vpn_ip}")
+                    tun = apply_full_tunnel_routes(
+                        result.tunnel_plan,
+                        result.session.endpoint.host,
+                    )
+                    self._log(tun.message)
+                    for c in tun.applied_commands[:6]:
+                        self._log(f"  plan: {c}")
+                    if self.client.state == ConnectState.CONNECTED:
+                        self.status_var.set(f"CONNECTED — {result.session.vpn_ip}")
+                else:
+                    self._log(f"ERROR: {result.message}")
+                    self.status_var.set("ERROR — see log")
+            self.root.after(0, done)
+
+        threading.Thread(target=work, daemon=True).start()
+
+    def run(self) -> None:
+        self.root.mainloop()
+
+
+def main() -> int:
+    app = RetroClientApp()
+    app.run()
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

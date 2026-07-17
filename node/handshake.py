@@ -157,19 +157,27 @@ def node_complete_hello(
     session_id = os.urandom(8)
     server_nonce = os.urandom(32)
     s_commit, s_opening = commit_bytes(server_nonce)
-    shared = hashlib.sha256(client_nonce + server_nonce + session_id + client_pub).digest()
-    crypto = SessionCrypto(key=derive_session_key(shared, salt=client_nonce[:16]))
+    # SERVER_HELLO is sealed under a key derivable from client_nonce alone
+    # (client does not yet know server_nonce). Session AEAD rekeys after open.
+    hello_shared = hashlib.sha256(client_nonce + client_pub + b"|hello").digest()
+    hello_crypto = SessionCrypto(
+        key=derive_session_key(hello_shared, salt=client_nonce[:16], info=b"rpt-v2-hello")
+    )
+    session_shared = hashlib.sha256(client_nonce + server_nonce + session_id + client_pub).digest()
+    crypto = SessionCrypto(
+        key=derive_session_key(session_shared, salt=client_nonce[:16], info=b"rpt-v2-session")
+    )
 
     parts = [int(x) for x in vpn_ip.split(".")]
     plain = server_nonce + s_opening.export() + bytes(parts)
     aad = b"RPT2-SERVER-HELLO" + session_id
-    nonce, sealed = crypto.seal(plain, aad=aad)
+    nonce, sealed = hello_crypto.seal(plain, aad=aad)
     reply = pack_server_hello(s_commit.export(), session_id, nonce, sealed)
     result = HandshakeResult(
         session_id=session_id,
         crypto=crypto,
         client_pub=client_pub,
-        shared_probe=shared,
+        shared_probe=session_shared,
     )
     return reply, result
 
