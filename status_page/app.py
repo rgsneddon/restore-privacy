@@ -13,6 +13,7 @@ import urllib.error
 import urllib.request
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
+from coffee_link import coffee_link_css, render_coffee_link_html
 from connect_web import (
     connect_via_web_css,
     connect_via_web_script,
@@ -140,6 +141,7 @@ def render_html(status: dict, poll_ms: int | None = None) -> bytes:
     .hint {{ margin-top:1rem; font-size:0.85rem; opacity:0.55; }}
     {download_css()}
     {connect_via_web_css()}
+    {coffee_link_css()}
   </style>
 </head>
 <body>
@@ -149,6 +151,7 @@ def render_html(status: dict, poll_ms: int | None = None) -> bytes:
   <div class="hint">Live count · updates automatically</div>
   {render_connect_via_web_html()}
   {render_download_section_html()}
+  {render_coffee_link_html()}
   <script>
 (function () {{
   var el = document.getElementById('clients-connected');
