@@ -110,6 +110,31 @@ class TestHostAndExtensionEntitlements(unittest.TestCase):
             text = (APP / rel).read_text(encoding="utf-8")
             self.assertIn(f'providerBundleId = "{TUNNEL_BUNDLE}"', text)
 
+    def test_packet_tunnel_team_signing_enabled(self):
+        """PacketTunnel must Team-sign so the OS can load the NE (not ad-hoc only)."""
+        for rel in (
+            "ios/Runner.xcodeproj/project.pbxproj",
+            "macos/Runner.xcodeproj/project.pbxproj",
+        ):
+            pbx = (APP / rel).read_text(encoding="utf-8")
+            # PacketTunnel configs: ALLOWED/REQUIRED YES with product bundle
+            self.assertIn(f"PRODUCT_BUNDLE_IDENTIFIER = {TUNNEL_BUNDLE};", pbx)
+            self.assertIn("CODE_SIGNING_ALLOWED = YES;", pbx)
+            self.assertIn("CODE_SIGNING_REQUIRED = YES;", pbx)
+            # Ad-hoc re-sign must not run when Team signing is on
+            self.assertIn("skip ad-hoc re-sign", pbx)
+            self.assertIn("CODE_SIGNING_ALLOWED", pbx)
+
+    def test_packet_tunnel_info_plist_extension_point(self):
+        for rel in (
+            "ios/PacketTunnel/Info.plist",
+            "macos/PacketTunnel/Info.plist",
+        ):
+            text = (APP / rel).read_text(encoding="utf-8")
+            self.assertIn("com.apple.networkextension.packet-tunnel", text)
+            self.assertIn("PacketTunnelProvider", text)
+            self.assertIn("NEProviderClasses", text)
+
 
 class TestOperatorChecklistDocs(unittest.TestCase):
     def test_apple_build_operator_checklist(self):
@@ -126,7 +151,7 @@ class TestOperatorChecklistDocs(unittest.TestCase):
         for needle in (
             "Developer portal",
             "Xcode",
-            "PacketTunnel code signing",
+            "PacketTunnel target",
             "Secrets",
             "Build and run",
             "Confirm residual public IP",

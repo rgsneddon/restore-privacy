@@ -33,7 +33,7 @@ open macos/Runner.xcworkspace
 - Host: `Runner/DebugProfile.entitlements` + `Runner/Release.entitlements` include `packet-tunnel-provider` + App Group.  
 - Extension: `PacketTunnel/PacketTunnel.entitlements` same NE + App Group.  
 
-**Your steps:** Developer portal App IDs → Xcode Team + Automatic Signing → set PacketTunnel `CODE_SIGNING_ALLOWED=YES` for real VPN. Full ordered list: [APPLE_BUILD.md — Operator checklist](../APPLE_BUILD.md#operator-checklist--enable-real-packet-tunnel-vpn).
+**Your steps:** Developer portal App IDs (host + `.PacketTunnel`) → Xcode Team + Automatic Signing on Runner and PacketTunnel → run. PacketTunnel Team signing is already enabled in the project. Full ordered list: [APPLE_BUILD.md — Operator checklist](../APPLE_BUILD.md#operator-checklist--enable-real-packet-tunnel-vpn).
 
 ## 3. Packet Tunnel extension
 
@@ -90,9 +90,9 @@ Same Flutter UI and auto-connect as Windows/Android (`lib/main.dart`):
 
 ## 7. Signing Packet Tunnel for system VPN
 
-- Target already has `CODE_SIGN_ENTITLEMENTS = PacketTunnel/PacketTunnel.entitlements` (packet-tunnel + App Group + sandbox network).  
-- Local builds use `CODE_SIGNING_ALLOWED = NO` when no NE profile is available so `flutter build macos` succeeds.  
-- For real system VPN: enable Team, set `CODE_SIGNING_ALLOWED = YES`, embed `PacketTunnel.appex`, and grant Network Extension + App Groups in the Developer portal.
+- Target has `CODE_SIGN_ENTITLEMENTS = PacketTunnel/PacketTunnel.entitlements` (packet-tunnel + App Group + sandbox network).  
+- `CODE_SIGNING_ALLOWED = YES` / `CODE_SIGNING_REQUIRED = YES` with team `SFCBP95595` (requires portal App ID + Network Extensions).  
+- `PacketTunnel.appex` is embedded in Runner; provider class is `PacketTunnelProvider`.
 
 ## 8. Gatekeeper / malware dialog (distribution)
 

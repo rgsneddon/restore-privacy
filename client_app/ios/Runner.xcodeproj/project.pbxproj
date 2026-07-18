@@ -493,13 +493,19 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
-			shellScript = "# Sign appex ad-hoc so Runner can embed without NE provisioning profile.
-# CODE_SIGN_ENTITLEMENTS remains set for production Team signing.
+			shellScript = "# Team-signed Packet Tunnel: do nothing (Xcode already signed with NE entitlements).
+# Ad-hoc only when CODE_SIGNING_ALLOWED=NO (unsigned CI / no NE profile).
 set -e
 APPX=\"${TARGET_BUILD_DIR}/${FULL_PRODUCT_NAME}\"
-if [ -d \"$APPX\" ]; then
-  echo \"Ad-hoc signing $APPX\"
+if [ ! -d \"$APPX\" ]; then
+  exit 0
+fi
+if [ \"${CODE_SIGNING_ALLOWED}\" = \"NO\" ] || [ \"${CODE_SIGNING_ALLOWED}\" = \"no\" ]; then
+  echo \"Ad-hoc signing PacketTunnel (CODE_SIGNING_ALLOWED=NO): $APPX\"
   /usr/bin/codesign --force --sign - --timestamp=none \"$APPX\"
+  /usr/bin/codesign --verify --verbose \"$APPX\" || true
+else
+  echo \"PacketTunnel Team-signed (CODE_SIGNING_ALLOWED=${CODE_SIGNING_ALLOWED}); skip ad-hoc re-sign: $APPX\"
   /usr/bin/codesign --verify --verbose \"$APPX\" || true
 fi
 ";
@@ -739,6 +745,8 @@ fi
 			buildSettings = {
 				CODE_SIGN_ENTITLEMENTS = Runner/Runner.entitlements;
 				DEVELOPMENT_TEAM = SFCBP95595;
+				CODE_SIGN_IDENTITY = "Apple Development";
+				CODE_SIGN_STYLE = Automatic;
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CLANG_ENABLE_MODULES = YES;
 				CURRENT_PROJECT_VERSION = "$(FLUTTER_BUILD_NUMBER)";
@@ -920,6 +928,8 @@ fi
 			buildSettings = {
 				CODE_SIGN_ENTITLEMENTS = Runner/Runner.entitlements;
 				DEVELOPMENT_TEAM = SFCBP95595;
+				CODE_SIGN_IDENTITY = "Apple Development";
+				CODE_SIGN_STYLE = Automatic;
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CLANG_ENABLE_MODULES = YES;
 				CURRENT_PROJECT_VERSION = "$(FLUTTER_BUILD_NUMBER)";
@@ -944,6 +954,8 @@ fi
 			buildSettings = {
 				CODE_SIGN_ENTITLEMENTS = Runner/Runner.entitlements;
 				DEVELOPMENT_TEAM = SFCBP95595;
+				CODE_SIGN_IDENTITY = "Apple Development";
+				CODE_SIGN_STYLE = Automatic;
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CLANG_ENABLE_MODULES = YES;
 				CURRENT_PROJECT_VERSION = "$(FLUTTER_BUILD_NUMBER)";
@@ -976,8 +988,10 @@ fi
 				);
 				MARKETING_VERSION = 1.0;
 				CODE_SIGN_ENTITLEMENTS = PacketTunnel/PacketTunnel.entitlements;
-				CODE_SIGNING_ALLOWED = NO;
-				CODE_SIGNING_REQUIRED = NO;
+				CODE_SIGN_IDENTITY = "Apple Development";
+				CODE_SIGN_STYLE = Automatic;
+				CODE_SIGNING_ALLOWED = YES;
+				CODE_SIGNING_REQUIRED = YES;
 				DEVELOPMENT_TEAM = SFCBP95595;
 				PRODUCT_BUNDLE_IDENTIFIER = com.restoreprivacy.restorePrivacyClient.PacketTunnel;
 				PRODUCT_NAME = "$(TARGET_NAME)";
@@ -1004,8 +1018,10 @@ fi
 				);
 				MARKETING_VERSION = 1.0;
 				CODE_SIGN_ENTITLEMENTS = PacketTunnel/PacketTunnel.entitlements;
-				CODE_SIGNING_ALLOWED = NO;
-				CODE_SIGNING_REQUIRED = NO;
+				CODE_SIGN_IDENTITY = "Apple Development";
+				CODE_SIGN_STYLE = Automatic;
+				CODE_SIGNING_ALLOWED = YES;
+				CODE_SIGNING_REQUIRED = YES;
 				DEVELOPMENT_TEAM = SFCBP95595;
 				PRODUCT_BUNDLE_IDENTIFIER = com.restoreprivacy.restorePrivacyClient.PacketTunnel;
 				PRODUCT_NAME = "$(TARGET_NAME)";
@@ -1032,8 +1048,10 @@ fi
 				);
 				MARKETING_VERSION = 1.0;
 				CODE_SIGN_ENTITLEMENTS = PacketTunnel/PacketTunnel.entitlements;
-				CODE_SIGNING_ALLOWED = NO;
-				CODE_SIGNING_REQUIRED = NO;
+				CODE_SIGN_IDENTITY = "Apple Development";
+				CODE_SIGN_STYLE = Automatic;
+				CODE_SIGNING_ALLOWED = YES;
+				CODE_SIGNING_REQUIRED = YES;
 				DEVELOPMENT_TEAM = SFCBP95595;
 				PRODUCT_BUNDLE_IDENTIFIER = com.restoreprivacy.restorePrivacyClient.PacketTunnel;
 				PRODUCT_NAME = "$(TARGET_NAME)";

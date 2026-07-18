@@ -105,7 +105,7 @@ Host + Packet Tunnel plists already declare the real product IDs:
 | `macos/PacketTunnel/PacketTunnel.entitlements` | `packet-tunnel-provider` + App Group |
 | `ios/PacketTunnel/PacketTunnel.entitlements` | same |
 
-Packet Tunnel targets still default to `CODE_SIGNING_ALLOWED = NO` so unsigned CI builds succeed. **For residual-IP VPN you must set signing to YES** (step 3 below).
+Packet Tunnel targets are configured for **Team signing** (`CODE_SIGNING_ALLOWED = YES`, `CODE_SIGNING_REQUIRED = YES`, team `SFCBP95595`). The old ad-hoc re-sign step only runs when signing is explicitly disabled.
 
 ## Operator checklist — enable real Packet Tunnel VPN
 
@@ -139,20 +139,19 @@ For **Runner** and **PacketTunnel** on each platform:
 3. Confirm capabilities appear (Network Extensions / Packet Tunnel, App Groups). If Xcode offers to “fix” entitlements mismatches, prefer keeping the repo plists above.
 4. Confirm provider bundle id stays `com.restoreprivacy.restorePrivacyClient.PacketTunnel` (matches `RptVpnChannel.providerBundleId`).
 
-### 3. Enable PacketTunnel code signing (required for system VPN)
+### 3. PacketTunnel target (already in the repo)
 
-In Xcode → **PacketTunnel** target → **Build Settings** (all configurations Debug / Release / Profile):
+The **PacketTunnel** app extension is already created and embedded:
 
-| Setting | Set to |
-|---------|--------|
-| **Code Signing Allowed** (`CODE_SIGNING_ALLOWED`) | **YES** |
-| **Code Signing Required** (`CODE_SIGNING_REQUIRED`) | **YES** |
-| **Development Team** | `SFCBP95595` |
-| **Code Signing Entitlements** | `PacketTunnel/PacketTunnel.entitlements` |
+| Item | Value |
+|------|--------|
+| Bundle ID | `com.restoreprivacy.restorePrivacyClient.PacketTunnel` |
+| Provider class | `PacketTunnelProvider` (`NativePrep/PacketTunnelProvider.swift`) |
+| Entitlements | `PacketTunnel/PacketTunnel.entitlements` (NE + App Group) |
+| Code signing | `CODE_SIGNING_ALLOWED = YES`, team `SFCBP95595` |
+| Embed | Runner → **Embed Foundation Extensions** → `PacketTunnel.appex` |
 
-Leave them **NO** only for unsigned CI; residual public IP will **not** change with ad-hoc / unsigned extensions.
-
-Also confirm **Runner → Build Phases → Embed Foundation Extensions** lists `PacketTunnel.appex`.
+**You only need to:** open the workspace, pick Team on Runner + PacketTunnel (Automatic Signing), and ensure the portal App ID for `.PacketTunnel` exists with Network Extensions + App Group. If Xcode shows a profile error, fix the portal App ID — do not create a second Packet Tunnel target.
 
 ### 4. Secrets the extension can read
 
