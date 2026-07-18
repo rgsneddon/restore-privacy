@@ -28,6 +28,14 @@ NODE_PUB_NAME = "node_elgamal.pub"
 # Never load or expect node private key on the client
 NODE_PRIV_NAME = "node_elgamal.priv"
 
+# SHA-256 of pre-0.1.3 universal product client_ed25519.priv (shipped in every install).
+# Any install still holding these bytes must rotate — even when packages no longer embed the file.
+KNOWN_SHARED_CLIENT_PRIV_SHA256: frozenset[str] = frozenset(
+    {
+        "f92ffc989f976ae75632c2def7dd0500749bcc8b6e82c590ed70414a3233fa7a",
+    }
+)
+
 
 class SecretsError(FileNotFoundError):
     pass
@@ -200,14 +208,23 @@ def generate_and_persist_device_key(dest_dir: Path) -> Ed25519PrivateKey:
     return cpriv
 
 
+def client_priv_sha256_hex(raw: bytes) -> str:
+    import hashlib
+
+    return hashlib.sha256(raw).hexdigest().lower()
+
+
+def is_known_shared_client_priv(raw: bytes) -> bool:
+    """True for denylisted pre-0.1.3 universal product keys (impersonation risk)."""
+    if len(raw) != 32:
+        return False
+    return client_priv_sha256_hex(raw) in KNOWN_SHARED_CLIENT_PRIV_SHA256
+
+
 def priv_matches_any_package_resident_key(
     raw: bytes, candidates: list[Path] | None = None
 ) -> bool:
-    """True if ``raw`` equals a client_ed25519.priv under a package/read-only tree.
-
-    Used to rotate leftover shared product keys after upgrades from old installers
-    that embedded the same priv for every user.
-    """
+    """True if ``raw`` equals a client_ed25519.priv under a package/read-only tree."""
     if len(raw) != 32:
         return False
     for d in candidates if candidates is not None else candidate_secrets_dirs():
@@ -222,27 +239,38 @@ def priv_matches_any_package_resident_key(
     return False
 
 
-def _rotate_device_key_if_shared(dest: Path, candidates: list[Path] | None = None) -> None:
-    """If dest holds a priv that matches package-resident shared material, regenerate."""
+def must_rotate_client_priv(
+    raw: bytes, candidates: list[Path] | None = None
+) -> bool:
+    """True when this priv must not be reused as a per-device identity."""
+    if is_known_shared_client_priv(raw):
+        return True
+    return priv_matches_any_package_resident_key(raw, candidates)
+
+
+def _rotate_device_key_if_shared(dest: Path, candidates: list[Path] | None = None) -> bool:
+    """If dest holds a shared/universal product priv, regenerate. Returns True if rotated."""
     priv_path = dest / CLIENT_PRIV_NAME
     if not priv_path.is_file():
-        return
+        return False
     try:
         raw = priv_path.read_bytes()
     except OSError:
-        return
-    if priv_matches_any_package_resident_key(raw, candidates):
-        try:
-            priv_path.unlink()
-        except OSError:
-            pass
-        pub = dest / CLIENT_PUB_NAME
-        try:
-            if pub.is_file():
-                pub.unlink()
-        except OSError:
-            pass
-        generate_and_persist_device_key(dest)
+        return False
+    if not must_rotate_client_priv(raw, candidates):
+        return False
+    try:
+        priv_path.unlink()
+    except OSError:
+        pass
+    pub = dest / CLIENT_PUB_NAME
+    try:
+        if pub.is_file():
+            pub.unlink()
+    except OSError:
+        pass
+    generate_and_persist_device_key(dest)
+    return True
 
 
 def ensure_device_admission_key(
@@ -251,29 +279,36 @@ def ensure_device_admission_key(
     """Ensure local device Ed25519 priv + node pub are available; generate priv if missing.
 
     Returns the secrets directory that holds both files.
-    Idempotent: second call reuses the same private key bytes (unless that key
-    is detected as a leftover shared package priv — then rotate once).
+    Idempotent for real per-device keys; **always rotates** denylisted shared product
+    keys (and package-resident matches) — including the Connect path that passes an
+    explicit secrets directory.
 
     When ``secrets_dir`` is set explicitly, bootstrap is confined to that directory
     (node pub must already be present there) so tests and custom installs do not
-    leak keys from other candidate paths.
+    leak keys from other candidate paths — except shared-key rotation still applies.
     """
     if secrets_dir is not None:
+        # Product Connect always uses this path (RptClient.secrets_dir may be set).
         dest = Path(secrets_dir)
         dest.mkdir(parents=True, exist_ok=True)
-        if dir_has_client_secrets(dest):
-            return dest
         if not (dest / NODE_PUB_NAME).is_file():
             raise SecretsError(
                 f"secrets dir incomplete: {dest} "
                 f"(need {NODE_PUB_NAME}; device {CLIENT_PRIV_NAME} is auto-generated)"
             )
-        if not (dest / CLIENT_PRIV_NAME).is_file():
-            generate_and_persist_device_key(dest)
-        else:
+        if (dest / CLIENT_PRIV_NAME).is_file():
             raw = (dest / CLIENT_PRIV_NAME).read_bytes()
             if len(raw) != 32:
                 raise SecretsError(f"{CLIENT_PRIV_NAME} must be 32 raw bytes")
+            # Rotate denylisted shared keys even when package trees no longer ship .priv
+            _rotate_device_key_if_shared(dest, candidate_secrets_dirs(dest))
+        else:
+            generate_and_persist_device_key(dest)
+        if not dir_has_client_secrets(dest):
+            raise SecretsError(
+                f"Failed to prepare device secrets in {dest} "
+                f"(need {CLIENT_PRIV_NAME} and {NODE_PUB_NAME})"
+            )
         return dest
 
     candidates = candidate_secrets_dirs()

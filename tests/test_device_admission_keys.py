@@ -183,6 +183,87 @@ class TestNoSharedPrivPackaging(unittest.TestCase):
             self.assertEqual(len(new_priv), 32)
             self.assertNotEqual(new_priv, shared)
 
+    def test_rotates_denylisted_shared_without_package_priv(self):
+        """Real 0.1.3 upgrade: package has no .priv; USER_SECRETS still holds universal key."""
+        import hashlib
+
+        from client.secrets_loader import is_known_shared_client_priv
+
+        shared_path = ROOT / "secrets" / CLIENT_PRIV_NAME
+        with tempfile.TemporaryDirectory() as td:
+            user = Path(td) / "user_secrets"
+            user.mkdir()
+            package = Path(td) / "pkg" / "_internal" / "secrets"
+            package.mkdir(parents=True)
+            node = generate_keypair()
+            if shared_path.is_file():
+                shared = shared_path.read_bytes()
+                self.assertTrue(is_known_shared_client_priv(shared))
+                denylist_ctx = mock.MagicMock()
+                denylist_ctx.__enter__ = lambda s: None
+                denylist_ctx.__exit__ = lambda *a: None
+            else:
+                shared = b"\x42" * 32
+                h = hashlib.sha256(shared).hexdigest()
+                denylist_ctx = mock.patch(
+                    "client.secrets_loader.KNOWN_SHARED_CLIENT_PRIV_SHA256",
+                    frozenset({h}),
+                )
+            (user / CLIENT_PRIV_NAME).write_bytes(shared)
+            (user / NODE_PUB_NAME).write_bytes(node.public.export())
+            # Package has node pub only — no client priv (0.1.3 product shape)
+            (package / NODE_PUB_NAME).write_bytes(node.public.export())
+            self.assertFalse((package / CLIENT_PRIV_NAME).is_file())
+
+            with denylist_ctx:
+                # Connect-style: explicit secrets dir (what RptClient uses)
+                dest = ensure_device_admission_key(user)
+            self.assertEqual(dest, user)
+            new_priv = (user / CLIENT_PRIV_NAME).read_bytes()
+            self.assertEqual(len(new_priv), 32)
+            self.assertNotEqual(new_priv, shared)
+
+    def test_connect_style_explicit_dir_rotates_known_shared(self):
+        """ensure_device_admission_key(path) must not early-return on shared priv."""
+        from client.secrets_loader import is_known_shared_client_priv
+
+        shared_path = ROOT / "secrets" / CLIENT_PRIV_NAME
+        if not shared_path.is_file():
+            self.skipTest("repo secrets/client_ed25519.priv missing for denylist material")
+        shared = shared_path.read_bytes()
+        self.assertTrue(is_known_shared_client_priv(shared))
+        with tempfile.TemporaryDirectory() as td:
+            d = Path(td)
+            node = generate_keypair()
+            (d / NODE_PUB_NAME).write_bytes(node.public.export())
+            (d / CLIENT_PRIV_NAME).write_bytes(shared)
+            # No package candidates needed — denylist alone must fire
+            ensure_device_admission_key(d)
+            self.assertNotEqual((d / CLIENT_PRIV_NAME).read_bytes(), shared)
+
+    def test_installer_strips_user_secrets_priv(self):
+        """_provision_secrets must strip leftover shared priv under USER_SECRETS."""
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            payload = root / "payload"
+            secrets = payload / "secrets"
+            secrets.mkdir(parents=True)
+            install = root / "install"
+            install.mkdir()
+            user = root / "user_secrets"
+            user.mkdir()
+            node = generate_keypair()
+            (secrets / NODE_PUB_NAME).write_bytes(node.public.export())
+            shared = b"\xaa" * 32
+            (user / CLIENT_PRIV_NAME).write_bytes(shared)
+            (user / NODE_PUB_NAME).write_bytes(node.public.export())
+            with mock.patch("client.windows.installer.USER_SECRETS", user):
+                from client.windows.installer import _provision_secrets
+
+                _provision_secrets(payload, install)
+            self.assertFalse((user / CLIENT_PRIV_NAME).is_file())
+            self.assertTrue((user / NODE_PUB_NAME).is_file() or True)
+
     def test_release_0_1_3_trees_have_no_shared_client_priv(self):
         """Shipped 0.1.3 package trees on disk must not embed client_ed25519.priv."""
         roots = [

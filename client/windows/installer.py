@@ -144,8 +144,10 @@ def _provision_secrets(payload_dir: Path, install_dir: Path) -> list[str]:
                 target.write_bytes(sp.read_bytes())
                 written.append(str(target))
 
-    # Strip package-resident shared priv everywhere under install (incl. _internal)
+    # Strip package-resident shared priv under install (incl. _internal) AND user secrets.
+    # USER_SECRETS may still hold the pre-0.1.3 universal client_ed25519.priv after upgrade.
     strip_all_private_keys(install_dir)
+    strip_all_private_keys(USER_SECRETS)
     return written
 
 
