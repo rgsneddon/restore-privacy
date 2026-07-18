@@ -24,17 +24,23 @@ class TestElevateHelpers(unittest.TestCase):
         with mock.patch.object(sys, "frozen", True, create=True), mock.patch.object(
             sys, "executable", r"C:\Apps\RestorePrivacy.exe"
         ), mock.patch.object(sys, "argv", [r"C:\Apps\RestorePrivacy.exe", "--foo"]):
-            exe, params = elev.launch_argv_for_elevation()
+            exe, params, cwd = elev.launch_argv_for_elevation()
             self.assertTrue(exe.lower().endswith("restoreprivacy.exe"))
             self.assertIn("--foo", params)
+            self.assertTrue(cwd)
 
         with mock.patch.object(sys, "frozen", False, create=True), mock.patch.object(
             sys, "executable", sys.executable
         ), mock.patch.object(sys, "argv", ["client/windows/__main__.py"]):
-            exe, params = elev.launch_argv_for_elevation()
+            exe, params, cwd = elev.launch_argv_for_elevation()
             self.assertIn("python", Path(exe).name.lower() or True)
             self.assertIn("-m", params)
             self.assertIn("client.windows", params)
+            # Dev elevate must use repo root as cwd or import fails silently
+            self.assertTrue(
+                (Path(cwd) / "client" / "windows").is_dir(),
+                f"dev elevate cwd should be repo root, got {cwd}",
+            )
 
     def test_elevate_skipped_when_disabled(self):
         with mock.patch.dict(os.environ, {"RPT_NO_AUTO_ELEVATE": "1"}, clear=False):
@@ -52,17 +58,22 @@ class TestElevateHelpers(unittest.TestCase):
         with mock.patch.dict(os.environ, {}, clear=False):
             os.environ.pop("RPT_NO_AUTO_ELEVATE", None)
             with mock.patch.object(elev, "is_admin", return_value=False), mock.patch.object(
-                elev, "launch_argv_for_elevation", return_value=(r"C:\x\app.exe", "")
+                elev,
+                "launch_argv_for_elevation",
+                return_value=(r"C:\x\app.exe", "", r"C:\x"),
             ), mock.patch.object(elev, "_shell_execute_runas", return_value=42) as se:
                 st = elev.elevate_if_needed()
                 self.assertEqual(st, "relaunched")
                 se.assert_called_once()
-                # runas verb used
+                # cwd passed to ShellExecute
+                self.assertEqual(se.call_args[1].get("cwd") or se.call_args[0][2], r"C:\x")
                 self.assertTrue(elev.should_exit_after_elevation(st))
 
     def test_elevate_uac_cancelled(self):
         with mock.patch.object(elev, "is_admin", return_value=False), mock.patch.object(
-            elev, "launch_argv_for_elevation", return_value=(r"C:\x\app.exe", "")
+            elev,
+            "launch_argv_for_elevation",
+            return_value=(r"C:\x\app.exe", "", r"C:\x"),
         ), mock.patch.object(elev, "_shell_execute_runas", return_value=-1223):
             os.environ.pop("RPT_NO_AUTO_ELEVATE", None)
             st = elev.elevate_if_needed()
