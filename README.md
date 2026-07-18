@@ -18,46 +18,60 @@
 - **Auto-connect** when you open the app (no separate “Connect” step)
 - Scrolling message:  
   `lightweight vpn to restore your privacy - no user data is retained - your privacy is restored`
-- Full-device VPN on supported platforms (Windows / Android), subject to OS permissions
-- Live status page with **currently connected** client count and installers
+- Full-device VPN on **Windows, Android, iOS, and macOS** when the OS grants VPN permission and (on Apple platforms) Network Extension signing is configured
+- Live status page with **currently connected** client count and installers for all four platforms
 
 ---
 
 ## How to install and use
 
+Download packages from the **[0.0.9 release](https://github.com/rgsneddon/restore-privacy/releases/tag/0.0.9)**  
+or use the buttons on https://restore-privacy-status.onrender.com/
+
+| Platform | Package |
+|----------|---------|
+| Windows | `restore-privacy-client-0.0.9-windows-x64-setup.exe` |
+| Android | `restore-privacy-client-0.0.9-android.apk` |
+| macOS | `restore-privacy-client-0.0.9-macos.zip` |
+| iOS | `restore-privacy-client-0.0.9-ios.zip` |
+
 ### Windows
 
-1. Download the **Windows installer (.exe)** from the [0.0.9 release](https://github.com/rgsneddon/restore-privacy/releases/tag/0.0.9)  
-   or use the button on https://restore-privacy-status.onrender.com/
+1. Download the **Windows installer (.exe)** from the release or status page.
 2. Run **`restore-privacy-client-0.0.9-windows-x64-setup.exe`**.  
    It installs the full client (bundled runtime + dependencies — **no separate Python install**), creates shortcuts, and launches the app.
-3. For full system VPN, run **Restore Privacy** as Administrator (Start Menu or Desktop shortcut → right-click → Run as administrator).
+3. For full system VPN, run **Restore Privacy** as Administrator (Start Menu or Desktop shortcut → right-click → Run as administrator), or accept the UAC prompt when the app auto-elevates.
 4. The app **connects automatically** on launch.
 
 ### Android
 
-1. Download the **APK** from the [0.0.9 release](https://github.com/rgsneddon/restore-privacy/releases/tag/0.0.9)  
-   or the status page.
+1. Download the **APK** from the release or status page.
 2. Install the APK (allow install from unknown sources if your device asks).
 3. Open **Restore Privacy** and grant **VPN** permission when prompted.
 4. The app **connects automatically** on launch.
 
-### iOS / macOS (prep — finish on a Mac)
+### macOS
 
-Scaffold + MacBook checklist: **`client_app/APPLE_BUILD.md`**.  
-Packet Tunnel Network Extension, secrets, and signing are Mac-only (stubs under `client_app/ios/NativePrep` and `macos/NativePrep`).
+1. Download **`restore-privacy-client-0.0.9-macos.zip`** from the release or status page.
+2. Unzip and open **`restore_privacy_client.app`** (you may need System Settings → Privacy & Security to allow the app if it is not notarized).
+3. The UI **auto-connects** on launch via the native `restore_privacy/vpn` channel.
+4. **Full-system VPN** requires an Apple Developer team with **Network Extension** (Packet Tunnel) entitlement, App Group secrets, and signing of the embedded `PacketTunnel` extension.  
+   Developer checklist: [`client_app/APPLE_BUILD.md`](client_app/APPLE_BUILD.md) · [`client_app/macos/BUILD_ON_MAC.md`](client_app/macos/BUILD_ON_MAC.md).
 
-### iOS / macOS notes
+### iOS
 
-Signed store installers are not published from the Windows build host yet.  
-If you build on a Mac, see `client_app/ios/BUILD_ON_MAC.md` and `client_app/macos/BUILD_ON_MAC.md`.
+1. Download **`restore-privacy-client-0.0.9-ios.zip`** from the release or status page.
+2. The zip contains **`Runner.app`** for sideload / device tooling (not an App Store build).
+3. Install onto a device with a development or enterprise signing workflow; grant **VPN** permission when prompted.
+4. The UI **auto-connects** on launch. Full tunnel uses the Packet Tunnel Network Extension; signing and App Groups are required for production VPN.  
+   Developer checklist: [`client_app/APPLE_BUILD.md`](client_app/APPLE_BUILD.md) · [`client_app/ios/BUILD_ON_MAC.md`](client_app/ios/BUILD_ON_MAC.md).
 
 ### Status page
 
 https://restore-privacy-status.onrender.com/
 
 - Live **currently connected clients** count (updates without reloading the page)
-- **Download** buttons for the client packages
+- **Download** buttons for Windows, Android, macOS, and iOS packages
 - **Connect via web** explains that a browser tab cannot run full system VPN, and links you to the real apps
 
 ---
@@ -66,7 +80,7 @@ https://restore-privacy-status.onrender.com/
 
 - **Privacy:** designed for **no user-info logs** and no public exposure of client identity — full detail in [PRIVACY_POLICY.md](PRIVACY_POLICY.md).
 - **License:** original project code is **MIT** — [LICENSE](LICENSE).
-- **Credits:** Wintun, cryptography, Bouncy Castle, Flutter, and other utilised parts — [CREDITS.md](CREDITS.md).
+- **Credits:** Wintun, cryptography, Bouncy Castle, Flutter, Apple CryptoKit, BigInt, and other utilised parts — [CREDITS.md](CREDITS.md).
 
 ---
 

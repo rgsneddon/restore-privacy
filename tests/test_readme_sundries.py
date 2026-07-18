@@ -78,6 +78,11 @@ class TestReadmePublicClientOnly(unittest.TestCase):
         self.assertTrue("how to" in lower or "install" in lower)
         self.assertTrue("windows" in lower)
         self.assertTrue("android" in lower or "apk" in lower)
+        self.assertTrue("macos" in lower)
+        self.assertTrue("ios" in lower)
+        self.assertIn("0.0.9", text)
+        # Not prep-stub-only Apple wording
+        self.assertNotIn("prep stubs", lower)
 
 
 if __name__ == "__main__":

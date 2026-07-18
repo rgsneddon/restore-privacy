@@ -36,6 +36,8 @@ Summary of utilised parts (see CREDITS.md for detail):
   - Wintun (virtual network adapter driver for Windows TUN I/O)
   - Python cryptography (X25519/Ed25519, ChaCha20-Poly1305, HKDF helpers as used)
   - Bouncy Castle (Android RPT client crypto helpers)
+  - Apple CryptoKit (iOS/macOS ChaCha20-Poly1305, Ed25519, HKDF for RPT2 Packet Tunnel)
+  - BigInt / attaswift (vendored; modular arithmetic for ElGamal/Pedersen on Apple)
   - Flutter / Dart SDK (multi-platform client UI shell)
   - Python standard library and packaging tools as used in the repo
   - Render.com (optional hosting of the public status page — service, not code)

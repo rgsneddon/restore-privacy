@@ -1,6 +1,6 @@
 # Privacy Policy — Restore Privacy
 
-**Last updated:** 17 July 2026  
+**Last updated:** 18 July 2026  
 **Product:** Restore Privacy Tunnel (RPT) — custom VPN node, client apps, and public status page  
 **Operator / project:** Russell G Sneddon (`rgsneddon`) / public repository [restore-privacy](https://github.com/rgsneddon/restore-privacy)
 
@@ -44,12 +44,13 @@ Process stdout/stderr for the node service is configured for **no journal sessio
 - Holds **in-memory** session state for active tunnels so traffic can be routed and so a **current session count** can be reported.
 - When a session ends, that in-memory state is dropped; it is **not** designed to be written as a durable user history file.
 
-### 3.2 Client applications (Windows, Android; iOS/macOS prep)
+### 3.2 Client applications (Windows, Android, iOS, and macOS)
 
 - On launch, clients **auto-connect** to the configured RPT node endpoint.
 - They use **local** cryptographic material (when provisioned) to complete admission and establish session keys.
-- Full-tunnel modes (where enabled by the OS and user permissions) route device traffic into the encrypted tunnel.
+- **Full-tunnel** modes route device traffic into the encrypted tunnel **only when** the OS grants VPN permission (Windows Administrator / UAC, Android VPN consent, iOS/macOS VPN permission). On **iOS and macOS**, full-system VPN also requires a signed **Packet Tunnel Network Extension** and App Group access to admission secrets; without that signing, the UI and handshake path may still run while system-wide routing is unavailable.
 - Clients are **not** designed to upload browsing history or identity dossiers to the node as product telemetry.
+- Public download packages (Windows `.exe`, Android `.apk`, macOS `.zip`, iOS `.zip`) do **not** include private admission keys (`*.priv`).
 
 ### 3.3 Public status page (e.g. Render)
 
@@ -71,7 +72,7 @@ Please understand these **operational limits**:
 
 1. **Hosting and networks.** The VPS provider, CDN, or DNS operator may log IP-level connection metadata under **their** policies (outside this application’s no-log settings).
 2. **Destination sites.** Websites and services you visit through the tunnel have their own privacy policies.
-3. **Device and OS.** Android VPN consent dialogs, Windows admin elevation, crash reporters, or OS network stacks may process data independently of this app.
+3. **Device and OS.** Android VPN consent dialogs, Windows admin elevation, iOS/macOS VPN permission sheets, Apple Network Extension processes, crash reporters, or OS network stacks may process data independently of this app.
 4. **Misconfiguration.** If an operator enables verbose logging, reverse proxies with access logs, or third-party monitoring, that can create logs this policy assumes are off.
 5. **Security vs. privacy.** Cryptographic admission keys identify a **product client**, not a named human account—but a key can still be treated as an access secret.
 6. **Open relay risk is reduced by keys, not by accounts.** Unauthorized clients should fail handshake; authorized keys must be protected.

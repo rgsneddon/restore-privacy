@@ -41,6 +41,12 @@ class TestPrivacyPolicy(unittest.TestCase):
         )
         # Operational limits section
         self.assertTrue("limit" in lower or "limits" in lower)
+        # Multi-platform client apps (shipped wording)
+        self.assertIn("Windows", text)
+        self.assertIn("Android", text)
+        self.assertIn("iOS", text)
+        self.assertIn("macOS", text)
+        self.assertNotIn("iOS/macOS prep", text)
         # Pointers to related docs
         self.assertIn("LICENSE", text)
         self.assertIn("README", text)
@@ -56,11 +62,14 @@ class TestLicenseAndCredits(unittest.TestCase):
         self.assertTrue(
             "THIRD-PARTY" in text.upper() or "Wintun" in text or "CREDITS" in text
         )
+        # Apple stack utilised components (aligned with CREDITS.md)
+        self.assertIn("CryptoKit", text)
+        self.assertIn("BigInt", text)
 
     def test_credits_name_utilised_components(self):
         text = _read("CREDITS.md")
         # Must credit real utilised parts
-        for name in ("Wintun", "cryptography", "Bouncy", "Flutter"):
+        for name in ("Wintun", "cryptography", "Bouncy", "Flutter", "CryptoKit", "BigInt"):
             self.assertIn(name, text, f"missing credit for {name}")
         self.assertIn("wintun", text.lower())
         self.assertIn("not", text.lower())
@@ -74,18 +83,20 @@ class TestReadmeHowto(unittest.TestCase):
         text = _read("README.md")
         lower = text.lower()
         self.assertTrue("how to" in lower or "install" in lower)
-        # End-user client path
-        self.assertTrue(
-            "restoreprivacy.bat" in lower
-            or "download" in lower
-            or "apk" in lower
-        )
-        self.assertTrue(
-            "android" in lower or "apk" in lower or "windows" in lower
-        )
-        self.assertTrue(
-            "0.0.1" in text or "release" in lower or "download" in lower
-        )
+        # End-user client path — all published platforms
+        self.assertIn("download", lower)
+        self.assertIn("windows", lower)
+        self.assertIn("android", lower)
+        self.assertIn("macos", lower)
+        self.assertIn("ios", lower)
+        self.assertIn("0.0.9", text)
+        self.assertNotIn("prep — finish on a Mac", text)
+        self.assertNotIn("prep stubs", lower)
+        # Package names from the public release catalog
+        self.assertIn("windows-x64-setup.exe", text)
+        self.assertIn("android.apk", text)
+        self.assertIn("macos.zip", text)
+        self.assertIn("ios.zip", text)
         # Links / names to legal docs
         self.assertIn("PRIVACY_POLICY", text)
         self.assertIn("LICENSE", text)
