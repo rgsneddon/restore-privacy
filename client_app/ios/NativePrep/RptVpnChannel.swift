@@ -1,7 +1,6 @@
 // iOS Flutter host — method channel restore_privacy/vpn
-// Registers connect/disconnect; starts Packet Tunnel when available, otherwise
-// runs real RPT2 handshake path (UK gate + secrets + HELLO) for honest results.
-// Success maps always include vpnIp when a session is established (criterion 3).
+// Full-tunnel honesty: product "Connected" only when Packet Tunnel is active.
+// Host-side RPT2 HELLO is diagnostic only (never ok:true for residual-IP change).
 
 import Foundation
 import Flutter
@@ -19,7 +18,8 @@ enum RptVpnChannel {
       case "connect":
         let args = call.arguments as? [String: Any] ?? [:]
         let ep = RptEndpoint.resolve(from: args)
-        connect(host: ep.host, port: ep.port, flutterResult: result)
+        let fullTunnel = (args["fullTunnel"] as? Bool) ?? true
+        connect(host: ep.host, port: ep.port, fullTunnel: fullTunnel, flutterResult: result)
       case "disconnect":
         disconnect { map in result(map) }
       case "hasSecrets":
@@ -35,57 +35,67 @@ enum RptVpnChannel {
     }
   }
 
-  private static func connect(host: String, port: UInt16, flutterResult: @escaping FlutterResult) {
+  private static func connect(
+    host: String,
+    port: UInt16,
+    fullTunnel: Bool,
+    flutterResult: @escaping FlutterResult
+  ) {
+    // Product path is full tunnel — residual public IP only changes via Packet Tunnel.
+    if !fullTunnel {
+      hostSideDiagnostic(host: host, port: port) { map in
+        flutterResult(map)
+      }
+      return
+    }
+
     loadOrCreateManager(host: host, port: port) { manager, neError in
-      if let manager {
-        startTunnel(manager: manager, host: host, port: port) { map in
-          if let ok = map["ok"] as? Bool, ok, map["vpnIp"] != nil {
-            flutterResult(map)
-          } else if let ok = map["ok"] as? Bool, ok {
-            // Tunnel up but missing vpnIp — query provider IPC then host handshake
-            queryProviderVpnIp(manager: manager) { ip in
-              if let ip, !ip.isEmpty {
-                flutterResult([
-                  "ok": true,
-                  "message": "Connected — tunnel IP \(ip)",
-                  "vpnIp": ip,
-                ] as [String: Any])
-              } else {
-                hostSideConnect(host: host, port: port) { fallback in
-                  flutterResult(fallback)
-                }
-              }
-            }
-          } else {
-            hostSideConnect(host: host, port: port) { fallback in
-              flutterResult(fallback)
-            }
-          }
-        }
-      } else {
-        hostSideConnect(host: host, port: port) { map in
+      guard let manager else {
+        let detail = neError.map { "NE preferences: \($0)" }
+        hostSideDiagnostic(host: host, port: port, detail: detail) { map in
           flutterResult(map)
+        }
+        return
+      }
+      startTunnel(manager: manager, host: host, port: port) { map in
+        if RptFullTunnelResult.isProductSuccess(map) {
+          flutterResult(map)
+          return
+        }
+        let detail = map["message"] as? String
+        hostSideDiagnostic(host: host, port: port, detail: detail) { diag in
+          flutterResult(diag)
         }
       }
     }
   }
 
-  /// Real product sequence: UK gate → secrets → RPT2 handshake (shipped engine).
-  /// Returns criterion-3 map including vpnIp on success.
-  private static func hostSideConnect(
+  /// Host RPT2 HELLO for diagnostics only — always ok:false for full-tunnel product.
+  /// Closes transport immediately; residual public IP does not change.
+  private static func hostSideDiagnostic(
     host: String,
     port: UInt16,
+    detail: String? = nil,
     completion: @escaping ([String: Any]) -> Void
   ) {
     DispatchQueue.global(qos: .userInitiated).async {
       let outcome = RptConnectOrchestrator.connect(host: host, port: port)
-      // Host-side only needs session derivation; close transport after HELLO.
       outcome.engine?.closeTransport()
-      var map = outcome.resultMap
-      // Ensure vpnIp key present on success
-      if outcome.ok, let ip = outcome.vpnIp, map["vpnIp"] == nil {
-        map["vpnIp"] = ip
+      let nodeDiag: String?
+      if outcome.ok, let ip = outcome.vpnIp {
+        nodeDiag = "Node reachable; session assigned \(ip) via \(host):\(port) (HELLO-only, transport closed)."
+      } else if !outcome.ok {
+        nodeDiag = "Node diagnostic: \(outcome.message)"
+      } else {
+        nodeDiag = nil
       }
+      let map = RptFullTunnelResult.productConnectMap(
+        packetTunnelActive: false,
+        vpnIp: outcome.vpnIp,
+        detailMessage: detail,
+        hostOnlyHello: outcome.ok,
+        nodeDiagnostic: nodeDiag
+      )
       DispatchQueue.main.async { completion(map) }
     }
   }
@@ -142,44 +152,66 @@ enum RptVpnChannel {
         "port": NSNumber(value: port),
       ]
       try session?.startTunnel(options: opts)
-      // Wait for connected, then pull vpnIp via app message
-      DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
-        if manager.connection.status == .connected {
+      pollTunnelConnected(manager: manager, attempt: 0, maxAttempts: 20, interval: 0.5) { connected in
+        if connected {
           queryProviderVpnIp(manager: manager) { ip in
-            if let ip, !ip.isEmpty {
-              completion([
-                "ok": true,
-                "message": "Connected — tunnel IP \(ip)",
-                "vpnIp": ip,
-              ] as [String: Any])
-            } else if let cfg = (manager.protocolConfiguration as? NETunnelProviderProtocol)?
-              .providerConfiguration,
-              let ip = cfg["vpnIp"] as? String, !ip.isEmpty {
-              completion([
-                "ok": true,
-                "message": "Connected — tunnel IP \(ip)",
-                "vpnIp": ip,
-              ] as [String: Any])
-            } else {
-              completion([
-                "ok": true,
-                "message": "Connected — Packet Tunnel active",
-                // vpnIp may still be filled by host-side path caller
-              ] as [String: Any])
+            var resolved = ip
+            if resolved == nil || resolved?.isEmpty == true,
+               let cfg = (manager.protocolConfiguration as? NETunnelProviderProtocol)?
+                 .providerConfiguration,
+               let cfgIp = cfg["vpnIp"] as? String, !cfgIp.isEmpty {
+              resolved = cfgIp
             }
+            let map = RptFullTunnelResult.productConnectMap(
+              packetTunnelActive: true,
+              vpnIp: resolved,
+              detailMessage: resolved.map { "Connected — tunnel IP \($0)" }
+            )
+            completion(map)
           }
         } else {
-          completion([
-            "ok": false,
-            "message": "Packet Tunnel start pending or failed (status \(manager.connection.status.rawValue))",
-          ] as [String: Any])
+          let st = manager.connection.status.rawValue
+          completion(
+            RptFullTunnelResult.productConnectMap(
+              packetTunnelActive: false,
+              detailMessage: "Packet Tunnel start pending or failed (status \(st))."
+            )
+          )
         }
       }
     } catch {
-      completion([
-        "ok": false,
-        "message": error.localizedDescription,
-      ] as [String: Any])
+      completion(
+        RptFullTunnelResult.productConnectMap(
+          packetTunnelActive: false,
+          detailMessage: error.localizedDescription
+        )
+      )
+    }
+  }
+
+  private static func pollTunnelConnected(
+    manager: NETunnelProviderManager,
+    attempt: Int,
+    maxAttempts: Int,
+    interval: TimeInterval,
+    completion: @escaping (Bool) -> Void
+  ) {
+    if manager.connection.status == .connected {
+      completion(true)
+      return
+    }
+    if attempt >= maxAttempts {
+      completion(false)
+      return
+    }
+    DispatchQueue.main.asyncAfter(deadline: .now() + interval) {
+      pollTunnelConnected(
+        manager: manager,
+        attempt: attempt + 1,
+        maxAttempts: maxAttempts,
+        interval: interval,
+        completion: completion
+      )
     }
   }
 

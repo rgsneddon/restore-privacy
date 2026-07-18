@@ -15,7 +15,8 @@ Build and sign on a **Mac** with Xcode. This Windows checkout only prepares sour
 | Protocol | **RPT2** (not WireGuard / OpenVPN) — see `client/connect.py`, `node/handshake.py` |
 | Method channel | **`restore_privacy/vpn`** — methods `connect`, `disconnect` (see `lib/vpn_controller.dart`) |
 | Connect args | `host`, `port`, `fullTunnel`, `sessionName`, `route`, `autoConnect` |
-| Result map | `{ ok: bool, message: String, vpnIp?: String }` — use `lib/connect_status.dart` |
+| Result map | `{ ok, message, vpnIp?, fullTunnelActive?, hostOnlySession? }` — use `lib/connect_status.dart` |
+| Residual public IP | Changes **only** when OS Packet Tunnel is `.connected`. Host-side RPT2 HELLO alone is diagnostic (`ok: false`). |
 | UI | Retro: banner `#000080`, black bg, white text; scrolling privacy string in `lib/theme.dart` |
 | Auto-connect | On launch (`RptConfig.autoConnectOnLaunch`) |
 | Full tunnel | `0.0.0.0/0` intent |
@@ -82,7 +83,7 @@ Native prep stubs (drag into Xcode targets as described in those docs):
 
 1. Shared Swift **RPT2 engine** under `apple_shared/Rpt2/` (also copied into `ios/NativePrep/Rpt2` and `macos/NativePrep/Rpt2`) with unit tests: `cd client_app/apple_shared/Rpt2 && swift test`.  
 2. **Packet Tunnel** targets (`ios/PacketTunnel`, `macos/PacketTunnel`) implementing UK gate → secrets → handshake → full-tunnel settings → packetFlow/UDP DATA + keepalive.  
-3. Host method channel `restore_privacy/vpn` registered from iOS `AppDelegate` / macOS `MainFlutterWindow`; starts NE when available, otherwise runs the real host-side RPT2 connect sequence (not a permanent stub).  
+3. Host method channel `restore_privacy/vpn` registered from iOS `AppDelegate` / macOS `MainFlutterWindow`; product connect succeeds **only** when Packet Tunnel is active. Host-side RPT2 HELLO is diagnostic-only (never a false “Connected” that leaves residual ISP IP unchanged).  
 4. Secrets helpers load **only** `client_ed25519.priv` + `node_elgamal.pub` (never `node_elgamal.priv`).
 
 ## What you must finish for device VPN (Apple Developer)

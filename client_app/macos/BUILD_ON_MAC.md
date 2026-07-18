@@ -54,6 +54,8 @@ Identical to iOS / Android:
 
 Endpoint defaults: `lib/rpt_config.dart` → `104.156.224.47:44044`.
 
+**Residual public IP:** product “Connected” requires Packet Tunnel `.connected`. A host-side RPT2 HELLO alone is diagnostic (`ok: false`) and does **not** change your ISP egress IP — enable Network Extension signing/entitlements for full-system VPN.
+
 ## 5. Secrets (required for connect)
 
 The app looks for **both** of these (never `node_elgamal.priv`), in order:

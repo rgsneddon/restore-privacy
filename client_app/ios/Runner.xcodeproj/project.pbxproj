@@ -7,6 +7,8 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		61E4B8768F3C2CD1D67F4176 /* RptFullTunnelResult.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6B6E833E61E4B8768F3C2CD1 /* RptFullTunnelResult.swift */; };
+		2E434A68870DAC1E5110D9FA /* RptFullTunnelResult.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6B6E833E61E4B8768F3C2CD1 /* RptFullTunnelResult.swift */; };
 		B6F167DE1D36BE52956936ED /* RptEndpoint.swift in Sources */ = {isa = PBXBuildFile; fileRef = 60DF89726CB0112FB8408B6D /* RptEndpoint.swift */; };
 		23E0DDE47637E5D10988B9CA /* RptEndpoint.swift in Sources */ = {isa = PBXBuildFile; fileRef = 60DF89726CB0112FB8408B6D /* RptEndpoint.swift */; };
 		A3E798CC69E28AD862366BD4 /* Network.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = BA98F8222A4AF392A7A4A84A /* Network.framework */; };
@@ -120,6 +122,7 @@
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
+		6B6E833E61E4B8768F3C2CD1 /* RptFullTunnelResult.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = "RptFullTunnelResult.swift"; path = "NativePrep/Rpt2/RptFullTunnelResult.swift"; sourceTree = "<group>"; };
 		61BF160C0289711F5F69C626 /* PacketTunnelProvider.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = "PacketTunnelProvider.swift"; path = "NativePrep/PacketTunnelProvider.swift"; sourceTree = "<group>"; };
 		1E8ECFC3BC60269BEBC2CA40 /* RptClientEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = "RptClientEngine.swift"; path = "NativePrep/Rpt2/RptClientEngine.swift"; sourceTree = "<group>"; };
 		B008E63BE1A87521A006D658 /* RptConnectOrchestrator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = "RptConnectOrchestrator.swift"; path = "NativePrep/Rpt2/RptConnectOrchestrator.swift"; sourceTree = "<group>"; };
@@ -244,6 +247,7 @@
 				A8340F72CA3D6450BE844011 /* RptPedersen.swift */,
 				BC2B56A3A7EB3E5A89358950 /* RptProtocol.swift */,
 				60DF89726CB0112FB8408B6D /* RptEndpoint.swift */,
+			6B6E833E61E4B8768F3C2CD1 /* RptFullTunnelResult.swift */,
 				E1A10CCAC1B8762250473E09 /* RptSessionCrypto.swift */,
 				07466FFA1B9B1F0989D529CC /* RptUkIpGate.swift */,
 				0F29D609169D04A5997EAE72 /* VendorBigInt */,
@@ -565,6 +569,7 @@ fi
 				3C286BCE142676397F3A447C /* RptPedersen.swift in Sources */,
 				D037DE89F6B615111C2C497C /* RptProtocol.swift in Sources */,
 				B6F167DE1D36BE52956936ED /* RptEndpoint.swift in Sources */,
+				61E4B8768F3C2CD1D67F4176 /* RptFullTunnelResult.swift in Sources */,
 				C1EC9DB0E9CF2DC565637E8E /* RptSessionCrypto.swift in Sources */,
 				AE626A7B048C9E0A4653D56C /* RptUkIpGate.swift in Sources */,
 				861B9F3BF57A20AAB3C54190 /* Addition.swift in Sources */,
@@ -609,6 +614,7 @@ fi
 				7FB1864B91278AE9C58463DB /* RptPedersen.swift in Sources */,
 				AA3450CB9AC946ADFD53CF6B /* RptProtocol.swift in Sources */,
 				23E0DDE47637E5D10988B9CA /* RptEndpoint.swift in Sources */,
+				2E434A68870DAC1E5110D9FA /* RptFullTunnelResult.swift in Sources */,
 				77943E3BD49C420AF0D56022 /* RptSessionCrypto.swift in Sources */,
 				20B2D4A3CB19BBDC5EFD89C2 /* RptUkIpGate.swift in Sources */,
 				4A54C0FBE676707BEACF054F /* Addition.swift in Sources */,

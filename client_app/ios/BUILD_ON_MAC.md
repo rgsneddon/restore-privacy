@@ -58,6 +58,8 @@ so Flutter UI does not hang (same contract as `lib/vpn_controller.dart`).
 
 Defaults: host/port from `lib/rpt_config.dart` (`104.156.224.47`, `44044`).
 
+**Residual public IP:** product “Connected” requires Packet Tunnel `.connected`. A host-side RPT2 HELLO alone is diagnostic (`ok: false`) and does **not** change your ISP egress IP — enable Network Extension signing/entitlements for full-system VPN.
+
 ## 5. Secrets
 
 Copy into the **App Group** container (or Keychain accessible to the extension):

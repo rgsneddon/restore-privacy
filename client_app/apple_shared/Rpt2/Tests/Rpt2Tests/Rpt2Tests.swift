@@ -315,6 +315,71 @@ final class Rpt2Tests: XCTestCase {
         XCTAssertNotNil(map["message"] as? String)
     }
 
+    func testFullTunnelHonestyHostOnlyHelloNotSuccess() {
+        let map = RptFullTunnelResult.productConnectMap(
+            packetTunnelActive: false,
+            vpnIp: "10.88.0.18",
+            hostOnlyHello: true,
+            nodeDiagnostic: "Node reachable (HELLO-only)."
+        )
+        XCTAssertEqual(map["ok"] as? Bool, false)
+        XCTAssertEqual(map["fullTunnelActive"] as? Bool, false)
+        XCTAssertEqual(map["hostOnlySession"] as? Bool, true)
+        XCTAssertEqual(map["vpnIp"] as? String, "10.88.0.18")
+        XCTAssertFalse(RptFullTunnelResult.isProductSuccess(map))
+        let msg = map["message"] as? String ?? ""
+        XCTAssertTrue(msg.lowercased().contains("residual public ip"))
+        XCTAssertFalse(msg.hasPrefix("Connected"))
+    }
+
+    func testFullTunnelHonestyPacketTunnelActiveIsSuccess() {
+        let map = RptFullTunnelResult.productConnectMap(
+            packetTunnelActive: true,
+            vpnIp: "10.88.0.19"
+        )
+        XCTAssertEqual(map["ok"] as? Bool, true)
+        XCTAssertEqual(map["fullTunnelActive"] as? Bool, true)
+        XCTAssertTrue(RptFullTunnelResult.isProductSuccess(map))
+        XCTAssertEqual(map["vpnIp"] as? String, "10.88.0.19")
+    }
+
+    func testFullTunnelHonestyNeFailureResidualIpMessage() {
+        let map = RptFullTunnelResult.productConnectMap(
+            packetTunnelActive: false,
+            detailMessage: "Packet Tunnel start pending or failed (status 3)."
+        )
+        XCTAssertEqual(map["ok"] as? Bool, false)
+        XCTAssertFalse(RptFullTunnelResult.isProductSuccess(map))
+        let msg = map["message"] as? String ?? ""
+        XCTAssertTrue(msg.contains("System VPN (Packet Tunnel) did not become active"))
+        XCTAssertTrue(msg.lowercased().contains("residual public ip"))
+        XCTAssertTrue(msg.contains("status 3"))
+    }
+
+    func testIsProductSuccessRejectsHostOnlyAndInactiveFlags() {
+        XCTAssertFalse(
+            RptFullTunnelResult.isProductSuccess([
+                "ok": true,
+                "hostOnlySession": true,
+                "vpnIp": "10.88.0.1",
+            ])
+        )
+        XCTAssertFalse(
+            RptFullTunnelResult.isProductSuccess([
+                "ok": true,
+                "fullTunnelActive": false,
+                "vpnIp": "10.88.0.1",
+            ])
+        )
+        XCTAssertTrue(
+            RptFullTunnelResult.isProductSuccess([
+                "ok": true,
+                "fullTunnelActive": true,
+                "hostOnlySession": false,
+            ])
+        )
+    }
+
     // MARK: - Mock node helpers (test-only, not a parallel client re-implementation of seal/open under test)
 
     /// Minimal node SERVER_HELLO builder so tests exercise shipped client completeServerHello.
