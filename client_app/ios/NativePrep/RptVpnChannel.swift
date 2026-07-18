@@ -11,7 +11,9 @@ enum RptVpnChannel {
   static let providerBundleId = "com.restoreprivacy.restorePrivacyClient.PacketTunnel"
 
   static func register(with messenger: FlutterBinaryMessenger) {
+    // Seed Application Support + App Group so Packet Tunnel can load the same keys.
     _ = try? RptSecrets.seedApplicationSupportFromBundleIfNeeded()
+    _ = try? RptSecrets.seedAppGroupFromKnownSourcesIfNeeded()
     let channel = FlutterMethodChannel(name: name, binaryMessenger: messenger)
     channel.setMethodCallHandler { call, result in
       switch call.method {

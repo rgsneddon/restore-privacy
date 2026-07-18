@@ -249,42 +249,4 @@ public enum RptSecrets {
         // Never copy node_elgamal.priv even if present in source tree by mistake
         return dest
     }
-
-    /// Copy admission keys into the shared App Group so Packet Tunnel can read them.
-    /// Call from the host app on launch (extension cannot see host Application Support alone).
-    @discardableResult
-    public static func seedAppGroupFromKnownSourcesIfNeeded(
-        fileManager: FileManager = .default,
-        bundle: Bundle = .main
-    ) throws -> URL? {
-        guard let groupBase = fileManager.containerURL(
-            forSecurityApplicationGroupIdentifier: appGroupId
-        ) else {
-            return nil
-        }
-        let dest = groupBase.appendingPathComponent("secrets", isDirectory: true)
-        if dirHasClientSecrets(dest, fileManager: fileManager) {
-            return dest
-        }
-        // Prefer any already-resolved source (home, App Support, bundle).
-        var source: URL?
-        for dir in candidateSecretsDirectories(fileManager: fileManager, bundle: bundle) {
-            if dir.standardizedFileURL.path == dest.standardizedFileURL.path { continue }
-            if dirHasClientSecrets(dir, fileManager: fileManager) {
-                source = dir
-                break
-            }
-        }
-        guard let source else { return nil }
-        try fileManager.createDirectory(at: dest, withIntermediateDirectories: true)
-        for name in [clientPrivName, nodePubName] {
-            let from = source.appendingPathComponent(name)
-            let to = dest.appendingPathComponent(name)
-            if fileManager.fileExists(atPath: to.path) {
-                try fileManager.removeItem(at: to)
-            }
-            try fileManager.copyItem(at: from, to: to)
-        }
-        return dest
-    }
 }

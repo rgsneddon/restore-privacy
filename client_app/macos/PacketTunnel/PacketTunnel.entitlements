@@ -16,5 +16,10 @@
 	<true/>
 	<key>com.apple.security.network.server</key>
 	<true/>
+	<!-- Read product keys from real home when App Group not yet seeded -->
+	<key>com.apple.security.temporary-exception.files.home-relative-path.read-only</key>
+	<array>
+		<string>.restore-privacy/</string>
+	</array>
 </dict>
 </plist>

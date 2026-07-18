@@ -1,178 +1,290 @@
-// macOS secrets helpers — multi-path search (bundle, App Support, real home).
-// Never load or ship node_elgamal.priv.
-//
-// Implementation is the shared Rpt2/RptSecrets.swift when compiled into the target.
-// This file is the NativePrep entry for prep docs / Xcode groups; keep API + path rules
-// in sync with apple_shared/Rpt2/Sources/Rpt2/RptSecrets.swift.
-
 import Foundation
+#if canImport(Darwin)
 import Darwin
+#endif
 
-enum RptSecrets {
-  static let clientPrivName = "client_ed25519.priv"
-  static let nodePubName = "node_elgamal.pub"
-  /// Must never be loaded or shipped by product clients.
-  static let nodePrivName = "node_elgamal.priv"
-  static var appGroupId: String { "group.com.restoreprivacy.shared" }
-  static let appSupportFolderName = "Restore Privacy"
+/// Secrets path helpers for Apple platforms.
+/// Never load or ship `node_elgamal.priv`.
+///
+/// Search order mirrors Windows `client/secrets_loader.py` / Android assets inject:
+/// env override → App Group → bundle Resources → Application Support → real user home
+/// (`~/.restore-privacy/secrets`) → sandbox home. Sandboxed apps must use real home via
+/// `getpwuid` (not container home) plus the home-relative temporary-exception entitlement.
+public enum RptSecrets {
+    public static let clientPrivName = "client_ed25519.priv"
+    public static let nodePubName = "node_elgamal.pub"
+    /// Must never be loaded by product clients.
+    public static let nodePrivName = "node_elgamal.priv"
 
-  /// Real login-user home (not App Sandbox container home).
-  static func realUserHomeDirectory() -> URL? {
-    if let pw = getpwuid(getuid()), let dir = pw.pointee.pw_dir {
-      return URL(fileURLWithPath: String(cString: dir), isDirectory: true)
-    }
-    if let home = ProcessInfo.processInfo.environment["HOME"], !home.isEmpty {
-      return URL(fileURLWithPath: home, isDirectory: true)
-    }
-    return FileManager.default.homeDirectoryForCurrentUser
-  }
+    public static var appGroupId: String { "group.com.restoreprivacy.shared" }
 
-  static func candidateSecretsDirectories(
-    fileManager: FileManager = .default,
-    bundle: Bundle = .main
-  ) -> [URL] {
-    var dirs: [URL] = []
-    if let env = ProcessInfo.processInfo.environment["RPT_SECRETS_DIR"], !env.isEmpty {
-      dirs.append(URL(fileURLWithPath: env, isDirectory: true))
-    }
-    if let base = fileManager.containerURL(forSecurityApplicationGroupIdentifier: appGroupId) {
-      dirs.append(base.appendingPathComponent("secrets", isDirectory: true))
-    }
-    if let res = bundle.resourceURL {
-      dirs.append(res.appendingPathComponent("secrets", isDirectory: true))
-    }
-    if let builtIn = bundle.url(forResource: "secrets", withExtension: nil) {
-      dirs.append(builtIn)
-    }
-    if let support = fileManager.urls(for: .applicationSupportDirectory, in: .userDomainMask).first {
-      dirs.append(
-        support
-          .appendingPathComponent(appSupportFolderName, isDirectory: true)
-          .appendingPathComponent("secrets", isDirectory: true)
-      )
-    }
-    if let realHome = realUserHomeDirectory() {
-      dirs.append(
-        realHome
-          .appendingPathComponent(".restore-privacy", isDirectory: true)
-          .appendingPathComponent("secrets", isDirectory: true)
-      )
-    }
-    dirs.append(
-      fileManager.homeDirectoryForCurrentUser
-        .appendingPathComponent(".restore-privacy/secrets", isDirectory: true)
-    )
-    var seen = Set<String>()
-    var unique: [URL] = []
-    for d in dirs {
-      let key = d.standardizedFileURL.path
-      if seen.insert(key).inserted { unique.append(d) }
-    }
-    return unique
-  }
+    /// Product-relative secrets folder name under Application Support / bundle.
+    public static let appSupportFolderName = "Restore Privacy"
 
-  static func dirHasClientSecrets(_ dir: URL, fileManager: FileManager = .default) -> Bool {
-    fileManager.fileExists(atPath: dir.appendingPathComponent(clientPrivName).path)
-      && fileManager.fileExists(atPath: dir.appendingPathComponent(nodePubName).path)
-  }
+    // MARK: - Path resolution
 
-  static func resolveSecretsDirectory(
-    fileManager: FileManager = .default,
-    bundle: Bundle = .main
-  ) -> URL? {
-    for dir in candidateSecretsDirectories(fileManager: fileManager, bundle: bundle) {
-      if dirHasClientSecrets(dir, fileManager: fileManager) { return dir }
+    /// Real login-user home (not the App Sandbox container home).
+    public static func realUserHomeDirectory() -> URL? {
+        #if os(macOS)
+        if let pw = getpwuid(getuid()), let dir = pw.pointee.pw_dir {
+            return URL(fileURLWithPath: String(cString: dir), isDirectory: true)
+        }
+        #endif
+        if let home = ProcessInfo.processInfo.environment["HOME"], !home.isEmpty {
+            // May be container path under sandbox — still useful as a candidate.
+            return URL(fileURLWithPath: home, isDirectory: true)
+        }
+        #if os(macOS)
+        return FileManager.default.homeDirectoryForCurrentUser
+        #else
+        return FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first
+        #endif
     }
-    return nil
-  }
 
-  static func secretsDirectory(fileManager: FileManager = .default) -> URL? {
-    if let found = resolveSecretsDirectory(fileManager: fileManager) { return found }
-    if let realHome = realUserHomeDirectory() {
-      return realHome
-        .appendingPathComponent(".restore-privacy/secrets", isDirectory: true)
-    }
-    return fileManager.homeDirectoryForCurrentUser
-      .appendingPathComponent(".restore-privacy/secrets", isDirectory: true)
-  }
+    /// Ordered candidate directories that may hold admission keys (never node private key).
+    public static func candidateSecretsDirectories(
+        fileManager: FileManager = .default,
+        bundle: Bundle = .main
+    ) -> [URL] {
+        var dirs: [URL] = []
 
-  static func clientPrivateKeyURL(fileManager: FileManager = .default) -> URL? {
-    secretsDirectory(fileManager: fileManager)?.appendingPathComponent(clientPrivName)
-  }
+        // 1. Explicit override (tests / advanced installs)
+        if let env = ProcessInfo.processInfo.environment["RPT_SECRETS_DIR"], !env.isEmpty {
+            dirs.append(URL(fileURLWithPath: env, isDirectory: true))
+        }
 
-  static func nodePublicKeyURL(fileManager: FileManager = .default) -> URL? {
-    secretsDirectory(fileManager: fileManager)?.appendingPathComponent(nodePubName)
-  }
+        // 2. App Group (host ↔ Packet Tunnel)
+        if let base = fileManager.containerURL(forSecurityApplicationGroupIdentifier: appGroupId) {
+            dirs.append(base.appendingPathComponent("secrets", isDirectory: true))
+        }
 
-  static func filesPresent(fileManager: FileManager = .default) -> Bool {
-    resolveSecretsDirectory(fileManager: fileManager) != nil
-  }
+        // 3. Bundled Resources/secrets (Android-style inject at package time)
+        if let res = bundle.resourceURL {
+            dirs.append(res.appendingPathComponent("secrets", isDirectory: true))
+        }
+        // Some Flutter layouts put resources under Contents/Resources via bundle path
+        if let builtIn = bundle.url(forResource: "secrets", withExtension: nil) {
+            dirs.append(builtIn)
+        }
 
-  static func searchedPathsDescription(
-    fileManager: FileManager = .default,
-    bundle: Bundle = .main
-  ) -> String {
-    candidateSecretsDirectories(fileManager: fileManager, bundle: bundle)
-      .prefix(8)
-      .map(\.path)
-      .joined(separator: ", ")
-  }
+        // 4. Application Support (sandbox-visible writable location)
+        if let support = fileManager.urls(for: .applicationSupportDirectory, in: .userDomainMask).first {
+            dirs.append(
+                support
+                    .appendingPathComponent(appSupportFolderName, isDirectory: true)
+                    .appendingPathComponent("secrets", isDirectory: true)
+            )
+        }
 
-  /// Load product admission material only. Never loads node_elgamal.priv.
-  static func loadAdmissionMaterial(
-    fileManager: FileManager = .default,
-    bundle: Bundle = .main
-  ) throws -> (clientPriv: Data, nodePub: Data) {
-    if let dir = resolveSecretsDirectory(fileManager: fileManager, bundle: bundle) {
-      return try loadFromDirectory(dir)
-    }
-    if let dir = try? seedApplicationSupportFromBundleIfNeeded(fileManager: fileManager, bundle: bundle) {
-      return try loadFromDirectory(dir)
-    }
-    let paths = searchedPathsDescription(fileManager: fileManager, bundle: bundle)
-    throw RptProtocol.ProtocolError(
-      "Missing admission secrets — place client_ed25519.priv and node_elgamal.pub in "
-        + "~/.restore-privacy/secrets/ (or Application Support/Restore Privacy/secrets/, "
-        + "or bundle Resources/secrets/). Never ship node_elgamal.priv. "
-        + "Searched: \(paths)"
-    )
-  }
+        // 5. Real user home ~/.restore-privacy/secrets (requires home-relative exception when sandboxed)
+        if let realHome = realUserHomeDirectory() {
+            dirs.append(
+                realHome
+                    .appendingPathComponent(".restore-privacy", isDirectory: true)
+                    .appendingPathComponent("secrets", isDirectory: true)
+            )
+        }
 
-  static func loadFromDirectory(_ dir: URL) throws -> (clientPriv: Data, nodePub: Data) {
-    let clientPriv = try Data(contentsOf: dir.appendingPathComponent(clientPrivName))
-    let nodePub = try Data(contentsOf: dir.appendingPathComponent(nodePubName))
-    guard clientPriv.count == 32 else {
-      throw RptProtocol.ProtocolError("client_ed25519.priv must be 32 raw bytes")
-    }
-    guard nodePub.count == 256 else {
-      throw RptProtocol.ProtocolError("node_elgamal.pub must be 256 bytes")
-    }
-    return (clientPriv, nodePub)
-  }
+        // 6. Sandbox / container home (Flutter)
+        #if os(macOS)
+        let containerHome = fileManager.homeDirectoryForCurrentUser
+            .appendingPathComponent(".restore-privacy", isDirectory: true)
+            .appendingPathComponent("secrets", isDirectory: true)
+        dirs.append(containerHome)
+        #else
+        if let docs = fileManager.urls(for: .documentDirectory, in: .userDomainMask).first {
+            dirs.append(docs.appendingPathComponent("secrets", isDirectory: true))
+        }
+        #endif
 
-  @discardableResult
-  static func seedApplicationSupportFromBundleIfNeeded(
-    fileManager: FileManager = .default,
-    bundle: Bundle = .main
-  ) throws -> URL? {
-    guard let res = bundle.resourceURL?.appendingPathComponent("secrets", isDirectory: true),
-          dirHasClientSecrets(res, fileManager: fileManager) else {
-      return nil
+        // De-dupe by standardized path
+        var seen = Set<String>()
+        var unique: [URL] = []
+        for d in dirs {
+            let key = d.standardizedFileURL.path
+            if seen.insert(key).inserted {
+                unique.append(d)
+            }
+        }
+        return unique
     }
-    guard let support = fileManager.urls(for: .applicationSupportDirectory, in: .userDomainMask).first else {
-      return res
+
+    /// First candidate directory that contains both admission files.
+    public static func resolveSecretsDirectory(
+        fileManager: FileManager = .default,
+        bundle: Bundle = .main
+    ) -> URL? {
+        for dir in candidateSecretsDirectories(fileManager: fileManager, bundle: bundle) {
+            if dirHasClientSecrets(dir, fileManager: fileManager) {
+                return dir
+            }
+        }
+        return nil
     }
-    let dest = support
-      .appendingPathComponent(appSupportFolderName, isDirectory: true)
-      .appendingPathComponent("secrets", isDirectory: true)
-    if dirHasClientSecrets(dest, fileManager: fileManager) { return dest }
-    try fileManager.createDirectory(at: dest, withIntermediateDirectories: true)
-    for name in [clientPrivName, nodePubName] {
-      let from = res.appendingPathComponent(name)
-      let to = dest.appendingPathComponent(name)
-      if fileManager.fileExists(atPath: to.path) { try fileManager.removeItem(at: to) }
-      try fileManager.copyItem(at: from, to: to)
+
+    public static func dirHasClientSecrets(_ dir: URL, fileManager: FileManager = .default) -> Bool {
+        let c = dir.appendingPathComponent(clientPrivName)
+        let n = dir.appendingPathComponent(nodePubName)
+        return fileManager.fileExists(atPath: c.path) && fileManager.fileExists(atPath: n.path)
     }
-    return dest
-  }
+
+    /// Preferred secrets directory for UI / docs (resolved or default install path).
+    public static func secretsDirectory(fileManager: FileManager = .default) -> URL? {
+        if let found = resolveSecretsDirectory(fileManager: fileManager) {
+            return found
+        }
+        // Default install location advertised to users
+        if let realHome = realUserHomeDirectory() {
+            return realHome
+                .appendingPathComponent(".restore-privacy", isDirectory: true)
+                .appendingPathComponent("secrets", isDirectory: true)
+        }
+        #if os(macOS)
+        return fileManager.homeDirectoryForCurrentUser
+            .appendingPathComponent(".restore-privacy/secrets", isDirectory: true)
+        #else
+        return fileManager.urls(for: .documentDirectory, in: .userDomainMask).first?
+            .appendingPathComponent("secrets", isDirectory: true)
+        #endif
+    }
+
+    public static func clientPrivateKeyURL(fileManager: FileManager = .default) -> URL? {
+        secretsDirectory(fileManager: fileManager)?.appendingPathComponent(clientPrivName)
+    }
+
+    public static func nodePublicKeyURL(fileManager: FileManager = .default) -> URL? {
+        secretsDirectory(fileManager: fileManager)?.appendingPathComponent(nodePubName)
+    }
+
+    public static func filesPresent(fileManager: FileManager = .default) -> Bool {
+        resolveSecretsDirectory(fileManager: fileManager) != nil
+    }
+
+    /// Human-readable list of paths searched (for error messages / diagnostics).
+    public static func searchedPathsDescription(
+        fileManager: FileManager = .default,
+        bundle: Bundle = .main
+    ) -> String {
+        candidateSecretsDirectories(fileManager: fileManager, bundle: bundle)
+            .prefix(8)
+            .map(\.path)
+            .joined(separator: ", ")
+    }
+
+    // MARK: - Load
+
+    /// Load product admission material only (client priv + node pub). Never loads node private key.
+    public static func loadAdmissionMaterial(
+        fileManager: FileManager = .default,
+        bundle: Bundle = .main
+    ) throws -> (clientPriv: Data, nodePub: Data) {
+        // Prefer a resolved directory that already has both files.
+        if let dir = resolveSecretsDirectory(fileManager: fileManager, bundle: bundle) {
+            return try loadFromDirectory(dir)
+        }
+
+        // Attempt bundle → Application Support seed if bundle has secrets but App Support does not
+        if let dir = try? seedApplicationSupportFromBundleIfNeeded(fileManager: fileManager, bundle: bundle) {
+            return try loadFromDirectory(dir)
+        }
+        // Host should seed App Group so Packet Tunnel can load the same keys.
+        if let dir = try? seedAppGroupFromKnownSourcesIfNeeded(fileManager: fileManager, bundle: bundle) {
+            return try loadFromDirectory(dir)
+        }
+
+        let paths = searchedPathsDescription(fileManager: fileManager, bundle: bundle)
+        throw RptProtocol.ProtocolError(
+            "Missing admission secrets — place client_ed25519.priv and node_elgamal.pub in "
+                + "App Group group.com.restoreprivacy.shared/secrets/ "
+                + "(or ~/.restore-privacy/secrets/, Application Support, or bundle Resources/secrets/). "
+                + "Never ship node_elgamal.priv. "
+                + "Searched: \(paths)"
+        )
+    }
+
+    public static func loadFromDirectory(_ dir: URL) throws -> (clientPriv: Data, nodePub: Data) {
+        let cURL = dir.appendingPathComponent(clientPrivName)
+        let nURL = dir.appendingPathComponent(nodePubName)
+        // Explicitly do not open node_elgamal.priv
+        let clientPriv = try Data(contentsOf: cURL)
+        let nodePub = try Data(contentsOf: nURL)
+        guard clientPriv.count == 32 else {
+            throw RptProtocol.ProtocolError("client_ed25519.priv must be 32 raw bytes")
+        }
+        guard nodePub.count == 256 else {
+            throw RptProtocol.ProtocolError("node_elgamal.pub must be 256 bytes")
+        }
+        return (clientPriv, nodePub)
+    }
+
+    /// Copy bundled Resources/secrets into Application Support so host and future launches find them.
+    @discardableResult
+    public static func seedApplicationSupportFromBundleIfNeeded(
+        fileManager: FileManager = .default,
+        bundle: Bundle = .main
+    ) throws -> URL? {
+        guard let res = bundle.resourceURL?
+            .appendingPathComponent("secrets", isDirectory: true),
+            dirHasClientSecrets(res, fileManager: fileManager) else {
+            return nil
+        }
+        guard let support = fileManager.urls(for: .applicationSupportDirectory, in: .userDomainMask).first else {
+            return res
+        }
+        let dest = support
+            .appendingPathComponent(appSupportFolderName, isDirectory: true)
+            .appendingPathComponent("secrets", isDirectory: true)
+        if dirHasClientSecrets(dest, fileManager: fileManager) {
+            return dest
+        }
+        try fileManager.createDirectory(at: dest, withIntermediateDirectories: true)
+        for name in [clientPrivName, nodePubName] {
+            let from = res.appendingPathComponent(name)
+            let to = dest.appendingPathComponent(name)
+            if fileManager.fileExists(atPath: to.path) {
+                try fileManager.removeItem(at: to)
+            }
+            try fileManager.copyItem(at: from, to: to)
+        }
+        // Never copy node_elgamal.priv even if present in source tree by mistake
+        return dest
+    }
+
+    /// Copy admission keys into the shared App Group so Packet Tunnel can read them.
+    /// Call from the host app on launch (extension cannot see host Application Support alone).
+    @discardableResult
+    public static func seedAppGroupFromKnownSourcesIfNeeded(
+        fileManager: FileManager = .default,
+        bundle: Bundle = .main
+    ) throws -> URL? {
+        guard let groupBase = fileManager.containerURL(
+            forSecurityApplicationGroupIdentifier: appGroupId
+        ) else {
+            return nil
+        }
+        let dest = groupBase.appendingPathComponent("secrets", isDirectory: true)
+        if dirHasClientSecrets(dest, fileManager: fileManager) {
+            return dest
+        }
+        // Prefer any already-resolved source (home, App Support, bundle).
+        var source: URL?
+        for dir in candidateSecretsDirectories(fileManager: fileManager, bundle: bundle) {
+            if dir.standardizedFileURL.path == dest.standardizedFileURL.path { continue }
+            if dirHasClientSecrets(dir, fileManager: fileManager) {
+                source = dir
+                break
+            }
+        }
+        guard let source else { return nil }
+        try fileManager.createDirectory(at: dest, withIntermediateDirectories: true)
+        for name in [clientPrivName, nodePubName] {
+            let from = source.appendingPathComponent(name)
+            let to = dest.appendingPathComponent(name)
+            if fileManager.fileExists(atPath: to.path) {
+                try fileManager.removeItem(at: to)
+            }
+            try fileManager.copyItem(at: from, to: to)
+        }
+        return dest
+    }
 }
