@@ -21,26 +21,23 @@ open macos/Runner.xcworkspace
 
 ## 2. Signing & entitlements (Xcode)
 
-1. **Runner** → **Signing & Capabilities** → your Team.  
-2. Bundle id e.g. `com.yourorg.restoreprivacy.macos`.  
-3. Add:
-   - **Network Extensions** (Packet Tunnel)  
-   - **App Groups** (share secrets with the extension)  
-   - For production system-wide VPN: **System Extension** / Network Extension entitlement as required by current macOS versions  
-4. Sample entitlement **comments** are in `macos/NativePrep/Runner.entitlements.example` — merge into `Runner/DebugProfile.entitlements` and `Runner/Release.entitlements` in Xcode (do not blindly replace sandbox settings without testing).
+**Already in-repo** (host + extension):
+
+| Bundle | ID |
+|--------|-----|
+| Host | `com.restoreprivacy.restorePrivacyClient` |
+| PacketTunnel | `com.restoreprivacy.restorePrivacyClient.PacketTunnel` |
+| App Group | `group.com.restoreprivacy.shared` |
+| Team | `SFCBP95595` |
+
+- Host: `Runner/DebugProfile.entitlements` + `Runner/Release.entitlements` include `packet-tunnel-provider` + App Group.  
+- Extension: `PacketTunnel/PacketTunnel.entitlements` same NE + App Group.  
+
+**Your steps:** Developer portal App IDs → Xcode Team + Automatic Signing → set PacketTunnel `CODE_SIGNING_ALLOWED=YES` for real VPN. Full ordered list: [APPLE_BUILD.md — Operator checklist](../APPLE_BUILD.md#operator-checklist--enable-real-packet-tunnel-vpn).
 
 ## 3. Packet Tunnel extension
 
-1. **File → New → Target → Network Extension → Packet Tunnel Provider**.  
-2. Name e.g. `PacketTunnel`.  
-3. Add sources from `macos/NativePrep/`:
-   - `PacketTunnelProvider.swift` → extension target  
-   - `RptVpnChannel.swift` → Runner target  
-   - `RptSecrets.swift` → shared / both as needed  
-4. Register the Flutter method channel on app launch (see `RptVpnChannel.swift`).  
-5. Extension must speak **RPT2** (same as Windows/Android). Outline: `ios/NativePrep/RPT_PROTOCOL.md` (shared).
-
-Until the extension is wired, the channel returns a clear failure map so Flutter stays responsive.
+The **PacketTunnel** target already exists (`NativePrep/PacketTunnelProvider.swift` + embed phase). Do **not** add a second NE target unless you rename bundle IDs everywhere (`RptVpnChannel.providerBundleId` must match).
 
 ## 4. Method channel contract
 

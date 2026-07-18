@@ -17,11 +17,15 @@
 	</array>
 	<key>com.apple.security.files.user-selected.read-only</key>
 	<true/>
-	<!-- App Groups (Packet Tunnel share) — enable when Team + App Group ID are provisioned:
+	<!-- Packet Tunnel Network Extension (host manages NETunnelProviderManager) -->
+	<key>com.apple.developer.networking.networkextension</key>
+	<array>
+		<string>packet-tunnel-provider</string>
+	</array>
+	<!-- Share secrets with PacketTunnel.appex -->
 	<key>com.apple.security.application-groups</key>
 	<array>
 		<string>group.com.restoreprivacy.shared</string>
 	</array>
-	-->
 </dict>
 </plist>

@@ -86,18 +86,143 @@ Native prep stubs (drag into Xcode targets as described in those docs):
 3. Host method channel `restore_privacy/vpn` registered from iOS `AppDelegate` / macOS `MainFlutterWindow`; product connect succeeds **only** when Packet Tunnel is active. Host-side RPT2 HELLO is diagnostic-only (never a false “Connected” that leaves residual ISP IP unchanged).  
 4. Secrets helpers load **only** `client_ed25519.priv` + `node_elgamal.pub` (never `node_elgamal.priv`).
 
-## What you must finish for device VPN (Apple Developer)
+## Network Extension entitlements (in-repo)
 
-1. Apple Developer team + App IDs with **Network Extensions** entitlement.  
-2. Enable App Groups + Packet Tunnel entitlements on Runner + PacketTunnel (see `NativePrep/Runner.entitlements.example` and `PacketTunnel/PacketTunnel.entitlements`).  
-3. Load secrets into a location the extension can read (App Group recommended).  
-4. Code sign, Archive, distribute / notarize.
+Host + Packet Tunnel plists already declare the real product IDs:
 
-## Success criteria on Mac
+| ID | Value |
+|----|--------|
+| Host bundle | `com.restoreprivacy.restorePrivacyClient` |
+| Packet Tunnel | `com.restoreprivacy.restorePrivacyClient.PacketTunnel` |
+| App Group | `group.com.restoreprivacy.shared` |
+| Team | `SFCBP95595` |
+
+| File | Keys |
+|------|------|
+| `macos/Runner/DebugProfile.entitlements` | `packet-tunnel-provider` + App Group (+ sandbox) |
+| `macos/Runner/Release.entitlements` | same |
+| `ios/Runner/Runner.entitlements` | `packet-tunnel-provider` + App Group (wired via `CODE_SIGN_ENTITLEMENTS`) |
+| `macos/PacketTunnel/PacketTunnel.entitlements` | `packet-tunnel-provider` + App Group |
+| `ios/PacketTunnel/PacketTunnel.entitlements` | same |
+
+Packet Tunnel targets still default to `CODE_SIGNING_ALLOWED = NO` so unsigned CI builds succeed. **For residual-IP VPN you must set signing to YES** (step 3 below).
+
+## Operator checklist — enable real Packet Tunnel VPN
+
+Do these **in order**. Entitlement *files* are already patched; you still must register them with Apple and sign with your Team.
+
+### 1. Developer portal ([developer.apple.com](https://developer.apple.com) → Identifiers)
+
+1. Sign in with the team that owns **SFCBP95595** (or your team if you change IDs).
+2. **App Groups** → create/register: `group.com.restoreprivacy.shared`.
+3. **App ID** `com.restoreprivacy.restorePrivacyClient` (host):
+   - Capability **Network Extensions** → enable **Packet Tunnel**
+   - Capability **App Groups** → select `group.com.restoreprivacy.shared`
+4. **App ID** `com.restoreprivacy.restorePrivacyClient.PacketTunnel` (extension):
+   - Same **Network Extensions → Packet Tunnel**
+   - Same **App Groups** entry
+5. If Xcode uses Automatic Signing, it will create Development profiles after step 2. For Mac distribution outside the Mac App Store, also ensure Developer ID + Network Extension is allowed for that App ID when Apple requires it.
+
+### 2. Xcode — pick Team (both platforms)
+
+```bash
+cd client_app
+open macos/Runner.xcworkspace   # macOS
+# and/or
+open ios/Runner.xcworkspace     # iOS
+```
+
+For **Runner** and **PacketTunnel** on each platform:
+
+1. **Signing & Capabilities** → Team **SFCBP95595** (Russell Sneddon).
+2. **Automatically manage signing** = ON.
+3. Confirm capabilities appear (Network Extensions / Packet Tunnel, App Groups). If Xcode offers to “fix” entitlements mismatches, prefer keeping the repo plists above.
+4. Confirm provider bundle id stays `com.restoreprivacy.restorePrivacyClient.PacketTunnel` (matches `RptVpnChannel.providerBundleId`).
+
+### 3. Enable PacketTunnel code signing (required for system VPN)
+
+In Xcode → **PacketTunnel** target → **Build Settings** (all configurations Debug / Release / Profile):
+
+| Setting | Set to |
+|---------|--------|
+| **Code Signing Allowed** (`CODE_SIGNING_ALLOWED`) | **YES** |
+| **Code Signing Required** (`CODE_SIGNING_REQUIRED`) | **YES** |
+| **Development Team** | `SFCBP95595` |
+| **Code Signing Entitlements** | `PacketTunnel/PacketTunnel.entitlements` |
+
+Leave them **NO** only for unsigned CI; residual public IP will **not** change with ad-hoc / unsigned extensions.
+
+Also confirm **Runner → Build Phases → Embed Foundation Extensions** lists `PacketTunnel.appex`.
+
+### 4. Secrets the extension can read
+
+```bash
+mkdir -p ~/.restore-privacy/secrets
+# product client key + node public key only (never node_elgamal.priv):
+cp /path/to/client_ed25519.priv /path/to/node_elgamal.pub ~/.restore-privacy/secrets/
+```
+
+Prefer App Group after first successful run:
+
+`~/Library/Group Containers/group.com.restoreprivacy.shared/secrets/`
+
+Or inject into a release `.app` / `Runner.app`:
+
+```bash
+python3 scripts/inject_apple_secrets.py --app path/to/restore_privacy_client.app
+python3 scripts/inject_apple_secrets.py --app path/to/Runner.app --ios
+```
+
+### 5. Build and run
+
+**macOS**
+
+```bash
+cd client_app
+flutter run -d macos
+# or release:
+flutter build macos --release
+```
+
+Approve the **VPN configuration** / network extension system prompt when it appears.
+
+**iOS** (physical device; Simulator is not enough for full VPN)
+
+```bash
+cd client_app
+flutter run -d <device-id>
+```
+
+Approve the VPN permission sheet. Trust the developer certificate under Settings if needed.
+
+### 6. Confirm residual public IP actually changed
+
+| Check | Expected |
+|-------|----------|
+| App status | `Connected — tunnel IP 10.88.0.x` **and** system VPN indicator on |
+| macOS menu bar / iOS status bar | VPN active |
+| Browser / `curl ifconfig.me` | **Not** your home residual IP (node egress) |
+| If Packet Tunnel failed | Honest `ok: false` residual-IP message (not a false “Connected”) |
+
+Inspect signed entitlements:
+
+```bash
+codesign -d --entitlements - path/to/restore_privacy_client.app
+codesign -d --entitlements - path/to/.../PacketTunnel.appex
+```
+
+Both host and extension should list `packet-tunnel-provider` and the App Group.
+
+### 7. Distribute (optional)
+
+- **macOS downloads:** Developer ID + notarize (`scripts/sign_and_notarize_macos.py`).
+- **iOS:** device / TestFlight / App Store with VPN privacy justification.
+
+## Success criteria on Mac / iPhone
 
 - Flutter UI launches and auto-connects.  
-- Channel `restore_privacy/vpn` returns real session results (not “extension not configured”).  
-- Full tunnel: device traffic exits via the RPT node when connected.  
+- Channel `restore_privacy/vpn` returns success only when Packet Tunnel is active (`fullTunnelActive`).  
+- Full tunnel: residual public IP exits via the RPT node when connected.  
 - No `node_elgamal.priv` in the app bundle.
 
 ## Gatekeeper (macOS downloads)

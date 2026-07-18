@@ -20,31 +20,22 @@ flutter run -d <ios-device>
 
 ## 2. Bundle ID & signing (Xcode)
 
-1. Select **Runner** → **Signing & Capabilities**.  
-2. Choose your **Team**.  
-3. Set a unique **Bundle Identifier** (e.g. `com.yourorg.restoreprivacy`).  
-4. Add capability **Network Extensions** → Packet Tunnel (host app).  
-5. Enable **App Groups** (e.g. `group.com.yourorg.restoreprivacy`) for secrets sharing with the extension.
+**Already in-repo:**
 
-## 3. Add Packet Tunnel extension target
+| Bundle | ID |
+|--------|-----|
+| Host | `com.restoreprivacy.restorePrivacyClient` |
+| PacketTunnel | `com.restoreprivacy.restorePrivacyClient.PacketTunnel` |
+| App Group | `group.com.restoreprivacy.shared` |
+| Host entitlements | `Runner/Runner.entitlements` (NE + App Group; `CODE_SIGN_ENTITLEMENTS` wired) |
+| Extension entitlements | `PacketTunnel/PacketTunnel.entitlements` |
+| Team | `SFCBP95595` |
 
-1. **File → New → Target → Network Extension → Packet Tunnel Provider**.  
-2. Name e.g. `PacketTunnel` (bundle id `…restoreprivacy.tunnel`).  
-3. Drag in prep sources from `ios/NativePrep/`:
-   - `PacketTunnelProvider.swift` → **PacketTunnel** target  
-   - `RptVpnChannel.swift` → **Runner** target  
-   - Optionally `RptSecrets.swift` into both (App Group access)  
-4. Wire method channel registration (see `RptVpnChannel.swift` header comments).  
-5. Extension **Info.plist**: `NEProviderClasses` / Packet Tunnel class name = `PacketTunnelProvider`.  
-6. Extension entitlements: Packet Tunnel + same **App Group**.
+**Your steps:** portal App IDs → Xcode Team + Automatic Signing → PacketTunnel `CODE_SIGNING_ALLOWED=YES` on device. Full ordered list: [APPLE_BUILD.md — Operator checklist](../APPLE_BUILD.md#operator-checklist--enable-real-packet-tunnel-vpn).
 
-Until the extension is complete, `RptVpnChannel` returns a clear map:
+## 3. Packet Tunnel extension target
 
-```json
-{ "ok": false, "message": "iOS Packet Tunnel not yet configured — …" }
-```
-
-so Flutter UI does not hang (same contract as `lib/vpn_controller.dart`).
+The **PacketTunnel** target already exists (`NativePrep/PacketTunnelProvider.swift` + Embed Foundation Extensions). Keep bundle id `com.restoreprivacy.restorePrivacyClient.PacketTunnel` in sync with `RptVpnChannel.providerBundleId`.
 
 ## 4. Method channel contract (must match Flutter)
 

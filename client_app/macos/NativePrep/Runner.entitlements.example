@@ -1,8 +1,10 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <!--
-  EXAMPLE only — merge carefully into DebugProfile.entitlements / Release.entitlements
-  in Xcode. Requires a paid Apple Developer account for Network Extensions.
+  Canonical host entitlements live in:
+    macos/Runner/DebugProfile.entitlements
+    macos/Runner/Release.entitlements
+  This example mirrors those keys for reference.
 -->
 <plist version="1.0">
 <dict>
@@ -12,17 +14,13 @@
 	<true/>
 	<key>com.apple.security.network.server</key>
 	<true/>
-	<!-- Uncomment / set after creating App Group in developer portal:
-	<key>com.apple.security.application-groups</key>
-	<array>
-		<string>group.com.restoreprivacy.shared</string>
-	</array>
-	-->
-	<!-- Network Extension (Packet Tunnel) — enable via Xcode Capabilities UI when ready.
 	<key>com.apple.developer.networking.networkextension</key>
 	<array>
 		<string>packet-tunnel-provider</string>
 	</array>
-	-->
+	<key>com.apple.security.application-groups</key>
+	<array>
+		<string>group.com.restoreprivacy.shared</string>
+	</array>
 </dict>
 </plist>
