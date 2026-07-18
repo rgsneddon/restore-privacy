@@ -114,7 +114,7 @@ spctl --assess --type execute -vv restore_privacy_client.app   # expect: accepte
 
 **Windows hosts cannot notarize.**
 
-## 8. Smoke checklist
+## 9. Smoke checklist
 
 - [ ] `flutter run -d macos` shows retro UI and auto-connect  
 - [ ] Channel responds (extension stub or real tunnel)  
