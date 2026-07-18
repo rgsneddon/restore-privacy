@@ -50,6 +50,7 @@ Process stdout/stderr for the node service is configured for **no journal sessio
 - On launch, clients **auto-connect** to the configured RPT node endpoint.
 - They use **local** cryptographic material (when provisioned) to complete admission and establish session keys.
 - **Full-tunnel** modes route device traffic into the encrypted tunnel **only when** the OS grants VPN permission (Windows Administrator / UAC, Android VPN consent, iOS/macOS VPN permission). On **iOS and macOS**, full-system VPN uses a signed **Packet Tunnel Network Extension** (and App Group access to admission secrets). Product connect success requires the system tunnel to be active (residual public IP only changes then).
+- **On app close / disconnect**, clients are designed to **fully tear down** the tunnel (routes, TUN/Packet Tunnel, session) so traffic **reverts to the device’s normal public IP path**. Closing the app is not intended to leave residual VPN routing active.
 - Clients are **not** designed to upload browsing history or identity dossiers to the node as product telemetry.
 - Public download packages (Windows `.exe`, Android `.apk`, macOS `.zip`, iOS `.zip` for **v0.1.2**) may include **product client admission keys** (`client_ed25519.priv` + `node_elgamal.pub`) so installers can connect seamlessly. They **never** include the **node private key** (`node_elgamal.priv`).
 

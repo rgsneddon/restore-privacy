@@ -1,6 +1,6 @@
 """Release download link catalog for the public status page (version 0.1.2).
 
-Public page advertises Windows .exe, Android .apk, macOS .zip, and iOS .zip.
+Public page advertises Windows .exe installer, Android .apk, macOS .zip, and iOS .zip.
 """
 
 from __future__ import annotations

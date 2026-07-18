@@ -1,4 +1,4 @@
-# macOS — build on MacBook
+﻿# macOS â€” build on MacBook
 
 Flutter `macos/` scaffold is ready. Full-system VPN requires a **Packet Tunnel Network Extension** (and often a **System Extension** entitlement for production). Sign and notarize on Mac only.
 
@@ -33,7 +33,7 @@ open macos/Runner.xcworkspace
 - Host: `Runner/DebugProfile.entitlements` + `Runner/Release.entitlements` include `packet-tunnel-provider` + App Group.  
 - Extension: `PacketTunnel/PacketTunnel.entitlements` same NE + App Group.  
 
-**Your steps:** Developer portal App IDs (host + `.PacketTunnel`) → Xcode Team + Automatic Signing on Runner and PacketTunnel → run. PacketTunnel Team signing is already enabled in the project. Full ordered list: [APPLE_BUILD.md — Operator checklist](../APPLE_BUILD.md#operator-checklist--enable-real-packet-tunnel-vpn).
+**Your steps:** Developer portal App IDs (host + `.PacketTunnel`) â†’ Xcode Team + Automatic Signing on Runner and PacketTunnel â†’ run. PacketTunnel Team signing is already enabled in the project. Full ordered list: [APPLE_BUILD.md â€” Operator checklist](../APPLE_BUILD.md#operator-checklist--enable-real-packet-tunnel-vpn).
 
 ## 3. Packet Tunnel extension
 
@@ -49,9 +49,9 @@ Identical to iOS / Android:
 | Methods | `connect`, `disconnect` |
 | Args / results | See `lib/vpn_controller.dart` and `lib/connect_status.dart` |
 
-Endpoint defaults: `lib/rpt_config.dart` → `104.156.224.47:44044`.
+Endpoint defaults: `lib/rpt_config.dart` â†’ `104.156.224.47:44044`.
 
-**Residual public IP:** product “Connected” requires Packet Tunnel `.connected`. A host-side RPT2 HELLO alone is diagnostic (`ok: false`) and does **not** change your ISP egress IP — enable Network Extension signing/entitlements for full-system VPN.
+**Residual public IP:** product â€œConnectedâ€ requires Packet Tunnel `.connected`. A host-side RPT2 HELLO alone is diagnostic (`ok: false`) and does **not** change your ISP egress IP â€” enable Network Extension signing/entitlements for full-system VPN.
 
 ## 5. Secrets (required for connect)
 
@@ -97,14 +97,14 @@ Same Flutter UI and auto-connect as Windows/Android (`lib/main.dart`):
 ## 8. Gatekeeper / malware dialog (distribution)
 
 Downloaded apps must use **Developer ID + notarization**, not ad-hoc signing.
-Otherwise macOS shows: *Apple could not verify “restore_privacy_client” is free of malware…*
+Otherwise macOS shows: *Apple could not verify â€œrestore_privacy_clientâ€ is free of malwareâ€¦*
 
 ### Automated (preferred)
 
 After `flutter build macos --release`:
 
 ```bash
-# From repo root — signs host + PacketTunnel with Developer ID Application,
+# From repo root â€” signs host + PacketTunnel with Developer ID Application,
 # submits to notarytool, staples, and writes the release zip:
 python3 scripts/sign_and_notarize_macos.py \
   --app client_app/build/macos/Build/Products/Release/restore_privacy_client.app \
@@ -121,8 +121,8 @@ GitHub **macos.zip** is Gatekeeper-safe.
 ### Manual
 
 ```bash
-# codesign --options runtime --timestamp --sign "Developer ID Application: …" …
-xcrun notarytool submit <zip-of-app> --key … --key-id … --issuer … --wait
+# codesign --options runtime --timestamp --sign "Developer ID Application: â€¦" â€¦
+xcrun notarytool submit <zip-of-app> --key â€¦ --key-id â€¦ --issuer â€¦ --wait
 xcrun stapler staple restore_privacy_client.app
 spctl --assess --type execute -vv restore_privacy_client.app   # expect: accepted, Notarized Developer ID
 ```
