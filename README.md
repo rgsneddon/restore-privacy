@@ -52,12 +52,7 @@ or use the buttons on https://restore-privacy-status.onrender.com/
 
 ### macOS
 
-Before connecting, install product admission keys (same as Windows/Android):
-
-```bash
-mkdir -p ~/.restore-privacy/secrets
-# copy client_ed25519.priv (32 bytes) and node_elgamal.pub (256 bytes) into that folder
-```
+Release packages **bundle product admission keys** (`client_ed25519.priv` + `node_elgamal.pub`) so the client can connect without a separate secrets step. Never ship `node_elgamal.priv`.
 
 1. Download **`restore-privacy-client-0.0.9-macos.zip`** from the release or status page.
 2. Unzip and open **`restore_privacy_client.app`** (you may need System Settings → Privacy & Security to allow the app if it is not notarized).

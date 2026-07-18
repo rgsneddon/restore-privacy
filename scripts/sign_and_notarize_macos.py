@@ -282,12 +282,22 @@ def main(argv: list[str] | None = None) -> int:
 
     identity = args.identity or codesign_identity()
     app = args.app.resolve()
-    # Inject admission secrets into Resources/secrets before signing (when available).
-    # Mirrors Android build-time assets inject; never bundles node_elgamal.priv.
+    # Bundle product admission keys into Resources/secrets before signing
+    # (seamless connect; mirrors Android assets inject). Never node_elgamal.priv.
     inject = ROOT / "scripts" / "inject_apple_secrets.py"
     if inject.is_file():
-        print(f"Injecting secrets into {app} (optional if missing)…", flush=True)
-        run([sys.executable, str(inject), "--app", str(app), "--optional"], check=False)
+        print(f"Injecting product secrets into {app}…", flush=True)
+        # Prefer real inject; fall back to optional so sign still works for CI without keys
+        r = subprocess.run(
+            [sys.executable, str(inject), "--app", str(app)],
+            check=False,
+        )
+        if r.returncode != 0:
+            print(
+                "WARNING: product secrets not injected — connect will fail until keys are present.",
+                flush=True,
+            )
+            run([sys.executable, str(inject), "--app", str(app), "--optional"], check=False)
     print(f"Signing {app} with {identity}", flush=True)
     sign_app(app, identity)
 

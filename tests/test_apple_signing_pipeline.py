@@ -31,6 +31,7 @@ class TestMacosSignNotarizeScript(unittest.TestCase):
         # Must not treat ad-hoc as success
         self.assertIn("Signature=adhoc", text)
         self.assertIn("PacketTunnel", text)
+        self.assertIn("inject_apple_secrets", text)
 
     def test_release_package_script_calls_sign_and_notarize(self):
         rel = ROOT / "scripts" / "build_release_0.0.9.py"
@@ -42,6 +43,8 @@ class TestMacosSignNotarizeScript(unittest.TestCase):
         self.assertIn("MACOS_ZIP_NAME", text)
         # iOS team-sign path (not permanently ad-hoc-only)
         self.assertIn("sign_ios_app", text)
+        self.assertIn("inject_product_secrets", text)
+        self.assertIn("inject_apple_secrets", text)
         self.assertIn("Apple Distribution", text)
         self.assertIn("codesign", text)
 
@@ -67,3 +70,50 @@ class TestGatekeeperDocsMentionNotarize(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TestInjectAppleSecretsScript(unittest.TestCase):
+    def test_inject_script_only_copies_product_keys(self):
+        script = ROOT / "scripts" / "inject_apple_secrets.py"
+        self.assertTrue(script.is_file())
+        text = script.read_text(encoding="utf-8")
+        self.assertIn("client_ed25519.priv", text)
+        self.assertIn("node_elgamal.pub", text)
+        self.assertIn("node_elgamal.priv", text)  # forbidden name
+        self.assertIn("Never copies", text) or self.assertIn("never", text.lower())
+        self.assertIn("Contents/Resources/secrets", text)
+        # Must refuse node private key
+        self.assertIn("FORBIDDEN", text) or self.assertIn("node_elgamal.priv", text)
+
+    def test_inject_roundtrip_into_temp_app_layout(self):
+        """Drive the real inject script on a fake .app tree."""
+        import subprocess
+        import tempfile
+        import shutil
+
+        script = ROOT / "scripts" / "inject_apple_secrets.py"
+        secrets = ROOT / "secrets"
+        if not (secrets / "client_ed25519.priv").is_file():
+            self.skipTest("product secrets not staged in repo secrets/")
+        with tempfile.TemporaryDirectory() as td:
+            app = Path(td) / "restore_privacy_client.app"
+            (app / "Contents" / "Resources").mkdir(parents=True)
+            r = subprocess.run(
+                [
+                    "python3",
+                    str(script),
+                    "--app",
+                    str(app),
+                    "--source",
+                    str(secrets),
+                ],
+                capture_output=True,
+                text=True,
+            )
+            self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+            dest = app / "Contents" / "Resources" / "secrets"
+            self.assertTrue((dest / "client_ed25519.priv").is_file())
+            self.assertEqual((dest / "client_ed25519.priv").stat().st_size, 32)
+            self.assertTrue((dest / "node_elgamal.pub").is_file())
+            self.assertEqual((dest / "node_elgamal.pub").stat().st_size, 256)
+            self.assertFalse((dest / "node_elgamal.priv").exists())

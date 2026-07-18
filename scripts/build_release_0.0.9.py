@@ -3,10 +3,13 @@
 
 - Windows: reuses prior .exe installer when local Windows build is unavailable
 - Android: reuses prior APK when flutter apk is not rebuilt here
-- macOS: zips Flutter restore_privacy_client.app (never includes *.priv)
+- macOS: zips Flutter restore_privacy_client.app after Developer ID sign/notarize
 - iOS: zips Flutter Runner.app for sideload / device install tooling
 
-Never bundles secrets/*.priv.
+Product admission keys (client_ed25519.priv + node_elgamal.pub) are **bundled**
+into Apple packages via scripts/inject_apple_secrets.py when present under
+repo secrets/ or ~/.restore-privacy/secrets/ (same pattern as Android assets).
+Never bundles node_elgamal.priv.
 """
 
 from __future__ import annotations
@@ -160,11 +163,23 @@ def sign_ios_app(app: Path) -> None:
     )
 
 
+def inject_product_secrets(app: Path, *, ios: bool) -> None:
+    """Bundle client_ed25519.priv + node_elgamal.pub into the app for seamless connect."""
+    script = ROOT / "scripts" / "inject_apple_secrets.py"
+    cmd = [sys.executable, str(script), "--app", str(app)]
+    if ios:
+        cmd.append("--ios")
+    # Prefer non-optional so release fails closed if keys missing on packager machine
+    subprocess.run(cmd, check=True)
+
+
 def package_ios_zip() -> Path:
     if not IOS_APP.is_dir():
         raise FileNotFoundError(
             f"Missing iOS app at {IOS_APP}. Run: cd client_app && flutter build ios --no-codesign"
         )
+    # Bundle product admission keys before signing/zipping
+    inject_product_secrets(IOS_APP, ios=True)
     _assert_no_priv(IOS_APP)
     # Team-sign when identity is available (not ad-hoc-only distribution story)
     try:
