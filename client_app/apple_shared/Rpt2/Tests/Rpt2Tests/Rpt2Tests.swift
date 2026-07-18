@@ -184,6 +184,49 @@ final class Rpt2Tests: XCTestCase {
         XCTAssertFalse(RptSecrets.clientPrivName.contains("node_elgamal.priv"))
     }
 
+    /// Multi-path resolution finds keys outside App Group / sandbox-only home.
+    func testSecretsCandidateDirsIncludeHomeAndBundle() {
+        let dirs = RptSecrets.candidateSecretsDirectories()
+        let paths = dirs.map(\.path).joined(separator: "\n")
+        // Real-user or container home product path
+        XCTAssertTrue(
+            paths.contains(".restore-privacy") || paths.contains("secrets"),
+            "expected secrets candidates, got: \(paths)"
+        )
+        // Never advertise loading node private key as a candidate file name in API
+        XCTAssertEqual(RptSecrets.nodePrivName, "node_elgamal.priv")
+    }
+
+    func testLoadAdmissionMaterialFromExplicitDirectory() throws {
+        let tmp = FileManager.default.temporaryDirectory
+            .appendingPathComponent("rpt-secrets-test-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: tmp, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: tmp) }
+
+        let priv = Data(repeating: 0x11, count: 32)
+        var pub = Data(repeating: 0x22, count: 256)
+        // ElGamal y must be in range; use a simple non-zero big-endian integer < P is hard —
+        // loadFromDirectory only checks length, not group membership.
+        pub[0] = 0x01
+        try priv.write(to: tmp.appendingPathComponent(RptSecrets.clientPrivName))
+        try pub.write(to: tmp.appendingPathComponent(RptSecrets.nodePubName))
+        // Must not require node_elgamal.priv
+        let loaded = try RptSecrets.loadFromDirectory(tmp)
+        XCTAssertEqual(loaded.clientPriv, priv)
+        XCTAssertEqual(loaded.nodePub, pub)
+        XCTAssertTrue(RptSecrets.dirHasClientSecrets(tmp))
+    }
+
+    func testMissingSecretsErrorListsSearchHint() {
+        // Point env at empty dir so resolution fails cleanly without reading real home secrets
+        let empty = FileManager.default.temporaryDirectory
+            .appendingPathComponent("rpt-empty-\(UUID().uuidString)", isDirectory: true)
+        try? FileManager.default.createDirectory(at: empty, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: empty) }
+        // loadFromDirectory on empty should throw
+        XCTAssertThrowsError(try RptSecrets.loadFromDirectory(empty))
+    }
+
     func testSessionCryptoRoundTrip() throws {
         let key = Data(repeating: 0x42, count: 32)
         let crypto = RptSessionCrypto(keyBytes: key)

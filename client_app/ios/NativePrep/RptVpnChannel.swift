@@ -12,6 +12,7 @@ enum RptVpnChannel {
   static let providerBundleId = "com.restoreprivacy.restorePrivacyClient.PacketTunnel"
 
   static func register(with messenger: FlutterBinaryMessenger) {
+    _ = try? RptSecrets.seedApplicationSupportFromBundleIfNeeded()
     let channel = FlutterMethodChannel(name: name, binaryMessenger: messenger)
     channel.setMethodCallHandler { call, result in
       switch call.method {
@@ -22,6 +23,13 @@ enum RptVpnChannel {
         connect(host: host, port: UInt16(port), flutterResult: result)
       case "disconnect":
         disconnect { map in result(map) }
+      case "hasSecrets":
+        result([
+          "ok": RptSecrets.filesPresent(),
+          "message": RptSecrets.filesPresent()
+            ? "Admission secrets found"
+            : "Missing admission secrets — searched: \(RptSecrets.searchedPathsDescription())",
+        ] as [String: Any])
       default:
         result(FlutterMethodNotImplemented)
       }

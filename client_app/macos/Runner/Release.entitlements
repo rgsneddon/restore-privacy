@@ -8,7 +8,14 @@
 	<true/>
 	<key>com.apple.security.network.server</key>
 	<true/>
-	<!-- App Groups require a paid Developer team + provisioning; enable in Xcode when signing.
+	<!-- Allow reading product admission keys from ~/.restore-privacy/secrets/ -->
+	<key>com.apple.security.temporary-exception.files.home-relative-path.read-only</key>
+	<array>
+		<string>.restore-privacy/</string>
+	</array>
+	<key>com.apple.security.files.user-selected.read-only</key>
+	<true/>
+	<!-- App Groups (Packet Tunnel share) — enable when Team + App Group ID are provisioned:
 	<key>com.apple.security.application-groups</key>
 	<array>
 		<string>group.com.restoreprivacy.shared</string>

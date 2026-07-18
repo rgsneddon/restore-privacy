@@ -54,14 +54,30 @@ Identical to iOS / Android:
 
 Endpoint defaults: `lib/rpt_config.dart` → `104.156.224.47:44044`.
 
-## 5. Secrets
+## 5. Secrets (required for connect)
 
-```text
-~/.restore-privacy/secrets/client_ed25519.priv
-~/.restore-privacy/secrets/node_elgamal.pub
+The app looks for **both** of these (never `node_elgamal.priv`), in order:
+
+1. `RPT_SECRETS_DIR` environment variable  
+2. App Group `group.com.restoreprivacy.shared/secrets/` (when provisioned)  
+3. Bundle `Contents/Resources/secrets/` (injected at package time, Android-style)  
+4. `~/Library/Application Support/Restore Privacy/secrets/`  
+5. **`~/.restore-privacy/secrets/`** (real login home; sandbox home-relative exception)
+
+```bash
+mkdir -p ~/.restore-privacy/secrets
+# product client key + node public key only:
+cp client_ed25519.priv node_elgamal.pub ~/.restore-privacy/secrets/
 ```
 
-Prefer **App Group** container for the extension process. **Never** ship `node_elgamal.priv`.
+Or inject into the `.app` before signing/notarizing:
+
+```bash
+python3 scripts/inject_apple_secrets.py \
+  --app client_app/build/macos/Build/Products/Release/restore_privacy_client.app
+```
+
+**Never** ship `node_elgamal.priv`.
 
 ## 6. Product behavior
 
