@@ -8,7 +8,8 @@ from dataclasses import dataclass, field
 from typing import Dict, List, Optional, Tuple
 
 # UDP has no TCP FIN: drop sessions idle longer than this (DATA/KEEPALIVE refresh last_seen).
-DEFAULT_SESSION_IDLE_SEC = 120.0
+# Keep short so "Currently connected" tracks live users, not a sticky total.
+DEFAULT_SESSION_IDLE_SEC = 60.0
 
 
 @dataclass
@@ -40,10 +41,22 @@ class SessionRegistry:
             old = self._by_id.get(session.session_id)
             if old and old.vpn_ip != session.vpn_ip:
                 self._by_ip.pop(old.vpn_ip, None)
-            # If another session held this VPN IP, drop it (one IP → one live session)
+            # If another session held this VPN IP, drop it (one tunnel IP → one live session)
             prior_ip = self._by_ip.get(session.vpn_ip)
             if prior_ip is not None and prior_ip.session_id != session.session_id:
                 self._by_id.pop(prior_ip.session_id, None)
+            # Same client UDP endpoint reconnecting → drop prior session (new session_id)
+            # so count does not accumulate orphans from reconnect storms.
+            dead_sid = [
+                sid
+                for sid, s in self._by_id.items()
+                if s.client_addr == session.client_addr
+                and sid != session.session_id
+            ]
+            for sid in dead_sid:
+                s = self._by_id.pop(sid, None)
+                if s:
+                    self._by_ip.pop(s.vpn_ip, None)
             self._by_id[session.session_id] = session
             self._by_ip[session.vpn_ip] = session
 

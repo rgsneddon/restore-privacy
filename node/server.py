@@ -267,7 +267,7 @@ class RPTNode:
 
         # Periodically drop idle sessions so clients_connected is live, not cumulative
         last_prune = 0.0
-        prune_every_sec = 5.0
+        prune_every_sec = 2.0
         while True:
             r, _, _ = select.select([sock, self.tun_fd], [], [], 1.0)
             if sock in r:

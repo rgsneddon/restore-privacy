@@ -39,11 +39,11 @@ class TestLiveClientCount(unittest.TestCase):
         self.assertEqual(reg.count(), 0)
         self.assertEqual(reg.status_payload()["clients_connected"], 0)
 
-        reg.add(_sess(b"\x01" * 8, "10.88.0.2", last_seen=now))
+        reg.add(_sess(b"\x01" * 8, "10.88.0.2", last_seen=now, addr=("1.1.1.1", 1001)))
         self.assertEqual(reg.count(), 1)
         self.assertEqual(reg.status_payload()["clients_connected"], 1)
 
-        reg.add(_sess(b"\x02" * 8, "10.88.0.3", last_seen=now))
+        reg.add(_sess(b"\x02" * 8, "10.88.0.3", last_seen=now, addr=("1.1.1.2", 1002)))
         self.assertEqual(reg.count(), 2)
         self.assertEqual(reg.status_payload()["clients_connected"], 2)
 
@@ -58,14 +58,22 @@ class TestLiveClientCount(unittest.TestCase):
     def test_expire_stale_lowers_count_not_cumulative(self):
         reg = SessionRegistry(idle_sec=60)
         now = time_module_time()
-        # Two "connects"
-        reg.add(_sess(b"\x0a" * 8, "10.88.0.10", last_seen=now))
-        reg.add(_sess(b"\x0b" * 8, "10.88.0.11", last_seen=now))
+        # Two "connects" (distinct client endpoints)
+        reg.add(
+            _sess(b"\x0a" * 8, "10.88.0.10", last_seen=now, addr=("9.9.9.9", 1111))
+        )
+        reg.add(
+            _sess(b"\x0b" * 8, "10.88.0.11", last_seen=now, addr=("8.8.8.8", 2222))
+        )
         peak = reg.count()
         self.assertEqual(peak, 2)
 
         # One goes idle past timeout (simulates disconnect/silence)
-        reg.add(_sess(b"\x0a" * 8, "10.88.0.10", last_seen=now - 200))
+        reg.add(
+            _sess(
+                b"\x0a" * 8, "10.88.0.10", last_seen=now - 200, addr=("9.9.9.9", 1111)
+            )
+        )
         # Other stays live
         live = reg.get(b"\x0b" * 8)
         self.assertIsNotNone(live)
@@ -97,13 +105,27 @@ class TestLiveClientCount(unittest.TestCase):
     def test_two_concurrent_live_sessions_count_two(self):
         reg = SessionRegistry()
         t = time_module_time()
-        reg.add(_sess(b"\x01" * 8, "10.88.0.2", last_seen=t))
-        reg.add(_sess(b"\x02" * 8, "10.88.0.3", last_seen=t))
+        reg.add(_sess(b"\x01" * 8, "10.88.0.2", last_seen=t, addr=("1.0.0.1", 1)))
+        reg.add(_sess(b"\x02" * 8, "10.88.0.3", last_seen=t, addr=("1.0.0.2", 2)))
         self.assertEqual(reg.status_payload()["clients_connected"], 2)
 
     def test_default_idle_constant_reasonable(self):
         self.assertGreaterEqual(DEFAULT_SESSION_IDLE_SEC, 30)
-        self.assertLessEqual(DEFAULT_SESSION_IDLE_SEC, 600)
+        self.assertLessEqual(DEFAULT_SESSION_IDLE_SEC, 120)
+
+    def test_reconnect_same_addr_replaces_orphan_session(self):
+        """Same client UDP endpoint reconnecting must not accumulate count."""
+        reg = SessionRegistry(idle_sec=600)
+        now = time_module_time()
+        addr = ("203.0.113.9", 54321)
+        reg.add(_sess(b"\xaa" * 8, "10.88.0.2", last_seen=now, addr=addr))
+        self.assertEqual(reg.count(), 1)
+        # New session_id, same client_addr (reconnect)
+        reg.add(_sess(b"\xbb" * 8, "10.88.0.3", last_seen=now, addr=addr))
+        self.assertEqual(reg.count(), 1)
+        self.assertIsNone(reg.get(b"\xaa" * 8))
+        self.assertIsNotNone(reg.get(b"\xbb" * 8))
+        self.assertEqual(reg.status_payload()["clients_connected"], 1)
 
 
 class TestServeLoopWiresExpiry(unittest.TestCase):
@@ -125,8 +147,10 @@ class TestStatusApiCurrentOnly(unittest.TestCase):
     def test_ui_handler_exposes_only_current_count(self):
         reg = SessionRegistry(idle_sec=60)
         t = time_module_time()
-        reg.add(_sess(b"\x01" * 8, "10.88.0.2", last_seen=t))
-        reg.add(_sess(b"\x02" * 8, "10.88.0.3", last_seen=t - 9999))
+        reg.add(_sess(b"\x01" * 8, "10.88.0.2", last_seen=t, addr=("5.5.5.5", 50)))
+        reg.add(
+            _sess(b"\x02" * 8, "10.88.0.3", last_seen=t - 9999, addr=("6.6.6.6", 60))
+        )
         # Payload callback uses real registry.status_payload
         Handler = make_handler(reg.status_payload)
         httpd = ThreadingHTTPServer(("127.0.0.1", 0), Handler)
