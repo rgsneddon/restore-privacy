@@ -1,14 +1,17 @@
 """Windows full-tunnel: Wintun adapter + default routes + sealed RPT DATA plane.
 
-Anti-blackhole: full-tunnel catch-all routes are only applied when a real
-system-capture TUN exists; routes bind to the adapter IF index; VPN server
-host is pinned on the physical gateway before dual /1 routes.
+Anti-blackhole:
+- Dual /1 only with real Wintun + valid IF index + on-link next-hop 0.0.0.0
+- Never next-hop 10.88.0.1 (ARP blackhole on Wintun)
+- Server host pinned on physical GW before catch-alls
+- Rollback catch-alls if setup fails or if_index missing
 """
 
 from __future__ import annotations
 
 import subprocess
 import sys
+import time
 from dataclasses import dataclass
 from typing import Optional
 
@@ -16,8 +19,10 @@ from client.connect import RptClient
 from client.dataplane import RptDataPlane
 from client.full_tunnel import (
     FullTunnelPlan,
+    routes_would_blackhole_without_if_index,
     routes_would_blackhole_without_system_capture,
     windows_route_commands,
+    windows_route_delete_commands,
 )
 from client.windows.tun_win import (
     WindowsTun,
@@ -79,24 +84,10 @@ def physical_default_gateway() -> Optional[str]:
     return candidates[0][1]
 
 
-def apply_routes_for_adapter(
-    plan: FullTunnelPlan,
-    server_host: str,
-    if_index: Optional[int] = None,
-) -> tuple[list[str], list[str]]:
-    """Apply full-tunnel dual /1 routes on TUN IF; pin server on physical GW.
-
-    Returns (commands, errors).
-    """
-    cmds = windows_route_commands(plan, server_host, if_index=if_index)
-    gw = physical_default_gateway()
-    if not gw:
-        return cmds, ["no physical default gateway — refusing full-tunnel routes (would blackhole)"]
-    cmds = [c.replace("PHYSICAL_GW", gw) for c in cmds]
-    errors: list[str] = []
+def _run_cmds(cmds: list[str]) -> tuple[list[str], list[str]]:
     applied: list[str] = []
+    errors: list[str] = []
     for cmd in cmds:
-        # Skip dual /1 if we somehow still have PHYSICAL_GW unsubstituted
         if "PHYSICAL_GW" in cmd:
             errors.append("physical gateway not substituted")
             continue
@@ -109,6 +100,37 @@ def apply_routes_for_adapter(
     return applied, errors
 
 
+def apply_routes_for_adapter(
+    plan: FullTunnelPlan,
+    server_host: str,
+    if_index: Optional[int] = None,
+    *,
+    include_catchall: bool = True,
+) -> tuple[list[str], list[str]]:
+    """Apply routes. Returns (commands, errors)."""
+    cmds = windows_route_commands(
+        plan, server_host, if_index=if_index, include_catchall=include_catchall
+    )
+    gw = physical_default_gateway()
+    if not gw:
+        return cmds, [
+            "no physical default gateway — refusing full-tunnel routes (would blackhole)"
+        ]
+    cmds = [c.replace("PHYSICAL_GW", gw) for c in cmds]
+    return _run_cmds(cmds)
+
+
+def rollback_full_tunnel_routes(
+    plan: FullTunnelPlan,
+    server_host: str,
+    if_index: Optional[int] = None,
+) -> list[str]:
+    """Best-effort remove dual /1 + server pin so internet works again offline VPN."""
+    cmds = windows_route_delete_commands(plan, server_host, if_index=if_index)
+    applied, _ = _run_cmds(cmds)
+    return applied
+
+
 def start_full_tunnel(
     client: RptClient,
     plan: FullTunnelPlan,
@@ -117,13 +139,16 @@ def start_full_tunnel(
     force_queue: bool = False,
     prefer_system_capture: bool = True,
 ) -> WindowsTunnelResult:
-    """Create OS TUN (Wintun), assign IP, install full-tunnel routes, start DATA plane.
+    """Create OS TUN (Wintun), install safe full-tunnel routes, start DATA plane.
 
-    Never applies dual /1 catch-all routes without system-capture TUN + physical
-    server pin — that combination is what blackholes user internet.
+    Never applies dual /1 without system-capture TUN + valid IF index.
     """
     if not client.session:
         return WindowsTunnelResult(False, "no session", [])
+
+    # Normalize Windows adapter name (avoid Linux-style rpt0)
+    if not plan.tunnel_iface or plan.tunnel_iface.lower().startswith("rpt0"):
+        plan.tunnel_iface = "RPT"
 
     if dry_run:
         cmds = windows_route_commands(plan, server_host, if_index=42)
@@ -135,7 +160,6 @@ def start_full_tunnel(
             routes_applied=False,
         )
 
-    # Prefer real Wintun so OS routes can deliver traffic into seal_packet
     try:
         tun = create_windows_tun(
             client_ip=plan.tunnel_client_ip,
@@ -160,36 +184,55 @@ def start_full_tunnel(
     plan.tunnel_iface = tun.name
     applied: list[str] = []
 
-    # Address on adapter (/24 + gateway — required for non-blackhole routing)
     try:
         applied.extend(tun.configure_address())
     except Exception as exc:
         tun.close()
         return WindowsTunnelResult(False, f"configure_address failed: {exc}", applied)
 
+    # Allow Windows to register the adapter before IF index query
+    time.sleep(0.4)
+
     capture = system_capture_ready(tun)
-    if_index = None
+    if_index: Optional[int] = None
     if capture:
         if_index = tun.interface_index() if hasattr(tun, "interface_index") else None
         if if_index is None:
             if_index = resolve_interface_index(tun.name)
+        # Retry IF lookup once
+        if if_index is None:
+            time.sleep(0.5)
+            if_index = resolve_interface_index(tun.name)
 
-    # Full-tunnel routes ONLY when OS can actually capture traffic into TUN.
-    # Queue-only TUN + default routes = permanent internet blackhole.
     route_msg = "routes skipped"
     routes_applied = False
-    if routes_would_blackhole_without_system_capture(capture, apply_default_routes=True):
-        # force_queue / test path: dataplane may run, but never install defaults
+
+    if routes_would_blackhole_without_system_capture(capture, True):
         route_msg = "no OS TUN capture — full-tunnel routes NOT applied (prevents blackhole)"
-    elif is_admin() and capture:
-        cmds, errs = apply_routes_for_adapter(plan, server_host, if_index=if_index)
+    elif routes_would_blackhole_without_if_index(if_index, True):
+        # Server pin only (keep UDP path); no dual /1
+        if is_admin():
+            cmds, errs = apply_routes_for_adapter(
+                plan, server_host, if_index=None, include_catchall=False
+            )
+            applied.extend(cmds)
+        route_msg = (
+            "refused dual /1: no Wintun IF index (would ARP-blackhole via 10.88.0.1); "
+            "session up but not full-tunnel — check adapter name / admin"
+        )
+        routes_applied = False
+    elif is_admin() and capture and if_index is not None:
+        cmds, errs = apply_routes_for_adapter(
+            plan, server_host, if_index=if_index, include_catchall=True
+        )
         applied.extend(cmds)
         if any("refusing full-tunnel" in e for e in errs):
             route_msg = "routes refused: " + "; ".join(errs)
             routes_applied = False
+            rollback_full_tunnel_routes(plan, server_host, if_index)
         else:
             routes_applied = True
-            route_msg = "full-tunnel routes applied (IF-bound, server pinned)"
+            route_msg = f"full-tunnel routes applied (IF={if_index}, server pinned)"
             if errs:
                 route_msg += f" ({len(errs)} warn)"
     elif is_admin():
@@ -198,33 +241,43 @@ def start_full_tunnel(
         route_msg = "Administrator required for system-wide routes"
 
     plane = RptDataPlane(client)
-    plane.start(tun)
+    try:
+        plane.start(tun)
+    except Exception as exc:
+        if routes_applied:
+            rollback_full_tunnel_routes(plan, server_host, if_index)
+        tun.close()
+        return WindowsTunnelResult(
+            False, f"dataplane start failed: {exc}", applied, routes_applied=False
+        )
 
     if not dataplane_enabled(tun) or not plane.is_running():
         plane.stop()
+        if routes_applied:
+            rollback_full_tunnel_routes(plan, server_host, if_index)
         tun.close()
         return WindowsTunnelResult(
             False,
-            "dataplane failed to start — routes not left active without forward path",
+            "dataplane failed — full-tunnel routes rolled back (prevents blackhole)",
             applied,
             tun=None,
-            routes_applied=routes_applied,
+            routes_applied=False,
         )
 
-    # Honest status: connected session is ok only if we didn't claim full tunnel
-    # with dead capture. Session + dataplane running is still "ok" for VPN IP.
     msg = (
         f"TUN mode={tun.mode}; {route_msg}; dataplane running (sealed RPT DATA); "
         f"system_capture={capture}; if_index={if_index}; "
         f"wintun_dll={wintun_dll_available()}"
     )
-    if routes_applied and not capture:
-        # Should be unreachable by construction
+    if routes_applied and (
+        not capture or routes_would_blackhole_without_if_index(if_index, True)
+    ):
         plane.stop()
+        rollback_full_tunnel_routes(plan, server_host, if_index)
         tun.close()
         return WindowsTunnelResult(
             False,
-            "refused: full-tunnel routes without system capture would blackhole internet",
+            "refused: full-tunnel routes without IF-bound capture would blackhole internet",
             applied,
             routes_applied=False,
         )
@@ -247,6 +300,13 @@ def apply_full_tunnel_routes(
     if_index: Optional[int] = None,
 ) -> WindowsTunnelResult:
     """Apply route table only (adapter must already exist)."""
+    if routes_would_blackhole_without_if_index(if_index, True):
+        return WindowsTunnelResult(
+            False,
+            "refused: if_index required for dual /1 (ARP blackhole otherwise)",
+            windows_route_commands(plan, server_host, if_index=None, include_catchall=False),
+            routes_applied=False,
+        )
     cmds = windows_route_commands(plan, server_host, if_index=if_index)
     gw = physical_default_gateway() or "0.0.0.0"
     cmds = [c.replace("PHYSICAL_GW", gw) for c in cmds]

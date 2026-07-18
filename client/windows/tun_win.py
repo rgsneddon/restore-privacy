@@ -162,19 +162,17 @@ class WintunTun:
         return resolve_interface_index(self.name)
 
     def configure_address(self) -> list[str]:
-        """Assign IPv4 on the Wintun adapter with on-link gateway 10.88.0.1.
+        """Assign IPv4 /32 on Wintun — no fake gateway 10.88.0.1 (cannot ARP).
 
-        Using /24 + gateway (not bare /32 alone) so dual /1 routes via the
-        tunnel gateway are reachable and do not blackhole internet traffic.
+        Full-tunnel uses IF-bound on-link routes (0.0.0.0 IF <n>), not a next-hop
+        that Windows would try to ARP on this virtual NIC.
         """
-        gateway = "10.88.0.1"
         cmds = [
             f'netsh interface ip set address name="{self.name}" '
-            f"static {self.client_ip} 255.255.255.0 {gateway}",
+            f"static {self.client_ip} 255.255.255.255",
             f'netsh interface ip delete dns name="{self.name}" all',
             f'netsh interface ip add dns name="{self.name}" addr=1.1.1.1 index=1',
             f'netsh interface ip add dns name="{self.name}" addr=9.9.9.9 index=2',
-            # Ensure adapter is up for routing
             f'netsh interface set interface name="{self.name}" admin=ENABLED',
         ]
         for c in cmds:
@@ -184,6 +182,12 @@ class WintunTun:
     def read_packet(self, max_size: int = 65535) -> Optional[bytes]:
         if self._closed or not self._session:
             return None
+        # Brief wait on Wintun ring so we do not spin forever with empty receives
+        try:
+            if self._read_event:
+                ctypes.windll.kernel32.WaitForSingleObject(self._read_event, 20)
+        except Exception:
+            pass
         with self._lock:
             size = wintypes.DWORD(0)
             ptr = self._WintunReceivePacket(self._session, ctypes.byref(size))
@@ -283,7 +287,7 @@ class WindowsTun:
             return self._impl.configure_address()  # type: ignore[no-any-return]
         return [
             f'netsh interface ip set address name="{self.name}" '
-            f"static {self.client_ip} 255.255.255.0 10.88.0.1",
+            f"static {self.client_ip} 255.255.255.255",
         ]
 
     def read_packet(self, max_size: int = 65535) -> Optional[bytes]:

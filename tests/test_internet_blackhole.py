@@ -17,6 +17,7 @@ from client.endpoint import Endpoint  # noqa: E402
 from client.full_tunnel import (  # noqa: E402
     assert_full_tunnel_plan,
     build_full_tunnel_plan,
+    routes_would_blackhole_without_if_index,
     routes_would_blackhole_without_system_capture,
     windows_route_commands,
 )
@@ -47,13 +48,21 @@ class TestWindowsAntiBlackholeRoutes(unittest.TestCase):
         self.assertIn("IF 17", joined)
         self.assertIn("0.0.0.0 mask 128.0.0.0 0.0.0.0 IF 17", joined)
         self.assertIn("128.0.0.0 mask 128.0.0.0 0.0.0.0 IF 17", joined)
-        # Address must put gateway on-link (/24), not bare /32 alone
-        self.assertIn("255.255.255.0", joined)
-        self.assertIn("10.88.0.1", joined)
+        # /32 address — no fake ARP gateway 10.88.0.1 for dual /1
+        self.assertIn("255.255.255.255", joined)
+        self.assertNotIn("mask 128.0.0.0 10.88.0.1", joined)
         pin_i = joined.find(server)
         catch_i = joined.find("0.0.0.0 mask 128.0.0.0")
         self.assertGreater(catch_i, pin_i)
         self.assertEqual(assert_full_tunnel_plan(plan), [])
+
+    def test_no_if_index_omits_dual_slash1(self):
+        plan = build_full_tunnel_plan("10.88.0.5", tunnel_iface="RPT")
+        cmds = "\n".join(windows_route_commands(plan, "104.156.224.47", if_index=None))
+        self.assertNotIn("mask 128.0.0.0", cmds)
+        self.assertIn("PHYSICAL_GW", cmds)
+        self.assertTrue(routes_would_blackhole_without_if_index(None, True))
+        self.assertFalse(routes_would_blackhole_without_if_index(12, True))
 
     def test_routes_would_blackhole_helper(self):
         self.assertTrue(

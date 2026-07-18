@@ -167,7 +167,15 @@ class RetroClientApp:
                     for c in tun_res.applied_commands[:6]:
                         self._log(f"  plan: {c}")
                     if self.client.state == ConnectState.CONNECTED and tun_res.ok:
-                        self.status_var.set(f"CONNECTED — {result.session.vpn_ip}")
+                        if getattr(tun_res, "routes_applied", False):
+                            self.status_var.set(
+                                f"CONNECTED — full tunnel {result.session.vpn_ip}"
+                            )
+                        else:
+                            self.status_var.set(
+                                f"CONNECTED (session {result.session.vpn_ip}) — "
+                                "full-tunnel routes not applied (see log)"
+                            )
                     else:
                         self.status_var.set("CONNECTED (session) — check dataplane log")
                 else:
