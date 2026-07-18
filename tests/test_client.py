@@ -90,18 +90,24 @@ class TestUiTheme(unittest.TestCase):
             SCROLLING_PRIVACY_TEXT,
             "lightweight vpn to restore your privacy - no user data is retained - your privacy is restored",
         )
-        self.assertEqual(BANNER_BG.lower(), "#000080")
-        self.assertEqual(WINDOW_BG.lower(), "#000000")
-        self.assertEqual(WINDOW_FG.lower(), "#ffffff")
+        # Product shell uses restorebritain contact palette (not Win3.1-only)
+        from client.ui_theme import CHROME_BG, PRIMARY
 
-    def test_windows_app_auto_connect_and_theme_in_source(self):
+        self.assertTrue(BANNER_BG.startswith("#"))
+        self.assertTrue(WINDOW_BG.startswith("#"))
+        self.assertTrue(WINDOW_FG.startswith("#"))
+        self.assertTrue(PRIMARY.startswith("#"))
+        self.assertTrue(CHROME_BG.startswith("#"))
+
+    def test_windows_app_manual_connect_and_theme_in_source(self):
         app = (ROOT / "client" / "windows" / "app.py").read_text(encoding="utf-8")
         self.assertIn("SCROLLING_PRIVACY_TEXT", app)
-        self.assertIn("BANNER_BG", app)
-        self.assertIn("WINDOW_BG", app)
-        self.assertIn("auto_connect_on_launch", app)
-        self.assertIn("_auto_connect", app)
-        self.assertIn("after(200", app)  # launch schedules connect
+        self.assertIn("CHROME_BG", app)
+        self.assertIn("_start_connect", app)
+        self.assertIn("_start_disconnect", app)
+        self.assertIn("_on_close_ui_only", app)
+        self.assertNotIn("_auto_connect", app)
+        self.assertIn("plain_tunnel_status", app)
 
     def test_flutter_sources(self):
         main = (ROOT / "client_app" / "lib" / "main.dart").read_text(encoding="utf-8")

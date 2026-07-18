@@ -152,38 +152,36 @@ class TestStopFullTunnel(unittest.TestCase):
 
 
 class TestWindowsAppCloseHook(unittest.TestCase):
-    """App UI close path must invoke stop_full_tunnel."""
+    """Close is UI-only; Disconnect (not close) runs full teardown."""
 
-    def test_app_source_wires_wm_delete_and_teardown(self):
+    def test_app_source_close_ui_only_disconnect_tears_down(self):
         app_path = ROOT / "client" / "windows" / "app.py"
         src = app_path.read_text(encoding="utf-8")
         self.assertIn("stop_full_tunnel", src)
         self.assertIn("WM_DELETE_WINDOW", src)
-        self.assertIn("_on_close", src)
-        self.assertIn("_teardown_tunnel", src)
-        # protocol registered
+        self.assertIn("_on_close_ui_only", src)
+        self.assertIn("disconnect_full_tunnel", src)
         self.assertIn('protocol("WM_DELETE_WINDOW"', src)
-        # finally teardown after mainloop
-        self.assertIn("finally:", src)
-        self.assertIn("self._teardown_tunnel()", src)
-        # _on_close calls teardown then destroy
-        self.assertIn("def _on_close", src)
-        self.assertLess(src.index("def _teardown_tunnel"), src.index("def _on_close"))
-        on_close = src[src.index("def _on_close") : src.index("def run")]
-        self.assertIn("_teardown_tunnel", on_close)
+        # Close must not call stop/teardown
+        on_close = src[src.index("def _on_close_ui_only") : src.index("def run")]
+        self.assertNotIn("stop_full_tunnel", on_close)
+        self.assertNotIn("disconnect_full_tunnel", on_close)
         self.assertIn("destroy", on_close)
+        # run() has no finally teardown
+        run_body = src[src.index("def run") : src.index("def run") + 180]
+        self.assertNotIn("stop_full_tunnel", run_body)
 
-    def test_teardown_method_calls_shipped_stop(self):
-        """AST: _teardown_tunnel body references stop_full_tunnel."""
+    def test_disconnect_helper_calls_shipped_stop(self):
+        """AST: disconnect_full_tunnel body references stop_full_tunnel."""
         app_path = ROOT / "client" / "windows" / "app.py"
         tree = ast.parse(app_path.read_text(encoding="utf-8"))
         found = False
         for node in ast.walk(tree):
-            if isinstance(node, ast.FunctionDef) and node.name == "_teardown_tunnel":
+            if isinstance(node, ast.FunctionDef) and node.name == "disconnect_full_tunnel":
                 body = ast.dump(node)
                 self.assertIn("stop_full_tunnel", body)
                 found = True
-        self.assertTrue(found, "_teardown_tunnel not found")
+        self.assertTrue(found, "disconnect_full_tunnel not found")
 
 
 class TestAndroidTeardownWiring(unittest.TestCase):
