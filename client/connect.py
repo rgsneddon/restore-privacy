@@ -68,6 +68,46 @@ class ConnectResult:
 StatusCallback = Callable[[str], None]
 
 
+def format_connect_failure(
+    exc: BaseException,
+    *,
+    host: str,
+    port: int,
+    timeout_s: float,
+) -> str:
+    """User-facing connect error — never bare 'timed out' without endpoint context.
+
+    UDP HELLO timeouts usually mean the node is down, firewalled, or blocked;
+    the message names host:port so the user can act.
+    """
+    target = f"{host}:{int(port)}"
+    name = type(exc).__name__
+    raw = str(exc).strip() or name
+
+    # socket.timeout and TimeoutError both surface as "timed out" on Windows
+    is_timeout = isinstance(exc, (TimeoutError, socket.timeout)) or (
+        name in ("timeout", "TimeoutError")
+        or raw.lower() in ("timed out", "timeout")
+        or "timed out" in raw.lower()
+    )
+    if is_timeout:
+        secs = int(timeout_s) if timeout_s == int(timeout_s) else timeout_s
+        return (
+            f"No reply from VPN node {target} within {secs}s. "
+            "Check your internet, firewall/UDP, or that the node is online."
+        )
+
+    # Secrets / admission often include useful detail already
+    if "secret" in raw.lower() or "client_ed25519" in raw.lower() or "node_elgamal" in raw.lower():
+        return raw if len(raw) <= 160 else raw[:157] + "…"
+
+    if len(raw) <= 120 and target not in raw:
+        return f"{raw} (node {target})"
+    if target not in raw and len(raw) < 100:
+        return f"{raw} — node {target}"
+    return raw if len(raw) <= 160 else raw[:157] + "…"
+
+
 def complete_server_hello(
     reply: bytes,
     client_nonce: bytes,
@@ -165,7 +205,7 @@ class RptClient:
         return result
 
     def connect(self, timeout: float = 20.0) -> ConnectResult:
-        """Perform authorized RPT handshake with the node. Auto-called on app launch.
+        """Perform authorized RPT handshake with the node (manual Connect path).
 
         UK public-IP gate runs first; non-UK users get a clear failure notice.
         """
@@ -207,11 +247,17 @@ class RptClient:
             )
         except Exception as exc:
             self.state = ConnectState.ERROR
-            self._status(f"Connect failed: {exc}")
-            return ConnectResult(ok=False, state=self.state, message=str(exc))
+            msg = format_connect_failure(
+                exc,
+                host=self.endpoint.host,
+                port=self.endpoint.port,
+                timeout_s=timeout,
+            )
+            self._status(f"Connect failed: {msg}")
+            return ConnectResult(ok=False, state=self.state, message=msg)
 
     def auto_connect_on_launch(self, timeout: float = 20.0) -> ConnectResult:
-        """Primary launch path — no separate Connect click required."""
+        """Legacy helper — same as connect(); product UI no longer auto-invokes this."""
         return self.connect(timeout=timeout)
 
     def seal_packet(self, ip_packet: bytes) -> bytes:
