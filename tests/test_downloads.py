@@ -23,7 +23,7 @@ from downloads import (  # noqa: E402
 
 
 class TestDownloadCatalog(unittest.TestCase):
-    def test_version_is_0_0_9(self):
+    def test_version_is_0_1_0(self):
         self.assertEqual(RELEASE_VERSION, "0.1.0")
         self.assertEqual(RELEASE_TAG, "0.1.0")
 
