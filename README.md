@@ -5,7 +5,7 @@
 
 | | |
 |--|--|
-| **Get the app** | [Download v0.0.7](https://github.com/rgsneddon/restore-privacy/releases/tag/0.0.7) · [Status & downloads](https://restore-privacy-status.onrender.com/) |
+| **Get the app** | [Download v0.0.8](https://github.com/rgsneddon/restore-privacy/releases/tag/0.0.8) · [Status & downloads](https://restore-privacy-status.onrender.com/) |
 | **Privacy** | [PRIVACY_POLICY.md](PRIVACY_POLICY.md) |
 | **License** | [LICENSE](LICENSE) (MIT) |
 | **Credits** | [CREDITS.md](CREDITS.md) |
@@ -27,22 +27,27 @@
 
 ### Windows
 
-1. Download the **Windows installer (.exe)** from the [0.0.7 release](https://github.com/rgsneddon/restore-privacy/releases/tag/0.0.7)  
+1. Download the **Windows installer (.exe)** from the [0.0.8 release](https://github.com/rgsneddon/restore-privacy/releases/tag/0.0.8)  
    or use the button on https://restore-privacy-status.onrender.com/
-2. Run **`restore-privacy-client-0.0.7-windows-x64-setup.exe`**.  
+2. Run **`restore-privacy-client-0.0.8-windows-x64-setup.exe`**.  
    It installs the full client (bundled runtime + dependencies — **no separate Python install**), creates shortcuts, and launches the app.
 3. For full system VPN, run **Restore Privacy** as Administrator (Start Menu or Desktop shortcut → right-click → Run as administrator).
 4. The app **connects automatically** on launch.
 
 ### Android
 
-1. Download the **APK** from the [0.0.7 release](https://github.com/rgsneddon/restore-privacy/releases/tag/0.0.7)  
+1. Download the **APK** from the [0.0.8 release](https://github.com/rgsneddon/restore-privacy/releases/tag/0.0.8)  
    or the status page.
 2. Install the APK (allow install from unknown sources if your device asks).
 3. Open **Restore Privacy** and grant **VPN** permission when prompted.
 4. The app **connects automatically** on launch.
 
-### iOS / macOS
+### iOS / macOS (prep — finish on a Mac)
+
+Scaffold + MacBook checklist: **`client_app/APPLE_BUILD.md`**.  
+Packet Tunnel Network Extension, secrets, and signing are Mac-only (stubs under `client_app/ios/NativePrep` and `macos/NativePrep`).
+
+### iOS / macOS notes
 
 Signed store installers are not published from the Windows build host yet.  
 If you build on a Mac, see `client_app/ios/BUILD_ON_MAC.md` and `client_app/macos/BUILD_ON_MAC.md`.

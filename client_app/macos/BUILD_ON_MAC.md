@@ -1,32 +1,92 @@
-# macOS — build on Mac later
+# macOS — build on MacBook
 
-Flutter `macos/` scaffold is present.
+Flutter `macos/` scaffold is ready. Full-system VPN requires a **Packet Tunnel Network Extension** (and often a **System Extension** entitlement for production). Sign and notarize on Mac only.
 
-## On your Mac
+## 1. Open and run
 
 ```bash
 cd client_app
 flutter pub get
 flutter run -d macos
-# or
+# release:
 flutter build macos
+open build/macos/Build/Products/Release/restore_privacy_client.app
 ```
 
-## Product behavior
+Or:
 
-Same retro CLI window and auto-connect as Windows/Android (`lib/main.dart`).
+```bash
+open macos/Runner.xcworkspace
+```
 
-For **full system VPN** on macOS, add a **System Extension / Network Extension** packet tunnel that speaks RPT2 (shared protocol with `client/connect.py`). The UI app can stay Flutter; the extension is native Swift/ObjC.
+## 2. Signing & entitlements (Xcode)
 
-## Keys
+1. **Runner** → **Signing & Capabilities** → your Team.  
+2. Bundle id e.g. `com.yourorg.restoreprivacy.macos`.  
+3. Add:
+   - **Network Extensions** (Packet Tunnel)  
+   - **App Groups** (share secrets with the extension)  
+   - For production system-wide VPN: **System Extension** / Network Extension entitlement as required by current macOS versions  
+4. Sample entitlement **comments** are in `macos/NativePrep/Runner.entitlements.example` — merge into `Runner/DebugProfile.entitlements` and `Runner/Release.entitlements` in Xcode (do not blindly replace sandbox settings without testing).
 
-Load from a user-local secrets dir (mirror of Windows `~/.restore-privacy/secrets/`):
+## 3. Packet Tunnel extension
 
-- `client_ed25519.priv`
-- `node_elgamal.pub`
+1. **File → New → Target → Network Extension → Packet Tunnel Provider**.  
+2. Name e.g. `PacketTunnel`.  
+3. Add sources from `macos/NativePrep/`:
+   - `PacketTunnelProvider.swift` → extension target  
+   - `RptVpnChannel.swift` → Runner target  
+   - `RptSecrets.swift` → shared / both as needed  
+4. Register the Flutter method channel on app launch (see `RptVpnChannel.swift`).  
+5. Extension must speak **RPT2** (same as Windows/Android). Outline: `ios/NativePrep/RPT_PROTOCOL.md` (shared).
 
-Endpoint default: `104.156.224.47:44044` UDP (`lib/rpt_config.dart`).
+Until the extension is wired, the channel returns a clear failure map so Flutter stays responsive.
 
-## Signing
+## 4. Method channel contract
 
-Notarization and Developer ID signing are done on the Mac only.
+Identical to iOS / Android:
+
+| | |
+|--|--|
+| Channel | `restore_privacy/vpn` |
+| Methods | `connect`, `disconnect` |
+| Args / results | See `lib/vpn_controller.dart` and `lib/connect_status.dart` |
+
+Endpoint defaults: `lib/rpt_config.dart` → `104.156.224.47:44044`.
+
+## 5. Secrets
+
+```text
+~/.restore-privacy/secrets/client_ed25519.priv
+~/.restore-privacy/secrets/node_elgamal.pub
+```
+
+Prefer **App Group** container for the extension process. **Never** ship `node_elgamal.priv`.
+
+## 6. Product behavior
+
+Same Flutter UI and auto-connect as Windows/Android (`lib/main.dart`):
+
+- Banner `#000080`, black background, white monospace text  
+- Exact scrolling privacy string in `lib/theme.dart`  
+- Full tunnel intent `0.0.0.0/0`  
+- UK IP gate before tunnel attach  
+- AppIcon under `Runner/Assets.xcassets/AppIcon.appiconset/`
+
+## 7. Notarization (distribution)
+
+```bash
+# After flutter build macos + Developer ID signing in Xcode or codesign:
+xcrun notarytool submit <app-or-dmg> --apple-id … --team-id … --password …
+xcrun stapler staple <app>
+```
+
+**Windows cannot notarize.**
+
+## 8. Smoke checklist
+
+- [ ] `flutter run -d macos` shows retro UI and auto-connect  
+- [ ] Channel responds (extension stub or real tunnel)  
+- [ ] With extension signed: full tunnel online via RPT node  
+- [ ] Quit / disconnect restores routing  
+- [ ] No node private key in the `.app` bundle

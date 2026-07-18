@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  EXAMPLE only — create Runner.entitlements in Xcode via Signing & Capabilities.
+  Network Extensions + App Groups require an Apple Developer team.
+-->
+<plist version="1.0">
+<dict>
+	<!-- App Groups: share secrets with Packet Tunnel extension
+	<key>com.apple.security.application-groups</key>
+	<array>
+		<string>group.com.restoreprivacy.shared</string>
+	</array>
+	-->
+	<!-- Packet Tunnel Network Extension
+	<key>com.apple.developer.networking.networkextension</key>
+	<array>
+		<string>packet-tunnel-provider</string>
+	</array>
+	-->
+</dict>
+</plist>

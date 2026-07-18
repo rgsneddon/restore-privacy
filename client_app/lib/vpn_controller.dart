@@ -36,8 +36,10 @@ class VpnController {
       return false;
     } on MissingPluginException {
       onStatus(
-        'Native VPN channel not bound on this platform build; '
-        'use the Android/Windows release client for full tunnel.',
+        'Native VPN channel not bound on this platform build. '
+        'Android/Windows: use the release installer. '
+        'iOS/macOS: wire restore_privacy/vpn + Packet Tunnel on a Mac '
+        '(see client_app/APPLE_BUILD.md).',
       );
       return false;
     }

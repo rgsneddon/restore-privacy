@@ -1,17 +1,36 @@
-# restore_privacy_client
+# Restore Privacy Client (Flutter)
 
-A new Flutter project.
+Cross-platform UI for the **RPT2** tunnel (custom protocol — not WireGuard/OpenVPN).
 
-## Getting Started
+| Platform | Status |
+|----------|--------|
+| **Android** | Full VpnService path shipped |
+| **Windows** | Native Python + installer (separate); Flutter Windows is UI-only unless extended |
+| **iOS / macOS** | **Prep ready** — finish Packet Tunnel + signing on a **Mac** |
 
-This project is a starting point for a Flutter application.
+## Shared config
 
-A few resources to get you started if this is your first Flutter project:
+- Endpoint / full tunnel / auto-connect: `lib/rpt_config.dart`  
+- Method channel: `restore_privacy/vpn` (`lib/vpn_controller.dart`)  
+- Theme / scrolling privacy string: `lib/theme.dart`  
 
-- [Learn Flutter](https://docs.flutter.dev/get-started/learn-flutter)
-- [Write your first Flutter app](https://docs.flutter.dev/get-started/codelab)
-- [Flutter learning resources](https://docs.flutter.dev/reference/learning-resources)
+## Apple (MacBook)
 
-For help getting started with Flutter development, view the
-[online documentation](https://docs.flutter.dev/), which offers tutorials,
-samples, guidance on mobile development, and a full API reference.
+Start here: **[APPLE_BUILD.md](APPLE_BUILD.md)**
+
+- [ios/BUILD_ON_MAC.md](ios/BUILD_ON_MAC.md)  
+- [macos/BUILD_ON_MAC.md](macos/BUILD_ON_MAC.md)  
+- Native stubs: `ios/NativePrep/`, `macos/NativePrep/`  
+
+## Android
+
+```bash
+cd client_app
+flutter pub get
+flutter build apk --release
+```
+
+## Secrets
+
+Never commit `*.priv`. Product keys: `client_ed25519.priv` + `node_elgamal.pub` only.  
+See Apple docs and Android inject path under `client_app/android`.
