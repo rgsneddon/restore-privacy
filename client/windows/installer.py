@@ -16,9 +16,10 @@ import traceback
 from pathlib import Path
 
 APP_NAME = "RestorePrivacy"
-VERSION = "0.0.5"
+VERSION = "0.0.6"
 # Install under LocalAppData so no elevation is required for deploy.
 INSTALL_DIR = Path(os.environ.get("LOCALAPPDATA", str(Path.home()))) / "Programs" / APP_NAME
+USER_SECRETS = Path.home() / ".restore-privacy" / "secrets"
 START_MENU = (
     Path(os.environ.get("APPDATA", str(Path.home() / "AppData" / "Roaming")))
     / "Microsoft"
@@ -28,6 +29,9 @@ START_MENU = (
     / APP_NAME
 )
 DESKTOP = Path(os.environ.get("USERPROFILE", str(Path.home()))) / "Desktop"
+# Product admission keys only (never node_elgamal.priv)
+CLIENT_PRIV = "client_ed25519.priv"
+NODE_PUB = "node_elgamal.pub"
 
 
 def _payload_root() -> Path:
@@ -52,7 +56,7 @@ def _payload_root() -> Path:
         if d.is_dir():
             return d
     raise FileNotFoundError(
-        "Client payload not found. Build with scripts/build_release_0.0.5.py first."
+        "Client payload not found. Build with scripts/build_release_0.0.6.py first."
     )
 
 
@@ -73,20 +77,75 @@ def _find_client_exe(root: Path) -> Path:
 def _copy_tree(src: Path, dst: Path) -> None:
     if dst.exists():
         shutil.rmtree(dst)
-    shutil.copytree(
-        src,
-        dst,
-        ignore=shutil.ignore_patterns("*.priv", "*.pyc", "__pycache__"),
-    )
+    # Allow product client_ed25519.priv in payload secrets/; never copy node_elgamal.priv
+    def _ignore(directory: str, names: list[str]) -> set[str]:
+        ignored: set[str] = set()
+        for n in names:
+            if n.endswith(".pyc") or n == "__pycache__":
+                ignored.add(n)
+            if n == "node_elgamal.priv":
+                ignored.add(n)
+        return ignored
+
+    shutil.copytree(src, dst, ignore=_ignore)
+
+
+def _find_payload_secrets(payload_dir: Path) -> Path | None:
+    for cand in (
+        payload_dir / "secrets",
+        payload_dir.parent / "secrets",
+    ):
+        if (cand / CLIENT_PRIV).is_file() and (cand / NODE_PUB).is_file():
+            return cand
+    # Nested onedir
+    for p in payload_dir.rglob(CLIENT_PRIV):
+        parent = p.parent
+        if (parent / NODE_PUB).is_file() and parent.name == "secrets":
+            return parent
+    return None
+
+
+def _provision_secrets(payload_dir: Path, install_dir: Path) -> list[str]:
+    """Install admission keys where the client resolver will find them."""
+    written: list[str] = []
+    src = _find_payload_secrets(payload_dir)
+    # Also try shipping secrets next to installer meipass
+    if src is None and getattr(sys, "frozen", False) and hasattr(sys, "_MEIPASS"):
+        base = Path(sys._MEIPASS)  # type: ignore[attr-defined]
+        for cand in (base / "secrets", base / "payload" / "secrets"):
+            if (cand / CLIENT_PRIV).is_file() and (cand / NODE_PUB).is_file():
+                src = cand
+                break
+    if src is None:
+        return written
+
+    for dest in (install_dir / "secrets", USER_SECRETS):
+        dest.mkdir(parents=True, exist_ok=True)
+        for name in (CLIENT_PRIV, NODE_PUB):
+            data = (src / name).read_bytes()
+            # Never write node private key even if mis-named
+            if name.endswith(".priv") and name != CLIENT_PRIV:
+                continue
+            target = dest / name
+            target.write_bytes(data)
+            written.append(str(target))
+    return written
 
 
 def _write_version(install_dir: Path) -> None:
     (install_dir / "VERSION").write_text(VERSION + "\n", encoding="utf-8")
+    secrets_ok = (install_dir / "secrets" / CLIENT_PRIV).is_file()
+    sec_line = (
+        "Admission secrets installed: yes"
+        if secrets_ok
+        else f"Admission secrets missing — place {CLIENT_PRIV} and {NODE_PUB} in secrets\\"
+    )
     (install_dir / "INSTALL.txt").write_text(
         f"Restore Privacy Client {VERSION}\r\n"
         "Installed with bundled Python runtime and dependencies.\r\n"
         "Run RestorePrivacy as Administrator for full system VPN.\r\n"
-        f"Install path: {install_dir}\r\n",
+        f"Install path: {install_dir}\r\n"
+        f"{sec_line}\r\n",
         encoding="utf-8",
     )
 
@@ -120,6 +179,7 @@ def install(launch: bool = True) -> Path:
 
     INSTALL_DIR.mkdir(parents=True, exist_ok=True)
     _copy_tree(payload_dir, INSTALL_DIR)
+    secrets_written = _provision_secrets(payload_dir, INSTALL_DIR)
     _write_version(INSTALL_DIR)
 
     installed_exe = INSTALL_DIR / client_src_exe.name
@@ -129,6 +189,13 @@ def install(launch: bool = True) -> Path:
         if not candidates:
             raise FileNotFoundError("Install copy failed — no .exe in install dir")
         installed_exe = candidates[0]
+
+    if not secrets_written:
+        # Still launch, but user will see a clear secrets error from the app
+        print(
+            "WARNING: admission secrets not found in installer payload. "
+            f"Place {CLIENT_PRIV} and {NODE_PUB} under {INSTALL_DIR / 'secrets'}"
+        )
 
     # Start menu + desktop shortcuts
     try:
@@ -174,6 +241,8 @@ def main() -> int:
         # Brief console feedback if a console is attached
         print(f"Installed Restore Privacy {VERSION} to:\n  {INSTALL_DIR}")
         print(f"Launched: {path}")
+        sec = INSTALL_DIR / "secrets"
+        print(f"Secrets dir: {sec} present={sec.is_dir()}")
         return 0
     except Exception as e:
         msg = f"Install failed: {e}\n{traceback.format_exc()}"

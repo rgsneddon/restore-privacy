@@ -1,4 +1,4 @@
-"""Release download link catalog for the public status page (version 0.0.5).
+"""Release download link catalog for the public status page (version 0.0.6).
 
 Public page advertises Windows .exe installer + Android .apk only.
 """
@@ -8,12 +8,12 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Iterable
 
-RELEASE_VERSION = "0.0.5"
+RELEASE_VERSION = "0.0.6"
 GITHUB_OWNER = "rgsneddon"
 GITHUB_REPO = "restore-privacy"
-RELEASE_TAG = "0.0.5"
+RELEASE_TAG = "0.0.6"
 
-# Canonical public asset filenames (must match releases/0.0.5/ and GitHub Release).
+# Canonical public asset filenames (must match releases/0.0.6/ and GitHub Release).
 WINDOWS_EXE_FILENAME = f"restore-privacy-client-{RELEASE_VERSION}-windows-x64-setup.exe"
 ANDROID_APK_FILENAME = f"restore-privacy-client-{RELEASE_VERSION}-android.apk"
 
@@ -32,7 +32,7 @@ class DownloadAsset:
         )
 
 
-# Artifacts attached to GitHub Release 0.0.5
+# Artifacts attached to GitHub Release 0.0.6
 RELEASE_ASSETS: tuple[DownloadAsset, ...] = (
     DownloadAsset(
         platform="windows",
