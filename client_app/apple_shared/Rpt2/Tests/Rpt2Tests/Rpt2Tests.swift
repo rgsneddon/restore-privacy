@@ -380,6 +380,16 @@ final class Rpt2Tests: XCTestCase {
         )
     }
 
+    func testDisconnectResultMapIsNotFullTunnelSuccess() {
+        let map = RptFullTunnelResult.disconnectResultMap()
+        XCTAssertEqual(map["ok"] as? Bool, true)
+        XCTAssertEqual(map["fullTunnelActive"] as? Bool, false)
+        XCTAssertFalse(RptFullTunnelResult.isProductSuccess(map))
+        let msg = map["message"] as? String ?? ""
+        XCTAssertTrue(msg.lowercased().contains("residual public ip"))
+        XCTAssertTrue(msg.lowercased().contains("disconnected") || msg.lowercased().contains("stopped"))
+    }
+
     // MARK: - Mock node helpers (test-only, not a parallel client re-implementation of seal/open under test)
 
     /// Minimal node SERVER_HELLO builder so tests exercise shipped client completeServerHello.

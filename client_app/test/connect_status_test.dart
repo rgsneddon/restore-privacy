@@ -105,5 +105,26 @@ void main() {
         isFalse,
       );
     });
+
+    test('disconnect map is not product connect success', () {
+      final map = {
+        'ok': true,
+        'message': kDisconnectedResidualIpMessage,
+        'fullTunnelActive': false,
+        'hostOnlySession': false,
+      };
+      expect(isConnectSuccess(map), isFalse);
+      expect(mapConnectStatusMessage(map).toLowerCase(), contains('residual public ip'));
+    });
+  });
+
+  group('app lifecycle stop-on-quit', () {
+    test('detached stops tunnel; pause/inactive do not', () {
+      expect(shouldStopTunnelOnAppLifecycle('detached'), isTrue);
+      expect(shouldStopTunnelOnAppLifecycle('AppLifecycleState.detached'), isTrue);
+      expect(shouldStopTunnelOnAppLifecycle('paused'), isFalse);
+      expect(shouldStopTunnelOnAppLifecycle('inactive'), isFalse);
+      expect(shouldStopTunnelOnAppLifecycle('resumed'), isFalse);
+    });
   });
 }

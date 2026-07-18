@@ -122,3 +122,16 @@ bool isUkGateFailureMessage(String message) {
   return m.contains('access denied') &&
       (m.contains('united kingdom') || m.contains('uk'));
 }
+
+/// Lifecycle states that must stop the system Packet Tunnel (app close / exit).
+/// Residual public IP reverts when the OS NE session stops.
+/// Does **not** include pause/inactive (background) — only full detach/exit.
+bool shouldStopTunnelOnAppLifecycle(String lifecycleStateName) {
+  final s = lifecycleStateName.trim().toLowerCase();
+  // AppLifecycleState.detached / matching names from tests and bindings.
+  return s == 'detached' || s == 'applifecyclestate.detached';
+}
+
+/// Human message after intentional tunnel stop (channel or quit).
+const String kDisconnectedResidualIpMessage =
+    'Disconnected — system VPN stopped; residual public IP restored';

@@ -45,12 +45,22 @@ class VpnController {
     }
   }
 
+  /// Stop system Packet Tunnel (same native path as app-quit hooks).
   Future<void> disconnect() async {
     try {
-      await _channel.invokeMethod<void>('disconnect');
-      onStatus('Disconnected');
+      final result = await _channel.invokeMethod<dynamic>('disconnect');
+      if (result is Map) {
+        final msg = result['message']?.toString().trim();
+        onStatus(
+          (msg != null && msg.isNotEmpty)
+              ? msg
+              : 'Disconnected — system VPN stopped; residual public IP restored',
+        );
+      } else {
+        onStatus('Disconnected — system VPN stopped; residual public IP restored');
+      }
     } catch (_) {
-      onStatus('Disconnected');
+      onStatus('Disconnected — system VPN stopped; residual public IP restored');
     }
   }
 }

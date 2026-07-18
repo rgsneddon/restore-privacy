@@ -23,7 +23,8 @@ enum RptVpnChannel {
         let fullTunnel = (args["fullTunnel"] as? Bool) ?? true
         connect(host: ep.host, port: ep.port, fullTunnel: fullTunnel, flutterResult: result)
       case "disconnect":
-        disconnect { map in result(map) }
+        // Same stop path as app-quit / terminate hooks.
+        stopAllTunnels { map in result(map) }
       case "hasSecrets":
         result([
           "ok": RptSecrets.filesPresent(),
@@ -240,10 +241,31 @@ enum RptVpnChannel {
     }
   }
 
-  private static func disconnect(completion: @escaping ([String: Any]) -> Void) {
-    NETunnelProviderManager.loadAllFromPreferences { managers, _ in
-      managers?.forEach { $0.connection.stopVPNTunnel() }
-      completion(["ok": true, "message": "Disconnected"] as [String: Any])
+  /// Stop every Restore Privacy Packet Tunnel session (channel disconnect + app quit).
+  /// Residual public IP reverts when the OS tears down the NE session.
+  static func stopAllTunnels(completion: (([String: Any]) -> Void)? = nil) {
+    let finish: ([String: Any]) -> Void = { map in
+      completion?(map)
+    }
+    NETunnelProviderManager.loadAllFromPreferences { managers, error in
+      if let error {
+        finish([
+          "ok": false,
+          "message": "Disconnect failed: \(error.localizedDescription)",
+          "fullTunnelActive": false,
+          "hostOnlySession": false,
+        ] as [String: Any])
+        return
+      }
+      let list = managers ?? []
+      for manager in list {
+        let proto = manager.protocolConfiguration as? NETunnelProviderProtocol
+        let bid = proto?.providerBundleIdentifier ?? ""
+        if bid.isEmpty || bid == providerBundleId || manager.localizedDescription == "Restore Privacy" {
+          manager.connection.stopVPNTunnel()
+        }
+      }
+      finish(RptFullTunnelResult.disconnectResultMap())
     }
   }
 }

@@ -75,4 +75,17 @@ public enum RptFullTunnelResult {
         if let active = map["fullTunnelActive"] as? Bool, active == false { return false }
         return true
     }
+
+    /// Result of stopping the system Packet Tunnel (channel disconnect / app quit).
+    /// Not a product connect success — residual public IP is expected after NE stops.
+    public static func disconnectResultMap(
+        message: String = "Disconnected — system VPN stopped; residual public IP restored"
+    ) -> [String: Any] {
+        [
+            "ok": true,
+            "message": message,
+            "fullTunnelActive": false,
+            "hostOnlySession": false,
+        ]
+    }
 }

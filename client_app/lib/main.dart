@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import 'connect_status.dart';
 import 'theme.dart';
 import 'vpn_controller.dart';
 
@@ -47,7 +48,7 @@ class RetroTunnelHome extends StatefulWidget {
 }
 
 class _RetroTunnelHomeState extends State<RetroTunnelHome>
-    with SingleTickerProviderStateMixin {
+    with SingleTickerProviderStateMixin, WidgetsBindingObserver {
   late final AnimationController _scrollCtrl;
   late final VpnController _vpn;
   final List<String> _log = [];
@@ -56,6 +57,7 @@ class _RetroTunnelHomeState extends State<RetroTunnelHome>
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _scrollCtrl = AnimationController(
       vsync: this,
       duration: const Duration(seconds: 18),
@@ -67,6 +69,14 @@ class _RetroTunnelHomeState extends State<RetroTunnelHome>
       _append('RESTORE PRIVACY tunnel client');
       _vpn.autoConnectOnLaunch();
     });
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    // On full app exit/detach, stop Packet Tunnel so residual ISP IP returns.
+    if (shouldStopTunnelOnAppLifecycle(state.name)) {
+      _vpn.disconnect();
+    }
   }
 
   void _onStatus(String msg) {
@@ -83,6 +93,9 @@ class _RetroTunnelHomeState extends State<RetroTunnelHome>
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    // Window/widget teardown — stop tunnel if still up.
+    _vpn.disconnect();
     _scrollCtrl.dispose();
     super.dispose();
   }
