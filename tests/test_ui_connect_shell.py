@@ -138,16 +138,38 @@ class TestConnectDisconnectHandlers(unittest.TestCase):
         self.assertIn("stop_full_tunnel", src)
         self.assertIn("self.client.connect", src)
 
-    def test_disconnect_tunnel_calls_stop_full_tunnel(self):
-        """Drive _disconnect_tunnel logic via mock on a minimal stand-in."""
-        from client.windows import tunnel_win
+    def test_disconnect_full_tunnel_calls_stop_full_tunnel(self):
+        """Drive shipped disconnect_full_tunnel (used by TunnelClientApp._disconnect_tunnel)."""
+        from client.windows import app as win_app
 
         client = mock.Mock()
         tunnel = mock.Mock()
-        with mock.patch.object(tunnel_win, "stop_full_tunnel") as stop:
-            # Inline the same order as app._disconnect_tunnel
-            stop(tunnel, client)
+        # Patch the name bound in app.py (where disconnect_full_tunnel looks it up)
+        with mock.patch.object(win_app, "stop_full_tunnel") as stop:
+            win_app.disconnect_full_tunnel(tunnel, client)
             stop.assert_called_once_with(tunnel, client)
+
+        # Idempotent: stop raises → falls back to client.disconnect
+        with mock.patch.object(
+            win_app, "stop_full_tunnel", side_effect=RuntimeError("x")
+        ):
+            win_app.disconnect_full_tunnel(tunnel, client)
+            client.disconnect.assert_called()
+
+    def test_app_disconnect_tunnel_method_uses_shipped_helper(self):
+        """TunnelClientApp._disconnect_tunnel clears state and calls disconnect_full_tunnel."""
+        from client.windows import app as win_app
+
+        with mock.patch.object(win_app, "disconnect_full_tunnel") as disc:
+            # Build a bare instance without Tk: attach required attrs only
+            obj = object.__new__(win_app.TunnelClientApp)
+            obj._tunnel = mock.Mock(name="tunnel")
+            obj.client = mock.Mock(name="client")
+            win_app.TunnelClientApp._disconnect_tunnel(obj)
+            self.assertIsNone(obj._tunnel)
+            disc.assert_called_once()
+            args = disc.call_args[0]
+            self.assertIs(args[1], obj.client)
 
     def test_flutter_toggle_calls_connect_and_disconnect(self):
         main = (ROOT / "client_app" / "lib" / "main.dart").read_text(encoding="utf-8")
@@ -161,7 +183,10 @@ class TestMacosPrep(unittest.TestCase):
         base = ROOT / "client_app" / "macos"
         self.assertTrue(base.is_dir())
         self.assertTrue((base / "Runner").is_dir())
-        self.assertTrue((base / "NativePrep" / "RptVpnChannel.swift").is_file() or True)
+        self.assertTrue(
+            (base / "NativePrep" / "RptVpnChannel.swift").is_file(),
+            "missing macos/NativePrep/RptVpnChannel.swift",
+        )
         # Shared Flutter UI is the macOS home
         main = (ROOT / "client_app" / "lib" / "main.dart").read_text(encoding="utf-8")
         self.assertIn("TunnelHome", main)

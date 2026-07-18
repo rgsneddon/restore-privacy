@@ -1,6 +1,5 @@
 import Cocoa
 import FlutterMacOS
-import NetworkExtension
 
 @main
 class AppDelegate: FlutterAppDelegate {
@@ -12,19 +11,7 @@ class AppDelegate: FlutterAppDelegate {
     return true
   }
 
-  /// Stop Packet Tunnel before quit so residual ISP IP returns when the UI closes.
-  /// Same stop path as method-channel `disconnect`; waits for stop to be issued.
-  override func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
-    RptVpnChannel.stopAllTunnels { _ in
-      DispatchQueue.main.async {
-        NSApp.reply(toApplicationShouldTerminate: true)
-      }
-    }
-    return .terminateLater
-  }
-
-  override func applicationWillTerminate(_ notification: Notification) {
-    // Blocking backup if ShouldTerminate path was skipped.
-    _ = RptVpnChannel.stopAllTunnelsAndWait(timeout: 2.0)
-  }
+  // Product policy: closing the window / quitting the host does NOT stop the Packet Tunnel.
+  // The user stops VPN only via the Flutter UI Disconnect button (method-channel "disconnect").
+  // Same policy as Windows / Android Flutter shells.
 }

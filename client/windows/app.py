@@ -41,6 +41,21 @@ from client.windows.elevate import (
 from client.windows.tunnel_win import start_full_tunnel, stop_full_tunnel
 
 
+def disconnect_full_tunnel(tunnel, client) -> None:
+    """Idempotent full stop: routes/dataplane/TUN/session.
+
+    Used only by the Disconnect button (not window close). Real entry point for tests.
+    """
+    try:
+        stop_full_tunnel(tunnel, client)
+    except Exception:
+        try:
+            if client is not None:
+                client.disconnect()
+        except Exception:
+            pass
+
+
 class TunnelClientApp:
     """Dark-blue chrome, black log, logo + title, single Connect/Disconnect button."""
 
@@ -293,13 +308,7 @@ class TunnelClientApp:
         """Idempotent full stop used only by Disconnect button (not window close)."""
         tunnel = self._tunnel
         self._tunnel = None
-        try:
-            stop_full_tunnel(tunnel, self.client)
-        except Exception:
-            try:
-                self.client.disconnect()
-            except Exception:
-                pass
+        disconnect_full_tunnel(tunnel, self.client)
 
     def _on_close_ui_only(self) -> None:
         """WM_DELETE_WINDOW — close the UI without stopping the VPN."""

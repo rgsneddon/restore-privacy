@@ -166,19 +166,28 @@ class TestWindowsAppCloseHook(unittest.TestCase):
         self.assertNotIn("stop_full_tunnel", on_close)
         self.assertIn("destroy", on_close)
         disc = src[src.index("def _disconnect_tunnel") : src.index("def _on_close_ui_only")]
-        self.assertIn("stop_full_tunnel", disc)
+        self.assertIn("disconnect_full_tunnel", disc)
+        # Module helper is the real stop path
+        self.assertIn("def disconnect_full_tunnel", src)
+        self.assertIn("stop_full_tunnel", src)
 
     def test_teardown_method_calls_shipped_stop(self):
-        """AST: _disconnect_tunnel body references stop_full_tunnel."""
+        """AST: _disconnect_tunnel delegates to disconnect_full_tunnel; helper calls stop_full_tunnel."""
         app_path = ROOT / "client" / "windows" / "app.py"
         tree = ast.parse(app_path.read_text(encoding="utf-8"))
-        found = False
+        found_disc = False
+        found_helper = False
         for node in ast.walk(tree):
             if isinstance(node, ast.FunctionDef) and node.name == "_disconnect_tunnel":
                 body = ast.dump(node)
+                self.assertIn("disconnect_full_tunnel", body)
+                found_disc = True
+            if isinstance(node, ast.FunctionDef) and node.name == "disconnect_full_tunnel":
+                body = ast.dump(node)
                 self.assertIn("stop_full_tunnel", body)
-                found = True
-        self.assertTrue(found, "_disconnect_tunnel not found")
+                found_helper = True
+        self.assertTrue(found_disc, "_disconnect_tunnel not found")
+        self.assertTrue(found_helper, "disconnect_full_tunnel not found")
 
 
 class TestAndroidTeardownWiring(unittest.TestCase):
