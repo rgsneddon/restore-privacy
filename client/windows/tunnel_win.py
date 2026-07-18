@@ -43,6 +43,9 @@ class WindowsTunnelResult:
     dataplane: Optional[RptDataPlane] = None
     system_capture: bool = False
     routes_applied: bool = False
+    plan: Optional[FullTunnelPlan] = None
+    server_host: Optional[str] = None
+    if_index: Optional[int] = None
 
 
 def is_admin() -> bool:
@@ -230,6 +233,84 @@ def rollback_full_tunnel_routes(
     return applied
 
 
+def stop_full_tunnel(
+    result: Optional[WindowsTunnelResult] = None,
+    client: Optional[RptClient] = None,
+    plan: Optional[FullTunnelPlan] = None,
+    server_host: Optional[str] = None,
+    if_index: Optional[int] = None,
+    *,
+    disconnect_session: bool = True,
+) -> list[str]:
+    """Idempotent full teardown: routes → dataplane → TUN → RPT session.
+
+    Order restores the physical path first (delete dual /1 + server pin), then
+    stops the DATA plane and closes Wintun so the machine reverts to the real
+    device IP path. Safe when already stopped or never connected.
+    """
+    applied: list[str] = []
+    res = result
+    plane = res.dataplane if res is not None else None
+    tun = res.tun if res is not None else None
+    routes_were_on = bool(res and res.routes_applied)
+    plan_obj = plan or (res.plan if res else None)
+    host = server_host or (res.server_host if res else None)
+    idx = if_index if if_index is not None else (res.if_index if res else None)
+
+    # 1) Remove full-tunnel routes first so traffic leaves the VPN immediately.
+    if host and (routes_were_on or plan_obj is not None):
+        try:
+            p = plan_obj or build_placeholder_plan()
+            applied.extend(rollback_full_tunnel_routes(p, host, idx))
+        except Exception:
+            # Best-effort: still continue teardown
+            try:
+                cmds = windows_route_delete_commands(
+                    plan_obj or build_placeholder_plan(), host, idx
+                )
+                applied.extend(cmds)
+            except Exception:
+                pass
+
+    # 2) Stop sealed DATA plane (also closes TUN if bound)
+    if plane is not None:
+        try:
+            plane.stop()
+        except Exception:
+            pass
+
+    # 3) Close TUN adapter if still open
+    if tun is not None:
+        try:
+            tun.close()
+        except Exception:
+            pass
+
+    # 4) End RPT session / UDP socket
+    if disconnect_session and client is not None:
+        try:
+            client.disconnect()
+        except Exception:
+            pass
+
+    if res is not None:
+        res.ok = False
+        res.routes_applied = False
+        res.dataplane = None
+        res.tun = None
+        res.message = "tunnel stopped — full teardown complete"
+
+    return applied
+
+
+def build_placeholder_plan() -> FullTunnelPlan:
+    """Minimal plan for route-delete when only host is known."""
+    return FullTunnelPlan(
+        tunnel_iface="RPT",
+        tunnel_client_ip="10.88.0.2",
+    )
+
+
 def start_full_tunnel(
     client: RptClient,
     plan: FullTunnelPlan,
@@ -257,6 +338,9 @@ def start_full_tunnel(
             applied_commands=cmds,
             system_capture=False,
             routes_applied=False,
+            plan=plan,
+            server_host=server_host,
+            if_index=42,
         )
 
     try:
@@ -393,6 +477,9 @@ def start_full_tunnel(
         dataplane=plane,
         system_capture=capture,
         routes_applied=routes_applied,
+        plan=plan,
+        server_host=server_host,
+        if_index=if_index,
     )
 
 

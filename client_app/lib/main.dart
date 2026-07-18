@@ -53,6 +53,7 @@ class _RetroTunnelHomeState extends State<RetroTunnelHome>
   late final VpnController _vpn;
   final List<String> _log = [];
   String _status = 'Launching…';
+  bool _tearingDown = false;
 
   @override
   void initState() {
@@ -71,14 +72,6 @@ class _RetroTunnelHomeState extends State<RetroTunnelHome>
     });
   }
 
-  @override
-  void didChangeAppLifecycleState(AppLifecycleState state) {
-    // On full app exit/detach, stop Packet Tunnel so residual ISP IP returns.
-    if (shouldStopTunnelOnAppLifecycle(state.name)) {
-      _vpn.disconnect();
-    }
-  }
-
   void _onStatus(String msg) {
     if (!mounted) return;
     setState(() {
@@ -91,11 +84,32 @@ class _RetroTunnelHomeState extends State<RetroTunnelHome>
     setState(() => _log.add(msg));
   }
 
+  /// Full tunnel teardown so OS routing reverts to the device IP.
+  /// Idempotent; not called on every pause/background — only close/detach.
+  Future<void> _teardownVpn() async {
+    if (_tearingDown) return;
+    _tearingDown = true;
+    try {
+      await _vpn.disconnect();
+    } catch (_) {
+      // Best-effort on exit
+    }
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    // Full app exit/detach: stop VPN (Android service + Apple Packet Tunnel)
+    // so residual public IP returns to the device path.
+    if (shouldStopTunnelOnAppLifecycle(state.name)) {
+      _teardownVpn();
+    }
+  }
+
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
     // Window/widget teardown — stop tunnel if still up.
-    _vpn.disconnect();
+    _teardownVpn();
     _scrollCtrl.dispose();
     super.dispose();
   }

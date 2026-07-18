@@ -25,6 +25,8 @@ import kotlin.concurrent.thread
 class RptVpnService : VpnService() {
     private var tun: ParcelFileDescriptor? = null
     private val running = AtomicBoolean(false)
+    /** True after intentional disconnect/revoke — do not sticky-restart a dead tunnel. */
+    private val userStopped = AtomicBoolean(false)
     private var worker: Thread? = null
     private var resultReceiver: ResultReceiver? = null
     private var reported = AtomicBoolean(false)
@@ -32,6 +34,7 @@ class RptVpnService : VpnService() {
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         when (intent?.action) {
             ACTION_CONNECT -> {
+                userStopped.set(false)
                 val host = intent.getStringExtra(EXTRA_HOST) ?: "104.156.224.47"
                 val port = intent.getIntExtra(EXTRA_PORT, 44044)
                 val fullTunnel = intent.getBooleanExtra(EXTRA_FULL_TUNNEL, true)
@@ -46,12 +49,24 @@ class RptVpnService : VpnService() {
                     return START_NOT_STICKY
                 }
                 startTunnel(host, port, fullTunnel, session)
+                // Sticky only while user wants the tunnel up (not after disconnect)
+                return if (userStopped.get()) START_NOT_STICKY else START_STICKY
             }
             ACTION_DISCONNECT -> {
+                // Intentional stop: full teardown, no sticky resurrection
+                userStopped.set(true)
                 stopTunnel()
+                return START_NOT_STICKY
+            }
+            else -> {
+                // No action / restart after kill: if user stopped, stay down
+                if (userStopped.get() || !running.get()) {
+                    stopTunnel()
+                    return START_NOT_STICKY
+                }
             }
         }
-        return START_STICKY
+        return if (userStopped.get()) START_NOT_STICKY else START_STICKY
     }
 
     private fun extractReceiver(intent: Intent): ResultReceiver? {
@@ -239,27 +254,46 @@ class RptVpnService : VpnService() {
         }
     }
 
+    /**
+     * Full teardown: stop dataplane loops, close TUN (clears OS VPN routes so
+     * the device reverts to its normal IP path), drop foreground, stop service.
+     * Idempotent — safe to call repeatedly from disconnect / onDestroy / onRevoke.
+     */
     private fun stopTunnel() {
         running.set(false)
-        try {
-            worker?.join(1500)
-        } catch (_: Exception) {
-        }
-        try {
-            tun?.close()
-        } catch (_: Exception) {
-        }
+        // Closing TUN unblocks FileInputStream.read and clears VpnService routes
+        val pfd = tun
         tun = null
+        try {
+            pfd?.close()
+        } catch (_: Exception) {
+        }
+        try {
+            worker?.join(2000)
+        } catch (_: Exception) {
+        }
+        worker = null
         try {
             stopForeground(STOP_FOREGROUND_REMOVE)
         } catch (_: Exception) {
         }
-        stopSelf()
+        try {
+            stopSelf()
+        } catch (_: Exception) {
+        }
     }
 
     override fun onDestroy() {
+        userStopped.set(true)
         stopTunnel()
         super.onDestroy()
+    }
+
+    override fun onRevoke() {
+        // System revoked VPN permission / another VPN took over — tear down fully
+        userStopped.set(true)
+        stopTunnel()
+        super.onRevoke()
     }
 
     private fun buildNotification(session: String, connecting: Boolean): Notification {

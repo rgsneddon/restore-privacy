@@ -29,7 +29,7 @@ from client.windows.elevate import (
     is_admin,
     should_exit_after_elevation,
 )
-from client.windows.tunnel_win import start_full_tunnel
+from client.windows.tunnel_win import start_full_tunnel, stop_full_tunnel
 
 
 class RetroClientApp:
@@ -42,6 +42,8 @@ class RetroClientApp:
         self.root.configure(bg=WINDOW_BG)
         self.root.minsize(480, 280)
         self._set_window_icon()
+        # Full tunnel teardown on window close (X) so traffic reverts to device IP
+        self.root.protocol("WM_DELETE_WINDOW", self._on_close)
 
         # Dark blue top banner (Windows 3.1-ish title bar)
         self.banner = tk.Frame(self.root, bg=BANNER_BG, height=28)
@@ -195,8 +197,40 @@ class RetroClientApp:
 
         threading.Thread(target=work, daemon=True).start()
 
+    def _teardown_tunnel(self) -> None:
+        """Stop dataplane, close TUN, delete full-tunnel routes, end session.
+
+        Idempotent: safe when never connected or already torn down.
+        """
+        tunnel = self._tunnel
+        self._tunnel = None
+        try:
+            stop_full_tunnel(tunnel, self.client)
+        except Exception:
+            # Never block exit on teardown errors
+            try:
+                self.client.disconnect()
+            except Exception:
+                pass
+
+    def _on_close(self) -> None:
+        """WM_DELETE_WINDOW — full disconnect before destroying the UI."""
+        try:
+            self._log("Closing — tearing down VPN tunnel…")
+        except Exception:
+            pass
+        self._teardown_tunnel()
+        try:
+            self.root.destroy()
+        except Exception:
+            pass
+
     def run(self) -> None:
-        self.root.mainloop()
+        try:
+            self.root.mainloop()
+        finally:
+            # Ensure teardown if mainloop ends without WM_DELETE_WINDOW
+            self._teardown_tunnel()
 
 
 def main() -> int:

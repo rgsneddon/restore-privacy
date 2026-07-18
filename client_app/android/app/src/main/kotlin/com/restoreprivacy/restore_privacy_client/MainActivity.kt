@@ -49,7 +49,9 @@ class MainActivity : FlutterActivity() {
                         prepareAndStart(host, port, fullTunnel, sessionName, result)
                     }
                     "disconnect" -> {
-                        stopService(Intent(this, RptVpnService::class.java))
+                        // ACTION_DISCONNECT runs stopTunnel (close TUN + stopSelf)
+                        // rather than only stopService, so OS VPN routes clear fully.
+                        sendDisconnect()
                         result.success(mapOf("ok" to true, "message" to "Disconnected"))
                     }
                     "hasSecrets" -> {
@@ -72,6 +74,27 @@ class MainActivity : FlutterActivity() {
         } catch (_: Exception) {
             false
         }
+    }
+
+    /** Tell [RptVpnService] to close TUN and stop so traffic reverts to device IP. */
+    private fun sendDisconnect() {
+        try {
+            val i = Intent(this, RptVpnService::class.java).apply {
+                action = RptVpnService.ACTION_DISCONNECT
+            }
+            startService(i)
+        } catch (_: Exception) {
+            try {
+                stopService(Intent(this, RptVpnService::class.java))
+            } catch (_: Exception) {
+            }
+        }
+    }
+
+    override fun onDestroy() {
+        // App close / swipe-away: full VPN teardown (configChanges avoids this on rotate)
+        sendDisconnect()
+        super.onDestroy()
     }
 
     private fun prepareAndStart(
