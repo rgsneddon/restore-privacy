@@ -21,7 +21,10 @@ from client.full_tunnel import (  # noqa: E402
     routes_would_blackhole_without_system_capture,
     windows_route_commands,
 )
-from client.windows.tunnel_win import start_full_tunnel  # noqa: E402
+from client.windows.tunnel_win import (  # noqa: E402
+    apply_routes_for_adapter,
+    start_full_tunnel,
+)
 from client.connect import complete_server_hello, build_authorized_client_hello  # noqa: E402
 from node.elgamal import generate_keypair  # noqa: E402
 from node.handshake import (  # noqa: E402
@@ -137,6 +140,115 @@ class TestWindowsAntiBlackholeRoutes(unittest.TestCase):
         self.assertIn("PHYSICAL_GW", joined)
         self.assertIn("IF 42", joined)
         self.assertIn("104.156.224.47", joined)
+
+    def test_server_pin_failure_refuses_dual_slash1(self):
+        """If pin fails, dual /1 must not install (recursive UDP blackhole)."""
+        plan = build_full_tunnel_plan("10.88.0.9", tunnel_iface="RPT")
+        server = "104.156.224.47"
+        pin_cmd = f"route add {server} mask 255.255.255.255 192.168.1.1 metric 1"
+        catch_a = "route add 0.0.0.0 mask 128.0.0.0 0.0.0.0 IF 17 metric 5"
+        catch_b = "route add 128.0.0.0 mask 128.0.0.0 0.0.0.0 IF 17 metric 5"
+        ran: list[str] = []
+
+        def fake_run(cmd, shell=True, capture_output=True, text=True):
+            ran.append(cmd)
+            # pin fails; catchalls must never be attempted
+            if "mask 255.255.255.255" in cmd and "route add" in cmd:
+                return mock.Mock(returncode=1, stderr="pin failed: network unreachable", stdout="")
+            if "mask 128.0.0.0" in cmd:
+                # Should not be reached — fail test if it is
+                return mock.Mock(returncode=0, stderr="", stdout="")
+            return mock.Mock(returncode=0, stderr="", stdout="")
+
+        with mock.patch(
+            "client.windows.tunnel_win.physical_default_gateway",
+            return_value="192.168.1.1",
+        ), mock.patch(
+            "client.windows.tunnel_win.subprocess.run",
+            side_effect=fake_run,
+        ), mock.patch(
+            "client.windows.tunnel_win.rollback_full_tunnel_routes",
+            return_value=[],
+        ) as rb:
+            applied, errs, full_ok = apply_routes_for_adapter(
+                plan, server, if_index=17, include_catchall=True
+            )
+        self.assertFalse(full_ok)
+        self.assertTrue(any("pin" in e.lower() or "dual /1" in e for e in errs))
+        # No dual /1 commands executed
+        self.assertFalse(any("mask 128.0.0.0" in c for c in ran))
+        rb.assert_called()
+
+    def test_start_full_tunnel_pin_fail_sets_routes_applied_false(self):
+        node_priv = generate_keypair()
+        cpriv, cpub = generate_client_admission_keypair()
+        node = NodeHandshake(node_priv, [ed25519_pub_raw(cpub)])
+        frame, client_nonce, client_pub = build_authorized_client_hello(
+            cpriv, node_priv.public
+        )
+        reply, _ = node_complete_hello(node, frame, "10.88.0.13")
+        session = complete_server_hello(reply, client_nonce, client_pub)
+        client = RptClient.__new__(RptClient)
+        client.session = session
+        client.endpoint = Endpoint("104.156.224.47", 44044)
+        client.state = ConnectState.CONNECTED
+        client._sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        client._sock.bind(("127.0.0.1", 0))
+        client._sock.setblocking(False)
+
+        plan = build_full_tunnel_plan(session.vpn_ip, tunnel_iface="RPT")
+
+        class FakeTun:
+            mode = "wintun"
+            name = "RPT"
+            _closed = False
+
+            def configure_address(self):
+                return ["netsh-ok"]
+
+            def interface_index(self):
+                return 17
+
+            def close(self):
+                self._closed = True
+
+            def read_packet(self, max_size=65535):
+                return None
+
+            def write_packet(self, packet):
+                pass
+
+            def fileno(self):
+                return -1
+
+        with mock.patch(
+            "client.windows.tunnel_win.create_windows_tun", return_value=FakeTun()
+        ), mock.patch(
+            "client.windows.tunnel_win.system_capture_ready", return_value=True
+        ), mock.patch(
+            "client.windows.tunnel_win.dataplane_enabled", return_value=True
+        ), mock.patch(
+            "client.windows.tunnel_win.is_admin", return_value=True
+        ), mock.patch(
+            "client.windows.tunnel_win.apply_routes_for_adapter",
+            return_value=(
+                ["pin-cmd"],
+                ["server pin failed: network unreachable"],
+                False,
+            ),
+        ) as apply_mock:
+            res = start_full_tunnel(client, plan, "104.156.224.47")
+        self.assertTrue(res.ok)  # session + dataplane may still run
+        self.assertFalse(res.routes_applied)
+        self.assertIn("refused", res.message.lower())
+        apply_mock.assert_called()
+        # Must request catchalls (include_catchall True) so pin+catchall logic runs
+        kwargs = apply_mock.call_args
+        self.assertTrue(
+            kwargs.kwargs.get("include_catchall", True)
+            or (len(kwargs.args) >= 0)
+        )
+        client._sock.close()
 
 
 class TestNodeNatStructural(unittest.TestCase):

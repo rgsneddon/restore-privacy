@@ -84,7 +84,32 @@ def physical_default_gateway() -> Optional[str]:
     return candidates[0][1]
 
 
+def _route_cmd_succeeded(returncode: int, stderr: str, stdout: str) -> bool:
+    """Windows ``route add`` often returns non-zero if the route already exists."""
+    if returncode == 0:
+        return True
+    text = f"{stderr or ''}{stdout or ''}".lower()
+    return (
+        "already exists" in text
+        or "object already exists" in text
+        or "the route already exists" in text
+    )
+
+
+def _is_server_pin_cmd(cmd: str, server_host: str) -> bool:
+    return (
+        "route add" in cmd
+        and server_host in cmd
+        and "mask 255.255.255.255" in cmd
+    )
+
+
+def _is_catchall_cmd(cmd: str) -> bool:
+    return "route add" in cmd and "mask 128.0.0.0" in cmd
+
+
 def _run_cmds(cmds: list[str]) -> tuple[list[str], list[str]]:
+    """Run shell cmds; treat 'already exists' as success for route add."""
     applied: list[str] = []
     errors: list[str] = []
     for cmd in cmds:
@@ -93,10 +118,11 @@ def _run_cmds(cmds: list[str]) -> tuple[list[str], list[str]]:
             continue
         r = subprocess.run(cmd, shell=True, capture_output=True, text=True)
         applied.append(cmd)
-        if r.returncode != 0:
-            err = (r.stderr or r.stdout or "").strip()[:200]
-            if err:
-                errors.append(err)
+        if not _route_cmd_succeeded(
+            r.returncode, r.stderr or "", r.stdout or ""
+        ):
+            err = (r.stderr or r.stdout or f"exit {r.returncode}").strip()[:200]
+            errors.append(err or f"command failed: {cmd[:80]}")
     return applied, errors
 
 
@@ -106,18 +132,91 @@ def apply_routes_for_adapter(
     if_index: Optional[int] = None,
     *,
     include_catchall: bool = True,
-) -> tuple[list[str], list[str]]:
-    """Apply routes. Returns (commands, errors)."""
+) -> tuple[list[str], list[str], bool]:
+    """Apply address/DNS, server pin, then dual /1 only if pin succeeded.
+
+    Returns ``(applied_cmds, errors, full_tunnel_ok)``.
+
+    **Critical:** dual /1 catch-alls are **not** installed if the server pin
+    fails — otherwise UDP to the node is trapped inside the tunnel (recursive
+    blackhole) while the UI still claims "server pinned".
+    """
     cmds = windows_route_commands(
         plan, server_host, if_index=if_index, include_catchall=include_catchall
     )
     gw = physical_default_gateway()
     if not gw:
-        return cmds, [
-            "no physical default gateway — refusing full-tunnel routes (would blackhole)"
-        ]
+        return (
+            cmds,
+            [
+                "no physical default gateway — refusing full-tunnel routes (would blackhole)"
+            ],
+            False,
+        )
     cmds = [c.replace("PHYSICAL_GW", gw) for c in cmds]
-    return _run_cmds(cmds)
+
+    applied: list[str] = []
+    errors: list[str] = []
+    pin_ok = False
+    catchall_applied = 0
+    catchall_wanted = include_catchall and if_index is not None and int(if_index) > 0
+
+    for cmd in cmds:
+        if "PHYSICAL_GW" in cmd:
+            errors.append(
+                "physical gateway not substituted — refusing full-tunnel (would blackhole)"
+            )
+            return applied, errors, False
+
+        is_pin = _is_server_pin_cmd(cmd, server_host)
+        is_catch = _is_catchall_cmd(cmd)
+
+        # Never install dual /1 unless server pin already succeeded
+        if is_catch and not pin_ok:
+            errors.append(
+                "server pin failed or missing — refusing dual /1 "
+                "(would blackhole UDP to node via TUN)"
+            )
+            # Do not run this or further catch-alls
+            continue
+
+        r = subprocess.run(cmd, shell=True, capture_output=True, text=True)
+        applied.append(cmd)
+        ok = _route_cmd_succeeded(r.returncode, r.stderr or "", r.stdout or "")
+        if not ok:
+            err = (r.stderr or r.stdout or f"exit {r.returncode}").strip()[:200]
+            label = err or f"command failed: {cmd[:80]}"
+            if is_pin:
+                errors.append(f"server pin failed: {label}")
+                pin_ok = False
+            elif is_catch:
+                errors.append(f"catchall route failed: {label}")
+            else:
+                # netsh address/dns — warn but do not block pin/catchall alone
+                errors.append(f"setup warn: {label}")
+            continue
+
+        if is_pin:
+            pin_ok = True
+        if is_catch:
+            catchall_applied += 1
+
+    if catchall_wanted:
+        full_ok = pin_ok and catchall_applied >= 2 and not any(
+            "refusing dual /1" in e or "server pin failed" in e for e in errors
+        )
+        if pin_ok and catchall_applied < 2:
+            errors.append(
+                "dual /1 incomplete — refusing full-tunnel (would blackhole)"
+            )
+            full_ok = False
+        if not full_ok:
+            # Roll back anything we installed so internet is not left broken
+            rollback_full_tunnel_routes(plan, server_host, if_index)
+        return applied, errors, full_ok
+
+    # Pin-only path (no catch-alls requested)
+    return applied, errors, pin_ok
 
 
 def rollback_full_tunnel_routes(
@@ -212,7 +311,7 @@ def start_full_tunnel(
     elif routes_would_blackhole_without_if_index(if_index, True):
         # Server pin only (keep UDP path); no dual /1
         if is_admin():
-            cmds, errs = apply_routes_for_adapter(
+            cmds, errs, _pin_ok = apply_routes_for_adapter(
                 plan, server_host, if_index=None, include_catchall=False
             )
             applied.extend(cmds)
@@ -222,19 +321,23 @@ def start_full_tunnel(
         )
         routes_applied = False
     elif is_admin() and capture and if_index is not None:
-        cmds, errs = apply_routes_for_adapter(
+        cmds, errs, full_ok = apply_routes_for_adapter(
             plan, server_host, if_index=if_index, include_catchall=True
         )
         applied.extend(cmds)
-        if any("refusing full-tunnel" in e for e in errs):
-            route_msg = "routes refused: " + "; ".join(errs)
-            routes_applied = False
-            rollback_full_tunnel_routes(plan, server_host, if_index)
-        else:
+        if full_ok:
             routes_applied = True
             route_msg = f"full-tunnel routes applied (IF={if_index}, server pinned)"
-            if errs:
-                route_msg += f" ({len(errs)} warn)"
+            # Non-critical netsh warnings only
+            warns = [e for e in errs if e.startswith("setup warn:")]
+            if warns:
+                route_msg += f" ({len(warns)} warn)"
+        else:
+            routes_applied = False
+            route_msg = "routes refused (pin/catchall failed; rolled back): " + (
+                "; ".join(errs) if errs else "unknown"
+            )
+            # apply_routes_for_adapter already rolls back on full_ok=False
     elif is_admin():
         route_msg = "admin but no OS TUN — routes not applied (would blackhole)"
     else:
@@ -316,10 +419,17 @@ def apply_full_tunnel_routes(
             message="dry-run or non-admin",
             applied_commands=cmds,
         )
-    applied, errs = apply_routes_for_adapter(plan, server_host, if_index=if_index)
+    applied, errs, full_ok = apply_routes_for_adapter(
+        plan, server_host, if_index=if_index
+    )
     return WindowsTunnelResult(
-        ok=True,
-        message="routes applied" + (f" warnings={errs}" if errs else ""),
+        ok=full_ok,
+        message=(
+            "routes applied"
+            if full_ok
+            else "routes refused (pin/catchall): " + "; ".join(errs)
+        )
+        + (f" warnings={errs}" if full_ok and errs else ""),
         applied_commands=applied,
-        routes_applied=True,
+        routes_applied=full_ok,
     )

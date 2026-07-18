@@ -1,4 +1,4 @@
-"""Release download link catalog for the public status page (version 0.0.7).
+"""Release download link catalog for the public status page (version 0.0.8).
 
 Public page advertises Windows .exe installer + Android .apk only.
 """
@@ -8,12 +8,12 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Iterable
 
-RELEASE_VERSION = "0.0.7"
+RELEASE_VERSION = "0.0.8"
 GITHUB_OWNER = "rgsneddon"
 GITHUB_REPO = "restore-privacy"
-RELEASE_TAG = "0.0.7"
+RELEASE_TAG = "0.0.8"
 
-# Canonical public asset filenames (must match releases/0.0.7/ and GitHub Release).
+# Canonical public asset filenames (must match releases/0.0.8/ and GitHub Release).
 WINDOWS_EXE_FILENAME = f"restore-privacy-client-{RELEASE_VERSION}-windows-x64-setup.exe"
 ANDROID_APK_FILENAME = f"restore-privacy-client-{RELEASE_VERSION}-android.apk"
 
@@ -32,7 +32,7 @@ class DownloadAsset:
         )
 
 
-# Artifacts attached to GitHub Release 0.0.7
+# Artifacts attached to GitHub Release 0.0.8
 RELEASE_ASSETS: tuple[DownloadAsset, ...] = (
     DownloadAsset(
         platform="windows",
@@ -76,7 +76,7 @@ def render_download_section_html(assets: Iterable[DownloadAsset] | None = None) 
     <div class="dl-buttons">
 {links_html}
     </div>
-    <p class="dl-note">Release <code>{RELEASE_TAG}</code> · Windows setup needs no separate Python install · run client as Administrator for full VPN</p>
+    <p class="dl-note">Release <code>{RELEASE_TAG}</code> · Windows setup needs no separate Python install · double-click ? UAC once for full VPN (auto-elevate)</p>
   </section>
 """
 
