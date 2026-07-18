@@ -32,13 +32,14 @@ public enum RptConnectOrchestrator {
     }
 
     public static func connect(
-        host: String = "104.156.224.47",
-        port: UInt16 = 44044,
+        host: String = RptEndpoint.host,
+        port: UInt16 = RptEndpoint.port,
         skipUkGate: Bool = false,
         ukGateFetcher: (() throws -> [String: Any])? = nil,
         secretsDir: URL? = nil,
         timeout: TimeInterval = 15
     ) -> ConnectOutcome {
+        let target = "\(host):\(port)"
         // 1. UK IP gate (fail closed)
         if !skipUkGate {
             let gate = RptUkIpGate.checkUkPublicIp(payloadProvider: ukGateFetcher)
@@ -58,18 +59,18 @@ public enum RptConnectOrchestrator {
         } catch {
             return ConnectOutcome(
                 ok: false,
-                message: error.localizedDescription,
+                message: "\(error.localizedDescription) [node \(target)]",
                 vpnIp: nil,
                 session: nil,
                 engine: nil
             )
         }
 
-        // 3. RPT2 handshake
+        // 3. RPT2 handshake against product node
         do {
             let engine = try RptClientEngine(clientPrivRaw: material.0, nodeElgamalPubRaw: material.1)
             let session = try engine.handshake(host: host, port: port, timeout: timeout)
-            let msg = "Connected — tunnel IP \(session.vpnIp)"
+            let msg = "Connected — tunnel IP \(session.vpnIp) via \(target)"
             return ConnectOutcome(
                 ok: true,
                 message: msg,
@@ -80,7 +81,7 @@ public enum RptConnectOrchestrator {
         } catch {
             return ConnectOutcome(
                 ok: false,
-                message: "Connect failed: \(error.localizedDescription)",
+                message: "Connect failed to \(target): \(error.localizedDescription)",
                 vpnIp: nil,
                 session: nil,
                 engine: nil

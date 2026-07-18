@@ -23,8 +23,8 @@ public final class RptClientEngine {
 
     /// Long-lived UDP transport used for HELLO + DATA + KEEPALIVE (node binds client_addr).
     private(set) public var transport: RptUDPTransport?
-    private var endpointHost: String = "104.156.224.47"
-    private var endpointPort: UInt16 = 44044
+    private var endpointHost: String = RptEndpoint.host
+    private var endpointPort: UInt16 = RptEndpoint.port
 
     public init(clientPrivRaw: Data, nodeElgamalPubRaw: Data) throws {
         guard clientPrivRaw.count == 32 else {

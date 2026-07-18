@@ -7,6 +7,8 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		B6F167DE1D36BE52956936ED /* RptEndpoint.swift in Sources */ = {isa = PBXBuildFile; fileRef = 60DF89726CB0112FB8408B6D /* RptEndpoint.swift */; };
+		23E0DDE47637E5D10988B9CA /* RptEndpoint.swift in Sources */ = {isa = PBXBuildFile; fileRef = 60DF89726CB0112FB8408B6D /* RptEndpoint.swift */; };
 		A3E798CC69E28AD862366BD4 /* Network.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = BA98F8222A4AF392A7A4A84A /* Network.framework */; };
 		27C73F1169CD485F9D3DEEB6 /* Network.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = BA98F8222A4AF392A7A4A84A /* Network.framework */; };
 		0AD856FDC79F35AB84D2CB0D /* RptClientEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1E8ECFC3BC60269BEBC2CA40 /* RptClientEngine.swift */; };
@@ -124,6 +126,7 @@
 		B7A984DE1FCFFC0139C1D464 /* RptElgamal.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = "RptElgamal.swift"; path = "NativePrep/Rpt2/RptElgamal.swift"; sourceTree = "<group>"; };
 		A8340F72CA3D6450BE844011 /* RptPedersen.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = "RptPedersen.swift"; path = "NativePrep/Rpt2/RptPedersen.swift"; sourceTree = "<group>"; };
 		BC2B56A3A7EB3E5A89358950 /* RptProtocol.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = "RptProtocol.swift"; path = "NativePrep/Rpt2/RptProtocol.swift"; sourceTree = "<group>"; };
+		60DF89726CB0112FB8408B6D /* RptEndpoint.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = "RptEndpoint.swift"; path = "NativePrep/Rpt2/RptEndpoint.swift"; sourceTree = "<group>"; };
 		E1A10CCAC1B8762250473E09 /* RptSessionCrypto.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = "RptSessionCrypto.swift"; path = "NativePrep/Rpt2/RptSessionCrypto.swift"; sourceTree = "<group>"; };
 		07466FFA1B9B1F0989D529CC /* RptUkIpGate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = "RptUkIpGate.swift"; path = "NativePrep/Rpt2/RptUkIpGate.swift"; sourceTree = "<group>"; };
 		1A3AD1EC56D0D7306F8F0784 /* Addition.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = "Addition.swift"; path = "NativePrep/Rpt2/VendorBigInt/Addition.swift"; sourceTree = "<group>"; };
@@ -240,6 +243,7 @@
 				B7A984DE1FCFFC0139C1D464 /* RptElgamal.swift */,
 				A8340F72CA3D6450BE844011 /* RptPedersen.swift */,
 				BC2B56A3A7EB3E5A89358950 /* RptProtocol.swift */,
+				60DF89726CB0112FB8408B6D /* RptEndpoint.swift */,
 				E1A10CCAC1B8762250473E09 /* RptSessionCrypto.swift */,
 				07466FFA1B9B1F0989D529CC /* RptUkIpGate.swift */,
 				0F29D609169D04A5997EAE72 /* VendorBigInt */,
@@ -560,6 +564,7 @@ fi
 				8DA5D118F1FB617796DF7BDE /* RptElgamal.swift in Sources */,
 				3C286BCE142676397F3A447C /* RptPedersen.swift in Sources */,
 				D037DE89F6B615111C2C497C /* RptProtocol.swift in Sources */,
+				B6F167DE1D36BE52956936ED /* RptEndpoint.swift in Sources */,
 				C1EC9DB0E9CF2DC565637E8E /* RptSessionCrypto.swift in Sources */,
 				AE626A7B048C9E0A4653D56C /* RptUkIpGate.swift in Sources */,
 				861B9F3BF57A20AAB3C54190 /* Addition.swift in Sources */,
@@ -603,6 +608,7 @@ fi
 				B55667EB4080B9E1877B920F /* RptElgamal.swift in Sources */,
 				7FB1864B91278AE9C58463DB /* RptPedersen.swift in Sources */,
 				AA3450CB9AC946ADFD53CF6B /* RptProtocol.swift in Sources */,
+				23E0DDE47637E5D10988B9CA /* RptEndpoint.swift in Sources */,
 				77943E3BD49C420AF0D56022 /* RptSessionCrypto.swift in Sources */,
 				20B2D4A3CB19BBDC5EFD89C2 /* RptUkIpGate.swift in Sources */,
 				4A54C0FBE676707BEACF054F /* Addition.swift in Sources */,

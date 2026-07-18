@@ -15,6 +15,22 @@ final class Rpt2Tests: XCTestCase {
         XCTAssertEqual(RptProtocol.MsgType.keepalive.rawValue, 0x04)
     }
 
+    /// Product node endpoint — must match Flutter RptConfig + Vultr status upstream.
+    func testProductEndpointIsActiveVultrNode() {
+        XCTAssertEqual(RptEndpoint.host, "104.156.224.47")
+        XCTAssertEqual(RptEndpoint.port, 44044)
+        XCTAssertEqual(RptEndpoint.hostPortDescription, "104.156.224.47:44044")
+        // Channel arg resolution defaults + NSNumber port
+        let def = RptEndpoint.resolve(from: nil)
+        XCTAssertEqual(def.host, RptEndpoint.host)
+        XCTAssertEqual(def.port, RptEndpoint.port)
+        let num = RptEndpoint.resolve(from: ["host": RptEndpoint.host, "port": NSNumber(value: 44044)])
+        XCTAssertEqual(num.port, 44044)
+        let override = RptEndpoint.resolve(from: ["host": "10.0.0.1", "port": 9])
+        XCTAssertEqual(override.host, "10.0.0.1")
+        XCTAssertEqual(override.port, 9)
+    }
+
     func testPackKeepaliveAndParse() throws {
         let sid = Data(repeating: 0xAB, count: 8)
         let frame = RptProtocol.packKeepalive(sessionId: sid)

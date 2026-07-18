@@ -9,12 +9,18 @@ let package = Package(
     ],
     products: [
         .library(name: "Rpt2", targets: ["Rpt2"]),
+        .executable(name: "RptConnectProbe", targets: ["RptConnectProbe"]),
     ],
     targets: [
         .target(
             name: "Rpt2",
             dependencies: [],
             path: "Sources/Rpt2"
+        ),
+        .executableTarget(
+            name: "RptConnectProbe",
+            dependencies: ["Rpt2"],
+            path: "Sources/RptConnectProbe"
         ),
         .testTarget(
             name: "Rpt2Tests",

@@ -10,8 +10,8 @@ class PacketTunnelProvider: NEPacketTunnelProvider {
   private var keepaliveTimer: DispatchSourceTimer?
   private var receiveSource: DispatchSourceRead?
   private var pathQueue = DispatchQueue(label: "com.restoreprivacy.tunnel.io")
-  private var endpointHost = "104.156.224.47"
-  private var endpointPort: UInt16 = 44044
+  private var endpointHost = RptEndpoint.host
+  private var endpointPort = RptEndpoint.port
   private var running = false
 
   override func startTunnel(options: [String: NSObject]?, completionHandler: @escaping (Error?) -> Void) {

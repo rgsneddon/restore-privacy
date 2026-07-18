@@ -18,9 +18,8 @@ enum RptVpnChannel {
       switch call.method {
       case "connect":
         let args = call.arguments as? [String: Any] ?? [:]
-        let host = args["host"] as? String ?? "104.156.224.47"
-        let port = (args["port"] as? Int) ?? 44044
-        connect(host: host, port: UInt16(port), flutterResult: result)
+        let ep = RptEndpoint.resolve(from: args)
+        connect(host: ep.host, port: ep.port, flutterResult: result)
       case "disconnect":
         disconnect { map in result(map) }
       case "hasSecrets":
