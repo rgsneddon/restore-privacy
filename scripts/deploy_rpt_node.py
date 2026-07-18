@@ -67,8 +67,12 @@ def main() -> int:
         return code or 1
 
     time.sleep(2)
+    # Explicitly ensure boot enable even if install.sh was old on disk
+    run("systemctl daemon-reload; systemctl enable rpt-node.service")
     for c in [
         "systemctl is-active rpt-node.service || true",
+        "systemctl is-enabled rpt-node.service || true",
+        "systemctl show rpt-node.service -p UnitFileState -p ActiveState -p Restart -p WantedBy --no-pager || true",
         "ss -ulnp | grep 44044 || true",
         "ss -tlnp | grep 8080 || true",
         "sysctl net.ipv4.ip_forward",
@@ -80,11 +84,21 @@ def main() -> int:
         "test -f /opt/restore-privacy/secrets/node_elgamal.pub && echo node_pub=ok",
         "test -f /opt/restore-privacy/secrets/client_ed25519.pub && echo client_pub=ok",
         "test -f /opt/restore-privacy/secrets/client_ed25519.priv && echo client_priv_present=ok",
+        "grep -E 'Restart=|WantedBy=|network-online' /etc/systemd/system/rpt-node.service || true",
     ]:
         run(c)
 
+    # Fail deploy if not boot-enabled (VPS reboot would leave node down)
+    code, out = run("systemctl is-enabled rpt-node.service")
+    if "enabled" not in out.strip().splitlines()[-1:]:
+        # is-enabled prints "enabled" alone when OK
+        if out.strip() != "enabled":
+            print(f"ERROR: rpt-node not enabled for boot (is-enabled={out!r})", file=sys.stderr)
+            client.close()
+            return 1
+
     client.close()
-    print("deploy complete")
+    print("deploy complete (boot-enabled)")
     return 0
 
 

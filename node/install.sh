@@ -88,10 +88,17 @@ if command -v ufw >/dev/null 2>&1; then
   ufw route allow in on "$WAN" out on "$TUN_IFACE" >/dev/null 2>&1 || true
 fi
 
-echo "[rpt-install] systemd (no journal session logs)"
+echo "[rpt-install] systemd (boot auto-start + restart on crash; no journal session logs)"
+# Ensure NetworkManager/systemd-networkd can satisfy network-online.target
+if systemctl list-unit-files network-online.target >/dev/null 2>&1; then
+  systemctl enable systemd-networkd-wait-online.service 2>/dev/null || true
+  systemctl enable NetworkManager-wait-online.service 2>/dev/null || true
+fi
 cat >/etc/systemd/system/${SERVICE_NAME}.service <<EOF
 [Unit]
 Description=Restore Privacy RPT custom VPN node
+Documentation=https://github.com/rgsneddon/restore-privacy
+# Start after networking so UDP 44044 bind and status UI work post-reboot
 After=network-online.target
 Wants=network-online.target
 
@@ -105,8 +112,12 @@ StandardError=null
 SyslogIdentifier=
 LogLevelMax=emerg
 ExecStart=/opt/restore-privacy/venv/bin/python -m node.server --config-json /opt/restore-privacy/rpt-node.json --listen-port ${LISTEN_PORT} --ui-port ${UI_PORT} --secrets-dir /opt/restore-privacy/secrets
-Restart=on-failure
-RestartSec=2
+# Always restart after crash or unexpected exit (and after reboot via enable below)
+Restart=always
+RestartSec=3
+# Cap restart thrash if the process is hard-broken
+StartLimitIntervalSec=60
+StartLimitBurst=10
 AmbientCapabilities=CAP_NET_ADMIN CAP_NET_RAW
 CapabilityBoundingSet=CAP_NET_ADMIN CAP_NET_RAW
 
@@ -116,8 +127,16 @@ EOF
 
 rm -rf /var/log/rpt-node /var/log/restore-privacy 2>/dev/null || true
 systemctl daemon-reload
+# Enable for multi-user boot (survives VPS reboot/maintenance)
 systemctl enable "${SERVICE_NAME}.service"
 systemctl restart "${SERVICE_NAME}.service"
 sleep 2
 systemctl --no-pager --full status "${SERVICE_NAME}.service" || true
+# Fail install if not enabled for boot — silent success without enable left nodes down after reboot
+if ! systemctl is-enabled "${SERVICE_NAME}.service" | grep -qx enabled; then
+  echo "[rpt-install] ERROR: ${SERVICE_NAME}.service is not enabled for boot" >&2
+  systemctl is-enabled "${SERVICE_NAME}.service" || true
+  exit 1
+fi
+echo "[rpt-install] boot-enabled=$(systemctl is-enabled "${SERVICE_NAME}.service") active=$(systemctl is-active "${SERVICE_NAME}.service")"
 echo "[rpt-install] done port=${LISTEN_PORT} ui=${UI_PORT} wan=${WAN}"
