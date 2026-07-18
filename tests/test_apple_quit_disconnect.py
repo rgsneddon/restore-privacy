@@ -59,23 +59,21 @@ class TestAppleQuitStopsTunnel(unittest.TestCase):
             self.assertIn("func stopTunnel", text)
             self.assertIn("closeTransport", text)
 
-    def test_flutter_lifecycle_wires_disconnect(self):
+    def test_flutter_explicit_disconnect_button(self):
+        """Product: Disconnect button only — not lifecycle/dispose auto-stop."""
         main = (APP / "lib" / "main.dart").read_text(encoding="utf-8")
-        self.assertIn("WidgetsBindingObserver", main)
-        self.assertIn("didChangeAppLifecycleState", main)
-        self.assertIn("shouldStopTunnelOnAppLifecycle", main)
         self.assertIn("_vpn.disconnect()", main)
-        # dispose also disconnects
+        self.assertIn("_onToggle", main)
         self.assertIn("void dispose()", main)
+        disp = main[main.index("void dispose") : main.index("void dispose") + 200]
+        self.assertNotIn("_vpn.disconnect", disp)
 
-    def test_dart_stop_on_lifecycle_helper(self):
+    def test_dart_lifecycle_helper_never_auto_stops(self):
         text = (APP / "lib" / "connect_status.dart").read_text(encoding="utf-8")
         self.assertIn("shouldStopTunnelOnAppLifecycle", text)
         self.assertIn("kDisconnectedResidualIpMessage", text)
-        self.assertIn("detached", text)
-        self.assertIn("paused", text)  # iOS app-switcher close
-        # residual-IP reversion is documented next to the helper
-        self.assertIn("residual public ip", text.lower())
+        # Policy: always false — residual IP only via explicit Disconnect
+        self.assertIn("return false", text)
 
     def test_disconnect_result_not_product_success_in_swift_helper(self):
         for rel in (

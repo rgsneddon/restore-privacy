@@ -152,38 +152,33 @@ class TestStopFullTunnel(unittest.TestCase):
 
 
 class TestWindowsAppCloseHook(unittest.TestCase):
-    """App UI close path must invoke stop_full_tunnel."""
+    """Window close must NOT tear down tunnel; Disconnect button still stops."""
 
-    def test_app_source_wires_wm_delete_and_teardown(self):
+    def test_app_source_close_ui_only_and_explicit_disconnect(self):
         app_path = ROOT / "client" / "windows" / "app.py"
         src = app_path.read_text(encoding="utf-8")
         self.assertIn("stop_full_tunnel", src)
         self.assertIn("WM_DELETE_WINDOW", src)
-        self.assertIn("_on_close", src)
-        self.assertIn("_teardown_tunnel", src)
-        # protocol registered
+        self.assertIn("_on_close_ui_only", src)
+        self.assertIn("_disconnect_tunnel", src)
         self.assertIn('protocol("WM_DELETE_WINDOW"', src)
-        # finally teardown after mainloop
-        self.assertIn("finally:", src)
-        self.assertIn("self._teardown_tunnel()", src)
-        # _on_close calls teardown then destroy
-        self.assertIn("def _on_close", src)
-        self.assertLess(src.index("def _teardown_tunnel"), src.index("def _on_close"))
-        on_close = src[src.index("def _on_close") : src.index("def run")]
-        self.assertIn("_teardown_tunnel", on_close)
+        on_close = src[src.index("def _on_close_ui_only") : src.index("def run")]
+        self.assertNotIn("stop_full_tunnel", on_close)
         self.assertIn("destroy", on_close)
+        disc = src[src.index("def _disconnect_tunnel") : src.index("def _on_close_ui_only")]
+        self.assertIn("stop_full_tunnel", disc)
 
     def test_teardown_method_calls_shipped_stop(self):
-        """AST: _teardown_tunnel body references stop_full_tunnel."""
+        """AST: _disconnect_tunnel body references stop_full_tunnel."""
         app_path = ROOT / "client" / "windows" / "app.py"
         tree = ast.parse(app_path.read_text(encoding="utf-8"))
         found = False
         for node in ast.walk(tree):
-            if isinstance(node, ast.FunctionDef) and node.name == "_teardown_tunnel":
+            if isinstance(node, ast.FunctionDef) and node.name == "_disconnect_tunnel":
                 body = ast.dump(node)
                 self.assertIn("stop_full_tunnel", body)
                 found = True
-        self.assertTrue(found, "_teardown_tunnel not found")
+        self.assertTrue(found, "_disconnect_tunnel not found")
 
 
 class TestAndroidTeardownWiring(unittest.TestCase):
@@ -228,39 +223,25 @@ class TestAndroidTeardownWiring(unittest.TestCase):
         revoke = svc[svc.index("override fun onRevoke") : svc.index("override fun onRevoke") + 250]
         self.assertIn("stopTunnel", revoke)
 
-    def test_main_activity_disconnect_sends_action_and_on_destroy(self):
+    def test_main_activity_disconnect_channel_only(self):
         act = (self.KT / "MainActivity.kt").read_text(encoding="utf-8")
         self.assertIn("ACTION_DISCONNECT", act)
         self.assertIn("sendDisconnect", act)
         self.assertIn('"disconnect"', act)
-        # disconnect channel uses sendDisconnect / ACTION_DISCONNECT
         disc_block = act[act.index('"disconnect"') : act.index('"disconnect"') + 350]
         self.assertIn("sendDisconnect", disc_block)
-        self.assertIn("override fun onDestroy", act)
+        # onDestroy must NOT auto-disconnect (UI Disconnect only)
         on_destroy = act[act.index("override fun onDestroy") : act.index("override fun onDestroy") + 200]
-        self.assertIn("sendDisconnect", on_destroy)
+        self.assertIn("super.onDestroy()", on_destroy)
+        self.assertNotIn("sendDisconnect()", on_destroy)
 
-    def test_flutter_dispose_and_detached_call_disconnect(self):
+    def test_flutter_explicit_disconnect_not_on_dispose(self):
         main = (self.LIB / "main.dart").read_text(encoding="utf-8")
-        self.assertIn("WidgetsBindingObserver", main)
-        self.assertIn("shouldStopTunnelOnAppLifecycle", main)
-        self.assertIn("_teardownVpn", main)
         self.assertIn("disconnect()", main)
-        # dispose tears down
-        disp = main[main.index("void dispose") : main.index("void dispose") + 280]
-        self.assertIn("_teardownVpn", disp)
-        self.assertIn("removeObserver", disp)
-        # Lifecycle uses pure helper (detached only — not pause/background)
-        life = main[
-            main.index("didChangeAppLifecycleState") : main.index(
-                "didChangeAppLifecycleState"
-            )
-            + 350
-        ]
-        self.assertIn("shouldStopTunnelOnAppLifecycle", life)
-        self.assertIn("_teardownVpn", life)
-        # Not required on pause (product choice)
-        self.assertNotIn("AppLifecycleState.paused", main)
+        self.assertIn("_onToggle", main)
+        disp = main[main.index("void dispose") : main.index("void dispose") + 200]
+        self.assertNotIn("_vpn.disconnect", disp)
+        self.assertNotIn("WidgetsBindingObserver", main)
 
     def test_vpn_controller_disconnect_invokes_channel(self):
         ctrl = (self.LIB / "vpn_controller.dart").read_text(encoding="utf-8")

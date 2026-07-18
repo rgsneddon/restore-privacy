@@ -62,7 +62,11 @@ class TestClientProtocol(unittest.TestCase):
         node_priv = generate_keypair()
         good_priv, good_pub = generate_client_admission_keypair()
         bad_priv, _ = generate_client_admission_keypair()
-        node = NodeHandshake(node_priv, [ed25519_pub_raw(good_pub)])
+        node = NodeHandshake(
+            node_priv,
+            [ed25519_pub_raw(good_pub)],
+            admit_unknown_devices=False,
+        )
         frame, _, _ = build_authorized_client_hello(bad_priv, node_priv.public)
         with self.assertRaises(AdmissionError):
             node_complete_hello(node, frame, "10.88.0.2")
@@ -97,20 +101,23 @@ class TestUiTheme(unittest.TestCase):
     def test_windows_app_auto_connect_and_theme_in_source(self):
         app = (ROOT / "client" / "windows" / "app.py").read_text(encoding="utf-8")
         self.assertIn("SCROLLING_PRIVACY_TEXT", app)
-        self.assertIn("BANNER_BG", app)
+        self.assertIn("CHROME_BG", app)
         self.assertIn("WINDOW_BG", app)
-        self.assertIn("auto_connect_on_launch", app)
-        self.assertIn("_auto_connect", app)
-        self.assertIn("after(200", app)  # launch schedules connect
+        self.assertIn("connect_button_label", app)
+        self.assertIn("_on_toggle_connect", app)
+        self.assertIn("start_full_tunnel", app)
+        self.assertIn("stop_full_tunnel", app)
 
     def test_flutter_sources(self):
         main = (ROOT / "client_app" / "lib" / "main.dart").read_text(encoding="utf-8")
         theme = (ROOT / "client_app" / "lib" / "theme.dart").read_text(encoding="utf-8")
         vpn = (ROOT / "client_app" / "lib" / "vpn_controller.dart").read_text(encoding="utf-8")
         self.assertIn(SCROLLING_PRIVACY_TEXT, theme)
-        self.assertIn("kBannerBg", main)
-        self.assertIn("autoConnectOnLaunch", vpn)
-        self.assertIn("0xFF000080", theme.replace(" ", ""))
+        self.assertIn("kChromeBg", main)
+        self.assertIn("connectButtonLabel", main)
+        self.assertIn("Future<bool> connect()", vpn)
+        self.assertIn("Future<void> disconnect()", vpn)
+        self.assertIn("0xFF0A1F5C", theme.replace(" ", ""))
         cfg = (ROOT / "client_app" / "lib" / "rpt_config.dart").read_text(encoding="utf-8")
         self.assertIn("fullTunnel = true", cfg)
         self.assertIn("0.0.0.0/0", cfg)

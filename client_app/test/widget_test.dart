@@ -15,8 +15,10 @@ void main() {
         .setMockMethodCallHandler(channel, (call) async {
       if (call.method == 'connect') {
         return {
-          'ok': false,
-          'message': 'test harness — VPN not started',
+          'ok': true,
+          'message': 'Connected — test harness',
+          'vpnIp': '10.88.0.2',
+          'fullTunnelActive': true,
         };
       }
       if (call.method == 'disconnect') {
@@ -31,27 +33,35 @@ void main() {
         .setMockMethodCallHandler(channel, null);
   });
 
-  testWidgets('retro UI banner and privacy string present; auto-connect path runs',
-      (WidgetTester tester) async {
+  testWidgets('UI has title, logo chrome, log, and Connect button', (tester) async {
     await tester.pumpWidget(const RestorePrivacyApp());
-    await tester.pump(); // first frame
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 50));
+
+    expect(find.text(kAppTitle), findsWidgets); // title + log line
+    expect(find.text(kBannerTitle), findsOneWidget);
+    expect(find.text(connectButtonLabel(false)), findsOneWidget);
+    expect(find.textContaining('lightweight vpn to restore your privacy'), findsWidgets);
+    // Dark blue chrome background
+    final scaffold = tester.widget<Scaffold>(find.byType(Scaffold));
+    expect(scaffold.backgroundColor, kChromeBg);
+  });
+
+  testWidgets('Connect button invokes channel connect', (tester) async {
+    await tester.pumpWidget(const RestorePrivacyApp());
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 50));
+
+    await tester.tap(find.text(connectButtonLabel(false)));
+    await tester.pump();
     await tester.pump(const Duration(milliseconds: 100));
 
-    expect(find.text(kBannerTitle), findsOneWidget);
-    // Scrolling privacy text appears in log on launch and in marquee
-    expect(find.textContaining('lightweight vpn to restore your privacy'), findsWidgets);
-    // Auto-connect invokes channel — status updated
-    expect(find.textContaining('Auto-connect'), findsWidgets);
+    // After successful connect, label flips to Disconnect
+    expect(find.text(connectButtonLabel(true)), findsOneWidget);
+  });
 
-    // Banner color is product dark blue
-    final banner = tester.widget<Container>(
-      find.descendant(
-        of: find.byType(SafeArea),
-        matching: find.byWidgetPredicate(
-          (w) => w is Container && w.color == kBannerBg,
-        ),
-      ).first,
-    );
-    expect(banner.color, kBannerBg);
+  test('connectButtonLabel toggles', () {
+    expect(connectButtonLabel(false), 'Connect');
+    expect(connectButtonLabel(true), 'Disconnect');
   });
 }
