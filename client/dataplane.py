@@ -83,6 +83,8 @@ class RptDataPlane:
         tun = self._tun
         assert tun is not None
         sock = self.sock
+        last_keepalive = 0.0
+        keepalive_every = 30.0  # keep node session live for clients_connected
         while not self._stop.is_set():
             try:
                 rlist = [sock]
@@ -92,6 +94,7 @@ class RptDataPlane:
                 readable, _, _ = select.select(rlist, [], [], 0.05)
             except (ValueError, OSError):
                 readable = []
+                fd = -1
 
             # UDP -> open -> TUN (always try nonblocking recv)
             try:
@@ -117,6 +120,15 @@ class RptDataPlane:
                     self.stats.tun_to_udp += 1
             except Exception:
                 self.stats.errors += 1
+
+            # Periodic KEEPALIVE so idle tunnels still count as connected on the node
+            now = time.time()
+            if (now - last_keepalive) >= keepalive_every:
+                try:
+                    self.client.send_keepalive()
+                except Exception:
+                    self.stats.errors += 1
+                last_keepalive = now
 
             if fd < 0:
                 time.sleep(0.01)

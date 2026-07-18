@@ -211,8 +211,8 @@ class RPTNode:
                 sess = self.registry.get(session_id)
                 if not sess:
                     return
-                sess.client_addr = addr
-                sess.last_seen = time.time()
+                # Refresh liveness under registry lock (keeps clients_connected accurate)
+                self.registry.touch(session_id, addr)
                 aad = session_id + struct.pack("!Q", counter)
                 try:
                     plaintext = sess.crypto.open(nonce, sealed, aad=aad)
@@ -265,6 +265,9 @@ class RPTNode:
             encoding="utf-8",
         )
 
+        # Periodically drop idle sessions so clients_connected is live, not cumulative
+        last_prune = 0.0
+        prune_every_sec = 5.0
         while True:
             r, _, _ = select.select([sock, self.tun_fd], [], [], 1.0)
             if sock in r:
@@ -276,6 +279,10 @@ class RPTNode:
                 except OSError:
                     continue
                 self.on_tun(packet, sock)
+            now = time.time()
+            if (now - last_prune) >= prune_every_sec:
+                self.registry.expire_stale(now=now)
+                last_prune = now
 
 
 def main(argv=None) -> int:
