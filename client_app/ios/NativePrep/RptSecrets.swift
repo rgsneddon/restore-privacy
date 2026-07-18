@@ -16,15 +16,21 @@ enum RptSecrets {
   static var appGroupId: String { "group.com.restoreprivacy.shared" }
   static let appSupportFolderName = "Restore Privacy"
 
-  /// Real login-user home (not App Sandbox container home).
+  /// Real login-user home (not App Sandbox container home). macOS-focused; iOS uses container paths.
   static func realUserHomeDirectory() -> URL? {
+    #if os(macOS)
     if let pw = getpwuid(getuid()), let dir = pw.pointee.pw_dir {
       return URL(fileURLWithPath: String(cString: dir), isDirectory: true)
     }
+    #endif
     if let home = ProcessInfo.processInfo.environment["HOME"], !home.isEmpty {
       return URL(fileURLWithPath: home, isDirectory: true)
     }
+    #if os(macOS)
     return FileManager.default.homeDirectoryForCurrentUser
+    #else
+    return FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first
+    #endif
   }
 
   static func candidateSecretsDirectories(
@@ -58,10 +64,16 @@ enum RptSecrets {
           .appendingPathComponent("secrets", isDirectory: true)
       )
     }
+    #if os(macOS)
     dirs.append(
       fileManager.homeDirectoryForCurrentUser
         .appendingPathComponent(".restore-privacy/secrets", isDirectory: true)
     )
+    #else
+    if let docs = fileManager.urls(for: .documentDirectory, in: .userDomainMask).first {
+      dirs.append(docs.appendingPathComponent("secrets", isDirectory: true))
+    }
+    #endif
     var seen = Set<String>()
     var unique: [URL] = []
     for d in dirs {
@@ -92,8 +104,13 @@ enum RptSecrets {
       return realHome
         .appendingPathComponent(".restore-privacy/secrets", isDirectory: true)
     }
+    #if os(macOS)
     return fileManager.homeDirectoryForCurrentUser
       .appendingPathComponent(".restore-privacy/secrets", isDirectory: true)
+    #else
+    return fileManager.urls(for: .documentDirectory, in: .userDomainMask).first?
+      .appendingPathComponent("secrets", isDirectory: true)
+    #endif
   }
 
   static func clientPrivateKeyURL(fileManager: FileManager = .default) -> URL? {

@@ -16,7 +16,7 @@ import traceback
 from pathlib import Path
 
 APP_NAME = "RestorePrivacy"
-VERSION = "0.0.9"
+VERSION = "0.1.0"
 # Install under LocalAppData so no elevation is required for deploy.
 INSTALL_DIR = Path(os.environ.get("LOCALAPPDATA", str(Path.home()))) / "Programs" / APP_NAME
 USER_SECRETS = Path.home() / ".restore-privacy" / "secrets"
@@ -56,7 +56,7 @@ def _payload_root() -> Path:
         if d.is_dir():
             return d
     raise FileNotFoundError(
-        "Client payload not found. Build with scripts/build_release_0.0.9.py first."
+        "Client payload not found. Build with scripts/build_release_0.1.0.py first."
     )
 
 

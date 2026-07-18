@@ -107,7 +107,7 @@ Published macOS zips must be **Developer ID signed and notarized** so users are 
 ```bash
 python3 scripts/sign_and_notarize_macos.py \
   --app client_app/build/macos/Build/Products/Release/restore_privacy_client.app \
-  --zip releases/0.0.9/restore-privacy-client-0.0.9-macos.zip
+  --zip releases/0.1.0/restore-privacy-client-0.1.0-macos.zip
 ```
 
 See [macos/BUILD_ON_MAC.md](macos/BUILD_ON_MAC.md) § Gatekeeper.

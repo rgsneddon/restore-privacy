@@ -25,7 +25,7 @@ public enum RptSecrets {
 
     /// Real login-user home (not the App Sandbox container home).
     public static func realUserHomeDirectory() -> URL? {
-        #if os(macOS) || os(iOS)
+        #if os(macOS)
         if let pw = getpwuid(getuid()), let dir = pw.pointee.pw_dir {
             return URL(fileURLWithPath: String(cString: dir), isDirectory: true)
         }
@@ -34,7 +34,11 @@ public enum RptSecrets {
             // May be container path under sandbox — still useful as a candidate.
             return URL(fileURLWithPath: home, isDirectory: true)
         }
+        #if os(macOS)
         return FileManager.default.homeDirectoryForCurrentUser
+        #else
+        return FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first
+        #endif
     }
 
     /// Ordered candidate directories that may hold admission keys (never node private key).
@@ -81,11 +85,17 @@ public enum RptSecrets {
             )
         }
 
-        // 6. Sandbox / NSHomeDirectory home (Flutter container)
+        // 6. Sandbox / container home (Flutter)
+        #if os(macOS)
         let containerHome = fileManager.homeDirectoryForCurrentUser
             .appendingPathComponent(".restore-privacy", isDirectory: true)
             .appendingPathComponent("secrets", isDirectory: true)
         dirs.append(containerHome)
+        #else
+        if let docs = fileManager.urls(for: .documentDirectory, in: .userDomainMask).first {
+            dirs.append(docs.appendingPathComponent("secrets", isDirectory: true))
+        }
+        #endif
 
         // De-dupe by standardized path
         var seen = Set<String>()
@@ -129,8 +139,13 @@ public enum RptSecrets {
                 .appendingPathComponent(".restore-privacy", isDirectory: true)
                 .appendingPathComponent("secrets", isDirectory: true)
         }
+        #if os(macOS)
         return fileManager.homeDirectoryForCurrentUser
             .appendingPathComponent(".restore-privacy/secrets", isDirectory: true)
+        #else
+        return fileManager.urls(for: .documentDirectory, in: .userDomainMask).first?
+            .appendingPathComponent("secrets", isDirectory: true)
+        #endif
     }
 
     public static func clientPrivateKeyURL(fileManager: FileManager = .default) -> URL? {
