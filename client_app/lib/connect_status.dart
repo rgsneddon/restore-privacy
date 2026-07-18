@@ -125,11 +125,16 @@ bool isUkGateFailureMessage(String message) {
 
 /// Lifecycle states that must stop the system Packet Tunnel (app close / exit).
 /// Residual public IP reverts when the OS NE session stops.
-/// Does **not** include pause/inactive (background) — only full detach/exit.
+///
+/// - `detached`: process exit / Flutter engine detach
+/// - `paused`: backgrounded — on iOS, app-switcher swipe-kill often never delivers
+///   `willTerminate` or `detached`, so paused is required for residual-IP reversion
 bool shouldStopTunnelOnAppLifecycle(String lifecycleStateName) {
   final s = lifecycleStateName.trim().toLowerCase();
-  // AppLifecycleState.detached / matching names from tests and bindings.
-  return s == 'detached' || s == 'applifecyclestate.detached';
+  return s == 'detached' ||
+      s == 'applifecyclestate.detached' ||
+      s == 'paused' ||
+      s == 'applifecyclestate.paused';
 }
 
 /// Human message after intentional tunnel stop (channel or quit).

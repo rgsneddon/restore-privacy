@@ -18,9 +18,16 @@ import NetworkExtension
   }
 
   /// App is closing — stop Packet Tunnel so residual public IP is restored.
-  /// Same stop path as method-channel `disconnect` (`stopAllTunnels` → `stopVPNTunnel`).
+  /// Blocking wait so process exit does not race async `loadAllFromPreferences`.
   override func applicationWillTerminate(_ application: UIApplication) {
-    RptVpnChannel.stopAllTunnels()
+    _ = RptVpnChannel.stopAllTunnelsAndWait(timeout: 2.0)
     super.applicationWillTerminate(application)
+  }
+
+  /// App-switcher swipe-kill often never delivers `willTerminate` or Flutter `detached`.
+  /// Stop NE on background so residual ISP IP returns when the user leaves/closes the app.
+  override func applicationDidEnterBackground(_ application: UIApplication) {
+    RptVpnChannel.stopAllTunnels()
+    super.applicationDidEnterBackground(application)
   }
 }

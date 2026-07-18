@@ -244,6 +244,13 @@ enum RptVpnChannel {
     }
   }
 
+  /// Whether a saved VPN manager is ours (product Packet Tunnel).
+  static func shouldStopManager(_ manager: NETunnelProviderManager) -> Bool {
+    let proto = manager.protocolConfiguration as? NETunnelProviderProtocol
+    let bid = proto?.providerBundleIdentifier ?? ""
+    return bid.isEmpty || bid == providerBundleId || manager.localizedDescription == "Restore Privacy"
+  }
+
   /// Stop every Restore Privacy Packet Tunnel session (channel disconnect + app quit).
   /// Residual public IP reverts when the OS tears down the NE session.
   static func stopAllTunnels(completion: (([String: Any]) -> Void)? = nil) {
@@ -260,16 +267,24 @@ enum RptVpnChannel {
         ] as [String: Any])
         return
       }
-      let list = managers ?? []
-      for manager in list {
-        // Only stop our product tunnel configs (avoid unrelated VPN profiles if any).
-        let proto = manager.protocolConfiguration as? NETunnelProviderProtocol
-        let bid = proto?.providerBundleIdentifier ?? ""
-        if bid.isEmpty || bid == providerBundleId || manager.localizedDescription == "Restore Privacy" {
-          manager.connection.stopVPNTunnel()
-        }
+      for manager in managers ?? [] where shouldStopManager(manager) {
+        manager.connection.stopVPNTunnel()
       }
       finish(RptFullTunnelResult.disconnectResultMap())
     }
+  }
+
+  /// Blocking stop for terminate hooks — waits until `stopVPNTunnel` is issued
+  /// (or timeout) so process exit does not race the async preferences load.
+  @discardableResult
+  static func stopAllTunnelsAndWait(timeout: TimeInterval = 2.0) -> [String: Any] {
+    let sem = DispatchSemaphore(value: 0)
+    var resultMap = RptFullTunnelResult.disconnectResultMap()
+    stopAllTunnels { map in
+      resultMap = map
+      sem.signal()
+    }
+    _ = sem.wait(timeout: .now() + timeout)
+    return resultMap
   }
 }

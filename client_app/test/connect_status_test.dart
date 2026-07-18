@@ -119,12 +119,26 @@ void main() {
   });
 
   group('app lifecycle stop-on-quit', () {
-    test('detached stops tunnel; pause/inactive do not', () {
+    test('detached and paused stop tunnel; inactive/resumed do not', () {
       expect(shouldStopTunnelOnAppLifecycle('detached'), isTrue);
       expect(shouldStopTunnelOnAppLifecycle('AppLifecycleState.detached'), isTrue);
-      expect(shouldStopTunnelOnAppLifecycle('paused'), isFalse);
+      // iOS app-switcher close often only delivers paused (not willTerminate/detached).
+      expect(shouldStopTunnelOnAppLifecycle('paused'), isTrue);
+      expect(shouldStopTunnelOnAppLifecycle('AppLifecycleState.paused'), isTrue);
       expect(shouldStopTunnelOnAppLifecycle('inactive'), isFalse);
       expect(shouldStopTunnelOnAppLifecycle('resumed'), isFalse);
+    });
+
+    test('disconnectResultMap contract is not product success (shipped helper)', () {
+      // Mirrors native RptFullTunnelResult.disconnectResultMap fields.
+      final map = {
+        'ok': true,
+        'message': kDisconnectedResidualIpMessage,
+        'fullTunnelActive': false,
+        'hostOnlySession': false,
+      };
+      expect(isConnectSuccess(map), isFalse);
+      expect(mapConnectStatusMessage(map), kDisconnectedResidualIpMessage);
     });
   });
 }

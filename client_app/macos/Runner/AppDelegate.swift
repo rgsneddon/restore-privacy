@@ -13,7 +13,7 @@ class AppDelegate: FlutterAppDelegate {
   }
 
   /// Stop Packet Tunnel before quit so residual ISP IP returns when the UI closes.
-  /// Uses the same stop path as method-channel `disconnect`.
+  /// Same stop path as method-channel `disconnect`; waits for stop to be issued.
   override func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
     RptVpnChannel.stopAllTunnels { _ in
       DispatchQueue.main.async {
@@ -24,7 +24,7 @@ class AppDelegate: FlutterAppDelegate {
   }
 
   override func applicationWillTerminate(_ notification: Notification) {
-    // Best-effort if ShouldTerminate path was skipped (e.g. force paths).
-    RptVpnChannel.stopAllTunnels()
+    // Blocking backup if ShouldTerminate path was skipped.
+    _ = RptVpnChannel.stopAllTunnelsAndWait(timeout: 2.0)
   }
 }

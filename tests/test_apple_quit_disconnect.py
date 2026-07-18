@@ -15,14 +15,24 @@ class TestAppleQuitStopsTunnel(unittest.TestCase):
         self.assertIn("applicationShouldTerminate", text)
         self.assertIn("applicationWillTerminate", text)
         self.assertIn("stopAllTunnels", text)
+        self.assertIn("stopAllTunnelsAndWait", text)
         self.assertIn("terminateLater", text)
         self.assertIn("RptVpnChannel", text)
 
-    def test_ios_app_delegate_stops_on_will_terminate(self):
+    def test_ios_app_delegate_stops_on_will_terminate_and_background(self):
         text = (APP / "ios" / "Runner" / "AppDelegate.swift").read_text(encoding="utf-8")
         self.assertIn("applicationWillTerminate", text)
+        # Blocking wait — stopVPNTunnel issued before process exit races loadAllFromPreferences
+        self.assertIn("stopAllTunnelsAndWait", text)
+        # App-switcher swipe-kill rarely gets willTerminate; background stop covers it
+        self.assertIn("applicationDidEnterBackground", text)
         self.assertIn("stopAllTunnels", text)
         self.assertIn("RptVpnChannel", text)
+
+    def test_ios_scene_delegate_stops_on_background(self):
+        text = (APP / "ios" / "Runner" / "SceneDelegate.swift").read_text(encoding="utf-8")
+        self.assertIn("sceneDidEnterBackground", text)
+        self.assertIn("stopAllTunnels", text)
 
     def test_channel_disconnect_uses_stop_all_tunnels(self):
         for rel in (
@@ -31,6 +41,8 @@ class TestAppleQuitStopsTunnel(unittest.TestCase):
         ):
             text = (APP / rel).read_text(encoding="utf-8")
             self.assertIn("stopAllTunnels", text)
+            self.assertIn("stopAllTunnelsAndWait", text)
+            self.assertIn("DispatchSemaphore", text)
             self.assertIn("stopVPNTunnel", text)
             self.assertIn('case "disconnect"', text)
             # disconnect case must call stopAllTunnels (not a parallel private disconnect)
@@ -61,6 +73,7 @@ class TestAppleQuitStopsTunnel(unittest.TestCase):
         self.assertIn("shouldStopTunnelOnAppLifecycle", text)
         self.assertIn("kDisconnectedResidualIpMessage", text)
         self.assertIn("detached", text)
+        self.assertIn("paused", text)  # iOS app-switcher close
         # residual-IP reversion is documented next to the helper
         self.assertIn("residual public ip", text.lower())
 
