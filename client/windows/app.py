@@ -50,6 +50,11 @@ from client.ui_theme import (
     upgrade_banner_text,
     upgrade_download_url,
 )
+from client.windows.elevate import (
+    elevate_if_needed,
+    is_admin,
+    should_exit_after_elevation,
+)
 from client.windows.tunnel_win import start_full_tunnel, stop_full_tunnel
 
 
@@ -125,17 +130,34 @@ class TunnelClientApp:
         )
         self.connect_btn.pack(side=tk.TOP, fill=tk.X, pady=(10, 6), ipady=6)
 
+        self.hint_row = tk.Frame(self.bottom, bg=CHROME_BG)
+        self.hint_row.pack(side=tk.TOP, fill=tk.X)
         self.hint = tk.Label(
-            self.bottom,
-            text="Connection is manual — press Connect to start, Disconnect to stop.",
+            self.hint_row,
+            text="Manual only — Connect starts, Disconnect stops. Close hides the window (VPN stays up).",
             bg=CHROME_BG,
             fg=TEXT_MUTED,
             font=("Segoe UI", 8),
             anchor="w",
-            wraplength=460,
+            wraplength=380,
             justify=tk.LEFT,
         )
-        self.hint.pack(side=tk.TOP, fill=tk.X)
+        self.hint.pack(side=tk.LEFT, fill=tk.X, expand=True)
+        self.quit_btn = tk.Button(
+            self.hint_row,
+            text="Quit",
+            command=self._quit_app,
+            bg=CHROME_BG,
+            fg=TEXT_MUTED,
+            activebackground=LIGHT_ACCENT,
+            activeforeground=TEXT,
+            relief=tk.FLAT,
+            font=("Segoe UI", 8, "underline"),
+            cursor="hand2",
+            bd=0,
+            padx=6,
+        )
+        self.quit_btn.pack(side=tk.RIGHT)
 
         # --- Header ---
         self.header = tk.Frame(self.chrome, bg=CHROME_BG)
@@ -458,9 +480,36 @@ class TunnelClientApp:
             self._log(f"Could not open browser: {exc}. Visit: {url}")
 
     def _on_close_ui_only(self) -> None:
-        """Close window without stopping the VPN (manual Disconnect only)."""
+        """Hide UI; keep process + tunnel alive (taskbar). Disconnect is separate.
+
+        Destroying the window would end mainloop and kill residual dual /1 routes
+        without rollback — so we iconify instead of destroy.
+        """
         try:
-            self._log("Window closed — VPN left running (use Disconnect to stop).")
+            self._log(
+                "Window hidden — VPN keeps running if connected. "
+                "Restore from the taskbar. Press Disconnect to stop, or Quit to exit."
+            )
+        except Exception:
+            pass
+        try:
+            self.root.iconify()
+        except Exception:
+            try:
+                self.root.withdraw()
+            except Exception:
+                pass
+
+    def _quit_app(self) -> None:
+        """Explicit quit: stop tunnel then exit process (safe route cleanup)."""
+        try:
+            self._log("Quit — stopping tunnel and exiting…")
+        except Exception:
+            pass
+        tunnel = self._tunnel
+        self._tunnel = None
+        try:
+            disconnect_full_tunnel(tunnel, self.client)
         except Exception:
             pass
         try:
@@ -469,7 +518,7 @@ class TunnelClientApp:
             pass
 
     def run(self) -> None:
-        # No finally-teardown: tunnel is user-controlled only
+        # No finally-teardown on hide: tunnel is user-controlled (Disconnect / Quit)
         self.root.mainloop()
 
 
@@ -478,10 +527,10 @@ RetroClientApp = TunnelClientApp
 
 
 def main() -> int:
-    """Launch UI — no auto-connect; no elevate-forced launch required."""
+    """Launch UI with UAC elevation for full-tunnel routes; never auto-connect."""
     if "--rpt-elevated" in sys.argv:
         sys.argv = [a for a in sys.argv if a != "--rpt-elevated"]
-    # Ignore legacy auto-connect flags
+    # Ignore legacy auto-connect flags — connect is always manual
     if "--rpt-auto-connect" in sys.argv:
         sys.argv = [a for a in sys.argv if a != "--rpt-auto-connect"]
 
@@ -492,6 +541,11 @@ def main() -> int:
         os.chdir(root)
     except Exception:
         pass
+
+    # Elevate once at launch so Wintun dual /1 can apply; do not auto-connect after.
+    status = elevate_if_needed()
+    if should_exit_after_elevation(status):
+        return 0
 
     try:
         app = TunnelClientApp()
@@ -508,6 +562,22 @@ def main() -> int:
         except Exception:
             print(f"Restore Privacy failed to open: {exc}", file=sys.stderr)
         return 1
+
+    if status.startswith("failed:"):
+        reason = status.split(":", 1)[-1]
+
+        def _note_elev_fail() -> None:
+            app._log(
+                f"Administrator elevation failed ({reason}). "
+                "You can still open the app; full system routes may need UAC."
+            )
+
+        app.root.after(100, _note_elev_fail)
+    elif status == "already_admin" or is_admin():
+        app.root.after(
+            100,
+            lambda: app._log("Running elevated — full tunnel routes available when you Connect."),
+        )
 
     # Never schedule auto-connect
     assert not auto_connect_on_launch_enabled()

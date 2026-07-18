@@ -52,13 +52,27 @@ class TestManualControlPolicy(unittest.TestCase):
 
     def test_close_path_no_teardown(self):
         src = (ROOT / "client" / "windows" / "app.py").read_text(encoding="utf-8")
-        close = src[src.index("def _on_close_ui_only") : src.index("def run")]
+        # Close hides (iconify/withdraw) — does not destroy process or stop tunnel
+        close = src[src.index("def _on_close_ui_only") : src.index("def _quit_app")]
         self.assertNotIn("stop_full_tunnel", close)
         self.assertNotIn("disconnect_full_tunnel", close)
-        self.assertIn("destroy", close)
-        run = src[src.index("def run") : src.index("def run") + 200]
+        self.assertTrue("iconify" in close or "withdraw" in close)
+        self.assertNotIn("self.root.destroy()", close)
+        # Explicit Quit stops tunnel then exits
+        quit_body = src[src.index("def _quit_app") : src.index("def run")]
+        self.assertIn("disconnect_full_tunnel", quit_body)
+        self.assertIn("destroy", quit_body)
+        run = src[src.index("def run") : src.index("def run") + 220]
         self.assertNotIn("stop_full_tunnel", run)
         self.assertNotIn("finally:", run)
+
+    def test_main_wires_elevation_without_auto_connect(self):
+        src = (ROOT / "client" / "windows" / "app.py").read_text(encoding="utf-8")
+        main = src[src.index("def main") :]
+        self.assertIn("elevate_if_needed", main)
+        self.assertIn("should_exit_after_elevation", main)
+        self.assertNotIn("_start_connect", main)
+        self.assertIn("Never schedule auto-connect", main)
 
     def test_disconnect_calls_stop_helper(self):
         client = mock.Mock()

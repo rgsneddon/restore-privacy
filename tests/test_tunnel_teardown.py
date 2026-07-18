@@ -162,13 +162,16 @@ class TestWindowsAppCloseHook(unittest.TestCase):
         self.assertIn("_on_close_ui_only", src)
         self.assertIn("disconnect_full_tunnel", src)
         self.assertIn('protocol("WM_DELETE_WINDOW"', src)
-        # Close must not call stop/teardown
-        on_close = src[src.index("def _on_close_ui_only") : src.index("def run")]
+        # Close hides process alive — no tunnel stop
+        on_close = src[src.index("def _on_close_ui_only") : src.index("def _quit_app")]
         self.assertNotIn("stop_full_tunnel", on_close)
         self.assertNotIn("disconnect_full_tunnel", on_close)
-        self.assertIn("destroy", on_close)
+        self.assertTrue("iconify" in on_close or "withdraw" in on_close)
+        # Quit explicitly stops tunnel
+        quit_body = src[src.index("def _quit_app") : src.index("def run")]
+        self.assertIn("disconnect_full_tunnel", quit_body)
         # run() has no finally teardown
-        run_body = src[src.index("def run") : src.index("def run") + 180]
+        run_body = src[src.index("def run") : src.index("def run") + 200]
         self.assertNotIn("stop_full_tunnel", run_body)
 
     def test_disconnect_helper_calls_shipped_stop(self):
