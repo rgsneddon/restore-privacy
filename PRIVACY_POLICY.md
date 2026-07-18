@@ -2,7 +2,7 @@
 
 **Last updated:** 18 July 2026  
 **Product:** Restore Privacy Tunnel (RPT) — custom VPN node, client apps, and public status page  
-**Current client packages:** [v0.1.1](https://github.com/rgsneddon/restore-privacy/releases/tag/0.1.1) (Windows · Android · macOS · iOS)  
+**Current client packages:** [v0.1.2](https://github.com/rgsneddon/restore-privacy/releases/tag/0.1.2) (Windows · Android · macOS · iOS)  
 **Operator / project:** Russell G Sneddon (`rgsneddon`) / public repository [restore-privacy](https://github.com/rgsneddon/restore-privacy)
 
 This policy describes how the **Restore Privacy** software is designed to handle data. It is written for end users and operators. It is **not** legal advice and is not a jurisdiction-specific compliance certificate (e.g. full GDPR/CCPA legal opinion).
@@ -51,13 +51,13 @@ Process stdout/stderr for the node service is configured for **no journal sessio
 - They use **local** cryptographic material (when provisioned) to complete admission and establish session keys.
 - **Full-tunnel** modes route device traffic into the encrypted tunnel **only when** the OS grants VPN permission (Windows Administrator / UAC, Android VPN consent, iOS/macOS VPN permission). On **iOS and macOS**, full-system VPN uses a signed **Packet Tunnel Network Extension** (and App Group access to admission secrets). Product connect success requires the system tunnel to be active (residual public IP only changes then).
 - Clients are **not** designed to upload browsing history or identity dossiers to the node as product telemetry.
-- Public download packages (Windows `.exe`, Android `.apk`, macOS `.zip`, iOS `.zip` for **v0.1.1**) may include **product client admission keys** (`client_ed25519.priv` + `node_elgamal.pub`) so installers can connect seamlessly. They **never** include the **node private key** (`node_elgamal.priv`).
+- Public download packages (Windows `.exe`, Android `.apk`, macOS `.zip`, iOS `.zip` for **v0.1.2**) may include **product client admission keys** (`client_ed25519.priv` + `node_elgamal.pub`) so installers can connect seamlessly. They **never** include the **node private key** (`node_elgamal.priv`).
 
 ### 3.3 Public status page (e.g. Render)
 
 - Proxies or displays a **live** `clients_connected` value from the node status API.
 - Updates the number in the browser via **client-side polling** (no requirement to store user history on the page host).
-- May offer **download links** to public GitHub release packages (current catalog: **v0.1.1**).
+- May offer **download links** to public GitHub release packages (current catalog: **v0.1.2**).
 
 ### 3.4 Operator-held secrets
 
