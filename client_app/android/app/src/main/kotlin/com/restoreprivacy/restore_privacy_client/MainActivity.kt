@@ -38,9 +38,8 @@ class MainActivity : FlutterActivity() {
                                 mapOf(
                                     "ok" to false,
                                     "message" to (
-                                        "Missing admission secrets — place client_ed25519.priv and " +
-                                            "node_elgamal.pub under app secrets (build injects from " +
-                                            "repo secrets/ when present)"
+                                        "Missing node_elgamal.pub — packages ship the public node key; " +
+                                            "a unique device Ed25519 key is generated on first run"
                                         ),
                                 ),
                             )
@@ -62,13 +61,13 @@ class MainActivity : FlutterActivity() {
             }
     }
 
+    /** True when node public key is available (device Ed25519 is generated on connect). */
     private fun secretsPresent(): Boolean {
         val dir = File(filesDir, "secrets")
-        if (File(dir, "client_ed25519.priv").isFile && File(dir, "node_elgamal.pub").isFile) {
+        if (File(dir, "node_elgamal.pub").isFile) {
             return true
         }
         return try {
-            assets.open("secrets/client_ed25519.priv").close()
             assets.open("secrets/node_elgamal.pub").close()
             true
         } catch (_: Exception) {

@@ -9,10 +9,9 @@ Windows/Android are staged from 0.1.1 when not rebuilt on this host.
 - macOS: zips Flutter restore_privacy_client.app after Developer ID sign/notarize
 - iOS: zips Flutter Runner.app for sideload / device install tooling
 
-Product admission keys (client_ed25519.priv + node_elgamal.pub) are **bundled**
-into Apple packages via scripts/inject_apple_secrets.py when present under
-repo secrets/ or ~/.restore-privacy/secrets/ (same pattern as Android assets).
-Never bundles node_elgamal.priv.
+Public node key (node_elgamal.pub) may be bundled via scripts/inject_apple_secrets.py.
+Per-device Ed25519 client keys are generated on first run — never a shared
+client_ed25519.priv. Never bundles node_elgamal.priv.
 """
 
 from __future__ import annotations
@@ -87,12 +86,9 @@ def write_version_files() -> None:
 
 
 def _assert_no_priv(root: Path) -> None:
-    """Never ship node private key. Client admission priv is allowed in product packages."""
+    """Never ship any .priv in public packages (per-device keys are generated at runtime)."""
     for p in root.rglob("*.priv"):
-        if p.name == "node_elgamal.priv":
-            raise RuntimeError(f"refusing to package node private key: {p}")
-        if p.name != "client_ed25519.priv":
-            raise RuntimeError(f"refusing to package unexpected secret file: {p}")
+        raise RuntimeError(f"refusing to package private key material: {p}")
 
 
 def sign_and_notarize_macos(app: Path, dest_zip: Path) -> None:
@@ -173,12 +169,11 @@ def sign_ios_app(app: Path) -> None:
 
 
 def inject_product_secrets(app: Path, *, ios: bool) -> None:
-    """Bundle client_ed25519.priv + node_elgamal.pub into the app for seamless connect."""
+    """Bundle node_elgamal.pub only; device Ed25519 keys are generated on first run."""
     script = ROOT / "scripts" / "inject_apple_secrets.py"
     cmd = [sys.executable, str(script), "--app", str(app)]
     if ios:
         cmd.append("--ios")
-    # Prefer non-optional so release fails closed if keys missing on packager machine
     subprocess.run(cmd, check=True)
 
 

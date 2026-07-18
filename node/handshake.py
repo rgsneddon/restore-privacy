@@ -5,7 +5,8 @@ from __future__ import annotations
 import hashlib
 import os
 from dataclasses import dataclass
-from typing import Iterable, Set
+from pathlib import Path
+from typing import Callable, Iterable, Optional, Set
 
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric.ed25519 import (
@@ -54,6 +55,30 @@ def load_ed25519_pub(raw: bytes) -> Ed25519PublicKey:
 def generate_client_admission_keypair() -> tuple[Ed25519PrivateKey, Ed25519PublicKey]:
     priv = Ed25519PrivateKey.generate()
     return priv, priv.public_key()
+
+
+def persist_enrolled_client_pub(secrets_dir: Path, client_pub: bytes) -> None:
+    """Append a newly enrolled device Ed25519 public key (32 bytes) to allow-list file.
+
+    Pure filesystem helper (no Linux-only imports) so unit tests can call it on Windows.
+    """
+    if len(client_pub) != 32:
+        return
+    allow_path = Path(secrets_dir) / "authorized_clients.pub"
+    Path(secrets_dir).mkdir(parents=True, exist_ok=True)
+    existing = b""
+    if allow_path.is_file():
+        existing = allow_path.read_bytes()
+        if client_pub in existing:
+            return
+    with allow_path.open("ab") as f:
+        if existing and not existing.endswith(b"\n"):
+            f.write(b"\n")
+        f.write(client_pub + b"\n")
+    try:
+        os.chmod(allow_path, 0o644)
+    except OSError:
+        pass
 
 
 def transcript_for_client_hello(client_pub: bytes, commit: bytes, elgamal_ct: bytes) -> bytes:
@@ -116,11 +141,44 @@ class AdmissionError(Exception):
 
 
 class NodeHandshake:
-    def __init__(self, node_elgamal: ElGamalPrivateKey, authorized_client_pubs: Iterable[bytes]):
+    """Node-side admission.
+
+    Free-product default: ``admit_unknown_devices=True`` accepts any client that
+    presents a valid Ed25519-signed HELLO + hybrid/Pedersen proof encrypted to
+    this node's ElGamal key (per-device keys generated on first client run).
+    Optional static allow-list still works for operator test keys / revocations
+    when combined with ``admit_unknown_devices=False``.
+    """
+
+    def __init__(
+        self,
+        node_elgamal: ElGamalPrivateKey,
+        authorized_client_pubs: Iterable[bytes] | None = None,
+        *,
+        admit_unknown_devices: bool = True,
+        on_enroll: Optional[Callable[[bytes], None]] = None,
+    ):
         self.node_elgamal = node_elgamal
-        self.authorized: Set[bytes] = set(authorized_client_pubs)
-        if not self.authorized:
-            raise ValueError("authorized client public keys required")
+        self.authorized: Set[bytes] = set(authorized_client_pubs or ())
+        self.admit_unknown_devices = bool(admit_unknown_devices)
+        self.on_enroll = on_enroll
+        if not self.authorized and not self.admit_unknown_devices:
+            raise ValueError(
+                "authorized client public keys required when admit_unknown_devices is False"
+            )
+
+    def enroll_device(self, client_pub: bytes) -> None:
+        """Remember a newly admitted device public key (in-memory + optional callback)."""
+        if len(client_pub) != 32:
+            return
+        if client_pub in self.authorized:
+            return
+        self.authorized.add(client_pub)
+        if self.on_enroll is not None:
+            try:
+                self.on_enroll(client_pub)
+            except Exception:
+                pass
 
 
 def node_complete_hello(
@@ -129,7 +187,8 @@ def node_complete_hello(
     vpn_ip: str,
 ) -> tuple[bytes, HandshakeResult]:
     client_pub, commit_b, hybrid_b, sig = parse_client_hello(frame)
-    if client_pub not in node.authorized:
+    known = client_pub in node.authorized
+    if not known and not node.admit_unknown_devices:
         raise AdmissionError("unauthorized client")
     pub = load_ed25519_pub(client_pub)
     try:
@@ -153,6 +212,10 @@ def node_complete_hello(
     expected_m = int.from_bytes(hashlib.sha256(client_nonce).digest(), "big") % Q
     if opening.message % Q != expected_m:
         raise AdmissionError("pedersen message mismatch")
+
+    # Crypto verified — enroll first-seen device keys for free-product mode
+    if not known:
+        node.enroll_device(client_pub)
 
     session_id = os.urandom(8)
     server_nonce = os.urandom(32)

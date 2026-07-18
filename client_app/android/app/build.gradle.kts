@@ -49,15 +49,16 @@ dependencies {
     implementation("org.bouncycastle:bcprov-jdk18on:1.78.1")
 }
 
-// Inject admission material into APK assets at build time from gitignored repo secrets/.
-// Never commits *.priv — only copies when present on the builder machine.
+// Inject public node key into APK assets only. Per-device Ed25519 client keys
+// are generated on first run (never a shared client_ed25519.priv in every APK).
 // rootProject = client_app/android → ../../secrets = restore_privacy/secrets
 tasks.register("copyRptSecretsToAssets") {
     doLast {
-        val repoSecrets = rootProject.file("../../secrets")
         val destDir = file("src/main/assets/secrets")
         destDir.mkdirs()
-        listOf("client_ed25519.priv", "node_elgamal.pub", "client_ed25519.pub").forEach { name ->
+        // Remove any previously injected shared client priv from assets tree
+        file("src/main/assets/secrets/client_ed25519.priv").let { if (it.exists()) it.delete() }
+        listOf("node_elgamal.pub").forEach { name ->
             val src = rootProject.file("../../secrets/$name")
             val dest = file("src/main/assets/secrets/$name")
             if (src.exists()) {

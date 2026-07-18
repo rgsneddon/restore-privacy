@@ -53,7 +53,7 @@ or use the buttons on https://restore-privacy-status.onrender.com/
 
 ### macOS
 
-Release packages **bundle product admission keys** (`client_ed25519.priv` + `node_elgamal.pub`) so the client can connect without a separate secrets step. Never ship `node_elgamal.priv`.
+Release packages may ship the **public** node key (`node_elgamal.pub`) so the client can open a HELLO. Each install **generates its own Ed25519 device key on first run** and stores it only on the device — packages do **not** ship a shared `client_ed25519.priv`. Never ship `node_elgamal.priv`.
 
 1. Download **`restore-privacy-client-0.1.2-macos.zip`** from the release or status page.
 2. Unzip and open **`restore_privacy_client.app`** (notarized Developer ID builds open without Gatekeeper malware blocks).

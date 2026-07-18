@@ -39,7 +39,8 @@ String mapConnectStatusMessage(dynamic result) {
 
 /// Known failure substrings used by native Android path (for tests / docs).
 const String kMissingSecretsMessage =
-    'Missing admission secrets — place client_ed25519.priv and node_elgamal.pub under app secrets';
+    'Missing node_elgamal.pub — packages ship the public node key; '
+    'a unique device Ed25519 key is generated on first run';
 const String kVpnPermissionDeniedMessage =
     'VPN permission denied — grant once for full tunnel';
 

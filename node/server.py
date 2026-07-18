@@ -26,6 +26,7 @@ from node.handshake import (
     ed25519_pub_raw,
     generate_client_admission_keypair,
     node_complete_hello,
+    persist_enrolled_client_pub,
 )
 from node.nolog import apply_no_log_policy
 from node.protocol import MsgType, pack_data, parse_data, parse_keepalive, peek_type
@@ -124,6 +125,8 @@ def ensure_secrets(secrets_dir: Path) -> tuple[ElGamalPrivateKey, bytes]:
 def load_authorized(secrets_dir: Path) -> list[bytes]:
     allow_path = secrets_dir / "authorized_clients.pub"
     pubs: list[bytes] = []
+    if not allow_path.is_file():
+        return pubs
     data = allow_path.read_bytes()
     # file may be raw 32-byte keys concatenated or newline separated binary
     if b"\n" in data:
@@ -142,8 +145,6 @@ def load_authorized(secrets_dir: Path) -> list[bytes]:
             chunk = data[i : i + 32]
             if len(chunk) == 32:
                 pubs.append(chunk)
-    if not pubs:
-        raise SystemExit("no authorized client public keys")
     return pubs
 
 
@@ -154,7 +155,19 @@ class RPTNode:
             raise SystemExit("invalid config: " + "; ".join(v))
         self.config = config
         self.registry = SessionRegistry()
-        self.handshake = NodeHandshake(node_key, authorized)
+        adm = config.get("admission") or {}
+        admit_unknown = bool(adm.get("admit_unknown_devices", True))
+        secrets_dir = Path(config.get("secrets_dir") or "/opt/restore-privacy/secrets")
+
+        def _on_enroll(pub: bytes) -> None:
+            persist_enrolled_client_pub(secrets_dir, pub)
+
+        self.handshake = NodeHandshake(
+            node_key,
+            authorized,
+            admit_unknown_devices=admit_unknown,
+            on_enroll=_on_enroll,
+        )
         self._next_ip = ipv4_to_int(config["pool_start"])
         self._pool_end = ipv4_to_int(config["pool_end"])
         self.tun_fd: Optional[int] = None

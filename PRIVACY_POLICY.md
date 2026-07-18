@@ -52,7 +52,7 @@ Process stdout/stderr for the node service is configured for **no journal sessio
 - **Full-tunnel** modes route device traffic into the encrypted tunnel **only when** the OS grants VPN permission (Windows Administrator / UAC, Android VPN consent, iOS/macOS VPN permission). On **iOS and macOS**, full-system VPN uses a signed **Packet Tunnel Network Extension** (and App Group access to admission secrets). Product connect success requires the system tunnel to be active (residual public IP only changes then).
 - **On app close / disconnect**, clients are designed to **fully tear down** the tunnel (routes, TUN/Packet Tunnel, session) so traffic **reverts to the device’s normal public IP path**. Closing the app is not intended to leave residual VPN routing active.
 - Clients are **not** designed to upload browsing history or identity dossiers to the node as product telemetry.
-- Public download packages (Windows `.exe`, Android `.apk`, macOS `.zip`, iOS `.zip` for **v0.1.2**) may include **product client admission keys** (`client_ed25519.priv` + `node_elgamal.pub`) so installers can connect seamlessly. They **never** include the **node private key** (`node_elgamal.priv`).
+- Public download packages (Windows `.exe`, Android `.apk`, macOS `.zip`, iOS `.zip`) may include the **public** node key (`node_elgamal.pub`) so clients can open a HELLO. Each install **generates a unique Ed25519 device private key on first run** and keeps it only in local device-private storage — packages do **not** ship a shared `client_ed25519.priv` (which would allow universal impersonation). They **never** include the **node private key** (`node_elgamal.priv`).
 
 ### 3.3 Public status page (e.g. Render)
 
@@ -64,7 +64,7 @@ Process stdout/stderr for the node service is configured for **no journal sessio
 
 - **Node ElGamal private key** and **authorized client private keys** are operational secrets.
 - The **node ElGamal private key** lives only on the operator node (e.g. `/opt/restore-privacy/secrets/`) and is gitignored—**never** in public release zips.
-- **Client** admission keys may be bundled in installers for seamless connect; possession of those keys allows tunnel use—treat them as credentials.
+- **Client** device Ed25519 keys are created locally on first run (not a shared installer secret). Possession of a device key allows tunnel use for that install—treat local secrets as credentials.
 
 ---
 
@@ -76,7 +76,7 @@ Please understand these **operational limits**:
 2. **Destination sites.** Websites and services you visit through the tunnel have their own privacy policies.
 3. **Device and OS.** Android VPN consent dialogs, Windows admin elevation, iOS/macOS VPN permission sheets, Apple Network Extension processes, crash reporters, or OS network stacks may process data independently of this app.
 4. **Misconfiguration.** If an operator enables verbose logging, reverse proxies with access logs, or third-party monitoring, that can create logs this policy assumes are off.
-5. **Security vs. privacy.** Cryptographic admission keys identify a **product client**, not a named human account—but a key can still be treated as an access secret.
+5. **Security vs. privacy.** Per-device Ed25519 keys identify a **product install**, not a named human account—but a device key can still be treated as an access secret for that install.
 6. **Open relay risk is reduced by keys, not by accounts.** Unauthorized clients should fail handshake; authorized keys must be protected.
 
 ---

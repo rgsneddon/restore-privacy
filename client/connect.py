@@ -30,7 +30,11 @@ from node.protocol import (
 
 from .endpoint import DEFAULT_ENDPOINT, Endpoint
 from .full_tunnel import FullTunnelPlan, build_full_tunnel_plan
-from .secrets_loader import load_client_private_key, load_node_elgamal_public, resolve_secrets_dir
+from .secrets_loader import (
+    ensure_device_admission_key,
+    load_client_private_key,
+    load_node_elgamal_public,
+)
 from .uk_gate import UkGateResult, check_uk_public_ip
 
 
@@ -175,7 +179,8 @@ class RptClient:
             return ConnectResult(ok=False, state=self.state, message=gate.message)
 
         try:
-            sdir = resolve_secrets_dir(self.secrets_dir)
+            # First run: generate a unique Ed25519 device key if missing; reuse thereafter.
+            sdir = ensure_device_admission_key(self.secrets_dir)
             client_priv = load_client_private_key(sdir)
             node_pub = load_node_elgamal_public(sdir)
             frame, client_nonce, client_pub = build_authorized_client_hello(client_priv, node_pub)

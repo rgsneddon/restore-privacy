@@ -134,15 +134,11 @@ def build_client_onedir() -> Path:
         "client.windows.elevate",
         str(entry),
     ]
-    # Bundle product secrets next to the frozen app when present (gitignored source)
+    # Bundle public node key only (never a shared client_ed25519.priv)
     secrets_src = ROOT / "secrets"
-    if (secrets_src / "client_ed25519.priv").is_file() and (
-        secrets_src / "node_elgamal.pub"
-    ).is_file():
+    if (secrets_src / "node_elgamal.pub").is_file():
         cmd.extend(
             [
-                "--add-data",
-                f"{secrets_src / 'client_ed25519.priv'};secrets",
                 "--add-data",
                 f"{secrets_src / 'node_elgamal.pub'};secrets",
             ]
@@ -170,25 +166,26 @@ def build_client_onedir() -> Path:
 
 
 def inject_product_secrets(target_dir: Path) -> None:
-    """Copy gitignored product admission keys into package secrets/ (not node priv)."""
+    """Copy public node_elgamal.pub only — device Ed25519 keys are generated on first run.
+
+    Never ships a shared client_ed25519.priv (impersonation risk) or node_elgamal.priv.
+    """
     src = ROOT / "secrets"
-    client_priv = src / "client_ed25519.priv"
     node_pub = src / "node_elgamal.pub"
-    if not client_priv.is_file() or not node_pub.is_file():
+    if not node_pub.is_file():
         raise RuntimeError(
-            "Build requires secrets/client_ed25519.priv and secrets/node_elgamal.pub "
-            "(gitignored operator keys). Refusing to ship a secrets-less Windows installer."
+            "Build requires secrets/node_elgamal.pub "
+            "(gitignored operator public key). Refusing to ship without node pub."
         )
-    if client_priv.stat().st_size != 32:
-        raise RuntimeError("client_ed25519.priv must be 32 bytes")
     dest = target_dir / "secrets"
     dest.mkdir(parents=True, exist_ok=True)
-    shutil.copy2(client_priv, dest / "client_ed25519.priv")
     shutil.copy2(node_pub, dest / "node_elgamal.pub")
-    # Ensure node private key never lands in package
+    # Strip any shared client priv or node private key from package tree
     for p in dest.glob("*.priv"):
-        if p.name != "client_ed25519.priv":
-            p.unlink()
+        p.unlink()
+    node_priv = dest / "node_elgamal.priv"
+    if node_priv.is_file():
+        node_priv.unlink()
 
 
 def build_windows_installer_exe(client_onedir: Path) -> Path:

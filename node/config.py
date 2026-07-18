@@ -35,8 +35,11 @@ def build_node_config(
         "tunnel_termination": True,
         "collect_user_data": False,
         "admission": {
-            "method": "elgamal_pedersen_ed25519_allowlist",
+            # Free product: clients generate a unique Ed25519 key on first run;
+            # node admits valid signed HELLO (device enrollment), not one shared priv.
+            "method": "elgamal_pedersen_ed25519_device_enrollment",
             "require_authorized_client_key": True,
+            "admit_unknown_devices": True,
             "require_username_password": False,
             "open_to_public": False,
             "only_restore_privacy_client": True,
@@ -68,8 +71,9 @@ def render_node_config_text(config: dict[str, Any] | None = None) -> str:
         "EncryptedTunnel = true",
         "TunnelTermination = true",
         "CollectUserData = false",
-        "AdmissionMethod = elgamal_pedersen_ed25519_allowlist",
+        "AdmissionMethod = elgamal_pedersen_ed25519_device_enrollment",
         "RequireAuthorizedClientKey = true",
+        "AdmitUnknownDevices = true",
         "RequireUsernamePassword = false",
         "OpenToPublic = false",
         "OnlyRestorePrivacyClient = true",
@@ -115,6 +119,10 @@ def validate_node_config(config: dict[str, Any]) -> list[str]:
         violations.append("must not require username/password user accounts")
     if not adm.get("only_restore_privacy_client"):
         violations.append("only_restore_privacy_client must be True")
+    # Free-product default: admit first-seen device pubs after crypto verify
+    if "admit_unknown_devices" in adm and not adm.get("admit_unknown_devices"):
+        # allowlist-only mode is valid for locked operators; not a violation
+        pass
     if config.get("collect_user_data"):
         violations.append("collect_user_data must be False")
     ui = config.get("ui") or {}

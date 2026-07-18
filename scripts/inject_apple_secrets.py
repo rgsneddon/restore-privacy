@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
-"""Inject admission secrets into a macOS/iOS app bundle (Android assets pattern).
+"""Inject public node material into a macOS/iOS app bundle.
 
-Copies **only** client_ed25519.priv + node_elgamal.pub from a source directory
-into ``Contents/Resources/secrets/`` (macOS) or ``Runner.app/secrets/`` (iOS).
+Copies **only** ``node_elgamal.pub`` (never a shared ``client_ed25519.priv``).
+Per-device Ed25519 keys are generated on first run by the client.
 Never copies ``node_elgamal.priv``.
 
 Source search (first hit wins):
@@ -39,18 +39,17 @@ def candidate_sources() -> list[Path]:
 
 def resolve_source(explicit: Path | None) -> Path:
     if explicit:
-        if not (explicit / CLIENT_PRIV).is_file() or not (explicit / NODE_PUB).is_file():
+        if not (explicit / NODE_PUB).is_file():
             raise FileNotFoundError(
-                f"incomplete secrets dir {explicit} (need {CLIENT_PRIV} + {NODE_PUB})"
+                f"incomplete secrets dir {explicit} (need {NODE_PUB})"
             )
         return explicit
     for d in candidate_sources():
-        if (d / CLIENT_PRIV).is_file() and (d / NODE_PUB).is_file():
+        if (d / NODE_PUB).is_file():
             return d
     searched = ", ".join(str(d) for d in candidate_sources())
     raise FileNotFoundError(
-        f"No admission secrets found (need {CLIENT_PRIV} and {NODE_PUB}). "
-        f"Checked: {searched}"
+        f"No node public key found (need {NODE_PUB}). Checked: {searched}"
     )
 
 
@@ -62,21 +61,19 @@ def inject(app: Path, source: Path, ios: bool) -> Path:
     else:
         dest = app / "Contents" / "Resources" / "secrets"
     dest.mkdir(parents=True, exist_ok=True)
-    for name in (CLIENT_PRIV, NODE_PUB):
-        src = source / name
-        dst = dest / name
-        shutil.copy2(src, dst)
-        print(f"injected {name} -> {dst} ({dst.stat().st_size} bytes)")
-    # Ensure we never leave node private key in the bundle
+    # Public node key only
+    src = source / NODE_PUB
+    dst = dest / NODE_PUB
+    shutil.copy2(src, dst)
+    print(f"injected {NODE_PUB} -> {dst} ({dst.stat().st_size} bytes)")
+    # Never leave private keys in the bundle
+    for leftover in list(dest.glob("*.priv")):
+        leftover.unlink()
+        print(f"removed priv from package: {leftover.name}")
     forbidden = dest / FORBIDDEN
     if forbidden.is_file():
         forbidden.unlink()
         print(f"removed accidental {FORBIDDEN}")
-    # Also remove from source-adjacent if someone copied whole secrets tree
-    for leftover in dest.glob("*.priv"):
-        if leftover.name != CLIENT_PRIV:
-            leftover.unlink()
-            print(f"removed non-client priv: {leftover.name}")
     return dest
 
 

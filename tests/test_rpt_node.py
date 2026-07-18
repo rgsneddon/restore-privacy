@@ -59,7 +59,12 @@ class TestHandshakeAdmission(unittest.TestCase):
         node_priv = generate_keypair()
         good_priv, good_pub = generate_client_admission_keypair()
         bad_priv, _ = generate_client_admission_keypair()
-        node = NodeHandshake(node_priv, [ed25519_pub_raw(good_pub)])
+        # Locked allow-list mode (operator): unknown device keys are rejected
+        node = NodeHandshake(
+            node_priv,
+            [ed25519_pub_raw(good_pub)],
+            admit_unknown_devices=False,
+        )
         frame, _, _ = build_client_hello(bad_priv, node_priv.public)
         with self.assertRaises(AdmissionError):
             node_complete_hello(node, frame, "10.88.0.2")
@@ -73,11 +78,13 @@ class TestConfigPrivacy(unittest.TestCase):
         self.assertFalse(cfg["collect_user_data"])
         self.assertTrue(cfg["admission"]["only_restore_privacy_client"])
         self.assertFalse(cfg["admission"]["open_to_public"])
+        self.assertTrue(cfg["admission"].get("admit_unknown_devices", True))
         self.assertEqual(cfg["ui"]["title"], "RESTORE PRIVACY")
         text = render_node_config_text(cfg)
         self.assertIn("ListenPort = ", text)
         self.assertIn("NATMasquerade = true", text)
         self.assertIn("OnlyRestorePrivacyClient = true", text)
+        self.assertIn("AdmitUnknownDevices = true", text)
         self.assertIn("ConnectionLog = false", text)
         self.assertIn("UITitle = RESTORE PRIVACY", text)
         self.assertTrue(config_text_forbids_log_sinks(text))

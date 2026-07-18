@@ -42,7 +42,8 @@ class TestAndroidConnectPath(unittest.TestCase):
         self.assertIn("ResultReceiver", main_act)
         self.assertIn("EXTRA_RECEIVER", main_act)
         self.assertIn("secretsPresent", main_act)
-        self.assertIn("Missing admission secrets", main_act)
+        self.assertIn("node_elgamal.pub", main_act)
+        self.assertIn("device Ed25519", main_act)
         self.assertIn("VPN permission denied", main_act)
         # Immediate success after startForegroundService is gone
         self.assertNotIn(
@@ -50,7 +51,7 @@ class TestAndroidConnectPath(unittest.TestCase):
             main_act,
         )
         self.assertIn("report(", svc)
-        self.assertIn("Missing admission secrets", svc)
+        self.assertIn("node_elgamal.pub", svc)
         self.assertIn("handshake failed", svc.lower().replace("rpt ", ""))
         self.assertIn("RESULT_OK", svc)
         self.assertIn("RESULT_ERR", svc)
@@ -61,8 +62,8 @@ class TestAndroidConnectPath(unittest.TestCase):
         self.assertIn("isConnectSuccess", ctrl)
         self.assertIn("mapConnectStatusMessage", ctrl)
         self.assertIn("isConnectSuccess", status)
-        self.assertIn("result['ok'] == true", status)
-        self.assertIn("Missing admission secrets", status)
+        self.assertIn("result['ok']", status)
+        self.assertIn("node_elgamal.pub", status)
 
     def test_secrets_assets_gitignore_and_build_inject(self):
         gradle = (

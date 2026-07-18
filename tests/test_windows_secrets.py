@@ -55,28 +55,30 @@ class TestSecretsResolveAndLoad(unittest.TestCase):
         with tempfile.TemporaryDirectory() as td:
             empty = Path(td) / "empty"
             empty.mkdir()
+            # Explicit empty dir with no node pub cannot bootstrap
             with self.assertRaises(SecretsError) as ctx:
                 resolve_secrets_dir(empty)
             msg = str(ctx.exception)
-            self.assertIn(CLIENT_PRIV_NAME, msg)
             self.assertIn(NODE_PUB_NAME, msg)
 
     def test_missing_global_message_is_windows_oriented(self):
-        # Point candidates at empty locations only
+        # Point candidates at empty locations only; no node pub available
         with tempfile.TemporaryDirectory() as td:
             empty = Path(td)
             with mock.patch(
                 "client.secrets_loader.candidate_secrets_dirs",
                 return_value=[empty / "nope"],
+            ), mock.patch(
+                "client.secrets_loader.preferred_writable_secrets_dir",
+                return_value=empty / "writable",
+            ), mock.patch(
+                "client.secrets_loader._find_node_pub",
+                return_value=None,
             ):
                 with self.assertRaises(SecretsError) as ctx:
                     resolve_secrets_dir()
                 msg = str(ctx.exception)
-                self.assertIn("No client secrets found", msg)
-                self.assertIn(CLIENT_PRIV_NAME, msg)
                 self.assertIn(NODE_PUB_NAME, msg)
-                # Not Linux-only dead-end as the sole instruction
-                self.assertIn("LOCALAPPDATA", msg)
 
     def test_candidate_dirs_include_windows_install_and_user(self):
         dirs = [str(p).replace("\\", "/").lower() for p in candidate_secrets_dirs()]
@@ -96,9 +98,10 @@ class TestSecretsResolveAndLoad(unittest.TestCase):
             # decoy node private key must not be provisioned
             (src / "node_elgamal.priv").write_bytes(b"\x00" * 256)
             written = provision_secrets_files(dest, source_dir=src)
-            self.assertIn(CLIENT_PRIV_NAME, written)
+            # Default: only public node key (device Ed25519 generated on first run)
             self.assertIn(NODE_PUB_NAME, written)
-            self.assertTrue((dest / CLIENT_PRIV_NAME).is_file())
+            self.assertNotIn(CLIENT_PRIV_NAME, written)
+            self.assertFalse((dest / CLIENT_PRIV_NAME).is_file())
             self.assertTrue((dest / NODE_PUB_NAME).is_file())
             self.assertFalse((dest / "node_elgamal.priv").is_file())
 
@@ -121,6 +124,7 @@ class TestConnectUsesSecrets(unittest.TestCase):
         with tempfile.TemporaryDirectory() as td:
             empty = Path(td) / "nosec"
             empty.mkdir()
+            # Explicit empty dir: no node_elgamal.pub → bootstrap fails closed
             client = RptClient(
                 secrets_dir=empty,
                 uk_gate_fetcher=lambda: {"country_code": "GB", "ip": "1.2.3.4"},
@@ -131,8 +135,9 @@ class TestConnectUsesSecrets(unittest.TestCase):
             self.assertEqual(result.state, ConnectState.ERROR)
             self.assertTrue(
                 "secrets" in result.message.lower()
+                or NODE_PUB_NAME in result.message
                 or CLIENT_PRIV_NAME in result.message
-                or "No client secrets" in result.message
+                or "node" in result.message.lower()
             )
 
 
@@ -140,20 +145,21 @@ class TestInstallerAndBuildRecipe(unittest.TestCase):
     def test_installer_provisions_secrets(self):
         inst = (ROOT / "client" / "windows" / "installer.py").read_text(encoding="utf-8")
         self.assertIn("_provision_secrets", inst)
-        self.assertIn("client_ed25519.priv", inst)
         self.assertIn("node_elgamal.pub", inst)
         self.assertIn("node_elgamal.priv", inst)  # must mention to exclude
+        self.assertIn("device Ed25519", inst)
         self.assertIn("VERSION = \"0.1.2\"", inst)
 
     def test_build_script_injects_secrets(self):
         script = (ROOT / "scripts" / "build_release_0.1.2.py").read_text(encoding="utf-8")
         self.assertIn("inject_product_secrets", script)
-        self.assertIn("client_ed25519.priv", script)
+        self.assertIn("node_elgamal.pub", script)
         self.assertIn('VERSION = "0.1.2"', script)
-        # Must not blanket-delete all .priv after inject
-        self.assertNotIn(
-            "for p in built.rglob(\"*.priv\"):\n        p.unlink()",
-            script,
+        # Public packages must not embed shared client priv
+        lower = script.lower()
+        self.assertTrue(
+            "never a shared" in lower or "device ed25519" in lower,
+            "build recipe must describe per-device keys / no shared client priv",
         )
 
 

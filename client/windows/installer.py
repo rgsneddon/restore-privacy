@@ -91,29 +91,32 @@ def _copy_tree(src: Path, dst: Path) -> None:
 
 
 def _find_payload_secrets(payload_dir: Path) -> Path | None:
+    """Find packaged secrets that include at least node_elgamal.pub (public)."""
     for cand in (
         payload_dir / "secrets",
         payload_dir.parent / "secrets",
     ):
-        if (cand / CLIENT_PRIV).is_file() and (cand / NODE_PUB).is_file():
+        if (cand / NODE_PUB).is_file():
             return cand
-    # Nested onedir
-    for p in payload_dir.rglob(CLIENT_PRIV):
+    for p in payload_dir.rglob(NODE_PUB):
         parent = p.parent
-        if (parent / NODE_PUB).is_file() and parent.name == "secrets":
+        if parent.name == "secrets":
             return parent
     return None
 
 
 def _provision_secrets(payload_dir: Path, install_dir: Path) -> list[str]:
-    """Install admission keys where the client resolver will find them."""
+    """Install public node key only — device Ed25519 is generated on first run.
+
+    Never copies a shared client_ed25519.priv into every install (impersonation risk).
+    Never copies node_elgamal.priv.
+    """
     written: list[str] = []
     src = _find_payload_secrets(payload_dir)
-    # Also try shipping secrets next to installer meipass
     if src is None and getattr(sys, "frozen", False) and hasattr(sys, "_MEIPASS"):
         base = Path(sys._MEIPASS)  # type: ignore[attr-defined]
         for cand in (base / "secrets", base / "payload" / "secrets"):
-            if (cand / CLIENT_PRIV).is_file() and (cand / NODE_PUB).is_file():
+            if (cand / NODE_PUB).is_file():
                 src = cand
                 break
     if src is None:
@@ -121,24 +124,31 @@ def _provision_secrets(payload_dir: Path, install_dir: Path) -> list[str]:
 
     for dest in (install_dir / "secrets", USER_SECRETS):
         dest.mkdir(parents=True, exist_ok=True)
-        for name in (CLIENT_PRIV, NODE_PUB):
-            data = (src / name).read_bytes()
-            # Never write node private key even if mis-named
-            if name.endswith(".priv") and name != CLIENT_PRIV:
+        # Only public node material — per-device client priv is created at first connect
+        for name in (NODE_PUB,):
+            sp = src / name
+            if not sp.is_file():
                 continue
             target = dest / name
-            target.write_bytes(data)
+            target.write_bytes(sp.read_bytes())
             written.append(str(target))
+        # Strip any shared client priv that older packages may have left in the tree
+        leftover = dest / CLIENT_PRIV
+        if leftover.is_file():
+            try:
+                leftover.unlink()
+            except OSError:
+                pass
     return written
 
 
 def _write_version(install_dir: Path) -> None:
     (install_dir / "VERSION").write_text(VERSION + "\n", encoding="utf-8")
-    secrets_ok = (install_dir / "secrets" / CLIENT_PRIV).is_file()
+    secrets_ok = (install_dir / "secrets" / NODE_PUB).is_file()
     sec_line = (
-        "Admission secrets installed: yes"
+        "Node public key installed: yes (device Ed25519 key is generated on first run)"
         if secrets_ok
-        else f"Admission secrets missing — place {CLIENT_PRIV} and {NODE_PUB} in secrets\\"
+        else f"Node public key missing — place {NODE_PUB} in secrets\\ (device key auto-generated)"
     )
     (install_dir / "INSTALL.txt").write_text(
         f"Restore Privacy Client {VERSION}\r\n"

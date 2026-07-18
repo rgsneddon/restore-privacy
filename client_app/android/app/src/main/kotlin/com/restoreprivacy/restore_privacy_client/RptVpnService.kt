@@ -89,27 +89,51 @@ class RptVpnService : VpnService() {
         }
     }
 
+    /**
+     * Load device Ed25519 priv + node ElGamal pub.
+     * Generates a unique client key on first run (never uses a shared APK-embedded priv).
+     * Packages may ship only node_elgamal.pub in assets.
+     */
     private fun loadSecrets(): Pair<ByteArray, ByteArray>? {
         val dir = File(filesDir, "secrets")
+        dir.mkdirs()
         val privF = File(dir, "client_ed25519.priv")
         val pubF = File(dir, "node_elgamal.pub")
-        if (privF.isFile && pubF.isFile) {
-            return privF.readBytes() to pubF.readBytes()
-        }
-        return try {
-            val priv = assets.open("secrets/client_ed25519.priv").readBytes()
-            val pub = assets.open("secrets/node_elgamal.pub").readBytes()
-            // Seed filesDir for later updates
+
+        // Ensure node public key (from assets or existing filesDir)
+        if (!pubF.isFile) {
             try {
-                dir.mkdirs()
-                if (!privF.exists()) privF.writeBytes(priv)
-                if (!pubF.exists()) pubF.writeBytes(pub)
+                assets.open("secrets/node_elgamal.pub").use { inp ->
+                    pubF.writeBytes(inp.readBytes())
+                }
             } catch (_: Exception) {
+                return null
             }
-            priv to pub
-        } catch (_: Exception) {
-            null
         }
+        if (!pubF.isFile || pubF.length() < 32L) return null
+
+        // Per-device key: generate once, reuse forever on this install
+        if (!privF.isFile || privF.length() != 32L) {
+            try {
+                val priv = generateDeviceEd25519PrivateKey()
+                privF.writeBytes(priv)
+            } catch (_: Exception) {
+                return null
+            }
+        }
+        val priv = privF.readBytes()
+        val pub = pubF.readBytes()
+        if (priv.size != 32) return null
+        return priv to pub
+    }
+
+    /** Cryptographically random 32-byte Ed25519 seed (BouncyCastle params). */
+    private fun generateDeviceEd25519PrivateKey(): ByteArray {
+        val seed = ByteArray(32)
+        java.security.SecureRandom().nextBytes(seed)
+        // Validate as Ed25519 private seed via BC
+        org.bouncycastle.crypto.params.Ed25519PrivateKeyParameters(seed, 0)
+        return seed
     }
 
     private fun startTunnel(host: String, port: Int, fullTunnel: Boolean, sessionName: String) {
@@ -122,7 +146,7 @@ class RptVpnService : VpnService() {
             running.set(false)
             report(
                 false,
-                "Missing admission secrets — place client_ed25519.priv and node_elgamal.pub under app secrets",
+                "Missing node public key — package must include node_elgamal.pub; device Ed25519 is auto-generated",
             )
             stopForeground(STOP_FOREGROUND_REMOVE)
             stopSelf()
