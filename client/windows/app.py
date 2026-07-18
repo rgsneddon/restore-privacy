@@ -7,6 +7,7 @@ teardown (dataplane, TUN, routes, session).
 
 from __future__ import annotations
 
+import os
 import sys
 import threading
 import tkinter as tk
@@ -334,23 +335,59 @@ def main() -> int:
     if "--rpt-elevated" in sys.argv:
         sys.argv = [a for a in sys.argv if a != "--rpt-elevated"]
 
+    # Ensure repo root is on path for elevated re-launch / odd cwd
+    root = Path(__file__).resolve().parents[2]
+    if str(root) not in sys.path:
+        sys.path.insert(0, str(root))
+    try:
+        os.chdir(root)
+    except Exception:
+        pass
+
     status = elevate_if_needed()
     if should_exit_after_elevation(status):
+        # Elevated child should be starting (UAC). If it does not appear, run:
+        #   set RPT_NO_AUTO_ELEVATE=1 && python -m client.windows
         return 0
 
-    app = TunnelClientApp()
+    try:
+        app = TunnelClientApp()
+    except Exception as exc:
+        # Visible failure when GUI cannot start (e.g. no display)
+        try:
+            import ctypes
+
+            ctypes.windll.user32.MessageBoxW(
+                0,
+                f"Restore Privacy failed to open:\n{exc}",
+                "RESTORE PRIVACY",
+                0x10,
+            )
+        except Exception:
+            print(f"Restore Privacy failed to open: {exc}", file=sys.stderr)
+        return 1
+
     if status.startswith("failed:"):
         reason = status.split(":", 1)[-1]
         app.root.after(
             100,
             lambda: app._log(
                 f"Auto-elevation failed ({reason}). "
-                "Full tunnel needs Administrator — approve UAC or run elevated."
+                "Full tunnel needs Administrator — approve UAC or run elevated. "
+                "UI is still open so you can try Connect."
             ),
         )
     elif status == "already_admin":
         app.root.after(
             100, lambda: app._log("Running elevated — full tunnel available.")
+        )
+    elif status == "skipped":
+        app.root.after(
+            100,
+            lambda: app._log(
+                "Running without auto-elevate (RPT_NO_AUTO_ELEVATE). "
+                "Connect still works for handshake; full-tunnel routes need admin."
+            ),
         )
     app.run()
     return 0

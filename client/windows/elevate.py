@@ -72,30 +72,32 @@ def _shell_execute_runas(exe: str, params: str, cwd: Optional[str] = None) -> in
     return int(info.hInstApp) if info.hInstApp else 1
 
 
-def launch_argv_for_elevation() -> tuple[str, str]:
-    """Return (executable, parameter string) for re-launching this process elevated."""
+def repo_root_for_dev() -> Path:
+    """Directory that must be cwd so ``python -m client.windows`` can import."""
+    # client/windows/elevate.py → repo root is parents[2]
+    return Path(__file__).resolve().parents[2]
+
+
+def launch_argv_for_elevation() -> tuple[str, str, Optional[str]]:
+    """Return (executable, parameter string, cwd) for re-launching elevated."""
     if getattr(sys, "frozen", False):
         exe = str(Path(sys.executable).resolve())
-        # Pass through any args after the exe
-        args = sys.argv[1:]
+        args = [a for a in sys.argv[1:] if a != "--rpt-elevated"]
         params = subprocess_list2cmdline(args) if args else ""
-        return exe, params
+        cwd = str(Path(exe).resolve().parent)
+        return exe, params, cwd
 
-    # Dev: python -m client.windows …
+    # Dev: must run from repo root so ``-m client.windows`` resolves
     exe = str(Path(sys.executable).resolve())
-    # Rebuild: -m client.windows [args…]
-    parts: list[str] = []
-    # Prefer module form when launched as __main__ of client.windows
-    if len(sys.argv) >= 1:
-        # sys.argv[0] is script path; use -m client.windows for stability
-        parts.extend(["-m", "client.windows"])
-        # If user passed extra args after script, keep them
-        # When running `python -m client.windows`, argv[0] is full path to __main__.py
-        # Extra args start at argv[1]
-        if len(sys.argv) > 1:
-            parts.extend(sys.argv[1:])
+    parts: list[str] = ["-m", "client.windows"]
+    extra = [a for a in sys.argv[1:] if a != "--rpt-elevated"]
+    # When launched as ``python -m client.windows``, argv[0] is __main__.py path
+    # and argv[1:] are user args — already filtered above.
+    # When launched as ``python path/to/app.py``, still use -m form.
+    parts.extend(extra)
     params = subprocess_list2cmdline(parts)
-    return exe, params
+    cwd = str(repo_root_for_dev())
+    return exe, params, cwd
 
 
 def subprocess_list2cmdline(seq: list[str]) -> str:
@@ -132,18 +134,19 @@ def elevate_if_needed(
     if os.environ.get(marker_env, "").strip() == "1" and not is_admin():
         return "failed:elevated_flag_set_but_still_not_admin"
 
-    exe, params = launch_argv_for_elevation()
-    # Child inherits env; set marker so we can detect loops
-    # ShellExecute does not easily pass custom env; append a no-op arg flag instead
+    exe, params, cwd = launch_argv_for_elevation()
+    # ShellExecute does not pass custom env; append flag so child can detect loops
     elev_flag = "--rpt-elevated"
-    if elev_flag not in sys.argv:
+    if elev_flag not in (params or ""):
         params = (params + " " + elev_flag).strip() if params else elev_flag
 
-    cwd = None
-    try:
-        cwd = str(Path(exe).resolve().parent)
-    except Exception:
-        cwd = os.getcwd()
+    if not cwd:
+        try:
+            cwd = str(repo_root_for_dev()) if not getattr(sys, "frozen", False) else str(
+                Path(exe).resolve().parent
+            )
+        except Exception:
+            cwd = os.getcwd()
 
     try:
         rc = _shell_execute_runas(exe, params, cwd=cwd)
