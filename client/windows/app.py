@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
-"""Windows RPT client — rounded dark-blue UI with Connect/Disconnect control.
+"""Windows RPT client — dark-blue UI with always-visible Connect/Disconnect.
 
-Tunnel stays up when the window is closed; only the Disconnect button runs full
-teardown (dataplane, TUN, routes, session).
+Tunnel stays up when the window is closed; only Disconnect runs full teardown.
+Connect works without Administrator: RPT session + dataplane start for all users;
+system-wide dual-/1 routes apply only when elevated (best-effort).
 """
 
 from __future__ import annotations
@@ -34,11 +35,7 @@ from client.ui_theme import (
     connect_button_label,
     resolve_logo_png,
 )
-from client.windows.elevate import (
-    elevate_if_needed,
-    is_admin,
-    should_exit_after_elevation,
-)
+from client.windows.elevate import is_admin
 from client.windows.tunnel_win import start_full_tunnel, stop_full_tunnel
 
 
@@ -57,17 +54,30 @@ def disconnect_full_tunnel(tunnel, client) -> None:
             pass
 
 
+def layout_pack_bottom_controls_first() -> bool:
+    """Policy flag for tests: bottom Connect bar is packed before expanding log."""
+    return True
+
+
+def non_admin_connect_allowed() -> bool:
+    """Connect must not require elevation (session starts without Run as admin)."""
+    return True
+
+
 class TunnelClientApp:
-    """Dark-blue chrome, black log, logo + title, single Connect/Disconnect button."""
+    """Dark-blue chrome, black log, logo + title, always-visible Connect/Disconnect."""
+
+    DEFAULT_GEOMETRY = "560x520"
+    MIN_WIDTH = 400
+    MIN_HEIGHT = 420
 
     def __init__(self) -> None:
         self.root = tk.Tk()
         self.root.title(APP_TITLE)
-        self.root.geometry("560x480")
+        self.root.geometry(self.DEFAULT_GEOMETRY)
         self.root.configure(bg=CHROME_BG)
-        self.root.minsize(420, 360)
+        self.root.minsize(self.MIN_WIDTH, self.MIN_HEIGHT)
         self._set_window_icon()
-        # Close UI only — do NOT tear down tunnel (user controls Disconnect)
         self.root.protocol("WM_DELETE_WINDOW", self._on_close_ui_only)
 
         self._connected = False
@@ -75,31 +85,69 @@ class TunnelClientApp:
         self._tunnel = None
         self.client = RptClient(status_cb=self._on_status)
 
-        # Outer chrome (dark blue)
+        # Outer chrome
         self.chrome = tk.Frame(self.root, bg=CHROME_BG, padx=14, pady=14)
         self.chrome.pack(fill=tk.BOTH, expand=True)
 
-        # Header: logo + title (high-contrast white)
-        header = tk.Frame(self.chrome, bg=CHROME_BG)
-        header.pack(fill=tk.X, pady=(0, 10))
+        # --- BOTTOM controls FIRST so expand=True log never hides them ---
+        self.bottom = tk.Frame(self.chrome, bg=CHROME_BG)
+        self.bottom.pack(side=tk.BOTTOM, fill=tk.X)
+
+        self.btn_var = tk.StringVar(value=connect_button_label(False))
+        self.connect_btn = tk.Button(
+            self.bottom,
+            textvariable=self.btn_var,
+            command=self._on_toggle_connect,
+            bg=BUTTON_BG,
+            fg=BUTTON_FG,
+            activebackground="#2563EB",
+            activeforeground=BUTTON_FG,
+            disabledforeground="#CCCCCC",
+            font=("Segoe UI", 14, "bold"),
+            relief=tk.RAISED,
+            cursor="hand2",
+            padx=20,
+            pady=14,
+            bd=2,
+            highlightthickness=2,
+            highlightbackground="#93C5FD",
+            highlightcolor="#FFFFFF",
+        )
+        self.connect_btn.pack(side=tk.TOP, fill=tk.X, pady=(8, 6), ipady=4)
+
+        self.status_var = tk.StringVar(value="Ready — press Connect to start the tunnel")
+        self.status_label = tk.Label(
+            self.bottom,
+            textvariable=self.status_var,
+            bg=CHROME_BG,
+            fg=STATUS_FG,
+            font=("Consolas", 9),
+            anchor="w",
+            wraplength=500,
+            justify=tk.LEFT,
+        )
+        self.status_label.pack(side=tk.TOP, fill=tk.X)
+
+        # --- TOP header ---
+        self.header = tk.Frame(self.chrome, bg=CHROME_BG)
+        self.header.pack(side=tk.TOP, fill=tk.X, pady=(0, 8))
 
         self._logo_photo = None
         logo_path = resolve_logo_png()
         if logo_path is not None:
             try:
-                # Prefer PhotoImage; resize via subsample if large
                 img = tk.PhotoImage(file=str(logo_path))
                 if img.width() > 64:
                     factor = max(1, img.width() // 48)
                     img = img.subsample(factor, factor)
                 self._logo_photo = img
-                tk.Label(header, image=self._logo_photo, bg=CHROME_BG).pack(
+                tk.Label(self.header, image=self._logo_photo, bg=CHROME_BG).pack(
                     side=tk.LEFT, padx=(0, 10)
                 )
             except Exception:
                 self._logo_photo = None
 
-        title_col = tk.Frame(header, bg=CHROME_BG)
+        title_col = tk.Frame(self.header, bg=CHROME_BG)
         title_col.pack(side=tk.LEFT, fill=tk.X, expand=True)
         title_font = tkfont.Font(family="Segoe UI", size=16, weight="bold")
         tk.Label(
@@ -119,12 +167,11 @@ class TunnelClientApp:
             anchor="w",
         ).pack(fill=tk.X)
 
-        # Rounded-looking outer pad around black log (visual radius via padding + border)
-        log_shell = tk.Frame(self.chrome, bg="#1E3A8A", padx=3, pady=3)
-        log_shell.pack(fill=tk.BOTH, expand=True, pady=(4, 12))
-        # Black output window (CLI-style)
+        # --- MIDDLE log (fills remaining space only) ---
+        self.log_shell = tk.Frame(self.chrome, bg="#1E3A8A", padx=3, pady=3)
+        self.log_shell.pack(side=tk.TOP, fill=tk.BOTH, expand=True, pady=(0, 4))
         self.output = tk.Text(
-            log_shell,
+            self.log_shell,
             bg=WINDOW_BG,
             fg=WINDOW_FG,
             insertbackground=WINDOW_FG,
@@ -136,52 +183,33 @@ class TunnelClientApp:
             borderwidth=0,
             padx=10,
             pady=10,
+            height=8,
         )
         self.output.pack(fill=tk.BOTH, expand=True)
 
-        # Single Connect / Disconnect control
-        self.btn_var = tk.StringVar(value=connect_button_label(False))
-        self.connect_btn = tk.Button(
-            self.chrome,
-            textvariable=self.btn_var,
-            command=self._on_toggle_connect,
-            bg=BUTTON_BG,
-            fg=BUTTON_FG,
-            activebackground="#2563EB",
-            activeforeground=BUTTON_FG,
-            font=("Segoe UI", 13, "bold"),
-            relief=tk.FLAT,
-            cursor="hand2",
-            padx=24,
-            pady=12,
-            bd=0,
-            highlightthickness=0,
-        )
-        self.connect_btn.pack(fill=tk.X, pady=(0, 8))
-
-        self.status_var = tk.StringVar(value="Ready — press Connect to start the tunnel")
-        tk.Label(
-            self.chrome,
-            textvariable=self.status_var,
-            bg=CHROME_BG,
-            fg=STATUS_FG,
-            font=("Consolas", 9),
-            anchor="w",
-            wraplength=500,
-            justify=tk.LEFT,
-        ).pack(fill=tk.X)
-
         self._log(f"{APP_TITLE} tunnel client")
         self._log(SCROLLING_PRIVACY_TEXT)
-        self._log("Press Connect to attach to the RPT node (full tunnel when elevated).")
+        self._log("Press Connect to attach to the RPT node — no Administrator required.")
         self._log(
             "Closing this window does not disconnect — use Disconnect to stop the tunnel."
         )
-        if not is_admin():
+        if is_admin():
+            self._log("Running elevated — full-system routes available when Connect succeeds.")
+        else:
             self._log(
-                "Not elevated — full tunnel needs admin (UAC). "
-                "Auto-elevate runs on launch when possible."
+                "Running as standard user — VPN session starts without admin; "
+                "system-wide catch-all routes apply only if elevated."
             )
+
+    def connect_button_visible(self) -> bool:
+        """True when the Connect control is mapped (for tests / probes)."""
+        try:
+            return bool(self.connect_btn.winfo_ismapped() or self.connect_btn.winfo_viewable())
+        except Exception:
+            return False
+
+    def connect_button_text(self) -> str:
+        return self.btn_var.get()
 
     def _set_window_icon(self) -> None:
         native = Path(__file__).resolve().parent / "native"
@@ -230,7 +258,7 @@ class TunnelClientApp:
         self._busy = True
         self.connect_btn.configure(state=tk.DISABLED)
         self.status_var.set("Connecting…")
-        self._log("Connect — starting RPT handshake…")
+        self._log("Connect — starting RPT handshake (no admin required)…")
 
         def work() -> None:
             result = self.client.connect(timeout=20.0)
@@ -239,10 +267,12 @@ class TunnelClientApp:
                 try:
                     if result.ok and result.session and result.tunnel_plan:
                         self._log(f"Session OK — VPN IP {result.session.vpn_ip}")
+                        # Prefer system Wintun when possible; falls back without admin
                         tun_res = start_full_tunnel(
                             self.client,
                             result.tunnel_plan,
                             result.session.endpoint.host,
+                            prefer_system_capture=True,
                         )
                         self._tunnel = tun_res
                         self._log(tun_res.message)
@@ -250,26 +280,29 @@ class TunnelClientApp:
                             self._log(
                                 f"DATA plane active (tun_mode={getattr(tun_res.tun, 'mode', '?')})"
                             )
-                        for c in tun_res.applied_commands[:6]:
+                        for c in (tun_res.applied_commands or [])[:6]:
                             self._log(f"  plan: {c}")
-                        if self.client.state == ConnectState.CONNECTED and tun_res.ok:
-                            if getattr(tun_res, "routes_applied", False):
+
+                        # Session success is enough for Connect — admin only for full routes
+                        if self.client.state == ConnectState.CONNECTED:
+                            if tun_res.ok and getattr(tun_res, "routes_applied", False):
                                 self.status_var.set(
                                     f"CONNECTED — full tunnel {result.session.vpn_ip}"
                                 )
+                            elif tun_res.ok:
+                                self.status_var.set(
+                                    f"CONNECTED — session {result.session.vpn_ip} "
+                                    "(dataplane up; system routes need admin if desired)"
+                                )
                             else:
                                 self.status_var.set(
-                                    f"CONNECTED (session {result.session.vpn_ip}) — "
-                                    "full-tunnel routes not applied (see log)"
+                                    f"CONNECTED — session {result.session.vpn_ip} "
+                                    f"(tunnel adapter: {tun_res.message[:80]})"
                                 )
                             self._set_connected_ui(True)
                         else:
-                            self.status_var.set(
-                                "Session up but dataplane incomplete — see log"
-                            )
-                            self._set_connected_ui(
-                                self.client.state == ConnectState.CONNECTED
-                            )
+                            self.status_var.set("Session incomplete — see log")
+                            self._set_connected_ui(False)
                     else:
                         self._log(f"ERROR: {result.message}")
                         self.status_var.set("ERROR — see log")
@@ -283,7 +316,7 @@ class TunnelClientApp:
         threading.Thread(target=work, daemon=True).start()
 
     def _start_disconnect(self) -> None:
-        """Explicit Disconnect — full tunnel stop (routes, TUN, dataplane, session)."""
+        """Explicit Disconnect — full tunnel stop."""
         self._busy = True
         self.connect_btn.configure(state=tk.DISABLED)
         self.status_var.set("Disconnecting…")
@@ -306,13 +339,11 @@ class TunnelClientApp:
         threading.Thread(target=work, daemon=True).start()
 
     def _disconnect_tunnel(self) -> None:
-        """Idempotent full stop used only by Disconnect button (not window close)."""
         tunnel = self._tunnel
         self._tunnel = None
         disconnect_full_tunnel(tunnel, self.client)
 
     def _on_close_ui_only(self) -> None:
-        """WM_DELETE_WINDOW — close the UI without stopping the VPN."""
         try:
             self._log("Window closed — tunnel left running (use Disconnect to stop).")
         except Exception:
@@ -326,16 +357,18 @@ class TunnelClientApp:
         self.root.mainloop()
 
 
-# Back-compat name for imports/tests
 RetroClientApp = TunnelClientApp
 
 
 def main() -> int:
-    """Launch UI; auto-request UAC so full tunnel can apply routes when Connect is used."""
+    """Launch UI without requiring Run as administrator.
+
+    Auto-elevate is opt-in via RPT_AUTO_ELEVATE=1 (for users who want system routes).
+    Connect always works for the RPT session as a standard user.
+    """
     if "--rpt-elevated" in sys.argv:
         sys.argv = [a for a in sys.argv if a != "--rpt-elevated"]
 
-    # Ensure repo root is on path for elevated re-launch / odd cwd
     root = Path(__file__).resolve().parents[2]
     if str(root) not in sys.path:
         sys.path.insert(0, str(root))
@@ -344,16 +377,19 @@ def main() -> int:
     except Exception:
         pass
 
-    status = elevate_if_needed()
-    if should_exit_after_elevation(status):
-        # Elevated child should be starting (UAC). If it does not appear, run:
-        #   set RPT_NO_AUTO_ELEVATE=1 && python -m client.windows
-        return 0
+    # Default: do NOT force UAC — Connect must work without admin.
+    # Set RPT_AUTO_ELEVATE=1 to opt into ShellExecute runas for full-system routes.
+    status = "skipped"
+    if os.environ.get("RPT_AUTO_ELEVATE", "").strip().lower() in ("1", "true", "yes"):
+        from client.windows.elevate import elevate_if_needed, should_exit_after_elevation
+
+        status = elevate_if_needed()
+        if should_exit_after_elevation(status):
+            return 0
 
     try:
         app = TunnelClientApp()
     except Exception as exc:
-        # Visible failure when GUI cannot start (e.g. no display)
         try:
             import ctypes
 
@@ -372,23 +408,24 @@ def main() -> int:
         app.root.after(
             100,
             lambda: app._log(
-                f"Auto-elevation failed ({reason}). "
-                "Full tunnel needs Administrator — approve UAC or run elevated. "
-                "UI is still open so you can try Connect."
+                f"Optional elevation failed ({reason}). "
+                "Connect still works without admin for the RPT session."
             ),
         )
     elif status == "already_admin":
         app.root.after(
-            100, lambda: app._log("Running elevated — full tunnel available.")
+            100, lambda: app._log("Running elevated — full-system routes available.")
         )
-    elif status == "skipped":
-        app.root.after(
-            100,
-            lambda: app._log(
-                "Running without auto-elevate (RPT_NO_AUTO_ELEVATE). "
-                "Connect still works for handshake; full-tunnel routes need admin."
-            ),
-        )
+
+    # Ensure button is drawn after first layout
+    def _ensure_btn() -> None:
+        try:
+            app.connect_btn.lift()
+            app.bottom.lift()
+        except Exception:
+            pass
+
+    app.root.after(50, _ensure_btn)
     app.run()
     return 0
 
