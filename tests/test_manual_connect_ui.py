@@ -103,15 +103,48 @@ class TestThemeAndStatus(unittest.TestCase):
         self.assertGreaterEqual(CORNER_RADIUS, 8)
 
     def test_plain_status_wording(self):
+        from client.ui_theme import STATUS_ERROR, STATUS_ERROR_FG, STATUS_ERROR_LABEL
+
         self.assertEqual(plain_tunnel_status("disconnected"), "Disconnected")
         self.assertIn("Connecting", plain_tunnel_status("connecting"))
         self.assertIn("Connected", plain_tunnel_status("connected", vpn_ip="10.88.0.2"))
         self.assertIn("10.88.0.2", plain_tunnel_status("connected", vpn_ip="10.88.0.2"))
         err = plain_tunnel_status("error", detail="timeout talking to node")
         self.assertIn("Could not connect", err)
+        self.assertIn(STATUS_ERROR_LABEL, err)
+        # Color constants must remain hex (not overwritten by message strings)
+        self.assertTrue(STATUS_ERROR.startswith("#"), STATUS_ERROR)
+        self.assertTrue(STATUS_ERROR_FG.startswith("#"), STATUS_ERROR_FG)
+        self.assertEqual(STATUS_ERROR, STATUS_ERROR_FG)
+        self.assertFalse(STATUS_ERROR_LABEL.startswith("#"))
         # Must not dump route tables as primary
         self.assertNotIn("route add", plain_tunnel_status("connected"))
         self.assertNotIn("mask 128", plain_tunnel_status("disconnected"))
+
+    def test_set_status_error_uses_hex_fg(self):
+        """Failed Connect must paint plain-language status without TclError on fg color."""
+        try:
+            app = TunnelClientApp()
+        except Exception as e:
+            self.skipTest(f"no display: {e}")
+            return
+        try:
+            app.root.update_idletasks()
+            app._set_status("error", detail="timeout")
+            app.root.update_idletasks()
+            self.assertIn("Could not connect", app.status_var.get())
+            fg = str(app.status_label.cget("fg")).lower()
+            # Tk may return #cd0a0a or system name; must not be the message string
+            self.assertNotEqual(fg, "could not connect")
+            self.assertTrue(
+                fg.startswith("#") or "cd0a0a" in fg.replace(" ", ""),
+                f"expected error red hex, got {fg!r}",
+            )
+        finally:
+            try:
+                app.root.destroy()
+            except Exception:
+                pass
 
     def test_button_labels(self):
         self.assertEqual(connect_button_label(False), "Connect")

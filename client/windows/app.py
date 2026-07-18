@@ -37,6 +37,7 @@ from client.ui_theme import (
     PRIMARY_DARK,
     SCROLLING_PRIVACY_TEXT,
     STATUS_ERROR,
+    STATUS_ERROR_FG,
     STATUS_OK,
     TEXT,
     TEXT_MUTED,
@@ -362,7 +363,8 @@ class TunnelClientApp:
             self.status_label.configure(fg=PRIMARY_DARK)
             self.detail_var.set("Stopping the tunnel and restoring normal internet…")
         elif state == "error":
-            self.status_label.configure(fg=STATUS_ERROR)
+            # STATUS_ERROR / STATUS_ERROR_FG are hex colors — never message strings
+            self.status_label.configure(fg=STATUS_ERROR_FG)
             self.detail_var.set(detail or "Check the activity log, then try Connect again.")
         else:
             self.status_label.configure(fg=TEXT)

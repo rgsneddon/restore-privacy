@@ -27,8 +27,9 @@ LIGHT_ACCENT = "#DEEDF7"  # cupertino soft blue panel
 TEXT = "#222222"  # cupertino body text
 TEXT_MUTED = "#363636"
 WHITE = "#FFFFFF"
-STATUS_OK = "#1B767E"  # site teal accent (homepage embed)
-STATUS_ERROR = "#CD0A0A"  # cupertino error red
+STATUS_OK = "#1B767E"  # site teal accent (homepage embed) — color for Connected
+STATUS_ERROR = "#CD0A0A"  # cupertino error red — color for failed Connect (never a message string)
+STATUS_ERROR_FG = STATUS_ERROR  # alias for fg= usage
 STATUS_WARN = "#A67C00"
 BORDER = "#AED0EA"  # cupertino border blue
 BUTTON_CONNECT_BG = PRIMARY
@@ -87,12 +88,12 @@ def connect_button_label(connected: bool) -> str:
     return "Disconnect" if connected else "Connect"
 
 
-# Tunnel UI states (plain language)
+# Tunnel UI states (plain language labels — never overwrite color constants above)
 STATUS_DISCONNECTED = "Disconnected"
 STATUS_CONNECTING = "Connecting…"
 STATUS_DISCONNECTING = "Disconnecting…"
 STATUS_CONNECTED = "Connected — protected"
-STATUS_ERROR = "Could not connect"
+STATUS_ERROR_LABEL = "Could not connect"
 
 
 def plain_tunnel_status(
@@ -120,8 +121,8 @@ def plain_tunnel_status(
             d = detail.strip().replace("\n", " ")
             if len(d) > 72:
                 d = d[:69] + "…"
-            return f"{STATUS_ERROR}: {d}"
-        return STATUS_ERROR
+            return f"{STATUS_ERROR_LABEL}: {d}"
+        return STATUS_ERROR_LABEL
     return STATUS_DISCONNECTED
 
 
