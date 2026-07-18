@@ -6,7 +6,7 @@ Cross-platform UI for the **RPT2** tunnel (custom protocol — not WireGuard/Ope
 |----------|--------|
 | **Android** | Full VpnService path shipped |
 | **Windows** | Native Python + installer (separate); Flutter Windows is UI-only unless extended |
-| **iOS / macOS** | **Prep ready** — finish Packet Tunnel + signing on a **Mac** |
+| **iOS / macOS** | **RPT2 Packet Tunnel + channel shipped** — sign Network Extension with Apple Developer team for full-system VPN |
 
 ## Shared config
 

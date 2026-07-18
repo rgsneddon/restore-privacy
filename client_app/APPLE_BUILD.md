@@ -78,13 +78,19 @@ Native prep stubs (drag into Xcode targets as described in those docs):
 - `macos/NativePrep/` — method channel + Packet Tunnel skeleton  
 - `ios/NativePrep/RPT_PROTOCOL.md` — handshake/DATA outline for Swift  
 
-## What you must finish on the Mac (cannot complete on Windows)
+## What is already implemented (this tree)
+
+1. Shared Swift **RPT2 engine** under `apple_shared/Rpt2/` (also copied into `ios/NativePrep/Rpt2` and `macos/NativePrep/Rpt2`) with unit tests: `cd client_app/apple_shared/Rpt2 && swift test`.  
+2. **Packet Tunnel** targets (`ios/PacketTunnel`, `macos/PacketTunnel`) implementing UK gate → secrets → handshake → full-tunnel settings → packetFlow/UDP DATA + keepalive.  
+3. Host method channel `restore_privacy/vpn` registered from iOS `AppDelegate` / macOS `MainFlutterWindow`; starts NE when available, otherwise runs the real host-side RPT2 connect sequence (not a permanent stub).  
+4. Secrets helpers load **only** `client_ed25519.priv` + `node_elgamal.pub` (never `node_elgamal.priv`).
+
+## What you must finish for device VPN (Apple Developer)
 
 1. Apple Developer team + App IDs with **Network Extensions** entitlement.  
-2. Xcode **Packet Tunnel** extension target(s) wired to the Flutter host app.  
-3. Implement RPT2 handshake + sealed DATA plane inside the extension (Python reference: `client/connect.py`, `client/dataplane.py`, `node/protocol.py`).  
-4. Load secrets into a location the extension can read (App Group recommended).  
-5. Code sign, Archive, distribute / notarize.
+2. Enable App Groups + Packet Tunnel entitlements on Runner + PacketTunnel (see `NativePrep/Runner.entitlements.example` and `PacketTunnel/PacketTunnel.entitlements`).  
+3. Load secrets into a location the extension can read (App Group recommended).  
+4. Code sign, Archive, distribute / notarize.
 
 ## Success criteria on Mac
 

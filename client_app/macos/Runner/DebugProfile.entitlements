@@ -6,7 +6,15 @@
 	<true/>
 	<key>com.apple.security.cs.allow-jit</key>
 	<true/>
+	<key>com.apple.security.network.client</key>
+	<true/>
 	<key>com.apple.security.network.server</key>
 	<true/>
+	<!-- App Groups require a paid Developer team + provisioning; enable in Xcode when signing.
+	<key>com.apple.security.application-groups</key>
+	<array>
+		<string>group.com.restoreprivacy.shared</string>
+	</array>
+	-->
 </dict>
 </plist>

@@ -73,7 +73,13 @@ Same Flutter UI and auto-connect as Windows/Android (`lib/main.dart`):
 - UK IP gate before tunnel attach  
 - AppIcon under `Runner/Assets.xcassets/AppIcon.appiconset/`
 
-## 7. Notarization (distribution)
+## 7. Signing Packet Tunnel for system VPN
+
+- Target already has `CODE_SIGN_ENTITLEMENTS = PacketTunnel/PacketTunnel.entitlements` (packet-tunnel + App Group + sandbox network).  
+- Local builds use `CODE_SIGNING_ALLOWED = NO` when no NE profile is available so `flutter build macos` succeeds.  
+- For real system VPN: enable Team, set `CODE_SIGNING_ALLOWED = YES`, embed `PacketTunnel.appex`, and grant Network Extension + App Groups in the Developer portal.
+
+## 8. Notarization (distribution)
 
 ```bash
 # After flutter build macos + Developer ID signing in Xcode or codesign:

@@ -92,9 +92,10 @@ Implement RPT2 in Swift inside the extension (not in Dart):
 
 ## 8. Signing & distribution
 
-- Development: free/paid Apple Developer team + device UDID.  
-- TestFlight / App Store: App Store Connect, privacy nutrition labels, VPN justification.  
-- **Not performed on Windows.**
+- Development: paid Apple Developer team + device UDID.  
+- Packet Tunnel target already has `CODE_SIGN_ENTITLEMENTS = PacketTunnel/PacketTunnel.entitlements` (packet-tunnel + App Group).  
+- Local/CI builds set `CODE_SIGNING_ALLOWED = NO` on PacketTunnel when no NE provisioning profile exists; for device VPN set `CODE_SIGNING_ALLOWED = YES`, choose Team, and **Embed Foundation Extensions** so `PacketTunnel.appex` is inside the host app.  
+- TestFlight / App Store: App Store Connect, privacy nutrition labels, VPN justification.
 
 ## 9. Smoke checklist on device
 

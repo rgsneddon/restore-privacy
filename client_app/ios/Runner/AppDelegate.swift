@@ -12,5 +12,7 @@ import UIKit
 
   func didInitializeImplicitFlutterEngine(_ engineBridge: FlutterImplicitEngineBridge) {
     GeneratedPluginRegistrant.register(with: engineBridge.pluginRegistry)
+    // restore_privacy/vpn method channel (connect / disconnect)
+    RptVpnChannel.register(with: engineBridge.applicationRegistrar.messenger())
   }
 }

@@ -5,7 +5,7 @@
 
 | | |
 |--|--|
-| **Get the app** | [Download v0.0.8](https://github.com/rgsneddon/restore-privacy/releases/tag/0.0.8) · [Status & downloads](https://restore-privacy-status.onrender.com/) |
+| **Get the app** | [Download v0.0.9](https://github.com/rgsneddon/restore-privacy/releases/tag/0.0.9) · [Status & downloads](https://restore-privacy-status.onrender.com/) |
 | **Privacy** | [PRIVACY_POLICY.md](PRIVACY_POLICY.md) |
 | **License** | [LICENSE](LICENSE) (MIT) |
 | **Credits** | [CREDITS.md](CREDITS.md) |
@@ -27,16 +27,16 @@
 
 ### Windows
 
-1. Download the **Windows installer (.exe)** from the [0.0.8 release](https://github.com/rgsneddon/restore-privacy/releases/tag/0.0.8)  
+1. Download the **Windows installer (.exe)** from the [0.0.9 release](https://github.com/rgsneddon/restore-privacy/releases/tag/0.0.9)  
    or use the button on https://restore-privacy-status.onrender.com/
-2. Run **`restore-privacy-client-0.0.8-windows-x64-setup.exe`**.  
+2. Run **`restore-privacy-client-0.0.9-windows-x64-setup.exe`**.  
    It installs the full client (bundled runtime + dependencies — **no separate Python install**), creates shortcuts, and launches the app.
 3. For full system VPN, run **Restore Privacy** as Administrator (Start Menu or Desktop shortcut → right-click → Run as administrator).
 4. The app **connects automatically** on launch.
 
 ### Android
 
-1. Download the **APK** from the [0.0.8 release](https://github.com/rgsneddon/restore-privacy/releases/tag/0.0.8)  
+1. Download the **APK** from the [0.0.9 release](https://github.com/rgsneddon/restore-privacy/releases/tag/0.0.9)  
    or the status page.
 2. Install the APK (allow install from unknown sources if your device asks).
 3. Open **Restore Privacy** and grant **VPN** permission when prompted.

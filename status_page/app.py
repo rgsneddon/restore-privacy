@@ -17,7 +17,7 @@ from pathlib import Path
 
 from downloads import download_css, render_download_section_html
 
-# Public page: title + BETA note + live client count + Windows .exe / Android .apk downloads.
+# Public page: title + BETA note + live client count + Windows .exe / Android .apk / macOS .zip / iOS .zip downloads.
 
 # Brand static files (favicon/logo) live next to this module
 STATUS_DIR = Path(__file__).resolve().parent
@@ -175,7 +175,7 @@ def fetch_upstream_status() -> dict:
 
 
 def render_html(status: dict, poll_ms: int | None = None) -> bytes:
-    """HTML: title + live client count + Windows .exe / Android .apk downloads."""
+    """HTML: title + live client count + Windows .exe / Android .apk / macOS .zip / iOS .zip downloads."""
     title = status.get("title", "RESTORE PRIVACY")
     n = int(status.get("clients_connected", 0))
     interval = int(poll_ms if poll_ms is not None else POLL_INTERVAL_MS)

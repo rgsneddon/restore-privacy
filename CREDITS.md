@@ -10,6 +10,8 @@ components are **utilised** by the shipped tree or release packages. They are
 |-----------|----------------------|--------------------|------------------|
 | **cryptography** (Python) | AEAD (ChaCha20-Poly1305), Ed25519, HKDF, and related primitives used by the node and Windows client | Apache-2.0 / BSD | https://github.com/pyca/cryptography |
 | **Bouncy Castle** (`bcprov-jdk18on`) | Android client handshake / AEAD helpers | MIT (Bouncy Castle) | https://www.bouncycastle.org/ |
+| **Apple CryptoKit** | iOS/macOS AEAD (ChaCha20-Poly1305), Ed25519, HKDF-SHA256 for RPT2 Packet Tunnel | Apple SDK | https://developer.apple.com/documentation/cryptokit |
+| **BigInt** (attaswift, vendored) | 2048-bit modular arithmetic for ElGamal/Pedersen on Apple platforms | MIT | https://github.com/attaswift/BigInt |
 
 Discrete-log **ElGamal** and **Pedersen** constructions in this repo are
 implemented for RPT using standard group parameters (**RFC 3526** MODP group

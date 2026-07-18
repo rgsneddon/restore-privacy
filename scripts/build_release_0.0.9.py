@@ -1,0 +1,237 @@
+#!/usr/bin/env python3
+"""Build / stage Restore Privacy client packages for release 0.0.9.
+
+- Windows: reuses prior .exe installer when local Windows build is unavailable
+- Android: reuses prior APK when flutter apk is not rebuilt here
+- macOS: zips Flutter restore_privacy_client.app (never includes *.priv)
+- iOS: zips Flutter Runner.app for sideload / device install tooling
+
+Never bundles secrets/*.priv.
+"""
+
+from __future__ import annotations
+
+import hashlib
+import json
+import shutil
+import subprocess
+import sys
+import zipfile
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parents[1]
+VERSION = "0.0.9"
+OUT = ROOT / "releases" / VERSION
+WINDOWS_EXE_NAME = f"restore-privacy-client-{VERSION}-windows-x64-setup.exe"
+ANDROID_APK_NAME = f"restore-privacy-client-{VERSION}-android.apk"
+MACOS_ZIP_NAME = f"restore-privacy-client-{VERSION}-macos.zip"
+IOS_ZIP_NAME = f"restore-privacy-client-{VERSION}-ios.zip"
+
+# Built Flutter products (when present)
+MACOS_APP = (
+    ROOT
+    / "client_app"
+    / "build"
+    / "macos"
+    / "Build"
+    / "Products"
+    / "Release"
+    / "restore_privacy_client.app"
+)
+IOS_APP = ROOT / "client_app" / "build" / "ios" / "iphoneos" / "Runner.app"
+
+# Prior release used when Windows/Android cannot be rebuilt on this host
+PRIOR_TAG = "0.0.8"
+PRIOR_WINDOWS = f"restore-privacy-client-{PRIOR_TAG}-windows-x64-setup.exe"
+PRIOR_ANDROID = f"restore-privacy-client-{PRIOR_TAG}-android.apk"
+PRIOR_DOWNLOAD = (
+    f"https://github.com/rgsneddon/restore-privacy/releases/download/{PRIOR_TAG}"
+)
+
+
+def sha256_file(path: Path) -> str:
+    h = hashlib.sha256()
+    with path.open("rb") as f:
+        for chunk in iter(lambda: f.read(1 << 20), b""):
+            h.update(chunk)
+    return h.hexdigest()
+
+
+def write_version_files() -> None:
+    (ROOT / "client" / "VERSION").write_text(VERSION + "\n", encoding="utf-8")
+    pubspec = ROOT / "client_app" / "pubspec.yaml"
+    text = pubspec.read_text(encoding="utf-8")
+    lines = []
+    for line in text.splitlines():
+        if line.startswith("version:"):
+            lines.append(f"version: {VERSION}+1")
+        else:
+            lines.append(line)
+    pubspec.write_text("\n".join(lines) + "\n", encoding="utf-8")
+    inst = ROOT / "client" / "windows" / "installer.py"
+    if inst.is_file():
+        t = inst.read_text(encoding="utf-8")
+        t2 = t
+        for old in ("0.0.8", "0.0.7", "0.0.6"):
+            t2 = t2.replace(f'VERSION = "{old}"', f'VERSION = "{VERSION}"')
+            t2 = t2.replace(f"build_release_{old}.py", f"build_release_{VERSION}.py")
+        if t2 != t:
+            inst.write_text(t2, encoding="utf-8")
+
+
+def _assert_no_priv(root: Path) -> None:
+    for p in root.rglob("*.priv"):
+        raise RuntimeError(f"refusing to package secret file: {p}")
+
+
+def package_macos_zip() -> Path:
+    if not MACOS_APP.is_dir():
+        raise FileNotFoundError(
+            f"Missing macOS app at {MACOS_APP}. Run: cd client_app && flutter build macos"
+        )
+    _assert_no_priv(MACOS_APP)
+    OUT.mkdir(parents=True, exist_ok=True)
+    dest = OUT / MACOS_ZIP_NAME
+    if dest.exists():
+        dest.unlink()
+    # zip the .app bundle with ditto for correct macOS resource forks / permissions
+    subprocess.run(
+        [
+            "ditto",
+            "-c",
+            "-k",
+            "--sequesterRsrc",
+            "--keepParent",
+            str(MACOS_APP),
+            str(dest),
+        ],
+        check=True,
+    )
+    return dest
+
+
+def package_ios_zip() -> Path:
+    if not IOS_APP.is_dir():
+        raise FileNotFoundError(
+            f"Missing iOS app at {IOS_APP}. Run: cd client_app && flutter build ios --no-codesign"
+        )
+    _assert_no_priv(IOS_APP)
+    OUT.mkdir(parents=True, exist_ok=True)
+    dest = OUT / IOS_ZIP_NAME
+    if dest.exists():
+        dest.unlink()
+    # Plain zip of Runner.app (unsigned / ad-hoc; sideload tooling)
+    with zipfile.ZipFile(dest, "w", zipfile.ZIP_DEFLATED) as zf:
+        for path in IOS_APP.rglob("*"):
+            if path.is_file():
+                arc = Path("Runner.app") / path.relative_to(IOS_APP)
+                zf.write(path, arc.as_posix())
+    return dest
+
+
+def fetch_prior_asset(name: str, dest: Path) -> Path:
+    """Download a prior release asset via gh (authenticated)."""
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    url = f"{PRIOR_DOWNLOAD}/{name}"
+    # Prefer gh so private rate limits / auth work
+    cmd = [
+        "gh",
+        "release",
+        "download",
+        PRIOR_TAG,
+        "--repo",
+        "rgsneddon/restore-privacy",
+        "--pattern",
+        name,
+        "--dir",
+        str(dest.parent),
+        "--clobber",
+    ]
+    subprocess.run(cmd, check=True)
+    src = dest.parent / name
+    if src.resolve() != dest.resolve():
+        if dest.exists():
+            dest.unlink()
+        src.rename(dest)
+    if not dest.is_file():
+        raise FileNotFoundError(f"failed to fetch {url} → {dest}")
+    return dest
+
+
+def stage_windows_exe() -> Path:
+    OUT.mkdir(parents=True, exist_ok=True)
+    dest = OUT / WINDOWS_EXE_NAME
+    # Prefer local build if present
+    local_candidates = [
+        ROOT / "releases" / PRIOR_TAG / PRIOR_WINDOWS,
+        ROOT / "dist" / VERSION / WINDOWS_EXE_NAME,
+    ]
+    for c in local_candidates:
+        if c.is_file():
+            shutil.copy2(c, dest)
+            return dest
+    fetch_prior_asset(PRIOR_WINDOWS, dest)
+    return dest
+
+
+def stage_android_apk() -> Path:
+    OUT.mkdir(parents=True, exist_ok=True)
+    dest = OUT / ANDROID_APK_NAME
+    local_candidates = [
+        ROOT / "releases" / PRIOR_TAG / PRIOR_ANDROID,
+        ROOT
+        / "client_app"
+        / "build"
+        / "app"
+        / "outputs"
+        / "flutter-apk"
+        / "app-release.apk",
+    ]
+    for c in local_candidates:
+        if c.is_file():
+            shutil.copy2(c, dest)
+            return dest
+    fetch_prior_asset(PRIOR_ANDROID, dest)
+    return dest
+
+
+def main() -> int:
+    write_version_files()
+    OUT.mkdir(parents=True, exist_ok=True)
+    artifacts: dict[str, str] = {}
+
+    win = stage_windows_exe()
+    artifacts[WINDOWS_EXE_NAME] = sha256_file(win)
+    print(f"windows: {win} ({win.stat().st_size} bytes)")
+
+    apk = stage_android_apk()
+    artifacts[ANDROID_APK_NAME] = sha256_file(apk)
+    print(f"android: {apk} ({apk.stat().st_size} bytes)")
+
+    mac = package_macos_zip()
+    artifacts[MACOS_ZIP_NAME] = sha256_file(mac)
+    print(f"macos:   {mac} ({mac.stat().st_size} bytes)")
+
+    ios = package_ios_zip()
+    artifacts[IOS_ZIP_NAME] = sha256_file(ios)
+    print(f"ios:     {ios} ({ios.stat().st_size} bytes)")
+
+    # Final no-secrets check on release dir
+    _assert_no_priv(OUT)
+
+    manifest = {
+        "version": VERSION,
+        "tag": VERSION,
+        "assets": [
+            {"filename": name, "sha256": dig, "bytes": (OUT / name).stat().st_size}
+            for name, dig in artifacts.items()
+        ],
+    }
+    man_path = OUT / "SHA256SUMS.json"
+    man_path.write_text(json.dumps(manifest, indent=2) + "\n", encoding="utf-8")
+    print(f"manifest: {man_path}")
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())
