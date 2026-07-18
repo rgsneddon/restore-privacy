@@ -16,7 +16,7 @@ import traceback
 from pathlib import Path
 
 APP_NAME = "RestorePrivacy"
-VERSION = "0.0.7"
+VERSION = "0.0.8"
 # Install under LocalAppData so no elevation is required for deploy.
 INSTALL_DIR = Path(os.environ.get("LOCALAPPDATA", str(Path.home()))) / "Programs" / APP_NAME
 USER_SECRETS = Path.home() / ".restore-privacy" / "secrets"
@@ -56,7 +56,7 @@ def _payload_root() -> Path:
         if d.is_dir():
             return d
     raise FileNotFoundError(
-        "Client payload not found. Build with scripts/build_release_0.0.7.py first."
+        "Client payload not found. Build with scripts/build_release_0.0.8.py first."
     )
 
 
@@ -143,7 +143,8 @@ def _write_version(install_dir: Path) -> None:
     (install_dir / "INSTALL.txt").write_text(
         f"Restore Privacy Client {VERSION}\r\n"
         "Installed with bundled Python runtime and dependencies.\r\n"
-        "Run RestorePrivacy as Administrator for full system VPN.\r\n"
+        "Full tunnel: double-click the shortcut (UAC prompt once) — no need to right-click Run as admin.\r\n"
+        "The app also auto-requests elevation on launch if needed.\r\n"
         f"Install path: {install_dir}\r\n"
         f"{sec_line}\r\n",
         encoding="utf-8",
@@ -151,15 +152,20 @@ def _write_version(install_dir: Path) -> None:
 
 
 def _create_shortcut(target: Path, link_path: Path, workdir: Path) -> None:
+    """Create .lnk; mark Run as administrator so double-click triggers UAC once."""
     link_path.parent.mkdir(parents=True, exist_ok=True)
-    # PowerShell COM shortcut (no extra deps)
+    # PowerShell COM shortcut + set "Run as administrator" bit (0x20 at offset 0x15)
     ps = (
         f'$ws = New-Object -ComObject WScript.Shell; '
         f'$s = $ws.CreateShortcut({str(link_path)!r}); '
         f'$s.TargetPath = {str(target)!r}; '
         f'$s.WorkingDirectory = {str(workdir)!r}; '
-        f'$s.Description = "Restore Privacy VPN Client {VERSION}"; '
-        f"$s.Save()"
+        f'$s.Description = "Restore Privacy VPN Client {VERSION} (elevates for full tunnel)"; '
+        f"$s.Save(); "
+        f"$p = {str(link_path)!r}; "
+        f"$b = [System.IO.File]::ReadAllBytes($p); "
+        f"if ($b.Length -gt 0x15) {{ $b[0x15] = $b[0x15] -bor 0x20; "
+        f"[System.IO.File]::WriteAllBytes($p, $b) }}"
     )
     subprocess.run(
         ["powershell", "-NoProfile", "-NonInteractive", "-Command", ps],

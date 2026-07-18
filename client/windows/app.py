@@ -24,7 +24,12 @@ from client.ui_theme import (
     WINDOW_BG,
     WINDOW_FG,
 )
-from client.windows.tunnel_win import is_admin, start_full_tunnel
+from client.windows.elevate import (
+    elevate_if_needed,
+    is_admin,
+    should_exit_after_elevation,
+)
+from client.windows.tunnel_win import start_full_tunnel
 
 
 class RetroClientApp:
@@ -144,7 +149,11 @@ class RetroClientApp:
         self._log(SCROLLING_PRIVACY_TEXT)
         self._log("Auto-connect on launch…")
         if not is_admin():
-            self._log("Note: run as Administrator for full system VPN routes.")
+            self._log(
+                "Not elevated — full tunnel needs admin. "
+                "If no UAC prompt appeared, set shortcut to Run as administrator "
+                "or allow elevation (auto-elevate runs on launch)."
+            )
 
         def work() -> None:
             result = self.client.auto_connect_on_launch()
@@ -191,7 +200,31 @@ class RetroClientApp:
 
 
 def main() -> int:
+    """Launch UI; auto-request UAC so users need not right-click Run as admin."""
+    # Strip internal elevation marker from argv so it does not affect logic
+    if "--rpt-elevated" in sys.argv:
+        sys.argv = [a for a in sys.argv if a != "--rpt-elevated"]
+
+    status = elevate_if_needed()
+    if should_exit_after_elevation(status):
+        # Elevated child is starting; exit this non-admin instance
+        return 0
+    if status.startswith("failed:"):
+        # Continue anyway so handshake still works; log will explain routes
+        pass
+
     app = RetroClientApp()
+    if status.startswith("failed:"):
+        reason = status.split(":", 1)[-1]
+        app.root.after(
+            100,
+            lambda: app._log(
+                f"Auto-elevation failed ({reason}). "
+                "Full tunnel needs Administrator — approve UAC or run elevated."
+            ),
+        )
+    elif status == "already_admin":
+        app.root.after(100, lambda: app._log("Running elevated — full tunnel available."))
     app.run()
     return 0
 

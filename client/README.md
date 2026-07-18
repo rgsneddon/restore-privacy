@@ -12,10 +12,14 @@ Requires:
 1. Secrets in `./secrets/` (gitignored) — copy from Vultr `/opt/restore-privacy/secrets/`:
    - `client_ed25519.priv`
    - `node_elgamal.pub`
-2. **Administrator** for full system VPN (creates a **Wintun** virtual NIC, installs default routes, starts sealed RPT DATA plane).
+2. **Elevation for full tunnel** (Wintun NIC + system routes). You do **not** need to
+   right-click **Run as administrator**: the app **auto-prompts UAC** on launch, and
+   installer shortcuts are marked to elevate on double-click (one **Yes** click).
 3. `client/windows/native/wintun.dll` (shipped open-source TUN driver — not the WireGuard protocol).
 
-Without admin, the session still handshakes but OS capture cannot be installed.
+Without elevation, the session can still handshake but OS-wide routes cannot be installed.
+A zero-UAC full-system VPN would need a pre-installed privileged Windows service; the
+one-click UAC re-launch is the practical workaround.
 
 Retro UI: dark blue banner, black background, white text, scrolling privacy string; **auto-connect on launch**.
 
