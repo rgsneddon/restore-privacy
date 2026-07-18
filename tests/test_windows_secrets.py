@@ -143,13 +143,13 @@ class TestInstallerAndBuildRecipe(unittest.TestCase):
         self.assertIn("client_ed25519.priv", inst)
         self.assertIn("node_elgamal.pub", inst)
         self.assertIn("node_elgamal.priv", inst)  # must mention to exclude
-        self.assertIn("VERSION = \"0.1.0\"", inst)
+        self.assertIn("VERSION = \"0.1.1\"", inst)
 
     def test_build_script_injects_secrets(self):
-        script = (ROOT / "scripts" / "build_release_0.1.0.py").read_text(encoding="utf-8")
+        script = (ROOT / "scripts" / "build_release_0.1.1.py").read_text(encoding="utf-8")
         self.assertIn("inject_product_secrets", script)
         self.assertIn("client_ed25519.priv", script)
-        self.assertIn('VERSION = "0.1.0"', script)
+        self.assertIn('VERSION = "0.1.1"', script)
         # Must not blanket-delete all .priv after inject
         self.assertNotIn(
             "for p in built.rglob(\"*.priv\"):\n        p.unlink()",

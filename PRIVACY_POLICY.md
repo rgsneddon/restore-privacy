@@ -2,6 +2,7 @@
 
 **Last updated:** 18 July 2026  
 **Product:** Restore Privacy Tunnel (RPT) — custom VPN node, client apps, and public status page  
+**Current client packages:** [v0.1.1](https://github.com/rgsneddon/restore-privacy/releases/tag/0.1.1) (Windows · Android · macOS · iOS)  
 **Operator / project:** Russell G Sneddon (`rgsneddon`) / public repository [restore-privacy](https://github.com/rgsneddon/restore-privacy)
 
 This policy describes how the **Restore Privacy** software is designed to handle data. It is written for end users and operators. It is **not** legal advice and is not a jurisdiction-specific compliance certificate (e.g. full GDPR/CCPA legal opinion).
@@ -28,7 +29,7 @@ Unless an operator **deliberately** changes configuration or hosting outside thi
 - Write **connection logs**, **session logs**, **access logs**, **traffic logs**, or **peer activity logs** for tunnel use.
 - Publish **client IP addresses**, **device identifiers**, or **session identifiers** on the public status page.
 - Keep a **lifetime / cumulative “total clients ever”** counter on the public page (the status metric is **currently connected** sessions only).
-- Bundle **private admission keys** in public GitHub release packages (operators provision secrets separately).
+- Bundle the **node ElGamal private key** (`node_elgamal.priv`) in public packages (never shipped).
 
 Process stdout/stderr for the node service is configured for **no journal session streams** in the standard install (`StandardOutput=null` / similar).
 
@@ -48,21 +49,21 @@ Process stdout/stderr for the node service is configured for **no journal sessio
 
 - On launch, clients **auto-connect** to the configured RPT node endpoint.
 - They use **local** cryptographic material (when provisioned) to complete admission and establish session keys.
-- **Full-tunnel** modes route device traffic into the encrypted tunnel **only when** the OS grants VPN permission (Windows Administrator / UAC, Android VPN consent, iOS/macOS VPN permission). On **iOS and macOS**, full-system VPN also requires a signed **Packet Tunnel Network Extension** and App Group access to admission secrets; without that signing, the UI and handshake path may still run while system-wide routing is unavailable.
+- **Full-tunnel** modes route device traffic into the encrypted tunnel **only when** the OS grants VPN permission (Windows Administrator / UAC, Android VPN consent, iOS/macOS VPN permission). On **iOS and macOS**, full-system VPN uses a signed **Packet Tunnel Network Extension** (and App Group access to admission secrets). Product connect success requires the system tunnel to be active (residual public IP only changes then).
 - Clients are **not** designed to upload browsing history or identity dossiers to the node as product telemetry.
-- Public download packages (Windows `.exe`, Android `.apk`, macOS `.zip`, iOS `.zip`) do **not** include private admission keys (`*.priv`).
+- Public download packages (Windows `.exe`, Android `.apk`, macOS `.zip`, iOS `.zip` for **v0.1.1**) may include **product client admission keys** (`client_ed25519.priv` + `node_elgamal.pub`) so installers can connect seamlessly. They **never** include the **node private key** (`node_elgamal.priv`).
 
 ### 3.3 Public status page (e.g. Render)
 
 - Proxies or displays a **live** `clients_connected` value from the node status API.
 - Updates the number in the browser via **client-side polling** (no requirement to store user history on the page host).
-- May offer **download links** to public GitHub release packages.
+- May offer **download links** to public GitHub release packages (current catalog: **v0.1.1**).
 
 ### 3.4 Operator-held secrets
 
 - **Node ElGamal private key** and **authorized client private keys** are operational secrets.
-- They live under paths such as `/opt/restore-privacy/secrets/` or local `secrets/` (gitignored)—**not** in the public release zips by design.
-- Possession of authorized client keys allows tunnel use; treat them as credentials.
+- The **node ElGamal private key** lives only on the operator node (e.g. `/opt/restore-privacy/secrets/`) and is gitignored—**never** in public release zips.
+- **Client** admission keys may be bundled in installers for seamless connect; possession of those keys allows tunnel use—treat them as credentials.
 
 ---
 
