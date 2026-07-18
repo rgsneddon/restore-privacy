@@ -148,6 +148,59 @@ class TestNoSharedPrivPackaging(unittest.TestCase):
             self.assertEqual(len(device), 32)
             self.assertNotEqual(device, shared)
 
+    def test_rotates_leftover_shared_priv_matching_package(self):
+        """Upgrade path: install secrets holding the same bytes as package priv must rotate."""
+        from client.secrets_loader import priv_matches_any_package_resident_key
+
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            package = root / "payload" / "_internal" / "secrets"
+            package.mkdir(parents=True)
+            install = root / "install" / "secrets"
+            install.mkdir(parents=True)
+            node = generate_keypair()
+            shared = b"\x11" * 32
+            (package / CLIENT_PRIV_NAME).write_bytes(shared)
+            (package / NODE_PUB_NAME).write_bytes(node.public.export())
+            (install / CLIENT_PRIV_NAME).write_bytes(shared)
+            (install / NODE_PUB_NAME).write_bytes(node.public.export())
+            self.assertTrue(
+                priv_matches_any_package_resident_key(shared, [package, install])
+            )
+            with mock.patch(
+                "client.secrets_loader.candidate_secrets_dirs",
+                return_value=[install, package],
+            ), mock.patch(
+                "client.secrets_loader.preferred_writable_secrets_dir",
+                return_value=install,
+            ), mock.patch(
+                "client.secrets_loader.is_trusted_device_key_dir",
+                side_effect=lambda d: d == install,
+            ):
+                dest = ensure_device_admission_key()
+            self.assertEqual(dest, install)
+            new_priv = (install / CLIENT_PRIV_NAME).read_bytes()
+            self.assertEqual(len(new_priv), 32)
+            self.assertNotEqual(new_priv, shared)
+
+    def test_release_0_1_3_trees_have_no_shared_client_priv(self):
+        """Shipped 0.1.3 package trees on disk must not embed client_ed25519.priv."""
+        roots = [
+            ROOT / "dist" / "0.1.3",
+            ROOT / "dist" / "RestorePrivacy-0.1.3",
+            ROOT / "releases" / "0.1.3",
+        ]
+        found = []
+        for r in roots:
+            if not r.is_dir():
+                continue
+            found.extend(r.rglob(CLIENT_PRIV_NAME))
+        self.assertEqual(
+            found,
+            [],
+            f"0.1.3 product trees must not ship shared priv: {found}",
+        )
+
     def test_android_assets_have_no_client_priv(self):
         assets = (
             ROOT
