@@ -1,4 +1,4 @@
-﻿# Apple platforms prep (iOS + macOS)
+# Apple platforms prep (iOS + macOS)
 
 Build and sign on a **Mac** with Xcode. This Windows checkout only prepares sources, icons, docs, and native stubs.
 
@@ -232,7 +232,7 @@ Published macOS zips must be **Developer ID signed and notarized** so users are 
 ```bash
 python3 scripts/sign_and_notarize_macos.py \
   --app client_app/build/macos/Build/Products/Release/restore_privacy_client.app \
-  --zip releases/0.1.2/restore-privacy-client-0.1.2-macos.zip
+  --zip releases/0.1.3/restore-privacy-client-0.1.3-macos.zip
 ```
 
 See [macos/BUILD_ON_MAC.md](macos/BUILD_ON_MAC.md) Â§ Gatekeeper.

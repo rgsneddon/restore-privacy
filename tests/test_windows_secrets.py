@@ -148,13 +148,13 @@ class TestInstallerAndBuildRecipe(unittest.TestCase):
         self.assertIn("node_elgamal.pub", inst)
         self.assertIn("node_elgamal.priv", inst)  # must mention to exclude
         self.assertIn("device Ed25519", inst)
-        self.assertIn("VERSION = \"0.1.2\"", inst)
+        self.assertIn("VERSION = \"0.1.3\"", inst)
 
     def test_build_script_injects_secrets(self):
-        script = (ROOT / "scripts" / "build_release_0.1.2.py").read_text(encoding="utf-8")
+        script = (ROOT / "scripts" / "build_release_0.1.3.py").read_text(encoding="utf-8")
         self.assertIn("inject_product_secrets", script)
         self.assertIn("node_elgamal.pub", script)
-        self.assertIn('VERSION = "0.1.2"', script)
+        self.assertIn('VERSION = "0.1.3"', script)
         # Public packages must not embed shared client priv
         lower = script.lower()
         self.assertTrue(
