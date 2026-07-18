@@ -97,7 +97,7 @@ object UkIpGate {
             connectTimeout = 8000
             readTimeout = 8000
             requestMethod = "GET"
-            setRequestProperty("User-Agent", "restore-privacy-client/0.0.4")
+            setRequestProperty("User-Agent", "restore-privacy-client/0.0.5")
             setRequestProperty("Accept", "application/json")
         }
         try {

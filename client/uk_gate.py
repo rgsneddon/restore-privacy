@@ -125,7 +125,7 @@ def default_geo_fetcher(url: str = DEFAULT_GEO_URL, timeout: float = DEFAULT_TIM
     req = urllib.request.Request(
         url,
         headers={
-            "User-Agent": "restore-privacy-client/0.0.4",
+            "User-Agent": "restore-privacy-client/0.0.5",
             "Accept": "application/json",
         },
         method="GET",
