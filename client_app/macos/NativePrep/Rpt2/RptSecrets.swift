@@ -117,12 +117,40 @@ public enum RptSecrets {
         return unique
     }
 
-    /// First candidate directory that contains both admission files.
+    /// True for bundle Resources/secrets — may hold a residual shared product priv; never trust it as device identity.
+    public static func isPackageReadonlySecretsDir(
+        _ dir: URL,
+        bundle: Bundle = .main,
+        fileManager: FileManager = .default
+    ) -> Bool {
+        let path = dir.standardizedFileURL.path
+        if let res = bundle.resourceURL?
+            .appendingPathComponent("secrets", isDirectory: true)
+            .standardizedFileURL.path,
+            path == res {
+            return true
+        }
+        if let builtIn = bundle.url(forResource: "secrets", withExtension: nil)?
+            .standardizedFileURL.path,
+            path == builtIn {
+            return true
+        }
+        // Common package markers
+        let lower = path.lowercased()
+        if lower.contains("/contents/resources/secrets") { return true }
+        if lower.hasSuffix("/runner.app/secrets") { return true }
+        return false
+    }
+
+    /// First **trusted** (non-package) directory that already has a device key + node pub.
     public static func resolveSecretsDirectory(
         fileManager: FileManager = .default,
         bundle: Bundle = .main
     ) -> URL? {
         for dir in candidateSecretsDirectories(fileManager: fileManager, bundle: bundle) {
+            if isPackageReadonlySecretsDir(dir, bundle: bundle, fileManager: fileManager) {
+                continue
+            }
             if dirHasClientSecrets(dir, fileManager: fileManager) {
                 return dir
             }
@@ -239,17 +267,17 @@ public enum RptSecrets {
     // MARK: - Load
 
     /// Load product admission material (device client priv + node pub). Never loads node private key.
-    /// Generates a unique Ed25519 device key on first run when only the node public key is available.
+    /// Generates a unique Ed25519 device key on first run. Never adopts a shared priv from the app bundle.
     public static func loadAdmissionMaterial(
         fileManager: FileManager = .default,
         bundle: Bundle = .main
     ) throws -> (clientPriv: Data, nodePub: Data) {
-        // Prefer a resolved directory that already has both files.
+        // Prefer trusted writable storage that already has a device key (not bundle).
         if let dir = resolveSecretsDirectory(fileManager: fileManager, bundle: bundle) {
             return try loadFromDirectory(dir)
         }
 
-        // Bootstrap: seed node pub from bundle, generate device key into App Support / App Group
+        // Bootstrap: node pub from bundle → generate device key into App Support / App Group
         if let dir = try? seedApplicationSupportFromBundleIfNeeded(fileManager: fileManager, bundle: bundle) {
             return try loadFromDirectory(dir)
         }
@@ -257,7 +285,7 @@ public enum RptSecrets {
             return try loadFromDirectory(dir)
         }
 
-        // Last resort: generate device key next to any available node pub
+        // Last resort: generate device key in preferred writable dir next to any node pub
         if let dest = secretsDirectory(fileManager: fileManager) {
             var nodeSrc: URL?
             for d in candidateSecretsDirectories(fileManager: fileManager, bundle: bundle) {
@@ -298,6 +326,7 @@ public enum RptSecrets {
     }
 
     /// Seed node_elgamal.pub from bundle and ensure a per-device Ed25519 key under Application Support.
+    /// Never copies client_ed25519.priv from the bundle (shared product key risk).
     @discardableResult
     public static func seedApplicationSupportFromBundleIfNeeded(
         fileManager: FileManager = .default,
@@ -308,7 +337,7 @@ public enum RptSecrets {
             return nil
         }
         let resNode = res.appendingPathComponent(nodePubName)
-        guard fileManager.fileExists(atPath: resNode.path) || dirHasClientSecrets(res, fileManager: fileManager) else {
+        guard fileManager.fileExists(atPath: resNode.path) else {
             return nil
         }
         guard let support = fileManager.urls(for: .applicationSupportDirectory, in: .userDomainMask).first else {
@@ -320,14 +349,11 @@ public enum RptSecrets {
         if dirHasClientSecrets(dest, fileManager: fileManager) {
             return dest
         }
-        let nodeSrc = fileManager.fileExists(atPath: resNode.path)
-            ? resNode
-            : res.appendingPathComponent(nodePubName)
-        guard fileManager.fileExists(atPath: nodeSrc.path) else { return nil }
-        return try ensureDeviceAdmissionKey(in: dest, nodePubSource: nodeSrc, fileManager: fileManager)
+        return try ensureDeviceAdmissionKey(in: dest, nodePubSource: resNode, fileManager: fileManager)
     }
 
     /// Ensure App Group has device key + node pub so Packet Tunnel can connect.
+    /// Never copies client_ed25519.priv from the app bundle — only from trusted writable dirs or generate.
     @discardableResult
     public static func seedAppGroupFromKnownSourcesIfNeeded(
         fileManager: FileManager = .default,
@@ -351,9 +377,12 @@ public enum RptSecrets {
                 break
             }
         }
-        // Also copy existing device priv from another candidate if present
+        // Device priv only from trusted (non-package) locations
         var privSrc: URL?
         for dir in candidateSecretsDirectories(fileManager: fileManager, bundle: bundle) {
+            if isPackageReadonlySecretsDir(dir, bundle: bundle, fileManager: fileManager) {
+                continue
+            }
             let c = dir.appendingPathComponent(clientPrivName)
             if fileManager.fileExists(atPath: c.path) {
                 privSrc = c

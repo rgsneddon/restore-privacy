@@ -158,9 +158,12 @@ def build_client_onedir() -> Path:
         exes = list(built.glob("*.exe"))
         if not exes:
             raise RuntimeError(f"No .exe in {built}")
-    # Never ship node private key; product client admission key is injected next
-    for p in built.rglob("node_elgamal.priv"):
-        p.unlink()
+    # Never ship any private key material in the package tree
+    for p in list(built.rglob("*.priv")):
+        try:
+            p.unlink()
+        except OSError:
+            pass
     inject_product_secrets(built)
     return built
 
@@ -169,6 +172,7 @@ def inject_product_secrets(target_dir: Path) -> None:
     """Copy public node_elgamal.pub only — device Ed25519 keys are generated on first run.
 
     Never ships a shared client_ed25519.priv (impersonation risk) or node_elgamal.priv.
+    Strips **all** ``*.priv`` under the entire package tree (incl. ``_internal/secrets``).
     """
     src = ROOT / "secrets"
     node_pub = src / "node_elgamal.pub"
@@ -180,12 +184,19 @@ def inject_product_secrets(target_dir: Path) -> None:
     dest = target_dir / "secrets"
     dest.mkdir(parents=True, exist_ok=True)
     shutil.copy2(node_pub, dest / "node_elgamal.pub")
-    # Strip any shared client priv or node private key from package tree
-    for p in dest.glob("*.priv"):
-        p.unlink()
-    node_priv = dest / "node_elgamal.priv"
-    if node_priv.is_file():
-        node_priv.unlink()
+    # Also place pub under _internal/secrets if that layout exists (onedir)
+    for sub in target_dir.rglob("secrets"):
+        if sub.is_dir():
+            try:
+                shutil.copy2(node_pub, sub / "node_elgamal.pub")
+            except OSError:
+                pass
+    # Strip every private key anywhere in the package tree
+    for p in list(target_dir.rglob("*.priv")):
+        try:
+            p.unlink()
+        except OSError:
+            pass
 
 
 def build_windows_installer_exe(client_onedir: Path) -> Path:
@@ -205,7 +216,7 @@ def build_windows_installer_exe(client_onedir: Path) -> Path:
     shutil.copytree(
         client_onedir,
         dest_payload,
-        ignore=shutil.ignore_patterns("node_elgamal.priv", "*.pyc", "__pycache__"),
+        ignore=shutil.ignore_patterns("*.priv", "*.pyc", "__pycache__"),
     )
     inject_product_secrets(dest_payload)
 

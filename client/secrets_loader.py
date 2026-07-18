@@ -104,6 +104,74 @@ def dir_has_client_secrets(d: Path) -> bool:
     )
 
 
+def is_package_readonly_secrets_dir(d: Path) -> bool:
+    """True for frozen/package payload paths — never trust client_ed25519.priv there.
+
+    Shared product priv left in ``_internal/secrets`` or PyInstaller extract dirs
+    must not be adopted as the device identity.
+    """
+    try:
+        s = str(d.resolve()).replace("\\", "/").lower()
+    except Exception:
+        s = str(d).replace("\\", "/").lower()
+    if getattr(sys, "frozen", False) and hasattr(sys, "_MEIPASS"):
+        try:
+            mei = str(Path(sys._MEIPASS).resolve()).replace("\\", "/").lower()  # type: ignore[attr-defined]
+            if s == mei or s.startswith(mei.rstrip("/") + "/"):
+                return True
+        except Exception:
+            pass
+    # Package layout markers (Windows onedir / older installer trees)
+    markers = (
+        "/_internal/",
+        "/_internal",
+        "/payload/secrets",
+        "/payload/",
+        "/_mei",
+        "\\_mei",
+    )
+    # Normalize already lowercased with /
+    for m in markers:
+        if m in s:
+            return True
+    # Bare meipass-style extract folders
+    if "/_mei" in s or s.endswith("_internal/secrets"):
+        return True
+    return False
+
+
+def is_trusted_device_key_dir(d: Path) -> bool:
+    """Writable locations where per-device keys are stored (not package bundles)."""
+    if is_package_readonly_secrets_dir(d):
+        return False
+    try:
+        resolved = d.resolve()
+    except Exception:
+        resolved = d
+    trusted: list[Path] = [
+        Path.home() / ".restore-privacy" / "secrets",
+        preferred_writable_secrets_dir(),
+    ]
+    env = os.environ.get("RPT_SECRETS_DIR", "").strip()
+    if env:
+        trusted.append(Path(env))
+    local = os.environ.get("LOCALAPPDATA", "").strip()
+    if local:
+        trusted.append(Path(local) / "Programs" / "RestorePrivacy" / "secrets")
+    for t in trusted:
+        try:
+            if resolved == t.resolve():
+                return True
+        except Exception:
+            if str(resolved) == str(t):
+                return True
+    # Install tree secrets/ (not _internal)
+    s = str(resolved).replace("\\", "/").lower()
+    if s.endswith("/secrets") and "restoreprivacy" in s and "/_internal/" not in s:
+        return True
+    return False
+
+
 def _find_node_pub(candidates: list[Path]) -> bytes | None:
     for d in candidates:
         p = d / NODE_PUB_NAME
@@ -163,8 +231,9 @@ def ensure_device_admission_key(
         return dest
 
     candidates = candidate_secrets_dirs()
+    # Only reuse a client priv from trusted writable storage — never package/_internal
     for d in candidates:
-        if dir_has_client_secrets(d):
+        if dir_has_client_secrets(d) and is_trusted_device_key_dir(d):
             return d
 
     dest = preferred_writable_secrets_dir()
@@ -184,6 +253,7 @@ def ensure_device_admission_key(
         except OSError:
             pass
 
+    # Always generate into writable dest when missing — ignore package-resident shared priv
     if not (dest / CLIENT_PRIV_NAME).is_file():
         generate_and_persist_device_key(dest)
     else:

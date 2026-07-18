@@ -77,17 +77,31 @@ def _find_client_exe(root: Path) -> Path:
 def _copy_tree(src: Path, dst: Path) -> None:
     if dst.exists():
         shutil.rmtree(dst)
-    # Allow product client_ed25519.priv in payload secrets/; never copy node_elgamal.priv
+    # Never copy any .priv (shared client_ed25519.priv or node_elgamal.priv)
     def _ignore(directory: str, names: list[str]) -> set[str]:
         ignored: set[str] = set()
         for n in names:
             if n.endswith(".pyc") or n == "__pycache__":
                 ignored.add(n)
-            if n == "node_elgamal.priv":
+            if n.endswith(".priv"):
                 ignored.add(n)
         return ignored
 
     shutil.copytree(src, dst, ignore=_ignore)
+
+
+def strip_all_private_keys(root: Path) -> list[str]:
+    """Remove every *.priv under root (shared client + node). Returns removed paths."""
+    removed: list[str] = []
+    if not root.is_dir():
+        return removed
+    for p in root.rglob("*.priv"):
+        try:
+            p.unlink()
+            removed.append(str(p))
+        except OSError:
+            pass
+    return removed
 
 
 def _find_payload_secrets(payload_dir: Path) -> Path | None:
@@ -109,7 +123,8 @@ def _provision_secrets(payload_dir: Path, install_dir: Path) -> list[str]:
     """Install public node key only — device Ed25519 is generated on first run.
 
     Never copies a shared client_ed25519.priv into every install (impersonation risk).
-    Never copies node_elgamal.priv.
+    Never copies node_elgamal.priv. Strips any .priv that slipped into the install tree
+    (e.g. under ``_internal/secrets`` from older packages).
     """
     written: list[str] = []
     src = _find_payload_secrets(payload_dir)
@@ -119,26 +134,18 @@ def _provision_secrets(payload_dir: Path, install_dir: Path) -> list[str]:
             if (cand / NODE_PUB).is_file():
                 src = cand
                 break
-    if src is None:
-        return written
 
     for dest in (install_dir / "secrets", USER_SECRETS):
         dest.mkdir(parents=True, exist_ok=True)
-        # Only public node material — per-device client priv is created at first connect
-        for name in (NODE_PUB,):
-            sp = src / name
-            if not sp.is_file():
-                continue
-            target = dest / name
-            target.write_bytes(sp.read_bytes())
-            written.append(str(target))
-        # Strip any shared client priv that older packages may have left in the tree
-        leftover = dest / CLIENT_PRIV
-        if leftover.is_file():
-            try:
-                leftover.unlink()
-            except OSError:
-                pass
+        if src is not None:
+            sp = src / NODE_PUB
+            if sp.is_file():
+                target = dest / NODE_PUB
+                target.write_bytes(sp.read_bytes())
+                written.append(str(target))
+
+    # Strip package-resident shared priv everywhere under install (incl. _internal)
+    strip_all_private_keys(install_dir)
     return written
 
 
@@ -195,6 +202,8 @@ def install(launch: bool = True) -> Path:
 
     INSTALL_DIR.mkdir(parents=True, exist_ok=True)
     _copy_tree(payload_dir, INSTALL_DIR)
+    # Belt-and-suspenders: never leave shared .priv from old payloads
+    strip_all_private_keys(INSTALL_DIR)
     secrets_written = _provision_secrets(payload_dir, INSTALL_DIR)
     _write_version(INSTALL_DIR)
 
