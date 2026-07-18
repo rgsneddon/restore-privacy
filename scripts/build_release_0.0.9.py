@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
 import shutil
 import subprocess
 import sys
@@ -84,6 +85,27 @@ def _assert_no_priv(root: Path) -> None:
         raise RuntimeError(f"refusing to package secret file: {p}")
 
 
+def sign_and_notarize_macos(app: Path, dest_zip: Path) -> None:
+    """Developer ID sign + notarytool + staple via shipped scripts/sign_and_notarize_macos.py.
+
+    This is what prevents Gatekeeper "Apple could not verify … free of malware"
+    for the published macOS zip (must not ship ad-hoc CODE_SIGN_IDENTITY=- alone).
+    """
+    script = ROOT / "scripts" / "sign_and_notarize_macos.py"
+    if not script.is_file():
+        raise FileNotFoundError(f"missing {script}")
+    cmd = [
+        sys.executable,
+        str(script),
+        "--app",
+        str(app),
+        "--zip",
+        str(dest_zip),
+    ]
+    # Allow RP_NOTARY_* / RP_CODESIGN_IDENTITY from environment
+    subprocess.run(cmd, check=True)
+
+
 def package_macos_zip() -> Path:
     if not MACOS_APP.is_dir():
         raise FileNotFoundError(
@@ -92,22 +114,50 @@ def package_macos_zip() -> Path:
     _assert_no_priv(MACOS_APP)
     OUT.mkdir(parents=True, exist_ok=True)
     dest = OUT / MACOS_ZIP_NAME
-    if dest.exists():
-        dest.unlink()
-    # zip the .app bundle with ditto for correct macOS resource forks / permissions
+    # Distribution path: Developer ID + notarize + staple, then zip (not ad-hoc)
+    sign_and_notarize_macos(MACOS_APP, dest)
+    if not dest.is_file():
+        raise RuntimeError(f"sign_and_notarize_macos did not produce {dest}")
+    return dest
+
+
+def sign_ios_app(app: Path) -> None:
+    """Sign iOS Runner.app + nested frameworks/appex with Apple Distribution (or Development).
+
+    Avoids a permanently ad-hoc-only iOS package when a team identity is in the keychain.
+    Full device install still needs a matching provisioning profile for the team.
+    """
+    identity = os.environ.get(
+        "RP_IOS_CODESIGN_IDENTITY",
+        "Apple Distribution: Russell Sneddon (SFCBP95595)",
+    )
+    # Nested frameworks
+    fw_dir = app / "Frameworks"
+    if fw_dir.is_dir():
+        for fw in sorted(fw_dir.glob("*.framework")):
+            subprocess.run(
+                ["codesign", "--force", "--timestamp", "--sign", identity, str(fw)],
+                check=False,
+            )
+    # Packet Tunnel extension
+    appex = app / "PlugIns" / "PacketTunnel.appex"
+    if appex.is_dir():
+        ent = ROOT / "client_app" / "ios" / "PacketTunnel" / "PacketTunnel.entitlements"
+        cmd = ["codesign", "--force", "--timestamp", "--sign", identity]
+        if ent.is_file():
+            cmd.extend(["--entitlements", str(ent)])
+        cmd.append(str(appex))
+        r = subprocess.run(cmd, check=False)
+        if r.returncode != 0:
+            subprocess.run(
+                ["codesign", "--force", "--timestamp", "--sign", identity, str(appex)],
+                check=True,
+            )
+    # Host app
     subprocess.run(
-        [
-            "ditto",
-            "-c",
-            "-k",
-            "--sequesterRsrc",
-            "--keepParent",
-            str(MACOS_APP),
-            str(dest),
-        ],
+        ["codesign", "--force", "--timestamp", "--sign", identity, str(app)],
         check=True,
     )
-    return dest
 
 
 def package_ios_zip() -> Path:
@@ -116,11 +166,16 @@ def package_ios_zip() -> Path:
             f"Missing iOS app at {IOS_APP}. Run: cd client_app && flutter build ios --no-codesign"
         )
     _assert_no_priv(IOS_APP)
+    # Team-sign when identity is available (not ad-hoc-only distribution story)
+    try:
+        sign_ios_app(IOS_APP)
+    except Exception as exc:  # noqa: BLE001 — packaging continues with best effort
+        print(f"iOS codesign warning: {exc}", file=sys.stderr)
     OUT.mkdir(parents=True, exist_ok=True)
     dest = OUT / IOS_ZIP_NAME
     if dest.exists():
         dest.unlink()
-    # Plain zip of Runner.app (unsigned / ad-hoc; sideload tooling)
+    # Zip signed Runner.app for sideload / device tooling
     with zipfile.ZipFile(dest, "w", zipfile.ZIP_DEFLATED) as zf:
         for path in IOS_APP.rglob("*"):
             if path.is_file():

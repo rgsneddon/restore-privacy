@@ -98,3 +98,16 @@ Native prep stubs (drag into Xcode targets as described in those docs):
 - Channel `restore_privacy/vpn` returns real session results (not “extension not configured”).  
 - Full tunnel: device traffic exits via the RPT node when connected.  
 - No `node_elgamal.priv` in the app bundle.
+
+## Gatekeeper (macOS downloads)
+
+Published macOS zips must be **Developer ID signed and notarized** so users are not blocked by
+*Apple could not verify “restore_privacy_client” is free of malware…*
+
+```bash
+python3 scripts/sign_and_notarize_macos.py \
+  --app client_app/build/macos/Build/Products/Release/restore_privacy_client.app \
+  --zip releases/0.0.9/restore-privacy-client-0.0.9-macos.zip
+```
+
+See [macos/BUILD_ON_MAC.md](macos/BUILD_ON_MAC.md) § Gatekeeper.

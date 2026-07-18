@@ -79,15 +79,40 @@ Same Flutter UI and auto-connect as Windows/Android (`lib/main.dart`):
 - Local builds use `CODE_SIGNING_ALLOWED = NO` when no NE profile is available so `flutter build macos` succeeds.  
 - For real system VPN: enable Team, set `CODE_SIGNING_ALLOWED = YES`, embed `PacketTunnel.appex`, and grant Network Extension + App Groups in the Developer portal.
 
-## 8. Notarization (distribution)
+## 8. Gatekeeper / malware dialog (distribution)
+
+Downloaded apps must use **Developer ID + notarization**, not ad-hoc signing.
+Otherwise macOS shows: *Apple could not verify “restore_privacy_client” is free of malware…*
+
+### Automated (preferred)
+
+After `flutter build macos --release`:
 
 ```bash
-# After flutter build macos + Developer ID signing in Xcode or codesign:
-xcrun notarytool submit <app-or-dmg> --apple-id … --team-id … --password …
-xcrun stapler staple <app>
+# From repo root — signs host + PacketTunnel with Developer ID Application,
+# submits to notarytool, staples, and writes the release zip:
+python3 scripts/sign_and_notarize_macos.py \
+  --app client_app/build/macos/Build/Products/Release/restore_privacy_client.app \
+  --zip releases/0.0.9/restore-privacy-client-0.0.9-macos.zip
 ```
 
-**Windows cannot notarize.**
+Credentials: `RP_NOTARY_KEY` / `RP_NOTARY_KEY_ID` / `RP_NOTARY_ISSUER`, or the
+App Store Connect API key under `~/Library/Developer/perccent-codesign/`.
+Identity default: `Developer ID Application: Russell Sneddon (SFCBP95595)`.
+
+Release packaging (`scripts/build_release_0.0.9.py`) calls this same path so the
+GitHub **macos.zip** is Gatekeeper-safe.
+
+### Manual
+
+```bash
+# codesign --options runtime --timestamp --sign "Developer ID Application: …" …
+xcrun notarytool submit <zip-of-app> --key … --key-id … --issuer … --wait
+xcrun stapler staple restore_privacy_client.app
+spctl --assess --type execute -vv restore_privacy_client.app   # expect: accepted, Notarized Developer ID
+```
+
+**Windows hosts cannot notarize.**
 
 ## 8. Smoke checklist
 
