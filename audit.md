@@ -5,10 +5,10 @@
 | **Product** | Restore Privacy Tunnel (RPT) |
 | **Repository** | `restore_privacy` (root of this tree) |
 | **Version under review** | **0.1.8** (`client/VERSION`, `status_page/downloads.py` `RELEASE_VERSION` / `RELEASE_TAG`) |
-| **Audit date** | 19 July 2026 (**refresh pass** after follow-up commit `34f138e`) |
-| **Prior pass** | Same date, first-pass `audit.md` + follow-ups in §10 |
+| **Audit date** | 19 July 2026 (**re-audit pass** on `523aca4`; tree unchanged since follow-ups) |
+| **Prior passes** | Same date: first-pass `audit.md` → follow-ups `34f138e` → refresh `523aca4` → this re-verify |
 | **Audit type** | Static code + policy consistency review (not a penetration test or live multi-OS residual-IP red-team) |
-| **Auditor method** | Tree inspection, spot-checks of closed follow-ups, unit/structural security/policy test suite |
+| **Auditor method** | Tree re-scan, spot-checks of closed follow-ups, expanded unit/structural security/policy test suite |
 
 ---
 
@@ -16,7 +16,7 @@
 
 Restore Privacy is a custom encrypted tunnel stack (node, multi-platform clients, public status page) with a clear product thesis: **no user-info logs**, **minimal public status surface**, and **honest “Connected”** only when residual public IP can change via full-tunnel routes.
 
-**Overall posture (refresh):** Still **strong** alignment between privacy claims and shipped helpers for residual honesty, session-only public metrics, device-key bootstrap (no shared client private key in packages), packaging gates that strip `*.priv` / forbid `node_elgamal.priv`, and Linux bake-in wheels. **Prior Medium doc findings M1 and M2 are re-verified closed** on the current tree (PRIVACY_POLICY §3.2 includes Linux; README contains `do **not** ship a shared`). Prior Low L3 (socket close) and L5 (Linux Mint catalog wording) are also closed.
+**Overall posture (this re-audit):** Still **strong** alignment between privacy claims and shipped helpers for residual honesty, session-only public metrics, device-key bootstrap (no shared client private key in packages), packaging gates that strip `*.priv` / forbid `node_elgamal.priv`, and Linux bake-in wheels. **No new High or Medium code/policy findings** relative to the prior refresh. **M1 and M2 remain closed** (PRIVACY_POLICY §3.2 includes Linux; README contains `do **not** ship a shared`). Low L3 (socket close) and L5 (Linux catalog wording) remain closed.
 
 **Primary residual risks (still open, by design or environment):**
 
@@ -25,7 +25,7 @@ Restore Privacy is a custom encrypted tunnel stack (node, multi-platform clients
 3. **Linux privilege floor** — residual needs root + host TUN/`ip` (M4).
 4. **UK gate** — egress IP visible to third-party geo endpoints (M5).
 
-**Supporting automated run (this refresh):** representative security/policy modules — **97 passed, 0 failed** (see §6). No documentation-string failure remains for the shared-key / §3.2 checks.
+**Supporting automated run (this re-audit):** expanded security/policy modules — **155 passed, 0 failed** (see §6). Spot-checks on HEAD `523aca4` match §4 closed/open tables; no delta requiring new finding IDs.
 
 ---
 
@@ -53,12 +53,13 @@ Restore Privacy is a custom encrypted tunnel stack (node, multi-platform clients
 - Full cryptographic review of ElGamal/Pedersen parameters (implementation present; formal crypto audit not performed).
 - Other monorepo apps outside `restore_privacy`.
 
-### 2.3 Method notes (this pass)
+### 2.3 Method notes (this re-audit)
 
-- Re-read version surfaces: `client/VERSION` == catalog `0.1.8`.
-- Spot-checked M1/M2 closed language in PRIVACY_POLICY and README.
-- Spot-checked release gates (`_assert_no_priv`, package `*.priv` refuse, `.gitignore secrets/`), Linux ABI docs, Apple “Mac work required”, connect socket close path.
-- Re-ran unit/structural tests for residual IP, secrets packaging, legal docs, downloads, Linux package, tunnel teardown, live client count, Apple honesty, audit structural tests.
+- Re-read version surfaces: `client/VERSION` == catalog `0.1.8` (still aligned).
+- Re-verified M1/M2 closed language in PRIVACY_POLICY and README (exact §3.2 heading; README shared-key sentence).
+- Re-verified release gates (`_assert_no_priv` in `build_release_0.1.8.py`, package `*.priv` refuse, `.gitignore secrets/`), Linux manylinux/ABI notes in `package_linux.py`, Apple “Mac work required”, `RptClient.connect` sock close path, `node/nolog.py`, status `normalize_status` / `clients_connected` only.
+- Re-ran expanded unit/structural suite (§6), including audit structural tests, follow-ups, residual IP, device keys, Windows secrets, legal docs, downloads, Linux installer package + client, tunnel teardown, live count, Apple honesty, no-system-Python Windows path, non-admin product Connect, UK gate, status-page minimal, README/sundries.
+- Working tree clean at start of pass (`main` @ `523aca4`); **no product code changes** required by findings.
 - **Did not** paste any secret key material into this document (local `secrets/` is gitignored; only path patterns cited).
 
 ---
@@ -156,17 +157,19 @@ Severity scale: **High** (likely security/privacy break or secret exposure) · *
 
 ---
 
-## 6. Automated checks run during this refresh
+## 6. Automated checks run during this re-audit
 
-**Command family:** `python -m unittest` on audit structural, audit follow-ups, residual, secrets packaging, legal, downloads, Linux package, teardown, live count, Apple honesty modules.
+**Command family:** `python -m unittest` on:
+
+`test_audit_md`, `test_audit_followups`, `test_device_admission_keys`, `test_residual_ip_capture`, `test_windows_secrets`, `test_legal_docs`, `test_downloads`, `test_linux_installer_package`, `test_linux_client`, `test_tunnel_teardown`, `test_live_client_count`, `test_apple_full_tunnel_honesty`, `test_no_python_user_path`, `test_nonadmin_product_connect`, `test_uk_gate`, `test_status_page_minimal`, `test_readme_sundries`.
 
 | Result | Detail |
 |--------|--------|
-| **Passed** | **97** |
+| **Passed** | **155** |
 | **Failed** | **0** |
-| **Log** | `{SCRATCH}/audit_refresh_supporting_tests.log` |
+| **Log** | `%TEMP%\reaudit_supporting_20260719_150611.log` (this host) |
 
-Interpretation: prior doc-string failure on README shared-key phrase is **gone**. Packaging and residual honesty tests remain green.
+Interpretation: documentation-string checks for shared-key / §3.2 remain green. Packaging, residual honesty, status minimization, and Apple honesty tests remain green. Count is higher than the prior refresh (97) because this pass includes additional related modules (UK gate, status minimal, README/sundries, Windows secrets, non-admin Connect).
 
 ---
 
@@ -196,7 +199,7 @@ Interpretation: prior doc-string failure on README shared-key phrase is **gone**
 
 ## 9. Conclusion
 
-As of **0.1.8 refresh**, the codebase and privacy policy remain **consistent** on core promises: no-log defaults, minimal public metrics, residual-honest Connect, and no shared client private keys in public packages. **Documentation inconsistencies M1/M2 from the first pass are closed and re-verified.** Remaining Medium items (Apple NE, Linux root floor, UK gate, host logging) are primarily **privilege / environment / operational** limits, not silent product dishonesty.
+As of **0.1.8 re-audit** (HEAD `523aca4` + this doc update), the codebase and privacy policy remain **consistent** on core promises: no-log defaults, minimal public metrics, residual-honest Connect, and no shared client private keys in public packages. **No new findings** versus the prior same-day refresh; **M1/M2 stay closed and re-verified.** Remaining Medium items (Apple NE, Linux root floor, UK gate, host logging) are primarily **privilege / environment / operational** limits, not silent product dishonesty.
 
 This document is a **static audit record**. Re-run after major releases or crypto/packaging changes.
 
@@ -225,4 +228,5 @@ This document is a **static audit record**. Re-run after major releases or crypt
 | Related policy | `PRIVACY_POLICY.md` |
 | Related legal | `LICENSE`, `CREDITS.md` |
 | Related user docs | `README.md`, `scripts/RELEASE.md`, `sundries.txt` |
-| Refresh commit target | Current `main` after follow-ups (`34f138e`+) |
+| Code baseline this re-audit | `main` @ `523aca4` (product tree unchanged; findings tables re-verified) |
+| This re-audit stamp | 19 July 2026 — 155/0 supporting tests; no new High/Medium |
