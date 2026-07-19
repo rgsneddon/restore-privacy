@@ -38,7 +38,7 @@ or use the buttons on https://restore-privacy-status.onrender.com/
 | Android | `restore-privacy-client-0.1.7-android.apk` |
 | macOS | `restore-privacy-client-0.1.7-macos.zip` *(prep zip / sign on Mac  -  see below)* |
 | iOS | `restore-privacy-client-0.1.7-ios.zip` *(prep zip / sign on Mac  -  see below)* |
-| Ubuntu / Linux | `restore-privacy-client-0.1.7-linux-x64.tar.gz` *(Ubuntu 20.04+ LTS, Mint, Pop!_OS, …)* |
+| Ubuntu / Linux | `restore-privacy-client-0.1.7-linux-x64.tar.gz` *(installer package; crypto deps baked in)* |
 
 ### Windows
 
@@ -60,21 +60,20 @@ or use the buttons on https://restore-privacy-status.onrender.com/
 
 **Supported floor:** Ubuntu **20.04 LTS and newer** (22.04, 24.04, …) and Mint/Pop built on those bases. Python **3.8+**. Older EOL Ubuntu (16.04/18.04) is not guaranteed.
 
-1. Download **`restore-privacy-client-0.1.7-linux-x64.tar.gz`** from the release or status page, **or** clone this repo.
-2. Unpack and install helpers:
+1. Download **`restore-privacy-client-0.1.7-linux-x64.tar.gz`** (installer package) from the release or status page.
+2. Unpack and run the **bundled installer** (installs app Python deps **from wheels inside the archive** — no network `pip install cryptography`):
    ```bash
    tar xzf restore-privacy-client-0.1.7-linux-x64.tar.gz
-   cd restore-privacy-0.1.7-linux   # or repo root
-   bash install_linux_ubuntu.sh    # or: bash scripts/install_linux_ubuntu.sh
-   # install_linux_mint.sh is the same recipe (back-compat alias)
+   cd restore-privacy-0.1.7-linux
+   bash install.sh
    ```
-   Installs **python3-tk**, **python3-cryptography**, **iproute2**, and handles Ubuntu 24.04 pip externally-managed envs when needed.
+   Creates a private `.venv` from `wheels/`. System packages only if missing: `python3-venv`, `python3-tk`, `iproute2`.
 3. Run the GUI (**root** needed so residual public IP uses the VPN node):
    ```bash
-   sudo PYTHONPATH=. python3 -m client.linux
+   sudo ./bin/privacy-restored
    ```
 4. Press **Connect**. Status is honest: residual public IP only changes when TUN + dual `/1` routes are active. **Disconnect** removes routes and stops the session.
-5. Details: [`client/linux/`](client/linux/) and `LINUX_UBUNTU.md` inside the tarball.
+5. Details: `LINUX_INSTALL.md` inside the tarball; source path for developers: [`client/linux/`](client/linux/).
 
 ### macOS / iOS (continue on a Mac)
 
@@ -114,10 +113,12 @@ Node deploy, ports, secrets, from-source builds, and tests: **[sundries.txt](sun
 # Windows GUI (requires system Python)
 python -m client.windows
 
-# Ubuntu / Mint GUI (root for full tunnel; 20.04+ LTS)
+# Ubuntu / Mint GUI from source (needs system cryptography)
 sudo PYTHONPATH=. python3 -m client.linux
+
+# Linux installer package with baked-in crypto wheels
+python scripts/package_linux.py
 
 # Release packages
 python scripts/build_release_0.1.7.py
-python scripts/package_linux.py
 ```

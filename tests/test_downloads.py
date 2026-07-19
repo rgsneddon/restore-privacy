@@ -48,9 +48,9 @@ class TestDownloadCatalog(unittest.TestCase):
         """Linux download button text is short and exact."""
         assets = available_downloads()
         by_plat = {a.platform: a for a in assets}
-        self.assertEqual(by_plat["linux"].label, "Linux - Client (.tar.gz)")
+        self.assertEqual(by_plat["linux"].label, "Linux - Installer (.tar.gz)")
         html = render_download_section_html()
-        self.assertIn("Linux - Client (.tar.gz)", html)
+        self.assertIn("Linux - Installer (.tar.gz)", html)
         self.assertIn('id="dl-linux"', html)
         # Other platform labels unchanged
         self.assertEqual(

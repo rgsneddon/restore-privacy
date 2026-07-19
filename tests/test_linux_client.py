@@ -183,23 +183,16 @@ class TestLinuxEntryAndDocs(unittest.TestCase):
         self.assertIn("start_full_tunnel", src)
 
     def test_install_script_and_package_recipe(self):
-        ubuntu = ROOT / "scripts" / "install_linux_ubuntu.sh"
-        mint = ROOT / "scripts" / "install_linux_mint.sh"
-        self.assertTrue(ubuntu.is_file())
-        self.assertTrue(mint.is_file())
-        t = ubuntu.read_text(encoding="utf-8")
-        self.assertIn("python3 -m client.linux", t)
-        self.assertIn("modprobe tun", t)
-        self.assertIn("python3-cryptography", t)
-        self.assertIn("iproute2", t)
-        self.assertIn("20.04", t)
-        self.assertIn("break-system-packages", t)
-        # Mint script delegates to Ubuntu recipe
-        mint_t = mint.read_text(encoding="utf-8")
-        self.assertIn("install_linux_ubuntu.sh", mint_t)
         pkg = ROOT / "scripts" / "package_linux.py"
         self.assertTrue(pkg.is_file())
-        self.assertIn("linux-x64.tar.gz", pkg.read_text(encoding="utf-8"))
+        t = pkg.read_text(encoding="utf-8")
+        self.assertIn("linux-x64.tar.gz", t)
+        self.assertIn("download_linux_wheels", t)
+        self.assertIn("--no-index", t)
+        self.assertIn("install.sh", t)
+        self.assertIn("privacy-restored", t)
+        # Bake-in package is the primary product path
+        self.assertIn("wheels", t)
 
     def test_readme_mentions_ubuntu(self):
         readme = (ROOT / "README.md").read_text(encoding="utf-8")
@@ -207,7 +200,8 @@ class TestLinuxEntryAndDocs(unittest.TestCase):
         self.assertIn("20.04", readme)
         self.assertIn("client.linux", readme)
         self.assertIn("linux-x64.tar.gz", readme)
-        self.assertIn("install_linux_ubuntu.sh", readme)
+        self.assertIn("install.sh", readme)
+        self.assertIn("privacy-restored", readme)
 
     def test_catalog_lists_linux(self):
         from status_page.downloads import (
@@ -261,12 +255,12 @@ class TestLinuxEntryAndDocs(unittest.TestCase):
             os.close(w)
 
     def test_install_script_installs_cryptography(self):
-        t = (ROOT / "scripts" / "install_linux_ubuntu.sh").read_text(encoding="utf-8")
-        self.assertIn("python3-cryptography", t)
-        self.assertIn("import cryptography", t)
-        self.assertIn("requirements.txt", t)
+        # Bake-in package installs cryptography from bundled wheels, not apt
+        t = (ROOT / "scripts" / "package_linux.py").read_text(encoding="utf-8")
+        self.assertIn("cryptography", t)
+        self.assertIn("wheels", t)
         readme = (ROOT / "README.md").read_text(encoding="utf-8")
-        self.assertIn("python3-cryptography", readme)
+        self.assertIn("wheels", readme.lower())
 
     def test_ubuntu_compat_floor_and_family(self):
         from client.linux.ubuntu_compat import (

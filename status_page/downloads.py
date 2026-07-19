@@ -59,7 +59,7 @@ RELEASE_ASSETS: tuple[DownloadAsset, ...] = (
     ),
     DownloadAsset(
         platform="linux",
-        label="Linux - Client (.tar.gz)",
+        label="Linux - Installer (.tar.gz)",
         filename=LINUX_TGZ_FILENAME,
     ),
 )
@@ -105,7 +105,7 @@ def render_download_section_html(assets: Iterable[DownloadAsset] | None = None) 
     <div class="dl-buttons">
 {links_html}
     </div>
-    <p class="dl-note">Release <code>{RELEASE_TAG}</code> | Windows setup needs no separate Python install | double-click -> UAC once for full VPN (auto-elevate) | Apple packages require Network Extension signing for system VPN | Ubuntu 20.04+: unpack tar.gz, bash install_linux_ubuntu.sh, sudo python3 -m client.linux</p>
+    <p class="dl-note">Release <code>{RELEASE_TAG}</code> | Windows setup needs no separate Python install | double-click -> UAC once for full VPN (auto-elevate) | Apple packages require Network Extension signing for system VPN | Linux: unpack tar.gz, bash install.sh (crypto deps baked in), sudo ./bin/privacy-restored</p>
   </section>
 """
 
