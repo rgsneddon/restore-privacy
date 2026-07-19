@@ -1,23 +1,40 @@
 import 'package:flutter/material.dart';
 
-/// Product palette: dark-blue chrome, black log, high-contrast white text.
+/// Product palette aligned with Windows client (restorebritain Cupertino chrome).
 const String kScrollingPrivacyText =
     'lightweight vpn to restore your privacy - no user data is retained - your privacy is restored';
 
-const String kAppTitle = 'RESTORE PRIVACY';
-const String kBannerTitle = 'Restore Privacy - Tunnel Client';
+const String kAppTitle = 'Restore Privacy';
+const String kBannerTitle = 'Restore Privacy — UK VPN';
+const String kTrayProductName = 'Privacy Restored';
 
-const Color kChromeBg = Color(0xFF0A1F5C); // dark blue main chrome
-const Color kBannerBg = Color(0xFF000080); // classic dark blue
-const Color kWindowBg = Color(0xFF000000); // black log area
-const Color kWindowFg = Color(0xFFFFFFFF); // white text
-const Color kStatusFg = Color(0xFFE0E0E0);
-const Color kButtonBg = Color(0xFF1D4ED8);
-const Color kButtonActiveBg = Color(0xFF047857);
-const Color kLogBorder = Color(0xFF1E3A8A);
+// Cupertino / Windows product shell
+const Color kChromeBg = Color(0xFFF2F5F7);
+const Color kPanelBg = Color(0xFFFFFFFF);
+const Color kPrimary = Color(0xFF2779AA);
+const Color kPrimaryDark = Color(0xFF0070A3);
+const Color kLightAccent = Color(0xFFDEEDF7);
+const Color kText = Color(0xFF222222);
+const Color kTextMuted = Color(0xFF363636);
+const Color kStatusOk = Color(0xFF1B767E);
+const Color kStatusError = Color(0xFFCD0A0A);
+const Color kBorder = Color(0xFFAED0EA);
+const Color kButtonConnectBg = kPrimary;
+const Color kButtonDisconnectBg = kStatusOk;
+const Color kButtonFg = Color(0xFFFFFFFF);
+const Color kWhite = Color(0xFFFFFFFF);
+
+// Legacy aliases used by older tests / docs
+const Color kBannerBg = kPrimaryDark;
+const Color kWindowBg = kPanelBg;
+const Color kWindowFg = kText;
+const Color kStatusFg = kTextMuted;
+const Color kButtonBg = kButtonConnectBg;
+const Color kButtonActiveBg = kButtonDisconnectBg;
+const Color kLogBorder = kBorder;
 
 /// Visual corner radius for rounded chrome (Material cards / buttons).
-const double kCornerRadius = 16;
+const double kCornerRadius = 14;
 
 /// Asset path for product logo (Flutter pubspec assets).
 const String kLogoAsset = 'assets/brand/logo-256.png';
@@ -25,3 +42,16 @@ const String kLogoAsset = 'assets/brand/logo-256.png';
 /// Single control label for the Connect / Disconnect button.
 String connectButtonLabel(bool connected) =>
     connected ? 'Disconnect' : 'Connect';
+
+/// Plain-language status card title.
+String plainConnectedStatus({String? vpnIp, bool residual = true}) {
+  if (!residual) {
+    return vpnIp == null || vpnIp.isEmpty
+        ? 'Session only — residual IP still on ISP'
+        : 'Session only — residual IP still on ISP ($vpnIp)';
+  }
+  if (vpnIp != null && vpnIp.isNotEmpty) {
+    return 'Connected — your traffic uses the VPN ($vpnIp)';
+  }
+  return 'Connected — protected';
+}

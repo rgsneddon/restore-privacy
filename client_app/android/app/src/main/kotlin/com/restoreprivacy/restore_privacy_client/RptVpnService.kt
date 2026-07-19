@@ -35,10 +35,11 @@ class RptVpnService : VpnService() {
         when (intent?.action) {
             ACTION_CONNECT -> {
                 userStopped.set(false)
+                desiredConnected = true
                 val host = intent.getStringExtra(EXTRA_HOST) ?: "104.156.224.47"
                 val port = intent.getIntExtra(EXTRA_PORT, 44044)
                 val fullTunnel = intent.getBooleanExtra(EXTRA_FULL_TUNNEL, true)
-                val session = intent.getStringExtra(EXTRA_SESSION) ?: "Restore Privacy"
+                val session = intent.getStringExtra(EXTRA_SESSION) ?: "Privacy Restored"
                 resultReceiver = extractReceiver(intent)
                 reported.set(false)
                 try {
@@ -55,15 +56,25 @@ class RptVpnService : VpnService() {
             ACTION_DISCONNECT -> {
                 // Intentional stop: full teardown, no sticky resurrection
                 userStopped.set(true)
+                desiredConnected = false
                 stopTunnel()
                 return START_NOT_STICKY
             }
             else -> {
-                // No action / restart after kill: if user stopped, stay down
-                if (userStopped.get() || !running.get()) {
+                // Null intent / sticky restart: keep foreground if session already active.
+                // Do NOT tear down solely because Activity was destroyed (minimize).
+                if (userStopped.get() || !desiredConnected) {
                     stopTunnel()
                     return START_NOT_STICKY
                 }
+                if (isSessionActive && running.get()) {
+                    return START_STICKY
+                }
+                // Process was killed mid-session — cannot rehydrate TUN without credentials path;
+                // drop sticky so OS does not loop empty restarts. User taps Connect again.
+                isSessionActive = false
+                activeVpnIp = ""
+                return START_NOT_STICKY
             }
         }
         return if (userStopped.get()) START_NOT_STICKY else START_STICKY
@@ -80,6 +91,12 @@ class RptVpnService : VpnService() {
 
     private fun report(ok: Boolean, message: String, vpnIp: String = "") {
         if (!reported.compareAndSet(false, true)) return
+        if (!ok) {
+            // Connect failed — do not keep sticky “desired connected” loops
+            desiredConnected = false
+            isSessionActive = false
+            activeVpnIp = ""
+        }
         val b = Bundle()
         b.putString(EXTRA_MESSAGE, message)
         if (vpnIp.isNotEmpty()) b.putString(EXTRA_VPN_IP, vpnIp)
@@ -210,6 +227,8 @@ class RptVpnService : VpnService() {
                     return@thread
                 }
                 tun = pfd
+                isSessionActive = true
+                activeVpnIp = session.vpnIp
                 startForeground(NOTIFICATION_ID, buildNotification(sessionName, connecting = false))
                 report(
                     true,
@@ -285,6 +304,8 @@ class RptVpnService : VpnService() {
      */
     private fun stopTunnel() {
         running.set(false)
+        isSessionActive = false
+        activeVpnIp = ""
         // Closing TUN unblocks FileInputStream.read and clears VpnService routes
         val pfd = tun
         tun = null
@@ -308,8 +329,15 @@ class RptVpnService : VpnService() {
     }
 
     override fun onDestroy() {
-        userStopped.set(true)
-        stopTunnel()
+        // Process/service death only — Activity minimize must not reach here.
+        // Do not mark userStopped unless already intentional disconnect/revoke,
+        // so a sticky restart path is not permanently poisoned.
+        if (userStopped.get() || !desiredConnected) {
+            stopTunnel()
+        } else if (!running.get()) {
+            isSessionActive = false
+            activeVpnIp = ""
+        }
         super.onDestroy()
     }
 
@@ -331,20 +359,23 @@ class RptVpnService : VpnService() {
         val text = if (connecting) {
             "Connecting RPT tunnel…"
         } else {
-            "Full VPN active — no user data retained"
+            "Full VPN active — minimize keeps protection on. Use Disconnect to stop."
         }
+        val title = if (session.isBlank()) "Privacy Restored" else session
         return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             Notification.Builder(this, channelId)
-                .setContentTitle(session)
+                .setContentTitle(title)
                 .setContentText(text)
                 .setSmallIcon(android.R.drawable.ic_lock_lock)
+                .setOngoing(true)
                 .build()
         } else {
             @Suppress("DEPRECATION")
             Notification.Builder(this)
-                .setContentTitle(session)
+                .setContentTitle(title)
                 .setContentText(text)
                 .setSmallIcon(android.R.drawable.ic_lock_lock)
+                .setOngoing(true)
                 .build()
         }
     }
@@ -362,5 +393,16 @@ class RptVpnService : VpnService() {
         const val RESULT_OK = 0
         const val RESULT_ERR = 1
         private const val NOTIFICATION_ID = 0x5250
+
+        /** UI rehydrate after minimize — true while TUN session is up. */
+        @Volatile
+        var isSessionActive: Boolean = false
+
+        @Volatile
+        var activeVpnIp: String = ""
+
+        /** User wants tunnel up (Connect) until explicit Disconnect / revoke. */
+        @Volatile
+        var desiredConnected: Boolean = false
     }
 }

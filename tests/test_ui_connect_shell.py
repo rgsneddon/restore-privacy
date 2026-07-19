@@ -39,11 +39,13 @@ class TestNoCloseTeardown(unittest.TestCase):
 
     def test_flutter_main_no_lifecycle_teardown(self):
         main = (ROOT / "client_app" / "lib" / "main.dart").read_text(encoding="utf-8")
-        self.assertNotIn("WidgetsBindingObserver", main)
+        # Lifecycle observer may rehydrate status only — must not stop tunnel
         self.assertNotIn("_teardownVpn", main)
+        self.assertIn("shouldStopTunnelOnAppLifecycle", main)
         if "void dispose" in main:
-            disp = main[main.index("void dispose") : main.index("void dispose") + 200]
+            disp = main[main.index("void dispose") : main.index("void dispose") + 280]
             self.assertNotIn("_vpn.disconnect", disp)
+            self.assertNotIn(".disconnect()", disp)
 
     def test_should_stop_lifecycle_always_false(self):
         status = (ROOT / "client_app" / "lib" / "connect_status.dart").read_text(

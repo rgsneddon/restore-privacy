@@ -50,8 +50,39 @@ class MainActivity : FlutterActivity() {
                     "disconnect" -> {
                         // ACTION_DISCONNECT runs stopTunnel (close TUN + stopSelf)
                         // rather than only stopService, so OS VPN routes clear fully.
+                        // Only explicit Disconnect from UI — never on Activity destroy.
                         sendDisconnect()
-                        result.success(mapOf("ok" to true, "message" to "Disconnected"))
+                        result.success(
+                            mapOf(
+                                "ok" to true,
+                                "message" to "Disconnected — system VPN stopped; residual public IP restored",
+                                "connected" to false,
+                                "fullTunnelActive" to false,
+                            ),
+                        )
+                    }
+                    "status" -> {
+                        // Rehydrate UI after minimize/resume — does not start/stop tunnel.
+                        val active = RptVpnService.isSessionActive
+                        val ip = RptVpnService.activeVpnIp
+                        result.success(
+                            mapOf(
+                                "ok" to active,
+                                "connected" to active,
+                                "fullTunnelActive" to active,
+                                "hostOnlySession" to false,
+                                "vpnIp" to ip,
+                                "message" to if (active) {
+                                    if (ip.isNotEmpty()) {
+                                        "Connected — your traffic uses the VPN ($ip)"
+                                    } else {
+                                        "Connected — protected"
+                                    }
+                                } else {
+                                    "Disconnected"
+                                },
+                            ),
+                        )
                     }
                     "hasSecrets" -> {
                         result.success(mapOf("ok" to secretsPresent()))
@@ -161,6 +192,10 @@ class MainActivity : FlutterActivity() {
                             "message" to message,
                             "vpnIp" to vpnIp,
                             "fullTunnel" to fullTunnel,
+                            // Product residual success requires active OS VPN (honest UI).
+                            "fullTunnelActive" to ok,
+                            "hostOnlySession" to false,
+                            "connected" to ok,
                         ),
                     )
                 } catch (_: Exception) {

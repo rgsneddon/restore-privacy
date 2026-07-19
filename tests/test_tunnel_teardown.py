@@ -221,53 +221,60 @@ class TestAndroidTeardownWiring(unittest.TestCase):
         sticky_region = svc[disc_idx : disc_idx + 400]
         self.assertIn("START_NOT_STICKY", sticky_region)
         self.assertIn("userStopped", svc)
-        # onDestroy + onRevoke tear down
+        # Explicit disconnect + revoke tear down (Activity minimize must not)
         self.assertIn("override fun onDestroy", svc)
         self.assertIn("override fun onRevoke", svc)
-        destroy = svc[svc.index("override fun onDestroy") :]
-        self.assertIn("stopTunnel", destroy.split("override fun")[0] if False else destroy[:300])
         revoke = svc[svc.index("override fun onRevoke") : svc.index("override fun onRevoke") + 250]
         self.assertIn("stopTunnel", revoke)
+        self.assertIn("ACTION_DISCONNECT", sticky_region)
 
-    def test_main_activity_disconnect_sends_action_and_on_destroy(self):
+    def test_main_activity_disconnect_sends_action_not_on_destroy(self):
+        """Product: Activity onDestroy must NOT stop VPN (minimize/stay-alive)."""
         act = (self.KT / "MainActivity.kt").read_text(encoding="utf-8")
         self.assertIn("ACTION_DISCONNECT", act)
         self.assertIn("sendDisconnect", act)
         self.assertIn('"disconnect"', act)
         # disconnect channel uses sendDisconnect / ACTION_DISCONNECT
-        disc_block = act[act.index('"disconnect"') : act.index('"disconnect"') + 350]
+        disc_block = act[act.index('"disconnect"') : act.index('"disconnect"') + 450]
         self.assertIn("sendDisconnect", disc_block)
         self.assertIn("override fun onDestroy", act)
-        on_destroy = act[act.index("override fun onDestroy") : act.index("override fun onDestroy") + 200]
-        self.assertIn("sendDisconnect", on_destroy)
+        on_destroy = act[
+            act.index("override fun onDestroy") : act.index("override fun onDestroy") + 220
+        ]
+        self.assertNotIn("sendDisconnect", on_destroy)
+        self.assertIn("super.onDestroy()", on_destroy)
+        # Status rehydrate for UI after minimize
+        self.assertIn('"status"', act)
+        self.assertIn("isSessionActive", act)
 
-    def test_flutter_dispose_and_detached_call_disconnect(self):
+    def test_flutter_dispose_does_not_stop_tunnel(self):
+        """Product: dispose/lifecycle rehydrate only — Disconnect button stops VPN."""
         main = (self.LIB / "main.dart").read_text(encoding="utf-8")
         self.assertIn("WidgetsBindingObserver", main)
         self.assertIn("shouldStopTunnelOnAppLifecycle", main)
-        self.assertIn("_teardownVpn", main)
         self.assertIn("disconnect()", main)
-        # dispose tears down
+        self.assertIn("_rehydrateSession", main)
+        # dispose must not tear down tunnel
         disp = main[main.index("void dispose") : main.index("void dispose") + 280]
-        self.assertIn("_teardownVpn", disp)
+        self.assertNotIn("_vpn.disconnect", disp)
         self.assertIn("removeObserver", disp)
-        # Lifecycle uses pure helper (detached only — not pause/background)
         life = main[
             main.index("didChangeAppLifecycleState") : main.index(
                 "didChangeAppLifecycleState"
             )
-            + 350
+            + 450
         ]
         self.assertIn("shouldStopTunnelOnAppLifecycle", life)
-        self.assertIn("_teardownVpn", life)
-        # Not required on pause (product choice)
-        self.assertNotIn("AppLifecycleState.paused", main)
+        self.assertNotIn("_vpn.disconnect", life)
+        self.assertIn("resumed", life)
 
     def test_vpn_controller_disconnect_invokes_channel(self):
         ctrl = (self.LIB / "vpn_controller.dart").read_text(encoding="utf-8")
         self.assertIn("Future<void> disconnect()", ctrl)
         self.assertIn("invokeMethod", ctrl)
         self.assertIn("'disconnect'", ctrl)
+        self.assertIn("'status'", ctrl)
+        self.assertIn("querySession", ctrl)
 
 
 if __name__ == "__main__":

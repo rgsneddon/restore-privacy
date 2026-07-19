@@ -11,9 +11,17 @@ class VpnController {
 
   VpnController({required this.onStatus});
 
-  /// Primary launch path — auto-connect to RPT node with full VPN intent.
+  /// Product policy: never auto-connect on launch (manual Connect only).
+  static bool get autoConnectOnLaunchEnabled => RptConfig.autoConnectOnLaunch;
+
+  /// Deprecated name kept for older call sites — always delegates to [connect]
+  /// and must not be invoked on cold launch.
+  @Deprecated('Use connect() from the Connect button only')
   Future<bool> autoConnectOnLaunch() async {
-    onStatus('Auto-connect on launch…');
+    onStatus('Connect from the button — auto-connect is disabled');
+    if (!autoConnectOnLaunchEnabled) {
+      return false;
+    }
     return connect();
   }
 
@@ -26,7 +34,7 @@ class VpnController {
         'fullTunnel': RptConfig.fullTunnel,
         'sessionName': RptConfig.sessionName,
         'route': RptConfig.defaultRoute,
-        'autoConnect': true,
+        'autoConnect': false,
       });
       final ok = isConnectSuccess(result);
       onStatus(mapConnectStatusMessage(result));
@@ -45,7 +53,7 @@ class VpnController {
     }
   }
 
-  /// Stop system Packet Tunnel (same native path as app-quit hooks).
+  /// Stop system VPN (explicit Disconnect only — not on minimize).
   Future<void> disconnect() async {
     try {
       final result = await _channel.invokeMethod<dynamic>('disconnect');
@@ -54,13 +62,46 @@ class VpnController {
         onStatus(
           (msg != null && msg.isNotEmpty)
               ? msg
-              : 'Disconnected — system VPN stopped; residual public IP restored',
+              : kDisconnectedResidualIpMessage,
         );
       } else {
-        onStatus('Disconnected — system VPN stopped; residual public IP restored');
+        onStatus(kDisconnectedResidualIpMessage);
       }
     } catch (_) {
-      onStatus('Disconnected — system VPN stopped; residual public IP restored');
+      onStatus(kDisconnectedResidualIpMessage);
     }
   }
+
+  /// Rehydrate UI after resume/minimize — does **not** start or stop the tunnel.
+  Future<VpnSessionSnapshot> querySession() async {
+    try {
+      final result = await _channel.invokeMethod<dynamic>('status');
+      if (result is Map) {
+        final ok = result['connected'] == true || isConnectSuccess(result);
+        final ip = result['vpnIp']?.toString().trim() ?? '';
+        final msg = result['message']?.toString().trim() ?? '';
+        return VpnSessionSnapshot(
+          connected: ok,
+          vpnIp: ip.isEmpty ? null : ip,
+          message: msg.isEmpty ? null : msg,
+        );
+      }
+    } on MissingPluginException {
+      // Host without native channel
+    } catch (_) {}
+    return const VpnSessionSnapshot(connected: false);
+  }
+}
+
+/// Snapshot of native VPN session for UI rehydrate (minimize/resume).
+class VpnSessionSnapshot {
+  final bool connected;
+  final String? vpnIp;
+  final String? message;
+
+  const VpnSessionSnapshot({
+    required this.connected,
+    this.vpnIp,
+    this.message,
+  });
 }
