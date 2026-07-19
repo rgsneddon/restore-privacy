@@ -183,20 +183,31 @@ class TestLinuxEntryAndDocs(unittest.TestCase):
         self.assertIn("start_full_tunnel", src)
 
     def test_install_script_and_package_recipe(self):
-        inst = ROOT / "scripts" / "install_linux_mint.sh"
-        self.assertTrue(inst.is_file())
-        t = inst.read_text(encoding="utf-8")
+        ubuntu = ROOT / "scripts" / "install_linux_ubuntu.sh"
+        mint = ROOT / "scripts" / "install_linux_mint.sh"
+        self.assertTrue(ubuntu.is_file())
+        self.assertTrue(mint.is_file())
+        t = ubuntu.read_text(encoding="utf-8")
         self.assertIn("python3 -m client.linux", t)
         self.assertIn("modprobe tun", t)
+        self.assertIn("python3-cryptography", t)
+        self.assertIn("iproute2", t)
+        self.assertIn("20.04", t)
+        self.assertIn("break-system-packages", t)
+        # Mint script delegates to Ubuntu recipe
+        mint_t = mint.read_text(encoding="utf-8")
+        self.assertIn("install_linux_ubuntu.sh", mint_t)
         pkg = ROOT / "scripts" / "package_linux.py"
         self.assertTrue(pkg.is_file())
         self.assertIn("linux-x64.tar.gz", pkg.read_text(encoding="utf-8"))
 
-    def test_readme_mentions_mint(self):
+    def test_readme_mentions_ubuntu(self):
         readme = (ROOT / "README.md").read_text(encoding="utf-8")
-        self.assertIn("Linux Mint", readme)
+        self.assertIn("Ubuntu", readme)
+        self.assertIn("20.04", readme)
         self.assertIn("client.linux", readme)
         self.assertIn("linux-x64.tar.gz", readme)
+        self.assertIn("install_linux_ubuntu.sh", readme)
 
     def test_catalog_lists_linux(self):
         from status_page.downloads import (
@@ -212,7 +223,10 @@ class TestLinuxEntryAndDocs(unittest.TestCase):
         html = render_download_section_html()
         self.assertIn("linux", html.lower())
         self.assertIn(LINUX_TGZ_FILENAME, html)
-        self.assertIn("Linux Mint", html)
+        self.assertTrue(
+            "Ubuntu" in html or "Linux" in html,
+            "catalog should mention Ubuntu/Linux",
+        )
 
     def test_tun_path_helper(self):
         p = tun_device_path()
@@ -247,13 +261,69 @@ class TestLinuxEntryAndDocs(unittest.TestCase):
             os.close(w)
 
     def test_install_script_installs_cryptography(self):
-        t = (ROOT / "scripts" / "install_linux_mint.sh").read_text(encoding="utf-8")
+        t = (ROOT / "scripts" / "install_linux_ubuntu.sh").read_text(encoding="utf-8")
         self.assertIn("python3-cryptography", t)
         self.assertIn("import cryptography", t)
         self.assertIn("requirements.txt", t)
-        # README documents the dep for Mint users
         readme = (ROOT / "README.md").read_text(encoding="utf-8")
         self.assertIn("python3-cryptography", readme)
+
+    def test_ubuntu_compat_floor_and_family(self):
+        from client.linux.ubuntu_compat import (
+            MIN_PYTHON,
+            is_ubuntu_family,
+            python_meets_minimum,
+            python_version_error_message,
+            support_summary,
+        )
+
+        self.assertEqual(MIN_PYTHON, (3, 8))
+        self.assertTrue(python_meets_minimum((3, 8)))
+        self.assertTrue(python_meets_minimum((3, 10)))
+        self.assertFalse(python_meets_minimum((3, 7)))
+        self.assertIn("3.8", python_version_error_message((3, 7)))
+        self.assertIn("20.04", support_summary())
+        self.assertTrue(
+            is_ubuntu_family({"ID": "ubuntu", "VERSION_ID": "22.04"})
+        )
+        self.assertTrue(
+            is_ubuntu_family({"ID": "linuxmint", "ID_LIKE": "ubuntu"})
+        )
+        self.assertTrue(
+            is_ubuntu_family({"ID": "pop", "ID_LIKE": "ubuntu debian"})
+        )
+        self.assertTrue(
+            is_ubuntu_family({"ID": "debian", "ID_LIKE": "debian"})
+        )
+
+    def test_default_route_parser_ubuntu_shapes(self):
+        from client.linux.tun_linux import _parse_default_route_line
+
+        gw, dev = _parse_default_route_line(
+            "default via 192.168.1.1 dev eth0 proto dhcp metric 100"
+        )
+        self.assertEqual(gw, "192.168.1.1")
+        self.assertEqual(dev, "eth0")
+        gw2, dev2 = _parse_default_route_line("default dev ens3 scope link")
+        self.assertIsNone(gw2)
+        self.assertEqual(dev2, "ens3")
+        gw3, dev3 = _parse_default_route_line(
+            "default via 10.0.0.1 dev ens5 metric 100"
+        )
+        self.assertEqual((gw3, dev3), ("10.0.0.1", "ens5"))
+
+    def test_linux_onlink_server_pin(self):
+        plan = build_full_tunnel_plan("10.88.0.2", tunnel_iface="rpt0")
+        cmds = linux_route_commands(
+            plan,
+            "1.2.3.4",
+            iface="rpt0",
+            physical_dev="eth0",
+            physical_gw="ONLINK",
+        )
+        joined = "\n".join(cmds)
+        self.assertIn("1.2.3.4/32 dev eth0", joined)
+        self.assertNotIn("via ONLINK", joined)
 
 
 if __name__ == "__main__":

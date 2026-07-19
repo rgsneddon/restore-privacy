@@ -141,32 +141,61 @@ def create_linux_tun(
         return None, f"TUN open failed: {exc}"
 
 
-def resolve_default_route() -> tuple[Optional[str], Optional[str]]:
-    """Return ``(gateway_ip, physical_dev)`` for the default IPv4 route."""
-    try:
-        out = subprocess.check_output(
-            ["ip", "route", "show", "default"],
-            text=True,
-            stderr=subprocess.DEVNULL,
-            timeout=5,
-        )
-    except Exception:
+def _parse_default_route_line(line: str) -> tuple[Optional[str], Optional[str]]:
+    """Parse one ``ip route`` default line into ``(gw, dev)``.
+
+    Handles common Ubuntu iproute2 shapes across 20.04–24.04:
+    - ``default via 192.168.1.1 dev eth0 proto dhcp metric 100``
+    - ``default dev eth0 scope link`` (on-link, no via)
+    - ``default via 10.0.0.1 dev ens3``
+    """
+    parts = line.split()
+    if not parts or parts[0] != "default":
         return None, None
-    # default via 192.168.1.1 dev eth0 proto dhcp metric 100
-    for line in out.splitlines():
-        parts = line.split()
-        if not parts or parts[0] != "default":
+    gw = None
+    dev = None
+    if "via" in parts:
+        i = parts.index("via")
+        if i + 1 < len(parts):
+            cand = parts[i + 1]
+            if cand.count(".") == 3 and not cand.startswith("10.88."):
+                gw = cand
+    if "dev" in parts:
+        i = parts.index("dev")
+        if i + 1 < len(parts):
+            dev = parts[i + 1]
+    return gw, dev
+
+
+def resolve_default_route() -> tuple[Optional[str], Optional[str]]:
+    """Return ``(gateway_ip, physical_dev)`` for the default IPv4 route.
+
+    Tries ``ip -4 route show default`` then ``ip route show default`` so both
+    older and newer iproute2 on Ubuntu work. On-link defaults (no via) return
+    ``(None, dev)`` so callers can pin the server with ``dev`` only.
+    """
+    cmds = (
+        ["ip", "-4", "route", "show", "default"],
+        ["ip", "route", "show", "default"],
+        ["ip", "route"],  # last resort: scan for default line
+    )
+    for cmd in cmds:
+        try:
+            out = subprocess.check_output(
+                cmd,
+                text=True,
+                stderr=subprocess.DEVNULL,
+                timeout=5,
+            )
+        except Exception:
             continue
-        gw = None
-        dev = None
-        if "via" in parts:
-            i = parts.index("via")
-            if i + 1 < len(parts):
-                gw = parts[i + 1]
-        if "dev" in parts:
-            i = parts.index("dev")
-            if i + 1 < len(parts):
-                dev = parts[i + 1]
-        if gw and not gw.startswith("10.88."):
-            return gw, dev
+        best_onlink: tuple[Optional[str], Optional[str]] = (None, None)
+        for line in out.splitlines():
+            gw, dev = _parse_default_route_line(line)
+            if gw and dev:
+                return gw, dev
+            if dev and not gw:
+                best_onlink = (None, dev)
+        if best_onlink[1]:
+            return best_onlink
     return None, None

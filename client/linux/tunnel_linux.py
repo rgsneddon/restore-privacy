@@ -266,23 +266,26 @@ def start_full_tunnel(
             iface=iface,
         )
 
-    if not gw or not phys_dev:
+    if not phys_dev:
         try:
             tun.close()
         except Exception:
             pass
         return LinuxTunnelResult(
             False,
-            "Could not resolve default route (physical gateway/device) for server pin",
+            "Could not resolve default route device for server pin "
+            "(ip -4 route show default)",
             plan=plan,
             server_host=server_host,
             iface=iface,
         )
+    # On-link default (no via): pin with dev only
+    pin_gw = gw if gw else "ONLINK"
 
     cmds = build_linux_route_plan_cmds(
         plan,
         server_host,
-        physical_gw=gw,
+        physical_gw=pin_gw,
         physical_dev=phys_dev,
         include_catchall=True,
     )

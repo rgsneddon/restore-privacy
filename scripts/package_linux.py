@@ -54,34 +54,52 @@ def main() -> int:
         if pub.is_file():
             shutil.copy2(pub, sec / "node_elgamal.pub")
 
-        inst = ROOT / "scripts" / "install_linux_mint.sh"
-        if inst.is_file():
-            shutil.copy2(inst, stage / "install_linux_mint.sh")
+        for script_name in (
+            "install_linux_ubuntu.sh",
+            "install_linux_mint.sh",
+        ):
+            inst = ROOT / "scripts" / script_name
+            if inst.is_file():
+                shutil.copy2(inst, stage / script_name)
 
-        (stage / "LINUX_MINT.md").write_text(
-            f"""# Restore Privacy {VERSION} - Linux Mint
+        (stage / "LINUX_UBUNTU.md").write_text(
+            f"""# Restore Privacy {VERSION} - Ubuntu family
+
+## Supported
+- **Ubuntu 20.04 LTS and newer** (22.04, 24.04, …)
+- Derivatives: **Linux Mint**, Pop!_OS, elementary OS, Kubuntu, Xubuntu, …
+- Python **3.8+**, ``iproute2``, kernel TUN
+
+EOL Ubuntu (16.04/18.04) is not guaranteed.
 
 ## Requirements
-- Linux Mint / Ubuntu-family (kernel TUN)
 - python3, python3-tk, **python3-cryptography** (or ``pip install -r requirements.txt``)
+- **iproute2** (``ip`` command)
 - root (sudo/pkexec) for full-tunnel residual public IP
 
 ## Install
 ```bash
+bash install_linux_ubuntu.sh
+# or (same recipe):
 bash install_linux_mint.sh
 ```
-This installs ``python3-tk`` and ``python3-cryptography`` (required for
-``python3 -m client.linux`` / ``client.connect``) and optionally loads the tun module.
+Installs ``python3-tk``, ``python3-cryptography``, ``iproute2``, and handles
+Ubuntu 24.04 pip externally-managed environments when needed.
 
 ## Run
 ```bash
 cd restore-privacy-{VERSION}-linux
-sudo python3 -m client.linux
+sudo PYTHONPATH=. python3 -m client.linux
 ```
 
 Press **Connect**. Residual public IP uses the VPN node only when TUN + dual /1
 routes are active. **Disconnect** tears down routes and the session.
 """,
+            encoding="utf-8",
+        )
+        # Keep historical name pointing at Ubuntu doc
+        (stage / "LINUX_MINT.md").write_text(
+            f"See LINUX_UBUNTU.md — Mint uses the same install as Ubuntu {VERSION}.\n",
             encoding="utf-8",
         )
 

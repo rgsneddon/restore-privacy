@@ -119,20 +119,35 @@ def linux_route_commands(
     physical_gw: str = "PHYSICAL_GW",
     include_catchall: bool = True,
 ) -> list[str]:
-    """``ip`` commands for full tunnel on Linux (Mint / Ubuntu; needs root).
+    """``ip`` commands for full tunnel on Linux (Ubuntu / Mint; needs root).
 
     Order: assign TUN address, pin VPN server on the physical path, then dual
     ``/1`` catch-alls into the TUN so residual public IP can use the node.
     Without ``include_catchall``, only address + server pin (no residual capture).
+
+    When ``physical_gw`` is empty or ``ONLINK``, pin uses ``dev`` only (on-link
+    default route style seen on some Ubuntu setups).
     """
     tun = (iface or plan.tunnel_iface or "rpt0").strip() or "rpt0"
     ip = plan.tunnel_client_ip
     cmds: list[str] = [
         f"ip link set dev {tun} up",
         f"ip addr replace {ip}/32 dev {tun}",
-        # Pin node host on physical path BEFORE dual /1
-        f"ip route replace {server_host}/32 via {physical_gw} dev {physical_dev}",
     ]
+    gw = (physical_gw or "").strip()
+    if not gw or gw.upper() == "ONLINK" or gw == "PHYSICAL_GW":
+        if gw == "PHYSICAL_GW":
+            # Placeholder kept for dry-run / tests that substitute later
+            cmds.append(
+                f"ip route replace {server_host}/32 via {physical_gw} dev {physical_dev}"
+            )
+        else:
+            # On-link pin (no next-hop)
+            cmds.append(f"ip route replace {server_host}/32 dev {physical_dev}")
+    else:
+        cmds.append(
+            f"ip route replace {server_host}/32 via {gw} dev {physical_dev}"
+        )
     if include_catchall:
         cmds.append(f"ip route replace 0.0.0.0/1 dev {tun}")
         cmds.append(f"ip route replace 128.0.0.0/1 dev {tun}")

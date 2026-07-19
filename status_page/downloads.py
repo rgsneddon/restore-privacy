@@ -59,7 +59,7 @@ RELEASE_ASSETS: tuple[DownloadAsset, ...] = (
     ),
     DownloadAsset(
         platform="linux",
-        label="Linux Mint / Ubuntu - Client (.tar.gz)",
+        label="Ubuntu / Linux Mint - Client (.tar.gz)",
         filename=LINUX_TGZ_FILENAME,
     ),
 )
@@ -101,11 +101,11 @@ def render_download_section_html(assets: Iterable[DownloadAsset] | None = None) 
     return f"""
   <section class="downloads" id="downloads" aria-label="Download Restore Privacy client">
     <h2>Download client v{RELEASE_VERSION}</h2>
-    <p class="dl-sub">Windows | Android | macOS | iOS | Linux Mint</p>
+    <p class="dl-sub">Windows | Android | macOS | iOS | Ubuntu / Linux</p>
     <div class="dl-buttons">
 {links_html}
     </div>
-    <p class="dl-note">Release <code>{RELEASE_TAG}</code> | Windows setup needs no separate Python install | double-click -> UAC once for full VPN (auto-elevate) | Apple packages require Network Extension signing for system VPN | Linux Mint: unpack tar.gz, bash install_linux_mint.sh, sudo python3 -m client.linux</p>
+    <p class="dl-note">Release <code>{RELEASE_TAG}</code> | Windows setup needs no separate Python install | double-click -> UAC once for full VPN (auto-elevate) | Apple packages require Network Extension signing for system VPN | Ubuntu 20.04+: unpack tar.gz, bash install_linux_ubuntu.sh, sudo python3 -m client.linux</p>
   </section>
 """
 

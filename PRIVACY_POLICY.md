@@ -2,7 +2,7 @@
 
 **Last updated:** 19 July 2026  
 **Product:** Restore Privacy Tunnel (RPT)  -  custom VPN node, client apps, and public status page  
-**Current client packages:** [v0.1.7](https://github.com/rgsneddon/restore-privacy/releases/tag/0.1.7) (Windows | Android | Linux Mint; macOS | iOS prep packages for Mac-side signing)  
+**Current client packages:** [v0.1.7](https://github.com/rgsneddon/restore-privacy/releases/tag/0.1.7) (Windows | Android | Ubuntu/Linux Mint 20.04+; macOS | iOS prep packages for Mac-side signing)  
 **Operator / project:** Russell G Sneddon (`rgsneddon`) / public repository [restore-privacy](https://github.com/rgsneddon/restore-privacy)
 
 This policy describes how the **Restore Privacy** software is designed to handle data. It is written for end users and operators. It is **not** legal advice and is not a jurisdiction-specific compliance certificate (e.g. full GDPR/CCPA legal opinion).

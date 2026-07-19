@@ -38,7 +38,7 @@ or use the buttons on https://restore-privacy-status.onrender.com/
 | Android | `restore-privacy-client-0.1.7-android.apk` |
 | macOS | `restore-privacy-client-0.1.7-macos.zip` *(prep zip / sign on Mac  -  see below)* |
 | iOS | `restore-privacy-client-0.1.7-ios.zip` *(prep zip / sign on Mac  -  see below)* |
-| Linux Mint | `restore-privacy-client-0.1.7-linux-x64.tar.gz` *(Mint / Ubuntu-family)* |
+| Ubuntu / Linux | `restore-privacy-client-0.1.7-linux-x64.tar.gz` *(Ubuntu 20.04+ LTS, Mint, Pop!_OS, …)* |
 
 ### Windows
 
@@ -56,23 +56,25 @@ or use the buttons on https://restore-privacy-status.onrender.com/
 3. Open **Restore Privacy**, press **Connect**, and grant **VPN** permission when prompted.
 4. Optional: **âš™ Settings** -> startup / autoconnect (defaults off). Minimize keeps the VPN service running until **Disconnect**.
 
-### Linux Mint (and Ubuntu-family)
+### Ubuntu and derivatives (Linux Mint, Pop!_OS, …)
+
+**Supported floor:** Ubuntu **20.04 LTS and newer** (22.04, 24.04, …) and Mint/Pop built on those bases. Python **3.8+**. Older EOL Ubuntu (16.04/18.04) is not guaranteed.
 
 1. Download **`restore-privacy-client-0.1.7-linux-x64.tar.gz`** from the release or status page, **or** clone this repo.
 2. Unpack and install helpers:
    ```bash
    tar xzf restore-privacy-client-0.1.7-linux-x64.tar.gz
    cd restore-privacy-0.1.7-linux   # or repo root
-   bash install_linux_mint.sh      # or: bash scripts/install_linux_mint.sh
+   bash install_linux_ubuntu.sh    # or: bash scripts/install_linux_ubuntu.sh
+   # install_linux_mint.sh is the same recipe (back-compat alias)
    ```
-   The install script installs **python3-tk** and **python3-cryptography** (required;
-   or ``sudo apt install python3-tk python3-cryptography`` / ``pip install -r requirements.txt``).
+   Installs **python3-tk**, **python3-cryptography**, **iproute2**, and handles Ubuntu 24.04 pip externally-managed envs when needed.
 3. Run the GUI (**root** needed so residual public IP uses the VPN node):
    ```bash
-   sudo python3 -m client.linux
+   sudo PYTHONPATH=. python3 -m client.linux
    ```
 4. Press **Connect**. Status is honest: residual public IP only changes when TUN + dual `/1` routes are active. **Disconnect** removes routes and stops the session.
-5. Details: [`client/linux/`](client/linux/) and `LINUX_MINT.md` inside the tarball.
+5. Details: [`client/linux/`](client/linux/) and `LINUX_UBUNTU.md` inside the tarball.
 
 ### macOS / iOS (continue on a Mac)
 
@@ -112,8 +114,8 @@ Node deploy, ports, secrets, from-source builds, and tests: **[sundries.txt](sun
 # Windows GUI (requires system Python)
 python -m client.windows
 
-# Linux Mint GUI (root for full tunnel)
-sudo python3 -m client.linux
+# Ubuntu / Mint GUI (root for full tunnel; 20.04+ LTS)
+sudo PYTHONPATH=. python3 -m client.linux
 
 # Release packages
 python scripts/build_release_0.1.7.py

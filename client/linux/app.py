@@ -1,8 +1,10 @@
 #!/usr/bin/env python3
-"""Linux Mint / Ubuntu RPT client - manual Connect/Disconnect Tk UI.
+"""Ubuntu-family RPT client (Ubuntu LTS, Mint, Pop!_OS, …) — Connect/Disconnect Tk UI.
 
 Residual public IP uses the VPN node only with root + TUN + dual /1 routes.
 Close does not disconnect (user presses Disconnect or Quit).
+
+Support floor: Ubuntu 20.04 LTS (Python 3.8+) and newer.
 """
 
 from __future__ import annotations
@@ -17,6 +19,12 @@ from pathlib import Path
 _ROOT = Path(__file__).resolve().parents[2]
 if str(_ROOT) not in sys.path:
     sys.path.insert(0, str(_ROOT))
+
+from client.linux.ubuntu_compat import (  # noqa: E402
+    python_meets_minimum,
+    python_version_error_message,
+    support_summary,
+)
 
 from client.connect import RptClient
 from client.ui_theme import (
@@ -145,7 +153,7 @@ class TunnelClientApp:
         banner.pack(fill=tk.X, pady=(0, 8))
         tk.Label(
             banner,
-            text=BANNER_TITLE + " - Linux Mint",
+            text=BANNER_TITLE + " - Ubuntu / Linux",
             bg=PRIMARY_DARK,
             fg=WHITE,
             font=("DejaVu Sans", 12, "bold"),
@@ -221,7 +229,7 @@ class TunnelClientApp:
             wrap=tk.WORD,
         )
         self.output.pack(fill=tk.BOTH, expand=True)
-        self._log("Linux client ready (Mint / Ubuntu family).")
+        self._log(f"Linux client ready. {support_summary()}")
         if is_root():
             self._log("Running as root - Connect can set residual routes.")
         else:
@@ -457,6 +465,10 @@ class TunnelClientApp:
 
 
 def main() -> int:
+    if not python_meets_minimum():
+        print(python_version_error_message(), file=sys.stderr)
+        return 1
+
     resume = "--rpt-auto-connect" in sys.argv
     if resume:
         sys.argv = [a for a in sys.argv if a != "--rpt-auto-connect"]
