@@ -8,6 +8,7 @@ padding (Tk has limited native rounded widgets).
 
 from __future__ import annotations
 
+import os
 from pathlib import Path
 
 # Exact privacy copy retained for product continuity
@@ -151,14 +152,104 @@ def version_is_behind(running: str, latest: str) -> bool:
     return version_tuple(running) < version_tuple(latest)
 
 
-def read_running_version(version_file: Path | None = None) -> str:
-    """Read client/VERSION (or explicit path)."""
-    if version_file is None:
-        version_file = Path(__file__).resolve().parent / "VERSION"
+def _read_version_text(path: Path) -> str | None:
     try:
-        return version_file.read_text(encoding="utf-8").strip()
+        text = path.read_text(encoding="utf-8").strip()
     except OSError:
-        return "0.0.0"
+        return None
+    if not text:
+        return None
+    # First line only; ignore trailing junk
+    line = text.splitlines()[0].strip().lstrip("vV")
+    return line or None
+
+
+def version_file_candidates() -> list[Path]:
+    """Locations where product VERSION may live (install tree, frozen, repo).
+
+    Installer writes ``VERSION`` next to the client .exe under
+    ``%LOCALAPPDATA%/Programs/RestorePrivacy/``. Frozen PyInstaller layouts
+    keep package data under ``_internal`` / ``_MEIPASS`` — not only
+    ``client/ui_theme.py``'s sibling path.
+    """
+    import sys
+
+    here = Path(__file__).resolve().parent  # client/
+    root = here.parent
+    out: list[Path] = [
+        here / "VERSION",
+        root / "client" / "VERSION",
+    ]
+    # Next to frozen executable / install dir
+    try:
+        if getattr(sys, "frozen", False):
+            exe_dir = Path(sys.executable).resolve().parent
+            out.extend(
+                [
+                    exe_dir / "VERSION",
+                    exe_dir / "client" / "VERSION",
+                    exe_dir / "_internal" / "client" / "VERSION",
+                    exe_dir / "_internal" / "VERSION",
+                ]
+            )
+            meipass = getattr(sys, "_MEIPASS", None)
+            if meipass:
+                base = Path(meipass)
+                out.extend(
+                    [
+                        base / "client" / "VERSION",
+                        base / "VERSION",
+                    ]
+                )
+        else:
+            # Dev: also honor cwd and common install dir for testing
+            out.append(Path.cwd() / "VERSION")
+            out.append(Path.cwd() / "client" / "VERSION")
+    except Exception:
+        pass
+    # Standard Windows install location (even when launched via shortcut)
+    try:
+        local = os.environ.get("LOCALAPPDATA") or ""
+        if local:
+            out.append(Path(local) / "Programs" / "RestorePrivacy" / "VERSION")
+    except Exception:
+        pass
+    # De-dupe preserving order
+    seen: set[str] = set()
+    unique: list[Path] = []
+    for p in out:
+        key = str(p)
+        if key in seen:
+            continue
+        seen.add(key)
+        unique.append(p)
+    return unique
+
+
+def embedded_package_version() -> str:
+    """Version shipped next to this package module (repo / onedir data)."""
+    v = _read_version_text(Path(__file__).resolve().parent / "VERSION")
+    return v or "0.1.4"
+
+
+def read_running_version(version_file: Path | None = None) -> str:
+    """Read the installed/running product version.
+
+    Prefer an explicit path, then install/frozen/repo candidates, then the
+    package-embedded VERSION. Never return a silent ``0.0.0`` when a real
+    product version is available on disk or embedded.
+    """
+    if version_file is not None:
+        v = _read_version_text(version_file)
+        if v:
+            return v
+        return embedded_package_version()
+
+    for cand in version_file_candidates():
+        v = _read_version_text(cand)
+        if v:
+            return v
+    return embedded_package_version()
 
 
 def catalog_latest_version() -> str:
@@ -168,12 +259,18 @@ def catalog_latest_version() -> str:
 
         return str(RELEASE_VERSION).strip()
     except Exception:
-        return read_running_version()
+        # Frozen clients may lack status_page — treat package version as catalog
+        return embedded_package_version()
 
 
 def upgrade_available(running: str | None = None, latest: str | None = None) -> bool:
     run = running if running is not None else read_running_version()
     lat = latest if latest is not None else catalog_latest_version()
+    # Unknown/placeholder must not force a false "update available"
+    if not run or run in ("0.0.0", "0", "unknown"):
+        run = embedded_package_version()
+    if not lat or lat in ("0.0.0", "0", "unknown"):
+        lat = embedded_package_version()
     return version_is_behind(run, lat)
 
 
@@ -196,6 +293,10 @@ def upgrade_banner_text(running: str | None = None, latest: str | None = None) -
     """Human message when upgrade is available; None if current."""
     run = running if running is not None else read_running_version()
     lat = latest if latest is not None else catalog_latest_version()
+    if not run or run in ("0.0.0", "0", "unknown"):
+        run = embedded_package_version()
+    if not lat or lat in ("0.0.0", "0", "unknown"):
+        lat = embedded_package_version()
     if not version_is_behind(run, lat):
         return None
     return f"Update available: you have v{run}, latest is v{lat}"

@@ -13,6 +13,7 @@ import shutil
 import subprocess
 import sys
 import traceback
+from collections.abc import Callable
 from pathlib import Path
 
 APP_NAME = "RestorePrivacy"
@@ -216,19 +217,57 @@ def _create_shortcut(
     )
 
 
-def install(launch: bool = True) -> Path:
-    """Deploy bundled client to INSTALL_DIR and optionally launch it."""
+def install_step_count() -> int:
+    """Number of user-visible install steps (for progress bar)."""
+    return 6
+
+
+def install(
+    launch: bool = True,
+    *,
+    progress_cb: Callable[[int, int, str], None] | None = None,
+) -> Path:
+    """Deploy bundled client to INSTALL_DIR and optionally launch it.
+
+    ``progress_cb(step_index, total, status_text)`` is invoked for GUI progress.
+    """
+
+    def _progress(step: int, status: str) -> None:
+        total = install_step_count()
+        if progress_cb is not None:
+            try:
+                progress_cb(step, total, status)
+            except Exception:
+                pass
+        print(f"[{step}/{total}] {status}")
+
+    _progress(1, "Locating product files…")
     payload = _payload_root()
     client_src_exe = _find_client_exe(payload)
     # If payload root is the onedir folder, copy whole tree
     payload_dir = client_src_exe.parent
 
+    _progress(2, f"Copying files to {INSTALL_DIR}…")
     INSTALL_DIR.mkdir(parents=True, exist_ok=True)
     _copy_tree(payload_dir, INSTALL_DIR)
     # Belt-and-suspenders: never leave shared .priv from old payloads
     strip_all_private_keys(INSTALL_DIR)
+
+    _progress(3, "Installing admission secrets…")
     secrets_written = _provision_secrets(payload_dir, INSTALL_DIR)
+
+    _progress(4, "Writing version and install info…")
     _write_version(INSTALL_DIR)
+    # Also place VERSION next to package data for frozen version readers
+    try:
+        for sub in (
+            INSTALL_DIR / "client" / "VERSION",
+            INSTALL_DIR / "_internal" / "client" / "VERSION",
+        ):
+            sub.parent.mkdir(parents=True, exist_ok=True)
+            sub.write_text(VERSION + "\n", encoding="utf-8")
+    except Exception:
+        pass
 
     installed_exe = INSTALL_DIR / client_src_exe.name
     if not installed_exe.is_file():
@@ -265,6 +304,7 @@ def install(launch: bool = True) -> Path:
 
     icon = resolve_shortcut_icon(INSTALL_DIR, installed_exe)
 
+    _progress(5, "Creating Start Menu and Desktop shortcuts…")
     # Start menu + desktop shortcuts (display name: Privacy Restored + logo)
     try:
         _create_shortcut(
@@ -304,6 +344,7 @@ def install(launch: bool = True) -> Path:
         encoding="utf-8",
     )
 
+    _progress(6, "Finishing install…")
     if launch and installed_exe.is_file():
         subprocess.Popen(
             [str(installed_exe)],
@@ -313,10 +354,139 @@ def install(launch: bool = True) -> Path:
     return installed_exe
 
 
+def run_installer_progress_ui(*, launch: bool = True) -> int:
+    """Standard installer window: title, status line, determinate progress bar."""
+    import threading
+    import tkinter as tk
+    from tkinter import ttk
+
+    root = tk.Tk()
+    root.title(f"{SHORTCUT_DISPLAY_NAME} Setup")
+    root.geometry("480x220")
+    root.resizable(False, False)
+    try:
+        root.attributes("-topmost", True)
+    except Exception:
+        pass
+
+    # Icon when available
+    try:
+        ico = Path(__file__).resolve().parent / "native" / "app_icon.ico"
+        if ico.is_file():
+            root.iconbitmap(default=str(ico))
+    except Exception:
+        pass
+
+    outer = tk.Frame(root, padx=18, pady=16)
+    outer.pack(fill=tk.BOTH, expand=True)
+
+    tk.Label(
+        outer,
+        text=f"{SHORTCUT_DISPLAY_NAME}",
+        font=("Segoe UI", 14, "bold"),
+        anchor="w",
+    ).pack(fill=tk.X)
+    tk.Label(
+        outer,
+        text=f"Installer — version {VERSION}",
+        font=("Segoe UI", 9),
+        fg="#444444",
+        anchor="w",
+    ).pack(fill=tk.X, pady=(0, 12))
+
+    status_var = tk.StringVar(value="Preparing install…")
+    status_lbl = tk.Label(
+        outer,
+        textvariable=status_var,
+        font=("Segoe UI", 10),
+        anchor="w",
+        wraplength=440,
+        justify=tk.LEFT,
+    )
+    status_lbl.pack(fill=tk.X, pady=(0, 8))
+
+    bar = ttk.Progressbar(outer, mode="determinate", maximum=install_step_count())
+    bar.pack(fill=tk.X, pady=(0, 12))
+    bar["value"] = 0
+
+    detail_var = tk.StringVar(value=f"Install location:\n{INSTALL_DIR}")
+    tk.Label(
+        outer,
+        textvariable=detail_var,
+        font=("Segoe UI", 8),
+        fg="#666666",
+        anchor="w",
+        justify=tk.LEFT,
+        wraplength=440,
+    ).pack(fill=tk.X)
+
+    btn_row = tk.Frame(outer)
+    btn_row.pack(fill=tk.X, side=tk.BOTTOM, pady=(12, 0))
+    close_btn = tk.Button(
+        btn_row,
+        text="Close",
+        state=tk.DISABLED,
+        width=10,
+        command=root.destroy,
+    )
+    close_btn.pack(side=tk.RIGHT)
+
+    result: dict = {"path": None, "error": None, "code": 1}
+
+    def on_progress(step: int, total: int, status: str) -> None:
+        def ui() -> None:
+            status_var.set(status)
+            bar["maximum"] = max(1, total)
+            bar["value"] = min(step, total)
+            root.update_idletasks()
+
+        root.after(0, ui)
+
+    def work() -> None:
+        try:
+            path = install(launch=launch, progress_cb=on_progress)
+            result["path"] = path
+            result["code"] = 0
+
+            def done_ok() -> None:
+                status_var.set(
+                    f"Installation complete.\n"
+                    f"Installed to:\n{INSTALL_DIR}\n"
+                    f"Launched: {path.name if path else 'yes'}"
+                )
+                bar["value"] = bar["maximum"]
+                close_btn.configure(state=tk.NORMAL)
+                close_btn.focus_set()
+
+            root.after(0, done_ok)
+        except Exception as exc:
+            result["error"] = str(exc)
+            result["code"] = 1
+            tb = traceback.format_exc()
+
+            def done_err() -> None:
+                status_var.set(f"Installation failed:\n{exc}")
+                detail_var.set(tb[:500])
+                close_btn.configure(state=tk.NORMAL)
+
+            root.after(0, done_err)
+
+    threading.Thread(target=work, daemon=True).start()
+    root.mainloop()
+    return int(result["code"])
+
+
 def main() -> int:
+    """GUI progress installer by default; console fallback if Tk unavailable."""
+    # Prefer standard progress window (double-click / frozen setup)
+    if sys.platform == "win32":
+        try:
+            return run_installer_progress_ui(launch=True)
+        except Exception as gui_exc:
+            print(f"Installer GUI unavailable ({gui_exc}); using console path.", file=sys.stderr)
+
     try:
         path = install(launch=True)
-        # Brief console feedback if a console is attached
         print(f"Installed Restore Privacy {VERSION} to:\n  {INSTALL_DIR}")
         print(f"Launched: {path}")
         sec = INSTALL_DIR / "secrets"
@@ -329,7 +499,9 @@ def main() -> int:
             # Message box when running windowed / double-clicked
             import ctypes
 
-            ctypes.windll.user32.MessageBoxW(0, msg[:1000], "Restore Privacy Installer", 0x10)
+            ctypes.windll.user32.MessageBoxW(
+                0, msg[:1000], f"{SHORTCUT_DISPLAY_NAME} Installer", 0x10
+            )
         except Exception:
             pass
         return 1

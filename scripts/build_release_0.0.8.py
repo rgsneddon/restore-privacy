@@ -145,6 +145,10 @@ def build_client_onedir() -> Path:
         cmd.extend(["--add-data", f"{icon};client/windows/native"])
     if brand_png.is_file():
         cmd.extend(["--add-data", f"{brand_png};client/windows/native"])
+    # Product VERSION for upgrade banner (avoid false 0.0.0 when frozen)
+    ver_file = ROOT / "client" / "VERSION"
+    if ver_file.is_file():
+        cmd.extend(["--add-data", f"{ver_file};client"])
     # Bundle public node key only (never a shared client_ed25519.priv)
     secrets_src = ROOT / "secrets"
     if (secrets_src / "node_elgamal.pub").is_file():
