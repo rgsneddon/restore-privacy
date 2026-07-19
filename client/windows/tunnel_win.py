@@ -371,23 +371,43 @@ def ipv6_residual_protected(result: Optional[WindowsTunnelResult]) -> bool:
     return bool(result and result.ipv6_mitigation_applied)
 
 
+def _cmd_exit_ok(returncode: int, stderr: str, stdout: str) -> bool:
+    """True only when the process succeeded (or route 'already exists' benign)."""
+    return _route_cmd_succeeded(returncode, stderr, stdout)
+
+
 def apply_ipv6_leak_mitigation(plan: FullTunnelPlan) -> tuple[list[str], bool]:
-    """Run IPv6 ISP-block commands; return (applied_cmds, success)."""
+    """Run IPv6 ISP-block commands; return (successful_cmds, mitigation_ok).
+
+    ``mitigation_ok`` is True only when the **critical** Disable-NetAdapterBinding
+    PowerShell step succeeds. Transition tech (teredo/6to4/isatap) is best-effort
+    and does not alone count as residual IPv6 protection. Failed commands are
+    **not** treated as success even if listed as attempted.
+    """
     cmds = windows_ipv6_leak_block_commands(tunnel_iface=plan.tunnel_iface or "RPT")
-    applied, errs = _run_cmds(cmds)
-    # Best-effort: treat as applied if we ran the command list (bindings may already be off)
-    ok = len(applied) >= 1 or not errs
-    if applied:
-        ok = True
-    return applied, ok
+    successful: list[str] = []
+    critical_ok = False
+    for cmd in cmds:
+        r = subprocess.run(cmd, shell=True, capture_output=True, text=True)
+        if not _cmd_exit_ok(r.returncode, r.stderr or "", r.stdout or ""):
+            # Do not claim success for failed disables
+            continue
+        successful.append(cmd)
+        if "Disable-NetAdapterBinding" in cmd:
+            critical_ok = True
+    return successful, critical_ok
 
 
 def rollback_ipv6_leak_mitigation(plan: Optional[FullTunnelPlan] = None) -> list[str]:
-    """Restore IPv6 bindings after Disconnect."""
+    """Restore IPv6 bindings after Disconnect (best-effort; only list successes)."""
     iface = (plan.tunnel_iface if plan else None) or "RPT"
     cmds = windows_ipv6_leak_rollback_commands(tunnel_iface=iface)
-    applied, _ = _run_cmds(cmds)
-    return applied
+    successful: list[str] = []
+    for cmd in cmds:
+        r = subprocess.run(cmd, shell=True, capture_output=True, text=True)
+        if _cmd_exit_ok(r.returncode, r.stderr or "", r.stdout or ""):
+            successful.append(cmd)
+    return successful
 
 
 def start_full_tunnel(

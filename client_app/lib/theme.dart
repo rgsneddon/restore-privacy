@@ -44,11 +44,28 @@ String connectButtonLabel(bool connected) =>
     connected ? 'Disconnect' : 'Connect';
 
 /// Plain-language status card title.
-String plainConnectedStatus({String? vpnIp, bool residual = true}) {
+///
+/// When [residual] is true and [ipv6Protected] is false, do not claim full
+/// protection (IPv6 may still use the ISP path).
+String plainConnectedStatus({
+  String? vpnIp,
+  bool residual = true,
+  bool? ipv6Protected,
+}) {
   if (!residual) {
     return vpnIp == null || vpnIp.isEmpty
         ? 'Session only — residual IP still on ISP'
         : 'Session only — residual IP still on ISP ($vpnIp)';
+  }
+  if (ipv6Protected == false) {
+    return vpnIp != null && vpnIp.isNotEmpty
+        ? 'Connected — IPv4 via VPN; IPv6 not protected ($vpnIp)'
+        : 'Connected — IPv4 via VPN; IPv6 not protected';
+  }
+  if (ipv6Protected == true) {
+    return vpnIp != null && vpnIp.isNotEmpty
+        ? 'Connected — VPN active; IPv6 ISP path blocked ($vpnIp)'
+        : 'Connected — VPN active; IPv6 ISP path blocked';
   }
   if (vpnIp != null && vpnIp.isNotEmpty) {
     return 'Connected — your traffic uses the VPN ($vpnIp)';

@@ -26,6 +26,25 @@ String mapConnectStatusMessage(dynamic result) {
   final ok = isConnectSuccess(result);
   if (ok) {
     final ip = result['vpnIp']?.toString().trim() ?? '';
+    // Prefer explicit native honesty about IPv6 when present
+    final v6 = result['ipv6Protected'];
+    if (v6 == false) {
+      if (message.toLowerCase().contains('ipv6 not protected')) {
+        return message;
+      }
+      return ip.isNotEmpty
+          ? 'Connected — IPv4 via VPN; IPv6 not protected ($ip)'
+          : 'Connected — IPv4 via VPN; IPv6 not protected';
+    }
+    if (v6 == true) {
+      if (message.toLowerCase().contains('ipv6 isp path blocked') ||
+          message.toLowerCase().contains('ipv6')) {
+        return message.isNotEmpty ? message : 'Connected — VPN active; IPv6 ISP path blocked';
+      }
+      return ip.isNotEmpty
+          ? 'Connected — VPN active; IPv6 ISP path blocked ($ip)'
+          : 'Connected — VPN active; IPv6 ISP path blocked';
+    }
     if (message.isNotEmpty && ip.isNotEmpty) {
       return message.contains(ip) ? message : '$message (VPN IP $ip)';
     }

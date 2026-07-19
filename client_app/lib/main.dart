@@ -130,11 +130,17 @@ class _TunnelHomeState extends State<TunnelHome> with WidgetsBindingObserver {
         if (ok) {
           final ipMatch = RegExp(r'10\.\d+\.\d+\.\d+').firstMatch(_status);
           _vpnIp = ipMatch?.group(0);
-          _status = plainConnectedStatus(vpnIp: _vpnIp, residual: true);
+          final v6Not = _status.toLowerCase().contains('ipv6 not protected');
+          final v6Ok = _status.toLowerCase().contains('ipv6 isp path blocked');
+          _status = plainConnectedStatus(
+            vpnIp: _vpnIp,
+            residual: true,
+            ipv6Protected: v6Not ? false : (v6Ok ? true : null),
+          );
         }
       });
       if (ok) {
-        _append('Connected — residual traffic uses the VPN node.');
+        _append(_status);
       }
     } finally {
       if (mounted) setState(() => _busy = false);
@@ -158,7 +164,14 @@ class _TunnelHomeState extends State<TunnelHome> with WidgetsBindingObserver {
       _connected = snap.connected;
       _vpnIp = snap.vpnIp;
       if (snap.connected) {
-        _status = plainConnectedStatus(vpnIp: snap.vpnIp, residual: true);
+        final msg = (snap.message ?? '').toLowerCase();
+        final v6Not = msg.contains('ipv6 not protected');
+        final v6Ok = msg.contains('ipv6 isp path blocked');
+        _status = plainConnectedStatus(
+          vpnIp: snap.vpnIp,
+          residual: true,
+          ipv6Protected: v6Not ? false : (v6Ok ? true : null),
+        );
       } else if (from == 'resume' && !_busy) {
         if (_status.toLowerCase().contains('connected') && !snap.connected) {
           _status = 'Not connected. Press Connect when you want protection.';

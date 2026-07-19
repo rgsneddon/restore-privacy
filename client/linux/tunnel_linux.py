@@ -69,9 +69,13 @@ def ipv6_residual_protected(result: Optional[LinuxTunnelResult]) -> bool:
 
 
 def apply_ipv6_leak_mitigation(iface: str = "rpt0") -> tuple[list[str], bool]:
+    """Install IPv6 blackhole; ok only if a blackhole default route command succeeded."""
     cmds = linux_ipv6_leak_block_commands(iface=iface)
     applied, _errs = _run_cmds(cmds)
-    return applied, bool(applied)
+    # linux _run_cmds only appends returncode==0 (or known-idempotent) to applied —
+    # never treat mere attempt as success.
+    ok = any("blackhole default" in c for c in applied)
+    return applied, ok
 
 
 def rollback_ipv6_leak_mitigation(iface: str = "rpt0") -> list[str]:

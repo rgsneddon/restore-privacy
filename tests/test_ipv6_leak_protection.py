@@ -108,6 +108,52 @@ class TestWindowsResultIpv6Flag(unittest.TestCase):
         base.ipv6_mitigation_applied = True
         self.assertTrue(ipv6_residual_protected(base))
 
+    def test_apply_ipv6_ok_false_when_critical_disable_fails(self):
+        """Failed Disable-NetAdapterBinding must not claim ipv6 protected."""
+        from unittest import mock
+
+        from client.full_tunnel import FullTunnelPlan
+        from client.windows import tunnel_win as tw
+
+        plan = FullTunnelPlan(tunnel_iface="RPT", tunnel_client_ip="10.88.0.2")
+
+        def fake_run(cmd, shell=True, capture_output=True, text=True):
+            r = mock.Mock()
+            if "Disable-NetAdapterBinding" in str(cmd):
+                r.returncode = 1
+                r.stderr = "access denied"
+                r.stdout = ""
+            else:
+                r.returncode = 0
+                r.stderr = ""
+                r.stdout = ""
+            return r
+
+        with mock.patch("client.windows.tunnel_win.subprocess.run", side_effect=fake_run):
+            applied, ok = tw.apply_ipv6_leak_mitigation(plan)
+        self.assertFalse(ok)
+        self.assertFalse(any("Disable-NetAdapterBinding" in c for c in applied))
+
+    def test_apply_ipv6_ok_true_only_when_disable_succeeds(self):
+        from unittest import mock
+
+        from client.full_tunnel import FullTunnelPlan
+        from client.windows import tunnel_win as tw
+
+        plan = FullTunnelPlan(tunnel_iface="RPT", tunnel_client_ip="10.88.0.2")
+
+        def fake_run(cmd, shell=True, capture_output=True, text=True):
+            r = mock.Mock()
+            r.returncode = 0
+            r.stderr = ""
+            r.stdout = ""
+            return r
+
+        with mock.patch("client.windows.tunnel_win.subprocess.run", side_effect=fake_run):
+            applied, ok = tw.apply_ipv6_leak_mitigation(plan)
+        self.assertTrue(ok)
+        self.assertTrue(any("Disable-NetAdapterBinding" in c for c in applied))
+
 
 class TestProductSourceIpv6Wiring(unittest.TestCase):
     def test_windows_tunnel_calls_ipv6_helpers(self):
@@ -143,6 +189,20 @@ class TestProductSourceIpv6Wiring(unittest.TestCase):
         )
         text = path.read_text(encoding="utf-8")
         self.assertIn('addRoute("::", 0)', text)
+        self.assertIn("ipv6RouteOk", text)
+        self.assertIn("IPv6 not protected", text)
+        self.assertIn("EXTRA_IPV6_PROTECTED", text)
+        self.assertIn("activeIpv6Protected", text)
+
+    def test_flutter_plain_connected_status_ipv6_honest(self):
+        theme = (ROOT / "client_app" / "lib" / "theme.dart").read_text(encoding="utf-8")
+        self.assertIn("ipv6Protected", theme)
+        self.assertIn("IPv6 not protected", theme)
+        cs = (ROOT / "client_app" / "lib" / "connect_status.dart").read_text(
+            encoding="utf-8"
+        )
+        self.assertIn("ipv6Protected", cs)
+        self.assertIn("IPv6 not protected", cs)
 
     def test_apple_packet_tunnel_ipv6_settings(self):
         for rel in (

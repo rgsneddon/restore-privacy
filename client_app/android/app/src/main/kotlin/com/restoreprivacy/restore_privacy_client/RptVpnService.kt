@@ -89,7 +89,12 @@ class RptVpnService : VpnService() {
         }
     }
 
-    private fun report(ok: Boolean, message: String, vpnIp: String = "") {
+    private fun report(
+        ok: Boolean,
+        message: String,
+        vpnIp: String = "",
+        ipv6Protected: Boolean? = null,
+    ) {
         if (!reported.compareAndSet(false, true)) return
         if (!ok) {
             // Real connect failure only — never call report(false) for “already up”
@@ -97,10 +102,16 @@ class RptVpnService : VpnService() {
             desiredConnected = false
             isSessionActive = false
             activeVpnIp = ""
+            activeIpv6Protected = null
+        } else if (ipv6Protected != null) {
+            activeIpv6Protected = ipv6Protected
         }
         val b = Bundle()
         b.putString(EXTRA_MESSAGE, message)
         if (vpnIp.isNotEmpty()) b.putString(EXTRA_VPN_IP, vpnIp)
+        if (ipv6Protected != null) {
+            b.putBoolean(EXTRA_IPV6_PROTECTED, ipv6Protected)
+        }
         try {
             resultReceiver?.send(if (ok) RESULT_OK else RESULT_ERR, b)
         } catch (_: Exception) {
@@ -114,9 +125,13 @@ class RptVpnService : VpnService() {
     private fun reportAlreadyRunningSession() {
         desiredConnected = true
         userStopped.set(false)
-        val decision = alreadyRunningConnectDecision(isSessionActive, activeVpnIp)
+        val decision = alreadyRunningConnectDecision(
+            isSessionActive,
+            activeVpnIp,
+            activeIpv6Protected,
+        )
         // decision.first = reportOk, .second = keepSessionFlags, .third = message
-        report(decision.first, decision.third, activeVpnIp)
+        report(decision.first, decision.third, activeVpnIp, ipv6Protected = activeIpv6Protected)
     }
 
     /**
@@ -210,12 +225,15 @@ class RptVpnService : VpnService() {
                     .setMtu(1280)
                     .addAddress(session.vpnIp, 32)
                     .addDnsServer("10.88.0.1")
+                var ipv6RouteOk = false
                 if (fullTunnel) {
                     builder.addRoute("0.0.0.0", 0)
                     try {
                         builder.addRoute("::", 0)
+                        ipv6RouteOk = true
                     } catch (_: Exception) {
-                        // Some API levels reject IPv6 routes; status honesty is client-side
+                        // Some API levels reject IPv6 routes — must not claim IPv6 protected
+                        ipv6RouteOk = false
                     }
                 }
                 try {
@@ -242,12 +260,16 @@ class RptVpnService : VpnService() {
                 tun = pfd
                 isSessionActive = true
                 activeVpnIp = session.vpnIp
+                activeIpv6Protected = if (fullTunnel) ipv6RouteOk else null
                 startForeground(NOTIFICATION_ID, buildNotification(sessionName, connecting = false))
-                report(
-                    true,
-                    "Connected — RPT full tunnel up (VPN IP ${session.vpnIp})",
-                    session.vpnIp,
-                )
+                val msg = if (!fullTunnel) {
+                    "Connected — RPT tunnel up (VPN IP ${session.vpnIp})"
+                } else if (ipv6RouteOk) {
+                    "Connected — VPN active; IPv6 ISP path blocked (VPN IP ${session.vpnIp})"
+                } else {
+                    "Connected — IPv4 via VPN; IPv6 not protected (VPN IP ${session.vpnIp})"
+                }
+                report(true, msg, session.vpnIp, ipv6Protected = if (fullTunnel) ipv6RouteOk else null)
 
                 // Two threads: TUN→UDP and UDP→TUN.
                 // Do NOT use FileInputStream.available() — on Android VPN it often
@@ -319,6 +341,7 @@ class RptVpnService : VpnService() {
         running.set(false)
         isSessionActive = false
         activeVpnIp = ""
+        activeIpv6Protected = null
         // Closing TUN unblocks FileInputStream.read and clears VpnService routes
         val pfd = tun
         tun = null
@@ -404,6 +427,7 @@ class RptVpnService : VpnService() {
         const val EXTRA_RECEIVER = "receiver"
         const val EXTRA_MESSAGE = "message"
         const val EXTRA_VPN_IP = "vpnIp"
+        const val EXTRA_IPV6_PROTECTED = "ipv6Protected"
         const val RESULT_OK = 0
         const val RESULT_ERR = 1
         private const val NOTIFICATION_ID = 0x5250
@@ -414,6 +438,10 @@ class RptVpnService : VpnService() {
 
         @Volatile
         var activeVpnIp: String = ""
+
+        /** Null when unknown/not full-tunnel; true only if ::/0 was installed. */
+        @Volatile
+        var activeIpv6Protected: Boolean? = null
 
         /** User wants tunnel up (Connect) until explicit Disconnect / revoke. */
         @Volatile
@@ -428,13 +456,23 @@ class RptVpnService : VpnService() {
         fun alreadyRunningConnectDecision(
             isSessionActive: Boolean,
             vpnIp: String,
+            ipv6Protected: Boolean? = activeIpv6Protected,
         ): Triple<Boolean, Boolean, String> {
             val ip = vpnIp.trim()
             val msg = if (isSessionActive) {
-                if (ip.isNotEmpty()) {
-                    "Connected — RPT full tunnel up (VPN IP $ip)"
-                } else {
-                    "Connected — full tunnel already active"
+                when {
+                    ipv6Protected == false && ip.isNotEmpty() ->
+                        "Connected — IPv4 via VPN; IPv6 not protected (VPN IP $ip)"
+                    ipv6Protected == false ->
+                        "Connected — IPv4 via VPN; IPv6 not protected"
+                    ipv6Protected == true && ip.isNotEmpty() ->
+                        "Connected — VPN active; IPv6 ISP path blocked (VPN IP $ip)"
+                    ipv6Protected == true ->
+                        "Connected — VPN active; IPv6 ISP path blocked"
+                    ip.isNotEmpty() ->
+                        "Connected — RPT full tunnel up (VPN IP $ip)"
+                    else ->
+                        "Connected — full tunnel already active"
                 }
             } else {
                 "VPN already connecting…"

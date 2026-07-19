@@ -65,6 +65,22 @@ class MainActivity : FlutterActivity() {
                         // Rehydrate UI after minimize/resume — does not start/stop tunnel.
                         val active = RptVpnService.isSessionActive
                         val ip = RptVpnService.activeVpnIp
+                        val v6 = RptVpnService.activeIpv6Protected
+                        val statusMsg = when {
+                            !active -> "Disconnected"
+                            v6 == false && ip.isNotEmpty() ->
+                                "Connected — IPv4 via VPN; IPv6 not protected ($ip)"
+                            v6 == false ->
+                                "Connected — IPv4 via VPN; IPv6 not protected"
+                            v6 == true && ip.isNotEmpty() ->
+                                "Connected — VPN active; IPv6 ISP path blocked ($ip)"
+                            v6 == true ->
+                                "Connected — VPN active; IPv6 ISP path blocked"
+                            ip.isNotEmpty() ->
+                                "Connected — your traffic uses the VPN ($ip)"
+                            else ->
+                                "Connected — protected"
+                        }
                         result.success(
                             mapOf(
                                 "ok" to active,
@@ -72,15 +88,8 @@ class MainActivity : FlutterActivity() {
                                 "fullTunnelActive" to active,
                                 "hostOnlySession" to false,
                                 "vpnIp" to ip,
-                                "message" to if (active) {
-                                    if (ip.isNotEmpty()) {
-                                        "Connected — your traffic uses the VPN ($ip)"
-                                    } else {
-                                        "Connected — protected"
-                                    }
-                                } else {
-                                    "Disconnected"
-                                },
+                                "ipv6Protected" to v6,
+                                "message" to statusMsg,
                             ),
                         )
                     }
@@ -195,6 +204,12 @@ class MainActivity : FlutterActivity() {
                 val message = resultData?.getString(RptVpnService.EXTRA_MESSAGE)
                     ?: if (ok) "Connected" else "Connect failed"
                 val vpnIp = resultData?.getString(RptVpnService.EXTRA_VPN_IP) ?: ""
+                val hasIpv6 = resultData?.containsKey(RptVpnService.EXTRA_IPV6_PROTECTED) == true
+                val ipv6Protected = if (hasIpv6) {
+                    resultData?.getBoolean(RptVpnService.EXTRA_IPV6_PROTECTED)
+                } else {
+                    null
+                }
                 try {
                     result.success(
                         mapOf(
@@ -206,6 +221,7 @@ class MainActivity : FlutterActivity() {
                             "fullTunnelActive" to ok,
                             "hostOnlySession" to false,
                             "connected" to ok,
+                            "ipv6Protected" to ipv6Protected,
                         ),
                     )
                 } catch (_: Exception) {

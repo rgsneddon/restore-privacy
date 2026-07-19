@@ -101,12 +101,13 @@ class TestAndroidConnectDisconnect(unittest.TestCase):
             svc.index("fun alreadyRunningConnectDecision") : svc.index(
                 "fun alreadyRunningConnectDecision"
             )
-            + 700
+            + 1600
         ]
         self.assertIn("return Triple(true, true, msg)", decision)
         self.assertNotIn("Triple(false", decision)
         self.assertIn("Connected — full tunnel already active", decision)
         self.assertIn("VPN already connecting…", decision)
+        self.assertIn("IPv6 not protected", decision)
 
         already = svc[
             svc.index("fun reportAlreadyRunningSession") : svc.index(
