@@ -44,11 +44,12 @@ class TestManualControlPolicy(unittest.TestCase):
         self.assertIn("_on_close_ui_only", src)
         self.assertIn("_start_connect", src)
         self.assertIn("_start_disconnect", src)
-        # main must not schedule connect
+        # Cold launch must not always connect; only resume after user UAC flag
         main = src[src.index("def main") :]
         self.assertNotIn("after(200", main)
-        self.assertNotIn("_start_connect)", main.replace("app._start_connect", ""))
-        self.assertIn("Never schedule auto-connect", main)
+        self.assertIn("Cold launch never auto-connects", main)
+        self.assertIn("resume_after_elevate", main)
+        self.assertIn("_resume_user_connect", main)
 
     def test_close_path_no_teardown(self):
         src = (ROOT / "client" / "windows" / "app.py").read_text(encoding="utf-8")
@@ -66,13 +67,15 @@ class TestManualControlPolicy(unittest.TestCase):
         self.assertNotIn("stop_full_tunnel", run)
         self.assertNotIn("finally:", run)
 
-    def test_main_wires_elevation_without_auto_connect(self):
+    def test_main_wires_elevation_without_cold_auto_connect(self):
         src = (ROOT / "client" / "windows" / "app.py").read_text(encoding="utf-8")
         main = src[src.index("def main") :]
         self.assertIn("elevate_if_needed", main)
         self.assertIn("should_exit_after_elevation", main)
-        self.assertNotIn("_start_connect", main)
-        self.assertIn("Never schedule auto-connect", main)
+        self.assertIn("Cold launch never auto-connects", main)
+        # Resume path only when --rpt-auto-connect (user pressed Connect before UAC)
+        self.assertIn("resume_after_elevate", main)
+        self.assertIn("_resume_user_connect", main)
 
     def test_disconnect_calls_stop_helper(self):
         client = mock.Mock()
@@ -94,6 +97,8 @@ class TestManualControlPolicy(unittest.TestCase):
         conn = src[src.index("def _start_connect") : src.index("def _start_disconnect")]
         self.assertIn("self.client.connect", conn)
         self.assertIn("start_full_tunnel", conn)
+        self.assertIn("require_system_capture=True", conn)
+        self.assertIn("residual_ip_capture_active", conn)
 
 
 class TestThemeAndStatus(unittest.TestCase):
@@ -110,6 +115,11 @@ class TestThemeAndStatus(unittest.TestCase):
         self.assertIn("Connecting", plain_tunnel_status("connecting"))
         self.assertIn("Connected", plain_tunnel_status("connected", vpn_ip="10.88.0.2"))
         self.assertIn("10.88.0.2", plain_tunnel_status("connected", vpn_ip="10.88.0.2"))
+        residual_off = plain_tunnel_status(
+            "connected", vpn_ip="10.88.0.2", residual_capture=False
+        )
+        self.assertIn("ISP", residual_off)
+        self.assertNotIn("uses the VPN", residual_off)
         err = plain_tunnel_status("error", detail="timeout talking to node")
         self.assertIn("Could not connect", err)
         self.assertIn(STATUS_ERROR_LABEL, err)

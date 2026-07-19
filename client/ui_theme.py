@@ -101,10 +101,14 @@ def plain_tunnel_status(
     *,
     vpn_ip: str | None = None,
     detail: str | None = None,
+    residual_capture: bool | None = None,
 ) -> str:
     """Map machine state to a short string any user can understand.
 
     state: disconnected | connecting | connected | disconnecting | error
+
+    When ``residual_capture`` is False, do not claim residual public IP uses the VPN
+    (session/queue-only is not product residual protection).
     """
     s = (state or "").strip().lower()
     if s == "connecting":
@@ -112,6 +116,10 @@ def plain_tunnel_status(
     if s == "disconnecting":
         return STATUS_DISCONNECTING
     if s == "connected":
+        if residual_capture is False:
+            if vpn_ip:
+                return f"Session only — residual IP still on ISP ({vpn_ip})"
+            return "Session only — residual IP still on ISP"
         if vpn_ip:
             return f"Connected — your traffic uses the VPN ({vpn_ip})"
         return STATUS_CONNECTED

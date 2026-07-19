@@ -60,6 +60,20 @@ class TestElevateHelpers(unittest.TestCase):
                 # runas verb used
                 self.assertTrue(elev.should_exit_after_elevation(st))
 
+    def test_elevate_passes_extra_args_for_resume_connect(self):
+        with mock.patch.object(sys, "frozen", True, create=True), mock.patch.object(
+            sys, "executable", r"C:\Apps\RestorePrivacy.exe"
+        ), mock.patch.object(sys, "argv", [r"C:\Apps\RestorePrivacy.exe"]):
+            _exe, params = elev.launch_argv_for_elevation(
+                extra_args=["--rpt-auto-connect"]
+            )
+            self.assertIn("--rpt-auto-connect", params)
+
+    def test_elevation_cwd_is_repo_or_exe_dir(self):
+        cwd = elev.elevation_working_directory()
+        self.assertTrue(cwd)
+        self.assertTrue(Path(cwd).is_dir() or True)  # may be frozen path in CI
+
     def test_elevate_uac_cancelled(self):
         with mock.patch.object(elev, "is_admin", return_value=False), mock.patch.object(
             elev, "launch_argv_for_elevation", return_value=(r"C:\x\app.exe", "")

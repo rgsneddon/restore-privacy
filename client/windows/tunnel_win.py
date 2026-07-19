@@ -318,10 +318,9 @@ def build_placeholder_plan() -> FullTunnelPlan:
 
 
 def product_tunnel_attach_active(result: Optional[WindowsTunnelResult]) -> bool:
-    """True when product Connect attach succeeded (session dataplane bound to a TUN).
+    """True when session dataplane is bound to a TUN (queue or Wintun).
 
-    Residual public IP may still use the ISP path unless routes_applied + system capture.
-    Non-admin queue TUN still counts as product attached.
+    Residual public IP may still use the ISP path unless residual_ip_capture_active.
     """
     if result is None or not result.ok:
         return False
@@ -333,6 +332,22 @@ def product_tunnel_attach_active(result: Optional[WindowsTunnelResult]) -> bool:
         return True
 
 
+def residual_ip_capture_active(result: Optional[WindowsTunnelResult]) -> bool:
+    """True only when device residual public IP can change via full tunnel.
+
+    Requires system-capture TUN + dual /1 routes applied + dataplane — not
+    handshake-only or in-process queue dataplane.
+    """
+    if result is None:
+        return False
+    return bool(
+        result.ok
+        and result.routes_applied
+        and result.system_capture
+        and result.dataplane is not None
+    )
+
+
 def start_full_tunnel(
     client: RptClient,
     plan: FullTunnelPlan,
@@ -340,14 +355,17 @@ def start_full_tunnel(
     dry_run: bool = False,
     force_queue: bool = False,
     prefer_system_capture: bool = True,
+    *,
+    require_system_capture: bool = False,
 ) -> WindowsTunnelResult:
     """Create OS TUN (Wintun), install safe full-tunnel routes, start DATA plane.
 
     Never applies dual /1 without system-capture TUN + valid IF index.
 
-    **Non-admin product path:** if Wintun cannot be created (no Administrator /
-    driver), always fall back to in-process queue TUN so Connect still starts the
-    sealed DATA plane. Dual /1 residual-IP routes remain elevated-only.
+    Product residual-IP path (``require_system_capture=True``): refuses queue-only
+    fallback — residual public IP only changes with real Wintun + dual /1.
+    When False, Wintun is preferred but queue TUN may start session dataplane
+    without changing residual public IP.
     """
     if not client.session:
         return WindowsTunnelResult(False, "no session", [])
@@ -369,6 +387,17 @@ def start_full_tunnel(
             if_index=42,
         )
 
+    # Residual public IP needs admin for Wintun + dual /1
+    if require_system_capture and not force_queue and not is_admin():
+        return WindowsTunnelResult(
+            False,
+            "Administrator required so device traffic uses the VPN node "
+            "(Wintun + dual /1 routes). Approve UAC when prompted.",
+            [],
+            plan=plan,
+            server_host=server_host,
+        )
+
     wintun_note = ""
     try:
         tun = create_windows_tun(
@@ -378,18 +407,28 @@ def start_full_tunnel(
             prefer_system_capture=prefer_system_capture and not force_queue,
         )
     except Exception as exc:
-        # Always fall back to queue TUN for product Connect without Run as admin
-        try:
-            tun = create_windows_tun(
-                client_ip=plan.tunnel_client_ip,
-                name=plan.tunnel_iface or "RPT",
-                force_queue=True,
-            )
-            wintun_note = f" (Wintun unavailable: {exc}; using in-process dataplane)"
-        except Exception as e2:
+        # Queue fallback only when residual capture is not required
+        if force_queue or not require_system_capture:
+            try:
+                tun = create_windows_tun(
+                    client_ip=plan.tunnel_client_ip,
+                    name=plan.tunnel_iface or "RPT",
+                    force_queue=True,
+                )
+                wintun_note = f" (Wintun unavailable: {exc}; using in-process dataplane)"
+            except Exception as e2:
+                return WindowsTunnelResult(
+                    False,
+                    f"TUN failed: {exc}; queue fallback also failed: {e2}",
+                    [],
+                    plan=plan,
+                    server_host=server_host,
+                )
+        else:
             return WindowsTunnelResult(
                 False,
-                f"TUN failed: {exc}; queue fallback also failed: {e2}",
+                f"Wintun TUN failed: {exc}. Residual public IP change needs "
+                "Administrator and a working Wintun adapter.",
                 [],
                 plan=plan,
                 server_host=server_host,
@@ -504,7 +543,7 @@ def start_full_tunnel(
             routes_applied=False,
         )
 
-    return WindowsTunnelResult(
+    result = WindowsTunnelResult(
         ok=True,
         message=msg,
         applied_commands=applied,
@@ -516,6 +555,29 @@ def start_full_tunnel(
         server_host=server_host,
         if_index=if_index,
     )
+
+    # Product residual-IP path: refuse queue/session-only success (ISP IP unchanged)
+    if require_system_capture and not residual_ip_capture_active(result):
+        plane.stop()
+        if routes_applied:
+            rollback_full_tunnel_routes(plan, server_host, if_index)
+        try:
+            tun.close()
+        except Exception:
+            pass
+        return WindowsTunnelResult(
+            False,
+            "Could not route device traffic via the VPN node "
+            f"(need Wintun + dual /1; system_capture={capture}, "
+            f"routes_applied={routes_applied}, if_index={if_index}). {route_msg}",
+            applied,
+            routes_applied=False,
+            plan=plan,
+            server_host=server_host,
+            if_index=if_index,
+        )
+
+    return result
 
 
 def apply_full_tunnel_routes(

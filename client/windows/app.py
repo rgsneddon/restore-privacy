@@ -57,7 +57,7 @@ from client.windows.elevate import (
     should_exit_after_elevation,
 )
 from client.windows.tunnel_win import (
-    product_tunnel_attach_active,
+    residual_ip_capture_active,
     start_full_tunnel,
     stop_full_tunnel,
 )
@@ -105,13 +105,13 @@ def close_disconnects_tunnel() -> bool:
 
 
 def non_admin_connect_allowed() -> bool:
-    """Standard users may Connect without Run as administrator."""
+    """UI may open without Administrator; residual Connect elevates on demand."""
     return True
 
 
 def product_connect_requires_admin() -> bool:
-    """False: product session+dataplane attach does not require elevation."""
-    return False
+    """True: product residual public IP path needs Administrator (Wintun + dual /1)."""
+    return True
 
 
 class TunnelClientApp:
@@ -384,11 +384,33 @@ class TunnelClientApp:
 
         self.root.after(0, ui)
 
-    def _set_status(self, state: str, *, vpn_ip: str | None = None, detail: str | None = None) -> None:
-        self.status_var.set(plain_tunnel_status(state, vpn_ip=vpn_ip, detail=detail))
-        if state == "connected":
+    def _set_status(
+        self,
+        state: str,
+        *,
+        vpn_ip: str | None = None,
+        detail: str | None = None,
+        residual_capture: bool | None = None,
+    ) -> None:
+        self.status_var.set(
+            plain_tunnel_status(
+                state,
+                vpn_ip=vpn_ip,
+                detail=detail,
+                residual_capture=residual_capture,
+            )
+        )
+        if state == "connected" and residual_capture is not False:
             self.status_label.configure(fg=STATUS_OK)
-            self.detail_var.set("Your internet traffic is going through the private tunnel.")
+            self.detail_var.set(
+                "Your residual public IP uses the VPN node (full-tunnel routes active)."
+            )
+        elif state == "connected":
+            # Should not be product success path; honest fallback only
+            self.status_label.configure(fg=STATUS_ERROR_FG)
+            self.detail_var.set(
+                "Session up but residual public IP still uses your ISP — not fully protected."
+            )
         elif state == "connecting":
             self.status_label.configure(fg=PRIMARY_DARK)
             self.detail_var.set("Please wait… setting up a secure connection.")
@@ -430,9 +452,35 @@ class TunnelClientApp:
             self._start_connect()
 
     def _start_connect(self) -> None:
+        # Residual public IP needs Administrator (Wintun + dual /1). Elevate first.
+        if product_connect_requires_admin() and not is_admin():
+            self._apply_control(connected=False, busy=True)
+            self._set_status("connecting")
+            self._log(
+                "Connect — Administrator required so residual public IP uses "
+                "the VPN node. Approving UAC will re-open and finish Connect…"
+            )
+            status = elevate_if_needed(extra_args=["--rpt-auto-connect"])
+            if should_exit_after_elevation(status):
+                # Elevated child resumes Connect via --rpt-auto-connect
+                try:
+                    self.root.destroy()
+                except Exception:
+                    pass
+                return
+            reason = status.split(":", 1)[-1] if status.startswith("failed:") else status
+            err = (
+                "Administrator required so your residual public IP uses the VPN node. "
+                f"Approve UAC when prompted ({reason})."
+            )
+            self._log(f"Could not connect: {err}")
+            self._set_status("error", detail=err)
+            self._apply_control(connected=False, busy=False)
+            return
+
         self._apply_control(connected=False, busy=True)
         self._set_status("connecting")
-        self._log("Connect — starting secure session…")
+        self._log("Connect — starting secure session (full-tunnel residual path)…")
 
         def work() -> None:
             result = self.client.connect(timeout=20.0)
@@ -448,26 +496,25 @@ class TunnelClientApp:
 
                     vpn_ip = result.session.vpn_ip
                     self._log(f"Session ready (tunnel address {vpn_ip})")
-                    # Wintun when available; queue TUN fallback without Administrator
+                    # Product residual path: Wintun + dual /1 only (no queue "Connected")
                     tun_res = start_full_tunnel(
                         self.client,
                         result.tunnel_plan,
                         result.session.endpoint.host,
                         prefer_system_capture=True,
+                        require_system_capture=True,
                     )
                     self._tunnel = tun_res
-                    # Product connected = session + dataplane (not dual /1 residual only)
-                    if product_tunnel_attach_active(tun_res):
-                        residual = bool(getattr(tun_res, "routes_applied", False))
-                        mode = getattr(getattr(tun_res, "tun", None), "mode", "?")
-                        if residual:
-                            self._log("Tunnel active — full system protection")
-                        else:
-                            self._log(
-                                f"Tunnel active — session protected (mode={mode}; "
-                                "system-wide routes need elevation when available)"
-                            )
-                        self._set_status("connected", vpn_ip=vpn_ip)
+                    if residual_ip_capture_active(tun_res):
+                        self._log(
+                            "Tunnel active — residual public IP uses the VPN node "
+                            f"(IF={getattr(tun_res, 'if_index', '?')})"
+                        )
+                        self._set_status(
+                            "connected",
+                            vpn_ip=vpn_ip,
+                            residual_capture=True,
+                        )
                         self._apply_control(connected=True, busy=False)
                     else:
                         # Capture attach failure BEFORE teardown overwrites tun_res.message
@@ -569,11 +616,12 @@ RetroClientApp = TunnelClientApp
 
 
 def main() -> int:
-    """Launch UI with UAC elevation for full-tunnel routes; never auto-connect."""
+    """Launch UI; residual Connect elevates (Wintun + dual /1). No cold auto-connect."""
     if "--rpt-elevated" in sys.argv:
         sys.argv = [a for a in sys.argv if a != "--rpt-elevated"]
-    # Ignore legacy auto-connect flags — connect is always manual
-    if "--rpt-auto-connect" in sys.argv:
+    # User pressed Connect then approved UAC — resume that one Connect only.
+    resume_after_elevate = "--rpt-auto-connect" in sys.argv
+    if resume_after_elevate:
         sys.argv = [a for a in sys.argv if a != "--rpt-auto-connect"]
 
     root = Path(__file__).resolve().parents[2]
@@ -584,8 +632,8 @@ def main() -> int:
     except Exception:
         pass
 
-    # Optional elevate for better residual routes — never required for Connect.
-    # If UAC is cancelled / disabled, continue as standard user (queue TUN path).
+    # Optional launch elevate so Connect can apply residual routes without a second UAC.
+    # If cancelled, UI still opens; Connect will request elevation again.
     status = elevate_if_needed()
     if should_exit_after_elevation(status):
         return 0
@@ -611,8 +659,8 @@ def main() -> int:
 
         def _note_elev_fail() -> None:
             app._log(
-                f"Elevation skipped ({reason}). "
-                "Connect still works without Administrator (session + dataplane)."
+                f"Elevation skipped at launch ({reason}). "
+                "Press Connect and approve UAC so residual public IP uses the VPN node."
             )
 
         app.root.after(100, _note_elev_fail)
@@ -620,20 +668,38 @@ def main() -> int:
         app.root.after(
             100,
             lambda: app._log(
-                "Running elevated — full system routes available when you Connect."
+                "Running elevated — Connect will route residual public IP via the VPN node."
             ),
         )
     else:
         app.root.after(
             100,
             lambda: app._log(
-                "Standard user — Connect works without Run as administrator."
+                "Standard user — Connect will request Administrator for residual routing."
             ),
         )
 
-    # Never schedule auto-connect
+    # Cold launch never auto-connects. Only resume when user already pressed Connect
+    # and UAC re-launched with --rpt-auto-connect.
     assert not auto_connect_on_launch_enabled()
     assert non_admin_connect_allowed()
+    if resume_after_elevate and is_admin():
+
+        def _resume_user_connect() -> None:
+            # Not cold auto-connect: user already pressed Connect before UAC.
+            app._log("Resuming Connect after elevation…")
+            app._start_connect()
+
+        app.root.after(350, _resume_user_connect)
+    elif resume_after_elevate and not is_admin():
+        app.root.after(
+            100,
+            lambda: app._log(
+                "Elevated Connect requested but process is not Administrator — "
+                "press Connect again and approve UAC."
+            ),
+        )
+
     app.run()
     return 0
 

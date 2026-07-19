@@ -72,12 +72,32 @@ def _shell_execute_runas(exe: str, params: str, cwd: Optional[str] = None) -> in
     return int(info.hInstApp) if info.hInstApp else 1
 
 
-def launch_argv_for_elevation() -> tuple[str, str]:
+def elevation_working_directory() -> str:
+    """cwd for elevated re-launch (repo root for -m, exe dir when frozen)."""
+    if getattr(sys, "frozen", False):
+        try:
+            return str(Path(sys.executable).resolve().parent)
+        except Exception:
+            return os.getcwd()
+    # client/windows/elevate.py → repo root
+    try:
+        return str(Path(__file__).resolve().parents[2])
+    except Exception:
+        return os.getcwd()
+
+
+def launch_argv_for_elevation(
+    extra_args: Optional[list[str]] = None,
+) -> tuple[str, str]:
     """Return (executable, parameter string) for re-launching this process elevated."""
+    extra = list(extra_args or [])
     if getattr(sys, "frozen", False):
         exe = str(Path(sys.executable).resolve())
         # Pass through any args after the exe
-        args = sys.argv[1:]
+        args = list(sys.argv[1:])
+        for a in extra:
+            if a not in args:
+                args.append(a)
         params = subprocess_list2cmdline(args) if args else ""
         return exe, params
 
@@ -94,6 +114,9 @@ def launch_argv_for_elevation() -> tuple[str, str]:
         # Extra args start at argv[1]
         if len(sys.argv) > 1:
             parts.extend(sys.argv[1:])
+    for a in extra:
+        if a not in parts:
+            parts.append(a)
     params = subprocess_list2cmdline(parts)
     return exe, params
 
@@ -109,6 +132,7 @@ def elevate_if_needed(
     *,
     force: bool = False,
     marker_env: str = "RPT_ELEVATED",
+    extra_args: Optional[list[str]] = None,
 ) -> str:
     """If not admin, re-launch elevated and signal caller to exit.
 
@@ -119,6 +143,9 @@ def elevate_if_needed(
       ``"failed:<reason>"`` — UAC cancelled or ShellExecute failed
 
     Set env ``RPT_NO_AUTO_ELEVATE=1`` to disable (tests / debugging).
+
+    ``extra_args`` are appended to the elevated child (e.g. ``--rpt-auto-connect``
+    after the user pressed Connect so residual routing can complete elevated).
     """
     if sys.platform != "win32":
         return "skipped"
@@ -132,18 +159,14 @@ def elevate_if_needed(
     if os.environ.get(marker_env, "").strip() == "1" and not is_admin():
         return "failed:elevated_flag_set_but_still_not_admin"
 
-    exe, params = launch_argv_for_elevation()
+    exe, params = launch_argv_for_elevation(extra_args=extra_args)
     # Child inherits env; set marker so we can detect loops
     # ShellExecute does not easily pass custom env; append a no-op arg flag instead
     elev_flag = "--rpt-elevated"
-    if elev_flag not in sys.argv:
+    if elev_flag not in (params or "") and elev_flag not in sys.argv:
         params = (params + " " + elev_flag).strip() if params else elev_flag
 
-    cwd = None
-    try:
-        cwd = str(Path(exe).resolve().parent)
-    except Exception:
-        cwd = os.getcwd()
+    cwd = elevation_working_directory()
 
     try:
         rc = _shell_execute_runas(exe, params, cwd=cwd)
