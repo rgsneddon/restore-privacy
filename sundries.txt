@@ -67,6 +67,13 @@ SECRETS / RELEASE GATES (mandatory)
 
     bash /opt/restore-privacy/node/install.sh
 
+  Tunnel DNS (privacy prep — clients default DNS to 10.88.0.1):
+    # After rpt0 is up (install.sh also attempts this):
+    bash /opt/restore-privacy/node/install_dns.sh
+    # Config sample: node/unbound-rpt.conf (listen 10.88.0.1, ACL 10.88.0.0/24 only)
+    # Do NOT open UDP/TCP 53 on the public WAN (not an open resolver).
+    # Live FlokiNET/VPS apply: when the box is running, re-run install_dns.sh if needed.
+
   Node properties (operator reference):
     Admission  — authorized RPT client keys only (ElGamal + Pedersen + Ed25519)
     Crypto     — custom RPT2 data plane (ChaCha20-Poly1305 after handshake)

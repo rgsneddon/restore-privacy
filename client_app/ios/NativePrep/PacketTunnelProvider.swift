@@ -51,7 +51,8 @@ class PacketTunnelProvider: NEPacketTunnelProvider {
         // Exclude RPT server host from tunnel to avoid recursive blackhole
         ipv4.excludedRoutes = [NEIPv4Route(destinationAddress: self.endpointHost, subnetMask: "255.255.255.255")]
         settings.ipv4Settings = ipv4
-        settings.dnsSettings = NEDNSSettings(servers: ["1.1.1.1", "9.9.9.9"])
+        // Node tunnel DNS (Unbound on 10.88.0.1) — not third-party public resolvers
+        settings.dnsSettings = NEDNSSettings(servers: ["10.88.0.1"])
         settings.mtu = 1280
 
         self.setTunnelNetworkSettings(settings) { err in

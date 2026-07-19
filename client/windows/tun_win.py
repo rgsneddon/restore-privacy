@@ -16,6 +16,7 @@ from pathlib import Path
 from typing import Optional
 
 from client.dataplane import QueueTun, TunIO
+from client.full_tunnel import default_tunnel_dns_servers
 
 # --- Wintun ctypes API (https://git.zx2c4.com/wintun/about/) ---
 
@@ -171,10 +172,14 @@ class WintunTun:
             f'netsh interface ip set address name="{self.name}" '
             f"static {self.client_ip} 255.255.255.255",
             f'netsh interface ip delete dns name="{self.name}" all',
-            f'netsh interface ip add dns name="{self.name}" addr=1.1.1.1 index=1',
-            f'netsh interface ip add dns name="{self.name}" addr=9.9.9.9 index=2',
-            f'netsh interface set interface name="{self.name}" admin=ENABLED',
         ]
+        for i, dns in enumerate(default_tunnel_dns_servers(), start=1):
+            cmds.append(
+                f'netsh interface ip add dns name="{self.name}" addr={dns} index={i}'
+            )
+        cmds.append(
+            f'netsh interface set interface name="{self.name}" admin=ENABLED'
+        )
         for c in cmds:
             subprocess.run(c, shell=True, capture_output=True, text=True)
         return cmds

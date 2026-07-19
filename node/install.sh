@@ -139,4 +139,15 @@ if ! systemctl is-enabled "${SERVICE_NAME}.service" | grep -qx enabled; then
   exit 1
 fi
 echo "[rpt-install] boot-enabled=$(systemctl is-enabled "${SERVICE_NAME}.service") active=$(systemctl is-active "${SERVICE_NAME}.service")"
+echo "[rpt-install] tunnel DNS (Unbound on ${CLIENT_NET%%/*} gateway — offline-safe re-run)"
+# Clients default full-tunnel DNS to 10.88.0.1 (node gateway). Install recursive DNS
+# for tunnel clients only. Safe if unbound already present; re-run after TUN is up.
+if [[ -f "${SCRIPT_DIR}/install_dns.sh" ]]; then
+  bash "${SCRIPT_DIR}/install_dns.sh" || {
+    echo "[rpt-install] WARN: install_dns.sh failed — run: bash ${SCRIPT_DIR}/install_dns.sh" >&2
+  }
+else
+  echo "[rpt-install] WARN: install_dns.sh missing; clients expect DNS at 10.88.0.1" >&2
+fi
+
 echo "[rpt-install] done port=${LISTEN_PORT} ui=${UI_PORT} wan=${WAN}"

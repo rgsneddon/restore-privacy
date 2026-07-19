@@ -13,6 +13,18 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any, Optional
 
+# Tunnel address plan (must match node/routing.py DEFAULT_TUNNEL_ADDR / CLIENT_NET).
+DEFAULT_TUNNEL_GATEWAY = "10.88.0.1"
+# Product full-tunnel DNS: node-local recursive resolver on the tunnel gateway.
+# Not Cloudflare/Quad9 — queries stay on the operator node when full tunnel is up.
+# Requires Unbound (or equivalent) on the node; see node/install_dns.sh.
+DEFAULT_TUNNEL_DNS_SERVERS: tuple[str, ...] = (DEFAULT_TUNNEL_GATEWAY,)
+
+
+def default_tunnel_dns_servers() -> list[str]:
+    """Shipped product DNS list for full-tunnel plans (copy, not shared mutable)."""
+    return list(DEFAULT_TUNNEL_DNS_SERVERS)
+
 
 @dataclass
 class FullTunnelPlan:
@@ -21,8 +33,8 @@ class FullTunnelPlan:
     tunnel_iface: str
     tunnel_client_ip: str
     tunnel_prefix: int = 32
-    tunnel_gateway: str = "10.88.0.1"
-    dns_servers: list[str] = field(default_factory=lambda: ["1.1.1.1", "9.9.9.9"])
+    tunnel_gateway: str = DEFAULT_TUNNEL_GATEWAY
+    dns_servers: list[str] = field(default_factory=default_tunnel_dns_servers)
     default_routes: list[str] = field(
         default_factory=lambda: ["0.0.0.0/1", "128.0.0.0/1"]
     )
@@ -43,12 +55,14 @@ class FullTunnelPlan:
 def build_full_tunnel_plan(
     client_vpn_ip: str,
     tunnel_iface: str = "RPT",
-    gateway: str = "10.88.0.1",
+    gateway: str = DEFAULT_TUNNEL_GATEWAY,
+    dns_servers: list[str] | None = None,
 ) -> FullTunnelPlan:
     return FullTunnelPlan(
         tunnel_iface=tunnel_iface,
         tunnel_client_ip=client_vpn_ip,
         tunnel_gateway=gateway,
+        dns_servers=list(dns_servers) if dns_servers is not None else default_tunnel_dns_servers(),
         allow_all_apps=True,
         disallowed_apps=[],
         default_routes=["0.0.0.0/1", "128.0.0.0/1"],
@@ -151,6 +165,11 @@ def linux_route_commands(
     if include_catchall:
         cmds.append(f"ip route replace 0.0.0.0/1 dev {tun}")
         cmds.append(f"ip route replace 128.0.0.0/1 dev {tun}")
+    # Point interface DNS at the node tunnel resolver (default 10.88.0.1)
+    if plan.dns_servers:
+        dns_args = " ".join(plan.dns_servers)
+        cmds.append(f"resolvectl dns {tun} {dns_args}")
+        cmds.append(f"resolvectl domain {tun} '~.'")
     return cmds
 
 
@@ -166,6 +185,7 @@ def linux_route_delete_commands(
         f"ip route del 0.0.0.0/1 dev {tun}",
         f"ip route del 128.0.0.0/1 dev {tun}",
         f"ip route del {server_host}/32",
+        f"resolvectl revert {tun}",
         f"ip link set dev {tun} down",
     ]
 

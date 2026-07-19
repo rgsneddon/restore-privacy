@@ -19,7 +19,7 @@ Reference implementations (read these on Mac):
 2. Load `client_ed25519.priv` + `node_elgamal.pub` from App Group / secrets dir.  
 3. Build authorized **CLIENT_HELLO** (Ed25519 + ElGamal + Pedersen — match Python).  
 4. Send UDP; parse **SERVER_HELLO**; derive session keys (ChaCha20-Poly1305).  
-5. Configure tunnel settings: IPv4 address = assigned VPN IP, routes `0.0.0.0/0`, DNS 1.1.1.1 / 9.9.9.9.  
+5. Configure tunnel settings: IPv4 address = assigned VPN IP, routes `0.0.0.0/0`, DNS `10.88.0.1` (node tunnel recursive resolver — not public 1.1.1.1/9.9.9.9).  
 6. Loop: read IP packets from `packetFlow` → seal DATA → UDP send; UDP DATA → open → `packetFlow.write`.  
 7. Periodic KEEPALIVE (~30s) so the node’s live client count stays accurate.  
 

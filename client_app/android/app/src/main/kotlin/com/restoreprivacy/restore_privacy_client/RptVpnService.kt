@@ -203,12 +203,12 @@ class RptVpnService : VpnService() {
                     return@thread
                 }
 
+                // DNS: node tunnel gateway recursive resolver (matches client.full_tunnel defaults)
                 val builder = Builder()
                     .setSession(sessionName)
                     .setMtu(1280)
                     .addAddress(session.vpnIp, 32)
-                    .addDnsServer("1.1.1.1")
-                    .addDnsServer("9.9.9.9")
+                    .addDnsServer("10.88.0.1")
                 if (fullTunnel) {
                     builder.addRoute("0.0.0.0", 0)
                 }
