@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Windows RPT client — sleek manual Connect/Disconnect UI.
+"""Windows RPT client - sleek manual Connect/Disconnect UI.
 
 No auto-connect. Close does not disconnect (user must press Disconnect).
 Palette from restorebritain.org.uk/contact (Cupertino theme tokens).
@@ -78,7 +78,7 @@ from client.windows.tunnel_win import (
 def disconnect_full_tunnel(
     tunnel, client, *, preserve_message: bool = False
 ) -> None:
-    """Idempotent full stop — Disconnect button, or cleanup after failed attach.
+    """Idempotent full stop - Disconnect button, or cleanup after failed attach.
 
     Set ``preserve_message=True`` when cleaning up a failed Connect so
     ``tunnel.message`` is not replaced with the teardown success string.
@@ -145,7 +145,7 @@ class TunnelClientApp:
         self.root.configure(bg=CHROME_BG)
         self.root.minsize(self.MIN_WIDTH, self.MIN_HEIGHT)
         self._set_window_icon()
-        # UI-only close — tunnel stays up until user presses Disconnect
+        # UI-only close - tunnel stays up until user presses Disconnect
         self.root.protocol("WM_DELETE_WINDOW", self._on_close_ui_only)
 
         self._connected = False
@@ -187,7 +187,7 @@ class TunnelClientApp:
         self.hint_row.pack(side=tk.TOP, fill=tk.X)
         self.hint = tk.Label(
             self.hint_row,
-            text="Manual only — Connect starts, Disconnect stops. Close hides the window (VPN stays up).",
+            text="Manual only - Connect starts, Disconnect stops. Close hides the window (VPN stays up).",
             bg=CHROME_BG,
             fg=TEXT_MUTED,
             font=("Segoe UI", 8),
@@ -376,7 +376,7 @@ class TunnelClientApp:
         )
         self.output.pack(fill=tk.BOTH, expand=True)
 
-        self._log(f"{APP_TITLE} — ready")
+        self._log(f"{APP_TITLE} - ready")
         self._log(SCROLLING_PRIVACY_TEXT)
         self._log("Press Connect to start the VPN. Closing this window does not disconnect.")
         ver = read_running_version()
@@ -467,9 +467,9 @@ class TunnelClientApp:
         self.output.configure(state=tk.DISABLED)
 
     def _on_client_status(self, msg: str) -> None:
-        """Secondary log only — do not dump raw protocol into main status."""
+        """Secondary log only - do not dump raw protocol into main status."""
         def ui() -> None:
-            short = msg if len(msg) <= 100 else msg[:97] + "…"
+            short = msg if len(msg) <= 100 else msg[:97] + "..."
             self._log(short)
 
         self.root.after(0, ui)
@@ -497,21 +497,21 @@ class TunnelClientApp:
             self.detail_var.set(
                 "Your residual public IP uses the VPN node (full-tunnel routes active)."
             )
-            # Pass connected=True explicitly — _apply_control may not have run yet
+            # Pass connected=True explicitly - _apply_control may not have run yet
             self._sync_tray_status(connected=True, residual=True)
         elif s == "connected":
             self.status_label.configure(fg=STATUS_ERROR_FG)
             self.detail_var.set(
-                "Session up but residual public IP still uses your ISP — not fully protected."
+                "Session up but residual public IP still uses your ISP - not fully protected."
             )
             self._sync_tray_status(connected=True, residual=False)
         elif s == "connecting":
             self.status_label.configure(fg=PRIMARY_DARK)
-            self.detail_var.set("Please wait… setting up a secure connection.")
+            self.detail_var.set("Please wait... setting up a secure connection.")
             self._sync_tray_status(connected=False, residual=False)
         elif s == "disconnecting":
             self.status_label.configure(fg=PRIMARY_DARK)
-            self.detail_var.set("Stopping the tunnel and restoring normal internet…")
+            self.detail_var.set("Stopping the tunnel and restoring normal internet...")
             # Still show connected tray until teardown finishes
             self._sync_tray_status(connected=True, residual=True)
         elif s in ("error", "failed"):
@@ -562,8 +562,8 @@ class TunnelClientApp:
             self._apply_control(connected=False, busy=True)
             self._set_status("connecting")
             self._log(
-                "Connect — Administrator required so residual public IP uses "
-                "the VPN node. Approving UAC will re-open and finish Connect…"
+                "Connect - Administrator required so residual public IP uses "
+                "the VPN node. Approving UAC will re-open and finish Connect..."
             )
             status = elevate_if_needed(extra_args=["--rpt-auto-connect"])
             if should_exit_after_elevation(status):
@@ -585,7 +585,7 @@ class TunnelClientApp:
 
         self._apply_control(connected=False, busy=True)
         self._set_status("connecting")
-        self._log("Connect — starting secure session (full-tunnel residual path)…")
+        self._log("Connect - starting secure session (full-tunnel residual path)...")
 
         def work() -> None:
             result = self.client.connect(timeout=20.0)
@@ -612,7 +612,7 @@ class TunnelClientApp:
                     self._tunnel = tun_res
                     if residual_ip_capture_active(tun_res):
                         self._log(
-                            "Tunnel active — residual public IP uses the VPN node "
+                            "Tunnel active - residual public IP uses the VPN node "
                             f"(IF={getattr(tun_res, 'if_index', '?')})"
                         )
                         # Apply control first so _connected is True, then status+tray
@@ -654,7 +654,7 @@ class TunnelClientApp:
     def _start_disconnect(self) -> None:
         self._apply_control(connected=True, busy=True)
         self._set_status("disconnecting")
-        self._log("Disconnect — stopping tunnel…")
+        self._log("Disconnect - stopping tunnel...")
 
         def work() -> None:
             try:
@@ -673,7 +673,7 @@ class TunnelClientApp:
 
     def _open_upgrade(self) -> None:
         url = upgrade_download_url()
-        self._log(f"Opening download page…")
+        self._log(f"Opening download page...")
         try:
             webbrowser.open(url)
         except Exception as exc:
@@ -781,9 +781,9 @@ class TunnelClientApp:
             save_settings(s)
             self._settings = s
             if s.autoconnect_on_launch:
-                note_var.set("Autoconnect on launch ON — next cold start will Connect.")
+                note_var.set("Autoconnect on launch ON - next cold start will Connect.")
             else:
-                note_var.set("Autoconnect on launch OFF — Connect is manual.")
+                note_var.set("Autoconnect on launch OFF - Connect is manual.")
             self._log(f"Settings: autoconnect_on_launch={s.autoconnect_on_launch}")
 
         _row(
@@ -842,11 +842,11 @@ class TunnelClientApp:
         """Hide UI; keep process + tunnel alive (tray / taskbar). Disconnect is separate.
 
         Destroying the window would end mainloop and kill residual dual /1 routes
-        without rollback — so we withdraw to tray instead of destroy.
+        without rollback - so we withdraw to tray instead of destroy.
         """
         try:
             self._log(
-                f"Window hidden — VPN keeps running if connected. "
+                f"Window hidden - VPN keeps running if connected. "
                 f"Restore from the system tray ({TRAY_DISPLAY_NAME}) or taskbar. "
                 "Press Disconnect to stop, or Quit to exit."
             )
@@ -863,7 +863,7 @@ class TunnelClientApp:
     def _quit_app(self) -> None:
         """Explicit quit: stop tunnel then exit process (safe route cleanup)."""
         try:
-            self._log("Quit — stopping tunnel and exiting…")
+            self._log("Quit - stopping tunnel and exiting...")
         except Exception:
             pass
         if self._tray is not None:
@@ -896,7 +896,7 @@ def main() -> int:
     """Launch UI; residual Connect elevates (Wintun + dual /1). No cold auto-connect."""
     if "--rpt-elevated" in sys.argv:
         sys.argv = [a for a in sys.argv if a != "--rpt-elevated"]
-    # User pressed Connect then approved UAC — resume that one Connect only.
+    # User pressed Connect then approved UAC - resume that one Connect only.
     resume_after_elevate = "--rpt-auto-connect" in sys.argv
     if resume_after_elevate:
         sys.argv = [a for a in sys.argv if a != "--rpt-auto-connect"]
@@ -909,7 +909,7 @@ def main() -> int:
     except Exception:
         pass
 
-    # Product surface is Tk — detach any leftover console host window.
+    # Product surface is Tk - detach any leftover console host window.
     try:
         from client.windows.launch_gui import free_console_if_attached
 
@@ -953,14 +953,14 @@ def main() -> int:
         app.root.after(
             100,
             lambda: app._log(
-                "Running elevated — Connect will route residual public IP via the VPN node."
+                "Running elevated - Connect will route residual public IP via the VPN node."
             ),
         )
     else:
         app.root.after(
             100,
             lambda: app._log(
-                "Standard user — Connect will request Administrator for residual routing."
+                "Standard user - Connect will request Administrator for residual routing."
             ),
         )
 
@@ -970,7 +970,7 @@ def main() -> int:
 
         def _resume_user_connect() -> None:
             # User already pressed Connect before UAC (or residual elevate).
-            app._log("Resuming Connect after elevation…")
+            app._log("Resuming Connect after elevation...")
             app._start_connect()
 
         app.root.after(350, _resume_user_connect)
@@ -978,14 +978,14 @@ def main() -> int:
         app.root.after(
             100,
             lambda: app._log(
-                "Elevated Connect requested but process is not Administrator — "
+                "Elevated Connect requested but process is not Administrator - "
                 "press Connect again and approve UAC."
             ),
         )
     elif should_autoconnect_on_launch() and not resume_after_elevate:
 
         def _settings_autoconnect() -> None:
-            app._log("Settings: autoconnect on launch — starting Connect…")
+            app._log("Settings: autoconnect on launch - starting Connect...")
             app._start_connect()
 
         app.root.after(450, _settings_autoconnect)
