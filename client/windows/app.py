@@ -56,7 +56,11 @@ from client.windows.elevate import (
     is_admin,
     should_exit_after_elevation,
 )
-from client.windows.tunnel_win import start_full_tunnel, stop_full_tunnel
+from client.windows.tunnel_win import (
+    product_tunnel_attach_active,
+    start_full_tunnel,
+    stop_full_tunnel,
+)
 
 
 def disconnect_full_tunnel(
@@ -97,6 +101,16 @@ def auto_connect_on_launch_enabled() -> bool:
 
 def close_disconnects_tunnel() -> bool:
     """Product policy: closing the window leaves the tunnel running."""
+    return False
+
+
+def non_admin_connect_allowed() -> bool:
+    """Standard users may Connect without Run as administrator."""
+    return True
+
+
+def product_connect_requires_admin() -> bool:
+    """False: product session+dataplane attach does not require elevation."""
     return False
 
 
@@ -434,23 +448,25 @@ class TunnelClientApp:
 
                     vpn_ip = result.session.vpn_ip
                     self._log(f"Session ready (tunnel address {vpn_ip})")
+                    # Wintun when available; queue TUN fallback without Administrator
                     tun_res = start_full_tunnel(
                         self.client,
                         result.tunnel_plan,
                         result.session.endpoint.host,
+                        prefer_system_capture=True,
                     )
                     self._tunnel = tun_res
-                    # Keep log concise — one line for tunnel outcome
-                    if tun_res.ok and tun_res.dataplane and tun_res.dataplane.is_running():
-                        residual = getattr(tun_res, "routes_applied", False)
-                        self._log(
-                            "Tunnel active"
-                            + (" — full system protection" if residual else " — session protected")
-                        )
-                        self._set_status("connected", vpn_ip=vpn_ip)
-                        self._apply_control(connected=True, busy=False)
-                    elif tun_res.ok:
-                        self._log("Tunnel started with limited protection — see details if needed")
+                    # Product connected = session + dataplane (not dual /1 residual only)
+                    if product_tunnel_attach_active(tun_res):
+                        residual = bool(getattr(tun_res, "routes_applied", False))
+                        mode = getattr(getattr(tun_res, "tun", None), "mode", "?")
+                        if residual:
+                            self._log("Tunnel active — full system protection")
+                        else:
+                            self._log(
+                                f"Tunnel active — session protected (mode={mode}; "
+                                "system-wide routes need elevation when available)"
+                            )
                         self._set_status("connected", vpn_ip=vpn_ip)
                         self._apply_control(connected=True, busy=False)
                     else:
@@ -568,7 +584,8 @@ def main() -> int:
     except Exception:
         pass
 
-    # Elevate once at launch so Wintun dual /1 can apply; do not auto-connect after.
+    # Optional elevate for better residual routes — never required for Connect.
+    # If UAC is cancelled / disabled, continue as standard user (queue TUN path).
     status = elevate_if_needed()
     if should_exit_after_elevation(status):
         return 0
@@ -594,19 +611,29 @@ def main() -> int:
 
         def _note_elev_fail() -> None:
             app._log(
-                f"Administrator elevation failed ({reason}). "
-                "You can still open the app; full system routes may need UAC."
+                f"Elevation skipped ({reason}). "
+                "Connect still works without Administrator (session + dataplane)."
             )
 
         app.root.after(100, _note_elev_fail)
     elif status == "already_admin" or is_admin():
         app.root.after(
             100,
-            lambda: app._log("Running elevated — full tunnel routes available when you Connect."),
+            lambda: app._log(
+                "Running elevated — full system routes available when you Connect."
+            ),
+        )
+    else:
+        app.root.after(
+            100,
+            lambda: app._log(
+                "Standard user — Connect works without Run as administrator."
+            ),
         )
 
     # Never schedule auto-connect
     assert not auto_connect_on_launch_enabled()
+    assert non_admin_connect_allowed()
     app.run()
     return 0
 

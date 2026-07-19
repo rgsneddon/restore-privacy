@@ -317,6 +317,22 @@ def build_placeholder_plan() -> FullTunnelPlan:
     )
 
 
+def product_tunnel_attach_active(result: Optional[WindowsTunnelResult]) -> bool:
+    """True when product Connect attach succeeded (session dataplane bound to a TUN).
+
+    Residual public IP may still use the ISP path unless routes_applied + system capture.
+    Non-admin queue TUN still counts as product attached.
+    """
+    if result is None or not result.ok:
+        return False
+    if result.dataplane is None:
+        return False
+    try:
+        return bool(result.dataplane.is_running())
+    except Exception:
+        return True
+
+
 def start_full_tunnel(
     client: RptClient,
     plan: FullTunnelPlan,
@@ -328,6 +344,10 @@ def start_full_tunnel(
     """Create OS TUN (Wintun), install safe full-tunnel routes, start DATA plane.
 
     Never applies dual /1 without system-capture TUN + valid IF index.
+
+    **Non-admin product path:** if Wintun cannot be created (no Administrator /
+    driver), always fall back to in-process queue TUN so Connect still starts the
+    sealed DATA plane. Dual /1 residual-IP routes remain elevated-only.
     """
     if not client.session:
         return WindowsTunnelResult(False, "no session", [])
@@ -349,6 +369,7 @@ def start_full_tunnel(
             if_index=42,
         )
 
+    wintun_note = ""
     try:
         tun = create_windows_tun(
             client_ip=plan.tunnel_client_ip,
@@ -357,17 +378,21 @@ def start_full_tunnel(
             prefer_system_capture=prefer_system_capture and not force_queue,
         )
     except Exception as exc:
-        if force_queue or not prefer_system_capture:
+        # Always fall back to queue TUN for product Connect without Run as admin
+        try:
             tun = create_windows_tun(
                 client_ip=plan.tunnel_client_ip,
                 name=plan.tunnel_iface or "RPT",
                 force_queue=True,
             )
-        else:
+            wintun_note = f" (Wintun unavailable: {exc}; using in-process dataplane)"
+        except Exception as e2:
             return WindowsTunnelResult(
                 False,
-                f"Wintun TUN failed: {exc}. Run as Administrator; wintun.dll must load.",
+                f"TUN failed: {exc}; queue fallback also failed: {e2}",
                 [],
+                plan=plan,
+                server_host=server_host,
             )
 
     plan.tunnel_iface = tun.name
@@ -431,7 +456,10 @@ def start_full_tunnel(
     elif is_admin():
         route_msg = "admin but no OS TUN — routes not applied (would blackhole)"
     else:
-        route_msg = "Administrator required for system-wide routes"
+        route_msg = (
+            "standard user — system-wide dual /1 skipped "
+            "(session + dataplane start without Administrator)"
+        )
 
     plane = RptDataPlane(client)
     try:
@@ -461,6 +489,7 @@ def start_full_tunnel(
         f"TUN mode={tun.mode}; {route_msg}; dataplane running (sealed RPT DATA); "
         f"system_capture={capture}; if_index={if_index}; "
         f"wintun_dll={wintun_dll_available()}"
+        f"{wintun_note}"
     )
     if routes_applied and (
         not capture or routes_would_blackhole_without_if_index(if_index, True)
