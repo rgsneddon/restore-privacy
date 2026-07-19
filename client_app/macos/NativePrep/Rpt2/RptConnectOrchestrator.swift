@@ -1,7 +1,8 @@
 import Foundation
 
-/// Host/extension connect sequence: UK gate → secrets → RPT2 handshake.
+/// Host/extension connect sequence: secrets → RPT2 handshake.
 /// Used by Packet Tunnel and host channel fallback.
+/// No public-IP geo admission (removed for privacy; device keys + crypto only).
 public enum RptConnectOrchestrator {
     public struct ConnectOutcome {
         public let ok: Bool
@@ -34,21 +35,12 @@ public enum RptConnectOrchestrator {
     public static func connect(
         host: String = RptEndpoint.host,
         port: UInt16 = RptEndpoint.port,
-        skipUkGate: Bool = false,
-        ukGateFetcher: (() throws -> [String: Any])? = nil,
         secretsDir: URL? = nil,
         timeout: TimeInterval = 15
     ) -> ConnectOutcome {
         let target = "\(host):\(port)"
-        // 1. UK IP gate (fail closed)
-        if !skipUkGate {
-            let gate = RptUkIpGate.checkUkPublicIp(payloadProvider: ukGateFetcher)
-            if !gate.allowed {
-                return ConnectOutcome(ok: false, message: gate.message, vpnIp: nil, session: nil, engine: nil)
-            }
-        }
 
-        // 2. Load secrets (client priv + node pub only)
+        // 1. Load secrets (client priv + node pub only)
         let material: (Data, Data)
         do {
             if let secretsDir {
@@ -66,7 +58,7 @@ public enum RptConnectOrchestrator {
             )
         }
 
-        // 3. RPT2 handshake against product node
+        // 2. RPT2 handshake against product node
         do {
             let engine = try RptClientEngine(clientPrivRaw: material.0, nodeElgamalPubRaw: material.1)
             let session = try engine.handshake(host: host, port: port, timeout: timeout)

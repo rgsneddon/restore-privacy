@@ -97,17 +97,29 @@ class TestProductConnectNoUkGeoGate(unittest.TestCase):
         self.assertNotIn("UK public-IP gate", text)
 
     def test_apple_product_paths_have_no_uk_gate_call(self):
-        orch = (
+        """All product Apple orchestrators + Packet Tunnel paths (shared + NativePrep)."""
+        orch_paths = (
             ROOT
             / "client_app"
             / "apple_shared"
             / "Rpt2"
             / "Sources"
             / "Rpt2"
-            / "RptConnectOrchestrator.swift"
-        ).read_text(encoding="utf-8")
-        self.assertNotIn("RptUkIpGate.checkUkPublicIp", orch)
-        self.assertNotIn("skipUkGate", orch)
+            / "RptConnectOrchestrator.swift",
+            ROOT / "client_app" / "ios" / "NativePrep" / "Rpt2" / "RptConnectOrchestrator.swift",
+            ROOT / "client_app" / "macos" / "NativePrep" / "Rpt2" / "RptConnectOrchestrator.swift",
+        )
+        for path in orch_paths:
+            self.assertTrue(path.is_file(), f"missing orchestrator: {path}")
+            text = path.read_text(encoding="utf-8")
+            self.assertNotIn(
+                "RptUkIpGate.checkUkPublicIp",
+                text,
+                f"product orchestrator still geo-gates: {path}",
+            )
+            self.assertNotIn("skipUkGate", text, f"stale skipUkGate param: {path}")
+            self.assertNotIn("ukGateFetcher", text, f"stale ukGateFetcher: {path}")
+            self.assertNotIn("UK IP gate", text)
         for rel in (
             "client_app/ios/NativePrep/PacketTunnelProvider.swift",
             "client_app/macos/NativePrep/PacketTunnelProvider.swift",
@@ -115,6 +127,17 @@ class TestProductConnectNoUkGeoGate(unittest.TestCase):
             text = (ROOT / rel).read_text(encoding="utf-8")
             self.assertNotIn("RptUkIpGate.checkUkPublicIp", text)
             self.assertNotIn("UK public IP gate", text)
+        # Host channel diagnostic uses orchestrator connect (no gate args)
+        for rel in (
+            "client_app/ios/NativePrep/RptVpnChannel.swift",
+            "client_app/macos/NativePrep/RptVpnChannel.swift",
+        ):
+            ch = ROOT / rel
+            if not ch.is_file():
+                continue
+            text = ch.read_text(encoding="utf-8")
+            self.assertNotIn("skipUkGate", text)
+            self.assertNotIn("RptUkIpGate", text)
 
 
 if __name__ == "__main__":
