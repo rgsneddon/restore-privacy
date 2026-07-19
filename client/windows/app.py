@@ -56,6 +56,11 @@ from client.windows.elevate import (
     is_admin,
     should_exit_after_elevation,
 )
+from client.windows.tray_win import (
+    TRAY_DISPLAY_NAME,
+    WindowsSystemTray,
+    resolve_tray_icon_path,
+)
 from client.windows.tunnel_win import (
     residual_ip_capture_active,
     start_full_tunnel,
@@ -134,7 +139,9 @@ class TunnelClientApp:
         self._connected = False
         self._busy = False
         self._tunnel = None
+        self._tray: WindowsSystemTray | None = None
         self.client = RptClient(status_cb=self._on_client_status)
+        self._start_system_tray()
 
         # Outer chrome with padding (rounded language via spacing)
         self.chrome = tk.Frame(self.root, bg=CHROME_BG, padx=PANEL_PAD + 4, pady=PANEL_PAD + 4)
@@ -360,6 +367,12 @@ class TunnelClientApp:
         native = Path(__file__).resolve().parent / "native"
         ico = native / "app_icon.ico"
         png = native / "app_icon.png"
+        # Prefer brand logo path (same as tray / shortcuts)
+        brand = resolve_tray_icon_path()
+        if brand is not None and brand.suffix.lower() == ".ico":
+            ico = brand
+        elif brand is not None and brand.suffix.lower() == ".png":
+            png = brand
         try:
             if ico.is_file():
                 self.root.iconbitmap(default=str(ico))
@@ -367,6 +380,48 @@ class TunnelClientApp:
                 img = tk.PhotoImage(file=str(png))
                 self.root.iconphoto(True, img)
                 self._icon_photo = img
+        except Exception:
+            pass
+
+    def _start_system_tray(self) -> None:
+        """Tray identity: Privacy Restored + product logo."""
+        try:
+            tray = WindowsSystemTray(
+                on_show=lambda: self.root.after(0, self._restore_from_tray),
+                on_quit=lambda: self.root.after(0, self._quit_app),
+                on_connect=lambda: self.root.after(0, self._tray_connect),
+                on_disconnect=lambda: self.root.after(0, self._tray_disconnect),
+            )
+            if tray.start():
+                self._tray = tray
+                self._log(f"System tray: {TRAY_DISPLAY_NAME}")
+        except Exception:
+            self._tray = None
+
+    def _restore_from_tray(self) -> None:
+        try:
+            self.root.deiconify()
+            self.root.lift()
+            self.root.focus_force()
+        except Exception:
+            pass
+
+    def _tray_connect(self) -> None:
+        if not self._connected and not self._busy:
+            self._start_connect()
+
+    def _tray_disconnect(self) -> None:
+        if self._connected and not self._busy:
+            self._start_disconnect()
+
+    def _sync_tray_status(self, *, residual: bool | None = None) -> None:
+        if self._tray is None:
+            return
+        try:
+            self._tray.update_status(
+                connected=self._connected,
+                residual=True if residual is None else residual,
+            )
         except Exception:
             pass
 
@@ -405,12 +460,14 @@ class TunnelClientApp:
             self.detail_var.set(
                 "Your residual public IP uses the VPN node (full-tunnel routes active)."
             )
+            self._sync_tray_status(residual=True)
         elif state == "connected":
             # Should not be product success path; honest fallback only
             self.status_label.configure(fg=STATUS_ERROR_FG)
             self.detail_var.set(
                 "Session up but residual public IP still uses your ISP — not fully protected."
             )
+            self._sync_tray_status(residual=False)
         elif state == "connecting":
             self.status_label.configure(fg=PRIMARY_DARK)
             self.detail_var.set("Please wait… setting up a secure connection.")
@@ -421,9 +478,11 @@ class TunnelClientApp:
             # STATUS_ERROR / STATUS_ERROR_FG are hex colors — never message strings
             self.status_label.configure(fg=STATUS_ERROR_FG)
             self.detail_var.set(detail or "Check the activity log, then try Connect again.")
+            self._sync_tray_status(residual=False)
         else:
             self.status_label.configure(fg=TEXT)
             self.detail_var.set("Not connected. Press Connect when you want protection.")
+            self._sync_tray_status(residual=False)
 
     def _apply_control(self, *, connected: bool, busy: bool) -> None:
         self._connected = connected
@@ -569,23 +628,24 @@ class TunnelClientApp:
             self._log(f"Could not open browser: {exc}. Visit: {url}")
 
     def _on_close_ui_only(self) -> None:
-        """Hide UI; keep process + tunnel alive (taskbar). Disconnect is separate.
+        """Hide UI; keep process + tunnel alive (tray / taskbar). Disconnect is separate.
 
         Destroying the window would end mainloop and kill residual dual /1 routes
-        without rollback — so we iconify instead of destroy.
+        without rollback — so we withdraw to tray instead of destroy.
         """
         try:
             self._log(
-                "Window hidden — VPN keeps running if connected. "
-                "Restore from the taskbar. Press Disconnect to stop, or Quit to exit."
+                f"Window hidden — VPN keeps running if connected. "
+                f"Restore from the system tray ({TRAY_DISPLAY_NAME}) or taskbar. "
+                "Press Disconnect to stop, or Quit to exit."
             )
         except Exception:
             pass
         try:
-            self.root.iconify()
+            self.root.withdraw()
         except Exception:
             try:
-                self.root.withdraw()
+                self.root.iconify()
             except Exception:
                 pass
 
@@ -595,6 +655,12 @@ class TunnelClientApp:
             self._log("Quit — stopping tunnel and exiting…")
         except Exception:
             pass
+        if self._tray is not None:
+            try:
+                self._tray.stop()
+            except Exception:
+                pass
+            self._tray = None
         tunnel = self._tunnel
         self._tunnel = None
         try:

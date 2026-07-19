@@ -16,7 +16,9 @@ import traceback
 from pathlib import Path
 
 APP_NAME = "RestorePrivacy"
-VERSION = "0.1.3"
+VERSION = "0.1.4"
+# User-facing shortcut / tray product name (logo icon on Start Menu + Desktop)
+SHORTCUT_DISPLAY_NAME = "Privacy Restored"
 # Install under LocalAppData so no elevation is required for deploy.
 INSTALL_DIR = Path(os.environ.get("LOCALAPPDATA", str(Path.home()))) / "Programs" / APP_NAME
 USER_SECRETS = Path.home() / ".restore-privacy" / "secrets"
@@ -56,7 +58,7 @@ def _payload_root() -> Path:
         if d.is_dir():
             return d
     raise FileNotFoundError(
-        "Client payload not found. Build with scripts/build_release_0.1.3.py first."
+        "Client payload not found. Build with scripts/build_release_0.1.4.py first."
     )
 
 
@@ -170,16 +172,35 @@ def _write_version(install_dir: Path) -> None:
     )
 
 
-def _create_shortcut(target: Path, link_path: Path, workdir: Path) -> None:
-    """Create .lnk; mark Run as administrator so double-click triggers UAC once."""
+def resolve_shortcut_icon(install_dir: Path, target: Path) -> Path:
+    """Logo ICO for Start Menu / Desktop shortcuts (product brand)."""
+    candidates = [
+        install_dir / "app_icon.ico",
+        install_dir / "client" / "windows" / "native" / "app_icon.ico",
+        install_dir / "_internal" / "client" / "windows" / "native" / "app_icon.ico",
+        install_dir / "_internal" / "app_icon.ico",
+        target,  # exe may embed icon from PyInstaller --icon
+    ]
+    for p in candidates:
+        if p.is_file() and p.suffix.lower() == ".ico":
+            return p
+    return target
+
+
+def _create_shortcut(
+    target: Path, link_path: Path, workdir: Path, *, icon: Path | None = None
+) -> None:
+    """Create .lnk with brand logo icon; Run as administrator for one UAC click."""
     link_path.parent.mkdir(parents=True, exist_ok=True)
-    # PowerShell COM shortcut + set "Run as administrator" bit (0x20 at offset 0x15)
+    icon_path = icon or resolve_shortcut_icon(workdir, target)
+    # PowerShell COM shortcut + IconLocation + "Run as administrator" bit (0x20 @ 0x15)
     ps = (
         f'$ws = New-Object -ComObject WScript.Shell; '
         f'$s = $ws.CreateShortcut({str(link_path)!r}); '
         f'$s.TargetPath = {str(target)!r}; '
         f'$s.WorkingDirectory = {str(workdir)!r}; '
-        f'$s.Description = "Restore Privacy VPN Client {VERSION} (elevates for full tunnel)"; '
+        f'$s.Description = "{SHORTCUT_DISPLAY_NAME} VPN Client {VERSION} (elevates for full tunnel)"; '
+        f'$s.IconLocation = {str(icon_path)!r} + ",0"; '
         f"$s.Save(); "
         f"$p = {str(link_path)!r}; "
         f"$b = [System.IO.File]::ReadAllBytes($p); "
@@ -224,17 +245,46 @@ def install(launch: bool = True) -> Path:
             f"Place {CLIENT_PRIV} and {NODE_PUB} under {INSTALL_DIR / 'secrets'}"
         )
 
-    # Start menu + desktop shortcuts
+    # Ensure brand logo ICO sits next to installed exe for shortcut IconLocation
     try:
+        for src_name in (
+            Path(__file__).resolve().parent / "native" / "app_icon.ico",
+        ):
+            if src_name.is_file():
+                dest_ico = INSTALL_DIR / "app_icon.ico"
+                if not dest_ico.is_file():
+                    shutil.copy2(src_name, dest_ico)
+                break
+        # Copy from payload tree if native icon was bundled under client path
+        for hit in INSTALL_DIR.rglob("app_icon.ico"):
+            if hit.is_file():
+                shutil.copy2(hit, INSTALL_DIR / "app_icon.ico")
+                break
+    except Exception:
+        pass
+
+    icon = resolve_shortcut_icon(INSTALL_DIR, installed_exe)
+
+    # Start menu + desktop shortcuts (display name: Privacy Restored + logo)
+    try:
+        _create_shortcut(
+            installed_exe,
+            START_MENU / f"{SHORTCUT_DISPLAY_NAME}.lnk",
+            INSTALL_DIR,
+            icon=icon,
+        )
+        _create_shortcut(
+            installed_exe,
+            DESKTOP / f"{SHORTCUT_DISPLAY_NAME}.lnk",
+            INSTALL_DIR,
+            icon=icon,
+        )
+        # Also keep legacy RestorePrivacy.lnk for upgrades that look for old name
         _create_shortcut(
             installed_exe,
             START_MENU / f"{APP_NAME}.lnk",
             INSTALL_DIR,
-        )
-        _create_shortcut(
-            installed_exe,
-            DESKTOP / f"{APP_NAME}.lnk",
-            INSTALL_DIR,
+            icon=icon,
         )
     except Exception:
         # Shortcuts are nice-to-have; install still succeeds
@@ -244,9 +294,10 @@ def install(launch: bool = True) -> Path:
     uninst = INSTALL_DIR / "Uninstall.bat"
     uninst.write_text(
         "@echo off\r\n"
-        f"title Uninstall Restore Privacy {VERSION}\r\n"
+        f"title Uninstall {SHORTCUT_DISPLAY_NAME} {VERSION}\r\n"
         f'rmdir /s /q "%LOCALAPPDATA%\\Programs\\{APP_NAME}"\r\n'
         f'rmdir /s /q "%APPDATA%\\Microsoft\\Windows\\Start Menu\\Programs\\{APP_NAME}"\r\n'
+        f'del /q "%USERPROFILE%\\Desktop\\{SHORTCUT_DISPLAY_NAME}.lnk" 2>nul\r\n'
         f'del /q "%USERPROFILE%\\Desktop\\{APP_NAME}.lnk" 2>nul\r\n'
         "echo Uninstalled.\r\n"
         "pause\r\n",

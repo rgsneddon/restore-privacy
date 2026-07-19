@@ -84,6 +84,8 @@ def build_client_onedir() -> Path:
         if old.exists():
             shutil.rmtree(old)
 
+    icon = ROOT / "client" / "windows" / "native" / "app_icon.ico"
+    brand_png = ROOT / "client" / "windows" / "native" / "app_icon.png"
     cmd = [
         sys.executable,
         "-m",
@@ -132,8 +134,17 @@ def build_client_onedir() -> Path:
         "client.windows.tunnel_win",
         "--hidden-import",
         "client.windows.elevate",
+        "--hidden-import",
+        "client.windows.tray_win",
+        "--hidden-import",
+        "client.ui_theme",
         str(entry),
     ]
+    if icon.is_file():
+        cmd.extend(["--icon", str(icon)])
+        cmd.extend(["--add-data", f"{icon};client/windows/native"])
+    if brand_png.is_file():
+        cmd.extend(["--add-data", f"{brand_png};client/windows/native"])
     # Bundle public node key only (never a shared client_ed25519.priv)
     secrets_src = ROOT / "secrets"
     if (secrets_src / "node_elgamal.pub").is_file():

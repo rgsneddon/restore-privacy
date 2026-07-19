@@ -1,4 +1,4 @@
-"""Tests for shipped status-page download catalog (release 0.1.3)."""
+"""Tests for shipped status-page download catalog (release 0.1.4)."""
 
 from __future__ import annotations
 
@@ -24,8 +24,8 @@ from downloads import (  # noqa: E402
 
 class TestDownloadCatalog(unittest.TestCase):
     def test_version_is_0_1_0(self):
-        self.assertEqual(RELEASE_VERSION, "0.1.3")
-        self.assertEqual(RELEASE_TAG, "0.1.3")
+        self.assertEqual(RELEASE_VERSION, "0.1.4")
+        self.assertEqual(RELEASE_TAG, "0.1.4")
 
     def test_public_assets_include_all_platforms(self):
         assets = available_downloads()
@@ -47,25 +47,25 @@ class TestDownloadCatalog(unittest.TestCase):
             MACOS_ZIP_FILENAME,
             IOS_ZIP_FILENAME,
         ):
-            self.assertIn("0.1.3", name)
+            self.assertIn("0.1.4", name)
 
     def test_available_downloads_have_https_github_release_urls(self):
         assets = available_downloads()
         for a in assets:
             self.assertTrue(a.url.startswith("https://"))
-            self.assertIn("/releases/download/0.1.3/", a.url)
+            self.assertIn("/releases/download/0.1.4/", a.url)
             self.assertIn(a.filename, a.url)
-            self.assertIn("0.1.3", a.filename)
+            self.assertIn("0.1.4", a.filename)
             # URLs come from shipped DownloadAsset.url property, not test-only strings
             expected = (
                 f"https://github.com/rgsneddon/restore-privacy/releases/download/"
-                f"0.1.3/{a.filename}"
+                f"0.1.4/{a.filename}"
             )
             self.assertEqual(a.url, expected)
 
     def test_render_download_section_uses_real_urls(self):
         html = render_download_section_html()
-        self.assertIn("Download client v0.1.3", html)
+        self.assertIn("Download client v0.1.4", html)
         self.assertIn('class="dl"', html)
         self.assertIn("Windows", html)
         self.assertIn("Android", html)
@@ -86,8 +86,8 @@ class TestDownloadCatalog(unittest.TestCase):
         self.assertIn("RESTORE PRIVACY", page)
         self.assertIn("clients-connected", page)
         self.assertIn("fetch('/api/status'", page)
-        self.assertIn("Download client v0.1.3", page)
-        self.assertIn("releases/download/0.1.3/", page)
+        self.assertIn("Download client v0.1.4", page)
+        self.assertIn("releases/download/0.1.4/", page)
         self.assertIn(WINDOWS_EXE_FILENAME, page)
         self.assertIn(ANDROID_APK_FILENAME, page)
         self.assertIn(MACOS_ZIP_FILENAME, page)
@@ -101,11 +101,11 @@ class TestDownloadCatalog(unittest.TestCase):
 
 
 class TestInstallerPackagingRecipe(unittest.TestCase):
-    """Structural: 0.1.3 build recipe produces advertised package names."""
+    """Structural: 0.1.4 build recipe produces advertised package names."""
 
     def test_build_script_wires_all_platform_names(self):
-        script = (ROOT / "scripts" / "build_release_0.1.3.py").read_text(encoding="utf-8")
-        self.assertIn('VERSION = "0.1.3"', script)
+        script = (ROOT / "scripts" / "build_release_0.1.4.py").read_text(encoding="utf-8")
+        self.assertIn('VERSION = "0.1.4"', script)
         self.assertIn("windows-x64-setup.exe", script)
         self.assertIn("android.apk", script)
         self.assertIn("macos.zip", script)
@@ -136,7 +136,7 @@ class TestInstallerPackagingRecipe(unittest.TestCase):
 
     def test_installer_module_version(self):
         inst = (ROOT / "client" / "windows" / "installer.py").read_text(encoding="utf-8")
-        self.assertIn('VERSION = "0.1.3"', inst)
+        self.assertIn('VERSION = "0.1.4"', inst)
         self.assertIn("def install", inst)
 
 

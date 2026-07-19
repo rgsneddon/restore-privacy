@@ -80,7 +80,7 @@ class TestReadmePublicClientOnly(unittest.TestCase):
         self.assertTrue("android" in lower or "apk" in lower)
         self.assertTrue("macos" in lower)
         self.assertTrue("ios" in lower)
-        self.assertIn("0.1.3", text)
+        self.assertIn("0.1.4", text)
         # Not prep-stub-only Apple wording
         self.assertNotIn("prep stubs", lower)
 

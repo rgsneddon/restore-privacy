@@ -35,7 +35,7 @@ class TestMacosSignNotarizeScript(unittest.TestCase):
         self.assertIn("inject_apple_secrets", text)
 
     def test_release_package_script_calls_sign_and_notarize(self):
-        rel = ROOT / "scripts" / "build_release_0.1.3.py"
+        rel = ROOT / "scripts" / "build_release_0.1.4.py"
         self.assertTrue(rel.is_file())
         text = rel.read_text(encoding="utf-8")
         self.assertIn("sign_and_notarize_macos", text)

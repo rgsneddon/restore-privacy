@@ -1,8 +1,8 @@
 # Privacy Policy — Restore Privacy
 
-**Last updated:** 18 July 2026  
+**Last updated:** 19 July 2026  
 **Product:** Restore Privacy Tunnel (RPT) — custom VPN node, client apps, and public status page  
-**Current client packages:** [v0.1.3](https://github.com/rgsneddon/restore-privacy/releases/tag/0.1.3) (Windows · Android · macOS · iOS)  
+**Current client packages:** [v0.1.4](https://github.com/rgsneddon/restore-privacy/releases/tag/0.1.4) (Windows · Android; macOS · iOS when published)  
 **Operator / project:** Russell G Sneddon (`rgsneddon`) / public repository [restore-privacy](https://github.com/rgsneddon/restore-privacy)
 
 This policy describes how the **Restore Privacy** software is designed to handle data. It is written for end users and operators. It is **not** legal advice and is not a jurisdiction-specific compliance certificate (e.g. full GDPR/CCPA legal opinion).
@@ -47,18 +47,18 @@ Process stdout/stderr for the node service is configured for **no journal sessio
 
 ### 3.2 Client applications (Windows, Android, iOS, and macOS)
 
-- On launch, clients **auto-connect** to the configured RPT node endpoint.
-- They use **local** cryptographic material (when provisioned) to complete admission and establish session keys.
-- **Full-tunnel** modes route device traffic into the encrypted tunnel **only when** the OS grants VPN permission (Windows Administrator / UAC, Android VPN consent, iOS/macOS VPN permission). On **iOS and macOS**, full-system VPN uses a signed **Packet Tunnel Network Extension** (and App Group access to admission secrets). Product connect success requires the system tunnel to be active (residual public IP only changes then).
-- **On app close / disconnect**, clients are designed to **fully tear down** the tunnel (routes, TUN/Packet Tunnel, session) so traffic **reverts to the device’s normal public IP path**. Closing the app is not intended to leave residual VPN routing active.
+- **Windows product UI** uses **manual Connect / Disconnect** (no cold auto-connect on launch). Closing the main window **hides** the UI; the tunnel stays up until the user **Disconnects** or **Quits**. The system tray identity is **Privacy Restored** (product logo icon).
+- Clients use **local** cryptographic material (when provisioned) to complete admission and establish session keys when the user connects.
+- **Full-tunnel** modes route device traffic into the encrypted tunnel **only when** the OS grants VPN permission (Windows Administrator / UAC + Wintun dual `/1` routes, Android VPN consent, iOS/macOS VPN permission). On **iOS and macOS**, full-system VPN uses a signed **Packet Tunnel Network Extension** (and App Group access to admission secrets). Product “connected for residual public IP” requires the system tunnel / dual `/1` path to be active (residual public IP only changes then).
+- **On Disconnect / Quit**, clients are designed to **fully tear down** the tunnel (routes, TUN/Packet Tunnel, session) so traffic **reverts to the device’s normal public IP path**.
 - Clients are **not** designed to upload browsing history or identity dossiers to the node as product telemetry.
-- Public download packages (Windows `.exe`, Android `.apk`, macOS `.zip`, iOS `.zip`) may include the **public** node key (`node_elgamal.pub`) so clients can open a HELLO. Each install **generates a unique Ed25519 device private key on first run** and keeps it only in local device-private storage — packages do **not** ship a shared `client_ed25519.priv` (which would allow universal impersonation). They **never** include the **node private key** (`node_elgamal.priv`).
+- Public download packages (Windows `.exe`, Android `.apk`, macOS `.zip`, iOS `.zip`) may include the **public** node key (`node_elgamal.pub`) so clients can open a HELLO. Each install **generates a unique Ed25519 device private key on first run** and keeps it only in local device-private storage — packages do **not** ship a shared `client_ed25519.priv` (which would allow universal impersonation). They **never** include the **node private key** (`node_elgamal.priv`). Windows installers ship a **bundled runtime** (no separate system Python install).
 
 ### 3.3 Public status page (e.g. Render)
 
 - Proxies or displays a **live** `clients_connected` value from the node status API.
 - Updates the number in the browser via **client-side polling** (no requirement to store user history on the page host).
-- May offer **download links** to public GitHub release packages (current catalog: **v0.1.3**).
+- May offer **download links** to public GitHub release packages (current catalog: **v0.1.4**).
 
 ### 3.4 Operator-held secrets
 
