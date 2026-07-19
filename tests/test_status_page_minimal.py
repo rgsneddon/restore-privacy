@@ -1,4 +1,4 @@
-﻿"""Public status page: title + live count + Windows .exe / Android .apk downloads."""
+"""Public status page: title + live count + Windows .exe / Android .apk downloads."""
 
 from __future__ import annotations
 
@@ -34,8 +34,8 @@ class TestPublicPageWithDownloads(unittest.TestCase):
         self.assertIn(">3<", html)
         self.assertIn("fetch('/api/status'", html)
         self.assertIn("setInterval(poll", html)
-        # Download buttons for v0.1.8 exe + apk
-        self.assertIn("Download client v0.1.8", html)
+        # Download buttons for v0.2.0 exe + apk
+        self.assertIn("Download client v0.2.0", html)
         self.assertIn(WINDOWS_EXE_FILENAME, html)
         self.assertIn(ANDROID_APK_FILENAME, html)
         self.assertIn(".exe", html)
@@ -70,10 +70,10 @@ class TestPublicPageWithDownloads(unittest.TestCase):
                     self.assertIn("https://x.com/rgsneddon", html)
                     self.assertIn("clients-connected", html)
                     self.assertIn("fetch('/api/status'", html)
-                    self.assertIn("Download client v0.1.8", html)
+                    self.assertIn("Download client v0.2.0", html)
                     self.assertIn(WINDOWS_EXE_FILENAME, html)
                     self.assertIn(ANDROID_APK_FILENAME, html)
-                    self.assertIn("/releases/download/0.1.8/", html)
+                    self.assertIn("/releases/download/0.2.0/", html)
         finally:
             httpd.shutdown()
             httpd.server_close()

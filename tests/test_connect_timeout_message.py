@@ -1,4 +1,4 @@
-﻿"""Connect timeout messaging must include node host:port; not bare 'timed out'."""
+"""Connect timeout messaging must include node host:port; not bare 'timed out'."""
 
 from __future__ import annotations
 

@@ -123,7 +123,7 @@ def build_client_onedir() -> Path:
         "--hidden-import",
         "client.connect",
         "--hidden-import",
-        "client.uk_gate",
+        "client.endpoint",
         "--hidden-import",
         "client.secrets_loader",
         "--hidden-import",

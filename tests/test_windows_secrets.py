@@ -1,4 +1,4 @@
-﻿"""Windows secrets resolution + provision â€” no 'copy from the node' dead-end when keys present."""
+"""Windows secrets resolution + provision â€” no 'copy from the node' dead-end when keys present."""
 
 from __future__ import annotations
 
@@ -157,13 +157,13 @@ class TestInstallerAndBuildRecipe(unittest.TestCase):
         self.assertIn("node_elgamal.pub", inst)
         self.assertIn("node_elgamal.priv", inst)  # must mention to exclude
         self.assertIn("device Ed25519", inst)
-        self.assertIn('VERSION = "0.1.9"', inst)
+        self.assertIn('VERSION = "0.2.0"', inst)
 
     def test_build_script_injects_secrets(self):
-        script = (ROOT / "scripts" / "build_release_0.1.8.py").read_text(encoding="utf-8")
+        script = (ROOT / "scripts" / "build_release_0.2.0.py").read_text(encoding="utf-8")
         self.assertIn("inject_product_secrets", script)
         self.assertIn("node_elgamal.pub", script)
-        self.assertIn('VERSION = "0.1.8"', script)
+        self.assertIn('VERSION = "0.2.0"', script)
         # Public packages must not embed shared client priv
         lower = script.lower()
         self.assertTrue(

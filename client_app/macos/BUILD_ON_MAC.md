@@ -71,7 +71,7 @@ Identical to iOS / Android:
 | Methods | `connect`, `disconnect` |
 | Args / results | See `lib/vpn_controller.dart` and `lib/connect_status.dart` |
 
-Endpoint defaults: `lib/rpt_config.dart` â†’ `104.156.224.47:44044`.
+Endpoint defaults: `lib/rpt_config.dart` → `82.221.101.241:44044`.
 
 **Residual public IP:** product â€œConnectedâ€ requires Packet Tunnel `.connected`. A host-side RPT2 HELLO alone is diagnostic (`ok: false`) and does **not** change your ISP egress IP â€” enable Network Extension signing/entitlements for full-system VPN.
 

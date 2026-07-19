@@ -1,4 +1,4 @@
-﻿"""Tests read shipped privacy policy, LICENSE, CREDITS, and README how-to."""
+"""Tests read shipped privacy policy, LICENSE, CREDITS, and README how-to."""
 
 from __future__ import annotations
 
@@ -89,7 +89,7 @@ class TestReadmeHowto(unittest.TestCase):
         self.assertIn("android", lower)
         self.assertIn("macos", lower)
         self.assertIn("ios", lower)
-        self.assertIn("0.1.8", text)
+        self.assertIn("0.2.0", text)
         self.assertNotIn("prep â€” finish on a Mac", text)
         self.assertNotIn("prep stubs", lower)
         # Package names from the public release catalog

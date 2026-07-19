@@ -1,4 +1,4 @@
-﻿"""Product Windows path without system Python vs source launch that needs Python.
+"""Product Windows path without system Python vs source launch that needs Python.
 
 End users install the frozen setup.exe (PyInstaller bundled runtime). Developers
 running ``python -m client.windows`` need a host interpreter.

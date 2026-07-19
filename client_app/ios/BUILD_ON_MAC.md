@@ -47,7 +47,7 @@ The **PacketTunnel** target already exists (`NativePrep/PacketTunnelProvider.swi
 | Success result | `{ "ok": true, "message": "…", "vpnIp": "10.88.0.x" }` |
 | Failure result | `{ "ok": false, "message": "…" }` |
 
-Defaults: host/port from `lib/rpt_config.dart` (`104.156.224.47`, `44044`).
+Defaults: host/port from `lib/rpt_config.dart` (`82.221.101.241`, `44044`).
 
 **Residual public IP:** product “Connected” requires Packet Tunnel `.connected`. A host-side RPT2 HELLO alone is diagnostic (`ok: false`) and does **not** change your ISP egress IP — enable Network Extension signing/entitlements for full-system VPN.
 

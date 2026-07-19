@@ -1,4 +1,4 @@
-﻿"""Product residual Connect: elevation + Wintun dual /1 (not queue-as-Connected).
+"""Product residual Connect: elevation + Wintun dual /1 (not queue-as-Connected).
 
 Queue attach remains available for diagnostics when require_system_capture=False.
 Product UI only reports Connected when residual_ip_capture_active.

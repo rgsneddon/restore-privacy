@@ -10,7 +10,7 @@ Reference implementations (read these on Mac):
 ## Constants
 
 - Magic: ASCII `RPT2` (4 bytes)  
-- UDP default: host/port from Flutter `connect` args or `104.156.224.47:44044`  
+- UDP default: host/port from Flutter `connect` args or `82.221.101.241:44044`  
 - Msg types: HELLO client/server, **DATA = 0x03**, **KEEPALIVE = 0x04**  
 
 ## Connect sequence (extension)

@@ -1,4 +1,4 @@
-﻿"""Shipped product endpoint must match Flutter + status page + Apple RptEndpoint."""
+"""Shipped product endpoint must match Flutter + status page + Apple RptEndpoint."""
 
 from __future__ import annotations
 

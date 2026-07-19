@@ -1,4 +1,4 @@
-Restore Privacy — operator / developer sundries
+﻿Restore Privacy â€” operator / developer sundries
 ================================================
 This file holds material that is NOT required for public end users of the
 client app. Public users should follow README.md only.
@@ -6,8 +6,8 @@ client app. Public users should follow README.md only.
 Contents moved from the public-facing README (ports, status-page hosting,
 node deploy, developer client-app notes, local tests, secrets).
 
-Source client version: 0.1.9 (UK geo gate removed — see scripts/RELEASE_NOTES_0.1.9.md).
-Public download catalog may still advertise 0.1.8 until packages are cut
+Source client version: 0.2.0 (product host 82.221.101.241:44044).
+Public download catalog: 0.2.0 (status_page/downloads.py RELEASE_VERSION).
 (see status_page/downloads.py RELEASE_VERSION).
 
 
@@ -17,13 +17,13 @@ SECRETS / RELEASE GATES (mandatory)
   - Public packages must never include node_elgamal.priv or a shared
     client_ed25519.priv. Release scripts run _assert_no_priv / strip inject.
   - VPS/CDN/hosting providers may log IP-level metadata under their policies
-    even when product no-log is enabled (see PRIVACY_POLICY.md §4).
+    even when product no-log is enabled (see PRIVACY_POLICY.md Â§4).
 
 
 1. PORTS
 --------
-  UDP 44044  — RPT tunnel (node listen)
-  TCP 8080   — Node local status UI (title + current client count)
+  UDP 44044  â€” RPT tunnel (node listen)
+  TCP 8080   â€” Node local status UI (title + current client count)
 
   Client apps connect to the configured RPT endpoint (default product host
   uses these ports on the operator's server).
@@ -41,7 +41,7 @@ SECRETS / RELEASE GATES (mandatory)
   (env RPT_STATUS_UPSTREAM, default http://<node>:8080/api/status).
 
   Free tier note: service may sleep after ~15 minutes idle; first hit can
-  take 30–90s to wake.
+  take 30â€“90s to wake.
 
   After deploy, the page shows current client count, download links, and
   Connect via web (honest browser limit + native client actions).
@@ -71,18 +71,18 @@ SECRETS / RELEASE GATES (mandatory)
 
     bash /opt/restore-privacy/node/install.sh
 
-  Tunnel DNS (privacy prep — clients default DNS to 10.88.0.1):
+  Tunnel DNS (privacy prep â€” clients default DNS to 10.88.0.1):
     # After rpt0 is up (install.sh also attempts this):
     bash /opt/restore-privacy/node/install_dns.sh
     # Config sample: node/unbound-rpt.conf (listen 10.88.0.1, ACL 10.88.0.0/24 only)
     # Do NOT open UDP/TCP 53 on the public WAN (not an open resolver).
 
-  Quiet host logging (prep — install.sh also attempts this):
+  Quiet host logging (prep â€” install.sh also attempts this):
     bash /opt/restore-privacy/node/install_host_privacy.sh
     # journald short retention; rpt-node unit uses StandardOutput=null (see install.sh)
-    # Product nolog: node/nolog.py — never enable connection/session logs for RPT.
+    # Product nolog: node/nolog.py â€” never enable connection/session logs for RPT.
 
-  Deploy follow-up (live VPS — not finished by git push alone):
+  Deploy follow-up (live VPS â€” not finished by git push alone):
     1) Copy/install node on the host (install.sh or deploy script)
     2) Confirm rpt-node active and rpt0 has 10.88.0.1
     3) Re-run install_dns.sh + install_host_privacy.sh if needed
@@ -90,10 +90,10 @@ SECRETS / RELEASE GATES (mandatory)
     Then consider further privacy actions (kill-switch, device-key rotate, etc.).
 
   Node properties (operator reference):
-    Admission  — authorized RPT client keys only (ElGamal + Pedersen + Ed25519)
-    Crypto     — custom RPT2 data plane (ChaCha20-Poly1305 after handshake)
-    Relay      — TUN + IP forward + MASQUERADE
-    Privacy    — no user-info / session activity log files by design
+    Admission  â€” authorized RPT client keys only (ElGamal + Pedersen + Ed25519)
+    Crypto     â€” custom RPT2 data plane (ChaCha20-Poly1305 after handshake)
+    Relay      â€” TUN + IP forward + MASQUERADE
+    Privacy    â€” no user-info / session activity log files by design
                  (see PRIVACY_POLICY.md)
 
 
@@ -104,7 +104,7 @@ SECRETS / RELEASE GATES (mandatory)
     python -m client.windows
     # Run as Administrator for full system VPN (Wintun residual IP)
 
-  Linux client (source — Ubuntu 20.04+ / Mint and similar):
+  Linux client (source â€” Ubuntu 20.04+ / Mint and similar):
     pip install -r requirements.txt
     # product residual path needs root + host TUN/`ip` (crypto alone is not enough)
     sudo python -m client.linux
@@ -115,7 +115,7 @@ SECRETS / RELEASE GATES (mandatory)
     python scripts/package_linux.py
     # produces restore-privacy-client-*-linux-x64.tar.gz under releases/
     # see README for install.sh / bin/privacy-restored; re-run package_linux on
-    # every tag so CPython 3.8–3.12 wheels stay current.
+    # every tag so CPython 3.8â€“3.12 wheels stay current.
 
   Android / Flutter:
     cd client_app
@@ -130,19 +130,19 @@ SECRETS / RELEASE GATES (mandatory)
     # alone are Mac-side work (see README Apple section).
 
   Layout:
-    client/       — shared connect path + Windows / Linux native UIs
-    client_app/   — Flutter multi-platform scaffolds
-    node/         — server node
-    status_page/  — public status + downloads
-    scripts/      — deploy / release helpers
+    client/       â€” shared connect path + Windows / Linux native UIs
+    client_app/   â€” Flutter multi-platform scaffolds
+    node/         â€” server node
+    status_page/  â€” public status + downloads
+    scripts/      â€” deploy / release helpers
 
 
 5. RELEASE PACKAGING (operators cutting a tag)
 ---------------------------------------------
   Process notes: scripts/RELEASE.md
 
-  Use the **current tag** recipe only (today: scripts/build_release_0.1.8.py
-  for v0.1.8). Historical scripts/build_release_0.*.py files are archives —
+  Use the **current tag** recipe only (today: scripts/build_release_0.2.0.py
+  for v0.2.0). Historical scripts/build_release_0.*.py files are archives —
   for a new version, copy the latest script and bump VERSION / PRIOR_TAG /
   status_page/downloads.py catalog.
 
@@ -150,11 +150,11 @@ SECRETS / RELEASE GATES (mandatory)
     - _assert_no_priv (or equivalent) on release output
     - inject/provision of node_elgamal.pub only — never node_elgamal.priv
     - never force-add secrets/ to git
-    - re-run python scripts/package_linux.py (also wired in build_release_0.1.8.py)
+    - re-run python scripts/package_linux.py (also wired in build_release_0.2.0.py)
 
   Short cut example:
 
-    python scripts/build_release_0.1.8.py
+    python scripts/build_release_0.2.0.py
     # then gh release create <tag> with assets under releases/
 
 
@@ -164,7 +164,7 @@ SECRETS / RELEASE GATES (mandatory)
     python -m unittest discover -s tests -v
 
 
-7. SECRETS (operators — never commit private keys)
+7. SECRETS (operators â€” never commit private keys)
 --------------------------------------------------
   Public installers do NOT ship private admission keys.
 
@@ -177,13 +177,13 @@ SECRETS / RELEASE GATES (mandatory)
   will not admit the client. Treat private keys as credentials.
 
   Never put root passwords or *.priv files in git or public release zips.
-  SSH login keys for the VPS live under the operator machine ~/.ssh/ — they
+  SSH login keys for the VPS live under the operator machine ~/.ssh/ â€” they
   are not RPT secrets/ and must not be mixed into release packages.
 
 
 8. RELATED LEGAL DOCS
 ---------------------
-  PRIVACY_POLICY.md  — full privacy policy
-  LICENSE            — MIT for original project code
-  CREDITS.md         — third-party attributions (Wintun, cryptography, etc.)
-  audit.md           — static code/policy audit record (operators/reviewers)
+  PRIVACY_POLICY.md  â€” full privacy policy
+  LICENSE            â€” MIT for original project code
+  CREDITS.md         â€” third-party attributions (Wintun, cryptography, etc.)
+  audit.md           â€” static code/policy audit record (operators/reviewers)

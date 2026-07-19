@@ -20,12 +20,12 @@ import kotlin.concurrent.thread
 
 /**
  * Full-tunnel VPN service for Restore Privacy Tunnel (RPT2).
- * Reports handshake/TUN success or failure via [ResultReceiver] â€” no silent fail.
+ * Reports handshake/TUN success or failure via [ResultReceiver] — no silent fail.
  */
 class RptVpnService : VpnService() {
     private var tun: ParcelFileDescriptor? = null
     private val running = AtomicBoolean(false)
-    /** True after intentional disconnect/revoke â€” do not sticky-restart a dead tunnel. */
+    /** True after intentional disconnect/revoke — do not sticky-restart a dead tunnel. */
     private val userStopped = AtomicBoolean(false)
     private var worker: Thread? = null
     private var resultReceiver: ResultReceiver? = null
@@ -70,7 +70,7 @@ class RptVpnService : VpnService() {
                 if (isSessionActive && running.get()) {
                     return START_STICKY
                 }
-                // Process was killed mid-session â€” cannot rehydrate TUN without credentials path;
+                // Process was killed mid-session — cannot rehydrate TUN without credentials path;
                 // drop sticky so OS does not loop empty restarts. User taps Connect again.
                 isSessionActive = false
                 activeVpnIp = ""
@@ -97,7 +97,7 @@ class RptVpnService : VpnService() {
     ) {
         if (!reported.compareAndSet(false, true)) return
         if (!ok) {
-            // Real connect failure only â€” never call report(false) for â€œalready upâ€
+            // Real connect failure only — never call report(false) for â€œalready upâ€
             // (that path must not clear desiredConnected / isSessionActive).
             desiredConnected = false
             isSessionActive = false
@@ -120,7 +120,7 @@ class RptVpnService : VpnService() {
 
     /**
      * Idempotent Connect while session is already up or still handshaking.
-     * Must keep [desiredConnected] / [isSessionActive] â€” never report(false).
+     * Must keep [desiredConnected] / [isSessionActive] — never report(false).
      */
     private fun reportAlreadyRunningSession() {
         desiredConnected = true
@@ -183,7 +183,7 @@ class RptVpnService : VpnService() {
 
     private fun startTunnel(host: String, port: Int, fullTunnel: Boolean, sessionName: String) {
         // Second Connect / Activity recreate while tunnel is up: keep live session.
-        // Never report(false) here â€” that would clear desiredConnected/isSessionActive
+        // Never report(false) here — that would clear desiredConnected/isSessionActive
         // and poison UI rehydrate after minimize.
         if (!running.compareAndSet(false, true)) {
             reportAlreadyRunningSession()
@@ -194,7 +194,7 @@ class RptVpnService : VpnService() {
             running.set(false)
             report(
                 false,
-                "Missing node public key â€” package must include node_elgamal.pub; device Ed25519 is auto-generated",
+                "Missing node public key — package must include node_elgamal.pub; device Ed25519 is auto-generated",
             )
             stopForeground(STOP_FOREGROUND_REMOVE)
             stopSelf()
@@ -232,7 +232,7 @@ class RptVpnService : VpnService() {
                         builder.addRoute("::", 0)
                         ipv6RouteOk = true
                     } catch (_: Exception) {
-                        // Some API levels reject IPv6 routes â€” must not claim IPv6 protected
+                        // Some API levels reject IPv6 routes — must not claim IPv6 protected
                         ipv6RouteOk = false
                     }
                 }
@@ -251,7 +251,7 @@ class RptVpnService : VpnService() {
                     return@thread
                 }
                 if (pfd == null) {
-                    report(false, "VpnService.establish returned null â€” VPN permission or policy blocked TUN")
+                    report(false, "VpnService.establish returned null — VPN permission or policy blocked TUN")
                     running.set(false)
                     stopForeground(STOP_FOREGROUND_REMOVE)
                     stopSelf()
@@ -263,16 +263,16 @@ class RptVpnService : VpnService() {
                 activeIpv6Protected = if (fullTunnel) ipv6RouteOk else null
                 startForeground(NOTIFICATION_ID, buildNotification(sessionName, connecting = false))
                 val msg = if (!fullTunnel) {
-                    "Connected â€” RPT tunnel up (VPN IP ${session.vpnIp})"
+                    "Connected — RPT tunnel up (VPN IP ${session.vpnIp})"
                 } else if (ipv6RouteOk) {
-                    "Connected â€” VPN active; IPv6 ISP path blocked (VPN IP ${session.vpnIp})"
+                    "Connected — VPN active; IPv6 ISP path blocked (VPN IP ${session.vpnIp})"
                 } else {
-                    "Connected â€” IPv4 via VPN; IPv6 not protected (VPN IP ${session.vpnIp})"
+                    "Connected — IPv4 via VPN; IPv6 not protected (VPN IP ${session.vpnIp})"
                 }
                 report(true, msg, session.vpnIp, ipv6Protected = if (fullTunnel) ipv6RouteOk else null)
 
                 // Two threads: TUNâ†’UDP and UDPâ†’TUN.
-                // Do NOT use FileInputStream.available() â€” on Android VPN it often
+                // Do NOT use FileInputStream.available() — on Android VPN it often
                 // stays 0 forever and blackholes all internet traffic.
                 val inTun = FileInputStream(pfd.fileDescriptor)
                 val outTun = FileOutputStream(pfd.fileDescriptor)
@@ -335,7 +335,7 @@ class RptVpnService : VpnService() {
     /**
      * Full teardown: stop dataplane loops, close TUN (clears OS VPN routes so
      * the device reverts to its normal IP path), drop foreground, stop service.
-     * Idempotent â€” safe to call repeatedly from disconnect / onDestroy / onRevoke.
+     * Idempotent — safe to call repeatedly from disconnect / onDestroy / onRevoke.
      */
     private fun stopTunnel() {
         running.set(false)
@@ -365,7 +365,7 @@ class RptVpnService : VpnService() {
     }
 
     override fun onDestroy() {
-        // Process/service death only â€” Activity minimize must not reach here.
+        // Process/service death only — Activity minimize must not reach here.
         // Do not mark userStopped unless already intentional disconnect/revoke,
         // so a sticky restart path is not permanently poisoned.
         if (userStopped.get() || !desiredConnected) {
@@ -378,7 +378,7 @@ class RptVpnService : VpnService() {
     }
 
     override fun onRevoke() {
-        // System revoked VPN permission / another VPN took over â€” tear down fully
+        // System revoked VPN permission / another VPN took over — tear down fully
         userStopped.set(true)
         desiredConnected = false
         stopTunnel()
@@ -394,9 +394,9 @@ class RptVpnService : VpnService() {
             )
         }
         val text = if (connecting) {
-            "Connecting RPT tunnelâ€¦"
+            "Connecting RPT tunnel…"
         } else {
-            "Full VPN active â€” minimize keeps protection on. Use Disconnect to stop."
+            "Full VPN active — minimize keeps protection on. Use Disconnect to stop."
         }
         val title = if (session.isBlank()) "Privacy Restored" else session
         return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
@@ -432,7 +432,7 @@ class RptVpnService : VpnService() {
         const val RESULT_ERR = 1
         private const val NOTIFICATION_ID = 0x5250
 
-        /** UI rehydrate after minimize â€” true while TUN session is up. */
+        /** UI rehydrate after minimize — true while TUN session is up. */
         @Volatile
         var isSessionActive: Boolean = false
 
@@ -462,20 +462,20 @@ class RptVpnService : VpnService() {
             val msg = if (isSessionActive) {
                 when {
                     ipv6Protected == false && ip.isNotEmpty() ->
-                        "Connected â€” IPv4 via VPN; IPv6 not protected (VPN IP $ip)"
+                        "Connected — IPv4 via VPN; IPv6 not protected (VPN IP $ip)"
                     ipv6Protected == false ->
-                        "Connected â€” IPv4 via VPN; IPv6 not protected"
+                        "Connected — IPv4 via VPN; IPv6 not protected"
                     ipv6Protected == true && ip.isNotEmpty() ->
-                        "Connected â€” VPN active; IPv6 ISP path blocked (VPN IP $ip)"
+                        "Connected — VPN active; IPv6 ISP path blocked (VPN IP $ip)"
                     ipv6Protected == true ->
-                        "Connected â€” VPN active; IPv6 ISP path blocked"
+                        "Connected — VPN active; IPv6 ISP path blocked"
                     ip.isNotEmpty() ->
-                        "Connected â€” RPT full tunnel up (VPN IP $ip)"
+                        "Connected — RPT full tunnel up (VPN IP $ip)"
                     else ->
-                        "Connected â€” full tunnel already active"
+                        "Connected — full tunnel already active"
                 }
             } else {
-                "VPN already connectingâ€¦"
+                "VPN already connecting…"
             }
             return Triple(true, true, msg)
         }

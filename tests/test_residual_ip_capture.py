@@ -1,4 +1,4 @@
-﻿"""Residual public IP must use the VPN node â€” not queue-only "Connected".
+"""Residual public IP must use the VPN node â€” not queue-only "Connected".
 
 Evidence targets: dual /1 + Wintun required for product Connect success;
 honest status when residual capture inactive; Disconnect tears routes down.

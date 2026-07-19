@@ -1,4 +1,4 @@
-﻿#!/usr/bin/env python3
+#!/usr/bin/env python3
 """Restore Privacy status page for Render.
 
 Proxies live **current** session count from the Vultr node. The page updates the

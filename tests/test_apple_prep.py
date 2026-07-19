@@ -1,4 +1,4 @@
-﻿"""Structural prep checks for iOS/macOS MacBook builds (no Xcode on Windows)."""
+"""Structural prep checks for iOS/macOS MacBook builds (no Xcode on Windows)."""
 
 from __future__ import annotations
 

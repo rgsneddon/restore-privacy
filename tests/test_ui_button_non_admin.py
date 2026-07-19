@@ -1,4 +1,4 @@
-﻿"""Connect button always visible; residual Connect elevates; diagnostic queue path exists."""
+"""Connect button always visible; residual Connect elevates; diagnostic queue path exists."""
 
 from __future__ import annotations
 

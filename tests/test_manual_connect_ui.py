@@ -1,4 +1,4 @@
-﻿"""Manual Connect/Disconnect UI: no auto-connect, no close teardown, sleek status, upgrade."""
+"""Manual Connect/Disconnect UI: no auto-connect, no close teardown, sleek status, upgrade."""
 
 from __future__ import annotations
 

@@ -1,4 +1,4 @@
-﻿"""Tests drive the shipped client connect / full-tunnel / UI theme paths."""
+"""Tests drive the shipped client connect / full-tunnel / UI theme paths."""
 
 from __future__ import annotations
 

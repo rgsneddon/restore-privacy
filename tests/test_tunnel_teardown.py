@@ -1,4 +1,4 @@
-﻿"""Full tunnel teardown on app close â€” Windows routes/stop + Android disconnect wiring.
+"""Full tunnel teardown on app close â€” Windows routes/stop + Android disconnect wiring.
 
 Tests drive the shipped teardown helpers and source control-flow (not reimplementations).
 """

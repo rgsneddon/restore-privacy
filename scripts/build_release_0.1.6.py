@@ -1,4 +1,4 @@
-﻿#!/usr/bin/env python3
+#!/usr/bin/env python3
 """Build / stage Restore Privacy client packages for release 0.1.6.
 
 Apple packages include Packet Tunnel Team signing + App Group secrets seed.

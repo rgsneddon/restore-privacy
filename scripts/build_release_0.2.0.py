@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Build / stage Restore Privacy client packages for release 0.1.8.
+"""Build / stage Restore Privacy client packages for release 0.2.0.
 
 Apple packages include Packet Tunnel Team signing + App Group secrets seed.
 Windows/Android are staged from 0.1.2 when not rebuilt on this host.
@@ -26,7 +26,7 @@ import zipfile
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-VERSION = "0.1.8"
+VERSION = "0.2.0"
 OUT = ROOT / "releases" / VERSION
 WINDOWS_EXE_NAME = f"restore-privacy-client-{VERSION}-windows-x64-setup.exe"
 ANDROID_APK_NAME = f"restore-privacy-client-{VERSION}-android.apk"
@@ -47,7 +47,7 @@ MACOS_APP = (
 IOS_APP = ROOT / "client_app" / "build" / "ios" / "iphoneos" / "Runner.app"
 
 # Prior release used when Windows/Android cannot be rebuilt on this host
-PRIOR_TAG = "0.1.7"
+PRIOR_TAG = "0.1.8"
 PRIOR_WINDOWS = f"restore-privacy-client-{PRIOR_TAG}-windows-x64-setup.exe"
 PRIOR_ANDROID = f"restore-privacy-client-{PRIOR_TAG}-android.apk"
 PRIOR_DOWNLOAD = (
@@ -78,7 +78,7 @@ def write_version_files() -> None:
     if inst.is_file():
         t = inst.read_text(encoding="utf-8")
         t2 = t
-        for old in ("0.1.7", "0.1.6", "0.1.5", "0.1.4", "0.1.3", "0.1.2", "0.1.1", "0.1.0", "0.0.9"):
+        for old in ("0.1.9", "0.1.8", "0.1.7", "0.1.6", "0.1.5", "0.1.4", "0.1.3", "0.1.2", "0.1.1", "0.1.0", "0.0.9"):
             t2 = t2.replace(f'VERSION = "{old}"', f'VERSION = "{VERSION}"')
             t2 = t2.replace(f"build_release_{old}.py", f"build_release_{VERSION}.py")
         if t2 != t:
@@ -418,7 +418,7 @@ def main() -> int:
             for name, dig in artifacts.items()
         ],
         "notes": (
-            "0.1.8: Linux installer package with baked-in cryptography wheels; "
+            "0.2.0: Linux installer package with baked-in cryptography wheels; "
             "Ubuntu 20.04+ family support; tray logo; clean UI. "
             "0.1.7: tray logo+status, mojibake-free UI, same-version install speed."
         ),

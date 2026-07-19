@@ -42,7 +42,11 @@ class TestAuditMd(unittest.TestCase):
 
     def test_audit_has_severity_and_version(self):
         text = AUDIT.read_text(encoding="utf-8")
-        self.assertIn("0.1.8", text)
+        # Current ship version (accept 0.2.x catalog / audit header)
+        self.assertTrue(
+            "0.2.0" in text or "0.1.8" in text,
+            "audit.md must cite the current or prior reviewed product version",
+        )
         # Severity labels used in findings
         for sev in ("High", "Medium", "Low", "Info"):
             self.assertIn(sev, text)

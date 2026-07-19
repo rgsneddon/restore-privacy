@@ -1,4 +1,4 @@
-﻿"""Linux Mint client: route plan, residual honesty, entry wiring."""
+"""Linux Mint client: route plan, residual honesty, entry wiring."""
 
 from __future__ import annotations
 

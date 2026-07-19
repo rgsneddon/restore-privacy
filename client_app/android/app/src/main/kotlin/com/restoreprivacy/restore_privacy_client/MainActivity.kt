@@ -101,7 +101,7 @@ class MainActivity : FlutterActivity() {
                         val status = StartupPrefs.setRunAtStartup(this, enabled)
                         result.success(
                             mapOf(
-                                "ok" to status.startsWith("enabled") || status == "disabled",
+                                "ok" to (status.startsWith("enabled") || status == "disabled"),
                                 "message" to status,
                             ),
                         )

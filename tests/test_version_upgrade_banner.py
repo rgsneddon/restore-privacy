@@ -1,4 +1,4 @@
-﻿"""Running version must not fall back to 0.0.0; upgrade banner only when behind."""
+"""Running version must not fall back to 0.0.0; upgrade banner only when behind."""
 
 from __future__ import annotations
 

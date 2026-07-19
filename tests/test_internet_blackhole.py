@@ -1,4 +1,4 @@
-﻿"""Anti-blackhole: full-tunnel routes + dataplane must not trap internet traffic."""
+"""Anti-blackhole: full-tunnel routes + dataplane must not trap internet traffic."""
 
 from __future__ import annotations
 

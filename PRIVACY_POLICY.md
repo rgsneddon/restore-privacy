@@ -1,9 +1,8 @@
-# Privacy Policy  -  Restore Privacy
+﻿# Privacy Policy  -  Restore Privacy
 
-**Last updated:** 19 July 2026  
+**Last updated:** 19 July 2026
 **Product:** Restore Privacy Tunnel (RPT)  -  custom VPN node, client apps, and public status page  
-**Current public packages:** [v0.1.8](https://github.com/rgsneddon/restore-privacy/releases/tag/0.1.8) (Windows | Android | Linux installer for Ubuntu 20.04+ / Mint; macOS | iOS prep packages for Mac-side signing)  
-**Source / next tag prep:** **v0.1.9** — UK public-IP geo admission removed (see below); packages when cut  
+**Current public packages:** [v0.2.0](https://github.com/rgsneddon/restore-privacy/releases/tag/0.2.0) (Windows | Android | Linux; macOS | iOS prep packages)  
 **Operator / project:** Russell G Sneddon (`rgsneddon`) / public repository [restore-privacy](https://github.com/rgsneddon/restore-privacy)
 
 This policy describes how the **Restore Privacy** software is designed to handle data. It is written for end users and operators. It is **not** legal advice and is not a jurisdiction-specific compliance certificate (e.g. full GDPR/CCPA legal opinion).
@@ -40,6 +39,8 @@ Process stdout/stderr for the node service is configured for **no journal sessio
 
 ### 3.1 VPN node (server)
 
+- Production product endpoint used by current client packages: **UDP 82.221.101.241:44044** (operator-hosted RPT node).
+
 - Listens for RPT tunnel handshakes and **encrypted** data frames.
 - **Admits** only peers that complete the product handshake with an **authorized client key** (Ed25519 allow-list + ElGamal / Pedersen-based handshake materials).
 - Assigns a temporary tunnel IP and **relays** IP traffic (forwarding + NAT) while the session is active.
@@ -62,7 +63,7 @@ Process stdout/stderr for the node service is configured for **no journal sessio
 
 - Proxies or displays a **live** `clients_connected` value from the node status API.
 - Updates the number in the browser via **client-side polling** (no requirement to store user history on the page host).
-- May offer **download links** to public GitHub release packages (current catalog: **v0.1.8**).
+- May offer **download links** to public GitHub release packages (current catalog: **v0.2.0**).
 
 ### 3.4 Operator-held secrets
 
