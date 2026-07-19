@@ -174,20 +174,20 @@ class TestThemeAndStatus(unittest.TestCase):
 
 class TestUpgradeOption(unittest.TestCase):
     def test_version_is_behind(self):
-        self.assertTrue(version_is_behind("0.1.3", "0.1.4"))
-        self.assertFalse(version_is_behind("0.1.4", "0.1.4"))
-        self.assertFalse(version_is_behind("0.1.5", "0.1.4"))
-        self.assertTrue(version_is_behind("0.0.8", "0.1.4"))
+        self.assertTrue(version_is_behind("0.1.4", "0.1.5"))
+        self.assertFalse(version_is_behind("0.1.5", "0.1.5"))
+        self.assertFalse(version_is_behind("0.1.6", "0.1.5"))
+        self.assertTrue(version_is_behind("0.0.8", "0.1.5"))
 
     def test_upgrade_available_helpers(self):
-        self.assertTrue(upgrade_available("0.1.0", "0.1.4"))
-        self.assertFalse(upgrade_available("0.1.4", "0.1.4"))
-        msg = upgrade_banner_text("0.1.0", "0.1.4")
+        self.assertTrue(upgrade_available("0.1.0", "0.1.5"))
+        self.assertFalse(upgrade_available("0.1.5", "0.1.5"))
+        msg = upgrade_banner_text("0.1.0", "0.1.5")
         self.assertIsNotNone(msg)
         assert msg is not None
         self.assertIn("0.1.0", msg)
-        self.assertIn("0.1.4", msg)
-        self.assertIsNone(upgrade_banner_text("0.1.4", "0.1.4"))
+        self.assertIn("0.1.5", msg)
+        self.assertIsNone(upgrade_banner_text("0.1.5", "0.1.5"))
 
     def test_app_wires_upgrade_ui(self):
         src = (ROOT / "client" / "windows" / "app.py").read_text(encoding="utf-8")

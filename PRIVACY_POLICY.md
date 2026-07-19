@@ -2,7 +2,7 @@
 
 **Last updated:** 19 July 2026  
 **Product:** Restore Privacy Tunnel (RPT) — custom VPN node, client apps, and public status page  
-**Current client packages:** [v0.1.4](https://github.com/rgsneddon/restore-privacy/releases/tag/0.1.4) (Windows · Android; macOS · iOS when published)  
+**Current client packages:** [v0.1.5](https://github.com/rgsneddon/restore-privacy/releases/tag/0.1.5) (Windows · Android; macOS · iOS prep packages for Mac-side signing)  
 **Operator / project:** Russell G Sneddon (`rgsneddon`) / public repository [restore-privacy](https://github.com/rgsneddon/restore-privacy)
 
 This policy describes how the **Restore Privacy** software is designed to handle data. It is written for end users and operators. It is **not** legal advice and is not a jurisdiction-specific compliance certificate (e.g. full GDPR/CCPA legal opinion).
@@ -47,7 +47,8 @@ Process stdout/stderr for the node service is configured for **no journal sessio
 
 ### 3.2 Client applications (Windows, Android, iOS, and macOS)
 
-- **Windows product UI** uses **manual Connect / Disconnect** (no cold auto-connect on launch). Closing the main window **hides** the UI; the tunnel stays up until the user **Disconnects** or **Quits**. The system tray identity is **Privacy Restored** (product logo icon).
+- **Product UI** uses **manual Connect / Disconnect** by default. Optional **Settings** preferences (stored only on the device) let the user enable **run at device startup** and/or **autoconnect on launch** (both **off** until opted in). These preferences are local only — not synced to the node or status page.
+- Closing or minimizing the main UI is designed to **leave the tunnel running** until the user **Disconnects** or **Quits** (Windows tray identity: **Privacy Restored**). Android keep-alive uses a foreground VPN service; Activity destroy does not stop the tunnel.
 - Clients use **local** cryptographic material (when provisioned) to complete admission and establish session keys when the user connects.
 - **Full-tunnel** modes route device traffic into the encrypted tunnel **only when** the OS grants VPN permission (Windows Administrator / UAC + Wintun dual `/1` routes, Android VPN consent, iOS/macOS VPN permission). On **iOS and macOS**, full-system VPN uses a signed **Packet Tunnel Network Extension** (and App Group access to admission secrets). Product “connected for residual public IP” requires the system tunnel / dual `/1` path to be active (residual public IP only changes then).
 - **On Disconnect / Quit**, clients are designed to **fully tear down** the tunnel (routes, TUN/Packet Tunnel, session) so traffic **reverts to the device’s normal public IP path**.
@@ -58,7 +59,7 @@ Process stdout/stderr for the node service is configured for **no journal sessio
 
 - Proxies or displays a **live** `clients_connected` value from the node status API.
 - Updates the number in the browser via **client-side polling** (no requirement to store user history on the page host).
-- May offer **download links** to public GitHub release packages (current catalog: **v0.1.4**).
+- May offer **download links** to public GitHub release packages (current catalog: **v0.1.5**).
 
 ### 3.4 Operator-held secrets
 
