@@ -86,10 +86,27 @@ def elevation_working_directory() -> str:
         return os.getcwd()
 
 
+def _windowed_python_host() -> str:
+    """Prefer pythonw.exe so elevated GUI does not open a bare console."""
+    try:
+        from client.windows.launch_gui import resolve_pythonw
+
+        pyw = resolve_pythonw()
+        if pyw is not None and pyw.is_file():
+            return str(pyw.resolve())
+    except Exception:
+        pass
+    return str(Path(sys.executable).resolve())
+
+
 def launch_argv_for_elevation(
     extra_args: Optional[list[str]] = None,
 ) -> tuple[str, str]:
-    """Return (executable, parameter string) for re-launching this process elevated."""
+    """Return (executable, parameter string) for re-launching this process elevated.
+
+    Non-frozen product path uses the windowed host (pythonw) when available so
+    UAC re-launch does not present a bare ``python.exe`` console as the UI.
+    """
     extra = list(extra_args or [])
     if getattr(sys, "frozen", False):
         exe = str(Path(sys.executable).resolve())
@@ -101,8 +118,8 @@ def launch_argv_for_elevation(
         params = subprocess_list2cmdline(args) if args else ""
         return exe, params
 
-    # Dev: python -m client.windows …
-    exe = str(Path(sys.executable).resolve())
+    # Dev / module launch: prefer pythonw + -m client.windows
+    exe = _windowed_python_host()
     # Rebuild: -m client.windows [args…]
     parts: list[str] = []
     # Prefer module form when launched as __main__ of client.windows

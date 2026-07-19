@@ -632,8 +632,16 @@ def main() -> int:
     except Exception:
         pass
 
+    # Product surface is Tk — detach any leftover console host window.
+    try:
+        from client.windows.launch_gui import free_console_if_attached
+
+        free_console_if_attached()
+    except Exception:
+        pass
+
     # Optional launch elevate so Connect can apply residual routes without a second UAC.
-    # If cancelled, UI still opens; Connect will request elevation again.
+    # Elevated child prefers pythonw (windowed host). If cancelled, UI still opens.
     status = elevate_if_needed()
     if should_exit_after_elevation(status):
         return 0
