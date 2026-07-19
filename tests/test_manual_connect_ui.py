@@ -1,4 +1,4 @@
-"""Manual Connect/Disconnect UI: no auto-connect, no close teardown, sleek status, upgrade."""
+﻿"""Manual Connect/Disconnect UI: no auto-connect, no close teardown, sleek status, upgrade."""
 
 from __future__ import annotations
 
@@ -53,7 +53,7 @@ class TestManualControlPolicy(unittest.TestCase):
 
     def test_close_path_no_teardown(self):
         src = (ROOT / "client" / "windows" / "app.py").read_text(encoding="utf-8")
-        # Close hides (iconify/withdraw) — does not destroy process or stop tunnel
+        # Close hides (iconify/withdraw) â€” does not destroy process or stop tunnel
         close = src[src.index("def _on_close_ui_only") : src.index("def _quit_app")]
         self.assertNotIn("stop_full_tunnel", close)
         self.assertNotIn("disconnect_full_tunnel", close)
@@ -93,7 +93,7 @@ class TestManualControlPolicy(unittest.TestCase):
         self.assertIn("def _disconnect_tunnel", src)
         self.assertIn("disconnect_full_tunnel", src)
         self.assertIn('self._set_status("disconnecting")', disc)
-        self.assertIn("Disconnecting…", src)  # button busy label in _apply_control
+        self.assertIn("Disconnectingâ€¦", src)  # button busy label in _apply_control
 
     def test_connect_handler_starts_tunnel(self):
         src = (ROOT / "client" / "windows" / "app.py").read_text(encoding="utf-8")
@@ -174,20 +174,20 @@ class TestThemeAndStatus(unittest.TestCase):
 
 class TestUpgradeOption(unittest.TestCase):
     def test_version_is_behind(self):
-        self.assertTrue(version_is_behind("0.1.4", "0.1.5"))
-        self.assertFalse(version_is_behind("0.1.5", "0.1.5"))
-        self.assertFalse(version_is_behind("0.1.6", "0.1.5"))
-        self.assertTrue(version_is_behind("0.0.8", "0.1.5"))
+        self.assertTrue(version_is_behind("0.1.5", "0.1.6"))
+        self.assertFalse(version_is_behind("0.1.6", "0.1.6"))
+        self.assertFalse(version_is_behind("0.1.7", "0.1.6"))
+        self.assertTrue(version_is_behind("0.0.8", "0.1.6"))
 
     def test_upgrade_available_helpers(self):
-        self.assertTrue(upgrade_available("0.1.0", "0.1.5"))
-        self.assertFalse(upgrade_available("0.1.5", "0.1.5"))
-        msg = upgrade_banner_text("0.1.0", "0.1.5")
+        self.assertTrue(upgrade_available("0.1.0", "0.1.6"))
+        self.assertFalse(upgrade_available("0.1.6", "0.1.6"))
+        msg = upgrade_banner_text("0.1.0", "0.1.6")
         self.assertIsNotNone(msg)
         assert msg is not None
         self.assertIn("0.1.0", msg)
-        self.assertIn("0.1.5", msg)
-        self.assertIsNone(upgrade_banner_text("0.1.5", "0.1.5"))
+        self.assertIn("0.1.6", msg)
+        self.assertIsNone(upgrade_banner_text("0.1.6", "0.1.6"))
 
     def test_app_wires_upgrade_ui(self):
         src = (ROOT / "client" / "windows" / "app.py").read_text(encoding="utf-8")
@@ -291,14 +291,14 @@ class TestDialogueStatusFlips(unittest.TestCase):
             app._set_status("connecting")
             app.root.update_idletasks()
             self.assertIn("Connecting", app.status_var.get())
-            self.assertEqual(app.btn_var.get(), "Connecting…")
+            self.assertEqual(app.btn_var.get(), "Connectingâ€¦")
             self.assertIn("Please wait", app.detail_var.get())
 
             app._apply_control(connected=True, busy=True)
             app._set_status("disconnecting")
             app.root.update_idletasks()
             self.assertIn("Disconnecting", app.status_var.get())
-            self.assertEqual(app.btn_var.get(), "Disconnecting…")
+            self.assertEqual(app.btn_var.get(), "Disconnectingâ€¦")
             self.assertIn("Stopping", app.detail_var.get())
 
             app._apply_control(connected=False, busy=False)

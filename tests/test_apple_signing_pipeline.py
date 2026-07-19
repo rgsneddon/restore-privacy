@@ -1,7 +1,7 @@
-"""Structural tests: shipped Apple distribution signing path is Gatekeeper-safe.
+﻿"""Structural tests: shipped Apple distribution signing path is Gatekeeper-safe.
 
 Asserts the real packaging/signing scripts invoke Developer ID, notarytool, and
-stapler on the product app path — not a re-implementation of Apple's tools.
+stapler on the product app path â€” not a re-implementation of Apple's tools.
 """
 
 from __future__ import annotations
@@ -35,7 +35,7 @@ class TestMacosSignNotarizeScript(unittest.TestCase):
         self.assertIn("inject_apple_secrets", text)
 
     def test_release_package_script_calls_sign_and_notarize(self):
-        rel = ROOT / "scripts" / "build_release_0.1.5.py"
+        rel = ROOT / "scripts" / "build_release_0.1.6.py"
         self.assertTrue(rel.is_file())
         text = rel.read_text(encoding="utf-8")
         self.assertIn("sign_and_notarize_macos", text)

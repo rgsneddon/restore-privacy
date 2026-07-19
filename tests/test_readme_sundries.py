@@ -1,4 +1,4 @@
-"""Tests: public README is client-user focused; sundries holds operator topics."""
+﻿"""Tests: public README is client-user focused; sundries holds operator topics."""
 
 from __future__ import annotations
 
@@ -80,7 +80,7 @@ class TestReadmePublicClientOnly(unittest.TestCase):
         self.assertTrue("android" in lower or "apk" in lower)
         self.assertTrue("macos" in lower)
         self.assertTrue("ios" in lower)
-        self.assertIn("0.1.5", text)
+        self.assertIn("0.1.6", text)
         # Not prep-stub-only Apple wording
         self.assertNotIn("prep stubs", lower)
 

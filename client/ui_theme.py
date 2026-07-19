@@ -1,4 +1,4 @@
-"""UI theme: restorebritain.org.uk contact palette, plain-language status, labels.
+﻿"""UI theme: restorebritain.org.uk contact palette, plain-language status, labels.
 
 Palette extracted from https://www.restorebritain.org.uk/contact page stack
 (jQuery UI Cupertino theme CSS loaded by that page) plus light chrome for a
@@ -16,10 +16,10 @@ SCROLLING_PRIVACY_TEXT = (
     "lightweight vpn to restore your privacy - no user data is retained - your privacy is restored"
 )
 
-# --- Palette (restorebritain.org.uk/contact → Cupertino theme CSS) ---
+# --- Palette (restorebritain.org.uk/contact â†’ Cupertino theme CSS) ---
 # Source: ajax.googleapis.com/.../themes/cupertino/jquery-ui.css as loaded by the contact page
 PALETTE_SOURCE_URL = "https://www.restorebritain.org.uk/contact"
-CHROME_BG = "#F2F5F7"  # cupertino #f2f5f7 — soft page background
+CHROME_BG = "#F2F5F7"  # cupertino #f2f5f7 â€” soft page background
 PANEL_BG = "#FFFFFF"  # white cards / status panel
 PRIMARY = "#2779AA"  # cupertino primary blue
 PRIMARY_ACTIVE = "#2694E8"  # lighter interactive blue
@@ -28,8 +28,8 @@ LIGHT_ACCENT = "#DEEDF7"  # cupertino soft blue panel
 TEXT = "#222222"  # cupertino body text
 TEXT_MUTED = "#363636"
 WHITE = "#FFFFFF"
-STATUS_OK = "#1B767E"  # site teal accent (homepage embed) — color for Connected
-STATUS_ERROR = "#CD0A0A"  # cupertino error red — color for failed Connect (never a message string)
+STATUS_OK = "#1B767E"  # site teal accent (homepage embed) â€” color for Connected
+STATUS_ERROR = "#CD0A0A"  # cupertino error red â€” color for failed Connect (never a message string)
 STATUS_ERROR_FG = STATUS_ERROR  # alias for fg= usage
 STATUS_WARN = "#A67C00"
 BORDER = "#AED0EA"  # cupertino border blue
@@ -57,7 +57,7 @@ BUTTON_BG_ARGB = 0xFF2779AA
 BUTTON_ACTIVE_ARGB = 0xFF1B767E
 
 APP_TITLE = "Restore Privacy"
-BANNER_TITLE = "Restore Privacy — UK VPN"
+BANNER_TITLE = "Restore Privacy â€” UK VPN"
 
 # Rounded-edge visual language (Tk approximates with padx/pady + relief)
 CORNER_RADIUS = 14
@@ -89,11 +89,11 @@ def connect_button_label(connected: bool) -> str:
     return "Disconnect" if connected else "Connect"
 
 
-# Tunnel UI states (plain language labels — never overwrite color constants above)
+# Tunnel UI states (plain language labels â€” never overwrite color constants above)
 STATUS_DISCONNECTED = "Disconnected"
-STATUS_CONNECTING = "Connecting…"
-STATUS_DISCONNECTING = "Disconnecting…"
-STATUS_CONNECTED = "Connected — protected"
+STATUS_CONNECTING = "Connectingâ€¦"
+STATUS_DISCONNECTING = "Disconnectingâ€¦"
+STATUS_CONNECTED = "Connected â€” protected"
 STATUS_ERROR_LABEL = "Could not connect"
 
 
@@ -119,17 +119,17 @@ def plain_tunnel_status(
     if s == "connected":
         if residual_capture is False:
             if vpn_ip:
-                return f"Session only — residual IP still on ISP ({vpn_ip})"
-            return "Session only — residual IP still on ISP"
+                return f"Session only â€” residual IP still on ISP ({vpn_ip})"
+            return "Session only â€” residual IP still on ISP"
         if vpn_ip:
-            return f"Connected — your traffic uses the VPN ({vpn_ip})"
+            return f"Connected â€” your traffic uses the VPN ({vpn_ip})"
         return STATUS_CONNECTED
     if s in ("error", "failed"):
         if detail:
             # Keep short: one line
             d = detail.strip().replace("\n", " ")
             if len(d) > 72:
-                d = d[:69] + "…"
+                d = d[:69] + "â€¦"
             return f"{STATUS_ERROR_LABEL}: {d}"
         return STATUS_ERROR_LABEL
     return STATUS_DISCONNECTED
@@ -142,7 +142,7 @@ def version_tuple(version: str) -> tuple[int, ...]:
         num = "".join(c for c in seg if c.isdigit())
         parts.append(int(num) if num else 0)
     while parts and parts[-1] == 0 and len(parts) > 1:
-        # keep trailing zeros meaningful only if mid segments exist — leave as-is
+        # keep trailing zeros meaningful only if mid segments exist â€” leave as-is
         break
     return tuple(parts) if parts else (0,)
 
@@ -169,7 +169,7 @@ def version_file_candidates() -> list[Path]:
 
     Installer writes ``VERSION`` next to the client .exe under
     ``%LOCALAPPDATA%/Programs/RestorePrivacy/``. Frozen PyInstaller layouts
-    keep package data under ``_internal`` / ``_MEIPASS`` — not only
+    keep package data under ``_internal`` / ``_MEIPASS`` â€” not only
     ``client/ui_theme.py``'s sibling path.
     """
     import sys
@@ -229,7 +229,7 @@ def version_file_candidates() -> list[Path]:
 def embedded_package_version() -> str:
     """Version shipped next to this package module (repo / onedir data)."""
     v = _read_version_text(Path(__file__).resolve().parent / "VERSION")
-    return v or "0.1.5"
+    return v or "0.1.6"
 
 
 def read_running_version(version_file: Path | None = None) -> str:
@@ -259,7 +259,7 @@ def catalog_latest_version() -> str:
 
         return str(RELEASE_VERSION).strip()
     except Exception:
-        # Frozen clients may lack status_page — treat package version as catalog
+        # Frozen clients may lack status_page â€” treat package version as catalog
         return embedded_package_version()
 
 

@@ -1,4 +1,4 @@
-"""Product Windows path without system Python vs source launch that needs Python.
+﻿"""Product Windows path without system Python vs source launch that needs Python.
 
 End users install the frozen setup.exe (PyInstaller bundled runtime). Developers
 running ``python -m client.windows`` need a host interpreter.
@@ -34,7 +34,7 @@ class TestProductPathNoSystemPython(unittest.TestCase):
         self.assertIn("_MEIPASS", src)
         self.assertIn("getattr(sys, \"frozen\"", src)
         self.assertIn("INSTALL_DIR", src)
-        # Deploys bundled client exe — not system python -m
+        # Deploys bundled client exe â€” not system python -m
         self.assertIn("_find_client_exe", src)
         self.assertNotIn("python -m client.windows", src)
 
@@ -65,7 +65,7 @@ class TestSourcePathRequiresPython(unittest.TestCase):
     def test_dev_entry_is_python_module_not_standalone_exe(self):
         main = (ROOT / "client" / "windows" / "__main__.py").read_text(encoding="utf-8")
         self.assertIn("client.windows", main)
-        # Module entry — requires a host interpreter to import
+        # Module entry â€” requires a host interpreter to import
         self.assertIn("from client.windows.app import main", main)
 
     def test_launch_gui_resolves_host_pythonw(self):
@@ -85,9 +85,9 @@ class TestLocalFrozenArtifactOptional(unittest.TestCase):
         candidates = [
             ROOT
             / "releases"
-            / "0.1.5"
-            / "restore-privacy-client-0.1.5-windows-x64-setup.exe",
-            ROOT / "dist" / "RestorePrivacy-Setup-0.1.5.exe",
+            / "0.1.6"
+            / "restore-privacy-client-0.1.6-windows-x64-setup.exe",
+            ROOT / "dist" / "RestorePrivacy-Setup-0.1.6.exe",
         ]
         found = [p for p in candidates if p.is_file()]
         if not found:

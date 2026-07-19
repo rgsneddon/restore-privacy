@@ -1,4 +1,4 @@
-"""Release download link catalog for the public status page (version 0.1.5).
+﻿"""Release download link catalog for the public status page (version 0.1.6).
 
 Public page advertises Windows .exe installer, Android .apk, macOS .zip, and iOS .zip.
 """
@@ -8,10 +8,10 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Iterable
 
-RELEASE_VERSION = "0.1.5"
+RELEASE_VERSION = "0.1.6"
 GITHUB_OWNER = "rgsneddon"
 GITHUB_REPO = "restore-privacy"
-RELEASE_TAG = "0.1.5"
+RELEASE_TAG = "0.1.6"
 
 # Canonical public asset filenames (must match GitHub Release assets).
 WINDOWS_EXE_FILENAME = f"restore-privacy-client-{RELEASE_VERSION}-windows-x64-setup.exe"
@@ -34,26 +34,26 @@ class DownloadAsset:
         )
 
 
-# Artifacts attached to GitHub Release 0.1.5
+# Artifacts attached to GitHub Release 0.1.6
 RELEASE_ASSETS: tuple[DownloadAsset, ...] = (
     DownloadAsset(
         platform="windows",
-        label="Windows (x64) — Installer (.exe)",
+        label="Windows (x64) â€” Installer (.exe)",
         filename=WINDOWS_EXE_FILENAME,
     ),
     DownloadAsset(
         platform="android",
-        label="Android — APK installer",
+        label="Android â€” APK installer",
         filename=ANDROID_APK_FILENAME,
     ),
     DownloadAsset(
         platform="macos",
-        label="macOS — App package (.zip)",
+        label="macOS â€” App package (.zip)",
         filename=MACOS_ZIP_FILENAME,
     ),
     DownloadAsset(
         platform="ios",
-        label="iOS — App package (.zip)",
+        label="iOS â€” App package (.zip)",
         filename=IOS_ZIP_FILENAME,
     ),
 )
@@ -92,11 +92,11 @@ def render_download_section_html(assets: Iterable[DownloadAsset] | None = None) 
     return f"""
   <section class="downloads" id="downloads" aria-label="Download Restore Privacy client">
     <h2>Download client v{RELEASE_VERSION}</h2>
-    <p class="dl-sub">Windows · Android · macOS · iOS</p>
+    <p class="dl-sub">Windows Â· Android Â· macOS Â· iOS</p>
     <div class="dl-buttons">
 {links_html}
     </div>
-    <p class="dl-note">Release <code>{RELEASE_TAG}</code> · Windows setup needs no separate Python install · double-click → UAC once for full VPN (auto-elevate) · Apple packages require Network Extension signing for system VPN</p>
+    <p class="dl-note">Release <code>{RELEASE_TAG}</code> Â· Windows setup needs no separate Python install Â· double-click â†’ UAC once for full VPN (auto-elevate) Â· Apple packages require Network Extension signing for system VPN</p>
   </section>
 """
 

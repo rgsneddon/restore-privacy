@@ -1,4 +1,4 @@
-"""UK public-IP security gate for Restore Privacy clients.
+﻿"""UK public-IP security gate for Restore Privacy clients.
 
 Only users whose core (public) IP is geolocated in the United Kingdom may
 connect. Non-UK and total lookup failures fail closed with a clear notice.
@@ -141,7 +141,7 @@ def fetch_geo_url(url: str, timeout: float = DEFAULT_TIMEOUT_SEC) -> dict:
     req = urllib.request.Request(
         url,
         headers={
-            "User-Agent": "restore-privacy-client/0.1.5",
+            "User-Agent": "restore-privacy-client/0.1.6",
             "Accept": "application/json",
         },
         method="GET",

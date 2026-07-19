@@ -1,4 +1,4 @@
-"""Windows secrets resolution + provision — no 'copy from the node' dead-end when keys present."""
+﻿"""Windows secrets resolution + provision â€” no 'copy from the node' dead-end when keys present."""
 
 from __future__ import annotations
 
@@ -124,7 +124,7 @@ class TestConnectUsesSecrets(unittest.TestCase):
         with tempfile.TemporaryDirectory() as td:
             empty = Path(td) / "nosec"
             empty.mkdir()
-            # Explicit empty dir: no node_elgamal.pub → bootstrap fails closed
+            # Explicit empty dir: no node_elgamal.pub â†’ bootstrap fails closed
             client = RptClient(
                 secrets_dir=empty,
                 uk_gate_fetcher=lambda: {"country_code": "GB", "ip": "1.2.3.4"},
@@ -148,13 +148,13 @@ class TestInstallerAndBuildRecipe(unittest.TestCase):
         self.assertIn("node_elgamal.pub", inst)
         self.assertIn("node_elgamal.priv", inst)  # must mention to exclude
         self.assertIn("device Ed25519", inst)
-        self.assertIn("VERSION = \"0.1.5\"", inst)
+        self.assertIn("VERSION = \"0.1.6\"", inst)
 
     def test_build_script_injects_secrets(self):
-        script = (ROOT / "scripts" / "build_release_0.1.5.py").read_text(encoding="utf-8")
+        script = (ROOT / "scripts" / "build_release_0.1.6.py").read_text(encoding="utf-8")
         self.assertIn("inject_product_secrets", script)
         self.assertIn("node_elgamal.pub", script)
-        self.assertIn('VERSION = "0.1.5"', script)
+        self.assertIn('VERSION = "0.1.6"', script)
         # Public packages must not embed shared client priv
         lower = script.lower()
         self.assertTrue(

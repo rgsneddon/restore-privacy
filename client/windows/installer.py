@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+﻿#!/usr/bin/env python3
 """Windows client installer for Restore Privacy.
 
 Deploys the bundled client (runtime + wintun + deps) into the user profile
@@ -17,7 +17,7 @@ from collections.abc import Callable
 from pathlib import Path
 
 APP_NAME = "RestorePrivacy"
-VERSION = "0.1.5"
+VERSION = "0.1.6"
 # User-facing shortcut / tray product name (logo icon on Start Menu + Desktop)
 SHORTCUT_DISPLAY_NAME = "Privacy Restored"
 # Install under LocalAppData so no elevation is required for deploy.
@@ -59,7 +59,7 @@ def _payload_root() -> Path:
         if d.is_dir():
             return d
     raise FileNotFoundError(
-        "Client payload not found. Build with scripts/build_release_0.1.5.py first."
+        "Client payload not found. Build with scripts/build_release_0.1.6.py first."
     )
 
 
@@ -166,7 +166,7 @@ def _find_payload_secrets(payload_dir: Path) -> Path | None:
 
 
 def _provision_secrets(payload_dir: Path, install_dir: Path) -> list[str]:
-    """Install public node key only — device Ed25519 is generated on first run.
+    """Install public node key only â€” device Ed25519 is generated on first run.
 
     Never copies a shared client_ed25519.priv into every install (impersonation risk).
     Never copies node_elgamal.priv. Strips any .priv that slipped into the install tree
@@ -203,12 +203,12 @@ def _write_version(install_dir: Path) -> None:
     sec_line = (
         "Node public key installed: yes (device Ed25519 key is generated on first run)"
         if secrets_ok
-        else f"Node public key missing — place {NODE_PUB} in secrets\\ (device key auto-generated)"
+        else f"Node public key missing â€” place {NODE_PUB} in secrets\\ (device key auto-generated)"
     )
     (install_dir / "INSTALL.txt").write_text(
         f"Restore Privacy Client {VERSION}\r\n"
         "Installed with bundled Python runtime and dependencies.\r\n"
-        "Full tunnel: double-click the shortcut (UAC prompt once) — no need to right-click Run as admin.\r\n"
+        "Full tunnel: double-click the shortcut (UAC prompt once) â€” no need to right-click Run as admin.\r\n"
         "The app also auto-requests elevation on launch if needed.\r\n"
         f"Install path: {install_dir}\r\n"
         f"{sec_line}\r\n",
@@ -309,22 +309,22 @@ def install(
                 pass
         print(f"[{step}/{total}] {status}")
 
-    _progress(1, "Locating product files…")
+    _progress(1, "Locating product filesâ€¦")
     payload = _payload_root()
     client_src_exe = _find_client_exe(payload)
     # If payload root is the onedir folder, copy whole tree
     payload_dir = client_src_exe.parent
 
-    _progress(2, f"Copying files to {INSTALL_DIR}…")
+    _progress(2, f"Copying files to {INSTALL_DIR}â€¦")
     INSTALL_DIR.mkdir(parents=True, exist_ok=True)
     _copy_tree(payload_dir, INSTALL_DIR)
     # Belt-and-suspenders: never leave shared .priv from old payloads
     strip_all_private_keys(INSTALL_DIR)
 
-    _progress(3, "Installing admission secrets…")
+    _progress(3, "Installing admission secretsâ€¦")
     secrets_written = _provision_secrets(payload_dir, INSTALL_DIR)
 
-    _progress(4, "Writing version and install info…")
+    _progress(4, "Writing version and install infoâ€¦")
     _write_version(INSTALL_DIR)
     # Also place VERSION next to package data for frozen version readers
     try:
@@ -342,7 +342,7 @@ def install(
         # rename if needed
         candidates = list(INSTALL_DIR.glob("*.exe"))
         if not candidates:
-            raise FileNotFoundError("Install copy failed — no .exe in install dir")
+            raise FileNotFoundError("Install copy failed â€” no .exe in install dir")
         installed_exe = candidates[0]
 
     if not secrets_written:
@@ -372,7 +372,7 @@ def install(
 
     icon = resolve_shortcut_icon(INSTALL_DIR, installed_exe)
 
-    _progress(5, "Creating Start Menu and Desktop shortcuts…")
+    _progress(5, "Creating Start Menu and Desktop shortcutsâ€¦")
     # Start menu + desktop shortcuts (display name: Privacy Restored + logo)
     try:
         _create_shortcut(
@@ -412,7 +412,7 @@ def install(
         encoding="utf-8",
     )
 
-    _progress(6, "Finishing install…")
+    _progress(6, "Finishing installâ€¦")
     if launch and installed_exe.is_file():
         subprocess.Popen(
             [str(installed_exe)],
@@ -456,13 +456,13 @@ def run_installer_progress_ui(*, launch: bool = True) -> int:
     ).pack(fill=tk.X)
     tk.Label(
         outer,
-        text=f"Installer — version {VERSION}",
+        text=f"Installer â€” version {VERSION}",
         font=("Segoe UI", 9),
         fg="#444444",
         anchor="w",
     ).pack(fill=tk.X, pady=(0, 12))
 
-    status_var = tk.StringVar(value="Preparing install…")
+    status_var = tk.StringVar(value="Preparing installâ€¦")
     status_lbl = tk.Label(
         outer,
         textvariable=status_var,
@@ -533,7 +533,7 @@ def run_installer_progress_ui(*, launch: bool = True) -> int:
 
             root.after(0, done_ok)
         except Exception as exc:
-            # Bind strings before nested callback — Python clears `except as` names
+            # Bind strings before nested callback â€” Python clears `except as` names
             # after the block, so deferred root.after cannot read `exc` later.
             err_msg = str(exc) or exc.__class__.__name__
             err_tb = traceback.format_exc()
@@ -544,7 +544,7 @@ def run_installer_progress_ui(*, launch: bool = True) -> int:
             fail_detail = (err_tb or "")[:500]
 
             def done_err() -> None:
-                # Stay open with real error — user dismisses via Close (no auto-destroy).
+                # Stay open with real error â€” user dismisses via Close (no auto-destroy).
                 status_var.set(fail_status)
                 detail_var.set(fail_detail)
                 close_btn.configure(state=tk.NORMAL)

@@ -1,4 +1,4 @@
-"""Tests read shipped privacy policy, LICENSE, CREDITS, and README how-to."""
+﻿"""Tests read shipped privacy policy, LICENSE, CREDITS, and README how-to."""
 
 from __future__ import annotations
 
@@ -83,14 +83,14 @@ class TestReadmeHowto(unittest.TestCase):
         text = _read("README.md")
         lower = text.lower()
         self.assertTrue("how to" in lower or "install" in lower)
-        # End-user client path — all published platforms
+        # End-user client path â€” all published platforms
         self.assertIn("download", lower)
         self.assertIn("windows", lower)
         self.assertIn("android", lower)
         self.assertIn("macos", lower)
         self.assertIn("ios", lower)
-        self.assertIn("0.1.5", text)
-        self.assertNotIn("prep — finish on a Mac", text)
+        self.assertIn("0.1.6", text)
+        self.assertNotIn("prep â€” finish on a Mac", text)
         self.assertNotIn("prep stubs", lower)
         # Package names from the public release catalog
         self.assertIn("windows-x64-setup.exe", text)
