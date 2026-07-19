@@ -301,7 +301,12 @@ class TestNoSharedPrivPackaging(unittest.TestCase):
         gradle = (
             ROOT / "client_app" / "android" / "app" / "build.gradle.kts"
         ).read_text(encoding="utf-8")
-        self.assertIn('listOf("node_elgamal.pub")', gradle)
+        self.assertIn("node_elgamal.pub", gradle)
+        self.assertIn("copyRptSecretsToAssets", gradle)
+        self.assertIn("product/", gradle)
+        # May mention client_ed25519.priv only to delete it from assets, never copy it in
+        inject = gradle.split("copyRptSecretsToAssets", 1)[1]
+        self.assertIn("it.delete()", inject)
         self.assertNotIn('listOf("client_ed25519.priv"', gradle)
 
     def test_android_service_generates_device_key(self):

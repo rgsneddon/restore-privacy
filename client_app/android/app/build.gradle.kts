@@ -51,22 +51,29 @@ dependencies {
 
 // Inject public node key into APK assets only. Per-device Ed25519 client keys
 // are generated on first run (never a shared client_ed25519.priv in every APK).
-// rootProject = client_app/android → ../../secrets = restore_privacy/secrets
+// Prefer tracked product/node_elgamal.pub (must match production node), then
+// operator secrets/. Wrong pub → hybrid decrypt fail → silent node drop → timeout.
+// rootProject = client_app/android → ../.. = restore_privacy
 tasks.register("copyRptSecretsToAssets") {
     doLast {
         val destDir = file("src/main/assets/secrets")
         destDir.mkdirs()
         // Remove any previously injected shared client priv from assets tree
         file("src/main/assets/secrets/client_ed25519.priv").let { if (it.exists()) it.delete() }
-        listOf("node_elgamal.pub").forEach { name ->
-            val src = rootProject.file("../../secrets/$name")
-            val dest = file("src/main/assets/secrets/$name")
-            if (src.exists()) {
-                src.copyTo(dest, overwrite = true)
-                logger.lifecycle("copyRptSecretsToAssets: injected $name")
-            } else {
-                logger.warn("copyRptSecretsToAssets: missing ${src.absolutePath}")
-            }
+        val name = "node_elgamal.pub"
+        val candidates = listOf(
+            rootProject.file("../../product/$name"),
+            rootProject.file("../../secrets/$name"),
+        )
+        val dest = file("src/main/assets/secrets/$name")
+        val src = candidates.firstOrNull { it.exists() }
+        if (src != null) {
+            src.copyTo(dest, overwrite = true)
+            logger.lifecycle("copyRptSecretsToAssets: injected $name from ${src.absolutePath}")
+        } else {
+            logger.warn(
+                "copyRptSecretsToAssets: missing product/ and secrets/ $name — APK handshake will fail"
+            )
         }
     }
 }

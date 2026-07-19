@@ -211,7 +211,18 @@ class RptVpnService : VpnService() {
                 val session = try {
                     engine.handshake(sock, host, port, timeoutMs = 20000)
                 } catch (e: Exception) {
-                    report(false, "RPT handshake failed: ${e.message ?: e.javaClass.simpleName}")
+                    val detail = e.message ?: e.javaClass.simpleName
+                    val hint =
+                        if (detail.contains("timed out", ignoreCase = true) ||
+                            detail.contains("timeout", ignoreCase = true) ||
+                            e is java.net.SocketTimeoutException
+                        ) {
+                            " No reply from $host:$port — check network/UDP, or that this " +
+                                "package’s node_elgamal.pub matches the production node."
+                        } else {
+                            ""
+                        }
+                    report(false, "RPT handshake failed: $detail$hint")
                     running.set(false)
                     stopForeground(STOP_FOREGROUND_REMOVE)
                     stopSelf()

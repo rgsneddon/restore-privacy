@@ -181,6 +181,15 @@ def is_trusted_device_key_dir(d: Path) -> bool:
 
 
 def _find_node_pub(candidates: list[Path]) -> bytes | None:
+    # Prefer tracked product key so builds/installs match production after host moves.
+    try:
+        from .endpoint import product_node_elgamal_pub_path
+
+        product_pub = product_node_elgamal_pub_path()
+        if product_pub.is_file():
+            return product_pub.read_bytes()
+    except Exception:
+        pass
     for d in candidates:
         p = d / NODE_PUB_NAME
         if p.is_file():

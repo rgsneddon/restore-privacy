@@ -150,7 +150,10 @@ def build_client_onedir() -> Path:
     if ver_file.is_file():
         cmd.extend(["--add-data", f"{ver_file};client"])
     # Bundle public node key only (never a shared client_ed25519.priv)
-    secrets_src = ROOT / "secrets"
+    # Prefer tracked product/ key so Windows packages match production node.
+    secrets_src = ROOT / "product"
+    if not (secrets_src / "node_elgamal.pub").is_file():
+        secrets_src = ROOT / "secrets"
     if (secrets_src / "node_elgamal.pub").is_file():
         cmd.extend(
             [
@@ -189,12 +192,15 @@ def inject_product_secrets(target_dir: Path) -> None:
     Never ships a shared client_ed25519.priv (impersonation risk) or node_elgamal.priv.
     Strips **all** ``*.priv`` under the entire package tree (incl. ``_internal/secrets``).
     """
-    src = ROOT / "secrets"
-    node_pub = src / "node_elgamal.pub"
+    # Prefer tracked product key (must match production node private key).
+    node_pub = ROOT / "product" / "node_elgamal.pub"
+    if not node_pub.is_file():
+        node_pub = ROOT / "secrets" / "node_elgamal.pub"
+    src = node_pub.parent
     if not node_pub.is_file():
         raise RuntimeError(
-            "Build requires secrets/node_elgamal.pub "
-            "(gitignored operator public key). Refusing to ship without node pub."
+            "Build requires product/node_elgamal.pub (or secrets/node_elgamal.pub). "
+            "Refusing to ship without node public key matching production."
         )
     dest = target_dir / "secrets"
     dest.mkdir(parents=True, exist_ok=True)

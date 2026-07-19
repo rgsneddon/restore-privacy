@@ -32,6 +32,8 @@ def candidate_sources() -> list[Path]:
     env = os.environ.get("RPT_SECRETS_DIR", "").strip()
     if env:
         out.append(Path(env))
+    # Tracked product key first (matches production node); then operator secrets/
+    out.append(ROOT / "product")
     out.append(ROOT / "secrets")
     out.append(Path.home() / ".restore-privacy" / "secrets")
     return out
