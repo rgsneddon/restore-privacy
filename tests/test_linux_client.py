@@ -221,6 +221,40 @@ class TestLinuxEntryAndDocs(unittest.TestCase):
         if sys.platform != "linux":
             self.assertFalse(system_capture_ready())
 
+    def test_open_linux_tun_sets_nonblock(self):
+        """Shipped open path must set O_NONBLOCK so dataplane does not stall."""
+        src = (ROOT / "client" / "linux" / "tun_linux.py").read_text(encoding="utf-8")
+        self.assertIn("O_NONBLOCK", src)
+        self.assertIn("F_SETFL", src)
+        self.assertIn("ensure_tun_nonblocking", src)
+        # Real helper: applying nonblock on a pipe fd must succeed
+        if sys.platform == "win32":
+            # fcntl is Unix-only; structural coverage above is the Windows bar
+            return
+        import os
+
+        from client.linux.tun_linux import ensure_tun_nonblocking
+
+        r, w = os.pipe()
+        try:
+            ensure_tun_nonblocking(r)
+            import fcntl
+
+            flags = fcntl.fcntl(r, fcntl.F_GETFL)
+            self.assertTrue(flags & os.O_NONBLOCK)
+        finally:
+            os.close(r)
+            os.close(w)
+
+    def test_install_script_installs_cryptography(self):
+        t = (ROOT / "scripts" / "install_linux_mint.sh").read_text(encoding="utf-8")
+        self.assertIn("python3-cryptography", t)
+        self.assertIn("import cryptography", t)
+        self.assertIn("requirements.txt", t)
+        # README documents the dep for Mint users
+        readme = (ROOT / "README.md").read_text(encoding="utf-8")
+        self.assertIn("python3-cryptography", readme)
+
 
 if __name__ == "__main__":
     unittest.main()

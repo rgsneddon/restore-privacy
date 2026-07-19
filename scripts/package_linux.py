@@ -63,13 +63,15 @@ def main() -> int:
 
 ## Requirements
 - Linux Mint / Ubuntu-family (kernel TUN)
-- python3, python3-tk
+- python3, python3-tk, **python3-cryptography** (or ``pip install -r requirements.txt``)
 - root (sudo/pkexec) for full-tunnel residual public IP
 
 ## Install
 ```bash
 bash install_linux_mint.sh
 ```
+This installs ``python3-tk`` and ``python3-cryptography`` (required for
+``python3 -m client.linux`` / ``client.connect``) and optionally loads the tun module.
 
 ## Run
 ```bash

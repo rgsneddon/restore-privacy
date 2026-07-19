@@ -20,12 +20,38 @@ if ! command -v python3 >/dev/null 2>&1; then
   exit 1
 fi
 
-# Tk for GUI
-if ! python3 -c "import tkinter" 2>/dev/null; then
-  echo "Installing python3-tk (needs sudo)..."
+# Ensure apt is available for deps
+need_apt=0
+if ! python3 -c "import tkinter" 2>/dev/null; then need_apt=1; fi
+if ! python3 -c "import cryptography" 2>/dev/null; then need_apt=1; fi
+if [[ "$need_apt" -eq 1 ]]; then
+  echo "Installing Python deps (python3-tk, python3-cryptography) via apt..."
   sudo apt-get update -y
-  sudo apt-get install -y python3-tk
+  # cryptography is required by client.connect at import time
+  sudo apt-get install -y python3-tk python3-cryptography python3-pip
 fi
+
+# Prefer distro package; fall back to pip for cryptography if still missing
+if ! python3 -c "import cryptography" 2>/dev/null; then
+  echo "Installing cryptography via pip..."
+  if [[ -f "$ROOT/requirements.txt" ]]; then
+    python3 -m pip install --user -r "$ROOT/requirements.txt" || \
+      sudo python3 -m pip install -r "$ROOT/requirements.txt"
+  else
+    python3 -m pip install --user "cryptography>=41" || \
+      sudo python3 -m pip install "cryptography>=41"
+  fi
+fi
+
+if ! python3 -c "import cryptography" 2>/dev/null; then
+  echo "ERROR: cryptography module still missing. Install: sudo apt install python3-cryptography"
+  exit 1
+fi
+if ! python3 -c "import tkinter" 2>/dev/null; then
+  echo "ERROR: tkinter still missing. Install: sudo apt install python3-tk"
+  exit 1
+fi
+echo "Python deps OK (tkinter + cryptography)"
 
 # TUN module
 if [[ ! -e /dev/net/tun ]]; then

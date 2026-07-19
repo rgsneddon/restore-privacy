@@ -65,6 +65,8 @@ or use the buttons on https://restore-privacy-status.onrender.com/
    cd restore-privacy-0.1.7-linux   # or repo root
    bash install_linux_mint.sh      # or: bash scripts/install_linux_mint.sh
    ```
+   The install script installs **python3-tk** and **python3-cryptography** (required;
+   or ``sudo apt install python3-tk python3-cryptography`` / ``pip install -r requirements.txt``).
 3. Run the GUI (**root** needed so residual public IP uses the VPN node):
    ```bash
    sudo python3 -m client.linux

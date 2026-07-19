@@ -96,10 +96,23 @@ def open_linux_tun(name: str = "rpt0") -> LinuxTun:
     ifr = struct.pack("16sH", name.encode("ascii")[:15], _IFF_TUN | _IFF_NO_PI)
     try:
         fcntl.ioctl(fd, _TUNSETIFF, ifr)
+        # Non-blocking: RptDataPlane select() + read_packet() must not stall on idle TUN
+        flags = fcntl.fcntl(fd, fcntl.F_GETFL)
+        fcntl.fcntl(fd, fcntl.F_SETFL, flags | os.O_NONBLOCK)
     except OSError:
         os.close(fd)
         raise
     return LinuxTun(name=name, fd=fd)
+
+
+def ensure_tun_nonblocking(fd: int) -> None:
+    """Apply O_NONBLOCK to an open TUN fd (shared helper for tests / callers)."""
+    if fd < 0:
+        return
+    import fcntl
+
+    flags = fcntl.fcntl(fd, fcntl.F_GETFL)
+    fcntl.fcntl(fd, fcntl.F_SETFL, flags | os.O_NONBLOCK)
 
 
 def create_linux_tun(
