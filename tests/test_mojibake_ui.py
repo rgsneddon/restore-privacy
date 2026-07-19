@@ -52,7 +52,7 @@ class TestDownloadsNoMojibake(unittest.TestCase):
         html = render_download_section_html()
         _assert_clean(html, "download html")
         self.assertIn(f"Download client v{RELEASE_VERSION}", html)
-        self.assertIn("Windows | Android | macOS | iOS", html)
+        self.assertIn("Windows | Android | macOS | iOS | Linux Mint", html)
         self.assertIn("->", html)  # UAC note uses ASCII arrow
         self.assertNotIn("Â·", html)
 
