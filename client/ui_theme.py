@@ -229,7 +229,7 @@ def version_file_candidates() -> list[Path]:
 def embedded_package_version() -> str:
     """Version shipped next to this package module (repo / onedir data)."""
     v = _read_version_text(Path(__file__).resolve().parent / "VERSION")
-    return v or "0.1.6"
+    return v or "0.1.7"
 
 
 def read_running_version(version_file: Path | None = None) -> str:

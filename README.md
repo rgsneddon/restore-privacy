@@ -5,7 +5,7 @@
 
 | | |
 |--|--|
-| **Get the app** | [Download v0.1.6](https://github.com/rgsneddon/restore-privacy/releases/tag/0.1.6)  |  [Status & downloads](https://restore-privacy-status.onrender.com/) |
+| **Get the app** | [Download v0.1.7](https://github.com/rgsneddon/restore-privacy/releases/tag/0.1.7)  |  [Status & downloads](https://restore-privacy-status.onrender.com/) |
 | **Privacy** | [PRIVACY_POLICY.md](PRIVACY_POLICY.md) |
 | **License** | [LICENSE](LICENSE) (MIT) |
 | **Credits** | [CREDITS.md](CREDITS.md) |
@@ -29,20 +29,20 @@
 
 ## How to install and use
 
-Download packages from the **[0.1.6 release](https://github.com/rgsneddon/restore-privacy/releases/tag/0.1.6)**  
+Download packages from the **[0.1.7 release](https://github.com/rgsneddon/restore-privacy/releases/tag/0.1.7)**  
 or use the buttons on https://restore-privacy-status.onrender.com/
 
 | Platform | Package |
 |----------|---------|
-| Windows | `restore-privacy-client-0.1.6-windows-x64-setup.exe` |
-| Android | `restore-privacy-client-0.1.6-android.apk` |
-| macOS | `restore-privacy-client-0.1.6-macos.zip` *(prep zip / sign on Mac  -  see below)* |
-| iOS | `restore-privacy-client-0.1.6-ios.zip` *(prep zip / sign on Mac  -  see below)* |
+| Windows | `restore-privacy-client-0.1.7-windows-x64-setup.exe` |
+| Android | `restore-privacy-client-0.1.7-android.apk` |
+| macOS | `restore-privacy-client-0.1.7-macos.zip` *(prep zip / sign on Mac  -  see below)* |
+| iOS | `restore-privacy-client-0.1.7-ios.zip` *(prep zip / sign on Mac  -  see below)* |
 
 ### Windows
 
 1. Download the **Windows installer (.exe)** from the release or status page.
-2. Run **`restore-privacy-client-0.1.6-windows-x64-setup.exe`**.  
+2. Run **`restore-privacy-client-0.1.7-windows-x64-setup.exe`**.  
    It installs the full client (**bundled runtime + Wintun + dependencies**  -  **no separate Python install**), creates **Privacy Restored** shortcuts with the **logo** icon, and can launch the app. The setup window shows standard install progress.
 3. Press **Connect** and approve **UAC** when prompted so residual public IP uses the VPN node.
 4. Optional: open **âš™ Settings** and enable **Run at device startup** and/or **Autoconnect on launch** for seamless power-up (both default **off**).
@@ -57,14 +57,14 @@ or use the buttons on https://restore-privacy-status.onrender.com/
 
 ### macOS / iOS (continue on a Mac)
 
-Release zips for **0.1.6** stage the Apple client packages for sideload / further signing. **Team signing and notarization must be done on a Mac.**
+Release zips for **0.1.7** stage the Apple client packages for sideload / further signing. **Team signing and notarization must be done on a Mac.**
 
-1. Download **`restore-privacy-client-0.1.6-macos.zip`** or **`restore-privacy-client-0.1.6-ios.zip`**, **or** clone this repo and open `client_app/` in Xcode / Flutter on macOS.
+1. Download **`restore-privacy-client-0.1.7-macos.zip`** or **`restore-privacy-client-0.1.7-ios.zip`**, **or** clone this repo and open `client_app/` in Xcode / Flutter on macOS.
 2. Developer checklist:  
    - [`client_app/APPLE_BUILD.md`](client_app/APPLE_BUILD.md)  
    - [`client_app/macos/BUILD_ON_MAC.md`](client_app/macos/BUILD_ON_MAC.md)  
    - [`client_app/ios/BUILD_ON_MAC.md`](client_app/ios/BUILD_ON_MAC.md)  
-   - Mac handoff notes: [`client_app/APPLE_HANDOFF_0.1.6.md`](client_app/APPLE_HANDOFF_0.1.6.md) (created with the release)
+   - Mac handoff notes: [`client_app/APPLE_HANDOFF_0.1.7.md`](client_app/APPLE_HANDOFF_0.1.7.md) (created with the release)
 3. Packages may ship the **public** node key (`node_elgamal.pub`). Each install **generates its own Ed25519 device key on first run**. Never ship `node_elgamal.priv` or a shared `client_ed25519.priv`.
 
 ### Status page
@@ -72,7 +72,7 @@ Release zips for **0.1.6** stage the Apple client packages for sideload / furthe
 https://restore-privacy-status.onrender.com/
 
 - Live **currently connected clients** count  
-- **Download** buttons for Windows, Android, macOS, and iOS (catalog v0.1.6)  
+- **Download** buttons for Windows, Android, macOS, and iOS (catalog v0.1.7)  
 - **Connect via web** explains that a browser tab cannot run full system VPN  
 
 ---
@@ -94,5 +94,5 @@ Node deploy, ports, secrets, from-source builds, and tests: **[sundries.txt](sun
 python -m client.windows
 
 # Release packages
-python scripts/build_release_0.1.6.py
+python scripts/build_release_0.1.7.py
 ```

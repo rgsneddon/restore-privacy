@@ -141,7 +141,7 @@ def fetch_geo_url(url: str, timeout: float = DEFAULT_TIMEOUT_SEC) -> dict:
     req = urllib.request.Request(
         url,
         headers={
-            "User-Agent": "restore-privacy-client/0.1.6",
+            "User-Agent": "restore-privacy-client/0.1.7",
             "Accept": "application/json",
         },
         method="GET",
