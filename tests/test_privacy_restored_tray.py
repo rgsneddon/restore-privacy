@@ -35,6 +35,7 @@ class TestTrayBranding(unittest.TestCase):
         tip = tray_tooltip_for_state(connected=True, residual=True)
         self.assertIn("Privacy Restored", tip)
         self.assertIn("connected", tip.lower())
+        self.assertNotIn("â€", tip)
         tip2 = tray_tooltip_for_state(connected=False)
         self.assertIn("Privacy Restored", tip2)
         self.assertIn("disconnected", tip2.lower())
@@ -138,9 +139,10 @@ class TestTrayStatusUpdate(unittest.TestCase):
 
         NIF_ICON = 0x00000002
         NIF_TIP = 0x00000004
+        NIF_SHOWTIP = 0x00000080
         NIM_MODIFY = 0x00000001
         self.assertEqual(captured.get("cmd"), NIM_MODIFY)
-        self.assertEqual(captured.get("flags"), NIF_TIP | NIF_ICON)
+        self.assertEqual(captured.get("flags"), NIF_TIP | NIF_ICON | NIF_SHOWTIP)
         self.assertIn("connected", (captured.get("tip") or "").lower())
         self.assertEqual(captured.get("hicon"), 99)
 
@@ -160,14 +162,28 @@ class TestTrayStatusUpdate(unittest.TestCase):
             self.skipTest("Windows only")
         h_disc = make_status_icon_handle(connected=False)
         h_conn = make_status_icon_handle(connected=True, residual=True)
-        self.assertTrue(h_disc, "disconnected HICON expected")
-        self.assertTrue(h_conn, "connected HICON expected")
+        self.assertTrue(h_disc, "disconnected HICON expected (logo + status)")
+        self.assertTrue(h_conn, "connected HICON expected (logo + status)")
         self.assertNotEqual(h_disc, h_conn)
+        # Logo file must exist so tray is not a blank synthetic-only square
+        logo = resolve_tray_icon_path()
+        self.assertIsNotNone(logo)
+        assert logo is not None
+        self.assertTrue(logo.is_file())
+        self.assertEqual(logo.suffix.lower(), ".ico")
         # Destroy to avoid GDI leak in test process
         import ctypes
 
         ctypes.windll.user32.DestroyIcon(h_disc)
         ctypes.windll.user32.DestroyIcon(h_conn)
+
+    def test_status_icon_prefers_logo_not_blank_only(self):
+        """make_status_icon_handle source documents logo+dot (not solid blank)."""
+        src = (ROOT / "client" / "windows" / "tray_win.py").read_text(encoding="utf-8")
+        self.assertIn("_load_logo_hicon", src)
+        self.assertIn("DrawIconEx", src)
+        self.assertIn("app_icon.ico", src)
+        self.assertIn("NIF_SHOWTIP", src)
 
     def test_app_source_syncs_tray_on_connect_disconnect(self):
         src = (ROOT / "client" / "windows" / "app.py").read_text(encoding="utf-8")

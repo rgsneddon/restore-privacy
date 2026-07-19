@@ -528,9 +528,9 @@ class TunnelClientApp:
         self._connected = connected
         self._busy = busy
         if busy and not connected:
-            label = "Connecting…"
+            label = "Connecting..."
         elif busy and connected:
-            label = "Disconnecting…"
+            label = "Disconnecting..."
         else:
             label = connect_button_label(connected)
         self.btn_var.set(label)

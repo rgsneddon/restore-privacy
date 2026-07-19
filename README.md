@@ -1,11 +1,11 @@
-﻿# Restore Privacy
+# Restore Privacy
 
-**Restore Privacy Tunnel (RPT)** â€” a custom-built VPN **client** for private connectivity.  
+**Restore Privacy Tunnel (RPT)**  -  a custom-built VPN **client** for private connectivity.  
 **Not** WireGuard, OpenVPN, IPsec, or any other pre-existing VPN product.
 
 | | |
 |--|--|
-| **Get the app** | [Download v0.1.6](https://github.com/rgsneddon/restore-privacy/releases/tag/0.1.6) Â· [Status & downloads](https://restore-privacy-status.onrender.com/) |
+| **Get the app** | [Download v0.1.6](https://github.com/rgsneddon/restore-privacy/releases/tag/0.1.6)  |  [Status & downloads](https://restore-privacy-status.onrender.com/) |
 | **Privacy** | [PRIVACY_POLICY.md](PRIVACY_POLICY.md) |
 | **License** | [LICENSE](LICENSE) (MIT) |
 | **Credits** | [CREDITS.md](CREDITS.md) |
@@ -15,7 +15,7 @@
 ## What you get
 
 - **Manual Connect / Disconnect** with optional seamless power-up via **Settings âš™**
-  - **Run at device startup** (Windows sign-in / Android boot â€” opt-in)
+  - **Run at device startup** (Windows sign-in / Android boot  -  opt-in)
   - **Autoconnect on launch** (opt-in; defaults off)
 - System tray identity **Privacy Restored** (Windows) with product **logo** icons
 - Scrolling message:  
@@ -36,14 +36,14 @@ or use the buttons on https://restore-privacy-status.onrender.com/
 |----------|---------|
 | Windows | `restore-privacy-client-0.1.6-windows-x64-setup.exe` |
 | Android | `restore-privacy-client-0.1.6-android.apk` |
-| macOS | `restore-privacy-client-0.1.6-macos.zip` *(prep zip / sign on Mac â€” see below)* |
-| iOS | `restore-privacy-client-0.1.6-ios.zip` *(prep zip / sign on Mac â€” see below)* |
+| macOS | `restore-privacy-client-0.1.6-macos.zip` *(prep zip / sign on Mac  -  see below)* |
+| iOS | `restore-privacy-client-0.1.6-ios.zip` *(prep zip / sign on Mac  -  see below)* |
 
 ### Windows
 
 1. Download the **Windows installer (.exe)** from the release or status page.
 2. Run **`restore-privacy-client-0.1.6-windows-x64-setup.exe`**.  
-   It installs the full client (**bundled runtime + Wintun + dependencies** â€” **no separate Python install**), creates **Privacy Restored** shortcuts with the **logo** icon, and can launch the app. The setup window shows standard install progress.
+   It installs the full client (**bundled runtime + Wintun + dependencies**  -  **no separate Python install**), creates **Privacy Restored** shortcuts with the **logo** icon, and can launch the app. The setup window shows standard install progress.
 3. Press **Connect** and approve **UAC** when prompted so residual public IP uses the VPN node.
 4. Optional: open **âš™ Settings** and enable **Run at device startup** and/or **Autoconnect on launch** for seamless power-up (both default **off**).
 5. Use the system tray (**Privacy Restored**) or taskbar to restore the window; **Disconnect** or **Quit** stops the tunnel.
@@ -53,7 +53,7 @@ or use the buttons on https://restore-privacy-status.onrender.com/
 1. Download the **APK** from the release or status page.
 2. Install the APK (allow install from unknown sources if your device asks).
 3. Open **Restore Privacy**, press **Connect**, and grant **VPN** permission when prompted.
-4. Optional: **âš™ Settings** â†’ startup / autoconnect (defaults off). Minimize keeps the VPN service running until **Disconnect**.
+4. Optional: **âš™ Settings** -> startup / autoconnect (defaults off). Minimize keeps the VPN service running until **Disconnect**.
 
 ### macOS / iOS (continue on a Mac)
 
@@ -80,7 +80,7 @@ https://restore-privacy-status.onrender.com/
 ## Privacy, license, and credits
 
 - **Privacy:** [PRIVACY_POLICY.md](PRIVACY_POLICY.md)  
-- **License:** **MIT** â€” [LICENSE](LICENSE)  
+- **License:** **MIT**  -  [LICENSE](LICENSE)  
 - **Credits:** [CREDITS.md](CREDITS.md)  
 
 ---

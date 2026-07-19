@@ -1,7 +1,8 @@
 """Windows system tray for Privacy Restored (product tray identity).
 
-Uses Shell_NotifyIcon via ctypes — no extra pip deps (safe for frozen onedir).
-Connected vs disconnected use distinct tooltip **and** tray icon (green vs grey badge).
+Uses Shell_NotifyIcon via ctypes - no extra pip deps (safe for frozen onedir).
+Tray shows the product logo ICO; connected vs disconnected differ by tooltip and
+a small status dot on the logo (never a blank solid square).
 """
 
 from __future__ import annotations
@@ -50,18 +51,21 @@ def resolve_tray_icon_path() -> Optional[Path]:
         except Exception:
             pass
     for p in candidates:
+        if p.is_file() and p.suffix.lower() == ".ico":
+            return p
+    for p in candidates:
         if p.is_file():
             return p
     return None
 
 
 def tray_tooltip_for_state(*, connected: bool, residual: bool = True) -> str:
-    """Short tray hover text using product tray name."""
+    """Short tray hover text using product tray name (ASCII-safe)."""
     if connected and residual:
-        return f"{TRAY_DISPLAY_NAME} — connected (VPN active)"
+        return f"{TRAY_DISPLAY_NAME} - connected (VPN active)"
     if connected:
-        return f"{TRAY_DISPLAY_NAME} — session only"
-    return f"{TRAY_DISPLAY_NAME} — disconnected"
+        return f"{TRAY_DISPLAY_NAME} - session only"
+    return f"{TRAY_DISPLAY_NAME} - disconnected"
 
 
 def tray_icon_state_key(*, connected: bool, residual: bool = True) -> str:
@@ -73,10 +77,35 @@ def tray_icon_state_key(*, connected: bool, residual: bool = True) -> str:
     return "disconnected"
 
 
-def make_status_icon_handle(*, connected: bool, residual: bool = True, size: int = 16):
-    """Create a small coloured tray HICON (green = connected, grey = disconnected).
+def _load_logo_hicon(size: int = 16) -> int:
+    """Load brand logo as HICON (tray-sized). Returns 0 on failure."""
+    if sys.platform != "win32":
+        return 0
+    try:
+        import ctypes
 
-    Pure Win32 GDI — no Pillow. Returns HICON or 0 on failure.
+        path = resolve_tray_icon_path()
+        if path is None or path.suffix.lower() != ".ico":
+            return 0
+        # IMAGE_ICON=1, LR_LOADFROMFILE=0x10
+        h = ctypes.windll.user32.LoadImageW(
+            None,
+            str(path),
+            1,
+            size,
+            size,
+            0x00000010,
+        )
+        return int(h) if h else 0
+    except Exception:
+        return 0
+
+
+def make_status_icon_handle(*, connected: bool, residual: bool = True, size: int = 16):
+    """Tray HICON: product logo with a small connected/disconnected status dot.
+
+    Prefers brand ``app_icon.ico`` so the tray is never a blank solid square.
+    Returns HICON or 0 on failure.
     """
     if sys.platform != "win32":
         return 0
@@ -84,16 +113,16 @@ def make_status_icon_handle(*, connected: bool, residual: bool = True, size: int
         import ctypes
         from ctypes import wintypes
 
-        # Colours BGRA for 32-bit DIB (Windows bottom-up)
-        if connected and residual:
-            r, g, b = 27, 118, 126  # STATUS_OK teal
-        elif connected:
-            r, g, b = 39, 121, 170  # primary blue
-        else:
-            r, g, b = 136, 136, 136  # grey disconnected
-
         user32 = ctypes.windll.user32
         gdi32 = ctypes.windll.gdi32
+
+        # Status dot colour (BGRA)
+        if connected and residual:
+            r, g, b = 27, 118, 126  # teal = VPN active
+        elif connected:
+            r, g, b = 39, 121, 170  # blue = session only
+        else:
+            r, g, b = 160, 160, 160  # grey = disconnected
 
         class BITMAPINFOHEADER(ctypes.Structure):
             _fields_ = [
@@ -128,34 +157,62 @@ def make_status_icon_handle(*, connected: bool, residual: bool = True, size: int
         bi = BITMAPINFO()
         bi.bmiHeader.biSize = ctypes.sizeof(BITMAPINFOHEADER)
         bi.bmiHeader.biWidth = size
-        bi.bmiHeader.biHeight = size  # bottom-up
+        bi.bmiHeader.biHeight = -size  # top-down DIB for simpler pixel indexing
         bi.bmiHeader.biPlanes = 1
         bi.bmiHeader.biBitCount = 32
-        bi.bmiHeader.biCompression = 0  # BI_RGB
+        bi.bmiHeader.biCompression = 0
 
         bits = ctypes.c_void_p()
-        hdc = user32.GetDC(None)
+        hdc_screen = user32.GetDC(None)
         hbm_color = gdi32.CreateDIBSection(
-            hdc, ctypes.byref(bi), 0, ctypes.byref(bits), None, 0
+            hdc_screen, ctypes.byref(bi), 0, ctypes.byref(bits), None, 0
         )
-        user32.ReleaseDC(None, hdc)
         if not hbm_color or not bits:
-            return 0
+            user32.ReleaseDC(None, hdc_screen)
+            # Fallback: logo alone (still better than blank solid)
+            return _load_logo_hicon(size)
 
-        # Fill solid colour (BGRA, alpha 255)
+        hdc_mem = gdi32.CreateCompatibleDC(hdc_screen)
+        old = gdi32.SelectObject(hdc_mem, hbm_color)
+        # White-ish background then logo
+        brush = gdi32.CreateSolidBrush(0x00F5F5F5)
+        class RECT(ctypes.Structure):
+            _fields_ = [
+                ("left", wintypes.LONG),
+                ("top", wintypes.LONG),
+                ("right", wintypes.LONG),
+                ("bottom", wintypes.LONG),
+            ]
+
+        rc = RECT(0, 0, size, size)
+        user32.FillRect(hdc_mem, ctypes.byref(rc), brush)
+        gdi32.DeleteObject(brush)
+
+        logo = _load_logo_hicon(size)
+        if logo:
+            # DI_NORMAL = 0x0003
+            user32.DrawIconEx(hdc_mem, 0, 0, logo, size, size, 0, None, 0x0003)
+            user32.DestroyIcon(logo)
+
+        gdi32.SelectObject(hdc_mem, old)
+        gdi32.DeleteDC(hdc_mem)
+        user32.ReleaseDC(None, hdc_screen)
+
+        # Paint status dot bottom-right into pixel buffer (top-down BGRA)
         px = (ctypes.c_ubyte * (size * size * 4)).from_address(bits.value)
-        for i in range(size * size):
-            o = i * 4
-            px[o] = b
-            px[o + 1] = g
-            px[o + 2] = r
-            px[o + 3] = 255
+        dot = max(3, size // 4)
+        for y in range(size - dot, size):
+            for x in range(size - dot, size):
+                o = (y * size + x) * 4
+                px[o] = b
+                px[o + 1] = g
+                px[o + 2] = r
+                px[o + 3] = 255
 
-        # 1-bit mask (all opaque → zeros)
         hbm_mask = gdi32.CreateBitmap(size, size, 1, 1, None)
         if not hbm_mask:
             gdi32.DeleteObject(hbm_color)
-            return 0
+            return _load_logo_hicon(size)
 
         ii = ICONINFO()
         ii.fIcon = True
@@ -166,9 +223,11 @@ def make_status_icon_handle(*, connected: bool, residual: bool = True, size: int
         hicon = user32.CreateIconIndirect(ctypes.byref(ii))
         gdi32.DeleteObject(hbm_mask)
         gdi32.DeleteObject(hbm_color)
-        return int(hicon) if hicon else 0
+        if hicon:
+            return int(hicon)
+        return _load_logo_hicon(size)
     except Exception:
-        return 0
+        return _load_logo_hicon(size)
 
 
 class WindowsSystemTray:
@@ -292,39 +351,54 @@ class WindowsSystemTray:
 
             NIF_ICON = 0x00000002
             NIF_TIP = 0x00000004
+            NIF_SHOWTIP = 0x00000080
             NIM_MODIFY = 0x00000001
             hicon = self._icon_for_state(connected=connected, residual=residual)
             nid = NOTIFYICONDATAW()
             nid.cbSize = ctypes.sizeof(NOTIFYICONDATAW)
             nid.hWnd = self._hwnd
             nid.uID = 1
-            nid.uFlags = NIF_TIP | (NIF_ICON if hicon else 0)
+            # Always refresh tip; refresh icon when we have a handle (logo + status dot)
+            flags = NIF_TIP | NIF_SHOWTIP
+            if hicon:
+                flags |= NIF_ICON
+            nid.uFlags = flags
             nid.hIcon = hicon or 0
-            nid.szTip = tip
-            ctypes.windll.shell32.Shell_NotifyIconW(NIM_MODIFY, ctypes.byref(nid))
+            # WCHAR tip: assign via buffer to avoid silent truncate issues
+            buf = (tip + ("\0" * 128))[:128]
+            nid.szTip = buf
+            ok = ctypes.windll.shell32.Shell_NotifyIconW(
+                NIM_MODIFY, ctypes.byref(nid)
+            )
+            if not ok and hicon:
+                # Retry tip-only if icon swap rejected
+                nid.uFlags = NIF_TIP | NIF_SHOWTIP
+                ctypes.windll.shell32.Shell_NotifyIconW(
+                    NIM_MODIFY, ctypes.byref(nid)
+                )
             self._nid = nid
         except Exception:
             pass
 
     def _load_base_icon(self):
+        """Brand logo HICON, else stock application icon (never a blank square)."""
         import ctypes
 
+        h = _load_logo_hicon(16)
+        if h:
+            return h
         path = resolve_tray_icon_path()
-        if path is None:
-            return ctypes.windll.user32.LoadIconW(None, 32512)
-
-        ico = str(path)
-        if path.suffix.lower() == ".ico":
-            h = ctypes.windll.user32.LoadImageW(
+        if path is not None and path.suffix.lower() == ".ico":
+            h2 = ctypes.windll.user32.LoadImageW(
                 None,
-                ico,
+                str(path),
                 1,  # IMAGE_ICON
                 0,
                 0,
                 0x00000010 | 0x00008000,  # LR_LOADFROMFILE | LR_DEFAULTSIZE
             )
-            if h:
-                return h
+            if h2:
+                return h2
         return ctypes.windll.user32.LoadIconW(None, 32512)
 
     def _run(self) -> None:
@@ -494,25 +568,36 @@ class WindowsSystemTray:
             return
         self._hwnd = hwnd
 
-        # Distinct visual states (coloured badges) + brand logo fallback
-        self._hicon_disconnected = make_status_icon_handle(
-            connected=False, residual=True
-        ) or self._load_base_icon()
-        self._hicon_connected = make_status_icon_handle(
-            connected=True, residual=True
-        ) or self._hicon_disconnected
-        self._hicon = self._hicon_disconnected
+        # Logo + status-dot variants (never blank solid squares)
+        base = self._load_base_icon()
+        self._hicon_disconnected = (
+            make_status_icon_handle(connected=False, residual=True) or base
+        )
+        self._hicon_connected = (
+            make_status_icon_handle(connected=True, residual=True) or base
+        )
+        self._hicon = self._hicon_disconnected or base
+
+        NIF_SHOWTIP = 0x00000080
+        NIM_SETVERSION = 0x00000004
+        NOTIFYICON_VERSION_4 = 4
 
         nid = NOTIFYICONDATAW()
         nid.cbSize = ctypes.sizeof(NOTIFYICONDATAW)
         nid.hWnd = hwnd
         nid.uID = 1
-        nid.uFlags = NIF_MESSAGE | NIF_ICON | NIF_TIP
+        nid.uFlags = NIF_MESSAGE | NIF_ICON | NIF_TIP | NIF_SHOWTIP
         nid.uCallbackMessage = WM_TRAY
         nid.hIcon = self._hicon
         tip = (self._tooltip or TRAY_DISPLAY_NAME)[:127]
-        nid.szTip = tip
+        nid.szTip = (tip + ("\0" * 128))[:128]
         shell32.Shell_NotifyIconW(NIM_ADD, ctypes.byref(nid))
+        # Modern tip behaviour (hover text updates reliably)
+        try:
+            nid.uVersion = NOTIFYICON_VERSION_4
+            shell32.Shell_NotifyIconW(NIM_SETVERSION, ctypes.byref(nid))
+        except Exception:
+            pass
         self._nid = nid
 
         # Apply any status that arrived before hwnd was ready

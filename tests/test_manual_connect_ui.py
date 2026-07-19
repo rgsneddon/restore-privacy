@@ -93,7 +93,7 @@ class TestManualControlPolicy(unittest.TestCase):
         self.assertIn("def _disconnect_tunnel", src)
         self.assertIn("disconnect_full_tunnel", src)
         self.assertIn('self._set_status("disconnecting")', disc)
-        self.assertIn("Disconnectingâ€¦", src)  # button busy label in _apply_control
+        self.assertIn("Disconnecting...", src)  # button busy label in _apply_control
 
     def test_connect_handler_starts_tunnel(self):
         src = (ROOT / "client" / "windows" / "app.py").read_text(encoding="utf-8")
@@ -291,14 +291,14 @@ class TestDialogueStatusFlips(unittest.TestCase):
             app._set_status("connecting")
             app.root.update_idletasks()
             self.assertIn("Connecting", app.status_var.get())
-            self.assertEqual(app.btn_var.get(), "Connectingâ€¦")
+            self.assertEqual(app.btn_var.get(), "Connecting...")
             self.assertIn("Please wait", app.detail_var.get())
 
             app._apply_control(connected=True, busy=True)
             app._set_status("disconnecting")
             app.root.update_idletasks()
             self.assertIn("Disconnecting", app.status_var.get())
-            self.assertEqual(app.btn_var.get(), "Disconnectingâ€¦")
+            self.assertEqual(app.btn_var.get(), "Disconnecting...")
             self.assertIn("Stopping", app.detail_var.get())
 
             app._apply_control(connected=False, busy=False)
