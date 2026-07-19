@@ -1,6 +1,7 @@
 /// RPT node endpoint and full-tunnel intent (shared with platform VPN).
 class RptConfig {
-  static const String host = '104.156.224.47';
+  /// Product default node (must match [client/endpoint.py] PRODUCT_NODE_HOST).
+  static const String host = '82.221.101.241';
   static const int port = 44044;
   static const String protocolMagic = 'RPT2';
   static const String sessionName = 'Privacy Restored';

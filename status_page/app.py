@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+﻿#!/usr/bin/env python3
 """Restore Privacy status page for Render.
 
 Proxies live **current** session count from the Vultr node. The page updates the
@@ -27,7 +27,7 @@ FAVICON_PNG_PATH = "/favicon.png"
 APPLE_TOUCH_PATH = "/apple-touch-icon.png"
 LOGO_PATH = "/logo.png"
 
-# Map URL path → filename under static/
+# Map URL path â†’ filename under static/
 STATIC_ROUTES: dict[str, str] = {
     FAVICON_PATH: "favicon.ico",
     "/favicon.ico": "favicon.ico",
@@ -86,7 +86,7 @@ def render_beta_note_html() -> str:
 
 
 # Upstream VPN node status (override via env on Render)
-DEFAULT_UPSTREAM = "http://104.156.224.47:8080/api/status"
+DEFAULT_UPSTREAM = "http://82.221.101.241:8080/api/status"
 UPSTREAM_STATUS_URL = os.environ.get("RPT_STATUS_UPSTREAM", DEFAULT_UPSTREAM).strip()
 FETCH_TIMEOUT_SEC = float(os.environ.get("RPT_STATUS_TIMEOUT", "4"))
 # Client-side poll interval (ms) for live count updates without page reload
@@ -223,7 +223,7 @@ def render_html(status: dict, poll_ms: int | None = None) -> bytes:
 {render_beta_note_html()}
   <div class="count">Currently connected clients</div>
   <div class="num" id="clients-connected" data-metric="current">{n}</div>
-  <div class="hint">Live count · updates automatically</div>
+  <div class="hint">Live count Â· updates automatically</div>
 {downloads_html}
   <script>
 (function () {{

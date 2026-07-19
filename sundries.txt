@@ -51,17 +51,21 @@ SECRETS / RELEASE GATES (mandatory)
 --------------------------
   Custom RPT node (not WireGuard/OpenVPN). Tree: node/
 
-  From a machine with SSH (password via environment — never commit):
+  Production node (current): 82.221.101.241 UDP 44044 / status TCP 8080
+  Product client defaults: client/endpoint.py + client_app/lib/rpt_config.dart
 
-    export RPT_SSH_HOST=YOUR_SERVER_IP
-    export RPT_SSH_USER=root
-    export RPT_SSH_PASSWORD='...'
+  From a machine with SSH (never commit passwords/keys into git):
+
+    export RPT_SSH_HOST=82.221.101.241
+    export RPT_SSH_USER=raskul          # FlokiNET image uses this user (sudo)
+    export RPT_SSH_KEY=$HOME/.ssh/id_ed25519_restore_privacy_vps
+    export RPT_SSH_SUDO=1
+    # Or password auth: export RPT_SSH_PASSWORD='...'
     pip install paramiko cryptography
     python scripts/deploy_rpt_node.py
 
-  Note: scripts/deploy_rpt_node.py authenticates with RPT_SSH_PASSWORD only
-  (look_for_keys=False). For interactive admin SSH to a new VPS, use a normal
-  OpenSSH key in authorized_keys; that path is separate from the deploy script.
+  Interactive admin SSH:
+    ssh -i ~/.ssh/id_ed25519_restore_privacy_vps raskul@82.221.101.241
 
   Or on the server after copying node/ to /opt/restore-privacy/node:
 

@@ -1,4 +1,4 @@
-package com.restoreprivacy.restore_privacy_client
+﻿package com.restoreprivacy.restore_privacy_client
 
 import android.app.Activity
 import android.content.Intent
@@ -28,7 +28,7 @@ class MainActivity : FlutterActivity() {
             .setMethodCallHandler { call, result ->
                 when (call.method) {
                     "connect" -> {
-                        val host = call.argument<String>("host") ?: "104.156.224.47"
+                        val host = call.argument<String>("host") ?: "82.221.101.241"
                         val port = call.argument<Int>("port") ?: 44044
                         val fullTunnel = call.argument<Boolean>("fullTunnel") ?: true
                         val sessionName = call.argument<String>("sessionName") ?: "Restore Privacy"
@@ -38,7 +38,7 @@ class MainActivity : FlutterActivity() {
                                 mapOf(
                                     "ok" to false,
                                     "message" to (
-                                        "Missing node_elgamal.pub — packages ship the public node key; " +
+                                        "Missing node_elgamal.pub â€” packages ship the public node key; " +
                                             "a unique device Ed25519 key is generated on first run"
                                         ),
                                 ),
@@ -50,36 +50,36 @@ class MainActivity : FlutterActivity() {
                     "disconnect" -> {
                         // ACTION_DISCONNECT runs stopTunnel (close TUN + stopSelf)
                         // rather than only stopService, so OS VPN routes clear fully.
-                        // Only explicit Disconnect from UI — never on Activity destroy.
+                        // Only explicit Disconnect from UI â€” never on Activity destroy.
                         sendDisconnect()
                         result.success(
                             mapOf(
                                 "ok" to true,
-                                "message" to "Disconnected — system VPN stopped; residual public IP restored",
+                                "message" to "Disconnected â€” system VPN stopped; residual public IP restored",
                                 "connected" to false,
                                 "fullTunnelActive" to false,
                             ),
                         )
                     }
                     "status" -> {
-                        // Rehydrate UI after minimize/resume — does not start/stop tunnel.
+                        // Rehydrate UI after minimize/resume â€” does not start/stop tunnel.
                         val active = RptVpnService.isSessionActive
                         val ip = RptVpnService.activeVpnIp
                         val v6 = RptVpnService.activeIpv6Protected
                         val statusMsg = when {
                             !active -> "Disconnected"
                             v6 == false && ip.isNotEmpty() ->
-                                "Connected — IPv4 via VPN; IPv6 not protected ($ip)"
+                                "Connected â€” IPv4 via VPN; IPv6 not protected ($ip)"
                             v6 == false ->
-                                "Connected — IPv4 via VPN; IPv6 not protected"
+                                "Connected â€” IPv4 via VPN; IPv6 not protected"
                             v6 == true && ip.isNotEmpty() ->
-                                "Connected — VPN active; IPv6 ISP path blocked ($ip)"
+                                "Connected â€” VPN active; IPv6 ISP path blocked ($ip)"
                             v6 == true ->
-                                "Connected — VPN active; IPv6 ISP path blocked"
+                                "Connected â€” VPN active; IPv6 ISP path blocked"
                             ip.isNotEmpty() ->
-                                "Connected — your traffic uses the VPN ($ip)"
+                                "Connected â€” your traffic uses the VPN ($ip)"
                             else ->
-                                "Connected — protected"
+                                "Connected â€” protected"
                         }
                         result.success(
                             mapOf(
@@ -166,7 +166,7 @@ class MainActivity : FlutterActivity() {
         }
     }
 
-    private var pendingHost: String = "104.156.224.47"
+    private var pendingHost: String = "82.221.101.241"
     private var pendingPort: Int = 44044
     private var pendingFullTunnel: Boolean = true
     private var pendingSession: String = "Restore Privacy"
@@ -183,7 +183,7 @@ class MainActivity : FlutterActivity() {
                 res?.success(
                     mapOf(
                         "ok" to false,
-                        "message" to "VPN permission denied — grant once for full tunnel",
+                        "message" to "VPN permission denied â€” grant once for full tunnel",
                     ),
                 )
             }

@@ -1,4 +1,4 @@
-"""Structural prep checks for iOS/macOS MacBook builds (no Xcode on Windows)."""
+﻿"""Structural prep checks for iOS/macOS MacBook builds (no Xcode on Windows)."""
 
 from __future__ import annotations
 
@@ -155,7 +155,7 @@ class TestAppleProjectTrees(unittest.TestCase):
 
     def test_shared_rpt_config(self):
         cfg = (APP / "lib" / "rpt_config.dart").read_text(encoding="utf-8")
-        self.assertIn("104.156.224.47", cfg)
+        self.assertIn("82.221.101.241", cfg)
         self.assertIn("44044", cfg)
         self.assertIn("fullTunnel = true", cfg)
         self.assertIn("autoConnectOnLaunch = false", cfg)

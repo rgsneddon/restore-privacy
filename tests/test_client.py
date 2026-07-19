@@ -1,4 +1,4 @@
-"""Tests drive the shipped client connect / full-tunnel / UI theme paths."""
+﻿"""Tests drive the shipped client connect / full-tunnel / UI theme paths."""
 
 from __future__ import annotations
 
@@ -82,11 +82,11 @@ class TestFullTunnel(unittest.TestCase):
         self.assertIn({"addr": "0.0.0.0", "prefix": 0}, cfg["routes"])
         self.assertIn({"addr": "::", "prefix": 0}, cfg["routes"])
         self.assertTrue(cfg["allowAllApps"])
-        cmds = "\n".join(windows_route_commands(plan, "104.156.224.47", if_index=9))
+        cmds = "\n".join(windows_route_commands(plan, "82.221.101.241", if_index=9))
         self.assertIn("0.0.0.0 mask 128.0.0.0 0.0.0.0 IF 9", cmds)
         self.assertIn("128.0.0.0 mask 128.0.0.0 0.0.0.0 IF 9", cmds)
         self.assertIn("IF 9", cmds)
-        self.assertIn("104.156.224.47", cmds)
+        self.assertIn("82.221.101.241", cmds)
         self.assertNotIn("mask 128.0.0.0 10.88.0.1", cmds)
 
 

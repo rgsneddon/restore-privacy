@@ -1,4 +1,4 @@
-"""Linux Mint client: route plan, residual honesty, entry wiring."""
+﻿"""Linux Mint client: route plan, residual honesty, entry wiring."""
 
 from __future__ import annotations
 
@@ -34,7 +34,7 @@ class TestLinuxRouteBuilders(unittest.TestCase):
         plan = build_full_tunnel_plan("10.88.0.2", tunnel_iface="rpt0")
         cmds = linux_route_commands(
             plan,
-            "104.156.224.47",
+            "82.221.101.241",
             iface="rpt0",
             physical_dev="eth0",
             physical_gw="192.168.1.1",
@@ -42,8 +42,8 @@ class TestLinuxRouteBuilders(unittest.TestCase):
         joined = "\n".join(cmds)
         self.assertIn("0.0.0.0/1 dev rpt0", joined)
         self.assertIn("128.0.0.0/1 dev rpt0", joined)
-        self.assertIn("104.156.224.47/32", joined)
-        pin = joined.find("104.156.224.47/32")
+        self.assertIn("82.221.101.241/32", joined)
+        pin = joined.find("82.221.101.241/32")
         catch = joined.find("0.0.0.0/1")
         self.assertLess(pin, catch)
         # no catch-all without flag

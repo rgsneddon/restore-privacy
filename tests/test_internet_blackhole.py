@@ -1,4 +1,4 @@
-"""Anti-blackhole: full-tunnel routes + dataplane must not trap internet traffic."""
+﻿"""Anti-blackhole: full-tunnel routes + dataplane must not trap internet traffic."""
 
 from __future__ import annotations
 
@@ -44,14 +44,14 @@ from node.routing import (  # noqa: E402
 class TestWindowsAntiBlackholeRoutes(unittest.TestCase):
     def test_route_plan_pins_server_before_catchall_and_uses_if_index(self):
         plan = build_full_tunnel_plan("10.88.0.5", tunnel_iface="RPT")
-        server = "104.156.224.47"
+        server = "82.221.101.241"
         cmds = windows_route_commands(plan, server, if_index=17)
         joined = "\n".join(cmds)
         self.assertIn(f"route add {server} mask 255.255.255.255 PHYSICAL_GW", joined)
         self.assertIn("IF 17", joined)
         self.assertIn("0.0.0.0 mask 128.0.0.0 0.0.0.0 IF 17", joined)
         self.assertIn("128.0.0.0 mask 128.0.0.0 0.0.0.0 IF 17", joined)
-        # /32 address — no fake ARP gateway 10.88.0.1 for dual /1
+        # /32 address â€” no fake ARP gateway 10.88.0.1 for dual /1
         self.assertIn("255.255.255.255", joined)
         self.assertNotIn("mask 128.0.0.0 10.88.0.1", joined)
         pin_i = joined.find(server)
@@ -61,7 +61,7 @@ class TestWindowsAntiBlackholeRoutes(unittest.TestCase):
 
     def test_no_if_index_omits_dual_slash1(self):
         plan = build_full_tunnel_plan("10.88.0.5", tunnel_iface="RPT")
-        cmds = "\n".join(windows_route_commands(plan, "104.156.224.47", if_index=None))
+        cmds = "\n".join(windows_route_commands(plan, "82.221.101.241", if_index=None))
         self.assertNotIn("mask 128.0.0.0", cmds)
         self.assertIn("PHYSICAL_GW", cmds)
         self.assertTrue(routes_would_blackhole_without_if_index(None, True))
@@ -105,7 +105,7 @@ class TestWindowsAntiBlackholeRoutes(unittest.TestCase):
             res = start_full_tunnel(
                 client,
                 plan,
-                "104.156.224.47",
+                "82.221.101.241",
                 force_queue=True,
                 prefer_system_capture=False,
             )
@@ -133,18 +133,18 @@ class TestWindowsAntiBlackholeRoutes(unittest.TestCase):
         client._sock = None  # dry_run does not start dataplane
 
         plan = build_full_tunnel_plan(session.vpn_ip)
-        # dry_run returns before needing socket for dataplane — patch start path
-        res = start_full_tunnel(client, plan, "104.156.224.47", dry_run=True)
+        # dry_run returns before needing socket for dataplane â€” patch start path
+        res = start_full_tunnel(client, plan, "82.221.101.241", dry_run=True)
         self.assertTrue(res.ok)
         joined = "\n".join(res.applied_commands)
         self.assertIn("PHYSICAL_GW", joined)
         self.assertIn("IF 42", joined)
-        self.assertIn("104.156.224.47", joined)
+        self.assertIn("82.221.101.241", joined)
 
     def test_server_pin_failure_refuses_dual_slash1(self):
         """If pin fails, dual /1 must not install (recursive UDP blackhole)."""
         plan = build_full_tunnel_plan("10.88.0.9", tunnel_iface="RPT")
-        server = "104.156.224.47"
+        server = "82.221.101.241"
         pin_cmd = f"route add {server} mask 255.255.255.255 192.168.1.1 metric 1"
         catch_a = "route add 0.0.0.0 mask 128.0.0.0 0.0.0.0 IF 17 metric 5"
         catch_b = "route add 128.0.0.0 mask 128.0.0.0 0.0.0.0 IF 17 metric 5"
@@ -156,7 +156,7 @@ class TestWindowsAntiBlackholeRoutes(unittest.TestCase):
             if "mask 255.255.255.255" in cmd and "route add" in cmd:
                 return mock.Mock(returncode=1, stderr="pin failed: network unreachable", stdout="")
             if "mask 128.0.0.0" in cmd:
-                # Should not be reached — fail test if it is
+                # Should not be reached â€” fail test if it is
                 return mock.Mock(returncode=0, stderr="", stdout="")
             return mock.Mock(returncode=0, stderr="", stdout="")
 
@@ -190,7 +190,7 @@ class TestWindowsAntiBlackholeRoutes(unittest.TestCase):
         session = complete_server_hello(reply, client_nonce, client_pub)
         client = RptClient.__new__(RptClient)
         client.session = session
-        client.endpoint = Endpoint("104.156.224.47", 44044)
+        client.endpoint = Endpoint("82.221.101.241", 44044)
         client.state = ConnectState.CONNECTED
         client._sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         client._sock.bind(("127.0.0.1", 0))
@@ -237,7 +237,7 @@ class TestWindowsAntiBlackholeRoutes(unittest.TestCase):
                 False,
             ),
         ) as apply_mock:
-            res = start_full_tunnel(client, plan, "104.156.224.47")
+            res = start_full_tunnel(client, plan, "82.221.101.241")
         self.assertTrue(res.ok)  # session + dataplane may still run
         self.assertFalse(res.routes_applied)
         self.assertIn("refused", res.message.lower())

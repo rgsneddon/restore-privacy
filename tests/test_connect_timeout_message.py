@@ -1,4 +1,4 @@
-"""Connect timeout messaging must include node host:port; not bare 'timed out'."""
+﻿"""Connect timeout messaging must include node host:port; not bare 'timed out'."""
 
 from __future__ import annotations
 
@@ -24,11 +24,11 @@ class TestFormatConnectFailure(unittest.TestCase):
     def test_timeout_includes_host_port(self):
         msg = format_connect_failure(
             TimeoutError("timed out"),
-            host="104.156.224.47",
+            host="82.221.101.241",
             port=44044,
             timeout_s=20.0,
         )
-        self.assertIn("104.156.224.47", msg)
+        self.assertIn("82.221.101.241", msg)
         self.assertIn("44044", msg)
         self.assertIn("20", msg)
         self.assertNotEqual(msg.strip().lower(), "timed out")

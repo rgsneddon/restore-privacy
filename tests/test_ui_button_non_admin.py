@@ -1,4 +1,4 @@
-"""Connect button always visible; residual Connect elevates; diagnostic queue path exists."""
+﻿"""Connect button always visible; residual Connect elevates; diagnostic queue path exists."""
 
 from __future__ import annotations
 
@@ -97,7 +97,7 @@ class TestNonAdminConnect(unittest.TestCase):
             res = start_full_tunnel(
                 client,
                 plan,
-                "104.156.224.47",
+                "82.221.101.241",
                 prefer_system_capture=True,
                 require_system_capture=False,
             )
@@ -113,7 +113,7 @@ class TestNonAdminConnect(unittest.TestCase):
             res = start_full_tunnel(
                 client,
                 plan,
-                "104.156.224.47",
+                "82.221.101.241",
                 require_system_capture=True,
             )
         self.assertFalse(res.ok)

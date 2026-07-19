@@ -1,4 +1,4 @@
-import XCTest
+﻿import XCTest
 @testable import Rpt2
 import CryptoKit
 import Foundation
@@ -15,11 +15,11 @@ final class Rpt2Tests: XCTestCase {
         XCTAssertEqual(RptProtocol.MsgType.keepalive.rawValue, 0x04)
     }
 
-    /// Product node endpoint — must match Flutter RptConfig + Vultr status upstream.
+    /// Product node endpoint â€” must match Flutter RptConfig + Vultr status upstream.
     func testProductEndpointIsActiveVultrNode() {
-        XCTAssertEqual(RptEndpoint.host, "104.156.224.47")
+        XCTAssertEqual(RptEndpoint.host, "82.221.101.241")
         XCTAssertEqual(RptEndpoint.port, 44044)
-        XCTAssertEqual(RptEndpoint.hostPortDescription, "104.156.224.47:44044")
+        XCTAssertEqual(RptEndpoint.hostPortDescription, "82.221.101.241:44044")
         // Channel arg resolution defaults + NSNumber port
         let def = RptEndpoint.resolve(from: nil)
         XCTAssertEqual(def.host, RptEndpoint.host)
@@ -221,7 +221,7 @@ final class Rpt2Tests: XCTestCase {
 
         let priv = Data(repeating: 0x11, count: 32)
         var pub = Data(repeating: 0x22, count: 256)
-        // ElGamal y must be in range; use a simple non-zero big-endian integer < P is hard —
+        // ElGamal y must be in range; use a simple non-zero big-endian integer < P is hard â€”
         // loadFromDirectory only checks length, not group membership.
         pub[0] = 0x01
         try priv.write(to: tmp.appendingPathComponent(RptSecrets.clientPrivName))
@@ -304,7 +304,7 @@ final class Rpt2Tests: XCTestCase {
     func testResultMapIncludesVpnIpOnOrchestratorShape() {
         let outcome = RptConnectOrchestrator.ConnectOutcome(
             ok: true,
-            message: "Connected — tunnel IP 10.88.0.2",
+            message: "Connected â€” tunnel IP 10.88.0.2",
             vpnIp: "10.88.0.2",
             session: nil,
             engine: nil

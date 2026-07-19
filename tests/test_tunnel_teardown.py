@@ -1,4 +1,4 @@
-"""Full tunnel teardown on app close — Windows routes/stop + Android disconnect wiring.
+﻿"""Full tunnel teardown on app close â€” Windows routes/stop + Android disconnect wiring.
 
 Tests drive the shipped teardown helpers and source control-flow (not reimplementations).
 """
@@ -30,7 +30,7 @@ class TestWindowsRouteDeleteCommands(unittest.TestCase):
 
     def test_delete_covers_dual_slash1_and_server_pin(self):
         plan = build_full_tunnel_plan("10.88.0.9", tunnel_iface="RPT")
-        server = "104.156.224.47"
+        server = "82.221.101.241"
         cmds = windows_route_delete_commands(plan, server, if_index=12)
         joined = "\n".join(cmds)
         self.assertIn(f"route delete {server} mask 255.255.255.255", joined)
@@ -48,7 +48,7 @@ class TestWindowsRouteDeleteCommands(unittest.TestCase):
 
 
 class TestStopFullTunnel(unittest.TestCase):
-    """stop_full_tunnel: routes first, then dataplane, TUN, session — idempotent."""
+    """stop_full_tunnel: routes first, then dataplane, TUN, session â€” idempotent."""
 
     def test_stop_with_no_tunnel_is_safe(self):
         client = RptClient()
@@ -65,7 +65,7 @@ class TestStopFullTunnel(unittest.TestCase):
 
     def test_stop_calls_route_rollback_dataplane_tun_and_disconnect(self):
         plan = build_full_tunnel_plan("10.88.0.5", tunnel_iface="RPT")
-        server = "104.156.224.47"
+        server = "82.221.101.241"
         plane = mock.Mock()
         tun = mock.Mock()
         client = mock.Mock(spec=RptClient)
@@ -162,7 +162,7 @@ class TestWindowsAppCloseHook(unittest.TestCase):
         self.assertIn("_on_close_ui_only", src)
         self.assertIn("disconnect_full_tunnel", src)
         self.assertIn('protocol("WM_DELETE_WINDOW"', src)
-        # Close hides process alive — no tunnel stop
+        # Close hides process alive â€” no tunnel stop
         on_close = src[src.index("def _on_close_ui_only") : src.index("def _quit_app")]
         self.assertNotIn("stop_full_tunnel", on_close)
         self.assertNotIn("disconnect_full_tunnel", on_close)
@@ -248,7 +248,7 @@ class TestAndroidTeardownWiring(unittest.TestCase):
         self.assertIn("isSessionActive", act)
 
     def test_flutter_dispose_does_not_stop_tunnel(self):
-        """Product: dispose/lifecycle rehydrate only — Disconnect button stops VPN."""
+        """Product: dispose/lifecycle rehydrate only â€” Disconnect button stops VPN."""
         main = (self.LIB / "main.dart").read_text(encoding="utf-8")
         self.assertIn("WidgetsBindingObserver", main)
         self.assertIn("shouldStopTunnelOnAppLifecycle", main)

@@ -1,4 +1,4 @@
-"""Product residual Connect: elevation + Wintun dual /1 (not queue-as-Connected).
+﻿"""Product residual Connect: elevation + Wintun dual /1 (not queue-as-Connected).
 
 Queue attach remains available for diagnostics when require_system_capture=False.
 Product UI only reports Connected when residual_ip_capture_active.
@@ -44,7 +44,7 @@ class TestResidualProductConnectPolicy(unittest.TestCase):
             res = start_full_tunnel(
                 client,
                 plan,
-                "104.156.224.47",
+                "82.221.101.241",
                 prefer_system_capture=True,
                 require_system_capture=True,
             )
@@ -79,7 +79,7 @@ class TestResidualProductConnectPolicy(unittest.TestCase):
             res = start_full_tunnel(
                 client,
                 plan,
-                "104.156.224.47",
+                "82.221.101.241",
                 prefer_system_capture=True,
                 require_system_capture=False,
             )
