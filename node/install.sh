@@ -150,4 +150,14 @@ else
   echo "[rpt-install] WARN: install_dns.sh missing; clients expect DNS at 10.88.0.1" >&2
 fi
 
+echo "[rpt-install] host privacy (quiet journal / no leftover app log dirs)"
+if [[ -f "${SCRIPT_DIR}/install_host_privacy.sh" ]]; then
+  bash "${SCRIPT_DIR}/install_host_privacy.sh" || {
+    echo "[rpt-install] WARN: install_host_privacy.sh failed — re-run on VPS after deploy" >&2
+  }
+else
+  echo "[rpt-install] WARN: install_host_privacy.sh missing" >&2
+fi
+
 echo "[rpt-install] done port=${LISTEN_PORT} ui=${UI_PORT} wan=${WAN}"
+echo "[rpt-install] NEXT (on live VPS if this was only a package copy): re-run install_dns.sh + install_host_privacy.sh after rpt0 is up"

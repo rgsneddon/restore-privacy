@@ -116,6 +116,8 @@ Node deploy, ports, secrets, from-source builds, and tests: **[sundries.txt](sun
 
 **Tunnel DNS (source prep):** Full-tunnel clients default DNS to the **node** (`10.88.0.1`), not Cloudflare/Quad9. Operators run [`node/install_dns.sh`](node/install_dns.sh) (Unbound, tunnel-only) on the VPS when the box is up — name resolution while connected needs that service.
 
+**Connect privacy:** Product Connect does **not** call third-party geo/telemetry HTTPS (no phones-home before handshake). Node host quiet-logging prep: [`node/install_host_privacy.sh`](node/install_host_privacy.sh). **Live VPS apply** of DNS + host privacy is the deploy step after this prep.
+
 **Release scripts:** Public download catalog remains **v0.1.8** until 0.1.9 assets are cut. For packaging, copy `scripts/build_release_0.1.8.py` → `build_release_0.1.9.py` and bump catalog/`VERSION`. Historical `build_release_0.*.py` files are archive/history. Always re-run `python scripts/package_linux.py` (or the Linux step inside the current release script) so manylinux wheels are refreshed.
 
 ```bash
