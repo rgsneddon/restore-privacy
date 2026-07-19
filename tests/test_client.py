@@ -62,7 +62,12 @@ class TestClientProtocol(unittest.TestCase):
         node_priv = generate_keypair()
         good_priv, good_pub = generate_client_admission_keypair()
         bad_priv, _ = generate_client_admission_keypair()
-        node = NodeHandshake(node_priv, [ed25519_pub_raw(good_pub)])
+        # Free-product default admits unknown devices; enforce allow-list for this check
+        node = NodeHandshake(
+            node_priv,
+            [ed25519_pub_raw(good_pub)],
+            admit_unknown_devices=False,
+        )
         frame, _, _ = build_authorized_client_hello(bad_priv, node_priv.public)
         with self.assertRaises(AdmissionError):
             node_complete_hello(node, frame, "10.88.0.2")

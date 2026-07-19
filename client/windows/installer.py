@@ -17,7 +17,7 @@ from collections.abc import Callable
 from pathlib import Path
 
 APP_NAME = "RestorePrivacy"
-VERSION = "0.1.8"
+VERSION = "0.1.9"
 # User-facing shortcut / tray product name (logo icon on Start Menu + Desktop)
 SHORTCUT_DISPLAY_NAME = "Privacy Restored"
 # Install under LocalAppData so no elevation is required for deploy.

@@ -20,7 +20,7 @@ Build and sign on a **Mac** with Xcode. This Windows checkout only prepares sour
 | UI | Retro: banner `#000080`, black bg, white text; scrolling privacy string in `lib/theme.dart` |
 | Auto-connect | On launch (`RptConfig.autoConnectOnLaunch`) |
 | Full tunnel | `0.0.0.0/0` intent |
-| UK IP gate | Client-side: only United Kingdom public IPs (mirror `client/uk_gate.py` / Android `UkIpGate.kt`) |
+| UK IP gate | **Removed** (0.1.9): no public-IP geo admission; device keys + RPT2 crypto only |
 | Brand icons | Already under `ios/.../AppIcon.appiconset` and `macos/.../AppIcon.appiconset` |
 
 ## Secrets (never commit `*.priv`)

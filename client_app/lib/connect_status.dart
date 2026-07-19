@@ -44,14 +44,6 @@ const String kMissingSecretsMessage =
 const String kVpnPermissionDeniedMessage =
     'VPN permission denied — grant once for full tunnel';
 
-/// UK public-IP security gate (must match native [UkIpGate] / Python uk_gate).
-const String kUkGateDeniedMessage =
-    'Access denied: Restore Privacy is only available when your public IP '
-    'is located in the United Kingdom. Your current network location is not UK.';
-const String kUkGateLookupFailedMessage =
-    'Access denied: could not verify that your public IP is in the United Kingdom. '
-    'Check your network connection and try again.';
-
 /// Honest full-tunnel failure: system VPN never came up (residual ISP IP expected).
 const String kPacketTunnelNotActiveMessage =
     'System VPN (Packet Tunnel) did not become active — your residual public IP '

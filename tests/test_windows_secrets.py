@@ -113,7 +113,6 @@ class TestConnectUsesSecrets(unittest.TestCase):
             _write_valid_secrets(d)
             client = RptClient(
                 secrets_dir=d,
-                uk_gate_fetcher=lambda: {"country_code": "GB", "ip": "1.2.3.4"},
             )
             # May fail later on network/handshake, but must not be the missing-secrets message
             try:
@@ -133,8 +132,6 @@ class TestConnectUsesSecrets(unittest.TestCase):
             # Explicit empty dir: no node_elgamal.pub → bootstrap fails closed
             client = RptClient(
                 secrets_dir=empty,
-                uk_gate_fetcher=lambda: {"country_code": "GB", "ip": "1.2.3.4"},
-                skip_uk_gate=True,
             )
             try:
                 result = client.connect(timeout=0.5)
@@ -160,7 +157,7 @@ class TestInstallerAndBuildRecipe(unittest.TestCase):
         self.assertIn("node_elgamal.pub", inst)
         self.assertIn("node_elgamal.priv", inst)  # must mention to exclude
         self.assertIn("device Ed25519", inst)
-        self.assertIn("VERSION = \"0.1.8\"", inst)
+        self.assertIn('VERSION = "0.1.9"', inst)
 
     def test_build_script_injects_secrets(self):
         script = (ROOT / "scripts" / "build_release_0.1.8.py").read_text(encoding="utf-8")

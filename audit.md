@@ -102,7 +102,7 @@ Severity scale: **High** (likely security/privacy break or secret exposure) · *
 |----|---------|----------|-------------------------|
 | M3 | **Apple residual protection depends on Network Extension signing** not present in prep zips alone. | README Apple section: “Mac work required”; residual only when Packet Tunnel signed/active; honesty tests require NE path. | Keep residual UI honest until NE is signed; prep zips remain Mac-side work. |
 | M4 | **Linux residual path depends on root + host TUN/`ip`**; app crypto is baked, OS floor is not. | `product_connect_requires_root()`, package LINUX_INSTALL docs; honest by design. | Do not market as zero-privilege residual VPN. |
-| M5 | **UK gate / geo check** contacts third-party public IP services (egress metadata). | `client/uk_gate.py` (User-Agent `restore-privacy-client/0.1.8`). | Disclose in privacy limits if users need more detail; minimize endpoints; no PII beyond egress IP as seen by those services. |
+| M5 | **UK gate / geo check** (third-party public IP on connect). | **Closed in 0.1.9 source:** product connect no longer calls geo APIs; `client/uk_gate.py` removed; Android/Apple product paths no longer invoke UkIpGate/RptUkIpGate. | Old 0.1.8 installs still gate until users upgrade; do not re-add client or node geo admission without a privacy review. |
 
 ### 4.3 Medium — closed on this refresh (were open on first pass)
 

@@ -2,7 +2,8 @@
 
 **Last updated:** 19 July 2026  
 **Product:** Restore Privacy Tunnel (RPT)  -  custom VPN node, client apps, and public status page  
-**Current client packages:** [v0.1.8](https://github.com/rgsneddon/restore-privacy/releases/tag/0.1.8) (Windows | Android | Linux installer for Ubuntu 20.04+ / Mint; macOS | iOS prep packages for Mac-side signing)  
+**Current public packages:** [v0.1.8](https://github.com/rgsneddon/restore-privacy/releases/tag/0.1.8) (Windows | Android | Linux installer for Ubuntu 20.04+ / Mint; macOS | iOS prep packages for Mac-side signing)  
+**Source / next tag prep:** **v0.1.9** — UK public-IP geo admission removed (see below); packages when cut  
 **Operator / project:** Russell G Sneddon (`rgsneddon`) / public repository [restore-privacy](https://github.com/rgsneddon/restore-privacy)
 
 This policy describes how the **Restore Privacy** software is designed to handle data. It is written for end users and operators. It is **not** legal advice and is not a jurisdiction-specific compliance certificate (e.g. full GDPR/CCPA legal opinion).
@@ -53,6 +54,7 @@ Process stdout/stderr for the node service is configured for **no journal sessio
 - **Full-tunnel** modes route device traffic into the encrypted tunnel **only when** the OS grants VPN permission (Windows Administrator / UAC + Wintun dual `/1` routes, Android VPN consent, iOS/macOS VPN permission). On **iOS and macOS**, full-system VPN uses a signed **Packet Tunnel Network Extension** (and App Group access to admission secrets). Product "connected for residual public IP" requires the system tunnel / dual `/1` path to be active (residual public IP only changes then).
 - **On Disconnect / Quit**, clients are designed to **fully tear down** the tunnel (routes, TUN/Packet Tunnel, session) so traffic **reverts to the device's normal public IP path**.
 - Clients are **not** designed to upload browsing history or identity dossiers to the node as product telemetry.
+- **No public-IP geo admission (from 0.1.9 source):** product Connect does **not** look up the device public IP via third-party geo services, and does **not** allow or deny access by country. Admission is cryptographic (device Ed25519 + node keys) only. Older installed packages (e.g. 0.1.8) may still perform a client-side UK geo check until users upgrade.
 - Public download packages (Windows `.exe`, Android `.apk`, Linux `.tar.gz` installer, macOS `.zip`, iOS `.zip`) may include the **public** node key (`node_elgamal.pub`) so clients can open a HELLO. Each install **generates a unique Ed25519 device private key on first run** and keeps it only in local device-private storage - packages do **not** ship a shared `client_ed25519.priv` (which would allow universal impersonation). They **never** include the **node private key** (`node_elgamal.priv`). Windows installers ship a **bundled runtime** (no separate system Python install). The Linux installer package ships **manylinux wheels** for the app Python crypto stack (private venv via `install.sh`); OS tools such as TUN/`ip`/root for full tunnel remain host-provided.
 
 ### 3.3 Public status page (e.g. Render)

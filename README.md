@@ -112,7 +112,9 @@ Node deploy, ports, secrets, from-source builds, and tests: **[sundries.txt](sun
 
 **Secrets discipline:** Never commit or force-add `secrets/` (gitignored). Public packages must never include `node_elgamal.priv` or a shared `client_ed25519.priv`. Release scripts run `_assert_no_priv` / strip inject gates — keep those on every tag. VPS/CDN operators may still log IP-level traffic under **their** policies (outside product no-log; see `PRIVACY_POLICY.md` §4).
 
-**Release scripts:** Use the **current tag** recipe only (`scripts/build_release_0.1.8.py` for v0.1.8). Historical `build_release_0.*.py` files are archive/history — do not fork a new copy for minor doc fixes; for a new version, copy the latest script and bump `VERSION` / `PRIOR_TAG`. Always re-run `python scripts/package_linux.py` (or the Linux step inside the current release script) so manylinux wheels are refreshed.
+**0.1.9 (source prep):** UK public-IP geo check **removed** from product Connect (Python, Android, Apple). No third-party geo lookup on connect; admission is device keys + node crypto only. Node admission crypto unchanged. See [`scripts/RELEASE_NOTES_0.1.9.md`](scripts/RELEASE_NOTES_0.1.9.md). **Shipped 0.1.8 installers still enforce the old UK check until users upgrade** to a 0.1.9 package.
+
+**Release scripts:** Public download catalog remains **v0.1.8** until 0.1.9 assets are cut. For packaging, copy `scripts/build_release_0.1.8.py` → `build_release_0.1.9.py` and bump catalog/`VERSION`. Historical `build_release_0.*.py` files are archive/history. Always re-run `python scripts/package_linux.py` (or the Linux step inside the current release script) so manylinux wheels are refreshed.
 
 ```bash
 # Windows GUI (requires system Python)

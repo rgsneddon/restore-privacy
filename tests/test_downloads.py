@@ -154,7 +154,8 @@ class TestInstallerPackagingRecipe(unittest.TestCase):
 
     def test_installer_module_version(self):
         inst = (ROOT / "client" / "windows" / "installer.py").read_text(encoding="utf-8")
-        self.assertIn('VERSION = "0.1.8"', inst)
+        # Source installer tracks next package tag (0.1.9); catalog may stay 0.1.8 until assets cut
+        self.assertIn('VERSION = "0.1.9"', inst)
         self.assertIn("def install", inst)
 
 

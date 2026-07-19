@@ -6,8 +6,9 @@ client app. Public users should follow README.md only.
 Contents moved from the public-facing README (ports, status-page hosting,
 node deploy, developer client-app notes, local tests, secrets).
 
-Current product catalog / client package version: 0.1.8
-(see client/VERSION and status_page/downloads.py RELEASE_VERSION).
+Source client version: 0.1.9 (UK geo gate removed — see scripts/RELEASE_NOTES_0.1.9.md).
+Public download catalog may still advertise 0.1.8 until packages are cut
+(see status_page/downloads.py RELEASE_VERSION).
 
 
 SECRETS / RELEASE GATES (mandatory)

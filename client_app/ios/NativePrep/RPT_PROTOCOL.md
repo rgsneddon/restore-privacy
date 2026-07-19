@@ -5,7 +5,7 @@ Reference implementations (read these on Mac):
 - Handshake / session: `client/connect.py`, `node/handshake.py`  
 - Frames: `node/protocol.py`  
 - Sealed DATA loop: `client/dataplane.py`  
-- UK gate: `client/uk_gate.py`  
+- UK geo gate: removed from product connect (0.1.9); no third-party geo before handshake  
 
 ## Constants
 

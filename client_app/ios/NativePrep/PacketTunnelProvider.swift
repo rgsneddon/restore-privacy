@@ -1,5 +1,6 @@
-// iOS Packet Tunnel — full RPT2 path (UK gate → secrets → handshake → full tunnel → DATA loops).
+// iOS Packet Tunnel — full RPT2 path (secrets → handshake → full tunnel → DATA loops).
 // HELLO and DATA share one long-lived UDP socket (node binds session.client_addr to HELLO source).
+// No public-IP geo admission (device keys + crypto only).
 
 import Foundation
 import NetworkExtension
@@ -29,18 +30,11 @@ class PacketTunnelProvider: NEPacketTunnelProvider {
     pathQueue.async { [weak self] in
       guard let self else { return }
       do {
-        // 1. UK public IP gate (fail closed)
-        let gate = RptUkIpGate.checkUkPublicIp()
-        guard gate.allowed else {
-          completionHandler(Self.error(gate.message, code: 10))
-          return
-        }
-
-        // 2. Load secrets (client_ed25519.priv + node_elgamal.pub only — never node_elgamal.priv)
+        // 1. Load secrets (client_ed25519.priv + node_elgamal.pub only — never node_elgamal.priv)
         let material = try RptSecrets.loadAdmissionMaterial()
         let engine = try RptClientEngine(clientPrivRaw: material.clientPriv, nodeElgamalPubRaw: material.nodePub)
 
-        // 3. RPT2 handshake on a long-lived connected UDP socket (kept open for DATA/KEEPALIVE)
+        // 2. RPT2 handshake on a long-lived connected UDP socket (kept open for DATA/KEEPALIVE)
         let session = try engine.handshake(host: self.endpointHost, port: self.endpointPort, timeout: 20)
         guard engine.transport?.isConnected == true else {
           completionHandler(Self.error("UDP transport not ready after HELLO", code: 12))

@@ -1,7 +1,12 @@
-"""UK public-IP security gate — drives shipped client.uk_gate + RptClient.connect."""
+"""Product connect has no UK public-IP geo admission (privacy: no third-party geo).
+
+Drives shipped ``RptClient.connect`` and asserts product sources no longer call
+geo providers or fail closed on non-UK country before handshake.
+"""
 
 from __future__ import annotations
 
+import ast
 import sys
 import unittest
 from pathlib import Path
@@ -11,138 +16,105 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
 from client.connect import ConnectState, RptClient  # noqa: E402
-from client.uk_gate import (  # noqa: E402
-    DEFAULT_GEO_URLS,
-    UK_GATE_DENIED_MESSAGE,
-    UK_GATE_LOOKUP_FAILED_MESSAGE,
-    check_uk_public_ip,
-    default_geo_fetcher,
-    evaluate_geo_payload,
-    is_uk_country,
-    normalize_country_code,
-)
 
 
-class TestUkGatePure(unittest.TestCase):
-    def test_normalize_and_is_uk(self):
-        self.assertEqual(normalize_country_code("gb"), "GB")
-        self.assertEqual(normalize_country_code("United Kingdom"), "GB")
-        self.assertTrue(is_uk_country("GB"))
-        self.assertTrue(is_uk_country("UK"))
-        self.assertFalse(is_uk_country("US"))
-        self.assertFalse(is_uk_country("DE"))
-
-    def test_evaluate_uk_payload_allows(self):
-        r = evaluate_geo_payload({"ip": "1.2.3.4", "country_code": "GB"})
-        self.assertTrue(r.allowed)
-        self.assertEqual(r.country_code, "GB")
-        self.assertEqual(r.public_ip, "1.2.3.4")
-
-    def test_evaluate_non_uk_denies_with_notice(self):
-        r = evaluate_geo_payload({"ip": "8.8.8.8", "country_code": "US"})
-        self.assertFalse(r.allowed)
-        self.assertEqual(r.message, UK_GATE_DENIED_MESSAGE)
-        self.assertIn("United Kingdom", r.message)
-        self.assertIn("not UK", r.message)
-
-    def test_evaluate_missing_country_fails_closed(self):
-        r = evaluate_geo_payload({"ip": "1.1.1.1"})
-        self.assertFalse(r.allowed)
-        self.assertEqual(r.message, UK_GATE_LOOKUP_FAILED_MESSAGE)
-
-    def test_check_uk_public_ip_uses_fetcher_seam(self):
-        uk = check_uk_public_ip(fetcher=lambda: {"country_code": "GB", "ip": "9.9.9.9"})
-        self.assertTrue(uk.allowed)
-        non = check_uk_public_ip(fetcher=lambda: {"countryCode": "FR", "ip": "1.1.1.1"})
-        self.assertFalse(non.allowed)
-        self.assertEqual(non.message, UK_GATE_DENIED_MESSAGE)
-
-    def test_check_uk_public_ip_fail_closed_on_fetcher_error(self):
-        def boom():
-            raise TimeoutError("network down")
-
-        r = check_uk_public_ip(fetcher=boom)
-        self.assertFalse(r.allowed)
-        self.assertEqual(r.message, UK_GATE_LOOKUP_FAILED_MESSAGE)
-
-    def test_ipinfo_and_country_is_payload_shapes(self):
-        r = evaluate_geo_payload({"ip": "1.2.3.4", "country": "GB", "city": "London"})
-        self.assertTrue(r.allowed)
-        r2 = evaluate_geo_payload({"ip": "2a00::1", "country": "GB"})
-        self.assertTrue(r2.allowed)
-
-    def test_default_geo_fetcher_falls_back_after_primary_failure(self):
-        """When first provider fails (e.g. 429), second success must be used."""
-        import urllib.error
-
-        calls: list[str] = []
-
-        def fake_fetch(url: str, timeout: float = 8.0) -> dict:
-            calls.append(url)
-            if "ipapi.co" in url:
-                raise urllib.error.HTTPError(url, 429, "Too Many Requests", None, None)
-            if "ipinfo.io" in url:
-                return {"ip": "9.9.9.9", "country": "GB"}
-            raise TimeoutError("skip")
-
-        with mock.patch("client.uk_gate.fetch_geo_url", side_effect=fake_fetch):
-            data = default_geo_fetcher()
-        self.assertEqual(data["country"], "GB")
-        self.assertTrue(any("ipapi.co" in u for u in calls))
-        self.assertTrue(any("ipinfo.io" in u for u in calls))
-        r = evaluate_geo_payload(data)
-        self.assertTrue(r.allowed)
-
-    def test_default_geo_urls_have_fallbacks(self):
-        self.assertGreaterEqual(len(DEFAULT_GEO_URLS), 2)
-        self.assertIn("ipapi.co", DEFAULT_GEO_URLS[0])
-
-
-class TestRptClientUkGate(unittest.TestCase):
-    def test_connect_blocked_for_non_uk_before_handshake(self):
-        client = RptClient(
-            uk_gate_fetcher=lambda: {"country_code": "US", "ip": "8.8.8.8"},
+class TestProductConnectNoUkGeoGate(unittest.TestCase):
+    def test_uk_gate_module_removed(self):
+        self.assertFalse(
+            (ROOT / "client" / "uk_gate.py").is_file(),
+            "client.uk_gate must not ship as product geo admission",
         )
-        # Must not reach secrets/handshake — gate fails first
-        with mock.patch(
-            "client.connect.load_client_private_key",
-            side_effect=AssertionError("must not load secrets when non-UK"),
-        ):
-            result = client.connect(timeout=1.0)
+
+    def test_connect_source_has_no_uk_gate_call(self):
+        src = (ROOT / "client" / "connect.py").read_text(encoding="utf-8")
+        self.assertNotIn("check_uk_public_ip", src)
+        self.assertNotIn("run_uk_gate", src)
+        self.assertNotIn("uk_gate_fetcher", src)
+        self.assertNotIn("skip_uk_gate", src)
+        self.assertNotIn("from .uk_gate", src)
+        # Docstring / comment must state no geo admission
+        lowered = src.lower().replace("—", "-").replace("–", "-")
+        self.assertIn("no public-ip geo", lowered)
+        self.assertIn("no third-party geo", lowered)
+        tree = ast.parse(src)
+        names = {n.id for n in ast.walk(tree) if isinstance(n, ast.Name)}
+        self.assertNotIn("check_uk_public_ip", names)
+        self.assertNotIn("UkGateResult", names)
+
+    def test_connect_does_not_block_for_non_uk_geo(self):
+        """Former behaviour blocked non-UK before secrets; product must reach secrets path."""
+        client = RptClient(secrets_dir=Path("/nonexistent/secrets/path-for-uk-strip-test"))
+        # If UK gate still ran, non-UK would never touch secrets. We only require that
+        # connect is not a UK denial — secrets/network failure is fine.
+        result = client.connect(timeout=0.5)
         self.assertFalse(result.ok)
         self.assertEqual(result.state, ConnectState.ERROR)
-        self.assertEqual(result.message, UK_GATE_DENIED_MESSAGE)
-        self.assertIsNotNone(client.last_uk_gate)
-        self.assertFalse(client.last_uk_gate.allowed)
-
-    def test_connect_uk_gate_passes_then_may_fail_on_secrets(self):
-        """UK result does not block at the gate; further connect may fail for other reasons."""
-        client = RptClient(
-            uk_gate_fetcher=lambda: {"country_code": "GB", "ip": "81.2.69.142"},
-            secrets_dir=Path("/nonexistent/secrets/path-for-test"),
+        msg = result.message.lower()
+        self.assertNotIn("united kingdom", msg)
+        self.assertNotIn("not uk", msg)
+        self.assertNotIn("geolocat", msg)
+        # Must have attempted admission material, not geo-only fail
+        self.assertTrue(
+            "secret" in msg
+            or "node_elgamal" in msg
+            or "client_ed25519" in msg
+            or "node" in msg
+            or "key" in msg
+            or "not found" in msg
+            or "missing" in msg
+            or "no such" in msg
+            or "permission" in msg
+            or "directory" in msg
+            or "file" in msg,
+            f"expected secrets/network failure, got: {result.message!r}",
         )
-        result = client.connect(timeout=1.0)
-        # Gate allowed — failure is from secrets/network, not UK denial
-        self.assertTrue(client.last_uk_gate.allowed)
-        self.assertNotEqual(result.message, UK_GATE_DENIED_MESSAGE)
-        self.assertNotIn("not UK", result.message)
 
-    def test_auto_connect_on_launch_uses_gate(self):
-        client = RptClient(
-            uk_gate_fetcher=lambda: {"country": "DE"},
-        )
-        result = client.auto_connect_on_launch(timeout=1.0)
+    def test_connect_does_not_call_geo_https(self):
+        """urllib geo fetch must not run during product connect."""
+        client = RptClient(secrets_dir=Path("/nonexistent/uk-strip-geo"))
+        with mock.patch("urllib.request.urlopen") as urlopen:
+            result = client.connect(timeout=0.3)
+            urlopen.assert_not_called()
         self.assertFalse(result.ok)
-        self.assertIn("United Kingdom", result.message)
+        self.assertNotIn("United Kingdom", result.message)
 
-    def test_run_uk_gate_entry_point(self):
-        client = RptClient(uk_gate_fetcher=lambda: {"country_code": "GB"})
-        g = client.run_uk_gate()
-        self.assertTrue(g.allowed)
-        client2 = RptClient(uk_gate_fetcher=lambda: {"country_code": "CA"})
-        g2 = client2.run_uk_gate()
-        self.assertFalse(g2.allowed)
-        self.assertEqual(g2.message, UK_GATE_DENIED_MESSAGE)
+    def test_android_vpn_service_has_no_uk_gate_call(self):
+        path = (
+            ROOT
+            / "client_app"
+            / "android"
+            / "app"
+            / "src"
+            / "main"
+            / "kotlin"
+            / "com"
+            / "restoreprivacy"
+            / "restore_privacy_client"
+            / "RptVpnService.kt"
+        )
+        text = path.read_text(encoding="utf-8")
+        self.assertNotIn("UkIpGate.checkUkPublicIp", text)
+        self.assertNotIn("UK public-IP gate", text)
+
+    def test_apple_product_paths_have_no_uk_gate_call(self):
+        orch = (
+            ROOT
+            / "client_app"
+            / "apple_shared"
+            / "Rpt2"
+            / "Sources"
+            / "Rpt2"
+            / "RptConnectOrchestrator.swift"
+        ).read_text(encoding="utf-8")
+        self.assertNotIn("RptUkIpGate.checkUkPublicIp", orch)
+        self.assertNotIn("skipUkGate", orch)
+        for rel in (
+            "client_app/ios/NativePrep/PacketTunnelProvider.swift",
+            "client_app/macos/NativePrep/PacketTunnelProvider.swift",
+        ):
+            text = (ROOT / rel).read_text(encoding="utf-8")
+            self.assertNotIn("RptUkIpGate.checkUkPublicIp", text)
+            self.assertNotIn("UK public IP gate", text)
 
 
 if __name__ == "__main__":

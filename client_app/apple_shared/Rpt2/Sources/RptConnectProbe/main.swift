@@ -10,14 +10,12 @@ struct RptConnectProbe {
         let port = UInt16(env["RPT_PORT"] ?? "") ?? RptEndpoint.port
         let secretsPath = env["RPT_SECRETS_DIR"]
             ?? (FileManager.default.currentDirectoryPath + "/secrets")
-        let skipUk = (env["RPT_SKIP_UK"] ?? "1") == "1"
-        print("APPLE_ORCHESTRATOR_CONNECT host=\(host) port=\(port) secrets=\(secretsPath) skipUk=\(skipUk)")
+        print("APPLE_ORCHESTRATOR_CONNECT host=\(host) port=\(port) secrets=\(secretsPath)")
         print("RptEndpoint.default=\(RptEndpoint.hostPortDescription)")
         let dir = URL(fileURLWithPath: secretsPath, isDirectory: true)
         let outcome = RptConnectOrchestrator.connect(
             host: host,
             port: port,
-            skipUkGate: skipUk,
             secretsDir: dir,
             timeout: 20
         )

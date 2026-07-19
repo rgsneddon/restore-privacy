@@ -58,15 +58,13 @@ class TestConnectTimeoutPath(unittest.TestCase):
     def test_connect_timeout_user_message_via_real_connect(self):
         """Drive RptClient.connect with patched recv that times out."""
         client = RptClient(endpoint=Endpoint(host="203.0.113.50", port=44044))
-        # UK gate pass + secrets + hello build, then UDP never replies
+        # Secrets + hello build, then UDP never replies (no UK geo gate on product path)
         sock = mock.Mock()
         sock.sendto = mock.Mock()
         sock.recvfrom = mock.Mock(side_effect=socket.timeout("timed out"))
         sock.settimeout = mock.Mock()
 
-        with mock.patch.object(
-            client, "run_uk_gate", return_value=mock.Mock(allowed=True, message="ok")
-        ), mock.patch(
+        with mock.patch(
             "client.connect.ensure_device_admission_key", return_value=Path(".")
         ), mock.patch(
             "client.connect.load_client_private_key"

@@ -10,7 +10,7 @@ import time
 from dataclasses import dataclass, field
 from enum import Enum
 from pathlib import Path
-from typing import Callable, Optional  # Callable used by status_cb + uk_gate_fetcher
+from typing import Callable, Optional  # Callable used by status_cb
 
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
 
@@ -35,7 +35,6 @@ from .secrets_loader import (
     load_client_private_key,
     load_node_elgamal_public,
 )
-from .uk_gate import UkGateResult, check_uk_public_ip
 
 
 class ConnectState(str, Enum):
@@ -166,57 +165,28 @@ class RptClient:
         endpoint: Endpoint | None = None,
         secrets_dir: Path | str | None = None,
         status_cb: StatusCallback | None = None,
-        uk_gate_fetcher: Optional[Callable[[], dict]] = None,
-        skip_uk_gate: bool = False,
     ):
         self.endpoint = endpoint or DEFAULT_ENDPOINT
         self.secrets_dir = Path(secrets_dir) if secrets_dir else None
         self.status_cb = status_cb or (lambda _m: None)
-        # Injectable geo fetch for tests; production uses live UK gate
-        self.uk_gate_fetcher = uk_gate_fetcher
-        self.skip_uk_gate = skip_uk_gate
         self.state = ConnectState.IDLE
         self.session: Optional[ClientSession] = None
         self.tunnel_plan: Optional[FullTunnelPlan] = None
         self._sock: Optional[socket.socket] = None
         self._stop = threading.Event()
         self._io_thread: Optional[threading.Thread] = None
-        self.last_uk_gate: Optional[UkGateResult] = None
 
     def _status(self, msg: str) -> None:
         self.status_cb(msg)
 
-    def run_uk_gate(self) -> UkGateResult:
-        """Security gate: only United Kingdom public IPs may proceed to handshake."""
-        if self.skip_uk_gate:
-            result = UkGateResult(True, "UK gate skipped (test/dev)")
-            self.last_uk_gate = result
-            return result
-        self._status("Verifying UK public IP location…")
-        result = check_uk_public_ip(fetcher=self.uk_gate_fetcher)
-        self.last_uk_gate = result
-        if result.allowed:
-            self._status(
-                f"UK location OK"
-                + (f" ({result.country_code})" if result.country_code else "")
-            )
-        else:
-            self._status(result.message)
-        return result
-
     def connect(self, timeout: float = 20.0) -> ConnectResult:
         """Perform authorized RPT handshake with the node (manual Connect path).
 
-        UK public-IP gate runs first; non-UK users get a clear failure notice.
+        Product connect uses device keys + node crypto only — no public-IP geo
+        admission and no third-party geo lookup before handshake.
         """
         self.state = ConnectState.CONNECTING
         self._status("Connecting to Restore Privacy node…")
-
-        # --- UK IP security gate (before any HELLO / secrets use) ---
-        gate = self.run_uk_gate()
-        if not gate.allowed:
-            self.state = ConnectState.ERROR
-            return ConnectResult(ok=False, state=self.state, message=gate.message)
 
         try:
             # First run: generate a unique Ed25519 device key if missing; reuse thereafter.

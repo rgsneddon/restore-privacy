@@ -6,10 +6,14 @@ For shipping a version, use **only the script matching the tag you are cutting**
 
 | Tag | Script |
 |-----|--------|
-| 0.1.8 | `scripts/build_release_0.1.8.py` |
+| 0.1.9 (prep) | Copy `scripts/build_release_0.1.8.py` → `build_release_0.1.9.py` when cutting packages; see `scripts/RELEASE_NOTES_0.1.9.md` |
+| 0.1.8 | `scripts/build_release_0.1.8.py` (last fully packaged public catalog until 0.1.9 assets ship) |
 
 Older `build_release_0.*.py` files are **historical archives**. Prefer copying the
 **latest** script when starting a new version rather than editing an ancient one.
+
+**0.1.9 product change (source):** UK public-IP geo gate removed from client
+connect paths (no third-party geo admission). Node admission crypto unchanged.
 
 Shared gates every release must keep:
 
