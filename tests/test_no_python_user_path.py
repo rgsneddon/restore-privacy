@@ -85,9 +85,9 @@ class TestLocalFrozenArtifactOptional(unittest.TestCase):
         candidates = [
             ROOT
             / "releases"
-            / "0.1.7"
-            / "restore-privacy-client-0.1.7-windows-x64-setup.exe",
-            ROOT / "dist" / "RestorePrivacy-Setup-0.1.7.exe",
+            / "0.1.8"
+            / "restore-privacy-client-0.1.8-windows-x64-setup.exe",
+            ROOT / "dist" / "RestorePrivacy-Setup-0.1.8.exe",
         ]
         found = [p for p in candidates if p.is_file()]
         if not found:

@@ -33,13 +33,13 @@ class TestVersionResolution(unittest.TestCase):
         """Simulates frozen: real VERSION at install root, not next to ui_theme only."""
         with tempfile.TemporaryDirectory() as td:
             install = Path(td)
-            (install / "VERSION").write_text("0.1.7\n", encoding="utf-8")
+            (install / "VERSION").write_text("0.1.8\n", encoding="utf-8")
             with mock.patch.object(
                 ui_theme,
                 "version_file_candidates",
                 return_value=[install / "VERSION", Path(td) / "missing" / "VERSION"],
             ):
-                self.assertEqual(read_running_version(), "0.1.7")
+                self.assertEqual(read_running_version(), "0.1.8")
 
     def test_explicit_version_file(self):
         with tempfile.TemporaryDirectory() as td:
@@ -65,13 +65,13 @@ class TestUpgradeBanner(unittest.TestCase):
         self.assertFalse(upgrade_available(running=latest, latest=latest))
 
     def test_banner_when_behind(self):
-        msg = upgrade_banner_text(running="0.1.0", latest="0.1.7")
+        msg = upgrade_banner_text(running="0.1.0", latest="0.1.8")
         self.assertIsNotNone(msg)
         assert msg is not None
         self.assertIn("0.1.0", msg)
-        self.assertIn("0.1.7", msg)
+        self.assertIn("0.1.8", msg)
         self.assertNotIn("0.0.0", msg)
-        self.assertTrue(upgrade_available(running="0.1.0", latest="0.1.7"))
+        self.assertTrue(upgrade_available(running="0.1.0", latest="0.1.8"))
 
     def test_zero_placeholder_does_not_force_upgrade_against_self(self):
         """If something still returns 0.0.0, treat as embedded package version."""
