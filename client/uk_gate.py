@@ -1,7 +1,10 @@
 """UK public-IP security gate for Restore Privacy clients.
 
 Only users whose core (public) IP is geolocated in the United Kingdom may
-connect. Non-UK and lookup failures fail closed with a clear notice.
+connect. Non-UK and total lookup failures fail closed with a clear notice.
+
+Uses multiple free geo HTTPS providers with fallback so a single rate-limit
+(HTTP 429) or outage does not block legitimate UK users.
 """
 
 from __future__ import annotations
@@ -23,9 +26,15 @@ UK_GATE_LOOKUP_FAILED_MESSAGE = (
 )
 
 # ISO country codes accepted as United Kingdom
-UK_COUNTRY_CODES = frozenset({"GB", "UK", "GG", "JE", "IM"})  # GB + Crown Dependencies often treated with UK
+UK_COUNTRY_CODES = frozenset({"GB", "UK", "GG", "JE", "IM"})  # GB + Crown Dependencies
 
-DEFAULT_GEO_URL = "https://ipapi.co/json/"
+# Primary + fallbacks (order matters). ipapi.co often rate-limits free clients.
+DEFAULT_GEO_URLS: tuple[str, ...] = (
+    "https://ipapi.co/json/",
+    "https://ipinfo.io/json",
+    "https://api.country.is/",
+)
+DEFAULT_GEO_URL = DEFAULT_GEO_URLS[0]
 DEFAULT_TIMEOUT_SEC = 8.0
 
 # Injected fetch: returns raw JSON dict from a geo provider (or raises).
@@ -52,7 +61,14 @@ def normalize_country_code(raw: object) -> str:
     if not s:
         return ""
     # Some providers return "United Kingdom"
-    if s in {"UNITED KINGDOM", "GREAT BRITAIN", "ENGLAND", "SCOTLAND", "WALES", "NORTHERN IRELAND"}:
+    if s in {
+        "UNITED KINGDOM",
+        "GREAT BRITAIN",
+        "ENGLAND",
+        "SCOTLAND",
+        "WALES",
+        "NORTHERN IRELAND",
+    }:
         return "GB"
     if len(s) >= 2 and s[:2].isalpha():
         return s[:2]
@@ -86,7 +102,7 @@ def evaluate_geo_payload(data: dict | None) -> UkGateResult:
             if code:
                 break
 
-    # ipinfo uses "country": "GB"
+    # ipinfo / country.is use "country": "GB"
     if not code and "country" in data:
         code = normalize_country_code(data.get("country"))
 
@@ -120,12 +136,12 @@ def evaluate_geo_payload(data: dict | None) -> UkGateResult:
     )
 
 
-def default_geo_fetcher(url: str = DEFAULT_GEO_URL, timeout: float = DEFAULT_TIMEOUT_SEC) -> dict:
-    """Fetch public IP + country from a free HTTPS geo API."""
+def fetch_geo_url(url: str, timeout: float = DEFAULT_TIMEOUT_SEC) -> dict:
+    """Fetch one geo JSON endpoint. Raises on HTTP/transport/parse errors."""
     req = urllib.request.Request(
         url,
         headers={
-            "User-Agent": "restore-privacy-client/0.0.5",
+            "User-Agent": "restore-privacy-client/0.1.3",
             "Accept": "application/json",
         },
         method="GET",
@@ -135,10 +151,41 @@ def default_geo_fetcher(url: str = DEFAULT_GEO_URL, timeout: float = DEFAULT_TIM
     data = json.loads(raw)
     if not isinstance(data, dict):
         raise ValueError("geo response is not a JSON object")
-    # ipapi.co uses error:true on failure
+    # ipapi.co uses error:true on failure / rate limit body
     if data.get("error") is True:
         raise ValueError(str(data.get("reason") or "geo API error"))
     return data
+
+
+def default_geo_fetcher(
+    url: str = DEFAULT_GEO_URL,
+    timeout: float = DEFAULT_TIMEOUT_SEC,
+    urls: tuple[str, ...] | None = None,
+) -> dict:
+    """Fetch public IP + country, trying fallback providers on failure.
+
+    When ``urls`` is None, uses DEFAULT_GEO_URLS (primary + fallbacks).
+    A single ``url`` override still allows one-shot fetch for tests that pass
+    an explicit URL only via the first argument with urls=().
+    """
+    if urls is not None:
+        chain = urls if urls else (url,)
+    else:
+        # Prefer full chain; put explicit url first if it is one of the defaults
+        chain = DEFAULT_GEO_URLS
+        if url and url not in chain:
+            chain = (url,) + DEFAULT_GEO_URLS
+
+    last_err: Exception | None = None
+    for u in chain:
+        try:
+            return fetch_geo_url(u, timeout=timeout)
+        except Exception as exc:
+            last_err = exc
+            continue
+    if last_err is not None:
+        raise last_err
+    raise ValueError("no geo providers configured")
 
 
 def check_uk_public_ip(
@@ -146,8 +193,8 @@ def check_uk_public_ip(
 ) -> UkGateResult:
     """Resolve core public IP country and gate on United Kingdom.
 
-    ``fetcher`` is injectable for tests. Default uses the live geo provider.
-    Fail closed on transport/parse errors.
+    ``fetcher`` is injectable for tests. Default uses live geo providers with
+    fallback. Fail closed only when every provider fails or country is non-UK.
     """
     try:
         data = (fetcher or default_geo_fetcher)()

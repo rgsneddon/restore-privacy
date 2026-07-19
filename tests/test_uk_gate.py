@@ -12,9 +12,11 @@ sys.path.insert(0, str(ROOT))
 
 from client.connect import ConnectState, RptClient  # noqa: E402
 from client.uk_gate import (  # noqa: E402
+    DEFAULT_GEO_URLS,
     UK_GATE_DENIED_MESSAGE,
     UK_GATE_LOOKUP_FAILED_MESSAGE,
     check_uk_public_ip,
+    default_geo_fetcher,
     evaluate_geo_payload,
     is_uk_country,
     normalize_country_code,
@@ -62,6 +64,38 @@ class TestUkGatePure(unittest.TestCase):
         r = check_uk_public_ip(fetcher=boom)
         self.assertFalse(r.allowed)
         self.assertEqual(r.message, UK_GATE_LOOKUP_FAILED_MESSAGE)
+
+    def test_ipinfo_and_country_is_payload_shapes(self):
+        r = evaluate_geo_payload({"ip": "1.2.3.4", "country": "GB", "city": "London"})
+        self.assertTrue(r.allowed)
+        r2 = evaluate_geo_payload({"ip": "2a00::1", "country": "GB"})
+        self.assertTrue(r2.allowed)
+
+    def test_default_geo_fetcher_falls_back_after_primary_failure(self):
+        """When first provider fails (e.g. 429), second success must be used."""
+        import urllib.error
+
+        calls: list[str] = []
+
+        def fake_fetch(url: str, timeout: float = 8.0) -> dict:
+            calls.append(url)
+            if "ipapi.co" in url:
+                raise urllib.error.HTTPError(url, 429, "Too Many Requests", None, None)
+            if "ipinfo.io" in url:
+                return {"ip": "9.9.9.9", "country": "GB"}
+            raise TimeoutError("skip")
+
+        with mock.patch("client.uk_gate.fetch_geo_url", side_effect=fake_fetch):
+            data = default_geo_fetcher()
+        self.assertEqual(data["country"], "GB")
+        self.assertTrue(any("ipapi.co" in u for u in calls))
+        self.assertTrue(any("ipinfo.io" in u for u in calls))
+        r = evaluate_geo_payload(data)
+        self.assertTrue(r.allowed)
+
+    def test_default_geo_urls_have_fallbacks(self):
+        self.assertGreaterEqual(len(DEFAULT_GEO_URLS), 2)
+        self.assertIn("ipapi.co", DEFAULT_GEO_URLS[0])
 
 
 class TestRptClientUkGate(unittest.TestCase):
