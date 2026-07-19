@@ -138,6 +138,10 @@ class RptVpnService : VpnService() {
      * Load device Ed25519 priv + node ElGamal pub.
      * Generates a unique client key on first run (never uses a shared APK-embedded priv).
      * Packages may ship only node_elgamal.pub in assets.
+     *
+     * **Always** refreshes `node_elgamal.pub` from APK assets (overwrite). Upgrades that
+     * fix a stale product key must heal prior installs without uninstall/clear-data.
+     * Device Ed25519 private key is never overwritten once generated.
      */
     private fun loadSecrets(): Pair<ByteArray, ByteArray>? {
         val dir = File(filesDir, "secrets")
@@ -145,15 +149,16 @@ class RptVpnService : VpnService() {
         val privF = File(dir, "client_ed25519.priv")
         val pubF = File(dir, "node_elgamal.pub")
 
-        // Ensure node public key (from assets or existing filesDir)
-        if (!pubF.isFile) {
-            try {
-                assets.open("secrets/node_elgamal.pub").use { inp ->
-                    pubF.writeBytes(inp.readBytes())
+        // Always copy package node pub → filesDir (heals stale key after APK upgrade).
+        try {
+            assets.open("secrets/node_elgamal.pub").use { inp ->
+                if (!refreshNodeElgamalPub(pubF, inp.readBytes())) {
+                    return null
                 }
-            } catch (_: Exception) {
-                return null
             }
+        } catch (_: Exception) {
+            // Assets missing: keep existing filesDir pub only if still usable.
+            if (!pubF.isFile || pubF.length() < 32L) return null
         }
         if (!pubF.isFile || pubF.length() < 32L) return null
 
@@ -429,6 +434,19 @@ class RptVpnService : VpnService() {
     }
 
     companion object {
+        /**
+         * Always write package [assetBytes] to [pubFile] (overwrite).
+         * Used so APK upgrades replace a stale node_elgamal.pub left in filesDir.
+         * @return true when the destination file is present and at least 32 bytes.
+         */
+        @JvmStatic
+        fun refreshNodeElgamalPub(pubFile: File, assetBytes: ByteArray): Boolean {
+            if (assetBytes.size < 32) return false
+            pubFile.parentFile?.mkdirs()
+            pubFile.writeBytes(assetBytes)
+            return pubFile.isFile && pubFile.length() >= 32L
+        }
+
         const val ACTION_CONNECT = "com.restoreprivacy.rpt.CONNECT"
         const val ACTION_DISCONNECT = "com.restoreprivacy.rpt.DISCONNECT"
         const val EXTRA_HOST = "host"

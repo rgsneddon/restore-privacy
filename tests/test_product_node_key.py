@@ -158,5 +158,82 @@ class TestAndroidHandshakeSurfacesTimeoutHint(unittest.TestCase):
         self.assertIn("matches the production node", svc)
 
 
+class TestAndroidNodePubRefreshOnUpgrade(unittest.TestCase):
+    """APK upgrade must overwrite filesDir node_elgamal.pub (not only if missing)."""
+
+    def _vpn_service_src(self) -> str:
+        return (
+            ROOT
+            / "client_app"
+            / "android"
+            / "app"
+            / "src"
+            / "main"
+            / "kotlin"
+            / "com"
+            / "restoreprivacy"
+            / "restore_privacy_client"
+            / "RptVpnService.kt"
+        ).read_text(encoding="utf-8")
+
+    def test_shipped_refresh_helper_always_writebytes(self):
+        """refreshNodeElgamalPub must overwrite; no skip-if-exists for node pub."""
+        svc = self._vpn_service_src()
+        self.assertIn("fun refreshNodeElgamalPub", svc)
+        # Extract helper body between fun and next fun/const
+        start = svc.index("fun refreshNodeElgamalPub")
+        body = svc[start : start + 500]
+        self.assertIn("writeBytes", body)
+        self.assertIn("assetBytes", body)
+        # Must not early-return solely because dest already exists
+        self.assertNotIn("if (!pubFile.isFile())", body)
+        self.assertNotIn("if (!pubFile.exists())", body)
+
+    def test_load_secrets_always_refreshes_from_assets(self):
+        """loadSecrets must call refresh from assets every Connect (upgrade heal)."""
+        svc = self._vpn_service_src()
+        load = svc[svc.index("private fun loadSecrets") : svc.index("private fun loadSecrets") + 1200]
+        self.assertIn('assets.open("secrets/node_elgamal.pub")', load)
+        self.assertIn("refreshNodeElgamalPub", load)
+        # Old bug: only copy when !pubF.isFile — must be gone for node pub path
+        self.assertNotIn("if (!pubF.isFile())", load)
+        self.assertIn("Always copy package node pub", load)
+
+    def test_refresh_node_elgamal_pub_file_overwrites_stale(self):
+        """Shipped Python mirror of Android helper: stale filesDir bytes replaced."""
+        from client.secrets_loader import refresh_node_elgamal_pub_file
+
+        stale = b"\x11" * 256  # wrong key material
+        good = product_node_elgamal_pub_path().read_bytes()
+        self.assertEqual(hashlib.sha256(good).hexdigest().lower(), PRODUCT_NODE_ELGAMAL_PUB_SHA256)
+        with tempfile.TemporaryDirectory() as td:
+            pub_path = Path(td) / "secrets" / "node_elgamal.pub"
+            pub_path.parent.mkdir(parents=True)
+            pub_path.write_bytes(stale)
+            self.assertEqual(pub_path.read_bytes(), stale)
+            ok = refresh_node_elgamal_pub_file(pub_path, good)
+            self.assertTrue(ok)
+            self.assertEqual(pub_path.read_bytes(), good)
+            self.assertEqual(
+                hashlib.sha256(pub_path.read_bytes()).hexdigest().lower(),
+                PRODUCT_NODE_ELGAMAL_PUB_SHA256,
+            )
+
+    def test_ensure_device_admission_overwrites_stale_node_pub(self):
+        """Connect bootstrap heals secrets_dir with product pin (Windows same policy)."""
+        good = product_node_elgamal_pub_path().read_bytes()
+        stale = b"\x22" * 256
+        with tempfile.TemporaryDirectory() as td:
+            sdir = Path(td)
+            (sdir / "node_elgamal.pub").write_bytes(stale)
+            # device key present so bootstrap keeps identity
+            from client.secrets_loader import generate_and_persist_device_key
+
+            generate_and_persist_device_key(sdir)
+            out = ensure_device_admission_key(sdir)
+            self.assertEqual(out, sdir)
+            self.assertEqual((sdir / "node_elgamal.pub").read_bytes(), good)
+
+
 if __name__ == "__main__":
     unittest.main()

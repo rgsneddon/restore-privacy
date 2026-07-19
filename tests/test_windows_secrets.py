@@ -63,6 +63,7 @@ class TestSecretsResolveAndLoad(unittest.TestCase):
 
     def test_missing_global_message_is_windows_oriented(self):
         # Point candidates at empty locations only; no node pub available
+        # (including no product/ pin — product exists in-repo for real installs).
         with tempfile.TemporaryDirectory() as td:
             empty = Path(td)
             with mock.patch(
@@ -74,6 +75,9 @@ class TestSecretsResolveAndLoad(unittest.TestCase):
             ), mock.patch(
                 "client.secrets_loader._find_node_pub",
                 return_value=None,
+            ), mock.patch(
+                "client.secrets_loader.sync_product_node_pub_into",
+                return_value=False,
             ):
                 with self.assertRaises(SecretsError) as ctx:
                     resolve_secrets_dir()

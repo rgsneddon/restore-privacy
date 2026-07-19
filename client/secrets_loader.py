@@ -197,6 +197,39 @@ def _find_node_pub(candidates: list[Path]) -> bytes | None:
     return None
 
 
+def refresh_node_elgamal_pub_file(pub_path: Path, asset_bytes: bytes) -> bool:
+    """Always overwrite ``node_elgamal.pub`` from package/asset bytes (upgrade heal).
+
+    Mirrors Android ``RptVpnService.refreshNodeElgamalPub``: a fixed APK/installer
+    must replace a stale filesDir/install-tree copy without uninstall/clear-data.
+    Device Ed25519 private keys are never touched here.
+
+    Returns True when the destination file exists and is at least 32 bytes.
+    """
+    if len(asset_bytes) < 32:
+        return False
+    pub_path = Path(pub_path)
+    pub_path.parent.mkdir(parents=True, exist_ok=True)
+    pub_path.write_bytes(asset_bytes)
+    try:
+        return pub_path.is_file() and pub_path.stat().st_size >= 32
+    except OSError:
+        return False
+
+
+def sync_product_node_pub_into(dest_dir: Path) -> bool:
+    """If tracked product pub exists, always overwrite ``dest_dir/node_elgamal.pub``."""
+    try:
+        from .endpoint import product_node_elgamal_pub_path
+
+        src = product_node_elgamal_pub_path()
+    except Exception:
+        return False
+    if not src.is_file():
+        return False
+    return refresh_node_elgamal_pub_file(Path(dest_dir) / NODE_PUB_NAME, src.read_bytes())
+
+
 def generate_and_persist_device_key(dest_dir: Path) -> Ed25519PrivateKey:
     """Create a new Ed25519 admission keypair and write it under dest_dir.
 
@@ -300,6 +333,11 @@ def ensure_device_admission_key(
         # Product Connect always uses this path (RptClient.secrets_dir may be set).
         dest = Path(secrets_dir)
         dest.mkdir(parents=True, exist_ok=True)
+        # If a node pub is already present, always refresh from product pin when
+        # available (heals stale keys after package upgrade). Do not invent a pub
+        # into an empty explicit dir — that stays fail-closed for tests/custom installs.
+        if (dest / NODE_PUB_NAME).is_file():
+            sync_product_node_pub_into(dest)
         if not (dest / NODE_PUB_NAME).is_file():
             raise SecretsError(
                 f"secrets dir incomplete: {dest} "
@@ -324,12 +362,20 @@ def ensure_device_admission_key(
     # Only reuse a client priv from trusted writable storage — never package/_internal
     for d in candidates:
         if dir_has_client_secrets(d) and is_trusted_device_key_dir(d):
+            # Heal stale node pub on every Connect (product pin wins over install copy).
+            if (d / NODE_PUB_NAME).is_file():
+                sync_product_node_pub_into(d)
             _rotate_device_key_if_shared(d, candidates)
             if dir_has_client_secrets(d):
                 return d
 
     dest = preferred_writable_secrets_dir()
     dest.mkdir(parents=True, exist_ok=True)
+    # First-time: seed node pub from product when available; else require package provision.
+    if not (dest / NODE_PUB_NAME).is_file():
+        sync_product_node_pub_into(dest)
+    elif (dest / NODE_PUB_NAME).is_file():
+        sync_product_node_pub_into(dest)
 
     if not (dest / NODE_PUB_NAME).is_file():
         raw = _find_node_pub(candidates)
