@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import sys
 import tempfile
+import traceback
 import unittest
 from pathlib import Path
 from unittest import mock
@@ -76,6 +77,72 @@ class TestInstallerProgressWiring(unittest.TestCase):
         self.assertIn("client", recipe)
         self.assertIn("add-data", recipe.replace("_", "-") or recipe)
         self.assertIn("ver_file", recipe)
+
+
+class TestInstallerFailureUi(unittest.TestCase):
+    def test_format_install_failure_status_includes_message(self):
+        s = inst.format_install_failure_status("copy failed: Access is denied")
+        self.assertIn("Installation failed", s)
+        self.assertIn("Access is denied", s)
+
+    def test_failure_callback_uses_captured_strings_not_exc(self):
+        """Shipped done_err must not close over bare ``exc`` (Python clears it)."""
+        src = (ROOT / "client" / "windows" / "installer.py").read_text(encoding="utf-8")
+        self.assertIn("format_install_failure_status", src)
+        self.assertIn("err_msg = str(exc)", src)
+        work = src[src.index("def work") : src.index("threading.Thread(target=work")]
+        self.assertIn("fail_status = format_install_failure_status(err_msg)", work)
+        done = work[work.index("def done_err") :]
+        # Deferred callback must use pre-bound strings only
+        self.assertIn("fail_status", done)
+        self.assertIn("fail_detail", done)
+        self.assertNotIn("{exc}", done)
+        self.assertNotIn("status_var.set(f\"Installation failed:\\n{exc}\")", src)
+
+    def test_deferred_failure_path_no_nameerror(self):
+        """Same capture pattern as run_installer_progress_ui work()/done_err."""
+        result: dict = {"error": None, "code": 1}
+        known = "Could not copy product files to X (Access is denied)"
+        try:
+            raise RuntimeError(known)
+        except Exception as exc:
+            err_msg = str(exc) or exc.__class__.__name__
+            err_tb = traceback.format_exc()
+            result["error"] = err_msg
+            result["code"] = 1
+            fail_status = inst.format_install_failure_status(err_msg)
+            fail_detail = (err_tb or "")[:500]
+
+            def done_err() -> str:
+                # Must not reference ``exc`` — would NameError after except ends
+                return fail_status
+
+        # After except block, deferred callback still works
+        shown = done_err()
+        self.assertIn("Installation failed", shown)
+        self.assertIn(known, shown)
+        self.assertEqual(result["error"], known)
+        self.assertIn("RuntimeError", fail_detail)
+
+    def test_install_surfaces_copy_failure_message(self):
+        with tempfile.TemporaryDirectory() as td:
+            fake_payload = Path(td) / "payload"
+            fake_payload.mkdir()
+            (fake_payload / f"{inst.APP_NAME}-{inst.VERSION}.exe").write_bytes(b"MZ")
+            install_dir = Path(td) / "install"
+
+            with mock.patch.object(inst, "_payload_root", return_value=fake_payload), mock.patch.object(
+                inst, "INSTALL_DIR", install_dir
+            ), mock.patch.object(
+                inst, "_copy_tree", side_effect=RuntimeError("Could not copy product files")
+            ):
+                with self.assertRaises(RuntimeError) as cm:
+                    inst.install(launch=False)
+            self.assertIn("Could not copy", str(cm.exception))
+            # Failure formatter still works for UI
+            ui = inst.format_install_failure_status(str(cm.exception))
+            self.assertIn("Installation failed", ui)
+            self.assertIn("Could not copy", ui)
 
 
 if __name__ == "__main__":

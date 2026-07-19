@@ -77,9 +77,46 @@ def _find_client_exe(root: Path) -> Path:
     raise FileNotFoundError(f"No client .exe under {root}")
 
 
+def _rmtree_best_effort(path: Path) -> None:
+    """Remove directory tree; on Windows, retry/chmod locked files when possible."""
+    if not path.exists():
+        return
+
+    def _onerror(func, p, _exc_info) -> None:  # type: ignore[no-untyped-def]
+        try:
+            os.chmod(p, 0o700)
+            func(p)
+        except Exception:
+            pass
+
+    try:
+        shutil.rmtree(path, onerror=_onerror)
+    except TypeError:
+        # Python 3.12+ prefers onexc
+        def _onexc(_func, p, _exc) -> None:  # type: ignore[no-untyped-def]
+            try:
+                os.chmod(p, 0o700)
+                _func(p)
+            except Exception:
+                pass
+
+        shutil.rmtree(path, onexc=_onexc)
+    if path.exists():
+        # Fallback: rename locked tree aside so copy can proceed
+        bak = path.with_name(path.name + ".old")
+        try:
+            if bak.exists():
+                shutil.rmtree(bak, ignore_errors=True)
+            path.rename(bak)
+        except OSError as exc:
+            raise RuntimeError(
+                f"Could not replace existing install at {path}. "
+                f"Close Restore Privacy / Privacy Restored if it is running, then try again. ({exc})"
+            ) from exc
+
+
 def _copy_tree(src: Path, dst: Path) -> None:
-    if dst.exists():
-        shutil.rmtree(dst)
+    _rmtree_best_effort(dst)
     # Never copy any .priv (shared client_ed25519.priv or node_elgamal.priv)
     def _ignore(directory: str, names: list[str]) -> set[str]:
         ignored: set[str] = set()
@@ -90,7 +127,13 @@ def _copy_tree(src: Path, dst: Path) -> None:
                 ignored.add(n)
         return ignored
 
-    shutil.copytree(src, dst, ignore=_ignore)
+    try:
+        shutil.copytree(src, dst, ignore=_ignore)
+    except OSError as exc:
+        raise RuntimeError(
+            f"Could not copy product files to {dst}. "
+            f"Close any running Restore Privacy app and retry. ({exc})"
+        ) from exc
 
 
 def strip_all_private_keys(root: Path) -> list[str]:
@@ -220,6 +263,12 @@ def _create_shortcut(
 def install_step_count() -> int:
     """Number of user-visible install steps (for progress bar)."""
     return 6
+
+
+def format_install_failure_status(error_message: str) -> str:
+    """User-facing status line after a failed install (no exception objects)."""
+    msg = (error_message or "").strip() or "Unknown error"
+    return f"Installation failed:\n{msg}"
 
 
 def install(
@@ -431,7 +480,7 @@ def run_installer_progress_ui(*, launch: bool = True) -> int:
     )
     close_btn.pack(side=tk.RIGHT)
 
-    result: dict = {"path": None, "error": None, "code": 1}
+    result: dict = {"path": None, "error": None, "traceback": None, "code": 1}
 
     def on_progress(step: int, total: int, status: str) -> None:
         def ui() -> None:
@@ -447,12 +496,14 @@ def run_installer_progress_ui(*, launch: bool = True) -> int:
             path = install(launch=launch, progress_cb=on_progress)
             result["path"] = path
             result["code"] = 0
+            # Capture path name before deferred callback (closure-safe)
+            path_name = path.name if path is not None else "yes"
 
             def done_ok() -> None:
                 status_var.set(
                     f"Installation complete.\n"
                     f"Installed to:\n{INSTALL_DIR}\n"
-                    f"Launched: {path.name if path else 'yes'}"
+                    f"Launched: {path_name}"
                 )
                 bar["value"] = bar["maximum"]
                 close_btn.configure(state=tk.NORMAL)
@@ -460,13 +511,19 @@ def run_installer_progress_ui(*, launch: bool = True) -> int:
 
             root.after(0, done_ok)
         except Exception as exc:
-            result["error"] = str(exc)
+            # Bind strings before nested callback — Python clears `except as` names
+            # after the block, so deferred root.after cannot read `exc` later.
+            err_msg = str(exc) or exc.__class__.__name__
+            err_tb = traceback.format_exc()
+            result["error"] = err_msg
+            result["traceback"] = err_tb
             result["code"] = 1
-            tb = traceback.format_exc()
+            fail_status = format_install_failure_status(err_msg)
+            fail_detail = (err_tb or "")[:500]
 
             def done_err() -> None:
-                status_var.set(f"Installation failed:\n{exc}")
-                detail_var.set(tb[:500])
+                status_var.set(fail_status)
+                detail_var.set(fail_detail)
                 close_btn.configure(state=tk.NORMAL)
 
             root.after(0, done_err)
