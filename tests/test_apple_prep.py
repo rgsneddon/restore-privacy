@@ -158,7 +158,7 @@ class TestAppleProjectTrees(unittest.TestCase):
         self.assertIn("104.156.224.47", cfg)
         self.assertIn("44044", cfg)
         self.assertIn("fullTunnel = true", cfg)
-        self.assertIn("autoConnectOnLaunch = true", cfg)
+        self.assertIn("autoConnectOnLaunch = false", cfg)
         self.assertIn("RPT2", cfg)
 
 

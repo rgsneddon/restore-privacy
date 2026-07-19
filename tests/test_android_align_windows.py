@@ -71,9 +71,57 @@ class TestAndroidConnectDisconnect(unittest.TestCase):
         self.assertIn("isSessionActive", svc)
         self.assertIn("START_STICKY", svc)
         self.assertIn("onRevoke", svc)
+        # Revoke must clear desiredConnected (sticky poison guard)
+        revoke = svc[svc.index("fun onRevoke") : svc.index("fun onRevoke") + 350]
+        self.assertIn("desiredConnected = false", revoke)
+        self.assertIn("stopTunnel", revoke)
         # Notification stay-alive copy
         self.assertIn("minimize", svc.lower())
         self.assertIn("Privacy Restored", svc)
+
+    def test_already_running_connect_keeps_session_flags(self):
+        """Second Connect while up must report ok and keep desiredConnected/isSessionActive.
+
+        Drives shipped RptVpnService.kt: poison path absent; already-running path
+        always reportOk=true + keepSessionFlags=true (Triple first two true).
+        """
+        svc = (KT / "RptVpnService.kt").read_text(encoding="utf-8")
+        # Old poison path must be gone
+        self.assertNotIn(
+            'report(false, "VPN already connecting or connected")',
+            svc,
+        )
+        self.assertNotIn("VPN already connecting or connected", svc)
+        self.assertIn("reportAlreadyRunningSession", svc)
+        self.assertIn("alreadyRunningConnectDecision", svc)
+        self.assertIn("compareAndSet(false, true)", svc)
+
+        # Pure helper in shipped source: return Triple(true, true, msg)
+        decision = svc[
+            svc.index("fun alreadyRunningConnectDecision") : svc.index(
+                "fun alreadyRunningConnectDecision"
+            )
+            + 700
+        ]
+        self.assertIn("return Triple(true, true, msg)", decision)
+        self.assertNotIn("Triple(false", decision)
+        self.assertIn("Connected — full tunnel already active", decision)
+        self.assertIn("VPN already connecting…", decision)
+
+        already = svc[
+            svc.index("fun reportAlreadyRunningSession") : svc.index(
+                "fun reportAlreadyRunningSession"
+            )
+            + 500
+        ]
+        self.assertNotIn("report(false", already)
+        self.assertIn("report(decision.first", already)
+        self.assertIn("desiredConnected = true", already)
+        self.assertIn("userStopped.set(false)", already)
+
+        # onRevoke clears desiredConnected
+        revoke = svc[svc.index("fun onRevoke") : svc.index("fun onRevoke") + 300]
+        self.assertIn("desiredConnected = false", revoke)
 
 
 class TestAndroidUiAlignment(unittest.TestCase):

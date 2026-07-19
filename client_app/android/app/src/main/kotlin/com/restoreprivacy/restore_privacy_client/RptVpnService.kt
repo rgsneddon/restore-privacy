@@ -92,7 +92,8 @@ class RptVpnService : VpnService() {
     private fun report(ok: Boolean, message: String, vpnIp: String = "") {
         if (!reported.compareAndSet(false, true)) return
         if (!ok) {
-            // Connect failed — do not keep sticky “desired connected” loops
+            // Real connect failure only — never call report(false) for “already up”
+            // (that path must not clear desiredConnected / isSessionActive).
             desiredConnected = false
             isSessionActive = false
             activeVpnIp = ""
@@ -104,6 +105,18 @@ class RptVpnService : VpnService() {
             resultReceiver?.send(if (ok) RESULT_OK else RESULT_ERR, b)
         } catch (_: Exception) {
         }
+    }
+
+    /**
+     * Idempotent Connect while session is already up or still handshaking.
+     * Must keep [desiredConnected] / [isSessionActive] — never report(false).
+     */
+    private fun reportAlreadyRunningSession() {
+        desiredConnected = true
+        userStopped.set(false)
+        val decision = alreadyRunningConnectDecision(isSessionActive, activeVpnIp)
+        // decision.first = reportOk, .second = keepSessionFlags, .third = message
+        report(decision.first, decision.third, activeVpnIp)
     }
 
     /**
@@ -154,8 +167,11 @@ class RptVpnService : VpnService() {
     }
 
     private fun startTunnel(host: String, port: Int, fullTunnel: Boolean, sessionName: String) {
-        if (running.getAndSet(true)) {
-            report(false, "VPN already connecting or connected")
+        // Second Connect / Activity recreate while tunnel is up: keep live session.
+        // Never report(false) here — that would clear desiredConnected/isSessionActive
+        // and poison UI rehydrate after minimize.
+        if (!running.compareAndSet(false, true)) {
+            reportAlreadyRunningSession()
             return
         }
         val secrets = loadSecrets()
@@ -344,6 +360,7 @@ class RptVpnService : VpnService() {
     override fun onRevoke() {
         // System revoked VPN permission / another VPN took over — tear down fully
         userStopped.set(true)
+        desiredConnected = false
         stopTunnel()
         super.onRevoke()
     }
@@ -404,5 +421,28 @@ class RptVpnService : VpnService() {
         /** User wants tunnel up (Connect) until explicit Disconnect / revoke. */
         @Volatile
         var desiredConnected: Boolean = false
+
+        /**
+         * Pure decision for already-running Connect (mirrored in Python tests).
+         * Returns (reportOk, keepSessionFlags, message).
+         * Must never yield reportOk=false (that poisons live session flags).
+         */
+        @JvmStatic
+        fun alreadyRunningConnectDecision(
+            isSessionActive: Boolean,
+            vpnIp: String,
+        ): Triple<Boolean, Boolean, String> {
+            val ip = vpnIp.trim()
+            val msg = if (isSessionActive) {
+                if (ip.isNotEmpty()) {
+                    "Connected — RPT full tunnel up (VPN IP $ip)"
+                } else {
+                    "Connected — full tunnel already active"
+                }
+            } else {
+                "VPN already connecting…"
+            }
+            return Triple(true, true, msg)
+        }
     }
 }

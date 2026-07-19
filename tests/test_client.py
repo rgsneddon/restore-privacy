@@ -114,12 +114,17 @@ class TestUiTheme(unittest.TestCase):
         theme = (ROOT / "client_app" / "lib" / "theme.dart").read_text(encoding="utf-8")
         vpn = (ROOT / "client_app" / "lib" / "vpn_controller.dart").read_text(encoding="utf-8")
         self.assertIn(SCROLLING_PRIVACY_TEXT, theme)
-        self.assertIn("kBannerBg", main)
+        # Windows-aligned product shell tokens
+        self.assertIn("kChromeBg", main)
+        self.assertIn("kPrimary", theme)
+        self.assertIn("0xFFF2F5F7", theme.replace(" ", ""))
+        self.assertIn("0xFF2779AA", theme.replace(" ", ""))
+        self.assertIn("connectButtonLabel", main)
         self.assertIn("autoConnectOnLaunch", vpn)
-        self.assertIn("0xFF000080", theme.replace(" ", ""))
         cfg = (ROOT / "client_app" / "lib" / "rpt_config.dart").read_text(encoding="utf-8")
         self.assertIn("fullTunnel = true", cfg)
         self.assertIn("0.0.0.0/0", cfg)
+        self.assertIn("autoConnectOnLaunch = false", cfg)
 
     def test_android_vpn_service_full_tunnel(self):
         base = (
