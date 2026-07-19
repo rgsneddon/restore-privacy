@@ -115,7 +115,7 @@ class TestLiveHelloWithProductKey(unittest.TestCase):
             from node.elgamal import ElGamalPublicKey
 
             node_pub = ElGamalPublicKey.import_bytes(product.read_bytes())
-            frame, nonce, cpub = build_authorized_client_hello(priv, node_pub)
+            frame, nonce, cpub, _eph = build_authorized_client_hello(priv, node_pub)
             self.assertEqual(frame[:5], b"RPT2\x01")
             sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
             sock.settimeout(12.0)
@@ -132,7 +132,7 @@ class TestLiveHelloWithProductKey(unittest.TestCase):
                 sock.close()
 
             self.assertEqual(peek_type(reply), MsgType.SERVER_HELLO)
-            sess = complete_server_hello(reply, nonce, cpub)
+            sess = complete_server_hello(reply, nonce, cpub, _eph)
             self.assertTrue(sess.vpn_ip.startswith("10.88.0."))
             self.assertEqual(len(sess.session_id), 8)
 

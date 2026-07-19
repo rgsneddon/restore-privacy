@@ -119,6 +119,10 @@ Node deploy, ports, secrets, from-source builds, and tests: **[sundries.txt](sun
 
 **Tunnel DNS / host privacy:** [node/install_dns.sh](node/install_dns.sh), [node/install_host_privacy.sh](node/install_host_privacy.sh). Connect does not phone home to third-party geo APIs.
 
+**Self-host (one shot):** `sudo bash scripts/selfhost_node.sh` — install node + tunnel DNS + host privacy defaults. Details: [sundries.txt](sundries.txt).
+
+**Traffic analysis mitigations (optional):** packet padding, send timing jitter, cover traffic (`node/traffic_shape.py`); session **PFS** via ephemeral X25519 (handshake); optional multi-hop path list (`client/multihop.py`, default single-hop, honest status). These reduce coarse DPI/size/timing fingerprints — they do **not** hide the fact that you use a VPN from a network observer, and VPS providers may still see IP-level metadata ([PRIVACY_POLICY.md](PRIVACY_POLICY.md) §4).
+
 **Release scripts:** Use **scripts/build_release_0.2.0.py**. Re-run python scripts/package_linux.py each tag for manylinux wheels.
 
 

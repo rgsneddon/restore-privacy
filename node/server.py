@@ -228,9 +228,13 @@ class RPTNode:
                 self.registry.touch(session_id, addr)
                 aad = session_id + struct.pack("!Q", counter)
                 try:
-                    plaintext = sess.crypto.open(nonce, sealed, aad=aad)
+                    plaintext, is_cover = sess.crypto.open_allow_cover(
+                        nonce, sealed, aad=aad
+                    )
                 except Exception:
                     return
+                if is_cover or plaintext is None:
+                    return  # cover traffic — discard, no TUN write
                 if self.tun_fd is not None:
                     try:
                         os.write(self.tun_fd, plaintext)

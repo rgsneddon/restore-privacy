@@ -54,6 +54,18 @@ SECRETS / RELEASE GATES (mandatory)
   Production node (current): 82.221.101.241 UDP 44044 / status TCP 8080
   Product client defaults: client/endpoint.py + client_app/lib/rpt_config.dart
 
+  *** Preferred one-shot self-host (root on Debian/Ubuntu VPS) ***
+    sudo bash scripts/selfhost_node.sh
+    # Runs node/install.sh + install_dns.sh + install_host_privacy.sh
+    # Skip pieces: SKIP_DNS=1 SKIP_HOST_PRIVACY=1
+    # Then ship ONLY secrets/node_elgamal.pub to clients (never .priv).
+
+  Optional privacy features (client/node code; defaults OFF unless noted):
+    - DATA padding + send jitter: node/traffic_shape.py (TrafficShapePolicy)
+    - Optional cover traffic dummy frames (same module)
+    - PFS session keys: ephemeral X25519 in handshake (on by default for new hellos)
+    - Multi-hop path list: client/multihop.py (opt-in; honest status when inactive)
+
   From a machine with SSH (never commit passwords/keys into git):
 
     export RPT_SSH_HOST=82.221.101.241

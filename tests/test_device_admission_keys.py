@@ -379,7 +379,7 @@ class TestDeviceKeyHandshake(unittest.TestCase):
             admit_unknown_devices=True,
             on_enroll=on_enroll,
         )
-        frame, _nonce, client_pub = build_client_hello(device_priv, node_priv.public)
+        frame, _nonce, client_pub, _eph = build_client_hello(device_priv, node_priv.public)
         self.assertEqual(client_pub, ed25519_pub_raw(device_pub))
         reply, result = node_complete_hello(hs, frame, "10.88.0.9")
         self.assertEqual(len(result.session_id), 8)
@@ -397,7 +397,7 @@ class TestDeviceKeyHandshake(unittest.TestCase):
             [ed25519_pub_raw(good_pub)],
             admit_unknown_devices=False,
         )
-        frame, _, _ = build_client_hello(bad_priv, node_priv.public)
+        frame, _, _, _eph = build_client_hello(bad_priv, node_priv.public)
         with self.assertRaises(AdmissionError):
             node_complete_hello(hs, frame, "10.88.0.3")
 

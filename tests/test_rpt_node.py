@@ -50,7 +50,7 @@ class TestHandshakeAdmission(unittest.TestCase):
         cpriv, cpub = generate_client_admission_keypair()
         allow = [ed25519_pub_raw(cpub)]
         node = NodeHandshake(node_priv, allow)
-        frame, _, _ = build_client_hello(cpriv, node_priv.public)
+        frame, _, _, _eph = build_client_hello(cpriv, node_priv.public)
         reply, result = node_complete_hello(node, frame, "10.88.0.2")
         self.assertEqual(len(result.session_id), 8)
         self.assertTrue(len(reply) > 100)
@@ -65,7 +65,7 @@ class TestHandshakeAdmission(unittest.TestCase):
             [ed25519_pub_raw(good_pub)],
             admit_unknown_devices=False,
         )
-        frame, _, _ = build_client_hello(bad_priv, node_priv.public)
+        frame, _, _, _eph = build_client_hello(bad_priv, node_priv.public)
         with self.assertRaises(AdmissionError):
             node_complete_hello(node, frame, "10.88.0.2")
 

@@ -14,10 +14,18 @@ from typing import Callable, Optional  # Callable used by status_cb
 
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
 
-from node.crypto_session import SessionCrypto, derive_session_key
+from node.crypto_session import CoverFrame, SessionCrypto, derive_session_key
 from node.elgamal import ElGamalPublicKey
 from node.handshake import build_client_hello, ed25519_pub_raw
 from node.pedersen import PedersenCommitment, PedersenOpening, open_verified
+from node.pfs import (
+    EPH_PUB_LEN,
+    EphemeralX25519,
+    derive_legacy_session_shared,
+    derive_pfs_session_shared,
+    session_crypto_from_shared,
+    x25519_shared_secret,
+)
 from node.protocol import (
     MAGIC,
     MsgType,
@@ -27,6 +35,7 @@ from node.protocol import (
     parse_server_hello,
     peek_type,
 )
+from node.traffic_shape import DEFAULT_TRAFFIC_SHAPE, TrafficShapePolicy
 
 from .endpoint import DEFAULT_ENDPOINT, Endpoint
 from .full_tunnel import FullTunnelPlan, build_full_tunnel_plan
@@ -53,6 +62,7 @@ class ClientSession:
     endpoint: Endpoint
     counter_out: int = 0
     client_pub: bytes = b""
+    pfs: bool = False
 
 
 @dataclass
@@ -111,17 +121,28 @@ def complete_server_hello(
     reply: bytes,
     client_nonce: bytes,
     client_pub: bytes,
+    client_eph: EphemeralX25519 | None = None,
+    *,
+    traffic_shape: TrafficShapePolicy | None = None,
 ) -> ClientSession:
-    """Process SERVER_HELLO using real RPT2 crypto (shipped path)."""
+    """Process SERVER_HELLO using real RPT2 crypto (shipped path).
+
+    When *client_eph* is provided and the node returns a server X25519 pub,
+    session AEAD keys use PFS (ephemeral DH). Otherwise falls back to legacy
+    nonce-only derivation for older nodes.
+    """
     if peek_type(reply) != MsgType.SERVER_HELLO:
         raise ValueError("expected SERVER_HELLO")
     s_commit_b, session_id, nonce, sealed = parse_server_hello(reply)
     hello_shared = hashlib.sha256(client_nonce + client_pub + b"|hello").digest()
-    hello_crypto = SessionCrypto(
-        key=derive_session_key(hello_shared, salt=client_nonce[:16], info=b"rpt-v2-hello")
+    hello_key = derive_session_key(
+        hello_shared, salt=client_nonce[:16], info=b"rpt-v2-hello"
     )
     aad = b"RPT2-SERVER-HELLO" + session_id
-    plain = hello_crypto.open(nonce, sealed, aad=aad)
+    # Raw AEAD open — handshake plain is not DATA-padded
+    from cryptography.hazmat.primitives.ciphers.aead import ChaCha20Poly1305
+
+    plain = ChaCha20Poly1305(hello_key).decrypt(nonce, sealed, aad)
     if len(plain) < 32 + 288 + 4:
         raise ValueError("SERVER_HELLO payload too short")
     server_nonce = plain[:32]
@@ -131,25 +152,43 @@ def complete_server_hello(
     ip_bytes = plain[32 + 288 : 32 + 288 + 4]
     vpn_ip = ".".join(str(b) for b in ip_bytes)
 
-    session_shared = hashlib.sha256(client_nonce + server_nonce + session_id + client_pub).digest()
-    crypto = SessionCrypto(
-        key=derive_session_key(session_shared, salt=client_nonce[:16], info=b"rpt-v2-session")
-    )
+    pfs = False
+    server_eph_off = 32 + 288 + 4
+    if (
+        client_eph is not None
+        and len(plain) >= server_eph_off + EPH_PUB_LEN
+    ):
+        server_eph_pub = plain[server_eph_off : server_eph_off + EPH_PUB_LEN]
+        eph_shared = x25519_shared_secret(client_eph.private, server_eph_pub)
+        session_shared = derive_pfs_session_shared(
+            client_nonce, server_nonce, session_id, client_pub, eph_shared
+        )
+        pfs = True
+    else:
+        session_shared = derive_legacy_session_shared(
+            client_nonce, server_nonce, session_id, client_pub
+        )
+    crypto = session_crypto_from_shared(session_shared, client_nonce)
+    if traffic_shape is not None:
+        crypto.traffic_shape = traffic_shape
     return ClientSession(
         session_id=session_id,
         crypto=crypto,
         vpn_ip=vpn_ip,
         endpoint=DEFAULT_ENDPOINT,
         client_pub=client_pub,
+        pfs=pfs,
     )
 
 
 def build_authorized_client_hello(
     client_priv: Ed25519PrivateKey,
     node_pub: ElGamalPublicKey,
-) -> tuple[bytes, bytes, bytes]:
-    """Real CLIENT_HELLO for authorized product client."""
-    return build_client_hello(client_priv, node_pub)
+    *,
+    with_pfs: bool = True,
+) -> tuple[bytes, bytes, bytes, EphemeralX25519 | None]:
+    """Real CLIENT_HELLO for authorized product client (PFS by default)."""
+    return build_client_hello(client_priv, node_pub, with_pfs=with_pfs)
 
 
 def assert_protocol_magic() -> bytes:
@@ -193,7 +232,9 @@ class RptClient:
             sdir = ensure_device_admission_key(self.secrets_dir)
             client_priv = load_client_private_key(sdir)
             node_pub = load_node_elgamal_public(sdir)
-            frame, client_nonce, client_pub = build_authorized_client_hello(client_priv, node_pub)
+            frame, client_nonce, client_pub, client_eph = build_authorized_client_hello(
+                client_priv, node_pub, with_pfs=True
+            )
             assert_protocol_magic()
 
             sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
@@ -202,14 +243,19 @@ class RptClient:
                 sock.sendto(frame, self.endpoint.address)
                 self._status(f"HELLO sent → {self.endpoint.host}:{self.endpoint.port}")
                 reply, _addr = sock.recvfrom(65535)
-                session = complete_server_hello(reply, client_nonce, client_pub)
+                session = complete_server_hello(
+                    reply, client_nonce, client_pub, client_eph
+                )
                 session.endpoint = self.endpoint
                 self.session = session
                 self.tunnel_plan = build_full_tunnel_plan(session.vpn_ip)
                 self._sock = sock
                 sock = None  # ownership transferred; disconnect() closes
                 self.state = ConnectState.CONNECTED
-                self._status(f"Connected — tunnel IP {session.vpn_ip} (full VPN)")
+                pfs_note = " PFS" if session.pfs else ""
+                self._status(
+                    f"Connected — tunnel IP {session.vpn_ip} (full VPN{pfs_note})"
+                )
                 return ConnectResult(
                     ok=True,
                     state=self.state,
@@ -254,7 +300,20 @@ class RptClient:
         if sid != self.session.session_id:
             raise ValueError("session mismatch")
         aad = sid + struct.pack("!Q", counter)
-        return self.session.crypto.open(nonce, sealed, aad=aad)
+        try:
+            return self.session.crypto.open(nonce, sealed, aad=aad)
+        except CoverFrame as exc:
+            raise CoverFrame("cover frame") from exc
+
+    def open_packet_allow_cover(self, frame: bytes) -> tuple[bytes | None, bool]:
+        """Open DATA; return (ip_or_None, is_cover)."""
+        if not self.session:
+            raise RuntimeError("not connected")
+        sid, counter, nonce, sealed = parse_data(frame)
+        if sid != self.session.session_id:
+            raise ValueError("session mismatch")
+        aad = sid + struct.pack("!Q", counter)
+        return self.session.crypto.open_allow_cover(nonce, sealed, aad=aad)
 
     def send_keepalive(self) -> None:
         if not self.session or not self._sock:

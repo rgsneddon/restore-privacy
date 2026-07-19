@@ -30,7 +30,16 @@ from .pedersen import (
     commit_bytes,
     open_verified,
 )
+from .pfs import (
+    EPH_PUB_LEN,
+    EphemeralX25519,
+    derive_legacy_session_shared,
+    derive_pfs_session_shared,
+    session_crypto_from_shared,
+    x25519_shared_secret,
+)
 from .protocol import pack_client_hello, pack_server_hello, parse_client_hello
+from .traffic_shape import DEFAULT_TRAFFIC_SHAPE
 
 
 def ed25519_pub_raw(pub: Ed25519PublicKey) -> bytes:
@@ -134,6 +143,8 @@ class HandshakeResult:
     crypto: SessionCrypto
     client_pub: bytes
     shared_probe: bytes
+    pfs: bool = False
+    server_eph_pub: bytes = b""
 
 
 class AdmissionError(Exception):
@@ -205,6 +216,9 @@ def node_complete_hello(
         raise AdmissionError("bad hybrid payload")
     client_nonce = opened[:32]
     opening = PedersenOpening.import_bytes(opened[32 : 32 + 288])
+    client_eph_pub = b""
+    if len(opened) >= 32 + 288 + EPH_PUB_LEN:
+        client_eph_pub = opened[32 + 288 : 32 + 288 + EPH_PUB_LEN]
     try:
         open_verified(commit, opening)
     except Exception as exc:
@@ -223,24 +237,47 @@ def node_complete_hello(
     # SERVER_HELLO is sealed under a key derivable from client_nonce alone
     # (client does not yet know server_nonce). Session AEAD rekeys after open.
     hello_shared = hashlib.sha256(client_nonce + client_pub + b"|hello").digest()
+    # Hello AEAD must not apply DATA padding (handshake plaintext).
     hello_crypto = SessionCrypto(
-        key=derive_session_key(hello_shared, salt=client_nonce[:16], info=b"rpt-v2-hello")
+        key=derive_session_key(hello_shared, salt=client_nonce[:16], info=b"rpt-v2-hello"),
+        traffic_shape=DEFAULT_TRAFFIC_SHAPE,
     )
-    session_shared = hashlib.sha256(client_nonce + server_nonce + session_id + client_pub).digest()
-    crypto = SessionCrypto(
-        key=derive_session_key(session_shared, salt=client_nonce[:16], info=b"rpt-v2-session")
-    )
+
+    # PFS: ephemeral X25519 when client offered a 32-byte eph pub in hybrid payload.
+    server_eph = EphemeralX25519.generate()
+    use_pfs = len(client_eph_pub) == EPH_PUB_LEN
+    if use_pfs:
+        try:
+            eph_shared = x25519_shared_secret(server_eph.private, client_eph_pub)
+            session_shared = derive_pfs_session_shared(
+                client_nonce, server_nonce, session_id, client_pub, eph_shared
+            )
+        except Exception as exc:
+            raise AdmissionError("ephemeral DH failed") from exc
+    else:
+        session_shared = derive_legacy_session_shared(
+            client_nonce, server_nonce, session_id, client_pub
+        )
+    crypto = session_crypto_from_shared(session_shared, client_nonce)
 
     parts = [int(x) for x in vpn_ip.split(".")]
     plain = server_nonce + s_opening.export() + bytes(parts)
+    if use_pfs:
+        plain = plain + server_eph.public_raw
     aad = b"RPT2-SERVER-HELLO" + session_id
-    nonce, sealed = hello_crypto.seal(plain, aad=aad)
-    reply = pack_server_hello(s_commit.export(), session_id, nonce, sealed)
+    # seal without DATA padding framing
+    from cryptography.hazmat.primitives.ciphers.aead import ChaCha20Poly1305 as _C
+
+    n = os.urandom(12)
+    sealed = _C(hello_crypto.key).encrypt(n, plain, aad)
+    reply = pack_server_hello(s_commit.export(), session_id, n, sealed)
     result = HandshakeResult(
         session_id=session_id,
         crypto=crypto,
         client_pub=client_pub,
         shared_probe=session_shared,
+        pfs=use_pfs,
+        server_eph_pub=server_eph.public_raw if use_pfs else b"",
     )
     return reply, result
 
@@ -248,13 +285,24 @@ def node_complete_hello(
 def build_client_hello(
     client_priv: Ed25519PrivateKey,
     node_elgamal_pub: ElGamalPublicKey,
-) -> tuple[bytes, bytes, bytes]:
+    *,
+    with_pfs: bool = True,
+) -> tuple[bytes, bytes, bytes, EphemeralX25519 | None]:
+    """Build CLIENT_HELLO. Returns (frame, client_nonce, client_pub, client_eph_or_None).
+
+    When *with_pfs* is True (default), includes an ephemeral X25519 public key in
+    the hybrid payload for perfect forward secrecy of session AEAD keys.
+    """
     client_pub = ed25519_pub_raw(client_priv.public_key())
     client_nonce = os.urandom(32)
     commit, opening = commit_bytes(client_nonce)
+    eph: EphemeralX25519 | None = None
     payload = client_nonce + opening.export()
+    if with_pfs:
+        eph = EphemeralX25519.generate()
+        payload = payload + eph.public_raw
     hybrid_b = pack_hybrid(node_elgamal_pub, payload)
     commit_b = commit.export()
     sig = client_priv.sign(transcript_for_client_hello(client_pub, commit_b, hybrid_b))
     frame = pack_client_hello(client_pub, commit_b, hybrid_b, sig)
-    return frame, client_nonce, client_pub
+    return frame, client_nonce, client_pub, eph

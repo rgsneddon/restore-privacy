@@ -84,11 +84,11 @@ class TestWindowsAntiBlackholeRoutes(unittest.TestCase):
         node_priv = generate_keypair()
         cpriv, cpub = generate_client_admission_keypair()
         node = NodeHandshake(node_priv, [ed25519_pub_raw(cpub)])
-        frame, client_nonce, client_pub = build_authorized_client_hello(
+        frame, client_nonce, client_pub, _eph = build_authorized_client_hello(
             cpriv, node_priv.public
         )
         reply, _ = node_complete_hello(node, frame, "10.88.0.11")
-        session = complete_server_hello(reply, client_nonce, client_pub)
+        session = complete_server_hello(reply, client_nonce, client_pub, _eph)
 
         client = RptClient.__new__(RptClient)
         client.session = session
@@ -121,11 +121,11 @@ class TestWindowsAntiBlackholeRoutes(unittest.TestCase):
         node_priv = generate_keypair()
         cpriv, cpub = generate_client_admission_keypair()
         node = NodeHandshake(node_priv, [ed25519_pub_raw(cpub)])
-        frame, client_nonce, client_pub = build_authorized_client_hello(
+        frame, client_nonce, client_pub, _eph = build_authorized_client_hello(
             cpriv, node_priv.public
         )
         reply, _ = node_complete_hello(node, frame, "10.88.0.12")
-        session = complete_server_hello(reply, client_nonce, client_pub)
+        session = complete_server_hello(reply, client_nonce, client_pub, _eph)
         client = RptClient.__new__(RptClient)
         client.session = session
         client.endpoint = Endpoint("1.2.3.4", 44044)
@@ -183,11 +183,11 @@ class TestWindowsAntiBlackholeRoutes(unittest.TestCase):
         node_priv = generate_keypair()
         cpriv, cpub = generate_client_admission_keypair()
         node = NodeHandshake(node_priv, [ed25519_pub_raw(cpub)])
-        frame, client_nonce, client_pub = build_authorized_client_hello(
+        frame, client_nonce, client_pub, _eph = build_authorized_client_hello(
             cpriv, node_priv.public
         )
         reply, _ = node_complete_hello(node, frame, "10.88.0.13")
-        session = complete_server_hello(reply, client_nonce, client_pub)
+        session = complete_server_hello(reply, client_nonce, client_pub, _eph)
         client = RptClient.__new__(RptClient)
         client.session = session
         client.endpoint = Endpoint("82.221.101.241", 44044)

@@ -46,12 +46,12 @@ class TestClientProtocol(unittest.TestCase):
         allow = [ed25519_pub_raw(cpub)]
         node = NodeHandshake(node_priv, allow)
 
-        frame, client_nonce, client_pub = build_authorized_client_hello(
+        frame, client_nonce, client_pub, _eph = build_authorized_client_hello(
             cpriv, node_priv.public
         )
         self.assertTrue(frame.startswith(b"RPT2"))
         reply, result = node_complete_hello(node, frame, "10.88.0.7")
-        session = complete_server_hello(reply, client_nonce, client_pub)
+        session = complete_server_hello(reply, client_nonce, client_pub, _eph)
         self.assertEqual(session.session_id, result.session_id)
         self.assertEqual(session.vpn_ip, "10.88.0.7")
         # AEAD roundtrip on session key
@@ -68,7 +68,7 @@ class TestClientProtocol(unittest.TestCase):
             [ed25519_pub_raw(good_pub)],
             admit_unknown_devices=False,
         )
-        frame, _, _ = build_authorized_client_hello(bad_priv, node_priv.public)
+        frame, _, _, _eph = build_authorized_client_hello(bad_priv, node_priv.public)
         with self.assertRaises(AdmissionError):
             node_complete_hello(node, frame, "10.88.0.2")
 

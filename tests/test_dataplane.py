@@ -41,9 +41,9 @@ class TestDataPlaneRealSealOpen(unittest.TestCase):
         node_priv = generate_keypair()
         cpriv, cpub = generate_client_admission_keypair()
         node = NodeHandshake(node_priv, [ed25519_pub_raw(cpub)])
-        frame, client_nonce, client_pub = build_authorized_client_hello(cpriv, node_priv.public)
+        frame, client_nonce, client_pub, _eph = build_authorized_client_hello(cpriv, node_priv.public)
         reply, result = node_complete_hello(node, frame, "10.88.0.9")
-        session = complete_server_hello(reply, client_nonce, client_pub)
+        session = complete_server_hello(reply, client_nonce, client_pub, _eph)
         return session, result
 
     def test_seal_and_open_via_dataplane_helpers(self):

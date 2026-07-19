@@ -8,12 +8,19 @@ from __future__ import annotations
 
 import select
 import socket
+import struct
 import threading
 import time
 from dataclasses import dataclass, field
 from typing import Callable, Optional, Protocol
 
-from node.protocol import MsgType, peek_type
+from node.crypto_session import CoverFrame
+from node.protocol import MsgType, pack_data, peek_type
+from node.traffic_shape import (
+    DEFAULT_TRAFFIC_SHAPE,
+    TrafficShapePolicy,
+    apply_send_jitter,
+)
 
 from .connect import RptClient
 
@@ -37,6 +44,8 @@ class DataPlaneStats:
     tun_to_udp: int = 0
     udp_to_tun: int = 0
     errors: int = 0
+    cover_sent: int = 0
+    cover_recv: int = 0
     started: bool = False
     stopped: bool = False
 
@@ -44,11 +53,20 @@ class DataPlaneStats:
 class RptDataPlane:
     """Bidirectional RPT DATA loop bound to an established client session."""
 
-    def __init__(self, client: RptClient):
+    def __init__(
+        self,
+        client: RptClient,
+        *,
+        traffic_shape: TrafficShapePolicy | None = None,
+    ):
         if not client.session or not client._sock:
             raise RuntimeError("RptDataPlane requires connected RptClient with socket")
         self.client = client
         self.sock: socket.socket = client._sock
+        self.traffic_shape = traffic_shape or DEFAULT_TRAFFIC_SHAPE
+        # Apply policy to session crypto for pad/cover on seal/open
+        if client.session:
+            client.session.crypto.traffic_shape = self.traffic_shape
         self.stats = DataPlaneStats()
         self._stop = threading.Event()
         self._thread: Optional[threading.Thread] = None
@@ -84,6 +102,7 @@ class RptDataPlane:
         assert tun is not None
         sock = self.sock
         last_keepalive = 0.0
+        last_cover = 0.0
         keepalive_every = 30.0  # keep node session live for clients_connected
         while not self._stop.is_set():
             try:
@@ -101,9 +120,12 @@ class RptDataPlane:
                 data, _addr = sock.recvfrom(65535)
                 t = peek_type(data)
                 if t == MsgType.DATA:
-                    plain = self.client.open_packet(data)
-                    tun.write_packet(plain)
-                    self.stats.udp_to_tun += 1
+                    plain, is_cover = self.client.open_packet_allow_cover(data)
+                    if is_cover:
+                        self.stats.cover_recv += 1
+                    elif plain:
+                        tun.write_packet(plain)
+                        self.stats.udp_to_tun += 1
             except BlockingIOError:
                 pass
             except OSError:
@@ -115,14 +137,29 @@ class RptDataPlane:
             try:
                 pkt = tun.read_packet()
                 if pkt:
+                    if self.traffic_shape.jitter_ms_max > 0:
+                        apply_send_jitter(self.traffic_shape.jitter_ms_max)
                     frame = self.client.seal_packet(pkt)
                     sock.sendto(frame, self.client.endpoint.address)
                     self.stats.tun_to_udp += 1
             except Exception:
                 self.stats.errors += 1
 
-            # Periodic KEEPALIVE so idle tunnels still count as connected on the node
+            # Optional cover traffic (dummy sealed frames)
             now = time.time()
+            if (
+                self.traffic_shape.cover_traffic
+                and self.traffic_shape.cover_interval_s > 0
+                and (now - last_cover) >= self.traffic_shape.cover_interval_s
+            ):
+                try:
+                    self._send_cover_frame()
+                    self.stats.cover_sent += 1
+                except Exception:
+                    self.stats.errors += 1
+                last_cover = now
+
+            # Periodic KEEPALIVE so idle tunnels still count as connected on the node
             if (now - last_keepalive) >= keepalive_every:
                 try:
                     self.client.send_keepalive()
@@ -144,10 +181,25 @@ class RptDataPlane:
 
     def open_to_tun_once(self, tun: TunIO, frame: bytes) -> bytes:
         """Open one RPT DATA frame via RptClient.open_packet and write to TUN."""
-        plain = self.client.open_packet(frame)
+        plain, is_cover = self.client.open_packet_allow_cover(frame)
+        if is_cover or plain is None:
+            self.stats.cover_recv += 1
+            return b""
         tun.write_packet(plain)
         self.stats.udp_to_tun += 1
         return plain
+
+    def _send_cover_frame(self) -> bytes:
+        """Seal and send one cover DATA frame (discarded by peer after open)."""
+        sess = self.client.session
+        if not sess:
+            raise RuntimeError("not connected")
+        sess.counter_out += 1
+        aad = sess.session_id + struct.pack("!Q", sess.counter_out)
+        nonce, sealed = sess.crypto.seal_cover(self.traffic_shape.pad_bucket, aad=aad)
+        frame = pack_data(sess.session_id, sess.counter_out, nonce, sealed)
+        self.sock.sendto(frame, self.client.endpoint.address)
+        return frame
 
 
 class QueueTun:
