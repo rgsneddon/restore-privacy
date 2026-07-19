@@ -204,6 +204,7 @@ class RptVpnService : VpnService() {
                 }
 
                 // DNS: node tunnel gateway recursive resolver (matches client.full_tunnel defaults)
+                // IPv6: add ::/0 so residual IPv6 is not left on the ISP path (leak protection)
                 val builder = Builder()
                     .setSession(sessionName)
                     .setMtu(1280)
@@ -211,6 +212,11 @@ class RptVpnService : VpnService() {
                     .addDnsServer("10.88.0.1")
                 if (fullTunnel) {
                     builder.addRoute("0.0.0.0", 0)
+                    try {
+                        builder.addRoute("::", 0)
+                    } catch (_: Exception) {
+                        // Some API levels reject IPv6 routes; status honesty is client-side
+                    }
                 }
                 try {
                     // Keep our app off the VPN loop so UDP to node works

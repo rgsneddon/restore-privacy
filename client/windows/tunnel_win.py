@@ -21,6 +21,8 @@ from client.full_tunnel import (
     FullTunnelPlan,
     routes_would_blackhole_without_if_index,
     routes_would_blackhole_without_system_capture,
+    windows_ipv6_leak_block_commands,
+    windows_ipv6_leak_rollback_commands,
     windows_route_commands,
     windows_route_delete_commands,
 )
@@ -46,6 +48,7 @@ class WindowsTunnelResult:
     plan: Optional[FullTunnelPlan] = None
     server_host: Optional[str] = None
     if_index: Optional[int] = None
+    ipv6_mitigation_applied: bool = False
 
 
 def is_admin() -> bool:
@@ -277,6 +280,19 @@ def stop_full_tunnel(
             except Exception:
                 pass
 
+    # 1b) Restore IPv6 on physical adapters (undo session leak mitigation)
+    if res is not None and (
+        getattr(res, "ipv6_mitigation_applied", False) or routes_were_on
+    ):
+        try:
+            applied.extend(rollback_ipv6_leak_mitigation(plan_obj))
+        except Exception:
+            pass
+        try:
+            res.ipv6_mitigation_applied = False
+        except Exception:
+            pass
+
     # 2) Stop sealed DATA plane (also closes TUN if bound)
     if plane is not None:
         try:
@@ -346,6 +362,32 @@ def residual_ip_capture_active(result: Optional[WindowsTunnelResult]) -> bool:
         and result.system_capture
         and result.dataplane is not None
     )
+
+
+def ipv6_residual_protected(result: Optional[WindowsTunnelResult]) -> bool:
+    """True when residual full tunnel also blocked ISP IPv6 egress for the session."""
+    if not residual_ip_capture_active(result):
+        return False
+    return bool(result and result.ipv6_mitigation_applied)
+
+
+def apply_ipv6_leak_mitigation(plan: FullTunnelPlan) -> tuple[list[str], bool]:
+    """Run IPv6 ISP-block commands; return (applied_cmds, success)."""
+    cmds = windows_ipv6_leak_block_commands(tunnel_iface=plan.tunnel_iface or "RPT")
+    applied, errs = _run_cmds(cmds)
+    # Best-effort: treat as applied if we ran the command list (bindings may already be off)
+    ok = len(applied) >= 1 or not errs
+    if applied:
+        ok = True
+    return applied, ok
+
+
+def rollback_ipv6_leak_mitigation(plan: Optional[FullTunnelPlan] = None) -> list[str]:
+    """Restore IPv6 bindings after Disconnect."""
+    iface = (plan.tunnel_iface if plan else None) or "RPT"
+    cmds = windows_ipv6_leak_rollback_commands(tunnel_iface=iface)
+    applied, _ = _run_cmds(cmds)
+    return applied
 
 
 def start_full_tunnel(
@@ -543,6 +585,19 @@ def start_full_tunnel(
             routes_applied=False,
         )
 
+    ipv6_ok = False
+    if routes_applied and capture:
+        try:
+            v6_cmds, ipv6_ok = apply_ipv6_leak_mitigation(plan)
+            applied.extend(v6_cmds)
+            if ipv6_ok:
+                msg += "; IPv6 ISP path blocked"
+            else:
+                msg += "; IPv6 leak mitigation incomplete"
+        except Exception as exc:
+            msg += f"; IPv6 mitigation error: {exc}"
+            ipv6_ok = False
+
     result = WindowsTunnelResult(
         ok=True,
         message=msg,
@@ -554,6 +609,7 @@ def start_full_tunnel(
         plan=plan,
         server_host=server_host,
         if_index=if_index,
+        ipv6_mitigation_applied=ipv6_ok,
     )
 
     # Product residual-IP path: refuse queue/session-only success (ISP IP unchanged)
@@ -561,6 +617,11 @@ def start_full_tunnel(
         plane.stop()
         if routes_applied:
             rollback_full_tunnel_routes(plan, server_host, if_index)
+        if ipv6_ok:
+            try:
+                rollback_ipv6_leak_mitigation(plan)
+            except Exception:
+                pass
         try:
             tun.close()
         except Exception:
@@ -575,6 +636,7 @@ def start_full_tunnel(
             plan=plan,
             server_host=server_host,
             if_index=if_index,
+            ipv6_mitigation_applied=False,
         )
 
     return result

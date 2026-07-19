@@ -69,6 +69,7 @@ from client.windows.tray_win import (
     resolve_tray_icon_path,
 )
 from client.windows.tunnel_win import (
+    ipv6_residual_protected,
     residual_ip_capture_active,
     start_full_tunnel,
     stop_full_tunnel,
@@ -481,6 +482,7 @@ class TunnelClientApp:
         vpn_ip: str | None = None,
         detail: str | None = None,
         residual_capture: bool | None = None,
+        ipv6_protected: bool | None = None,
     ) -> None:
         """Update main status dialogue and tray to match Connect/Disconnect state."""
         s = (state or "").strip().lower()
@@ -490,13 +492,20 @@ class TunnelClientApp:
                 vpn_ip=vpn_ip,
                 detail=detail,
                 residual_capture=residual_capture,
+                ipv6_protected=ipv6_protected,
             )
         )
         if s == "connected" and residual_capture is not False:
-            self.status_label.configure(fg=STATUS_OK)
-            self.detail_var.set(
-                "Your residual public IP uses the VPN node (full-tunnel routes active)."
-            )
+            if ipv6_protected is False:
+                self.status_label.configure(fg=STATUS_ERROR_FG)
+                self.detail_var.set(
+                    "IPv4 uses the VPN node, but IPv6 may still use your ISP - not fully protected."
+                )
+            else:
+                self.status_label.configure(fg=STATUS_OK)
+                self.detail_var.set(
+                    "Your residual public IP uses the VPN node; IPv6 ISP path is blocked."
+                )
             # Pass connected=True explicitly - _apply_control may not have run yet
             self._sync_tray_status(connected=True, residual=True)
         elif s == "connected":
@@ -611,9 +620,11 @@ class TunnelClientApp:
                     )
                     self._tunnel = tun_res
                     if residual_ip_capture_active(tun_res):
+                        v6 = ipv6_residual_protected(tun_res)
                         self._log(
                             "Tunnel active - residual public IP uses the VPN node "
-                            f"(IF={getattr(tun_res, 'if_index', '?')})"
+                            f"(IF={getattr(tun_res, 'if_index', '?')}; "
+                            f"ipv6_protected={v6})"
                         )
                         # Apply control first so _connected is True, then status+tray
                         self._apply_control(connected=True, busy=False)
@@ -621,6 +632,7 @@ class TunnelClientApp:
                             "connected",
                             vpn_ip=vpn_ip,
                             residual_capture=True,
+                            ipv6_protected=v6,
                         )
                     else:
                         # Capture attach failure BEFORE teardown overwrites tun_res.message

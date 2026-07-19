@@ -26,6 +26,11 @@ def default_tunnel_dns_servers() -> list[str]:
     return list(DEFAULT_TUNNEL_DNS_SERVERS)
 
 
+# Product residual full tunnel must address IPv6 ISP leaks (IPv4 dual /1 alone is not enough).
+IPV6_LEAK_POLICY_BLOCK_ISP = "block_isp"
+DEFAULT_IPV6_LEAK_POLICY = IPV6_LEAK_POLICY_BLOCK_ISP
+
+
 @dataclass
 class FullTunnelPlan:
     """Platform-agnostic full VPN plan."""
@@ -42,6 +47,8 @@ class FullTunnelPlan:
     disallowed_apps: list[str] = field(default_factory=list)
     mtu: int = 1280
     session_name: str = "Restore Privacy"
+    # When residual IPv4 capture is up, also block ISP IPv6 egress (privacy).
+    ipv6_leak_policy: str = DEFAULT_IPV6_LEAK_POLICY
 
     def is_full_tunnel(self) -> bool:
         return (
@@ -206,18 +213,90 @@ def routes_would_blackhole_without_if_index(
     return apply_default_routes and (if_index is None or int(if_index) <= 0)
 
 
+def windows_ipv6_leak_block_commands(*, tunnel_iface: str = "RPT") -> list[str]:
+    """Commands to stop residual IPv6 using the ISP while full tunnel is up.
+
+    Disables the IPv6 stack binding on every *up* adapter except the tunnel NIC.
+    Symmetric rollback re-enables ``ms_tcpip6`` on adapters (see rollback helper).
+    """
+    tun = (tunnel_iface or "RPT").replace("'", "''")
+    # Single PowerShell invocation — testable as a pure string list.
+    ps = (
+        f"$tun='{tun}'; "
+        "Get-NetAdapter -ErrorAction SilentlyContinue | "
+        "Where-Object { $_.Status -eq 'Up' -and $_.Name -ne $tun } | "
+        "ForEach-Object { "
+        "Disable-NetAdapterBinding -Name $_.Name -ComponentID ms_tcpip6 "
+        "-Confirm:$false -ErrorAction SilentlyContinue "
+        "}"
+    )
+    return [
+        "netsh interface teredo set state disabled",
+        "netsh interface 6to4 set state state=disabled",
+        "netsh interface isatap set state disabled",
+        f'powershell -NoProfile -ExecutionPolicy Bypass -Command "{ps}"',
+    ]
+
+
+def windows_ipv6_leak_rollback_commands(*, tunnel_iface: str = "RPT") -> list[str]:
+    """Restore IPv6 bindings after product Disconnect (best-effort, all adapters)."""
+    _ = tunnel_iface  # reserved for future per-adapter snapshots
+    ps = (
+        "Get-NetAdapter -ErrorAction SilentlyContinue | "
+        "ForEach-Object { "
+        "Enable-NetAdapterBinding -Name $_.Name -ComponentID ms_tcpip6 "
+        "-Confirm:$false -ErrorAction SilentlyContinue "
+        "}"
+    )
+    return [
+        f'powershell -NoProfile -ExecutionPolicy Bypass -Command "{ps}"',
+        "netsh interface teredo set state default",
+        "netsh interface 6to4 set state state=default",
+        "netsh interface isatap set state default",
+    ]
+
+
+def linux_ipv6_leak_block_commands(*, iface: str = "rpt0") -> list[str]:
+    """Blackhole default IPv6 so residual IPv6 does not use the ISP path.
+
+    Does not permanently disable host IPv6 via sysctl (restored by delete).
+    """
+    _ = iface
+    return [
+        "ip -6 route replace blackhole default metric 1",
+        "ip -6 route replace blackhole default proto static metric 1 table main",
+    ]
+
+
+def linux_ipv6_leak_rollback_commands(*, iface: str = "rpt0") -> list[str]:
+    """Remove IPv6 blackhole defaults installed for the session."""
+    _ = iface
+    return [
+        "ip -6 route del blackhole default metric 1",
+        "ip -6 route del blackhole default table main",
+        "ip -6 route del blackhole default",
+    ]
+
+
 def android_vpn_builder_config(plan: FullTunnelPlan) -> dict[str, Any]:
     """Config dict consumed by Android VpnService.Builder (full tunnel)."""
+    # IPv6 ::/0 into the VPN so residual IPv6 is not left on the ISP (may blackhole
+    # until the node carries IPv6 — privacy preference over silent leak).
+    routes: list[dict[str, Any]] = [{"addr": "0.0.0.0", "prefix": 0}]
+    if plan.ipv6_leak_policy == IPV6_LEAK_POLICY_BLOCK_ISP:
+        routes.append({"addr": "::", "prefix": 0})
     return {
         "session": plan.session_name,
         "mtu": plan.mtu,
         "addresses": [{"addr": plan.tunnel_client_ip, "prefix": 32}],
-        "routes": [{"addr": "0.0.0.0", "prefix": 0}],
+        "routes": routes,
         "dns": list(plan.dns_servers),
         "allowAllApps": plan.allow_all_apps,
         "disallowedApplications": list(plan.disallowed_apps),
         "blocking": True,
         "protectNodeSocket": True,
+        "ipv6LeakPolicy": plan.ipv6_leak_policy,
+        "ipv6Protected": plan.ipv6_leak_policy == IPV6_LEAK_POLICY_BLOCK_ISP,
     }
 
 
@@ -228,8 +307,12 @@ def assert_full_tunnel_plan(plan: FullTunnelPlan) -> list[str]:
     if not plan.allow_all_apps:
         violations.append("allow_all_apps must be True")
     cfg = android_vpn_builder_config(plan)
-    if cfg.get("routes") != [{"addr": "0.0.0.0", "prefix": 0}]:
-        violations.append("android routes must be 0.0.0.0/0")
+    routes = cfg.get("routes") or []
+    if {"addr": "0.0.0.0", "prefix": 0} not in routes:
+        violations.append("android routes must include 0.0.0.0/0")
+    if plan.ipv6_leak_policy == IPV6_LEAK_POLICY_BLOCK_ISP:
+        if {"addr": "::", "prefix": 0} not in routes:
+            violations.append("android routes must include ::/0 for IPv6 leak policy")
     cmds = "\n".join(windows_route_commands(plan, "1.2.3.4", if_index=12))
     if "0.0.0.0 mask 128.0.0.0 0.0.0.0 IF 12" not in cmds:
         violations.append("windows routes must be on-link IF-bound dual /1")

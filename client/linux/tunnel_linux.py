@@ -16,6 +16,8 @@ from client.connect import RptClient
 from client.dataplane import RptDataPlane
 from client.full_tunnel import (
     FullTunnelPlan,
+    linux_ipv6_leak_block_commands,
+    linux_ipv6_leak_rollback_commands,
     linux_route_commands,
     linux_route_delete_commands,
 )
@@ -40,6 +42,7 @@ class LinuxTunnelResult:
     plan: Optional[FullTunnelPlan] = None
     server_host: Optional[str] = None
     iface: Optional[str] = None
+    ipv6_mitigation_applied: bool = False
 
 
 def product_connect_requires_root() -> bool:
@@ -57,6 +60,24 @@ def residual_ip_capture_active(result: Optional[LinuxTunnelResult]) -> bool:
         and result.system_capture
         and result.dataplane is not None
     )
+
+
+def ipv6_residual_protected(result: Optional[LinuxTunnelResult]) -> bool:
+    if not residual_ip_capture_active(result):
+        return False
+    return bool(result and result.ipv6_mitigation_applied)
+
+
+def apply_ipv6_leak_mitigation(iface: str = "rpt0") -> tuple[list[str], bool]:
+    cmds = linux_ipv6_leak_block_commands(iface=iface)
+    applied, _errs = _run_cmds(cmds)
+    return applied, bool(applied)
+
+
+def rollback_ipv6_leak_mitigation(iface: str = "rpt0") -> list[str]:
+    cmds = linux_ipv6_leak_rollback_commands(iface=iface)
+    applied, _ = _run_cmds(cmds)
+    return applied
 
 
 def product_tunnel_attach_active(result: Optional[LinuxTunnelResult]) -> bool:
@@ -155,6 +176,18 @@ def stop_full_tunnel(
                 tunnel_iface=iface or "rpt0", tunnel_client_ip="10.88.0.2"
             )
             applied.extend(rollback_full_tunnel_routes(p, host, iface))
+        except Exception:
+            pass
+
+    if res is not None and (
+        getattr(res, "ipv6_mitigation_applied", False) or routes_were_on
+    ):
+        try:
+            applied.extend(rollback_ipv6_leak_mitigation(iface or "rpt0"))
+        except Exception:
+            pass
+        try:
+            res.ipv6_mitigation_applied = False
         except Exception:
             pass
 
@@ -335,9 +368,21 @@ def start_full_tunnel(
             routes_applied=False,
         )
 
+    ipv6_ok = False
+    try:
+        v6_cmds, ipv6_ok = apply_ipv6_leak_mitigation(iface)
+        applied.extend(v6_cmds)
+    except Exception:
+        ipv6_ok = False
+    msg = f"full tunnel active on {iface} ({tun_msg})"
+    if ipv6_ok:
+        msg += "; IPv6 ISP path blocked"
+    else:
+        msg += "; IPv6 leak mitigation incomplete"
+
     return LinuxTunnelResult(
         True,
-        f"full tunnel active on {iface} ({tun_msg})",
+        msg,
         applied_commands=applied,
         tun=tun,
         dataplane=plane,
@@ -346,4 +391,5 @@ def start_full_tunnel(
         plan=plan,
         server_host=server_host,
         iface=iface,
+        ipv6_mitigation_applied=ipv6_ok,
     )

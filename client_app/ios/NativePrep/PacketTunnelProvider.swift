@@ -51,6 +51,11 @@ class PacketTunnelProvider: NEPacketTunnelProvider {
         // Exclude RPT server host from tunnel to avoid recursive blackhole
         ipv4.excludedRoutes = [NEIPv4Route(destinationAddress: self.endpointHost, subnetMask: "255.255.255.255")]
         settings.ipv4Settings = ipv4
+        // IPv6: claim default IPv6 route into the tunnel so residual IPv6 is not
+        // left on the ISP path (may blackhole until node carries IPv6 — privacy first).
+        let ipv6 = NEIPv6Settings(addresses: ["fd00:7274::2"], networkPrefixLengths: [128 as NSNumber])
+        ipv6.includedRoutes = [NEIPv6Route.default()]
+        settings.ipv6Settings = ipv6
         // Node tunnel DNS (Unbound on 10.88.0.1) — not third-party public resolvers
         settings.dnsSettings = NEDNSSettings(servers: ["10.88.0.1"])
         settings.mtu = 1280

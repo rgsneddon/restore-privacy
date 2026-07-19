@@ -103,6 +103,7 @@ def plain_tunnel_status(
     vpn_ip: str | None = None,
     detail: str | None = None,
     residual_capture: bool | None = None,
+    ipv6_protected: bool | None = None,
 ) -> str:
     """Map machine state to a short string any user can understand.
 
@@ -110,6 +111,9 @@ def plain_tunnel_status(
 
     When ``residual_capture`` is False, do not claim residual public IP uses the VPN
     (session/queue-only is not product residual protection).
+
+    When residual capture is on but ``ipv6_protected`` is False, do not claim full
+    protection — IPv6 may still use the ISP path.
     """
     s = (state or "").strip().lower()
     if s == "connecting":
@@ -121,6 +125,16 @@ def plain_tunnel_status(
             if vpn_ip:
                 return f"Session only - residual IP still on ISP ({vpn_ip})"
             return "Session only - residual IP still on ISP"
+        # Residual IPv4 path active
+        if ipv6_protected is False:
+            if vpn_ip:
+                return f"Connected - IPv4 via VPN; IPv6 not protected ({vpn_ip})"
+            return "Connected - IPv4 via VPN; IPv6 not protected"
+        if ipv6_protected is True:
+            if vpn_ip:
+                return f"Connected - VPN active; IPv6 ISP path blocked ({vpn_ip})"
+            return "Connected - VPN active; IPv6 ISP path blocked"
+        # ipv6_protected unknown (legacy callers): keep prior residual wording
         if vpn_ip:
             return f"Connected - your traffic uses the VPN ({vpn_ip})"
         return STATUS_CONNECTED
