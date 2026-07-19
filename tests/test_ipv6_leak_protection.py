@@ -10,11 +10,14 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
 from client.full_tunnel import (  # noqa: E402
+    RPT_IPV6_DISABLED_PREFIX,
     android_vpn_builder_config,
     assert_full_tunnel_plan,
     build_full_tunnel_plan,
     linux_ipv6_leak_block_commands,
     linux_ipv6_leak_rollback_commands,
+    parse_windows_ipv6_disable_result,
+    windows_ipv6_disable_powershell,
     windows_ipv6_leak_block_commands,
     windows_ipv6_leak_rollback_commands,
 )
@@ -40,6 +43,34 @@ class TestIpv6LeakCommandBuilders(unittest.TestCase):
         self.assertIn("teredo", joined_b.lower())
         # Tunnel name excluded from disable
         self.assertIn("RPT", joined_b)
+        # Critical PS must not swallow disable failures
+        critical = windows_ipv6_disable_powershell(tunnel_iface="RPT")
+        self.assertIn("Disable-NetAdapterBinding", critical)
+        self.assertNotIn("SilentlyContinue", critical)
+        self.assertIn(RPT_IPV6_DISABLED_PREFIX, critical)
+        self.assertIn("exit 1", critical)
+        self.assertIn("Get-NetAdapterBinding", critical)
+
+    def test_parse_windows_ipv6_disable_zero_effect_not_ok(self):
+        """Zero disables (empty ForEach / all failed) must not pass even with exit 0."""
+        ok, n = parse_windows_ipv6_disable_result(0, f"{RPT_IPV6_DISABLED_PREFIX}0\n")
+        self.assertFalse(ok)
+        self.assertEqual(n, 0)
+        ok2, n2 = parse_windows_ipv6_disable_result(1, f"{RPT_IPV6_DISABLED_PREFIX}0\n")
+        self.assertFalse(ok2)
+        self.assertEqual(n2, 0)
+        # exit 0 without marker also fails
+        ok3, n3 = parse_windows_ipv6_disable_result(0, "")
+        self.assertFalse(ok3)
+        self.assertEqual(n3, 0)
+
+    def test_parse_windows_ipv6_disable_positive_count_ok(self):
+        ok, n = parse_windows_ipv6_disable_result(0, f"{RPT_IPV6_DISABLED_PREFIX}2\n")
+        self.assertTrue(ok)
+        self.assertEqual(n, 2)
+        # positive count but non-zero exit still fails (PS contract)
+        ok_bad, _ = parse_windows_ipv6_disable_result(1, f"{RPT_IPV6_DISABLED_PREFIX}3\n")
+        self.assertFalse(ok_bad)
 
     def test_linux_blackhole_and_rollback(self):
         block = linux_ipv6_leak_block_commands(iface="rpt0")
@@ -122,7 +153,7 @@ class TestWindowsResultIpv6Flag(unittest.TestCase):
             if "Disable-NetAdapterBinding" in str(cmd):
                 r.returncode = 1
                 r.stderr = "access denied"
-                r.stdout = ""
+                r.stdout = f"{RPT_IPV6_DISABLED_PREFIX}0\n"
             else:
                 r.returncode = 0
                 r.stderr = ""
@@ -132,6 +163,31 @@ class TestWindowsResultIpv6Flag(unittest.TestCase):
         with mock.patch("client.windows.tunnel_win.subprocess.run", side_effect=fake_run):
             applied, ok = tw.apply_ipv6_leak_mitigation(plan)
         self.assertFalse(ok)
+        self.assertFalse(any("Disable-NetAdapterBinding" in c for c in applied))
+
+    def test_apply_ipv6_ok_false_on_zero_effect_exit0(self):
+        """Silenced/zero-adapter path that still exits 0 must not claim protected."""
+        from unittest import mock
+
+        from client.full_tunnel import FullTunnelPlan
+        from client.windows import tunnel_win as tw
+
+        plan = FullTunnelPlan(tunnel_iface="RPT", tunnel_client_ip="10.88.0.2")
+
+        def fake_run(cmd, shell=True, capture_output=True, text=True):
+            r = mock.Mock()
+            r.returncode = 0
+            r.stderr = ""
+            if "Disable-NetAdapterBinding" in str(cmd):
+                # Mimic old SilentlyContinue zero-effect: exit 0, count 0
+                r.stdout = f"{RPT_IPV6_DISABLED_PREFIX}0\n"
+            else:
+                r.stdout = ""
+            return r
+
+        with mock.patch("client.windows.tunnel_win.subprocess.run", side_effect=fake_run):
+            applied, ok = tw.apply_ipv6_leak_mitigation(plan)
+        self.assertFalse(ok, "zero-effect must not set mitigation_ok")
         self.assertFalse(any("Disable-NetAdapterBinding" in c for c in applied))
 
     def test_apply_ipv6_ok_true_only_when_disable_succeeds(self):
@@ -146,7 +202,10 @@ class TestWindowsResultIpv6Flag(unittest.TestCase):
             r = mock.Mock()
             r.returncode = 0
             r.stderr = ""
-            r.stdout = ""
+            if "Disable-NetAdapterBinding" in str(cmd):
+                r.stdout = f"{RPT_IPV6_DISABLED_PREFIX}2\n"
+            else:
+                r.stdout = ""
             return r
 
         with mock.patch("client.windows.tunnel_win.subprocess.run", side_effect=fake_run):

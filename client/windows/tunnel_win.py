@@ -379,22 +379,40 @@ def _cmd_exit_ok(returncode: int, stderr: str, stdout: str) -> bool:
 def apply_ipv6_leak_mitigation(plan: FullTunnelPlan) -> tuple[list[str], bool]:
     """Run IPv6 ISP-block commands; return (successful_cmds, mitigation_ok).
 
-    ``mitigation_ok`` is True only when the **critical** Disable-NetAdapterBinding
-    PowerShell step succeeds. Transition tech (teredo/6to4/isatap) is best-effort
-    and does not alone count as residual IPv6 protection. Failed commands are
-    **not** treated as success even if listed as attempted.
+    ``mitigation_ok`` is True only when the **critical** verified PowerShell
+    disable reports ``RPT_IPV6_DISABLED>=1`` and exit 0 (see
+    ``parse_windows_ipv6_disable_result``). Zero-effect runs (SilentlyContinue /
+    empty ForEach / all disables failed) yield ``ok=False`` even if process
+    exit were 0 without a positive count. Transition tech is best-effort only.
     """
+    from client.full_tunnel import (
+        parse_windows_ipv6_disable_result,
+        windows_ipv6_disable_powershell,
+    )
+
     cmds = windows_ipv6_leak_block_commands(tunnel_iface=plan.tunnel_iface or "RPT")
+    critical_ps = windows_ipv6_disable_powershell(
+        tunnel_iface=plan.tunnel_iface or "RPT"
+    )
     successful: list[str] = []
     critical_ok = False
     for cmd in cmds:
         r = subprocess.run(cmd, shell=True, capture_output=True, text=True)
+        is_critical = cmd.strip() == critical_ps.strip() or (
+            "Disable-NetAdapterBinding" in cmd and "RPT_IPV6_DISABLED" in cmd
+        )
+        if is_critical:
+            ok, _count = parse_windows_ipv6_disable_result(
+                r.returncode, r.stdout or "", r.stderr or ""
+            )
+            if ok:
+                successful.append(cmd)
+                critical_ok = True
+            # failed critical: do not append as success, leave critical_ok False
+            continue
         if not _cmd_exit_ok(r.returncode, r.stderr or "", r.stdout or ""):
-            # Do not claim success for failed disables
             continue
         successful.append(cmd)
-        if "Disable-NetAdapterBinding" in cmd:
-            critical_ok = True
     return successful, critical_ok
 
 

@@ -213,28 +213,78 @@ def routes_would_blackhole_without_if_index(
     return apply_default_routes and (if_index is None or int(if_index) <= 0)
 
 
+# Marker emitted by the critical PowerShell IPv6-disable step (parsed by apply path).
+RPT_IPV6_DISABLED_PREFIX = "RPT_IPV6_DISABLED="
+
+
+def windows_ipv6_disable_powershell(*, tunnel_iface: str = "RPT") -> str:
+    """Critical PowerShell: disable ms_tcpip6 on non-tunnel adapters and verify.
+
+    - Does **not** use ``-ErrorAction SilentlyContinue`` on Disable-NetAdapterBinding
+      (that would exit 0 with zero effect).
+    - Prints ``RPT_IPV6_DISABLED=<n>`` where n is adapters verified disabled.
+    - Exits **1** when n==0 (no adapter protected) so callers cannot claim success.
+    """
+    tun = (tunnel_iface or "RPT").replace("'", "''")
+    # Keep as one -Command string; single-quoted PS blocks avoid shell expansion.
+    return (
+        "powershell -NoProfile -ExecutionPolicy Bypass -Command \""
+        f"$tun='{tun}'; "
+        "$disabled=0; "
+        "$adapters=@(Get-NetAdapter -ErrorAction Stop | "
+        "Where-Object { $_.Status -eq 'Up' -and $_.Name -ne $tun }); "
+        "foreach ($a in $adapters) { "
+        "  try { "
+        "    Disable-NetAdapterBinding -Name $a.Name -ComponentID ms_tcpip6 "
+        "      -Confirm:$false -ErrorAction Stop; "
+        "    $b=Get-NetAdapterBinding -Name $a.Name -ComponentID ms_tcpip6 "
+        "      -ErrorAction Stop; "
+        "    if (-not $b.Enabled) { $disabled++ } "
+        "  } catch { } "
+        "}; "
+        f"Write-Output ('{RPT_IPV6_DISABLED_PREFIX}' + $disabled); "
+        "if ($disabled -lt 1) { exit 1 } else { exit 0 }"
+        "\""
+    )
+
+
+def parse_windows_ipv6_disable_result(
+    returncode: int,
+    stdout: str,
+    stderr: str = "",
+) -> tuple[bool, int]:
+    """Interpret critical PS IPv6-disable process result.
+
+    Returns ``(mitigation_ok, disabled_count)``.
+    ``mitigation_ok`` is True only when exit code is 0 **and**
+    ``RPT_IPV6_DISABLED`` reports a positive count (zero-effect cannot pass).
+    """
+    _ = stderr
+    text = stdout or ""
+    count = 0
+    for line in text.splitlines():
+        line = line.strip()
+        if line.startswith(RPT_IPV6_DISABLED_PREFIX):
+            try:
+                count = int(line[len(RPT_IPV6_DISABLED_PREFIX) :].strip())
+            except ValueError:
+                count = 0
+            break
+    ok = (returncode == 0) and (count >= 1)
+    return ok, count
+
+
 def windows_ipv6_leak_block_commands(*, tunnel_iface: str = "RPT") -> list[str]:
     """Commands to stop residual IPv6 using the ISP while full tunnel is up.
 
-    Disables the IPv6 stack binding on every *up* adapter except the tunnel NIC.
-    Symmetric rollback re-enables ``ms_tcpip6`` on adapters (see rollback helper).
+    Transition tech is best-effort; the last command is the **critical** verified
+    Disable-NetAdapterBinding step (see ``windows_ipv6_disable_powershell``).
     """
-    tun = (tunnel_iface or "RPT").replace("'", "''")
-    # Single PowerShell invocation — testable as a pure string list.
-    ps = (
-        f"$tun='{tun}'; "
-        "Get-NetAdapter -ErrorAction SilentlyContinue | "
-        "Where-Object { $_.Status -eq 'Up' -and $_.Name -ne $tun } | "
-        "ForEach-Object { "
-        "Disable-NetAdapterBinding -Name $_.Name -ComponentID ms_tcpip6 "
-        "-Confirm:$false -ErrorAction SilentlyContinue "
-        "}"
-    )
     return [
         "netsh interface teredo set state disabled",
         "netsh interface 6to4 set state state=disabled",
         "netsh interface isatap set state disabled",
-        f'powershell -NoProfile -ExecutionPolicy Bypass -Command "{ps}"',
+        windows_ipv6_disable_powershell(tunnel_iface=tunnel_iface),
     ]
 
 
