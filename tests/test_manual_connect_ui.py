@@ -79,7 +79,8 @@ class TestManualControlPolicy(unittest.TestCase):
         tunnel = mock.Mock()
         with mock.patch("client.windows.app.stop_full_tunnel") as stop:
             disconnect_full_tunnel(tunnel, client)
-            stop.assert_called_once_with(tunnel, client)
+            stop.assert_called_once()
+            self.assertEqual(stop.call_args[0][:2], (tunnel, client))
 
     def test_disconnect_handler_wired_in_source(self):
         src = (ROOT / "client" / "windows" / "app.py").read_text(encoding="utf-8")

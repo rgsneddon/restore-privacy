@@ -241,12 +241,17 @@ def stop_full_tunnel(
     if_index: Optional[int] = None,
     *,
     disconnect_session: bool = True,
+    preserve_message: bool = False,
 ) -> list[str]:
     """Idempotent full teardown: routes → dataplane → TUN → RPT session.
 
     Order restores the physical path first (delete dual /1 + server pin), then
     stops the DATA plane and closes Wintun so the machine reverts to the real
     device IP path. Safe when already stopped or never connected.
+
+    When ``preserve_message`` is True (cleanup after a failed Connect attach),
+    do not overwrite ``result.message`` with the teardown success string so the
+    original attach failure can still be shown to the user.
     """
     applied: list[str] = []
     res = result
@@ -298,7 +303,8 @@ def stop_full_tunnel(
         res.routes_applied = False
         res.dataplane = None
         res.tun = None
-        res.message = "tunnel stopped — full teardown complete"
+        if not preserve_message:
+            res.message = "tunnel stopped — full teardown complete"
 
     return applied
 

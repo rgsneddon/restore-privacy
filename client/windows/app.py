@@ -59,16 +59,35 @@ from client.windows.elevate import (
 from client.windows.tunnel_win import start_full_tunnel, stop_full_tunnel
 
 
-def disconnect_full_tunnel(tunnel, client) -> None:
-    """Idempotent full stop — used only by Disconnect (not window close)."""
+def disconnect_full_tunnel(
+    tunnel, client, *, preserve_message: bool = False
+) -> None:
+    """Idempotent full stop — Disconnect button, or cleanup after failed attach.
+
+    Set ``preserve_message=True`` when cleaning up a failed Connect so
+    ``tunnel.message`` is not replaced with the teardown success string.
+    """
     try:
-        stop_full_tunnel(tunnel, client)
+        stop_full_tunnel(tunnel, client, preserve_message=preserve_message)
     except Exception:
         try:
             if client is not None:
                 client.disconnect()
         except Exception:
             pass
+
+
+def attach_failure_user_message(original: str | None) -> str:
+    """User-facing error after a failed tunnel attach (before/after cleanup).
+
+    ``stop_full_tunnel`` rewrites ``result.message`` to a teardown success string;
+    Connect must not show that as the reason attach failed.
+    """
+    msg = (original or "").strip() or "Tunnel setup failed"
+    low = msg.lower()
+    if "full teardown complete" in low or low.startswith("tunnel stopped"):
+        return "Tunnel setup failed"
+    return msg
 
 
 def auto_connect_on_launch_enabled() -> bool:
@@ -435,13 +454,18 @@ class TunnelClientApp:
                         self._set_status("connected", vpn_ip=vpn_ip)
                         self._apply_control(connected=True, busy=False)
                     else:
+                        # Capture attach failure BEFORE teardown overwrites tun_res.message
+                        original_err = getattr(tun_res, "message", None)
                         try:
-                            disconnect_full_tunnel(tun_res, self.client)
+                            disconnect_full_tunnel(
+                                tun_res, self.client, preserve_message=True
+                            )
                         except Exception:
                             pass
                         self._tunnel = None
-                        err = tun_res.message or "Tunnel setup failed"
-                        self._log(f"Tunnel setup failed: {err[:120]}")
+                        # Never surface teardown success as the Connect failure reason
+                        err = attach_failure_user_message(original_err)
+                        self._log(f"Could not connect: {err[:160]}")
                         self._set_status("error", detail=err)
                         self._apply_control(connected=False, busy=False)
                 finally:
