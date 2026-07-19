@@ -167,7 +167,7 @@ Severity scale: **High** (likely security/privacy break or secret exposure) · *
 |--------|--------|
 | **Passed** | **155** |
 | **Failed** | **0** |
-| **Log** | `%TEMP%\reaudit_supporting_20260719_150611.log` (this host) |
+| **Log** | Goal SCRATCH `audit_refresh_supporting_tests.log` (155 OK); companion `audit_refresh_presence.log` / `audit_refresh_coverage.log` |
 
 Interpretation: documentation-string checks for shared-key / §3.2 remain green. Packaging, residual honesty, status minimization, and Apple honesty tests remain green. Count is higher than the prior refresh (97) because this pass includes additional related modules (UK gate, status minimal, README/sundries, Windows secrets, non-admin Connect).
 
