@@ -6,6 +6,10 @@ client app. Public users should follow README.md only.
 Contents moved from the public-facing README (ports, status-page hosting,
 node deploy, developer client-app notes, local tests, secrets).
 
+Current product catalog / client package version: 0.1.8
+(see client/VERSION and status_page/downloads.py RELEASE_VERSION).
+
+
 SECRETS / RELEASE GATES (mandatory)
 -----------------------------------
   - Never commit or force-add secrets/ (gitignored). Do not `git add -f secrets/`.
@@ -54,6 +58,10 @@ SECRETS / RELEASE GATES (mandatory)
     pip install paramiko cryptography
     python scripts/deploy_rpt_node.py
 
+  Note: scripts/deploy_rpt_node.py authenticates with RPT_SSH_PASSWORD only
+  (look_for_keys=False). For interactive admin SSH to a new VPS, use a normal
+  OpenSSH key in authorized_keys; that path is separate from the deploy script.
+
   Or on the server after copying node/ to /opt/restore-privacy/node:
 
     bash /opt/restore-privacy/node/install.sh
@@ -71,7 +79,20 @@ SECRETS / RELEASE GATES (mandatory)
   Windows client (source):
     pip install -r requirements.txt
     python -m client.windows
-    # Run as Administrator for full system VPN (Wintun)
+    # Run as Administrator for full system VPN (Wintun residual IP)
+
+  Linux client (source — Ubuntu 20.04+ / Mint and similar):
+    pip install -r requirements.txt
+    # product residual path needs root + host TUN/`ip` (crypto alone is not enough)
+    sudo python -m client.linux
+    # residual public IP only when full tunnel succeeds (require_system_capture);
+    # non-root runs fail honestly rather than claiming Connected.
+
+  End-user Linux install package (baked manylinux cryptography wheels):
+    python scripts/package_linux.py
+    # produces restore-privacy-client-*-linux-x64.tar.gz under releases/
+    # see README for install.sh / bin/privacy-restored; re-run package_linux on
+    # every tag so CPython 3.8–3.12 wheels stay current.
 
   Android / Flutter:
     cd client_app
@@ -82,22 +103,45 @@ SECRETS / RELEASE GATES (mandatory)
   iOS / macOS (build on a Mac):
     client_app/ios/BUILD_ON_MAC.md
     client_app/macos/BUILD_ON_MAC.md
+    # Residual IP requires signed Packet Tunnel / Network Extension; prep zips
+    # alone are Mac-side work (see README Apple section).
 
   Layout:
-    client/       — shared connect path + Windows retro UI
+    client/       — shared connect path + Windows / Linux native UIs
     client_app/   — Flutter multi-platform scaffolds
     node/         — server node
     status_page/  — public status + downloads
     scripts/      — deploy / release helpers
 
 
-5. LOCAL TESTS (developers)
+5. RELEASE PACKAGING (operators cutting a tag)
+---------------------------------------------
+  Process notes: scripts/RELEASE.md
+
+  Use the **current tag** recipe only (today: scripts/build_release_0.1.8.py
+  for v0.1.8). Historical scripts/build_release_0.*.py files are archives —
+  for a new version, copy the latest script and bump VERSION / PRIOR_TAG /
+  status_page/downloads.py catalog.
+
+  Every release must keep:
+    - _assert_no_priv (or equivalent) on release output
+    - inject/provision of node_elgamal.pub only — never node_elgamal.priv
+    - never force-add secrets/ to git
+    - re-run python scripts/package_linux.py (also wired in build_release_0.1.8.py)
+
+  Short cut example:
+
+    python scripts/build_release_0.1.8.py
+    # then gh release create <tag> with assets under releases/
+
+
+6. LOCAL TESTS (developers)
 ---------------------------
     pip install -r requirements.txt
     python -m unittest discover -s tests -v
 
 
-6. SECRETS (operators — never commit private keys)
+7. SECRETS (operators — never commit private keys)
 --------------------------------------------------
   Public installers do NOT ship private admission keys.
 
@@ -110,10 +154,13 @@ SECRETS / RELEASE GATES (mandatory)
   will not admit the client. Treat private keys as credentials.
 
   Never put root passwords or *.priv files in git or public release zips.
+  SSH login keys for the VPS live under the operator machine ~/.ssh/ — they
+  are not RPT secrets/ and must not be mixed into release packages.
 
 
-7. RELATED LEGAL DOCS
+8. RELATED LEGAL DOCS
 ---------------------
   PRIVACY_POLICY.md  — full privacy policy
   LICENSE            — MIT for original project code
   CREDITS.md         — third-party attributions (Wintun, cryptography, etc.)
+  audit.md           — static code/policy audit record (operators/reviewers)
