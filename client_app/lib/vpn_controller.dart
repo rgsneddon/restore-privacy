@@ -11,7 +11,7 @@ class VpnController {
 
   VpnController({required this.onStatus});
 
-  /// Product policy: never auto-connect on launch (manual Connect only).
+  /// Compile-time default is off; runtime Settings may enable autoconnect.
   static bool get autoConnectOnLaunchEnabled => RptConfig.autoConnectOnLaunch;
 
   /// Deprecated name kept for older call sites — always delegates to [connect]

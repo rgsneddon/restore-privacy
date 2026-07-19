@@ -73,12 +73,12 @@ class TestWindowedLaunch(unittest.TestCase):
         # Must not raise; True/False depends on whether a console is attached
         self.assertIsInstance(free_console_if_attached(), bool)
 
-    def test_app_no_auto_connect(self):
+    def test_app_default_no_auto_connect(self):
         from client.windows.app import auto_connect_on_launch_enabled
 
         self.assertFalse(auto_connect_on_launch_enabled())
         app = (ROOT / "client" / "windows" / "app.py").read_text(encoding="utf-8")
-        self.assertNotIn("_auto_connect", app)
+        self.assertNotIn("def _auto_connect", app)
         self.assertIn("free_console_if_attached", app)
 
 

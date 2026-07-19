@@ -2,6 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import 'connect_status.dart';
+import 'prefs_backend.dart';
+import 'settings_screen.dart';
+import 'settings_store.dart';
 import 'theme.dart';
 import 'vpn_controller.dart';
 
@@ -44,12 +47,15 @@ class RestorePrivacyApp extends StatelessWidget {
   }
 }
 
-/// Windows-aligned product shell: logo, status card, Connect/Disconnect.
+/// Windows-aligned product shell: logo, status card, Connect/Disconnect, Settings.
 ///
 /// Minimize / background does **not** stop the tunnel — only Disconnect does.
-/// On resume, session status is rehydrated from the native VPN service.
+/// Autoconnect on launch is opt-in via Settings (defaults off).
 class TunnelHome extends StatefulWidget {
-  const TunnelHome({super.key});
+  const TunnelHome({super.key, this.settingsStore});
+
+  /// Injectable store for tests; production loads SharedPreferences.
+  final SettingsStore? settingsStore;
 
   @override
   State<TunnelHome> createState() => _TunnelHomeState();
@@ -57,36 +63,87 @@ class TunnelHome extends StatefulWidget {
 
 class _TunnelHomeState extends State<TunnelHome> with WidgetsBindingObserver {
   late final VpnController _vpn;
+  SettingsStore? _store;
+  ProductSettings _settings = ProductSettings.defaults;
   final List<String> _log = [];
   final ScrollController _logScroll = ScrollController();
   String _status = 'Not connected. Press Connect when you want protection.';
   String? _vpnIp;
   bool _connected = false;
   bool _busy = false;
+  bool _autoconnectAttempted = false;
 
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     _vpn = VpnController(onStatus: _onStatus);
-    WidgetsBinding.instance.addPostFrameCallback((_) {
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      await _initSettings();
+      if (!mounted) return;
       _append(kAppTitle);
       _append(kScrollingPrivacyText);
-      _append('Manual only — Connect starts, Disconnect stops.');
-      _append(
-        'Minimize keeps the VPN running. Use Disconnect to stop the tunnel.',
-      );
-      // Never auto-connect on launch (product policy).
-      assert(!VpnController.autoConnectOnLaunchEnabled);
-      _rehydrateSession(from: 'launch');
+      _append('Connect starts, Disconnect stops. Minimize keeps the VPN running.');
+      await _rehydrateSession(from: 'launch');
+      await _maybeAutoconnect();
     });
+  }
+
+  Future<void> _initSettings() async {
+    if (widget.settingsStore != null) {
+      _store = widget.settingsStore;
+    } else {
+      try {
+        final backend = await SharedPreferencesBackend.create();
+        _store = SettingsStore(backend);
+      } catch (_) {
+        _store = SettingsStore(MemorySettingsBackend());
+      }
+    }
+    final loaded = await _store!.load();
+    if (!mounted) return;
+    setState(() => _settings = loaded);
+  }
+
+  Future<void> _maybeAutoconnect() async {
+    if (_autoconnectAttempted) return;
+    _autoconnectAttempted = true;
+    final store = _store;
+    if (store == null) return;
+    final s = await store.load();
+    if (!store.shouldAutoconnectOnLaunch(s)) return;
+    if (_connected || _busy) return;
+    _append('Settings: autoconnect on launch — starting Connect…');
+    await _onToggleConnectOnly();
+  }
+
+  Future<void> _onToggleConnectOnly() async {
+    // Connect path only (used by autoconnect)
+    if (_busy || _connected) return;
+    setState(() => _busy = true);
+    try {
+      _append('Connect — starting RPT full tunnel…');
+      final ok = await _vpn.connect();
+      if (!mounted) return;
+      setState(() {
+        _connected = ok;
+        if (ok) {
+          final ipMatch = RegExp(r'10\.\d+\.\d+\.\d+').firstMatch(_status);
+          _vpnIp = ipMatch?.group(0);
+          _status = plainConnectedStatus(vpnIp: _vpnIp, residual: true);
+        }
+      });
+      if (ok) {
+        _append('Connected — residual traffic uses the VPN node.');
+      }
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
   }
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    // Product policy: never stop tunnel on pause/inactive/detached/hidden.
     if (shouldStopTunnelOnAppLifecycle(state.name)) {
-      // Unreachable with current policy (always false) — kept for contract.
       return;
     }
     if (state == AppLifecycleState.resumed) {
@@ -103,7 +160,6 @@ class _TunnelHomeState extends State<TunnelHome> with WidgetsBindingObserver {
       if (snap.connected) {
         _status = plainConnectedStatus(vpnIp: snap.vpnIp, residual: true);
       } else if (from == 'resume' && !_busy) {
-        // Keep last status unless we know we are down
         if (_status.toLowerCase().contains('connected') && !snap.connected) {
           _status = 'Not connected. Press Connect when you want protection.';
         }
@@ -138,9 +194,9 @@ class _TunnelHomeState extends State<TunnelHome> with WidgetsBindingObserver {
 
   Future<void> _onToggle() async {
     if (_busy) return;
-    setState(() => _busy = true);
-    try {
-      if (_connected) {
+    if (_connected) {
+      setState(() => _busy = true);
+      try {
         _append('Disconnect — tearing down tunnel…');
         await _vpn.disconnect();
         if (!mounted) return;
@@ -150,31 +206,38 @@ class _TunnelHomeState extends State<TunnelHome> with WidgetsBindingObserver {
           _status = 'Disconnected. Press Connect when you want protection.';
         });
         _append('Disconnected.');
-      } else {
-        _append('Connect — starting RPT full tunnel…');
-        final ok = await _vpn.connect();
-        if (!mounted) return;
-        setState(() {
-          _connected = ok;
-          if (ok) {
-            // Prefer message already set by controller; refine card title
-            final ipMatch = RegExp(r'10\.\d+\.\d+\.\d+').firstMatch(_status);
-            _vpnIp = ipMatch?.group(0);
-            _status = plainConnectedStatus(vpnIp: _vpnIp, residual: true);
-          }
-        });
-        if (ok) {
-          _append('Connected — residual traffic uses the VPN node.');
-        }
+      } finally {
+        if (mounted) setState(() => _busy = false);
       }
-    } finally {
-      if (mounted) setState(() => _busy = false);
+    } else {
+      await _onToggleConnectOnly();
+    }
+  }
+
+  Future<void> _openSettings() async {
+    final store = _store;
+    if (store == null) return;
+    final updated = await Navigator.of(context).push<ProductSettings>(
+      MaterialPageRoute(
+        builder: (_) => SettingsScreen(
+          store: store,
+          initial: _settings,
+          onChanged: (s) {
+            if (mounted) setState(() => _settings = s);
+          },
+        ),
+      ),
+    );
+    if (updated != null && mounted) {
+      setState(() => _settings = updated);
+    } else if (mounted) {
+      final s = await store.load();
+      setState(() => _settings = s);
     }
   }
 
   @override
   void dispose() {
-    // Widget teardown only — must NOT call disconnect (tunnel stays up).
     WidgetsBinding.instance.removeObserver(this);
     _logScroll.dispose();
     super.dispose();
@@ -196,7 +259,6 @@ class _TunnelHomeState extends State<TunnelHome> with WidgetsBindingObserver {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              // Header: logo + title (Windows-aligned)
               Row(
                 children: [
                   ClipRRect(
@@ -246,10 +308,14 @@ class _TunnelHomeState extends State<TunnelHome> with WidgetsBindingObserver {
                       ],
                     ),
                   ),
+                  IconButton(
+                    tooltip: 'Settings',
+                    onPressed: _openSettings,
+                    icon: const Icon(Icons.settings, color: kPrimaryDark),
+                  ),
                 ],
               ),
               const SizedBox(height: 14),
-              // Status card (plain language)
               Container(
                 decoration: BoxDecoration(
                   color: kPanelBg,
@@ -282,7 +348,6 @@ class _TunnelHomeState extends State<TunnelHome> with WidgetsBindingObserver {
                 ),
               ),
               const SizedBox(height: 12),
-              // Activity log
               Expanded(
                 child: Container(
                   decoration: BoxDecoration(
@@ -306,7 +371,6 @@ class _TunnelHomeState extends State<TunnelHome> with WidgetsBindingObserver {
                 ),
               ),
               const SizedBox(height: 14),
-              // Primary Connect / Disconnect
               SizedBox(
                 height: 52,
                 child: ElevatedButton(
@@ -327,9 +391,11 @@ class _TunnelHomeState extends State<TunnelHome> with WidgetsBindingObserver {
                 ),
               ),
               const SizedBox(height: 8),
-              const Text(
-                'Manual only — Connect starts, Disconnect stops. Minimize keeps the VPN alive.',
-                style: TextStyle(
+              Text(
+                _settings.autoconnectOnLaunch
+                    ? 'Autoconnect on launch is ON (Settings). Minimize keeps VPN alive.'
+                    : 'Manual Connect, or enable seamless power-up in Settings ⚙',
+                style: const TextStyle(
                   color: kTextMuted,
                   fontSize: 11,
                 ),
@@ -342,5 +408,4 @@ class _TunnelHomeState extends State<TunnelHome> with WidgetsBindingObserver {
   }
 }
 
-/// Back-compat alias used by older tests / docs.
 typedef RetroTunnelHome = TunnelHome;

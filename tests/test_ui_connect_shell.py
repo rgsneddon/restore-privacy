@@ -98,7 +98,7 @@ class TestUiShell(unittest.TestCase):
         self.assertIn("_on_toggle_connect", src)
         self.assertIn("resolve_logo_png", src)
         self.assertIn("tk.Button", src)
-        self.assertNotIn("_auto_connect", src)
+        self.assertNotIn("def _auto_connect", src)
 
     def test_flutter_shell_structure(self):
         main = (ROOT / "client_app" / "lib" / "main.dart").read_text(encoding="utf-8")

@@ -56,6 +56,13 @@ from client.windows.elevate import (
     is_admin,
     should_exit_after_elevation,
 )
+from client.windows.settings_store import (
+    ProductSettings,
+    apply_run_at_startup,
+    load_settings,
+    save_settings,
+    should_autoconnect_on_launch,
+)
 from client.windows.tray_win import (
     TRAY_DISPLAY_NAME,
     WindowsSystemTray,
@@ -100,8 +107,8 @@ def attach_failure_user_message(original: str | None) -> str:
 
 
 def auto_connect_on_launch_enabled() -> bool:
-    """Product policy: never auto-connect."""
-    return False
+    """True when user enabled autoconnect in Settings (default off)."""
+    return should_autoconnect_on_launch()
 
 
 def close_disconnects_tunnel() -> bool:
@@ -242,6 +249,24 @@ class TunnelClientApp:
             font=("Segoe UI", 9),
             anchor="w",
         ).pack(fill=tk.X)
+
+        # Settings cog (gear)
+        self.settings_btn = tk.Button(
+            self.header,
+            text="⚙",
+            command=self._open_settings,
+            bg=CHROME_BG,
+            fg=PRIMARY_DARK,
+            activebackground=LIGHT_ACCENT,
+            activeforeground=PRIMARY_DARK,
+            relief=tk.FLAT,
+            font=("Segoe UI", 16),
+            cursor="hand2",
+            bd=0,
+            padx=8,
+        )
+        self.settings_btn.pack(side=tk.RIGHT)
+        self._settings = load_settings()
 
         # --- Upgrade banner (only if behind catalog) ---
         self.upgrade_frame = tk.Frame(
@@ -636,6 +661,165 @@ class TunnelClientApp:
         except Exception as exc:
             self._log(f"Could not open browser: {exc}. Visit: {url}")
 
+    def _open_settings(self) -> None:
+        """Settings surface: run-at-startup + autoconnect-on-launch switches."""
+        win = tk.Toplevel(self.root)
+        win.title("Settings")
+        win.configure(bg=CHROME_BG)
+        win.geometry("420x280")
+        win.transient(self.root)
+        try:
+            win.grab_set()
+        except Exception:
+            pass
+
+        cur = load_settings()
+        self._settings = cur
+        run_var = tk.BooleanVar(value=cur.run_at_startup)
+        auto_var = tk.BooleanVar(value=cur.autoconnect_on_launch)
+        note_var = tk.StringVar(value="")
+
+        pad = tk.Frame(win, bg=CHROME_BG, padx=16, pady=14)
+        pad.pack(fill=tk.BOTH, expand=True)
+
+        tk.Label(
+            pad,
+            text="Settings",
+            bg=CHROME_BG,
+            fg=PRIMARY_DARK,
+            font=("Segoe UI", 14, "bold"),
+            anchor="w",
+        ).pack(fill=tk.X, pady=(0, 10))
+
+        card = tk.Frame(
+            pad,
+            bg=PANEL_BG,
+            highlightbackground=BORDER,
+            highlightthickness=1,
+            padx=12,
+            pady=10,
+        )
+        card.pack(fill=tk.X)
+
+        def _row(parent, text, sub, var, on_toggle) -> None:
+            row = tk.Frame(parent, bg=PANEL_BG)
+            row.pack(fill=tk.X, pady=6)
+            col = tk.Frame(row, bg=PANEL_BG)
+            col.pack(side=tk.LEFT, fill=tk.X, expand=True)
+            tk.Label(
+                col,
+                text=text,
+                bg=PANEL_BG,
+                fg=TEXT,
+                font=("Segoe UI", 10, "bold"),
+                anchor="w",
+            ).pack(fill=tk.X)
+            tk.Label(
+                col,
+                text=sub,
+                bg=PANEL_BG,
+                fg=TEXT_MUTED,
+                font=("Segoe UI", 8),
+                anchor="w",
+                wraplength=280,
+                justify=tk.LEFT,
+            ).pack(fill=tk.X)
+            # Switch-style checkbutton (slider-like on/off)
+            sw = tk.Checkbutton(
+                row,
+                variable=var,
+                command=on_toggle,
+                bg=PANEL_BG,
+                activebackground=PANEL_BG,
+                onvalue=True,
+                offvalue=False,
+                indicatoron=True,
+                selectcolor=PRIMARY,
+                fg=PRIMARY_DARK,
+            )
+            sw.pack(side=tk.RIGHT, padx=(8, 0))
+
+        def _save_run() -> None:
+            s = ProductSettings(
+                run_at_startup=bool(run_var.get()),
+                autoconnect_on_launch=bool(auto_var.get()),
+            )
+            save_settings(s)
+            self._settings = s
+            st = apply_run_at_startup(s.run_at_startup)
+            if s.run_at_startup:
+                note_var.set(
+                    f"Run at startup: {st}. App will open at sign-in when enabled."
+                )
+            else:
+                note_var.set(f"Run at startup: {st}.")
+            self._log(f"Settings: run_at_startup={s.run_at_startup} ({st})")
+
+        def _save_auto() -> None:
+            s = ProductSettings(
+                run_at_startup=bool(run_var.get()),
+                autoconnect_on_launch=bool(auto_var.get()),
+            )
+            save_settings(s)
+            self._settings = s
+            if s.autoconnect_on_launch:
+                note_var.set("Autoconnect on launch ON — next cold start will Connect.")
+            else:
+                note_var.set("Autoconnect on launch OFF — Connect is manual.")
+            self._log(f"Settings: autoconnect_on_launch={s.autoconnect_on_launch}")
+
+        _row(
+            card,
+            "Run at device startup",
+            "Start Privacy Restored when you sign in to Windows",
+            run_var,
+            _save_run,
+        )
+        tk.Frame(card, bg=BORDER, height=1).pack(fill=tk.X, pady=4)
+        _row(
+            card,
+            "Autoconnect on launch",
+            "When the app opens, start Connect automatically",
+            auto_var,
+            _save_auto,
+        )
+
+        tk.Label(
+            pad,
+            textvariable=note_var,
+            bg=CHROME_BG,
+            fg=PRIMARY_DARK,
+            font=("Segoe UI", 8),
+            anchor="w",
+            wraplength=380,
+            justify=tk.LEFT,
+        ).pack(fill=tk.X, pady=(12, 0))
+
+        tk.Label(
+            pad,
+            text="Both default off. Seamless power-up needs both on. "
+            "Administrator / UAC may still be required for full tunnel.",
+            bg=CHROME_BG,
+            fg=TEXT_MUTED,
+            font=("Segoe UI", 8),
+            anchor="w",
+            wraplength=380,
+            justify=tk.LEFT,
+        ).pack(fill=tk.X, pady=(8, 0))
+
+        tk.Button(
+            pad,
+            text="Close",
+            command=win.destroy,
+            bg=PRIMARY,
+            fg=WHITE,
+            relief=tk.FLAT,
+            font=("Segoe UI", 9, "bold"),
+            padx=14,
+            pady=6,
+            cursor="hand2",
+        ).pack(anchor="e", pady=(14, 0))
+
     def _on_close_ui_only(self) -> None:
         """Hide UI; keep process + tunnel alive (tray / taskbar). Disconnect is separate.
 
@@ -762,14 +946,12 @@ def main() -> int:
             ),
         )
 
-    # Cold launch never auto-connects. Only resume when user already pressed Connect
-    # and UAC re-launched with --rpt-auto-connect.
-    assert not auto_connect_on_launch_enabled()
+    # Cold launch: optional user autoconnect (Settings); resume after UAC Connect.
     assert non_admin_connect_allowed()
     if resume_after_elevate and is_admin():
 
         def _resume_user_connect() -> None:
-            # Not cold auto-connect: user already pressed Connect before UAC.
+            # User already pressed Connect before UAC (or residual elevate).
             app._log("Resuming Connect after elevation…")
             app._start_connect()
 
@@ -782,6 +964,13 @@ def main() -> int:
                 "press Connect again and approve UAC."
             ),
         )
+    elif should_autoconnect_on_launch() and not resume_after_elevate:
+
+        def _settings_autoconnect() -> None:
+            app._log("Settings: autoconnect on launch — starting Connect…")
+            app._start_connect()
+
+        app.root.after(450, _settings_autoconnect)
 
     app.run()
     return 0

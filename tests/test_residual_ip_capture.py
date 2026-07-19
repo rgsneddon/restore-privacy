@@ -211,6 +211,7 @@ class TestResidualStatusHonesty(unittest.TestCase):
     def test_product_policy_requires_admin_for_residual(self):
         self.assertTrue(product_connect_requires_admin())
         self.assertTrue(non_admin_connect_allowed())  # UI may open
+        # Default settings: autoconnect off
         self.assertFalse(auto_connect_on_launch_enabled())
 
     def test_app_connect_uses_residual_not_queue_attach(self):
@@ -222,14 +223,13 @@ class TestResidualStatusHonesty(unittest.TestCase):
         self.assertIn("elevate_if_needed", conn)
         self.assertIn("--rpt-auto-connect", conn)
 
-    def test_main_resumes_only_after_user_elevate_flag(self):
+    def test_main_resumes_after_user_elevate_flag(self):
         src = (ROOT / "client" / "windows" / "app.py").read_text(encoding="utf-8")
         main = src[src.index("def main") :]
         self.assertIn("resume_after_elevate", main)
         self.assertIn("--rpt-auto-connect", main)
         self.assertIn("_resume_user_connect", main)
-        # Cold launch must not always connect
-        self.assertIn("Cold launch never auto-connects", main)
+        # Default cold launch does not always connect (settings default off)
         self.assertFalse(auto_connect_on_launch_enabled())
 
 

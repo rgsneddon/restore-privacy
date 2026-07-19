@@ -87,6 +87,16 @@ class MainActivity : FlutterActivity() {
                     "hasSecrets" -> {
                         result.success(mapOf("ok" to secretsPresent()))
                     }
+                    "setRunAtStartup" -> {
+                        val enabled = call.argument<Boolean>("enabled") ?: false
+                        val status = StartupPrefs.setRunAtStartup(this, enabled)
+                        result.success(
+                            mapOf(
+                                "ok" to status.startsWith("enabled") || status == "disabled",
+                                "message" to status,
+                            ),
+                        )
+                    }
                     else -> result.notImplemented()
                 }
             }

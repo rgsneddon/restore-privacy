@@ -32,24 +32,24 @@ from client.windows.app import (  # noqa: E402
 
 class TestManualControlPolicy(unittest.TestCase):
     def test_no_auto_connect_policy(self):
+        # Default settings: autoconnect off (opt-in via Settings)
         self.assertFalse(auto_connect_on_launch_enabled())
 
     def test_close_does_not_disconnect_policy(self):
         self.assertFalse(close_disconnects_tunnel())
 
-    def test_app_source_no_auto_connect(self):
+    def test_app_source_manual_default_optional_autoconnect(self):
         src = (ROOT / "client" / "windows" / "app.py").read_text(encoding="utf-8")
-        self.assertNotIn("_auto_connect", src)
-        self.assertNotIn("auto_connect_on_launch()", src)
+        self.assertNotIn("def _auto_connect", src)
         self.assertIn("_on_close_ui_only", src)
         self.assertIn("_start_connect", src)
         self.assertIn("_start_disconnect", src)
-        # Cold launch must not always connect; only resume after user UAC flag
         main = src[src.index("def main") :]
         self.assertNotIn("after(200", main)
-        self.assertIn("Cold launch never auto-connects", main)
         self.assertIn("resume_after_elevate", main)
         self.assertIn("_resume_user_connect", main)
+        self.assertIn("should_autoconnect_on_launch", main)
+        self.assertIn("_settings_autoconnect", main)
 
     def test_close_path_no_teardown(self):
         src = (ROOT / "client" / "windows" / "app.py").read_text(encoding="utf-8")
@@ -67,15 +67,14 @@ class TestManualControlPolicy(unittest.TestCase):
         self.assertNotIn("stop_full_tunnel", run)
         self.assertNotIn("finally:", run)
 
-    def test_main_wires_elevation_without_cold_auto_connect(self):
+    def test_main_wires_elevation_and_optional_settings_autoconnect(self):
         src = (ROOT / "client" / "windows" / "app.py").read_text(encoding="utf-8")
         main = src[src.index("def main") :]
         self.assertIn("elevate_if_needed", main)
         self.assertIn("should_exit_after_elevation", main)
-        self.assertIn("Cold launch never auto-connects", main)
-        # Resume path only when --rpt-auto-connect (user pressed Connect before UAC)
         self.assertIn("resume_after_elevate", main)
         self.assertIn("_resume_user_connect", main)
+        self.assertIn("should_autoconnect_on_launch", main)
 
     def test_disconnect_calls_stop_helper(self):
         client = mock.Mock()

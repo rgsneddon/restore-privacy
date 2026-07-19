@@ -100,7 +100,7 @@ class TestNoAutoConnectPreserved(unittest.TestCase):
     def test_windows_app_still_manual(self):
         src = (ROOT / "client" / "windows" / "app.py").read_text(encoding="utf-8")
         self.assertIn("_start_connect", src)
-        self.assertNotIn("_auto_connect", src)
+        self.assertNotIn("def _auto_connect", src)
 
 
 if __name__ == "__main__":

@@ -75,7 +75,7 @@ class TestAttachFailureMessage(unittest.TestCase):
     def test_still_manual_connect_only(self):
         self.assertFalse(auto_connect_on_launch_enabled())
         src = (ROOT / "client" / "windows" / "app.py").read_text(encoding="utf-8")
-        self.assertNotIn("_auto_connect", src)
+        self.assertNotIn("def _auto_connect", src)
         self.assertIn("_start_connect", src)
 
 

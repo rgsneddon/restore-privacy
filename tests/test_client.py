@@ -106,7 +106,7 @@ class TestUiTheme(unittest.TestCase):
         self.assertIn("_start_connect", app)
         self.assertIn("_start_disconnect", app)
         self.assertIn("_on_close_ui_only", app)
-        self.assertNotIn("_auto_connect", app)
+        self.assertNotIn("def _auto_connect", app)
         self.assertIn("plain_tunnel_status", app)
 
     def test_flutter_sources(self):

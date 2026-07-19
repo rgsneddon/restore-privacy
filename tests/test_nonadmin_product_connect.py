@@ -109,7 +109,7 @@ class TestResidualProductConnectPolicy(unittest.TestCase):
         self.assertIn("residual_ip_capture_active", src)
         self.assertIn("require_system_capture=True", src)
         self.assertIn("non_admin_connect_allowed", src)
-        self.assertNotIn("_auto_connect", src)
+        self.assertNotIn("def _auto_connect", src)
         conn = src[src.index("def _start_connect") : src.index("def _start_disconnect")]
         self.assertIn("start_full_tunnel", conn)
         self.assertIn("residual_ip_capture_active", conn)
