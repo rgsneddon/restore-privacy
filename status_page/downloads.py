@@ -59,7 +59,7 @@ RELEASE_ASSETS: tuple[DownloadAsset, ...] = (
     ),
     DownloadAsset(
         platform="linux",
-        label="Ubuntu / Linux Mint - Client (.tar.gz)",
+        label="Linux - Client (.tar.gz)",
         filename=LINUX_TGZ_FILENAME,
     ),
 )

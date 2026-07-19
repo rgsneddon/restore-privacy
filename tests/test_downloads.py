@@ -43,6 +43,22 @@ class TestDownloadCatalog(unittest.TestCase):
         self.assertEqual(by_plat["macos"].filename, MACOS_ZIP_FILENAME)
         self.assertTrue(by_plat["ios"].filename.endswith(".zip"))
         self.assertEqual(by_plat["ios"].filename, IOS_ZIP_FILENAME)
+
+    def test_linux_button_label_simplified(self):
+        """Linux download button text is short and exact."""
+        assets = available_downloads()
+        by_plat = {a.platform: a for a in assets}
+        self.assertEqual(by_plat["linux"].label, "Linux - Client (.tar.gz)")
+        html = render_download_section_html()
+        self.assertIn("Linux - Client (.tar.gz)", html)
+        self.assertIn('id="dl-linux"', html)
+        # Other platform labels unchanged
+        self.assertEqual(
+            by_plat["windows"].label, "Windows (x64) - Installer (.exe)"
+        )
+        self.assertEqual(by_plat["android"].label, "Android - APK installer")
+        self.assertEqual(by_plat["macos"].label, "macOS - App package (.zip)")
+        self.assertEqual(by_plat["ios"].label, "iOS - App package (.zip)")
         for name in (
             WINDOWS_EXE_FILENAME,
             ANDROID_APK_FILENAME,
