@@ -444,14 +444,19 @@ class TunnelClientApp:
         if self._connected and not self._busy:
             self._start_disconnect()
 
-    def _sync_tray_status(self, *, residual: bool | None = None) -> None:
+    def _sync_tray_status(
+        self,
+        *,
+        connected: bool | None = None,
+        residual: bool | None = None,
+    ) -> None:
+        """Push tray tip+icon from explicit flags (do not rely on stale ``_connected``)."""
         if self._tray is None:
             return
         try:
-            self._tray.update_status(
-                connected=self._connected,
-                residual=True if residual is None else residual,
-            )
+            conn = self._connected if connected is None else bool(connected)
+            res = True if residual is None else bool(residual)
+            self._tray.update_status(connected=conn, residual=res)
         except Exception:
             pass
 
@@ -477,42 +482,47 @@ class TunnelClientApp:
         detail: str | None = None,
         residual_capture: bool | None = None,
     ) -> None:
+        """Update main status dialogue and tray to match Connect/Disconnect state."""
+        s = (state or "").strip().lower()
         self.status_var.set(
             plain_tunnel_status(
-                state,
+                s,
                 vpn_ip=vpn_ip,
                 detail=detail,
                 residual_capture=residual_capture,
             )
         )
-        if state == "connected" and residual_capture is not False:
+        if s == "connected" and residual_capture is not False:
             self.status_label.configure(fg=STATUS_OK)
             self.detail_var.set(
                 "Your residual public IP uses the VPN node (full-tunnel routes active)."
             )
-            self._sync_tray_status(residual=True)
-        elif state == "connected":
-            # Should not be product success path; honest fallback only
+            # Pass connected=True explicitly — _apply_control may not have run yet
+            self._sync_tray_status(connected=True, residual=True)
+        elif s == "connected":
             self.status_label.configure(fg=STATUS_ERROR_FG)
             self.detail_var.set(
                 "Session up but residual public IP still uses your ISP — not fully protected."
             )
-            self._sync_tray_status(residual=False)
-        elif state == "connecting":
+            self._sync_tray_status(connected=True, residual=False)
+        elif s == "connecting":
             self.status_label.configure(fg=PRIMARY_DARK)
             self.detail_var.set("Please wait… setting up a secure connection.")
-        elif state == "disconnecting":
+            self._sync_tray_status(connected=False, residual=False)
+        elif s == "disconnecting":
             self.status_label.configure(fg=PRIMARY_DARK)
             self.detail_var.set("Stopping the tunnel and restoring normal internet…")
-        elif state == "error":
-            # STATUS_ERROR / STATUS_ERROR_FG are hex colors — never message strings
+            # Still show connected tray until teardown finishes
+            self._sync_tray_status(connected=True, residual=True)
+        elif s in ("error", "failed"):
             self.status_label.configure(fg=STATUS_ERROR_FG)
             self.detail_var.set(detail or "Check the activity log, then try Connect again.")
-            self._sync_tray_status(residual=False)
+            self._sync_tray_status(connected=False, residual=False)
         else:
+            # disconnected
             self.status_label.configure(fg=TEXT)
             self.detail_var.set("Not connected. Press Connect when you want protection.")
-            self._sync_tray_status(residual=False)
+            self._sync_tray_status(connected=False, residual=False)
 
     def _apply_control(self, *, connected: bool, busy: bool) -> None:
         self._connected = connected
@@ -531,6 +541,12 @@ class TunnelClientApp:
             )
         except Exception:
             pass
+        # Keep tray aligned whenever button state flips (Connect/Disconnect done)
+        if not busy:
+            self._sync_tray_status(
+                connected=connected,
+                residual=connected,  # product success path is residual full tunnel
+            )
 
     def _on_toggle_connect(self) -> None:
         if self._busy:
@@ -599,12 +615,13 @@ class TunnelClientApp:
                             "Tunnel active — residual public IP uses the VPN node "
                             f"(IF={getattr(tun_res, 'if_index', '?')})"
                         )
+                        # Apply control first so _connected is True, then status+tray
+                        self._apply_control(connected=True, busy=False)
                         self._set_status(
                             "connected",
                             vpn_ip=vpn_ip,
                             residual_capture=True,
                         )
-                        self._apply_control(connected=True, busy=False)
                     else:
                         # Capture attach failure BEFORE teardown overwrites tun_res.message
                         original_err = getattr(tun_res, "message", None)
@@ -647,6 +664,7 @@ class TunnelClientApp:
                 def done() -> None:
                     self._apply_control(connected=False, busy=False)
                     self._set_status("disconnected")
+                    self._sync_tray_status(connected=False, residual=False)
                     self._log("Disconnected.")
 
                 self.root.after(0, done)

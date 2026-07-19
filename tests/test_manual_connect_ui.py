@@ -224,5 +224,132 @@ class TestTkConstructIdle(unittest.TestCase):
                 pass
 
 
+class TestDialogueStatusFlips(unittest.TestCase):
+    """Main window status dialogue must track Connect / Disconnect states."""
+
+    def _make_app(self):
+        try:
+            return TunnelClientApp()
+        except Exception as e:
+            self.skipTest(f"no display: {e}")
+            return None
+
+    def test_set_status_connected_updates_dialogue(self):
+        app = self._make_app()
+        if app is None:
+            return
+        try:
+            app.root.update_idletasks()
+            app._set_status(
+                "connected", vpn_ip="10.88.0.2", residual_capture=True
+            )
+            app.root.update_idletasks()
+            status = app.status_var.get()
+            self.assertIn("Connected", status)
+            self.assertIn("10.88.0.2", status)
+            detail = app.detail_var.get()
+            self.assertIn("residual public ip", detail.lower())
+            self.assertIn("vpn", detail.lower())
+            self.assertEqual(app.connect_button_text(), "Connect")  # not applied yet
+        finally:
+            try:
+                app.root.destroy()
+            except Exception:
+                pass
+
+    def test_apply_control_then_status_shows_disconnect_button(self):
+        app = self._make_app()
+        if app is None:
+            return
+        try:
+            app.root.update_idletasks()
+            # Product connect success order
+            app._apply_control(connected=True, busy=False)
+            app._set_status(
+                "connected", vpn_ip="10.88.0.2", residual_capture=True
+            )
+            app.root.update_idletasks()
+            self.assertTrue(app._connected)
+            self.assertEqual(app.connect_button_text(), "Disconnect")
+            self.assertIn("Connected", app.status_var.get())
+            self.assertIn(
+                "VPN", app.detail_var.get()
+            )
+        finally:
+            try:
+                app.root.destroy()
+            except Exception:
+                pass
+
+    def test_connecting_and_disconnecting_dialogue(self):
+        app = self._make_app()
+        if app is None:
+            return
+        try:
+            app.root.update_idletasks()
+            app._apply_control(connected=False, busy=True)
+            app._set_status("connecting")
+            app.root.update_idletasks()
+            self.assertIn("Connecting", app.status_var.get())
+            self.assertEqual(app.btn_var.get(), "Connecting…")
+            self.assertIn("Please wait", app.detail_var.get())
+
+            app._apply_control(connected=True, busy=True)
+            app._set_status("disconnecting")
+            app.root.update_idletasks()
+            self.assertIn("Disconnecting", app.status_var.get())
+            self.assertEqual(app.btn_var.get(), "Disconnecting…")
+            self.assertIn("Stopping", app.detail_var.get())
+
+            app._apply_control(connected=False, busy=False)
+            app._set_status("disconnected")
+            app.root.update_idletasks()
+            self.assertIn("Disconnected", app.status_var.get())
+            self.assertEqual(app.connect_button_text(), "Connect")
+            self.assertIn("Not connected", app.detail_var.get())
+        finally:
+            try:
+                app.root.destroy()
+            except Exception:
+                pass
+
+    def test_set_status_pushes_explicit_tray_flags(self):
+        """_set_status must pass connected= so tray never uses stale _connected."""
+        app = self._make_app()
+        if app is None:
+            return
+        try:
+            mock_tray = mock.Mock()
+            app._tray = mock_tray
+            app._connected = False  # stale / pre-apply_control
+
+            app._set_status(
+                "connected", vpn_ip="10.88.0.2", residual_capture=True
+            )
+            mock_tray.update_status.assert_called_with(
+                connected=True, residual=True
+            )
+
+            app._set_status("disconnected")
+            mock_tray.update_status.assert_called_with(
+                connected=False, residual=False
+            )
+
+            app._set_status("connecting")
+            mock_tray.update_status.assert_called_with(
+                connected=False, residual=False
+            )
+
+            app._set_status("disconnecting")
+            mock_tray.update_status.assert_called_with(
+                connected=True, residual=True
+            )
+        finally:
+            try:
+                app.root.destroy()
+            except Exception:
+                pass
+
+
 if __name__ == "__main__":
     unittest.main()

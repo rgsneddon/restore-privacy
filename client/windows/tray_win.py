@@ -1,6 +1,7 @@
 """Windows system tray for Privacy Restored (product tray identity).
 
 Uses Shell_NotifyIcon via ctypes — no extra pip deps (safe for frozen onedir).
+Connected vs disconnected use distinct tooltip **and** tray icon (green vs grey badge).
 """
 
 from __future__ import annotations
@@ -12,6 +13,9 @@ from typing import Callable, Optional
 
 # Product tray identity (distinct from window title "Restore Privacy")
 TRAY_DISPLAY_NAME = "Privacy Restored"
+
+# Private message to apply status updates on the tray thread
+_WM_RPT_TRAY_STATUS = 0x0400 + 99  # WM_USER + 99
 
 
 def resolve_tray_icon_path() -> Optional[Path]:
@@ -60,6 +64,113 @@ def tray_tooltip_for_state(*, connected: bool, residual: bool = True) -> str:
     return f"{TRAY_DISPLAY_NAME} — disconnected"
 
 
+def tray_icon_state_key(*, connected: bool, residual: bool = True) -> str:
+    """Discrete tray visual state for tests / icon selection."""
+    if connected and residual:
+        return "connected"
+    if connected:
+        return "session_only"
+    return "disconnected"
+
+
+def make_status_icon_handle(*, connected: bool, residual: bool = True, size: int = 16):
+    """Create a small coloured tray HICON (green = connected, grey = disconnected).
+
+    Pure Win32 GDI — no Pillow. Returns HICON or 0 on failure.
+    """
+    if sys.platform != "win32":
+        return 0
+    try:
+        import ctypes
+        from ctypes import wintypes
+
+        # Colours BGRA for 32-bit DIB (Windows bottom-up)
+        if connected and residual:
+            r, g, b = 27, 118, 126  # STATUS_OK teal
+        elif connected:
+            r, g, b = 39, 121, 170  # primary blue
+        else:
+            r, g, b = 136, 136, 136  # grey disconnected
+
+        user32 = ctypes.windll.user32
+        gdi32 = ctypes.windll.gdi32
+
+        class BITMAPINFOHEADER(ctypes.Structure):
+            _fields_ = [
+                ("biSize", wintypes.DWORD),
+                ("biWidth", wintypes.LONG),
+                ("biHeight", wintypes.LONG),
+                ("biPlanes", wintypes.WORD),
+                ("biBitCount", wintypes.WORD),
+                ("biCompression", wintypes.DWORD),
+                ("biSizeImage", wintypes.DWORD),
+                ("biXPelsPerMeter", wintypes.LONG),
+                ("biYPelsPerMeter", wintypes.LONG),
+                ("biClrUsed", wintypes.DWORD),
+                ("biClrImportant", wintypes.DWORD),
+            ]
+
+        class BITMAPINFO(ctypes.Structure):
+            _fields_ = [
+                ("bmiHeader", BITMAPINFOHEADER),
+                ("bmiColors", wintypes.DWORD * 3),
+            ]
+
+        class ICONINFO(ctypes.Structure):
+            _fields_ = [
+                ("fIcon", wintypes.BOOL),
+                ("xHotspot", wintypes.DWORD),
+                ("yHotspot", wintypes.DWORD),
+                ("hbmMask", wintypes.HBITMAP),
+                ("hbmColor", wintypes.HBITMAP),
+            ]
+
+        bi = BITMAPINFO()
+        bi.bmiHeader.biSize = ctypes.sizeof(BITMAPINFOHEADER)
+        bi.bmiHeader.biWidth = size
+        bi.bmiHeader.biHeight = size  # bottom-up
+        bi.bmiHeader.biPlanes = 1
+        bi.bmiHeader.biBitCount = 32
+        bi.bmiHeader.biCompression = 0  # BI_RGB
+
+        bits = ctypes.c_void_p()
+        hdc = user32.GetDC(None)
+        hbm_color = gdi32.CreateDIBSection(
+            hdc, ctypes.byref(bi), 0, ctypes.byref(bits), None, 0
+        )
+        user32.ReleaseDC(None, hdc)
+        if not hbm_color or not bits:
+            return 0
+
+        # Fill solid colour (BGRA, alpha 255)
+        px = (ctypes.c_ubyte * (size * size * 4)).from_address(bits.value)
+        for i in range(size * size):
+            o = i * 4
+            px[o] = b
+            px[o + 1] = g
+            px[o + 2] = r
+            px[o + 3] = 255
+
+        # 1-bit mask (all opaque → zeros)
+        hbm_mask = gdi32.CreateBitmap(size, size, 1, 1, None)
+        if not hbm_mask:
+            gdi32.DeleteObject(hbm_color)
+            return 0
+
+        ii = ICONINFO()
+        ii.fIcon = True
+        ii.xHotspot = 0
+        ii.yHotspot = 0
+        ii.hbmMask = hbm_mask
+        ii.hbmColor = hbm_color
+        hicon = user32.CreateIconIndirect(ctypes.byref(ii))
+        gdi32.DeleteObject(hbm_mask)
+        gdi32.DeleteObject(hbm_color)
+        return int(hicon) if hicon else 0
+    except Exception:
+        return 0
+
+
 class WindowsSystemTray:
     """Notify-icon tray: Show window / Connect / Disconnect / Quit.
 
@@ -83,7 +194,13 @@ class WindowsSystemTray:
         self._nid = None
         self._running = False
         self._hicon = None
+        self._hicon_connected = None
+        self._hicon_disconnected = None
+        self._connected = False
+        self._residual = True
         self._tooltip = tray_tooltip_for_state(connected=False)
+        self._lock = threading.Lock()
+        self._pending: Optional[tuple[bool, bool]] = None
 
     def start(self) -> bool:
         if sys.platform != "win32":
@@ -101,7 +218,6 @@ class WindowsSystemTray:
             return
         try:
             import ctypes
-            from ctypes import wintypes
 
             if self._hwnd:
                 ctypes.windll.user32.PostMessageW(self._hwnd, 0x0010, 0, 0)  # WM_CLOSE
@@ -109,9 +225,48 @@ class WindowsSystemTray:
             pass
 
     def update_status(self, *, connected: bool, residual: bool = True) -> None:
-        self._tooltip = tray_tooltip_for_state(connected=connected, residual=residual)
-        if not self._running or self._nid is None or self._hwnd is None:
+        """Update tray tip + icon for connected/disconnected (thread-safe)."""
+        with self._lock:
+            self._connected = bool(connected)
+            self._residual = bool(residual)
+            self._tooltip = tray_tooltip_for_state(
+                connected=self._connected, residual=self._residual
+            )
+            self._pending = (self._connected, self._residual)
+
+        if not self._running:
             return
+        # Prefer posting to tray thread so Shell_NotifyIcon runs there
+        try:
+            import ctypes
+
+            if self._hwnd:
+                ctypes.windll.user32.PostMessageW(
+                    self._hwnd, _WM_RPT_TRAY_STATUS, 0, 0
+                )
+                return
+        except Exception:
+            pass
+        # Fallback: apply directly (may race until hwnd ready)
+        self._apply_notify_modify()
+
+    def _icon_for_state(self, *, connected: bool, residual: bool = True):
+        if connected:
+            if self._hicon_connected:
+                return self._hicon_connected
+        else:
+            if self._hicon_disconnected:
+                return self._hicon_disconnected
+        return self._hicon
+
+    def _apply_notify_modify(self) -> None:
+        if not self._running or self._hwnd is None:
+            return
+        with self._lock:
+            connected = self._connected
+            residual = self._residual
+            tip = (self._tooltip or TRAY_DISPLAY_NAME)[:127]
+            self._pending = None
         try:
             import ctypes
             from ctypes import wintypes
@@ -135,26 +290,27 @@ class WindowsSystemTray:
                     ("hBalloonIcon", wintypes.HICON),
                 ]
 
+            NIF_ICON = 0x00000002
             NIF_TIP = 0x00000004
             NIM_MODIFY = 0x00000001
+            hicon = self._icon_for_state(connected=connected, residual=residual)
             nid = NOTIFYICONDATAW()
             nid.cbSize = ctypes.sizeof(NOTIFYICONDATAW)
             nid.hWnd = self._hwnd
             nid.uID = 1
-            nid.uFlags = NIF_TIP
-            tip = self._tooltip[:127]
+            nid.uFlags = NIF_TIP | (NIF_ICON if hicon else 0)
+            nid.hIcon = hicon or 0
             nid.szTip = tip
             ctypes.windll.shell32.Shell_NotifyIconW(NIM_MODIFY, ctypes.byref(nid))
+            self._nid = nid
         except Exception:
             pass
 
-    def _load_icon(self):
+    def _load_base_icon(self):
         import ctypes
-        from ctypes import wintypes
 
         path = resolve_tray_icon_path()
         if path is None:
-            # Stock application icon
             return ctypes.windll.user32.LoadIconW(None, 32512)
 
         ico = str(path)
@@ -169,7 +325,6 @@ class WindowsSystemTray:
             )
             if h:
                 return h
-        # Fallback stock icon
         return ctypes.windll.user32.LoadIconW(None, 32512)
 
     def _run(self) -> None:
@@ -238,7 +393,6 @@ class WindowsSystemTray:
                 ("hBalloonIcon", wintypes.HICON),
             ]
 
-        # 64-bit Windows: LRESULT / WPARAM / LPARAM are pointer-sized
         LRESULT = ctypes.c_ssize_t
         WNDPROC = ctypes.WINFUNCTYPE(
             LRESULT, wintypes.HWND, wintypes.UINT, wintypes.WPARAM, wintypes.LPARAM
@@ -268,6 +422,9 @@ class WindowsSystemTray:
 
         def wnd_proc(hwnd, msg, wparam, lparam):
             try:
+                if msg == _WM_RPT_TRAY_STATUS:
+                    self_ref._apply_notify_modify()
+                    return 0
                 if msg == WM_TRAY:
                     if int(lparam) & 0xFFFF == WM_RBUTTONUP or int(lparam) == WM_RBUTTONUP:
                         _popup(hwnd)
@@ -310,13 +467,12 @@ class WindowsSystemTray:
         wc.lpfnWndProc = ctypes.cast(self._wndproc, ctypes.c_void_p)
         wc.hInstance = hinst
         wc.lpszClassName = class_name
-        # Unregister stale class from prior test runs
         try:
             user32.UnregisterClassW(class_name, hinst)
         except Exception:
             pass
         atom = user32.RegisterClassW(ctypes.byref(wc))
-        if not atom and ctypes.get_last_error() not in (0, 1410):  # already exists
+        if not atom and ctypes.get_last_error() not in (0, 1410):
             pass
 
         hwnd = user32.CreateWindowExW(
@@ -337,7 +493,15 @@ class WindowsSystemTray:
             self._running = False
             return
         self._hwnd = hwnd
-        self._hicon = self._load_icon()
+
+        # Distinct visual states (coloured badges) + brand logo fallback
+        self._hicon_disconnected = make_status_icon_handle(
+            connected=False, residual=True
+        ) or self._load_base_icon()
+        self._hicon_connected = make_status_icon_handle(
+            connected=True, residual=True
+        ) or self._hicon_disconnected
+        self._hicon = self._hicon_disconnected
 
         nid = NOTIFYICONDATAW()
         nid.cbSize = ctypes.sizeof(NOTIFYICONDATAW)
@@ -350,6 +514,12 @@ class WindowsSystemTray:
         nid.szTip = tip
         shell32.Shell_NotifyIconW(NIM_ADD, ctypes.byref(nid))
         self._nid = nid
+
+        # Apply any status that arrived before hwnd was ready
+        with self._lock:
+            pending = self._pending
+        if pending is not None:
+            self._apply_notify_modify()
 
         msg = wintypes.MSG()
         while self._running and user32.GetMessageW(ctypes.byref(msg), None, 0, 0) != 0:
