@@ -88,7 +88,11 @@ class TestManualControlPolicy(unittest.TestCase):
     def test_disconnect_handler_wired_in_source(self):
         src = (ROOT / "client" / "windows" / "app.py").read_text(encoding="utf-8")
         disc = src[src.index("def _start_disconnect") : src.index("def _open_upgrade")]
-        self.assertIn("disconnect_full_tunnel", disc)
+        self.assertTrue(
+            "disconnect_full_tunnel" in disc or "_disconnect_tunnel" in disc
+        )
+        self.assertIn("def _disconnect_tunnel", src)
+        self.assertIn("disconnect_full_tunnel", src)
         self.assertIn('self._set_status("disconnecting")', disc)
         self.assertIn("Disconnecting…", src)  # button busy label in _apply_control
 

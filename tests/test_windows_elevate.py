@@ -16,7 +16,6 @@ from client.windows import elevate as elev  # noqa: E402
 
 class TestElevateHelpers(unittest.TestCase):
     def test_is_admin_callable(self):
-        # On this host may be true or false; must not raise
         v = elev.is_admin()
         self.assertIsInstance(v, bool)
 
@@ -35,6 +34,11 @@ class TestElevateHelpers(unittest.TestCase):
             self.assertIn("python", Path(exe).name.lower() or True)
             self.assertIn("-m", params)
             self.assertIn("client.windows", params)
+            cwd = elev.elevation_working_directory()
+            self.assertTrue(
+                (Path(cwd) / "client" / "windows").is_dir(),
+                f"dev elevate cwd should be repo root, got {cwd}",
+            )
 
     def test_elevate_skipped_when_disabled(self):
         with mock.patch.dict(os.environ, {"RPT_NO_AUTO_ELEVATE": "1"}, clear=False):
@@ -52,12 +56,16 @@ class TestElevateHelpers(unittest.TestCase):
         with mock.patch.dict(os.environ, {}, clear=False):
             os.environ.pop("RPT_NO_AUTO_ELEVATE", None)
             with mock.patch.object(elev, "is_admin", return_value=False), mock.patch.object(
-                elev, "launch_argv_for_elevation", return_value=(r"C:\x\app.exe", "")
+                elev,
+                "launch_argv_for_elevation",
+                return_value=(r"C:\x\app.exe", ""),
+            ), mock.patch.object(
+                elev, "elevation_working_directory", return_value=r"C:\x"
             ), mock.patch.object(elev, "_shell_execute_runas", return_value=42) as se:
                 st = elev.elevate_if_needed()
                 self.assertEqual(st, "relaunched")
                 se.assert_called_once()
-                # runas verb used
+                self.assertEqual(se.call_args[1].get("cwd") or se.call_args[0][2], r"C:\x")
                 self.assertTrue(elev.should_exit_after_elevation(st))
 
     def test_elevate_passes_extra_args_for_resume_connect(self):
@@ -72,11 +80,12 @@ class TestElevateHelpers(unittest.TestCase):
     def test_elevation_cwd_is_repo_or_exe_dir(self):
         cwd = elev.elevation_working_directory()
         self.assertTrue(cwd)
-        self.assertTrue(Path(cwd).is_dir() or True)  # may be frozen path in CI
 
     def test_elevate_uac_cancelled(self):
         with mock.patch.object(elev, "is_admin", return_value=False), mock.patch.object(
-            elev, "launch_argv_for_elevation", return_value=(r"C:\x\app.exe", "")
+            elev,
+            "launch_argv_for_elevation",
+            return_value=(r"C:\x\app.exe", ""),
         ), mock.patch.object(elev, "_shell_execute_runas", return_value=-1223):
             os.environ.pop("RPT_NO_AUTO_ELEVATE", None)
             st = elev.elevate_if_needed()
@@ -92,6 +101,7 @@ class TestElevateHelpers(unittest.TestCase):
         src = (ROOT / "client" / "windows" / "installer.py").read_text(encoding="utf-8")
         self.assertIn("0x20", src)
         self.assertIn("ReadAllBytes", src)
+        self.assertIn("IconLocation", src)
 
 
 if __name__ == "__main__":

@@ -1,6 +1,28 @@
-# macOS â€” build on MacBook
+# macOS — build on MacBook
 
 Flutter `macos/` scaffold is ready. Full-system VPN requires a **Packet Tunnel Network Extension** (and often a **System Extension** entitlement for production). Sign and notarize on Mac only.
+
+## UI (shared with Android / iOS)
+
+The Connect/Disconnect shell lives in **shared Dart** (`lib/main.dart`, `lib/theme.dart`):
+
+- Dark-blue chrome (`kChromeBg`), rounded corners (`kCornerRadius`)
+- Black log window + high-contrast white title
+- Product logo asset: `assets/brand/logo-256.png`
+- **One** button: **Connect** / **Disconnect** (no auto-connect on launch)
+- Closing the window / quitting the host does **not** stop the tunnel — `Runner/AppDelegate.swift` does **not** call `stopAllTunnels` on terminate
+- Only **Disconnect** calls the native channel `disconnect` → `RptVpnChannel.stopAllTunnels`
+
+On macOS the same UI is used automatically (`flutter run -d macos`). Native `restore_privacy/vpn` channel + Packet Tunnel handle real connect/stop (`NativePrep/RptVpnChannel.swift`).
+
+```bash
+cd client_app
+flutter pub get
+flutter run -d macos
+# release:
+flutter build macos
+open build/macos/Build/Products/Release/restore_privacy_client.app
+```
 
 ## 1. Open and run
 

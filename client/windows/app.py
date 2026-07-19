@@ -119,6 +119,11 @@ def product_connect_requires_admin() -> bool:
     return True
 
 
+def layout_pack_bottom_controls_first() -> bool:
+    """Connect bar packs at bottom before expanding log (always-visible primary control)."""
+    return True
+
+
 class TunnelClientApp:
     """Sleek shell: primary Connect/Disconnect, plain status panel, optional upgrade."""
 
@@ -598,6 +603,12 @@ class TunnelClientApp:
 
         threading.Thread(target=work, daemon=True).start()
 
+    def _disconnect_tunnel(self) -> None:
+        """Stop tunnel + session (Disconnect / Quit). Clears ``_tunnel`` first."""
+        tunnel = self._tunnel
+        self._tunnel = None
+        disconnect_full_tunnel(tunnel, self.client)
+
     def _start_disconnect(self) -> None:
         self._apply_control(connected=True, busy=True)
         self._set_status("disconnecting")
@@ -605,9 +616,7 @@ class TunnelClientApp:
 
         def work() -> None:
             try:
-                tunnel = self._tunnel
-                self._tunnel = None
-                disconnect_full_tunnel(tunnel, self.client)
+                self._disconnect_tunnel()
             finally:
 
                 def done() -> None:

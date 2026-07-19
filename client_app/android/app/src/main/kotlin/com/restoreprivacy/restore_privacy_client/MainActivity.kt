@@ -91,8 +91,7 @@ class MainActivity : FlutterActivity() {
     }
 
     override fun onDestroy() {
-        // App close / swipe-away: full VPN teardown (configChanges avoids this on rotate)
-        sendDisconnect()
+        // Activity destroy only; tunnel stop is explicit via channel "disconnect".
         super.onDestroy()
     }
 

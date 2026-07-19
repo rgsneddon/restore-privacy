@@ -15,7 +15,7 @@ void main() {
         'ok': false,
         'message': kMissingSecretsMessage,
       });
-      expect(msg, contains('Missing admission secrets'));
+      expect(msg, contains('node_elgamal.pub'));
       expect(msg.toLowerCase(), isNot(equals('connected')));
     });
 
@@ -118,13 +118,13 @@ void main() {
     });
   });
 
-  group('app lifecycle stop-on-quit', () {
-    test('detached and paused stop tunnel; inactive/resumed do not', () {
-      expect(shouldStopTunnelOnAppLifecycle('detached'), isTrue);
-      expect(shouldStopTunnelOnAppLifecycle('AppLifecycleState.detached'), isTrue);
-      // iOS app-switcher close often only delivers paused (not willTerminate/detached).
-      expect(shouldStopTunnelOnAppLifecycle('paused'), isTrue);
-      expect(shouldStopTunnelOnAppLifecycle('AppLifecycleState.paused'), isTrue);
+  group('app lifecycle must not auto-stop tunnel', () {
+    test('close/background/detach never auto-disconnect (user uses Disconnect button)', () {
+      // Product roll-back: tunnel stays up until explicit Disconnect.
+      expect(shouldStopTunnelOnAppLifecycle('detached'), isFalse);
+      expect(shouldStopTunnelOnAppLifecycle('AppLifecycleState.detached'), isFalse);
+      expect(shouldStopTunnelOnAppLifecycle('paused'), isFalse);
+      expect(shouldStopTunnelOnAppLifecycle('AppLifecycleState.paused'), isFalse);
       expect(shouldStopTunnelOnAppLifecycle('inactive'), isFalse);
       expect(shouldStopTunnelOnAppLifecycle('resumed'), isFalse);
     });
