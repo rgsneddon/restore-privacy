@@ -227,24 +227,33 @@ class RptClient:
             assert_protocol_magic()
 
             sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-            sock.settimeout(timeout)
-            sock.sendto(frame, self.endpoint.address)
-            self._status(f"HELLO sent → {self.endpoint.host}:{self.endpoint.port}")
-            reply, _addr = sock.recvfrom(65535)
-            session = complete_server_hello(reply, client_nonce, client_pub)
-            session.endpoint = self.endpoint
-            self.session = session
-            self.tunnel_plan = build_full_tunnel_plan(session.vpn_ip)
-            self._sock = sock
-            self.state = ConnectState.CONNECTED
-            self._status(f"Connected — tunnel IP {session.vpn_ip} (full VPN)")
-            return ConnectResult(
-                ok=True,
-                state=self.state,
-                message=f"connected as {session.vpn_ip}",
-                session=session,
-                tunnel_plan=self.tunnel_plan,
-            )
+            try:
+                sock.settimeout(timeout)
+                sock.sendto(frame, self.endpoint.address)
+                self._status(f"HELLO sent → {self.endpoint.host}:{self.endpoint.port}")
+                reply, _addr = sock.recvfrom(65535)
+                session = complete_server_hello(reply, client_nonce, client_pub)
+                session.endpoint = self.endpoint
+                self.session = session
+                self.tunnel_plan = build_full_tunnel_plan(session.vpn_ip)
+                self._sock = sock
+                sock = None  # ownership transferred; disconnect() closes
+                self.state = ConnectState.CONNECTED
+                self._status(f"Connected — tunnel IP {session.vpn_ip} (full VPN)")
+                return ConnectResult(
+                    ok=True,
+                    state=self.state,
+                    message=f"connected as {session.vpn_ip}",
+                    session=session,
+                    tunnel_plan=self.tunnel_plan,
+                )
+            finally:
+                # Close only if handshake failed before we assigned self._sock
+                if sock is not None:
+                    try:
+                        sock.close()
+                    except Exception:
+                        pass
         except Exception as exc:
             self.state = ConnectState.ERROR
             msg = format_connect_failure(

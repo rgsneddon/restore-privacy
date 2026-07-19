@@ -45,7 +45,7 @@ Process stdout/stderr for the node service is configured for **no journal sessio
 - Holds **in-memory** session state for active tunnels so traffic can be routed and so a **current session count** can be reported.
 - When a session ends, that in-memory state is dropped; it is **not** designed to be written as a durable user history file.
 
-### 3.2 Client applications (Windows, Android, iOS, and macOS)
+### 3.2 Client applications (Windows, Android, Linux, iOS, and macOS)
 
 - **Product UI** uses **manual Connect / Disconnect** by default. Optional **Settings** preferences (stored only on the device) let the user enable **run at device startup** and/or **autoconnect on launch** (both **off** until opted in). These preferences are local only  -  not synced to the node or status page.
 - Closing or minimizing the main UI is designed to **leave the tunnel running** until the user **Disconnects** or **Quits** (Windows tray identity: **Privacy Restored**). Android keep-alive uses a foreground VPN service; Activity destroy does not stop the tunnel.

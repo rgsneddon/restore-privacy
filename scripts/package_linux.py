@@ -303,6 +303,15 @@ def write_docs(stage: Path) -> None:
 You do **not** need `apt install python3-cryptography` or network `pip install`
 for the app’s Python crypto stack.
 
+### Supported wheeled Python ABIs (x86_64)
+The packager downloads **manylinux2014 / manylinux_2_17** wheels for **CPython 3.8, 3.9, 3.10, 3.11, and 3.12**
+(see ``_PY_VERSIONS`` / ``_PLATFORMS`` in ``scripts/package_linux.py``).
+``cryptography`` is typically **abi3** (one wheel covers many Python versions);
+``cffi`` is often **version-specific** — the archive includes multiple ``cp3x`` tags when available.
+
+**Publishers:** re-run ``python scripts/package_linux.py`` on **every** release so wheels
+match current PyPI tags. Do not reuse an old ``wheels/`` directory across major crypto upgrades.
+
 ## Still provided by the OS
 - `python3` + `python3-venv` + `python3-tk` (GUI)
 - `iproute2` (`ip` for dual /1 routes)

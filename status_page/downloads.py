@@ -1,6 +1,6 @@
 """Release download link catalog for the public status page (version 0.1.8).
 
-Public page advertises Windows, Android, macOS, iOS, and Linux Mint packages.
+Public page advertises Windows, Android, macOS, iOS, and Linux packages.
 """
 
 from __future__ import annotations

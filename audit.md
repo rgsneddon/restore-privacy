@@ -187,7 +187,22 @@ This document is a **static audit record** for the repository tree reviewed on t
 
 ---
 
-## 10. Document control
+## 10. Follow-ups addressed (post-audit)
+
+| Rec | Status |
+|-----|--------|
+| M1 privacy §3.2 includes Linux | Done (heading lists Linux) |
+| M2 README `do **not** ship a shared` | Done (device-key packaging sentence) |
+| Release `_assert_no_priv` / never force-add `secrets/` | Documented in README + `sundries.txt` + `scripts/RELEASE.md`; gates remain in `build_release_0.1.8.py` / `package_linux.py` |
+| Linux wheeled ABIs + re-run `package_linux.py` | Documented in package `LINUX_INSTALL.md` generator + README |
+| Apple residual honesty + Mac work required | Strengthened in README Apple section |
+| Ops VPS/CDN outside no-log | Already privacy §4; restated in README/sundries for operators |
+| Optional release script consolidation | `scripts/RELEASE.md` (current-tag-only guidance; historical scripts retained) |
+| Optional connect socket close | `RptClient.connect` closes UDP sock on failed handshake; secrets tests call `disconnect()` |
+
+---
+
+## 11. Document control
 
 | Item | |
 |------|--|

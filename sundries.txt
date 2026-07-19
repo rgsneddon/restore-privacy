@@ -6,6 +6,14 @@ client app. Public users should follow README.md only.
 Contents moved from the public-facing README (ports, status-page hosting,
 node deploy, developer client-app notes, local tests, secrets).
 
+SECRETS / RELEASE GATES (mandatory)
+-----------------------------------
+  - Never commit or force-add secrets/ (gitignored). Do not `git add -f secrets/`.
+  - Public packages must never include node_elgamal.priv or a shared
+    client_ed25519.priv. Release scripts run _assert_no_priv / strip inject.
+  - VPS/CDN/hosting providers may log IP-level metadata under their policies
+    even when product no-log is enabled (see PRIVACY_POLICY.md §4).
+
 
 1. PORTS
 --------

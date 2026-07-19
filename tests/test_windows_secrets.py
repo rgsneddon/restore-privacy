@@ -116,29 +116,41 @@ class TestConnectUsesSecrets(unittest.TestCase):
                 uk_gate_fetcher=lambda: {"country_code": "GB", "ip": "1.2.3.4"},
             )
             # May fail later on network/handshake, but must not be the missing-secrets message
-            result = client.connect(timeout=0.5)
-            self.assertNotIn("No client secrets found", result.message)
-            self.assertNotIn("Copy from the node", result.message)
+            try:
+                result = client.connect(timeout=0.5)
+                self.assertNotIn("No client secrets found", result.message)
+                self.assertNotIn("Copy from the node", result.message)
+            finally:
+                try:
+                    client.disconnect()
+                except Exception:
+                    pass
 
     def test_connect_without_secrets_reports_secrets_failure(self):
         with tempfile.TemporaryDirectory() as td:
             empty = Path(td) / "nosec"
             empty.mkdir()
-            # Explicit empty dir: no node_elgamal.pub â†’ bootstrap fails closed
+            # Explicit empty dir: no node_elgamal.pub → bootstrap fails closed
             client = RptClient(
                 secrets_dir=empty,
                 uk_gate_fetcher=lambda: {"country_code": "GB", "ip": "1.2.3.4"},
                 skip_uk_gate=True,
             )
-            result = client.connect(timeout=0.5)
-            self.assertFalse(result.ok)
-            self.assertEqual(result.state, ConnectState.ERROR)
-            self.assertTrue(
-                "secrets" in result.message.lower()
-                or NODE_PUB_NAME in result.message
-                or CLIENT_PRIV_NAME in result.message
-                or "node" in result.message.lower()
-            )
+            try:
+                result = client.connect(timeout=0.5)
+                self.assertFalse(result.ok)
+                self.assertEqual(result.state, ConnectState.ERROR)
+                self.assertTrue(
+                    "secrets" in result.message.lower()
+                    or NODE_PUB_NAME in result.message
+                    or CLIENT_PRIV_NAME in result.message
+                    or "node" in result.message.lower()
+                )
+            finally:
+                try:
+                    client.disconnect()
+                except Exception:
+                    pass
 
 
 class TestInstallerAndBuildRecipe(unittest.TestCase):

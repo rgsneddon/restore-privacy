@@ -74,10 +74,11 @@ or use the buttons on https://restore-privacy-status.onrender.com/
    ```
 4. Press **Connect**. Status is honest: residual public IP only changes when TUN + dual `/1` routes are active. **Disconnect** removes routes and stops the session.
 5. Details: `LINUX_INSTALL.md` inside the tarball; source path for developers: [`client/linux/`](client/linux/).
+   - **Wheeled ABIs:** the release package includes manylinux wheels for **CPython 3.8–3.12** (`cryptography` abi3 + matching `cffi` tags). Re-run `python scripts/package_linux.py` on every release so wheels stay current.
 
 ### macOS / iOS (continue on a Mac)
 
-Release zips for **0.1.8** stage the Apple client packages for sideload / further signing. **Team signing and notarization must be done on a Mac.**
+Release zips for **0.1.8** are **prep packages** for sideload / further signing — **Mac work required**. Residual public IP does **not** change until Packet Tunnel / Network Extension is signed and active; host-side HELLO alone is diagnostic only. **Team signing and notarization must be done on a Mac.**
 
 1. Download **`restore-privacy-client-0.1.8-macos.zip`** or **`restore-privacy-client-0.1.8-ios.zip`**, **or** clone this repo and open `client_app/` in Xcode / Flutter on macOS.
 2. Developer checklist:  
@@ -85,14 +86,14 @@ Release zips for **0.1.8** stage the Apple client packages for sideload / furthe
    - [`client_app/macos/BUILD_ON_MAC.md`](client_app/macos/BUILD_ON_MAC.md)  
    - [`client_app/ios/BUILD_ON_MAC.md`](client_app/ios/BUILD_ON_MAC.md)  
    - Mac handoff notes: [`client_app/APPLE_HANDOFF_0.1.8.md`](client_app/APPLE_HANDOFF_0.1.8.md) (created with the release)
-3. Packages may ship the **public** node key (`node_elgamal.pub`). Each install **generates its own Ed25519 device key on first run**. Never ship `node_elgamal.priv` or a shared `client_ed25519.priv`.
+3. Packages may ship the **public** node key (`node_elgamal.pub`). Each install **generates its own Ed25519 device key on first run**. Packages do **not** ship a shared `client_ed25519.priv` (which would allow universal impersonation). Never ship `node_elgamal.priv`.
 
 ### Status page
 
 https://restore-privacy-status.onrender.com/
 
 - Live **currently connected clients** count  
-- **Download** buttons for Windows, Android, macOS, iOS, and Linux Mint (catalog v0.1.8)  
+- **Download** buttons for Windows, Android, macOS, iOS, and Linux (catalog v0.1.8)  
 - **Connect via web** explains that a browser tab cannot run full system VPN  
 
 ---
@@ -109,6 +110,10 @@ https://restore-privacy-status.onrender.com/
 
 Node deploy, ports, secrets, from-source builds, and tests: **[sundries.txt](sundries.txt)**.
 
+**Secrets discipline:** Never commit or force-add `secrets/` (gitignored). Public packages must never include `node_elgamal.priv` or a shared `client_ed25519.priv`. Release scripts run `_assert_no_priv` / strip inject gates — keep those on every tag. VPS/CDN operators may still log IP-level traffic under **their** policies (outside product no-log; see `PRIVACY_POLICY.md` §4).
+
+**Release scripts:** Use the **current tag** recipe only (`scripts/build_release_0.1.8.py` for v0.1.8). Historical `build_release_0.*.py` files are archive/history — do not fork a new copy for minor doc fixes; for a new version, copy the latest script and bump `VERSION` / `PRIOR_TAG`. Always re-run `python scripts/package_linux.py` (or the Linux step inside the current release script) so manylinux wheels are refreshed.
+
 ```bash
 # Windows GUI (requires system Python)
 python -m client.windows
@@ -116,9 +121,9 @@ python -m client.windows
 # Ubuntu / Mint GUI from source (needs system cryptography)
 sudo PYTHONPATH=. python3 -m client.linux
 
-# Linux installer package with baked-in crypto wheels
+# Linux installer package with baked-in crypto wheels (re-run each release)
 python scripts/package_linux.py
 
-# Release packages
+# Release packages (current tag)
 python scripts/build_release_0.1.8.py
 ```
