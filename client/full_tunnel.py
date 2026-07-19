@@ -110,6 +110,51 @@ def windows_route_delete_commands(
     return cmds
 
 
+def linux_route_commands(
+    plan: FullTunnelPlan,
+    server_host: str,
+    *,
+    iface: Optional[str] = None,
+    physical_dev: str = "PHYSICAL_DEV",
+    physical_gw: str = "PHYSICAL_GW",
+    include_catchall: bool = True,
+) -> list[str]:
+    """``ip`` commands for full tunnel on Linux (Mint / Ubuntu; needs root).
+
+    Order: assign TUN address, pin VPN server on the physical path, then dual
+    ``/1`` catch-alls into the TUN so residual public IP can use the node.
+    Without ``include_catchall``, only address + server pin (no residual capture).
+    """
+    tun = (iface or plan.tunnel_iface or "rpt0").strip() or "rpt0"
+    ip = plan.tunnel_client_ip
+    cmds: list[str] = [
+        f"ip link set dev {tun} up",
+        f"ip addr replace {ip}/32 dev {tun}",
+        # Pin node host on physical path BEFORE dual /1
+        f"ip route replace {server_host}/32 via {physical_gw} dev {physical_dev}",
+    ]
+    if include_catchall:
+        cmds.append(f"ip route replace 0.0.0.0/1 dev {tun}")
+        cmds.append(f"ip route replace 128.0.0.0/1 dev {tun}")
+    return cmds
+
+
+def linux_route_delete_commands(
+    plan: FullTunnelPlan,
+    server_host: str,
+    *,
+    iface: Optional[str] = None,
+) -> list[str]:
+    """Commands to tear down Linux full-tunnel routes and TUN addressing."""
+    tun = (iface or plan.tunnel_iface or "rpt0").strip() or "rpt0"
+    return [
+        f"ip route del 0.0.0.0/1 dev {tun}",
+        f"ip route del 128.0.0.0/1 dev {tun}",
+        f"ip route del {server_host}/32",
+        f"ip link set dev {tun} down",
+    ]
+
+
 def routes_would_blackhole_without_system_capture(
     system_capture: bool,
     apply_default_routes: bool,
@@ -165,4 +210,23 @@ def assert_full_tunnel_plan(plan: FullTunnelPlan) -> list[str]:
     no_if = "\n".join(windows_route_commands(plan, "1.2.3.4", if_index=None))
     if "mask 128.0.0.0" in no_if:
         violations.append("without if_index must not emit dual /1 catch-alls")
+    # Linux dual /1 into TUN + server pin before catch-alls
+    lcmds = "\n".join(
+        linux_route_commands(
+            plan, "1.2.3.4", iface="rpt0", physical_dev="eth0", physical_gw="192.168.1.1"
+        )
+    )
+    if "0.0.0.0/1 dev rpt0" not in lcmds or "128.0.0.0/1 dev rpt0" not in lcmds:
+        violations.append("linux routes must include dual /1 into TUN")
+    if "1.2.3.4/32" not in lcmds:
+        violations.append("linux server pin missing")
+    lpin = lcmds.find("1.2.3.4/32")
+    lcatch = lcmds.find("0.0.0.0/1")
+    if lpin < 0 or lcatch < 0 or lpin > lcatch:
+        violations.append("linux server pin must be ordered before dual /1")
+    no_catch = "\n".join(
+        linux_route_commands(plan, "1.2.3.4", include_catchall=False)
+    )
+    if "0.0.0.0/1" in no_catch:
+        violations.append("linux without include_catchall must not emit dual /1")
     return violations

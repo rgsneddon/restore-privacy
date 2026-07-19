@@ -29,9 +29,11 @@ class TestDownloadCatalog(unittest.TestCase):
 
     def test_public_assets_include_all_platforms(self):
         assets = available_downloads()
-        self.assertEqual(len(assets), 4)
+        self.assertEqual(len(assets), 5)
         platforms = {a.platform for a in assets}
-        self.assertEqual(platforms, {"windows", "android", "macos", "ios"})
+        self.assertEqual(
+            platforms, {"windows", "android", "macos", "ios", "linux"}
+        )
         by_plat = {a.platform: a for a in assets}
         self.assertTrue(by_plat["windows"].filename.endswith(".exe"))
         self.assertEqual(by_plat["windows"].filename, WINDOWS_EXE_FILENAME)

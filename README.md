@@ -38,6 +38,7 @@ or use the buttons on https://restore-privacy-status.onrender.com/
 | Android | `restore-privacy-client-0.1.7-android.apk` |
 | macOS | `restore-privacy-client-0.1.7-macos.zip` *(prep zip / sign on Mac  -  see below)* |
 | iOS | `restore-privacy-client-0.1.7-ios.zip` *(prep zip / sign on Mac  -  see below)* |
+| Linux Mint | `restore-privacy-client-0.1.7-linux-x64.tar.gz` *(Mint / Ubuntu-family)* |
 
 ### Windows
 
@@ -54,6 +55,22 @@ or use the buttons on https://restore-privacy-status.onrender.com/
 2. Install the APK (allow install from unknown sources if your device asks).
 3. Open **Restore Privacy**, press **Connect**, and grant **VPN** permission when prompted.
 4. Optional: **âš™ Settings** -> startup / autoconnect (defaults off). Minimize keeps the VPN service running until **Disconnect**.
+
+### Linux Mint (and Ubuntu-family)
+
+1. Download **`restore-privacy-client-0.1.7-linux-x64.tar.gz`** from the release or status page, **or** clone this repo.
+2. Unpack and install helpers:
+   ```bash
+   tar xzf restore-privacy-client-0.1.7-linux-x64.tar.gz
+   cd restore-privacy-0.1.7-linux   # or repo root
+   bash install_linux_mint.sh      # or: bash scripts/install_linux_mint.sh
+   ```
+3. Run the GUI (**root** needed so residual public IP uses the VPN node):
+   ```bash
+   sudo python3 -m client.linux
+   ```
+4. Press **Connect**. Status is honest: residual public IP only changes when TUN + dual `/1` routes are active. **Disconnect** removes routes and stops the session.
+5. Details: [`client/linux/`](client/linux/) and `LINUX_MINT.md` inside the tarball.
 
 ### macOS / iOS (continue on a Mac)
 
@@ -72,7 +89,7 @@ Release zips for **0.1.7** stage the Apple client packages for sideload / furthe
 https://restore-privacy-status.onrender.com/
 
 - Live **currently connected clients** count  
-- **Download** buttons for Windows, Android, macOS, and iOS (catalog v0.1.7)  
+- **Download** buttons for Windows, Android, macOS, iOS, and Linux Mint (catalog v0.1.7)  
 - **Connect via web** explains that a browser tab cannot run full system VPN  
 
 ---
@@ -93,6 +110,10 @@ Node deploy, ports, secrets, from-source builds, and tests: **[sundries.txt](sun
 # Windows GUI (requires system Python)
 python -m client.windows
 
+# Linux Mint GUI (root for full tunnel)
+sudo python3 -m client.linux
+
 # Release packages
 python scripts/build_release_0.1.7.py
+python scripts/package_linux.py
 ```

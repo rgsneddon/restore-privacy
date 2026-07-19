@@ -1,6 +1,6 @@
 """Release download link catalog for the public status page (version 0.1.7).
 
-Public page advertises Windows .exe installer, Android .apk, macOS .zip, and iOS .zip.
+Public page advertises Windows, Android, macOS, iOS, and Linux Mint packages.
 """
 
 from __future__ import annotations
@@ -18,6 +18,7 @@ WINDOWS_EXE_FILENAME = f"restore-privacy-client-{RELEASE_VERSION}-windows-x64-se
 ANDROID_APK_FILENAME = f"restore-privacy-client-{RELEASE_VERSION}-android.apk"
 MACOS_ZIP_FILENAME = f"restore-privacy-client-{RELEASE_VERSION}-macos.zip"
 IOS_ZIP_FILENAME = f"restore-privacy-client-{RELEASE_VERSION}-ios.zip"
+LINUX_TGZ_FILENAME = f"restore-privacy-client-{RELEASE_VERSION}-linux-x64.tar.gz"
 
 
 @dataclass(frozen=True)
@@ -56,6 +57,11 @@ RELEASE_ASSETS: tuple[DownloadAsset, ...] = (
         label="iOS - App package (.zip)",
         filename=IOS_ZIP_FILENAME,
     ),
+    DownloadAsset(
+        platform="linux",
+        label="Linux Mint / Ubuntu - Client (.tar.gz)",
+        filename=LINUX_TGZ_FILENAME,
+    ),
 )
 
 
@@ -63,6 +69,7 @@ def available_downloads(
     include_android: bool = True,
     include_macos: bool = True,
     include_ios: bool = True,
+    include_linux: bool = True,
 ) -> list[DownloadAsset]:
     """Return download assets advertised on the public status page."""
     out: list[DownloadAsset] = []
@@ -72,6 +79,8 @@ def available_downloads(
         if a.platform == "macos" and not include_macos:
             continue
         if a.platform == "ios" and not include_ios:
+            continue
+        if a.platform == "linux" and not include_linux:
             continue
         out.append(a)
     return out
@@ -92,11 +101,11 @@ def render_download_section_html(assets: Iterable[DownloadAsset] | None = None) 
     return f"""
   <section class="downloads" id="downloads" aria-label="Download Restore Privacy client">
     <h2>Download client v{RELEASE_VERSION}</h2>
-    <p class="dl-sub">Windows | Android | macOS | iOS</p>
+    <p class="dl-sub">Windows | Android | macOS | iOS | Linux Mint</p>
     <div class="dl-buttons">
 {links_html}
     </div>
-    <p class="dl-note">Release <code>{RELEASE_TAG}</code> | Windows setup needs no separate Python install | double-click -> UAC once for full VPN (auto-elevate) | Apple packages require Network Extension signing for system VPN</p>
+    <p class="dl-note">Release <code>{RELEASE_TAG}</code> | Windows setup needs no separate Python install | double-click -> UAC once for full VPN (auto-elevate) | Apple packages require Network Extension signing for system VPN | Linux Mint: unpack tar.gz, bash install_linux_mint.sh, sudo python3 -m client.linux</p>
   </section>
 """
 
@@ -119,6 +128,8 @@ def download_css() -> str:
     a.dl#dl-macos:hover { background: #6b7280; }
     a.dl#dl-ios { background: #6d28d9; }
     a.dl#dl-ios:hover { background: #7c3aed; }
+    a.dl#dl-linux { background: #b45309; }
+    a.dl#dl-linux:hover { background: #d97706; }
     .dl-note { margin-top: 1rem; font-size: 0.8rem; opacity: 0.55; line-height: 1.4; }
     .dl-note code { font-size: 0.85em; }
 """
