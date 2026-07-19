@@ -98,6 +98,8 @@ class TestInstallerFailureUi(unittest.TestCase):
         self.assertIn("fail_detail", done)
         self.assertNotIn("{exc}", done)
         self.assertNotIn("status_var.set(f\"Installation failed:\\n{exc}\")", src)
+        # Failure must NOT auto-destroy (user reads error + Close)
+        self.assertNotIn("root.destroy", done)
 
     def test_deferred_failure_path_no_nameerror(self):
         """Same capture pattern as run_installer_progress_ui work()/done_err."""
@@ -143,6 +145,32 @@ class TestInstallerFailureUi(unittest.TestCase):
             ui = inst.format_install_failure_status(str(cm.exception))
             self.assertIn("Installation failed", ui)
             self.assertIn("Could not copy", ui)
+
+
+class TestInstallerAutoCloseOnSuccess(unittest.TestCase):
+    def test_policy_autoclose_on_success(self):
+        self.assertTrue(inst.should_autoclose_installer_on_success())
+        self.assertGreater(inst.installer_success_autoclose_ms(), 0)
+        self.assertLessEqual(inst.installer_success_autoclose_ms(), 5000)
+
+    def test_success_status_formatter(self):
+        s = inst.format_install_success_status(Path(r"C:\Programs\RestorePrivacy"), "app.exe")
+        self.assertIn("Installation complete", s)
+        self.assertIn("RestorePrivacy", s)
+        self.assertIn("app.exe", s)
+
+    def test_done_ok_schedules_destroy_on_success(self):
+        src = (ROOT / "client" / "windows" / "installer.py").read_text(encoding="utf-8")
+        work = src[src.index("def work") : src.index("threading.Thread(target=work")]
+        self.assertIn("format_install_success_status", work)
+        self.assertIn("should_autoclose_installer_on_success", work)
+        done_ok = work[work.index("def done_ok") : work.index("def done_err")]
+        self.assertIn("root.destroy", done_ok)
+        self.assertIn("root.after(autoclose_ms, root.destroy)", done_ok)
+        # Failure branch must not schedule destroy
+        done_err = work[work.index("def done_err") :]
+        self.assertNotIn("root.destroy", done_err)
+        self.assertIn("fail_status", done_err)
 
 
 if __name__ == "__main__":

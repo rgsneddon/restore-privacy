@@ -271,6 +271,25 @@ def format_install_failure_status(error_message: str) -> str:
     return f"Installation failed:\n{msg}"
 
 
+def format_install_success_status(install_dir: Path, launched_name: str) -> str:
+    """User-facing status after a successful install."""
+    return (
+        f"Installation complete.\n"
+        f"Installed to:\n{install_dir}\n"
+        f"Launched: {launched_name}"
+    )
+
+
+def installer_success_autoclose_ms() -> int:
+    """How long to show success text before auto-closing the setup window."""
+    return 900
+
+
+def should_autoclose_installer_on_success() -> bool:
+    """Product policy: success closes the installer; failure stays open."""
+    return True
+
+
 def install(
     launch: bool = True,
     *,
@@ -499,15 +518,18 @@ def run_installer_progress_ui(*, launch: bool = True) -> int:
             # Capture path name before deferred callback (closure-safe)
             path_name = path.name if path is not None else "yes"
 
+            success_status = format_install_success_status(INSTALL_DIR, path_name)
+            autoclose_ms = installer_success_autoclose_ms()
+            do_autoclose = should_autoclose_installer_on_success()
+
             def done_ok() -> None:
-                status_var.set(
-                    f"Installation complete.\n"
-                    f"Installed to:\n{INSTALL_DIR}\n"
-                    f"Launched: {path_name}"
-                )
+                status_var.set(success_status)
                 bar["value"] = bar["maximum"]
                 close_btn.configure(state=tk.NORMAL)
                 close_btn.focus_set()
+                # Do not leave the setup window open after a successful install.
+                if do_autoclose:
+                    root.after(autoclose_ms, root.destroy)
 
             root.after(0, done_ok)
         except Exception as exc:
@@ -522,9 +544,11 @@ def run_installer_progress_ui(*, launch: bool = True) -> int:
             fail_detail = (err_tb or "")[:500]
 
             def done_err() -> None:
+                # Stay open with real error — user dismisses via Close (no auto-destroy).
                 status_var.set(fail_status)
                 detail_var.set(fail_detail)
                 close_btn.configure(state=tk.NORMAL)
+                close_btn.focus_set()
 
             root.after(0, done_err)
 
