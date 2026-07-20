@@ -57,6 +57,15 @@ class TestAuditMd(unittest.TestCase):
         )
         self.assertIn("residual_ip_capture", text.lower() + text)
 
+    def test_audit_threat_scenarios_present(self):
+        text = AUDIT.read_text(encoding="utf-8")
+        self.assertIn("Threat model scenarios", text)
+        self.assertIn("VPS compromise", text)
+        self.assertIn("device seizure", text.lower())
+        self.assertIn("ISP", text)
+        self.assertIn("traffic analysis", text.lower())
+
 
 if __name__ == "__main__":
     unittest.main()
+

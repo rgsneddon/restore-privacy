@@ -93,25 +93,64 @@ Please understand these **operational limits**:
 
 ---
 
-## 5. Cookies and tracking
+## 5. Threat model
+
+This section is for **user education**. It states **what Restore Privacy protects against** and **what it does not**, in plain language. A longer scenario write-up (VPS compromise, ISP traffic analysis, client device seizure) lives in [audit.md §4.6](audit.md). This is **not** a formal certification or pen-test report.
+
+### 5.1 What it protects against
+
+| Goal | Product stance when residual full tunnel is actually up |
+|------|--------------------------------------------------------|
+| **Casual observation of destination sites on the home ISP path** | Device traffic is intended to exit via the VPN node, so destination sites and the home ISP path see the **node’s residual public IP**, not your home IP (Windows dual `/1` + Wintun, Android VPN service, signed Apple Packet Tunnel). |
+| **Product node writing user browsing history** | Shipped no-log defaults: no connection / session / traffic / user-info logs for tunnel use. |
+| **Public “who is online” metrics** | Status page and node public API are **title (+ downloads) only** — no live client count, no per-client lists, no identifying session fields. |
+| **Shared installer impersonation** | Each install generates its **own** device Ed25519 key; packages do not ship a universal `client_ed25519.priv`. |
+| **Coarse wire fingerprints** | Outer obfuscation and traffic shaping (padding / jitter / cover) are **on by default** on the product residual DATA path as **mitigations** (not undetectability). |
+| **Casual non-tunnel leaks while connected** | Kill-switch / IPv6 ISP block / tunnel-only DNS reduce common residual-IP and DNS leaks when residual capture is active. |
+| **Past-session key recovery from long-term keys alone** | Session AEAD incorporates **ephemeral X25519 (PFS)** on the product path so long-term key compromise later should not reconstruct that session’s traffic keys from the public transcript alone. |
+
+### 5.2 What it does **not** protect against
+
+| Non-goal | Why |
+|----------|-----|
+| **Endpoint correlation** | A service you visit can still recognize *you* via accounts, cookies, browser fingerprint, or the same login across sessions. The tunnel does **not** unlink your identity at the destination. Destinations may also correlate multiple sessions that share the **same VPN egress IP** (many users behind one node). |
+| **Behavioral analysis** | Observers (ISP, workplace, or analyst with flow logs) can still study **when** you connect, **how long**, and rough volume patterns. Pad/cover/obfs reduce coarse fingerprints; they do **not** stop behavioral analysis of usage patterns. |
+| **VPS / provider metadata** | The VPS host, CDN, or upstream network may log IP-level or netflow data under **their** policies (see §4 item 1). Product no-log does not erase provider logs. |
+| **VPS compromise (active sessions)** | If the node host is fully compromised while you are connected, **live** memory may still expose session material. See [audit.md](audit.md) **VPS compromise** scenario. |
+| **Traffic analysis by ISP (undetectability)** | Your ISP can still see that you talk to the VPN node. We do **not** claim DPI-undetectability or full pluggable-transport parity. |
+| **Client device seizure** | Seizure of an unlocked (or decryptable) device exposes local keys, apps, browser history, and any local connection log. Disk encryption is an OS control, not an RPT server feature. |
+| **Multi-hop residual routing** | Hop *lists* may exist for planning; product traffic remains **single-hop / entry-only** until a real multi-hop path ships. |
+| **Malware or compromised endpoints** | A keylogger, malicious browser extension, or rooted device is outside the tunnel’s trust boundary. |
+
+### 5.3 Scenario map (summary)
+
+| Scenario | Protects / mitigates | Does not eliminate |
+|----------|----------------------|--------------------|
+| **VPS compromise** | No durable user-info logs; PFS for past sessions; no public client metrics | Live memory, provider IP logs, future key abuse until rotation |
+| **Traffic analysis by ISP** | Residual egress via node; pad/obfs mitigations | Visibility of VPN use; DPI-class fingerprinting; behavioral timing |
+| **Client device seizure** | No server-side history upload by design | Local forensics, device key, other apps |
+
+---
+
+## 6. Cookies and tracking
 
 The status page is a minimal static UI. It does **not** use advertising trackers or analytics SDKs in the shipped code. It does **not** poll a live client count. No account login cookies are required for the tunnel protocol itself.
 
 ---
 
-## 6. Children
+## 7. Children
 
 This software is a network tool for general audiences. It is not directed at children under 13 (or the minimum age in your jurisdiction). Do not provide personal data of children through misconfigured logging or external services.
 
 ---
 
-## 7. Changes
+## 8. Changes
 
 We may update this policy as the product evolves. The **Last updated** date at the top will change when material edits are made. Continued use of updated software implies review of the current policy in the repository.
 
 ---
 
-## 8. Contact
+## 9. Contact
 
 For privacy questions about this open-source project, open an issue on:
 

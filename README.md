@@ -120,6 +120,30 @@ Core promises: **no user-info logs** by design, **minimal public status** (title
 
 ---
 
+## Threat model
+
+Short user-education summary. Full policy language: **[PRIVACY_POLICY.md — Threat model](PRIVACY_POLICY.md)**. Scenario detail for operators/auditors: **[audit.md §4.6](audit.md)** (VPS compromise, traffic analysis by ISP, client device seizure).
+
+### What it protects against
+
+- **Residual public IP** uses the VPN node when full tunnel is actually up (honest status otherwise).
+- **No user-info logs** on the product node path; **no public live client count**.
+- **Per-device keys** (not a shared installer private key).
+- **Mitigations** for coarse traffic fingerprints: outer obfuscation + padding/jitter/cover (default on product residual DATA path) — **not** a claim of DPI-undetectability.
+- **Kill-switch / tunnel DNS / IPv6 ISP block** while residual capture is active.
+- **PFS** (ephemeral X25519) so long-term key compromise later should not reconstruct past session AEAD keys from the public transcript alone.
+
+### What it does **not** protect against
+
+- **Endpoint correlation** — sites still know you via logins, cookies, and browser fingerprints; many users share one node egress IP.
+- **Behavioral analysis** — observers can still study when you connect and rough usage patterns.
+- **VPS / provider IP metadata** — hosters may log network metadata outside app no-log settings.
+- **Traffic analysis by ISP** beyond mitigations — you still appear to use a VPN; no multi-hop residual yet.
+- **Client device seizure** — local keys, apps, and browser history on an unlocked device are out of scope for the node’s no-log promise.
+- Malware, compromised OS, or destination-site tracking.
+
+---
+
 ## Operators / developers
 
 Node deploy, ports, secrets, from-source builds, and tests: **[sundries.txt](sundries.txt)**.

@@ -6,10 +6,10 @@
 | **Repository** | `restore_privacy` |
 | **Version under review** | **0.2.2** (`client/VERSION`, catalog `RELEASE_VERSION` / `RELEASE_TAG`) |
 | **Production node** | **82.221.101.241:44044** (UDP); status UI TCP 8080 |
-| **Audit date** | 20 July 2026 (**0.2.2 ship pass**) |
-| **Prior passes** | 0.1.8 first-pass; 0.2.0 ship; 0.2.1 docs; UK geo strip; DNS/IPv6; node pub pin; traffic-shape/PFS/multi-hop config |
+| **Audit date** | 20 July 2026 (**0.2.2 ship pass**); threat-model scenarios refreshed |
+| **Prior passes** | 0.1.8 first-pass; 0.2.0 ship; 0.2.1 docs; UK geo strip; DNS/IPv6; node pub pin; traffic-shape/PFS/multi-hop config; monitoring aggregates |
 | **Audit type** | Static code + policy consistency (not a pen-test or multi-OS residual red-team) |
-| **Auditor method** | Tree scan, endpoint/catalog alignment, packaging gates, security/policy unit suite |
+| **Auditor method** | Tree scan, endpoint/catalog alignment, packaging gates, security/policy unit suite; documented threat scenarios |
 
 ---
 
@@ -141,6 +141,47 @@ Restore Privacy **0.2.2** ships clients and public catalog aligned to the **Flok
 | I11 | Self-host one-shot script |
 | I12 | Product traffic-shape on by default + Settings legal links |
 | I13 | Native residual pad/cover/obfs/PFS parity with Python DATA path (Android + apple_shared + iOS/macOS NativePrep; exact product obfs key length) |
+| I14 | Threat model scenarios documented (VPS compromise, ISP traffic analysis, client device seizure) |
+
+---
+
+## 4.6 Threat model scenarios
+
+Durable product-honest scenarios for operators and users. Update this section when architecture, defaults, or hosting assumptions change. User-facing summary: [PRIVACY_POLICY.md](PRIVACY_POLICY.md) § Threat model; plain-language pointer: [README.md](README.md).
+
+**Honesty constraints (all scenarios):** Product does **not** claim DPI-undetectability, multi-hop residual routing, or that VPS/provider IP metadata is invisible. Pad / jitter / cover / outer obfuscation are **mitigations only**.
+
+### Scenario A — VPS compromise
+
+| | |
+|--|--|
+| **Threat** | An attacker or subpoena gains control of the operator VPS (root shell, disk image, or live memory of the RPT node process). |
+| **Product response** | Node defaults: **no-log** (`node/nolog.py` — connection / session / traffic / user-info logs off); public status **title-only** (no live client count, no per-client lists); session state is **in-memory** for routing; session AEAD uses **ephemeral X25519 PFS** so long-term node key alone should not reconstruct past session traffic keys from the public transcript; packages never ship `node_elgamal.priv`; optional sealed/TPM-class backend reduces plaintext long-term key on disk. |
+| **Residual risk** | **Active** sessions in memory at compromise time may still be inspectable (keys, VPN IPs, concurrent peer addresses). Provider or attacker **IP-level / netflow** logs outside the app remain. Compromised long-term keys enable future impersonation until rotation + client public-pin refresh. Disk forensics may recover misconfigured host logs if the operator disabled no-log. |
+
+### Scenario B — Traffic analysis by ISP (or local network observer)
+
+| | |
+|--|--|
+| **Threat** | The user’s ISP, workplace network, or local passive observer watches size/timing/destination of packets between the client and the product node (and may try protocol fingerprinting). |
+| **Product response** | Residual full tunnel moves **destination** traffic through the node so sites see the node egress, not the home IP (when residual capture is actually up). **Outer obfuscation** (QUIC-mimic wrap) and **traffic shaping** (padding, send jitter, cover frames) reduce coarse clear-`RPT2` magic and size/timing fingerprints on the product path. Kill-switch / tunnel DNS reduce casual ISP DNS and non-tunnel leak while connected. |
+| **Residual risk** | **Traffic analysis by ISP** still sees that the user talks to the VPN node (volume, duration, rough timing). Mitigations are **not** a guarantee of DPI-undetectability or pluggable-transport parity. Multi-hop residual is **not** product-routed. Behavioral patterns (when you connect, how long you stay online) remain visible to the on-path observer. |
+
+### Scenario C — Client device seizure
+
+| | |
+|--|--|
+| **Threat** | Lawful seizure or theft of the user’s phone/PC with forensic access to disk and, if unlocked, live process memory. |
+| **Product response** | No product telemetry of browsing history to the node; local **device Ed25519** key is install-scoped (not a shared installer secret); licence acceptance and connection log (if used) are **local-only** and user-exportable, not uploaded by design; residual Connect does not phone home to third-party geo APIs. |
+| **Residual risk** | **Client device seizure** can expose the **local device key**, settings, any local connection log, OS VPN config, browser history, and other apps—outside RPT’s no-log node promise. Full-disk encryption and OS lock screens are the primary controls; the product does not claim deniable storage or remote wipe. Possession of the device key allows tunnel use as that install until the operator revokes/rotates admission material. |
+
+### Scenario coverage matrix (quick)
+
+| Scenario | Primary mitigations in product | Explicit non-claim |
+|----------|-------------------------------|--------------------|
+| VPS compromise | No-log defaults; in-memory sessions; PFS; no public client metrics | No “provider sees nothing”; no perfect past-session secrecy if memory was live |
+| ISP traffic analysis | Residual tunnel; pad/cover/obfs mitigations; kill-switch / tunnel DNS | No DPI-undetectability; no multi-hop residual |
+| Client device seizure | No server-side user history; local-only prefs/logs | No protection of unlocked disk / other apps / endpoint forensics |
 
 ---
 
@@ -232,5 +273,6 @@ Re-run after major releases or crypto/packaging changes.
 | Item | |
 |------|--|
 | Output | `audit.md` (repo root) |
-| Related | `PRIVACY_POLICY.md`, `README.md`, `scripts/RELEASE_NOTES_0.2.2.md` |
+| Related | `PRIVACY_POLICY.md` (Threat model), `README.md` (Threat model), `scripts/RELEASE_NOTES_0.2.2.md` |
 | Code baseline | 0.2.2 ship + node 82.221.101.241 |
+| Threat scenarios | §4.6 — re-review on each major release |
