@@ -580,7 +580,9 @@ def start_full_tunnel(
             "(session + dataplane start without Administrator)"
         )
 
-    plane = RptDataPlane(client)
+    from client.product_policy import product_dataplane_traffic_shape
+
+    plane = RptDataPlane(client, traffic_shape=product_dataplane_traffic_shape())
     try:
         plane.start(tun)
     except Exception as exc:

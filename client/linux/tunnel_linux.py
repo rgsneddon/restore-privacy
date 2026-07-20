@@ -352,8 +352,11 @@ def start_full_tunnel(
         )
 
     # DATA plane: RptDataPlane.start requires TunIO (LinuxTun implements it)
+    # Product traffic-shape policy (padding/jitter/cover; RPT_TRAFFIC_SHAPE=0 disables)
     try:
-        plane = RptDataPlane(client)
+        from client.product_policy import product_dataplane_traffic_shape
+
+        plane = RptDataPlane(client, traffic_shape=product_dataplane_traffic_shape())
         plane.start(tun)
     except Exception as exc:  # noqa: BLE001
         rollback_full_tunnel_routes(plan, server_host, iface)
