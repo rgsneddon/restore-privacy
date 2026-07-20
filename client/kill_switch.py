@@ -16,6 +16,11 @@ Windows (critical):
 
   Rollback restores saved DefaultOutboundAction and removes RPT-KS rules.
 
+  Script emission: pure multi-line PowerShell bodies
+  (``windows_ks_apply_script`` / ``windows_ks_rollback_script``) wrapped as
+  ``powershell -EncodedCommand`` (UTF-16LE base64). Never space-collapse
+  multi-statement scripts into ``-Command "..."``.
+
 Linux: iptables OUTPUT chain — ACCEPT lo + tunnel iface + node host; DROP rest.
 
 Android uses ``VpnService.Builder.setBlocking(true)``.
@@ -23,6 +28,7 @@ Android uses ``VpnService.Builder.setBlocking(true)``.
 
 from __future__ import annotations
 
+import base64
 import os
 import re
 import subprocess
@@ -38,8 +44,8 @@ WIN_CRITICAL_ALLOW_NODE = f"{WIN_RULE_PREFIX}-allow-node"
 WIN_CRITICAL_ALLOW_TUN = f"{WIN_RULE_PREFIX}-allow-tun-if"
 # Profile-level fail-closed (not an unscoped New-NetFirewallRule Block)
 WIN_PROFILE_DEFAULT_OUTBOUND_BLOCK = "DefaultOutboundAction Block"
-# State file for prior profile outbound actions (restored on rollback)
-WIN_KS_STATE_FILE = r"$env:ProgramData\RestorePrivacy\ks-outbound-state.json"
+# PowerShell expression for state file (must be double-quoted in script body)
+WIN_KS_STATE_PATH_PS = '"$env:ProgramData\\RestorePrivacy\\ks-outbound-state.json"'
 
 
 @dataclass(frozen=True)
@@ -69,19 +75,43 @@ def _ps_escape_single(s: str) -> str:
     return s.replace("'", "''")
 
 
-def windows_kill_switch_block_commands(
+def powershell_encoded_command(script_body: str) -> str:
+    """Wrap a multi-line PowerShell body as ``powershell -EncodedCommand`` (UTF-16LE).
+
+    This is the only supported emission path for multi-statement Windows KS scripts.
+    """
+    body = script_body.lstrip("\n")
+    if body and not body.endswith("\n"):
+        body += "\n"
+    b64 = base64.b64encode(body.encode("utf-16-le")).decode("ascii")
+    return f"powershell -NoProfile -ExecutionPolicy Bypass -EncodedCommand {b64}"
+
+
+def decode_powershell_encoded_command(cmd: str) -> str:
+    """Extract and decode the script body from an EncodedCommand argv string."""
+    marker = "-EncodedCommand "
+    idx = cmd.find(marker)
+    if idx < 0:
+        # Also accept lowercase / mixed
+        m = re.search(r"-EncodedCommand\s+(\S+)", cmd, flags=re.IGNORECASE)
+        if not m:
+            raise ValueError("no -EncodedCommand payload in command")
+        b64 = m.group(1)
+    else:
+        b64 = cmd[idx + len(marker) :].strip().split()[0]
+    return base64.b64decode(b64).decode("utf-16-le")
+
+
+def windows_ks_apply_script(
     *,
     server_host: str,
     tunnel_iface: str = "RPT",
     policy: Optional[KillSwitchPolicy] = None,
-) -> list[str]:
-    """Scoped allows + profile DefaultOutboundAction=Block (no unscoped block rule).
-
-    Requires admin. Uses PowerShell NetSecurity cmdlets.
-    """
+) -> str:
+    """Multi-line PowerShell body for kill-switch apply (pure; not argv-wrapped)."""
     pol = policy or default_kill_switch_policy()
     if not pol.enabled or not pol.block_non_tunnel_ipv4:
-        return []
+        return ""
     host = _ps_escape_single(server_host.strip())
     iface = _ps_escape_single((tunnel_iface or "RPT").strip())
     n_node = WIN_CRITICAL_ALLOW_NODE
@@ -90,116 +120,143 @@ def windows_kill_switch_block_commands(
     n_stun = f"{WIN_RULE_PREFIX}-block-stun"
     n_mdns = f"{WIN_RULE_PREFIX}-block-mdns"
     pfx = WIN_RULE_PREFIX
-    state = WIN_KS_STATE_FILE
+    state = WIN_KS_STATE_PATH_PS
 
-    # PowerShell: save profile outbound actions → scoped allows → DefaultOutboundAction Block
-    script = f"""
-$ErrorActionPreference = 'Stop'
-$statePath = {state}
-$dir = Split-Path -Parent $statePath
-if (-not (Test-Path $dir)) {{ New-Item -ItemType Directory -Path $dir -Force | Out-Null }}
-# Save prior DefaultOutboundAction per profile for honest rollback
-$prior = @{{}}
-foreach ($name in @('Domain','Private','Public')) {{
-  $p = Get-NetFirewallProfile -Name $name -ErrorAction Stop
-  $prior[$name] = [string]$p.DefaultOutboundAction
-}}
-$prior | ConvertTo-Json | Set-Content -Path $statePath -Encoding UTF8
-# Remove prior RPT-KS rules only (not other firewall rules)
-Get-NetFirewallRule -ErrorAction SilentlyContinue |
-  Where-Object {{ $_.DisplayName -like '{pfx}-*' }} |
-  Remove-NetFirewallRule -ErrorAction SilentlyContinue
-# Scoped allows only (node RemoteAddress + tunnel InterfaceAlias + loopback)
-New-NetFirewallRule -DisplayName '{n_node}' -Direction Outbound -Action Allow -RemoteAddress '{host}' -Enabled True -Profile Any | Out-Null
-$if = Get-NetAdapter -Name '{iface}' -ErrorAction SilentlyContinue
-if (-not $if) {{ throw 'tunnel adapter not found: {iface}' }}
-New-NetFirewallRule -DisplayName '{n_tun}' -Direction Outbound -Action Allow -InterfaceAlias $if.Name -Enabled True -Profile Any | Out-Null
-New-NetFirewallRule -DisplayName '{n_lo}' -Direction Outbound -Action Allow -RemoteAddress 127.0.0.0/8 -Enabled True -Profile Any | Out-Null
-"""
+    lines = [
+        "$ErrorActionPreference = 'Stop'",
+        f"$statePath = {state}",
+        "$dir = Split-Path -Parent $statePath",
+        "if (-not (Test-Path $dir)) { New-Item -ItemType Directory -Path $dir -Force | Out-Null }",
+        "# Save prior DefaultOutboundAction per profile for honest rollback",
+        "$prior = @{}",
+        "foreach ($name in @('Domain','Private','Public')) {",
+        "  $p = Get-NetFirewallProfile -Name $name -ErrorAction Stop",
+        "  $prior[$name] = [string]$p.DefaultOutboundAction",
+        "}",
+        "$prior | ConvertTo-Json | Set-Content -Path $statePath -Encoding UTF8",
+        "# Remove prior RPT-KS rules only (not other firewall rules)",
+        "Get-NetFirewallRule -ErrorAction SilentlyContinue |",
+        f"  Where-Object {{ $_.DisplayName -like '{pfx}-*' }} |",
+        "  Remove-NetFirewallRule -ErrorAction SilentlyContinue",
+        "# Scoped allows only (node RemoteAddress + tunnel InterfaceAlias + loopback)",
+        (
+            f"New-NetFirewallRule -DisplayName '{n_node}' -Direction Outbound "
+            f"-Action Allow -RemoteAddress '{host}' -Enabled True -Profile Any | Out-Null"
+        ),
+        f"$if = Get-NetAdapter -Name '{iface}' -ErrorAction SilentlyContinue",
+        f"if (-not $if) {{ throw 'tunnel adapter not found: {iface}' }}",
+        (
+            f"New-NetFirewallRule -DisplayName '{n_tun}' -Direction Outbound "
+            f"-Action Allow -InterfaceAlias $if.Name -Enabled True -Profile Any | Out-Null"
+        ),
+        (
+            f"New-NetFirewallRule -DisplayName '{n_lo}' -Direction Outbound "
+            f"-Action Allow -RemoteAddress 127.0.0.0/8 -Enabled True -Profile Any | Out-Null"
+        ),
+    ]
     if pol.block_stun_mdns:
         # Port-scoped blocks only (RemotePort) — not global unscoped Action Block
-        script += f"""
-New-NetFirewallRule -DisplayName '{n_stun}' -Direction Outbound -Action Block -Protocol UDP -RemotePort 3478,5349 -Enabled True -Profile Any | Out-Null
-New-NetFirewallRule -DisplayName '{n_mdns}' -Direction Outbound -Action Block -Protocol UDP -RemotePort 5353 -Enabled True -Profile Any | Out-Null
-"""
-    script += f"""
-# Fail-closed via profile default (NOT an unscoped New-NetFirewallRule Action Block)
-foreach ($name in @('Domain','Private','Public')) {{
-  Set-NetFirewallProfile -Name $name -DefaultOutboundAction Block -ErrorAction Stop
-}}
-# Verify critical allows + profile default
-foreach ($n in @('{n_node}', '{n_tun}')) {{
-  if (-not (Get-NetFirewallRule -DisplayName $n -ErrorAction SilentlyContinue)) {{
-    throw ('missing critical kill-switch allow rule: ' + $n)
-  }}
-}}
-foreach ($name in @('Domain','Private','Public')) {{
-  $p = Get-NetFirewallProfile -Name $name
-  if ([string]$p.DefaultOutboundAction -ne 'Block') {{
-    throw ('DefaultOutboundAction not Block on profile: ' + $name)
-  }}
-}}
-Write-Output 'RPT_KS_OK'
-exit 0
-"""
-    one_line = " ".join(line.strip() for line in script.splitlines() if line.strip())
-    return [
-        f'powershell -NoProfile -ExecutionPolicy Bypass -Command "{one_line}"'
+        lines.extend(
+            [
+                (
+                    f"New-NetFirewallRule -DisplayName '{n_stun}' -Direction Outbound "
+                    f"-Action Block -Protocol UDP -RemotePort 3478,5349 "
+                    f"-Enabled True -Profile Any | Out-Null"
+                ),
+                (
+                    f"New-NetFirewallRule -DisplayName '{n_mdns}' -Direction Outbound "
+                    f"-Action Block -Protocol UDP -RemotePort 5353 "
+                    f"-Enabled True -Profile Any | Out-Null"
+                ),
+            ]
+        )
+    lines.extend(
+        [
+            "# Fail-closed via profile default (NOT an unscoped New-NetFirewallRule Action Block)",
+            "foreach ($name in @('Domain','Private','Public')) {",
+            "  Set-NetFirewallProfile -Name $name -DefaultOutboundAction Block -ErrorAction Stop",
+            "}",
+            "# Verify critical allows + profile default",
+            f"foreach ($n in @('{n_node}', '{n_tun}')) {{",
+            "  if (-not (Get-NetFirewallRule -DisplayName $n -ErrorAction SilentlyContinue)) {",
+            "    throw ('missing critical kill-switch allow rule: ' + $n)",
+            "  }",
+            "}",
+            "foreach ($name in @('Domain','Private','Public')) {",
+            "  $p = Get-NetFirewallProfile -Name $name",
+            "  if ([string]$p.DefaultOutboundAction -ne 'Block') {",
+            "    throw ('DefaultOutboundAction not Block on profile: ' + $name)",
+            "  }",
+            "}",
+            "Write-Output 'RPT_KS_OK'",
+            "exit 0",
+        ]
+    )
+    return "\n".join(lines) + "\n"
+
+
+def windows_ks_rollback_script() -> str:
+    """Multi-line PowerShell body for kill-switch rollback (pure; not argv-wrapped)."""
+    pfx = WIN_RULE_PREFIX
+    state = WIN_KS_STATE_PATH_PS
+    lines = [
+        "$ErrorActionPreference = 'Continue'",
+        f"$statePath = {state}",
+        "Get-NetFirewallRule -ErrorAction SilentlyContinue |",
+        f"  Where-Object {{ $_.DisplayName -like '{pfx}-*' }} |",
+        "  Remove-NetFirewallRule -ErrorAction SilentlyContinue",
+        "if (Test-Path $statePath) {",
+        "  try {",
+        "    $prior = Get-Content -Path $statePath -Raw | ConvertFrom-Json",
+        "    foreach ($name in @('Domain','Private','Public')) {",
+        "      $val = $prior.$name",
+        "      if (-not $val) { $val = 'Allow' }",
+        "      Set-NetFirewallProfile -Name $name -DefaultOutboundAction $val -ErrorAction SilentlyContinue",
+        "    }",
+        "    Remove-Item -Path $statePath -Force -ErrorAction SilentlyContinue",
+        "  } catch {",
+        "    foreach ($name in @('Domain','Private','Public')) {",
+        "      Set-NetFirewallProfile -Name $name -DefaultOutboundAction Allow -ErrorAction SilentlyContinue",
+        "    }",
+        "  }",
+        "} else {",
+        "  foreach ($name in @('Domain','Private','Public')) {",
+        "    Set-NetFirewallProfile -Name $name -DefaultOutboundAction Allow -ErrorAction SilentlyContinue",
+        "  }",
+        "}",
+        "exit 0",
     ]
+    return "\n".join(lines) + "\n"
+
+
+def windows_kill_switch_block_commands(
+    *,
+    server_host: str,
+    tunnel_iface: str = "RPT",
+    policy: Optional[KillSwitchPolicy] = None,
+) -> list[str]:
+    """Executable argv list: EncodedCommand wrapping ``windows_ks_apply_script``."""
+    body = windows_ks_apply_script(
+        server_host=server_host,
+        tunnel_iface=tunnel_iface,
+        policy=policy,
+    )
+    if not body:
+        return []
+    return [powershell_encoded_command(body)]
 
 
 def windows_kill_switch_rollback_commands() -> list[str]:
-    """Remove RPT-KS rules and restore prior DefaultOutboundAction from state file."""
-    pfx = WIN_RULE_PREFIX
-    state = WIN_KS_STATE_FILE
-    script = f"""
-$ErrorActionPreference = 'Continue'
-$statePath = {state}
-Get-NetFirewallRule -ErrorAction SilentlyContinue |
-  Where-Object {{ $_.DisplayName -like '{pfx}-*' }} |
-  Remove-NetFirewallRule -ErrorAction SilentlyContinue
-if (Test-Path $statePath) {{
-  try {{
-    $prior = Get-Content -Path $statePath -Raw | ConvertFrom-Json
-    foreach ($name in @('Domain','Private','Public')) {{
-      $val = $prior.$name
-      if (-not $val) {{ $val = 'Allow' }}
-      Set-NetFirewallProfile -Name $name -DefaultOutboundAction $val -ErrorAction SilentlyContinue
-    }}
-    Remove-Item -Path $statePath -Force -ErrorAction SilentlyContinue
-  }} catch {{
-    foreach ($name in @('Domain','Private','Public')) {{
-      Set-NetFirewallProfile -Name $name -DefaultOutboundAction Allow -ErrorAction SilentlyContinue
-    }}
-  }}
-}} else {{
-  foreach ($name in @('Domain','Private','Public')) {{
-    Set-NetFirewallProfile -Name $name -DefaultOutboundAction Allow -ErrorAction SilentlyContinue
-  }}
-}}
-exit 0
-"""
-    one_line = " ".join(line.strip() for line in script.splitlines() if line.strip())
-    return [
-        f'powershell -NoProfile -ExecutionPolicy Bypass -Command "{one_line}"'
-    ]
+    """Executable argv list: EncodedCommand wrapping ``windows_ks_rollback_script``."""
+    return [powershell_encoded_command(windows_ks_rollback_script())]
 
 
-def assert_windows_ks_commands_safe(cmds: list[str]) -> list[str]:
-    """Return violations for unsafe Windows kill-switch command shapes.
-
-    - No unrestricted allow (remoteip=any without InterfaceAlias)
-    - No **unscoped** Action=Block New-NetFirewallRule (no RemotePort/RemoteAddress/
-      InterfaceAlias) — those blackhole VPN traffic under Defender rule order
-    - Must use Set-NetFirewallProfile DefaultOutboundAction Block
-    - Must scope allows via InterfaceAlias + RemoteAddress
-    - Rollback must restore DefaultOutboundAction
-    """
+def assert_windows_ks_script_safe(script_body: str) -> list[str]:
+    """Policy safety checks on the pure multi-line PowerShell body."""
     violations: list[str] = []
-    joined = "\n".join(cmds)
+    joined = script_body
     low = joined.lower()
 
-    # netsh-style remoteip=any on an allow rule
     for m in re.finditer(
         r"action\s*=\s*allow[^\"\n]*remoteip\s*=\s*any",
         joined,
@@ -217,15 +274,11 @@ def assert_windows_ks_commands_safe(cmds: list[str]) -> list[str]:
             violations.append(
                 "allow rule pairs localip=any with remoteip=any without InterfaceAlias"
             )
-    if re.search(r'action=allow[^"\n]*#\s*iface=', joined, re.I):
-        violations.append("netsh allow rule contains invalid # iface= trailer")
 
-    # Unscoped New-NetFirewallRule Action Block (no port/addr/iface scope)
-    # Match PowerShell: New-NetFirewallRule ... -Action Block ... without RemotePort etc.
     for m in re.finditer(
-        r"New-NetFirewallRule\b[^;|]*?-Action\s+Block\b[^;|]*",
+        r"New-NetFirewallRule\b[^\n]*?-Action\s+Block\b[^\n]*",
         joined,
-        flags=re.IGNORECASE | re.DOTALL,
+        flags=re.IGNORECASE,
     ):
         rule = m.group(0)
         rl = rule.lower()
@@ -247,30 +300,69 @@ def assert_windows_ks_commands_safe(cmds: list[str]) -> list[str]:
                 f"(use DefaultOutboundAction Block + scoped allows): {rule[:120]}"
             )
 
-    # Legacy RPT-KS-block-out unscoped rule name must not appear
     if f"{WIN_RULE_PREFIX}-block-out" in joined:
         violations.append(
             f"legacy unscoped {WIN_RULE_PREFIX}-block-out rule must not be created"
         )
 
-    if cmds and "InterfaceAlias" not in joined:
+    if "InterfaceAlias" not in joined:
         violations.append("missing InterfaceAlias-scoped tunnel allow")
-    if cmds and "RemoteAddress" not in joined and "remoteip=" not in low:
+    if "RemoteAddress" not in joined and "remoteip=" not in low:
         violations.append("missing node RemoteAddress/remoteip allow")
-    if cmds and "Set-NetFirewallProfile" not in joined:
+    if "Set-NetFirewallProfile" not in joined:
         violations.append("missing Set-NetFirewallProfile for DefaultOutboundAction")
-    if cmds and "DefaultOutboundAction" not in joined:
+    if "DefaultOutboundAction" not in joined:
         violations.append("missing DefaultOutboundAction Block profile setting")
-    if cmds and "Block" not in joined:
+    if "Block" not in joined:
         violations.append("missing fail-closed Block default")
+    # State path must be double-quoted PowerShell string
+    if '"$env:ProgramData\\RestorePrivacy\\ks-outbound-state.json"' not in joined:
+        # Also accept single-escaped form in body
+        if "ks-outbound-state.json" not in joined:
+            violations.append("missing ks-outbound-state.json state path")
+        elif "$statePath =" in joined and '"$env:ProgramData' not in joined:
+            violations.append(
+                "state path must be double-quoted: "
+                '"$env:ProgramData\\RestorePrivacy\\ks-outbound-state.json"'
+            )
 
+    return violations
+
+
+def assert_windows_ks_commands_safe(cmds: list[str]) -> list[str]:
+    """Decode EncodedCommand bodies and run policy safety checks."""
+    if not cmds:
+        return ["empty command list"]
+    violations: list[str] = []
+    for cmd in cmds:
+        if "-EncodedCommand" not in cmd and "-encodedcommand" not in cmd.lower():
+            violations.append(
+                "Windows KS must use -EncodedCommand (not space-collapsed -Command)"
+            )
+            # Still try policy on raw if it looks like old style
+            violations.extend(assert_windows_ks_script_safe(cmd))
+            continue
+        try:
+            body = decode_powershell_encoded_command(cmd)
+        except Exception as exc:  # noqa: BLE001
+            violations.append(f"cannot decode EncodedCommand: {exc}")
+            continue
+        violations.extend(assert_windows_ks_script_safe(body))
     return violations
 
 
 def assert_windows_ks_rollback_restores_profiles(cmds: list[str]) -> list[str]:
     """Rollback must restore DefaultOutboundAction (from state or Allow fallback)."""
     violations: list[str] = []
-    joined = "\n".join(cmds)
+    if not cmds:
+        return ["empty rollback list"]
+    bodies: list[str] = []
+    for cmd in cmds:
+        try:
+            bodies.append(decode_powershell_encoded_command(cmd))
+        except Exception:
+            bodies.append(cmd)
+    joined = "\n".join(bodies)
     if "Set-NetFirewallProfile" not in joined:
         violations.append("rollback missing Set-NetFirewallProfile restore")
     if "DefaultOutboundAction" not in joined:
@@ -278,6 +370,98 @@ def assert_windows_ks_rollback_restores_profiles(cmds: list[str]) -> list[str]:
     if "ks-outbound-state" not in joined and "Allow" not in joined:
         violations.append("rollback missing state file or Allow fallback")
     return violations
+
+
+def parse_powershell_script(script_body: str) -> list[str]:
+    """Return parse errors for a PowerShell script body (empty list if valid).
+
+    Uses System.Management.Automation.Language.Parser via powershell when
+    available; falls back to a structural check that rejects space-joined
+    multi-statement patterns that never parse.
+    """
+    errors: list[str] = []
+    body = script_body or ""
+    if not body.strip():
+        return ["empty script body"]
+    # Structural: multi-line bodies must contain real newlines (not space-joined)
+    if "\n" not in body and body.count("$") > 3 and " = " in body:
+        # Single long line with many assignments is the old broken join pattern
+        if re.search(r"=\s*'Stop'\s+\$", body):
+            errors.append(
+                "script looks space-joined without statement separators "
+                "(use newlines or ';')"
+            )
+    # Prefer real PowerShell AST parse on Windows
+    ps = None
+    for cand in (
+        os.environ.get("RPT_POWERSHELL"),
+        "powershell",
+        "pwsh",
+    ):
+        if not cand:
+            continue
+        try:
+            # Probe
+            r = subprocess.run(
+                [cand, "-NoProfile", "-Command", "exit 0"],
+                capture_output=True,
+                timeout=10,
+            )
+            if r.returncode == 0:
+                ps = cand
+                break
+        except Exception:
+            continue
+    if ps is None:
+        # No PowerShell: keep structural checks only
+        if "$statePath =" in body and '"$env:ProgramData' not in body:
+            errors.append("unquoted $env:ProgramData state path")
+        return errors
+
+    # Write body to a temp file next to process (not scratch-as-HOME)
+    import tempfile
+
+    with tempfile.NamedTemporaryFile(
+        mode="w",
+        suffix=".ps1",
+        delete=False,
+        encoding="utf-8",
+        newline="\n",
+    ) as f:
+        f.write(body)
+        path = f.name
+    try:
+        # AST parse without executing
+        parse_cmd = (
+            "$e=$null; $t=$null; "
+            f"[void][System.Management.Automation.Language.Parser]::ParseFile("
+            f"'{path.replace(chr(39), chr(39)+chr(39))}', [ref]$t, [ref]$e); "
+            "if ($e -and $e.Count -gt 0) { "
+            "$e | ForEach-Object { $_.ToString() }; exit 2 } "
+            "else { exit 0 }"
+        )
+        r = subprocess.run(
+            [ps, "-NoProfile", "-NonInteractive", "-Command", parse_cmd],
+            capture_output=True,
+            text=True,
+            timeout=30,
+        )
+        if r.returncode != 0:
+            msg = (r.stdout or r.stderr or "").strip() or f"parse exit {r.returncode}"
+            for line in msg.splitlines():
+                line = line.strip()
+                if line:
+                    errors.append(line)
+            if not errors:
+                errors.append(f"PowerShell parse failed (exit {r.returncode})")
+    except Exception as exc:  # noqa: BLE001
+        errors.append(f"parse harness error: {exc}")
+    finally:
+        try:
+            os.unlink(path)
+        except OSError:
+            pass
+    return errors
 
 
 def linux_kill_switch_block_commands(

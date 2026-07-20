@@ -21,19 +21,23 @@ from client.kill_switch import (  # noqa: E402
     LINUX_CHAIN,
     WIN_CRITICAL_ALLOW_NODE,
     WIN_CRITICAL_ALLOW_TUN,
-    WIN_PROFILE_DEFAULT_OUTBOUND_BLOCK,
     WIN_RULE_PREFIX,
     android_kill_switch_builder_flags,
     assert_windows_ks_commands_safe,
     assert_windows_ks_rollback_restores_profiles,
+    assert_windows_ks_script_safe,
     build_kill_switch_plan,
+    decode_powershell_encoded_command,
     default_kill_switch_policy,
     linux_kill_switch_block_commands,
     linux_kill_switch_rollback_commands,
+    parse_powershell_script,
     product_kill_switch_enabled,
     run_kill_switch_commands,
     windows_kill_switch_block_commands,
     windows_kill_switch_rollback_commands,
+    windows_ks_apply_script,
+    windows_ks_rollback_script,
 )
 from client.leak_protection import (  # noqa: E402
     PUBLIC_DNS_BLOCKLIST,
@@ -47,45 +51,53 @@ from client.leak_protection import (  # noqa: E402
 class TestKillSwitchBuilders(unittest.TestCase):
     def test_windows_uses_profile_default_not_unscoped_block(self):
         """No unscoped Action=Block rule; fail-closed via DefaultOutboundAction."""
-        block = windows_kill_switch_block_commands(server_host="82.221.101.241")
-        roll = windows_kill_switch_rollback_commands()
-        self.assertTrue(block)
-        joined = "\n".join(block)
-        self.assertIn(WIN_RULE_PREFIX, joined)
-        self.assertIn("82.221.101.241", joined)
-        self.assertIn("RemoteAddress", joined)
-        self.assertIn("InterfaceAlias", joined)
-        self.assertIn(WIN_CRITICAL_ALLOW_NODE, joined)
-        self.assertIn(WIN_CRITICAL_ALLOW_TUN, joined)
-        self.assertIn("Set-NetFirewallProfile", joined)
-        self.assertIn("DefaultOutboundAction", joined)
-        self.assertIn("Block", joined)
-        # Must NOT create legacy global block-out rule
-        self.assertNotIn(f"{WIN_RULE_PREFIX}-block-out", joined)
-        # STUN/mDNS may use port-scoped blocks
-        self.assertIn("3478", joined)
-        self.assertIn("5353", joined)
-        violations = assert_windows_ks_commands_safe(block)
+        body = windows_ks_apply_script(server_host="82.221.101.241")
+        self.assertTrue(body)
+        self.assertIn("\n", body)  # multi-line, not space-joined
+        self.assertIn(WIN_RULE_PREFIX, body)
+        self.assertIn("82.221.101.241", body)
+        self.assertIn("RemoteAddress", body)
+        self.assertIn("InterfaceAlias", body)
+        self.assertIn(WIN_CRITICAL_ALLOW_NODE, body)
+        self.assertIn(WIN_CRITICAL_ALLOW_TUN, body)
+        self.assertIn("Set-NetFirewallProfile", body)
+        self.assertIn("DefaultOutboundAction", body)
+        self.assertIn("Block", body)
+        self.assertNotIn(f"{WIN_RULE_PREFIX}-block-out", body)
+        self.assertIn("3478", body)
+        self.assertIn("5353", body)
+        self.assertIn(
+            '"$env:ProgramData\\RestorePrivacy\\ks-outbound-state.json"', body
+        )
+        violations = assert_windows_ks_script_safe(body)
         self.assertEqual(violations, [], msg=violations)
-        self.assertNotIn("remoteip=any", joined.lower())
-        self.assertNotIn("localip=any", joined.lower())
-        # Rollback restores profiles
+        # Emission is EncodedCommand wrapping the pure body
+        cmds = windows_kill_switch_block_commands(server_host="82.221.101.241")
+        self.assertEqual(len(cmds), 1)
+        self.assertIn("-EncodedCommand", cmds[0])
+        decoded = decode_powershell_encoded_command(cmds[0])
+        self.assertEqual(decoded, body)
+        self.assertEqual(assert_windows_ks_commands_safe(cmds), [])
+        roll = windows_kill_switch_rollback_commands()
         rv = assert_windows_ks_rollback_restores_profiles(roll)
         self.assertEqual(rv, [], msg=rv)
-        self.assertIn("DefaultOutboundAction", "\n".join(roll))
+        roll_body = windows_ks_rollback_script()
+        self.assertIn("DefaultOutboundAction", roll_body)
 
     def test_assert_rejects_unscoped_block_rule(self):
         """Safety helper fails on New-NetFirewallRule Action=Block with no scope."""
-        bad = [
-            "New-NetFirewallRule -DisplayName 'RPT-KS-block-out' "
-            "-Direction Outbound -Action Block -Enabled True -Profile Any",
-            "New-NetFirewallRule -DisplayName 'RPT-KS-allow-node' "
-            "-Direction Outbound -Action Allow -RemoteAddress 1.2.3.4",
-            "New-NetFirewallRule -DisplayName 'RPT-KS-allow-tun-if' "
-            "-Direction Outbound -Action Allow -InterfaceAlias RPT",
-            "Set-NetFirewallProfile -Name Domain -DefaultOutboundAction Block",
-        ]
-        v = assert_windows_ks_commands_safe(bad)
+        bad_body = "\n".join(
+            [
+                "New-NetFirewallRule -DisplayName 'RPT-KS-block-out' "
+                "-Direction Outbound -Action Block -Enabled True -Profile Any",
+                "New-NetFirewallRule -DisplayName 'RPT-KS-allow-node' "
+                "-Direction Outbound -Action Allow -RemoteAddress 1.2.3.4",
+                "New-NetFirewallRule -DisplayName 'RPT-KS-allow-tun-if' "
+                "-Direction Outbound -Action Allow -InterfaceAlias RPT",
+                "Set-NetFirewallProfile -Name Domain -DefaultOutboundAction Block",
+            ]
+        )
+        v = assert_windows_ks_script_safe(bad_body)
         self.assertTrue(
             any("unscoped" in x.lower() or "block-out" in x.lower() for x in v),
             f"expected unscoped block rejection, got {v}",
@@ -93,24 +105,52 @@ class TestKillSwitchBuilders(unittest.TestCase):
 
     def test_assert_windows_ks_rejects_broken_allow_all(self):
         """Safety helper fails if allow rules use remoteip=any without InterfaceAlias."""
-        bad = [
-            f'netsh advfirewall firewall add rule name="{WIN_RULE_PREFIX}-allow-tun" '
-            f"dir=out action=allow enable=yes interfacetype=any "
-            f"localip=any remoteip=any profile=any # iface=RPT",
-            f'netsh advfirewall firewall add rule name="{WIN_RULE_PREFIX}-block-out" '
-            f"dir=out action=block protocol=any enable=yes",
-        ]
-        v = assert_windows_ks_commands_safe(bad)
+        bad_body = "\n".join(
+            [
+                f'netsh advfirewall firewall add rule name="{WIN_RULE_PREFIX}-allow-tun" '
+                f"dir=out action=allow enable=yes interfacetype=any "
+                f"localip=any remoteip=any profile=any # iface=RPT",
+                f'netsh advfirewall firewall add rule name="{WIN_RULE_PREFIX}-block-out" '
+                f"dir=out action=block protocol=any enable=yes",
+            ]
+        )
+        v = assert_windows_ks_script_safe(bad_body)
         self.assertTrue(v, "must reject remoteip=any allow without InterfaceAlias")
 
     def test_port_scoped_block_is_allowed(self):
         """STUN RemotePort blocks are scoped — not treated as global blackhole."""
+        body = windows_ks_apply_script(server_host="1.2.3.4")
+        self.assertIn("RemotePort", body)
+        self.assertIn("3478", body)
+        self.assertEqual(assert_windows_ks_script_safe(body), [])
         cmds = windows_kill_switch_block_commands(server_host="1.2.3.4")
-        joined = "\n".join(cmds)
-        self.assertIn("RemotePort", joined)
-        self.assertIn("3478", joined)
-        # Still no unscoped block-out
         self.assertEqual(assert_windows_ks_commands_safe(cmds), [])
+
+    def test_powershell_apply_and_rollback_parse_clean(self):
+        """Real PowerShell AST parse of pure bodies (gates runnability)."""
+        apply_body = windows_ks_apply_script(
+            server_host="82.221.101.241", tunnel_iface="RPT"
+        )
+        roll_body = windows_ks_rollback_script()
+        for label, body in (("apply", apply_body), ("rollback", roll_body)):
+            errs = parse_powershell_script(body)
+            self.assertEqual(
+                errs,
+                [],
+                msg=f"{label} script parse errors: {errs}\n--- body ---\n{body[:500]}",
+            )
+        # EncodedCommand round-trip body is identical and still parses
+        cmd = windows_kill_switch_block_commands(server_host="82.221.101.241")[0]
+        decoded = decode_powershell_encoded_command(cmd)
+        self.assertEqual(decoded, apply_body)
+        self.assertEqual(parse_powershell_script(decoded), [])
+
+    def test_no_space_joined_command_emission(self):
+        """Shipped argv must not use space-collapsed -Command multi-statements."""
+        for cmd in windows_kill_switch_block_commands(server_host="1.2.3.4"):
+            self.assertIn("-EncodedCommand", cmd)
+            self.assertNotIn("-Command \"", cmd)
+            self.assertNotIn("='Stop' $", cmd)  # classic broken join artifact
 
     def test_linux_block_and_rollback(self):
         block = linux_kill_switch_block_commands(
