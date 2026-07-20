@@ -664,8 +664,8 @@ def start_full_tunnel(
             from client.kill_switch import (
                 build_kill_switch_plan,
                 product_kill_switch_enabled,
+                run_kill_switch_commands,
             )
-            import subprocess
 
             if product_kill_switch_enabled():
                 ks = build_kill_switch_plan(
@@ -673,17 +673,20 @@ def start_full_tunnel(
                     server_host=server_host,
                     tunnel_iface=plan.tunnel_iface or "RPT",
                 )
-                for cmd in ks.apply:
-                    try:
-                        subprocess.run(cmd, shell=True, capture_output=True, timeout=20)
-                        applied.append(cmd)
-                    except Exception:
-                        pass
-                ks_applied = bool(ks.apply)
+                ran, ok, errs = run_kill_switch_commands(
+                    ks.apply, shell=True, platform="windows"
+                )
+                applied.extend(ran)
+                # Only claim kill-switch on when critical rules actually installed
+                ks_applied = bool(ok)
                 if ks_applied:
                     msg += "; kill-switch on"
+                elif ks.apply:
+                    detail = (errs[0] if errs else "rules not verified")
+                    msg += f"; kill-switch incomplete ({detail})"
         except Exception as exc:
             msg += f"; kill-switch incomplete: {exc}"
+            ks_applied = False
 
     result = WindowsTunnelResult(
         ok=True,

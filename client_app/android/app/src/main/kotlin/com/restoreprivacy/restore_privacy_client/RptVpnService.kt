@@ -236,11 +236,16 @@ class RptVpnService : VpnService() {
 
                 // DNS: node tunnel gateway recursive resolver (matches client.full_tunnel defaults)
                 // IPv6: add ::/0 so residual IPv6 is not left on the ISP path (leak protection)
+                // Kill switch: setBlocking(true) on API 29+ so non-VPN apps cannot bypass the TUN
                 val builder = Builder()
                     .setSession(sessionName)
                     .setMtu(1280)
                     .addAddress(session.vpnIp, 32)
                     .addDnsServer("10.88.0.1")
+                if (android.os.Build.VERSION.SDK_INT >= 29) {
+                    // Product kill-switch: block traffic that would leave outside the VPN
+                    builder.setBlocking(true)
+                }
                 var ipv6RouteOk = false
                 if (fullTunnel) {
                     builder.addRoute("0.0.0.0", 0)

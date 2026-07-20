@@ -404,6 +404,7 @@ def start_full_tunnel(
         from client.kill_switch import (
             build_kill_switch_plan,
             product_kill_switch_enabled,
+            run_kill_switch_commands,
         )
 
         if product_kill_switch_enabled():
@@ -412,11 +413,16 @@ def start_full_tunnel(
                 server_host=server_host,
                 tunnel_iface=iface or "rpt0",
             )
-            ks_cmds, _ = _run_cmds(ks.apply)
-            applied.extend(ks_cmds)
-            ks_applied = bool(ks.apply)
+            ran, ok, errs = run_kill_switch_commands(
+                ks.apply, shell=True, platform="linux"
+            )
+            applied.extend(ran)
+            ks_applied = bool(ok)
             if ks_applied:
                 msg += "; kill-switch on"
+            elif ks.apply:
+                detail = errs[0] if errs else "rules not verified"
+                msg += f"; kill-switch incomplete ({detail})"
     except Exception:
         ks_applied = False
 
