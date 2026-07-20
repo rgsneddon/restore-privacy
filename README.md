@@ -162,6 +162,8 @@ Node deploy, ports, secrets, from-source builds, and tests: **[sundries.txt](sun
 
 **Tunnel DNS / host privacy:** [node/install_dns.sh](node/install_dns.sh), [node/install_host_privacy.sh](node/install_host_privacy.sh).
 
+**Data at rest (LUKS / dm-crypt):** [node/install_disk_encryption.sh](node/install_disk_encryption.sh) — `check` / `dry-run` / confirmed `format`. Combines with **no-logs** and [shutdown wipe](node/install_shutdown_wipe.sh) (runtime scrub on stop; optional aggressive secrets wipe). Honesty: FDE protects locked disks only; does not erase provider snapshots.
+
 **Release scripts:** Use **scripts/build_release_0.2.2.py**. Re-run `python scripts/package_linux.py` each tag for manylinux wheels.
 
 ```bash

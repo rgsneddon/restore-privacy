@@ -10,7 +10,8 @@
 #   curl -fsSL … | bash   # or:
 #   sudo bash scripts/selfhost_node.sh
 #
-# Env overrides: INSTALL_ROOT, LISTEN_PORT, UI_PORT, SKIP_DNS=1, SKIP_HOST_PRIVACY=1
+# Env overrides: INSTALL_ROOT, LISTEN_PORT, UI_PORT, SKIP_DNS=1, SKIP_HOST_PRIVACY=1,
+#                SKIP_DISK_ENCRYPTION=1, SKIP_SHUTDOWN_WIPE=1
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -66,4 +67,7 @@ echo "Check:  ss -ulnp | grep $LISTEN_PORT"
 echo "        curl -s http://127.0.0.1:$UI_PORT/status"
 echo
 echo "Privacy limits: the VPS provider may still see IP-level metadata (privacy policy §4)."
+echo "Data at rest (optional strong fallback): LUKS/dm-crypt — node/install_disk_encryption.sh check"
+echo "  Full-disk format is operator-driven (RPT_LUKS_CONFIRM=yes); often needs reimage + console unlock."
+echo "Shutdown wipe: install_shutdown_wipe.sh (runtime scrub; not provider snapshots)."
 echo "Optional multi-hop, padding, cover traffic: client-side / future hop config — see README."

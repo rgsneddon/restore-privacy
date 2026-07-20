@@ -44,4 +44,22 @@ fi
 
 echo "[rpt-host-privacy] remind: do not enable verbose rsyslog/ulogd peer connection logs for RPT"
 echo "[rpt-host-privacy] remind: VPS provider may still log IP-level metadata under their policy"
+
+# Optional: LUKS/dm-crypt data-at-rest + shutdown wipe (strong fallback; non-fatal)
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+if [[ "${SKIP_DISK_ENCRYPTION:-0}" != "1" ]] && [[ -f "${SCRIPT_DIR}/install_disk_encryption.sh" ]]; then
+  echo "[rpt-host-privacy] disk encryption check (LUKS/dm-crypt; non-destructive)"
+  bash "${SCRIPT_DIR}/install_disk_encryption.sh" check || true
+fi
+if [[ "${SKIP_SHUTDOWN_WIPE:-0}" != "1" ]] && [[ -f "${SCRIPT_DIR}/install_shutdown_wipe.sh" ]]; then
+  if [[ "$(id -u)" -eq 0 ]]; then
+    echo "[rpt-host-privacy] install shutdown/stop auto-wipe (best-effort runtime scrub)"
+    bash "${SCRIPT_DIR}/install_shutdown_wipe.sh" || {
+      echo "[rpt-host-privacy] WARN: install_shutdown_wipe.sh failed (non-fatal)" >&2
+    }
+  else
+    echo "[rpt-host-privacy] skip wipe install (not root)"
+  fi
+fi
+echo "[rpt-host-privacy] compose: no-logs + optional LUKS at-rest + wipe on stop/shutdown"
 echo "[rpt-host-privacy] done"

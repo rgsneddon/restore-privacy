@@ -90,16 +90,33 @@ SECRETS / RELEASE GATES (mandatory)
     # Config sample: node/unbound-rpt.conf (listen 10.88.0.1, ACL 10.88.0.0/24 only)
     # Do NOT open UDP/TCP 53 on the public WAN (not an open resolver).
 
-  Quiet host logging (prep â€” install.sh also attempts this):
+  Quiet host logging (prep — install.sh also attempts this):
     bash /opt/restore-privacy/node/install_host_privacy.sh
     # journald short retention; rpt-node unit uses StandardOutput=null (see install.sh)
-    # Product nolog: node/nolog.py â€” never enable connection/session logs for RPT.
+    # Product nolog: node/nolog.py — never enable connection/session logs for RPT.
+    # Also runs LUKS/dm-crypt *check* + installs shutdown/stop auto-wipe (best-effort).
 
-  Deploy follow-up (live VPS â€” not finished by git push alone):
+  Full-disk / data-volume encryption (LUKS + dm-crypt — data at rest):
+    bash /opt/restore-privacy/node/install_disk_encryption.sh check
+    bash /opt/restore-privacy/node/install_disk_encryption.sh dry-run /dev/sdX
+    # DESTRUCTIVE format only with explicit confirm (often needs reimage + console unlock):
+    #   RPT_LUKS_CONFIRM=yes bash …/install_disk_encryption.sh format /dev/sdX
+    # Honesty: LUKS protects locked/off disks; unlocked root can still read.
+    # Compose with no-logs + wipe — does not erase VPS provider snapshots/netflow.
+
+  Shutdown / stop auto-wipe (runtime scrub; optional aggressive secrets):
+    bash /opt/restore-privacy/node/install_shutdown_wipe.sh
+    # Wires ExecStop on rpt-node + rpt-node-shutdown-wipe.service
+    # Default keeps admission keys (Restart=always safe). Aggressive:
+    #   RPT_WIPE_SECRETS_ON_SHUTDOWN=1
+    # Pure plan helpers: node/disk_encryption.py
+
+  Deploy follow-up (live VPS — not finished by git push alone):
     1) Copy/install node on the host (install.sh or deploy script)
     2) Confirm rpt-node active and rpt0 has 10.88.0.1
     3) Re-run install_dns.sh + install_host_privacy.sh if needed
-    4) Smoke-test: client Connect, DNS via tunnel, no public :53 open
+    4) Optional: LUKS volume for secrets/data (install_disk_encryption.sh)
+    5) Smoke-test: client Connect, DNS via tunnel, no public :53 open
     Then consider further privacy actions (kill-switch, device-key rotate, etc.).
 
   Node properties (operator reference):

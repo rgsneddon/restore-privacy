@@ -27,7 +27,14 @@ class TestSelfHostRecipe(unittest.TestCase):
         self.assertIn("VPS provider", text)
 
     def test_node_install_scripts_present(self):
-        for name in ("install.sh", "install_dns.sh", "install_host_privacy.sh"):
+        for name in (
+            "install.sh",
+            "install_dns.sh",
+            "install_host_privacy.sh",
+            "install_disk_encryption.sh",
+            "install_shutdown_wipe.sh",
+            "rpt_shutdown_wipe.sh",
+        ):
             p = ROOT / "node" / name
             self.assertTrue(p.is_file(), f"missing node/{name}")
 

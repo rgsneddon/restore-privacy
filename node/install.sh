@@ -27,6 +27,10 @@ mkdir -p "$INSTALL_ROOT/node" "$INSTALL_ROOT/secrets"
 chmod 700 "$INSTALL_ROOT/secrets"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cp -a "$SCRIPT_DIR"/*.py "$INSTALL_ROOT/node/" 2>/dev/null || true
+# Operator helpers: LUKS/dm-crypt, host privacy, DNS, shutdown wipe
+cp -a "$SCRIPT_DIR"/*.sh "$INSTALL_ROOT/node/" 2>/dev/null || true
+cp -a "$SCRIPT_DIR"/*.conf "$INSTALL_ROOT/node/" 2>/dev/null || true
+chmod 755 "$INSTALL_ROOT/node/"*.sh 2>/dev/null || true
 touch "$INSTALL_ROOT/node/__init__.py"
 
 echo "[rpt-install] venv + cryptography"
