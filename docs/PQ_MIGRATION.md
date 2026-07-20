@@ -42,7 +42,7 @@ Default product env keeps `RPT_PQ_HYBRID=0` until S2 is complete and audited.
 | Material | Rotation driver | Notes |
 |----------|-----------------|-------|
 | Node **ElGamal** long-term | `node.key_rotation` / HSM-sealed backend | Clients re-provision **public** only |
-| Session AEAD keys | Per session (X25519 PFS) | Already ephemeral |
+| Session AEAD keys | Per session (X25519 PFS) | Product default on Python + Android/Apple residual engines |
 | Hybrid KEM ephemeral | Per session encaps | When S2 enabled |
 | Device Ed25519 | Per install (not shared) | Never ship shared client priv |
 | Product `node_elgamal.pub` pin | On node rotation | Catalog / assets refresh |

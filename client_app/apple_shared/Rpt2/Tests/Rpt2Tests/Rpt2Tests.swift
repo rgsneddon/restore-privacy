@@ -90,7 +90,8 @@ final class Rpt2Tests: XCTestCase {
                 sessionKey: key,
                 vpnIp: "10.88.0.5",
                 clientPub: clientPriv.publicKey.rawRepresentation,
-                clientNonce: Data(repeating: 9, count: 32)
+                clientNonce: Data(repeating: 9, count: 32),
+                pfs: true
             )
         )
 
@@ -115,7 +116,8 @@ final class Rpt2Tests: XCTestCase {
                 sessionKey: Data(repeating: 2, count: 32),
                 vpnIp: "10.88.0.1",
                 clientPub: clientPriv.publicKey.rawRepresentation,
-                clientNonce: Data(repeating: 3, count: 32)
+                clientNonce: Data(repeating: 3, count: 32),
+                pfs: true
             )
         )
         XCTAssertThrowsError(try engine.openPacket(Data(repeating: 0, count: 64)))
@@ -149,6 +151,7 @@ final class Rpt2Tests: XCTestCase {
         XCTAssertEqual(session.vpnIp, "10.88.0.7")
         XCTAssertEqual(session.sessionId.count, 8)
         XCTAssertEqual(session.sessionKey.count, 32)
+        XCTAssertTrue(session.pfs)
 
         // DATA round-trip under derived session keys
         let pkt = Data("hello-ip-packet".utf8)
@@ -274,7 +277,8 @@ final class Rpt2Tests: XCTestCase {
                 sessionKey: key,
                 vpnIp: "10.88.0.9",
                 clientPub: clientPriv.publicKey.rawRepresentation,
-                clientNonce: Data(repeating: 1, count: 32)
+                clientNonce: Data(repeating: 1, count: 32),
+                pfs: true
             )
         )
         XCTAssertNil(engine.transport)
@@ -422,12 +426,24 @@ final class Rpt2Tests: XCTestCase {
         let opening = try RptPedersen.Opening.importBytes(Data(opened.dropFirst(32).prefix(288)))
         let commit = try RptPedersen.Commitment.importBytes(commitB)
         _ = try RptPedersen.openVerified(commitment: commit, opening: opening)
+        // Product PFS: client eph X25519 pub after opening (32 bytes)
+        guard opened.count >= 32 + 288 + 32 else {
+            throw RptProtocol.ProtocolError("CLIENT_HELLO missing client X25519 eph (product PFS)")
+        }
+        let clientEphPub = Data(opened.dropFirst(32 + 288).prefix(32))
 
         var sessionId = Data(count: 8)
         _ = sessionId.withUnsafeMutableBytes { SecRandomCopyBytes(kSecRandomDefault, 8, $0.baseAddress!) }
         var serverNonce = Data(count: 32)
         _ = serverNonce.withUnsafeMutableBytes { SecRandomCopyBytes(kSecRandomDefault, 32, $0.baseAddress!) }
         let (sCommit, sOpening) = RptPedersen.commitBytes(serverNonce)
+
+        // Server ephemeral X25519 for PFS session IKM
+        let serverEph = Curve25519.KeyAgreement.PrivateKey()
+        let serverEphPub = serverEph.publicKey.rawRepresentation
+        let peer = try Curve25519.KeyAgreement.PublicKey(rawRepresentation: clientEphPub)
+        // Derive session on node side for consistency checks (client completes independently)
+        _ = try serverEph.sharedSecretFromKeyAgreement(with: peer)
 
         var helloSharedMaterial = clientNonce
         helloSharedMaterial.append(clientPub)
@@ -441,7 +457,8 @@ final class Rpt2Tests: XCTestCase {
         let helloCrypto = RptSessionCrypto(keyBytes: helloKey)
         let parts = vpnIp.split(separator: ".").compactMap { UInt8($0) }
         guard parts.count == 4 else { throw RptProtocol.ProtocolError("bad vpn ip") }
-        var plain = serverNonce + sOpening.export() + Data(parts)
+        // plain = server_nonce + opening + vpn_ip + server_eph_pub (Python node_complete_hello PFS)
+        var plain = serverNonce + sOpening.export() + Data(parts) + serverEphPub
         var aad = Data("RPT2-SERVER-HELLO".utf8)
         aad.append(sessionId)
         let (nOut, sealedOut) = try helloCrypto.seal(plaintext: plain, aad: aad)

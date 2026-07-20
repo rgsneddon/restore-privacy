@@ -21,6 +21,9 @@ import java.security.SecureRandom
 /**
  * Authorized RPT2 client engine — ElGamal hybrid + Pedersen + Ed25519 + ChaCha20-Poly1305.
  * Mirrors Python `client.connect` / `node.handshake` (not WireGuard/OpenVPN).
+ *
+ * Product path uses **PFS**: ephemeral X25519 in HELLO hybrid payload and session IKM
+ * (`|pfs-x25519|`), matching Python `with_pfs=True` / node `require_pfs`.
  */
 class RptClientEngine(
     private val clientPrivRaw: ByteArray,
@@ -35,6 +38,7 @@ class RptClientEngine(
         val sessionId: ByteArray,
         val sessionKey: ByteArray,
         val vpnIp: String,
+        val pfs: Boolean = true,
     )
 
     fun handshake(socket: DatagramSocket, host: String, port: Int, timeoutMs: Int = 15000): Session {
@@ -43,7 +47,9 @@ class RptClientEngine(
         val clientPub = ed25519PublicFromPrivate(clientPrivRaw)
         val clientNonce = ByteArray(32).also { rnd.nextBytes(it) }
         val (commit, opening) = pedersenCommitBytes(clientNonce)
-        val payload = clientNonce + opening
+        // PFS: ephemeral X25519 public key appended to hybrid plaintext (Python build_client_hello)
+        val eph = generateX25519()
+        val payload = clientNonce + opening + eph.publicKey
         val hybrid = packHybrid(nodeElgamalPubRaw, payload)
         val transcript = byteArrayOf() +
             "RPT2-CLIENT-HELLO|".toByteArray(Charsets.US_ASCII) +
@@ -56,7 +62,7 @@ class RptClientEngine(
         val pkt = DatagramPacket(buf, buf.size)
         socket.receive(pkt)
         val reply = buf.copyOf(pkt.length)
-        val session = completeServerHello(reply, clientNonce, clientPub)
+        val session = completeServerHello(reply, clientNonce, clientPub, eph)
         this.sessionId = session.sessionId
         this.sessionKey = session.sessionKey
         this.counterOut = 0
@@ -92,7 +98,12 @@ class RptClientEngine(
         return bb.array()
     }
 
-    private fun completeServerHello(reply: ByteArray, clientNonce: ByteArray, clientPub: ByteArray): Session {
+    private fun completeServerHello(
+        reply: ByteArray,
+        clientNonce: ByteArray,
+        clientPub: ByteArray,
+        clientEph: X25519KeyPair,
+    ): Session {
         require(reply.size >= 5 + 256 + 8 + 12 + 16) { "short SERVER_HELLO" }
         require(reply[0] == 0x52.toByte() && reply[4] == 0x02.toByte()) { "not SERVER_HELLO" }
         val body = reply.copyOfRange(5, reply.size)
@@ -104,16 +115,45 @@ class RptClientEngine(
         val helloKey = hkdf(helloShared, clientNonce.copyOfRange(0, 16), "rpt-v2-hello".toByteArray())
         val aad = "RPT2-SERVER-HELLO".toByteArray(Charsets.US_ASCII) + sid
         val plain = aeadOpen(helloKey, nonce, sealed, aad)
-        require(plain.size >= 32 + 288 + 4) { "short hello payload" }
+        // Product PFS: server_nonce + pedersen opening + vpn_ip + server X25519 pub (32)
+        val serverEphOff = 32 + 288 + 4
+        require(plain.size >= serverEphOff + 32) {
+            "SERVER_HELLO missing server X25519 pub (product requires PFS)"
+        }
         val serverNonce = plain.copyOfRange(0, 32)
         val opening = plain.copyOfRange(32, 32 + 288)
-        // verify pedersen opening against sCommit
         require(pedersenVerify(sCommit, opening)) { "pedersen open failed" }
         val ipBytes = plain.copyOfRange(32 + 288, 32 + 288 + 4)
         val vpnIp = ipBytes.joinToString(".") { (it.toInt() and 0xff).toString() }
-        val sessionShared = sha256(clientNonce + serverNonce + sid + clientPub)
+        val serverEphPub = plain.copyOfRange(serverEphOff, serverEphOff + 32)
+        val ephShared = x25519Shared(clientEph.privateKey, serverEphPub)
+        // Python derive_pfs_session_shared
+        val sessionShared = sha256(
+            clientNonce + serverNonce + sid + clientPub +
+                "|pfs-x25519|".toByteArray(Charsets.US_ASCII) + ephShared
+        )
         val sessionKey = hkdf(sessionShared, clientNonce.copyOfRange(0, 16), "rpt-v2-session".toByteArray())
-        return Session(sid, sessionKey, vpnIp)
+        return Session(sid, sessionKey, vpnIp, pfs = true)
+    }
+
+    private data class X25519KeyPair(val privateKey: ByteArray, val publicKey: ByteArray)
+
+    private fun generateX25519(): X25519KeyPair {
+        val priv = ByteArray(32).also { rnd.nextBytes(it) }
+        // Clamp per RFC 7748
+        priv[0] = (priv[0].toInt() and 248).toByte()
+        priv[31] = (priv[31].toInt() and 127).toByte()
+        priv[31] = (priv[31].toInt() or 64).toByte()
+        val pub = ByteArray(32)
+        org.bouncycastle.math.ec.rfc7748.X25519.scalarMultBase(priv, 0, pub, 0)
+        return X25519KeyPair(priv, pub)
+    }
+
+    private fun x25519Shared(privateKey: ByteArray, peerPublic: ByteArray): ByteArray {
+        require(peerPublic.size == 32) { "X25519 public key must be 32 bytes" }
+        val out = ByteArray(32)
+        org.bouncycastle.math.ec.rfc7748.X25519.scalarMult(privateKey, 0, peerPublic, 0, out, 0)
+        return out
     }
 
     private fun packData(sid: ByteArray, counter: Long, nonce: ByteArray, sealed: ByteArray): ByteArray {
