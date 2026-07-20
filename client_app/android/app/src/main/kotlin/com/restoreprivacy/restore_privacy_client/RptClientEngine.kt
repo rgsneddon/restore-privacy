@@ -43,34 +43,70 @@ class RptClientEngine(
         val pfs: Boolean = true,
     )
 
-    fun handshake(socket: DatagramSocket, host: String, port: Int, timeoutMs: Int = 15000): Session {
-        socket.soTimeout = timeoutMs
+    /**
+     * Product HELLO: ElGamal hybrid + Pedersen + Ed25519 + X25519 PFS, outer-obfs wrap.
+     * Retries on poll timeout (mobile UDP drop / NAT) without changing crypto.
+     */
+    fun handshake(
+        socket: DatagramSocket,
+        host: String,
+        port: Int,
+        timeoutMs: Int = 15000,
+        attempts: Int = 3,
+    ): Session {
+        // Force IPv4 literal resolution (product node is IPv4-only)
         val endpoint = InetSocketAddress(host, port)
-        val clientPub = ed25519PublicFromPrivate(clientPrivRaw)
-        val clientNonce = ByteArray(32).also { rnd.nextBytes(it) }
-        val (commit, opening) = pedersenCommitBytes(clientNonce)
-        // PFS: ephemeral X25519 public key appended to hybrid plaintext (Python build_client_hello)
-        val eph = generateX25519()
-        val payload = clientNonce + opening + eph.publicKey
-        val hybrid = packHybrid(nodeElgamalPubRaw, payload)
-        val transcript = byteArrayOf() +
-            "RPT2-CLIENT-HELLO|".toByteArray(Charsets.US_ASCII) +
-            clientPub + commit + hybrid
-        val sig = ed25519Sign(clientPrivRaw, transcript)
-        val hello = packClientHello(clientPub, commit, hybrid, sig)
-        // Outer wrap HELLO (Python maybe_wrap)
-        val wireHello = RptObfuscation.maybeWrap(hello)
-        socket.send(DatagramPacket(wireHello, wireHello.size, endpoint))
+        val perAttempt = (timeoutMs / attempts.coerceAtLeast(1)).coerceAtLeast(5000)
+        var last: Exception? = null
+        repeat(attempts.coerceAtLeast(1)) { attempt ->
+            try {
+                socket.soTimeout = perAttempt
+                val clientPub = ed25519PublicFromPrivate(clientPrivRaw)
+                val clientNonce = ByteArray(32).also { rnd.nextBytes(it) }
+                val (commit, opening) = pedersenCommitBytes(clientNonce)
+                // PFS: ephemeral X25519 public key appended to hybrid plaintext
+                // (must match Python build_client_hello — node requires PFS)
+                val eph = generateX25519()
+                val payload = clientNonce + opening + eph.publicKey
+                val hybrid = packHybrid(nodeElgamalPubRaw, payload)
+                val transcript = byteArrayOf() +
+                    "RPT2-CLIENT-HELLO|".toByteArray(Charsets.US_ASCII) +
+                    clientPub + commit + hybrid
+                val sig = ed25519Sign(clientPrivRaw, transcript)
+                val hello = packClientHello(clientPub, commit, hybrid, sig)
+                // Outer wrap HELLO (Python maybe_wrap) — product residual wire
+                val wireHello = RptObfuscation.maybeWrap(hello)
+                socket.send(DatagramPacket(wireHello, wireHello.size, endpoint))
 
-        val buf = ByteArray(65535)
-        val pkt = DatagramPacket(buf, buf.size)
-        socket.receive(pkt)
-        val reply = RptObfuscation.maybeUnwrap(buf.copyOf(pkt.length))
-        val session = completeServerHello(reply, clientNonce, clientPub, eph)
-        this.sessionId = session.sessionId
-        this.sessionKey = session.sessionKey
-        this.counterOut = 0
-        return session
+                val buf = ByteArray(65535)
+                val pkt = DatagramPacket(buf, buf.size)
+                socket.receive(pkt)
+                val reply = RptObfuscation.maybeUnwrap(buf.copyOf(pkt.length))
+                val session = completeServerHello(reply, clientNonce, clientPub, eph)
+                this.sessionId = session.sessionId
+                this.sessionKey = session.sessionKey
+                this.counterOut = 0
+                return session
+            } catch (e: java.net.SocketTimeoutException) {
+                last = e
+                // retry with fresh HELLO (new nonce/eph) on next loop
+            } catch (e: Exception) {
+                // Non-timeout parse/crypto errors: do not burn retries uselessly
+                if (e is java.net.SocketTimeoutException) {
+                    last = e
+                } else if (
+                    e.message?.contains("timed out", ignoreCase = true) == true ||
+                    e.message?.contains("timeout", ignoreCase = true) == true
+                ) {
+                    last = e
+                } else {
+                    throw e
+                }
+            }
+        }
+        throw last ?: java.net.SocketTimeoutException(
+            "Poll timed out after $attempts HELLO attempt(s) to $host:$port"
+        )
     }
 
     /** Seal IP packet with product pad (RPTP) then pack DATA; caller should outer-wrap for UDP. */

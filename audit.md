@@ -6,7 +6,7 @@
 | **Repository** | `restore_privacy` |
 | **Version under review** | **0.2.3** (`client/VERSION`, catalog `RELEASE_VERSION` / `RELEASE_TAG`) |
 | **Production node** | **82.221.101.241:44044** (UDP); status UI TCP 8080 |
-| **Audit date** | 20 July 2026 (**0.2.3 ship pass**) |
+| **Audit date** | 20 July 2026 (**0.2.3 ship + connect hotfix**) |
 | **Prior passes** | 0.1.8–0.2.2 ship/docs; UK geo strip; DNS/IPv6; node pub pin; traffic-shape/PFS; native parity; monitoring; threat model; FDE; ephemeral nodes |
 | **Audit type** | Static code + policy consistency (not a pen-test or multi-OS residual red-team) |
 | **Auditor method** | Tree scan, endpoint/catalog alignment, packaging gates, security/policy unit suite; threat scenarios; release no-priv |
@@ -28,6 +28,8 @@ Restore Privacy **0.2.3** ships clients and public catalog aligned to the **Flok
 | **Layer obfuscation** (QUIC-mimic outer wrap) | **On by default**; product key **33 bytes** (Python/Kotlin/Swift) |
 | **Traffic shape** (pad / jitter / cover) | **On by default** product residual DATA path |
 | **Native residual wire parity** | Android + iOS/macOS NativePrep pad/cover/obfs/PFS |
+| **Android connect hotfix** | Rebuilt APK embeds `pfs-x25519` + `RPT-OBFS-LAYER` (prior 0.2.3 APK lacked PFS → node silent-drop / Poll timed out); licence + Settings in Flutter; HELLO retries |
+| **Desktop connect UX** | Windows/Linux residual attach off Tk UI thread (no Not Responding freeze); Linux licence gate + Settings |
 | **Settings transparency** | Local connection log (exportable), leak test, DPI mitigation disclaimer |
 | **Licence gate** | Accept end-user licence before Connect / autoconnect; local-only store |
 | **Anon registration honesty** | No admin/operator verification for device key; OS elevation for residual is separate |

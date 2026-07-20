@@ -833,31 +833,56 @@ class TunnelClientApp:
         )
 
         def work() -> None:
+            # Handshake + residual tunnel attach stay off the Tk UI thread so
+            # Windows does not show "(Not Responding)" while Wintun/routes run.
             result = self.client.connect(timeout=20.0)
+
+            if not (result.ok and result.session and result.tunnel_plan):
+                msg = result.message or "Connection failed"
+
+                def fail_hs() -> None:
+                    self._log(f"Could not connect: {msg}")
+                    self._connection_log(KIND_ERROR, f"Connect failed: {msg}")
+                    self._set_status("error", detail=msg)
+                    self._apply_control(connected=False, busy=False)
+
+                self.root.after(0, fail_hs)
+                return
+
+            vpn_ip = result.session.vpn_ip
+
+            def note_session() -> None:
+                self._log(f"Session ready (tunnel address {vpn_ip})")
+                self._connection_log(
+                    KIND_SESSION, f"Session ready (tunnel address {vpn_ip})"
+                )
+                self._log("Attaching residual tunnel (Wintun + routes)…")
+
+            self.root.after(0, note_session)
+
+            try:
+                # Product residual path: Wintun + dual /1 only (never on UI thread)
+                tun_res = start_full_tunnel(
+                    self.client,
+                    result.tunnel_plan,
+                    result.session.endpoint.host,
+                    prefer_system_capture=True,
+                    require_system_capture=True,
+                )
+            except Exception as exc:
+                err = f"Tunnel attach error: {exc}"
+
+                def fail_exc() -> None:
+                    self._log(f"Could not connect: {err[:160]}")
+                    self._connection_log(KIND_ERROR, f"Connect failed: {err[:160]}")
+                    self._set_status("error", detail=err)
+                    self._apply_control(connected=False, busy=False)
+
+                self.root.after(0, fail_exc)
+                return
 
             def done() -> None:
                 try:
-                    if not (result.ok and result.session and result.tunnel_plan):
-                        msg = result.message or "Connection failed"
-                        self._log(f"Could not connect: {msg}")
-                        self._connection_log(KIND_ERROR, f"Connect failed: {msg}")
-                        self._set_status("error", detail=msg)
-                        self._apply_control(connected=False, busy=False)
-                        return
-
-                    vpn_ip = result.session.vpn_ip
-                    self._log(f"Session ready (tunnel address {vpn_ip})")
-                    self._connection_log(
-                        KIND_SESSION, f"Session ready (tunnel address {vpn_ip})"
-                    )
-                    # Product residual path: Wintun + dual /1 only (no queue "Connected")
-                    tun_res = start_full_tunnel(
-                        self.client,
-                        result.tunnel_plan,
-                        result.session.endpoint.host,
-                        prefer_system_capture=True,
-                        require_system_capture=True,
-                    )
                     self._tunnel = tun_res
                     if residual_ip_capture_active(tun_res):
                         v6 = ipv6_residual_protected(tun_res)

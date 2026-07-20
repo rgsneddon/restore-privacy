@@ -104,6 +104,14 @@ class TestLicenceGateUiWiring(unittest.TestCase):
         self.assertIn("kLicenceAcceptButton", main + screen)
         self.assertIn("Accept licence", gate)
 
+    def test_linux_connect_gated(self):
+        src = (ROOT / "client" / "linux" / "app.py").read_text(encoding="utf-8")
+        self.assertIn("assert_may_connect", src)
+        self.assertIn("accept_licence", src)
+        self.assertIn("LICENCE_ACCEPT_BUTTON", src)
+        self.assertIn("_show_licence_prompt", src)
+        self.assertIn("_open_settings", src)
+
 
 if __name__ == "__main__":
     unittest.main()

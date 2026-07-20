@@ -102,6 +102,26 @@ class TestManualControlPolicy(unittest.TestCase):
         self.assertIn("start_full_tunnel", conn)
         self.assertIn("require_system_capture=True", conn)
         self.assertIn("residual_ip_capture_active", conn)
+        # Residual attach must not run on the Tk UI thread (Not Responding freeze)
+        self.assertIn("threading.Thread", conn)
+        self.assertIn("Attaching residual tunnel", conn)
+        # start_full_tunnel must be in worker, not only inside a root.after done callback
+        # that previously blocked the UI during Wintun/route install.
+        attach_idx = conn.index("start_full_tunnel")
+        # The note_session after() must appear before attach, and done after() after attach
+        self.assertLess(conn.index("note_session"), attach_idx)
+        self.assertGreater(conn.index("def done"), attach_idx)
+
+    def test_linux_connect_tunnel_off_ui_thread(self):
+        src = (ROOT / "client" / "linux" / "app.py").read_text(encoding="utf-8")
+        conn = src[src.index("def _start_connect") : src.index("def _disconnect_tunnel")]
+        self.assertIn("start_full_tunnel", conn)
+        self.assertIn("threading.Thread", conn)
+        self.assertIn("Attaching residual tunnel", conn)
+        self.assertIn("assert_may_connect", conn)
+        attach_idx = conn.index("start_full_tunnel")
+        self.assertLess(conn.index("note_session"), attach_idx)
+        self.assertGreater(conn.index("def done"), attach_idx)
 
 
 class TestThemeAndStatus(unittest.TestCase):

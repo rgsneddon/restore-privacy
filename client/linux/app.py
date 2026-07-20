@@ -64,6 +64,40 @@ from client.linux.tunnel_linux import (
     start_full_tunnel,
     stop_full_tunnel,
 )
+from client.licence_gate import (
+    LICENCE_ACCEPT_BUTTON,
+    LICENCE_PROMPT_TITLE,
+    accept_licence,
+    assert_may_connect,
+    has_accepted_licence,
+    licence_url,
+    short_licence_summary,
+)
+from client.registration_copy import (
+    ANON_REGISTRATION_SUMMARY,
+    OS_PRIVILEGE_HONESTY,
+    SEAMLESS_HINT,
+    SEAMLESS_TAGLINE,
+)
+from client.transparency_copy import (
+    CONNECTION_LOG_DISCLAIMER,
+    CONNECTION_LOG_TITLE,
+    DPI_MITIGATION_DISCLAIMER,
+    DPI_MITIGATION_TITLE,
+    LEAK_TEST_BUTTON,
+    LEAK_TEST_DISCLAIMER,
+    LEAK_TEST_TITLE,
+)
+from client.connection_log import (
+    KIND_CONNECT,
+    KIND_DISCONNECT,
+    KIND_ERROR,
+    KIND_SESSION,
+    append_event,
+    format_export,
+    read_events,
+)
+from client.leak_test import run_product_leak_test
 
 
 def disconnect_full_tunnel(tunnel, client, *, preserve_message: bool = False) -> None:
@@ -90,11 +124,15 @@ def close_disconnects_tunnel() -> bool:
 
 
 class TunnelClientApp:
-    """Manual Connect/Disconnect shell for Linux Mint."""
+    """Manual Connect/Disconnect shell for Linux (Ubuntu-family residual path).
 
-    DEFAULT_GEOMETRY = "520x480"
+    Licence acceptance is required before Connect (parity with Windows/Android).
+    Handshake + TUN attach run off the Tk UI thread.
+    """
+
+    DEFAULT_GEOMETRY = "520x520"
     MIN_WIDTH = 400
-    MIN_HEIGHT = 400
+    MIN_HEIGHT = 420
 
     def __init__(self) -> None:
         self.root = tk.Tk()
@@ -139,6 +177,15 @@ class TunnelClientApp:
         quit_row.pack(fill=tk.X)
         tk.Button(
             quit_row,
+            text="Settings",
+            command=self._open_settings,
+            bg=CHROME_BG,
+            fg=PRIMARY_DARK,
+            relief=tk.FLAT,
+            font=("DejaVu Sans", 9, "bold"),
+        ).pack(side=tk.LEFT)
+        tk.Button(
+            quit_row,
             text="Quit",
             command=self._quit_app,
             bg=CHROME_BG,
@@ -161,6 +208,13 @@ class TunnelClientApp:
         ).pack(anchor="w")
         tk.Label(
             banner,
+            text=SEAMLESS_TAGLINE,
+            bg=PRIMARY_DARK,
+            fg=WHITE,
+            font=("DejaVu Sans", 8, "bold"),
+        ).pack(anchor="w", pady=(2, 0))
+        tk.Label(
+            banner,
             text=SCROLLING_PRIVACY_TEXT,
             bg=PRIMARY_DARK,
             fg=WHITE,
@@ -173,7 +227,11 @@ class TunnelClientApp:
             value=plain_tunnel_status("disconnected")
         )
         self.detail_var = tk.StringVar(
-            value="Not connected. Press Connect when you want protection."
+            value=(
+                "Accept the licence, then press Connect for residual protection."
+                if not has_accepted_licence()
+                else "Not connected. Press Connect when you want protection."
+            )
         )
         status_card = tk.Frame(top, bg=WHITE, padx=12, pady=10)
         status_card.pack(fill=tk.X, pady=(0, 8))
@@ -186,6 +244,21 @@ class TunnelClientApp:
             anchor="w",
         )
         self.status_label.pack(fill=tk.X)
+        badge_row = tk.Frame(status_card, bg=WHITE)
+        badge_row.pack(fill=tk.X, pady=(2, 0))
+        self._licence_badge_var = tk.StringVar(
+            value="Licence accepted" if has_accepted_licence() else "Licence required"
+        )
+        self._licence_badge = tk.Label(
+            badge_row,
+            textvariable=self._licence_badge_var,
+            bg="#E8F5E9" if has_accepted_licence() else "#FDECEC",
+            fg=PRIMARY_DARK if has_accepted_licence() else STATUS_ERROR_FG,
+            font=("DejaVu Sans", 8, "bold"),
+            padx=6,
+            pady=2,
+        )
+        self._licence_badge.pack(side=tk.RIGHT)
         tk.Label(
             status_card,
             textvariable=self.detail_var,
@@ -196,6 +269,20 @@ class TunnelClientApp:
             wraplength=460,
             justify=tk.LEFT,
         ).pack(fill=tk.X, pady=(4, 0))
+        self._licence_cta = tk.Frame(status_card, bg=WHITE)
+        tk.Button(
+            self._licence_cta,
+            text=LICENCE_ACCEPT_BUTTON,
+            command=self._show_licence_prompt,
+            bg=PRIMARY,
+            fg=WHITE,
+            relief=tk.FLAT,
+            font=("DejaVu Sans", 9, "bold"),
+            padx=10,
+            pady=4,
+        ).pack(anchor="w", pady=(6, 0))
+        if not has_accepted_licence():
+            self._licence_cta.pack(fill=tk.X)
 
         # Optional upgrade banner
         try:
@@ -231,12 +318,16 @@ class TunnelClientApp:
         )
         self.output.pack(fill=tk.BOTH, expand=True)
         self._log(f"Linux client ready. {support_summary()}")
+        self._log(SEAMLESS_HINT)
         if is_root():
             self._log("Running as root - Connect can set residual routes.")
         else:
             self._log(
                 "Not root - Connect will request elevation (pkexec/sudo) for full tunnel."
             )
+        if not has_accepted_licence():
+            self._log("Accept the end-user licence before Connect.")
+            self.root.after(200, self._show_licence_prompt)
 
     def connect_button_text(self) -> str:
         return self.btn_var.get()
@@ -330,7 +421,263 @@ class TunnelClientApp:
         else:
             self._start_connect()
 
+    def _refresh_licence_badge(self) -> None:
+        ok = has_accepted_licence()
+        self._licence_badge_var.set("Licence accepted" if ok else "Licence required")
+        try:
+            self._licence_badge.configure(
+                bg="#E8F5E9" if ok else "#FDECEC",
+                fg=PRIMARY_DARK if ok else STATUS_ERROR_FG,
+            )
+        except Exception:
+            pass
+        try:
+            if ok:
+                self._licence_cta.pack_forget()
+            else:
+                self._licence_cta.pack(fill=tk.X)
+        except Exception:
+            pass
+
+    def _show_licence_prompt(self) -> None:
+        win = tk.Toplevel(self.root)
+        win.title(LICENCE_PROMPT_TITLE)
+        win.configure(bg=CHROME_BG)
+        win.transient(self.root)
+        win.grab_set()
+        frm = tk.Frame(win, bg=WHITE, padx=14, pady=12)
+        frm.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
+        tk.Label(
+            frm,
+            text=LICENCE_PROMPT_TITLE,
+            bg=WHITE,
+            fg=PRIMARY_DARK,
+            font=("DejaVu Sans", 12, "bold"),
+        ).pack(anchor="w")
+        tk.Label(
+            frm,
+            text=short_licence_summary(),
+            bg=WHITE,
+            fg=TEXT,
+            font=("DejaVu Sans", 9),
+            wraplength=420,
+            justify=tk.LEFT,
+        ).pack(anchor="w", pady=(8, 4))
+        tk.Label(
+            frm,
+            text=ANON_REGISTRATION_SUMMARY,
+            bg=WHITE,
+            fg=TEXT_MUTED,
+            font=("DejaVu Sans", 8),
+            wraplength=420,
+            justify=tk.LEFT,
+        ).pack(anchor="w", pady=(4, 2))
+        tk.Label(
+            frm,
+            text=OS_PRIVILEGE_HONESTY,
+            bg=WHITE,
+            fg=TEXT_MUTED,
+            font=("DejaVu Sans", 8),
+            wraplength=420,
+            justify=tk.LEFT,
+        ).pack(anchor="w", pady=(2, 8))
+
+        def open_lic() -> None:
+            try:
+                webbrowser.open(licence_url())
+            except Exception as exc:
+                self._log(f"Could not open licence: {exc}")
+
+        tk.Button(
+            frm,
+            text="View full end-user licence (LICENSE)",
+            command=open_lic,
+            relief=tk.FLAT,
+            bg=WHITE,
+            fg=PRIMARY,
+            font=("DejaVu Sans", 8, "underline"),
+            cursor="hand2",
+        ).pack(anchor="w")
+
+        def do_accept() -> None:
+            accept_licence()
+            append_event("settings", "End-user licence accepted")
+            self._refresh_licence_badge()
+            self.detail_var.set(
+                "Licence accepted. Press Connect when you want protection."
+            )
+            self._log("Licence accepted (stored locally only).")
+            try:
+                win.destroy()
+            except Exception:
+                pass
+
+        row = tk.Frame(frm, bg=WHITE)
+        row.pack(fill=tk.X, pady=(12, 0))
+        tk.Button(
+            row,
+            text=LICENCE_ACCEPT_BUTTON,
+            command=do_accept,
+            bg=PRIMARY,
+            fg=WHITE,
+            relief=tk.FLAT,
+            font=("DejaVu Sans", 10, "bold"),
+            padx=12,
+            pady=6,
+        ).pack(side=tk.LEFT)
+        tk.Button(
+            row,
+            text="Not now",
+            command=win.destroy,
+            bg=WHITE,
+            fg=TEXT_MUTED,
+            relief=tk.FLAT,
+        ).pack(side=tk.LEFT, padx=(10, 0))
+
+    def _open_settings(self) -> None:
+        """Settings: licence, local connection log, leak test, DPI honesty."""
+        win = tk.Toplevel(self.root)
+        win.title("Settings")
+        win.configure(bg=CHROME_BG)
+        win.geometry("480x520")
+        frm = tk.Frame(win, bg=WHITE, padx=12, pady=10)
+        frm.pack(fill=tk.BOTH, expand=True, padx=8, pady=8)
+        tk.Label(
+            frm,
+            text="Settings",
+            bg=WHITE,
+            fg=PRIMARY_DARK,
+            font=("DejaVu Sans", 12, "bold"),
+        ).pack(anchor="w")
+        tk.Label(
+            frm,
+            text=LICENCE_PROMPT_TITLE
+            + (": accepted" if has_accepted_licence() else ": required before Connect"),
+            bg=WHITE,
+            fg=TEXT,
+            font=("DejaVu Sans", 9),
+        ).pack(anchor="w", pady=(8, 2))
+        tk.Button(
+            frm,
+            text=LICENCE_ACCEPT_BUTTON if not has_accepted_licence() else "Review licence",
+            command=lambda: (win.destroy(), self._show_licence_prompt()),
+            bg=PRIMARY if not has_accepted_licence() else CHROME_BG,
+            fg=WHITE if not has_accepted_licence() else PRIMARY_DARK,
+            relief=tk.FLAT,
+        ).pack(anchor="w", pady=(0, 8))
+
+        tk.Label(
+            frm,
+            text=CONNECTION_LOG_TITLE,
+            bg=WHITE,
+            fg=PRIMARY_DARK,
+            font=("DejaVu Sans", 10, "bold"),
+        ).pack(anchor="w", pady=(6, 2))
+        tk.Label(
+            frm,
+            text=CONNECTION_LOG_DISCLAIMER,
+            bg=WHITE,
+            fg=TEXT_MUTED,
+            font=("DejaVu Sans", 8),
+            wraplength=440,
+            justify=tk.LEFT,
+        ).pack(anchor="w")
+        log_box = tk.Text(
+            frm,
+            height=8,
+            bg="#1e1e1e",
+            fg="#d4d4d4",
+            font=("DejaVu Sans Mono", 8),
+            wrap=tk.WORD,
+        )
+        log_box.pack(fill=tk.BOTH, expand=True, pady=(4, 4))
+        try:
+            events = read_events(limit=40)
+            log_box.insert(tk.END, format_export(events) if events else "(no local events yet)\n")
+        except Exception as exc:
+            log_box.insert(tk.END, f"(could not read log: {exc})\n")
+        log_box.configure(state=tk.DISABLED)
+
+        tk.Label(
+            frm,
+            text=LEAK_TEST_TITLE,
+            bg=WHITE,
+            fg=PRIMARY_DARK,
+            font=("DejaVu Sans", 10, "bold"),
+        ).pack(anchor="w", pady=(8, 2))
+        tk.Label(
+            frm,
+            text=LEAK_TEST_DISCLAIMER,
+            bg=WHITE,
+            fg=TEXT_MUTED,
+            font=("DejaVu Sans", 8),
+            wraplength=440,
+            justify=tk.LEFT,
+        ).pack(anchor="w")
+        leak_var = tk.StringVar(value="")
+        tk.Label(frm, textvariable=leak_var, bg=WHITE, fg=TEXT, font=("DejaVu Sans", 8), wraplength=440, justify=tk.LEFT).pack(anchor="w")
+
+        def run_leak() -> None:
+            leak_var.set("Running leak test…")
+            win.update_idletasks()
+
+            def work() -> None:
+                try:
+                    res = run_product_leak_test(
+                        residual_capture_active=residual_ip_capture_active(self._tunnel)
+                        if self._tunnel
+                        else False,
+                        ipv6_protected=ipv6_residual_protected(self._tunnel)
+                        if self._tunnel
+                        else False,
+                    )
+                    msg = getattr(res, "summary", None) or str(res)
+                except Exception as exc:
+                    msg = f"Leak test error: {exc}"
+
+                def done() -> None:
+                    leak_var.set(msg[:400])
+                    append_event(KIND_CONNECT if "PASS" in msg else KIND_ERROR, f"Leak test: {msg[:120]}")
+
+                self.root.after(0, done)
+
+            threading.Thread(target=work, daemon=True).start()
+
+        tk.Button(
+            frm,
+            text=LEAK_TEST_BUTTON,
+            command=run_leak,
+            bg=PRIMARY,
+            fg=WHITE,
+            relief=tk.FLAT,
+        ).pack(anchor="w", pady=(4, 8))
+
+        tk.Label(
+            frm,
+            text=DPI_MITIGATION_TITLE,
+            bg=WHITE,
+            fg=PRIMARY_DARK,
+            font=("DejaVu Sans", 10, "bold"),
+        ).pack(anchor="w", pady=(4, 2))
+        tk.Label(
+            frm,
+            text=DPI_MITIGATION_DISCLAIMER,
+            bg=WHITE,
+            fg=TEXT_MUTED,
+            font=("DejaVu Sans", 8),
+            wraplength=440,
+            justify=tk.LEFT,
+        ).pack(anchor="w")
+
     def _start_connect(self) -> None:
+        ok_lic, lic_msg = assert_may_connect()
+        if not ok_lic:
+            self._log(lic_msg)
+            self._set_status("error", detail=lic_msg)
+            self.detail_var.set(lic_msg)
+            self._show_licence_prompt()
+            return
+
         if product_connect_requires_root() and not is_root():
             self._apply_control(connected=False, busy=True)
             self._set_status("connecting")
@@ -358,29 +705,56 @@ class TunnelClientApp:
         self._apply_control(connected=False, busy=True)
         self._set_status("connecting")
         self._log("Connect - starting secure session (full-tunnel residual path)...")
+        append_event(KIND_CONNECT, "Connect started (full-tunnel residual path)")
 
         def work() -> None:
+            # Handshake + residual TUN/routes off the Tk UI thread.
             result = self.client.connect(timeout=20.0)
+
+            if not (result.ok and result.session and result.tunnel_plan):
+                msg = result.message or "Connection failed"
+
+                def fail_hs() -> None:
+                    self._log(f"Could not connect: {msg}")
+                    append_event(KIND_ERROR, f"Connect failed: {msg}")
+                    self._set_status("error", detail=msg)
+                    self._apply_control(connected=False, busy=False)
+
+                self.root.after(0, fail_hs)
+                return
+
+            vpn_ip = result.session.vpn_ip
+
+            def note_session() -> None:
+                self._log(f"Session ready (tunnel address {vpn_ip})")
+                append_event(KIND_SESSION, f"Session ready (tunnel address {vpn_ip})")
+                self._log("Attaching residual tunnel (TUN + dual /1 routes)…")
+
+            self.root.after(0, note_session)
+
+            plan = result.tunnel_plan
+            plan.tunnel_iface = "rpt0"
+            try:
+                tun_res = start_full_tunnel(
+                    self.client,
+                    plan,
+                    result.session.endpoint.host,
+                    require_system_capture=True,
+                )
+            except Exception as exc:
+                err = f"Tunnel attach error: {exc}"
+
+                def fail_exc() -> None:
+                    self._log(f"Could not connect: {err[:160]}")
+                    append_event(KIND_ERROR, f"Connect failed: {err[:160]}")
+                    self._set_status("error", detail=err)
+                    self._apply_control(connected=False, busy=False)
+
+                self.root.after(0, fail_exc)
+                return
 
             def done() -> None:
                 try:
-                    if not (result.ok and result.session and result.tunnel_plan):
-                        msg = result.message or "Connection failed"
-                        self._log(f"Could not connect: {msg}")
-                        self._set_status("error", detail=msg)
-                        self._apply_control(connected=False, busy=False)
-                        return
-
-                    vpn_ip = result.session.vpn_ip
-                    self._log(f"Session ready (tunnel address {vpn_ip})")
-                    plan = result.tunnel_plan
-                    plan.tunnel_iface = "rpt0"
-                    tun_res = start_full_tunnel(
-                        self.client,
-                        plan,
-                        result.session.endpoint.host,
-                        require_system_capture=True,
-                    )
                     self._tunnel = tun_res
                     if residual_ip_capture_active(tun_res):
                         v6 = ipv6_residual_protected(tun_res)
@@ -388,6 +762,11 @@ class TunnelClientApp:
                             "Tunnel active - residual public IP uses the VPN node "
                             f"(iface={getattr(tun_res, 'iface', '?')}; "
                             f"ipv6_protected={v6})"
+                        )
+                        append_event(
+                            KIND_CONNECT,
+                            "Connected — residual public IP uses the VPN node "
+                            f"(ipv6_protected={v6})",
                         )
                         self._apply_control(connected=True, busy=False)
                         self._set_status(
@@ -407,6 +786,7 @@ class TunnelClientApp:
                         self._tunnel = None
                         err = attach_failure_user_message(original_err)
                         self._log(f"Could not connect: {err[:160]}")
+                        append_event(KIND_ERROR, f"Connect failed: {err[:160]}")
                         self._set_status("error", detail=err)
                         self._apply_control(connected=False, busy=False)
                 finally:

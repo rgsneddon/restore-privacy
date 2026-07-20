@@ -16,6 +16,7 @@ import java.net.DatagramPacket
 import java.net.DatagramSocket
 import java.net.InetSocketAddress
 import java.util.concurrent.atomic.AtomicBoolean
+import java.util.concurrent.atomic.AtomicLong
 import kotlin.concurrent.thread
 
 /**
@@ -211,19 +212,24 @@ class RptVpnService : VpnService() {
             // Product connect: device keys + RPT2 handshake only (no public-IP geo gate)
             val sock = DatagramSocket()
             try {
+                // Keep UDP to the node off any existing VPN routing loop when a TUN is up.
+                // First-run Connect has no VPN yet — protect() may return false; still OK.
                 protect(sock)
                 val engine = RptClientEngine(clientPriv, nodePub)
                 val session = try {
-                    engine.handshake(sock, host, port, timeoutMs = 20000)
+                    // 3 attempts × ~8s — mobile UDP is lossy; node silent-drops bad HELLO
+                    engine.handshake(sock, host, port, timeoutMs = 24000, attempts = 3)
                 } catch (e: Exception) {
                     val detail = e.message ?: e.javaClass.simpleName
                     val hint =
                         if (detail.contains("timed out", ignoreCase = true) ||
                             detail.contains("timeout", ignoreCase = true) ||
+                            detail.contains("Poll timed", ignoreCase = true) ||
                             e is java.net.SocketTimeoutException
                         ) {
                             " No reply from $host:$port — check network/UDP, or that this " +
-                                "package’s node_elgamal.pub matches the production node."
+                                "package’s node_elgamal.pub matches the production node " +
+                                "(and that the APK includes PFS + outer obfs wire)."
                         } else {
                             ""
                         }
@@ -300,7 +306,7 @@ class RptVpnService : VpnService() {
                 sock.soTimeout = 200
                 val endpoint = InetSocketAddress(host, port)
                 // Product residual: pad+cover on DATA + outer QUIC-mimic wrap (Python parity)
-                @Volatile var lastCoverMs = System.currentTimeMillis()
+                val lastCoverMs = AtomicLong(System.currentTimeMillis())
                 val tunToUdp = thread(name = "rpt-tun-up", isDaemon = true) {
                     val buf = ByteArray(32767)
                     while (running.get()) {
@@ -340,11 +346,11 @@ class RptVpnService : VpnService() {
                             Thread.sleep(200)
                             val now = System.currentTimeMillis()
                             if (RptTrafficShape.PRODUCT_COVER &&
-                                now - lastCoverMs >= RptTrafficShape.PRODUCT_COVER_INTERVAL_MS
+                                now - lastCoverMs.get() >= RptTrafficShape.PRODUCT_COVER_INTERVAL_MS
                             ) {
                                 val wire = engine.sealAndWrapCover()
                                 sock.send(DatagramPacket(wire, wire.size, endpoint))
-                                lastCoverMs = now
+                                lastCoverMs.set(now)
                             }
                         } catch (_: Exception) {
                             if (!running.get()) break
