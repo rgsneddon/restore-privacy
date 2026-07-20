@@ -4,14 +4,21 @@ When the product tunnel is active (or kill-switch is engaged), traffic must not
 leak to the default physical interface. Rules are fail-closed on connect path:
 apply blocks after routes; on disconnect, always roll back.
 
-Windows: WFP rules via PowerShell ``New-NetFirewallRule`` — allow **only**
-the VPN node remote IP and the tunnel ``InterfaceAlias``; then a global outbound
-block. Never emit unrestricted ``remoteip=any`` allow rules.
+Windows (critical):
+  Explicit unscoped ``Action=Block`` rules **defeat** scoped allows (Defender
+  Firewall evaluates block before allow). So we **never** create a global
+  outbound block rule. Instead:
+
+  1. Save each profile's ``DefaultOutboundAction`` to ProgramData state file
+  2. ``Set-NetFirewallProfile -DefaultOutboundAction Block`` (fail-closed default)
+  3. Scoped **Allow** only: node RemoteAddress, tunnel InterfaceAlias, loopback
+  4. Optional **scoped** Block for STUN/mDNS (RemotePort only — not global)
+
+  Rollback restores saved DefaultOutboundAction and removes RPT-KS rules.
 
 Linux: iptables OUTPUT chain — ACCEPT lo + tunnel iface + node host; DROP rest.
 
-IPv6 leak blocking remains in ``full_tunnel``; kill-switch complements IPv4
-non-tunnel block. Android uses ``VpnService.Builder.setBlocking(true)``.
+Android uses ``VpnService.Builder.setBlocking(true)``.
 """
 
 from __future__ import annotations
@@ -26,10 +33,13 @@ from typing import Optional
 WIN_RULE_PREFIX = "RPT-KS"
 LINUX_CHAIN = "RPT_KILLSWITCH"
 
-# Critical rule name fragments that must succeed for kill_switch_applied=True
+# Critical allow rule display names (literal in command text)
 WIN_CRITICAL_ALLOW_NODE = f"{WIN_RULE_PREFIX}-allow-node"
 WIN_CRITICAL_ALLOW_TUN = f"{WIN_RULE_PREFIX}-allow-tun-if"
-WIN_CRITICAL_BLOCK_OUT = f"{WIN_RULE_PREFIX}-block-out"
+# Profile-level fail-closed (not an unscoped New-NetFirewallRule Block)
+WIN_PROFILE_DEFAULT_OUTBOUND_BLOCK = "DefaultOutboundAction Block"
+# State file for prior profile outbound actions (restored on rollback)
+WIN_KS_STATE_FILE = r"$env:ProgramData\RestorePrivacy\ks-outbound-state.json"
 
 
 @dataclass(frozen=True)
@@ -65,32 +75,41 @@ def windows_kill_switch_block_commands(
     tunnel_iface: str = "RPT",
     policy: Optional[KillSwitchPolicy] = None,
 ) -> list[str]:
-    """Firewall rules: allow node host + tunnel InterfaceAlias only; block rest.
+    """Scoped allows + profile DefaultOutboundAction=Block (no unscoped block rule).
 
-    Requires admin. Uses PowerShell NetSecurity cmdlets so allows are **scoped**
-    (RemoteAddress=node or InterfaceAlias=tun). Never uses remoteip=any allows.
+    Requires admin. Uses PowerShell NetSecurity cmdlets.
     """
     pol = policy or default_kill_switch_policy()
     if not pol.enabled or not pol.block_non_tunnel_ipv4:
         return []
     host = _ps_escape_single(server_host.strip())
     iface = _ps_escape_single((tunnel_iface or "RPT").strip())
-    # Literal display names (must appear in command text for audits/tests)
     n_node = WIN_CRITICAL_ALLOW_NODE
     n_tun = WIN_CRITICAL_ALLOW_TUN
-    n_block = WIN_CRITICAL_BLOCK_OUT
     n_lo = f"{WIN_RULE_PREFIX}-allow-lo"
     n_stun = f"{WIN_RULE_PREFIX}-block-stun"
     n_mdns = f"{WIN_RULE_PREFIX}-block-mdns"
     pfx = WIN_RULE_PREFIX
+    state = WIN_KS_STATE_FILE
 
-    # Single PowerShell script: remove prior rules, add scoped allows, then block.
-    # Exit 0 only if allow-node, allow-tun-if, and block-out all exist.
+    # PowerShell: save profile outbound actions → scoped allows → DefaultOutboundAction Block
     script = f"""
 $ErrorActionPreference = 'Stop'
+$statePath = {state}
+$dir = Split-Path -Parent $statePath
+if (-not (Test-Path $dir)) {{ New-Item -ItemType Directory -Path $dir -Force | Out-Null }}
+# Save prior DefaultOutboundAction per profile for honest rollback
+$prior = @{{}}
+foreach ($name in @('Domain','Private','Public')) {{
+  $p = Get-NetFirewallProfile -Name $name -ErrorAction Stop
+  $prior[$name] = [string]$p.DefaultOutboundAction
+}}
+$prior | ConvertTo-Json | Set-Content -Path $statePath -Encoding UTF8
+# Remove prior RPT-KS rules only (not other firewall rules)
 Get-NetFirewallRule -ErrorAction SilentlyContinue |
   Where-Object {{ $_.DisplayName -like '{pfx}-*' }} |
   Remove-NetFirewallRule -ErrorAction SilentlyContinue
+# Scoped allows only (node RemoteAddress + tunnel InterfaceAlias + loopback)
 New-NetFirewallRule -DisplayName '{n_node}' -Direction Outbound -Action Allow -RemoteAddress '{host}' -Enabled True -Profile Any | Out-Null
 $if = Get-NetAdapter -Name '{iface}' -ErrorAction SilentlyContinue
 if (-not $if) {{ throw 'tunnel adapter not found: {iface}' }}
@@ -98,16 +117,26 @@ New-NetFirewallRule -DisplayName '{n_tun}' -Direction Outbound -Action Allow -In
 New-NetFirewallRule -DisplayName '{n_lo}' -Direction Outbound -Action Allow -RemoteAddress 127.0.0.0/8 -Enabled True -Profile Any | Out-Null
 """
     if pol.block_stun_mdns:
+        # Port-scoped blocks only (RemotePort) — not global unscoped Action Block
         script += f"""
 New-NetFirewallRule -DisplayName '{n_stun}' -Direction Outbound -Action Block -Protocol UDP -RemotePort 3478,5349 -Enabled True -Profile Any | Out-Null
 New-NetFirewallRule -DisplayName '{n_mdns}' -Direction Outbound -Action Block -Protocol UDP -RemotePort 5353 -Enabled True -Profile Any | Out-Null
 """
     script += f"""
-New-NetFirewallRule -DisplayName '{n_block}' -Direction Outbound -Action Block -Enabled True -Profile Any | Out-Null
-$need = @('{n_node}', '{n_tun}', '{n_block}')
-foreach ($n in $need) {{
+# Fail-closed via profile default (NOT an unscoped New-NetFirewallRule Action Block)
+foreach ($name in @('Domain','Private','Public')) {{
+  Set-NetFirewallProfile -Name $name -DefaultOutboundAction Block -ErrorAction Stop
+}}
+# Verify critical allows + profile default
+foreach ($n in @('{n_node}', '{n_tun}')) {{
   if (-not (Get-NetFirewallRule -DisplayName $n -ErrorAction SilentlyContinue)) {{
-    throw ('missing critical kill-switch rule: ' + $n)
+    throw ('missing critical kill-switch allow rule: ' + $n)
+  }}
+}}
+foreach ($name in @('Domain','Private','Public')) {{
+  $p = Get-NetFirewallProfile -Name $name
+  if ([string]$p.DefaultOutboundAction -ne 'Block') {{
+    throw ('DefaultOutboundAction not Block on profile: ' + $name)
   }}
 }}
 Write-Output 'RPT_KS_OK'
@@ -120,23 +149,56 @@ exit 0
 
 
 def windows_kill_switch_rollback_commands() -> list[str]:
+    """Remove RPT-KS rules and restore prior DefaultOutboundAction from state file."""
     pfx = WIN_RULE_PREFIX
+    state = WIN_KS_STATE_FILE
+    script = f"""
+$ErrorActionPreference = 'Continue'
+$statePath = {state}
+Get-NetFirewallRule -ErrorAction SilentlyContinue |
+  Where-Object {{ $_.DisplayName -like '{pfx}-*' }} |
+  Remove-NetFirewallRule -ErrorAction SilentlyContinue
+if (Test-Path $statePath) {{
+  try {{
+    $prior = Get-Content -Path $statePath -Raw | ConvertFrom-Json
+    foreach ($name in @('Domain','Private','Public')) {{
+      $val = $prior.$name
+      if (-not $val) {{ $val = 'Allow' }}
+      Set-NetFirewallProfile -Name $name -DefaultOutboundAction $val -ErrorAction SilentlyContinue
+    }}
+    Remove-Item -Path $statePath -Force -ErrorAction SilentlyContinue
+  }} catch {{
+    foreach ($name in @('Domain','Private','Public')) {{
+      Set-NetFirewallProfile -Name $name -DefaultOutboundAction Allow -ErrorAction SilentlyContinue
+    }}
+  }}
+}} else {{
+  foreach ($name in @('Domain','Private','Public')) {{
+    Set-NetFirewallProfile -Name $name -DefaultOutboundAction Allow -ErrorAction SilentlyContinue
+  }}
+}}
+exit 0
+"""
+    one_line = " ".join(line.strip() for line in script.splitlines() if line.strip())
     return [
-        "powershell -NoProfile -ExecutionPolicy Bypass -Command \""
-        f"Get-NetFirewallRule -ErrorAction SilentlyContinue | "
-        f"Where-Object {{ $_.DisplayName -like '{pfx}-*' }} | "
-        f"Remove-NetFirewallRule -ErrorAction SilentlyContinue; exit 0\""
+        f'powershell -NoProfile -ExecutionPolicy Bypass -Command "{one_line}"'
     ]
 
 
 def assert_windows_ks_commands_safe(cmds: list[str]) -> list[str]:
-    """Return violations if allow rules are unrestricted (remoteip=any without iface).
+    """Return violations for unsafe Windows kill-switch command shapes.
 
-    Shipped product path must never emit allow-all outbound rules that defeat
-    the kill switch or blackhole alongside a global block.
+    - No unrestricted allow (remoteip=any without InterfaceAlias)
+    - No **unscoped** Action=Block New-NetFirewallRule (no RemotePort/RemoteAddress/
+      InterfaceAlias) — those blackhole VPN traffic under Defender rule order
+    - Must use Set-NetFirewallProfile DefaultOutboundAction Block
+    - Must scope allows via InterfaceAlias + RemoteAddress
+    - Rollback must restore DefaultOutboundAction
     """
     violations: list[str] = []
     joined = "\n".join(cmds)
+    low = joined.lower()
+
     # netsh-style remoteip=any on an allow rule
     for m in re.finditer(
         r"action\s*=\s*allow[^\"\n]*remoteip\s*=\s*any",
@@ -144,23 +206,77 @@ def assert_windows_ks_commands_safe(cmds: list[str]) -> list[str]:
         flags=re.IGNORECASE,
     ):
         snippet = m.group(0)
-        if "interfacealias" not in snippet.lower() and "interface type" not in snippet.lower():
+        if "interfacealias" not in snippet.lower():
             violations.append(f"unrestricted allow remoteip=any: {snippet[:80]}")
-    # netsh allow with localip=any remoteip=any
-    if re.search(r"remoteip\s*=\s*any.*localip\s*=\s*any|localip\s*=\s*any.*remoteip\s*=\s*any", joined, re.I):
+    if re.search(
+        r"remoteip\s*=\s*any.*localip\s*=\s*any|localip\s*=\s*any.*remoteip\s*=\s*any",
+        joined,
+        re.I,
+    ):
         if "InterfaceAlias" not in joined:
-            violations.append("allow rule pairs localip=any with remoteip=any without InterfaceAlias")
-    # Invalid netsh comment trailers that break parsing
+            violations.append(
+                "allow rule pairs localip=any with remoteip=any without InterfaceAlias"
+            )
     if re.search(r'action=allow[^"\n]*#\s*iface=', joined, re.I):
         violations.append("netsh allow rule contains invalid # iface= trailer")
-    # Must scope tun allow via InterfaceAlias in PowerShell path
+
+    # Unscoped New-NetFirewallRule Action Block (no port/addr/iface scope)
+    # Match PowerShell: New-NetFirewallRule ... -Action Block ... without RemotePort etc.
+    for m in re.finditer(
+        r"New-NetFirewallRule\b[^;|]*?-Action\s+Block\b[^;|]*",
+        joined,
+        flags=re.IGNORECASE | re.DOTALL,
+    ):
+        rule = m.group(0)
+        rl = rule.lower()
+        scoped = any(
+            k in rl
+            for k in (
+                "-remoteport",
+                "-remoteaddress",
+                "-localport",
+                "-localaddress",
+                "-interfacealias",
+                "-program",
+                "-service",
+            )
+        )
+        if not scoped:
+            violations.append(
+                "unscoped New-NetFirewallRule Action=Block blackholes VPN "
+                f"(use DefaultOutboundAction Block + scoped allows): {rule[:120]}"
+            )
+
+    # Legacy RPT-KS-block-out unscoped rule name must not appear
+    if f"{WIN_RULE_PREFIX}-block-out" in joined:
+        violations.append(
+            f"legacy unscoped {WIN_RULE_PREFIX}-block-out rule must not be created"
+        )
+
     if cmds and "InterfaceAlias" not in joined:
         violations.append("missing InterfaceAlias-scoped tunnel allow")
-    if cmds and ("RemoteAddress" not in joined and "remoteip=" not in joined.lower()):
+    if cmds and "RemoteAddress" not in joined and "remoteip=" not in low:
         violations.append("missing node RemoteAddress/remoteip allow")
-    # Must have a block-out rule
-    if cmds and WIN_CRITICAL_BLOCK_OUT not in joined and "block-out" not in joined.lower():
-        violations.append("missing outbound block rule")
+    if cmds and "Set-NetFirewallProfile" not in joined:
+        violations.append("missing Set-NetFirewallProfile for DefaultOutboundAction")
+    if cmds and "DefaultOutboundAction" not in joined:
+        violations.append("missing DefaultOutboundAction Block profile setting")
+    if cmds and "Block" not in joined:
+        violations.append("missing fail-closed Block default")
+
+    return violations
+
+
+def assert_windows_ks_rollback_restores_profiles(cmds: list[str]) -> list[str]:
+    """Rollback must restore DefaultOutboundAction (from state or Allow fallback)."""
+    violations: list[str] = []
+    joined = "\n".join(cmds)
+    if "Set-NetFirewallProfile" not in joined:
+        violations.append("rollback missing Set-NetFirewallProfile restore")
+    if "DefaultOutboundAction" not in joined:
+        violations.append("rollback missing DefaultOutboundAction restore")
+    if "ks-outbound-state" not in joined and "Allow" not in joined:
+        violations.append("rollback missing state file or Allow fallback")
     return violations
 
 
@@ -283,8 +399,8 @@ def run_kill_switch_commands(
     """Execute kill-switch commands; return (applied, success, errors).
 
     ``success`` is True only when at least one command ran with returncode 0
-    **and** (for Windows) stdout contains ``RPT_KS_OK`` or critical rule names
-    appear in applied output — never True merely because the plan was non-empty.
+    **and** (for Windows) stdout contains ``RPT_KS_OK`` — never True merely
+    because the plan was non-empty.
     """
     applied: list[str] = []
     errors: list[str] = []
@@ -306,32 +422,25 @@ def run_kill_switch_commands(
                 if "RPT_KS_OK" in out:
                     saw_ok_marker = True
             else:
-                # idempotent deletes / already-exists may still be ok on rollback
                 low = out.lower()
                 if "no such" in low or "not found" in low or "cannot find" in low:
                     applied.append(cmd)
                 else:
-                    errors.append(f"exit {r.returncode}: {out.strip()[:200] or cmd[:80]}")
+                    errors.append(
+                        f"exit {r.returncode}: {out.strip()[:200] or cmd[:80]}"
+                    )
         except Exception as exc:  # noqa: BLE001
             errors.append(f"{type(exc).__name__}: {exc}")
     plat = platform.lower()
     if not cmds:
         return applied, False, errors
     if plat in ("windows", "win32", "win"):
-        # Require explicit success marker from the PowerShell apply script
         success = any_zero and saw_ok_marker and not errors
         return applied, success, errors
     if plat in ("linux", "ubuntu", "mint"):
-        # Need DROP rule and tunnel ACCEPT among applied (or zero errors on apply set)
-        joined = "\n".join(applied)
-        success = (
-            any_zero
-            and f"-o " in joined
-            and "-j DROP" in joined
-            and not any("exit " in e for e in errors if "2>/dev/null" not in e)
-        )
-        # Soften: if all cmds applied with rc0, success
         if any_zero and not errors:
-            success = True
+            return applied, True, errors
+        joined = "\n".join(applied)
+        success = any_zero and "-o " in joined and "-j DROP" in joined
         return applied, success, errors
     return applied, any_zero and not errors, errors
