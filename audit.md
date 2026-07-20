@@ -122,7 +122,7 @@ Restore Privacy **0.2.2** ships clients and public catalog aligned to the **Flok
 | L1 | Historical `build_release_0.*.py` surface | Accepted; use current-tag script |
 | L2 | Local `dist/`/`build/` hygiene | gitignored |
 | L4 | manylinux ABI matrix | Re-run `package_linux.py` each tag |
-| L5 | *(closed)* Mobile/native pad–cover–obfs–PFS lag | Dual-wired on Android + NativePrep iOS/macOS; gates in `test_native_parity_wire` / `test_native_pfs_wire` |
+| L5 | *(closed)* Mobile/native pad–cover–obfs–PFS lag | Dual-wired on Android + NativePrep iOS/macOS; gates in `test_native_parity_wire` / `test_native_pfs_wire`. Product `_PRODUCT_OBFS_KEY` is **33 bytes** (17 + 8 NUL + 8 tail) on Python/Kotlin/Swift — Apple pad must be `count: 8` (not 7); structural check in `TestNativeObfsKeyMatchesPython`. |
 
 ### 4.5 Info / strengths
 
@@ -140,7 +140,7 @@ Restore Privacy **0.2.2** ships clients and public catalog aligned to the **Flok
 | I10 | Multi-hop status honesty (not routed / entry-only) |
 | I11 | Self-host one-shot script |
 | I12 | Product traffic-shape on by default + Settings legal links |
-| I13 | Native residual pad/cover/obfs/PFS parity with Python DATA path |
+| I13 | Native residual pad/cover/obfs/PFS parity with Python DATA path (Android + apple_shared + iOS/macOS NativePrep; exact product obfs key length) |
 
 ---
 

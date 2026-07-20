@@ -7,11 +7,14 @@ import CryptoKit
 public enum RptObfuscation {
     public static let obfsVersion: UInt32 = 0x5250_5431 // 'RPT1'
     private static let rptMagic = Data("RPT2".utf8)
-    /// Same public product key material as Python `_PRODUCT_OBFS_KEY` (32 bytes).
+    /// Same public product key material as Python `_PRODUCT_OBFS_KEY` (33 bytes:
+    /// ``RPT-OBFS-LAYER-v1`` + 8 NUL + 8 tail bytes).
     private static let productObfsKey: Data = {
         var k = Data("RPT-OBFS-LAYER-v1".utf8)
-        k.append(Data(repeating: 0, count: 7))
+        k.append(Data(repeating: 0, count: 8))
         k.append(contentsOf: [0x9a, 0x3c, 0x7e, 0x11, 0xd4, 0x55, 0x88, 0x02])
+        // Mirror node.obfuscation._PRODUCT_OBFS_KEY exactly (len 33).
+        assert(k.count == 33)
         return k
     }()
 

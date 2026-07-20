@@ -39,7 +39,7 @@ OBFS_VERSION = 0x52505431  # 'RPT1' as u32
 _PRODUCT_OBFS_KEY = (
     b"RPT-OBFS-LAYER-v1\x00\x00\x00\x00\x00\x00\x00\x00"
     b"\x9a\x3c\x7e\x11\xd4\x55\x88\x02"
-)  # 32 bytes
+)  # 33 bytes: 17 prefix + 8 NUL + 8 tail
 
 
 class ObfuscationError(ValueError):

@@ -195,20 +195,53 @@ class TestAppleTrafficShapeAndObfs(unittest.TestCase):
 
 class TestNativeObfsKeyMatchesPython(unittest.TestCase):
     def test_product_obfs_key_constant_in_native(self):
-        """Native sources embed the same public product obfs key material as Python."""
+        """Native sources embed the *exact* product obfs key as Python (len + pad)."""
         from node import obfuscation as obfs_mod
 
         py_key = obfs_mod._PRODUCT_OBFS_KEY
-        self.assertGreaterEqual(len(py_key), 24)
+        # Contract: RPT-OBFS-LAYER-v1 (17) + 8 NUL + 8 tail = 33
+        self.assertEqual(len(py_key), 33, "Python product obfs key length")
         self.assertTrue(py_key.startswith(b"RPT-OBFS-LAYER-v1"))
-        for path in (KT_OBFS, SWIFT_SHARED / "RptObfuscation.swift", SWIFT_IOS):
+        self.assertEqual(py_key[17:25], b"\x00" * 8)
+        self.assertEqual(py_key[25:], bytes([0x9A, 0x3C, 0x7E, 0x11, 0xD4, 0x55, 0x88, 0x02]))
+
+        # Kotlin: 8 explicit \\u0000 after prefix in string literal
+        kt = KT_OBFS.read_text(encoding="utf-8")
+        self.assertIn("RPT-OBFS-LAYER-v1", kt)
+        # Count consecutive \u0000 in the key string (must be 8, not 7)
+        import re
+
+        m = re.search(
+            r'RPT-OBFS-LAYER-v1((?:\\u0000)+)',
+            kt,
+        )
+        self.assertIsNotNone(m, "Kotlin PRODUCT_OBFS_KEY missing NUL pad sequence")
+        nuls = m.group(1).count("\\u0000")
+        self.assertEqual(nuls, 8, f"Kotlin NUL pad must be 8 (got {nuls}) to match Python key len 33")
+        self.assertIn("0x9a", kt.lower())
+
+        # Swift apple_shared + NativePrep: Data(repeating: 0, count: 8)
+        for path in (
+            SWIFT_SHARED / "RptObfuscation.swift",
+            SWIFT_IOS,
+            SWIFT_MAC,
+        ):
             text = path.read_text(encoding="utf-8")
             self.assertIn("RPT-OBFS-LAYER-v1", text, str(path))
-            # Trailing key bytes present (Kotlin 0x9a / Swift 0x9a)
-            self.assertTrue(
-                "0x9a" in text.lower() or "0X9A" in text,
-                f"missing key tail bytes in {path}",
+            self.assertIn(
+                "Data(repeating: 0, count: 8)",
+                text,
+                f"{path} must pad with 8 NULs (not 7) for Python interop",
             )
+            self.assertNotIn(
+                "Data(repeating: 0, count: 7)",
+                text,
+                f"{path} must not use 7-NUL pad (breaks obfs interop)",
+            )
+            self.assertIn("0x9a", text.lower(), str(path))
+            # Explicit length contract comment or assert where present
+            if "assert(k.count" in text:
+                self.assertIn("assert(k.count == 33)", text, str(path))
 
 
 if __name__ == "__main__":
