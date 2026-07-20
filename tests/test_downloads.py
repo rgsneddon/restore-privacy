@@ -11,6 +11,7 @@ sys.path.insert(0, str(ROOT / "status_page"))
 
 import app as status_app  # noqa: E402
 from downloads import (  # noqa: E402
+    ANDROID_APK_FILENAME,
     GITHUB_REPO,
     IOS_ZIP_FILENAME,
     LINUX_TGZ_FILENAME,
@@ -32,19 +33,24 @@ class TestDownloadCatalog(unittest.TestCase):
 
     def test_public_assets_include_device_packages(self):
         assets = available_downloads()
-        self.assertEqual(len(assets), 4)
+        self.assertEqual(len(assets), 5)
         platforms = {a.platform for a in assets}
-        self.assertEqual(platforms, {"windows", "linux", "macos", "ios"})
+        self.assertEqual(platforms, {"windows", "linux", "macos", "ios", "android"})
         by_plat = {a.platform: a for a in assets}
         self.assertEqual(by_plat["windows"].filename, WINDOWS_ZIP_FILENAME)
         self.assertTrue(by_plat["windows"].filename.endswith(".zip"))
         self.assertEqual(by_plat["linux"].filename, LINUX_TGZ_FILENAME)
         self.assertEqual(by_plat["macos"].filename, MACOS_ZIP_FILENAME)
         self.assertEqual(by_plat["ios"].filename, IOS_ZIP_FILENAME)
-        # No unpublished prep/APK names on the public catalog.
+        self.assertEqual(by_plat["android"].filename, ANDROID_APK_FILENAME)
+        self.assertTrue(by_plat["android"].filename.endswith(".apk"))
+        self.assertEqual(
+            by_plat["android"].filename,
+            "restore-privacy-rust-1.0.0-android.apk",
+        )
         for a in assets:
             self.assertNotIn("apple-prep", a.filename)
-            self.assertNotIn("android", a.filename)
+            self.assertNotIn("android-prep", a.filename)
 
     def test_labels_and_html(self):
         html = render_download_section_html()
@@ -53,13 +59,14 @@ class TestDownloadCatalog(unittest.TestCase):
         self.assertIn("Windows (x64) - Client/Node (.zip)", html)
         self.assertIn('id="dl-macos"', html)
         self.assertIn('id="dl-ios"', html)
+        self.assertIn('id="dl-android"', html)
         self.assertIn("macOS - Client (.zip)", html)
         self.assertIn("iOS - Client (.zip)", html)
+        self.assertIn("Android - APK installer", html)
         self.assertIn(RUST_REPO_URL, html)
         self.assertIn("RUST-IN-PRIVACY", html)
-        self.assertIn("Windows | Linux | macOS | iOS", html)
+        self.assertIn("Windows | Linux | macOS | iOS | Android", html)
         self.assertNotIn("apple-prep", html)
-        self.assertNotIn("android.apk", html)
 
     def test_available_downloads_have_https_github_release_urls(self):
         assets = available_downloads()
@@ -80,6 +87,7 @@ class TestDownloadCatalog(unittest.TestCase):
         self.assertIn('class="dl"', html)
         self.assertIn("Windows", html)
         self.assertIn("Linux", html)
+        self.assertIn(ANDROID_APK_FILENAME, html)
         for a in available_downloads():
             self.assertIn(a.url, html)
             self.assertNotIn('href="#"', html)
@@ -97,8 +105,8 @@ class TestDownloadCatalog(unittest.TestCase):
         self.assertIn(LINUX_TGZ_FILENAME, page)
         self.assertIn(MACOS_ZIP_FILENAME, page)
         self.assertIn(IOS_ZIP_FILENAME, page)
+        self.assertIn(ANDROID_APK_FILENAME, page)
         self.assertNotIn("apple-prep", page)
-        self.assertNotIn("android.apk", page)
         for a in available_downloads():
             self.assertIn(a.url, page)
 

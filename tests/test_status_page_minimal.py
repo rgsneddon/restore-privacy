@@ -15,6 +15,7 @@ sys.path.insert(0, str(ROOT / "status_page"))
 
 import app as status_app  # noqa: E402
 from downloads import (  # noqa: E402
+    ANDROID_APK_FILENAME,
     IOS_ZIP_FILENAME,
     MACOS_ZIP_FILENAME,
     RUST_REPO_URL,
@@ -47,8 +48,8 @@ class TestPublicPageWithDownloads(unittest.TestCase):
         self.assertIn(WINDOWS_ZIP_FILENAME, html)
         self.assertIn(MACOS_ZIP_FILENAME, html)
         self.assertIn(IOS_ZIP_FILENAME, html)
+        self.assertIn(ANDROID_APK_FILENAME, html)
         self.assertNotIn("apple-prep", html)
-        self.assertNotIn("android.apk", html)
         for a in available_downloads():
             self.assertIn(a.url, html)
         self.assertIn(RUST_REPO_URL, html)

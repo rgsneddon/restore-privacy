@@ -5,7 +5,7 @@
 
 | | |
 |--|--|
-| **Get the app** | [Download v0.2.3](https://github.com/rgsneddon/restore-privacy/releases/tag/0.2.3) · [Status & downloads](https://restore-privacy-status.onrender.com/) |
+| **Get the app** | [Public v1.0.0 (RUST-IN-PRIVACY)](https://github.com/rgsneddon/RUST-IN-PRIVACY/releases/tag/v1.0.0) · [Status & downloads](https://restore-privacy-status.onrender.com/) · [legacy private 0.2.3](https://github.com/rgsneddon/restore-privacy/releases/tag/0.2.3) |
 | **Privacy** | [PRIVACY_POLICY.md](PRIVACY_POLICY.md) |
 | **License** | [LICENSE](LICENSE) (MIT) |
 | **Credits** | [CREDITS.md](CREDITS.md) |
@@ -39,16 +39,18 @@
 
 ## How to install and use
 
-Download packages from the **[0.2.3 release](https://github.com/rgsneddon/restore-privacy/releases/tag/0.2.3)**  
-or use the buttons on https://restore-privacy-status.onrender.com/
+**Product downloads (v1.0.0):** [RUST-IN-PRIVACY release](https://github.com/rgsneddon/RUST-IN-PRIVACY/releases/tag/v1.0.0)  
+or the buttons on https://restore-privacy-status.onrender.com/
 
-| Platform | Package |
-|----------|---------|
-| Windows | `restore-privacy-client-0.2.3-windows-x64-setup.exe` |
-| Android | `restore-privacy-client-0.2.3-android.apk` |
-| macOS | `restore-privacy-client-0.2.3-macos.zip` *(prep zip / sign on Mac — see below)* |
-| iOS | `restore-privacy-client-0.2.3-ios.zip` *(prep zip / sign on Mac — see below)* |
-| Ubuntu / Linux | `restore-privacy-client-0.2.3-linux-x64.tar.gz` *(installer package; crypto deps baked in)* |
+| Platform | Package (public) |
+|----------|------------------|
+| Windows | `restore-privacy-rust-1.0.0-windows-x64.zip` |
+| Android | [`restore-privacy-rust-1.0.0-android.apk`](https://github.com/rgsneddon/RUST-IN-PRIVACY/releases/download/v1.0.0/restore-privacy-rust-1.0.0-android.apk) |
+| macOS | `restore-privacy-rust-1.0.0-macos.zip` |
+| iOS | `restore-privacy-rust-1.0.0-ios.zip` |
+| Ubuntu / Linux | `restore-privacy-rust-1.0.0-linux-x64.tar.gz` |
+
+Legacy private-repo installers (0.2.3) remain under the [restore-privacy 0.2.3](https://github.com/rgsneddon/restore-privacy/releases/tag/0.2.3) tag for historical builds.
 
 ### Windows
 
@@ -61,7 +63,7 @@ or use the buttons on https://restore-privacy-status.onrender.com/
 
 ### Android
 
-1. Download the **APK** from the release or status page.
+1. Download **`restore-privacy-rust-1.0.0-android.apk`** from the [v1.0.0 release](https://github.com/rgsneddon/RUST-IN-PRIVACY/releases/download/v1.0.0/restore-privacy-rust-1.0.0-android.apk) or status page.
 2. Install the APK (allow install from unknown sources if your device asks).
 3. Open **Restore Privacy**, press **Connect**, and grant **VPN** permission when prompted.
 4. Optional: **Settings** → startup / autoconnect (defaults off); open audit / privacy / licence links. Minimize keeps the VPN service running until **Disconnect**.
