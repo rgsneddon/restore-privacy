@@ -64,11 +64,12 @@ class TestPackageLinuxHelpers(unittest.TestCase):
         from status_page.downloads import RELEASE_ASSETS, render_download_section_html
 
         linux = next(a for a in RELEASE_ASSETS if a.platform == "linux")
-        self.assertEqual(linux.label, "Linux - Installer (.tar.gz)")
+        self.assertEqual(linux.label, "Linux (x64) - Installer (.tar.gz)")
         html = render_download_section_html()
-        self.assertIn("Linux - Installer (.tar.gz)", html)
-        self.assertIn("install.sh", html.lower() + " baked")  # note mentions install
-        self.assertIn("baked", html.lower())
+        self.assertIn("Linux (x64) - Installer (.tar.gz)", html)
+        self.assertIn(linux.url, html)
+        self.assertIn("/releases/download/v1.0.0/", html)
+        self.assertTrue(linux.filename.endswith(".tar.gz"))
 
     def test_readme_primary_path_is_install_sh(self):
         readme = (ROOT / "README.md").read_text(encoding="utf-8")

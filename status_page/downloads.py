@@ -1,7 +1,7 @@
 """Release download link catalog for the public status page (version 1.0.0).
 
-Public page advertises Windows, Linux, and Apple/Android prep packages from
-the public Rust host RUST-IN-PRIVACY.
+Public page advertises only packages published on the live GitHub release
+``rgsneddon/RUST-IN-PRIVACY`` tag ``v1.0.0`` (Windows, Linux, macOS, iOS).
 """
 
 from __future__ import annotations
@@ -17,10 +17,8 @@ RELEASE_TAG = "v1.0.0"
 # Canonical public asset filenames (must match GitHub Release assets).
 WINDOWS_ZIP_FILENAME = f"restore-privacy-rust-{RELEASE_VERSION}-windows-x64.zip"
 LINUX_TGZ_FILENAME = f"restore-privacy-rust-{RELEASE_VERSION}-linux-x64.tar.gz"
-APPLE_PREP_FILENAME = f"restore-privacy-rust-{RELEASE_VERSION}-apple-prep.zip"
-ANDROID_APK_FILENAME = f"restore-privacy-rust-{RELEASE_VERSION}-android.apk"
-# Legacy prep zip still published alongside the residual APK.
-ANDROID_PREP_FILENAME = f"restore-privacy-rust-{RELEASE_VERSION}-android-prep.zip"
+MACOS_ZIP_FILENAME = f"restore-privacy-rust-{RELEASE_VERSION}-macos.zip"
+IOS_ZIP_FILENAME = f"restore-privacy-rust-{RELEASE_VERSION}-ios.zip"
 
 
 @dataclass(frozen=True)
@@ -50,13 +48,13 @@ RELEASE_ASSETS: tuple[DownloadAsset, ...] = (
     ),
     DownloadAsset(
         platform="macos",
-        label="macOS / iOS - Apple prep (.zip)",
-        filename=APPLE_PREP_FILENAME,
+        label="macOS - Client (.zip)",
+        filename=MACOS_ZIP_FILENAME,
     ),
     DownloadAsset(
-        platform="android",
-        label="Android - APK installer",
-        filename=ANDROID_APK_FILENAME,
+        platform="ios",
+        label="iOS - Client (.zip)",
+        filename=IOS_ZIP_FILENAME,
     ),
 )
 
@@ -66,15 +64,20 @@ def available_downloads(
     include_macos: bool = True,
     include_ios: bool = True,
     include_linux: bool = True,
+    include_windows: bool = True,
 ) -> list[DownloadAsset]:
-    """Return download assets advertised on the public status page."""
+    """Return download assets advertised on the public status page.
+
+    ``include_android`` is retained for call-site compatibility; Android is not
+    on the public v1.0.0 release catalog (no-op filter).
+    """
+    del include_android  # not published on public v1.0.0 release
     out: list[DownloadAsset] = []
     for a in RELEASE_ASSETS:
-        if a.platform == "android" and not include_android:
+        if a.platform == "windows" and not include_windows:
             continue
         if a.platform == "macos" and not include_macos:
             continue
-        # ios prep is bundled in apple/macos prep package
         if a.platform == "ios" and not include_ios:
             continue
         if a.platform == "linux" and not include_linux:
@@ -100,8 +103,6 @@ def download_css() -> str:
       font-weight: 600; font-size: 0.98rem; box-sizing: border-box;
     }
     a.dl:hover { background: #2563eb; }
-    a.dl#dl-android { background: #047857; }
-    a.dl#dl-android:hover { background: #059669; }
     a.dl#dl-macos { background: #4b5563; }
     a.dl#dl-macos:hover { background: #6b7280; }
     a.dl#dl-ios { background: #6d28d9; }
@@ -138,7 +139,7 @@ def render_download_section_html(assets: Iterable[DownloadAsset] | None = None) 
     return f"""
   <section class="downloads" id="downloads" aria-label="Download Restore Privacy client">
     <h2>Download client v{RELEASE_VERSION}</h2>
-    <p class="dl-sub">Windows | Linux | Apple prep | Android prep — Rust host</p>
+    <p class="dl-sub">Windows | Linux | macOS | iOS - Rust host</p>
     <div class="dl-buttons">
 {links_html}
 {render_rust_footer_html()}

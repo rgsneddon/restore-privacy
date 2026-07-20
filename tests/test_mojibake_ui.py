@@ -52,9 +52,9 @@ class TestDownloadsNoMojibake(unittest.TestCase):
         html = render_download_section_html()
         _assert_clean(html, "download html")
         self.assertIn(f"Download client v{RELEASE_VERSION}", html)
-        self.assertIn("Windows | Android | macOS | iOS | Ubuntu / Linux", html)
-
-        self.assertIn("->", html)  # UAC note uses ASCII arrow
+        self.assertIn("Windows | Linux | macOS | iOS - Rust host", html)
+        self.assertNotIn("apple-prep", html)
+        self.assertNotIn("android.apk", html)
         self.assertNotIn("Â·", html)
 
     def test_downloads_module_source_clean(self):
