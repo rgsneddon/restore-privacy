@@ -9,7 +9,7 @@
 | **Privacy** | [PRIVACY_POLICY.md](PRIVACY_POLICY.md) |
 | **License** | [LICENSE](LICENSE) (MIT) |
 | **Credits** | [CREDITS.md](CREDITS.md) |
-| **Security audit** | [audit.md](audit.md) |
+| **Security audit** | [AUDIT.md](AUDIT.md) |
 
 ---
 
@@ -114,7 +114,7 @@ https://restore-privacy-status.onrender.com/
 | **Privacy policy** | [PRIVACY_POLICY.md](PRIVACY_POLICY.md) |
 | **License** | [LICENSE](LICENSE) (MIT) |
 | **Credits** | [CREDITS.md](CREDITS.md) |
-| **Code & policy audit** | [audit.md](audit.md) |
+| **Code & policy audit** | [AUDIT.md](AUDIT.md) |
 
 Core promises: **no user-info logs** by design, **minimal public status** (title + downloads — **no live client count**), **device keys** (not a shared client private key), **honest residual** only when full tunnel is up, **no third-party geo** on Connect. Product Windows/Linux clients enable **outer-layer obfuscation**, **padding / jitter / cover**, and **kill-switch** by default on residual paths; multi-hop *config* is not residual until a real relay ships. Node tunnel DNS uses **DoT** upstream. VPS providers may still see IP-level metadata (privacy §4).
 
@@ -122,7 +122,7 @@ Core promises: **no user-info logs** by design, **minimal public status** (title
 
 ## Threat model
 
-Short user-education summary. Full policy language: **[PRIVACY_POLICY.md — Threat model](PRIVACY_POLICY.md)**. Scenario detail for operators/auditors: **[audit.md §4.6](audit.md)** (VPS compromise, traffic analysis by ISP, client device seizure).
+Short user-education summary. Full policy language: **[PRIVACY_POLICY.md — Threat model](PRIVACY_POLICY.md)**. Scenario detail for operators/auditors: **[AUDIT.md §4.6](AUDIT.md)** (VPS compromise, traffic analysis by ISP, client device seizure).
 
 ### What it protects against
 

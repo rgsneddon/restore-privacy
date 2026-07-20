@@ -19,12 +19,12 @@ def _read(name: str) -> str:
 
 class TestAuditThreatScenarios(unittest.TestCase):
     def test_threat_model_section_and_scenarios(self):
-        text = _read("audit.md")
+        text = _read("AUDIT.md")
         # Section exists (heading)
         self.assertTrue(
             re.search(r"(?im)^#+ .*threat model", text)
             or "Threat model scenarios" in text,
-            "audit.md must have a threat model / scenarios section",
+            "AUDIT.md must have a threat model / scenarios section",
         )
         self.assertIn("Threat model scenarios", text)
 
@@ -100,7 +100,7 @@ class TestPrivacyThreatModel(unittest.TestCase):
         # Honesty
         self.assertNotIn("dpi-undetectable", low)
         self.assertIn("mitigation", low)
-        self.assertIn("audit.md", text)
+        self.assertIn("AUDIT.md", text)
 
 
 class TestReadmeThreatModel(unittest.TestCase):
@@ -121,14 +121,14 @@ class TestReadmeThreatModel(unittest.TestCase):
         self.assertIn("endpoint correlation", low)
         self.assertIn("behavioral analysis", low)
         self.assertIn("PRIVACY_POLICY", text)
-        self.assertIn("audit.md", text)
+        self.assertIn("AUDIT.md", text)
         self.assertNotIn("dpi-undetectable", low)
         self.assertNotIn("impossible to detect", low)
 
 
 class TestThreatModelNoOverclaim(unittest.TestCase):
     def test_three_docs_share_honesty(self):
-        for name in ("audit.md", "PRIVACY_POLICY.md", "README.md"):
+        for name in ("AUDIT.md", "PRIVACY_POLICY.md", "README.md"):
             text = _read(name).lower()
             self.assertNotIn("dpi-undetectable", text)
             self.assertNotIn("perfect anonymity", text)

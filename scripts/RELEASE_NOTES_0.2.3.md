@@ -9,10 +9,10 @@
 - **Licence acceptance gate** before Connect (and autoconnect); anonymous device registration with **no admin/operator verification** (OS elevation for residual still separate).
 - **Native residual wire parity:** Android + Apple NativePrep dual-wire **pad/cover, outer obfs, PFS** with Python (product obfs key **33 bytes**).
 - **Monitoring without logging:** process-wide aggregate bandwidth only; public status stays **title-only**.
-- **Threat model** docs in `audit.md` §4.6, `PRIVACY_POLICY.md`, and `README.md` (VPS compromise, ISP traffic analysis, device seizure; endpoint correlation / behavioral analysis limits).
+- **Threat model** docs in `AUDIT.md` §4.6, `PRIVACY_POLICY.md`, and `README.md` (VPS compromise, ISP traffic analysis, device seizure; endpoint correlation / behavioral analysis limits).
 - **Node FDE:** LUKS/dm-crypt operator helpers + shutdown auto-wipe (compose with no-log).
 - **Ephemeral / short-lived nodes:** periodic snapshot/rebuild plan (`scripts/ephemeral_node.py`, timer install); dry-run default.
-- Catalog, README, privacy policy, and **audit.md** updated for **0.2.3**.
+- Catalog, README, privacy policy, and **AUDIT.md** updated for **0.2.3**.
 
 ## Package provenance (honest)
 
@@ -33,4 +33,4 @@ Install **0.2.3** from this GitHub Release or the status page. Accept the end-us
 - Ephemeral dry-run: `python scripts/ephemeral_node.py --dry-run`
 - FDE check: `bash node/install_disk_encryption.sh check`
 - Build: `python scripts/build_release_0.2.3.py`
-- Audit: [audit.md](../audit.md)
+- Audit: [AUDIT.md](../AUDIT.md)

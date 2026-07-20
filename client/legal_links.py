@@ -1,7 +1,7 @@
 """Public document links for client Settings (audit, privacy, end-user licence).
 
 Installed clients open stable GitHub blob URLs so they work without a local
-source tree. Paths match repo root files: audit.md, PRIVACY_POLICY.md, LICENSE.
+source tree. Paths match repo root files: AUDIT.md, PRIVACY_POLICY.md, LICENSE.
 """
 
 from __future__ import annotations
@@ -17,7 +17,7 @@ AUDIT_LABEL = "Most recent audit"
 PRIVACY_POLICY_LABEL = "Privacy policy"
 END_USER_LICENCE_LABEL = "End user licence"
 
-AUDIT_REPO_PATH = "audit.md"
+AUDIT_REPO_PATH = "AUDIT.md"
 PRIVACY_POLICY_REPO_PATH = "PRIVACY_POLICY.md"
 # On-disk spelling is LICENSE (US); UI label uses “licence”.
 END_USER_LICENCE_REPO_PATH = "LICENSE"

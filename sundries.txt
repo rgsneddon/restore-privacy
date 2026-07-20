@@ -229,4 +229,4 @@ SECRETS / RELEASE GATES (mandatory)
   PRIVACY_POLICY.md  â€” full privacy policy
   LICENSE            â€” MIT for original project code
   CREDITS.md         â€” third-party attributions (Wintun, cryptography, etc.)
-  audit.md           â€” static code/policy audit record (operators/reviewers)
+  AUDIT.md           â€” static code/policy audit record (operators/reviewers)

@@ -10,7 +10,7 @@
 - **Multi-hop:** hop *list* config only — **not residual multi-hop**; status is entry-only / not routed.
 - **Self-host:** `scripts/selfhost_node.sh` one-shot install recipe.
 - **Product node pub pin:** `product/node_elgamal.pub` must match the live node (Android always refreshes assets → filesDir).
-- Catalog, README, privacy policy, and **audit.md** updated for **0.2.1**.
+- Catalog, README, privacy policy, and **AUDIT.md** updated for **0.2.1**.
 
 ## Package provenance (honest)
 
@@ -28,4 +28,4 @@ Install **0.2.1** packages from this GitHub Release or the status page. Prefer u
 
 - Self-host: `sudo bash scripts/selfhost_node.sh`
 - Build: `python scripts/build_release_0.2.1.py`
-- Audit: [audit.md](../audit.md)
+- Audit: [AUDIT.md](../AUDIT.md)

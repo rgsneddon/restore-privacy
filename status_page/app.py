@@ -73,7 +73,7 @@ def read_static_bytes(url_path: str) -> tuple[bytes, str] | None:
 GITHUB_BLOB_MAIN = "https://github.com/rgsneddon/restore-privacy/blob/main"
 LICENCE_URL = f"{GITHUB_BLOB_MAIN}/LICENSE"
 PRIVACY_POLICY_URL = f"{GITHUB_BLOB_MAIN}/PRIVACY_POLICY.md"
-SECURITY_AUDIT_URL = f"{GITHUB_BLOB_MAIN}/audit.md"
+SECURITY_AUDIT_URL = f"{GITHUB_BLOB_MAIN}/AUDIT.md"
 
 # Labels shown under the product title (terms of use / privacy / audit).
 LICENCE_LABEL = "LICENCE"

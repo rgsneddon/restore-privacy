@@ -64,7 +64,7 @@ Restore Privacy **0.2.3** ships clients and public catalog aligned to the **Flok
 | Node | `node/*` (handshake, pfs, traffic_shape, crypto_session, nolog, install scripts) |
 | Public web | `status_page/*` catalog **v0.2.3** |
 | Packaging | `scripts/build_release_0.2.3.py`, `package_linux.py`, `selfhost_node.sh` |
-| Policies | `PRIVACY_POLICY.md`, `LICENSE`, `CREDITS.md`, `README.md`, `sundries.txt`, `audit.md` |
+| Policies | `PRIVACY_POLICY.md`, `LICENSE`, `CREDITS.md`, `README.md`, `sundries.txt`, `AUDIT.md` |
 
 ### 2.2 Method notes
 
@@ -278,7 +278,7 @@ Re-run after major releases or crypto/packaging changes.
 
 | Item | |
 |------|--|
-| Output | `audit.md` (repo root) |
+| Output | `AUDIT.md` (repo root) |
 | Related | `PRIVACY_POLICY.md` (Threat model), `README.md` (Threat model), `scripts/RELEASE_NOTES_0.2.3.md` |
 | Code baseline | 0.2.3 ship + node 82.221.101.241 |
 | Threat scenarios | §4.6 — re-review on each major release |

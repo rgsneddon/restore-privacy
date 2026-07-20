@@ -1,4 +1,4 @@
-"""Structural checks for repo-root audit.md (code & policy audit deliverable)."""
+"""Structural checks for repo-root AUDIT.md (code & policy audit deliverable)."""
 
 from __future__ import annotations
 
@@ -7,14 +7,16 @@ import unittest
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-AUDIT = ROOT / "audit.md"
+AUDIT = ROOT / "AUDIT.md"
 
 
 class TestAuditMd(unittest.TestCase):
     def test_audit_md_exists_and_substantial(self):
-        self.assertTrue(AUDIT.is_file(), "audit.md must exist at repo root")
+        self.assertTrue(AUDIT.is_file(), "AUDIT.md must exist at repo root")
+        # GitHub (case-sensitive) must see uppercase path — not only Windows-insensitive open
+        self.assertEqual(AUDIT.name, "AUDIT.md")
         text = AUDIT.read_text(encoding="utf-8")
-        self.assertGreater(len(text), 3000, "audit.md should be a non-trivial audit")
+        self.assertGreater(len(text), 3000, "AUDIT.md should be a non-trivial audit")
         self.assertIn("# Restore Privacy", text)
         self.assertIn("Executive summary", text)
         self.assertIn("Findings", text)
@@ -45,7 +47,7 @@ class TestAuditMd(unittest.TestCase):
         # Current ship version (accept 0.2.x catalog / audit header)
         self.assertTrue(
             "0.2.3" in text or "0.2.1" in text or "0.2.0" in text or "0.1.8" in text,
-            "audit.md must cite the current or prior reviewed product version",
+            "AUDIT.md must cite the current or prior reviewed product version",
         )
         # Severity labels used in findings
         for sev in ("High", "Medium", "Low", "Info"):

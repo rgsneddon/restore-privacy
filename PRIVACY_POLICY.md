@@ -3,7 +3,7 @@
 **Last updated:** 20 July 2026  
 **Product:** Restore Privacy Tunnel (RPT) — custom VPN node, client apps, and public status page  
 **Current public packages:** [v0.2.3](https://github.com/rgsneddon/restore-privacy/releases/tag/0.2.3) (Windows | Android | Linux; macOS | iOS prep packages)  
-**Code & policy audit:** [audit.md](audit.md)  
+**Code & policy audit:** [AUDIT.md](AUDIT.md)  
 **Operator / project:** Russell G Sneddon (`rgsneddon`) / public repository [restore-privacy](https://github.com/rgsneddon/restore-privacy)
 
 This policy describes how the **Restore Privacy** software is designed to handle data. It is written for end users and operators. It is **not** legal advice and is not a jurisdiction-specific compliance certificate (e.g. full GDPR/CCPA legal opinion).
@@ -51,7 +51,7 @@ Process stdout/stderr for the node service is configured for **no journal sessio
 
 ### 3.2 Client applications (Windows, Android, Linux, iOS, and macOS)
 
-- **Product UI** uses **manual Connect / Disconnect** by default. Optional **Settings** preferences (stored only on the device) let the user enable **run at device startup** and/or **autoconnect on launch** (both **off** until opted in). Settings also exposes links to the **most recent audit** (`audit.md`), **privacy policy** (`PRIVACY_POLICY.md`), and **end user licence** (`LICENSE`). These preferences and links are local/device-side only  -  not synced to the node or status page.
+- **Product UI** uses **manual Connect / Disconnect** by default. Optional **Settings** preferences (stored only on the device) let the user enable **run at device startup** and/or **autoconnect on launch** (both **off** until opted in). Settings also exposes links to the **most recent audit** (`AUDIT.md`), **privacy policy** (`PRIVACY_POLICY.md`), and **end user licence** (`LICENSE`). These preferences and links are local/device-side only  -  not synced to the node or status page.
 - Closing or minimizing the main UI is designed to **leave the tunnel running** until the user **Disconnects** or **Quits** (Windows tray identity: **Privacy Restored**). Android keep-alive uses a foreground VPN service; Activity destroy does not stop the tunnel.
 - Clients use **local** cryptographic material (when provisioned) to complete admission and establish session keys when the user connects. On the Python client/node path, session AEAD keys incorporate **ephemeral X25519** material (perfect forward secrecy) in addition to handshake nonces — long-term keys remain for admission/authentication.
 - **Traffic-shape** features (packet padding, send-side timing jitter, cover/dummy frames) are **enabled by default** on the product Windows/Linux Python DATA path (bounded pad bucket, modest send jitter, periodic cover frames). Set environment variable **`RPT_TRAFFIC_SHAPE=0`** to disable. They reduce coarse traffic fingerprints and are **not** a guarantee of undetectability against sophisticated DPI. Native Android/Apple engines may lag this wire surface until dual-wired.
@@ -95,7 +95,7 @@ Please understand these **operational limits**:
 
 ## 5. Threat model
 
-This section is for **user education**. It states **what Restore Privacy protects against** and **what it does not**, in plain language. A longer scenario write-up (VPS compromise, ISP traffic analysis, client device seizure) lives in [audit.md §4.6](audit.md). This is **not** a formal certification or pen-test report.
+This section is for **user education**. It states **what Restore Privacy protects against** and **what it does not**, in plain language. A longer scenario write-up (VPS compromise, ISP traffic analysis, client device seizure) lives in [AUDIT.md §4.6](AUDIT.md). This is **not** a formal certification or pen-test report.
 
 ### 5.1 What it protects against
 
@@ -116,7 +116,7 @@ This section is for **user education**. It states **what Restore Privacy protect
 | **Endpoint correlation** | A service you visit can still recognize *you* via accounts, cookies, browser fingerprint, or the same login across sessions. The tunnel does **not** unlink your identity at the destination. Destinations may also correlate multiple sessions that share the **same VPN egress IP** (many users behind one node). |
 | **Behavioral analysis** | Observers (ISP, workplace, or analyst with flow logs) can still study **when** you connect, **how long**, and rough volume patterns. Pad/cover/obfs reduce coarse fingerprints; they do **not** stop behavioral analysis of usage patterns. |
 | **VPS / provider metadata** | The VPS host, CDN, or upstream network may log IP-level or netflow data under **their** policies (see §4 item 1). Product no-log does not erase provider logs. |
-| **VPS compromise (active sessions)** | If the node host is fully compromised while you are connected, **live** memory may still expose session material. See [audit.md](audit.md) **VPS compromise** scenario. |
+| **VPS compromise (active sessions)** | If the node host is fully compromised while you are connected, **live** memory may still expose session material. See [AUDIT.md](AUDIT.md) **VPS compromise** scenario. |
 | **Traffic analysis by ISP (undetectability)** | Your ISP can still see that you talk to the VPN node. We do **not** claim DPI-undetectability or full pluggable-transport parity. |
 | **Client device seizure** | Seizure of an unlocked (or decryptable) device exposes local keys, apps, browser history, and any local connection log. Disk encryption is an OS control, not an RPT server feature. |
 | **Multi-hop residual routing** | Hop *lists* may exist for planning; product traffic remains **single-hop / entry-only** until a real multi-hop path ships. |

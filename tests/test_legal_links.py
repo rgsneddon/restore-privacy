@@ -49,7 +49,8 @@ class TestLegalLinksHelper(unittest.TestCase):
         for label, url in urls.items():
             self.assertTrue(url.startswith("https://github.com/rgsneddon/restore-privacy/blob/main/"))
             self.assertIn(label, (AUDIT_LABEL, PRIVACY_POLICY_LABEL, END_USER_LICENCE_LABEL))
-        self.assertTrue(audit_url().endswith("/audit.md"))
+        self.assertTrue(audit_url().endswith("/AUDIT.md"))
+        self.assertEqual(AUDIT_REPO_PATH, "AUDIT.md")
         self.assertTrue(privacy_policy_url().endswith("/PRIVACY_POLICY.md"))
         self.assertTrue(end_user_licence_url().endswith("/LICENSE"))
 
@@ -70,7 +71,8 @@ class TestLegalLinksHelper(unittest.TestCase):
         self.assertIn("Most recent audit", links)
         self.assertIn("Privacy policy", links)
         self.assertIn("End user licence", links)
-        self.assertIn("audit.md", links)
+        self.assertIn("AUDIT.md", links)
+        self.assertNotIn("repoPath: 'audit.md'", links)
         self.assertIn("PRIVACY_POLICY.md", links)
         self.assertIn("LICENSE", links)
         self.assertIn("launchUrl", dart)
