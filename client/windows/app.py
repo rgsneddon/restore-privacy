@@ -696,7 +696,7 @@ class TunnelClientApp:
         win = tk.Toplevel(self.root)
         win.title("Settings")
         win.configure(bg=CHROME_BG)
-        win.geometry("420x280")
+        win.geometry("420x420")
         win.transient(self.root)
         try:
             win.grab_set()
@@ -836,6 +836,51 @@ class TunnelClientApp:
             wraplength=380,
             justify=tk.LEFT,
         ).pack(fill=tk.X, pady=(8, 0))
+
+        # Legal / policy documents (stable public GitHub URLs)
+        from client.legal_links import LEGAL_DOC_LINKS
+
+        docs_card = tk.Frame(
+            pad,
+            bg=PANEL_BG,
+            highlightbackground=BORDER,
+            highlightthickness=1,
+            padx=12,
+            pady=8,
+        )
+        docs_card.pack(fill=tk.X, pady=(12, 0))
+        tk.Label(
+            docs_card,
+            text="Documents",
+            bg=PANEL_BG,
+            fg=PRIMARY_DARK,
+            font=("Segoe UI", 10, "bold"),
+            anchor="w",
+        ).pack(fill=tk.X, pady=(0, 4))
+
+        def _open_legal(url: str, label: str) -> None:
+            self._log(f"Opening {label}...")
+            try:
+                webbrowser.open(url)
+            except Exception as exc:
+                self._log(f"Could not open browser: {exc}. Visit: {url}")
+                note_var.set(f"Open manually: {url}")
+
+        for link in LEGAL_DOC_LINKS:
+            lbl = tk.Label(
+                docs_card,
+                text=link.label,
+                bg=PANEL_BG,
+                fg=PRIMARY,
+                font=("Segoe UI", 9, "underline"),
+                cursor="hand2",
+                anchor="w",
+            )
+            lbl.pack(fill=tk.X, pady=2)
+            lbl.bind(
+                "<Button-1>",
+                lambda _e, u=link.url, t=link.label: _open_legal(u, t),
+            )
 
         tk.Button(
             pad,

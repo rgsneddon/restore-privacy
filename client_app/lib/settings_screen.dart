@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:url_launcher/url_launcher.dart';
 
+import 'legal_links.dart';
 import 'settings_store.dart';
 import 'theme.dart';
 
-/// Settings surface: run-at-startup + autoconnect-on-launch switches.
+/// Settings surface: run-at-startup + autoconnect-on-launch switches + legal docs.
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({
     super.key,
@@ -75,6 +77,20 @@ class _SettingsScreenState extends State<SettingsScreen> {
     if (mounted) setState(() => _busy = false);
   }
 
+  Future<void> _openLegalDoc(LegalDocLink link) async {
+    final uri = Uri.parse(link.url);
+    try {
+      final ok = await launchUrl(uri, mode: LaunchMode.externalApplication);
+      if (!ok && mounted) {
+        setState(() => _note = 'Could not open ${link.label}. Visit: ${link.url}');
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _note = 'Could not open ${link.label}: $e');
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -132,6 +148,42 @@ class _SettingsScreenState extends State<SettingsScreen> {
             '(startup launches the app; autoconnect starts the VPN). '
             'OS VPN permission / Administrator may still be required.',
             style: TextStyle(color: kTextMuted, fontSize: 12),
+          ),
+          const SizedBox(height: 20),
+          Text(
+            'Documents',
+            style: TextStyle(
+              color: kPrimaryDark,
+              fontSize: 14,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Container(
+            decoration: BoxDecoration(
+              color: kPanelBg,
+              borderRadius: BorderRadius.circular(kCornerRadius),
+              border: Border.all(color: kBorder),
+            ),
+            child: Column(
+              children: [
+                for (var i = 0; i < kLegalDocLinks.length; i++) ...[
+                  if (i > 0) const Divider(height: 1),
+                  ListTile(
+                    title: Text(
+                      kLegalDocLinks[i].label,
+                      style: const TextStyle(
+                        fontWeight: FontWeight.w600,
+                        color: kPrimary,
+                        decoration: TextDecoration.underline,
+                      ),
+                    ),
+                    trailing: const Icon(Icons.open_in_new, size: 18, color: kPrimary),
+                    onTap: () => _openLegalDoc(kLegalDocLinks[i]),
+                  ),
+                ],
+              ],
+            ),
           ),
           if (_note != null) ...[
             const SizedBox(height: 12),

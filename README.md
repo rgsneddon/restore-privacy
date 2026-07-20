@@ -5,7 +5,7 @@
 
 | | |
 |--|--|
-| **Get the app** | [Download v0.2.1](https://github.com/rgsneddon/restore-privacy/releases/tag/0.2.1) · [Status & downloads](https://restore-privacy-status.onrender.com/) |
+| **Get the app** | [Download v0.2.2](https://github.com/rgsneddon/restore-privacy/releases/tag/0.2.2) · [Status & downloads](https://restore-privacy-status.onrender.com/) |
 | **Privacy** | [PRIVACY_POLICY.md](PRIVACY_POLICY.md) |
 | **License** | [LICENSE](LICENSE) (MIT) |
 | **Credits** | [CREDITS.md](CREDITS.md) |
@@ -19,6 +19,7 @@
 - **Manual Connect / Disconnect** with optional seamless power-up via **Settings**
   - **Run at device startup** (Windows sign-in / Android boot — opt-in)
   - **Autoconnect on launch** (opt-in; defaults off)
+  - **Settings** links to the **most recent audit**, **privacy policy**, and **end user licence**
 - System tray identity **Privacy Restored** (Windows) with product **logo** icons
 - Scrolling message:  
   `lightweight vpn to restore your privacy - no user data is retained - your privacy is restored`
@@ -28,31 +29,32 @@
 - Live status page with **currently connected** client count and installers
 - **No third-party geo lookup** on Connect (admission is cryptographic only)
 - Session **PFS** (ephemeral X25519) on the Python client/node handshake path
-- Optional traffic-shape features (padding / jitter / cover) — **defaults off**
+- **Product traffic shaping** (padding / send jitter / cover) **on by default** for Windows/Linux Python DATA path (`RPT_TRAFFIC_SHAPE=0` to opt out)
 - Multi-hop hop *lists* may be configured for planning — **not residual multi-hop** until a real relay path ships
+- Native Android/Apple engines may lag Python pad/cover/PFS wire extensions (documented honestly)
 
 ---
 
 ## How to install and use
 
-Download packages from the **[0.2.1 release](https://github.com/rgsneddon/restore-privacy/releases/tag/0.2.1)**  
+Download packages from the **[0.2.2 release](https://github.com/rgsneddon/restore-privacy/releases/tag/0.2.2)**  
 or use the buttons on https://restore-privacy-status.onrender.com/
 
 | Platform | Package |
 |----------|---------|
-| Windows | `restore-privacy-client-0.2.1-windows-x64-setup.exe` |
-| Android | `restore-privacy-client-0.2.1-android.apk` |
-| macOS | `restore-privacy-client-0.2.1-macos.zip` *(prep zip / sign on Mac — see below)* |
-| iOS | `restore-privacy-client-0.2.1-ios.zip` *(prep zip / sign on Mac — see below)* |
-| Ubuntu / Linux | `restore-privacy-client-0.2.1-linux-x64.tar.gz` *(installer package; crypto deps baked in)* |
+| Windows | `restore-privacy-client-0.2.2-windows-x64-setup.exe` |
+| Android | `restore-privacy-client-0.2.2-android.apk` |
+| macOS | `restore-privacy-client-0.2.2-macos.zip` *(prep zip / sign on Mac — see below)* |
+| iOS | `restore-privacy-client-0.2.2-ios.zip` *(prep zip / sign on Mac — see below)* |
+| Ubuntu / Linux | `restore-privacy-client-0.2.2-linux-x64.tar.gz` *(installer package; crypto deps baked in)* |
 
 ### Windows
 
 1. Download the **Windows installer (.exe)** from the release or status page.
-2. Run **`restore-privacy-client-0.2.1-windows-x64-setup.exe`**.  
+2. Run **`restore-privacy-client-0.2.2-windows-x64-setup.exe`**.  
    It installs the full client (**bundled runtime + Wintun + dependencies** — **no separate Python install**), creates **Privacy Restored** shortcuts with the **logo** icon, and can launch the app.
 3. Press **Connect** and approve **UAC** when prompted so residual public IP uses the VPN node.
-4. Optional: open **Settings** and enable **Run at device startup** and/or **Autoconnect on launch** (both default **off**).
+4. Optional: open **Settings** and enable **Run at device startup** and/or **Autoconnect on launch** (both default **off**). Settings also links to the audit, privacy policy, and end user licence.
 5. Use the system tray (**Privacy Restored**) or taskbar to restore the window; **Disconnect** or **Quit** stops the tunnel.
 
 ### Android
@@ -60,17 +62,17 @@ or use the buttons on https://restore-privacy-status.onrender.com/
 1. Download the **APK** from the release or status page.
 2. Install the APK (allow install from unknown sources if your device asks).
 3. Open **Restore Privacy**, press **Connect**, and grant **VPN** permission when prompted.
-4. Optional: **Settings** → startup / autoconnect (defaults off). Minimize keeps the VPN service running until **Disconnect**.
+4. Optional: **Settings** → startup / autoconnect (defaults off); open audit / privacy / licence links. Minimize keeps the VPN service running until **Disconnect**.
 
 ### Ubuntu and derivatives (Linux Mint, Pop!_OS, …)
 
 **Supported floor:** Ubuntu **20.04 LTS and newer** (22.04, 24.04, …) and Mint/Pop built on those bases. Python **3.8+**.
 
-1. Download **`restore-privacy-client-0.2.1-linux-x64.tar.gz`** from the release or status page.
+1. Download **`restore-privacy-client-0.2.2-linux-x64.tar.gz`** from the release or status page.
 2. Unpack and run the **bundled installer** (crypto wheels baked in — no network `pip install cryptography`):
    ```bash
-   tar xzf restore-privacy-client-0.2.1-linux-x64.tar.gz
-   cd restore-privacy-0.2.1-linux
+   tar xzf restore-privacy-client-0.2.2-linux-x64.tar.gz
+   cd restore-privacy-0.2.2-linux
    bash install.sh
    ```
 3. Run the GUI (**root** needed so residual public IP uses the VPN node):
@@ -83,14 +85,14 @@ or use the buttons on https://restore-privacy-status.onrender.com/
 
 ### macOS / iOS (continue on a Mac)
 
-Release zips for **0.2.1** are **prep packages** for sideload / further signing — **Mac work required**. Residual public IP does **not** change until Packet Tunnel / Network Extension is signed and active; host-side HELLO alone is **diagnostic** only.
+Release zips for **0.2.2** are **prep packages** for sideload / further signing — **Mac work required**. Residual public IP does **not** change until Packet Tunnel / Network Extension is signed and active; host-side HELLO alone is **diagnostic** only.
 
-1. Download **`restore-privacy-client-0.2.1-macos.zip`** or **`restore-privacy-client-0.2.1-ios.zip`**, or clone this repo and open `client_app/` on macOS.
+1. Download **`restore-privacy-client-0.2.2-macos.zip`** or **`restore-privacy-client-0.2.2-ios.zip`**, or clone this repo and open `client_app/` on macOS.
 2. Checklist:
    - [`client_app/APPLE_BUILD.md`](client_app/APPLE_BUILD.md)
    - [`client_app/macos/BUILD_ON_MAC.md`](client_app/macos/BUILD_ON_MAC.md)
    - [`client_app/ios/BUILD_ON_MAC.md`](client_app/ios/BUILD_ON_MAC.md)
-   - Mac handoff: [`client_app/APPLE_HANDOFF_0.2.1.md`](client_app/APPLE_HANDOFF_0.2.1.md)
+   - Mac handoff: [`client_app/APPLE_HANDOFF_0.2.2.md`](client_app/APPLE_HANDOFF_0.2.2.md) (or prior `APPLE_HANDOFF_0.2.1.md` if not yet copied)
 3. Packages may ship the **public** node key (`node_elgamal.pub`). Each install **generates its own Ed25519 device key on first run**. Packages **do **not** ship a shared** `client_ed25519.priv`. Never ship `node_elgamal.priv`.
 
 ### Status page
@@ -98,7 +100,7 @@ Release zips for **0.2.1** are **prep packages** for sideload / further signing 
 https://restore-privacy-status.onrender.com/
 
 - Live **currently connected clients** count  
-- **Download** buttons for Windows, Android, macOS, iOS, and Linux (catalog **v0.2.1**)  
+- **Download** buttons for Windows, Android, macOS, iOS, and Linux (catalog **v0.2.2**)  
 - **Connect via web** explains that a browser tab cannot run full system VPN  
 
 ---
@@ -112,7 +114,7 @@ https://restore-privacy-status.onrender.com/
 | **Credits** | [CREDITS.md](CREDITS.md) |
 | **Code & policy audit** | [audit.md](audit.md) |
 
-Core promises: **no user-info logs** by design, **minimal public status** (live count only), **device keys** (not a shared client private key), **honest residual** only when full tunnel is up, **no third-party geo** on Connect. Optional padding/jitter/cover and multi-hop *config* are documented honestly in the policy and audit — multi-hop is **not residual** until a real relay ships. VPS providers may still see IP-level metadata (privacy §4).
+Core promises: **no user-info logs** by design, **minimal public status** (live count only), **device keys** (not a shared client private key), **honest residual** only when full tunnel is up, **no third-party geo** on Connect. Product Windows/Linux clients enable **padding / jitter / cover** by default on the DATA path (opt out with `RPT_TRAFFIC_SHAPE=0`); multi-hop *config* is not residual until a real relay ships. VPS providers may still see IP-level metadata (privacy §4).
 
 ---
 
@@ -122,13 +124,13 @@ Node deploy, ports, secrets, from-source builds, and tests: **[sundries.txt](sun
 
 **Secrets discipline:** Never commit or force-add `secrets/` (gitignored). Public packages must never include `node_elgamal.priv` or a shared `client_ed25519.priv`. Release scripts run `_assert_no_priv` / strip inject gates — keep those on every tag.
 
-**0.2.1 release:** Production node **82.221.101.241:44044**. See [scripts/RELEASE_NOTES_0.2.1.md](scripts/RELEASE_NOTES_0.2.1.md). Prefer upgrading from 0.2.0 so node public key and handshake paths stay current.
+**0.2.2 release:** Production node **82.221.101.241:44044**. Product traffic-shape **on by default**. See [scripts/RELEASE_NOTES_0.2.2.md](scripts/RELEASE_NOTES_0.2.2.md). Prefer upgrading from 0.2.1 so Settings legal links and shaping policy stay current.
 
 **Self-host (one shot):** `sudo bash scripts/selfhost_node.sh` — node install + tunnel DNS + host privacy. Details: [sundries.txt](sundries.txt).
 
 **Tunnel DNS / host privacy:** [node/install_dns.sh](node/install_dns.sh), [node/install_host_privacy.sh](node/install_host_privacy.sh).
 
-**Release scripts:** Use **scripts/build_release_0.2.1.py**. Re-run `python scripts/package_linux.py` each tag for manylinux wheels.
+**Release scripts:** Use **scripts/build_release_0.2.2.py**. Re-run `python scripts/package_linux.py` each tag for manylinux wheels.
 
 ```bash
 # Windows GUI (requires system Python)
@@ -141,5 +143,5 @@ sudo PYTHONPATH=. python3 -m client.linux
 python scripts/package_linux.py
 
 # Release packages (current tag)
-python scripts/build_release_0.2.1.py
+python scripts/build_release_0.2.2.py
 ```

@@ -2,7 +2,7 @@
 
 **Last updated:** 20 July 2026  
 **Product:** Restore Privacy Tunnel (RPT) — custom VPN node, client apps, and public status page  
-**Current public packages:** [v0.2.1](https://github.com/rgsneddon/restore-privacy/releases/tag/0.2.1) (Windows | Android | Linux; macOS | iOS prep packages)  
+**Current public packages:** [v0.2.2](https://github.com/rgsneddon/restore-privacy/releases/tag/0.2.2) (Windows | Android | Linux; macOS | iOS prep packages)  
 **Code & policy audit:** [audit.md](audit.md)  
 **Operator / project:** Russell G Sneddon (`rgsneddon`) / public repository [restore-privacy](https://github.com/rgsneddon/restore-privacy)
 
@@ -50,10 +50,10 @@ Process stdout/stderr for the node service is configured for **no journal sessio
 
 ### 3.2 Client applications (Windows, Android, Linux, iOS, and macOS)
 
-- **Product UI** uses **manual Connect / Disconnect** by default. Optional **Settings** preferences (stored only on the device) let the user enable **run at device startup** and/or **autoconnect on launch** (both **off** until opted in). These preferences are local only  -  not synced to the node or status page.
+- **Product UI** uses **manual Connect / Disconnect** by default. Optional **Settings** preferences (stored only on the device) let the user enable **run at device startup** and/or **autoconnect on launch** (both **off** until opted in). Settings also exposes links to the **most recent audit** (`audit.md`), **privacy policy** (`PRIVACY_POLICY.md`), and **end user licence** (`LICENSE`). These preferences and links are local/device-side only  -  not synced to the node or status page.
 - Closing or minimizing the main UI is designed to **leave the tunnel running** until the user **Disconnects** or **Quits** (Windows tray identity: **Privacy Restored**). Android keep-alive uses a foreground VPN service; Activity destroy does not stop the tunnel.
 - Clients use **local** cryptographic material (when provisioned) to complete admission and establish session keys when the user connects. On the Python client/node path, session AEAD keys incorporate **ephemeral X25519** material (perfect forward secrecy) in addition to handshake nonces — long-term keys remain for admission/authentication.
-- Optional **traffic-shape** features (packet padding, send-side timing jitter, cover/dummy frames) may be enabled in software; **defaults are off** for bandwidth/compatibility. They reduce coarse traffic fingerprints and are **not** a guarantee of undetectability against sophisticated DPI.
+- **Traffic-shape** features (packet padding, send-side timing jitter, cover/dummy frames) are **enabled by default** on the product Windows/Linux Python DATA path (bounded pad bucket, modest send jitter, periodic cover frames). Set environment variable **`RPT_TRAFFIC_SHAPE=0`** to disable. They reduce coarse traffic fingerprints and are **not** a guarantee of undetectability against sophisticated DPI. Native Android/Apple engines may lag this wire surface until dual-wired.
 - **Full-tunnel** modes route device traffic into the encrypted tunnel **only when** the OS grants VPN permission (Windows Administrator / UAC + Wintun dual `/1` routes, Android VPN consent, iOS/macOS VPN permission). On **iOS and macOS**, full-system VPN uses a signed **Packet Tunnel Network Extension** (and App Group access to admission secrets). Product "connected for residual public IP" requires the system tunnel / dual `/1` path to be active (residual public IP only changes then).
 - **On Disconnect / Quit**, clients are designed to **fully tear down** the tunnel (routes, TUN/Packet Tunnel, session) so traffic **reverts to the device's normal public IP path**.
 - Clients are **not** designed to upload browsing history or identity dossiers to the node as product telemetry.
@@ -65,7 +65,7 @@ Process stdout/stderr for the node service is configured for **no journal sessio
 
 - Proxies or displays a **live** `clients_connected` value from the node status API.
 - Updates the number in the browser via **client-side polling** (no requirement to store user history on the page host).
-- May offer **download links** to public GitHub release packages (current catalog: **v0.2.1**).
+- May offer **download links** to public GitHub release packages (current catalog: **v0.2.2**).
 
 ### 3.4 Operator-held secrets
 
@@ -85,7 +85,7 @@ Please understand these **operational limits**:
 4. **Misconfiguration.** If an operator enables verbose logging, reverse proxies with access logs, or third-party monitoring, that can create logs this policy assumes are off.
 5. **Security vs. privacy.** Per-device Ed25519 keys identify a **product install**, not a named human account - but a device key can still be treated as an access secret for that install.
 6. **Open relay risk is reduced by keys, not by accounts.** Unauthorized clients should fail handshake; authorized keys must be protected.
-7. **Traffic analysis mitigations are optional and incomplete.** Packet padding, timing jitter, and cover traffic reduce coarse size/timing fingerprints; they do **not** guarantee undetectability against sophisticated DPI. Multi-hop hop *lists* may be configured for future use; product traffic remains **single-hop / entry-only** until a real multi-hop relay path ships (status never claims multi-hop residual from config alone). Session AEAD keys use ephemeral X25519 material (PFS) so long-term key compromise after a session ends should not reconstruct that session’s traffic keys from the public transcript alone.
+7. **Traffic analysis mitigations are incomplete.** Product Windows/Linux clients apply packet padding, timing jitter, and cover traffic **by default** (opt out with `RPT_TRAFFIC_SHAPE=0`). They reduce coarse size/timing fingerprints; they do **not** guarantee undetectability against sophisticated DPI. Multi-hop hop *lists* may be configured for future use; product traffic remains **single-hop / entry-only** until a real multi-hop relay path ships (status never claims multi-hop residual from config alone). Session AEAD keys use ephemeral X25519 material (PFS) so long-term key compromise after a session ends should not reconstruct that session’s traffic keys from the public transcript alone.
 8. **Self-hosted operators** must still protect `node_elgamal.priv`, keep product no-log defaults, and remember provider-level IP logs (limit 1 above).
 
 ---
