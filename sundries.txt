@@ -60,6 +60,19 @@ SECRETS / RELEASE GATES (mandatory)
     # Skip pieces: SKIP_DNS=1 SKIP_HOST_PRIVACY=1
     # Then ship ONLY secrets/node_elgamal.pub to clients (never .priv).
 
+  *** Ephemeral / short-lived node (periodic snapshot + rebuild) ***
+    # Dry-run plan (safe default) — ordered snapshot → rebuild → selfhost → health:
+    python scripts/ephemeral_node.py --dry-run --mode snapshot_then_rebuild --period 7d
+    # Modes: snapshot | rebuild | snapshot_then_rebuild
+    # Periodic systemd timer (default dry-run oneshot):
+    sudo bash scripts/install_ephemeral_timer.sh          # PERIOD=7d
+    # Live destructive rebuild requires explicit confirm (never default):
+    #   RPT_EPHEMERAL_CONFIRM=yes python scripts/ephemeral_node.py --live --mode rebuild
+    # Optional provider hooks: RPT_SNAPSHOT_CMD=...  RPT_REBUILD_CMD=...
+    # Pure helpers: node/ephemeral_node.py
+    # Honesty: does not erase provider backups/netflow; re-ship public node pin
+    # if keys regenerate; re-applies no-log via selfhost on rebuild step.
+
   Optional privacy features (client/node code; defaults OFF unless noted):
     - DATA padding + send jitter: node/traffic_shape.py (TrafficShapePolicy)
     - Optional cover traffic dummy frames (same module)

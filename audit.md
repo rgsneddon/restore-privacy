@@ -266,6 +266,7 @@ Re-run after major releases or crypto/packaging changes.
 | Kill-switch + DoT DNS + outer obfs | In tree (Python + native residual outer wrap) |
 | Native pad/cover/obfs/PFS parity | **Done** (Android + iOS/macOS NativePrep; structural gates) |
 | LUKS/dm-crypt FDE + shutdown wipe scripts | **In tree** (`install_disk_encryption.sh`, `install_shutdown_wipe.sh`; at-rest only; not live root secrecy) |
+| Ephemeral / short-lived node rebuild | **In tree** (`scripts/ephemeral_node.py`, timer install; dry-run default; periodic snapshot/rebuild plan) |
 
 ---
 
