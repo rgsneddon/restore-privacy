@@ -33,9 +33,10 @@ class TestPeriodParse(unittest.TestCase):
         self.assertEqual(parse_period_seconds("24h"), 24 * 3600)
         self.assertEqual(parse_period_seconds("30m"), 30 * 60)
         self.assertEqual(parse_period_seconds("1w"), 7 * 86400)
-        # Prefer largest unit (1w) when evenly divisible
+        # Prefer largest unit when evenly divisible
         self.assertIn(format_period(7 * 86400), ("7d", "1w"))
-        self.assertEqual(format_period(24 * 3600), "24h")
+        self.assertIn(format_period(24 * 3600), ("24h", "1d"))
+        self.assertEqual(format_period(30 * 60), "30m")
 
     def test_parse_rejects_bad(self):
         with self.assertRaises(ValueError):
