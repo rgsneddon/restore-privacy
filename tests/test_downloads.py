@@ -1,4 +1,4 @@
-"""Tests for shipped status-page download catalog (current RELEASE_VERSION)."""
+"""Tests for shipped status-page download catalog (RUST-IN-PRIVACY v1.0.0)."""
 
 from __future__ import annotations
 
@@ -11,62 +11,44 @@ sys.path.insert(0, str(ROOT / "status_page"))
 
 import app as status_app  # noqa: E402
 from downloads import (  # noqa: E402
-    ANDROID_APK_FILENAME,
-    IOS_ZIP_FILENAME,
-    MACOS_ZIP_FILENAME,
+    ANDROID_PREP_FILENAME,
+    APPLE_PREP_FILENAME,
+    GITHUB_REPO,
+    LINUX_TGZ_FILENAME,
     RELEASE_TAG,
     RELEASE_VERSION,
-    WINDOWS_EXE_FILENAME,
+    RUST_REPO_URL,
+    WINDOWS_ZIP_FILENAME,
     available_downloads,
     render_download_section_html,
 )
 
 
 class TestDownloadCatalog(unittest.TestCase):
-    def test_version_matches_client_version_file(self):
-        ver = (ROOT / "client" / "VERSION").read_text(encoding="utf-8").strip()
-        self.assertEqual(RELEASE_VERSION, ver)
-        self.assertEqual(RELEASE_TAG, ver)
-        self.assertEqual(RELEASE_VERSION, "0.2.3")
+    def test_version_is_rust_1_0_0(self):
+        self.assertEqual(RELEASE_VERSION, "1.0.0")
+        self.assertEqual(RELEASE_TAG, "v1.0.0")
+        self.assertEqual(GITHUB_REPO, "RUST-IN-PRIVACY")
 
-    def test_public_assets_include_all_platforms(self):
+    def test_public_assets_include_device_packages(self):
         assets = available_downloads()
-        self.assertEqual(len(assets), 5)
+        self.assertEqual(len(assets), 4)
         platforms = {a.platform for a in assets}
-        self.assertEqual(
-            platforms, {"windows", "android", "macos", "ios", "linux"}
-        )
+        self.assertEqual(platforms, {"windows", "linux", "macos", "android"})
         by_plat = {a.platform: a for a in assets}
-        self.assertTrue(by_plat["windows"].filename.endswith(".exe"))
-        self.assertEqual(by_plat["windows"].filename, WINDOWS_EXE_FILENAME)
-        self.assertTrue(by_plat["android"].filename.endswith(".apk"))
-        self.assertEqual(by_plat["android"].filename, ANDROID_APK_FILENAME)
-        self.assertTrue(by_plat["macos"].filename.endswith(".zip"))
-        self.assertEqual(by_plat["macos"].filename, MACOS_ZIP_FILENAME)
-        self.assertTrue(by_plat["ios"].filename.endswith(".zip"))
-        self.assertEqual(by_plat["ios"].filename, IOS_ZIP_FILENAME)
+        self.assertEqual(by_plat["windows"].filename, WINDOWS_ZIP_FILENAME)
+        self.assertTrue(by_plat["windows"].filename.endswith(".zip"))
+        self.assertEqual(by_plat["linux"].filename, LINUX_TGZ_FILENAME)
+        self.assertEqual(by_plat["macos"].filename, APPLE_PREP_FILENAME)
+        self.assertEqual(by_plat["android"].filename, ANDROID_PREP_FILENAME)
 
-    def test_linux_button_label_simplified(self):
-        """Linux download button text is short and exact."""
-        assets = available_downloads()
-        by_plat = {a.platform: a for a in assets}
-        self.assertEqual(by_plat["linux"].label, "Linux - Installer (.tar.gz)")
+    def test_labels_and_html(self):
         html = render_download_section_html()
-        self.assertIn("Linux - Installer (.tar.gz)", html)
+        self.assertIn("Linux (x64) - Installer (.tar.gz)", html)
         self.assertIn('id="dl-linux"', html)
-        self.assertEqual(
-            by_plat["windows"].label, "Windows (x64) - Installer (.exe)"
-        )
-        self.assertEqual(by_plat["android"].label, "Android - APK installer")
-        self.assertEqual(by_plat["macos"].label, "macOS - App package (.zip)")
-        self.assertEqual(by_plat["ios"].label, "iOS - App package (.zip)")
-        for name in (
-            WINDOWS_EXE_FILENAME,
-            ANDROID_APK_FILENAME,
-            MACOS_ZIP_FILENAME,
-            IOS_ZIP_FILENAME,
-        ):
-            self.assertIn(RELEASE_VERSION, name)
+        self.assertIn("Windows (x64) - Client/Node (.zip)", html)
+        self.assertIn(RUST_REPO_URL, html)
+        self.assertIn("RUST-IN-PRIVACY", html)
 
     def test_available_downloads_have_https_github_release_urls(self):
         assets = available_downloads()
@@ -74,9 +56,9 @@ class TestDownloadCatalog(unittest.TestCase):
             self.assertTrue(a.url.startswith("https://"))
             self.assertIn(f"/releases/download/{RELEASE_TAG}/", a.url)
             self.assertIn(a.filename, a.url)
-            self.assertIn(RELEASE_VERSION, a.filename)
+            self.assertIn("RUST-IN-PRIVACY", a.url)
             expected = (
-                f"https://github.com/rgsneddon/restore-privacy/releases/download/"
+                f"https://github.com/rgsneddon/RUST-IN-PRIVACY/releases/download/"
                 f"{RELEASE_TAG}/{a.filename}"
             )
             self.assertEqual(a.url, expected)
@@ -86,18 +68,12 @@ class TestDownloadCatalog(unittest.TestCase):
         self.assertIn(f"Download client v{RELEASE_VERSION}", html)
         self.assertIn('class="dl"', html)
         self.assertIn("Windows", html)
-        self.assertIn("Android", html)
-        self.assertIn("macOS", html)
-        self.assertIn("iOS", html)
-        self.assertIn(".exe", html)
-        self.assertIn(".apk", html)
-        self.assertIn(".zip", html)
+        self.assertIn("Linux", html)
         for a in available_downloads():
             self.assertIn(a.url, html)
             self.assertNotIn('href="#"', html)
 
     def test_status_page_html_includes_downloads(self):
-        """Public page keeps title and shows all platform download buttons (no count)."""
         page = status_app.render_html(
             {"title": "RESTORE PRIVACY"}
         ).decode("utf-8")
@@ -106,55 +82,12 @@ class TestDownloadCatalog(unittest.TestCase):
         self.assertNotIn("fetch('/api/status'", page)
         self.assertIn(f"Download client v{RELEASE_VERSION}", page)
         self.assertIn(f"releases/download/{RELEASE_TAG}/", page)
-        self.assertIn(WINDOWS_EXE_FILENAME, page)
-        self.assertIn(ANDROID_APK_FILENAME, page)
-        self.assertIn(MACOS_ZIP_FILENAME, page)
-        self.assertIn(IOS_ZIP_FILENAME, page)
+        self.assertIn(WINDOWS_ZIP_FILENAME, page)
+        self.assertIn(LINUX_TGZ_FILENAME, page)
+        self.assertIn(APPLE_PREP_FILENAME, page)
+        self.assertIn(ANDROID_PREP_FILENAME, page)
         for a in available_downloads():
             self.assertIn(a.url, page)
-        self.assertNotIn("windows-x64.zip", page)
-        self.assertNotIn("windows-standalone", page)
-
-
-class TestInstallerPackagingRecipe(unittest.TestCase):
-    """Structural: current-tag build recipe produces advertised package names."""
-
-    def test_build_script_wires_all_platform_names(self):
-        script = (ROOT / "scripts" / f"build_release_{RELEASE_VERSION}.py").read_text(
-            encoding="utf-8"
-        )
-        self.assertIn(f'VERSION = "{RELEASE_VERSION}"', script)
-        self.assertIn("windows-x64-setup.exe", script)
-        self.assertIn("android.apk", script)
-        self.assertIn("macos.zip", script)
-        self.assertIn("ios.zip", script)
-        self.assertIn("WINDOWS_EXE_NAME", script)
-        self.assertIn("ANDROID_APK_NAME", script)
-        self.assertIn("MACOS_ZIP_NAME", script)
-        self.assertIn("IOS_ZIP_NAME", script)
-        self.assertIn("package_macos_zip", script)
-        self.assertIn("package_ios_zip", script)
-        self.assertEqual(
-            WINDOWS_EXE_FILENAME,
-            f"restore-privacy-client-{RELEASE_VERSION}-windows-x64-setup.exe",
-        )
-        self.assertEqual(
-            ANDROID_APK_FILENAME,
-            f"restore-privacy-client-{RELEASE_VERSION}-android.apk",
-        )
-        self.assertEqual(
-            MACOS_ZIP_FILENAME,
-            f"restore-privacy-client-{RELEASE_VERSION}-macos.zip",
-        )
-        self.assertEqual(
-            IOS_ZIP_FILENAME,
-            f"restore-privacy-client-{RELEASE_VERSION}-ios.zip",
-        )
-
-    def test_installer_module_version(self):
-        inst = (ROOT / "client" / "windows" / "installer.py").read_text(encoding="utf-8")
-        self.assertIn(f'VERSION = "{RELEASE_VERSION}"', inst)
-        self.assertIn("def install", inst)
 
 
 if __name__ == "__main__":

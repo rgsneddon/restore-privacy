@@ -1,6 +1,7 @@
-"""Release download link catalog for the public status page (version 0.2.3).
+"""Release download link catalog for the public status page (version 1.0.0).
 
-Public page advertises Windows, Android, macOS, iOS, and Linux packages.
+Public page advertises Windows, Linux, and Apple/Android prep packages from
+the public Rust host RUST-IN-PRIVACY.
 """
 
 from __future__ import annotations
@@ -8,17 +9,16 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Iterable
 
-RELEASE_VERSION = "0.2.3"
+RELEASE_VERSION = "1.0.0"
 GITHUB_OWNER = "rgsneddon"
-GITHUB_REPO = "restore-privacy"
-RELEASE_TAG = "0.2.3"
+GITHUB_REPO = "RUST-IN-PRIVACY"
+RELEASE_TAG = "v1.0.0"
 
 # Canonical public asset filenames (must match GitHub Release assets).
-WINDOWS_EXE_FILENAME = f"restore-privacy-client-{RELEASE_VERSION}-windows-x64-setup.exe"
-ANDROID_APK_FILENAME = f"restore-privacy-client-{RELEASE_VERSION}-android.apk"
-MACOS_ZIP_FILENAME = f"restore-privacy-client-{RELEASE_VERSION}-macos.zip"
-IOS_ZIP_FILENAME = f"restore-privacy-client-{RELEASE_VERSION}-ios.zip"
-LINUX_TGZ_FILENAME = f"restore-privacy-client-{RELEASE_VERSION}-linux-x64.tar.gz"
+WINDOWS_ZIP_FILENAME = f"restore-privacy-rust-{RELEASE_VERSION}-windows-x64.zip"
+LINUX_TGZ_FILENAME = f"restore-privacy-rust-{RELEASE_VERSION}-linux-x64.tar.gz"
+APPLE_PREP_FILENAME = f"restore-privacy-rust-{RELEASE_VERSION}-apple-prep.zip"
+ANDROID_PREP_FILENAME = f"restore-privacy-rust-{RELEASE_VERSION}-android-prep.zip"
 
 
 @dataclass(frozen=True)
@@ -35,32 +35,26 @@ class DownloadAsset:
         )
 
 
-# Artifacts attached to GitHub Release 0.2.3
 RELEASE_ASSETS: tuple[DownloadAsset, ...] = (
     DownloadAsset(
         platform="windows",
-        label="Windows (x64) - Installer (.exe)",
-        filename=WINDOWS_EXE_FILENAME,
-    ),
-    DownloadAsset(
-        platform="android",
-        label="Android - APK installer",
-        filename=ANDROID_APK_FILENAME,
-    ),
-    DownloadAsset(
-        platform="macos",
-        label="macOS - App package (.zip)",
-        filename=MACOS_ZIP_FILENAME,
-    ),
-    DownloadAsset(
-        platform="ios",
-        label="iOS - App package (.zip)",
-        filename=IOS_ZIP_FILENAME,
+        label="Windows (x64) - Client/Node (.zip)",
+        filename=WINDOWS_ZIP_FILENAME,
     ),
     DownloadAsset(
         platform="linux",
-        label="Linux - Installer (.tar.gz)",
+        label="Linux (x64) - Installer (.tar.gz)",
         filename=LINUX_TGZ_FILENAME,
+    ),
+    DownloadAsset(
+        platform="macos",
+        label="macOS / iOS - Apple prep (.zip)",
+        filename=APPLE_PREP_FILENAME,
+    ),
+    DownloadAsset(
+        platform="android",
+        label="Android - Prep package (.zip)",
+        filename=ANDROID_PREP_FILENAME,
     ),
 )
 
@@ -78,6 +72,7 @@ def available_downloads(
             continue
         if a.platform == "macos" and not include_macos:
             continue
+        # ios prep is bundled in apple/macos prep package
         if a.platform == "ios" and not include_ios:
             continue
         if a.platform == "linux" and not include_linux:
@@ -86,42 +81,9 @@ def available_downloads(
     return out
 
 
-# Footer: link to the Rust rewrite repository (not install instructional text).
-RUST_REPO_URL = "https://github.com/rgsneddon/restore-privacy-rust"
-RUST_REPO_LABEL = "Rust rewrite (work in progress)"
-
-
-def render_rust_footer_html() -> str:
-    """Footer under download buttons — link to the public Rust rewrite repo."""
-    return (
-        f'    <p class="dl-footer" id="rust-repo-footer">'
-        f'<a class="rust-link" id="rust-repo-link" href="{RUST_REPO_URL}" '
-        f'rel="noopener noreferrer" target="_blank">{RUST_REPO_LABEL}</a></p>'
-    )
-
-
-def render_download_section_html(assets: Iterable[DownloadAsset] | None = None) -> str:
-    """HTML fragment: download buttons with real https release URLs."""
-    items = list(assets) if assets is not None else available_downloads()
-    if not items:
-        return ""
-    links = []
-    for a in items:
-        links.append(
-            f'    <a class="dl" id="dl-{a.platform}" href="{a.url}" '
-            f'download="{a.filename}">{a.label}</a>'
-        )
-    links_html = "\n".join(links)
-    return f"""
-  <section class="downloads" id="downloads" aria-label="Download Restore Privacy client">
-    <h2>Download client v{RELEASE_VERSION}</h2>
-    <p class="dl-sub">Windows | Android | macOS | iOS | Ubuntu / Linux</p>
-    <div class="dl-buttons">
-{links_html}
-    </div>
-{render_rust_footer_html()}
-  </section>
-"""
+# Footer: link to the public Rust product repository.
+RUST_REPO_URL = "https://github.com/rgsneddon/RUST-IN-PRIVACY"
+RUST_REPO_LABEL = "Rust product (RUST-IN-PRIVACY v1.0.0)"
 
 
 def download_css() -> str:
@@ -147,4 +109,37 @@ def download_css() -> str:
     .dl-footer { margin-top: 1.25rem; font-size: 0.9rem; line-height: 1.45; }
     .dl-footer a.rust-link { color:#93c5fd; text-decoration:underline; font-weight:600; }
     .dl-footer a.rust-link:hover { color:#bfdbfe; }
+"""
+
+
+def render_rust_footer_html() -> str:
+    """Footer under download buttons — link to the public Rust product repo."""
+    return (
+        f'    <p class="dl-footer" id="rust-repo-footer">'
+        f'<a class="rust-link" id="rust-repo-link" href="{RUST_REPO_URL}" '
+        f'rel="noopener noreferrer" target="_blank">{RUST_REPO_LABEL}</a></p>'
+    )
+
+
+def render_download_section_html(assets: Iterable[DownloadAsset] | None = None) -> str:
+    """HTML fragment: download buttons with real https release URLs."""
+    items = list(assets) if assets is not None else available_downloads()
+    if not items:
+        return ""
+    links = []
+    for a in items:
+        links.append(
+            f'    <a class="dl" id="dl-{a.platform}" href="{a.url}" '
+            f'download="{a.filename}">{a.label}</a>'
+        )
+    links_html = "\n".join(links)
+    return f"""
+  <section class="downloads" id="downloads" aria-label="Download Restore Privacy client">
+    <h2>Download client v{RELEASE_VERSION}</h2>
+    <p class="dl-sub">Windows | Linux | Apple prep | Android prep — Rust host</p>
+    <div class="dl-buttons">
+{links_html}
+{render_rust_footer_html()}
+    </div>
+  </section>
 """

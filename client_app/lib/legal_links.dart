@@ -9,7 +9,7 @@ class LegalDocLink {
   final String repoPath;
 
   static const blobBase =
-      'https://github.com/rgsneddon/restore-privacy/blob/main';
+      'https://github.com/rgsneddon/RUST-IN-PRIVACY/blob/main';
 
   String get url => '$blobBase/$repoPath';
 }

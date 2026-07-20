@@ -9,7 +9,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 GITHUB_REPO_BLOB_BASE = (
-    "https://github.com/rgsneddon/restore-privacy/blob/main"
+    "https://github.com/rgsneddon/RUST-IN-PRIVACY/blob/main"
 )
 
 # User-facing labels (Settings) and relative repo paths.

@@ -64,7 +64,7 @@ class TestTitleLegalLinks(unittest.TestCase):
         self.assertIn("PRIVACY_POLICY.md", status_app.PRIVACY_POLICY_URL)
         self.assertIn("AUDIT.md", status_app.SECURITY_AUDIT_URL)
         self.assertTrue(status_app.SECURITY_AUDIT_URL.endswith("/AUDIT.md"))
-        self.assertIn("github.com/rgsneddon/restore-privacy", status_app.LICENCE_URL)
+        self.assertIn("github.com/rgsneddon/RUST-IN-PRIVACY", status_app.LICENCE_URL)
         # Labels
         self.assertEqual(status_app.LICENCE_LABEL, "LICENCE")
         self.assertEqual(status_app.PRIVACY_POLICY_LABEL, "PRIVACY POLICY")

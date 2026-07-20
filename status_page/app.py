@@ -69,8 +69,8 @@ def read_static_bytes(url_path: str) -> tuple[bytes, str] | None:
             ctype = "application/octet-stream"
     return data, ctype
 
-# Public legal / audit document links (stable GitHub blob URLs).
-GITHUB_BLOB_MAIN = "https://github.com/rgsneddon/restore-privacy/blob/main"
+# Public legal / audit document links (stable GitHub blob URLs on public Rust host).
+GITHUB_BLOB_MAIN = "https://github.com/rgsneddon/RUST-IN-PRIVACY/blob/main"
 LICENCE_URL = f"{GITHUB_BLOB_MAIN}/LICENSE"
 PRIVACY_POLICY_URL = f"{GITHUB_BLOB_MAIN}/PRIVACY_POLICY.md"
 SECURITY_AUDIT_URL = f"{GITHUB_BLOB_MAIN}/AUDIT.md"
@@ -80,9 +80,9 @@ LICENCE_LABEL = "LICENCE"
 PRIVACY_POLICY_LABEL = "PRIVACY POLICY"
 SECURITY_AUDIT_LABEL = "SECURITY AUDIT"
 
-# New Rust rewrite repository (footer link).
-RUST_REPO_URL = "https://github.com/rgsneddon/restore-privacy-rust"
-RUST_REPO_LABEL = "Rust rewrite (work in progress)"
+# Public Rust product repository (footer link).
+RUST_REPO_URL = "https://github.com/rgsneddon/RUST-IN-PRIVACY"
+RUST_REPO_LABEL = "Rust product (RUST-IN-PRIVACY v1.0.0)"
 
 # Kept for older imports/tests that still reference the constant name.
 BETA_NOTE_TEXT = ""
