@@ -56,6 +56,27 @@ from client.windows.elevate import (
     is_admin,
     should_exit_after_elevation,
 )
+from client.connection_log import (
+    KIND_CONNECT,
+    KIND_DISCONNECT,
+    KIND_ERROR,
+    KIND_LEAK_TEST,
+    KIND_SESSION,
+    append_event,
+    format_export,
+    read_events,
+)
+from client.leak_test import run_product_leak_test
+from client.transparency_copy import (
+    CONNECTION_LOG_DISCLAIMER,
+    CONNECTION_LOG_TITLE,
+    DPI_MITIGATION_DISCLAIMER,
+    DPI_MITIGATION_TITLE,
+    EXPORT_LOG_BUTTON,
+    LEAK_TEST_BUTTON,
+    LEAK_TEST_DISCLAIMER,
+    LEAK_TEST_TITLE,
+)
 from client.windows.settings_store import (
     ProductSettings,
     apply_run_at_startup,
@@ -467,6 +488,13 @@ class TunnelClientApp:
         self.output.see(tk.END)
         self.output.configure(state=tk.DISABLED)
 
+    def _connection_log(self, kind: str, message: str) -> None:
+        """Persist a user-visible connection event locally (Settings export)."""
+        try:
+            append_event(kind, message)
+        except Exception:
+            pass
+
     def _on_client_status(self, msg: str) -> None:
         """Secondary log only - do not dump raw protocol into main status."""
         def ui() -> None:
@@ -595,6 +623,9 @@ class TunnelClientApp:
         self._apply_control(connected=False, busy=True)
         self._set_status("connecting")
         self._log("Connect - starting secure session (full-tunnel residual path)...")
+        self._connection_log(
+            KIND_CONNECT, "Connect started (full-tunnel residual path)"
+        )
 
         def work() -> None:
             result = self.client.connect(timeout=20.0)
@@ -604,12 +635,16 @@ class TunnelClientApp:
                     if not (result.ok and result.session and result.tunnel_plan):
                         msg = result.message or "Connection failed"
                         self._log(f"Could not connect: {msg}")
+                        self._connection_log(KIND_ERROR, f"Connect failed: {msg}")
                         self._set_status("error", detail=msg)
                         self._apply_control(connected=False, busy=False)
                         return
 
                     vpn_ip = result.session.vpn_ip
                     self._log(f"Session ready (tunnel address {vpn_ip})")
+                    self._connection_log(
+                        KIND_SESSION, f"Session ready (tunnel address {vpn_ip})"
+                    )
                     # Product residual path: Wintun + dual /1 only (no queue "Connected")
                     tun_res = start_full_tunnel(
                         self.client,
@@ -625,6 +660,11 @@ class TunnelClientApp:
                             "Tunnel active - residual public IP uses the VPN node "
                             f"(IF={getattr(tun_res, 'if_index', '?')}; "
                             f"ipv6_protected={v6})"
+                        )
+                        self._connection_log(
+                            KIND_CONNECT,
+                            "Connected — residual public IP uses the VPN node "
+                            f"(ipv6_protected={v6})",
                         )
                         # Apply control first so _connected is True, then status+tray
                         self._apply_control(connected=True, busy=False)
@@ -647,6 +687,9 @@ class TunnelClientApp:
                         # Never surface teardown success as the Connect failure reason
                         err = attach_failure_user_message(original_err)
                         self._log(f"Could not connect: {err[:160]}")
+                        self._connection_log(
+                            KIND_ERROR, f"Connect failed: {err[:160]}"
+                        )
                         self._set_status("error", detail=err)
                         self._apply_control(connected=False, busy=False)
                 finally:
@@ -667,6 +710,7 @@ class TunnelClientApp:
         self._apply_control(connected=True, busy=True)
         self._set_status("disconnecting")
         self._log("Disconnect - stopping tunnel...")
+        self._connection_log(KIND_DISCONNECT, "Disconnect started")
 
         def work() -> None:
             try:
@@ -678,6 +722,7 @@ class TunnelClientApp:
                     self._set_status("disconnected")
                     self._sync_tray_status(connected=False, residual=False)
                     self._log("Disconnected.")
+                    self._connection_log(KIND_DISCONNECT, "Disconnected")
 
                 self.root.after(0, done)
 
@@ -692,11 +737,12 @@ class TunnelClientApp:
             self._log(f"Could not open browser: {exc}. Visit: {url}")
 
     def _open_settings(self) -> None:
-        """Settings surface: run-at-startup + autoconnect-on-launch switches."""
+        """Settings: startup prefs, local connection log, leak test, DPI honesty."""
         win = tk.Toplevel(self.root)
         win.title("Settings")
         win.configure(bg=CHROME_BG)
-        win.geometry("420x420")
+        win.geometry("460x720")
+        win.minsize(400, 520)
         win.transient(self.root)
         try:
             win.grab_set()
@@ -708,9 +754,20 @@ class TunnelClientApp:
         run_var = tk.BooleanVar(value=cur.run_at_startup)
         auto_var = tk.BooleanVar(value=cur.autoconnect_on_launch)
         note_var = tk.StringVar(value="")
+        leak_var = tk.StringVar(value="")
 
-        pad = tk.Frame(win, bg=CHROME_BG, padx=16, pady=14)
-        pad.pack(fill=tk.BOTH, expand=True)
+        # Scrollable body for taller transparency content
+        canvas = tk.Canvas(win, bg=CHROME_BG, highlightthickness=0)
+        scroll = tk.Scrollbar(win, orient=tk.VERTICAL, command=canvas.yview)
+        pad = tk.Frame(canvas, bg=CHROME_BG, padx=16, pady=14)
+        pad.bind(
+            "<Configure>",
+            lambda e: canvas.configure(scrollregion=canvas.bbox("all")),
+        )
+        canvas.create_window((0, 0), window=pad, anchor="nw")
+        canvas.configure(yscrollcommand=scroll.set)
+        scroll.pack(side=tk.RIGHT, fill=tk.Y)
+        canvas.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
 
         tk.Label(
             pad,
@@ -754,7 +811,6 @@ class TunnelClientApp:
                 wraplength=280,
                 justify=tk.LEFT,
             ).pack(fill=tk.X)
-            # Switch-style checkbutton (slider-like on/off)
             sw = tk.Checkbutton(
                 row,
                 variable=var,
@@ -821,7 +877,7 @@ class TunnelClientApp:
             fg=PRIMARY_DARK,
             font=("Segoe UI", 8),
             anchor="w",
-            wraplength=380,
+            wraplength=400,
             justify=tk.LEFT,
         ).pack(fill=tk.X, pady=(12, 0))
 
@@ -833,9 +889,213 @@ class TunnelClientApp:
             fg=TEXT_MUTED,
             font=("Segoe UI", 8),
             anchor="w",
-            wraplength=380,
+            wraplength=400,
             justify=tk.LEFT,
         ).pack(fill=tk.X, pady=(8, 0))
+
+        # --- Connection log (local only, exportable) ---
+        log_card = tk.Frame(
+            pad,
+            bg=PANEL_BG,
+            highlightbackground=BORDER,
+            highlightthickness=1,
+            padx=12,
+            pady=8,
+        )
+        log_card.pack(fill=tk.X, pady=(14, 0))
+        tk.Label(
+            log_card,
+            text=CONNECTION_LOG_TITLE,
+            bg=PANEL_BG,
+            fg=PRIMARY_DARK,
+            font=("Segoe UI", 10, "bold"),
+            anchor="w",
+        ).pack(fill=tk.X, pady=(0, 4))
+        tk.Label(
+            log_card,
+            text=CONNECTION_LOG_DISCLAIMER,
+            bg=PANEL_BG,
+            fg=TEXT_MUTED,
+            font=("Segoe UI", 8),
+            anchor="w",
+            wraplength=400,
+            justify=tk.LEFT,
+        ).pack(fill=tk.X, pady=(0, 6))
+        log_box = tk.Text(
+            log_card,
+            height=7,
+            wrap=tk.WORD,
+            font=("Consolas", 8),
+            bg=CHROME_BG,
+            fg=TEXT,
+            relief=tk.FLAT,
+            state=tk.DISABLED,
+        )
+        log_box.pack(fill=tk.X)
+
+        def _refresh_log_view() -> None:
+            events = read_events(limit=80)
+            body = (
+                "\n".join(ev.format_line() for ev in events)
+                if events
+                else "(No connection events yet. Connect or Disconnect to record.)"
+            )
+            log_box.configure(state=tk.NORMAL)
+            log_box.delete("1.0", tk.END)
+            log_box.insert(tk.END, body)
+            log_box.configure(state=tk.DISABLED)
+
+        def _export_log() -> None:
+            from tkinter import filedialog
+
+            dest = filedialog.asksaveasfilename(
+                parent=win,
+                title="Export connection log",
+                defaultextension=".txt",
+                filetypes=[
+                    ("Text", "*.txt"),
+                    ("All files", "*.*"),
+                ],
+                initialfile="restore-privacy-connection-log.txt",
+            )
+            if not dest:
+                return
+            try:
+                from pathlib import Path as _P
+
+                from client.connection_log import export_to_file
+
+                export_to_file(_P(dest))
+                note_var.set(f"Exported connection log to {dest}")
+                self._log(f"Settings: exported connection log to {dest}")
+            except Exception as exc:
+                note_var.set(f"Export failed: {exc}")
+
+        btn_row = tk.Frame(log_card, bg=PANEL_BG)
+        btn_row.pack(fill=tk.X, pady=(8, 0))
+        tk.Button(
+            btn_row,
+            text=EXPORT_LOG_BUTTON,
+            command=_export_log,
+            bg=PRIMARY,
+            fg=WHITE,
+            relief=tk.FLAT,
+            font=("Segoe UI", 8, "bold"),
+            padx=10,
+            pady=4,
+            cursor="hand2",
+        ).pack(side=tk.LEFT)
+        tk.Button(
+            btn_row,
+            text="Refresh",
+            command=_refresh_log_view,
+            bg=LIGHT_ACCENT,
+            fg=PRIMARY_DARK,
+            relief=tk.FLAT,
+            font=("Segoe UI", 8),
+            padx=10,
+            pady=4,
+            cursor="hand2",
+        ).pack(side=tk.LEFT, padx=(8, 0))
+        _refresh_log_view()
+
+        # --- Leak test ---
+        leak_card = tk.Frame(
+            pad,
+            bg=PANEL_BG,
+            highlightbackground=BORDER,
+            highlightthickness=1,
+            padx=12,
+            pady=8,
+        )
+        leak_card.pack(fill=tk.X, pady=(14, 0))
+        tk.Label(
+            leak_card,
+            text=LEAK_TEST_TITLE,
+            bg=PANEL_BG,
+            fg=PRIMARY_DARK,
+            font=("Segoe UI", 10, "bold"),
+            anchor="w",
+        ).pack(fill=tk.X, pady=(0, 4))
+        tk.Label(
+            leak_card,
+            text=LEAK_TEST_DISCLAIMER,
+            bg=PANEL_BG,
+            fg=TEXT_MUTED,
+            font=("Segoe UI", 8),
+            anchor="w",
+            wraplength=400,
+            justify=tk.LEFT,
+        ).pack(fill=tk.X, pady=(0, 6))
+
+        def _run_leak_test() -> None:
+            residual = residual_ip_capture_active(self._tunnel)
+            ipv6 = ipv6_residual_protected(self._tunnel) if residual else False
+            # Offline-safe default: no live public-IP probe (CI / no network).
+            # Decision still uses real residual + shipped DNS plan.
+            result = run_product_leak_test(
+                residual_capture_active=residual,
+                ipv6_protected=ipv6,
+                run_public_ip_probe=False,
+            )
+            msg = result.format_user_message()
+            leak_var.set(msg)
+            self._connection_log(KIND_LEAK_TEST, f"{result.verdict}: {result.summary}")
+            self._log(f"Leak test: {result.verdict} — {result.summary}")
+            note_var.set(f"Leak test: {result.verdict}")
+            _refresh_log_view()
+
+        tk.Button(
+            leak_card,
+            text=LEAK_TEST_BUTTON,
+            command=_run_leak_test,
+            bg=PRIMARY,
+            fg=WHITE,
+            relief=tk.FLAT,
+            font=("Segoe UI", 9, "bold"),
+            padx=12,
+            pady=5,
+            cursor="hand2",
+        ).pack(anchor="w")
+        tk.Label(
+            leak_card,
+            textvariable=leak_var,
+            bg=PANEL_BG,
+            fg=TEXT,
+            font=("Segoe UI", 8),
+            anchor="w",
+            justify=tk.LEFT,
+            wraplength=400,
+        ).pack(fill=tk.X, pady=(8, 0))
+
+        # --- DPI / traffic-analysis honesty ---
+        dpi_card = tk.Frame(
+            pad,
+            bg=PANEL_BG,
+            highlightbackground=BORDER,
+            highlightthickness=1,
+            padx=12,
+            pady=8,
+        )
+        dpi_card.pack(fill=tk.X, pady=(14, 0))
+        tk.Label(
+            dpi_card,
+            text=DPI_MITIGATION_TITLE,
+            bg=PANEL_BG,
+            fg=PRIMARY_DARK,
+            font=("Segoe UI", 10, "bold"),
+            anchor="w",
+        ).pack(fill=tk.X, pady=(0, 4))
+        tk.Label(
+            dpi_card,
+            text=DPI_MITIGATION_DISCLAIMER,
+            bg=PANEL_BG,
+            fg=TEXT,
+            font=("Segoe UI", 8),
+            anchor="w",
+            wraplength=400,
+            justify=tk.LEFT,
+        ).pack(fill=tk.X)
 
         # Legal / policy documents (stable public GitHub URLs)
         from client.legal_links import LEGAL_DOC_LINKS
@@ -848,7 +1108,7 @@ class TunnelClientApp:
             padx=12,
             pady=8,
         )
-        docs_card.pack(fill=tk.X, pady=(12, 0))
+        docs_card.pack(fill=tk.X, pady=(14, 0))
         tk.Label(
             docs_card,
             text="Documents",

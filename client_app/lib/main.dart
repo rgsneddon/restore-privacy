@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import 'connect_status.dart';
+import 'connection_log.dart';
 import 'prefs_backend.dart';
 import 'settings_screen.dart';
 import 'settings_store.dart';
@@ -65,6 +67,7 @@ class _TunnelHomeState extends State<TunnelHome> with WidgetsBindingObserver {
   late final VpnController _vpn;
   SettingsStore? _store;
   ProductSettings _settings = ProductSettings.defaults;
+  ConnectionLog? _connectionLog;
   final List<String> _log = [];
   final ScrollController _logScroll = ScrollController();
   String _status = 'Not connected. Press Connect when you want protection.';
@@ -100,9 +103,21 @@ class _TunnelHomeState extends State<TunnelHome> with WidgetsBindingObserver {
         _store = SettingsStore(MemorySettingsBackend());
       }
     }
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      _connectionLog = ConnectionLog(PrefsConnectionLogBackend(prefs));
+    } catch (_) {
+      _connectionLog = ConnectionLog(MemoryConnectionLogBackend());
+    }
     final loaded = await _store!.load();
     if (!mounted) return;
     setState(() => _settings = loaded);
+  }
+
+  Future<void> _connLog(String kind, String message) async {
+    try {
+      await _connectionLog?.appendEvent(kind, message);
+    } catch (_) {}
   }
 
   Future<void> _maybeAutoconnect() async {
@@ -123,6 +138,7 @@ class _TunnelHomeState extends State<TunnelHome> with WidgetsBindingObserver {
     setState(() => _busy = true);
     try {
       _append('Connect — starting RPT full tunnel…');
+      await _connLog(kLogKindConnect, 'Connect started (RPT full tunnel)');
       final ok = await _vpn.connect();
       if (!mounted) return;
       setState(() {
@@ -141,6 +157,9 @@ class _TunnelHomeState extends State<TunnelHome> with WidgetsBindingObserver {
       });
       if (ok) {
         _append(_status);
+        await _connLog(kLogKindConnect, 'Connected — residual path active');
+      } else {
+        await _connLog(kLogKindError, 'Connect failed');
       }
     } finally {
       if (mounted) setState(() => _busy = false);
@@ -211,6 +230,7 @@ class _TunnelHomeState extends State<TunnelHome> with WidgetsBindingObserver {
       setState(() => _busy = true);
       try {
         _append('Disconnect — tearing down tunnel…');
+        await _connLog(kLogKindDisconnect, 'Disconnect started');
         await _vpn.disconnect();
         if (!mounted) return;
         setState(() {
@@ -219,6 +239,7 @@ class _TunnelHomeState extends State<TunnelHome> with WidgetsBindingObserver {
           _status = 'Disconnected. Press Connect when you want protection.';
         });
         _append('Disconnected.');
+        await _connLog(kLogKindDisconnect, 'Disconnected');
       } finally {
         if (mounted) setState(() => _busy = false);
       }
@@ -235,6 +256,9 @@ class _TunnelHomeState extends State<TunnelHome> with WidgetsBindingObserver {
         builder: (_) => SettingsScreen(
           store: store,
           initial: _settings,
+          connectionLog: _connectionLog,
+          residualCaptureActive: _connected,
+          ipv6Protected: _status.toLowerCase().contains('ipv6 isp path blocked'),
           onChanged: (s) {
             if (mounted) setState(() => _settings = s);
           },
