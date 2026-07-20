@@ -117,9 +117,12 @@ def evaluate_leak_test(inputs: LeakTestInputs) -> LeakTestResult:
         )
 
     probe_fail = False
+    probe_match = False
+    probe_inconclusive = False
     if inputs.public_ip_probe_ran:
         if inputs.public_ip_matches_expected_node is True:
             details.append("Public egress probe matches expected VPN/node path.")
+            probe_match = True
         elif inputs.public_ip_matches_expected_node is False:
             details.append(
                 "Public egress probe did not match expected VPN/node path "
@@ -128,6 +131,7 @@ def evaluate_leak_test(inputs: LeakTestInputs) -> LeakTestResult:
             probe_fail = True
         else:
             details.append("Public egress probe ran but result was inconclusive.")
+            probe_inconclusive = True
     else:
         details.append(
             "Live public-IP probe not run (offline-safe path or user skipped)."
@@ -141,27 +145,35 @@ def evaluate_leak_test(inputs: LeakTestInputs) -> LeakTestResult:
             claims_multihop_residual=claims_mh,
         )
 
-    if not inputs.ipv6_protected or not inputs.public_ip_probe_ran:
+    # PASS only when residual + DNS + IPv6 + definitive matching egress probe.
+    # Inconclusive probe (ran but matches=None) must never claim pass / "matched".
+    if (
+        inputs.ipv6_protected
+        and inputs.public_ip_probe_ran
+        and probe_match
+        and not probe_inconclusive
+    ):
         return LeakTestResult(
-            verdict=VERDICT_PARTIAL,
+            verdict=VERDICT_PASS,
             summary=(
-                "Residual IPv4 capture looks good; "
-                + (
-                    "IPv6 protection not confirmed."
-                    if not inputs.ipv6_protected
-                    else "live egress probe not run."
-                )
+                "Residual capture active, tunnel DNS only, IPv6 protected, "
+                "and egress probe matched the node path."
             ),
             details=tuple(details),
             claims_multihop_residual=claims_mh,
         )
 
+    reasons: list[str] = []
+    if not inputs.ipv6_protected:
+        reasons.append("IPv6 protection not confirmed")
+    if not inputs.public_ip_probe_ran:
+        reasons.append("live egress probe not run")
+    elif probe_inconclusive:
+        reasons.append("egress probe result was inconclusive")
+    summary_tail = "; ".join(reasons) if reasons else "checks incomplete"
     return LeakTestResult(
-        verdict=VERDICT_PASS,
-        summary=(
-            "Residual capture active, tunnel DNS only, IPv6 protected, "
-            "and egress probe matched the node path."
-        ),
+        verdict=VERDICT_PARTIAL,
+        summary=f"Residual IPv4 capture looks good; {summary_tail}.",
         details=tuple(details),
         claims_multihop_residual=claims_mh,
     )

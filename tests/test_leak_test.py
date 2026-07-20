@@ -84,6 +84,30 @@ class TestEvaluateLeakTest(unittest.TestCase):
         )
         self.assertEqual(r.verdict, VERDICT_PARTIAL)
 
+    def test_inconclusive_probe_is_not_pass(self):
+        """probe_ran=True + matches=None must not pass or claim probe matched."""
+        r = evaluate_leak_test(
+            LeakTestInputs(
+                residual_capture_active=True,
+                ipv6_protected=True,
+                dns_tunnel_gateway_only=True,
+                public_ip_probe_ran=True,
+                public_ip_matches_expected_node=None,
+            )
+        )
+        self.assertNotEqual(r.verdict, VERDICT_PASS)
+        self.assertIn(
+            r.verdict,
+            (VERDICT_PARTIAL, VERDICT_INCONCLUSIVE),
+            f"expected partial/inconclusive, got {r.verdict}",
+        )
+        blob = (r.summary + " " + " ".join(r.details)).lower()
+        self.assertIn("inconclusive", blob)
+        self.assertNotIn("egress probe matched", blob)
+        self.assertNotIn("probe matched the node", r.summary.lower())
+        # User message must not claim a clean pass
+        self.assertNotIn("LEAK TEST: PASS", r.format_user_message().upper())
+
     def test_partial_without_ipv6(self):
         r = evaluate_leak_test(
             LeakTestInputs(

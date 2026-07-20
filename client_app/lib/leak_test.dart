@@ -113,9 +113,12 @@ LeakTestResult evaluateLeakTest(LeakTestInputs inputs) {
   }
 
   var probeFail = false;
+  var probeMatch = false;
+  var probeInconclusive = false;
   if (inputs.publicIpProbeRan) {
     if (inputs.publicIpMatchesExpectedNode == true) {
       details.add('Public egress probe matches expected VPN/node path.');
+      probeMatch = true;
     } else if (inputs.publicIpMatchesExpectedNode == false) {
       details.add(
         'Public egress probe did not match expected VPN/node path '
@@ -124,6 +127,7 @@ LeakTestResult evaluateLeakTest(LeakTestInputs inputs) {
       probeFail = true;
     } else {
       details.add('Public egress probe ran but result was inconclusive.');
+      probeInconclusive = true;
     }
   } else {
     details.add(
@@ -140,22 +144,36 @@ LeakTestResult evaluateLeakTest(LeakTestInputs inputs) {
     );
   }
 
-  if (!inputs.ipv6Protected || !inputs.publicIpProbeRan) {
+  // PASS only when residual + DNS + IPv6 + definitive matching egress probe.
+  // Inconclusive probe (ran but matches=null) must never claim pass / "matched".
+  if (inputs.ipv6Protected &&
+      inputs.publicIpProbeRan &&
+      probeMatch &&
+      !probeInconclusive) {
     return LeakTestResult(
-      verdict: kVerdictPartial,
-      summary: !inputs.ipv6Protected
-          ? 'Residual IPv4 capture looks good; IPv6 protection not confirmed.'
-          : 'Residual IPv4 capture looks good; live egress probe not run.',
+      verdict: kVerdictPass,
+      summary:
+          'Residual capture active, tunnel DNS only, IPv6 protected, '
+          'and egress probe matched the node path.',
       details: details,
       claimsMultihopResidual: claimsMh,
     );
   }
 
+  final reasons = <String>[];
+  if (!inputs.ipv6Protected) {
+    reasons.add('IPv6 protection not confirmed');
+  }
+  if (!inputs.publicIpProbeRan) {
+    reasons.add('live egress probe not run');
+  } else if (probeInconclusive) {
+    reasons.add('egress probe result was inconclusive');
+  }
+  final summaryTail =
+      reasons.isEmpty ? 'checks incomplete' : reasons.join('; ');
   return LeakTestResult(
-    verdict: kVerdictPass,
-    summary:
-        'Residual capture active, tunnel DNS only, IPv6 protected, '
-        'and egress probe matched the node path.',
+    verdict: kVerdictPartial,
+    summary: 'Residual IPv4 capture looks good; $summaryTail.',
     details: details,
     claimsMultihopResidual: claimsMh,
   );
