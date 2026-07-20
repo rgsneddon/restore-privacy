@@ -97,13 +97,13 @@ class TestDownloadCatalog(unittest.TestCase):
             self.assertNotIn('href="#"', html)
 
     def test_status_page_html_includes_downloads(self):
-        """Public page keeps title + count and shows all platform download buttons."""
+        """Public page keeps title and shows all platform download buttons (no count)."""
         page = status_app.render_html(
-            {"title": "RESTORE PRIVACY", "clients_connected": 2}
+            {"title": "RESTORE PRIVACY"}
         ).decode("utf-8")
         self.assertIn("RESTORE PRIVACY", page)
-        self.assertIn("clients-connected", page)
-        self.assertIn("fetch('/api/status'", page)
+        self.assertNotIn("clients-connected", page)
+        self.assertNotIn("fetch('/api/status'", page)
         self.assertIn(f"Download client v{RELEASE_VERSION}", page)
         self.assertIn(f"releases/download/{RELEASE_TAG}/", page)
         self.assertIn(WINDOWS_EXE_FILENAME, page)

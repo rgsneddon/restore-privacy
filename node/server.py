@@ -29,6 +29,7 @@ from node.handshake import (
     persist_enrolled_client_pub,
 )
 from node.nolog import apply_no_log_policy
+from node.obfuscation import maybe_unwrap, maybe_wrap
 from node.protocol import MsgType, pack_data, parse_data, parse_keepalive, peek_type
 from node.routing import (
     build_nat_masquerade_commands,
@@ -199,6 +200,10 @@ class RPTNode:
             os.system(cmd)
 
     def on_udp(self, data: bytes, addr: Tuple[str, int], sock) -> None:
+        try:
+            data = maybe_unwrap(data)
+        except Exception:
+            return
         t = peek_type(data)
         if t is None:
             return
@@ -218,13 +223,13 @@ class RPTNode:
                     vpn_ip=vpn_ip,
                 )
                 self.registry.add(sess)
-                sock.sendto(reply, addr)
+                sock.sendto(maybe_wrap(reply), addr)
             elif t == MsgType.DATA:
                 session_id, counter, nonce, sealed = parse_data(data)
                 sess = self.registry.get(session_id)
                 if not sess:
                     return
-                # Refresh liveness under registry lock (keeps clients_connected accurate)
+                # Refresh liveness under registry lock (idle prune for routing)
                 self.registry.touch(session_id, addr)
                 aad = session_id + struct.pack("!Q", counter)
                 try:
@@ -258,7 +263,7 @@ class RPTNode:
         nonce, sealed = sess.crypto.seal(packet, aad=aad)
         frame = pack_data(sess.session_id, sess.counter_out, nonce, sealed)
         try:
-            sock.sendto(frame, sess.client_addr)
+            sock.sendto(maybe_wrap(frame), sess.client_addr)
         except OSError:
             return
 
@@ -282,7 +287,7 @@ class RPTNode:
             encoding="utf-8",
         )
 
-        # Periodically drop idle sessions so clients_connected is live, not cumulative
+        # Periodically drop idle sessions so tunnel IPs are freed for routing
         last_prune = 0.0
         prune_every_sec = 2.0
         while True:

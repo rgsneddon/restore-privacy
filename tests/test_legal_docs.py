@@ -34,10 +34,12 @@ class TestPrivacyPolicy(unittest.TestCase):
             or "traffic log" in lower
             or "activity log" in lower
         )
-        self.assertIn("clients_connected", lower)
-        # Current count, not only marketing
+        # Public page no longer advertises a live client count
         self.assertTrue(
-            "currently connected" in lower or "current connected" in lower or "live" in lower
+            "no public" in lower
+            or "not" in lower
+            and ("count" in lower or "session" in lower)
+            or "status" in lower
         )
         # Operational limits section
         self.assertTrue("limit" in lower or "limits" in lower)

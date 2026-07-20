@@ -26,6 +26,7 @@ from node.pfs import (
     session_crypto_from_shared,
     x25519_shared_secret,
 )
+from node.obfuscation import maybe_unwrap, maybe_wrap, product_obfuscation_enabled
 from node.protocol import (
     MAGIC,
     MsgType,
@@ -240,9 +241,11 @@ class RptClient:
             sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
             try:
                 sock.settimeout(timeout)
-                sock.sendto(frame, self.endpoint.address)
+                wire = maybe_wrap(frame)
+                sock.sendto(wire, self.endpoint.address)
                 self._status(f"HELLO sent → {self.endpoint.host}:{self.endpoint.port}")
-                reply, _addr = sock.recvfrom(65535)
+                raw_reply, _addr = sock.recvfrom(65535)
+                reply = maybe_unwrap(raw_reply)
                 session = complete_server_hello(
                     reply, client_nonce, client_pub, client_eph
                 )
@@ -286,17 +289,22 @@ class RptClient:
         return self.connect(timeout=timeout)
 
     def seal_packet(self, ip_packet: bytes) -> bytes:
+        """Seal IP into RPT DATA then outer-layer wrap (product obfuscation)."""
         if not self.session:
             raise RuntimeError("not connected")
         self.session.counter_out += 1
         aad = self.session.session_id + struct.pack("!Q", self.session.counter_out)
         nonce, sealed = self.session.crypto.seal(ip_packet, aad=aad)
-        return pack_data(self.session.session_id, self.session.counter_out, nonce, sealed)
+        inner = pack_data(
+            self.session.session_id, self.session.counter_out, nonce, sealed
+        )
+        return maybe_wrap(inner)
 
     def open_packet(self, frame: bytes) -> bytes:
         if not self.session:
             raise RuntimeError("not connected")
-        sid, counter, nonce, sealed = parse_data(frame)
+        inner = maybe_unwrap(frame)
+        sid, counter, nonce, sealed = parse_data(inner)
         if sid != self.session.session_id:
             raise ValueError("session mismatch")
         aad = sid + struct.pack("!Q", counter)
@@ -306,10 +314,11 @@ class RptClient:
             raise CoverFrame("cover frame") from exc
 
     def open_packet_allow_cover(self, frame: bytes) -> tuple[bytes | None, bool]:
-        """Open DATA; return (ip_or_None, is_cover)."""
+        """Open DATA (after outer unwrap); return (ip_or_None, is_cover)."""
         if not self.session:
             raise RuntimeError("not connected")
-        sid, counter, nonce, sealed = parse_data(frame)
+        inner = maybe_unwrap(frame)
+        sid, counter, nonce, sealed = parse_data(inner)
         if sid != self.session.session_id:
             raise ValueError("session mismatch")
         aad = sid + struct.pack("!Q", counter)
@@ -318,7 +327,8 @@ class RptClient:
     def send_keepalive(self) -> None:
         if not self.session or not self._sock:
             return
-        self._sock.sendto(pack_keepalive(self.session.session_id), self.endpoint.address)
+        wire = maybe_wrap(pack_keepalive(self.session.session_id))
+        self._sock.sendto(wire, self.endpoint.address)
 
     def disconnect(self) -> None:
         self._stop.set()

@@ -1,4 +1,4 @@
-"""Public status page: title + live count + Windows .exe / Android .apk downloads."""
+"""Public status page: title + downloads (no live client counter)."""
 
 from __future__ import annotations
 
@@ -22,18 +22,17 @@ from downloads import (  # noqa: E402
 
 
 class TestPublicPageWithDownloads(unittest.TestCase):
-    def test_render_has_title_count_poll_and_download_buttons(self):
+    def test_render_has_title_and_download_buttons_no_count(self):
         html = status_app.render_html(
-            {"title": "RESTORE PRIVACY", "clients_connected": 3}
+            {"title": "RESTORE PRIVACY"}
         ).decode("utf-8")
         self.assertIn("RESTORE PRIVACY", html)
         self.assertIn("BETA - test phase - please report any bugs to", html)
         self.assertIn("https://x.com/rgsneddon", html)
-        self.assertIn("Currently connected clients", html)
-        self.assertIn('id="clients-connected"', html)
-        self.assertIn(">3<", html)
-        self.assertIn("fetch('/api/status'", html)
-        self.assertIn("setInterval(poll", html)
+        self.assertNotIn("Currently connected clients", html)
+        self.assertNotIn('id="clients-connected"', html)
+        self.assertNotIn("fetch('/api/status'", html)
+        self.assertNotIn("setInterval(poll", html)
         # Download buttons for current catalog exe + apk
         self.assertIn("Download client v0.2.2", html)
         self.assertIn(WINDOWS_EXE_FILENAME, html)
@@ -56,7 +55,7 @@ class TestPublicPageWithDownloads(unittest.TestCase):
             with mock.patch.object(
                 status_app,
                 "fetch_upstream_status",
-                return_value={"title": "RESTORE PRIVACY", "clients_connected": 2},
+                return_value={"title": "RESTORE PRIVACY", "upstream_ok": True},
             ):
                 for _ in range(2):
                     with urllib.request.urlopen(
@@ -68,8 +67,8 @@ class TestPublicPageWithDownloads(unittest.TestCase):
                         "BETA - test phase - please report any bugs to", html
                     )
                     self.assertIn("https://x.com/rgsneddon", html)
-                    self.assertIn("clients-connected", html)
-                    self.assertIn("fetch('/api/status'", html)
+                    self.assertNotIn("clients-connected", html)
+                    self.assertNotIn("fetch('/api/status'", html)
                     self.assertIn("Download client v0.2.2", html)
                     self.assertIn(WINDOWS_EXE_FILENAME, html)
                     self.assertIn(ANDROID_APK_FILENAME, html)

@@ -94,16 +94,19 @@ class TestConfigPrivacy(unittest.TestCase):
 
 
 class TestSessionsUI(unittest.TestCase):
-    def test_status_payload_only_count(self):
+    def test_status_payload_title_only(self):
         reg = SessionRegistry()
         payload = reg.status_payload()
-        self.assertEqual(payload, {"title": "RESTORE PRIVACY", "clients_connected": 0})
+        self.assertEqual(payload, {"title": "RESTORE PRIVACY"})
+        self.assertNotIn("clients_connected", payload)
         self.assertNotIn("ip", payload)
         self.assertNotIn("clients", payload)
 
     def test_ui_handler_status_json(self):
-        Handler = make_handler(lambda: {"title": "RESTORE PRIVACY", "clients_connected": 3, "secret": "nope"})
-        # Exercise handler class construction; payload filter tested via safe dict in do_GET source
+        Handler = make_handler(
+            lambda: {"title": "RESTORE PRIVACY", "clients_connected": 3, "secret": "nope"}
+        )
+        # Exercise handler class construction; payload filter strips count
         self.assertTrue(callable(Handler))
 
 

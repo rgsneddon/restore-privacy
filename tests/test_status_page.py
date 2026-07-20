@@ -1,4 +1,4 @@
-"""Tests drive shipped status_page helpers (current count + dynamic poll)."""
+"""Tests drive shipped status_page helpers (title + downloads; no live count)."""
 
 from __future__ import annotations
 
@@ -17,9 +17,8 @@ sys.path.insert(0, str(ROOT / "status_page"))
 import app as status_app  # noqa: E402
 
 
-class TestCurrentCountOnly(unittest.TestCase):
-    def test_normalize_uses_current_not_lifetime_total(self):
-        # When both present, current session field wins — not a cumulative total
+class TestPublicTitleOnly(unittest.TestCase):
+    def test_normalize_strips_count_and_totals(self):
         out = status_app.normalize_status(
             {
                 "title": "RESTORE PRIVACY",
@@ -29,11 +28,11 @@ class TestCurrentCountOnly(unittest.TestCase):
                 "clients_total": 100,
             }
         )
-        self.assertEqual(out["clients_connected"], 3)
+        self.assertEqual(out, {"title": "RESTORE PRIVACY"})
+        self.assertNotIn("clients_connected", out)
         self.assertNotIn("total", out)
-        self.assertNotIn("lifetime_clients", out)
 
-    def test_public_payload_strips_identity_and_totals(self):
+    def test_public_payload_title_only(self):
         safe = status_app.public_status_payload(
             {
                 "title": "RESTORE PRIVACY",
@@ -43,8 +42,8 @@ class TestCurrentCountOnly(unittest.TestCase):
                 "clients": [{"id": "x"}],
             }
         )
-        self.assertEqual(set(safe.keys()), {"title", "clients_connected"})
-        self.assertEqual(safe["clients_connected"], 2)
+        self.assertEqual(set(safe.keys()), {"title"})
+        self.assertNotIn("clients_connected", safe)
 
     def test_fetch_upstream_filters_fields(self):
         payload = json.dumps(
@@ -69,45 +68,33 @@ class TestCurrentCountOnly(unittest.TestCase):
         with mock.patch("urllib.request.urlopen", return_value=Resp()):
             out = status_app.fetch_upstream_status()
         self.assertEqual(out["title"], "RESTORE PRIVACY")
-        self.assertEqual(out["clients_connected"], 2)
+        self.assertNotIn("clients_connected", out)
         self.assertNotIn("ip", out)
         self.assertNotIn("total", out)
+        self.assertTrue(out.get("upstream_ok"))
 
     def test_fetch_upstream_fallback_on_error(self):
         with mock.patch("urllib.request.urlopen", side_effect=TimeoutError("down")):
             out = status_app.fetch_upstream_status()
         self.assertEqual(out["title"], "RESTORE PRIVACY")
-        self.assertEqual(out["clients_connected"], 0)
+        self.assertNotIn("clients_connected", out)
 
 
-class TestDynamicHtml(unittest.TestCase):
-    def test_render_html_no_meta_refresh_has_poll(self):
+class TestHtmlNoCounter(unittest.TestCase):
+    def test_render_html_no_count_or_poll(self):
         html = status_app.render_html(
-            {"title": "RESTORE PRIVACY", "clients_connected": 7},
+            {"title": "RESTORE PRIVACY"},
             poll_ms=3000,
         ).decode("utf-8")
         self.assertIn("RESTORE PRIVACY", html)
-        self.assertIn("Currently connected clients", html)
+        self.assertNotIn("Currently connected clients", html)
         self.assertNotIn("total clients", html.lower())
-        self.assertNotIn("lifetime clients", html.lower())
-        self.assertNotIn("cumulative", html.lower())
-        # No full-page reload as update mechanism
+        self.assertNotIn("clients_connected", html)
+        self.assertNotIn('id="clients-connected"', html)
+        self.assertNotIn("fetch('/api/status'", html)
+        self.assertNotIn("setInterval(poll", html)
         self.assertNotIn('http-equiv="refresh"', html.lower())
-        self.assertNotIn("http-equiv='refresh'", html.lower())
-        # Client-side poll of status API + DOM update
-        self.assertIn("fetch('/api/status'", html)
-        self.assertIn("setInterval(poll", html)
-        self.assertIn("clients_connected", html)
-        self.assertIn('id="clients-connected"', html)
-        self.assertIn("el.textContent", html)
-        self.assertIn(">7<", html)
-
-    def test_render_html_uses_shipped_poll_interval(self):
-        html = status_app.render_html(
-            {"title": "RESTORE PRIVACY", "clients_connected": 0},
-            poll_ms=2500,
-        ).decode("utf-8")
-        self.assertIn("var pollMs = 2500;", html)
+        self.assertIn("Download client", html)
 
 
 class TestHttpHandlers(unittest.TestCase):
@@ -131,23 +118,21 @@ class TestHttpHandlers(unittest.TestCase):
         with mock.patch.object(
             status_app,
             "fetch_upstream_status",
-            return_value={"title": "RESTORE PRIVACY", "clients_connected": 4},
+            return_value={"title": "RESTORE PRIVACY", "upstream_ok": True},
         ):
             for _ in range(2):
                 code, ctype, body = self._get("/api/status")
                 self.assertEqual(code, 200)
                 self.assertIn("json", ctype)
                 data = json.loads(body)
-                self.assertEqual(data["clients_connected"], 4)
-                self.assertEqual(set(data.keys()), {"title", "clients_connected"})
-                self.assertNotIn("total", data)
+                self.assertEqual(data, {"title": "RESTORE PRIVACY"})
+                self.assertNotIn("clients_connected", data)
 
                 code, ctype, html = self._get("/")
                 self.assertEqual(code, 200)
                 self.assertIn("html", ctype)
-                self.assertIn("Currently connected clients", html)
-                self.assertIn("fetch('/api/status'", html)
-                self.assertNotIn('http-equiv="refresh"', html.lower())
+                self.assertNotIn("Currently connected clients", html)
+                self.assertIn("Download client", html)
 
 
 if __name__ == "__main__":

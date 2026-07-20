@@ -19,10 +19,10 @@ CONF_SRC="${SCRIPT_DIR}/unbound-rpt.conf"
 
 export DEBIAN_FRONTEND=noninteractive
 
-echo "[rpt-dns] packages (unbound)"
+echo "[rpt-dns] packages (unbound + ca-certificates for DoT)"
 if command -v apt-get >/dev/null 2>&1; then
   apt-get update -y
-  apt-get install -y unbound
+  apt-get install -y unbound ca-certificates
 else
   echo "unsupported package manager — install unbound manually and use ${CONF_SRC}" >&2
   exit 1
@@ -73,4 +73,6 @@ else
 fi
 
 echo "[rpt-dns] done. Clients use DNS ${TUNNEL_DNS_ADDR} when full tunnel is up."
+echo "[rpt-dns] Upstream is DNS-over-TLS (DoT) to privacy resolvers — see unbound-rpt.conf."
 echo "[rpt-dns] Do not open port 53 on the public WAN."
+echo "[rpt-dns] Do not configure client-side Cloudflare/Google/Quad9 as residual DNS fallbacks."

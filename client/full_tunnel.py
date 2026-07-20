@@ -344,7 +344,11 @@ def android_vpn_builder_config(plan: FullTunnelPlan) -> dict[str, Any]:
         "allowAllApps": plan.allow_all_apps,
         "disallowedApplications": list(plan.disallowed_apps),
         "blocking": True,
+        "allowBypass": False,
+        "killSwitch": True,
         "protectNodeSocket": True,
+        "blockWebRtcMdns": True,
+        "disallowPublicDnsFallback": True,
         "ipv6LeakPolicy": plan.ipv6_leak_policy,
         "ipv6Protected": plan.ipv6_leak_policy == IPV6_LEAK_POLICY_BLOCK_ISP,
     }

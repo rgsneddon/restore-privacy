@@ -20,7 +20,7 @@ class TestBetaNote(unittest.TestCase):
     def test_render_beta_note_below_headline(self):
         """Drive shipped render_html — note sits after h1 with objective wording."""
         html = status_app.render_html(
-            {"title": "RESTORE PRIVACY", "clients_connected": 1}
+            {"title": "RESTORE PRIVACY"}
         ).decode("utf-8")
         self.assertIn("RESTORE PRIVACY", html)
         # Shipped fragment
@@ -40,9 +40,9 @@ class TestBetaNote(unittest.TestCase):
         note_pos = html.find('id="beta-note"')
         self.assertGreater(h1_pos, 0)
         self.assertGreater(note_pos, h1_pos)
-        # Existing surface still present
-        self.assertIn("clients-connected", html)
-        self.assertIn("fetch('/api/status'", html)
+        # Downloads remain; live client count removed
+        self.assertNotIn("clients-connected", html)
+        self.assertNotIn("fetch('/api/status'", html)
         self.assertIn("Download client", html)
 
     def test_beta_constants_match_objective(self):
@@ -61,7 +61,7 @@ class TestBetaNote(unittest.TestCase):
             with mock.patch.object(
                 status_app,
                 "fetch_upstream_status",
-                return_value={"title": "RESTORE PRIVACY", "clients_connected": 0},
+                return_value={"title": "RESTORE PRIVACY", "upstream_ok": True},
             ):
                 for _ in range(2):
                     with urllib.request.urlopen(
@@ -74,8 +74,8 @@ class TestBetaNote(unittest.TestCase):
                         html,
                     )
                     self.assertIn("https://x.com/rgsneddon", html)
-                    self.assertIn("clients-connected", html)
-                    self.assertIn("fetch('/api/status'", html)
+                    self.assertNotIn("clients-connected", html)
+                    self.assertNotIn("fetch('/api/status'", html)
         finally:
             httpd.shutdown()
             httpd.server_close()

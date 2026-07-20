@@ -17,20 +17,21 @@
 
 Restore Privacy **0.2.2** ships clients and public catalog aligned to the **FlokiNET** node at **82.221.101.241**, with product **traffic shaping enabled by default** on the Windows/Linux Python DATA path, Settings links to audit / privacy policy / end user licence, and docs aligned.
 
-**Core privacy thesis (unchanged):** **no user-info logs**, **minimal public status** (`clients_connected` only), **honest Connected** when residual full tunnel is active, **device Ed25519 keys** (no shared client private key in packages), **no third-party geo on Connect**.
+**Core privacy thesis:** **no user-info logs**, **minimal public status** (title + downloads — **no live client count**), **honest Connected** when residual full tunnel is active, **device Ed25519 keys** (no shared client private key in packages), **no third-party geo on Connect**.
 
-**New / updated since 0.2.1 (this pass):**
+**New / updated privacy hardening (this pass):**
 
 | Area | Status |
 |------|--------|
-| Session **PFS** (ephemeral X25519 → session AEAD IKM) | Shipped on Python handshake path; unit-proven long-term-only reconstruction fails |
-| **Traffic shape** (pad / jitter / cover) | **Enabled by default** via `product_dataplane_traffic_shape()`; opt out `RPT_TRAFFIC_SHAPE=0` |
-| **Settings legal links** | Audit, privacy policy, end user licence → stable GitHub blob URLs |
-| **Multi-hop** | Hop *list* config only; `is_multihop_active() is False`; status **entry-only / not routed** |
-| **Self-host** | `scripts/selfhost_node.sh` one-shot recipe |
-| **Product node pub pin** | `product/node_elgamal.pub` + Android assets refresh on Connect |
+| **Public client count removed** | Status page HTML/API + node UI/API title-only; registry keeps internal size for routing only |
+| Session **PFS** (ephemeral X25519 → session AEAD IKM) | Shipped on Python handshake path |
+| **Layer obfuscation** (QUIC-mimic outer wrap) | **On by default** (`RPT_OBFS`); client+node DATA/HELLO path |
+| **Traffic shape** (pad / jitter / cover) | **On by default**; opt out `RPT_TRAFFIC_SHAPE=0` |
+| **Kill switch + IPv6 + WebRTC surface** | Windows/Linux firewall helpers + STUN/mDNS block; Android blocking flags |
+| **Node DoT DNS** | Unbound tunnel-only + DoT forward; clients DNS=`10.88.0.1` only |
+| **Multi-hop** | Hop *list* config only; not residual multi-hop |
 
-**Overall posture:** **Strong** alignment between claims and code for residual honesty (`residual_ip_capture`), no-phones-home Connect, packaging strip of `*.priv`, tunnel DNS default `10.88.0.1`, IPv6 leak honesty, multi-hop **honesty**, and product traffic-shape **on by default** with honest DPI limits.
+**Overall posture:** **Strong** alignment for residual honesty (`residual_ip_capture`), no public live count, no-phones-home Connect, packaging strip of `*.priv`, tunnel DNS + DoT upstream, kill-switch/IPv6, obfuscation+traffic-shape with honest DPI limits.
 
 **Primary residual risks (open by design / environment):**
 
@@ -76,8 +77,8 @@ Restore Privacy **0.2.2** ships clients and public catalog aligned to the **Flok
         v
 [Node: admission + sessions + NAT + Unbound 10.88.0.1]
         |
-        v  status: title + clients_connected only
-[Status page]  <-- download catalog v0.2.2
+        v  status: title only (no public count)
+[Status page]  <-- download catalog (no live counter)
 ```
 
 ---
@@ -126,7 +127,7 @@ Restore Privacy **0.2.2** ships clients and public catalog aligned to the **Flok
 | I1 | Residual honesty + IPv6 honesty on product Connect |
 | I2 | Dual `/1` anti-blackhole routing |
 | I3 | No shared client priv; device key bootstrap |
-| I4 | Public status minimization |
+| I4 | Public status minimization (no client count) |
 | I5 | Node no-log + host privacy install script |
 | I6 | Tunnel DNS default 10.88.0.1 (node Unbound) |
 | I7 | Version surfaces aligned at **0.2.2** |
@@ -143,7 +144,7 @@ Restore Privacy **0.2.2** ships clients and public catalog aligned to the **Flok
 | Claim | Behaviour | Verdict |
 |-------|-----------|---------|
 | No user-info logs | `nolog.py`; systemd null stdout | Aligned (host can still misconfigure) |
-| Public page: live count only | `normalize_status` | Aligned |
+| Public page: no live count | `normalize_status` title-only | Aligned |
 | No shared client priv | Strip/generate device key | Aligned |
 | Residual only with full tunnel | Product gates | Aligned |
 | No third-party geo on Connect | No phones-home tests | Aligned |
@@ -191,7 +192,7 @@ Restore Privacy **0.2.2** ships clients and public catalog aligned to the **Flok
 1. Rebuild/sign Apple packages on a Mac with 0.2.2 sources before marketing residual Apple.  
 2. Redeploy status page (Render) so catalog picks up **0.2.2**.  
 3. Wire Android/Apple engines to Python pad/cover/PFS wire when residual native path is ready.  
-4. Optional next privacy: Connect kill-switch; real multi-hop relay (only then flip `MULTI_HOP_ROUTING_IMPLEMENTED`).  
+4. Optional next privacy: real multi-hop residual relay (only then flip `MULTI_HOP_ROUTING_IMPLEMENTED`); deepen native mobile kill-switch/obfs.  
 5. Ops: keep Unbound tunnel-only; no public :53; provider log awareness.  
 
 ---
@@ -216,7 +217,7 @@ Re-run after major releases or crypto/packaging changes.
 | Settings legal links | In tree (Windows + Flutter) |
 | Multi-hop residual | **Not done** (config only) |
 | Self-host recipe | In tree |
-| Optional kill-switch | Not done (future) |
+| Kill-switch + DoT DNS + outer obfs | In tree (Python path) |
 
 ---
 

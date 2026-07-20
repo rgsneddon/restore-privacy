@@ -43,6 +43,7 @@ class LinuxTunnelResult:
     server_host: Optional[str] = None
     iface: Optional[str] = None
     ipv6_mitigation_applied: bool = False
+    kill_switch_applied: bool = False
 
 
 def product_connect_requires_root() -> bool:
@@ -192,6 +193,17 @@ def stop_full_tunnel(
             pass
         try:
             res.ipv6_mitigation_applied = False
+        except Exception:
+            pass
+
+    if routes_were_on or (res is not None and getattr(res, "kill_switch_applied", False)):
+        try:
+            from client.kill_switch import linux_kill_switch_rollback_commands
+
+            rb, _ = _run_cmds(linux_kill_switch_rollback_commands())
+            applied.extend(rb)
+            if res is not None:
+                res.kill_switch_applied = False
         except Exception:
             pass
 
@@ -387,6 +399,27 @@ def start_full_tunnel(
     else:
         msg += "; IPv6 leak mitigation incomplete"
 
+    ks_applied = False
+    try:
+        from client.kill_switch import (
+            build_kill_switch_plan,
+            product_kill_switch_enabled,
+        )
+
+        if product_kill_switch_enabled():
+            ks = build_kill_switch_plan(
+                "linux",
+                server_host=server_host,
+                tunnel_iface=iface or "rpt0",
+            )
+            ks_cmds, _ = _run_cmds(ks.apply)
+            applied.extend(ks_cmds)
+            ks_applied = bool(ks.apply)
+            if ks_applied:
+                msg += "; kill-switch on"
+    except Exception:
+        ks_applied = False
+
     return LinuxTunnelResult(
         True,
         msg,
@@ -399,4 +432,5 @@ def start_full_tunnel(
         server_host=server_host,
         iface=iface,
         ipv6_mitigation_applied=ipv6_ok,
+        kill_switch_applied=ks_applied,
     )

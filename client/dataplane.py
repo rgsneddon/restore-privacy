@@ -15,7 +15,7 @@ from dataclasses import dataclass, field
 from typing import Callable, Optional, Protocol
 
 from node.crypto_session import CoverFrame
-from node.protocol import MsgType, pack_data, peek_type
+from node.protocol import pack_data
 from node.traffic_shape import (
     DEFAULT_TRAFFIC_SHAPE,
     TrafficShapePolicy,
@@ -103,7 +103,7 @@ class RptDataPlane:
         sock = self.sock
         last_keepalive = 0.0
         last_cover = 0.0
-        keepalive_every = 30.0  # keep node session live for clients_connected
+        keepalive_every = 30.0  # keep node session alive (routing / idle prune)
         while not self._stop.is_set():
             try:
                 rlist = [sock]
@@ -115,17 +115,16 @@ class RptDataPlane:
                 readable = []
                 fd = -1
 
-            # UDP -> open -> TUN (always try nonblocking recv)
+            # UDP -> unwrap+open -> TUN (always try nonblocking recv)
             try:
                 data, _addr = sock.recvfrom(65535)
-                t = peek_type(data)
-                if t == MsgType.DATA:
-                    plain, is_cover = self.client.open_packet_allow_cover(data)
-                    if is_cover:
-                        self.stats.cover_recv += 1
-                    elif plain:
-                        tun.write_packet(plain)
-                        self.stats.udp_to_tun += 1
+                # open_packet_allow_cover unwraps outer obfuscation layer
+                plain, is_cover = self.client.open_packet_allow_cover(data)
+                if is_cover:
+                    self.stats.cover_recv += 1
+                elif plain:
+                    tun.write_packet(plain)
+                    self.stats.udp_to_tun += 1
             except BlockingIOError:
                 pass
             except OSError:
@@ -133,7 +132,7 @@ class RptDataPlane:
             except Exception:
                 self.stats.errors += 1
 
-            # TUN -> seal -> UDP (real seal_packet on shipped client)
+            # TUN -> seal+wrap -> UDP (real seal_packet on shipped client)
             try:
                 pkt = tun.read_packet()
                 if pkt:
@@ -159,7 +158,7 @@ class RptDataPlane:
                     self.stats.errors += 1
                 last_cover = now
 
-            # Periodic KEEPALIVE so idle tunnels still count as connected on the node
+            # Periodic KEEPALIVE so idle tunnels are not pruned on the node
             if (now - last_keepalive) >= keepalive_every:
                 try:
                     self.client.send_keepalive()
@@ -197,9 +196,12 @@ class RptDataPlane:
         sess.counter_out += 1
         aad = sess.session_id + struct.pack("!Q", sess.counter_out)
         nonce, sealed = sess.crypto.seal_cover(self.traffic_shape.pad_bucket, aad=aad)
+        from node.obfuscation import maybe_wrap
+
         frame = pack_data(sess.session_id, sess.counter_out, nonce, sealed)
-        self.sock.sendto(frame, self.client.endpoint.address)
-        return frame
+        wire = maybe_wrap(frame)
+        self.sock.sendto(wire, self.client.endpoint.address)
+        return wire
 
 
 class QueueTun:

@@ -26,12 +26,14 @@
 - **Full-device VPN** when the OS grants VPN permission (Windows UAC / Wintun dual `/1`, Android VPN consent, Apple Packet Tunnel when signed)
 - Residual public IP uses the **VPN node** only when full-tunnel routes are active (**honest status** otherwise)
 - **Close / minimize** keeps the tunnel running until **Disconnect** or **Quit**
-- Live status page with **currently connected** client count and installers
+- Public status page with **download installers only** (no live client count)
 - **No third-party geo lookup** on Connect (admission is cryptographic only)
 - Session **PFS** (ephemeral X25519) on the Python client/node handshake path
+- **Layer obfuscation** (QUIC-mimic outer wrap around RPT frames) **on by default** (`RPT_OBFS=0` to opt out) — mitigation, not DPI-undetectability
 - **Product traffic shaping** (padding / send jitter / cover) **on by default** for Windows/Linux Python DATA path (`RPT_TRAFFIC_SHAPE=0` to opt out)
+- **Kill switch** on product full tunnel: block non-tunnel egress while connected (`RPT_KILL_SWITCH=0` to opt out); IPv6 ISP path blocked; tunnel DNS only (`10.88.0.1`, no public DNS fallbacks)
 - Multi-hop hop *lists* may be configured for planning — **not residual multi-hop** until a real relay path ships
-- Native Android/Apple engines may lag Python pad/cover/PFS wire extensions (documented honestly)
+- Native Android/Apple engines may lag Python pad/cover/PFS/obfs wire extensions (documented honestly)
 
 ---
 
@@ -99,9 +101,9 @@ Release zips for **0.2.2** are **prep packages** for sideload / further signing 
 
 https://restore-privacy-status.onrender.com/
 
-- Live **currently connected clients** count  
 - **Download** buttons for Windows, Android, macOS, iOS, and Linux (catalog **v0.2.2**)  
-- **Connect via web** explains that a browser tab cannot run full system VPN  
+- **No** public live session / connected-client counter  
+- **Connect via web** (if present in docs) explains that a browser tab cannot run full system VPN  
 
 ---
 
@@ -114,7 +116,7 @@ https://restore-privacy-status.onrender.com/
 | **Credits** | [CREDITS.md](CREDITS.md) |
 | **Code & policy audit** | [audit.md](audit.md) |
 
-Core promises: **no user-info logs** by design, **minimal public status** (live count only), **device keys** (not a shared client private key), **honest residual** only when full tunnel is up, **no third-party geo** on Connect. Product Windows/Linux clients enable **padding / jitter / cover** by default on the DATA path (opt out with `RPT_TRAFFIC_SHAPE=0`); multi-hop *config* is not residual until a real relay ships. VPS providers may still see IP-level metadata (privacy §4).
+Core promises: **no user-info logs** by design, **minimal public status** (title + downloads — **no live client count**), **device keys** (not a shared client private key), **honest residual** only when full tunnel is up, **no third-party geo** on Connect. Product Windows/Linux clients enable **outer-layer obfuscation**, **padding / jitter / cover**, and **kill-switch** by default on residual paths; multi-hop *config* is not residual until a real relay ships. Node tunnel DNS uses **DoT** upstream. VPS providers may still see IP-level metadata (privacy §4).
 
 ---
 

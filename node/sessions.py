@@ -1,4 +1,4 @@
-"""In-memory live sessions only — count is current connections, not lifetime total."""
+"""In-memory live sessions for routing — not published as a public client count."""
 
 from __future__ import annotations
 
@@ -8,7 +8,6 @@ from dataclasses import dataclass, field
 from typing import Dict, List, Optional, Tuple
 
 # UDP has no TCP FIN: drop sessions idle longer than this (DATA/KEEPALIVE refresh last_seen).
-# Keep short so "Currently connected" tracks live users, not a sticky total.
 DEFAULT_SESSION_IDLE_SEC = 60.0
 
 
@@ -23,7 +22,7 @@ class Session:
 
 
 class SessionRegistry:
-    """Live session store. ``clients_connected`` == number of non-expired sessions."""
+    """Live session store for routing (internal size only; not a public metric)."""
 
     def __init__(self, idle_sec: float = DEFAULT_SESSION_IDLE_SEC) -> None:
         self._by_id: Dict[bytes, Session] = {}
@@ -32,6 +31,7 @@ class SessionRegistry:
         self.idle_sec = float(idle_sec)
 
     def count(self) -> int:
+        """Internal live session size for routing/tests — not exposed on public status."""
         with self._lock:
             return len(self._by_id)
 
@@ -91,8 +91,7 @@ class SessionRegistry:
     ) -> int:
         """Remove sessions idle longer than idle_sec. Returns how many were dropped.
 
-        This is how ``clients_connected`` decreases when clients disconnect or go
-        silent (UDP has no explicit disconnect).
+        UDP has no explicit disconnect — idle prune frees tunnel IPs for routing.
         """
         now_t = time.time() if now is None else float(now)
         limit = self.idle_sec if idle_sec is None else float(idle_sec)
@@ -115,10 +114,10 @@ class SessionRegistry:
             return list(self._by_id.keys())
 
     def status_payload(self) -> dict:
-        """Only title + **current** live count — never lifetime totals or identities.
+        """Public status: product title only — no live client count field.
 
-        Always prunes stale sessions first so the public number cannot stick at a
-        cumulative high-water mark of past connects.
+        Session registry still prunes idle sessions for routing; count is never
+        published on the public UI/API surface.
         """
         self.expire_stale()
-        return {"title": "RESTORE PRIVACY", "clients_connected": self.count()}
+        return {"title": "RESTORE PRIVACY"}

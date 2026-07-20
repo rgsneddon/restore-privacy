@@ -64,8 +64,12 @@ class TestDataPlaneRealSealOpen(unittest.TestCase):
         tun.inbound.put(ip_pkt)
 
         frame = plane.seal_from_tun_once(tun)
-        self.assertEqual(peek_type(frame), MsgType.DATA)
-        # open_packet is the shipped path
+        # Product path wraps outer obfuscation; inner is still RPT DATA
+        from node.obfuscation import maybe_unwrap, looks_like_bare_rpt
+
+        self.assertFalse(looks_like_bare_rpt(frame))
+        self.assertEqual(peek_type(maybe_unwrap(frame)), MsgType.DATA)
+        # open_packet is the shipped path (unwraps + opens)
         plain = client.open_packet(frame)
         self.assertEqual(plain, ip_pkt)
 

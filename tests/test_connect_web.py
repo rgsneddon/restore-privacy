@@ -50,18 +50,17 @@ class TestConnectViaWebBuilder(unittest.TestCase):
             self.assertIn("/releases/download/", a["href"])
             self.assertTrue(a["href"].startswith("https://"))
 
-    def test_public_page_excludes_connect_section_keeps_poll(self):
+    def test_public_page_excludes_connect_section_and_count(self):
         page = status_app.render_html(
-            {"title": "RESTORE PRIVACY", "clients_connected": 1}
+            {"title": "RESTORE PRIVACY"}
         ).decode("utf-8")
         # Connect-via-web is not on the public minimal page
         self.assertNotIn("Connect via web", page)
         self.assertNotIn("connect-via-web", page)
-        # Public page may show downloads; connect-via-web section stays off
-        self.assertNotIn("connect-via-web", page)
-        # Live count poll remains
-        self.assertIn("fetch('/api/status'", page)
-        self.assertIn("setInterval(poll", page)
+        # No live client count poll
+        self.assertNotIn("fetch('/api/status'", page)
+        self.assertNotIn("setInterval(poll", page)
+        self.assertNotIn("Currently connected clients", page)
         self.assertNotIn('http-equiv="refresh"', page.lower())
 
 
@@ -79,7 +78,7 @@ class TestConnectViaWebHttp(unittest.TestCase):
         with mock.patch.object(
             status_app,
             "fetch_upstream_status",
-            return_value={"title": "RESTORE PRIVACY", "clients_connected": 2},
+            return_value={"title": "RESTORE PRIVACY", "upstream_ok": True},
         ):
             for _ in range(2):
                 with urllib.request.urlopen(
@@ -87,7 +86,7 @@ class TestConnectViaWebHttp(unittest.TestCase):
                 ) as resp:
                     html = resp.read().decode("utf-8")
                 self.assertIn("RESTORE PRIVACY", html)
-                self.assertIn("fetch('/api/status'", html)
+                self.assertNotIn("fetch('/api/status'", html)
                 self.assertNotIn("Connect via web", html)
                 # Downloads present; connect-via-web section remains off
                 self.assertIn("releases/download/0.2.2/", html)

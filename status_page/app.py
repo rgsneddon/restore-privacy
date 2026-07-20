@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """Restore Privacy status page for Render.
 
-Proxies live **current** session count from the Vultr node. The page updates the
-count dynamically via client-side fetch of /api/status (no full-page refresh).
+Public surface: product title, beta note, and client download links only.
+Does **not** expose a connected-client count or poll a live session metric.
 """
 
 from __future__ import annotations
@@ -17,7 +17,7 @@ from pathlib import Path
 
 from downloads import download_css, render_download_section_html
 
-# Public page: title + BETA note + live client count + Windows .exe / Android .apk / macOS .zip / iOS .zip downloads.
+# Public page: title + BETA note + download buttons (no live client counter).
 
 # Brand static files (favicon/logo) live next to this module
 STATUS_DIR = Path(__file__).resolve().parent
@@ -27,7 +27,7 @@ FAVICON_PNG_PATH = "/favicon.png"
 APPLE_TOUCH_PATH = "/apple-touch-icon.png"
 LOGO_PATH = "/logo.png"
 
-# Map URL path â†’ filename under static/
+# Map URL path → filename under static/
 STATIC_ROUTES: dict[str, str] = {
     FAVICON_PATH: "favicon.ico",
     "/favicon.ico": "favicon.ico",
@@ -85,16 +85,17 @@ def render_beta_note_html() -> str:
     )
 
 
-# Upstream VPN node status (override via env on Render)
+# Upstream VPN node status (override via env on Render) — used only for health/title
 DEFAULT_UPSTREAM = "http://82.221.101.241:8080/api/status"
 UPSTREAM_STATUS_URL = os.environ.get("RPT_STATUS_UPSTREAM", DEFAULT_UPSTREAM).strip()
 FETCH_TIMEOUT_SEC = float(os.environ.get("RPT_STATUS_TIMEOUT", "4"))
-# Client-side poll interval (ms) for live count updates without page reload
-POLL_INTERVAL_MS = int(os.environ.get("RPT_STATUS_POLL_MS", "3000"))
 
-# Fields that must never appear (totals / lifetime / identity)
+# Fields that must never appear on the public surface
 FORBIDDEN_STATUS_KEYS = frozenset(
     {
+        "clients_connected",
+        "current_clients",
+        "active_sessions",
         "total",
         "total_clients",
         "clients_total",
@@ -112,44 +113,26 @@ FORBIDDEN_STATUS_KEYS = frozenset(
 
 
 def normalize_status(data: dict | None) -> dict:
-    """Map upstream JSON to current-session count only (not a cumulative total)."""
+    """Map upstream JSON to public title only — never a live client count."""
     data = data or {}
-    # Prefer explicit current-session fields; never lifetime/total counters
-    raw = data.get("clients_connected")
-    if raw is None:
-        raw = data.get("current_clients")
-    if raw is None:
-        raw = data.get("active_sessions")
-    try:
-        n = int(raw if raw is not None else 0)
-    except (TypeError, ValueError):
-        n = 0
-    if n < 0:
-        n = 0
     return {
         "title": str(data.get("title", "RESTORE PRIVACY")),
-        # Name emphasizes current live sessions, not a running total
-        "clients_connected": n,
     }
 
 
 def public_status_payload(status: dict) -> dict:
-    """Strict public JSON: title + current count only."""
+    """Strict public JSON: product title only (no clients_connected)."""
     safe = normalize_status(status)
-    # Drop anything else that may have been attached
-    return {
-        "title": safe["title"],
-        "clients_connected": int(safe["clients_connected"]),
-    }
+    return {"title": safe["title"]}
 
 
 def fetch_upstream_status() -> dict:
-    """Pull live current count from the node; never store it. Fallback to 0 on failure."""
+    """Pull optional title from the node; never expose a session count."""
     try:
         req = urllib.request.Request(
             UPSTREAM_STATUS_URL,
             headers={
-                "User-Agent": "restore-privacy-status-page/1.1",
+                "User-Agent": "restore-privacy-status-page/1.2",
                 "Accept": "application/json",
             },
             method="GET",
@@ -158,7 +141,7 @@ def fetch_upstream_status() -> dict:
             raw = resp.read().decode("utf-8", errors="replace")
         data = json.loads(raw)
         if not isinstance(data, dict):
-            return {"title": "RESTORE PRIVACY", "clients_connected": 0, "upstream_ok": False}
+            return {"title": "RESTORE PRIVACY", "upstream_ok": False}
         out = public_status_payload(data)
         out["upstream_ok"] = True
         return out
@@ -171,16 +154,13 @@ def fetch_upstream_status() -> dict:
         OSError,
         json.JSONDecodeError,
     ):
-        return {"title": "RESTORE PRIVACY", "clients_connected": 0, "upstream_ok": False}
+        return {"title": "RESTORE PRIVACY", "upstream_ok": False}
 
 
 def render_html(status: dict, poll_ms: int | None = None) -> bytes:
-    """HTML: title + live client count + Windows .exe / Android .apk / macOS .zip / iOS .zip downloads."""
+    """HTML: title + beta note + download buttons (no connected-client counter)."""
+    _ = poll_ms  # retained for call-site compat; public page does not poll a count
     title = status.get("title", "RESTORE PRIVACY")
-    n = int(status.get("clients_connected", 0))
-    interval = int(poll_ms if poll_ms is not None else POLL_INTERVAL_MS)
-    if interval < 500:
-        interval = 500
     # Escape for embedding in HTML text (title is product constant; still sanitize)
     title_safe = (
         str(title)
@@ -211,9 +191,8 @@ def render_html(status: dict, poll_ms: int | None = None) -> bytes:
                  font-size:0.95rem; opacity:0.85; line-height:1.45; color:#fbbf24; }}
     .beta-note a {{ color:#93c5fd; }}
     .beta-note a:hover {{ color:#bfdbfe; }}
-    .count {{ font-size:1.25rem; opacity:0.9; }}
-    .num {{ font-size:3rem; font-weight:700; margin-top:0.4rem; color:#6ee7b7; }}
-    .hint {{ margin-top:1rem; font-size:0.85rem; opacity:0.55; }}
+    .tagline {{ margin:0 0 0.5rem; max-width:28rem; text-align:center; padding:0 1rem;
+                font-size:0.95rem; opacity:0.75; line-height:1.45; }}
 {dl_css}
   </style>
 </head>
@@ -221,34 +200,8 @@ def render_html(status: dict, poll_ms: int | None = None) -> bytes:
   <img class="brand-logo" src="/logo.png" width="96" height="96" alt="Restore Privacy logo"/>
   <h1>{title_safe}</h1>
 {render_beta_note_html()}
-  <div class="count">Currently connected clients</div>
-  <div class="num" id="clients-connected" data-metric="current">{n}</div>
-  <div class="hint">Live count Â· updates automatically</div>
+  <p class="tagline">Download the client for your platform. No public live session counter.</p>
 {downloads_html}
-  <script>
-(function () {{
-  var el = document.getElementById('clients-connected');
-  var pollMs = {interval};
-  function applyCount(n) {{
-    if (typeof n !== 'number' || !isFinite(n) || n < 0) n = 0;
-    el.textContent = String(Math.floor(n));
-  }}
-  function poll() {{
-    fetch('/api/status', {{ cache: 'no-store', credentials: 'same-origin' }})
-      .then(function (r) {{ return r.json(); }})
-      .then(function (data) {{
-        // Only live session count (clients_connected)
-        if (data && Object.prototype.hasOwnProperty.call(data, 'clients_connected')) {{
-          applyCount(Number(data.clients_connected));
-        }}
-      }})
-      .catch(function () {{ /* keep last shown value */ }});
-  }}
-  setInterval(poll, pollMs);
-  // Immediate refresh after load so first paint can correct without reload
-  setTimeout(poll, 200);
-}})();
-  </script>
 </body>
 </html>
 """

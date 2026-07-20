@@ -17,7 +17,7 @@ Restore Privacy is a **custom-built encrypted tunnel** (not WireGuard, OpenVPN, 
 | Commitment | Meaning |
 |------------|---------|
 | **No user-info logs** | The node and status software are configured **not** to write connection, session, access, traffic, accounting, or peer-activity logs to disk. |
-| **No client PII collection** | The public status surface exposes **only** a live **current connected client count** (and a product title) - not identities, IPs, usernames, or per-client lists. |
+| **No client PII collection** | The public status surface exposes **product title and download links** only — **not** a live connected-client count, identities, IPs, usernames, or per-client lists. |
 | **Tunnel as a relay** | After cryptographic admission, the node forwards encrypted-session traffic; it is not designed as an analytics or advertising platform. |
 
 ---
@@ -29,7 +29,7 @@ Unless an operator **deliberately** changes configuration or hosting outside thi
 - Store **usernames, passwords, email addresses, or account profiles** for tunnel use (tunnel attach uses **cryptographic product keys**, not user accounts).
 - Write **connection logs**, **session logs**, **access logs**, **traffic logs**, or **peer activity logs** for tunnel use.
 - Publish **client IP addresses**, **device identifiers**, or **session identifiers** on the public status page.
-- Keep a **lifetime / cumulative "total clients ever"** counter on the public page (the status metric is **currently connected** sessions only).
+- Keep a **lifetime / cumulative "total clients ever"** counter or a **live connected-client count** on the public page.
 - Bundle the **node ElGamal private key** (`node_elgamal.priv`) in public packages (never shipped).
 
 Process stdout/stderr for the node service is configured for **no journal session streams** in the standard install (`StandardOutput=null` / similar).
@@ -45,8 +45,9 @@ Process stdout/stderr for the node service is configured for **no journal sessio
 - Listens for RPT tunnel handshakes and **encrypted** data frames.
 - **Admits** only peers that complete the product handshake with an **authorized client key** (Ed25519 allow-list + ElGamal / Pedersen-based handshake materials).
 - Assigns a temporary tunnel IP and **relays** IP traffic (forwarding + NAT) while the session is active.
-- Holds **in-memory** session state for active tunnels so traffic can be routed and so a **current session count** can be reported.
+- Holds **in-memory** session state for active tunnels so traffic can be routed (internal only — **not** published as a public live count).
 - When a session ends, that in-memory state is dropped; it is **not** designed to be written as a durable user history file.
+- Outer **layer obfuscation** (QUIC-mimic wrapper around RPT frames) is enabled by default on the product Python path so clear ``RPT2`` magic is not on the wire alone (mitigation; not a DPI-undetectability claim).
 
 ### 3.2 Client applications (Windows, Android, Linux, iOS, and macOS)
 
@@ -58,13 +59,15 @@ Process stdout/stderr for the node service is configured for **no journal sessio
 - **On Disconnect / Quit**, clients are designed to **fully tear down** the tunnel (routes, TUN/Packet Tunnel, session) so traffic **reverts to the device's normal public IP path**.
 - Clients are **not** designed to upload browsing history or identity dossiers to the node as product telemetry.
 - **No public-IP geo admission (from 0.1.9 source):** product Connect does **not** look up the device public IP via third-party geo services, and does **not** allow or deny access by country. Admission is cryptographic (device Ed25519 + node keys) only. Older installed packages (e.g. 0.1.8) may still perform a client-side UK geo check until users upgrade.
-- **DNS on full tunnel (source prep):** product full-tunnel clients default DNS to the **node tunnel gateway** (`10.88.0.1`), not third-party public resolvers (e.g. Cloudflare/Quad9). Name queries then go to the operator node (local recursive resolver such as Unbound). The operator must run tunnel-only DNS on the node (`node/install_dns.sh`); until that is applied, name resolution while connected may fail. The VPS provider may still see recursive upstream traffic from the node.
+- **DNS on full tunnel:** product full-tunnel clients default DNS to the **node tunnel gateway** (`10.88.0.1`) only — **no** client-side public DNS fallbacks (Cloudflare/Google/Quad9/etc.). The node Unbound instance listens on the tunnel address and uses **DNS-over-TLS (DoT)** upstream to privacy-oriented resolvers (`node/unbound-rpt.conf`, `node/install_dns.sh`). Until node DNS is installed, name resolution while connected may fail. The VPS provider may still see DoT/encrypted recursive upstream traffic from the node.
+- **Kill switch / leak protection:** when residual full tunnel is up, product Windows/Linux clients apply an **always-on kill switch** (block non-tunnel outbound) plus **IPv6 ISP path blocking**. STUN/mDNS ports used by common WebRTC discovery are blocked under the kill-switch rules. Android builder config uses `blocking=true` / `allowBypass=false`. Disconnect rolls back kill-switch and IPv6 mitigations.
 - Public download packages (Windows `.exe`, Android `.apk`, Linux `.tar.gz` installer, macOS `.zip`, iOS `.zip`) may include the **public** node key (`node_elgamal.pub`) so clients can open a HELLO. Each install **generates a unique Ed25519 device private key on first run** and keeps it only in local device-private storage - packages do **not** ship a shared `client_ed25519.priv` (which would allow universal impersonation). They **never** include the **node private key** (`node_elgamal.priv`). Windows installers ship a **bundled runtime** (no separate system Python install). The Linux installer package ships **manylinux wheels** for the app Python crypto stack (private venv via `install.sh`); OS tools such as TUN/`ip`/root for full tunnel remain host-provided.
 
 ### 3.3 Public status page (e.g. Render)
 
-- Proxies or displays a **live** `clients_connected` value from the node status API.
-- Updates the number in the browser via **client-side polling** (no requirement to store user history on the page host).
+- Displays the product **title**, beta note, and **download links** only.
+- Does **not** expose a live connected-client count or poll a session metric on the public HTML surface.
+- Optional `/api/status` JSON is **title-only** (no `clients_connected`).
 - May offer **download links** to public GitHub release packages (current catalog: **v0.2.2**).
 
 ### 3.4 Operator-held secrets
@@ -92,7 +95,7 @@ Please understand these **operational limits**:
 
 ## 5. Cookies and tracking
 
-The status page is a minimal static/JS UI. It does **not** use advertising trackers or analytics SDKs in the shipped code. Browser `fetch` of `/api/status` is for the live count only. No account login cookies are required for the tunnel protocol itself.
+The status page is a minimal static UI. It does **not** use advertising trackers or analytics SDKs in the shipped code. It does **not** poll a live client count. No account login cookies are required for the tunnel protocol itself.
 
 ---
 

@@ -49,6 +49,7 @@ class WindowsTunnelResult:
     server_host: Optional[str] = None
     if_index: Optional[int] = None
     ipv6_mitigation_applied: bool = False
+    kill_switch_applied: bool = False
 
 
 def is_admin() -> bool:
@@ -290,6 +291,25 @@ def stop_full_tunnel(
             pass
         try:
             res.ipv6_mitigation_applied = False
+        except Exception:
+            pass
+
+    # 1c) Kill-switch firewall rollback (non-tunnel block)
+    if routes_were_on or (res is not None and getattr(res, "kill_switch_applied", False)):
+        try:
+            from client.kill_switch import windows_kill_switch_rollback_commands
+
+            for cmd in windows_kill_switch_rollback_commands():
+                try:
+                    # best-effort shell
+                    import subprocess
+
+                    subprocess.run(cmd, shell=True, capture_output=True, timeout=15)
+                    applied.append(cmd)
+                except Exception:
+                    pass
+            if res is not None:
+                res.kill_switch_applied = False
         except Exception:
             pass
 
@@ -638,6 +658,33 @@ def start_full_tunnel(
             msg += f"; IPv6 mitigation error: {exc}"
             ipv6_ok = False
 
+    ks_applied = False
+    if routes_applied and capture:
+        try:
+            from client.kill_switch import (
+                build_kill_switch_plan,
+                product_kill_switch_enabled,
+            )
+            import subprocess
+
+            if product_kill_switch_enabled():
+                ks = build_kill_switch_plan(
+                    "windows",
+                    server_host=server_host,
+                    tunnel_iface=plan.tunnel_iface or "RPT",
+                )
+                for cmd in ks.apply:
+                    try:
+                        subprocess.run(cmd, shell=True, capture_output=True, timeout=20)
+                        applied.append(cmd)
+                    except Exception:
+                        pass
+                ks_applied = bool(ks.apply)
+                if ks_applied:
+                    msg += "; kill-switch on"
+        except Exception as exc:
+            msg += f"; kill-switch incomplete: {exc}"
+
     result = WindowsTunnelResult(
         ok=True,
         message=msg,
@@ -650,6 +697,7 @@ def start_full_tunnel(
         server_host=server_host,
         if_index=if_index,
         ipv6_mitigation_applied=ipv6_ok,
+        kill_switch_applied=ks_applied,
     )
 
     # Product residual-IP path: refuse queue/session-only success (ISP IP unchanged)

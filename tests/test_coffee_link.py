@@ -37,15 +37,16 @@ class TestCoffeeLinkBuilder(unittest.TestCase):
         self.assertIn("coffee-footer", css)
         self.assertIn("margin-top: auto", css)
 
-    def test_public_page_excludes_coffee_keeps_count(self):
+    def test_public_page_excludes_coffee_keeps_title_downloads(self):
         page = status_app.render_html(
-            {"title": "RESTORE PRIVACY", "clients_connected": 0}
+            {"title": "RESTORE PRIVACY"}
         ).decode("utf-8")
         self.assertNotIn("buy rus a coffee", page)
         self.assertNotIn("buymeacoffee.com", page)
-        self.assertIn("fetch('/api/status'", page)
-        self.assertIn("setInterval(poll", page)
+        self.assertNotIn("fetch('/api/status'", page)
+        self.assertNotIn("clients_connected", page)
         self.assertIn("RESTORE PRIVACY", page)
+        self.assertIn("Download client", page)
 
 
 class TestCoffeeLinkHttp(unittest.TestCase):
@@ -62,14 +63,14 @@ class TestCoffeeLinkHttp(unittest.TestCase):
         with mock.patch.object(
             status_app,
             "fetch_upstream_status",
-            return_value={"title": "RESTORE PRIVACY", "clients_connected": 1},
+            return_value={"title": "RESTORE PRIVACY", "upstream_ok": True},
         ):
             for _ in range(2):
                 with urllib.request.urlopen(
                     f"http://127.0.0.1:{self._port}/", timeout=5
                 ) as resp:
                     html = resp.read().decode("utf-8")
-                self.assertIn("fetch('/api/status'", html)
+                self.assertNotIn("fetch('/api/status'", html)
                 self.assertNotIn("buy rus a coffee", html)
                 self.assertIn("Download client v0.2.2", html)
 
