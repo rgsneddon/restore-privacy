@@ -22,8 +22,10 @@ import java.security.SecureRandom
  * Authorized RPT2 client engine — ElGamal hybrid + Pedersen + Ed25519 + ChaCha20-Poly1305.
  * Mirrors Python `client.connect` / `node.handshake` (not WireGuard/OpenVPN).
  *
- * Product path uses **PFS**: ephemeral X25519 in HELLO hybrid payload and session IKM
- * (`|pfs-x25519|`), matching Python `with_pfs=True` / node `require_pfs`.
+ * Product residual parity with Python path:
+ * - **PFS**: ephemeral X25519 in HELLO (`|pfs-x25519|`)
+ * - **Traffic shape**: RPTP pad + RPTC cover on DATA AEAD plaintext
+ * - **Outer obfs**: QUIC-mimic wrap/unwrap on UDP (not bare RPT2 alone)
  */
 class RptClientEngine(
     private val clientPrivRaw: ByteArray,
@@ -56,12 +58,14 @@ class RptClientEngine(
             clientPub + commit + hybrid
         val sig = ed25519Sign(clientPrivRaw, transcript)
         val hello = packClientHello(clientPub, commit, hybrid, sig)
-        socket.send(DatagramPacket(hello, hello.size, endpoint))
+        // Outer wrap HELLO (Python maybe_wrap)
+        val wireHello = RptObfuscation.maybeWrap(hello)
+        socket.send(DatagramPacket(wireHello, wireHello.size, endpoint))
 
         val buf = ByteArray(65535)
         val pkt = DatagramPacket(buf, buf.size)
         socket.receive(pkt)
-        val reply = buf.copyOf(pkt.length)
+        val reply = RptObfuscation.maybeUnwrap(buf.copyOf(pkt.length))
         val session = completeServerHello(reply, clientNonce, clientPub, eph)
         this.sessionId = session.sessionId
         this.sessionKey = session.sessionKey
@@ -69,20 +73,59 @@ class RptClientEngine(
         return session
     }
 
+    /** Seal IP packet with product pad (RPTP) then pack DATA; caller should outer-wrap for UDP. */
     fun sealPacket(ipPacket: ByteArray): ByteArray {
         val sid = sessionId ?: error("no session")
         val key = sessionKey ?: error("no session")
         counterOut += 1
         val aad = sid + longToBytes(counterOut)
-        val (nonce, sealed) = aeadSeal(key, ipPacket, aad)
+        val body = RptTrafficShape.prepareOutbound(ipPacket)
+        val (nonce, sealed) = aeadSeal(key, body, aad)
         return packData(sid, counterOut, nonce, sealed)
     }
 
-    fun openPacket(frame: ByteArray): ByteArray {
+    /**
+     * Open a DATA frame (inner RPT2, after outer unwrap). Returns null if cover (RPTC).
+     * Throws if frame is not DATA or AEAD fails.
+     */
+    fun openPacketAllowCover(frame: ByteArray): ByteArray? {
         val key = sessionKey ?: error("no session")
         val (sid, counter, nonce, sealed) = parseData(frame)
         val aad = sid + longToBytes(counter)
-        return aeadOpen(key, nonce, sealed, aad)
+        val raw = aeadOpen(key, nonce, sealed, aad)
+        val (plain, isCover) = RptTrafficShape.interpretInbound(raw)
+        if (isCover) return null
+        return plain
+    }
+
+    fun openPacket(frame: ByteArray): ByteArray {
+        return openPacketAllowCover(frame)
+            ?: throw IllegalArgumentException("cover traffic frame")
+    }
+
+    /** Seal a cover (RPTC) DATA frame for traffic shaping. */
+    fun sealCoverFrame(size: Int = RptTrafficShape.PRODUCT_COVER_SIZE): ByteArray {
+        val sid = sessionId ?: error("no session")
+        val key = sessionKey ?: error("no session")
+        counterOut += 1
+        val aad = sid + longToBytes(counterOut)
+        val body = RptTrafficShape.makeCoverPayload(size)
+        val (nonce, sealed) = aeadSeal(key, body, aad)
+        return packData(sid, counterOut, nonce, sealed)
+    }
+
+    /** Product residual UDP send: seal then outer-wrap. */
+    fun sealAndWrapPacket(ipPacket: ByteArray): ByteArray =
+        RptObfuscation.maybeWrap(sealPacket(ipPacket))
+
+    fun sealAndWrapCover(): ByteArray =
+        RptObfuscation.maybeWrap(sealCoverFrame())
+
+    /** Product residual UDP recv: outer-unwrap then open DATA (null = cover). */
+    fun unwrapAndOpen(udpPayload: ByteArray): ByteArray? {
+        val inner = RptObfuscation.maybeUnwrap(udpPayload)
+        if (inner.size < 5 || inner[4] != 0x03.toByte()) return null
+        return openPacketAllowCover(inner)
     }
 
     // --- protocol ---

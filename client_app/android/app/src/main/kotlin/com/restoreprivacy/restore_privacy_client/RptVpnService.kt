@@ -299,14 +299,16 @@ class RptVpnService : VpnService() {
                 val outTun = FileOutputStream(pfd.fileDescriptor)
                 sock.soTimeout = 200
                 val endpoint = InetSocketAddress(host, port)
+                // Product residual: pad+cover on DATA + outer QUIC-mimic wrap (Python parity)
+                @Volatile var lastCoverMs = System.currentTimeMillis()
                 val tunToUdp = thread(name = "rpt-tun-up", isDaemon = true) {
                     val buf = ByteArray(32767)
                     while (running.get()) {
                         try {
                             val n = inTun.read(buf) // blocking read of VPN packets
                             if (n > 0) {
-                                val frame = engine.sealPacket(buf.copyOf(n))
-                                sock.send(DatagramPacket(frame, frame.size, endpoint))
+                                val wire = engine.sealAndWrapPacket(buf.copyOf(n))
+                                sock.send(DatagramPacket(wire, wire.size, endpoint))
                             } else if (n < 0) {
                                 break
                             }
@@ -321,8 +323,9 @@ class RptVpnService : VpnService() {
                         try {
                             val pkt = DatagramPacket(buf, buf.size)
                             sock.receive(pkt)
-                            if (pkt.length > 5 && buf[4] == 0x03.toByte()) {
-                                val plain = engine.openPacket(buf.copyOf(pkt.length))
+                            // Outer unwrap then open; null = cover (discard)
+                            val plain = engine.unwrapAndOpen(buf.copyOf(pkt.length))
+                            if (plain != null && plain.isNotEmpty()) {
                                 outTun.write(plain)
                                 outTun.flush()
                             }
@@ -331,8 +334,26 @@ class RptVpnService : VpnService() {
                         }
                     }
                 }
+                val coverThread = thread(name = "rpt-cover", isDaemon = true) {
+                    while (running.get()) {
+                        try {
+                            Thread.sleep(200)
+                            val now = System.currentTimeMillis()
+                            if (RptTrafficShape.PRODUCT_COVER &&
+                                now - lastCoverMs >= RptTrafficShape.PRODUCT_COVER_INTERVAL_MS
+                            ) {
+                                val wire = engine.sealAndWrapCover()
+                                sock.send(DatagramPacket(wire, wire.size, endpoint))
+                                lastCoverMs = now
+                            }
+                        } catch (_: Exception) {
+                            if (!running.get()) break
+                        }
+                    }
+                }
                 tunToUdp.join(Long.MAX_VALUE)
                 udpToTun.join(2_000)
+                coverThread.join(500)
                 try {
                     inTun.close()
                 } catch (_: Exception) {

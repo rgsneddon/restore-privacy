@@ -7,8 +7,10 @@ import CryptoKit
 /// (`node/server.py`). HELLO and subsequent DATA/KEEPALIVE **must** share one long-lived
 /// socket (same as Android DatagramSocket / Python sock).
 ///
-/// Product path uses **PFS**: ephemeral X25519 (`Curve25519.KeyAgreement`) in the HELLO
-/// hybrid payload and session IKM (`|pfs-x25519|`), matching Python `with_pfs=True`.
+/// Product residual parity with Python path:
+/// - **PFS**: ephemeral X25519 (`|pfs-x25519|`)
+/// - **Traffic shape**: RPTP pad + RPTC cover on DATA AEAD plaintext
+/// - **Outer obfs**: QUIC-mimic wrap/unwrap on UDP
 public final class RptClientEngine {
     public struct Session {
         public let sessionId: Data
@@ -179,12 +181,14 @@ public final class RptClientEngine {
             try sock.connect(host: host, port: port)
         }
         let (frame, clientNonce, clientPub) = try buildClientHello()
-        try sock.send(frame)
-        let reply = try sock.receive(timeout: timeout)
+        try sock.send(try RptObfuscation.maybeWrap(frame))
+        let outerReply = try sock.receive(timeout: timeout)
+        let reply = try RptObfuscation.maybeUnwrap(outerReply)
         return try completeServerHello(reply: reply, clientNonce: clientNonce, clientPub: clientPub)
     }
 
     // MARK: - DATA plane (shipped) — same transport as HELLO
+    // Product residual: pad (RPTP) / cover (RPTC) inside AEAD; outer wrap on UDP.
 
     public func sealPacket(_ ipPacket: Data) throws -> Data {
         guard let sid = sessionId, let keyBytes = sessionKey else {
@@ -194,12 +198,14 @@ public final class RptClientEngine {
         var aad = sid
         var c = counterOut.bigEndian
         aad.append(Data(bytes: &c, count: 8))
+        let body = try RptTrafficShape.prepareOutbound(ipPacket)
         let crypto = RptSessionCrypto(keyBytes: keyBytes)
-        let (nonce, sealed) = try crypto.seal(plaintext: ipPacket, aad: aad)
+        let (nonce, sealed) = try crypto.seal(plaintext: body, aad: aad)
         return RptProtocol.packData(sessionId: sid, counter: counterOut, nonce: nonce, sealed: sealed)
     }
 
-    public func openPacket(_ frame: Data) throws -> Data {
+    /// Open DATA after outer unwrap; returns nil if cover (RPTC).
+    public func openPacketAllowCover(_ frame: Data) throws -> Data? {
         guard let keyBytes = sessionKey else {
             throw RptProtocol.ProtocolError("no session")
         }
@@ -211,7 +217,31 @@ public final class RptClientEngine {
         var c = counter.bigEndian
         aad.append(Data(bytes: &c, count: 8))
         let crypto = RptSessionCrypto(keyBytes: keyBytes)
-        return try crypto.open(nonce: nonce, ciphertext: sealed, aad: aad)
+        let raw = try crypto.open(nonce: nonce, ciphertext: sealed, aad: aad)
+        let (plain, isCover) = try RptTrafficShape.interpretInbound(raw)
+        if isCover { return nil }
+        return plain
+    }
+
+    public func openPacket(_ frame: Data) throws -> Data {
+        guard let plain = try openPacketAllowCover(frame) else {
+            throw RptProtocol.ProtocolError("cover traffic frame")
+        }
+        return plain
+    }
+
+    public func sealCoverFrame(size: Int = RptTrafficShape.productCoverSize) throws -> Data {
+        guard let sid = sessionId, let keyBytes = sessionKey else {
+            throw RptProtocol.ProtocolError("no session")
+        }
+        counterOut += 1
+        var aad = sid
+        var c = counterOut.bigEndian
+        aad.append(Data(bytes: &c, count: 8))
+        let body = RptTrafficShape.makeCoverPayload(size: size)
+        let crypto = RptSessionCrypto(keyBytes: keyBytes)
+        let (nonce, sealed) = try crypto.seal(plaintext: body, aad: aad)
+        return RptProtocol.packData(sessionId: sid, counter: counterOut, nonce: nonce, sealed: sealed)
     }
 
     public func packKeepalive() throws -> Data {
@@ -219,23 +249,37 @@ public final class RptClientEngine {
         return RptProtocol.packKeepalive(sessionId: sid)
     }
 
-    /// Seal one IP packet and send on the HELLO transport (shipped dataplane path).
+    /// Seal + outer-wrap one IP packet and send on the HELLO transport.
     public func sendSealedPacket(_ ipPacket: Data) throws {
         guard let sock = transport else { throw RptProtocol.ProtocolError("no transport") }
         let frame = try sealPacket(ipPacket)
-        try sock.send(frame)
+        try sock.send(try RptObfuscation.maybeWrap(frame))
     }
 
-    /// Send KEEPALIVE on the HELLO transport.
+    public func sendCoverFrame() throws {
+        guard let sock = transport else { throw RptProtocol.ProtocolError("no transport") }
+        let frame = try sealCoverFrame()
+        try sock.send(try RptObfuscation.maybeWrap(frame))
+    }
+
+    /// Send KEEPALIVE on the HELLO transport (outer-wrapped).
     public func sendKeepalive() throws {
         guard let sock = transport else { throw RptProtocol.ProtocolError("no transport") }
-        try sock.send(try packKeepalive())
+        try sock.send(try RptObfuscation.maybeWrap(try packKeepalive()))
     }
 
-    /// Receive one UDP frame on the HELLO transport (non-blocking when timeout is small).
+    /// Receive one UDP frame, outer-unwrap; returns inner RPT frame.
     public func receiveFrame(timeout: TimeInterval = 0.05) throws -> Data {
         guard let sock = transport else { throw RptProtocol.ProtocolError("no transport") }
-        return try sock.receive(timeout: timeout)
+        let outer = try sock.receive(timeout: timeout)
+        return try RptObfuscation.maybeUnwrap(outer)
+    }
+
+    /// Receive and open DATA; returns nil for cover or non-DATA.
+    public func receiveAndOpenPacket(timeout: TimeInterval = 0.05) throws -> Data? {
+        let inner = try receiveFrame(timeout: timeout)
+        guard RptProtocol.peekType(inner) == .data else { return nil }
+        return try openPacketAllowCover(inner)
     }
 
     public func closeTransport() {

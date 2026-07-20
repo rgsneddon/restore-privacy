@@ -122,15 +122,13 @@ class TestIosNativePrepPfsWire(unittest.TestCase):
     def test_ios_nativeprep_has_pfs_dual_wire(self):
         _assert_swift_pfs_engine(SWIFT_IOS_NATIVEPREP, self)
 
-    def test_ios_nativeprep_matches_apple_shared_pfs(self):
-        """NativePrep must not lag apple_shared on PFS wire."""
-        shared = SWIFT_SHARED.read_bytes()
-        ios = SWIFT_IOS_NATIVEPREP.read_bytes()
-        self.assertEqual(
-            hashlib.sha256(shared).hexdigest(),
-            hashlib.sha256(ios).hexdigest(),
-            "ios NativePrep RptClientEngine.swift must match apple_shared PFS dual-wire",
-        )
+    def test_ios_nativeprep_includes_pad_cover_obfs(self):
+        """NativePrep embeds pad/cover/obfs (merged into engine for Xcode compile)."""
+        text = SWIFT_IOS_NATIVEPREP.read_text(encoding="utf-8")
+        self.assertIn("RPTP", text)
+        self.assertIn("RPTC", text)
+        self.assertIn("RptObfuscation", text)
+        self.assertIn("maybeWrap", text)
 
 
 class TestMacosNativePrepPfsWire(unittest.TestCase):
@@ -139,13 +137,13 @@ class TestMacosNativePrepPfsWire(unittest.TestCase):
     def test_macos_nativeprep_has_pfs_dual_wire(self):
         _assert_swift_pfs_engine(SWIFT_MACOS_NATIVEPREP, self)
 
-    def test_macos_nativeprep_matches_apple_shared_pfs(self):
-        shared = SWIFT_SHARED.read_bytes()
+    def test_macos_nativeprep_matches_ios_nativeprep(self):
+        ios = SWIFT_IOS_NATIVEPREP.read_bytes()
         mac = SWIFT_MACOS_NATIVEPREP.read_bytes()
         self.assertEqual(
-            hashlib.sha256(shared).hexdigest(),
+            hashlib.sha256(ios).hexdigest(),
             hashlib.sha256(mac).hexdigest(),
-            "macos NativePrep RptClientEngine.swift must match apple_shared PFS dual-wire",
+            "iOS and macOS NativePrep residual engines must stay aligned",
         )
 
 

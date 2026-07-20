@@ -7,8 +7,10 @@ import CryptoKit
 /// (`node/server.py`). HELLO and subsequent DATA/KEEPALIVE **must** share one long-lived
 /// socket (same as Android DatagramSocket / Python sock).
 ///
-/// Product path uses **PFS**: ephemeral X25519 (`Curve25519.KeyAgreement`) in the HELLO
-/// hybrid payload and session IKM (`|pfs-x25519|`), matching Python `with_pfs=True`.
+/// Product residual parity with Python path:
+/// - **PFS**: ephemeral X25519 (`|pfs-x25519|`)
+/// - **Traffic shape**: RPTP pad + RPTC cover on DATA AEAD plaintext
+/// - **Outer obfs**: QUIC-mimic wrap/unwrap on UDP
 public final class RptClientEngine {
     public struct Session {
         public let sessionId: Data
@@ -179,12 +181,14 @@ public final class RptClientEngine {
             try sock.connect(host: host, port: port)
         }
         let (frame, clientNonce, clientPub) = try buildClientHello()
-        try sock.send(frame)
-        let reply = try sock.receive(timeout: timeout)
+        try sock.send(try RptObfuscation.maybeWrap(frame))
+        let outerReply = try sock.receive(timeout: timeout)
+        let reply = try RptObfuscation.maybeUnwrap(outerReply)
         return try completeServerHello(reply: reply, clientNonce: clientNonce, clientPub: clientPub)
     }
 
     // MARK: - DATA plane (shipped) — same transport as HELLO
+    // Product residual: pad (RPTP) / cover (RPTC) inside AEAD; outer wrap on UDP.
 
     public func sealPacket(_ ipPacket: Data) throws -> Data {
         guard let sid = sessionId, let keyBytes = sessionKey else {
@@ -194,12 +198,14 @@ public final class RptClientEngine {
         var aad = sid
         var c = counterOut.bigEndian
         aad.append(Data(bytes: &c, count: 8))
+        let body = try RptTrafficShape.prepareOutbound(ipPacket)
         let crypto = RptSessionCrypto(keyBytes: keyBytes)
-        let (nonce, sealed) = try crypto.seal(plaintext: ipPacket, aad: aad)
+        let (nonce, sealed) = try crypto.seal(plaintext: body, aad: aad)
         return RptProtocol.packData(sessionId: sid, counter: counterOut, nonce: nonce, sealed: sealed)
     }
 
-    public func openPacket(_ frame: Data) throws -> Data {
+    /// Open DATA after outer unwrap; returns nil if cover (RPTC).
+    public func openPacketAllowCover(_ frame: Data) throws -> Data? {
         guard let keyBytes = sessionKey else {
             throw RptProtocol.ProtocolError("no session")
         }
@@ -211,7 +217,31 @@ public final class RptClientEngine {
         var c = counter.bigEndian
         aad.append(Data(bytes: &c, count: 8))
         let crypto = RptSessionCrypto(keyBytes: keyBytes)
-        return try crypto.open(nonce: nonce, ciphertext: sealed, aad: aad)
+        let raw = try crypto.open(nonce: nonce, ciphertext: sealed, aad: aad)
+        let (plain, isCover) = try RptTrafficShape.interpretInbound(raw)
+        if isCover { return nil }
+        return plain
+    }
+
+    public func openPacket(_ frame: Data) throws -> Data {
+        guard let plain = try openPacketAllowCover(frame) else {
+            throw RptProtocol.ProtocolError("cover traffic frame")
+        }
+        return plain
+    }
+
+    public func sealCoverFrame(size: Int = RptTrafficShape.productCoverSize) throws -> Data {
+        guard let sid = sessionId, let keyBytes = sessionKey else {
+            throw RptProtocol.ProtocolError("no session")
+        }
+        counterOut += 1
+        var aad = sid
+        var c = counterOut.bigEndian
+        aad.append(Data(bytes: &c, count: 8))
+        let body = RptTrafficShape.makeCoverPayload(size: size)
+        let crypto = RptSessionCrypto(keyBytes: keyBytes)
+        let (nonce, sealed) = try crypto.seal(plaintext: body, aad: aad)
+        return RptProtocol.packData(sessionId: sid, counter: counterOut, nonce: nonce, sealed: sealed)
     }
 
     public func packKeepalive() throws -> Data {
@@ -219,23 +249,37 @@ public final class RptClientEngine {
         return RptProtocol.packKeepalive(sessionId: sid)
     }
 
-    /// Seal one IP packet and send on the HELLO transport (shipped dataplane path).
+    /// Seal + outer-wrap one IP packet and send on the HELLO transport.
     public func sendSealedPacket(_ ipPacket: Data) throws {
         guard let sock = transport else { throw RptProtocol.ProtocolError("no transport") }
         let frame = try sealPacket(ipPacket)
-        try sock.send(frame)
+        try sock.send(try RptObfuscation.maybeWrap(frame))
     }
 
-    /// Send KEEPALIVE on the HELLO transport.
+    public func sendCoverFrame() throws {
+        guard let sock = transport else { throw RptProtocol.ProtocolError("no transport") }
+        let frame = try sealCoverFrame()
+        try sock.send(try RptObfuscation.maybeWrap(frame))
+    }
+
+    /// Send KEEPALIVE on the HELLO transport (outer-wrapped).
     public func sendKeepalive() throws {
         guard let sock = transport else { throw RptProtocol.ProtocolError("no transport") }
-        try sock.send(try packKeepalive())
+        try sock.send(try RptObfuscation.maybeWrap(try packKeepalive()))
     }
 
-    /// Receive one UDP frame on the HELLO transport (non-blocking when timeout is small).
+    /// Receive one UDP frame, outer-unwrap; returns inner RPT frame.
     public func receiveFrame(timeout: TimeInterval = 0.05) throws -> Data {
         guard let sock = transport else { throw RptProtocol.ProtocolError("no transport") }
-        return try sock.receive(timeout: timeout)
+        let outer = try sock.receive(timeout: timeout)
+        return try RptObfuscation.maybeUnwrap(outer)
+    }
+
+    /// Receive and open DATA; returns nil for cover or non-DATA.
+    public func receiveAndOpenPacket(timeout: TimeInterval = 0.05) throws -> Data? {
+        let inner = try receiveFrame(timeout: timeout)
+        guard RptProtocol.peekType(inner) == .data else { return nil }
+        return try openPacketAllowCover(inner)
     }
 
     public func closeTransport() {
@@ -360,4 +404,207 @@ public final class RptUDPTransport {
 
     /// File descriptor for select/poll loops (Packet Tunnel dataplane).
     public var fileDescriptor: Int32 { fd }
+}
+
+// MARK: - Traffic shape (product parity with node/traffic_shape.py)
+/// Product traffic-shape helpers — mirrors `node/traffic_shape.py`.
+///
+/// Wire (AEAD plaintext):
+///   Real padded: RPTP || u16_be(len) || plain || random_pad
+///   Cover dummy: RPTC || random_bytes
+public enum RptTrafficShape {
+    public static let padMagic = Data("RPTP".utf8)
+    public static let coverMagic = Data("RPTC".utf8)
+    public static let productPadBucket: Int = 128
+    public static let productCoverSize: Int = 128
+    public static let productCoverIntervalS: TimeInterval = 2.0
+    public static let productPadding: Bool = true
+    public static let productCover: Bool = true
+
+    public static func padPayload(_ plain: Data, bucket: Int = productPadBucket) throws -> Data {
+        guard plain.count <= 65535 else {
+            throw RptProtocol.ProtocolError("plain too large for u16 length")
+        }
+        let b = max(16, min(2048, bucket))
+        var lenBe = UInt16(plain.count).bigEndian
+        var body = Data(bytes: &lenBe, count: 2)
+        body.append(plain)
+        let padLen = (b - (body.count % b)) % b
+        var out = padMagic
+        out.append(body)
+        if padLen > 0 {
+            var pad = Data(count: padLen)
+            _ = pad.withUnsafeMutableBytes {
+                SecRandomCopyBytes(kSecRandomDefault, padLen, $0.baseAddress!)
+            }
+            out.append(pad)
+        }
+        return out
+    }
+
+    public static func makeCoverPayload(size: Int = productCoverSize) -> Data {
+        let n = max(16, min(2048, size))
+        var noise = Data(count: n - coverMagic.count)
+        _ = noise.withUnsafeMutableBytes {
+            SecRandomCopyBytes(kSecRandomDefault, noise.count, $0.baseAddress!)
+        }
+        var out = coverMagic
+        out.append(noise)
+        return out
+    }
+
+    /// Returns (payload, isCover). Unmarked blobs treated as raw IP (compat).
+    public static func unpadPayload(_ blob: Data) throws -> (Data, Bool) {
+        if blob.count >= 4, blob.prefix(4) == coverMagic {
+            return (Data(), true)
+        }
+        if blob.count < 4 || blob.prefix(4) != padMagic {
+            return (blob, false)
+        }
+        let rest = blob.dropFirst(4)
+        guard rest.count >= 2 else {
+            throw RptProtocol.ProtocolError("truncated padded payload")
+        }
+        let n = Int(rest[rest.startIndex]) << 8 | Int(rest[rest.startIndex + 1])
+        guard rest.count >= 2 + n else {
+            throw RptProtocol.ProtocolError("padded payload length exceeds buffer")
+        }
+        let start = rest.index(rest.startIndex, offsetBy: 2)
+        let end = rest.index(start, offsetBy: n)
+        return (Data(rest[start..<end]), false)
+    }
+
+    public static func prepareOutbound(_ ipPacket: Data, padding: Bool = productPadding) throws -> Data {
+        if padding { return try padPayload(ipPacket) }
+        return ipPacket
+    }
+
+    public static func interpretInbound(_ blob: Data) throws -> (Data?, Bool) {
+        let (plain, isCover) = try unpadPayload(blob)
+        if isCover { return (nil, true) }
+        return (plain, false)
+    }
+}
+
+// MARK: - Outer obfuscation (product parity with node/obfuscation.py)
+/// Outer QUIC-mimic layer — mirrors `node/obfuscation.py`.
+///
+/// Product residual UDP is not bare RPT2 alone; wrap outbound / unwrap inbound.
+public enum RptObfuscation {
+    public static let obfsVersion: UInt32 = 0x5250_5431 // 'RPT1'
+    private static let rptMagic = Data("RPT2".utf8)
+    /// Same public product key material as Python `_PRODUCT_OBFS_KEY` (32 bytes).
+    private static let productObfsKey: Data = {
+        var k = Data("RPT-OBFS-LAYER-v1".utf8)
+        k.append(Data(repeating: 0, count: 7))
+        k.append(contentsOf: [0x9a, 0x3c, 0x7e, 0x11, 0xd4, 0x55, 0x88, 0x02])
+        return k
+    }()
+
+    public static let productObfsEnabled: Bool = true
+
+    public static func looksLikeBareRpt(_ data: Data) -> Bool {
+        data.count >= 5 && data.prefix(4) == rptMagic
+    }
+
+    public static func looksLikeObfs(_ data: Data) -> Bool {
+        guard data.count >= 1 + 4 + 1 + 8 + 1 + 2 + 12 else { return false }
+        guard (data[0] & 0xC0) == 0xC0 else { return false }
+        let ver = data.subdata(in: 1..<5).withUnsafeBytes { $0.load(as: UInt32.self).bigEndian }
+        return ver == obfsVersion
+    }
+
+    private static func streamMask(nonce: Data, length: Int) -> Data {
+        var out = Data()
+        var counter: UInt32 = 0
+        while out.count < length {
+            var material = productObfsKey
+            material.append(nonce)
+            var c = counter.bigEndian
+            material.append(Data(bytes: &c, count: 4))
+            let h = Data(SHA256.hash(data: material))
+            out.append(h)
+            counter += 1
+        }
+        return Data(out.prefix(length))
+    }
+
+    private static func xor(_ data: Data, mask: Data) -> Data {
+        precondition(mask.count >= data.count)
+        var out = Data(count: data.count)
+        for i in 0..<data.count {
+            out[i] = data[i] ^ mask[i]
+        }
+        return out
+    }
+
+    public static func wrapFrame(_ inner: Data) throws -> Data {
+        guard !inner.isEmpty else {
+            throw RptProtocol.ProtocolError("empty inner frame")
+        }
+        var flagsByte: UInt8 = 0xC0
+        var r: UInt8 = 0
+        _ = withUnsafeMutableBytes(of: &r) { SecRandomCopyBytes(kSecRandomDefault, 1, $0.baseAddress!) }
+        flagsByte |= (r & 0x0F)
+        var dcid = Data(count: 8)
+        _ = dcid.withUnsafeMutableBytes { SecRandomCopyBytes(kSecRandomDefault, 8, $0.baseAddress!) }
+        var nonce = Data(count: 12)
+        _ = nonce.withUnsafeMutableBytes { SecRandomCopyBytes(kSecRandomDefault, 12, $0.baseAddress!) }
+        let mask = streamMask(nonce: nonce, length: inner.count)
+        let body = xor(inner, mask: mask)
+        guard body.count <= 0xFFFF else {
+            throw RptProtocol.ProtocolError("inner frame too large")
+        }
+        var out = Data()
+        out.append(flagsByte)
+        var ver = obfsVersion.bigEndian
+        out.append(Data(bytes: &ver, count: 4))
+        out.append(8) // dcid_len
+        out.append(dcid)
+        out.append(0) // scid_len
+        var plen = UInt16(body.count).bigEndian
+        out.append(Data(bytes: &plen, count: 2))
+        out.append(nonce)
+        out.append(body)
+        return out
+    }
+
+    public static func unwrapFrame(_ outer: Data, allowBare: Bool = true) throws -> Data {
+        if allowBare, looksLikeBareRpt(outer) { return outer }
+        guard looksLikeObfs(outer) else {
+            throw RptProtocol.ProtocolError("not an RPT obfuscated frame")
+        }
+        var o = 0
+        o += 1 // flags
+        o += 4 // version
+        let dcidLen = Int(outer[o]); o += 1
+        guard dcidLen == 8 else {
+            throw RptProtocol.ProtocolError("unexpected dcid_len")
+        }
+        o += dcidLen
+        let scidLen = Int(outer[o]); o += 1
+        o += scidLen
+        guard o + 2 + 12 <= outer.count else {
+            throw RptProtocol.ProtocolError("truncated outer")
+        }
+        let plen = Int(outer[o]) << 8 | Int(outer[o + 1])
+        o += 2
+        let nonce = outer.subdata(in: o..<(o + 12))
+        o += 12
+        guard o + plen <= outer.count else {
+            throw RptProtocol.ProtocolError("truncated body")
+        }
+        let body = outer.subdata(in: o..<(o + plen))
+        let mask = streamMask(nonce: nonce, length: plen)
+        return xor(body, mask: mask)
+    }
+
+    public static func maybeWrap(_ inner: Data, enabled: Bool = productObfsEnabled) throws -> Data {
+        if enabled { return try wrapFrame(inner) }
+        return inner
+    }
+
+    public static func maybeUnwrap(_ outer: Data, enabled: Bool = productObfsEnabled) throws -> Data {
+        try unwrapFrame(outer, allowBare: true)
+    }
 }

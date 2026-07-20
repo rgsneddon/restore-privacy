@@ -33,18 +33,18 @@ Restore Privacy **0.2.2** ships clients and public catalog aligned to the **Flok
 | **PFS product default** | `require_pfs` on node/client product path; legacy lab-only |
 | **Key rotation** | `node/key_rotation.py` + public re-provision; no shared client priv |
 | **PQ readiness** | `docs/PQ_MIGRATION.md` + `node/pq_hybrid.py` hybrid IKM hook (not residual PQ wire) |
+| **Native residual wire parity** | Android + iOS/macOS NativePrep: **PFS + RPTP/RPTC pad/cover + outer QUIC-mimic obfs** dual-wired to Python product DATA path |
 | **Multi-hop** | Hop *list* config only; not residual multi-hop |
 
-**Overall posture:** **Strong** alignment for residual honesty (`residual_ip_capture`), no public live count, no-phones-home Connect, packaging strip of `*.priv`, tunnel DNS + DoT upstream, kill-switch/IPv6, obfuscation+traffic-shape with honest DPI limits.
+**Overall posture:** **Strong** alignment for residual honesty (`residual_ip_capture`), no public live count, no-phones-home Connect, packaging strip of `*.priv`, tunnel DNS + DoT upstream, kill-switch/IPv6, and **product wire parity** (Python + native residual engines: pad/cover/obfs/PFS) with honest DPI limits.
 
 **Primary residual risks (open by design / environment):**
 
 1. **Operational** — VPS/CDN/provider IP-level logging outside product no-log (privacy §4).  
-2. **Apple** — residual IP still requires signed Packet Tunnel / NE; 0.2.2 macOS/iOS zips may be prep packages.  
+2. **Apple** — residual IP still requires signed Packet Tunnel / NE; public zips may be prep packages.  
 3. **Linux privilege floor** — residual needs root + TUN/`ip` (M4).  
 4. **IPv6** — mitigation blocks ISP IPv6 path; node is still primarily IPv4 data-plane.  
-5. **Traffic analysis** — padding/jitter/cover are mitigations, not undetectability guarantees.  
-6. **Mobile wire parity** — Android/Apple native engines may lag Python pad/cover/PFS wire extensions (honest staging).
+5. **Traffic analysis** — padding/jitter/cover/outer obfs are mitigations, not undetectability guarantees.
 
 ---
 
@@ -56,7 +56,7 @@ Restore Privacy **0.2.2** ships clients and public catalog aligned to the **Flok
 |------|--------|
 | Shared client | `client/connect.py`, `endpoint.py`, `full_tunnel.py`, `secrets_loader.py`, `multihop.py`, `dataplane.py`, `product_policy.py`, `legal_links.py` |
 | Windows / Linux | `client/windows/*`, `client/linux/*` |
-| Mobile / Apple | `client_app/` Flutter + NativePrep |
+| Mobile / Apple | `client_app/` Flutter + NativePrep residual engines (PFS/pad/cover/obfs) |
 | Node | `node/*` (handshake, pfs, traffic_shape, crypto_session, nolog, install scripts) |
 | Public web | `status_page/*` catalog **v0.2.2** |
 | Packaging | `scripts/build_release_0.2.2.py`, `package_linux.py`, `selfhost_node.sh` |
@@ -122,7 +122,7 @@ Restore Privacy **0.2.2** ships clients and public catalog aligned to the **Flok
 | L1 | Historical `build_release_0.*.py` surface | Accepted; use current-tag script |
 | L2 | Local `dist/`/`build/` hygiene | gitignored |
 | L4 | manylinux ABI matrix | Re-run `package_linux.py` each tag |
-| L5 | Mobile/native PFS/pad parity lag | Documented; Python path primary |
+| L5 | *(closed)* Mobile/native pad–cover–obfs–PFS lag | Dual-wired on Android + NativePrep iOS/macOS; gates in `test_native_parity_wire` / `test_native_pfs_wire` |
 
 ### 4.5 Info / strengths
 
@@ -140,6 +140,7 @@ Restore Privacy **0.2.2** ships clients and public catalog aligned to the **Flok
 | I10 | Multi-hop status honesty (not routed / entry-only) |
 | I11 | Self-host one-shot script |
 | I12 | Product traffic-shape on by default + Settings legal links |
+| I13 | Native residual pad/cover/obfs/PFS parity with Python DATA path |
 
 ---
 
@@ -193,17 +194,17 @@ Restore Privacy **0.2.2** ships clients and public catalog aligned to the **Flok
 
 ## 8. Recommendations (non-binding)
 
-1. Rebuild/sign Apple packages on a Mac with 0.2.2 sources before marketing residual Apple.  
-2. Redeploy status page (Render) so catalog picks up **0.2.2**.  
-3. Wire Android/Apple engines to Python pad/cover/PFS wire when residual native path is ready.  
-4. Optional next privacy: real multi-hop residual relay (only then flip `MULTI_HOP_ROUTING_IMPLEMENTED`); deepen native mobile kill-switch/obfs.  
+1. Rebuild/sign Apple packages on a Mac from current `main` (NativePrep pad/cover/obfs/PFS) before marketing residual Apple.  
+2. Redeploy status page (Render) so catalog picks up current release tag.  
+3. *(done)* Native residual pad/cover/obfs/PFS dual-wire — keep NativePrep hash-aligned with apple_shared helpers.  
+4. Optional next privacy: real multi-hop residual relay (only then flip `MULTI_HOP_ROUTING_IMPLEMENTED`).  
 5. Ops: keep Unbound tunnel-only; no public :53; provider log awareness.  
 
 ---
 
 ## 9. Conclusion
 
-**0.2.2** is consistent on core privacy promises, enables product DATA traffic shaping by default with honest DPI limits, surfaces audit/privacy/licence from Settings, and keeps multi-hop **honest** (config / entry-only). Remaining Medium items are privilege/environment and incomplete TA resistance — not silent product dishonesty.
+**0.2.2+** is consistent on core privacy promises, enables product DATA traffic shaping / outer obfuscation / PFS by default on **Python and native residual engines** (Android + Apple NativePrep), surfaces audit/privacy/licence from Settings, and keeps multi-hop **honest** (config / entry-only). Remaining Medium items are privilege/environment and incomplete TA resistance — not silent product dishonesty.
 
 Re-run after major releases or crypto/packaging changes.
 
@@ -217,11 +218,12 @@ Re-run after major releases or crypto/packaging changes.
 | UK geo removal | Closed |
 | Release gates / secrets | In place |
 | Node pub pin + Android refresh | Closed in product |
-| PFS + traffic_shape product default on | In tree (Python path) |
+| PFS + traffic_shape product default on | In tree (Python + native residual engines) |
 | Settings legal links | In tree (Windows + Flutter) |
 | Multi-hop residual | **Not done** (config only) |
 | Self-host recipe | In tree |
-| Kill-switch + DoT DNS + outer obfs | In tree (Python path) |
+| Kill-switch + DoT DNS + outer obfs | In tree (Python + native residual outer wrap) |
+| Native pad/cover/obfs/PFS parity | **Done** (Android + iOS/macOS NativePrep; structural gates) |
 
 ---
 
