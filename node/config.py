@@ -50,9 +50,13 @@ def build_node_config(
         "routing": routing_config_block(),
         "ui": {
             "title": "RESTORE PRIVACY",
-            "show_client_count": True,
+            # Public status is title-only; never publish live client counts.
+            "show_client_count": False,
             "show_client_identities": False,
             "show_client_ips": False,
+            # Optional in-memory aggregates are process-wide only (not public).
+            "aggregate_metrics_only": True,
+            "publish_aggregate_metrics": False,
         },
     }
     return apply_no_log_policy(raw)
@@ -81,8 +85,9 @@ def render_node_config_text(config: dict[str, Any] | None = None) -> str:
         f"EnableIPForward = true",
         f"NATMasquerade = true",
         "UITitle = RESTORE PRIVACY",
-        "UIShowClientCount = true",
+        "UIShowClientCount = false",
         "UIShowClientIdentities = false",
+        "UIPublishAggregateMetrics = false",
         "LoggingEnabled = false",
         "ConnectionLog = false",
         "SessionLog = false",
@@ -128,8 +133,15 @@ def validate_node_config(config: dict[str, Any]) -> list[str]:
     ui = config.get("ui") or {}
     if ui.get("title") != "RESTORE PRIVACY":
         violations.append("ui.title must be RESTORE PRIVACY")
+    if ui.get("show_client_count"):
+        violations.append("ui.show_client_count must be False (public status is title-only)")
     if ui.get("show_client_identities") or ui.get("show_client_ips"):
         violations.append("ui must not show identities/ips")
+    if ui.get("publish_aggregate_metrics"):
+        violations.append(
+            "ui.publish_aggregate_metrics must be False "
+            "(aggregates stay internal; public status stays minimal)"
+        )
     violations.extend(assert_no_log_config(config))
     violations.extend(assert_routing_enabled(config))
     return violations

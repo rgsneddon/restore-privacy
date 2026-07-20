@@ -116,8 +116,10 @@ class SessionRegistry:
     def status_payload(self) -> dict:
         """Public status: product title only — no live client count field.
 
-        Session registry still prunes idle sessions for routing; count is never
-        published on the public UI/API surface.
+        Session registry still prunes idle sessions for routing; count and any
+        aggregate bandwidth counters are never published on the public UI/API.
         """
         self.expire_stale()
-        return {"title": "RESTORE PRIVACY"}
+        from node.aggregate_metrics import filter_public_status
+
+        return filter_public_status({"title": "RESTORE PRIVACY"})

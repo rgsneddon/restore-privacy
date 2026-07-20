@@ -90,12 +90,15 @@ DEFAULT_UPSTREAM = "http://82.221.101.241:8080/api/status"
 UPSTREAM_STATUS_URL = os.environ.get("RPT_STATUS_UPSTREAM", DEFAULT_UPSTREAM).strip()
 FETCH_TIMEOUT_SEC = float(os.environ.get("RPT_STATUS_TIMEOUT", "4"))
 
-# Fields that must never appear on the public surface
+# Fields that must never appear on the public surface (counts, identities, lists,
+# or even node-wide aggregates — public page stays title + downloads only).
 FORBIDDEN_STATUS_KEYS = frozenset(
     {
         "clients_connected",
         "current_clients",
         "active_sessions",
+        "live_clients",
+        "connected_clients",
         "total",
         "total_clients",
         "clients_total",
@@ -106,24 +109,64 @@ FORBIDDEN_STATUS_KEYS = frozenset(
         "history",
         "ip",
         "ips",
+        "client_ip",
+        "client_ips",
         "clients",
         "sessions",
+        "session_ids",
+        "session_list",
+        "per_client",
+        "per_session",
+        "by_client",
+        "by_session",
+        "client_id",
+        "client_ids",
+        "user",
+        "users",
+        "username",
+        "identity",
+        "identities",
+        "bandwidth_per_client",
+        "bytes_per_client",
+        "client_bandwidth",
+        "session_bandwidth",
+        # Aggregates stay off the public page (internal node monitoring only)
+        "total_bytes_in",
+        "total_bytes_out",
+        "total_bytes_relayed",
+        "total_datagrams_in",
+        "total_datagrams_out",
+        "process_uptime_sec",
+        "bandwidth",
+        "bytes",
     }
 )
 
+# Only these keys may appear in public status JSON (upstream_ok is transport meta).
+ALLOWED_PUBLIC_STATUS_KEYS = frozenset({"title"})
+
 
 def normalize_status(data: dict | None) -> dict:
-    """Map upstream JSON to public title only — never a live client count."""
+    """Map upstream JSON to public title only — never counts, lists, or aggregates."""
     data = data or {}
+    # Explicitly drop forbidden keys even if an allow-list miss occurs later
+    for key in list(data.keys()):
+        if str(key).lower() in FORBIDDEN_STATUS_KEYS or str(key) in FORBIDDEN_STATUS_KEYS:
+            continue
     return {
         "title": str(data.get("title", "RESTORE PRIVACY")),
     }
 
 
 def public_status_payload(status: dict) -> dict:
-    """Strict public JSON: product title only (no clients_connected)."""
+    """Strict public JSON: product title only (no clients_connected / aggregates)."""
     safe = normalize_status(status)
-    return {"title": safe["title"]}
+    # Hard allow-list — never pass through unexpected fields
+    out = {"title": safe["title"]}
+    for k in list(out.keys()):
+        if k not in ALLOWED_PUBLIC_STATUS_KEYS:
+            del out[k]
+    return out
 
 
 def fetch_upstream_status() -> dict:
@@ -200,7 +243,7 @@ def render_html(status: dict, poll_ms: int | None = None) -> bytes:
   <img class="brand-logo" src="/logo.png" width="96" height="96" alt="Restore Privacy logo"/>
   <h1>{title_safe}</h1>
 {render_beta_note_html()}
-  <p class="tagline">Download the client for your platform. No public live session counter.</p>
+  <p class="tagline">Download the client for your platform. No public live session counter or per-client metrics.</p>
 {downloads_html}
 </body>
 </html>

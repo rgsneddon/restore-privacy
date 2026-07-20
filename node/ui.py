@@ -7,10 +7,12 @@ import threading
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from typing import Callable
 
+from node.aggregate_metrics import filter_public_status
+
 
 def public_status_from_payload(payload: dict) -> dict:
-    """Strip any count/session fields from a status callback for public HTTP."""
-    return {"title": str((payload or {}).get("title", "RESTORE PRIVACY"))}
+    """Strip counts/sessions/IPs/aggregates from a status callback for public HTTP."""
+    return filter_public_status(payload or {})
 
 
 def make_handler(get_status: Callable[[], dict]):

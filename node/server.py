@@ -36,6 +36,7 @@ from node.routing import (
     build_sysctl_forward_commands,
     detect_wan_iface_command,
 )
+from node.aggregate_metrics import process_counters
 from node.sessions import Session, SessionRegistry
 from node.ui import start_ui_server
 
@@ -239,7 +240,11 @@ class RPTNode:
                     vpn_ip=vpn_ip,
                 )
                 self.registry.add(sess)
-                sock.sendto(maybe_wrap(reply), addr)
+                out = maybe_wrap(reply)
+                sock.sendto(out, addr)
+                # Aggregate only — never attribute HELLO bytes to a client id
+                process_counters().record_inbound(len(data))
+                process_counters().record_outbound(len(out))
             elif t == MsgType.DATA:
                 session_id, counter, nonce, sealed = parse_data(data)
                 sess = self.registry.get(session_id)
@@ -247,6 +252,8 @@ class RPTNode:
                     return
                 # Refresh liveness under registry lock (idle prune for routing)
                 self.registry.touch(session_id, addr)
+                # Process-wide bandwidth only (no per-client metric store)
+                process_counters().record_inbound(len(data))
                 aad = session_id + struct.pack("!Q", counter)
                 try:
                     plaintext, is_cover = sess.crypto.open_allow_cover(
@@ -264,6 +271,7 @@ class RPTNode:
             elif t == MsgType.KEEPALIVE:
                 sid = parse_keepalive(data)
                 self.registry.touch(sid, addr)
+                process_counters().record_inbound(len(data))
         except Exception:
             return
 
@@ -279,7 +287,9 @@ class RPTNode:
         nonce, sealed = sess.crypto.seal(packet, aad=aad)
         frame = pack_data(sess.session_id, sess.counter_out, nonce, sealed)
         try:
-            sock.sendto(maybe_wrap(frame), sess.client_addr)
+            wire = maybe_wrap(frame)
+            sock.sendto(wire, sess.client_addr)
+            process_counters().record_outbound(len(wire))
         except OSError:
             return
 
