@@ -4,47 +4,49 @@
 |-------|--------|
 | **Product** | Restore Privacy Tunnel (RPT) |
 | **Repository** | `restore_privacy` |
-| **Version under review** | **0.2.2** (`client/VERSION`, catalog `RELEASE_VERSION` / `RELEASE_TAG`) |
+| **Version under review** | **0.2.3** (`client/VERSION`, catalog `RELEASE_VERSION` / `RELEASE_TAG`) |
 | **Production node** | **82.221.101.241:44044** (UDP); status UI TCP 8080 |
-| **Audit date** | 20 July 2026 (**0.2.2 ship pass**); threat-model scenarios refreshed |
-| **Prior passes** | 0.1.8 first-pass; 0.2.0 ship; 0.2.1 docs; UK geo strip; DNS/IPv6; node pub pin; traffic-shape/PFS/multi-hop config; monitoring aggregates |
+| **Audit date** | 20 July 2026 (**0.2.3 ship pass**) |
+| **Prior passes** | 0.1.8–0.2.2 ship/docs; UK geo strip; DNS/IPv6; node pub pin; traffic-shape/PFS; native parity; monitoring; threat model; FDE; ephemeral nodes |
 | **Audit type** | Static code + policy consistency (not a pen-test or multi-OS residual red-team) |
-| **Auditor method** | Tree scan, endpoint/catalog alignment, packaging gates, security/policy unit suite; documented threat scenarios |
+| **Auditor method** | Tree scan, endpoint/catalog alignment, packaging gates, security/policy unit suite; threat scenarios; release no-priv |
 
 ---
 
 ## 1. Executive summary
 
-Restore Privacy **0.2.2** ships clients and public catalog aligned to the **FlokiNET** node at **82.221.101.241**, with product **traffic shaping enabled by default** on the Windows/Linux Python DATA path, Settings links to audit / privacy policy / end user licence, and docs aligned.
+Restore Privacy **0.2.3** ships clients and public catalog aligned to the **FlokiNET** node at **82.221.101.241**, carrying forward **0.2.2** defaults (traffic shape, Settings legal links, PFS/obfs) and adding **Settings transparency**, **licence gate**, **aggregate-only monitoring**, **threat-model education**, **LUKS FDE / wipe ops**, and **ephemeral node rebuild** tooling.
 
 **Core privacy thesis:** **no user-info logs**, **minimal public status** (title + downloads — **no live client count**), **honest Connected** when residual full tunnel is active, **device Ed25519 keys** (no shared client private key in packages), **no third-party geo on Connect**.
 
-**New / updated privacy hardening (this pass):**
+**New / updated privacy hardening (0.2.3 pass):**
 
 | Area | Status |
 |------|--------|
 | **Public client count removed** | Status page HTML/API + node UI/API title-only; registry keeps internal size for routing only |
-| Session **PFS** (ephemeral X25519 → session AEAD IKM) | Shipped on Python handshake path |
-| **Layer obfuscation** (QUIC-mimic outer wrap) | **On by default** (`RPT_OBFS`); client+node DATA/HELLO path |
-| **Traffic shape** (pad / jitter / cover) | **On by default**; opt out `RPT_TRAFFIC_SHAPE=0` |
-| **Kill switch + IPv6 + WebRTC surface** | Windows/Linux firewall helpers + STUN/mDNS block; Android blocking flags |
-| **Node DoT DNS** | Unbound tunnel-only + DoT forward; clients DNS=`10.88.0.1` only |
-| **HSM/TPM-class key backend** | `node/key_backend.py` file\|mock\|sealed; product HELLO decrypt via backend |
-| **PFS product default** | `require_pfs` on node/client product path; legacy lab-only |
-| **Key rotation** | `node/key_rotation.py` + public re-provision; no shared client priv |
-| **PQ readiness** | `docs/PQ_MIGRATION.md` + `node/pq_hybrid.py` hybrid IKM hook (not residual PQ wire) |
-| **Native residual wire parity** | Android + iOS/macOS NativePrep: **PFS + RPTP/RPTC pad/cover + outer QUIC-mimic obfs** dual-wired to Python product DATA path |
+| Session **PFS** (ephemeral X25519 → session AEAD IKM) | Python + native residual dual-wire |
+| **Layer obfuscation** (QUIC-mimic outer wrap) | **On by default**; product key **33 bytes** (Python/Kotlin/Swift) |
+| **Traffic shape** (pad / jitter / cover) | **On by default** product residual DATA path |
+| **Native residual wire parity** | Android + iOS/macOS NativePrep pad/cover/obfs/PFS |
+| **Settings transparency** | Local connection log (exportable), leak test, DPI mitigation disclaimer |
+| **Licence gate** | Accept end-user licence before Connect / autoconnect; local-only store |
+| **Anon registration honesty** | No admin/operator verification for device key; OS elevation for residual is separate |
+| **Aggregate monitoring** | Process-wide bandwidth only; never per-client; not on public status |
+| **Threat model docs** | audit §4.6 + PRIVACY_POLICY + README (VPS / ISP / device seizure) |
+| **LUKS/dm-crypt FDE + wipe** | Operator scripts; compose with no-log; at-rest honesty |
+| **Ephemeral short-lived nodes** | Periodic snapshot/rebuild plan; dry-run default |
 | **Multi-hop** | Hop *list* config only; not residual multi-hop |
 
-**Overall posture:** **Strong** alignment for residual honesty (`residual_ip_capture`), no public live count, no-phones-home Connect, packaging strip of `*.priv`, tunnel DNS + DoT upstream, kill-switch/IPv6, and **product wire parity** (Python + native residual engines: pad/cover/obfs/PFS) with honest DPI limits.
+**Overall posture:** **Strong** alignment for residual honesty (`residual_ip_capture`), no public live count, no-phones-home Connect, packaging strip of `*.priv`, tunnel DNS + DoT, kill-switch/IPv6, native wire parity, user-facing honesty (licence, DPI, threat model), and operator at-rest/ephemeral tooling — without over-claiming DPI-undetectability or multi-hop residual.
 
 **Primary residual risks (open by design / environment):**
 
-1. **Operational** — VPS/CDN/provider IP-level logging outside product no-log (privacy §4).  
-2. **Apple** — residual IP still requires signed Packet Tunnel / NE; public zips may be prep packages.  
+1. **Operational** — VPS/CDN/provider IP-level logging outside product no-log (privacy §4 / threat model).  
+2. **Apple** — residual IP still requires signed Packet Tunnel / NE; public zips may be prep packages (**APPLE_HANDOFF_0.2.3**).  
 3. **Linux privilege floor** — residual needs root + TUN/`ip` (M4).  
 4. **IPv6** — mitigation blocks ISP IPv6 path; node is still primarily IPv4 data-plane.  
-5. **Traffic analysis** — padding/jitter/cover/outer obfs are mitigations, not undetectability guarantees.
+5. **Traffic analysis** — padding/jitter/cover/outer obfs are mitigations, not undetectability guarantees.  
+6. **FDE / wipe / rebuild** — protect at-rest or reduce on-host state only; not provider snapshots/netflow; unlocked root still sees secrets.
 
 ---
 
@@ -58,13 +60,13 @@ Restore Privacy **0.2.2** ships clients and public catalog aligned to the **Flok
 | Windows / Linux | `client/windows/*`, `client/linux/*` |
 | Mobile / Apple | `client_app/` Flutter + NativePrep residual engines (PFS/pad/cover/obfs) |
 | Node | `node/*` (handshake, pfs, traffic_shape, crypto_session, nolog, install scripts) |
-| Public web | `status_page/*` catalog **v0.2.2** |
-| Packaging | `scripts/build_release_0.2.2.py`, `package_linux.py`, `selfhost_node.sh` |
+| Public web | `status_page/*` catalog **v0.2.3** |
+| Packaging | `scripts/build_release_0.2.3.py`, `package_linux.py`, `selfhost_node.sh` |
 | Policies | `PRIVACY_POLICY.md`, `LICENSE`, `CREDITS.md`, `README.md`, `sundries.txt`, `audit.md` |
 
 ### 2.2 Method notes
 
-- Version surfaces: `client/VERSION` == catalog **0.2.2**.  
+- Version surfaces: `client/VERSION` == catalog **0.2.3**.  
 - Product default host **82.221.101.241** (not 104.156.224.47).  
 - Product node ElGamal pub pin: `PRODUCT_NODE_ELGAMAL_PUB_SHA256` / `product/NODE_ELGAMAL_PUB.sha256`.  
 - Spot-checked `_assert_no_priv`, multi-hop honesty flags, traffic_shape product default **on**.  
@@ -75,7 +77,7 @@ Restore Privacy **0.2.2** ships clients and public catalog aligned to the **Flok
 ## 3. Architecture snapshot
 
 ```
-[Clients 0.2.2 → 82.221.101.241:44044]
+[Clients 0.2.3 → 82.221.101.241:44044]
         |  RPT2 HELLO (Ed25519 + ElGamal hybrid + optional X25519 PFS)
         |  sealed DATA (± product pad / cover by default on Python path)
         v
@@ -134,7 +136,7 @@ Restore Privacy **0.2.2** ships clients and public catalog aligned to the **Flok
 | I4 | Public status minimization (no client count) |
 | I5 | Node no-log + host privacy install script |
 | I6 | Tunnel DNS default 10.88.0.1 (node Unbound) |
-| I7 | Version surfaces aligned at **0.2.2** |
+| I7 | Version surfaces aligned at **0.2.3** |
 | I8 | MIT + CREDITS present |
 | I9 | PFS unit tests (long-term-only fail) |
 | I10 | Multi-hop status honesty (not routed / entry-only) |
@@ -194,7 +196,7 @@ Durable product-honest scenarios for operators and users. Update this section wh
 | No shared client priv | Strip/generate device key | Aligned |
 | Residual only with full tunnel | Product gates | Aligned |
 | No third-party geo on Connect | No phones-home tests | Aligned |
-| Catalog v0.2.2 + node 82.221… | downloads + endpoint | Aligned |
+| Catalog v0.2.3 + node 82.221… | downloads + endpoint | Aligned |
 | Multi-hop residual | Config only; active=False | Aligned (honest) |
 | PFS session keys | X25519 in handshake KDF | Aligned (Python path) |
 | Traffic shape | Product default **on**; opt-out env | Aligned |
@@ -208,9 +210,9 @@ Durable product-honest scenarios for operators and users. Update this section wh
 | Result | Detail |
 |--------|--------|
 | **Target** | Exit 0 on supporting suite |
-| **Log** | SCRATCH / `tests_0.2.2.log` |
+| **Log** | SCRATCH / `tests_0.2.3.log` / `audit_0.2.3.log` |
 
-### 6.1 Package host credibility (0.2.2)
+### 6.1 Package host credibility (0.2.3)
 
 | Expectation | Notes |
 |-------------|--------|
@@ -226,7 +228,7 @@ Durable product-honest scenarios for operators and users. Update this section wh
 |---------|--------|
 | `secrets/` gitignored | Yes |
 | Installer strip `*.priv` | Yes |
-| `_assert_no_priv` on release | Yes (`build_release_0.2.2.py`) |
+| `_assert_no_priv` on release | Yes (`build_release_0.2.3.py`) |
 | Product `node_elgamal.pub` tracked | Yes (`product/`) |
 | Never force-add secrets | Documented |
 | This audit embeds no keys | Confirmed |
@@ -245,7 +247,7 @@ Durable product-honest scenarios for operators and users. Update this section wh
 
 ## 9. Conclusion
 
-**0.2.2+** is consistent on core privacy promises, enables product DATA traffic shaping / outer obfuscation / PFS by default on **Python and native residual engines** (Android + Apple NativePrep), surfaces audit/privacy/licence from Settings, and keeps multi-hop **honest** (config / entry-only). Remaining Medium items are privilege/environment and incomplete TA resistance — not silent product dishonesty.
+**0.2.3** is consistent on core privacy promises, enables product DATA traffic shaping / outer obfuscation / PFS on **Python and native residual engines**, adds Settings transparency + licence gate + threat-model education, keeps public status minimal (aggregate metrics internal only), and ships operator FDE/ephemeral rebuild tooling without over-claim. Multi-hop remains **honest** (config / entry-only). Remaining Medium items are privilege/environment and incomplete TA resistance — not silent product dishonesty.
 
 Re-run after major releases or crypto/packaging changes.
 
@@ -275,6 +277,6 @@ Re-run after major releases or crypto/packaging changes.
 | Item | |
 |------|--|
 | Output | `audit.md` (repo root) |
-| Related | `PRIVACY_POLICY.md` (Threat model), `README.md` (Threat model), `scripts/RELEASE_NOTES_0.2.2.md` |
-| Code baseline | 0.2.2 ship + node 82.221.101.241 |
+| Related | `PRIVACY_POLICY.md` (Threat model), `README.md` (Threat model), `scripts/RELEASE_NOTES_0.2.3.md` |
+| Code baseline | 0.2.3 ship + node 82.221.101.241 |
 | Threat scenarios | §4.6 — re-review on each major release |

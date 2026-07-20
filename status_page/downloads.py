@@ -1,4 +1,4 @@
-"""Release download link catalog for the public status page (version 0.2.2).
+"""Release download link catalog for the public status page (version 0.2.3).
 
 Public page advertises Windows, Android, macOS, iOS, and Linux packages.
 """
@@ -8,10 +8,10 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Iterable
 
-RELEASE_VERSION = "0.2.2"
+RELEASE_VERSION = "0.2.3"
 GITHUB_OWNER = "rgsneddon"
 GITHUB_REPO = "restore-privacy"
-RELEASE_TAG = "0.2.2"
+RELEASE_TAG = "0.2.3"
 
 # Canonical public asset filenames (must match GitHub Release assets).
 WINDOWS_EXE_FILENAME = f"restore-privacy-client-{RELEASE_VERSION}-windows-x64-setup.exe"
@@ -35,7 +35,7 @@ class DownloadAsset:
         )
 
 
-# Artifacts attached to GitHub Release 0.2.2
+# Artifacts attached to GitHub Release 0.2.3
 RELEASE_ASSETS: tuple[DownloadAsset, ...] = (
     DownloadAsset(
         platform="windows",

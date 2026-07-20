@@ -89,7 +89,7 @@ class TestConnectViaWebHttp(unittest.TestCase):
                 self.assertNotIn("fetch('/api/status'", html)
                 self.assertNotIn("Connect via web", html)
                 # Downloads present; connect-via-web section remains off
-                self.assertIn("releases/download/0.2.2/", html)
+                self.assertIn("releases/download/0.2.3/", html)
 
 
 if __name__ == "__main__":

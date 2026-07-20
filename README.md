@@ -5,7 +5,7 @@
 
 | | |
 |--|--|
-| **Get the app** | [Download v0.2.2](https://github.com/rgsneddon/restore-privacy/releases/tag/0.2.2) · [Status & downloads](https://restore-privacy-status.onrender.com/) |
+| **Get the app** | [Download v0.2.3](https://github.com/rgsneddon/restore-privacy/releases/tag/0.2.3) · [Status & downloads](https://restore-privacy-status.onrender.com/) |
 | **Privacy** | [PRIVACY_POLICY.md](PRIVACY_POLICY.md) |
 | **License** | [LICENSE](LICENSE) (MIT) |
 | **Credits** | [CREDITS.md](CREDITS.md) |
@@ -39,21 +39,21 @@
 
 ## How to install and use
 
-Download packages from the **[0.2.2 release](https://github.com/rgsneddon/restore-privacy/releases/tag/0.2.2)**  
+Download packages from the **[0.2.3 release](https://github.com/rgsneddon/restore-privacy/releases/tag/0.2.3)**  
 or use the buttons on https://restore-privacy-status.onrender.com/
 
 | Platform | Package |
 |----------|---------|
-| Windows | `restore-privacy-client-0.2.2-windows-x64-setup.exe` |
-| Android | `restore-privacy-client-0.2.2-android.apk` |
-| macOS | `restore-privacy-client-0.2.2-macos.zip` *(prep zip / sign on Mac — see below)* |
-| iOS | `restore-privacy-client-0.2.2-ios.zip` *(prep zip / sign on Mac — see below)* |
-| Ubuntu / Linux | `restore-privacy-client-0.2.2-linux-x64.tar.gz` *(installer package; crypto deps baked in)* |
+| Windows | `restore-privacy-client-0.2.3-windows-x64-setup.exe` |
+| Android | `restore-privacy-client-0.2.3-android.apk` |
+| macOS | `restore-privacy-client-0.2.3-macos.zip` *(prep zip / sign on Mac — see below)* |
+| iOS | `restore-privacy-client-0.2.3-ios.zip` *(prep zip / sign on Mac — see below)* |
+| Ubuntu / Linux | `restore-privacy-client-0.2.3-linux-x64.tar.gz` *(installer package; crypto deps baked in)* |
 
 ### Windows
 
 1. Download the **Windows installer (.exe)** from the release or status page.
-2. Run **`restore-privacy-client-0.2.2-windows-x64-setup.exe`**.  
+2. Run **`restore-privacy-client-0.2.3-windows-x64-setup.exe`**.  
    It installs the full client (**bundled runtime + Wintun + dependencies** — **no separate Python install**), creates **Privacy Restored** shortcuts with the **logo** icon, and can launch the app.
 3. Press **Connect** and approve **UAC** when prompted so residual public IP uses the VPN node.
 4. Optional: open **Settings** and enable **Run at device startup** and/or **Autoconnect on launch** (both default **off**). Settings also links to the audit, privacy policy, and end user licence.
@@ -70,11 +70,11 @@ or use the buttons on https://restore-privacy-status.onrender.com/
 
 **Supported floor:** Ubuntu **20.04 LTS and newer** (22.04, 24.04, …) and Mint/Pop built on those bases. Python **3.8+**.
 
-1. Download **`restore-privacy-client-0.2.2-linux-x64.tar.gz`** from the release or status page.
+1. Download **`restore-privacy-client-0.2.3-linux-x64.tar.gz`** from the release or status page.
 2. Unpack and run the **bundled installer** (crypto wheels baked in — no network `pip install cryptography`):
    ```bash
-   tar xzf restore-privacy-client-0.2.2-linux-x64.tar.gz
-   cd restore-privacy-0.2.2-linux
+   tar xzf restore-privacy-client-0.2.3-linux-x64.tar.gz
+   cd restore-privacy-0.2.3-linux
    bash install.sh
    ```
 3. Run the GUI (**root** needed so residual public IP uses the VPN node):
@@ -87,21 +87,21 @@ or use the buttons on https://restore-privacy-status.onrender.com/
 
 ### macOS / iOS (continue on a Mac)
 
-Release zips for **0.2.2** are **prep packages** for sideload / further signing — **Mac work required**. Residual public IP does **not** change until Packet Tunnel / Network Extension is signed and active; host-side HELLO alone is **diagnostic** only.
+Release zips for **0.2.3** are **prep packages** for sideload / further signing — **Mac work required**. Residual public IP does **not** change until Packet Tunnel / Network Extension is signed and active; host-side HELLO alone is **diagnostic** only.
 
-1. Download **`restore-privacy-client-0.2.2-macos.zip`** or **`restore-privacy-client-0.2.2-ios.zip`**, or clone this repo and open `client_app/` on macOS.
+1. Download **`restore-privacy-client-0.2.3-macos.zip`** or **`restore-privacy-client-0.2.3-ios.zip`**, or clone this repo and open `client_app/` on macOS.
 2. Checklist:
    - [`client_app/APPLE_BUILD.md`](client_app/APPLE_BUILD.md)
    - [`client_app/macos/BUILD_ON_MAC.md`](client_app/macos/BUILD_ON_MAC.md)
    - [`client_app/ios/BUILD_ON_MAC.md`](client_app/ios/BUILD_ON_MAC.md)
-   - Mac handoff: [`client_app/APPLE_HANDOFF_0.2.2.md`](client_app/APPLE_HANDOFF_0.2.2.md) (or prior `APPLE_HANDOFF_0.2.1.md` if not yet copied)
+   - Mac handoff: [`client_app/APPLE_HANDOFF_0.2.3.md`](client_app/APPLE_HANDOFF_0.2.3.md) (or prior `APPLE_HANDOFF_0.2.2.md` if not yet copied)
 3. Packages may ship the **public** node key (`node_elgamal.pub`). Each install **generates its own Ed25519 device key on first run**. Packages **do **not** ship a shared** `client_ed25519.priv`. Never ship `node_elgamal.priv`.
 
 ### Status page
 
 https://restore-privacy-status.onrender.com/
 
-- **Download** buttons for Windows, Android, macOS, iOS, and Linux (catalog **v0.2.2**)  
+- **Download** buttons for Windows, Android, macOS, iOS, and Linux (catalog **v0.2.3**)  
 - **No** public live session / connected-client counter  
 - **Connect via web** (if present in docs) explains that a browser tab cannot run full system VPN  
 
@@ -156,7 +156,7 @@ Node deploy, ports, secrets, from-source builds, and tests: **[sundries.txt](sun
 
 **Post-quantum readiness:** staged hybrid Kyber/ML-KEM hook in `node/pq_hybrid.py` + plan [`docs/PQ_MIGRATION.md`](docs/PQ_MIGRATION.md) (not residual PQ on the wire until dual-wire + real ML-KEM).
 
-**0.2.2 release:** Production node **82.221.101.241:44044**. Product traffic-shape **on by default**. See [scripts/RELEASE_NOTES_0.2.2.md](scripts/RELEASE_NOTES_0.2.2.md). Prefer upgrading from 0.2.1 so Settings legal links and shaping policy stay current.
+**0.2.3 release:** Production node **82.221.101.241:44044**. Settings transparency, licence gate, native wire parity, FDE/ephemeral ops tooling. See [scripts/RELEASE_NOTES_0.2.3.md](scripts/RELEASE_NOTES_0.2.3.md). Prefer upgrading from 0.2.2.
 
 **Self-host (one shot):** `sudo bash scripts/selfhost_node.sh` — node install + tunnel DNS + host privacy. Details: [sundries.txt](sundries.txt).
 
@@ -166,7 +166,7 @@ Node deploy, ports, secrets, from-source builds, and tests: **[sundries.txt](sun
 
 **Ephemeral / short-lived nodes:** [scripts/ephemeral_node.py](scripts/ephemeral_node.py) — **periodic** VPS **snapshot** and/or **rebuild** plan (`--dry-run` by default). Install timer: [scripts/install_ephemeral_timer.sh](scripts/install_ephemeral_timer.sh). Live rebuild requires `RPT_EPHEMERAL_CONFIRM=yes`. Rebuild re-runs self-host (no-log). Does not erase provider backups/netflow; re-ship **public** node pin if keys rotate.
 
-**Release scripts:** Use **scripts/build_release_0.2.2.py**. Re-run `python scripts/package_linux.py` each tag for manylinux wheels.
+**Release scripts:** Use **scripts/build_release_0.2.3.py**. Re-run `python scripts/package_linux.py` each tag for manylinux wheels. Apple: [APPLE_HANDOFF_0.2.3.md](client_app/APPLE_HANDOFF_0.2.3.md).
 
 ```bash
 # Windows GUI (requires system Python)
@@ -179,5 +179,5 @@ sudo PYTHONPATH=. python3 -m client.linux
 python scripts/package_linux.py
 
 # Release packages (current tag)
-python scripts/build_release_0.2.2.py
+python scripts/build_release_0.2.3.py
 ```

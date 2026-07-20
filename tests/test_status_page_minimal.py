@@ -34,7 +34,7 @@ class TestPublicPageWithDownloads(unittest.TestCase):
         self.assertNotIn("fetch('/api/status'", html)
         self.assertNotIn("setInterval(poll", html)
         # Download buttons for current catalog exe + apk
-        self.assertIn("Download client v0.2.2", html)
+        self.assertIn("Download client v0.2.3", html)
         self.assertIn(WINDOWS_EXE_FILENAME, html)
         self.assertIn(ANDROID_APK_FILENAME, html)
         self.assertIn(".exe", html)
@@ -69,10 +69,10 @@ class TestPublicPageWithDownloads(unittest.TestCase):
                     self.assertIn("https://x.com/rgsneddon", html)
                     self.assertNotIn("clients-connected", html)
                     self.assertNotIn("fetch('/api/status'", html)
-                    self.assertIn("Download client v0.2.2", html)
+                    self.assertIn("Download client v0.2.3", html)
                     self.assertIn(WINDOWS_EXE_FILENAME, html)
                     self.assertIn(ANDROID_APK_FILENAME, html)
-                    self.assertIn("/releases/download/0.2.2/", html)
+                    self.assertIn("/releases/download/0.2.3/", html)
         finally:
             httpd.shutdown()
             httpd.server_close()

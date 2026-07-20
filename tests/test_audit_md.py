@@ -44,7 +44,7 @@ class TestAuditMd(unittest.TestCase):
         text = AUDIT.read_text(encoding="utf-8")
         # Current ship version (accept 0.2.x catalog / audit header)
         self.assertTrue(
-            "0.2.2" in text or "0.2.1" in text or "0.2.0" in text or "0.1.8" in text,
+            "0.2.3" in text or "0.2.1" in text or "0.2.0" in text or "0.1.8" in text,
             "audit.md must cite the current or prior reviewed product version",
         )
         # Severity labels used in findings

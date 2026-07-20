@@ -27,7 +27,7 @@ class TestDownloadCatalog(unittest.TestCase):
         ver = (ROOT / "client" / "VERSION").read_text(encoding="utf-8").strip()
         self.assertEqual(RELEASE_VERSION, ver)
         self.assertEqual(RELEASE_TAG, ver)
-        self.assertEqual(RELEASE_VERSION, "0.2.2")
+        self.assertEqual(RELEASE_VERSION, "0.2.3")
 
     def test_public_assets_include_all_platforms(self):
         assets = available_downloads()
