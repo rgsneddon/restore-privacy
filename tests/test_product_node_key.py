@@ -30,6 +30,7 @@ from client.secrets_loader import (  # noqa: E402
     load_client_private_key,
     load_node_elgamal_public,
 )
+from node.obfuscation import maybe_unwrap, maybe_wrap  # noqa: E402
 from node.protocol import MsgType, peek_type  # noqa: E402
 
 
@@ -117,11 +118,14 @@ class TestLiveHelloWithProductKey(unittest.TestCase):
             node_pub = ElGamalPublicKey.import_bytes(product.read_bytes())
             frame, nonce, cpub, _eph = build_authorized_client_hello(priv, node_pub)
             self.assertEqual(frame[:5], b"RPT2\x01")
+            # Product wire (Rust node + device releases) uses outer QUIC-mimic obfs.
+            wire = maybe_wrap(frame)
+            self.assertNotEqual(wire[:4], b"RPT2", "product HELLO must be obfuscated")
             sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
             sock.settimeout(12.0)
             try:
-                sock.sendto(frame, (PRODUCT_NODE_HOST, DEFAULT_ENDPOINT.port))
-                reply, _addr = sock.recvfrom(65535)
+                sock.sendto(wire, (PRODUCT_NODE_HOST, DEFAULT_ENDPOINT.port))
+                raw_reply, _addr = sock.recvfrom(65535)
             except (TimeoutError, socket.timeout) as exc:
                 self.fail(
                     f"No SERVER_HELLO from {PRODUCT_NODE_HOST}:{DEFAULT_ENDPOINT.port} "
@@ -131,6 +135,7 @@ class TestLiveHelloWithProductKey(unittest.TestCase):
             finally:
                 sock.close()
 
+            reply = maybe_unwrap(raw_reply)
             self.assertEqual(peek_type(reply), MsgType.SERVER_HELLO)
             sess = complete_server_hello(reply, nonce, cpub, _eph)
             self.assertTrue(sess.vpn_ip.startswith("10.88.0."))
