@@ -6,6 +6,8 @@ import 'package:url_launcher/url_launcher.dart';
 import 'connection_log.dart';
 import 'leak_test.dart';
 import 'legal_links.dart';
+import 'licence_gate.dart';
+import 'registration_copy.dart';
 import 'settings_store.dart';
 import 'theme.dart';
 import 'transparency_copy.dart';
@@ -37,6 +39,8 @@ class SettingsScreen extends StatefulWidget {
     required this.initial,
     this.onChanged,
     this.connectionLog,
+    this.licenceGate,
+    this.onLicenceChanged,
     this.residualCaptureActive = false,
     this.ipv6Protected = false,
   });
@@ -47,6 +51,8 @@ class SettingsScreen extends StatefulWidget {
 
   /// Injectable log for tests; production creates a SharedPreferences backend.
   final ConnectionLog? connectionLog;
+  final LicenceGate? licenceGate;
+  final ValueChanged<bool>? onLicenceChanged;
 
   /// Current tunnel residual posture (from home / native status when known).
   final bool residualCaptureActive;
@@ -64,13 +70,33 @@ class _SettingsScreenState extends State<SettingsScreen> {
   String? _leakResult;
   ConnectionLog? _log;
   List<ConnectionLogEvent> _events = const [];
+  bool _licenceAccepted = false;
 
   @override
   void initState() {
     super.initState();
     _settings = widget.initial;
     _log = widget.connectionLog;
-    WidgetsBinding.instance.addPostFrameCallback((_) => _ensureLog());
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      await _ensureLog();
+      final ok = await widget.licenceGate?.mayConnect() ?? false;
+      if (mounted) setState(() => _licenceAccepted = ok);
+    });
+  }
+
+  Future<void> _acceptLicence() async {
+    final gate = widget.licenceGate;
+    if (gate == null) {
+      setState(() => _note = 'Licence store unavailable on this build.');
+      return;
+    }
+    await gate.acceptLicence();
+    widget.onLicenceChanged?.call(true);
+    if (!mounted) return;
+    setState(() {
+      _licenceAccepted = true;
+      _note = 'Licence accepted (stored locally only). Connect is unlocked.';
+    });
   }
 
   Future<void> _ensureLog() async {
@@ -259,6 +285,55 @@ class _SettingsScreenState extends State<SettingsScreen> {
             '(startup launches the app; autoconnect starts the VPN). '
             'OS VPN permission / Administrator may still be required.',
             style: TextStyle(color: kTextMuted, fontSize: 12),
+          ),
+          const SizedBox(height: 20),
+          Text(
+            kLicencePromptTitle,
+            style: TextStyle(
+              color: kPrimaryDark,
+              fontSize: 14,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            _licenceAccepted
+                ? 'Accepted on this device. Connect is allowed.'
+                : 'Not accepted — Connect is blocked until you accept.',
+            style: const TextStyle(fontSize: 12, color: kText),
+          ),
+          const SizedBox(height: 6),
+          const Text(
+            kShortLicenceSummary,
+            style: TextStyle(fontSize: 12, color: kTextMuted),
+          ),
+          const SizedBox(height: 8),
+          Align(
+            alignment: Alignment.centerLeft,
+            child: FilledButton(
+              onPressed: _acceptLicence,
+              style: FilledButton.styleFrom(backgroundColor: kPrimary),
+              child: const Text(kLicenceAcceptButton),
+            ),
+          ),
+          const SizedBox(height: 12),
+          Text(
+            kAnonRegistrationTitle,
+            style: TextStyle(
+              color: kPrimaryDark,
+              fontSize: 14,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+          const SizedBox(height: 6),
+          const Text(
+            kAnonRegistrationSummary,
+            style: TextStyle(fontSize: 12, color: kTextMuted),
+          ),
+          const SizedBox(height: 6),
+          const Text(
+            kOsPrivilegeHonesty,
+            style: TextStyle(fontSize: 12, color: kTextMuted),
           ),
           const SizedBox(height: 20),
           Text(

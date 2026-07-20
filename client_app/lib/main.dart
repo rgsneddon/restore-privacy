@@ -4,7 +4,9 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import 'connect_status.dart';
 import 'connection_log.dart';
+import 'licence_gate.dart';
 import 'prefs_backend.dart';
+import 'registration_copy.dart';
 import 'settings_screen.dart';
 import 'settings_store.dart';
 import 'theme.dart';
@@ -49,15 +51,16 @@ class RestorePrivacyApp extends StatelessWidget {
   }
 }
 
-/// Windows-aligned product shell: logo, status card, Connect/Disconnect, Settings.
+/// Seamless product shell: hero status, Connect/Disconnect, Settings transparency.
 ///
 /// Minimize / background does **not** stop the tunnel — only Disconnect does.
-/// Autoconnect on launch is opt-in via Settings (defaults off).
+/// Licence acceptance is required before Connect; autoconnect cannot bypass it.
 class TunnelHome extends StatefulWidget {
-  const TunnelHome({super.key, this.settingsStore});
+  const TunnelHome({super.key, this.settingsStore, this.licenceGate});
 
   /// Injectable store for tests; production loads SharedPreferences.
   final SettingsStore? settingsStore;
+  final LicenceGate? licenceGate;
 
   @override
   State<TunnelHome> createState() => _TunnelHomeState();
@@ -66,6 +69,7 @@ class TunnelHome extends StatefulWidget {
 class _TunnelHomeState extends State<TunnelHome> with WidgetsBindingObserver {
   late final VpnController _vpn;
   SettingsStore? _store;
+  LicenceGate? _licence;
   ProductSettings _settings = ProductSettings.defaults;
   ConnectionLog? _connectionLog;
   final List<String> _log = [];
@@ -75,6 +79,7 @@ class _TunnelHomeState extends State<TunnelHome> with WidgetsBindingObserver {
   bool _connected = false;
   bool _busy = false;
   bool _autoconnectAttempted = false;
+  bool _licenceAccepted = false;
 
   @override
   void initState() {
@@ -86,8 +91,11 @@ class _TunnelHomeState extends State<TunnelHome> with WidgetsBindingObserver {
       if (!mounted) return;
       _append(kAppTitle);
       _append(kScrollingPrivacyText);
-      _append('Connect starts, Disconnect stops. Minimize keeps the VPN running.');
+      _append(kSeamlessHint);
       await _rehydrateSession(from: 'launch');
+      if (!_licenceAccepted) {
+        await _showLicenceSheet();
+      }
       await _maybeAutoconnect();
     });
   }
@@ -103,6 +111,27 @@ class _TunnelHomeState extends State<TunnelHome> with WidgetsBindingObserver {
         _store = SettingsStore(MemorySettingsBackend());
       }
     }
+    if (widget.licenceGate != null) {
+      _licence = widget.licenceGate;
+    } else {
+      try {
+        final prefs = await SharedPreferences.getInstance();
+        _licence = LicenceGate(
+          PrefsLicenceBackend(
+            (k) async => prefs.getBool(k),
+            (k, v) async {
+              await prefs.setBool(k, v);
+            },
+            (k) async => prefs.getString(k),
+            (k, v) async {
+              await prefs.setString(k, v);
+            },
+          ),
+        );
+      } catch (_) {
+        _licence = LicenceGate(MemoryLicenceBackend());
+      }
+    }
     try {
       final prefs = await SharedPreferences.getInstance();
       _connectionLog = ConnectionLog(PrefsConnectionLogBackend(prefs));
@@ -110,14 +139,98 @@ class _TunnelHomeState extends State<TunnelHome> with WidgetsBindingObserver {
       _connectionLog = ConnectionLog(MemoryConnectionLogBackend());
     }
     final loaded = await _store!.load();
+    final accepted = await _licence!.mayConnect();
     if (!mounted) return;
-    setState(() => _settings = loaded);
+    setState(() {
+      _settings = loaded;
+      _licenceAccepted = accepted;
+      if (!accepted) {
+        _status =
+            'Accept the licence, then press Connect for residual protection.';
+      }
+    });
   }
 
   Future<void> _connLog(String kind, String message) async {
     try {
       await _connectionLog?.appendEvent(kind, message);
     } catch (_) {}
+  }
+
+  Future<void> _showLicenceSheet() async {
+    if (!mounted) return;
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: kPanelBg,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      builder: (ctx) {
+        return Padding(
+          padding: const EdgeInsets.fromLTRB(20, 16, 20, 28),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Text(
+                kLicencePromptTitle,
+                style: TextStyle(
+                  color: kPrimaryDark,
+                  fontSize: 18,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+              const SizedBox(height: 10),
+              const Text(kShortLicenceSummary, style: TextStyle(fontSize: 13)),
+              const SizedBox(height: 10),
+              const Text(
+                kAnonRegistrationSummary,
+                style: TextStyle(fontSize: 12, color: kTextMuted),
+              ),
+              const SizedBox(height: 6),
+              const Text(
+                kOsPrivilegeHonesty,
+                style: TextStyle(fontSize: 12, color: kTextMuted),
+              ),
+              const SizedBox(height: 16),
+              FilledButton(
+                onPressed: () async {
+                  await _licence?.acceptLicence();
+                  if (!mounted) return;
+                  setState(() {
+                    _licenceAccepted = true;
+                    _status =
+                        'Licence accepted. Press Connect when you want protection.';
+                  });
+                  _append('Licence accepted (stored locally only).');
+                  Navigator.of(ctx).pop();
+                },
+                style: FilledButton.styleFrom(backgroundColor: kPrimary),
+                child: const Text(kLicenceAcceptButton),
+              ),
+              TextButton(
+                onPressed: () => Navigator.of(ctx).pop(),
+                child: const Text('Not now'),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Future<bool> assertMayConnect() async {
+    final gate = _licence;
+    if (gate == null) return false;
+    final r = await gate.assertMayConnect();
+    if (!r.ok) {
+      _append(r.message);
+      setState(() => _status = r.message);
+      await _showLicenceSheet();
+      return false;
+    }
+    return true;
   }
 
   Future<void> _maybeAutoconnect() async {
@@ -128,6 +241,11 @@ class _TunnelHomeState extends State<TunnelHome> with WidgetsBindingObserver {
     final s = await store.load();
     if (!store.shouldAutoconnectOnLaunch(s)) return;
     if (_connected || _busy) return;
+    // Never bypass licence on autoconnect.
+    if (!await assertMayConnect()) {
+      _append('Settings: autoconnect skipped — accept the end-user licence first.');
+      return;
+    }
     _append('Settings: autoconnect on launch — starting Connect…');
     await _onToggleConnectOnly();
   }
@@ -135,6 +253,7 @@ class _TunnelHomeState extends State<TunnelHome> with WidgetsBindingObserver {
   Future<void> _onToggleConnectOnly() async {
     // Connect path only (used by autoconnect)
     if (_busy || _connected) return;
+    if (!await assertMayConnect()) return;
     setState(() => _busy = true);
     try {
       _append('Connect — starting RPT full tunnel…');
@@ -257,8 +376,12 @@ class _TunnelHomeState extends State<TunnelHome> with WidgetsBindingObserver {
           store: store,
           initial: _settings,
           connectionLog: _connectionLog,
+          licenceGate: _licence,
           residualCaptureActive: _connected,
           ipv6Protected: _status.toLowerCase().contains('ipv6 isp path blocked'),
+          onLicenceChanged: (accepted) {
+            if (mounted) setState(() => _licenceAccepted = accepted);
+          },
           onChanged: (s) {
             if (mounted) setState(() => _settings = s);
           },
@@ -269,7 +392,11 @@ class _TunnelHomeState extends State<TunnelHome> with WidgetsBindingObserver {
       setState(() => _settings = updated);
     } else if (mounted) {
       final s = await store.load();
-      setState(() => _settings = s);
+      final accepted = await _licence?.mayConnect() ?? false;
+      setState(() {
+        _settings = s;
+        _licenceAccepted = accepted;
+      });
     }
   }
 
@@ -323,11 +450,11 @@ class _TunnelHomeState extends State<TunnelHome> with WidgetsBindingObserver {
                     ),
                   ),
                   const SizedBox(width: 12),
-                  const Expanded(
+                  Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(
+                        const Text(
                           kAppTitle,
                           style: TextStyle(
                             color: kPrimaryDark,
@@ -335,11 +462,20 @@ class _TunnelHomeState extends State<TunnelHome> with WidgetsBindingObserver {
                             fontSize: 18,
                           ),
                         ),
-                        Text(
+                        const Text(
                           kBannerTitle,
                           style: TextStyle(
                             color: kTextMuted,
                             fontSize: 12,
+                          ),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          kSeamlessTagline,
+                          style: TextStyle(
+                            color: kPrimary,
+                            fontSize: 11,
+                            fontWeight: FontWeight.w600,
                           ),
                         ),
                       ],
@@ -359,18 +495,56 @@ class _TunnelHomeState extends State<TunnelHome> with WidgetsBindingObserver {
                   borderRadius: BorderRadius.circular(kCornerRadius),
                   border: Border.all(color: kBorder),
                 ),
-                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
+                    Row(
+                      children: [
+                        const Expanded(
+                          child: Text(
+                            'VPN status',
+                            style: TextStyle(
+                              color: kTextMuted,
+                              fontSize: 11,
+                            ),
+                          ),
+                        ),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 8,
+                            vertical: 3,
+                          ),
+                          decoration: BoxDecoration(
+                            color: _licenceAccepted
+                                ? kLightAccent
+                                : const Color(0xFFFDECEC),
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: Text(
+                            _licenceAccepted
+                                ? 'Licence accepted'
+                                : 'Licence required',
+                            style: TextStyle(
+                              color: _licenceAccepted
+                                  ? kPrimaryDark
+                                  : kStatusError,
+                              fontSize: 11,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
                     Text(
                       _connected
                           ? plainConnectedStatus(vpnIp: _vpnIp, residual: true)
                           : 'Disconnected',
                       style: TextStyle(
                         color: statusColor,
-                        fontWeight: FontWeight.w600,
-                        fontSize: 15,
+                        fontWeight: FontWeight.w700,
+                        fontSize: 17,
                       ),
                     ),
                     const SizedBox(height: 4),
@@ -381,6 +555,19 @@ class _TunnelHomeState extends State<TunnelHome> with WidgetsBindingObserver {
                         fontSize: 12,
                       ),
                     ),
+                    if (!_licenceAccepted) ...[
+                      const SizedBox(height: 10),
+                      Align(
+                        alignment: Alignment.centerLeft,
+                        child: FilledButton(
+                          onPressed: _showLicenceSheet,
+                          style: FilledButton.styleFrom(
+                            backgroundColor: kPrimary,
+                          ),
+                          child: const Text(kLicenceAcceptButton),
+                        ),
+                      ),
+                    ],
                   ],
                 ),
               ),

@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
-"""Windows RPT client - sleek manual Connect/Disconnect UI.
+"""Windows RPT client — seamless Connect/Disconnect product shell.
 
-No auto-connect. Close does not disconnect (user must press Disconnect).
-Palette from restorebritain.org.uk/contact (Cupertino theme tokens).
+Licence acceptance required before Connect. Anonymous device registration
+(no admin verification). Residual tunnel may still elevate for OS routing.
+Close hides the window; Disconnect stops the tunnel.
 """
 
 from __future__ import annotations
@@ -67,6 +68,23 @@ from client.connection_log import (
     read_events,
 )
 from client.leak_test import run_product_leak_test
+from client.licence_gate import (
+    LICENCE_ACCEPT_BUTTON,
+    LICENCE_PROMPT_TITLE,
+    accept_licence,
+    assert_may_connect,
+    has_accepted_licence,
+    licence_url,
+    may_connect,
+    short_licence_summary,
+)
+from client.registration_copy import (
+    ANON_REGISTRATION_SUMMARY,
+    ANON_REGISTRATION_TITLE,
+    OS_PRIVILEGE_HONESTY,
+    SEAMLESS_HINT,
+    SEAMLESS_TAGLINE,
+)
 from client.transparency_copy import (
     CONNECTION_LOG_DISCLAIMER,
     CONNECTION_LOG_TITLE,
@@ -154,11 +172,11 @@ def layout_pack_bottom_controls_first() -> bool:
 
 
 class TunnelClientApp:
-    """Sleek shell: primary Connect/Disconnect, plain status panel, optional upgrade."""
+    """Seamless shell: hero status, Connect/Disconnect, Settings transparency."""
 
-    DEFAULT_GEOMETRY = "520x480"
-    MIN_WIDTH = 400
-    MIN_HEIGHT = 400
+    DEFAULT_GEOMETRY = "540x560"
+    MIN_WIDTH = 420
+    MIN_HEIGHT = 480
 
     def __init__(self) -> None:
         self.root = tk.Tk()
@@ -195,26 +213,26 @@ class TunnelClientApp:
             activebackground=PRIMARY,
             activeforeground=BUTTON_FG,
             disabledforeground=DISABLED_FG,
-            font=("Segoe UI", 13, "bold"),
+            font=("Segoe UI", 14, "bold"),
             relief=tk.FLAT,
             cursor="hand2",
             padx=20,
-            pady=14,
+            pady=16,
             bd=0,
             highlightthickness=0,
         )
-        self.connect_btn.pack(side=tk.TOP, fill=tk.X, pady=(10, 6), ipady=6)
+        self.connect_btn.pack(side=tk.TOP, fill=tk.X, pady=(10, 6), ipady=8)
 
         self.hint_row = tk.Frame(self.bottom, bg=CHROME_BG)
         self.hint_row.pack(side=tk.TOP, fill=tk.X)
         self.hint = tk.Label(
             self.hint_row,
-            text="Manual only - Connect starts, Disconnect stops. Close hides the window (VPN stays up).",
+            text=SEAMLESS_HINT,
             bg=CHROME_BG,
             fg=TEXT_MUTED,
             font=("Segoe UI", 8),
             anchor="w",
-            wraplength=380,
+            wraplength=400,
             justify=tk.LEFT,
         )
         self.hint.pack(side=tk.LEFT, fill=tk.X, expand=True)
@@ -271,6 +289,14 @@ class TunnelClientApp:
             font=("Segoe UI", 9),
             anchor="w",
         ).pack(fill=tk.X)
+        tk.Label(
+            title_col,
+            text=SEAMLESS_TAGLINE,
+            bg=CHROME_BG,
+            fg=PRIMARY,
+            font=("Segoe UI", 8, "bold"),
+            anchor="w",
+        ).pack(fill=tk.X, pady=(2, 0))
 
         # Settings cog (gear)
         self.settings_btn = tk.Button(
@@ -322,25 +348,40 @@ class TunnelClientApp:
                 pady=4,
             ).pack(side=tk.RIGHT, padx=(8, 0))
 
-        # --- Status card (plain language) ---
+        # --- Hero status card (plain language, residual-honest) ---
         self.status_card = tk.Frame(
             self.chrome,
             bg=PANEL_BG,
-            padx=PANEL_PAD,
-            pady=PANEL_PAD,
+            padx=PANEL_PAD + 4,
+            pady=PANEL_PAD + 4,
             highlightbackground=BORDER,
             highlightthickness=1,
         )
         self.status_card.pack(side=tk.TOP, fill=tk.X, pady=(0, 10))
 
+        hero_top = tk.Frame(self.status_card, bg=PANEL_BG)
+        hero_top.pack(fill=tk.X)
         tk.Label(
-            self.status_card,
+            hero_top,
             text="VPN status",
             bg=PANEL_BG,
             fg=TEXT_MUTED,
             font=("Segoe UI", 8),
             anchor="w",
-        ).pack(fill=tk.X)
+        ).pack(side=tk.LEFT, fill=tk.X, expand=True)
+        self._licence_badge_var = tk.StringVar(
+            value="Licence accepted" if may_connect() else "Licence required"
+        )
+        self._licence_badge = tk.Label(
+            hero_top,
+            textvariable=self._licence_badge_var,
+            bg=LIGHT_ACCENT if may_connect() else "#FDECEC",
+            fg=PRIMARY_DARK if may_connect() else STATUS_ERROR_FG,
+            font=("Segoe UI", 8, "bold"),
+            padx=8,
+            pady=2,
+        )
+        self._licence_badge.pack(side=tk.RIGHT)
 
         self.status_var = tk.StringVar(value=plain_tunnel_status("disconnected"))
         self.status_label = tk.Label(
@@ -348,14 +389,20 @@ class TunnelClientApp:
             textvariable=self.status_var,
             bg=PANEL_BG,
             fg=TEXT,
-            font=("Segoe UI", 14, "bold"),
+            font=("Segoe UI", 16, "bold"),
             anchor="w",
-            wraplength=440,
+            wraplength=460,
             justify=tk.LEFT,
         )
-        self.status_label.pack(fill=tk.X, pady=(4, 0))
+        self.status_label.pack(fill=tk.X, pady=(8, 0))
 
-        self.detail_var = tk.StringVar(value="Not connected. Press Connect when you want protection.")
+        self.detail_var = tk.StringVar(
+            value=(
+                "Accept the licence, then press Connect for residual protection."
+                if not may_connect()
+                else "Ready. Press Connect when you want residual protection."
+            )
+        )
         self.detail_label = tk.Label(
             self.status_card,
             textvariable=self.detail_var,
@@ -363,10 +410,34 @@ class TunnelClientApp:
             fg=TEXT_MUTED,
             font=("Segoe UI", 9),
             anchor="w",
-            wraplength=440,
+            wraplength=460,
             justify=tk.LEFT,
         )
         self.detail_label.pack(fill=tk.X, pady=(6, 0))
+
+        # Licence CTA when not yet accepted (seamless first-run)
+        self._licence_cta = tk.Frame(self.status_card, bg=PANEL_BG)
+        tk.Button(
+            self._licence_cta,
+            text=LICENCE_ACCEPT_BUTTON,
+            command=self._show_licence_prompt,
+            bg=PRIMARY,
+            fg=WHITE,
+            relief=tk.FLAT,
+            font=("Segoe UI", 9, "bold"),
+            cursor="hand2",
+            padx=12,
+            pady=5,
+        ).pack(side=tk.LEFT, pady=(10, 0))
+        tk.Label(
+            self._licence_cta,
+            text="Required once before Connect",
+            bg=PANEL_BG,
+            fg=TEXT_MUTED,
+            font=("Segoe UI", 8),
+        ).pack(side=tk.LEFT, padx=(10, 0), pady=(10, 0))
+        if not may_connect():
+            self._licence_cta.pack(fill=tk.X)
 
         # --- Concise activity log (secondary) ---
         tk.Label(
@@ -585,6 +656,131 @@ class TunnelClientApp:
                 residual=connected,  # product success path is residual full tunnel
             )
 
+    def _refresh_licence_badge(self) -> None:
+        accepted = may_connect()
+        try:
+            self._licence_badge_var.set(
+                "Licence accepted" if accepted else "Licence required"
+            )
+            self._licence_badge.configure(
+                bg=LIGHT_ACCENT if accepted else "#FDECEC",
+                fg=PRIMARY_DARK if accepted else STATUS_ERROR_FG,
+            )
+            if accepted:
+                self._licence_cta.pack_forget()
+            else:
+                self._licence_cta.pack(fill=tk.X)
+        except Exception:
+            pass
+
+    def _show_licence_prompt(self) -> None:
+        """First-run / Settings: accept end-user licence (local only)."""
+        win = tk.Toplevel(self.root)
+        win.title(LICENCE_PROMPT_TITLE)
+        win.configure(bg=CHROME_BG)
+        win.geometry("460x420")
+        win.transient(self.root)
+        try:
+            win.grab_set()
+        except Exception:
+            pass
+        pad = tk.Frame(win, bg=CHROME_BG, padx=16, pady=14)
+        pad.pack(fill=tk.BOTH, expand=True)
+        tk.Label(
+            pad,
+            text=LICENCE_PROMPT_TITLE,
+            bg=CHROME_BG,
+            fg=PRIMARY_DARK,
+            font=("Segoe UI", 14, "bold"),
+            anchor="w",
+        ).pack(fill=tk.X, pady=(0, 8))
+        tk.Label(
+            pad,
+            text=short_licence_summary(),
+            bg=CHROME_BG,
+            fg=TEXT,
+            font=("Segoe UI", 9),
+            anchor="w",
+            wraplength=420,
+            justify=tk.LEFT,
+        ).pack(fill=tk.X, pady=(0, 8))
+        tk.Label(
+            pad,
+            text=ANON_REGISTRATION_SUMMARY,
+            bg=CHROME_BG,
+            fg=TEXT_MUTED,
+            font=("Segoe UI", 8),
+            anchor="w",
+            wraplength=420,
+            justify=tk.LEFT,
+        ).pack(fill=tk.X, pady=(0, 4))
+        tk.Label(
+            pad,
+            text=OS_PRIVILEGE_HONESTY,
+            bg=CHROME_BG,
+            fg=TEXT_MUTED,
+            font=("Segoe UI", 8),
+            anchor="w",
+            wraplength=420,
+            justify=tk.LEFT,
+        ).pack(fill=tk.X, pady=(0, 10))
+
+        def _open_full() -> None:
+            try:
+                webbrowser.open(licence_url())
+            except Exception as exc:
+                self._log(f"Could not open licence: {exc}")
+
+        tk.Label(
+            pad,
+            text="View full end-user licence (LICENSE)",
+            bg=CHROME_BG,
+            fg=PRIMARY,
+            font=("Segoe UI", 9, "underline"),
+            cursor="hand2",
+            anchor="w",
+        ).pack(fill=tk.X)
+        pad.winfo_children()[-1].bind("<Button-1>", lambda _e: _open_full())
+
+        btn_row = tk.Frame(pad, bg=CHROME_BG)
+        btn_row.pack(fill=tk.X, pady=(16, 0))
+
+        def _do_accept() -> None:
+            accept_licence()
+            self._log("Licence accepted (stored locally only).")
+            self._connection_log("settings", "End-user licence accepted")
+            self._refresh_licence_badge()
+            self.detail_var.set("Licence accepted. Press Connect when ready.")
+            try:
+                win.destroy()
+            except Exception:
+                pass
+
+        tk.Button(
+            btn_row,
+            text=LICENCE_ACCEPT_BUTTON,
+            command=_do_accept,
+            bg=PRIMARY,
+            fg=WHITE,
+            relief=tk.FLAT,
+            font=("Segoe UI", 10, "bold"),
+            padx=14,
+            pady=8,
+            cursor="hand2",
+        ).pack(side=tk.LEFT)
+        tk.Button(
+            btn_row,
+            text="Not now",
+            command=win.destroy,
+            bg=CHROME_BG,
+            fg=TEXT_MUTED,
+            relief=tk.FLAT,
+            font=("Segoe UI", 9),
+            padx=10,
+            pady=8,
+            cursor="hand2",
+        ).pack(side=tk.LEFT, padx=(10, 0))
+
     def _on_toggle_connect(self) -> None:
         if self._busy:
             return
@@ -594,6 +790,15 @@ class TunnelClientApp:
             self._start_connect()
 
     def _start_connect(self) -> None:
+        # Licence gate — blocks Connect and autoconnect resume alike.
+        ok_lic, lic_msg = assert_may_connect()
+        if not ok_lic:
+            self._log(lic_msg)
+            self._set_status("error", detail=lic_msg)
+            self.detail_var.set(lic_msg)
+            self._show_licence_prompt()
+            return
+
         # Residual public IP needs Administrator (Wintun + dual /1). Elevate first.
         if product_connect_requires_admin() and not is_admin():
             self._apply_control(connected=False, busy=True)
@@ -892,6 +1097,80 @@ class TunnelClientApp:
             wraplength=400,
             justify=tk.LEFT,
         ).pack(fill=tk.X, pady=(8, 0))
+
+        # --- Licence + anonymous registration honesty ---
+        lic_card = tk.Frame(
+            pad,
+            bg=PANEL_BG,
+            highlightbackground=BORDER,
+            highlightthickness=1,
+            padx=12,
+            pady=8,
+        )
+        lic_card.pack(fill=tk.X, pady=(14, 0))
+        tk.Label(
+            lic_card,
+            text=LICENCE_PROMPT_TITLE,
+            bg=PANEL_BG,
+            fg=PRIMARY_DARK,
+            font=("Segoe UI", 10, "bold"),
+            anchor="w",
+        ).pack(fill=tk.X, pady=(0, 4))
+        lic_status = (
+            "Accepted on this device."
+            if has_accepted_licence()
+            else "Not accepted — Connect is blocked until you accept."
+        )
+        tk.Label(
+            lic_card,
+            text=lic_status,
+            bg=PANEL_BG,
+            fg=TEXT,
+            font=("Segoe UI", 8),
+            anchor="w",
+            wraplength=400,
+            justify=tk.LEFT,
+        ).pack(fill=tk.X)
+        tk.Button(
+            lic_card,
+            text=LICENCE_ACCEPT_BUTTON,
+            command=lambda: (self._show_licence_prompt(), note_var.set("Review licence…")),
+            bg=PRIMARY,
+            fg=WHITE,
+            relief=tk.FLAT,
+            font=("Segoe UI", 8, "bold"),
+            padx=10,
+            pady=4,
+            cursor="hand2",
+        ).pack(anchor="w", pady=(8, 0))
+        tk.Label(
+            lic_card,
+            text=ANON_REGISTRATION_TITLE,
+            bg=PANEL_BG,
+            fg=PRIMARY_DARK,
+            font=("Segoe UI", 9, "bold"),
+            anchor="w",
+        ).pack(fill=tk.X, pady=(12, 2))
+        tk.Label(
+            lic_card,
+            text=ANON_REGISTRATION_SUMMARY,
+            bg=PANEL_BG,
+            fg=TEXT_MUTED,
+            font=("Segoe UI", 8),
+            anchor="w",
+            wraplength=400,
+            justify=tk.LEFT,
+        ).pack(fill=tk.X)
+        tk.Label(
+            lic_card,
+            text=OS_PRIVILEGE_HONESTY,
+            bg=PANEL_BG,
+            fg=TEXT_MUTED,
+            font=("Segoe UI", 8),
+            anchor="w",
+            wraplength=400,
+            justify=tk.LEFT,
+        ).pack(fill=tk.X, pady=(4, 0))
 
         # --- Connection log (local only, exportable) ---
         log_card = tk.Frame(
@@ -1302,10 +1581,20 @@ def main() -> int:
     elif should_autoconnect_on_launch() and not resume_after_elevate:
 
         def _settings_autoconnect() -> None:
+            # assert_may_connect inside _start_connect — never bypass licence.
+            if not may_connect():
+                app._log(
+                    "Settings: autoconnect skipped — accept the end-user licence first."
+                )
+                app._show_licence_prompt()
+                return
             app._log("Settings: autoconnect on launch - starting Connect...")
             app._start_connect()
 
         app.root.after(450, _settings_autoconnect)
+    elif not may_connect():
+        # First-run seamless path: surface licence before the user hunts for it.
+        app.root.after(500, app._show_licence_prompt)
 
     app.run()
     return 0
