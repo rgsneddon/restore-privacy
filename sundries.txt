@@ -64,7 +64,8 @@ SECRETS / RELEASE GATES (mandatory)
     - DATA padding + send jitter: node/traffic_shape.py (TrafficShapePolicy)
     - Optional cover traffic dummy frames (same module)
     - PFS session keys: ephemeral X25519 in handshake (on by default for new hellos)
-    - Multi-hop path list: client/multihop.py (opt-in; honest status when inactive)
+    - Multi-hop hop *list* only: client/multihop.py (config/path planning; not routed yet;
+      is_multihop_active=False; status says entry-only / not residual multi-hop)
 
   From a machine with SSH (never commit passwords/keys into git):
 

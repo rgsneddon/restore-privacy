@@ -1,4 +1,4 @@
-"""Optional multi-hop path selection — default single-hop, honest status."""
+"""Optional multi-hop path *config* — default single-hop, honest status."""
 
 from __future__ import annotations
 
@@ -6,11 +6,13 @@ import unittest
 
 from client.endpoint import PRODUCT_NODE_HOST, PRODUCT_NODE_PORT
 from client.multihop import (
+    MULTI_HOP_ROUTING_IMPLEMENTED,
     Hop,
     MultiHopConfig,
     build_hop_path,
     default_single_hop,
     first_hop_endpoint,
+    hop_path_configured,
     is_multihop_active,
     multihop_status_text,
     parse_hops_csv,
@@ -32,7 +34,8 @@ class TestMultiHopPath(unittest.TestCase):
         self.assertEqual(len(hops), 1)
         self.assertEqual(hops[0].host, PRODUCT_NODE_HOST)
 
-    def test_two_or_more_hops_when_enabled(self):
+    def test_two_or_more_hops_configured_not_claimed_active(self):
+        """≥2 hops + enabled is config only — not multi-hop residual until relay exists."""
         hops = [
             Hop("10.0.0.1", 44044),
             Hop("10.0.0.2", 44045),
@@ -41,17 +44,23 @@ class TestMultiHopPath(unittest.TestCase):
         path = build_hop_path(hops)
         self.assertEqual(len(path), 3)
         cfg = MultiHopConfig(hops=hops, enabled=True)
-        self.assertTrue(is_multihop_active(cfg))
+        self.assertTrue(hop_path_configured(cfg))
+        # Product has no multi-hop data path yet
+        self.assertFalse(MULTI_HOP_ROUTING_IMPLEMENTED)
+        self.assertFalse(is_multihop_active(cfg))
         text = multihop_status_text(cfg)
-        self.assertIn("multi-hop active", text)
+        self.assertNotIn("multi-hop active", text)
+        self.assertIn("not routed", text.lower())
+        self.assertIn("entry-only", text.lower())
         self.assertIn("10.0.0.1", text)
         self.assertIn("10.0.0.2", text)
-        # Entry hop is first
+        # Entry hop is first (what Connect would dial if wired)
         self.assertEqual(first_hop_endpoint(cfg).host, "10.0.0.1")
 
     def test_enabled_but_one_hop_honest(self):
         cfg = MultiHopConfig(hops=[Hop("1.2.3.4")], enabled=True)
         self.assertFalse(is_multihop_active(cfg))
+        self.assertFalse(hop_path_configured(cfg))
         self.assertIn("≥2", multihop_status_text(cfg))
 
     def test_parse_hops_csv(self):
@@ -66,10 +75,21 @@ class TestMultiHopPath(unittest.TestCase):
             hops=[Hop("9.9.9.9"), Hop("8.8.8.8")],
             enabled=False,
         )
-        # active_hops falls back to product single hop when disabled
         hops = cfg.active_hops()
         self.assertEqual(len(hops), 1)
         self.assertEqual(hops[0].host, PRODUCT_NODE_HOST)
+        self.assertFalse(hop_path_configured(cfg))
+        self.assertFalse(is_multihop_active(cfg))
+
+    def test_routing_flag_gates_active(self):
+        """is_multihop_active requires MULTI_HOP_ROUTING_IMPLEMENTED (shipped constant)."""
+        self.assertIs(MULTI_HOP_ROUTING_IMPLEMENTED, False)
+        cfg = MultiHopConfig(
+            hops=[Hop("1.1.1.1"), Hop("2.2.2.2")],
+            enabled=True,
+        )
+        self.assertTrue(hop_path_configured(cfg))
+        self.assertFalse(is_multihop_active(cfg))
 
 
 if __name__ == "__main__":

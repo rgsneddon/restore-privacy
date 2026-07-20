@@ -1,7 +1,14 @@
-"""Optional multi-hop path selection (privacy: default remains single hop).
+"""Optional multi-hop path *configuration* (privacy: default remains single hop).
 
-Multi-hop is **opt-in**. Status strings stay honest: inactive multi-hop never
-claims multi-hop residual protection.
+Multi-hop is **opt-in configuration only** until a real multi-hop relay/data path
+exists in the product. Status strings stay honest:
+
+- Never claim multi-hop residual protection from a hop list alone.
+- ``is_multihop_active()`` is False until ``MULTI_HOP_ROUTING_IMPLEMENTED`` is
+  flipped when RptClient / node actually route through intermediate hops.
+
+Connect still uses a single entry endpoint (first configured hop or product
+default). Extra hops are stored for operators planning a future relay path.
 """
 
 from __future__ import annotations
@@ -11,10 +18,14 @@ from typing import Iterable, Sequence
 
 from .endpoint import DEFAULT_ENDPOINT, PRODUCT_NODE_HOST, PRODUCT_NODE_PORT, Endpoint
 
+# Flip to True only when product code actually chains handshakes/relays across hops.
+# Until then, config is "path planned / entry-only" — not multi-hop residual.
+MULTI_HOP_ROUTING_IMPLEMENTED = False
+
 
 @dataclass(frozen=True)
 class Hop:
-    """One operator relay hop."""
+    """One operator relay hop (config entry)."""
 
     host: str
     port: int = PRODUCT_NODE_PORT
@@ -28,13 +39,14 @@ class Hop:
 
 @dataclass
 class MultiHopConfig:
-    """Ordered hop list. Empty or one hop ⇒ single-hop product path."""
+    """Ordered hop list for operators. Empty or disabled ⇒ product single hop."""
 
     hops: list[Hop] = field(default_factory=list)
-    # When False, ignore hops beyond the first even if listed.
+    # When False, ignore hops beyond the product default.
     enabled: bool = False
 
     def active_hops(self) -> list[Hop]:
+        """Hops used for *entry selection* today (first hop only is dialed)."""
         if not self.enabled:
             return [Hop(PRODUCT_NODE_HOST, PRODUCT_NODE_PORT)]
         built = build_hop_path(self.hops)
@@ -59,14 +71,23 @@ def build_hop_path(hops: Sequence[Hop] | Iterable[Hop] | None) -> list[Hop]:
 
 
 def first_hop_endpoint(config: MultiHopConfig | None = None) -> Endpoint:
-    """Endpoint used for the initial CLIENT_HELLO (entry hop)."""
+    """Endpoint used for the initial CLIENT_HELLO (entry hop only)."""
     cfg = config or MultiHopConfig()
     hops = cfg.active_hops()
     return hops[0].as_endpoint()
 
 
+def hop_path_configured(config: MultiHopConfig | None = None) -> bool:
+    """True when operator enabled multi-hop *config* with ≥2 listed hops.
+
+    Does **not** mean traffic is multi-hop routed (see ``is_multihop_active``).
+    """
+    cfg = config or MultiHopConfig()
+    return bool(cfg.enabled and len(build_hop_path(cfg.hops)) >= 2)
+
+
 def multihop_status_text(config: MultiHopConfig | None = None) -> str:
-    """Honest UI/status string — never claims multi-hop when inactive."""
+    """Honest UI/status — never claims multi-hop residual from config alone."""
     cfg = config or MultiHopConfig()
     if not cfg.enabled:
         return "single-hop (multi-hop inactive)"
@@ -74,12 +95,23 @@ def multihop_status_text(config: MultiHopConfig | None = None) -> str:
     if len(hops) < 2:
         return "single-hop (multi-hop needs ≥2 configured hops)"
     labels = " → ".join(h.label() for h in hops)
+    if not MULTI_HOP_ROUTING_IMPLEMENTED:
+        # Path planned / stored only — Connect still uses entry hop alone.
+        return (
+            f"multi-hop path configured (not routed; entry-only): {labels}"
+        )
     return f"multi-hop active ({len(hops)} hops): {labels}"
 
 
 def is_multihop_active(config: MultiHopConfig | None = None) -> bool:
-    cfg = config or MultiHopConfig()
-    return bool(cfg.enabled and len(build_hop_path(cfg.hops)) >= 2)
+    """True only when real multi-hop routing is implemented **and** selected.
+
+    Config with ≥2 hops is insufficient: product has no intermediate-hop relay
+    data path yet, so this stays False until MULTI_HOP_ROUTING_IMPLEMENTED.
+    """
+    if not MULTI_HOP_ROUTING_IMPLEMENTED:
+        return False
+    return hop_path_configured(config)
 
 
 def parse_hops_csv(text: str) -> list[Hop]:
