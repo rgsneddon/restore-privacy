@@ -166,10 +166,12 @@ class TestPublicStatusStripsInjectedPayloads(unittest.TestCase):
 
     def test_html_no_live_count(self):
         html = status_app.render_html({"title": "RESTORE PRIVACY"}).decode("utf-8")
-        self.assertIn("No public live session counter", html)
-        self.assertIn("per-client metrics", html.lower())
+        # Minimal public page: no live count chrome; downloads + legal links remain
         self.assertNotIn("clients_connected", html)
         self.assertNotIn("Currently connected", html)
+        self.assertNotIn('id="clients-connected"', html)
+        self.assertIn("Download client", html)
+        self.assertIn("LICENCE", html)
 
 
 class TestConfigNoPublicClientCount(unittest.TestCase):

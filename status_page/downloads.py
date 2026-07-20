@@ -86,6 +86,20 @@ def available_downloads(
     return out
 
 
+# Footer: link to the Rust rewrite repository (not install instructional text).
+RUST_REPO_URL = "https://github.com/rgsneddon/restore-privacy-rust"
+RUST_REPO_LABEL = "Rust rewrite (work in progress)"
+
+
+def render_rust_footer_html() -> str:
+    """Footer under download buttons — link to the public Rust rewrite repo."""
+    return (
+        f'    <p class="dl-footer" id="rust-repo-footer">'
+        f'<a class="rust-link" id="rust-repo-link" href="{RUST_REPO_URL}" '
+        f'rel="noopener noreferrer" target="_blank">{RUST_REPO_LABEL}</a></p>'
+    )
+
+
 def render_download_section_html(assets: Iterable[DownloadAsset] | None = None) -> str:
     """HTML fragment: download buttons with real https release URLs."""
     items = list(assets) if assets is not None else available_downloads()
@@ -105,7 +119,7 @@ def render_download_section_html(assets: Iterable[DownloadAsset] | None = None) 
     <div class="dl-buttons">
 {links_html}
     </div>
-    <p class="dl-note">Release <code>{RELEASE_TAG}</code> | Windows setup needs no separate Python install | double-click -> UAC once for full VPN (auto-elevate) | Apple packages require Network Extension signing for system VPN | Linux: unpack tar.gz, bash install.sh (crypto deps baked in), sudo ./bin/privacy-restored</p>
+{render_rust_footer_html()}
   </section>
 """
 
@@ -130,6 +144,7 @@ def download_css() -> str:
     a.dl#dl-ios:hover { background: #7c3aed; }
     a.dl#dl-linux { background: #b45309; }
     a.dl#dl-linux:hover { background: #d97706; }
-    .dl-note { margin-top: 1rem; font-size: 0.8rem; opacity: 0.55; line-height: 1.4; }
-    .dl-note code { font-size: 0.85em; }
+    .dl-footer { margin-top: 1.25rem; font-size: 0.9rem; line-height: 1.45; }
+    .dl-footer a.rust-link { color:#93c5fd; text-decoration:underline; font-weight:600; }
+    .dl-footer a.rust-link:hover { color:#bfdbfe; }
 """

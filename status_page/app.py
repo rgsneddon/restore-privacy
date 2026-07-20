@@ -69,20 +69,49 @@ def read_static_bytes(url_path: str) -> tuple[bytes, str] | None:
             ctype = "application/octet-stream"
     return data, ctype
 
-BETA_NOTE_TEXT = (
-    "BETA - test phase - please report any bugs to https://x.com/rgsneddon"
-)
+# Public legal / audit document links (stable GitHub blob URLs).
+GITHUB_BLOB_MAIN = "https://github.com/rgsneddon/restore-privacy/blob/main"
+LICENCE_URL = f"{GITHUB_BLOB_MAIN}/LICENSE"
+PRIVACY_POLICY_URL = f"{GITHUB_BLOB_MAIN}/PRIVACY_POLICY.md"
+SECURITY_AUDIT_URL = f"{GITHUB_BLOB_MAIN}/audit.md"
+
+# Labels shown under the product title (terms of use / privacy / audit).
+LICENCE_LABEL = "LICENCE"
+PRIVACY_POLICY_LABEL = "PRIVACY POLICY"
+SECURITY_AUDIT_LABEL = "SECURITY AUDIT"
+
+# New Rust rewrite repository (footer link).
+RUST_REPO_URL = "https://github.com/rgsneddon/restore-privacy-rust"
+RUST_REPO_LABEL = "Rust rewrite (work in progress)"
+
+# Kept for older imports/tests that still reference the constant name.
+BETA_NOTE_TEXT = ""
 BETA_NOTE_URL = "https://x.com/rgsneddon"
 
 
-def render_beta_note_html() -> str:
-    """Note immediately below the RESTORE PRIVACY headline (bug reports on X)."""
-    return (
-        f'  <p class="beta-note" id="beta-note">'
-        f"BETA - test phase - please report any bugs to "
-        f'<a href="{BETA_NOTE_URL}" rel="noopener noreferrer" target="_blank">'
-        f"{BETA_NOTE_URL}</a></p>"
+def render_legal_links_html() -> str:
+    """Links immediately below the RESTORE PRIVACY headline (licence / privacy / audit)."""
+    items = (
+        (LICENCE_LABEL, LICENCE_URL, "licence-link"),
+        (PRIVACY_POLICY_LABEL, PRIVACY_POLICY_URL, "privacy-link"),
+        (SECURITY_AUDIT_LABEL, SECURITY_AUDIT_URL, "audit-link"),
     )
+    anchors = []
+    for label, url, el_id in items:
+        anchors.append(
+            f'<a class="doc-link" id="{el_id}" href="{url}" '
+            f'rel="noopener noreferrer" target="_blank">{label}</a>'
+        )
+    joined = '<span class="doc-sep" aria-hidden="true"> · </span>'.join(anchors)
+    return (
+        f'  <nav class="doc-links" id="doc-links" aria-label="Legal and audit documents">'
+        f"{joined}</nav>"
+    )
+
+
+def render_beta_note_html() -> str:
+    """Deprecated: under-title strip is now legal/audit links (kept for import compat)."""
+    return render_legal_links_html()
 
 
 # Upstream VPN node status (override via env on Render) — used only for health/title
@@ -201,7 +230,7 @@ def fetch_upstream_status() -> dict:
 
 
 def render_html(status: dict, poll_ms: int | None = None) -> bytes:
-    """HTML: title + beta note + download buttons (no connected-client counter)."""
+    """HTML: title + legal/audit links + downloads + Rust repo footer (no client count)."""
     _ = poll_ms  # retained for call-site compat; public page does not poll a count
     title = status.get("title", "RESTORE PRIVACY")
     # Escape for embedding in HTML text (title is product constant; still sanitize)
@@ -230,20 +259,19 @@ def render_html(status: dict, poll_ms: int | None = None) -> bytes:
     .brand-logo {{ width:96px; height:96px; border-radius:18px; margin:0 0 1rem;
                    object-fit:cover; box-shadow:0 4px 24px rgba(0,0,0,0.35); }}
     h1 {{ letter-spacing:0.12em; font-weight:600; font-size:clamp(1.6rem, 4vw, 2.2rem); margin:0 0 0.65rem; }}
-    .beta-note {{ margin:0 0 1.5rem; max-width:32rem; text-align:center; padding:0 1rem;
-                 font-size:0.95rem; opacity:0.85; line-height:1.45; color:#fbbf24; }}
-    .beta-note a {{ color:#93c5fd; }}
-    .beta-note a:hover {{ color:#bfdbfe; }}
-    .tagline {{ margin:0 0 0.5rem; max-width:28rem; text-align:center; padding:0 1rem;
-                font-size:0.95rem; opacity:0.75; line-height:1.45; }}
+    .doc-links {{ margin:0 0 1.5rem; max-width:32rem; text-align:center; padding:0 1rem;
+                  font-size:0.9rem; line-height:1.5; }}
+    .doc-links a.doc-link {{ color:#93c5fd; text-decoration:underline; font-weight:600;
+                             letter-spacing:0.04em; }}
+    .doc-links a.doc-link:hover {{ color:#bfdbfe; }}
+    .doc-sep {{ color:#6b7280; margin:0 0.15rem; }}
 {dl_css}
   </style>
 </head>
 <body>
   <img class="brand-logo" src="/logo.png" width="96" height="96" alt="Restore Privacy logo"/>
   <h1>{title_safe}</h1>
-{render_beta_note_html()}
-  <p class="tagline">Download the client for your platform. No public live session counter or per-client metrics.</p>
+{render_legal_links_html()}
 {downloads_html}
 </body>
 </html>
