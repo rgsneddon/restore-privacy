@@ -11,7 +11,7 @@ sys.path.insert(0, str(ROOT / "status_page"))
 
 import app as status_app  # noqa: E402
 from downloads import (  # noqa: E402
-    ANDROID_PREP_FILENAME,
+    ANDROID_APK_FILENAME,
     APPLE_PREP_FILENAME,
     GITHUB_REPO,
     LINUX_TGZ_FILENAME,
@@ -40,7 +40,8 @@ class TestDownloadCatalog(unittest.TestCase):
         self.assertTrue(by_plat["windows"].filename.endswith(".zip"))
         self.assertEqual(by_plat["linux"].filename, LINUX_TGZ_FILENAME)
         self.assertEqual(by_plat["macos"].filename, APPLE_PREP_FILENAME)
-        self.assertEqual(by_plat["android"].filename, ANDROID_PREP_FILENAME)
+        self.assertEqual(by_plat["android"].filename, ANDROID_APK_FILENAME)
+        self.assertTrue(by_plat["android"].filename.endswith(".apk"))
 
     def test_labels_and_html(self):
         html = render_download_section_html()
@@ -85,7 +86,7 @@ class TestDownloadCatalog(unittest.TestCase):
         self.assertIn(WINDOWS_ZIP_FILENAME, page)
         self.assertIn(LINUX_TGZ_FILENAME, page)
         self.assertIn(APPLE_PREP_FILENAME, page)
-        self.assertIn(ANDROID_PREP_FILENAME, page)
+        self.assertIn(ANDROID_APK_FILENAME, page)
         for a in available_downloads():
             self.assertIn(a.url, page)
 

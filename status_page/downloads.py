@@ -18,6 +18,8 @@ RELEASE_TAG = "v1.0.0"
 WINDOWS_ZIP_FILENAME = f"restore-privacy-rust-{RELEASE_VERSION}-windows-x64.zip"
 LINUX_TGZ_FILENAME = f"restore-privacy-rust-{RELEASE_VERSION}-linux-x64.tar.gz"
 APPLE_PREP_FILENAME = f"restore-privacy-rust-{RELEASE_VERSION}-apple-prep.zip"
+ANDROID_APK_FILENAME = f"restore-privacy-rust-{RELEASE_VERSION}-android.apk"
+# Legacy prep zip still published alongside the residual APK.
 ANDROID_PREP_FILENAME = f"restore-privacy-rust-{RELEASE_VERSION}-android-prep.zip"
 
 
@@ -53,8 +55,8 @@ RELEASE_ASSETS: tuple[DownloadAsset, ...] = (
     ),
     DownloadAsset(
         platform="android",
-        label="Android - Prep package (.zip)",
-        filename=ANDROID_PREP_FILENAME,
+        label="Android - APK installer",
+        filename=ANDROID_APK_FILENAME,
     ),
 )
 
