@@ -81,7 +81,7 @@ class TestReadmePublicClientOnly(unittest.TestCase):
         self.assertTrue("macos" in lower)
         self.assertTrue("ios" in lower)
         self.assertTrue(
-            "0.2.0" in text or "0.1.8" in text,
+            "0.2.1" in text or "0.2.0" in text or "0.1.8" in text,
             "README how-to must cite the current public package version",
         )
         # Not prep-stub-only Apple wording

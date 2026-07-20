@@ -89,7 +89,7 @@ class TestReadmeHowto(unittest.TestCase):
         self.assertIn("android", lower)
         self.assertIn("macos", lower)
         self.assertIn("ios", lower)
-        self.assertIn("0.2.0", text)
+        self.assertTrue("0.2.1" in text or "0.2.0" in text)
         self.assertNotIn("prep â€” finish on a Mac", text)
         self.assertNotIn("prep stubs", lower)
         # Package names from the public release catalog

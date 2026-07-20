@@ -6,8 +6,8 @@ client app. Public users should follow README.md only.
 Contents moved from the public-facing README (ports, status-page hosting,
 node deploy, developer client-app notes, local tests, secrets).
 
-Source client version: 0.2.0 (product host 82.221.101.241:44044).
-Public download catalog: 0.2.0 (status_page/downloads.py RELEASE_VERSION).
+Source client version: 0.2.1 (product host 82.221.101.241:44044).
+Public download catalog: 0.2.1 (status_page/downloads.py RELEASE_VERSION).
 (see status_page/downloads.py RELEASE_VERSION).
 
 
@@ -154,8 +154,8 @@ SECRETS / RELEASE GATES (mandatory)
 ---------------------------------------------
   Process notes: scripts/RELEASE.md
 
-  Use the **current tag** recipe only (today: scripts/build_release_0.2.0.py
-  for v0.2.0). Historical scripts/build_release_0.*.py files are archives —
+  Use the **current tag** recipe only (today: scripts/build_release_0.2.1.py
+  for v0.2.1). Historical scripts/build_release_0.*.py files are archives —
   for a new version, copy the latest script and bump VERSION / PRIOR_TAG /
   status_page/downloads.py catalog.
 
@@ -163,11 +163,11 @@ SECRETS / RELEASE GATES (mandatory)
     - _assert_no_priv (or equivalent) on release output
     - inject/provision of node_elgamal.pub only — never node_elgamal.priv
     - never force-add secrets/ to git
-    - re-run python scripts/package_linux.py (also wired in build_release_0.2.0.py)
+    - re-run python scripts/package_linux.py (also wired in build_release_0.2.1.py)
 
   Short cut example:
 
-    python scripts/build_release_0.2.0.py
+    python scripts/build_release_0.2.1.py
     # then gh release create <tag> with assets under releases/
 
 
