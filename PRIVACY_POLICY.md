@@ -89,7 +89,7 @@ Please understand these **operational limits**:
 5. **Security vs. privacy.** Per-device Ed25519 keys identify a **product install**, not a named human account - but a device key can still be treated as an access secret for that install.
 6. **Open relay risk is reduced by keys, not by accounts.** Unauthorized clients should fail handshake; authorized keys must be protected.
 7. **Traffic analysis mitigations are incomplete.** Product Windows/Linux clients apply packet padding, timing jitter, and cover traffic **by default** (opt out with `RPT_TRAFFIC_SHAPE=0`). They reduce coarse size/timing fingerprints; they do **not** guarantee undetectability against sophisticated DPI. Multi-hop hop *lists* may be configured for future use; product traffic remains **single-hop / entry-only** until a real multi-hop relay path ships (status never claims multi-hop residual from config alone). Session AEAD keys use ephemeral X25519 material (PFS) so long-term key compromise after a session ends should not reconstruct that session’s traffic keys from the public transcript alone.
-8. **Self-hosted operators** must still protect `node_elgamal.priv`, keep product no-log defaults, and remember provider-level IP logs (limit 1 above).
+8. **Self-hosted operators** must still protect long-term node keys (prefer `RPT_KEY_BACKEND=sealed` / TPM-class wrap so plaintext `node_elgamal.priv` is not free on disk), keep product no-log defaults, and remember provider-level IP logs (limit 1 above). Session AEAD uses ephemeral X25519 (PFS) on the product path; long-term key rotation updates public pins only for clients. Post-quantum hybrid (Kyber/ML-KEM class) is staged readiness — not residual PQ on the wire until dual-wire + real ML-KEM ships (`docs/PQ_MIGRATION.md`).
 
 ---
 

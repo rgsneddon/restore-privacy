@@ -124,11 +124,20 @@ def pack_hybrid(node_pub: ElGamalPublicKey, plaintext: bytes) -> bytes:
     return ct.export() + nonce + sealed
 
 
-def open_hybrid(node_priv: ElGamalPrivateKey, blob: bytes) -> bytes:
+def open_hybrid(node_priv, blob: bytes) -> bytes:
+    """Decrypt hybrid HELLO blob with ElGamal private key **or** NodeKeyBackend.
+
+    Product nodes should pass a key-protection backend so plaintext
+    ``node_elgamal.priv`` is not required on disk when sealed/mock/TPM is enabled.
+    """
     if len(blob) < 512 + 12 + 16:
         raise ValueError("hybrid blob too short")
     ct = ElGamalCiphertext.import_bytes(blob[:512])
-    key = decrypt(node_priv, ct)
+    # Backend contract: decrypt_ciphertext; classic key: node/elgamal.decrypt
+    if hasattr(node_priv, "decrypt_ciphertext"):
+        key = node_priv.decrypt_ciphertext(ct)
+    else:
+        key = decrypt(node_priv, ct)
     if len(key) != 32:
         # encode_message may return key with exact bytes
         key = key[:32] if len(key) >= 32 else key.ljust(32, b"\x00")
@@ -163,16 +172,19 @@ class NodeHandshake:
 
     def __init__(
         self,
-        node_elgamal: ElGamalPrivateKey,
+        node_elgamal,  # ElGamalPrivateKey | NodeKeyBackend
         authorized_client_pubs: Iterable[bytes] | None = None,
         *,
         admit_unknown_devices: bool = True,
         on_enroll: Optional[Callable[[bytes], None]] = None,
+        require_pfs: bool = False,
     ):
         self.node_elgamal = node_elgamal
         self.authorized: Set[bytes] = set(authorized_client_pubs or ())
         self.admit_unknown_devices = bool(admit_unknown_devices)
         self.on_enroll = on_enroll
+        # When True, refuse HELLO without client ephemeral X25519 (product node default)
+        self.require_pfs = bool(require_pfs)
         if not self.authorized and not self.admit_unknown_devices:
             raise ValueError(
                 "authorized client public keys required when admit_unknown_devices is False"
@@ -246,6 +258,8 @@ def node_complete_hello(
     # PFS: ephemeral X25519 when client offered a 32-byte eph pub in hybrid payload.
     server_eph = EphemeralX25519.generate()
     use_pfs = len(client_eph_pub) == EPH_PUB_LEN
+    if getattr(node, "require_pfs", False) and not use_pfs:
+        raise AdmissionError("product path requires PFS (client ephemeral X25519 missing)")
     if use_pfs:
         try:
             eph_shared = x25519_shared_secret(server_eph.private, client_eph_pub)

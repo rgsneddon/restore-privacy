@@ -111,7 +111,9 @@ class TestEphemeralX25519(unittest.TestCase):
         self.assertIsNone(eph)
         reply, result = node_complete_hello(hs, frame, "10.88.0.3")
         self.assertFalse(result.pfs)
-        sess = complete_server_hello(reply, cnonce, cpub, None)
+        sess = complete_server_hello(
+            reply, cnonce, cpub, None, require_pfs=False
+        )
         self.assertFalse(sess.pfs)
         self.assertEqual(sess.crypto.key, result.crypto.key)
 

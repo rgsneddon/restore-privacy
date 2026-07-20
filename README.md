@@ -126,6 +126,12 @@ Node deploy, ports, secrets, from-source builds, and tests: **[sundries.txt](sun
 
 **Secrets discipline:** Never commit or force-add `secrets/` (gitignored). Public packages must never include `node_elgamal.priv` or a shared `client_ed25519.priv`. Release scripts run `_assert_no_priv` / strip inject gates — keep those on every tag.
 
+**Node key protection:** `RPT_KEY_BACKEND=file|mock|sealed|tpm` — sealed/TPM-class stores long-term ElGamal under a wrap key so plaintext `.priv` is not required on disk. See `node/key_backend.py`.
+
+**Key rotation:** `python scripts/rotate_node_keys.py --secrets-dir …` updates node long-term material + `product/node_elgamal.pub` pin; clients re-provision **public** only (`reprovision_node_public`). Session **PFS** (X25519) is the product default.
+
+**Post-quantum readiness:** staged hybrid Kyber/ML-KEM hook in `node/pq_hybrid.py` + plan [`docs/PQ_MIGRATION.md`](docs/PQ_MIGRATION.md) (not residual PQ on the wire until dual-wire + real ML-KEM).
+
 **0.2.2 release:** Production node **82.221.101.241:44044**. Product traffic-shape **on by default**. See [scripts/RELEASE_NOTES_0.2.2.md](scripts/RELEASE_NOTES_0.2.2.md). Prefer upgrading from 0.2.1 so Settings legal links and shaping policy stay current.
 
 **Self-host (one shot):** `sudo bash scripts/selfhost_node.sh` — node install + tunnel DNS + host privacy. Details: [sundries.txt](sundries.txt).

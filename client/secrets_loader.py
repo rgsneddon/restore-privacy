@@ -28,6 +28,20 @@ NODE_PUB_NAME = "node_elgamal.pub"
 # Never load or expect node private key on the client
 NODE_PRIV_NAME = "node_elgamal.priv"
 
+
+def reprovision_node_public_key(
+    secrets_dir: str | Path,
+    source_pub: str | Path | bytes,
+) -> Path:
+    """Refresh node_elgamal.pub after operator key rotation (public only).
+
+    Delegates to ``node.key_rotation.reprovision_node_public`` — never writes
+    a shared client private key.
+    """
+    from node.key_rotation import reprovision_node_public
+
+    return reprovision_node_public(secrets_dir, source_pub)
+
 # SHA-256 of pre-0.1.3 universal product client_ed25519.priv (shipped in every install).
 # Any install still holding these bytes must rotate — even when packages no longer embed the file.
 KNOWN_SHARED_CLIENT_PRIV_SHA256: frozenset[str] = frozenset(

@@ -125,12 +125,13 @@ def complete_server_hello(
     client_eph: EphemeralX25519 | None = None,
     *,
     traffic_shape: TrafficShapePolicy | None = None,
+    require_pfs: bool = True,
 ) -> ClientSession:
     """Process SERVER_HELLO using real RPT2 crypto (shipped path).
 
-    When *client_eph* is provided and the node returns a server X25519 pub,
-    session AEAD keys use PFS (ephemeral DH). Otherwise falls back to legacy
-    nonce-only derivation for older nodes.
+    Product default *require_pfs=True*: session AEAD keys must use ephemeral
+    X25519. Legacy nonce-only derivation remains only when require_pfs=False
+    (interop tests / older nodes).
     """
     if peek_type(reply) != MsgType.SERVER_HELLO:
         raise ValueError("expected SERVER_HELLO")
@@ -166,6 +167,11 @@ def complete_server_hello(
         )
         pfs = True
     else:
+        if require_pfs:
+            raise ValueError(
+                "product session path requires PFS (ephemeral X25519); "
+                "legacy nonce-only derivation is not the product default"
+            )
         session_shared = derive_legacy_session_shared(
             client_nonce, server_nonce, session_id, client_pub
         )

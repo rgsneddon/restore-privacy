@@ -29,6 +29,10 @@ Restore Privacy **0.2.2** ships clients and public catalog aligned to the **Flok
 | **Traffic shape** (pad / jitter / cover) | **On by default**; opt out `RPT_TRAFFIC_SHAPE=0` |
 | **Kill switch + IPv6 + WebRTC surface** | Windows/Linux firewall helpers + STUN/mDNS block; Android blocking flags |
 | **Node DoT DNS** | Unbound tunnel-only + DoT forward; clients DNS=`10.88.0.1` only |
+| **HSM/TPM-class key backend** | `node/key_backend.py` file\|mock\|sealed; product HELLO decrypt via backend |
+| **PFS product default** | `require_pfs` on node/client product path; legacy lab-only |
+| **Key rotation** | `node/key_rotation.py` + public re-provision; no shared client priv |
+| **PQ readiness** | `docs/PQ_MIGRATION.md` + `node/pq_hybrid.py` hybrid IKM hook (not residual PQ wire) |
 | **Multi-hop** | Hop *list* config only; not residual multi-hop |
 
 **Overall posture:** **Strong** alignment for residual honesty (`residual_ip_capture`), no public live count, no-phones-home Connect, packaging strip of `*.priv`, tunnel DNS + DoT upstream, kill-switch/IPv6, obfuscation+traffic-shape with honest DPI limits.

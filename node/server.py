@@ -81,23 +81,24 @@ def dest_ip_from_packet(pkt: bytes) -> Optional[str]:
     return f"{pkt[16]}.{pkt[17]}.{pkt[18]}.{pkt[19]}"
 
 
-def ensure_secrets(secrets_dir: Path) -> tuple[ElGamalPrivateKey, bytes]:
+def ensure_secrets(secrets_dir: Path):
+    """Prepare secrets dir; return (node_key_backend_or_priv, client_pub).
+
+    Long-term node ElGamal is loaded via ``node.key_backend`` so HSM/TPM-class
+    sealed backends need not keep plaintext ``node_elgamal.priv`` on disk.
+    """
+    from node.key_backend import load_node_key_backend
+
     secrets_dir.mkdir(parents=True, exist_ok=True)
-    os.chmod(secrets_dir, 0o700)
-    node_priv_path = secrets_dir / "node_elgamal.priv"
-    node_pub_path = secrets_dir / "node_elgamal.pub"
+    try:
+        os.chmod(secrets_dir, 0o700)
+    except OSError:
+        pass
     client_priv_path = secrets_dir / "client_ed25519.priv"
     client_pub_path = secrets_dir / "client_ed25519.pub"
     allow_path = secrets_dir / "authorized_clients.pub"
 
-    if node_priv_path.exists():
-        node = ElGamalPrivateKey.import_bytes(node_priv_path.read_bytes())
-    else:
-        node = generate_keypair()
-        node_priv_path.write_bytes(node.export())
-        os.chmod(node_priv_path, 0o600)
-        node_pub_path.write_bytes(node.public.export())
-        os.chmod(node_pub_path, 0o644)
+    node_backend = load_node_key_backend(secrets_dir)
 
     if client_pub_path.exists():
         client_pub = client_pub_path.read_bytes()
@@ -107,20 +108,29 @@ def ensure_secrets(secrets_dir: Path) -> tuple[ElGamalPrivateKey, bytes]:
         from node.handshake import ed25519_priv_raw
 
         client_priv_path.write_bytes(ed25519_priv_raw(cpriv))
-        os.chmod(client_priv_path, 0o600)
+        try:
+            os.chmod(client_priv_path, 0o600)
+        except OSError:
+            pass
         client_pub_path.write_bytes(client_pub)
-        os.chmod(client_pub_path, 0o644)
+        try:
+            os.chmod(client_pub_path, 0o644)
+        except OSError:
+            pass
 
     if not allow_path.exists():
         allow_path.write_bytes(client_pub + b"\n")
-        os.chmod(allow_path, 0o644)
+        try:
+            os.chmod(allow_path, 0o644)
+        except OSError:
+            pass
     else:
         # ensure client pub is in allow list
         raw = allow_path.read_bytes()
         if client_pub not in raw:
             allow_path.write_bytes(raw.rstrip(b"\n") + b"\n" + client_pub + b"\n")
 
-    return node, client_pub
+    return node_backend, client_pub
 
 
 def load_authorized(secrets_dir: Path) -> list[bytes]:
@@ -150,7 +160,8 @@ def load_authorized(secrets_dir: Path) -> list[bytes]:
 
 
 class RPTNode:
-    def __init__(self, config: dict, node_key: ElGamalPrivateKey, authorized: list[bytes]):
+    def __init__(self, config: dict, node_key, authorized: list[bytes]):
+        """*node_key* is ElGamalPrivateKey or NodeKeyBackend (prefer backend)."""
         v = validate_node_config(config)
         if v:
             raise SystemExit("invalid config: " + "; ".join(v))
@@ -158,6 +169,10 @@ class RPTNode:
         self.registry = SessionRegistry()
         adm = config.get("admission") or {}
         admit_unknown = bool(adm.get("admit_unknown_devices", True))
+        # Product node requires PFS by default (env can relax for lab only)
+        require_pfs = str(
+            os.environ.get("RPT_REQUIRE_PFS", "1")
+        ).strip().lower() not in ("0", "false", "off", "no")
         secrets_dir = Path(config.get("secrets_dir") or "/opt/restore-privacy/secrets")
 
         def _on_enroll(pub: bytes) -> None:
@@ -167,6 +182,7 @@ class RPTNode:
             node_key,
             authorized,
             admit_unknown_devices=admit_unknown,
+            require_pfs=require_pfs,
             on_enroll=_on_enroll,
         )
         self._next_ip = ipv4_to_int(config["pool_start"])
