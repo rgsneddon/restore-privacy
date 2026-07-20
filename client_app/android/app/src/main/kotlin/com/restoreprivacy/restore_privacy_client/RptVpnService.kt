@@ -9,6 +9,7 @@ import android.os.Build
 import android.os.Bundle
 import android.os.ParcelFileDescriptor
 import android.os.ResultReceiver
+import android.system.OsConstants
 import java.io.File
 import java.io.FileInputStream
 import java.io.FileOutputStream
@@ -240,28 +241,26 @@ class RptVpnService : VpnService() {
                     return@thread
                 }
 
-                // DNS: node tunnel gateway recursive resolver (matches client.full_tunnel defaults)
-                // IPv6: add ::/0 so residual IPv6 is not left on the ISP path (leak protection)
+                // DNS: node tunnel gateway recursive resolver (10.88.0.1 / unbound on residual node)
                 // Kill switch: setBlocking(true) on API 29+ so non-VPN apps cannot bypass the TUN
+                // IPv4-only residual: do NOT install ::/0 without a TUN IPv6 address — that
+                // blackholes dual-stack apps under setBlocking while the node only routes IPv4.
                 val builder = Builder()
                     .setSession(sessionName)
                     .setMtu(1280)
                     .addAddress(session.vpnIp, 32)
                     .addDnsServer("10.88.0.1")
-                if (android.os.Build.VERSION.SDK_INT >= 29) {
-                    // Product kill-switch: block traffic that would leave outside the VPN
+                if (Build.VERSION.SDK_INT >= 29) {
                     builder.setBlocking(true)
                 }
-                var ipv6RouteOk = false
+                // Prefer IPv4 residual path (product node DATA/TUN is IPv4).
+                try {
+                    builder.allowFamily(OsConstants.AF_INET)
+                } catch (_: Exception) {
+                }
+                val ipv6RouteOk = false
                 if (fullTunnel) {
                     builder.addRoute("0.0.0.0", 0)
-                    try {
-                        builder.addRoute("::", 0)
-                        ipv6RouteOk = true
-                    } catch (_: Exception) {
-                        // Some API levels reject IPv6 routes — must not claim IPv6 protected
-                        ipv6RouteOk = false
-                    }
                 }
                 try {
                     // Keep our app off the VPN loop so UDP to node works
@@ -285,26 +284,56 @@ class RptVpnService : VpnService() {
                     return@thread
                 }
                 tun = pfd
+
+                // Critical: after establish(), re-protect (and prefer a fresh socket).
+                // Pre-establish protect() is often a no-op; without post-establish protect,
+                // node UDP is routed into the TUN and residual traffic blackholes.
+                val endpoint = InetSocketAddress(host, port)
+                val dataSock = try {
+                    openProtectedNodeSocket(endpoint)
+                } catch (e: Exception) {
+                    try {
+                        pfd.close()
+                    } catch (_: Exception) {
+                    }
+                    tun = null
+                    report(
+                        false,
+                        "Could not protect UDP to $host:$port after VPN establish " +
+                            "(${e.message}) — residual traffic would blackhole",
+                    )
+                    running.set(false)
+                    stopForeground(STOP_FOREGROUND_REMOVE)
+                    stopSelf()
+                    return@thread
+                }
+                // Close handshake socket; dataplane uses protected dataSock only
+                try {
+                    sock.close()
+                } catch (_: Exception) {
+                }
+
                 isSessionActive = true
                 activeVpnIp = session.vpnIp
                 activeIpv6Protected = if (fullTunnel) ipv6RouteOk else null
                 startForeground(NOTIFICATION_ID, buildNotification(sessionName, connecting = false))
                 val msg = if (!fullTunnel) {
                     "Connected — RPT tunnel up (VPN IP ${session.vpnIp})"
-                } else if (ipv6RouteOk) {
-                    "Connected — VPN active; IPv6 ISP path blocked (VPN IP ${session.vpnIp})"
                 } else {
+                    // IPv4 residual only (AF_INET); ISP IPv6 is not claimed protected
                     "Connected — IPv4 via VPN; IPv6 not protected (VPN IP ${session.vpnIp})"
                 }
                 report(true, msg, session.vpnIp, ipv6Protected = if (fullTunnel) ipv6RouteOk else null)
 
-                // Two threads: TUNâ†’UDP and UDPâ†’TUN.
+                // Two threads: TUN→UDP and UDP→TUN.
                 // Do NOT use FileInputStream.available() — on Android VPN it often
                 // stays 0 forever and blackholes all internet traffic.
-                val inTun = FileInputStream(pfd.fileDescriptor)
-                val outTun = FileOutputStream(pfd.fileDescriptor)
-                sock.soTimeout = 200
-                val endpoint = InetSocketAddress(host, port)
+                // Dup FDs so read/write threads do not share one stream state.
+                val pfdIn = ParcelFileDescriptor.dup(pfd.fileDescriptor)
+                val pfdOut = ParcelFileDescriptor.dup(pfd.fileDescriptor)
+                val inTun = FileInputStream(pfdIn.fileDescriptor)
+                val outTun = FileOutputStream(pfdOut.fileDescriptor)
+                dataSock.soTimeout = 200
                 // Product residual: pad+cover on DATA + outer QUIC-mimic wrap (Python parity)
                 val lastCoverMs = AtomicLong(System.currentTimeMillis())
                 val tunToUdp = thread(name = "rpt-tun-up", isDaemon = true) {
@@ -314,7 +343,7 @@ class RptVpnService : VpnService() {
                             val n = inTun.read(buf) // blocking read of VPN packets
                             if (n > 0) {
                                 val wire = engine.sealAndWrapPacket(buf.copyOf(n))
-                                sock.send(DatagramPacket(wire, wire.size, endpoint))
+                                dataSock.send(DatagramPacket(wire, wire.size))
                             } else if (n < 0) {
                                 break
                             }
@@ -328,7 +357,7 @@ class RptVpnService : VpnService() {
                     while (running.get()) {
                         try {
                             val pkt = DatagramPacket(buf, buf.size)
-                            sock.receive(pkt)
+                            dataSock.receive(pkt)
                             // Outer unwrap then open; null = cover (discard)
                             val plain = engine.unwrapAndOpen(buf.copyOf(pkt.length))
                             if (plain != null && plain.isNotEmpty()) {
@@ -349,7 +378,7 @@ class RptVpnService : VpnService() {
                                 now - lastCoverMs.get() >= RptTrafficShape.PRODUCT_COVER_INTERVAL_MS
                             ) {
                                 val wire = engine.sealAndWrapCover()
-                                sock.send(DatagramPacket(wire, wire.size, endpoint))
+                                dataSock.send(DatagramPacket(wire, wire.size))
                                 lastCoverMs.set(now)
                             }
                         } catch (_: Exception) {
@@ -368,6 +397,18 @@ class RptVpnService : VpnService() {
                     outTun.close()
                 } catch (_: Exception) {
                 }
+                try {
+                    pfdIn.close()
+                } catch (_: Exception) {
+                }
+                try {
+                    pfdOut.close()
+                } catch (_: Exception) {
+                }
+                try {
+                    dataSock.close()
+                } catch (_: Exception) {
+                }
             } catch (e: Exception) {
                 report(false, "VPN tunnel error: ${e.message ?: e.javaClass.simpleName}")
             } finally {
@@ -378,6 +419,26 @@ class RptVpnService : VpnService() {
                 running.set(false)
             }
         }
+    }
+
+    /**
+     * Fresh UDP socket to the product node that is **VpnService.protect**-ed so
+     * residual traffic is not looped into the TUN (classic Android blackhole).
+     * Must be called **after** [Builder.establish].
+     */
+    private fun openProtectedNodeSocket(endpoint: InetSocketAddress): DatagramSocket {
+        val s = DatagramSocket()
+        // protect() after establish is required — pre-establish protect is unreliable.
+        if (!protect(s)) {
+            try {
+                s.close()
+            } catch (_: Exception) {
+            }
+            throw IllegalStateException("VpnService.protect returned false")
+        }
+        s.connect(endpoint)
+        s.soTimeout = 200
+        return s
     }
 
     /**

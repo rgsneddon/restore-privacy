@@ -294,6 +294,34 @@ class TestAndroidTunReadNotAvailableOnly(unittest.TestCase):
         self.assertIn("addDisallowedApplication", src)
         self.assertIn("addRoute(\"0.0.0.0\", 0)", src)
 
+    def test_post_establish_protect_and_no_ipv6_blackhole_route(self):
+        """Residual must re-protect UDP after establish; avoid ::/0 without IPv6 TUN."""
+        path = (
+            ROOT
+            / "client_app"
+            / "android"
+            / "app"
+            / "src"
+            / "main"
+            / "kotlin"
+            / "com"
+            / "restoreprivacy"
+            / "restore_privacy_client"
+            / "RptVpnService.kt"
+        )
+        src = path.read_text(encoding="utf-8")
+        self.assertIn("openProtectedNodeSocket", src)
+        self.assertIn("VpnService.protect returned false", src)
+        # establish then protected dataplane socket (order: establish appears before openProtected)
+        est = src.index("builder.establish()")
+        prot = src.index("openProtectedNodeSocket")
+        self.assertGreater(prot, est, "must protect node UDP after establish")
+        # Do not install IPv6 catch-all without handling (blackholes dual-stack under kill-switch)
+        self.assertNotIn('addRoute("::", 0)', src)
+        self.assertIn("allowFamily(OsConstants.AF_INET)", src)
+        self.assertIn("ParcelFileDescriptor.dup", src)
+        self.assertIn('addDnsServer("10.88.0.1")', src)
+
 
 if __name__ == "__main__":
     unittest.main()
