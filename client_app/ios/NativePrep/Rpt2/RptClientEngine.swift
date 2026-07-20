@@ -6,6 +6,9 @@ import CryptoKit
 /// Important: the node binds the session to the UDP source address of CLIENT_HELLO
 /// (`node/server.py`). HELLO and subsequent DATA/KEEPALIVE **must** share one long-lived
 /// socket (same as Android DatagramSocket / Python sock).
+///
+/// Product path uses **PFS**: ephemeral X25519 (`Curve25519.KeyAgreement`) in the HELLO
+/// hybrid payload and session IKM (`|pfs-x25519|`), matching Python `with_pfs=True`.
 public final class RptClientEngine {
     public struct Session {
         public let sessionId: Data
@@ -13,6 +16,7 @@ public final class RptClientEngine {
         public let vpnIp: String
         public let clientPub: Data
         public let clientNonce: Data
+        public let pfs: Bool
     }
 
     private let clientPrivRaw: Data
@@ -20,6 +24,8 @@ public final class RptClientEngine {
     private var sessionId: Data?
     private var sessionKey: Data?
     private var counterOut: UInt64 = 0
+    /// Ephemeral X25519 private key for the in-flight HELLO (PFS).
+    private var pendingClientEph: Curve25519.KeyAgreement.PrivateKey?
 
     /// Long-lived UDP transport used for HELLO + DATA + KEEPALIVE (node binds client_addr).
     private(set) public var transport: RptUDPTransport?
@@ -59,7 +65,11 @@ public final class RptClientEngine {
         var clientNonce = Data(count: 32)
         _ = clientNonce.withUnsafeMutableBytes { SecRandomCopyBytes(kSecRandomDefault, 32, $0.baseAddress!) }
         let (commit, opening) = RptPedersen.commitBytes(clientNonce)
-        let payload = clientNonce + opening.export()
+        // PFS: ephemeral X25519 public key (Python build_client_hello with_pfs=True)
+        let eph = Curve25519.KeyAgreement.PrivateKey()
+        self.pendingClientEph = eph
+        let ephPub = eph.publicKey.rawRepresentation
+        let payload = clientNonce + opening.export() + ephPub
         let hybrid = try packHybrid(plaintext: payload)
         let commitB = commit.export()
         var transcript = Data("RPT2-CLIENT-HELLO|".utf8)
@@ -80,6 +90,9 @@ public final class RptClientEngine {
         guard RptProtocol.peekType(reply) == .serverHello else {
             throw RptProtocol.ProtocolError("expected SERVER_HELLO")
         }
+        guard let clientEph = pendingClientEph else {
+            throw RptProtocol.ProtocolError("missing client ephemeral X25519 (call buildClientHello first)")
+        }
         let (sCommitB, sessionId, nonce, sealed) = try RptProtocol.parseServerHello(reply)
         var helloSharedMaterial = clientNonce
         helloSharedMaterial.append(clientPub)
@@ -94,8 +107,12 @@ public final class RptClientEngine {
         var aad = Data("RPT2-SERVER-HELLO".utf8)
         aad.append(sessionId)
         let plain = try helloCrypto.open(nonce: nonce, ciphertext: sealed, aad: aad)
-        guard plain.count >= 32 + 288 + 4 else {
-            throw RptProtocol.ProtocolError("SERVER_HELLO payload too short")
+        // Product PFS: server_nonce + opening + vpn_ip + server X25519 pub (32)
+        let serverEphOff = 32 + 288 + 4
+        guard plain.count >= serverEphOff + 32 else {
+            throw RptProtocol.ProtocolError(
+                "SERVER_HELLO missing server X25519 pub (product requires PFS)"
+            )
         }
         let serverNonce = Data(plain.prefix(32))
         let opening = try RptPedersen.Opening.importBytes(Data(plain.dropFirst(32).prefix(288)))
@@ -103,11 +120,18 @@ public final class RptClientEngine {
         _ = try RptPedersen.openVerified(commitment: commit, opening: opening)
         let ipBytes = Data(plain.dropFirst(32 + 288).prefix(4))
         let vpnIp = ipBytes.map { String($0) }.joined(separator: ".")
-
+        let serverEphPub = Data(plain.dropFirst(serverEphOff).prefix(32))
+        let peerPub = try Curve25519.KeyAgreement.PublicKey(rawRepresentation: serverEphPub)
+        let ephShared = try clientEph.sharedSecretFromKeyAgreement(with: peerPub)
+        // Python derive_pfs_session_shared — raw 32-byte ECDH output
+        var ephSharedBytes = Data()
+        ephShared.withUnsafeBytes { ephSharedBytes.append(contentsOf: $0) }
         var sessionSharedMaterial = clientNonce
         sessionSharedMaterial.append(serverNonce)
         sessionSharedMaterial.append(sessionId)
         sessionSharedMaterial.append(clientPub)
+        sessionSharedMaterial.append(Data("|pfs-x25519|".utf8))
+        sessionSharedMaterial.append(ephSharedBytes)
         let sessionShared = Data(SHA256.hash(data: sessionSharedMaterial))
         let sessionKey = RptSessionCrypto.deriveSessionKey(
             sharedSecret: sessionShared,
@@ -119,9 +143,11 @@ public final class RptClientEngine {
             sessionKey: sessionKey,
             vpnIp: vpnIp,
             clientPub: clientPub,
-            clientNonce: clientNonce
+            clientNonce: clientNonce,
+            pfs: true
         )
         applySession(session)
+        self.pendingClientEph = nil
         return session
     }
 
