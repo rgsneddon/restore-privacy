@@ -24,15 +24,19 @@ fi
 
 echo "[rpt-wipe-install] install wipe script"
 mkdir -p "${INSTALL_ROOT}/node"
-if [[ -f "$WIPE_SRC" ]]; then
-  cp -a "$WIPE_SRC" "$WIPE_DST"
-else
+if [[ ! -f "$WIPE_SRC" ]]; then
   echo "[rpt-wipe-install] ERROR: missing ${WIPE_SRC}" >&2
   exit 1
 fi
-chmod 755 "$WIPE_DST"
-# Also keep a copy next to live tree when install root differs
-cp -a "$WIPE_SRC" "${SCRIPT_DIR}/rpt_shutdown_wipe.sh" 2>/dev/null || true
+# Avoid "same file" failure when SCRIPT_DIR == INSTALL_ROOT/node (set -e)
+src_real="$(readlink -f "$WIPE_SRC" 2>/dev/null || echo "$WIPE_SRC")"
+dst_real="$(readlink -f "$WIPE_DST" 2>/dev/null || echo "$WIPE_DST")"
+if [[ "$src_real" != "$dst_real" ]]; then
+  cp -a "$WIPE_SRC" "$WIPE_DST"
+else
+  echo "[rpt-wipe-install] wipe script already at ${WIPE_DST}"
+fi
+chmod 755 "$WIPE_DST" 2>/dev/null || chmod 755 "$WIPE_SRC"
 
 echo "[rpt-wipe-install] wire ExecStop on ${SERVICE_NAME}.service (if present)"
 if [[ -f "$UNIT" ]]; then
@@ -80,7 +84,19 @@ WantedBy=halt.target reboot.target shutdown.target
 EOF
 
 systemctl daemon-reload 2>/dev/null || true
-systemctl enable rpt-node-shutdown-wipe.service 2>/dev/null || true
+# enable may warn on some hosts; unit files are still installed for halt/reboot
+if systemctl enable rpt-node-shutdown-wipe.service 2>/dev/null; then
+  echo "[rpt-wipe-install] enabled rpt-node-shutdown-wipe.service"
+else
+  echo "[rpt-wipe-install] WARN: could not enable shutdown wipe unit (files installed; enable later)" >&2
+fi
+# Reload node unit so ExecStop takes effect
+systemctl daemon-reload 2>/dev/null || true
+if systemctl cat rpt-node.service 2>/dev/null | grep -q rpt_shutdown_wipe; then
+  echo "[rpt-wipe-install] ExecStop wipe wired on rpt-node.service"
+else
+  echo "[rpt-wipe-install] WARN: ExecStop wipe not detected on rpt-node.service" >&2
+fi
 
 echo "[rpt-wipe-install] honesty: wipe is best-effort local; not provider snapshots"
 echo "[rpt-wipe-install] honesty: LUKS protects at rest; unlocked root can still read"

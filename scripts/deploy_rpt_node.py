@@ -30,15 +30,38 @@ except ImportError:
 ROOT = Path(__file__).resolve().parents[1]
 NODE_DIR = ROOT / "node"
 
-# Extra non-.py artifacts required for privacy install path
+# Extra non-.py artifacts required for privacy install path (0.2.3+).
+# Must stay complete: host-privacy composes FDE check + shutdown wipe.
 NODE_EXTRA = (
     "install.sh",
     "install_dns.sh",
     "install_host_privacy.sh",
+    "install_disk_encryption.sh",
+    "install_shutdown_wipe.sh",
+    "rpt_shutdown_wipe.sh",
     "unbound-rpt.conf",
 )
 
+# Privacy-critical Python modules that must be on the host (subset of *.py;
+# deploy still copies every node/*.py — this list is for structural gates).
+NODE_PRIVACY_PY = (
+    "nolog.py",
+    "obfuscation.py",
+    "traffic_shape.py",
+    "pfs.py",
+    "aggregate_metrics.py",
+    "disk_encryption.py",
+    "ephemeral_node.py",
+    "server.py",
+    "sessions.py",
+    "ui.py",
+    "config.py",
+    "key_backend.py",
+    "key_rotation.py",
+)
+
 DEFAULT_HOST = "82.221.101.241"
+INSTALL_ROOT = "/opt/restore-privacy"
 
 
 def _env_truthy(name: str) -> bool:
@@ -134,31 +157,65 @@ def main() -> int:
         with sftp.file(remote, "wb") as rf:
             rf.write(data)
 
+    missing_extra = [n for n in NODE_EXTRA if not (NODE_DIR / n).is_file()]
+    if missing_extra:
+        print(f"ERROR: deploy NODE_EXTRA missing locally: {missing_extra}", file=sys.stderr)
+        client.close()
+        return 1
+    missing_py = [n for n in NODE_PRIVACY_PY if not (NODE_DIR / n).is_file()]
+    if missing_py:
+        print(f"ERROR: privacy py modules missing locally: {missing_py}", file=sys.stderr)
+        client.close()
+        return 1
+
     sftp = client.open_sftp()
     for path in sorted(NODE_DIR.glob("*.py")):
-        remote = f"/opt/restore-privacy/node/{path.name}"
+        remote = f"{INSTALL_ROOT}/node/{path.name}"
         print(f"put {path.name}")
-        sftp.put(str(path), remote)
+        # Prefer LF-normalized text for pure-Python sources too
+        try:
+            put_text_lf(path, remote)
+        except Exception:
+            sftp.put(str(path), remote)
     for name in NODE_EXTRA:
         local = NODE_DIR / name
-        if not local.is_file():
-            print(f"WARN: missing {local}", file=sys.stderr)
-            continue
-        remote = f"/opt/restore-privacy/node/{name}"
+        remote = f"{INSTALL_ROOT}/node/{name}"
         print(f"put {name} (lf)")
         put_text_lf(local, remote)
     sftp.close()
 
-    run("chmod +x /opt/restore-privacy/node/install.sh /opt/restore-privacy/node/install_dns.sh /opt/restore-privacy/node/install_host_privacy.sh 2>/dev/null || true", as_root=True)
-    code, _ = run("bash /opt/restore-privacy/node/install.sh", timeout=900, as_root=True)
+    run(
+        "chmod +x "
+        f"{INSTALL_ROOT}/node/install.sh "
+        f"{INSTALL_ROOT}/node/install_dns.sh "
+        f"{INSTALL_ROOT}/node/install_host_privacy.sh "
+        f"{INSTALL_ROOT}/node/install_disk_encryption.sh "
+        f"{INSTALL_ROOT}/node/install_shutdown_wipe.sh "
+        f"{INSTALL_ROOT}/node/rpt_shutdown_wipe.sh "
+        "2>/dev/null || true",
+        as_root=True,
+    )
+    code, _ = run(f"bash {INSTALL_ROOT}/node/install.sh", timeout=900, as_root=True)
     if code != 0:
         print(f"install failed exit={code}", file=sys.stderr)
         client.close()
         return code or 1
 
-    # Privacy scripts again after TUN may exist
-    run("bash /opt/restore-privacy/node/install_dns.sh", timeout=300, as_root=True)
-    run("bash /opt/restore-privacy/node/install_host_privacy.sh", timeout=120, as_root=True)
+    # Privacy scripts again after TUN may exist (DNS + host privacy + FDE check + wipe)
+    run(f"bash {INSTALL_ROOT}/node/install_dns.sh", timeout=300, as_root=True)
+    run(f"bash {INSTALL_ROOT}/node/install_host_privacy.sh", timeout=180, as_root=True)
+    # Explicit non-destructive FDE check (also invoked from host_privacy)
+    run(
+        f"bash {INSTALL_ROOT}/node/install_disk_encryption.sh check || true",
+        timeout=60,
+        as_root=True,
+    )
+    # Ensure wipe unit is installed even if host_privacy skipped wipe step
+    run(
+        f"bash {INSTALL_ROOT}/node/install_shutdown_wipe.sh || true",
+        timeout=120,
+        as_root=True,
+    )
 
     time.sleep(2)
     run("systemctl daemon-reload; systemctl enable rpt-node.service", as_root=True)
@@ -173,12 +230,27 @@ def main() -> int:
         "ip addr show rpt0 || true",
         "curl -s http://127.0.0.1:8080/api/status || true",
         "test ! -d /var/log/rpt-node && echo no_rpt_log_dir=ok",
-        "test -f /opt/restore-privacy/secrets/node_elgamal.pub && echo node_pub=ok",
+        f"test -f {INSTALL_ROOT}/secrets/node_elgamal.pub && echo node_pub=ok",
         "systemctl is-active unbound 2>/dev/null || systemctl is-active unbound.service 2>/dev/null || true",
         "ss -ulnp | grep ':53' || true",
         "grep -E 'interface:|access-control' /etc/unbound/unbound.conf.d/rpt-tunnel.conf 2>/dev/null || true",
         "hostname -I || true",
         "grep -E 'Restart=|WantedBy=|network-online|StandardOutput' /etc/systemd/system/rpt-node.service || true",
+        # --- privacy prerequisite presence ---
+        f"test -f {INSTALL_ROOT}/node/nolog.py && echo nolog_py=ok",
+        f"test -f {INSTALL_ROOT}/node/aggregate_metrics.py && echo aggregate_metrics=ok",
+        f"test -f {INSTALL_ROOT}/node/disk_encryption.py && echo disk_encryption_py=ok",
+        f"test -f {INSTALL_ROOT}/node/install_disk_encryption.sh && echo fde_script=ok",
+        f"test -f {INSTALL_ROOT}/node/install_shutdown_wipe.sh && echo wipe_install=ok",
+        f"test -f {INSTALL_ROOT}/node/rpt_shutdown_wipe.sh && echo wipe_script=ok",
+        f"test -f {INSTALL_ROOT}/node/obfuscation.py && test -f {INSTALL_ROOT}/node/traffic_shape.py && echo wire_privacy_py=ok",
+        f"test -f {INSTALL_ROOT}/node/pfs.py && echo pfs_py=ok",
+        "grep -E 'StandardOutput=null|LogLevelMax=emerg' /etc/systemd/system/rpt-node.service && echo nolog_unit=ok || true",
+        "grep -E 'ExecStop=.*rpt_shutdown_wipe|rpt_shutdown_wipe' /etc/systemd/system/rpt-node.service && echo wipe_execstop=ok || true",
+        "systemctl is-enabled rpt-node-shutdown-wipe.service 2>/dev/null || true",
+        # title-only status (no clients_connected)
+        "curl -s http://127.0.0.1:8080/api/status | tee /tmp/rpt-status.json; "
+        "grep -q '\"title\"' /tmp/rpt-status.json && ! grep -q clients_connected /tmp/rpt-status.json && echo status_title_only=ok || true",
     ]:
         run(c, as_root=True)
 
