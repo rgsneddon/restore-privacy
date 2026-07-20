@@ -34,3 +34,14 @@ flutter build apk --release
 
 Never commit `*.priv`. Product keys: `client_ed25519.priv` + `node_elgamal.pub` only.  
 See Apple docs and Android inject path under `client_app/android`.
+
+## Android build dependencies
+
+From repo root on Windows:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File scripts\setup_android_build.ps1
+``` 
+
+Requires Flutter (C:\src\flutter), JDK 17, and Android SDK under %LOCALAPPDATA%\Android\Sdk.
+
