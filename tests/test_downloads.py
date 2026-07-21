@@ -111,6 +111,20 @@ class TestDownloadCatalog(unittest.TestCase):
         self.assertNotIn('href="#"', html)
         self.assertIn("data-price-pence=\"245\"", html)
 
+    def test_download_section_omits_long_pay_flow_copy(self):
+        """Public downloads: no long session-id success-page explainer block."""
+        html = render_download_section_html()
+        self.assertNotIn("Each button opens the payment page", html)
+        self.assertNotIn("Direct package files are not linked until paid", html)
+        self.assertNotIn('id="dl-pay-flow"', html)
+        self.assertNotIn('id="dl-claim-hint"', html)
+        self.assertNotIn("/download/success?session_id=", html)
+        # Pay buttons still present and usable
+        self.assertIn("Pay £2.45", html)
+        self.assertIn('id="dl-windows"', html)
+        self.assertIn("client_reference_id=windows", html)
+        self.assertIn("donate.stripe.com", html)
+
     def test_status_page_html_includes_paid_downloads(self):
         page = status_app.render_html({"title": "RESTORE PRIVACY"}).decode("utf-8")
         self.assertIn("RESTORE PRIVACY", page)

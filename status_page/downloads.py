@@ -269,12 +269,6 @@ def render_download_section_html(assets: Iterable[DownloadAsset] | None = None) 
     items = list(assets) if assets is not None else available_downloads()
     if not items:
         return ""
-    from payments import (
-        DEFAULT_PRODUCTION_PUBLIC_BASE_URL,
-        stripe_payment_page_url,
-    )
-
-    pay_base = stripe_payment_page_url()
     links = []
     for a in items:
         href = a.pay_path
@@ -286,7 +280,6 @@ def render_download_section_html(assets: Iterable[DownloadAsset] | None = None) 
             f"Pay {PRICE_LABEL} - {a.label}</a>"
         )
     links_html = "\n".join(links)
-    claim = f"{DEFAULT_PRODUCTION_PUBLIC_BASE_URL}/download/success"
     return f"""
   <section class="downloads" id="downloads" aria-label="Download Restore Privacy client">
     <h2>Download client v{RELEASE_VERSION}</h2>
@@ -294,11 +287,6 @@ def render_download_section_html(assets: Iterable[DownloadAsset] | None = None) 
       <span id="catalog-version">v{RELEASE_VERSION}</span>
       (paid download only; installers delivered after Stripe payment)</p>
     <p class="dl-price" id="dl-price">{PRICE_LABEL} GBP per package — pay on Stripe, then get a one-time download link</p>
-    <p class="dl-sub" id="dl-pay-flow">Each button opens the payment page
-      (<a href="{pay_base}" rel="noopener noreferrer" target="_blank" id="dl-payment-page-base">Stripe payment page</a>).
-      After payment, open your one-time link from the success page
-      (<code id="dl-claim-hint">{claim}?session_id=…</code>) or support with your Checkout session id.
-      Direct package files are not linked until paid.</p>
     <div class="dl-buttons">
 {links_html}
 {render_rust_footer_html()}
