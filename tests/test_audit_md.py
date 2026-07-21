@@ -44,9 +44,9 @@ class TestAuditMd(unittest.TestCase):
 
     def test_audit_has_severity_and_version(self):
         text = AUDIT.read_text(encoding="utf-8")
-        # Public ship 0.2.3 and/or prior reviewed versions
+        # Public ship 0.2.9 and/or prior reviewed versions
         self.assertTrue(
-            "0.2.3" in text
+            "0.2.9" in text
             or "1.0.0" in text
             or "0.2.1" in text
             or "0.2.0" in text
@@ -54,12 +54,12 @@ class TestAuditMd(unittest.TestCase):
             "AUDIT.md must cite the public product version and/or prior reviewed version",
         )
         self.assertIn("82.221.101.241", text)
-        # Catalog may mention 0.2.3 (current) or historical dual-repo notes
+        # Catalog may mention 0.2.9 (current) or historical dual-repo notes
         self.assertTrue(
-            "0.2.3" in text or "1.0.0" in text or "catalog" in text.lower(),
+            "0.2.9" in text or "1.0.0" in text or "catalog" in text.lower(),
             "AUDIT should mention product catalog version",
         )
-        self.assertNotIn("tests_0.2.3.log", text)
+        self.assertNotIn("tests_0.2.9.log", text)
         # Severity labels used in findings
         for sev in ("High", "Medium", "Low", "Info"):
             self.assertIn(sev, text)

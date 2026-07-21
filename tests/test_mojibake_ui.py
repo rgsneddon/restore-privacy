@@ -53,7 +53,7 @@ class TestDownloadsNoMojibake(unittest.TestCase):
         _assert_clean(html, "download html")
         self.assertIn(f"Download client v{RELEASE_VERSION}", html)
         self.assertIn("Windows | Linux | macOS | iOS | Android", html)
-        self.assertIn("releases/tag/0.2.3", html)
+        self.assertIn("releases/tag/0.2.9", html)
         self.assertIn("Pay", html)
         self.assertNotIn("apple-prep", html)
         self.assertNotIn("Â·", html)

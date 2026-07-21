@@ -262,7 +262,7 @@ echo "  Run GUI (root for full tunnel):"
 echo "    sudo $ROOT/bin/privacy-restored"
 echo "  Or: $ROOT/bin/privacy-restored   # will request elevation on Connect"
 '''
-    (stage / "install.sh").write_text(content.replace("\r\n", "\n"), encoding="utf-8", newline="\n")
+    (stage / "install.sh").write_text(content.replace("\r\n", "\n"), encoding="utf-8")
 
 
 def write_launcher(stage: Path) -> None:
@@ -286,7 +286,6 @@ exec "$VENV_PY" -m client.linux "$@"
             "\r\n", "\n"
         ),
         encoding="utf-8",
-        newline="\n",
     )
 
 
@@ -328,17 +327,14 @@ sudo ./bin/privacy-restored
 Press **Connect**. Residual public IP changes only when TUN + dual /1 are active.
 """,
         encoding="utf-8",
-        newline="\n",
     )
     (stage / "LINUX_UBUNTU.md").write_text(
         f"See LINUX_INSTALL.md for the bake-in installer package ({VERSION}).\n",
         encoding="utf-8",
-        newline="\n",
     )
     (stage / "LINUX_MINT.md").write_text(
         f"See LINUX_INSTALL.md — same package for Mint and Ubuntu ({VERSION}).\n",
         encoding="utf-8",
-        newline="\n",
     )
 
 
@@ -415,7 +411,6 @@ def main() -> int:
                 "#!/usr/bin/env bash\n"
                 'exec bash "$(cd "$(dirname "$0")" && pwd)/install.sh" "$@"\n',
                 encoding="utf-8",
-                newline="\n",
             )
 
         for p in stage.rglob("*.priv"):

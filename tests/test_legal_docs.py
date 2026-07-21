@@ -53,15 +53,15 @@ class TestPrivacyPolicy(unittest.TestCase):
         self.assertIn("LICENSE", text)
         self.assertIn("README", text)
 
-    def test_policy_public_catalog_is_v0_2_3(self):
-        """User-facing policy must advertise public catalog v0.2.3 as current signed ship."""
+    def test_policy_public_catalog_is_v0_2_9(self):
+        """User-facing policy must advertise public catalog v0.2.9 as current signed ship."""
         text = _read("PRIVACY_POLICY.md")
-        self.assertIn("0.2.3", text)
-        self.assertIn("releases/tag/0.2.3", text)
+        self.assertIn("0.2.9", text)
+        self.assertIn("releases/tag/0.2.9", text)
         self.assertIn("Developer ID", text)
         self.assertIn("Team-signed", text)
         self.assertIn(
-            "https://github.com/rgsneddon/restore-privacy/releases/tag/0.2.3",
+            "https://github.com/rgsneddon/restore-privacy/releases/tag/0.2.9",
             text,
         )
         # Must not claim RUST-IN-PRIVACY v1.0.0 as the current public packages line
@@ -108,16 +108,16 @@ class TestReadmeHowto(unittest.TestCase):
         self.assertIn("android", lower)
         self.assertIn("macos", lower)
         self.assertIn("ios", lower)
-        # Public ship is restore-privacy 0.2.3 (signed)
-        self.assertIn("0.2.3", text)
-        self.assertIn("releases/tag/0.2.3", text)
+        # Public ship is restore-privacy 0.2.9 (signed)
+        self.assertIn("0.2.9", text)
+        self.assertIn("releases/tag/0.2.9", text)
         self.assertIn("Developer ID", text)
         self.assertIn("Team-signed", text)
         self.assertNotIn("prep stubs", lower)
         self.assertNotIn("prep packages only", lower)
         # Package basenames from the public release catalog
         self.assertIn(
-            "restore-privacy-client-0.2.3-windows-x64-setup.exe",
+            "restore-privacy-client-0.2.9-windows-x64-setup.exe",
             text,
         )
         self.assertIn("android.apk", text)

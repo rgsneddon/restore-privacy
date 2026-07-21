@@ -45,7 +45,7 @@ class TestPaidDownloadUI(unittest.TestCase):
             self.assertNotIn(f'href="{a.url}"', html)
         self.assertNotIn('href="#"', html)
         # Page still cites the release as package source (not free button target)
-        self.assertIn("releases/tag/0.2.3", html)
+        self.assertIn("releases/tag/0.2.9", html)
 
     def test_status_page_html_paid_flow(self):
         page = status_app.render_html({"title": "RESTORE PRIVACY"}).decode("utf-8")
@@ -53,7 +53,7 @@ class TestPaidDownloadUI(unittest.TestCase):
         self.assertIn("£2.45", page)
         self.assertIn(BMC_TIP_URL, page)
         self.assertNotIn(
-            'href="https://github.com/rgsneddon/restore-privacy/releases/download/0.2.3/restore-privacy-client-0.2.3-windows-x64-setup.exe"',
+            'href="https://github.com/rgsneddon/restore-privacy/releases/download/0.2.9/restore-privacy-client-0.2.9-windows-x64-setup.exe"',
             page,
         )
 
@@ -68,7 +68,7 @@ class TestCheckoutAmount(unittest.TestCase):
     def test_checkout_form_body_includes_245_gbp_and_platform(self):
         creq = payments.CheckoutRequest(
             platform="windows",
-            filename="restore-privacy-client-0.2.3-windows-x64-setup.exe",
+            filename="restore-privacy-client-0.2.9-windows-x64-setup.exe",
             success_url="https://example.test/success",
             cancel_url="https://example.test/cancel",
         )
@@ -81,7 +81,7 @@ class TestCheckoutAmount(unittest.TestCase):
         self.assertEqual(parsed["metadata[platform]"], ["windows"])
         self.assertEqual(
             parsed["metadata[filename]"],
-            ["restore-privacy-client-0.2.3-windows-x64-setup.exe"],
+            ["restore-privacy-client-0.2.9-windows-x64-setup.exe"],
         )
         self.assertEqual(parsed["metadata[amount_pence]"], ["245"])
 
@@ -193,7 +193,7 @@ class TestWebhookAndTokens(unittest.TestCase):
                         "id": "cs_x",
                         "metadata": {
                             "platform": "linux",
-                            "filename": "restore-privacy-client-0.2.3-linux-x64.tar.gz",
+                            "filename": "restore-privacy-client-0.2.9-linux-x64.tar.gz",
                             "amount_pence": "245",
                             "currency": "gbp",
                         },
@@ -220,7 +220,7 @@ class TestWebhookAndTokens(unittest.TestCase):
                         "currency": "gbp",
                         "metadata": {
                             "platform": "windows",
-                            "filename": "restore-privacy-client-0.2.3-windows-x64-setup.exe",
+                            "filename": "restore-privacy-client-0.2.9-windows-x64-setup.exe",
                             "amount_pence": "245",
                             "currency": "gbp",
                         },
@@ -259,7 +259,7 @@ class TestWebhookAndTokens(unittest.TestCase):
                         "id": "cs_bad_amt",
                         "metadata": {
                             "platform": "ios",
-                            "filename": "restore-privacy-client-0.2.3-ios.zip",
+                            "filename": "restore-privacy-client-0.2.9-ios.zip",
                             "amount_pence": "999",
                             "currency": "gbp",
                         },
@@ -303,7 +303,7 @@ class TestAdminAuth(unittest.TestCase):
     def test_admin_html_lists_grants_callable(self):
         payments.init_db()
         payments.mint_download_token(
-            filename="restore-privacy-client-0.2.3-macos.zip",
+            filename="restore-privacy-client-0.2.9-macos.zip",
             platform="macos",
             session_id="cs_admin",
         )
@@ -384,7 +384,7 @@ class TestBuyerSuccessFulfilment(unittest.TestCase):
                         "currency": "gbp",
                         "metadata": {
                             "platform": "linux",
-                            "filename": "restore-privacy-client-0.2.3-linux-x64.tar.gz",
+                            "filename": "restore-privacy-client-0.2.9-linux-x64.tar.gz",
                             "amount_pence": "245",
                             "currency": "gbp",
                         },
@@ -419,7 +419,7 @@ class TestBuyerSuccessFulfilment(unittest.TestCase):
                         "currency": "gbp",
                         "metadata": {
                             "platform": "windows",
-                            "filename": "restore-privacy-client-0.2.3-windows-x64-setup.exe",
+                            "filename": "restore-privacy-client-0.2.9-windows-x64-setup.exe",
                             "amount_pence": "245",
                             "currency": "gbp",
                         },
@@ -579,7 +579,7 @@ class TestAdminHtmlArchitecture(unittest.TestCase):
     def test_authenticated_admin_has_settings_and_grants(self):
         payments.init_db()
         payments.mint_download_token(
-            filename="restore-privacy-client-0.2.3-android.apk",
+            filename="restore-privacy-client-0.2.9-android.apk",
             platform="android",
             session_id="cs_arch_1",
         )
@@ -600,7 +600,7 @@ class TestAdminHtmlArchitecture(unittest.TestCase):
     def test_project_grants_uses_real_store(self):
         payments.init_db()
         tok = payments.mint_download_token(
-            filename="restore-privacy-client-0.2.3-linux-x64.tar.gz",
+            filename="restore-privacy-client-0.2.9-linux-x64.tar.gz",
             platform="linux",
             session_id="cs_proj",
         )

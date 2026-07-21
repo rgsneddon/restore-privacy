@@ -1,10 +1,10 @@
-"""Release download catalog + paid download UI (version 0.2.3).
+"""Release download catalog + paid download UI (version 0.2.9).
 
 Primary path: pay **£2.45** (GBP) via Stripe Checkout per package, then a
 single-use download token. Free permanent GitHub ``href`` is not used on the
 public buttons. Buy Me a Coffee is tip/support only.
 
-Current public packages: restore-privacy GitHub Release **0.2.3**
+Current public packages: restore-privacy GitHub Release **0.2.9**
 (macOS Developer ID notarized; iOS Team-signed sideload).
 """
 
@@ -15,10 +15,10 @@ from typing import Iterable
 
 from coffee_link import COFFEE_LINK_URL, coffee_tip_url
 
-RELEASE_VERSION = "0.2.3"
+RELEASE_VERSION = "0.2.9"
 GITHUB_OWNER = "rgsneddon"
 GITHUB_REPO = "restore-privacy"
-RELEASE_TAG = "0.2.3"
+RELEASE_TAG = "0.2.9"
 RELEASE_PAGE_URL = (
     f"https://github.com/{GITHUB_OWNER}/{GITHUB_REPO}/releases/tag/{RELEASE_TAG}"
 )
@@ -26,7 +26,7 @@ RELEASE_DOWNLOAD_BASE = (
     f"https://github.com/{GITHUB_OWNER}/{GITHUB_REPO}/releases/download/{RELEASE_TAG}"
 )
 
-# Canonical public asset filenames (must match GitHub Release 0.2.3 assets).
+# Canonical public asset filenames (must match GitHub Release 0.2.9 assets).
 WINDOWS_EXE_FILENAME = f"restore-privacy-client-{RELEASE_VERSION}-windows-x64-setup.exe"
 ANDROID_APK_FILENAME = f"restore-privacy-client-{RELEASE_VERSION}-android.apk"
 MACOS_ZIP_FILENAME = f"restore-privacy-client-{RELEASE_VERSION}-macos.zip"
@@ -108,12 +108,12 @@ def available_downloads(
     return out
 
 
-# Footer: explicit link to the public 0.2.3 release page (package source of truth).
+# Footer: explicit link to the public 0.2.9 release page (package source of truth).
 RUST_REPO_URL = RELEASE_PAGE_URL
-RUST_REPO_LABEL = "Package source - restore-privacy 0.2.3 release (signed)"
+RUST_REPO_LABEL = "Package source - restore-privacy 0.2.9 release (signed)"
 
 
-# Compatibility aliases used by older tests (map to 0.2.3 installers).
+# Compatibility aliases used by older tests (map to 0.2.9 installers).
 WINDOWS_ZIP_FILENAME = WINDOWS_EXE_FILENAME
 
 
@@ -187,7 +187,7 @@ def render_download_section_html(assets: Iterable[DownloadAsset] | None = None) 
   <section class="downloads" id="downloads" aria-label="Download Restore Privacy client">
     <h2>Download client v{RELEASE_VERSION}</h2>
     <p class="dl-sub">Windows | Linux | macOS | iOS | Android - packages from
-      <a class="rust-link" href="{RELEASE_PAGE_URL}" rel="noopener noreferrer" target="_blank">0.2.3 release</a></p>
+      <a class="rust-link" href="{RELEASE_PAGE_URL}" rel="noopener noreferrer" target="_blank">0.2.9 release</a></p>
     <p class="dl-price" id="dl-price">{PRICE_LABEL} GBP per package download (Stripe Checkout)</p>
     <div class="dl-buttons">
 {links_html}

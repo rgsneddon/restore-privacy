@@ -74,7 +74,7 @@ class TestSecurityAuditArtifacts(unittest.TestCase):
         results = {
             "generated_at": "2026-07-21T00:00:00Z",
             "node_host": "82.221.101.241",
-            "catalog_version": "0.2.3",
+            "catalog_version": "0.2.9",
             "unit_suite": {
                 "ran": True,
                 "ok": True,
@@ -93,7 +93,7 @@ class TestSecurityAuditArtifacts(unittest.TestCase):
         md = mod.build_markdown(results)
         self.assertIn("residual_ip_capture", md)
         self.assertIn("82.221.101.241", md)
-        self.assertIn("0.2.3", md)
+        self.assertIn("0.2.9", md)
         self.assertIn("**PASS**", md)
         self.assertIn("title-only=True", md)
         self.assertNotIn("dpi-undetectable", md.lower())

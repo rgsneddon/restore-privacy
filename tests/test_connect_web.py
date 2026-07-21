@@ -90,9 +90,9 @@ class TestConnectViaWebHttp(unittest.TestCase):
                 self.assertNotIn("Connect via web", html)
                 # Downloads present; connect-via-web section remains off
                 self.assertTrue(
-                    "releases/tag/0.2.3" in html
-                    or "releases/download/0.2.3/" in html
-                    or "restore-privacy-client-0.2.3-" in html,
+                    "releases/tag/0.2.9" in html
+                    or "releases/download/0.2.9/" in html
+                    or "restore-privacy-client-0.2.9-" in html,
                     html[:500],
                 )
 

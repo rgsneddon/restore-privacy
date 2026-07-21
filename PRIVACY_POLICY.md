@@ -2,7 +2,7 @@
 
 **Last updated:** 21 July 2026  
 **Product:** Restore Privacy Tunnel (RPT / RPT2) — custom VPN node, client apps, and public status page  
-**Current public packages:** [v0.2.3](https://github.com/rgsneddon/restore-privacy/releases/tag/0.2.3) (Windows · Android · macOS · iOS · Linux — macOS Developer ID notarized; iOS Team-signed sideload)  
+**Current public packages:** [v0.2.9](https://github.com/rgsneddon/restore-privacy/releases/tag/0.2.9) (Windows · Android · macOS · iOS · Linux — macOS Developer ID notarized; iOS Team-signed sideload)  
 **Code & policy audit:** [AUDIT.md](AUDIT.md)  
 **Operator / project:** Russell G Sneddon (`rgsneddon`) / [restore-privacy](https://github.com/rgsneddon/restore-privacy)
 
@@ -68,7 +68,7 @@ Process stdout/stderr for the node service is configured for **no journal sessio
 - Displays the product **title**, beta note, and **download links** only.
 - Does **not** expose a live connected-client count or poll a session metric on the public HTML surface.
 - Optional `/api/status` JSON is **title-only** (no `clients_connected`).
-- May offer **download links** to public GitHub release packages (current catalog: **v0.2.3** on [restore-privacy](https://github.com/rgsneddon/restore-privacy/releases/tag/0.2.3); asset URLs under `…/releases/download/0.2.3/`).
+- May offer **download links** to public GitHub release packages (current catalog: **v0.2.9** on [restore-privacy](https://github.com/rgsneddon/restore-privacy/releases/tag/0.2.9); asset URLs under `…/releases/download/0.2.9/`).
 
 ### 3.4 Operator-held secrets
 
