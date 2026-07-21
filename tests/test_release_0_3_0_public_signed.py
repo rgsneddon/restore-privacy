@@ -121,27 +121,68 @@ class TestLocal029PackagesIfPresent(unittest.TestCase):
         import tarfile
 
         for path in present:
-            if path.name.endswith(".exe"):
-                blob = product.read_bytes()
-                self.assertGreaterEqual(
-                    path.read_bytes().count(blob),
-                    1,
-                    f"{path.name} missing product node_elgamal.pub blob",
-                )
-                continue
             pubs: list[tuple[str, str]] = []
-            if path.name.endswith(".tar.gz"):
+            if path.name.endswith(".exe"):
+                # May be PyInstaller onefile (raw blob) or 7z SFX (compressed).
+                blob = product.read_bytes()
+                if path.read_bytes().count(blob) >= 1:
+                    continue
+                # 7z SFX: extract members and verify node_elgamal.pub
+                if not shutil.which("7z"):
+                    self.skipTest("7z required to inspect compressed Windows SFX")
+                with tempfile.TemporaryDirectory() as td:
+                    tdp = Path(td)
+                    r = subprocess.run(
+                        ["7z", "x", "-y", str(path), f"-o{tdp}"],
+                        capture_output=True,
+                        text=True,
+                    )
+                    self.assertEqual(r.returncode, 0, r.stderr + r.stdout)
+                    found = list(tdp.rglob("node_elgamal.pub"))
+                    self.assertTrue(found, f"{path.name}: no node_elgamal.pub after 7z x")
+                    for fp in found:
+                        dig = hashlib.sha256(fp.read_bytes()).hexdigest()
+                        pubs.append((str(fp.relative_to(tdp)), dig))
+                    # No flyclient in extracted tree
+                    self.assertFalse(
+                        list(tdp.rglob("flyclient_connect.py")),
+                        f"{path.name} still embeds flyclient_connect.py",
+                    )
+                    conn = next(
+                        (
+                            p
+                            for p in tdp.rglob("connect.py")
+                            if "client" in str(p)
+                        ),
+                        None,
+                    )
+                    if conn is not None:
+                        ctext = conn.read_text(encoding="utf-8", errors="replace")
+                        self.assertNotIn("flyclient", ctext.lower())
+                        self.assertIn("HELLO sent", ctext)
+            elif path.name.endswith(".tar.gz"):
                 with tarfile.open(path, "r:*") as tf:
                     for m in tf.getmembers():
                         if m.name.endswith("node_elgamal.pub") and m.isfile():
                             dig = hashlib.sha256(tf.extractfile(m).read()).hexdigest()
                             pubs.append((m.name, dig))
+                        if m.name.endswith("flyclient_connect.py"):
+                            self.fail(f"{path.name} embeds {m.name}")
+                    # always-HELLO path in connect.py
+                    for m in tf.getmembers():
+                        if m.name.endswith("client/connect.py"):
+                            ctext = tf.extractfile(m).read().decode("utf-8", errors="replace")
+                            self.assertNotIn("flyclient", ctext.lower())
+                            self.assertIn("HELLO sent", ctext)
+                            break
             else:
                 with zipfile.ZipFile(path) as zf:
                     for n in zf.namelist():
                         if n.endswith("node_elgamal.pub"):
                             dig = hashlib.sha256(zf.read(n)).hexdigest()
                             pubs.append((n, dig))
+                        if "flyclient" in n.lower():
+                            self.fail(f"{path.name} embeds {n}")
             self.assertTrue(pubs, f"{path.name}: no node_elgamal.pub")
             for n, dig in pubs:
                 self.assertEqual(
