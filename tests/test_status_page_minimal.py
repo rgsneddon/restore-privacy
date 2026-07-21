@@ -51,10 +51,13 @@ class TestPublicPageWithDownloads(unittest.TestCase):
         self.assertIn(IOS_ZIP_FILENAME, html)
         self.assertIn(ANDROID_APK_FILENAME, html)
         self.assertNotIn("apple-prep", html)
+        self.assertIn("Coming soon", html)
+        self.assertIn("https://restoreprivacy.online", html)
         for a in available_downloads():
-            self.assertIn(f'href="{a.pay_path}"', html)
-            self.assertIn(f"client_reference_id={a.platform}", html)
+            # Temporary mode: redundant host hrefs, not live Stripe pay_path
+            self.assertNotIn(f'href="{a.pay_path}"', html)
             self.assertNotIn(f'href="{a.url}"', html)
+            self.assertIn(f'id="dl-{a.platform}"', html)
             self.assertTrue(
                 a.url.startswith(
                     "https://github.com/rgsneddon/restore-privacy/releases/download/0.3.4/"
@@ -104,11 +107,13 @@ class TestPublicPageWithDownloads(unittest.TestCase):
                     self.assertNotIn("fetch('/api/status'", html)
                     self.assertIn("Download client v0.3.4", html)
                     self.assertIn(WINDOWS_ZIP_FILENAME, html)
-                    self.assertIn("donate.stripe.com", html)
-                    self.assertIn("client_reference_id=windows", html)
+                    self.assertIn("Coming soon", html)
+                    self.assertIn("https://restoreprivacy.online", html)
+                    self.assertNotIn("donate.stripe.com", html)
                     self.assertIn("£2.45", html)
                     self.assertNotIn('id="rust-repo-link"', html)
                     self.assertNotIn("installers after £2.45 payment only", html)
+                    self.assertNotIn("releases/download/", html)
         finally:
             httpd.shutdown()
             httpd.server_close()

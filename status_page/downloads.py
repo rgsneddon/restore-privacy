@@ -145,6 +145,38 @@ PRICE_LABEL = "£2.45"
 # Default tip identity; runtime public page uses coffee_tip_url() (env override).
 BMC_TIP_URL = COFFEE_LINK_URL
 
+# --- Temporary public buy-button mode (while packages finish qualification) ---
+# Default ON: platform controls show "Coming soon" and self-link to the public
+# host (no Stripe checkout). Flip CATALOG_BUY_BUTTONS_COMING_SOON to False, or
+# set env RPT_CATALOG_BUY_LIVE=1 / RPT_CATALOG_BUY_COMING_SOON=0, to restore the
+# live Stripe Pay architecture without redesigning the catalog/pay pipeline.
+CATALOG_BUY_BUTTONS_COMING_SOON = True
+COMING_SOON_PUBLIC_HREF = "https://restoreprivacy.online"
+
+
+def catalog_buy_buttons_coming_soon() -> bool:
+    """True when public platform controls are temporary coming-soon self-links.
+
+    Switch-back (live Stripe Pay buttons):
+      - set ``CATALOG_BUY_BUTTONS_COMING_SOON = False`` in this module, **or**
+      - ``RPT_CATALOG_BUY_LIVE=1`` / ``true`` / ``yes`` / ``on``, **or**
+      - ``RPT_CATALOG_BUY_COMING_SOON=0`` / ``false`` / ``no`` / ``off``
+
+    Force coming-soon even if the constant is False:
+      - ``RPT_CATALOG_BUY_COMING_SOON=1`` / ``true`` / ``yes`` / ``on``
+    """
+    import os
+
+    live = os.environ.get("RPT_CATALOG_BUY_LIVE", "").strip().lower()
+    if live in ("1", "true", "yes", "on"):
+        return False
+    cs = os.environ.get("RPT_CATALOG_BUY_COMING_SOON", "").strip().lower()
+    if cs in ("0", "false", "no", "off"):
+        return False
+    if cs in ("1", "true", "yes", "on"):
+        return True
+    return bool(CATALOG_BUY_BUTTONS_COMING_SOON)
+
 
 @dataclass(frozen=True)
 class DownloadAsset:
@@ -329,6 +361,8 @@ def download_css() -> str:
     a.dl#dl-ios:hover, button.dl#dl-ios:hover { background: #7c3aed; }
     a.dl#dl-linux, button.dl#dl-linux { background: #b45309; }
     a.dl#dl-linux:hover, button.dl#dl-linux:hover { background: #d97706; }
+    a.dl.dl-coming-soon, button.dl.dl-coming-soon { opacity: 0.92; }
+    a.dl.dl-coming-soon:hover, button.dl.dl-coming-soon:hover { opacity: 1; }
     .dl-footer { margin-top: 1.25rem; font-size: 0.9rem; line-height: 1.45; width: 100%; }
     .dl-footer a.catalog-link { color:#93c5fd; text-decoration:underline; font-weight:600; }
     .dl-footer a.catalog-link:hover { color:#bfdbfe; }
@@ -378,8 +412,32 @@ def render_catalog_footer_html() -> str:
 render_rust_footer_html = render_catalog_footer_html
 
 
-def _render_platform_pay_link(a: DownloadAsset) -> str:
-    """One paid platform control (stable id + pay attrs for existing tests)."""
+def _render_platform_pay_link(
+    a: DownloadAsset,
+    *,
+    coming_soon: bool | None = None,
+) -> str:
+    """One platform control (stable id + data attrs for layout/tests).
+
+    When *coming_soon* is true (default via :func:`catalog_buy_buttons_coming_soon`),
+    the control is a **Coming soon** label with a redundant href to
+    :data:`COMING_SOON_PUBLIC_HREF` (https://restoreprivacy.online) — not Stripe.
+
+    When *coming_soon* is false, restores the live Stripe Payment Link path
+    (``data-pay-via="stripe-payment-page"``, ``Pay £2.45 - …``).
+    """
+    if coming_soon is None:
+        coming_soon = catalog_buy_buttons_coming_soon()
+    if coming_soon:
+        href = COMING_SOON_PUBLIC_HREF
+        return (
+            f'<a class="dl dl-coming-soon" id="dl-{a.platform}" href="{href}" '
+            f'rel="noopener noreferrer" '
+            f'data-platform="{a.platform}" data-filename="{a.filename}" '
+            f'data-price-pence="245" data-pay-via="coming-soon" '
+            f'data-coming-soon="1">'
+            f"Coming soon - {a.label}</a>"
+        )
     href = a.pay_path
     return (
         f'<a class="dl" id="dl-{a.platform}" href="{href}" '
@@ -400,35 +458,63 @@ def download_menu_rows(
     return items[:3], items[3:]
 
 
-def render_download_section_html(assets: Iterable[DownloadAsset] | None = None) -> str:
-    """HTML: pay via Stripe, then thank-you + one-time download on restoreprivacy.online.
+def render_download_section_html(
+    assets: Iterable[DownloadAsset] | None = None,
+    *,
+    coming_soon: bool | None = None,
+) -> str:
+    """HTML: platform buy controls (live Stripe pay **or** temporary coming-soon).
 
     Platform menu below the download title is **two rows**: three items, then two.
+
+    *coming_soon* defaults to :func:`catalog_buy_buttons_coming_soon`. Pass
+    ``coming_soon=False`` (or env live switch) to restore Stripe Pay buttons.
     """
     items = list(assets) if assets is not None else available_downloads()
     if not items:
         return ""
-    from payments import stripe_payment_page_url
+    if coming_soon is None:
+        coming_soon = catalog_buy_buttons_coming_soon()
 
-    # pay_base kept for potential footer/how-to; buttons use per-platform pay_path.
-    _ = stripe_payment_page_url()
+    if not coming_soon:
+        from payments import stripe_payment_page_url
+
+        # Keep pay pipeline imported/ready; buttons use per-platform pay_path.
+        _ = stripe_payment_page_url()
+
     row1, row2 = download_menu_rows(items)
-    row1_html = "\n      ".join(_render_platform_pay_link(a) for a in row1)
+    row1_html = "\n      ".join(
+        _render_platform_pay_link(a, coming_soon=coming_soon) for a in row1
+    )
     row2_block = ""
     if row2:
-        row2_html = "\n      ".join(_render_platform_pay_link(a) for a in row2)
+        row2_html = "\n      ".join(
+            _render_platform_pay_link(a, coming_soon=coming_soon) for a in row2
+        )
         row2_block = f"""
     <div class="dl-row dl-row-2" id="dl-row-2" data-dl-row="2" data-dl-count="{len(row2)}">
       {row2_html}
     </div>"""
+    if coming_soon:
+        price_line = (
+            f"{PRICE_LABEL} GBP per package when available — "
+            f"buy buttons coming soon (links return to restoreprivacy.online)"
+        )
+        buttons_mode = ' data-buy-mode="coming-soon"'
+    else:
+        price_line = (
+            f"{PRICE_LABEL} GBP per package — pay on Stripe, "
+            f"then download starts automatically"
+        )
+        buttons_mode = ' data-buy-mode="stripe-live"'
     # Order: title/price → pay controls → red payment disclaimer → BMC tip
     # (disclaimer is bottom of the shop section, immediately above buymeacoffee).
     return f"""
   <section class="downloads" id="downloads" aria-label="Download Restore Privacy client">
     <h2>Download client v{RELEASE_VERSION}</h2>
     <p class="dl-sub">Windows | Linux | macOS | iOS | Android</p>
-    <p class="dl-price" id="dl-price">{PRICE_LABEL} GBP per package — pay on Stripe, then download starts automatically</p>
-    <div class="dl-buttons" id="dl-buttons" data-dl-layout="3+2">
+    <p class="dl-price" id="dl-price">{price_line}</p>
+    <div class="dl-buttons" id="dl-buttons" data-dl-layout="3+2"{buttons_mode}>
     <div class="dl-row dl-row-3" id="dl-row-1" data-dl-row="1" data-dl-count="{len(row1)}">
       {row1_html}
     </div>{row2_block}

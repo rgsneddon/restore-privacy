@@ -92,7 +92,9 @@ class TestDownloadCatalog(unittest.TestCase):
         self.assertIn('id="dl-android"', html)
         self.assertIn("£2.45", html)
         self.assertIn(BMC_TIP_URL, html)
-        self.assertIn("Pay £2.45", html)
+        # Temporary default: Coming soon self-links (not live Pay £2.45 checkout)
+        self.assertIn("Coming soon", html)
+        self.assertIn("https://restoreprivacy.online", html)
         # Free permanent GitHub installer hrefs must not appear in public HTML.
         self.assertNotIn("releases/download/0.3.4/", html)
         # FULL CATALOGUE / catalog footer link must not be visible on public downloads.
@@ -119,7 +121,7 @@ class TestDownloadCatalog(unittest.TestCase):
         self.assertIn('id="dl-row-2"', html)
         self.assertIn('data-dl-count="3"', html)
         self.assertIn('data-dl-count="2"', html)
-        # All five platform controls still present with pay attrs
+        # All five platform controls still present with stable ids/attrs
         for a in assets:
             self.assertIn(f'id="dl-{a.platform}"', html)
             self.assertIn(f'data-platform="{a.platform}"', html)
@@ -134,9 +136,10 @@ class TestDownloadCatalog(unittest.TestCase):
         row2_at = html.find('id="dl-row-2"')
         self.assertGreater(row1_at, head_at)
         self.assertGreater(row2_at, row1_at)
+        # Temporary mode: redundant host hrefs, not Stripe / free GitHub
         for a in available_downloads():
-            self.assertIn(f'href="{a.pay_path}"', html)
-            self.assertIn(f"client_reference_id={a.platform}", html)
+            self.assertIn('href="https://restoreprivacy.online"', html)
+            self.assertNotIn(f'href="{a.pay_path}"', html)
             self.assertNotIn(f'href="{a.url}"', html)
 
     def test_available_downloads_have_https_github_release_urls(self):
@@ -147,9 +150,12 @@ class TestDownloadCatalog(unittest.TestCase):
     def test_render_download_section_uses_paid_paths(self):
         html = render_download_section_html()
         self.assertIn(f"Download client v{RELEASE_VERSION}", html)
-        self.assertIn('class="dl"', html)
+        # Temporary mode uses class="dl dl-coming-soon"; live mode uses class="dl"
+        self.assertIn('class="dl', html)
         self.assertNotIn('href="#"', html)
         self.assertIn("data-price-pence=\"245\"", html)
+        self.assertIn("Coming soon", html)
+        self.assertIn("https://restoreprivacy.online", html)
 
     def test_download_section_omits_long_pay_flow_copy(self):
         """Public downloads: no long session-id success-page explainer block."""
@@ -159,11 +165,11 @@ class TestDownloadCatalog(unittest.TestCase):
         self.assertNotIn('id="dl-pay-flow"', html)
         self.assertNotIn('id="dl-claim-hint"', html)
         self.assertNotIn("/download/success?session_id=", html)
-        # Pay buttons still present and usable
-        self.assertIn("Pay £2.45", html)
+        # Platform controls present (temporary Coming soon default)
+        self.assertIn("Coming soon", html)
         self.assertIn('id="dl-windows"', html)
-        self.assertIn("client_reference_id=windows", html)
-        self.assertIn("donate.stripe.com", html)
+        self.assertIn("https://restoreprivacy.online", html)
+        self.assertNotIn("donate.stripe.com", html)
         # No bottom generic “Stripe payment page” footer link
         self.assertNotIn('id="stripe-payment-page-link"', html)
         self.assertNotIn(">Stripe payment page<", html)
@@ -202,12 +208,15 @@ class TestDownloadCatalog(unittest.TestCase):
         self.assertIn("RESTORE PRIVACY", page)
         self.assertNotIn("clients-connected", page)
         self.assertIn(f"Download client v{RELEASE_VERSION}", page)
-        self.assertIn("donate.stripe.com", page)
-        self.assertIn("client_reference_id=windows", page)
+        # Temporary default: Coming soon self-links (not live Stripe checkout)
+        self.assertIn("Coming soon", page)
+        self.assertIn("https://restoreprivacy.online", page)
+        self.assertNotIn("donate.stripe.com", page)
         self.assertIn("£2.45", page)
         self.assertIn(WINDOWS_ZIP_FILENAME, page)  # data-filename
         self.assertIn(ANDROID_APK_FILENAME, page)
         self.assertIn(BMC_TIP_URL, page)
+        self.assertNotIn("releases/download/", page)
 
 
 if __name__ == "__main__":
