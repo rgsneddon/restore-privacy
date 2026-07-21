@@ -60,14 +60,10 @@ class TestLegalLinksHelper(unittest.TestCase):
         self.assertEqual(AUDIT_REPO_PATH, "AUDIT.md")
         self.assertTrue(privacy_policy_url().endswith("/PRIVACY_POLICY.md"))
         self.assertTrue(end_user_licence_url().endswith("/LICENSE"))
-        # Absolute Render URLs match what Settings webbrowser.open uses
+        # Absolute status-host URLs match what Settings webbrowser.open uses
+        self.assertTrue(audit_url().startswith("https://restoreprivacy.online/"))
         self.assertTrue(
-            audit_url().startswith("https://restore-privacy-status.onrender.com/")
-        )
-        self.assertTrue(
-            privacy_policy_url().startswith(
-                "https://restore-privacy-status.onrender.com/"
-            )
+            privacy_policy_url().startswith("https://restoreprivacy.online/")
         )
 
     def test_windows_settings_wires_legal_links(self):

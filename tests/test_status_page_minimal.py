@@ -68,11 +68,9 @@ class TestPublicPageWithDownloads(unittest.TestCase):
         self.assertNotIn('id="rust-repo-link"', html)
         self.assertNotIn("rust-repo-footer", html)
         self.assertNotIn("installers after £2.45 payment only", html)
-        # Public footer uses status host (private repo); bookkeeping URL may still exist.
-        self.assertIn(RUST_REPO_URL, html)
+        # Public site origin for seamless production funnel
         self.assertIn("restoreprivacy.online", html)
-        self.assertIn("restore-privacy", html)
-        self.assertIn('id="rust-repo-link"', html)
+        self.assertIn('id="dl-site-origin"', html)
         self.assertIn("£2.45", html)
         self.assertIn("buymeacoffee.com/rgsneddon", html)
         self.assertIn("how-to-buy-footer-link", html)
