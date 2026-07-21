@@ -1,0 +1,32 @@
+{
+  "version": "0.3.0",
+  "tag": "0.3.0",
+  "assets": [
+    {
+      "filename": "restore-privacy-client-0.3.0-windows-x64-setup.exe",
+      "sha256": "b49b286fc3cc23ffe00f23b179a375ffb70b37cfa240ca4e7459dabc98958f11",
+      "bytes": 30842453
+    },
+    {
+      "filename": "restore-privacy-client-0.3.0-android.apk",
+      "sha256": "2b5c099227373f101e446afef315ec87203509107ce3e6b144c6f1346cd22292",
+      "bytes": 48142726
+    },
+    {
+      "filename": "restore-privacy-client-0.3.0-macos.zip",
+      "sha256": "e4567626f9ade33b430f95451d636d0f2bf8a4de9055fe796c4fa01e669c935b",
+      "bytes": 18947024
+    },
+    {
+      "filename": "restore-privacy-client-0.3.0-ios.zip",
+      "sha256": "3ba1b7209ac8fc87ca60162b2fbea34f9fd4b8ac6d3e1a82ebbe207834c7771d",
+      "bytes": 8042058
+    },
+    {
+      "filename": "restore-privacy-client-0.3.0-linux-x64.tar.gz",
+      "sha256": "66d55dd3e3bdcc951917a5238dc1156822a14e5ca9822904614a7d05416be025",
+      "bytes": 14291988
+    }
+  ],
+  "notes": "0.3.0: connect continuity (flyclient tip + Wintun settle poll); paid status admin; catalog from 0.2.9. Carries 0.2.9 tray/audit; 0.2.3 Settings/licence/pad/obfs/PFS."
+}

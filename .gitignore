@@ -45,3 +45,8 @@ client_app/apple_shared/Rpt2/.swiftpm/
 # Paid download SQLite / local payment data
 status_page/data/
 
+
+# Staged paid installers (deploy via host disk or CI; use RPT_GITHUB_TOKEN on Render if not staged)
+status_page/assets/*/
+!status_page/assets/README.md
+
