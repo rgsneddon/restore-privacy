@@ -44,6 +44,12 @@ class TestRestoreInternetSources(unittest.TestCase):
         self.assertIn(".restore-privacy", text)
         self.assertIn("RPT-FW", text)
         self.assertIn(RESTORE_INTERNET_DISPLAY_NAME, text)
+        # Portable SFX tree (catalog extract) — not only LocalAppData install
+        self.assertIn("%~dp0RestorePrivacy.exe", text)
+        self.assertIn("Remove-Item -LiteralPath", text)
+        # Must not use broken escaped quotes in delayed delete
+        self.assertNotIn('\\"%INSTALL%\\"', text)
+        self.assertNotIn('rmdir /s /q \\"', text)
 
     def test_linux_script_restores_and_removes(self):
         sh = ROOT / "client" / "linux" / "Restore Internet"

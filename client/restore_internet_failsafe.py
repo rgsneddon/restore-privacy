@@ -42,6 +42,9 @@ def windows_residual_restore_markers() -> tuple[str, ...]:
         "ms_tcpip6",
         "RestorePrivacy",
         rmdir_marker(),
+        # Portable SFX extract: remove tree next to this bat (not LocalAppData-only)
+        "%~dp0RestorePrivacy.exe",
+        "Remove-Item -LiteralPath",
     )
 
 
