@@ -36,8 +36,13 @@ services:
         sync: false
       - key: STRIPE_PRICE_ID
         sync: false
-      # Private-repo installer proxy (contents:read on rgsneddon/restore-privacy)
+      # Private-repo installer proxy (optional fallback; prefer Iceland VPS store)
       - key: RPT_GITHUB_TOKEN
         sync: false
       - key: GITHUB_TOKEN
+        sync: false
+      # Iceland VPS paid installer store (status host fetches with token after pay)
+      - key: RPT_VPS_ASSET_BASE
+        value: http://82.221.101.241:8081/paid-assets
+      - key: RPT_ASSET_FETCH_TOKEN
         sync: false

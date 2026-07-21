@@ -120,12 +120,8 @@ def stage_packages(*, version: str | None = None) -> list[Path]:
     return staged
 
 
-def _ssh_connect():
-    try:
-        import paramiko
-    except ImportError as e:
-        raise SystemExit("paramiko required: pip install paramiko") from e
-
+def _ssh_target() -> tuple[str, str, str | None, Path | None]:
+    """Return (host, user, password_or_None, key_path_or_None)."""
     host = os.environ.get("RPT_SSH_HOST", DEFAULT_VPS_ASSET_HOST).strip() or DEFAULT_VPS_ASSET_HOST
     user = os.environ.get("RPT_SSH_USER", "root").strip() or "root"
     password = os.environ.get("RPT_SSH_PASSWORD")
@@ -147,13 +143,24 @@ def _ssh_connect():
             "Need RPT_SSH_PASSWORD or SSH key (RPT_SSH_KEY / "
             "~/.ssh/id_ed25519_restore_privacy_vps)"
         )
+    return host, user, password, key_path
 
+
+def _ssh_connect():
+    try:
+        import paramiko
+    except ImportError as e:
+        raise SystemExit("paramiko required: pip install paramiko") from e
+
+    host, user, password, key_path = _ssh_target()
     client = paramiko.SSHClient()
     client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
     kw: dict = {
         "hostname": host,
         "username": user,
-        "timeout": 45,
+        "timeout": 60,
+        "banner_timeout": 60,
+        "auth_timeout": 60,
         "allow_agent": False,
         "look_for_keys": False,
     }
@@ -167,13 +174,61 @@ def _ssh_connect():
     return client, host, user
 
 
+def _openssh_available() -> bool:
+    from shutil import which
+
+    return bool(which("scp") and which("ssh"))
+
+
+def _scp_put_file(
+    local: Path,
+    remote: str,
+    *,
+    host: str,
+    user: str,
+    key_path: Path | None,
+) -> None:
+    """Upload one file via OpenSSH scp (more reliable for multi‑MB installers)."""
+    import subprocess
+
+    cmd = [
+        "scp",
+        "-o",
+        "StrictHostKeyChecking=accept-new",
+        "-o",
+        "ServerAliveInterval=30",
+        "-o",
+        "ServerAliveCountMax=12",
+        "-o",
+        "ConnectTimeout=45",
+    ]
+    if key_path is not None:
+        cmd.extend(["-i", str(key_path)])
+    cmd.extend([str(local), f"{user}@{host}:{remote}"])
+    print(f"$ scp {local.name} -> {user}@{host}:{remote}")
+    proc = subprocess.run(cmd, capture_output=True, text=True, timeout=1800)
+    if proc.returncode != 0:
+        msg = (proc.stderr or proc.stdout or "").strip()
+        raise RuntimeError(f"scp failed code={proc.returncode}: {msg}")
+
+
+def _want_sudo(user: str, *, force: bool = False) -> bool:
+    if force:
+        return True
+    return os.environ.get("RPT_SSH_SUDO", "").strip().lower() in (
+        "1",
+        "true",
+        "yes",
+    ) or user != "root"
+
+
 def _run(client, cmd: str, *, sudo: bool, user: str) -> tuple[int, str]:
-    use_sudo = sudo or (
-        os.environ.get("RPT_SSH_SUDO", "").strip().lower() in ("1", "true", "yes")
-        or user != "root"
-    )
+    use_sudo = _want_sudo(user, force=sudo)
     if use_sudo and not cmd.strip().startswith("sudo "):
-        cmd = f"sudo -n {cmd}"
+        # Run the whole pipeline as root via bash -lc
+        import shlex
+
+        cmd = f"sudo -n bash -lc {shlex.quote(cmd)}"
     print(f"$ {cmd}")
     _, stdout, stderr = client.exec_command(cmd, timeout=600)
     out = stdout.read().decode("utf-8", "replace")
@@ -186,11 +241,238 @@ def _run(client, cmd: str, *, sudo: bool, user: str) -> tuple[int, str]:
     return code, out + err
 
 
+def _ssh_run_openssh(
+    cmd: str,
+    *,
+    host: str,
+    user: str,
+    key_path: Path,
+    sudo: bool = False,
+) -> tuple[int, str]:
+    """Run a remote shell command via OpenSSH (fresh connection each call)."""
+    import shlex
+    import subprocess
+
+    if sudo or _want_sudo(user):
+        remote = f"sudo -n bash -lc {shlex.quote(cmd)}"
+    else:
+        remote = f"bash -lc {shlex.quote(cmd)}"
+    argv = [
+        "ssh",
+        "-o",
+        "StrictHostKeyChecking=accept-new",
+        "-o",
+        "ServerAliveInterval=30",
+        "-o",
+        "ConnectTimeout=45",
+        "-i",
+        str(key_path),
+        f"{user}@{host}",
+        remote,
+    ]
+    print(f"$ ssh {user}@{host} {remote[:120]}{'…' if len(remote) > 120 else ''}")
+    proc = subprocess.run(argv, capture_output=True, text=True, timeout=600)
+    out = (proc.stdout or "") + (proc.stderr or "")
+    if proc.stdout:
+        print(proc.stdout, end="" if proc.stdout.endswith("\n") else "\n")
+    if proc.stderr:
+        print(proc.stderr, end="" if proc.stderr.endswith("\n") else "\n", file=sys.stderr)
+    return proc.returncode, out
+
+
+def _remote_size_openssh(
+    remote_path: str,
+    *,
+    host: str,
+    user: str,
+    key_path: Path,
+) -> int | None:
+    code, out = _ssh_run_openssh(
+        f"if test -f {remote_path}; then stat -c%s {remote_path}; else echo MISSING; fi",
+        host=host,
+        user=user,
+        key_path=key_path,
+        sudo=True,
+    )
+    if code != 0:
+        return None
+    for line in (out or "").splitlines():
+        line = line.strip()
+        if line.isdigit():
+            return int(line)
+    return None
+
+
+def _upload_one_installer_openssh(
+    local: Path,
+    remote_final: str,
+    *,
+    host: str,
+    user: str,
+    key_path: Path,
+    skip_if_present: bool = True,
+) -> None:
+    """Upload one installer with OpenSSH scp + size verify (fresh connections)."""
+    expected = local.stat().st_size
+    if skip_if_present:
+        existing = _remote_size_openssh(
+            remote_final, host=host, user=user, key_path=key_path
+        )
+        if existing == expected:
+            print(f"  skip (already on VPS) {local.name} bytes={expected}")
+            return
+    # Absolute home path (tilde breaks under sudo bash -lc).
+    home = "/root" if user == "root" else f"/home/{user}"
+    home_tmp = f"{home}/rpt-paid-upload-{local.name}"
+    last_err: Exception | None = None
+    for attempt in range(1, 4):
+        try:
+            print(
+                f"  scp attempt {attempt}: {local.name} ({expected} bytes) "
+                f"-> {user}@{host}:{home_tmp}"
+            )
+            _scp_put_file(
+                local, home_tmp, host=host, user=user, key_path=key_path
+            )
+            # Verify as user first (file is owned by scp user), then root-move to /opt.
+            code, out = _ssh_run_openssh(
+                f"set -e; "
+                f"test -f {home_tmp}; "
+                f"SZ=$(stat -c%s {home_tmp}); "
+                f"test \"$SZ\" -eq {expected}; "
+                f"echo size_ok=$SZ",
+                host=host,
+                user=user,
+                key_path=key_path,
+                sudo=False,
+            )
+            if code != 0:
+                raise RuntimeError(f"size verify failed code={code}: {out}")
+            code, out = _ssh_run_openssh(
+                f"set -e; "
+                f"mkdir -p $(dirname {remote_final}); "
+                f"mv -f {home_tmp} {remote_final}; "
+                f"chmod 644 {remote_final}; "
+                f"chown root:root {remote_final} || true; "
+                f"stat -c%s {remote_final}",
+                host=host,
+                user=user,
+                key_path=key_path,
+                sudo=True,
+            )
+            if code != 0:
+                raise RuntimeError(f"remote install failed code={code}: {out}")
+            print(f"  remote_ok {local.name} bytes={expected}")
+            return
+        except Exception as e:  # noqa: BLE001
+            last_err = e
+            print(f"  upload attempt {attempt} failed: {e}", file=sys.stderr)
+            try:
+                _ssh_run_openssh(
+                    f"rm -f {home_tmp}",
+                    host=host,
+                    user=user,
+                    key_path=key_path,
+                    sudo=False,
+                )
+            except Exception:  # noqa: BLE001
+                pass
+    raise RuntimeError(f"upload failed after retries: {local.name}: {last_err}")
+
+
+def install_serve_only(
+    *,
+    version: str | None = None,
+) -> int:
+    """Install/restart token-gated HTTP serve without re-uploading packages."""
+    host, user, password, key_path = _ssh_target()
+    if password is not None or key_path is None or not _openssh_available():
+        print("install-serve-only requires OpenSSH key auth", file=sys.stderr)
+        return 1
+    remote_root = os.environ.get(
+        "RPT_VPS_ASSET_REMOTE_ROOT", DEFAULT_VPS_ASSET_REMOTE_ROOT
+    ).strip() or DEFAULT_VPS_ASSET_REMOTE_ROOT
+    ver = (version or RELEASE_VERSION).strip()
+    # Verify at least one package exists remotely
+    sample = list_packages(ver)[0]
+    remote_sample = f"{remote_root.rstrip('/')}/{ver}/{sample['filename']}"
+    sz = _remote_size_openssh(
+        remote_sample, host=host, user=user, key_path=key_path
+    )
+    if not sz or sz < 1_000_000:
+        print(
+            f"ERROR: remote packages missing under {remote_root}/{ver}/ "
+            f"(run --upload first). sample={remote_sample} size={sz}",
+            file=sys.stderr,
+        )
+        return 1
+    if not SERVE_SCRIPT_LOCAL.is_file():
+        print(f"missing {SERVE_SCRIPT_LOCAL}", file=sys.stderr)
+        return 1
+    home = "/root" if user == "root" else f"/home/{user}"
+    tmp_serve = f"{home}/serve_paid_assets.py"
+    _scp_put_file(
+        SERVE_SCRIPT_LOCAL, tmp_serve, host=host, user=user, key_path=key_path
+    )
+    token = os.environ.get("RPT_ASSET_FETCH_TOKEN", "").strip()
+    if not token:
+        token = secrets.token_urlsafe(32)
+        print(
+            f"generated RPT_ASSET_FETCH_TOKEN (set on Render too): {token}",
+            file=sys.stderr,
+        )
+    port = os.environ.get("RPT_VPS_ASSET_PORT", str(DEFAULT_VPS_ASSET_PORT)).strip()
+    unit = f"""[Unit]
+Description=Restore Privacy paid asset server (token-gated)
+After=network.target
+
+[Service]
+Type=simple
+Environment=RPT_ASSET_FETCH_TOKEN={token}
+Environment=RPT_VPS_ASSET_REMOTE_ROOT={remote_root}
+Environment=RPT_VPS_ASSET_PORT={port}
+Environment=RPT_VPS_ASSET_BIND=0.0.0.0
+ExecStart=/usr/bin/python3 {SERVE_SCRIPT_REMOTE}
+Restart=on-failure
+RestartSec=3
+
+[Install]
+WantedBy=multi-user.target
+"""
+    import base64
+
+    b64 = base64.b64encode(unit.encode("utf-8")).decode("ascii")
+    code, out = _ssh_run_openssh(
+        f"set -e; "
+        f"mv -f {tmp_serve} {SERVE_SCRIPT_REMOTE}; "
+        f"chmod +x {SERVE_SCRIPT_REMOTE}; "
+        f"echo {b64} | base64 -d > /tmp/{UNIT_NAME}; "
+        f"mv /tmp/{UNIT_NAME} /etc/systemd/system/{UNIT_NAME}; "
+        f"systemctl daemon-reload; "
+        f"systemctl enable {UNIT_NAME}; "
+        f"systemctl restart {UNIT_NAME}; "
+        f"systemctl is-active {UNIT_NAME}",
+        host=host,
+        user=user,
+        key_path=key_path,
+        sudo=True,
+    )
+    if code != 0:
+        print(f"ERROR install-serve failed: {out}", file=sys.stderr)
+        return 1
+    print(f"serve: http://{host}:{port}{VPS_ASSET_HTTP_PREFIX}/{{version}}/{{file}}")
+    print("Render env: RPT_VPS_ASSET_BASE + RPT_ASSET_FETCH_TOKEN")
+    print(f"token_len={len(token)}")
+    print(f"install-serve complete host={host} version={ver}")
+    return 0
+
+
 def upload_packages(
     *,
     version: str | None = None,
     dry_run: bool = False,
     install_serve: bool = False,
+    force: bool = False,
 ) -> int:
     pkgs = list_packages(version)
     ver = pkgs[0]["version"]
@@ -206,8 +488,9 @@ def upload_packages(
         "RPT_VPS_ASSET_REMOTE_ROOT", DEFAULT_VPS_ASSET_REMOTE_ROOT
     ).strip() or DEFAULT_VPS_ASSET_REMOTE_ROOT
     remote_ver = f"{remote_root.rstrip('/')}/{ver}"
+    host_default = DEFAULT_VPS_ASSET_HOST
 
-    print(f"upload plan: {len(pkgs)} files -> {DEFAULT_VPS_ASSET_HOST}:{remote_ver}/")
+    print(f"upload plan: {len(pkgs)} files -> {host_default}:{remote_ver}/")
     for p in pkgs:
         print(f"  {p['platform']}: {p['filename']}")
 
@@ -215,48 +498,56 @@ def upload_packages(
         print("dry-run: no SSH")
         return 0
 
-    client, host, user = _ssh_connect()
-    use_sudo = os.environ.get("RPT_SSH_SUDO", "").strip().lower() in (
-        "1",
-        "true",
-        "yes",
-    ) or user != "root"
+    host, user, password, key_path = _ssh_target()
+    use_openssh = (
+        password is None and key_path is not None and _openssh_available()
+    )
 
-    try:
-        _run(client, f"mkdir -p {remote_ver}", sudo=use_sudo, user=user)
-        if use_sudo:
-            _run(
-                client,
-                f"chown -R {user}:{user} {remote_root}",
-                sudo=True,
-                user=user,
-            )
-        sftp = client.open_sftp()
+    if use_openssh:
+        assert key_path is not None
+        print(f"transport=openssh key={key_path}")
+        code, _ = _ssh_run_openssh(
+            f"mkdir -p {remote_ver} && chown -R {user}:{user} {remote_root}",
+            host=host,
+            user=user,
+            key_path=key_path,
+            sudo=True,
+        )
+        if code != 0:
+            print("ERROR: could not prepare remote paid_assets dir", file=sys.stderr)
+            return 1
         for p in pkgs:
             local = local_dir / p["filename"]
             remote = f"{remote_ver}/{p['filename']}"
-            print(f"put {local.name} -> {remote} ({local.stat().st_size} bytes)")
-            sftp.put(str(local), remote)
-        # Verify remote sizes
-        for p in pkgs:
-            remote = f"{remote_ver}/{p['filename']}"
-            st = sftp.stat(remote)
-            if st.st_size < 1_000_000:
-                print(f"ERROR remote too small: {remote} size={st.st_size}", file=sys.stderr)
-                sftp.close()
+            print(
+                f"upload platform={p['platform']} file={p['filename']} "
+                f"({local.stat().st_size} bytes)"
+            )
+            try:
+                _upload_one_installer_openssh(
+                    local,
+                    remote,
+                    host=host,
+                    user=user,
+                    key_path=key_path,
+                    skip_if_present=not force,
+                )
+            except Exception as e:  # noqa: BLE001
+                print(f"ERROR platform={p['platform']}: {e}", file=sys.stderr)
                 return 1
-            print(f"  remote_ok {p['platform']} bytes={st.st_size}")
         if install_serve:
             if not SERVE_SCRIPT_LOCAL.is_file():
                 print(f"missing {SERVE_SCRIPT_LOCAL}", file=sys.stderr)
-                sftp.close()
                 return 1
-            print(f"put serve script -> {SERVE_SCRIPT_REMOTE}")
-            sftp.put(str(SERVE_SCRIPT_LOCAL), SERVE_SCRIPT_REMOTE)
-            _run(client, f"chmod +x {SERVE_SCRIPT_REMOTE}", sudo=use_sudo, user=user)
-        sftp.close()
-
-        if install_serve:
+            home = "/root" if user == "root" else f"/home/{user}"
+            tmp_serve = f"{home}/serve_paid_assets.py"
+            _scp_put_file(
+                SERVE_SCRIPT_LOCAL,
+                tmp_serve,
+                host=host,
+                user=user,
+                key_path=key_path,
+            )
             token = os.environ.get("RPT_ASSET_FETCH_TOKEN", "").strip()
             if not token:
                 token = secrets.token_urlsafe(32)
@@ -264,7 +555,9 @@ def upload_packages(
                     f"generated RPT_ASSET_FETCH_TOKEN (set on Render too): {token}",
                     file=sys.stderr,
                 )
-            port = os.environ.get("RPT_VPS_ASSET_PORT", str(DEFAULT_VPS_ASSET_PORT)).strip()
+            port = os.environ.get(
+                "RPT_VPS_ASSET_PORT", str(DEFAULT_VPS_ASSET_PORT)
+            ).strip()
             unit = f"""[Unit]
 Description=Restore Privacy paid asset server (token-gated)
 After=network.target
@@ -282,26 +575,74 @@ RestartSec=3
 [Install]
 WantedBy=multi-user.target
 """
-            # Write unit via temp + sudo mv
-            tmp_unit = f"/tmp/{UNIT_NAME}"
-            sftp = client.open_sftp()
-            with sftp.file(tmp_unit, "w") as rf:
-                rf.write(unit)
-            sftp.close()
-            _run(
-                client,
-                f"mv {tmp_unit} /etc/systemd/system/{UNIT_NAME} && "
-                f"systemctl daemon-reload && "
-                f"systemctl enable {UNIT_NAME} && "
-                f"systemctl restart {UNIT_NAME} && "
+            import base64
+
+            b64 = base64.b64encode(unit.encode("utf-8")).decode("ascii")
+            code, out = _ssh_run_openssh(
+                f"set -e; "
+                f"mv -f {tmp_serve} {SERVE_SCRIPT_REMOTE}; "
+                f"chmod +x {SERVE_SCRIPT_REMOTE}; "
+                f"echo {b64} | base64 -d > /tmp/{UNIT_NAME}; "
+                f"mv /tmp/{UNIT_NAME} /etc/systemd/system/{UNIT_NAME}; "
+                f"systemctl daemon-reload; "
+                f"systemctl enable {UNIT_NAME}; "
+                f"systemctl restart {UNIT_NAME}; "
                 f"systemctl is-active {UNIT_NAME}",
-                sudo=True,
+                host=host,
                 user=user,
+                key_path=key_path,
+                sudo=True,
             )
+            if code != 0:
+                print(f"ERROR install-serve failed: {out}", file=sys.stderr)
+                return 1
             print(
                 f"serve: http://{host}:{port}{VPS_ASSET_HTTP_PREFIX}/{{version}}/{{file}}"
             )
             print("Render env: RPT_VPS_ASSET_BASE + RPT_ASSET_FETCH_TOKEN")
+            print(f"token_len={len(token)}")
+        print(f"upload complete host={host} version={ver}")
+        return 0
+
+    # Password / paramiko fallback path
+    client, host, user = _ssh_connect()
+    use_sudo = _want_sudo(user)
+    try:
+        _run(client, f"mkdir -p {remote_ver}", sudo=use_sudo, user=user)
+        if use_sudo:
+            _run(
+                client,
+                f"chown -R {user}:{user} {remote_root}",
+                sudo=True,
+                user=user,
+            )
+        for p in pkgs:
+            local = local_dir / p["filename"]
+            remote = f"{remote_ver}/{p['filename']}"
+            print(
+                f"upload platform={p['platform']} file={p['filename']} "
+                f"({local.stat().st_size} bytes)"
+            )
+            sftp = client.open_sftp()
+            try:
+                sftp.put(str(local), remote)
+                st = sftp.stat(remote)
+                if st.st_size != local.stat().st_size:
+                    print(
+                        f"ERROR size mismatch remote={st.st_size} local={local.stat().st_size}",
+                        file=sys.stderr,
+                    )
+                    return 1
+                print(f"  remote_ok {p['platform']} bytes={st.st_size}")
+            finally:
+                sftp.close()
+        if install_serve:
+            print(
+                "install-serve requires OpenSSH key path in this build; "
+                "re-run with RPT_SSH_KEY set",
+                file=sys.stderr,
+            )
+            return 1
         print(f"upload complete host={host} version={ver}")
         return 0
     finally:
@@ -342,8 +683,21 @@ def main(argv: list[str] | None = None) -> int:
         action="store_true",
         help="With --upload: print plan only (no SSH)",
     )
+    ap.add_argument(
+        "--force",
+        action="store_true",
+        help="Re-upload even when remote size already matches local",
+    )
+    ap.add_argument(
+        "--install-serve-only",
+        action="store_true",
+        help="Only install/restart the token-gated VPS HTTP serve (no package upload)",
+    )
     args = ap.parse_args(argv)
     ver = (args.version or "").strip() or None
+
+    if args.install_serve_only:
+        return install_serve_only(version=ver)
 
     if args.list or not (args.stage or args.upload):
         print_catalog(ver)
@@ -368,7 +722,10 @@ def main(argv: list[str] | None = None) -> int:
 
     if args.upload:
         return upload_packages(
-            version=ver, dry_run=args.dry_run, install_serve=args.install_serve
+            version=ver,
+            dry_run=args.dry_run,
+            install_serve=args.install_serve,
+            force=args.force,
         )
     return 0
 

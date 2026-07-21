@@ -42,17 +42,46 @@ Collaborators and Render still need a token (or staged files) for fulfilment.
 
 This environment cannot flip visibility without `gh auth` / `GH_TOKEN`.
 
-## Fulfilment when the repo is private (pick one)
+## Fulfilment when the repo is private (preferred: Iceland VPS)
 
-| Method | Render env / disk |
-|--------|-------------------|
-| **A. GitHub token** | `RPT_GITHUB_TOKEN` or `GITHUB_TOKEN` with `contents:read` on the private repo |
-| **B. Staged files** | Copy catalog packages to `status_page/assets/0.3.0/` on the host (`python scripts/stage_paid_assets.py`) |
+Paid installers for **each device** (windows / android / macos / ios / linux) are hosted on the product VPS and streamed by the status host after Stripe pays.
 
-Local monorepo also searches `releases/0.3.0/` (gitignored).  
-**Note:** binary packages under `status_page/assets/*/` are **gitignored** — Render auto-deploy does **not** ship them unless you upload out-of-band or set the token (preferred for private releases).
+### Operator: collect + host on Iceland (`82.221.101.241`)
 
-## Stripe env (Render)
+```bash
+# List one package per platform
+python scripts/host_paid_assets_vps.py --list
+
+# Stage from releases/0.3.0 → status_page/assets/0.3.0
+python scripts/host_paid_assets_vps.py --stage
+
+# Upload each device package to /opt/restore-privacy/paid_assets/0.3.0/
+# and install token-gated HTTP serve on :8081
+export RPT_SSH_USER=raskul RPT_SSH_SUDO=1
+export RPT_SSH_KEY=~/.ssh/id_ed25519_restore_privacy_vps
+export RPT_ASSET_FETCH_TOKEN='long-random-secret'   # same value on Render
+python scripts/host_paid_assets_vps.py --stage --upload --install-serve
+
+# If packages already uploaded: only (re)start the serve unit
+python scripts/host_paid_assets_vps.py --install-serve-only
+```
+
+Layout on VPS: `/opt/restore-privacy/paid_assets/{version}/{filename}`  
+HTTP (token only): `http://82.221.101.241:8081/paid-assets/{version}/{filename}`  
+Header: `X-RPT-Asset-Token: <RPT_ASSET_FETCH_TOKEN>` — **401 without token** (not free).
+
+### Render env (status host)
+
+| Variable | Purpose |
+|----------|---------|
+| `RPT_VPS_ASSET_BASE` | `http://82.221.101.241:8081/paid-assets` |
+| `RPT_ASSET_FETCH_TOKEN` | Same secret as VPS `rpt-paid-assets.service` |
+| `STRIPE_SECRET_KEY` | Optional server Checkout; webhook verification uses signing secret |
+| `STRIPE_WEBHOOK_SECRET` | Required for grants (`whsec_…`) |
+
+Fallbacks (optional): local `status_page/assets/{version}/`, or `RPT_GITHUB_TOKEN` for private GitHub release API.
+
+## Stripe env (Render) — also see table above
 
 | Variable | Purpose |
 |----------|---------|

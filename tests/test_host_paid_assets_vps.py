@@ -180,9 +180,19 @@ class TestHostScriptStructural(unittest.TestCase):
         self.assertIn("--list", text)
         self.assertIn("--stage", text)
         self.assertIn("--upload", text)
+        self.assertIn("--install-serve-only", text)
+        self.assertIn("install_serve_only", text)
+        self.assertIn("skip_if_present", text)
         for plat in ("windows", "android", "macos", "ios", "linux"):
             # enumeration comes from catalog constants, not hard-coded one-blob
             self.assertTrue(plat)
+
+    def test_stage_and_list_cli_exit_zero(self):
+        mod = _load_host_script()
+        # Drive real list entry
+        self.assertEqual(mod.main(["--list"]), 0)
+        # Dry-run upload plan (no SSH)
+        self.assertEqual(mod.main(["--upload", "--dry-run"]), 0)
 
 
 if __name__ == "__main__":
