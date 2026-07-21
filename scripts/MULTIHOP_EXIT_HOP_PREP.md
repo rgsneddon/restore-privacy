@@ -27,6 +27,18 @@ Connect still dials the **entry** hop only. Status text will say *path configure
 | **Host firewall** | `ufw` present; status **inactive** (not blocking). Rule `allow 44044/udp` applied for when ufw is enabled. INPUT policy ACCEPT. |
 | **FlokiNET panel** | **Operator must** open **UDP 44044** inbound for this VPS in the FlokiNET control panel (cannot automate panel login). |
 
+## Install status (Romania exit)
+
+| Check | Result |
+|-------|--------|
+| **rpt-node.service** | **active** + **enabled** |
+| **UDP 44044** | listening on `0.0.0.0:44044` |
+| **ElGamal A** | new exit key on host (`node_elgamal.priv` present; pub SHA-256 ≠ entry product pin) |
+| **External UDP** | send to `185.146.232.107:44044` succeeded (`nc -u -z` exit 0) |
+| **Status UI** | local `http://127.0.0.1:8080/api/status` → title-only |
+| **Multi-hop residual** | still **not** routed (`MULTI_HOP_ROUTING_IMPLEMENTED=false`); entry default remains Iceland |
+
+
 ## What we need when the exit VPS is ready
 
 Provide these before we can **build/install the multi-hop exit node** on the new box:
