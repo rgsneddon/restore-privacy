@@ -165,6 +165,22 @@ class Test036AndroidPackageMultihop(unittest.TestCase):
             self.assertIn(b"pfs-x25519", dex)
 
 
+def _zip_member_contains(zf, member_suffixes: tuple[str, ...], needles: list[bytes]) -> dict[str, bool]:
+    """Return which needles appear in any zip member whose name ends with *suffixes*."""
+    found = {n.decode("utf-8", errors="replace"): False for n in needles}
+    for name in zf.namelist():
+        if not any(name.endswith(s) for s in member_suffixes):
+            continue
+        try:
+            blob = zf.read(name)
+        except Exception:
+            continue
+        for n in needles:
+            if n in blob:
+                found[n.decode("utf-8", errors="replace")] = True
+    return found
+
+
 @unittest.skipUnless(
     (REL / f"restore-privacy-client-{VERSION}-macos.zip").is_file(),
     "releases/0.3.6 macOS zip not present",
@@ -176,11 +192,97 @@ class Test036MacosPackagePubs(unittest.TestCase):
         zpath = REL / f"restore-privacy-client-{VERSION}-macos.zip"
         with zipfile.ZipFile(zpath) as z:
             exit_names = [n for n in z.namelist() if n.endswith("exit_node_elgamal.pub")]
-            entry_names = [n for n in z.namelist() if n.endswith("node_elgamal.pub") and "exit_" not in n]
+            entry_names = [
+                n
+                for n in z.namelist()
+                if n.endswith("node_elgamal.pub") and "exit_node" not in n
+            ]
             self.assertTrue(exit_names, "exit_node_elgamal.pub missing from macOS zip")
             self.assertTrue(entry_names)
             exit_b = z.read(exit_names[0])
             self.assertEqual(hashlib.sha256(exit_b).hexdigest(), EXIT_PUB_PIN)
+
+    def test_macos_binaries_embed_residual_via_exit(self):
+        """PacketTunnel + Flutter App must embed exit residual selection (not pubs-only inject)."""
+        import zipfile
+
+        zpath = REL / f"restore-privacy-client-{VERSION}-macos.zip"
+        needles = [
+            b"185.146.232.107",
+            b"exit_node_elgamal.pub",
+            b"RPT_MULTIHOP_ENABLED",
+        ]
+        with zipfile.ZipFile(zpath) as z:
+            # PacketTunnel native residual path
+            pt = _zip_member_contains(
+                z,
+                ("/PacketTunnel", "PacketTunnel"),
+                [b"185.146.232.107", b"exit_node_elgamal.pub"],
+            )
+            self.assertTrue(
+                pt.get("185.146.232.107"),
+                "PacketTunnel binary missing Romania exit host string",
+            )
+            self.assertTrue(
+                pt.get("exit_node_elgamal.pub"),
+                "PacketTunnel binary missing exit_node_elgamal.pub string",
+            )
+            # Flutter AOT App
+            app = _zip_member_contains(
+                z,
+                ("/App", "/App.framework/Versions/A/App"),
+                [b"185.146.232.107", b"RPT_MULTIHOP_ENABLED"],
+            )
+            self.assertTrue(
+                app.get("185.146.232.107"),
+                "Flutter App AOT missing Romania exit host",
+            )
+            self.assertTrue(
+                app.get("RPT_MULTIHOP_ENABLED"),
+                "Flutter App AOT missing RPT_MULTIHOP_ENABLED",
+            )
+
+
+@unittest.skipUnless(
+    (REL / f"restore-privacy-client-{VERSION}-ios.zip").is_file(),
+    "releases/0.3.6 iOS zip not present",
+)
+class Test036IosPackageMultihop(unittest.TestCase):
+    def test_ios_zip_ships_entry_and_exit_pubs(self):
+        import zipfile
+
+        zpath = REL / f"restore-privacy-client-{VERSION}-ios.zip"
+        with zipfile.ZipFile(zpath) as z:
+            exit_names = [n for n in z.namelist() if n.endswith("exit_node_elgamal.pub")]
+            self.assertTrue(exit_names, "exit_node_elgamal.pub missing from iOS zip")
+            exit_b = z.read(exit_names[0])
+            self.assertEqual(hashlib.sha256(exit_b).hexdigest(), EXIT_PUB_PIN)
+
+    def test_ios_binaries_embed_residual_via_exit(self):
+        import zipfile
+
+        zpath = REL / f"restore-privacy-client-{VERSION}-ios.zip"
+        with zipfile.ZipFile(zpath) as z:
+            pt = _zip_member_contains(
+                z,
+                ("/PacketTunnel", "PacketTunnel"),
+                [b"185.146.232.107", b"exit_node_elgamal.pub"],
+            )
+            self.assertTrue(
+                pt.get("185.146.232.107"),
+                "iOS PacketTunnel missing Romania exit host",
+            )
+            self.assertTrue(
+                pt.get("exit_node_elgamal.pub"),
+                "iOS PacketTunnel missing exit_node_elgamal.pub",
+            )
+            app = _zip_member_contains(
+                z,
+                ("/App", "App.framework/App"),
+                [b"185.146.232.107", b"RPT_MULTIHOP_ENABLED"],
+            )
+            self.assertTrue(app.get("185.146.232.107"))
+            self.assertTrue(app.get("RPT_MULTIHOP_ENABLED"))
 
 
 if __name__ == "__main__":

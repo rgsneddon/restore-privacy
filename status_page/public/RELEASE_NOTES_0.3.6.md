@@ -15,8 +15,8 @@
 |----------|--------------------|-----------------|--------|
 | **Linux** x64 tar.gz | **Yes** | **Yes** | Rebuilt via `package_linux.py` — `MULTI_HOP_ROUTING_IMPLEMENTED=True`, both pubs |
 | **Android** APK | **Yes** (residual host + exit pub) | **Yes** | Flutter release rebuild; RptConfig exit host + `exit_node_elgamal.pub` in assets |
-| **macOS** zip | **Yes** (host/options + exit pub) | **Yes** | DevID-signed app with entry+exit pubs; Packet Tunnel loads exit pub when residual host is Romania |
-| **iOS** zip | **Yes** (host + exit pub) | **Yes** | Team-signed sideload with entry+exit pubs |
+| **macOS** zip | **Yes** | **Yes** | Flutter+NativePrep **rebuild** (PacketTunnel + App embed exit host / `exit_node_elgamal.pub` / multihop define); DevID-signed; residual-via-exit when multi-hop enabled |
+| **iOS** zip | **Yes** | **Yes** | Flutter+NativePrep **rebuild** (PacketTunnel + App embed exit residual selection); Team-signed sideload |
 | **Windows** SFX | Catalog pin only | Entry only in frozen PE | Native Windows PE rebuild required for multihop residual *code*; macOS cannot re-freeze Windows PE |
 
 Linux and Android are the strongest multi-hop residual packages for operator tests.
