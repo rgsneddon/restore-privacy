@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<!--
+	  Developer ID distribution host entitlements (Hardened Runtime).
+
+	  CRITICAL: do NOT put com.apple.developer.networking.networkextension on the
+	  host when signing with Developer ID Application without a matching Developer
+	  ID provisioning profile. That restricted entitlement alone causes AMFI to
+	  SIGKILL the process (exit 137) and open(1) fails with:
+	    RBSRequestErrorDomain Code=5 / POSIX 163 "Launchd job spawn failed"
+	    "The application restore_privacy_client can't be opened."
+
+	  Isolation (Developer ID ad-hoc entitlement hunt, 0.2.3 app):
+	    bare / net / sandbox / app-groups / CS = ALIVE
+	    networkextension packet-tunnel-provider alone = DEAD rc=137
+
+	  Packet Tunnel NE stays on the appex only (PacketTunnel.entitlements).
+	  Host still manages the tunnel via NETunnelProviderManager APIs; the
+	  restricted NE entitlement on the host is what kills launch under DevID.
+	  App Sandbox is OFF on the host so Flutter + residual networking work.
+	-->
+	<key>com.apple.security.app-sandbox</key>
+	<false/>
+	<!-- Flutter / Dart under Hardened Runtime -->
+	<key>com.apple.security.cs.allow-jit</key>
+	<true/>
+	<key>com.apple.security.cs.allow-unsigned-executable-memory</key>
+	<true/>
+	<key>com.apple.security.cs.disable-library-validation</key>
+	<true/>
+	<!-- Outbound residual + local diagnostics -->
+	<key>com.apple.security.network.client</key>
+	<true/>
+	<key>com.apple.security.network.server</key>
+	<true/>
+	<!-- Share secrets with PacketTunnel.appex (not restricted the same way as NE) -->
+	<key>com.apple.security.application-groups</key>
+	<array>
+		<string>group.com.restoreprivacy.shared</string>
+	</array>
+</dict>
+</plist>

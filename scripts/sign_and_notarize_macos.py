@@ -97,9 +97,14 @@ def entitlements_for(path: Path) -> Path | None:
         ent = ROOT / "client_app/macos/PacketTunnel/PacketTunnel.entitlements"
         return ent if ent.is_file() else None
     if path.suffix == ".app" or name == "restore_privacy_client":
-        # Host: use Release entitlements (sandbox + network). NE keys stay on appex.
-        ent = ROOT / "client_app/macos/Runner/Release.entitlements"
-        return ent if ent.is_file() else None
+        # Developer ID host: Flutter needs CS allow-jit / unsigned-exec under Hardened Runtime
+        # (missing those → launchd spawn fail POSIX 163 / process SIGKILL 137).
+        for candidate in (
+            ROOT / "client_app/macos/Runner/DeveloperID.entitlements",
+            ROOT / "client_app/macos/Runner/Release.entitlements",
+        ):
+            if candidate.is_file():
+                return candidate
     return None
 
 
@@ -125,9 +130,49 @@ def sign_path(path: Path, identity: str) -> None:
     run(cmd)
 
 
+def strip_development_profiles(app: Path) -> None:
+    """Remove Xcode-managed development provisioning profiles.
+
+    Developer ID distribution must not embed a device-limited *Mac Team
+    Provisioning Profile* (ProvisionedDevices). That mismatch causes launchd
+    spawn failure (RBSRequestErrorDomain Code=5 / POSIX 163) —
+    "The application can't be opened".
+    """
+    removed = 0
+    for prof in app.rglob("embedded.provisionprofile"):
+        try:
+            # Prefer parsing; if it lists ProvisionedDevices, it's development.
+            import plistlib
+            import subprocess as _sp
+
+            raw = _sp.check_output(
+                ["security", "cms", "-D", "-i", str(prof)],
+                stderr=_sp.DEVNULL,
+            )
+            data = plistlib.loads(raw)
+            name = str(data.get("Name", ""))
+            is_dev = bool(data.get("ProvisionedDevices")) or "Team Provisioning Profile" in name
+            if is_dev or True:
+                # Always strip for Developer ID path — distribution profiles for NE
+                # are not used the same way as iOS; host is Developer ID signed.
+                print(f"removing development profile: {prof} ({name!r})", flush=True)
+                prof.unlink()
+                removed += 1
+        except Exception as exc:
+            # If unreadable, still remove for Developer ID packaging safety.
+            print(f"removing unreadable profile {prof}: {exc}", flush=True)
+            try:
+                prof.unlink()
+                removed += 1
+            except OSError:
+                pass
+    print(f"stripped {removed} embedded.provisionprofile file(s)", flush=True)
+
+
 def sign_app(app: Path, identity: str) -> None:
     if not app.is_dir():
         raise FileNotFoundError(f"app not found: {app}")
+    strip_development_profiles(app)
     # Sign deepest nested first
     nested: list[Path] = []
     for root, dirs, files in os.walk(app / "Contents"):

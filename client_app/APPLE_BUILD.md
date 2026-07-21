@@ -99,11 +99,16 @@ Host + Packet Tunnel plists already declare the real product IDs:
 
 | File | Keys |
 |------|------|
-| `macos/Runner/DebugProfile.entitlements` | `packet-tunnel-provider` + App Group (+ sandbox) |
-| `macos/Runner/Release.entitlements` | same |
+| `macos/Runner/DebugProfile.entitlements` | `packet-tunnel-provider` + App Group (+ sandbox) — Team-signed Xcode path |
+| `macos/Runner/Release.entitlements` | same (Xcode Release / Team-signed) |
+| `macos/Runner/DeveloperID.entitlements` | **Distribution host:** Flutter CS + network + App Group; **no** host `networkextension` (AMFI kills DevID host with NE without a matching profile — open fails POSIX 163 / exit 137) |
 | `ios/Runner/Runner.entitlements` | `packet-tunnel-provider` + App Group (wired via `CODE_SIGN_ENTITLEMENTS`) |
-| `macos/PacketTunnel/PacketTunnel.entitlements` | `packet-tunnel-provider` + App Group |
+| `macos/PacketTunnel/PacketTunnel.entitlements` | `packet-tunnel-provider` + App Group (appex keeps NE for Developer ID) |
 | `ios/PacketTunnel/PacketTunnel.entitlements` | same |
+
+`scripts/sign_and_notarize_macos.py` prefers `DeveloperID.entitlements` for the host
+app, strips development `embedded.provisionprofile`s, and signs the Packet Tunnel
+appex with `PacketTunnel.entitlements`.
 
 Packet Tunnel targets are configured for **Team signing** (`CODE_SIGNING_ALLOWED = YES`, `CODE_SIGNING_REQUIRED = YES`, team `SFCBP95595`). The old ad-hoc re-sign step only runs when signing is explicitly disabled.
 

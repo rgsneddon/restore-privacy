@@ -120,6 +120,31 @@ class TestLocal023PackagesIfPresent(unittest.TestCase):
                 text=True,
             )
             self.assertEqual(r.returncode, 0, r.stderr + r.stdout)
+            # Host must not carry restricted NE entitlement under Developer ID
+            # (that was the 0.2.3 "can't be opened" / SIGKILL 137 root cause).
+            ents = subprocess.check_output(
+                ["codesign", "-d", "--entitlements", ":-", str(app)],
+                stderr=subprocess.STDOUT,
+                text=True,
+            )
+            self.assertNotIn(
+                "com.apple.developer.networking.networkextension",
+                ents,
+                "Developer ID host must not claim networkextension",
+            )
+            self.assertIn("com.apple.security.cs.allow-jit", ents)
+            # Appex still carries NE for Packet Tunnel
+            appex = next((tdp / "mac").rglob("*.appex"), None)
+            if appex is not None:
+                aents = subprocess.check_output(
+                    ["codesign", "-d", "--entitlements", ":-", str(appex)],
+                    stderr=subprocess.STDOUT,
+                    text=True,
+                )
+                self.assertIn(
+                    "com.apple.developer.networking.networkextension", aents
+                )
+                self.assertIn("packet-tunnel-provider", aents)
 
 
 if __name__ == "__main__":

@@ -53,6 +53,7 @@ def _assert_ne_and_group(tc: unittest.TestCase, path: Path) -> None:
 
 class TestHostAndExtensionEntitlements(unittest.TestCase):
     def test_host_entitlements_declare_ne_and_app_group(self):
+        # Team-signed Xcode/dev paths keep NE on the host for NETunnelProviderManager.
         for p in HOST_ENTITLEMENTS:
             with self.subTest(path=str(p.relative_to(ROOT))):
                 _assert_ne_and_group(self, p)
@@ -61,6 +62,31 @@ class TestHostAndExtensionEntitlements(unittest.TestCase):
         for p in EXTENSION_ENTITLEMENTS:
             with self.subTest(path=str(p.relative_to(ROOT))):
                 _assert_ne_and_group(self, p)
+
+    def test_developer_id_host_omits_networkextension(self):
+        """Developer ID host must not claim restricted NE without a matching profile.
+
+        com.apple.developer.networking.networkextension on the host alone causes
+        AMFI SIGKILL (exit 137) / open fails with POSIX 163 when signed Developer ID
+        without a Developer ID provisioning profile that grants that entitlement.
+        Packet Tunnel NE remains on the appex only (see PacketTunnel.entitlements).
+        """
+        path = APP / "macos" / "Runner" / "DeveloperID.entitlements"
+        self.assertTrue(path.is_file(), "missing DeveloperID.entitlements")
+        text = _plist_text(path)
+        stripped = re.sub(r"<!--.*?-->", "", text, flags=re.S)
+        self.assertNotIn(
+            NE_KEY,
+            stripped,
+            "Developer ID host must not embed networkextension (AMFI kill)",
+        )
+        self.assertNotIn(PACKET_TUNNEL, stripped)
+        # Flutter under Hardened Runtime
+        self.assertIn("com.apple.security.cs.allow-jit", stripped)
+        self.assertIn("com.apple.security.cs.allow-unsigned-executable-memory", stripped)
+        self.assertIn("com.apple.security.cs.disable-library-validation", stripped)
+        self.assertIn(APP_GROUP, stripped)
+        self.assertIn("com.apple.security.network.client", stripped)
 
     def test_ios_host_entitlements_wired_in_pbxproj(self):
         pbx = (APP / "ios" / "Runner.xcodeproj" / "project.pbxproj").read_text(

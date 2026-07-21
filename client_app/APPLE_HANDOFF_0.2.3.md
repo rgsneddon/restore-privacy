@@ -15,6 +15,21 @@ Download: https://github.com/rgsneddon/restore-privacy/releases/tag/0.2.3
 
 **Do not treat 0.2.3 public Apple assets as prep-only.** Prep-stage wording applies only if you are rebuilding from source before re-sign.
 
+### macOS open fix (Developer ID host entitlements)
+
+If open fails with *The application “restore_privacy_client” can’t be opened*
+(`RBSRequestErrorDomain` / POSIX 163, binary exit 137):
+
+1. Strip any embedded **development** `embedded.provisionprofile` before DevID re-sign.
+2. Sign the **host** with `macos/Runner/DeveloperID.entitlements` — Flutter CS keys
+   (allow-jit / unsigned-executable-memory / disable-library-validation), network,
+   App Group — **without** `com.apple.developer.networking.networkextension` on the host.
+3. Keep `packet-tunnel-provider` NE only on `PacketTunnel.appex` (`PacketTunnel.entitlements`).
+4. Re-run `scripts/sign_and_notarize_macos.py` and replace the GitHub **0.2.3** macOS zip.
+
+Restricted NE on a Developer ID–signed host without a matching Developer ID profile
+is killed by AMFI; that was the root cause of the public zip not opening.
+
 ## Residual honesty
 
 - Residual public IP changes only when the OS Packet Tunnel is **connected**.

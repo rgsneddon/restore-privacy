@@ -21,7 +21,7 @@
 | `restore-privacy-client-0.2.3-windows-x64-setup.exe` | Setup installer |
 | `restore-privacy-client-0.2.3-android.apk` | Flutter APK |
 | `restore-privacy-client-0.2.3-linux-x64.tar.gz` | Installer package |
-| `restore-privacy-client-0.2.3-macos.zip` | **Developer ID signed + notarized** (`node_elgamal.pub` only) |
+| `restore-privacy-client-0.2.3-macos.zip` | **Developer ID signed + notarized** (`node_elgamal.pub` only); host omits restricted NE entitlement so the app **opens** under Gatekeeper (Packet Tunnel NE remains on the appex) |
 | `restore-privacy-client-0.2.3-ios.zip` | **Team-signed sideload** (`node_elgamal.pub` only) |
 
 ## Signing / privacy

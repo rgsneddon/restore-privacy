@@ -33,6 +33,11 @@ class TestMacosSignNotarizeScript(unittest.TestCase):
         self.assertIn("Signature=adhoc", text)
         self.assertIn("PacketTunnel", text)
         self.assertIn("inject_apple_secrets", text)
+        # Developer ID host path: strip development profiles + use DeveloperID.entitlements
+        # (host NE under DevID → "can't be opened" / SIGKILL 137)
+        self.assertIn("strip_development_profiles", text)
+        self.assertIn("DeveloperID.entitlements", text)
+        self.assertIn("embedded.provisionprofile", text)
 
     def test_release_package_script_calls_sign_and_notarize(self):
         rel = ROOT / "scripts" / "build_release_0.2.3.py"
