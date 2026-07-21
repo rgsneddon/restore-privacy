@@ -131,6 +131,149 @@ class TestPurchaseIdBuyerUi(unittest.TestCase):
         self.assertNotIn("github.com/rgsneddon", html)
 
 
+class TestAdminOndemandMint(unittest.TestCase):
+    def setUp(self):
+        self._td = tempfile.TemporaryDirectory()
+        os.environ["RPT_PAYMENT_DATA_DIR"] = self._td.name
+        import payments
+
+        self.pay = payments
+        self.pay.init_db()
+
+    def tearDown(self):
+        self._td.cleanup()
+        os.environ.pop("RPT_PAYMENT_DATA_DIR", None)
+
+    def test_mint_by_platform_without_ppi(self):
+        out = self.pay.admin_mint_download_for_platform(
+            "android", base_url="https://restoreprivacy.online"
+        )
+        self.assertTrue(out.get("admin_ondemand"))
+        self.assertEqual(out["platform"], "android")
+        self.assertTrue(out["download_path"].startswith("/download?token="))
+        self.assertTrue(
+            out["download_url"].startswith(
+                "https://restoreprivacy.online/download?token="
+            )
+        )
+        self.assertNotIn("github.com", out["download_url"])
+        self.assertNotIn("releases/download", out["download_url"])
+        g = self.pay.lookup_download_token(out["token"])
+        self.assertIsNotNone(g)
+        self.assertEqual(g and g.get("platform"), "android")
+
+    def test_unknown_platform_fails_closed(self):
+        with self.assertRaises(ValueError):
+            self.pay.admin_mint_download_for_platform(" Commodore64 ")
+
+    def test_admin_html_has_ondemand_dropdown_and_ppi_reissue(self):
+        from admin_panel import render_admin_html
+
+        page = render_admin_html().decode("utf-8")
+        self.assertIn('id="admin-ondemand-mint"', page)
+        self.assertIn('id="admin-ondemand-mint-form"', page)
+        self.assertIn('id="ondemand_platform"', page)
+        self.assertIn("admin-ondemand-mint-submit", page)
+        for p in ("windows", "linux", "macos", "ios", "android"):
+            self.assertIn(f'value="{p}"', page)
+        # PPI path remains
+        self.assertIn('id="admin-reissue"', page)
+        self.assertIn('id="admin-reissue-form"', page)
+        self.assertIn("purchase_id", page)
+        self.assertIn("Customer recovery (RPT-PPI)", page)
+        self.assertIn("admin-reissue-elaborate", page)
+        # No PPI required on ondemand form
+        ondemand = page[
+            page.find('id="admin-ondemand-mint"') : page.find(
+                'id="admin-ondemand-mint"'
+            )
+            + 2500
+        ]
+        self.assertNotIn('name="purchase_id"', ondemand)
+
+    def test_ondemand_post_requires_auth(self):
+        import io
+        import app as status_app
+
+        body = b"platform=windows"
+
+        class FakeHandler(status_app.Handler):
+            def __init__(self):
+                self.headers = {"Content-Length": str(len(body))}
+                self.rfile = io.BytesIO(body)
+                self.wfile = io.BytesIO()
+                self.path = "/admin/mint-download"
+                self.command = "POST"
+                self.request_version = "HTTP/1.1"
+                self.client_address = ("127.0.0.1", 0)
+                self._code = None
+
+            def send_response(self, code, message=None):
+                self._code = code
+
+            def send_header(self, *a):
+                return
+
+            def end_headers(self):
+                return
+
+            def log_message(self, *a):
+                return
+
+        with mock.patch.object(status_app, "admin_enabled", return_value=True):
+            with mock.patch.object(status_app, "is_authenticated", return_value=False):
+                h = FakeHandler()
+                h.do_POST()
+        # Unauthenticated → login page, no download token mint in body as success
+        out = h.wfile.getvalue().decode("utf-8", errors="replace")
+        self.assertIn("admin-login-form", out)
+        self.assertNotIn("ondemand-download-link", out)
+
+    def test_ondemand_post_mints_when_authenticated(self):
+        import io
+        from admin_panel import mint_session_token, SESSION_COOKIE
+        import app as status_app
+
+        body = b"platform=macos"
+        session = mint_session_token()
+
+        class FakeHandler(status_app.Handler):
+            def __init__(self):
+                self.headers = {
+                    "Content-Length": str(len(body)),
+                    "Cookie": f"{SESSION_COOKIE}={session}",
+                }
+                self.rfile = io.BytesIO(body)
+                self.wfile = io.BytesIO()
+                self.path = "/admin/mint-download"
+                self.command = "POST"
+                self.request_version = "HTTP/1.1"
+                self.client_address = ("127.0.0.1", 0)
+                self._code = None
+
+            def send_response(self, code, message=None):
+                self._code = code
+
+            def send_header(self, *a):
+                return
+
+            def end_headers(self):
+                return
+
+            def log_message(self, *a):
+                return
+
+        with mock.patch.object(status_app, "admin_enabled", return_value=True):
+            with mock.patch.object(status_app, "is_authenticated", return_value=True):
+                h = FakeHandler()
+                h.do_POST()
+        out = h.wfile.getvalue().decode("utf-8", errors="replace")
+        self.assertEqual(h._code, 200)
+        self.assertIn("ondemand-download-link", out)
+        self.assertIn("/download?token=", out)
+        self.assertNotIn("releases/download/", out)
+
+
 class TestSeedTestPurchase(unittest.TestCase):
     def setUp(self):
         self._td = tempfile.TemporaryDirectory()

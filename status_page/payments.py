@@ -1710,6 +1710,57 @@ def find_paid_purchase_by_id(purchase_id: str) -> dict[str, Any] | None:
         conn.close()
 
 
+def admin_mint_download_for_platform(
+    platform: str,
+    *,
+    now: float | None = None,
+    base_url: str | None = None,
+    ttl_sec: int = TOKEN_TTL_SEC,
+) -> dict[str, Any]:
+    """Admin failsafe: mint a live single-use download for a catalog platform.
+
+    Does **not** require an RPT product purchase identifier. Intended for
+    authenticated operators only (enforced at the HTTP layer). Creates a
+    normal paid grant row so ``/download?token=`` works; does **not** emit free
+    permanent GitHub installer URLs.
+
+    Unlike customer RPT-PPI reissue, this is a silent failsafe mint — no
+    durable customer-recovery audit log is written here.
+    """
+    plat = (platform or "").strip().lower()
+    fname = platform_filename(plat)
+    if not fname:
+        raise ValueError(f"unknown platform: {platform!r}")
+    # Distinct session prefix so grants are not confused with Stripe sessions
+    session_id = f"admin_ondemand_{secrets.token_hex(8)}"
+    token = mint_download_token(
+        filename=fname,
+        platform=plat,
+        session_id=session_id,
+        amount_pence=PRICE_PENCE,
+        currency=PRICE_CURRENCY,
+        ttl_sec=ttl_sec,
+        now=now,
+    )
+    path = f"/download?token={token}"
+    base = (base_url if base_url is not None else public_base_url()).rstrip("/")
+    url = f"{base}{path}"
+    if "github.com" in url.lower() and "releases/download" in url.lower():
+        raise RuntimeError("refusing free GitHub release URL from admin_mint_download_for_platform")
+    pid = purchase_id_for_token(token) or ""
+    return {
+        "token": token,
+        "download_path": path,
+        "download_url": url,
+        "platform": plat,
+        "filename": fname,
+        "session_id": session_id,
+        "purchase_id": pid,  # present in DB; not required to mint
+        "admin_ondemand": True,
+        "amount_pence": PRICE_PENCE,
+    }
+
+
 def seed_test_purchase_enabled() -> bool:
     """True only when operator explicitly opts into local/staging seed tools.
 

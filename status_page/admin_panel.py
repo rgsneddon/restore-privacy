@@ -34,6 +34,15 @@ from payments import (
     STRIPE_WEBHOOK_EVENTS,
     STRIPE_WEBHOOK_PATH,
 )
+
+# Catalog device packages for admin failsafe dropdown (current ship pin).
+_ADMIN_CATALOG_PLATFORMS: tuple[str, ...] = (
+    "windows",
+    "linux",
+    "macos",
+    "ios",
+    "android",
+)
 from processor_plugins import (
     list_processor_plugins,
     processor_plugin_views,
@@ -533,15 +542,26 @@ def render_purchase_reissue_section_html(
 <section id="admin-reissue" class="card" aria-labelledby="admin-reissue-heading">
   <h2 id="admin-reissue-heading">Re-issue download by purchase identifier</h2>
   <p class="muted" id="admin-reissue-note">
-    After a buyer loses their installer, enter the <strong>product purchase identifier</strong>
-    they were shown on the thank-you page (format <code>RPT-XXXX-XXXX-XXXX</code>).
-    A new single-use paid download link is minted for the same package — not a free permanent GitHub URL.
+    <strong>Customer recovery (RPT-PPI).</strong> When a buyer loses their installer,
+    they should quote the <strong>product purchase identifier</strong> from the thank-you
+    page (format <code>RPT-XXXX-XXXX-XXXX</code>). Enter it below to mint a
+    <strong>secondary single-use download link</strong> for the same package they paid for.
+    Tell the buyer: open the link once on a trusted device, save the installer, and keep
+    their RPT-… ID for any future recovery. This is the preferred recovery path when the
+    customer still has their purchase identifier.
+  </p>
+  <p class="muted" id="admin-reissue-elaborate">
+    Steps for the buyer after you send the link: (1) open the one-time URL,
+    (2) download starts or use the on-page button, (3) run/install the package,
+    (4) for Connect, use payment entitlement as on the original thank-you page if needed.
+    Do <strong>not</strong> post free GitHub release URLs — only the paid
+    <code>/download?token=…</code> link from this form.
   </p>
   {err}
   {ok}
   <form method="post" action="/admin/reissue-download" id="admin-reissue-form">
     <label class="field" for="purchase_id">
-      <span class="field-label">Product purchase identifier</span>
+      <span class="field-label">Product purchase identifier (RPT-PPI)</span>
       <input id="purchase_id" name="purchase_id" type="text"
              autocomplete="off" required
              placeholder="RPT-A1B2-C3D4-E5F6"
@@ -550,6 +570,74 @@ def render_purchase_reissue_section_html(
              title="RPT-XXXX-XXXX-XXXX"/>
     </label>
     <button type="submit" id="admin-reissue-submit">Create secondary download link</button>
+  </form>
+</section>
+"""
+
+
+def render_admin_ondemand_mint_section_html(
+    *,
+    result: dict[str, Any] | None = None,
+    error: str = "",
+    platform: str = "windows",
+) -> str:
+    """Admin failsafe: mint live download by platform dropdown — no RPT-PPI required.
+
+    Always shown on authenticated admin page (unlike seed-test, which is env-gated).
+    Does not write a customer-recovery audit log; short failsafe copy only.
+    """
+    err = (
+        f'<p class="err" id="ondemand-error">{_escape(error)}</p>' if error else ""
+    )
+    ok = ""
+    if result and result.get("download_url"):
+        url = _escape(str(result["download_url"]))
+        path = _escape(str(result.get("download_path") or ""))
+        plat = _escape(str(result.get("platform") or ""))
+        fname = _escape(str(result.get("filename") or ""))
+        ok = f"""
+  <div class="ok-msg" id="ondemand-result" role="status">
+    <p><strong>Admin failsafe link minted</strong> for <strong id="ondemand-result-platform">{plat}</strong>
+      (<code id="ondemand-result-filename">{fname}</code>).</p>
+    <p>One-time paid download (not free GitHub):</p>
+    <p><a id="ondemand-download-link" href="{url}" rel="noopener noreferrer">{url}</a></p>
+    <p class="muted">Path: <code id="ondemand-download-path">{path}</code>
+      — single-use; not written as a customer RPT-PPI recovery event.</p>
+  </div>"""
+    plat_sel = (platform or "windows").strip().lower()
+    options = []
+    labels = {
+        "windows": "Windows (x64) installer",
+        "linux": "Linux (x64) installer",
+        "macos": "macOS app package",
+        "ios": "iOS app package",
+        "android": "Android APK",
+    }
+    for p in _ADMIN_CATALOG_PLATFORMS:
+        sel = " selected" if p == plat_sel else ""
+        lab = labels.get(p, p)
+        options.append(f'<option value="{p}"{sel}>{_escape(lab)}</option>')
+    opts = "\n      ".join(options)
+    return f"""
+<section id="admin-ondemand-mint" class="card" aria-labelledby="admin-ondemand-heading"
+         data-admin-failsafe="1">
+  <h2 id="admin-ondemand-heading">Generate download link (admin failsafe)</h2>
+  <p class="muted" id="admin-ondemand-note">
+    Mint a <strong>live single-use</strong> download for the current catalog package
+    <strong>without</strong> a customer RPT purchase identifier. Use when you need an
+    on-demand installer link. Prefer <a href="#admin-reissue">RPT-PPI re-issue</a> when
+    the buyer still has their purchase ID. Not a free public unlock.
+  </p>
+  {err}
+  {ok}
+  <form method="post" action="/admin/mint-download" id="admin-ondemand-mint-form">
+    <label class="field" for="ondemand_platform">
+      <span class="field-label">Package / device</span>
+      <select id="ondemand_platform" name="platform" required>
+      {opts}
+      </select>
+    </label>
+    <button type="submit" id="admin-ondemand-mint-submit">Generate live download link</button>
   </form>
 </section>
 """
@@ -885,6 +973,9 @@ def render_admin_html(
     reissue_result: dict[str, Any] | None = None,
     reissue_error: str = "",
     reissue_form_value: str = "",
+    ondemand_result: dict[str, Any] | None = None,
+    ondemand_error: str = "",
+    ondemand_platform: str = "windows",
     seed_result: dict[str, Any] | None = None,
     seed_error: str = "",
     seed_platform: str = "windows",
@@ -918,6 +1009,11 @@ def render_admin_html(
         result=reissue_result,
         error=reissue_error,
         form_value=reissue_form_value,
+    )
+    ondemand_html = render_admin_ondemand_mint_section_html(
+        result=ondemand_result,
+        error=ondemand_error,
+        platform=ondemand_platform,
     )
     seed_html = render_seed_test_purchase_section_html(
         result=seed_result,
@@ -964,11 +1060,11 @@ code{{font-size:0.85rem;word-break:break-all}}
 border-radius:8px;border:1px solid var(--input-border);background:var(--input-bg);color:var(--fg)}}
 .processor-form button{{margin-top:0.75rem;padding:0.55rem 1rem;border:0;border-radius:8px;
 background:var(--btn-bg);color:var(--btn-fg);font-weight:600;cursor:pointer}}
-#admin-reissue-form label.field,#admin-seed-purchase-form label.field{{display:block;margin:0.65rem 0}}
-#admin-reissue-form .field-label,#admin-seed-purchase-form .field-label{{display:block;font-weight:600;font-size:0.9rem;margin-bottom:0.25rem}}
-#admin-reissue-form input,#admin-seed-purchase-form select{{width:100%;max-width:28rem;box-sizing:border-box;padding:0.5rem 0.6rem;
+#admin-reissue-form label.field,#admin-seed-purchase-form label.field,#admin-ondemand-mint-form label.field{{display:block;margin:0.65rem 0}}
+#admin-reissue-form .field-label,#admin-seed-purchase-form .field-label,#admin-ondemand-mint-form .field-label{{display:block;font-weight:600;font-size:0.9rem;margin-bottom:0.25rem}}
+#admin-reissue-form input,#admin-seed-purchase-form select,#admin-ondemand-mint-form select{{width:100%;max-width:28rem;box-sizing:border-box;padding:0.5rem 0.6rem;
 border-radius:8px;border:1px solid var(--input-border);background:var(--input-bg);color:var(--fg)}}
-#admin-reissue-form button,#admin-seed-purchase-form button{{margin-top:0.75rem;padding:0.55rem 1rem;border:0;border-radius:8px;
+#admin-reissue-form button,#admin-seed-purchase-form button,#admin-ondemand-mint-form button{{margin-top:0.75rem;padding:0.55rem 1rem;border:0;border-radius:8px;
 background:var(--btn-bg);color:var(--btn-fg);font-weight:600;cursor:pointer}}
 .ok-msg{{color:var(--badge-ok-fg);background:var(--badge-ok-bg);padding:0.5rem 0.75rem;border-radius:8px}}
 .err{{color:var(--err)}}
@@ -984,12 +1080,14 @@ background:var(--btn-bg);color:var(--btn-fg);font-weight:600;cursor:pointer}}
   <a href="/">VPN APP Shop</a>
 </div>
 <nav class="nav-local" id="admin-nav" aria-label="Admin sections">
-  <a href="#admin-reissue">Re-issue download</a>
+  <a href="#admin-reissue">Re-issue by RPT-PPI</a>
+  <a href="#admin-ondemand-mint">Generate download (failsafe)</a>
   {('<a href="#admin-seed-purchase">Seed test purchase</a>' if seed_test_purchase_enabled() else '')}
   <a href="#admin-processor-settings">Processor settings</a>
   <a href="#admin-grants">Paid download grants</a>
 </nav>
 {reissue_html}
+{ondemand_html}
 {seed_html}
 {settings_html}
 <section id="admin-grants" class="card">

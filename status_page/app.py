@@ -1030,6 +1030,52 @@ class Handler(BaseHTTPRequestHandler):
                 )
             return
 
+        if path in ("/admin/mint-download", "/admin/mint-download/"):
+            # Admin failsafe: live download by platform — no RPT-PPI required
+            if not admin_enabled():
+                self._send(503, "text/plain; charset=utf-8", b"admin disabled")
+                return
+            if not is_authenticated(self.headers):
+                self._send(200, "text/html; charset=utf-8", render_login_html())
+                return
+            from payments import admin_mint_download_for_platform
+
+            form = dict(urllib.parse.parse_qsl(body.decode("utf-8", "replace")))
+            plat = (form.get("platform") or "windows").strip().lower()
+            try:
+                minted = admin_mint_download_for_platform(plat)
+            except ValueError as exc:
+                self._send(
+                    400,
+                    "text/html; charset=utf-8",
+                    render_admin_html(
+                        ondemand_error=str(exc),
+                        ondemand_platform=plat,
+                    ),
+                )
+                return
+            url = str(minted.get("download_url") or "")
+            if "github.com" in url.lower() and "releases/download" in url.lower():
+                self._send(
+                    500,
+                    "text/html; charset=utf-8",
+                    render_admin_html(
+                        ondemand_error="Internal error: refusing free release URL",
+                        ondemand_platform=plat,
+                    ),
+                )
+                return
+            # No durable customer-recovery log for this failsafe path
+            self._send(
+                200,
+                "text/html; charset=utf-8",
+                render_admin_html(
+                    ondemand_result=minted,
+                    ondemand_platform=str(minted.get("platform") or plat),
+                ),
+            )
+            return
+
         if path in ("/admin/seed-test-purchase", "/admin/seed-test-purchase/"):
             if not admin_enabled():
                 self._send(503, "text/plain; charset=utf-8", b"admin disabled")
