@@ -164,7 +164,7 @@ Node deploy, ports, secrets, from-source builds, and tests: **[sundries.txt](sun
 
 **Ephemeral / short-lived nodes:** [scripts/ephemeral_node.py](scripts/ephemeral_node.py) — **periodic** VPS **snapshot** and/or **rebuild** plan (`--dry-run` by default). Install timer: [scripts/install_ephemeral_timer.sh](scripts/install_ephemeral_timer.sh). Live rebuild requires `RPT_EPHEMERAL_CONFIRM=yes`. Rebuild re-runs self-host (no-log). Does not erase provider backups/netflow; re-ship **public** node pin if keys rotate.
 
-**Release scripts:** `scripts/build_release_0.3.3.py`. Apple handoff: [`client_app/APPLE_HANDOFF_0.3.0.md`](client_app/APPLE_HANDOFF_0.3.0.md). Release notes: [`scripts/RELEASE_NOTES_0.3.0.md`](scripts/RELEASE_NOTES_0.3.0.md).
+**Release scripts:** `scripts/build_release_0.3.3.py`. Apple handoff: [`client_app/APPLE_HANDOFF_0.3.3.md`](client_app/APPLE_HANDOFF_0.3.3.md). Release notes: [`scripts/RELEASE_NOTES_0.3.3.md`](scripts/RELEASE_NOTES_0.3.3.md).
 
 ```bash
 # Windows GUI (requires system Python)
