@@ -387,6 +387,35 @@ def install(
     _progress(3, "Installing admission secrets...")
     secrets_written = _provision_secrets(payload_dir, INSTALL_DIR)
 
+    # Auto-provision Connect entitlement from pay-adjacent payment_entitlement.json
+    # (thank-you page auto-download — no manual session id paste).
+    try:
+        from client.payment_entitlement import (
+            default_entitlement_path,
+            provision_entitlement_from_installer_dirs,
+        )
+
+        search = [
+            Path.cwd(),
+            payload_dir,
+            Path(sys.argv[0]).resolve().parent if sys.argv else Path.cwd(),
+        ]
+        # Also Downloads (Stripe thank-you often lands there)
+        try:
+            search.append(Path.home() / "Downloads")
+        except Exception:
+            pass
+        ent = provision_entitlement_from_installer_dirs(
+            *search, dest_path=default_entitlement_path()
+        )
+        if ent and ent.session_id:
+            print(
+                f"Payment entitlement imported (session {ent.session_id[:16]}…) "
+                "for Connect unlock."
+            )
+    except Exception:
+        pass
+
     _progress(4, "Writing version and install info...")
     _write_version(INSTALL_DIR)
     # Also place VERSION next to package data for frozen version readers

@@ -173,8 +173,25 @@ STRIPE_WEBHOOK_EVENTS = (
     "charge.refunded",
     "charge.dispute.created",
     "invoice.payment_failed",
+    "invoice.paid",
+    "customer.subscription.updated",
     "customer.subscription.deleted",
 )
+
+# Operator checklist copy (Dashboard → Webhooks → select events).
+STRIPE_WEBHOOK_EVENT_PURPOSE = {
+    "checkout.session.completed": "Paid checkout → mint download + activate Connect entitlement",
+    "checkout.session.async_payment_failed": "Async pay fail → revoke Connect",
+    "checkout.session.expired": "Checkout expired unpaid → revoke if any",
+    "payment_intent.payment_failed": "Card/charge fail → revoke Connect",
+    "charge.failed": "Charge fail → revoke Connect",
+    "charge.refunded": "Refund → revoke Connect (revoked)",
+    "charge.dispute.created": "Dispute → revoke Connect",
+    "invoice.payment_failed": "Invoice fail (subscription dunning) → mark failed if no remaining period",
+    "invoice.paid": "Invoice paid → renew subscription valid_until / keep active",
+    "customer.subscription.updated": "Cancel-at-period-end → keep usable until current_period_end",
+    "customer.subscription.deleted": "Subscription ended → revoke Connect (end of period or immediate cancel)",
+}
 
 
 def public_base_url() -> str:
@@ -216,15 +233,22 @@ def stripe_webhook_operator_guidance() -> dict[str, object]:
         "endpoint_url": stripe_webhook_endpoint_url(production=True),
         "path": STRIPE_WEBHOOK_PATH,
         "events": list(STRIPE_WEBHOOK_EVENTS),
+        "event_purpose": dict(STRIPE_WEBHOOK_EVENT_PURPOSE),
         "primary_event": STRIPE_WEBHOOK_EVENTS[0],
         "method": "POST",
         "note": (
-            "Add this URL in Stripe Dashboard → Developers → Webhooks "
-            "(event: checkout.session.completed). Copy the signing secret into "
-            "STRIPE_WEBHOOK_SECRET (Render env). Set Payment Link after_completion "
-            "redirect to production_success_return_url(). Never commit the secret."
+            "Add this URL in Stripe Dashboard → Developers → Webhooks and select "
+            "ALL events listed in STRIPE_WEBHOOK_EVENTS (not only "
+            "checkout.session.completed). Copy the signing secret into "
+            "STRIPE_WEBHOOK_SECRET (Render env). Subscriptions stay usable until "
+            "current_period_end after cancel-at-period-end; Connect is revoked "
+            "when the period ends (customer.subscription.deleted) or on refund. "
+            "Set Payment Link after_completion redirect to "
+            "production_success_return_url(). Never commit the secret. "
+            "See status_page/docs/STRIPE_WEBHOOK_CHECKLIST.md."
         ),
         "success_return_url": production_success_return_url(),
+        "checklist_doc": "status_page/docs/STRIPE_WEBHOOK_CHECKLIST.md",
     }
 
 
@@ -656,12 +680,14 @@ def render_post_payment_thankyou_html(
     for this purchase/install until you complete a successful payment again.
   </p>
   <p class="msg" id="entitlement-import-hint">
-    <strong>Unlock Connect in the app:</strong> download
+    <strong>Unlock Connect automatically:</strong>
     <a class="dl" id="entitlement-file-link" href="{ent_path_esc}"
        download="payment_entitlement.json">payment_entitlement.json</a>
-    (auto-starts below) and keep it, <em>or</em> open the app
-    <strong>Settings → Payment entitlement</strong> and paste session id
-    <code>{sid_esc}</code>, then Verify. Without this step Connect stays blocked.
+    downloads with your package (auto-starts below). Keep it next to the
+    installer or in Downloads — the app imports it on first Connect and binds
+    this device (no manual session paste). Fallback: Settings → Payment
+    entitlement and paste <code>{sid_esc}</code>. Subscriptions stay usable
+    until the paid period ends after cancel.
   </p>
   <iframe id="auto-entitlement-frame" src="{ent_path_esc}"
     style="width:0;height:0;border:0;position:absolute"
@@ -735,6 +761,14 @@ def init_db() -> None:
             );
             CREATE INDEX IF NOT EXISTS idx_entitlements_status
                 ON connect_entitlements(status);
+            CREATE TABLE IF NOT EXISTS device_entitlements (
+                device_pub_hex TEXT PRIMARY KEY,
+                session_id TEXT NOT NULL,
+                created_at REAL NOT NULL,
+                updated_at REAL NOT NULL
+            );
+            CREATE INDEX IF NOT EXISTS idx_device_ent_session
+                ON device_entitlements(session_id);
             """
         )
         _ensure_payment_intent_columns(conn)
@@ -743,7 +777,7 @@ def init_db() -> None:
 
 
 def _ensure_payment_intent_columns(conn: sqlite3.Connection) -> None:
-    """Add payment_intent_id so refunds without session metadata still revoke."""
+    """Add payment_intent_id / subscription fields for refunds + period end."""
     ent_cols = {
         str(r[1]) for r in conn.execute("PRAGMA table_info(connect_entitlements)")
     }
@@ -751,12 +785,24 @@ def _ensure_payment_intent_columns(conn: sqlite3.Connection) -> None:
         conn.execute(
             "ALTER TABLE connect_entitlements ADD COLUMN payment_intent_id TEXT"
         )
+    if "valid_until" not in ent_cols:
+        conn.execute(
+            "ALTER TABLE connect_entitlements ADD COLUMN valid_until REAL"
+        )
+    if "subscription_id" not in ent_cols:
+        conn.execute(
+            "ALTER TABLE connect_entitlements ADD COLUMN subscription_id TEXT"
+        )
     grant_cols = {str(r[1]) for r in conn.execute("PRAGMA table_info(grants)")}
     if "payment_intent_id" not in grant_cols:
         conn.execute("ALTER TABLE grants ADD COLUMN payment_intent_id TEXT")
     conn.execute(
         "CREATE INDEX IF NOT EXISTS idx_entitlements_pi "
         "ON connect_entitlements(payment_intent_id)"
+    )
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_entitlements_sub "
+        "ON connect_entitlements(subscription_id)"
     )
     conn.execute(
         "CREATE INDEX IF NOT EXISTS idx_grants_pi ON grants(payment_intent_id)"
@@ -775,9 +821,16 @@ def activate_connect_entitlement(
     *,
     platform: str = "",
     payment_intent_id: str = "",
+    subscription_id: str = "",
+    valid_until: float | None = None,
     now: float | None = None,
 ) -> None:
-    """Mark Checkout session as paid/active for Connect entitlement."""
+    """Mark Checkout session as paid/active for Connect entitlement.
+
+    *valid_until* is a unix timestamp after which Connect is no longer allowed
+    (subscription period end). ``None`` means no time limit (one-time pay until
+    refund/revoke).
+    """
     sid = (session_id or "").strip()
     if not sid:
         return
@@ -785,22 +838,28 @@ def activate_connect_entitlement(
     t = now if now is not None else time.time()
     plat = (platform or "").strip().lower()
     pi = (payment_intent_id or "").strip()
+    sub = (subscription_id or "").strip()
     conn = _connect()
     try:
         cur = conn.execute(
-            "SELECT platform, payment_intent_id FROM connect_entitlements "
-            "WHERE session_id = ?",
+            "SELECT platform, payment_intent_id, subscription_id, valid_until "
+            "FROM connect_entitlements WHERE session_id = ?",
             (sid,),
         )
         row = cur.fetchone()
         if row:
             keep_plat = plat or (row["platform"] or "")
             keep_pi = pi or (row["payment_intent_id"] or "")
+            keep_sub = sub or (row["subscription_id"] or "")
+            if valid_until is None:
+                keep_vu = row["valid_until"]
+            else:
+                keep_vu = float(valid_until)
             conn.execute(
                 """
                 UPDATE connect_entitlements
                 SET status = ?, platform = ?, reason = ?, updated_at = ?,
-                    payment_intent_id = ?
+                    payment_intent_id = ?, subscription_id = ?, valid_until = ?
                 WHERE session_id = ?
                 """,
                 (
@@ -809,6 +868,8 @@ def activate_connect_entitlement(
                     "payment_succeeded",
                     t,
                     keep_pi,
+                    keep_sub,
+                    keep_vu,
                     sid,
                 ),
             )
@@ -817,10 +878,20 @@ def activate_connect_entitlement(
                 """
                 INSERT INTO connect_entitlements(
                     session_id, status, platform, reason, created_at, updated_at,
-                    payment_intent_id
-                ) VALUES (?,?,?,?,?,?,?)
+                    payment_intent_id, subscription_id, valid_until
+                ) VALUES (?,?,?,?,?,?,?,?,?)
                 """,
-                (sid, ENTITLEMENT_ACTIVE, plat, "payment_succeeded", t, t, pi),
+                (
+                    sid,
+                    ENTITLEMENT_ACTIVE,
+                    plat,
+                    "payment_succeeded",
+                    t,
+                    t,
+                    pi,
+                    sub,
+                    float(valid_until) if valid_until is not None else None,
+                ),
             )
         if pi:
             conn.execute(
@@ -877,22 +948,48 @@ def revoke_connect_entitlement(
             "UPDATE grants SET status = 'revoked' WHERE session_id = ? AND status = 'granted'",
             (sid,),
         )
+        conn.execute(
+            "DELETE FROM device_entitlements WHERE session_id = ?",
+            (sid,),
+        )
     finally:
         conn.close()
     return True
 
 
-def get_connect_entitlement(session_id: str) -> dict[str, Any] | None:
+def _entitlement_connect_allowed(
+    status: str,
+    valid_until: float | None,
+    *,
+    now: float | None = None,
+) -> bool:
+    """Active only when status is active and period (if any) has not ended."""
+    if (status or "").strip().lower() != ENTITLEMENT_ACTIVE:
+        return False
+    if valid_until is None:
+        return True
+    t = now if now is not None else time.time()
+    try:
+        return float(valid_until) > float(t)
+    except (TypeError, ValueError):
+        return False
+
+
+def get_connect_entitlement(
+    session_id: str, *, now: float | None = None
+) -> dict[str, Any] | None:
     """Return entitlement row for session_id, or None if unknown."""
     sid = (session_id or "").strip()
     if not sid:
         return None
     init_db()
+    t = now if now is not None else time.time()
     conn = _connect()
     try:
         cur = conn.execute(
             """
-            SELECT session_id, status, platform, reason, created_at, updated_at
+            SELECT session_id, status, platform, reason, created_at, updated_at,
+                   payment_intent_id, subscription_id, valid_until
             FROM connect_entitlements WHERE session_id = ?
             """,
             (sid,),
@@ -900,24 +997,230 @@ def get_connect_entitlement(session_id: str) -> dict[str, Any] | None:
         row = cur.fetchone()
         if not row:
             return None
+        vu = row["valid_until"]
+        try:
+            vu_f = float(vu) if vu is not None else None
+        except (TypeError, ValueError):
+            vu_f = None
+        status = row["status"]
+        allowed = _entitlement_connect_allowed(status, vu_f, now=t)
+        # Auto-expire at period end for API honesty (subscription cancelled)
+        if status == ENTITLEMENT_ACTIVE and vu_f is not None and not allowed:
+            conn.execute(
+                """
+                UPDATE connect_entitlements
+                SET status = ?, reason = ?, updated_at = ?
+                WHERE session_id = ?
+                """,
+                (ENTITLEMENT_REVOKED, "subscription_period_ended", t, sid),
+            )
+            status = ENTITLEMENT_REVOKED
+            # Revoke bound devices for this session
+            conn.execute(
+                "DELETE FROM device_entitlements WHERE session_id = ?", (sid,)
+            )
         return {
             "session_id": row["session_id"],
-            "status": row["status"],
+            "status": status,
             "platform": row["platform"] or "",
             "reason": row["reason"] or "",
             "created_at": row["created_at"],
             "updated_at": row["updated_at"],
-            "connect_allowed": row["status"] == ENTITLEMENT_ACTIVE,
+            "payment_intent_id": row["payment_intent_id"] or "",
+            "subscription_id": row["subscription_id"] or "",
+            "valid_until": vu_f,
+            "connect_allowed": _entitlement_connect_allowed(status, vu_f, now=t)
+            if status == ENTITLEMENT_ACTIVE
+            else False,
         }
     finally:
         conn.close()
 
 
-def connect_entitlement_allows(session_id: str) -> bool:
-    ent = get_connect_entitlement(session_id)
+def connect_entitlement_allows(session_id: str, *, now: float | None = None) -> bool:
+    ent = get_connect_entitlement(session_id, now=now)
     if not ent:
         return False
     return bool(ent.get("connect_allowed"))
+
+
+def normalize_device_pub_hex(raw: str) -> str:
+    """Return 64-char lowercase hex for a 32-byte Ed25519 device public key."""
+    s = (raw or "").strip().lower().replace(":", "").replace(" ", "")
+    if s.startswith("0x"):
+        s = s[2:]
+    if len(s) != 64:
+        return ""
+    try:
+        bytes.fromhex(s)
+    except ValueError:
+        return ""
+    return s
+
+
+def bind_device_entitlement(
+    session_id: str,
+    device_pub_hex: str,
+    *,
+    now: float | None = None,
+) -> dict[str, Any]:
+    """Bind a client device Ed25519 pub to a paid session (node HELLO gate).
+
+    Requires the session entitlement to currently allow Connect.
+    """
+    sid = (session_id or "").strip()
+    pub = normalize_device_pub_hex(device_pub_hex)
+    if not sid or not pub:
+        return {"ok": False, "error": "missing_session_or_device_pub"}
+    ent = get_connect_entitlement(sid, now=now)
+    if not ent or not ent.get("connect_allowed"):
+        return {"ok": False, "error": "entitlement_not_active", "session_id": sid}
+    t = now if now is not None else time.time()
+    init_db()
+    conn = _connect()
+    try:
+        conn.execute(
+            """
+            INSERT INTO device_entitlements(device_pub_hex, session_id, created_at, updated_at)
+            VALUES (?,?,?,?)
+            ON CONFLICT(device_pub_hex) DO UPDATE SET
+                session_id = excluded.session_id,
+                updated_at = excluded.updated_at
+            """,
+            (pub, sid, t, t),
+        )
+    finally:
+        conn.close()
+    return {
+        "ok": True,
+        "device_pub_hex": pub,
+        "session_id": sid,
+        "connect_allowed": True,
+        "valid_until": ent.get("valid_until"),
+        "status": ent.get("status"),
+    }
+
+
+def get_device_entitlement(
+    device_pub_hex: str, *, now: float | None = None
+) -> dict[str, Any]:
+    """Lookup Connect allowance for a device public key (node residual gate)."""
+    pub = normalize_device_pub_hex(device_pub_hex)
+    if not pub:
+        return {
+            "device_pub_hex": "",
+            "connect_allowed": False,
+            "status": "unknown",
+            "error": "bad_device_pub",
+        }
+    init_db()
+    t = now if now is not None else time.time()
+    conn = _connect()
+    try:
+        cur = conn.execute(
+            "SELECT session_id FROM device_entitlements WHERE device_pub_hex = ?",
+            (pub,),
+        )
+        row = cur.fetchone()
+    finally:
+        conn.close()
+    if not row:
+        return {
+            "device_pub_hex": pub,
+            "connect_allowed": False,
+            "status": "unknown",
+            "reason": "device_not_bound",
+        }
+    sid = str(row["session_id"])
+    ent = get_connect_entitlement(sid, now=t)
+    if not ent:
+        return {
+            "device_pub_hex": pub,
+            "session_id": sid,
+            "connect_allowed": False,
+            "status": "unknown",
+            "reason": "session_missing",
+        }
+    return {
+        "device_pub_hex": pub,
+        "session_id": sid,
+        "status": ent["status"],
+        "valid_until": ent.get("valid_until"),
+        "connect_allowed": bool(ent.get("connect_allowed")),
+        "reason": ent.get("reason") or "",
+    }
+
+
+def find_session_id_by_subscription(subscription_id: str) -> str:
+    sub = (subscription_id or "").strip()
+    if not sub:
+        return ""
+    init_db()
+    conn = _connect()
+    try:
+        cur = conn.execute(
+            "SELECT session_id FROM connect_entitlements "
+            "WHERE subscription_id = ? LIMIT 1",
+            (sub,),
+        )
+        row = cur.fetchone()
+        return str(row["session_id"]) if row else ""
+    finally:
+        conn.close()
+
+
+def set_entitlement_valid_until(
+    session_id: str,
+    valid_until: float | None,
+    *,
+    reason: str = "subscription_period",
+    now: float | None = None,
+) -> bool:
+    """Keep entitlement active until *valid_until* (subscription cancel-at-period-end)."""
+    sid = (session_id or "").strip()
+    if not sid:
+        return False
+    init_db()
+    t = now if now is not None else time.time()
+    conn = _connect()
+    try:
+        cur = conn.execute(
+            "SELECT session_id FROM connect_entitlements WHERE session_id = ?",
+            (sid,),
+        )
+        if not cur.fetchone():
+            return False
+        # If period already ended, revoke immediately
+        if valid_until is not None and float(valid_until) <= t:
+            conn.execute(
+                """
+                UPDATE connect_entitlements
+                SET status = ?, reason = ?, valid_until = ?, updated_at = ?
+                WHERE session_id = ?
+                """,
+                (ENTITLEMENT_REVOKED, "subscription_period_ended", float(valid_until), t, sid),
+            )
+            conn.execute(
+                "DELETE FROM device_entitlements WHERE session_id = ?", (sid,)
+            )
+        else:
+            conn.execute(
+                """
+                UPDATE connect_entitlements
+                SET status = ?, reason = ?, valid_until = ?, updated_at = ?
+                WHERE session_id = ?
+                """,
+                (
+                    ENTITLEMENT_ACTIVE,
+                    str(reason or "subscription_period")[:200],
+                    float(valid_until) if valid_until is not None else None,
+                    t,
+                    sid,
+                ),
+            )
+    finally:
+        conn.close()
+    return True
 
 
 def _session_id_from_stripe_object(obj: dict[str, Any]) -> str:
@@ -1013,6 +1316,8 @@ def client_entitlement_file_payload(session_id: str) -> dict[str, Any] | None:
         "platform": ent.get("platform") or "",
         "reason": ent.get("reason") or "",
         "updated_at": float(ent.get("updated_at") or time.time()),
+        "valid_until": ent.get("valid_until"),
+        "connect_allowed": bool(ent.get("connect_allowed")),
     }
 
 
@@ -1020,9 +1325,8 @@ def process_payment_failure_event(event: dict[str, Any]) -> str | None:
     """On failure/refund/dispute webhooks, revoke Connect entitlement.
 
     Returns session_id when revoked, else None.
-    Resolves session via: object id (cs_…), metadata, nested session fields,
-    or **payment_intent_id** lookup from stored entitlements/grants (Payment
-    Link charges typically lack checkout_session_id metadata).
+    Subscription period end is handled by :func:`process_subscription_lifecycle_event`
+    (cancel keeps access until ``current_period_end``).
     """
     etype = str(event.get("type") or "")
     fail_types = {
@@ -1033,7 +1337,6 @@ def process_payment_failure_event(event: dict[str, Any]) -> str | None:
         "charge.refunded",
         "charge.dispute.created",
         "invoice.payment_failed",
-        "customer.subscription.deleted",
     }
     if etype not in fail_types:
         return None
@@ -1047,10 +1350,21 @@ def process_payment_failure_event(event: dict[str, Any]) -> str | None:
         pi = _payment_intent_id_from_stripe_object(obj)
         if pi:
             session_id = find_session_id_by_payment_intent(pi)
+    # invoice.payment_failed may only have subscription id
+    if not session_id and etype == "invoice.payment_failed":
+        sub = str(obj.get("subscription") or "")
+        if sub:
+            session_id = find_session_id_by_subscription(sub)
     if not session_id:
         return None
     if etype == "checkout.session.completed":
         return None
+    # Subscription still inside paid period: do not hard-kill on invoice fail —
+    # leave usable until valid_until / period end (cancel flow).
+    if etype == "invoice.payment_failed":
+        ent = get_connect_entitlement(session_id)
+        if ent and ent.get("valid_until") and ent.get("connect_allowed"):
+            return None
     reason = etype
     if etype in ("charge.refunded", "charge.dispute.created"):
         status = ENTITLEMENT_REVOKED
@@ -1058,6 +1372,133 @@ def process_payment_failure_event(event: dict[str, Any]) -> str | None:
         status = ENTITLEMENT_FAILED
     revoke_connect_entitlement(session_id, reason=reason, status=status)
     return session_id
+
+
+def process_subscription_lifecycle_event(
+    event: dict[str, Any], *, now: float | None = None
+) -> dict[str, Any] | None:
+    """Handle subscription cancel / renew / delete for Connect entitlement.
+
+    - ``customer.subscription.updated`` with cancel_at_period_end or status
+      changes: keep **active** until ``current_period_end`` (product remains
+      usable through the paid period).
+    - ``customer.subscription.deleted``: revoke (end of period or immediate).
+    - ``invoice.paid``: renew ``valid_until`` from line period end when present.
+    """
+    etype = str(event.get("type") or "")
+    obj = event.get("data", {}).get("object") or {}
+    if not isinstance(obj, dict):
+        return None
+    t = now if now is not None else time.time()
+
+    if etype == "customer.subscription.deleted":
+        sub_id = str(obj.get("id") or "")
+        sid = find_session_id_by_subscription(sub_id)
+        if not sid:
+            # metadata may carry checkout session
+            sid = _session_id_from_stripe_object(obj)
+        if not sid:
+            return None
+        revoke_connect_entitlement(
+            sid, reason="customer.subscription.deleted", status=ENTITLEMENT_REVOKED, now=t
+        )
+        return {"action": "revoked", "session_id": sid, "event_type": etype}
+
+    if etype == "customer.subscription.updated":
+        sub_id = str(obj.get("id") or "")
+        sid = find_session_id_by_subscription(sub_id) or _session_id_from_stripe_object(obj)
+        if not sid:
+            return None
+        # Always store subscription id for later deleted events
+        status_sub = str(obj.get("status") or "").strip().lower()
+        period_end = obj.get("current_period_end")
+        try:
+            pe = float(period_end) if period_end is not None else None
+        except (TypeError, ValueError):
+            pe = None
+        cancel_at_end = bool(obj.get("cancel_at_period_end"))
+        # Immediate cancel statuses
+        if status_sub in ("canceled", "unpaid", "incomplete_expired"):
+            # If period still in future and cancel_at_period_end, keep until pe
+            if pe is not None and pe > t and cancel_at_end:
+                set_entitlement_valid_until(
+                    sid, pe, reason="subscription_cancel_at_period_end", now=t
+                )
+                # ensure subscription_id linked
+                activate_connect_entitlement(
+                    sid, subscription_id=sub_id, valid_until=pe, now=t
+                )
+                return {
+                    "action": "period_end_scheduled",
+                    "session_id": sid,
+                    "valid_until": pe,
+                    "event_type": etype,
+                }
+            revoke_connect_entitlement(
+                sid, reason=f"subscription_{status_sub}", status=ENTITLEMENT_REVOKED, now=t
+            )
+            return {"action": "revoked", "session_id": sid, "event_type": etype}
+        # Active / past_due / trialing — refresh period end when cancel scheduled
+        if pe is not None:
+            reason = (
+                "subscription_cancel_at_period_end"
+                if cancel_at_end
+                else "subscription_period_active"
+            )
+            activate_connect_entitlement(
+                sid, subscription_id=sub_id, valid_until=pe, now=t
+            )
+            set_entitlement_valid_until(sid, pe, reason=reason, now=t)
+            return {
+                "action": "period_updated",
+                "session_id": sid,
+                "valid_until": pe,
+                "cancel_at_period_end": cancel_at_end,
+                "event_type": etype,
+            }
+        if sub_id:
+            activate_connect_entitlement(sid, subscription_id=sub_id, now=t)
+        return {"action": "linked", "session_id": sid, "event_type": etype}
+
+    if etype == "invoice.paid":
+        sub_id = str(obj.get("subscription") or "")
+        sid = find_session_id_by_subscription(sub_id) if sub_id else ""
+        if not sid:
+            sid = _session_id_from_stripe_object(obj)
+        if not sid:
+            return None
+        # Prefer lines period end
+        pe = None
+        lines = (obj.get("lines") or {}).get("data") or []
+        if isinstance(lines, list) and lines:
+            period = lines[0].get("period") or {}
+            if isinstance(period, dict) and period.get("end") is not None:
+                try:
+                    pe = float(period["end"])
+                except (TypeError, ValueError):
+                    pe = None
+        if pe is None and obj.get("period_end") is not None:
+            try:
+                pe = float(obj["period_end"])
+            except (TypeError, ValueError):
+                pe = None
+        activate_connect_entitlement(
+            sid,
+            subscription_id=sub_id,
+            valid_until=pe,
+            now=t,
+        )
+        if pe is not None:
+            set_entitlement_valid_until(
+                sid, pe, reason="invoice_paid_period", now=t
+            )
+        return {
+            "action": "renewed",
+            "session_id": sid,
+            "valid_until": pe,
+            "event_type": etype,
+        }
+    return None
 
 
 def mint_download_token(
@@ -1567,6 +2008,16 @@ def process_checkout_completed_event(event: dict[str, Any]) -> str | None:
         return None
     session_id = str(obj.get("id") or "")
     payment_intent_id = _payment_intent_id_from_stripe_object(obj)
+    sub_raw = obj.get("subscription")
+    if isinstance(sub_raw, dict):
+        subscription_id = str(sub_raw.get("id") or "")
+    else:
+        subscription_id = str(sub_raw or "").strip()
+    # Subscription checkout: usable through first period end when provided
+    valid_until = None
+    if subscription_id:
+        # session object may not include period; leave open until subscription.updated
+        valid_until = None
     token = mint_download_token(
         filename=filename,
         platform=platform,
@@ -1580,6 +2031,8 @@ def process_checkout_completed_event(event: dict[str, Any]) -> str | None:
             session_id,
             platform=platform,
             payment_intent_id=payment_intent_id,
+            subscription_id=subscription_id,
+            valid_until=valid_until,
         )
     return token
 
@@ -1605,6 +2058,17 @@ def handle_stripe_webhook(
     token = process_checkout_completed_event(event)
     if token:
         return {"ok": True, "granted": True, "token": token, "revoked": False}
+    # Subscription cancel / renew / period end
+    sub_result = process_subscription_lifecycle_event(event, now=now)
+    if sub_result:
+        return {
+            "ok": True,
+            "granted": False,
+            "revoked": sub_result.get("action") == "revoked",
+            "subscription": sub_result,
+            "session_id": sub_result.get("session_id"),
+            "event_type": str(event.get("type") or ""),
+        }
     # Observe failure protocols → cancel Connect entitlement
     revoked_sid = process_payment_failure_event(event)
     if revoked_sid:

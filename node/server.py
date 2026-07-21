@@ -357,6 +357,10 @@ def main(argv=None) -> int:
     config["ui_port"] = args.ui_port
     config["collect_user_data"] = False
 
+    # Product residual: refuse HELLO unless device is bound to paid entitlement
+    # (status host). Operators may set RPT_REQUIRE_PAYMENT_ENTITLEMENT=0 for lab.
+    os.environ.setdefault("RPT_REQUIRE_PAYMENT_ENTITLEMENT", "1")
+
     secrets = Path(args.secrets_dir)
     node_key, _ = ensure_secrets(secrets)
     authorized = load_authorized(secrets)

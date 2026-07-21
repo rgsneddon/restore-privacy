@@ -495,12 +495,23 @@ class Handler(BaseHTTPRequestHandler):
                     "platform": ent.get("platform") or "",
                     "reason": ent.get("reason") or "",
                     "connect_allowed": bool(ent.get("connect_allowed")),
+                    "valid_until": ent.get("valid_until"),
                 }
             self._send(
                 200,
                 "application/json",
                 json.dumps(payload).encode("utf-8"),
             )
+            return
+
+        if path in ("/api/device-entitlement", "/device-entitlement"):
+            # Node residual HELLO gate — device Ed25519 pub must be bound to paid session
+            from payments import get_device_entitlement
+
+            device_pub = (query.get("device_pub") or query.get("device_pub_hex") or "").strip()
+            payload = get_device_entitlement(device_pub)
+            code = 200 if not payload.get("error") else 400
+            self._send(code, "application/json", json.dumps(payload).encode("utf-8"))
             return
 
         if path in (
@@ -847,6 +858,29 @@ class Handler(BaseHTTPRequestHandler):
                     }
                 ).encode("utf-8"),
             )
+            return
+
+        if path in ("/api/bind-device-entitlement", "/bind-device-entitlement"):
+            # Client auto-bind after pay: JSON {session_id, device_pub}
+            from payments import bind_device_entitlement
+
+            try:
+                data = json.loads(body.decode("utf-8") or "{}")
+            except json.JSONDecodeError:
+                self._send(
+                    400,
+                    "application/json",
+                    json.dumps({"ok": False, "error": "bad_json"}).encode("utf-8"),
+                )
+                return
+            if not isinstance(data, dict):
+                data = {}
+            result = bind_device_entitlement(
+                str(data.get("session_id") or ""),
+                str(data.get("device_pub") or data.get("device_pub_hex") or ""),
+            )
+            code = 200 if result.get("ok") else 403
+            self._send(code, "application/json", json.dumps(result).encode("utf-8"))
             return
 
         if path == "/webhook/stripe":

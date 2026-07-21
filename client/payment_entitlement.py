@@ -6,8 +6,11 @@ sets status to ``failed`` / ``revoked`` and **Connect is blocked** for that
 install until a new successful payment is completed.
 
 Local cache under the product data dir; optional refresh from the status host
-``/api/connect-entitlement``. Node residual still uses device crypto; this gate
-is enforced on every product Connect entry path.
+``/api/connect-entitlement``. After pay the thank-you page auto-downloads
+``payment_entitlement.json`` (discovered on first Connect — no manual session
+paste required when the file lands next to the install or in Downloads). The
+client also binds the local device Ed25519 pub to the paid session so the
+**node** can refuse residual HELLO for non-entitled installs.
 """
 
 from __future__ import annotations
@@ -30,6 +33,7 @@ KEY_STATUS = "status"
 KEY_PLATFORM = "platform"
 KEY_REASON = "reason"
 KEY_UPDATED_AT = "updated_at"
+KEY_VALID_UNTIL = "valid_until"
 
 STATUS_ACTIVE = "active"
 STATUS_FAILED = "failed"
@@ -40,19 +44,20 @@ STATUS_UNPAID = "unpaid"
 CONNECT_BLOCKED_PAYMENT_MSG = (
     "Connect is blocked: payment failed or entitlement was revoked for this "
     "install. Successful payment is required. If payment fails at any time "
-    "(checkout failure, failed charge, refund, or dispute), the ability to "
-    "Connect with the Restore Privacy app is cancelled until you complete a "
-    "successful payment again on https://restoreprivacy.online/ — then paste "
-    "the Checkout session id (cs_…) in Settings → Payment entitlement, or "
-    "place payment_entitlement.json in the product data folder."
+    "(checkout failure, failed charge, refund, dispute, or subscription period "
+    "ended), the ability to Connect with the Restore Privacy app is cancelled "
+    "until you complete a successful payment again on https://restoreprivacy.online/ "
+    "(re-download payment_entitlement.json from the thank-you page, or use "
+    "Settings → Payment entitlement)."
 )
 
 CONNECT_BLOCKED_NO_ENTITLEMENT_MSG = (
     "Connect is blocked: no successful payment entitlement on this install. "
-    "After paying on https://restoreprivacy.online/, open Settings → Payment "
-    "entitlement and paste the Checkout session id (cs_…) from the thank-you "
-    "page (or import the downloaded payment_entitlement.json). Successful "
-    "payment is required; if payment fails at any time, Connect is cancelled."
+    "After paying on https://restoreprivacy.online/, keep the auto-downloaded "
+    "payment_entitlement.json (or re-open the thank-you page) so the app can "
+    "import it automatically — then Connect. Settings → Payment entitlement "
+    "is only a fallback. Successful payment is required; if payment fails or a "
+    "subscription period ends, Connect is cancelled."
 )
 
 # Strong disclaimer for README / portal / privacy / licence surfaces
@@ -81,24 +86,34 @@ class PaymentEntitlement:
     platform: str = ""
     reason: str = ""
     updated_at: float = 0.0
+    valid_until: float | None = None
 
     def to_dict(self) -> dict[str, Any]:
-        return {
+        d: dict[str, Any] = {
             KEY_SESSION_ID: str(self.session_id or ""),
             KEY_STATUS: str(self.status or STATUS_UNKNOWN),
             KEY_PLATFORM: str(self.platform or ""),
             KEY_REASON: str(self.reason or ""),
             KEY_UPDATED_AT: float(self.updated_at or 0.0),
         }
+        if self.valid_until is not None:
+            d[KEY_VALID_UNTIL] = float(self.valid_until)
+        return d
 
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> "PaymentEntitlement":
+        vu_raw = data.get(KEY_VALID_UNTIL)
+        try:
+            vu = float(vu_raw) if vu_raw is not None and str(vu_raw).strip() != "" else None
+        except (TypeError, ValueError):
+            vu = None
         return cls(
             session_id=str(data.get(KEY_SESSION_ID) or ""),
             status=str(data.get(KEY_STATUS) or STATUS_UNKNOWN).strip().lower(),
             platform=str(data.get(KEY_PLATFORM) or ""),
             reason=str(data.get(KEY_REASON) or ""),
             updated_at=float(data.get(KEY_UPDATED_AT) or 0.0),
+            valid_until=vu,
         )
 
 
@@ -159,6 +174,7 @@ def record_payment_success(
     platform: str = "",
     path: Optional[Path] = None,
     now: float | None = None,
+    valid_until: float | None = None,
 ) -> PaymentEntitlement:
     """Local cache after successful paid fulfilment."""
     t = now if now is not None else time.time()
@@ -168,6 +184,7 @@ def record_payment_success(
         platform=str(platform or "").strip().lower(),
         reason="payment_succeeded",
         updated_at=t,
+        valid_until=valid_until,
     )
     save_payment_entitlement(ent, path=path)
     return ent
@@ -383,6 +400,12 @@ def payment_allows_connect(
     if is_payment_blocking_status(st):
         return False
     if st == STATUS_ACTIVE:
+        if e.valid_until is not None:
+            try:
+                if float(e.valid_until) <= time.time():
+                    return False
+            except (TypeError, ValueError):
+                pass
         return True
     # unknown / empty
     if not req:
@@ -427,8 +450,14 @@ def ensure_entitlement_for_connect(
     *,
     base_url: str | None = None,
     fetch: Any = None,
+    bind_device: bool = True,
 ) -> PaymentEntitlement:
-    """Bootstrap + remote refresh used by every shipped Connect entry path."""
+    """Bootstrap + remote refresh used by every shipped Connect entry path.
+
+    Auto-provisions from ``payment_entitlement.json`` next to the install or in
+    Downloads (thank-you auto-download), then binds the local device pub so the
+    residual node can admit HELLO.
+    """
     local = load_payment_entitlement(path)
     if not local.session_id:
         discovered = try_discover_entitlement_file(dest_path=path)
@@ -441,9 +470,19 @@ def ensure_entitlement_for_connect(
             if boot is not None:
                 local = boot
     if local.session_id:
-        return refresh_entitlement_from_remote(
+        local = refresh_entitlement_from_remote(
             path=path, base_url=base_url, fetch=fetch
         )
+        if (
+            bind_device
+            and local.status == STATUS_ACTIVE
+            and payment_allows_connect(local, require=True)
+        ):
+            try:
+                bind_device_to_remote(local.session_id, base_url=base_url)
+            except Exception:  # noqa: BLE001
+                pass
+        return local
     return local
 
 
@@ -526,11 +565,112 @@ def refresh_entitlement_from_remote(
             status=st if st in (STATUS_FAILED, STATUS_REVOKED, STATUS_UNPAID) else STATUS_FAILED,
         )
     if st == STATUS_ACTIVE:
+        vu = remote.get("valid_until")
+        try:
+            vu_f = float(vu) if vu is not None and str(vu).strip() != "" else None
+        except (TypeError, ValueError):
+            vu_f = None
         return record_payment_success(
             local.session_id,
             platform=local.platform or str(remote.get("platform") or ""),
             path=path,
             now=t,
+            valid_until=vu_f,
         )
     # Unknown remote (network blip): keep last known local status
     return local
+
+
+def local_device_pub_hex() -> str:
+    """Hex of local product Ed25519 device public key (for status-host bind)."""
+    try:
+        from client.secrets_loader import (
+            CLIENT_PUB_NAME,
+            ensure_device_admission_key,
+        )
+
+        d = ensure_device_admission_key()
+        pub_path = d / CLIENT_PUB_NAME
+        if pub_path.is_file():
+            raw = pub_path.read_bytes()
+            if len(raw) == 32:
+                return raw.hex().lower()
+    except Exception:  # noqa: BLE001
+        pass
+    return ""
+
+
+def bind_device_to_remote(
+    session_id: str,
+    *,
+    device_pub_hex: str | None = None,
+    base_url: str | None = None,
+    timeout: float = 8.0,
+) -> dict[str, Any]:
+    """POST /api/bind-device-entitlement so the node can admit this install."""
+    sid = (session_id or "").strip()
+    pub = (device_pub_hex or local_device_pub_hex() or "").strip().lower()
+    if not sid or not pub:
+        return {"ok": False, "error": "missing_session_or_device"}
+    base = (base_url or os.environ.get("RPT_PUBLIC_BASE_URL") or "").strip()
+    if not base:
+        base = "https://restoreprivacy.online"
+    base = base.rstrip("/")
+    url = f"{base}/api/bind-device-entitlement"
+    body = json.dumps({"session_id": sid, "device_pub": pub}).encode("utf-8")
+    req = urllib.request.Request(
+        url,
+        data=body,
+        headers={
+            "User-Agent": "RestorePrivacy-payment-entitlement/0.3.3",
+            "Accept": "application/json",
+            "Content-Type": "application/json",
+        },
+        method="POST",
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=timeout) as resp:  # noqa: S310
+            raw = resp.read().decode("utf-8", errors="replace")
+        data = json.loads(raw)
+        if isinstance(data, dict):
+            return data
+    except (urllib.error.URLError, TimeoutError, OSError, json.JSONDecodeError, ValueError) as exc:
+        return {"ok": False, "error": str(exc)}
+    return {"ok": False, "error": "bad_response"}
+
+
+def auto_provision_and_bind(
+    path: Optional[Path] = None,
+    *,
+    base_url: str | None = None,
+    fetch: Any = None,
+) -> PaymentEntitlement:
+    """Discover post-pay entitlement file, verify remote, bind device for node HELLO.
+
+    Primary auto path after Stripe thank-you (no manual session id paste).
+    """
+    ent = ensure_entitlement_for_connect(path=path, base_url=base_url, fetch=fetch)
+    if ent.session_id and ent.status == STATUS_ACTIVE:
+        bind_device_to_remote(ent.session_id, base_url=base_url)
+    return ent
+
+
+def provision_entitlement_from_installer_dirs(
+    *search_dirs: Path | str,
+    dest_path: Optional[Path] = None,
+) -> PaymentEntitlement | None:
+    """Copy payment_entitlement.json from pay-adjacent dirs into product data.
+
+    Called by Windows/Linux installers when the thank-you file sits next to the
+    downloaded package (auto-provision — no Settings paste).
+    """
+    dest = dest_path or default_entitlement_path()
+    for d in search_dirs:
+        try:
+            p = Path(d) / ENTITLEMENT_FILENAME
+            if p.is_file():
+                return import_entitlement_from_file(p, path=dest)
+        except (OSError, json.JSONDecodeError, TypeError, ValueError):
+            continue
+    return None
+

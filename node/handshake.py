@@ -239,6 +239,17 @@ def node_complete_hello(
     if opening.message % Q != expected_m:
         raise AdmissionError("pedersen message mismatch")
 
+    # Payment entitlement: refuse residual HELLO when device is not bound to
+    # an active paid session (status host /api/device-entitlement). Lab tests
+    # set RPT_REQUIRE_PAYMENT_ENTITLEMENT=0.
+    from .payment_entitlement_gate import (
+        device_may_connect,
+        payment_entitlement_required_on_node,
+    )
+
+    if payment_entitlement_required_on_node() and not device_may_connect(client_pub):
+        raise AdmissionError("payment entitlement required")
+
     # Crypto verified — enroll first-seen device keys for free-product mode
     if not known:
         node.enroll_device(client_pub)

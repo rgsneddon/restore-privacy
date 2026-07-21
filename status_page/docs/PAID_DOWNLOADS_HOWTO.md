@@ -45,16 +45,23 @@ Legacy `STRIPE_PRICE_ID` is ignored for Checkout unless `STRIPE_ALLOW_LEGACY_PRI
 
 ### 1.4 Webhook (required for fulfilment)
 
-After payment, Stripe must notify this site so a download token is minted.
+After payment, Stripe must notify this site so a download token is minted **and**
+Connect entitlement is activated/revoked (including subscription period end).
 The receiver already runs on the Render status service (same app as the public page).
 
 1. Developers → **Webhooks** → **Add endpoint**.
 2. **Endpoint URL** (production — paste exactly):  
    **`https://restoreprivacy.online/webhook/stripe`**
-3. Events to send: at least **`checkout.session.completed`**.
+3. Events to send: **all events listed in**
+   [`STRIPE_WEBHOOK_CHECKLIST.md`](STRIPE_WEBHOOK_CHECKLIST.md)
+   (not only `checkout.session.completed` — failures, refunds, subscription
+   cancel/period-end, and `invoice.paid` are required for Connect revoke).
 4. Copy the **Signing secret** (`whsec_…`) → set **`STRIPE_WEBHOOK_SECRET`** on Render
    (Environment) or paste it in `/admin` → Stripe → Save connection.
 5. Confirm `RPT_PUBLIC_BASE_URL` = `https://restoreprivacy.online` (no trailing slash).
+
+**Subscription cancel:** product stays usable until `current_period_end`; after that
+Connect and residual HELLO are refused. See the checklist doc.
 
 Do **not** invent a second Render service for webhooks — reuse `restore-privacy-status`.
 
