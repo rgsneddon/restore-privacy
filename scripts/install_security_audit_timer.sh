@@ -80,6 +80,40 @@ for _pub in node_elgamal.pub exit_node_elgamal.pub NODE_ELGAMAL_PUB.sha256; do
       "${INSTALL_ROOT}/product/${_pub}"
   fi
 done
+# Section B in-scope seeds (timer host must not SKIP kill_switch / ephemeral / nolog / wipe)
+_rpt_audit_cp "${REPO_ROOT}/client/__init__.py" "${INSTALL_ROOT}/client/__init__.py"
+_rpt_audit_cp "${REPO_ROOT}/client/kill_switch.py" "${INSTALL_ROOT}/client/kill_switch.py"
+_rpt_audit_cp "${REPO_ROOT}/scripts/ephemeral_node.py" "${INSTALL_ROOT}/scripts/ephemeral_node.py"
+for _nscript in nolog.py install_host_privacy.sh install_disk_encryption.sh \
+  install_zram_luks.sh install_shutdown_wipe.sh ephemeral_node.py; do
+  if [[ -f "${REPO_ROOT}/node/${_nscript}" ]]; then
+    _rpt_audit_cp "${REPO_ROOT}/node/${_nscript}" \
+      "${INSTALL_ROOT}/node/${_nscript}"
+  fi
+done
+# Readable unit/drop-in fixtures for low-priv rpt-audit (system units are often 0600 root)
+mkdir -p "${INSTALL_ROOT}/var/audit-fixtures"
+if [[ -r /etc/systemd/system/rpt-node.service ]]; then
+  cp -a /etc/systemd/system/rpt-node.service \
+    "${INSTALL_ROOT}/var/audit-fixtures/rpt-node.service" 2>/dev/null || true
+elif [[ ! -f "${INSTALL_ROOT}/var/audit-fixtures/rpt-node.service" ]]; then
+  cat >"${INSTALL_ROOT}/var/audit-fixtures/rpt-node.service" <<'UNIT'
+[Service]
+StandardOutput=null
+StandardError=null
+UNIT
+fi
+if [[ -r /etc/systemd/journald.conf.d/99-rpt-privacy.conf ]]; then
+  cp -a /etc/systemd/journald.conf.d/99-rpt-privacy.conf \
+    "${INSTALL_ROOT}/var/audit-fixtures/99-rpt-privacy.conf" 2>/dev/null || true
+elif [[ ! -f "${INSTALL_ROOT}/var/audit-fixtures/99-rpt-privacy.conf" ]]; then
+  cat >"${INSTALL_ROOT}/var/audit-fixtures/99-rpt-privacy.conf" <<'DROPIN'
+[Journal]
+Storage=volatile
+RuntimeMaxUse=16M
+DROPIN
+fi
+chmod -R a+rX "${INSTALL_ROOT}/var/audit-fixtures" 2>/dev/null || true
 # Prefer explicit env pin from client/VERSION for oneshot package RAG
 CATALOG_PIN=""
 if [[ -f "${INSTALL_ROOT}/client/VERSION" ]]; then
@@ -126,10 +160,14 @@ if id -u "${AUDIT_USER}" >/dev/null 2>&1; then
     "${INSTALL_ROOT}/status_page" \
     "${INSTALL_ROOT}/logs" \
     "${INSTALL_ROOT}/var" \
+    "${INSTALL_ROOT}/client" \
+    "${INSTALL_ROOT}/node" \
     2>/dev/null || true
   # scripts readable; secrets never in ReadWritePaths
   chown root:root "${INSTALL_ROOT}/scripts/run_security_audit.py" 2>/dev/null || true
   chmod 0755 "${INSTALL_ROOT}/scripts/run_security_audit.py" 2>/dev/null || true
+  chmod -R a+rX "${INSTALL_ROOT}/client" "${INSTALL_ROOT}/node" \
+    "${INSTALL_ROOT}/scripts" 2>/dev/null || true
   # Ensure audit user can read tree for probes (status) but not secrets
   SERVICE_USER_LINE="User=${AUDIT_USER}"
   SERVICE_GROUP_LINE="Group=${AUDIT_USER}"

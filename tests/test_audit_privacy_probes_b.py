@@ -12,6 +12,7 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "scripts"))
 
 from audit_privacy_probes import (  # noqa: E402
+    SECTION_B_IN_SCOPE,
     probe_disk_wipe_readiness,
     probe_ephemeral_dry_run,
     probe_host_privacy_drift,
@@ -252,6 +253,94 @@ class TestSectionBProbes(unittest.TestCase):
         self.assertIn("kill_switch_default_off", md)
         self.assertIn("firewall", md.lower())
         self.assertIn("no firewall", md.lower() or "excluded" in md.lower())
+
+    def test_timer_host_fixture_all_in_scope_pass(self):
+        """Prepared install-root (timer host seeds) yields all-in-scope PASS; firewall SKIP."""
+        with tempfile.TemporaryDirectory() as td:
+            install = Path(td)
+            # Config + readable unit/drop-in fixtures (as install_security_audit_timer seeds)
+            (install / "rpt-node.json").write_text(
+                '{"logging": {"logging_enabled": false, "connection_log": false, '
+                '"session_log": false, "access_log": false, "traffic_log": false, '
+                '"accounting_log": false, "peer_activity_log": false, '
+                '"user_info_log": false, "verbose": false, "log_file": null, '
+                '"log_path": null, "journal": false}, "collect_user_data": false}\n',
+                encoding="utf-8",
+            )
+            fix = install / "var" / "audit-fixtures"
+            fix.mkdir(parents=True)
+            (fix / "rpt-node.service").write_text(
+                "[Service]\nStandardOutput=null\nStandardError=null\n",
+                encoding="utf-8",
+            )
+            (fix / "99-rpt-privacy.conf").write_text(
+                "[Journal]\nStorage=volatile\nRuntimeMaxUse=16M\n",
+                encoding="utf-8",
+            )
+            # node recipes for disk wipe readiness
+            node_dir = install / "node"
+            node_dir.mkdir(parents=True)
+            for name in (
+                "install_disk_encryption.sh",
+                "install_zram_luks.sh",
+                "install_shutdown_wipe.sh",
+                "install_host_privacy.sh",
+                "nolog.py",
+            ):
+                src = ROOT / "node" / name
+                if src.is_file():
+                    (node_dir / name).write_bytes(src.read_bytes())
+                else:
+                    (node_dir / name).write_text("# fixture\n", encoding="utf-8")
+            # client kill_switch + ephemeral script seeds
+            (install / "client").mkdir(parents=True)
+            (install / "client" / "__init__.py").write_bytes(
+                (ROOT / "client" / "__init__.py").read_bytes()
+            )
+            (install / "client" / "kill_switch.py").write_bytes(
+                (ROOT / "client" / "kill_switch.py").read_bytes()
+            )
+            (install / "scripts").mkdir(parents=True)
+            (install / "scripts" / "ephemeral_node.py").write_bytes(
+                (ROOT / "scripts" / "ephemeral_node.py").read_bytes()
+            )
+            # node.nolog import path
+            (node_dir / "nolog.py").write_bytes(
+                (ROOT / "node" / "nolog.py").read_bytes()
+            )
+            (node_dir / "__init__.py").write_text("", encoding="utf-8")
+
+            agg = run_all_section_b_probes(
+                http_status={
+                    "ok": True,
+                    "status_code": 200,
+                    "body": {"title": "RESTORE PRIVACY"},
+                },
+                repo_root=ROOT,
+                install_root=install,
+                run_ephemeral_subprocess=False,
+            )
+            self.assertTrue(agg["ok"], msg=agg)
+            self.assertTrue(agg.get("all_in_scope_pass"), msg=agg["probes"])
+            for name in SECTION_B_IN_SCOPE:
+                p = agg["probes"][name]
+                self.assertFalse(
+                    p.get("skipped"),
+                    msg=f"{name} skipped: {p}",
+                )
+                self.assertTrue(p.get("ok"), msg=f"{name} not ok: {p}")
+                if name != "kill_switch_default_off":
+                    self.assertFalse(
+                        p.get("warn"),
+                        msg=f"{name} warn (not pure PASS): {p}",
+                    )
+            fw = agg["probes"]["firewall_expose_surface"]
+            self.assertTrue(fw.get("skipped"))
+            md = render_section_b_markdown(agg)
+            self.assertIn("all PASS", md)
+            # Table states for in-scope are PASS
+            for name in SECTION_B_IN_SCOPE:
+                self.assertIn(f"**{name}** | **PASS**", md)
 
 
 if __name__ == "__main__":

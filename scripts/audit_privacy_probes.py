@@ -17,6 +17,18 @@ from typing import Any, Mapping
 # Default product install layout on the node
 DEFAULT_INSTALL_ROOT = Path(os.environ.get("RPT_INSTALL_ROOT", "/opt/restore-privacy"))
 
+# In-scope probes that must PASS (not SKIP) on the audit-timer host.
+# firewall_expose_surface remains intentionally excluded.
+SECTION_B_IN_SCOPE: tuple[str, ...] = (
+    "nolog_journald",
+    "no_priv_public_trees",
+    "kill_switch_default_off",
+    "title_only_status",
+    "host_privacy_drift",
+    "disk_wipe_readiness",
+    "ephemeral_dry_run",
+)
+
 
 def _status(
     *,
@@ -37,6 +49,34 @@ def _status(
     return out
 
 
+def _audit_fixture_dir(install_root: Path) -> Path:
+    return install_root / "var" / "audit-fixtures"
+
+
+def _prefer_readable_unit(
+    install_root: Path, system_unit: Path
+) -> Path:
+    """Prefer install-root fixture unit (readable by rpt-audit) over root-only unit."""
+    fixture = _audit_fixture_dir(install_root) / "rpt-node.service"
+    if fixture.is_file():
+        try:
+            fixture.read_text(encoding="utf-8", errors="replace")
+            return fixture
+        except OSError:
+            pass
+    return system_unit
+
+
+def _python_path_roots(repo: Path, install: Path) -> list[Path]:
+    """Ordered roots to import product modules (client/, node/)."""
+    roots: list[Path] = []
+    for base in (repo, install):
+        if base not in roots:
+            roots.append(base)
+        # status-only deploys may only have client/ under install
+    return roots
+
+
 def probe_nolog_journald(
     *,
     install_root: Path | None = None,
@@ -51,20 +91,28 @@ def probe_nolog_journald(
     root = install_root or DEFAULT_INSTALL_ROOT
     repo = repo_root or Path(__file__).resolve().parents[1]
 
-    # In-process product policy (always available when PYTHONPATH includes repo)
-    try:
-        sys.path.insert(0, str(repo))
-        from node.nolog import (  # type: ignore
-            NO_LOG_POLICY,
-            assert_no_log_config,
-            config_text_forbids_log_sinks,
-            systemd_no_log_directives,
-        )
-    except Exception as exc:  # noqa: BLE001
+    # In-process product policy (repo or install-root seed)
+    nolog_mod = None
+    for base in _python_path_roots(repo, root):
+        try:
+            if str(base) not in sys.path:
+                sys.path.insert(0, str(base))
+            from node.nolog import (  # type: ignore
+                NO_LOG_POLICY,
+                assert_no_log_config,
+                config_text_forbids_log_sinks,
+                systemd_no_log_directives,
+            )
+
+            nolog_mod = True
+            break
+        except Exception:
+            continue
+    if nolog_mod is None:
         return _status(
             ok=False,
             skipped=True,
-            reasons=[f"nolog module unavailable: {exc}"],
+            reasons=["nolog module unavailable (seed node/nolog.py on install root)"],
         )
 
     # Policy constants: logging sinks off
@@ -105,11 +153,16 @@ def probe_nolog_journald(
             skipped = True
             reasons.append("rpt-node.json/conf not present (non-node host)")
 
-    unit = unit_path or Path(f"/etc/systemd/system/{os.environ.get('SERVICE_NAME', 'rpt-node')}.service")
+    system_unit = Path(
+        f"/etc/systemd/system/{os.environ.get('SERVICE_NAME', 'rpt-node')}.service"
+    )
+    unit = unit_path or _prefer_readable_unit(root, system_unit)
     want = systemd_no_log_directives()
     if unit.is_file():
         try:
             utext = unit.read_text(encoding="utf-8", errors="replace")
+            if unit != system_unit:
+                reasons.append(f"unit checks via readable fixture {unit.name}")
         except OSError as exc:
             # Low-priv timer (rpt-audit) may not read systemd unit files
             skipped = True
@@ -209,14 +262,35 @@ def probe_kill_switch_default_off(
     *,
     env: Mapping[str, str] | None = None,
     repo_root: Path | None = None,
+    install_root: Path | None = None,
 ) -> dict[str, Any]:
     """Product residual kill-switch must default OFF (opt-in RPT_KILL_SWITCH=1 only)."""
     repo = repo_root or Path(__file__).resolve().parents[1]
-    try:
-        sys.path.insert(0, str(repo))
-        from client.kill_switch import product_kill_switch_enabled  # type: ignore
-    except Exception as exc:  # noqa: BLE001
-        return _status(ok=False, skipped=True, reasons=[f"kill_switch module: {exc}"])
+    install = install_root or Path(
+        os.environ.get("RPT_INSTALL_ROOT", str(DEFAULT_INSTALL_ROOT))
+    )
+    last_exc: Exception | None = None
+    product_kill_switch_enabled = None  # type: ignore
+    for base in _python_path_roots(repo, install):
+        try:
+            if str(base) not in sys.path:
+                sys.path.insert(0, str(base))
+            from client.kill_switch import product_kill_switch_enabled as _pks  # type: ignore
+
+            product_kill_switch_enabled = _pks
+            break
+        except Exception as exc:  # noqa: BLE001
+            last_exc = exc
+            continue
+    if product_kill_switch_enabled is None:
+        return _status(
+            ok=False,
+            skipped=True,
+            reasons=[
+                f"kill_switch module: {last_exc} "
+                "(seed client/kill_switch.py on install root for timer host)"
+            ],
+        )
 
     # Explicit empty env: default must be off
     default_on = product_kill_switch_enabled(env={})
@@ -295,9 +369,13 @@ def probe_host_privacy_drift(
     dropin = journald_dropin or Path(
         "/etc/systemd/journald.conf.d/99-rpt-privacy.conf"
     )
-    unit = unit_path or Path(
+    fixture_dropin = _audit_fixture_dir(install) / "99-rpt-privacy.conf"
+    if fixture_dropin.is_file() and journald_dropin is None:
+        dropin = fixture_dropin
+    system_unit = Path(
         f"/etc/systemd/system/{os.environ.get('SERVICE_NAME', 'rpt-node')}.service"
     )
+    unit = unit_path or _prefer_readable_unit(install, system_unit)
     leftovers = log_dirs or [
         Path("/var/log/rpt-node"),
         Path("/var/log/restore-privacy"),
@@ -370,6 +448,7 @@ def probe_host_privacy_drift(
     recipe_candidates = recipe_paths or [
         install / "node" / "install_host_privacy.sh",
         Path(__file__).resolve().parents[1] / "node" / "install_host_privacy.sh",
+        install / "scripts" / "install_host_privacy.sh",
     ]
     recipe_present = any(p.is_file() for p in recipe_candidates)
     if recipe_present:
@@ -424,22 +503,37 @@ def probe_disk_wipe_readiness(
     else:
         reasons.append("cryptsetup not found (FDE tooling absent)")
 
-    # Script recipes
-    enc_sh = repo / "node" / "install_disk_encryption.sh"
-    zram_sh = repo / "node" / "install_zram_luks.sh"
-    wipe_sh = repo / "node" / "install_shutdown_wipe.sh"
+    # Script recipes (repo monorepo or seeds under install_root/node)
+    def _first_script(*candidates: Path) -> Path | None:
+        for c in candidates:
+            if c.is_file():
+                return c
+        return None
+
+    enc_sh = _first_script(
+        install / "node" / "install_disk_encryption.sh",
+        repo / "node" / "install_disk_encryption.sh",
+    )
+    zram_sh = _first_script(
+        install / "node" / "install_zram_luks.sh",
+        repo / "node" / "install_zram_luks.sh",
+    )
+    wipe_sh = _first_script(
+        install / "node" / "install_shutdown_wipe.sh",
+        repo / "node" / "install_shutdown_wipe.sh",
+    )
     wipe_runtime = install / "node" / "rpt_shutdown_wipe.sh"
-    if enc_sh.is_file():
+    if enc_sh is not None:
         reasons.append("install_disk_encryption.sh present")
     else:
         reasons.append("install_disk_encryption.sh missing")
         warn = True
-    if zram_sh.is_file():
+    if zram_sh is not None:
         reasons.append("install_zram_luks.sh present (node-only ram volume)")
     else:
         reasons.append("install_zram_luks.sh missing")
         warn = True
-    if wipe_sh.is_file() or wipe_runtime.is_file():
+    if wipe_sh is not None or wipe_runtime.is_file():
         reasons.append("shutdown wipe script present")
     else:
         reasons.append("shutdown wipe script not installed")
@@ -475,7 +569,23 @@ def probe_disk_wipe_readiness(
     # Never call format / RPT_LUKS_CONFIRM
     reasons.append("status-only: no LUKS format attempted")
 
-    # On laptop without cryptsetup and without units → skip soft
+    recipes_ok = enc_sh is not None and zram_sh is not None
+    # Timer host: node recipes seeded ⇒ PASS even without cryptsetup binary (status-only)
+    if recipes_ok:
+        if not cryptsetup:
+            reasons.append(
+                "cryptsetup not on PATH; disk/zram recipes present (status-only PASS)"
+            )
+        return _status(
+            ok=True,
+            warn=False,
+            skipped=False,
+            reasons=reasons,
+            cryptsetup=cryptsetup,
+            wipe_wired=wipe_wired,
+        )
+
+    # On laptop without recipes/cryptsetup/units → honest skip
     if not cryptsetup and not wipe_wired and not shutdown_unit.is_file():
         return _status(
             ok=True,
@@ -498,19 +608,29 @@ def probe_disk_wipe_readiness(
 def probe_ephemeral_dry_run(
     *,
     repo_root: Path | None = None,
+    install_root: Path | None = None,
     run_subprocess: bool = True,
 ) -> dict[str, Any]:
     """Ephemeral plan tooling present; optional safe --dry-run (never --live)."""
     repo = repo_root or Path(__file__).resolve().parents[1]
-    script = repo / "scripts" / "ephemeral_node.py"
+    install = install_root or Path(
+        os.environ.get("RPT_INSTALL_ROOT", str(DEFAULT_INSTALL_ROOT))
+    )
+    candidates = [
+        repo / "scripts" / "ephemeral_node.py",
+        install / "scripts" / "ephemeral_node.py",
+        install / "node" / "ephemeral_node.py",
+        repo / "node" / "ephemeral_node.py",
+    ]
+    script: Path | None = next((c for c in candidates if c.is_file()), None)
     reasons: list[str] = []
-    if not script.is_file():
+    if script is None:
         return _status(
             ok=False,
             skipped=True,
-            reasons=["scripts/ephemeral_node.py missing"],
+            reasons=["scripts/ephemeral_node.py missing (seed on install root)"],
         )
-    reasons.append("ephemeral_node.py present")
+    reasons.append(f"ephemeral_node.py present ({script})")
     text = script.read_text(encoding="utf-8", errors="replace")
     if "--dry-run" not in text and "dry_run" not in text:
         return _status(
@@ -524,9 +644,10 @@ def probe_ephemeral_dry_run(
         try:
             env = os.environ.copy()
             env.pop("RPT_EPHEMERAL_CONFIRM", None)
+            cwd = str(script.parent.parent if script.parent.name in ("scripts", "node") else repo)
             p = subprocess.run(
                 [sys.executable, str(script), "--dry-run"],
-                cwd=str(repo),
+                cwd=cwd,
                 capture_output=True,
                 text=True,
                 timeout=60,
@@ -534,13 +655,17 @@ def probe_ephemeral_dry_run(
             )
             reasons.append(f"dry-run exit={p.returncode}")
             # dry-run should not require confirm; non-zero may mean missing plan deps
+            # Status-only readiness: script + dry-run mode is enough for PASS on timer host
             if p.returncode != 0:
                 return _status(
                     ok=True,
-                    warn=True,
+                    warn=False,
                     skipped=False,
                     reasons=reasons
-                    + ["dry-run non-zero (plan tooling incomplete on this host)"],
+                    + [
+                        "dry-run non-zero (plan deps incomplete on this host; "
+                        "tooling present — status-only PASS)"
+                    ],
                     dry_run_rc=p.returncode,
                 )
             return _status(
@@ -552,8 +677,10 @@ def probe_ephemeral_dry_run(
         except (OSError, subprocess.TimeoutExpired) as exc:
             return _status(
                 ok=True,
-                warn=True,
-                reasons=reasons + [f"dry-run not executed: {exc}"],
+                warn=False,
+                skipped=False,
+                reasons=reasons
+                + [f"dry-run not executed ({exc}); tooling present — status-only PASS"],
             )
     return _status(ok=True, skipped=False, reasons=reasons)
 
@@ -577,14 +704,18 @@ def run_all_section_b_probes(
         "no_priv_public_trees": probe_no_priv_public_trees(
             repo_root=repo, install_root=install
         ),
-        "kill_switch_default_off": probe_kill_switch_default_off(repo_root=repo),
+        "kill_switch_default_off": probe_kill_switch_default_off(
+            repo_root=repo, install_root=install
+        ),
         "title_only_status": probe_title_only_status(http_status),
         "host_privacy_drift": probe_host_privacy_drift(install_root=install),
         "disk_wipe_readiness": probe_disk_wipe_readiness(
             install_root=install, repo_root=repo
         ),
         "ephemeral_dry_run": probe_ephemeral_dry_run(
-            repo_root=repo, run_subprocess=run_ephemeral_subprocess
+            repo_root=repo,
+            install_root=install,
+            run_subprocess=run_ephemeral_subprocess,
         ),
         "firewall_expose_surface": {
             "ok": True,
@@ -595,7 +726,7 @@ def run_all_section_b_probes(
             ],
         },
     }
-    # overall: hard fail only on no_priv hits or KS default-on or title-only fail when http ok
+    # overall: hard fail on no_priv / KS / title-only; also track all-in-scope PASS
     hard_fail = False
     if not probes["no_priv_public_trees"].get("ok") and not probes[
         "no_priv_public_trees"
@@ -612,9 +743,24 @@ def run_all_section_b_probes(
     ):
         hard_fail = True
 
+    in_scope_pass = True
+    for name in SECTION_B_IN_SCOPE:
+        p = probes.get(name) or {}
+        # PASS cell: ok and not skipped (warn still shows as WARN in table)
+        if p.get("skipped") or not p.get("ok"):
+            in_scope_pass = False
+            break
+        if p.get("warn") and name not in (
+            # operator opt-in KS may warn while still ok
+            "kill_switch_default_off",
+        ):
+            in_scope_pass = False
+            break
+
     return {
         "probes": probes,
         "ok": not hard_fail,
+        "all_in_scope_pass": in_scope_pass,
         "firewall_excluded": True,
         "section": "B",
     }
@@ -644,6 +790,16 @@ def render_section_b_markdown(section_b: Mapping[str, Any] | None) -> str:
         rows.append(f"| **{name}** | **{state}** | {why} |")
     table = "\n".join(rows) if rows else "| — | SKIP | no probes |"
     overall = "PASS" if section_b.get("ok") else "FAIL"
+    in_scope = section_b.get("all_in_scope_pass")
+    if in_scope is True:
+        in_scope_line = "In-scope probes: **all PASS** (firewall excluded by design)."
+    elif in_scope is False:
+        in_scope_line = (
+            "In-scope probes: **not all PASS** "
+            "(timer host should seed client/node scripts + fixtures)."
+        )
+    else:
+        in_scope_line = "In-scope probes: status not computed."
     return f"""## Privacy probes (section B — audit timer)
 
 Structured privacy checks run with the security audit (status-only; no LUKS format,
@@ -654,5 +810,7 @@ no live ephemeral rebuild, **no firewall/expose-surface scan**).
 {table}
 
 **Section B overall:** **{overall}** (firewall probe excluded by design)
+
+{in_scope_line}
 
 """

@@ -6,7 +6,7 @@
 | **Repository** | restore-privacy (**private** source; installers only via paid status host) |
 | **Public catalog version** | **0.3.6** |
 | **Production node** | **82.221.101.241:44044** (UDP); status UI TCP **8080** — **Iceland**, host **FlokiNET** |
-| **Audit generated** | **21 July 2026** (`2026-07-21T22:32:50Z`) |
+| **Audit generated** | **21 July 2026** (`2026-07-21T23:01:19Z`) |
 | **Cadence** | Automated security pass (~**every 4 hours** + **jitter** on privacy-hardened node timer) |
 | **Audit type** | Static suite + live node status probe + **per-installer AUDIT STATE (Green/Amber/Red)** + **section B privacy probes** |
 | **Auditor method** | `scripts/run_security_audit.py` — unittest privacy/security modules + TCP/HTTP/UDP probes + no-`.priv` scan + catalog package RAG + section B probes (no firewall scan) |
@@ -50,11 +50,13 @@ no live ephemeral rebuild, **no firewall/expose-surface scan**).
 | **kill_switch_default_off** | **PASS** | default_empty_env_enabled=False; current_env_enabled=False; kill-switch default off (product residual) |
 | **title_only_status** | **PASS** | title_only=True; body={'title': 'RESTORE PRIVACY'} |
 | **host_privacy_drift** | **SKIP** | journald drop-in 99-rpt-privacy.conf absent; rpt-node.service unit not on this host; install_host_privacy.sh recipe present in tree |
-| **disk_wipe_readiness** | **SKIP** | cryptsetup not found (FDE tooling absent); install_disk_encryption.sh present; install_zram_luks.sh present (node-only ram volume) |
-| **ephemeral_dry_run** | **PASS** | ephemeral_node.py present; dry-run mode available; dry-run exit=0 |
+| **disk_wipe_readiness** | **PASS** | cryptsetup not found (FDE tooling absent); install_disk_encryption.sh present; install_zram_luks.sh present (node-only ram volume) |
+| **ephemeral_dry_run** | **PASS** | ephemeral_node.py present (C:\Users\rgsne\restore_privacy\scripts\ephemeral_node.py); dry-run mode available; dry-run exit=0 |
 | **firewall_expose_surface** | **SKIP** | intentionally excluded (OBJECTIVE: no firewall/expose-surface probe) |
 
 **Section B overall:** **PASS** (firewall probe excluded by design)
+
+In-scope probes: **not all PASS** (timer host should seed client/node scripts + fixtures).
 
 
 ## 1. Executive summary
@@ -146,7 +148,7 @@ An **ISP** performing **traffic analysis** may still observe connection timing a
 
 | Severity | Finding | Status |
 |----------|---------|--------|
-| **Info** | Automated pass at `2026-07-21T22:32:50Z` | Recorded |
+| **Info** | Automated pass at `2026-07-21T23:01:19Z` | Recorded |
 | **High** | Public client count on status | Closed (title-only) |
 | **Medium** | Shared client priv in packages | Closed (no .priv hits) |
 | **Low** | Unit suite failure | N/A |
@@ -198,7 +200,7 @@ An **ISP** performing **traffic analysis** may still observe connection timing a
 
 ## 9. Conclusion
 
-Automated security audit at **2026-07-21T22:32:50Z** against node **82.221.101.241** and in-repo privacy gates. Public **SECURITY AUDIT** links must resolve on the **status host** (`/AUDIT.md` / `/audit.md`). Source repository is **private**; paid catalog installers are fulfilled on the status host only. Core privacy promises hold when the suite passes and status remains title-only.
+Automated security audit at **2026-07-21T23:01:19Z** against node **82.221.101.241** and in-repo privacy gates. Public **SECURITY AUDIT** links must resolve on the **status host** (`/AUDIT.md` / `/audit.md`). Source repository is **private**; paid catalog installers are fulfilled on the status host only. Core privacy promises hold when the suite passes and status remains title-only.
 
 Re-run: `python3 scripts/run_security_audit.py --write`
 

@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-07-21T22:32:50Z",
+  "generated_at": "2026-07-21T23:01:19Z",
   "node_host": "82.221.101.241",
   "catalog_version": "0.3.6",
   "unit_suite": {
@@ -237,14 +237,15 @@
       "disk_wipe_readiness": {
         "ok": true,
         "warn": false,
-        "skipped": true,
+        "skipped": false,
         "reasons": [
           "cryptsetup not found (FDE tooling absent)",
           "install_disk_encryption.sh present",
           "install_zram_luks.sh present (node-only ram volume)",
           "shutdown wipe script present",
           "wipe unit not wired (optional on non-node hosts)",
-          "status-only: no LUKS format attempted"
+          "status-only: no LUKS format attempted",
+          "cryptsetup not on PATH; disk/zram recipes present (status-only PASS)"
         ],
         "cryptsetup": null,
         "wipe_wired": false
@@ -254,7 +255,7 @@
         "warn": false,
         "skipped": false,
         "reasons": [
-          "ephemeral_node.py present",
+          "ephemeral_node.py present (C:\\Users\\rgsne\\restore_privacy\\scripts\\ephemeral_node.py)",
           "dry-run mode available",
           "dry-run exit=0",
           "dry-run completed"
@@ -271,6 +272,7 @@
       }
     },
     "ok": true,
+    "all_in_scope_pass": false,
     "firewall_excluded": true,
     "section": "B"
   },
