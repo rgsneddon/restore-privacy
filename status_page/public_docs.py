@@ -170,6 +170,26 @@ def _escape(s: str) -> str:
     )
 
 
+# Package RAG solid-colour cells (AUDIT STATE column) — upgrade emoji to CSS boxes
+_RAG_SWATCH_MAP: dict[str, tuple[str, str]] = {
+    "🟩": ("rag-green", "Green"),
+    "🟧": ("rag-amber", "Amber"),
+    "🟥": ("rag-red", "Red"),
+}
+
+
+def rag_swatch_html(emoji_or_state: str) -> str | None:
+    """Safe solid colour box HTML for a package RAG state emoji, or None."""
+    key = (emoji_or_state or "").strip()
+    if key in _RAG_SWATCH_MAP:
+        css, label = _RAG_SWATCH_MAP[key]
+        return (
+            f'<span class="rag-swatch {css}" title="{label}" '
+            f'role="img" aria-label="{label}"></span>'
+        )
+    return None
+
+
 def _inline_format(escaped_line: str) -> str:
     """Limited inline markdown on already-escaped text (safe: no raw HTML)."""
     import re
@@ -185,7 +205,24 @@ def _inline_format(escaped_line: str) -> str:
     s = re.sub(r"`([^`]+)`", r"<code>\1</code>", s)
     s = re.sub(r"\*\*([^*]+)\*\*", r"<strong>\1</strong>", s)
     s = re.sub(r"(?<!\*)\*([^*]+)\*(?!\*)", r"<em>\1</em>", s)
+    # Standalone RAG emoji → solid colour box (after escape; emoji unchanged)
+    for emoji, (css, label) in _RAG_SWATCH_MAP.items():
+        if emoji in s:
+            box = (
+                f'<span class="rag-swatch {css}" title="{label}" '
+                f'role="img" aria-label="{label}"></span>'
+            )
+            s = s.replace(emoji, box)
     return s
+
+
+def _format_table_cell(raw_cell: str, *, header: bool = False) -> str:
+    """Format one table cell; pure RAG swatch cells get centered solid fill."""
+    stripped = (raw_cell or "").strip()
+    box = rag_swatch_html(stripped)
+    if box is not None and not header:
+        return f'<div class="rag-cell">{box}</div>'
+    return _inline_format(_escape(raw_cell))
 
 
 def markdownish_to_html(text: str) -> str:
@@ -289,7 +326,8 @@ def markdownish_to_html(text: str) -> str:
             else:
                 tag = "td"
             cells_html = "".join(
-                f"<{tag}>{_inline_format(_escape(c))}</{tag}>" for c in cells
+                f"<{tag}>{_format_table_cell(c, header=(tag == 'th'))}</{tag}>"
+                for c in cells
             )
             out.append(f"<tr>{cells_html}</tr>")
             i += 1
@@ -392,6 +430,15 @@ table.doc-table th, table.doc-table td {
 }
 table.doc-table th { background: #111827; color: #fde68a; font-weight: 600; }
 table.doc-table tr:nth-child(even) td { background: #0f141c; }
+/* Package AUDIT STATE solid colour cells */
+.rag-cell { display: flex; align-items: center; justify-content: center; min-height: 1.5rem; }
+.rag-swatch {
+  display: inline-block; width: 1.35rem; height: 1.35rem; border-radius: 4px;
+  border: 1px solid rgba(255,255,255,0.12); vertical-align: middle;
+}
+.rag-swatch.rag-green { background: #22c55e; }
+.rag-swatch.rag-amber { background: #f59e0b; }
+.rag-swatch.rag-red { background: #ef4444; }
 .muted { opacity: 0.78; font-size: 0.92rem; }
 footer.doc-foot {
   margin-top: 2.5rem; padding-top: 1rem; border-top: 1px solid #1f2937;

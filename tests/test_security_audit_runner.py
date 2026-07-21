@@ -312,11 +312,12 @@ class TestAuditTimerPrivacySectionA(unittest.TestCase):
         self.assertIn("**PASS**", md)
         self.assertIn("title-only=True", md)
         self.assertNotIn("dpi-undetectable", md.lower())
-        # Top package RAG section
+        # Top package RAG section — solid colour cells (not bare **Green** words)
         self.assertIn("Installer package AUDIT STATE", md)
-        self.assertIn("**Green**", md)
-        self.assertIn("**Amber**", md)
-        self.assertIn("**Red**", md)
+        self.assertIn("🟩", md)
+        self.assertIn("🟧", md)
+        self.assertIn("🟥", md)
+        self.assertNotRegex(md, r"\| \*\*Green\*\* \|")
         self.assertIn("Windows", md)
         self.assertIn("Android", md)
         # Section appears before executive summary numbering body

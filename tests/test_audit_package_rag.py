@@ -102,10 +102,22 @@ class TestPackageRagEvaluation(unittest.TestCase):
         self.assertIn("Installer package AUDIT STATE", md)
         for label in ("Windows", "Linux", "macOS", "iOS", "Android"):
             self.assertIn(label, md)
-        self.assertIn("**Green**", md)
-        self.assertIn("**Amber**", md)
-        self.assertIn("**Red**", md)
+        # State column uses solid colour swatches, not bare **Green**/**Amber**/**Red** cells
+        green = self.mod.package_state_cell_markup("Green")
+        amber = self.mod.package_state_cell_markup("Amber")
+        red = self.mod.package_state_cell_markup("Red")
+        self.assertEqual(green, "🟩")
+        self.assertEqual(amber, "🟧")
+        self.assertEqual(red, "🟥")
+        self.assertIn(green, md)
+        self.assertIn(amber, md)
+        self.assertIn(red, md)
+        # Package data rows must not use bold state words as the AUDIT STATE cell
+        self.assertNotRegex(md, r"\| \*\*Green\*\* \|")
+        self.assertNotRegex(md, r"\| \*\*Amber\*\* \|")
+        self.assertNotRegex(md, r"\| \*\*Red\*\* \|")
         self.assertIn("Catalog overall", md)
+        self.assertIn("solid colour", md.lower())
 
     def test_priv_hit_is_red(self):
         # Synthetic: mock contains_priv
@@ -141,9 +153,14 @@ class TestAuditMdHasPackageRag(unittest.TestCase):
         )
         for plat in ("Windows", "Linux", "macOS", "iOS", "Android"):
             self.assertIn(plat, text)
-        for state in ("Green", "Amber", "Red"):
-            # At least the legend or a row uses the label
-            self.assertIn(state, text)
+        # Solid colour indicators present; legend may still name colours in words
+        self.assertTrue(
+            "🟩" in text or "🟧" in text or "🟥" in text,
+            "AUDIT package table should use solid colour swatches",
+        )
+        # Legend still explains meaning
+        self.assertIn("Green", text)
+        self.assertIn("Meaning", text)
 
 
 if __name__ == "__main__":
