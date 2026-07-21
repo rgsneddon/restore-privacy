@@ -1,11 +1,11 @@
 {
-  "generated_at": "2026-07-21T14:01:51Z",
+  "generated_at": "2026-07-21T16:45:18Z",
   "node_host": "82.221.101.241",
   "catalog_version": "0.3.4",
   "unit_suite": {
     "ran": true,
-    "ok": false,
-    "returncode": 1,
+    "ok": true,
+    "returncode": 0,
     "modules": [
       "tests.test_legal_links",
       "tests.test_legal_docs",
@@ -57,50 +57,42 @@
       {
         "platform": "windows",
         "label": "Windows",
-        "filename": "restore-privacy-client-0.3.4-windows-x64-setup.exe",
-        "state": "Green",
+        "filename": "(missing windows)",
+        "state": "Red",
         "reasons": [
-          "node_elgamal.pub pin matches product monopin",
-          "PE/MZ magic OK"
+          "package file not found under releases/ or status_page/assets/"
         ],
-        "path": "/Users/russellsneddon/restore-privacy/releases/0.3.4/restore-privacy-client-0.3.4-windows-x64-setup.exe",
-        "bytes": 12870677
+        "path": null
       },
       {
         "platform": "linux",
         "label": "Linux",
-        "filename": "restore-privacy-client-0.3.4-linux-x64.tar.gz",
-        "state": "Green",
+        "filename": "(missing linux)",
+        "state": "Red",
         "reasons": [
-          "node_elgamal.pub pin matches product monopin",
-          "archive present (structural residual gates N/A in this pass)"
+          "package file not found under releases/ or status_page/assets/"
         ],
-        "path": "/Users/russellsneddon/restore-privacy/releases/0.3.4/restore-privacy-client-0.3.4-linux-x64.tar.gz",
-        "bytes": 14293532
+        "path": null
       },
       {
         "platform": "macos",
         "label": "macOS",
-        "filename": "restore-privacy-client-0.3.4-macos.zip",
-        "state": "Green",
+        "filename": "(missing macos)",
+        "state": "Red",
         "reasons": [
-          "node_elgamal.pub pin matches product monopin",
-          "archive present (structural residual gates N/A in this pass)"
+          "package file not found under releases/ or status_page/assets/"
         ],
-        "path": "/Users/russellsneddon/restore-privacy/releases/0.3.4/restore-privacy-client-0.3.4-macos.zip",
-        "bytes": 18818223
+        "path": null
       },
       {
         "platform": "ios",
         "label": "iOS",
-        "filename": "restore-privacy-client-0.3.4-ios.zip",
-        "state": "Green",
+        "filename": "(missing ios)",
+        "state": "Red",
         "reasons": [
-          "node_elgamal.pub pin matches product monopin",
-          "archive present (structural residual gates N/A in this pass)"
+          "package file not found under releases/ or status_page/assets/"
         ],
-        "path": "/Users/russellsneddon/restore-privacy/releases/0.3.4/restore-privacy-client-0.3.4-ios.zip",
-        "bytes": 7996339
+        "path": null
       },
       {
         "platform": "android",
@@ -111,11 +103,11 @@
           "node_elgamal.pub pin matches product monopin",
           "Android residual wire (PFS + outer obfs) present"
         ],
-        "path": "/Users/russellsneddon/restore-privacy/releases/0.3.4/restore-privacy-client-0.3.4-android.apk",
-        "bytes": 48046085
+        "path": "/Users/russellsneddon/restore-privacy/status_page/assets/0.3.4/restore-privacy-client-0.3.4-android.apk",
+        "bytes": 51518667
       }
     ],
-    "overall": "Green",
+    "overall": "Red",
     "legend": {
       "Green": "Present, no *.priv, product node pub pin match, platform structural gate pass",
       "Amber": "Present but pin/structural check incomplete or soft warning",
@@ -232,7 +224,7 @@
     "section_b": true,
     "firewall_probe_excluded": true
   },
-  "overall_ok": false,
+  "overall_ok": true,
   "privacy": {
     "redacted": true,
     "no_suite_tails": true,

@@ -256,10 +256,36 @@ def run_unit_suite() -> dict:
 
     Captures are kept only in-memory for the process lifetime; public write path
     drops tails (section A — no multi-KB suite dumps in JSON).
+
+    Requires project deps from root ``requirements.txt`` (``cryptography>=41``)
+    for the same interpreter as ``sys.executable``. Example::
+
+        python3 -m venv .venv && .venv/bin/pip install -r requirements.txt
+        .venv/bin/python scripts/run_security_audit.py
     """
     tests_dir = ROOT / "tests"
     if not tests_dir.is_dir():
         return {"ran": False, "reason": "tests/ not present (node install)", "ok": True, "modules": []}
+
+    # Fail fast with an actionable message when the interpreter lacks crypto dep
+    # (suite modules import client/crypto paths that need cryptography).
+    try:
+        import cryptography  # noqa: F401
+    except ImportError:
+        hint = (
+            "ModuleNotFoundError: cryptography — install project deps for this "
+            "interpreter: python3 -m venv .venv && .venv/bin/pip install -r "
+            "requirements.txt && .venv/bin/python scripts/run_security_audit.py"
+        )
+        return {
+            "ran": True,
+            "ok": False,
+            "returncode": 1,
+            "modules": SECURITY_TEST_MODULES,
+            "stdout_tail": "",
+            "stderr_tail": redact_audit_text(hint),
+            "error": "missing_cryptography",
+        }
 
     cmd = [sys.executable, "-m", "unittest", *SECURITY_TEST_MODULES, "-q"]
     env = os.environ.copy()
