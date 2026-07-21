@@ -30,11 +30,13 @@ from payments import (
     PRICE_LABEL,
     PRICE_PENCE,
     create_checkout_session,
+    find_grant_by_session,
     handle_stripe_webhook,
     init_db,
     platform_filename,
     redeem_download_token,
     stripe_configured,
+    wait_for_grant_by_session,
 )
 
 # Public page: title + BETA note + download buttons (no live client counter).
@@ -305,12 +307,17 @@ def _parse_query(path_with_q: str) -> tuple[str, dict[str, str]]:
     return path, dict(urllib.parse.parse_qsl(q, keep_blank_values=True))
 
 
-def _html_page(title: str, body_inner: str) -> bytes:
-    title_safe = (
-        title.replace("&", "&amp;")
+def _escape_html(s: str) -> str:
+    return (
+        s.replace("&", "&amp;")
         .replace("<", "&lt;")
         .replace(">", "&gt;")
+        .replace('"', "&quot;")
     )
+
+
+def _html_page(title: str, body_inner: str) -> bytes:
+    title_safe = _escape_html(title)
     return f"""<!DOCTYPE html>
 <html lang="en"><head>
 <meta charset="utf-8"/><meta name="viewport" content="width=device-width, initial-scale=1"/>
@@ -453,23 +460,49 @@ class Handler(BaseHTTPRequestHandler):
         if path in ("/download/success", "/pay/success"):
             token = (query.get("token") or "").strip()
             platform = (query.get("platform") or "").strip()
-            # Token is normally issued by webhook; success page can show instructions
+            session_id = (query.get("session_id") or "").strip()
+            # Stripe success_url supplies session_id={CHECKOUT_SESSION_ID}; webhook
+            # may still be in-flight — poll briefly for the minted grant.
+            grant = None
             if token:
-                link = f'/download?token={urllib.parse.quote(token)}'
+                grant = {
+                    "token": token,
+                    "download_path": f"/download?token={urllib.parse.quote(token)}",
+                }
+            elif session_id:
+                grant = wait_for_grant_by_session(session_id, timeout_sec=8.0)
+                if grant is None:
+                    grant = find_grant_by_session(session_id)
+            if grant and grant.get("token"):
+                link = grant.get("download_path") or (
+                    f"/download?token={urllib.parse.quote(str(grant['token']))}"
+                )
+                fname = grant.get("filename") or platform or "package"
                 inner = (
                     f'<p class="msg" id="pay-success">Payment received. Your one-time download:</p>'
-                    f'<p><a class="dl" id="success-download-link" href="{link}">Download package</a></p>'
+                    f'<p><a class="dl" id="success-download-link" href="{link}">'
+                    f"Download {_escape_html(str(fname))}</a></p>"
                     f'<p class="msg">Link works once and expires. Tip optional: '
                     f'<a href="https://buymeacoffee.com/rgsneddon">buymeacoffee.com/rgsneddon</a></p>'
+                    f'<p><a href="/">Home</a></p>'
                 )
             else:
+                # Meta-refresh so a late webhook can still unlock the page
+                refresh = ""
+                if session_id:
+                    q = urllib.parse.urlencode(
+                        {"session_id": session_id, "platform": platform}
+                    )
+                    refresh = (
+                        f'<meta http-equiv="refresh" content="3;url=/download/success?{q}"/>'
+                    )
                 inner = (
+                    f"{refresh}"
                     f'<p class="msg" id="pay-success-pending">Payment submitted'
-                    f'{(" for " + platform) if platform else ""}. '
-                    f"When Stripe confirms, use the download link from the email/receipt page "
-                    f"or refresh this page if a token was attached.</p>"
-                    f'<p class="msg">If fulfilment is delayed a few seconds, wait for the webhook, '
-                    f"then open the success URL with <code>?token=</code> from admin or email.</p>"
+                    f'{(" for " + _escape_html(platform)) if platform else ""}. '
+                    f"Confirming with Stripe… this page refreshes automatically.</p>"
+                    f'<p class="msg">If nothing appears after ~30s, contact support with session id '
+                    f"<code id=\"pending-session-id\">{_escape_html(session_id)}</code>.</p>"
                     f'<p><a href="/">Home</a></p>'
                 )
             self._send(200, "text/html; charset=utf-8", _html_page("Thank you", inner))

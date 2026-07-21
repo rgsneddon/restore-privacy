@@ -218,6 +218,72 @@ def list_recent_grants(limit: int = 50) -> list[dict[str, Any]]:
         conn.close()
 
 
+def find_grant_by_session(
+    session_id: str, *, now: float | None = None, unused_only: bool = True
+) -> dict[str, Any] | None:
+    """Map Stripe Checkout session id → grant (token + filename), if present.
+
+    Does **not** mark the token used — that happens on /download redeem.
+    """
+    sid = (session_id or "").strip()
+    if not sid:
+        return None
+    init_db()
+    t = now if now is not None else time.time()
+    conn = _connect()
+    try:
+        row = conn.execute(
+            """
+            SELECT token, filename, platform, session_id, amount_pence, currency,
+                   created_at, expires_at, used_at, status
+            FROM grants WHERE session_id = ? ORDER BY created_at DESC LIMIT 1
+            """,
+            (sid,),
+        ).fetchone()
+        if row is None:
+            return None
+        if float(row["expires_at"]) < t:
+            return None
+        if unused_only and (row["status"] != "granted" or row["used_at"] is not None):
+            return None
+        return {
+            "token": row["token"],
+            "filename": row["filename"],
+            "platform": row["platform"],
+            "session_id": row["session_id"],
+            "amount_pence": row["amount_pence"],
+            "currency": row["currency"],
+            "status": row["status"],
+            "used_at": row["used_at"],
+            "download_path": f"/download?token={row['token']}",
+            "url": asset_download_url(row["filename"]),
+        }
+    finally:
+        conn.close()
+
+
+def wait_for_grant_by_session(
+    session_id: str,
+    *,
+    timeout_sec: float = 8.0,
+    interval_sec: float = 0.25,
+    now: float | None = None,
+    sleep_fn: Callable[[float], None] | None = None,
+) -> dict[str, Any] | None:
+    """Poll for webhook-minted grant after Checkout redirect (race-friendly)."""
+    sleeper = sleep_fn or time.sleep
+    start = time.time() if now is None else float(now)
+    deadline = start + max(0.0, timeout_sec)
+    while True:
+        grant = find_grant_by_session(session_id, now=now)
+        if grant is not None:
+            return grant
+        tcur = time.time() if now is None else float(now)
+        if tcur >= deadline:
+            return None
+        sleeper(interval_sec)
+
+
 # --- Stripe Checkout (stdlib HTTP) -----------------------------------------------
 
 

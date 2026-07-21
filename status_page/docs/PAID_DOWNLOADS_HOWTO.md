@@ -83,9 +83,10 @@ Checkout success URL pattern (set automatically from `RPT_PUBLIC_BASE_URL`):
 - Success: `/download/success?session_id={CHECKOUT_SESSION_ID}&platform=…`
 - Cancel: `/download/cancel?platform=…`
 
-After `checkout.session.completed`, the webhook returns a `token`; buyers should open:
+After payment, Stripe redirects to the success page with **`session_id`**. That page:
 
-- `/download?token=…` (one-time)
+1. Looks up the webhook-minted grant by Checkout session id (polls a few seconds if the webhook is slightly late).
+2. Shows a **one-time** link: `/download?token=…` (`#success-download-link`).
 
 You may also surface the token from admin grants if a buyer contacts support.
 

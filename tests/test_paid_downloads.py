@@ -309,5 +309,101 @@ class TestHowtoDoc(unittest.TestCase):
         self.assertIn("RPT_ADMIN_PASSWORD", text)
 
 
+class TestBuyerSuccessFulfilment(unittest.TestCase):
+    """After pay, /download/success?session_id=… must surface the real one-time link."""
+
+    def setUp(self):
+        self._td = tempfile.TemporaryDirectory(ignore_cleanup_errors=True)
+        self.addCleanup(self._td.cleanup)
+        os.environ["RPT_PAYMENT_DATA_DIR"] = self._td.name
+        payments.init_db()
+
+    def _sign(self, payload: bytes, secret: str, ts: int | None = None) -> str:
+        t = int(ts if ts is not None else time.time())
+        signed = f"{t}.".encode("utf-8") + payload
+        sig = hmac.new(secret.encode("utf-8"), signed, hashlib.sha256).hexdigest()
+        return f"t={t},v1={sig}"
+
+    def test_find_grant_by_session_after_webhook(self):
+        secret = "whsec_success"
+        session_id = "cs_test_success_abc"
+        payload = json.dumps(
+            {
+                "type": "checkout.session.completed",
+                "data": {
+                    "object": {
+                        "id": session_id,
+                        "currency": "gbp",
+                        "metadata": {
+                            "platform": "linux",
+                            "filename": "restore-privacy-rust-1.0.0-linux-x64.tar.gz",
+                            "amount_pence": "245",
+                            "currency": "gbp",
+                        },
+                    }
+                },
+            }
+        ).encode("utf-8")
+        result = payments.handle_stripe_webhook(
+            payload, self._sign(payload, secret), secret=secret
+        )
+        self.assertTrue(result["granted"])
+        token = result["token"]
+        found = payments.find_grant_by_session(session_id)
+        self.assertIsNotNone(found)
+        assert found is not None
+        self.assertEqual(found["token"], token)
+        self.assertEqual(found["download_path"], f"/download?token={token}")
+
+    def test_success_page_shows_download_link_for_session_id(self):
+        import threading
+        import urllib.request
+        from http.server import ThreadingHTTPServer
+
+        secret = "whsec_page"
+        session_id = "cs_test_page_xyz"
+        payload = json.dumps(
+            {
+                "type": "checkout.session.completed",
+                "data": {
+                    "object": {
+                        "id": session_id,
+                        "currency": "gbp",
+                        "metadata": {
+                            "platform": "windows",
+                            "filename": "restore-privacy-rust-1.0.0-windows-x64.zip",
+                            "amount_pence": "245",
+                            "currency": "gbp",
+                        },
+                    }
+                },
+            }
+        ).encode("utf-8")
+        result = payments.handle_stripe_webhook(
+            payload, self._sign(payload, secret), secret=secret
+        )
+        self.assertTrue(result["granted"])
+        token = result["token"]
+
+        httpd = ThreadingHTTPServer(("127.0.0.1", 0), status_app.Handler)
+        port = httpd.server_address[1]
+        threading.Thread(target=httpd.serve_forever, daemon=True).start()
+        try:
+            url = (
+                f"http://127.0.0.1:{port}/download/success?"
+                f"session_id={urllib.parse.quote(session_id)}&platform=windows"
+            )
+            with urllib.request.urlopen(url, timeout=15) as resp:
+                body = resp.read().decode("utf-8")
+                self.assertEqual(resp.status, 200)
+            self.assertIn("pay-success", body)
+            self.assertIn("success-download-link", body)
+            self.assertIn(f"/download?token={token}", body)
+            self.assertNotIn("pay-success-pending", body)
+        finally:
+            httpd.shutdown()
+            httpd.server_close()
+
+
 if __name__ == "__main__":
     unittest.main()
