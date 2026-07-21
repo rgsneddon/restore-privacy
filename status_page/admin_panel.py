@@ -22,6 +22,7 @@ from payments import (
     list_recent_grants,
     public_base_url,
     reissue_download_for_purchase_id,
+    seed_test_purchase_enabled,
     stripe_payment_link_id,
     stripe_payment_page_url,
     stripe_price_id,
@@ -554,6 +555,72 @@ def render_purchase_reissue_section_html(
 """
 
 
+def render_seed_test_purchase_section_html(
+    *,
+    result: dict[str, Any] | None = None,
+    error: str = "",
+    platform: str = "windows",
+) -> str:
+    """Dev/staging-only card: seed a paid test grant (RPT-… + platform).
+
+    Hidden unless :func:`seed_test_purchase_enabled` (``RPT_ADMIN_SEED_PURCHASE=1``).
+    Still creates a full-price paid grant + single-use token — never a free public unlock.
+    """
+    if not seed_test_purchase_enabled():
+        return ""
+    err = (
+        f'<p class="err" id="seed-purchase-error">{_escape(error)}</p>' if error else ""
+    )
+    ok = ""
+    if result and result.get("purchase_id"):
+        pid = _escape(str(result["purchase_id"]))
+        plat = _escape(str(result.get("platform") or ""))
+        fname = _escape(str(result.get("filename") or ""))
+        url = _escape(str(result.get("download_url") or ""))
+        path = _escape(str(result.get("download_path") or ""))
+        ok = f"""
+  <div class="ok-msg" id="seed-purchase-result" role="status">
+    <p><strong>Test purchase seeded</strong> (local/staging only).</p>
+    <p>Product purchase identifier:
+      <code id="seed-purchase-id">{pid}</code></p>
+    <p>Platform: <strong id="seed-purchase-platform">{plat}</strong>
+      — <code id="seed-purchase-filename">{fname}</code></p>
+    <p>One-time paid download (not free GitHub):
+      <a id="seed-download-link" href="{url}" rel="noopener noreferrer">{url}</a></p>
+    <p class="muted">Path: <code id="seed-download-path">{path}</code>
+      — use the purchase ID above in the re-issue form after consuming the token.</p>
+  </div>"""
+    plat_sel = (platform or "windows").strip().lower()
+    options = []
+    for p in ("windows", "linux", "macos", "ios", "android"):
+        sel = " selected" if p == plat_sel else ""
+        options.append(f'<option value="{p}"{sel}>{p}</option>')
+    opts = "\n      ".join(options)
+    return f"""
+<section id="admin-seed-purchase" class="card" aria-labelledby="admin-seed-purchase-heading"
+         data-dev-only="1">
+  <h2 id="admin-seed-purchase-heading">Seed test purchase (dev / staging)</h2>
+  <p class="muted" id="admin-seed-purchase-note">
+    <strong>Dev-only.</strong> Creates a full-price paid grant with a unique
+    <code>RPT-…</code> product purchase identifier for testing re-issue.
+    Enabled only when <code>RPT_ADMIN_SEED_PURCHASE=1</code>.
+    Does <strong>not</strong> open free public unlocks — download still needs the single-use token.
+  </p>
+  {err}
+  {ok}
+  <form method="post" action="/admin/seed-test-purchase" id="admin-seed-purchase-form">
+    <label class="field" for="seed_platform">
+      <span class="field-label">Platform</span>
+      <select id="seed_platform" name="platform" required>
+      {opts}
+      </select>
+    </label>
+    <button type="submit" id="admin-seed-purchase-submit">Seed test purchase (RPT-…)</button>
+  </form>
+</section>
+"""
+
+
 def render_login_html(*, error: str = "") -> bytes:
     err = (
         f'<p class="err" id="admin-error">{_escape(error)}</p>' if error else ""
@@ -818,6 +885,9 @@ def render_admin_html(
     reissue_result: dict[str, Any] | None = None,
     reissue_error: str = "",
     reissue_form_value: str = "",
+    seed_result: dict[str, Any] | None = None,
+    seed_error: str = "",
+    seed_platform: str = "windows",
 ) -> bytes:
     """Full private admin page: reissue by purchase id, processor settings, grants."""
     projected = project_grants_for_admin(grants)
@@ -848,6 +918,11 @@ def render_admin_html(
         result=reissue_result,
         error=reissue_error,
         form_value=reissue_form_value,
+    )
+    seed_html = render_seed_test_purchase_section_html(
+        result=seed_result,
+        error=seed_error,
+        platform=seed_platform,
     )
     settings_html = render_processor_settings_html(message=message, error=error)
     body = f"""<!DOCTYPE html>
@@ -889,11 +964,11 @@ code{{font-size:0.85rem;word-break:break-all}}
 border-radius:8px;border:1px solid var(--input-border);background:var(--input-bg);color:var(--fg)}}
 .processor-form button{{margin-top:0.75rem;padding:0.55rem 1rem;border:0;border-radius:8px;
 background:var(--btn-bg);color:var(--btn-fg);font-weight:600;cursor:pointer}}
-#admin-reissue-form label.field{{display:block;margin:0.65rem 0}}
-#admin-reissue-form .field-label{{display:block;font-weight:600;font-size:0.9rem;margin-bottom:0.25rem}}
-#admin-reissue-form input{{width:100%;max-width:28rem;box-sizing:border-box;padding:0.5rem 0.6rem;
+#admin-reissue-form label.field,#admin-seed-purchase-form label.field{{display:block;margin:0.65rem 0}}
+#admin-reissue-form .field-label,#admin-seed-purchase-form .field-label{{display:block;font-weight:600;font-size:0.9rem;margin-bottom:0.25rem}}
+#admin-reissue-form input,#admin-seed-purchase-form select{{width:100%;max-width:28rem;box-sizing:border-box;padding:0.5rem 0.6rem;
 border-radius:8px;border:1px solid var(--input-border);background:var(--input-bg);color:var(--fg)}}
-#admin-reissue-form button{{margin-top:0.75rem;padding:0.55rem 1rem;border:0;border-radius:8px;
+#admin-reissue-form button,#admin-seed-purchase-form button{{margin-top:0.75rem;padding:0.55rem 1rem;border:0;border-radius:8px;
 background:var(--btn-bg);color:var(--btn-fg);font-weight:600;cursor:pointer}}
 .ok-msg{{color:var(--badge-ok-fg);background:var(--badge-ok-bg);padding:0.5rem 0.75rem;border-radius:8px}}
 .err{{color:var(--err)}}
@@ -910,10 +985,12 @@ background:var(--btn-bg);color:var(--btn-fg);font-weight:600;cursor:pointer}}
 </div>
 <nav class="nav-local" id="admin-nav" aria-label="Admin sections">
   <a href="#admin-reissue">Re-issue download</a>
+  {('<a href="#admin-seed-purchase">Seed test purchase</a>' if seed_test_purchase_enabled() else '')}
   <a href="#admin-processor-settings">Processor settings</a>
   <a href="#admin-grants">Paid download grants</a>
 </nav>
 {reissue_html}
+{seed_html}
 {settings_html}
 <section id="admin-grants" class="card">
   <h2 id="admin-grants-heading">Paid download grants</h2>

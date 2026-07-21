@@ -131,6 +131,65 @@ class TestPurchaseIdBuyerUi(unittest.TestCase):
         self.assertNotIn("github.com/rgsneddon", html)
 
 
+class TestSeedTestPurchase(unittest.TestCase):
+    def setUp(self):
+        self._td = tempfile.TemporaryDirectory()
+        os.environ["RPT_PAYMENT_DATA_DIR"] = self._td.name
+        os.environ["RPT_ADMIN_SEED_PURCHASE"] = "1"
+        import payments
+
+        self.pay = payments
+        self.pay.init_db()
+
+    def tearDown(self):
+        self._td.cleanup()
+        os.environ.pop("RPT_PAYMENT_DATA_DIR", None)
+        os.environ.pop("RPT_ADMIN_SEED_PURCHASE", None)
+
+    def test_seed_disabled_by_default(self):
+        os.environ.pop("RPT_ADMIN_SEED_PURCHASE", None)
+        self.assertFalse(self.pay.seed_test_purchase_enabled())
+        with self.assertRaises(ValueError):
+            self.pay.seed_test_purchase("windows")
+
+    def test_seed_creates_purchase_id_and_paid_token(self):
+        seeded = self.pay.seed_test_purchase(
+            "linux", base_url="https://restoreprivacy.online"
+        )
+        self.assertTrue(seeded["seed"])
+        self.assertRegex(
+            seeded["purchase_id"], r"^RPT-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}$"
+        )
+        self.assertEqual(seeded["platform"], "linux")
+        self.assertTrue(seeded["download_path"].startswith("/download?token="))
+        self.assertNotIn("github.com", seeded["download_url"])
+        self.assertNotIn("releases/download", seeded["download_url"])
+        # Reissue works on the seeded purchase id
+        issued = self.pay.reissue_download_for_purchase_id(seeded["purchase_id"])
+        self.assertIsNotNone(issued)
+        self.assertEqual(issued and issued["purchase_id"], seeded["purchase_id"])
+
+    def test_admin_seed_ui_only_when_enabled(self):
+        from admin_panel import (
+            render_admin_html,
+            render_seed_test_purchase_section_html,
+        )
+
+        os.environ.pop("RPT_ADMIN_SEED_PURCHASE", None)
+        self.assertEqual(render_seed_test_purchase_section_html(), "")
+        page_off = render_admin_html().decode("utf-8")
+        # Shared CSS may mention seed form selectors; the live section must be absent
+        self.assertNotIn('id="admin-seed-purchase"', page_off)
+        self.assertNotIn('id="admin-seed-purchase-submit"', page_off)
+
+        os.environ["RPT_ADMIN_SEED_PURCHASE"] = "1"
+        page_on = render_admin_html().decode("utf-8")
+        self.assertIn('id="admin-seed-purchase"', page_on)
+        self.assertIn('id="admin-seed-purchase-form"', page_on)
+        self.assertIn("RPT_ADMIN_SEED_PURCHASE", page_on)
+        self.assertIn("data-dev-only", page_on)
+
+
 class TestAdminReissueUi(unittest.TestCase):
     def test_reissue_form_is_top_of_admin_page(self):
         from admin_panel import render_admin_html, render_purchase_reissue_section_html

@@ -1710,6 +1710,72 @@ def find_paid_purchase_by_id(purchase_id: str) -> dict[str, Any] | None:
         conn.close()
 
 
+def seed_test_purchase_enabled() -> bool:
+    """True only when operator explicitly opts into local/staging seed tools.
+
+    Requires ``RPT_ADMIN_SEED_PURCHASE=1`` (or ``true``/``yes``/``on``).
+    Never on by default — production must set the env deliberately.
+    Seeded grants still require a single-use ``/download?token=`` (no free unlock).
+    """
+    return os.environ.get("RPT_ADMIN_SEED_PURCHASE", "").strip().lower() in (
+        "1",
+        "true",
+        "yes",
+        "on",
+    )
+
+
+def seed_test_purchase(
+    platform: str = "windows",
+    *,
+    now: float | None = None,
+    base_url: str | None = None,
+    ttl_sec: int = TOKEN_TTL_SEC,
+) -> dict[str, Any]:
+    """Mint a **paid** test grant (full price) for admin reissue / recovery tests.
+
+    Creates a durable product purchase identifier + single-use download token for
+    a catalog platform. Does **not** expose free permanent GitHub installer URLs.
+
+    Raises ``ValueError`` if seeding is disabled or the platform is unknown.
+    """
+    if not seed_test_purchase_enabled():
+        raise ValueError(
+            "seed_test_purchase disabled — set RPT_ADMIN_SEED_PURCHASE=1 for local/staging only"
+        )
+    plat = (platform or "").strip().lower() or "windows"
+    fname = platform_filename(plat)
+    if not fname:
+        raise ValueError(f"unknown platform for seed: {platform!r}")
+    session_id = f"seed_test_{secrets.token_hex(8)}"
+    token = mint_download_token(
+        filename=fname,
+        platform=plat,
+        session_id=session_id,
+        amount_pence=PRICE_PENCE,
+        currency=PRICE_CURRENCY,
+        ttl_sec=ttl_sec,
+        now=now,
+    )
+    pid = purchase_id_for_token(token) or ""
+    path = f"/download?token={token}"
+    base = (base_url if base_url is not None else public_base_url()).rstrip("/")
+    url = f"{base}{path}"
+    if "github.com" in url.lower() and "releases/download" in url.lower():
+        raise RuntimeError("refusing free GitHub release URL from seed_test_purchase")
+    return {
+        "purchase_id": pid,
+        "token": token,
+        "download_path": path,
+        "download_url": url,
+        "platform": plat,
+        "filename": fname,
+        "session_id": session_id,
+        "seed": True,
+        "amount_pence": PRICE_PENCE,
+    }
+
+
 def reissue_download_for_purchase_id(
     purchase_id: str,
     *,

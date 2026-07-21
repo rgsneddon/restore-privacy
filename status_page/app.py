@@ -1030,6 +1030,61 @@ class Handler(BaseHTTPRequestHandler):
                 )
             return
 
+        if path in ("/admin/seed-test-purchase", "/admin/seed-test-purchase/"):
+            if not admin_enabled():
+                self._send(503, "text/plain; charset=utf-8", b"admin disabled")
+                return
+            if not is_authenticated(self.headers):
+                self._send(200, "text/html; charset=utf-8", render_login_html())
+                return
+            from payments import seed_test_purchase, seed_test_purchase_enabled
+
+            if not seed_test_purchase_enabled():
+                self._send(
+                    403,
+                    "text/html; charset=utf-8",
+                    render_admin_html(
+                        seed_error=(
+                            "Seed test purchase is disabled. "
+                            "Set RPT_ADMIN_SEED_PURCHASE=1 for local/staging only."
+                        ),
+                    ),
+                )
+                return
+            form = dict(urllib.parse.parse_qsl(body.decode("utf-8", "replace")))
+            plat = (form.get("platform") or "windows").strip().lower()
+            try:
+                seeded = seed_test_purchase(plat)
+            except ValueError as exc:
+                self._send(
+                    400,
+                    "text/html; charset=utf-8",
+                    render_admin_html(seed_error=str(exc), seed_platform=plat),
+                )
+                return
+            url = str(seeded.get("download_url") or "")
+            if "github.com" in url.lower() and "releases/download" in url.lower():
+                self._send(
+                    500,
+                    "text/html; charset=utf-8",
+                    render_admin_html(
+                        seed_error="Internal error: refusing free release URL",
+                        seed_platform=plat,
+                    ),
+                )
+                return
+            # Pre-fill reissue form with the new purchase id for convenience
+            self._send(
+                200,
+                "text/html; charset=utf-8",
+                render_admin_html(
+                    seed_result=seeded,
+                    seed_platform=str(seeded.get("platform") or plat),
+                    reissue_form_value=str(seeded.get("purchase_id") or ""),
+                ),
+            )
+            return
+
         self._send(404, "text/plain; charset=utf-8", b"not found")
 
 
