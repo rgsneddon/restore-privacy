@@ -163,7 +163,7 @@ Re-run: `python3 scripts/run_security_audit.py --write`
 | Public audit on private GitHub blob | **Fixed** — clients use status-origin `/AUDIT.md` |
 | Periodic node audit | **In tree** — 4h systemd timer |
 | Multi-hop residual | Not done (config only) |
-| Kill-switch + DoT + outer obfs | In tree |
+| Kill-switch (default off; opt-in RPT_KILL_SWITCH=1) + DoT + outer obfs | In tree |
 | Ephemeral node rebuild | In tree (dry-run default) |
 
 ---

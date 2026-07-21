@@ -127,7 +127,7 @@ Short user-education summary. Full policy language: **[PRIVACY_POLICY.md — Thr
 - **No user-info logs** on the product node path; **no public live client count**.
 - **Per-device keys** (not a shared installer private key).
 - **Mitigations** for coarse traffic fingerprints: outer obfuscation + padding/jitter/cover (default on product residual DATA path) — **not** a claim of DPI-undetectability.
-- **Kill-switch / tunnel DNS / IPv6 ISP block** while residual capture is active.
+- **Tunnel-only DNS** (`10.88.0.1`) while residual capture is active; **IPv4 residual honesty** when full tunnel is up. Kill-switch firewall blocks are **not** applied by default (opt-in only: `RPT_KILL_SWITCH=1`).
 - **PFS** (ephemeral X25519) so long-term key compromise later should not reconstruct past session AEAD keys from the public transcript alone.
 
 ### What it does **not** protect against

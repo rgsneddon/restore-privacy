@@ -107,7 +107,7 @@ This section is for **user education**. It states **what Restore Privacy protect
 | **Public “who is online” metrics** | Status page and node public API are **title (+ downloads) only** — no live client count, no per-client lists, no identifying session fields. |
 | **Shared installer impersonation** | Each install generates its **own** device Ed25519 key; packages do not ship a universal `client_ed25519.priv`. |
 | **Coarse wire fingerprints** | Outer obfuscation and traffic shaping (padding / jitter / cover) are **on by default** on the product residual DATA path as **mitigations** (not undetectability). |
-| **Casual non-tunnel leaks while connected** | Kill-switch / IPv6 ISP block / tunnel-only DNS reduce common residual-IP and DNS leaks when residual capture is active. |
+| **Casual DNS leaks while residual is up** | Tunnel-only DNS (`10.88.0.1`) is the product residual plan (no public DNS fallbacks). Kill-switch firewall blocks of non-tunnel egress are **not** applied by default (opt-in `RPT_KILL_SWITCH=1` only). Residual routes may still fail open to the ISP path without that opt-in. |
 | **Past-session key recovery from long-term keys alone** | Session AEAD incorporates **ephemeral X25519 (PFS)** on the product path so long-term key compromise later should not reconstruct that session’s traffic keys from the public transcript alone. |
 
 ### 5.2 What it does **not** protect against
