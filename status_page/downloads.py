@@ -28,6 +28,38 @@ RELEASE_DOWNLOAD_BASE = (
     f"https://github.com/{GITHUB_OWNER}/{GITHUB_REPO}/releases/download/{RELEASE_TAG}"
 )
 
+
+def product_client_version() -> str | None:
+    """Monorepo product pin from ``client/VERSION`` when present (status-only deploys: None)."""
+    try:
+        from pathlib import Path
+
+        p = Path(__file__).resolve().parents[1] / "client" / "VERSION"
+        if p.is_file():
+            v = p.read_text(encoding="utf-8").strip()
+            return v or None
+    except OSError:
+        return None
+    return None
+
+
+def current_catalog_version() -> str:
+    """Single current catalog version for pay buttons and fulfilment.
+
+    This is the **shipped** catalog pin (``RELEASE_VERSION``). When the monorepo
+    ``client/VERSION`` is present it must match — use :func:`catalog_matches_product_pin`.
+    """
+    return RELEASE_VERSION
+
+
+def catalog_matches_product_pin() -> bool:
+    """True when catalog version matches client/VERSION (or client pin absent)."""
+    pin = product_client_version()
+    if pin is None:
+        return True
+    return pin == current_catalog_version()
+
+
 # Canonical public asset filenames (must match GitHub Release 0.3.0 assets).
 WINDOWS_EXE_FILENAME = f"restore-privacy-client-{RELEASE_VERSION}-windows-x64-setup.exe"
 ANDROID_APK_FILENAME = f"restore-privacy-client-{RELEASE_VERSION}-android.apk"
@@ -97,6 +129,14 @@ RELEASE_ASSETS: tuple[DownloadAsset, ...] = (
 
 # Fixed platform order for operator staging / Iceland VPS host layout.
 CATALOG_PLATFORMS: tuple[str, ...] = tuple(a.platform for a in RELEASE_ASSETS)
+
+
+def is_current_catalog_filename(filename: str) -> bool:
+    """True only for installers in the current catalog set (not stale tags)."""
+    name = (filename or "").strip()
+    if not name:
+        return False
+    return name in {a.filename for a in RELEASE_ASSETS}
 
 
 def list_catalog_platform_packages(

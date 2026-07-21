@@ -217,9 +217,17 @@ class CheckoutRequest:
 
 
 def platform_filename(platform: str) -> str | None:
-    """Current catalog installer filename for a platform (paid mint source of truth)."""
+    """Current-catalog installer filename for a platform (always latest ship pin)."""
+    from downloads import current_catalog_version
+
+    plat = (platform or "").strip().lower()
+    if not plat:
+        return None
     for a in available_downloads():
-        if a.platform == platform:
+        if a.platform == plat:
+            # Guard: filename must embed the live catalog version.
+            if current_catalog_version() not in a.filename:
+                return None
             return a.filename
     return None
 
@@ -254,6 +262,10 @@ def asset_download_url(filename: str) -> str | None:
     Paid fulfilment must use :func:`open_release_asset` (local disk or authenticated
     GitHub API) so installers still work when the repo is **private**.
     """
+    from downloads import is_current_catalog_filename
+
+    if not is_current_catalog_filename(filename):
+        return None
     for a in RELEASE_ASSETS:
         if a.filename == filename:
             return a.url
@@ -310,7 +322,12 @@ def vps_asset_url(filename: str, *, version: str | None = None) -> str:
 
 
 def catalog_filenames() -> frozenset[str]:
-    return frozenset(a.filename for a in RELEASE_ASSETS)
+    """Filenames for the **current** catalog only (never prior tags)."""
+    from downloads import is_current_catalog_filename
+
+    return frozenset(
+        a.filename for a in RELEASE_ASSETS if is_current_catalog_filename(a.filename)
+    )
 
 
 def asset_search_dirs() -> list[Path]:

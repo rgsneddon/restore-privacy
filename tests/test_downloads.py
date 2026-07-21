@@ -41,12 +41,28 @@ EXPECTED_PUBLIC_CATALOG_FOOTER = (
 
 class TestDownloadCatalog(unittest.TestCase):
     def test_version_is_0_2_9(self):
+        from downloads import (
+            catalog_matches_product_pin,
+            current_catalog_version,
+            is_current_catalog_filename,
+        )
+
         self.assertEqual(RELEASE_VERSION, "0.3.0")
         self.assertEqual(RELEASE_TAG, "0.3.0")
+        self.assertEqual(current_catalog_version(), RELEASE_VERSION)
+        self.assertTrue(catalog_matches_product_pin())
         self.assertEqual(GITHUB_REPO, "restore-privacy")
         self.assertEqual(RELEASE_PAGE_URL, EXPECTED_RELEASE_PAGE)
         self.assertEqual(RELEASE_DOWNLOAD_BASE, EXPECTED_DOWNLOAD_PREFIX.rstrip("/"))
         self.assertEqual(RUST_REPO_URL, EXPECTED_PUBLIC_CATALOG_FOOTER)
+        for a in available_downloads():
+            self.assertTrue(is_current_catalog_filename(a.filename))
+            self.assertIn(RELEASE_VERSION, a.filename)
+        self.assertFalse(
+            is_current_catalog_filename(
+                "restore-privacy-client-0.2.9-windows-x64-setup.exe"
+            )
+        )
 
     def test_public_assets_include_device_packages(self):
         assets = available_downloads()

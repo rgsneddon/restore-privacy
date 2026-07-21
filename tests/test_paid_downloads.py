@@ -258,6 +258,64 @@ class TestWebhookAndTokens(unittest.TestCase):
 
         second = payments.redeem_download_token(token)
         self.assertIsNone(second, "token must be single-use")
+        # Grant must embed the live catalog version
+        from downloads import RELEASE_VERSION
+
+        self.assertIn(RELEASE_VERSION, first["filename"])
+        self.assertIn(RELEASE_VERSION, first["url"])
+
+    def test_stale_metadata_filename_grants_current_catalog_only(self):
+        """Webhook metadata with an old package name must still mint the current ship."""
+        from downloads import RELEASE_VERSION, WINDOWS_EXE_FILENAME
+
+        secret = "whsec_stale_meta"
+        payload = json.dumps(
+            {
+                "type": "checkout.session.completed",
+                "data": {
+                    "object": {
+                        "id": "cs_stale_meta_1",
+                        "payment_status": "paid",
+                        "currency": "gbp",
+                        "amount_total": 245,
+                        "metadata": {
+                            "platform": "windows",
+                            # Stale prior catalog name — must not be granted as-is
+                            "filename": "restore-privacy-client-0.2.9-windows-x64-setup.exe",
+                            "amount_pence": "245",
+                            "currency": "gbp",
+                        },
+                    }
+                },
+            }
+        ).encode("utf-8")
+        result = payments.handle_stripe_webhook(
+            payload, self._sign(payload, secret), secret=secret
+        )
+        self.assertTrue(result["ok"])
+        self.assertTrue(result["granted"], result)
+        grants = payments.list_recent_grants(5)
+        self.assertTrue(grants)
+        granted = grants[0]["filename"]
+        self.assertEqual(granted, WINDOWS_EXE_FILENAME)
+        self.assertIn(RELEASE_VERSION, granted)
+        self.assertNotIn("0.2.9", granted)
+        self.assertIsNone(
+            payments.open_release_asset(
+                "restore-privacy-client-0.2.9-windows-x64-setup.exe"
+            )
+        )
+
+    def test_platform_filename_is_always_current_catalog_version(self):
+        from downloads import RELEASE_VERSION, current_catalog_version
+
+        self.assertEqual(current_catalog_version(), RELEASE_VERSION)
+        for plat in ("windows", "android", "macos", "ios", "linux"):
+            fname = payments.platform_filename(plat)
+            self.assertIsNotNone(fname)
+            assert fname is not None
+            self.assertIn(RELEASE_VERSION, fname)
+            self.assertIn(fname, payments.catalog_filenames())
 
     def test_wrong_amount_metadata_refuses_grant(self):
         secret = "whsec_amt"
@@ -902,6 +960,21 @@ class TestPrivateRepoProxyFulfilment(unittest.TestCase):
 
     def test_open_release_asset_rejects_unknown_filename(self):
         self.assertIsNone(payments.open_release_asset("not-a-catalog-file.exe"))
+
+    def test_open_release_asset_rejects_stale_version_filename(self):
+        """Prior catalog tags must not fulfil under the current pay path."""
+        from downloads import RELEASE_VERSION
+
+        stale = "restore-privacy-client-0.2.9-windows-x64-setup.exe"
+        self.assertNotEqual(RELEASE_VERSION, "0.2.9")
+        self.assertNotIn(stale, payments.catalog_filenames())
+        self.assertIsNone(payments.open_release_asset(stale))
+        for ver in ("0.2.3", "0.2.9", "0.1.8"):
+            name = f"restore-privacy-client-{ver}-android.apk"
+            self.assertIsNone(
+                payments.open_release_asset(name),
+                msg=f"must refuse stale {name}",
+            )
 
     def test_open_release_asset_github_api_sends_auth_header(self):
         fname = "restore-privacy-client-0.3.0-windows-x64-setup.exe"
