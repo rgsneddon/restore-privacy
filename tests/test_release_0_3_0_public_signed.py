@@ -95,6 +95,61 @@ class Test029PublicCatalogCurrent(unittest.TestCase):
 
 
 class TestLocal029PackagesIfPresent(unittest.TestCase):
+    def test_all_platform_packages_ship_product_node_elgamal_pub(self):
+        """Every staged installer must embed product pin pub (not a stale prior key).
+
+        Linux carry-forward historically shipped sha 23136cfe… which breaks HELLO.
+        """
+        sys.path.insert(0, str(ROOT))
+        from client.endpoint import PRODUCT_NODE_ELGAMAL_PUB_SHA256
+
+        product = ROOT / "product" / "node_elgamal.pub"
+        self.assertTrue(product.is_file())
+        exp = hashlib.sha256(product.read_bytes()).hexdigest()
+        self.assertEqual(exp, PRODUCT_NODE_ELGAMAL_PUB_SHA256)
+        names = [
+            f"restore-privacy-client-{VERSION}-windows-x64-setup.exe",
+            f"restore-privacy-client-{VERSION}-android.apk",
+            f"restore-privacy-client-{VERSION}-macos.zip",
+            f"restore-privacy-client-{VERSION}-ios.zip",
+            f"restore-privacy-client-{VERSION}-linux-x64.tar.gz",
+        ]
+        present = [RELEASE_DIR / n for n in names if (RELEASE_DIR / n).is_file()]
+        if len(present) < 5:
+            self.skipTest(f"need all five packages under releases/{VERSION}/")
+
+        import tarfile
+
+        for path in present:
+            if path.name.endswith(".exe"):
+                blob = product.read_bytes()
+                self.assertGreaterEqual(
+                    path.read_bytes().count(blob),
+                    1,
+                    f"{path.name} missing product node_elgamal.pub blob",
+                )
+                continue
+            pubs: list[tuple[str, str]] = []
+            if path.name.endswith(".tar.gz"):
+                with tarfile.open(path, "r:*") as tf:
+                    for m in tf.getmembers():
+                        if m.name.endswith("node_elgamal.pub") and m.isfile():
+                            dig = hashlib.sha256(tf.extractfile(m).read()).hexdigest()
+                            pubs.append((m.name, dig))
+            else:
+                with zipfile.ZipFile(path) as zf:
+                    for n in zf.namelist():
+                        if n.endswith("node_elgamal.pub"):
+                            dig = hashlib.sha256(zf.read(n)).hexdigest()
+                            pubs.append((n, dig))
+            self.assertTrue(pubs, f"{path.name}: no node_elgamal.pub")
+            for n, dig in pubs:
+                self.assertEqual(
+                    dig,
+                    exp,
+                    f"{path.name}:{n} sha {dig} != product pin {exp}",
+                )
+
     def test_local_zips_no_priv_and_macos_developer_id(self):
         if not MACOS_ZIP.is_file() or not IOS_ZIP.is_file():
             self.skipTest("local releases/0.3.2 Apple zips not present")
@@ -106,6 +161,10 @@ class TestLocal029PackagesIfPresent(unittest.TestCase):
                 self.assertTrue(pubs, zpath)
                 dig = hashlib.sha256(zf.read(pubs[0])).hexdigest()
                 self.assertTrue(dig.startswith("1b126abf"), dig)
+                sys.path.insert(0, str(ROOT))
+                from client.endpoint import PRODUCT_NODE_ELGAMAL_PUB_SHA256
+
+                self.assertEqual(dig, PRODUCT_NODE_ELGAMAL_PUB_SHA256)
         if not shutil.which("codesign"):
             self.skipTest("codesign not available")
         with tempfile.TemporaryDirectory() as td:

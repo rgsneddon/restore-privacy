@@ -240,11 +240,54 @@ def stage_android_apk() -> Path:
     )
 
 
+def _rewrite_linux_node_elgamal_pub(tarball: Path) -> None:
+    """Ensure every node_elgamal.pub inside the Linux tarball matches product pin.
+
+    Carry-forward priors may ship a stale pub (HELLO hybrid decrypt fails).
+    """
+    import tarfile
+    import tempfile
+
+    product = ROOT / "product" / "node_elgamal.pub"
+    if not product.is_file() or product.stat().st_size < 32:
+        raise FileNotFoundError(f"missing product node pub: {product}")
+    pub_bytes = product.read_bytes()
+    work = Path(tempfile.mkdtemp(prefix="rpt-linux-pub-"))
+    try:
+        with tarfile.open(tarball, "r:gz") as tf:
+            tf.extractall(work)
+        replaced = 0
+        for p in work.rglob("node_elgamal.pub"):
+            p.write_bytes(pub_bytes)
+            replaced += 1
+        # Prefer product/ + secrets/ so secrets_loader finds the correct key
+        for top in [d for d in work.iterdir() if d.is_dir()]:
+            for sub in ("product", "secrets"):
+                d = top / sub
+                d.mkdir(parents=True, exist_ok=True)
+                (d / "node_elgamal.pub").write_bytes(pub_bytes)
+                replaced += 1
+        if replaced == 0:
+            raise RuntimeError(f"no node_elgamal.pub in {tarball}")
+        tmp_out = work / "repacked.tar.gz"
+        with tarfile.open(tmp_out, "w:gz") as tf:
+            for child in sorted(work.iterdir()):
+                if child.name == "repacked.tar.gz":
+                    continue
+                tf.add(child, arcname=child.name)
+        shutil.copy2(tmp_out, tarball)
+        print(f"rewrote node_elgamal.pub in {tarball.name} ({replaced} path(s))")
+    finally:
+        shutil.rmtree(work, ignore_errors=True)
+
+
 def stage_linux_tgz() -> Path:
     dest = OUT / LINUX_TGZ_NAME
-    return _stage_from_prior(
+    _stage_from_prior(
         f"restore-privacy-client-{PRIOR_TAG}-linux-x64.tar.gz", dest
     )
+    _rewrite_linux_node_elgamal_pub(dest)
+    return dest
 
 
 def stage_macos_zip() -> Path:
