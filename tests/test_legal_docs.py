@@ -91,11 +91,21 @@ class TestReadmeHowto(unittest.TestCase):
         self.assertIn("android", lower)
         self.assertIn("macos", lower)
         self.assertIn("ios", lower)
-        self.assertTrue("0.2.3" in text or "0.2.1" in text or "0.2.0" in text)
-        self.assertNotIn("prep â€” finish on a Mac", text)
+        # Public ship is RUST-IN-PRIVACY v1.0.0; private tree may still mention 0.2.3 history
+        self.assertTrue(
+            "1.0.0" in text or "0.2.3" in text or "0.2.1" in text or "0.2.0" in text,
+            "README must cite public v1.0.0 and/or historical 0.2.x",
+        )
+        self.assertIn("RUST-IN-PRIVACY", text)
+        self.assertIn("releases/tag/v1.0.0", text)
         self.assertNotIn("prep stubs", lower)
-        # Package names from the public release catalog
-        self.assertIn("windows-x64-setup.exe", text)
+        # Package basenames from the public release catalog
+        self.assertTrue(
+            "restore-privacy-rust-1.0.0-windows-x64.zip" in text
+            or "windows-x64.zip" in text
+            or "windows-x64-setup.exe" in text,
+            "README must cite a Windows package basename",
+        )
         self.assertIn("android.apk", text)
         self.assertIn("macos.zip", text)
         self.assertIn("ios.zip", text)

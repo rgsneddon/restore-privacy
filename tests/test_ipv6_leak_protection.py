@@ -233,6 +233,7 @@ class TestProductSourceIpv6Wiring(unittest.TestCase):
             self.assertIn("ipv6_residual_protected", text)
 
     def test_android_adds_ipv6_route(self):
+        """Android residual is IPv4-only: no bare ::/0 (blackhole risk); honesty flags remain."""
         path = (
             ROOT
             / "client_app"
@@ -247,11 +248,14 @@ class TestProductSourceIpv6Wiring(unittest.TestCase):
             / "RptVpnService.kt"
         )
         text = path.read_text(encoding="utf-8")
-        self.assertIn('addRoute("::", 0)', text)
+        # Product anti-blackhole: do not install ::/0 without TUN IPv6
+        self.assertNotIn('addRoute("::", 0)', text)
+        self.assertIn("::/0", text)  # documented in comments / honesty path
         self.assertIn("ipv6RouteOk", text)
         self.assertIn("IPv6 not protected", text)
         self.assertIn("EXTRA_IPV6_PROTECTED", text)
         self.assertIn("activeIpv6Protected", text)
+        self.assertIn('addRoute("0.0.0.0", 0)', text)
 
     def test_flutter_plain_connected_status_ipv6_honest(self):
         theme = (ROOT / "client_app" / "lib" / "theme.dart").read_text(encoding="utf-8")

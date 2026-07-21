@@ -2,24 +2,26 @@
 
 | Field | Value |
 |-------|--------|
-| **Product** | Restore Privacy Tunnel (RPT) |
-| **Repository** | `restore_privacy` |
-| **Version under review** | **0.2.3** (`client/VERSION`, catalog `RELEASE_VERSION` / `RELEASE_TAG`) |
-| **Production node** | **82.221.101.241:44044** (UDP); status UI TCP 8080 |
-| **Audit date** | 20 July 2026 (**0.2.3 ship + connect hotfix**) |
-| **Prior passes** | 0.1.8–0.2.2 ship/docs; UK geo strip; DNS/IPv6; node pub pin; traffic-shape/PFS; native parity; monitoring; threat model; FDE; ephemeral nodes |
+| **Product** | Restore Privacy Tunnel (RPT / RPT2) |
+| **Repositories** | **Private** `restore_privacy` (node/client/status_page) · **Public** [RUST-IN-PRIVACY](https://github.com/rgsneddon/RUST-IN-PRIVACY) (protocol crates + device packages) |
+| **Public product version** | **1.0.0** / tag **v1.0.0** ([release](https://github.com/rgsneddon/RUST-IN-PRIVACY/releases/tag/v1.0.0)) |
+| **Private tree label** | `client/VERSION` may read **0.2.3** (legacy GUI packaging); status-page catalog is **1.0.0** |
+| **Production node** | **82.221.101.241:44044** (UDP); status UI TCP 8080; deploy: Python `node.server` via `scripts/deploy_rpt_node.py` |
+| **Audit date** | **21 July 2026** (**docs + dual-repo security pass** — public v1.0.0 installers + production Python node) |
+| **Prior passes** | 0.1.8–0.2.3 ship/docs; UK geo strip; DNS/IPv6; node pub pin; traffic-shape/PFS; native parity; monitoring; threat model; FDE; ephemeral nodes; Rust cutover / Android residual |
 | **Audit type** | Static code + policy consistency (not a pen-test or multi-OS residual red-team) |
-| **Auditor method** | Tree scan, endpoint/catalog alignment, packaging gates, security/policy unit suite; threat scenarios; release no-priv |
+| **Auditor method** | Tree scan, endpoint/catalog alignment, packaging gates, security/policy unit suite; threat scenarios; release no-priv; live HELLO pin check |
 
 ---
 
 ## 1. Executive summary
 
-Restore Privacy **0.2.3** ships clients and public catalog aligned to the **FlokiNET** node at **82.221.101.241**, carrying forward **0.2.2** defaults (traffic shape, Settings legal links, PFS/obfs) and adding **Settings transparency**, **licence gate**, **aggregate-only monitoring**, **threat-model education**, **LUKS FDE / wipe ops**, and **ephemeral node rebuild** tooling.
+Restore Privacy’s **public product ship is v1.0.0** on **RUST-IN-PRIVACY**: Windows/Linux/macOS/iOS/Android residual packages, product ElGamal **pub pin** only, and download buttons that use explicit  
+`https://github.com/rgsneddon/RUST-IN-PRIVACY/releases/download/v1.0.0/<file>` URLs. The **private** tree still hosts the **Python production node**, Flutter residual client sources, status page, and operator tooling. Production endpoint remains **82.221.101.241:44044**.
 
-**Core privacy thesis:** **no user-info logs**, **minimal public status** (title + downloads — **no live client count**), **honest Connected** when residual full tunnel is active, **device Ed25519 keys** (no shared client private key in packages), **no third-party geo on Connect**.
+**Core privacy thesis:** **no user-info logs**, **minimal public status** (title + downloads — **no live client count**), **honest Connected** when residual full tunnel is active, **device Ed25519 keys** (no shared client private key in packages), **no third-party geo on Connect**, **session PFS** + outer **obfs** as **mitigations** (not DPI-undetectability).
 
-**New / updated privacy hardening (0.2.3 pass):**
+**Carry-forward privacy hardening (0.2.x → 1.0.0 public packages):**
 
 | Area | Status |
 |------|--------|
@@ -44,7 +46,7 @@ Restore Privacy **0.2.3** ships clients and public catalog aligned to the **Flok
 **Primary residual risks (open by design / environment):**
 
 1. **Operational** — VPS/CDN/provider IP-level logging outside product no-log (privacy §4 / threat model).  
-2. **Apple** — residual IP still requires signed Packet Tunnel / NE; public zips may be prep packages (**APPLE_HANDOFF_0.2.3**).  
+2. **Apple** — residual IP still requires signed Packet Tunnel / NE; public **v1.0.0** zips are residual packages (see RUST-IN-PRIVACY `docs/APPLE_HANDOFF_1.0.0.md`).  
 3. **Linux privilege floor** — residual needs root + TUN/`ip` (M4).  
 4. **IPv6** — mitigation blocks ISP IPv6 path; node is still primarily IPv4 data-plane.  
 5. **Traffic analysis** — padding/jitter/cover/outer obfs are mitigations, not undetectability guarantees.  
@@ -62,16 +64,17 @@ Restore Privacy **0.2.3** ships clients and public catalog aligned to the **Flok
 | Windows / Linux | `client/windows/*`, `client/linux/*` |
 | Mobile / Apple | `client_app/` Flutter + NativePrep residual engines (PFS/pad/cover/obfs) |
 | Node | `node/*` (handshake, pfs, traffic_shape, crypto_session, nolog, install scripts) |
-| Public web | `status_page/*` catalog **v0.2.3** |
-| Packaging | `scripts/build_release_0.2.3.py`, `package_linux.py`, `selfhost_node.sh` |
+| Public web | `status_page/*` catalog **v1.0.0** → RUST-IN-PRIVACY release assets |
+| Packaging | Public: RUST-IN-PRIVACY `scripts/build_release_1.0.0.py` + Flutter APK; private legacy: `scripts/build_release_0.2.3.py` |
 | Policies | `PRIVACY_POLICY.md`, `LICENSE`, `CREDITS.md`, `README.md`, `sundries.txt`, `AUDIT.md` |
 
 ### 2.2 Method notes
 
-- Version surfaces: `client/VERSION` == catalog **0.2.3**.  
-- Product default host **82.221.101.241** (not 104.156.224.47).  
-- Product node ElGamal pub pin: `PRODUCT_NODE_ELGAMAL_PUB_SHA256` / `product/NODE_ELGAMAL_PUB.sha256`.  
-- Spot-checked `_assert_no_priv`, multi-hop honesty flags, traffic_shape product default **on**.  
+- Public version surfaces: status-page `RELEASE_VERSION` / `RELEASE_TAG` = **1.0.0** / **v1.0.0**; package basenames `restore-privacy-rust-1.0.0-*`.  
+- Private `client/VERSION` may remain **0.2.3** (GUI packaging history) without being the public download catalog.  
+- Product default host **82.221.101.241**.  
+- Product node ElGamal pub pin: `PRODUCT_NODE_ELGAMAL_PUB_SHA256` / `product/NODE_ELGAMAL_PUB.sha256` (SHA-256 `1b126abf…`).  
+- Spot-checked no tracked `*.priv` in public host, multi-hop honesty, traffic_shape / obfs product defaults **on**.  
 - **Did not** paste secret material into this document.
 
 ---
@@ -79,14 +82,14 @@ Restore Privacy **0.2.3** ships clients and public catalog aligned to the **Flok
 ## 3. Architecture snapshot
 
 ```
-[Clients 0.2.3 → 82.221.101.241:44044]
-        |  RPT2 HELLO (Ed25519 + ElGamal hybrid + optional X25519 PFS)
-        |  sealed DATA (± product pad / cover by default on Python path)
+[Public installers v1.0.0  →  82.221.101.241:44044]
+        |  RPT2 HELLO (Ed25519 + ElGamal hybrid + X25519 PFS + outer obfs)
+        |  sealed DATA (± product pad / cover on residual paths)
         v
-[Node: admission + sessions + NAT + Unbound 10.88.0.1]
-        |
-        v  status: title only (no public count)
-[Status page]  <-- download catalog (no live counter)
+[Production node: Python node.server + NAT + Unbound 10.88.0.1]
+        |  secrets: node_elgamal.priv (host only, never packaged)
+        v  status API: title only (no public count)
+[Status page]  <-- catalog hrefs …/RUST-IN-PRIVACY/releases/download/v1.0.0/<file>
 ```
 
 ---

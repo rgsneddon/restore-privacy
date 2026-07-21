@@ -109,8 +109,15 @@ class TestDocsTrafficShapeAligned(unittest.TestCase):
             "enabled by default" in privacy.lower(),
             "PRIVACY_POLICY should state shaping enabled by default",
         )
-        self.assertIn("0.2.3", readme)
-        self.assertIn("0.2.3", privacy)
+        # Version surface: public v1.0.0 and/or historical 0.2.3
+        self.assertTrue(
+            "1.0.0" in readme or "0.2.3" in readme,
+            "README must cite product version",
+        )
+        self.assertTrue(
+            "1.0.0" in privacy or "0.2.3" in privacy or "0.2" in privacy,
+            "PRIVACY_POLICY must cite a product version generation",
+        )
 
 
 if __name__ == "__main__":

@@ -54,12 +54,11 @@ Legacy private-repo installers (0.2.3) remain under the [restore-privacy 0.2.3](
 
 ### Windows
 
-1. Download the **Windows installer (.exe)** from the release or status page.
-2. Run **`restore-privacy-client-0.2.3-windows-x64-setup.exe`**.  
-   It installs the full client (**bundled runtime + Wintun + dependencies** — **no separate Python install**), creates **Privacy Restored** shortcuts with the **logo** icon, and can launch the app.
-3. Press **Connect** and approve **UAC** when prompted so residual public IP uses the VPN node.
-4. Optional: open **Settings** and enable **Run at device startup** and/or **Autoconnect on launch** (both default **off**). Settings also links to the audit, privacy policy, and end user licence.
-5. Use the system tray (**Privacy Restored**) or taskbar to restore the window; **Disconnect** or **Quit** stops the tunnel.
+1. Download **`restore-privacy-rust-1.0.0-windows-x64.zip`** from the [v1.0.0 release](https://github.com/rgsneddon/RUST-IN-PRIVACY/releases/download/v1.0.0/restore-privacy-rust-1.0.0-windows-x64.zip) or status page.
+2. Unpack and run **`rpt-client.exe`** (product HELLO / residual CLI path ships with **`rpt-node.exe`** for lab self-host).  
+   *Legacy full GUI installer (`restore-privacy-client-0.2.3-windows-x64-setup.exe`) remains on private tags only — not the public catalog.*
+3. Connect to **`82.221.101.241:44044`**. For residual public IP change, use an OS VPN path where available and approve elevation/UAC when prompted.
+4. Optional (Flutter residual builds): **Settings** → startup / autoconnect (defaults **off**); legal links to audit / privacy / licence.
 
 ### Android
 
@@ -70,42 +69,31 @@ Legacy private-repo installers (0.2.3) remain under the [restore-privacy 0.2.3](
 
 ### Ubuntu and derivatives (Linux Mint, Pop!_OS, …)
 
-**Supported floor:** Ubuntu **20.04 LTS and newer** (22.04, 24.04, …) and Mint/Pop built on those bases. Python **3.8+**.
-
-1. Download **`restore-privacy-client-0.2.3-linux-x64.tar.gz`** from the release or status page.
-2. Unpack and run the **bundled installer** (crypto wheels baked in — no network `pip install cryptography`):
+1. Download **`restore-privacy-rust-1.0.0-linux-x64.tar.gz`** from the [v1.0.0 release](https://github.com/rgsneddon/RUST-IN-PRIVACY/releases/download/v1.0.0/restore-privacy-rust-1.0.0-linux-x64.tar.gz) or status page.
+2. Unpack and follow **`install.sh`** (builds/installs Rust `rpt-client` / `rpt-node` where tooling allows):
    ```bash
-   tar xzf restore-privacy-client-0.2.3-linux-x64.tar.gz
-   cd restore-privacy-0.2.3-linux
+   tar xzf restore-privacy-rust-1.0.0-linux-x64.tar.gz
+   cd restore-privacy-rust-1.0.0-linux   # directory name as packaged
    bash install.sh
    ```
-3. Run the GUI (**root** needed so residual public IP uses the VPN node):
-   ```bash
-   sudo ./bin/privacy-restored
-   ```
-4. Press **Connect**. Status is honest: residual public IP only changes when TUN + dual `/1` routes are active.
-5. Details: `LINUX_INSTALL.md` inside the tarball; source: [`client/linux/`](client/linux/).  
-   - **Wheeled ABIs:** manylinux wheels for **CPython 3.8–3.12**. Re-run `python scripts/package_linux.py` on every release.
+3. Run **`rpt-client --host 82.221.101.241 --port 44044`** for product HELLO. Residual full-tunnel IP change needs root + TUN/`ip` when using a full residual path.
+4. *Legacy private GUI tarball (`restore-privacy-client-0.2.3-linux-x64.tar.gz`) is historical only.*
 
-### macOS / iOS (continue on a Mac)
+### macOS / iOS
 
-Release zips for **0.2.3** are **prep packages** for sideload / further signing — **Mac work required**. Residual public IP does **not** change until Packet Tunnel / Network Extension is signed and active; host-side HELLO alone is **diagnostic** only.
-
-1. Download **`restore-privacy-client-0.2.3-macos.zip`** or **`restore-privacy-client-0.2.3-ios.zip`**, or clone this repo and open `client_app/` on macOS.
-2. Checklist:
-   - [`client_app/APPLE_BUILD.md`](client_app/APPLE_BUILD.md)
-   - [`client_app/macos/BUILD_ON_MAC.md`](client_app/macos/BUILD_ON_MAC.md)
-   - [`client_app/ios/BUILD_ON_MAC.md`](client_app/ios/BUILD_ON_MAC.md)
-   - Mac handoff: [`client_app/APPLE_HANDOFF_0.2.3.md`](client_app/APPLE_HANDOFF_0.2.3.md) (or prior `APPLE_HANDOFF_0.2.2.md` if not yet copied)
-3. Packages may ship the **public** node key (`node_elgamal.pub`). Each install **generates its own Ed25519 device key on first run**. Packages **do **not** ship a shared** `client_ed25519.priv`. Never ship `node_elgamal.priv`.
+1. Download **`restore-privacy-rust-1.0.0-macos.zip`** or **`restore-privacy-rust-1.0.0-ios.zip`** from the [v1.0.0 release](https://github.com/rgsneddon/RUST-IN-PRIVACY/releases/tag/v1.0.0).
+2. Residual public IP changes only when **Packet Tunnel / Network Extension** is **connected** (signed app path). Host-side HELLO alone is **diagnostic**.
+3. Rebuild / resign notes: public host docs [`docs/APPLE_BUILD.md`](https://github.com/rgsneddon/RUST-IN-PRIVACY/blob/main/docs/APPLE_BUILD.md) · [`docs/APPLE_HANDOFF_1.0.0.md`](https://github.com/rgsneddon/RUST-IN-PRIVACY/blob/main/docs/APPLE_HANDOFF_1.0.0.md). Private tree: `client_app/` + handoff notes.
+4. Packages ship **`node_elgamal.pub` only**. Each install generates its own Ed25519 device key. **Never** ship `node_elgamal.priv` or a shared `client_ed25519.priv`.
 
 ### Status page
 
 https://restore-privacy-status.onrender.com/
 
-- **Download** buttons for Windows, Android, macOS, iOS, and Linux (catalog **v0.2.3**)  
+- **Download** buttons for Windows, Linux, macOS, iOS, Android — catalog **v1.0.0** → [RUST-IN-PRIVACY release](https://github.com/rgsneddon/RUST-IN-PRIVACY/releases/tag/v1.0.0)  
+- Explicit asset URLs: `https://github.com/rgsneddon/RUST-IN-PRIVACY/releases/download/v1.0.0/<filename>`  
 - **No** public live session / connected-client counter  
-- **Connect via web** (if present in docs) explains that a browser tab cannot run full system VPN  
+- A browser tab cannot run full system VPN
 
 ---
 
@@ -158,9 +146,9 @@ Node deploy, ports, secrets, from-source builds, and tests: **[sundries.txt](sun
 
 **Post-quantum readiness:** staged hybrid Kyber/ML-KEM hook in `node/pq_hybrid.py` + plan [`docs/PQ_MIGRATION.md`](docs/PQ_MIGRATION.md) (not residual PQ on the wire until dual-wire + real ML-KEM).
 
-**0.2.3 release:** Production node **82.221.101.241:44044**. Settings transparency, licence gate, native wire parity, FDE/ephemeral ops tooling. See [scripts/RELEASE_NOTES_0.2.3.md](scripts/RELEASE_NOTES_0.2.3.md). Prefer upgrading from 0.2.2.
+**Public product ship (v1.0.0):** Installers and release notes on **[RUST-IN-PRIVACY v1.0.0](https://github.com/rgsneddon/RUST-IN-PRIVACY/releases/tag/v1.0.0)**. Production node **82.221.101.241:44044** (currently **Python** `node.server` via `scripts/deploy_rpt_node.py`; Rust `rpt-node` remains the public protocol host). Private tree `client/VERSION` may still read **0.2.3** for legacy GUI packaging.
 
-**Self-host (one shot):** `sudo bash scripts/selfhost_node.sh` — node install + tunnel DNS + host privacy. Details: [sundries.txt](sundries.txt).
+**Self-host (one shot):** `sudo bash scripts/selfhost_node.sh` — node install + tunnel DNS + host privacy. Deploy remote: `python scripts/deploy_rpt_node.py` (`RPT_SSH_HOST`, `RPT_SSH_USER`, key). Details: [sundries.txt](sundries.txt).
 
 **Tunnel DNS / host privacy:** [node/install_dns.sh](node/install_dns.sh), [node/install_host_privacy.sh](node/install_host_privacy.sh).
 
@@ -168,7 +156,7 @@ Node deploy, ports, secrets, from-source builds, and tests: **[sundries.txt](sun
 
 **Ephemeral / short-lived nodes:** [scripts/ephemeral_node.py](scripts/ephemeral_node.py) — **periodic** VPS **snapshot** and/or **rebuild** plan (`--dry-run` by default). Install timer: [scripts/install_ephemeral_timer.sh](scripts/install_ephemeral_timer.sh). Live rebuild requires `RPT_EPHEMERAL_CONFIRM=yes`. Rebuild re-runs self-host (no-log). Does not erase provider backups/netflow; re-ship **public** node pin if keys rotate.
 
-**Release scripts:** Use **scripts/build_release_0.2.3.py**. Re-run `python scripts/package_linux.py` each tag for manylinux wheels. Apple: [APPLE_HANDOFF_0.2.3.md](client_app/APPLE_HANDOFF_0.2.3.md).
+**Release scripts:** Public assets — **RUST-IN-PRIVACY** `scripts/build_release_1.0.0.py` + Android Flutter APK. Legacy private GUI tags: `scripts/build_release_0.2.3.py`. Apple handoff (public): RUST-IN-PRIVACY `docs/APPLE_HANDOFF_1.0.0.md`.
 
 ```bash
 # Windows GUI (requires system Python)

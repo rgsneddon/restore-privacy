@@ -44,11 +44,17 @@ class TestAuditMd(unittest.TestCase):
 
     def test_audit_has_severity_and_version(self):
         text = AUDIT.read_text(encoding="utf-8")
-        # Current ship version (accept 0.2.x catalog / audit header)
+        # Public ship v1.0.0 and/or private 0.2.x history
         self.assertTrue(
-            "0.2.3" in text or "0.2.1" in text or "0.2.0" in text or "0.1.8" in text,
-            "AUDIT.md must cite the current or prior reviewed product version",
+            "1.0.0" in text
+            or "0.2.3" in text
+            or "0.2.1" in text
+            or "0.2.0" in text
+            or "0.1.8" in text,
+            "AUDIT.md must cite the public product version and/or prior reviewed version",
         )
+        self.assertIn("RUST-IN-PRIVACY", text)
+        self.assertIn("82.221.101.241", text)
         # Severity labels used in findings
         for sev in ("High", "Medium", "Low", "Info"):
             self.assertIn(sev, text)
