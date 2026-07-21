@@ -1157,9 +1157,23 @@ class TestGrantNotBurnedOnFulfilmentFail(unittest.TestCase):
         fname = "restore-privacy-client-0.3.0-ios.zip"
         (Path(self._td.name) / fname).write_bytes(b"PK\x03\x04ios-unit")
         os.environ["RPT_ASSET_DIR"] = self._td.name
+        os.environ.pop("RPT_ASSET_FETCH_TOKEN", None)
+        os.environ.pop("RPT_VPS_ASSET_TOKEN", None)
         ready = payments.check_fulfilment_ready()
         self.assertTrue(ready.get("ok"), ready)
         self.assertEqual(ready.get("source"), "local")
+        self.assertIn("vps_token_configured", ready)
+        self.assertFalse(ready.get("vps_token_configured"))
+
+    def test_check_fulfilment_ready_reports_vps_token_configured(self):
+        fname = "restore-privacy-client-0.3.0-linux-x64.tar.gz"
+        (Path(self._td.name) / fname).write_bytes(b"FAKE-TGZ-UNIT")
+        os.environ["RPT_ASSET_DIR"] = self._td.name
+        os.environ["RPT_ASSET_FETCH_TOKEN"] = "unit-match-secret-not-prod"
+        ready = payments.check_fulfilment_ready()
+        self.assertTrue(ready.get("ok"), ready)
+        self.assertTrue(ready.get("vps_token_configured"), ready)
+        self.assertIn("vps_asset_base", ready)
 
 
 

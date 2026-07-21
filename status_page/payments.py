@@ -831,7 +831,15 @@ def check_fulfilment_ready() -> dict[str, Any]:
     """Probe that at least one catalog installer is openable (local or API).
 
     Closes the body immediately — used for production readiness evidence.
+    Includes non-secret flags so operators can confirm VPS token match without
+    printing the secret (``vps_token_configured``).
     """
+    vps_tok = bool(vps_asset_fetch_token())
+    vps_base = vps_asset_base_url()
+    meta = {
+        "vps_token_configured": vps_tok,
+        "vps_asset_base": vps_base,
+    }
     for asset in available_downloads():
         opened = open_release_asset(asset.filename)
         if opened is None:
@@ -842,13 +850,15 @@ def check_fulfilment_ready() -> dict[str, Any]:
                 body.close()
         except Exception:  # noqa: BLE001
             pass
-        return {
+        out = {
             "ok": True,
             "source": opened.get("source"),
             "probe_filename": asset.filename,
             "content_length": opened.get("content_length"),
         }
-    return {
+        out.update(meta)
+        return out
+    out = {
         "ok": False,
         "error": "no_asset_source",
         "hint": (
@@ -857,6 +867,8 @@ def check_fulfilment_ready() -> dict[str, Any]:
             "or set RPT_GITHUB_TOKEN"
         ),
     }
+    out.update(meta)
+    return out
 
 
 def list_recent_grants(limit: int = 50) -> list[dict[str, Any]]:
