@@ -6,6 +6,9 @@ class RptConfig {
   static const String protocolMagic = 'RPT2';
   static const String sessionName = 'Privacy Restored';
 
+  /// Product pin — must match monorepo ``client/VERSION`` and pubspec version.
+  static const String productVersion = '0.3.3';
+
   /// Full tunnel: all device traffic (0.0.0.0/0).
   static const bool fullTunnel = true;
   static const String defaultRoute = '0.0.0.0/0';

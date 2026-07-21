@@ -6,6 +6,7 @@ library;
 import 'dart:convert';
 import 'dart:io';
 
+import 'rpt_config.dart';
 import 'settings_store.dart';
 
 const String kKeyLicenceAccepted = 'licence_accepted';
@@ -225,7 +226,10 @@ class LicenceGate {
     try {
       client.connectionTimeout = timeout;
       final req = await client.getUrl(uri);
-      req.headers.set(HttpHeaders.userAgentHeader, 'RestorePrivacy-flutter/0.3.3');
+      req.headers.set(
+        HttpHeaders.userAgentHeader,
+        'RestorePrivacy-flutter/${RptConfig.productVersion}',
+      );
       req.headers.set(HttpHeaders.acceptHeader, 'application/json');
       final resp = await req.close().timeout(timeout);
       final body = await resp.transform(utf8.decoder).join();

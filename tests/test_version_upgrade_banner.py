@@ -29,9 +29,32 @@ class TestVersionResolution(unittest.TestCase):
         self.assertRegex(ver, r"^\d+\.\d+")
         self.assertEqual(read_running_version(), ver)
         self.assertNotEqual(read_running_version(), "0.0.0")
+        # Current ship pin (not a stale prior release)
+        self.assertEqual(ver, "0.3.3")
+        self.assertNotEqual(read_running_version(), "0.2.3")
 
-    def test_install_dir_version_preferred_over_missing_module_sibling(self):
-        """Simulates frozen: real VERSION at install root, not next to ui_theme only."""
+    def test_stale_version_file_does_not_override_newer_package_pin(self):
+        """Leftover 0.2.3 VERSION must not win over package 0.3.3 pin."""
+        with tempfile.TemporaryDirectory() as td:
+            stale = Path(td) / "old" / "VERSION"
+            stale.parent.mkdir(parents=True)
+            stale.write_text("0.2.3\n", encoding="utf-8")
+            fresh = Path(td) / "package" / "VERSION"
+            fresh.parent.mkdir(parents=True)
+            fresh.write_text("0.3.3\n", encoding="utf-8")
+            with mock.patch.object(
+                ui_theme,
+                "version_file_candidates",
+                return_value=[stale, fresh],
+            ):
+                with mock.patch.object(
+                    ui_theme, "embedded_package_version", return_value="0.3.3"
+                ):
+                    self.assertEqual(read_running_version(), "0.3.3")
+                    self.assertNotEqual(read_running_version(), "0.2.3")
+
+    def test_install_dir_version_readable_when_only_source(self):
+        """Simulates frozen: VERSION only at install root."""
         with tempfile.TemporaryDirectory() as td:
             install = Path(td)
             (install / "VERSION").write_text("0.1.8\n", encoding="utf-8")
@@ -40,7 +63,10 @@ class TestVersionResolution(unittest.TestCase):
                 "version_file_candidates",
                 return_value=[install / "VERSION", Path(td) / "missing" / "VERSION"],
             ):
-                self.assertEqual(read_running_version(), "0.1.8")
+                with mock.patch.object(
+                    ui_theme, "embedded_package_version", return_value="0.1.8"
+                ):
+                    self.assertEqual(read_running_version(), "0.1.8")
 
     def test_explicit_version_file(self):
         with tempfile.TemporaryDirectory() as td:
@@ -57,6 +83,31 @@ class TestVersionResolution(unittest.TestCase):
     def test_embedded_package_version_not_zero(self):
         self.assertNotEqual(embedded_package_version(), "0.0.0")
         self.assertRegex(embedded_package_version(), r"^\d+\.\d+")
+        self.assertEqual(embedded_package_version(), "0.3.3")
+
+    def test_all_product_pins_match_monorepo(self):
+        """Windows installer, catalog, Flutter pubspec/RptConfig share client/VERSION."""
+        pin = (ROOT / "client" / "VERSION").read_text(encoding="utf-8").strip()
+        self.assertEqual(pin, catalog_latest_version())
+        # Installer loads pin from client/VERSION
+        from client.windows import installer as inst
+
+        self.assertEqual(inst.VERSION, pin)
+        pubspec = (ROOT / "client_app" / "pubspec.yaml").read_text(encoding="utf-8")
+        self.assertIn(f"version: {pin}+", pubspec)
+        rpt = (ROOT / "client_app" / "lib" / "rpt_config.dart").read_text(
+            encoding="utf-8"
+        )
+        self.assertIn(f"productVersion = '{pin}'", rpt)
+        # UI surfaces call the real helpers
+        win = (ROOT / "client" / "windows" / "app.py").read_text(encoding="utf-8")
+        linux = (ROOT / "client" / "linux" / "app.py").read_text(encoding="utf-8")
+        self.assertIn("read_running_version", win)
+        self.assertIn("read_running_version", linux)
+        flutter_main = (ROOT / "client_app" / "lib" / "main.dart").read_text(
+            encoding="utf-8"
+        )
+        self.assertIn("RptConfig.productVersion", flutter_main)
 
 
 class TestUpgradeBanner(unittest.TestCase):

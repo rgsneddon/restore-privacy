@@ -181,29 +181,30 @@ def _read_version_text(path: Path) -> str | None:
 def version_file_candidates() -> list[Path]:
     """Locations where product VERSION may live (install tree, frozen, repo).
 
-    Installer writes ``VERSION`` next to the client .exe under
-    ``%LOCALAPPDATA%/Programs/RestorePrivacy/``. Frozen PyInstaller layouts
-    keep package data under ``_internal`` / ``_MEIPASS``  -  not only
-    ``client/ui_theme.py``'s sibling path.
+    Order is package-first (module / frozen payload), then install dir, then
+    cwd leftovers. :func:`read_running_version` picks the **highest** parsed
+    version among readable candidates so a stale ``0.2.3`` file next to an
+    older install path cannot override a current package pin.
     """
     import sys
 
     here = Path(__file__).resolve().parent  # client/
     root = here.parent
     out: list[Path] = [
+        # Package pin (source of truth in monorepo and onedir _internal)
         here / "VERSION",
         root / "client" / "VERSION",
     ]
-    # Next to frozen executable / install dir
+    # Next to frozen executable / install dir (installer also writes VERSION)
     try:
         if getattr(sys, "frozen", False):
             exe_dir = Path(sys.executable).resolve().parent
             out.extend(
                 [
-                    exe_dir / "VERSION",
-                    exe_dir / "client" / "VERSION",
                     exe_dir / "_internal" / "client" / "VERSION",
                     exe_dir / "_internal" / "VERSION",
+                    exe_dir / "client" / "VERSION",
+                    exe_dir / "VERSION",
                 ]
             )
             meipass = getattr(sys, "_MEIPASS", None)
@@ -216,9 +217,9 @@ def version_file_candidates() -> list[Path]:
                     ]
                 )
         else:
-            # Dev: also honor cwd and common install dir for testing
-            out.append(Path.cwd() / "VERSION")
+            # Dev: also honor cwd for testing
             out.append(Path.cwd() / "client" / "VERSION")
+            out.append(Path.cwd() / "VERSION")
     except Exception:
         pass
     # Standard Windows install location (even when launched via shortcut)
@@ -226,6 +227,21 @@ def version_file_candidates() -> list[Path]:
         local = os.environ.get("LOCALAPPDATA") or ""
         if local:
             out.append(Path(local) / "Programs" / "RestorePrivacy" / "VERSION")
+            out.append(
+                Path(local)
+                / "Programs"
+                / "RestorePrivacy"
+                / "client"
+                / "VERSION"
+            )
+            out.append(
+                Path(local)
+                / "Programs"
+                / "RestorePrivacy"
+                / "_internal"
+                / "client"
+                / "VERSION"
+            )
     except Exception:
         pass
     # De-dupe preserving order
@@ -243,15 +259,17 @@ def version_file_candidates() -> list[Path]:
 def embedded_package_version() -> str:
     """Version shipped next to this package module (repo / onedir data)."""
     v = _read_version_text(Path(__file__).resolve().parent / "VERSION")
-    return v or "0.1.8"
+    # Fallback matches monorepo catalog pin — never a stale prior ship
+    return v or "0.3.3"
 
 
 def read_running_version(version_file: Path | None = None) -> str:
     """Read the installed/running product version.
 
-    Prefer an explicit path, then install/frozen/repo candidates, then the
-    package-embedded VERSION. Never return a silent ``0.0.0`` when a real
-    product version is available on disk or embedded.
+    Collects VERSION from package / install candidates and returns the
+    **newest** dotted version found (plus the embedded package pin). That way
+    a leftover ``0.2.3`` install path cannot make a current ``0.3.3`` package
+    report the old number. Explicit *version_file* still wins when readable.
     """
     if version_file is not None:
         v = _read_version_text(version_file)
@@ -259,11 +277,18 @@ def read_running_version(version_file: Path | None = None) -> str:
             return v
         return embedded_package_version()
 
+    found: list[str] = []
     for cand in version_file_candidates():
         v = _read_version_text(cand)
         if v:
-            return v
-    return embedded_package_version()
+            found.append(v)
+    emb = embedded_package_version()
+    if emb:
+        found.append(emb)
+    if not found:
+        return "0.3.3"
+    # Highest product pin wins (stale VERSION files lose)
+    return max(found, key=version_tuple)
 
 
 def catalog_latest_version() -> str:

@@ -17,7 +17,17 @@ from collections.abc import Callable
 from pathlib import Path
 
 APP_NAME = "RestorePrivacy"
-VERSION = "0.3.3"
+def _product_version_pin() -> str:
+    """Load monorepo pin from client/VERSION (single source of truth)."""
+    pin = Path(__file__).resolve().parents[1] / "VERSION"
+    try:
+        line = pin.read_text(encoding="utf-8").strip().splitlines()[0].strip()
+        return line.lstrip("vV") or "0.3.3"
+    except (OSError, IndexError):
+        return "0.3.3"
+
+
+VERSION = _product_version_pin()
 # User-facing shortcut / tray product name (logo icon on Start Menu + Desktop)
 SHORTCUT_DISPLAY_NAME = "Privacy Restored"
 # Install under LocalAppData so no elevation is required for deploy.
