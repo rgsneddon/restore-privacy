@@ -21,6 +21,11 @@ def product_node_elgamal_pub_path() -> Path:
     return Path(__file__).resolve().parents[1] / "product" / "node_elgamal.pub"
 
 
+def product_exit_node_elgamal_pub_path() -> Path:
+    """Tracked exit-hop public key (Romania multi-hop residual; public only)."""
+    return Path(__file__).resolve().parents[1] / "product" / "exit_node_elgamal.pub"
+
+
 @dataclass(frozen=True)
 class Endpoint:
     # Literal default keeps alignment tests and frozen configs unambiguous.

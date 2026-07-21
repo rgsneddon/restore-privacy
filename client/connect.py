@@ -40,10 +40,17 @@ from node.traffic_shape import DEFAULT_TRAFFIC_SHAPE, TrafficShapePolicy
 
 from .endpoint import DEFAULT_ENDPOINT, Endpoint
 from .full_tunnel import FullTunnelPlan, assert_full_tunnel_plan, build_full_tunnel_plan
+from .multihop import (
+    MultiHopConfig,
+    is_multihop_active,
+    multihop_config_from_env,
+    multihop_status_text,
+    residual_endpoint,
+)
 from .secrets_loader import (
     ensure_device_admission_key,
     load_client_private_key,
-    load_node_elgamal_public,
+    load_node_elgamal_public_for_endpoint,
 )
 
 
@@ -227,8 +234,11 @@ class RptClient:
         endpoint: Endpoint | None = None,
         secrets_dir: Path | str | None = None,
         status_cb: StatusCallback | None = None,
+        multihop: MultiHopConfig | None = None,
     ):
-        self.endpoint = endpoint or DEFAULT_ENDPOINT
+        self.multihop = multihop if multihop is not None else multihop_config_from_env()
+        # Residual dial: exit hop when multi-hop active, else entry/default.
+        self.endpoint = endpoint or residual_endpoint(self.multihop)
         self.secrets_dir = Path(secrets_dir) if secrets_dir else None
         self.status_cb = status_cb or (lambda _m: None)
         self.state = ConnectState.IDLE
@@ -248,14 +258,10 @@ class RptClient:
         force_reconnect: bool = False,
         residual_ready: bool = False,
     ) -> ConnectResult:
-        """Perform authorized RPT handshake with the node (manual Connect path).
+        """Perform authorized RPT handshake with residual node (entry or exit).
 
-        Product connect uses device keys + node crypto only — no public-IP geo
-        admission and no third-party geo lookup before handshake.
-
-        Always runs a real HELLO unless already connected and
-        ``force_reconnect`` is false (idempotent double-click guard only).
-        ``residual_ready`` is accepted for API compatibility; it does not skip HELLO.
+        When multi-hop is active, residual HELLO targets the **exit** hop; path
+        status names entry → exit. Single-hop default remains Iceland entry.
         """
         _ = residual_ready  # residual attach is handled by platform tunnel layers
         if (
@@ -276,13 +282,15 @@ class RptClient:
             )
 
         self.state = ConnectState.CONNECTING
-        self._status("Connecting to Restore Privacy node…")
+        self.endpoint = residual_endpoint(self.multihop)
+        mh_note = multihop_status_text(self.multihop)
+        self._status(f"Connecting… {mh_note}")
 
         try:
             # Pure crypto prep before socket I/O (short critical path to send HELLO).
             sdir = ensure_device_admission_key(self.secrets_dir)
             client_priv = load_client_private_key(sdir)
-            node_pub = load_node_elgamal_public(sdir)
+            node_pub = load_node_elgamal_public_for_endpoint(self.endpoint, sdir)
             frame, client_nonce, client_pub, client_eph = build_authorized_client_hello(
                 client_priv, node_pub, with_pfs=True
             )
@@ -293,7 +301,10 @@ class RptClient:
             try:
                 sock.settimeout(timeout)
                 sock.sendto(wire, self.endpoint.address)
-                self._status(f"HELLO sent → {self.endpoint.host}:{self.endpoint.port}")
+                hop_kind = "exit residual" if is_multihop_active(self.multihop) else "entry"
+                self._status(
+                    f"HELLO sent → {self.endpoint.host}:{self.endpoint.port} ({hop_kind})"
+                )
                 raw_reply, _addr = sock.recvfrom(65535)
                 reply = maybe_unwrap(raw_reply)
                 session = complete_server_hello(
@@ -309,7 +320,7 @@ class RptClient:
                 self.state = ConnectState.CONNECTED
                 pfs_note = " PFS" if session.pfs else ""
                 self._status(
-                    f"Connected — tunnel IP {session.vpn_ip} (full VPN{pfs_note})"
+                    f"Connected — tunnel IP {session.vpn_ip} (full VPN{pfs_note}); {mh_note}"
                 )
                 return ConnectResult(
                     ok=True,

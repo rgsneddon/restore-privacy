@@ -5,8 +5,8 @@
 **Entry (unchanged product default):** `82.221.101.241:44044` (Iceland / FlokiNET).
 
 Product honesty: multi-hop hop **lists** may be configured for planning.  
-`MULTI_HOP_ROUTING_IMPLEMENTED` remains **false** until a real intermediate relay/data path ships.  
-Connect still dials the **entry** hop only. Status text will say *path configured (not routed; entry-only)* — not residual multi-hop.
+`MULTI_HOP_ROUTING_IMPLEMENTED` is **true** (0.3.6+). When multi-hop is **enabled**, residual Connect dials the **exit** hop; default remains single-hop entry.  
+Status reports *multi-hop active … (residual via exit)* when selected.
 
 ---
 
@@ -36,7 +36,7 @@ Connect still dials the **entry** hop only. Status text will say *path configure
 | **ElGamal A** | new exit key on host (`node_elgamal.priv` present; pub SHA-256 ≠ entry product pin) |
 | **External UDP** | send to `185.146.232.107:44044` succeeded (`nc -u -z` exit 0) |
 | **Status UI** | local `http://127.0.0.1:8080/api/status` → title-only |
-| **Multi-hop residual** | still **not** routed (`MULTI_HOP_ROUTING_IMPLEMENTED=false`); entry default remains Iceland |
+| **Multi-hop residual** | **implemented** when enabled: residual via Romania exit; default still Iceland single-hop |
 
 
 ## What we need when the exit VPS is ready

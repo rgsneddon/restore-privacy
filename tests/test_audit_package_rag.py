@@ -53,7 +53,7 @@ class TestPackageRagEvaluation(unittest.TestCase):
 
     def test_render_section_lists_all_platforms(self):
         rag = {
-            "catalog_version": "0.3.5",
+            "catalog_version": "0.3.6",
             "overall": "Green",
             "packages": [
                 {
@@ -199,10 +199,10 @@ class TestPkgRagCellScrollHtml(unittest.TestCase):
         self.assertIn("overflow-x: auto", css)
         self.assertIn("table-layout: fixed", css)
         self.assertNotIn("width: max-content", css)
-        long_name = "restore-privacy-client-0.3.5-windows-x64-setup.exe"
+        long_name = "restore-privacy-client-0.3.6-windows-x64-setup.exe"
         md = self.mod.render_package_rag_section(
             {
-                "catalog_version": "0.3.5",
+                "catalog_version": "0.3.6",
                 "overall": "Green",
                 "packages": [
                     {

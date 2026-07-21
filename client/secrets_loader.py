@@ -435,10 +435,55 @@ def load_client_private_key(secrets_dir: Path | None = None) -> Ed25519PrivateKe
     return Ed25519PrivateKey.from_private_bytes(raw)
 
 
-def load_node_elgamal_public(secrets_dir: Path | None = None) -> ElGamalPublicKey:
+def load_node_elgamal_public(
+    secrets_dir: Path | None = None,
+    *,
+    pub_name: str | None = None,
+) -> ElGamalPublicKey:
+    """Load node ElGamal public key for HELLO.
+
+    *pub_name* defaults to ``node_elgamal.pub`` (entry). For multi-hop residual
+    to the Romania exit hop, pass ``exit_node_elgamal.pub`` (or use
+    :func:`load_node_elgamal_public_for_endpoint`).
+    """
+    name = (pub_name or NODE_PUB_NAME).strip() or NODE_PUB_NAME
+    # Prefer tracked product/ keys for known names
+    if name == NODE_PUB_NAME:
+        try:
+            from .endpoint import product_node_elgamal_pub_path
+
+            pp = product_node_elgamal_pub_path()
+            if pp.is_file() and pp.stat().st_size >= 32:
+                return ElGamalPublicKey.import_bytes(pp.read_bytes())
+        except Exception:
+            pass
+    if name == "exit_node_elgamal.pub":
+        try:
+            from .endpoint import product_exit_node_elgamal_pub_path
+
+            ep = product_exit_node_elgamal_pub_path()
+            if ep.is_file() and ep.stat().st_size >= 32:
+                return ElGamalPublicKey.import_bytes(ep.read_bytes())
+        except Exception:
+            pass
     d = resolve_secrets_dir(secrets_dir)
-    raw = (d / NODE_PUB_NAME).read_bytes()
+    path = d / name
+    if not path.is_file() and name != NODE_PUB_NAME:
+        # fall back to entry pub only if exit missing (will fail HELLO to exit)
+        path = d / NODE_PUB_NAME
+    raw = path.read_bytes()
     return ElGamalPublicKey.import_bytes(raw)
+
+
+def load_node_elgamal_public_for_endpoint(
+    endpoint,
+    secrets_dir: Path | None = None,
+) -> ElGamalPublicKey:
+    """Pick entry vs exit node pub based on residual dial endpoint."""
+    from .multihop import node_pub_name_for_endpoint
+
+    name = node_pub_name_for_endpoint(endpoint)
+    return load_node_elgamal_public(secrets_dir, pub_name=name)
 
 
 def secrets_present(secrets_dir: Path | None = None) -> bool:
