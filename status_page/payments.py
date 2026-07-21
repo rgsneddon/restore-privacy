@@ -453,8 +453,10 @@ def render_post_payment_thankyou_html(
 ) -> str:
     """Thank-you page body: auto-start one-time download + run-as-administrator copy.
 
-    Auto-start targets the paid ``/download?token=…`` path only (iframe + script click).
-    Visible fallback link remains if the browser blocks automatic download.
+    **Exactly one** auto-start mechanism: a hidden iframe whose ``src`` is the paid
+    ``/download?token=…`` path. The visible fallback anchor is **manual only** (no
+    script click / meta-refresh) so if the browser blocks the iframe the grant is
+    still unused and the user can click once to download.
     """
     link = (download_path or "").strip()
     if not link.startswith("/download"):
@@ -480,12 +482,12 @@ def render_post_payment_thankyou_html(
     {admin}
   </p>
   <p class="msg" id="auto-download-note">Your download should start automatically…</p>
-  <!-- Auto-start paid installer (single-use grant path only; not free public GH). -->
+  <!-- Sole auto-start: one iframe request to the single-use grant path. -->
   <iframe id="auto-download-frame" src="{link_esc}" style="width:0;height:0;border:0;position:absolute"
     title="Automatic product download" aria-hidden="true"></iframe>
   <p>
     <a class="dl" id="success-download-link" href="{link_esc}"
-       data-auto-download="1" data-platform="{_escape_html_text(plat)}">
+       data-manual-download="1" data-platform="{_escape_html_text(plat)}">
       Download {fname_esc} (if it did not start)
     </a>
   </p>
@@ -493,23 +495,6 @@ def render_post_payment_thankyou_html(
     <a href="https://buymeacoffee.com/rgsneddon">buymeacoffee.com/rgsneddon</a></p>
   <p><a href="/">Home</a></p>
 </section>
-<script id="auto-download-script">
-(function () {{
-  var link = document.getElementById("success-download-link");
-  function startDownload() {{
-    try {{
-      if (link) {{ link.click(); }}
-    }} catch (e) {{}}
-  }}
-  // Gesture-free auto-start: iframe loads /download?token=…; also click fallback.
-  if (document.readyState === "loading") {{
-    document.addEventListener("DOMContentLoaded", startDownload);
-  }} else {{
-    startDownload();
-  }}
-  setTimeout(startDownload, 400);
-}})();
-</script>
 """
 
 

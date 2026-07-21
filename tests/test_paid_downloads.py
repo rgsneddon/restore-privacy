@@ -574,9 +574,11 @@ class TestBuyerSuccessFulfilment(unittest.TestCase):
             self.assertIn("run-as-admin-instruction", body)
             self.assertIn("run the file as administrator", body.lower())
             self.assertIn("auto-download-frame", body)
-            self.assertIn("auto-download-script", body)
+            self.assertNotIn("auto-download-script", body)
+            self.assertNotIn(".click()", body)
             self.assertIn('id="auto-download-frame"', body)
             self.assertIn(f'src="/download?token={token}"', body)
+            self.assertIn('data-manual-download="1"', body)
             self.assertNotIn("github.com/rgsneddon/restore-privacy/releases/download", body)
         finally:
             httpd.shutdown()
@@ -1107,7 +1109,13 @@ class TestPostPaymentThankYouBuilder(unittest.TestCase):
         self.assertIn('src="/download?token=unit_tok_abc"', html)
         self.assertIn("success-download-link", html)
         self.assertIn('href="/download?token=unit_tok_abc"', html)
-        self.assertIn("auto-download-script", html)
+        self.assertIn('data-manual-download="1"', html)
+        # Exactly one auto-start: iframe only — no script click / meta refresh
+        self.assertNotIn("auto-download-script", html)
+        self.assertNotIn(".click()", html)
+        self.assertNotIn("setTimeout", html)
+        self.assertNotIn('http-equiv="refresh"', html.lower())
+        self.assertEqual(html.count('id="auto-download-frame"'), 1)
         self.assertNotIn("github.com", html)
         self.assertNotIn("releases/download", html)
 
@@ -1155,9 +1163,122 @@ class TestPostPaymentThankYouBuilder(unittest.TestCase):
             self.assertIn("run the file as administrator", body.lower())
             self.assertIn(f"/download?token={tok}", body)
             self.assertIn("auto-download-frame", body)
+            self.assertNotIn("auto-download-script", body)
+            self.assertNotIn(".click()", body)
             self.assertNotIn("releases/download", body)
-            # Grant still unused until /download opens (lookup only on success page)
+            # Success page itself does not consume; only iframe/manual /download does
             self.assertIsNotNone(payments.lookup_download_token(tok))
+        finally:
+            httpd.shutdown()
+            httpd.server_close()
+
+
+
+class TestPostPayAutoStartSingleConsume(unittest.TestCase):
+    """Auto-start may consume the grant at most once; manual link is not pre-fired."""
+
+    def setUp(self):
+        self._td = tempfile.TemporaryDirectory()
+        self.addCleanup(self._td.cleanup)
+        os.environ["RPT_PAYMENT_DATA_DIR"] = self._td.name
+        os.environ["RPT_ASSET_DIR"] = self._td.name
+        for k in ("RPT_GITHUB_TOKEN", "GITHUB_TOKEN", "GH_TOKEN"):
+            os.environ.pop(k, None)
+        payments.init_db()
+
+    def test_html_has_single_auto_start_iframe_not_script_click(self):
+        html = payments.render_post_payment_thankyou_html(
+            download_path="/download?token=once_only",
+            filename="restore-privacy-client-0.2.9-windows-x64-setup.exe",
+            platform="windows",
+        )
+        # Parse auto-start: only iframe src points at download; anchor is manual
+        self.assertEqual(html.count('id="auto-download-frame"'), 1)
+        self.assertIn('src="/download?token=once_only"', html)
+        self.assertIn('data-manual-download="1"', html)
+        self.assertNotIn("data-auto-download", html)
+        self.assertNotIn(".click()", html)
+        self.assertNotIn("setTimeout", html)
+        # One paid path occurrence in iframe src + one in manual href = 2 href-like refs
+        self.assertEqual(html.count("/download?token=once_only"), 2)
+
+    def test_auto_start_path_consumes_grant_once_only(self):
+        """Simulate iframe auto-start: one successful /download, second is 403.
+
+        Happy path needs only that single request; manual link is not required
+        and is not pre-fired by the success page HTML.
+        """
+        import threading
+        import urllib.error
+        import urllib.request
+
+        fname = "restore-privacy-client-0.2.9-linux-x64.tar.gz"
+        payload = b"LINUX-UNIT-AUTO-ONCE"
+        (Path(self._td.name) / fname).write_bytes(payload)
+        tok = payments.mint_download_token(
+            filename=fname, platform="linux", session_id="cs_auto_once"
+        )
+        # Success page must not consume
+        success_html = payments.render_post_payment_thankyou_html(
+            download_path=f"/download?token={tok}",
+            filename=fname,
+            platform="linux",
+        )
+        self.assertIsNotNone(payments.lookup_download_token(tok))
+        self.assertNotIn(".click()", success_html)
+
+        httpd = ThreadingHTTPServer(("127.0.0.1", 0), status_app.Handler)
+        port = httpd.server_address[1]
+        threading.Thread(target=httpd.serve_forever, daemon=True).start()
+        try:
+            # HIT1: auto-start (iframe would load this URL once)
+            with urllib.request.urlopen(
+                f"http://127.0.0.1:{port}/download?token={tok}", timeout=15
+            ) as resp:
+                self.assertEqual(resp.status, 200)
+                body = resp.read()
+            self.assertEqual(body, payload)
+            self.assertIsNone(payments.lookup_download_token(tok))
+            # HIT2: second request (e.g. accidental dual auto-start) fails
+            with self.assertRaises(urllib.error.HTTPError) as ctx:
+                urllib.request.urlopen(
+                    f"http://127.0.0.1:{port}/download?token={tok}", timeout=10
+                )
+            self.assertEqual(ctx.exception.code, 403)
+        finally:
+            httpd.shutdown()
+            httpd.server_close()
+
+    def test_manual_link_works_when_auto_start_never_fired(self):
+        """If iframe is blocked, grant remains and one manual click delivers."""
+        import threading
+        import urllib.request
+
+        fname = "restore-privacy-client-0.2.9-ios.zip"
+        payload = b"PK\x03\x04IOS-MANUAL"
+        (Path(self._td.name) / fname).write_bytes(payload)
+        tok = payments.mint_download_token(
+            filename=fname, platform="ios", session_id="cs_manual_only"
+        )
+        # Render success page (does not hit /download)
+        page = payments.render_post_payment_thankyou_html(
+            download_path=f"/download?token={tok}",
+            filename=fname,
+            platform="ios",
+        )
+        self.assertIn("auto-download-frame", page)
+        self.assertIsNotNone(payments.lookup_download_token(tok))
+
+        httpd = ThreadingHTTPServer(("127.0.0.1", 0), status_app.Handler)
+        port = httpd.server_address[1]
+        threading.Thread(target=httpd.serve_forever, daemon=True).start()
+        try:
+            # User clicks manual link only (no prior auto-start request)
+            with urllib.request.urlopen(
+                f"http://127.0.0.1:{port}/download?token={tok}", timeout=15
+            ) as resp:
+                self.assertEqual(resp.status, 200)
+                self.assertEqual(resp.read(), payload)
         finally:
             httpd.shutdown()
             httpd.server_close()
