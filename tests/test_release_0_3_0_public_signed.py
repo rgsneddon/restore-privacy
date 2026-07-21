@@ -123,13 +123,13 @@ class TestLocal029PackagesIfPresent(unittest.TestCase):
         for path in present:
             pubs: list[tuple[str, str]] = []
             if path.name.endswith(".exe"):
-                # May be PyInstaller onefile (raw blob) or 7z SFX (compressed).
-                blob = product.read_bytes()
-                if path.read_bytes().count(blob) >= 1:
-                    continue
-                # 7z SFX: extract members and verify node_elgamal.pub
+                # 7z SFX (or PyInstaller): extract and verify coherent frozen-first layout.
                 if not shutil.which("7z"):
-                    self.skipTest("7z required to inspect compressed Windows SFX")
+                    # Fall back: raw product pub blob (legacy onefile)
+                    blob = product.read_bytes()
+                    if path.read_bytes().count(blob) >= 1:
+                        continue
+                    self.skipTest("7z required to inspect Windows installer")
                 with tempfile.TemporaryDirectory() as td:
                     tdp = Path(td)
                     r = subprocess.run(
@@ -143,7 +143,6 @@ class TestLocal029PackagesIfPresent(unittest.TestCase):
                     for fp in found:
                         dig = hashlib.sha256(fp.read_bytes()).hexdigest()
                         pubs.append((str(fp.relative_to(tdp)), dig))
-                    # No flyclient in extracted tree
                     self.assertFalse(
                         list(tdp.rglob("flyclient_connect.py")),
                         f"{path.name} still embeds flyclient_connect.py",
@@ -160,28 +159,52 @@ class TestLocal029PackagesIfPresent(unittest.TestCase):
                         ctext = conn.read_text(encoding="utf-8", errors="replace")
                         self.assertNotIn("flyclient", ctext.lower())
                         self.assertIn("HELLO sent", ctext)
-                    # Runnable deps: cryptography (+ cffi) and Tk runtime
-                    crypt = list(tdp.rglob("cryptography")) + list(
-                        tdp.rglob("cryptography-*.dist-info")
-                    )
-                    self.assertTrue(
-                        crypt,
-                        f"{path.name}: missing cryptography package/wheels",
-                    )
-                    cffi = (
-                        list(tdp.rglob("cffi"))
-                        + list(tdp.rglob("_cffi_backend*.pyd"))
-                        + list(tdp.rglob("cffi-*.dist-info"))
+                    # Primary launch: frozen onedir first (not pure-Python embed)
+                    run_bat = next(tdp.rglob("run.bat"), None)
+                    self.assertIsNotNone(run_bat, f"{path.name}: missing run.bat")
+                    bat = run_bat.read_text(encoding="utf-8", errors="replace")
+                    self.assertIn("RestorePrivacy.exe", bat)
+                    # Frozen path must be primary (first executable launch target)
+                    start_idx = bat.lower().find("restoreprivacy.exe")
+                    py_idx = bat.lower().find("python\\python.exe")
+                    if py_idx >= 0:
+                        self.assertLess(
+                            start_idx,
+                            py_idx,
+                            f"{path.name}: run.bat must launch frozen exe before pure-Python",
+                        )
+                    frozen = list(tdp.rglob("RestorePrivacy.exe"))
+                    self.assertTrue(frozen, f"{path.name}: missing RestorePrivacy.exe")
+                    # Matched-ABI Tk under _internal (not cross-grafted into python/)
+                    tk_files = list(tdp.rglob("_tkinter.pyd"))
+                    self.assertTrue(tk_files, f"{path.name}: missing _tkinter.pyd")
+                    for tkp in tk_files:
+                        # Disallow broken python/_tkinter.pyd next to embed 3.12
+                        rel = str(tkp.relative_to(tdp)).replace("\\", "/")
+                        if rel.startswith("python/") or "/python/" in rel:
+                            self.fail(
+                                f"{path.name}: refuse ABI-grafted {rel}; "
+                                "use frozen _internal Tk only"
+                            )
+                        data = tkp.read_bytes()
+                        # PE import must match a python3XY.dll ABI string
+                        self.assertTrue(
+                            b"python314.dll" in data or b"python3" in data,
+                            f"{path.name}:{rel} has no python3XY.dll import string",
+                        )
+                        if b"python314.dll" in data:
+                            # Sibling runtime must ship matching dll
+                            dlls = list(tdp.rglob("python314.dll"))
+                            self.assertTrue(
+                                dlls,
+                                f"{path.name}: _tkinter imports python314.dll but dll missing",
+                            )
+                    crypt = list(tdp.rglob("cryptography"))
+                    self.assertTrue(crypt, f"{path.name}: missing cryptography")
+                    cffi = list(tdp.rglob("_cffi_backend*.pyd")) + list(
+                        tdp.rglob("cffi")
                     )
                     self.assertTrue(cffi, f"{path.name}: missing cffi")
-                    tk = list(tdp.rglob("_tkinter.pyd")) + list(
-                        tdp.rglob("_tkinter*.pyd")
-                    )
-                    self.assertTrue(tk, f"{path.name}: missing _tkinter.pyd")
-                    tcl = list(tdp.rglob("_tcl_data")) + list(tdp.rglob("tcl86*.dll"))
-                    self.assertTrue(
-                        tcl, f"{path.name}: missing Tcl/Tk runtime data or dlls"
-                    )
             elif path.name.endswith(".tar.gz"):
                 with tarfile.open(path, "r:*") as tf:
                     for m in tf.getmembers():
