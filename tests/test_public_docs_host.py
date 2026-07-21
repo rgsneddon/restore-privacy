@@ -56,8 +56,39 @@ class TestPublicDocsRegistry(unittest.TestCase):
             assert got is not None
             body, ctype, title = got
             self.assertGreater(len(body), 50)
-            self.assertTrue(ctype.startswith("text/"))
+            self.assertTrue(ctype.startswith("text/html"), f"{path} -> {ctype}")
             self.assertTrue(title)
+            html = body.decode("utf-8", errors="replace")
+            self.assertIn("<!DOCTYPE html>", html)
+            self.assertIn('id="doc-body"', html)
+            self.assertIn("doc-top", html)
+
+    def test_docs_are_readable_html_with_content(self):
+        """Shipped renderer wraps privacy/audit/licence in a browser-friendly shell."""
+        privacy = public_docs.document_bytes_for_path("/PRIVACY_POLICY.md")
+        assert privacy is not None
+        body, ctype, title = privacy
+        self.assertIn("text/html", ctype)
+        html = body.decode("utf-8")
+        self.assertIn("Privacy", html)
+        self.assertIn("0.3.0", html)
+        self.assertIn("restore-privacy-status.onrender.com", html)
+        # No raw markdown dump as the sole body
+        self.assertIn("<h1>", html.lower() + html)  # headings rendered
+        self.assertIn("max-width", html)  # shell CSS for readability
+
+        licence = public_docs.document_bytes_for_path("/LICENSE")
+        assert licence is not None
+        lhtml = licence[0].decode("utf-8")
+        self.assertIn("MIT License", lhtml)
+        self.assertIn("doc-plain", lhtml)
+
+        audit = public_docs.document_bytes_for_path("/AUDIT.md")
+        assert audit is not None
+        ahtml = audit[0].decode("utf-8")
+        self.assertIn("Audit", ahtml)
+        self.assertIn("0.3.0", ahtml)
+        self.assertIn("doc-table", ahtml)  # tables rendered
 
 
 class TestHowToBuyAndHttp(unittest.TestCase):
@@ -91,6 +122,10 @@ class TestHowToBuyAndHttp(unittest.TestCase):
                     body = resp.read()
                     self.assertEqual(resp.status, 200, path)
                     self.assertGreater(len(body), 40, path)
+                    ctype = resp.headers.get("Content-Type", "")
+                    self.assertIn("text/html", ctype, f"{path} {ctype}")
+                    html = body.decode("utf-8", errors="replace")
+                    self.assertIn("<html", html.lower())
         finally:
             httpd.shutdown()
             httpd.server_close()

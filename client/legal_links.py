@@ -44,9 +44,15 @@ def status_origin() -> str:
 
 
 # Compatibility: older code expected a GitHub blob base constant.
+# Docs are served on the status host (repo is private) — do not open this for users.
 GITHUB_REPO_BLOB_BASE = (
     "https://github.com/rgsneddon/restore-privacy/blob/main"
 )
+
+
+def assert_status_origin_urls() -> list[str]:
+    """Return legal URLs; used by tests to verify Render status-host targets."""
+    return [link.url for link in LEGAL_DOC_LINKS]
 
 
 @dataclass(frozen=True)

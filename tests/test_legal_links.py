@@ -54,10 +54,21 @@ class TestLegalLinksHelper(unittest.TestCase):
                 msg=f"{label} should use status origin, got {url}",
             )
             self.assertNotIn("github.com", url)
+            self.assertNotIn("/blob/", url)
+            self.assertNotIn("raw.githubusercontent.com", url)
         self.assertTrue(audit_url().endswith("/AUDIT.md"))
         self.assertEqual(AUDIT_REPO_PATH, "AUDIT.md")
         self.assertTrue(privacy_policy_url().endswith("/PRIVACY_POLICY.md"))
         self.assertTrue(end_user_licence_url().endswith("/LICENSE"))
+        # Absolute Render URLs match what Settings webbrowser.open uses
+        self.assertTrue(
+            audit_url().startswith("https://restore-privacy-status.onrender.com/")
+        )
+        self.assertTrue(
+            privacy_policy_url().startswith(
+                "https://restore-privacy-status.onrender.com/"
+            )
+        )
 
     def test_windows_settings_wires_legal_links(self):
         src = (ROOT / "client" / "windows" / "app.py").read_text(encoding="utf-8")

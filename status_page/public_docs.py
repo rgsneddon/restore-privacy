@@ -42,7 +42,9 @@ class PublicDoc:
     path: str
     title: str
     filename: str
-    content_type: str = "text/markdown; charset=utf-8"
+    # Browser responses are HTML shells; raw source remains on disk as md/plain.
+    content_type: str = "text/html; charset=utf-8"
+    plain: bool = False  # True for LICENSE-style plain text (preformatted)
     aliases: tuple[str, ...] = ()
 
 
@@ -59,7 +61,7 @@ PUBLIC_DOCS: tuple[PublicDoc, ...] = (
         path=LICENSE_PATH,
         title="Licence — Restore Privacy",
         filename="LICENSE",
-        content_type="text/plain; charset=utf-8",
+        plain=True,
         aliases=("/licence", "/LICENSE.txt", "/docs/LICENSE"),
     ),
     PublicDoc(
@@ -165,15 +167,323 @@ def load_public_document_bytes(filename: str, *, min_size: int = 20) -> bytes | 
     return None
 
 
+def _escape(s: str) -> str:
+    return (
+        s.replace("&", "&amp;")
+        .replace("<", "&lt;")
+        .replace(">", "&gt;")
+        .replace('"', "&quot;")
+    )
+
+
+def _inline_format(escaped_line: str) -> str:
+    """Limited inline markdown on already-escaped text (safe: no raw HTML)."""
+    import re
+
+    # Links: [label](url) — only http(s) and relative paths
+    def link_sub(m: re.Match[str]) -> str:
+        label, url = m.group(1), m.group(2)
+        if url.startswith(("http://", "https://", "/")):
+            return f'<a href="{url}">{label}</a>'
+        return m.group(0)
+
+    s = re.sub(r"\[([^\]]+)\]\(([^)]+)\)", link_sub, escaped_line)
+    s = re.sub(r"`([^`]+)`", r"<code>\1</code>", s)
+    s = re.sub(r"\*\*([^*]+)\*\*", r"<strong>\1</strong>", s)
+    s = re.sub(r"(?<!\*)\*([^*]+)\*(?!\*)", r"<em>\1</em>", s)
+    return s
+
+
+def markdownish_to_html(text: str) -> str:
+    """Conservative markdown → HTML for product docs (escape-first, no script)."""
+    import re
+
+    text = text.lstrip("\ufeff").replace("\r\n", "\n").replace("\r", "\n")
+    lines = text.split("\n")
+    out: list[str] = []
+    i = 0
+    in_ul = False
+    in_ol = False
+    in_table = False
+
+    def close_lists() -> None:
+        nonlocal in_ul, in_ol
+        if in_ul:
+            out.append("</ul>")
+            in_ul = False
+        if in_ol:
+            out.append("</ol>")
+            in_ol = False
+
+    def close_table() -> None:
+        nonlocal in_table
+        if in_table:
+            out.append("</tbody></table>")
+            in_table = False
+
+    while i < len(lines):
+        raw = lines[i]
+        stripped = raw.strip()
+
+        # fenced code
+        if stripped.startswith("```"):
+            close_lists()
+            close_table()
+            i += 1
+            code_lines: list[str] = []
+            while i < len(lines) and not lines[i].strip().startswith("```"):
+                code_lines.append(lines[i])
+                i += 1
+            if i < len(lines):
+                i += 1
+            out.append(
+                "<pre class=\"doc-code\"><code>"
+                + _escape("\n".join(code_lines))
+                + "</code></pre>"
+            )
+            continue
+
+        if not stripped:
+            close_lists()
+            close_table()
+            i += 1
+            continue
+
+        # horizontal rule
+        if re.fullmatch(r"-{3,}|_{3,}|\*{3,}", stripped):
+            close_lists()
+            close_table()
+            out.append("<hr/>")
+            i += 1
+            continue
+
+        # headings
+        hm = re.match(r"^(#{1,4})\s+(.*)$", stripped)
+        if hm:
+            close_lists()
+            close_table()
+            level = len(hm.group(1))
+            out.append(
+                f"<h{level}>{_inline_format(_escape(hm.group(2)))}</h{level}>"
+            )
+            i += 1
+            continue
+
+        # table row
+        if stripped.startswith("|") and stripped.endswith("|"):
+            close_lists()
+            cells = [c.strip() for c in stripped.strip("|").split("|")]
+            # separator row |---|---|
+            if all(re.fullmatch(r":?-+:?", c.replace(" ", "")) for c in cells if c):
+                i += 1
+                continue
+            if not in_table:
+                out.append('<table class="doc-table"><tbody>')
+                in_table = True
+                # first row as header when next is separator
+                next_is_sep = False
+                if i + 1 < len(lines):
+                    nxt = lines[i + 1].strip()
+                    if nxt.startswith("|") and nxt.endswith("|"):
+                        ncells = [c.strip() for c in nxt.strip("|").split("|")]
+                        next_is_sep = all(
+                            re.fullmatch(r":?-+:?", c.replace(" ", ""))
+                            for c in ncells
+                            if c
+                        )
+                tag = "th" if next_is_sep else "td"
+            else:
+                tag = "td"
+            cells_html = "".join(
+                f"<{tag}>{_inline_format(_escape(c))}</{tag}>" for c in cells
+            )
+            out.append(f"<tr>{cells_html}</tr>")
+            i += 1
+            continue
+        else:
+            close_table()
+
+        # unordered list
+        um = re.match(r"^[-*+]\s+(.*)$", stripped)
+        if um:
+            close_table()
+            if in_ol:
+                out.append("</ol>")
+                in_ol = False
+            if not in_ul:
+                out.append("<ul>")
+                in_ul = True
+            out.append(f"<li>{_inline_format(_escape(um.group(1)))}</li>")
+            i += 1
+            continue
+
+        # ordered list
+        om = re.match(r"^(\d+)\.\s+(.*)$", stripped)
+        if om:
+            close_table()
+            if in_ul:
+                out.append("</ul>")
+                in_ul = False
+            if not in_ol:
+                out.append("<ol>")
+                in_ol = True
+            out.append(f"<li>{_inline_format(_escape(om.group(2)))}</li>")
+            i += 1
+            continue
+
+        close_lists()
+        # paragraph (merge consecutive non-empty non-special lines)
+        para = [stripped]
+        i += 1
+        while i < len(lines):
+            s2 = lines[i].strip()
+            if not s2 or s2.startswith("#") or s2.startswith("|") or s2.startswith("```"):
+                break
+            if re.match(r"^[-*+]\s+", s2) or re.match(r"^\d+\.\s+", s2):
+                break
+            if re.fullmatch(r"-{3,}|_{3,}|\*{3,}", s2):
+                break
+            para.append(s2)
+            i += 1
+        joined = " ".join(para)
+        out.append(f"<p>{_inline_format(_escape(joined))}</p>")
+
+    close_lists()
+    close_table()
+    return "\n".join(out)
+
+
+DOC_SHELL_CSS = """
+:root { color-scheme: dark; }
+* { box-sizing: border-box; }
+body {
+  margin: 0; padding: 0;
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, Ubuntu, sans-serif;
+  background: #0b0f14; color: #e8eef5;
+  line-height: 1.6; font-size: 1.02rem;
+}
+.wrap { max-width: 48rem; margin: 0 auto; padding: 1.25rem 1.35rem 3rem; }
+header.doc-top {
+  display: flex; flex-wrap: wrap; gap: 0.65rem 1rem; align-items: center;
+  justify-content: space-between; margin-bottom: 1.25rem;
+  padding-bottom: 0.85rem; border-bottom: 1px solid #1f2937;
+}
+header.doc-top a { color: #93c5fd; text-decoration: none; font-weight: 600; font-size: 0.95rem; }
+header.doc-top a:hover { text-decoration: underline; }
+h1,h2,h3,h4 { line-height: 1.25; color: #f8fafc; font-weight: 650; }
+h1 { font-size: 1.55rem; margin: 0 0 1rem; }
+h2 { font-size: 1.2rem; margin: 1.75rem 0 0.65rem; }
+h3 { font-size: 1.05rem; margin: 1.35rem 0 0.5rem; }
+h4 { font-size: 1rem; margin: 1.15rem 0 0.4rem; }
+p { margin: 0.65rem 0; }
+a { color: #93c5fd; }
+ul, ol { padding-left: 1.35rem; margin: 0.5rem 0 0.85rem; }
+li { margin: 0.25rem 0; }
+hr { border: 0; border-top: 1px solid #374151; margin: 1.5rem 0; }
+code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 0.9em; background: #111827; padding: 0.12rem 0.35rem; border-radius: 4px;
+}
+pre.doc-code, pre.doc-plain {
+  background: #111827; border: 1px solid #1f2937; border-radius: 10px;
+  padding: 0.9rem 1rem; overflow-x: auto; font-size: 0.88rem; line-height: 1.45;
+}
+pre.doc-code code { background: transparent; padding: 0; }
+table.doc-table {
+  width: 100%; border-collapse: collapse; margin: 0.85rem 0 1.1rem;
+  font-size: 0.95rem; display: block; overflow-x: auto;
+}
+table.doc-table th, table.doc-table td {
+  border: 1px solid #374151; padding: 0.45rem 0.6rem; text-align: left; vertical-align: top;
+}
+table.doc-table th { background: #111827; color: #fde68a; font-weight: 600; }
+table.doc-table tr:nth-child(even) td { background: #0f141c; }
+.muted { opacity: 0.78; font-size: 0.92rem; }
+footer.doc-foot {
+  margin-top: 2.5rem; padding-top: 1rem; border-top: 1px solid #1f2937;
+  font-size: 0.9rem; opacity: 0.85;
+}
+footer.doc-foot a { margin-right: 0.65rem; }
+article.doc-body { word-wrap: break-word; overflow-wrap: anywhere; }
+@media (max-width: 560px) {
+  .wrap { padding: 1rem 0.9rem 2.5rem; }
+  h1 { font-size: 1.35rem; }
+}
+"""
+
+
+def render_document_html(
+    *,
+    title: str,
+    raw: bytes,
+    plain: bool = False,
+) -> bytes:
+    """Wrap product doc bytes in a readable dark HTML shell for browsers."""
+    text = raw.decode("utf-8", errors="replace")
+    if text.startswith("\ufeff"):
+        text = text[1:]
+    if plain:
+        body_inner = f'<pre class="doc-plain">{_escape(text)}</pre>'
+    else:
+        body_inner = markdownish_to_html(text)
+    # Ensure a leading h1 when markdown starts with # Title
+    page = f"""<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<meta name="color-scheme" content="dark"/>
+<title>{_escape(title)}</title>
+<style>{DOC_SHELL_CSS}</style>
+</head>
+<body>
+<div class="wrap">
+<header class="doc-top">
+  <a href="/" id="doc-back-home">← Status &amp; downloads</a>
+  <nav class="doc-mini" aria-label="Documents">
+    <a href="{HOW_TO_BUY_PATH}">How to buy</a>
+    <a href="{PRIVACY_PATH}">Privacy</a>
+    <a href="{LICENSE_PATH}">Licence</a>
+    <a href="{AUDIT_PATH}">Audit</a>
+    <a href="{README_PATH}">README</a>
+  </nav>
+</header>
+<article class="doc-body" id="doc-body">
+{body_inner}
+</article>
+<footer class="doc-foot">
+  <p class="muted">Restore Privacy public documents on this status host
+  (source repository is private). Paid installers: <a href="/#downloads">downloads</a>.</p>
+  <p>
+    <a href="{HOW_TO_BUY_PATH}">How to buy</a>
+    <a href="{PRIVACY_PATH}">Privacy</a>
+    <a href="{LICENSE_PATH}">Licence</a>
+    <a href="{AUDIT_PATH}">Audit</a>
+    <a href="{CREDITS_PATH}">Credits</a>
+    <a href="{README_PATH}">README</a>
+  </p>
+</footer>
+</div>
+</body>
+</html>
+"""
+    return page.encode("utf-8")
+
+
 def document_bytes_for_path(url_path: str) -> tuple[bytes, str, str] | None:
-    """Return (body, content_type, title) for a public doc path, or None."""
+    """Return (body, content_type, title) for a public doc path, or None.
+
+    Bodies are **readable HTML** shells (not raw markdown dumps) so in-app
+    Settings links open user-friendly pages on the Render status host.
+    """
     doc = public_doc_by_path(url_path)
     if doc is None:
         return None
     data = load_public_document_bytes(doc.filename)
     if data is None:
         return None
-    return data, doc.content_type, doc.title
+    html = render_document_html(title=doc.title, raw=data, plain=doc.plain)
+    return html, "text/html; charset=utf-8", doc.title
 
 
 def render_how_to_buy_html() -> bytes:
@@ -202,14 +512,20 @@ def render_how_to_buy_html() -> bytes:
 <meta charset="utf-8"/><meta name="viewport" content="width=device-width, initial-scale=1"/>
 <title>How to buy — Restore Privacy</title>
 <style>
-body{{margin:0;padding:1.5rem;font-family:system-ui,sans-serif;background:#0b0f14;color:#e8eef5;
-max-width:42rem;margin-inline:auto;line-height:1.5}}
-a{{color:#93c5fd}} h1{{font-size:1.35rem}} h2{{font-size:1.05rem;margin-top:1.5rem}}
-code{{font-size:0.88rem;word-break:break-all;background:#111827;padding:0.1rem 0.35rem;border-radius:4px}}
-ol{{padding-left:1.25rem}} .card{{background:#111827;border-radius:12px;padding:1rem 1.15rem;margin:1rem 0}}
-.muted{{opacity:0.8;font-size:0.95rem}}
+{DOC_SHELL_CSS}
+.card{{background:#111827;border-radius:12px;padding:1rem 1.15rem;margin:1rem 0;border:1px solid #1f2937}}
+ol{{padding-left:1.25rem}}
 </style></head><body>
-<p><a href="/">← Status &amp; downloads</a></p>
+<div class="wrap">
+<header class="doc-top">
+  <a href="/">← Status &amp; downloads</a>
+  <nav aria-label="Documents">
+    <a href="{PRIVACY_PATH}">Privacy</a>
+    <a href="{LICENSE_PATH}">Licence</a>
+    <a href="{AUDIT_PATH}">Audit</a>
+    <a href="{README_PATH}">README</a>
+  </nav>
+</header>
 <h1 id="how-to-buy-heading">How to buy Restore Privacy</h1>
 <p class="muted">Paid package download ({_escape(PRICE_LABEL)} / {PRICE_PENCE} pence GBP).
 No free permanent installer buttons on the status page.</p>
@@ -239,11 +555,15 @@ No free permanent installer buttons on the status page.</p>
 </ul>
 </div>
 
-<p class="muted"><a href="{HOW_TO_BUY_PATH}">How to buy</a> ·
-<a href="{LICENSE_PATH}">Licence</a> ·
-<a href="{PRIVACY_PATH}">Privacy</a> ·
-<a href="{AUDIT_PATH}">Security audit</a> ·
-<a href="{README_PATH}">README</a></p>
+<footer class="doc-foot">
+<p class="muted"><a href="{HOW_TO_BUY_PATH}">How to buy</a>
+<a href="{LICENSE_PATH}">Licence</a>
+<a href="{PRIVACY_PATH}">Privacy</a>
+<a href="{AUDIT_PATH}">Security audit</a>
+<a href="{README_PATH}">README</a>
+<a href="{CREDITS_PATH}">Credits</a></p>
+</footer>
+</div>
 </body></html>
 """
     return body.encode("utf-8")
@@ -267,13 +587,4 @@ def render_public_nav_links_html() -> str:
     return (
         f'  <nav class="doc-links" id="doc-links" aria-label="Legal and product documents">'
         f"{joined}</nav>"
-    )
-
-
-def _escape(s: str) -> str:
-    return (
-        s.replace("&", "&amp;")
-        .replace("<", "&lt;")
-        .replace(">", "&gt;")
-        .replace('"', "&quot;")
     )

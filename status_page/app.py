@@ -649,7 +649,14 @@ class Handler(BaseHTTPRequestHandler):
             if data is None:
                 self._send(404, "text/plain; charset=utf-8", b"audit not found")
                 return
-            self._send(200, "text/markdown; charset=utf-8", data)
+            from public_docs import render_document_html
+
+            html = render_document_html(
+                title="Security audit — Restore Privacy",
+                raw=data,
+                plain=False,
+            )
+            self._send(200, "text/html; charset=utf-8", html)
             return
 
         # --- Admin ---
