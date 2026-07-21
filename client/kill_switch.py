@@ -1,7 +1,7 @@
-"""Always-on kill switch: block non-tunnel egress while full tunnel is expected.
+"""Optional kill switch: block non-tunnel egress while full tunnel is expected.
 
-When the product tunnel is active (or kill-switch is engaged), traffic must not
-leak to the default physical interface. Rules are fail-closed on connect path:
+**Product default is OFF** (removed from residual Connect). Opt in only with
+``RPT_KILL_SWITCH=1``. When enabled, rules are fail-closed on connect path:
 apply blocks after routes; on disconnect, always roll back.
 
 Windows (critical):
@@ -23,7 +23,8 @@ Windows (critical):
 
 Linux: iptables OUTPUT chain — ACCEPT lo + tunnel iface + node host; DROP rest.
 
-Android uses ``VpnService.Builder.setBlocking(true)``.
+Android historically used ``VpnService.Builder.setBlocking(true)``; product residual
+no longer enables that by default.
 """
 
 from __future__ import annotations
@@ -50,9 +51,9 @@ WIN_KS_STATE_PATH_PS = '"$env:ProgramData\\RestorePrivacy\\ks-outbound-state.jso
 
 @dataclass(frozen=True)
 class KillSwitchPolicy:
-    """Product kill-switch policy (always-on when tunnel residual is claimed)."""
+    """Kill-switch policy — product residual default is **disabled**."""
 
-    enabled: bool = True
+    enabled: bool = False
     block_non_tunnel_ipv4: bool = True
     block_non_tunnel_ipv6: bool = True
     # WebRTC / STUN / mDNS common leak surfaces when kill-switch engaged
@@ -60,11 +61,16 @@ class KillSwitchPolicy:
 
 
 def product_kill_switch_enabled(env: Optional[dict] = None) -> bool:
+    """True only when operator explicitly opts in with RPT_KILL_SWITCH=1.
+
+    Default (unset / 0 / false / off) is **disabled** — residual Connect does not
+    apply firewall/iptables kill-switch or Android setBlocking.
+    """
     e = env if env is not None else os.environ
-    raw = str(e.get("RPT_KILL_SWITCH", "1")).strip().lower()
-    if raw in ("0", "false", "off", "no", "disabled"):
-        return False
-    return True
+    raw = str(e.get("RPT_KILL_SWITCH", "0")).strip().lower()
+    if raw in ("1", "true", "on", "yes", "enabled"):
+        return True
+    return False
 
 
 def default_kill_switch_policy() -> KillSwitchPolicy:
@@ -518,13 +524,18 @@ def linux_kill_switch_rollback_commands() -> list[str]:
 
 
 def android_kill_switch_builder_flags() -> dict:
-    """Flags for Android VpnService.Builder — blocking + no bypass."""
+    """Flags for Android VpnService.Builder — product default: no kill-switch block.
+
+    ``blocking`` / ``killSwitch`` follow :func:`product_kill_switch_enabled` (off).
+    ``protectNodeSocket`` stays True so node UDP is not looped into the TUN.
+    """
+    on = product_kill_switch_enabled()
     return {
-        "blocking": True,
-        "allowBypass": False,
-        "killSwitch": True,
+        "blocking": on,
+        "allowBypass": not on,
+        "killSwitch": on,
         "protectNodeSocket": True,
-        "blockWebRtcMdns": True,
+        "blockWebRtcMdns": on,
     }
 
 

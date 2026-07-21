@@ -32,7 +32,7 @@
 - Session **PFS** (ephemeral X25519) on the Python client/node handshake path
 - **Layer obfuscation** (QUIC-mimic outer wrap around RPT frames) **on by default** (`RPT_OBFS=0` to opt out) — mitigation, not DPI-undetectability
 - **Product traffic shaping** (padding / send jitter / cover) **on by default** for Windows/Linux Python DATA path (`RPT_TRAFFIC_SHAPE=0` to opt out)
-- **Kill switch** on product full tunnel: block non-tunnel egress while connected (`RPT_KILL_SWITCH=0` to opt out); IPv6 ISP path blocked; tunnel DNS only (`10.88.0.1`, no public DNS fallbacks)
+- **No product kill switch by default** (firewall/iptables block rules and Android `setBlocking` are off; opt in only with `RPT_KILL_SWITCH=1`); tunnel DNS only (`10.88.0.1`, no public DNS fallbacks); IPv4 residual honesty still applies
 - Multi-hop hop *lists* may be configured for planning — **not residual multi-hop** until a real relay path ships
 - Native Android/Apple engines may lag Python pad/cover/PFS/obfs wire extensions (documented honestly)
 
@@ -113,7 +113,7 @@ https://restoreprivacy.online/
 | **Credits** | [CREDITS.md](CREDITS.md) |
 | **Code & policy audit** | [AUDIT.md](AUDIT.md) |
 
-Core promises: **no user-info logs** by design, **minimal public status** (title + downloads — **no live client count**), **device keys** (not a shared client private key), **honest residual** only when full tunnel is up, **no third-party geo** on Connect. Product Windows/Linux clients enable **outer-layer obfuscation**, **padding / jitter / cover**, and **kill-switch** by default on residual paths; multi-hop *config* is not residual until a real relay ships. Node tunnel DNS uses **DoT** upstream. VPS providers may still see IP-level metadata (privacy §4).
+Core promises: **no user-info logs** by design, **minimal public status** (title + downloads — **no live client count**), **device keys** (not a shared client private key), **honest residual** only when full tunnel is up, **no third-party geo** on Connect. Product Windows/Linux clients enable **outer-layer obfuscation** and **padding / jitter / cover** by default on residual paths; **kill-switch is not applied by default**. Multi-hop *config* is not residual until a real relay ships. Node tunnel DNS uses **DoT** upstream. VPS providers may still see IP-level metadata (privacy §4).
 
 ---
 

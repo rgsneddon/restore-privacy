@@ -22,6 +22,7 @@ from client.kill_switch import (  # noqa: E402
     WIN_CRITICAL_ALLOW_NODE,
     WIN_CRITICAL_ALLOW_TUN,
     WIN_RULE_PREFIX,
+    KillSwitchPolicy,
     android_kill_switch_builder_flags,
     assert_windows_ks_commands_safe,
     assert_windows_ks_rollback_restores_profiles,
@@ -47,11 +48,14 @@ from client.leak_protection import (  # noqa: E402
     webrtc_leak_mitigations,
 )
 
+# Explicit opt-in policy for unit tests of rule builders (product default is off).
+_KS_ON = KillSwitchPolicy(enabled=True)
+
 
 class TestKillSwitchBuilders(unittest.TestCase):
     def test_windows_uses_profile_default_not_unscoped_block(self):
         """No unscoped Action=Block rule; fail-closed via DefaultOutboundAction."""
-        body = windows_ks_apply_script(server_host="82.221.101.241")
+        body = windows_ks_apply_script(server_host="82.221.101.241", policy=_KS_ON)
         self.assertTrue(body)
         self.assertIn("\n", body)  # multi-line, not space-joined
         self.assertIn(WIN_RULE_PREFIX, body)
@@ -72,7 +76,9 @@ class TestKillSwitchBuilders(unittest.TestCase):
         violations = assert_windows_ks_script_safe(body)
         self.assertEqual(violations, [], msg=violations)
         # Emission is EncodedCommand wrapping the pure body
-        cmds = windows_kill_switch_block_commands(server_host="82.221.101.241")
+        cmds = windows_kill_switch_block_commands(
+            server_host="82.221.101.241", policy=_KS_ON
+        )
         self.assertEqual(len(cmds), 1)
         self.assertIn("-EncodedCommand", cmds[0])
         decoded = decode_powershell_encoded_command(cmds[0])
@@ -119,17 +125,17 @@ class TestKillSwitchBuilders(unittest.TestCase):
 
     def test_port_scoped_block_is_allowed(self):
         """STUN RemotePort blocks are scoped — not treated as global blackhole."""
-        body = windows_ks_apply_script(server_host="1.2.3.4")
+        body = windows_ks_apply_script(server_host="1.2.3.4", policy=_KS_ON)
         self.assertIn("RemotePort", body)
         self.assertIn("3478", body)
         self.assertEqual(assert_windows_ks_script_safe(body), [])
-        cmds = windows_kill_switch_block_commands(server_host="1.2.3.4")
+        cmds = windows_kill_switch_block_commands(server_host="1.2.3.4", policy=_KS_ON)
         self.assertEqual(assert_windows_ks_commands_safe(cmds), [])
 
     def test_powershell_apply_and_rollback_parse_clean(self):
         """Real PowerShell AST parse of pure bodies (gates runnability)."""
         apply_body = windows_ks_apply_script(
-            server_host="82.221.101.241", tunnel_iface="RPT"
+            server_host="82.221.101.241", tunnel_iface="RPT", policy=_KS_ON
         )
         roll_body = windows_ks_rollback_script()
         for label, body in (("apply", apply_body), ("rollback", roll_body)):
@@ -140,21 +146,25 @@ class TestKillSwitchBuilders(unittest.TestCase):
                 msg=f"{label} script parse errors: {errs}\n--- body ---\n{body[:500]}",
             )
         # EncodedCommand round-trip body is identical and still parses
-        cmd = windows_kill_switch_block_commands(server_host="82.221.101.241")[0]
+        cmd = windows_kill_switch_block_commands(
+            server_host="82.221.101.241", policy=_KS_ON
+        )[0]
         decoded = decode_powershell_encoded_command(cmd)
         self.assertEqual(decoded, apply_body)
         self.assertEqual(parse_powershell_script(decoded), [])
 
     def test_no_space_joined_command_emission(self):
         """Shipped argv must not use space-collapsed -Command multi-statements."""
-        for cmd in windows_kill_switch_block_commands(server_host="1.2.3.4"):
+        for cmd in windows_kill_switch_block_commands(
+            server_host="1.2.3.4", policy=_KS_ON
+        ):
             self.assertIn("-EncodedCommand", cmd)
             self.assertNotIn("-Command \"", cmd)
             self.assertNotIn("='Stop' $", cmd)  # classic broken join artifact
 
     def test_linux_block_and_rollback(self):
         block = linux_kill_switch_block_commands(
-            server_host="82.221.101.241", tunnel_iface="rpt0"
+            server_host="82.221.101.241", tunnel_iface="rpt0", policy=_KS_ON
         )
         roll = linux_kill_switch_rollback_commands()
         joined = "\n".join(block)
@@ -166,7 +176,10 @@ class TestKillSwitchBuilders(unittest.TestCase):
 
     def test_build_plan_windows_linux(self):
         w = build_kill_switch_plan(
-            "windows", server_host="1.2.3.4", tunnel_iface="RPT"
+            "windows",
+            server_host="1.2.3.4",
+            tunnel_iface="RPT",
+            policy=_KS_ON,
         )
         self.assertEqual(w.platform, "windows")
         self.assertTrue(w.apply)
@@ -174,16 +187,27 @@ class TestKillSwitchBuilders(unittest.TestCase):
         self.assertEqual(assert_windows_ks_rollback_restores_profiles(w.rollback), [])
         self.assertTrue(w.rollback)
         l = build_kill_switch_plan(
-            "linux", server_host="1.2.3.4", tunnel_iface="rpt0"
+            "linux",
+            server_host="1.2.3.4",
+            tunnel_iface="rpt0",
+            policy=_KS_ON,
         )
         self.assertEqual(l.platform, "linux")
         self.assertTrue(l.apply)
 
-    def test_product_default_on(self):
+    def test_product_default_off(self):
+        """Product residual: kill switch is off unless RPT_KILL_SWITCH=1."""
         import os
 
         with mock.patch.dict(os.environ, {}, clear=False):
             os.environ.pop("RPT_KILL_SWITCH", None)
+            self.assertFalse(product_kill_switch_enabled())
+            self.assertFalse(default_kill_switch_policy().enabled)
+            plan = build_kill_switch_plan(
+                "windows", server_host="1.2.3.4", tunnel_iface="RPT"
+            )
+            self.assertEqual(plan.apply, [])
+        with mock.patch.dict(os.environ, {"RPT_KILL_SWITCH": "1"}, clear=False):
             self.assertTrue(product_kill_switch_enabled())
             self.assertTrue(default_kill_switch_policy().enabled)
 
@@ -218,25 +242,25 @@ class TestKillSwitchBuilders(unittest.TestCase):
             )
             self.assertFalse(ok2)
 
-    def test_windows_tunnel_wires_kill_switch_success_path(self):
+    def test_windows_tunnel_gates_kill_switch_on_policy(self):
         src = (ROOT / "client" / "windows" / "tunnel_win.py").read_text(
             encoding="utf-8"
         )
+        self.assertIn("product_kill_switch_enabled", src)
         self.assertIn("run_kill_switch_commands", src)
         self.assertIn("kill_switch_applied", src)
-        self.assertIn("ks_applied = bool(ok)", src)
 
-    def test_linux_tunnel_wires_kill_switch_success_path(self):
+    def test_linux_tunnel_gates_kill_switch_on_policy(self):
         src = (ROOT / "client" / "linux" / "tunnel_linux.py").read_text(
             encoding="utf-8"
         )
+        self.assertIn("product_kill_switch_enabled", src)
         self.assertIn("run_kill_switch_commands", src)
         self.assertIn("kill_switch_applied", src)
-        self.assertIn("ks_applied = bool(ok)", src)
 
 
 class TestAndroidKillSwitchNative(unittest.TestCase):
-    def test_rpt_vpn_service_calls_set_blocking(self):
+    def test_rpt_vpn_service_no_set_blocking_by_default(self):
         kt = (
             ROOT
             / "client_app"
@@ -252,7 +276,9 @@ class TestAndroidKillSwitchNative(unittest.TestCase):
         )
         self.assertTrue(kt.is_file(), f"missing {kt}")
         text = kt.read_text(encoding="utf-8")
-        self.assertIn("setBlocking(true)", text)
+        # Product residual: kill switch removed — no builder blocking call
+        self.assertNotIn(".setBlocking(", text)
+        self.assertIn("Kill switch removed", text)
         self.assertIn("Builder()", text)
         self.assertIn('addDnsServer("10.88.0.1")', text)
         self.assertNotIn("1.1.1.1", text)
@@ -283,20 +309,21 @@ class TestDnsLeakAndNoPublicFallback(unittest.TestCase):
         cfg = android_vpn_builder_config(p)
         self.assertEqual(cfg["dns"], ["10.88.0.1"])
         self.assertTrue(cfg.get("disallowPublicDnsFallback"))
-        self.assertTrue(cfg.get("killSwitch"))
-        self.assertFalse(cfg.get("allowBypass"))
-        self.assertTrue(cfg.get("blocking"))
+        # Kill switch off by default on product residual
+        self.assertFalse(cfg.get("killSwitch"))
+        self.assertTrue(cfg.get("allowBypass"))
+        self.assertFalse(cfg.get("blocking"))
 
 
 class TestWebRtcAndIpv6(unittest.TestCase):
     def test_webrtc_mitigations_dict(self):
         m = webrtc_leak_mitigations()
-        self.assertTrue(m["block_stun_udp_3478"])
-        self.assertTrue(m["block_mdns_udp_5353"])
-        self.assertTrue(m["kill_switch_required"])
+        self.assertFalse(m["kill_switch_required"])
+        self.assertFalse(m.get("kill_switch_default_on", True))
         flags = android_kill_switch_builder_flags()
-        self.assertTrue(flags["blocking"])
-        self.assertFalse(flags["allowBypass"])
+        self.assertFalse(flags["blocking"])
+        self.assertTrue(flags["allowBypass"])
+        self.assertFalse(flags["killSwitch"])
 
     def test_ipv6_block_still_present(self):
         self.assertTrue(windows_ipv6_leak_block_commands())

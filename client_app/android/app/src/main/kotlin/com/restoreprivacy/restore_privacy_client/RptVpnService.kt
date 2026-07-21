@@ -270,17 +270,13 @@ class RptVpnService : VpnService() {
                 }
 
                 // DNS: node tunnel gateway recursive resolver (10.88.0.1 / unbound on residual node)
-                // Kill switch: setBlocking(true) on API 29+ so non-VPN apps cannot bypass the TUN
-                // IPv4-only residual: do NOT install ::/0 without a TUN IPv6 address — that
-                // blackholes dual-stack apps under setBlocking while the node only routes IPv4.
+                // Kill switch removed from product residual (no VpnService blocking mode).
+                // IPv4-only residual: do NOT install ::/0 without a TUN IPv6 address.
                 val builder = Builder()
                     .setSession(sessionName)
                     .setMtu(1280)
                     .addAddress(session.vpnIp, 32)
                     .addDnsServer("10.88.0.1")
-                if (Build.VERSION.SDK_INT >= 29) {
-                    builder.setBlocking(true)
-                }
                 // Prefer IPv4 residual path (product node DATA/TUN is IPv4).
                 try {
                     builder.allowFamily(OsConstants.AF_INET)

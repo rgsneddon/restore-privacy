@@ -30,7 +30,7 @@ Latest automated security audit for production node **82.221.101.241** and the i
 | No `*.priv` under product/releases/status_page | OK |
 | Live node healthy (TCP+HTTP) | YES |
 
-**Overall posture:** **Strong** for residual honesty (`residual_ip_capture`), no public live count, no-phones-home Connect, packaging strip of `*.priv`, tunnel DNS + DoT, kill-switch/IPv6, Settings transparency — without multi-hop residual claims.
+**Overall posture:** **Strong** for residual honesty (`residual_ip_capture`), no public live count, no-phones-home Connect, packaging strip of `*.priv`, tunnel DNS + DoT, Settings transparency — without multi-hop residual claims. Product kill-switch is **off by default**.
 
 **Primary residual risks (open by design / environment):**
 

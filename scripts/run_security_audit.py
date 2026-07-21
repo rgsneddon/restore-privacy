@@ -213,7 +213,7 @@ Latest automated security audit for production node **{host}** and the in-repo p
 | No `*.priv` under product/releases/status_page | {"OK" if priv.get("ok") else "HITS: " + ", ".join(priv.get("hits") or [])} |
 | Live node healthy (TCP+HTTP) | {"YES" if node_ok else "NO"} |
 
-**Overall posture:** **Strong** for residual honesty (`residual_ip_capture`), no public live count, no-phones-home Connect, packaging strip of `*.priv`, tunnel DNS + DoT, kill-switch/IPv6, Settings transparency — without multi-hop residual claims.
+**Overall posture:** **Strong** for residual honesty (`residual_ip_capture`), no public live count, no-phones-home Connect, packaging strip of `*.priv`, tunnel DNS + DoT, Settings transparency — without multi-hop residual claims. Product kill-switch is **off by default** (opt-in ``RPT_KILL_SWITCH=1`` only).
 
 **Primary residual risks (open by design / environment):**
 

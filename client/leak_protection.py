@@ -2,8 +2,8 @@
 
 - Product full-tunnel DNS is tunnel gateway only (see ``full_tunnel``).
 - No public DNS fallback constants (1.1.1.1 / 8.8.8.8 / 9.9.9.9) on residual path.
-- WebRTC mitigations: block STUN/mDNS ports under kill-switch; Android builder
-  flags; document browser WebRTC as OS/browser-limited.
+- WebRTC: browser/OS limited; kill-switch STUN/mDNS blocks are **opt-in only**
+  (``RPT_KILL_SWITCH=1``). Product residual no longer applies kill-switch by default.
 """
 
 from __future__ import annotations
@@ -60,19 +60,24 @@ def dns_leak_check_plan() -> dict:
 
 
 def webrtc_leak_mitigations() -> dict:
-    """Documented + enforceable WebRTC-related mitigations on product path."""
+    """Documented WebRTC-related mitigations on product path (kill switch opt-in)."""
+    from client.kill_switch import product_kill_switch_enabled
+
+    ks = product_kill_switch_enabled()
     return {
-        "block_stun_udp_3478": True,
-        "block_turn_udp_5349": True,
-        "block_mdns_udp_5353": True,
-        "android_vpn_blocking": True,
-        "android_allow_bypass": False,
+        "block_stun_udp_3478": ks,
+        "block_turn_udp_5349": ks,
+        "block_mdns_udp_5353": ks,
+        "android_vpn_blocking": ks,
+        "android_allow_bypass": not ks,
         "browser_webrtc_note": (
             "Browser WebRTC may still use local interfaces unless the OS VPN "
-            "captures all apps (Android VpnService / Windows dual /1 + kill-switch). "
+            "captures all apps (Android VpnService / Windows dual /1 routes). "
+            "Kill-switch firewall blocks are opt-in (RPT_KILL_SWITCH=1). "
             "Disable WebRTC in the browser for maximum assurance."
         ),
-        "kill_switch_required": True,
+        "kill_switch_required": False,
+        "kill_switch_default_on": False,
     }
 
 
