@@ -21,6 +21,7 @@ from payments import (
     PRICE_PENCE,
     list_recent_grants,
     public_base_url,
+    reissue_download_for_purchase_id,
     stripe_payment_link_id,
     stripe_payment_page_url,
     stripe_price_id,
@@ -490,10 +491,67 @@ def project_grants_for_admin(
                 "used_at": g.get("used_at"),
                 "token": g.get("token") or "",
                 "session_id": g.get("session_id") or "",
+                "purchase_id": g.get("purchase_id") or "",
                 "created_at": g.get("created_at"),
             }
         )
     return out
+
+
+def render_purchase_reissue_section_html(
+    *,
+    result: dict[str, Any] | None = None,
+    error: str = "",
+    form_value: str = "",
+) -> str:
+    """Top-of-admin pathway: enter product purchase identifier → secondary download link.
+
+    Fail-closed: unknown IDs show *error* without inventing a download URL.
+    """
+    err = (
+        f'<p class="err" id="reissue-error">{_escape(error)}</p>' if error else ""
+    )
+    ok = ""
+    if result and result.get("download_url"):
+        url = _escape(str(result["download_url"]))
+        path = _escape(str(result.get("download_path") or ""))
+        pid = _escape(str(result.get("purchase_id") or ""))
+        plat = _escape(str(result.get("platform") or ""))
+        fname = _escape(str(result.get("filename") or ""))
+        ok = f"""
+  <div class="ok-msg" id="reissue-result" role="status">
+    <p><strong>Secondary download link minted</strong> for purchase
+    <code id="reissue-result-purchase-id">{pid}</code>
+    ({plat} — <code>{fname}</code>).</p>
+    <p>Pass this <strong>one-time</strong> link to the buyer (not a free GitHub URL):</p>
+    <p><a id="reissue-download-link" href="{url}" rel="noopener noreferrer">{url}</a></p>
+    <p class="muted">Path only: <code id="reissue-download-path">{path}</code></p>
+  </div>"""
+    val = _escape(form_value)
+    return f"""
+<section id="admin-reissue" class="card" aria-labelledby="admin-reissue-heading">
+  <h2 id="admin-reissue-heading">Re-issue download by purchase identifier</h2>
+  <p class="muted" id="admin-reissue-note">
+    After a buyer loses their installer, enter the <strong>product purchase identifier</strong>
+    they were shown on the thank-you page (format <code>RPT-XXXX-XXXX-XXXX</code>).
+    A new single-use paid download link is minted for the same package — not a free permanent GitHub URL.
+  </p>
+  {err}
+  {ok}
+  <form method="post" action="/admin/reissue-download" id="admin-reissue-form">
+    <label class="field" for="purchase_id">
+      <span class="field-label">Product purchase identifier</span>
+      <input id="purchase_id" name="purchase_id" type="text"
+             autocomplete="off" required
+             placeholder="RPT-A1B2-C3D4-E5F6"
+             value="{val}"
+             pattern="[Rr][Pp][Tt][-A-Za-z0-9]+"
+             title="RPT-XXXX-XXXX-XXXX"/>
+    </label>
+    <button type="submit" id="admin-reissue-submit">Create secondary download link</button>
+  </form>
+</section>
+"""
 
 
 def render_login_html(*, error: str = "") -> bytes:
@@ -757,8 +815,11 @@ def render_admin_html(
     *,
     message: str = "",
     error: str = "",
+    reissue_result: dict[str, Any] | None = None,
+    reissue_error: str = "",
+    reissue_form_value: str = "",
 ) -> bytes:
-    """Full private admin page: processor settings + payment grants administration."""
+    """Full private admin page: reissue by purchase id, processor settings, grants."""
     projected = project_grants_for_admin(grants)
     rows = []
     for g in projected:
@@ -766,8 +827,10 @@ def render_admin_html(
         tok_short = (tok[:10] + "…") if len(tok) > 12 else tok
         used = g.get("used_at")
         used_s = "used" if used else str(g.get("status") or "")
+        pid = str(g.get("purchase_id") or "")
         rows.append(
             "<tr>"
+            f"<td><code>{_escape(pid)}</code></td>"
             f"<td>{_escape(str(g.get('platform') or ''))}</td>"
             f"<td>{_escape(str(g.get('filename') or ''))}</td>"
             f"<td>{int(g.get('amount_pence') or 0)} {_escape(str(g.get('currency') or ''))}</td>"
@@ -779,7 +842,12 @@ def render_admin_html(
     table = (
         "\n".join(rows)
         if rows
-        else '<tr><td colspan="6">No grants yet</td></tr>'
+        else '<tr><td colspan="7">No grants yet</td></tr>'
+    )
+    reissue_html = render_purchase_reissue_section_html(
+        result=reissue_result,
+        error=reissue_error,
+        form_value=reissue_form_value,
     )
     settings_html = render_processor_settings_html(message=message, error=error)
     body = f"""<!DOCTYPE html>
@@ -821,9 +889,16 @@ code{{font-size:0.85rem;word-break:break-all}}
 border-radius:8px;border:1px solid var(--input-border);background:var(--input-bg);color:var(--fg)}}
 .processor-form button{{margin-top:0.75rem;padding:0.55rem 1rem;border:0;border-radius:8px;
 background:var(--btn-bg);color:var(--btn-fg);font-weight:600;cursor:pointer}}
+#admin-reissue-form label.field{{display:block;margin:0.65rem 0}}
+#admin-reissue-form .field-label{{display:block;font-weight:600;font-size:0.9rem;margin-bottom:0.25rem}}
+#admin-reissue-form input{{width:100%;max-width:28rem;box-sizing:border-box;padding:0.5rem 0.6rem;
+border-radius:8px;border:1px solid var(--input-border);background:var(--input-bg);color:var(--fg)}}
+#admin-reissue-form button{{margin-top:0.75rem;padding:0.55rem 1rem;border:0;border-radius:8px;
+background:var(--btn-bg);color:var(--btn-fg);font-weight:600;cursor:pointer}}
 .ok-msg{{color:var(--badge-ok-fg);background:var(--badge-ok-bg);padding:0.5rem 0.75rem;border-radius:8px}}
 .err{{color:var(--err)}}
 .plugin-nav{{margin:0.5rem 0 1rem;font-size:0.9rem}}
+.purchase-id-box,.purchase-id-advice{{/* reserved for public thank-you if mirrored */}}
 </style>
 {admin_theme_boot_script()}
 </head><body>
@@ -834,17 +909,19 @@ background:var(--btn-bg);color:var(--btn-fg);font-weight:600;cursor:pointer}}
   <a href="/">VPN APP Shop</a>
 </div>
 <nav class="nav-local" id="admin-nav" aria-label="Admin sections">
+  <a href="#admin-reissue">Re-issue download</a>
   <a href="#admin-processor-settings">Processor settings</a>
   <a href="#admin-grants">Paid download grants</a>
 </nav>
+{reissue_html}
 {settings_html}
 <section id="admin-grants" class="card">
   <h2 id="admin-grants-heading">Paid download grants</h2>
   <p class="muted">Recent Stripe-verified download tokens ({_escape(PRICE_LABEL)} GBP each).
-  Use session id / token to help a buyer after Checkout. Secrets never shown.</p>
+  Purchase identifier is durable; download token is single-use. Secrets never shown.</p>
   <table id="admin-grants-table">
     <thead><tr>
-      <th>Platform</th><th>Filename</th><th>Amount</th><th>Status</th><th>Token</th><th>Session</th>
+      <th>Purchase ID</th><th>Platform</th><th>Filename</th><th>Amount</th><th>Status</th><th>Token</th><th>Session</th>
     </tr></thead>
     <tbody>
 {table}

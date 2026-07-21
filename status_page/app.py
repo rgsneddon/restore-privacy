@@ -377,6 +377,11 @@ a{{color:#93c5fd}} .msg{{max-width:28rem;line-height:1.5;margin:0.65rem auto}}
 .thankyou h1{{letter-spacing:0.08em;margin:0 0 0.75rem}}
 .pkg{{font-size:1.05rem;margin:0.5rem 0 1rem}}
 .admin-run{{color:#fde68a;font-weight:500}}
+.purchase-id-box{{max-width:32rem;margin:1rem auto;padding:0.85rem 1rem;text-align:left;
+background:rgba(127,29,29,0.28);border:1px solid #b91c1c;border-radius:10px}}
+.purchase-id-value{{font-size:1.15rem;margin:0.4rem 0}}
+.purchase-id-value code{{font-size:1.05rem;letter-spacing:0.04em;color:#fecaca}}
+.purchase-id-advice{{font-size:0.88rem;line-height:1.45;color:#fecaca;margin:0.5rem 0 0}}
 a.dl{{display:inline-block;margin:0.75rem 0;padding:0.75rem 1.25rem;background:#1d4ed8;
 color:#fff;text-decoration:none;border-radius:8px;font-weight:600}}
 a.dl:hover{{background:#2563eb}}
@@ -705,11 +710,20 @@ class Handler(BaseHTTPRequestHandler):
                     activate_connect_entitlement(
                         str(grant["session_id"]), platform=plat
                     )
+                purchase_id = str(grant.get("purchase_id") or "")
+                if not purchase_id and grant.get("token"):
+                    try:
+                        from payments import purchase_id_for_token
+
+                        purchase_id = purchase_id_for_token(str(grant["token"])) or ""
+                    except Exception:  # noqa: BLE001
+                        purchase_id = ""
                 inner = render_post_payment_thankyou_html(
                     download_path=str(link),
                     filename=str(fname),
                     platform=plat,
                     session_id=session_id or str(grant.get("session_id") or ""),
+                    purchase_id=purchase_id,
                 )
             else:
                 # Meta-refresh so a late webhook can still unlock the page
@@ -966,6 +980,53 @@ class Handler(BaseHTTPRequestHandler):
                     400,
                     "text/html; charset=utf-8",
                     render_admin_html(error=err),
+                )
+            return
+
+        if path in ("/admin/reissue-download", "/admin/reissue-download/"):
+            if not admin_enabled():
+                self._send(503, "text/plain; charset=utf-8", b"admin disabled")
+                return
+            if not is_authenticated(self.headers):
+                self._send(200, "text/html; charset=utf-8", render_login_html())
+                return
+            from payments import reissue_download_for_purchase_id
+
+            form = dict(urllib.parse.parse_qsl(body.decode("utf-8", "replace")))
+            pid_in = (form.get("purchase_id") or "").strip()
+            issued = reissue_download_for_purchase_id(pid_in)
+            if issued and issued.get("download_url"):
+                # Never emit free GitHub installer URLs from reissue
+                url = str(issued["download_url"])
+                if "github.com" in url.lower() and "releases/download" in url.lower():
+                    self._send(
+                        500,
+                        "text/html; charset=utf-8",
+                        render_admin_html(
+                            reissue_error="Internal error: refusing free release URL",
+                            reissue_form_value=pid_in,
+                        ),
+                    )
+                    return
+                self._send(
+                    200,
+                    "text/html; charset=utf-8",
+                    render_admin_html(
+                        reissue_result=issued,
+                        reissue_form_value=str(issued.get("purchase_id") or pid_in),
+                    ),
+                )
+            else:
+                self._send(
+                    400,
+                    "text/html; charset=utf-8",
+                    render_admin_html(
+                        reissue_error=(
+                            "No paid purchase found for that product purchase identifier. "
+                            "Check the RPT-XXXX-XXXX-XXXX value the buyer saved on the thank-you page."
+                        ),
+                        reissue_form_value=pid_in,
+                    ),
                 )
             return
 

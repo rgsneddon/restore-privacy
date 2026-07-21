@@ -666,6 +666,7 @@ def render_post_payment_thankyou_html(
     filename: str,
     platform: str = "",
     session_id: str = "",
+    purchase_id: str = "",
 ) -> str:
     """Thank-you page body: auto-start one-time download + run-as-administrator copy.
 
@@ -673,6 +674,10 @@ def render_post_payment_thankyou_html(
     ``/download?token=…`` path. The visible fallback anchor is **manual only** (no
     script click / meta-refresh) so if the browser blocks the iframe the grant is
     still unused and the user can click once to download.
+
+    *purchase_id* is the durable product purchase identifier (distinct from the
+    single-use download token). Buyers are **strongly advised** to note it so the
+    operator can re-issue a secondary download link after software loss.
     """
     link = (download_path or "").strip()
     if not link.startswith("/download"):
@@ -695,6 +700,24 @@ def render_post_payment_thankyou_html(
     }.get(plat, plat or "your package")
     sid = (session_id or "").strip()
     sid_esc = _escape_html_text(sid)
+    pid = normalize_purchase_id(purchase_id) or (purchase_id or "").strip().upper()
+    pid_esc = _escape_html_text(pid)
+    purchase_block = ""
+    if pid:
+        purchase_block = f"""
+  <div class="msg purchase-id-box" id="purchase-id-box" role="region"
+       aria-labelledby="purchase-id-heading">
+    <p id="purchase-id-heading"><strong>Your product purchase identifier</strong></p>
+    <p class="purchase-id-value"><code id="product-purchase-id">{pid_esc}</code></p>
+    <p class="purchase-id-advice" id="purchase-id-advice">
+      <strong>STRONG ADVICE — SAVE THIS IDENTIFIER NOW:</strong>
+      write it down or store it somewhere safe (password manager, email to yourself).
+      It is <strong>not</strong> your one-time download link. If you lose the
+      installer later, contact the operator with this identifier so a
+      <strong>secondary download link</strong> can be recreated for you.
+      Without this identifier, re-fulfilment may not be possible.
+    </p>
+  </div>"""
     ent_path = f"/api/connect-entitlement-file?session_id={urllib.parse.quote(sid)}" if sid else ""
     ent_path_esc = _escape_html_text(ent_path)
     ent_block = ""
@@ -728,6 +751,7 @@ def render_post_payment_thankyou_html(
   <h1 id="thank-you-heading">Thank you</h1>
   <p class="msg" id="pay-success">Payment confirmed. Your <strong id="paid-platform-label">{_escape_html_text(plat_label)}</strong> installer is ready:</p>
   <p class="pkg" id="paid-package-name"><strong>{fname_esc}</strong></p>
+  {purchase_block}
   {ent_block}
   <p class="msg admin-run" id="run-as-admin-instruction">
     <strong>{_escape_html_text(admin_lead)}</strong>
@@ -758,6 +782,36 @@ def _connect() -> sqlite3.Connection:
     conn = sqlite3.connect(str(db_path()), timeout=30, isolation_level=None)
     conn.row_factory = sqlite3.Row
     return conn
+
+
+def generate_purchase_id() -> str:
+    """Mint a unique durable product purchase identifier (not a download token).
+
+    Format ``RPT-XXXX-XXXX-XXXX`` (12 hex chars) — stable across re-issued
+    single-use download tokens for the same paid purchase.
+    """
+    raw = secrets.token_hex(6).upper()
+    return f"RPT-{raw[0:4]}-{raw[4:8]}-{raw[8:12]}"
+
+
+def normalize_purchase_id(purchase_id: str | None) -> str:
+    """Normalize operator/buyer-entered purchase id for lookup (uppercase, strip)."""
+    s = (purchase_id or "").strip().upper().replace(" ", "")
+    # Allow missing dashes: RPTA7K2… → leave as entered if already dashed
+    if s.startswith("RPT") and "-" not in s and len(s) == 15:
+        # RPT + 12 hex
+        body = s[3:]
+        s = f"RPT-{body[0:4]}-{body[4:8]}-{body[8:12]}"
+    return s
+
+
+def _migrate_grants_purchase_id(conn: sqlite3.Connection) -> None:
+    cols = {str(row[1]) for row in conn.execute("PRAGMA table_info(grants)").fetchall()}
+    if "purchase_id" not in cols:
+        conn.execute("ALTER TABLE grants ADD COLUMN purchase_id TEXT")
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_grants_purchase_id ON grants(purchase_id)"
+    )
 
 
 def init_db() -> None:
@@ -800,6 +854,7 @@ def init_db() -> None:
             """
         )
         _ensure_payment_intent_columns(conn)
+        _migrate_grants_purchase_id(conn)
     finally:
         conn.close()
 
@@ -1538,11 +1593,16 @@ def mint_download_token(
     currency: str = PRICE_CURRENCY,
     ttl_sec: int = TOKEN_TTL_SEC,
     now: float | None = None,
+    purchase_id: str | None = None,
 ) -> str:
     """Create a single-use expiring download token bound to a **current catalog** asset.
 
     Re-resolves the platform to the live catalog filename so callers cannot mint
     a stale version string. Raises ``ValueError`` if the platform is unknown.
+
+    Assigns a durable :func:`generate_purchase_id` when *purchase_id* is omitted
+    (new paid purchase). Pass an existing id when re-issuing a secondary download
+    for the same paid purchase.
     """
     plat = (platform or "").strip().lower()
     bound = resolve_paid_grant_filename(plat, metadata_filename=filename)
@@ -1553,14 +1613,17 @@ def mint_download_token(
     init_db()
     t = now if now is not None else time.time()
     token = secrets.token_urlsafe(32)
+    pid = normalize_purchase_id(purchase_id) if purchase_id else ""
+    if not pid:
+        pid = generate_purchase_id()
     conn = _connect()
     try:
         conn.execute(
             """
             INSERT INTO grants(
                 token, filename, platform, session_id, amount_pence, currency,
-                created_at, expires_at, used_at, status
-            ) VALUES (?,?,?,?,?,?,?,?,NULL,'granted')
+                created_at, expires_at, used_at, status, purchase_id
+            ) VALUES (?,?,?,?,?,?,?,?,NULL,'granted',?)
             """,
             (
                 token,
@@ -1571,6 +1634,7 @@ def mint_download_token(
                 currency,
                 t,
                 t + ttl_sec,
+                pid,
             ),
         )
     finally:
@@ -1578,7 +1642,119 @@ def mint_download_token(
     return token
 
 
+def purchase_id_for_token(token: str) -> str | None:
+    """Return durable purchase_id for a grant token, if stored."""
+    tok = (token or "").strip()
+    if not tok:
+        return None
+    init_db()
+    conn = _connect()
+    try:
+        row = conn.execute(
+            "SELECT purchase_id FROM grants WHERE token = ?", (tok,)
+        ).fetchone()
+        if row is None:
+            return None
+        pid = row["purchase_id"] if "purchase_id" in row.keys() else None
+        return normalize_purchase_id(str(pid or "")) or None
+    finally:
+        conn.close()
+
+
+def find_paid_purchase_by_id(purchase_id: str) -> dict[str, Any] | None:
+    """Lookup a **paid** grant lineage by durable purchase identifier.
+
+    Returns the earliest grant row for that id (original paid package binding).
+    Used status / consumed tokens still match — reissue mints a new token.
+    Unknown or empty ids return None (fail closed).
+    """
+    pid = normalize_purchase_id(purchase_id)
+    if not pid or not pid.startswith("RPT-"):
+        return None
+    init_db()
+    conn = _connect()
+    try:
+        row = conn.execute(
+            """
+            SELECT token, filename, platform, session_id, amount_pence, currency,
+                   created_at, expires_at, used_at, status, purchase_id
+            FROM grants
+            WHERE purchase_id = ?
+            ORDER BY created_at ASC
+            LIMIT 1
+            """,
+            (pid,),
+        ).fetchone()
+        if row is None:
+            return None
+        # Only full-price paid catalogue grants may reissue
+        if int(row["amount_pence"] or 0) != PRICE_PENCE:
+            return None
+        st = str(row["status"] or "").strip().lower()
+        # Rows are created as status=granted; used downloads keep status with used_at set
+        if st not in ("granted", "used", "consumed"):
+            return None
+        return {
+            "token": row["token"],
+            "filename": row["filename"],
+            "platform": row["platform"],
+            "session_id": row["session_id"],
+            "amount_pence": row["amount_pence"],
+            "currency": row["currency"],
+            "status": row["status"],
+            "used_at": row["used_at"],
+            "purchase_id": normalize_purchase_id(str(row["purchase_id"] or "")) or pid,
+            "created_at": row["created_at"],
+        }
+    finally:
+        conn.close()
+
+
+def reissue_download_for_purchase_id(
+    purchase_id: str,
+    *,
+    ttl_sec: int = TOKEN_TTL_SEC,
+    now: float | None = None,
+    base_url: str | None = None,
+) -> dict[str, Any] | None:
+    """Mint a **new** single-use download token for a paid purchase_id.
+
+    Returns dict with ``token``, ``download_path``, ``download_url``,
+    ``purchase_id``, ``platform``, ``filename`` — or **None** if unknown/unpaid.
+    Never returns free permanent GitHub installer URLs.
+    """
+    original = find_paid_purchase_by_id(purchase_id)
+    if original is None:
+        return None
+    pid = str(original["purchase_id"])
+    token = mint_download_token(
+        filename=str(original["filename"]),
+        platform=str(original["platform"]),
+        session_id=str(original.get("session_id") or ""),
+        amount_pence=int(original.get("amount_pence") or PRICE_PENCE),
+        currency=str(original.get("currency") or PRICE_CURRENCY),
+        ttl_sec=ttl_sec,
+        now=now,
+        purchase_id=pid,
+    )
+    path = f"/download?token={token}"
+    base = (base_url if base_url is not None else public_base_url()).rstrip("/")
+    return {
+        "token": token,
+        "download_path": path,
+        "download_url": f"{base}{path}",
+        "purchase_id": pid,
+        "platform": original["platform"],
+        "filename": original["filename"],
+        "session_id": original.get("session_id") or "",
+    }
+
+
 def _grant_dict_from_row(row: sqlite3.Row) -> dict[str, Any]:
+    keys = set(row.keys())
+    pid = ""
+    if "purchase_id" in keys and row["purchase_id"]:
+        pid = normalize_purchase_id(str(row["purchase_id"])) or str(row["purchase_id"])
     return {
         "token": row["token"],
         "filename": row["filename"],
@@ -1587,6 +1763,8 @@ def _grant_dict_from_row(row: sqlite3.Row) -> dict[str, Any]:
         "amount_pence": row["amount_pence"],
         "currency": row["currency"],
         "url": asset_download_url(row["filename"]),
+        "purchase_id": pid,
+        "download_path": f"/download?token={row['token']}",
     }
 
 
@@ -1754,14 +1932,19 @@ def list_recent_grants(limit: int = 50) -> list[dict[str, Any]]:
         rows = conn.execute(
             """
             SELECT token, filename, platform, session_id, amount_pence, currency,
-                   created_at, expires_at, used_at, status
+                   created_at, expires_at, used_at, status, purchase_id
             FROM grants ORDER BY created_at DESC LIMIT ?
             """,
             (int(limit),),
         ).fetchall()
         out = []
         for r in rows:
-            out.append({k: r[k] for k in r.keys()})
+            d = {k: r[k] for k in r.keys()}
+            if d.get("purchase_id"):
+                d["purchase_id"] = (
+                    normalize_purchase_id(str(d["purchase_id"])) or d["purchase_id"]
+                )
+            out.append(d)
         return out
     finally:
         conn.close()
@@ -1784,7 +1967,7 @@ def find_grant_by_session(
         row = conn.execute(
             """
             SELECT token, filename, platform, session_id, amount_pence, currency,
-                   created_at, expires_at, used_at, status
+                   created_at, expires_at, used_at, status, purchase_id
             FROM grants WHERE session_id = ? ORDER BY created_at DESC LIMIT 1
             """,
             (sid,),
@@ -1795,6 +1978,9 @@ def find_grant_by_session(
             return None
         if unused_only and (row["status"] != "granted" or row["used_at"] is not None):
             return None
+        pid = ""
+        if "purchase_id" in row.keys() and row["purchase_id"]:
+            pid = normalize_purchase_id(str(row["purchase_id"])) or str(row["purchase_id"])
         return {
             "token": row["token"],
             "filename": row["filename"],
@@ -1804,6 +1990,7 @@ def find_grant_by_session(
             "currency": row["currency"],
             "status": row["status"],
             "used_at": row["used_at"],
+            "purchase_id": pid,
             "download_path": f"/download?token={row['token']}",
             "url": asset_download_url(row["filename"]),
         }
