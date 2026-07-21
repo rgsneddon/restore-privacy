@@ -1,0 +1,46 @@
+MIT License
+
+Copyright (c) 2026 Russell G Sneddon / Restore Privacy contributors
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+
+-------------------------------------------------------------------------------
+THIRD-PARTY COMPONENTS
+
+This repository’s own original code (RPT protocol, node, clients, status page)
+is licensed under the MIT License above.
+
+Separately, the project **utilises** third-party software and design building
+blocks. Those components remain under **their own licenses**. Attribution and
+links are collected in CREDITS.md (and summarised below). Redistribution of
+binaries that embed those components must respect their license terms.
+
+Summary of utilised parts (see CREDITS.md for detail):
+
+  - Wintun (virtual network adapter driver for Windows TUN I/O)
+  - Python cryptography (X25519/Ed25519, ChaCha20-Poly1305, HKDF helpers as used)
+  - Bouncy Castle (Android RPT client crypto helpers)
+  - Apple CryptoKit (iOS/macOS ChaCha20-Poly1305, Ed25519, HKDF for RPT2 Packet Tunnel)
+  - BigInt / attaswift (vendored; modular arithmetic for ElGamal/Pedersen on Apple)
+  - Flutter / Dart SDK (multi-platform client UI shell)
+  - Python standard library and packaging tools as used in the repo
+  - Render.com (optional hosting of the public status page — service, not code)
+
+Do not confuse “uses Wintun as a TUN driver” with “is WireGuard”: the tunnel
+protocol in this project is custom RPT, not the WireGuard protocol.

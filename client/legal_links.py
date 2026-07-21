@@ -1,27 +1,52 @@
 """Public document links for client Settings (audit, privacy, end-user licence).
 
-Installed clients open stable GitHub blob URLs so they work without a local
-source tree. Paths match repo root files: AUDIT.md, PRIVACY_POLICY.md, LICENSE.
+Installed clients open **status-origin** URLs on the Render status host so docs
+remain available even when GitHub is private. Override the origin with
+``RPT_PUBLIC_BASE_URL`` (same as the status page).
 """
 
 from __future__ import annotations
 
+import os
 from dataclasses import dataclass
 
-# Public product host (restore-privacy is public; RUST-IN-PRIVACY may be private → 404).
-GITHUB_REPO_BLOB_BASE = (
-    "https://github.com/rgsneddon/restore-privacy/blob/main"
-)
+# Default public status host (how-to-buy + legal docs are served here).
+DEFAULT_STATUS_ORIGIN = "https://restore-privacy-status.onrender.com"
 
-# User-facing labels (Settings) and relative repo paths.
+# User-facing labels (Settings) and status-origin paths.
 AUDIT_LABEL = "Most recent audit"
 PRIVACY_POLICY_LABEL = "Privacy policy"
 END_USER_LICENCE_LABEL = "End user licence"
+HOW_TO_BUY_LABEL = "How to buy"
 
 AUDIT_REPO_PATH = "AUDIT.md"
 PRIVACY_POLICY_REPO_PATH = "PRIVACY_POLICY.md"
 # On-disk spelling is LICENSE (US); UI label uses “licence”.
 END_USER_LICENCE_REPO_PATH = "LICENSE"
+HOW_TO_BUY_PATH = "how-to-buy"
+
+# Status-origin URL paths (must match status_page/public_docs.py).
+AUDIT_STATUS_PATH = "/AUDIT.md"
+PRIVACY_STATUS_PATH = "/PRIVACY_POLICY.md"
+LICENCE_STATUS_PATH = "/LICENSE"
+HOW_TO_BUY_STATUS_PATH = "/how-to-buy"
+README_STATUS_PATH = "/README.md"
+
+
+def status_origin() -> str:
+    """Public base for legal/how-to URLs (env RPT_PUBLIC_BASE_URL or Render default)."""
+    raw = os.environ.get("RPT_PUBLIC_BASE_URL", "").strip().rstrip("/")
+    if raw and not raw.startswith("http://127.0.0.1") and not raw.startswith(
+        "http://localhost"
+    ):
+        return raw
+    return DEFAULT_STATUS_ORIGIN
+
+
+# Compatibility: older code expected a GitHub blob base constant.
+GITHUB_REPO_BLOB_BASE = (
+    "https://github.com/rgsneddon/restore-privacy/blob/main"
+)
 
 
 @dataclass(frozen=True)
@@ -30,23 +55,40 @@ class LegalDocLink:
 
     label: str
     repo_path: str
+    status_path: str
 
     @property
     def url(self) -> str:
-        return f"{GITHUB_REPO_BLOB_BASE}/{self.repo_path}"
+        """Absolute URL on the public status host."""
+        return status_origin().rstrip("/") + self.status_path
 
 
 LEGAL_DOC_LINKS: tuple[LegalDocLink, ...] = (
-    LegalDocLink(label=AUDIT_LABEL, repo_path=AUDIT_REPO_PATH),
-    LegalDocLink(label=PRIVACY_POLICY_LABEL, repo_path=PRIVACY_POLICY_REPO_PATH),
     LegalDocLink(
-        label=END_USER_LICENCE_LABEL, repo_path=END_USER_LICENCE_REPO_PATH
+        label=AUDIT_LABEL,
+        repo_path=AUDIT_REPO_PATH,
+        status_path=AUDIT_STATUS_PATH,
+    ),
+    LegalDocLink(
+        label=PRIVACY_POLICY_LABEL,
+        repo_path=PRIVACY_POLICY_REPO_PATH,
+        status_path=PRIVACY_STATUS_PATH,
+    ),
+    LegalDocLink(
+        label=END_USER_LICENCE_LABEL,
+        repo_path=END_USER_LICENCE_REPO_PATH,
+        status_path=LICENCE_STATUS_PATH,
+    ),
+    LegalDocLink(
+        label=HOW_TO_BUY_LABEL,
+        repo_path=HOW_TO_BUY_PATH,
+        status_path=HOW_TO_BUY_STATUS_PATH,
     ),
 )
 
 
 def legal_doc_urls() -> dict[str, str]:
-    """Map Settings label → public URL."""
+    """Map Settings label → public status-origin URL."""
     return {link.label: link.url for link in LEGAL_DOC_LINKS}
 
 
@@ -60,3 +102,11 @@ def privacy_policy_url() -> str:
 
 def end_user_licence_url() -> str:
     return LEGAL_DOC_LINKS[2].url
+
+
+def how_to_buy_url() -> str:
+    return LEGAL_DOC_LINKS[3].url
+
+
+def readme_url() -> str:
+    return status_origin().rstrip("/") + README_STATUS_PATH

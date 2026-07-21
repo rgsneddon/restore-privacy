@@ -96,15 +96,33 @@ def read_static_bytes(url_path: str) -> tuple[bytes, str] | None:
             ctype = "application/octet-stream"
     return data, ctype
 
-# Public legal / audit: prefer same-origin mirrors (repo may be private).
-# GitHub blob URLs remain as secondary targets for operators with access.
-GITHUB_BLOB_MAIN = "https://github.com/rgsneddon/restore-privacy/blob/main"
-LICENCE_URL = f"{GITHUB_BLOB_MAIN}/LICENSE"
-PRIVACY_POLICY_URL = f"{GITHUB_BLOB_MAIN}/PRIVACY_POLICY.md"
-SECURITY_AUDIT_URL = f"{GITHUB_BLOB_MAIN}/AUDIT.md"
-# Same-origin mirrors so status page always has audit even if GH is private.
-SECURITY_AUDIT_LOCAL_PATH = "/AUDIT.md"
+# Public legal / audit: same-origin on this Render host (GitHub optional secondary).
+from public_docs import (  # noqa: E402
+    AUDIT_PATH,
+    HOW_TO_BUY_PATH,
+    LICENSE_PATH,
+    PRIVACY_PATH,
+    README_PATH,
+    document_bytes_for_path,
+    load_public_document_bytes,
+    production_status_origin,
+    public_doc_absolute_url,
+    public_docs_catalog,
+    render_how_to_buy_html,
+    render_public_nav_links_html,
+)
+
+# Absolute URLs for operators / external quote (status origin + path).
+LICENCE_URL = public_doc_absolute_url(LICENSE_PATH)
+PRIVACY_POLICY_URL = public_doc_absolute_url(PRIVACY_PATH)
+SECURITY_AUDIT_URL = public_doc_absolute_url(AUDIT_PATH)
+README_URL = public_doc_absolute_url(README_PATH)
+HOW_TO_BUY_URL = public_doc_absolute_url(HOW_TO_BUY_PATH)
+# Same-origin paths (also used as hrefs on the public page).
+SECURITY_AUDIT_LOCAL_PATH = AUDIT_PATH
 SECURITY_AUDIT_LOCAL_PATH_LOWER = "/audit.md"
+LICENCE_LOCAL_PATH = LICENSE_PATH
+PRIVACY_LOCAL_PATH = PRIVACY_PATH
 
 # Labels shown under the product title (terms of use / privacy / audit).
 LICENCE_LABEL = "LICENCE"
@@ -118,47 +136,27 @@ RUST_REPO_LABEL = "Package source - restore-privacy (signed releases)"
 # Kept for older imports/tests that still reference the constant name.
 BETA_NOTE_TEXT = ""
 BETA_NOTE_URL = "https://x.com/rgsneddon"
+GITHUB_BLOB_MAIN = "https://github.com/rgsneddon/restore-privacy/blob/main"
 
 
 def audit_document_bytes() -> bytes | None:
-    """Load AUDIT.md from status_page, repo root, or install root (node)."""
-    candidates = (
-        STATUS_DIR / "AUDIT.md",
-        STATUS_DIR.parent / "AUDIT.md",
-        Path(os.environ.get("RPT_INSTALL_ROOT", "/opt/restore-privacy")) / "AUDIT.md",
-        Path(os.environ.get("RPT_AUDIT_PATH", "")),
-    )
-    for path in candidates:
-        if not path or str(path) in (".", ""):
-            continue
-        try:
-            if path.is_file() and path.stat().st_size > 200:
-                return path.read_bytes()
-        except OSError:
-            continue
+    """Load AUDIT.md (status public pack, status_page, repo root, install root)."""
+    data = load_public_document_bytes("AUDIT.md", min_size=200)
+    if data is not None:
+        return data
+    # Back-compat: RPT_AUDIT_PATH override
+    extra = Path(os.environ.get("RPT_AUDIT_PATH", ""))
+    try:
+        if extra.is_file() and extra.stat().st_size > 200:
+            return extra.read_bytes()
+    except OSError:
+        pass
     return None
 
 
 def render_legal_links_html() -> str:
-    """Links immediately below the RESTORE PRIVACY headline (licence / privacy / audit)."""
-    # Prefer same-origin /AUDIT.md so the page never 404s when a GH host is private.
-    audit_href = SECURITY_AUDIT_LOCAL_PATH
-    items = (
-        (LICENCE_LABEL, LICENCE_URL, "licence-link"),
-        (PRIVACY_POLICY_LABEL, PRIVACY_POLICY_URL, "privacy-link"),
-        (SECURITY_AUDIT_LABEL, audit_href, "audit-link"),
-    )
-    anchors = []
-    for label, url, el_id in items:
-        anchors.append(
-            f'<a class="doc-link" id="{el_id}" href="{url}" '
-            f'rel="noopener noreferrer" target="_blank">{label}</a>'
-        )
-    joined = '<span class="doc-sep" aria-hidden="true"> · </span>'.join(anchors)
-    return (
-        f'  <nav class="doc-links" id="doc-links" aria-label="Legal and audit documents">'
-        f"{joined}</nav>"
-    )
+    """Links immediately below the headline: licence / privacy / audit / README / how-to-buy."""
+    return render_public_nav_links_html()
 
 
 def render_beta_note_html() -> str:
@@ -623,7 +621,22 @@ class Handler(BaseHTTPRequestHandler):
             )
             return
 
-        # Public security audit (AUDIT.md + audit.md case alias)
+        # Public how-to-buy page
+        if path in (HOW_TO_BUY_PATH, "/how-to-buy/", "/howtobuy", "/buy"):
+            self._send(
+                200,
+                "text/html; charset=utf-8",
+                render_how_to_buy_html(),
+            )
+            return
+
+        # Public documents (README, LICENSE, privacy, audit, credits) — same-origin
+        doc = document_bytes_for_path(path)
+        if doc is not None:
+            data, ctype, _title = doc
+            self._send(200, ctype, data)
+            return
+        # Back-compat audit-only aliases if registry miss
         if path in (
             SECURITY_AUDIT_LOCAL_PATH,
             SECURITY_AUDIT_LOCAL_PATH_LOWER,
@@ -632,13 +645,7 @@ class Handler(BaseHTTPRequestHandler):
         ):
             data = audit_document_bytes()
             if data is None:
-                # Fallback redirect to public GitHub blob when local file not packaged
-                self._send(
-                    302,
-                    "text/plain; charset=utf-8",
-                    b"",
-                    extra_headers=[("Location", SECURITY_AUDIT_URL)],
-                )
+                self._send(404, "text/plain; charset=utf-8", b"audit not found")
                 return
             self._send(200, "text/markdown; charset=utf-8", data)
             return

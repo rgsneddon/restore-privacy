@@ -23,15 +23,16 @@ from client.legal_links import (  # noqa: E402
 
 
 class TestLegalLinksHelper(unittest.TestCase):
-    def test_three_links_with_expected_labels(self):
+    def test_core_links_with_expected_labels(self):
         labels = [link.label for link in LEGAL_DOC_LINKS]
-        self.assertEqual(
-            labels,
-            [AUDIT_LABEL, PRIVACY_POLICY_LABEL, END_USER_LICENCE_LABEL],
-        )
+        self.assertIn(AUDIT_LABEL, labels)
+        self.assertIn(PRIVACY_POLICY_LABEL, labels)
+        self.assertIn(END_USER_LICENCE_LABEL, labels)
         self.assertEqual(AUDIT_LABEL, "Most recent audit")
         self.assertEqual(PRIVACY_POLICY_LABEL, "Privacy policy")
         self.assertEqual(END_USER_LICENCE_LABEL, "End user licence")
+        # Public status host also surfaces how-to-buy
+        self.assertIn("How to buy", labels)
 
     def test_repo_paths_exist_on_disk(self):
         for path_name in (
@@ -43,16 +44,16 @@ class TestLegalLinksHelper(unittest.TestCase):
             self.assertTrue(p.is_file(), f"missing shipped document: {path_name}")
             self.assertGreater(p.stat().st_size, 200)
 
-    def test_urls_point_at_github_blob_main(self):
+    def test_urls_point_at_status_origin(self):
         urls = legal_doc_urls()
-        self.assertEqual(len(urls), 3)
+        self.assertGreaterEqual(len(urls), 3)
         for label, url in urls.items():
-            self.assertTrue(
-                url.startswith(
-                    "https://github.com/rgsneddon/restore-privacy/blob/main/"
-                )
+            self.assertIn(
+                "restore-privacy-status.onrender.com",
+                url,
+                msg=f"{label} should use status origin, got {url}",
             )
-            self.assertIn(label, (AUDIT_LABEL, PRIVACY_POLICY_LABEL, END_USER_LICENCE_LABEL))
+            self.assertNotIn("github.com", url)
         self.assertTrue(audit_url().endswith("/AUDIT.md"))
         self.assertEqual(AUDIT_REPO_PATH, "AUDIT.md")
         self.assertTrue(privacy_policy_url().endswith("/PRIVACY_POLICY.md"))
@@ -79,6 +80,8 @@ class TestLegalLinksHelper(unittest.TestCase):
         self.assertNotIn("repoPath: 'audit.md'", links)
         self.assertIn("PRIVACY_POLICY.md", links)
         self.assertIn("LICENSE", links)
+        self.assertIn("restore-privacy-status.onrender.com", links)
+        self.assertIn("how-to-buy", links)
         self.assertIn("launchUrl", dart)
 
 
