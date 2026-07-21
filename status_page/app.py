@@ -323,11 +323,14 @@ def render_html(status: dict, poll_ms: int | None = None) -> bytes:
                              letter-spacing:0.04em; }}
     .doc-links a.doc-link:hover {{ color:#bfdbfe; }}
     .doc-sep {{ color:#6b7280; margin:0 0.15rem; }}
-    .audit-countdown {{ margin:0 0 1.25rem; text-align:center; font-size:0.95rem;
-                        color:#a7f3d0; letter-spacing:0.03em; }}
+    .audit-countdown {{ margin:0 0 1.25rem; text-align:center; max-width:28rem;
+                        padding:0 1rem; letter-spacing:0.02em; }}
+    .audit-countdown-row {{ font-size:0.95rem; color:#a7f3d0; }}
     .audit-countdown-label {{ color:#9ca3af; margin-right:0.5rem; text-transform:lowercase; }}
     .audit-countdown-value {{ font-variant-numeric:tabular-nums; font-weight:700;
                               color:#6ee7b7; font-size:1.05rem; }}
+    .audit-countdown-blurb {{ margin:0.4rem 0 0; font-size:0.78rem; line-height:1.4;
+                              color:#9ca3af; font-weight:400; letter-spacing:0.01em; }}
 {dl_css}
   </style>
 </head>

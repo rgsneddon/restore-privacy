@@ -13,6 +13,7 @@ sys.path.insert(0, str(ROOT / "status_page"))
 from audit_countdown import (  # noqa: E402
     AUDIT_PERIOD,
     AUDIT_PERIOD_SECONDS,
+    TIME_TIL_NEXT_AUDIT_BLURB,
     TIME_TIL_NEXT_AUDIT_LABEL,
     countdown_state,
     format_countdown,
@@ -82,7 +83,9 @@ class TestAuditCountdownMath(unittest.TestCase):
         st = countdown_state(now=now, last_generated_at=last)
         self.assertTrue(st["available"])
         self.assertEqual(st["label"], TIME_TIL_NEXT_AUDIT_LABEL)
-        self.assertEqual(st["label"], "time til next audit")
+        self.assertIn("time til next audit", st["label"])
+        self.assertIn("wipedown", st["label"])
+        self.assertEqual(st["blurb"], TIME_TIL_NEXT_AUDIT_BLURB)
         self.assertEqual(st["period_seconds"], AUDIT_PERIOD_SECONDS)
         # 4h - 1h15m5s = 2h44m55s = 9895s
         self.assertEqual(st["remaining_seconds"], 2 * 3600 + 44 * 60 + 55)
@@ -100,30 +103,54 @@ class TestAuditCountdownMath(unittest.TestCase):
 
 
 class TestAuditCountdownUi(unittest.TestCase):
-    def test_fragment_has_label_and_setinterval(self):
+    def test_fragment_has_label_blurb_and_setinterval(self):
         last = datetime(2026, 7, 21, 10, 0, 0, tzinfo=timezone.utc)
-        # Inject via temporary json is overkill — use render with mocked load
         html = render_audit_countdown_html(
             now=last + timedelta(hours=1),
             json_path=ROOT / "status_page" / "static" / "security_audit_latest.json",
         )
         self.assertIn("time til next audit", html)
+        self.assertIn("wipedown", html)
         self.assertIn('id="audit-countdown"', html)
         self.assertIn('id="audit-countdown-value"', html)
+        self.assertIn('id="audit-countdown-blurb"', html)
         self.assertIn("setInterval", html)
         self.assertIn("1000", html)
         self.assertIn("data-next-audit", html)
+        # Honest 4h job: security audit + temp scratch; not full erase
+        low = html.lower()
+        self.assertIn("security audit", low)
+        self.assertIn("4h", low)
+        self.assertIn("scratch", low)
+        self.assertIn("not a full", low)
+        self.assertNotIn("restore internet", low)
+        self.assertNotIn("full disk wipe", low)
 
     def test_status_render_html_includes_live_countdown(self):
         """Drive shipped status_page.render_html entry point."""
         page = status_app.render_html({"title": "RESTORE PRIVACY"}).decode("utf-8")
         self.assertIn("time til next audit", page)
+        self.assertIn("wipedown", page)
         self.assertIn('id="audit-countdown"', page)
         self.assertIn('id="audit-countdown-value"', page)
+        self.assertIn('id="audit-countdown-blurb"', page)
+        self.assertIn("security audit", page.lower())
         self.assertIn("setInterval", page)
+        self.assertIn("audit-countdown-blurb", page)
         # Still no client count poll
         self.assertNotIn("clients-connected", page)
         self.assertNotIn("fetch('/api/status'", page)
+
+    def test_blurb_honesty_markers(self):
+        """Canonical blurb: audit + period + scratch wipe; no full host/device wipe claim."""
+        blurb = TIME_TIL_NEXT_AUDIT_BLURB.lower()
+        self.assertIn("security audit", blurb)
+        self.assertIn("4h", blurb)
+        self.assertTrue("scratch" in blurb or "temporary" in blurb)
+        self.assertIn("not a full", blurb)
+        self.assertNotIn("restore internet", blurb)
+        self.assertNotIn("luks format", blurb)
+        self.assertIn("wipedown", TIME_TIL_NEXT_AUDIT_LABEL)
 
 
 if __name__ == "__main__":

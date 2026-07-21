@@ -1,13 +1,17 @@
 """Next security-audit countdown (4h cadence from last audit write).
 
-Used by the public status page **time til next audit** real-time counter.
+Used by the public status page real-time counter.
 Source of truth for last run: ``status_page/static/security_audit_latest.json``
 ``generated_at`` (written by ``scripts/run_security_audit.py --write``).
 Period matches ``scripts/install_security_audit_timer.sh`` default ``PERIOD=4h``.
+
+Honest job: security audit probes + public AUDIT refresh + temporary audit
+scratch wipe — not a full VPS disk wipe or end-user **Restore Internet**.
 """
 
 from __future__ import annotations
 
+import html
 import json
 import re
 from datetime import datetime, timedelta, timezone
@@ -18,7 +22,13 @@ from typing import Any
 AUDIT_PERIOD = timedelta(hours=4)
 AUDIT_PERIOD_SECONDS = int(AUDIT_PERIOD.total_seconds())  # 14400
 
-TIME_TIL_NEXT_AUDIT_LABEL = "time til next audit"
+# Portal homepage: short label + one-line honesty (what the ~4h timer actually does)
+TIME_TIL_NEXT_AUDIT_LABEL = "time til next audit / wipedown"
+TIME_TIL_NEXT_AUDIT_BLURB = (
+    "~every 4h: security audit (node probes, package confidence, privacy checks) "
+    "refreshes the public audit; temporary audit scratch is wiped — "
+    "not a full server or device erase"
+)
 
 _STATIC_DIR = Path(__file__).resolve().parent / "static"
 _DEFAULT_JSON = _STATIC_DIR / "security_audit_latest.json"
@@ -123,6 +133,7 @@ def countdown_state(
             "display": "—",
             "period_seconds": int(p.total_seconds()),
             "label": TIME_TIL_NEXT_AUDIT_LABEL,
+            "blurb": TIME_TIL_NEXT_AUDIT_BLURB,
         }
     nxt = next_audit_at(last, p)
     rem = remaining_seconds_until(nxt, now=now)
@@ -134,6 +145,7 @@ def countdown_state(
         "display": format_countdown(rem),
         "period_seconds": int(p.total_seconds()),
         "label": TIME_TIL_NEXT_AUDIT_LABEL,
+        "blurb": TIME_TIL_NEXT_AUDIT_BLURB,
     }
 
 
@@ -142,16 +154,20 @@ def render_audit_countdown_html(
     now: datetime | None = None,
     json_path: Path | None = None,
 ) -> str:
-    """HTML fragment: label + live-updating countdown (1s ``setInterval``)."""
+    """HTML fragment: label + countdown + honest blurb (1s ``setInterval``)."""
     state = countdown_state(now=now, json_path=json_path)
-    label = state["label"]
-    display = state["display"]
-    next_iso = state.get("next_audit_at") or ""
+    label = html.escape(str(state["label"]))
+    blurb = html.escape(str(state.get("blurb") or TIME_TIL_NEXT_AUDIT_BLURB))
+    display = html.escape(str(state["display"]))
+    next_iso = html.escape(str(state.get("next_audit_at") or ""))
     available = "1" if state["available"] else "0"
     # data-next-audit is ISO Z used by client JS; empty when unavailable
     return f"""  <div class="audit-countdown" id="audit-countdown" data-available="{available}" data-next-audit="{next_iso}" data-period-seconds="{state['period_seconds']}">
-    <span class="audit-countdown-label">{label}</span>
-    <span class="audit-countdown-value" id="audit-countdown-value" aria-live="polite">{display}</span>
+    <div class="audit-countdown-row">
+      <span class="audit-countdown-label">{label}</span>
+      <span class="audit-countdown-value" id="audit-countdown-value" aria-live="polite">{display}</span>
+    </div>
+    <p class="audit-countdown-blurb" id="audit-countdown-blurb">{blurb}</p>
   </div>
   <script>
   (function () {{
