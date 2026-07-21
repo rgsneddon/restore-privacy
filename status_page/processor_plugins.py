@@ -133,7 +133,9 @@ def _stripe_readiness() -> dict[str, Any]:
     from payments import (
         PRICE_LABEL,
         public_base_url,
+        stripe_payment_page_url,
         stripe_price_id,
+        stripe_remaining_required_keys,
         stripe_secret_key,
         stripe_webhook_secret,
     )
@@ -141,6 +143,8 @@ def _stripe_readiness() -> dict[str, Any]:
     secret = stripe_secret_key()
     webhook = stripe_webhook_secret()
     price = stripe_price_id()
+    pay_page = stripe_payment_page_url()
+    remaining = stripe_remaining_required_keys()
     mode = "unconfigured"
     if secret.startswith("sk_live_"):
         mode = "live"
@@ -149,14 +153,28 @@ def _stripe_readiness() -> dict[str, Any]:
     elif secret:
         mode = "configured"
     return {
+        # Payment page alone is not "ready" for paid-download fulfilment
         "ready": bool(secret and webhook),
         "checkout_ready": bool(secret),
         "fulfilment_ready": bool(secret and webhook),
+        "payment_page_ready": bool(
+            pay_page.startswith("https://donate.stripe.com/")
+            or pay_page.startswith("https://buy.stripe.com/")
+            or "stripe.com" in pay_page
+        ),
+        "payment_page_url": pay_page,
+        "remaining_required": remaining,
+        "whats_next": remaining,
         "fields": {
             "STRIPE_SECRET_KEY": bool(secret),
             "STRIPE_WEBHOOK_SECRET": bool(webhook),
             "STRIPE_PRICE_ID": bool(price),
-            "RPT_PUBLIC_BASE_URL": bool(public_base_url()),
+            "RPT_PUBLIC_BASE_URL": bool(
+                public_base_url()
+                and public_base_url() != "http://127.0.0.1:10000"
+            )
+            or bool(os.environ.get("RPT_PUBLIC_BASE_URL", "").strip()),
+            "STRIPE_PAYMENT_PAGE_URL": bool(pay_page),
         },
         "stripe_mode": mode,
         "price_label": PRICE_LABEL,
@@ -185,13 +203,17 @@ def _bmc_readiness() -> dict[str, Any]:
 # Plugin catalog
 # ---------------------------------------------------------------------------
 
+# Lazy import avoided: payments does not import this module.
+from payments import DEFAULT_STRIPE_PAYMENT_PAGE_URL  # noqa: E402
+
 STRIPE_PLUGIN = ProcessorPlugin(
     id="stripe",
     display_name="Stripe",
     role="paid_downloads",
     description=(
-        "Paid package downloads (£2.45 GBP) via Stripe Checkout. "
-        "Enter API and webhook secrets from your Stripe Dashboard — never commit them."
+        "Paid package downloads (£2.45 GBP) via Stripe Checkout API. "
+        "A public Payment Link / Donate page can be registered separately; "
+        "Checkout fulfilment still needs secret key + webhook — never commit them."
     ),
     variables=(
         ProcessorVariable(
@@ -230,12 +252,22 @@ STRIPE_PLUGIN = ProcessorPlugin(
             input_type="url",
             placeholder="https://restore-privacy-status.onrender.com",
         ),
+        ProcessorVariable(
+            key="STRIPE_PAYMENT_PAGE_URL",
+            label="Public payment page (Payment Link / Donate)",
+            purpose="Operator Stripe donate/pay page — public URL, not a secret",
+            required=False,
+            secret=False,
+            input_type="url",
+            placeholder="https://donate.stripe.com/…",
+        ),
     ),
     dashboard_links=(
         ("Dashboard", "https://dashboard.stripe.com"),
         ("API keys", "https://dashboard.stripe.com/apikeys"),
         ("Webhooks", "https://dashboard.stripe.com/webhooks"),
         ("Payments", "https://dashboard.stripe.com/payments"),
+        ("Payment page", DEFAULT_STRIPE_PAYMENT_PAGE_URL),
     ),
     readiness_fn=_stripe_readiness,
 )

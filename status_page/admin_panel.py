@@ -21,7 +21,9 @@ from payments import (
     PRICE_PENCE,
     list_recent_grants,
     public_base_url,
+    stripe_payment_page_url,
     stripe_price_id,
+    stripe_remaining_required_keys,
     stripe_secret_key,
     stripe_webhook_secret,
 )
@@ -433,6 +435,7 @@ def processor_settings_view() -> dict[str, Any]:
     mode = stripe_key_mode_label(secret)
     stripe_ready = bool(secret)
     webhook_ready = bool(webhook)
+    remaining = stripe_remaining_required_keys()
     return {
         "stripe_configured": stripe_ready,
         "stripe_webhook_configured": webhook_ready,
@@ -440,6 +443,9 @@ def processor_settings_view() -> dict[str, Any]:
         "stripe_mode": mode,
         "stripe_checkout_ready": stripe_ready,  # Checkout needs secret; webhook separate
         "stripe_fulfilment_ready": stripe_ready and webhook_ready,
+        "stripe_payment_page_url": stripe_payment_page_url(),
+        "stripe_remaining_required": remaining,
+        "stripe_whats_next": remaining,
         "price_label": PRICE_LABEL,
         "price_pence": PRICE_PENCE,
         "public_base_url": public_base_url(),
@@ -618,8 +624,32 @@ def render_processor_settings_html(
         fields_html = "\n".join(form_fields)
         extra_status = ""
         if pid == "stripe":
+            pay_page = str(v.get("stripe_payment_page_url") or stripe_payment_page_url())
+            remaining = v.get("stripe_whats_next")
+            if remaining is None:
+                remaining = stripe_remaining_required_keys()
+            remaining_list = list(remaining or [])
+            if remaining_list:
+                next_items = "".join(
+                    f"<li><code>{_escape(str(k))}</code></li>" for k in remaining_list
+                )
+                next_html = (
+                    f'<div id="stripe-whats-next" class="whats-next">'
+                    f"<strong>What&apos;s next for paid downloads:</strong>"
+                    f"<ul id=\"stripe-remaining-required\">{next_items}</ul>"
+                    f"<p class=\"muted\">The payment page alone does not enable Checkout "
+                    f"token fulfilment — enter the secret key and webhook signing secret "
+                    f"from Stripe Dashboard → Developers.</p></div>"
+                )
+            else:
+                next_html = (
+                    '<div id="stripe-whats-next" class="whats-next">'
+                    "<p><strong>Paid-download connection complete</strong> "
+                    "(secret + webhook present).</p></div>"
+                )
             extra_status = f"""
   <dl id="admin-stripe-status" class="status-list">
+    <div><dt>Payment page</dt><dd id="stripe-payment-page"><a href="{_escape(pay_page)}" target="_blank" rel="noopener noreferrer" id="link-stripe-payment-page">{_escape(pay_page)}</a></dd></div>
     <div><dt>Secret key</dt><dd id="stripe-secret-status">{_status_badge(bool(v.get("stripe_configured")))}</dd></div>
     <div><dt>Key mode</dt><dd id="stripe-key-mode">{_escape(stripe_mode)}</dd></div>
     <div><dt>Webhook signing secret</dt><dd id="stripe-webhook-status">{_status_badge(bool(v.get("stripe_webhook_configured")))}</dd></div>
@@ -628,7 +658,8 @@ def render_processor_settings_html(
     <div><dt>Fulfilment ready (key + webhook)</dt><dd id="stripe-fulfilment-ready">{_status_badge(bool(v.get("stripe_fulfilment_ready")))}</dd></div>
     <div><dt>Public base URL</dt><dd id="stripe-public-base"><code>{_escape(base)}</code></dd></div>
     <div><dt>Webhook endpoint</dt><dd id="stripe-webhook-url"><code>{_escape(webhook_url)}</code></dd></div>
-  </dl>"""
+  </dl>
+  {next_html}"""
         if pid == "bmc":
             extra_status = f"""
   <dl id="admin-bmc-status" class="status-list">

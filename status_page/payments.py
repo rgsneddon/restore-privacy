@@ -60,6 +60,43 @@ def stripe_price_id() -> str:
     return os.environ.get("STRIPE_PRICE_ID", "").strip()
 
 
+# Public Stripe Payment Link / Donate page (not a secret — operator-provided).
+# Does **not** enable Checkout token fulfilment by itself.
+DEFAULT_STRIPE_PAYMENT_PAGE_URL = (
+    "https://donate.stripe.com/cNi7sM4uOeWQ9TBe0q7kc00"
+)
+
+
+def stripe_payment_page_url() -> str:
+    """Operator Stripe payment page (Payment Link / Donate). Public, non-secret.
+
+    Override with ``STRIPE_PAYMENT_PAGE_URL`` or ``RPT_STRIPE_PAYMENT_PAGE_URL``.
+    """
+    for key in ("STRIPE_PAYMENT_PAGE_URL", "RPT_STRIPE_PAYMENT_PAGE_URL"):
+        raw = os.environ.get(key, "").strip()
+        if raw:
+            return raw.rstrip("/")
+    return DEFAULT_STRIPE_PAYMENT_PAGE_URL
+
+
+def stripe_remaining_required_keys() -> list[str]:
+    """Env keys still needed for paid-download Checkout + webhook fulfilment.
+
+    The payment page URL alone never clears this list.
+    """
+    missing: list[str] = []
+    if not stripe_secret_key():
+        missing.append("STRIPE_SECRET_KEY")
+    if not stripe_webhook_secret():
+        missing.append("STRIPE_WEBHOOK_SECRET")
+    # public_base_url always has a default; still flag empty override if explicitly blank
+    base = os.environ.get("RPT_PUBLIC_BASE_URL", "").strip()
+    if not base and public_base_url() in ("", "http://127.0.0.1:10000"):
+        # Recommend setting production base URL when still on local default
+        missing.append("RPT_PUBLIC_BASE_URL")
+    return missing
+
+
 def public_base_url() -> str:
     """Canonical public site URL for success/cancel/webhook (no trailing slash)."""
     return os.environ.get("RPT_PUBLIC_BASE_URL", "http://127.0.0.1:10000").rstrip("/")

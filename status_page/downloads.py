@@ -148,9 +148,13 @@ def download_css() -> str:
 
 
 def render_rust_footer_html() -> str:
-    """Footer under download buttons — release source + tip link."""
+    """Footer under download buttons — release source + tip / Stripe payment page."""
+    # Local import avoids circular import (payments → downloads).
+    from payments import stripe_payment_page_url
+
     tip = coffee_tip_url()
     tip_label = tip.replace("https://", "").replace("http://", "")
+    pay_page = stripe_payment_page_url()
     return (
         f'    <p class="dl-footer" id="rust-repo-footer">'
         f'<a class="rust-link" id="rust-repo-link" href="{RUST_REPO_URL}" '
@@ -158,7 +162,9 @@ def render_rust_footer_html() -> str:
         f'    <p class="dl-tip" id="bmc-tip">'
         f'Tip / support (not a paid download): '
         f'<a id="bmc-tip-link" href="{tip}" rel="noopener noreferrer" '
-        f'target="_blank">{tip_label}</a></p>'
+        f'target="_blank">{tip_label}</a>'
+        f' · <a id="stripe-payment-page-link" href="{pay_page}" rel="noopener noreferrer" '
+        f'target="_blank">Stripe payment page</a></p>'
     )
 
 
