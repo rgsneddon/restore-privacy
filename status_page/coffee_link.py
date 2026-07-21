@@ -2,8 +2,20 @@
 
 from __future__ import annotations
 
+import os
+
 COFFEE_LINK_TEXT = "buy rus a coffee"
 COFFEE_LINK_URL = "https://buymeacoffee.com/rgsneddon"
+
+
+def coffee_tip_url() -> str:
+    """Public tip URL (env RPT_BMC_TIP_URL overrides default product page)."""
+    return os.environ.get("RPT_BMC_TIP_URL", "").strip() or COFFEE_LINK_URL
+
+
+def coffee_tip_label() -> str:
+    """Footer link text (env RPT_BMC_TIP_LABEL overrides default)."""
+    return os.environ.get("RPT_BMC_TIP_LABEL", "").strip() or COFFEE_LINK_TEXT
 
 
 def coffee_link_css() -> str:
@@ -29,12 +41,25 @@ def coffee_link_css() -> str:
 
 
 def render_coffee_link_html() -> str:
-    """Footer fragment: exact link text and URL, bottom-centre placement."""
+    """Footer fragment: tip URL + label, bottom-centre placement."""
+    url = coffee_tip_url()
+    label = coffee_tip_label()
+    # Minimal attribute escape
+    safe_url = (
+        url.replace("&", "&amp;")
+        .replace('"', "&quot;")
+        .replace("<", "&lt;")
+    )
+    safe_label = (
+        label.replace("&", "&amp;")
+        .replace("<", "&lt;")
+        .replace(">", "&gt;")
+    )
     return f"""
   <footer class="coffee-footer" id="coffee-footer">
     <a class="coffee-link"
-       href="{COFFEE_LINK_URL}"
+       href="{safe_url}"
        target="_blank"
-       rel="noopener noreferrer">{COFFEE_LINK_TEXT}</a>
+       rel="noopener noreferrer">{safe_label}</a>
   </footer>
 """

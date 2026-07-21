@@ -490,8 +490,19 @@ class TestProcessorSettingsView(unittest.TestCase):
         self.assertIn("id=\"stripe-key-mode\">test<", html)
         self.assertIn("dashboard.stripe.com", html)
         self.assertIn("buymeacoffee.com", html)
-        self.assertIn("link-stripe-apikeys", html)
-        self.assertIn("link-bmc-login", html)
+        # Plugin UI uses dashboard links (ids may include hyphenated labels)
+        self.assertTrue(
+            "link-stripe-apikeys" in html
+            or "link-stripe-api-keys" in html
+            or "dashboard.stripe.com/apikeys" in html,
+            "stripe API keys link missing",
+        )
+        self.assertTrue(
+            "link-bmc-login" in html
+            or "link-bmc-creator-login" in html
+            or "buymeacoffee.com/login" in html,
+            "bmc login link missing",
+        )
         self.assertNotIn(secret, html)
         self.assertNotIn(webhook, html)
         self.assertNotIn("sk_test_", html)

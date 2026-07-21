@@ -15,7 +15,7 @@ import secrets
 import time
 from typing import Any
 
-from coffee_link import COFFEE_LINK_TEXT, COFFEE_LINK_URL
+from coffee_link import COFFEE_LINK_TEXT, coffee_tip_url
 from payments import (
     PRICE_LABEL,
     PRICE_PENCE,
@@ -24,6 +24,10 @@ from payments import (
     stripe_price_id,
     stripe_secret_key,
     stripe_webhook_secret,
+)
+from processor_plugins import (
+    list_processor_plugins,
+    processor_plugin_views,
 )
 
 SESSION_COOKIE = "rpt_admin_session"
@@ -444,8 +448,9 @@ def processor_settings_view() -> dict[str, Any]:
         "stripe_payments_url": STRIPE_DASHBOARD_PAYMENTS_URL,
         "stripe_webhooks_url": STRIPE_DASHBOARD_WEBHOOKS_URL,
         "stripe_apikeys_url": STRIPE_DASHBOARD_APIKEYS_URL,
-        "bmc_tip_url": COFFEE_LINK_URL,
-        "bmc_tip_label": COFFEE_LINK_TEXT,
+        "bmc_tip_url": coffee_tip_url(),
+        "bmc_tip_label": os.environ.get("RPT_BMC_TIP_LABEL", "").strip()
+        or COFFEE_LINK_TEXT,
         "bmc_dashboard_url": BMC_DASHBOARD_URL,
         "bmc_role": "tip_support_only",
         # Explicit: secrets never leave the view model as values
@@ -531,10 +536,19 @@ def _status_badge(ok: bool, yes: str = "ready", no: str = "not set") -> str:
     return f'<span class="badge {cls}" data-ready="{"1" if ok else "0"}">{_escape(label)}</span>'
 
 
-def render_processor_settings_html(view: dict[str, Any] | None = None) -> str:
-    """HTML fragment: payment-processor settings/status (authenticated admin only)."""
+def render_processor_settings_html(
+    view: dict[str, Any] | None = None,
+    *,
+    message: str = "",
+    error: str = "",
+    plugin_views: list[dict[str, Any]] | None = None,
+) -> str:
+    """HTML fragment: plugin-driven processor detail + variable entry forms.
+
+    Authenticated admin only. Secret fields are write-only (never prefilled).
+    """
     v = view if view is not None else processor_settings_view()
-    # Hard guarantee: never emit raw secret env values if somehow present
+    plugins = plugin_views if plugin_views is not None else processor_plugin_views()
     forbidden_fragments = (
         "sk_live_",
         "sk_test_",
@@ -544,14 +558,67 @@ def render_processor_settings_html(view: dict[str, Any] | None = None) -> str:
     stripe_mode = str(v.get("stripe_mode") or "unconfigured")
     base = str(v.get("public_base_url") or "")
     webhook_url = f"{base.rstrip('/')}{v.get('webhook_path') or '/webhook/stripe'}"
-    frag = f"""
-<section id="admin-processor-settings" class="card">
-  <h2>Payment processor settings</h2>
-  <p class="muted">Readiness from host environment. Secrets stay on the server
-  (Render env) — log into Stripe / Buy Me a Coffee dashboards with your own accounts
-  to change keys, webhooks, and payouts.</p>
+    msg_html = (
+        f'<p class="ok-msg" id="processor-apply-ok">{_escape(message)}</p>' if message else ""
+    )
+    err_html = (
+        f'<p class="err" id="processor-apply-error">{_escape(error)}</p>' if error else ""
+    )
 
-  <h3 id="admin-stripe-heading">Stripe (paid downloads { _escape(str(v.get('price_label') or '')) })</h3>
+    plugin_blocks: list[str] = []
+    for pv in plugins:
+        pid = _escape(str(pv.get("id") or ""))
+        name = _escape(str(pv.get("display_name") or ""))
+        role = _escape(str(pv.get("role") or ""))
+        desc = _escape(str(pv.get("description") or ""))
+        ready = pv.get("readiness") or {}
+        ready_flag = bool(ready.get("ready") or ready.get("fulfilment_ready") or ready.get("checkout_ready"))
+        badge = _status_badge(ready_flag, "connection ready", "needs variables")
+        links = []
+        for ln in pv.get("dashboard_links") or []:
+            links.append(
+                f'<a href="{_escape(str(ln.get("url") or ""))}" target="_blank" '
+                f'rel="noopener noreferrer" id="link-{pid}-{_escape(str(ln.get("label") or "").lower().replace(" ", "-"))}">'
+                f'{_escape(str(ln.get("label") or ""))}</a>'
+            )
+        links_html = " · ".join(links) if links else ""
+        # Variable checklist + form fields
+        rows = []
+        form_fields = []
+        for var in pv.get("variables") or []:
+            key = str(var.get("key") or "")
+            configured = bool(var.get("configured"))
+            rows.append(
+                "<tr>"
+                f"<td><code class=\"var-key\">{_escape(key)}</code></td>"
+                f"<td>{_escape(str(var.get('label') or ''))}</td>"
+                f"<td>{'required' if var.get('required') else 'optional'}</td>"
+                f"<td>{_status_badge(configured, 'set', 'not set')}</td>"
+                f"<td class=\"muted\">{_escape(str(var.get('purpose') or ''))}</td>"
+                "</tr>"
+            )
+            itype = str(var.get("input_type") or "text")
+            if var.get("secret"):
+                itype = "password"
+            ph = _escape(str(var.get("placeholder") or ""))
+            autocomplete = "off" if var.get("secret") else "on"
+            form_fields.append(
+                f'<label class="field" for="fld-{pid}-{_escape(key)}">'
+                f'<span class="field-label">{_escape(str(var.get("label") or key))}'
+                f'{" *" if var.get("required") else ""}</span>'
+                f'<span class="field-key"><code>{_escape(key)}</code></span>'
+                f'<input id="fld-{pid}-{_escape(key)}" name="{_escape(key)}" type="{_escape(itype)}" '
+                f'placeholder="{ph}" autocomplete="{autocomplete}" '
+                f'{"value=\"\" " if var.get("secret") else ""}'
+                f'/>'
+                f'<span class="field-purpose muted">{_escape(str(var.get("purpose") or ""))}</span>'
+                f"</label>"
+            )
+        table = "\n".join(rows) if rows else "<tr><td colspan=5>No variables</td></tr>"
+        fields_html = "\n".join(form_fields)
+        extra_status = ""
+        if pid == "stripe":
+            extra_status = f"""
   <dl id="admin-stripe-status" class="status-list">
     <div><dt>Secret key</dt><dd id="stripe-secret-status">{_status_badge(bool(v.get("stripe_configured")))}</dd></div>
     <div><dt>Key mode</dt><dd id="stripe-key-mode">{_escape(stripe_mode)}</dd></div>
@@ -561,34 +628,65 @@ def render_processor_settings_html(view: dict[str, Any] | None = None) -> str:
     <div><dt>Fulfilment ready (key + webhook)</dt><dd id="stripe-fulfilment-ready">{_status_badge(bool(v.get("stripe_fulfilment_ready")))}</dd></div>
     <div><dt>Public base URL</dt><dd id="stripe-public-base"><code>{_escape(base)}</code></dd></div>
     <div><dt>Webhook endpoint</dt><dd id="stripe-webhook-url"><code>{_escape(webhook_url)}</code></dd></div>
-  </dl>
-  <p class="ops-links" id="admin-stripe-links">
-    Operator logins (Stripe account):
-    <a href="{_escape(str(v.get('stripe_dashboard_url') or ''))}" target="_blank" rel="noopener noreferrer" id="link-stripe-dashboard">Dashboard</a>
-    · <a href="{_escape(str(v.get('stripe_apikeys_url') or ''))}" target="_blank" rel="noopener noreferrer" id="link-stripe-apikeys">API keys</a>
-    · <a href="{_escape(str(v.get('stripe_webhooks_url') or ''))}" target="_blank" rel="noopener noreferrer" id="link-stripe-webhooks">Webhooks</a>
-    · <a href="{_escape(str(v.get('stripe_payments_url') or ''))}" target="_blank" rel="noopener noreferrer" id="link-stripe-payments">Payments</a>
-  </p>
-
-  <h3 id="admin-bmc-heading">Buy Me a Coffee (tip / support only)</h3>
-  <p class="muted">BMC does <strong>not</strong> mint download tokens. Tips go to the creator page.</p>
+  </dl>"""
+        if pid == "bmc":
+            extra_status = f"""
   <dl id="admin-bmc-status" class="status-list">
     <div><dt>Public tip URL</dt><dd id="bmc-tip-url"><a href="{_escape(str(v.get('bmc_tip_url') or ''))}" target="_blank" rel="noopener noreferrer">{_escape(str(v.get('bmc_tip_url') or ''))}</a></dd></div>
     <div><dt>Footer label</dt><dd id="bmc-tip-label">{_escape(str(v.get('bmc_tip_label') or ''))}</dd></div>
     <div><dt>Role</dt><dd id="bmc-role">{_escape(str(v.get('bmc_role') or ''))}</dd></div>
-  </dl>
-  <p class="ops-links" id="admin-bmc-links">
-    Operator login (BMC):
-    <a href="{_escape(str(v.get('bmc_dashboard_url') or ''))}" target="_blank" rel="noopener noreferrer" id="link-bmc-login">Creator login</a>
-  </p>
+  </dl>"""
+        plugin_blocks.append(
+            f"""
+<article class="processor-plugin" id="processor-plugin-{pid}" data-processor="{pid}">
+  <header class="plugin-head">
+    <h3 id="admin-{pid}-heading">{name}</h3>
+    <span class="plugin-role">{role}</span>
+    <span id="{pid}-connection-badge">{badge}</span>
+  </header>
+  <p class="muted plugin-desc">{desc}</p>
+  {extra_status}
+  <p class="ops-links" id="admin-{pid}-links">Operator dashboards: {links_html}</p>
+  <h4>Variables to enter</h4>
+  <table class="var-table" id="{pid}-variables-table">
+    <thead><tr><th>Env key</th><th>Label</th><th>Need</th><th>Status</th><th>Purpose</th></tr></thead>
+    <tbody>
+{table}
+    </tbody>
+  </table>
+  <form method="post" action="/admin/processors/apply" class="processor-form"
+        id="form-processor-{pid}" data-processor="{pid}">
+    <input type="hidden" name="plugin_id" value="{pid}"/>
+    {fields_html}
+    <button type="submit" id="btn-apply-{pid}">Save {name} connection</button>
+    <p class="muted field-note">Secret fields are write-only — leave blank to keep the existing value.
+    Values apply to this process and local data store (not committed to git).</p>
+  </form>
+</article>
+"""
+        )
+
+    plugins_html = "\n".join(plugin_blocks)
+    # Plugin option list for selector navigation
+    option_links = " · ".join(
+        f'<a href="#processor-plugin-{_escape(str(p.get("id") or ""))}">'
+        f'{_escape(str(p.get("display_name") or ""))}</a>'
+        for p in plugins
+    )
+    frag = f"""
+<section id="admin-processor-settings" class="card">
+  <h2>Payment processor settings</h2>
+  <p class="muted">Each connection option is a <strong>processor plugin</strong> with the correct
+  variables to enter for that payment path. Secrets stay on the server — never shown after save.
+  Prefer host/Render env for production permanence; local apply wires the running process.</p>
+  <nav class="plugin-nav" id="processor-plugin-nav" aria-label="Processor plugins">{option_links}</nav>
+  {msg_html}{err_html}
+{plugins_html}
 </section>
 """
     low = frag.lower()
     for bad in forbidden_fragments:
-        # Allow the string "sk_test_" only inside prose? We never put keys in HTML.
-        # stripe_mode is only "test"/"live"/… without sk_ prefix.
         if bad.lower() in low and bad not in ("RPT_ADMIN_PASSWORD",):
-            # If a secret prefix leaked, strip entire settings to safe placeholder
             return (
                 '<section id="admin-processor-settings"><p class="err">'
                 "Settings redacted (secret material detected).</p></section>"
@@ -596,7 +694,12 @@ def render_processor_settings_html(view: dict[str, Any] | None = None) -> str:
     return frag
 
 
-def render_admin_html(grants: list[dict[str, Any]] | None = None) -> bytes:
+def render_admin_html(
+    grants: list[dict[str, Any]] | None = None,
+    *,
+    message: str = "",
+    error: str = "",
+) -> bytes:
     """Full private admin page: processor settings + payment grants administration."""
     projected = project_grants_for_admin(grants)
     rows = []
@@ -620,7 +723,7 @@ def render_admin_html(grants: list[dict[str, Any]] | None = None) -> bytes:
         if rows
         else '<tr><td colspan="6">No grants yet</td></tr>'
     )
-    settings_html = render_processor_settings_html()
+    settings_html = render_processor_settings_html(message=message, error=error)
     body = f"""<!DOCTYPE html>
 <html lang="en"><head>
 <meta charset="utf-8"/><meta name="viewport" content="width=device-width, initial-scale=1"/>
@@ -630,7 +733,7 @@ def render_admin_html(grants: list[dict[str, Any]] | None = None) -> bytes:
 {admin_theme_css()}
 body{{margin:0;padding:1.5rem}}
 h1{{font-size:1.25rem;margin:0}} h2{{font-size:1.05rem;margin:0 0 0.5rem}}
-h3{{font-size:0.95rem;margin:1rem 0 0.4rem}}
+h3{{font-size:0.95rem;margin:1rem 0 0.4rem}} h4{{font-size:0.9rem;margin:0.75rem 0 0.35rem}}
 table{{border-collapse:collapse;width:100%;max-width:56rem;font-size:0.9rem}}
 th,td{{border-bottom:1px solid var(--table-border);padding:0.45rem 0.5rem;text-align:left}}
 th{{color:var(--fg-muted);font-weight:600}}
@@ -649,6 +752,20 @@ font-weight:600}}
 .ops-links{{font-size:0.9rem;margin:0.75rem 0 0.25rem}}
 .nav-local a{{margin-right:0.75rem;font-size:0.9rem}}
 code{{font-size:0.85rem;word-break:break-all}}
+.processor-plugin{{border-top:1px solid var(--border);margin-top:1.25rem;padding-top:1rem}}
+.plugin-head{{display:flex;flex-wrap:wrap;gap:0.5rem 0.75rem;align-items:center}}
+.plugin-role{{font-size:0.8rem;color:var(--fg-muted)}}
+.var-table{{margin:0.5rem 0 1rem;font-size:0.85rem}}
+.processor-form label.field{{display:block;margin:0.65rem 0}}
+.processor-form .field-label{{display:block;font-weight:600;font-size:0.9rem}}
+.processor-form .field-key{{display:block;font-size:0.8rem;margin:0.15rem 0}}
+.processor-form input{{width:100%;max-width:28rem;box-sizing:border-box;padding:0.5rem 0.6rem;
+border-radius:8px;border:1px solid var(--input-border);background:var(--input-bg);color:var(--fg)}}
+.processor-form button{{margin-top:0.75rem;padding:0.55rem 1rem;border:0;border-radius:8px;
+background:var(--btn-bg);color:var(--btn-fg);font-weight:600;cursor:pointer}}
+.ok-msg{{color:var(--badge-ok-fg);background:var(--badge-ok-bg);padding:0.5rem 0.75rem;border-radius:8px}}
+.err{{color:var(--err)}}
+.plugin-nav{{margin:0.5rem 0 1rem;font-size:0.9rem}}
 </style>
 {admin_theme_boot_script()}
 </head><body>

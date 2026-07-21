@@ -13,7 +13,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Iterable
 
-from coffee_link import COFFEE_LINK_URL
+from coffee_link import COFFEE_LINK_URL, coffee_tip_url
 
 RELEASE_VERSION = "0.2.3"
 GITHUB_OWNER = "rgsneddon"
@@ -34,7 +34,8 @@ IOS_ZIP_FILENAME = f"restore-privacy-client-{RELEASE_VERSION}-ios.zip"
 LINUX_TGZ_FILENAME = f"restore-privacy-client-{RELEASE_VERSION}-linux-x64.tar.gz"
 
 PRICE_LABEL = "£2.45"
-BMC_TIP_URL = COFFEE_LINK_URL  # https://buymeacoffee.com/rgsneddon
+# Default tip identity; runtime public page uses coffee_tip_url() (env override).
+BMC_TIP_URL = COFFEE_LINK_URL
 
 
 @dataclass(frozen=True)
@@ -148,14 +149,16 @@ def download_css() -> str:
 
 def render_rust_footer_html() -> str:
     """Footer under download buttons — release source + tip link."""
+    tip = coffee_tip_url()
+    tip_label = tip.replace("https://", "").replace("http://", "")
     return (
         f'    <p class="dl-footer" id="rust-repo-footer">'
         f'<a class="rust-link" id="rust-repo-link" href="{RUST_REPO_URL}" '
         f'rel="noopener noreferrer" target="_blank">{RUST_REPO_LABEL}</a></p>\n'
         f'    <p class="dl-tip" id="bmc-tip">'
         f'Tip / support (not a paid download): '
-        f'<a id="bmc-tip-link" href="{BMC_TIP_URL}" rel="noopener noreferrer" '
-        f'target="_blank">buymeacoffee.com/rgsneddon</a></p>'
+        f'<a id="bmc-tip-link" href="{tip}" rel="noopener noreferrer" '
+        f'target="_blank">{tip_label}</a></p>'
     )
 
 

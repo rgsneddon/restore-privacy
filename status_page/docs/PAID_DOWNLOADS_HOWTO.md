@@ -109,9 +109,10 @@ This is the **private** architecture on the same Render service — not the publ
 2. Open `https://YOUR-STATUS-HOST/admin` (operator only).
 3. Sign in with **status-page** credentials (not your Stripe or BMC dashboard passwords). Username defaults to `admin`.
 4. After login you get one admin surface:
-   - **Payment processor settings** — Stripe readiness (secret key / webhook / mode test|live), Checkout + fulfilment ready flags, public base URL + webhook endpoint path, deep links to Stripe Dashboard (API keys, webhooks, payments). Buy Me a Coffee tip URL + creator login link. **No secret keys are shown in HTML.**
+   - **Payment processor settings (`#admin-processor-settings`)** — each processor is a **plugin** (Stripe paid downloads, BMC tip-only) listing the **correct env variable names** to enter, readiness, and dashboard links. Forms POST to `/admin/processors/apply` (write-only secrets; never echoed). Applied values update the running process and optional local `status_page/data/processor_env.json` (gitignored). Prefer Render env for production permanence.
    - **Paid download grants** — recent Stripe-verified tokens (platform, filename, amount, used/unused, truncated token, session id) for fulfilment support.
-5. To **change** processor logins/keys: use the Stripe and BMC dashboard links from the settings section; update Render env vars; redeploy if needed. This site does not store editable secret forms in the browser.
+5. **Stripe variables:** `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, optional `STRIPE_PRICE_ID`, `RPT_PUBLIC_BASE_URL`.  
+   **BMC variables:** `RPT_BMC_TIP_URL`, optional `RPT_BMC_TIP_LABEL`.
 
 Unauthenticated visitors only see the login form; grants and processor readiness are not public.
 

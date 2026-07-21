@@ -38,6 +38,7 @@ from payments import (
     stripe_configured,
     wait_for_grant_by_session,
 )
+from processor_plugins import apply_processor_entry, apply_stored_env_to_process
 
 # Public page: title + BETA note + download buttons (no live client counter).
 
@@ -695,10 +696,38 @@ class Handler(BaseHTTPRequestHandler):
             self.end_headers()
             return
 
+        if path == "/admin/processors/apply":
+            if not admin_enabled():
+                self._send(503, "text/plain; charset=utf-8", b"admin disabled")
+                return
+            if not is_authenticated(self.headers):
+                self._send(200, "text/html; charset=utf-8", render_login_html())
+                return
+            form = dict(urllib.parse.parse_qsl(body.decode("utf-8", "replace")))
+            plugin_id = (form.get("plugin_id") or "").strip()
+            result = apply_processor_entry(plugin_id, form, persist=True)
+            if result.get("ok"):
+                keys = ", ".join(result.get("applied_keys") or []) or "(no new values)"
+                msg = f"Saved {plugin_id} connection variables: {keys}."
+                self._send(
+                    200,
+                    "text/html; charset=utf-8",
+                    render_admin_html(message=msg),
+                )
+            else:
+                err = "; ".join(result.get("errors") or ["apply failed"])
+                self._send(
+                    400,
+                    "text/html; charset=utf-8",
+                    render_admin_html(error=err),
+                )
+            return
+
         self._send(404, "text/plain; charset=utf-8", b"not found")
 
 
 def main() -> int:
+    apply_stored_env_to_process()
     init_db()
     host = os.environ.get("HOST", "0.0.0.0")
     port = int(os.environ.get("PORT", "10000"))
