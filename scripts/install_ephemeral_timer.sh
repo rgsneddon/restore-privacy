@@ -35,15 +35,22 @@ echo "[rpt-ephemeral] honesty: does not erase provider backups/netflow"
 echo "[rpt-ephemeral] honesty: re-ship public node pin if keys regenerate"
 
 mkdir -p "${INSTALL_ROOT}/scripts" "${INSTALL_ROOT}/node" "${INSTALL_ROOT}/var"
-cp -a "${SCRIPT_DIR}/ephemeral_node.py" "${INSTALL_ROOT}/scripts/" 2>/dev/null || \
-  cp -a "${REPO_ROOT}/scripts/ephemeral_node.py" "${INSTALL_ROOT}/scripts/"
-cp -a "${SCRIPT_DIR}/weekly_entry_rebuild.py" "${INSTALL_ROOT}/scripts/" 2>/dev/null || \
-  cp -a "${REPO_ROOT}/scripts/weekly_entry_rebuild.py" "${INSTALL_ROOT}/scripts/" 2>/dev/null || true
-# Ensure pure helper modules are available under install tree
-for mod in ephemeral_node.py rebuild_lock.py; do
-  if [[ -f "${REPO_ROOT}/node/${mod}" ]]; then
-    cp -a "${REPO_ROOT}/node/${mod}" "${INSTALL_ROOT}/node/" 2>/dev/null || true
+# Copy only when source ≠ dest (in-place install under INSTALL_ROOT is a no-op)
+_rpt_cp() {
+  local src="$1" dst="$2"
+  if [[ -f "$src" ]]; then
+    if [[ "$(readlink -f "$src" 2>/dev/null || realpath "$src" 2>/dev/null || echo "$src")" != \
+          "$(readlink -f "$dst" 2>/dev/null || realpath "$dst" 2>/dev/null || echo "$dst")" ]]; then
+      cp -a "$src" "$dst"
+    fi
   fi
+}
+_rpt_cp "${SCRIPT_DIR}/ephemeral_node.py" "${INSTALL_ROOT}/scripts/ephemeral_node.py"
+_rpt_cp "${REPO_ROOT}/scripts/ephemeral_node.py" "${INSTALL_ROOT}/scripts/ephemeral_node.py"
+_rpt_cp "${SCRIPT_DIR}/weekly_entry_rebuild.py" "${INSTALL_ROOT}/scripts/weekly_entry_rebuild.py"
+_rpt_cp "${REPO_ROOT}/scripts/weekly_entry_rebuild.py" "${INSTALL_ROOT}/scripts/weekly_entry_rebuild.py"
+for mod in ephemeral_node.py rebuild_lock.py; do
+  _rpt_cp "${REPO_ROOT}/node/${mod}" "${INSTALL_ROOT}/node/${mod}"
 done
 
 export PYTHONPATH="${REPO_ROOT}:${INSTALL_ROOT}"
