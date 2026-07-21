@@ -209,7 +209,7 @@ Re-run: `python3 scripts/run_security_audit.py --write`
 |-----|--------|
 | Public audit on private GitHub blob | **Fixed** — clients use status-origin `/AUDIT.md` |
 | Periodic node audit | **In tree** — 4h systemd timer |
-| Multi-hop residual | **In tree** — opt-in residual-via-exit (Romania); entry Iceland default |
+| Multi-hop residual | **In tree** — opt-in residual-via-exit (Romania); Linux/Android/Apple packages ship exit pub; Windows PE needs native rebuild for multihop code |
 | Kill-switch + DoT + outer obfs | In tree |
 | Ephemeral node rebuild | In tree (dry-run default) |
 

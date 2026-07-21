@@ -22,8 +22,12 @@ def _read(rel: str) -> str:
 class TestEndpointAlignment(unittest.TestCase):
     def test_flutter_rpt_config(self):
         text = _read("client_app/lib/rpt_config.dart")
-        self.assertIn(f"host = '{PRODUCT_HOST}'", text)
+        # Entry default + residual host getter (multi-hop may select exit)
+        self.assertIn(f"entryHost = '{PRODUCT_HOST}'", text)
+        self.assertIn("exitHost = '185.146.232.107'", text)
         self.assertIn(f"port = {PRODUCT_PORT}", text)
+        self.assertIn("static String get host", text)
+        self.assertIn("multiHopEnabled", text)
 
     def test_python_client_endpoint(self):
         text = _read("client/endpoint.py")

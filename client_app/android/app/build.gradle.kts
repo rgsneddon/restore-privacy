@@ -49,10 +49,10 @@ dependencies {
     implementation("org.bouncycastle:bcprov-jdk18on:1.78.1")
 }
 
-// Inject public node key into APK assets only. Per-device Ed25519 client keys
+// Inject public node keys into APK assets only. Per-device Ed25519 client keys
 // are generated on first run (never a shared client_ed25519.priv in every APK).
-// Prefer tracked product/node_elgamal.pub (must match production node), then
-// operator secrets/. Wrong pub → hybrid decrypt fail → silent node drop → timeout.
+// Entry: product/node_elgamal.pub (Iceland). Exit: exit_node_elgamal.pub (Romania multi-hop).
+// Wrong pub → hybrid decrypt fail → silent node drop → timeout.
 // rootProject = client_app/android → ../.. = restore_privacy
 tasks.register("copyRptSecretsToAssets") {
     doLast {
@@ -60,20 +60,24 @@ tasks.register("copyRptSecretsToAssets") {
         destDir.mkdirs()
         // Remove any previously injected shared client priv from assets tree
         file("src/main/assets/secrets/client_ed25519.priv").let { if (it.exists()) it.delete() }
-        val name = "node_elgamal.pub"
-        val candidates = listOf(
-            rootProject.file("../../product/$name"),
-            rootProject.file("../../secrets/$name"),
-        )
-        val dest = file("src/main/assets/secrets/$name")
-        val src = candidates.firstOrNull { it.exists() }
-        if (src != null) {
-            src.copyTo(dest, overwrite = true)
-            logger.lifecycle("copyRptSecretsToAssets: injected $name from ${src.absolutePath}")
-        } else {
-            logger.warn(
-                "copyRptSecretsToAssets: missing product/ and secrets/ $name — APK handshake will fail"
+        val names = listOf("node_elgamal.pub", "exit_node_elgamal.pub")
+        for (name in names) {
+            val candidates = listOf(
+                rootProject.file("../../product/$name"),
+                rootProject.file("../../secrets/$name"),
             )
+            val dest = file("src/main/assets/secrets/$name")
+            val src = candidates.firstOrNull { it.exists() }
+            if (src != null) {
+                src.copyTo(dest, overwrite = true)
+                logger.lifecycle("copyRptSecretsToAssets: injected $name from ${src.absolutePath}")
+            } else if (name == "node_elgamal.pub") {
+                logger.warn(
+                    "copyRptSecretsToAssets: missing product/ and secrets/ $name — APK handshake will fail"
+                )
+            } else {
+                logger.lifecycle("copyRptSecretsToAssets: optional $name not found (skip)")
+            }
         }
     }
 }

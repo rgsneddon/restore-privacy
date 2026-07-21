@@ -33,8 +33,9 @@ class PacketTunnelProvider: NEPacketTunnelProvider {
     pathQueue.async { [weak self] in
       guard let self else { return }
       do {
-        // 1. Load secrets (client_ed25519.priv + node_elgamal.pub only — never node_elgamal.priv)
-        let material = try RptSecrets.loadAdmissionMaterial()
+        // 1. Load secrets (client_ed25519.priv + entry/exit pub only — never node_elgamal.priv)
+        // Multi-hop residual: when host is Romania exit, HELLO uses exit_node_elgamal.pub.
+        let material = try RptSecrets.loadAdmissionMaterial(residualHost: self.endpointHost)
         let engine = try RptClientEngine(clientPrivRaw: material.clientPriv, nodeElgamalPubRaw: material.nodePub)
 
         // 2. RPT2 handshake on a long-lived connected UDP socket (kept open for DATA/KEEPALIVE)

@@ -158,33 +158,56 @@ class RptVpnService : VpnService() {
     }
 
     /**
-     * Load device Ed25519 priv + node ElGamal pub.
+     * Load device Ed25519 priv + node ElGamal pub for residual HELLO.
      * Generates a unique client key on first run (never uses a shared APK-embedded priv).
-     * Packages may ship only node_elgamal.pub in assets.
+     * Packages ship `node_elgamal.pub` (entry) and optionally `exit_node_elgamal.pub` (multi-hop).
      *
-     * **Always** refreshes `node_elgamal.pub` from APK assets (overwrite). Upgrades that
-     * fix a stale product key must heal prior installs without uninstall/clear-data.
-     * Device Ed25519 private key is never overwritten once generated.
+     * When *residualHost* is the product Romania exit, load exit pub; otherwise entry pub.
+     * **Always** refreshes the chosen pub from APK assets (overwrite). Device Ed25519 private
+     * key is never overwritten once generated.
      */
-    private fun loadSecrets(): Pair<ByteArray, ByteArray>? {
+    private fun loadSecrets(residualHost: String = ""): Pair<ByteArray, ByteArray>? {
         val dir = File(filesDir, "secrets")
         dir.mkdirs()
         val privF = File(dir, "client_ed25519.priv")
-        val pubF = File(dir, "node_elgamal.pub")
+        val host = residualHost.trim()
+        val pubName =
+            if (host == PRODUCT_EXIT_HOST || host.endsWith(PRODUCT_EXIT_HOST)) {
+                "exit_node_elgamal.pub"
+            } else {
+                "node_elgamal.pub"
+            }
+        val pubF = File(dir, pubName)
 
-        // Always copy package node pub → filesDir (heals stale key after APK upgrade).
+        // Always copy package pub → filesDir (heals stale key after APK upgrade).
         try {
-            assets.open("secrets/node_elgamal.pub").use { inp ->
+            assets.open("secrets/$pubName").use { inp ->
                 if (!refreshNodeElgamalPub(pubF, inp.readBytes())) {
                     return null
                 }
             }
         } catch (_: Exception) {
-            // Assets missing: keep existing filesDir pub only if still usable.
+            // Fall back to entry pub if exit asset missing
+            if (pubName != "node_elgamal.pub") {
+                try {
+                    assets.open("secrets/node_elgamal.pub").use { inp ->
+                        val entryF = File(dir, "node_elgamal.pub")
+                        if (!refreshNodeElgamalPub(entryF, inp.readBytes())) {
+                            return null
+                        }
+                        return loadSecretsAfterPub(privF, entryF)
+                    }
+                } catch (_: Exception) {
+                    /* continue */
+                }
+            }
             if (!pubF.isFile || pubF.length() < 32L) return null
         }
         if (!pubF.isFile || pubF.length() < 32L) return null
+        return loadSecretsAfterPub(privF, pubF)
+    }
 
+    private fun loadSecretsAfterPub(privF: File, pubF: File): Pair<ByteArray, ByteArray>? {
         // Per-device key: generate once, reuse forever on this install
         if (!privF.isFile || privF.length() != 32L) {
             try {
@@ -223,12 +246,13 @@ class RptVpnService : VpnService() {
             )
             return
         }
-        val secrets = loadSecrets()
+        val secrets = loadSecrets(host)
         if (secrets == null) {
             running.set(false)
             report(
                 false,
-                "Missing node public key — package must include node_elgamal.pub; device Ed25519 is auto-generated",
+                "Missing node public key — package must include node_elgamal.pub " +
+                    "(and exit_node_elgamal.pub for multi-hop residual); device Ed25519 is auto-generated",
             )
             stopForeground(STOP_FOREGROUND_REMOVE)
             stopSelf()
@@ -551,6 +575,9 @@ class RptVpnService : VpnService() {
     }
 
     companion object {
+        /** Product Romania exit hop (multi-hop residual when Flutter passes this host). */
+        const val PRODUCT_EXIT_HOST = "185.146.232.107"
+
         /**
          * Always write package [assetBytes] to [pubFile] (overwrite).
          * Used so APK upgrades replace a stale node_elgamal.pub left in filesDir.

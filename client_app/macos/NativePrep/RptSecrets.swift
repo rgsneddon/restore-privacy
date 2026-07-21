@@ -21,8 +21,20 @@ import Security
 public enum RptSecrets {
     public static let clientPrivName = "client_ed25519.priv"
     public static let nodePubName = "node_elgamal.pub"
+    /// Romania exit hop public key (multi-hop residual HELLO when residual host is exit).
+    public static let exitNodePubName = "exit_node_elgamal.pub"
+    public static let productExitHost = "185.146.232.107"
     /// Must never be loaded by product clients.
     public static let nodePrivName = "node_elgamal.priv"
+
+    /// Public key basename for residual HELLO: exit pub when dialing Romania exit.
+    public static func residualNodePubName(forHost host: String) -> String {
+        let h = host.trimmingCharacters(in: .whitespacesAndNewlines)
+        if h == productExitHost {
+            return exitNodePubName
+        }
+        return nodePubName
+    }
 
     public static var appGroupId: String { "group.com.restoreprivacy.shared" }
 
@@ -268,36 +280,42 @@ public enum RptSecrets {
 
     /// Load product admission material (device client priv + node pub). Never loads node private key.
     /// Generates a unique Ed25519 device key on first run. Never adopts a shared priv from the app bundle.
+    /// When *residualHost* is the Romania exit, prefers ``exit_node_elgamal.pub``.
     public static func loadAdmissionMaterial(
         fileManager: FileManager = .default,
-        bundle: Bundle = .main
+        bundle: Bundle = .main,
+        residualHost: String = ""
     ) throws -> (clientPriv: Data, nodePub: Data) {
         // Prefer trusted writable storage that already has a device key (not bundle).
         if let dir = resolveSecretsDirectory(fileManager: fileManager, bundle: bundle) {
-            return try loadFromDirectory(dir)
+            return try loadFromDirectory(dir, residualHost: residualHost)
         }
 
         // Bootstrap: node pub from bundle → generate device key into App Support / App Group
         if let dir = try? seedApplicationSupportFromBundleIfNeeded(fileManager: fileManager, bundle: bundle) {
-            return try loadFromDirectory(dir)
+            return try loadFromDirectory(dir, residualHost: residualHost)
         }
         if let dir = try? seedAppGroupFromKnownSourcesIfNeeded(fileManager: fileManager, bundle: bundle) {
-            return try loadFromDirectory(dir)
+            return try loadFromDirectory(dir, residualHost: residualHost)
         }
 
         // Last resort: generate device key in preferred writable dir next to any node pub
         if let dest = secretsDirectory(fileManager: fileManager) {
             var nodeSrc: URL?
+            let want = residualNodePubName(forHost: residualHost)
             for d in candidateSecretsDirectories(fileManager: fileManager, bundle: bundle) {
-                let n = d.appendingPathComponent(nodePubName)
-                if fileManager.fileExists(atPath: n.path) {
-                    nodeSrc = n
-                    break
+                for name in [want, nodePubName] {
+                    let n = d.appendingPathComponent(name)
+                    if fileManager.fileExists(atPath: n.path) {
+                        nodeSrc = n
+                        break
+                    }
                 }
+                if nodeSrc != nil { break }
             }
             if let nodeSrc {
                 _ = try ensureDeviceAdmissionKey(in: dest, nodePubSource: nodeSrc, fileManager: fileManager)
-                return try loadFromDirectory(dest)
+                return try loadFromDirectory(dest, residualHost: residualHost)
             }
         }
 
@@ -311,8 +329,20 @@ public enum RptSecrets {
     }
 
     public static func loadFromDirectory(_ dir: URL) throws -> (clientPriv: Data, nodePub: Data) {
+        try loadFromDirectory(dir, residualHost: "")
+    }
+
+    public static func loadFromDirectory(
+        _ dir: URL,
+        residualHost: String
+    ) throws -> (clientPriv: Data, nodePub: Data) {
         let cURL = dir.appendingPathComponent(clientPrivName)
-        let nURL = dir.appendingPathComponent(nodePubName)
+        let pubName = residualNodePubName(forHost: residualHost)
+        var nURL = dir.appendingPathComponent(pubName)
+        // Fall back to entry pub if exit pub missing
+        if !FileManager.default.fileExists(atPath: nURL.path), pubName != nodePubName {
+            nURL = dir.appendingPathComponent(nodePubName)
+        }
         // Explicitly do not open node_elgamal.priv
         let clientPriv = try Data(contentsOf: cURL)
         let nodePub = try Data(contentsOf: nURL)
@@ -320,7 +350,7 @@ public enum RptSecrets {
             throw RptProtocol.ProtocolError("client_ed25519.priv must be 32 raw bytes")
         }
         guard nodePub.count == 256 else {
-            throw RptProtocol.ProtocolError("node_elgamal.pub must be 256 bytes")
+            throw RptProtocol.ProtocolError("\(pubName) must be 256 bytes")
         }
         return (clientPriv, nodePub)
     }

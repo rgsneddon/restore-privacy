@@ -131,11 +131,56 @@ class Test036LinuxPackageMultihop(unittest.TestCase):
             encoding="utf-8"
         )
         self.assertIn("Linux", notes)
-        self.assertIn("Carry-forward", notes)
-        self.assertIn("residual-via-exit", notes.lower().replace("**", "") or notes)
-        # Windows not claimed as multihop residual without rebuild
+        self.assertIn("Android", notes)
+        low = notes.lower().replace("**", "")
+        self.assertIn("residual-via-exit", low)
+        # Windows honesty: native PE rebuild still required for multihop code
         self.assertIn("Windows", notes)
-        self.assertIn("bbfb771f", notes)  # linux sha256 prefix in notes
+        self.assertTrue(
+            "native" in low or "rebuild" in low or "carry" in low,
+            "RELEASE_NOTES must be honest about Windows multihop residual limits",
+        )
+
+
+
+@unittest.skipUnless(
+    (REL / f"restore-privacy-client-{VERSION}-android.apk").is_file(),
+    "releases/0.3.6 Android APK not present",
+)
+class Test036AndroidPackageMultihop(unittest.TestCase):
+    def test_apk_ships_entry_and_exit_pubs(self):
+        import zipfile
+
+        apk = REL / f"restore-privacy-client-{VERSION}-android.apk"
+        with zipfile.ZipFile(apk) as z:
+            names = set(z.namelist())
+            self.assertIn("assets/secrets/node_elgamal.pub", names)
+            self.assertIn("assets/secrets/exit_node_elgamal.pub", names)
+            exit_b = z.read("assets/secrets/exit_node_elgamal.pub")
+            entry_b = z.read("assets/secrets/node_elgamal.pub")
+            self.assertEqual(hashlib.sha256(exit_b).hexdigest(), EXIT_PUB_PIN)
+            self.assertNotEqual(exit_b, entry_b)
+            dex = z.read("classes.dex")
+            self.assertIn(b"185.146.232.107", dex)
+            self.assertIn(b"pfs-x25519", dex)
+
+
+@unittest.skipUnless(
+    (REL / f"restore-privacy-client-{VERSION}-macos.zip").is_file(),
+    "releases/0.3.6 macOS zip not present",
+)
+class Test036MacosPackagePubs(unittest.TestCase):
+    def test_macos_zip_ships_entry_and_exit_pubs(self):
+        import zipfile
+
+        zpath = REL / f"restore-privacy-client-{VERSION}-macos.zip"
+        with zipfile.ZipFile(zpath) as z:
+            exit_names = [n for n in z.namelist() if n.endswith("exit_node_elgamal.pub")]
+            entry_names = [n for n in z.namelist() if n.endswith("node_elgamal.pub") and "exit_" not in n]
+            self.assertTrue(exit_names, "exit_node_elgamal.pub missing from macOS zip")
+            self.assertTrue(entry_names)
+            exit_b = z.read(exit_names[0])
+            self.assertEqual(hashlib.sha256(exit_b).hexdigest(), EXIT_PUB_PIN)
 
 
 if __name__ == "__main__":

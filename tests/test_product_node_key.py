@@ -197,12 +197,18 @@ class TestAndroidNodePubRefreshOnUpgrade(unittest.TestCase):
     def test_load_secrets_always_refreshes_from_assets(self):
         """loadSecrets must call refresh from assets every Connect (upgrade heal)."""
         svc = self._vpn_service_src()
-        load = svc[svc.index("private fun loadSecrets") : svc.index("private fun loadSecrets") + 1200]
-        self.assertIn('assets.open("secrets/node_elgamal.pub")', load)
+        load = svc[svc.index("private fun loadSecrets") : svc.index("private fun loadSecrets") + 1600]
+        # Entry or exit pub path (multi-hop residual uses exit_node when host is Romania)
+        self.assertTrue(
+            'assets.open("secrets/node_elgamal.pub")' in load
+            or 'assets.open("secrets/$pubName")' in load,
+            "loadSecrets must open package secrets pub assets",
+        )
         self.assertIn("refreshNodeElgamalPub", load)
         # Old bug: only copy when !pubF.isFile — must be gone for node pub path
         self.assertNotIn("if (!pubF.isFile())", load)
-        self.assertIn("Always copy package node pub", load)
+        self.assertIn("Always copy package pub", load)
+        self.assertIn("exit_node_elgamal.pub", load)
 
     def test_refresh_node_elgamal_pub_file_overwrites_stale(self):
         """Shipped Python mirror of Android helper: stale filesDir bytes replaced."""

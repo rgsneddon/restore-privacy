@@ -1,12 +1,15 @@
 #!/usr/bin/env python3
 """Inject public node material into a macOS/iOS app bundle.
 
-Copies **only** ``node_elgamal.pub`` (never a shared ``client_ed25519.priv``).
-Per-device Ed25519 keys are generated on first run by the client.
-Never copies ``node_elgamal.priv``.
+Copies **public** ElGamal keys only:
+  - ``node_elgamal.pub`` (Iceland entry)
+  - ``exit_node_elgamal.pub`` (Romania exit, multi-hop residual)
 
-Source search (first hit wins):
-  RPT_SECRETS_DIR env, <repo>/secrets/, ~/.restore-privacy/secrets/
+Never copies a shared ``client_ed25519.priv`` or ``node_elgamal.priv``.
+Per-device Ed25519 keys are generated on first run by the client.
+
+Source search (first hit wins for each pub):
+  RPT_SECRETS_DIR env, <repo>/product/, <repo>/secrets/, ~/.restore-privacy/secrets/
 
 Usage:
   python3 scripts/inject_apple_secrets.py --app path/to/restore_privacy_client.app
@@ -24,6 +27,8 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 CLIENT_PRIV = "client_ed25519.priv"
 NODE_PUB = "node_elgamal.pub"
+EXIT_PUB = "exit_node_elgamal.pub"
+PUBLIC_PUBS = (NODE_PUB, EXIT_PUB)
 FORBIDDEN = "node_elgamal.priv"
 
 
@@ -32,27 +37,33 @@ def candidate_sources() -> list[Path]:
     env = os.environ.get("RPT_SECRETS_DIR", "").strip()
     if env:
         out.append(Path(env))
-    # Tracked product key first (matches production node); then operator secrets/
+    # Tracked product keys first (entry + exit); then operator secrets/
     out.append(ROOT / "product")
     out.append(ROOT / "secrets")
     out.append(Path.home() / ".restore-privacy" / "secrets")
     return out
 
 
-def resolve_source(explicit: Path | None) -> Path:
-    if explicit:
-        if not (explicit / NODE_PUB).is_file():
-            raise FileNotFoundError(
-                f"incomplete secrets dir {explicit} (need {NODE_PUB})"
-            )
-        return explicit
+def resolve_pub(name: str, explicit: Path | None) -> Path | None:
+    """Return path to a public key file, or None if not found."""
+    if explicit and (explicit / name).is_file():
+        return explicit / name
     for d in candidate_sources():
-        if (d / NODE_PUB).is_file():
-            return d
-    searched = ", ".join(str(d) for d in candidate_sources())
-    raise FileNotFoundError(
-        f"No node public key found (need {NODE_PUB}). Checked: {searched}"
-    )
+        p = d / name
+        if p.is_file() and p.stat().st_size >= 32:
+            return p
+    return None
+
+
+def resolve_source(explicit: Path | None) -> Path:
+    """Directory that contains at least entry node_elgamal.pub (compat)."""
+    entry = resolve_pub(NODE_PUB, explicit)
+    if entry is None:
+        searched = ", ".join(str(d) for d in candidate_sources())
+        raise FileNotFoundError(
+            f"No node public key found (need {NODE_PUB}). Checked: {searched}"
+        )
+    return entry.parent
 
 
 def inject(app: Path, source: Path, ios: bool) -> Path:
@@ -63,11 +74,20 @@ def inject(app: Path, source: Path, ios: bool) -> Path:
     else:
         dest = app / "Contents" / "Resources" / "secrets"
     dest.mkdir(parents=True, exist_ok=True)
-    # Public node key only
-    src = source / NODE_PUB
-    dst = dest / NODE_PUB
-    shutil.copy2(src, dst)
-    print(f"injected {NODE_PUB} -> {dst} ({dst.stat().st_size} bytes)")
+    # Entry + exit public keys (never private keys)
+    for name in PUBLIC_PUBS:
+        src = resolve_pub(name, source if source.is_dir() else source.parent)
+        if src is None and name == NODE_PUB:
+            # required
+            src = source / NODE_PUB if (source / NODE_PUB).is_file() else None
+        if src is None:
+            if name == NODE_PUB:
+                raise FileNotFoundError(f"missing required {NODE_PUB}")
+            print(f"skip optional {name} (not found)")
+            continue
+        dst = dest / name
+        shutil.copy2(src, dst)
+        print(f"injected {name} -> {dst} ({dst.stat().st_size} bytes)")
     # Never leave private keys in the bundle
     for leftover in list(dest.glob("*.priv")):
         leftover.unlink()
