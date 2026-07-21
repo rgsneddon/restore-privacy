@@ -3,7 +3,7 @@
 | Field | Value |
 |-------|--------|
 | **Product** | Restore Privacy Tunnel (RPT / RPT2) |
-| **Repository** | [restore-privacy](https://github.com/rgsneddon/restore-privacy) (public packages + operator tree) |
+| **Repository** | restore-privacy (**private** source; installers only via paid status host) |
 | **Public catalog version** | **0.3.0** |
 | **Production node** | **82.221.101.241:44044** (UDP); status UI TCP **8080** |
 | **Audit generated** | **21 July 2026** (`2026-07-21T02:30:04Z`) |
@@ -122,7 +122,7 @@ An **ISP** performing **traffic analysis** may still observe connection timing a
 | Expectation | Notes |
 |-------------|--------|
 | Product host | **82.221.101.241** |
-| Public catalog | **0.3.0** on [restore-privacy releases](https://github.com/rgsneddon/restore-privacy/releases) |
+| Public catalog | **0.3.0** paid installers on [status host](https://restore-privacy-status.onrender.com/) (£2.45; no free GitHub release downloads) |
 | Node pub pin | `1b126abf…` |
 | No `.priv` in public package trees | OK |
 

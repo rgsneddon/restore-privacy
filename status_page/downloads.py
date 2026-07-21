@@ -120,8 +120,12 @@ def available_downloads(
     return out
 
 
-# Footer: catalog identity (repo may be private — installers only after pay).
-RUST_REPO_URL = RELEASE_PAGE_URL
+# Footer: catalog identity on the public status host (repo is private — no free GH).
+# RELEASE_PAGE_URL remains for bookkeeping; public HTML must not send buyers to a
+# 404 GitHub release page when the repository is private.
+# Keep this string in sync with payments.DEFAULT_PRODUCTION_PUBLIC_BASE_URL
+# (avoid importing payments here — circular with payments → downloads).
+RUST_REPO_URL = "https://restore-privacy-status.onrender.com/#downloads"
 RUST_REPO_LABEL = (
     f"Catalog v{RELEASE_VERSION} — installers after £2.45 payment only (signed packages)"
 )

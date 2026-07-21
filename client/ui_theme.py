@@ -289,18 +289,28 @@ def upgrade_available(running: str | None = None, latest: str | None = None) -> 
 
 
 def upgrade_download_url() -> str:
-    """Windows installer URL for the catalog release (best-effort)."""
+    """Paid catalog / Windows pay entry (repo is private — never free GH releases).
+
+    Prefer the Stripe payment page for the Windows package so an in-app
+    "update" opens the same seamless pay → webhook → one-time proxy path as
+    the public status downloads. Fall back to the status host downloads
+    section when the catalog module is unavailable (frozen clients).
+    """
     try:
         from status_page.downloads import available_downloads
 
         for a in available_downloads():
             if a.platform == "windows":
-                return a.url
+                # pay_path, not a.url (a.url is bookkeeping-only GitHub asset URL)
+                return a.pay_path
     except Exception:
         pass
-    return (
-        "https://github.com/rgsneddon/restore-privacy/releases/latest"
-    )
+    try:
+        from status_page.payments import DEFAULT_PRODUCTION_PUBLIC_BASE_URL
+
+        return f"{DEFAULT_PRODUCTION_PUBLIC_BASE_URL}/#downloads"
+    except Exception:
+        return "https://restore-privacy-status.onrender.com/#downloads"
 
 
 def upgrade_banner_text(running: str | None = None, latest: str | None = None) -> str | None:

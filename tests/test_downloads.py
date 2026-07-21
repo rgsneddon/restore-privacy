@@ -33,6 +33,10 @@ EXPECTED_RELEASE_PAGE = (
 EXPECTED_DOWNLOAD_PREFIX = (
     "https://github.com/rgsneddon/restore-privacy/releases/download/0.3.0/"
 )
+# Public footer points at the paid status host (repo is private).
+EXPECTED_PUBLIC_CATALOG_FOOTER = (
+    "https://restore-privacy-status.onrender.com/#downloads"
+)
 
 
 class TestDownloadCatalog(unittest.TestCase):
@@ -42,7 +46,7 @@ class TestDownloadCatalog(unittest.TestCase):
         self.assertEqual(GITHUB_REPO, "restore-privacy")
         self.assertEqual(RELEASE_PAGE_URL, EXPECTED_RELEASE_PAGE)
         self.assertEqual(RELEASE_DOWNLOAD_BASE, EXPECTED_DOWNLOAD_PREFIX.rstrip("/"))
-        self.assertEqual(RUST_REPO_URL, EXPECTED_RELEASE_PAGE)
+        self.assertEqual(RUST_REPO_URL, EXPECTED_PUBLIC_CATALOG_FOOTER)
 
     def test_public_assets_include_device_packages(self):
         assets = available_downloads()
@@ -70,8 +74,10 @@ class TestDownloadCatalog(unittest.TestCase):
         self.assertIn('id="dl-android"', html)
         self.assertIn("£2.45", html)
         self.assertIn(BMC_TIP_URL, html)
-        self.assertIn(EXPECTED_RELEASE_PAGE, html)
+        self.assertIn(EXPECTED_PUBLIC_CATALOG_FOOTER, html)
         self.assertIn("Pay £2.45", html)
+        # Free permanent GitHub installer hrefs must not appear in public HTML.
+        self.assertNotIn("releases/download/0.3.0/", html)
         for a in available_downloads():
             self.assertIn(f'href="{a.pay_path}"', html)
             self.assertIn(f"client_reference_id={a.platform}", html)

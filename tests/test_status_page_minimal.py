@@ -64,8 +64,9 @@ class TestPublicPageWithDownloads(unittest.TestCase):
             RELEASE_PAGE_URL,
             "https://github.com/rgsneddon/restore-privacy/releases/tag/0.3.0",
         )
+        # Public footer uses status host (private repo); bookkeeping URL may still exist.
         self.assertIn(RUST_REPO_URL, html)
-        self.assertIn(RELEASE_PAGE_URL, html)
+        self.assertIn("restore-privacy-status.onrender.com", html)
         self.assertIn("restore-privacy", html)
         self.assertIn('id="rust-repo-link"', html)
         self.assertIn("£2.45", html)

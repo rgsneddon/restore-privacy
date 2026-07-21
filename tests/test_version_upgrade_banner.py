@@ -18,6 +18,7 @@ from client.ui_theme import (  # noqa: E402
     read_running_version,
     upgrade_available,
     upgrade_banner_text,
+    upgrade_download_url,
     version_file_candidates,
 )
 
@@ -85,6 +86,20 @@ class TestUpgradeBanner(unittest.TestCase):
         self.assertIn("upgrade_banner_text", src)
         self.assertIn("if self._upgrade_msg", src)
         self.assertIn("upgrade_frame.pack", src)
+
+    def test_upgrade_download_url_is_paid_not_free_github(self):
+        """In-app update must open paid path; free GH release hrefs are gone."""
+        url = upgrade_download_url()
+        self.assertTrue(url.startswith("http"))
+        self.assertNotIn("releases/download", url)
+        self.assertNotIn("releases/latest", url)
+        # Prefer Stripe payment page for Windows, else status host downloads.
+        self.assertTrue(
+            "donate.stripe.com" in url
+            or "restore-privacy-status.onrender.com" in url
+            or "/#downloads" in url,
+            msg=f"unexpected upgrade url: {url}",
+        )
 
 
 if __name__ == "__main__":
