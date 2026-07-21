@@ -429,6 +429,9 @@ class Handler(BaseHTTPRequestHandler):
 
         # --- Paid download flow ---
         if path == "/pay":
+            # Legacy path: same Stripe payment page as the download buttons.
+            from payments import stripe_payment_page_href_for_platform
+
             platform = (query.get("platform") or "").strip()
             if not platform or not platform_filename(platform):
                 self._send(
@@ -437,33 +440,7 @@ class Handler(BaseHTTPRequestHandler):
                     _html_page("Pay", '<p class="msg">Unknown package.</p><p><a href="/">Back</a></p>'),
                 )
                 return
-            if not stripe_configured():
-                self._send(
-                    503,
-                    "text/html; charset=utf-8",
-                    _html_page(
-                        "Payments unavailable",
-                        f'<p class="msg" id="pay-unconfigured">Payments are not configured yet '
-                        f"(missing STRIPE_SECRET_KEY). See operator how-to. "
-                        f"Price remains {PRICE_LABEL} ({PRICE_PENCE} pence GBP) per download.</p>"
-                        f'<p><a href="/">Back</a></p>',
-                    ),
-                )
-                return
-            try:
-                session = create_checkout_session(platform)
-            except ValueError as e:
-                self._send(
-                    502,
-                    "text/html; charset=utf-8",
-                    _html_page(
-                        "Checkout error",
-                        f'<p class="msg">Could not start checkout: {str(e)[:200]}</p>'
-                        f'<p><a href="/">Back</a></p>',
-                    ),
-                )
-                return
-            self._redirect(session["url"])
+            self._redirect(stripe_payment_page_href_for_platform(platform))
             return
 
         if path == "/download":

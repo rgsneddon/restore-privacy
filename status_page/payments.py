@@ -113,6 +113,21 @@ def stripe_payment_page_url() -> str:
     return DEFAULT_STRIPE_PAYMENT_PAGE_URL
 
 
+def stripe_payment_page_href_for_platform(platform: str) -> str:
+    """Payment page URL with product identity for webhook fulfilment.
+
+    Stripe Payment Links accept ``client_reference_id`` on the URL; the webhook
+    reads it as the requested package platform and mints a one-time download token.
+    """
+    plat = (platform or "").strip().lower()
+    base = stripe_payment_page_url()
+    if not plat:
+        return base
+    q = urllib.parse.urlencode({"client_reference_id": plat})
+    sep = "&" if "?" in base else "?"
+    return f"{base}{sep}{q}"
+
+
 def stripe_payment_link_id() -> str:
     """Stripe Payment Link id (plink_…). Public identifier — not a secret key.
 
@@ -721,35 +736,55 @@ def verify_stripe_signature(
 
 
 def process_checkout_completed_event(event: dict[str, Any]) -> str | None:
-    """On checkout.session.completed, mint a download token. Returns token or None."""
+    """On checkout.session.completed, mint a download token. Returns token or None.
+
+    Supports server Checkout (metadata platform/filename/amount) and Payment Link
+    pays that set ``client_reference_id`` to the requested platform via the
+    download-button URL query.
+    """
     if event.get("type") != "checkout.session.completed":
         return None
     obj = event.get("data", {}).get("object") or {}
+    payment_status = str(obj.get("payment_status") or "").lower()
+    if payment_status and payment_status not in ("paid", "no_payment_required"):
+        return None
     meta = obj.get("metadata") or {}
-    platform = str(meta.get("platform") or obj.get("client_reference_id") or "").strip()
+    if not isinstance(meta, dict):
+        meta = {}
+    platform = str(
+        meta.get("platform") or obj.get("client_reference_id") or ""
+    ).strip().lower()
     filename = str(meta.get("filename") or "").strip()
     if not filename:
         filename = platform_filename(platform) or ""
     if not platform or not filename:
         return None
-    # Prefer metadata amount; fall back to product price
     try:
-        amount = int(meta.get("amount_pence") or PRICE_PENCE)
+        if meta.get("amount_pence") is not None and str(meta.get("amount_pence")).strip() != "":
+            amount = int(meta.get("amount_pence"))
+            if amount != PRICE_PENCE:
+                return None
+            amount = PRICE_PENCE
+        elif obj.get("amount_total") is not None:
+            amount = int(obj.get("amount_total"))
+            if amount <= 0:
+                amount = PRICE_PENCE
+        else:
+            amount = PRICE_PENCE
     except (TypeError, ValueError):
         amount = PRICE_PENCE
-    if amount != PRICE_PENCE:
-        # Refuse wrong amount
-        return None
     currency = str(meta.get("currency") or obj.get("currency") or PRICE_CURRENCY).lower()
-    if currency != PRICE_CURRENCY:
+    if meta.get("currency") and str(meta.get("currency")).lower() != PRICE_CURRENCY:
         return None
+    if not currency:
+        currency = PRICE_CURRENCY
     session_id = str(obj.get("id") or "")
     return mint_download_token(
         filename=filename,
         platform=platform,
         session_id=session_id,
-        amount_pence=amount,
-        currency=currency,
+        amount_pence=amount if amount > 0 else PRICE_PENCE,
+        currency=currency if currency else PRICE_CURRENCY,
     )
 
 

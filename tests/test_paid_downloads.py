@@ -39,17 +39,26 @@ class TestPaidDownloadUI(unittest.TestCase):
         self.assertIn(BMC_TIP_URL, html)
         self.assertIn("buymeacoffee.com/rgsneddon", html)
         self.assertIn("Tip / support", html)
+        pay_base = payments.stripe_payment_page_url()
+        self.assertEqual(
+            pay_base, "https://donate.stripe.com/cNi7sM4uOeWQ9TBe0q7kc00"
+        )
         for a in available_downloads():
-            self.assertIn(f'href="/pay?platform={a.platform}"', html)
-            # Must not be free permanent release download on the button
+            href = payments.stripe_payment_page_href_for_platform(a.platform)
+            self.assertIn(f'href="{href}"', html)
+            self.assertIn(f"client_reference_id={a.platform}", href)
+            self.assertIn("donate.stripe.com", href)
             self.assertNotIn(f'href="{a.url}"', html)
+            self.assertNotIn(f'href="/pay?platform={a.platform}"', html)
         self.assertNotIn('href="#"', html)
-        # Page still cites the release as package source (not free button target)
-        self.assertIn("releases/tag/0.2.9", html)
+        self.assertIn("catalog-version", html)
+        self.assertIn("v0.2.9", html)
+        self.assertIn("data-pay-via=\"stripe-payment-page\"", html)
 
     def test_status_page_html_paid_flow(self):
         page = status_app.render_html({"title": "RESTORE PRIVACY"}).decode("utf-8")
-        self.assertIn("/pay?platform=windows", page)
+        self.assertIn("donate.stripe.com/cNi7sM4uOeWQ9TBe0q7kc00", page)
+        self.assertIn("client_reference_id=windows", page)
         self.assertIn("£2.45", page)
         self.assertIn(BMC_TIP_URL, page)
         self.assertNotIn(
@@ -257,6 +266,7 @@ class TestWebhookAndTokens(unittest.TestCase):
                 "data": {
                     "object": {
                         "id": "cs_bad_amt",
+                        "payment_status": "paid",
                         "metadata": {
                             "platform": "ios",
                             "filename": "restore-privacy-client-0.2.9-ios.zip",
@@ -271,6 +281,36 @@ class TestWebhookAndTokens(unittest.TestCase):
         result = payments.handle_stripe_webhook(payload, header, secret=secret)
         self.assertTrue(result["ok"])
         self.assertFalse(result["granted"])
+
+    def test_payment_link_client_reference_grants_platform_package(self):
+        """Payment Link sets client_reference_id=platform; webhook mints that package only."""
+        secret = "whsec_plink"
+        payload = json.dumps(
+            {
+                "type": "checkout.session.completed",
+                "data": {
+                    "object": {
+                        "id": "cs_plink_windows_1",
+                        "payment_status": "paid",
+                        "currency": "gbp",
+                        "amount_total": 245,
+                        "client_reference_id": "windows",
+                        "metadata": {},
+                    }
+                },
+            }
+        ).encode("utf-8")
+        result = payments.handle_stripe_webhook(
+            payload, self._sign(payload, secret), secret=secret
+        )
+        self.assertTrue(result["granted"], result)
+        token = result["token"]
+        grant = payments.redeem_download_token(token)
+        self.assertIsNotNone(grant)
+        assert grant is not None
+        self.assertEqual(grant["platform"], "windows")
+        self.assertTrue(str(grant["filename"]).endswith("windows-x64-setup.exe"))
+        self.assertIsNone(payments.redeem_download_token(token))
 
 
 class TestAdminAuth(unittest.TestCase):

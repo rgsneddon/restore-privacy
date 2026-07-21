@@ -56,8 +56,15 @@ class DownloadAsset:
 
     @property
     def pay_path(self) -> str:
-        """Paid checkout entry on this status site (not a free GitHub href)."""
-        return f"/pay?platform={self.platform}"
+        """Paid entry: Stripe payment page with platform for post-pay fulfilment.
+
+        Not a free GitHub href. Uses the operator Payment Link URL plus
+        ``client_reference_id=<platform>`` so the webhook can mint a token for
+        this package only.
+        """
+        from payments import stripe_payment_page_href_for_platform
+
+        return stripe_payment_page_href_for_platform(self.platform)
 
 
 RELEASE_ASSETS: tuple[DownloadAsset, ...] = (
@@ -176,27 +183,40 @@ def render_rust_footer_html() -> str:
 
 
 def render_download_section_html(assets: Iterable[DownloadAsset] | None = None) -> str:
-    """HTML fragment: paid download buttons (£2.45) — not free permanent GitHub hrefs."""
+    """HTML: pay via Stripe payment page, then one-time download after webhook grant."""
     items = list(assets) if assets is not None else available_downloads()
     if not items:
         return ""
+    from payments import (
+        DEFAULT_PRODUCTION_PUBLIC_BASE_URL,
+        stripe_payment_page_url,
+    )
+
+    pay_base = stripe_payment_page_url()
     links = []
     for a in items:
-        # Paid entry: /pay?platform=… (server starts Stripe Checkout)
+        href = a.pay_path
         links.append(
-            f'    <a class="dl" id="dl-{a.platform}" href="{a.pay_path}" '
+            f'    <a class="dl" id="dl-{a.platform}" href="{href}" '
+            f'rel="noopener noreferrer" target="_blank" '
             f'data-platform="{a.platform}" data-filename="{a.filename}" '
-            f'data-price-pence="245">'
+            f'data-price-pence="245" data-pay-via="stripe-payment-page">'
             f"Pay {PRICE_LABEL} - {a.label}</a>"
         )
     links_html = "\n".join(links)
+    claim = f"{DEFAULT_PRODUCTION_PUBLIC_BASE_URL}/download/success"
     return f"""
   <section class="downloads" id="downloads" aria-label="Download Restore Privacy client">
     <h2>Download client v{RELEASE_VERSION}</h2>
     <p class="dl-sub">Windows | Linux | macOS | iOS | Android — catalog
       <span id="catalog-version">v{RELEASE_VERSION}</span>
       (paid download only; installers delivered after Stripe payment)</p>
-    <p class="dl-price" id="dl-price">{PRICE_LABEL} GBP per package download (Stripe Checkout)</p>
+    <p class="dl-price" id="dl-price">{PRICE_LABEL} GBP per package — pay on Stripe, then get a one-time download link</p>
+    <p class="dl-sub" id="dl-pay-flow">Each button opens the payment page
+      (<a href="{pay_base}" rel="noopener noreferrer" target="_blank" id="dl-payment-page-base">Stripe payment page</a>).
+      After payment, open your one-time link from the success page
+      (<code id="dl-claim-hint">{claim}?session_id=…</code>) or support with your Checkout session id.
+      Direct package files are not linked until paid.</p>
     <div class="dl-buttons">
 {links_html}
 {render_rust_footer_html()}
