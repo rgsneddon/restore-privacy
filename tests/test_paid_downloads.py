@@ -31,7 +31,7 @@ from downloads import (  # noqa: E402
 
 class TestPaidDownloadUI(unittest.TestCase):
     def test_buttons_are_paid_not_free_github_href(self):
-        # Default catalog mode is Coming soon (self-link); live Stripe via coming_soon=False
+        # Default catalog: live Stripe Payment Link Pay buttons
         html = render_download_section_html()
         self.assertIn("£2.45", html)
         self.assertIn("GBP", html)
@@ -44,38 +44,34 @@ class TestPaidDownloadUI(unittest.TestCase):
         self.assertIn("Windows | Linux | macOS | iOS | Android", html)
         self.assertNotIn('href="#"', html)
         self.assertNotIn("catalog-version", html)
-        for a in available_downloads():
-            self.assertNotIn(f'href="{a.url}"', html)  # never free GitHub release href
-            self.assertNotIn(f'href="/pay?platform={a.platform}"', html)
-
+        self.assertIn('data-buy-mode="stripe-live"', html)
+        self.assertIn('data-pay-via="stripe-payment-page"', html)
+        self.assertIn("Pay £2.45", html)
         pay_base = payments.stripe_payment_page_url()
         self.assertEqual(
             pay_base, "https://donate.stripe.com/cNi7sM4uOeWQ9TBe0q7kc00"
         )
-        live = render_download_section_html(coming_soon=False)
-        self.assertIn('data-buy-mode="stripe-live"', live)
-        self.assertIn('data-pay-via="stripe-payment-page"', live)
         for a in available_downloads():
             href = payments.stripe_payment_page_href_for_platform(a.platform)
-            self.assertIn(f'href="{href}"', live)
+            self.assertIn(f'href="{href}"', html)
             self.assertIn(f"client_reference_id={a.platform}", href)
             self.assertIn("donate.stripe.com", href)
-            self.assertNotIn(f'href="{a.url}"', live)
+            self.assertNotIn(f'href="{a.url}"', html)  # never free GitHub release href
+            self.assertNotIn(f'href="/pay?platform={a.platform}"', html)
 
     def test_status_page_html_paid_flow(self):
         page = status_app.render_html({"title": "RESTORE PRIVACY"}).decode("utf-8")
         self.assertIn("£2.45", page)
         self.assertIn(BMC_TIP_URL, page)
-        # Default Coming soon: no free GitHub installer links
+        self.assertIn("donate.stripe.com/cNi7sM4uOeWQ9TBe0q7kc00", page)
+        self.assertIn("client_reference_id=windows", page)
+        self.assertIn("Pay £2.45", page)
+        # No free GitHub installer links
         self.assertNotIn(
             'href="https://github.com/rgsneddon/restore-privacy/releases/download/0.3.4/restore-privacy-client-0.3.4-windows-x64-setup.exe"',
             page,
         )
-        self.assertIn("coming soon", page.lower())
-        # Live Stripe payment-page path still available when Coming soon is off
-        live = render_download_section_html(coming_soon=False)
-        self.assertIn("donate.stripe.com/cNi7sM4uOeWQ9TBe0q7kc00", live)
-        self.assertIn("client_reference_id=windows", live)
+        self.assertNotIn("coming soon", page.lower())
 
 
 class TestCheckoutAmount(unittest.TestCase):

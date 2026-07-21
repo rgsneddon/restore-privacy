@@ -145,20 +145,19 @@ PRICE_LABEL = "£2.45"
 # Default tip identity; runtime public page uses coffee_tip_url() (env override).
 BMC_TIP_URL = COFFEE_LINK_URL
 
-# --- Temporary public buy-button mode (while packages finish qualification) ---
-# Default ON: platform controls show "Coming soon" and self-link to the public
-# host (no Stripe checkout). Flip CATALOG_BUY_BUTTONS_COMING_SOON to False, or
-# set env RPT_CATALOG_BUY_LIVE=1 / RPT_CATALOG_BUY_COMING_SOON=0, to restore the
-# live Stripe Pay architecture without redesigning the catalog/pay pipeline.
-CATALOG_BUY_BUTTONS_COMING_SOON = True
+# --- Public buy-button mode ---
+# Default OFF (live Stripe Pay): platform controls open the operator Payment Link.
+# Temporary "Coming soon" self-links: set CATALOG_BUY_BUTTONS_COMING_SOON = True, or
+# set env RPT_CATALOG_BUY_COMING_SOON=1. Force live anytime with RPT_CATALOG_BUY_LIVE=1.
+CATALOG_BUY_BUTTONS_COMING_SOON = False
 COMING_SOON_PUBLIC_HREF = "https://restoreprivacy.online"
 
 
 def catalog_buy_buttons_coming_soon() -> bool:
     """True when public platform controls are temporary coming-soon self-links.
 
-    Switch-back (live Stripe Pay buttons):
-      - set ``CATALOG_BUY_BUTTONS_COMING_SOON = False`` in this module, **or**
+    Live Stripe Pay buttons (default when constant is False):
+      - ``CATALOG_BUY_BUTTONS_COMING_SOON = False`` in this module, **or**
       - ``RPT_CATALOG_BUY_LIVE=1`` / ``true`` / ``yes`` / ``on``, **or**
       - ``RPT_CATALOG_BUY_COMING_SOON=0`` / ``false`` / ``no`` / ``off``
 

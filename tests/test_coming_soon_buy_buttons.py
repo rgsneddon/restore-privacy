@@ -22,17 +22,16 @@ from downloads import (  # noqa: E402
 
 
 class TestComingSoonBuyButtons(unittest.TestCase):
-    def test_default_switch_is_coming_soon_on(self):
-        self.assertTrue(CATALOG_BUY_BUTTONS_COMING_SOON)
-        with mock.patch.dict(os.environ, {}, clear=False):
-            # Clear override envs if present
-            env = {
-                k: v
-                for k, v in os.environ.items()
-                if k not in ("RPT_CATALOG_BUY_LIVE", "RPT_CATALOG_BUY_COMING_SOON")
-            }
-            with mock.patch.dict(os.environ, env, clear=True):
-                self.assertTrue(catalog_buy_buttons_coming_soon())
+    def test_default_switch_is_live_stripe_pay(self):
+        # Product default: live Stripe Payment Link buttons (Coming soon off)
+        self.assertFalse(CATALOG_BUY_BUTTONS_COMING_SOON)
+        env = {
+            k: v
+            for k, v in os.environ.items()
+            if k not in ("RPT_CATALOG_BUY_LIVE", "RPT_CATALOG_BUY_COMING_SOON")
+        }
+        with mock.patch.dict(os.environ, env, clear=True):
+            self.assertFalse(catalog_buy_buttons_coming_soon())
 
     def test_render_coming_soon_labels_and_redundant_href(self):
         html = render_download_section_html(coming_soon=True)

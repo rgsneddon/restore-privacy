@@ -23,6 +23,9 @@ services:
       # Already set here — leave blank in /admin processor form (do not clear this).
       - key: RPT_PUBLIC_BASE_URL
         value: https://restoreprivacy.online
+      # Live catalog Pay buttons (not temporary Coming soon)
+      - key: RPT_CATALOG_BUY_LIVE
+        value: "1"
       # Operator-only /admin (required to enable private payment admin page)
       - key: RPT_ADMIN_USER
         value: admin

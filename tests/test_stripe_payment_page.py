@@ -136,17 +136,14 @@ class TestPaymentPageInAdminHtml(unittest.TestCase):
         self.assertNotIn("how-to-buy-footer-link", foot)
         self.assertNotIn('href="/how-to-buy"', foot)
         self.assertIn("bmc-tip-link", foot)
-        # Public footer still omits generic Stripe link; temporary default is
-        # Coming soon self-links (live Stripe path restored via coming_soon=False).
+        # Public footer omits generic Stripe link; catalog uses live Pay buttons.
         html = render_download_section_html()
         self.assertNotIn('id="stripe-payment-page-link"', html)
         self.assertNotIn(">Stripe payment page<", html)
-        self.assertIn("Coming soon", html)
-        self.assertIn("https://restoreprivacy.online", html)
-        live = render_download_section_html(coming_soon=False)
-        self.assertIn("Pay £2.45", live)
-        self.assertIn("client_reference_id=windows", live)
-        self.assertIn(OPERATOR_PAYMENT_PAGE, live)
+        self.assertIn("Pay £2.45", html)
+        self.assertIn("client_reference_id=windows", html)
+        self.assertIn(OPERATOR_PAYMENT_PAGE, html)
+        self.assertNotIn("Coming soon", html)
 
 
 if __name__ == "__main__":
