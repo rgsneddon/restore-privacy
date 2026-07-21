@@ -294,14 +294,57 @@ def run_unit_suite() -> dict:
 
 
 def check_no_priv_in_tree() -> dict:
-    hits = []
-    for base in (ROOT / "product", ROOT / "releases", ROOT / "status_page"):
-        if not base.exists():
-            continue
-        for p in base.rglob("*.priv"):
-            # secrets/ is gitignored; still flag if under product/releases/status
-            hits.append(str(p.relative_to(ROOT)))
-    return {"ok": len(hits) == 0, "hits": hits[:20]}
+    """Extended public-tree ``*.priv`` scan (section B) + legacy hits field."""
+    try:
+        from audit_privacy_probes import probe_no_priv_public_trees
+    except ImportError:
+        sys.path.insert(0, str(Path(__file__).resolve().parent))
+        from audit_privacy_probes import probe_no_priv_public_trees  # type: ignore
+
+    install = Path(os.environ.get("RPT_INSTALL_ROOT", "/opt/restore-privacy"))
+    ext = probe_no_priv_public_trees(repo_root=ROOT, install_root=install)
+    hits = list(ext.get("hits") or [])
+    # Normalize to relative paths when under ROOT
+    norm: list[str] = []
+    for h in hits:
+        try:
+            p = Path(h)
+            if p.is_absolute():
+                try:
+                    norm.append(str(p.relative_to(ROOT)))
+                    continue
+                except ValueError:
+                    pass
+            norm.append(h)
+        except (TypeError, ValueError):
+            norm.append(str(h))
+    return {
+        "ok": bool(ext.get("ok")),
+        "hits": norm[:20],
+        "scanned_roots": ext.get("scanned_roots"),
+        "warn": ext.get("warn"),
+        "skipped": ext.get("skipped"),
+        "reasons": ext.get("reasons"),
+    }
+
+
+def run_section_b_probes(http_status: dict | None = None) -> dict:
+    """Section B privacy probes (firewall/expose-surface excluded)."""
+    try:
+        from audit_privacy_probes import run_all_section_b_probes
+    except ImportError:
+        sys.path.insert(0, str(Path(__file__).resolve().parent))
+        from audit_privacy_probes import run_all_section_b_probes  # type: ignore
+
+    install = Path(os.environ.get("RPT_INSTALL_ROOT", "/opt/restore-privacy"))
+    # Avoid slow/failing ephemeral subprocess when node-only timer wants speed?
+    # Still run dry-run — it's the product check; timeout 60s is fine.
+    return run_all_section_b_probes(
+        http_status=http_status,
+        repo_root=ROOT,
+        install_root=install,
+        run_ephemeral_subprocess=True,
+    )
 
 
 def load_catalog_version() -> str:
@@ -676,6 +719,13 @@ def build_markdown(results: dict) -> str:
     priv = results["no_priv"]
     pkg = results.get("package_rag") or evaluate_catalog_packages(catalog)
     package_section = render_package_rag_section(pkg)
+    try:
+        from audit_privacy_probes import render_section_b_markdown
+    except ImportError:
+        sys.path.insert(0, str(Path(__file__).resolve().parent))
+        from audit_privacy_probes import render_section_b_markdown  # type: ignore
+
+    section_b_md = render_section_b_markdown(results.get("section_b"))
     suite_line = (
         f"**PASS** ({len(suite.get('modules') or [])} modules)"
         if suite.get("ok")
@@ -688,7 +738,18 @@ def build_markdown(results: dict) -> str:
         title_only = set(body.keys()) <= {"title"} or (
             "title" in body and "clients" not in body and "count" not in body
         )
+    sb = results.get("section_b") or {}
+    if isinstance(sb.get("probes"), dict):
+        tprobe = sb["probes"].get("title_only_status") or {}
+        if "title_only" in tprobe:
+            title_only = bool(tprobe.get("title_only"))
     pkg_overall = pkg.get("overall") or "Red"
+    sb_ok = sb.get("ok")
+    sb_line = (
+        "PASS"
+        if sb_ok
+        else ("SKIP/partial" if not sb else "FAIL")
+    )
 
     return f"""# Restore Privacy — Code & Policy Audit
 
@@ -700,12 +761,13 @@ def build_markdown(results: dict) -> str:
 | **Production node** | **{host}:{UDP_PORT}** (UDP); status UI TCP **{STATUS_PORT}** — **Iceland**, host **FlokiNET** |
 | **Audit generated** | **{human_date()}** (`{now}`) |
 | **Cadence** | Automated security pass (~**every 4 hours** + **jitter** on privacy-hardened node timer) |
-| **Audit type** | Static suite + live node status probe + **per-installer AUDIT STATE (Green/Amber/Red)** |
-| **Auditor method** | `scripts/run_security_audit.py` — unittest privacy/security modules + TCP/HTTP/UDP probes + no-`.priv` scan + catalog package RAG |
+| **Audit type** | Static suite + live node status probe + **per-installer AUDIT STATE (Green/Amber/Red)** + **section B privacy probes** |
+| **Auditor method** | `scripts/run_security_audit.py` — unittest privacy/security modules + TCP/HTTP/UDP probes + no-`.priv` scan + catalog package RAG + section B probes (no firewall scan) |
 
 ---
 
 {package_section}
+{section_b_md}
 ## 1. Executive summary
 
 Latest automated security audit for production node **{host}** and the in-repo privacy/security gates.
@@ -720,7 +782,8 @@ Latest automated security audit for production node **{host}** and the in-repo p
 | Node status TCP :{STATUS_PORT} | {"reachable" if tcp.get("ok") else "UNREACHABLE"} |
 | Node `/status` HTTP | {"OK" if http.get("ok") else "FAIL"} — title-only={title_only} |
 | UDP product port :{UDP_PORT} | {"probe sent" if udp.get("sent") else "send failed"} |
-| No `*.priv` under product/releases/status_page | {"OK" if priv.get("ok") else "HITS: " + ", ".join(priv.get("hits") or [])} |
+| No `*.priv` under public trees | {"OK" if priv.get("ok") else "HITS: " + ", ".join(priv.get("hits") or [])} |
+| Privacy probes (section B) | {sb_line} (firewall excluded) |
 | Live node healthy (TCP+HTTP) | {"YES" if node_ok else "NO"} |
 | Catalog installers AUDIT STATE | **{pkg_overall}** (see top package table) |
 
@@ -878,16 +941,19 @@ def collect(node_only: bool = False) -> dict:
     # Node timer forces localhost probes; laptop/CI may use product public host.
     host = require_localhost_probe_host(DEFAULT_HOST)
     catalog = load_catalog_version()
+    http_status = probe_http_status(host, STATUS_PORT)
+    section_b = run_section_b_probes(http_status)
     results = {
         "generated_at": iso_z(),
         "node_host": host,
         "catalog_version": catalog,
         "unit_suite": {"ran": False, "ok": True, "reason": "skipped"} if node_only else run_unit_suite(),
         "tcp_status": probe_tcp(host, STATUS_PORT),
-        "http_status": probe_http_status(host, STATUS_PORT),
+        "http_status": http_status,
         "udp": probe_udp_open(host, UDP_PORT),
         "no_priv": check_no_priv_in_tree(),
         "package_rag": evaluate_catalog_packages(catalog),
+        "section_b": section_b,
         "audit_privacy": {
             "localhost_required": os.environ.get("RPT_AUDIT_REQUIRE_LOCALHOST", "")
             .strip()
@@ -896,6 +962,8 @@ def collect(node_only: bool = False) -> dict:
             "outbound_allowed": audit_outbound_allowed(),
             "probe_host_loopback": is_loopback_host(host),
             "no_network_exfil": True,
+            "section_b": True,
+            "firewall_probe_excluded": True,
         },
     }
     results["overall_ok"] = bool(
@@ -903,6 +971,7 @@ def collect(node_only: bool = False) -> dict:
         and results["tcp_status"].get("ok")
         and results["http_status"].get("ok")
         and results["no_priv"].get("ok")
+        and results["section_b"].get("ok", True)
         # Package Red does not fail the whole audit exit alone (node host may lack
         # releases/); RAG is reported honestly for readers instead.
     )

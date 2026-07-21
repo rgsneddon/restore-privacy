@@ -45,6 +45,10 @@ mkdir -p \
   "${INSTALL_ROOT}/var/audit-scratch"
 
 cp -a "${REPO_ROOT}/scripts/run_security_audit.py" "${INSTALL_ROOT}/scripts/"
+# Section B privacy probes (imported by the runner)
+if [[ -f "${REPO_ROOT}/scripts/audit_privacy_probes.py" ]]; then
+  cp -a "${REPO_ROOT}/scripts/audit_privacy_probes.py" "${INSTALL_ROOT}/scripts/"
+fi
 # Seed current audit document
 if [[ -f "${REPO_ROOT}/AUDIT.md" ]]; then
   cp -a "${REPO_ROOT}/AUDIT.md" "${INSTALL_ROOT}/AUDIT.md"
