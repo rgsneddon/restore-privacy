@@ -29,13 +29,15 @@ from downloads import download_css, render_download_section_html
 from payments import (
     PRICE_LABEL,
     PRICE_PENCE,
+    check_fulfilment_ready,
+    consume_download_token,
     create_checkout_session,
     find_grant_by_session,
     handle_stripe_webhook,
     init_db,
+    lookup_download_token,
     open_release_asset,
     platform_filename,
-    redeem_download_token,
     stripe_configured,
     wait_for_grant_by_session,
 )
@@ -426,6 +428,16 @@ class Handler(BaseHTTPRequestHandler):
         if path in ("/health", "/healthz"):
             self._send(200, "application/json", b'{"ok":true}')
             return
+        if path in ("/health/fulfilment", "/api/fulfilment-ready"):
+            # Production readiness: can the host open a catalog installer?
+            payload = check_fulfilment_ready()
+            code = 200 if payload.get("ok") else 503
+            self._send(
+                code,
+                "application/json",
+                json.dumps(payload).encode("utf-8"),
+            )
+            return
 
         # --- Paid download flow ---
         if path == "/pay":
@@ -445,7 +457,8 @@ class Handler(BaseHTTPRequestHandler):
 
         if path == "/download":
             token = (query.get("token") or "").strip()
-            grant = redeem_download_token(token) if token else None
+            # Lookup without consuming so proxy failure does not burn the grant.
+            grant = lookup_download_token(token) if token else None
             fname = (grant or {}).get("filename") if grant else None
             if not grant or not fname:
                 self._send(
@@ -469,8 +482,26 @@ class Handler(BaseHTTPRequestHandler):
                         "Fulfilment error",
                         '<p class="msg" id="download-fulfil-failed">Paid download could not be fetched. '
                         "Operators: set RPT_GITHUB_TOKEN (or GITHUB_TOKEN) with contents:read, "
-                        "or stage packages under RPT_ASSET_DIR.</p>"
+                        "or stage packages under status_page/assets/.</p>"
                         '<p><a href="/">Home</a></p>',
+                    ),
+                )
+                return
+            # Consume only after the installer source is open (single-use starts here).
+            if not consume_download_token(token):
+                try:
+                    body_fail = asset.get("body")
+                    if hasattr(body_fail, "close"):
+                        body_fail.close()
+                except Exception:  # noqa: BLE001
+                    pass
+                self._send(
+                    403,
+                    "text/html; charset=utf-8",
+                    _html_page(
+                        "Download unavailable",
+                        '<p class="msg" id="download-denied">Invalid, expired, or already-used download link.</p>'
+                        '<p><a href="/">Get a new download</a></p>',
                     ),
                 )
                 return

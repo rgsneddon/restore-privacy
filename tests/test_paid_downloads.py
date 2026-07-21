@@ -903,5 +903,99 @@ class TestPrivateRepoProxyFulfilment(unittest.TestCase):
             httpd.server_close()
 
 
+
+class TestGrantNotBurnedOnFulfilmentFail(unittest.TestCase):
+    """Proxy failure must not consume the single-use grant (lookup then consume)."""
+
+    def setUp(self):
+        self._td = tempfile.TemporaryDirectory()
+        self.addCleanup(self._td.cleanup)
+        os.environ["RPT_PAYMENT_DATA_DIR"] = self._td.name
+        os.environ["RPT_ASSET_DIR"] = str(Path(self._td.name) / "empty")
+        Path(os.environ["RPT_ASSET_DIR"]).mkdir(parents=True, exist_ok=True)
+        for k in ("RPT_GITHUB_TOKEN", "GITHUB_TOKEN", "GH_TOKEN"):
+            os.environ.pop(k, None)
+        payments.init_db()
+
+    def test_lookup_does_not_consume(self):
+        fname = "restore-privacy-client-0.2.9-linux-x64.tar.gz"
+        tok = payments.mint_download_token(
+            filename=fname, platform="linux", session_id="cs_lookup"
+        )
+        g1 = payments.lookup_download_token(tok)
+        g2 = payments.lookup_download_token(tok)
+        self.assertIsNotNone(g1)
+        self.assertIsNotNone(g2)
+        self.assertEqual(g1["filename"], fname)
+        # still consumable
+        self.assertTrue(payments.consume_download_token(tok))
+        self.assertIsNone(payments.lookup_download_token(tok))
+
+    def test_http_502_leaves_token_reusable_then_success(self):
+        import threading
+        import urllib.error
+        import urllib.request
+
+        fname = "restore-privacy-client-0.2.9-macos.zip"
+        tok = payments.mint_download_token(
+            filename=fname, platform="macos", session_id="cs_noburn"
+        )
+        # No local asset, no token → open fails
+        with mock.patch.object(
+            payments, "asset_search_dirs", return_value=[Path(self._td.name) / "empty"]
+        ):
+            with mock.patch.object(payments, "github_auth_token", return_value=""):
+                with mock.patch.object(
+                    payments, "open_release_asset", return_value=None
+                ):
+                    # Need app to call open_release_asset from payments module
+                    pass
+        # Patch on status_app.open_release_asset since app imports the symbol
+        httpd = ThreadingHTTPServer(("127.0.0.1", 0), status_app.Handler)
+        port = httpd.server_address[1]
+        threading.Thread(target=httpd.serve_forever, daemon=True).start()
+        try:
+            with mock.patch.object(status_app, "open_release_asset", return_value=None):
+                try:
+                    urllib.request.urlopen(
+                        f"http://127.0.0.1:{port}/download?token={tok}", timeout=10
+                    )
+                    self.fail("expected HTTPError 502")
+                except urllib.error.HTTPError as e:
+                    self.assertEqual(e.code, 502)
+                    body = e.read().decode("utf-8", errors="replace")
+                    self.assertIn("download-fulfil-failed", body)
+            # Grant still valid
+            self.assertIsNotNone(payments.lookup_download_token(tok))
+            # Stage asset and succeed
+            payload = b"MACOS-ZIP-UNIT"
+            (Path(self._td.name) / fname).write_bytes(payload)
+            os.environ["RPT_ASSET_DIR"] = self._td.name
+            with mock.patch.object(
+                status_app,
+                "open_release_asset",
+                side_effect=lambda fn, **kw: payments.open_release_asset(fn, **kw),
+            ):
+                with urllib.request.urlopen(
+                    f"http://127.0.0.1:{port}/download?token={tok}", timeout=10
+                ) as resp:
+                    self.assertEqual(resp.status, 200)
+                    data = resp.read()
+            self.assertEqual(data, payload)
+            # Now burned
+            self.assertIsNone(payments.lookup_download_token(tok))
+        finally:
+            httpd.shutdown()
+            httpd.server_close()
+
+    def test_check_fulfilment_ready_local(self):
+        fname = "restore-privacy-client-0.2.9-ios.zip"
+        (Path(self._td.name) / fname).write_bytes(b"PK\x03\x04ios-unit")
+        os.environ["RPT_ASSET_DIR"] = self._td.name
+        ready = payments.check_fulfilment_ready()
+        self.assertTrue(ready.get("ok"), ready)
+        self.assertEqual(ready.get("source"), "local")
+
+
 if __name__ == "__main__":
     unittest.main()

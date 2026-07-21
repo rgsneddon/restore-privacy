@@ -621,14 +621,16 @@ def render_processor_settings_html(
                 itype = "password"
             ph = _escape(str(var.get("placeholder") or ""))
             autocomplete = "off" if var.get("secret") else "on"
+            value_attr = 'value="" ' if var.get("secret") else ""
+            req_mark = " *" if var.get("required") else ""
             form_fields.append(
                 f'<label class="field" for="fld-{pid}-{_escape(key)}">'
                 f'<span class="field-label">{_escape(str(var.get("label") or key))}'
-                f'{" *" if var.get("required") else ""}</span>'
+                f"{req_mark}</span>"
                 f'<span class="field-key"><code>{_escape(key)}</code></span>'
                 f'<input id="fld-{pid}-{_escape(key)}" name="{_escape(key)}" type="{_escape(itype)}" '
                 f'placeholder="{ph}" autocomplete="{autocomplete}" '
-                f'{"value=\"\" " if var.get("secret") else ""}'
+                f"{value_attr}"
                 f'/>'
                 f'<span class="field-purpose muted">{_escape(str(var.get("purpose") or ""))}</span>'
                 f"</label>"

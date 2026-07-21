@@ -460,16 +460,35 @@ def mint_download_token(
     return token
 
 
-def redeem_download_token(
+def _grant_dict_from_row(row: sqlite3.Row) -> dict[str, Any]:
+    return {
+        "token": row["token"],
+        "filename": row["filename"],
+        "platform": row["platform"],
+        "session_id": row["session_id"],
+        "amount_pence": row["amount_pence"],
+        "currency": row["currency"],
+        "url": asset_download_url(row["filename"]),
+    }
+
+
+def lookup_download_token(
     token: str, *, now: float | None = None
 ) -> dict[str, Any] | None:
-    """Return grant dict and mark used if valid unused non-expired token."""
+    """Return grant if valid, unused, and non-expired — **does not** mark used.
+
+    Use before opening the installer so a failed proxy does not burn the grant.
+    Call :func:`consume_download_token` only after the asset is opened successfully.
+    """
     init_db()
     t = now if now is not None else time.time()
+    tok = (token or "").strip()
+    if not tok:
+        return None
     conn = _connect()
     try:
         row = conn.execute(
-            "SELECT * FROM grants WHERE token = ?", (token,)
+            "SELECT * FROM grants WHERE token = ?", (tok,)
         ).fetchone()
         if row is None:
             return None
@@ -477,21 +496,82 @@ def redeem_download_token(
             return None
         if float(row["expires_at"]) < t:
             return None
-        conn.execute(
-            "UPDATE grants SET used_at = ?, status = 'used' WHERE token = ?",
-            (t, token),
-        )
-        return {
-            "token": row["token"],
-            "filename": row["filename"],
-            "platform": row["platform"],
-            "session_id": row["session_id"],
-            "amount_pence": row["amount_pence"],
-            "currency": row["currency"],
-            "url": asset_download_url(row["filename"]),
-        }
+        return _grant_dict_from_row(row)
     finally:
         conn.close()
+
+
+def consume_download_token(token: str, *, now: float | None = None) -> bool:
+    """Mark a still-valid grant as used. Returns True if this call consumed it."""
+    init_db()
+    t = now if now is not None else time.time()
+    tok = (token or "").strip()
+    if not tok:
+        return False
+    conn = _connect()
+    try:
+        row = conn.execute(
+            "SELECT status, used_at, expires_at FROM grants WHERE token = ?",
+            (tok,),
+        ).fetchone()
+        if row is None:
+            return False
+        if row["status"] != "granted" or row["used_at"] is not None:
+            return False
+        if float(row["expires_at"]) < t:
+            return False
+        cur = conn.execute(
+            "UPDATE grants SET used_at = ?, status = 'used' "
+            "WHERE token = ? AND status = 'granted' AND used_at IS NULL",
+            (t, tok),
+        )
+        return cur.rowcount == 1
+    finally:
+        conn.close()
+
+
+def redeem_download_token(
+    token: str, *, now: float | None = None
+) -> dict[str, Any] | None:
+    """Lookup + consume in one step (legacy helpers / tests).
+
+    HTTP /download should use :func:`lookup_download_token` then
+    :func:`consume_download_token` only after :func:`open_release_asset` succeeds.
+    """
+    grant = lookup_download_token(token, now=now)
+    if grant is None:
+        return None
+    if not consume_download_token(token, now=now):
+        return None
+    return grant
+
+
+def check_fulfilment_ready() -> dict[str, Any]:
+    """Probe that at least one catalog installer is openable (local or API).
+
+    Closes the body immediately — used for production readiness evidence.
+    """
+    for asset in available_downloads():
+        opened = open_release_asset(asset.filename)
+        if opened is None:
+            continue
+        body = opened.get("body")
+        try:
+            if hasattr(body, "close"):
+                body.close()
+        except Exception:  # noqa: BLE001
+            pass
+        return {
+            "ok": True,
+            "source": opened.get("source"),
+            "probe_filename": asset.filename,
+            "content_length": opened.get("content_length"),
+        }
+    return {
+        "ok": False,
+        "error": "no_asset_source",
+        "hint": "Set RPT_GITHUB_TOKEN or stage packages under status_page/assets/{version}/",
+    }
 
 
 def list_recent_grants(limit: int = 50) -> list[dict[str, Any]]:
