@@ -256,8 +256,8 @@ def admin_password() -> str:
 # Override with RPT_ADMIN_PASSWORD_DIGEST or prefer live RPT_ADMIN_PASSWORD env.
 # Plaintext operator password is intentionally never stored in the repository.
 _DEFAULT_ADMIN_PASSWORD_DIGEST = (
-    "pbkdf2_sha256$200000$ab3f30efe29d52b0b7d5946ccb7f6266$"
-    "d3a85f8d6cc2c2124766b1ba0a942551955f0aad0becf1aff82aff7c3b889cf5"
+    "pbkdf2_sha256$200000$f089cfac23eb426ac209efa3570e7aa3$25dbddb2e18658db"
+    "9211a5480a3da123792e9135d02542b5a1b92a8bc76b60e5"
 )
 
 
