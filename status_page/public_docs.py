@@ -324,10 +324,12 @@ def markdownish_to_html(text: str) -> str:
                 i += 1
                 continue
             if not in_table:
-                # Installer package AUDIT STATE table: wide Package/State + platform icons
+                # Installer package table: Platform | Package | STATE | Notes
                 header_join = " ".join(cells).lower()
                 table_is_pkg_rag = (
-                    "audit state" in header_join and "package" in header_join
+                    "package" in header_join
+                    and "platform" in header_join
+                    and ("state" in header_join or "audit state" in header_join)
                 )
                 tclass = "doc-table pkg-rag" if table_is_pkg_rag else "doc-table"
                 out.append(f'<table class="{tclass}"><tbody>')

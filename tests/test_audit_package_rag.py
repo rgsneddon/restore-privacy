@@ -100,6 +100,9 @@ class TestPackageRagEvaluation(unittest.TestCase):
         }
         md = self.mod.render_package_rag_section(rag)
         self.assertIn("Installer package AUDIT STATE", md)
+        # Table column heading is STATE (not AUDIT STATE)
+        self.assertIn("| Platform | Package | STATE | Notes |", md)
+        self.assertNotIn("| Platform | Package | AUDIT STATE | Notes |", md)
         for label in ("Windows", "Linux", "macOS", "iOS", "Android"):
             self.assertIn(label, md)
         # Platform column: distinct OS-relative icons with labels
