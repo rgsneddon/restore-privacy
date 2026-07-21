@@ -217,10 +217,35 @@ class CheckoutRequest:
 
 
 def platform_filename(platform: str) -> str | None:
+    """Current catalog installer filename for a platform (paid mint source of truth)."""
     for a in available_downloads():
         if a.platform == platform:
             return a.filename
     return None
+
+
+def resolve_paid_grant_filename(
+    platform: str, *, metadata_filename: str = ""
+) -> str | None:
+    """Bind a paid grant to the **current** catalog package for ``platform``.
+
+    Always returns the live :func:`platform_filename` for a known platform so a
+    pay-time grant cannot freeze a stale older version string from Stripe
+    metadata (e.g. a leftover ``…-0.2.9-…`` name after the catalog moved on).
+    Unknown platforms return None. Optional ``metadata_filename`` is ignored
+    unless it exactly equals the current catalog name (then still that name).
+    """
+    plat = (platform or "").strip().lower()
+    if not plat:
+        return None
+    current = platform_filename(plat)
+    if not current:
+        return None
+    meta = (metadata_filename or "").strip()
+    # Never accept non-catalog or stale version filenames into grants.
+    if meta and meta != current:
+        return current
+    return current
 
 
 def asset_download_url(filename: str) -> str | None:
@@ -627,7 +652,17 @@ def mint_download_token(
     ttl_sec: int = TOKEN_TTL_SEC,
     now: float | None = None,
 ) -> str:
-    """Create a single-use expiring download token bound to a release asset."""
+    """Create a single-use expiring download token bound to a **current catalog** asset.
+
+    Re-resolves the platform to the live catalog filename so callers cannot mint
+    a stale version string. Raises ``ValueError`` if the platform is unknown.
+    """
+    plat = (platform or "").strip().lower()
+    bound = resolve_paid_grant_filename(plat, metadata_filename=filename)
+    if not bound or bound not in catalog_filenames():
+        raise ValueError(f"cannot mint grant for unknown platform/package: {platform!r}")
+    filename = bound
+    platform = plat
     init_db()
     t = now if now is not None else time.time()
     token = secrets.token_urlsafe(32)
@@ -1039,10 +1074,13 @@ def process_checkout_completed_event(event: dict[str, Any]) -> str | None:
     platform = str(
         meta.get("platform") or obj.get("client_reference_id") or ""
     ).strip().lower()
-    filename = str(meta.get("filename") or "").strip()
-    if not filename:
-        filename = platform_filename(platform) or ""
+    # Always mint the **current** catalog package for the platform (pay-time truth).
+    filename = resolve_paid_grant_filename(
+        platform, metadata_filename=str(meta.get("filename") or "")
+    ) or ""
     if not platform or not filename:
+        return None
+    if filename not in catalog_filenames():
         return None
     # Resolve paid amount in pence; never invent PRICE_PENCE when zero/missing.
     amount: int | None = None
