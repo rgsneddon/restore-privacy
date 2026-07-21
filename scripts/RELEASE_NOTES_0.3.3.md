@@ -11,6 +11,7 @@ Catalog advances to **0.3.3**.
 ## Highlights
 
 - **Flyclient removed** from product Connect: no residual HELLO/route skip path; Connect always performs a real HELLO (idempotent “already connected” only when not force-reconnecting).
+- **Android Connect fix:** catalog APK embeds product residual wire (**PFS** `pfs-x25519` + outer **RPT-OBFS**). Earlier carry-forward APKs omitted both → node silent-drop HELLO → Poll timed out.
 - Production node remains **`82.221.101.241:44044`**.
 - Wintun IF settle poll with legacy-floor max (~0.9s) and ASAP return.
 - **Status / payments:** private `/admin` payment-processor settings + grants; paid downloads (£2.45 Stripe).

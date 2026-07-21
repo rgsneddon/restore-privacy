@@ -4,7 +4,8 @@ The live node defaults to require_pfs=True and silent-drops HELLOs that omit the
 X25519 eph field — that surfaces on-device as ``Poll timed out``. Licence/Settings
 strings must also be present in the Flutter AOT blob for the seamless UI.
 
-Public v1.0.0 asset name: restore-privacy-client-0.2.3-android.apk
+Catalog monopin: ``releases/{VERSION}/restore-privacy-client-{VERSION}-android.apk``
+must pass these gates (carry-forward without PFS is a Connect regression).
 """
 
 from __future__ import annotations
@@ -20,11 +21,16 @@ PRODUCT_PUB_PIN = (
     ROOT / "product" / "NODE_ELGAMAL_PUB.sha256"
 ).read_text(encoding="utf-8").strip().split()[0]
 
-# Prefer public RUST-IN-PRIVACY basename, then private client release path.
+# Current catalog first — never let a stale prior hide a broken monopin APK.
 _CANDIDATES = [
-    ROOT / "releases" / "1.0.0" / "restore-privacy-client-0.2.3-android.apk",
-    ROOT.parents[0] / "RUST-IN-PRIVACY" / "releases" / "1.0.0" / "restore-privacy-client-0.2.3-android.apk",
     ROOT / "releases" / VERSION / f"restore-privacy-client-{VERSION}-android.apk",
+    ROOT / "status_page" / "assets" / VERSION / f"restore-privacy-client-{VERSION}-android.apk",
+    ROOT / "releases" / "1.0.0" / "restore-privacy-client-0.2.3-android.apk",
+    ROOT.parents[0]
+    / "RUST-IN-PRIVACY"
+    / "releases"
+    / "1.0.0"
+    / "restore-privacy-client-0.2.3-android.apk",
 ]
 
 
@@ -47,9 +53,9 @@ def _assert_wire(apk: Path) -> None:
             hashlib.sha256(pub).hexdigest() == PRODUCT_PUB_PIN
         ), "APK node_elgamal.pub must match product pin"
         dex = z.read("classes.dex")
-        # Product residual HELLO (node require_pfs)
-        assert b"pfs-x25519" in dex
-        assert b"RPT-OBFS-LAYER" in dex
+        # Product residual HELLO (node require_pfs) — silent drop without these
+        assert b"pfs-x25519" in dex, f"{apk.name} missing PFS wire (Connect times out)"
+        assert b"RPT-OBFS-LAYER" in dex, f"{apk.name} missing outer obfs wire"
         assert b"RPTP" in dex
         assert b"RPTC" in dex
         # Flutter AOT may hold licence/Settings copy
@@ -60,15 +66,21 @@ def _assert_wire(apk: Path) -> None:
 
 
 class TestAndroidReleaseApkWire(unittest.TestCase):
+    def test_catalog_apk_has_pfs_obfs_and_pub_pin(self):
+        """Current catalog Android package must be residual-wire complete."""
+        catalog = (
+            ROOT
+            / "releases"
+            / VERSION
+            / f"restore-privacy-client-{VERSION}-android.apk"
+        )
+        self.assertTrue(catalog.is_file(), f"missing catalog APK: {catalog}")
+        _assert_wire(catalog)
+
     def test_apk_present_with_pfs_obfs_and_pub_pin(self):
         apk = _resolve_apk()
         self.assertTrue(apk.is_file(), f"missing release APK among {_CANDIDATES}")
         _assert_wire(apk)
-        # Public product name must be used when present under releases/1.0.0
-        public = ROOT / "releases" / "1.0.0" / "restore-privacy-client-0.2.3-android.apk"
-        if public.is_file():
-            _assert_wire(public)
-            self.assertEqual(public.name, "restore-privacy-client-0.2.3-android.apk")
 
 
 if __name__ == "__main__":

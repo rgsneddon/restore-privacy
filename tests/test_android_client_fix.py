@@ -57,6 +57,23 @@ class TestAndroidConnectPath(unittest.TestCase):
         self.assertIn("RESULT_OK", svc)
         self.assertIn("RESULT_ERR", svc)
 
+    def test_shipped_engine_has_product_pfs_and_outer_obfs(self):
+        """Connect residual path must match node require_pfs + product obfs wire."""
+        engine = (KT / "RptClientEngine.kt").read_text(encoding="utf-8")
+        obfs = (KT / "RptObfuscation.kt").read_text(encoding="utf-8")
+        svc = (KT / "RptVpnService.kt").read_text(encoding="utf-8")
+        # HELLO embeds X25519 eph and labels session with product PFS transcript
+        self.assertIn("pfs-x25519", engine)
+        self.assertIn("generateX25519", engine)
+        self.assertIn("maybeWrap", engine)
+        self.assertIn("RptObfuscation.maybeWrap", engine)
+        self.assertIn("RPT-OBFS-LAYER", obfs)
+        self.assertTrue(obfs.count("PRODUCT_OBFS_ENABLED") >= 1)
+        # Service drives real engine handshake (not a mock path)
+        self.assertIn("RptClientEngine", svc)
+        self.assertIn("engine.handshake", svc)
+        self.assertIn("node_elgamal.pub", svc)
+
     def test_flutter_maps_status_honestly(self):
         ctrl = (LIB / "vpn_controller.dart").read_text(encoding="utf-8")
         status = (LIB / "connect_status.dart").read_text(encoding="utf-8")

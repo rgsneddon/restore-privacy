@@ -233,11 +233,70 @@ def stage_windows_exe() -> Path:
     )
 
 
+def _android_apk_has_residual_wire(apk: Path) -> bool:
+    """True when classes.dex embeds product PFS + outer obfs (Connect requires both)."""
+    import zipfile
+
+    try:
+        with zipfile.ZipFile(apk) as z:
+            dex = z.read("classes.dex")
+        return b"pfs-x25519" in dex and b"RPT-OBFS-LAYER" in dex
+    except Exception:
+        return False
+
+
 def stage_android_apk() -> Path:
+    """Stage Android APK that embeds product residual wire (PFS + outer obfs).
+
+    Carry-forward of pre-PFS APKs causes silent HELLO drop on the live node
+    (require_pfs=True) → on-device Poll timed out / Connect failure. Prefer a
+    wire-complete prior (e.g. status_page/assets/0.3.0) over a broken rename.
+    """
     dest = OUT / ANDROID_APK_NAME
-    return _stage_from_prior(
-        f"restore-privacy-client-{PRIOR_TAG}-android.apk", dest
-    )
+    candidates: list[Path] = [
+        ROOT
+        / "status_page"
+        / "assets"
+        / PRIOR_TAG
+        / f"restore-privacy-client-{PRIOR_TAG}-android.apk",
+        ROOT / "releases" / PRIOR_TAG / f"restore-privacy-client-{PRIOR_TAG}-android.apk",
+        # Known residual-wire complete build used when later carry-forwards lost PFS
+        ROOT
+        / "status_page"
+        / "assets"
+        / "0.3.0"
+        / "restore-privacy-client-0.3.0-android.apk",
+        ROOT / "releases" / "0.3.0" / "restore-privacy-client-0.3.0-android.apk",
+    ]
+    chosen: Path | None = None
+    for c in candidates:
+        if c.is_file() and _android_apk_has_residual_wire(c):
+            chosen = c
+            break
+    if chosen is None:
+        # Last resort: prior path via helper, still gate on wire
+        try:
+            staged = _stage_from_prior(
+                f"restore-privacy-client-{PRIOR_TAG}-android.apk", dest
+            )
+        except FileNotFoundError as exc:
+            raise FileNotFoundError(
+                "No Android APK with product residual wire (pfs-x25519 + "
+                "RPT-OBFS-LAYER). Rebuild: cd client_app && flutter build apk --release"
+            ) from exc
+        if not _android_apk_has_residual_wire(staged):
+            raise RuntimeError(
+                f"{staged.name} lacks PFS/outer-obfs residual wire — refusing to ship "
+                "(node require_pfs silent-drops HELLO → Connect timeout)"
+            )
+        return staged
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    if dest.resolve() != chosen.resolve():
+        shutil.copy2(chosen, dest)
+    if not _android_apk_has_residual_wire(dest):
+        raise RuntimeError(f"staged {dest} still missing residual wire")
+    print(f"android: staged residual-wire APK from {chosen}")
+    return dest
 
 
 def _rewrite_linux_node_elgamal_pub(tarball: Path) -> None:
