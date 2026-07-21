@@ -28,7 +28,9 @@ Catalog advances to **0.3.3**.
 
 ## Signing / privacy
 
-- macOS: Developer ID Application + notarized/stapled.
+- macOS: Developer ID Application + notarized/stapled (host **without** Network Extension so the public zip opens).
+- Residual public-IP via Packet Tunnel on a developer Mac still needs **Team residual re-sign**: `scripts/sign_macos_residual_team.py` (host `TeamResidual.entitlements` + Packet Tunnel appex + Mac Team profiles). Public DevID alone is not full host-NE residual — see `client_app/APPLE_HANDOFF_0.3.3.md`.
+- Windows / Android / Linux residual use their own full-tunnel stacks with the same product `node_elgamal.pub` pin.
 - iOS: Apple Distribution team-signed sideload.
 - Packages never ship `node_elgamal.priv` or a shared `client_ed25519.priv`.
 - Residual public IP only when OS tunnel is connected.

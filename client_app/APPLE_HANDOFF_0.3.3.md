@@ -42,6 +42,24 @@ After product full-tunnel Connect, the main window hides to a menu-bar tray
 - Residual public IP changes only when the OS Packet Tunnel is **connected**.
 - Host-side HELLO alone is diagnostic; it does not install system residual routes.
 
+### Residual public-IP via Packet Tunnel (Team residual re-sign)
+
+The **public** `restore-privacy-client-0.3.3-macos.zip` is **Developer ID + notarized** and deliberately **omits host Network Extension** so the app opens for all downloaders (host NE without a matching DevID profile is AMFI-killed). That zip is **not** full host-NE residual by itself.
+
+To get **residual public-IP via Packet Tunnel** on a developer Mac (host + appex `packet-tunnel-provider` authorized by Mac Team Provisioning Profiles), re-sign a Release `.app` with:
+
+```bash
+# After flutter build macos --release (or unpack/rebuild from the public zip sources)
+python3 scripts/sign_macos_residual_team.py \
+  --app client_app/build/macos/Build/Products/Release/restore_privacy_client.app
+open client_app/build/macos/Build/Products/Release/restore_privacy_client.app
+# Connect → approve System Settings → Network → VPN & Filters if prompted
+```
+
+Details: `TeamResidual.entitlements` (host NE) vs `DeveloperID.entitlements` (no host NE); see `APPLE_BUILD.md` § Residual Packet Tunnel on this Mac (Team sign).
+
+**Windows / Android / Linux** residual paths use their own full-tunnel stacks (Wintun dual `/1`, Android VPN, Linux TUN dual `/1`) with the same product `node_elgamal.pub` pin (`client/endpoint.py` / `product/node_elgamal.pub`) — they do **not** use this Apple Team residual re-sign path.
+
 ## Rebuild on a Mac (optional operator path)
 
 1. Checkout tag **0.3.3** (or current `main` with 0.3.3 surfaces).

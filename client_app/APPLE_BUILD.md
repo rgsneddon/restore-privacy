@@ -110,12 +110,13 @@ Host + Packet Tunnel plists already declare the real product IDs:
 app, strips development `embedded.provisionprofile`s, and signs the Packet Tunnel
 appex with `PacketTunnel.entitlements`.
 
-### Residual Packet Tunnel on this Mac (Team sign)
+### Residual Packet Tunnel on this Mac (Team residual re-sign)
 
 Public **Developer ID** zips omit host Network Extension so the app **opens** for all
-downloaders (restricted NE without a matching DevID profile is AMFI-killed). Residual
-public IP still requires host + appex `packet-tunnel-provider` authorized by a **Mac
-Team Provisioning Profile**:
+downloaders (restricted NE without a matching DevID profile is AMFI-killed). That
+public DevID path is **not** full host-NE residual. Residual public IP still requires
+host + appex `packet-tunnel-provider` authorized by a **Mac Team Provisioning Profile**
+(Team residual re-sign on a developer Mac):
 
 ```bash
 # After flutter build macos --release

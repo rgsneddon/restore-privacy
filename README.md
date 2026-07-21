@@ -82,7 +82,7 @@ Published **0.3.0** macOS builds are **Developer ID signed and notarized**.
 1. On the [status downloads page](https://restoreprivacy.online/), pay **£2.45** for **macOS** and download **`restore-privacy-client-0.3.3-macos.zip`** (one-time link after payment).
 2. Unzip and open **`restore_privacy_client.app`**.
 3. Press **Connect** and approve the **VPN configuration** prompt.
-4. Residual public IP only changes when the Packet Tunnel is **active**. Host-only HELLO is **diagnostic** only. **Mac work required** for residual Packet Tunnel signing when rebuilding from source (see `client_app/APPLE_HANDOFF_0.3.0.md`). **Disconnect** / **Quit** stops the system VPN.
+4. Residual public IP only changes when the Packet Tunnel is **active**. Host-only HELLO is **diagnostic** only. Residual public-IP via Packet Tunnel on a developer Mac still needs **Team residual re-sign** (`scripts/sign_macos_residual_team.py`) — the public Developer ID zip alone is not full host-NE residual (see `client_app/APPLE_HANDOFF_0.3.3.md`). **Disconnect** / **Quit** stops the system VPN.
 
 ### iOS
 
