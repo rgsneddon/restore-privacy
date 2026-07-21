@@ -186,7 +186,7 @@ def build_markdown(results: dict) -> str:
 | Field | Value |
 |-------|--------|
 | **Product** | Restore Privacy Tunnel (RPT / RPT2) |
-| **Repository** | [restore-privacy](https://github.com/rgsneddon/restore-privacy) (public packages + operator tree) |
+| **Repository** | restore-privacy (**private** source; installers only via paid status host) |
 | **Public catalog version** | **{catalog}** |
 | **Production node** | **{host}:{UDP_PORT}** (UDP); status UI TCP **{STATUS_PORT}** |
 | **Audit generated** | **{human_date()}** (`{now}`) |
@@ -240,7 +240,7 @@ Latest automated security audit for production node **{host}** and the in-repo p
 
 ### 2.2 Method notes
 
-- Public audit URLs use **restore-privacy** GitHub (`AUDIT.md`). Status page also serves **`/AUDIT.md`** and **`/audit.md`**.  
+- Public audit is served on the **status host** as **`/AUDIT.md`** and **`/audit.md`** (source repo is private).  
 - Product default host **{host}**.  
 - Product node ElGamal pub pin: `product/NODE_ELGAMAL_PUB.sha256` (SHA-256 `1b126abf…`).  
 - **Did not** paste secret material into this document.
@@ -305,7 +305,7 @@ An **ISP** performing **traffic analysis** may still observe connection timing a
 | Expectation | Notes |
 |-------------|--------|
 | Product host | **{host}** |
-| Public catalog | **{catalog}** on [restore-privacy releases](https://github.com/rgsneddon/restore-privacy/releases) |
+| Public catalog | **{catalog}** paid installers on [status host](https://restore-privacy-status.onrender.com/) (£2.45; no free GitHub release downloads) |
 | Node pub pin | `1b126abf…` |
 | No `.priv` in public package trees | {"OK" if priv.get("ok") else "HITS"} |
 
@@ -333,7 +333,7 @@ An **ISP** performing **traffic analysis** may still observe connection timing a
 
 ## 9. Conclusion
 
-Automated security audit at **{now}** against node **{host}** and in-repo privacy gates. Public **SECURITY AUDIT** links must resolve on the **public** restore-privacy host (and/or status-page `/AUDIT.md`). Core privacy promises hold when the suite passes and status remains title-only.
+Automated security audit at **{now}** against node **{host}** and in-repo privacy gates. Public **SECURITY AUDIT** links must resolve on the **status host** (`/AUDIT.md` / `/audit.md`). Source repository is **private**; paid catalog installers are fulfilled on the status host only. Core privacy promises hold when the suite passes and status remains title-only.
 
 Re-run: `python3 scripts/run_security_audit.py --write`
 
@@ -343,7 +343,7 @@ Re-run: `python3 scripts/run_security_audit.py --write`
 
 | Rec | Status |
 |-----|--------|
-| Public audit 404 (private RUST-IN-PRIVACY blob) | **Fixed** — links → restore-privacy + local `/AUDIT.md` |
+| Public audit on private GitHub blob | **Fixed** — clients use status-origin `/AUDIT.md` |
 | Periodic node audit | **In tree** — 4h systemd timer |
 | Multi-hop residual | Not done (config only) |
 | Kill-switch + DoT + outer obfs | In tree |
@@ -394,12 +394,16 @@ def write_outputs(results: dict, out_path: Path) -> None:
             lower.write_text(md, encoding="utf-8")
         except OSError:
             pass
-    # Status page local copy for Render/node packaging
-    status_copy = ROOT / "status_page" / "AUDIT.md"
-    try:
-        status_copy.write_text(md, encoding="utf-8")
-    except OSError:
-        pass
+    # Status page copies for Render (rootDir=status_page) + public_docs host
+    for status_copy in (
+        ROOT / "status_page" / "AUDIT.md",
+        ROOT / "status_page" / "public" / "AUDIT.md",
+    ):
+        try:
+            status_copy.parent.mkdir(parents=True, exist_ok=True)
+            status_copy.write_text(md, encoding="utf-8")
+        except OSError:
+            pass
     # Machine-readable
     json_path = ROOT / "status_page" / "static" / "security_audit_latest.json"
     try:

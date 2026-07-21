@@ -61,6 +61,13 @@ class TestPrivacyPolicy(unittest.TestCase):
         self.assertIn("Developer ID", text)
         self.assertIn("Team-signed", text)
         self.assertIn("private", text.lower())
+        self.assertIn("£2.45", text)
+        # Paid-only distribution — no free permanent public installer CDN claim
+        self.assertIn("one-time", text.lower())
+        self.assertNotIn(
+            "download links to public GitHub release packages",
+            text,
+        )
         # Must not claim RUST-IN-PRIVACY v1.0.0 as the current public packages line
         self.assertNotIn(
             "Current public packages:** [RUST-IN-PRIVACY v1.0.0]",
@@ -91,6 +98,17 @@ class TestLicenseAndCredits(unittest.TestCase):
         self.assertIn("not", text.lower())
         # Clarify not WireGuard protocol
         self.assertTrue("wireguard" in text.lower() or "WireGuard" in text)
+        # Distribution services (private source + paid status host)
+        self.assertIn("Stripe", text)
+        self.assertIn("restore-privacy-status.onrender.com", text)
+        self.assertIn("private", text.lower())
+
+    def test_license_notes_paid_catalog_distribution(self):
+        text = _read("LICENSE")
+        self.assertIn("MIT License", text)
+        self.assertIn("Stripe", text)
+        self.assertIn("0.3.0", text)
+        self.assertIn("private", text.lower())
 
 
 class TestReadmeHowto(unittest.TestCase):
@@ -110,8 +128,12 @@ class TestReadmeHowto(unittest.TestCase):
         self.assertIn("restore-privacy-status.onrender.com", text)
         self.assertIn("Developer ID", text)
         self.assertIn("Team-signed", text)
+        self.assertIn("private", lower)
+        self.assertIn("£2.45", text)
         self.assertNotIn("prep stubs", lower)
         self.assertNotIn("prep packages only", lower)
+        # Buyer path is paid status host — not free GH releases/download
+        self.assertNotIn("releases/download/", text)
         # Package basenames from the public release catalog
         self.assertIn(
             "restore-privacy-client-0.3.0-windows-x64-setup.exe",

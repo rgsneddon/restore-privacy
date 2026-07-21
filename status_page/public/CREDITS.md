@@ -45,8 +45,9 @@ their owners.
 |-----------|------|-----------------|
 | **PyInstaller** | Optional Windows standalone bundle in release builds | GPL-2.0 with exception (see PyInstaller docs) — https://pyinstaller.org/ |
 | **paramiko** | Optional deploy script SSH helper | LGPL-2.1 — https://www.paramiko.org/ |
-| **GitHub** / **GitHub Releases** | Source hosting and installer downloads | Service terms of GitHub, Inc. |
-| **Render** | Optional public status-page hosting (`restore-privacy-status`) | Service terms of Render — https://render.com/ |
+| **GitHub** | Private operator source hosting (not a free public installer CDN) | Service terms of GitHub, Inc. |
+| **Stripe** | Paid catalog checkout / Payment Link (£2.45 GBP per package) on the status host | Service terms of Stripe — https://stripe.com/ |
+| **Render** | Public status-page hosting + paid download fulfilment (`restore-privacy-status`) | Service terms of Render — https://render.com/ |
 
 ## Standards and algorithms (non-code)
 
@@ -56,7 +57,8 @@ their owners.
 ## Project authorship
 
 Original RPT protocol, node, clients, and status page: **Russell G Sneddon** and
-contributors to https://github.com/rgsneddon/restore-privacy
+contributors (operator repository **restore-privacy** is **private**; public
+docs and paid installers: https://restore-privacy-status.onrender.com/).
 
 Project license for original code: **MIT** — see [`LICENSE`](LICENSE).
 

@@ -40,7 +40,12 @@ Summary of utilised parts (see CREDITS.md for detail):
   - BigInt / attaswift (vendored; modular arithmetic for ElGamal/Pedersen on Apple)
   - Flutter / Dart SDK (multi-platform client UI shell)
   - Python standard library and packaging tools as used in the repo
-  - Render.com (optional hosting of the public status page — service, not code)
+  - Render.com (hosting of the public status page and paid download fulfilment — service, not code)
+  - Stripe (paid catalog checkout / Payment Link — service, not code)
+
+Product distribution: end-user installers for catalog v0.3.0 are sold via the
+public status host (one-time download after payment). The operator source tree
+may be private; this MIT grant still applies to the original code as distributed.
 
 Do not confuse “uses Wintun as a TUN driver” with “is WireGuard”: the tunnel
 protocol in this project is custom RPT, not the WireGuard protocol.

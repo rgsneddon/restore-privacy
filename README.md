@@ -147,7 +147,7 @@ Node deploy, ports, secrets, from-source builds, and tests: **[sundries.txt](sun
 
 **Device keys:** packages do **not** ship a shared client private key; each install generates its own Ed25519 device key on first run.
 
-**Secrets discipline:** Never commit or force-add `secrets/` (gitignored). Public packages must never include `node_elgamal.priv` or a shared `client_ed25519.priv`. Release scripts run `_assert_no_priv` / strip inject gates — keep those on every tag.
+**Secrets discipline:** Never commit or force-add `secrets/` (gitignored). Paid release packages must never include `node_elgamal.priv` or a shared `client_ed25519.priv`. Release scripts run `_assert_no_priv` / strip inject gates — keep those on every tag.
 
 **Node key protection:** `RPT_KEY_BACKEND=file|mock|sealed|tpm` — sealed/TPM-class stores long-term ElGamal under a wrap key so plaintext `.priv` is not required on disk. See `node/key_backend.py`.
 

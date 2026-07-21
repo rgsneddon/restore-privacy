@@ -2,9 +2,9 @@
 
 **Last updated:** 21 July 2026  
 **Product:** Restore Privacy Tunnel (RPT / RPT2) — custom VPN node, client apps, and public status page  
-**Current packages (catalog v0.3.0):** paid installers via [status downloads](https://restore-privacy-status.onrender.com/) (Windows · Android · macOS · iOS · Linux — macOS Developer ID notarized; iOS Team-signed sideload). The product source repository is private; installers are not free permanent public GitHub downloads.  
-**Code & policy audit:** [AUDIT.md](AUDIT.md)  
-**Operator / project:** Russell G Sneddon (`rgsneddon`) / [restore-privacy](https://github.com/rgsneddon/restore-privacy)
+**Current packages (catalog v0.3.0):** paid installers (£2.45 GBP per package) via [status downloads](https://restore-privacy-status.onrender.com/) (Windows · Android · macOS · iOS · Linux — macOS Developer ID notarized; iOS Team-signed sideload). The product **source repository is private**; free permanent public GitHub installer URLs are **not** offered. After payment the status host delivers a **one-time** download (authenticated proxy).  
+**Code & policy audit:** [AUDIT.md](AUDIT.md) (also served on the status host as `/AUDIT.md`)  
+**Operator / project:** Russell G Sneddon (`rgsneddon`) / Restore Privacy — public docs and paid downloads: [status host](https://restore-privacy-status.onrender.com/)
 
 This policy describes how the **Restore Privacy** software is designed to handle data. It is written for end users and operators. It is **not** legal advice and is not a jurisdiction-specific compliance certificate (e.g. full GDPR/CCPA legal opinion).
 
@@ -17,7 +17,7 @@ Restore Privacy is a **custom-built encrypted tunnel** (not WireGuard, OpenVPN, 
 | Commitment | Meaning |
 |------------|---------|
 | **No user-info logs** | The node and status software are configured **not** to write connection, session, access, traffic, accounting, or peer-activity logs to disk. |
-| **No client PII collection** | The public status surface exposes **product title and download links** only — **not** a live connected-client count, identities, IPs, usernames, or per-client lists. |
+| **No client PII collection** | The public status surface exposes **product title and paid-download entry** only — **not** a live connected-client count, identities, IPs, usernames, or per-client lists. |
 | **Tunnel as a relay** | After cryptographic admission, the node forwards encrypted-session traffic; it is not designed as an analytics or advertising platform. |
 
 ---
@@ -61,19 +61,20 @@ Process stdout/stderr for the node service is configured for **no journal sessio
 - **No public-IP geo admission (from 0.1.9 source):** product Connect does **not** look up the device public IP via third-party geo services, and does **not** allow or deny access by country. Admission is cryptographic (device Ed25519 + node keys) only. Older installed packages (e.g. 0.1.8) may still perform a client-side UK geo check until users upgrade.
 - **DNS on full tunnel:** product full-tunnel clients default DNS to the **node tunnel gateway** (`10.88.0.1`) only — **no** client-side public DNS fallbacks (Cloudflare/Google/Quad9/etc.). The node Unbound instance listens on the tunnel address and uses **DNS-over-TLS (DoT)** upstream to privacy-oriented resolvers (`node/unbound-rpt.conf`, `node/install_dns.sh`). Until node DNS is installed, name resolution while connected may fail. The VPS provider may still see DoT/encrypted recursive upstream traffic from the node.
 - **Kill switch / leak protection:** when residual full tunnel is up, product Windows/Linux clients apply an **always-on kill switch** (block non-tunnel outbound) plus **IPv6 ISP path blocking**. STUN/mDNS ports used by common WebRTC discovery are blocked under the kill-switch rules. Android builder config uses `blocking=true` / `allowBypass=false`. Disconnect rolls back kill-switch and IPv6 mitigations.
-- Public download packages (Windows `.exe`, Android `.apk`, Linux `.tar.gz` installer, macOS `.zip`, iOS `.zip`) may include the **public** node key (`node_elgamal.pub`) so clients can open a HELLO. Each install **generates a unique Ed25519 device private key on first run** and keeps it only in local device-private storage - packages do **not** ship a shared `client_ed25519.priv` (which would allow universal impersonation). They **never** include the **node private key** (`node_elgamal.priv`). Windows installers ship a **bundled runtime** (no separate system Python install). The Linux installer package ships **manylinux wheels** for the app Python crypto stack (private venv via `install.sh`); OS tools such as TUN/`ip`/root for full tunnel remain host-provided.
+- Paid catalog packages (Windows `.exe`, Android `.apk`, Linux `.tar.gz` installer, macOS `.zip`, iOS `.zip`) may include the **public** node key (`node_elgamal.pub`) so clients can open a HELLO. Each install **generates a unique Ed25519 device private key on first run** and keeps it only in local device-private storage - packages do **not** ship a shared `client_ed25519.priv` (which would allow universal impersonation). They **never** include the **node private key** (`node_elgamal.priv`). Windows installers ship a **bundled runtime** (no separate system Python install). The Linux installer package ships **manylinux wheels** for the app Python crypto stack (private venv via `install.sh`); OS tools such as TUN/`ip`/root for full tunnel remain host-provided.
 
 ### 3.3 Public status page (e.g. Render)
 
-- Displays the product **title**, beta note, and **download links** only.
+- Displays the product **title**, beta note, and **paid download** entry (Stripe Payment Link per platform) only.
 - Does **not** expose a live connected-client count or poll a session metric on the public HTML surface.
 - Optional `/api/status` JSON is **title-only** (no `clients_connected`).
-- May offer **download links** to public GitHub release packages (current catalog: **v0.3.0** fulfilled after payment on [status downloads](https://restore-privacy-status.onrender.com/) (private source repo; no free permanent public installer URLs)).
+- **Does not** publish free permanent GitHub `releases/download` installer buttons. Catalog **v0.3.0** packages are fulfilled **after payment** on [status downloads](https://restore-privacy-status.onrender.com/) via a **one-time** proxy download (private source repository).
+- Serves same-origin legal documents (`/PRIVACY_POLICY.md`, `/LICENSE`, `/README.md`, `/CREDITS.md`, `/AUDIT.md`) so clients can open docs without a public GitHub tree.
 
 ### 3.4 Operator-held secrets
 
 - **Node ElGamal private key** and **authorized client private keys** are operational secrets.
-- The **node ElGamal private key** lives only on the operator node (e.g. `/opt/restore-privacy/secrets/`) and is gitignored - **never** in public release zips.
+- The **node ElGamal private key** lives only on the operator node (e.g. `/opt/restore-privacy/secrets/`) and is gitignored - **never** in paid release packages.
 - **Client** device Ed25519 keys are created locally on first run (not a shared installer secret). Possession of a device key allows tunnel use for that install - treat local secrets as credentials.
 
 ---
@@ -152,15 +153,16 @@ We may update this policy as the product evolves. The **Last updated** date at t
 
 ## 9. Contact
 
-For privacy questions about this open-source project, open an issue on:
+The product **source repository is private**. For privacy questions about Restore Privacy:
 
-https://github.com/rgsneddon/restore-privacy
-
-Or contact the repository owner via their GitHub profile.
+- Read the public policy and audit on the [status host](https://restore-privacy-status.onrender.com/) (`/PRIVACY_POLICY.md`, `/AUDIT.md`)
+- Install / pay path: [How to buy](https://restore-privacy-status.onrender.com/how-to-buy)
+- Or contact the operator via their public project channels (e.g. GitHub profile `rgsneddon`)
 
 ---
 
-## 9. Related documents
+## 10. Related documents
 
-- Project license and third-party credits: [`LICENSE`](LICENSE), [`CREDITS.md`](CREDITS.md)
+- Project license and third-party credits: [`LICENSE`](LICENSE), [`CREDITS.md`](CREDITS.md) (also on the status host)
 - How to install and run: [`README.md`](README.md)
+- Code & policy audit: [`AUDIT.md`](AUDIT.md)

@@ -6,7 +6,7 @@
 | **Repository** | restore-privacy (**private** source; installers only via paid status host) |
 | **Public catalog version** | **0.3.0** |
 | **Production node** | **82.221.101.241:44044** (UDP); status UI TCP **8080** |
-| **Audit generated** | **21 July 2026** (`2026-07-21T02:30:04Z`) |
+| **Audit generated** | **21 July 2026** (`2026-07-21T05:19:23Z`) |
 | **Cadence** | Automated security pass (target **every 4 hours** on node/operator timer) |
 | **Audit type** | Static suite + live node status probe (not a pen-test or multi-OS residual red-team) |
 | **Auditor method** | `scripts/run_security_audit.py` — unittest privacy/security modules + TCP/HTTP/UDP probes + no-`.priv` scan |
@@ -57,7 +57,7 @@ Latest automated security audit for production node **82.221.101.241** and the i
 
 ### 2.2 Method notes
 
-- Public audit URLs use **restore-privacy** GitHub (`AUDIT.md`). Status page also serves **`/AUDIT.md`** and **`/audit.md`**.  
+- Public audit is served on the **status host** as **`/AUDIT.md`** and **`/audit.md`** (source repo is private).  
 - Product default host **82.221.101.241**.  
 - Product node ElGamal pub pin: `product/NODE_ELGAMAL_PUB.sha256` (SHA-256 `1b126abf…`).  
 - **Did not** paste secret material into this document.
@@ -98,7 +98,7 @@ An **ISP** performing **traffic analysis** may still observe connection timing a
 
 | Severity | Finding | Status |
 |----------|---------|--------|
-| **Info** | Automated pass at `2026-07-21T02:30:04Z` | Recorded |
+| **Info** | Automated pass at `2026-07-21T05:19:23Z` | Recorded |
 | **High** | Public client count on status | Closed (title-only) |
 | **Medium** | Shared client priv in packages | Closed (no .priv hits) |
 | **Low** | Unit suite failure | N/A |
@@ -150,7 +150,7 @@ An **ISP** performing **traffic analysis** may still observe connection timing a
 
 ## 9. Conclusion
 
-Automated security audit at **2026-07-21T02:30:04Z** against node **82.221.101.241** and in-repo privacy gates. Public **SECURITY AUDIT** links must resolve on the **public** restore-privacy host (and/or status-page `/AUDIT.md`). Core privacy promises hold when the suite passes and status remains title-only.
+Automated security audit at **2026-07-21T05:19:23Z** against node **82.221.101.241** and in-repo privacy gates. Public **SECURITY AUDIT** links must resolve on the **status host** (`/AUDIT.md` / `/audit.md`). Source repository is **private**; paid catalog installers are fulfilled on the status host only. Core privacy promises hold when the suite passes and status remains title-only.
 
 Re-run: `python3 scripts/run_security_audit.py --write`
 
@@ -160,7 +160,7 @@ Re-run: `python3 scripts/run_security_audit.py --write`
 
 | Rec | Status |
 |-----|--------|
-| Public audit 404 (private RUST-IN-PRIVACY blob) | **Fixed** — links → restore-privacy + local `/AUDIT.md` |
+| Public audit on private GitHub blob | **Fixed** — clients use status-origin `/AUDIT.md` |
 | Periodic node audit | **In tree** — 4h systemd timer |
 | Multi-hop residual | Not done (config only) |
 | Kill-switch + DoT + outer obfs | In tree |
