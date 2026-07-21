@@ -26,14 +26,19 @@
 - **Full-device VPN** when the OS grants VPN permission (Windows UAC / Wintun dual `/1`, Android VPN consent, Apple Packet Tunnel when signed)
 - Residual public IP uses the **VPN node** only when full-tunnel routes are active (**honest status** otherwise)
 - **Close / minimize** keeps the tunnel running until **Disconnect** or **Quit**
-- Public status page with **download installers only** (no live client count)
+- **Disconnect / Quit** restores residual routes and product firewall state so the device returns to normal internet (Windows dual `/1` teardown + scoped **RPT-FW** cleanup; Linux TUN/routes teardown)
+- **Windows Defender Firewall** product rules are **scoped allows only** (node UDP + program) — not unscoped blocks; kill-switch remains opt-in
+- **Restore Internet** failsafe in every catalog installer (network restore + complete product removal) — see warning below
+- Public status page with **download installers only** (no live client count; package subtitle is platform names only)
 - **No third-party geo lookup** on Connect (admission is cryptographic only)
-- Session **PFS** (ephemeral X25519) on the Python client/node handshake path
+- Connect uses the standard **HELLO** residual path (**flyclient** fast-path removed in catalog **v0.3.3**)
+- Session **PFS** (ephemeral X25519) on the Python client/node handshake path; Android catalog APK ships residual wire (**PFS + outer obfs**)
 - **Layer obfuscation** (QUIC-mimic outer wrap around RPT frames) **on by default** (`RPT_OBFS=0` to opt out) — mitigation, not DPI-undetectability
 - **Product traffic shaping** (padding / send jitter / cover) **on by default** for Windows/Linux Python DATA path (`RPT_TRAFFIC_SHAPE=0` to opt out)
 - **No product kill switch by default** (firewall/iptables block rules and Android `setBlocking` are off; opt in only with `RPT_KILL_SWITCH=1`); tunnel DNS only (`10.88.0.1`, no public DNS fallbacks); IPv4 residual honesty still applies
 - Multi-hop hop *lists* may be configured for planning — **not residual multi-hop** until a real relay path ships
 - Native Android/Apple engines may lag Python pad/cover/PFS/obfs wire extensions (documented honestly)
+- Security audit documents **per-installer AUDIT STATE** (Green / Amber / Red) for catalog packages — [AUDIT.md](AUDIT.md)
 
 ---
 
@@ -53,16 +58,18 @@ The product source repository is **private**; free permanent GitHub release down
 ### Windows
 
 1. On the [status downloads page](https://restoreprivacy.online/), pay **£2.45** for **Windows** and download **`restore-privacy-client-0.3.3-windows-x64-setup.exe`** (one-time link after payment).
-2. Run the installer (bundled runtime + Wintun — no separate Python install).
-3. Press **Connect** and approve **UAC** when prompted so residual public IP uses the VPN node.
+2. Run the installer (PE self-extracting package: frozen runtime + Wintun — no separate Python install). The package may extract as a portable tree or install under LocalAppData.
+3. Press **Connect** and approve **UAC** when prompted so residual public IP uses the VPN node. Scoped **Windows Defender Firewall** allows (node UDP + program) may be applied for residual Connect.
 4. Optional: **Settings** → startup / autoconnect (defaults **off**); legal links to audit / privacy / licence.
+5. **Disconnect** / **Quit** tears down dual `/1` residual routes so ordinary internet works again. For **complete removal**, use **Restore Internet** (see warning below).
 
 ### Android
 
 1. On the [status downloads page](https://restoreprivacy.online/), pay **£2.45** for **Android** and download **`restore-privacy-client-0.3.3-android.apk`** (one-time link after payment).
-2. Install the APK (allow install from unknown sources if your device asks).
+2. Install the APK (allow install from unknown sources if your device asks). Catalog APK includes residual wire (**PFS + outer obfs**).
 3. Open **Restore Privacy**, press **Connect**, and grant **VPN** permission when prompted.
 4. Optional: **Settings** → startup / autoconnect (defaults off). Minimize keeps the VPN service running until **Disconnect**.
+5. For complete removal, open the in-package **Restore Internet** guidance and uninstall via system Settings.
 
 ### Ubuntu and derivatives (Linux Mint, Pop!_OS, …)
 
@@ -70,27 +77,30 @@ The product source repository is **private**; free permanent GitHub release down
 2. Unpack and run the bundled installer:
    ```bash
    tar xzf restore-privacy-client-0.3.3-linux-x64.tar.gz
-   cd restore-privacy-0.3.0-linux
+   cd restore-privacy-*-linux   # package folder name from the archive
    bash install.sh
    ```
 3. Run **`sudo ./bin/privacy-restored`** for residual public IP (TUN + dual `/1` routes).
+4. Failsafe: **`sudo bash "./Restore Internet"`** restores normal internet and removes the product (see warning below).
 
 ### macOS
 
-Published **0.3.0** macOS builds are **Developer ID signed and notarized**.
+Published **v0.3.3** macOS builds are **Developer ID signed and notarized**.
 
 1. On the [status downloads page](https://restoreprivacy.online/), pay **£2.45** for **macOS** and download **`restore-privacy-client-0.3.3-macos.zip`** (one-time link after payment).
 2. Unzip and open **`restore_privacy_client.app`**.
 3. Press **Connect** and approve the **VPN configuration** prompt.
 4. Residual public IP only changes when the Packet Tunnel is **active**. Host-only HELLO is **diagnostic** only. Residual public-IP via Packet Tunnel on a developer Mac still needs **Team residual re-sign** (`scripts/sign_macos_residual_team.py`) — the public Developer ID zip alone is not full host-NE residual (see `client_app/APPLE_HANDOFF_0.3.3.md`). **Disconnect** / **Quit** stops the system VPN.
+5. Failsafe: run **`Restore Internet.command`** in the package (or follow VPN Settings cleanup) — see warning below.
 
 ### iOS
 
-Published **0.3.0** iOS packages are **Team-signed sideload** zips (not App Store).
+Published **v0.3.3** iOS packages are **Team-signed sideload** zips (not App Store).
 
 1. On the [status downloads page](https://restoreprivacy.online/), pay **£2.45** for **iOS** and download **`restore-privacy-client-0.3.3-ios.zip`** (one-time link after payment).
 2. Install **`Runner.app`** with device tooling; press **Connect** and grant **VPN** permission.
 3. Residual public IP only changes when the Packet Tunnel is **active**.
+4. Complete removal: follow **`Restore Internet.txt`** (Settings → VPN / Delete App) — see warning below.
 
 ### Status page
 
@@ -100,6 +110,18 @@ https://restoreprivacy.online/
 - Installers are delivered **after payment** (single-use link); the product repo is private  
 - **No** public live session / connected-client counter  
 - A browser tab cannot run full system VPN
+
+### Restore Internet (failsafe) — BIG WARNING
+
+Every catalog installer includes a **Restore Internet** failsafe (Windows/Linux
+runnable script; macOS `.command`; iOS/Android guidance). Use it only when you
+need residual internet restored **and** complete product removal.
+
+> **WARNING:** Running **Restore Internet** will **ERASE ALL** parts of
+> **Restore Privacy** from the device (app, tunnel residual, shortcuts, product
+> secrets). You may **not** be able to automatically re-download your
+> subscription app afterward. Contact **russell.gray.sneddon@gmail.com** to
+> obtain a new download link.
 
 ---
 
@@ -112,7 +134,7 @@ https://restoreprivacy.online/
 | **Credits** | [CREDITS.md](CREDITS.md) |
 | **Code & policy audit** | [AUDIT.md](AUDIT.md) |
 
-Core promises: **no user-info logs** by design, **minimal public status** (title + downloads — **no live client count**), **device keys** (not a shared client private key), **honest residual** only when full tunnel is up, **no third-party geo** on Connect. Product Windows/Linux clients enable **outer-layer obfuscation** and **padding / jitter / cover** by default on residual paths; **kill-switch is not applied by default**. Multi-hop *config* is not residual until a real relay ships. Node tunnel DNS uses **DoT** upstream. VPS providers may still see IP-level metadata (privacy §4).
+Core promises: **no user-info logs** by design, **minimal public status** (title + downloads — **no live client count**), **device keys** (not a shared client private key), **honest residual** only when full tunnel is up, **no third-party geo** on Connect. Product Windows/Linux clients enable **outer-layer obfuscation** and **padding / jitter / cover** by default on residual paths; **kill-switch is not applied by default**. **Disconnect / Quit** restores residual routes (no intentional blackhole after normal teardown). **Restore Internet** is a full wipe failsafe (not ordinary Disconnect). Multi-hop *config* is not residual until a real relay ships. Node tunnel DNS uses **DoT** upstream. VPS providers may still see IP-level metadata (privacy §4).
 
 ---
 

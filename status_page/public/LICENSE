@@ -39,6 +39,7 @@ Summary of utilised parts (see CREDITS.md for detail):
   - Apple CryptoKit (iOS/macOS ChaCha20-Poly1305, Ed25519, HKDF for RPT2 Packet Tunnel)
   - BigInt / attaswift (vendored; modular arithmetic for ElGamal/Pedersen on Apple)
   - Flutter / Dart SDK (multi-platform client UI shell)
+  - 7-Zip / LZMA SDK PE SFX stub (Windows catalog self-extractor packaging)
   - Python standard library and packaging tools as used in the repo
   - Render.com (hosting of the public status page and paid download fulfilment — service, not code)
   - Stripe (paid catalog checkout / Payment Link — service, not code)
@@ -47,5 +48,22 @@ Product distribution: end-user installers for catalog v0.3.3 are sold via the
 public status host (one-time download after payment). The operator source tree
 may be private; this MIT grant still applies to the original code as distributed.
 
+End-user packaging notes (do not change the MIT grant above):
+
+  - Catalog installers include a “Restore Internet” failsafe that restores
+    residual network settings and can erase all product parts from the device.
+    After a full wipe, a new paid one-time download link may be required;
+    contact russell.gray.sneddon@gmail.com (or re-purchase on the status host).
+  - Ordinary Disconnect / Quit is designed to restore residual routes without
+    uninstalling the product.
+  - THE SOFTWARE IS PROVIDED “AS IS” (see warranty disclaimer above). The
+    failsafe is a convenience for residual recovery and complete removal; it
+    does not create a warranty of re-download rights beyond the operator’s
+    paid fulfilment process.
+
 Do not confuse “uses Wintun as a TUN driver” with “is WireGuard”: the tunnel
 protocol in this project is custom RPT, not the WireGuard protocol.
+
+Windows installers may use a PE 7-Zip SFX-style self-extractor stub for
+payload delivery; 7-Zip / LZMA SDK components remain under their own licenses
+when redistributed (see CREDITS.md if listed).

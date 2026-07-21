@@ -1,11 +1,22 @@
 {
-  "generated_at": "2026-07-21T10:00:28Z",
+  "generated_at": "2026-07-21T10:47:19Z",
   "node_host": "82.221.101.241",
   "catalog_version": "0.3.3",
   "unit_suite": {
-    "ran": false,
+    "ran": true,
     "ok": true,
-    "reason": "skipped"
+    "returncode": 0,
+    "modules": [
+      "tests.test_legal_links",
+      "tests.test_legal_docs",
+      "tests.test_no_public_client_count",
+      "tests.test_connect_no_phones_home",
+      "tests.test_obfuscation",
+      "tests.test_kill_switch_leaks",
+      "tests.test_product_node_key",
+      "tests.test_pfs_product_require",
+      "tests.test_downloads"
+    ]
   },
   "tcp_status": {
     "host": "82.221.101.241",
@@ -46,7 +57,7 @@
           "PE/MZ magic OK"
         ],
         "path": "/Users/russellsneddon/restore-privacy/releases/0.3.3/restore-privacy-client-0.3.3-windows-x64-setup.exe",
-        "bytes": 12872499
+        "bytes": 12870677
       },
       {
         "platform": "linux",
@@ -58,7 +69,7 @@
           "archive present (structural residual gates N/A in this pass)"
         ],
         "path": "/Users/russellsneddon/restore-privacy/releases/0.3.3/restore-privacy-client-0.3.3-linux-x64.tar.gz",
-        "bytes": 14292481
+        "bytes": 14291286
       },
       {
         "platform": "macos",
@@ -70,7 +81,7 @@
           "archive present (structural residual gates N/A in this pass)"
         ],
         "path": "/Users/russellsneddon/restore-privacy/releases/0.3.3/restore-privacy-client-0.3.3-macos.zip",
-        "bytes": 18817832
+        "bytes": 51999448
       },
       {
         "platform": "ios",
@@ -82,7 +93,7 @@
           "archive present (structural residual gates N/A in this pass)"
         ],
         "path": "/Users/russellsneddon/restore-privacy/releases/0.3.3/restore-privacy-client-0.3.3-ios.zip",
-        "bytes": 7996349
+        "bytes": 8016800
       },
       {
         "platform": "android",
@@ -94,7 +105,7 @@
           "Android residual wire (PFS + outer obfs) present"
         ],
         "path": "/Users/russellsneddon/restore-privacy/releases/0.3.3/restore-privacy-client-0.3.3-android.apk",
-        "bytes": 48142726
+        "bytes": 48046085
       }
     ],
     "overall": "Green",

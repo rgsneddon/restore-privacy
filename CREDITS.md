@@ -44,6 +44,7 @@ their owners.
 | Component | Role | License / notes |
 |-----------|------|-----------------|
 | **PyInstaller** | Optional Windows standalone bundle in release builds | GPL-2.0 with exception (see PyInstaller docs) — https://pyinstaller.org/ |
+| **7-Zip / LZMA SDK** (PE SFX stub) | Windows catalog self-extracting setup packaging (`7zSD.sfx`-style) | LZMA SDK public-domain / 7-Zip license as applicable — https://www.7-zip.org/ · https://www.7-zip.org/sdk.html |
 | **paramiko** | Optional deploy script SSH helper | LGPL-2.1 — https://www.paramiko.org/ |
 | **GitHub** | Private operator source hosting (not a free public installer CDN) | Service terms of GitHub, Inc. |
 | **Stripe** | Paid catalog checkout / Payment Link (£2.45 GBP per package) on the status host | Service terms of Stripe — https://stripe.com/ |

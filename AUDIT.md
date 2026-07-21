@@ -6,7 +6,7 @@
 | **Repository** | restore-privacy (**private** source; installers only via paid status host) |
 | **Public catalog version** | **0.3.3** |
 | **Production node** | **82.221.101.241:44044** (UDP); status UI TCP **8080** |
-| **Audit generated** | **21 July 2026** (`2026-07-21T10:00:28Z`) |
+| **Audit generated** | **21 July 2026** (`2026-07-21T10:47:19Z`) |
 | **Cadence** | Automated security pass (target **every 4 hours** on node/operator timer) |
 | **Audit type** | Static suite + live node status probe + **per-installer AUDIT STATE (Green/Amber/Red)** |
 | **Auditor method** | `scripts/run_security_audit.py` — unittest privacy/security modules + TCP/HTTP/UDP probes + no-`.priv` scan + catalog package RAG |
@@ -47,7 +47,7 @@ Latest automated security audit for production node **82.221.101.241** and the i
 
 | Check | Result |
 |-------|--------|
-| Security unit suite | **PASS** (0 modules) |
+| Security unit suite | **PASS** (9 modules) |
 | Node status TCP :8080 | reachable |
 | Node `/status` HTTP | OK — title-only=True |
 | UDP product port :44044 | probe sent |
@@ -123,7 +123,7 @@ An **ISP** performing **traffic analysis** may still observe connection timing a
 
 | Severity | Finding | Status |
 |----------|---------|--------|
-| **Info** | Automated pass at `2026-07-21T10:00:28Z` | Recorded |
+| **Info** | Automated pass at `2026-07-21T10:47:19Z` | Recorded |
 | **High** | Public client count on status | Closed (title-only) |
 | **Medium** | Shared client priv in packages | Closed (no .priv hits) |
 | **Low** | Unit suite failure | N/A |
@@ -137,8 +137,8 @@ An **ISP** performing **traffic analysis** may still observe connection timing a
 
 | Result | Detail |
 |--------|--------|
-| **Unit suite** | **PASS** (0 modules) |
-| **Return code** | n/a |
+| **Unit suite** | **PASS** (9 modules) |
+| **Return code** | 0 |
 | **Log** | operator SCRATCH / `security_audit.log` / node journal `rpt-security-audit.service` |
 | **Generator** | `scripts/run_security_audit.py` |
 
@@ -175,7 +175,7 @@ An **ISP** performing **traffic analysis** may still observe connection timing a
 
 ## 9. Conclusion
 
-Automated security audit at **2026-07-21T10:00:28Z** against node **82.221.101.241** and in-repo privacy gates. Public **SECURITY AUDIT** links must resolve on the **status host** (`/AUDIT.md` / `/audit.md`). Source repository is **private**; paid catalog installers are fulfilled on the status host only. Core privacy promises hold when the suite passes and status remains title-only.
+Automated security audit at **2026-07-21T10:47:19Z** against node **82.221.101.241** and in-repo privacy gates. Public **SECURITY AUDIT** links must resolve on the **status host** (`/AUDIT.md` / `/audit.md`). Source repository is **private**; paid catalog installers are fulfilled on the status host only. Core privacy promises hold when the suite passes and status remains title-only.
 
 Re-run: `python3 scripts/run_security_audit.py --write`
 

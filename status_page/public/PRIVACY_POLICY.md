@@ -56,7 +56,8 @@ Process stdout/stderr for the node service is configured for **no journal sessio
 - Clients use **local** cryptographic material (when provisioned) to complete admission and establish session keys when the user connects. On the Python client/node path, session AEAD keys incorporate **ephemeral X25519** material (perfect forward secrecy) in addition to handshake nonces — long-term keys remain for admission/authentication.
 - **Traffic-shape** features (packet padding, send-side timing jitter, cover/dummy frames) are **enabled by default** on the product Windows/Linux Python DATA path (bounded pad bucket, modest send jitter, periodic cover frames). Set environment variable **`RPT_TRAFFIC_SHAPE=0`** to disable. They reduce coarse traffic fingerprints and are **not** a guarantee of undetectability against sophisticated DPI. Native Android/Apple engines may lag this wire surface until dual-wired.
 - **Full-tunnel** modes route device traffic into the encrypted tunnel **only when** the OS grants VPN permission (Windows Administrator / UAC + Wintun dual `/1` routes, Android VPN consent, iOS/macOS VPN permission). On **iOS and macOS**, full-system VPN uses a signed **Packet Tunnel Network Extension** (and App Group access to admission secrets). Product "connected for residual public IP" requires the system tunnel / dual `/1` path to be active (residual public IP only changes then).
-- **On Disconnect / Quit**, clients are designed to **fully tear down** the tunnel (routes, TUN/Packet Tunnel, session) so traffic **reverts to the device's normal public IP path**.
+- **On Disconnect / Quit**, clients are designed to **fully tear down** the tunnel (routes, TUN/Packet Tunnel, session, and product residual route state such as Windows dual `/1`) so traffic **reverts to the device's normal public IP path**. This is ordinary session teardown — **not** the same as **Restore Internet** complete product removal (see §3.5).
+- **Windows Defender Firewall product rules:** residual Connect may install **scoped allow** rules (**RPT-FW**) for the product program and the product node UDP endpoint only. These are local OS firewall configuration for connectivity — **not** telemetry, analytics, or outbound reporting. On Disconnect / Quit / Restore Internet they are removed with residual restore. Unscoped “block all” kill-switch rules are **not** applied by default.
 - Clients are **not** designed to upload browsing history or identity dossiers to the node as product telemetry.
 - **No public-IP geo admission (from 0.1.9 source):** product Connect does **not** look up the device public IP via third-party geo services, and does **not** allow or deny access by country. Admission is cryptographic (device Ed25519 + node keys) only. Older installed packages (e.g. 0.1.8) may still perform a client-side UK geo check until users upgrade.
 - **DNS on full tunnel:** product full-tunnel clients default DNS to the **node tunnel gateway** (`10.88.0.1`) only — **no** client-side public DNS fallbacks (Cloudflare/Google/Quad9/etc.). The node Unbound instance listens on the tunnel address and uses **DNS-over-TLS (DoT)** upstream to privacy-oriented resolvers (`node/unbound-rpt.conf`, `node/install_dns.sh`). Until node DNS is installed, name resolution while connected may fail. The VPS provider may still see DoT/encrypted recursive upstream traffic from the node.
@@ -65,17 +66,30 @@ Process stdout/stderr for the node service is configured for **no journal sessio
 
 ### 3.3 Public status page (e.g. Render)
 
-- Displays the product **title**, beta note, and **paid download** entry (Stripe Payment Link per platform) only.
+- Displays the product **title**, beta note, and **paid download** entry (Stripe Payment Link per platform) only. The downloads platform line is **platform names only** (Windows | Linux | macOS | iOS | Android) — not a live client metric.
 - Does **not** expose a live connected-client count or poll a session metric on the public HTML surface.
 - Optional `/api/status` JSON is **title-only** (no `clients_connected`).
 - **Does not** publish free permanent GitHub `releases/download` installer buttons. Catalog **v0.3.3** packages are fulfilled **after payment** on [status downloads](https://restoreprivacy.online/) via a **one-time** proxy download (private source repository).
-- Serves same-origin legal documents (`/PRIVACY_POLICY.md`, `/LICENSE`, `/README.md`, `/CREDITS.md`, `/AUDIT.md`) so clients can open docs without a public GitHub tree.
+- Serves same-origin legal documents (`/PRIVACY_POLICY.md`, `/LICENSE`, `/README.md`, `/CREDITS.md`, `/AUDIT.md`) so clients can open docs without a public GitHub tree. The security audit includes a **per-installer AUDIT STATE** (Green / Amber / Red) for catalog packages.
 
 ### 3.4 Operator-held secrets
 
 - **Node ElGamal private key** and **authorized client private keys** are operational secrets.
 - The **node ElGamal private key** lives only on the operator node (e.g. `/opt/restore-privacy/secrets/`) and is gitignored - **never** in paid release packages.
 - **Client** device Ed25519 keys are created locally on first run (not a shared installer secret). Possession of a device key allows tunnel use for that install - treat local secrets as credentials.
+
+### 3.5 Restore Internet failsafe (complete product removal)
+
+Every catalog installer ships a user-facing **Restore Internet** artifact (Windows/Linux runnable script; macOS `.command`; iOS/Android guidance text).
+
+| Intent | Behaviour |
+|--------|-----------|
+| **Network restore** | Best-effort residual route / kill-switch / firewall cleanup so ordinary internet works again. |
+| **Complete removal** | Deletes the product app tree (including portable Windows extract trees), shortcuts, and local product secrets (e.g. `~/.restore-privacy` / device-local keys). |
+
+This processing is **entirely on the user’s device**. It does **not** phone home, upload identity, or notify the node/status host that a wipe occurred.
+
+**BIG WARNING (user-facing):** Running **Restore Internet** **ERASES ALL** parts of Restore Privacy from the device. Paid catalog downloads use **one-time** fulfilment links. After a full wipe you may **not** be able to automatically re-download your subscription app. Contact **russell.gray.sneddon@gmail.com** to obtain a new download link (or pay again on the [status downloads](https://restoreprivacy.online/) page). Ordinary **Disconnect** does **not** perform this full wipe.
 
 ---
 
@@ -157,6 +171,7 @@ The product **source repository is private**. For privacy questions about Restor
 
 - Read the public policy and audit on the [status host](https://restoreprivacy.online/) (`/PRIVACY_POLICY.md`, `/AUDIT.md`)
 - Install / pay path: [How to buy](https://restoreprivacy.online/how-to-buy)
+- **Re-download after full wipe (Restore Internet):** **russell.gray.sneddon@gmail.com**
 - Or contact the operator via their public project channels (e.g. GitHub profile `rgsneddon`)
 
 ---
@@ -164,5 +179,5 @@ The product **source repository is private**. For privacy questions about Restor
 ## 10. Related documents
 
 - Project license and third-party credits: [`LICENSE`](LICENSE), [`CREDITS.md`](CREDITS.md) (also on the status host)
-- How to install and run: [`README.md`](README.md)
-- Code & policy audit: [`AUDIT.md`](AUDIT.md)
+- How to install and run (including **Restore Internet** warning): [`README.md`](README.md)
+- Code & policy audit (including per-installer AUDIT STATE): [`AUDIT.md`](AUDIT.md)
