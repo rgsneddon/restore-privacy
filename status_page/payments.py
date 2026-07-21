@@ -2020,20 +2020,34 @@ def _probe_vps_fetch_error() -> str | None:
         return f"error:{type(e).__name__}"[:120]
 
 
-def check_fulfilment_ready() -> dict[str, Any]:
+def check_fulfilment_ready(*, platform: str | None = None) -> dict[str, Any]:
     """Probe that at least one catalog installer is openable (local or API).
 
     Closes the body immediately — used for production readiness evidence.
     Includes non-secret flags so operators can confirm VPS token match without
     printing the secret (``vps_token_configured``).
+
+    When *platform* is set (e.g. ``macos``), only that catalog package is probed
+    so live-test evidence can pin the paid macOS zip.
     """
     vps_tok = bool(vps_asset_fetch_token())
     vps_base = vps_asset_base_url()
     meta: dict[str, Any] = {
         "vps_token_configured": vps_tok,
         "vps_asset_base": vps_base,
+        "github_token_configured": bool(github_auth_token()),
     }
-    for asset in available_downloads():
+    assets = list(available_downloads())
+    want = (platform or "").strip().lower()
+    if want:
+        filtered = [a for a in assets if a.platform == want]
+        if filtered:
+            assets = filtered
+        meta["probe_platform"] = want
+    else:
+        # Prefer macOS first for default probe (primary live-test package)
+        assets = sorted(assets, key=lambda a: 0 if a.platform == "macos" else 1)
+    for asset in assets:
         opened = open_release_asset(asset.filename)
         if opened is None:
             continue
@@ -2048,6 +2062,7 @@ def check_fulfilment_ready() -> dict[str, Any]:
             "source": opened.get("source"),
             "probe_filename": asset.filename,
             "content_length": opened.get("content_length"),
+            "probe_platform": asset.platform,
         }
         out.update(meta)
         return out
@@ -2061,7 +2076,7 @@ def check_fulfilment_ready() -> dict[str, Any]:
         "hint": (
             "Set RPT_ASSET_FETCH_TOKEN + host installers on Iceland VPS "
             "(scripts/host_paid_assets_vps.py), or stage status_page/assets/{version}/, "
-            "or set RPT_GITHUB_TOKEN"
+            "or set RPT_GITHUB_TOKEN for private GitHub Release assets"
         ),
     }
     out.update(meta)

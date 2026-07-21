@@ -460,7 +460,9 @@ class Handler(BaseHTTPRequestHandler):
             return
         if path in ("/health/fulfilment", "/api/fulfilment-ready"):
             # Production readiness: can the host open a catalog installer?
-            payload = check_fulfilment_ready()
+            # Optional ?platform=macos pins the live-test package probe.
+            plat = (query.get("platform") or "").strip() or None
+            payload = check_fulfilment_ready(platform=plat)
             code = 200 if payload.get("ok") else 503
             self._send(
                 code,
