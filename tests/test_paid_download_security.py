@@ -172,10 +172,10 @@ class TestHttpDownloadHandlerDeniesUnpaid(unittest.TestCase):
         """Staged status_page/assets must not be reachable by bare URL."""
         name = available_downloads()[0].filename
         for path in (
-            f"/assets/0.3.4/{name}",
-            f"/static/../assets/0.3.4/{name}",
+            f"/assets/0.3.5/{name}",
+            f"/static/../assets/0.3.5/{name}",
             f"/assets/{name}",
-            f"/releases/0.3.4/{name}",
+            f"/releases/0.3.5/{name}",
         ):
             h = _FakeHandler(path)
             h.do_GET()

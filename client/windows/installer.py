@@ -69,7 +69,7 @@ def _payload_root() -> Path:
         if d.is_dir():
             return d
     raise FileNotFoundError(
-        "Client payload not found. Build with scripts/build_release_0.3.4.py first."
+        "Client payload not found. Build with scripts/build_release_0.3.5.py first."
     )
 
 

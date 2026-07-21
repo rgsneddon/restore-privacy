@@ -28,12 +28,12 @@ class TestPurchaseIdStoreAndReissue(unittest.TestCase):
 
     def test_two_purchases_get_distinct_purchase_ids(self):
         t1 = self.pay.mint_download_token(
-            filename="restore-privacy-client-0.3.4-windows-x64-setup.exe",
+            filename="restore-privacy-client-0.3.5-windows-x64-setup.exe",
             platform="windows",
             session_id="cs_test_1",
         )
         t2 = self.pay.mint_download_token(
-            filename="restore-privacy-client-0.3.4-linux-x64.tar.gz",
+            filename="restore-privacy-client-0.3.5-linux-x64.tar.gz",
             platform="linux",
             session_id="cs_test_2",
         )
@@ -48,7 +48,7 @@ class TestPurchaseIdStoreAndReissue(unittest.TestCase):
 
     def test_reissue_mints_new_token_same_purchase_id(self):
         tok = self.pay.mint_download_token(
-            filename="restore-privacy-client-0.3.4-android.apk",
+            filename="restore-privacy-client-0.3.5-android.apk",
             platform="android",
             session_id="cs_test_android",
         )
@@ -115,7 +115,7 @@ class TestPurchaseIdBuyerUi(unittest.TestCase):
 
         html = render_post_payment_thankyou_html(
             download_path="/download?token=abcTOKEN123",
-            filename="restore-privacy-client-0.3.4-linux-x64.tar.gz",
+            filename="restore-privacy-client-0.3.5-linux-x64.tar.gz",
             platform="linux",
             session_id="cs_test_ty",
             purchase_id="RPT-A1B2-C3D4-E5F6",
@@ -365,7 +365,7 @@ class TestAdminReissueUi(unittest.TestCase):
                 "download_url": "https://restoreprivacy.online/download?token=xyz",
                 "download_path": "/download?token=xyz",
                 "platform": "windows",
-                "filename": "restore-privacy-client-0.3.4-windows-x64-setup.exe",
+                "filename": "restore-privacy-client-0.3.5-windows-x64-setup.exe",
             }
         )
         self.assertIn("reissue-download-link", frag)
@@ -393,7 +393,7 @@ class TestAdminReissueUi(unittest.TestCase):
 
             payments.init_db()
             tok = payments.mint_download_token(
-                filename="restore-privacy-client-0.3.4-macos.zip",
+                filename="restore-privacy-client-0.3.5-macos.zip",
                 platform="macos",
                 session_id="cs_admin_reissue",
             )
