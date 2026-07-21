@@ -108,22 +108,29 @@ def probe_nolog_journald(
     unit = unit_path or Path(f"/etc/systemd/system/{os.environ.get('SERVICE_NAME', 'rpt-node')}.service")
     want = systemd_no_log_directives()
     if unit.is_file():
-        utext = unit.read_text(encoding="utf-8", errors="replace")
-        if re.search(r"(?m)^StandardOutput=(journal|syslog|kmsg)\b", utext):
-            reasons.append(f"{unit.name}: StandardOutput to journal (prefer null)")
-            warn = True
-        if re.search(r"(?m)^StandardError=(journal|syslog|kmsg)\b", utext):
-            reasons.append(f"{unit.name}: StandardError to journal (prefer null)")
-            warn = True
-        if "StandardOutput=null" in utext:
-            reasons.append("unit StandardOutput=null present")
-        else:
-            # install.sh ships null — warn if unit exists without it
-            reasons.append("unit missing StandardOutput=null")
-            warn = True
-        for d in want:
-            if d.startswith("Standard") and d in utext:
-                pass
+        try:
+            utext = unit.read_text(encoding="utf-8", errors="replace")
+        except OSError as exc:
+            # Low-priv timer (rpt-audit) may not read systemd unit files
+            skipped = True
+            reasons.append(f"unit unreadable ({exc.__class__.__name__}); skip nolog unit checks")
+            utext = ""
+        if utext:
+            if re.search(r"(?m)^StandardOutput=(journal|syslog|kmsg)\b", utext):
+                reasons.append(f"{unit.name}: StandardOutput to journal (prefer null)")
+                warn = True
+            if re.search(r"(?m)^StandardError=(journal|syslog|kmsg)\b", utext):
+                reasons.append(f"{unit.name}: StandardError to journal (prefer null)")
+                warn = True
+            if "StandardOutput=null" in utext:
+                reasons.append("unit StandardOutput=null present")
+            else:
+                # install.sh ships null — warn if unit exists without it
+                reasons.append("unit missing StandardOutput=null")
+                warn = True
+            for d in want:
+                if d.startswith("Standard") and d in utext:
+                    pass
     else:
         reasons.append("rpt-node.service unit not on this host")
         if not skipped:
@@ -310,12 +317,18 @@ def probe_host_privacy_drift(
         dropin_present = False
 
     if dropin_present:
-        text = dropin.read_text(encoding="utf-8", errors="replace")
-        if "RuntimeMaxUse" in text or "Storage=volatile" in text:
-            reasons.append("journald drop-in present (short retention)")
-        else:
-            reasons.append("journald drop-in present but missing retention markers")
-            warn = True
+        try:
+            text = dropin.read_text(encoding="utf-8", errors="replace")
+        except OSError as exc:
+            text = ""
+            reasons.append(f"journald drop-in unreadable ({exc.__class__.__name__})")
+            dropin_present = False
+        if text:
+            if "RuntimeMaxUse" in text or "Storage=volatile" in text:
+                reasons.append("journald drop-in present (short retention)")
+            else:
+                reasons.append("journald drop-in present but missing retention markers")
+                warn = True
     else:
         reasons.append("journald drop-in 99-rpt-privacy.conf absent")
 
@@ -329,19 +342,28 @@ def probe_host_privacy_drift(
             pass
 
     if unit_present:
-        utext = unit.read_text(encoding="utf-8", errors="replace")
-        if re.search(r"(?m)^StandardOutput=(journal|syslog|kmsg)\b", utext):
-            reasons.append("unit logs to journal (host-privacy drift)")
-            warn = True
-        else:
-            reasons.append("unit not logging StandardOutput to journal")
-        # Primary install_host_privacy.sh artifact missing while node unit exists
-        if not dropin_present:
+        try:
+            utext = unit.read_text(encoding="utf-8", errors="replace")
+        except OSError as exc:
+            # Low-priv audit timer cannot read systemd units — honest skip
             reasons.append(
-                "WARN: node unit present but journald drop-in missing "
-                "(re-run install_host_privacy.sh)"
+                f"unit unreadable ({exc.__class__.__name__}); skip host-privacy unit checks"
             )
-            warn = True
+            unit_present = False
+            utext = ""
+        if utext:
+            if re.search(r"(?m)^StandardOutput=(journal|syslog|kmsg)\b", utext):
+                reasons.append("unit logs to journal (host-privacy drift)")
+                warn = True
+            else:
+                reasons.append("unit not logging StandardOutput to journal")
+            # Primary install_host_privacy.sh artifact missing while node unit exists
+            if not dropin_present:
+                reasons.append(
+                    "WARN: node unit present but journald drop-in missing "
+                    "(re-run install_host_privacy.sh)"
+                )
+                warn = True
     else:
         reasons.append("rpt-node.service unit not on this host")
 
@@ -427,14 +449,26 @@ def probe_disk_wipe_readiness(
         f"/etc/systemd/system/{os.environ.get('SERVICE_NAME', 'rpt-node')}.service"
     )
     wipe_wired = False
-    if shutdown_unit.is_file():
-        wipe_wired = True
-        reasons.append("rpt-node-shutdown-wipe.service present")
-    if node_unit.is_file():
-        utext = node_unit.read_text(encoding="utf-8", errors="replace")
-        if "rpt_shutdown_wipe" in utext:
+    try:
+        if shutdown_unit.is_file():
             wipe_wired = True
-            reasons.append("rpt-node.service ExecStop wipe wired")
+            reasons.append("rpt-node-shutdown-wipe.service present")
+    except OSError:
+        pass
+    try:
+        if node_unit.is_file():
+            try:
+                utext = node_unit.read_text(encoding="utf-8", errors="replace")
+            except OSError as exc:
+                reasons.append(
+                    f"node unit unreadable ({exc.__class__.__name__}); skip wipe-wire check"
+                )
+                utext = ""
+            if utext and "rpt_shutdown_wipe" in utext:
+                wipe_wired = True
+                reasons.append("rpt-node.service ExecStop wipe wired")
+    except OSError:
+        pass
     if not wipe_wired:
         reasons.append("wipe unit not wired (optional on non-node hosts)")
 

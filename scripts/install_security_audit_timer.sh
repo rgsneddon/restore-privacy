@@ -48,19 +48,37 @@ mkdir -p \
   "${INSTALL_ROOT}/logs" \
   "${INSTALL_ROOT}/var/audit-scratch"
 
-cp -a "${REPO_ROOT}/scripts/run_security_audit.py" "${INSTALL_ROOT}/scripts/"
+# Copy runner into install root (no-op when script already lives under INSTALL_ROOT)
+_rpt_audit_cp() {
+  local src="$1" dest="$2"
+  if [[ ! -f "$src" ]]; then
+    return 0
+  fi
+  if [[ -e "$dest" ]] && [[ "$src" -ef "$dest" ]]; then
+    return 0
+  fi
+  cp -a "$src" "$dest"
+}
+_rpt_audit_cp "${REPO_ROOT}/scripts/run_security_audit.py" \
+  "${INSTALL_ROOT}/scripts/run_security_audit.py"
 # Section B privacy probes (imported by the runner)
-if [[ -f "${REPO_ROOT}/scripts/audit_privacy_probes.py" ]]; then
-  cp -a "${REPO_ROOT}/scripts/audit_privacy_probes.py" "${INSTALL_ROOT}/scripts/"
-fi
+_rpt_audit_cp "${REPO_ROOT}/scripts/audit_privacy_probes.py" \
+  "${INSTALL_ROOT}/scripts/audit_privacy_probes.py"
 # Seed current audit document
 if [[ -f "${REPO_ROOT}/AUDIT.md" ]]; then
-  cp -a "${REPO_ROOT}/AUDIT.md" "${INSTALL_ROOT}/AUDIT.md"
+  if [[ ! -e "${INSTALL_ROOT}/AUDIT.md" ]] \
+    || ! [[ "${REPO_ROOT}/AUDIT.md" -ef "${INSTALL_ROOT}/AUDIT.md" ]]; then
+    cp -a "${REPO_ROOT}/AUDIT.md" "${INSTALL_ROOT}/AUDIT.md"
+  fi
 fi
 # Seed public mirror when present (status host /AUDIT.md)
 if [[ -f "${REPO_ROOT}/status_page/public/AUDIT.md" ]]; then
-  cp -a "${REPO_ROOT}/status_page/public/AUDIT.md" \
-    "${INSTALL_ROOT}/status_page/public/AUDIT.md" 2>/dev/null || true
+  mkdir -p "${INSTALL_ROOT}/status_page/public"
+  if [[ ! -e "${INSTALL_ROOT}/status_page/public/AUDIT.md" ]] \
+    || ! [[ "${REPO_ROOT}/status_page/public/AUDIT.md" -ef "${INSTALL_ROOT}/status_page/public/AUDIT.md" ]]; then
+    cp -a "${REPO_ROOT}/status_page/public/AUDIT.md" \
+      "${INSTALL_ROOT}/status_page/public/AUDIT.md" 2>/dev/null || true
+  fi
 fi
 
 # Dedicated low-privilege identity (fallback: root oneshot with Protect* still applied)
