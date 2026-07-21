@@ -1,4 +1,4 @@
-"""Discrete Buy Me a Coffee footer for the public status page."""
+"""Discrete Buy Me a Coffee footer for the public VPN APP Shop."""
 
 from __future__ import annotations
 

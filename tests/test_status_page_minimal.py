@@ -1,4 +1,4 @@
-"""Public status page: title + legal links + downloads + Rust footer (no live count)."""
+"""Public VPN APP Shop: title + legal links + downloads + Rust footer (no live count)."""
 
 from __future__ import annotations
 

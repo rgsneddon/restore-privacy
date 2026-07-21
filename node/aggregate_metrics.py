@@ -111,7 +111,7 @@ def filter_public_status(payload: Optional[Mapping[str, Any]]) -> dict[str, Any]
     """Strict public JSON: product title only (no counts, lists, IPs, aggregates).
 
     Aggregate bandwidth may exist in process memory but is **not** published here
-    so the status page remains minimal.
+    so the VPN APP Shop remains minimal.
     """
     data = dict(payload or {})
     title = str(data.get("title", "RESTORE PRIVACY") or "RESTORE PRIVACY")
@@ -202,7 +202,7 @@ class AggregateCounters:
             self._datagrams_out += 1
 
     def snapshot(self) -> dict[str, int]:
-        """Internal aggregate snapshot (not for public status page)."""
+        """Internal aggregate snapshot (not for public VPN APP Shop)."""
         with self._lock:
             bi, bo = self._bytes_in, self._bytes_out
             di, do = self._datagrams_in, self._datagrams_out

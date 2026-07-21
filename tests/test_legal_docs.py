@@ -123,7 +123,7 @@ class TestReadmeHowto(unittest.TestCase):
         self.assertIn("android", lower)
         self.assertIn("macos", lower)
         self.assertIn("ios", lower)
-        # Catalog ship is 0.3.0 (signed packages via paid status page)
+        # Catalog ship is 0.3.0 (signed packages via paid VPN APP Shop)
         self.assertIn("0.3.3", text)
         self.assertIn("restoreprivacy.online", text)
         self.assertIn("Developer ID", text)
@@ -149,7 +149,7 @@ class TestReadmeHowto(unittest.TestCase):
         # User-facing status/downloads OK; operator deploy is not required here
         self.assertTrue(
             "restoreprivacy.online" in text
-            or "status page" in lower
+            or "VPN APP Shop" in lower
             or "download" in lower
         )
         # Operator material lives in sundries

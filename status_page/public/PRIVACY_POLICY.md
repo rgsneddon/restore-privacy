@@ -1,7 +1,7 @@
 ﻿# Privacy Policy  -  Restore Privacy
 
 **Last updated:** 21 July 2026  
-**Product:** Restore Privacy Tunnel (RPT / RPT2) — custom VPN node, client apps, and public status page  
+**Product:** Restore Privacy Tunnel (RPT / RPT2) — custom VPN node, client apps, and public VPN APP Shop  
 **Current packages (catalog v0.3.3):** paid installers (£2.45 GBP per package) via [status downloads](https://restoreprivacy.online/) (Windows · Android · macOS · iOS · Linux — macOS Developer ID notarized; iOS Team-signed sideload). The product **source repository is private**; free permanent public GitHub installer URLs are **not** offered. After payment the status host delivers a **one-time** download (authenticated proxy).  
 
 **STRONG DISCLAIMER — PAYMENT REQUIRED FOR CONNECT:** Access to **Connect** and residual VPN use requires **successful payment**. If payment **fails at any time** (failed checkout, failed charge, refund, dispute, or revoked entitlement), the ability to **Connect with the Restore Privacy app is cancelled** for that purchase/install until a successful payment is completed. Stripe Checkout session id is used as a **payment entitlement** key (not a username/password account); status host stores entitlement outcome for Connect checks.
@@ -26,11 +26,11 @@ Restore Privacy is a **custom-built encrypted tunnel** (not WireGuard, OpenVPN, 
 
 ## 2. What we do **not** collect or retain (by design)
 
-Unless an operator **deliberately** changes configuration or hosting outside this software's defaults, the shipped node and status page are intended **not** to:
+Unless an operator **deliberately** changes configuration or hosting outside this software's defaults, the shipped node and VPN APP Shop are intended **not** to:
 
 - Store **usernames, passwords, email addresses, or account profiles** for tunnel use (tunnel attach uses **cryptographic product keys**, not user accounts).
 - Write **connection logs**, **session logs**, **access logs**, **traffic logs**, or **peer activity logs** for tunnel use.
-- Publish **client IP addresses**, **device identifiers**, or **session identifiers** on the public status page.
+- Publish **client IP addresses**, **device identifiers**, or **session identifiers** on the public VPN APP Shop.
 - Keep a **lifetime / cumulative "total clients ever"** counter or a **live connected-client count** on the public page.
 - Bundle the **node ElGamal private key** (`node_elgamal.priv`) in public packages (never shipped).
 
@@ -55,7 +55,7 @@ Process stdout/stderr for the node service is configured for **no journal sessio
 
 ### 3.2 Client applications (Windows, Android, Linux, iOS, and macOS)
 
-- **Product UI** uses **manual Connect / Disconnect** by default. Optional **Settings** preferences (stored only on the device) let the user enable **run at device startup** and/or **autoconnect on launch** (both **off** until opted in). Settings also exposes links to the **most recent audit** (`AUDIT.md`), **privacy policy** (`PRIVACY_POLICY.md`), and **end user licence** (`LICENSE`). These preferences and links are local/device-side only  -  not synced to the node or status page.
+- **Product UI** uses **manual Connect / Disconnect** by default. Optional **Settings** preferences (stored only on the device) let the user enable **run at device startup** and/or **autoconnect on launch** (both **off** until opted in). Settings also exposes links to the **most recent audit** (`AUDIT.md`), **privacy policy** (`PRIVACY_POLICY.md`), and **end user licence** (`LICENSE`). These preferences and links are local/device-side only  -  not synced to the node or VPN APP Shop.
 - Closing or minimizing the main UI is designed to **leave the tunnel running** until the user **Disconnects** or **Quits** (Windows tray identity: **Privacy Restored**). Android keep-alive uses a foreground VPN service; Activity destroy does not stop the tunnel.
 - Clients use **local** cryptographic material (when provisioned) to complete admission and establish session keys when the user connects. On the Python client/node path, session AEAD keys incorporate **ephemeral X25519** material (perfect forward secrecy) in addition to handshake nonces — long-term keys remain for admission/authentication.
 - **Traffic-shape** features (packet padding, send-side timing jitter, cover/dummy frames) are **enabled by default** on the product Windows/Linux Python DATA path (bounded pad bucket, modest send jitter, periodic cover frames). Set environment variable **`RPT_TRAFFIC_SHAPE=0`** to disable. They reduce coarse traffic fingerprints and are **not** a guarantee of undetectability against sophisticated DPI. Native Android/Apple engines may lag this wire surface until dual-wired.
@@ -68,7 +68,7 @@ Process stdout/stderr for the node service is configured for **no journal sessio
 - **Kill switch / leak protection:** product residual **does not** apply a kill switch by default (no always-on firewall/iptables block of non-tunnel egress; Android does not use `setBlocking(true)`). Optional opt-in: set environment variable **`RPT_KILL_SWITCH=1`** on Windows/Linux. Tunnel DNS remains gateway-only (`10.88.0.1`). Browser WebRTC may still use local interfaces — disable WebRTC in the browser for maximum assurance.
 - Paid catalog packages (Windows `.exe`, Android `.apk`, Linux `.tar.gz` installer, macOS `.zip`, iOS `.zip`) may include the **public** node key (`node_elgamal.pub`) so clients can open a HELLO. Each install **generates a unique Ed25519 device private key on first run** and keeps it only in local device-private storage - packages do **not** ship a shared `client_ed25519.priv` (which would allow universal impersonation). They **never** include the **node private key** (`node_elgamal.priv`). Windows installers ship a **bundled runtime** (no separate system Python install). The Linux installer package ships **manylinux wheels** for the app Python crypto stack (private venv via `install.sh`); OS tools such as TUN/`ip`/root for full tunnel remain host-provided.
 
-### 3.3 Public status page (e.g. Render)
+### 3.3 Public VPN APP Shop (e.g. Render)
 
 - Displays the product **title**, beta note, and **paid download** entry (Stripe Payment Link per platform) only. The downloads platform line is **platform names only** (Windows | Linux | macOS | iOS | Android) — not a live client metric.
 - **Payment entitlement:** after successful paid Checkout the status host records an **active** Connect entitlement for that Stripe session (and binds Stripe `payment_intent` id so refunds without session metadata still revoke). Webhook-observed **payment failures / refunds / disputes** set the entitlement to **failed/revoked** so Connect is blocked for that purchase. Clients import the session id (or `payment_entitlement.json` from the thank-you page) under **Settings → Payment entitlement**, then query `/api/connect-entitlement` on Connect to re-check status (no password account; session id only).
@@ -123,7 +123,7 @@ This section is for **user education**. It states **what Restore Privacy protect
 |------|--------------------------------------------------------|
 | **Casual observation of destination sites on the home ISP path** | Device traffic is intended to exit via the VPN node, so destination sites and the home ISP path see the **node’s residual public IP**, not your home IP (Windows dual `/1` + Wintun, Android VPN service, signed Apple Packet Tunnel). |
 | **Product node writing user browsing history** | Shipped no-log defaults: no connection / session / traffic / user-info logs for tunnel use. |
-| **Public “who is online” metrics** | Status page and node public API are **title (+ downloads) only** — no live client count, no per-client lists, no identifying session fields. |
+| **Public “who is online” metrics** | VPN APP Shop and node public API are **title (+ downloads) only** — no live client count, no per-client lists, no identifying session fields. |
 | **Shared installer impersonation** | Each install generates its **own** device Ed25519 key; packages do not ship a universal `client_ed25519.priv`. |
 | **Coarse wire fingerprints** | Outer obfuscation and traffic shaping (padding / jitter / cover) are **on by default** on the product residual DATA path as **mitigations** (not undetectability). |
 | **Casual DNS leaks while residual is up** | Tunnel-only DNS (`10.88.0.1`) is the product residual plan (no public DNS fallbacks). Kill-switch firewall blocks of non-tunnel egress are **not** applied by default (opt-in `RPT_KILL_SWITCH=1` only). Residual routes may still fail open to the ISP path without that opt-in. |
@@ -154,7 +154,7 @@ This section is for **user education**. It states **what Restore Privacy protect
 
 ## 6. Cookies and tracking
 
-The status page is a minimal static UI. It does **not** use advertising trackers or analytics SDKs in the shipped code. It does **not** poll a live client count. No account login cookies are required for the tunnel protocol itself.
+The VPN APP Shop is a minimal static UI. It does **not** use advertising trackers or analytics SDKs in the shipped code. It does **not** poll a live client count. No account login cookies are required for the tunnel protocol itself.
 
 ---
 

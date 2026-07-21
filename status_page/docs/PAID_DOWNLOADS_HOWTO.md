@@ -105,7 +105,7 @@ You may also surface the token from admin grants if a buyer contacts support.
 
 1. Claim or log into [https://buymeacoffee.com/rgsneddon](https://buymeacoffee.com/rgsneddon).
 2. Complete payout settings in the BMC creator dashboard so tips land in your linked account.
-3. The status page shows this URL as **tip / support only** (`#bmc-tip-link`).  
+3. The VPN APP Shop shows this URL as **tip / support only** (`#bmc-tip-link`).  
    **Paying on BMC does not mint a download token** — use Stripe for gated downloads.
 
 ---
@@ -116,7 +116,7 @@ This is the **private** architecture on the same Render service — not the publ
 
 1. Admin is enabled by a **password digest** shipped in the app (no plaintext secret in git). Prefer setting `RPT_ADMIN_PASSWORD` (and optional `RPT_ADMIN_USER` / `RPT_ADMIN_SESSION_SECRET`) on Render to override/rotate.
 2. Open `https://YOUR-STATUS-HOST/admin` (operator only).
-3. Sign in with **status-page** credentials (not your Stripe or BMC dashboard passwords). Username defaults to `admin`.
+3. Sign in with **VPN APP Shop** credentials (not your Stripe or BMC dashboard passwords). Username defaults to `admin`.
 4. After login you get one admin surface:
    - **Payment processor settings (`#admin-processor-settings`)** — each processor is a **plugin** (Stripe paid downloads, BMC tip-only) listing the **correct env variable names** to enter, readiness, and dashboard links. Forms POST to `/admin/processors/apply` (write-only secrets; never echoed). Applied values update the running process and optional local `status_page/data/processor_env.json` (gitignored). Prefer Render env for production permanence.
    - **Paid download grants** — recent Stripe-verified tokens (platform, filename, amount, used/unused, truncated token, session id) for fulfilment support.

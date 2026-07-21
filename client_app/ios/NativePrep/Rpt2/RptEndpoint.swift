@@ -1,13 +1,13 @@
 import Foundation
 
 /// Single source of truth for the product RPT node endpoint (must match Flutter `RptConfig`
-/// and the production node / status-page upstream).
+/// and the production node / VPN APP Shop upstream).
 public enum RptEndpoint {
     /// Active production RPT node public IPv4 (FlokiNET).
     public static let host: String = "82.221.101.241"
     /// Product UDP listen port (RPT2).
     public static let port: UInt16 = 44044
-    /// Status UI HTTP (operator/status page only; not the tunnel).
+    /// Status UI HTTP (operator/VPN APP Shop only; not the tunnel).
     public static let statusHttpPort: UInt16 = 8080
 
     public static var hostPortDescription: String { "\(host):\(port)" }

@@ -1,4 +1,4 @@
-"""Tests drive shipped coffee-link builder / status-page render."""
+"""Tests drive shipped coffee-link builder / VPN APP Shop render."""
 
 from __future__ import annotations
 

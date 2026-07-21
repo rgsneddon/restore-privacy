@@ -23,7 +23,7 @@
 
 ## Upgrade
 
-Install **0.2.2** packages from this GitHub Release or the status page. Prefer upgrading from 0.2.1 for traffic-shape defaults and Settings document links.
+Install **0.2.2** packages from this GitHub Release or the VPN APP Shop. Prefer upgrading from 0.2.1 for traffic-shape defaults and Settings document links.
 
 ## Operators
 

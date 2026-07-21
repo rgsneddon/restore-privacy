@@ -100,7 +100,7 @@ class TestAggregateCounters(unittest.TestCase):
         self.assertEqual(snap["total_bytes_out"], 40)
         self.assertEqual(snap["total_bytes_relayed"], 190)
         self.assertEqual(assert_metrics_non_identifying(snap), [])
-        # Public fragment must not leak aggregates onto the status page
+        # Public fragment must not leak aggregates onto the VPN APP Shop
         self.assertEqual(c.public_status_fragment(), {})
         self.assertEqual(filter_public_status({**snap, "title": "RESTORE PRIVACY"}), {
             "title": "RESTORE PRIVACY"

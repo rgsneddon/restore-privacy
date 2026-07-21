@@ -23,7 +23,7 @@ SOFTWARE.
 -------------------------------------------------------------------------------
 THIRD-PARTY COMPONENTS
 
-This repository’s own original code (RPT protocol, node, clients, status page)
+This repository’s own original code (RPT protocol, node, clients, VPN APP Shop)
 is licensed under the MIT License above.
 
 Separately, the project **utilises** third-party software and design building
@@ -41,7 +41,7 @@ Summary of utilised parts (see CREDITS.md for detail):
   - Flutter / Dart SDK (multi-platform client UI shell)
   - 7-Zip / LZMA SDK PE SFX stub (Windows catalog self-extractor packaging)
   - Python standard library and packaging tools as used in the repo
-  - Render.com (hosting of the public status page and paid download fulfilment — service, not code)
+  - Render.com (hosting of the public VPN APP Shop and paid download fulfilment — service, not code)
   - Stripe (paid catalog checkout / Payment Link — service, not code)
 
 Product distribution: end-user installers for catalog v0.3.3 are sold via the

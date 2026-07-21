@@ -1,4 +1,4 @@
-"""Brand logo / favicon: status page wiring + platform icon slots from vpnlogo.jpg."""
+"""Brand logo / favicon: VPN APP Shop wiring + platform icon slots from vpnlogo.jpg."""
 
 from __future__ import annotations
 

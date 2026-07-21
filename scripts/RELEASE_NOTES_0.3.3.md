@@ -38,4 +38,6 @@ Catalog advances to **0.3.3**.
 
 ## Upgrade
 
+Install **0.3.3** from this GitHub Release ([0.3.3](https://github.com/rgsneddon/restore-privacy/releases/tag/0.3.3)) or the VPN APP Shop download catalog (catalog **v0.3.3**, paid buttons fulfil the same assets). Accept the end-user licence on first Connect.
+
 Paid catalog pin is **v0.3.3**. Replace prior installers.

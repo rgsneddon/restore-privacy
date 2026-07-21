@@ -108,7 +108,7 @@ Published **v0.3.3** iOS packages are **Team-signed sideload** zips (not App Sto
 3. Residual public IP only changes when the Packet Tunnel is **active**.
 4. Complete removal: follow **`Restore Internet.txt`** (Settings → VPN / Delete App) — see warning below.
 
-### Status page
+### VPN APP Shop
 
 https://restoreprivacy.online/
 

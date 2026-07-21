@@ -1,6 +1,6 @@
 """Next security-audit countdown (4h cadence from last audit write).
 
-Used by the public status page real-time counter.
+Used by the public VPN APP Shop real-time counter.
 Source of truth for last run: ``status_page/static/security_audit_latest.json``
 ``generated_at`` (written by ``scripts/run_security_audit.py --write``).
 Period matches ``scripts/install_security_audit_timer.sh`` default ``PERIOD=4h``.

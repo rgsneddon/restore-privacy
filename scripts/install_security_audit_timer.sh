@@ -12,7 +12,7 @@
 #   - Schedule jitter via RandomizedDelaySec (15–30m class)
 #
 # Writes ${INSTALL_ROOT}/AUDIT.md and status_page copies when present.
-# Status page can serve local AUDIT.md at /AUDIT.md and /audit.md.
+# VPN APP Shop can serve local AUDIT.md at /AUDIT.md and /audit.md.
 #
 # Usage (root on production node):
 #   bash scripts/install_security_audit_timer.sh

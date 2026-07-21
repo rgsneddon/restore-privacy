@@ -22,7 +22,7 @@ class TestSundriesHoldsOperatorTopics(unittest.TestCase):
         # Ports / node listen
         self.assertTrue("44044" in text or "ports" in lower)
         self.assertTrue("8080" in text or "status ui" in lower)
-        # Status page hosting / deploy detail
+        # VPN APP Shop hosting / deploy detail
         self.assertTrue(
             "render" in lower or "status_page" in lower or "onrender" in lower
         )
@@ -56,10 +56,10 @@ class TestReadmePublicClientOnly(unittest.TestCase):
         self.assertIn("PRIVACY_POLICY", text)
         self.assertIn("LICENSE", text)
         self.assertTrue("CREDITS" in text or "credit" in lower)
-        # Status page as user surface is OK
+        # VPN APP Shop as user surface is OK
         self.assertTrue(
             "restoreprivacy.online" in text
-            or "status page" in lower
+            or "VPN APP Shop" in lower
             or "download" in lower
         )
         # Operator deploy / secrets / unittest must NOT be the README focus

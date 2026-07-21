@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Restore Privacy status page for Render.
+"""Restore Privacy VPN APP Shop for Render.
 
 Public surface: product title, beta note, and client download links only.
 Does **not** expose a connected-client count or poll a live session metric.

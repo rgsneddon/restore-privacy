@@ -23,7 +23,7 @@
 
 ## Upgrade
 
-Install **0.2.1** packages from this GitHub Release or the status page. Prefer upgrading from 0.2.0 so node pub and handshake paths stay current.
+Install **0.2.1** packages from this GitHub Release or the VPN APP Shop. Prefer upgrading from 0.2.0 so node pub and handshake paths stay current.
 ## Operators
 
 - Self-host: `sudo bash scripts/selfhost_node.sh`

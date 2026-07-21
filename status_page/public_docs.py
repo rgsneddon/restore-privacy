@@ -36,7 +36,7 @@ CREDITS_PATH = "/CREDITS.md"
 
 @dataclass(frozen=True)
 class PublicDoc:
-    """One public document served by the status page."""
+    """One public document served by the VPN APP Shop."""
 
     id: str
     path: str
@@ -662,12 +662,12 @@ ol{{padding-left:1.25rem}}
 </header>
 <h1 id="how-to-buy-heading">How to buy Restore Privacy</h1>
 <p class="muted">Paid package download ({_escape(PRICE_LABEL)} / {PRICE_PENCE} pence GBP).
-No free permanent installer buttons on the status page.</p>
+No free permanent installer buttons on the VPN APP Shop.</p>
 
 <div class="card" id="how-to-buy-steps">
 <h2>Steps</h2>
 <ol>
-  <li>Open the status page: <a href="{_escape(home)}">{_escape(home)}</a></li>
+  <li>Open the VPN APP Shop: <a href="{_escape(home)}">{_escape(home)}</a></li>
   <li>Choose your platform under <strong>Download client</strong>.
       Each button opens the Stripe payment page with your package identity
       (<code>client_reference_id</code>).</li>

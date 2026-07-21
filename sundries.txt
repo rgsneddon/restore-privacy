@@ -3,7 +3,7 @@
 This file holds material that is NOT required for public end users of the
 client app. Public users should follow README.md only.
 
-Contents moved from the public-facing README (ports, status-page hosting,
+Contents moved from the public-facing README (ports, VPN APP Shop hosting,
 node deploy, developer client-app notes, local tests, secrets).
 
 Source client version: 0.2.1 (product host 82.221.101.241:44044).
@@ -37,7 +37,7 @@ SECRETS / RELEASE GATES (mandatory)
   Health:         /health
   Live example:   https://restoreprivacy.online/
 
-  The status page proxies live clients_connected from the node upstream
+  The VPN APP Shop proxies live clients_connected from the node upstream
   (env RPT_STATUS_UPSTREAM, default http://<node>:8080/api/status).
 
   Free tier note: service may sleep after ~15 minutes idle; first hit can

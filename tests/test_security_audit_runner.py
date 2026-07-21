@@ -205,7 +205,7 @@ class TestAuditTimerPrivacySectionA(unittest.TestCase):
         self.assertIn("82.221.101.241", text)
         self.assertIn("residual_ip_capture", text)
         self.assertIn("Findings", text)
-        # status page copy used for /AUDIT.md and /audit.md
+        # VPN APP Shop copy used for /AUDIT.md and /audit.md
         status_copy = ROOT / "status_page" / "AUDIT.md"
         self.assertTrue(status_copy.is_file())
         self.assertGreater(status_copy.stat().st_size, 2000)

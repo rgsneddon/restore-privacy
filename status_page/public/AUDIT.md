@@ -167,7 +167,7 @@ An **ISP** performing **traffic analysis** may still observe connection timing a
 ## 8. Recommendations (non-binding)
 
 1. Keep **4-hour** timer enabled on the production node (`install_security_audit_timer.sh`).  
-2. Redeploy status page after audit link / catalog changes.  
+2. Redeploy VPN APP Shop after audit link / catalog changes.  
 3. Multi-hop residual remains optional future work (do not claim until residual).  
 4. Ops: keep Unbound tunnel-only; no public :53; provider log awareness.
 
@@ -197,7 +197,7 @@ Re-run: `python3 scripts/run_security_audit.py --write`
 
 | Item | |
 |------|--|
-| Output | `AUDIT.md` (repo root); served as `/AUDIT.md` and `/audit.md` on status page |
+| Output | `AUDIT.md` (repo root); served as `/AUDIT.md` and `/audit.md` on VPN APP Shop |
 | Related | `PRIVACY_POLICY.md`, `README.md`, `scripts/run_security_audit.py` |
 | Code baseline | Catalog **0.3.3** + node **82.221.101.241** |
 | Pass date | **21 July 2026** |

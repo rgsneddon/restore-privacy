@@ -1,7 +1,7 @@
 """Local end-user licence acceptance gate (must accept before Connect).
 
 Acceptance is stored only on the device. This module never uploads acceptance
-state to the node, status page, or any remote collector. Autoconnect and manual
+state to the node, VPN APP Shop, or any remote collector. Autoconnect and manual
 Connect both call :func:`may_connect` / :func:`assert_may_connect`.
 """
 

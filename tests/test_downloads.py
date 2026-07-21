@@ -1,4 +1,4 @@
-"""Tests for shipped status-page download catalog (restore-privacy 0.3.0) + paid UI."""
+"""Tests for shipped VPN APP Shop download catalog (restore-privacy 0.3.0) + paid UI."""
 
 from __future__ import annotations
 

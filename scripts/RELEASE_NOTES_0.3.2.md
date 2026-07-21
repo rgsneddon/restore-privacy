@@ -37,4 +37,4 @@ Catalog advances from **0.2.9** to **0.3.2**.
 
 ## Upgrade
 
-Install **0.3.2** from this GitHub Release ([0.3.2](https://github.com/rgsneddon/restore-privacy/releases/tag/0.3.2)) or the status page download catalog (catalog **v0.3.2**, paid buttons fulfil the same assets). Accept the end-user licence on first Connect.
+Install **0.3.2** from this GitHub Release ([0.3.2](https://github.com/rgsneddon/restore-privacy/releases/tag/0.3.2)) or the VPN APP Shop download catalog (catalog **v0.3.2**, paid buttons fulfil the same assets). Accept the end-user licence on first Connect.

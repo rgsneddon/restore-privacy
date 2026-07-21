@@ -299,7 +299,7 @@ BMC_PLUGIN = ProcessorPlugin(
     role="tip_support_only",
     description=(
         "Tip / support only — does not mint download tokens. "
-        "Set the public tip URL shown on the status page footer."
+        "Set the public tip URL shown on the VPN APP Shop footer."
     ),
     variables=(
         ProcessorVariable(

@@ -14,7 +14,7 @@ Includes privacy work since 0.1.8:
 
 ## Upgrade
 
-Install **0.2.0** packages from the GitHub Release or status page. Older
+Install **0.2.0** packages from the GitHub Release or VPN APP Shop. Older
 0.1.8 installers may still point at the previous node IP until upgraded.
 
 ## Operators

@@ -22,7 +22,7 @@ SOURCE_NAME = "vpnlogo.jpg"
 SOURCE = BRAND_DIR / SOURCE_NAME
 DOWNLOADS_SRC = Path.home() / "Downloads" / "vpnlogo.jpg"
 
-# Status page static assets
+# VPN APP Shop static assets
 STATUS_STATIC = ROOT / "status_page" / "static"
 # Windows Python client
 WIN_CLIENT_ICON = ROOT / "client" / "windows" / "native" / "app_icon.ico"
@@ -138,7 +138,7 @@ def generate_all() -> dict:
     save_ico(master, BRAND_DIR / "favicon.ico", [16, 32, 48])
     written.append(str(BRAND_DIR / "favicon.ico"))
 
-    # Status page static
+    # VPN APP Shop static
     STATUS_STATIC.mkdir(parents=True, exist_ok=True)
     shutil.copy2(BRAND_DIR / "favicon.ico", STATUS_STATIC / "favicon.ico")
     shutil.copy2(BRAND_DIR / "favicon-32.png", STATUS_STATIC / "favicon.png")

@@ -365,7 +365,7 @@ def load_catalog_version() -> str:
 VALID_PACKAGE_STATES = frozenset({"Green", "Amber", "Red"})
 
 # Solid colour cells for the package AUDIT STATE table (no bare Green/Amber/Red words).
-# Unicode solid squares render in plain markdown; status-page HTML upgrades them to CSS boxes.
+# Unicode solid squares render in plain markdown; VPN APP Shop HTML upgrades them to CSS boxes.
 PACKAGE_STATE_SWATCH: dict[str, str] = {
     "Green": "🟩",
     "Amber": "🟧",
@@ -949,7 +949,7 @@ An **ISP** performing **traffic analysis** may still observe connection timing a
 ## 8. Recommendations (non-binding)
 
 1. Keep **4-hour** timer enabled on the production node (`install_security_audit_timer.sh`).  
-2. Redeploy status page after audit link / catalog changes.  
+2. Redeploy VPN APP Shop after audit link / catalog changes.  
 3. Multi-hop residual remains optional future work (do not claim until residual).  
 4. Ops: keep Unbound tunnel-only; no public :53; provider log awareness.
 
@@ -979,7 +979,7 @@ Re-run: `python3 scripts/run_security_audit.py --write`
 
 | Item | |
 |------|--|
-| Output | `AUDIT.md` (repo root); served as `/AUDIT.md` and `/audit.md` on status page |
+| Output | `AUDIT.md` (repo root); served as `/AUDIT.md` and `/audit.md` on VPN APP Shop |
 | Related | `PRIVACY_POLICY.md`, `README.md`, `scripts/run_security_audit.py` |
 | Code baseline | Catalog **{catalog}** + node **{host}** |
 | Pass date | **{human_date()}** |
@@ -1042,7 +1042,7 @@ def write_outputs(results: dict, out_path: Path) -> None:
             lower.write_text(md, encoding="utf-8")
         except OSError:
             pass
-    # Status page copies for Render (rootDir=status_page) + public_docs host
+    # VPN APP Shop copies for Render (rootDir=status_page) + public_docs host
     # Local copies only — never git push / HTTP upload from this runner.
     for status_copy in (
         ROOT / "status_page" / "AUDIT.md",

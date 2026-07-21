@@ -33,4 +33,4 @@ Catalog jumps from public **0.2.3** straight to **0.2.9** (no intermediate publi
 
 ## Upgrade
 
-Install **0.2.9** from this GitHub Release ([0.2.9](https://github.com/rgsneddon/restore-privacy/releases/tag/0.2.9)) or the status page download catalog (catalog **v0.2.9**, paid buttons fulfil the same assets). Accept the end-user licence on first Connect.
+Install **0.2.9** from this GitHub Release ([0.2.9](https://github.com/rgsneddon/restore-privacy/releases/tag/0.2.9)) or the VPN APP Shop download catalog (catalog **v0.2.9**, paid buttons fulfil the same assets). Accept the end-user licence on first Connect.

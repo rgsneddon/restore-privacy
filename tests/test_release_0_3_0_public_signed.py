@@ -40,7 +40,7 @@ class Test029PublicCatalogCurrent(unittest.TestCase):
         # Must not present RUST v1.0.0 as the primary Get the app / package table
         self.assertNotIn("Public v1.0.0 (RUST-IN-PRIVACY)", readme)
         self.assertNotIn("restore-privacy-rust-1.0.0-macos.zip", readme)
-        # Primary path is paid status page, not free permanent GH release links
+        # Primary path is paid VPN APP Shop, not free permanent GH release links
         self.assertIn("paid", lower)
         self.assertNotIn(
             "[Download v0.3.3](https://github.com/rgsneddon/restore-privacy/releases/tag/0.3.3)",
@@ -91,7 +91,8 @@ class Test029PublicCatalogCurrent(unittest.TestCase):
         self.assertNotIn("prep packages only", h)
         self.assertIn("do not treat 0.3.3 public apple assets as prep-only", h)
         self.assertIn("developer id signed + notarized", n)
-        self.assertIn("status page download catalog (catalog **v0.3.3**", n)
+        # notes text is lowercased above — match product storefront name
+        self.assertIn("vpn app shop download catalog (catalog **v0.3.3**", n)
 
 
 class TestLocal029PackagesIfPresent(unittest.TestCase):

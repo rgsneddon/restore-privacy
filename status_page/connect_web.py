@@ -1,4 +1,4 @@
-"""Connect-via-web panel for the public status page.
+"""Connect-via-web panel for the public VPN APP Shop.
 
 A normal browser tab cannot create a full OS TUN / system-wide VPN. This module
 ships the maximum honest path: a clear Connect via web control that explains
@@ -22,7 +22,7 @@ ACTION_LINE = (
 
 
 def recommended_download_actions() -> list[dict[str, str]]:
-    """Primary actions: paid status-page paths (not free public GitHub hrefs)."""
+    """Primary actions: paid VPN APP Shop paths (not free public GitHub hrefs)."""
     actions: list[dict[str, str]] = []
     for asset in available_downloads():
         actions.append(
@@ -58,7 +58,7 @@ def render_connect_via_web_html() -> str:
     <details class="connect-limited">
       <summary>Limited web check (not a full-device VPN)</summary>
       <p class="connect-limited-note">
-        This only contacts this status page&rsquo;s live API to show the current session count.
+        This only contacts this VPN APP Shop&rsquo;s live API to show the current session count.
         It does <strong>not</strong> route your device traffic or replace the Windows/Android client.
       </p>
       <button type="button" class="connect-probe" id="connect-web-probe">Run web status check</button>

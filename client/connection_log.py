@@ -1,7 +1,7 @@
 """Local-only connection log for product clients (device storage, user-exportable).
 
 Events stay on the device under the product data directory. This module never
-uploads log content to the node, status page, or any remote collector.
+uploads log content to the node, VPN APP Shop, or any remote collector.
 """
 
 from __future__ import annotations

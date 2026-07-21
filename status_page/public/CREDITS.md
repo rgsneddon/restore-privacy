@@ -48,7 +48,7 @@ their owners.
 | **paramiko** | Optional deploy script SSH helper | LGPL-2.1 — https://www.paramiko.org/ |
 | **GitHub** | Private operator source hosting (not a free public installer CDN) | Service terms of GitHub, Inc. |
 | **Stripe** | Paid catalog checkout / Payment Link (£2.45 GBP per package) on the status host | Service terms of Stripe — https://stripe.com/ |
-| **Render** | Public status-page hosting + paid download fulfilment (`restore-privacy-status`) | Service terms of Render — https://render.com/ |
+| **Render** | Public VPN APP Shop hosting + paid download fulfilment (`restore-privacy-status`) | Service terms of Render — https://render.com/ |
 | **FlokiNET** (Flokinet) | Production RPT node VPS in **Iceland** (product host `82.221.101.241`) | Host public privacy materials — https://flokinet.is/privacy/ · https://flokinet.is/vps/ · https://flokinet.is/ |
 
 ## Standards and algorithms (non-code)
@@ -58,7 +58,7 @@ their owners.
 
 ## Project authorship
 
-Original RPT protocol, node, clients, and status page: **Russell G Sneddon** and
+Original RPT protocol, node, clients, and VPN APP Shop: **Russell G Sneddon** and
 contributors (operator repository **restore-privacy** is **private**; public
 docs and paid installers: https://restoreprivacy.online/).
 

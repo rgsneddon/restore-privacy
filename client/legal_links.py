@@ -2,7 +2,7 @@
 
 Installed clients open **status-origin** URLs on the public status host (restoreprivacy.online) so docs
 remain available even when GitHub is private. Override the origin with
-``RPT_PUBLIC_BASE_URL`` (same as the status page).
+``RPT_PUBLIC_BASE_URL`` (same as the VPN APP Shop).
 """
 
 from __future__ import annotations

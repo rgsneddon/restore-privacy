@@ -1,4 +1,4 @@
-# Render Blueprint — Restore Privacy public status page + private /admin
+# Render Blueprint — Restore Privacy public VPN APP Shop + private /admin
 # Public: title + paid downloads. Private /admin: operator login, payment
 # processor settings (Stripe/BMC readiness), paid-download grant admin.
 # Set secrets in the Render dashboard — never commit real keys/passwords.

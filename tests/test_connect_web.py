@@ -36,7 +36,7 @@ class TestConnectViaWebBuilder(unittest.TestCase):
         self.assertIn("system-wide vpn", lower)
         self.assertNotIn("full system vpn is now active in this tab", lower)
         self.assertNotIn('href="#"', html)
-        # Paid status-page paths (not free public GitHub release hrefs)
+        # Paid VPN APP Shop paths (not free public GitHub release hrefs)
         for a in available_downloads():
             self.assertIn(a.pay_path, html)
             self.assertIn("donate.stripe.com", a.pay_path)

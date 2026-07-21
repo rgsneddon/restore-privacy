@@ -1,4 +1,4 @@
-"""Shipped product endpoint must match Flutter + status page + Apple RptEndpoint."""
+"""Shipped product endpoint must match Flutter + VPN APP Shop + Apple RptEndpoint."""
 
 from __future__ import annotations
 
@@ -8,7 +8,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 
-# Active Vultr RPT node (status page + live clients)
+# Active Vultr RPT node (VPN APP Shop + live clients)
 PRODUCT_HOST = "82.221.101.241"
 PRODUCT_PORT = "44044"
 

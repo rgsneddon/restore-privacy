@@ -254,7 +254,7 @@ def available_downloads(
     include_linux: bool = True,
     include_windows: bool = True,
 ) -> list[DownloadAsset]:
-    """Return download assets advertised on the public status page."""
+    """Return download assets advertised on the public VPN APP Shop."""
     out: list[DownloadAsset] = []
     for a in RELEASE_ASSETS:
         if a.platform == "android" and not include_android:

@@ -831,7 +831,7 @@ background:var(--btn-bg);color:var(--btn-fg);font-weight:600;cursor:pointer}}
 <div class="top">
   <h1 id="admin-heading">Payment administration</h1>
   <a href="/admin/logout" id="admin-logout">Log out</a>
-  <a href="/">Status page</a>
+  <a href="/">VPN APP Shop</a>
 </div>
 <nav class="nav-local" id="admin-nav" aria-label="Admin sections">
   <a href="#admin-processor-settings">Processor settings</a>
