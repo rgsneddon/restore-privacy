@@ -149,6 +149,84 @@ def countdown_state(
     }
 
 
+def load_security_audit_latest(
+    path: Path | None = None,
+) -> dict[str, Any] | None:
+    """Load ``security_audit_latest.json`` when present (dict or None)."""
+    p = path if path is not None else _DEFAULT_JSON
+    try:
+        if not p.is_file():
+            return None
+        data = json.loads(p.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError, TypeError, ValueError):
+        return None
+    return data if isinstance(data, dict) else None
+
+
+def current_audit_rag_colour(
+    *,
+    json_path: Path | None = None,
+    data: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    """Map the latest audit overall package RAG to Green / Amber / Red.
+
+    Prefers ``package_rag.overall``. Falls back to ``overall_ok`` boolean
+    (True→Green, False→Red). When neither is available, ``available`` is False
+    (honest unavailable — not a fake Green).
+
+    Returns::
+      {
+        "available": bool,
+        "colour": "Green"|"Amber"|"Red"|None,
+        "css": "rag-green"|"rag-amber"|"rag-red"|None,
+        "label": display label for discrete text,
+      }
+    """
+    payload = data if data is not None else load_security_audit_latest(json_path)
+    if not payload:
+        return {
+            "available": False,
+            "colour": None,
+            "css": None,
+            "label": "unavailable",
+        }
+    colour: str | None = None
+    pr = payload.get("package_rag")
+    if isinstance(pr, dict):
+        raw = str(pr.get("overall") or "").strip()
+        low = raw.lower()
+        if low == "green" or raw in ("🟩", "Green"):
+            colour = "Green"
+        elif low == "amber" or raw in ("🟧", "Amber"):
+            colour = "Amber"
+        elif low == "red" or raw in ("🟥", "Red"):
+            colour = "Red"
+    if colour is None and "overall_ok" in payload:
+        ok = payload.get("overall_ok")
+        if ok is True:
+            colour = "Green"
+        elif ok is False:
+            colour = "Red"
+    if colour is None:
+        return {
+            "available": False,
+            "colour": None,
+            "css": None,
+            "label": "unavailable",
+        }
+    css_map = {
+        "Green": "rag-green",
+        "Amber": "rag-amber",
+        "Red": "rag-red",
+    }
+    return {
+        "available": True,
+        "colour": colour,
+        "css": css_map[colour],
+        "label": colour,
+    }
+
+
 def render_audit_countdown_html(
     *,
     now: datetime | None = None,
@@ -173,6 +251,98 @@ def render_audit_countdown_html(
   (function () {{
     var root = document.getElementById("audit-countdown");
     var el = document.getElementById("audit-countdown-value");
+    if (!root || !el) return;
+    var nextIso = root.getAttribute("data-next-audit") || "";
+    var available = root.getAttribute("data-available") === "1";
+    function pad(n) {{ return n < 10 ? "0" + n : String(n); }}
+    function fmt(sec) {{
+      sec = Math.max(0, Math.floor(sec));
+      var h = Math.floor(sec / 3600);
+      var m = Math.floor((sec % 3600) / 60);
+      var s = sec % 60;
+      return pad(h) + ":" + pad(m) + ":" + pad(s);
+    }}
+    function tick() {{
+      if (!available || !nextIso) {{
+        el.textContent = "—";
+        return;
+      }}
+      var deadline = Date.parse(nextIso);
+      if (isNaN(deadline)) {{
+        el.textContent = "—";
+        return;
+      }}
+      var rem = Math.max(0, Math.floor((deadline - Date.now()) / 1000));
+      el.textContent = fmt(rem);
+    }}
+    tick();
+    setInterval(tick, 1000);
+  }})();
+  </script>
+"""
+
+
+def render_audit_page_ticker_html(
+    *,
+    now: datetime | None = None,
+    json_path: Path | None = None,
+    rag: dict[str, Any] | None = None,
+) -> str:
+    """Countdown + current-run RAG colour for the public **/AUDIT.md** page.
+
+    Placed under the audit H1. Uses unique element ids so it does not collide
+    with the homepage ``#audit-countdown`` widget.
+    """
+    state = countdown_state(now=now, json_path=json_path)
+    rag_state = rag if rag is not None else current_audit_rag_colour(json_path=json_path)
+    display = html.escape(str(state["display"]))
+    next_iso = html.escape(str(state.get("next_audit_at") or ""))
+    available = "1" if state["available"] else "0"
+    period = int(state["period_seconds"])
+
+    if rag_state.get("available") and rag_state.get("css") and rag_state.get("colour"):
+        css = html.escape(str(rag_state["css"]))
+        colour = html.escape(str(rag_state["colour"]))
+        colour_attr = colour.lower()
+        rag_block = f"""
+    <div class="audit-page-current-run" id="audit-page-current-run"
+         data-rag-colour="{colour_attr}">
+      <span class="rag-swatch {css}" title="{colour}"
+            role="img" aria-label="{colour}"></span>
+      <span class="audit-page-current-run-text" id="audit-page-current-run-text">
+        The current audit run is <strong id="audit-page-current-run-colour">{colour}</strong>.
+      </span>
+    </div>"""
+    else:
+        rag_block = """
+    <div class="audit-page-current-run audit-page-current-run-unavailable"
+         id="audit-page-current-run" data-rag-colour="unavailable">
+      <span class="audit-page-current-run-text" id="audit-page-current-run-text">
+        The current audit run colour is <strong>unavailable</strong>.
+      </span>
+    </div>"""
+
+    return f"""
+  <div class="audit-page-ticker" id="audit-page-ticker"
+       data-available="{available}" data-next-audit="{next_iso}"
+       data-period-seconds="{period}">
+    <div class="audit-page-countdown-row">
+      <span class="audit-page-countdown-label" id="audit-page-countdown-label">
+        Time until next audit
+      </span>
+      <span class="audit-page-countdown-value" id="audit-page-countdown-value"
+            aria-live="polite">{display}</span>
+    </div>
+    {rag_block}
+    <p class="audit-page-ticker-blurb" id="audit-page-ticker-blurb">
+      ~every 4h automated security pass (node probes, package confidence, privacy
+      checks). Countdown from last written audit timestamp.
+    </p>
+  </div>
+  <script>
+  (function () {{
+    var root = document.getElementById("audit-page-ticker");
+    var el = document.getElementById("audit-page-countdown-value");
     if (!root || !el) return;
     var nextIso = root.getAttribute("data-next-audit") || "";
     var available = root.getAttribute("data-available") === "1";

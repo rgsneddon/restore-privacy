@@ -630,6 +630,39 @@ table.doc-table.section-b-probes .cell-scroll code {
 .rag-swatch.rag-green { background: #22c55e; }
 .rag-swatch.rag-amber { background: #f59e0b; }
 .rag-swatch.rag-red { background: #ef4444; }
+/* Audit page: countdown under H1 + current-run RAG colour */
+.audit-page-ticker {
+  margin: 0.85rem 0 1.35rem; padding: 0.85rem 1rem;
+  background: #111827; border: 1px solid #1f2937; border-radius: 10px;
+  max-width: 36rem;
+}
+.audit-page-countdown-row {
+  display: flex; flex-wrap: wrap; gap: 0.5rem 1rem; align-items: baseline;
+  margin-bottom: 0.55rem;
+}
+.audit-page-countdown-label {
+  color: #9ca3af; font-size: 0.9rem; text-transform: lowercase; letter-spacing: 0.02em;
+}
+.audit-page-countdown-value {
+  font-variant-numeric: tabular-nums; font-weight: 700; font-size: 1.35rem;
+  color: #6ee7b7; letter-spacing: 0.04em;
+}
+.audit-page-current-run {
+  display: flex; align-items: center; gap: 0.55rem; flex-wrap: wrap;
+  margin: 0.35rem 0 0.25rem; font-size: 0.95rem;
+}
+.audit-page-current-run .rag-swatch {
+  width: 1.15rem; height: 1.15rem; flex-shrink: 0;
+}
+.audit-page-current-run-text { color: #e8eef5; line-height: 1.4; }
+.audit-page-current-run-text strong { font-weight: 700; }
+.audit-page-current-run[data-rag-colour="green"] .audit-page-current-run-text strong { color: #22c55e; }
+.audit-page-current-run[data-rag-colour="amber"] .audit-page-current-run-text strong { color: #f59e0b; }
+.audit-page-current-run[data-rag-colour="red"] .audit-page-current-run-text strong { color: #ef4444; }
+.audit-page-current-run-unavailable .audit-page-current-run-text { color: #9ca3af; }
+.audit-page-ticker-blurb {
+  margin: 0.45rem 0 0; font-size: 0.78rem; line-height: 1.4; color: #9ca3af;
+}
 .muted { opacity: 0.78; font-size: 0.92rem; }
 footer.doc-foot {
   margin-top: 2.5rem; padding-top: 1rem; border-top: 1px solid #1f2937;
@@ -644,13 +677,32 @@ article.doc-body { word-wrap: break-word; overflow-wrap: anywhere; }
 """
 
 
+def _is_audit_document(*, title: str, text: str) -> bool:
+    """True when this shell is the public Code & Policy Audit document."""
+    t = (title or "").lower()
+    body = (text or "").lower()
+    if "code & policy audit" in body or "code and policy audit" in body:
+        return True
+    if "security audit" in t and "restore privacy" in t:
+        return True
+    if "code & policy audit" in t:
+        return True
+    return False
+
+
 def render_document_html(
     *,
     title: str,
     raw: bytes,
     plain: bool = False,
+    include_audit_ticker: bool | None = None,
 ) -> bytes:
-    """Wrap product doc bytes in a readable dark HTML shell for browsers."""
+    """Wrap product doc bytes in a readable dark HTML shell for browsers.
+
+    When the document is the public audit (or *include_audit_ticker* is True),
+    injects a live countdown + current-run Green/Amber/Red banner immediately
+    under the first ``h1`` (``Restore Privacy — Code & Policy Audit``).
+    """
     text = raw.decode("utf-8", errors="replace")
     if text.startswith("\ufeff"):
         text = text[1:]
@@ -658,6 +710,20 @@ def render_document_html(
         body_inner = f'<pre class="doc-plain">{_escape(text)}</pre>'
     else:
         body_inner = markdownish_to_html(text)
+    want_ticker = (
+        include_audit_ticker
+        if include_audit_ticker is not None
+        else _is_audit_document(title=title, text=text)
+    )
+    if want_ticker and not plain and "</h1>" in body_inner:
+        try:
+            from audit_countdown import render_audit_page_ticker_html
+        except ImportError:  # pragma: no cover
+            from status_page.audit_countdown import (  # type: ignore
+                render_audit_page_ticker_html,
+            )
+        ticker = render_audit_page_ticker_html()
+        body_inner = body_inner.replace("</h1>", "</h1>\n" + ticker, 1)
     # Ensure a leading h1 when markdown starts with # Title
     page = f"""<!DOCTYPE html>
 <html lang="en">
@@ -712,7 +778,13 @@ def document_bytes_for_path(url_path: str) -> tuple[bytes, str, str] | None:
     data = load_public_document_bytes(doc.filename)
     if data is None:
         return None
-    html = render_document_html(title=doc.title, raw=data, plain=doc.plain)
+    is_audit = doc.filename.upper() in ("AUDIT.MD", "AUDIT") or doc.id == "audit"
+    html = render_document_html(
+        title=doc.title,
+        raw=data,
+        plain=doc.plain,
+        include_audit_ticker=is_audit or None,
+    )
     return html, "text/html; charset=utf-8", doc.title
 
 
