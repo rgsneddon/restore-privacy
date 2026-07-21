@@ -55,6 +55,14 @@ class TestAuditMd(unittest.TestCase):
         )
         self.assertIn("RUST-IN-PRIVACY", text)
         self.assertIn("82.221.101.241", text)
+        # Dual-repo public catalog alignment (not stale v0.2.3 as primary catalog)
+        self.assertNotIn("Catalog v0.2.3", text)
+        self.assertTrue(
+            "Catalog **v1.0.0**" in text or "catalog **v1.0.0**" in text.lower(),
+            "AUDIT policy matrix must cite catalog v1.0.0",
+        )
+        self.assertNotIn("tests_0.2.3.log", text)
+        self.assertIn("21 July 2026", text)
         # Severity labels used in findings
         for sev in ("High", "Medium", "Low", "Info"):
             self.assertIn(sev, text)

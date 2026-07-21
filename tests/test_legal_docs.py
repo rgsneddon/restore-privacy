@@ -53,6 +53,19 @@ class TestPrivacyPolicy(unittest.TestCase):
         self.assertIn("LICENSE", text)
         self.assertIn("README", text)
 
+    def test_policy_public_catalog_is_v1_0_0(self):
+        """User-facing policy must advertise public catalog v1.0.0, not v0.2.3."""
+        text = _read("PRIVACY_POLICY.md")
+        self.assertIn("v1.0.0", text)
+        self.assertIn("RUST-IN-PRIVACY", text)
+        self.assertIn("releases/tag/v1.0.0", text)
+        self.assertNotIn("current catalog: **v0.2.3**", text)
+        # Primary package host line is RUST-IN-PRIVACY, not private 0.2.3 tag as current
+        self.assertIn(
+            "https://github.com/rgsneddon/RUST-IN-PRIVACY/releases/tag/v1.0.0",
+            text,
+        )
+
 
 class TestLicenseAndCredits(unittest.TestCase):
     def test_license_mit_and_third_party_section(self):

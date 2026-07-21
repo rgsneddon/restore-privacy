@@ -141,7 +141,7 @@ Restore Privacy’s **public product ship is v1.0.0** on **RUST-IN-PRIVACY**: Wi
 | I4 | Public status minimization (no client count) |
 | I5 | Node no-log + host privacy install script |
 | I6 | Tunnel DNS default 10.88.0.1 (node Unbound) |
-| I7 | Version surfaces aligned at **0.2.3** |
+| I7 | Public version surfaces aligned at **v1.0.0** (catalog + RUST-IN-PRIVACY); private `client/VERSION` may lag |
 | I8 | MIT + CREDITS present |
 | I9 | PFS unit tests (long-term-only fail) |
 | I10 | Multi-hop status honesty (not routed / entry-only) |
@@ -201,29 +201,30 @@ Durable product-honest scenarios for operators and users. Update this section wh
 | No shared client priv | Strip/generate device key | Aligned |
 | Residual only with full tunnel | Product gates | Aligned |
 | No third-party geo on Connect | No phones-home tests | Aligned |
-| Catalog v0.2.3 + node 82.221… | downloads + endpoint | Aligned |
+| Catalog **v1.0.0** + node 82.221… | `status_page/downloads.py` → RUST-IN-PRIVACY `/releases/download/v1.0.0/` | Aligned |
 | Multi-hop residual | Config only; active=False | Aligned (honest) |
 | PFS session keys | X25519 in handshake KDF | Aligned (Python path) |
 | Traffic shape | Product default **on**; opt-out env | Aligned |
 
 ---
 
-## 6. Automated checks (this pass)
+## 6. Automated checks (this pass — 21 July 2026)
 
-**Modules (representative):** `test_endpoint_alignment`, `test_downloads`, `test_connect_no_phones_home`, `test_pfs`, `test_traffic_shape`, `test_product_traffic_shape`, `test_legal_links`, `test_multihop`, `test_product_node_key`, `test_audit_md`, residual/secrets/legal as available.
+**Modules (representative):** `test_audit_md`, `test_threat_model_docs`, `test_legal_docs`, `test_legal_links`, `test_downloads`, `test_product_node_key`, `test_pfs_product_require`, `test_obfuscation`, `test_kill_switch_leaks`, `test_ipv6_leak_protection`, `test_internet_blackhole`, `test_android_release_wire`, `test_no_public_client_count`, `test_connect_no_phones_home`; RUST-IN-PRIVACY `test_release_1_0_0` + `cargo test --workspace`.
 
 | Result | Detail |
 |--------|--------|
-| **Target** | Exit 0 on supporting suite |
-| **Log** | SCRATCH / `tests_0.2.3.log` / `audit_0.2.3.log` |
+| **Target** | Exit 0 on security/structural suite |
+| **Log** | SCRATCH / `security_audit.log` / `audit_doc_tests.log` / `cargo_security.log` |
 
-### 6.1 Package host credibility (0.2.3)
+### 6.1 Package host credibility (public v1.0.0)
 
 | Expectation | Notes |
 |-------------|--------|
 | Product host | **82.221.101.241** in endpoint sources and packages |
+| Public release | [RUST-IN-PRIVACY v1.0.0](https://github.com/rgsneddon/RUST-IN-PRIVACY/releases/tag/v1.0.0) |
 | Node pub | Pin `1b126abf…` (`product/NODE_ELGAMAL_PUB.sha256`) |
-| No `.priv` in public packages | `_assert_no_priv` / inject gates |
+| No `.priv` in public packages | `_assert_no_priv` / inject gates / public tree scan |
 
 ---
 
@@ -233,7 +234,7 @@ Durable product-honest scenarios for operators and users. Update this section wh
 |---------|--------|
 | `secrets/` gitignored | Yes |
 | Installer strip `*.priv` | Yes |
-| `_assert_no_priv` on release | Yes (`build_release_0.2.3.py`) |
+| `_assert_no_priv` on release | Yes (public RUST-IN-PRIVACY packaging + legacy `build_release_0.2.3.py` gates) |
 | Product `node_elgamal.pub` tracked | Yes (`product/`) |
 | Never force-add secrets | Documented |
 | This audit embeds no keys | Confirmed |
@@ -252,7 +253,7 @@ Durable product-honest scenarios for operators and users. Update this section wh
 
 ## 9. Conclusion
 
-**0.2.3** is consistent on core privacy promises, enables product DATA traffic shaping / outer obfuscation / PFS on **Python and native residual engines**, adds Settings transparency + licence gate + threat-model education, keeps public status minimal (aggregate metrics internal only), and ships operator FDE/ephemeral rebuild tooling without over-claim. Multi-hop remains **honest** (config / entry-only). Remaining Medium items are privilege/environment and incomplete TA resistance — not silent product dishonesty.
+**Public product v1.0.0** (RUST-IN-PRIVACY installers + status-page catalog) and the **private operator tree** are consistent on core privacy promises: no-log node path, title-only public status, device keys, residual honesty, product DATA traffic shaping / outer obfuscation / PFS on residual engines, Settings transparency + licence gate + threat-model education, and operator FDE/ephemeral rebuild tooling — without over-claiming DPI-undetectability or multi-hop residual. Production node at **82.221.101.241:44044** remains the Python deploy path unless intentionally cut over to Rust `rpt-node`. Multi-hop remains **honest** (config / entry-only). Remaining Medium items are privilege/environment and incomplete traffic-analysis resistance — not silent product dishonesty.
 
 Re-run after major releases or crypto/packaging changes.
 
@@ -282,6 +283,7 @@ Re-run after major releases or crypto/packaging changes.
 | Item | |
 |------|--|
 | Output | `AUDIT.md` (repo root) |
-| Related | `PRIVACY_POLICY.md` (Threat model), `README.md` (Threat model), `scripts/RELEASE_NOTES_0.2.3.md` |
-| Code baseline | 0.2.3 ship + node 82.221.101.241 |
+| Related | `PRIVACY_POLICY.md` (Threat model), `README.md` (Threat model), RUST-IN-PRIVACY `AUDIT.md` / `RELEASE_NOTES_1.0.0.md` |
+| Code baseline | Public **v1.0.0** packages + private tree (may still label `client/VERSION` 0.2.3) + node **82.221.101.241** |
+| Pass date | **21 July 2026** (docs + dual-repo security pass) |
 | Threat scenarios | §4.6 — re-review on each major release |
