@@ -119,7 +119,8 @@ def format_connect_failure(
         secs = int(timeout_s) if timeout_s == int(timeout_s) else timeout_s
         return (
             f"No reply from VPN node {target} within {secs}s. "
-            "Check your internet, firewall/UDP, or that the node is online."
+            "Check your internet, Windows Defender Firewall/UDP, or that the node is online. "
+            "On Windows, run AllowFirewall.bat (or reinstall) if residual Connect is blocked."
         )
 
     # Secrets / admission often include useful detail already

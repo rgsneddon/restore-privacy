@@ -425,14 +425,19 @@ def install(
 
     icon = resolve_shortcut_icon(INSTALL_DIR, installed_exe)
 
-    # Residual restore helper (dual /1 + KS + IPv6) — next to exe for emergency use
+    # Residual restore + Defender Firewall allow helpers (next to exe)
     restore_bat = INSTALL_DIR / "RestoreInternet.bat"
+    allow_bat = INSTALL_DIR / "AllowFirewall.bat"
     try:
-        src_bat = Path(__file__).resolve().parent / "RestoreInternet.bat"
-        if src_bat.is_file():
-            shutil.copy2(src_bat, restore_bat)
-        elif not restore_bat.is_file():
-            # Minimal fallback if payload omitted the bat
+        here = Path(__file__).resolve().parent
+        for name, dest in (
+            ("RestoreInternet.bat", restore_bat),
+            ("AllowFirewall.bat", allow_bat),
+        ):
+            src_bat = here / name
+            if src_bat.is_file():
+                shutil.copy2(src_bat, dest)
+        if not restore_bat.is_file():
             restore_bat.write_text(
                 "@echo off\r\n"
                 "route delete 0.0.0.0 mask 128.0.0.0\r\n"
@@ -443,13 +448,23 @@ def install(
     except Exception:
         pass
 
-    # Launch wrapper: wait for app exit then residual restore (covers Quit path)
+    # Best-effort: scoped Windows Defender Firewall allows for residual Connect
+    try:
+        from client.windows.firewall_allow import apply_windows_fw_allows
+
+        apply_windows_fw_allows(program_path=str(installed_exe))
+    except Exception:
+        # May fail without elevation; AllowFirewall.bat / UAC Connect still applies
+        pass
+
+    # Launch wrapper: allow FW, run app, residual restore on exit (Quit path)
     launch_bat = INSTALL_DIR / "LaunchPrivacyRestored.bat"
     try:
         launch_bat.write_text(
             "@echo off\r\n"
             "setlocal\r\n"
             "cd /d \"%~dp0\"\r\n"
+            "if exist \"%~dp0AllowFirewall.bat\" call \"%~dp0AllowFirewall.bat\" /quiet\r\n"
             f'start /wait "" "%~dp0{installed_exe.name}"\r\n'
             "if exist \"%~dp0RestoreInternet.bat\" call \"%~dp0RestoreInternet.bat\" /quiet\r\n",
             encoding="utf-8",
@@ -487,16 +502,27 @@ def install(
                 INSTALL_DIR,
                 icon=icon,
             )
+        if allow_bat.is_file():
+            _create_shortcut(
+                allow_bat,
+                START_MENU / "Allow Firewall for Privacy Restored.lnk",
+                INSTALL_DIR,
+                icon=icon,
+            )
     except Exception:
         # Shortcuts are nice-to-have; install still succeeds
         pass
 
-    # Tiny uninstaller helper (batch) — restore residual path before remove
+    # Tiny uninstaller helper (batch) — residual restore + remove product FW rules
     uninst = INSTALL_DIR / "Uninstall.bat"
     uninst.write_text(
         "@echo off\r\n"
         f"title Uninstall {SHORTCUT_DISPLAY_NAME} {VERSION}\r\n"
         "if exist \"%~dp0RestoreInternet.bat\" call \"%~dp0RestoreInternet.bat\" /quiet\r\n"
+        "powershell -NoProfile -ExecutionPolicy Bypass -Command "
+        "\"Get-NetFirewallRule -EA SilentlyContinue | "
+        "Where-Object { $_.DisplayName -like 'RPT-FW-*' -or $_.DisplayName -like 'RPT-KS-*' } | "
+        "Remove-NetFirewallRule -EA SilentlyContinue\" 2>nul\r\n"
         f'rmdir /s /q "%LOCALAPPDATA%\\Programs\\{APP_NAME}"\r\n'
         f'rmdir /s /q "%APPDATA%\\Microsoft\\Windows\\Start Menu\\Programs\\{APP_NAME}"\r\n'
         f'del /q "%USERPROFILE%\\Desktop\\{SHORTCUT_DISPLAY_NAME}.lnk" 2>nul\r\n'

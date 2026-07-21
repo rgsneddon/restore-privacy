@@ -378,6 +378,16 @@ def restore_windows_residual_path(
         except Exception:
             pass
 
+    # 4) Re-apply scoped product Defender Firewall allows (RPT-FW-*) so residual
+    # Connect is not left blocked after KS rollback / first install.
+    try:
+        from client.windows.firewall_allow import apply_windows_fw_allows
+
+        _ran, _ok, _errs = apply_windows_fw_allows(server_host=host)
+        applied.extend(_ran)
+    except Exception:
+        pass
+
     return applied
 
 
@@ -664,6 +674,16 @@ def start_full_tunnel(
             plan=plan,
             server_host=server_host,
         )
+
+    # Best-effort: scoped Defender Firewall allows for residual UDP + product exe
+    # (does not enable kill-switch; safe Allow rules only).
+    if is_admin():
+        try:
+            from client.windows.firewall_allow import apply_windows_fw_allows
+
+            apply_windows_fw_allows(server_host=server_host)
+        except Exception:
+            pass
 
     wintun_note = ""
     try:

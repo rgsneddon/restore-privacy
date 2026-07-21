@@ -862,6 +862,16 @@ class TunnelClientApp:
 
             if not (result.ok and result.session and result.tunnel_plan):
                 msg = result.message or "Connection failed"
+                low = msg.lower()
+                if "timed out" in low or "no reply" in low or "timeout" in low:
+                    try:
+                        from client.windows.firewall_allow import (
+                            windows_firewall_connect_hint,
+                        )
+
+                        msg = f"{msg} {windows_firewall_connect_hint()}"
+                    except Exception:
+                        pass
 
                 def fail_hs() -> None:
                     self._log(f"Could not connect: {msg}")
