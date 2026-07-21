@@ -15,6 +15,7 @@ import payments  # noqa: E402
 import processor_plugins as plugins  # noqa: E402
 
 OPERATOR_PAYMENT_PAGE = "https://donate.stripe.com/cNi7sM4uOeWQ9TBe0q7kc00"
+OPERATOR_PAYMENT_LINK_ID = "plink_1TvTu6JDavQ2TJW6FeL0dIh9"
 
 
 class TestStripePaymentPageUrl(unittest.TestCase):
@@ -22,6 +23,8 @@ class TestStripePaymentPageUrl(unittest.TestCase):
         for k in (
             "STRIPE_PAYMENT_PAGE_URL",
             "RPT_STRIPE_PAYMENT_PAGE_URL",
+            "STRIPE_PAYMENT_LINK_ID",
+            "RPT_STRIPE_PAYMENT_LINK_ID",
             "STRIPE_SECRET_KEY",
             "STRIPE_WEBHOOK_SECRET",
             "RPT_PUBLIC_BASE_URL",
@@ -33,12 +36,21 @@ class TestStripePaymentPageUrl(unittest.TestCase):
         self.assertEqual(url, OPERATOR_PAYMENT_PAGE)
         self.assertEqual(payments.DEFAULT_STRIPE_PAYMENT_PAGE_URL, OPERATOR_PAYMENT_PAGE)
 
+    def test_default_payment_link_id(self):
+        self.assertEqual(payments.stripe_payment_link_id(), OPERATOR_PAYMENT_LINK_ID)
+        self.assertTrue(payments.stripe_payment_link_id().startswith("plink_"))
+        self.assertEqual(
+            payments.DEFAULT_STRIPE_PAYMENT_LINK_ID, OPERATOR_PAYMENT_LINK_ID
+        )
+
     def test_env_override(self):
         os.environ["STRIPE_PAYMENT_PAGE_URL"] = "https://donate.stripe.com/custom_test"
         self.assertEqual(
             payments.stripe_payment_page_url(),
             "https://donate.stripe.com/custom_test",
         )
+        os.environ["STRIPE_PAYMENT_LINK_ID"] = "plink_custom_unit_test"
+        self.assertEqual(payments.stripe_payment_link_id(), "plink_custom_unit_test")
 
 
 class TestStripeWhatsNext(unittest.TestCase):
@@ -49,6 +61,8 @@ class TestStripeWhatsNext(unittest.TestCase):
             "RPT_PUBLIC_BASE_URL",
             "STRIPE_PAYMENT_PAGE_URL",
             "RPT_STRIPE_PAYMENT_PAGE_URL",
+            "STRIPE_PAYMENT_LINK_ID",
+            "RPT_STRIPE_PAYMENT_LINK_ID",
         ):
             os.environ.pop(k, None)
 
@@ -61,6 +75,8 @@ class TestStripeWhatsNext(unittest.TestCase):
         ready = plugins._stripe_readiness()
         self.assertTrue(ready.get("payment_page_ready"))
         self.assertEqual(ready.get("payment_page_url"), OPERATOR_PAYMENT_PAGE)
+        self.assertEqual(ready.get("payment_link_id"), OPERATOR_PAYMENT_LINK_ID)
+        self.assertTrue(ready.get("payment_link_ready"))
         self.assertFalse(ready.get("checkout_ready"))
         self.assertFalse(ready.get("fulfilment_ready"))
         self.assertFalse(ready.get("ready"))
@@ -93,7 +109,9 @@ class TestPaymentPageInAdminHtml(unittest.TestCase):
         html = admin_panel.render_processor_settings_html()
         self.assertIn("admin-processor-settings", html)
         self.assertIn(OPERATOR_PAYMENT_PAGE, html)
+        self.assertIn(OPERATOR_PAYMENT_LINK_ID, html)
         self.assertIn("stripe-payment-page", html)
+        self.assertIn("stripe-payment-link-id", html)
         self.assertIn("link-stripe-payment-page", html)
         self.assertIn("stripe-whats-next", html)
         # with secret set, webhook still missing → what's next mentions webhook

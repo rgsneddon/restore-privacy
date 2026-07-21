@@ -133,6 +133,7 @@ def _stripe_readiness() -> dict[str, Any]:
     from payments import (
         PRICE_LABEL,
         public_base_url,
+        stripe_payment_link_id,
         stripe_payment_page_url,
         stripe_price_id,
         stripe_remaining_required_keys,
@@ -144,6 +145,7 @@ def _stripe_readiness() -> dict[str, Any]:
     webhook = stripe_webhook_secret()
     price = stripe_price_id()
     pay_page = stripe_payment_page_url()
+    plink = stripe_payment_link_id()
     remaining = stripe_remaining_required_keys()
     mode = "unconfigured"
     if secret.startswith("sk_live_"):
@@ -163,6 +165,8 @@ def _stripe_readiness() -> dict[str, Any]:
             or "stripe.com" in pay_page
         ),
         "payment_page_url": pay_page,
+        "payment_link_id": plink,
+        "payment_link_ready": bool(plink.startswith("plink_")),
         "remaining_required": remaining,
         "whats_next": remaining,
         "fields": {
@@ -175,6 +179,7 @@ def _stripe_readiness() -> dict[str, Any]:
             )
             or bool(os.environ.get("RPT_PUBLIC_BASE_URL", "").strip()),
             "STRIPE_PAYMENT_PAGE_URL": bool(pay_page),
+            "STRIPE_PAYMENT_LINK_ID": bool(plink),
         },
         "stripe_mode": mode,
         "price_label": PRICE_LABEL,
@@ -260,6 +265,15 @@ STRIPE_PLUGIN = ProcessorPlugin(
             secret=False,
             input_type="url",
             placeholder="https://donate.stripe.com/…",
+        ),
+        ProcessorVariable(
+            key="STRIPE_PAYMENT_LINK_ID",
+            label="Payment Link id",
+            purpose="Stripe object id (plink_…) for the same payment page — not a secret",
+            required=False,
+            secret=False,
+            input_type="text",
+            placeholder="plink_…",
         ),
     ),
     dashboard_links=(

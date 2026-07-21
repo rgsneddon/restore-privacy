@@ -65,6 +65,8 @@ def stripe_price_id() -> str:
 DEFAULT_STRIPE_PAYMENT_PAGE_URL = (
     "https://donate.stripe.com/cNi7sM4uOeWQ9TBe0q7kc00"
 )
+# Dashboard Payment Link object id (plink_…) for the same public page.
+DEFAULT_STRIPE_PAYMENT_LINK_ID = "plink_1TvTu6JDavQ2TJW6FeL0dIh9"
 
 
 def stripe_payment_page_url() -> str:
@@ -77,6 +79,18 @@ def stripe_payment_page_url() -> str:
         if raw:
             return raw.rstrip("/")
     return DEFAULT_STRIPE_PAYMENT_PAGE_URL
+
+
+def stripe_payment_link_id() -> str:
+    """Stripe Payment Link id (plink_…). Public identifier — not a secret key.
+
+    Override with ``STRIPE_PAYMENT_LINK_ID`` or ``RPT_STRIPE_PAYMENT_LINK_ID``.
+    """
+    for key in ("STRIPE_PAYMENT_LINK_ID", "RPT_STRIPE_PAYMENT_LINK_ID"):
+        raw = os.environ.get(key, "").strip()
+        if raw:
+            return raw
+    return DEFAULT_STRIPE_PAYMENT_LINK_ID
 
 
 def stripe_remaining_required_keys() -> list[str]:
