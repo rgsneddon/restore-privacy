@@ -129,9 +129,12 @@ LICENCE_LABEL = "LICENCE"
 PRIVACY_POLICY_LABEL = "PRIVACY POLICY"
 SECURITY_AUDIT_LABEL = "SECURITY AUDIT"
 
-# Public product repository (footer link).
-RUST_REPO_URL = "https://github.com/rgsneddon/restore-privacy"
-RUST_REPO_LABEL = "Package source - restore-privacy (signed releases)"
+# Public product repository (footer link) — pre-RUST restore-privacy monorepo.
+PRODUCT_REPO_URL = "https://github.com/rgsneddon/restore-privacy"
+PRODUCT_REPO_LABEL = "Package source - restore-privacy (signed releases)"
+# Back-compat aliases (historical RUST_REPO_* names).
+RUST_REPO_URL = PRODUCT_REPO_URL
+RUST_REPO_LABEL = PRODUCT_REPO_LABEL
 
 # Kept for older imports/tests that still reference the constant name.
 BETA_NOTE_TEXT = ""
@@ -280,7 +283,7 @@ def fetch_upstream_status() -> dict:
 
 
 def render_html(status: dict, poll_ms: int | None = None) -> bytes:
-    """HTML: title + legal/audit links + downloads + Rust repo footer (no client count)."""
+    """HTML: title + legal/audit links + downloads (no client count)."""
     _ = poll_ms  # retained for call-site compat; public page does not poll a count
     title = status.get("title", "RESTORE PRIVACY")
     # Escape for embedding in HTML text (title is product constant; still sanitize)

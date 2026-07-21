@@ -276,10 +276,14 @@ def available_downloads(
 # 404 GitHub release page when the repository is private.
 # Keep this string in sync with payments.DEFAULT_PRODUCTION_PUBLIC_BASE_URL
 # (avoid importing payments here — circular with payments → downloads).
-RUST_REPO_URL = "https://restoreprivacy.online/#downloads"
-RUST_REPO_LABEL = (
+# Pre-RUST product line: restore-privacy Python RPT catalog (not RUST-IN-PRIVACY).
+PRODUCT_CATALOG_URL = "https://restoreprivacy.online/#downloads"
+PRODUCT_CATALOG_LABEL = (
     f"Catalog v{RELEASE_VERSION} — installers after £2.45 payment only (signed packages)"
 )
+# Back-compat aliases (historical RUST_REPO_* names; values are pre-RUST catalog).
+RUST_REPO_URL = PRODUCT_CATALOG_URL
+RUST_REPO_LABEL = PRODUCT_CATALOG_LABEL
 
 
 # Compatibility aliases used by older tests (map to 0.3.3 installers).
@@ -320,18 +324,18 @@ def download_css() -> str:
     a.dl#dl-linux, button.dl#dl-linux { background: #b45309; }
     a.dl#dl-linux:hover, button.dl#dl-linux:hover { background: #d97706; }
     .dl-footer { margin-top: 1.25rem; font-size: 0.9rem; line-height: 1.45; width: 100%; }
-    .dl-footer a.rust-link { color:#93c5fd; text-decoration:underline; font-weight:600; }
-    .dl-footer a.rust-link:hover { color:#bfdbfe; }
+    .dl-footer a.catalog-link { color:#93c5fd; text-decoration:underline; font-weight:600; }
+    .dl-footer a.catalog-link:hover { color:#bfdbfe; }
     .dl-tip { margin-top: 0.85rem; font-size: 0.88rem; opacity: 0.85; width: 100%; }
     .dl-tip a { color:#f9a8d4; text-decoration:underline; font-weight:600; }
 """
 
 
-def render_rust_footer_html() -> str:
+def render_catalog_footer_html() -> str:
     """Footer under download buttons — optional tip only (no How-to-buy link).
 
     The old “Catalog v… — installers after £2.45…” / FULL CATALOGUE footer link
-    (``rust-repo-link``) is intentionally **not** emitted on the public page.
+    is intentionally **not** emitted on the public page.
     Platform Pay buttons remain the only catalog entry; no separate catalogue link.
     """
     tip = coffee_tip_url()
@@ -342,6 +346,10 @@ def render_rust_footer_html() -> str:
         f'<a id="bmc-tip-link" href="{tip}" rel="noopener noreferrer" '
         f'target="_blank">{tip_label}</a></p>'
     )
+
+
+# Back-compat alias (historical name from RUST residual era).
+render_rust_footer_html = render_catalog_footer_html
 
 
 def _render_platform_pay_link(a: DownloadAsset) -> str:
@@ -396,14 +404,14 @@ def render_download_section_html(assets: Iterable[DownloadAsset] | None = None) 
     <h2>Download client v{RELEASE_VERSION}</h2>
     <p class="dl-sub">Windows | Linux | macOS | iOS | Android — catalog
       <span id="catalog-version">v{RELEASE_VERSION}</span>
-      on <a class="rust-link" href="{origin}/" id="dl-site-origin">restoreprivacy.online</a>
+      on <a class="catalog-link" href="{origin}/" id="dl-site-origin">restoreprivacy.online</a>
       (paid download only)</p>
     <p class="dl-price" id="dl-price">{PRICE_LABEL} GBP per package — pay on Stripe, then download starts automatically</p>
     <div class="dl-buttons" id="dl-buttons" data-dl-layout="3+2">
     <div class="dl-row dl-row-3" id="dl-row-1" data-dl-row="1" data-dl-count="{len(row1)}">
       {row1_html}
     </div>{row2_block}
-{render_rust_footer_html()}
+{render_catalog_footer_html()}
     </div>
   </section>
 """

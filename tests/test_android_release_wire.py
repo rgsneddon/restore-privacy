@@ -22,15 +22,10 @@ PRODUCT_PUB_PIN = (
 ).read_text(encoding="utf-8").strip().split()[0]
 
 # Current catalog first — never let a stale prior hide a broken monopin APK.
+# Pre-RUST product line only (this monorepo); do not resolve sibling RUST-IN-PRIVACY.
 _CANDIDATES = [
     ROOT / "releases" / VERSION / f"restore-privacy-client-{VERSION}-android.apk",
     ROOT / "status_page" / "assets" / VERSION / f"restore-privacy-client-{VERSION}-android.apk",
-    ROOT / "releases" / "1.0.0" / "restore-privacy-client-0.2.3-android.apk",
-    ROOT.parents[0]
-    / "RUST-IN-PRIVACY"
-    / "releases"
-    / "1.0.0"
-    / "restore-privacy-client-0.2.3-android.apk",
 ]
 
 
