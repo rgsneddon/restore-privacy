@@ -295,7 +295,13 @@ def download_css() -> str:
     .downloads { margin-top: 2.5rem; text-align: center; max-width: 52rem; padding: 0 1rem; }
     .downloads h2 { font-size: 1.1rem; letter-spacing: 0.08em; font-weight: 600; margin: 0 0 0.4rem; }
     .dl-sub { opacity: 0.75; font-size: 0.95rem; margin: 0 0 1.1rem; }
-    .dl-price { opacity: 0.9; font-size: 0.95rem; margin: 0 0 1rem; font-weight: 600; color: #fde68a; }
+    .dl-price { opacity: 0.9; font-size: 0.95rem; margin: 0 0 0.65rem; font-weight: 600; color: #fde68a; }
+    .dl-payment-disclaimer {
+      max-width: 36rem; margin: 0 auto 1.1rem; padding: 0.65rem 0.85rem;
+      font-size: 0.82rem; line-height: 1.45; font-weight: 600;
+      color: #fecaca; background: rgba(127, 29, 29, 0.35);
+      border: 1px solid #b91c1c; border-radius: 8px; text-align: left;
+    }
     /* Platform menu under title: row of 3, then row of 2 (not a single vertical stack). */
     .dl-buttons {
       display: flex; flex-direction: column; gap: 0.75rem; align-items: center; width: 100%;
@@ -400,6 +406,7 @@ def render_download_section_html(assets: Iterable[DownloadAsset] | None = None) 
     <h2>Download client v{RELEASE_VERSION}</h2>
     <p class="dl-sub">Windows | Linux | macOS | iOS | Android</p>
     <p class="dl-price" id="dl-price">{PRICE_LABEL} GBP per package — pay on Stripe, then download starts automatically</p>
+    <p class="dl-payment-disclaimer" id="dl-payment-disclaimer"><strong>STRONG DISCLAIMER — PAYMENT REQUIRED FOR CONNECT:</strong> Access to Connect and residual VPN use requires <strong>successful payment</strong>. If payment <strong>fails at any time</strong> (failed checkout, failed charge, refund, dispute, or revoked entitlement), the ability to <strong>Connect with the Restore Privacy app is cancelled</strong> for that purchase/install until a successful payment is completed.</p>
     <div class="dl-buttons" id="dl-buttons" data-dl-layout="3+2">
     <div class="dl-row dl-row-3" id="dl-row-1" data-dl-row="1" data-dl-count="{len(row1)}">
       {row1_html}

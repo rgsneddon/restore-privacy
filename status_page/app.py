@@ -29,10 +29,12 @@ from downloads import download_css, render_download_section_html
 from payments import (
     PRICE_LABEL,
     PRICE_PENCE,
+    activate_connect_entitlement,
     check_fulfilment_ready,
     consume_download_token,
     create_checkout_session,
     find_grant_by_session,
+    get_connect_entitlement,
     handle_stripe_webhook,
     init_db,
     lookup_download_token,
@@ -462,6 +464,45 @@ class Handler(BaseHTTPRequestHandler):
             )
             return
 
+        if path in ("/api/connect-entitlement", "/connect-entitlement"):
+            # Payment entitlement for Connect gate (no PII; session_id only)
+            session_id = (query.get("session_id") or "").strip()
+            if not session_id:
+                self._send(
+                    400,
+                    "application/json",
+                    json.dumps(
+                        {
+                            "status": "unknown",
+                            "connect_allowed": False,
+                            "error": "missing_session_id",
+                        }
+                    ).encode("utf-8"),
+                )
+                return
+            ent = get_connect_entitlement(session_id)
+            if not ent:
+                payload = {
+                    "session_id": session_id,
+                    "status": "unknown",
+                    "connect_allowed": False,
+                    "reason": "no_entitlement",
+                }
+            else:
+                payload = {
+                    "session_id": ent["session_id"],
+                    "status": ent["status"],
+                    "platform": ent.get("platform") or "",
+                    "reason": ent.get("reason") or "",
+                    "connect_allowed": bool(ent.get("connect_allowed")),
+                }
+            self._send(
+                200,
+                "application/json",
+                json.dumps(payload).encode("utf-8"),
+            )
+            return
+
         # --- Paid download flow ---
         if path == "/pay":
             # Legacy path: same Stripe payment page as the download buttons.
@@ -601,10 +642,14 @@ class Handler(BaseHTTPRequestHandler):
                     or "package"
                 )
                 plat = str(grant.get("platform") or platform or "")
+                # Ensure Connect entitlement is active for this paid session
+                if session_id:
+                    activate_connect_entitlement(session_id, platform=plat)
                 inner = render_post_payment_thankyou_html(
                     download_path=str(link),
                     filename=str(fname),
                     platform=plat,
+                    session_id=session_id,
                 )
             else:
                 # Meta-refresh so a late webhook can still unlock the page

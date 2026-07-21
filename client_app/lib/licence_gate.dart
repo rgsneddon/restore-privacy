@@ -14,13 +14,35 @@ const String kConnectBlockedLicenceMsg =
     'Accept the end-user licence before connecting. '
     'Open Settings or the licence prompt, review the licence, then Accept.';
 
+const String kConnectBlockedPaymentMsg =
+    'Connect is blocked: payment failed or entitlement was revoked for this '
+    'install. Successful payment is required. If payment fails at any time, '
+    'the ability to Connect with the Restore Privacy app is cancelled until '
+    'you complete a successful payment again on https://restoreprivacy.online/';
+
+const String kKeyPaymentStatus = 'payment_entitlement_status';
+const String kKeyPaymentSessionId = 'payment_entitlement_session_id';
+const String kPaymentStatusActive = 'active';
+const String kPaymentStatusFailed = 'failed';
+const String kPaymentStatusRevoked = 'revoked';
+const String kPaymentStatusUnpaid = 'unpaid';
+const String kPaymentStatusUnknown = 'unknown';
+
 const String kLicencePromptTitle = 'End-user licence';
 const String kLicenceAcceptButton = 'Accept licence';
+
+const String kPaymentConnectDisclaimerPlain =
+    'STRONG DISCLAIMER — PAYMENT REQUIRED FOR CONNECT: Access to Connect and '
+    'residual VPN use requires successful payment. If payment fails at any '
+    'time (failed checkout, failed charge, refund, dispute, or revoked '
+    'entitlement), the ability to Connect with the Restore Privacy app is '
+    'cancelled for that purchase/install until a successful payment is completed.';
 
 const String kShortLicenceSummary =
     'Restore Privacy is provided under the MIT licence and related third-party '
     'terms (see End user licence / LICENSE). By accepting, you agree to use the '
-    'software under those terms. Acceptance is stored only on this device.';
+    'software under those terms. Acceptance is stored only on this device. '
+    '$kPaymentConnectDisclaimerPlain';
 
 class LicenceAcceptance {
   final bool accepted;
@@ -97,13 +119,49 @@ class LicenceGate {
     return true;
   }
 
-  Future<bool> mayConnect() async => hasAcceptedLicence();
+  Future<String> paymentStatus() async {
+    final s = await backend.getString(kKeyPaymentStatus);
+    return (s ?? kPaymentStatusUnknown).trim().toLowerCase();
+  }
 
-  Future<({bool ok, String message})> assertMayConnect() async {
-    if (await mayConnect()) {
-      return (ok: true, message: '');
+  Future<void> recordPaymentSuccess(String sessionId) async {
+    await backend.setString(kKeyPaymentSessionId, sessionId);
+    await backend.setString(kKeyPaymentStatus, kPaymentStatusActive);
+  }
+
+  Future<void> recordPaymentFailure({String reason = 'payment_failed'}) async {
+    await backend.setString(kKeyPaymentStatus, kPaymentStatusFailed);
+  }
+
+  /// Failed / revoked / unpaid always block. Missing entitlement blocks when
+  /// product requires payment (default). Active allows.
+  Future<bool> paymentAllowsConnect({bool require = true}) async {
+    final st = await paymentStatus();
+    if (st == kPaymentStatusFailed ||
+        st == kPaymentStatusRevoked ||
+        st == kPaymentStatusUnpaid) {
+      return false;
     }
-    return (ok: false, message: kConnectBlockedLicenceMsg);
+    if (st == kPaymentStatusActive) return true;
+    if (!require) return true;
+    return false;
+  }
+
+  Future<bool> mayConnect({bool requirePayment = true}) async {
+    if (!await hasAcceptedLicence()) return false;
+    return paymentAllowsConnect(require: requirePayment);
+  }
+
+  Future<({bool ok, String message})> assertMayConnect({
+    bool requirePayment = true,
+  }) async {
+    if (!await hasAcceptedLicence()) {
+      return (ok: false, message: kConnectBlockedLicenceMsg);
+    }
+    if (!await paymentAllowsConnect(require: requirePayment)) {
+      return (ok: false, message: kConnectBlockedPaymentMsg);
+    }
+    return (ok: true, message: '');
   }
 
   Future<LicenceAcceptance> acceptLicence({

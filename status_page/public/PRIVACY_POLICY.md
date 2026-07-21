@@ -3,6 +3,8 @@
 **Last updated:** 21 July 2026  
 **Product:** Restore Privacy Tunnel (RPT / RPT2) — custom VPN node, client apps, and public status page  
 **Current packages (catalog v0.3.3):** paid installers (£2.45 GBP per package) via [status downloads](https://restoreprivacy.online/) (Windows · Android · macOS · iOS · Linux — macOS Developer ID notarized; iOS Team-signed sideload). The product **source repository is private**; free permanent public GitHub installer URLs are **not** offered. After payment the status host delivers a **one-time** download (authenticated proxy).  
+
+**STRONG DISCLAIMER — PAYMENT REQUIRED FOR CONNECT:** Access to **Connect** and residual VPN use requires **successful payment**. If payment **fails at any time** (failed checkout, failed charge, refund, dispute, or revoked entitlement), the ability to **Connect with the Restore Privacy app is cancelled** for that purchase/install until a successful payment is completed. Stripe Checkout session id is used as a **payment entitlement** key (not a username/password account); status host stores entitlement outcome for Connect checks.
 **Code & policy audit:** [AUDIT.md](AUDIT.md) (also served on the status host as `/AUDIT.md`)  
 **Operator / project:** Russell G Sneddon (`rgsneddon`) / Restore Privacy — public docs and paid downloads: [status host](https://restoreprivacy.online/)
 

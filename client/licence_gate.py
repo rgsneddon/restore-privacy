@@ -146,15 +146,28 @@ def clear_licence_acceptance(path: Optional[Path] = None) -> None:
 
 
 def may_connect(path: Optional[Path] = None) -> bool:
-    """Product Connect gate: licence must be accepted locally."""
-    return has_accepted_licence(path)
+    """Product Connect gate: licence accepted **and** payment entitlement allows.
+
+    Payment failure / revoked entitlement always blocks Connect (see
+    :mod:`client.payment_entitlement`).
+    """
+    if not has_accepted_licence(path):
+        return False
+    from client.payment_entitlement import payment_allows_connect
+
+    return payment_allows_connect()
 
 
 def assert_may_connect(path: Optional[Path] = None) -> tuple[bool, str]:
     """Return ``(True, \"\")`` if Connect may proceed; else ``(False, message)``."""
-    if may_connect(path):
-        return True, ""
-    return False, CONNECT_BLOCKED_LICENCE_MSG
+    if not has_accepted_licence(path):
+        return False, CONNECT_BLOCKED_LICENCE_MSG
+    from client.payment_entitlement import assert_payment_may_connect
+
+    ok_pay, pay_msg = assert_payment_may_connect()
+    if not ok_pay:
+        return False, pay_msg
+    return True, ""
 
 
 def licence_url() -> str:
@@ -167,10 +180,13 @@ def licence_label() -> str:
 
 def short_licence_summary() -> str:
     """Plain-language summary shown in the Accept dialog (not the full MIT text)."""
+    from client.payment_entitlement import PAYMENT_CONNECT_DISCLAIMER_PLAIN
+
     return (
         "Restore Privacy is provided under the MIT licence and related third-party "
         "terms (see End user licence / LICENSE). By accepting, you agree to use the "
-        "software under those terms. Acceptance is stored only on this device."
+        "software under those terms. Acceptance is stored only on this device. "
+        + PAYMENT_CONNECT_DISCLAIMER_PLAIN
     )
 
 

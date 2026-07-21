@@ -162,7 +162,19 @@ def stripe_remaining_required_keys() -> list[str]:
 DEFAULT_PRODUCTION_PUBLIC_BASE_URL = "https://restoreprivacy.online"
 STRIPE_WEBHOOK_PATH = "/webhook/stripe"
 # Event operators must select when adding the endpoint in Stripe Dashboard.
-STRIPE_WEBHOOK_EVENTS = ("checkout.session.completed",)
+# completed → grant download + activate Connect entitlement;
+# failure / refund / dispute → revoke Connect entitlement for that session.
+STRIPE_WEBHOOK_EVENTS = (
+    "checkout.session.completed",
+    "checkout.session.async_payment_failed",
+    "checkout.session.expired",
+    "payment_intent.payment_failed",
+    "charge.failed",
+    "charge.refunded",
+    "charge.dispute.created",
+    "invoice.payment_failed",
+    "customer.subscription.deleted",
+)
 
 
 def public_base_url() -> str:
@@ -601,6 +613,7 @@ def render_post_payment_thankyou_html(
     download_path: str,
     filename: str,
     platform: str = "",
+    session_id: str = "",
 ) -> str:
     """Thank-you page body: auto-start one-time download + run-as-administrator copy.
 
@@ -628,6 +641,20 @@ def render_post_payment_thankyou_html(
         "ios": "iOS",
         "linux": "Linux",
     }.get(plat, plat or "your package")
+    sid = (session_id or "").strip()
+    sid_esc = _escape_html_text(sid)
+    ent_block = ""
+    if sid:
+        ent_block = f"""
+  <p class="msg entitlement-note" id="connect-entitlement-note">
+    <strong>Connect entitlement:</strong> payment session
+    <code id="connect-session-id">{sid_esc}</code> is active.
+    If payment fails or is refunded later, Connect is cancelled for this install.
+  </p>
+  <p class="msg" id="entitlement-import-hint">
+    In the app, save this session id under product data as payment entitlement
+    (or re-download after a new successful payment).
+  </p>"""
     # Emphasize Windows admin wording for .exe; still show admin phrase for all.
     admin_lead = "Please run the file as administrator."
     btn = f"Download {plat_label} package"
@@ -636,6 +663,7 @@ def render_post_payment_thankyou_html(
   <h1 id="thank-you-heading">Thank you</h1>
   <p class="msg" id="pay-success">Payment confirmed. Your <strong id="paid-platform-label">{_escape_html_text(plat_label)}</strong> installer is ready:</p>
   <p class="pkg" id="paid-package-name"><strong>{fname_esc}</strong></p>
+  {ent_block}
   <p class="msg admin-run" id="run-as-admin-instruction">
     <strong>{_escape_html_text(admin_lead)}</strong>
     {admin}
@@ -686,10 +714,226 @@ def init_db() -> None:
             );
             CREATE INDEX IF NOT EXISTS idx_grants_session ON grants(session_id);
             CREATE INDEX IF NOT EXISTS idx_grants_created ON grants(created_at);
+            CREATE TABLE IF NOT EXISTS connect_entitlements (
+                session_id TEXT PRIMARY KEY,
+                status TEXT NOT NULL,
+                platform TEXT,
+                reason TEXT,
+                created_at REAL NOT NULL,
+                updated_at REAL NOT NULL
+            );
+            CREATE INDEX IF NOT EXISTS idx_entitlements_status
+                ON connect_entitlements(status);
             """
         )
     finally:
         conn.close()
+
+
+# --- Connect entitlement (payment success → may Connect; failure → block) -----
+
+ENTITLEMENT_ACTIVE = "active"
+ENTITLEMENT_FAILED = "failed"
+ENTITLEMENT_REVOKED = "revoked"
+
+
+def activate_connect_entitlement(
+    session_id: str,
+    *,
+    platform: str = "",
+    now: float | None = None,
+) -> None:
+    """Mark Checkout session as paid/active for Connect entitlement."""
+    sid = (session_id or "").strip()
+    if not sid:
+        return
+    init_db()
+    t = now if now is not None else time.time()
+    plat = (platform or "").strip().lower()
+    conn = _connect()
+    try:
+        cur = conn.execute(
+            "SELECT platform FROM connect_entitlements WHERE session_id = ?",
+            (sid,),
+        )
+        row = cur.fetchone()
+        if row:
+            keep_plat = plat or (row["platform"] or "")
+            conn.execute(
+                """
+                UPDATE connect_entitlements
+                SET status = ?, platform = ?, reason = ?, updated_at = ?
+                WHERE session_id = ?
+                """,
+                (ENTITLEMENT_ACTIVE, keep_plat, "payment_succeeded", t, sid),
+            )
+        else:
+            conn.execute(
+                """
+                INSERT INTO connect_entitlements(
+                    session_id, status, platform, reason, created_at, updated_at
+                ) VALUES (?,?,?,?,?,?)
+                """,
+                (sid, ENTITLEMENT_ACTIVE, plat, "payment_succeeded", t, t),
+            )
+    finally:
+        conn.close()
+
+
+def revoke_connect_entitlement(
+    session_id: str,
+    *,
+    reason: str = "payment_failed",
+    status: str = ENTITLEMENT_FAILED,
+    now: float | None = None,
+) -> bool:
+    """Revoke Connect for a payment session (failed charge, refund, etc.)."""
+    sid = (session_id or "").strip()
+    if not sid:
+        return False
+    init_db()
+    t = now if now is not None else time.time()
+    st = (status or ENTITLEMENT_FAILED).strip().lower()
+    if st not in (ENTITLEMENT_FAILED, ENTITLEMENT_REVOKED):
+        st = ENTITLEMENT_FAILED
+    conn = _connect()
+    try:
+        cur = conn.execute(
+            "SELECT session_id FROM connect_entitlements WHERE session_id = ?",
+            (sid,),
+        )
+        row = cur.fetchone()
+        if row:
+            conn.execute(
+                """
+                UPDATE connect_entitlements
+                SET status = ?, reason = ?, updated_at = ?
+                WHERE session_id = ?
+                """,
+                (st, str(reason or st)[:200], t, sid),
+            )
+        else:
+            conn.execute(
+                """
+                INSERT INTO connect_entitlements(
+                    session_id, status, platform, reason, created_at, updated_at
+                ) VALUES (?,?,?,?,?,?)
+                """,
+                (sid, st, "", str(reason or st)[:200], t, t),
+            )
+        # Also mark related download grants revoked so tokens cannot re-serve
+        conn.execute(
+            "UPDATE grants SET status = 'revoked' WHERE session_id = ? AND status = 'granted'",
+            (sid,),
+        )
+    finally:
+        conn.close()
+    return True
+
+
+def get_connect_entitlement(session_id: str) -> dict[str, Any] | None:
+    """Return entitlement row for session_id, or None if unknown."""
+    sid = (session_id or "").strip()
+    if not sid:
+        return None
+    init_db()
+    conn = _connect()
+    try:
+        cur = conn.execute(
+            """
+            SELECT session_id, status, platform, reason, created_at, updated_at
+            FROM connect_entitlements WHERE session_id = ?
+            """,
+            (sid,),
+        )
+        row = cur.fetchone()
+        if not row:
+            return None
+        return {
+            "session_id": row["session_id"],
+            "status": row["status"],
+            "platform": row["platform"] or "",
+            "reason": row["reason"] or "",
+            "created_at": row["created_at"],
+            "updated_at": row["updated_at"],
+            "connect_allowed": row["status"] == ENTITLEMENT_ACTIVE,
+        }
+    finally:
+        conn.close()
+
+
+def connect_entitlement_allows(session_id: str) -> bool:
+    ent = get_connect_entitlement(session_id)
+    if not ent:
+        return False
+    return bool(ent.get("connect_allowed"))
+
+
+def _session_id_from_stripe_object(obj: dict[str, Any]) -> str:
+    """Extract Checkout session id from various Stripe event objects."""
+    if not isinstance(obj, dict):
+        return ""
+    # checkout.session.*
+    oid = str(obj.get("id") or "")
+    if oid.startswith("cs_"):
+        return oid
+    # payment_intent / charge may embed session via metadata
+    meta = obj.get("metadata") or {}
+    if isinstance(meta, dict):
+        for key in ("checkout_session_id", "session_id", "cs_id"):
+            v = str(meta.get(key) or "").strip()
+            if v.startswith("cs_"):
+                return v
+    # charge.payment_intent is pi_…; look up grants by payment metadata later
+    for key in ("checkout_session", "session"):
+        nested = obj.get(key)
+        if isinstance(nested, str) and nested.startswith("cs_"):
+            return nested
+        if isinstance(nested, dict):
+            nid = str(nested.get("id") or "")
+            if nid.startswith("cs_"):
+                return nid
+    return oid if oid.startswith("cs_") else ""
+
+
+def process_payment_failure_event(event: dict[str, Any]) -> str | None:
+    """On failure/refund/dispute webhooks, revoke Connect entitlement.
+
+    Returns session_id when revoked, else None.
+    """
+    etype = str(event.get("type") or "")
+    fail_types = {
+        "checkout.session.async_payment_failed",
+        "checkout.session.expired",
+        "payment_intent.payment_failed",
+        "charge.failed",
+        "charge.refunded",
+        "charge.dispute.created",
+        "invoice.payment_failed",
+        "customer.subscription.deleted",
+    }
+    if etype not in fail_types:
+        return None
+    obj = event.get("data", {}).get("object") or {}
+    if not isinstance(obj, dict):
+        return None
+    session_id = _session_id_from_stripe_object(obj)
+    # Also try payment_status on session objects
+    if not session_id and etype.startswith("checkout.session"):
+        session_id = str(obj.get("id") or "")
+    if not session_id:
+        # Fallback: revoke by matching grants payment intent metadata unavailable
+        return None
+    # Unpaid completed sessions should not stay active
+    if etype == "checkout.session.completed":
+        return None
+    reason = etype
+    if etype == "charge.refunded":
+        status = ENTITLEMENT_REVOKED
+    else:
+        status = ENTITLEMENT_FAILED
+    revoke_connect_entitlement(session_id, reason=reason, status=status)
+    return session_id
 
 
 def mint_download_token(
@@ -1198,13 +1442,17 @@ def process_checkout_completed_event(event: dict[str, Any]) -> str | None:
     if currency != PRICE_CURRENCY:
         return None
     session_id = str(obj.get("id") or "")
-    return mint_download_token(
+    token = mint_download_token(
         filename=filename,
         platform=platform,
         session_id=session_id,
         amount_pence=PRICE_PENCE,
         currency=PRICE_CURRENCY,
     )
+    # Successful paid session → Connect entitlement active
+    if session_id:
+        activate_connect_entitlement(session_id, platform=platform)
+    return token
 
 
 def handle_stripe_webhook(
@@ -1214,9 +1462,9 @@ def handle_stripe_webhook(
     secret: str | None = None,
     now: float | None = None,
 ) -> dict[str, Any]:
-    """Verify signature and grant token when applicable.
+    """Verify signature; grant token on paid checkout; revoke on payment failure.
 
-    Returns {ok, granted, token?, error?}.
+    Returns {ok, granted, token?, revoked?, session_id?, error?}.
     """
     wh_secret = (secret if secret is not None else stripe_webhook_secret()).strip()
     if not verify_stripe_signature(payload, sig_header, wh_secret, now=now):
@@ -1227,8 +1475,33 @@ def handle_stripe_webhook(
         return {"ok": False, "granted": False, "error": "bad_json"}
     token = process_checkout_completed_event(event)
     if token:
-        return {"ok": True, "granted": True, "token": token}
-    return {"ok": True, "granted": False}
+        return {"ok": True, "granted": True, "token": token, "revoked": False}
+    # Observe failure protocols → cancel Connect entitlement
+    revoked_sid = process_payment_failure_event(event)
+    if revoked_sid:
+        return {
+            "ok": True,
+            "granted": False,
+            "revoked": True,
+            "session_id": revoked_sid,
+            "event_type": str(event.get("type") or ""),
+        }
+    # Unpaid checkout.session.completed must not leave an active entitlement
+    if event.get("type") == "checkout.session.completed":
+        obj = (event.get("data") or {}).get("object") or {}
+        if isinstance(obj, dict):
+            ps = str(obj.get("payment_status") or "").strip().lower()
+            sid = str(obj.get("id") or "")
+            if sid and ps and ps not in ("paid", "no_payment_required"):
+                revoke_connect_entitlement(sid, reason=f"unpaid:{ps}")
+                return {
+                    "ok": True,
+                    "granted": False,
+                    "revoked": True,
+                    "session_id": sid,
+                    "event_type": "checkout.session.completed",
+                }
+    return {"ok": True, "granted": False, "revoked": False}
 
 
 def checkout_amount_fields_for_tests() -> dict[str, Any]:

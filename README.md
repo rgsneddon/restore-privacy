@@ -47,6 +47,8 @@ Restore Privacy is built from the ground up using unashamed vibe coding methods 
 **Current catalog (v0.3.3):** pay-per-package installers on https://restoreprivacy.online/ (£2.45 GBP via Stripe).  
 The product source repository is **private**; free permanent GitHub release downloads are not offered. After payment the status site delivers the installer once (authenticated proxy).
 
+> **STRONG DISCLAIMER — PAYMENT REQUIRED FOR CONNECT:** Access to **Connect** and residual VPN use requires **successful payment**. If payment **fails at any time** (failed checkout, failed charge, refund, dispute, or revoked entitlement), the ability to **Connect with the Restore Privacy app is cancelled** for that purchase/install until a successful payment is completed.
+
 | Platform | Package |
 |----------|---------|
 | Windows | `restore-privacy-client-0.3.3-windows-x64-setup.exe` |

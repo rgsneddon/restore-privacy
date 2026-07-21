@@ -50,6 +50,11 @@ may be private; this MIT grant still applies to the original code as distributed
 
 End-user packaging notes (do not change the MIT grant above):
 
+  - STRONG DISCLAIMER — PAYMENT REQUIRED FOR CONNECT: Access to Connect and
+    residual VPN use requires successful payment. If payment fails at any time
+    (failed checkout, failed charge, refund, dispute, or revoked entitlement),
+    the ability to Connect with the Restore Privacy app is cancelled for that
+    purchase/install until a successful payment is completed.
   - Catalog installers include a “Restore Internet” failsafe that restores
     residual network settings and can erase all product parts from the device.
     After a full wipe, a new paid one-time download link may be required;
