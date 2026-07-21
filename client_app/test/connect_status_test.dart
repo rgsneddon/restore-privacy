@@ -118,8 +118,13 @@ void main() {
       expect(map['ok'], isTrue);
       expect(map['fullTunnelActive'], isTrue);
       expect(map['hostOnlySession'], isFalse);
+      expect(map['ipv6Protected'], isFalse);
       expect(isConnectSuccess(map), isTrue);
-      expect(mapConnectStatusMessage(map), contains('10.88.0.19'));
+      final msg = mapConnectStatusMessage(map);
+      expect(msg, contains('10.88.0.19'));
+      // Apple residual honesty: IPv4 via VPN; no IPv6 kill-switch claim
+      expect(msg, contains('IPv6 not protected'));
+      expect(msg.toLowerCase(), isNot(contains('ipv6 isp path blocked')));
       // macOS hide-to-tray only after product full-tunnel success
       expect(shouldHideToTrayAfterConnect(map), isTrue);
       expect(shouldHideToTrayAfterConnectSuccess(true), isTrue);

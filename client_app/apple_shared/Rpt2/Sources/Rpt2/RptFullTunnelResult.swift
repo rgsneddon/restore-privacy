@@ -27,19 +27,23 @@ public enum RptFullTunnelResult {
     ) -> [String: Any] {
         let ip = (vpnIp ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
         if packetTunnelActive && !hostOnlyHello {
+            // Apple residual is IPv4-only: do not claim IPv6 ISP path blocked / kill-switch.
             let base: String
-            if let d = detailMessage?.trimmingCharacters(in: .whitespacesAndNewlines), !d.isEmpty {
+            if let d = detailMessage?.trimmingCharacters(in: .whitespacesAndNewlines),
+               !d.isEmpty,
+               d.lowercased().contains("ipv6") {
                 base = d
             } else if !ip.isEmpty {
-                base = "Connected — tunnel IP \(ip)"
+                base = "Connected — IPv4 via VPN; IPv6 not protected (\(ip))"
             } else {
-                base = "Connected — Packet Tunnel active"
+                base = "Connected — IPv4 via VPN; IPv6 not protected"
             }
             var m: [String: Any] = [
                 "ok": true,
                 "message": base,
                 "fullTunnelActive": true,
                 "hostOnlySession": false,
+                "ipv6Protected": false,
             ]
             if !ip.isEmpty { m["vpnIp"] = ip }
             return m

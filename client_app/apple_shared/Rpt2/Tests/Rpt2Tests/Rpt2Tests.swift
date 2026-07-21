@@ -345,6 +345,11 @@ final class Rpt2Tests: XCTestCase {
         XCTAssertEqual(map["fullTunnelActive"] as? Bool, true)
         XCTAssertTrue(RptFullTunnelResult.isProductSuccess(map))
         XCTAssertEqual(map["vpnIp"] as? String, "10.88.0.19")
+        // Apple residual: no IPv6 kill-switch — honest unprotected IPv6
+        XCTAssertEqual(map["ipv6Protected"] as? Bool, false)
+        let msg = map["message"] as? String ?? ""
+        XCTAssertTrue(msg.contains("IPv6 not protected"))
+        XCTAssertFalse(msg.lowercased().contains("ipv6 isp path blocked"))
     }
 
     func testFullTunnelHonestyNeFailureResidualIpMessage() {

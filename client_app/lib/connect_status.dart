@@ -155,19 +155,33 @@ Map<String, dynamic> buildFullTunnelConnectResult({
   String? detailMessage,
   bool hostOnlyHello = false,
   String? nodeDiagnostic,
+  /// Apple residual is IPv4-only (no IPv6 kill-switch). Default false for honesty.
+  /// Platforms that install real IPv6 protection may pass true.
+  bool ipv6Protected = false,
 }) {
   if (packetTunnelActive && !hostOnlyHello) {
     final ip = (vpnIp ?? '').trim();
-    final base = (detailMessage ?? '').trim().isNotEmpty
-        ? detailMessage!.trim()
-        : (ip.isNotEmpty
-            ? 'Connected — tunnel IP $ip'
-            : 'Connected — Packet Tunnel active');
+    final detail = (detailMessage ?? '').trim();
+    final String base;
+    if (detail.isNotEmpty && detail.toLowerCase().contains('ipv6')) {
+      base = detail;
+    } else if (!ipv6Protected) {
+      base = ip.isNotEmpty
+          ? 'Connected — IPv4 via VPN; IPv6 not protected ($ip)'
+          : 'Connected — IPv4 via VPN; IPv6 not protected';
+    } else if (detail.isNotEmpty) {
+      base = detail;
+    } else {
+      base = ip.isNotEmpty
+          ? 'Connected — tunnel IP $ip'
+          : 'Connected — Packet Tunnel active';
+    }
     return {
       'ok': true,
       'message': base,
       'fullTunnelActive': true,
       'hostOnlySession': false,
+      'ipv6Protected': ipv6Protected,
       if (ip.isNotEmpty) 'vpnIp': ip,
     };
   }

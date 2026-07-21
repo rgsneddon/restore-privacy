@@ -50,11 +50,9 @@ class PacketTunnelProvider: NEPacketTunnelProvider {
         ipv4.includedRoutes = [defaultRoute]
         ipv4.excludedRoutes = [NEIPv4Route(destinationAddress: self.endpointHost, subnetMask: "255.255.255.255")]
         settings.ipv4Settings = ipv4
-        // IPv6: claim default IPv6 route into the tunnel so residual IPv6 is not
-        // left on the ISP path (may blackhole until node carries IPv6 — privacy first).
-        let ipv6 = NEIPv6Settings(addresses: ["fd00:7274::2"], networkPrefixLengths: [128 as NSNumber])
-        ipv6.includedRoutes = [NEIPv6Route.default()]
-        settings.ipv6Settings = ipv6
+        // No IPv6 kill-switch / default-route blackhole: the node is IPv4 residual only.
+        // Leaving NEIPv6Settings unset keeps ISP IPv6 available (honestly unprotected).
+        settings.ipv6Settings = nil
         // Node tunnel DNS (Unbound on 10.88.0.1) — not third-party public resolvers
         settings.dnsSettings = NEDNSSettings(servers: ["10.88.0.1"])
         settings.mtu = 1280
@@ -103,8 +101,10 @@ class PacketTunnelProvider: NEPacketTunnelProvider {
     if let s = session {
       let info: [String: Any] = [
         "ok": true,
-        "message": "Connected — tunnel IP \(s.vpnIp)",
+        "message": "Connected — IPv4 via VPN; IPv6 not protected (\(s.vpnIp))",
         "vpnIp": s.vpnIp,
+        "ipv6Protected": false,
+        "fullTunnelActive": true,
       ]
       completionHandler?(try? JSONSerialization.data(withJSONObject: info))
     } else {

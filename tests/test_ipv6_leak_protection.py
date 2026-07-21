@@ -267,14 +267,23 @@ class TestProductSourceIpv6Wiring(unittest.TestCase):
         self.assertIn("ipv6Protected", cs)
         self.assertIn("IPv6 not protected", cs)
 
-    def test_apple_packet_tunnel_ipv6_settings(self):
+    def test_apple_packet_tunnel_no_ipv6_killswitch(self):
+        """Apple residual must not install IPv6 default-route kill-switch/blackhole."""
         for rel in (
             "client_app/ios/NativePrep/PacketTunnelProvider.swift",
             "client_app/macos/NativePrep/PacketTunnelProvider.swift",
         ):
             text = (ROOT / rel).read_text(encoding="utf-8")
-            self.assertIn("NEIPv6Settings", text)
-            self.assertIn("includedRoutes", text)
+            # No catch-all IPv6 route into the tunnel
+            self.assertNotIn("NEIPv6Route.default()", text)
+            self.assertNotIn("NEIPv6Settings(addresses:", text)
+            self.assertIn("settings.ipv6Settings = nil", text)
+            # Still full IPv4 residual + tunnel DNS
+            self.assertIn("NEIPv4Route.default()", text)
+            self.assertIn("10.88.0.1", text)
+            # Honesty: do not claim IPv6 ISP path blocked
+            self.assertIn("ipv6Protected", text)
+            self.assertIn("IPv6 not protected", text)
 
 
 if __name__ == "__main__":
