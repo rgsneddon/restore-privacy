@@ -168,6 +168,35 @@ class TestDownloadCatalog(unittest.TestCase):
         self.assertNotIn('id="stripe-payment-page-link"', html)
         self.assertNotIn(">Stripe payment page<", html)
 
+    def test_payment_disclaimer_subscription_and_above_bmc(self):
+        """Red disclaimer names subscription cancel; sits after pay, before BMC tip."""
+        from downloads import payment_connect_disclaimer_html, render_download_section_html
+
+        frag = payment_connect_disclaimer_html()
+        self.assertIn('id="dl-payment-disclaimer"', frag)
+        self.assertIn("STRONG DISCLAIMER", frag)
+        self.assertIn("subscription cancellation", frag.lower())
+        self.assertIn("subscription period", frag.lower())
+        self.assertIn("Connect with the Restore Privacy app is cancelled", frag)
+
+        html = render_download_section_html()
+        self.assertIn('id="dl-payment-disclaimer"', html)
+        self.assertIn("subscription cancellation", html.lower())
+        pay_at = html.find('id="dl-windows"')
+        disc_at = html.find('id="dl-payment-disclaimer"')
+        bmc_at = html.find('id="bmc-tip"')
+        bmc_link_at = html.find('id="bmc-tip-link"')
+        self.assertGreater(pay_at, 0, "pay control marker missing")
+        self.assertGreater(disc_at, 0, "disclaimer marker missing")
+        self.assertGreater(bmc_at, 0, "bmc tip marker missing")
+        # After pay buttons, immediately above BMC tip
+        self.assertGreater(disc_at, pay_at)
+        self.assertGreater(bmc_at, disc_at)
+        self.assertGreater(bmc_link_at, disc_at)
+        # Closing pay-buttons div ends before disclaimer
+        buttons_end = html.find("</div>", html.find('id="dl-buttons"'))
+        self.assertGreater(disc_at, buttons_end)
+
     def test_status_page_html_includes_paid_downloads(self):
         page = status_app.render_html({"title": "RESTORE PRIVACY"}).decode("utf-8")
         self.assertIn("RESTORE PRIVACY", page)

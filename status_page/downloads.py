@@ -297,7 +297,7 @@ def download_css() -> str:
     .dl-sub { opacity: 0.75; font-size: 0.95rem; margin: 0 0 1.1rem; }
     .dl-price { opacity: 0.9; font-size: 0.95rem; margin: 0 0 0.65rem; font-weight: 600; color: #fde68a; }
     .dl-payment-disclaimer {
-      max-width: 36rem; margin: 0 auto 1.1rem; padding: 0.65rem 0.85rem;
+      max-width: 36rem; margin: 1.15rem auto 0.35rem; padding: 0.65rem 0.85rem;
       font-size: 0.82rem; line-height: 1.45; font-weight: 600;
       color: #fecaca; background: rgba(127, 29, 29, 0.35);
       border: 1px solid #b91c1c; border-radius: 8px; text-align: left;
@@ -335,6 +335,26 @@ def download_css() -> str:
     .dl-tip { margin-top: 0.85rem; font-size: 0.88rem; opacity: 0.85; width: 100%; }
     .dl-tip a { color:#f9a8d4; text-decoration:underline; font-weight:600; }
 """
+
+
+def payment_connect_disclaimer_html() -> str:
+    """Red STRONG DISCLAIMER box for the public downloads section.
+
+    Placed after platform pay controls and immediately above the BMC tip link.
+    """
+    return (
+        '<p class="dl-payment-disclaimer" id="dl-payment-disclaimer">'
+        "<strong>STRONG DISCLAIMER — PAYMENT REQUIRED FOR CONNECT:</strong> "
+        "Access to Connect and residual VPN use requires "
+        "<strong>successful payment</strong>. If payment "
+        "<strong>fails at any time</strong> (failed checkout, failed charge, "
+        "refund, dispute, revoked entitlement, or "
+        "<strong>subscription cancellation</strong> / end of the paid "
+        "subscription period), the ability to "
+        "<strong>Connect with the Restore Privacy app is cancelled</strong> "
+        "for that purchase/install until a successful payment is completed."
+        "</p>"
+    )
 
 
 def render_catalog_footer_html() -> str:
@@ -401,17 +421,19 @@ def render_download_section_html(assets: Iterable[DownloadAsset] | None = None) 
     <div class="dl-row dl-row-2" id="dl-row-2" data-dl-row="2" data-dl-count="{len(row2)}">
       {row2_html}
     </div>"""
+    # Order: title/price → pay controls → red payment disclaimer → BMC tip
+    # (disclaimer is bottom of the shop section, immediately above buymeacoffee).
     return f"""
   <section class="downloads" id="downloads" aria-label="Download Restore Privacy client">
     <h2>Download client v{RELEASE_VERSION}</h2>
     <p class="dl-sub">Windows | Linux | macOS | iOS | Android</p>
     <p class="dl-price" id="dl-price">{PRICE_LABEL} GBP per package — pay on Stripe, then download starts automatically</p>
-    <p class="dl-payment-disclaimer" id="dl-payment-disclaimer"><strong>STRONG DISCLAIMER — PAYMENT REQUIRED FOR CONNECT:</strong> Access to Connect and residual VPN use requires <strong>successful payment</strong>. If payment <strong>fails at any time</strong> (failed checkout, failed charge, refund, dispute, or revoked entitlement), the ability to <strong>Connect with the Restore Privacy app is cancelled</strong> for that purchase/install until a successful payment is completed.</p>
     <div class="dl-buttons" id="dl-buttons" data-dl-layout="3+2">
     <div class="dl-row dl-row-3" id="dl-row-1" data-dl-row="1" data-dl-count="{len(row1)}">
       {row1_html}
     </div>{row2_block}
-{render_catalog_footer_html()}
     </div>
+    {payment_connect_disclaimer_html()}
+{render_catalog_footer_html()}
   </section>
 """

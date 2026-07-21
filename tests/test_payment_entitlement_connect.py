@@ -413,6 +413,7 @@ class TestDocsAndPortalDisclaimer(unittest.TestCase):
         self.assertIn("dl-payment-disclaimer", html)
         self.assertIn("STRONG DISCLAIMER", html)
         self.assertIn("fails at any time", html)
+        self.assertIn("subscription cancellation", html.lower())
 
         ty = render_post_payment_thankyou_html(
             download_path="/download?token=abc",
