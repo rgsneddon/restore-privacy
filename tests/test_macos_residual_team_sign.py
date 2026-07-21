@@ -25,6 +25,24 @@ class TestMacosResidualTeamSign(unittest.TestCase):
         # Forbidden combo that AMFI SIGKILLs with NE (even with profile)
         self.assertNotIn("allow-unsigned-executable-memory", text)
         self.assertNotIn("disable-library-validation", text)
+        # Host Mac Team profile omits application-groups — do not claim App Group on host
+        # (Packet Tunnel still has group + home temporary-exception; host seeds ~/.restore-privacy)
+        stripped = re.sub(r"<!--.*?-->", "", text, flags=re.S)
+        self.assertNotIn("application-groups", stripped)
+
+    def test_host_seeds_home_secrets_for_appex_without_app_group(self):
+        secrets = MAC / "NativePrep" / "RptSecrets.swift"
+        channel = CHANNEL
+        s = secrets.read_text(encoding="utf-8")
+        c = channel.read_text(encoding="utf-8")
+        self.assertIn("seedHomeRestorePrivacyFromKnownSourcesIfNeeded", s)
+        self.assertIn(".restore-privacy", s)
+        self.assertIn("seedHomeRestorePrivacyFromKnownSourcesIfNeeded", c)
+        # Appex still has App Group + home temporary-exception
+        appex = APPEX_ENT.read_text(encoding="utf-8")
+        self.assertIn("group.com.restoreprivacy.shared", appex)
+        self.assertIn("temporary-exception.files.home-relative-path.read-only", appex)
+        self.assertIn(".restore-privacy/", appex)
 
     def test_developer_id_host_omits_ne(self):
         """Public DevID zip must keep opening without restricted host NE."""

@@ -404,4 +404,68 @@ public enum RptSecrets {
         }
         return dirHasClientSecrets(dest, fileManager: fileManager) ? dest : nil
     }
+
+    /// Seed `~/.restore-privacy/secrets` for Packet Tunnel when host cannot use App Groups.
+    ///
+    /// Mac Team residual host profiles often authorize Network Extension but omit
+    /// `application-groups`. The sandboxed appex still has a home-relative
+    /// temporary-exception for `.restore-privacy/`, so this is the residual
+    /// host→appex secrets path without App Group on the host.
+    @discardableResult
+    public static func seedHomeRestorePrivacyFromKnownSourcesIfNeeded(
+        fileManager: FileManager = .default,
+        bundle: Bundle = .main
+    ) throws -> URL? {
+        guard let realHome = realUserHomeDirectory() else { return nil }
+        let dest = realHome
+            .appendingPathComponent(".restore-privacy", isDirectory: true)
+            .appendingPathComponent("secrets", isDirectory: true)
+        if dirHasClientSecrets(dest, fileManager: fileManager) {
+            return dest
+        }
+        var nodeSrc: URL?
+        for dir in candidateSecretsDirectories(fileManager: fileManager, bundle: bundle) {
+            if dir.standardizedFileURL.path == dest.standardizedFileURL.path { continue }
+            let n = dir.appendingPathComponent(nodePubName)
+            if fileManager.fileExists(atPath: n.path) {
+                nodeSrc = n
+                break
+            }
+        }
+        var privSrc: URL?
+        for dir in candidateSecretsDirectories(fileManager: fileManager, bundle: bundle) {
+            if isPackageReadonlySecretsDir(dir, bundle: bundle, fileManager: fileManager) {
+                continue
+            }
+            if dir.standardizedFileURL.path == dest.standardizedFileURL.path { continue }
+            let c = dir.appendingPathComponent(clientPrivName)
+            if fileManager.fileExists(atPath: c.path) {
+                privSrc = c
+                break
+            }
+        }
+        guard let nodeSrc else {
+            // Fall back to bundle Resources/secrets/node_elgamal.pub
+            if let res = bundle.resourceURL?
+                .appendingPathComponent("secrets", isDirectory: true)
+                .appendingPathComponent(nodePubName),
+               fileManager.fileExists(atPath: res.path) {
+                return try ensureDeviceAdmissionKey(in: dest, nodePubSource: res, fileManager: fileManager)
+            }
+            return nil
+        }
+        try fileManager.createDirectory(at: dest, withIntermediateDirectories: true)
+        let nodeDest = dest.appendingPathComponent(nodePubName)
+        if !fileManager.fileExists(atPath: nodeDest.path) {
+            try fileManager.copyItem(at: nodeSrc, to: nodeDest)
+        }
+        let privDest = dest.appendingPathComponent(clientPrivName)
+        if let privSrc, !fileManager.fileExists(atPath: privDest.path) {
+            try fileManager.copyItem(at: privSrc, to: privDest)
+        }
+        if !fileManager.fileExists(atPath: privDest.path) {
+            _ = try ensureDeviceAdmissionKey(in: dest, nodePubSource: nodeSrc, fileManager: fileManager)
+        }
+        return dirHasClientSecrets(dest, fileManager: fileManager) ? dest : nil
+    }
 }
