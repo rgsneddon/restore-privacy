@@ -10,6 +10,60 @@ void main() {
       expect(isConnectSuccess('x'), isFalse);
     });
 
+    test('connecting map is not product success (Android long HELLO)', () {
+      expect(
+        isConnectSuccess({
+          'ok': true,
+          'connecting': true,
+          'message': 'VPN still connecting…',
+          'fullTunnelActive': false,
+        }),
+        isFalse,
+      );
+      expect(
+        isConnectSuccess({
+          'ok': false,
+          'connecting': true,
+          'message': 'VPN still connecting — waiting for full tunnel…',
+        }),
+        isFalse,
+      );
+      expect(
+        isConnectingInProgress({
+          'connecting': true,
+          'message': 'VPN still connecting…',
+        }),
+        isTrue,
+      );
+    });
+
+    test('status card title stays Connecting while busy', () {
+      expect(
+        statusCardTitle(connected: false, busyConnecting: true),
+        kConnectingTitle,
+      );
+      expect(
+        statusCardTitle(connected: false, busyConnecting: false),
+        'Disconnected',
+      );
+      expect(
+        statusCardTitle(
+          connected: true,
+          busyConnecting: false,
+          vpnIp: '10.88.0.2',
+        ),
+        contains('10.88.0.2'),
+      );
+      final msg = connectingStatusMessage(
+        host: '82.221.101.241',
+        port: 44044,
+        elapsedSeconds: 12,
+      );
+      expect(msg, contains('Connecting'));
+      expect(msg, contains('12s'));
+      expect(msg, contains('full tunnel'));
+    });
+
     test('does not invent Connected on failure', () {
       final msg = mapConnectStatusMessage({
         'ok': false,

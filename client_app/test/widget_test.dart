@@ -15,7 +15,12 @@ void main() {
   var statusConnected = false;
 
   setUp(() {
-    SharedPreferences.setMockInitialValues({});
+    // Pre-accept licence so Connect is not blocked by the bottom sheet.
+    SharedPreferences.setMockInitialValues({
+      'licence_accepted': true,
+      'licence_id': 'MIT-2026',
+      'licence_accepted_at': '1',
+    });
     statusConnected = false;
     TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
         .setMockMethodCallHandler(channel, (call) async {
@@ -72,17 +77,30 @@ void main() {
   testWidgets('Connect then Disconnect invoke channel methods', (tester) async {
     await tester.pumpWidget(const RestorePrivacyApp());
     await tester.pump();
-    await tester.pump(const Duration(milliseconds: 50));
+    await tester.pump(const Duration(milliseconds: 100));
+    await tester.pumpAndSettle();
 
+    // If sheet still open, accept with the real button label.
+    final acceptBtn = find.text('Accept licence');
+    if (acceptBtn.evaluate().isNotEmpty) {
+      await tester.tap(acceptBtn);
+      await tester.pumpAndSettle();
+    }
+
+    expect(find.text(connectButtonLabel(false)), findsOneWidget);
+    await tester.ensureVisible(find.text(connectButtonLabel(false)));
     await tester.tap(find.text(connectButtonLabel(false)));
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 100));
+    await tester.pump(const Duration(seconds: 1));
+    await tester.pumpAndSettle();
 
     expect(find.text(connectButtonLabel(true)), findsOneWidget);
 
     await tester.tap(find.text(connectButtonLabel(true)));
     await tester.pump();
-    await tester.pump(const Duration(milliseconds: 100));
+    await tester.pump(const Duration(milliseconds: 200));
+    await tester.pumpAndSettle();
 
     expect(find.text(connectButtonLabel(false)), findsOneWidget);
   });

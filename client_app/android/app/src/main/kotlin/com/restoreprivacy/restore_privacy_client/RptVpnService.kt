@@ -42,7 +42,19 @@ class RptVpnService : VpnService() {
                 val port = intent.getIntExtra(EXTRA_PORT, 44044)
                 val fullTunnel = intent.getBooleanExtra(EXTRA_FULL_TUNNEL, true)
                 val session = intent.getStringExtra(EXTRA_SESSION) ?: "Privacy Restored"
-                resultReceiver = extractReceiver(intent)
+                val recv = extractReceiver(intent)
+                // Already handshaking or up: reply to *this* receiver only — do not
+                // steal the active connect's ResultReceiver / reported flag (that hung
+                // Flutter and looked like an Android timeout).
+                if (running.get()) {
+                    replyToReceiverOnly(recv, alreadyRunningConnectDecision(
+                        isSessionActive,
+                        activeVpnIp,
+                        activeIpv6Protected,
+                    ))
+                    return if (userStopped.get()) START_NOT_STICKY else START_STICKY
+                }
+                resultReceiver = recv
                 reported.set(false)
                 try {
                     startForeground(NOTIFICATION_ID, buildNotification(session, connecting = true))
@@ -96,11 +108,11 @@ class RptVpnService : VpnService() {
         message: String,
         vpnIp: String = "",
         ipv6Protected: Boolean? = null,
+        connecting: Boolean = false,
     ) {
         if (!reported.compareAndSet(false, true)) return
-        if (!ok) {
-            // Real connect failure only — never call report(false) for â€œalready upâ€
-            // (that path must not clear desiredConnected / isSessionActive).
+        if (!ok && !connecting) {
+            // Real connect failure only — never clear session for in-progress replies.
             desiredConnected = false
             isSessionActive = false
             activeVpnIp = ""
@@ -110,30 +122,39 @@ class RptVpnService : VpnService() {
         }
         val b = Bundle()
         b.putString(EXTRA_MESSAGE, message)
+        b.putBoolean(EXTRA_CONNECTING, connecting)
         if (vpnIp.isNotEmpty()) b.putString(EXTRA_VPN_IP, vpnIp)
         if (ipv6Protected != null) {
             b.putBoolean(EXTRA_IPV6_PROTECTED, ipv6Protected)
         }
         try {
-            resultReceiver?.send(if (ok) RESULT_OK else RESULT_ERR, b)
+            // RESULT_OK only for residual full-tunnel success
+            resultReceiver?.send(if (ok && !connecting) RESULT_OK else RESULT_ERR, b)
         } catch (_: Exception) {
         }
     }
 
     /**
-     * Idempotent Connect while session is already up or still handshaking.
-     * Must keep [desiredConnected] / [isSessionActive] — never report(false).
+     * Reply to a late Connect tap without replacing the active handshake's receiver.
+     * [decision]: first=sessionActiveOk, second=keepFlags, third=message.
      */
-    private fun reportAlreadyRunningSession() {
+    private fun replyToReceiverOnly(
+        recv: ResultReceiver?,
+        decision: Triple<Boolean, Boolean, String>,
+    ) {
         desiredConnected = true
         userStopped.set(false)
-        val decision = alreadyRunningConnectDecision(
-            isSessionActive,
-            activeVpnIp,
-            activeIpv6Protected,
-        )
-        // decision.first = reportOk, .second = keepSessionFlags, .third = message
-        report(decision.first, decision.third, activeVpnIp, ipv6Protected = activeIpv6Protected)
+        val sessionUp = decision.first && isSessionActive
+        val connecting = !sessionUp
+        val b = Bundle()
+        b.putString(EXTRA_MESSAGE, decision.third)
+        b.putBoolean(EXTRA_CONNECTING, connecting)
+        if (activeVpnIp.isNotEmpty()) b.putString(EXTRA_VPN_IP, activeVpnIp)
+        activeIpv6Protected?.let { b.putBoolean(EXTRA_IPV6_PROTECTED, it) }
+        try {
+            recv?.send(if (sessionUp) RESULT_OK else RESULT_ERR, b)
+        } catch (_: Exception) {
+        }
     }
 
     /**
@@ -189,11 +210,17 @@ class RptVpnService : VpnService() {
     }
 
     private fun startTunnel(host: String, port: Int, fullTunnel: Boolean, sessionName: String) {
-        // Second Connect / Activity recreate while tunnel is up: keep live session.
-        // Never report(false) here — that would clear desiredConnected/isSessionActive
-        // and poison UI rehydrate after minimize.
+        // Second Connect while tunnel is up/handshaking is handled in onStartCommand
+        // (replyToReceiverOnly) so we never steal the active ResultReceiver here.
         if (!running.compareAndSet(false, true)) {
-            reportAlreadyRunningSession()
+            replyToReceiverOnly(
+                resultReceiver,
+                alreadyRunningConnectDecision(
+                    isSessionActive,
+                    activeVpnIp,
+                    activeIpv6Protected,
+                ),
+            )
             return
         }
         val secrets = loadSecrets()
@@ -218,8 +245,9 @@ class RptVpnService : VpnService() {
                 protect(sock)
                 val engine = RptClientEngine(clientPriv, nodePub)
                 val session = try {
-                    // 3 attempts × ~8s — mobile UDP is lossy; node silent-drops bad HELLO
-                    engine.handshake(sock, host, port, timeoutMs = 24000, attempts = 3)
+                    // Mobile UDP is lossy: longer budget so status stays Connecting
+                    // until full residual (HELLO + TUN). Windows is usually faster.
+                    engine.handshake(sock, host, port, timeoutMs = 60000, attempts = 5)
                 } catch (e: Exception) {
                     val detail = e.message ?: e.javaClass.simpleName
                     val hint =
@@ -550,6 +578,8 @@ class RptVpnService : VpnService() {
         const val EXTRA_MESSAGE = "message"
         const val EXTRA_VPN_IP = "vpnIp"
         const val EXTRA_IPV6_PROTECTED = "ipv6Protected"
+        /** True while HELLO/TUN is still in progress (not residual success). */
+        const val EXTRA_CONNECTING = "connecting"
         const val RESULT_OK = 0
         const val RESULT_ERR = 1
         private const val NOTIFICATION_ID = 0x5250
@@ -575,29 +605,36 @@ class RptVpnService : VpnService() {
          * Must never yield reportOk=false (that poisons live session flags).
          */
         @JvmStatic
+        /**
+         * @return Triple(sessionActiveSuccess, keepFlags, message)
+         * When not yet residual, first=false so Flutter keeps Connecting…
+         */
         fun alreadyRunningConnectDecision(
             isSessionActive: Boolean,
             vpnIp: String,
             ipv6Protected: Boolean? = activeIpv6Protected,
         ): Triple<Boolean, Boolean, String> {
             val ip = vpnIp.trim()
-            val msg = if (isSessionActive) {
-                when {
-                    ipv6Protected == false && ip.isNotEmpty() ->
-                        "Connected — IPv4 via VPN; IPv6 not protected (VPN IP $ip)"
-                    ipv6Protected == false ->
-                        "Connected — IPv4 via VPN; IPv6 not protected"
-                    ipv6Protected == true && ip.isNotEmpty() ->
-                        "Connected — VPN active; IPv6 ISP path blocked (VPN IP $ip)"
-                    ipv6Protected == true ->
-                        "Connected — VPN active; IPv6 ISP path blocked"
-                    ip.isNotEmpty() ->
-                        "Connected — RPT full tunnel up (VPN IP $ip)"
-                    else ->
-                        "Connected — full tunnel already active"
-                }
-            } else {
-                "VPN already connecting…"
+            if (!isSessionActive) {
+                return Triple(
+                    false,
+                    true,
+                    "VPN still connecting — waiting for full tunnel (RPT2 + system VPN)…",
+                )
+            }
+            val msg = when {
+                ipv6Protected == false && ip.isNotEmpty() ->
+                    "Connected — IPv4 via VPN; IPv6 not protected (VPN IP $ip)"
+                ipv6Protected == false ->
+                    "Connected — IPv4 via VPN; IPv6 not protected"
+                ipv6Protected == true && ip.isNotEmpty() ->
+                    "Connected — VPN active; IPv6 ISP path blocked (VPN IP $ip)"
+                ipv6Protected == true ->
+                    "Connected — VPN active; IPv6 ISP path blocked"
+                ip.isNotEmpty() ->
+                    "Connected — RPT full tunnel up (VPN IP $ip)"
+                else ->
+                    "Connected — full tunnel already active"
             }
             return Triple(true, true, msg)
         }

@@ -80,10 +80,11 @@ class TestAndroidConnectDisconnect(unittest.TestCase):
         self.assertIn("Privacy Restored", svc)
 
     def test_already_running_connect_keeps_session_flags(self):
-        """Second Connect while up must report ok and keep desiredConnected/isSessionActive.
+        """Second Connect while up/handshaking must not steal the active ResultReceiver.
 
-        Drives shipped RptVpnService.kt: poison path absent; already-running path
-        always reportOk=true + keepSessionFlags=true (Triple first two true).
+        When session is active → residual success; when still handshaking →
+        connecting=true (not product success) so Flutter keeps Connecting…
+        until full tunnel. Poison path that clear-session on double-tap is gone.
         """
         svc = (KT / "RptVpnService.kt").read_text(encoding="utf-8")
         # Old poison path must be gone
@@ -92,33 +93,35 @@ class TestAndroidConnectDisconnect(unittest.TestCase):
             svc,
         )
         self.assertNotIn("VPN already connecting or connected", svc)
-        self.assertIn("reportAlreadyRunningSession", svc)
+        self.assertIn("replyToReceiverOnly", svc)
         self.assertIn("alreadyRunningConnectDecision", svc)
+        self.assertIn("EXTRA_CONNECTING", svc)
         self.assertIn("compareAndSet(false, true)", svc)
+        # Longer Android HELLO budget for mobile UDP
+        self.assertIn("timeoutMs = 60000", svc)
+        self.assertIn("attempts = 5", svc)
 
-        # Pure helper in shipped source: return Triple(true, true, msg)
         decision = svc[
             svc.index("fun alreadyRunningConnectDecision") : svc.index(
                 "fun alreadyRunningConnectDecision"
             )
-            + 1600
+            + 2200
         ]
-        self.assertIn("return Triple(true, true, msg)", decision)
-        self.assertNotIn("Triple(false", decision)
+        # Session up → success triple; still connecting → first=false
+        self.assertIn("Triple(true, true, msg)", decision)
+        self.assertIn("Triple(", decision)
+        self.assertIn("false", decision)
         self.assertIn("Connected — full tunnel already active", decision)
-        self.assertIn("VPN already connecting…", decision)
+        self.assertIn("still connecting", decision.lower())
         self.assertIn("IPv6 not protected", decision)
 
-        already = svc[
-            svc.index("fun reportAlreadyRunningSession") : svc.index(
-                "fun reportAlreadyRunningSession"
-            )
-            + 500
+        reply = svc[
+            svc.index("fun replyToReceiverOnly") : svc.index("fun replyToReceiverOnly")
+            + 700
         ]
-        self.assertNotIn("report(false", already)
-        self.assertIn("report(decision.first", already)
-        self.assertIn("desiredConnected = true", already)
-        self.assertIn("userStopped.set(false)", already)
+        self.assertIn("desiredConnected = true", reply)
+        self.assertIn("userStopped.set(false)", reply)
+        self.assertIn("EXTRA_CONNECTING", reply)
 
         # onRevoke clears desiredConnected
         revoke = svc[svc.index("fun onRevoke") : svc.index("fun onRevoke") + 300]

@@ -43,10 +43,13 @@ const String kLogoAsset = 'assets/brand/logo-256.png';
 String connectButtonLabel(bool connected) =>
     connected ? 'Disconnect' : 'Connect';
 
-/// Plain-language status card title.
+/// Plain-language **connected** status card title (not used while connecting).
 ///
 /// When [residual] is true and [ipv6Protected] is false, do not claim full
 /// protection (IPv6 may still use the ISP path).
+///
+/// For Connecting vs Disconnected while busy, use [statusCardTitle] in
+/// `connect_status.dart` so Android long handshakes stay on Connecting.
 String plainConnectedStatus({
   String? vpnIp,
   bool residual = true,

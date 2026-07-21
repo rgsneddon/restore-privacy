@@ -316,6 +316,13 @@ class _TunnelHomeState extends State<TunnelHome> with WidgetsBindingObserver {
   Future<void> _rehydrateSession({required String from}) async {
     final snap = await _vpn.querySession();
     if (!mounted) return;
+    // While Connect is in flight, do not overwrite Connecting… with Disconnected.
+    if (_busy && !snap.connected) {
+      if (snap.connecting && (snap.message ?? '').isNotEmpty) {
+        setState(() => _status = snap.message!);
+      }
+      return;
+    }
     setState(() {
       _connected = snap.connected;
       _vpnIp = snap.vpnIp;
@@ -328,6 +335,8 @@ class _TunnelHomeState extends State<TunnelHome> with WidgetsBindingObserver {
           residual: true,
           ipv6Protected: v6Not ? false : (v6Ok ? true : null),
         );
+      } else if (snap.connecting) {
+        _status = snap.message ?? connectingStatusMessage();
       } else if (from == 'resume' && !_busy) {
         if (_status.toLowerCase().contains('connected') && !snap.connected) {
           _status = 'Not connected. Press Connect when you want protection.';
@@ -432,7 +441,15 @@ class _TunnelHomeState extends State<TunnelHome> with WidgetsBindingObserver {
   Widget build(BuildContext context) {
     final btnLabel = connectButtonLabel(_connected);
     final btnColor = _connected ? kButtonDisconnectBg : kButtonConnectBg;
-    final statusColor = _connected ? kStatusOk : kText;
+    final statusColor = _connected
+        ? kStatusOk
+        : (_busy ? kPrimary : kText);
+    final cardTitle = statusCardTitle(
+      connected: _connected,
+      busyConnecting: _busy && !_connected,
+      vpnIp: _vpnIp,
+      residual: true,
+    );
 
     return Scaffold(
       backgroundColor: kChromeBg,
@@ -559,9 +576,7 @@ class _TunnelHomeState extends State<TunnelHome> with WidgetsBindingObserver {
                     ),
                     const SizedBox(height: 8),
                     Text(
-                      _connected
-                          ? plainConnectedStatus(vpnIp: _vpnIp, residual: true)
-                          : 'Disconnected',
+                      cardTitle,
                       style: TextStyle(
                         color: statusColor,
                         fontWeight: FontWeight.w700,

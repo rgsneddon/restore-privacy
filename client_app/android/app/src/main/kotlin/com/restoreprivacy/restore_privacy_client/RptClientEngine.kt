@@ -51,12 +51,13 @@ class RptClientEngine(
         socket: DatagramSocket,
         host: String,
         port: Int,
-        timeoutMs: Int = 15000,
-        attempts: Int = 3,
+        timeoutMs: Int = 60000,
+        attempts: Int = 5,
     ): Session {
         // Force IPv4 literal resolution (product node is IPv4-only)
         val endpoint = InetSocketAddress(host, port)
-        val perAttempt = (timeoutMs / attempts.coerceAtLeast(1)).coerceAtLeast(5000)
+        // At least 8s per try on mobile (NAT/UDP loss); total budget is timeoutMs
+        val perAttempt = (timeoutMs / attempts.coerceAtLeast(1)).coerceAtLeast(8000)
         var last: Exception? = null
         repeat(attempts.coerceAtLeast(1)) { attempt ->
             try {

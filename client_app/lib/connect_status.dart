@@ -4,16 +4,75 @@
 /// Full-tunnel product rule: residual public IP only changes when the OS VPN
 /// (Packet Tunnel / platform VPN service) is active. A host-only RPT2 HELLO
 /// that assigns a tunnel IP is **not** a product connect success.
+///
+/// While [busyConnecting] is true, the UI must keep a **Connecting** title
+/// until full-tunnel success is reported (Android handshake can take 30–60s).
+
+import 'theme.dart';
 
 /// True only when native side reports a real successful **full-tunnel** session.
 /// Rejects host-only HELLO maps even if they carry `ok: true` / `vpnIp`.
+/// Also rejects explicit in-progress / connecting maps (`connecting: true`).
 bool isConnectSuccess(dynamic result) {
   if (result is! Map) return false;
   if (result['ok'] != true) return false;
+  // Still handshaking — not residual success (Android may take many seconds).
+  if (result['connecting'] == true) return false;
   // Explicit host-only / no-system-VPN markers from Apple (and shared helpers).
   if (result['hostOnlySession'] == true) return false;
   if (result['fullTunnelActive'] == false) return false;
   return true;
+}
+
+/// Primary status-card title: Connected / Connecting / Disconnected.
+///
+/// [busyConnecting] keeps **Connecting…** until full residual success so the
+/// UI does not flash Disconnected while Android finishes HELLO + TUN.
+String statusCardTitle({
+  required bool connected,
+  required bool busyConnecting,
+  String? vpnIp,
+  bool residual = true,
+  bool? ipv6Protected,
+}) {
+  if (connected) {
+    return plainConnectedStatus(
+      vpnIp: vpnIp,
+      residual: residual,
+      ipv6Protected: ipv6Protected,
+    );
+  }
+  if (busyConnecting) {
+    return kConnectingTitle;
+  }
+  return 'Disconnected';
+}
+
+/// Short card title while the native VPN is still coming up.
+const String kConnectingTitle = 'Connecting…';
+
+/// Status line while waiting for full-tunnel residual (RPT2 + OS VPN).
+String connectingStatusMessage({
+  String host = '82.221.101.241',
+  int port = 44044,
+  int? elapsedSeconds,
+}) {
+  final base =
+      'Connecting to $host:$port (RPT2) — waiting for full tunnel…';
+  if (elapsedSeconds == null || elapsedSeconds <= 0) {
+    return base;
+  }
+  return '$base (${elapsedSeconds}s)';
+}
+
+/// True when a channel map means handshake/TUN is still in progress.
+bool isConnectingInProgress(dynamic result) {
+  if (result is! Map) return false;
+  if (result['connecting'] == true) return true;
+  final msg = (result['message']?.toString() ?? '').toLowerCase();
+  return msg.contains('already connecting') ||
+      msg.contains('still connecting') ||
+      msg.contains('waiting for full tunnel');
 }
 
 /// macOS: hide main window to menu-bar tray only after **product** full-tunnel success.
@@ -31,6 +90,11 @@ String mapConnectStatusMessage(dynamic result) {
     return 'Connect failed — unexpected response from VPN layer';
   }
   final message = result['message']?.toString().trim() ?? '';
+  if (isConnectingInProgress(result) && !isConnectSuccess(result)) {
+    return message.isNotEmpty
+        ? message
+        : connectingStatusMessage();
+  }
   final ok = isConnectSuccess(result);
   if (ok) {
     final ip = result['vpnIp']?.toString().trim() ?? '';

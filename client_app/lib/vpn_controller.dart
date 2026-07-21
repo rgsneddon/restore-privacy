@@ -1,11 +1,17 @@
+import 'dart:async';
+
 import 'package:flutter/services.dart';
 
 import 'connect_status.dart';
 import 'rpt_config.dart';
+import 'theme.dart';
 
 /// Platform channel to Android VpnService / Windows plugin hooks.
 class VpnController {
   static const MethodChannel _channel = MethodChannel('restore_privacy/vpn');
+
+  /// How often to refresh the Connecting status line while native work runs.
+  static const Duration connectingProgressInterval = Duration(seconds: 3);
 
   final void Function(String) onStatus;
 
@@ -25,9 +31,29 @@ class VpnController {
     return connect();
   }
 
+  /// Product Connect: keep **Connecting** status until native full-tunnel result.
+  ///
+  /// Android HELLO + TUN can take tens of seconds on mobile UDP — do not drop
+  /// the Connecting line early. Progress ticks update the subtitle only.
   Future<bool> connect() async {
+    Timer? progress;
+    final started = DateTime.now();
+    void tickConnecting() {
+      final elapsed = DateTime.now().difference(started).inSeconds;
+      onStatus(
+        connectingStatusMessage(
+          host: RptConfig.host,
+          port: RptConfig.port,
+          elapsedSeconds: elapsed > 0 ? elapsed : null,
+        ),
+      );
+    }
+
     try {
-      onStatus('Connecting to ${RptConfig.host}:${RptConfig.port} (RPT2)…');
+      tickConnecting();
+      progress = Timer.periodic(connectingProgressInterval, (_) {
+        tickConnecting();
+      });
       final result = await _channel.invokeMethod<dynamic>('connect', {
         'host': RptConfig.host,
         'port': RptConfig.port,
@@ -36,13 +62,25 @@ class VpnController {
         'route': RptConfig.defaultRoute,
         'autoConnect': false,
       });
+      progress.cancel();
+      progress = null;
+
+      // If native says still connecting (double-tap / race), keep waiting via status.
+      if (isConnectingInProgress(result) && !isConnectSuccess(result)) {
+        onStatus(mapConnectStatusMessage(result));
+        final ok = await _waitForFullTunnel();
+        return ok;
+      }
+
       final ok = isConnectSuccess(result);
       onStatus(mapConnectStatusMessage(result));
       return ok;
     } on PlatformException catch (e) {
+      progress?.cancel();
       onStatus('VPN error: ${e.message ?? e.code}');
       return false;
     } on MissingPluginException {
+      progress?.cancel();
       onStatus(
         'Native VPN channel not bound on this platform build. '
         'Android/Windows: use the release installer. '
@@ -50,7 +88,48 @@ class VpnController {
         '(see client_app/APPLE_BUILD.md).',
       );
       return false;
+    } finally {
+      progress?.cancel();
     }
+  }
+
+  /// Poll native session until full tunnel is up or give up (Android in-progress).
+  Future<bool> _waitForFullTunnel({
+    Duration maxWait = const Duration(seconds: 75),
+    Duration pollEvery = const Duration(seconds: 2),
+  }) async {
+    final deadline = DateTime.now().add(maxWait);
+    while (DateTime.now().isBefore(deadline)) {
+      await Future<void>.delayed(pollEvery);
+      final snap = await querySession();
+      if (snap.connected) {
+        onStatus(
+          snap.message ??
+              plainConnectedStatus(vpnIp: snap.vpnIp, residual: true),
+        );
+        return true;
+      }
+      if (snap.connecting) {
+        onStatus(
+          snap.message ??
+              connectingStatusMessage(
+                host: RptConfig.host,
+                port: RptConfig.port,
+              ),
+        );
+        continue;
+      }
+      // Not connected and not connecting — failed or idle
+      if ((snap.message ?? '').toLowerCase().contains('fail')) {
+        onStatus(snap.message!);
+        return false;
+      }
+    }
+    onStatus(
+      'Connect timed out waiting for full tunnel — check network/UDP to '
+      '${RptConfig.host}:${RptConfig.port}, then try Connect again.',
+    );
+    return false;
   }
 
   /// Stop system VPN (explicit Disconnect only — not on minimize).
@@ -77,11 +156,15 @@ class VpnController {
     try {
       final result = await _channel.invokeMethod<dynamic>('status');
       if (result is Map) {
-        final ok = result['connected'] == true || isConnectSuccess(result);
+        final connecting = result['connecting'] == true ||
+            isConnectingInProgress(result);
+        final ok = !connecting &&
+            (result['connected'] == true || isConnectSuccess(result));
         final ip = result['vpnIp']?.toString().trim() ?? '';
         final msg = result['message']?.toString().trim() ?? '';
         return VpnSessionSnapshot(
           connected: ok,
+          connecting: connecting,
           vpnIp: ip.isEmpty ? null : ip,
           message: msg.isEmpty ? null : msg,
         );
@@ -96,11 +179,13 @@ class VpnController {
 /// Snapshot of native VPN session for UI rehydrate (minimize/resume).
 class VpnSessionSnapshot {
   final bool connected;
+  final bool connecting;
   final String? vpnIp;
   final String? message;
 
   const VpnSessionSnapshot({
     required this.connected,
+    this.connecting = false,
     this.vpnIp,
     this.message,
   });

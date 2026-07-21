@@ -62,29 +62,34 @@ class MainActivity : FlutterActivity() {
                         )
                     }
                     "status" -> {
-                        // Rehydrate UI after minimize/resume â€” does not start/stop tunnel.
+                        // Rehydrate UI after minimize/resume — does not start/stop tunnel.
                         val active = RptVpnService.isSessionActive
+                        val connecting =
+                            RptVpnService.desiredConnected && !active
                         val ip = RptVpnService.activeVpnIp
                         val v6 = RptVpnService.activeIpv6Protected
                         val statusMsg = when {
+                            connecting ->
+                                "Connecting — waiting for full tunnel (RPT2 + system VPN)…"
                             !active -> "Disconnected"
                             v6 == false && ip.isNotEmpty() ->
-                                "Connected â€” IPv4 via VPN; IPv6 not protected ($ip)"
+                                "Connected — IPv4 via VPN; IPv6 not protected ($ip)"
                             v6 == false ->
-                                "Connected â€” IPv4 via VPN; IPv6 not protected"
+                                "Connected — IPv4 via VPN; IPv6 not protected"
                             v6 == true && ip.isNotEmpty() ->
-                                "Connected â€” VPN active; IPv6 ISP path blocked ($ip)"
+                                "Connected — VPN active; IPv6 ISP path blocked ($ip)"
                             v6 == true ->
-                                "Connected â€” VPN active; IPv6 ISP path blocked"
+                                "Connected — VPN active; IPv6 ISP path blocked"
                             ip.isNotEmpty() ->
-                                "Connected â€” your traffic uses the VPN ($ip)"
+                                "Connected — your traffic uses the VPN ($ip)"
                             else ->
-                                "Connected â€” protected"
+                                "Connected — protected"
                         }
                         result.success(
                             mapOf(
                                 "ok" to active,
                                 "connected" to active,
+                                "connecting" to connecting,
                                 "fullTunnelActive" to active,
                                 "hostOnlySession" to false,
                                 "vpnIp" to ip,
@@ -200,9 +205,15 @@ class MainActivity : FlutterActivity() {
         // Reply only after service reports handshake/TUN outcome
         val receiver = object : ResultReceiver(Handler(Looper.getMainLooper())) {
             override fun onReceiveResult(resultCode: Int, resultData: Bundle?) {
-                val ok = resultCode == RptVpnService.RESULT_OK
+                val connecting =
+                    resultData?.getBoolean(RptVpnService.EXTRA_CONNECTING, false) == true
+                val ok = resultCode == RptVpnService.RESULT_OK && !connecting
                 val message = resultData?.getString(RptVpnService.EXTRA_MESSAGE)
-                    ?: if (ok) "Connected" else "Connect failed"
+                    ?: when {
+                        connecting -> "Connecting — waiting for full tunnel…"
+                        ok -> "Connected"
+                        else -> "Connect failed"
+                    }
                 val vpnIp = resultData?.getString(RptVpnService.EXTRA_VPN_IP) ?: ""
                 val hasIpv6 = resultData?.containsKey(RptVpnService.EXTRA_IPV6_PROTECTED) == true
                 val ipv6Protected = if (hasIpv6) {
@@ -219,6 +230,7 @@ class MainActivity : FlutterActivity() {
                             "fullTunnel" to fullTunnel,
                             // Product residual success requires active OS VPN (honest UI).
                             "fullTunnelActive" to ok,
+                            "connecting" to connecting,
                             "hostOnlySession" to false,
                             "connected" to ok,
                             "ipv6Protected" to ipv6Protected,
