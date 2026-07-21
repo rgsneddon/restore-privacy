@@ -327,7 +327,58 @@ BMC_PLUGIN = ProcessorPlugin(
     readiness_fn=_bmc_readiness,
 )
 
-_REGISTRY: tuple[ProcessorPlugin, ...] = (STRIPE_PLUGIN, BMC_PLUGIN)
+
+def _vps_assets_readiness() -> dict[str, Any]:
+    from payments import vps_asset_base_url, vps_asset_fetch_token
+
+    tok = vps_asset_fetch_token()
+    base = vps_asset_base_url()
+    return {
+        "ready": bool(tok and base.startswith("http")),
+        "fields": {
+            "RPT_ASSET_FETCH_TOKEN": bool(tok),
+            "RPT_VPS_ASSET_BASE": bool(base),
+        },
+        "vps_base_url": base,
+        "token_configured": bool(tok),
+        "role": "paid_installer_fetch",
+    }
+
+
+VPS_ASSETS_PLUGIN = ProcessorPlugin(
+    id="vps_assets",
+    display_name="Iceland VPS paid installers",
+    role="paid_installer_fetch",
+    description=(
+        "Shared secret for status host → Iceland VPS paid-asset HTTP fetch "
+        "(X-RPT-Asset-Token). Must match rpt-paid-assets.service on the VPS. "
+        "Never commit the token; set here or as Render env RPT_ASSET_FETCH_TOKEN."
+    ),
+    variables=(
+        ProcessorVariable(
+            key="RPT_ASSET_FETCH_TOKEN",
+            label="Asset fetch token",
+            purpose="Same secret as VPS unit Environment=RPT_ASSET_FETCH_TOKEN",
+            required=True,
+            secret=True,
+            input_type="password",
+            placeholder="paste shared VPS/Render token",
+        ),
+        ProcessorVariable(
+            key="RPT_VPS_ASSET_BASE",
+            label="VPS paid-asset base URL (optional)",
+            purpose="Default http://82.221.101.241:8081/paid-assets",
+            required=False,
+            secret=False,
+            input_type="text",
+            placeholder="http://82.221.101.241:8081/paid-assets",
+        ),
+    ),
+    dashboard_links=(),
+    readiness_fn=_vps_assets_readiness,
+)
+
+_REGISTRY: tuple[ProcessorPlugin, ...] = (STRIPE_PLUGIN, BMC_PLUGIN, VPS_ASSETS_PLUGIN)
 
 
 def list_processor_plugins() -> list[ProcessorPlugin]:
@@ -415,9 +466,19 @@ def validate_processor_entry(
                     f"{var.key} must be a Stripe webhook signing secret"
                 )
                 continue
-        if var.input_type == "url" and value and not value.startswith("https://"):
-            errors.append(f"{var.key} must be an https:// URL")
-            continue
+        if var.input_type == "url" and value:
+            # VPS paid-asset store is plain HTTP on the product host; allow http there.
+            if var.key == "RPT_VPS_ASSET_BASE":
+                if not (
+                    value.startswith("https://") or value.startswith("http://")
+                ):
+                    errors.append(
+                        f"{var.key} must be an http:// or https:// URL"
+                    )
+                    continue
+            elif not value.startswith("https://"):
+                errors.append(f"{var.key} must be an https:// URL")
+                continue
         cleaned[var.key] = value
     return {
         "ok": not errors,

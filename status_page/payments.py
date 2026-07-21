@@ -302,11 +302,25 @@ VPS_ASSET_HTTP_PREFIX = "/paid-assets"
 
 
 def vps_asset_fetch_token() -> str:
-    """Shared secret for status host → Iceland VPS asset fetch (never browser-facing)."""
+    """Shared secret for status host → Iceland VPS asset fetch (never browser-facing).
+
+    Reads process env first, then admin-persisted processor store (same keys),
+    so a token saved via ``/admin`` works without a Render dashboard API key.
+    """
     for key in ("RPT_ASSET_FETCH_TOKEN", "RPT_VPS_ASSET_TOKEN"):
         val = os.environ.get(key, "").strip()
         if val:
             return val
+    try:
+        from processor_plugins import load_stored_processor_env
+
+        stored = load_stored_processor_env()
+        for key in ("RPT_ASSET_FETCH_TOKEN", "RPT_VPS_ASSET_TOKEN"):
+            val = (stored.get(key) or "").strip()
+            if val:
+                return val
+    except Exception:
+        pass
     return ""
 
 
@@ -317,6 +331,13 @@ def vps_asset_base_url() -> str:
     ``http://82.221.101.241:8081/paid-assets``.
     """
     raw = os.environ.get("RPT_VPS_ASSET_BASE", "").strip().rstrip("/")
+    if not raw:
+        try:
+            from processor_plugins import load_stored_processor_env
+
+            raw = (load_stored_processor_env().get("RPT_VPS_ASSET_BASE") or "").strip().rstrip("/")
+        except Exception:
+            raw = ""
     if raw:
         return raw
     host = os.environ.get("RPT_VPS_ASSET_HOST", DEFAULT_VPS_ASSET_HOST).strip()
