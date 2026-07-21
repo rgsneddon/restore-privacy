@@ -222,6 +222,19 @@ def _format_table_cell(raw_cell: str, *, header: bool = False) -> str:
     box = rag_swatch_html(stripped)
     if box is not None and not header:
         return f'<div class="rag-cell">{box}</div>'
+    # Platform icon + label (emoji + optional markdown bold name)
+    import re
+
+    plat = re.match(
+        r"^(🪟|🐧|🍎|📱|🤖|📦)\s+(\*\*)?(.+?)(\*\*)?$",
+        stripped,
+    )
+    if plat and not header:
+        icon, _, name, _ = plat.group(1), plat.group(2), plat.group(3), plat.group(4)
+        return (
+            f'<span class="plat-icon" aria-hidden="true">{icon}</span>'
+            f"<strong>{_escape(name.strip())}</strong>"
+        )
     return _inline_format(_escape(raw_cell))
 
 
@@ -236,6 +249,7 @@ def markdownish_to_html(text: str) -> str:
     in_ul = False
     in_ol = False
     in_table = False
+    table_is_pkg_rag = False
 
     def close_lists() -> None:
         nonlocal in_ul, in_ol
@@ -247,10 +261,11 @@ def markdownish_to_html(text: str) -> str:
             in_ol = False
 
     def close_table() -> None:
-        nonlocal in_table
+        nonlocal in_table, table_is_pkg_rag
         if in_table:
             out.append("</tbody></table>")
             in_table = False
+            table_is_pkg_rag = False
 
     while i < len(lines):
         raw = lines[i]
@@ -309,7 +324,13 @@ def markdownish_to_html(text: str) -> str:
                 i += 1
                 continue
             if not in_table:
-                out.append('<table class="doc-table"><tbody>')
+                # Installer package AUDIT STATE table: wide Package/State + platform icons
+                header_join = " ".join(cells).lower()
+                table_is_pkg_rag = (
+                    "audit state" in header_join and "package" in header_join
+                )
+                tclass = "doc-table pkg-rag" if table_is_pkg_rag else "doc-table"
+                out.append(f'<table class="{tclass}"><tbody>')
                 in_table = True
                 # first row as header when next is separator
                 next_is_sep = False
@@ -430,8 +451,29 @@ table.doc-table th, table.doc-table td {
 }
 table.doc-table th { background: #111827; color: #fde68a; font-weight: 600; }
 table.doc-table tr:nth-child(even) td { background: #0f141c; }
+/* Package AUDIT STATE: single-line Package + State; room for long basenames */
+table.doc-table.pkg-rag {
+  min-width: 56rem; width: max-content; max-width: none;
+}
+table.doc-table.pkg-rag th:nth-child(1),
+table.doc-table.pkg-rag td:nth-child(1) {
+  white-space: nowrap; min-width: 8.5rem;
+}
+table.doc-table.pkg-rag th:nth-child(2),
+table.doc-table.pkg-rag td:nth-child(2) {
+  white-space: nowrap; min-width: 28rem; max-width: none;
+}
+table.doc-table.pkg-rag th:nth-child(3),
+table.doc-table.pkg-rag td:nth-child(3) {
+  white-space: nowrap; min-width: 7.5rem; text-align: center; vertical-align: middle;
+}
+table.doc-table.pkg-rag td:nth-child(2) code {
+  white-space: nowrap; word-break: keep-all; overflow-wrap: normal;
+  display: inline-block; font-size: 0.82rem;
+}
+table.doc-table.pkg-rag .plat-icon { margin-right: 0.35rem; font-size: 1.15rem; }
 /* Package AUDIT STATE solid colour cells */
-.rag-cell { display: flex; align-items: center; justify-content: center; min-height: 1.5rem; }
+.rag-cell { display: flex; align-items: center; justify-content: center; min-height: 1.5rem; min-width: 2.5rem; }
 .rag-swatch {
   display: inline-block; width: 1.35rem; height: 1.35rem; border-radius: 4px;
   border: 1px solid rgba(255,255,255,0.12); vertical-align: middle;

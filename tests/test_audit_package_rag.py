@@ -102,6 +102,24 @@ class TestPackageRagEvaluation(unittest.TestCase):
         self.assertIn("Installer package AUDIT STATE", md)
         for label in ("Windows", "Linux", "macOS", "iOS", "Android"):
             self.assertIn(label, md)
+        # Platform column: distinct OS-relative icons with labels
+        labels = {
+            "windows": "Windows",
+            "linux": "Linux",
+            "macos": "macOS",
+            "ios": "iOS",
+            "android": "Android",
+        }
+        for plat, icon in self.mod.PLATFORM_ICONS.items():
+            self.assertIn(icon, md, msg=plat)
+            cell = self.mod.package_platform_cell_markup(plat, labels[plat])
+            self.assertIn(icon, cell)
+            self.assertIn(labels[plat], cell)
+        self.assertIn("🪟", md)
+        self.assertIn("🐧", md)
+        self.assertIn("🍎", md)
+        self.assertIn("📱", md)
+        self.assertIn("🤖", md)
         # State column uses solid colour swatches, not bare **Green**/**Amber**/**Red** cells
         green = self.mod.package_state_cell_markup("Green")
         amber = self.mod.package_state_cell_markup("Amber")
@@ -118,6 +136,7 @@ class TestPackageRagEvaluation(unittest.TestCase):
         self.assertNotRegex(md, r"\| \*\*Red\*\* \|")
         self.assertIn("Catalog overall", md)
         self.assertIn("solid colour", md.lower())
+        self.assertIn("single-line", md.lower())
 
     def test_priv_hit_is_red(self):
         # Synthetic: mock contains_priv
