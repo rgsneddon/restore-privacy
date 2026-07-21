@@ -863,7 +863,7 @@ Latest automated security audit for production node **{host}** and the in-repo p
 | Live node healthy (TCP+HTTP) | {"YES" if node_ok else "NO"} |
 | Catalog installers AUDIT STATE | {package_state_cell_markup(pkg_overall if pkg_overall in VALID_PACKAGE_STATES else "Red")} (see top package table) |
 
-**Overall posture:** **Strong** for residual honesty (`residual_ip_capture`), no public live count, no-phones-home Connect, packaging strip of `*.priv`, tunnel DNS + DoT, Settings transparency — without multi-hop residual claims. Product kill-switch is **off by default** (opt-in ``RPT_KILL_SWITCH=1`` only). Installer package confidence is the RAG table at the top of this audit.
+**Overall posture:** **Strong** for residual honesty (`residual_ip_capture`), no public live count, no-phones-home Connect, packaging strip of `*.priv`, tunnel DNS + DoT, Settings transparency. Multi-hop residual is **opt-in** (`RPT_MULTIHOP_ENABLED=1`): residual-via-exit (Romania); default single-hop Iceland entry — not full intermediate encapsulation. Windows **0.3.6** PE is rebuilt with multihop prep. Product kill-switch is **off by default** (opt-in ``RPT_KILL_SWITCH=1`` only). Installer package confidence is the RAG table at the top of this audit.
 
 **Primary residual risks (open by design / environment):**
 
@@ -935,7 +935,7 @@ An **ISP** performing **traffic analysis** may still observe connection timing a
 | **High** | Public client count on status | {"Closed (title-only)" if title_only or not http.get("ok") else "REVIEW"} |
 | **Medium** | Shared client priv in packages | {"Closed (no .priv hits)" if priv.get("ok") else "OPEN — see hits"} |
 | **Low** | Unit suite failure | {"N/A" if suite.get("ok") or not suite.get("ran") else "OPEN — see suite log"} |
-| **Info** | Multi-hop residual | Not implemented (honest config-only) |
+| **Info** | Multi-hop residual | Opt-in residual-via-exit (Romania); Windows PE multihop rebuild shipped in catalog when package present |
 
 ---
 
@@ -976,8 +976,8 @@ An **ISP** performing **traffic analysis** may still observe connection timing a
 
 1. Keep **4-hour** timer enabled on the production node (`install_security_audit_timer.sh`).  
 2. Redeploy VPN APP Shop after audit link / catalog changes.  
-3. Multi-hop residual remains optional future work (do not claim until residual).  
-4. Ops: keep Unbound tunnel-only; no public :53; provider log awareness.
+3. Keep multi-hop residual honesty: residual-via-exit when enabled; do not claim full intermediate encapsulation.  
+4. Ops: keep Unbound tunnel-only; no public :53; provider log awareness; zram+LUKS2 node-only on multi-hop hosts.
 
 ---
 
@@ -995,7 +995,7 @@ Re-run: `python3 scripts/run_security_audit.py --write`
 |-----|--------|
 | Public audit on private GitHub blob | **Fixed** — clients use status-origin `/AUDIT.md` |
 | Periodic node audit | **In tree** — 4h systemd timer |
-| Multi-hop residual | Not done (config only) |
+| Multi-hop residual | **In tree** — opt-in residual-via-exit (Romania); Windows multihop PE via `build_windows_multihop.py`; Linux/Android/Apple ship exit pub |
 | Kill-switch + DoT + outer obfs | In tree |
 | Ephemeral node rebuild | In tree (dry-run default) |
 

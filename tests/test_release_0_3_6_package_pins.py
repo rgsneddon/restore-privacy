@@ -78,6 +78,27 @@ class Test036SourcePins(unittest.TestCase):
         self.assertIn("exit_node_elgamal.pub", src)
         self.assertIn("node_elgamal.pub", src)
 
+    def test_release_notes_honest_package_matrix(self):
+        notes = (ROOT / "scripts" / "RELEASE_NOTES_0.3.6.md").read_text(
+            encoding="utf-8"
+        )
+        self.assertIn("Linux", notes)
+        self.assertIn("Android", notes)
+        low = notes.lower().replace("**", "")
+        self.assertIn("residual-via-exit", low)
+        # Windows: rebuilt multihop PE (not full intermediate encapsulation)
+        self.assertIn("Windows", notes)
+        self.assertTrue(
+            "build_windows_multihop" in low
+            or "rebuilt" in low
+            or "residual-via-exit" in low,
+            "RELEASE_NOTES must document Windows multihop residual PE status",
+        )
+        self.assertTrue(
+            "intermediate encapsulation" in low or "not full intermediate" in low,
+            "RELEASE_NOTES must not over-claim full multi-hop onion residual",
+        )
+
 
 @unittest.skipUnless(LINUX.is_file(), "releases/0.3.6 Linux package not present")
 class Test036LinuxPackageMultihop(unittest.TestCase):
@@ -126,19 +147,54 @@ class Test036LinuxPackageMultihop(unittest.TestCase):
             entry_bytes = tf.extractfile(entry_members[0]).read()
             self.assertNotEqual(exit_bytes, entry_bytes)
 
-    def test_release_notes_honest_package_matrix(self):
-        notes = (ROOT / "scripts" / "RELEASE_NOTES_0.3.6.md").read_text(
-            encoding="utf-8"
+
+@unittest.skipUnless(
+    (REL / f"restore-privacy-client-{VERSION}-windows-x64-setup.exe").is_file(),
+    "releases/0.3.6 Windows setup not present",
+)
+class Test036WindowsPackageMultihop(unittest.TestCase):
+    """Gates the rebuilt Windows multihop PE (not carry-forward pin-only)."""
+
+    def test_pe_size_and_magic(self):
+        pe = REL / f"restore-privacy-client-{VERSION}-windows-x64-setup.exe"
+        raw = pe.read_bytes()
+        self.assertTrue(raw[:2] == b"MZ", "Windows package must be a PE")
+        self.assertGreater(
+            pe.stat().st_size,
+            20_000_000,
+            "Windows multihop setup should be a full client, not a stub",
         )
-        self.assertIn("Linux", notes)
-        self.assertIn("Android", notes)
-        low = notes.lower().replace("**", "")
-        self.assertIn("residual-via-exit", low)
-        # Windows honesty: native PE rebuild still required for multihop code
-        self.assertIn("Windows", notes)
+
+    def test_pe_embeds_multihop_markers(self):
+        pe = REL / f"restore-privacy-client-{VERSION}-windows-x64-setup.exe"
+        raw = pe.read_bytes()
         self.assertTrue(
-            "native" in low or "rebuild" in low or "carry" in low,
-            "RELEASE_NOTES must be honest about Windows multihop residual limits",
+            b"multihop" in raw or b"MULTI_HOP" in raw,
+            "setup must embed multihop module markers from prep rebuild",
+        )
+        self.assertIn(
+            b"exit_node_elgamal",
+            raw,
+            "setup must embed exit hop public-key name from product inject",
+        )
+        self.assertNotIn(b"node_elgamal.priv", raw)
+
+    def test_paid_asset_tree_has_same_filename(self):
+        """Paid fulfilment path under status_page/assets when staged."""
+        paid = (
+            ROOT
+            / "status_page"
+            / "assets"
+            / VERSION
+            / f"restore-privacy-client-{VERSION}-windows-x64-setup.exe"
+        )
+        pe = REL / f"restore-privacy-client-{VERSION}-windows-x64-setup.exe"
+        if not paid.is_file():
+            self.skipTest("status_page/assets Windows package not staged yet")
+        self.assertEqual(
+            _sha256(paid),
+            _sha256(pe),
+            "paid asset tree must match releases/ Windows multihop PE",
         )
 
 

@@ -197,11 +197,14 @@ Node deploy, ports, secrets, from-source builds, and tests: **[sundries.txt](sun
 
 **Ephemeral / short-lived nodes:** [scripts/ephemeral_node.py](scripts/ephemeral_node.py) — **periodic** VPS **snapshot** and/or **rebuild** plan (`--dry-run` by default). Install timer: [scripts/install_ephemeral_timer.sh](scripts/install_ephemeral_timer.sh). Live rebuild requires `RPT_EPHEMERAL_CONFIRM=yes`. Rebuild re-runs self-host (no-log). Does not erase provider backups/netflow; re-ship **public** node pin if keys rotate.
 
-**Release scripts:** `scripts/build_release_0.3.6.py`. Apple handoff: [`client_app/APPLE_HANDOFF_0.3.6.md`](client_app/APPLE_HANDOFF_0.3.6.md). Release notes: [`scripts/RELEASE_NOTES_0.3.6.md`](scripts/RELEASE_NOTES_0.3.6.md).
+**Release scripts:** `scripts/build_release_0.3.6.py`. **Windows multihop PE** (x64 only): `scripts/build_windows_multihop.py` / `scripts\build_windows_multihop.bat` — handoff [`client/windows/WINDOWS_HANDOFF_0.3.6.md`](client/windows/WINDOWS_HANDOFF_0.3.6.md). Apple handoff: [`client_app/APPLE_HANDOFF_0.3.6.md`](client_app/APPLE_HANDOFF_0.3.6.md). Release notes: [`scripts/RELEASE_NOTES_0.3.6.md`](scripts/RELEASE_NOTES_0.3.6.md). Catalog **0.3.6** Windows paid package embeds multihop residual-via-exit (opt-in `RPT_MULTIHOP_ENABLED=1`).
 
 ```bash
 # Windows GUI (requires system Python)
 python -m client.windows
+
+# Windows multihop residual installer (run on Windows x64)
+python scripts/build_windows_multihop.py
 
 # Ubuntu / Mint GUI from source (needs system cryptography)
 sudo PYTHONPATH=. python3 -m client.linux

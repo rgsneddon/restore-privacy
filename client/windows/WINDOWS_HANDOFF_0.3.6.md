@@ -4,8 +4,9 @@ Catalog monopin: **0.3.6**
 Production entry (default): **82.221.101.241:44044** (Iceland)  
 Production exit (multi-hop residual): **185.146.232.107:44044** (Romania)
 
-The **published** GitHub Release Windows SFX was pin-only until you rebuild on a
-**Windows x64** machine. macOS cannot freeze a Windows PE.
+Catalog **0.3.6** Windows multihop residual PE is built on a **Windows x64**
+machine via the one-command path below (macOS cannot freeze a Windows PE).
+Paid asset name: `restore-privacy-client-0.3.6-windows-x64-setup.exe`.
 
 ## One command (Windows laptop)
 
@@ -131,4 +132,4 @@ Common issues:
 - Catalog / release notes: `scripts/RELEASE_NOTES_0.3.6.md`
 - Full multi-platform release script: `scripts/build_release_0.3.6.py` (`--windows-only` rebuilds Windows via this path)
 - Multihop unit tests: `tests/test_multihop.py`
-- Package pin honesty: `tests/test_release_0_3_6_package_pins.py` (Windows PE multihop still optional until you upload a rebuilt exe)
+- Package pin honesty: `tests/test_release_0_3_6_package_pins.py` (Windows PE multihop gates run when the rebuilt setup is present under `releases/0.3.6/`)

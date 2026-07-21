@@ -1,7 +1,7 @@
 {
-  "generated_at": "2026-07-21T16:45:18Z",
+  "generated_at": "2026-07-21T20:16:32Z",
   "node_host": "82.221.101.241",
-  "catalog_version": "0.3.4",
+  "catalog_version": "0.3.6",
   "unit_suite": {
     "ran": true,
     "ok": true,
@@ -51,18 +51,20 @@
     ]
   },
   "package_rag": {
-    "catalog_version": "0.3.4",
+    "catalog_version": "0.3.6",
     "pin": "1b126abfae737c66ce99670b730e123f2831ce5beb2868d7865324f391280bbe",
     "packages": [
       {
         "platform": "windows",
         "label": "Windows",
-        "filename": "(missing windows)",
-        "state": "Red",
+        "filename": "restore-privacy-client-0.3.6-windows-x64-setup.exe",
+        "state": "Amber",
         "reasons": [
-          "package file not found under releases/ or status_page/assets/"
+          "PE/MZ magic OK",
+          "node_elgamal.pub not found inside package (pin not verified)"
         ],
-        "path": null
+        "path": "C:\\Users\\rgsne\\restore_privacy\\releases\\0.3.6\\restore-privacy-client-0.3.6-windows-x64-setup.exe",
+        "bytes": 36666068
       },
       {
         "platform": "linux",
@@ -97,14 +99,12 @@
       {
         "platform": "android",
         "label": "Android",
-        "filename": "restore-privacy-client-0.3.4-android.apk",
-        "state": "Green",
+        "filename": "(missing android)",
+        "state": "Red",
         "reasons": [
-          "node_elgamal.pub pin matches product monopin",
-          "Android residual wire (PFS + outer obfs) present"
+          "package file not found under releases/ or status_page/assets/"
         ],
-        "path": "/Users/russellsneddon/restore-privacy/status_page/assets/0.3.4/restore-privacy-client-0.3.4-android.apk",
-        "bytes": 51518667
+        "path": null
       }
     ],
     "overall": "Red",

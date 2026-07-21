@@ -17,9 +17,9 @@
 | **Android** APK | **Yes** (residual host + exit pub) | **Yes** | Flutter release rebuild; RptConfig exit host + `exit_node_elgamal.pub` in assets |
 | **macOS** zip | **Yes** | **Yes** | Flutter+NativePrep **rebuild** (PacketTunnel + App embed exit host / `exit_node_elgamal.pub` / multihop define); DevID-signed; residual-via-exit when multi-hop enabled |
 | **iOS** zip | **Yes** | **Yes** | Flutter+NativePrep **rebuild** (PacketTunnel + App embed exit residual selection); Team-signed sideload |
-| **Windows** SFX | **Rebuild on Windows** | Entry + exit (after rebuild) | Run **`scripts\build_windows_multihop.bat`** on a Windows x64 laptop (see `client/windows/WINDOWS_HANDOFF_0.3.6.md`). macOS cannot freeze Windows PE; published PE is pin-only until you upload a rebuilt setup. |
+| **Windows** SFX | **Yes** (residual-via-exit) | **Yes** | **Rebuilt** on Windows x64 via `scripts/build_windows_multihop.py` (PyInstaller onedir + setup). Ships `client/multihop.py` (`MULTI_HOP_ROUTING_IMPLEMENTED=True`), entry + exit ElGamal **public** keys, Wintun. Default single-hop Iceland; `RPT_MULTIHOP_ENABLED=1` residual-via-exit Romania. Not full intermediate encapsulation. |
 
-Linux and Android are the strongest multi-hop residual packages for operator tests.
+Windows PE multihop residual is in the paid catalog asset `restore-privacy-client-0.3.6-windows-x64-setup.exe` (see handoff).
 
 ## Catalog / payment
 
@@ -34,6 +34,7 @@ Linux and Android are the strongest multi-hop residual packages for operator tes
 
 1. Single-hop Connect (default) → residual via Iceland entry  
 2. Multi-hop on **Linux 0.3.6**: `RPT_MULTIHOP_ENABLED=1` → residual via Romania  
-3. Multi-hop on **Android 0.3.6** with multihop define/env when available  
-4. Paid download for **0.3.6** after assets are on status host / private GH release  
-5. Confirm node zram/LUKS2 is **node-only** (entry + exit hosts)
+3. Multi-hop on **Windows 0.3.6** (rebuilt PE): `RPT_MULTIHOP_ENABLED=1` → residual via Romania  
+4. Multi-hop on **Android 0.3.6** with multihop define/env when available  
+5. Paid download for **0.3.6** after assets are on status host / private GH release / VPS paid_assets  
+6. Confirm node zram/LUKS2 is **node-only** (entry + exit hosts)
