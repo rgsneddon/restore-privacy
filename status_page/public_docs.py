@@ -170,19 +170,42 @@ def _escape(s: str) -> str:
     )
 
 
-# Package RAG solid-colour cells (AUDIT STATE column) — upgrade emoji to CSS boxes
+# Package RAG + section B State solid-colour cells — emoji or PASS/SKIP/FAIL words
 _RAG_SWATCH_MAP: dict[str, tuple[str, str]] = {
     "🟩": ("rag-green", "Green"),
     "🟧": ("rag-amber", "Amber"),
     "🟥": ("rag-red", "Red"),
 }
+# Word states (section B Privacy probes + package legend text fallbacks)
+_RAG_WORD_SWATCH_MAP: dict[str, tuple[str, str]] = {
+    "PASS": ("rag-green", "PASS"),
+    "SKIP": ("rag-amber", "SKIP"),
+    "FAIL": ("rag-red", "FAIL"),
+    "GREEN": ("rag-green", "Green"),
+    "AMBER": ("rag-amber", "Amber"),
+    "RED": ("rag-red", "Red"),
+}
 
 
 def rag_swatch_html(emoji_or_state: str) -> str | None:
-    """Safe solid colour box HTML for a package RAG state emoji, or None."""
+    """Safe solid colour box HTML for a RAG/section-B state, or None.
+
+    Accepts package emoji (🟩/🟧/🟥) and word states (PASS/SKIP/FAIL), including
+    markdown-bold forms such as ``**PASS**``.
+    """
     key = (emoji_or_state or "").strip()
+    if not key:
+        return None
     if key in _RAG_SWATCH_MAP:
         css, label = _RAG_SWATCH_MAP[key]
+        return (
+            f'<span class="rag-swatch {css}" title="{label}" '
+            f'role="img" aria-label="{label}"></span>'
+        )
+    # Strip markdown bold / surrounding asterisks and case-fold
+    word = key.replace("*", "").strip().upper()
+    if word in _RAG_WORD_SWATCH_MAP:
+        css, label = _RAG_WORD_SWATCH_MAP[word]
         return (
             f'<span class="rag-swatch {css}" title="{label}" '
             f'role="img" aria-label="{label}"></span>'
@@ -250,6 +273,7 @@ def markdownish_to_html(text: str) -> str:
     in_ol = False
     in_table = False
     table_is_pkg_rag = False
+    table_is_section_b = False
 
     def close_lists() -> None:
         nonlocal in_ul, in_ol
@@ -261,11 +285,12 @@ def markdownish_to_html(text: str) -> str:
             in_ol = False
 
     def close_table() -> None:
-        nonlocal in_table, table_is_pkg_rag
+        nonlocal in_table, table_is_pkg_rag, table_is_section_b
         if in_table:
             out.append("</tbody></table>")
             in_table = False
             table_is_pkg_rag = False
+            table_is_section_b = False
 
     while i < len(lines):
         raw = lines[i]
@@ -325,13 +350,24 @@ def markdownish_to_html(text: str) -> str:
                 continue
             if not in_table:
                 # Installer package table: Platform | Package | STATE | Notes
+                # Section B privacy probes: Probe | State | Notes
                 header_join = " ".join(cells).lower()
                 table_is_pkg_rag = (
                     "package" in header_join
                     and "platform" in header_join
                     and ("state" in header_join or "audit state" in header_join)
                 )
-                tclass = "doc-table pkg-rag" if table_is_pkg_rag else "doc-table"
+                table_is_section_b = (
+                    not table_is_pkg_rag
+                    and "probe" in header_join
+                    and "state" in header_join
+                )
+                if table_is_pkg_rag:
+                    tclass = "doc-table pkg-rag"
+                elif table_is_section_b:
+                    tclass = "doc-table section-b-probes"
+                else:
+                    tclass = "doc-table"
                 out.append(f'<table class="{tclass}"><tbody>')
                 in_table = True
                 # first row as header when next is separator
@@ -349,15 +385,21 @@ def markdownish_to_html(text: str) -> str:
             else:
                 tag = "td"
             # Package AUDIT STATE: scroll lengthy Package (col 2) / Notes (col 4) in-cell
+            # Section B: scroll lengthy Notes (col 3) only — Probe col stays identity
+            scroll_cols: set[int] = set()
+            if table_is_pkg_rag:
+                scroll_cols = {1, 3}
+            elif table_is_section_b:
+                scroll_cols = {2}  # Notes only; not Probe (0) or State (1)
             cell_parts: list[str] = []
             for col_i, c in enumerate(cells):
                 inner = _format_table_cell(c, header=(tag == "th"))
-                if table_is_pkg_rag and tag == "td" and col_i in (1, 3):
+                if col_i in scroll_cols and tag == "td":
                     cell_parts.append(
                         f'<{tag} class="pkg-cell-scroll">'
                         f'<div class="cell-scroll">{inner}</div></{tag}>'
                     )
-                elif table_is_pkg_rag and tag == "th" and col_i in (1, 3):
+                elif col_i in scroll_cols and tag == "th":
                     cell_parts.append(
                         f'<{tag} class="pkg-cell-scroll">{inner}</{tag}>'
                     )
@@ -526,7 +568,60 @@ table.doc-table.pkg-rag .cell-scroll code {
   font-size: 0.82rem;
 }
 table.doc-table.pkg-rag .plat-icon { margin-right: 0.35rem; font-size: 1.15rem; }
-/* Package AUDIT STATE solid colour cells */
+/*
+ * Privacy probes section B (Probe | State | Notes): State solid colour boxes;
+ * lengthy Notes scroll in-cell; Probe column stays fixed identity (no scroll).
+ */
+table.doc-table.section-b-probes {
+  display: table;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  table-layout: fixed;
+  overflow: visible;
+}
+table.doc-table.section-b-probes th:nth-child(1),
+table.doc-table.section-b-probes td:nth-child(1) {
+  width: 28%;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  vertical-align: middle;
+}
+table.doc-table.section-b-probes th:nth-child(2),
+table.doc-table.section-b-probes td:nth-child(2) {
+  width: 12%;
+  white-space: nowrap;
+  text-align: center;
+  vertical-align: middle;
+  overflow: visible;
+}
+table.doc-table.section-b-probes th:nth-child(3),
+table.doc-table.section-b-probes td:nth-child(3),
+table.doc-table.section-b-probes th.pkg-cell-scroll,
+table.doc-table.section-b-probes td.pkg-cell-scroll {
+  width: 60%;
+  max-width: 0;
+  overflow: hidden;
+  vertical-align: middle;
+}
+table.doc-table.section-b-probes .cell-scroll {
+  max-width: 100%;
+  overflow-x: auto;
+  overflow-y: hidden;
+  white-space: nowrap;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: thin;
+}
+table.doc-table.section-b-probes td.pkg-cell-scroll .cell-scroll code,
+table.doc-table.section-b-probes .cell-scroll code {
+  white-space: nowrap;
+  word-break: keep-all;
+  overflow-wrap: normal;
+  display: inline-block;
+  font-size: 0.82rem;
+}
+/* Package AUDIT STATE + section B State solid colour cells */
 .rag-cell { display: flex; align-items: center; justify-content: center; min-height: 1.5rem; min-width: 2.5rem; }
 .rag-swatch {
   display: inline-block; width: 1.35rem; height: 1.35rem; border-radius: 4px;
