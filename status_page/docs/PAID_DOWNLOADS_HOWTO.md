@@ -105,9 +105,9 @@ You may also surface the token from admin grants if a buyer contacts support.
 
 This is the **private** architecture on the same Render service — not the public catalog.
 
-1. Set `RPT_ADMIN_PASSWORD` (and optional `RPT_ADMIN_USER` / `RPT_ADMIN_SESSION_SECRET`) on Render.
-2. Open `https://YOUR-STATUS-HOST/admin` (only you, with those credentials).
-3. Sign in with **status-page** credentials (not your Stripe or BMC dashboard passwords).
+1. Admin is enabled by a **password digest** shipped in the app (no plaintext secret in git). Prefer setting `RPT_ADMIN_PASSWORD` (and optional `RPT_ADMIN_USER` / `RPT_ADMIN_SESSION_SECRET`) on Render to override/rotate.
+2. Open `https://YOUR-STATUS-HOST/admin` (operator only).
+3. Sign in with **status-page** credentials (not your Stripe or BMC dashboard passwords). Username defaults to `admin`.
 4. After login you get one admin surface:
    - **Payment processor settings** — Stripe readiness (secret key / webhook / mode test|live), Checkout + fulfilment ready flags, public base URL + webhook endpoint path, deep links to Stripe Dashboard (API keys, webhooks, payments). Buy Me a Coffee tip URL + creator login link. **No secret keys are shown in HTML.**
    - **Paid download grants** — recent Stripe-verified tokens (platform, filename, amount, used/unused, truncated token, session id) for fulfilment support.

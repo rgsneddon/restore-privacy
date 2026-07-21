@@ -600,5 +600,84 @@ class TestAdminThemeAppearance(unittest.TestCase):
                 self.assertIn("localStorage", html)
 
 
+class TestAdminBootstrapDigest(unittest.TestCase):
+    """Admin can enable via password digest without plaintext secret in git."""
+
+    def setUp(self):
+        self._saved = {
+            k: os.environ.get(k)
+            for k in (
+                "RPT_ADMIN_PASSWORD",
+                "RPT_ADMIN_PASSWORD_DIGEST",
+                "RPT_ADMIN_DISABLE_BOOTSTRAP",
+                "RPT_ADMIN_SESSION_SECRET",
+                "RPT_ADMIN_USER",
+            )
+        }
+        for k in self._saved:
+            os.environ.pop(k, None)
+
+    def tearDown(self):
+        for k, v in self._saved.items():
+            if v is None:
+                os.environ.pop(k, None)
+            else:
+                os.environ[k] = v
+
+    def test_digest_roundtrip_enables_admin_without_plaintext_env(self):
+        # Ephemeral password for the test only — not the production secret fixture
+        pw = "unit-bootstrap-password-not-prod"
+        dig = admin_panel.make_password_digest(pw)
+        os.environ["RPT_ADMIN_PASSWORD_DIGEST"] = dig
+        os.environ.pop("RPT_ADMIN_PASSWORD", None)
+        self.assertTrue(admin_panel.admin_enabled())
+        self.assertTrue(admin_panel.verify_credentials("admin", pw))
+        self.assertFalse(admin_panel.verify_credentials("admin", "wrong-password"))
+        tok = admin_panel.mint_session_token()
+        self.assertTrue(admin_panel.verify_session_token(tok))
+
+    def test_disable_bootstrap_requires_env_password(self):
+        os.environ["RPT_ADMIN_DISABLE_BOOTSTRAP"] = "1"
+        os.environ.pop("RPT_ADMIN_PASSWORD", None)
+        self.assertFalse(admin_panel.admin_enabled())
+        os.environ["RPT_ADMIN_PASSWORD"] = "env-only-secret"
+        self.assertTrue(admin_panel.admin_enabled())
+        self.assertTrue(admin_panel.verify_credentials("admin", "env-only-secret"))
+
+    def test_default_digest_ships_and_enables_without_env_password(self):
+        os.environ.pop("RPT_ADMIN_PASSWORD", None)
+        os.environ.pop("RPT_ADMIN_PASSWORD_DIGEST", None)
+        os.environ.pop("RPT_ADMIN_DISABLE_BOOTSTRAP", None)
+        dig = admin_panel.admin_password_digest()
+        self.assertTrue(dig.startswith("pbkdf2_sha256$"))
+        self.assertTrue(admin_panel.admin_enabled())
+        # Digest string must not contain a plaintext password field
+        self.assertNotIn("password=", dig.lower())
+        html = admin_panel.render_login_html().decode("utf-8")
+        self.assertIn("admin-login-form", html)
+
+    def test_http_admin_login_form_when_bootstrap_enabled(self):
+        os.environ.pop("RPT_ADMIN_PASSWORD", None)
+        os.environ.pop("RPT_ADMIN_DISABLE_BOOTSTRAP", None)
+        httpd = ThreadingHTTPServer(("127.0.0.1", 0), status_app.Handler)
+        port = httpd.server_address[1]
+        import threading
+        import urllib.request
+
+        t = threading.Thread(target=httpd.serve_forever, daemon=True)
+        t.start()
+        try:
+            with urllib.request.urlopen(f"http://127.0.0.1:{port}/admin", timeout=5) as resp:
+                body = resp.read().decode("utf-8")
+                code = resp.status
+            self.assertEqual(code, 200)
+            self.assertIn("admin-login-form", body)
+            self.assertNotIn("admin disabled", body)
+            self.assertNotIn("admin-grants-table", body)
+        finally:
+            httpd.shutdown()
+            httpd.server_close()
+
+
 if __name__ == "__main__":
     unittest.main()

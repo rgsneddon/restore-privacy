@@ -234,8 +234,76 @@ def admin_username() -> str:
 
 
 def admin_password() -> str:
-    """Plain password from env (set on host; never commit). Empty = admin disabled."""
+    """Plain password from env (set on host; never commit). Empty = use digest path."""
     return os.environ.get("RPT_ADMIN_PASSWORD", "").strip()
+
+
+# PBKDF2 digest so /admin can enable without plaintext secret in Render env or git.
+# Format: pbkdf2_sha256$iterations$salt_hex$digest_hex
+# Override with RPT_ADMIN_PASSWORD_DIGEST or prefer live RPT_ADMIN_PASSWORD env.
+# Plaintext operator password is intentionally never stored in the repository.
+_DEFAULT_ADMIN_PASSWORD_DIGEST = (
+    "pbkdf2_sha256$200000$ab3f30efe29d52b0b7d5946ccb7f6266$"
+    "d3a85f8d6cc2c2124766b1ba0a942551955f0aad0becf1aff82aff7c3b889cf5"
+)
+
+
+def admin_password_digest() -> str:
+    """Password digest for bootstrap enablement (env override or shipped default).
+
+    Set ``RPT_ADMIN_DISABLE_BOOTSTRAP=1`` to force env-password-only mode.
+    Set ``RPT_ADMIN_PASSWORD_DIGEST`` (even empty) to override the shipped digest.
+    """
+    if os.environ.get("RPT_ADMIN_DISABLE_BOOTSTRAP", "").strip().lower() in (
+        "1",
+        "true",
+        "yes",
+    ):
+        return ""
+    if "RPT_ADMIN_PASSWORD_DIGEST" in os.environ:
+        return os.environ.get("RPT_ADMIN_PASSWORD_DIGEST", "").strip()
+    return _DEFAULT_ADMIN_PASSWORD_DIGEST
+
+
+def make_password_digest(password: str, *, iterations: int = 200_000, salt: bytes | None = None) -> str:
+    """Build a pbkdf2_sha256 digest string for a password (tests / rotation)."""
+    if salt is None:
+        salt = secrets.token_bytes(16)
+    dig = hashlib.pbkdf2_hmac(
+        "sha256", password.encode("utf-8"), salt, int(iterations)
+    )
+    return f"pbkdf2_sha256${int(iterations)}${salt.hex()}${dig.hex()}"
+
+
+def verify_password_digest(password: str, digest: str) -> bool:
+    """Constant-time-ish verify of password against pbkdf2_sha256$… digest."""
+    try:
+        scheme, iters_s, salt_hex, want_hex = digest.split("$", 3)
+    except ValueError:
+        return False
+    if scheme != "pbkdf2_sha256":
+        return False
+    try:
+        iterations = int(iters_s)
+        salt = bytes.fromhex(salt_hex)
+        want = bytes.fromhex(want_hex)
+    except ValueError:
+        return False
+    if iterations < 10_000 or not salt or not want:
+        return False
+    got = hashlib.pbkdf2_hmac("sha256", password.encode("utf-8"), salt, iterations)
+    return hmac.compare_digest(got, want)
+
+
+def verify_admin_password(password: str) -> bool:
+    """Env plaintext wins when set; otherwise bootstrap digest."""
+    env_pw = admin_password()
+    if env_pw:
+        return hmac.compare_digest(password, env_pw)
+    dig = admin_password_digest()
+    if not dig:
+        return False
+    return verify_password_digest(password, dig)
 
 
 def admin_session_secret() -> str:
@@ -244,20 +312,26 @@ def admin_session_secret() -> str:
         return secret
     # Derive a host-local secret from password when set so sessions work without extra env
     pw = admin_password()
-    if not pw:
-        return ""
-    return hashlib.sha256(f"rpt-admin-session|{pw}".encode("utf-8")).hexdigest()
+    if pw:
+        return hashlib.sha256(f"rpt-admin-session|{pw}".encode("utf-8")).hexdigest()
+    dig = admin_password_digest()
+    if dig:
+        return hashlib.sha256(f"rpt-admin-session|digest|{dig}".encode("utf-8")).hexdigest()
+    return ""
 
 
 def admin_enabled() -> bool:
-    return bool(admin_password() and admin_session_secret())
+    """Enabled when plaintext env password or bootstrap digest is available."""
+    if not admin_session_secret():
+        return False
+    return bool(admin_password() or admin_password_digest())
 
 
 def verify_credentials(username: str, password: str) -> bool:
     if not admin_enabled():
         return False
     u_ok = hmac.compare_digest(username.strip(), admin_username())
-    p_ok = hmac.compare_digest(password, admin_password())
+    p_ok = verify_admin_password(password)
     return u_ok and p_ok
 
 
