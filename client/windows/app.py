@@ -835,7 +835,23 @@ class TunnelClientApp:
         def work() -> None:
             # Handshake + residual tunnel attach stay off the Tk UI thread so
             # Windows does not show "(Not Responding)" while Wintun/routes run.
-            result = self.client.connect(timeout=20.0)
+            # Flyclient-style: tip residual state + prefetch physical GW during HELLO.
+            from concurrent.futures import ThreadPoolExecutor
+
+            from client.windows.tunnel_win import physical_default_gateway
+
+            prior = self._tunnel
+            residual_ready = residual_ip_capture_active(prior)
+            with ThreadPoolExecutor(max_workers=1) as pool:
+                gw_fut = pool.submit(physical_default_gateway)
+                result = self.client.connect(
+                    timeout=20.0,
+                    residual_ready=residual_ready,
+                )
+                try:
+                    phys_gw = gw_fut.result(timeout=8)
+                except Exception:
+                    phys_gw = None
 
             if not (result.ok and result.session and result.tunnel_plan):
                 msg = result.message or "Connection failed"
@@ -856,18 +872,24 @@ class TunnelClientApp:
                 self._connection_log(
                     KIND_SESSION, f"Session ready (tunnel address {vpn_ip})"
                 )
-                self._log("Attaching residual tunnel (Wintun + routes)…")
+                if residual_ready:
+                    self._log("Flyclient tip: residual already active — fast path…")
+                else:
+                    self._log("Attaching residual tunnel (Wintun + routes)…")
 
             self.root.after(0, note_session)
 
             try:
                 # Product residual path: Wintun + dual /1 only (never on UI thread)
+                # prior= enables flyclient skip when residual already applied
                 tun_res = start_full_tunnel(
                     self.client,
                     result.tunnel_plan,
                     result.session.endpoint.host,
                     prefer_system_capture=True,
                     require_system_capture=True,
+                    prior=prior if residual_ready else None,
+                    physical_gw=phys_gw,
                 )
             except Exception as exc:
                 err = f"Tunnel attach error: {exc}"

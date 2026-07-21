@@ -244,6 +244,7 @@ def start_full_tunnel(
     dry_run: bool = False,
     require_system_capture: bool = True,
     prior: "LinuxTunnelResult | None" = None,
+    prefetched_default_route: tuple | None = None,
 ) -> LinuxTunnelResult:
     """Open TUN, apply dual /1 routes, start DATA plane.
 
@@ -251,7 +252,8 @@ def start_full_tunnel(
     real TUN + dual /1. ``dry_run`` only returns the planned ``ip`` commands.
 
     Flyclient-style: if ``prior`` already has residual routes for the same plan IP,
-    return it without re-applying routes.
+    return it without re-applying routes. ``prefetched_default_route`` is
+    ``(gw, phys_dev)`` from resolve_default_route() overlapped with HELLO.
     """
     if not client.session:
         return LinuxTunnelResult(False, "no session", [])
@@ -284,7 +286,14 @@ def start_full_tunnel(
         iface = "rpt0"
     plan.tunnel_iface = iface
 
-    gw, phys_dev = resolve_default_route()
+    if (
+        prefetched_default_route is not None
+        and isinstance(prefetched_default_route, (tuple, list))
+        and len(prefetched_default_route) >= 2
+    ):
+        gw, phys_dev = prefetched_default_route[0], prefetched_default_route[1]
+    else:
+        gw, phys_dev = resolve_default_route()
     if dry_run:
         cmds = build_linux_route_plan_cmds(
             plan,

@@ -709,7 +709,23 @@ class TunnelClientApp:
 
         def work() -> None:
             # Handshake + residual TUN/routes off the Tk UI thread.
-            result = self.client.connect(timeout=20.0)
+            # Flyclient-style: tip residual state + prefetch default route during HELLO.
+            from concurrent.futures import ThreadPoolExecutor
+
+            from client.linux.tunnel_linux import resolve_default_route
+
+            prior = self._tunnel
+            residual_ready = residual_ip_capture_active(prior)
+            with ThreadPoolExecutor(max_workers=1) as pool:
+                route_fut = pool.submit(resolve_default_route)
+                result = self.client.connect(
+                    timeout=20.0,
+                    residual_ready=residual_ready,
+                )
+                try:
+                    prefetched_route = route_fut.result(timeout=8)
+                except Exception:
+                    prefetched_route = (None, None)
 
             if not (result.ok and result.session and result.tunnel_plan):
                 msg = result.message or "Connection failed"
@@ -728,7 +744,10 @@ class TunnelClientApp:
             def note_session() -> None:
                 self._log(f"Session ready (tunnel address {vpn_ip})")
                 append_event(KIND_SESSION, f"Session ready (tunnel address {vpn_ip})")
-                self._log("Attaching residual tunnel (TUN + dual /1 routes)…")
+                if residual_ready:
+                    self._log("Flyclient tip: residual already active — fast path…")
+                else:
+                    self._log("Attaching residual tunnel (TUN + dual /1 routes)…")
 
             self.root.after(0, note_session)
 
@@ -740,6 +759,8 @@ class TunnelClientApp:
                     plan,
                     result.session.endpoint.host,
                     require_system_capture=True,
+                    prior=prior if residual_ready else None,
+                    prefetched_default_route=prefetched_route,
                 )
             except Exception as exc:
                 err = f"Tunnel attach error: {exc}"

@@ -151,5 +151,113 @@ class TestRptClientFlyclientConnect(unittest.TestCase):
             sock_cls.assert_not_called()
 
 
+class TestStartFullTunnelPriorSkip(unittest.TestCase):
+    """Drive real start_full_tunnel(..., prior=) skip on Windows/Linux helpers."""
+
+    def _warm_client(self, vpn_ip: str = "10.88.0.11"):
+        from client.connect import ClientSession
+        from node.crypto_session import SessionCrypto
+
+        client = RptClient()
+        client.session = ClientSession(
+            session_id=b"\x02" * 8,
+            crypto=mock.Mock(spec=SessionCrypto),
+            vpn_ip=vpn_ip,
+            endpoint=client.endpoint,
+            pfs=True,
+        )
+        client.tunnel_plan = build_full_tunnel_plan(vpn_ip)
+        client.state = ConnectState.CONNECTED
+        return client
+
+    def test_windows_prior_same_plan_skips_tun_and_routes(self):
+        from client.windows.tunnel_win import WindowsTunnelResult, start_full_tunnel
+
+        client = self._warm_client()
+        plan = client.tunnel_plan
+        host = client.endpoint.host
+        prior = WindowsTunnelResult(
+            ok=True,
+            message="prior residual",
+            applied_commands=["route add 0.0.0.0 mask 128.0.0.0 0.0.0.0 IF 12"],
+            system_capture=True,
+            routes_applied=True,
+            plan=plan,
+            server_host=host,
+            if_index=12,
+        )
+        with mock.patch(
+            "client.windows.tunnel_win.create_windows_tun"
+        ) as create_tun:
+            out = start_full_tunnel(
+                client,
+                plan,
+                host,
+                require_system_capture=True,
+                prior=prior,
+            )
+            create_tun.assert_not_called()
+        self.assertTrue(out.ok)
+        self.assertTrue(out.routes_applied)
+        self.assertIn("flyclient skip", out.message)
+        self.assertEqual(out.if_index, 12)
+
+    def test_linux_prior_same_plan_skips_tun_and_routes(self):
+        from client.linux.tunnel_linux import LinuxTunnelResult, start_full_tunnel
+
+        client = self._warm_client()
+        plan = client.tunnel_plan
+        plan.tunnel_iface = "rpt0"
+        host = client.endpoint.host
+        prior = LinuxTunnelResult(
+            ok=True,
+            message="prior residual",
+            applied_commands=["ip route add 0.0.0.0/1 dev rpt0"],
+            system_capture=True,
+            routes_applied=True,
+            plan=plan,
+            server_host=host,
+            iface="rpt0",
+        )
+        with mock.patch(
+            "client.linux.tunnel_linux.create_linux_tun"
+        ) as create_tun, mock.patch(
+            "client.linux.tunnel_linux.resolve_default_route"
+        ) as resolve:
+            out = start_full_tunnel(
+                client,
+                plan,
+                host,
+                require_system_capture=True,
+                prior=prior,
+            )
+            create_tun.assert_not_called()
+            resolve.assert_not_called()
+        self.assertTrue(out.ok)
+        self.assertTrue(out.routes_applied)
+        self.assertIn("flyclient skip", out.message)
+        self.assertEqual(out.iface, "rpt0")
+
+
+class TestProductAppsWireFlyclient(unittest.TestCase):
+    def test_windows_app_work_passes_residual_ready_and_prior(self):
+        src = (
+            ROOT / "client" / "windows" / "app.py"
+        ).read_text(encoding="utf-8")
+        self.assertIn("residual_ready=", src)
+        self.assertIn("residual_ip_capture_active(prior)", src)
+        self.assertIn("prior=prior if residual_ready else None", src)
+        self.assertIn("physical_gw=phys_gw", src)
+        self.assertIn("physical_default_gateway", src)
+
+    def test_linux_app_work_passes_residual_ready_and_prior(self):
+        src = (ROOT / "client" / "linux" / "app.py").read_text(encoding="utf-8")
+        self.assertIn("residual_ready=", src)
+        self.assertIn("residual_ip_capture_active(prior)", src)
+        self.assertIn("prior=prior if residual_ready else None", src)
+        self.assertIn("prefetched_default_route=", src)
+        self.assertIn("resolve_default_route", src)
+
+
 if __name__ == "__main__":
     unittest.main()

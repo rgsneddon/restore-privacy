@@ -139,6 +139,7 @@ def apply_routes_for_adapter(
     if_index: Optional[int] = None,
     *,
     include_catchall: bool = True,
+    physical_gw: Optional[str] = None,
 ) -> tuple[list[str], list[str], bool]:
     """Apply address/DNS, server pin, then dual /1 only if pin succeeded.
 
@@ -147,11 +148,13 @@ def apply_routes_for_adapter(
     **Critical:** dual /1 catch-alls are **not** installed if the server pin
     fails — otherwise UDP to the node is trapped inside the tunnel (recursive
     blackhole) while the UI still claims "server pinned".
+
+    ``physical_gw`` may be prefetched (flyclient cold path overlaps HELLO).
     """
     cmds = windows_route_commands(
         plan, server_host, if_index=if_index, include_catchall=include_catchall
     )
-    gw = physical_default_gateway()
+    gw = physical_gw or physical_default_gateway()
     if not gw:
         return (
             cmds,
@@ -458,6 +461,7 @@ def start_full_tunnel(
     *,
     require_system_capture: bool = False,
     prior: Optional[WindowsTunnelResult] = None,
+    physical_gw: Optional[str] = None,
 ) -> WindowsTunnelResult:
     """Create OS TUN (Wintun), install safe full-tunnel routes, start DATA plane.
 
@@ -469,7 +473,8 @@ def start_full_tunnel(
     without changing residual public IP.
 
     Flyclient-style: if ``prior`` already has residual routes for the same plan IP,
-    return it without re-installing dual /1.
+    return it without re-installing dual /1. ``physical_gw`` may be prefetched
+    during HELLO to shorten the cold residual attach path.
     """
     if not client.session:
         return WindowsTunnelResult(False, "no session", [])
@@ -597,7 +602,11 @@ def start_full_tunnel(
         # Server pin only (keep UDP path); no dual /1
         if is_admin():
             cmds, errs, _pin_ok = apply_routes_for_adapter(
-                plan, server_host, if_index=None, include_catchall=False
+                plan,
+                server_host,
+                if_index=None,
+                include_catchall=False,
+                physical_gw=physical_gw,
             )
             applied.extend(cmds)
         route_msg = (
@@ -607,7 +616,11 @@ def start_full_tunnel(
         routes_applied = False
     elif is_admin() and capture and if_index is not None:
         cmds, errs, full_ok = apply_routes_for_adapter(
-            plan, server_host, if_index=if_index, include_catchall=True
+            plan,
+            server_host,
+            if_index=if_index,
+            include_catchall=True,
+            physical_gw=physical_gw,
         )
         applied.extend(cmds)
         if full_ok:
