@@ -5,18 +5,24 @@ is **enabled** with ≥2 hops and routing is implemented, residual Connect dials
 the **exit** (last) hop so egress residual is the exit VPS; the hop list still
 names entry → exit for path honesty.
 
+**Entry downtime failover** (weekly wipe/rebuild): pure selection prefers
+**entry** when healthy; automatically residual-fails over to **exit** when entry
+is draining/down; re-prefers entry when healthy again. Fail closed if neither
+path is usable.
+
 Node-only zram + LUKS2 applies on multi-hop hosts; clients never run LUKS/zram.
 
 Honesty:
 - ``is_multihop_active()`` is True only when routing is implemented **and**
   multi-hop is enabled with ≥2 hops.
 - Status never claims multi-hop residual when disabled or when only one hop.
+- Failover does not invent a third hop; if exit is also unhealthy, selection fails closed.
 """
 
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Iterable, Sequence
+from typing import Iterable, Optional, Sequence
 
 from .endpoint import DEFAULT_ENDPOINT, PRODUCT_NODE_HOST, PRODUCT_NODE_PORT, Endpoint
 
@@ -94,12 +100,167 @@ def residual_endpoint(config: MultiHopConfig | None = None) -> Endpoint:
 
     - Multi-hop **active**: last hop (exit) — residual egress is the exit VPS.
     - Otherwise: first hop / product entry.
+
+    For entry-drain / health-aware selection (weekly wipe failover), use
+    :func:`select_residual_endpoint` instead.
     """
     cfg = config or MultiHopConfig()
     hops = build_hop_path(cfg.active_hops())
     if is_multihop_active(cfg) and len(hops) >= 2:
         return hops[-1].as_endpoint()
     return hops[0].as_endpoint()
+
+
+class ResidualUnavailable(Exception):
+    """Neither entry nor exit residual is usable (fail closed)."""
+
+
+@dataclass(frozen=True)
+class ResidualSelection:
+    """Result of entry-primary / exit-failover residual preference."""
+
+    endpoint: Endpoint
+    reason: str  # entry_primary | exit_failover | multihop_residual_via_exit | entry_fallback
+    entry_healthy: bool
+    exit_healthy: bool
+    entry_draining: bool
+    failover_active: bool
+
+    def to_dict(self) -> dict:
+        return {
+            "host": self.endpoint.host,
+            "port": self.endpoint.port,
+            "reason": self.reason,
+            "entry_healthy": self.entry_healthy,
+            "exit_healthy": self.exit_healthy,
+            "entry_draining": self.entry_draining,
+            "failover_active": self.failover_active,
+        }
+
+
+def entry_endpoint(config: MultiHopConfig | None = None) -> Endpoint:
+    """Entry hop endpoint (product Iceland when default)."""
+    return first_hop_endpoint(config)
+
+
+def exit_endpoint(config: MultiHopConfig | None = None) -> Endpoint:
+    """Exit hop when multi-hop path configured; else product exit constant."""
+    cfg = config or MultiHopConfig()
+    if hop_path_configured(cfg):
+        hops = build_hop_path(cfg.hops)
+        return hops[-1].as_endpoint()
+    return Endpoint(host=PRODUCT_EXIT_HOST, port=PRODUCT_EXIT_PORT)
+
+
+def select_residual_endpoint(
+    config: MultiHopConfig | None = None,
+    *,
+    entry_healthy: bool = True,
+    exit_healthy: bool = True,
+    entry_draining: bool = False,
+) -> ResidualSelection:
+    """Prefer entry when healthy; automatic exit failover when entry down/draining.
+
+    Rules (pure, unit-testable):
+    1. Entry healthy and not draining → **entry-primary** residual (re-entry after rebuild).
+    2. Entry unhealthy or draining, exit healthy → **exit failover** residual.
+    3. Multi-hop active + entry healthy: product residual-via-exit still dials exit
+       for intentional multi-hop egress (not a wipe failover).
+    4. Both unusable → raise :class:`ResidualUnavailable` (fail closed).
+
+    Weekly entry wipe sets ``entry_draining=True`` so clients flip to exit without
+    a manual user step; when entry recovers, pass ``entry_healthy=True`` /
+    ``entry_draining=False`` so preference returns to entry.
+    """
+    cfg = config or MultiHopConfig()
+    entry_ok = bool(entry_healthy) and not bool(entry_draining)
+    exit_ok = bool(exit_healthy)
+    entry_ep = entry_endpoint(cfg)
+    exit_ep = exit_endpoint(cfg)
+
+    # Intentional multi-hop residual-via-exit when entry is up (product path).
+    if is_multihop_active(cfg) and entry_ok:
+        if exit_ok:
+            return ResidualSelection(
+                endpoint=residual_endpoint(cfg),
+                reason="multihop_residual_via_exit",
+                entry_healthy=True,
+                exit_healthy=True,
+                entry_draining=bool(entry_draining),
+                failover_active=False,
+            )
+        # Multihop wants exit but exit down — fall back to entry if still up
+        return ResidualSelection(
+            endpoint=entry_ep,
+            reason="entry_fallback",
+            entry_healthy=True,
+            exit_healthy=False,
+            entry_draining=bool(entry_draining),
+            failover_active=False,
+        )
+
+    # Entry-primary (single-hop default and post-rebuild re-entry)
+    if entry_ok:
+        return ResidualSelection(
+            endpoint=entry_ep,
+            reason="entry_primary",
+            entry_healthy=True,
+            exit_healthy=exit_ok,
+            entry_draining=False,
+            failover_active=False,
+        )
+
+    # Entry down/draining → solid exit failover
+    if exit_ok:
+        return ResidualSelection(
+            endpoint=exit_ep,
+            reason="exit_failover",
+            entry_healthy=bool(entry_healthy),
+            exit_healthy=True,
+            entry_draining=bool(entry_draining),
+            failover_active=True,
+        )
+
+    raise ResidualUnavailable(
+        "fail closed: entry unavailable (down/draining) and exit unhealthy — "
+        "no residual path; do not invent a third hop"
+    )
+
+
+def residual_try_order(
+    config: MultiHopConfig | None = None,
+    *,
+    entry_healthy: bool = True,
+    exit_healthy: bool = True,
+    entry_draining: bool = False,
+) -> list[Endpoint]:
+    """Ordered residual dial targets for HELLO failover (unique endpoints).
+
+    Preferred first; alternate hop second when available so connect can try
+    exit if entry HELLO fails (and re-prefer entry when entry is healthy).
+    """
+    cfg = config or MultiHopConfig()
+    try:
+        primary = select_residual_endpoint(
+            cfg,
+            entry_healthy=entry_healthy,
+            exit_healthy=exit_healthy,
+            entry_draining=entry_draining,
+        ).endpoint
+    except ResidualUnavailable:
+        return []
+
+    order: list[Endpoint] = [primary]
+    entry_ep = entry_endpoint(cfg)
+    exit_ep = exit_endpoint(cfg)
+    # Always allow try of the other hop when it is believed healthy
+    for alt, ok in ((exit_ep, exit_healthy), (entry_ep, entry_healthy and not entry_draining)):
+        if not ok:
+            continue
+        if any(a.host == alt.host and a.port == alt.port for a in order):
+            continue
+        order.append(alt)
+    return order
 
 
 def hop_path_configured(config: MultiHopConfig | None = None) -> bool:

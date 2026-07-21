@@ -47,10 +47,13 @@ from .endpoint import DEFAULT_ENDPOINT, Endpoint
 from .full_tunnel import FullTunnelPlan, assert_full_tunnel_plan, build_full_tunnel_plan
 from .multihop import (
     MultiHopConfig,
+    entry_endpoint,
     is_multihop_active,
     multihop_config_from_env,
     multihop_status_text,
     residual_endpoint,
+    residual_try_order,
+    select_residual_endpoint,
 )
 from .secrets_loader import (
     ensure_device_admission_key,
@@ -240,10 +243,32 @@ class RptClient:
         secrets_dir: Path | str | None = None,
         status_cb: StatusCallback | None = None,
         multihop: MultiHopConfig | None = None,
+        *,
+        entry_healthy: bool = True,
+        exit_healthy: bool = True,
+        entry_draining: bool = False,
     ):
         self.multihop = multihop if multihop is not None else multihop_config_from_env()
-        # Residual dial: exit hop when multi-hop active, else entry/default.
-        self.endpoint = endpoint or residual_endpoint(self.multihop)
+        # Health hints for weekly entry wipe failover (entry-primary / exit failover).
+        self.entry_healthy = bool(entry_healthy)
+        self.exit_healthy = bool(exit_healthy)
+        self.entry_draining = bool(entry_draining)
+        # Residual dial: preference-aware (entry healthy → entry; else exit failover).
+        if endpoint is not None:
+            self.endpoint = endpoint
+            self._endpoint_pinned = True
+        else:
+            self._endpoint_pinned = False
+            try:
+                sel = select_residual_endpoint(
+                    self.multihop,
+                    entry_healthy=self.entry_healthy,
+                    exit_healthy=self.exit_healthy,
+                    entry_draining=self.entry_draining,
+                )
+                self.endpoint = sel.endpoint
+            except Exception:
+                self.endpoint = residual_endpoint(self.multihop)
         self.secrets_dir = Path(secrets_dir) if secrets_dir else None
         self.status_cb = status_cb or (lambda _m: None)
         self.state = ConnectState.IDLE
@@ -252,9 +277,95 @@ class RptClient:
         self._sock: Optional[socket.socket] = None
         self._stop = threading.Event()
         self._io_thread: Optional[threading.Thread] = None
+        self.last_selection_reason: str = ""
+
+    def set_node_health(
+        self,
+        *,
+        entry_healthy: Optional[bool] = None,
+        exit_healthy: Optional[bool] = None,
+        entry_draining: Optional[bool] = None,
+    ) -> None:
+        """Update entry/exit health for automatic failover / re-entry preference."""
+        if entry_healthy is not None:
+            self.entry_healthy = bool(entry_healthy)
+        if exit_healthy is not None:
+            self.exit_healthy = bool(exit_healthy)
+        if entry_draining is not None:
+            self.entry_draining = bool(entry_draining)
 
     def _status(self, msg: str) -> None:
         self.status_cb(msg)
+
+    def _hello_to_endpoint(
+        self,
+        endpoint: Endpoint,
+        *,
+        timeout: float,
+        sdir: Path,
+        client_priv,
+        mh_note: str,
+    ) -> ConnectResult:
+        """Single residual HELLO attempt to *endpoint*."""
+        self.endpoint = endpoint
+        node_pub = load_node_elgamal_public_for_endpoint(endpoint, sdir)
+        frame, client_nonce, client_pub, client_eph = build_authorized_client_hello(
+            client_priv, node_pub, with_pfs=True
+        )
+        assert_protocol_magic()
+        wire = maybe_wrap(frame)
+
+        sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        try:
+            sock.settimeout(timeout)
+            sock.sendto(wire, endpoint.address)
+            entry_host = entry_endpoint(self.multihop).host
+            if endpoint.host != entry_host and (
+                is_multihop_active(self.multihop)
+                or self.last_selection_reason
+                in ("exit_failover", "hello_failover", "multihop_residual_via_exit")
+            ):
+                hop_kind = (
+                    "exit failover"
+                    if self.last_selection_reason
+                    in ("exit_failover", "hello_failover")
+                    else "exit residual"
+                )
+            else:
+                hop_kind = "entry"
+            self._status(
+                f"HELLO sent → {endpoint.host}:{endpoint.port} ({hop_kind})"
+            )
+            raw_reply, _addr = sock.recvfrom(65535)
+            reply = maybe_unwrap(raw_reply)
+            session = complete_server_hello(
+                reply, client_nonce, client_pub, client_eph
+            )
+            session.endpoint = endpoint
+            self.session = session
+            self.tunnel_plan = _tunnel_plan_for_session(
+                self.tunnel_plan, session.vpn_ip
+            )
+            self._sock = sock
+            sock = None  # ownership transferred; disconnect() closes
+            self.state = ConnectState.CONNECTED
+            pfs_note = " PFS" if session.pfs else ""
+            self._status(
+                f"Connected — tunnel IP {session.vpn_ip} (full VPN{pfs_note}); {mh_note}"
+            )
+            return ConnectResult(
+                ok=True,
+                state=self.state,
+                message=f"connected as {session.vpn_ip}",
+                session=session,
+                tunnel_plan=self.tunnel_plan,
+            )
+        finally:
+            if sock is not None:
+                try:
+                    sock.close()
+                except Exception:
+                    pass
 
     def connect(
         self,
@@ -265,8 +376,12 @@ class RptClient:
     ) -> ConnectResult:
         """Perform authorized RPT handshake with residual node (entry or exit).
 
-        When multi-hop is active, residual HELLO targets the **exit** hop; path
-        status names entry → exit. Single-hop default remains Iceland entry.
+        Preference (automatic, no manual user step):
+        - Entry healthy (not draining) → prefer **entry** residual (re-entry after rebuild).
+        - Entry down/draining → **exit failover** residual so flow is retained.
+        - Multi-hop active + entry up → residual-via-exit product path.
+        - HELLO failure on primary → try alternate hop when healthy (solid failover).
+        - Fail closed if neither path succeeds.
         """
         _ = residual_ready  # residual attach is handled by platform tunnel layers
         if (
@@ -287,60 +402,67 @@ class RptClient:
             )
 
         self.state = ConnectState.CONNECTING
-        self.endpoint = residual_endpoint(self.multihop)
         mh_note = multihop_status_text(self.multihop)
+
+        if self._endpoint_pinned:
+            targets = [self.endpoint]
+            self.last_selection_reason = "pinned"
+        else:
+            try:
+                sel = select_residual_endpoint(
+                    self.multihop,
+                    entry_healthy=self.entry_healthy,
+                    exit_healthy=self.exit_healthy,
+                    entry_draining=self.entry_draining,
+                )
+                self.last_selection_reason = sel.reason
+                self.endpoint = sel.endpoint
+                if sel.failover_active:
+                    mh_note = f"{mh_note}; exit failover (entry draining/down)"
+                elif sel.reason == "entry_primary":
+                    mh_note = f"{mh_note}; entry-primary residual"
+            except Exception as sel_exc:
+                self.last_selection_reason = "unavailable"
+                self.state = ConnectState.ERROR
+                msg = f"residual unavailable (fail closed): {sel_exc}"
+                self._status(f"Connect failed: {msg}")
+                return ConnectResult(ok=False, state=self.state, message=msg)
+
+            targets = residual_try_order(
+                self.multihop,
+                entry_healthy=self.entry_healthy,
+                exit_healthy=self.exit_healthy,
+                entry_draining=self.entry_draining,
+            )
+            if not targets:
+                targets = [self.endpoint]
+
         self._status(f"Connecting… {mh_note}")
 
         try:
-            # Pure crypto prep before socket I/O (short critical path to send HELLO).
             sdir = ensure_device_admission_key(self.secrets_dir)
             client_priv = load_client_private_key(sdir)
-            node_pub = load_node_elgamal_public_for_endpoint(self.endpoint, sdir)
-            frame, client_nonce, client_pub, client_eph = build_authorized_client_hello(
-                client_priv, node_pub, with_pfs=True
-            )
-            assert_protocol_magic()
-            wire = maybe_wrap(frame)
-
-            sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-            try:
-                sock.settimeout(timeout)
-                sock.sendto(wire, self.endpoint.address)
-                hop_kind = "exit residual" if is_multihop_active(self.multihop) else "entry"
-                self._status(
-                    f"HELLO sent → {self.endpoint.host}:{self.endpoint.port} ({hop_kind})"
-                )
-                raw_reply, _addr = sock.recvfrom(65535)
-                reply = maybe_unwrap(raw_reply)
-                session = complete_server_hello(
-                    reply, client_nonce, client_pub, client_eph
-                )
-                session.endpoint = self.endpoint
-                self.session = session
-                self.tunnel_plan = _tunnel_plan_for_session(
-                    self.tunnel_plan, session.vpn_ip
-                )
-                self._sock = sock
-                sock = None  # ownership transferred; disconnect() closes
-                self.state = ConnectState.CONNECTED
-                pfs_note = " PFS" if session.pfs else ""
-                self._status(
-                    f"Connected — tunnel IP {session.vpn_ip} (full VPN{pfs_note}); {mh_note}"
-                )
-                return ConnectResult(
-                    ok=True,
-                    state=self.state,
-                    message=f"connected as {session.vpn_ip}",
-                    session=session,
-                    tunnel_plan=self.tunnel_plan,
-                )
-            finally:
-                # Close only if handshake failed before we assigned self._sock
-                if sock is not None:
-                    try:
-                        sock.close()
-                    except Exception:
-                        pass
+            last_exc: Optional[BaseException] = None
+            for i, ep in enumerate(targets):
+                try:
+                    if i > 0:
+                        self._status(
+                            f"Primary residual failed — trying failover "
+                            f"{ep.host}:{ep.port}"
+                        )
+                        self.last_selection_reason = "hello_failover"
+                    return self._hello_to_endpoint(
+                        ep,
+                        timeout=timeout,
+                        sdir=sdir,
+                        client_priv=client_priv,
+                        mh_note=mh_note,
+                    )
+                except Exception as exc:
+                    last_exc = exc
+                    continue
+            assert last_exc is not None
+            raise last_exc
         except Exception as exc:
             self.state = ConnectState.ERROR
             msg = format_connect_failure(

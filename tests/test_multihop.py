@@ -23,6 +23,7 @@ from client.multihop import (
     node_pub_name_for_endpoint,
     parse_hops_csv,
     residual_endpoint,
+    select_residual_endpoint,
 )
 
 
@@ -125,6 +126,26 @@ class TestMultiHopPath(unittest.TestCase):
             enabled=True,
         )
         self.assertTrue(is_multihop_active(cfg))
+
+    def test_select_residual_entry_primary_and_exit_failover(self):
+        # Entry healthy → entry-primary (single-hop default)
+        sel = select_residual_endpoint(
+            default_single_hop(),
+            entry_healthy=True,
+            exit_healthy=True,
+            entry_draining=False,
+        )
+        self.assertEqual(sel.endpoint.host, PRODUCT_NODE_HOST)
+        self.assertEqual(sel.reason, "entry_primary")
+        # Entry draining → automatic exit failover
+        fo = select_residual_endpoint(
+            default_single_hop(),
+            entry_healthy=True,
+            exit_healthy=True,
+            entry_draining=True,
+        )
+        self.assertEqual(fo.endpoint.host, PRODUCT_EXIT_HOST)
+        self.assertTrue(fo.failover_active)
 
 
 if __name__ == "__main__":

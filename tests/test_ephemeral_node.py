@@ -130,6 +130,10 @@ class TestScheduleUnits(unittest.TestCase):
         unit = systemd_service_unit(dry_run=True)
         self.assertIn("--dry-run", unit)
         self.assertNotIn("RPT_EPHEMERAL_CONFIRM=yes", unit)
+        # Default weekly entry-only service (exclusive; never exit concurrent)
+        self.assertIn("weekly_entry_rebuild.py", unit)
+        legacy = systemd_service_unit(dry_run=True, weekly_entry=False)
+        self.assertIn("ephemeral_node.py", legacy)
 
     def test_cron_line_periodic(self):
         line = cron_line(period="7d", dry_run=True)
@@ -183,9 +187,10 @@ class TestScriptsAndDocs(unittest.TestCase):
         p = ROOT / "scripts" / "install_ephemeral_timer.sh"
         self.assertTrue(p.is_file())
         text = p.read_text(encoding="utf-8")
-        self.assertIn("periodic", text.lower())
         self.assertIn("timer", text.lower())
         self.assertIn("ephemeral_node.py", text)
+        self.assertIn("weekly_entry_rebuild.py", text)
+        self.assertIn("exclusive", text.lower())
         self.assertIn("selfhost", text.lower() or "no-log")
 
     def test_nolog_still_off(self):

@@ -60,16 +60,20 @@ SECRETS / RELEASE GATES (mandatory)
     # Skip pieces: SKIP_DNS=1 SKIP_HOST_PRIVACY=1
     # Then ship ONLY secrets/node_elgamal.pub to clients (never .priv).
 
-  *** Ephemeral / short-lived node (periodic snapshot + rebuild) ***
-    # Dry-run plan (safe default) — ordered snapshot → rebuild → selfhost → health:
+  *** Weekly entry wipe/rebuild (exclusive lock; exit failover) ***
+    # Dry-run weekly entry-only plan (safe default) — NEVER wipe exit/both:
+    python scripts/weekly_entry_rebuild.py --dry-run --period 7d
+    # Generic ephemeral plan still available:
     python scripts/ephemeral_node.py --dry-run --mode snapshot_then_rebuild --period 7d
-    # Modes: snapshot | rebuild | snapshot_then_rebuild
-    # Periodic systemd timer (default dry-run oneshot):
+    # Periodic systemd timer (default dry-run oneshot, entry-only weekly):
     sudo bash scripts/install_ephemeral_timer.sh          # PERIOD=7d
+    # Exclusive lock: node/rebuild_lock.py — second concurrent start fails closed
+    # Exit must be healthy before live entry drain (fail closed otherwise)
+    # Clients: entry draining/down → residual exit failover; entry healthy → re-entry
     # Live destructive rebuild requires explicit confirm (never default):
-    #   RPT_EPHEMERAL_CONFIRM=yes python scripts/ephemeral_node.py --live --mode rebuild
+    #   RPT_EPHEMERAL_CONFIRM=yes python scripts/weekly_entry_rebuild.py --live
     # Optional provider hooks: RPT_SNAPSHOT_CMD=...  RPT_REBUILD_CMD=...
-    # Pure helpers: node/ephemeral_node.py
+    # Pure helpers: node/ephemeral_node.py, node/rebuild_lock.py, client/multihop.py
     # Honesty: does not erase provider backups/netflow; re-ship public node pin
     # if keys regenerate; re-applies no-log via selfhost on rebuild step.
 
