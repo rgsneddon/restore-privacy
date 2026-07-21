@@ -1,17 +1,20 @@
 #!/usr/bin/env python3
 """Build / stage Restore Privacy client packages for release 0.3.6.
 
-**0.3.6** node-only zram+LUKS2 catalog. Apple packages are Flutter-built then
+**0.3.6** multi-hop residual catalog. Apple packages are Flutter-built then
 DevID/notarized (macOS) / Team-signed (iOS). Linux is rebuilt via package_linux.
-Windows SFX is repacked with VERSION/title pins rewritten to 0.3.6 when a full
-PyInstaller rebuild is unavailable. Android prefers flutter build apk; otherwise
-residual-wire carry-forward with versionName rewritten when possible.
+**Windows multihop PE** must be built on Windows x64::
 
-- macOS: Flutter restore_privacy_client.app → inject pub-only → DevID sign/notarize → zip
-- iOS: Flutter Runner.app → inject pub-only → Distribution team-sign → zip
-- Windows / Android / Linux: prefer local 0.3.4 assets renamed to 0.3.6 filenames
+  python scripts/build_windows_multihop.py
+  # or:  scripts\\build_windows_multihop.bat
+  # or:  python scripts/build_release_0.3.6.py --windows-only
+
+If PyInstaller rebuild is unavailable, Windows falls back to carry-forward /
+SFX pin rewrite (honest: no multihop residual *code* until native rebuild).
 
 Never bundles node_elgamal.priv or shared client_ed25519.priv.
+
+Handoff: ``client/windows/WINDOWS_HANDOFF_0.3.6.md``
 """
 
 from __future__ import annotations
@@ -243,13 +246,42 @@ def _stage_from_prior(prior_name: str, dest: Path) -> Path:
     return dest
 
 
-def stage_windows_exe() -> Path:
+def rebuild_windows_setup() -> Path:
+    """Fresh PyInstaller Windows setup (multihop + entry/exit pubs). Windows host only."""
+    import importlib.util
+
+    path = ROOT / "scripts" / "build_windows_multihop.py"
+    spec = importlib.util.spec_from_file_location("rpt_win_mh_036", path)
+    if spec is None or spec.loader is None:
+        raise RuntimeError(f"cannot load {path}")
+    m = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(m)
+    return m.rebuild_windows_setup()
+
+
+def stage_windows_exe(*, force_rebuild: bool = False) -> Path:
+    """Stage Windows setup.exe — prefer live multihop rebuild, else carry-forward."""
     dest = OUT / WINDOWS_EXE_NAME
+    OUT.mkdir(parents=True, exist_ok=True)
+    if force_rebuild or sys.platform.startswith("win"):
+        try:
+            built = rebuild_windows_setup()
+            if built.resolve() != dest.resolve():
+                shutil.copy2(built, dest)
+            print(f"windows rebuilt (multihop): {dest}")
+            return dest
+        except Exception as exc:  # noqa: BLE001
+            print(
+                f"windows multihop rebuild failed ({exc}); "
+                f"falling back to carry-forward…",
+                file=sys.stderr,
+            )
+            if force_rebuild:
+                raise
     # Prefer already-rebuilt 0.3.6 SFX if present with correct pin
     if dest.is_file() and dest.stat().st_size > 1_000_000:
         data = dest.read_bytes()
         if b'Title="Restore Privacy ' + VERSION.encode() + b'"' in data or b"0.3.4" not in data:
-            # still ensure VERSION extractable — light check via 7z if available
             print(f"windows: keeping existing {dest.name}")
             return dest
     _stage_from_prior(
@@ -508,9 +540,14 @@ def main(argv: list[str] | None = None) -> int:
         help="Only package macOS + iOS (still write version pins; skip non-Apple carry-forward)",
     )
     ap.add_argument(
+        "--windows-only",
+        action="store_true",
+        help="Only rebuild Windows multihop setup.exe (run on Windows x64)",
+    )
+    ap.add_argument(
         "--with-carry-forward",
         action="store_true",
-        help="Also stage Windows/Android/Linux from 0.3.4 under 0.3.6 names (default if not apple-only)",
+        help="Also stage Windows/Android/Linux under 0.3.6 names (default if not apple/windows-only)",
     )
     args = ap.parse_args(argv)
 
@@ -519,6 +556,50 @@ def main(argv: list[str] | None = None) -> int:
     artifacts: dict[str, str] = {}
 
     print(f"=== Restore Privacy release {VERSION} ===")
+
+    if args.windows_only:
+        win = stage_windows_exe(force_rebuild=True)
+        artifacts[WINDOWS_EXE_NAME] = sha256_file(win)
+        print(f"windows: {win} ({win.stat().st_size} bytes) [multihop rebuild]")
+        _assert_no_priv(OUT)
+        man_path = OUT / "SHA256SUMS.json"
+        manifest = {
+            "version": VERSION,
+            "tag": VERSION,
+            "assets": [
+                {
+                    "filename": name,
+                    "sha256": dig,
+                    "bytes": (OUT / name).stat().st_size,
+                }
+                for name, dig in artifacts.items()
+            ],
+            "notes": "0.3.6 Windows multihop residual PE (build_windows_multihop / --windows-only)",
+        }
+        # Merge with existing manifest assets when present
+        if man_path.is_file():
+            try:
+                prev = json.loads(man_path.read_text(encoding="utf-8"))
+                by_name = {
+                    a["filename"]: a for a in (prev.get("assets") or []) if a.get("filename")
+                }
+                for name, dig in artifacts.items():
+                    by_name[name] = {
+                        "filename": name,
+                        "sha256": dig,
+                        "bytes": (OUT / name).stat().st_size,
+                    }
+                manifest["assets"] = list(by_name.values())
+                if prev.get("notes"):
+                    manifest["notes"] = prev["notes"]
+            except (OSError, json.JSONDecodeError, KeyError):
+                pass
+        text = json.dumps(manifest, indent=2) + "\n"
+        man_path.write_text(text, encoding="utf-8")
+        (OUT / "manifest.json").write_text(text, encoding="utf-8")
+        print(f"manifest: {man_path}")
+        print("OK:", list(artifacts.keys()))
+        return 0
 
     # Apple packages are required for this release
     mac = stage_macos_zip()
@@ -531,17 +612,17 @@ def main(argv: list[str] | None = None) -> int:
 
     do_carry = args.with_carry_forward or not args.apple_only
     if do_carry:
-        win = stage_windows_exe()
+        win = stage_windows_exe(force_rebuild=False)
         artifacts[WINDOWS_EXE_NAME] = sha256_file(win)
-        print(f"windows: {win} ({win.stat().st_size} bytes) [carry-forward]")
+        print(f"windows: {win} ({win.stat().st_size} bytes)")
 
         apk = stage_android_apk()
         artifacts[ANDROID_APK_NAME] = sha256_file(apk)
-        print(f"android: {apk} ({apk.stat().st_size} bytes) [carry-forward]")
+        print(f"android: {apk} ({apk.stat().st_size} bytes)")
 
         linux = stage_linux_tgz()
         artifacts[LINUX_TGZ_NAME] = sha256_file(linux)
-        print(f"linux:   {linux} ({linux.stat().st_size} bytes) [carry-forward]")
+        print(f"linux:   {linux} ({linux.stat().st_size} bytes)")
 
     _assert_no_priv(OUT)
 

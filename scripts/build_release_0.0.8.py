@@ -125,6 +125,8 @@ def build_client_onedir() -> Path:
         "--hidden-import",
         "client.endpoint",
         "--hidden-import",
+        "client.multihop",
+        "--hidden-import",
         "client.secrets_loader",
         "--hidden-import",
         "client.dataplane",
@@ -149,18 +151,15 @@ def build_client_onedir() -> Path:
     ver_file = ROOT / "client" / "VERSION"
     if ver_file.is_file():
         cmd.extend(["--add-data", f"{ver_file};client"])
-    # Bundle public node key only (never a shared client_ed25519.priv)
-    # Prefer tracked product/ key so Windows packages match production node.
-    secrets_src = ROOT / "product"
-    if not (secrets_src / "node_elgamal.pub").is_file():
-        secrets_src = ROOT / "secrets"
-    if (secrets_src / "node_elgamal.pub").is_file():
-        cmd.extend(
-            [
-                "--add-data",
-                f"{secrets_src / 'node_elgamal.pub'};secrets",
-            ]
-        )
+    # Public ElGamal keys only (entry + exit for multi-hop residual; never *.priv)
+    # Prefer tracked product/ so Windows packages match production entry/exit nodes.
+    for pub_name in ("node_elgamal.pub", "exit_node_elgamal.pub"):
+        pub = ROOT / "product" / pub_name
+        if not pub.is_file():
+            pub = ROOT / "secrets" / pub_name
+        if pub.is_file():
+            cmd.extend(["--add-data", f"{pub};secrets"])
+            cmd.extend(["--add-data", f"{pub};product"])
     r = subprocess.run(cmd, cwd=ROOT, capture_output=True, text=True)
     log = DIST / "pyinstaller_client.log"
     log.write_text((r.stdout or "") + "\n" + (r.stderr or ""), encoding="utf-8")
@@ -187,31 +186,48 @@ def build_client_onedir() -> Path:
 
 
 def inject_product_secrets(target_dir: Path) -> None:
-    """Copy public node_elgamal.pub only — device Ed25519 keys are generated on first run.
+    """Copy public ElGamal pubs only — device Ed25519 keys are generated on first run.
+
+    Ships:
+      - ``node_elgamal.pub`` (Iceland entry)
+      - ``exit_node_elgamal.pub`` (Romania exit, multi-hop residual) when present
 
     Never ships a shared client_ed25519.priv (impersonation risk) or node_elgamal.priv.
     Strips **all** ``*.priv`` under the entire package tree (incl. ``_internal/secrets``).
     """
-    # Prefer tracked product key (must match production node private key).
-    node_pub = ROOT / "product" / "node_elgamal.pub"
-    if not node_pub.is_file():
-        node_pub = ROOT / "secrets" / "node_elgamal.pub"
-    src = node_pub.parent
-    if not node_pub.is_file():
+    pubs: list[tuple[str, Path]] = []
+    for name in ("node_elgamal.pub", "exit_node_elgamal.pub"):
+        p = ROOT / "product" / name
+        if not p.is_file():
+            p = ROOT / "secrets" / name
+        if p.is_file() and p.stat().st_size >= 32:
+            pubs.append((name, p))
+    if not any(n == "node_elgamal.pub" for n, _ in pubs):
         raise RuntimeError(
             "Build requires product/node_elgamal.pub (or secrets/node_elgamal.pub). "
             "Refusing to ship without node public key matching production."
         )
-    dest = target_dir / "secrets"
-    dest.mkdir(parents=True, exist_ok=True)
-    shutil.copy2(node_pub, dest / "node_elgamal.pub")
-    # Also place pub under _internal/secrets if that layout exists (onedir)
+    # Top-level secrets/ + product/ (secrets_loader prefers product/ when frozen)
+    for sub_name in ("secrets", "product"):
+        dest = target_dir / sub_name
+        dest.mkdir(parents=True, exist_ok=True)
+        for name, src in pubs:
+            shutil.copy2(src, dest / name)
+    # Also place pubs under every secrets/ dir in the tree (onedir _internal/secrets)
     for sub in target_dir.rglob("secrets"):
         if sub.is_dir():
-            try:
-                shutil.copy2(node_pub, sub / "node_elgamal.pub")
-            except OSError:
-                pass
+            for name, src in pubs:
+                try:
+                    shutil.copy2(src, sub / name)
+                except OSError:
+                    pass
+    for sub in target_dir.rglob("product"):
+        if sub.is_dir() and sub != target_dir / "product":
+            for name, src in pubs:
+                try:
+                    shutil.copy2(src, sub / name)
+                except OSError:
+                    pass
     # Strip every private key anywhere in the package tree
     for p in list(target_dir.rglob("*.priv")):
         try:

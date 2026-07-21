@@ -5,6 +5,7 @@
 | Tag | Script |
 |-----|--------|
 | **0.3.6** | `scripts/build_release_0.3.6.py` |
+| **0.3.6 Windows multihop PE** | `scripts/build_windows_multihop.py` / `scripts/build_windows_multihop.bat` (Windows x64 only; handoff `client/windows/WINDOWS_HANDOFF_0.3.6.md`) |
 | 0.3.4 | `scripts/build_release_0.3.4.py` |
 | 0.3.3 | `scripts/build_release_0.3.3.py` (archive) |
 | 0.3.0 | `scripts/build_release_0.3.0.py` (archive) |

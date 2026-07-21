@@ -17,7 +17,7 @@
 | **Android** APK | **Yes** (residual host + exit pub) | **Yes** | Flutter release rebuild; RptConfig exit host + `exit_node_elgamal.pub` in assets |
 | **macOS** zip | **Yes** | **Yes** | Flutter+NativePrep **rebuild** (PacketTunnel + App embed exit host / `exit_node_elgamal.pub` / multihop define); DevID-signed; residual-via-exit when multi-hop enabled |
 | **iOS** zip | **Yes** | **Yes** | Flutter+NativePrep **rebuild** (PacketTunnel + App embed exit residual selection); Team-signed sideload |
-| **Windows** SFX | Catalog pin only | Entry only in frozen PE | Native Windows PE rebuild required for multihop residual *code*; macOS cannot re-freeze Windows PE |
+| **Windows** SFX | **Rebuild on Windows** | Entry + exit (after rebuild) | Run **`scripts\build_windows_multihop.bat`** on a Windows x64 laptop (see `client/windows/WINDOWS_HANDOFF_0.3.6.md`). macOS cannot freeze Windows PE; published PE is pin-only until you upload a rebuilt setup. |
 
 Linux and Android are the strongest multi-hop residual packages for operator tests.
 
