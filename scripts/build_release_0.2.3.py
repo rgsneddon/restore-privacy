@@ -1,16 +1,16 @@
 #!/usr/bin/env python3
 """Build / stage Restore Privacy client packages for release 0.2.3.
 
-Apple packages include Packet Tunnel Team signing + App Group secrets seed.
-Windows/Android are staged from 0.1.2 when not rebuilt on this host.
+Public GitHub Release **0.2.3** ships **Developer ID–notarized** macOS and
+**Team-signed** iOS residual packages (not prep-only as the public story).
 
 - Windows: reuses prior .exe installer when local Windows build is unavailable
 - Android: reuses prior APK when flutter apk is not rebuilt here
 - macOS: zips Flutter restore_privacy_client.app after Developer ID sign/notarize
-- iOS: zips Flutter Runner.app for sideload / device install tooling
+- iOS: zips Flutter Runner.app after Apple Distribution team-sign (sideload)
 
 Public node key (node_elgamal.pub) may be bundled via scripts/inject_apple_secrets.py.
-Per-device Ed25519 client keys are generated on first run â€” never a shared
+Per-device Ed25519 client keys are generated on first run — never a shared
 client_ed25519.priv. Never bundles node_elgamal.priv.
 """
 

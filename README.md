@@ -50,7 +50,7 @@ or the buttons on https://restore-privacy-status.onrender.com/
 | iOS | `restore-privacy-rust-1.0.0-ios.zip` |
 | Ubuntu / Linux | `restore-privacy-rust-1.0.0-linux-x64.tar.gz` |
 
-Legacy private-repo installers (0.2.3) remain under the [restore-privacy 0.2.3](https://github.com/rgsneddon/restore-privacy/releases/tag/0.2.3) tag for historical builds.
+Legacy private-repo installers (**0.2.3**, macOS Developer ID notarized / iOS Team-signed) remain under the [restore-privacy 0.2.3](https://github.com/rgsneddon/restore-privacy/releases/tag/0.2.3) release for historical builds.
 
 ### Windows
 

@@ -1,38 +1,36 @@
-# Apple handoff — Restore Privacy 0.2.3
+# Apple handoff — Restore Privacy **0.2.3**
 
 Production RPT node: **82.221.101.241:44044** (UDP).
 
-## What this zip is
+## Public package status (current)
 
-Release **macOS/iOS** packages for 0.2.3 may be **prep packages** staged on Windows for sideload / further Mac work. Residual public IP requires a **signed Packet Tunnel / Network Extension** built from current `client_app` sources on a Mac.
+| Asset | Signing (GitHub Release **0.2.3**) |
+|-------|-------------------------------------|
+| `restore-privacy-client-0.2.3-macos.zip` | **Developer ID Application** (SFCBP95595) + **notarized** (stapled) |
+| `restore-privacy-client-0.2.3-ios.zip` | **Apple Distribution** Team-signed sideload (Runner + Packet Tunnel) |
 
-## On a Mac
+Both inject **`node_elgamal.pub` only**. No `*.priv` in packages. Per-device Ed25519 is generated on first run.
 
-1. Clone / pull `main` at tag **0.2.3**.
-2. Confirm `lib/rpt_config.dart` host = `82.221.101.241`.
-3. Inject **only** `node_elgamal.pub` (from `product/node_elgamal.pub` or node secrets) — never `node_elgamal.priv` / never shared `client_ed25519.priv`.
-4. Follow:
-   - `APPLE_BUILD.md`
-   - `macos/BUILD_ON_MAC.md`
-   - `ios/BUILD_ON_MAC.md`
-5. Team-sign + notarize macOS; provision iOS for device install.
-6. Rebuild zips and attach to GitHub Release **0.2.3** if replacing prep assets.
+Download: https://github.com/rgsneddon/restore-privacy/releases/tag/0.2.3
 
-## 0.2.3 product UI notes (rebuild required for full UI)
+**Do not treat 0.2.3 public Apple assets as prep-only.** Prep-stage wording applies only if you are rebuilding from source before re-sign.
 
-- **Licence acceptance** before Connect (Settings + first-run sheet).
-- **Connection log** (local export), **leak test**, **DPI mitigation** disclaimer on Settings.
-- **NativePrep** residual engines: pad/cover + outer obfs + PFS (product obfs key 33 bytes).
-- Seamless shell copy: anonymous registration / no admin verification vs OS elevation honesty.
+## Residual honesty
 
-## Privacy notes for Apple residual
+- Residual public IP changes only when the OS Packet Tunnel is **connected**.
+- Host-side HELLO alone is diagnostic; it does not install system residual routes.
 
-- Do not market residual IP change until NE is signed and active.
-- Host-side HELLO alone is diagnostic only.
-- Device Ed25519 keys generate on first run.
+## Rebuild on a Mac (optional operator path)
 
-## Product keys
+1. Checkout tag **0.2.3** (or current `main` with 0.2.3 surfaces).
+2. Confirm `client_app/lib/rpt_config.dart` host = `82.221.101.241`.
+3. Inject **only** `node_elgamal.pub` via `scripts/inject_apple_secrets.py` — never `node_elgamal.priv` / never shared `client_ed25519.priv`.
+4. Follow `APPLE_BUILD.md`, `macos/BUILD_ON_MAC.md`, `ios/BUILD_ON_MAC.md`.
+5. Sign/notarize: `scripts/sign_and_notarize_macos.py` (macOS); Distribution codesign for iOS.
+6. Package via `scripts/build_release_0.2.3.py` and attach to GitHub Release **0.2.3** if replacing assets.
 
-| Ship | Never ship |
-|------|------------|
-| `node_elgamal.pub` | `node_elgamal.priv`, shared `client_ed25519.priv` |
+## Product UI notes (in-tree)
+
+- Licence acceptance before Connect.
+- Connection log, leak test, DPI mitigation disclaimer on Settings.
+- NativePrep residual engines: pad/cover + outer obfs + PFS (product obfs key **33** bytes).
