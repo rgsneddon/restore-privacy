@@ -5,7 +5,8 @@ Designed for:
   - Operator laptop / CI (full unittest suite)
   - Production node (lighter probes when tests/ missing)
 
-Default period target: every 4 hours via scripts/install_security_audit_timer.sh.
+Default period target: every 4 hours via scripts/install_security_audit_timer.sh
+(with schedule jitter + privacy-hardened oneshot unit — section A).
 
 Usage:
   python3 scripts/run_security_audit.py
@@ -13,10 +14,13 @@ Usage:
   python3 scripts/run_security_audit.py --write --out AUDIT.md
 
 Environment:
-  RPT_NODE_HOST     default 82.221.101.241
+  RPT_NODE_HOST     default 82.221.101.241 (timer forces 127.0.0.1 on node)
   RPT_STATUS_PORT   default 8080
   RPT_UDP_PORT      default 44044
   RPT_AUDIT_PATH    override output path
+  RPT_AUDIT_NO_OUTBOUND=1  skip any optional live HTTP fetches during audit
+  RPT_HOST_STATEMENTS_OFFLINE=1  host-statement probes use fixtures only
+  RPT_AUDIT_REQUIRE_LOCALHOST=1  refuse non-loopback probe host (node timer)
 """
 
 from __future__ import annotations
@@ -24,18 +28,24 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import re
 import socket
 import subprocess
 import sys
+import tempfile
 import urllib.error
 import urllib.request
 from datetime import datetime, timezone
 from pathlib import Path
+from typing import Any
 
 ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_HOST = os.environ.get("RPT_NODE_HOST", "82.221.101.241")
 STATUS_PORT = int(os.environ.get("RPT_STATUS_PORT", "8080"))
 UDP_PORT = int(os.environ.get("RPT_UDP_PORT", "44044"))
+
+# Loopback hosts allowed when RPT_AUDIT_REQUIRE_LOCALHOST=1 (node timer policy)
+_LOOPBACK_HOSTS = frozenset({"127.0.0.1", "::1", "localhost"})
 
 # Structural / privacy suite — keep lightweight and deterministic.
 # Do not include tests that assert AUDIT.md body content here (those run after --write).
@@ -64,6 +74,139 @@ def iso_z(dt: datetime | None = None) -> str:
 def human_date(dt: datetime | None = None) -> str:
     d = dt or utc_now()
     return d.strftime("%-d %B %Y") if sys.platform != "win32" else d.strftime("%d %B %Y")
+
+
+def is_loopback_host(host: str) -> bool:
+    """True when probe host is loopback (node-timer local-only policy)."""
+    h = (host or "").strip().lower().strip("[]")
+    if h in _LOOPBACK_HOSTS:
+        return True
+    # IPv4 mapped / zone id
+    if h.startswith("127."):
+        return True
+    return False
+
+
+def require_localhost_probe_host(host: str | None = None) -> str:
+    """Return host for probes; raise if localhost required and host is not loopback."""
+    h = (host if host is not None else DEFAULT_HOST).strip() or "127.0.0.1"
+    require = os.environ.get("RPT_AUDIT_REQUIRE_LOCALHOST", "").strip().lower() in (
+        "1",
+        "true",
+        "yes",
+    )
+    if require and not is_loopback_host(h):
+        raise ValueError(
+            f"RPT_AUDIT_REQUIRE_LOCALHOST set but RPT_NODE_HOST={h!r} is not loopback; "
+            "node timer must probe 127.0.0.1 only"
+        )
+    return h
+
+
+# --- Section A: redact audit artifacts before public write ---
+
+_RE_HOME_PATH = re.compile(r"(?i)(/home|\\Users|C:\\Users)/[^\s\"']+")
+_RE_SSH_USER_AT = re.compile(r"\b([A-Za-z0-9._-]+)@([A-Za-z0-9._-]+\.[A-Za-z]{2,})\b")
+_RE_BEARER = re.compile(r"(?i)\b(bearer\s+)[A-Za-z0-9._\-+/=]{12,}")
+_RE_TOKENISH = re.compile(
+    r"(?i)\b("
+    r"gho_|ghu_|ghp_|github_pat_|sk_live_|sk_test_|rk_live_|rk_test_|"
+    r"xox[baprs]-|AKIA[0-9A-Z]{12,}|RPT_ASSET_FETCH_TOKEN=|"
+    r"api[_-]?key=|token=|secret=|password="
+    r")([^\s\"']{4,})"
+)
+_RE_PEM_BLOCK = re.compile(
+    r"-----BEGIN [A-Z0-9 ]*PRIVATE KEY-----.*?-----END [A-Z0-9 ]*PRIVATE KEY-----",
+    re.DOTALL | re.IGNORECASE,
+)
+
+
+def redact_audit_text(text: str) -> str:
+    """Strip sensitive fragments from strings destined for AUDIT.md / public JSON.
+
+    Removes home paths, token-like secrets, PEM private blocks, and softens
+    user@host SSH-style identities. Product monopin hosts (e.g. 82.221.101.241),
+    SHA-256 pins, and public status titles are left intact.
+    """
+    if not text:
+        return text
+    s = str(text)
+    s = _RE_PEM_BLOCK.sub("[REDACTED_PRIVATE_KEY]", s)
+    s = _RE_HOME_PATH.sub(r"\1/[REDACTED_USER]", s)
+    s = _RE_BEARER.sub(r"\1[REDACTED_TOKEN]", s)
+    s = _RE_TOKENISH.sub(r"\1[REDACTED]", s)
+    s = _RE_SSH_USER_AT.sub(r"[REDACTED_USER]@\2", s)
+    return s
+
+
+def redact_audit_value(value: Any) -> Any:
+    """Recursively redact strings in nested dict/list structures."""
+    if isinstance(value, str):
+        return redact_audit_text(value)
+    if isinstance(value, dict):
+        return {k: redact_audit_value(v) for k, v in value.items()}
+    if isinstance(value, list):
+        return [redact_audit_value(v) for v in value]
+    if isinstance(value, tuple):
+        return tuple(redact_audit_value(v) for v in value)
+    return value
+
+
+def slim_results_for_public_json(results: dict) -> dict:
+    """Public machine JSON: no suite tails, redacted strings, no exfil-friendly dumps."""
+    slim = redact_audit_value(dict(results))
+    us = dict(slim.get("unit_suite") or {})
+    us.pop("stdout_tail", None)
+    us.pop("stderr_tail", None)
+    # Never ship multi-KB captured process output
+    for k in list(us.keys()):
+        if k.endswith("_tail") or k in ("stdout", "stderr", "output"):
+            us.pop(k, None)
+    slim["unit_suite"] = us
+    slim["privacy"] = {
+        "redacted": True,
+        "no_suite_tails": True,
+        "no_network_exfil": True,
+        "note": "Audit artifacts are local-only; timer does not git-push or upload",
+    }
+    return slim
+
+
+def wipe_path(path: Path) -> None:
+    """Best-effort delete of temporary capture files (PrivateTmp companion)."""
+    try:
+        if path.is_file():
+            # Overwrite then unlink (best-effort; not full shred)
+            try:
+                size = path.stat().st_size
+                with path.open("wb") as f:
+                    f.write(b"\0" * min(size, 1_000_000))
+            except OSError:
+                pass
+            path.unlink(missing_ok=True)
+        elif path.is_dir():
+            import shutil
+
+            shutil.rmtree(path, ignore_errors=True)
+    except OSError:
+        pass
+
+
+def audit_outbound_allowed() -> bool:
+    """False on hardened node timer (no live third-party fetches during audit)."""
+    if os.environ.get("RPT_AUDIT_NO_OUTBOUND", "").strip().lower() in (
+        "1",
+        "true",
+        "yes",
+    ):
+        return False
+    if os.environ.get("RPT_HOST_STATEMENTS_OFFLINE", "").strip().lower() in (
+        "1",
+        "true",
+        "yes",
+    ):
+        return False
+    return True
 
 
 def probe_tcp(host: str, port: int, timeout: float = 5.0) -> dict:
@@ -109,7 +252,11 @@ def probe_http_status(host: str, port: int, timeout: float = 8.0) -> dict:
 
 
 def run_unit_suite() -> dict:
-    """Run security-related unittest modules when available."""
+    """Run security-related unittest modules when available.
+
+    Captures are kept only in-memory for the process lifetime; public write path
+    drops tails (section A — no multi-KB suite dumps in JSON).
+    """
     tests_dir = ROOT / "tests"
     if not tests_dir.is_dir():
         return {"ran": False, "reason": "tests/ not present (node install)", "ok": True, "modules": []}
@@ -117,22 +264,33 @@ def run_unit_suite() -> dict:
     cmd = [sys.executable, "-m", "unittest", *SECURITY_TEST_MODULES, "-q"]
     env = os.environ.copy()
     env["PYTHONPATH"] = str(ROOT) + os.pathsep + env.get("PYTHONPATH", "")
-    p = subprocess.run(
-        cmd,
-        cwd=str(ROOT),
-        env=env,
-        capture_output=True,
-        text=True,
-        timeout=600,
-    )
-    return {
-        "ran": True,
-        "ok": p.returncode == 0,
-        "returncode": p.returncode,
-        "modules": SECURITY_TEST_MODULES,
-        "stdout_tail": (p.stdout or "")[-2000:],
-        "stderr_tail": (p.stderr or "")[-2000:],
-    }
+    # Prefer offline host-statement fixtures if those tests appear later
+    if not audit_outbound_allowed():
+        env["RPT_HOST_STATEMENTS_OFFLINE"] = "1"
+        env["RPT_AUDIT_NO_OUTBOUND"] = "1"
+    scratch = Path(tempfile.mkdtemp(prefix="rpt-audit-suite-"))
+    try:
+        p = subprocess.run(
+            cmd,
+            cwd=str(ROOT),
+            env=env,
+            capture_output=True,
+            text=True,
+            timeout=600,
+        )
+        # Keep short redacted tails for operator stderr only (not public JSON)
+        out_tail = redact_audit_text((p.stdout or "")[-800:])
+        err_tail = redact_audit_text((p.stderr or "")[-800:])
+        return {
+            "ran": True,
+            "ok": p.returncode == 0,
+            "returncode": p.returncode,
+            "modules": SECURITY_TEST_MODULES,
+            "stdout_tail": out_tail,
+            "stderr_tail": err_tail,
+        }
+    finally:
+        wipe_path(scratch)
 
 
 def check_no_priv_in_tree() -> dict:
@@ -541,7 +699,7 @@ def build_markdown(results: dict) -> str:
 | **Public catalog version** | **{catalog}** |
 | **Production node** | **{host}:{UDP_PORT}** (UDP); status UI TCP **{STATUS_PORT}** — **Iceland**, host **FlokiNET** |
 | **Audit generated** | **{human_date()}** (`{now}`) |
-| **Cadence** | Automated security pass (target **every 4 hours** on node/operator timer) |
+| **Cadence** | Automated security pass (~**every 4 hours** + **jitter** on privacy-hardened node timer) |
 | **Audit type** | Static suite + live node status probe + **per-installer AUDIT STATE (Green/Amber/Red)** |
 | **Auditor method** | `scripts/run_security_audit.py` — unittest privacy/security modules + TCP/HTTP/UDP probes + no-`.priv` scan + catalog package RAG |
 
@@ -717,7 +875,8 @@ Re-run: `python3 scripts/run_security_audit.py --write`
 
 
 def collect(node_only: bool = False) -> dict:
-    host = DEFAULT_HOST
+    # Node timer forces localhost probes; laptop/CI may use product public host.
+    host = require_localhost_probe_host(DEFAULT_HOST)
     catalog = load_catalog_version()
     results = {
         "generated_at": iso_z(),
@@ -729,6 +888,15 @@ def collect(node_only: bool = False) -> dict:
         "udp": probe_udp_open(host, UDP_PORT),
         "no_priv": check_no_priv_in_tree(),
         "package_rag": evaluate_catalog_packages(catalog),
+        "audit_privacy": {
+            "localhost_required": os.environ.get("RPT_AUDIT_REQUIRE_LOCALHOST", "")
+            .strip()
+            .lower()
+            in ("1", "true", "yes"),
+            "outbound_allowed": audit_outbound_allowed(),
+            "probe_host_loopback": is_loopback_host(host),
+            "no_network_exfil": True,
+        },
     }
     results["overall_ok"] = bool(
         results["unit_suite"].get("ok")
@@ -742,7 +910,11 @@ def collect(node_only: bool = False) -> dict:
 
 
 def write_outputs(results: dict, out_path: Path) -> None:
-    md = build_markdown(results)
+    """Write AUDIT.md + mirrors + JSON with section-A redaction (no suite tails)."""
+    # Redact nested error strings before markdown so tails never leak home paths
+    safe_results = redact_audit_value(dict(results))
+    md = redact_audit_text(build_markdown(safe_results))
+    out_path.parent.mkdir(parents=True, exist_ok=True)
     out_path.write_text(md, encoding="utf-8")
     # Case-insensitive FS: same path. On Linux, optionally mirror lowercase if distinct.
     lower = out_path.parent / "audit.md"
@@ -752,6 +924,7 @@ def write_outputs(results: dict, out_path: Path) -> None:
         except OSError:
             pass
     # Status page copies for Render (rootDir=status_page) + public_docs host
+    # Local copies only — never git push / HTTP upload from this runner.
     for status_copy in (
         ROOT / "status_page" / "AUDIT.md",
         ROOT / "status_page" / "public" / "AUDIT.md",
@@ -761,16 +934,11 @@ def write_outputs(results: dict, out_path: Path) -> None:
             status_copy.write_text(md, encoding="utf-8")
         except OSError:
             pass
-    # Machine-readable
+    # Machine-readable (redacted, no suite tails)
     json_path = ROOT / "status_page" / "static" / "security_audit_latest.json"
     try:
         json_path.parent.mkdir(parents=True, exist_ok=True)
-        # Drop huge tails for JSON
-        slim = dict(results)
-        us = dict(slim.get("unit_suite") or {})
-        us.pop("stdout_tail", None)
-        us.pop("stderr_tail", None)
-        slim["unit_suite"] = us
+        slim = slim_results_for_public_json(safe_results)
         json_path.write_text(json.dumps(slim, indent=2) + "\n", encoding="utf-8")
     except OSError:
         pass
@@ -788,14 +956,25 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--json", action="store_true", help="Print results JSON to stdout")
     args = ap.parse_args(argv)
 
-    results = collect(node_only=args.node_only)
+    try:
+        results = collect(node_only=args.node_only)
+    except ValueError as exc:
+        print(str(exc), file=sys.stderr)
+        return 3
     if args.write:
         write_outputs(results, args.out.resolve())
         print(f"Wrote {args.out}", flush=True)
     if args.json or not args.write:
-        print(json.dumps({k: v for k, v in results.items() if k != "unit_suite" or True}, indent=2, default=str))
+        # Never dump suite tails to stdout JSON either
+        print(json.dumps(slim_results_for_public_json(results), indent=2, default=str))
     if results.get("unit_suite", {}).get("ran") and not results["unit_suite"].get("ok"):
-        print(results["unit_suite"].get("stderr_tail") or results["unit_suite"].get("stdout_tail"), file=sys.stderr)
+        # Operator-only stderr: already redacted short tails
+        print(
+            results["unit_suite"].get("stderr_tail")
+            or results["unit_suite"].get("stdout_tail")
+            or "unit suite failed",
+            file=sys.stderr,
+        )
         return 2
     return 0 if results.get("overall_ok") else 1
 
