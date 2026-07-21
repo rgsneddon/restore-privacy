@@ -257,6 +257,81 @@ class TestProductAppsWireFlyclient(unittest.TestCase):
         self.assertIn("prior=prior if residual_ready else None", src)
         self.assertIn("prefetched_default_route=", src)
         self.assertIn("resolve_default_route", src)
+        # Prefetch failure must pass None (not (None, None)) so tunnel re-resolves
+        self.assertIn("prefetched_route = None", src)
+        self.assertNotIn("prefetched_route = (None, None)", src)
+
+
+class TestLinuxPrefetchFallback(unittest.TestCase):
+    """Empty prefetch must re-call resolve_default_route (not stuck on None,None)."""
+
+    def test_empty_prefetch_tuple_falls_back_to_live_resolve(self):
+        from client.linux.tunnel_linux import start_full_tunnel
+
+        client = RptClient()
+        from client.connect import ClientSession
+        from node.crypto_session import SessionCrypto
+
+        client.session = ClientSession(
+            session_id=b"\x03" * 8,
+            crypto=mock.Mock(spec=SessionCrypto),
+            vpn_ip="10.88.0.12",
+            endpoint=client.endpoint,
+            pfs=True,
+        )
+        plan = build_full_tunnel_plan("10.88.0.12")
+        plan.tunnel_iface = "rpt0"
+        host = client.endpoint.host
+
+        # Empty prefetch would previously skip re-resolve and fail residual attach
+        with mock.patch(
+            "client.linux.tunnel_linux.resolve_default_route",
+            return_value=("192.168.1.1", "eth0"),
+        ) as resolve, mock.patch(
+            "client.linux.tunnel_linux.create_linux_tun",
+            return_value=(None, "stop after resolve"),
+        ):
+            start_full_tunnel(
+                client,
+                plan,
+                host,
+                require_system_capture=True,
+                prefetched_default_route=(None, None),
+            )
+            resolve.assert_called()
+
+    def test_valid_prefetch_skips_live_resolve(self):
+        from client.linux.tunnel_linux import start_full_tunnel
+
+        client = RptClient()
+        from client.connect import ClientSession
+        from node.crypto_session import SessionCrypto
+
+        client.session = ClientSession(
+            session_id=b"\x04" * 8,
+            crypto=mock.Mock(spec=SessionCrypto),
+            vpn_ip="10.88.0.13",
+            endpoint=client.endpoint,
+            pfs=True,
+        )
+        plan = build_full_tunnel_plan("10.88.0.13")
+        plan.tunnel_iface = "rpt0"
+        host = client.endpoint.host
+
+        with mock.patch(
+            "client.linux.tunnel_linux.resolve_default_route"
+        ) as resolve, mock.patch(
+            "client.linux.tunnel_linux.create_linux_tun",
+            return_value=(None, "stop after resolve"),
+        ):
+            start_full_tunnel(
+                client,
+                plan,
+                host,
+                require_system_capture=True,
+                prefetched_default_route=("10.0.0.1", "wlan0"),
+            )
+            resolve.assert_not_called()
 
 
 if __name__ == "__main__":

@@ -725,7 +725,9 @@ class TunnelClientApp:
                 try:
                     prefetched_route = route_fut.result(timeout=8)
                 except Exception:
-                    prefetched_route = (None, None)
+                    # Do not pass (None, None) — that would skip re-resolve in
+                    # start_full_tunnel. None means "resolve live".
+                    prefetched_route = None
 
             if not (result.ok and result.session and result.tunnel_plan):
                 msg = result.message or "Connection failed"

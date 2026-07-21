@@ -292,6 +292,10 @@ def start_full_tunnel(
         and len(prefetched_default_route) >= 2
     ):
         gw, phys_dev = prefetched_default_route[0], prefetched_default_route[1]
+        # Empty prefetch (timeout/failure) must fall back to a live resolve —
+        # never stick with (None, None) and fail residual attach.
+        if not gw and not phys_dev:
+            gw, phys_dev = resolve_default_route()
     else:
         gw, phys_dev = resolve_default_route()
     if dry_run:
