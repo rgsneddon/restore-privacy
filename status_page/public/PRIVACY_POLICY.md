@@ -2,7 +2,7 @@
 
 **Last updated:** 21 July 2026  
 **Product:** Restore Privacy Tunnel (RPT / RPT2) — custom VPN node, client apps, and public status page  
-**Current packages (catalog v0.2.9):** paid installers via [status downloads](https://restore-privacy-status.onrender.com/) (Windows · Android · macOS · iOS · Linux — macOS Developer ID notarized; iOS Team-signed sideload). The product source repository is private; installers are not free permanent public GitHub downloads.  
+**Current packages (catalog v0.3.0):** paid installers via [status downloads](https://restore-privacy-status.onrender.com/) (Windows · Android · macOS · iOS · Linux — macOS Developer ID notarized; iOS Team-signed sideload). The product source repository is private; installers are not free permanent public GitHub downloads.  
 **Code & policy audit:** [AUDIT.md](AUDIT.md)  
 **Operator / project:** Russell G Sneddon (`rgsneddon`) / [restore-privacy](https://github.com/rgsneddon/restore-privacy)
 
@@ -68,7 +68,7 @@ Process stdout/stderr for the node service is configured for **no journal sessio
 - Displays the product **title**, beta note, and **download links** only.
 - Does **not** expose a live connected-client count or poll a session metric on the public HTML surface.
 - Optional `/api/status` JSON is **title-only** (no `clients_connected`).
-- May offer **download links** to public GitHub release packages (current catalog: **v0.2.9** fulfilled after payment on [status downloads](https://restore-privacy-status.onrender.com/) (private source repo; no free permanent public installer URLs)).
+- May offer **download links** to public GitHub release packages (current catalog: **v0.3.0** fulfilled after payment on [status downloads](https://restore-privacy-status.onrender.com/) (private source repo; no free permanent public installer URLs)).
 
 ### 3.4 Operator-held secrets
 

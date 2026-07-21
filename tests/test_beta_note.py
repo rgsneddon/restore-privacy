@@ -37,9 +37,12 @@ class TestTitleLegalLinks(unittest.TestCase):
         self.assertIn("LICENCE", html)
         self.assertIn("PRIVACY POLICY", html)
         self.assertIn("SECURITY AUDIT", html)
-        self.assertIn(status_app.LICENCE_URL, html)
-        self.assertIn(status_app.PRIVACY_POLICY_URL, html)
-        # Audit link is same-origin so it never 404s when a GH host is private
+        # Same-origin hrefs (status host; not absolute GitHub blob URLs in nav)
+        self.assertIn('id="licence-link" href="/LICENSE"', html)
+        self.assertIn('id="privacy-link" href="/PRIVACY_POLICY.md"', html)
+        self.assertIn('id="audit-link" href="/AUDIT.md"', html)
+        self.assertIn('id="readme-link" href="/README.md"', html)
+        self.assertIn('id="how-to-buy-link" href="/how-to-buy"', html)
         self.assertIn(status_app.SECURITY_AUDIT_LOCAL_PATH, html)
         self.assertIn('id="doc-links"', html)
         self.assertIn('id="licence-link"', html)
@@ -65,7 +68,17 @@ class TestTitleLegalLinks(unittest.TestCase):
         self.assertIn("PRIVACY_POLICY.md", status_app.PRIVACY_POLICY_URL)
         self.assertIn("AUDIT.md", status_app.SECURITY_AUDIT_URL)
         self.assertTrue(status_app.SECURITY_AUDIT_URL.endswith("/AUDIT.md"))
-        self.assertIn("github.com/rgsneddon/restore-privacy", status_app.LICENCE_URL)
+        # Absolute constants use public status origin (Render), not GitHub blobs
+        self.assertIn(
+            "restore-privacy-status.onrender.com", status_app.LICENCE_URL
+        )
+        self.assertIn(
+            "restore-privacy-status.onrender.com", status_app.PRIVACY_POLICY_URL
+        )
+        self.assertIn(
+            "restore-privacy-status.onrender.com", status_app.SECURITY_AUDIT_URL
+        )
+        self.assertNotIn("github.com", status_app.LICENCE_URL)
         self.assertNotIn("RUST-IN-PRIVACY", status_app.LICENCE_URL)
         # Labels
         self.assertEqual(status_app.LICENCE_LABEL, "LICENCE")

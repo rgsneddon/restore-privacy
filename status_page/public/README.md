@@ -5,7 +5,7 @@
 
 | | |
 |--|--|
-| **Get the app** | [Status & paid downloads](https://restore-privacy-status.onrender.com/) (catalog **v0.2.9**, £2.45 per package) |
+| **Get the app** | [Status & paid downloads](https://restore-privacy-status.onrender.com/) (catalog **v0.3.0**, £2.45 per package) |
 | **Privacy** | [PRIVACY_POLICY.md](PRIVACY_POLICY.md) |
 | **License** | [LICENSE](LICENSE) (MIT) |
 | **Credits** | [CREDITS.md](CREDITS.md) |
@@ -40,56 +40,56 @@
 
 ## How to install and use
 
-**Current catalog (v0.2.9):** pay-per-package installers on https://restore-privacy-status.onrender.com/ (£2.45 GBP via Stripe).  
+**Current catalog (v0.3.0):** pay-per-package installers on https://restore-privacy-status.onrender.com/ (£2.45 GBP via Stripe).  
 The product source repository is **private**; free permanent GitHub release downloads are not offered. After payment the status site delivers the installer once (authenticated proxy).
 
 | Platform | Package |
 |----------|---------|
-| Windows | `restore-privacy-client-0.2.9-windows-x64-setup.exe` |
-| Android | `restore-privacy-client-0.2.9-android.apk` |
-| macOS | `restore-privacy-client-0.2.9-macos.zip` *(Developer ID signed + notarized)* |
-| iOS | `restore-privacy-client-0.2.9-ios.zip` *(Team-signed sideload)* |
-| Ubuntu / Linux | `restore-privacy-client-0.2.9-linux-x64.tar.gz` |
+| Windows | `restore-privacy-client-0.3.0-windows-x64-setup.exe` |
+| Android | `restore-privacy-client-0.3.0-android.apk` |
+| macOS | `restore-privacy-client-0.3.0-macos.zip` *(Developer ID signed + notarized)* |
+| iOS | `restore-privacy-client-0.3.0-ios.zip` *(Team-signed sideload)* |
+| Ubuntu / Linux | `restore-privacy-client-0.3.0-linux-x64.tar.gz` |
 
 ### Windows
 
-1. On the [status downloads page](https://restore-privacy-status.onrender.com/), pay **£2.45** for **Windows** and download **`restore-privacy-client-0.2.9-windows-x64-setup.exe`** (one-time link after payment).
+1. On the [status downloads page](https://restore-privacy-status.onrender.com/), pay **£2.45** for **Windows** and download **`restore-privacy-client-0.3.0-windows-x64-setup.exe`** (one-time link after payment).
 2. Run the installer (bundled runtime + Wintun — no separate Python install).
 3. Press **Connect** and approve **UAC** when prompted so residual public IP uses the VPN node.
 4. Optional: **Settings** → startup / autoconnect (defaults **off**); legal links to audit / privacy / licence.
 
 ### Android
 
-1. On the [status downloads page](https://restore-privacy-status.onrender.com/), pay **£2.45** for **Android** and download **`restore-privacy-client-0.2.9-android.apk`** (one-time link after payment).
+1. On the [status downloads page](https://restore-privacy-status.onrender.com/), pay **£2.45** for **Android** and download **`restore-privacy-client-0.3.0-android.apk`** (one-time link after payment).
 2. Install the APK (allow install from unknown sources if your device asks).
 3. Open **Restore Privacy**, press **Connect**, and grant **VPN** permission when prompted.
 4. Optional: **Settings** → startup / autoconnect (defaults off). Minimize keeps the VPN service running until **Disconnect**.
 
 ### Ubuntu and derivatives (Linux Mint, Pop!_OS, …)
 
-1. On the [status downloads page](https://restore-privacy-status.onrender.com/), pay **£2.45** for **Linux** and download **`restore-privacy-client-0.2.9-linux-x64.tar.gz`** (one-time link after payment).
+1. On the [status downloads page](https://restore-privacy-status.onrender.com/), pay **£2.45** for **Linux** and download **`restore-privacy-client-0.3.0-linux-x64.tar.gz`** (one-time link after payment).
 2. Unpack and run the bundled installer:
    ```bash
-   tar xzf restore-privacy-client-0.2.9-linux-x64.tar.gz
-   cd restore-privacy-0.2.9-linux
+   tar xzf restore-privacy-client-0.3.0-linux-x64.tar.gz
+   cd restore-privacy-0.3.0-linux
    bash install.sh
    ```
 3. Run **`sudo ./bin/privacy-restored`** for residual public IP (TUN + dual `/1` routes).
 
 ### macOS
 
-Published **0.2.9** macOS builds are **Developer ID signed and notarized**.
+Published **0.3.0** macOS builds are **Developer ID signed and notarized**.
 
-1. On the [status downloads page](https://restore-privacy-status.onrender.com/), pay **£2.45** for **macOS** and download **`restore-privacy-client-0.2.9-macos.zip`** (one-time link after payment).
+1. On the [status downloads page](https://restore-privacy-status.onrender.com/), pay **£2.45** for **macOS** and download **`restore-privacy-client-0.3.0-macos.zip`** (one-time link after payment).
 2. Unzip and open **`restore_privacy_client.app`**.
 3. Press **Connect** and approve the **VPN configuration** prompt.
-4. Residual public IP only changes when the Packet Tunnel is **active**. Host-only HELLO is **diagnostic** only. **Mac work required** for residual Packet Tunnel signing when rebuilding from source (see `client_app/APPLE_HANDOFF_0.2.9.md`). **Disconnect** / **Quit** stops the system VPN.
+4. Residual public IP only changes when the Packet Tunnel is **active**. Host-only HELLO is **diagnostic** only. **Mac work required** for residual Packet Tunnel signing when rebuilding from source (see `client_app/APPLE_HANDOFF_0.3.0.md`). **Disconnect** / **Quit** stops the system VPN.
 
 ### iOS
 
-Published **0.2.9** iOS packages are **Team-signed sideload** zips (not App Store).
+Published **0.3.0** iOS packages are **Team-signed sideload** zips (not App Store).
 
-1. On the [status downloads page](https://restore-privacy-status.onrender.com/), pay **£2.45** for **iOS** and download **`restore-privacy-client-0.2.9-ios.zip`** (one-time link after payment).
+1. On the [status downloads page](https://restore-privacy-status.onrender.com/), pay **£2.45** for **iOS** and download **`restore-privacy-client-0.3.0-ios.zip`** (one-time link after payment).
 2. Install **`Runner.app`** with device tooling; press **Connect** and grant **VPN** permission.
 3. Residual public IP only changes when the Packet Tunnel is **active**.
 
@@ -97,7 +97,7 @@ Published **0.2.9** iOS packages are **Team-signed sideload** zips (not App Stor
 
 https://restore-privacy-status.onrender.com/
 
-- **Pay £2.45** buttons for Windows, Android, macOS, iOS, Linux — catalog **v0.2.9**  
+- **Pay £2.45** buttons for Windows, Android, macOS, iOS, Linux — catalog **v0.3.0**  
 - Installers are delivered **after payment** (single-use link); the product repo is private  
 - **No** public live session / connected-client counter  
 - A browser tab cannot run full system VPN
@@ -155,7 +155,7 @@ Node deploy, ports, secrets, from-source builds, and tests: **[sundries.txt](sun
 
 **Post-quantum readiness:** staged hybrid Kyber/ML-KEM hook in `node/pq_hybrid.py` + plan [`docs/PQ_MIGRATION.md`](docs/PQ_MIGRATION.md) (not residual PQ on the wire until dual-wire + real ML-KEM).
 
-**Product ship (v0.2.9):** Paid installers on **[status downloads](https://restore-privacy-status.onrender.com/)** (macOS Developer ID notarized; iOS Team-signed). Source repo is private. Production node **82.221.101.241:44044**.
+**Product ship (v0.3.0):** Paid installers on **[status downloads](https://restore-privacy-status.onrender.com/)** (macOS Developer ID notarized; iOS Team-signed). Source repo is private. Production node **82.221.101.241:44044**.
 
 **Self-host (one shot):** `sudo bash scripts/selfhost_node.sh` — node install + tunnel DNS + host privacy. Deploy remote: `python scripts/deploy_rpt_node.py` (`RPT_SSH_HOST`, `RPT_SSH_USER`, key). Details: [sundries.txt](sundries.txt).
 
@@ -165,7 +165,7 @@ Node deploy, ports, secrets, from-source builds, and tests: **[sundries.txt](sun
 
 **Ephemeral / short-lived nodes:** [scripts/ephemeral_node.py](scripts/ephemeral_node.py) — **periodic** VPS **snapshot** and/or **rebuild** plan (`--dry-run` by default). Install timer: [scripts/install_ephemeral_timer.sh](scripts/install_ephemeral_timer.sh). Live rebuild requires `RPT_EPHEMERAL_CONFIRM=yes`. Rebuild re-runs self-host (no-log). Does not erase provider backups/netflow; re-ship **public** node pin if keys rotate.
 
-**Release scripts:** `scripts/build_release_0.2.9.py`. Apple handoff: [`client_app/APPLE_HANDOFF_0.2.9.md`](client_app/APPLE_HANDOFF_0.2.9.md). Release notes: [`scripts/RELEASE_NOTES_0.2.9.md`](scripts/RELEASE_NOTES_0.2.9.md).
+**Release scripts:** `scripts/build_release_0.3.0.py`. Apple handoff: [`client_app/APPLE_HANDOFF_0.3.0.md`](client_app/APPLE_HANDOFF_0.3.0.md). Release notes: [`scripts/RELEASE_NOTES_0.3.0.md`](scripts/RELEASE_NOTES_0.3.0.md).
 
 ```bash
 # Windows GUI (requires system Python)
@@ -178,5 +178,5 @@ sudo PYTHONPATH=. python3 -m client.linux
 python scripts/package_linux.py  # manylinux wheels for CPython 3.8–3.12; re-run each release
 
 # Release packages (current tag)
-python scripts/build_release_0.2.9.py
+python scripts/build_release_0.3.0.py
 ```

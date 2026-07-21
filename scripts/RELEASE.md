@@ -4,14 +4,14 @@
 
 | Tag | Script |
 |-----|--------|
-| **0.2.9** | `scripts/build_release_0.2.9.py` |
+| **0.3.0** | `scripts/build_release_0.3.0.py` |
 | 0.2.3 | `scripts/build_release_0.2.3.py` (archive) |
 | 0.2.2 | `scripts/build_release_0.2.2.py` (archive) |
 | 0.2.1 | `scripts/build_release_0.2.1.py` (archive) |
 | 0.2.0 | `scripts/build_release_0.2.0.py` (archive) |
 | 0.1.8 | `scripts/build_release_0.1.8.py` (archive) |
 
-Product node: **82.221.101.241:44044**. See `scripts/RELEASE_NOTES_0.2.9.md`.
+Product node: **82.221.101.241:44044**. See `scripts/RELEASE_NOTES_0.3.0.md`.
 
 Older `build_release_0.*.py` files are historical archives. Prefer copying the
 **latest** script when starting a new version.
@@ -27,7 +27,7 @@ Shared gates every release must keep:
 
 ```bash
 # Bump VERSION / downloads catalog / installer VERSION first
-python scripts/build_release_0.2.9.py
-# Confirm releases/0.2.9/ has windows + linux (+ android/apple if built)
-# gh release create 0.2.9 with those files
+python scripts/build_release_0.3.0.py
+# Confirm releases/0.3.0/ has windows + linux (+ android/apple if built)
+# gh release create 0.3.0 with those files
 ```
