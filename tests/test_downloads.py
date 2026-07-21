@@ -100,7 +100,8 @@ class TestDownloadCatalog(unittest.TestCase):
         self.assertNotIn("rust-repo-footer", html)
         self.assertNotIn("installers after £2.45 payment only", html)
         self.assertNotIn("FULL CATALOGUE", html.upper())
-        self.assertIn("how-to-buy-footer-link", html)
+        self.assertNotIn("how-to-buy-footer-link", html)
+        self.assertNotIn('href="/how-to-buy"', html)
         self.assertIn("bmc-tip-link", html)
 
     def test_download_menu_is_three_then_two_rows(self):

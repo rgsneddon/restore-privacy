@@ -135,14 +135,8 @@ def public_docs_catalog() -> list[dict[str, str]]:
                 "url": public_doc_absolute_url(doc),
             }
         )
-    out.append(
-        {
-            "id": "how-to-buy",
-            "path": HOW_TO_BUY_PATH,
-            "title": "How to buy",
-            "url": public_doc_absolute_url(HOW_TO_BUY_PATH),
-        }
-    )
+    # How-to-buy page may still exist at HOW_TO_BUY_PATH; it is not listed in
+    # public chrome / catalog link surfaces.
     return out
 
 
@@ -441,7 +435,6 @@ def render_document_html(
 <header class="doc-top">
   <a href="/" id="doc-back-home">← Status &amp; downloads</a>
   <nav class="doc-mini" aria-label="Documents">
-    <a href="{HOW_TO_BUY_PATH}">How to buy</a>
     <a href="{PRIVACY_PATH}">Privacy</a>
     <a href="{LICENSE_PATH}">Licence</a>
     <a href="{AUDIT_PATH}">Audit</a>
@@ -455,7 +448,6 @@ def render_document_html(
   <p class="muted">Restore Privacy public documents on this status host
   (source repository is private). Paid installers: <a href="/#downloads">downloads</a>.</p>
   <p>
-    <a href="{HOW_TO_BUY_PATH}">How to buy</a>
     <a href="{PRIVACY_PATH}">Privacy</a>
     <a href="{LICENSE_PATH}">Licence</a>
     <a href="{AUDIT_PATH}">Audit</a>
@@ -505,7 +497,6 @@ def render_how_to_buy_html() -> bytes:
         f'    <li><a href="{d["path"]}">{_escape(d["title"])}</a> '
         f'(<code>{_escape(d["url"])}</code>)</li>'
         for d in docs
-        if d["id"] != "how-to-buy"
     )
     body = f"""<!DOCTYPE html>
 <html lang="en"><head>
@@ -556,7 +547,7 @@ No free permanent installer buttons on the status page.</p>
 </div>
 
 <footer class="doc-foot">
-<p class="muted"><a href="{HOW_TO_BUY_PATH}">How to buy</a>
+<p class="muted">
 <a href="{LICENSE_PATH}">Licence</a>
 <a href="{PRIVACY_PATH}">Privacy</a>
 <a href="{AUDIT_PATH}">Security audit</a>
@@ -570,13 +561,12 @@ No free permanent installer buttons on the status page.</p>
 
 
 def render_public_nav_links_html() -> str:
-    """Nav fragment: licence · privacy · audit · readme · how-to-buy (same-origin)."""
+    """Nav fragment: licence · privacy · audit · readme (same-origin; no How-to-buy)."""
     items = (
         ("LICENCE", LICENSE_PATH, "licence-link"),
         ("PRIVACY POLICY", PRIVACY_PATH, "privacy-link"),
         ("SECURITY AUDIT", AUDIT_PATH, "audit-link"),
         ("README", README_PATH, "readme-link"),
-        ("HOW TO BUY", HOW_TO_BUY_PATH, "how-to-buy-link"),
     )
     anchors = []
     for label, path, el_id in items:

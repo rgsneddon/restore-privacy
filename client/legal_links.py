@@ -10,31 +10,28 @@ from __future__ import annotations
 import os
 from dataclasses import dataclass
 
-# Default public status host (how-to-buy + legal docs are served here).
+# Default public status host (legal docs are served here).
 DEFAULT_STATUS_ORIGIN = "https://restoreprivacy.online"
 
 # User-facing labels (Settings) and status-origin paths.
 AUDIT_LABEL = "Most recent audit"
 PRIVACY_POLICY_LABEL = "Privacy policy"
 END_USER_LICENCE_LABEL = "End user licence"
-HOW_TO_BUY_LABEL = "How to buy"
 
 AUDIT_REPO_PATH = "AUDIT.md"
 PRIVACY_POLICY_REPO_PATH = "PRIVACY_POLICY.md"
 # On-disk spelling is LICENSE (US); UI label uses “licence”.
 END_USER_LICENCE_REPO_PATH = "LICENSE"
-HOW_TO_BUY_PATH = "how-to-buy"
 
 # Status-origin URL paths (must match status_page/public_docs.py).
 AUDIT_STATUS_PATH = "/AUDIT.md"
 PRIVACY_STATUS_PATH = "/PRIVACY_POLICY.md"
 LICENCE_STATUS_PATH = "/LICENSE"
-HOW_TO_BUY_STATUS_PATH = "/how-to-buy"
 README_STATUS_PATH = "/README.md"
 
 
 def status_origin() -> str:
-    """Public base for legal/how-to URLs (env RPT_PUBLIC_BASE_URL or production default)."""
+    """Public base for legal URLs (env RPT_PUBLIC_BASE_URL or production default)."""
     raw = os.environ.get("RPT_PUBLIC_BASE_URL", "").strip().rstrip("/")
     if raw and not raw.startswith("http://127.0.0.1") and not raw.startswith(
         "http://localhost"
@@ -85,11 +82,6 @@ LEGAL_DOC_LINKS: tuple[LegalDocLink, ...] = (
         repo_path=END_USER_LICENCE_REPO_PATH,
         status_path=LICENCE_STATUS_PATH,
     ),
-    LegalDocLink(
-        label=HOW_TO_BUY_LABEL,
-        repo_path=HOW_TO_BUY_PATH,
-        status_path=HOW_TO_BUY_STATUS_PATH,
-    ),
 )
 
 
@@ -108,10 +100,6 @@ def privacy_policy_url() -> str:
 
 def end_user_licence_url() -> str:
     return LEGAL_DOC_LINKS[2].url
-
-
-def how_to_buy_url() -> str:
-    return LEGAL_DOC_LINKS[3].url
 
 
 def readme_url() -> str:

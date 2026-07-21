@@ -22,8 +22,9 @@ class TestPublicDocsRegistry(unittest.TestCase):
         cat = public_docs.public_docs_catalog()
         ids = {d["id"] for d in cat}
         self.assertTrue(
-            {"readme", "licence", "privacy", "audit", "how-to-buy"}.issubset(ids)
+            {"readme", "licence", "privacy", "audit"}.issubset(ids)
         )
+        self.assertNotIn("how-to-buy", ids)
         for d in cat:
             self.assertTrue(d["path"].startswith("/"), d)
             self.assertIn("restoreprivacy.online", d["url"])
@@ -138,7 +139,9 @@ class TestPublicStatusLinks(unittest.TestCase):
         self.assertIn('id="privacy-link" href="/PRIVACY_POLICY.md"', html)
         self.assertIn('id="audit-link" href="/AUDIT.md"', html)
         self.assertIn('id="readme-link" href="/README.md"', html)
-        self.assertIn('id="how-to-buy-link" href="/how-to-buy"', html)
+        self.assertNotIn("how-to-buy-link", html)
+        self.assertNotIn('href="/how-to-buy"', html)
+        self.assertNotIn("How to buy", html)
         # Must not force private GitHub-only licence/privacy for public nav
         self.assertNotIn(
             'id="licence-link" href="https://github.com/rgsneddon/RUST-IN-PRIVACY',
@@ -152,7 +155,6 @@ class TestPublicStatusLinks(unittest.TestCase):
         )
         self.assertIn("restoreprivacy.online", status_app.LICENCE_URL)
         self.assertIn("restoreprivacy.online", status_app.SECURITY_AUDIT_URL)
-        self.assertIn("/how-to-buy", status_app.HOW_TO_BUY_URL)
 
 
 class TestClientLegalLinksStatusOrigin(unittest.TestCase):
@@ -164,14 +166,16 @@ class TestClientLegalLinksStatusOrigin(unittest.TestCase):
         os.environ.pop("RPT_PUBLIC_BASE_URL", None)
         urls = legal_links.legal_doc_urls()
         self.assertIn(legal_links.AUDIT_LABEL, urls)
-        for u in urls.values():
+        self.assertNotIn("How to buy", urls)
+        for label, u in urls.items():
             self.assertIn("restoreprivacy.online", u)
             self.assertNotIn("github.com", u)
+            self.assertNotIn("/how-to-buy", u, msg=label)
         self.assertTrue(legal_links.audit_url().endswith("/AUDIT.md"))
         self.assertTrue(legal_links.privacy_policy_url().endswith("/PRIVACY_POLICY.md"))
         self.assertTrue(legal_links.end_user_licence_url().endswith("/LICENSE"))
-        self.assertTrue(legal_links.how_to_buy_url().endswith("/how-to-buy"))
         self.assertTrue(legal_links.readme_url().endswith("/README.md"))
+        self.assertFalse(hasattr(legal_links, "how_to_buy_url"))
 
 
 if __name__ == "__main__":

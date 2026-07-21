@@ -31,8 +31,8 @@ class TestLegalLinksHelper(unittest.TestCase):
         self.assertEqual(AUDIT_LABEL, "Most recent audit")
         self.assertEqual(PRIVACY_POLICY_LABEL, "Privacy policy")
         self.assertEqual(END_USER_LICENCE_LABEL, "End user licence")
-        # Public status host also surfaces how-to-buy
-        self.assertIn("How to buy", labels)
+        # How-to-buy is not a Settings legal-doc entry
+        self.assertNotIn("How to buy", labels)
 
     def test_repo_paths_exist_on_disk(self):
         for path_name in (
@@ -88,7 +88,8 @@ class TestLegalLinksHelper(unittest.TestCase):
         self.assertIn("PRIVACY_POLICY.md", links)
         self.assertIn("LICENSE", links)
         self.assertIn("restoreprivacy.online", links)
-        self.assertIn("how-to-buy", links)
+        self.assertNotIn("how-to-buy", links)
+        self.assertNotIn("How to buy", links)
         self.assertIn("launchUrl", dart)
 
 

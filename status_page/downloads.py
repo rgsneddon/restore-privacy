@@ -328,7 +328,7 @@ def download_css() -> str:
 
 
 def render_rust_footer_html() -> str:
-    """Footer under download buttons — How to buy + tip only.
+    """Footer under download buttons — optional tip only (no How-to-buy link).
 
     The old “Catalog v… — installers after £2.45…” / FULL CATALOGUE footer link
     (``rust-repo-link``) is intentionally **not** emitted on the public page.
@@ -338,8 +338,7 @@ def render_rust_footer_html() -> str:
     tip_label = tip.replace("https://", "").replace("http://", "")
     return (
         f'    <p class="dl-tip" id="bmc-tip">'
-        f'<a id="how-to-buy-footer-link" href="/how-to-buy">How to buy</a>'
-        f' · Tip / support (not a paid download): '
+        f'Tip / support (not a paid download): '
         f'<a id="bmc-tip-link" href="{tip}" rel="noopener noreferrer" '
         f'target="_blank">{tip_label}</a></p>'
     )

@@ -130,8 +130,9 @@ class TestPaymentPageInAdminHtml(unittest.TestCase):
         self.assertNotIn("stripe-payment-page-link", foot)
         self.assertNotIn(">Stripe payment page<", foot)
         self.assertNotIn("/admin/processors/apply", foot)
-        # Tip / how-to-buy remain
-        self.assertIn("how-to-buy-footer-link", foot)
+        # Tip remains; How-to-buy footer link is removed
+        self.assertNotIn("how-to-buy-footer-link", foot)
+        self.assertNotIn('href="/how-to-buy"', foot)
         self.assertIn("bmc-tip-link", foot)
         # Platform pay buttons still use the Payment Link
         html = render_download_section_html()

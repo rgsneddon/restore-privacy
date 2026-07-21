@@ -155,7 +155,7 @@ def audit_document_bytes() -> bytes | None:
 
 
 def render_legal_links_html() -> str:
-    """Links immediately below the headline: licence / privacy / audit / README / how-to-buy."""
+    """Links immediately below the headline: licence / privacy / audit / README."""
     return render_public_nav_links_html()
 
 

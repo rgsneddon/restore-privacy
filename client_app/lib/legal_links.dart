@@ -1,4 +1,4 @@
-/// Public document links for Settings (audit, privacy, end-user licence, how-to-buy).
+/// Public document links for Settings (audit, privacy, end-user licence).
 ///
 /// Always open **status-host** absolute URLs (readable HTML pages on
 /// restoreprivacy.online). Paths match status_page/public_docs.py — never
@@ -23,12 +23,10 @@ class LegalDocLink {
 const String kAuditLabel = 'Most recent audit';
 const String kPrivacyPolicyLabel = 'Privacy policy';
 const String kEndUserLicenceLabel = 'End user licence';
-const String kHowToBuyLabel = 'How to buy';
 
 const List<LegalDocLink> kLegalDocLinks = [
   LegalDocLink(label: kAuditLabel, statusPath: '/AUDIT.md'),
   LegalDocLink(label: kPrivacyPolicyLabel, statusPath: '/PRIVACY_POLICY.md'),
   // On-disk spelling is LICENSE; UI label uses “licence”.
   LegalDocLink(label: kEndUserLicenceLabel, statusPath: '/LICENSE'),
-  LegalDocLink(label: kHowToBuyLabel, statusPath: '/how-to-buy'),
 ];

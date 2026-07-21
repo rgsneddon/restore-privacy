@@ -73,7 +73,8 @@ class TestPublicPageWithDownloads(unittest.TestCase):
         self.assertIn('id="dl-site-origin"', html)
         self.assertIn("£2.45", html)
         self.assertIn("buymeacoffee.com/rgsneddon", html)
-        self.assertIn("how-to-buy-footer-link", html)
+        self.assertNotIn("how-to-buy-footer-link", html)
+        self.assertNotIn('href="/how-to-buy"', html)
         self.assertNotIn("connect-via-web", html)
         self.assertNotIn("Connect via web", html)
 

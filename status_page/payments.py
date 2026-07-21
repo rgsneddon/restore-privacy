@@ -653,7 +653,7 @@ def render_post_payment_thankyou_html(
   </p>
   <p class="msg muted">This link is one-time and expires. It only unlocks the package you paid for.
     Tip optional: <a href="https://buymeacoffee.com/rgsneddon">buymeacoffee.com/rgsneddon</a></p>
-  <p><a href="/">Home</a> · <a href="/how-to-buy">How to buy</a></p>
+  <p><a href="/">Home</a></p>
 </section>
 """
 
