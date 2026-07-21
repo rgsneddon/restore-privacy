@@ -56,8 +56,38 @@ def stripe_webhook_secret() -> str:
 
 
 def stripe_price_id() -> str:
-    """Optional pre-created Price id; if empty, Checkout uses unit_amount=245."""
-    return os.environ.get("STRIPE_PRICE_ID", "").strip()
+    """Optional **one-time** Price id for package Checkout only.
+
+    Prefer ``STRIPE_CHECKOUT_PRICE_ID`` / ``STRIPE_ONE_TIME_PRICE_ID``.
+
+    Legacy ``STRIPE_PRICE_ID`` is **ignored by default** for Checkout because operators
+    often paste a Payment Link **recurring** price here, which Stripe rejects with
+    mode=payment. Set ``STRIPE_ALLOW_LEGACY_PRICE_ID=1`` to use ``STRIPE_PRICE_ID``
+    only when that price is known one-time.
+    """
+    for key in ("STRIPE_CHECKOUT_PRICE_ID", "STRIPE_ONE_TIME_PRICE_ID"):
+        raw = os.environ.get(key, "").strip()
+        if raw:
+            return raw
+    if os.environ.get("STRIPE_ALLOW_LEGACY_PRICE_ID", "").strip().lower() in (
+        "1",
+        "true",
+        "yes",
+    ):
+        return os.environ.get("STRIPE_PRICE_ID", "").strip()
+    return ""
+
+
+def stripe_payment_link_price_id() -> str:
+    """Price id on the operator Payment Link (may be recurring) — display only.
+
+    Not used for package Checkout session create (payment mode).
+    """
+    for key in ("STRIPE_PAYMENT_LINK_PRICE_ID", "RPT_STRIPE_PAYMENT_LINK_PRICE_ID"):
+        raw = os.environ.get(key, "").strip()
+        if raw:
+            return raw
+    return DEFAULT_STRIPE_PAYMENT_LINK_PRICE_ID
 
 
 # Public Stripe Payment Link / Donate page (not a secret — operator-provided).
@@ -67,6 +97,8 @@ DEFAULT_STRIPE_PAYMENT_PAGE_URL = (
 )
 # Dashboard Payment Link object id (plink_…) for the same public page.
 DEFAULT_STRIPE_PAYMENT_LINK_ID = "plink_1TvTu6JDavQ2TJW6FeL0dIh9"
+# Line item price on that Payment Link (recurring / donate) — not for payment-mode Checkout.
+DEFAULT_STRIPE_PAYMENT_LINK_PRICE_ID = "price_1TvTsaJDavQ2TJW6HZVIG7hg"
 
 
 def stripe_payment_page_url() -> str:
@@ -394,7 +426,11 @@ def _default_http_post(
 
 
 def build_checkout_form_body(req: CheckoutRequest) -> bytes:
-    """application/x-www-form-urlencoded body for Stripe Checkout Session create."""
+    """application/x-www-form-urlencoded body for Stripe Checkout Session create.
+
+    Always uses ``mode=payment`` (one-time). Package downloads never attach a
+    recurring Payment Link price — that causes HTTP 400 from Stripe.
+    """
     fields: list[tuple[str, str]] = [
         ("mode", "payment"),
         ("success_url", req.success_url),
@@ -405,11 +441,14 @@ def build_checkout_form_body(req: CheckoutRequest) -> bytes:
         ("metadata[amount_pence]", str(PRICE_PENCE)),
         ("metadata[currency]", PRICE_CURRENCY),
     ]
+    # One-time Dashboard price only (see stripe_price_id). Never use Payment Link
+    # recurring price ids here.
     price_id = stripe_price_id()
     if price_id:
         fields.append(("line_items[0][price]", price_id))
         fields.append(("line_items[0][quantity]", "1"))
     else:
+        # Inline one-time price_data — correct for payment mode (245 pence GBP).
         fields.extend(
             [
                 ("line_items[0][price_data][currency]", PRICE_CURRENCY),

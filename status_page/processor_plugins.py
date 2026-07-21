@@ -247,13 +247,13 @@ STRIPE_PLUGIN = ProcessorPlugin(
             placeholder="paste webhook signing secret",
         ),
         ProcessorVariable(
-            key="STRIPE_PRICE_ID",
-            label="Price id (optional)",
-            purpose="Dashboard Price id; leave empty to use unit_amount=245 GBP",
+            key="STRIPE_CHECKOUT_PRICE_ID",
+            label="One-time Checkout price id (optional)",
+            purpose="One-time price_… only; leave empty for unit_amount=245. Never use a recurring Payment Link price.",
             required=False,
             secret=False,
             input_type="text",
-            placeholder="price_… (optional)",
+            placeholder="price_… one-time only (optional)",
         ),
         ProcessorVariable(
             key="RPT_PUBLIC_BASE_URL",

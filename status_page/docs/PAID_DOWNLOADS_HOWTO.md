@@ -30,14 +30,18 @@ This site no longer offers those files as free permanent buttons; payment grants
 
 ### 1.3 Product price (£2.45)
 
-**Option A (simplest):** leave `STRIPE_PRICE_ID` empty.  
-The app creates Checkout line items with `unit_amount=245` and `currency=gbp`.
+**Option A (simplest / default):** leave checkout price env empty.  
+The app creates Checkout line items with `mode=payment`, `unit_amount=245`, `currency=gbp`.
 
-**Option B (Dashboard price):**
+**Option B (Dashboard one-time price only):**
 
 1. Product catalog → **Add product** → name e.g. `Restore Privacy download`.
-2. Price: **£2.45**, currency **GBP**, one-time.
-3. Copy the **Price id** (`price_…`) into `STRIPE_PRICE_ID`.
+2. Price: **£2.45**, currency **GBP**, **one-time** (not recurring / subscription).
+3. Copy the **Price id** (`price_…`) into **`STRIPE_CHECKOUT_PRICE_ID`** (not the Payment Link price).
+
+**Do not** put a Payment Link **recurring** price in `STRIPE_PRICE_ID` for downloads.
+That causes: *You specified payment mode but passed a recurring price*.
+Legacy `STRIPE_PRICE_ID` is ignored for Checkout unless `STRIPE_ALLOW_LEGACY_PRICE_ID=1`.
 
 ### 1.4 Webhook (required for fulfilment)
 

@@ -75,6 +75,7 @@ class TestCheckoutAmount(unittest.TestCase):
         with mock.patch.dict(os.environ, {"STRIPE_PRICE_ID": ""}, clear=False):
             body = payments.build_checkout_form_body(creq).decode("utf-8")
         parsed = urllib.parse.parse_qs(body)
+        self.assertEqual(parsed["mode"], ["payment"])
         self.assertEqual(parsed["line_items[0][price_data][unit_amount]"], ["245"])
         self.assertEqual(parsed["line_items[0][price_data][currency]"], ["gbp"])
         self.assertEqual(parsed["metadata[platform]"], ["windows"])
@@ -83,6 +84,50 @@ class TestCheckoutAmount(unittest.TestCase):
             ["restore-privacy-client-0.2.3-windows-x64-setup.exe"],
         )
         self.assertEqual(parsed["metadata[amount_pence]"], ["245"])
+
+    def test_legacy_stripe_price_id_ignored_avoids_recurring_payment_mode_error(self):
+        """STRIPE_PRICE_ID often holds a Payment Link recurring price — must not be used."""
+        creq = payments.CheckoutRequest(
+            platform="windows",
+            filename="restore-privacy-client-0.2.3-windows-x64-setup.exe",
+            success_url="https://example.test/success",
+            cancel_url="https://example.test/cancel",
+        )
+        recurring = "price_1TvTsaJDavQ2TJW6HZVIG7hg"
+        with mock.patch.dict(
+            os.environ,
+            {
+                "STRIPE_PRICE_ID": recurring,
+                "STRIPE_CHECKOUT_PRICE_ID": "",
+                "STRIPE_ONE_TIME_PRICE_ID": "",
+                "STRIPE_ALLOW_LEGACY_PRICE_ID": "",
+            },
+            clear=False,
+        ):
+            body = payments.build_checkout_form_body(creq).decode("utf-8")
+            self.assertEqual(payments.stripe_price_id(), "")
+        parsed = urllib.parse.parse_qs(body)
+        self.assertEqual(parsed["mode"], ["payment"])
+        self.assertNotIn("line_items[0][price]", parsed)
+        self.assertEqual(parsed["line_items[0][price_data][unit_amount]"], ["245"])
+        self.assertNotIn(recurring, body)
+
+    def test_explicit_one_time_checkout_price_id_used(self):
+        creq = payments.CheckoutRequest(
+            platform="linux",
+            filename="restore-privacy-client-0.2.3-linux-x64.tar.gz",
+            success_url="https://example.test/success",
+            cancel_url="https://example.test/cancel",
+        )
+        with mock.patch.dict(
+            os.environ,
+            {"STRIPE_CHECKOUT_PRICE_ID": "price_one_time_unit_test"},
+            clear=False,
+        ):
+            body = payments.build_checkout_form_body(creq).decode("utf-8")
+        parsed = urllib.parse.parse_qs(body)
+        self.assertEqual(parsed["line_items[0][price]"], ["price_one_time_unit_test"])
+        self.assertNotIn("line_items[0][price_data][unit_amount]", parsed)
 
     def test_create_checkout_session_drives_http_with_secret(self):
         captured: dict = {}
