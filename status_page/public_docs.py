@@ -346,10 +346,22 @@ def markdownish_to_html(text: str) -> str:
                 tag = "th" if next_is_sep else "td"
             else:
                 tag = "td"
-            cells_html = "".join(
-                f"<{tag}>{_format_table_cell(c, header=(tag == 'th'))}</{tag}>"
-                for c in cells
-            )
+            # Package AUDIT STATE: scroll lengthy Package (col 2) / Notes (col 4) in-cell
+            cell_parts: list[str] = []
+            for col_i, c in enumerate(cells):
+                inner = _format_table_cell(c, header=(tag == "th"))
+                if table_is_pkg_rag and tag == "td" and col_i in (1, 3):
+                    cell_parts.append(
+                        f'<{tag} class="pkg-cell-scroll">'
+                        f'<div class="cell-scroll">{inner}</div></{tag}>'
+                    )
+                elif table_is_pkg_rag and tag == "th" and col_i in (1, 3):
+                    cell_parts.append(
+                        f'<{tag} class="pkg-cell-scroll">{inner}</{tag}>'
+                    )
+                else:
+                    cell_parts.append(f"<{tag}>{inner}</{tag}>")
+            cells_html = "".join(cell_parts)
             out.append(f"<tr>{cells_html}</tr>")
             i += 1
             continue
@@ -451,25 +463,65 @@ table.doc-table th, table.doc-table td {
 }
 table.doc-table th { background: #111827; color: #fde68a; font-weight: 600; }
 table.doc-table tr:nth-child(even) td { background: #0f141c; }
-/* Package AUDIT STATE: single-line Package + State; room for long basenames */
+/*
+ * Package AUDIT STATE (pkg-rag): fit content column; lengthy Package/Notes
+ * scroll *inside the cell* — do not force full-page horizontal widen via max-content.
+ */
 table.doc-table.pkg-rag {
-  min-width: 56rem; width: max-content; max-width: none;
+  display: table;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  table-layout: fixed;
+  overflow: visible;
 }
 table.doc-table.pkg-rag th:nth-child(1),
 table.doc-table.pkg-rag td:nth-child(1) {
-  white-space: nowrap; min-width: 8.5rem;
+  width: 18%;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 table.doc-table.pkg-rag th:nth-child(2),
-table.doc-table.pkg-rag td:nth-child(2) {
-  white-space: nowrap; min-width: 28rem; max-width: none;
+table.doc-table.pkg-rag td:nth-child(2),
+table.doc-table.pkg-rag th.pkg-cell-scroll,
+table.doc-table.pkg-rag td.pkg-cell-scroll {
+  width: 34%;
+  max-width: 0; /* with table-layout:fixed, enable overflow scroll */
+  overflow: hidden;
+  vertical-align: middle;
 }
 table.doc-table.pkg-rag th:nth-child(3),
 table.doc-table.pkg-rag td:nth-child(3) {
-  white-space: nowrap; min-width: 7.5rem; text-align: center; vertical-align: middle;
+  width: 12%;
+  white-space: nowrap;
+  text-align: center;
+  vertical-align: middle;
+  overflow: visible;
 }
-table.doc-table.pkg-rag td:nth-child(2) code {
-  white-space: nowrap; word-break: keep-all; overflow-wrap: normal;
-  display: inline-block; font-size: 0.82rem;
+table.doc-table.pkg-rag th:nth-child(4),
+table.doc-table.pkg-rag td:nth-child(4) {
+  width: 36%;
+  max-width: 0;
+  overflow: hidden;
+  vertical-align: middle;
+}
+/* In-cell horizontal scroll for long basenames / notes (not page scroll) */
+table.doc-table.pkg-rag .cell-scroll {
+  max-width: 100%;
+  overflow-x: auto;
+  overflow-y: hidden;
+  white-space: nowrap;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: thin;
+}
+table.doc-table.pkg-rag td.pkg-cell-scroll .cell-scroll code,
+table.doc-table.pkg-rag .cell-scroll code {
+  white-space: nowrap;
+  word-break: keep-all;
+  overflow-wrap: normal;
+  display: inline-block;
+  font-size: 0.82rem;
 }
 table.doc-table.pkg-rag .plat-icon { margin-right: 0.35rem; font-size: 1.15rem; }
 /* Package AUDIT STATE solid colour cells */

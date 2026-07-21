@@ -136,7 +136,7 @@ class TestPackageRagEvaluation(unittest.TestCase):
         self.assertNotRegex(md, r"\| \*\*Red\*\* \|")
         self.assertIn("Catalog overall", md)
         self.assertIn("solid colour", md.lower())
-        self.assertIn("single-line", md.lower())
+        self.assertIn("inside the cell", md.lower())
 
     def test_priv_hit_is_red(self):
         # Synthetic: mock contains_priv
@@ -180,6 +180,48 @@ class TestAuditMdHasPackageRag(unittest.TestCase):
         # Legend still explains meaning
         self.assertIn("Green", text)
         self.assertIn("Meaning", text)
+
+
+class TestPkgRagCellScrollHtml(unittest.TestCase):
+    """Status-host HTML: lengthy Package/Notes scroll in-cell, not page-widen."""
+
+    def test_css_and_html_cell_scroll(self):
+        import sys
+
+        sys.path.insert(0, str(ROOT / "status_page"))
+        from public_docs import DOC_SHELL_CSS, markdownish_to_html  # noqa: E402
+
+        css = DOC_SHELL_CSS
+        self.assertIn("cell-scroll", css)
+        self.assertIn("overflow-x: auto", css)
+        self.assertIn("table-layout: fixed", css)
+        self.assertNotIn("width: max-content", css)
+        long_name = "restore-privacy-client-0.3.3-windows-x64-setup.exe"
+        md = self.mod.render_package_rag_section(
+            {
+                "catalog_version": "0.3.3",
+                "overall": "Green",
+                "packages": [
+                    {
+                        "platform": "windows",
+                        "label": "Windows",
+                        "filename": long_name,
+                        "state": "Green",
+                        "reasons": ["pin ok; lengthy note for scroll"],
+                    }
+                ],
+                "legend": {"Green": "g", "Amber": "a", "Red": "r"},
+            }
+        )
+        html = markdownish_to_html(md)
+        self.assertIn("pkg-rag", html)
+        self.assertIn("pkg-cell-scroll", html)
+        self.assertIn("cell-scroll", html)
+        self.assertIn(long_name, html)
+
+    @classmethod
+    def setUpClass(cls):
+        cls.mod = _load_audit_mod()
 
 
 if __name__ == "__main__":
