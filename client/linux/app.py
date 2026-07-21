@@ -75,6 +75,7 @@ from client.licence_gate import (
 )
 from client.payment_entitlement import (
     PAYMENT_CONNECT_DISCLAIMER_PLAIN,
+    ensure_entitlement_for_connect,
     import_session_and_verify,
     load_payment_entitlement,
     payment_allows_connect,
@@ -85,6 +86,7 @@ from client.registration_copy import (
     SEAMLESS_HINT,
     SEAMLESS_TAGLINE,
 )
+from client.startup_bootstrap import bootstrap_payment_entitlement
 from client.transparency_copy import (
     CONNECTION_LOG_DISCLAIMER,
     CONNECTION_LOG_TITLE,
@@ -94,6 +96,14 @@ from client.transparency_copy import (
     LEAK_TEST_DISCLAIMER,
     LEAK_TEST_TITLE,
 )
+from client.linux.settings_store import (
+    ProductSettings,
+    apply_run_at_startup,
+    load_settings,
+    save_settings,
+    should_autoconnect_on_launch,
+)
+from client.legal_links import LEGAL_DOC_LINKS
 from client.connection_log import (
     KIND_CONNECT,
     KIND_DISCONNECT,
@@ -541,13 +551,29 @@ class TunnelClientApp:
         ).pack(side=tk.LEFT, padx=(10, 0))
 
     def _open_settings(self) -> None:
-        """Settings: licence, local connection log, leak test, DPI honesty."""
+        """Settings: startup prefs, licence, payment, log, leak test, docs, DPI."""
         win = tk.Toplevel(self.root)
         win.title("Settings")
         win.configure(bg=CHROME_BG)
-        win.geometry("480x520")
-        frm = tk.Frame(win, bg=WHITE, padx=12, pady=10)
-        frm.pack(fill=tk.BOTH, expand=True, padx=8, pady=8)
+        win.geometry("500x640")
+        # Scrollable body for full product Settings surface
+        canvas = tk.Canvas(win, bg=CHROME_BG, highlightthickness=0)
+        scroll = tk.Scrollbar(win, orient=tk.VERTICAL, command=canvas.yview)
+        frm = tk.Frame(canvas, bg=WHITE, padx=12, pady=10)
+        frm.bind(
+            "<Configure>",
+            lambda e: canvas.configure(scrollregion=canvas.bbox("all")),
+        )
+        canvas.create_window((0, 0), window=frm, anchor="nw")
+        canvas.configure(yscrollcommand=scroll.set)
+        scroll.pack(side=tk.RIGHT, fill=tk.Y)
+        canvas.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+
+        cur = load_settings()
+        run_var = tk.BooleanVar(value=cur.run_at_startup)
+        auto_var = tk.BooleanVar(value=cur.autoconnect_on_launch)
+        note_var = tk.StringVar(value="")
+
         tk.Label(
             frm,
             text="Settings",
@@ -555,6 +581,64 @@ class TunnelClientApp:
             fg=PRIMARY_DARK,
             font=("DejaVu Sans", 12, "bold"),
         ).pack(anchor="w")
+        tk.Label(
+            frm,
+            text="Seamless power-up (both default off)",
+            bg=WHITE,
+            fg=PRIMARY_DARK,
+            font=("DejaVu Sans", 10, "bold"),
+        ).pack(anchor="w", pady=(10, 2))
+
+        def _save_prefs() -> None:
+            s = ProductSettings(
+                run_at_startup=bool(run_var.get()),
+                autoconnect_on_launch=bool(auto_var.get()),
+            )
+            save_settings(s)
+            st = apply_run_at_startup(s.run_at_startup)
+            note_var.set(
+                f"Saved. Run at startup: {st}. "
+                f"Autoconnect: {'on' if s.autoconnect_on_launch else 'off'}."
+            )
+            self._log(
+                f"Settings: run_at_startup={s.run_at_startup} ({st}); "
+                f"autoconnect={s.autoconnect_on_launch}"
+            )
+
+        tk.Checkbutton(
+            frm,
+            text="Run at device startup (XDG autostart)",
+            variable=run_var,
+            command=_save_prefs,
+            bg=WHITE,
+            fg=TEXT,
+            activebackground=WHITE,
+            selectcolor=WHITE,
+            font=("DejaVu Sans", 9),
+            anchor="w",
+        ).pack(fill=tk.X, pady=(2, 0))
+        tk.Checkbutton(
+            frm,
+            text="Autoconnect on launch (same Connect gates)",
+            variable=auto_var,
+            command=_save_prefs,
+            bg=WHITE,
+            fg=TEXT,
+            activebackground=WHITE,
+            selectcolor=WHITE,
+            font=("DejaVu Sans", 9),
+            anchor="w",
+        ).pack(fill=tk.X, pady=(0, 4))
+        tk.Label(
+            frm,
+            textvariable=note_var,
+            bg=WHITE,
+            fg=PRIMARY_DARK,
+            font=("DejaVu Sans", 8),
+            wraplength=440,
+            justify=tk.LEFT,
+        ).pack(anchor="w")
+
         tk.Label(
             frm,
             text=LICENCE_PROMPT_TITLE
@@ -609,20 +693,23 @@ class TunnelClientApp:
 
         def _verify_pay() -> None:
             sid = (session_var.get() or "").strip()
-            if not sid:
-                pay_note.set("Enter Checkout session id (cs_…) from thank-you page.")
-                return
             pay_note.set("Verifying…")
             win.update_idletasks()
             try:
-                ent = import_session_and_verify(sid)
+                if sid:
+                    ent = import_session_and_verify(sid)
+                else:
+                    # Auto-import payment_entitlement.json (Downloads / install dir)
+                    ent = ensure_entitlement_for_connect(bind_device=True)
                 ok = payment_allows_connect()
+                if ent and getattr(ent, "session_id", None):
+                    session_var.set(ent.session_id)
                 pay_note.set(
-                    f"Status: {ent.status}"
+                    f"Status: {getattr(ent, 'status', '?') if ent else load_payment_entitlement().status}"
                     + (" — Connect allowed." if ok else " — Connect blocked.")
                 )
                 self._log(
-                    "Payment verified." if ok else f"Payment status: {ent.status}"
+                    "Payment verified." if ok else "Payment not active for Connect."
                 )
             except Exception as exc:  # noqa: BLE001
                 pay_note.set(f"Verify failed: {exc}")
@@ -634,7 +721,38 @@ class TunnelClientApp:
             bg=PRIMARY,
             fg=WHITE,
             relief=tk.FLAT,
+        ).pack(anchor="w", pady=(0, 2))
+        tk.Label(
+            frm,
+            text="Leave session blank to auto-import payment_entitlement.json from Downloads.",
+            bg=WHITE,
+            fg=TEXT_MUTED,
+            font=("DejaVu Sans", 8),
+            wraplength=440,
+            justify=tk.LEFT,
         ).pack(anchor="w", pady=(0, 8))
+
+        tk.Label(
+            frm,
+            text="Documents",
+            bg=WHITE,
+            fg=PRIMARY_DARK,
+            font=("DejaVu Sans", 10, "bold"),
+        ).pack(anchor="w", pady=(6, 2))
+        for link in LEGAL_DOC_LINKS:
+            tk.Button(
+                frm,
+                text=link.label,
+                command=lambda u=link.url, t=link.label: (
+                    webbrowser.open(u),
+                    self._log(f"Opened {t}"),
+                ),
+                bg=CHROME_BG,
+                fg=PRIMARY_DARK,
+                relief=tk.FLAT,
+                font=("DejaVu Sans", 9),
+                anchor="w",
+            ).pack(fill=tk.X, pady=1)
 
         tk.Label(
             frm,
@@ -740,12 +858,21 @@ class TunnelClientApp:
         ).pack(anchor="w")
 
     def _start_connect(self) -> None:
+        # Fast path: re-discover post-pay entitlement before gate (no Settings tour)
+        try:
+            bootstrap_payment_entitlement(bind_device=True)
+        except Exception:
+            pass
         ok_lic, lic_msg = assert_may_connect()
         if not ok_lic:
             self._log(lic_msg)
             self._set_status("error", detail=lic_msg)
             self.detail_var.set(lic_msg)
-            self._show_licence_prompt()
+            if not has_accepted_licence():
+                self._show_licence_prompt()
+            else:
+                # Payment/other gate — open Settings where verify lives
+                self._open_settings()
             return
 
         if product_connect_requires_root() and not is_root():
@@ -969,6 +1096,12 @@ def main() -> int:
         print(f"Restore Privacy failed to open: {exc}", file=sys.stderr)
         return 1
 
+    # Import post-pay entitlement early so Connect can be one tap after licence
+    try:
+        bootstrap_payment_entitlement(bind_device=True)
+    except Exception:
+        pass
+
     if resume and is_root():
         app.root.after(350, app._start_connect)
     elif resume and not is_root():
@@ -979,6 +1112,21 @@ def main() -> int:
                 "press Connect again and approve elevation."
             ),
         )
+    elif should_autoconnect_on_launch():
+        def _settings_autoconnect() -> None:
+            ok, msg = assert_may_connect()
+            if not ok:
+                app._log(
+                    "Settings: autoconnect skipped — "
+                    + (msg or "accept licence / verify payment first.")
+                )
+                if not has_accepted_licence():
+                    app._show_licence_prompt()
+                return
+            app._log("Settings: autoconnect on launch — starting Connect…")
+            app._start_connect()
+
+        app.root.after(450, _settings_autoconnect)
 
     app.run()
     return 0

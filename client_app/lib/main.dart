@@ -151,6 +151,13 @@ class _TunnelHomeState extends State<TunnelHome> with WidgetsBindingObserver {
       _connectionLog = ConnectionLog(MemoryConnectionLogBackend());
     }
     final loaded = await _store!.load();
+    // Refresh payment if we already have a session id (post-pay recheck)
+    final sid = await _licence!.paymentSessionId();
+    if (sid.isNotEmpty) {
+      try {
+        await _licence!.refreshEntitlementFromRemote();
+      } catch (_) {}
+    }
     final licOk = await _licence!.hasAcceptedLicence();
     final canConnect = await _licence!.mayConnect();
     if (!mounted) return;
@@ -159,8 +166,11 @@ class _TunnelHomeState extends State<TunnelHome> with WidgetsBindingObserver {
       _licenceAccepted = licOk;
       if (!canConnect) {
         _status = licOk
-            ? 'Verify payment in Settings (Checkout session id), then Connect.'
+            ? 'Verify payment in Settings (session id or recheck), then Connect.'
             : 'Accept the licence, then press Connect for residual protection.';
+      } else {
+        _status =
+            'Ready. Press Connect when you want residual protection.';
       }
     });
   }

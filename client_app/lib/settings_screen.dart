@@ -132,23 +132,41 @@ class _SettingsScreenState extends State<SettingsScreen> {
       return;
     }
     final sid = _sessionCtrl.text.trim();
-    if (sid.isEmpty) {
-      setState(() => _note = 'Enter the Checkout session id (cs_…) first.');
-      return;
-    }
     setState(() {
       _busy = true;
       _note = 'Verifying payment entitlement…';
     });
     try {
-      final st = await gate.importSessionAndVerify(sid);
+      final String st;
+      if (sid.isNotEmpty) {
+        st = await gate.importSessionAndVerify(sid);
+      } else {
+        // Recheck existing session (if any) without forcing a paste
+        final existing = await gate.paymentSessionId();
+        if (existing.isEmpty) {
+          if (mounted) {
+            setState(() {
+              _note =
+                  'Enter the Checkout session id (cs_…) from the thank-you page, '
+                  'or complete pay on restoreprivacy.online first.';
+              _busy = false;
+            });
+          }
+          return;
+        }
+        st = await gate.refreshEntitlementFromRemote();
+      }
       final ok = await gate.paymentAllowsConnect();
+      final sid2 = await gate.paymentSessionId();
       if (!mounted) return;
       setState(() {
         _paymentOk = ok;
         _paymentStatus = st;
+        if (sid2.isNotEmpty && _sessionCtrl.text.trim().isEmpty) {
+          _sessionCtrl.text = sid2;
+        }
         _note = ok
-            ? 'Payment active — Connect allowed (status=$st).'
+            ? 'Payment active — Connect allowed (status=$st). Press Connect on the home screen.'
             : 'Payment not active (status=$st). Connect stays blocked until successful payment.';
       });
       widget.onLicenceChanged?.call(await gate.hasAcceptedLicence());

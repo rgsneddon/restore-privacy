@@ -150,6 +150,9 @@ class TestLicenceGateUiWiring(unittest.TestCase):
         self.assertIn("_open_settings", src)
         self.assertIn("import_session_and_verify", src)
         self.assertIn("Payment entitlement", src)
+        self.assertIn("autoconnect_on_launch", src)
+        self.assertIn("LEGAL_DOC_LINKS", src)
+        self.assertIn("should_autoconnect_on_launch", src)
 
 
 if __name__ == "__main__":

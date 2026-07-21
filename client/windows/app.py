@@ -80,10 +80,12 @@ from client.licence_gate import (
 )
 from client.payment_entitlement import (
     PAYMENT_CONNECT_DISCLAIMER_PLAIN,
+    ensure_entitlement_for_connect,
     import_session_and_verify,
     load_payment_entitlement,
     payment_allows_connect,
 )
+from client.startup_bootstrap import bootstrap_payment_entitlement
 from client.registration_copy import (
     ANON_REGISTRATION_SUMMARY,
     ANON_REGISTRATION_TITLE,
@@ -806,13 +808,21 @@ class TunnelClientApp:
             self._start_connect()
 
     def _start_connect(self) -> None:
-        # Licence gate — blocks Connect and autoconnect resume alike.
+        # Fast path: import post-pay entitlement before gate (no Settings tour)
+        try:
+            bootstrap_payment_entitlement(bind_device=True)
+        except Exception:
+            pass
+        # Licence + payment gate — blocks Connect and autoconnect resume alike.
         ok_lic, lic_msg = assert_may_connect()
         if not ok_lic:
             self._log(lic_msg)
             self._set_status("error", detail=lic_msg)
             self.detail_var.set(lic_msg)
-            self._show_licence_prompt()
+            if not has_accepted_licence():
+                self._show_licence_prompt()
+            else:
+                self._open_settings()
             return
 
         # Residual public IP needs Administrator (Wintun + dual /1). Elevate first.
@@ -1260,7 +1270,8 @@ class TunnelClientApp:
         ).pack(fill=tk.X, pady=(6, 2))
         tk.Label(
             pay_card,
-            text="Paste Checkout session id (cs_…) from the thank-you page after payment:",
+            text="Paste Checkout session id (cs_…) or leave blank to auto-import "
+            "payment_entitlement.json from Downloads / install folder:",
             bg=PANEL_BG,
             fg=TEXT_MUTED,
             font=("Segoe UI", 8),
@@ -1282,23 +1293,24 @@ class TunnelClientApp:
 
         def _verify_payment() -> None:
             sid = (session_var.get() or "").strip()
-            if not sid:
-                note_var.set("Enter the Checkout session id (cs_…) first.")
-                return
             note_var.set("Verifying payment entitlement…")
             win.update_idletasks()
 
             def work() -> None:
                 try:
-                    ent = import_session_and_verify(sid)
+                    if sid:
+                        ent = import_session_and_verify(sid)
+                    else:
+                        ent = ensure_entitlement_for_connect(bind_device=True)
                     ok = payment_allows_connect()
+                    st = getattr(ent, "status", None) or load_payment_entitlement().status
                     msg = (
-                        f"Payment active — Connect allowed (status={ent.status})."
+                        f"Payment active — Connect allowed (status={st})."
                         if ok
                         else (
-                            f"Payment not active (status={ent.status}"
-                            f"{', ' + ent.reason if ent.reason else ''}). "
-                            "Connect stays blocked until successful payment."
+                            f"Payment not active (status={st}). "
+                            "Connect stays blocked until successful payment "
+                            "(or place payment_entitlement.json in Downloads)."
                         )
                     )
                 except Exception as exc:  # noqa: BLE001
@@ -1307,9 +1319,10 @@ class TunnelClientApp:
 
                 def done() -> None:
                     note_var.set(msg)
-                    pay_status_var.set(
-                        f"Status: {load_payment_entitlement().status}"
-                    )
+                    ent2 = load_payment_entitlement()
+                    pay_status_var.set(f"Status: {ent2.status}")
+                    if ent2.session_id:
+                        session_var.set(ent2.session_id)
                     self._log(msg)
                     self._refresh_licence_badge()
                     if ok:
@@ -1762,6 +1775,12 @@ def main() -> int:
             ),
         )
 
+    # Import post-pay entitlement early (Downloads / install) for one-tap Connect
+    try:
+        bootstrap_payment_entitlement(bind_device=True)
+    except Exception:
+        pass
+
     # Cold launch: optional user autoconnect (Settings); resume after UAC Connect.
     assert non_admin_connect_allowed()
     if resume_after_elevate and is_admin():
@@ -1783,12 +1802,17 @@ def main() -> int:
     elif should_autoconnect_on_launch() and not resume_after_elevate:
 
         def _settings_autoconnect() -> None:
-            # assert_may_connect inside _start_connect — never bypass licence.
-            if not may_connect():
+            # assert_may_connect inside _start_connect — never bypass licence/payment.
+            ok, msg = assert_may_connect()
+            if not ok:
                 app._log(
-                    "Settings: autoconnect skipped — accept the end-user licence first."
+                    "Settings: autoconnect skipped — "
+                    + (msg or "accept licence / verify payment first.")
                 )
-                app._show_licence_prompt()
+                if not has_accepted_licence():
+                    app._show_licence_prompt()
+                else:
+                    app._open_settings()
                 return
             app._log("Settings: autoconnect on launch - starting Connect...")
             app._start_connect()
