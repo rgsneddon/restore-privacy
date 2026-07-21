@@ -51,8 +51,11 @@ class TestPaidDownloadUI(unittest.TestCase):
             self.assertNotIn(f'href="{a.url}"', html)
             self.assertNotIn(f'href="/pay?platform={a.platform}"', html)
         self.assertNotIn('href="#"', html)
-        self.assertIn("catalog-version", html)
-        self.assertIn("v0.3.3", html)
+        self.assertNotIn("catalog-version", html)
+        self.assertNotIn("paid download only", html)
+        # Version still in section h2; platforms in subtitle
+        self.assertIn("Download client v0.3.3", html)
+        self.assertIn("Windows | Linux | macOS | iOS | Android", html)
         self.assertIn("data-pay-via=\"stripe-payment-page\"", html)
 
     def test_status_page_html_paid_flow(self):

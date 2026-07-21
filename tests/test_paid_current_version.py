@@ -197,8 +197,11 @@ class TestOpenPrefersCurrentVersionStore(unittest.TestCase):
 
     def test_ui_catalog_version_matches_grant_names(self):
         html = render_download_section_html()
+        # Version remains in the h2 title (not the removed subtitle catalog-version span)
         self.assertIn(f"Download client v{RELEASE_VERSION}", html)
-        self.assertIn(f'id="catalog-version">v{RELEASE_VERSION}<', html)
+        self.assertNotIn('id="catalog-version"', html)
+        self.assertNotIn("paid download only", html)
+        self.assertIn("Windows | Linux | macOS | iOS | Android", html)
         for a in available_downloads():
             self.assertIn(a.filename, html)
             self.assertNotIn(f'href="{a.url}"', html)

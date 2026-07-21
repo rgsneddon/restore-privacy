@@ -382,14 +382,10 @@ def render_download_section_html(assets: Iterable[DownloadAsset] | None = None) 
     items = list(assets) if assets is not None else available_downloads()
     if not items:
         return ""
-    from payments import (
-        DEFAULT_PRODUCTION_PUBLIC_BASE_URL,
-        stripe_payment_page_url,
-    )
+    from payments import stripe_payment_page_url
 
     # pay_base kept for potential footer/how-to; buttons use per-platform pay_path.
     _ = stripe_payment_page_url()
-    origin = DEFAULT_PRODUCTION_PUBLIC_BASE_URL
     row1, row2 = download_menu_rows(items)
     row1_html = "\n      ".join(_render_platform_pay_link(a) for a in row1)
     row2_block = ""
@@ -402,10 +398,7 @@ def render_download_section_html(assets: Iterable[DownloadAsset] | None = None) 
     return f"""
   <section class="downloads" id="downloads" aria-label="Download Restore Privacy client">
     <h2>Download client v{RELEASE_VERSION}</h2>
-    <p class="dl-sub">Windows | Linux | macOS | iOS | Android — catalog
-      <span id="catalog-version">v{RELEASE_VERSION}</span>
-      on <a class="catalog-link" href="{origin}/" id="dl-site-origin">restoreprivacy.online</a>
-      (paid download only)</p>
+    <p class="dl-sub">Windows | Linux | macOS | iOS | Android</p>
     <p class="dl-price" id="dl-price">{PRICE_LABEL} GBP per package — pay on Stripe, then download starts automatically</p>
     <div class="dl-buttons" id="dl-buttons" data-dl-layout="3+2">
     <div class="dl-row dl-row-3" id="dl-row-1" data-dl-row="1" data-dl-count="{len(row1)}">

@@ -68,9 +68,11 @@ class TestPublicPageWithDownloads(unittest.TestCase):
         self.assertNotIn('id="rust-repo-link"', html)
         self.assertNotIn("rust-repo-footer", html)
         self.assertNotIn("installers after £2.45 payment only", html)
-        # Public site origin for seamless production funnel
-        self.assertIn("restoreprivacy.online", html)
-        self.assertIn('id="dl-site-origin"', html)
+        # Platform list remains; trailing catalog/site/paid-only clause removed
+        self.assertIn("Windows | Linux | macOS | iOS | Android", html)
+        self.assertNotIn("paid download only", html)
+        self.assertNotIn('id="catalog-version"', html)
+        self.assertNotIn('id="dl-site-origin"', html)
         self.assertIn("£2.45", html)
         self.assertIn("buymeacoffee.com/rgsneddon", html)
         self.assertNotIn("how-to-buy-footer-link", html)
