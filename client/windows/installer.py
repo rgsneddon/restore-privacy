@@ -443,24 +443,39 @@ def install(
     except Exception:
         pass
 
-    _progress(5, "Creating Start Menu and Desktop shortcuts...")
-    # Start menu + desktop shortcuts (display name: Privacy Restored + logo)
+    # Launch wrapper: wait for app exit then residual restore (covers Quit path)
+    launch_bat = INSTALL_DIR / "LaunchPrivacyRestored.bat"
     try:
+        launch_bat.write_text(
+            "@echo off\r\n"
+            "setlocal\r\n"
+            "cd /d \"%~dp0\"\r\n"
+            f'start /wait "" "%~dp0{installed_exe.name}"\r\n'
+            "if exist \"%~dp0RestoreInternet.bat\" call \"%~dp0RestoreInternet.bat\" /quiet\r\n",
+            encoding="utf-8",
+        )
+    except Exception:
+        launch_bat = installed_exe
+
+    _progress(5, "Creating Start Menu and Desktop shortcuts...")
+    # Start menu + desktop shortcuts — launch via wrapper so Quit restores internet
+    try:
+        shortcut_target = launch_bat if launch_bat.is_file() else installed_exe
         _create_shortcut(
-            installed_exe,
+            shortcut_target,
             START_MENU / f"{SHORTCUT_DISPLAY_NAME}.lnk",
             INSTALL_DIR,
             icon=icon,
         )
         _create_shortcut(
-            installed_exe,
+            shortcut_target,
             DESKTOP / f"{SHORTCUT_DISPLAY_NAME}.lnk",
             INSTALL_DIR,
             icon=icon,
         )
         # Also keep legacy RestorePrivacy.lnk for upgrades that look for old name
         _create_shortcut(
-            installed_exe,
+            shortcut_target,
             START_MENU / f"{APP_NAME}.lnk",
             INSTALL_DIR,
             icon=icon,
