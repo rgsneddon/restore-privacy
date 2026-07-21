@@ -23,6 +23,16 @@ need_root() {
 
 need_root "$@"
 
+log "================================================================"
+log "===  BIG WARNING — READ BEFORE RUNNING RESTORE INTERNET  ==="
+log "================================================================"
+log "Running Restore Internet will ERASE ALL parts of Restore Privacy"
+log "from this device (app, tunnel residual, shortcuts, product secrets)."
+log "You may NOT be able to automatically re-download your subscription"
+log "app afterward. Contact russell.gray.sneddon@gmail.com to obtain a"
+log "new download link."
+log "================================================================"
+log ""
 log "=== Restore Internet ==="
 log "Restoring normal internet, then removing Restore Privacy..."
 

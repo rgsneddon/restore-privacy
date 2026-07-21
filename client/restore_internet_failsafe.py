@@ -14,6 +14,37 @@ ROOT = Path(__file__).resolve().parents[1]
 # Display name required in every catalog installer
 RESTORE_INTERNET_DISPLAY_NAME = "Restore Internet"
 
+# Contact for a new paid download link after a full wipe (OBJECTIVE email, corrected spelling)
+RESTORE_INTERNET_CONTACT_EMAIL = "russell.gray.sneddon@gmail.com"
+
+
+def restore_internet_warning_markers() -> tuple[str, ...]:
+    """Substrings that MUST appear in every user-facing Restore Internet artifact and docs.
+
+    Contract: conspicuous full-product-erasure warning + re-download contact email.
+    """
+    return (
+        "WARNING",
+        "ALL",
+        "Restore Privacy",
+        RESTORE_INTERNET_CONTACT_EMAIL,
+    )
+
+
+def restore_internet_warning_banner_lines() -> tuple[str, ...]:
+    """Canonical multi-line BIG WARNING copy for scripts/docs (user-visible)."""
+    email = RESTORE_INTERNET_CONTACT_EMAIL
+    return (
+        "================================================================",
+        "===  BIG WARNING — READ BEFORE RUNNING RESTORE INTERNET  ===",
+        "================================================================",
+        "Running Restore Internet will ERASE ALL parts of Restore Privacy",
+        "from this device (app, tunnel residual, shortcuts, product secrets).",
+        "You may NOT be able to automatically re-download your subscription",
+        f"app afterward. Contact {email} to obtain a new download link.",
+        "================================================================",
+    )
+
 # Source paths shipped into packages (relative to repo root)
 WINDOWS_BAT = Path("client/windows/Restore Internet.bat")
 # ASCII-safe alias without spaces for some copy steps

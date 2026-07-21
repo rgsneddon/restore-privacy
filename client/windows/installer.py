@@ -281,18 +281,28 @@ def resolve_shortcut_icon(install_dir: Path, target: Path) -> Path:
 
 
 def _create_shortcut(
-    target: Path, link_path: Path, workdir: Path, *, icon: Path | None = None
+    target: Path,
+    link_path: Path,
+    workdir: Path,
+    *,
+    icon: Path | None = None,
+    description: str | None = None,
 ) -> None:
     """Create .lnk with brand logo icon; Run as administrator for one UAC click."""
     link_path.parent.mkdir(parents=True, exist_ok=True)
     icon_path = icon or resolve_shortcut_icon(workdir, target)
+    desc = description or (
+        f"{SHORTCUT_DISPLAY_NAME} VPN Client {VERSION} (elevates for full tunnel)"
+    )
+    # Escape for PowerShell double-quoted string
+    desc_ps = desc.replace("`", "``").replace('"', '`"').replace("$", "`$")
     # PowerShell COM shortcut + IconLocation + "Run as administrator" bit (0x20 @ 0x15)
     ps = (
         f'$ws = New-Object -ComObject WScript.Shell; '
         f'$s = $ws.CreateShortcut({str(link_path)!r}); '
         f'$s.TargetPath = {str(target)!r}; '
         f'$s.WorkingDirectory = {str(workdir)!r}; '
-        f'$s.Description = "{SHORTCUT_DISPLAY_NAME} VPN Client {VERSION} (elevates for full tunnel)"; '
+        f'$s.Description = "{desc_ps}"; '
         f'$s.IconLocation = {str(icon_path)!r} + ",0"; '
         f"$s.Save(); "
         f"$p = {str(link_path)!r}; "
@@ -500,17 +510,23 @@ def install(
             icon=icon,
         )
         if restore_bat.is_file():
+            _ri_desc = (
+                "WARNING: erases ALL Restore Privacy; contact "
+                "russell.gray.sneddon@gmail.com for a new download link"
+            )
             _create_shortcut(
                 restore_bat,
                 START_MENU / "Restore Internet.lnk",
                 INSTALL_DIR,
                 icon=icon,
+                description=_ri_desc,
             )
             _create_shortcut(
                 restore_bat,
                 DESKTOP / "Restore Internet.lnk",
                 INSTALL_DIR,
                 icon=icon,
+                description=_ri_desc,
             )
         if allow_bat.is_file():
             _create_shortcut(

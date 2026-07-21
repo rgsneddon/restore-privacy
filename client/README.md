@@ -1,5 +1,24 @@
 # Restore Privacy client
 
+## Restore Internet (failsafe) — BIG WARNING
+
+Each platform ships a user-facing **Restore Internet** artifact for residual
+network restore **plus** complete product removal.
+
+> **WARNING:** Running **Restore Internet** will **ERASE ALL** parts of
+> **Restore Privacy** from the device (app, tunnel residual, shortcuts, product
+> secrets). You may **not** be able to automatically re-download your
+> subscription app afterward. Contact **russell.gray.sneddon@gmail.com** to
+> obtain a new download link.
+
+| Platform | Artifact |
+|----------|----------|
+| Windows | `client/windows/Restore Internet.bat` |
+| Linux | `client/linux/Restore Internet` |
+| macOS | `client_app/macos/Restore Internet.command` |
+| iOS | `client_app/ios/Restore Internet.txt` |
+| Android | `client_app/android/app/src/main/assets/Restore Internet.txt` |
+
 ## Windows (this machine)
 
 ```bash

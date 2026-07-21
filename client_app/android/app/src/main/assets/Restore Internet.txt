@@ -1,3 +1,13 @@
+================================================================
+===  BIG WARNING — READ BEFORE RUNNING RESTORE INTERNET  ===
+================================================================
+Following these steps will ERASE ALL parts of Restore Privacy
+from this device (app, VPN profile, product data).
+You may NOT be able to automatically re-download your subscription
+app afterward. Contact russell.gray.sneddon@gmail.com to obtain a
+new download link.
+================================================================
+
 Restore Internet — failsafe (Android)
 =====================================
 
@@ -13,5 +23,6 @@ If residual VPN is stuck or you want complete removal:
 After uninstall, ordinary mobile/Wi‑Fi internet is restored and the product
 is removed from the device.
 
-Reinstall: download the current APK from https://restoreprivacy.online/ after
-payment.
+Reinstall: contact russell.gray.sneddon@gmail.com for a new download link
+(paid one-time links may no longer work after full removal), or pay again on
+https://restoreprivacy.online/ and install the current APK.

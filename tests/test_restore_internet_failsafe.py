@@ -13,11 +13,14 @@ ROOT = Path(__file__).resolve().parents[1]
 
 from client.restore_internet_failsafe import (  # noqa: E402
     PLATFORM_SOURCES,
+    RESTORE_INTERNET_CONTACT_EMAIL,
     RESTORE_INTERNET_DISPLAY_NAME,
     assert_source_files_exist,
     inventory_packaging_sources,
     linux_residual_restore_markers,
     package_member_names_for_platform,
+    restore_internet_warning_banner_lines,
+    restore_internet_warning_markers,
     windows_residual_restore_markers,
 )
 
@@ -33,6 +36,42 @@ class TestRestoreInternetSources(unittest.TestCase):
         for plat in ("windows", "linux", "macos", "ios", "android"):
             self.assertTrue(inv[plat], msg=plat)
             self.assertTrue(Path(inv[plat]).is_file())
+
+    def test_all_platform_sources_have_big_warning(self):
+        """Every shipped Restore Internet source shows full-erase + contact email."""
+        markers = restore_internet_warning_markers()
+        self.assertIn(RESTORE_INTERNET_CONTACT_EMAIL, markers)
+        self.assertEqual(
+            RESTORE_INTERNET_CONTACT_EMAIL, "russell.gray.sneddon@gmail.com"
+        )
+        # Banner helper must expose the same contract (tests drive real helper)
+        banner = "\n".join(restore_internet_warning_banner_lines())
+        for m in markers:
+            self.assertIn(m, banner, msg=f"banner missing {m!r}")
+        for plat, rel in PLATFORM_SOURCES.items():
+            text = (ROOT / rel).read_text(encoding="utf-8", errors="replace")
+            for m in markers:
+                self.assertIn(m, text, msg=f"{plat} missing warning marker {m!r}")
+            # Conspicuous user-visible banner (not only a buried REM/comment mid-file)
+            self.assertIn("BIG WARNING", text, msg=plat)
+            # Full-erase language near the start of the file (first 40 lines)
+            head = "\n".join(text.splitlines()[:40])
+            self.assertIn("WARNING", head, msg=f"{plat} warning not early/user-visible")
+            self.assertIn(RESTORE_INTERNET_CONTACT_EMAIL, head, msg=plat)
+
+    def test_docs_document_restore_internet_warning(self):
+        """README + Linux package docs carry wipe + re-download contact warning."""
+        markers = restore_internet_warning_markers()
+        docs = [
+            ROOT / "README.md",
+            ROOT / "client" / "README.md",
+            ROOT / "scripts" / "package_linux.py",
+        ]
+        for path in docs:
+            text = path.read_text(encoding="utf-8", errors="replace")
+            self.assertIn("Restore Internet", text, msg=str(path))
+            for m in markers:
+                self.assertIn(m, text, msg=f"{path.name} missing {m!r}")
 
     def test_windows_script_restores_and_removes(self):
         bat = ROOT / "client" / "windows" / "Restore Internet.bat"
@@ -153,6 +192,9 @@ class TestInstallerWiresRestoreInternet(unittest.TestCase):
         self.assertIn("Restore Internet.bat", inst)
         self.assertIn("Restore Internet.lnk", inst)
         self.assertIn("Uninstall.bat", inst)
+        # Shortcut tooltip carries wipe + contact warning
+        self.assertIn("russell.gray.sneddon@gmail.com", inst)
+        self.assertIn("erases ALL Restore Privacy", inst)
 
     def test_package_linux_writes_failsafe(self):
         src = (ROOT / "scripts" / "package_linux.py").read_text(encoding="utf-8")

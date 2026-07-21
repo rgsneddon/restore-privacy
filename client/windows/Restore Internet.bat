@@ -29,6 +29,16 @@ if errorlevel 1 (
 
 title Restore Internet — Restore Privacy failsafe
 echo.
+echo ================================================================
+echo ===  BIG WARNING — READ BEFORE RUNNING RESTORE INTERNET  ===
+echo ================================================================
+echo Running Restore Internet will ERASE ALL parts of Restore Privacy
+echo from this device (app, tunnel residual, shortcuts, product secrets^).
+echo You may NOT be able to automatically re-download your subscription
+echo app afterward. Contact russell.gray.sneddon@gmail.com to obtain a
+echo new download link.
+echo ================================================================
+echo.
 echo === Restore Internet ===
 echo Restoring normal internet, then removing Restore Privacy from this PC...
 echo.

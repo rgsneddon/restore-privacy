@@ -101,6 +101,18 @@ https://restoreprivacy.online/
 - **No** public live session / connected-client counter  
 - A browser tab cannot run full system VPN
 
+### Restore Internet (failsafe) — BIG WARNING
+
+Every catalog installer includes a **Restore Internet** failsafe (Windows/Linux
+runnable script; macOS `.command`; iOS/Android guidance). Use it only when you
+need residual internet restored **and** complete product removal.
+
+> **WARNING:** Running **Restore Internet** will **ERASE ALL** parts of
+> **Restore Privacy** from the device (app, tunnel residual, shortcuts, product
+> secrets). You may **not** be able to automatically re-download your
+> subscription app afterward. Contact **russell.gray.sneddon@gmail.com** to
+> obtain a new download link.
+
 ---
 
 ## Privacy, license, credits, and audit

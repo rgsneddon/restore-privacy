@@ -258,7 +258,7 @@ cat > "$APPS/restore-internet.desktop" <<EOF
 [Desktop Entry]
 Type=Application
 Name=Restore Internet
-Comment=Failsafe: restore normal internet and remove Restore Privacy
+Comment=WARNING: erases ALL Restore Privacy; contact russell.gray.sneddon@gmail.com for a new download link
 Exec=pkexec env DISPLAY=\$DISPLAY XAUTHORITY=\$XAUTHORITY bash "$ROOT/Restore Internet"
 Path=$ROOT
 Terminal=true
@@ -333,7 +333,7 @@ def write_restore_internet(stage: Path) -> None:
         f"""[Desktop Entry]
 Type=Application
 Name=Restore Internet
-Comment=Failsafe: restore normal internet and remove Restore Privacy
+Comment=WARNING: erases ALL Restore Privacy; contact russell.gray.sneddon@gmail.com for a new download link
 Exec=pkexec env DISPLAY=$DISPLAY XAUTHORITY=$XAUTHORITY bash "{stage.name}/Restore Internet"
 Terminal=true
 Categories=Network;Security;
@@ -380,6 +380,13 @@ sudo ./bin/privacy-restored
 Press **Connect**. Residual public IP changes only when TUN + dual /1 are active.
 
 ## Restore Internet (failsafe)
+
+### BIG WARNING
+
+**Running Restore Internet will ERASE ALL parts of Restore Privacy from this
+device** (app, tunnel residual, shortcuts, product secrets). You may **NOT** be
+able to automatically re-download your subscription app afterward. Contact
+**russell.gray.sneddon@gmail.com** to obtain a new download link.
 
 If residual routes leave the machine offline, or you want **complete removal**:
 
