@@ -574,8 +574,18 @@ class Handler(BaseHTTPRequestHandler):
         if path == "/download":
             token = (query.get("token") or "").strip()
             # Lookup without consuming so proxy failure does not burn the grant.
+            # Filename is taken only from the paid grant row — never from query string.
             grant = lookup_download_token(token) if token else None
             fname = (grant or {}).get("filename") if grant else None
+            # Reject path traversal / non-catalog names even if a grant row were corrupted
+            if grant and fname:
+                from payments import _safe_catalog_filename
+
+                safe = _safe_catalog_filename(str(fname))
+                if not safe:
+                    fname = None
+                else:
+                    fname = safe
             if not grant or not fname:
                 self._send(
                     403,
@@ -589,6 +599,7 @@ class Handler(BaseHTTPRequestHandler):
                 return
             # Paid proxy: stream installer from local/API (works when repo is private).
             # Do NOT redirect unpaid browsers to free public github.com/releases/download.
+            # open_release_asset must never be called without a validated paid grant.
             asset = open_release_asset(str(fname))
             if asset is None:
                 self._send(
@@ -663,19 +674,11 @@ class Handler(BaseHTTPRequestHandler):
             session_id = (query.get("session_id") or "").strip()
             # Stripe success_url supplies session_id={CHECKOUT_SESSION_ID}; webhook
             # may still be in-flight — poll briefly for the minted grant.
+            # Security: never invent a download link for an unverified token —
+            # only a DB grant (paid webhook) may unlock the thank-you download UI.
             grant = None
             if token:
-                # Prefer grant row (filename) without consuming; fallback token-only.
                 grant = lookup_download_token(token)
-                if grant is None:
-                    grant = {
-                        "token": token,
-                        "filename": platform_filename(platform) or "package",
-                        "platform": platform,
-                        "download_path": (
-                            f"/download?token={urllib.parse.quote(token)}"
-                        ),
-                    }
             elif session_id:
                 # Payment Link after_payment redirect lands here; webhook may lag
                 # on free-tier cold start — wait longer than a local unit test.
@@ -687,9 +690,10 @@ class Handler(BaseHTTPRequestHandler):
                 link = grant.get("download_path") or (
                     f"/download?token={urllib.parse.quote(tok)}"
                 )
+                # Never trust client-supplied filename — use grant / catalog only
                 fname = (
                     grant.get("filename")
-                    or platform_filename(platform)
+                    or platform_filename(str(grant.get("platform") or platform))
                     or platform
                     or "package"
                 )
@@ -697,11 +701,15 @@ class Handler(BaseHTTPRequestHandler):
                 # Ensure Connect entitlement is active for this paid session
                 if session_id:
                     activate_connect_entitlement(session_id, platform=plat)
+                elif grant.get("session_id"):
+                    activate_connect_entitlement(
+                        str(grant["session_id"]), platform=plat
+                    )
                 inner = render_post_payment_thankyou_html(
                     download_path=str(link),
                     filename=str(fname),
                     platform=plat,
-                    session_id=session_id,
+                    session_id=session_id or str(grant.get("session_id") or ""),
                 )
             else:
                 # Meta-refresh so a late webhook can still unlock the page
@@ -713,8 +721,16 @@ class Handler(BaseHTTPRequestHandler):
                     refresh = (
                         f'<meta http-equiv="refresh" content="3;url=/download/success?{q}"/>'
                     )
+                deny_note = ""
+                if token and not session_id:
+                    deny_note = (
+                        '<p class="msg" id="pay-success-invalid-token">'
+                        "That download link is invalid, expired, or already used. "
+                        "Complete payment again to get a new link.</p>"
+                    )
                 inner = (
                     f"{refresh}"
+                    f"{deny_note}"
                     f'<p class="msg" id="pay-success-pending">Payment submitted'
                     f'{(" for " + _escape_html(platform)) if platform else ""}. '
                     f"Confirming with Stripe… this page refreshes automatically.</p>"

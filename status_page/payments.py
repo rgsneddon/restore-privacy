@@ -440,12 +440,34 @@ def content_type_for_filename(filename: str) -> str:
     return "application/octet-stream"
 
 
+def _safe_catalog_filename(filename: str) -> str | None:
+    """Return basename only when it is a current catalog package; else None.
+
+    Blocks path traversal and non-catalog names before any disk/HTTP open.
+    """
+    raw = (filename or "").strip()
+    if not raw or raw in (".", ".."):
+        return None
+    # Reject separators and absolute paths (Windows/Unix)
+    if any(sep in raw for sep in ("/", "\\", "\x00")):
+        return None
+    name = Path(raw).name
+    if name != raw or name in (".", ".."):
+        return None
+    if name not in catalog_filenames():
+        return None
+    return name
+
+
 def open_release_asset(
     filename: str,
     *,
     urlopen: Callable[..., Any] | None = None,
 ) -> dict[str, Any] | None:
     """Open installer bytes for a **paid** redeem (proxy/stream, not free public redirect).
+
+    **Call only after a paid grant token has been validated.** This helper does not
+    enforce payment itself; HTTP ``/download`` must gate with lookup/consume.
 
     Resolution order:
       1. Local file under :func:`asset_search_dirs` (operator-staged / VPS on-disk)
@@ -458,13 +480,19 @@ def open_release_asset(
     file-like bodies. Returns None if the filename is not a catalog asset or
     no source is available.
     """
-    if filename not in catalog_filenames():
+    filename = _safe_catalog_filename(filename) or ""
+    if not filename:
         return None
     open_url = urlopen or urllib.request.urlopen
 
     # 1) Local disk (status assets, monorepo releases, VPS paid_assets when co-located)
     for base in asset_search_dirs():
-        path = base / filename
+        try:
+            base_r = base.resolve()
+            path = (base_r / filename).resolve()
+            path.relative_to(base_r)
+        except (OSError, ValueError):
+            continue
         try:
             if path.is_file() and path.stat().st_size > 0:
                 fh = path.open("rb")

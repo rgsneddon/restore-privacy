@@ -61,13 +61,23 @@ class Handler(BaseHTTPRequestHandler):
             self.send_error(404, "not found")
             return
         version, filename = parts
-        if ".." in version or ".." in filename or "/" in filename:
+        if ".." in version or ".." in filename or "/" in filename or "\\" in filename:
+            self.send_error(400, "bad path")
+            return
+        # Filenames only — no nested paths under version/
+        if Path(filename).name != filename:
             self.send_error(400, "bad path")
             return
         root = _root()
         fpath = (root / version / filename).resolve()
         try:
             fpath.relative_to(root)
+        except ValueError:
+            self.send_error(400, "bad path")
+            return
+        # Ensure resolved path stays under version dir (no symlink escape)
+        try:
+            fpath.relative_to((root / version).resolve())
         except ValueError:
             self.send_error(400, "bad path")
             return
