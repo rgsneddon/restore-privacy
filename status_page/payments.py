@@ -2083,18 +2083,26 @@ def check_fulfilment_ready(*, platform: str | None = None) -> dict[str, Any]:
     return out
 
 
-def list_recent_grants(limit: int = 50) -> list[dict[str, Any]]:
+def list_recent_grants(limit: int | None = 50) -> list[dict[str, Any]]:
+    """List grants newest-first from the shipped store.
+
+    *limit* caps the row count when a positive int. Pass ``limit=None`` for the
+    **full** completed-payment grant history (authenticated admin list). Used
+    tokens remain in the store and are returned with status/used_at set.
+    """
     init_db()
     conn = _connect()
     try:
-        rows = conn.execute(
-            """
+        sql = """
             SELECT token, filename, platform, session_id, amount_pence, currency,
                    created_at, expires_at, used_at, status, purchase_id
-            FROM grants ORDER BY created_at DESC LIMIT ?
-            """,
-            (int(limit),),
-        ).fetchall()
+            FROM grants ORDER BY created_at DESC
+        """
+        if limit is None:
+            rows = conn.execute(sql).fetchall()
+        else:
+            lim = max(0, int(limit))
+            rows = conn.execute(sql + " LIMIT ?", (lim,)).fetchall()
         out = []
         for r in rows:
             d = {k: r[k] for k in r.keys()}
@@ -2106,6 +2114,11 @@ def list_recent_grants(limit: int = 50) -> list[dict[str, Any]]:
         return out
     finally:
         conn.close()
+
+
+def list_all_grants() -> list[dict[str, Any]]:
+    """Full grant history for operator admin (no silent row drop-off)."""
+    return list_recent_grants(limit=None)
 
 
 def find_grant_by_session(

@@ -1382,5 +1382,161 @@ class TestPostPayAutoStartSingleConsume(unittest.TestCase):
             httpd.server_close()
 
 
+class TestAdminFullGrantsListNoDropOff(unittest.TestCase):
+    """Admin lists *all* completed-payment grants; used tokens stay listed."""
+
+    # Former default list window that silently dropped older paid rows.
+    FORMER_DEFAULT_CAP = 50
+
+    def setUp(self):
+        self._td = tempfile.TemporaryDirectory()
+        self.addCleanup(self._td.cleanup)
+        os.environ["RPT_PAYMENT_DATA_DIR"] = self._td.name
+        payments.init_db()
+
+    def _mint_n(self, n: int, *, base_ts: float | None = None) -> list[dict[str, str]]:
+        """Mint *n* completed-payment grants via shipped mint helper (real store)."""
+        platforms = ("windows", "linux", "macos", "ios", "android")
+        t0 = base_ts if base_ts is not None else time.time()
+        minted: list[dict[str, str]] = []
+        for i in range(n):
+            plat = platforms[i % len(platforms)]
+            sid = f"cs_full_hist_{i:04d}"
+            tok = payments.mint_download_token(
+                filename="",  # resolve from platform
+                platform=plat,
+                session_id=sid,
+                now=t0 + float(i),
+            )
+            pid = payments.purchase_id_for_token(tok) or ""
+            minted.append(
+                {
+                    "token": tok,
+                    "session_id": sid,
+                    "platform": plat,
+                    "purchase_id": pid,
+                }
+            )
+        return minted
+
+    def test_list_all_grants_exceeds_former_cap(self):
+        n = self.FORMER_DEFAULT_CAP + 12
+        minted = self._mint_n(n)
+        # Truncated window would hide oldest if still capped at 50
+        recent_only = payments.list_recent_grants(self.FORMER_DEFAULT_CAP)
+        self.assertEqual(len(recent_only), self.FORMER_DEFAULT_CAP)
+        full = payments.list_all_grants()
+        self.assertEqual(len(full), n)
+        tokens = {g["token"] for g in full}
+        sessions = {g["session_id"] for g in full}
+        pids = {g.get("purchase_id") or "" for g in full}
+        for m in minted:
+            self.assertIn(m["token"], tokens)
+            self.assertIn(m["session_id"], sessions)
+            self.assertIn(m["purchase_id"], pids)
+            self.assertTrue(str(m["purchase_id"]).startswith("RPT-"))
+
+    def test_admin_projection_and_html_include_all_minted(self):
+        n = self.FORMER_DEFAULT_CAP + 8
+        minted = self._mint_n(n)
+        rows = admin_panel.project_grants_for_admin()
+        self.assertEqual(len(rows), n)
+        row_tokens = {r["token"] for r in rows}
+        row_sids = {r["session_id"] for r in rows}
+        for m in minted:
+            self.assertIn(m["token"], row_tokens)
+            self.assertIn(m["session_id"], row_sids)
+
+        html = admin_panel.render_admin_html().decode("utf-8")
+        self.assertIn("admin-grants-table", html)
+        self.assertIn("admin-grants-blurb", html)
+        self.assertIn("Full history", html)
+        self.assertNotIn("Recent Stripe-verified", html)
+        # Every durable session id appears (admin truncates display of session
+        # to 18 chars — use that prefix so we drive the real HTML path).
+        for m in minted:
+            sid = m["session_id"]
+            self.assertIn(sid[:18], html)
+            # Purchase id is durable identity in the table
+            self.assertIn(m["purchase_id"], html)
+
+    def test_used_grant_still_listed_with_used_status(self):
+        tok = payments.mint_download_token(
+            filename="restore-privacy-client-0.3.6-linux-x64.tar.gz",
+            platform="linux",
+            session_id="cs_used_still_listed",
+        )
+        self.assertTrue(payments.consume_download_token(tok))
+        # Buyer token path is spent; admin history must still show the row.
+        full = payments.list_all_grants()
+        match = [g for g in full if g["token"] == tok]
+        self.assertEqual(len(match), 1)
+        self.assertEqual(match[0].get("status"), "used")
+        self.assertIsNotNone(match[0].get("used_at"))
+
+        rows = admin_panel.project_grants_for_admin()
+        self.assertTrue(any(r["token"] == tok for r in rows))
+        html = admin_panel.render_admin_html().decode("utf-8")
+        self.assertIn("cs_used_still_listed"[:18], html)
+        self.assertIn(">used<", html)
+        self.assertIn("admin-grants-table", html)
+
+    def test_public_and_unauth_have_no_grants_table(self):
+        self._mint_n(3)
+        public = status_app.render_html({"title": "RESTORE PRIVACY"}).decode("utf-8")
+        self.assertNotIn("admin-grants-table", public)
+        self.assertNotIn("admin-grants-blurb", public)
+
+        os.environ["RPT_ADMIN_PASSWORD"] = "temp-admin-pass-grants"
+        os.environ["RPT_ADMIN_SESSION_SECRET"] = "temp-sess-grants"
+        try:
+            httpd = ThreadingHTTPServer(("127.0.0.1", 0), status_app.Handler)
+            port = httpd.server_address[1]
+            import threading
+            import urllib.request
+
+            t = threading.Thread(target=httpd.serve_forever, daemon=True)
+            t.start()
+            try:
+                with urllib.request.urlopen(
+                    f"http://127.0.0.1:{port}/admin", timeout=5
+                ) as resp:
+                    body = resp.read().decode("utf-8")
+                self.assertIn("admin-login-form", body)
+                self.assertNotIn("admin-grants-table", body)
+                # Must not leak mint session ids without auth
+                self.assertNotIn("cs_full_hist_", body)
+            finally:
+                httpd.shutdown()
+                httpd.server_close()
+        finally:
+            os.environ.pop("RPT_ADMIN_PASSWORD", None)
+            os.environ.pop("RPT_ADMIN_SESSION_SECRET", None)
+
+    def test_invalid_payment_does_not_invent_grant_rows(self):
+        before = len(payments.list_all_grants())
+        payload = json.dumps(
+            {
+                "type": "checkout.session.completed",
+                "data": {
+                    "object": {
+                        "id": "cs_no_grant",
+                        "metadata": {
+                            "platform": "linux",
+                            "filename": "restore-privacy-client-0.3.6-linux-x64.tar.gz",
+                            "amount_pence": "245",
+                            "currency": "gbp",
+                        },
+                    }
+                },
+            }
+        ).encode("utf-8")
+        result = payments.handle_stripe_webhook(
+            payload, "t=1,v1=deadbeef", secret="whsec_test"
+        )
+        self.assertFalse(result.get("granted"))
+        self.assertEqual(len(payments.list_all_grants()), before)
+
+
 if __name__ == "__main__":
     unittest.main()

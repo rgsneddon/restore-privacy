@@ -20,6 +20,7 @@ from coffee_link import COFFEE_LINK_TEXT, coffee_tip_url
 from payments import (
     PRICE_LABEL,
     PRICE_PENCE,
+    list_all_grants,
     list_recent_grants,
     public_base_url,
     reissue_download_for_purchase_id,
@@ -486,10 +487,21 @@ def processor_settings_view() -> dict[str, Any]:
 
 
 def project_grants_for_admin(
-    grants: list[dict[str, Any]] | None = None, *, limit: int = 50
+    grants: list[dict[str, Any]] | None = None, *, limit: int | None = None
 ) -> list[dict[str, Any]]:
-    """Project grant rows for admin UI (full token kept for operator support, truncated in HTML)."""
-    raw = grants if grants is not None else list_recent_grants(limit)
+    """Project grant rows for admin UI.
+
+    Default loads the **full** completed-payment grant history from the shipped
+    store (no silent drop past a short window). Pass *limit* only when a caller
+    intentionally wants a truncated sample. Full token is kept for operator
+    support; HTML truncates the display value only.
+    """
+    if grants is not None:
+        raw = grants
+    elif limit is None:
+        raw = list_all_grants()
+    else:
+        raw = list_recent_grants(limit)
     out: list[dict[str, Any]] = []
     for g in raw:
         out.append(
@@ -1138,8 +1150,10 @@ background:var(--btn-bg);color:var(--btn-fg);font-weight:600;cursor:pointer}}
 {settings_html}
 <section id="admin-grants" class="card">
   <h2 id="admin-grants-heading">Paid download grants</h2>
-  <p class="muted">Recent Stripe-verified download tokens ({_escape(PRICE_LABEL)} GBP each).
-  Purchase identifier is durable; download token is single-use. Secrets never shown.</p>
+  <p class="muted" id="admin-grants-blurb">Full history of Stripe-verified download grants
+  ({_escape(PRICE_LABEL)} GBP each) — every completed payment grant in the store.
+  Used single-use tokens stay listed (status <code>used</code>); purchase identifier is durable.
+  Secrets never shown.</p>
   <table id="admin-grants-table">
     <thead><tr>
       <th>Purchase ID</th><th>Platform</th><th>Filename</th><th>Amount</th><th>Status</th><th>Token</th><th>Session</th>
