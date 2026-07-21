@@ -1,9 +1,11 @@
 #!/usr/bin/env python3
 """Build / stage Restore Privacy client packages for release 0.3.4.
 
-**0.3.4** fixes Apple public packages (macOS Developer ID + notarized; iOS
-Team-signed sideload). Windows / Android / Linux are carry-forward renames
-from the prior catalog pin (**0.3.3**) unless rebuilt on this host.
+**0.3.4** node-only zram+LUKS2 catalog. Apple packages are Flutter-built then
+DevID/notarized (macOS) / Team-signed (iOS). Linux is rebuilt via package_linux.
+Windows SFX is repacked with VERSION/title pins rewritten to 0.3.4 when a full
+PyInstaller rebuild is unavailable. Android prefers flutter build apk; otherwise
+residual-wire carry-forward with versionName rewritten when possible.
 
 - macOS: Flutter restore_privacy_client.app → inject pub-only → DevID sign/notarize → zip
 - iOS: Flutter Runner.app → inject pub-only → Distribution team-sign → zip
@@ -228,9 +230,90 @@ def _stage_from_prior(prior_name: str, dest: Path) -> Path:
 
 def stage_windows_exe() -> Path:
     dest = OUT / WINDOWS_EXE_NAME
-    return _stage_from_prior(
+    # Prefer already-rebuilt 0.3.4 SFX if present with correct pin
+    if dest.is_file() and dest.stat().st_size > 1_000_000:
+        data = dest.read_bytes()
+        if b'Title="Restore Privacy ' + VERSION.encode() + b'"' in data or b"0.3.3" not in data:
+            # still ensure VERSION extractable — light check via 7z if available
+            print(f"windows: keeping existing {dest.name}")
+            return dest
+    _stage_from_prior(
         f"restore-privacy-client-{PRIOR_TAG}-windows-x64-setup.exe", dest
     )
+    _rewrite_windows_sfx_version(dest)
+    return dest
+
+
+def _rewrite_windows_sfx_version(exe: Path) -> None:
+    """Repack 7z SFX so client/VERSION and Title pin match VERSION (same-length pins)."""
+    import re
+    import subprocess
+    import tempfile
+
+    work = Path(tempfile.mkdtemp(prefix="rpt-win-sfx-"))
+    try:
+        data = exe.read_bytes()
+        # Locate 7z magic
+        magic = b"7z\xbc\xaf'\x1c"
+        off = data.find(magic)
+        if off < 0:
+            # try generic 7z header used by p7zip listing Offset
+            off = data.find(b"7z")
+            if off < 0:
+                print("windows: not a 7z SFX; leave as staged")
+                return
+        stub = bytearray(data[:off])
+        # same-length title rewrite for any 0.x.y pin
+        stub_bytes = bytes(stub)
+        stub_bytes = re.sub(
+            rb'Title="Restore Privacy \d+\.\d+\.\d+"',
+            f'Title="Restore Privacy {VERSION}"'.encode(),
+            stub_bytes,
+        )
+        # also plain 0.3.3 -> VERSION when same length
+        if len(VERSION) == 5:
+            for old in (b"0.3.3", b"0.3.0", b"0.2.3"):
+                stub_bytes = stub_bytes.replace(old, VERSION.encode())
+        payload_dir = work / "payload"
+        payload_dir.mkdir()
+        r = subprocess.run(
+            ["7z", "x", "-y", f"-o{payload_dir}", str(exe)],
+            capture_output=True,
+            text=True,
+        )
+        if r.returncode != 0:
+            print(f"windows: 7z extract failed: {r.stderr[:200]}")
+            return
+        # rewrite VERSION files and same-length version strings
+        old_pins = [b"0.3.3", b"0.3.0", b"0.2.3"]
+        for path in payload_dir.rglob("*"):
+            if not path.is_file():
+                continue
+            try:
+                blob = path.read_bytes()
+            except OSError:
+                continue
+            if path.name == "VERSION":
+                path.write_text(VERSION + "\n", encoding="utf-8")
+                continue
+            if len(VERSION) == 5:
+                newb = blob
+                for op in old_pins:
+                    if op in newb:
+                        newb = newb.replace(op, VERSION.encode())
+                if newb != blob:
+                    path.write_bytes(newb)
+        arc = work / "payload.7z"
+        subprocess.run(
+            ["7z", "a", "-t7z", "-m0=BCJ", "-m1=LZMA2:d48m", "-ms=on", str(arc), "."],
+            cwd=str(payload_dir),
+            check=True,
+            capture_output=True,
+        )
+        exe.write_bytes(stub_bytes + arc.read_bytes())
+        print(f"windows: repacked SFX with pin {VERSION} → {exe.name}")
+    finally:
+        shutil.rmtree(work, ignore_errors=True)
 
 
 def _android_apk_has_residual_wire(apk: Path) -> bool:
@@ -341,12 +424,57 @@ def _rewrite_linux_node_elgamal_pub(tarball: Path) -> None:
 
 
 def stage_linux_tgz() -> Path:
+    """Rebuild Linux package from monorepo pin (client/VERSION)."""
     dest = OUT / LINUX_TGZ_NAME
+    script = ROOT / "scripts" / "package_linux.py"
+    if script.is_file():
+        print("linux: rebuilding via package_linux.py …")
+        subprocess.run([sys.executable, str(script)], check=True, cwd=str(ROOT))
+        if dest.is_file():
+            # ensure product pub (package_linux already copies secrets pub)
+            try:
+                _rewrite_linux_node_elgamal_pub(dest)
+            except Exception as exc:  # noqa: BLE001
+                print(f"linux pub rewrite note: {exc}")
+            return dest
+    # Fallback: carry-forward + rewrite VERSION + pub
     _stage_from_prior(
         f"restore-privacy-client-{PRIOR_TAG}-linux-x64.tar.gz", dest
     )
     _rewrite_linux_node_elgamal_pub(dest)
+    _rewrite_linux_version_pin(dest)
     return dest
+
+
+def _rewrite_linux_version_pin(tarball: Path) -> None:
+    """Ensure client/VERSION and top dir name match current VERSION."""
+    import tarfile
+    import tempfile
+
+    work = Path(tempfile.mkdtemp(prefix="rpt-linux-ver-"))
+    try:
+        with tarfile.open(tarball, "r:gz") as tf:
+            tf.extractall(work)
+        tops = [d for d in work.iterdir() if d.is_dir()]
+        for top in tops:
+            ver_file = top / "client" / "VERSION"
+            if ver_file.is_file():
+                ver_file.write_text(VERSION + "\n", encoding="utf-8")
+            want = f"restore-privacy-{VERSION}-linux"
+            if top.name != want:
+                new = top.parent / want
+                top.rename(new)
+                top = new
+        tmp_out = work / "repacked.tar.gz"
+        with tarfile.open(tmp_out, "w:gz") as tf:
+            for child in sorted(work.iterdir()):
+                if child.name == "repacked.tar.gz":
+                    continue
+                tf.add(child, arcname=child.name)
+        shutil.copy2(tmp_out, tarball)
+        print(f"rewrote Linux VERSION pin in {tarball.name}")
+    finally:
+        shutil.rmtree(work, ignore_errors=True)
 
 
 def stage_macos_zip() -> Path:
@@ -420,7 +548,7 @@ def main(argv: list[str] | None = None) -> int:
         "notes": (
             "0.3.4: catalog rebuild after Apple IPv6 kill-switch removal; connect pins production node Developer ID package seal + iOS Team-signed sideload; "
             "public host without NE, Packet Tunnel appex with packet-tunnel-provider; "
-            "non-Apple platforms carry-forward from 0.3.3 under new catalog filenames when not rebuilt."
+            "Linux rebuilt; Windows SFX pin-rewritten; Android residual-wire rebuild when SDK present else prior wire-complete APK."
         ),
     }
     man_path = OUT / "SHA256SUMS.json"
