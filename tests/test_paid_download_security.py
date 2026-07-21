@@ -85,8 +85,12 @@ class TestPublicHtmlNoFreeInstallerHrefs(unittest.TestCase):
     def test_homepage_downloads_html_is_paid_only(self):
         html = render_download_section_html()
         self.assertIn("data-pay-via", html)
-        # Temporary default is Coming soon (not live Pay); still no free installers
-        self.assertIn("Coming soon", html)
+        # Live catalog: Pay buttons (Stripe Payment Link); never free GitHub installers
+        self.assertIn("Pay £2.45", html)
+        self.assertIn('data-buy-mode="stripe-live"', html)
+        self.assertIn("donate.stripe.com", html)
+        self.assertIn("client_reference_id=", html)
+        self.assertNotIn("Coming soon", html)
         self.assertNotIn("releases/download/", html)
         for a in available_downloads():
             self.assertNotIn(f'href="{a.url}"', html)
@@ -97,9 +101,9 @@ class TestPublicHtmlNoFreeInstallerHrefs(unittest.TestCase):
             )
         page = status_app.render_html({"title": "RESTORE PRIVACY"}).decode("utf-8")
         self.assertNotIn("releases/download/", page)
-        self.assertIn("Coming soon", page)
-        self.assertIn("https://restoreprivacy.online", page)
-        self.assertNotIn("donate.stripe.com", page)
+        self.assertIn("Pay £2.45", page)
+        self.assertIn("donate.stripe.com", page)
+        self.assertNotIn("Coming soon", page)
 
 
 class TestDownloadTokenDeniesUnpaid(unittest.TestCase):

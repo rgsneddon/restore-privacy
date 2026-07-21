@@ -1,8 +1,13 @@
 """Product-honest leak test: residual capture + DNS posture (local evaluation).
 
 The Settings **Leak test** button evaluates whether residual public-IP capture
-and tunnel DNS look correct. It does **not** claim multi-hop residual routing
-or perfect DPI / leak-proofing beyond what residual capture + DNS plan measure.
+and tunnel DNS look correct. It does **not** claim perfect DPI / leak-proofing
+beyond what residual capture + DNS plan measure.
+
+Multi-hop: when residual is actively dialing the **exit** hop
+(``RPT_MULTIHOP_ENABLED=1`` + routing implemented), the result may report
+multi-hop residual via exit. Default single-hop never claims multi-hop residual.
+This is residual-via-exit selection, not full intermediate encapsulation.
 
 Live public-IP probes are optional and injectable so CI stays offline-safe.
 """
@@ -31,7 +36,7 @@ class LeakTestInputs:
     # Optional egress probe (None = not run this session)
     public_ip_probe_ran: bool = False
     public_ip_matches_expected_node: Optional[bool] = None
-    # Product honesty: multi-hop residual is not implemented
+    # True when Connect residual dials the exit hop (multi-hop active)
     multihop_residual_routed: bool = False
 
 
@@ -42,15 +47,21 @@ class LeakTestResult:
     verdict: str
     summary: str
     details: tuple[str, ...] = ()
-    # Always false for product honesty — multi-hop residual is not claimed.
+    # True only when multi-hop residual (exit dial) is actually active this session
     claims_multihop_residual: bool = False
 
     def format_user_message(self) -> str:
         lines = [f"Leak test: {self.verdict.upper()} — {self.summary}"]
         lines.extend(f"• {d}" for d in self.details)
-        if not self.claims_multihop_residual:
+        if self.claims_multihop_residual:
             lines.append(
-                "• Multi-hop residual routing is not claimed (entry/config only)."
+                "• Multi-hop residual is active (residual via exit hop; "
+                "not full intermediate encapsulation)."
+            )
+        else:
+            lines.append(
+                "• Multi-hop residual is opt-in (RPT_MULTIHOP_ENABLED=1); "
+                "default is single-hop entry."
             )
         return "\n".join(lines)
 
@@ -66,12 +77,12 @@ def evaluate_leak_test(inputs: LeakTestInputs) -> LeakTestResult:
     - **inconclusive**: insufficient state (e.g. not connected) without hard fail signals.
     """
     details: list[str] = []
-    claims_mh = False  # never true on product path
+    claims_mh = bool(inputs.multihop_residual_routed)
 
-    if inputs.multihop_residual_routed:
-        # Defensive: product should never pass True; if it does, refuse to claim it.
+    if claims_mh:
         details.append(
-            "Multi-hop residual flag was set; product does not route multi-hop residual."
+            "Multi-hop residual path selected: residual dials exit hop "
+            "(entry→exit path configured; residual-via-exit, not full encapsulation)."
         )
 
     dns_ok = bool(inputs.dns_tunnel_gateway_only) and not inputs.public_dns_violations
@@ -205,6 +216,14 @@ def collect_leak_test_inputs(
         except Exception:
             matches = None
 
+    mh_routed = False
+    try:
+        from client.multihop import is_multihop_active, multihop_config_from_env
+
+        mh_routed = bool(is_multihop_active(multihop_config_from_env()))
+    except Exception:
+        mh_routed = False
+
     return LeakTestInputs(
         residual_capture_active=bool(residual_capture_active),
         ipv6_protected=bool(ipv6_protected),
@@ -212,7 +231,7 @@ def collect_leak_test_inputs(
         public_dns_violations=violations,
         public_ip_probe_ran=probe_ran,
         public_ip_matches_expected_node=matches,
-        multihop_residual_routed=False,
+        multihop_residual_routed=mh_routed,
     )
 
 

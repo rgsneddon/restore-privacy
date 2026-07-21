@@ -224,13 +224,18 @@ fi
 # Verify cryptography from venv (not system)
 python -c "import cryptography; print('cryptography', cryptography.__version__, 'OK (bundled)')"
 
-# Secrets
+# Secrets (entry + exit pubs for multi-hop residual; never private keys)
 SECRETS_DIR="${HOME}/.restore-privacy/secrets"
 mkdir -p "$SECRETS_DIR"
-if [[ -f "$ROOT/secrets/node_elgamal.pub" ]]; then
-  cp -f "$ROOT/secrets/node_elgamal.pub" "$SECRETS_DIR/"
-  echo "Installed node public key to $SECRETS_DIR"
-fi
+for pub in node_elgamal.pub exit_node_elgamal.pub; do
+  if [[ -f "$ROOT/product/$pub" ]]; then
+    cp -f "$ROOT/product/$pub" "$SECRETS_DIR/"
+    echo "Installed $pub from product/ to $SECRETS_DIR"
+  elif [[ -f "$ROOT/secrets/$pub" ]]; then
+    cp -f "$ROOT/secrets/$pub" "$SECRETS_DIR/"
+    echo "Installed $pub from secrets/ to $SECRETS_DIR"
+  fi
+done
 
 # Ensure launcher is executable
 chmod +x "$ROOT/bin/privacy-restored" 2>/dev/null || true
@@ -465,9 +470,34 @@ def main() -> int:
 
         sec = stage / "secrets"
         sec.mkdir(exist_ok=True)
-        pub = ROOT / "secrets" / "node_elgamal.pub"
-        if pub.is_file():
-            shutil.copy2(pub, sec / "node_elgamal.pub")
+        # Entry + exit ElGamal pubs (public only) for single-hop / multi-hop residual
+        for name, candidates in (
+            (
+                "node_elgamal.pub",
+                (
+                    ROOT / "product" / "node_elgamal.pub",
+                    ROOT / "secrets" / "node_elgamal.pub",
+                ),
+            ),
+            (
+                "exit_node_elgamal.pub",
+                (
+                    ROOT / "product" / "exit_node_elgamal.pub",
+                    ROOT / "secrets" / "exit_node_elgamal.pub",
+                ),
+            ),
+        ):
+            for src in candidates:
+                if src.is_file() and src.stat().st_size >= 32:
+                    shutil.copy2(src, sec / name)
+                    break
+        # Also ship product/ tree pubs when present (load_node prefers product/)
+        prod = stage / "product"
+        prod.mkdir(exist_ok=True)
+        for name in ("node_elgamal.pub", "exit_node_elgamal.pub"):
+            src = ROOT / "product" / name
+            if src.is_file():
+                shutil.copy2(src, prod / name)
 
         wheels_dir = stage / "wheels"
         print("Downloading manylinux wheels (cryptography stack)…")

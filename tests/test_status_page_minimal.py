@@ -51,13 +51,16 @@ class TestPublicPageWithDownloads(unittest.TestCase):
         self.assertIn(IOS_ZIP_FILENAME, html)
         self.assertIn(ANDROID_APK_FILENAME, html)
         self.assertNotIn("apple-prep", html)
-        self.assertIn("Coming soon", html)
-        self.assertIn("https://restoreprivacy.online", html)
+        # Live catalog: Stripe Pay buttons (not Coming soon)
+        self.assertIn("Pay £2.45", html)
+        self.assertIn("donate.stripe.com", html)
+        self.assertIn('data-buy-mode="stripe-live"', html)
+        self.assertNotIn("Coming soon", html)
         for a in available_downloads():
-            # Temporary mode: redundant host hrefs, not live Stripe pay_path
-            self.assertNotIn(f'href="{a.pay_path}"', html)
-            self.assertNotIn(f'href="{a.url}"', html)
+            # Live mode: Stripe Payment Link with client_reference_id; never free GH href
             self.assertIn(f'id="dl-{a.platform}"', html)
+            self.assertIn(f"client_reference_id={a.platform}", html)
+            self.assertNotIn(f'href="{a.url}"', html)
             self.assertTrue(
                 a.url.startswith(
                     "https://github.com/rgsneddon/restore-privacy/releases/download/0.3.6/"
@@ -107,9 +110,9 @@ class TestPublicPageWithDownloads(unittest.TestCase):
                     self.assertNotIn("fetch('/api/status'", html)
                     self.assertIn("Download client v0.3.6", html)
                     self.assertIn(WINDOWS_ZIP_FILENAME, html)
-                    self.assertIn("Coming soon", html)
-                    self.assertIn("https://restoreprivacy.online", html)
-                    self.assertNotIn("donate.stripe.com", html)
+                    self.assertIn("Pay £2.45", html)
+                    self.assertIn("donate.stripe.com", html)
+                    self.assertNotIn("Coming soon", html)
                     self.assertIn("£2.45", html)
                     self.assertNotIn('id="rust-repo-link"', html)
                     self.assertNotIn("installers after £2.45 payment only", html)

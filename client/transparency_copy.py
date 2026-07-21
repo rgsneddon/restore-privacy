@@ -30,8 +30,9 @@ CONNECTION_LOG_DISCLAIMER = (
 
 LEAK_TEST_DISCLAIMER = (
     "Leak test checks residual public-IP capture and tunnel DNS posture on this "
-    "device. It does not prove multi-hop residual routing (not product-routed) or "
-    "perfect leak-proofing on every OEM."
+    "device. Multi-hop residual is opt-in (RPT_MULTIHOP_ENABLED=1) and means residual "
+    "via the exit hop — not full intermediate encapsulation or perfect leak-proofing "
+    "on every OEM."
 )
 
 # Substring gates used by tests (must appear in product Settings UI sources)

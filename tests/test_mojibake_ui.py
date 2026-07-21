@@ -56,8 +56,9 @@ class TestDownloadsNoMojibake(unittest.TestCase):
         # Trailing “catalog v… on restoreprivacy.online (paid download only)” removed
         self.assertNotIn("paid download only", html)
         self.assertNotIn("catalog-version", html)
-        # Temporary default: Coming soon labels (live mode still has Pay £2.45)
-        self.assertIn("Coming soon", html)
+        # Live catalog: Pay labels (no Coming soon)
+        self.assertIn("Pay £2.45", html)
+        self.assertNotIn("Coming soon", html)
         self.assertNotIn("apple-prep", html)
         self.assertNotIn("Â·", html)
 

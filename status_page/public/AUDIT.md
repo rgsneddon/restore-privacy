@@ -76,7 +76,7 @@ Latest automated security audit for production node **82.221.101.241** and the i
 | Live node healthy (TCP+HTTP) | YES |
 | Catalog installers AUDIT STATE | 🟥 (see top package table) |
 
-**Overall posture:** **Strong** for residual honesty (`residual_ip_capture`), no public live count, no-phones-home Connect, packaging strip of `*.priv`, tunnel DNS + DoT, Settings transparency — without multi-hop residual claims. Product kill-switch is **off by default** (opt-in ``RPT_KILL_SWITCH=1`` only). Installer package confidence is the RAG table at the top of this audit.
+**Overall posture:** **Strong** for residual honesty (`residual_ip_capture`), no public live count, no-phones-home Connect, packaging strip of `*.priv`, tunnel DNS + DoT, Settings transparency. Multi-hop residual is **opt-in** (`RPT_MULTIHOP_ENABLED=1`): residual dials the exit hop (Romania); default single-hop Iceland entry; residual-via-exit, not full intermediate encapsulation. Product kill-switch is **off by default** (opt-in ``RPT_KILL_SWITCH=1`` only). Installer package confidence is the RAG table at the top of this audit.
 
 **Primary residual risks (open by design / environment):**
 
@@ -148,7 +148,7 @@ An **ISP** performing **traffic analysis** may still observe connection timing a
 | **High** | Public client count on status | Closed (title-only) |
 | **Medium** | Shared client priv in packages | Closed (no .priv hits) |
 | **Low** | Unit suite failure | N/A |
-| **Info** | Multi-hop residual | Not implemented (honest config-only) |
+| **Info** | Multi-hop residual | Opt-in residual-via-exit (Romania); default single-hop entry |
 
 ---
 
@@ -168,8 +168,9 @@ An **ISP** performing **traffic analysis** may still observe connection timing a
 | Expectation | Notes |
 |-------------|--------|
 | Product host | **82.221.101.241** |
-| Public catalog | **0.3.4** paid installers on [status host](https://restoreprivacy.online/) (£2.45; no free GitHub release downloads) |
-| Node pub pin | `1b126abf…` |
+| Public catalog | **0.3.6** paid installers on [status host](https://restoreprivacy.online/) (£2.45; no free GitHub release downloads) |
+| Node pub pin (entry) | `1b126abf…` |
+| Exit pub pin (Romania) | `a36a3f38…` |
 | No `.priv` in public package trees | OK |
 
 ---
@@ -189,8 +190,8 @@ An **ISP** performing **traffic analysis** may still observe connection timing a
 
 1. Keep **4-hour** timer enabled on the production node (`install_security_audit_timer.sh`).  
 2. Redeploy VPN APP Shop after audit link / catalog changes.  
-3. Multi-hop residual remains optional future work (do not claim until residual).  
-4. Ops: keep Unbound tunnel-only; no public :53; provider log awareness.
+3. Keep multi-hop residual honesty: residual-via-exit when enabled; do not claim full intermediate encapsulation.  
+4. Ops: keep Unbound tunnel-only; no public :53; provider log awareness; zram+LUKS2 node-only on multi-hop hosts.
 
 ---
 
@@ -208,7 +209,7 @@ Re-run: `python3 scripts/run_security_audit.py --write`
 |-----|--------|
 | Public audit on private GitHub blob | **Fixed** — clients use status-origin `/AUDIT.md` |
 | Periodic node audit | **In tree** — 4h systemd timer |
-| Multi-hop residual | Not done (config only) |
+| Multi-hop residual | **In tree** — opt-in residual-via-exit (Romania); entry Iceland default |
 | Kill-switch + DoT + outer obfs | In tree |
 | Ephemeral node rebuild | In tree (dry-run default) |
 

@@ -38,7 +38,7 @@ Restore Privacy is built from the ground up using unashamed vibe coding methods 
 - **Layer obfuscation** (QUIC-mimic outer wrap around RPT frames) **on by default on every residual path** (`RPT_OBFS=0` to opt out on Python; native product constants default on) — mitigation, not DPI-undetectability
 - **Product traffic shaping** (padding / send jitter / cover) **on by default on every residual path** — Windows/Linux Python (`RPT_TRAFFIC_SHAPE=0` to opt out), Android VPN service, and Apple Packet Tunnel (pad bucket 128, cover ~2s, jitter ≤40ms)
 - **No product kill switch by default** (firewall/iptables block rules and Android `setBlocking` are off; opt in only with `RPT_KILL_SWITCH=1`); tunnel DNS only (`10.88.0.1`, no public DNS fallbacks); IPv4 residual honesty still applies
-- Multi-hop hop *lists* may be configured for planning — **not residual multi-hop** until a real relay path ships
+- Multi-hop residual is **opt-in** (`RPT_MULTIHOP_ENABLED=1`): residual Connect dials the **exit** hop (Romania); default remains **single-hop** Iceland entry
 - Security audit documents **per-installer AUDIT STATE** (Green / Amber / Red) for catalog packages — [AUDIT.md](AUDIT.md)
 
 ---
@@ -79,6 +79,8 @@ The product source repository is **private**; free permanent GitHub release down
 6. For complete removal, open the in-package **Restore Internet** guidance and uninstall via system Settings.
 
 ### Ubuntu and derivatives (Linux Mint, Pop!_OS, …)
+
+Supported floor: **Ubuntu 20.04 LTS** and later (including 22.04 / 24.04 LTS).
 
 1. On the [status downloads page](https://restoreprivacy.online/), pay **£2.45** for **Linux** and download **`restore-privacy-client-0.3.6-linux-x64.tar.gz`** (one-time link after payment).
 2. Unpack and run the bundled installer:
@@ -141,7 +143,7 @@ need residual internet restored **and** complete product removal.
 | **Credits** | [CREDITS.md](CREDITS.md) |
 | **Code & policy audit** | [AUDIT.md](AUDIT.md) |
 
-Core promises: **no user-info logs** by design, **minimal public status** (title + downloads — **no live client count**), **device keys** (not a shared client private key), **honest residual** only when full tunnel is up, **no third-party geo** on Connect. Product residual paths on **all platforms** (Windows, Linux, Android, iOS, macOS) enable **outer-layer obfuscation** and **padding / jitter / cover** by default; **kill-switch is not applied by default**. **Disconnect / Quit** restores residual routes (no intentional blackhole after normal teardown). **Restore Internet** is a full wipe failsafe (not ordinary Disconnect). Multi-hop *config* is not residual until a real relay ships. Node tunnel DNS uses **DoT** upstream. Production node VPS: **Iceland / FlokiNET** — **as far as we can be assured** from host public statements, **no invasive logs** of users connecting to the node (privacy §3.1 / §4).
+Core promises: **no user-info logs** by design, **minimal public status** (title + downloads — **no live client count**), **device keys** (not a shared client private key), **honest residual** only when full tunnel is up, **no third-party geo** on Connect. Product residual paths on **all platforms** (Windows, Linux, Android, iOS, macOS) enable **outer-layer obfuscation** and **padding / jitter / cover** by default; **kill-switch is not applied by default**. **Disconnect / Quit** restores residual routes (no intentional blackhole after normal teardown). **Restore Internet** is a full wipe failsafe (not ordinary Disconnect). Multi-hop residual is **opt-in** (`RPT_MULTIHOP_ENABLED=1`): residual dials the Romania exit; default remains single-hop Iceland entry. Node tunnel DNS uses **DoT** upstream. Production node VPS: **Iceland / FlokiNET** — **as far as we can be assured** from host public statements, **no invasive logs** of users connecting to the node (privacy §3.1 / §4).
 
 ---
 
@@ -163,7 +165,7 @@ Short user-education summary. Full policy language: **[PRIVACY_POLICY.md — Thr
 - **Endpoint correlation** — sites still know you via logins, cookies, and browser fingerprints; many users share one node egress IP.
 - **Behavioral analysis** — observers can still study when you connect and rough usage patterns.
 - **VPS / provider IP metadata** — product node is **FlokiNET** in **Iceland** (strict Icelandic privacy norms); **as far as we can be assured** from FlokiNET’s public statements the host does **not** retain invasive connection logs of users connecting to the node. Other providers (CDN/status, home ISP, destinations) may still log. Node OS compromise remains a residual risk.
-- **Traffic analysis by ISP** beyond mitigations — you still appear to use a VPN; no multi-hop residual yet.
+- **Traffic analysis by ISP** beyond mitigations — you still appear to use a VPN; opt-in multi-hop residual uses the Romania exit when enabled
 - **Client device seizure** — local keys, apps, and browser history on an unlocked device are out of scope for the node’s no-log promise.
 - Malware, compromised OS, or destination-site tracking.
 

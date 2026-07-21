@@ -7,7 +7,8 @@ public buttons. After payment the status host **proxies** the installer
 restore-privacy repo is **private**. Buy Me a Coffee is tip/support only.
 
 Current catalog packages: restore-privacy release **0.3.6**
-(macOS Developer ID notarized; iOS Team-signed sideload).
+(Windows setup needs no separate Python install; macOS Developer ID notarized;
+iOS Team-signed sideload).
 """
 
 from __future__ import annotations
@@ -15,7 +16,10 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Iterable
 
-from coffee_link import COFFEE_LINK_URL, coffee_tip_url
+try:
+    from coffee_link import COFFEE_LINK_URL, coffee_tip_url
+except ImportError:  # package import path (status_page as package)
+    from status_page.coffee_link import COFFEE_LINK_URL, coffee_tip_url
 
 RELEASE_VERSION = "0.3.6"
 GITHUB_OWNER = "rgsneddon"

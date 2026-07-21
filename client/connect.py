@@ -1,4 +1,9 @@
-"""RPT client connect path — authorized handshake + session (testable without UI)."""
+"""RPT client connect path — authorized handshake + session (testable without UI).
+
+Admission is cryptographic only: **no public-IP geo** gate and **no third-party geo**
+lookup on Connect. Multi-hop residual (when enabled) dials the exit hop; default is
+single-hop product entry.
+"""
 
 from __future__ import annotations
 

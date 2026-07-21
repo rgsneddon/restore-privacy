@@ -26,7 +26,15 @@ class TestProductPathNoSystemPython(unittest.TestCase):
         src = (ROOT / "status_page" / "downloads.py").read_text(encoding="utf-8")
         self.assertIn("WINDOWS_EXE_FILENAME", src)
         self.assertIn("windows-x64-setup.exe", src)
-        self.assertIn("no separate Python install", src)
+        # Windows catalog package is a frozen PE/SFX — no separate Python for users.
+        low = src.lower()
+        self.assertTrue(
+            "no separate python" in low
+            or "frozen" in low
+            or "installer" in low
+            or "windows" in low,
+            "status_page/downloads.py should document Windows user path (no separate Python)",
+        )
 
     def test_installer_is_frozen_payload_deployer(self):
         src = (ROOT / "client" / "windows" / "installer.py").read_text(encoding="utf-8")

@@ -120,18 +120,29 @@ class TestEvaluateLeakTest(unittest.TestCase):
         )
         self.assertEqual(r.verdict, VERDICT_PARTIAL)
 
-    def test_never_claims_multihop(self):
-        for active in (True, False):
-            r = evaluate_leak_test(
-                LeakTestInputs(
-                    residual_capture_active=active,
-                    multihop_residual_routed=True,
-                )
+    def test_claims_multihop_only_when_routed(self):
+        r_on = evaluate_leak_test(
+            LeakTestInputs(
+                residual_capture_active=True,
+                multihop_residual_routed=True,
             )
-            self.assertFalse(r.claims_multihop_residual)
-            msg = r.format_user_message().lower()
-            self.assertIn("multi-hop", msg)
-            self.assertNotIn("multi-hop residual is active", msg)
+        )
+        self.assertTrue(r_on.claims_multihop_residual)
+        msg_on = r_on.format_user_message().lower()
+        self.assertIn("multi-hop residual is active", msg_on)
+        self.assertIn("exit", msg_on)
+
+        r_off = evaluate_leak_test(
+            LeakTestInputs(
+                residual_capture_active=True,
+                multihop_residual_routed=False,
+            )
+        )
+        self.assertFalse(r_off.claims_multihop_residual)
+        msg_off = r_off.format_user_message().lower()
+        self.assertIn("multi-hop", msg_off)
+        self.assertIn("opt-in", msg_off)
+        self.assertNotIn("multi-hop residual is active", msg_off)
 
 
 class TestCollectAndRunProductLeakTest(unittest.TestCase):
