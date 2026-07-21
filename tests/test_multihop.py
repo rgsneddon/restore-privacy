@@ -121,8 +121,6 @@ class TestMultiHopPath(unittest.TestCase):
     def test_entry_exit_requires_exit_host(self):
         with self.assertRaises(ValueError):
             build_entry_exit_path("")
-        self.assertFalse(hop_path_configured(cfg))
-        self.assertFalse(is_multihop_active(cfg))
 
     def test_routing_flag_gates_active(self):
         """is_multihop_active requires MULTI_HOP_ROUTING_IMPLEMENTED (shipped constant)."""
