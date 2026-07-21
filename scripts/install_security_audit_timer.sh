@@ -73,6 +73,13 @@ if [[ -f "${REPO_ROOT}/status_page/downloads.py" ]]; then
   _rpt_audit_cp "${REPO_ROOT}/status_page/downloads.py" \
     "${INSTALL_ROOT}/status_page/downloads.py"
 fi
+# Product pubs for PE pin / multihop exit pin honesty in package RAG
+for _pub in node_elgamal.pub exit_node_elgamal.pub NODE_ELGAMAL_PUB.sha256; do
+  if [[ -f "${REPO_ROOT}/product/${_pub}" ]]; then
+    _rpt_audit_cp "${REPO_ROOT}/product/${_pub}" \
+      "${INSTALL_ROOT}/product/${_pub}"
+  fi
+done
 # Prefer explicit env pin from client/VERSION for oneshot package RAG
 CATALOG_PIN=""
 if [[ -f "${INSTALL_ROOT}/client/VERSION" ]]; then
