@@ -610,32 +610,117 @@ def _android_wire_ok(path: Path) -> bool | None:
         return None
 
 
-def resolve_catalog_package_path(version: str, filename: str) -> Path | None:
-    """Resolve paid catalog installer under monopin search paths.
+def catalog_asset_search_dirs(version: str | None = None) -> list[Path]:
+    """Directories that may hold catalog monopin installers (AUDIT package RAG).
 
-    Order: releases/{ver}/, status_page/assets/{ver}/, status_page/assets/ (flat).
+    Aligns with paid fulfilment :func:`status_page.payments.asset_search_dirs`
+    so RAG does not false-miss packages that the status host can serve:
+
+    1. ``RPT_ASSET_DIR`` (operator override)
+    2. ``status_page/assets/{ver}/`` — Render rootDir=status_page deploy path
+    3. ``releases/{ver}/`` — monorepo local/dev stage
+    4. ``RPT_VPS_ASSET_REMOTE_ROOT/{ver}`` or ``/opt/restore-privacy/paid_assets/{ver}``
+    5. ``dist/{ver}/`` — build intermediate (dev only)
+
+    Each root is the **version directory** where ``filename`` is expected
+    (catalog ``relative_path`` = ``{ver}/{filename}``).
+    """
+    ver = (version or load_catalog_version()).strip()
+    dirs: list[Path] = []
+    seen: set[str] = set()
+
+    def _add(p: Path) -> None:
+        try:
+            key = str(p.resolve()) if p.exists() else str(p)
+        except OSError:
+            key = str(p)
+        if key in seen:
+            return
+        seen.add(key)
+        dirs.append(p)
+
+    raw = os.environ.get("RPT_ASSET_DIR", "").strip()
+    if raw:
+        _add(Path(raw).expanduser())
+    # Prefer status assets first (same order as payments.asset_search_dirs)
+    _add(ROOT / "status_page" / "assets" / ver)
+    _add(ROOT / "releases" / ver)
+    remote_root = os.environ.get(
+        "RPT_VPS_ASSET_REMOTE_ROOT", "/opt/restore-privacy/paid_assets"
+    ).strip()
+    if remote_root:
+        _add(Path(remote_root) / ver)
+    _add(ROOT / "dist" / ver)
+    # Flat status_page/assets (legacy mis-stage)
+    _add(ROOT / "status_page" / "assets")
+    return dirs
+
+
+def resolve_catalog_package_path(
+    version: str,
+    filename: str,
+    *,
+    relative_path: str | None = None,
+) -> Path | None:
+    """Resolve paid catalog installer under monopin fulfilment search paths.
+
+    Uses :func:`catalog_asset_search_dirs` + catalog basename (and optional
+    ``relative_path`` like ``0.3.6/restore-privacy-client-0.3.6-….exe``).
     """
     ver = (version or "").strip()
     name = (filename or "").strip()
     if not ver or not name:
         return None
-    candidates = (
-        ROOT / "releases" / ver / name,
-        ROOT / "status_page" / "assets" / ver / name,
-        ROOT / "status_page" / "assets" / name,
-        ROOT / "dist" / ver / name,
-    )
-    for base in candidates:
-        try:
-            if base.is_file() and base.stat().st_size > 1000:
-                return base
-        except OSError:
-            continue
+    # Security: basename only (no path traversal)
+    name = Path(name).name
+    if name in (".", "..") or not name:
+        return None
+    rel = (relative_path or "").strip().replace("\\", "/")
+    rel_name = Path(rel).name if rel else ""
+
+    for base in catalog_asset_search_dirs(ver):
+        candidates = [base / name]
+        # If relative_path is version/filename and base is version dir, name alone
+        # is enough; if base is a parent of version, try relative_path join.
+        if rel and rel_name == name and "/" in rel:
+            parent = base.parent if base.name == ver else base
+            candidates.append(parent / rel)
+            candidates.append(base / rel)  # rarely: double version
+        for cand in candidates:
+            try:
+                if cand.is_file() and cand.stat().st_size > 1000:
+                    return cand
+            except OSError:
+                continue
     return None
 
 
-def catalog_platform_filenames(version: str | None = None) -> list[tuple[str, str, str]]:
-    """(platform, label, filename) for current monopin — prefer downloads.py list."""
+def catalog_search_roots_display(version: str | None = None) -> list[str]:
+    """Human-readable monopin roots for missing-package reasons."""
+    ver = (version or load_catalog_version()).strip()
+    out: list[str] = []
+    for d in catalog_asset_search_dirs(ver):
+        try:
+            # Prefer repo-relative paths in reasons when under ROOT
+            try:
+                rel = d.resolve().relative_to(ROOT.resolve())
+                out.append(rel.as_posix().rstrip("/") + "/")
+                continue
+            except (ValueError, OSError):
+                pass
+            out.append(str(d).replace("\\", "/").rstrip("/") + "/")
+        except OSError:
+            out.append(str(d).replace("\\", "/") + "/")
+    return out
+
+
+def catalog_platform_filenames(
+    version: str | None = None,
+) -> list[tuple[str, str, str, str]]:
+    """(platform, label, filename, relative_path) for current monopin.
+
+    Driven by :func:`downloads.list_catalog_platform_packages` when importable.
+    """
     ver = (version or load_catalog_version()).strip()
     label_map = {p: lab for p, lab, _ in _CATALOG_PACKAGE_SPECS}
     try:
@@ -644,19 +729,25 @@ def catalog_platform_filenames(version: str | None = None) -> list[tuple[str, st
             sys.path.insert(0, sp)
         from downloads import list_catalog_platform_packages  # type: ignore
 
-        out: list[tuple[str, str, str]] = []
-        for row in list_catalog_platform_packages() or []:
+        out: list[tuple[str, str, str, str]] = []
+        for row in list_catalog_platform_packages(version=ver) or []:
             plat = str(row.get("platform") or "").strip().lower()
             fname = str(row.get("filename") or "").strip()
+            rel = str(row.get("relative_path") or f"{ver}/{fname}").strip()
             if not plat or not fname:
                 continue
-            out.append((plat, label_map.get(plat, plat.title()), fname))
+            out.append((plat, label_map.get(plat, plat.title()), fname, rel))
         if len(out) >= 5:
             return out
     except Exception:
         pass
     return [
-        (plat, lab, f"restore-privacy-client-{ver}-{suffix}")
+        (
+            plat,
+            lab,
+            f"restore-privacy-client-{ver}-{suffix}",
+            f"{ver}/restore-privacy-client-{ver}-{suffix}",
+        )
         for plat, lab, suffix in _CATALOG_PACKAGE_SPECS
     ]
 
@@ -750,18 +841,21 @@ def evaluate_package_audit_state(
     if path is None or not path.is_file():
         ver = load_catalog_version()
         miss = expected_filename or f"restore-privacy-client-{ver}-*"
+        roots = catalog_search_roots_display(ver)
+        roots_txt = ", ".join(roots[:5]) if roots else f"releases/{ver}/, status_page/assets/{ver}/"
         return {
             "platform": platform,
             "label": label,
             "filename": filename or f"(missing {platform})",
             "state": "Red",
             "reasons": [
-                f"catalog monopin asset not staged locally "
-                f"(looked for {miss} under releases/{ver}/ and "
-                f"status_page/assets/{ver}/; paid host may still fulfil via "
-                f"private GH / VPS when uploaded)"
+                f"catalog monopin asset not staged "
+                f"(looked for {miss} / relative_path {ver}/{miss} under "
+                f"{roots_txt}; paid host may still fulfil via private GH / "
+                f"VPS HTTP when uploaded)"
             ],
             "path": None,
+            "search_roots": roots,
         }
 
     if path.stat().st_size < 1000:
@@ -883,13 +977,15 @@ def evaluate_catalog_packages(catalog_version: str | None = None) -> dict:
     pin = product_node_pub_pin()
     exit_pin = product_exit_pub_pin()
     packages: list[dict] = []
-    for platform, _label, fname in catalog_platform_filenames(ver):
-        path = resolve_catalog_package_path(ver, fname)
-        packages.append(
-            evaluate_package_audit_state(
-                platform, path, pin=pin, expected_filename=fname
-            )
+    search_roots = catalog_search_roots_display(ver)
+    for platform, _label, fname, rel in catalog_platform_filenames(ver):
+        path = resolve_catalog_package_path(ver, fname, relative_path=rel)
+        row = evaluate_package_audit_state(
+            platform, path, pin=pin, expected_filename=fname
         )
+        row["relative_path"] = rel
+        row["search_roots"] = search_roots
+        packages.append(row)
     # Overall: worst state wins
     order = {"Green": 0, "Amber": 1, "Red": 2}
     worst = "Green"

@@ -43,6 +43,73 @@ class TestPackageRagEvaluation(unittest.TestCase):
             "releases/" in why or "status_page/assets" in why or "assets/" in why,
             f"reason should cite package search paths: {why}",
         )
+        self.assertIn("relative_path", why)
+
+    def test_catalog_filenames_match_downloads_monopin(self):
+        """Package RAG must use same basenames as downloads catalog list."""
+        ver = self.mod.load_catalog_version()
+        self.assertEqual(ver, "0.3.6")
+        rows = self.mod.catalog_platform_filenames(ver)
+        self.assertEqual(len(rows), 5)
+        # Prefer status_page.downloads when importable
+        import sys
+
+        sp = str(ROOT / "status_page")
+        if sp not in sys.path:
+            sys.path.insert(0, sp)
+        from downloads import list_catalog_platform_packages  # type: ignore
+
+        cat = {p["platform"]: p for p in list_catalog_platform_packages(version=ver)}
+        for plat, _lab, fname, rel in rows:
+            self.assertIn(plat, cat)
+            self.assertEqual(fname, cat[plat]["filename"])
+            self.assertEqual(rel, cat[plat]["relative_path"])
+            self.assertTrue(rel.startswith(f"{ver}/"))
+            self.assertTrue(fname.startswith(f"restore-privacy-client-{ver}-"))
+
+    def test_search_dirs_align_with_fulfilment_roots(self):
+        """Search roots include status assets, releases, and VPS paid_assets monopin."""
+        ver = self.mod.load_catalog_version()
+        dirs = self.mod.catalog_asset_search_dirs(ver)
+        as_posix = [str(d).replace("\\", "/") for d in dirs]
+        joined = " | ".join(as_posix)
+        self.assertTrue(
+            any(f"status_page/assets/{ver}" in p or f"assets\\{ver}" in p or p.endswith(f"assets/{ver}") for p in as_posix)
+            or any(p.endswith(f"assets/{ver}") or p.endswith(f"assets\\{ver}") for p in as_posix),
+            f"missing status assets root: {joined}",
+        )
+        self.assertTrue(
+            any(f"releases/{ver}" in p or p.endswith(f"releases/{ver}") or p.endswith(f"releases\\{ver}") for p in as_posix),
+            f"missing releases root: {joined}",
+        )
+        self.assertTrue(
+            any("paid_assets" in p for p in as_posix),
+            f"missing VPS paid_assets root: {joined}",
+        )
+        # Display reasons use monopin path text
+        disp = self.mod.catalog_search_roots_display(ver)
+        self.assertTrue(any("0.3.6" in d for d in disp))
+
+    def test_resolve_finds_staged_windows_via_catalog_relative_path(self):
+        """Present status_page/assets or releases package is not false-missing."""
+        ver = self.mod.load_catalog_version()
+        fname = f"restore-privacy-client-{ver}-windows-x64-setup.exe"
+        rel = f"{ver}/{fname}"
+        path = self.mod.resolve_catalog_package_path(ver, fname, relative_path=rel)
+        self.assertIsNotNone(
+            path,
+            "Windows 0.3.6 setup must resolve from catalog fulfilment paths",
+        )
+        assert path is not None
+        self.assertTrue(path.is_file())
+        self.assertEqual(path.name, fname)
+        # Honest state: not Red-for-missing
+        pin = self.mod.product_node_pub_pin()
+        st = self.mod.evaluate_package_audit_state(
+            "windows", path, pin=pin, expected_filename=fname
+        )
+        self.assertIn(st["state"], ("Green", "Amber"))
+        self.assertNotIn("not staged", " ".join(st["reasons"]).lower())
 
     def test_valid_states_only(self):
         for s in ("Green", "Amber", "Red"):
@@ -52,16 +119,28 @@ class TestPackageRagEvaluation(unittest.TestCase):
         """Drive real catalog monopin packages when present under releases/."""
         ver = self.mod.load_catalog_version()
         rag = self.mod.evaluate_catalog_packages(ver)
+        self.assertEqual(rag.get("catalog_version"), ver)
         plats = {p["platform"] for p in rag["packages"]}
         self.assertEqual(
             plats, {"windows", "linux", "macos", "ios", "android"}
         )
         for p in rag["packages"]:
             self.assertIn(p["state"], self.mod.VALID_PACKAGE_STATES)
+            self.assertIn("relative_path", p)
+            self.assertTrue(str(p["relative_path"]).startswith(f"{ver}/"))
+            # Missing rows must cite monopin search roots (not a wrong version path)
+            if p.get("path") is None:
+                why = " ".join(p.get("reasons") or []).lower()
+                self.assertIn(ver, why)
+                self.assertIn("relative_path", why)
         self.assertIn(rag["overall"], self.mod.VALID_PACKAGE_STATES)
         # With current monorepo catalog tree, expect packages present
         present = sum(1 for p in rag["packages"] if p.get("path"))
         self.assertGreaterEqual(present, 1)
+        # Windows staged for 0.3.6 must not be Red-for-missing
+        win = next(p for p in rag["packages"] if p["platform"] == "windows")
+        if win.get("path"):
+            self.assertIn(win["state"], ("Green", "Amber"))
 
     def test_render_section_lists_all_platforms(self):
         rag = {
