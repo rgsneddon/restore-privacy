@@ -160,6 +160,28 @@ class TestLocal029PackagesIfPresent(unittest.TestCase):
                         ctext = conn.read_text(encoding="utf-8", errors="replace")
                         self.assertNotIn("flyclient", ctext.lower())
                         self.assertIn("HELLO sent", ctext)
+                    # Runnable deps: cryptography (+ cffi) and Tk runtime
+                    crypt = list(tdp.rglob("cryptography")) + list(
+                        tdp.rglob("cryptography-*.dist-info")
+                    )
+                    self.assertTrue(
+                        crypt,
+                        f"{path.name}: missing cryptography package/wheels",
+                    )
+                    cffi = (
+                        list(tdp.rglob("cffi"))
+                        + list(tdp.rglob("_cffi_backend*.pyd"))
+                        + list(tdp.rglob("cffi-*.dist-info"))
+                    )
+                    self.assertTrue(cffi, f"{path.name}: missing cffi")
+                    tk = list(tdp.rglob("_tkinter.pyd")) + list(
+                        tdp.rglob("_tkinter*.pyd")
+                    )
+                    self.assertTrue(tk, f"{path.name}: missing _tkinter.pyd")
+                    tcl = list(tdp.rglob("_tcl_data")) + list(tdp.rglob("tcl86*.dll"))
+                    self.assertTrue(
+                        tcl, f"{path.name}: missing Tcl/Tk runtime data or dlls"
+                    )
             elif path.name.endswith(".tar.gz"):
                 with tarfile.open(path, "r:*") as tf:
                     for m in tf.getmembers():
