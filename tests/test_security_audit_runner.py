@@ -33,14 +33,65 @@ class TestSecurityAuditArtifacts(unittest.TestCase):
         self.assertIn("--write", text)
         self.assertIn("redact_audit_text", text)
         self.assertIn("slim_results_for_public_json", text)
+        # Architecture paths used by package RAG
+        self.assertIn("catalog_platform_filenames", text)
+        self.assertIn("build_windows_multihop", text)
+        self.assertIn("tests.test_multihop", text)
 
     def test_timer_install_script_four_hours(self):
         p = ROOT / "scripts" / "install_security_audit_timer.sh"
         self.assertTrue(p.is_file())
         text = p.read_text(encoding="utf-8")
         self.assertIn("4h", text)
+        self.assertIn("PERIOD=", text)
+        self.assertIn("OnUnitActiveSec=${PERIOD}", text)
         self.assertIn("rpt-security-audit", text)
         self.assertIn("run_security_audit.py", text)
+        self.assertIn("rpt-security-audit.timer", text)
+
+    def test_catalog_version_matches_product_pin(self):
+        """Runner monopin must track downloads / client VERSION (not a stale hardcode)."""
+        mod = _load_audit_mod()
+        ver = mod.load_catalog_version()
+        self.assertRegex(ver, r"^\d+\.\d+\.\d+")
+        client_ver = (ROOT / "client" / "VERSION").read_text(encoding="utf-8").strip()
+        self.assertEqual(ver, client_ver)
+        # Markdown template must not reintroduce “multihop not implemented”
+        src = (ROOT / "scripts" / "run_security_audit.py").read_text(encoding="utf-8")
+        low = src.lower()
+        self.assertNotIn("not implemented (honest config-only)", low)
+        self.assertNotIn("not done (config only)", low)
+        self.assertIn("residual-via-exit", low)
+
+    def test_windows_package_rag_uses_pe_multihop_when_present(self):
+        """Drive real evaluate_package_audit_state on rebuilt Windows PE when staged."""
+        mod = _load_audit_mod()
+        ver = mod.load_catalog_version()
+        pe = (
+            ROOT
+            / "releases"
+            / ver
+            / f"restore-privacy-client-{ver}-windows-x64-setup.exe"
+        )
+        if not pe.is_file():
+            pe = (
+                ROOT
+                / "status_page"
+                / "assets"
+                / ver
+                / f"restore-privacy-client-{ver}-windows-x64-setup.exe"
+            )
+        if not pe.is_file():
+            self.skipTest("Windows catalog PE not present on this host")
+        pin = mod.product_node_pub_pin()
+        out = mod.evaluate_package_audit_state(
+            "windows", pe, pin=pin, expected_filename=pe.name
+        )
+        self.assertIn(out["state"], ("Green", "Amber"))
+        joined = " ".join(out.get("reasons") or []).lower()
+        self.assertIn("pe/mz", joined)
+        self.assertIn("multihop", joined)
+        self.assertNotEqual(out["state"], "Red")
 
 
 class TestAuditTimerPrivacySectionA(unittest.TestCase):

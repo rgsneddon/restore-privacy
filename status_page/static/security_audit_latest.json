@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-07-21T20:16:32Z",
+  "generated_at": "2026-07-21T21:50:49Z",
   "node_host": "82.221.101.241",
   "catalog_version": "0.3.6",
   "unit_suite": {
@@ -15,7 +15,9 @@
       "tests.test_kill_switch_leaks",
       "tests.test_product_node_key",
       "tests.test_pfs_product_require",
-      "tests.test_downloads"
+      "tests.test_downloads",
+      "tests.test_multihop",
+      "tests.test_audit_package_rag"
     ]
   },
   "tcp_status": {
@@ -53,65 +55,69 @@
   "package_rag": {
     "catalog_version": "0.3.6",
     "pin": "1b126abfae737c66ce99670b730e123f2831ce5beb2868d7865324f391280bbe",
+    "exit_pin": "a36a3f38066ece7b33abfab6a57942fb998919b4a753ee0d9e9ec9c97c1c7352",
     "packages": [
       {
         "platform": "windows",
         "label": "Windows",
         "filename": "restore-privacy-client-0.3.6-windows-x64-setup.exe",
-        "state": "Amber",
+        "state": "Green",
         "reasons": [
+          "node_elgamal.pub embedded (raw product pin match)",
           "PE/MZ magic OK",
-          "node_elgamal.pub not found inside package (pin not verified)"
+          "multihop residual prep markers present (exit_node_elgamal; residual-via-exit when RPT_MULTIHOP_ENABLED=1)",
+          "exit_node_elgamal.pub raw bytes present (Romania exit pin)"
         ],
         "path": "C:\\Users\\rgsne\\restore_privacy\\releases\\0.3.6\\restore-privacy-client-0.3.6-windows-x64-setup.exe",
         "bytes": 36666068
       },
       {
-        "platform": "linux",
-        "label": "Linux",
-        "filename": "(missing linux)",
+        "platform": "android",
+        "label": "Android",
+        "filename": "restore-privacy-client-0.3.6-android.apk",
         "state": "Red",
         "reasons": [
-          "package file not found under releases/ or status_page/assets/"
+          "catalog monopin asset not staged locally (looked for restore-privacy-client-0.3.6-android.apk under releases/0.3.6/ and status_page/assets/0.3.6/; paid host may still fulfil via private GH / VPS when uploaded)"
         ],
         "path": null
       },
       {
         "platform": "macos",
         "label": "macOS",
-        "filename": "(missing macos)",
+        "filename": "restore-privacy-client-0.3.6-macos.zip",
         "state": "Red",
         "reasons": [
-          "package file not found under releases/ or status_page/assets/"
+          "catalog monopin asset not staged locally (looked for restore-privacy-client-0.3.6-macos.zip under releases/0.3.6/ and status_page/assets/0.3.6/; paid host may still fulfil via private GH / VPS when uploaded)"
         ],
         "path": null
       },
       {
         "platform": "ios",
         "label": "iOS",
-        "filename": "(missing ios)",
+        "filename": "restore-privacy-client-0.3.6-ios.zip",
         "state": "Red",
         "reasons": [
-          "package file not found under releases/ or status_page/assets/"
+          "catalog monopin asset not staged locally (looked for restore-privacy-client-0.3.6-ios.zip under releases/0.3.6/ and status_page/assets/0.3.6/; paid host may still fulfil via private GH / VPS when uploaded)"
         ],
         "path": null
       },
       {
-        "platform": "android",
-        "label": "Android",
-        "filename": "(missing android)",
+        "platform": "linux",
+        "label": "Linux",
+        "filename": "restore-privacy-client-0.3.6-linux-x64.tar.gz",
         "state": "Red",
         "reasons": [
-          "package file not found under releases/ or status_page/assets/"
+          "catalog monopin asset not staged locally (looked for restore-privacy-client-0.3.6-linux-x64.tar.gz under releases/0.3.6/ and status_page/assets/0.3.6/; paid host may still fulfil via private GH / VPS when uploaded)"
         ],
         "path": null
       }
     ],
+    "staged_count": 1,
     "overall": "Red",
     "legend": {
-      "Green": "Present, no *.priv, product node pub pin match, platform structural gate pass",
+      "Green": "Present, no *.priv, product node pub pin match, platform structural gate pass (Windows multihop markers when PE)",
       "Amber": "Present but pin/structural check incomplete or soft warning",
-      "Red": "Missing, embeds *.priv, pin mismatch, or failed structural gate (e.g. non-PE Windows)"
+      "Red": "Missing from local releases/assets tree, embeds *.priv, pin mismatch, or failed structural gate"
     }
   },
   "section_b": {

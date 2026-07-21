@@ -30,7 +30,19 @@ class TestPackageRagEvaluation(unittest.TestCase):
             "windows", None, pin="abc"
         )
         self.assertEqual(out["state"], "Red")
-        self.assertIn("not found", " ".join(out["reasons"]).lower())
+        why = " ".join(out["reasons"]).lower()
+        # Architecture: missing monopin asset under releases/assets (honest Red)
+        self.assertTrue(
+            "not staged" in why
+            or "not found" in why
+            or "missing" in why
+            or "looked for" in why,
+            f"expected missing-asset reason, got: {why}",
+        )
+        self.assertTrue(
+            "releases/" in why or "status_page/assets" in why or "assets/" in why,
+            f"reason should cite package search paths: {why}",
+        )
 
     def test_valid_states_only(self):
         for s in ("Green", "Amber", "Red"):

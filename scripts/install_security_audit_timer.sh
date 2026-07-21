@@ -37,6 +37,10 @@ if [[ "$(id -u)" -ne 0 ]]; then
 fi
 
 echo "[rpt-audit] security audit timer (period=${PERIOD}, jitter<=${JITTER_SEC}s)"
+# Default cadence is 4 hours (OnUnitActiveSec=4h) unless PERIOD is overridden.
+if [[ "${PERIOD}" != "4h" && "${PERIOD}" != "4hour" && "${PERIOD}" != "4 hours" ]]; then
+  echo "[rpt-audit] NOTE: non-default PERIOD=${PERIOD} (product default is 4h)" >&2
+fi
 mkdir -p \
   "${INSTALL_ROOT}/scripts" \
   "${INSTALL_ROOT}/status_page/static" \
@@ -52,6 +56,11 @@ fi
 # Seed current audit document
 if [[ -f "${REPO_ROOT}/AUDIT.md" ]]; then
   cp -a "${REPO_ROOT}/AUDIT.md" "${INSTALL_ROOT}/AUDIT.md"
+fi
+# Seed public mirror when present (status host /AUDIT.md)
+if [[ -f "${REPO_ROOT}/status_page/public/AUDIT.md" ]]; then
+  cp -a "${REPO_ROOT}/status_page/public/AUDIT.md" \
+    "${INSTALL_ROOT}/status_page/public/AUDIT.md" 2>/dev/null || true
 fi
 
 # Dedicated low-privilege identity (fallback: root oneshot with Protect* still applied)

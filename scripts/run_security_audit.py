@@ -49,6 +49,7 @@ _LOOPBACK_HOSTS = frozenset({"127.0.0.1", "::1", "localhost"})
 
 # Structural / privacy suite — keep lightweight and deterministic.
 # Do not include tests that assert AUDIT.md body content here (those run after --write).
+# Architecture 0.3.6+: multihop residual-via-exit, catalog monopin, package RAG helpers.
 SECURITY_TEST_MODULES = [
     "tests.test_legal_links",
     "tests.test_legal_docs",
@@ -59,6 +60,8 @@ SECURITY_TEST_MODULES = [
     "tests.test_product_node_key",
     "tests.test_pfs_product_require",
     "tests.test_downloads",
+    "tests.test_multihop",
+    "tests.test_audit_package_rag",
 ]
 
 
@@ -374,16 +377,37 @@ def run_section_b_probes(http_status: dict | None = None) -> dict:
 
 
 def load_catalog_version() -> str:
+    """Catalog monopin: status_page.downloads then client/VERSION."""
     try:
-        sys.path.insert(0, str(ROOT / "status_page"))
+        sp = str(ROOT / "status_page")
+        if sp not in sys.path:
+            sys.path.insert(0, sp)
+        try:
+            from downloads import current_catalog_version  # type: ignore
+
+            v = str(current_catalog_version()).strip()
+            if v:
+                return v
+        except Exception:
+            pass
         from downloads import RELEASE_VERSION  # type: ignore
 
-        return str(RELEASE_VERSION)
+        return str(RELEASE_VERSION).strip()
     except Exception:
         ver = ROOT / "client" / "VERSION"
         if ver.is_file():
             return ver.read_text(encoding="utf-8").strip()
         return "unknown"
+
+
+def product_exit_pub_pin() -> str:
+    """SHA-256 of product/exit_node_elgamal.pub (Romania exit) when tracked."""
+    import hashlib
+
+    pub = ROOT / "product" / "exit_node_elgamal.pub"
+    if pub.is_file() and pub.stat().st_size >= 32:
+        return hashlib.sha256(pub.read_bytes()).hexdigest().lower()
+    return ""
 
 
 # --- Catalog installer AUDIT STATE (Green / Amber / Red) ---
@@ -587,14 +611,123 @@ def _android_wire_ok(path: Path) -> bool | None:
 
 
 def resolve_catalog_package_path(version: str, filename: str) -> Path | None:
-    """Prefer releases/{version}/ then status_page/assets/{version}/."""
-    for base in (
-        ROOT / "releases" / version / filename,
-        ROOT / "status_page" / "assets" / version / filename,
-    ):
-        if base.is_file() and base.stat().st_size > 1000:
-            return base
+    """Resolve paid catalog installer under monopin search paths.
+
+    Order: releases/{ver}/, status_page/assets/{ver}/, status_page/assets/ (flat).
+    """
+    ver = (version or "").strip()
+    name = (filename or "").strip()
+    if not ver or not name:
+        return None
+    candidates = (
+        ROOT / "releases" / ver / name,
+        ROOT / "status_page" / "assets" / ver / name,
+        ROOT / "status_page" / "assets" / name,
+        ROOT / "dist" / ver / name,
+    )
+    for base in candidates:
+        try:
+            if base.is_file() and base.stat().st_size > 1000:
+                return base
+        except OSError:
+            continue
     return None
+
+
+def catalog_platform_filenames(version: str | None = None) -> list[tuple[str, str, str]]:
+    """(platform, label, filename) for current monopin — prefer downloads.py list."""
+    ver = (version or load_catalog_version()).strip()
+    label_map = {p: lab for p, lab, _ in _CATALOG_PACKAGE_SPECS}
+    try:
+        sp = str(ROOT / "status_page")
+        if sp not in sys.path:
+            sys.path.insert(0, sp)
+        from downloads import list_catalog_platform_packages  # type: ignore
+
+        out: list[tuple[str, str, str]] = []
+        for row in list_catalog_platform_packages() or []:
+            plat = str(row.get("platform") or "").strip().lower()
+            fname = str(row.get("filename") or "").strip()
+            if not plat or not fname:
+                continue
+            out.append((plat, label_map.get(plat, plat.title()), fname))
+        if len(out) >= 5:
+            return out
+    except Exception:
+        pass
+    return [
+        (plat, lab, f"restore-privacy-client-{ver}-{suffix}")
+        for plat, lab, suffix in _CATALOG_PACKAGE_SPECS
+    ]
+
+
+def _package_contains_raw_pub(path: Path, pub_path: Path) -> bool:
+    """True when the raw public-key file bytes appear inside the package (PE/archives)."""
+    if not pub_path.is_file() or pub_path.stat().st_size < 32:
+        return False
+    try:
+        needle = pub_path.read_bytes()
+    except OSError:
+        return False
+    name = path.name.lower()
+    try:
+        if name.endswith((".zip", ".apk")):
+            import zipfile
+
+            with zipfile.ZipFile(path) as zf:
+                for n in zf.namelist():
+                    if n.endswith(pub_path.name) or pub_path.name in n:
+                        try:
+                            if zf.read(n) == needle:
+                                return True
+                        except Exception:
+                            continue
+            # Also scan members for raw embed
+            with zipfile.ZipFile(path) as zf:
+                for n in zf.namelist():
+                    try:
+                        if needle in zf.read(n):
+                            return True
+                    except Exception:
+                        continue
+            return False
+        if name.endswith((".tar.gz", ".tgz")):
+            import tarfile
+
+            with tarfile.open(path, "r:gz") as tf:
+                for m in tf.getmembers():
+                    if not m.isfile():
+                        continue
+                    f = tf.extractfile(m)
+                    if f is None:
+                        continue
+                    try:
+                        blob = f.read()
+                    except Exception:
+                        continue
+                    if blob == needle or needle in blob:
+                        return True
+            return False
+        if name.endswith(".exe"):
+            # PyInstaller onefile often embeds secrets as raw bytes without 7z member names
+            data = path.read_bytes()
+            return needle in data
+    except Exception:
+        return False
+    return False
+
+
+def _windows_multihop_markers(path: Path) -> dict[str, bool]:
+    """Structural multihop residual markers inside Windows setup PE."""
+    try:
+        raw = path.read_bytes()
+    except OSError:
+        return {"multihop": False, "exit_pub_name": False, "exit_host": False}
+    return {
+        "multihop": b"multihop" in raw or b"MULTI_HOP" in raw,
+        "exit_pub_name": b"exit_node_elgamal" in raw,
+        "exit_host": b"185.146.232.107" in raw,
+    }
 
 
 def evaluate_package_audit_state(
@@ -602,6 +735,7 @@ def evaluate_package_audit_state(
     path: Path | None,
     *,
     pin: str,
+    expected_filename: str = "",
 ) -> dict:
     """Pure per-package RAG: presence, no priv, pin, platform structural gates.
 
@@ -611,15 +745,22 @@ def evaluate_package_audit_state(
     reasons: list[str] = []
     label_map = {p: lab for p, lab, _ in _CATALOG_PACKAGE_SPECS}
     label = label_map.get(platform, platform)
-    filename = path.name if path is not None else ""
+    filename = path.name if path is not None else (expected_filename or "")
 
     if path is None or not path.is_file():
+        ver = load_catalog_version()
+        miss = expected_filename or f"restore-privacy-client-{ver}-*"
         return {
             "platform": platform,
             "label": label,
             "filename": filename or f"(missing {platform})",
             "state": "Red",
-            "reasons": ["package file not found under releases/ or status_page/assets/"],
+            "reasons": [
+                f"catalog monopin asset not staged locally "
+                f"(looked for {miss} under releases/{ver}/ and "
+                f"status_page/assets/{ver}/; paid host may still fulfil via "
+                f"private GH / VPS when uploaded)"
+            ],
             "path": None,
         }
 
@@ -645,10 +786,15 @@ def evaluate_package_audit_state(
 
     soft: list[str] = []
     hard_fail = False
+    entry_pub = ROOT / "product" / "node_elgamal.pub"
+    exit_pub = ROOT / "product" / "exit_node_elgamal.pub"
 
-    # Pin when package embeds node_elgamal.pub
+    # Pin when package embeds node_elgamal.pub (archive member or raw PE bytes)
     pub_sha = _package_node_pub_sha256(path)
-    if pub_sha is None:
+    if pub_sha is None and _package_contains_raw_pub(path, entry_pub):
+        pub_sha = pin or _sha256_bytes(entry_pub.read_bytes())
+        reasons.append("node_elgamal.pub embedded (raw product pin match)")
+    elif pub_sha is None:
         soft.append("node_elgamal.pub not found inside package (pin not verified)")
     elif pin and pub_sha != pin:
         hard_fail = True
@@ -664,6 +810,21 @@ def evaluate_package_audit_state(
             reasons.append("not a Windows PE (MZ) — unrunnable on user devices")
         elif pe is True:
             reasons.append("PE/MZ magic OK")
+            mh = _windows_multihop_markers(path)
+            if mh.get("multihop") and mh.get("exit_pub_name"):
+                reasons.append(
+                    "multihop residual prep markers present "
+                    "(exit_node_elgamal; residual-via-exit when RPT_MULTIHOP_ENABLED=1)"
+                )
+            elif mh.get("multihop"):
+                soft.append("multihop marker present but exit pub name not found in PE")
+            else:
+                soft.append(
+                    "multihop residual markers not found "
+                    "(rebuild via scripts/build_windows_multihop.py)"
+                )
+            if _package_contains_raw_pub(path, exit_pub):
+                reasons.append("exit_node_elgamal.pub raw bytes present (Romania exit pin)")
         else:
             soft.append("PE magic not checked")
     elif platform == "android":
@@ -675,8 +836,22 @@ def evaluate_package_audit_state(
             reasons.append("Android residual wire (PFS + outer obfs) present")
         else:
             soft.append("Android wire not verified")
+        try:
+            import zipfile
+
+            with zipfile.ZipFile(path) as zf:
+                names = zf.namelist()
+                if any(n.endswith("exit_node_elgamal.pub") for n in names):
+                    reasons.append("exit_node_elgamal.pub present (multihop exit pin)")
+                elif _package_contains_raw_pub(path, exit_pub):
+                    reasons.append("exit_node_elgamal.pub raw bytes present (multihop exit)")
+        except Exception:
+            if _package_contains_raw_pub(path, exit_pub):
+                reasons.append("exit_node_elgamal.pub raw bytes present (multihop exit)")
     else:
         reasons.append("archive present (structural residual gates N/A in this pass)")
+        if _package_contains_raw_pub(path, exit_pub):
+            reasons.append("exit_node_elgamal.pub present (multihop exit pin)")
 
     if hard_fail:
         state = "Red"
@@ -706,11 +881,15 @@ def evaluate_catalog_packages(catalog_version: str | None = None) -> dict:
     """Evaluate all five catalog installers for the monopin version."""
     ver = (catalog_version or load_catalog_version()).strip()
     pin = product_node_pub_pin()
+    exit_pin = product_exit_pub_pin()
     packages: list[dict] = []
-    for platform, _label, suffix in _CATALOG_PACKAGE_SPECS:
-        fname = f"restore-privacy-client-{ver}-{suffix}"
+    for platform, _label, fname in catalog_platform_filenames(ver):
         path = resolve_catalog_package_path(ver, fname)
-        packages.append(evaluate_package_audit_state(platform, path, pin=pin))
+        packages.append(
+            evaluate_package_audit_state(
+                platform, path, pin=pin, expected_filename=fname
+            )
+        )
     # Overall: worst state wins
     order = {"Green": 0, "Amber": 1, "Red": 2}
     worst = "Green"
@@ -718,15 +897,24 @@ def evaluate_catalog_packages(catalog_version: str | None = None) -> dict:
         st = p.get("state") or "Red"
         if order.get(st, 2) > order.get(worst, 0):
             worst = st
+    staged = sum(1 for p in packages if p.get("path"))
     return {
         "catalog_version": ver,
         "pin": pin,
+        "exit_pin": exit_pin,
         "packages": packages,
+        "staged_count": staged,
         "overall": worst,
         "legend": {
-            "Green": "Present, no *.priv, product node pub pin match, platform structural gate pass",
+            "Green": (
+                "Present, no *.priv, product node pub pin match, "
+                "platform structural gate pass (Windows multihop markers when PE)"
+            ),
             "Amber": "Present but pin/structural check incomplete or soft warning",
-            "Red": "Missing, embeds *.priv, pin mismatch, or failed structural gate (e.g. non-PE Windows)",
+            "Red": (
+                "Missing from local releases/assets tree, embeds *.priv, "
+                "pin mismatch, or failed structural gate"
+            ),
         },
     }
 
@@ -881,10 +1069,12 @@ Latest automated security audit for production node **{host}** and the in-repo p
 
 | Area | Paths |
 |------|--------|
-| Shared client | `client/connect.py`, `client/endpoint.py`, `client/full_tunnel.py`, `client/secrets_loader.py`, `client/legal_links.py`, residual honesty / `residual_ip_capture` |
-| Windows / Linux | `client/windows/*`, `client/linux/*` |
-| Mobile / Apple | `client_app/` Flutter + NativePrep residual engines |
-| Node | `node/*` (handshake, pfs, traffic_shape, crypto_session, nolog) |
+| Shared client | `client/connect.py`, `client/endpoint.py`, `client/full_tunnel.py`, `client/multihop.py`, `client/secrets_loader.py`, `client/legal_links.py`, residual honesty / `residual_ip_capture` |
+| Multi-hop residual | Opt-in residual-via-exit (`RPT_MULTIHOP_ENABLED=1`); entry Iceland + exit Romania pubs under `product/` |
+| Windows / Linux | `client/windows/*` (multihop PE via `scripts/build_windows_multihop.py`), `client/linux/*` |
+| Mobile / Apple | `client_app/` Flutter + NativePrep residual engines (exit pub inject) |
+| Node | `node/*` (handshake, pfs, traffic_shape, crypto_session, nolog); node-only zram+LUKS2 |
+| Paid packages | `status_page/downloads.py` monopin **{catalog}**; assets under `status_page/assets/{catalog}/` + VPS `paid_assets` |
 | Public web | `status_page/*` catalog **{catalog}** |
 | Policies | `PRIVACY_POLICY.md`, `LICENSE`, `CREDITS.md`, `README.md`, `AUDIT.md` |
 

@@ -44,13 +44,35 @@ class TestAuditMd(unittest.TestCase):
 
     def test_audit_has_severity_and_version(self):
         text = AUDIT.read_text(encoding="utf-8")
-        # Current paid catalog
-        self.assertIn("0.3.4", text)
+        # Current paid catalog monopin (must match downloads / client/VERSION)
+        sys_path_root = ROOT / "status_page"
+        import sys
+
+        if str(sys_path_root) not in sys.path:
+            sys.path.insert(0, str(sys_path_root))
+        try:
+            from downloads import current_catalog_version  # type: ignore
+
+            catalog = str(current_catalog_version()).strip()
+        except Exception:
+            catalog = (ROOT / "client" / "VERSION").read_text(encoding="utf-8").strip()
+        self.assertTrue(catalog, "catalog version must be resolvable")
+        self.assertIn(catalog, text)
         self.assertIn("82.221.101.241", text)
         self.assertIn("private", text.lower())
         self.assertIn("restoreprivacy.online", text)
         self.assertNotIn("public packages + operator tree", text)
         self.assertNotIn("tests_0.3.2.log", text)
+        # Architecture honesty: multihop residual-via-exit (not stale “config only”)
+        low = text.lower()
+        self.assertNotIn("multi-hop residual | not implemented", low)
+        self.assertNotIn("not done (config only)", low)
+        self.assertTrue(
+            "residual-via-exit" in low or "rpt_multihop_enabled" in low or "multi-hop residual is **opt-in**" in low
+            or "multi-hop residual is **opt-in**" in text.lower()
+            or "opt-in" in low and "multi-hop" in low,
+            "AUDIT.md must describe opt-in multi-hop residual-via-exit",
+        )
         # Severity labels used in findings
         for sev in ("High", "Medium", "Low", "Info"):
             self.assertIn(sev, text)
