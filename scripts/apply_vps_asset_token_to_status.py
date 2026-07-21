@@ -42,38 +42,36 @@ def main() -> int:
         print("BLOCKED: set RPT_ASSET_FETCH_TOKEN or RPT_ASSET_TOKEN_FILE", file=sys.stderr)
         return 2
 
-    jar: list[str] = []
+    # http.cookiejar handles Set-Cookie on 302 login (urllib default opener).
+    jar = urllib.request.HTTPCookieProcessor()
+    opener = urllib.request.build_opener(jar)
 
     def req(method: str, path: str, data: bytes | None = None, form: bool = False):
         headers = {"User-Agent": "rpt-apply-vps-token"}
-        if jar:
-            headers["Cookie"] = "; ".join(jar)
         if form and data is not None:
             headers["Content-Type"] = "application/x-www-form-urlencoded"
         r = urllib.request.Request(
             base + path, data=data, method=method, headers=headers
         )
         try:
-            with urllib.request.urlopen(r, timeout=60) as resp:
+            with opener.open(r, timeout=60) as resp:
                 body = resp.read()
-                # capture set-cookie
-                sc = resp.headers.get_all("Set-Cookie") or []
-                for c in sc:
-                    jar.append(c.split(";", 1)[0])
                 return resp.status, body
         except urllib.error.HTTPError as e:
-            sc = e.headers.get_all("Set-Cookie") if e.headers else None
-            if sc:
-                for c in sc:
-                    jar.append(c.split(";", 1)[0])
             return e.code, e.read()
 
     body = urllib.parse.urlencode(
         {"username": user, "password": password}
     ).encode()
-    st, _ = req("POST", "/admin/login", body, form=True)
-    if st not in (200, 302) and not jar:
+    st, raw = req("POST", "/admin/login", body, form=True)
+    cookies = list(jar.cookiejar)
+    if st not in (200, 302) and not cookies:
         print("login failed", st, file=sys.stderr)
+        return 1
+    # Successful login redirects to /admin; a re-shown login form is failure.
+    login_body = raw.decode("utf-8", "replace") if raw else ""
+    if st == 200 and "Admin login" in login_body and not cookies:
+        print("login failed (invalid credentials)", file=sys.stderr)
         return 1
     body = urllib.parse.urlencode(
         {
@@ -91,7 +89,7 @@ def main() -> int:
         return 1
     # health
     st, raw = req("GET", "/health/fulfilment")
-    print("health", raw.decode("utf-8", "replace")[:300])
+    print("health", raw.decode("utf-8", "replace")[:400])
     return 0
 
 

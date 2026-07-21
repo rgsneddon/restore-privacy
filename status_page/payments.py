@@ -827,6 +827,41 @@ def redeem_download_token(
     return grant
 
 
+def _probe_vps_fetch_error() -> str | None:
+    """Best-effort VPS connectivity diagnostic (no secret material)."""
+    vps_token = vps_asset_fetch_token()
+    if not vps_token:
+        return "token_missing"
+    assets = list(available_downloads())
+    if not assets:
+        return "empty_catalog"
+    filename = assets[0].filename
+    try:
+        vps_url = vps_asset_url(filename)
+        headers = {
+            "User-Agent": "restore-privacy-status-fulfilment-probe",
+            "X-RPT-Asset-Token": vps_token,
+        }
+        req = urllib.request.Request(vps_url, headers=headers, method="GET")
+        with urllib.request.urlopen(req, timeout=20) as resp:
+            # Read nothing — headers only prove reachability
+            code = getattr(resp, "status", 200)
+            if int(code) >= 400:
+                return f"http_{code}"
+            return None
+    except urllib.error.HTTPError as e:
+        return f"http_{e.code}"
+    except urllib.error.URLError as e:
+        reason = getattr(e, "reason", e)
+        return f"urlerror:{type(reason).__name__}:{reason}"[:160]
+    except TimeoutError:
+        return "timeout"
+    except OSError as e:
+        return f"oserror:{type(e).__name__}"[:120]
+    except Exception as e:  # noqa: BLE001
+        return f"error:{type(e).__name__}"[:120]
+
+
 def check_fulfilment_ready() -> dict[str, Any]:
     """Probe that at least one catalog installer is openable (local or API).
 
@@ -836,7 +871,7 @@ def check_fulfilment_ready() -> dict[str, Any]:
     """
     vps_tok = bool(vps_asset_fetch_token())
     vps_base = vps_asset_base_url()
-    meta = {
+    meta: dict[str, Any] = {
         "vps_token_configured": vps_tok,
         "vps_asset_base": vps_base,
     }
@@ -858,6 +893,10 @@ def check_fulfilment_ready() -> dict[str, Any]:
         }
         out.update(meta)
         return out
+    if vps_tok:
+        probe_err = _probe_vps_fetch_error()
+        if probe_err:
+            meta["vps_fetch_error"] = probe_err
     out = {
         "ok": False,
         "error": "no_asset_source",
