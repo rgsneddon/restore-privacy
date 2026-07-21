@@ -243,14 +243,41 @@ def start_full_tunnel(
     *,
     dry_run: bool = False,
     require_system_capture: bool = True,
+    prior: "LinuxTunnelResult | None" = None,
 ) -> LinuxTunnelResult:
     """Open TUN, apply dual /1 routes, start DATA plane.
 
     Product residual path (``require_system_capture=True``) refuses success without
     real TUN + dual /1. ``dry_run`` only returns the planned ``ip`` commands.
+
+    Flyclient-style: if ``prior`` already has residual routes for the same plan IP,
+    return it without re-applying routes.
     """
     if not client.session:
         return LinuxTunnelResult(False, "no session", [])
+
+    if (
+        prior is not None
+        and prior.ok
+        and prior.routes_applied
+        and prior.system_capture
+        and prior.plan is not None
+        and prior.plan.tunnel_client_ip == plan.tunnel_client_ip
+        and prior.server_host == server_host
+        and not dry_run
+    ):
+        return LinuxTunnelResult(
+            True,
+            "flyclient skip — residual already applied",
+            applied_commands=list(prior.applied_commands or []),
+            system_capture=True,
+            routes_applied=True,
+            plan=plan,
+            server_host=server_host,
+            iface=prior.iface,
+            tun=prior.tun,
+            dataplane=prior.dataplane,
+        )
 
     iface = (plan.tunnel_iface or "rpt0").strip()
     if not iface or iface.upper() == "RPT":

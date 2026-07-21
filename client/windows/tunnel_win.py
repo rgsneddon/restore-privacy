@@ -457,6 +457,7 @@ def start_full_tunnel(
     prefer_system_capture: bool = True,
     *,
     require_system_capture: bool = False,
+    prior: Optional[WindowsTunnelResult] = None,
 ) -> WindowsTunnelResult:
     """Create OS TUN (Wintun), install safe full-tunnel routes, start DATA plane.
 
@@ -466,9 +467,39 @@ def start_full_tunnel(
     fallback — residual public IP only changes with real Wintun + dual /1.
     When False, Wintun is preferred but queue TUN may start session dataplane
     without changing residual public IP.
+
+    Flyclient-style: if ``prior`` already has residual routes for the same plan IP,
+    return it without re-installing dual /1.
     """
     if not client.session:
         return WindowsTunnelResult(False, "no session", [])
+
+    # Flyclient tip: residual already applied for this session/plan
+    if (
+        prior is not None
+        and prior.ok
+        and prior.routes_applied
+        and prior.system_capture
+        and prior.plan is not None
+        and prior.plan.tunnel_client_ip == plan.tunnel_client_ip
+        and prior.server_host == server_host
+        and not dry_run
+        and not force_queue
+    ):
+        return WindowsTunnelResult(
+            ok=True,
+            message="flyclient skip — residual already applied",
+            applied_commands=list(prior.applied_commands or []),
+            tun=prior.tun,
+            dataplane=prior.dataplane,
+            system_capture=True,
+            routes_applied=True,
+            plan=plan,
+            server_host=server_host,
+            if_index=prior.if_index,
+            ipv6_mitigation_applied=prior.ipv6_mitigation_applied,
+            kill_switch_applied=prior.kill_switch_applied,
+        )
 
     # Normalize Windows adapter name (avoid Linux-style rpt0)
     if not plan.tunnel_iface or plan.tunnel_iface.lower().startswith("rpt0"):

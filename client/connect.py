@@ -39,6 +39,11 @@ from node.protocol import (
 from node.traffic_shape import DEFAULT_TRAFFIC_SHAPE, TrafficShapePolicy
 
 from .endpoint import DEFAULT_ENDPOINT, Endpoint
+from .flyclient_connect import (
+    FlyclientConnectState,
+    flyclient_decide_full_connect_work,
+    flyclient_reuse_tunnel_plan,
+)
 from .full_tunnel import FullTunnelPlan, build_full_tunnel_plan
 from .secrets_loader import (
     ensure_device_admission_key,
@@ -225,17 +230,79 @@ class RptClient:
     def _status(self, msg: str) -> None:
         self.status_cb(msg)
 
-    def connect(self, timeout: float = 20.0) -> ConnectResult:
+    def connect(
+        self,
+        timeout: float = 20.0,
+        *,
+        force_reconnect: bool = False,
+        residual_ready: bool = False,
+    ) -> ConnectResult:
         """Perform authorized RPT handshake with the node (manual Connect path).
 
         Product connect uses device keys + node crypto only — no public-IP geo
         admission and no third-party geo lookup before handshake.
+
+        Flyclient-style fast path: if a live session already exists and residual
+        is ready (or only plan reuse is needed), skip a full HELLO exchange.
         """
+        # --- flyclient tip: skip re-HELLO when session is warm ---
+        step_plan = flyclient_decide_full_connect_work(
+            FlyclientConnectState(
+                session_connected=self.state == ConnectState.CONNECTED
+                and self.session is not None,
+                session_vpn_ip=(self.session.vpn_ip if self.session else ""),
+                residual_routes_applied=residual_ready,
+                residual_tun_up=residual_ready,
+                has_if_index_or_iface=True,
+                tunnel_plan_vpn_ip=(
+                    self.tunnel_plan.tunnel_client_ip if self.tunnel_plan else ""
+                ),
+                force_reconnect=force_reconnect,
+            )
+        )
+        if (
+            not force_reconnect
+            and step_plan.early_exit
+            and self.session is not None
+            and self.tunnel_plan is not None
+        ):
+            self._status(
+                f"Already connected — tunnel IP {self.session.vpn_ip} (flyclient skip)"
+            )
+            return ConnectResult(
+                ok=True,
+                state=ConnectState.CONNECTED,
+                message=f"already connected as {self.session.vpn_ip}",
+                session=self.session,
+                tunnel_plan=self.tunnel_plan,
+            )
+        if (
+            not force_reconnect
+            and not step_plan.needs_hello()
+            and self.session is not None
+        ):
+            # Warm session: only refresh plan if needed
+            self.tunnel_plan = flyclient_reuse_tunnel_plan(
+                self.tunnel_plan, self.session.vpn_ip
+            )
+            self.state = ConnectState.CONNECTED
+            self._status(
+                f"Session warm — tunnel IP {self.session.vpn_ip} "
+                f"(flyclient residual attach remaining)"
+            )
+            return ConnectResult(
+                ok=True,
+                state=self.state,
+                message=f"connected as {self.session.vpn_ip}",
+                session=self.session,
+                tunnel_plan=self.tunnel_plan,
+            )
+
         self.state = ConnectState.CONNECTING
         self._status("Connecting to Restore Privacy node…")
 
         try:
-            # First run: generate a unique Ed25519 device key if missing; reuse thereafter.
+            # Pure crypto prep before socket I/O (short critical path to send HELLO).
             sdir = ensure_device_admission_key(self.secrets_dir)
             client_priv = load_client_private_key(sdir)
             node_pub = load_node_elgamal_public(sdir)
@@ -243,11 +310,11 @@ class RptClient:
                 client_priv, node_pub, with_pfs=True
             )
             assert_protocol_magic()
+            wire = maybe_wrap(frame)
 
             sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
             try:
                 sock.settimeout(timeout)
-                wire = maybe_wrap(frame)
                 sock.sendto(wire, self.endpoint.address)
                 self._status(f"HELLO sent → {self.endpoint.host}:{self.endpoint.port}")
                 raw_reply, _addr = sock.recvfrom(65535)
@@ -257,7 +324,10 @@ class RptClient:
                 )
                 session.endpoint = self.endpoint
                 self.session = session
-                self.tunnel_plan = build_full_tunnel_plan(session.vpn_ip)
+                # Reuse plan skeleton only when IP matches prior plan
+                self.tunnel_plan = flyclient_reuse_tunnel_plan(
+                    self.tunnel_plan, session.vpn_ip
+                )
                 self._sock = sock
                 sock = None  # ownership transferred; disconnect() closes
                 self.state = ConnectState.CONNECTED
