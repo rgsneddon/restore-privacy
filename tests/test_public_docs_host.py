@@ -72,7 +72,7 @@ class TestPublicDocsRegistry(unittest.TestCase):
         html = body.decode("utf-8")
         self.assertIn("Privacy", html)
         self.assertIn("0.3.0", html)
-        self.assertIn("restore-privacy-status.onrender.com", html)
+        self.assertIn("restoreprivacy.online", html)
         # No raw markdown dump as the sole body
         self.assertIn("<h1>", html.lower() + html)  # headings rendered
         self.assertIn("max-width", html)  # shell CSS for readability
