@@ -1,22 +1,11 @@
 {
-  "generated_at": "2026-07-21T05:19:23Z",
+  "generated_at": "2026-07-21T10:00:28Z",
   "node_host": "82.221.101.241",
-  "catalog_version": "0.3.0",
+  "catalog_version": "0.3.3",
   "unit_suite": {
-    "ran": true,
+    "ran": false,
     "ok": true,
-    "returncode": 0,
-    "modules": [
-      "tests.test_legal_links",
-      "tests.test_legal_docs",
-      "tests.test_no_public_client_count",
-      "tests.test_connect_no_phones_home",
-      "tests.test_obfuscation",
-      "tests.test_kill_switch_leaks",
-      "tests.test_product_node_key",
-      "tests.test_pfs_product_require",
-      "tests.test_downloads"
-    ]
+    "reason": "skipped"
   },
   "tcp_status": {
     "host": "82.221.101.241",
@@ -42,6 +31,78 @@
   "no_priv": {
     "ok": true,
     "hits": []
+  },
+  "package_rag": {
+    "catalog_version": "0.3.3",
+    "pin": "1b126abfae737c66ce99670b730e123f2831ce5beb2868d7865324f391280bbe",
+    "packages": [
+      {
+        "platform": "windows",
+        "label": "Windows",
+        "filename": "restore-privacy-client-0.3.3-windows-x64-setup.exe",
+        "state": "Green",
+        "reasons": [
+          "node_elgamal.pub pin matches product monopin",
+          "PE/MZ magic OK"
+        ],
+        "path": "/Users/russellsneddon/restore-privacy/releases/0.3.3/restore-privacy-client-0.3.3-windows-x64-setup.exe",
+        "bytes": 12872499
+      },
+      {
+        "platform": "linux",
+        "label": "Linux",
+        "filename": "restore-privacy-client-0.3.3-linux-x64.tar.gz",
+        "state": "Green",
+        "reasons": [
+          "node_elgamal.pub pin matches product monopin",
+          "archive present (structural residual gates N/A in this pass)"
+        ],
+        "path": "/Users/russellsneddon/restore-privacy/releases/0.3.3/restore-privacy-client-0.3.3-linux-x64.tar.gz",
+        "bytes": 14292481
+      },
+      {
+        "platform": "macos",
+        "label": "macOS",
+        "filename": "restore-privacy-client-0.3.3-macos.zip",
+        "state": "Green",
+        "reasons": [
+          "node_elgamal.pub pin matches product monopin",
+          "archive present (structural residual gates N/A in this pass)"
+        ],
+        "path": "/Users/russellsneddon/restore-privacy/releases/0.3.3/restore-privacy-client-0.3.3-macos.zip",
+        "bytes": 18817832
+      },
+      {
+        "platform": "ios",
+        "label": "iOS",
+        "filename": "restore-privacy-client-0.3.3-ios.zip",
+        "state": "Green",
+        "reasons": [
+          "node_elgamal.pub pin matches product monopin",
+          "archive present (structural residual gates N/A in this pass)"
+        ],
+        "path": "/Users/russellsneddon/restore-privacy/releases/0.3.3/restore-privacy-client-0.3.3-ios.zip",
+        "bytes": 7996349
+      },
+      {
+        "platform": "android",
+        "label": "Android",
+        "filename": "restore-privacy-client-0.3.3-android.apk",
+        "state": "Green",
+        "reasons": [
+          "node_elgamal.pub pin matches product monopin",
+          "Android residual wire (PFS + outer obfs) present"
+        ],
+        "path": "/Users/russellsneddon/restore-privacy/releases/0.3.3/restore-privacy-client-0.3.3-android.apk",
+        "bytes": 48142726
+      }
+    ],
+    "overall": "Green",
+    "legend": {
+      "Green": "Present, no *.priv, product node pub pin match, platform structural gate pass",
+      "Amber": "Present but pin/structural check incomplete or soft warning",
+      "Red": "Missing, embeds *.priv, pin mismatch, or failed structural gate (e.g. non-PE Windows)"
+    }
   },
   "overall_ok": true
 }

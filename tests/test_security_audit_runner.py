@@ -89,6 +89,52 @@ class TestSecurityAuditArtifacts(unittest.TestCase):
             },
             "udp": {"sent": True, "error": None},
             "no_priv": {"ok": True, "hits": []},
+            "package_rag": {
+                "catalog_version": "0.2.9",
+                "overall": "Amber",
+                "packages": [
+                    {
+                        "platform": "windows",
+                        "label": "Windows",
+                        "filename": "restore-privacy-client-0.2.9-windows-x64-setup.exe",
+                        "state": "Green",
+                        "reasons": ["pin ok"],
+                    },
+                    {
+                        "platform": "linux",
+                        "label": "Linux",
+                        "filename": "restore-privacy-client-0.2.9-linux-x64.tar.gz",
+                        "state": "Amber",
+                        "reasons": ["soft"],
+                    },
+                    {
+                        "platform": "macos",
+                        "label": "macOS",
+                        "filename": "x-macos.zip",
+                        "state": "Red",
+                        "reasons": ["missing"],
+                    },
+                    {
+                        "platform": "ios",
+                        "label": "iOS",
+                        "filename": "x-ios.zip",
+                        "state": "Green",
+                        "reasons": [],
+                    },
+                    {
+                        "platform": "android",
+                        "label": "Android",
+                        "filename": "x-android.apk",
+                        "state": "Green",
+                        "reasons": [],
+                    },
+                ],
+                "legend": {
+                    "Green": "OK",
+                    "Amber": "Partial",
+                    "Red": "Fail",
+                },
+            },
         }
         md = mod.build_markdown(results)
         self.assertIn("residual_ip_capture", md)
@@ -97,6 +143,18 @@ class TestSecurityAuditArtifacts(unittest.TestCase):
         self.assertIn("**PASS**", md)
         self.assertIn("title-only=True", md)
         self.assertNotIn("dpi-undetectable", md.lower())
+        # Top package RAG section
+        self.assertIn("Installer package AUDIT STATE", md)
+        self.assertIn("**Green**", md)
+        self.assertIn("**Amber**", md)
+        self.assertIn("**Red**", md)
+        self.assertIn("Windows", md)
+        self.assertIn("Android", md)
+        # Section appears before executive summary numbering body
+        self.assertLess(
+            md.index("Installer package AUDIT STATE"),
+            md.index("## 1. Executive summary"),
+        )
 
 
 if __name__ == "__main__":

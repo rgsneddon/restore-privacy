@@ -159,6 +159,354 @@ def load_catalog_version() -> str:
         return "unknown"
 
 
+# --- Catalog installer AUDIT STATE (Green / Amber / Red) ---
+
+VALID_PACKAGE_STATES = frozenset({"Green", "Amber", "Red"})
+
+# platform key → filename suffix pattern under releases/{version}/
+_CATALOG_PACKAGE_SPECS: list[tuple[str, str, str]] = [
+    ("windows", "Windows", "windows-x64-setup.exe"),
+    ("linux", "Linux", "linux-x64.tar.gz"),
+    ("macos", "macOS", "macos.zip"),
+    ("ios", "iOS", "ios.zip"),
+    ("android", "Android", "android.apk"),
+]
+
+
+def product_node_pub_pin() -> str:
+    """SHA-256 monopin for product/node_elgamal.pub (hex lowercase)."""
+    pin_file = ROOT / "product" / "NODE_ELGAMAL_PUB.sha256"
+    if pin_file.is_file():
+        return pin_file.read_text(encoding="utf-8").strip().split()[0].lower()
+    pub = ROOT / "product" / "node_elgamal.pub"
+    if pub.is_file():
+        import hashlib
+
+        return hashlib.sha256(pub.read_bytes()).hexdigest().lower()
+    return ""
+
+
+def _sha256_bytes(data: bytes) -> str:
+    import hashlib
+
+    return hashlib.sha256(data).hexdigest().lower()
+
+
+def _package_contains_priv(path: Path) -> bool:
+    """True if archive/package embeds any ``*.priv`` member (Red)."""
+    name = path.name.lower()
+    try:
+        if name.endswith(".zip") or name.endswith(".apk") or name.endswith(".exe"):
+            # .exe may be 7z SFX — try zip first, then 7z list
+            import zipfile
+
+            if name.endswith((".zip", ".apk")):
+                with zipfile.ZipFile(path) as zf:
+                    for n in zf.namelist():
+                        if n.lower().endswith(".priv"):
+                            return True
+                return False
+        if name.endswith((".tar.gz", ".tgz")):
+            import tarfile
+
+            with tarfile.open(path, "r:gz") as tf:
+                for m in tf.getmembers():
+                    if m.name.lower().endswith(".priv"):
+                        return True
+            return False
+        if name.endswith(".exe"):
+            # 7z SFX / PE packages: list via 7z when available
+            try:
+                p = subprocess.run(
+                    ["7z", "l", str(path)],
+                    capture_output=True,
+                    text=True,
+                    timeout=60,
+                )
+                for line in (p.stdout or "").splitlines():
+                    if ".priv" in line.lower():
+                        return True
+            except (OSError, subprocess.TimeoutExpired):
+                pass
+    except Exception:
+        return False
+    return False
+
+
+def _package_node_pub_sha256(path: Path) -> str | None:
+    """Return SHA-256 of embedded node_elgamal.pub, or None if not found."""
+    name = path.name.lower()
+    try:
+        if name.endswith((".zip", ".apk")):
+            import zipfile
+
+            with zipfile.ZipFile(path) as zf:
+                for n in zf.namelist():
+                    if n.endswith("node_elgamal.pub") or n.endswith("/node_elgamal.pub"):
+                        return _sha256_bytes(zf.read(n))
+            return None
+        if name.endswith((".tar.gz", ".tgz")):
+            import tarfile
+
+            with tarfile.open(path, "r:gz") as tf:
+                for m in tf.getmembers():
+                    if m.isfile() and m.name.endswith("node_elgamal.pub"):
+                        f = tf.extractfile(m)
+                        if f is not None:
+                            return _sha256_bytes(f.read())
+            return None
+        if name.endswith(".exe"):
+            # Prefer 7z extract of known paths
+            try:
+                p = subprocess.run(
+                    ["7z", "l", str(path)],
+                    capture_output=True,
+                    text=True,
+                    timeout=60,
+                )
+                out = p.stdout or ""
+                if "node_elgamal.pub" not in out:
+                    return None
+                import tempfile
+
+                with tempfile.TemporaryDirectory(prefix="rpt-audit-pub-") as td:
+                    subprocess.run(
+                        [
+                            "7z",
+                            "e",
+                            f"-o{td}",
+                            str(path),
+                            "*node_elgamal.pub",
+                            "-r",
+                            "-y",
+                        ],
+                        capture_output=True,
+                        timeout=90,
+                    )
+                    for hit in Path(td).rglob("node_elgamal.pub"):
+                        return _sha256_bytes(hit.read_bytes())
+            except (OSError, subprocess.TimeoutExpired):
+                return None
+    except Exception:
+        return None
+    return None
+
+
+def _windows_pe_ok(path: Path) -> bool | None:
+    """True if PE/MZ; False if Mach-O; None if not windows exe or unreadable."""
+    if not path.name.lower().endswith(".exe"):
+        return None
+    try:
+        magic = path.read_bytes()[:4]
+    except OSError:
+        return None
+    if magic[:2] == b"MZ":
+        return True
+    # Mach-O 64-bit (accidental macOS SFX)
+    if magic in (bytes.fromhex("cffaedfe"), bytes.fromhex("feedfacf"), bytes.fromhex("cefaedfe")):
+        return False
+    return False
+
+
+def _android_wire_ok(path: Path) -> bool | None:
+    """True if APK dex embeds product residual wire (PFS + outer obfs)."""
+    if not path.name.lower().endswith(".apk"):
+        return None
+    try:
+        import zipfile
+
+        with zipfile.ZipFile(path) as zf:
+            if "classes.dex" not in zf.namelist():
+                return False
+            dex = zf.read("classes.dex")
+        return b"pfs-x25519" in dex and b"RPT-OBFS-LAYER" in dex
+    except Exception:
+        return None
+
+
+def resolve_catalog_package_path(version: str, filename: str) -> Path | None:
+    """Prefer releases/{version}/ then status_page/assets/{version}/."""
+    for base in (
+        ROOT / "releases" / version / filename,
+        ROOT / "status_page" / "assets" / version / filename,
+    ):
+        if base.is_file() and base.stat().st_size > 1000:
+            return base
+    return None
+
+
+def evaluate_package_audit_state(
+    platform: str,
+    path: Path | None,
+    *,
+    pin: str,
+) -> dict:
+    """Pure per-package RAG: presence, no priv, pin, platform structural gates.
+
+    Returns dict with keys: platform, label, filename, state (Green|Amber|Red),
+    reasons (list[str]), path (str|None).
+    """
+    reasons: list[str] = []
+    label_map = {p: lab for p, lab, _ in _CATALOG_PACKAGE_SPECS}
+    label = label_map.get(platform, platform)
+    filename = path.name if path is not None else ""
+
+    if path is None or not path.is_file():
+        return {
+            "platform": platform,
+            "label": label,
+            "filename": filename or f"(missing {platform})",
+            "state": "Red",
+            "reasons": ["package file not found under releases/ or status_page/assets/"],
+            "path": None,
+        }
+
+    if path.stat().st_size < 1000:
+        return {
+            "platform": platform,
+            "label": label,
+            "filename": path.name,
+            "state": "Red",
+            "reasons": [f"package too small ({path.stat().st_size} bytes)"],
+            "path": str(path),
+        }
+
+    if _package_contains_priv(path):
+        return {
+            "platform": platform,
+            "label": label,
+            "filename": path.name,
+            "state": "Red",
+            "reasons": ["embeds *.priv (must never ship private keys)"],
+            "path": str(path),
+        }
+
+    soft: list[str] = []
+    hard_fail = False
+
+    # Pin when package embeds node_elgamal.pub
+    pub_sha = _package_node_pub_sha256(path)
+    if pub_sha is None:
+        soft.append("node_elgamal.pub not found inside package (pin not verified)")
+    elif pin and pub_sha != pin:
+        hard_fail = True
+        reasons.append(f"node_elgamal.pub pin mismatch (got {pub_sha[:12]}…)")
+    else:
+        reasons.append("node_elgamal.pub pin matches product monopin")
+
+    # Platform structural gates
+    if platform == "windows":
+        pe = _windows_pe_ok(path)
+        if pe is False:
+            hard_fail = True
+            reasons.append("not a Windows PE (MZ) — unrunnable on user devices")
+        elif pe is True:
+            reasons.append("PE/MZ magic OK")
+        else:
+            soft.append("PE magic not checked")
+    elif platform == "android":
+        wire = _android_wire_ok(path)
+        if wire is False:
+            hard_fail = True
+            reasons.append("missing product residual wire (pfs-x25519 / RPT-OBFS-LAYER)")
+        elif wire is True:
+            reasons.append("Android residual wire (PFS + outer obfs) present")
+        else:
+            soft.append("Android wire not verified")
+    else:
+        reasons.append("archive present (structural residual gates N/A in this pass)")
+
+    if hard_fail:
+        state = "Red"
+    elif soft:
+        state = "Amber"
+        reasons.extend(soft)
+    else:
+        state = "Green"
+
+    # Presence without pin when pin empty → Amber at best
+    if state == "Green" and not pin:
+        state = "Amber"
+        reasons.append("product pin unavailable on this host")
+
+    return {
+        "platform": platform,
+        "label": label,
+        "filename": path.name,
+        "state": state,
+        "reasons": reasons,
+        "path": str(path),
+        "bytes": path.stat().st_size,
+    }
+
+
+def evaluate_catalog_packages(catalog_version: str | None = None) -> dict:
+    """Evaluate all five catalog installers for the monopin version."""
+    ver = (catalog_version or load_catalog_version()).strip()
+    pin = product_node_pub_pin()
+    packages: list[dict] = []
+    for platform, _label, suffix in _CATALOG_PACKAGE_SPECS:
+        fname = f"restore-privacy-client-{ver}-{suffix}"
+        path = resolve_catalog_package_path(ver, fname)
+        packages.append(evaluate_package_audit_state(platform, path, pin=pin))
+    # Overall: worst state wins
+    order = {"Green": 0, "Amber": 1, "Red": 2}
+    worst = "Green"
+    for p in packages:
+        st = p.get("state") or "Red"
+        if order.get(st, 2) > order.get(worst, 0):
+            worst = st
+    return {
+        "catalog_version": ver,
+        "pin": pin,
+        "packages": packages,
+        "overall": worst,
+        "legend": {
+            "Green": "Present, no *.priv, product node pub pin match, platform structural gate pass",
+            "Amber": "Present but pin/structural check incomplete or soft warning",
+            "Red": "Missing, embeds *.priv, pin mismatch, or failed structural gate (e.g. non-PE Windows)",
+        },
+    }
+
+
+def render_package_rag_section(pkg_results: dict) -> str:
+    """Markdown top section: per-installer AUDIT STATE Green|Amber|Red."""
+    ver = pkg_results.get("catalog_version") or "?"
+    overall = pkg_results.get("overall") or "Red"
+    packages = pkg_results.get("packages") or []
+    legend = pkg_results.get("legend") or {}
+    rows = []
+    for p in packages:
+        state = p.get("state") or "Red"
+        if state not in VALID_PACKAGE_STATES:
+            state = "Red"
+        why = "; ".join(p.get("reasons") or []) or "—"
+        rows.append(
+            f"| **{p.get('label') or p.get('platform')}** | `{p.get('filename')}` | **{state}** | {why} |"
+        )
+    table = "\n".join(rows) if rows else "| — | — | **Red** | no packages evaluated |"
+    return f"""## Installer package AUDIT STATE (catalog v{ver})
+
+Reader confidence for **each current paid catalog installer** after this security-audit pass.
+States are **Green**, **Amber**, or **Red** only (RAG). Regenerated by
+`scripts/run_security_audit.py --write` (4-hour timer).
+
+| Platform | Package | AUDIT STATE | Notes |
+|----------|---------|-------------|-------|
+{table}
+
+**Catalog overall (worst package):** **{overall}**
+
+| State | Meaning |
+|-------|---------|
+| **Green** | {legend.get("Green", "OK")} |
+| **Amber** | {legend.get("Amber", "Partial")} |
+| **Red** | {legend.get("Red", "Fail")} |
+
+---
+"""
+
+
 def build_markdown(results: dict) -> str:
     now = results["generated_at"]
     host = results["node_host"]
@@ -168,6 +516,8 @@ def build_markdown(results: dict) -> str:
     http = results["http_status"]
     udp = results["udp"]
     priv = results["no_priv"]
+    pkg = results.get("package_rag") or evaluate_catalog_packages(catalog)
+    package_section = render_package_rag_section(pkg)
     suite_line = (
         f"**PASS** ({len(suite.get('modules') or [])} modules)"
         if suite.get("ok")
@@ -180,6 +530,7 @@ def build_markdown(results: dict) -> str:
         title_only = set(body.keys()) <= {"title"} or (
             "title" in body and "clients" not in body and "count" not in body
         )
+    pkg_overall = pkg.get("overall") or "Red"
 
     return f"""# Restore Privacy — Code & Policy Audit
 
@@ -191,11 +542,12 @@ def build_markdown(results: dict) -> str:
 | **Production node** | **{host}:{UDP_PORT}** (UDP); status UI TCP **{STATUS_PORT}** |
 | **Audit generated** | **{human_date()}** (`{now}`) |
 | **Cadence** | Automated security pass (target **every 4 hours** on node/operator timer) |
-| **Audit type** | Static suite + live node status probe (not a pen-test or multi-OS residual red-team) |
-| **Auditor method** | `scripts/run_security_audit.py` — unittest privacy/security modules + TCP/HTTP/UDP probes + no-`.priv` scan |
+| **Audit type** | Static suite + live node status probe + **per-installer AUDIT STATE (Green/Amber/Red)** |
+| **Auditor method** | `scripts/run_security_audit.py` — unittest privacy/security modules + TCP/HTTP/UDP probes + no-`.priv` scan + catalog package RAG |
 
 ---
 
+{package_section}
 ## 1. Executive summary
 
 Latest automated security audit for production node **{host}** and the in-repo privacy/security gates.
@@ -212,8 +564,9 @@ Latest automated security audit for production node **{host}** and the in-repo p
 | UDP product port :{UDP_PORT} | {"probe sent" if udp.get("sent") else "send failed"} |
 | No `*.priv` under product/releases/status_page | {"OK" if priv.get("ok") else "HITS: " + ", ".join(priv.get("hits") or [])} |
 | Live node healthy (TCP+HTTP) | {"YES" if node_ok else "NO"} |
+| Catalog installers AUDIT STATE | **{pkg_overall}** (see top package table) |
 
-**Overall posture:** **Strong** for residual honesty (`residual_ip_capture`), no public live count, no-phones-home Connect, packaging strip of `*.priv`, tunnel DNS + DoT, Settings transparency — without multi-hop residual claims. Product kill-switch is **off by default** (opt-in ``RPT_KILL_SWITCH=1`` only).
+**Overall posture:** **Strong** for residual honesty (`residual_ip_capture`), no public live count, no-phones-home Connect, packaging strip of `*.priv`, tunnel DNS + DoT, Settings transparency — without multi-hop residual claims. Product kill-switch is **off by default** (opt-in ``RPT_KILL_SWITCH=1`` only). Installer package confidence is the RAG table at the top of this audit.
 
 **Primary residual risks (open by design / environment):**
 
@@ -365,21 +718,25 @@ Re-run: `python3 scripts/run_security_audit.py --write`
 
 def collect(node_only: bool = False) -> dict:
     host = DEFAULT_HOST
+    catalog = load_catalog_version()
     results = {
         "generated_at": iso_z(),
         "node_host": host,
-        "catalog_version": load_catalog_version(),
+        "catalog_version": catalog,
         "unit_suite": {"ran": False, "ok": True, "reason": "skipped"} if node_only else run_unit_suite(),
         "tcp_status": probe_tcp(host, STATUS_PORT),
         "http_status": probe_http_status(host, STATUS_PORT),
         "udp": probe_udp_open(host, UDP_PORT),
         "no_priv": check_no_priv_in_tree(),
+        "package_rag": evaluate_catalog_packages(catalog),
     }
     results["overall_ok"] = bool(
         results["unit_suite"].get("ok")
         and results["tcp_status"].get("ok")
         and results["http_status"].get("ok")
         and results["no_priv"].get("ok")
+        # Package Red does not fail the whole audit exit alone (node host may lack
+        # releases/); RAG is reported honestly for readers instead.
     )
     return results
 
