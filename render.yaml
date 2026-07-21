@@ -19,7 +19,8 @@ services:
         value: http://82.221.101.241:8080/api/status
       - key: RPT_STATUS_TIMEOUT
         value: "4"
-      # Public site origin (Checkout success/cancel + webhook display on /admin)
+      # Public site origin (Checkout success/cancel + webhook display on /admin).
+      # Already set here — leave blank in /admin processor form (do not clear this).
       - key: RPT_PUBLIC_BASE_URL
         value: https://restoreprivacy.online
       # Operator-only /admin (required to enable private payment admin page)
@@ -29,12 +30,14 @@ services:
         sync: false
       - key: RPT_ADMIN_SESSION_SECRET
         sync: false
-      # Stripe paid downloads (£2.45) — set in Render dashboard
+      # Stripe paid downloads (£2.45) — paste secrets in Render dashboard (sync: false).
+      # Never commit real sk_… / whsec_… values.
       - key: STRIPE_SECRET_KEY
         sync: false
       - key: STRIPE_WEBHOOK_SECRET
         sync: false
-      - key: STRIPE_PRICE_ID
+      # Optional one-time price_… ; leave unset for unit_amount=245 (£2.45) Checkout
+      - key: STRIPE_CHECKOUT_PRICE_ID
         sync: false
       # Private-repo installer proxy (optional fallback; prefer Iceland VPS store)
       - key: RPT_GITHUB_TOKEN
