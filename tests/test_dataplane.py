@@ -176,12 +176,15 @@ class TestAndroidEngineSource(unittest.TestCase):
         self.assertIn("fun handshake", engine)
         self.assertIn("fun sealPacket", engine)
         self.assertIn("fun openPacket", engine)
+        self.assertIn("fun sealAndWrapPacket", engine)
+        self.assertIn("fun unwrapAndOpen", engine)
         self.assertIn("RPT2-CLIENT-HELLO", engine)
         self.assertIn("elgamalEncrypt", engine)
         self.assertIn("pedersenCommitBytes", engine)
         self.assertIn("engine.handshake", svc)
-        self.assertIn("engine.sealPacket", svc)
-        self.assertIn("engine.openPacket", svc)
+        # Product dataplane uses obfs wrap path (sealAndWrap / unwrapAndOpen), not bare sealPacket.
+        self.assertIn("engine.sealAndWrapPacket", svc)
+        self.assertIn("engine.unwrapAndOpen", svc)
         self.assertNotIn("byteArrayOf(0x52, 0x50, 0x54, 0x32)", svc)  # no magic-only probe
 
 
