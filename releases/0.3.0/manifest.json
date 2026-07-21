@@ -28,5 +28,6 @@
       "bytes": 14291988
     }
   ],
-  "notes": "0.3.0: connect continuity (flyclient tip + Wintun settle poll); paid status admin; catalog from 0.2.9. Carries 0.2.9 tray/audit; 0.2.3 Settings/licence/pad/obfs/PFS."
+  "notes": "0.3.0: Windows rebuilt; Android+Linux staged from build; macOS/iOS byte-identical to 0.2.3 priors (no Apple toolchain on build host); connect continuity (flyclient tip + Wintun settle); paid status admin.",
+  "apple_staged_from_prior": "0.2.3"
 }
