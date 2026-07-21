@@ -20,6 +20,7 @@
   - **Run at device startup** (Windows sign-in / Android boot — opt-in)
   - **Autoconnect on launch** (opt-in; defaults off)
   - **Settings** links to the **most recent audit**, **privacy policy**, and **end user licence**
+- **Quick connection using flyclient** on product full residual Connect (Windows/Linux): tip-then-full path skips redundant HELLO and route re-apply when residual is already ready, and overlaps cold-path prep with HELLO — not blockchain FlyClient / PoW sampling; pin, PFS, and residual honesty unchanged
 - System tray identity **Privacy Restored** (Windows) with product **logo** icons
 - Scrolling message:  
   `lightweight vpn to restore your privacy - no user data is retained - your privacy is restored`
