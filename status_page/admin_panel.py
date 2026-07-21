@@ -26,7 +26,11 @@ from payments import (
     stripe_price_id,
     stripe_remaining_required_keys,
     stripe_secret_key,
+    stripe_webhook_endpoint_url,
+    stripe_webhook_operator_guidance,
     stripe_webhook_secret,
+    STRIPE_WEBHOOK_EVENTS,
+    STRIPE_WEBHOOK_PATH,
 )
 from processor_plugins import (
     list_processor_plugins,
@@ -451,7 +455,10 @@ def processor_settings_view() -> dict[str, Any]:
         "price_label": PRICE_LABEL,
         "price_pence": PRICE_PENCE,
         "public_base_url": public_base_url(),
-        "webhook_path": "/webhook/stripe",
+        "webhook_path": STRIPE_WEBHOOK_PATH,
+        "webhook_endpoint_url": stripe_webhook_endpoint_url(production=True),
+        "webhook_events": list(STRIPE_WEBHOOK_EVENTS),
+        "webhook_guidance": stripe_webhook_operator_guidance(),
         "stripe_dashboard_url": STRIPE_DASHBOARD_URL,
         "stripe_payments_url": STRIPE_DASHBOARD_PAYMENTS_URL,
         "stripe_webhooks_url": STRIPE_DASHBOARD_WEBHOOKS_URL,
@@ -565,7 +572,11 @@ def render_processor_settings_html(
     )
     stripe_mode = str(v.get("stripe_mode") or "unconfigured")
     base = str(v.get("public_base_url") or "")
-    webhook_url = f"{base.rstrip('/')}{v.get('webhook_path') or '/webhook/stripe'}"
+    webhook_url = str(
+        v.get("webhook_endpoint_url") or stripe_webhook_endpoint_url(production=True)
+    )
+    webhook_events = v.get("webhook_events") or list(STRIPE_WEBHOOK_EVENTS)
+    events_csv = ", ".join(str(e) for e in webhook_events)
     msg_html = (
         f'<p class="ok-msg" id="processor-apply-ok">{_escape(message)}</p>' if message else ""
     )
@@ -661,8 +672,18 @@ def render_processor_settings_html(
     <div><dt>Checkout ready</dt><dd id="stripe-checkout-ready">{_status_badge(bool(v.get("stripe_checkout_ready")))}</dd></div>
     <div><dt>Fulfilment ready (key + webhook)</dt><dd id="stripe-fulfilment-ready">{_status_badge(bool(v.get("stripe_fulfilment_ready")))}</dd></div>
     <div><dt>Public base URL</dt><dd id="stripe-public-base"><code>{_escape(base)}</code></dd></div>
-    <div><dt>Webhook endpoint</dt><dd id="stripe-webhook-url"><code>{_escape(webhook_url)}</code></dd></div>
+    <div><dt>Webhook endpoint (paste into Stripe)</dt>
+      <dd id="stripe-webhook-url"><code id="stripe-webhook-endpoint-url">{_escape(webhook_url)}</code></dd></div>
+    <div><dt>Webhook events</dt>
+      <dd id="stripe-webhook-events"><code>{_escape(events_csv)}</code></dd></div>
   </dl>
+  <p class="muted" id="stripe-webhook-paste-help">
+    Stripe Dashboard → Developers → Webhooks → Add endpoint → Endpoint URL =
+    <strong id="stripe-webhook-url-strong">{_escape(webhook_url)}</strong>
+    · Events to send: <strong>{_escape(events_csv)}</strong>.
+    After create, paste the signing secret into <code>STRIPE_WEBHOOK_SECRET</code>
+    (Render Environment or Save Stripe connection below).
+  </p>
   {next_html}"""
         if pid == "bmc":
             extra_status = f"""

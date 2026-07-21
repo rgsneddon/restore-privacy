@@ -111,9 +111,50 @@ def stripe_remaining_required_keys() -> list[str]:
     return missing
 
 
+# Production Render status service (Stripe webhook destination host).
+DEFAULT_PRODUCTION_PUBLIC_BASE_URL = "https://restore-privacy-status.onrender.com"
+STRIPE_WEBHOOK_PATH = "/webhook/stripe"
+# Event operators must select when adding the endpoint in Stripe Dashboard.
+STRIPE_WEBHOOK_EVENTS = ("checkout.session.completed",)
+
+
 def public_base_url() -> str:
     """Canonical public site URL for success/cancel/webhook (no trailing slash)."""
     return os.environ.get("RPT_PUBLIC_BASE_URL", "http://127.0.0.1:10000").rstrip("/")
+
+
+def production_public_base_url() -> str:
+    """Public base for operator-facing production URLs (Render status service)."""
+    raw = os.environ.get("RPT_PUBLIC_BASE_URL", "").strip()
+    if raw and not raw.startswith("http://127.0.0.1") and not raw.startswith("http://localhost"):
+        return raw.rstrip("/")
+    return DEFAULT_PRODUCTION_PUBLIC_BASE_URL
+
+
+def stripe_webhook_endpoint_url(*, production: bool = True) -> str:
+    """Full URL Stripe should POST events to (paste into Dashboard → Webhooks).
+
+    When ``production`` is True (default), uses the Render public origin so the
+    operator always has a copy-paste endpoint even if local default base is set.
+    """
+    base = production_public_base_url() if production else public_base_url()
+    return f"{base.rstrip('/')}{STRIPE_WEBHOOK_PATH}"
+
+
+def stripe_webhook_operator_guidance() -> dict[str, object]:
+    """Non-secret fields for admin/docs: endpoint URL + required events."""
+    return {
+        "endpoint_url": stripe_webhook_endpoint_url(production=True),
+        "path": STRIPE_WEBHOOK_PATH,
+        "events": list(STRIPE_WEBHOOK_EVENTS),
+        "primary_event": STRIPE_WEBHOOK_EVENTS[0],
+        "method": "POST",
+        "note": (
+            "Add this URL in Stripe Dashboard → Developers → Webhooks. "
+            "After create, copy the signing secret into STRIPE_WEBHOOK_SECRET "
+            "(Render env or /admin Stripe form). Never commit the secret."
+        ),
+    }
 
 
 def stripe_configured() -> bool:

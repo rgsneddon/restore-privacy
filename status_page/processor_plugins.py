@@ -138,7 +138,11 @@ def _stripe_readiness() -> dict[str, Any]:
         stripe_price_id,
         stripe_remaining_required_keys,
         stripe_secret_key,
+        stripe_webhook_endpoint_url,
+        stripe_webhook_operator_guidance,
         stripe_webhook_secret,
+        STRIPE_WEBHOOK_EVENTS,
+        STRIPE_WEBHOOK_PATH,
     )
 
     secret = stripe_secret_key()
@@ -184,7 +188,10 @@ def _stripe_readiness() -> dict[str, Any]:
         "stripe_mode": mode,
         "price_label": PRICE_LABEL,
         "public_base_url": public_base_url(),
-        "webhook_path": "/webhook/stripe",
+        "webhook_path": STRIPE_WEBHOOK_PATH,
+        "webhook_endpoint_url": stripe_webhook_endpoint_url(production=True),
+        "webhook_events": list(STRIPE_WEBHOOK_EVENTS),
+        "webhook_guidance": stripe_webhook_operator_guidance(),
     }
 
 

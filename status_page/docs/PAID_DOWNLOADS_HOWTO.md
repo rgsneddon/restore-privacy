@@ -42,12 +42,17 @@ The app creates Checkout line items with `unit_amount=245` and `currency=gbp`.
 ### 1.4 Webhook (required for fulfilment)
 
 After payment, Stripe must notify this site so a download token is minted.
+The receiver already runs on the Render status service (same app as the public page).
 
 1. Developers → **Webhooks** → **Add endpoint**.
-2. Endpoint URL (production example):  
-   `https://YOUR-STATUS-HOST/webhook/stripe`
+2. **Endpoint URL** (production — paste exactly):  
+   **`https://restore-privacy-status.onrender.com/webhook/stripe`**
 3. Events to send: at least **`checkout.session.completed`**.
-4. Copy the **Signing secret** (`whsec_…`) → `STRIPE_WEBHOOK_SECRET`.
+4. Copy the **Signing secret** (`whsec_…`) → set **`STRIPE_WEBHOOK_SECRET`** on Render
+   (Environment) or paste it in `/admin` → Stripe → Save connection.
+5. Confirm `RPT_PUBLIC_BASE_URL` = `https://restore-privacy-status.onrender.com` (no trailing slash).
+
+Do **not** invent a second Render service for webhooks — reuse `restore-privacy-status`.
 
 Local testing: [Stripe CLI](https://stripe.com/docs/stripe-cli)
 
