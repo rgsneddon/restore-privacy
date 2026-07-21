@@ -29,7 +29,7 @@ class Test029PublicCatalogCurrent(unittest.TestCase):
         readme = (ROOT / "README.md").read_text(encoding="utf-8")
         lower = readme.lower()
         self.assertIn("0.3.0", readme)
-        self.assertIn("restore-privacy-status.onrender.com", readme)
+        self.assertIn("restoreprivacy.online", readme)
         self.assertIn("restore-privacy-client-0.3.0-macos.zip", readme)
         self.assertIn("restore-privacy-client-0.3.0-ios.zip", readme)
         self.assertIn("Developer ID", readme)
@@ -50,7 +50,7 @@ class Test029PublicCatalogCurrent(unittest.TestCase):
     def test_privacy_current_public_is_0_2_9_signed(self):
         privacy = (ROOT / "PRIVACY_POLICY.md").read_text(encoding="utf-8")
         self.assertIn("0.3.0", privacy)
-        self.assertIn("restore-privacy-status.onrender.com", privacy)
+        self.assertIn("restoreprivacy.online", privacy)
         self.assertIn("Developer ID", privacy)
         self.assertIn("Team-signed", privacy)
         self.assertIn("private", privacy.lower())

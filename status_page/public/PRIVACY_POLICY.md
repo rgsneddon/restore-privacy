@@ -2,9 +2,9 @@
 
 **Last updated:** 21 July 2026  
 **Product:** Restore Privacy Tunnel (RPT / RPT2) — custom VPN node, client apps, and public status page  
-**Current packages (catalog v0.3.0):** paid installers (£2.45 GBP per package) via [status downloads](https://restore-privacy-status.onrender.com/) (Windows · Android · macOS · iOS · Linux — macOS Developer ID notarized; iOS Team-signed sideload). The product **source repository is private**; free permanent public GitHub installer URLs are **not** offered. After payment the status host delivers a **one-time** download (authenticated proxy).  
+**Current packages (catalog v0.3.0):** paid installers (£2.45 GBP per package) via [status downloads](https://restoreprivacy.online/) (Windows · Android · macOS · iOS · Linux — macOS Developer ID notarized; iOS Team-signed sideload). The product **source repository is private**; free permanent public GitHub installer URLs are **not** offered. After payment the status host delivers a **one-time** download (authenticated proxy).  
 **Code & policy audit:** [AUDIT.md](AUDIT.md) (also served on the status host as `/AUDIT.md`)  
-**Operator / project:** Russell G Sneddon (`rgsneddon`) / Restore Privacy — public docs and paid downloads: [status host](https://restore-privacy-status.onrender.com/)
+**Operator / project:** Russell G Sneddon (`rgsneddon`) / Restore Privacy — public docs and paid downloads: [status host](https://restoreprivacy.online/)
 
 This policy describes how the **Restore Privacy** software is designed to handle data. It is written for end users and operators. It is **not** legal advice and is not a jurisdiction-specific compliance certificate (e.g. full GDPR/CCPA legal opinion).
 
@@ -68,7 +68,7 @@ Process stdout/stderr for the node service is configured for **no journal sessio
 - Displays the product **title**, beta note, and **paid download** entry (Stripe Payment Link per platform) only.
 - Does **not** expose a live connected-client count or poll a session metric on the public HTML surface.
 - Optional `/api/status` JSON is **title-only** (no `clients_connected`).
-- **Does not** publish free permanent GitHub `releases/download` installer buttons. Catalog **v0.3.0** packages are fulfilled **after payment** on [status downloads](https://restore-privacy-status.onrender.com/) via a **one-time** proxy download (private source repository).
+- **Does not** publish free permanent GitHub `releases/download` installer buttons. Catalog **v0.3.0** packages are fulfilled **after payment** on [status downloads](https://restoreprivacy.online/) via a **one-time** proxy download (private source repository).
 - Serves same-origin legal documents (`/PRIVACY_POLICY.md`, `/LICENSE`, `/README.md`, `/CREDITS.md`, `/AUDIT.md`) so clients can open docs without a public GitHub tree.
 
 ### 3.4 Operator-held secrets
@@ -155,8 +155,8 @@ We may update this policy as the product evolves. The **Last updated** date at t
 
 The product **source repository is private**. For privacy questions about Restore Privacy:
 
-- Read the public policy and audit on the [status host](https://restore-privacy-status.onrender.com/) (`/PRIVACY_POLICY.md`, `/AUDIT.md`)
-- Install / pay path: [How to buy](https://restore-privacy-status.onrender.com/how-to-buy)
+- Read the public policy and audit on the [status host](https://restoreprivacy.online/) (`/PRIVACY_POLICY.md`, `/AUDIT.md`)
+- Install / pay path: [How to buy](https://restoreprivacy.online/how-to-buy)
 - Or contact the operator via their public project channels (e.g. GitHub profile `rgsneddon`)
 
 ---

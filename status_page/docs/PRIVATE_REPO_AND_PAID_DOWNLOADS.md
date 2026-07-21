@@ -22,9 +22,9 @@ If fulfilment returns **503**, paying customers cannot download until you stage 
 1. Status downloads → Stripe Payment Link  
    `https://donate.stripe.com/cNi7sM4uOeWQ9TBe0q7kc00?client_reference_id=<platform>`
 2. Stripe **After payment → Redirect to**  
-   `https://restore-privacy-status.onrender.com/download/success?session_id={CHECKOUT_SESSION_ID}`  
+   `https://restoreprivacy.online/download/success?session_id={CHECKOUT_SESSION_ID}`  
    (required — already configured for seamless thank-you)
-3. Webhook `POST https://restore-privacy-status.onrender.com/webhook/stripe`  
+3. Webhook `POST https://restoreprivacy.online/webhook/stripe`  
    event **`checkout.session.completed`** → mints one-time token for that platform  
    (requires `payment_status` paid + **245** pence GBP + platform from `client_reference_id` / metadata)
 4. Success page shows **Download \<platform\> package** → `/download?token=…`  
@@ -87,7 +87,7 @@ Fallbacks (optional): local `status_page/assets/{version}/`, or `RPT_GITHUB_TOKE
 |----------|---------|
 | `STRIPE_SECRET_KEY` | Optional server Checkout; webhook verification uses signing secret |
 | `STRIPE_WEBHOOK_SECRET` | Required for grants (`whsec_…`) |
-| `RPT_PUBLIC_BASE_URL` | `https://restore-privacy-status.onrender.com` |
+| `RPT_PUBLIC_BASE_URL` | `https://restoreprivacy.online` |
 | `RPT_GITHUB_TOKEN` | Private release asset fetch if not staging files |
 
 ## Payment Link amount (critical for seamless grants)
@@ -108,11 +108,11 @@ Webhook grants only when paid amount is **245 pence (GBP)** and currency is **gb
 curl -sI "https://github.com/rgsneddon/restore-privacy/releases/download/0.3.0/..."  → 404
 
 # Status paywall
-curl -s https://restore-privacy-status.onrender.com/ | findstr /i "donate.stripe releases/download"
+curl -s https://restoreprivacy.online/ | findstr /i "donate.stripe releases/download"
   → donate.stripe present; releases/download absent
 
 # Fulfilment ready for paid proxy
-curl -s https://restore-privacy-status.onrender.com/health/fulfilment
+curl -s https://restoreprivacy.online/health/fulfilment
   → {"ok": true, "source": "local"|"github_api"|...}
 
 # After a £2.45 test payment for one platform:

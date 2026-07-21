@@ -37,7 +37,7 @@ EXPECTED_DOWNLOAD_PREFIX = (
 )
 # Public footer points at the paid status host (repo is private).
 EXPECTED_PUBLIC_CATALOG_FOOTER = (
-    "https://restore-privacy-status.onrender.com/#downloads"
+    "https://restoreprivacy.online/#downloads"
 )
 
 

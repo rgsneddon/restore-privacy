@@ -21,7 +21,7 @@ services:
         value: "4"
       # Public site origin (Checkout success/cancel + webhook display on /admin)
       - key: RPT_PUBLIC_BASE_URL
-        value: https://restore-privacy-status.onrender.com
+        value: https://restoreprivacy.online
       # Operator-only /admin (required to enable private payment admin page)
       - key: RPT_ADMIN_USER
         value: admin

@@ -1,15 +1,16 @@
 /// Public document links for Settings (audit, privacy, end-user licence, how-to-buy).
 ///
-/// Always open **Render status-host** absolute URLs (readable HTML pages).
-/// Paths match status_page/public_docs.py — never GitHub blob/raw.
+/// Always open **status-host** absolute URLs (readable HTML pages on
+/// restoreprivacy.online). Paths match status_page/public_docs.py — never
+/// GitHub blob/raw. Docs stay available when GitHub is private.
 class LegalDocLink {
   const LegalDocLink({required this.label, required this.statusPath});
 
   final String label;
   final String statusPath;
 
-  /// Public status host (restore-privacy-status.onrender.com).
-  static const statusOrigin = 'https://restore-privacy-status.onrender.com';
+  /// Public status host (restoreprivacy.online — paid downloads + docs).
+  static const statusOrigin = 'https://restoreprivacy.online';
 
   /// Absolute URL opened by Settings (external browser).
   String get url => '$statusOrigin$statusPath';

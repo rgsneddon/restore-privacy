@@ -86,7 +86,7 @@ class TestStripeWhatsNext(unittest.TestCase):
     def test_secrets_clear_remaining(self):
         os.environ["STRIPE_SECRET_KEY"] = "sk_test_FAKE_FOR_UNIT"
         os.environ["STRIPE_WEBHOOK_SECRET"] = "whsec_FAKE_FOR_UNIT"
-        os.environ["RPT_PUBLIC_BASE_URL"] = "https://restore-privacy-status.onrender.com"
+        os.environ["RPT_PUBLIC_BASE_URL"] = "https://restoreprivacy.online"
         remaining = payments.stripe_remaining_required_keys()
         self.assertEqual(remaining, [])
         ready = plugins._stripe_readiness()

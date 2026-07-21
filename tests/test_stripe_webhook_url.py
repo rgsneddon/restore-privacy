@@ -13,7 +13,7 @@ sys.path.insert(0, str(ROOT / "status_page"))
 import admin_panel  # noqa: E402
 import payments  # noqa: E402
 
-PROD_WEBHOOK = "https://restore-privacy-status.onrender.com/webhook/stripe"
+PROD_WEBHOOK = "https://restoreprivacy.online/webhook/stripe"
 
 
 class TestStripeWebhookEndpointUrl(unittest.TestCase):

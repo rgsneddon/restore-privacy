@@ -305,7 +305,7 @@ An **ISP** performing **traffic analysis** may still observe connection timing a
 | Expectation | Notes |
 |-------------|--------|
 | Product host | **{host}** |
-| Public catalog | **{catalog}** paid installers on [status host](https://restore-privacy-status.onrender.com/) (£2.45; no free GitHub release downloads) |
+| Public catalog | **{catalog}** paid installers on [status host](https://restoreprivacy.online/) (£2.45; no free GitHub release downloads) |
 | Node pub pin | `1b126abf…` |
 | No `.priv` in public package trees | {"OK" if priv.get("ok") else "HITS"} |
 

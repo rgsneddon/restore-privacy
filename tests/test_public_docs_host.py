@@ -26,7 +26,7 @@ class TestPublicDocsRegistry(unittest.TestCase):
         )
         for d in cat:
             self.assertTrue(d["path"].startswith("/"), d)
-            self.assertIn("restore-privacy-status.onrender.com", d["url"])
+            self.assertIn("restoreprivacy.online", d["url"])
             self.assertTrue(d["url"].endswith(d["path"]), d)
 
     def test_load_each_document_bytes(self):
@@ -150,8 +150,8 @@ class TestPublicStatusLinks(unittest.TestCase):
             status_app.LICENCE_URL.endswith("/LICENSE")
             or status_app.LICENCE_URL.endswith("/LICENSE")
         )
-        self.assertIn("restore-privacy-status.onrender.com", status_app.LICENCE_URL)
-        self.assertIn("restore-privacy-status.onrender.com", status_app.SECURITY_AUDIT_URL)
+        self.assertIn("restoreprivacy.online", status_app.LICENCE_URL)
+        self.assertIn("restoreprivacy.online", status_app.SECURITY_AUDIT_URL)
         self.assertIn("/how-to-buy", status_app.HOW_TO_BUY_URL)
 
 
@@ -165,7 +165,7 @@ class TestClientLegalLinksStatusOrigin(unittest.TestCase):
         urls = legal_links.legal_doc_urls()
         self.assertIn(legal_links.AUDIT_LABEL, urls)
         for u in urls.values():
-            self.assertIn("restore-privacy-status.onrender.com", u)
+            self.assertIn("restoreprivacy.online", u)
             self.assertNotIn("github.com", u)
         self.assertTrue(legal_links.audit_url().endswith("/AUDIT.md"))
         self.assertTrue(legal_links.privacy_policy_url().endswith("/PRIVACY_POLICY.md"))

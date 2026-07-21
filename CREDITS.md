@@ -58,7 +58,7 @@ their owners.
 
 Original RPT protocol, node, clients, and status page: **Russell G Sneddon** and
 contributors (operator repository **restore-privacy** is **private**; public
-docs and paid installers: https://restore-privacy-status.onrender.com/).
+docs and paid installers: https://restoreprivacy.online/).
 
 Project license for original code: **MIT** — see [`LICENSE`](LICENSE).
 

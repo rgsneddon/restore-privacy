@@ -58,7 +58,7 @@ class TestReadmePublicClientOnly(unittest.TestCase):
         self.assertTrue("CREDITS" in text or "credit" in lower)
         # Status page as user surface is OK
         self.assertTrue(
-            "restore-privacy-status.onrender.com" in text
+            "restoreprivacy.online" in text
             or "status page" in lower
             or "download" in lower
         )

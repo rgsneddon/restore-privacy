@@ -57,7 +57,7 @@ class TestPrivacyPolicy(unittest.TestCase):
         """User-facing policy must advertise catalog v0.3.0 as current paid ship."""
         text = _read("PRIVACY_POLICY.md")
         self.assertIn("0.3.0", text)
-        self.assertIn("restore-privacy-status.onrender.com", text)
+        self.assertIn("restoreprivacy.online", text)
         self.assertIn("Developer ID", text)
         self.assertIn("Team-signed", text)
         self.assertIn("private", text.lower())
@@ -100,7 +100,7 @@ class TestLicenseAndCredits(unittest.TestCase):
         self.assertTrue("wireguard" in text.lower() or "WireGuard" in text)
         # Distribution services (private source + paid status host)
         self.assertIn("Stripe", text)
-        self.assertIn("restore-privacy-status.onrender.com", text)
+        self.assertIn("restoreprivacy.online", text)
         self.assertIn("private", text.lower())
 
     def test_license_notes_paid_catalog_distribution(self):
@@ -125,7 +125,7 @@ class TestReadmeHowto(unittest.TestCase):
         self.assertIn("ios", lower)
         # Catalog ship is 0.3.0 (signed packages via paid status page)
         self.assertIn("0.3.0", text)
-        self.assertIn("restore-privacy-status.onrender.com", text)
+        self.assertIn("restoreprivacy.online", text)
         self.assertIn("Developer ID", text)
         self.assertIn("Team-signed", text)
         self.assertIn("private", lower)
@@ -148,7 +148,7 @@ class TestReadmeHowto(unittest.TestCase):
         self.assertTrue("CREDITS" in text or "credit" in lower)
         # User-facing status/downloads OK; operator deploy is not required here
         self.assertTrue(
-            "restore-privacy-status.onrender.com" in text
+            "restoreprivacy.online" in text
             or "status page" in lower
             or "download" in lower
         )

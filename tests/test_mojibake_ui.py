@@ -54,7 +54,7 @@ class TestDownloadsNoMojibake(unittest.TestCase):
         self.assertIn(f"Download client v{RELEASE_VERSION}", html)
         self.assertIn("Windows | Linux | macOS | iOS | Android", html)
         # Catalog footer is the paid status host (private repo — no free GH release page).
-        self.assertIn("restore-privacy-status.onrender.com", html)
+        self.assertIn("restoreprivacy.online", html)
         self.assertIn("Pay", html)
         self.assertNotIn("apple-prep", html)
         self.assertNotIn("Â·", html)

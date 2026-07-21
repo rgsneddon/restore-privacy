@@ -1,6 +1,6 @@
 """Public document links for client Settings (audit, privacy, end-user licence).
 
-Installed clients open **status-origin** URLs on the Render status host so docs
+Installed clients open **status-origin** URLs on the public status host (restoreprivacy.online) so docs
 remain available even when GitHub is private. Override the origin with
 ``RPT_PUBLIC_BASE_URL`` (same as the status page).
 """
@@ -11,7 +11,7 @@ import os
 from dataclasses import dataclass
 
 # Default public status host (how-to-buy + legal docs are served here).
-DEFAULT_STATUS_ORIGIN = "https://restore-privacy-status.onrender.com"
+DEFAULT_STATUS_ORIGIN = "https://restoreprivacy.online"
 
 # User-facing labels (Settings) and status-origin paths.
 AUDIT_LABEL = "Most recent audit"
@@ -34,7 +34,7 @@ README_STATUS_PATH = "/README.md"
 
 
 def status_origin() -> str:
-    """Public base for legal/how-to URLs (env RPT_PUBLIC_BASE_URL or Render default)."""
+    """Public base for legal/how-to URLs (env RPT_PUBLIC_BASE_URL or production default)."""
     raw = os.environ.get("RPT_PUBLIC_BASE_URL", "").strip().rstrip("/")
     if raw and not raw.startswith("http://127.0.0.1") and not raw.startswith(
         "http://localhost"

@@ -35,7 +35,7 @@ SECRETS / RELEASE GATES (mandatory)
   Render blueprint: render.yaml
   One-click deploy: https://render.com/deploy?repo=https://github.com/rgsneddon/restore-privacy
   Health:         /health
-  Live example:   https://restore-privacy-status.onrender.com/
+  Live example:   https://restoreprivacy.online/
 
   The status page proxies live clients_connected from the node upstream
   (env RPT_STATUS_UPSTREAM, default http://<node>:8080/api/status).

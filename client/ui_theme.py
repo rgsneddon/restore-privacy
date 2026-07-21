@@ -310,7 +310,7 @@ def upgrade_download_url() -> str:
 
         return f"{DEFAULT_PRODUCTION_PUBLIC_BASE_URL}/#downloads"
     except Exception:
-        return "https://restore-privacy-status.onrender.com/#downloads"
+        return "https://restoreprivacy.online/#downloads"
 
 
 def upgrade_banner_text(running: str | None = None, latest: str | None = None) -> str | None:

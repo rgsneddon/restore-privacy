@@ -202,7 +202,7 @@ def available_downloads(
 # 404 GitHub release page when the repository is private.
 # Keep this string in sync with payments.DEFAULT_PRODUCTION_PUBLIC_BASE_URL
 # (avoid importing payments here — circular with payments → downloads).
-RUST_REPO_URL = "https://restore-privacy-status.onrender.com/#downloads"
+RUST_REPO_URL = "https://restoreprivacy.online/#downloads"
 RUST_REPO_LABEL = (
     f"Catalog v{RELEASE_VERSION} — installers after £2.45 payment only (signed packages)"
 )
@@ -294,13 +294,20 @@ def download_menu_rows(
 
 
 def render_download_section_html(assets: Iterable[DownloadAsset] | None = None) -> str:
-    """HTML: pay via Stripe payment page, then one-time download after webhook grant.
+    """HTML: pay via Stripe, then thank-you + one-time download on restoreprivacy.online.
 
     Platform menu below the download title is **two rows**: three items, then two.
     """
     items = list(assets) if assets is not None else available_downloads()
     if not items:
         return ""
+    from payments import (
+        DEFAULT_PRODUCTION_PUBLIC_BASE_URL,
+        stripe_payment_page_url,
+    )
+
+    pay_base = stripe_payment_page_url()
+    claim = f"{DEFAULT_PRODUCTION_PUBLIC_BASE_URL}/download/success"
     row1, row2 = download_menu_rows(items)
     row1_html = "\n      ".join(_render_platform_pay_link(a) for a in row1)
     row2_block = ""
@@ -315,8 +322,14 @@ def render_download_section_html(assets: Iterable[DownloadAsset] | None = None) 
     <h2>Download client v{RELEASE_VERSION}</h2>
     <p class="dl-sub">Windows | Linux | macOS | iOS | Android — catalog
       <span id="catalog-version">v{RELEASE_VERSION}</span>
-      (paid download only; installers delivered after Stripe payment)</p>
-    <p class="dl-price" id="dl-price">{PRICE_LABEL} GBP per package — pay on Stripe, then get a one-time download link</p>
+      on <a class="rust-link" href="{DEFAULT_PRODUCTION_PUBLIC_BASE_URL}/" id="dl-site-origin">restoreprivacy.online</a>
+      (paid download only)</p>
+    <p class="dl-price" id="dl-price">{PRICE_LABEL} GBP per package — pay on Stripe, then download starts automatically</p>
+    <p class="dl-sub" id="dl-pay-flow">Each button opens Stripe for that platform
+      (<a href="{pay_base}" rel="noopener noreferrer" target="_blank" id="dl-payment-page-base">payment page</a>).
+      After payment you return to the thank-you page
+      (<code id="dl-claim-hint">{claim}?session_id=…</code>) where your installer starts
+      automatically (one-time link). Direct package files are not linked until paid.</p>
     <div class="dl-buttons" id="dl-buttons" data-dl-layout="3+2">
     <div class="dl-row dl-row-3" id="dl-row-1" data-dl-row="1" data-dl-count="{len(row1)}">
       {row1_html}

@@ -122,7 +122,7 @@ An **ISP** performing **traffic analysis** may still observe connection timing a
 | Expectation | Notes |
 |-------------|--------|
 | Product host | **82.221.101.241** |
-| Public catalog | **0.3.0** paid installers on [status host](https://restore-privacy-status.onrender.com/) (£2.45; no free GitHub release downloads) |
+| Public catalog | **0.3.0** paid installers on [status host](https://restoreprivacy.online/) (£2.45; no free GitHub release downloads) |
 | Node pub pin | `1b126abf…` |
 | No `.priv` in public package trees | OK |
 

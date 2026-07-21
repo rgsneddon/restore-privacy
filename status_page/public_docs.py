@@ -1,4 +1,4 @@
-"""Public documents and how-to-buy pages served by the Render status host.
+"""Public documents and how-to-buy pages served by the public status host (restoreprivacy.online).
 
 Stable same-origin paths (no GitHub dependency for public readers):
 
@@ -24,7 +24,7 @@ REPO_ROOT = STATUS_DIR.parent
 PUBLIC_DIR = STATUS_DIR / "public"
 
 # Production status origin (override with RPT_PUBLIC_BASE_URL when not localhost).
-DEFAULT_STATUS_ORIGIN = "https://restore-privacy-status.onrender.com"
+DEFAULT_STATUS_ORIGIN = "https://restoreprivacy.online"
 
 HOW_TO_BUY_PATH = "/how-to-buy"
 README_PATH = "/README.md"

@@ -70,13 +70,13 @@ class TestTitleLegalLinks(unittest.TestCase):
         self.assertTrue(status_app.SECURITY_AUDIT_URL.endswith("/AUDIT.md"))
         # Absolute constants use public status origin (Render), not GitHub blobs
         self.assertIn(
-            "restore-privacy-status.onrender.com", status_app.LICENCE_URL
+            "restoreprivacy.online", status_app.LICENCE_URL
         )
         self.assertIn(
-            "restore-privacy-status.onrender.com", status_app.PRIVACY_POLICY_URL
+            "restoreprivacy.online", status_app.PRIVACY_POLICY_URL
         )
         self.assertIn(
-            "restore-privacy-status.onrender.com", status_app.SECURITY_AUDIT_URL
+            "restoreprivacy.online", status_app.SECURITY_AUDIT_URL
         )
         self.assertNotIn("github.com", status_app.LICENCE_URL)
         self.assertNotIn("RUST-IN-PRIVACY", status_app.LICENCE_URL)

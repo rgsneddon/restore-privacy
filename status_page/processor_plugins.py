@@ -262,7 +262,7 @@ STRIPE_PLUGIN = ProcessorPlugin(
             required=True,
             secret=False,
             input_type="url",
-            placeholder="https://restore-privacy-status.onrender.com",
+            placeholder="https://restoreprivacy.online",
         ),
         ProcessorVariable(
             key="STRIPE_PAYMENT_PAGE_URL",

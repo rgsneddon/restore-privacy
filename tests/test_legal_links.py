@@ -49,7 +49,7 @@ class TestLegalLinksHelper(unittest.TestCase):
         self.assertGreaterEqual(len(urls), 3)
         for label, url in urls.items():
             self.assertIn(
-                "restore-privacy-status.onrender.com",
+                "restoreprivacy.online",
                 url,
                 msg=f"{label} should use status origin, got {url}",
             )
@@ -91,7 +91,7 @@ class TestLegalLinksHelper(unittest.TestCase):
         self.assertNotIn("repoPath: 'audit.md'", links)
         self.assertIn("PRIVACY_POLICY.md", links)
         self.assertIn("LICENSE", links)
-        self.assertIn("restore-privacy-status.onrender.com", links)
+        self.assertIn("restoreprivacy.online", links)
         self.assertIn("how-to-buy", links)
         self.assertIn("launchUrl", dart)
 

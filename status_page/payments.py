@@ -159,7 +159,7 @@ def stripe_remaining_required_keys() -> list[str]:
 
 
 # Production Render status service (Stripe webhook destination host).
-DEFAULT_PRODUCTION_PUBLIC_BASE_URL = "https://restore-privacy-status.onrender.com"
+DEFAULT_PRODUCTION_PUBLIC_BASE_URL = "https://restoreprivacy.online"
 STRIPE_WEBHOOK_PATH = "/webhook/stripe"
 # Event operators must select when adding the endpoint in Stripe Dashboard.
 STRIPE_WEBHOOK_EVENTS = ("checkout.session.completed",)
@@ -171,7 +171,7 @@ def public_base_url() -> str:
 
 
 def production_public_base_url() -> str:
-    """Public base for operator-facing production URLs (Render status service)."""
+    """Public base for operator-facing production URLs (custom domain status host)."""
     raw = os.environ.get("RPT_PUBLIC_BASE_URL", "").strip()
     if raw and not raw.startswith("http://127.0.0.1") and not raw.startswith("http://localhost"):
         return raw.rstrip("/")
@@ -181,11 +181,21 @@ def production_public_base_url() -> str:
 def stripe_webhook_endpoint_url(*, production: bool = True) -> str:
     """Full URL Stripe should POST events to (paste into Dashboard → Webhooks).
 
-    When ``production`` is True (default), uses the Render public origin so the
-    operator always has a copy-paste endpoint even if local default base is set.
+    When ``production`` is True (default), uses the canonical public origin
+    (restoreprivacy.online) so operators always have a copy-paste endpoint.
     """
     base = production_public_base_url() if production else public_base_url()
     return f"{base.rstrip('/')}{STRIPE_WEBHOOK_PATH}"
+
+
+def production_success_return_url() -> str:
+    """Stripe after_completion / Checkout success URL template (Dashboard paste).
+
+    Includes the Checkout session id placeholder Stripe substitutes after payment
+    so the buyer lands on thank-you + auto-download on the public origin.
+    """
+    base = production_public_base_url().rstrip("/")
+    return f"{base}{DEFAULT_SUCCESS_PATH}?session_id={{CHECKOUT_SESSION_ID}}"
 
 
 def stripe_webhook_operator_guidance() -> dict[str, object]:
@@ -197,10 +207,12 @@ def stripe_webhook_operator_guidance() -> dict[str, object]:
         "primary_event": STRIPE_WEBHOOK_EVENTS[0],
         "method": "POST",
         "note": (
-            "Add this URL in Stripe Dashboard → Developers → Webhooks. "
-            "After create, copy the signing secret into STRIPE_WEBHOOK_SECRET "
-            "(Render env or /admin Stripe form). Never commit the secret."
+            "Add this URL in Stripe Dashboard → Developers → Webhooks "
+            "(event: checkout.session.completed). Copy the signing secret into "
+            "STRIPE_WEBHOOK_SECRET (Render env). Set Payment Link after_completion "
+            "redirect to production_success_return_url(). Never commit the secret."
         ),
+        "success_return_url": production_success_return_url(),
     }
 
 

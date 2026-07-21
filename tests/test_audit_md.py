@@ -48,7 +48,7 @@ class TestAuditMd(unittest.TestCase):
         self.assertIn("0.3.0", text)
         self.assertIn("82.221.101.241", text)
         self.assertIn("private", text.lower())
-        self.assertIn("restore-privacy-status.onrender.com", text)
+        self.assertIn("restoreprivacy.online", text)
         self.assertNotIn("public packages + operator tree", text)
         self.assertNotIn("tests_0.3.0.log", text)
         # Severity labels used in findings

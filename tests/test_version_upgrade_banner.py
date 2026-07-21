@@ -96,7 +96,7 @@ class TestUpgradeBanner(unittest.TestCase):
         # Prefer Stripe payment page for Windows, else status host downloads.
         self.assertTrue(
             "donate.stripe.com" in url
-            or "restore-privacy-status.onrender.com" in url
+            or "restoreprivacy.online" in url
             or "/#downloads" in url,
             msg=f"unexpected upgrade url: {url}",
         )

@@ -50,11 +50,11 @@ The receiver already runs on the Render status service (same app as the public p
 
 1. Developers → **Webhooks** → **Add endpoint**.
 2. **Endpoint URL** (production — paste exactly):  
-   **`https://restore-privacy-status.onrender.com/webhook/stripe`**
+   **`https://restoreprivacy.online/webhook/stripe`**
 3. Events to send: at least **`checkout.session.completed`**.
 4. Copy the **Signing secret** (`whsec_…`) → set **`STRIPE_WEBHOOK_SECRET`** on Render
    (Environment) or paste it in `/admin` → Stripe → Save connection.
-5. Confirm `RPT_PUBLIC_BASE_URL` = `https://restore-privacy-status.onrender.com` (no trailing slash).
+5. Confirm `RPT_PUBLIC_BASE_URL` = `https://restoreprivacy.online` (no trailing slash).
 
 Do **not** invent a second Render service for webhooks — reuse `restore-privacy-status`.
 
@@ -72,7 +72,7 @@ stripe trigger checkout.session.completed
 | `STRIPE_SECRET_KEY` | `sk_test_…` or `sk_live_…` |
 | `STRIPE_WEBHOOK_SECRET` | `whsec_…` from the webhook endpoint |
 | `STRIPE_PRICE_ID` | Optional `price_…` for £2.45 GBP |
-| `RPT_PUBLIC_BASE_URL` | Public site origin, e.g. `https://restore-privacy-status.onrender.com` (no trailing slash). Used for success/cancel URLs. |
+| `RPT_PUBLIC_BASE_URL` | Public site origin, e.g. `https://restoreprivacy.online` (no trailing slash). Used for success/cancel URLs. |
 | `RPT_PAYMENT_DATA_DIR` | Optional directory for SQLite grant DB (default: `status_page/data/`) |
 | `RPT_DOWNLOAD_TOKEN_TTL_SEC` | Optional token lifetime (default `3600`) |
 | `RPT_ADMIN_USER` | Admin username (default `admin`) |
@@ -151,7 +151,7 @@ Architecture (modules):
 | `/admin/logout` | Clear session cookie |
 
 **Payment Link after payment (required for seamless UX):** redirect to  
-`https://restore-privacy-status.onrender.com/download/success?session_id={CHECKOUT_SESSION_ID}`
+`https://restoreprivacy.online/download/success?session_id={CHECKOUT_SESSION_ID}`
 
 **Private source repo:** make GitHub **private**, then either set **`RPT_GITHUB_TOKEN`** on Render **or** stage packages  
 (`python scripts/stage_paid_assets.py` → `status_page/assets/0.3.0/`). See `docs/PRIVATE_REPO_AND_PAID_DOWNLOADS.md`.
