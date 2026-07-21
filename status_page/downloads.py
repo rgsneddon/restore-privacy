@@ -95,6 +95,43 @@ RELEASE_ASSETS: tuple[DownloadAsset, ...] = (
     ),
 )
 
+# Fixed platform order for operator staging / Iceland VPS host layout.
+CATALOG_PLATFORMS: tuple[str, ...] = tuple(a.platform for a in RELEASE_ASSETS)
+
+
+def list_catalog_platform_packages(
+    *, version: str | None = None
+) -> list[dict[str, str]]:
+    """Per-device product packages for the current (or given) catalog version.
+
+    Returns one dict per platform with keys:
+    ``version``, ``platform``, ``filename``, ``relative_path``
+    (relative to a version root: ``{version}/{filename}``).
+    """
+    ver = (version or RELEASE_VERSION).strip()
+    out: list[dict[str, str]] = []
+    for a in RELEASE_ASSETS:
+        # Rebuild filename if a different version is requested.
+        if ver == RELEASE_VERSION:
+            fname = a.filename
+        else:
+            # Canonical pattern: restore-privacy-client-{ver}-…
+            suffix = a.filename.split(f"-{RELEASE_VERSION}-", 1)[-1]
+            if suffix == a.filename:
+                # fallback: replace version substring once
+                fname = a.filename.replace(RELEASE_VERSION, ver, 1)
+            else:
+                fname = f"restore-privacy-client-{ver}-{suffix}"
+        out.append(
+            {
+                "version": ver,
+                "platform": a.platform,
+                "filename": fname,
+                "relative_path": f"{ver}/{fname}",
+            }
+        )
+    return out
+
 
 def available_downloads(
     include_android: bool = True,

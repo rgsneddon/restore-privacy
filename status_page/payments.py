@@ -244,6 +244,46 @@ def github_auth_token() -> str:
     return ""
 
 
+# Iceland product VPS (same host as RPT node) — paid installer store.
+DEFAULT_VPS_ASSET_HOST = "82.221.101.241"
+DEFAULT_VPS_ASSET_PORT = 8081
+DEFAULT_VPS_ASSET_REMOTE_ROOT = "/opt/restore-privacy/paid_assets"
+# HTTP path prefix on the VPS paid-asset server.
+VPS_ASSET_HTTP_PREFIX = "/paid-assets"
+
+
+def vps_asset_fetch_token() -> str:
+    """Shared secret for status host → Iceland VPS asset fetch (never browser-facing)."""
+    for key in ("RPT_ASSET_FETCH_TOKEN", "RPT_VPS_ASSET_TOKEN"):
+        val = os.environ.get(key, "").strip()
+        if val:
+            return val
+    return ""
+
+
+def vps_asset_base_url() -> str:
+    """Base URL for Iceland-hosted paid installers (no trailing slash).
+
+    Override with ``RPT_VPS_ASSET_BASE`` e.g.
+    ``http://82.221.101.241:8081/paid-assets``.
+    """
+    raw = os.environ.get("RPT_VPS_ASSET_BASE", "").strip().rstrip("/")
+    if raw:
+        return raw
+    host = os.environ.get("RPT_VPS_ASSET_HOST", DEFAULT_VPS_ASSET_HOST).strip()
+    port = os.environ.get("RPT_VPS_ASSET_PORT", str(DEFAULT_VPS_ASSET_PORT)).strip()
+    return f"http://{host}:{port}{VPS_ASSET_HTTP_PREFIX}"
+
+
+def vps_asset_url(filename: str, *, version: str | None = None) -> str:
+    """Full URL for one catalog installer on the Iceland VPS paid-asset store."""
+    from downloads import RELEASE_VERSION
+
+    ver = (version or RELEASE_VERSION).strip()
+    base = vps_asset_base_url()
+    return f"{base}/{ver}/{filename}"
+
+
 def catalog_filenames() -> frozenset[str]:
     return frozenset(a.filename for a in RELEASE_ASSETS)
 
@@ -253,6 +293,8 @@ def asset_search_dirs() -> list[Path]:
 
     Prefer ``status_page/assets/{VERSION}/`` first — that path is what Render can
     ship when ``rootDir`` is ``status_page`` (repo ``releases/`` is not deployed).
+    Also includes the Iceland VPS on-disk layout when status runs on that host
+    (``/opt/restore-privacy/paid_assets/{VERSION}``).
     """
     out: list[Path] = []
     raw = os.environ.get("RPT_ASSET_DIR", "").strip()
@@ -265,6 +307,12 @@ def asset_search_dirs() -> list[Path]:
     out.append(status / "assets" / RELEASE_VERSION)
     # Monorepo checkout: releases/{VERSION} (gitignored; local/dev only)
     out.append(status.parent / "releases" / RELEASE_VERSION)
+    # Iceland VPS layout (when paid fulfilment runs co-located with the node)
+    remote_root = os.environ.get(
+        "RPT_VPS_ASSET_REMOTE_ROOT", DEFAULT_VPS_ASSET_REMOTE_ROOT
+    ).strip()
+    if remote_root:
+        out.append(Path(remote_root) / RELEASE_VERSION)
     return out
 
 
@@ -289,9 +337,10 @@ def open_release_asset(
     """Open installer bytes for a **paid** redeem (proxy/stream, not free public redirect).
 
     Resolution order:
-      1. Local file under :func:`asset_search_dirs` (operator-staged packages)
-      2. GitHub Releases API with :func:`github_auth_token` (works for private repos)
-      3. Direct release download URL with the same token (fallback)
+      1. Local file under :func:`asset_search_dirs` (operator-staged / VPS on-disk)
+      2. Iceland VPS paid-asset HTTP store (:func:`vps_asset_url` + fetch token)
+      3. GitHub Releases API with :func:`github_auth_token` (private repos)
+      4. Direct release download URL with the same token (fallback)
 
     Returns dict with keys: filename, content_type, content_length (int|None),
     body (readable binary file-like or bytes), source (str). Caller must close
@@ -302,7 +351,7 @@ def open_release_asset(
         return None
     open_url = urlopen or urllib.request.urlopen
 
-    # 1) Local disk
+    # 1) Local disk (status assets, monorepo releases, VPS paid_assets when co-located)
     for base in asset_search_dirs():
         path = base / filename
         try:
@@ -318,10 +367,32 @@ def open_release_asset(
         except OSError:
             continue
 
+    # 2) Iceland VPS HTTP store (status on Render → fetch from product host)
+    vps_token = vps_asset_fetch_token()
+    if vps_token:
+        try:
+            vps_url = vps_asset_url(filename)
+            headers = {
+                "User-Agent": "restore-privacy-status-fulfilment",
+                "X-RPT-Asset-Token": vps_token,
+            }
+            req = urllib.request.Request(vps_url, headers=headers)
+            resp = open_url(req, timeout=120)
+            length = resp.headers.get("Content-Length")
+            return {
+                "filename": filename,
+                "content_type": content_type_for_filename(filename),
+                "content_length": int(length) if length and length.isdigit() else None,
+                "body": resp,
+                "source": "vps",
+            }
+        except (urllib.error.URLError, urllib.error.HTTPError, TimeoutError, OSError):
+            pass
+
     token = github_auth_token()
     from downloads import GITHUB_OWNER, GITHUB_REPO, RELEASE_TAG
 
-    # 2) GitHub API asset download (private-repo safe with token)
+    # 3) GitHub API asset download (private-repo safe with token)
     api_headers = {
         "Accept": "application/vnd.github+json",
         "User-Agent": "restore-privacy-status-fulfilment",
@@ -695,7 +766,11 @@ def check_fulfilment_ready() -> dict[str, Any]:
     return {
         "ok": False,
         "error": "no_asset_source",
-        "hint": "Set RPT_GITHUB_TOKEN or stage packages under status_page/assets/{version}/",
+        "hint": (
+            "Set RPT_ASSET_FETCH_TOKEN + host installers on Iceland VPS "
+            "(scripts/host_paid_assets_vps.py), or stage status_page/assets/{version}/, "
+            "or set RPT_GITHUB_TOKEN"
+        ),
     }
 
 
