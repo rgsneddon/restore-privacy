@@ -110,15 +110,75 @@ class TestSectionBProbes(unittest.TestCase):
         )
         self.assertFalse(bad["ok"])
 
-    def test_host_privacy_and_disk_and_ephemeral(self):
-        hp = probe_host_privacy_drift(install_root=ROOT)
-        self.assertIn("reasons", hp)
-        # Recipe exists in repo
-        self.assertTrue(
-            any("install_host_privacy" in str(x) for x in hp["reasons"])
-            or hp.get("ok")
-            or hp.get("skipped")
-        )
+    def test_host_privacy_unit_without_dropin_warns(self):
+        """Node unit present + missing 99-rpt-privacy.conf ⇒ WARN (not false PASS)."""
+        with tempfile.TemporaryDirectory() as td:
+            tdp = Path(td)
+            unit = tdp / "rpt-node.service"
+            unit.write_text(
+                "[Service]\nStandardOutput=null\nStandardError=null\n",
+                encoding="utf-8",
+            )
+            missing_dropin = tdp / "no-such-dropin.conf"
+            # Recipe may exist under ROOT — must not force PASS without drop-in
+            r = probe_host_privacy_drift(
+                install_root=tdp,
+                unit_path=unit,
+                journald_dropin=missing_dropin,
+                log_dirs=[tdp / "no-logs"],
+                recipe_paths=[ROOT / "node" / "install_host_privacy.sh"],
+            )
+            self.assertFalse(r.get("skipped"), msg=r)
+            self.assertTrue(r.get("warn"), msg=r)
+            self.assertFalse(r.get("ok"), msg=r)
+            self.assertFalse(r.get("dropin_present"))
+            self.assertTrue(r.get("unit_present"))
+            joined = " ".join(r.get("reasons") or [])
+            self.assertIn("drop-in", joined.lower())
+
+    def test_host_privacy_no_host_artifacts_skips(self):
+        """No unit/drop-in/log dirs ⇒ honest SKIP even if recipe exists in monorepo."""
+        with tempfile.TemporaryDirectory() as td:
+            tdp = Path(td)
+            r = probe_host_privacy_drift(
+                install_root=tdp,
+                unit_path=tdp / "missing.service",
+                journald_dropin=tdp / "missing.conf",
+                log_dirs=[tdp / "no-log-a", tdp / "no-log-b"],
+                recipe_paths=[ROOT / "node" / "install_host_privacy.sh"],
+            )
+            self.assertTrue(r.get("skipped"), msg=r)
+            self.assertTrue(r.get("ok"), msg=r)
+            self.assertFalse(r.get("warn"), msg=r)
+            self.assertIn("non-node host", " ".join(r.get("reasons") or []))
+
+    def test_host_privacy_dropin_and_unit_pass(self):
+        with tempfile.TemporaryDirectory() as td:
+            tdp = Path(td)
+            unit = tdp / "rpt-node.service"
+            unit.write_text(
+                "[Service]\nStandardOutput=null\nStandardError=null\n",
+                encoding="utf-8",
+            )
+            dropin = tdp / "99-rpt-privacy.conf"
+            dropin.write_text(
+                "[Journal]\nStorage=volatile\nRuntimeMaxUse=32M\n",
+                encoding="utf-8",
+            )
+            r = probe_host_privacy_drift(
+                install_root=tdp,
+                unit_path=unit,
+                journald_dropin=dropin,
+                log_dirs=[tdp / "absent-log"],
+                recipe_paths=[ROOT / "node" / "install_host_privacy.sh"],
+            )
+            self.assertFalse(r.get("skipped"), msg=r)
+            self.assertTrue(r.get("ok"), msg=r)
+            self.assertFalse(r.get("warn"), msg=r)
+            self.assertTrue(r.get("dropin_present"))
+            self.assertTrue(r.get("unit_present"))
+
+    def test_disk_and_ephemeral(self):
         disk = probe_disk_wipe_readiness(repo_root=ROOT, install_root=ROOT)
         self.assertTrue(
             any("no LUKS format" in str(x) for x in disk["reasons"])

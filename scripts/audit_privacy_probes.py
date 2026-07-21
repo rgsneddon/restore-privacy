@@ -273,8 +273,15 @@ def probe_host_privacy_drift(
     journald_dropin: Path | None = None,
     unit_path: Path | None = None,
     log_dirs: list[Path] | None = None,
+    recipe_paths: list[Path] | None = None,
 ) -> dict[str, Any]:
-    """Lightweight checks aligned with node/install_host_privacy.sh."""
+    """Lightweight checks aligned with node/install_host_privacy.sh.
+
+    Host artifacts = systemd unit and/or journald drop-in and/or leftover log dirs.
+    The install recipe file alone is **not** a host artifact: recipe present without
+    unit/drop-in ⇒ honest **SKIP** (developer laptop), not PASS.
+    On a node (unit present): missing ``99-rpt-privacy.conf`` is a **WARN**.
+    """
     reasons: list[str] = []
     warn = False
     install = install_root or DEFAULT_INSTALL_ROOT
@@ -289,9 +296,20 @@ def probe_host_privacy_drift(
         Path("/var/log/restore-privacy"),
     ]
 
-    present_any = False
-    if dropin.is_file():
-        present_any = True
+    unit_present = False
+    dropin_present = False
+    leftover_present = False
+
+    try:
+        unit_present = unit.is_file()
+    except OSError:
+        unit_present = False
+    try:
+        dropin_present = dropin.is_file()
+    except OSError:
+        dropin_present = False
+
+    if dropin_present:
         text = dropin.read_text(encoding="utf-8", errors="replace")
         if "RuntimeMaxUse" in text or "Storage=volatile" in text:
             reasons.append("journald drop-in present (short retention)")
@@ -304,36 +322,59 @@ def probe_host_privacy_drift(
     for d in leftovers:
         try:
             if d.exists():
-                present_any = True
+                leftover_present = True
                 reasons.append(f"leftover log dir exists: {d}")
                 warn = True
         except OSError:
             pass
 
-    if unit.is_file():
-        present_any = True
+    if unit_present:
         utext = unit.read_text(encoding="utf-8", errors="replace")
         if re.search(r"(?m)^StandardOutput=(journal|syslog|kmsg)\b", utext):
             reasons.append("unit logs to journal (host-privacy drift)")
             warn = True
         else:
             reasons.append("unit not logging StandardOutput to journal")
+        # Primary install_host_privacy.sh artifact missing while node unit exists
+        if not dropin_present:
+            reasons.append(
+                "WARN: node unit present but journald drop-in missing "
+                "(re-run install_host_privacy.sh)"
+            )
+            warn = True
+    else:
+        reasons.append("rpt-node.service unit not on this host")
 
-    # Recipe file exists in install or repo for operator drift docs
-    recipe_candidates = [
+    recipe_candidates = recipe_paths or [
         install / "node" / "install_host_privacy.sh",
         Path(__file__).resolve().parents[1] / "node" / "install_host_privacy.sh",
     ]
-    if any(p.is_file() for p in recipe_candidates):
-        reasons.append("install_host_privacy.sh recipe present")
+    recipe_present = any(p.is_file() for p in recipe_candidates)
+    if recipe_present:
+        reasons.append("install_host_privacy.sh recipe present in tree")
     else:
         reasons.append("install_host_privacy.sh recipe missing from tree")
-        warn = True
 
-    if not present_any and not any(p.is_file() for p in recipe_candidates):
-        return _status(ok=True, skipped=True, reasons=reasons + ["non-node host"])
-    # Recipe present alone is enough to not skip
-    return _status(ok=not warn, warn=warn, skipped=False, reasons=reasons)
+    host_artifacts = unit_present or dropin_present or leftover_present
+    if not host_artifacts:
+        # Developer / CI: no node install surface — honest skip (recipe alone ≠ pass)
+        return _status(
+            ok=True,
+            skipped=True,
+            warn=False,
+            reasons=reasons + ["non-node host (no unit/drop-in/log-dir artifacts)"],
+            unit_present=False,
+            dropin_present=False,
+        )
+
+    return _status(
+        ok=not warn,
+        warn=warn,
+        skipped=False,
+        reasons=reasons,
+        unit_present=unit_present,
+        dropin_present=dropin_present,
+    )
 
 
 def probe_disk_wipe_readiness(
