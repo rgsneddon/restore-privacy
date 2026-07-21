@@ -16,6 +16,14 @@ bool isConnectSuccess(dynamic result) {
   return true;
 }
 
+/// macOS: hide main window to menu-bar tray only after **product** full-tunnel success.
+///
+/// Must match [isConnectSuccess] — host-only HELLO / failed Packet Tunnel must not hide.
+bool shouldHideToTrayAfterConnect(dynamic result) => isConnectSuccess(result);
+
+/// Same gate when Flutter already reduced the channel map to a bool (e.g. `_vpn.connect()`).
+bool shouldHideToTrayAfterConnectSuccess(bool productConnectOk) => productConnectOk;
+
 /// Human-readable status from the method-channel map (never invent "Connected"
 /// for host-only HELLO or failed Packet Tunnel).
 String mapConnectStatusMessage(dynamic result) {

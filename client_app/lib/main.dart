@@ -5,6 +5,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'connect_status.dart';
 import 'connection_log.dart';
 import 'licence_gate.dart';
+import 'macos_window.dart';
 import 'prefs_backend.dart';
 import 'registration_copy.dart';
 import 'settings_screen.dart';
@@ -68,6 +69,7 @@ class TunnelHome extends StatefulWidget {
 
 class _TunnelHomeState extends State<TunnelHome> with WidgetsBindingObserver {
   late final VpnController _vpn;
+  final MacWindowController _macWindow = MacWindowController();
   SettingsStore? _store;
   LicenceGate? _licence;
   ProductSettings _settings = ProductSettings.defaults;
@@ -86,6 +88,16 @@ class _TunnelHomeState extends State<TunnelHome> with WidgetsBindingObserver {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     _vpn = VpnController(onStatus: _onStatus);
+    // macOS menu bar tray → Flutter Disconnect / Show
+    _macWindow.setHandlers(
+      onTrayDisconnect: () {
+        if (!_connected || _busy) return;
+        _onToggle();
+      },
+      onTrayShow: () {
+        // Native already orders the window front; keep Flutter mounted.
+      },
+    );
     WidgetsBinding.instance.addPostFrameCallback((_) async {
       await _initSettings();
       if (!mounted) return;
@@ -277,6 +289,12 @@ class _TunnelHomeState extends State<TunnelHome> with WidgetsBindingObserver {
       if (ok) {
         _append(_status);
         await _connLog(kLogKindConnect, 'Connected — residual path active');
+        // macOS: hide to menu-bar tray only after product full-tunnel success.
+        if (shouldHideToTrayAfterConnectSuccess(ok)) {
+          await _macWindow.setTrayConnected(true);
+          await _macWindow.hideToTray(connected: true);
+          _append('Window hidden to menu bar tray — restore via the RP tray icon.');
+        }
       } else {
         await _connLog(kLogKindError, 'Connect failed');
       }
@@ -359,6 +377,9 @@ class _TunnelHomeState extends State<TunnelHome> with WidgetsBindingObserver {
         });
         _append('Disconnected.');
         await _connLog(kLogKindDisconnect, 'Disconnected');
+        await _macWindow.setTrayConnected(false);
+        // Restore UI after explicit disconnect so status is visible.
+        await _macWindow.showFromTray();
       } finally {
         if (mounted) setState(() => _busy = false);
       }

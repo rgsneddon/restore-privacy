@@ -66,6 +66,9 @@ void main() {
       expect(map['hostOnlySession'], isFalse);
       expect(isConnectSuccess(map), isTrue);
       expect(mapConnectStatusMessage(map), contains('10.88.0.19'));
+      // macOS hide-to-tray only after product full-tunnel success
+      expect(shouldHideToTrayAfterConnect(map), isTrue);
+      expect(shouldHideToTrayAfterConnectSuccess(true), isTrue);
     });
 
     test('(c) NE start failed is ok:false with residual-IP honest message', () {
@@ -80,6 +83,19 @@ void main() {
       expect(msg, contains('System VPN (Packet Tunnel) did not become active'));
       expect(msg.toLowerCase(), contains('residual public ip'));
       expect(msg, contains('status 3'));
+      // Must NOT hide to tray on failed Packet Tunnel
+      expect(shouldHideToTrayAfterConnect(map), isFalse);
+      expect(shouldHideToTrayAfterConnectSuccess(false), isFalse);
+    });
+
+    test('host-only HELLO does not hide to tray', () {
+      final map = buildFullTunnelConnectResult(
+        packetTunnelActive: false,
+        vpnIp: '10.88.0.18',
+        hostOnlyHello: true,
+      );
+      expect(isConnectSuccess(map), isFalse);
+      expect(shouldHideToTrayAfterConnect(map), isFalse);
     });
 
     test('legacy hostOnlySession flag rejects ok:true maps', () {
