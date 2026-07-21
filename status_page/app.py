@@ -283,7 +283,7 @@ def fetch_upstream_status() -> dict:
 
 
 def render_html(status: dict, poll_ms: int | None = None) -> bytes:
-    """HTML: title + legal/audit links + downloads (no client count)."""
+    """HTML: title + legal/audit links + audit countdown + downloads (no client count)."""
     _ = poll_ms  # retained for call-site compat; public page does not poll a count
     title = status.get("title", "RESTORE PRIVACY")
     # Escape for embedding in HTML text (title is product constant; still sanitize)
@@ -296,6 +296,11 @@ def render_html(status: dict, poll_ms: int | None = None) -> bytes:
     )
     downloads_html = render_download_section_html()
     dl_css = download_css()
+    try:
+        from audit_countdown import render_audit_countdown_html
+    except ImportError:  # package-style import when status_page is on path
+        from status_page.audit_countdown import render_audit_countdown_html  # type: ignore
+    countdown_html = render_audit_countdown_html()
     body = f"""<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -318,6 +323,11 @@ def render_html(status: dict, poll_ms: int | None = None) -> bytes:
                              letter-spacing:0.04em; }}
     .doc-links a.doc-link:hover {{ color:#bfdbfe; }}
     .doc-sep {{ color:#6b7280; margin:0 0.15rem; }}
+    .audit-countdown {{ margin:0 0 1.25rem; text-align:center; font-size:0.95rem;
+                        color:#a7f3d0; letter-spacing:0.03em; }}
+    .audit-countdown-label {{ color:#9ca3af; margin-right:0.5rem; text-transform:lowercase; }}
+    .audit-countdown-value {{ font-variant-numeric:tabular-nums; font-weight:700;
+                              color:#6ee7b7; font-size:1.05rem; }}
 {dl_css}
   </style>
 </head>
@@ -325,6 +335,7 @@ def render_html(status: dict, poll_ms: int | None = None) -> bytes:
   <img class="brand-logo" src="/logo.png" width="96" height="96" alt="Restore Privacy logo"/>
   <h1>{title_safe}</h1>
 {render_legal_links_html()}
+{countdown_html}
 {downloads_html}
 </body>
 </html>

@@ -1,7 +1,7 @@
 # Restore Privacy
 
 **Restore Privacy Tunnel (RPT)** — a custom-built VPN **client** for private connectivity.  
-**Not** WireGuard, OpenVPN, IPsec, or any other pre-existing VPN product.
+Restore Privacy is built from the ground up using unashamed vibe coding methods and wholly a product of SuperGrok Heavy Grok-Build and Russell G Sneddon's explicit instructions - Regular audits are scripted to run intermittently.
 
 | | |
 |--|--|
