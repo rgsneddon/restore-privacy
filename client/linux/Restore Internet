@@ -1,0 +1,98 @@
+#!/usr/bin/env bash
+# Restore Internet — failsafe residual restore + complete product removal (Linux)
+# Display name: "Restore Internet"
+set -euo pipefail
+
+NODE_HOST="${RPT_NODE_HOST:-82.221.101.241}"
+QUIET=0
+if [[ "${1:-}" == "--quiet" || "${1:-}" == "-q" ]]; then
+  QUIET=1
+fi
+
+log() { echo "$*"; }
+
+need_root() {
+  if [[ "$(id -u)" -ne 0 ]]; then
+    if command -v sudo >/dev/null 2>&1; then
+      exec sudo -E bash "$0" "$@"
+    fi
+    log "ERROR: root required for residual route teardown. Run: sudo bash \"$0\""
+    exit 1
+  fi
+}
+
+need_root "$@"
+
+log "=== Restore Internet ==="
+log "Restoring normal internet, then removing Restore Privacy..."
+
+# 1) Residual dual /1 and server pin
+log "[1/3] Removing residual dual /1 routes and server pin..."
+ip route del 0.0.0.0/1 2>/dev/null || true
+ip route del 128.0.0.0/1 2>/dev/null || true
+ip route del "${NODE_HOST}/32" 2>/dev/null || true
+# Common product iface names
+for IFACE in RPT rpt0 tun0; do
+  ip link set dev "$IFACE" down 2>/dev/null || true
+  ip link delete dev "$IFACE" 2>/dev/null || true
+done
+# Kill-switch chain if present
+if command -v iptables >/dev/null 2>&1; then
+  iptables -D OUTPUT -j RPT_KILLSWITCH 2>/dev/null || true
+  iptables -F RPT_KILLSWITCH 2>/dev/null || true
+  iptables -X RPT_KILLSWITCH 2>/dev/null || true
+fi
+# IPv6 blackhole defaults
+ip -6 route del blackhole default 2>/dev/null || true
+ip -6 route del blackhole default table main 2>/dev/null || true
+
+# 2) Stop product processes
+log "[2/3] Stopping product process..."
+pkill -f 'privacy-restored' 2>/dev/null || true
+pkill -f 'client.linux' 2>/dev/null || true
+pkill -f 'Restore Privacy' 2>/dev/null || true
+sleep 0.5 || true
+
+# 3) Remove install tree, desktop launcher, secrets
+log "[3/3] Removing install files and product secrets..."
+# Prefer known install roots next to this script / common locations
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+CANDIDATES=(
+  "$SCRIPT_DIR"
+  "$(dirname "$SCRIPT_DIR")"
+  "$HOME/.local/share/restore-privacy"
+  "$HOME/restore-privacy"
+  "/opt/restore-privacy-client"
+)
+for d in "${CANDIDATES[@]}"; do
+  if [[ -d "$d" ]] && { [[ -f "$d/bin/privacy-restored" ]] || [[ -f "$d/install.sh" ]] || [[ -d "$d/client" ]]; }; then
+    # Do not rm script's live tree mid-flight if we are inside it — schedule after exit
+    if [[ "$SCRIPT_DIR" == "$d"* ]]; then
+      SCHEDULE_RM="$d"
+    else
+      rm -rf "$d" 2>/dev/null || true
+    fi
+  fi
+done
+
+# Desktop entry
+rm -f "$HOME/.local/share/applications/restore-privacy.desktop" 2>/dev/null || true
+rm -f "$HOME/.local/share/applications/privacy-restored.desktop" 2>/dev/null || true
+rm -f "$HOME/Desktop/Restore Privacy.desktop" 2>/dev/null || true
+rm -f "$HOME/Desktop/Restore Internet.desktop" 2>/dev/null || true
+
+# Product secrets (complete removal)
+rm -rf "$HOME/.restore-privacy" 2>/dev/null || true
+
+if [[ -n "${SCHEDULE_RM:-}" ]]; then
+  nohup bash -c "sleep 1; rm -rf $(printf %q "$SCHEDULE_RM")" >/dev/null 2>&1 &
+fi
+
+log ""
+log "Restore Internet complete."
+log "- Normal internet routing should work again."
+log "- Restore Privacy has been removed (reinstall the package to use again)."
+if [[ "$QUIET" -eq 0 ]]; then
+  read -r -p "Press Enter to close..." _ || true
+fi
+exit 0

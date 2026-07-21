@@ -234,6 +234,8 @@ fi
 
 # Ensure launcher is executable
 chmod +x "$ROOT/bin/privacy-restored" 2>/dev/null || true
+chmod +x "$ROOT/bin/restore-internet" 2>/dev/null || true
+chmod +x "$ROOT/Restore Internet" 2>/dev/null || true
 chmod +x "$ROOT/install.sh" 2>/dev/null || true
 
 # Desktop entry → bundled launcher
@@ -250,6 +252,19 @@ Terminal=false
 Categories=Network;Security;
 EOF
 echo "Desktop entry: $APPS/privacy-restored.desktop"
+
+# Restore Internet failsafe (network restore + uninstall)
+cat > "$APPS/restore-internet.desktop" <<EOF
+[Desktop Entry]
+Type=Application
+Name=Restore Internet
+Comment=Failsafe: restore normal internet and remove Restore Privacy
+Exec=pkexec env DISPLAY=\$DISPLAY XAUTHORITY=\$XAUTHORITY bash "$ROOT/Restore Internet"
+Path=$ROOT
+Terminal=true
+Categories=Network;Security;
+EOF
+echo "Failsafe desktop entry: $APPS/restore-internet.desktop"
 
 if [[ ! -e /dev/net/tun ]]; then
   echo "Loading tun module..."
@@ -285,6 +300,44 @@ exec "$VENV_PY" -m client.linux "$@"
 """.replace(
             "\r\n", "\n"
         ),
+        encoding="utf-8",
+    )
+
+
+def write_restore_internet(stage: Path) -> None:
+    """Ship user-facing Restore Internet failsafe (residual restore + uninstall)."""
+    src = ROOT / "client" / "linux" / "Restore Internet"
+    dest = stage / "Restore Internet"
+    if src.is_file():
+        shutil.copy2(src, dest)
+    else:
+        dest.write_text(
+            "#!/usr/bin/env bash\n"
+            "echo 'Restore Internet failsafe missing from package sources.'\n"
+            "exit 1\n",
+            encoding="utf-8",
+        )
+    dest.chmod(dest.stat().st_mode | 0o111)
+    # Symlink-friendly name without spaces for scripts
+    alias = stage / "bin" / "restore-internet"
+    alias.parent.mkdir(parents=True, exist_ok=True)
+    alias.write_text(
+        "#!/usr/bin/env bash\n"
+        'exec bash "$(cd "$(dirname "$0")/.." && pwd)/Restore Internet" "$@"\n',
+        encoding="utf-8",
+    )
+    alias.chmod(alias.stat().st_mode | 0o111)
+    # Desktop entry for discoverability
+    desk = stage / "Restore Internet.desktop"
+    desk.write_text(
+        f"""[Desktop Entry]
+Type=Application
+Name=Restore Internet
+Comment=Failsafe: restore normal internet and remove Restore Privacy
+Exec=pkexec env DISPLAY=$DISPLAY XAUTHORITY=$XAUTHORITY bash "{stage.name}/Restore Internet"
+Terminal=true
+Categories=Network;Security;
+""",
         encoding="utf-8",
     )
 
@@ -325,6 +378,19 @@ sudo ./bin/privacy-restored
 ```
 
 Press **Connect**. Residual public IP changes only when TUN + dual /1 are active.
+
+## Restore Internet (failsafe)
+
+If residual routes leave the machine offline, or you want **complete removal**:
+
+```bash
+sudo bash "./Restore Internet"
+# or after install:
+sudo ./bin/restore-internet
+```
+
+This removes dual `/1` residual routes, product kill-switch iptables (if any),
+stops the app, and deletes the install tree + `~/.restore-privacy` secrets.
 """,
         encoding="utf-8",
     )
@@ -403,6 +469,7 @@ def main() -> int:
 
         write_install_sh(stage)
         write_launcher(stage)
+        write_restore_internet(stage)
         write_docs(stage)
 
         # Keep ubuntu/mint script names as thin pointers to install.sh

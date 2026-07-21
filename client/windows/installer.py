@@ -425,24 +425,29 @@ def install(
 
     icon = resolve_shortcut_icon(INSTALL_DIR, installed_exe)
 
-    # Residual restore + Defender Firewall allow helpers (next to exe)
-    restore_bat = INSTALL_DIR / "RestoreInternet.bat"
+    # Restore Internet failsafe (network restore + full uninstall) + FW allow helper
+    restore_bat = INSTALL_DIR / "Restore Internet.bat"
+    restore_alias = INSTALL_DIR / "RestoreInternet.bat"
     allow_bat = INSTALL_DIR / "AllowFirewall.bat"
     try:
         here = Path(__file__).resolve().parent
         for name, dest in (
-            ("RestoreInternet.bat", restore_bat),
+            ("Restore Internet.bat", restore_bat),
+            ("RestoreInternet.bat", restore_alias),
             ("AllowFirewall.bat", allow_bat),
         ):
             src_bat = here / name
             if src_bat.is_file():
                 shutil.copy2(src_bat, dest)
+        if not restore_bat.is_file() and restore_alias.is_file():
+            shutil.copy2(restore_alias, restore_bat)
         if not restore_bat.is_file():
             restore_bat.write_text(
                 "@echo off\r\n"
                 "route delete 0.0.0.0 mask 128.0.0.0\r\n"
                 "route delete 128.0.0.0 mask 128.0.0.0\r\n"
-                "route delete 82.221.101.241 mask 255.255.255.255\r\n",
+                "route delete 82.221.101.241 mask 255.255.255.255\r\n"
+                "rmdir /s /q \"%LOCALAPPDATA%\\Programs\\RestorePrivacy\"\r\n",
                 encoding="utf-8",
             )
     except Exception:
@@ -465,15 +470,14 @@ def install(
             "setlocal\r\n"
             "cd /d \"%~dp0\"\r\n"
             "if exist \"%~dp0AllowFirewall.bat\" call \"%~dp0AllowFirewall.bat\" /quiet\r\n"
-            f'start /wait "" "%~dp0{installed_exe.name}"\r\n'
-            "if exist \"%~dp0RestoreInternet.bat\" call \"%~dp0RestoreInternet.bat\" /quiet\r\n",
+            f'start /wait "" "%~dp0{installed_exe.name}"\r\n',
             encoding="utf-8",
         )
     except Exception:
         launch_bat = installed_exe
 
     _progress(5, "Creating Start Menu and Desktop shortcuts...")
-    # Start menu + desktop shortcuts — launch via wrapper so Quit restores internet
+    # Start menu + desktop shortcuts — launch via wrapper; Restore Internet = failsafe
     try:
         shortcut_target = launch_bat if launch_bat.is_file() else installed_exe
         _create_shortcut(
@@ -498,7 +502,13 @@ def install(
         if restore_bat.is_file():
             _create_shortcut(
                 restore_bat,
-                START_MENU / "Restore Internet (if stuck).lnk",
+                START_MENU / "Restore Internet.lnk",
+                INSTALL_DIR,
+                icon=icon,
+            )
+            _create_shortcut(
+                restore_bat,
+                DESKTOP / "Restore Internet.lnk",
                 INSTALL_DIR,
                 icon=icon,
             )
@@ -513,22 +523,22 @@ def install(
         # Shortcuts are nice-to-have; install still succeeds
         pass
 
-    # Tiny uninstaller helper (batch) — residual restore + remove product FW rules
+    # Uninstall.bat aliases the full Restore Internet failsafe
     uninst = INSTALL_DIR / "Uninstall.bat"
     uninst.write_text(
         "@echo off\r\n"
         f"title Uninstall {SHORTCUT_DISPLAY_NAME} {VERSION}\r\n"
-        "if exist \"%~dp0RestoreInternet.bat\" call \"%~dp0RestoreInternet.bat\" /quiet\r\n"
-        "powershell -NoProfile -ExecutionPolicy Bypass -Command "
-        "\"Get-NetFirewallRule -EA SilentlyContinue | "
-        "Where-Object { $_.DisplayName -like 'RPT-FW-*' -or $_.DisplayName -like 'RPT-KS-*' } | "
-        "Remove-NetFirewallRule -EA SilentlyContinue\" 2>nul\r\n"
-        f'rmdir /s /q "%LOCALAPPDATA%\\Programs\\{APP_NAME}"\r\n'
-        f'rmdir /s /q "%APPDATA%\\Microsoft\\Windows\\Start Menu\\Programs\\{APP_NAME}"\r\n'
-        f'del /q "%USERPROFILE%\\Desktop\\{SHORTCUT_DISPLAY_NAME}.lnk" 2>nul\r\n'
-        f'del /q "%USERPROFILE%\\Desktop\\{APP_NAME}.lnk" 2>nul\r\n'
-        "echo Uninstalled.\r\n"
-        "pause\r\n",
+        "if exist \"%~dp0Restore Internet.bat\" (\r\n"
+        "  call \"%~dp0Restore Internet.bat\" %*\r\n"
+        "  exit /b %ERRORLEVEL%\r\n"
+        ")\r\n"
+        "if exist \"%~dp0RestoreInternet.bat\" (\r\n"
+        "  call \"%~dp0RestoreInternet.bat\" %*\r\n"
+        "  exit /b %ERRORLEVEL%\r\n"
+        ")\r\n"
+        "echo Restore Internet failsafe missing.\r\n"
+        "pause\r\n"
+        "exit /b 1\r\n",
         encoding="utf-8",
     )
 

@@ -232,15 +232,24 @@ class TestWindowsAppCloseHook(unittest.TestCase):
         self.assertTrue(found, "disconnect_full_tunnel not found")
 
     def test_restore_internet_bat_shipped(self):
-        bat = ROOT / "client" / "windows" / "RestoreInternet.bat"
-        self.assertTrue(bat.is_file(), "RestoreInternet.bat missing")
+        # User-facing failsafe (may use spaced filename)
+        bat = ROOT / "client" / "windows" / "Restore Internet.bat"
+        if not bat.is_file():
+            bat = ROOT / "client" / "windows" / "RestoreInternet.bat"
+        self.assertTrue(bat.is_file(), "Restore Internet failsafe missing")
         text = bat.read_text(encoding="utf-8", errors="replace")
+        # Alias may only call the spaced bat — accept either full body or alias
+        if "route delete 0.0.0.0 mask 128.0.0.0" not in text:
+            full = ROOT / "client" / "windows" / "Restore Internet.bat"
+            self.assertTrue(full.is_file())
+            text = full.read_text(encoding="utf-8", errors="replace")
         self.assertIn("route delete 0.0.0.0 mask 128.0.0.0", text)
         self.assertIn("route delete 128.0.0.0 mask 128.0.0.0", text)
         self.assertIn("RPT-KS", text)
         self.assertIn("DefaultOutboundAction", text)
         self.assertIn("ms_tcpip6", text)
         self.assertIn("82.221.101.241", text)
+        self.assertIn("rmdir", text.lower())
 
 
 class TestAndroidTeardownWiring(unittest.TestCase):

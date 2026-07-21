@@ -1,0 +1,17 @@
+Restore Internet — failsafe (Android)
+=====================================
+
+If residual VPN is stuck or you want complete removal:
+
+1. Open the system VPN / notification shade and **Disconnect** any active
+   Restore Privacy / Privacy Restored VPN session.
+2. Settings → Network & internet → VPN → remove Restore Privacy if listed.
+3. Settings → Apps → Restore Privacy → Uninstall
+   (or long-press the app icon → Uninstall).
+4. Optional: clear app storage before uninstall if the option is shown.
+
+After uninstall, ordinary mobile/Wi‑Fi internet is restored and the product
+is removed from the device.
+
+Reinstall: download the current APK from https://restoreprivacy.online/ after
+payment.

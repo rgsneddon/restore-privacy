@@ -1,0 +1,18 @@
+Restore Internet — failsafe (iOS)
+=================================
+
+iOS does not allow a third-party app package to fully uninstall itself or clear
+all VPN configuration without user action in Settings. Use these steps:
+
+1. Open Settings → VPN (or General → VPN & Device Management).
+2. Disconnect and delete any VPN configuration named Restore Privacy /
+   restore_privacy_client / Packet Tunnel.
+3. Delete the Restore Privacy / Runner app from the Home Screen
+   (long-press → Remove App → Delete App).
+4. Optional: reboot the device.
+
+After these steps, residual traffic uses the carrier/Wi‑Fi path again and the
+product is removed from the device.
+
+Reinstall: pay for the iOS package on https://restoreprivacy.online/ and
+sideload Runner.app again.
