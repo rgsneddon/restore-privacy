@@ -30,10 +30,10 @@ from downloads import (  # noqa: E402
 )
 
 EXPECTED_RELEASE_PAGE = (
-    "https://github.com/rgsneddon/restore-privacy/releases/tag/0.3.0"
+    "https://github.com/rgsneddon/restore-privacy/releases/tag/0.3.1"
 )
 EXPECTED_DOWNLOAD_PREFIX = (
-    "https://github.com/rgsneddon/restore-privacy/releases/download/0.3.0/"
+    "https://github.com/rgsneddon/restore-privacy/releases/download/0.3.1/"
 )
 # Public footer points at the paid status host (repo is private).
 EXPECTED_PUBLIC_CATALOG_FOOTER = (
@@ -49,8 +49,8 @@ class TestDownloadCatalog(unittest.TestCase):
             is_current_catalog_filename,
         )
 
-        self.assertEqual(RELEASE_VERSION, "0.3.0")
-        self.assertEqual(RELEASE_TAG, "0.3.0")
+        self.assertEqual(RELEASE_VERSION, "0.3.1")
+        self.assertEqual(RELEASE_TAG, "0.3.1")
         self.assertEqual(current_catalog_version(), RELEASE_VERSION)
         self.assertTrue(catalog_matches_product_pin())
         self.assertEqual(GITHUB_REPO, "restore-privacy")
@@ -94,7 +94,7 @@ class TestDownloadCatalog(unittest.TestCase):
         self.assertIn(BMC_TIP_URL, html)
         self.assertIn("Pay £2.45", html)
         # Free permanent GitHub installer hrefs must not appear in public HTML.
-        self.assertNotIn("releases/download/0.3.0/", html)
+        self.assertNotIn("releases/download/0.3.1/", html)
         # FULL CATALOGUE / catalog footer link must not be visible on public downloads.
         self.assertNotIn('id="rust-repo-link"', html)
         self.assertNotIn("rust-repo-footer", html)

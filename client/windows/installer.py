@@ -17,7 +17,7 @@ from collections.abc import Callable
 from pathlib import Path
 
 APP_NAME = "RestorePrivacy"
-VERSION = "0.3.0"
+VERSION = "0.3.1"
 # User-facing shortcut / tray product name (logo icon on Start Menu + Desktop)
 SHORTCUT_DISPLAY_NAME = "Privacy Restored"
 # Install under LocalAppData so no elevation is required for deploy.
@@ -59,7 +59,7 @@ def _payload_root() -> Path:
         if d.is_dir():
             return d
     raise FileNotFoundError(
-        "Client payload not found. Build with scripts/build_release_0.3.0.py first."
+        "Client payload not found. Build with scripts/build_release_0.3.1.py first."
     )
 
 

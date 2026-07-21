@@ -45,7 +45,7 @@ class TestPublicPageWithDownloads(unittest.TestCase):
         self.assertNotIn('id="clients-connected"', html)
         self.assertNotIn("fetch('/api/status'", html)
         self.assertNotIn("setInterval(poll", html)
-        self.assertIn("Download client v0.3.0", html)
+        self.assertIn("Download client v0.3.1", html)
         self.assertIn(WINDOWS_ZIP_FILENAME, html)
         self.assertIn(MACOS_ZIP_FILENAME, html)
         self.assertIn(IOS_ZIP_FILENAME, html)
@@ -57,12 +57,12 @@ class TestPublicPageWithDownloads(unittest.TestCase):
             self.assertNotIn(f'href="{a.url}"', html)
             self.assertTrue(
                 a.url.startswith(
-                    "https://github.com/rgsneddon/restore-privacy/releases/download/0.3.0/"
+                    "https://github.com/rgsneddon/restore-privacy/releases/download/0.3.1/"
                 )
             )
         self.assertEqual(
             RELEASE_PAGE_URL,
-            "https://github.com/rgsneddon/restore-privacy/releases/tag/0.3.0",
+            "https://github.com/rgsneddon/restore-privacy/releases/tag/0.3.1",
         )
         # Catalogue footer link removed — pay buttons are the only catalog entry.
         self.assertNotIn('id="rust-repo-link"', html)
@@ -100,7 +100,7 @@ class TestPublicPageWithDownloads(unittest.TestCase):
                     self.assertNotIn("BETA - test phase", html)
                     self.assertNotIn("clients-connected", html)
                     self.assertNotIn("fetch('/api/status'", html)
-                    self.assertIn("Download client v0.3.0", html)
+                    self.assertIn("Download client v0.3.1", html)
                     self.assertIn(WINDOWS_ZIP_FILENAME, html)
                     self.assertIn("donate.stripe.com", html)
                     self.assertIn("client_reference_id=windows", html)
