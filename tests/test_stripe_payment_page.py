@@ -122,13 +122,24 @@ class TestPaymentPageInAdminHtml(unittest.TestCase):
         self.assertNotIn("sk_test_MUST_NOT_APPEAR", html2)
         self.assertNotIn("whsec_", html2)
 
-    def test_public_footer_has_payment_page_link(self):
-        from downloads import render_rust_footer_html
+    def test_public_footer_omits_generic_payment_page_link(self):
+        """Footer must not show a bottom “Stripe payment page” link."""
+        from downloads import render_download_section_html, render_rust_footer_html
 
         foot = render_rust_footer_html()
-        self.assertIn("stripe-payment-page-link", foot)
-        self.assertIn(OPERATOR_PAYMENT_PAGE, foot)
+        self.assertNotIn("stripe-payment-page-link", foot)
+        self.assertNotIn(">Stripe payment page<", foot)
         self.assertNotIn("/admin/processors/apply", foot)
+        # Tip / how-to-buy remain
+        self.assertIn("how-to-buy-footer-link", foot)
+        self.assertIn("bmc-tip-link", foot)
+        # Platform pay buttons still use the Payment Link
+        html = render_download_section_html()
+        self.assertNotIn('id="stripe-payment-page-link"', html)
+        self.assertNotIn(">Stripe payment page<", html)
+        self.assertIn("Pay £2.45", html)
+        self.assertIn(f"client_reference_id=windows", html)
+        self.assertIn(OPERATOR_PAYMENT_PAGE, html)
 
 
 if __name__ == "__main__":

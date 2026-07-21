@@ -124,6 +124,9 @@ class TestDownloadCatalog(unittest.TestCase):
         self.assertIn('id="dl-windows"', html)
         self.assertIn("client_reference_id=windows", html)
         self.assertIn("donate.stripe.com", html)
+        # No bottom generic “Stripe payment page” footer link
+        self.assertNotIn('id="stripe-payment-page-link"', html)
+        self.assertNotIn(">Stripe payment page<", html)
 
     def test_status_page_html_includes_paid_downloads(self):
         page = status_app.render_html({"title": "RESTORE PRIVACY"}).decode("utf-8")
