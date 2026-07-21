@@ -1,8 +1,11 @@
-"""Release download catalog + paid download UI (version 1.0.0).
+"""Release download catalog + paid download UI (version 0.2.3).
 
 Primary path: pay **£2.45** (GBP) via Stripe Checkout per package, then a
 single-use download token. Free permanent GitHub ``href`` is not used on the
 public buttons. Buy Me a Coffee is tip/support only.
+
+Current public packages: restore-privacy GitHub Release **0.2.3**
+(macOS Developer ID notarized; iOS Team-signed sideload).
 """
 
 from __future__ import annotations
@@ -12,10 +15,10 @@ from typing import Iterable
 
 from coffee_link import COFFEE_LINK_URL
 
-RELEASE_VERSION = "1.0.0"
+RELEASE_VERSION = "0.2.3"
 GITHUB_OWNER = "rgsneddon"
-GITHUB_REPO = "RUST-IN-PRIVACY"
-RELEASE_TAG = "v1.0.0"
+GITHUB_REPO = "restore-privacy"
+RELEASE_TAG = "0.2.3"
 RELEASE_PAGE_URL = (
     f"https://github.com/{GITHUB_OWNER}/{GITHUB_REPO}/releases/tag/{RELEASE_TAG}"
 )
@@ -23,12 +26,12 @@ RELEASE_DOWNLOAD_BASE = (
     f"https://github.com/{GITHUB_OWNER}/{GITHUB_REPO}/releases/download/{RELEASE_TAG}"
 )
 
-# Canonical public asset filenames (must match GitHub Release assets).
-WINDOWS_ZIP_FILENAME = f"restore-privacy-rust-{RELEASE_VERSION}-windows-x64.zip"
-LINUX_TGZ_FILENAME = f"restore-privacy-rust-{RELEASE_VERSION}-linux-x64.tar.gz"
-MACOS_ZIP_FILENAME = f"restore-privacy-rust-{RELEASE_VERSION}-macos.zip"
-IOS_ZIP_FILENAME = f"restore-privacy-rust-{RELEASE_VERSION}-ios.zip"
-ANDROID_APK_FILENAME = f"restore-privacy-rust-{RELEASE_VERSION}-android.apk"
+# Canonical public asset filenames (must match GitHub Release 0.2.3 assets).
+WINDOWS_EXE_FILENAME = f"restore-privacy-client-{RELEASE_VERSION}-windows-x64-setup.exe"
+ANDROID_APK_FILENAME = f"restore-privacy-client-{RELEASE_VERSION}-android.apk"
+MACOS_ZIP_FILENAME = f"restore-privacy-client-{RELEASE_VERSION}-macos.zip"
+IOS_ZIP_FILENAME = f"restore-privacy-client-{RELEASE_VERSION}-ios.zip"
+LINUX_TGZ_FILENAME = f"restore-privacy-client-{RELEASE_VERSION}-linux-x64.tar.gz"
 
 PRICE_LABEL = "£2.45"
 BMC_TIP_URL = COFFEE_LINK_URL  # https://buymeacoffee.com/rgsneddon
@@ -54,28 +57,28 @@ class DownloadAsset:
 RELEASE_ASSETS: tuple[DownloadAsset, ...] = (
     DownloadAsset(
         platform="windows",
-        label="Windows (x64) - Client/Node (.zip)",
-        filename=WINDOWS_ZIP_FILENAME,
-    ),
-    DownloadAsset(
-        platform="linux",
-        label="Linux (x64) - Installer (.tar.gz)",
-        filename=LINUX_TGZ_FILENAME,
-    ),
-    DownloadAsset(
-        platform="macos",
-        label="macOS - Client (.zip)",
-        filename=MACOS_ZIP_FILENAME,
-    ),
-    DownloadAsset(
-        platform="ios",
-        label="iOS - Client (.zip)",
-        filename=IOS_ZIP_FILENAME,
+        label="Windows (x64) - Installer (.exe)",
+        filename=WINDOWS_EXE_FILENAME,
     ),
     DownloadAsset(
         platform="android",
         label="Android - APK installer",
         filename=ANDROID_APK_FILENAME,
+    ),
+    DownloadAsset(
+        platform="macos",
+        label="macOS - App package (.zip, Developer ID + notarized)",
+        filename=MACOS_ZIP_FILENAME,
+    ),
+    DownloadAsset(
+        platform="ios",
+        label="iOS - App package (.zip, Team-signed sideload)",
+        filename=IOS_ZIP_FILENAME,
+    ),
+    DownloadAsset(
+        platform="linux",
+        label="Linux (x64) - Installer (.tar.gz)",
+        filename=LINUX_TGZ_FILENAME,
     ),
 )
 
@@ -104,9 +107,13 @@ def available_downloads(
     return out
 
 
-# Footer: explicit link to the public v1.0.0 release page (package source of truth).
+# Footer: explicit link to the public 0.2.3 release page (package source of truth).
 RUST_REPO_URL = RELEASE_PAGE_URL
-RUST_REPO_LABEL = "Package source - RUST-IN-PRIVACY v1.0.0 release"
+RUST_REPO_LABEL = "Package source - restore-privacy 0.2.3 release (signed)"
+
+
+# Compatibility aliases used by older tests (map to 0.2.3 installers).
+WINDOWS_ZIP_FILENAME = WINDOWS_EXE_FILENAME
 
 
 def download_css() -> str:
@@ -171,7 +178,7 @@ def render_download_section_html(assets: Iterable[DownloadAsset] | None = None) 
   <section class="downloads" id="downloads" aria-label="Download Restore Privacy client">
     <h2>Download client v{RELEASE_VERSION}</h2>
     <p class="dl-sub">Windows | Linux | macOS | iOS | Android - packages from
-      <a class="rust-link" href="{RELEASE_PAGE_URL}" rel="noopener noreferrer" target="_blank">v1.0.0 release</a></p>
+      <a class="rust-link" href="{RELEASE_PAGE_URL}" rel="noopener noreferrer" target="_blank">0.2.3 release</a></p>
     <p class="dl-price" id="dl-price">{PRICE_LABEL} GBP per package download (Stripe Checkout)</p>
     <div class="dl-buttons">
 {links_html}

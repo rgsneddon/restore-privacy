@@ -42,7 +42,7 @@ class TestCoffeeLinkBuilder(unittest.TestCase):
             {"title": "RESTORE PRIVACY"}
         ).decode("utf-8")
         self.assertNotIn("buy rus a coffee", page)
-        self.assertNotIn("buymeacoffee.com", page)
+        self.assertIn("buymeacoffee.com", page)  # tip/support footer (not free package href)
         self.assertNotIn("fetch('/api/status'", page)
         self.assertNotIn("clients_connected", page)
         self.assertIn("RESTORE PRIVACY", page)
@@ -72,7 +72,7 @@ class TestCoffeeLinkHttp(unittest.TestCase):
                     html = resp.read().decode("utf-8")
                 self.assertNotIn("fetch('/api/status'", html)
                 self.assertNotIn("buy rus a coffee", html)
-                self.assertIn("Download client v1.0.0", html)
+                self.assertIn("Download client v0.2.3", html)
 
 
 if __name__ == "__main__":

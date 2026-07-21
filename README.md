@@ -5,7 +5,7 @@
 
 | | |
 |--|--|
-| **Get the app** | [Public v1.0.0 (RUST-IN-PRIVACY)](https://github.com/rgsneddon/RUST-IN-PRIVACY/releases/tag/v1.0.0) · [Status & downloads](https://restore-privacy-status.onrender.com/) · [legacy private 0.2.3](https://github.com/rgsneddon/restore-privacy/releases/tag/0.2.3) |
+| **Get the app** | [Download v0.2.3](https://github.com/rgsneddon/restore-privacy/releases/tag/0.2.3) · [Status & downloads](https://restore-privacy-status.onrender.com/) |
 | **Privacy** | [PRIVACY_POLICY.md](PRIVACY_POLICY.md) |
 | **License** | [LICENSE](LICENSE) (MIT) |
 | **Credits** | [CREDITS.md](CREDITS.md) |
@@ -39,59 +39,65 @@
 
 ## How to install and use
 
-**Product downloads (v1.0.0):** [RUST-IN-PRIVACY release](https://github.com/rgsneddon/RUST-IN-PRIVACY/releases/tag/v1.0.0)  
+**Current public packages (v0.2.3):** [GitHub Release 0.2.3](https://github.com/rgsneddon/restore-privacy/releases/tag/0.2.3)  
 or the buttons on https://restore-privacy-status.onrender.com/
 
-| Platform | Package (public) |
-|----------|------------------|
-| Windows | `restore-privacy-rust-1.0.0-windows-x64.zip` |
-| Android | [`restore-privacy-rust-1.0.0-android.apk`](https://github.com/rgsneddon/RUST-IN-PRIVACY/releases/download/v1.0.0/restore-privacy-rust-1.0.0-android.apk) |
-| macOS | `restore-privacy-rust-1.0.0-macos.zip` |
-| iOS | `restore-privacy-rust-1.0.0-ios.zip` |
-| Ubuntu / Linux | `restore-privacy-rust-1.0.0-linux-x64.tar.gz` |
-
-Legacy private-repo installers (**0.2.3**, macOS Developer ID notarized / iOS Team-signed) remain under the [restore-privacy 0.2.3](https://github.com/rgsneddon/restore-privacy/releases/tag/0.2.3) release for historical builds.
+| Platform | Package |
+|----------|---------|
+| Windows | `restore-privacy-client-0.2.3-windows-x64-setup.exe` |
+| Android | `restore-privacy-client-0.2.3-android.apk` |
+| macOS | `restore-privacy-client-0.2.3-macos.zip` *(Developer ID signed + notarized)* |
+| iOS | `restore-privacy-client-0.2.3-ios.zip` *(Team-signed sideload)* |
+| Ubuntu / Linux | `restore-privacy-client-0.2.3-linux-x64.tar.gz` |
 
 ### Windows
 
-1. Download **`restore-privacy-rust-1.0.0-windows-x64.zip`** from the [v1.0.0 release](https://github.com/rgsneddon/RUST-IN-PRIVACY/releases/download/v1.0.0/restore-privacy-rust-1.0.0-windows-x64.zip) or status page.
-2. Unpack and run **`rpt-client.exe`** (product HELLO / residual CLI path ships with **`rpt-node.exe`** for lab self-host).  
-   *Legacy full GUI installer (`restore-privacy-client-0.2.3-windows-x64-setup.exe`) remains on private tags only — not the public catalog.*
-3. Connect to **`82.221.101.241:44044`**. For residual public IP change, use an OS VPN path where available and approve elevation/UAC when prompted.
-4. Optional (Flutter residual builds): **Settings** → startup / autoconnect (defaults **off**); legal links to audit / privacy / licence.
+1. Download **`restore-privacy-client-0.2.3-windows-x64-setup.exe`** from the [0.2.3 release](https://github.com/rgsneddon/restore-privacy/releases/tag/0.2.3) or status page.
+2. Run the installer (bundled runtime + Wintun — no separate Python install).
+3. Press **Connect** and approve **UAC** when prompted so residual public IP uses the VPN node.
+4. Optional: **Settings** → startup / autoconnect (defaults **off**); legal links to audit / privacy / licence.
 
 ### Android
 
-1. Download **`restore-privacy-rust-1.0.0-android.apk`** from the [v1.0.0 release](https://github.com/rgsneddon/RUST-IN-PRIVACY/releases/download/v1.0.0/restore-privacy-rust-1.0.0-android.apk) or status page.
+1. Download **`restore-privacy-client-0.2.3-android.apk`** from the [0.2.3 release](https://github.com/rgsneddon/restore-privacy/releases/tag/0.2.3) or status page.
 2. Install the APK (allow install from unknown sources if your device asks).
 3. Open **Restore Privacy**, press **Connect**, and grant **VPN** permission when prompted.
-4. Optional: **Settings** → startup / autoconnect (defaults off); open audit / privacy / licence links. Minimize keeps the VPN service running until **Disconnect**.
+4. Optional: **Settings** → startup / autoconnect (defaults off). Minimize keeps the VPN service running until **Disconnect**.
 
 ### Ubuntu and derivatives (Linux Mint, Pop!_OS, …)
 
-1. Download **`restore-privacy-rust-1.0.0-linux-x64.tar.gz`** from the [v1.0.0 release](https://github.com/rgsneddon/RUST-IN-PRIVACY/releases/download/v1.0.0/restore-privacy-rust-1.0.0-linux-x64.tar.gz) or status page.
-2. Unpack and follow **`install.sh`** (builds/installs Rust `rpt-client` / `rpt-node` where tooling allows):
+1. Download **`restore-privacy-client-0.2.3-linux-x64.tar.gz`** from the [0.2.3 release](https://github.com/rgsneddon/restore-privacy/releases/tag/0.2.3) or status page.
+2. Unpack and run the bundled installer:
    ```bash
-   tar xzf restore-privacy-rust-1.0.0-linux-x64.tar.gz
-   cd restore-privacy-rust-1.0.0-linux   # directory name as packaged
+   tar xzf restore-privacy-client-0.2.3-linux-x64.tar.gz
+   cd restore-privacy-0.2.3-linux
    bash install.sh
    ```
-3. Run **`rpt-client --host 82.221.101.241 --port 44044`** for product HELLO. Residual full-tunnel IP change needs root + TUN/`ip` when using a full residual path.
-4. *Legacy private GUI tarball (`restore-privacy-client-0.2.3-linux-x64.tar.gz`) is historical only.*
+3. Run **`sudo ./bin/privacy-restored`** for residual public IP (TUN + dual `/1` routes).
 
-### macOS / iOS
+### macOS
 
-1. Download **`restore-privacy-rust-1.0.0-macos.zip`** or **`restore-privacy-rust-1.0.0-ios.zip`** from the [v1.0.0 release](https://github.com/rgsneddon/RUST-IN-PRIVACY/releases/tag/v1.0.0).
-2. Residual public IP changes only when **Packet Tunnel / Network Extension** is **connected** (signed app path). Host-side HELLO alone is **diagnostic**.
-3. Rebuild / resign notes: public host docs [`docs/APPLE_BUILD.md`](https://github.com/rgsneddon/RUST-IN-PRIVACY/blob/main/docs/APPLE_BUILD.md) · [`docs/APPLE_HANDOFF_1.0.0.md`](https://github.com/rgsneddon/RUST-IN-PRIVACY/blob/main/docs/APPLE_HANDOFF_1.0.0.md). Private tree: `client_app/` + handoff notes.
-4. Packages ship **`node_elgamal.pub` only**. Each install generates its own Ed25519 device key. **Never** ship `node_elgamal.priv` or a shared `client_ed25519.priv`.
+Published **0.2.3** macOS builds are **Developer ID signed and notarized**.
+
+1. Download **`restore-privacy-client-0.2.3-macos.zip`** from the [0.2.3 release](https://github.com/rgsneddon/restore-privacy/releases/tag/0.2.3) or status page.
+2. Unzip and open **`restore_privacy_client.app`**.
+3. Press **Connect** and approve the **VPN configuration** prompt.
+4. Residual public IP only changes when the Packet Tunnel is **active**. **Disconnect** / **Quit** stops the system VPN.
+
+### iOS
+
+Published **0.2.3** iOS packages are **Team-signed sideload** zips (not App Store).
+
+1. Download **`restore-privacy-client-0.2.3-ios.zip`** from the [0.2.3 release](https://github.com/rgsneddon/restore-privacy/releases/tag/0.2.3) or status page.
+2. Install **`Runner.app`** with device tooling; press **Connect** and grant **VPN** permission.
+3. Residual public IP only changes when the Packet Tunnel is **active**.
 
 ### Status page
 
 https://restore-privacy-status.onrender.com/
 
-- **Download** buttons for Windows, Linux, macOS, iOS, Android — catalog **v1.0.0** → [RUST-IN-PRIVACY release](https://github.com/rgsneddon/RUST-IN-PRIVACY/releases/tag/v1.0.0)  
-- Explicit asset URLs: `https://github.com/rgsneddon/RUST-IN-PRIVACY/releases/download/v1.0.0/<filename>`  
+- **Download** buttons for Windows, Android, macOS, iOS, Linux — catalog **v0.2.3** → [release 0.2.3](https://github.com/rgsneddon/restore-privacy/releases/tag/0.2.3)  
+- Explicit asset URLs: `https://github.com/rgsneddon/restore-privacy/releases/download/0.2.3/<filename>`  
 - **No** public live session / connected-client counter  
 - A browser tab cannot run full system VPN
 
@@ -146,7 +152,7 @@ Node deploy, ports, secrets, from-source builds, and tests: **[sundries.txt](sun
 
 **Post-quantum readiness:** staged hybrid Kyber/ML-KEM hook in `node/pq_hybrid.py` + plan [`docs/PQ_MIGRATION.md`](docs/PQ_MIGRATION.md) (not residual PQ on the wire until dual-wire + real ML-KEM).
 
-**Public product ship (v1.0.0):** Installers and release notes on **[RUST-IN-PRIVACY v1.0.0](https://github.com/rgsneddon/RUST-IN-PRIVACY/releases/tag/v1.0.0)**. Production node **82.221.101.241:44044** (currently **Python** `node.server` via `scripts/deploy_rpt_node.py`; Rust `rpt-node` remains the public protocol host). Private tree `client/VERSION` may still read **0.2.3** for legacy GUI packaging.
+**Public product ship (v0.2.3):** Installers and release notes on **[restore-privacy 0.2.3](https://github.com/rgsneddon/restore-privacy/releases/tag/0.2.3)** (macOS Developer ID notarized; iOS Team-signed). Production node **82.221.101.241:44044**.
 
 **Self-host (one shot):** `sudo bash scripts/selfhost_node.sh` — node install + tunnel DNS + host privacy. Deploy remote: `python scripts/deploy_rpt_node.py` (`RPT_SSH_HOST`, `RPT_SSH_USER`, key). Details: [sundries.txt](sundries.txt).
 
@@ -156,7 +162,7 @@ Node deploy, ports, secrets, from-source builds, and tests: **[sundries.txt](sun
 
 **Ephemeral / short-lived nodes:** [scripts/ephemeral_node.py](scripts/ephemeral_node.py) — **periodic** VPS **snapshot** and/or **rebuild** plan (`--dry-run` by default). Install timer: [scripts/install_ephemeral_timer.sh](scripts/install_ephemeral_timer.sh). Live rebuild requires `RPT_EPHEMERAL_CONFIRM=yes`. Rebuild re-runs self-host (no-log). Does not erase provider backups/netflow; re-ship **public** node pin if keys rotate.
 
-**Release scripts:** Public assets — **RUST-IN-PRIVACY** `scripts/build_release_1.0.0.py` + Android Flutter APK. Legacy private GUI tags: `scripts/build_release_0.2.3.py`. Apple handoff (public): RUST-IN-PRIVACY `docs/APPLE_HANDOFF_1.0.0.md`.
+**Release scripts:** `scripts/build_release_0.2.3.py`. Apple handoff: [`client_app/APPLE_HANDOFF_0.2.3.md`](client_app/APPLE_HANDOFF_0.2.3.md). Release notes: [`scripts/RELEASE_NOTES_0.2.3.md`](scripts/RELEASE_NOTES_0.2.3.md).
 
 ```bash
 # Windows GUI (requires system Python)

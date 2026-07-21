@@ -4,7 +4,7 @@ The live node defaults to require_pfs=True and silent-drops HELLOs that omit the
 X25519 eph field — that surfaces on-device as ``Poll timed out``. Licence/Settings
 strings must also be present in the Flutter AOT blob for the seamless UI.
 
-Public v1.0.0 asset name: restore-privacy-rust-1.0.0-android.apk
+Public v1.0.0 asset name: restore-privacy-client-0.2.3-android.apk
 """
 
 from __future__ import annotations
@@ -22,8 +22,8 @@ PRODUCT_PUB_PIN = (
 
 # Prefer public RUST-IN-PRIVACY basename, then private client release path.
 _CANDIDATES = [
-    ROOT / "releases" / "1.0.0" / "restore-privacy-rust-1.0.0-android.apk",
-    ROOT.parents[0] / "RUST-IN-PRIVACY" / "releases" / "1.0.0" / "restore-privacy-rust-1.0.0-android.apk",
+    ROOT / "releases" / "1.0.0" / "restore-privacy-client-0.2.3-android.apk",
+    ROOT.parents[0] / "RUST-IN-PRIVACY" / "releases" / "1.0.0" / "restore-privacy-client-0.2.3-android.apk",
     ROOT / "releases" / VERSION / f"restore-privacy-client-{VERSION}-android.apk",
 ]
 
@@ -65,10 +65,10 @@ class TestAndroidReleaseApkWire(unittest.TestCase):
         self.assertTrue(apk.is_file(), f"missing release APK among {_CANDIDATES}")
         _assert_wire(apk)
         # Public product name must be used when present under releases/1.0.0
-        public = ROOT / "releases" / "1.0.0" / "restore-privacy-rust-1.0.0-android.apk"
+        public = ROOT / "releases" / "1.0.0" / "restore-privacy-client-0.2.3-android.apk"
         if public.is_file():
             _assert_wire(public)
-            self.assertEqual(public.name, "restore-privacy-rust-1.0.0-android.apk")
+            self.assertEqual(public.name, "restore-privacy-client-0.2.3-android.apk")
 
 
 if __name__ == "__main__":

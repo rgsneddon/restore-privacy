@@ -45,7 +45,7 @@ class TestPublicPageWithDownloads(unittest.TestCase):
         self.assertNotIn('id="clients-connected"', html)
         self.assertNotIn("fetch('/api/status'", html)
         self.assertNotIn("setInterval(poll", html)
-        self.assertIn("Download client v1.0.0", html)
+        self.assertIn("Download client v0.2.3", html)
         self.assertIn(WINDOWS_ZIP_FILENAME, html)
         self.assertIn(MACOS_ZIP_FILENAME, html)
         self.assertIn(IOS_ZIP_FILENAME, html)
@@ -56,12 +56,12 @@ class TestPublicPageWithDownloads(unittest.TestCase):
             self.assertNotIn(f'href="{a.url}"', html)
             self.assertTrue(
                 a.url.startswith(
-                    "https://github.com/rgsneddon/RUST-IN-PRIVACY/releases/download/v1.0.0/"
+                    "https://github.com/rgsneddon/restore-privacy/releases/download/0.2.3/"
                 )
             )
         self.assertEqual(
             RELEASE_PAGE_URL,
-            "https://github.com/rgsneddon/RUST-IN-PRIVACY/releases/tag/v1.0.0",
+            "https://github.com/rgsneddon/restore-privacy/releases/tag/0.2.3",
         )
         self.assertIn(RUST_REPO_URL, html)
         self.assertIn(RELEASE_PAGE_URL, html)
@@ -94,7 +94,7 @@ class TestPublicPageWithDownloads(unittest.TestCase):
                     self.assertNotIn("BETA - test phase", html)
                     self.assertNotIn("clients-connected", html)
                     self.assertNotIn("fetch('/api/status'", html)
-                    self.assertIn("Download client v1.0.0", html)
+                    self.assertIn("Download client v0.2.3", html)
                     self.assertIn(WINDOWS_ZIP_FILENAME, html)
                     self.assertIn("/pay?platform=windows", html)
                     self.assertIn("£2.45", html)

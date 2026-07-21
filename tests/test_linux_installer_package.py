@@ -69,7 +69,7 @@ class TestPackageLinuxHelpers(unittest.TestCase):
         self.assertIn("Linux (x64) - Installer (.tar.gz)", html)
         self.assertIn(f"/pay?platform={linux.platform}", html)
         self.assertIn(linux.filename, html)
-        self.assertIn("/releases/download/v1.0.0/", linux.url)
+        self.assertIn("/releases/download/0.2.3/", linux.url)
         self.assertTrue(linux.filename.endswith(".tar.gz"))
 
     def test_readme_primary_path_is_install_sh(self):

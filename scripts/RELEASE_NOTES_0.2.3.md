@@ -33,4 +33,4 @@
 
 ## Upgrade
 
-Install **0.2.3** from this GitHub Release or the status page. Accept the end-user licence on first Connect.
+Install **0.2.3** from this GitHub Release ([0.2.3](https://github.com/rgsneddon/restore-privacy/releases/tag/0.2.3)) or the status page download catalog (catalog **v0.2.3**, paid buttons fulfil the same assets). Accept the end-user licence on first Connect.

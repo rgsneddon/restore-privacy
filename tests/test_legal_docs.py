@@ -53,16 +53,20 @@ class TestPrivacyPolicy(unittest.TestCase):
         self.assertIn("LICENSE", text)
         self.assertIn("README", text)
 
-    def test_policy_public_catalog_is_v1_0_0(self):
-        """User-facing policy must advertise public catalog v1.0.0, not v0.2.3."""
+    def test_policy_public_catalog_is_v0_2_3(self):
+        """User-facing policy must advertise public catalog v0.2.3 as current signed ship."""
         text = _read("PRIVACY_POLICY.md")
-        self.assertIn("v1.0.0", text)
-        self.assertIn("RUST-IN-PRIVACY", text)
-        self.assertIn("releases/tag/v1.0.0", text)
-        self.assertNotIn("current catalog: **v0.2.3**", text)
-        # Primary package host line is RUST-IN-PRIVACY, not private 0.2.3 tag as current
+        self.assertIn("0.2.3", text)
+        self.assertIn("releases/tag/0.2.3", text)
+        self.assertIn("Developer ID", text)
+        self.assertIn("Team-signed", text)
         self.assertIn(
-            "https://github.com/rgsneddon/RUST-IN-PRIVACY/releases/tag/v1.0.0",
+            "https://github.com/rgsneddon/restore-privacy/releases/tag/0.2.3",
+            text,
+        )
+        # Must not claim RUST-IN-PRIVACY v1.0.0 as the current public packages line
+        self.assertNotIn(
+            "Current public packages:** [RUST-IN-PRIVACY v1.0.0]",
             text,
         )
 
@@ -104,20 +108,17 @@ class TestReadmeHowto(unittest.TestCase):
         self.assertIn("android", lower)
         self.assertIn("macos", lower)
         self.assertIn("ios", lower)
-        # Public ship is RUST-IN-PRIVACY v1.0.0; private tree may still mention 0.2.3 history
-        self.assertTrue(
-            "1.0.0" in text or "0.2.3" in text or "0.2.1" in text or "0.2.0" in text,
-            "README must cite public v1.0.0 and/or historical 0.2.x",
-        )
-        self.assertIn("RUST-IN-PRIVACY", text)
-        self.assertIn("releases/tag/v1.0.0", text)
+        # Public ship is restore-privacy 0.2.3 (signed)
+        self.assertIn("0.2.3", text)
+        self.assertIn("releases/tag/0.2.3", text)
+        self.assertIn("Developer ID", text)
+        self.assertIn("Team-signed", text)
         self.assertNotIn("prep stubs", lower)
+        self.assertNotIn("prep packages only", lower)
         # Package basenames from the public release catalog
-        self.assertTrue(
-            "restore-privacy-rust-1.0.0-windows-x64.zip" in text
-            or "windows-x64.zip" in text
-            or "windows-x64-setup.exe" in text,
-            "README must cite a Windows package basename",
+        self.assertIn(
+            "restore-privacy-client-0.2.3-windows-x64-setup.exe",
+            text,
         )
         self.assertIn("android.apk", text)
         self.assertIn("macos.zip", text)

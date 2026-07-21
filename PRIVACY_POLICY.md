@@ -2,9 +2,9 @@
 
 **Last updated:** 21 July 2026  
 **Product:** Restore Privacy Tunnel (RPT / RPT2) — custom VPN node, client apps, and public status page  
-**Current public packages:** [RUST-IN-PRIVACY v1.0.0](https://github.com/rgsneddon/RUST-IN-PRIVACY/releases/tag/v1.0.0) (Windows | Linux | macOS | iOS | Android — `restore-privacy-rust-1.0.0-*`)  
-**Code & policy audit:** [AUDIT.md](AUDIT.md) (private tree) · [RUST-IN-PRIVACY AUDIT](https://github.com/rgsneddon/RUST-IN-PRIVACY/blob/main/AUDIT.md)  
-**Operator / project:** Russell G Sneddon (`rgsneddon`) / public packages host [RUST-IN-PRIVACY](https://github.com/rgsneddon/RUST-IN-PRIVACY); private sources [restore-privacy](https://github.com/rgsneddon/restore-privacy)
+**Current public packages:** [v0.2.3](https://github.com/rgsneddon/restore-privacy/releases/tag/0.2.3) (Windows · Android · macOS · iOS · Linux — macOS Developer ID notarized; iOS Team-signed sideload)  
+**Code & policy audit:** [AUDIT.md](AUDIT.md)  
+**Operator / project:** Russell G Sneddon (`rgsneddon`) / [restore-privacy](https://github.com/rgsneddon/restore-privacy)
 
 This policy describes how the **Restore Privacy** software is designed to handle data. It is written for end users and operators. It is **not** legal advice and is not a jurisdiction-specific compliance certificate (e.g. full GDPR/CCPA legal opinion).
 
@@ -68,7 +68,7 @@ Process stdout/stderr for the node service is configured for **no journal sessio
 - Displays the product **title**, beta note, and **download links** only.
 - Does **not** expose a live connected-client count or poll a session metric on the public HTML surface.
 - Optional `/api/status` JSON is **title-only** (no `clients_connected`).
-- May offer **download links** to public GitHub release packages (current catalog: **v1.0.0** on [RUST-IN-PRIVACY](https://github.com/rgsneddon/RUST-IN-PRIVACY/releases/tag/v1.0.0); asset URLs under `…/releases/download/v1.0.0/`).
+- May offer **download links** to public GitHub release packages (current catalog: **v0.2.3** on [restore-privacy](https://github.com/rgsneddon/restore-privacy/releases/tag/0.2.3); asset URLs under `…/releases/download/0.2.3/`).
 
 ### 3.4 Operator-held secrets
 

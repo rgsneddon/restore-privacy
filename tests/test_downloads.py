@@ -1,4 +1,4 @@
-"""Tests for shipped status-page download catalog (RUST-IN-PRIVACY v1.0.0) + paid UI."""
+"""Tests for shipped status-page download catalog (restore-privacy 0.2.3) + paid UI."""
 
 from __future__ import annotations
 
@@ -28,18 +28,18 @@ from downloads import (  # noqa: E402
 )
 
 EXPECTED_RELEASE_PAGE = (
-    "https://github.com/rgsneddon/RUST-IN-PRIVACY/releases/tag/v1.0.0"
+    "https://github.com/rgsneddon/restore-privacy/releases/tag/0.2.3"
 )
 EXPECTED_DOWNLOAD_PREFIX = (
-    "https://github.com/rgsneddon/RUST-IN-PRIVACY/releases/download/v1.0.0/"
+    "https://github.com/rgsneddon/restore-privacy/releases/download/0.2.3/"
 )
 
 
 class TestDownloadCatalog(unittest.TestCase):
-    def test_version_is_rust_1_0_0(self):
-        self.assertEqual(RELEASE_VERSION, "1.0.0")
-        self.assertEqual(RELEASE_TAG, "v1.0.0")
-        self.assertEqual(GITHUB_REPO, "RUST-IN-PRIVACY")
+    def test_version_is_0_2_3(self):
+        self.assertEqual(RELEASE_VERSION, "0.2.3")
+        self.assertEqual(RELEASE_TAG, "0.2.3")
+        self.assertEqual(GITHUB_REPO, "restore-privacy")
         self.assertEqual(RELEASE_PAGE_URL, EXPECTED_RELEASE_PAGE)
         self.assertEqual(RELEASE_DOWNLOAD_BASE, EXPECTED_DOWNLOAD_PREFIX.rstrip("/"))
         self.assertEqual(RUST_REPO_URL, EXPECTED_RELEASE_PAGE)
@@ -63,7 +63,9 @@ class TestDownloadCatalog(unittest.TestCase):
         html = render_download_section_html()
         self.assertIn("Linux (x64) - Installer (.tar.gz)", html)
         self.assertIn('id="dl-linux"', html)
-        self.assertIn("Windows (x64) - Client/Node (.zip)", html)
+        self.assertIn("Windows (x64) - Installer (.exe)", html)
+        self.assertIn("Developer ID + notarized", html)
+        self.assertIn("Team-signed sideload", html)
         self.assertIn('id="dl-android"', html)
         self.assertIn("£2.45", html)
         self.assertIn(BMC_TIP_URL, html)
