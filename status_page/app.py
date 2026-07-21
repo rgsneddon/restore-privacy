@@ -567,7 +567,9 @@ class Handler(BaseHTTPRequestHandler):
                         ),
                     }
             elif session_id:
-                grant = wait_for_grant_by_session(session_id, timeout_sec=8.0)
+                # Payment Link after_payment redirect lands here; webhook may lag
+                # on free-tier cold start — wait longer than a local unit test.
+                grant = wait_for_grant_by_session(session_id, timeout_sec=20.0)
                 if grant is None:
                     grant = find_grant_by_session(session_id)
             if grant and grant.get("token"):

@@ -144,10 +144,17 @@ Architecture (modules):
 | `/pay?platform=windows` | Redirects to Stripe payment page for that package |
 | `/api/checkout` | JSON POST `{ "platform": "android" }` → `{ url, amount_pence: 245, … }` |
 | `/webhook/stripe` | Stripe webhook (signature required) |
-| `/download?token=` | Single-use download redirect |
+| `/download?token=` | Single-use **proxy** download of the paid package (not a free GitHub redirect) |
+| `/download/success?session_id=` | After Payment Link redirect — **Download \<platform\> package** button |
 | `/admin` | **Private** operator page: processor settings + grants (login required) |
 | `/admin/login` | Login form / POST credentials |
 | `/admin/logout` | Clear session cookie |
+
+**Payment Link after payment (required for seamless UX):** redirect to  
+`https://restore-privacy-status.onrender.com/download/success?session_id={CHECKOUT_SESSION_ID}`
+
+**Private source repo:** make GitHub **private**, then either set **`RPT_GITHUB_TOKEN`** on Render **or** stage packages  
+(`python scripts/stage_paid_assets.py` → `status_page/assets/0.3.0/`). See `docs/PRIVATE_REPO_AND_PAID_DOWNLOADS.md`.
 
 ---
 
@@ -156,8 +163,9 @@ Architecture (modules):
 - Never commit `sk_live_`, `whsec_`, or admin passwords.
 - Webhook **must** verify `Stripe-Signature` (implemented in `payments.py`).
 - Tokens are single-use and time-limited; invalid/expired tokens do not download.
-- GitHub may still host free release assets outside this site; only **this** downloads UI is paid-gated.
+- Public status HTML must not expose free permanent `releases/download` installer buttons.
+- With a **private** repo, unpaid browsers cannot fetch installers; paid buyers get them only via token + server proxy.
 
 ## Success page UX
 
-After Checkout, `/download/success` shows **Thank you**, auto-starts the one-time `/download?token=…` installer, and instructs the buyer to **run the file as administrator** (Windows: right-click → Run as administrator). A fallback download button remains if the browser blocks auto-download.
+After payment redirect, `/download/success` shows **Thank you**, names the **platform package you paid for**, auto-starts the one-time `/download?token=…` installer (proxy stream), and instructs **run as administrator**. A fallback **Download \<platform\> package** button remains if the browser blocks auto-download.

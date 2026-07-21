@@ -68,7 +68,7 @@ Process stdout/stderr for the node service is configured for **no journal sessio
 - Displays the product **title**, beta note, and **download links** only.
 - Does **not** expose a live connected-client count or poll a session metric on the public HTML surface.
 - Optional `/api/status` JSON is **title-only** (no `clients_connected`).
-- May offer **download links** to public GitHub release packages (current catalog: **v0.3.0** fulfilled after payment on [status downloads](https://restore-privacy-status.onrender.com/) (private source repo; no free permanent public installer URLs)).
+- May deliver **paid installers** (current catalog: **v0.3.0**) after payment on [status downloads](https://restore-privacy-status.onrender.com/) via a one-time token (server-side proxy). The product source repository is private — there are no free permanent public installer URLs.
 
 ### 3.4 Operator-held secrets
 

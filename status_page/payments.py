@@ -249,17 +249,22 @@ def catalog_filenames() -> frozenset[str]:
 
 
 def asset_search_dirs() -> list[Path]:
-    """Directories that may hold release installers for local proxy fulfilment."""
+    """Directories that may hold release installers for local proxy fulfilment.
+
+    Prefer ``status_page/assets/{VERSION}/`` first — that path is what Render can
+    ship when ``rootDir`` is ``status_page`` (repo ``releases/`` is not deployed).
+    """
     out: list[Path] = []
     raw = os.environ.get("RPT_ASSET_DIR", "").strip()
     if raw:
         out.append(Path(raw).expanduser())
-    # status_page/../releases/{VERSION}
     from downloads import RELEASE_VERSION  # local import avoids cycles at module load
 
-    root = Path(__file__).resolve().parents[1]
-    out.append(root / "releases" / RELEASE_VERSION)
-    out.append(Path(__file__).resolve().parent / "assets" / RELEASE_VERSION)
+    status = Path(__file__).resolve().parent
+    # Deploy root-friendly (Render rootDir=status_page)
+    out.append(status / "assets" / RELEASE_VERSION)
+    # Monorepo checkout: releases/{VERSION} (gitignored; local/dev only)
+    out.append(status.parent / "releases" / RELEASE_VERSION)
     return out
 
 
@@ -470,12 +475,20 @@ def render_post_payment_thankyou_html(
         run_as_administrator_instruction(filename=fname, platform=platform)
     )
     plat = (platform or "").strip().lower()
+    plat_label = {
+        "windows": "Windows",
+        "android": "Android",
+        "macos": "macOS",
+        "ios": "iOS",
+        "linux": "Linux",
+    }.get(plat, plat or "your package")
     # Emphasize Windows admin wording for .exe; still show admin phrase for all.
     admin_lead = "Please run the file as administrator."
+    btn = f"Download {plat_label} package"
     return f"""
 <section id="post-pay-thankyou" class="thankyou" aria-labelledby="thank-you-heading">
   <h1 id="thank-you-heading">Thank you</h1>
-  <p class="msg" id="pay-success">Thank you for your payment. Your package is ready:</p>
+  <p class="msg" id="pay-success">Payment confirmed. Your <strong id="paid-platform-label">{_escape_html_text(plat_label)}</strong> installer is ready:</p>
   <p class="pkg" id="paid-package-name"><strong>{fname_esc}</strong></p>
   <p class="msg admin-run" id="run-as-admin-instruction">
     <strong>{_escape_html_text(admin_lead)}</strong>
@@ -487,13 +500,14 @@ def render_post_payment_thankyou_html(
     title="Automatic product download" aria-hidden="true"></iframe>
   <p>
     <a class="dl" id="success-download-link" href="{link_esc}"
-       data-manual-download="1" data-platform="{_escape_html_text(plat)}">
-      Download {fname_esc} (if it did not start)
+       data-manual-download="1" data-platform="{_escape_html_text(plat)}"
+       data-filename="{fname_esc}">
+      { _escape_html_text(btn) } (if it did not start)
     </a>
   </p>
-  <p class="msg muted">The link works once and expires. Tip optional:
-    <a href="https://buymeacoffee.com/rgsneddon">buymeacoffee.com/rgsneddon</a></p>
-  <p><a href="/">Home</a></p>
+  <p class="msg muted">This link is one-time and expires. It only unlocks the package you paid for.
+    Tip optional: <a href="https://buymeacoffee.com/rgsneddon">buymeacoffee.com/rgsneddon</a></p>
+  <p><a href="/">Home</a> · <a href="/how-to-buy">How to buy</a></p>
 </section>
 """
 
