@@ -195,7 +195,10 @@ class TestWebhookAndTokens(unittest.TestCase):
         first = payments.redeem_download_token(token)
         self.assertIsNotNone(first)
         assert first is not None
-        self.assertTrue(first["url"].endswith("windows-x64.zip"))
+        self.assertTrue(
+            first["url"].endswith("windows-x64-setup.exe"),
+            first["url"],
+        )
         self.assertEqual(first["amount_pence"], 245)
 
         second = payments.redeem_download_token(token)
@@ -403,6 +406,163 @@ class TestBuyerSuccessFulfilment(unittest.TestCase):
         finally:
             httpd.shutdown()
             httpd.server_close()
+
+
+class TestAdminPageAccess(unittest.TestCase):
+    def test_access_decision_wrong_and_valid_session(self):
+        os.environ["RPT_ADMIN_PASSWORD"] = "gate-pass"
+        os.environ["RPT_ADMIN_SESSION_SECRET"] = "gate-sess"
+        try:
+            self.assertEqual(
+                admin_panel.admin_page_access(authenticated=False),
+                "login_required",
+            )
+            self.assertEqual(
+                admin_panel.admin_page_access(authenticated=True),
+                "granted",
+            )
+            self.assertEqual(
+                admin_panel.admin_page_access(
+                    authenticated=True, enabled=False
+                ),
+                "disabled",
+            )
+            self.assertFalse(admin_panel.verify_credentials("admin", "wrong"))
+            self.assertTrue(admin_panel.verify_credentials("admin", "gate-pass"))
+            tok = admin_panel.mint_session_token()
+            self.assertTrue(admin_panel.verify_session_token(tok))
+            self.assertFalse(admin_panel.verify_session_token("bad:token:x"))
+        finally:
+            os.environ.pop("RPT_ADMIN_PASSWORD", None)
+            os.environ.pop("RPT_ADMIN_SESSION_SECRET", None)
+
+
+class TestProcessorSettingsView(unittest.TestCase):
+    def setUp(self):
+        self._saved = {
+            k: os.environ.get(k)
+            for k in (
+                "STRIPE_SECRET_KEY",
+                "STRIPE_WEBHOOK_SECRET",
+                "STRIPE_PRICE_ID",
+                "RPT_PUBLIC_BASE_URL",
+            )
+        }
+
+    def tearDown(self):
+        for k, v in self._saved.items():
+            if v is None:
+                os.environ.pop(k, None)
+            else:
+                os.environ[k] = v
+
+    def test_unconfigured_flags(self):
+        os.environ.pop("STRIPE_SECRET_KEY", None)
+        os.environ.pop("STRIPE_WEBHOOK_SECRET", None)
+        os.environ.pop("STRIPE_PRICE_ID", None)
+        view = admin_panel.processor_settings_view()
+        self.assertFalse(view["stripe_configured"])
+        self.assertFalse(view["stripe_webhook_configured"])
+        self.assertFalse(view["stripe_fulfilment_ready"])
+        self.assertEqual(view["stripe_mode"], "unconfigured")
+        self.assertFalse(view["secrets_in_view"])
+        self.assertEqual(view["bmc_tip_url"], "https://buymeacoffee.com/rgsneddon")
+        self.assertEqual(view["bmc_role"], "tip_support_only")
+
+    def test_configured_test_mode_no_secret_in_html(self):
+        secret = "sk_test_UNIT_FAKE_NOT_A_REAL_KEY_xyz"
+        webhook = "whsec_UNIT_FAKE_NOT_A_REAL_SECRET"
+        os.environ["STRIPE_SECRET_KEY"] = secret
+        os.environ["STRIPE_WEBHOOK_SECRET"] = webhook
+        os.environ["RPT_PUBLIC_BASE_URL"] = "https://example-status.test"
+        view = admin_panel.processor_settings_view()
+        self.assertTrue(view["stripe_configured"])
+        self.assertTrue(view["stripe_webhook_configured"])
+        self.assertTrue(view["stripe_fulfilment_ready"])
+        self.assertEqual(view["stripe_mode"], "test")
+        # View model must not carry raw secrets
+        blob = json.dumps(view)
+        self.assertNotIn(secret, blob)
+        self.assertNotIn(webhook, blob)
+
+        html = admin_panel.render_processor_settings_html(view)
+        self.assertIn("admin-processor-settings", html)
+        self.assertIn("id=\"stripe-key-mode\">test<", html)
+        self.assertIn("dashboard.stripe.com", html)
+        self.assertIn("buymeacoffee.com", html)
+        self.assertIn("link-stripe-apikeys", html)
+        self.assertIn("link-bmc-login", html)
+        self.assertNotIn(secret, html)
+        self.assertNotIn(webhook, html)
+        self.assertNotIn("sk_test_", html)
+        self.assertNotIn("whsec_", html)
+
+    def test_live_mode_label(self):
+        os.environ["STRIPE_SECRET_KEY"] = "sk_live_UNIT_FAKE"
+        self.assertEqual(admin_panel.stripe_key_mode_label(), "live")
+
+
+class TestAdminHtmlArchitecture(unittest.TestCase):
+    def setUp(self):
+        self._td = tempfile.TemporaryDirectory(ignore_cleanup_errors=True)
+        self.addCleanup(self._td.cleanup)
+        os.environ["RPT_PAYMENT_DATA_DIR"] = self._td.name
+        os.environ["RPT_ADMIN_PASSWORD"] = "admin-arch"
+        os.environ["RPT_ADMIN_SESSION_SECRET"] = "admin-arch-sess"
+        os.environ.pop("STRIPE_SECRET_KEY", None)
+        os.environ.pop("STRIPE_WEBHOOK_SECRET", None)
+
+    def tearDown(self):
+        for k in (
+            "RPT_ADMIN_PASSWORD",
+            "RPT_ADMIN_SESSION_SECRET",
+            "RPT_PAYMENT_DATA_DIR",
+        ):
+            os.environ.pop(k, None)
+
+    def test_authenticated_admin_has_settings_and_grants(self):
+        payments.init_db()
+        payments.mint_download_token(
+            filename="restore-privacy-client-0.2.3-android.apk",
+            platform="android",
+            session_id="cs_arch_1",
+        )
+        html = admin_panel.render_admin_html().decode("utf-8")
+        self.assertIn("admin-processor-settings", html)
+        self.assertIn("admin-grants-table", html)
+        self.assertIn("Payment administration", html)
+        self.assertIn("android", html)
+        self.assertIn("245", html)
+        self.assertIn("bmc-tip-url", html)
+        self.assertIn("stripe-checkout-ready", html)
+        # No secret material
+        self.assertNotIn("sk_live_", html)
+        self.assertNotIn("sk_test_", html)
+        self.assertNotIn("whsec_", html)
+        self.assertNotIn("admin-arch", html)  # password must not appear
+
+    def test_project_grants_uses_real_store(self):
+        payments.init_db()
+        tok = payments.mint_download_token(
+            filename="restore-privacy-client-0.2.3-linux-x64.tar.gz",
+            platform="linux",
+            session_id="cs_proj",
+        )
+        rows = admin_panel.project_grants_for_admin(limit=10)
+        self.assertTrue(any(r["token"] == tok and r["platform"] == "linux" for r in rows))
+
+
+class TestPublicVsAdminSurface(unittest.TestCase):
+    def test_public_html_has_no_admin_grants_or_processor_panel(self):
+        html = status_app.render_html({"title": "RESTORE PRIVACY"}).decode("utf-8")
+        self.assertNotIn("admin-grants-table", html)
+        self.assertNotIn("admin-processor-settings", html)
+        self.assertNotIn("rpt_admin_session", html)
+        self.assertNotIn("STRIPE_SECRET_KEY", html)
+        self.assertNotIn("sk_live_", html)
+        self.assertNotIn("whsec_", html)
+        # Public may still mention paid flow / tip
+        self.assertIn("RESTORE PRIVACY", html.upper() if "RESTORE" in html.upper() else html)
 
 
 if __name__ == "__main__":

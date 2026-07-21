@@ -1,5 +1,7 @@
-﻿# Render Blueprint â€” Restore Privacy public status page
-# Proxies live client count from the Vultr VPN node UI.
+# Render Blueprint — Restore Privacy public status page + private /admin
+# Public: title + paid downloads. Private /admin: operator login, payment
+# processor settings (Stripe/BMC readiness), paid-download grant admin.
+# Set secrets in the Render dashboard — never commit real keys/passwords.
 services:
   - type: web
     name: restore-privacy-status
@@ -17,3 +19,20 @@ services:
         value: http://82.221.101.241:8080/api/status
       - key: RPT_STATUS_TIMEOUT
         value: "4"
+      # Public site origin (Checkout success/cancel + webhook display on /admin)
+      - key: RPT_PUBLIC_BASE_URL
+        value: https://restore-privacy-status.onrender.com
+      # Operator-only /admin (required to enable private payment admin page)
+      - key: RPT_ADMIN_USER
+        value: admin
+      - key: RPT_ADMIN_PASSWORD
+        sync: false
+      - key: RPT_ADMIN_SESSION_SECRET
+        sync: false
+      # Stripe paid downloads (£2.45) — set in Render dashboard
+      - key: STRIPE_SECRET_KEY
+        sync: false
+      - key: STRIPE_WEBHOOK_SECRET
+        sync: false
+      - key: STRIPE_PRICE_ID
+        sync: false

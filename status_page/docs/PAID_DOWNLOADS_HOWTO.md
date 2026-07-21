@@ -101,14 +101,28 @@ You may also surface the token from admin grants if a buyer contacts support.
 
 ---
 
-## 3. Admin panel
+## 3. Private admin page (operator only)
 
-1. Set `RPT_ADMIN_PASSWORD` (and optional `RPT_ADMIN_USER`) on the host.
-2. Open `https://YOUR-STATUS-HOST/admin`.
-3. Sign in with those credentials (not your Stripe or BMC dashboard passwords).
-4. View recent **paid download grants** (platform, filename, amount, used/unused, truncated token).
+This is the **private** architecture on the same Render service — not the public catalog.
 
-Unauthenticated visitors only see the login form; grant data is not public.
+1. Set `RPT_ADMIN_PASSWORD` (and optional `RPT_ADMIN_USER` / `RPT_ADMIN_SESSION_SECRET`) on Render.
+2. Open `https://YOUR-STATUS-HOST/admin` (only you, with those credentials).
+3. Sign in with **status-page** credentials (not your Stripe or BMC dashboard passwords).
+4. After login you get one admin surface:
+   - **Payment processor settings** — Stripe readiness (secret key / webhook / mode test|live), Checkout + fulfilment ready flags, public base URL + webhook endpoint path, deep links to Stripe Dashboard (API keys, webhooks, payments). Buy Me a Coffee tip URL + creator login link. **No secret keys are shown in HTML.**
+   - **Paid download grants** — recent Stripe-verified tokens (platform, filename, amount, used/unused, truncated token, session id) for fulfilment support.
+5. To **change** processor logins/keys: use the Stripe and BMC dashboard links from the settings section; update Render env vars; redeploy if needed. This site does not store editable secret forms in the browser.
+
+Unauthenticated visitors only see the login form; grants and processor readiness are not public.
+
+Architecture (modules):
+
+| Piece | Role |
+|-------|------|
+| `admin_panel.py` | Login, session, processor settings view, grants HTML |
+| `payments.py` | Stripe Checkout, webhook grant mint, SQLite grants |
+| `coffee_link.py` | BMC tip URL (public footer + admin tip identity) |
+| `app.py` | Routes: public catalog + gated `/admin*` + webhook |
 
 ---
 
@@ -121,7 +135,9 @@ Unauthenticated visitors only see the login form; grant data is not public.
 | `/api/checkout` | JSON POST `{ "platform": "android" }` → `{ url, amount_pence: 245, … }` |
 | `/webhook/stripe` | Stripe webhook (signature required) |
 | `/download?token=` | Single-use download redirect |
-| `/admin` | Operator grants panel (login required) |
+| `/admin` | **Private** operator page: processor settings + grants (login required) |
+| `/admin/login` | Login form / POST credentials |
+| `/admin/logout` | Clear session cookie |
 
 ---
 
