@@ -551,8 +551,14 @@ def _package_contains_priv(path: Path) -> bool:
     return False
 
 
+def _is_entry_node_pub_member(name: str) -> bool:
+    """True for entry ``node_elgamal.pub`` only — never ``exit_node_elgamal.pub``."""
+    base = Path(name.replace("\\", "/")).name.lower()
+    return base == "node_elgamal.pub"
+
+
 def _package_node_pub_sha256(path: Path) -> str | None:
-    """Return SHA-256 of embedded node_elgamal.pub, or None if not found."""
+    """Return SHA-256 of embedded entry node_elgamal.pub, or None if not found."""
     name = path.name.lower()
     try:
         if name.endswith((".zip", ".apk")):
@@ -560,7 +566,7 @@ def _package_node_pub_sha256(path: Path) -> str | None:
 
             with zipfile.ZipFile(path) as zf:
                 for n in zf.namelist():
-                    if n.endswith("node_elgamal.pub") or n.endswith("/node_elgamal.pub"):
+                    if _is_entry_node_pub_member(n):
                         return _sha256_bytes(zf.read(n))
             return None
         if name.endswith((".tar.gz", ".tgz")):
@@ -568,7 +574,7 @@ def _package_node_pub_sha256(path: Path) -> str | None:
 
             with tarfile.open(path, "r:gz") as tf:
                 for m in tf.getmembers():
-                    if m.isfile() and m.name.endswith("node_elgamal.pub"):
+                    if m.isfile() and _is_entry_node_pub_member(m.name):
                         f = tf.extractfile(m)
                         if f is not None:
                             return _sha256_bytes(f.read())
@@ -602,7 +608,9 @@ def _package_node_pub_sha256(path: Path) -> str | None:
                         timeout=90,
                     )
                     for hit in Path(td).rglob("node_elgamal.pub"):
-                        return _sha256_bytes(hit.read_bytes())
+                        # rglob also matches *exit*_node_elgamal.pub names — filter basename
+                        if _is_entry_node_pub_member(hit.name):
+                            return _sha256_bytes(hit.read_bytes())
             except (OSError, subprocess.TimeoutExpired):
                 return None
     except Exception:

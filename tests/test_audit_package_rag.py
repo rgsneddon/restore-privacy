@@ -111,6 +111,38 @@ class TestPackageRagEvaluation(unittest.TestCase):
         self.assertIn(st["state"], ("Green", "Amber"))
         self.assertNotIn("not staged", " ".join(st["reasons"]).lower())
 
+    def test_entry_pub_matcher_excludes_exit_pub_name(self):
+        """exit_node_elgamal.pub must not be treated as entry pin."""
+        self.assertTrue(self.mod._is_entry_node_pub_member("secrets/node_elgamal.pub"))
+        self.assertFalse(
+            self.mod._is_entry_node_pub_member("secrets/exit_node_elgamal.pub")
+        )
+        self.assertFalse(
+            self.mod._is_entry_node_pub_member("product/exit_node_elgamal.pub")
+        )
+
+    def test_catalog_036_all_platforms_green_when_staged(self):
+        """When monopin 0.3.6 assets are fully staged, RAG overall must be Green."""
+        ver = self.mod.load_catalog_version()
+        self.assertEqual(ver, "0.3.6")
+        rag = self.mod.evaluate_catalog_packages(ver)
+        missing = [
+            p["platform"]
+            for p in rag["packages"]
+            if not p.get("path") or p.get("state") != "Green"
+        ]
+        self.assertEqual(
+            rag.get("staged_count"),
+            5,
+            f"expected five staged packages, got {rag.get('staged_count')}: {rag['packages']}",
+        )
+        self.assertEqual(
+            missing,
+            [],
+            f"non-Green platforms: {missing} detail={[(p['platform'], p['state'], p.get('reasons')) for p in rag['packages']]}",
+        )
+        self.assertEqual(rag["overall"], "Green")
+
     def test_valid_states_only(self):
         for s in ("Green", "Amber", "Red"):
             self.assertIn(s, self.mod.VALID_PACKAGE_STATES)
