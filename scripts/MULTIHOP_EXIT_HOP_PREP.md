@@ -10,6 +10,23 @@ Connect still dials the **entry** hop only. Status text will say *path configure
 
 ---
 
+
+## Live exit hop (Romania) — recorded
+
+| Field | Value |
+|-------|--------|
+| **Role** | Exit hop (for now) |
+| **Country** | **Romania** (FlokiNET) |
+| **Public IPv4** | `185.146.232.107` |
+| **SSH** | `raskul@185.146.232.107` / alias `restore-privacy-hop` |
+| **SSH key** | `~/.ssh/id_ed25519_restore_privacy_hop` (BatchMode confirmed) |
+| **OS** | Ubuntu 26.04 LTS |
+| **ElGamal** | **A — new exit-only keypair** (not product entry pin) |
+| **Entry (unchanged)** | `82.221.101.241:44044` (Iceland) |
+| **RPT port** | UDP **44044** |
+| **Host firewall** | `ufw` present; status **inactive** (not blocking). Rule `allow 44044/udp` applied for when ufw is enabled. INPUT policy ACCEPT. |
+| **FlokiNET panel** | **Operator must** open **UDP 44044** inbound for this VPS in the FlokiNET control panel (cannot automate panel login). |
+
 ## What we need when the exit VPS is ready
 
 Provide these before we can **build/install the multi-hop exit node** on the new box:

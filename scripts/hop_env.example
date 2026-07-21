@@ -3,12 +3,20 @@
 #   82.221.101.241:44044
 #
 # Exit hop (second FlokiNET country — fill when VPS is ready):
+# Romania exit hop (FlokiNET) — live when ready:
+RPT_EXIT_HOST=185.146.232.107
+RPT_EXIT_PORT=44044
+# RPT_EXIT_COUNTRY=Romania
+# RPT_EXIT_ELGAMAL=new  # policy A — new exit-only keypair
+# Entry remains 82.221.101.241:44044 (Iceland)
 # RPT_EXIT_HOST=
 # RPT_EXIT_PORT=44044
 #
 # Enable hop-list *config* only (not residual multi-hop routing):
 # RPT_MULTIHOP_ENABLED=1
-# RPT_MULTIHOP_HOPS=82.221.101.241:44044,<EXIT_HOST>:44044
+# RPT_MULTIHOP_HOPS=82.221.101.241:44044,185.146.232.107:44044
+# RPT_SSH_HOST=185.146.232.107
+# RPT_SSH_ROLE=exit_hop
 #
 # Deploy exit node over SSH:
 # RPT_SSH_HOST=<EXIT_HOST>
