@@ -29,7 +29,7 @@ Restore Privacy is built from the ground up using unashamed vibe coding methods 
 - **Disconnect / Quit** restores residual routes and product firewall state so the device returns to normal internet (Windows dual `/1` teardown + scoped **RPT-FW** cleanup; Linux TUN/routes teardown)
 - **Windows Defender Firewall** product rules are **scoped allows only** (node UDP + program) — not unscoped blocks; kill-switch remains opt-in
 - **Restore Internet** failsafe in every catalog installer (network restore + complete product removal) — see warning below
-- Public status page with **download installers only** (no live client count; package subtitle is platform names only)
+- Public payment portal with seamless flow to downloadable installer package
 - **No third-party geo lookup** on Connect (admission is cryptographic only)
 - Connect uses the standard **HELLO** residual path (**flyclient** fast-path removed in catalog **v0.3.3**)
 - Session **PFS** (ephemeral X25519) on the Python client/node handshake path; Android catalog APK ships residual wire (**PFS + outer obfs**)
