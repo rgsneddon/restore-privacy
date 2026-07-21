@@ -26,30 +26,33 @@ from client.full_tunnel import (  # noqa: E402
 from client.connect import ConnectState, RptClient  # noqa: E402
 from client.windows.tunnel_win import (  # noqa: E402
     DEFAULT_ADAPTER_SETTLE_MAX_SEC,
+    LEGACY_ADAPTER_SETTLE_TOTAL_SEC,
     adapter_settle_budget,
     wait_for_wintun_if_index,
 )
 
 
 class TestAdapterSettleContinuity(unittest.TestCase):
-    """∇_μ(ρ_t u^μ)=0: no fixed multi-sleep backlog for Wintun IF index."""
+    """∇_μ(ρ_t u^μ)=0: poll ASAP, max_wait ≥ legacy, one resolve per poll."""
 
-    def test_settle_budget_far_below_legacy_fixed_sleeps(self):
+    def test_settle_budget_covers_legacy_total_not_shorter_deadline(self):
         mx, pl = adapter_settle_budget()
-        # Legacy was sleep(0.4) + optional sleep(0.5) = up to 0.9s of pure ρ
-        self.assertLess(mx, 0.4)
-        self.assertLessEqual(mx, DEFAULT_ADAPTER_SETTLE_MAX_SEC)
+        # Max must cover legacy 0.4+0.5 so late IF still resolves; poll keeps ASAP
+        self.assertGreaterEqual(mx, LEGACY_ADAPTER_SETTLE_TOTAL_SEC)
+        self.assertEqual(mx, DEFAULT_ADAPTER_SETTLE_MAX_SEC)
         self.assertGreater(pl, 0)
-        self.assertLessEqual(pl, mx if mx > 0 else pl)
+        self.assertLess(pl, mx)
 
     def test_wait_returns_immediately_when_index_ready(self):
         sleeps: list[float] = []
         clock = {"t": 0.0}
+        calls = {"n": 0}
 
         class FakeTun:
             name = "RPT"
 
             def interface_index(self):
+                calls["n"] += 1
                 return 42
 
         def sleep_fn(dt: float) -> None:
@@ -59,15 +62,20 @@ class TestAdapterSettleContinuity(unittest.TestCase):
         def mono() -> float:
             return clock["t"]
 
-        idx = wait_for_wintun_if_index(
-            FakeTun(),
-            max_sec=0.15,
-            poll_sec=0.02,
-            sleep_fn=sleep_fn,
-            monotonic_fn=mono,
-        )
+        with mock.patch(
+            "client.windows.tunnel_win.resolve_interface_index"
+        ) as resolve:
+            idx = wait_for_wintun_if_index(
+                FakeTun(),
+                max_sec=0.9,
+                poll_sec=0.05,
+                sleep_fn=sleep_fn,
+                monotonic_fn=mono,
+            )
+            resolve.assert_not_called()
         self.assertEqual(idx, 42)
         self.assertEqual(sleeps, [], "must not accumulate sleep when IF is ready")
+        self.assertEqual(calls["n"], 1, "single resolve path per try (no double)")
 
     def test_wait_polls_then_succeeds_without_full_legacy_tax(self):
         sleeps: list[float] = []
@@ -89,18 +97,54 @@ class TestAdapterSettleContinuity(unittest.TestCase):
             return clock["t"]
 
         with mock.patch(
-            "client.windows.tunnel_win.resolve_interface_index", return_value=None
-        ):
+            "client.windows.tunnel_win.resolve_interface_index"
+        ) as resolve:
             idx = wait_for_wintun_if_index(
                 FakeTun(),
-                max_sec=0.15,
-                poll_sec=0.02,
+                max_sec=0.9,
+                poll_sec=0.05,
                 sleep_fn=sleep_fn,
                 monotonic_fn=mono,
             )
+            resolve.assert_not_called()
         self.assertEqual(idx, 7)
         self.assertTrue(sleeps, "polls until ready")
-        self.assertLess(sum(sleeps), 0.4, "total wait mass below legacy 0.4s floor")
+        # Early success: total sleep << full max when ready on 3rd try
+        self.assertLess(sum(sleeps), LEGACY_ADAPTER_SETTLE_TOTAL_SEC)
+
+    def test_delayed_readiness_at_0_3s_still_resolves_under_legacy_max(self):
+        """IF first queryable at ~0.3s must succeed (0.15s cap would fail)."""
+        sleeps: list[float] = []
+        clock = {"t": 0.0}
+
+        class FakeTun:
+            name = "RPT"
+
+            def interface_index(self):
+                # Ready only after 0.3s of simulated wall time
+                return 99 if clock["t"] >= 0.3 else None
+
+        def sleep_fn(dt: float) -> None:
+            sleeps.append(dt)
+            clock["t"] += dt
+
+        def mono() -> float:
+            return clock["t"]
+
+        with mock.patch(
+            "client.windows.tunnel_win.resolve_interface_index"
+        ) as resolve:
+            idx = wait_for_wintun_if_index(
+                FakeTun(),
+                max_sec=LEGACY_ADAPTER_SETTLE_TOTAL_SEC,
+                poll_sec=0.05,
+                sleep_fn=sleep_fn,
+                monotonic_fn=mono,
+            )
+            resolve.assert_not_called()
+        self.assertEqual(idx, 99)
+        self.assertGreaterEqual(clock["t"], 0.3)
+        self.assertLessEqual(clock["t"], LEGACY_ADAPTER_SETTLE_TOTAL_SEC + 0.05)
 
 
 class TestFlyclientDecide(unittest.TestCase):

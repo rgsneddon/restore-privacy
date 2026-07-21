@@ -65,8 +65,11 @@ def is_admin() -> bool:
 
 # Continuity constraint ∇_μ(ρ_t u^μ)=0 on residual attach: no fixed sleep "density"
 # backlog after Wintun create — poll IF index and return as soon as flux is ready.
-DEFAULT_ADAPTER_SETTLE_MAX_SEC = 0.15
-DEFAULT_ADAPTER_SETTLE_POLL_SEC = 0.02
+# Max wait ≥ legacy sleep(0.4)+sleep(0.5) so late-registering adapters still succeed;
+# poll interval keeps cold path returning ASAP when the index is already queryable.
+LEGACY_ADAPTER_SETTLE_TOTAL_SEC = 0.9  # historical fixed 0.4s + 0.5s
+DEFAULT_ADAPTER_SETTLE_MAX_SEC = LEGACY_ADAPTER_SETTLE_TOTAL_SEC
+DEFAULT_ADAPTER_SETTLE_POLL_SEC = 0.05
 
 
 def adapter_settle_budget(
@@ -76,8 +79,9 @@ def adapter_settle_budget(
 ) -> tuple[float, float]:
     """Pure budget for Wintun IF settle: (max_wait, poll_interval).
 
-    Scales settle waits far below the historical fixed 0.4s + 0.5s sleeps while
-    still allowing a short OS registration window.
+    Max wait is at least the legacy total (~0.9s) so adapters that only become
+    queryable mid-window still resolve. Poll + early return removes fixed ρ
+    when the IF index is ready immediately or early in the window.
     """
     mx = DEFAULT_ADAPTER_SETTLE_MAX_SEC if max_sec is None else float(max_sec)
     pl = DEFAULT_ADAPTER_SETTLE_POLL_SEC if poll_sec is None else float(poll_sec)
@@ -101,7 +105,10 @@ def wait_for_wintun_if_index(
     """Resolve Wintun IF index ASAP — poll instead of fixed multi-sleep backlog.
 
     Continuity: ρ (wait mass) does not accumulate past readiness; returns on first
-    successful index. ``sleep_fn`` / ``monotonic_fn`` injectables for unit tests.
+    successful index. One resolve per poll only (``interface_index`` already wraps
+    ``resolve_interface_index`` on WindowsTun — do not double-call).
+
+    ``sleep_fn`` / ``monotonic_fn`` injectables for unit tests.
     """
     max_wait, poll = adapter_settle_budget(max_sec=max_sec, poll_sec=poll_sec)
     sleeper = time.sleep if sleep_fn is None else sleep_fn
@@ -110,14 +117,12 @@ def wait_for_wintun_if_index(
     name = getattr(tun, "name", None) or "RPT"
 
     def _try() -> Optional[int]:
-        idx = None
-        if hasattr(tun, "interface_index"):
+        # Single resolve path per poll. WindowsTun.interface_index → resolve once.
+        if hasattr(tun, "interface_index") and callable(tun.interface_index):
             try:
-                idx = tun.interface_index()
+                return tun.interface_index()
             except Exception:
-                idx = None
-        if idx is not None:
-            return idx
+                return None
         return resolve_interface_index(name)
 
     idx = _try()
