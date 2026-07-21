@@ -52,7 +52,8 @@ class TestPublicPageWithDownloads(unittest.TestCase):
         self.assertIn(ANDROID_APK_FILENAME, html)
         self.assertNotIn("apple-prep", html)
         for a in available_downloads():
-            self.assertIn(f'href="{a.url}"', html)
+            self.assertIn(f'href="/pay?platform={a.platform}"', html)
+            self.assertNotIn(f'href="{a.url}"', html)
             self.assertTrue(
                 a.url.startswith(
                     "https://github.com/rgsneddon/RUST-IN-PRIVACY/releases/download/v1.0.0/"
@@ -66,9 +67,10 @@ class TestPublicPageWithDownloads(unittest.TestCase):
         self.assertIn(RELEASE_PAGE_URL, html)
         self.assertIn("RUST-IN-PRIVACY", html)
         self.assertIn('id="rust-repo-link"', html)
+        self.assertIn("£2.45", html)
+        self.assertIn("buymeacoffee.com/rgsneddon", html)
         self.assertNotIn("connect-via-web", html)
         self.assertNotIn("Connect via web", html)
-        self.assertNotIn("buymeacoffee.com", html)
 
     def test_handler_twice_has_downloads(self):
         httpd = ThreadingHTTPServer(("127.0.0.1", 0), status_app.Handler)
@@ -94,7 +96,8 @@ class TestPublicPageWithDownloads(unittest.TestCase):
                     self.assertNotIn("fetch('/api/status'", html)
                     self.assertIn("Download client v1.0.0", html)
                     self.assertIn(WINDOWS_ZIP_FILENAME, html)
-                    self.assertIn("/releases/download/v1.0.0/", html)
+                    self.assertIn("/pay?platform=windows", html)
+                    self.assertIn("£2.45", html)
                     self.assertIn(RUST_REPO_URL, html)
         finally:
             httpd.shutdown()

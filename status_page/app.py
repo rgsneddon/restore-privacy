@@ -11,11 +11,31 @@ import json
 import mimetypes
 import os
 import urllib.error
+import urllib.parse
 import urllib.request
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
+from admin_panel import (
+    SESSION_COOKIE,
+    admin_enabled,
+    is_authenticated,
+    mint_session_token,
+    render_admin_html,
+    render_login_html,
+    verify_credentials,
+)
 from downloads import download_css, render_download_section_html
+from payments import (
+    PRICE_LABEL,
+    PRICE_PENCE,
+    create_checkout_session,
+    handle_stripe_webhook,
+    init_db,
+    platform_filename,
+    redeem_download_token,
+    stripe_configured,
+)
 
 # Public page: title + BETA note + download buttons (no live client counter).
 
@@ -278,21 +298,75 @@ def render_html(status: dict, poll_ms: int | None = None) -> bytes:
 """
     return body.encode("utf-8")
 
+def _parse_query(path_with_q: str) -> tuple[str, dict[str, str]]:
+    if "?" not in path_with_q:
+        return path_with_q, {}
+    path, q = path_with_q.split("?", 1)
+    return path, dict(urllib.parse.parse_qsl(q, keep_blank_values=True))
+
+
+def _html_page(title: str, body_inner: str) -> bytes:
+    title_safe = (
+        title.replace("&", "&amp;")
+        .replace("<", "&lt;")
+        .replace(">", "&gt;")
+    )
+    return f"""<!DOCTYPE html>
+<html lang="en"><head>
+<meta charset="utf-8"/><meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>{title_safe}</title>
+<style>
+body{{margin:0;min-height:100vh;display:flex;flex-direction:column;align-items:center;
+justify-content:center;background:#0b0f14;color:#e8eef5;font-family:system-ui,sans-serif;
+padding:2rem;text-align:center}}
+a{{color:#93c5fd}} .msg{{max-width:28rem;line-height:1.5}}
+</style></head><body>
+{body_inner}
+</body></html>
+""".encode("utf-8")
+
+
 class Handler(BaseHTTPRequestHandler):
     def log_message(self, format, *args):  # noqa: A003
         # No access / user-info logs
         return
 
-    def _send(self, code: int, content_type: str, data: bytes) -> None:
+    def _send(
+        self,
+        code: int,
+        content_type: str,
+        data: bytes,
+        *,
+        extra_headers: list[tuple[str, str]] | None = None,
+    ) -> None:
         self.send_response(code)
         self.send_header("Content-Type", content_type)
         self.send_header("Content-Length", str(len(data)))
         self.send_header("Cache-Control", "no-store")
+        if extra_headers:
+            for k, v in extra_headers:
+                self.send_header(k, v)
         self.end_headers()
         self.wfile.write(data)
 
+    def _redirect(self, location: str, code: int = 302) -> None:
+        self.send_response(code)
+        self.send_header("Location", location)
+        self.send_header("Content-Length", "0")
+        self.send_header("Cache-Control", "no-store")
+        self.end_headers()
+
+    def _read_body(self) -> bytes:
+        try:
+            n = int(self.headers.get("Content-Length") or "0")
+        except ValueError:
+            n = 0
+        if n <= 0:
+            return b""
+        return self.rfile.read(n)
+
     def do_GET(self):  # noqa: N802
-        path = self.path.split("?", 1)[0]
+        path, query = _parse_query(self.path)
         if path in ("/", "/index.html"):
             self._send(
                 200,
@@ -303,7 +377,6 @@ class Handler(BaseHTTPRequestHandler):
         static = read_static_bytes(path)
         if static is not None:
             data, ctype = static
-            # Favicon/logo can be cached lightly; still no user data
             self.send_response(200)
             self.send_header("Content-Type", ctype)
             self.send_header("Content-Length", str(len(data)))
@@ -319,10 +392,236 @@ class Handler(BaseHTTPRequestHandler):
         if path in ("/health", "/healthz"):
             self._send(200, "application/json", b'{"ok":true}')
             return
+
+        # --- Paid download flow ---
+        if path == "/pay":
+            platform = (query.get("platform") or "").strip()
+            if not platform or not platform_filename(platform):
+                self._send(
+                    400,
+                    "text/html; charset=utf-8",
+                    _html_page("Pay", '<p class="msg">Unknown package.</p><p><a href="/">Back</a></p>'),
+                )
+                return
+            if not stripe_configured():
+                self._send(
+                    503,
+                    "text/html; charset=utf-8",
+                    _html_page(
+                        "Payments unavailable",
+                        f'<p class="msg" id="pay-unconfigured">Payments are not configured yet '
+                        f"(missing STRIPE_SECRET_KEY). See operator how-to. "
+                        f"Price remains {PRICE_LABEL} ({PRICE_PENCE} pence GBP) per download.</p>"
+                        f'<p><a href="/">Back</a></p>',
+                    ),
+                )
+                return
+            try:
+                session = create_checkout_session(platform)
+            except ValueError as e:
+                self._send(
+                    502,
+                    "text/html; charset=utf-8",
+                    _html_page(
+                        "Checkout error",
+                        f'<p class="msg">Could not start checkout: {str(e)[:200]}</p>'
+                        f'<p><a href="/">Back</a></p>',
+                    ),
+                )
+                return
+            self._redirect(session["url"])
+            return
+
+        if path == "/download":
+            token = (query.get("token") or "").strip()
+            grant = redeem_download_token(token) if token else None
+            if not grant or not grant.get("url"):
+                self._send(
+                    403,
+                    "text/html; charset=utf-8",
+                    _html_page(
+                        "Download unavailable",
+                        '<p class="msg" id="download-denied">Invalid, expired, or already-used download link.</p>'
+                        '<p><a href="/">Get a new download</a></p>',
+                    ),
+                )
+                return
+            # Single-use: already marked used; send buyer to asset URL once
+            self._redirect(str(grant["url"]))
+            return
+
+        if path in ("/download/success", "/pay/success"):
+            token = (query.get("token") or "").strip()
+            platform = (query.get("platform") or "").strip()
+            # Token is normally issued by webhook; success page can show instructions
+            if token:
+                link = f'/download?token={urllib.parse.quote(token)}'
+                inner = (
+                    f'<p class="msg" id="pay-success">Payment received. Your one-time download:</p>'
+                    f'<p><a class="dl" id="success-download-link" href="{link}">Download package</a></p>'
+                    f'<p class="msg">Link works once and expires. Tip optional: '
+                    f'<a href="https://buymeacoffee.com/rgsneddon">buymeacoffee.com/rgsneddon</a></p>'
+                )
+            else:
+                inner = (
+                    f'<p class="msg" id="pay-success-pending">Payment submitted'
+                    f'{(" for " + platform) if platform else ""}. '
+                    f"When Stripe confirms, use the download link from the email/receipt page "
+                    f"or refresh this page if a token was attached.</p>"
+                    f'<p class="msg">If fulfilment is delayed a few seconds, wait for the webhook, '
+                    f"then open the success URL with <code>?token=</code> from admin or email.</p>"
+                    f'<p><a href="/">Home</a></p>'
+                )
+            self._send(200, "text/html; charset=utf-8", _html_page("Thank you", inner))
+            return
+
+        if path in ("/download/cancel", "/pay/cancel"):
+            self._send(
+                200,
+                "text/html; charset=utf-8",
+                _html_page(
+                    "Cancelled",
+                    '<p class="msg" id="pay-cancel">Checkout cancelled — no charge.</p>'
+                    '<p><a href="/">Back to downloads</a></p>',
+                ),
+            )
+            return
+
+        # --- Admin ---
+        if path == "/admin" or path == "/admin/":
+            if not admin_enabled():
+                self._send(
+                    503,
+                    "text/plain; charset=utf-8",
+                    b"admin disabled (set RPT_ADMIN_PASSWORD)",
+                )
+                return
+            if not is_authenticated(self.headers):
+                self._send(200, "text/html; charset=utf-8", render_login_html())
+                return
+            self._send(200, "text/html; charset=utf-8", render_admin_html())
+            return
+        if path == "/admin/login":
+            # GET shows login form
+            if not admin_enabled():
+                self._send(503, "text/plain; charset=utf-8", b"admin disabled")
+                return
+            self._send(200, "text/html; charset=utf-8", render_login_html())
+            return
+        if path == "/admin/logout":
+            self._send(
+                302,
+                "text/plain; charset=utf-8",
+                b"",
+                extra_headers=[
+                    (
+                        "Set-Cookie",
+                        f"{SESSION_COOKIE}=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0",
+                    ),
+                    ("Location", "/admin/login"),
+                ],
+            )
+            return
+
+        self._send(404, "text/plain; charset=utf-8", b"not found")
+
+    def do_POST(self):  # noqa: N802
+        path, _query = _parse_query(self.path)
+        body = self._read_body()
+
+        if path == "/api/checkout":
+            try:
+                data = json.loads(body.decode("utf-8") or "{}")
+            except json.JSONDecodeError:
+                self._send(400, "application/json", b'{"error":"bad_json"}')
+                return
+            platform = str(data.get("platform") or "").strip()
+            if not stripe_configured():
+                self._send(
+                    503,
+                    "application/json",
+                    json.dumps(
+                        {
+                            "error": "stripe_unconfigured",
+                            "amount_pence": PRICE_PENCE,
+                            "price_label": PRICE_LABEL,
+                        }
+                    ).encode("utf-8"),
+                )
+                return
+            try:
+                session = create_checkout_session(platform)
+            except ValueError as e:
+                self._send(
+                    400,
+                    "application/json",
+                    json.dumps({"error": str(e)}).encode("utf-8"),
+                )
+                return
+            self._send(
+                200,
+                "application/json",
+                json.dumps(
+                    {
+                        "id": session["id"],
+                        "url": session["url"],
+                        "amount_pence": session["amount_pence"],
+                        "currency": session["currency"],
+                        "platform": session["platform"],
+                        "filename": session["filename"],
+                    }
+                ).encode("utf-8"),
+            )
+            return
+
+        if path == "/webhook/stripe":
+            sig = self.headers.get("Stripe-Signature") or ""
+            result = handle_stripe_webhook(body, sig)
+            if not result.get("ok"):
+                self._send(
+                    400,
+                    "application/json",
+                    json.dumps(result).encode("utf-8"),
+                )
+                return
+            # Attach download URL for success page when granted
+            if result.get("granted") and result.get("token"):
+                result = dict(result)
+                result["download_path"] = f"/download?token={result['token']}"
+            self._send(200, "application/json", json.dumps(result).encode("utf-8"))
+            return
+
+        if path == "/admin/login":
+            if not admin_enabled():
+                self._send(503, "text/plain; charset=utf-8", b"admin disabled")
+                return
+            form = dict(urllib.parse.parse_qsl(body.decode("utf-8", "replace")))
+            user = form.get("username") or ""
+            password = form.get("password") or ""
+            if not verify_credentials(user, password):
+                self._send(
+                    401,
+                    "text/html; charset=utf-8",
+                    render_login_html(error="Invalid username or password"),
+                )
+                return
+            token = mint_session_token()
+            self.send_response(302)
+            self.send_header("Location", "/admin")
+            self.send_header(
+                "Set-Cookie",
+                f"{SESSION_COOKIE}={token}; Path=/; HttpOnly; SameSite=Lax; Max-Age=28800",
+            )
+            self.send_header("Content-Length", "0")
+            self.send_header("Cache-Control", "no-store")
+            self.end_headers()
+            return
+
         self._send(404, "text/plain; charset=utf-8", b"not found")
 
 
 def main() -> int:
+    init_db()
     host = os.environ.get("HOST", "0.0.0.0")
     port = int(os.environ.get("PORT", "10000"))
     httpd = ThreadingHTTPServer((host, port), Handler)

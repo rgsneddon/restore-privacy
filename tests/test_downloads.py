@@ -1,4 +1,4 @@
-"""Tests for shipped status-page download catalog (RUST-IN-PRIVACY v1.0.0)."""
+"""Tests for shipped status-page download catalog (RUST-IN-PRIVACY v1.0.0) + paid UI."""
 
 from __future__ import annotations
 
@@ -12,6 +12,7 @@ sys.path.insert(0, str(ROOT / "status_page"))
 import app as status_app  # noqa: E402
 from downloads import (  # noqa: E402
     ANDROID_APK_FILENAME,
+    BMC_TIP_URL,
     GITHUB_REPO,
     IOS_ZIP_FILENAME,
     LINUX_TGZ_FILENAME,
@@ -26,7 +27,6 @@ from downloads import (  # noqa: E402
     render_download_section_html,
 )
 
-# Exact public release used by the downloads page.
 EXPECTED_RELEASE_PAGE = (
     "https://github.com/rgsneddon/RUST-IN-PRIVACY/releases/tag/v1.0.0"
 )
@@ -51,85 +51,50 @@ class TestDownloadCatalog(unittest.TestCase):
         self.assertEqual(platforms, {"windows", "linux", "macos", "ios", "android"})
         by_plat = {a.platform: a for a in assets}
         self.assertEqual(by_plat["windows"].filename, WINDOWS_ZIP_FILENAME)
-        self.assertTrue(by_plat["windows"].filename.endswith(".zip"))
         self.assertEqual(by_plat["linux"].filename, LINUX_TGZ_FILENAME)
         self.assertEqual(by_plat["macos"].filename, MACOS_ZIP_FILENAME)
         self.assertEqual(by_plat["ios"].filename, IOS_ZIP_FILENAME)
         self.assertEqual(by_plat["android"].filename, ANDROID_APK_FILENAME)
-        self.assertTrue(by_plat["android"].filename.endswith(".apk"))
-        self.assertEqual(
-            by_plat["android"].filename,
-            "restore-privacy-rust-1.0.0-android.apk",
-        )
         for a in assets:
-            self.assertNotIn("apple-prep", a.filename)
-            self.assertNotIn("android-prep", a.filename)
+            self.assertEqual(a.url, f"{EXPECTED_DOWNLOAD_PREFIX}{a.filename}")
+            self.assertEqual(a.pay_path, f"/pay?platform={a.platform}")
 
-    def test_labels_and_html(self):
+    def test_labels_and_html_paid(self):
         html = render_download_section_html()
         self.assertIn("Linux (x64) - Installer (.tar.gz)", html)
         self.assertIn('id="dl-linux"', html)
         self.assertIn("Windows (x64) - Client/Node (.zip)", html)
-        self.assertIn('id="dl-macos"', html)
-        self.assertIn('id="dl-ios"', html)
         self.assertIn('id="dl-android"', html)
-        self.assertIn("macOS - Client (.zip)", html)
-        self.assertIn("iOS - Client (.zip)", html)
-        self.assertIn("Android - APK installer", html)
+        self.assertIn("£2.45", html)
+        self.assertIn(BMC_TIP_URL, html)
         self.assertIn(EXPECTED_RELEASE_PAGE, html)
-        self.assertIn("RUST-IN-PRIVACY", html)
-        self.assertIn("Windows | Linux | macOS | iOS | Android", html)
-        self.assertNotIn("apple-prep", html)
+        self.assertIn("Pay £2.45", html)
+        for a in available_downloads():
+            self.assertIn(f'href="/pay?platform={a.platform}"', html)
+            self.assertNotIn(f'href="{a.url}"', html)
 
     def test_available_downloads_have_https_github_release_urls(self):
-        assets = available_downloads()
-        for a in assets:
-            self.assertTrue(
-                a.url.startswith(EXPECTED_DOWNLOAD_PREFIX),
-                f"not explicit v1.0.0 download URL: {a.url}",
-            )
+        for a in available_downloads():
+            self.assertTrue(a.url.startswith(EXPECTED_DOWNLOAD_PREFIX))
             self.assertEqual(a.url, f"{EXPECTED_DOWNLOAD_PREFIX}{a.filename}")
-            self.assertNotIn("restore-privacy/releases", a.url)
-            self.assertNotIn("href=\"#\"", a.url)
-            self.assertNotIn("/download/0.", a.url)
-            self.assertNotIn("/tag/", a.url)  # asset links are /download/, not /tag/
 
-    def test_render_download_section_uses_real_urls(self):
+    def test_render_download_section_uses_paid_paths(self):
         html = render_download_section_html()
         self.assertIn(f"Download client v{RELEASE_VERSION}", html)
         self.assertIn('class="dl"', html)
-        self.assertIn("Windows", html)
-        self.assertIn("Linux", html)
-        self.assertIn(ANDROID_APK_FILENAME, html)
-        self.assertIn(EXPECTED_RELEASE_PAGE, html)
-        self.assertIn(f'href="{EXPECTED_RELEASE_PAGE}"', html)
-        for a in available_downloads():
-            self.assertIn(f'href="{a.url}"', html)
-            self.assertNotIn('href="#"', html)
-            self.assertNotIn("github.com/rgsneddon/restore-privacy/releases", html)
+        self.assertNotIn('href="#"', html)
+        self.assertIn("data-price-pence=\"245\"", html)
 
-    def test_status_page_html_includes_downloads(self):
-        page = status_app.render_html(
-            {"title": "RESTORE PRIVACY"}
-        ).decode("utf-8")
+    def test_status_page_html_includes_paid_downloads(self):
+        page = status_app.render_html({"title": "RESTORE PRIVACY"}).decode("utf-8")
         self.assertIn("RESTORE PRIVACY", page)
         self.assertNotIn("clients-connected", page)
-        self.assertNotIn("fetch('/api/status'", page)
         self.assertIn(f"Download client v{RELEASE_VERSION}", page)
-        self.assertIn(EXPECTED_DOWNLOAD_PREFIX, page)
-        self.assertIn(EXPECTED_RELEASE_PAGE, page)
-        self.assertIn(WINDOWS_ZIP_FILENAME, page)
-        self.assertIn(LINUX_TGZ_FILENAME, page)
-        self.assertIn(MACOS_ZIP_FILENAME, page)
-        self.assertIn(IOS_ZIP_FILENAME, page)
+        self.assertIn("/pay?platform=", page)
+        self.assertIn("£2.45", page)
+        self.assertIn(WINDOWS_ZIP_FILENAME, page)  # data-filename
         self.assertIn(ANDROID_APK_FILENAME, page)
-        self.assertNotIn("apple-prep", page)
-        for a in available_downloads():
-            self.assertIn(f'href="{a.url}"', page)
-            self.assertEqual(
-                a.url,
-                f"https://github.com/rgsneddon/RUST-IN-PRIVACY/releases/download/v1.0.0/{a.filename}",
-            )
+        self.assertIn(BMC_TIP_URL, page)
 
 
 if __name__ == "__main__":

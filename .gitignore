@@ -41,3 +41,7 @@ dist/
 # Swift package build (RPT2 engine tests)
 client_app/apple_shared/Rpt2/.build/
 client_app/apple_shared/Rpt2/.swiftpm/
+
+# Paid download SQLite / local payment data
+status_page/data/
+
