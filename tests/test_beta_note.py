@@ -39,7 +39,8 @@ class TestTitleLegalLinks(unittest.TestCase):
         self.assertIn("SECURITY AUDIT", html)
         self.assertIn(status_app.LICENCE_URL, html)
         self.assertIn(status_app.PRIVACY_POLICY_URL, html)
-        self.assertIn(status_app.SECURITY_AUDIT_URL, html)
+        # Audit link is same-origin so it never 404s when a GH host is private
+        self.assertIn(status_app.SECURITY_AUDIT_LOCAL_PATH, html)
         self.assertIn('id="doc-links"', html)
         self.assertIn('id="licence-link"', html)
         self.assertIn('id="privacy-link"', html)
@@ -64,7 +65,8 @@ class TestTitleLegalLinks(unittest.TestCase):
         self.assertIn("PRIVACY_POLICY.md", status_app.PRIVACY_POLICY_URL)
         self.assertIn("AUDIT.md", status_app.SECURITY_AUDIT_URL)
         self.assertTrue(status_app.SECURITY_AUDIT_URL.endswith("/AUDIT.md"))
-        self.assertIn("github.com/rgsneddon/RUST-IN-PRIVACY", status_app.LICENCE_URL)
+        self.assertIn("github.com/rgsneddon/restore-privacy", status_app.LICENCE_URL)
+        self.assertNotIn("RUST-IN-PRIVACY", status_app.LICENCE_URL)
         # Labels
         self.assertEqual(status_app.LICENCE_LABEL, "LICENCE")
         self.assertEqual(status_app.PRIVACY_POLICY_LABEL, "PRIVACY POLICY")

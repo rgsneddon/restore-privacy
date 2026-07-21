@@ -8,8 +8,9 @@ class LegalDocLink {
   final String label;
   final String repoPath;
 
+  // Public product host (restore-privacy is public; RUST-IN-PRIVACY may be private → 404).
   static const blobBase =
-      'https://github.com/rgsneddon/RUST-IN-PRIVACY/blob/main';
+      'https://github.com/rgsneddon/restore-privacy/blob/main';
 
   String get url => '$blobBase/$repoPath';
 }

@@ -1,0 +1,47 @@
+{
+  "generated_at": "2026-07-21T02:30:04Z",
+  "node_host": "82.221.101.241",
+  "catalog_version": "0.2.3",
+  "unit_suite": {
+    "ran": true,
+    "ok": true,
+    "returncode": 0,
+    "modules": [
+      "tests.test_legal_links",
+      "tests.test_legal_docs",
+      "tests.test_no_public_client_count",
+      "tests.test_connect_no_phones_home",
+      "tests.test_obfuscation",
+      "tests.test_kill_switch_leaks",
+      "tests.test_product_node_key",
+      "tests.test_pfs_product_require",
+      "tests.test_downloads"
+    ]
+  },
+  "tcp_status": {
+    "host": "82.221.101.241",
+    "port": 8080,
+    "ok": true,
+    "error": null
+  },
+  "http_status": {
+    "url": "http://82.221.101.241:8080/status",
+    "ok": true,
+    "status_code": 200,
+    "body": {
+      "title": "RESTORE PRIVACY"
+    },
+    "error": null
+  },
+  "udp": {
+    "host": "82.221.101.241",
+    "port": 44044,
+    "sent": true,
+    "error": null
+  },
+  "no_priv": {
+    "ok": true,
+    "hits": []
+  },
+  "overall_ok": true
+}

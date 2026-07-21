@@ -48,7 +48,9 @@ class TestLegalLinksHelper(unittest.TestCase):
         self.assertEqual(len(urls), 3)
         for label, url in urls.items():
             self.assertTrue(
-                url.startswith("https://github.com/rgsneddon/RUST-IN-PRIVACY/blob/main/")
+                url.startswith(
+                    "https://github.com/rgsneddon/restore-privacy/blob/main/"
+                )
             )
             self.assertIn(label, (AUDIT_LABEL, PRIVACY_POLICY_LABEL, END_USER_LICENCE_LABEL))
         self.assertTrue(audit_url().endswith("/AUDIT.md"))

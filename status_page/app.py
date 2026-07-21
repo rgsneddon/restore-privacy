@@ -91,32 +91,57 @@ def read_static_bytes(url_path: str) -> tuple[bytes, str] | None:
             ctype = "application/octet-stream"
     return data, ctype
 
-# Public legal / audit document links (stable GitHub blob URLs on public Rust host).
-GITHUB_BLOB_MAIN = "https://github.com/rgsneddon/RUST-IN-PRIVACY/blob/main"
+# Public legal / audit document links (stable GitHub blob URLs on public product host).
+# restore-privacy is public; RUST-IN-PRIVACY may be private → public AUDIT links 404 there.
+GITHUB_BLOB_MAIN = "https://github.com/rgsneddon/restore-privacy/blob/main"
 LICENCE_URL = f"{GITHUB_BLOB_MAIN}/LICENSE"
 PRIVACY_POLICY_URL = f"{GITHUB_BLOB_MAIN}/PRIVACY_POLICY.md"
 SECURITY_AUDIT_URL = f"{GITHUB_BLOB_MAIN}/AUDIT.md"
+# Same-origin mirrors so status page always has audit even if GH link changes.
+SECURITY_AUDIT_LOCAL_PATH = "/AUDIT.md"
+SECURITY_AUDIT_LOCAL_PATH_LOWER = "/audit.md"
 
 # Labels shown under the product title (terms of use / privacy / audit).
 LICENCE_LABEL = "LICENCE"
 PRIVACY_POLICY_LABEL = "PRIVACY POLICY"
 SECURITY_AUDIT_LABEL = "SECURITY AUDIT"
 
-# Public Rust product repository (footer link).
-RUST_REPO_URL = "https://github.com/rgsneddon/RUST-IN-PRIVACY"
-RUST_REPO_LABEL = "Rust product (RUST-IN-PRIVACY v1.0.0)"
+# Public product repository (footer link).
+RUST_REPO_URL = "https://github.com/rgsneddon/restore-privacy"
+RUST_REPO_LABEL = "Package source - restore-privacy (signed releases)"
 
 # Kept for older imports/tests that still reference the constant name.
 BETA_NOTE_TEXT = ""
 BETA_NOTE_URL = "https://x.com/rgsneddon"
 
 
+def audit_document_bytes() -> bytes | None:
+    """Load AUDIT.md from status_page, repo root, or install root (node)."""
+    candidates = (
+        STATUS_DIR / "AUDIT.md",
+        STATUS_DIR.parent / "AUDIT.md",
+        Path(os.environ.get("RPT_INSTALL_ROOT", "/opt/restore-privacy")) / "AUDIT.md",
+        Path(os.environ.get("RPT_AUDIT_PATH", "")),
+    )
+    for path in candidates:
+        if not path or str(path) in (".", ""):
+            continue
+        try:
+            if path.is_file() and path.stat().st_size > 200:
+                return path.read_bytes()
+        except OSError:
+            continue
+    return None
+
+
 def render_legal_links_html() -> str:
     """Links immediately below the RESTORE PRIVACY headline (licence / privacy / audit)."""
+    # Prefer same-origin /AUDIT.md so the page never 404s when a GH host is private.
+    audit_href = SECURITY_AUDIT_LOCAL_PATH
     items = (
         (LICENCE_LABEL, LICENCE_URL, "licence-link"),
         (PRIVACY_POLICY_LABEL, PRIVACY_POLICY_URL, "privacy-link"),
-        (SECURITY_AUDIT_LABEL, SECURITY_AUDIT_URL, "audit-link"),
+        (SECURITY_AUDIT_LABEL, audit_href, "audit-link"),
     )
     anchors = []
     for label, url, el_id in items:
@@ -518,6 +543,26 @@ class Handler(BaseHTTPRequestHandler):
                     '<p><a href="/">Back to downloads</a></p>',
                 ),
             )
+            return
+
+        # Public security audit (AUDIT.md + audit.md case alias)
+        if path in (
+            SECURITY_AUDIT_LOCAL_PATH,
+            SECURITY_AUDIT_LOCAL_PATH_LOWER,
+            "/docs/AUDIT.md",
+            "/docs/audit.md",
+        ):
+            data = audit_document_bytes()
+            if data is None:
+                # Fallback redirect to public GitHub blob when local file not packaged
+                self._send(
+                    302,
+                    "text/plain; charset=utf-8",
+                    b"",
+                    extra_headers=[("Location", SECURITY_AUDIT_URL)],
+                )
+                return
+            self._send(200, "text/markdown; charset=utf-8", data)
             return
 
         # --- Admin ---

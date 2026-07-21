@@ -8,8 +8,9 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+# Public product host (restore-privacy is public; RUST-IN-PRIVACY may be private → 404).
 GITHUB_REPO_BLOB_BASE = (
-    "https://github.com/rgsneddon/RUST-IN-PRIVACY/blob/main"
+    "https://github.com/rgsneddon/restore-privacy/blob/main"
 )
 
 # User-facing labels (Settings) and relative repo paths.
