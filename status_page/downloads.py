@@ -2,9 +2,11 @@
 
 Primary path: pay **£2.45** (GBP) via Stripe Checkout per package, then a
 single-use download token. Free permanent GitHub ``href`` is not used on the
-public buttons. Buy Me a Coffee is tip/support only.
+public buttons. After payment the status host **proxies** the installer
+(authenticated GitHub API / local assets) so fulfilment works when the
+restore-privacy repo is **private**. Buy Me a Coffee is tip/support only.
 
-Current public packages: restore-privacy GitHub Release **0.2.9**
+Current catalog packages: restore-privacy release **0.2.9**
 (macOS Developer ID notarized; iOS Team-signed sideload).
 """
 
@@ -46,7 +48,10 @@ class DownloadAsset:
 
     @property
     def url(self) -> str:
-        """Underlying release asset URL (fulfilment target after payment)."""
+        """Canonical release asset URL (bookkeeping / authenticated fetch only).
+
+        Public HTML must use :attr:`pay_path`, not this URL as a free href.
+        """
         return f"{RELEASE_DOWNLOAD_BASE}/{self.filename}"
 
     @property
@@ -108,9 +113,11 @@ def available_downloads(
     return out
 
 
-# Footer: explicit link to the public 0.2.9 release page (package source of truth).
+# Footer: catalog identity (repo may be private — installers only after pay).
 RUST_REPO_URL = RELEASE_PAGE_URL
-RUST_REPO_LABEL = "Package source - restore-privacy 0.2.9 release (signed)"
+RUST_REPO_LABEL = (
+    f"Catalog v{RELEASE_VERSION} — installers after £2.45 payment only (signed packages)"
+)
 
 
 # Compatibility aliases used by older tests (map to 0.2.9 installers).
@@ -186,8 +193,9 @@ def render_download_section_html(assets: Iterable[DownloadAsset] | None = None) 
     return f"""
   <section class="downloads" id="downloads" aria-label="Download Restore Privacy client">
     <h2>Download client v{RELEASE_VERSION}</h2>
-    <p class="dl-sub">Windows | Linux | macOS | iOS | Android - packages from
-      <a class="rust-link" href="{RELEASE_PAGE_URL}" rel="noopener noreferrer" target="_blank">0.2.9 release</a></p>
+    <p class="dl-sub">Windows | Linux | macOS | iOS | Android — catalog
+      <span id="catalog-version">v{RELEASE_VERSION}</span>
+      (paid download only; installers delivered after Stripe payment)</p>
     <p class="dl-price" id="dl-price">{PRICE_LABEL} GBP per package download (Stripe Checkout)</p>
     <div class="dl-buttons">
 {links_html}

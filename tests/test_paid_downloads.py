@@ -173,7 +173,7 @@ class TestCheckoutAmount(unittest.TestCase):
 
 class TestWebhookAndTokens(unittest.TestCase):
     def setUp(self):
-        self._td = tempfile.TemporaryDirectory(ignore_cleanup_errors=True)
+        self._td = tempfile.TemporaryDirectory()
         self.addCleanup(self._td.cleanup)
         os.environ["RPT_PAYMENT_DATA_DIR"] = self._td.name
         payments.init_db()
@@ -275,7 +275,7 @@ class TestWebhookAndTokens(unittest.TestCase):
 
 class TestAdminAuth(unittest.TestCase):
     def setUp(self):
-        self._td = tempfile.TemporaryDirectory(ignore_cleanup_errors=True)
+        self._td = tempfile.TemporaryDirectory()
         self.addCleanup(self._td.cleanup)
         os.environ["RPT_PAYMENT_DATA_DIR"] = self._td.name
         os.environ["RPT_ADMIN_USER"] = "ops"
@@ -361,7 +361,7 @@ class TestBuyerSuccessFulfilment(unittest.TestCase):
     """After pay, /download/success?session_id=… must surface the real one-time link."""
 
     def setUp(self):
-        self._td = tempfile.TemporaryDirectory(ignore_cleanup_errors=True)
+        self._td = tempfile.TemporaryDirectory()
         self.addCleanup(self._td.cleanup)
         os.environ["RPT_PAYMENT_DATA_DIR"] = self._td.name
         payments.init_db()
@@ -560,7 +560,7 @@ class TestProcessorSettingsView(unittest.TestCase):
 
 class TestAdminHtmlArchitecture(unittest.TestCase):
     def setUp(self):
-        self._td = tempfile.TemporaryDirectory(ignore_cleanup_errors=True)
+        self._td = tempfile.TemporaryDirectory()
         self.addCleanup(self._td.cleanup)
         os.environ["RPT_PAYMENT_DATA_DIR"] = self._td.name
         os.environ["RPT_ADMIN_PASSWORD"] = "admin-arch"
@@ -730,6 +730,134 @@ class TestAdminBootstrapDigest(unittest.TestCase):
             self.assertIn("admin-login-form", body)
             self.assertNotIn("admin disabled", body)
             self.assertNotIn("admin-grants-table", body)
+        finally:
+            httpd.shutdown()
+            httpd.server_close()
+
+
+
+class TestPrivateRepoProxyFulfilment(unittest.TestCase):
+    """Paid redeem must proxy installers (local/API) — not free public GH redirects."""
+
+    def setUp(self):
+        self._td = tempfile.TemporaryDirectory()
+        self.addCleanup(self._td.cleanup)
+        os.environ["RPT_PAYMENT_DATA_DIR"] = self._td.name
+        os.environ["RPT_ASSET_DIR"] = self._td.name
+        for k in ("RPT_GITHUB_TOKEN", "GITHUB_TOKEN", "GH_TOKEN"):
+            os.environ.pop(k, None)
+        payments.init_db()
+
+    def test_paid_fulfilment_mode_is_proxy(self):
+        self.assertEqual(payments.paid_fulfilment_mode(), "proxy")
+
+    def test_open_release_asset_from_local_dir(self):
+        fname = "restore-privacy-client-0.2.9-linux-x64.tar.gz"
+        payload = b"FAKE-LINUX-PACKAGE-BYTES-FOR-UNIT"
+        (Path(self._td.name) / fname).write_bytes(payload)
+        asset = payments.open_release_asset(fname)
+        self.assertIsNotNone(asset)
+        assert asset is not None
+        self.assertEqual(asset["source"], "local")
+        self.assertEqual(asset["filename"], fname)
+        body = asset["body"]
+        try:
+            data = body.read() if hasattr(body, "read") else body
+        finally:
+            if hasattr(body, "close"):
+                body.close()
+        self.assertEqual(data, payload)
+
+    def test_open_release_asset_rejects_unknown_filename(self):
+        self.assertIsNone(payments.open_release_asset("not-a-catalog-file.exe"))
+
+    def test_open_release_asset_github_api_sends_auth_header(self):
+        fname = "restore-privacy-client-0.2.9-windows-x64-setup.exe"
+        os.environ["RPT_GITHUB_TOKEN"] = "unit-test-token"
+        # Empty search dirs so we do not pick up real releases/0.2.9 on disk
+        os.environ["RPT_ASSET_DIR"] = str(Path(self._td.name) / "empty_assets")
+        Path(os.environ["RPT_ASSET_DIR"]).mkdir(parents=True, exist_ok=True)
+        seen = []
+
+        class FakeResp:
+            def __init__(self, data: bytes, headers=None):
+                self._data = data
+                self.headers = headers or {}
+
+            def read(self, n=-1):
+                if n is None or n < 0:
+                    out, self._data = self._data, b""
+                    return out
+                out, self._data = self._data[:n], self._data[n:]
+                return out
+
+            def __enter__(self):
+                return self
+
+            def __exit__(self, *a):
+                return False
+
+            def close(self):
+                pass
+
+        def fake_urlopen(req, timeout=None):
+            url = req.full_url if hasattr(req, "full_url") else req.get_full_url()
+            headers = {k.lower(): v for k, v in req.header_items()}
+            seen.append((url, headers.get("authorization", "")))
+            if url.endswith("/releases/tags/0.2.9"):
+                body = json.dumps(
+                    {"assets": [{"name": fname, "id": 424242}]}
+                ).encode()
+                return FakeResp(body, {"Content-Type": "application/json"})
+            if url.endswith("/releases/assets/424242"):
+                return FakeResp(b"EXE-BYTES", {"Content-Length": "9"})
+            raise AssertionError(f"unexpected url {url}")
+
+        with mock.patch.object(
+            payments, "asset_search_dirs", return_value=[Path(os.environ["RPT_ASSET_DIR"])]
+        ):
+            asset = payments.open_release_asset(fname, urlopen=fake_urlopen)
+        self.assertIsNotNone(asset)
+        assert asset is not None
+        self.assertEqual(asset["source"], "github_api")
+        body = asset["body"]
+        data = body.read() if hasattr(body, "read") else body
+        if hasattr(body, "close"):
+            body.close()
+        self.assertEqual(data, b"EXE-BYTES")
+        self.assertTrue(
+            any(h.startswith("Bearer unit-test-token") for _, h in seen), seen
+        )
+        self.assertTrue(any("/releases/assets/424242" in u for u, _ in seen), seen)
+
+    def test_http_download_streams_not_redirects_to_github(self):
+        import threading
+        import urllib.request
+
+        fname = "restore-privacy-client-0.2.9-android.apk"
+        payload = b"APK-UNIT-PAYLOAD"
+        (Path(self._td.name) / fname).write_bytes(payload)
+        token = payments.mint_download_token(
+            filename=fname, platform="android", session_id="cs_unit_proxy"
+        )
+        httpd = ThreadingHTTPServer(("127.0.0.1", 0), status_app.Handler)
+        port = httpd.server_address[1]
+        threading.Thread(target=httpd.serve_forever, daemon=True).start()
+        try:
+            req = urllib.request.Request(
+                f"http://127.0.0.1:{port}/download?token={token}"
+            )
+            with urllib.request.urlopen(req, timeout=10) as resp:
+                self.assertEqual(resp.status, 200)
+                self.assertNotIn("github.com", resp.geturl())
+                body = resp.read()
+                disp = resp.headers.get("Content-Disposition", "")
+            self.assertEqual(body, payload)
+            self.assertIn(fname, disp)
+            with self.assertRaises(Exception):
+                urllib.request.urlopen(
+                    f"http://127.0.0.1:{port}/download?token={token}", timeout=5
+                )
         finally:
             httpd.shutdown()
             httpd.server_close()

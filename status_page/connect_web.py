@@ -22,14 +22,14 @@ ACTION_LINE = (
 
 
 def recommended_download_actions() -> list[dict[str, str]]:
-    """Primary actions: real https release URLs (not # placeholders)."""
+    """Primary actions: paid status-page paths (not free public GitHub hrefs)."""
     actions: list[dict[str, str]] = []
     for asset in available_downloads():
         actions.append(
             {
                 "platform": asset.platform,
                 "label": f"Get {asset.label}",
-                "href": asset.url,
+                "href": asset.pay_path,
                 "filename": asset.filename,
             }
         )
@@ -43,7 +43,7 @@ def render_connect_via_web_html() -> str:
     for a in actions:
         buttons.append(
             f'      <a class="connect-btn" id="connect-web-{a["platform"]}" '
-            f'href="{a["href"]}" download="{a["filename"]}">{a["label"]}</a>'
+            f'href="{a["href"]}">{a["label"]}</a>'
         )
     buttons_html = "\n".join(buttons)
     # Limited in-page demo: only checks live status API — clearly not full VPN

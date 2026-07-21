@@ -209,10 +209,167 @@ def platform_filename(platform: str) -> str | None:
 
 
 def asset_download_url(filename: str) -> str | None:
+    """Canonical GitHub release asset URL (bookkeeping only — not a free public href).
+
+    Paid fulfilment must use :func:`open_release_asset` (local disk or authenticated
+    GitHub API) so installers still work when the repo is **private**.
+    """
     for a in RELEASE_ASSETS:
         if a.filename == filename:
             return a.url
     return None
+
+
+def github_auth_token() -> str:
+    """Server-side token for private release asset fetch (never expose to browsers)."""
+    for key in ("RPT_GITHUB_TOKEN", "GITHUB_TOKEN", "GH_TOKEN"):
+        val = os.environ.get(key, "").strip()
+        if val:
+            return val
+    return ""
+
+
+def catalog_filenames() -> frozenset[str]:
+    return frozenset(a.filename for a in RELEASE_ASSETS)
+
+
+def asset_search_dirs() -> list[Path]:
+    """Directories that may hold release installers for local proxy fulfilment."""
+    out: list[Path] = []
+    raw = os.environ.get("RPT_ASSET_DIR", "").strip()
+    if raw:
+        out.append(Path(raw).expanduser())
+    # status_page/../releases/{VERSION}
+    from downloads import RELEASE_VERSION  # local import avoids cycles at module load
+
+    root = Path(__file__).resolve().parents[1]
+    out.append(root / "releases" / RELEASE_VERSION)
+    out.append(Path(__file__).resolve().parent / "assets" / RELEASE_VERSION)
+    return out
+
+
+def content_type_for_filename(filename: str) -> str:
+    lower = filename.lower()
+    if lower.endswith(".apk"):
+        return "application/vnd.android.package-archive"
+    if lower.endswith(".exe"):
+        return "application/vnd.microsoft.portable-executable"
+    if lower.endswith(".zip"):
+        return "application/zip"
+    if lower.endswith(".tar.gz") or lower.endswith(".tgz"):
+        return "application/gzip"
+    return "application/octet-stream"
+
+
+def open_release_asset(
+    filename: str,
+    *,
+    urlopen: Callable[..., Any] | None = None,
+) -> dict[str, Any] | None:
+    """Open installer bytes for a **paid** redeem (proxy/stream, not free public redirect).
+
+    Resolution order:
+      1. Local file under :func:`asset_search_dirs` (operator-staged packages)
+      2. GitHub Releases API with :func:`github_auth_token` (works for private repos)
+      3. Direct release download URL with the same token (fallback)
+
+    Returns dict with keys: filename, content_type, content_length (int|None),
+    body (readable binary file-like or bytes), source (str). Caller must close
+    file-like bodies. Returns None if the filename is not a catalog asset or
+    no source is available.
+    """
+    if filename not in catalog_filenames():
+        return None
+    open_url = urlopen or urllib.request.urlopen
+
+    # 1) Local disk
+    for base in asset_search_dirs():
+        path = base / filename
+        try:
+            if path.is_file() and path.stat().st_size > 0:
+                fh = path.open("rb")
+                return {
+                    "filename": filename,
+                    "content_type": content_type_for_filename(filename),
+                    "content_length": path.stat().st_size,
+                    "body": fh,
+                    "source": "local",
+                }
+        except OSError:
+            continue
+
+    token = github_auth_token()
+    from downloads import GITHUB_OWNER, GITHUB_REPO, RELEASE_TAG
+
+    # 2) GitHub API asset download (private-repo safe with token)
+    api_headers = {
+        "Accept": "application/vnd.github+json",
+        "User-Agent": "restore-privacy-status-fulfilment",
+    }
+    if token:
+        api_headers["Authorization"] = f"Bearer {token}"
+    meta_url = (
+        f"https://api.github.com/repos/{GITHUB_OWNER}/{GITHUB_REPO}"
+        f"/releases/tags/{RELEASE_TAG}"
+    )
+    try:
+        req = urllib.request.Request(meta_url, headers=api_headers)
+        with open_url(req, timeout=60) as resp:
+            meta = json.loads(resp.read().decode("utf-8"))
+        asset_id = None
+        for asset in meta.get("assets") or []:
+            if asset.get("name") == filename:
+                asset_id = asset.get("id")
+                break
+        if asset_id is not None:
+            dl_headers = {
+                "Accept": "application/octet-stream",
+                "User-Agent": "restore-privacy-status-fulfilment",
+            }
+            if token:
+                dl_headers["Authorization"] = f"Bearer {token}"
+            asset_url = (
+                f"https://api.github.com/repos/{GITHUB_OWNER}/{GITHUB_REPO}"
+                f"/releases/assets/{asset_id}"
+            )
+            dl_req = urllib.request.Request(asset_url, headers=dl_headers)
+            resp = open_url(dl_req, timeout=120)
+            length = resp.headers.get("Content-Length")
+            return {
+                "filename": filename,
+                "content_type": content_type_for_filename(filename),
+                "content_length": int(length) if length and length.isdigit() else None,
+                "body": resp,
+                "source": "github_api",
+            }
+    except (urllib.error.URLError, urllib.error.HTTPError, TimeoutError, json.JSONDecodeError, ValueError, OSError):
+        pass
+
+    # 3) Direct release URL (public repos, or private with token redirect support)
+    url = asset_download_url(filename)
+    if not url:
+        return None
+    headers = {"User-Agent": "restore-privacy-status-fulfilment"}
+    if token:
+        headers["Authorization"] = f"Bearer {token}"
+    try:
+        req = urllib.request.Request(url, headers=headers)
+        resp = open_url(req, timeout=120)
+        length = resp.headers.get("Content-Length")
+        return {
+            "filename": filename,
+            "content_type": content_type_for_filename(filename),
+            "content_length": int(length) if length and length.isdigit() else None,
+            "body": resp,
+            "source": "github_url",
+        }
+    except (urllib.error.URLError, urllib.error.HTTPError, TimeoutError, OSError):
+        return None
+
+
+def paid_fulfilment_mode() -> str:
+    """How /download delivers installers: always server-side proxy (not free GH redirect)."""
+    return "proxy"
 
 
 # --- SQLite store -----------------------------------------------------------------

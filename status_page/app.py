@@ -33,6 +33,7 @@ from payments import (
     find_grant_by_session,
     handle_stripe_webhook,
     init_db,
+    open_release_asset,
     platform_filename,
     redeem_download_token,
     stripe_configured,
@@ -92,13 +93,13 @@ def read_static_bytes(url_path: str) -> tuple[bytes, str] | None:
             ctype = "application/octet-stream"
     return data, ctype
 
-# Public legal / audit document links (stable GitHub blob URLs on public product host).
-# restore-privacy is public; RUST-IN-PRIVACY may be private → public AUDIT links 404 there.
+# Public legal / audit: prefer same-origin mirrors (repo may be private).
+# GitHub blob URLs remain as secondary targets for operators with access.
 GITHUB_BLOB_MAIN = "https://github.com/rgsneddon/restore-privacy/blob/main"
 LICENCE_URL = f"{GITHUB_BLOB_MAIN}/LICENSE"
 PRIVACY_POLICY_URL = f"{GITHUB_BLOB_MAIN}/PRIVACY_POLICY.md"
 SECURITY_AUDIT_URL = f"{GITHUB_BLOB_MAIN}/AUDIT.md"
-# Same-origin mirrors so status page always has audit even if GH link changes.
+# Same-origin mirrors so status page always has audit even if GH is private.
 SECURITY_AUDIT_LOCAL_PATH = "/AUDIT.md"
 SECURITY_AUDIT_LOCAL_PATH_LOWER = "/audit.md"
 
@@ -468,7 +469,8 @@ class Handler(BaseHTTPRequestHandler):
         if path == "/download":
             token = (query.get("token") or "").strip()
             grant = redeem_download_token(token) if token else None
-            if not grant or not grant.get("url"):
+            fname = (grant or {}).get("filename") if grant else None
+            if not grant or not fname:
                 self._send(
                     403,
                     "text/html; charset=utf-8",
@@ -479,8 +481,56 @@ class Handler(BaseHTTPRequestHandler):
                     ),
                 )
                 return
-            # Single-use: already marked used; send buyer to asset URL once
-            self._redirect(str(grant["url"]))
+            # Paid proxy: stream installer from local/API (works when repo is private).
+            # Do NOT redirect unpaid browsers to free public github.com/releases/download.
+            asset = open_release_asset(str(fname))
+            if asset is None:
+                self._send(
+                    502,
+                    "text/html; charset=utf-8",
+                    _html_page(
+                        "Fulfilment error",
+                        '<p class="msg" id="download-fulfil-failed">Paid download could not be fetched. '
+                        "Operators: set RPT_GITHUB_TOKEN (or GITHUB_TOKEN) with contents:read, "
+                        "or stage packages under RPT_ASSET_DIR.</p>"
+                        '<p><a href="/">Home</a></p>',
+                    ),
+                )
+                return
+            body = asset["body"]
+            ctype = str(asset.get("content_type") or "application/octet-stream")
+            length = asset.get("content_length")
+            disp = f'attachment; filename="{fname}"'
+            try:
+                self.send_response(200)
+                self.send_header("Content-Type", ctype)
+                self.send_header("Content-Disposition", disp)
+                self.send_header("Cache-Control", "no-store")
+                self.send_header("X-RPT-Fulfilment", str(asset.get("source") or "proxy"))
+                if length is not None:
+                    self.send_header("Content-Length", str(int(length)))
+                self.end_headers()
+                if isinstance(body, (bytes, bytearray)):
+                    self.wfile.write(body)
+                else:
+                    try:
+                        while True:
+                            chunk = body.read(65536)
+                            if not chunk:
+                                break
+                            self.wfile.write(chunk)
+                    finally:
+                        try:
+                            body.close()
+                        except Exception:  # noqa: BLE001
+                            pass
+            except Exception:  # noqa: BLE001
+                try:
+                    if hasattr(body, "close"):
+                        body.close()
+                except Exception:  # noqa: BLE001
+                    pass
+                raise
             return
 
         if path in ("/download/success", "/pay/success"):

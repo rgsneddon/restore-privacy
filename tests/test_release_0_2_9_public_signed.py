@@ -29,24 +29,31 @@ class Test029PublicCatalogCurrent(unittest.TestCase):
         readme = (ROOT / "README.md").read_text(encoding="utf-8")
         lower = readme.lower()
         self.assertIn("0.2.9", readme)
-        self.assertIn("releases/tag/0.2.9", readme)
+        self.assertIn("restore-privacy-status.onrender.com", readme)
         self.assertIn("restore-privacy-client-0.2.9-macos.zip", readme)
         self.assertIn("restore-privacy-client-0.2.9-ios.zip", readme)
         self.assertIn("Developer ID", readme)
         self.assertIn("notariz", lower)
         self.assertIn("team-signed", lower)
+        self.assertIn("private", lower)
         self.assertNotIn("prep packages only", lower)
         # Must not present RUST v1.0.0 as the primary Get the app / package table
         self.assertNotIn("Public v1.0.0 (RUST-IN-PRIVACY)", readme)
         self.assertNotIn("restore-privacy-rust-1.0.0-macos.zip", readme)
-        self.assertNotIn("legacy private 0.2.9", lower)
+        # Primary path is paid status page, not free permanent GH release links
+        self.assertIn("paid", lower)
+        self.assertNotIn(
+            "[Download v0.2.9](https://github.com/rgsneddon/restore-privacy/releases/tag/0.2.9)",
+            readme,
+        )
 
     def test_privacy_current_public_is_0_2_9_signed(self):
         privacy = (ROOT / "PRIVACY_POLICY.md").read_text(encoding="utf-8")
         self.assertIn("0.2.9", privacy)
-        self.assertIn("releases/tag/0.2.9", privacy)
+        self.assertIn("restore-privacy-status.onrender.com", privacy)
         self.assertIn("Developer ID", privacy)
         self.assertIn("Team-signed", privacy)
+        self.assertIn("private", privacy.lower())
         self.assertNotIn(
             "Current public packages:** [RUST-IN-PRIVACY v1.0.0]",
             privacy,

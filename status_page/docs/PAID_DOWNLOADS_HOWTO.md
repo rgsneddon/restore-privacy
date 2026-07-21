@@ -6,10 +6,10 @@ Funds settle in **your Stripe account** when you use **live** API keys.
 [Buy Me a Coffee](https://buymeacoffee.com/rgsneddon) is linked as **tip / support only**.
 It does **not** unlock the paid download (BMC is not the fulfilment API).
 
-Public release packages still exist on GitHub  
-(`https://github.com/rgsneddon/RUST-IN-PRIVACY/releases/tag/v1.0.0`).  
-This site no longer offers those files as free permanent buttons; payment grants a
-**single-use, expiring** download token that then redirects to the release asset.
+The product GitHub repository is **private**. This site does **not** offer free
+permanent installer buttons. Payment grants a **single-use, expiring** download
+token; `/download` **proxies** the installer via a server-side GitHub token
+(`RPT_GITHUB_TOKEN` / `GITHUB_TOKEN`) or locally staged assets (`RPT_ASSET_DIR`).
 
 ---
 

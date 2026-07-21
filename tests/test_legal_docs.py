@@ -54,16 +54,13 @@ class TestPrivacyPolicy(unittest.TestCase):
         self.assertIn("README", text)
 
     def test_policy_public_catalog_is_v0_2_9(self):
-        """User-facing policy must advertise public catalog v0.2.9 as current signed ship."""
+        """User-facing policy must advertise catalog v0.2.9 as current paid ship."""
         text = _read("PRIVACY_POLICY.md")
         self.assertIn("0.2.9", text)
-        self.assertIn("releases/tag/0.2.9", text)
+        self.assertIn("restore-privacy-status.onrender.com", text)
         self.assertIn("Developer ID", text)
         self.assertIn("Team-signed", text)
-        self.assertIn(
-            "https://github.com/rgsneddon/restore-privacy/releases/tag/0.2.9",
-            text,
-        )
+        self.assertIn("private", text.lower())
         # Must not claim RUST-IN-PRIVACY v1.0.0 as the current public packages line
         self.assertNotIn(
             "Current public packages:** [RUST-IN-PRIVACY v1.0.0]",
@@ -108,9 +105,9 @@ class TestReadmeHowto(unittest.TestCase):
         self.assertIn("android", lower)
         self.assertIn("macos", lower)
         self.assertIn("ios", lower)
-        # Public ship is restore-privacy 0.2.9 (signed)
+        # Catalog ship is 0.2.9 (signed packages via paid status page)
         self.assertIn("0.2.9", text)
-        self.assertIn("releases/tag/0.2.9", text)
+        self.assertIn("restore-privacy-status.onrender.com", text)
         self.assertIn("Developer ID", text)
         self.assertIn("Team-signed", text)
         self.assertNotIn("prep stubs", lower)
