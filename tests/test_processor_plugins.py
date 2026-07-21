@@ -25,7 +25,7 @@ class TestProcessorPluginCatalog(unittest.TestCase):
         stripe_keys = {v["key"] for v in catalog["stripe"]}
         self.assertIn("STRIPE_SECRET_KEY", stripe_keys)
         self.assertIn("STRIPE_WEBHOOK_SECRET", stripe_keys)
-        self.assertIn("STRIPE_PRICE_ID", stripe_keys)
+        self.assertIn("STRIPE_CHECKOUT_PRICE_ID", stripe_keys)
         self.assertIn("RPT_PUBLIC_BASE_URL", stripe_keys)
         # Required keys match what payments helpers actually read
         self.assertTrue(
