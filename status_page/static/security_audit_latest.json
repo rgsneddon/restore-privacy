@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-07-21T23:01:19Z",
+  "generated_at": "2026-07-21T23:17:38Z",
   "node_host": "82.221.101.241",
   "catalog_version": "0.3.6",
   "unit_suite": {
@@ -276,12 +276,69 @@
     "firewall_excluded": true,
     "section": "B"
   },
+  "multihop_structure": {
+    "probes": {
+      "multihop_module_flags": {
+        "ok": true,
+        "warn": false,
+        "skipped": false,
+        "reasons": [
+          "MULTI_HOP_ROUTING_IMPLEMENTED=True (residual-via-exit)",
+          "entry host 82.221.101.241:44044 (Iceland monopin)",
+          "exit host 185.146.232.107:44044 (Romania monopin)"
+        ],
+        "entry_host": "82.221.101.241",
+        "exit_host": "185.146.232.107",
+        "entry_port": 44044,
+        "exit_port": 44044,
+        "routing_implemented": true
+      },
+      "multihop_product_pubs": {
+        "ok": true,
+        "warn": false,
+        "skipped": false,
+        "reasons": [
+          "entry pub present (C:\\Users\\rgsne\\restore_privacy\\product\\node_elgamal.pub) sha=1b126abfae737c66\u2026",
+          "exit pub present (C:\\Users\\rgsne\\restore_privacy\\product\\exit_node_elgamal.pub) sha=a36a3f38066ece7b\u2026",
+          "entry and exit pubs are distinct"
+        ],
+        "entry_pub": "C:\\Users\\rgsne\\restore_privacy\\product\\node_elgamal.pub",
+        "exit_pub": "C:\\Users\\rgsne\\restore_privacy\\product\\exit_node_elgamal.pub"
+      },
+      "multihop_residual_via_exit": {
+        "ok": true,
+        "warn": false,
+        "skipped": false,
+        "reasons": [
+          "is_multihop_active=True for entry\u2192exit path",
+          "residual_endpoint dials exit 185.146.232.107:44044 (residual-via-exit)",
+          "multi-hop disabled residual stays entry 82.221.101.241 (default single-hop)",
+          "status text: multi-hop active (2 hops): 82.221.101.241:44044 \u2192 185.146.232.107:44044 (residual via 185.146.232.107:44044)"
+        ],
+        "status_text": "multi-hop active (2 hops): 82.221.101.241:44044 \u2192 185.146.232.107:44044 (residual via 185.146.232.107:44044)"
+      },
+      "multihop_node_host_layout": {
+        "ok": true,
+        "warn": false,
+        "skipped": false,
+        "reasons": [
+          "present: C:\\Users\\rgsne\\restore_privacy\\node\\install_zram_luks.sh",
+          "present: C:\\Users\\rgsne\\restore_privacy\\node\\install_host_privacy.sh",
+          "node-only: clients never install LUKS/zram"
+        ]
+      }
+    },
+    "ok": true,
+    "section": "multihop_node_structure",
+    "honesty": "residual-via-exit when multi-hop enabled; not full intermediate onion encapsulation; default single-hop Iceland entry"
+  },
   "audit_privacy": {
     "localhost_required": false,
     "outbound_allowed": true,
     "probe_host_loopback": false,
     "no_network_exfil": true,
     "section_b": true,
+    "multihop_structure": true,
     "firewall_probe_excluded": true
   },
   "overall_ok": true,

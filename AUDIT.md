@@ -6,10 +6,10 @@
 | **Repository** | restore-privacy (**private** source; installers only via paid status host) |
 | **Public catalog version** | **0.3.6** |
 | **Production node** | **82.221.101.241:44044** (UDP); status UI TCP **8080** — **Iceland**, host **FlokiNET** |
-| **Audit generated** | **21 July 2026** (`2026-07-21T23:01:19Z`) |
+| **Audit generated** | **21 July 2026** (`2026-07-21T23:17:38Z`) |
 | **Cadence** | Automated security pass (~**every 4 hours** + **jitter** on privacy-hardened node timer) |
-| **Audit type** | Static suite + live node status probe + **per-installer AUDIT STATE (Green/Amber/Red)** + **section B privacy probes** |
-| **Auditor method** | `scripts/run_security_audit.py` — unittest privacy/security modules + TCP/HTTP/UDP probes + no-`.priv` scan + catalog package RAG + section B probes (no firewall scan) |
+| **Audit type** | Static suite + live node status probe + **per-installer AUDIT STATE** + **section B privacy probes** + **multihop node structure** |
+| **Auditor method** | `scripts/run_security_audit.py` — unittest privacy/security modules + TCP/HTTP/UDP probes + no-`.priv` scan + catalog package RAG + section B + multihop structure (no firewall scan) |
 
 ---
 
@@ -59,6 +59,26 @@ no live ephemeral rebuild, **no firewall/expose-surface scan**).
 In-scope probes: **not all PASS** (timer host should seed client/node scripts + fixtures).
 
 
+## Multihop node structure (audit timer)
+
+Structural product-layout checks for multi-hop residual (**entry → exit**).  
+Honesty: **residual-via-exit when multi-hop enabled; not full intermediate onion encapsulation; default single-hop Iceland entry**.
+
+| Probe | State | Notes |
+|-------|-------|-------|
+| **multihop_module_flags** | **PASS** | MULTI_HOP_ROUTING_IMPLEMENTED=True (residual-via-exit); entry host 82.221.101.241:44044 (Iceland monopin); exit host 185.146.232.107:44044 (Romania monopin) |
+| **multihop_product_pubs** | **PASS** | entry pub present (C:\Users\rgsne\restore_privacy\product\node_elgamal.pub) sha=1b126abfae737c66…; exit pub present (C:\Users\rgsne\restore_privacy\product\exit_node_elgamal.pub... |
+| **multihop_residual_via_exit** | **PASS** | is_multihop_active=True for entry→exit path; residual_endpoint dials exit 185.146.232.107:44044 (residual-via-exit); multi-hop disabled residual stays entry 82.221.101.241 (defa... |
+| **multihop_node_host_layout** | **PASS** | present: C:\Users\rgsne\restore_privacy\node\install_zram_luks.sh; present: C:\Users\rgsne\restore_privacy\node\install_host_privacy.sh; node-only: clients never install LUKS/zram |
+
+**Multihop structure overall:** **PASS**
+
+| Role | Host | Public key |
+|------|------|------------|
+| **Entry** (Iceland) | `82.221.101.241:44044` | `product/node_elgamal.pub` |
+| **Exit** (Romania) | `185.146.232.107:44044` | `product/exit_node_elgamal.pub` |
+
+
 ## 1. Executive summary
 
 Latest automated security audit for production node **82.221.101.241** and the in-repo privacy/security gates.
@@ -75,6 +95,7 @@ Latest automated security audit for production node **82.221.101.241** and the i
 | UDP product port :44044 | probe sent |
 | No `*.priv` under public trees | OK |
 | Privacy probes (section B) | PASS (firewall excluded) |
+| Multihop node structure | PASS (residual-via-exit honesty) |
 | Live node healthy (TCP+HTTP) | YES |
 | Catalog installers AUDIT STATE | 🟩 (see top package table) |
 
@@ -148,7 +169,7 @@ An **ISP** performing **traffic analysis** may still observe connection timing a
 
 | Severity | Finding | Status |
 |----------|---------|--------|
-| **Info** | Automated pass at `2026-07-21T23:01:19Z` | Recorded |
+| **Info** | Automated pass at `2026-07-21T23:17:38Z` | Recorded |
 | **High** | Public client count on status | Closed (title-only) |
 | **Medium** | Shared client priv in packages | Closed (no .priv hits) |
 | **Low** | Unit suite failure | N/A |
@@ -200,7 +221,7 @@ An **ISP** performing **traffic analysis** may still observe connection timing a
 
 ## 9. Conclusion
 
-Automated security audit at **2026-07-21T23:01:19Z** against node **82.221.101.241** and in-repo privacy gates. Public **SECURITY AUDIT** links must resolve on the **status host** (`/AUDIT.md` / `/audit.md`). Source repository is **private**; paid catalog installers are fulfilled on the status host only. Core privacy promises hold when the suite passes and status remains title-only.
+Automated security audit at **2026-07-21T23:17:38Z** against node **82.221.101.241** and in-repo privacy gates. Public **SECURITY AUDIT** links must resolve on the **status host** (`/AUDIT.md` / `/audit.md`). Source repository is **private**; paid catalog installers are fulfilled on the status host only. Core privacy promises hold when the suite passes and status remains title-only.
 
 Re-run: `python3 scripts/run_security_audit.py --write`
 

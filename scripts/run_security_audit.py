@@ -376,6 +376,20 @@ def run_section_b_probes(http_status: dict | None = None) -> dict:
     )
 
 
+def run_multihop_structure_probes() -> dict:
+    """Multihop entry/exit product-layout probes for the audit timer path."""
+    try:
+        from audit_multihop_structure import run_all_multihop_structure_probes
+    except ImportError:
+        sys.path.insert(0, str(Path(__file__).resolve().parent))
+        from audit_multihop_structure import (  # type: ignore
+            run_all_multihop_structure_probes,
+        )
+
+    install = Path(os.environ.get("RPT_INSTALL_ROOT", "/opt/restore-privacy"))
+    return run_all_multihop_structure_probes(repo_root=ROOT, install_root=install)
+
+
 def load_catalog_version() -> str:
     """Catalog monopin: env → downloads → client/VERSION (repo or install root)."""
     env_v = os.environ.get("RPT_CATALOG_VERSION", "").strip()
@@ -1126,6 +1140,17 @@ def build_markdown(results: dict) -> str:
         from audit_privacy_probes import render_section_b_markdown  # type: ignore
 
     section_b_md = render_section_b_markdown(results.get("section_b"))
+    try:
+        from audit_multihop_structure import render_multihop_structure_markdown
+    except ImportError:
+        sys.path.insert(0, str(Path(__file__).resolve().parent))
+        from audit_multihop_structure import (  # type: ignore
+            render_multihop_structure_markdown,
+        )
+
+    multihop_md = render_multihop_structure_markdown(
+        results.get("multihop_structure")
+    )
     suite_line = (
         f"**PASS** ({len(suite.get('modules') or [])} modules)"
         if suite.get("ok")
@@ -1150,6 +1175,13 @@ def build_markdown(results: dict) -> str:
         if sb_ok
         else ("SKIP/partial" if not sb else "FAIL")
     )
+    mh = results.get("multihop_structure") or {}
+    mh_ok = mh.get("ok")
+    mh_line = (
+        "PASS"
+        if mh_ok
+        else ("SKIP/partial" if not mh else "FAIL")
+    )
 
     return f"""# Restore Privacy — Code & Policy Audit
 
@@ -1161,13 +1193,14 @@ def build_markdown(results: dict) -> str:
 | **Production node** | **{host}:{UDP_PORT}** (UDP); status UI TCP **{STATUS_PORT}** — **Iceland**, host **FlokiNET** |
 | **Audit generated** | **{human_date()}** (`{now}`) |
 | **Cadence** | Automated security pass (~**every 4 hours** + **jitter** on privacy-hardened node timer) |
-| **Audit type** | Static suite + live node status probe + **per-installer AUDIT STATE (Green/Amber/Red)** + **section B privacy probes** |
-| **Auditor method** | `scripts/run_security_audit.py` — unittest privacy/security modules + TCP/HTTP/UDP probes + no-`.priv` scan + catalog package RAG + section B probes (no firewall scan) |
+| **Audit type** | Static suite + live node status probe + **per-installer AUDIT STATE** + **section B privacy probes** + **multihop node structure** |
+| **Auditor method** | `scripts/run_security_audit.py` — unittest privacy/security modules + TCP/HTTP/UDP probes + no-`.priv` scan + catalog package RAG + section B + multihop structure (no firewall scan) |
 
 ---
 
 {package_section}
 {section_b_md}
+{multihop_md}
 ## 1. Executive summary
 
 Latest automated security audit for production node **{host}** and the in-repo privacy/security gates.
@@ -1184,6 +1217,7 @@ Latest automated security audit for production node **{host}** and the in-repo p
 | UDP product port :{UDP_PORT} | {"probe sent" if udp.get("sent") else "send failed"} |
 | No `*.priv` under public trees | {"OK" if priv.get("ok") else "HITS: " + ", ".join(priv.get("hits") or [])} |
 | Privacy probes (section B) | {sb_line} (firewall excluded) |
+| Multihop node structure | {mh_line} (residual-via-exit honesty) |
 | Live node healthy (TCP+HTTP) | {"YES" if node_ok else "NO"} |
 | Catalog installers AUDIT STATE | {package_state_cell_markup(pkg_overall if pkg_overall in VALID_PACKAGE_STATES else "Red")} (see top package table) |
 
@@ -1345,6 +1379,7 @@ def collect(node_only: bool = False) -> dict:
     catalog = load_catalog_version()
     http_status = probe_http_status(host, STATUS_PORT)
     section_b = run_section_b_probes(http_status)
+    multihop_structure = run_multihop_structure_probes()
     results = {
         "generated_at": iso_z(),
         "node_host": host,
@@ -1356,6 +1391,7 @@ def collect(node_only: bool = False) -> dict:
         "no_priv": check_no_priv_in_tree(),
         "package_rag": evaluate_catalog_packages(catalog),
         "section_b": section_b,
+        "multihop_structure": multihop_structure,
         "audit_privacy": {
             "localhost_required": os.environ.get("RPT_AUDIT_REQUIRE_LOCALHOST", "")
             .strip()
@@ -1365,6 +1401,7 @@ def collect(node_only: bool = False) -> dict:
             "probe_host_loopback": is_loopback_host(host),
             "no_network_exfil": True,
             "section_b": True,
+            "multihop_structure": True,
             "firewall_probe_excluded": True,
         },
     }
@@ -1374,6 +1411,7 @@ def collect(node_only: bool = False) -> dict:
         and results["http_status"].get("ok")
         and results["no_priv"].get("ok")
         and results["section_b"].get("ok", True)
+        and results["multihop_structure"].get("ok", True)
         # Package Red does not fail the whole audit exit alone (node host may lack
         # releases/); RAG is reported honestly for readers instead.
     )

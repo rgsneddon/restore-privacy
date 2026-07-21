@@ -65,6 +65,9 @@ _rpt_audit_cp "${REPO_ROOT}/scripts/run_security_audit.py" \
 # Section B privacy probes (imported by the runner)
 _rpt_audit_cp "${REPO_ROOT}/scripts/audit_privacy_probes.py" \
   "${INSTALL_ROOT}/scripts/audit_privacy_probes.py"
+# Multihop node-structure probes (entry/exit pubs + residual-via-exit honesty)
+_rpt_audit_cp "${REPO_ROOT}/scripts/audit_multihop_structure.py" \
+  "${INSTALL_ROOT}/scripts/audit_multihop_structure.py"
 # Catalog monopin for package RAG when full monorepo is not deployed on the node
 if [[ -f "${REPO_ROOT}/client/VERSION" ]]; then
   _rpt_audit_cp "${REPO_ROOT}/client/VERSION" "${INSTALL_ROOT}/client/VERSION"
@@ -83,6 +86,8 @@ done
 # Section B in-scope seeds (timer host must not SKIP kill_switch / ephemeral / nolog / wipe)
 _rpt_audit_cp "${REPO_ROOT}/client/__init__.py" "${INSTALL_ROOT}/client/__init__.py"
 _rpt_audit_cp "${REPO_ROOT}/client/kill_switch.py" "${INSTALL_ROOT}/client/kill_switch.py"
+_rpt_audit_cp "${REPO_ROOT}/client/multihop.py" "${INSTALL_ROOT}/client/multihop.py"
+_rpt_audit_cp "${REPO_ROOT}/client/endpoint.py" "${INSTALL_ROOT}/client/endpoint.py"
 _rpt_audit_cp "${REPO_ROOT}/scripts/ephemeral_node.py" "${INSTALL_ROOT}/scripts/ephemeral_node.py"
 for _nscript in nolog.py install_host_privacy.sh install_disk_encryption.sh \
   install_zram_luks.sh install_shutdown_wipe.sh ephemeral_node.py; do
