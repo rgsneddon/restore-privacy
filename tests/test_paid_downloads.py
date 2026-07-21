@@ -565,5 +565,40 @@ class TestPublicVsAdminSurface(unittest.TestCase):
         self.assertIn("RESTORE PRIVACY", html.upper() if "RESTORE" in html.upper() else html)
 
 
+class TestAdminThemeAppearance(unittest.TestCase):
+    """Device colour scheme + explicit light/dark preference on shipped admin pages."""
+
+    def test_normalize_theme_mode(self):
+        self.assertEqual(admin_panel.normalize_theme_mode("light"), "light")
+        self.assertEqual(admin_panel.normalize_theme_mode("DARK"), "dark")
+        self.assertEqual(admin_panel.normalize_theme_mode("system"), "system")
+        self.assertEqual(admin_panel.normalize_theme_mode(None), "system")
+        self.assertEqual(admin_panel.normalize_theme_mode("neon"), "system")
+
+    def test_theme_css_follows_prefers_color_scheme(self):
+        css = admin_panel.admin_theme_css()
+        self.assertIn("prefers-color-scheme: dark", css)
+        self.assertIn('[data-theme="light"]', css)
+        self.assertIn('[data-theme="dark"]', css)
+        self.assertIn("--bg:", css)
+
+    def test_login_and_admin_ship_theme_picker(self):
+        login = admin_panel.render_login_html().decode("utf-8")
+        admin = admin_panel.render_admin_html(grants=[]).decode("utf-8")
+        for html, label in ((login, "login"), (admin, "admin")):
+            with self.subTest(page=label):
+                self.assertIn("admin-theme-bar", html)
+                self.assertIn("admin-theme-ask", html)
+                self.assertIn("Prefer light or dark mode?", html)
+                self.assertIn("theme-light", html)
+                self.assertIn("theme-dark", html)
+                self.assertIn("theme-system", html)
+                self.assertIn("prefers-color-scheme", html)
+                self.assertIn("color-scheme", html)
+                self.assertIn(admin_panel.THEME_STORAGE_KEY, html)
+                self.assertIn("admin-theme-script", html)
+                self.assertIn("localStorage", html)
+
+
 if __name__ == "__main__":
     unittest.main()

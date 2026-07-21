@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import hashlib
 import hmac
+import json
 import os
 import secrets
 import time
@@ -28,12 +29,204 @@ from payments import (
 SESSION_COOKIE = "rpt_admin_session"
 SESSION_TTL_SEC = 8 * 3600
 
+# Appearance: follow device/OS colour scheme by default; operator may pick light/dark.
+THEME_STORAGE_KEY = "rpt_admin_theme"
+THEME_MODES = frozenset({"system", "light", "dark"})
+DEFAULT_THEME_MODE = "system"
+
 # Operator dashboard deep links (no secrets; login happens on Stripe/BMC sites)
 STRIPE_DASHBOARD_URL = "https://dashboard.stripe.com"
 STRIPE_DASHBOARD_PAYMENTS_URL = "https://dashboard.stripe.com/payments"
 STRIPE_DASHBOARD_WEBHOOKS_URL = "https://dashboard.stripe.com/webhooks"
 STRIPE_DASHBOARD_APIKEYS_URL = "https://dashboard.stripe.com/apikeys"
 BMC_DASHBOARD_URL = "https://www.buymeacoffee.com/login"
+
+
+def normalize_theme_mode(mode: str | None) -> str:
+    """Pure: accept light / dark / system only; invalid → system (device colours)."""
+    m = (mode or "").strip().lower()
+    if m in THEME_MODES:
+        return m
+    return DEFAULT_THEME_MODE
+
+
+def admin_theme_css() -> str:
+    """Shared light/dark tokens; default tracks prefers-color-scheme (device settings)."""
+    return """
+:root, [data-theme="light"] {
+  color-scheme: light;
+  --bg: #f4f6f9;
+  --bg-elevated: #ffffff;
+  --fg: #0f172a;
+  --fg-muted: #475569;
+  --border: #d1d9e6;
+  --input-bg: #ffffff;
+  --input-border: #cbd5e1;
+  --link: #1d4ed8;
+  --btn-bg: #1d4ed8;
+  --btn-fg: #ffffff;
+  --err: #b91c1c;
+  --badge-ok-bg: #d1fae5;
+  --badge-ok-fg: #065f46;
+  --badge-bad-bg: #fee2e2;
+  --badge-bad-fg: #991b1b;
+  --table-border: #e2e8f0;
+  --theme-active: #1d4ed8;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --bg: #0b0f14;
+    --bg-elevated: #111827;
+    --fg: #e8eef5;
+    --fg-muted: #94a3b8;
+    --border: #1f2937;
+    --input-bg: #0b0f14;
+    --input-border: #374151;
+    --link: #93c5fd;
+    --btn-bg: #1d4ed8;
+    --btn-fg: #ffffff;
+    --err: #fca5a5;
+    --badge-ok-bg: #064e3b;
+    --badge-ok-fg: #6ee7b7;
+    --badge-bad-bg: #450a0a;
+    --badge-bad-fg: #fca5a5;
+    --table-border: #1f2937;
+    --theme-active: #93c5fd;
+  }
+}
+[data-theme="dark"] {
+  color-scheme: dark;
+  --bg: #0b0f14;
+  --bg-elevated: #111827;
+  --fg: #e8eef5;
+  --fg-muted: #94a3b8;
+  --border: #1f2937;
+  --input-bg: #0b0f14;
+  --input-border: #374151;
+  --link: #93c5fd;
+  --btn-bg: #1d4ed8;
+  --btn-fg: #ffffff;
+  --err: #fca5a5;
+  --badge-ok-bg: #064e3b;
+  --badge-ok-fg: #6ee7b7;
+  --badge-bad-bg: #450a0a;
+  --badge-bad-fg: #fca5a5;
+  --table-border: #1f2937;
+  --theme-active: #93c5fd;
+}
+html, body {
+  background: var(--bg);
+  color: var(--fg);
+  font-family: system-ui, -apple-system, Segoe UI, sans-serif;
+}
+a { color: var(--link); }
+.theme-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem 0.75rem;
+  font-size: 0.85rem;
+  margin: 0 0 1rem;
+}
+.theme-bar .theme-ask {
+  color: var(--fg-muted);
+  margin: 0;
+}
+.theme-bar fieldset {
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  margin: 0;
+  padding: 0.35rem 0.55rem;
+  display: inline-flex;
+  gap: 0.35rem;
+  background: var(--bg-elevated);
+}
+.theme-bar legend {
+  font-size: 0.75rem;
+  color: var(--fg-muted);
+  padding: 0 0.25rem;
+}
+.theme-bar label {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  cursor: pointer;
+  padding: 0.2rem 0.4rem;
+  border-radius: 6px;
+  margin: 0;
+  font-size: 0.85rem;
+}
+.theme-bar input { accent-color: var(--theme-active); margin: 0; }
+.theme-bar label:has(input:checked) {
+  outline: 1px solid var(--theme-active);
+  background: color-mix(in srgb, var(--theme-active) 12%, transparent);
+}
+"""
+
+
+def admin_theme_picker_html() -> str:
+    """Ask light / dark / device (system) preference — shipped on login + admin."""
+    return f"""
+<div class="theme-bar" id="admin-theme-bar" role="group" aria-label="Colour mode">
+  <p class="theme-ask" id="admin-theme-ask">Prefer light or dark mode?
+  Default follows your device colour settings.</p>
+  <fieldset id="admin-theme-fieldset">
+    <legend>Appearance</legend>
+    <label><input type="radio" name="admin-theme" id="theme-system" value="system" checked/> Device</label>
+    <label><input type="radio" name="admin-theme" id="theme-light" value="light"/> Light</label>
+    <label><input type="radio" name="admin-theme" id="theme-dark" value="dark"/> Dark</label>
+  </fieldset>
+</div>
+"""
+
+
+def admin_theme_boot_script() -> str:
+    """Apply stored or system theme before paint; wire radio controls."""
+    key = THEME_STORAGE_KEY
+    return f"""
+<script id="admin-theme-script">
+(function () {{
+  var KEY = {json_dumps_str(key)};
+  var root = document.documentElement;
+  function normalize(m) {{
+    m = (m || "").toLowerCase();
+    if (m === "light" || m === "dark" || m === "system") return m;
+    return "system";
+  }}
+  function apply(mode) {{
+    mode = normalize(mode);
+    if (mode === "system") {{
+      root.removeAttribute("data-theme");
+    }} else {{
+      root.setAttribute("data-theme", mode);
+    }}
+    try {{ localStorage.setItem(KEY, mode); }} catch (e) {{}}
+    var radios = document.querySelectorAll('input[name="admin-theme"]');
+    for (var i = 0; i < radios.length; i++) {{
+      radios[i].checked = (radios[i].value === mode);
+    }}
+  }}
+  var saved = "system";
+  try {{ saved = normalize(localStorage.getItem(KEY)); }} catch (e) {{}}
+  apply(saved);
+  document.addEventListener("DOMContentLoaded", function () {{
+    apply(saved);
+    var radios = document.querySelectorAll('input[name="admin-theme"]');
+    for (var i = 0; i < radios.length; i++) {{
+      radios[i].addEventListener("change", function (ev) {{
+        if (ev.target && ev.target.checked) apply(ev.target.value);
+      }});
+    }}
+  }});
+}})();
+</script>
+"""
+
+
+def json_dumps_str(s: str) -> str:
+    """JSON-encode a string for safe embedding in a script tag."""
+    return json.dumps(s)
 
 
 def admin_username() -> str:
@@ -216,21 +409,31 @@ def render_login_html(*, error: str = "") -> bytes:
     body = f"""<!DOCTYPE html>
 <html lang="en"><head>
 <meta charset="utf-8"/><meta name="viewport" content="width=device-width, initial-scale=1"/>
+<meta name="color-scheme" content="light dark"/>
 <title>Admin login — Restore Privacy</title>
 <style>
-body{{margin:0;min-height:100vh;display:flex;align-items:center;justify-content:center;
-background:#0b0f14;color:#e8eef5;font-family:system-ui,sans-serif}}
-form{{background:#111827;padding:1.5rem 1.75rem;border-radius:12px;min-width:18rem;
-max-width:22rem}}
-label{{display:block;font-size:0.85rem;margin:0.6rem 0 0.25rem;opacity:0.85}}
-input{{width:100%;box-sizing:border-box;padding:0.55rem 0.65rem;border-radius:8px;
-border:1px solid #374151;background:#0b0f14;color:#e8eef5}}
+{admin_theme_css()}
+body{{margin:0;min-height:100vh;display:flex;flex-direction:column;align-items:center;
+justify-content:center;padding:1rem;box-sizing:border-box}}
+.login-wrap{{width:100%;max-width:22rem}}
+form#admin-login-form{{background:var(--bg-elevated);padding:1.5rem 1.75rem;border-radius:12px;
+border:1px solid var(--border);width:100%;box-sizing:border-box}}
+form#admin-login-form > label{{display:block;font-size:0.85rem;margin:0.6rem 0 0.25rem;
+color:var(--fg-muted)}}
+form#admin-login-form input[type="text"],
+form#admin-login-form input[type="password"],
+form#admin-login-form input:not([type]){{width:100%;box-sizing:border-box;padding:0.55rem 0.65rem;
+border-radius:8px;border:1px solid var(--input-border);background:var(--input-bg);color:var(--fg)}}
 button{{margin-top:1rem;width:100%;padding:0.7rem;border:0;border-radius:8px;
-background:#1d4ed8;color:#fff;font-weight:600;cursor:pointer}}
-.err{{color:#fca5a5;font-size:0.9rem}}
-h1{{font-size:1.1rem;margin:0 0 0.5rem}}
-.note{{opacity:0.7;font-size:0.85rem;margin:0 0 0.75rem;line-height:1.35}}
-</style></head><body>
+background:var(--btn-bg);color:var(--btn-fg);font-weight:600;cursor:pointer}}
+.err{{color:var(--err);font-size:0.9rem}}
+h1{{font-size:1.1rem;margin:0 0 0.5rem;color:var(--fg)}}
+.note{{color:var(--fg-muted);font-size:0.85rem;margin:0 0 0.75rem;line-height:1.35}}
+</style>
+{admin_theme_boot_script()}
+</head><body>
+<div class="login-wrap">
+{admin_theme_picker_html()}
 <form method="post" action="/admin/login" id="admin-login-form">
   <h1>Operator admin</h1>
   <p class="note" id="admin-login-note">Private page: payment processor settings
@@ -242,6 +445,7 @@ h1{{font-size:1.1rem;margin:0 0 0.5rem}}
   <input id="password" name="password" type="password" autocomplete="current-password" required/>
   <button type="submit">Sign in</button>
 </form>
+</div>
 </body></html>
 """
     return body.encode("utf-8")
@@ -346,31 +550,35 @@ def render_admin_html(grants: list[dict[str, Any]] | None = None) -> bytes:
     body = f"""<!DOCTYPE html>
 <html lang="en"><head>
 <meta charset="utf-8"/><meta name="viewport" content="width=device-width, initial-scale=1"/>
+<meta name="color-scheme" content="light dark"/>
 <title>Admin — payments &amp; processors</title>
 <style>
-body{{margin:0;padding:1.5rem;background:#0b0f14;color:#e8eef5;font-family:system-ui,sans-serif}}
+{admin_theme_css()}
+body{{margin:0;padding:1.5rem}}
 h1{{font-size:1.25rem;margin:0}} h2{{font-size:1.05rem;margin:0 0 0.5rem}}
-h3{{font-size:0.95rem;margin:1rem 0 0.4rem;opacity:0.95}}
-a{{color:#93c5fd}}
+h3{{font-size:0.95rem;margin:1rem 0 0.4rem}}
 table{{border-collapse:collapse;width:100%;max-width:56rem;font-size:0.9rem}}
-th,td{{border-bottom:1px solid #1f2937;padding:0.45rem 0.5rem;text-align:left}}
-th{{opacity:0.75;font-weight:600}}
-.top{{display:flex;gap:1rem;align-items:center;margin-bottom:1rem;flex-wrap:wrap}}
-.card{{background:#111827;border-radius:12px;padding:1rem 1.15rem;margin:1rem 0;
-max-width:56rem}}
-.muted{{opacity:0.75;font-size:0.9rem;line-height:1.4}}
+th,td{{border-bottom:1px solid var(--table-border);padding:0.45rem 0.5rem;text-align:left}}
+th{{color:var(--fg-muted);font-weight:600}}
+.top{{display:flex;gap:1rem;align-items:center;margin-bottom:0.75rem;flex-wrap:wrap}}
+.card{{background:var(--bg-elevated);border:1px solid var(--border);border-radius:12px;
+padding:1rem 1.15rem;margin:1rem 0;max-width:56rem}}
+.muted{{color:var(--fg-muted);font-size:0.9rem;line-height:1.4}}
 .status-list{{margin:0.5rem 0}}
 .status-list > div{{display:grid;grid-template-columns:12rem 1fr;gap:0.35rem 0.75rem;
 padding:0.25rem 0;font-size:0.9rem}}
-.status-list dt{{opacity:0.7}}
+.status-list dt{{color:var(--fg-muted)}}
 .badge{{display:inline-block;padding:0.15rem 0.5rem;border-radius:6px;font-size:0.8rem;
 font-weight:600}}
-.badge.ok{{background:#064e3b;color:#6ee7b7}}
-.badge.bad{{background:#450a0a;color:#fca5a5}}
+.badge.ok{{background:var(--badge-ok-bg);color:var(--badge-ok-fg)}}
+.badge.bad{{background:var(--badge-bad-bg);color:var(--badge-bad-fg)}}
 .ops-links{{font-size:0.9rem;margin:0.75rem 0 0.25rem}}
 .nav-local a{{margin-right:0.75rem;font-size:0.9rem}}
 code{{font-size:0.85rem;word-break:break-all}}
-</style></head><body>
+</style>
+{admin_theme_boot_script()}
+</head><body>
+{admin_theme_picker_html()}
 <div class="top">
   <h1 id="admin-heading">Payment administration</h1>
   <a href="/admin/logout" id="admin-logout">Log out</a>
