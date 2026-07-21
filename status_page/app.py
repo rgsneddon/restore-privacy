@@ -503,6 +503,47 @@ class Handler(BaseHTTPRequestHandler):
             )
             return
 
+        if path in (
+            "/api/connect-entitlement-file",
+            "/connect-entitlement-file",
+        ):
+            # Downloadable payment_entitlement.json for the desktop/mobile app
+            from payments import client_entitlement_file_payload
+
+            session_id = (query.get("session_id") or "").strip()
+            if not session_id:
+                self._send(
+                    400,
+                    "application/json",
+                    json.dumps({"error": "missing_session_id"}).encode("utf-8"),
+                )
+                return
+            payload = client_entitlement_file_payload(session_id)
+            if not payload:
+                self._send(
+                    404,
+                    "application/json",
+                    json.dumps(
+                        {
+                            "error": "no_entitlement",
+                            "session_id": session_id,
+                        }
+                    ).encode("utf-8"),
+                )
+                return
+            body = (json.dumps(payload, indent=2) + "\n").encode("utf-8")
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json; charset=utf-8")
+            self.send_header(
+                "Content-Disposition",
+                'attachment; filename="payment_entitlement.json"',
+            )
+            self.send_header("Content-Length", str(len(body)))
+            self.send_header("Cache-Control", "no-store")
+            self.end_headers()
+            self.wfile.write(body)
+            return
+
         # --- Paid download flow ---
         if path == "/pay":
             # Legacy path: same Stripe payment page as the download buttons.

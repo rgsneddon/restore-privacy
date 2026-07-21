@@ -14,13 +14,14 @@ from __future__ import annotations
 
 import json
 import os
+import sys
 import time
 import urllib.error
 import urllib.parse
 import urllib.request
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any, Callable, Optional
 
 # Local entitlement file (same data family as licence acceptance)
 ENTITLEMENT_FILENAME = "payment_entitlement.json"
@@ -41,7 +42,17 @@ CONNECT_BLOCKED_PAYMENT_MSG = (
     "install. Successful payment is required. If payment fails at any time "
     "(checkout failure, failed charge, refund, or dispute), the ability to "
     "Connect with the Restore Privacy app is cancelled until you complete a "
-    "successful payment again on https://restoreprivacy.online/"
+    "successful payment again on https://restoreprivacy.online/ — then paste "
+    "the Checkout session id (cs_…) in Settings → Payment entitlement, or "
+    "place payment_entitlement.json in the product data folder."
+)
+
+CONNECT_BLOCKED_NO_ENTITLEMENT_MSG = (
+    "Connect is blocked: no successful payment entitlement on this install. "
+    "After paying on https://restoreprivacy.online/, open Settings → Payment "
+    "entitlement and paste the Checkout session id (cs_…) from the thank-you "
+    "page (or import the downloaded payment_entitlement.json). Successful "
+    "payment is required; if payment fails at any time, Connect is cancelled."
 )
 
 # Strong disclaimer for README / portal / privacy / licence surfaces
@@ -169,20 +180,184 @@ def record_payment_failure(
     platform: str = "",
     path: Optional[Path] = None,
     now: float | None = None,
+    status: str = STATUS_FAILED,
 ) -> PaymentEntitlement:
     """Local cache when payment failed or entitlement was revoked."""
     t = now if now is not None else time.time()
     prev = load_payment_entitlement(path)
     sid = str(session_id or prev.session_id or "").strip()
+    st = str(status or STATUS_FAILED).strip().lower()
+    if st not in (STATUS_FAILED, STATUS_REVOKED, STATUS_UNPAID):
+        st = STATUS_FAILED
     ent = PaymentEntitlement(
         session_id=sid,
-        status=STATUS_FAILED,
+        status=st,
         platform=str(platform or prev.platform or "").strip().lower(),
         reason=str(reason or "payment_failed"),
         updated_at=t,
     )
     save_payment_entitlement(ent, path=path)
     return ent
+
+
+def store_session_pending(
+    session_id: str,
+    *,
+    platform: str = "",
+    path: Optional[Path] = None,
+    now: float | None = None,
+) -> PaymentEntitlement:
+    """Remember Checkout session id before remote verify (status still unknown)."""
+    t = now if now is not None else time.time()
+    prev = load_payment_entitlement(path)
+    sid = str(session_id or "").strip()
+    ent = PaymentEntitlement(
+        session_id=sid,
+        status=STATUS_UNKNOWN,
+        platform=str(platform or prev.platform or "").strip().lower(),
+        reason="session_import_pending",
+        updated_at=t,
+    )
+    save_payment_entitlement(ent, path=path)
+    return ent
+
+
+def import_entitlement_from_dict(
+    data: dict[str, Any],
+    *,
+    path: Optional[Path] = None,
+    now: float | None = None,
+) -> PaymentEntitlement:
+    """Import entitlement dict (thank-you download / product data file)."""
+    ent = PaymentEntitlement.from_dict(data if isinstance(data, dict) else {})
+    t = now if now is not None else time.time()
+    if not ent.updated_at:
+        ent = PaymentEntitlement(
+            session_id=ent.session_id,
+            status=ent.status or STATUS_UNKNOWN,
+            platform=ent.platform,
+            reason=ent.reason or "imported_file",
+            updated_at=t,
+        )
+    save_payment_entitlement(ent, path=path)
+    return ent
+
+
+def import_entitlement_from_file(
+    source: Path | str,
+    *,
+    path: Optional[Path] = None,
+    now: float | None = None,
+) -> PaymentEntitlement:
+    """Load payment_entitlement.json from disk into the product data path."""
+    src = Path(source)
+    raw = json.loads(src.read_text(encoding="utf-8"))
+    if not isinstance(raw, dict):
+        raise ValueError("entitlement file must be a JSON object")
+    return import_entitlement_from_dict(raw, path=path, now=now)
+
+
+def entitlement_discovery_candidates() -> list[Path]:
+    """Common locations for a post-pay entitlement file next to the install."""
+    out: list[Path] = []
+    try:
+        out.append(default_entitlement_path())
+    except Exception:  # noqa: BLE001
+        pass
+    # CWD and parent (portable / SFX extract dir)
+    try:
+        cwd = Path.cwd()
+        out.append(cwd / ENTITLEMENT_FILENAME)
+        out.append(cwd.parent / ENTITLEMENT_FILENAME)
+    except Exception:  # noqa: BLE001
+        pass
+    # Next to argv[0] when running a frozen/portable binary
+    try:
+        exe = Path(sys.argv[0]).resolve()
+        out.append(exe.parent / ENTITLEMENT_FILENAME)
+    except Exception:  # noqa: BLE001
+        pass
+    # User Downloads (thank-you auto-download often lands here)
+    try:
+        home = Path.home()
+        out.append(home / "Downloads" / ENTITLEMENT_FILENAME)
+        out.append(home / "downloads" / ENTITLEMENT_FILENAME)
+    except Exception:  # noqa: BLE001
+        pass
+    # Dedupe while preserving order
+    seen: set[str] = set()
+    unique: list[Path] = []
+    for p in out:
+        key = str(p)
+        if key in seen:
+            continue
+        seen.add(key)
+        unique.append(p)
+    return unique
+
+
+def try_discover_entitlement_file(
+    *,
+    dest_path: Optional[Path] = None,
+) -> PaymentEntitlement | None:
+    """If payment_entitlement.json exists nearby, import it into product data."""
+    dest = dest_path or default_entitlement_path()
+    existing = load_payment_entitlement(dest)
+    if existing.session_id and existing.status == STATUS_ACTIVE:
+        return existing
+    for cand in entitlement_discovery_candidates():
+        if cand == dest:
+            continue
+        try:
+            if not cand.is_file():
+                continue
+            ent = import_entitlement_from_file(cand, path=dest)
+            if ent.session_id:
+                return ent
+        except (OSError, json.JSONDecodeError, TypeError, ValueError):
+            continue
+    return None
+
+
+def import_session_and_verify(
+    session_id: str,
+    *,
+    path: Optional[Path] = None,
+    base_url: str | None = None,
+    platform: str = "",
+    now: float | None = None,
+    fetch: Any = None,
+) -> PaymentEntitlement:
+    """Provision local entitlement from Checkout session id and verify remotely.
+
+    This is the shipped paid-user path after Stripe success: paste/import
+    ``cs_…`` session id → status host confirms active or failed.
+    """
+    sid = str(session_id or "").strip()
+    if not sid:
+        return load_payment_entitlement(path)
+    store_session_pending(sid, platform=platform, path=path, now=now)
+    return refresh_entitlement_from_remote(
+        path=path,
+        base_url=base_url,
+        now=now,
+        fetch=fetch,
+    )
+
+
+def maybe_bootstrap_from_env(
+    *,
+    path: Optional[Path] = None,
+    base_url: str | None = None,
+    fetch: Any = None,
+) -> PaymentEntitlement | None:
+    """If ``RPT_PAYMENT_SESSION_ID`` is set, import and verify once."""
+    sid = (os.environ.get("RPT_PAYMENT_SESSION_ID") or "").strip()
+    if not sid:
+        return None
+    return import_session_and_verify(
+        sid, path=path, base_url=base_url, fetch=fetch
+    )
 
 
 def is_payment_blocking_status(status: str) -> bool:
@@ -225,10 +400,51 @@ def assert_payment_may_connect(
     path: Optional[Path] = None,
     *,
     require: bool | None = None,
+    refresh: bool = True,
+    base_url: str | None = None,
+    fetch: Any = None,
 ) -> tuple[bool, str]:
+    """Gate Connect on payment entitlement.
+
+    When ``refresh`` is true (product default on Connect):
+    - discover/import nearby entitlement file or ``RPT_PAYMENT_SESSION_ID``
+    - re-query the status host so refunds/revokes cancel Connect promptly
+    """
+    if refresh:
+        ensure_entitlement_for_connect(
+            path=path, base_url=base_url, fetch=fetch
+        )
     if payment_allows_connect(path=path, require=require):
         return True, ""
-    return False, CONNECT_BLOCKED_PAYMENT_MSG
+    ent = load_payment_entitlement(path)
+    if is_payment_blocking_status(ent.status):
+        return False, CONNECT_BLOCKED_PAYMENT_MSG
+    return False, CONNECT_BLOCKED_NO_ENTITLEMENT_MSG
+
+
+def ensure_entitlement_for_connect(
+    path: Optional[Path] = None,
+    *,
+    base_url: str | None = None,
+    fetch: Any = None,
+) -> PaymentEntitlement:
+    """Bootstrap + remote refresh used by every shipped Connect entry path."""
+    local = load_payment_entitlement(path)
+    if not local.session_id:
+        discovered = try_discover_entitlement_file(dest_path=path)
+        if discovered is not None and discovered.session_id:
+            local = discovered
+        else:
+            boot = maybe_bootstrap_from_env(
+                path=path, base_url=base_url, fetch=fetch
+            )
+            if boot is not None:
+                local = boot
+    if local.session_id:
+        return refresh_entitlement_from_remote(
+            path=path, base_url=base_url, fetch=fetch
+        )
+    return local
 
 
 def entitlement_status_url(
@@ -280,12 +496,24 @@ def refresh_entitlement_from_remote(
     *,
     base_url: str | None = None,
     now: float | None = None,
+    fetch: Callable[[str], dict[str, Any]] | None = None,
 ) -> PaymentEntitlement:
-    """Refresh local cache from status host when session_id is known."""
+    """Refresh local cache from status host when session_id is known.
+
+    ``fetch`` may inject a test double; production uses
+    :func:`fetch_remote_entitlement_status`.
+    """
     local = load_payment_entitlement(path)
     if not local.session_id:
         return local
-    remote = fetch_remote_entitlement_status(local.session_id, base_url=base_url)
+    if fetch is not None:
+        remote = fetch(local.session_id)
+    else:
+        remote = fetch_remote_entitlement_status(
+            local.session_id, base_url=base_url
+        )
+    if not isinstance(remote, dict):
+        remote = {"status": STATUS_UNKNOWN, "error": "bad_response"}
     st = str(remote.get("status") or STATUS_UNKNOWN).strip().lower()
     t = now if now is not None else time.time()
     if is_payment_blocking_status(st):
@@ -295,6 +523,7 @@ def refresh_entitlement_from_remote(
             platform=local.platform,
             path=path,
             now=t,
+            status=st if st in (STATUS_FAILED, STATUS_REVOKED, STATUS_UNPAID) else STATUS_FAILED,
         )
     if st == STATUS_ACTIVE:
         return record_payment_success(
@@ -303,4 +532,5 @@ def refresh_entitlement_from_remote(
             path=path,
             now=t,
         )
+    # Unknown remote (network blip): keep last known local status
     return local

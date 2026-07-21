@@ -71,6 +71,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
   ConnectionLog? _log;
   List<ConnectionLogEvent> _events = const [];
   bool _licenceAccepted = false;
+  bool _paymentOk = false;
+  String _paymentStatus = kPaymentStatusUnknown;
+  final TextEditingController _sessionCtrl = TextEditingController();
 
   @override
   void initState() {
@@ -79,8 +82,30 @@ class _SettingsScreenState extends State<SettingsScreen> {
     _log = widget.connectionLog;
     WidgetsBinding.instance.addPostFrameCallback((_) async {
       await _ensureLog();
-      final ok = await widget.licenceGate?.mayConnect() ?? false;
-      if (mounted) setState(() => _licenceAccepted = ok);
+      await _refreshLicenceAndPayment();
+    });
+  }
+
+  @override
+  void dispose() {
+    _sessionCtrl.dispose();
+    super.dispose();
+  }
+
+  Future<void> _refreshLicenceAndPayment() async {
+    final gate = widget.licenceGate;
+    final licOk = await gate?.hasAcceptedLicence() ?? false;
+    final payOk = await gate?.paymentAllowsConnect() ?? false;
+    final st = await gate?.paymentStatus() ?? kPaymentStatusUnknown;
+    final sid = await gate?.paymentSessionId() ?? '';
+    if (!mounted) return;
+    setState(() {
+      _licenceAccepted = licOk;
+      _paymentOk = payOk;
+      _paymentStatus = st;
+      if (sid.isNotEmpty && _sessionCtrl.text.isEmpty) {
+        _sessionCtrl.text = sid;
+      }
     });
   }
 
@@ -95,8 +120,43 @@ class _SettingsScreenState extends State<SettingsScreen> {
     if (!mounted) return;
     setState(() {
       _licenceAccepted = true;
-      _note = 'Licence accepted (stored locally only). Connect is unlocked.';
+      _note =
+          'Licence accepted (stored locally only). Paste payment session id below if Connect is still blocked.';
     });
+  }
+
+  Future<void> _verifyPayment() async {
+    final gate = widget.licenceGate;
+    if (gate == null) {
+      setState(() => _note = 'Payment store unavailable on this build.');
+      return;
+    }
+    final sid = _sessionCtrl.text.trim();
+    if (sid.isEmpty) {
+      setState(() => _note = 'Enter the Checkout session id (cs_…) first.');
+      return;
+    }
+    setState(() {
+      _busy = true;
+      _note = 'Verifying payment entitlement…';
+    });
+    try {
+      final st = await gate.importSessionAndVerify(sid);
+      final ok = await gate.paymentAllowsConnect();
+      if (!mounted) return;
+      setState(() {
+        _paymentOk = ok;
+        _paymentStatus = st;
+        _note = ok
+            ? 'Payment active — Connect allowed (status=$st).'
+            : 'Payment not active (status=$st). Connect stays blocked until successful payment.';
+      });
+      widget.onLicenceChanged?.call(await gate.hasAcceptedLicence());
+    } catch (e) {
+      if (mounted) setState(() => _note = 'Could not verify payment: $e');
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
   }
 
   Future<void> _ensureLog() async {
@@ -314,6 +374,47 @@ class _SettingsScreenState extends State<SettingsScreen> {
               onPressed: _acceptLicence,
               style: FilledButton.styleFrom(backgroundColor: kPrimary),
               child: const Text(kLicenceAcceptButton),
+            ),
+          ),
+          const SizedBox(height: 20),
+          Text(
+            'Payment entitlement',
+            style: TextStyle(
+              color: kPrimaryDark,
+              fontSize: 14,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+          const SizedBox(height: 6),
+          const Text(
+            kPaymentConnectDisclaimerPlain,
+            style: TextStyle(fontSize: 12, color: kTextMuted),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            _paymentOk
+                ? 'Payment status: $_paymentStatus — Connect allowed for payment.'
+                : 'Payment status: $_paymentStatus — Connect blocked until successful payment is verified.',
+            style: const TextStyle(fontSize: 12, color: kText),
+          ),
+          const SizedBox(height: 8),
+          TextField(
+            controller: _sessionCtrl,
+            decoration: const InputDecoration(
+              labelText: 'Checkout session id (cs_…)',
+              border: OutlineInputBorder(),
+              isDense: true,
+            ),
+            style: const TextStyle(fontSize: 13),
+            enabled: !_busy,
+          ),
+          const SizedBox(height: 8),
+          Align(
+            alignment: Alignment.centerLeft,
+            child: FilledButton(
+              onPressed: _busy ? null : _verifyPayment,
+              style: FilledButton.styleFrom(backgroundColor: kPrimary),
+              child: const Text('Verify payment / unlock Connect'),
             ),
           ),
           const SizedBox(height: 12),

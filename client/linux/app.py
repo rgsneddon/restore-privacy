@@ -73,6 +73,12 @@ from client.licence_gate import (
     licence_url,
     short_licence_summary,
 )
+from client.payment_entitlement import (
+    PAYMENT_CONNECT_DISCLAIMER_PLAIN,
+    import_session_and_verify,
+    load_payment_entitlement,
+    payment_allows_connect,
+)
 from client.registration_copy import (
     ANON_REGISTRATION_SUMMARY,
     OS_PRIVILEGE_HONESTY,
@@ -563,6 +569,70 @@ class TunnelClientApp:
             command=lambda: (win.destroy(), self._show_licence_prompt()),
             bg=PRIMARY if not has_accepted_licence() else CHROME_BG,
             fg=WHITE if not has_accepted_licence() else PRIMARY_DARK,
+            relief=tk.FLAT,
+        ).pack(anchor="w", pady=(0, 8))
+
+        tk.Label(
+            frm,
+            text="Payment entitlement",
+            bg=WHITE,
+            fg=PRIMARY_DARK,
+            font=("DejaVu Sans", 10, "bold"),
+        ).pack(anchor="w", pady=(6, 2))
+        tk.Label(
+            frm,
+            text=PAYMENT_CONNECT_DISCLAIMER_PLAIN,
+            bg=WHITE,
+            fg=TEXT_MUTED,
+            font=("DejaVu Sans", 8),
+            wraplength=440,
+            justify=tk.LEFT,
+        ).pack(anchor="w")
+        _pay = load_payment_entitlement()
+        pay_note = tk.StringVar(
+            value=f"Status: {_pay.status or 'unknown'}"
+            + (f" ({_pay.session_id[:16]}…)" if _pay.session_id else "")
+        )
+        tk.Label(
+            frm,
+            textvariable=pay_note,
+            bg=WHITE,
+            fg=TEXT,
+            font=("DejaVu Sans", 8),
+            wraplength=440,
+            justify=tk.LEFT,
+        ).pack(anchor="w", pady=(2, 2))
+        session_var = tk.StringVar(value=_pay.session_id or "")
+        tk.Entry(frm, textvariable=session_var, font=("DejaVu Sans", 9)).pack(
+            fill=tk.X, pady=(2, 4)
+        )
+
+        def _verify_pay() -> None:
+            sid = (session_var.get() or "").strip()
+            if not sid:
+                pay_note.set("Enter Checkout session id (cs_…) from thank-you page.")
+                return
+            pay_note.set("Verifying…")
+            win.update_idletasks()
+            try:
+                ent = import_session_and_verify(sid)
+                ok = payment_allows_connect()
+                pay_note.set(
+                    f"Status: {ent.status}"
+                    + (" — Connect allowed." if ok else " — Connect blocked.")
+                )
+                self._log(
+                    "Payment verified." if ok else f"Payment status: {ent.status}"
+                )
+            except Exception as exc:  # noqa: BLE001
+                pay_note.set(f"Verify failed: {exc}")
+
+        tk.Button(
+            frm,
+            text="Verify payment / unlock Connect",
+            command=_verify_pay,
+            bg=PRIMARY,
+            fg=WHITE,
             relief=tk.FLAT,
         ).pack(anchor="w", pady=(0, 8))
 

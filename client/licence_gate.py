@@ -145,26 +145,38 @@ def clear_licence_acceptance(path: Optional[Path] = None) -> None:
         pass
 
 
-def may_connect(path: Optional[Path] = None) -> bool:
+def may_connect(path: Optional[Path] = None, *, refresh_payment: bool = False) -> bool:
     """Product Connect gate: licence accepted **and** payment entitlement allows.
 
     Payment failure / revoked entitlement always blocks Connect (see
-    :mod:`client.payment_entitlement`).
+    :mod:`client.payment_entitlement`). UI badges use local cache only
+    (``refresh_payment=False``). The Connect entry path uses
+    :func:`assert_may_connect`, which refreshes remote entitlement.
     """
     if not has_accepted_licence(path):
         return False
-    from client.payment_entitlement import payment_allows_connect
+    from client.payment_entitlement import (
+        assert_payment_may_connect,
+        payment_allows_connect,
+    )
 
+    if refresh_payment:
+        ok, _ = assert_payment_may_connect(refresh=True)
+        return ok
     return payment_allows_connect()
 
 
 def assert_may_connect(path: Optional[Path] = None) -> tuple[bool, str]:
-    """Return ``(True, \"\")`` if Connect may proceed; else ``(False, message)``."""
+    """Return ``(True, \"\")`` if Connect may proceed; else ``(False, message)``.
+
+    Always re-checks payment entitlement (remote refresh when session id is
+    known) so refunds / failed charges cancel Connect for that install.
+    """
     if not has_accepted_licence(path):
         return False, CONNECT_BLOCKED_LICENCE_MSG
     from client.payment_entitlement import assert_payment_may_connect
 
-    ok_pay, pay_msg = assert_payment_may_connect()
+    ok_pay, pay_msg = assert_payment_may_connect(refresh=True)
     if not ok_pay:
         return False, pay_msg
     return True, ""

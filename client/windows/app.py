@@ -78,6 +78,12 @@ from client.licence_gate import (
     may_connect,
     short_licence_summary,
 )
+from client.payment_entitlement import (
+    PAYMENT_CONNECT_DISCLAIMER_PLAIN,
+    import_session_and_verify,
+    load_payment_entitlement,
+    payment_allows_connect,
+)
 from client.registration_copy import (
     ANON_REGISTRATION_SUMMARY,
     ANON_REGISTRATION_TITLE,
@@ -1207,6 +1213,132 @@ class TunnelClientApp:
             pady=4,
             cursor="hand2",
         ).pack(anchor="w", pady=(8, 0))
+
+        # --- Payment entitlement (post-pay session id → Connect unlock) ---
+        pay_card = tk.Frame(
+            pad,
+            bg=PANEL_BG,
+            highlightbackground=BORDER,
+            highlightthickness=1,
+            padx=12,
+            pady=8,
+        )
+        pay_card.pack(fill=tk.X, pady=(14, 0))
+        tk.Label(
+            pay_card,
+            text="Payment entitlement",
+            bg=PANEL_BG,
+            fg=PRIMARY_DARK,
+            font=("Segoe UI", 10, "bold"),
+            anchor="w",
+        ).pack(fill=tk.X, pady=(0, 4))
+        tk.Label(
+            pay_card,
+            text=PAYMENT_CONNECT_DISCLAIMER_PLAIN,
+            bg=PANEL_BG,
+            fg=TEXT_MUTED,
+            font=("Segoe UI", 8),
+            anchor="w",
+            wraplength=400,
+            justify=tk.LEFT,
+        ).pack(fill=tk.X)
+        _pay = load_payment_entitlement()
+        _pay_status = (
+            f"Status: {_pay.status or 'unknown'}"
+            + (f" (session {_pay.session_id[:18]}…)" if _pay.session_id else " (no session)")
+        )
+        pay_status_var = tk.StringVar(value=_pay_status)
+        tk.Label(
+            pay_card,
+            textvariable=pay_status_var,
+            bg=PANEL_BG,
+            fg=TEXT,
+            font=("Segoe UI", 8),
+            anchor="w",
+            wraplength=400,
+            justify=tk.LEFT,
+        ).pack(fill=tk.X, pady=(6, 2))
+        tk.Label(
+            pay_card,
+            text="Paste Checkout session id (cs_…) from the thank-you page after payment:",
+            bg=PANEL_BG,
+            fg=TEXT_MUTED,
+            font=("Segoe UI", 8),
+            anchor="w",
+            wraplength=400,
+            justify=tk.LEFT,
+        ).pack(fill=tk.X)
+        session_var = tk.StringVar(value=_pay.session_id or "")
+        session_entry = tk.Entry(
+            pay_card,
+            textvariable=session_var,
+            font=("Segoe UI", 9),
+            bg=WHITE,
+            fg=TEXT,
+            relief=tk.SOLID,
+            bd=1,
+        )
+        session_entry.pack(fill=tk.X, pady=(4, 4))
+
+        def _verify_payment() -> None:
+            sid = (session_var.get() or "").strip()
+            if not sid:
+                note_var.set("Enter the Checkout session id (cs_…) first.")
+                return
+            note_var.set("Verifying payment entitlement…")
+            win.update_idletasks()
+
+            def work() -> None:
+                try:
+                    ent = import_session_and_verify(sid)
+                    ok = payment_allows_connect()
+                    msg = (
+                        f"Payment active — Connect allowed (status={ent.status})."
+                        if ok
+                        else (
+                            f"Payment not active (status={ent.status}"
+                            f"{', ' + ent.reason if ent.reason else ''}). "
+                            "Connect stays blocked until successful payment."
+                        )
+                    )
+                except Exception as exc:  # noqa: BLE001
+                    msg = f"Could not verify payment: {exc}"
+                    ok = False
+
+                def done() -> None:
+                    note_var.set(msg)
+                    pay_status_var.set(
+                        f"Status: {load_payment_entitlement().status}"
+                    )
+                    self._log(msg)
+                    self._refresh_licence_badge()
+                    if ok:
+                        self.detail_var.set(
+                            "Payment verified. Press Connect when you want protection."
+                        )
+
+                try:
+                    self.root.after(0, done)
+                except Exception:
+                    pass
+
+            import threading
+
+            threading.Thread(target=work, daemon=True).start()
+
+        tk.Button(
+            pay_card,
+            text="Verify payment / unlock Connect",
+            command=_verify_payment,
+            bg=PRIMARY,
+            fg=WHITE,
+            relief=tk.FLAT,
+            font=("Segoe UI", 8, "bold"),
+            padx=10,
+            pady=4,
+            cursor="hand2",
+        ).pack(anchor="w", pady=(4, 0))
+
         tk.Label(
             lic_card,
             text=ANON_REGISTRATION_TITLE,

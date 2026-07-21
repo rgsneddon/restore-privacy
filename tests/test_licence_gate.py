@@ -7,6 +7,7 @@ import sys
 import tempfile
 import unittest
 from pathlib import Path
+from unittest import mock
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
@@ -22,6 +23,7 @@ from client.licence_gate import (  # noqa: E402
     load_licence_acceptance,
     may_connect,
 )
+from client.payment_entitlement import record_payment_success  # noqa: E402
 
 
 class TestLicenceGateStore(unittest.TestCase):
@@ -36,16 +38,29 @@ class TestLicenceGateStore(unittest.TestCase):
             self.assertEqual(msg, CONNECT_BLOCKED_LICENCE_MSG)
 
     def test_accept_unlocks_may_connect(self):
+        """Licence + active payment entitlement both required for Connect."""
         with tempfile.TemporaryDirectory() as td:
             path = Path(td) / "licence_acceptance.json"
+            pay = Path(td) / "payment_entitlement.json"
             st = accept_licence(path, ts=1_700_000_000.0)
             self.assertTrue(st.accepted)
             self.assertEqual(st.licence_id, CURRENT_LICENCE_ID)
             self.assertTrue(has_accepted_licence(path))
-            self.assertTrue(may_connect(path))
-            ok, msg = assert_may_connect(path)
-            self.assertTrue(ok)
-            self.assertEqual(msg, "")
+            # Licence alone is not enough under default payment require
+            with mock.patch(
+                "client.payment_entitlement.default_entitlement_path",
+                return_value=pay,
+            ):
+                with mock.patch(
+                    "client.payment_entitlement.ensure_entitlement_for_connect",
+                    return_value=None,
+                ):
+                    self.assertFalse(may_connect(path))
+                    record_payment_success("cs_test_licence", path=pay)
+                    self.assertTrue(may_connect(path))
+                    ok, msg = assert_may_connect(path)
+                    self.assertTrue(ok)
+                    self.assertEqual(msg, "")
             loaded = load_licence_acceptance(path)
             self.assertTrue(loaded.accepted)
             self.assertEqual(loaded.licence_id, CURRENT_LICENCE_ID)
@@ -53,17 +68,33 @@ class TestLicenceGateStore(unittest.TestCase):
     def test_wrong_licence_id_blocks(self):
         with tempfile.TemporaryDirectory() as td:
             path = Path(td) / "licence_acceptance.json"
+            pay = Path(td) / "payment_entitlement.json"
             accept_licence(path, licence_id="OLD-ID")
-            self.assertFalse(has_accepted_licence(path))
-            self.assertFalse(may_connect(path))
+            record_payment_success("cs_x", path=pay)
+            with mock.patch(
+                "client.payment_entitlement.default_entitlement_path",
+                return_value=pay,
+            ):
+                self.assertFalse(has_accepted_licence(path))
+                self.assertFalse(may_connect(path))
 
     def test_clear_blocks_again(self):
         with tempfile.TemporaryDirectory() as td:
             path = Path(td) / "licence_acceptance.json"
+            pay = Path(td) / "payment_entitlement.json"
             accept_licence(path)
-            self.assertTrue(may_connect(path))
-            clear_licence_acceptance(path)
-            self.assertFalse(may_connect(path))
+            with mock.patch(
+                "client.payment_entitlement.default_entitlement_path",
+                return_value=pay,
+            ):
+                with mock.patch(
+                    "client.payment_entitlement.ensure_entitlement_for_connect",
+                    return_value=None,
+                ):
+                    record_payment_success("cs_clear", path=pay)
+                    self.assertTrue(may_connect(path))
+                    clear_licence_acceptance(path)
+                    self.assertFalse(may_connect(path))
 
     def test_local_only_no_network_imports(self):
         self.assertTrue(licence_gate_is_local_only())
@@ -89,6 +120,9 @@ class TestLicenceGateUiWiring(unittest.TestCase):
         self.assertIn("may_connect", src)
         # Autoconnect path must not bypass
         self.assertIn("assert_may_connect", src)
+        # Payment entitlement import path (post-pay unlock)
+        self.assertIn("import_session_and_verify", src)
+        self.assertIn("Payment entitlement", src)
 
     def test_flutter_connect_gated(self):
         main = (ROOT / "client_app" / "lib" / "main.dart").read_text(encoding="utf-8")
@@ -103,6 +137,9 @@ class TestLicenceGateUiWiring(unittest.TestCase):
         self.assertIn("acceptLicence", main + gate + screen)
         self.assertIn("kLicenceAcceptButton", main + screen)
         self.assertIn("Accept licence", gate)
+        self.assertIn("importSessionAndVerify", gate + screen)
+        self.assertIn("refreshEntitlementFromRemote", gate)
+        self.assertIn("Verify payment", screen)
 
     def test_linux_connect_gated(self):
         src = (ROOT / "client" / "linux" / "app.py").read_text(encoding="utf-8")
@@ -111,6 +148,8 @@ class TestLicenceGateUiWiring(unittest.TestCase):
         self.assertIn("LICENCE_ACCEPT_BUTTON", src)
         self.assertIn("_show_licence_prompt", src)
         self.assertIn("_open_settings", src)
+        self.assertIn("import_session_and_verify", src)
+        self.assertIn("Payment entitlement", src)
 
 
 if __name__ == "__main__":

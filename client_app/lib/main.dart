@@ -151,14 +151,16 @@ class _TunnelHomeState extends State<TunnelHome> with WidgetsBindingObserver {
       _connectionLog = ConnectionLog(MemoryConnectionLogBackend());
     }
     final loaded = await _store!.load();
-    final accepted = await _licence!.mayConnect();
+    final licOk = await _licence!.hasAcceptedLicence();
+    final canConnect = await _licence!.mayConnect();
     if (!mounted) return;
     setState(() {
       _settings = loaded;
-      _licenceAccepted = accepted;
-      if (!accepted) {
-        _status =
-            'Accept the licence, then press Connect for residual protection.';
+      _licenceAccepted = licOk;
+      if (!canConnect) {
+        _status = licOk
+            ? 'Verify payment in Settings (Checkout session id), then Connect.'
+            : 'Accept the licence, then press Connect for residual protection.';
       }
     });
   }
@@ -235,11 +237,16 @@ class _TunnelHomeState extends State<TunnelHome> with WidgetsBindingObserver {
   Future<bool> assertMayConnect() async {
     final gate = _licence;
     if (gate == null) return false;
-    final r = await gate.assertMayConnect();
+    // Refreshes remote payment entitlement so refunds cancel Connect.
+    final r = await gate.assertMayConnect(refreshPayment: true);
     if (!r.ok) {
       _append(r.message);
       setState(() => _status = r.message);
-      await _showLicenceSheet();
+      final licOk = await gate.hasAcceptedLicence();
+      if (!licOk) {
+        await _showLicenceSheet();
+      }
+      // Payment failures: message already points to Settings → Payment entitlement.
       return false;
     }
     return true;
@@ -420,12 +427,13 @@ class _TunnelHomeState extends State<TunnelHome> with WidgetsBindingObserver {
     );
     if (updated != null && mounted) {
       setState(() => _settings = updated);
-    } else if (mounted) {
+    }
+    if (mounted) {
       final s = await store.load();
-      final accepted = await _licence?.mayConnect() ?? false;
+      final licOk = await _licence?.hasAcceptedLicence() ?? false;
       setState(() {
         _settings = s;
-        _licenceAccepted = accepted;
+        _licenceAccepted = licOk;
       });
     }
   }

@@ -49,6 +49,8 @@ The product source repository is **private**; free permanent GitHub release down
 
 > **STRONG DISCLAIMER — PAYMENT REQUIRED FOR CONNECT:** Access to **Connect** and residual VPN use requires **successful payment**. If payment **fails at any time** (failed checkout, failed charge, refund, dispute, or revoked entitlement), the ability to **Connect with the Restore Privacy app is cancelled** for that purchase/install until a successful payment is completed.
 
+**Unlock Connect after payment:** the thank-you page shows your Checkout **session id** (`cs_…`) and auto-downloads `payment_entitlement.json`. In the app open **Settings → Payment entitlement**, paste the session id, and press **Verify payment / unlock Connect** (or place `payment_entitlement.json` in the product data folder). On every Connect the app re-checks the status host so a later refund/failure cancels Connect for that install.
+
 | Platform | Package |
 |----------|---------|
 | Windows | `restore-privacy-client-0.3.3-windows-x64-setup.exe` |
@@ -61,17 +63,19 @@ The product source repository is **private**; free permanent GitHub release down
 
 1. On the [status downloads page](https://restoreprivacy.online/), pay **£2.45** for **Windows** and download **`restore-privacy-client-0.3.3-windows-x64-setup.exe`** (one-time link after payment).
 2. Run the installer (PE self-extracting package: frozen runtime + Wintun — no separate Python install). The package may extract as a portable tree or install under LocalAppData.
-3. Press **Connect** and approve **UAC** when prompted so residual public IP uses the VPN node. Scoped **Windows Defender Firewall** allows (node UDP + program) may be applied for residual Connect.
-4. Optional: **Settings** → startup / autoconnect (defaults **off**); legal links to audit / privacy / licence.
-5. **Disconnect** / **Quit** tears down dual `/1` residual routes so ordinary internet works again. For **complete removal**, use **Restore Internet** (see warning below).
+3. Open **Settings → Payment entitlement**, paste the Checkout session id from the thank-you page (or import `payment_entitlement.json`), and **Verify payment** so Connect is allowed.
+4. Press **Connect** and approve **UAC** when prompted so residual public IP uses the VPN node. Scoped **Windows Defender Firewall** allows (node UDP + program) may be applied for residual Connect.
+5. Optional: **Settings** → startup / autoconnect (defaults **off**); legal links to audit / privacy / licence.
+6. **Disconnect** / **Quit** tears down dual `/1` residual routes so ordinary internet works again. For **complete removal**, use **Restore Internet** (see warning below).
 
 ### Android
 
 1. On the [status downloads page](https://restoreprivacy.online/), pay **£2.45** for **Android** and download **`restore-privacy-client-0.3.3-android.apk`** (one-time link after payment).
 2. Install the APK (allow install from unknown sources if your device asks). Catalog APK includes residual wire (**PFS + outer obfs**).
-3. Open **Restore Privacy**, press **Connect**, and grant **VPN** permission when prompted.
-4. Optional: **Settings** → startup / autoconnect (defaults off). Minimize keeps the VPN service running until **Disconnect**.
-5. For complete removal, open the in-package **Restore Internet** guidance and uninstall via system Settings.
+3. Open **Restore Privacy** → **Settings → Payment entitlement**, paste the Checkout session id and **Verify payment**.
+4. Press **Connect**, and grant **VPN** permission when prompted.
+5. Optional: **Settings** → startup / autoconnect (defaults off). Minimize keeps the VPN service running until **Disconnect**.
+6. For complete removal, open the in-package **Restore Internet** guidance and uninstall via system Settings.
 
 ### Ubuntu and derivatives (Linux Mint, Pop!_OS, …)
 

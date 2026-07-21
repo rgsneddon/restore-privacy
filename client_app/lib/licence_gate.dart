@@ -3,6 +3,9 @@
 /// Acceptance is stored only on this device. Never uploaded by the client.
 library;
 
+import 'dart:convert';
+import 'dart:io';
+
 import 'settings_store.dart';
 
 const String kKeyLicenceAccepted = 'licence_accepted';
@@ -18,7 +21,15 @@ const String kConnectBlockedPaymentMsg =
     'Connect is blocked: payment failed or entitlement was revoked for this '
     'install. Successful payment is required. If payment fails at any time, '
     'the ability to Connect with the Restore Privacy app is cancelled until '
-    'you complete a successful payment again on https://restoreprivacy.online/';
+    'you complete a successful payment again on https://restoreprivacy.online/ — '
+    'then paste the Checkout session id (cs_…) in Settings → Payment entitlement.';
+
+const String kConnectBlockedNoEntitlementMsg =
+    'Connect is blocked: no successful payment entitlement on this install. '
+    'After paying on https://restoreprivacy.online/, open Settings → Payment '
+    'entitlement and paste the Checkout session id (cs_…) from the thank-you '
+    'page. Successful payment is required; if payment fails at any time, '
+    'Connect is cancelled.';
 
 const String kKeyPaymentStatus = 'payment_entitlement_status';
 const String kKeyPaymentSessionId = 'payment_entitlement_session_id';
@@ -27,6 +38,8 @@ const String kPaymentStatusFailed = 'failed';
 const String kPaymentStatusRevoked = 'revoked';
 const String kPaymentStatusUnpaid = 'unpaid';
 const String kPaymentStatusUnknown = 'unknown';
+
+const String kDefaultPaymentStatusBaseUrl = 'https://restoreprivacy.online';
 
 const String kLicencePromptTitle = 'End-user licence';
 const String kLicenceAcceptButton = 'Accept licence';
@@ -124,13 +137,107 @@ class LicenceGate {
     return (s ?? kPaymentStatusUnknown).trim().toLowerCase();
   }
 
+  Future<String> paymentSessionId() async {
+    return (await backend.getString(kKeyPaymentSessionId) ?? '').trim();
+  }
+
   Future<void> recordPaymentSuccess(String sessionId) async {
     await backend.setString(kKeyPaymentSessionId, sessionId);
     await backend.setString(kKeyPaymentStatus, kPaymentStatusActive);
   }
 
-  Future<void> recordPaymentFailure({String reason = 'payment_failed'}) async {
-    await backend.setString(kKeyPaymentStatus, kPaymentStatusFailed);
+  Future<void> recordPaymentFailure({
+    String reason = 'payment_failed',
+    String status = kPaymentStatusFailed,
+  }) async {
+    final st = status.trim().toLowerCase();
+    final write = (st == kPaymentStatusRevoked || st == kPaymentStatusUnpaid)
+        ? st
+        : kPaymentStatusFailed;
+    await backend.setString(kKeyPaymentStatus, write);
+  }
+
+  /// Paste Checkout session id and verify against the status host.
+  ///
+  /// This is the shipped paid-user path after Stripe success.
+  Future<String> importSessionAndVerify(
+    String sessionId, {
+    String? baseUrl,
+    Future<Map<String, dynamic>> Function(String sessionId)? fetch,
+  }) async {
+    final sid = sessionId.trim();
+    if (sid.isEmpty) return kPaymentStatusUnknown;
+    await backend.setString(kKeyPaymentSessionId, sid);
+    await backend.setString(kKeyPaymentStatus, kPaymentStatusUnknown);
+    return refreshEntitlementFromRemote(baseUrl: baseUrl, fetch: fetch);
+  }
+
+  Future<String> refreshEntitlementFromRemote({
+    String? baseUrl,
+    Future<Map<String, dynamic>> Function(String sessionId)? fetch,
+  }) async {
+    final sid = await paymentSessionId();
+    if (sid.isEmpty) return await paymentStatus();
+    Map<String, dynamic> remote;
+    try {
+      if (fetch != null) {
+        remote = await fetch(sid);
+      } else {
+        remote = await fetchRemoteEntitlementStatus(sid, baseUrl: baseUrl);
+      }
+    } catch (_) {
+      return await paymentStatus();
+    }
+    final st = (remote['status']?.toString() ?? kPaymentStatusUnknown)
+        .trim()
+        .toLowerCase();
+    if (st == kPaymentStatusFailed ||
+        st == kPaymentStatusRevoked ||
+        st == kPaymentStatusUnpaid) {
+      await recordPaymentFailure(reason: remote['reason']?.toString() ?? st, status: st);
+      return st;
+    }
+    if (st == kPaymentStatusActive) {
+      await recordPaymentSuccess(sid);
+      return kPaymentStatusActive;
+    }
+    return await paymentStatus();
+  }
+
+  static Future<Map<String, dynamic>> fetchRemoteEntitlementStatus(
+    String sessionId, {
+    String? baseUrl,
+    Duration timeout = const Duration(seconds: 8),
+  }) async {
+    final sid = sessionId.trim();
+    if (sid.isEmpty) {
+      return {'status': kPaymentStatusUnknown, 'error': 'missing_session_id'};
+    }
+    final base = (baseUrl ??
+            Platform.environment['RPT_PUBLIC_BASE_URL'] ??
+            kDefaultPaymentStatusBaseUrl)
+        .trim()
+        .replaceAll(RegExp(r'/+$'), '');
+    final uri = Uri.parse(
+      '$base/api/connect-entitlement?session_id=${Uri.encodeQueryComponent(sid)}',
+    );
+    final client = HttpClient();
+    try {
+      client.connectionTimeout = timeout;
+      final req = await client.getUrl(uri);
+      req.headers.set(HttpHeaders.userAgentHeader, 'RestorePrivacy-flutter/0.3.3');
+      req.headers.set(HttpHeaders.acceptHeader, 'application/json');
+      final resp = await req.close().timeout(timeout);
+      final body = await resp.transform(utf8.decoder).join();
+      final data = jsonDecode(body);
+      if (data is Map<String, dynamic>) return data;
+      if (data is Map) return Map<String, dynamic>.from(data);
+      return {'status': kPaymentStatusUnknown, 'error': 'bad_response'};
+    } catch (e) {
+      return {'status': kPaymentStatusUnknown, 'error': e.toString()};
+    } finally {
+      client.close(force: true);
+    }
   }
 
   /// Failed / revoked / unpaid always block. Missing entitlement blocks when
@@ -154,12 +261,27 @@ class LicenceGate {
 
   Future<({bool ok, String message})> assertMayConnect({
     bool requirePayment = true,
+    bool refreshPayment = true,
+    String? baseUrl,
+    Future<Map<String, dynamic>> Function(String sessionId)? fetch,
   }) async {
     if (!await hasAcceptedLicence()) {
       return (ok: false, message: kConnectBlockedLicenceMsg);
     }
+    if (refreshPayment) {
+      final sid = await paymentSessionId();
+      if (sid.isNotEmpty) {
+        await refreshEntitlementFromRemote(baseUrl: baseUrl, fetch: fetch);
+      }
+    }
     if (!await paymentAllowsConnect(require: requirePayment)) {
-      return (ok: false, message: kConnectBlockedPaymentMsg);
+      final st = await paymentStatus();
+      if (st == kPaymentStatusFailed ||
+          st == kPaymentStatusRevoked ||
+          st == kPaymentStatusUnpaid) {
+        return (ok: false, message: kConnectBlockedPaymentMsg);
+      }
+      return (ok: false, message: kConnectBlockedNoEntitlementMsg);
     }
     return (ok: true, message: '');
   }
