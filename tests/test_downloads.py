@@ -1,4 +1,4 @@
-"""Tests for shipped status-page download catalog (restore-privacy 0.2.9) + paid UI."""
+"""Tests for shipped status-page download catalog (restore-privacy 0.3.0) + paid UI."""
 
 from __future__ import annotations
 
@@ -28,17 +28,17 @@ from downloads import (  # noqa: E402
 )
 
 EXPECTED_RELEASE_PAGE = (
-    "https://github.com/rgsneddon/restore-privacy/releases/tag/0.2.9"
+    "https://github.com/rgsneddon/restore-privacy/releases/tag/0.3.0"
 )
 EXPECTED_DOWNLOAD_PREFIX = (
-    "https://github.com/rgsneddon/restore-privacy/releases/download/0.2.9/"
+    "https://github.com/rgsneddon/restore-privacy/releases/download/0.3.0/"
 )
 
 
 class TestDownloadCatalog(unittest.TestCase):
     def test_version_is_0_2_9(self):
-        self.assertEqual(RELEASE_VERSION, "0.2.9")
-        self.assertEqual(RELEASE_TAG, "0.2.9")
+        self.assertEqual(RELEASE_VERSION, "0.3.0")
+        self.assertEqual(RELEASE_TAG, "0.3.0")
         self.assertEqual(GITHUB_REPO, "restore-privacy")
         self.assertEqual(RELEASE_PAGE_URL, EXPECTED_RELEASE_PAGE)
         self.assertEqual(RELEASE_DOWNLOAD_BASE, EXPECTED_DOWNLOAD_PREFIX.rstrip("/"))

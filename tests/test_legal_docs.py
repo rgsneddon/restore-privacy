@@ -54,9 +54,9 @@ class TestPrivacyPolicy(unittest.TestCase):
         self.assertIn("README", text)
 
     def test_policy_public_catalog_is_v0_2_9(self):
-        """User-facing policy must advertise catalog v0.2.9 as current paid ship."""
+        """User-facing policy must advertise catalog v0.3.0 as current paid ship."""
         text = _read("PRIVACY_POLICY.md")
-        self.assertIn("0.2.9", text)
+        self.assertIn("0.3.0", text)
         self.assertIn("restore-privacy-status.onrender.com", text)
         self.assertIn("Developer ID", text)
         self.assertIn("Team-signed", text)
@@ -105,8 +105,8 @@ class TestReadmeHowto(unittest.TestCase):
         self.assertIn("android", lower)
         self.assertIn("macos", lower)
         self.assertIn("ios", lower)
-        # Catalog ship is 0.2.9 (signed packages via paid status page)
-        self.assertIn("0.2.9", text)
+        # Catalog ship is 0.3.0 (signed packages via paid status page)
+        self.assertIn("0.3.0", text)
         self.assertIn("restore-privacy-status.onrender.com", text)
         self.assertIn("Developer ID", text)
         self.assertIn("Team-signed", text)
@@ -114,7 +114,7 @@ class TestReadmeHowto(unittest.TestCase):
         self.assertNotIn("prep packages only", lower)
         # Package basenames from the public release catalog
         self.assertIn(
-            "restore-privacy-client-0.2.9-windows-x64-setup.exe",
+            "restore-privacy-client-0.3.0-windows-x64-setup.exe",
             text,
         )
         self.assertIn("android.apk", text)

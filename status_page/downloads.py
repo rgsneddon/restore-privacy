@@ -1,4 +1,4 @@
-"""Release download catalog + paid download UI (version 0.2.9).
+"""Release download catalog + paid download UI (version 0.3.0).
 
 Primary path: pay **£2.45** (GBP) via Stripe Checkout per package, then a
 single-use download token. Free permanent GitHub ``href`` is not used on the
@@ -6,7 +6,7 @@ public buttons. After payment the status host **proxies** the installer
 (authenticated GitHub API / local assets) so fulfilment works when the
 restore-privacy repo is **private**. Buy Me a Coffee is tip/support only.
 
-Current catalog packages: restore-privacy release **0.2.9**
+Current catalog packages: restore-privacy release **0.3.0**
 (macOS Developer ID notarized; iOS Team-signed sideload).
 """
 
@@ -17,10 +17,10 @@ from typing import Iterable
 
 from coffee_link import COFFEE_LINK_URL, coffee_tip_url
 
-RELEASE_VERSION = "0.2.9"
+RELEASE_VERSION = "0.3.0"
 GITHUB_OWNER = "rgsneddon"
 GITHUB_REPO = "restore-privacy"
-RELEASE_TAG = "0.2.9"
+RELEASE_TAG = "0.3.0"
 RELEASE_PAGE_URL = (
     f"https://github.com/{GITHUB_OWNER}/{GITHUB_REPO}/releases/tag/{RELEASE_TAG}"
 )
@@ -28,7 +28,7 @@ RELEASE_DOWNLOAD_BASE = (
     f"https://github.com/{GITHUB_OWNER}/{GITHUB_REPO}/releases/download/{RELEASE_TAG}"
 )
 
-# Canonical public asset filenames (must match GitHub Release 0.2.9 assets).
+# Canonical public asset filenames (must match GitHub Release 0.3.0 assets).
 WINDOWS_EXE_FILENAME = f"restore-privacy-client-{RELEASE_VERSION}-windows-x64-setup.exe"
 ANDROID_APK_FILENAME = f"restore-privacy-client-{RELEASE_VERSION}-android.apk"
 MACOS_ZIP_FILENAME = f"restore-privacy-client-{RELEASE_VERSION}-macos.zip"
@@ -127,7 +127,7 @@ RUST_REPO_LABEL = (
 )
 
 
-# Compatibility aliases used by older tests (map to 0.2.9 installers).
+# Compatibility aliases used by older tests (map to 0.3.0 installers).
 WINDOWS_ZIP_FILENAME = WINDOWS_EXE_FILENAME
 
 
