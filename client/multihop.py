@@ -139,3 +139,80 @@ def default_single_hop() -> MultiHopConfig:
         hops=[Hop(DEFAULT_ENDPOINT.host, DEFAULT_ENDPOINT.port)],
         enabled=False,
     )
+
+
+def entry_hop() -> Hop:
+    """Product entry hop (Iceland / FlokiNET production node)."""
+    return Hop(PRODUCT_NODE_HOST, PRODUCT_NODE_PORT)
+
+
+def build_entry_exit_path(
+    exit_host: str,
+    *,
+    exit_port: int = PRODUCT_NODE_PORT,
+    entry_host: str | None = None,
+    entry_port: int = PRODUCT_NODE_PORT,
+) -> list[Hop]:
+    """Ordered path: entry (default product pin) → exit hop (second FlokiNET VPS).
+
+    Config only — Connect still dials the **entry** hop until multi-hop routing
+    is implemented. Empty exit_host raises ValueError.
+    """
+    exit_h = (exit_host or "").strip()
+    if not exit_h:
+        raise ValueError("exit_host is required for entry→exit path planning")
+    entry_h = (entry_host or PRODUCT_NODE_HOST).strip() or PRODUCT_NODE_HOST
+    return build_hop_path(
+        [
+            Hop(entry_h, entry_port),
+            Hop(exit_h, exit_port),
+        ]
+    )
+
+
+def multihop_config_from_env(
+    env: dict[str, str] | None = None,
+) -> MultiHopConfig:
+    """Build MultiHopConfig from operator environment (opt-in).
+
+    Recognised keys (all optional except when enabling):
+
+    - ``RPT_MULTIHOP_ENABLED=1`` — enable path *config* (not residual routing)
+    - ``RPT_MULTIHOP_HOPS`` — CSV ``host[:port],host2[:port]`` (≥2 for path)
+    - ``RPT_EXIT_HOST`` / ``RPT_EXIT_PORT`` — second hop when CSV omitted
+      (entry stays product pin ``PRODUCT_NODE_HOST``)
+
+    Default: disabled single-hop (product entry only).
+    """
+    import os
+
+    e = env if env is not None else os.environ
+    enabled = str(e.get("RPT_MULTIHOP_ENABLED", "")).strip().lower() in (
+        "1",
+        "true",
+        "yes",
+        "on",
+    )
+    csv = str(e.get("RPT_MULTIHOP_HOPS", "") or "").strip()
+    if csv:
+        hops = parse_hops_csv(csv)
+    else:
+        exit_host = str(e.get("RPT_EXIT_HOST", "") or "").strip()
+        if exit_host:
+            try:
+                exit_port = int(str(e.get("RPT_EXIT_PORT", "") or PRODUCT_NODE_PORT))
+            except ValueError:
+                exit_port = PRODUCT_NODE_PORT
+            hops = build_entry_exit_path(exit_host, exit_port=exit_port)
+        else:
+            hops = [entry_hop()]
+    return MultiHopConfig(hops=hops, enabled=enabled)
+
+
+def exit_hop_label(config: MultiHopConfig | None = None) -> str | None:
+    """Second hop label when a multi-hop path is configured; else None."""
+    cfg = config or MultiHopConfig()
+    if not hop_path_configured(cfg):
+        return None
+    hops = build_hop_path(cfg.hops)
+    return hops[1].label() if len(hops) >= 2 else None

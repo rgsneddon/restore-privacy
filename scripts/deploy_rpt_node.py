@@ -1,17 +1,22 @@
 #!/usr/bin/env python3
-"""Deploy RPT node over SSH.
+"""Deploy RPT node over SSH (entry or exit hop).
 
 Auth (never commit secrets):
-  - Preferred: OpenSSH key via RPT_SSH_KEY (or default ~/.ssh/id_ed25519_restore_privacy_vps
-    then ~/.ssh/id_ed25519) with RPT_SSH_USER (default root; FlokiNET often uses a sudo user).
+  - Preferred: OpenSSH key via RPT_SSH_KEY (or defaults:
+    ~/.ssh/id_ed25519_restore_privacy_hop for exit hop, then
+    ~/.ssh/id_ed25519_restore_privacy_vps, then ~/.ssh/id_ed25519)
+    with RPT_SSH_USER (default root; FlokiNET often uses raskul + RPT_SSH_SUDO=1).
   - Or: RPT_SSH_PASSWORD for password auth (look_for_keys=False).
 
 Environment:
-  RPT_SSH_HOST     default 82.221.101.241
+  RPT_SSH_HOST     default 82.221.101.241 (product **entry**); set to exit VPS IP for hop 2
   RPT_SSH_USER     default root
   RPT_SSH_KEY      path to private key (optional)
   RPT_SSH_PASSWORD password auth (optional if key works)
   RPT_SSH_SUDO     if "1"/true, prefix install commands with sudo -n
+  RPT_SSH_ROLE     optional label: entry | exit_hop (logging only)
+
+See scripts/MULTIHOP_EXIT_HOP_PREP.md for second FlokiNET exit-hop prep.
 """
 
 from __future__ import annotations
@@ -75,11 +80,20 @@ def _resolve_key_path() -> Path | None:
         p = Path(explicit).expanduser()
         return p if p.is_file() else None
     home = Path.home() / ".ssh"
-    for name in (
-        "id_ed25519_restore_privacy_vps",
-        "id_ed25519",
-        "id_rsa",
-    ):
+    # Prefer hop key when targeting a non-default host (exit hop profile).
+    host = os.environ.get("RPT_SSH_HOST", DEFAULT_HOST).strip() or DEFAULT_HOST
+    role = os.environ.get("RPT_SSH_ROLE", "").strip().lower()
+    names: list[str] = []
+    if role in ("exit", "exit_hop", "hop") or host != DEFAULT_HOST:
+        names.append("id_ed25519_restore_privacy_hop")
+    names.extend(
+        (
+            "id_ed25519_restore_privacy_vps",
+            "id_ed25519",
+            "id_rsa",
+        )
+    )
+    for name in names:
         p = home / name
         if p.is_file():
             return p
@@ -92,18 +106,21 @@ def main() -> int:
     password = os.environ.get("RPT_SSH_PASSWORD")
     key_path = _resolve_key_path()
     use_sudo = _env_truthy("RPT_SSH_SUDO") or user != "root"
+    role = os.environ.get("RPT_SSH_ROLE", "").strip() or (
+        "exit_hop" if host != DEFAULT_HOST else "entry"
+    )
 
     if not password and key_path is None:
         print(
             "Need RPT_SSH_PASSWORD or an SSH private key "
-            "(RPT_SSH_KEY or ~/.ssh/id_ed25519_restore_privacy_vps)",
+            "(RPT_SSH_KEY or ~/.ssh/id_ed25519_restore_privacy_hop|vps)",
             file=sys.stderr,
         )
         return 2
 
     client = paramiko.SSHClient()
     client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-    print(f"connecting {user}@{host} ...")
+    print(f"connecting {user}@{host} role={role} ...")
     connect_kw: dict = {
         "hostname": host,
         "username": user,

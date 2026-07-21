@@ -1,0 +1,18 @@
+# Example operator env for multi-hop *prep* (copy values out-of-band; do not commit secrets).
+# Entry (product default — Iceland FlokiNET):
+#   82.221.101.241:44044
+#
+# Exit hop (second FlokiNET country — fill when VPS is ready):
+# RPT_EXIT_HOST=
+# RPT_EXIT_PORT=44044
+#
+# Enable hop-list *config* only (not residual multi-hop routing):
+# RPT_MULTIHOP_ENABLED=1
+# RPT_MULTIHOP_HOPS=82.221.101.241:44044,<EXIT_HOST>:44044
+#
+# Deploy exit node over SSH:
+# RPT_SSH_HOST=<EXIT_HOST>
+# RPT_SSH_USER=raskul
+# RPT_SSH_SUDO=1
+# RPT_SSH_KEY=$HOME/.ssh/id_ed25519_restore_privacy_hop
+# RPT_SSH_PASSWORD=   # one-time bootstrap only; prefer key auth

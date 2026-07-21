@@ -9,11 +9,15 @@ from client.multihop import (
     MULTI_HOP_ROUTING_IMPLEMENTED,
     Hop,
     MultiHopConfig,
+    build_entry_exit_path,
     build_hop_path,
     default_single_hop,
+    entry_hop,
+    exit_hop_label,
     first_hop_endpoint,
     hop_path_configured,
     is_multihop_active,
+    multihop_config_from_env,
     multihop_status_text,
     parse_hops_csv,
 )
@@ -78,6 +82,45 @@ class TestMultiHopPath(unittest.TestCase):
         hops = cfg.active_hops()
         self.assertEqual(len(hops), 1)
         self.assertEqual(hops[0].host, PRODUCT_NODE_HOST)
+
+    def test_entry_exit_path_planning_not_residual(self):
+        """Second FlokiNET exit hop is config-only until routing ships."""
+        path = build_entry_exit_path("203.0.113.50", exit_port=44044)
+        self.assertEqual(len(path), 2)
+        self.assertEqual(path[0].host, PRODUCT_NODE_HOST)
+        self.assertEqual(path[0].port, PRODUCT_NODE_PORT)
+        self.assertEqual(path[1].host, "203.0.113.50")
+        cfg = MultiHopConfig(hops=path, enabled=True)
+        self.assertTrue(hop_path_configured(cfg))
+        self.assertFalse(MULTI_HOP_ROUTING_IMPLEMENTED)
+        self.assertFalse(is_multihop_active(cfg))
+        self.assertEqual(first_hop_endpoint(cfg).host, PRODUCT_NODE_HOST)
+        self.assertEqual(exit_hop_label(cfg), "203.0.113.50:44044")
+        text = multihop_status_text(cfg)
+        self.assertIn("not routed", text.lower())
+        self.assertIn("entry-only", text.lower())
+        self.assertNotIn("multi-hop active", text)
+
+    def test_multihop_config_from_env_exit_host(self):
+        env = {
+            "RPT_MULTIHOP_ENABLED": "1",
+            "RPT_EXIT_HOST": "198.51.100.9",
+            "RPT_EXIT_PORT": "44044",
+        }
+        cfg = multihop_config_from_env(env)
+        self.assertTrue(cfg.enabled)
+        self.assertTrue(hop_path_configured(cfg))
+        self.assertEqual(cfg.hops[0].host, PRODUCT_NODE_HOST)
+        self.assertEqual(cfg.hops[1].host, "198.51.100.9")
+        self.assertFalse(is_multihop_active(cfg))
+        # Default remains single-hop when disabled / no exit
+        bare = multihop_config_from_env({})
+        self.assertFalse(bare.enabled)
+        self.assertEqual(entry_hop().host, PRODUCT_NODE_HOST)
+
+    def test_entry_exit_requires_exit_host(self):
+        with self.assertRaises(ValueError):
+            build_entry_exit_path("")
         self.assertFalse(hop_path_configured(cfg))
         self.assertFalse(is_multihop_active(cfg))
 
