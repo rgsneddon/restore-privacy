@@ -176,12 +176,17 @@ def _stripe_readiness() -> dict[str, Any]:
         "fields": {
             "STRIPE_SECRET_KEY": bool(secret),
             "STRIPE_WEBHOOK_SECRET": bool(webhook),
-            "STRIPE_PRICE_ID": bool(price),
+            # Match form key STRIPE_CHECKOUT_PRICE_ID (not legacy STRIPE_PRICE_ID)
+            "STRIPE_CHECKOUT_PRICE_ID": bool(price),
+            "STRIPE_PRICE_ID": bool(price),  # back-compat alias for older views
             "RPT_PUBLIC_BASE_URL": bool(
                 public_base_url()
                 and public_base_url() != "http://127.0.0.1:10000"
             )
-            or bool(os.environ.get("RPT_PUBLIC_BASE_URL", "").strip()),
+            or bool(os.environ.get("RPT_PUBLIC_BASE_URL", "").strip())
+            or bool(
+                (load_stored_processor_env().get("RPT_PUBLIC_BASE_URL") or "").strip()
+            ),
             "STRIPE_PAYMENT_PAGE_URL": bool(pay_page),
             "STRIPE_PAYMENT_LINK_ID": bool(plink),
         },
@@ -494,7 +499,10 @@ def apply_processor_entry(
     """Validate, inject into process env, optionally persist to data store.
 
     Returns {ok, errors, applied_keys, readiness, plugin_id} — never secret values.
+    Empty secret fields keep existing store/env values (never wipe on blank submit).
     """
+    # Ensure existing disk secrets are visible to validate_processor_entry
+    apply_stored_env_to_process()
     result = validate_processor_entry(plugin_id, submitted)
     if not result["ok"]:
         return {
@@ -508,6 +516,8 @@ def apply_processor_entry(
     inject_values_into_process(cleaned)
     if persist and cleaned:
         save_stored_processor_env(cleaned)
+        # Re-apply full store so merge is active in this process
+        apply_stored_env_to_process()
     plugin = get_processor_plugin(plugin_id)
     readiness: dict[str, Any] = {}
     if plugin and plugin.readiness_fn:
@@ -516,6 +526,15 @@ def apply_processor_entry(
         "ok": True,
         "errors": [],
         "applied_keys": sorted(cleaned.keys()),
+        "kept_existing": [
+            v.key
+            for v in (plugin.variables if plugin else ())
+            if v.key not in cleaned
+            and (
+                os.environ.get(v.key, "").strip()
+                or (load_stored_processor_env().get(v.key) or "").strip()
+            )
+        ],
         "readiness": readiness,
         "plugin_id": plugin_id,
         # Confirm secrets not echoed
@@ -523,14 +542,37 @@ def apply_processor_entry(
     }
 
 
+def _key_is_configured(key: str, field_ready: dict[str, Any]) -> bool:
+    """True when readiness or env/store has a non-empty value for *key*."""
+    if field_ready.get(key):
+        return True
+    if os.environ.get(key, "").strip():
+        return True
+    stored = load_stored_processor_env()
+    if (stored.get(key) or "").strip():
+        return True
+    return False
+
+
 def processor_plugin_views() -> list[dict[str, Any]]:
     """Safe projection of all plugins for admin UI (no secret values)."""
+    # Disk → env so badges match last admin save without full process restart
+    apply_stored_env_to_process()
     views: list[dict[str, Any]] = []
     for p in list_processor_plugins():
         readiness = p.readiness_fn() if p.readiness_fn else {}
         field_ready = readiness.get("fields") or {}
         vars_out = []
         for v in p.variables:
+            configured = _key_is_configured(v.key, field_ready)
+            # Optional Checkout price: empty means unit_amount path — not a failure
+            status_kind = "set" if configured else "not_set"
+            if (
+                v.key == "STRIPE_CHECKOUT_PRICE_ID"
+                and not configured
+                and not v.required
+            ):
+                status_kind = "optional_ok"
             vars_out.append(
                 {
                     "key": v.key,
@@ -540,7 +582,9 @@ def processor_plugin_views() -> list[dict[str, Any]]:
                     "secret": v.secret,
                     "input_type": v.input_type,
                     "placeholder": v.placeholder,
-                    "configured": bool(field_ready.get(v.key) or os.environ.get(v.key, "").strip()),
+                    "configured": configured
+                    or status_kind == "optional_ok",
+                    "status_kind": status_kind,
                 }
             )
         views.append(

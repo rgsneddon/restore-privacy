@@ -120,7 +120,9 @@ class TestPaymentPageInAdminHtml(unittest.TestCase):
         self.assertIn("STRIPE_SECRET_KEY", html2)
         self.assertIn("stripe-remaining-required", html2)
         self.assertNotIn("sk_test_MUST_NOT_APPEAR", html2)
-        self.assertNotIn("whsec_", html2)
+        # Doc guide may show whsec_… / sk_test_… prefixes; block real-looking values
+        self.assertNotRegex(html2, r"sk_(?:live|test)_[A-Za-z0-9]{10,}")
+        self.assertNotRegex(html2, r"whsec_[A-Za-z0-9]{10,}")
 
     def test_public_footer_omits_generic_payment_page_link(self):
         """Footer must not show a bottom “Stripe payment page” link."""

@@ -20,13 +20,15 @@ class TestProcessorPluginCatalog(unittest.TestCase):
     def test_registry_lists_stripe_and_bmc_with_correct_keys(self):
         reg = plugins.list_processor_plugins()
         ids = [p.id for p in reg]
-        self.assertEqual(ids, ["stripe", "bmc"])
+        self.assertEqual(ids, ["stripe", "bmc", "vps_assets"])
         catalog = plugins.plugin_variable_catalog()
         stripe_keys = {v["key"] for v in catalog["stripe"]}
         self.assertIn("STRIPE_SECRET_KEY", stripe_keys)
         self.assertIn("STRIPE_WEBHOOK_SECRET", stripe_keys)
         self.assertIn("STRIPE_CHECKOUT_PRICE_ID", stripe_keys)
         self.assertIn("RPT_PUBLIC_BASE_URL", stripe_keys)
+        vps_keys = {v["key"] for v in catalog["vps_assets"]}
+        self.assertIn("RPT_ASSET_FETCH_TOKEN", vps_keys)
         # Required keys match what payments helpers actually read
         self.assertTrue(
             any(v["key"] == "STRIPE_SECRET_KEY" and v["required"] for v in catalog["stripe"])

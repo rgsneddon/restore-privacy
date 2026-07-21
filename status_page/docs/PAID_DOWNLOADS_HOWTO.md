@@ -76,15 +76,18 @@ stripe trigger checkout.session.completed
 
 | Variable | Purpose |
 |----------|---------|
-| `STRIPE_SECRET_KEY` | `sk_test_…` or `sk_live_…` |
-| `STRIPE_WEBHOOK_SECRET` | `whsec_…` from the webhook endpoint |
-| `STRIPE_PRICE_ID` | Optional `price_…` for £2.45 GBP |
+| `STRIPE_SECRET_KEY` | `sk_test_…` or `sk_live_…` (Dashboard → Developers → API keys) |
+| `STRIPE_WEBHOOK_SECRET` | `whsec_…` from the webhook endpoint (Dashboard → Webhooks → Signing secret) |
+| `STRIPE_CHECKOUT_PRICE_ID` | Optional one-time `price_…` only; **leave empty** to use built-in `unit_amount=245` (£2.45) |
 | `RPT_PUBLIC_BASE_URL` | Public site origin, e.g. `https://restoreprivacy.online` (no trailing slash). Used for success/cancel URLs. |
+| `RPT_ASSET_FETCH_TOKEN` | Shared secret (you choose) for status host → Iceland VPS paid installer fetch; same value on VPS unit |
 | `RPT_PAYMENT_DATA_DIR` | Optional directory for SQLite grant DB (default: `status_page/data/`) |
 | `RPT_DOWNLOAD_TOKEN_TTL_SEC` | Optional token lifetime (default `3600`) |
 | `RPT_ADMIN_USER` | Admin username (default `admin`) |
 | `RPT_ADMIN_PASSWORD` | Admin password (**required** to enable `/admin`) |
 | `RPT_ADMIN_SESSION_SECRET` | Optional session HMAC secret (derived from password if omitted) |
+
+**Admin Save behaviour:** secret fields are write-only (always empty on reload). After you paste a key and click **Save**, the table badge flips to **set**. Leave a field blank on a later Save to **keep** the stored value — blanks never wipe secrets. Values go to process env + gitignored `status_page/data/processor_env.json`. On free Render, also set the same keys under **Environment** so redeploys keep them.
 
 ### 1.6 Test mode vs live
 
@@ -127,7 +130,8 @@ This is the **private** architecture on the same Render service — not the publ
 4. After login you get one admin surface:
    - **Payment processor settings (`#admin-processor-settings`)** — each processor is a **plugin** (Stripe paid downloads, BMC tip-only) listing the **correct env variable names** to enter, readiness, and dashboard links. Forms POST to `/admin/processors/apply` (write-only secrets; never echoed). Applied values update the running process and optional local `status_page/data/processor_env.json` (gitignored). Prefer Render env for production permanence.
    - **Paid download grants** — recent Stripe-verified tokens (platform, filename, amount, used/unused, truncated token, session id) for fulfilment support.
-5. **Stripe variables:** `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, optional `STRIPE_PRICE_ID`, `RPT_PUBLIC_BASE_URL`.  
+5. **Stripe variables:** `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, optional `STRIPE_CHECKOUT_PRICE_ID`, `RPT_PUBLIC_BASE_URL`.  
+   **VPS assets:** `RPT_ASSET_FETCH_TOKEN` (and optional `RPT_VPS_ASSET_BASE`).  
    **BMC variables:** `RPT_BMC_TIP_URL`, optional `RPT_BMC_TIP_LABEL`.
 
 Unauthenticated visitors only see the login form; grants and processor readiness are not public.

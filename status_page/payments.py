@@ -47,12 +47,36 @@ def db_path() -> Path:
     return _data_dir() / "paid_downloads.sqlite3"
 
 
+def _env_or_processor_store(*keys: str) -> str:
+    """Read secret/config from process env, then admin-persisted processor_env.json.
+
+    Ensures values saved via ``/admin`` show as **set** after save and after
+    process restart when the gitignored store is still present. Host/Render env
+    always wins when already set.
+    """
+    for key in keys:
+        val = os.environ.get(key, "").strip()
+        if val:
+            return val
+    try:
+        from processor_plugins import load_stored_processor_env
+
+        stored = load_stored_processor_env()
+        for key in keys:
+            val = (stored.get(key) or "").strip()
+            if val:
+                return val
+    except Exception:
+        pass
+    return ""
+
+
 def stripe_secret_key() -> str:
-    return os.environ.get("STRIPE_SECRET_KEY", "").strip()
+    return _env_or_processor_store("STRIPE_SECRET_KEY")
 
 
 def stripe_webhook_secret() -> str:
-    return os.environ.get("STRIPE_WEBHOOK_SECRET", "").strip()
+    return _env_or_processor_store("STRIPE_WEBHOOK_SECRET")
 
 
 def stripe_price_id() -> str:
@@ -64,9 +88,11 @@ def stripe_price_id() -> str:
     often paste a Payment Link **recurring** price here, which Stripe rejects with
     mode=payment. Set ``STRIPE_ALLOW_LEGACY_PRICE_ID=1`` to use ``STRIPE_PRICE_ID``
     only when that price is known one-time.
+
+    Empty is OK: Checkout uses ``unit_amount`` = £2.45 when no one-time price id.
     """
     for key in ("STRIPE_CHECKOUT_PRICE_ID", "STRIPE_ONE_TIME_PRICE_ID"):
-        raw = os.environ.get(key, "").strip()
+        raw = _env_or_processor_store(key)
         if raw:
             return raw
     if os.environ.get("STRIPE_ALLOW_LEGACY_PRICE_ID", "").strip().lower() in (
@@ -74,7 +100,7 @@ def stripe_price_id() -> str:
         "true",
         "yes",
     ):
-        return os.environ.get("STRIPE_PRICE_ID", "").strip()
+        return _env_or_processor_store("STRIPE_PRICE_ID")
     return ""
 
 

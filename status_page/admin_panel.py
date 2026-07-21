@@ -11,6 +11,7 @@ import hashlib
 import hmac
 import json
 import os
+import re
 import secrets
 import time
 from typing import Any
@@ -764,6 +765,27 @@ def _status_badge(ok: bool, yes: str = "ready", no: str = "not set") -> str:
     return f'<span class="badge {cls}" data-ready="{"1" if ok else "0"}">{_escape(label)}</span>'
 
 
+# Real-looking secret material only (not docs prefixes like sk_test_… / whsec_…).
+_SECRET_LEAK_RE = re.compile(
+    r"(?:sk_live_|sk_test_|rk_live_|rk_test_)[A-Za-z0-9]{10,}"
+    r"|whsec_[A-Za-z0-9]{10,}"
+    r"|RPT_ADMIN_PASSWORD\s*=\s*\S+",
+    re.IGNORECASE,
+)
+
+
+def _html_contains_secret_material(html: str) -> bool:
+    """True when body looks like it embeds a real Stripe/admin secret value."""
+    return bool(_SECRET_LEAK_RE.search(html or ""))
+
+
+def _redact_secret_material(html: str) -> str:
+    """Replace real-looking secret values; leave doc placeholders (ellipsis) alone."""
+    if not html:
+        return html
+    return _SECRET_LEAK_RE.sub("[redacted]", html)
+
+
 def render_processor_settings_html(
     view: dict[str, Any] | None = None,
     *,
@@ -777,12 +799,6 @@ def render_processor_settings_html(
     """
     v = view if view is not None else processor_settings_view()
     plugins = plugin_views if plugin_views is not None else processor_plugin_views()
-    forbidden_fragments = (
-        "sk_live_",
-        "sk_test_",
-        "whsec_",
-        "RPT_ADMIN_PASSWORD",
-    )
     stripe_mode = str(v.get("stripe_mode") or "unconfigured")
     base = str(v.get("public_base_url") or "")
     webhook_url = str(
@@ -805,7 +821,7 @@ def render_processor_settings_html(
         desc = _escape(str(pv.get("description") or ""))
         ready = pv.get("readiness") or {}
         ready_flag = bool(ready.get("ready") or ready.get("fulfilment_ready") or ready.get("checkout_ready"))
-        badge = _status_badge(ready_flag, "connection ready", "needs variables")
+        conn_badge = _status_badge(ready_flag, "connection ready", "needs variables")
         links = []
         for ln in pv.get("dashboard_links") or []:
             links.append(
@@ -820,12 +836,19 @@ def render_processor_settings_html(
         for var in pv.get("variables") or []:
             key = str(var.get("key") or "")
             configured = bool(var.get("configured"))
+            kind = str(var.get("status_kind") or ("set" if configured else "not_set"))
+            if kind == "optional_ok":
+                row_badge = _status_badge(True, "optional (unit_amount)", "not set")
+            elif kind == "set" or configured:
+                row_badge = _status_badge(True, "set", "not set")
+            else:
+                row_badge = _status_badge(False, "set", "not set")
             rows.append(
                 "<tr>"
                 f"<td><code class=\"var-key\">{_escape(key)}</code></td>"
                 f"<td>{_escape(str(var.get('label') or ''))}</td>"
                 f"<td>{'required' if var.get('required') else 'optional'}</td>"
-                f"<td>{_status_badge(configured, 'set', 'not set')}</td>"
+                f"<td>{row_badge}</td>"
                 f"<td class=\"muted\">{_escape(str(var.get('purpose') or ''))}</td>"
                 "</tr>"
             )
@@ -913,7 +936,7 @@ def render_processor_settings_html(
   <header class="plugin-head">
     <h3 id="admin-{pid}-heading">{name}</h3>
     <span class="plugin-role">{role}</span>
-    <span id="{pid}-connection-badge">{badge}</span>
+    <span id="{pid}-connection-badge">{conn_badge}</span>
   </header>
   <p class="muted plugin-desc">{desc}</p>
   {extra_status}
@@ -930,8 +953,11 @@ def render_processor_settings_html(
     <input type="hidden" name="plugin_id" value="{pid}"/>
     {fields_html}
     <button type="submit" id="btn-apply-{pid}">Save {name} connection</button>
-    <p class="muted field-note">Secret fields are write-only — leave blank to keep the existing value.
-    Values apply to this process and local data store (not committed to git).</p>
+    <p class="muted field-note">Secret fields are <strong>write-only</strong> (always empty on purpose).
+    Leave blank to keep a value already on the server. After Save, the table badge
+    <strong>set</strong> is the truth — not the empty box. Values persist to the
+    server data store and process env (never git). For production permanence also
+    set the same keys in the Render dashboard Environment.</p>
   </form>
 </article>
 """
@@ -950,18 +976,38 @@ def render_processor_settings_html(
   <p class="muted">Each connection option is a <strong>processor plugin</strong> with the correct
   variables to enter for that payment path. Secrets stay on the server — never shown after save.
   Prefer host/Render env for production permanence; local apply wires the running process.</p>
+  <div class="muted" id="admin-key-howto" style="margin:0.75rem 0 1rem;padding:0.75rem 0.9rem;border:1px solid var(--border);border-radius:10px">
+    <p style="margin:0 0 0.5rem"><strong>Where to find keys (one at a time)</strong> — never commit secrets to git.</p>
+    <ol style="margin:0;padding-left:1.25rem;line-height:1.45">
+      <li><code>STRIPE_SECRET_KEY</code> — Stripe Dashboard → Developers →
+        <a href="https://dashboard.stripe.com/apikeys" target="_blank" rel="noopener noreferrer">API keys</a>
+        → Secret key (<code>sk_live_…</code> or <code>sk_test_…</code>). Paste → Save Stripe.</li>
+      <li><code>STRIPE_WEBHOOK_SECRET</code> — Developers →
+        <a href="https://dashboard.stripe.com/webhooks" target="_blank" rel="noopener noreferrer">Webhooks</a>
+        → your endpoint (or add one to <code>…/webhook/stripe</code>) → Signing secret
+        (<code>whsec_…</code>). Paste → Save Stripe.</li>
+      <li><code>STRIPE_CHECKOUT_PRICE_ID</code> — <strong>optional</strong>. Leave empty to use
+        built-in £2.45 unit_amount Checkout. Only set a <em>one-time</em> Price id from
+        Products → Prices if you deliberately use Dashboard Prices (not a recurring Payment Link price).</li>
+      <li><code>RPT_ASSET_FETCH_TOKEN</code> — shared secret you choose (long random string).
+        Set the <strong>same</strong> value on the Iceland VPS paid-asset service and here
+        (or as Render env). Not from Stripe. Generate with a password manager if you do not have one yet.</li>
+    </ol>
+    <p style="margin:0.5rem 0 0">After each Save, confirm the table badge flips to
+    <strong>set</strong> (secret boxes stay empty on purpose). Also set the same keys on
+    <strong>Render → Environment</strong> so redeploys keep them.</p>
+  </div>
   <nav class="plugin-nav" id="processor-plugin-nav" aria-label="Processor plugins">{option_links}</nav>
   {msg_html}{err_html}
 {plugins_html}
 </section>
 """
-    low = frag.lower()
-    for bad in forbidden_fragments:
-        if bad.lower() in low and bad not in ("RPT_ADMIN_PASSWORD",):
-            return (
-                '<section id="admin-processor-settings"><p class="err">'
-                "Settings redacted (secret material detected).</p></section>"
-            )
+    # Block only real-looking secret values, not doc prefixes (sk_test_… / whsec_…).
+    if _html_contains_secret_material(frag):
+        return (
+            '<section id="admin-processor-settings"><p class="err">'
+            "Settings redacted (secret material detected).</p></section>"
+        )
     return frag
 
 
@@ -1105,11 +1151,8 @@ background:var(--btn-bg);color:var(--btn-fg);font-weight:600;cursor:pointer}}
 </section>
 </body></html>
 """
-    # Final secret scan on full page
-    low = body.lower()
-    for prefix in ("sk_live_", "sk_test_", "whsec_"):
-        if prefix in low:
-            body = body.replace(prefix, "[redacted]_")
+    # Final secret scan on full page (real values only; keep guide prefixes)
+    body = _redact_secret_material(body)
     return body.encode("utf-8")
 
 
