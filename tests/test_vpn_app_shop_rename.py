@@ -8,13 +8,14 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 
-# Primary user-facing / mirrored surfaces that must use the new name.
+# Primary user-facing / mirrored / operator-doc surfaces that must use the new name.
 PRIMARY_SURFACES = (
     "README.md",
     "PRIVACY_POLICY.md",
     "LICENSE",
     "CREDITS.md",
     "AUDIT.md",
+    "sundries.txt",
     "status_page/public/README.md",
     "status_page/public/PRIVACY_POLICY.md",
     "status_page/public/LICENSE",
@@ -67,6 +68,13 @@ class TestVpnAppShopRename(unittest.TestCase):
         src = (ROOT / "status_page" / "public_docs.py").read_text(encoding="utf-8")
         self.assertIn("Open the VPN APP Shop:", src)
         self.assertNotIn("Open the status page:", src)
+
+    def test_sundries_storefront_section(self):
+        text = (ROOT / "sundries.txt").read_text(encoding="utf-8")
+        self.assertIn("PUBLIC VPN APP Shop", text)
+        self.assertNotIn("PUBLIC STATUS PAGE", text)
+        cleaned = text.replace("status_page", "")
+        self.assertEqual(OLD_PRODUCT_NAME.findall(cleaned), [])
 
 
 if __name__ == "__main__":

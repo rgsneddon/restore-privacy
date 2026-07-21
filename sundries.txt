@@ -29,7 +29,7 @@ SECRETS / RELEASE GATES (mandatory)
   uses these ports on the operator's server).
 
 
-2. PUBLIC STATUS PAGE (hosting / deploy detail)
+2. PUBLIC VPN APP Shop (hosting / deploy detail)
 -----------------------------------------------
   App source:     status_page/
   Render blueprint: render.yaml
