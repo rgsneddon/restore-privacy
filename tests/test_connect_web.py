@@ -39,7 +39,8 @@ class TestConnectViaWebBuilder(unittest.TestCase):
         # Paid status-page paths (not free public GitHub release hrefs)
         for a in available_downloads():
             self.assertIn(a.pay_path, html)
-            self.assertTrue(a.pay_path.startswith("/pay?"))
+            self.assertIn("donate.stripe.com", a.pay_path)
+            self.assertIn(f"client_reference_id={a.platform}", a.pay_path)
             self.assertNotIn(a.url, html)
         self.assertIn("not a full-device VPN", html)
         self.assertIn("connect-web-probe", html)
@@ -48,8 +49,9 @@ class TestConnectViaWebBuilder(unittest.TestCase):
         actions = recommended_download_actions()
         self.assertGreaterEqual(len(actions), 2)
         for a in actions:
-            self.assertTrue(a["href"].startswith("/pay?platform="))
-            self.assertNotIn("github.com", a["href"])
+            self.assertIn("donate.stripe.com", a["href"])
+            self.assertIn("client_reference_id=", a["href"])
+            self.assertNotIn("github.com/rgsneddon/restore-privacy/releases/download", a["href"])
 
     def test_public_page_excludes_connect_section_and_count(self):
         page = status_app.render_html(

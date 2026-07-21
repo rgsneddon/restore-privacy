@@ -141,7 +141,7 @@ Architecture (modules):
 | Path | Role |
 |------|------|
 | `/` | Status + paid download buttons (£2.45) |
-| `/pay?platform=windows` | Starts Stripe Checkout for that package |
+| `/pay?platform=windows` | Redirects to Stripe payment page for that package |
 | `/api/checkout` | JSON POST `{ "platform": "android" }` → `{ url, amount_pence: 245, … }` |
 | `/webhook/stripe` | Stripe webhook (signature required) |
 | `/download?token=` | Single-use download redirect |

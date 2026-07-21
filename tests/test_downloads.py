@@ -57,7 +57,8 @@ class TestDownloadCatalog(unittest.TestCase):
         self.assertEqual(by_plat["android"].filename, ANDROID_APK_FILENAME)
         for a in assets:
             self.assertEqual(a.url, f"{EXPECTED_DOWNLOAD_PREFIX}{a.filename}")
-            self.assertEqual(a.pay_path, f"/pay?platform={a.platform}")
+            self.assertIn("donate.stripe.com", a.pay_path)
+            self.assertIn(f"client_reference_id={a.platform}", a.pay_path)
 
     def test_labels_and_html_paid(self):
         html = render_download_section_html()
@@ -72,7 +73,8 @@ class TestDownloadCatalog(unittest.TestCase):
         self.assertIn(EXPECTED_RELEASE_PAGE, html)
         self.assertIn("Pay £2.45", html)
         for a in available_downloads():
-            self.assertIn(f'href="/pay?platform={a.platform}"', html)
+            self.assertIn(f'href="{a.pay_path}"', html)
+            self.assertIn(f"client_reference_id={a.platform}", html)
             self.assertNotIn(f'href="{a.url}"', html)
 
     def test_available_downloads_have_https_github_release_urls(self):
@@ -92,7 +94,8 @@ class TestDownloadCatalog(unittest.TestCase):
         self.assertIn("RESTORE PRIVACY", page)
         self.assertNotIn("clients-connected", page)
         self.assertIn(f"Download client v{RELEASE_VERSION}", page)
-        self.assertIn("/pay?platform=", page)
+        self.assertIn("donate.stripe.com", page)
+        self.assertIn("client_reference_id=windows", page)
         self.assertIn("£2.45", page)
         self.assertIn(WINDOWS_ZIP_FILENAME, page)  # data-filename
         self.assertIn(ANDROID_APK_FILENAME, page)

@@ -52,7 +52,8 @@ class TestPublicPageWithDownloads(unittest.TestCase):
         self.assertIn(ANDROID_APK_FILENAME, html)
         self.assertNotIn("apple-prep", html)
         for a in available_downloads():
-            self.assertIn(f'href="/pay?platform={a.platform}"', html)
+            self.assertIn(f'href="{a.pay_path}"', html)
+            self.assertIn(f"client_reference_id={a.platform}", html)
             self.assertNotIn(f'href="{a.url}"', html)
             self.assertTrue(
                 a.url.startswith(
@@ -96,7 +97,8 @@ class TestPublicPageWithDownloads(unittest.TestCase):
                     self.assertNotIn("fetch('/api/status'", html)
                     self.assertIn("Download client v0.3.0", html)
                     self.assertIn(WINDOWS_ZIP_FILENAME, html)
-                    self.assertIn("/pay?platform=windows", html)
+                    self.assertIn("donate.stripe.com", html)
+                    self.assertIn("client_reference_id=windows", html)
                     self.assertIn("£2.45", html)
                     self.assertIn(RUST_REPO_URL, html)
         finally:
