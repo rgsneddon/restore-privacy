@@ -4,6 +4,11 @@ Maps the *tip-then-full* idea to residual VPN: pure, unit-testable decisions tha
 skip redundant work on the full-connect critical path (HELLO → plan → TUN →
 routes / DNS / kill-switch) without weakening product wire (pin, PFS, outer obfs).
 
+Continuity design constraint (∇_μ(ρ_t u^μ)=0): connection “density” ρ_t must not
+accumulate as redundant HELLO/route/settle work along the pipeline — skip when
+the tip is already residual-ready, reuse plans, overlap pure prep with HELLO,
+and poll OS readiness instead of fixed sleep backlog (see tunnel_win settle).
+
 Not blockchain FlyClient (PoW header sampling).
 """
 

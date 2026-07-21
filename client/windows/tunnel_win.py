@@ -63,6 +63,74 @@ def is_admin() -> bool:
         return False
 
 
+# Continuity constraint ∇_μ(ρ_t u^μ)=0 on residual attach: no fixed sleep "density"
+# backlog after Wintun create — poll IF index and return as soon as flux is ready.
+DEFAULT_ADAPTER_SETTLE_MAX_SEC = 0.15
+DEFAULT_ADAPTER_SETTLE_POLL_SEC = 0.02
+
+
+def adapter_settle_budget(
+    *,
+    max_sec: float | None = None,
+    poll_sec: float | None = None,
+) -> tuple[float, float]:
+    """Pure budget for Wintun IF settle: (max_wait, poll_interval).
+
+    Scales settle waits far below the historical fixed 0.4s + 0.5s sleeps while
+    still allowing a short OS registration window.
+    """
+    mx = DEFAULT_ADAPTER_SETTLE_MAX_SEC if max_sec is None else float(max_sec)
+    pl = DEFAULT_ADAPTER_SETTLE_POLL_SEC if poll_sec is None else float(poll_sec)
+    if mx < 0:
+        mx = 0.0
+    if pl <= 0:
+        pl = DEFAULT_ADAPTER_SETTLE_POLL_SEC
+    if pl > mx and mx > 0:
+        pl = mx
+    return mx, pl
+
+
+def wait_for_wintun_if_index(
+    tun: "WindowsTun",
+    *,
+    max_sec: float | None = None,
+    poll_sec: float | None = None,
+    sleep_fn=None,
+    monotonic_fn=None,
+) -> Optional[int]:
+    """Resolve Wintun IF index ASAP — poll instead of fixed multi-sleep backlog.
+
+    Continuity: ρ (wait mass) does not accumulate past readiness; returns on first
+    successful index. ``sleep_fn`` / ``monotonic_fn`` injectables for unit tests.
+    """
+    max_wait, poll = adapter_settle_budget(max_sec=max_sec, poll_sec=poll_sec)
+    sleeper = time.sleep if sleep_fn is None else sleep_fn
+    clock = time.monotonic if monotonic_fn is None else monotonic_fn
+    deadline = clock() + max_wait
+    name = getattr(tun, "name", None) or "RPT"
+
+    def _try() -> Optional[int]:
+        idx = None
+        if hasattr(tun, "interface_index"):
+            try:
+                idx = tun.interface_index()
+            except Exception:
+                idx = None
+        if idx is not None:
+            return idx
+        return resolve_interface_index(name)
+
+    idx = _try()
+    if idx is not None:
+        return idx
+    while clock() < deadline:
+        sleeper(poll)
+        idx = _try()
+        if idx is not None:
+            return idx
+    return _try()
+
+
 def physical_default_gateway() -> Optional[str]:
     """Return the physical LAN default gateway (not the RPT tunnel GW)."""
     try:
@@ -579,19 +647,11 @@ def start_full_tunnel(
         tun.close()
         return WindowsTunnelResult(False, f"configure_address failed: {exc}", applied)
 
-    # Allow Windows to register the adapter before IF index query
-    time.sleep(0.4)
-
+    # Continuity: poll for IF index ASAP (no fixed 0.4s + 0.5s sleep backlog).
     capture = system_capture_ready(tun)
     if_index: Optional[int] = None
     if capture:
-        if_index = tun.interface_index() if hasattr(tun, "interface_index") else None
-        if if_index is None:
-            if_index = resolve_interface_index(tun.name)
-        # Retry IF lookup once
-        if if_index is None:
-            time.sleep(0.5)
-            if_index = resolve_interface_index(tun.name)
+        if_index = wait_for_wintun_if_index(tun)
 
     route_msg = "routes skipped"
     routes_applied = False
