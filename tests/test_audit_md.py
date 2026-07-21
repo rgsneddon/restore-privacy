@@ -66,6 +66,12 @@ class TestAuditMd(unittest.TestCase):
         self.assertIn("Threat model scenarios", text)
         self.assertIn("VPS compromise", text)
         self.assertIn("device seizure", text.lower())
+        # Scenario C documents Restore Internet failsafe wipe
+        self.assertIn("Restore Internet", text)
+        c_idx = text.index("Scenario C")
+        c_chunk = text[c_idx : c_idx + 1200].lower()
+        self.assertIn("restore internet", c_chunk)
+        self.assertIn("erase everything relating to this vpn from your device", c_chunk)
         self.assertIn("ISP", text)
         self.assertIn("traffic analysis", text.lower())
 

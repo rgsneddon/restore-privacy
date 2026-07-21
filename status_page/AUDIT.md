@@ -115,7 +115,7 @@ An **ISP** performing **traffic analysis** may still observe connection timing a
 
 #### Scenario C — Client device seizure
 
-**Device seizure** of a user machine may expose the local **device key** and residual config stored on disk. Packages never ship a shared client private key; keys are generated per device. **Residual risk:** local disk / unlocked endpoint compromise.
+**Device seizure** of a user machine may expose the local **device key** and residual config stored on disk. Packages never ship a shared client private key; keys are generated per device. **Restore Internet** executable (shipped with your download) will erase everything relating to this VPN from your device. **Residual risk:** local disk / unlocked endpoint compromise (if the failsafe was not run before seizure, residual product material may still be recoverable).
 
 ---
 

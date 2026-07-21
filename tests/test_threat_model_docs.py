@@ -63,10 +63,15 @@ class TestAuditThreatScenarios(unittest.TestCase):
             "audit must document client device seizure",
         )
         seiz_idx = text.index("Scenario C")
-        seiz_chunk = text[seiz_idx : seiz_idx + 1200].lower()
-        self.assertIn("device seizure", seiz_chunk)
-        self.assertIn("device key", seiz_chunk)
-        self.assertTrue("local" in seiz_chunk or "disk" in seiz_chunk)
+        seiz_chunk = text[seiz_idx : seiz_idx + 1200]
+        seiz_low = seiz_chunk.lower()
+        self.assertIn("device seizure", seiz_low)
+        self.assertIn("device key", seiz_low)
+        self.assertTrue("local" in seiz_low or "disk" in seiz_low)
+        # Failsafe wipe note (OBJECTIVE): Restore Internet erases product VPN material
+        self.assertIn("Restore Internet", seiz_chunk)
+        self.assertIn("shipped with your download", seiz_low)
+        self.assertIn("erase everything relating to this vpn", seiz_low)
 
         # Anti over-claim
         low = text.lower()
