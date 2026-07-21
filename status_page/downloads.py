@@ -214,16 +214,27 @@ WINDOWS_ZIP_FILENAME = WINDOWS_EXE_FILENAME
 
 def download_css() -> str:
     return """
-    .downloads { margin-top: 2.5rem; text-align: center; max-width: 28rem; padding: 0 1rem; }
+    .downloads { margin-top: 2.5rem; text-align: center; max-width: 52rem; padding: 0 1rem; }
     .downloads h2 { font-size: 1.1rem; letter-spacing: 0.08em; font-weight: 600; margin: 0 0 0.4rem; }
     .dl-sub { opacity: 0.75; font-size: 0.95rem; margin: 0 0 1.1rem; }
     .dl-price { opacity: 0.9; font-size: 0.95rem; margin: 0 0 1rem; font-weight: 600; color: #fde68a; }
-    .dl-buttons { display: flex; flex-direction: column; gap: 0.75rem; align-items: center; }
+    /* Platform menu under title: row of 3, then row of 2 (not a single vertical stack). */
+    .dl-buttons {
+      display: flex; flex-direction: column; gap: 0.75rem; align-items: center; width: 100%;
+    }
+    .dl-row {
+      display: flex; flex-direction: row; flex-wrap: nowrap; gap: 0.75rem;
+      justify-content: center; align-items: stretch; width: 100%;
+    }
+    .dl-row-3 { max-width: 100%; }
+    .dl-row-2 { max-width: 70%; }
     a.dl, button.dl {
-      display: inline-block; min-width: 18rem; padding: 0.85rem 1.35rem;
+      display: inline-flex; align-items: center; justify-content: center;
+      flex: 1 1 0; min-width: 0; max-width: 16rem;
+      padding: 0.85rem 0.75rem;
       background: #1d4ed8; color: #fff; text-decoration: none; border-radius: 8px;
-      font-weight: 600; font-size: 0.98rem; box-sizing: border-box; border: 0; cursor: pointer;
-      font-family: inherit; text-align: center;
+      font-weight: 600; font-size: 0.9rem; box-sizing: border-box; border: 0; cursor: pointer;
+      font-family: inherit; text-align: center; line-height: 1.25;
     }
     a.dl:hover, button.dl:hover { background: #2563eb; }
     a.dl#dl-android, button.dl#dl-android { background: #047857; }
@@ -234,10 +245,10 @@ def download_css() -> str:
     a.dl#dl-ios:hover, button.dl#dl-ios:hover { background: #7c3aed; }
     a.dl#dl-linux, button.dl#dl-linux { background: #b45309; }
     a.dl#dl-linux:hover, button.dl#dl-linux:hover { background: #d97706; }
-    .dl-footer { margin-top: 1.25rem; font-size: 0.9rem; line-height: 1.45; }
+    .dl-footer { margin-top: 1.25rem; font-size: 0.9rem; line-height: 1.45; width: 100%; }
     .dl-footer a.rust-link { color:#93c5fd; text-decoration:underline; font-weight:600; }
     .dl-footer a.rust-link:hover { color:#bfdbfe; }
-    .dl-tip { margin-top: 0.85rem; font-size: 0.88rem; opacity: 0.85; }
+    .dl-tip { margin-top: 0.85rem; font-size: 0.88rem; opacity: 0.85; width: 100%; }
     .dl-tip a { color:#f9a8d4; text-decoration:underline; font-weight:600; }
 """
 
@@ -262,22 +273,45 @@ def render_rust_footer_html() -> str:
     )
 
 
+def _render_platform_pay_link(a: DownloadAsset) -> str:
+    """One paid platform control (stable id + pay attrs for existing tests)."""
+    href = a.pay_path
+    return (
+        f'<a class="dl" id="dl-{a.platform}" href="{href}" '
+        f'rel="noopener noreferrer" target="_blank" '
+        f'data-platform="{a.platform}" data-filename="{a.filename}" '
+        f'data-price-pence="245" data-pay-via="stripe-payment-page">'
+        f"Pay {PRICE_LABEL} - {a.label}</a>"
+    )
+
+
+def download_menu_rows(
+    assets: Iterable[DownloadAsset] | None = None,
+) -> tuple[list[DownloadAsset], list[DownloadAsset]]:
+    """Split catalog into two rows under the title: three, then two."""
+    items = list(assets) if assets is not None else available_downloads()
+    if len(items) <= 3:
+        return items, []
+    return items[:3], items[3:]
+
+
 def render_download_section_html(assets: Iterable[DownloadAsset] | None = None) -> str:
-    """HTML: pay via Stripe payment page, then one-time download after webhook grant."""
+    """HTML: pay via Stripe payment page, then one-time download after webhook grant.
+
+    Platform menu below the download title is **two rows**: three items, then two.
+    """
     items = list(assets) if assets is not None else available_downloads()
     if not items:
         return ""
-    links = []
-    for a in items:
-        href = a.pay_path
-        links.append(
-            f'    <a class="dl" id="dl-{a.platform}" href="{href}" '
-            f'rel="noopener noreferrer" target="_blank" '
-            f'data-platform="{a.platform}" data-filename="{a.filename}" '
-            f'data-price-pence="245" data-pay-via="stripe-payment-page">'
-            f"Pay {PRICE_LABEL} - {a.label}</a>"
-        )
-    links_html = "\n".join(links)
+    row1, row2 = download_menu_rows(items)
+    row1_html = "\n      ".join(_render_platform_pay_link(a) for a in row1)
+    row2_block = ""
+    if row2:
+        row2_html = "\n      ".join(_render_platform_pay_link(a) for a in row2)
+        row2_block = f"""
+    <div class="dl-row dl-row-2" id="dl-row-2" data-dl-row="2" data-dl-count="{len(row2)}">
+      {row2_html}
+    </div>"""
     return f"""
   <section class="downloads" id="downloads" aria-label="Download Restore Privacy client">
     <h2>Download client v{RELEASE_VERSION}</h2>
@@ -285,8 +319,10 @@ def render_download_section_html(assets: Iterable[DownloadAsset] | None = None) 
       <span id="catalog-version">v{RELEASE_VERSION}</span>
       (paid download only; installers delivered after Stripe payment)</p>
     <p class="dl-price" id="dl-price">{PRICE_LABEL} GBP per package — pay on Stripe, then get a one-time download link</p>
-    <div class="dl-buttons">
-{links_html}
+    <div class="dl-buttons" id="dl-buttons" data-dl-layout="3+2">
+    <div class="dl-row dl-row-3" id="dl-row-1" data-dl-row="1" data-dl-count="{len(row1)}">
+      {row1_html}
+    </div>{row2_block}
 {render_rust_footer_html()}
     </div>
   </section>

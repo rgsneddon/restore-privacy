@@ -24,6 +24,8 @@ from downloads import (  # noqa: E402
     RUST_REPO_URL,
     WINDOWS_ZIP_FILENAME,
     available_downloads,
+    download_css,
+    download_menu_rows,
     render_download_section_html,
 )
 
@@ -94,6 +96,37 @@ class TestDownloadCatalog(unittest.TestCase):
         self.assertIn("Pay £2.45", html)
         # Free permanent GitHub installer hrefs must not appear in public HTML.
         self.assertNotIn("releases/download/0.3.0/", html)
+
+    def test_download_menu_is_three_then_two_rows(self):
+        """Platform menu under the title: row of 3, then row of 2."""
+        assets = available_downloads()
+        self.assertEqual(len(assets), 5)
+        row1, row2 = download_menu_rows(assets)
+        self.assertEqual(len(row1), 3)
+        self.assertEqual(len(row2), 2)
+        self.assertEqual([a.platform for a in row1 + row2], [a.platform for a in assets])
+
+        html = render_download_section_html()
+        self.assertIn('data-dl-layout="3+2"', html)
+        self.assertIn('id="dl-row-1"', html)
+        self.assertIn('id="dl-row-2"', html)
+        self.assertIn('data-dl-count="3"', html)
+        self.assertIn('data-dl-count="2"', html)
+        # All five platform controls still present with pay attrs
+        for a in assets:
+            self.assertIn(f'id="dl-{a.platform}"', html)
+            self.assertIn(f'data-platform="{a.platform}"', html)
+            self.assertIn(f'data-filename="{a.filename}"', html)
+        # CSS ships row layout (not a single vertical stack of five)
+        css = download_css()
+        self.assertIn(".dl-row", css)
+        self.assertIn("flex-direction: row", css)
+        # Row wrappers appear under the downloads heading
+        head_at = html.find("<h2>")
+        row1_at = html.find('id="dl-row-1"')
+        row2_at = html.find('id="dl-row-2"')
+        self.assertGreater(row1_at, head_at)
+        self.assertGreater(row2_at, row1_at)
         for a in available_downloads():
             self.assertIn(f'href="{a.pay_path}"', html)
             self.assertIn(f"client_reference_id={a.platform}", html)
