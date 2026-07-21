@@ -122,13 +122,42 @@ def windows_route_delete_commands(
     server_host: str,
     if_index: Optional[int] = None,
 ) -> list[str]:
-    """Commands to tear down full-tunnel routes (rollback on failure)."""
+    """Commands to tear down full-tunnel routes (rollback on failure / Disconnect).
+
+    Emits dual ``/1`` deletes first so residual traffic leaves a dead Wintun,
+    then server pin. Extra gateway-qualified deletes cover Windows variants that
+    keep IF-bound dual ``/1`` until the next-hop form is removed.
+    """
+    _ = plan  # plan reserved for future iface-scoped cleanup
+    _ = if_index
+    host = (server_host or "").strip()
     cmds = [
-        f"route delete {server_host} mask 255.255.255.255",
+        # Dual /1 catch-alls first (blackhole if left after TUN close)
         "route delete 0.0.0.0 mask 128.0.0.0",
         "route delete 128.0.0.0 mask 128.0.0.0",
+        # Gateway-qualified form (some Windows builds keep IF-bound dual /1)
+        "route delete 0.0.0.0 mask 128.0.0.0 0.0.0.0",
+        "route delete 128.0.0.0 mask 128.0.0.0 0.0.0.0",
     ]
+    if host:
+        cmds.append(f"route delete {host} mask 255.255.255.255")
     return cmds
+
+
+def windows_residual_restore_route_commands(
+    server_host: str | None = None,
+) -> list[str]:
+    """Product residual restore: dual /1 + pin deletes without a live tunnel object.
+
+    Used when Disconnect/Quit lacks complete ``WindowsTunnelResult`` flags but
+    OS routes may still blackhole internet into a closed Wintun adapter.
+    """
+    from client.endpoint import PRODUCT_NODE_HOST
+
+    host = (server_host or PRODUCT_NODE_HOST or "").strip()
+    # Minimal plan for the shared delete builder
+    plan = FullTunnelPlan(tunnel_iface="RPT", tunnel_client_ip="10.88.0.2")
+    return windows_route_delete_commands(plan, host or PRODUCT_NODE_HOST)
 
 
 def linux_route_commands(

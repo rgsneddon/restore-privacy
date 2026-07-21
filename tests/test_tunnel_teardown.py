@@ -17,10 +17,13 @@ sys.path.insert(0, str(ROOT))
 from client.connect import ConnectState, RptClient  # noqa: E402
 from client.full_tunnel import (  # noqa: E402
     build_full_tunnel_plan,
+    windows_residual_restore_route_commands,
     windows_route_delete_commands,
 )
+from client.kill_switch import windows_kill_switch_rollback_commands  # noqa: E402
 from client.windows.tunnel_win import (  # noqa: E402
     WindowsTunnelResult,
+    restore_windows_residual_path,
     stop_full_tunnel,
 )
 
@@ -36,6 +39,8 @@ class TestWindowsRouteDeleteCommands(unittest.TestCase):
         self.assertIn(f"route delete {server} mask 255.255.255.255", joined)
         self.assertIn("route delete 0.0.0.0 mask 128.0.0.0", joined)
         self.assertIn("route delete 128.0.0.0 mask 128.0.0.0", joined)
+        # Gateway-qualified dual /1 for stubborn IF-bound routes
+        self.assertIn("route delete 0.0.0.0 mask 128.0.0.0 0.0.0.0", joined)
         # No leftover add of catch-alls in teardown list
         self.assertNotIn("route add", joined)
 
@@ -46,21 +51,36 @@ class TestWindowsRouteDeleteCommands(unittest.TestCase):
         # Same essential deletes regardless of if_index (routes are not IF-scoped on delete)
         self.assertEqual(a, b)
 
+    def test_residual_restore_commands_use_product_host(self):
+        cmds = windows_residual_restore_route_commands(None)
+        joined = "\n".join(cmds)
+        self.assertIn("route delete 0.0.0.0 mask 128.0.0.0", joined)
+        self.assertIn("82.221.101.241", joined)
+
 
 class TestStopFullTunnel(unittest.TestCase):
     """stop_full_tunnel: routes first, then dataplane, TUN, session â€” idempotent."""
 
     def test_stop_with_no_tunnel_is_safe(self):
         client = RptClient()
-        # Never connected
-        applied = stop_full_tunnel(None, client)
+        # Never connected — still runs residual restore (idempotent)
+        with mock.patch(
+            "client.windows.tunnel_win.restore_windows_residual_path",
+            return_value=["route delete 0.0.0.0 mask 128.0.0.0"],
+        ) as rest:
+            applied = stop_full_tunnel(None, client)
         self.assertIsInstance(applied, list)
+        self.assertGreaterEqual(rest.call_count, 1)
         self.assertEqual(client.state, ConnectState.DISCONNECTED)
 
     def test_stop_twice_is_safe(self):
         client = RptClient()
-        stop_full_tunnel(None, client)
-        stop_full_tunnel(None, client)
+        with mock.patch(
+            "client.windows.tunnel_win.restore_windows_residual_path",
+            return_value=[],
+        ):
+            stop_full_tunnel(None, client)
+            stop_full_tunnel(None, client)
         self.assertEqual(client.state, ConnectState.DISCONNECTED)
 
     def test_stop_calls_route_rollback_dataplane_tun_and_disconnect(self):
@@ -81,15 +101,17 @@ class TestStopFullTunnel(unittest.TestCase):
             if_index=17,
         )
         with mock.patch(
-            "client.windows.tunnel_win.rollback_full_tunnel_routes",
+            "client.windows.tunnel_win.restore_windows_residual_path",
             return_value=["route delete 0.0.0.0 mask 128.0.0.0"],
-        ) as rb:
+        ) as rest:
             applied = stop_full_tunnel(result, client)
-        rb.assert_called_once()
-        args, _kwargs = rb.call_args
-        self.assertEqual(args[0], plan)
-        self.assertEqual(args[1], server)
-        self.assertEqual(args[2], 17)
+        # Before TUN close + after TUN close
+        self.assertGreaterEqual(rest.call_count, 2)
+        # First restore uses plan + host from result
+        kwargs0 = rest.call_args_list[0].kwargs
+        self.assertEqual(kwargs0.get("server_host"), server)
+        self.assertEqual(kwargs0.get("plan"), plan)
+        self.assertEqual(kwargs0.get("if_index"), 17)
         plane.stop.assert_called_once()
         tun.close.assert_called_once()
         client.disconnect.assert_called_once()
@@ -98,7 +120,8 @@ class TestStopFullTunnel(unittest.TestCase):
         self.assertIsNone(result.dataplane)
         self.assertIsNone(result.tun)
 
-    def test_stop_without_routes_still_stops_dataplane_and_session(self):
+    def test_stop_without_routes_still_restores_and_stops_session(self):
+        """Incomplete flags must not skip residual restore (blackhole fix)."""
         plane = mock.Mock()
         tun = mock.Mock()
         client = mock.Mock(spec=RptClient)
@@ -111,15 +134,34 @@ class TestStopFullTunnel(unittest.TestCase):
             routes_applied=False,
             plan=None,
             server_host=None,
+            kill_switch_applied=False,
         )
         with mock.patch(
-            "client.windows.tunnel_win.rollback_full_tunnel_routes"
-        ) as rb:
+            "client.windows.tunnel_win.restore_windows_residual_path",
+            return_value=["route delete 0.0.0.0 mask 128.0.0.0"],
+        ) as rest:
             stop_full_tunnel(result, client)
-        rb.assert_not_called()
+        self.assertGreaterEqual(rest.call_count, 1)
         plane.stop.assert_called_once()
         tun.close.assert_called_once()
         client.disconnect.assert_called_once()
+
+    def test_restore_windows_residual_path_runs_ks_rollback(self):
+        """Shipped restore helper drives real KS rollback command builder."""
+        roll = windows_kill_switch_rollback_commands()
+        self.assertTrue(roll)
+        with mock.patch(
+            "client.windows.tunnel_win._run_cmds",
+            return_value=(["route delete 0.0.0.0 mask 128.0.0.0"], []),
+        ):
+            with mock.patch("subprocess.run") as spr:
+                applied = restore_windows_residual_path(server_host="82.221.101.241")
+        self.assertTrue(any("128.0.0.0" in c for c in applied))
+        # KS rollback script executed
+        self.assertTrue(spr.called)
+        # EncodedCommand payload present in at least one call
+        joined = " ".join(str(c) for c in (spr.call_args_list[0][0][0],))
+        self.assertIn("powershell", joined.lower())
 
     def test_stop_swallows_component_errors(self):
         plane = mock.Mock()
@@ -141,7 +183,7 @@ class TestStopFullTunnel(unittest.TestCase):
             if_index=3,
         )
         with mock.patch(
-            "client.windows.tunnel_win.rollback_full_tunnel_routes",
+            "client.windows.tunnel_win.restore_windows_residual_path",
             side_effect=OSError("route boom"),
         ):
             # Must not raise
@@ -161,21 +203,23 @@ class TestWindowsAppCloseHook(unittest.TestCase):
         self.assertIn("WM_DELETE_WINDOW", src)
         self.assertIn("_on_close_ui_only", src)
         self.assertIn("disconnect_full_tunnel", src)
+        self.assertIn("restore_windows_residual_path", src)
         self.assertIn('protocol("WM_DELETE_WINDOW"', src)
-        # Close hides process alive â€” no tunnel stop
+        # Close hides process alive — no tunnel stop
         on_close = src[src.index("def _on_close_ui_only") : src.index("def _quit_app")]
         self.assertNotIn("stop_full_tunnel", on_close)
         self.assertNotIn("disconnect_full_tunnel", on_close)
         self.assertTrue("iconify" in on_close or "withdraw" in on_close)
-        # Quit explicitly stops tunnel
+        # Quit explicitly stops tunnel + residual restore belt-and-suspenders
         quit_body = src[src.index("def _quit_app") : src.index("def run")]
         self.assertIn("disconnect_full_tunnel", quit_body)
+        self.assertIn("restore_windows_residual_path", quit_body)
         # run() has no finally teardown
         run_body = src[src.index("def run") : src.index("def run") + 200]
         self.assertNotIn("stop_full_tunnel", run_body)
 
-    def test_disconnect_helper_calls_shipped_stop(self):
-        """AST: disconnect_full_tunnel body references stop_full_tunnel."""
+    def test_disconnect_helper_calls_shipped_stop_and_restore(self):
+        """AST: disconnect_full_tunnel body references stop + residual restore."""
         app_path = ROOT / "client" / "windows" / "app.py"
         tree = ast.parse(app_path.read_text(encoding="utf-8"))
         found = False
@@ -183,8 +227,20 @@ class TestWindowsAppCloseHook(unittest.TestCase):
             if isinstance(node, ast.FunctionDef) and node.name == "disconnect_full_tunnel":
                 body = ast.dump(node)
                 self.assertIn("stop_full_tunnel", body)
+                self.assertIn("restore_windows_residual_path", body)
                 found = True
         self.assertTrue(found, "disconnect_full_tunnel not found")
+
+    def test_restore_internet_bat_shipped(self):
+        bat = ROOT / "client" / "windows" / "RestoreInternet.bat"
+        self.assertTrue(bat.is_file(), "RestoreInternet.bat missing")
+        text = bat.read_text(encoding="utf-8", errors="replace")
+        self.assertIn("route delete 0.0.0.0 mask 128.0.0.0", text)
+        self.assertIn("route delete 128.0.0.0 mask 128.0.0.0", text)
+        self.assertIn("RPT-KS", text)
+        self.assertIn("DefaultOutboundAction", text)
+        self.assertIn("ms_tcpip6", text)
+        self.assertIn("82.221.101.241", text)
 
 
 class TestAndroidTeardownWiring(unittest.TestCase):

@@ -110,6 +110,7 @@ from client.windows.tray_win import (
 from client.windows.tunnel_win import (
     ipv6_residual_protected,
     residual_ip_capture_active,
+    restore_windows_residual_path,
     start_full_tunnel,
     stop_full_tunnel,
 )
@@ -118,7 +119,10 @@ from client.windows.tunnel_win import (
 def disconnect_full_tunnel(
     tunnel, client, *, preserve_message: bool = False
 ) -> None:
-    """Idempotent full stop - Disconnect button, or cleanup after failed attach.
+    """Idempotent full stop - Disconnect button, Quit, or cleanup after failed attach.
+
+    Always restores residual internet (dual /1, KS, IPv6) even when ``tunnel``
+    is None or in-memory flags are incomplete.
 
     Set ``preserve_message=True`` when cleaning up a failed Connect so
     ``tunnel.message`` is not replaced with the teardown success string.
@@ -129,6 +133,12 @@ def disconnect_full_tunnel(
         try:
             if client is not None:
                 client.disconnect()
+        except Exception:
+            pass
+        # stop_full_tunnel failed mid-way — still force residual restore
+        try:
+            host = getattr(tunnel, "server_host", None) if tunnel is not None else None
+            restore_windows_residual_path(server_host=host)
         except Exception:
             pass
 
@@ -1501,9 +1511,9 @@ class TunnelClientApp:
                 pass
 
     def _quit_app(self) -> None:
-        """Explicit quit: stop tunnel then exit process (safe route cleanup)."""
+        """Explicit quit: full residual teardown then exit (never leave dual /1)."""
         try:
-            self._log("Quit - stopping tunnel and exiting...")
+            self._log("Quit - stopping tunnel and restoring internet...")
         except Exception:
             pass
         if self._tray is not None:
@@ -1516,6 +1526,12 @@ class TunnelClientApp:
         self._tunnel = None
         try:
             disconnect_full_tunnel(tunnel, self.client)
+        except Exception:
+            pass
+        # Belt-and-suspenders: residual restore even if disconnect path skipped
+        try:
+            host = getattr(tunnel, "server_host", None) if tunnel is not None else None
+            restore_windows_residual_path(server_host=host)
         except Exception:
             pass
         try:

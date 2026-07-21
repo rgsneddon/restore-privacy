@@ -425,6 +425,24 @@ def install(
 
     icon = resolve_shortcut_icon(INSTALL_DIR, installed_exe)
 
+    # Residual restore helper (dual /1 + KS + IPv6) — next to exe for emergency use
+    restore_bat = INSTALL_DIR / "RestoreInternet.bat"
+    try:
+        src_bat = Path(__file__).resolve().parent / "RestoreInternet.bat"
+        if src_bat.is_file():
+            shutil.copy2(src_bat, restore_bat)
+        elif not restore_bat.is_file():
+            # Minimal fallback if payload omitted the bat
+            restore_bat.write_text(
+                "@echo off\r\n"
+                "route delete 0.0.0.0 mask 128.0.0.0\r\n"
+                "route delete 128.0.0.0 mask 128.0.0.0\r\n"
+                "route delete 82.221.101.241 mask 255.255.255.255\r\n",
+                encoding="utf-8",
+            )
+    except Exception:
+        pass
+
     _progress(5, "Creating Start Menu and Desktop shortcuts...")
     # Start menu + desktop shortcuts (display name: Privacy Restored + logo)
     try:
@@ -447,15 +465,23 @@ def install(
             INSTALL_DIR,
             icon=icon,
         )
+        if restore_bat.is_file():
+            _create_shortcut(
+                restore_bat,
+                START_MENU / "Restore Internet (if stuck).lnk",
+                INSTALL_DIR,
+                icon=icon,
+            )
     except Exception:
         # Shortcuts are nice-to-have; install still succeeds
         pass
 
-    # Tiny uninstaller helper (batch)
+    # Tiny uninstaller helper (batch) — restore residual path before remove
     uninst = INSTALL_DIR / "Uninstall.bat"
     uninst.write_text(
         "@echo off\r\n"
         f"title Uninstall {SHORTCUT_DISPLAY_NAME} {VERSION}\r\n"
+        "if exist \"%~dp0RestoreInternet.bat\" call \"%~dp0RestoreInternet.bat\" /quiet\r\n"
         f'rmdir /s /q "%LOCALAPPDATA%\\Programs\\{APP_NAME}"\r\n'
         f'rmdir /s /q "%APPDATA%\\Microsoft\\Windows\\Start Menu\\Programs\\{APP_NAME}"\r\n'
         f'del /q "%USERPROFILE%\\Desktop\\{SHORTCUT_DISPLAY_NAME}.lnk" 2>nul\r\n'

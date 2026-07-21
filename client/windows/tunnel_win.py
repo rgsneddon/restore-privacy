@@ -313,6 +313,74 @@ def rollback_full_tunnel_routes(
     return applied
 
 
+def restore_windows_residual_path(
+    *,
+    server_host: Optional[str] = None,
+    plan: Optional[FullTunnelPlan] = None,
+    if_index: Optional[int] = None,
+    run_kill_switch_rollback: bool = True,
+    run_ipv6_rollback: bool = True,
+) -> list[str]:
+    """Always attempt residual restore so Disconnect/Quit never leave a blackhole.
+
+    Does **not** depend on ``routes_applied`` / ``kill_switch_applied`` flags.
+    Safe and idempotent when residual was never applied (route delete no-ops).
+    """
+    applied: list[str] = []
+    try:
+        from client.endpoint import PRODUCT_NODE_HOST
+        from client.full_tunnel import windows_residual_restore_route_commands
+    except Exception:
+        PRODUCT_NODE_HOST = "82.221.101.241"  # type: ignore[misc,assignment]
+        windows_residual_restore_route_commands = None  # type: ignore[assignment]
+
+    host = (server_host or "").strip() or str(PRODUCT_NODE_HOST)
+
+    # 1) Dual /1 + server pin (use plan-aware builder when available, else product defaults)
+    try:
+        if plan is not None:
+            applied.extend(rollback_full_tunnel_routes(plan, host, if_index))
+        elif windows_residual_restore_route_commands is not None:
+            cmds = windows_residual_restore_route_commands(host)
+            ran, _errs = _run_cmds(cmds)
+            applied.extend(ran)
+        else:
+            p = build_placeholder_plan()
+            applied.extend(rollback_full_tunnel_routes(p, host, if_index))
+    except Exception:
+        try:
+            # Second chance: bare product residual deletes
+            from client.full_tunnel import windows_residual_restore_route_commands as _wrr
+
+            ran, _ = _run_cmds(_wrr(host))
+            applied.extend(ran)
+        except Exception:
+            pass
+
+    # 2) IPv6 bindings re-enabled (session may have disabled ms_tcpip6 on adapters)
+    if run_ipv6_rollback:
+        try:
+            applied.extend(rollback_ipv6_leak_mitigation(plan))
+        except Exception:
+            pass
+
+    # 3) Kill-switch: always roll back RPT-KS rules + DefaultOutboundAction
+    if run_kill_switch_rollback:
+        try:
+            from client.kill_switch import windows_kill_switch_rollback_commands
+
+            for cmd in windows_kill_switch_rollback_commands():
+                try:
+                    subprocess.run(cmd, shell=True, capture_output=True, timeout=20)
+                    applied.append(cmd)
+                except Exception:
+                    pass
+        except Exception:
+            pass
+
+    return applied
+
+
 def stop_full_tunnel(
     result: Optional[WindowsTunnelResult] = None,
     client: Optional[RptClient] = None,
@@ -323,11 +391,15 @@ def stop_full_tunnel(
     disconnect_session: bool = True,
     preserve_message: bool = False,
 ) -> list[str]:
-    """Idempotent full teardown: routes → dataplane → TUN → RPT session.
+    """Idempotent full teardown: residual restore → dataplane → TUN → RPT session.
 
-    Order restores the physical path first (delete dual /1 + server pin), then
-    stops the DATA plane and closes Wintun so the machine reverts to the real
-    device IP path. Safe when already stopped or never connected.
+    Order restores the physical path first (delete dual /1 + server pin + KS +
+    IPv6 undo), then stops the DATA plane and closes Wintun so the machine
+    reverts to the real device IP path.
+
+    Residual restore **always** runs (even when ``result`` is None or flags are
+    incomplete) so Disconnect/Quit never leave dual ``/1`` or profile Block
+    after the TUN is gone.
 
     When ``preserve_message`` is True (cleanup after a failed Connect attach),
     do not overwrite ``result.message`` with the teardown success string so the
@@ -337,55 +409,27 @@ def stop_full_tunnel(
     res = result
     plane = res.dataplane if res is not None else None
     tun = res.tun if res is not None else None
-    routes_were_on = bool(res and res.routes_applied)
     plan_obj = plan or (res.plan if res else None)
     host = server_host or (res.server_host if res else None)
     idx = if_index if if_index is not None else (res.if_index if res else None)
 
-    # 1) Remove full-tunnel routes first so traffic leaves the VPN immediately.
-    if host and (routes_were_on or plan_obj is not None):
-        try:
-            p = plan_obj or build_placeholder_plan()
-            applied.extend(rollback_full_tunnel_routes(p, host, idx))
-        except Exception:
-            # Best-effort: still continue teardown
-            try:
-                cmds = windows_route_delete_commands(
-                    plan_obj or build_placeholder_plan(), host, idx
-                )
-                applied.extend(cmds)
-            except Exception:
-                pass
-
-    # 1b) Restore IPv6 on physical adapters (undo session leak mitigation)
-    if res is not None and (
-        getattr(res, "ipv6_mitigation_applied", False) or routes_were_on
-    ):
-        try:
-            applied.extend(rollback_ipv6_leak_mitigation(plan_obj))
-        except Exception:
-            pass
+    # 1) Always restore residual path first (routes / KS / IPv6) — flag-independent.
+    try:
+        applied.extend(
+            restore_windows_residual_path(
+                server_host=host,
+                plan=plan_obj,
+                if_index=idx,
+                run_kill_switch_rollback=True,
+                run_ipv6_rollback=True,
+            )
+        )
+    except Exception:
+        pass
+    if res is not None:
         try:
             res.ipv6_mitigation_applied = False
-        except Exception:
-            pass
-
-    # 1c) Kill-switch firewall rollback (non-tunnel block)
-    if routes_were_on or (res is not None and getattr(res, "kill_switch_applied", False)):
-        try:
-            from client.kill_switch import windows_kill_switch_rollback_commands
-
-            for cmd in windows_kill_switch_rollback_commands():
-                try:
-                    # best-effort shell
-                    import subprocess
-
-                    subprocess.run(cmd, shell=True, capture_output=True, timeout=15)
-                    applied.append(cmd)
-                except Exception:
-                    pass
-            if res is not None:
-                res.kill_switch_applied = False
+            res.kill_switch_applied = False
         except Exception:
             pass
 
@@ -402,6 +446,20 @@ def stop_full_tunnel(
             tun.close()
         except Exception:
             pass
+
+    # 3b) Routes again after TUN close (covers race where delete raced adapter teardown)
+    try:
+        applied.extend(
+            restore_windows_residual_path(
+                server_host=host,
+                plan=plan_obj,
+                if_index=idx,
+                run_kill_switch_rollback=True,
+                run_ipv6_rollback=False,  # already re-enabled above
+            )
+        )
+    except Exception:
+        pass
 
     # 4) End RPT session / UDP socket
     if disconnect_session and client is not None:
