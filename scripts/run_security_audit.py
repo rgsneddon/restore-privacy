@@ -377,11 +377,20 @@ def run_section_b_probes(http_status: dict | None = None) -> dict:
 
 
 def load_catalog_version() -> str:
-    """Catalog monopin: status_page.downloads then client/VERSION."""
-    try:
-        sp = str(ROOT / "status_page")
-        if sp not in sys.path:
-            sys.path.insert(0, sp)
+    """Catalog monopin: env → downloads → client/VERSION (repo or install root)."""
+    env_v = os.environ.get("RPT_CATALOG_VERSION", "").strip()
+    if env_v and env_v.lower() != "unknown":
+        return env_v
+
+    install = Path(os.environ.get("RPT_INSTALL_ROOT", "") or ROOT)
+
+    def _from_downloads(base: Path) -> str | None:
+        sp = base / "status_page"
+        if not sp.is_dir():
+            return None
+        sp_s = str(sp)
+        if sp_s not in sys.path:
+            sys.path.insert(0, sp_s)
         try:
             from downloads import current_catalog_version  # type: ignore
 
@@ -390,14 +399,37 @@ def load_catalog_version() -> str:
                 return v
         except Exception:
             pass
-        from downloads import RELEASE_VERSION  # type: ignore
+        try:
+            from downloads import RELEASE_VERSION  # type: ignore
 
-        return str(RELEASE_VERSION).strip()
-    except Exception:
-        ver = ROOT / "client" / "VERSION"
-        if ver.is_file():
-            return ver.read_text(encoding="utf-8").strip()
-        return "unknown"
+            v = str(RELEASE_VERSION).strip()
+            if v:
+                return v
+        except Exception:
+            pass
+        return None
+
+    def _from_version_file(base: Path) -> str | None:
+        for rel in ("client/VERSION", "VERSION", "status_page/assets/CATALOG_VERSION"):
+            p = base / rel
+            try:
+                if p.is_file():
+                    v = p.read_text(encoding="utf-8").strip().split()[0]
+                    if v and v.lower() != "unknown":
+                        return v
+            except OSError:
+                continue
+        return None
+
+    for base in (ROOT, install):
+        v = _from_downloads(base)
+        if v:
+            return v
+    for base in (ROOT, install):
+        v = _from_version_file(base)
+        if v:
+            return v
+    return "unknown"
 
 
 def product_exit_pub_pin() -> str:

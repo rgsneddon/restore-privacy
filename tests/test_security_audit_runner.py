@@ -104,6 +104,10 @@ class TestAuditTimerPrivacySectionA(unittest.TestCase):
         # Local probes only
         self.assertIn("RPT_NODE_HOST=127.0.0.1", text)
         self.assertIn("RPT_AUDIT_REQUIRE_LOCALHOST=1", text)
+        # Package RAG monopin + VPS paid_assets path for honest catalog states
+        self.assertIn("RPT_CATALOG_VERSION", text)
+        self.assertIn("RPT_VPS_ASSET_REMOTE_ROOT", text)
+        self.assertIn("paid_assets", text)
         # No network exfil of audit artifacts (comments may say "do not git push")
         self.assertIn("no network exfil", text.lower().replace("-", " "))
         self.assertNotRegex(text, r"(?m)^\s*git\s+push\b")

@@ -6,7 +6,7 @@
 | **Repository** | restore-privacy (**private** source; installers only via paid status host) |
 | **Public catalog version** | **0.3.6** |
 | **Production node** | **82.221.101.241:44044** (UDP); status UI TCP **8080** — **Iceland**, host **FlokiNET** |
-| **Audit generated** | **21 July 2026** (`2026-07-21T22:07:18Z`) |
+| **Audit generated** | **21 July 2026** (`2026-07-21T22:09:00Z`) |
 | **Cadence** | Automated security pass (~**every 4 hours** + **jitter** on privacy-hardened node timer) |
 | **Audit type** | Static suite + live node status probe + **per-installer AUDIT STATE (Green/Amber/Red)** + **section B privacy probes** |
 | **Auditor method** | `scripts/run_security_audit.py` — unittest privacy/security modules + TCP/HTTP/UDP probes + no-`.priv` scan + catalog package RAG + section B probes (no firewall scan) |
@@ -146,7 +146,7 @@ An **ISP** performing **traffic analysis** may still observe connection timing a
 
 | Severity | Finding | Status |
 |----------|---------|--------|
-| **Info** | Automated pass at `2026-07-21T22:07:18Z` | Recorded |
+| **Info** | Automated pass at `2026-07-21T22:09:00Z` | Recorded |
 | **High** | Public client count on status | Closed (title-only) |
 | **Medium** | Shared client priv in packages | Closed (no .priv hits) |
 | **Low** | Unit suite failure | N/A |
@@ -198,7 +198,7 @@ An **ISP** performing **traffic analysis** may still observe connection timing a
 
 ## 9. Conclusion
 
-Automated security audit at **2026-07-21T22:07:18Z** against node **82.221.101.241** and in-repo privacy gates. Public **SECURITY AUDIT** links must resolve on the **status host** (`/AUDIT.md` / `/audit.md`). Source repository is **private**; paid catalog installers are fulfilled on the status host only. Core privacy promises hold when the suite passes and status remains title-only.
+Automated security audit at **2026-07-21T22:09:00Z** against node **82.221.101.241** and in-repo privacy gates. Public **SECURITY AUDIT** links must resolve on the **status host** (`/AUDIT.md` / `/audit.md`). Source repository is **private**; paid catalog installers are fulfilled on the status host only. Core privacy promises hold when the suite passes and status remains title-only.
 
 Re-run: `python3 scripts/run_security_audit.py --write`
 

@@ -57,6 +57,7 @@ _rpt_audit_cp() {
   if [[ -e "$dest" ]] && [[ "$src" -ef "$dest" ]]; then
     return 0
   fi
+  mkdir -p "$(dirname "$dest")"
   cp -a "$src" "$dest"
 }
 _rpt_audit_cp "${REPO_ROOT}/scripts/run_security_audit.py" \
@@ -64,6 +65,24 @@ _rpt_audit_cp "${REPO_ROOT}/scripts/run_security_audit.py" \
 # Section B privacy probes (imported by the runner)
 _rpt_audit_cp "${REPO_ROOT}/scripts/audit_privacy_probes.py" \
   "${INSTALL_ROOT}/scripts/audit_privacy_probes.py"
+# Catalog monopin for package RAG when full monorepo is not deployed on the node
+if [[ -f "${REPO_ROOT}/client/VERSION" ]]; then
+  _rpt_audit_cp "${REPO_ROOT}/client/VERSION" "${INSTALL_ROOT}/client/VERSION"
+fi
+if [[ -f "${REPO_ROOT}/status_page/downloads.py" ]]; then
+  _rpt_audit_cp "${REPO_ROOT}/status_page/downloads.py" \
+    "${INSTALL_ROOT}/status_page/downloads.py"
+fi
+# Prefer explicit env pin from client/VERSION for oneshot package RAG
+CATALOG_PIN=""
+if [[ -f "${INSTALL_ROOT}/client/VERSION" ]]; then
+  CATALOG_PIN="$(tr -d ' \t\r\n' <"${INSTALL_ROOT}/client/VERSION" | head -c 32 || true)"
+elif [[ -f "${REPO_ROOT}/client/VERSION" ]]; then
+  CATALOG_PIN="$(tr -d ' \t\r\n' <"${REPO_ROOT}/client/VERSION" | head -c 32 || true)"
+fi
+if [[ -z "${CATALOG_PIN}" ]]; then
+  CATALOG_PIN="${RPT_CATALOG_VERSION:-0.3.6}"
+fi
 # Seed current audit document
 if [[ -f "${REPO_ROOT}/AUDIT.md" ]]; then
   if [[ ! -e "${INSTALL_ROOT}/AUDIT.md" ]] \
@@ -118,13 +137,15 @@ cat >"${WRAPPER}" <<WRAP
 #!/usr/bin/env bash
 # Local-only audit oneshot — no network exfil of AUDIT.md.
 set -euo pipefail
-export PYTHONPATH="${INSTALL_ROOT}"
+export PYTHONPATH="${INSTALL_ROOT}:${INSTALL_ROOT}/status_page"
 export RPT_INSTALL_ROOT="${INSTALL_ROOT}"
 export RPT_AUDIT_PATH="${INSTALL_ROOT}/AUDIT.md"
 export RPT_NODE_HOST=127.0.0.1
 export RPT_AUDIT_REQUIRE_LOCALHOST=1
 export RPT_AUDIT_NO_OUTBOUND=1
 export RPT_HOST_STATEMENTS_OFFLINE=1
+export RPT_CATALOG_VERSION="${CATALOG_PIN}"
+export RPT_VPS_ASSET_REMOTE_ROOT="${INSTALL_ROOT}/paid_assets"
 export TMPDIR="${INSTALL_ROOT}/var/audit-scratch"
 mkdir -p "\${TMPDIR}"
 # Never git push / curl upload from this job
@@ -159,13 +180,15 @@ Type=oneshot
 WorkingDirectory=${INSTALL_ROOT}
 ${SERVICE_USER_LINE}
 ${SERVICE_GROUP_LINE}
-Environment=PYTHONPATH=${INSTALL_ROOT}
+Environment=PYTHONPATH=${INSTALL_ROOT}:${INSTALL_ROOT}/status_page
 Environment=RPT_INSTALL_ROOT=${INSTALL_ROOT}
 Environment=RPT_AUDIT_PATH=${INSTALL_ROOT}/AUDIT.md
 Environment=RPT_NODE_HOST=127.0.0.1
 Environment=RPT_AUDIT_REQUIRE_LOCALHOST=1
 Environment=RPT_AUDIT_NO_OUTBOUND=1
 Environment=RPT_HOST_STATEMENTS_OFFLINE=1
+Environment=RPT_CATALOG_VERSION=${CATALOG_PIN}
+Environment=RPT_VPS_ASSET_REMOTE_ROOT=${INSTALL_ROOT}/paid_assets
 Environment=TMPDIR=${INSTALL_ROOT}/var/audit-scratch
 # Local write only — do not add ExecStartPost git push / curl upload
 ExecStart=${WRAPPER}
