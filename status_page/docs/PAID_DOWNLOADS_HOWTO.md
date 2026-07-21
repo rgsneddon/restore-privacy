@@ -157,3 +157,7 @@ Architecture (modules):
 - Webhook **must** verify `Stripe-Signature` (implemented in `payments.py`).
 - Tokens are single-use and time-limited; invalid/expired tokens do not download.
 - GitHub may still host free release assets outside this site; only **this** downloads UI is paid-gated.
+
+## Success page UX
+
+After Checkout, `/download/success` shows **Thank you**, auto-starts the one-time `/download?token=…` installer, and instructs the buyer to **run the file as administrator** (Windows: right-click → Run as administrator). A fallback download button remains if the browser blocks auto-download.

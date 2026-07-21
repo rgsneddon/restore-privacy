@@ -488,6 +488,16 @@ class TestBuyerSuccessFulfilment(unittest.TestCase):
             self.assertIn("success-download-link", body)
             self.assertIn(f"/download?token={token}", body)
             self.assertNotIn("pay-success-pending", body)
+            # Thank-you + auto-download + admin instruction
+            self.assertIn("Thank you", body)
+            self.assertIn("thank-you-heading", body)
+            self.assertIn("run-as-admin-instruction", body)
+            self.assertIn("run the file as administrator", body.lower())
+            self.assertIn("auto-download-frame", body)
+            self.assertIn("auto-download-script", body)
+            self.assertIn('id="auto-download-frame"', body)
+            self.assertIn(f'src="/download?token={token}"', body)
+            self.assertNotIn("github.com/rgsneddon/restore-privacy/releases/download", body)
         finally:
             httpd.shutdown()
             httpd.server_close()
@@ -995,6 +1005,82 @@ class TestGrantNotBurnedOnFulfilmentFail(unittest.TestCase):
         ready = payments.check_fulfilment_ready()
         self.assertTrue(ready.get("ok"), ready)
         self.assertEqual(ready.get("source"), "local")
+
+
+
+class TestPostPaymentThankYouBuilder(unittest.TestCase):
+    """Pure builder: thank you, auto-start paid path, run-as-administrator."""
+
+    def test_builder_thankyou_admin_and_auto_start(self):
+        html = payments.render_post_payment_thankyou_html(
+            download_path="/download?token=unit_tok_abc",
+            filename="restore-privacy-client-0.2.9-windows-x64-setup.exe",
+            platform="windows",
+        )
+        self.assertIn("Thank you", html)
+        self.assertIn("thank-you-heading", html)
+        self.assertIn("pay-success", html)
+        self.assertIn("restore-privacy-client-0.2.9-windows-x64-setup.exe", html)
+        self.assertIn("run the file as administrator", html.lower())
+        self.assertIn("Run as administrator", html)
+        self.assertIn("auto-download-frame", html)
+        self.assertIn('src="/download?token=unit_tok_abc"', html)
+        self.assertIn("success-download-link", html)
+        self.assertIn('href="/download?token=unit_tok_abc"', html)
+        self.assertIn("auto-download-script", html)
+        self.assertNotIn("github.com", html)
+        self.assertNotIn("releases/download", html)
+
+    def test_builder_rejects_external_free_url(self):
+        with self.assertRaises(ValueError):
+            payments.render_post_payment_thankyou_html(
+                download_path=(
+                    "https://github.com/rgsneddon/restore-privacy/releases/"
+                    "download/0.2.9/restore-privacy-client-0.2.9-windows-x64-setup.exe"
+                ),
+                filename="x.exe",
+                platform="windows",
+            )
+
+    def test_run_as_admin_windows_and_linux(self):
+        w = payments.run_as_administrator_instruction(
+            filename="restore-privacy-client-0.2.9-windows-x64-setup.exe",
+            platform="windows",
+        )
+        self.assertIn("Run as administrator", w)
+        l = payments.run_as_administrator_instruction(
+            filename="restore-privacy-client-0.2.9-linux-x64.tar.gz",
+            platform="linux",
+        )
+        self.assertIn("administrator", l.lower())
+        self.assertIn("sudo", l.lower())
+
+    def test_success_page_token_query_auto_starts(self):
+        import threading
+        import urllib.request
+
+        fname = "restore-privacy-client-0.2.9-android.apk"
+        tok = payments.mint_download_token(
+            filename=fname, platform="android", session_id="cs_thank_tok"
+        )
+        httpd = ThreadingHTTPServer(("127.0.0.1", 0), status_app.Handler)
+        port = httpd.server_address[1]
+        threading.Thread(target=httpd.serve_forever, daemon=True).start()
+        try:
+            url = f"http://127.0.0.1:{port}/pay/success?token={urllib.parse.quote(tok)}&platform=android"
+            with urllib.request.urlopen(url, timeout=15) as resp:
+                body = resp.read().decode("utf-8")
+                self.assertEqual(resp.status, 200)
+            self.assertIn("Thank you", body)
+            self.assertIn("run the file as administrator", body.lower())
+            self.assertIn(f"/download?token={tok}", body)
+            self.assertIn("auto-download-frame", body)
+            self.assertNotIn("releases/download", body)
+            # Grant still unused until /download opens (lookup only on success page)
+            self.assertIsNotNone(payments.lookup_download_token(tok))
+        finally:
+            httpd.shutdown()
+            httpd.server_close()
 
 
 if __name__ == "__main__":

@@ -387,6 +387,132 @@ def paid_fulfilment_mode() -> str:
     return "proxy"
 
 
+def _escape_html_text(s: str) -> str:
+    return (
+        str(s)
+        .replace("&", "&amp;")
+        .replace("<", "&lt;")
+        .replace(">", "&gt;")
+        .replace('"', "&quot;")
+    )
+
+
+def run_as_administrator_instruction(
+    *, filename: str = "", platform: str = ""
+) -> str:
+    """User-facing residual install elevation guidance (honest per platform)."""
+    plat = (platform or "").strip().lower()
+    name = (filename or "").lower()
+    if not plat:
+        if name.endswith(".exe"):
+            plat = "windows"
+        elif name.endswith(".apk"):
+            plat = "android"
+        elif "macos" in name or name.endswith("-macos.zip"):
+            plat = "macos"
+        elif "ios" in name or name.endswith("-ios.zip"):
+            plat = "ios"
+        elif "linux" in name or name.endswith(".tar.gz"):
+            plat = "linux"
+    if plat == "windows" or name.endswith(".exe"):
+        return (
+            "Please run the file as administrator: right-click the downloaded installer "
+            "→ Run as administrator (approve UAC). Residual full-tunnel VPN needs elevation."
+        )
+    if plat == "linux" or "linux" in name:
+        return (
+            "Please run the installer as administrator (e.g. with sudo) so residual "
+            "full-tunnel routes can be installed."
+        )
+    if plat == "macos" or "macos" in name:
+        return (
+            "Please open the app and approve macOS VPN / administrator prompts when asked "
+            "so residual Packet Tunnel can activate."
+        )
+    if plat == "android" or name.endswith(".apk"):
+        return (
+            "Please install the APK and grant VPN permission when Android asks "
+            "(system VPN consent is required for residual tunnel)."
+        )
+    if plat == "ios" or "ios" in name:
+        return (
+            "Please install the app with your device tooling and grant VPN permission "
+            "when iOS asks (Packet Tunnel requires user approval)."
+        )
+    return (
+        "Please run the downloaded file as administrator / with elevated privileges "
+        "and approve any system VPN prompts so residual protection can install."
+    )
+
+
+def render_post_payment_thankyou_html(
+    *,
+    download_path: str,
+    filename: str,
+    platform: str = "",
+) -> str:
+    """Thank-you page body: auto-start one-time download + run-as-administrator copy.
+
+    Auto-start targets the paid ``/download?token=…`` path only (iframe + script click).
+    Visible fallback link remains if the browser blocks automatic download.
+    """
+    link = (download_path or "").strip()
+    if not link.startswith("/download"):
+        raise ValueError("download_path must be a paid /download?token= path")
+    if "github.com" in link.lower() or link.startswith("http"):
+        raise ValueError("download_path must not be an external free release URL")
+    fname = (filename or "package").strip() or "package"
+    fname_esc = _escape_html_text(fname)
+    link_esc = _escape_html_text(link)
+    admin = _escape_html_text(
+        run_as_administrator_instruction(filename=fname, platform=platform)
+    )
+    plat = (platform or "").strip().lower()
+    # Emphasize Windows admin wording for .exe; still show admin phrase for all.
+    admin_lead = "Please run the file as administrator."
+    return f"""
+<section id="post-pay-thankyou" class="thankyou" aria-labelledby="thank-you-heading">
+  <h1 id="thank-you-heading">Thank you</h1>
+  <p class="msg" id="pay-success">Thank you for your payment. Your package is ready:</p>
+  <p class="pkg" id="paid-package-name"><strong>{fname_esc}</strong></p>
+  <p class="msg admin-run" id="run-as-admin-instruction">
+    <strong>{_escape_html_text(admin_lead)}</strong>
+    {admin}
+  </p>
+  <p class="msg" id="auto-download-note">Your download should start automatically…</p>
+  <!-- Auto-start paid installer (single-use grant path only; not free public GH). -->
+  <iframe id="auto-download-frame" src="{link_esc}" style="width:0;height:0;border:0;position:absolute"
+    title="Automatic product download" aria-hidden="true"></iframe>
+  <p>
+    <a class="dl" id="success-download-link" href="{link_esc}"
+       data-auto-download="1" data-platform="{_escape_html_text(plat)}">
+      Download {fname_esc} (if it did not start)
+    </a>
+  </p>
+  <p class="msg muted">The link works once and expires. Tip optional:
+    <a href="https://buymeacoffee.com/rgsneddon">buymeacoffee.com/rgsneddon</a></p>
+  <p><a href="/">Home</a></p>
+</section>
+<script id="auto-download-script">
+(function () {{
+  var link = document.getElementById("success-download-link");
+  function startDownload() {{
+    try {{
+      if (link) {{ link.click(); }}
+    }} catch (e) {{}}
+  }}
+  // Gesture-free auto-start: iframe loads /download?token=…; also click fallback.
+  if (document.readyState === "loading") {{
+    document.addEventListener("DOMContentLoaded", startDownload);
+  }} else {{
+    startDownload();
+  }}
+  setTimeout(startDownload, 400);
+}})();
+</script>
+"""
+
+
 # --- SQLite store -----------------------------------------------------------------
 
 

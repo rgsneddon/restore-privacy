@@ -38,6 +38,7 @@ from payments import (
     lookup_download_token,
     open_release_asset,
     platform_filename,
+    render_post_payment_thankyou_html,
     stripe_configured,
     wait_for_grant_by_session,
 )
@@ -355,7 +356,14 @@ def _html_page(title: str, body_inner: str) -> bytes:
 body{{margin:0;min-height:100vh;display:flex;flex-direction:column;align-items:center;
 justify-content:center;background:#0b0f14;color:#e8eef5;font-family:system-ui,sans-serif;
 padding:2rem;text-align:center}}
-a{{color:#93c5fd}} .msg{{max-width:28rem;line-height:1.5}}
+a{{color:#93c5fd}} .msg{{max-width:28rem;line-height:1.5;margin:0.65rem auto}}
+.thankyou h1{{letter-spacing:0.08em;margin:0 0 0.75rem}}
+.pkg{{font-size:1.05rem;margin:0.5rem 0 1rem}}
+.admin-run{{color:#fde68a;font-weight:500}}
+a.dl{{display:inline-block;margin:0.75rem 0;padding:0.75rem 1.25rem;background:#1d4ed8;
+color:#fff;text-decoration:none;border-radius:8px;font-weight:600}}
+a.dl:hover{{background:#2563eb}}
+.muted{{opacity:0.8;font-size:0.9rem}}
 </style></head><body>
 {body_inner}
 </body></html>
@@ -549,26 +557,37 @@ class Handler(BaseHTTPRequestHandler):
             # may still be in-flight — poll briefly for the minted grant.
             grant = None
             if token:
-                grant = {
-                    "token": token,
-                    "download_path": f"/download?token={urllib.parse.quote(token)}",
-                }
+                # Prefer grant row (filename) without consuming; fallback token-only.
+                grant = lookup_download_token(token)
+                if grant is None:
+                    grant = {
+                        "token": token,
+                        "filename": platform_filename(platform) or "package",
+                        "platform": platform,
+                        "download_path": (
+                            f"/download?token={urllib.parse.quote(token)}"
+                        ),
+                    }
             elif session_id:
                 grant = wait_for_grant_by_session(session_id, timeout_sec=8.0)
                 if grant is None:
                     grant = find_grant_by_session(session_id)
             if grant and grant.get("token"):
+                tok = str(grant["token"])
                 link = grant.get("download_path") or (
-                    f"/download?token={urllib.parse.quote(str(grant['token']))}"
+                    f"/download?token={urllib.parse.quote(tok)}"
                 )
-                fname = grant.get("filename") or platform or "package"
-                inner = (
-                    f'<p class="msg" id="pay-success">Payment received. Your one-time download:</p>'
-                    f'<p><a class="dl" id="success-download-link" href="{link}">'
-                    f"Download {_escape_html(str(fname))}</a></p>"
-                    f'<p class="msg">Link works once and expires. Tip optional: '
-                    f'<a href="https://buymeacoffee.com/rgsneddon">buymeacoffee.com/rgsneddon</a></p>'
-                    f'<p><a href="/">Home</a></p>'
+                fname = (
+                    grant.get("filename")
+                    or platform_filename(platform)
+                    or platform
+                    or "package"
+                )
+                plat = str(grant.get("platform") or platform or "")
+                inner = render_post_payment_thankyou_html(
+                    download_path=str(link),
+                    filename=str(fname),
+                    platform=plat,
                 )
             else:
                 # Meta-refresh so a late webhook can still unlock the page
