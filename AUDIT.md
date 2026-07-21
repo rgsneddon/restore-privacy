@@ -4,7 +4,7 @@
 |-------|--------|
 | **Product** | Restore Privacy Tunnel (RPT / RPT2) |
 | **Repository** | restore-privacy (**private** source; installers only via paid status host) |
-| **Public catalog version** | **0.3.1** |
+| **Public catalog version** | **0.3.2** |
 | **Production node** | **82.221.101.241:44044** (UDP); status UI TCP **8080** |
 | **Audit generated** | **21 July 2026** (`2026-07-21T05:19:23Z`) |
 | **Cadence** | Automated security pass (target **every 4 hours** on node/operator timer) |
@@ -52,7 +52,7 @@ Latest automated security audit for production node **82.221.101.241** and the i
 | Windows / Linux | `client/windows/*`, `client/linux/*` |
 | Mobile / Apple | `client_app/` Flutter + NativePrep residual engines |
 | Node | `node/*` (handshake, pfs, traffic_shape, crypto_session, nolog) |
-| Public web | `status_page/*` catalog **0.3.1** |
+| Public web | `status_page/*` catalog **0.3.2** |
 | Policies | `PRIVACY_POLICY.md`, `LICENSE`, `CREDITS.md`, `README.md`, `AUDIT.md` |
 
 ### 2.2 Method notes
@@ -122,7 +122,7 @@ An **ISP** performing **traffic analysis** may still observe connection timing a
 | Expectation | Notes |
 |-------------|--------|
 | Product host | **82.221.101.241** |
-| Public catalog | **0.3.1** paid installers on [status host](https://restoreprivacy.online/) (£2.45; no free GitHub release downloads) |
+| Public catalog | **0.3.2** paid installers on [status host](https://restoreprivacy.online/) (£2.45; no free GitHub release downloads) |
 | Node pub pin | `1b126abf…` |
 | No `.priv` in public package trees | OK |
 
@@ -174,6 +174,6 @@ Re-run: `python3 scripts/run_security_audit.py --write`
 |------|--|
 | Output | `AUDIT.md` (repo root); served as `/AUDIT.md` and `/audit.md` on status page |
 | Related | `PRIVACY_POLICY.md`, `README.md`, `scripts/run_security_audit.py` |
-| Code baseline | Catalog **0.3.1** + node **82.221.101.241** |
+| Code baseline | Catalog **0.3.2** + node **82.221.101.241** |
 | Pass date | **21 July 2026** |
 | Machine JSON | `status_page/static/security_audit_latest.json` (when `--write`) |

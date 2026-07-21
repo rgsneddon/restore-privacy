@@ -45,12 +45,12 @@ class TestAuditMd(unittest.TestCase):
     def test_audit_has_severity_and_version(self):
         text = AUDIT.read_text(encoding="utf-8")
         # Current paid catalog
-        self.assertIn("0.3.1", text)
+        self.assertIn("0.3.2", text)
         self.assertIn("82.221.101.241", text)
         self.assertIn("private", text.lower())
         self.assertIn("restoreprivacy.online", text)
         self.assertNotIn("public packages + operator tree", text)
-        self.assertNotIn("tests_0.3.1.log", text)
+        self.assertNotIn("tests_0.3.2.log", text)
         # Severity labels used in findings
         for sev in ("High", "Medium", "Low", "Info"):
             self.assertIn(sev, text)

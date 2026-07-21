@@ -40,7 +40,7 @@ class TestMacosSignNotarizeScript(unittest.TestCase):
         self.assertIn("embedded.provisionprofile", text)
 
     def test_release_package_script_calls_sign_and_notarize(self):
-        rel = ROOT / "scripts" / "build_release_0.3.1.py"
+        rel = ROOT / "scripts" / "build_release_0.3.2.py"
         self.assertTrue(rel.is_file())
         text = rel.read_text(encoding="utf-8")
         self.assertIn("sign_and_notarize_macos", text)
