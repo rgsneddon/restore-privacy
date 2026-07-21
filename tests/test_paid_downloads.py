@@ -31,6 +31,7 @@ from downloads import (  # noqa: E402
 
 class TestPaidDownloadUI(unittest.TestCase):
     def test_buttons_are_paid_not_free_github_href(self):
+        # Default catalog mode is Coming soon (self-link); live Stripe via coming_soon=False
         html = render_download_section_html()
         self.assertIn("£2.45", html)
         self.assertIn("GBP", html)
@@ -39,35 +40,42 @@ class TestPaidDownloadUI(unittest.TestCase):
         self.assertIn(BMC_TIP_URL, html)
         self.assertIn("buymeacoffee.com/rgsneddon", html)
         self.assertIn("Tip / support", html)
+        self.assertIn("Download client v0.3.4", html)
+        self.assertIn("Windows | Linux | macOS | iOS | Android", html)
+        self.assertNotIn('href="#"', html)
+        self.assertNotIn("catalog-version", html)
+        for a in available_downloads():
+            self.assertNotIn(f'href="{a.url}"', html)  # never free GitHub release href
+            self.assertNotIn(f'href="/pay?platform={a.platform}"', html)
+
         pay_base = payments.stripe_payment_page_url()
         self.assertEqual(
             pay_base, "https://donate.stripe.com/cNi7sM4uOeWQ9TBe0q7kc00"
         )
+        live = render_download_section_html(coming_soon=False)
+        self.assertIn('data-buy-mode="stripe-live"', live)
+        self.assertIn('data-pay-via="stripe-payment-page"', live)
         for a in available_downloads():
             href = payments.stripe_payment_page_href_for_platform(a.platform)
-            self.assertIn(f'href="{href}"', html)
+            self.assertIn(f'href="{href}"', live)
             self.assertIn(f"client_reference_id={a.platform}", href)
             self.assertIn("donate.stripe.com", href)
-            self.assertNotIn(f'href="{a.url}"', html)
-            self.assertNotIn(f'href="/pay?platform={a.platform}"', html)
-        self.assertNotIn('href="#"', html)
-        self.assertNotIn("catalog-version", html)
-        self.assertNotIn("paid download only", html)
-        # Version still in section h2; platforms in subtitle
-        self.assertIn("Download client v0.3.4", html)
-        self.assertIn("Windows | Linux | macOS | iOS | Android", html)
-        self.assertIn("data-pay-via=\"stripe-payment-page\"", html)
+            self.assertNotIn(f'href="{a.url}"', live)
 
     def test_status_page_html_paid_flow(self):
         page = status_app.render_html({"title": "RESTORE PRIVACY"}).decode("utf-8")
-        self.assertIn("donate.stripe.com/cNi7sM4uOeWQ9TBe0q7kc00", page)
-        self.assertIn("client_reference_id=windows", page)
         self.assertIn("£2.45", page)
         self.assertIn(BMC_TIP_URL, page)
+        # Default Coming soon: no free GitHub installer links
         self.assertNotIn(
             'href="https://github.com/rgsneddon/restore-privacy/releases/download/0.3.4/restore-privacy-client-0.3.4-windows-x64-setup.exe"',
             page,
         )
+        self.assertIn("coming soon", page.lower())
+        # Live Stripe payment-page path still available when Coming soon is off
+        live = render_download_section_html(coming_soon=False)
+        self.assertIn("donate.stripe.com/cNi7sM4uOeWQ9TBe0q7kc00", live)
+        self.assertIn("client_reference_id=windows", live)
 
 
 class TestCheckoutAmount(unittest.TestCase):
@@ -743,8 +751,9 @@ class TestProcessorSettingsView(unittest.TestCase):
         )
         self.assertNotIn(secret, html)
         self.assertNotIn(webhook, html)
-        self.assertNotIn("sk_test_", html)
-        self.assertNotIn("whsec_", html)
+        # Admin howto may show sk_test_… / whsec_… prefixes; ban real-looking values only
+        self.assertNotRegex(html, r"sk_(?:live|test)_[A-Za-z0-9]{10,}")
+        self.assertNotRegex(html, r"whsec_[A-Za-z0-9]{10,}")
 
     def test_live_mode_label(self):
         os.environ["STRIPE_SECRET_KEY"] = "sk_live_UNIT_FAKE"
@@ -784,10 +793,9 @@ class TestAdminHtmlArchitecture(unittest.TestCase):
         self.assertIn("245", html)
         self.assertIn("bmc-tip-url", html)
         self.assertIn("stripe-checkout-ready", html)
-        # No secret material
-        self.assertNotIn("sk_live_", html)
-        self.assertNotIn("sk_test_", html)
-        self.assertNotIn("whsec_", html)
+        # Guide may show prefix+ellipsis; ban real-looking secret values only
+        self.assertNotRegex(html, r"sk_(?:live|test)_[A-Za-z0-9]{10,}")
+        self.assertNotRegex(html, r"whsec_[A-Za-z0-9]{10,}")
         self.assertNotIn("admin-arch", html)  # password must not appear
 
     def test_project_grants_uses_real_store(self):
@@ -982,6 +990,9 @@ class TestPrivateRepoProxyFulfilment(unittest.TestCase):
     def test_open_release_asset_github_api_sends_auth_header(self):
         fname = "restore-privacy-client-0.3.4-windows-x64-setup.exe"
         os.environ["RPT_GITHUB_TOKEN"] = "unit-test-token"
+        # Force GitHub path: no local files, no VPS token (default base would intercept)
+        os.environ.pop("RPT_ASSET_FETCH_TOKEN", None)
+        os.environ.pop("RPT_VPS_ASSET_TOKEN", None)
         # Empty search dirs so we do not pick up real releases/0.3.4 on disk
         os.environ["RPT_ASSET_DIR"] = str(Path(self._td.name) / "empty_assets")
         Path(os.environ["RPT_ASSET_DIR"]).mkdir(parents=True, exist_ok=True)
@@ -1012,7 +1023,8 @@ class TestPrivateRepoProxyFulfilment(unittest.TestCase):
             url = req.full_url if hasattr(req, "full_url") else req.get_full_url()
             headers = {k.lower(): v for k, v in req.header_items()}
             seen.append((url, headers.get("authorization", "")))
-            if url.endswith("/releases/tags/0.3.0"):
+            # RELEASE_TAG pin is 0.3.4 (catalog monopin)
+            if "/releases/tags/0.3.4" in url:
                 body = json.dumps(
                     {"assets": [{"name": fname, "id": 424242}]}
                 ).encode()

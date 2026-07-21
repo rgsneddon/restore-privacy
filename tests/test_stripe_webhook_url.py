@@ -46,9 +46,9 @@ class TestStripeWebhookEndpointUrl(unittest.TestCase):
         self.assertIn(PROD_WEBHOOK, html)
         self.assertIn("checkout.session.completed", html)
         self.assertIn("stripe-webhook-endpoint-url", html)
-        self.assertNotIn("whsec_", html)
-        self.assertNotIn("sk_live_", html)
-        self.assertNotIn("sk_test_", html)
+        # Admin key howto may document prefixes (whsec_… / sk_test_…); ban real values only
+        self.assertNotRegex(html, r"sk_(?:live|test)_[A-Za-z0-9]{10,}")
+        self.assertNotRegex(html, r"whsec_[A-Za-z0-9]{10,}")
 
     def test_app_routes_webhook_path(self):
         import app as status_app
