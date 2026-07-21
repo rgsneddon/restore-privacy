@@ -46,6 +46,23 @@ This environment cannot flip visibility without `gh auth` / `GH_TOKEN`.
 
 Paid installers for **each device** (windows / android / macos / ios / linux) are hosted on the product VPS and streamed by the status host after Stripe pays.
 
+### Every commit: assure current per-device packages
+
+Install once per clone so **each commit** fails if catalog pin / `client/VERSION` /
+five device filenames drift (buyers always get the **current** package identity):
+
+```bash
+python scripts/install_commit_package_task.py
+# or: python scripts/install_commit_package_task.py --force
+
+# Manual check / list
+python scripts/assure_current_packages.py --check
+python scripts/assure_current_packages.py --list
+```
+
+After a real release version bump, re-stage and upload to Iceland
+(`host_paid_assets_vps.py`) so fulfilment binaries match the new pin.
+
 ### Operator: collect + host on Iceland (`82.221.101.241`)
 
 ```bash

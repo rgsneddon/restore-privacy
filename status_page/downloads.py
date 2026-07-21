@@ -60,6 +60,80 @@ def catalog_matches_product_pin() -> bool:
     return pin == current_catalog_version()
 
 
+REQUIRED_CATALOG_PLATFORMS: tuple[str, ...] = (
+    "windows",
+    "android",
+    "macos",
+    "ios",
+    "linux",
+)
+
+
+def assure_current_catalog_packages() -> dict[str, object]:
+    """Imperative check: paid downloads bind only the **current** per-device packages.
+
+    Returns a dict::
+        {
+          "ok": bool,
+          "catalog_version": str,
+          "product_pin": str | None,
+          "platforms": list[dict],  # from list_catalog_platform_packages()
+          "errors": list[str],
+        }
+
+    Failures (ok=False) include: catalog pin ≠ client/VERSION, fewer/more than
+    five device platforms, filename missing current version, or stale platform.
+    Safe for every commit (no network, no SSH, no binary rebuild).
+    """
+    errors: list[str] = []
+    catalog = current_catalog_version()
+    pin = product_client_version()
+    if pin is not None and pin != catalog:
+        errors.append(
+            f"catalog pin {catalog!r} does not match client/VERSION {pin!r} "
+            f"— bump RELEASE_VERSION / RELEASE_TAG / filenames together"
+        )
+    pkgs = list_catalog_platform_packages()
+    platforms = [p["platform"] for p in pkgs]
+    if len(pkgs) != len(REQUIRED_CATALOG_PLATFORMS):
+        errors.append(
+            f"expected {len(REQUIRED_CATALOG_PLATFORMS)} device packages, got {len(pkgs)}"
+        )
+    for need in REQUIRED_CATALOG_PLATFORMS:
+        if need not in platforms:
+            errors.append(f"missing platform package: {need}")
+    seen: set[str] = set()
+    for p in pkgs:
+        plat = p["platform"]
+        fname = p["filename"]
+        ver = p["version"]
+        if plat in seen:
+            errors.append(f"duplicate platform entry: {plat}")
+        seen.add(plat)
+        if ver != catalog:
+            errors.append(f"platform {plat}: version {ver!r} != catalog {catalog!r}")
+        if catalog not in fname:
+            errors.append(
+                f"platform {plat}: filename {fname!r} missing catalog version {catalog!r}"
+            )
+        if not fname.startswith(f"restore-privacy-client-{catalog}-"):
+            errors.append(
+                f"platform {plat}: filename {fname!r} is not current-catalog pattern"
+            )
+        if not is_current_catalog_filename(fname) and ver == RELEASE_VERSION:
+            errors.append(f"platform {plat}: {fname!r} not in current RELEASE_ASSETS")
+    # RELEASE_TAG must match catalog for bookkeeping URLs
+    if RELEASE_TAG != catalog:
+        errors.append(f"RELEASE_TAG {RELEASE_TAG!r} != catalog version {catalog!r}")
+    return {
+        "ok": not errors,
+        "catalog_version": catalog,
+        "product_pin": pin,
+        "platforms": pkgs,
+        "errors": errors,
+    }
+
+
 # Canonical public asset filenames (must match GitHub Release 0.3.0 assets).
 WINDOWS_EXE_FILENAME = f"restore-privacy-client-{RELEASE_VERSION}-windows-x64-setup.exe"
 ANDROID_APK_FILENAME = f"restore-privacy-client-{RELEASE_VERSION}-android.apk"
