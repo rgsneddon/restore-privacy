@@ -5,7 +5,7 @@ Restore Privacy is built from the ground up using unashamed vibe coding methods 
 
 | | |
 |--|--|
-| **Get the app** | [Status & paid downloads](https://restoreprivacy.online/) (catalog **v0.3.3**, £2.45 per package) |
+| **Get the app** | [Status & paid downloads](https://restoreprivacy.online/) (catalog **v0.3.4**, £2.45 per package) |
 | **Privacy** | [PRIVACY_POLICY.md](PRIVACY_POLICY.md) |
 | **License** | [LICENSE](LICENSE) (MIT) |
 | **Credits** | [CREDITS.md](CREDITS.md) |
@@ -31,7 +31,9 @@ Restore Privacy is built from the ground up using unashamed vibe coding methods 
 - **Restore Internet** failsafe in every catalog installer (network restore + complete product removal) — see warning below
 - Public payment portal with seamless flow to downloadable installer package
 - **No third-party geo lookup** on Connect (admission is cryptographic only)
-- Connect uses the standard **HELLO** residual path (**flyclient** fast-path removed in catalog **v0.3.3**)
+- Connect uses the standard **HELLO** residual path (**flyclient** fast-path removed in catalog **v0.3.4**)
+- **Node-only** optional **zram + LUKS2** encrypted RAM volume for host data (`node/install_zram_luks.sh`) — **not** client encryption; residual Connect unchanged
+- Optional node **LUKS2 disk** data-at-rest (`node/install_disk_encryption.sh`) — at-rest only
 - Session **PFS** (ephemeral X25519) on residual HELLO for all product clients (Python Windows/Linux, Android, iOS/macOS Packet Tunnel)
 - **Layer obfuscation** (QUIC-mimic outer wrap around RPT frames) **on by default on every residual path** (`RPT_OBFS=0` to opt out on Python; native product constants default on) — mitigation, not DPI-undetectability
 - **Product traffic shaping** (padding / send jitter / cover) **on by default on every residual path** — Windows/Linux Python (`RPT_TRAFFIC_SHAPE=0` to opt out), Android VPN service, and Apple Packet Tunnel (pad bucket 128, cover ~2s, jitter ≤40ms)
@@ -43,7 +45,7 @@ Restore Privacy is built from the ground up using unashamed vibe coding methods 
 
 ## How to install and use
 
-**Current catalog (v0.3.3):** pay-per-package installers on https://restoreprivacy.online/ (£2.45 GBP via Stripe).  
+**Current catalog (v0.3.4):** pay-per-package installers on https://restoreprivacy.online/ (£2.45 GBP via Stripe).  
 The product source repository is **private**; free permanent GitHub release downloads are not offered. After payment the status site delivers the installer once (authenticated proxy).
 
 > **STRONG DISCLAIMER — PAYMENT REQUIRED FOR CONNECT:** Access to **Connect** and residual VPN use requires **successful payment**. If payment **fails at any time** (failed checkout, failed charge, refund, dispute, or revoked entitlement), the ability to **Connect with the Restore Privacy app is cancelled** for that purchase/install until a successful payment is completed.
@@ -52,15 +54,15 @@ The product source repository is **private**; free permanent GitHub release down
 
 | Platform | Package |
 |----------|---------|
-| Windows | `restore-privacy-client-0.3.3-windows-x64-setup.exe` |
-| Android | `restore-privacy-client-0.3.3-android.apk` |
-| macOS | `restore-privacy-client-0.3.3-macos.zip` *(Developer ID signed + notarized)* |
-| iOS | `restore-privacy-client-0.3.3-ios.zip` *(Team-signed sideload)* |
-| Ubuntu / Linux | `restore-privacy-client-0.3.3-linux-x64.tar.gz` |
+| Windows | `restore-privacy-client-0.3.4-windows-x64-setup.exe` |
+| Android | `restore-privacy-client-0.3.4-android.apk` |
+| macOS | `restore-privacy-client-0.3.4-macos.zip` *(Developer ID signed + notarized)* |
+| iOS | `restore-privacy-client-0.3.4-ios.zip` *(Team-signed sideload)* |
+| Ubuntu / Linux | `restore-privacy-client-0.3.4-linux-x64.tar.gz` |
 
 ### Windows
 
-1. On the [status downloads page](https://restoreprivacy.online/), pay **£2.45** for **Windows** and download **`restore-privacy-client-0.3.3-windows-x64-setup.exe`** (one-time link after payment).
+1. On the [status downloads page](https://restoreprivacy.online/), pay **£2.45** for **Windows** and download **`restore-privacy-client-0.3.4-windows-x64-setup.exe`** (one-time link after payment).
 2. Run the installer (PE self-extracting package: frozen runtime + Wintun — no separate Python install). The package may extract as a portable tree or install under LocalAppData.
 3. Open **Settings → Payment entitlement**, paste the Checkout session id from the thank-you page (or import `payment_entitlement.json`), and **Verify payment** so Connect is allowed.
 4. Press **Connect** and approve **UAC** when prompted so residual public IP uses the VPN node. Scoped **Windows Defender Firewall** allows (node UDP + program) may be applied for residual Connect.
@@ -69,7 +71,7 @@ The product source repository is **private**; free permanent GitHub release down
 
 ### Android
 
-1. On the [status downloads page](https://restoreprivacy.online/), pay **£2.45** for **Android** and download **`restore-privacy-client-0.3.3-android.apk`** (one-time link after payment).
+1. On the [status downloads page](https://restoreprivacy.online/), pay **£2.45** for **Android** and download **`restore-privacy-client-0.3.4-android.apk`** (one-time link after payment).
 2. Install the APK (allow install from unknown sources if your device asks). Catalog APK includes residual wire (**PFS + outer obfs**).
 3. Open **Restore Privacy** → **Settings → Payment entitlement**, paste the Checkout session id and **Verify payment**.
 4. Press **Connect**, and grant **VPN** permission when prompted.
@@ -78,10 +80,10 @@ The product source repository is **private**; free permanent GitHub release down
 
 ### Ubuntu and derivatives (Linux Mint, Pop!_OS, …)
 
-1. On the [status downloads page](https://restoreprivacy.online/), pay **£2.45** for **Linux** and download **`restore-privacy-client-0.3.3-linux-x64.tar.gz`** (one-time link after payment).
+1. On the [status downloads page](https://restoreprivacy.online/), pay **£2.45** for **Linux** and download **`restore-privacy-client-0.3.4-linux-x64.tar.gz`** (one-time link after payment).
 2. Unpack and run the bundled installer:
    ```bash
-   tar xzf restore-privacy-client-0.3.3-linux-x64.tar.gz
+   tar xzf restore-privacy-client-0.3.4-linux-x64.tar.gz
    cd restore-privacy-*-linux   # package folder name from the archive
    bash install.sh
    ```
@@ -90,19 +92,19 @@ The product source repository is **private**; free permanent GitHub release down
 
 ### macOS
 
-Published **v0.3.3** macOS builds are **Developer ID signed and notarized**.
+Published **v0.3.4** macOS builds are **Developer ID signed and notarized**.
 
-1. On the [status downloads page](https://restoreprivacy.online/), pay **£2.45** for **macOS** and download **`restore-privacy-client-0.3.3-macos.zip`** (one-time link after payment).
+1. On the [status downloads page](https://restoreprivacy.online/), pay **£2.45** for **macOS** and download **`restore-privacy-client-0.3.4-macos.zip`** (one-time link after payment).
 2. Unzip and open **`restore_privacy_client.app`**.
 3. Press **Connect** and approve the **VPN configuration** prompt.
-4. Residual public IP only changes when the Packet Tunnel is **active**. Host-only HELLO is **diagnostic** only. Residual public-IP via Packet Tunnel on a developer Mac still needs **Team residual re-sign** (`scripts/sign_macos_residual_team.py`) — the public Developer ID zip alone is not full host-NE residual (see `client_app/APPLE_HANDOFF_0.3.3.md`). **Disconnect** / **Quit** stops the system VPN.
+4. Residual public IP only changes when the Packet Tunnel is **active**. Host-only HELLO is **diagnostic** only. Residual public-IP via Packet Tunnel on a developer Mac still needs **Team residual re-sign** (`scripts/sign_macos_residual_team.py`) — the public Developer ID zip alone is not full host-NE residual (see `client_app/APPLE_HANDOFF_0.3.4.md`). **Disconnect** / **Quit** stops the system VPN.
 5. Failsafe: run **`Restore Internet.command`** in the package (or follow VPN Settings cleanup) — see warning below.
 
 ### iOS
 
-Published **v0.3.3** iOS packages are **Team-signed sideload** zips (not App Store).
+Published **v0.3.4** iOS packages are **Team-signed sideload** zips (not App Store).
 
-1. On the [status downloads page](https://restoreprivacy.online/), pay **£2.45** for **iOS** and download **`restore-privacy-client-0.3.3-ios.zip`** (one-time link after payment).
+1. On the [status downloads page](https://restoreprivacy.online/), pay **£2.45** for **iOS** and download **`restore-privacy-client-0.3.4-ios.zip`** (one-time link after payment).
 2. Install **`Runner.app`** with device tooling; press **Connect** and grant **VPN** permission.
 3. Residual public IP only changes when the Packet Tunnel is **active**.
 4. Complete removal: follow **`Restore Internet.txt`** (Settings → VPN / Delete App) — see warning below.
@@ -111,7 +113,7 @@ Published **v0.3.3** iOS packages are **Team-signed sideload** zips (not App Sto
 
 https://restoreprivacy.online/
 
-- **Pay £2.45** buttons for Windows, Android, macOS, iOS, Linux — catalog **v0.3.3**  
+- **Pay £2.45** buttons for Windows, Android, macOS, iOS, Linux — catalog **v0.3.4**  
 - Installers are delivered **after payment** (single-use link); the product repo is private  
 - **No** public live session / connected-client counter  
 - A browser tab cannot run full system VPN
@@ -181,7 +183,7 @@ Node deploy, ports, secrets, from-source builds, and tests: **[sundries.txt](sun
 
 **Post-quantum readiness:** staged hybrid Kyber/ML-KEM hook in `node/pq_hybrid.py` + plan [`docs/PQ_MIGRATION.md`](docs/PQ_MIGRATION.md) (not residual PQ on the wire until dual-wire + real ML-KEM).
 
-**Product ship (v0.3.3):** Paid installers on **[status downloads](https://restoreprivacy.online/)** (macOS Developer ID notarized; iOS Team-signed). Source repo is private. Production node **82.221.101.241:44044** (**Iceland**, **FlokiNET** VPS; host public **no invasive logs** stance as far as we can be assured — see privacy policy).
+**Product ship (v0.3.4):** Paid installers on **[status downloads](https://restoreprivacy.online/)** (macOS Developer ID notarized; iOS Team-signed). Source repo is private. Production node **82.221.101.241:44044** (**Iceland**, **FlokiNET** VPS; host public **no invasive logs** stance as far as we can be assured — see privacy policy).
 
 **Self-host (one shot):** `sudo bash scripts/selfhost_node.sh` — node install + tunnel DNS + host privacy. Deploy remote: `python scripts/deploy_rpt_node.py` (`RPT_SSH_HOST`, `RPT_SSH_USER`, key). Details: [sundries.txt](sundries.txt).
 
@@ -189,9 +191,11 @@ Node deploy, ports, secrets, from-source builds, and tests: **[sundries.txt](sun
 
 **Data at rest (LUKS / dm-crypt):** [node/install_disk_encryption.sh](node/install_disk_encryption.sh) — `check` / `dry-run` / confirmed `format`. Combines with **no-logs** and [shutdown wipe](node/install_shutdown_wipe.sh) (runtime scrub on stop; optional aggressive secrets wipe). Honesty: FDE protects locked disks only; does not erase provider snapshots.
 
+**Ram-only node volume (zram + LUKS2):** [node/install_zram_luks.sh](node/install_zram_luks.sh) — `check` / `dry-run` / `status` / confirm-gated `format` (`RPT_ZRAM_LUKS_CONFIRM=yes`). **Node-host only** — clients never install LUKS/zram; residual Connect is unchanged. Honesty: encrypted RAM-backed volume, not full live-root secrecy, not client FDE, not erasure of VPS provider snapshots/netflow.
+
 **Ephemeral / short-lived nodes:** [scripts/ephemeral_node.py](scripts/ephemeral_node.py) — **periodic** VPS **snapshot** and/or **rebuild** plan (`--dry-run` by default). Install timer: [scripts/install_ephemeral_timer.sh](scripts/install_ephemeral_timer.sh). Live rebuild requires `RPT_EPHEMERAL_CONFIRM=yes`. Rebuild re-runs self-host (no-log). Does not erase provider backups/netflow; re-ship **public** node pin if keys rotate.
 
-**Release scripts:** `scripts/build_release_0.3.3.py`. Apple handoff: [`client_app/APPLE_HANDOFF_0.3.3.md`](client_app/APPLE_HANDOFF_0.3.3.md). Release notes: [`scripts/RELEASE_NOTES_0.3.3.md`](scripts/RELEASE_NOTES_0.3.3.md).
+**Release scripts:** `scripts/build_release_0.3.4.py`. Apple handoff: [`client_app/APPLE_HANDOFF_0.3.4.md`](client_app/APPLE_HANDOFF_0.3.4.md). Release notes: [`scripts/RELEASE_NOTES_0.3.4.md`](scripts/RELEASE_NOTES_0.3.4.md).
 
 ```bash
 # Windows GUI (requires system Python)
@@ -204,5 +208,5 @@ sudo PYTHONPATH=. python3 -m client.linux
 python scripts/package_linux.py  # manylinux wheels for CPython 3.8–3.12; re-run each release
 
 # Release packages (current tag)
-python scripts/build_release_0.3.3.py
+python scripts/build_release_0.3.4.py
 ```

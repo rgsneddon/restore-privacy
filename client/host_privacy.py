@@ -111,7 +111,7 @@ def _fetch_url(url: str, timeout: float = 12.0) -> str:
     req = urllib.request.Request(
         url,
         headers={
-            "User-Agent": "RestorePrivacy-host-privacy-probe/0.3.3 (+https://restoreprivacy.online/)",
+            "User-Agent": "RestorePrivacy-host-privacy-probe/0.3.4 (+https://restoreprivacy.online/)",
             "Accept": "text/html,application/xhtml+xml,text/plain;q=0.9,*/*;q=0.8",
         },
         method="GET",

@@ -7,7 +7,7 @@ class RptConfig {
   static const String sessionName = 'Privacy Restored';
 
   /// Product pin — must match monorepo ``client/VERSION`` and pubspec version.
-  static const String productVersion = '0.3.3';
+  static const String productVersion = '0.3.4';
 
   /// Full tunnel: all device traffic (0.0.0.0/0).
   static const bool fullTunnel = true;

@@ -43,6 +43,7 @@ class TestDeployPrivacyPrereqs(unittest.TestCase):
             "install_dns.sh",
             "install_host_privacy.sh",
             "install_disk_encryption.sh",
+            "install_zram_luks.sh",
             "install_shutdown_wipe.sh",
             "rpt_shutdown_wipe.sh",
             "unbound-rpt.conf",
@@ -75,6 +76,7 @@ class TestDeployPrivacyPrereqs(unittest.TestCase):
         self.assertIn("install_host_privacy.sh", src)
         self.assertIn("install_dns.sh", src)
         self.assertIn("install_disk_encryption.sh", src)
+        self.assertIn("install_zram_luks.sh", src)
         self.assertIn("install_shutdown_wipe.sh", src)
         self.assertIn("rpt_shutdown_wipe.sh", src)
         self.assertIn("status_title_only", src)
@@ -86,6 +88,7 @@ class TestDeployPrivacyPrereqs(unittest.TestCase):
     def test_host_privacy_still_composes_fde_wipe(self):
         host = (ROOT / "node" / "install_host_privacy.sh").read_text(encoding="utf-8")
         self.assertIn("install_disk_encryption.sh", host)
+        self.assertIn("install_zram_luks.sh", host)
         self.assertIn("install_shutdown_wipe.sh", host)
 
     def test_nolog_flags_still_false(self):
@@ -113,6 +116,7 @@ class TestDeployAstLists(unittest.TestCase):
         self.assertIsNotNone(found)
         for name in (
             "install_disk_encryption.sh",
+            "install_zram_luks.sh",
             "install_shutdown_wipe.sh",
             "rpt_shutdown_wipe.sh",
         ):

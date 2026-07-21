@@ -51,6 +51,10 @@ if [[ "${SKIP_DISK_ENCRYPTION:-0}" != "1" ]] && [[ -f "${SCRIPT_DIR}/install_dis
   echo "[rpt-host-privacy] disk encryption check (LUKS/dm-crypt; non-destructive)"
   bash "${SCRIPT_DIR}/install_disk_encryption.sh" check || true
 fi
+if [[ "${SKIP_ZRAM_LUKS:-0}" != "1" ]] && [[ -f "${SCRIPT_DIR}/install_zram_luks.sh" ]]; then
+  echo "[rpt-host-privacy] zram+LUKS2 ram-volume check (node-only; non-destructive)"
+  bash "${SCRIPT_DIR}/install_zram_luks.sh" check || true
+fi
 if [[ "${SKIP_SHUTDOWN_WIPE:-0}" != "1" ]] && [[ -f "${SCRIPT_DIR}/install_shutdown_wipe.sh" ]]; then
   if [[ "$(id -u)" -eq 0 ]]; then
     echo "[rpt-host-privacy] install shutdown/stop auto-wipe (best-effort runtime scrub)"
@@ -61,5 +65,5 @@ if [[ "${SKIP_SHUTDOWN_WIPE:-0}" != "1" ]] && [[ -f "${SCRIPT_DIR}/install_shutd
     echo "[rpt-host-privacy] skip wipe install (not root)"
   fi
 fi
-echo "[rpt-host-privacy] compose: no-logs + optional LUKS at-rest + wipe on stop/shutdown"
+echo "[rpt-host-privacy] compose: no-logs + optional LUKS at-rest / zram+LUKS2 + wipe on stop/shutdown"
 echo "[rpt-host-privacy] done"

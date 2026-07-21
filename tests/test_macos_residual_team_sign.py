@@ -97,11 +97,11 @@ class TestMacosResidualTeamSign(unittest.TestCase):
 
     def test_catalog_handoff_and_build_docs_name_team_residual_resign(self):
         """Operator-facing residual docs: Packet Tunnel residual needs Team re-sign."""
-        handoff = (ROOT / "client_app" / "APPLE_HANDOFF_0.3.3.md").read_text(
+        handoff = (ROOT / "client_app" / "APPLE_HANDOFF_0.3.4.md").read_text(
             encoding="utf-8"
         )
         build = (ROOT / "client_app" / "APPLE_BUILD.md").read_text(encoding="utf-8")
-        for label, text in (("APPLE_HANDOFF_0.3.3.md", handoff), ("APPLE_BUILD.md", build)):
+        for label, text in (("APPLE_HANDOFF_0.3.4.md", handoff), ("APPLE_BUILD.md", build)):
             with self.subTest(doc=label):
                 self.assertIn("scripts/sign_macos_residual_team.py", text)
                 self.assertIn("Team residual", text)

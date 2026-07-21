@@ -1,11 +1,11 @@
 {
-  "generated_at": "2026-07-21T10:47:19Z",
+  "generated_at": "2026-07-21T14:01:51Z",
   "node_host": "82.221.101.241",
-  "catalog_version": "0.3.3",
+  "catalog_version": "0.3.4",
   "unit_suite": {
     "ran": true,
-    "ok": true,
-    "returncode": 0,
+    "ok": false,
+    "returncode": 1,
     "modules": [
       "tests.test_legal_links",
       "tests.test_legal_docs",
@@ -41,70 +41,77 @@
   },
   "no_priv": {
     "ok": true,
-    "hits": []
+    "hits": [],
+    "scanned_roots": 6,
+    "warn": false,
+    "skipped": false,
+    "reasons": [
+      "scanned_roots=6",
+      "hits=0"
+    ]
   },
   "package_rag": {
-    "catalog_version": "0.3.3",
+    "catalog_version": "0.3.4",
     "pin": "1b126abfae737c66ce99670b730e123f2831ce5beb2868d7865324f391280bbe",
     "packages": [
       {
         "platform": "windows",
         "label": "Windows",
-        "filename": "restore-privacy-client-0.3.3-windows-x64-setup.exe",
+        "filename": "restore-privacy-client-0.3.4-windows-x64-setup.exe",
         "state": "Green",
         "reasons": [
           "node_elgamal.pub pin matches product monopin",
           "PE/MZ magic OK"
         ],
-        "path": "/Users/russellsneddon/restore-privacy/releases/0.3.3/restore-privacy-client-0.3.3-windows-x64-setup.exe",
+        "path": "/Users/russellsneddon/restore-privacy/releases/0.3.4/restore-privacy-client-0.3.4-windows-x64-setup.exe",
         "bytes": 12870677
       },
       {
         "platform": "linux",
         "label": "Linux",
-        "filename": "restore-privacy-client-0.3.3-linux-x64.tar.gz",
+        "filename": "restore-privacy-client-0.3.4-linux-x64.tar.gz",
         "state": "Green",
         "reasons": [
           "node_elgamal.pub pin matches product monopin",
           "archive present (structural residual gates N/A in this pass)"
         ],
-        "path": "/Users/russellsneddon/restore-privacy/releases/0.3.3/restore-privacy-client-0.3.3-linux-x64.tar.gz",
-        "bytes": 14291286
+        "path": "/Users/russellsneddon/restore-privacy/releases/0.3.4/restore-privacy-client-0.3.4-linux-x64.tar.gz",
+        "bytes": 14293532
       },
       {
         "platform": "macos",
         "label": "macOS",
-        "filename": "restore-privacy-client-0.3.3-macos.zip",
+        "filename": "restore-privacy-client-0.3.4-macos.zip",
         "state": "Green",
         "reasons": [
           "node_elgamal.pub pin matches product monopin",
           "archive present (structural residual gates N/A in this pass)"
         ],
-        "path": "/Users/russellsneddon/restore-privacy/releases/0.3.3/restore-privacy-client-0.3.3-macos.zip",
-        "bytes": 51999448
+        "path": "/Users/russellsneddon/restore-privacy/releases/0.3.4/restore-privacy-client-0.3.4-macos.zip",
+        "bytes": 18818223
       },
       {
         "platform": "ios",
         "label": "iOS",
-        "filename": "restore-privacy-client-0.3.3-ios.zip",
+        "filename": "restore-privacy-client-0.3.4-ios.zip",
         "state": "Green",
         "reasons": [
           "node_elgamal.pub pin matches product monopin",
           "archive present (structural residual gates N/A in this pass)"
         ],
-        "path": "/Users/russellsneddon/restore-privacy/releases/0.3.3/restore-privacy-client-0.3.3-ios.zip",
-        "bytes": 8016800
+        "path": "/Users/russellsneddon/restore-privacy/releases/0.3.4/restore-privacy-client-0.3.4-ios.zip",
+        "bytes": 7996339
       },
       {
         "platform": "android",
         "label": "Android",
-        "filename": "restore-privacy-client-0.3.3-android.apk",
+        "filename": "restore-privacy-client-0.3.4-android.apk",
         "state": "Green",
         "reasons": [
           "node_elgamal.pub pin matches product monopin",
           "Android residual wire (PFS + outer obfs) present"
         ],
-        "path": "/Users/russellsneddon/restore-privacy/releases/0.3.3/restore-privacy-client-0.3.3-android.apk",
+        "path": "/Users/russellsneddon/restore-privacy/releases/0.3.4/restore-privacy-client-0.3.4-android.apk",
         "bytes": 48046085
       }
     ],
@@ -115,5 +122,121 @@
       "Red": "Missing, embeds *.priv, pin mismatch, or failed structural gate (e.g. non-PE Windows)"
     }
   },
-  "overall_ok": true
+  "section_b": {
+    "probes": {
+      "nolog_journald": {
+        "ok": true,
+        "warn": false,
+        "skipped": true,
+        "reasons": [
+          "rpt-node.json/conf not present (non-node host)",
+          "rpt-node.service unit not on this host"
+        ],
+        "directives": [
+          "StandardOutput=null",
+          "StandardError=null",
+          "SyslogIdentifier=",
+          "LogLevelMax=emerg"
+        ]
+      },
+      "no_priv_public_trees": {
+        "ok": true,
+        "warn": false,
+        "skipped": false,
+        "reasons": [
+          "scanned_roots=6",
+          "hits=0"
+        ],
+        "hits": [],
+        "scanned_roots": 6
+      },
+      "kill_switch_default_off": {
+        "ok": true,
+        "warn": false,
+        "skipped": false,
+        "reasons": [
+          "default_empty_env_enabled=False",
+          "current_env_enabled=False",
+          "kill-switch default off (product residual)"
+        ],
+        "operator_opt_in": false
+      },
+      "title_only_status": {
+        "ok": true,
+        "warn": false,
+        "skipped": false,
+        "reasons": [
+          "title_only=True",
+          "body={'title': 'RESTORE PRIVACY'}"
+        ],
+        "title_only": true
+      },
+      "host_privacy_drift": {
+        "ok": true,
+        "warn": false,
+        "skipped": true,
+        "reasons": [
+          "journald drop-in 99-rpt-privacy.conf absent",
+          "rpt-node.service unit not on this host",
+          "install_host_privacy.sh recipe present in tree",
+          "non-node host (no unit/drop-in/log-dir artifacts)"
+        ],
+        "unit_present": false,
+        "dropin_present": false
+      },
+      "disk_wipe_readiness": {
+        "ok": true,
+        "warn": false,
+        "skipped": true,
+        "reasons": [
+          "cryptsetup not found (FDE tooling absent)",
+          "install_disk_encryption.sh present",
+          "install_zram_luks.sh present (node-only ram volume)",
+          "shutdown wipe script present",
+          "wipe unit not wired (optional on non-node hosts)",
+          "status-only: no LUKS format attempted"
+        ],
+        "cryptsetup": null,
+        "wipe_wired": false
+      },
+      "ephemeral_dry_run": {
+        "ok": true,
+        "warn": false,
+        "skipped": false,
+        "reasons": [
+          "ephemeral_node.py present",
+          "dry-run mode available",
+          "dry-run exit=0",
+          "dry-run completed"
+        ],
+        "dry_run_rc": 0
+      },
+      "firewall_expose_surface": {
+        "ok": true,
+        "skipped": true,
+        "warn": false,
+        "reasons": [
+          "intentionally excluded (OBJECTIVE: no firewall/expose-surface probe)"
+        ]
+      }
+    },
+    "ok": true,
+    "firewall_excluded": true,
+    "section": "B"
+  },
+  "audit_privacy": {
+    "localhost_required": false,
+    "outbound_allowed": true,
+    "probe_host_loopback": false,
+    "no_network_exfil": true,
+    "section_b": true,
+    "firewall_probe_excluded": true
+  },
+  "overall_ok": false,
+  "privacy": {
+    "redacted": true,
+    "no_suite_tails": true,
+    "no_network_exfil": true,
+    "note": "Audit artifacts are local-only; timer does not git-push or upload"
+  }
 }

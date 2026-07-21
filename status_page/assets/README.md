@@ -4,8 +4,12 @@ Catalog packages under `{VERSION}/` are served by the status host after payment
 (`open_release_asset` → local source). This keeps fulfilment working when the
 GitHub repo is private without requiring a runtime `RPT_GITHUB_TOKEN`.
 
-Current ship: **0.3.3** under `0.3.3/`. Keep prior version dirs only if needed for rollback.
+Current ship: **0.3.4** under `0.3.4/`. Keep prior version dirs only if needed for rollback.
 
-**0.3.3 staging:** Windows setup was rebuilt on this host; Android APK and Linux tarball match `releases/0.3.0` (see `releases/0.3.0/SHA256SUMS.json`). macOS and iOS zips are **byte-identical to 0.2.3 priors** staged when Apple toolchains were absent — they are not freshly rebuilt 0.3.0 clients; residual Packet Tunnel signing still needs Mac work for a true 0.3.0 Apple rebuild.
+**0.3.4 staging:** All five platform packages staged from `releases/0.3.4/` (Apple
+notarized macOS + Team-signed iOS when built on this host; Windows/Android/Linux
+may carry-forward prior binaries under **0.3.4** filenames — see
+`releases/0.3.4/manifest.json`). Node-only **zram + LUKS2** is a host deploy
+feature and does not change residual client packages.
 
 Do not put `*.priv` here. Re-stage from `releases/{VERSION}/` on each ship.

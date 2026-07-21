@@ -26,7 +26,7 @@ class TestDocsM1M2(unittest.TestCase):
 
 class TestReleaseGates(unittest.TestCase):
     def test_current_build_release_has_assert_no_priv(self):
-        script = (ROOT / "scripts" / "build_release_0.3.3.py").read_text(encoding="utf-8")
+        script = (ROOT / "scripts" / "build_release_0.3.4.py").read_text(encoding="utf-8")
         self.assertIn("_assert_no_priv", script)
         self.assertIn("def _assert_no_priv", script)
 
@@ -94,9 +94,9 @@ class TestAppleAndOps(unittest.TestCase):
         path = ROOT / "scripts" / "RELEASE.md"
         self.assertTrue(path.is_file())
         text = path.read_text(encoding="utf-8")
-        # Current monopin script must be documented (0.3.3+)
+        # Current monopin script must be documented (0.3.4+)
         self.assertTrue(
-            "build_release_0.3.3.py" in text or "build_release_0.3.0.py" in text,
+            "build_release_0.3.4.py" in text or "build_release_0.3.0.py" in text,
             "RELEASE.md must name a current build_release script",
         )
         self.assertIn("_assert_no_priv", text)

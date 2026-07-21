@@ -404,12 +404,18 @@ def probe_disk_wipe_readiness(
 
     # Script recipes
     enc_sh = repo / "node" / "install_disk_encryption.sh"
+    zram_sh = repo / "node" / "install_zram_luks.sh"
     wipe_sh = repo / "node" / "install_shutdown_wipe.sh"
     wipe_runtime = install / "node" / "rpt_shutdown_wipe.sh"
     if enc_sh.is_file():
         reasons.append("install_disk_encryption.sh present")
     else:
         reasons.append("install_disk_encryption.sh missing")
+        warn = True
+    if zram_sh.is_file():
+        reasons.append("install_zram_luks.sh present (node-only ram volume)")
+    else:
+        reasons.append("install_zram_luks.sh missing")
         warn = True
     if wipe_sh.is_file() or wipe_runtime.is_file():
         reasons.append("shutdown wipe script present")

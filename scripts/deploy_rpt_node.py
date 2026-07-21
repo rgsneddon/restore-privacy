@@ -31,12 +31,13 @@ ROOT = Path(__file__).resolve().parents[1]
 NODE_DIR = ROOT / "node"
 
 # Extra non-.py artifacts required for privacy install path (0.2.3+).
-# Must stay complete: host-privacy composes FDE check + shutdown wipe.
+# Must stay complete: host-privacy composes FDE check + zram+LUKS2 check + wipe.
 NODE_EXTRA = (
     "install.sh",
     "install_dns.sh",
     "install_host_privacy.sh",
     "install_disk_encryption.sh",
+    "install_zram_luks.sh",
     "install_shutdown_wipe.sh",
     "rpt_shutdown_wipe.sh",
     "unbound-rpt.conf",
@@ -190,6 +191,7 @@ def main() -> int:
         f"{INSTALL_ROOT}/node/install_dns.sh "
         f"{INSTALL_ROOT}/node/install_host_privacy.sh "
         f"{INSTALL_ROOT}/node/install_disk_encryption.sh "
+        f"{INSTALL_ROOT}/node/install_zram_luks.sh "
         f"{INSTALL_ROOT}/node/install_shutdown_wipe.sh "
         f"{INSTALL_ROOT}/node/rpt_shutdown_wipe.sh "
         "2>/dev/null || true",
@@ -204,9 +206,14 @@ def main() -> int:
     # Privacy scripts again after TUN may exist (DNS + host privacy + FDE check + wipe)
     run(f"bash {INSTALL_ROOT}/node/install_dns.sh", timeout=300, as_root=True)
     run(f"bash {INSTALL_ROOT}/node/install_host_privacy.sh", timeout=180, as_root=True)
-    # Explicit non-destructive FDE check (also invoked from host_privacy)
+    # Explicit non-destructive FDE + zram+LUKS2 checks (also from host_privacy)
     run(
         f"bash {INSTALL_ROOT}/node/install_disk_encryption.sh check || true",
+        timeout=60,
+        as_root=True,
+    )
+    run(
+        f"bash {INSTALL_ROOT}/node/install_zram_luks.sh check || true",
         timeout=60,
         as_root=True,
     )
@@ -241,6 +248,7 @@ def main() -> int:
         f"test -f {INSTALL_ROOT}/node/aggregate_metrics.py && echo aggregate_metrics=ok",
         f"test -f {INSTALL_ROOT}/node/disk_encryption.py && echo disk_encryption_py=ok",
         f"test -f {INSTALL_ROOT}/node/install_disk_encryption.sh && echo fde_script=ok",
+        f"test -f {INSTALL_ROOT}/node/install_zram_luks.sh && echo zram_luks_script=ok",
         f"test -f {INSTALL_ROOT}/node/install_shutdown_wipe.sh && echo wipe_install=ok",
         f"test -f {INSTALL_ROOT}/node/rpt_shutdown_wipe.sh && echo wipe_script=ok",
         f"test -f {INSTALL_ROOT}/node/obfuscation.py && test -f {INSTALL_ROOT}/node/traffic_shape.py && echo wire_privacy_py=ok",

@@ -1,8 +1,8 @@
-"""restore-privacy 0.3.3 is the signed, published current public catalog.
+"""restore-privacy 0.3.4 is the signed, published current public catalog.
 
-README, PRIVACY_POLICY, and status_page/downloads must present 0.3.3 as current
+README, PRIVACY_POLICY, and status_page/downloads must present 0.3.4 as current
 (not RUST-IN-PRIVACY v1.0.0 as the sole public package story). Optional local
-zip codesign when releases/0.3.3 Apple packages are on disk.
+zip codesign when releases/0.3.4 Apple packages are on disk.
 """
 from __future__ import annotations
 
@@ -16,7 +16,7 @@ import zipfile
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-VERSION = "0.3.3"
+VERSION = "0.3.4"
 RELEASE_DIR = ROOT / "releases" / VERSION
 MACOS_ZIP = RELEASE_DIR / f"restore-privacy-client-{VERSION}-macos.zip"
 IOS_ZIP = RELEASE_DIR / f"restore-privacy-client-{VERSION}-ios.zip"
@@ -28,10 +28,10 @@ class Test029PublicCatalogCurrent(unittest.TestCase):
     def test_readme_current_public_is_0_2_9_signed(self):
         readme = (ROOT / "README.md").read_text(encoding="utf-8")
         lower = readme.lower()
-        self.assertIn("0.3.3", readme)
+        self.assertIn("0.3.4", readme)
         self.assertIn("restoreprivacy.online", readme)
-        self.assertIn("restore-privacy-client-0.3.3-macos.zip", readme)
-        self.assertIn("restore-privacy-client-0.3.3-ios.zip", readme)
+        self.assertIn("restore-privacy-client-0.3.4-macos.zip", readme)
+        self.assertIn("restore-privacy-client-0.3.4-ios.zip", readme)
         self.assertIn("Developer ID", readme)
         self.assertIn("notariz", lower)
         self.assertIn("team-signed", lower)
@@ -43,13 +43,13 @@ class Test029PublicCatalogCurrent(unittest.TestCase):
         # Primary path is paid VPN APP Shop, not free permanent GH release links
         self.assertIn("paid", lower)
         self.assertNotIn(
-            "[Download v0.3.3](https://github.com/rgsneddon/restore-privacy/releases/tag/0.3.3)",
+            "[Download v0.3.4](https://github.com/rgsneddon/restore-privacy/releases/tag/0.3.4)",
             readme,
         )
 
     def test_privacy_current_public_is_0_2_9_signed(self):
         privacy = (ROOT / "PRIVACY_POLICY.md").read_text(encoding="utf-8")
-        self.assertIn("0.3.3", privacy)
+        self.assertIn("0.3.4", privacy)
         self.assertIn("restoreprivacy.online", privacy)
         self.assertIn("Developer ID", privacy)
         self.assertIn("Team-signed", privacy)
@@ -68,18 +68,18 @@ class Test029PublicCatalogCurrent(unittest.TestCase):
             available_downloads,
         )
 
-        self.assertEqual(RELEASE_VERSION, "0.3.3")
-        self.assertEqual(RELEASE_TAG, "0.3.3")
+        self.assertEqual(RELEASE_VERSION, "0.3.4")
+        self.assertEqual(RELEASE_TAG, "0.3.4")
         self.assertEqual(GITHUB_REPO, "restore-privacy")
-        self.assertEqual(MACOS_ZIP_FILENAME, "restore-privacy-client-0.3.3-macos.zip")
+        self.assertEqual(MACOS_ZIP_FILENAME, "restore-privacy-client-0.3.4-macos.zip")
         names = {a.filename for a in available_downloads()}
-        self.assertIn("restore-privacy-client-0.3.3-windows-x64-setup.exe", names)
-        self.assertIn("restore-privacy-client-0.3.3-macos.zip", names)
-        self.assertIn("restore-privacy-client-0.3.3-ios.zip", names)
+        self.assertIn("restore-privacy-client-0.3.4-windows-x64-setup.exe", names)
+        self.assertIn("restore-privacy-client-0.3.4-macos.zip", names)
+        self.assertIn("restore-privacy-client-0.3.4-ios.zip", names)
 
     def test_handoff_and_release_notes_signed_not_prep_only(self):
-        handoff = ROOT / "client_app" / "APPLE_HANDOFF_0.3.3.md"
-        notes = ROOT / "scripts" / "RELEASE_NOTES_0.3.3.md"
+        handoff = ROOT / "client_app" / "APPLE_HANDOFF_0.3.4.md"
+        notes = ROOT / "scripts" / "RELEASE_NOTES_0.3.4.md"
         self.assertTrue(handoff.is_file())
         self.assertTrue(notes.is_file())
         h = handoff.read_text(encoding="utf-8").lower()
@@ -89,10 +89,10 @@ class Test029PublicCatalogCurrent(unittest.TestCase):
         self.assertIn("notariz", h)
         self.assertIn("team-signed", h)
         self.assertNotIn("prep packages only", h)
-        self.assertIn("do not treat 0.3.3 public apple assets as prep-only", h)
+        self.assertIn("do not treat 0.3.4 public apple assets as prep-only", h)
         self.assertIn("developer id signed + notarized", n)
         # notes text is lowercased above — match product storefront name
-        self.assertIn("vpn app shop download catalog (catalog **v0.3.3**", n)
+        self.assertIn("vpn app shop download catalog (catalog **v0.3.4**", n)
 
 
 class TestLocal029PackagesIfPresent(unittest.TestCase):
@@ -239,7 +239,7 @@ class TestLocal029PackagesIfPresent(unittest.TestCase):
 
     def test_local_zips_no_priv_and_macos_developer_id(self):
         if not MACOS_ZIP.is_file() or not IOS_ZIP.is_file():
-            self.skipTest("local releases/0.3.3 Apple zips not present")
+            self.skipTest("local releases/0.3.4 Apple zips not present")
         for zpath in (MACOS_ZIP, IOS_ZIP):
             with zipfile.ZipFile(zpath) as zf:
                 names = zf.namelist()

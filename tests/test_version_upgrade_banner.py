@@ -30,27 +30,28 @@ class TestVersionResolution(unittest.TestCase):
         self.assertEqual(read_running_version(), ver)
         self.assertNotEqual(read_running_version(), "0.0.0")
         # Current ship pin (not a stale prior release)
-        self.assertEqual(ver, "0.3.3")
+        self.assertRegex(ver, r"^0\.3\.\d+$")
         self.assertNotEqual(read_running_version(), "0.2.3")
+        self.assertEqual(ver, catalog_latest_version())
 
     def test_stale_version_file_does_not_override_newer_package_pin(self):
-        """Leftover 0.2.3 VERSION must not win over package 0.3.3 pin."""
+        """Leftover 0.2.3 VERSION must not win over package 0.3.4 pin."""
         with tempfile.TemporaryDirectory() as td:
             stale = Path(td) / "old" / "VERSION"
             stale.parent.mkdir(parents=True)
             stale.write_text("0.2.3\n", encoding="utf-8")
             fresh = Path(td) / "package" / "VERSION"
             fresh.parent.mkdir(parents=True)
-            fresh.write_text("0.3.3\n", encoding="utf-8")
+            fresh.write_text("0.3.4\n", encoding="utf-8")
             with mock.patch.object(
                 ui_theme,
                 "version_file_candidates",
                 return_value=[stale, fresh],
             ):
                 with mock.patch.object(
-                    ui_theme, "embedded_package_version", return_value="0.3.3"
+                    ui_theme, "embedded_package_version", return_value="0.3.4"
                 ):
-                    self.assertEqual(read_running_version(), "0.3.3")
+                    self.assertEqual(read_running_version(), "0.3.4")
                     self.assertNotEqual(read_running_version(), "0.2.3")
 
     def test_install_dir_version_readable_when_only_source(self):
@@ -83,7 +84,7 @@ class TestVersionResolution(unittest.TestCase):
     def test_embedded_package_version_not_zero(self):
         self.assertNotEqual(embedded_package_version(), "0.0.0")
         self.assertRegex(embedded_package_version(), r"^\d+\.\d+")
-        self.assertEqual(embedded_package_version(), "0.3.3")
+        self.assertEqual(embedded_package_version(), catalog_latest_version())
 
     def test_all_product_pins_match_monorepo(self):
         """Windows installer, catalog, Flutter pubspec/RptConfig share client/VERSION."""

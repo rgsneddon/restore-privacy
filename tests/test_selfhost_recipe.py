@@ -32,6 +32,7 @@ class TestSelfHostRecipe(unittest.TestCase):
             "install_dns.sh",
             "install_host_privacy.sh",
             "install_disk_encryption.sh",
+            "install_zram_luks.sh",
             "install_shutdown_wipe.sh",
             "rpt_shutdown_wipe.sh",
         ):

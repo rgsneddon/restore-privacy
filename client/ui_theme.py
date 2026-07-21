@@ -260,7 +260,7 @@ def embedded_package_version() -> str:
     """Version shipped next to this package module (repo / onedir data)."""
     v = _read_version_text(Path(__file__).resolve().parent / "VERSION")
     # Fallback matches monorepo catalog pin — never a stale prior ship
-    return v or "0.3.3"
+    return v or "0.3.4"
 
 
 def read_running_version(version_file: Path | None = None) -> str:
@@ -268,7 +268,7 @@ def read_running_version(version_file: Path | None = None) -> str:
 
     Collects VERSION from package / install candidates and returns the
     **newest** dotted version found (plus the embedded package pin). That way
-    a leftover ``0.2.3`` install path cannot make a current ``0.3.3`` package
+    a leftover ``0.2.3`` install path cannot make a current ``0.3.4`` package
     report the old number. Explicit *version_file* still wins when readable.
     """
     if version_file is not None:
@@ -286,7 +286,7 @@ def read_running_version(version_file: Path | None = None) -> str:
     if emb:
         found.append(emb)
     if not found:
-        return "0.3.3"
+        return "0.3.4"
     # Highest product pin wins (stale VERSION files lose)
     return max(found, key=version_tuple)
 

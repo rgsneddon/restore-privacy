@@ -417,7 +417,7 @@ class TestDocsAndPortalDisclaimer(unittest.TestCase):
 
         ty = render_post_payment_thankyou_html(
             download_path="/download?token=abc",
-            filename="RestorePrivacy-0.3.3-linux.run",
+            filename="RestorePrivacy-0.3.4-linux.run",
             platform="linux",
             session_id="cs_thankyou_1",
         )

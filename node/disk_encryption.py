@@ -72,6 +72,43 @@ HONESTY_NOLOG = (
     "media if those files or secrets ever land on disk."
 )
 
+# --- zram + LUKS2 ram-only volume (node host only; never a client requirement) ---
+
+HONESTY_ZRAM_LUKS = (
+    "zram + LUKS2 provides an **encrypted RAM-backed volume on the node host** for "
+    "operator-chosen node data (e.g. secrets/runtime under the mapped mount). It is "
+    "**not** client device encryption, not residual tunnel crypto, and not full "
+    "live-root secrecy against root on an unlocked host. Contents live in RAM "
+    "(compressed zram) behind LUKS2; a power loss loses that volume unless the "
+    "operator re-creates it. VPS provider netflow/snapshots of the root disk are "
+    "out of scope."
+)
+
+HONESTY_NODE_ONLY = (
+    "LUKS2 and zram are **node-only** install options. Windows/Linux/Android/iOS/"
+    "macOS clients do **not** install LUKS/zram and keep residual Connect (HELLO + "
+    "full tunnel) unchanged."
+)
+
+DEFAULT_ZRAM_SIZE_MIB = 512
+DEFAULT_ZRAM_MAPPER = "rpt-zram-crypt"
+DEFAULT_ZRAM_MOUNT = "/mnt/rpt-ram-data"
+DEFAULT_ZRAM_DEVICE = "/dev/zram0"
+
+# Devices that must never be passed to destructive format helpers by accident.
+FORBIDDEN_FORMAT_DEVICES: tuple[str, ...] = (
+    "/",
+    "/dev",
+    "/dev/sda",
+    "/dev/sda1",
+    "/dev/vda",
+    "/dev/vda1",
+    "/dev/nvme0n1",
+    "/dev/nvme0n1p1",
+    "/dev/mapper/root",
+    "/dev/root",
+)
+
 
 def install_root_from_env(default: str = DEFAULT_INSTALL_ROOT) -> str:
     return os.environ.get("INSTALL_ROOT", default).strip() or default
@@ -251,4 +288,164 @@ def fde_docs_markers() -> dict[str, str]:
         "at_rest": HONESTY_AT_REST,
         "wipe": HONESTY_WIPE,
         "nolog": HONESTY_NOLOG,
+        "zram": "zram",
+        "luks2": "luks2",
+        "node_only": HONESTY_NODE_ONLY,
+        "zram_luks": HONESTY_ZRAM_LUKS,
+    }
+
+
+def is_safe_format_device(device: str, *, allow_zram: bool = True) -> bool:
+    """True if *device* is an acceptable cryptsetup/zram target (policy only).
+
+    Allows ``/dev/zramN`` when *allow_zram* is True. Rejects empty paths, bare
+    ``/``, and common root-disk names unless the operator uses a non-listed
+    dedicated partition (still requires RPT_LUKS_CONFIRM=yes on live format).
+    """
+    dev = str(device or "").strip()
+    if not dev.startswith("/dev/"):
+        return False
+    if ".." in dev or "\x00" in dev:
+        return False
+    # Single path component under /dev (or /dev/mapper/name)
+    parts = [p for p in dev.split("/") if p]
+    if len(parts) < 2 or parts[0] != "dev":
+        return False
+    name = parts[-1]
+    if not name or name in (".", ".."):
+        return False
+    if allow_zram and name.startswith("zram") and name[4:].isdigit():
+        return True
+    # Explicit deny list for common root disks (use dedicated partition names)
+    if dev in FORBIDDEN_FORMAT_DEVICES or name in {
+        "sda",
+        "vda",
+        "nvme0n1",
+        "root",
+    }:
+        return False
+    # Dedicated partition style: sdb1, vdb1, nvme0n1p2, loop0, etc.
+    if any(ch.isdigit() for ch in name) or name.startswith("loop") or name.startswith(
+        "mapper"
+    ):
+        return True
+    return False
+
+
+def zram_setup_commands_dry_run(
+    *,
+    size_mib: int = DEFAULT_ZRAM_SIZE_MIB,
+    zram_device: str = DEFAULT_ZRAM_DEVICE,
+) -> list[str]:
+    """Non-executed sequence to create a zram block device (node host)."""
+    size = max(64, min(8192, int(size_mib)))
+    dev = str(zram_device).strip() or DEFAULT_ZRAM_DEVICE
+    if not is_safe_format_device(dev, allow_zram=True):
+        raise ValueError(f"unsafe or invalid zram device: {dev}")
+    idx = dev.replace("/dev/zram", "")
+    return [
+        "# Load zram (RAM-compressed block device — node host only)",
+        "modprobe zram num_devices=1 || true",
+        f"echo {size}M > /sys/block/zram{idx}/disksize",
+        f"# Block device ready: {dev}",
+    ]
+
+
+def zram_luks2_commands_dry_run(
+    *,
+    size_mib: int = DEFAULT_ZRAM_SIZE_MIB,
+    zram_device: str = DEFAULT_ZRAM_DEVICE,
+    mapper_name: str = DEFAULT_ZRAM_MAPPER,
+    mount_point: str = DEFAULT_ZRAM_MOUNT,
+) -> list[str]:
+    """Documented zram → LUKS2 → mount sequence (never executed here).
+
+    Live install script requires ``RPT_ZRAM_LUKS_CONFIRM=yes`` for format.
+    """
+    dev = str(zram_device).strip() or DEFAULT_ZRAM_DEVICE
+    if not is_safe_format_device(dev, allow_zram=True):
+        raise ValueError(f"unsafe or invalid zram device: {dev}")
+    mapper = (
+        "".join(ch for ch in mapper_name if ch.isalnum() or ch in "-_")
+        or DEFAULT_ZRAM_MAPPER
+    )
+    mount = str(mount_point).strip() or DEFAULT_ZRAM_MOUNT
+    steps = zram_setup_commands_dry_run(size_mib=size_mib, zram_device=dev)
+    steps.extend(
+        [
+            f"# LUKS2 format on RAM-backed {dev} (DESTRUCTIVE for that zram volume)",
+            f"cryptsetup luksFormat --type luks2 {dev}",
+            f"cryptsetup open {dev} {mapper}",
+            f"mkfs.ext4 /dev/mapper/{mapper}",
+            f"mkdir -p {mount}",
+            f"mount /dev/mapper/{mapper} {mount}",
+            f"# Place node secrets/runtime under {mount} (operator choice)",
+            f"# On shutdown: umount {mount}; cryptsetup close {mapper}; reset zram",
+            f"umount {mount}",
+            f"cryptsetup close {mapper}",
+            f"echo 1 > /sys/block/{dev.split('/')[-1]}/reset || true",
+        ]
+    )
+    return steps
+
+
+def plan_zram_luks2_volume(
+    *,
+    size_mib: int = DEFAULT_ZRAM_SIZE_MIB,
+    zram_device: str = DEFAULT_ZRAM_DEVICE,
+    mapper_name: str = DEFAULT_ZRAM_MAPPER,
+    mount_point: str = DEFAULT_ZRAM_MOUNT,
+    confirm_env: str = "RPT_ZRAM_LUKS_CONFIRM",
+) -> dict:
+    """Pure plan for node ram-only encrypted volume (check/dry-run/status)."""
+    size = max(64, min(8192, int(size_mib)))
+    dev = str(zram_device).strip() or DEFAULT_ZRAM_DEVICE
+    safe = is_safe_format_device(dev, allow_zram=True)
+    cmds = (
+        zram_luks2_commands_dry_run(
+            size_mib=size,
+            zram_device=dev,
+            mapper_name=mapper_name,
+            mount_point=mount_point,
+        )
+        if safe
+        else []
+    )
+    return {
+        "mode": "zram_luks2",
+        "node_only": True,
+        "client_encryption": False,
+        "size_mib": size,
+        "zram_device": dev,
+        "mapper_name": mapper_name,
+        "mount_point": mount_point,
+        "luks_type": "luks2",
+        "safe_device": safe,
+        "confirm_env": confirm_env,
+        "confirm_required": "yes",
+        "commands_dry_run": cmds,
+        "check_commands": cryptsetup_check_commands()
+        + [
+            "command -v modprobe",
+            "lsmod | grep zram || true",
+            "ls -la /dev/zram* 2>/dev/null || true",
+        ],
+        "honesty_zram_luks": HONESTY_ZRAM_LUKS,
+        "honesty_node_only": HONESTY_NODE_ONLY,
+        "honesty_at_rest": HONESTY_AT_REST,
+        "honesty_wipe": HONESTY_WIPE,
+        "honesty_nolog": HONESTY_NOLOG,
+    }
+
+
+def zram_luks_docs_markers() -> dict[str, str]:
+    """Markers for structural tests of ram-only node encryption docs/scripts."""
+    return {
+        "zram": "zram",
+        "luks2": "luks2",
+        "cryptsetup": "cryptsetup",
+        "node_only": "node-only",
+        "not_client": "not client",
+        "confirm": "RPT_ZRAM_LUKS_CONFIRM",
+        "honesty": HONESTY_ZRAM_LUKS[:40],
     }

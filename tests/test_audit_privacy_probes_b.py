@@ -222,7 +222,7 @@ class TestSectionBProbes(unittest.TestCase):
         results = {
             "generated_at": "2026-07-21T00:00:00Z",
             "node_host": "127.0.0.1",
-            "catalog_version": "0.3.3",
+            "catalog_version": "0.3.4",
             "unit_suite": {"ran": False, "ok": True, "reason": "skipped"},
             "tcp_status": {"ok": True},
             "http_status": {
@@ -233,7 +233,7 @@ class TestSectionBProbes(unittest.TestCase):
             "udp": {"sent": True},
             "no_priv": {"ok": True, "hits": []},
             "package_rag": {
-                "catalog_version": "0.3.3",
+                "catalog_version": "0.3.4",
                 "overall": "Green",
                 "packages": [],
                 "legend": {"Green": "OK", "Amber": "A", "Red": "R"},

@@ -45,7 +45,7 @@ class TestAuditMd(unittest.TestCase):
     def test_audit_has_severity_and_version(self):
         text = AUDIT.read_text(encoding="utf-8")
         # Current paid catalog
-        self.assertIn("0.3.3", text)
+        self.assertIn("0.3.4", text)
         self.assertIn("82.221.101.241", text)
         self.assertIn("private", text.lower())
         self.assertIn("restoreprivacy.online", text)

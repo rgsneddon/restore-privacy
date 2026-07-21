@@ -78,7 +78,7 @@ def fetch_device_entitlement(
     req = urllib.request.Request(
         url,
         headers={
-            "User-Agent": "RestorePrivacy-node-entitlement/0.3.3",
+            "User-Agent": "RestorePrivacy-node-entitlement/0.3.4",
             "Accept": "application/json",
         },
         method="GET",

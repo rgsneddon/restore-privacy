@@ -514,7 +514,7 @@ def fetch_remote_entitlement_status(
     req = urllib.request.Request(
         url,
         headers={
-            "User-Agent": "RestorePrivacy-payment-entitlement/0.3.3",
+            "User-Agent": "RestorePrivacy-payment-entitlement/0.3.4",
             "Accept": "application/json",
         },
         method="GET",
@@ -622,7 +622,7 @@ def bind_device_to_remote(
         url,
         data=body,
         headers={
-            "User-Agent": "RestorePrivacy-payment-entitlement/0.3.3",
+            "User-Agent": "RestorePrivacy-payment-entitlement/0.3.4",
             "Accept": "application/json",
             "Content-Type": "application/json",
         },

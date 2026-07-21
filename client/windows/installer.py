@@ -22,9 +22,9 @@ def _product_version_pin() -> str:
     pin = Path(__file__).resolve().parents[1] / "VERSION"
     try:
         line = pin.read_text(encoding="utf-8").strip().splitlines()[0].strip()
-        return line.lstrip("vV") or "0.3.3"
+        return line.lstrip("vV") or "0.3.4"
     except (OSError, IndexError):
-        return "0.3.3"
+        return "0.3.4"
 
 
 VERSION = _product_version_pin()
@@ -69,7 +69,7 @@ def _payload_root() -> Path:
         if d.is_dir():
             return d
     raise FileNotFoundError(
-        "Client payload not found. Build with scripts/build_release_0.3.3.py first."
+        "Client payload not found. Build with scripts/build_release_0.3.4.py first."
     )
 
 
