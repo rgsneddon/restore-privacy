@@ -254,17 +254,15 @@ def download_css() -> str:
 
 
 def render_rust_footer_html() -> str:
-    """Footer under download buttons — catalog identity + tip (no generic Stripe link).
+    """Footer under download buttons — How to buy + tip only.
 
-    Platform Pay buttons carry Stripe Payment Link hrefs; a separate bottom
-    “Stripe payment page” link is intentionally not shown.
+    The old “Catalog v… — installers after £2.45…” / FULL CATALOGUE footer link
+    (``rust-repo-link``) is intentionally **not** emitted on the public page.
+    Platform Pay buttons remain the only catalog entry; no separate catalogue link.
     """
     tip = coffee_tip_url()
     tip_label = tip.replace("https://", "").replace("http://", "")
     return (
-        f'    <p class="dl-footer" id="rust-repo-footer">'
-        f'<a class="rust-link" id="rust-repo-link" href="{RUST_REPO_URL}" '
-        f'rel="noopener noreferrer" target="_blank">{RUST_REPO_LABEL}</a></p>\n'
         f'    <p class="dl-tip" id="bmc-tip">'
         f'<a id="how-to-buy-footer-link" href="/how-to-buy">How to buy</a>'
         f' · Tip / support (not a paid download): '

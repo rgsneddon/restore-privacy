@@ -92,10 +92,16 @@ class TestDownloadCatalog(unittest.TestCase):
         self.assertIn('id="dl-android"', html)
         self.assertIn("£2.45", html)
         self.assertIn(BMC_TIP_URL, html)
-        self.assertIn(EXPECTED_PUBLIC_CATALOG_FOOTER, html)
         self.assertIn("Pay £2.45", html)
         # Free permanent GitHub installer hrefs must not appear in public HTML.
         self.assertNotIn("releases/download/0.3.0/", html)
+        # FULL CATALOGUE / catalog footer link must not be visible on public downloads.
+        self.assertNotIn('id="rust-repo-link"', html)
+        self.assertNotIn("rust-repo-footer", html)
+        self.assertNotIn("installers after £2.45 payment only", html)
+        self.assertNotIn("FULL CATALOGUE", html.upper())
+        self.assertIn("how-to-buy-footer-link", html)
+        self.assertIn("bmc-tip-link", html)
 
     def test_download_menu_is_three_then_two_rows(self):
         """Platform menu under the title: row of 3, then row of 2."""

@@ -64,13 +64,13 @@ class TestPublicPageWithDownloads(unittest.TestCase):
             RELEASE_PAGE_URL,
             "https://github.com/rgsneddon/restore-privacy/releases/tag/0.3.0",
         )
-        # Public footer uses status host (private repo); bookkeeping URL may still exist.
-        self.assertIn(RUST_REPO_URL, html)
-        self.assertIn("restore-privacy-status.onrender.com", html)
-        self.assertIn("restore-privacy", html)
-        self.assertIn('id="rust-repo-link"', html)
+        # Catalogue footer link removed — pay buttons are the only catalog entry.
+        self.assertNotIn('id="rust-repo-link"', html)
+        self.assertNotIn("rust-repo-footer", html)
+        self.assertNotIn("installers after £2.45 payment only", html)
         self.assertIn("£2.45", html)
         self.assertIn("buymeacoffee.com/rgsneddon", html)
+        self.assertIn("how-to-buy-footer-link", html)
         self.assertNotIn("connect-via-web", html)
         self.assertNotIn("Connect via web", html)
 
@@ -101,7 +101,8 @@ class TestPublicPageWithDownloads(unittest.TestCase):
                     self.assertIn("donate.stripe.com", html)
                     self.assertIn("client_reference_id=windows", html)
                     self.assertIn("£2.45", html)
-                    self.assertIn(RUST_REPO_URL, html)
+                    self.assertNotIn('id="rust-repo-link"', html)
+                    self.assertNotIn("installers after £2.45 payment only", html)
         finally:
             httpd.shutdown()
             httpd.server_close()
