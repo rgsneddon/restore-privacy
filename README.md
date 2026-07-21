@@ -15,7 +15,7 @@
 
 ## What you get
 
-- Production node: **`82.221.101.241:44044`** (UDP RPT2)
+- Production node: **`82.221.101.241:44044`** (UDP RPT2), hosted in **Iceland** on **FlokiNET** under **strict Icelandic privacy** norms — **as far as we can be assured** from the host’s public statements (**“No invasive logs”**; no third-party tenant traffic/pattern sharing; resource-usage monitoring only — https://flokinet.is/privacy/, https://flokinet.is/vps/)
 - **Manual Connect / Disconnect** with optional seamless power-up via **Settings**
   - **Run at device startup** (Windows sign-in / Android boot — opt-in)
   - **Autoconnect on launch** (opt-in; defaults off)
@@ -134,7 +134,7 @@ need residual internet restored **and** complete product removal.
 | **Credits** | [CREDITS.md](CREDITS.md) |
 | **Code & policy audit** | [AUDIT.md](AUDIT.md) |
 
-Core promises: **no user-info logs** by design, **minimal public status** (title + downloads — **no live client count**), **device keys** (not a shared client private key), **honest residual** only when full tunnel is up, **no third-party geo** on Connect. Product Windows/Linux clients enable **outer-layer obfuscation** and **padding / jitter / cover** by default on residual paths; **kill-switch is not applied by default**. **Disconnect / Quit** restores residual routes (no intentional blackhole after normal teardown). **Restore Internet** is a full wipe failsafe (not ordinary Disconnect). Multi-hop *config* is not residual until a real relay ships. Node tunnel DNS uses **DoT** upstream. VPS providers may still see IP-level metadata (privacy §4).
+Core promises: **no user-info logs** by design, **minimal public status** (title + downloads — **no live client count**), **device keys** (not a shared client private key), **honest residual** only when full tunnel is up, **no third-party geo** on Connect. Product Windows/Linux clients enable **outer-layer obfuscation** and **padding / jitter / cover** by default on residual paths; **kill-switch is not applied by default**. **Disconnect / Quit** restores residual routes (no intentional blackhole after normal teardown). **Restore Internet** is a full wipe failsafe (not ordinary Disconnect). Multi-hop *config* is not residual until a real relay ships. Node tunnel DNS uses **DoT** upstream. Production node VPS: **Iceland / FlokiNET** — **as far as we can be assured** from host public statements, **no invasive logs** of users connecting to the node (privacy §3.1 / §4).
 
 ---
 
@@ -155,7 +155,7 @@ Short user-education summary. Full policy language: **[PRIVACY_POLICY.md — Thr
 
 - **Endpoint correlation** — sites still know you via logins, cookies, and browser fingerprints; many users share one node egress IP.
 - **Behavioral analysis** — observers can still study when you connect and rough usage patterns.
-- **VPS / provider IP metadata** — hosters may log network metadata outside app no-log settings.
+- **VPS / provider IP metadata** — product node is **FlokiNET** in **Iceland** (strict Icelandic privacy norms); **as far as we can be assured** from FlokiNET’s public statements the host does **not** retain invasive connection logs of users connecting to the node. Other providers (CDN/status, home ISP, destinations) may still log. Node OS compromise remains a residual risk.
 - **Traffic analysis by ISP** beyond mitigations — you still appear to use a VPN; no multi-hop residual yet.
 - **Client device seizure** — local keys, apps, and browser history on an unlocked device are out of scope for the node’s no-log promise.
 - Malware, compromised OS, or destination-site tracking.
@@ -176,7 +176,7 @@ Node deploy, ports, secrets, from-source builds, and tests: **[sundries.txt](sun
 
 **Post-quantum readiness:** staged hybrid Kyber/ML-KEM hook in `node/pq_hybrid.py` + plan [`docs/PQ_MIGRATION.md`](docs/PQ_MIGRATION.md) (not residual PQ on the wire until dual-wire + real ML-KEM).
 
-**Product ship (v0.3.3):** Paid installers on **[status downloads](https://restoreprivacy.online/)** (macOS Developer ID notarized; iOS Team-signed). Source repo is private. Production node **82.221.101.241:44044**.
+**Product ship (v0.3.3):** Paid installers on **[status downloads](https://restoreprivacy.online/)** (macOS Developer ID notarized; iOS Team-signed). Source repo is private. Production node **82.221.101.241:44044** (**Iceland**, **FlokiNET** VPS; host public **no invasive logs** stance as far as we can be assured — see privacy policy).
 
 **Self-host (one shot):** `sudo bash scripts/selfhost_node.sh` — node install + tunnel DNS + host privacy. Deploy remote: `python scripts/deploy_rpt_node.py` (`RPT_SSH_HOST`, `RPT_SSH_USER`, key). Details: [sundries.txt](sundries.txt).
 

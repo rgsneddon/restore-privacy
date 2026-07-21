@@ -539,7 +539,7 @@ def build_markdown(results: dict) -> str:
 | **Product** | Restore Privacy Tunnel (RPT / RPT2) |
 | **Repository** | restore-privacy (**private** source; installers only via paid status host) |
 | **Public catalog version** | **{catalog}** |
-| **Production node** | **{host}:{UDP_PORT}** (UDP); status UI TCP **{STATUS_PORT}** |
+| **Production node** | **{host}:{UDP_PORT}** (UDP); status UI TCP **{STATUS_PORT}** — **Iceland**, host **FlokiNET** |
 | **Audit generated** | **{human_date()}** (`{now}`) |
 | **Cadence** | Automated security pass (target **every 4 hours** on node/operator timer) |
 | **Audit type** | Static suite + live node status probe + **per-installer AUDIT STATE (Green/Amber/Red)** |
@@ -570,7 +570,7 @@ Latest automated security audit for production node **{host}** and the in-repo p
 
 **Primary residual risks (open by design / environment):**
 
-1. **Operational** — VPS/CDN/provider IP-level logging outside product no-log.  
+1. **Operational** — Product node is on **FlokiNET** in **Iceland** (strict **Icelandic** privacy / free-expression hosting norms). **As far as we can be assured** from FlokiNET’s public statements (**“No invasive logs”**; resource-usage monitoring only; no third-party tenant traffic/pattern sharing — https://flokinet.is/privacy/, https://flokinet.is/vps/), the host does **not** retain invasive logs of users connecting to the node. That is host-published posture, not a product forensic audit. Separate CDN/status hosts and home-ISP paths may still log. Node **OS compromise** (live RAM) remains residual.  
 2. **Apple** — residual IP requires signed Packet Tunnel / NE.  
 3. **Linux privilege floor** — residual needs root + TUN/`ip`.  
 4. **Traffic analysis** — padding/jitter/cover/outer obfs are mitigations only.  
@@ -618,7 +618,7 @@ Latest automated security audit for production node **{host}** and the in-repo p
 
 #### Scenario A — VPS compromise
 
-If the **VPS** host (production node) is fully compromised while sessions are active, **in-memory** session material may be exposed. Product **no-log** / nolog composition reduces durable user-info logs on disk but does **not** erase live RAM. **Residual risk:** operator/provider compromise of the node host.
+Production node placement: **Iceland**, hypervisor host **FlokiNET**. **As far as we can be assured** from FlokiNET’s public statements, the host does **not** retain invasive connection logs of users connecting to the node (**“No invasive logs”**; no third-party traffic/pattern sharing; overall resource usage only). If the **VPS guest OS / root** (production node) is fully compromised while sessions are active, **in-memory** session material may still be exposed. Product **no-log** / nolog composition reduces durable user-info logs on disk but does **not** erase live RAM. **Residual risk:** compromise of the node OS (distinct from FlokiNET’s published no-invasive-logs posture for tenant connection logging).
 
 #### Scenario B — Traffic analysis by ISP
 

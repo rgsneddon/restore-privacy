@@ -41,6 +41,8 @@ Process stdout/stderr for the node service is configured for **no journal sessio
 ### 3.1 VPN node (server)
 
 - Production product endpoint used by current client packages: **UDP 82.221.101.241:44044** (operator-hosted RPT node).
+- **Location / host:** the production node is hosted in **Iceland** on **FlokiNET** (also written Flokinet; https://flokinet.is/). Icelandic privacy and free-expression law (including the broader **Icelandic** press/speech protections that privacy-focused hosts cite, such as IMMI-era policy) governs this placement more strictly than many common VPS jurisdictions.
+- **Host connection logging (assurance, not a product forensic audit):** as far as we can be assured from FlokiNET’s **public** statements, the host does **not** retain invasive logs of users connecting to the VPS / node and does **not** share tenant traffic or traffic patterns with third parties; FlokiNET states **“No invasive logs”**, root-only customer access, monitoring limited to **overall resource usage**, and no third-party sharing of traffic/patterns (see https://flokinet.is/privacy/ and https://flokinet.is/vps/). This is **host-published posture**, not a Restore Privacy laboratory audit of FlokiNET’s network. Product **application** no-log defaults (below) remain separate.
 
 - Listens for RPT tunnel handshakes and **encrypted** data frames.
 - **Admits** only peers that complete the product handshake with an **authorized client key** (Ed25519 allow-list + ElGamal / Pedersen-based handshake materials).
@@ -97,7 +99,7 @@ This processing is **entirely on the user’s device**. It does **not** phone ho
 
 Please understand these **operational limits**:
 
-1. **Hosting and networks.** The VPS provider, CDN, or DNS operator may log IP-level connection metadata under **their** policies (outside this application's no-log settings).
+1. **Hosting and networks.** The production RPT node runs on **FlokiNET** in **Iceland** under **strict Icelandic privacy** / free-expression-oriented hosting norms. **As far as we can be assured** from FlokiNET’s public materials, the host does **not** retain invasive connection logs of users connecting to the node and does not share tenant traffic/patterns with third parties (**“No invasive logs”**; resource-usage monitoring only — https://flokinet.is/privacy/, https://flokinet.is/vps/). That assurance is **not** a third-party no-logs audit and does **not** erase risk if the **node OS itself** is compromised (live memory). A separate **CDN**, status host, or DNS operator (or another **VPS provider** if you self-host elsewhere) may still log IP-level connection metadata under **their** policies (**outside this application's no-log** settings).
 2. **Destination sites.** Websites and services you visit through the tunnel have their own privacy policies.
 3. **Device and OS.** Android VPN consent dialogs, Windows admin elevation, iOS/macOS VPN permission sheets, Apple Network Extension processes, crash reporters, or OS network stacks may process data independently of this app.
 4. **Misconfiguration.** If an operator enables verbose logging, reverse proxies with access logs, or third-party monitoring, that can create logs this policy assumes are off.
@@ -130,8 +132,8 @@ This section is for **user education**. It states **what Restore Privacy protect
 |----------|-----|
 | **Endpoint correlation** | A service you visit can still recognize *you* via accounts, cookies, browser fingerprint, or the same login across sessions. The tunnel does **not** unlink your identity at the destination. Destinations may also correlate multiple sessions that share the **same VPN egress IP** (many users behind one node). |
 | **Behavioral analysis** | Observers (ISP, workplace, or analyst with flow logs) can still study **when** you connect, **how long**, and rough volume patterns. Pad/cover/obfs reduce coarse fingerprints; they do **not** stop behavioral analysis of usage patterns. |
-| **VPS / provider metadata** | The VPS host, CDN, or upstream network may log IP-level or netflow data under **their** policies (see §4 item 1). Product no-log does not erase provider logs. |
-| **VPS compromise (active sessions)** | If the node host is fully compromised while you are connected, **live** memory may still expose session material. See [AUDIT.md](AUDIT.md) **VPS compromise** scenario. |
+| **VPS / provider metadata** | Product node is on **FlokiNET** in **Iceland**. As far as we can be assured from host public statements, FlokiNET does **not** retain invasive logs of users connecting to the node (see §3.1 / §4 item 1). Other networks (home ISP path before Connect, CDN/status hosts, destination sites) may still log under their policies. Product no-log does not erase **non-FlokiNET** provider logs. |
+| **VPS compromise (active sessions)** | If the **node OS / root** is fully compromised while you are connected, **live** memory may still expose session material — distinct from FlokiNET’s published “no invasive logs” / no tenant traffic sharing stance. See [AUDIT.md](AUDIT.md) **VPS compromise** scenario. |
 | **Traffic analysis by ISP (undetectability)** | Your ISP can still see that you talk to the VPN node. We do **not** claim DPI-undetectability or full pluggable-transport parity. |
 | **Client device seizure** | Seizure of an unlocked (or decryptable) device exposes local keys, apps, browser history, and any local connection log. Disk encryption is an OS control, not an RPT server feature. |
 | **Multi-hop residual routing** | Hop *lists* may exist for planning; product traffic remains **single-hop / entry-only** until a real multi-hop path ships. |

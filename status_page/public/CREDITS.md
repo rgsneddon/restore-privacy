@@ -49,6 +49,7 @@ their owners.
 | **GitHub** | Private operator source hosting (not a free public installer CDN) | Service terms of GitHub, Inc. |
 | **Stripe** | Paid catalog checkout / Payment Link (£2.45 GBP per package) on the status host | Service terms of Stripe — https://stripe.com/ |
 | **Render** | Public status-page hosting + paid download fulfilment (`restore-privacy-status`) | Service terms of Render — https://render.com/ |
+| **FlokiNET** (Flokinet) | Production RPT node VPS in **Iceland** (product host `82.221.101.241`) | Host public privacy materials — https://flokinet.is/privacy/ · https://flokinet.is/vps/ · https://flokinet.is/ |
 
 ## Standards and algorithms (non-code)
 
