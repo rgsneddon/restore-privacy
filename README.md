@@ -32,12 +32,11 @@ Restore Privacy is built from the ground up using unashamed vibe coding methods 
 - Public payment portal with seamless flow to downloadable installer package
 - **No third-party geo lookup** on Connect (admission is cryptographic only)
 - Connect uses the standard **HELLO** residual path (**flyclient** fast-path removed in catalog **v0.3.3**)
-- Session **PFS** (ephemeral X25519) on the Python client/node handshake path; Android catalog APK ships residual wire (**PFS + outer obfs**)
-- **Layer obfuscation** (QUIC-mimic outer wrap around RPT frames) **on by default** (`RPT_OBFS=0` to opt out) — mitigation, not DPI-undetectability
-- **Product traffic shaping** (padding / send jitter / cover) **on by default** for Windows/Linux Python DATA path (`RPT_TRAFFIC_SHAPE=0` to opt out)
+- Session **PFS** (ephemeral X25519) on residual HELLO for all product clients (Python Windows/Linux, Android, iOS/macOS Packet Tunnel)
+- **Layer obfuscation** (QUIC-mimic outer wrap around RPT frames) **on by default on every residual path** (`RPT_OBFS=0` to opt out on Python; native product constants default on) — mitigation, not DPI-undetectability
+- **Product traffic shaping** (padding / send jitter / cover) **on by default on every residual path** — Windows/Linux Python (`RPT_TRAFFIC_SHAPE=0` to opt out), Android VPN service, and Apple Packet Tunnel (pad bucket 128, cover ~2s, jitter ≤40ms)
 - **No product kill switch by default** (firewall/iptables block rules and Android `setBlocking` are off; opt in only with `RPT_KILL_SWITCH=1`); tunnel DNS only (`10.88.0.1`, no public DNS fallbacks); IPv4 residual honesty still applies
 - Multi-hop hop *lists* may be configured for planning — **not residual multi-hop** until a real relay path ships
-- Native Android/Apple engines may lag Python pad/cover/PFS/obfs wire extensions (documented honestly)
 - Security audit documents **per-installer AUDIT STATE** (Green / Amber / Red) for catalog packages — [AUDIT.md](AUDIT.md)
 
 ---
@@ -140,7 +139,7 @@ need residual internet restored **and** complete product removal.
 | **Credits** | [CREDITS.md](CREDITS.md) |
 | **Code & policy audit** | [AUDIT.md](AUDIT.md) |
 
-Core promises: **no user-info logs** by design, **minimal public status** (title + downloads — **no live client count**), **device keys** (not a shared client private key), **honest residual** only when full tunnel is up, **no third-party geo** on Connect. Product Windows/Linux clients enable **outer-layer obfuscation** and **padding / jitter / cover** by default on residual paths; **kill-switch is not applied by default**. **Disconnect / Quit** restores residual routes (no intentional blackhole after normal teardown). **Restore Internet** is a full wipe failsafe (not ordinary Disconnect). Multi-hop *config* is not residual until a real relay ships. Node tunnel DNS uses **DoT** upstream. Production node VPS: **Iceland / FlokiNET** — **as far as we can be assured** from host public statements, **no invasive logs** of users connecting to the node (privacy §3.1 / §4).
+Core promises: **no user-info logs** by design, **minimal public status** (title + downloads — **no live client count**), **device keys** (not a shared client private key), **honest residual** only when full tunnel is up, **no third-party geo** on Connect. Product residual paths on **all platforms** (Windows, Linux, Android, iOS, macOS) enable **outer-layer obfuscation** and **padding / jitter / cover** by default; **kill-switch is not applied by default**. **Disconnect / Quit** restores residual routes (no intentional blackhole after normal teardown). **Restore Internet** is a full wipe failsafe (not ordinary Disconnect). Multi-hop *config* is not residual until a real relay ships. Node tunnel DNS uses **DoT** upstream. Production node VPS: **Iceland / FlokiNET** — **as far as we can be assured** from host public statements, **no invasive logs** of users connecting to the node (privacy §3.1 / §4).
 
 ---
 
@@ -153,7 +152,7 @@ Short user-education summary. Full policy language: **[PRIVACY_POLICY.md — Thr
 - **Residual public IP** uses the VPN node when full tunnel is actually up (honest status otherwise).
 - **No user-info logs** on the product node path; **no public live client count**.
 - **Per-device keys** (not a shared installer private key).
-- **Mitigations** for coarse traffic fingerprints: outer obfuscation + padding/jitter/cover (default on product residual DATA path) — **not** a claim of DPI-undetectability.
+- **Mitigations** for coarse traffic fingerprints: outer obfuscation + padding/jitter/cover (default on **all** product residual DATA paths) — **not** a claim of DPI-undetectability.
 - **Tunnel-only DNS** (`10.88.0.1`) while residual capture is active; **IPv4 residual honesty** when full tunnel is up. Kill-switch firewall blocks are **not** applied by default (opt-in only: `RPT_KILL_SWITCH=1`).
 - **PFS** (ephemeral X25519) so long-term key compromise later should not reconstruct past session AEAD keys from the public transcript alone.
 

@@ -18,10 +18,26 @@ object RptTrafficShape {
     const val PRODUCT_PAD_BUCKET: Int = 128
     const val PRODUCT_COVER_SIZE: Int = 128
     const val PRODUCT_COVER_INTERVAL_MS: Long = 2000L
+    /** Bounded send-side delay (ms); matches Python product policy (jitter_ms_max=40). */
+    const val PRODUCT_JITTER_MS_MAX: Int = 40
     const val PRODUCT_PADDING: Boolean = true
     const val PRODUCT_COVER: Boolean = true
 
     private val rnd = SecureRandom()
+
+    /** Product residual send jitter (0…PRODUCT_JITTER_MS_MAX). DATA path only. */
+    fun applySendJitter() {
+        val maxMs = PRODUCT_JITTER_MS_MAX
+        if (maxMs <= 0) return
+        val ms = rnd.nextInt(maxMs + 1)
+        if (ms > 0) {
+            try {
+                Thread.sleep(ms.toLong())
+            } catch (_: InterruptedException) {
+                Thread.currentThread().interrupt()
+            }
+        }
+    }
 
     fun padPayload(plain: ByteArray, bucket: Int = PRODUCT_PAD_BUCKET): ByteArray {
         require(plain.size in 0..65535) { "plain too large for u16 length" }

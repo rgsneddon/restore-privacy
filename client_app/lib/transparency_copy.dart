@@ -8,7 +8,8 @@ const String kExportLogButton = 'Export log';
 
 /// Plain-language: mitigation ≠ DPI-undetectability.
 const String kDpiMitigationDisclaimer =
-    'Traffic shaping (padding and cover traffic) and outer obfuscation reduce '
+    'Traffic shaping (padding, send jitter, and cover traffic) and outer obfuscation '
+    'are on by default on residual paths for all platforms. They reduce '
     'coarse traffic analysis, but they are mitigations only — not a guarantee of '
     'DPI-undetectability or full pluggable-transport parity (for example obfs4, '
     'meek, or V2Ray). A determined network observer may still fingerprint the tunnel.';

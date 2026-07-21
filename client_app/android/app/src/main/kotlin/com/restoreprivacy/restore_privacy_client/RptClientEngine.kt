@@ -151,9 +151,11 @@ class RptClientEngine(
         return packData(sid, counterOut, nonce, sealed)
     }
 
-    /** Product residual UDP send: seal then outer-wrap. */
-    fun sealAndWrapPacket(ipPacket: ByteArray): ByteArray =
-        RptObfuscation.maybeWrap(sealPacket(ipPacket))
+    /** Product residual UDP send: pad + outer-wrap (+ bounded send jitter). */
+    fun sealAndWrapPacket(ipPacket: ByteArray): ByteArray {
+        RptTrafficShape.applySendJitter()
+        return RptObfuscation.maybeWrap(sealPacket(ipPacket))
+    }
 
     fun sealAndWrapCover(): ByteArray =
         RptObfuscation.maybeWrap(sealCoverFrame())

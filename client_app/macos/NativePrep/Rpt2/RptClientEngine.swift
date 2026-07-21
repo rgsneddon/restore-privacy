@@ -250,12 +250,15 @@ public final class RptClientEngine {
     }
 
     /// Seal + outer-wrap one IP packet and send on the HELLO transport.
+    /// Product residual: pad + outer obfs + bounded send jitter (default on).
     public func sendSealedPacket(_ ipPacket: Data) throws {
         guard let sock = transport else { throw RptProtocol.ProtocolError("no transport") }
+        RptTrafficShape.applySendJitter()
         let frame = try sealPacket(ipPacket)
         try sock.send(try RptObfuscation.maybeWrap(frame))
     }
 
+    /// Cover (RPTC) frame with outer wrap — product residual default (~2s interval in Packet Tunnel).
     public func sendCoverFrame() throws {
         guard let sock = transport else { throw RptProtocol.ProtocolError("no transport") }
         let frame = try sealCoverFrame()
@@ -418,8 +421,20 @@ public enum RptTrafficShape {
     public static let productPadBucket: Int = 128
     public static let productCoverSize: Int = 128
     public static let productCoverIntervalS: TimeInterval = 2.0
+    /// Bounded send-side delay (ms) matching Python product policy (RPT_TRAFFIC_SHAPE).
+    public static let productJitterMsMax: Int = 40
     public static let productPadding: Bool = true
     public static let productCover: Bool = true
+
+    /// Optional product send jitter (0…productJitterMsMax). Residual DATA send only.
+    public static func applySendJitter() {
+        let maxMs = productJitterMsMax
+        guard maxMs > 0 else { return }
+        let ms = Int.random(in: 0...maxMs)
+        if ms > 0 {
+            Thread.sleep(forTimeInterval: Double(ms) / 1000.0)
+        }
+    }
 
     public static func padPayload(_ plain: Data, bucket: Int = productPadBucket) throws -> Data {
         guard plain.count <= 65535 else {

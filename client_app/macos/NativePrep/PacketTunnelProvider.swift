@@ -1,5 +1,6 @@
 // macOS Packet Tunnel — full RPT2 path (secrets → handshake → full tunnel → DATA loops).
 // HELLO and DATA share one long-lived UDP socket (node binds session.client_addr to HELLO source).
+// Product residual defaults: outer obfs + RPTP pad + cover (~2s) + bounded send jitter.
 // No public-IP geo admission (device keys + crypto only).
 
 import Foundation
@@ -9,11 +10,13 @@ class PacketTunnelProvider: NEPacketTunnelProvider {
   private var engine: RptClientEngine?
   private var session: RptClientEngine.Session?
   private var keepaliveTimer: DispatchSourceTimer?
+  private var coverTimer: DispatchSourceTimer?
   private var receiveSource: DispatchSourceRead?
   private var pathQueue = DispatchQueue(label: "com.restoreprivacy.tunnel.io")
   private var endpointHost = RptEndpoint.host
   private var endpointPort = RptEndpoint.port
   private var running = false
+  private var lastCoverSent = Date.distantPast
 
   override func startTunnel(options: [String: NSObject]?, completionHandler: @escaping (Error?) -> Void) {
     let proto = protocolConfiguration as? NETunnelProviderProtocol
@@ -68,6 +71,7 @@ class PacketTunnelProvider: NEPacketTunnelProvider {
           // Transport already connected + ready (BSD connect completed before HELLO reply)
           self.startPacketLoops()
           self.startKeepalive()
+          self.startCoverTraffic()
           completionHandler(nil)
         }
       } catch {
@@ -89,6 +93,8 @@ class PacketTunnelProvider: NEPacketTunnelProvider {
     running = false
     keepaliveTimer?.cancel()
     keepaliveTimer = nil
+    coverTimer?.cancel()
+    coverTimer = nil
     receiveSource?.cancel()
     receiveSource = nil
     engine?.closeTransport()
@@ -127,8 +133,10 @@ class PacketTunnelProvider: NEPacketTunnelProvider {
       do {
         let data = try engine.receiveFrame(timeout: 0.0)
         if RptProtocol.peekType(data) == .data {
-          let plain = try engine.openPacket(data)
-          self.packetFlow.writePackets([plain], withProtocols: [NSNumber(value: AF_INET)])
+          // Product residual: discard peer cover (RPTC) without tearing tunnel
+          if let plain = try engine.openPacketAllowCover(data), !plain.isEmpty {
+            self.packetFlow.writePackets([plain], withProtocols: [NSNumber(value: AF_INET)])
+          }
         }
       } catch {}
     }
@@ -144,6 +152,7 @@ class PacketTunnelProvider: NEPacketTunnelProvider {
       guard let self, self.running, let engine = self.engine else { return }
       for packet in packets {
         do {
+          // sendSealedPacket: product pad + outer obfs + bounded jitter
           try engine.sendSealedPacket(packet)
         } catch {}
       }
@@ -162,6 +171,28 @@ class PacketTunnelProvider: NEPacketTunnelProvider {
     }
     timer.resume()
     keepaliveTimer = timer
+  }
+
+  /// Product residual cover traffic (RPTC) at productCoverIntervalS — default on.
+  private func startCoverTraffic() {
+    guard RptTrafficShape.productCover else { return }
+    let interval = max(0.2, RptTrafficShape.productCoverIntervalS)
+    let timer = DispatchSource.makeTimerSource(queue: pathQueue)
+    timer.schedule(deadline: .now() + interval, repeating: 0.25)
+    timer.setEventHandler { [weak self] in
+      guard let self, self.running, let engine = self.engine else { return }
+      guard RptTrafficShape.productCover else { return }
+      let now = Date()
+      if now.timeIntervalSince(self.lastCoverSent) < RptTrafficShape.productCoverIntervalS {
+        return
+      }
+      do {
+        try engine.sendCoverFrame()
+        self.lastCoverSent = now
+      } catch {}
+    }
+    timer.resume()
+    coverTimer = timer
   }
 
   private static func error(_ message: String, code: Int) -> NSError {

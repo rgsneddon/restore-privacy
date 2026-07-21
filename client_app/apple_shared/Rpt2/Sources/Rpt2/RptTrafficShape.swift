@@ -11,8 +11,20 @@ public enum RptTrafficShape {
     public static let productPadBucket: Int = 128
     public static let productCoverSize: Int = 128
     public static let productCoverIntervalS: TimeInterval = 2.0
+    /// Bounded send-side delay (ms) matching Python product policy (RPT_TRAFFIC_SHAPE).
+    public static let productJitterMsMax: Int = 40
     public static let productPadding: Bool = true
     public static let productCover: Bool = true
+
+    /// Optional product send jitter (0…productJitterMsMax). Call on residual DATA send only.
+    public static func applySendJitter() {
+        let maxMs = productJitterMsMax
+        guard maxMs > 0 else { return }
+        let ms = Int.random(in: 0...maxMs)
+        if ms > 0 {
+            Thread.sleep(forTimeInterval: Double(ms) / 1000.0)
+        }
+    }
 
     public static func padPayload(_ plain: Data, bucket: Int = productPadBucket) throws -> Data {
         guard plain.count <= 65535 else {

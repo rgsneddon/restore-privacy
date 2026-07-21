@@ -250,12 +250,15 @@ public final class RptClientEngine {
     }
 
     /// Seal + outer-wrap one IP packet and send on the HELLO transport.
+    /// Product residual: pad + outer obfs + bounded send jitter (default on).
     public func sendSealedPacket(_ ipPacket: Data) throws {
         guard let sock = transport else { throw RptProtocol.ProtocolError("no transport") }
+        RptTrafficShape.applySendJitter()
         let frame = try sealPacket(ipPacket)
         try sock.send(try RptObfuscation.maybeWrap(frame))
     }
 
+    /// Cover (RPTC) frame with outer wrap — product residual default (~2s interval in Packet Tunnel).
     public func sendCoverFrame() throws {
         guard let sock = transport else { throw RptProtocol.ProtocolError("no transport") }
         let frame = try sealCoverFrame()

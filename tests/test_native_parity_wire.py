@@ -114,11 +114,16 @@ class TestAndroidTrafficShapeAndObfs(unittest.TestCase):
         self.assertIn("sealAndWrapPacket", eng)
         self.assertIn("unwrapAndOpen", eng)
         self.assertIn("RptObfuscation.maybeWrap", eng)
-        # VPN dataplane uses wrap + cover timer
+        # VPN dataplane uses wrap + cover timer + product jitter
         self.assertIn("sealAndWrapPacket", vpn)
         self.assertIn("unwrapAndOpen", vpn)
         self.assertIn("sealAndWrapCover", vpn)
         self.assertIn("PRODUCT_COVER_INTERVAL_MS", vpn)
+        self.assertIn("PRODUCT_COVER", vpn)
+        self.assertIn("applySendJitter", eng)
+        self.assertIn("PRODUCT_JITTER_MS_MAX", shape)
+        self.assertIn("PRODUCT_PADDING: Boolean = true", shape)
+        self.assertIn("PRODUCT_COVER: Boolean = true", shape)
 
     def test_python_pad_cover_wire_contract(self):
         """Shipped Python pad/cover (what native mirrors) round-trips."""
@@ -158,6 +163,8 @@ class TestAppleTrafficShapeAndObfs(unittest.TestCase):
         self.assertIn("sealCoverFrame", eng)
         self.assertIn("sendCoverFrame", eng)
         self.assertIn("openPacketAllowCover", eng)
+        self.assertIn("applySendJitter", eng)
+        self.assertIn("productJitterMsMax", shape)
 
     def test_ios_nativeprep_product_wired(self):
         self.assertTrue(SWIFT_IOS.is_file())
@@ -167,6 +174,8 @@ class TestAppleTrafficShapeAndObfs(unittest.TestCase):
         self.assertIn("|pfs-x25519|", text)
         self.assertIn("RptTrafficShape.prepareOutbound", text)
         self.assertIn("RptObfuscation.maybeWrap", text)
+        self.assertIn("applySendJitter", text)
+        self.assertIn("productJitterMsMax", text)
         # Must not be legacy-only session IKM
         self.assertNotIn(
             "sessionSharedMaterial.append(clientPub)\n"
@@ -182,6 +191,8 @@ class TestAppleTrafficShapeAndObfs(unittest.TestCase):
         self.assertIn("|pfs-x25519|", text)
         self.assertIn("RptTrafficShape.prepareOutbound", text)
         self.assertIn("RptObfuscation.maybeWrap", text)
+        self.assertIn("applySendJitter", text)
+        self.assertIn("productJitterMsMax", text)
 
     def test_ios_macos_nativeprep_engines_match(self):
         ios = SWIFT_IOS.read_bytes()
@@ -191,6 +202,26 @@ class TestAppleTrafficShapeAndObfs(unittest.TestCase):
             hashlib.sha256(mac).hexdigest(),
             "iOS and macOS NativePrep residual engines must stay aligned",
         )
+
+    def test_apple_packet_tunnel_residual_defaults(self):
+        """Packet Tunnel residual loops use pad/wrap/cover + cover-tolerant open."""
+        for rel in (
+            "client_app/ios/NativePrep/PacketTunnelProvider.swift",
+            "client_app/macos/NativePrep/PacketTunnelProvider.swift",
+        ):
+            text = (ROOT / rel).read_text(encoding="utf-8")
+            self.assertIn("sendSealedPacket", text, rel)
+            self.assertIn("openPacketAllowCover", text, rel)
+            self.assertIn("startCoverTraffic", text, rel)
+            self.assertIn("sendCoverFrame", text, rel)
+            self.assertIn("productCover", text, rel)
+            self.assertIn("productCoverIntervalS", text, rel)
+            # Must not hard-open cover as IP (throws / tears tunnel)
+            self.assertNotIn(
+                "let plain = try engine.openPacket(data)",
+                text,
+                msg=f"{rel} must use openPacketAllowCover on residual inbound",
+            )
 
 
 class TestNativeObfsKeyMatchesPython(unittest.TestCase):

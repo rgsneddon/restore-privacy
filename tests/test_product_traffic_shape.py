@@ -12,10 +12,9 @@ ROOT = Path(__file__).resolve().parents[1]
 from client.product_policy import (  # noqa: E402
     PRODUCT_ENABLED_TRAFFIC_SHAPE,
     product_dataplane_traffic_shape,
+    product_outer_obfuscation_enabled,
     traffic_shape_enabled_by_env,
 )
-from client.dataplane import RptDataPlane  # noqa: E402
-from node.crypto_session import SessionCrypto  # noqa: E402
 from node.traffic_shape import DEFAULT_TRAFFIC_SHAPE  # noqa: E402
 
 
@@ -40,10 +39,13 @@ class TestProductTrafficShapePolicy(unittest.TestCase):
 
     def test_enabled_policy_roundtrip_via_session_crypto(self):
         """Real seal/open with product enabled policy recovers IP payload."""
+        try:
+            from node.crypto_session import SessionCrypto
+        except ImportError:
+            self.skipTest("cryptography not installed")
         pol = PRODUCT_ENABLED_TRAFFIC_SHAPE
         crypto = SessionCrypto(key=b"p" * 32, traffic_shape=pol)
         ip = b"\x45" + b"\xab" * 60
-        aad = b"sessid01" + b"\x00" * 0  # 8 bytes sid + use counter in tests
         import struct
 
         aad = b"S" * 8 + struct.pack("!Q", 1)
@@ -70,6 +72,98 @@ class TestProductTrafficShapePolicy(unittest.TestCase):
         ).read_text(encoding="utf-8")
         self.assertIn("product_dataplane_traffic_shape", src)
         self.assertIn("RptDataPlane(client, traffic_shape=", src)
+
+    def test_product_defaults_match_native_bounds(self):
+        """Python product policy bounds must match native residual constants."""
+        pol = PRODUCT_ENABLED_TRAFFIC_SHAPE
+        self.assertEqual(pol.pad_bucket, 128)
+        self.assertEqual(pol.jitter_ms_max, 40)
+        self.assertEqual(pol.cover_interval_s, 2.0)
+        self.assertTrue(pol.padding and pol.cover_traffic)
+
+        with mock.patch.dict(os.environ, {}, clear=False):
+            os.environ.pop("RPT_OBFS", None)
+            self.assertTrue(product_outer_obfuscation_enabled())
+        with mock.patch.dict(os.environ, {"RPT_OBFS": "0"}):
+            self.assertFalse(product_outer_obfuscation_enabled())
+
+        # Android constants
+        kt = (
+            ROOT
+            / "client_app"
+            / "android"
+            / "app"
+            / "src"
+            / "main"
+            / "kotlin"
+            / "com"
+            / "restoreprivacy"
+            / "restore_privacy_client"
+            / "RptTrafficShape.kt"
+        ).read_text(encoding="utf-8")
+        self.assertIn("PRODUCT_PAD_BUCKET: Int = 128", kt)
+        self.assertIn("PRODUCT_JITTER_MS_MAX: Int = 40", kt)
+        self.assertIn("PRODUCT_COVER_INTERVAL_MS: Long = 2000L", kt)
+        self.assertIn("PRODUCT_PADDING: Boolean = true", kt)
+        self.assertIn("PRODUCT_COVER: Boolean = true", kt)
+
+        # Apple shared + Packet Tunnel
+        swift = (
+            ROOT
+            / "client_app"
+            / "apple_shared"
+            / "Rpt2"
+            / "Sources"
+            / "Rpt2"
+            / "RptTrafficShape.swift"
+        ).read_text(encoding="utf-8")
+        self.assertIn("productPadBucket: Int = 128", swift)
+        self.assertIn("productJitterMsMax: Int = 40", swift)
+        self.assertIn("productCoverIntervalS: TimeInterval = 2.0", swift)
+        self.assertIn("productPadding: Bool = true", swift)
+        self.assertIn("productCover: Bool = true", swift)
+
+    def test_dataplane_applies_product_shape_on_real_start_path(self):
+        """RptDataPlane stores the product policy used by residual tunnels."""
+        try:
+            from client.dataplane import RptDataPlane
+            from node.crypto_session import SessionCrypto
+        except ImportError:
+            self.skipTest("cryptography not installed")
+        pol = product_dataplane_traffic_shape()
+
+        class _Sess:
+            def __init__(self):
+                self.crypto = SessionCrypto(key=b"k" * 32)
+
+        class _Client:
+            def __init__(self):
+                self.session = _Sess()
+                self.sock = object()
+
+        plane = RptDataPlane(_Client(), traffic_shape=pol)
+        self.assertTrue(plane.traffic_shape.padding)
+        self.assertGreater(plane.traffic_shape.jitter_ms_max, 0)
+        self.assertTrue(plane.traffic_shape.cover_traffic)
+        self.assertEqual(plane.traffic_shape.pad_bucket, 128)
+
+
+class TestDocsAllPlatformsResidualShape(unittest.TestCase):
+    def test_readme_no_native_lag_claim(self):
+        text = (ROOT / "README.md").read_text(encoding="utf-8")
+        lower = text.lower()
+        self.assertNotIn("may lag", lower)
+        self.assertIn("every residual path", lower)
+        self.assertIn("outer", lower)
+        self.assertIn("padding", lower)
+        # Not Windows/Linux-only defaults
+        self.assertIn("android", lower)
+        self.assertIn("ios", lower)
+
+    def test_privacy_all_platforms(self):
+        text = (ROOT / "PRIVACY_POLICY.md").read_text(encoding="utf-8")
+        self.assertIn("every product residual path", text)
+        self.assertNotIn("may lag this wire surface", text)
 
 
 if __name__ == "__main__":
