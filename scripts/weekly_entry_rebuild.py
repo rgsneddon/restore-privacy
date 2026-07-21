@@ -47,6 +47,10 @@ from node.rebuild_lock import (  # noqa: E402
     release_rebuild_lock,
     update_rebuild_lock_state,
 )
+from node.wipe_preflight import (  # noqa: E402
+    plan_has_required_live_steps,
+    run_live_prewipe_gates,
+)
 
 
 def _run_step_command(cmd: str, *, dry_run: bool) -> int:
@@ -105,6 +109,16 @@ def main(argv: list[str] | None = None) -> int:
         "--exit-unhealthy",
         action="store_true",
         help="Simulate exit unhealthy → plan aborts wipe (fail closed)",
+    )
+    p.add_argument(
+        "--entry-unhealthy",
+        action="store_true",
+        help="Simulate entry pre-wipe health fail → plan aborts (fail closed)",
+    )
+    p.add_argument(
+        "--skip-live-probes",
+        action="store_true",
+        help="(tests only) skip real UDP/ss probes; use --exit/--entry-unhealthy flags",
     )
     p.add_argument(
         "--rotate-keys",
@@ -166,7 +180,9 @@ def main(argv: list[str] | None = None) -> int:
             print(msg, file=sys.stderr)
             return 2
 
+    # Default health flags; live path overrides with real probes unless skipped
     exit_healthy = not args.exit_unhealthy and _env_bool("RPT_EXIT_HEALTHY", True)
+    entry_healthy = not args.entry_unhealthy and _env_bool("RPT_ENTRY_HEALTHY", True)
 
     plan = build_weekly_entry_rebuild_plan(
         period=args.period,
@@ -175,6 +191,7 @@ def main(argv: list[str] | None = None) -> int:
         rotate_keys=args.rotate_keys,
         role=args.role,
         exit_healthy=exit_healthy,
+        entry_healthy=entry_healthy,
         provider_snapshot_cmd=os.environ.get("RPT_SNAPSHOT_CMD", ""),
         provider_rebuild_cmd=os.environ.get("RPT_REBUILD_CMD", ""),
     )
@@ -183,10 +200,14 @@ def main(argv: list[str] | None = None) -> int:
     print(
         f"# period_seconds={plan.period_seconds} "
         f"(parse: {parse_period_seconds(args.period)}) "
-        f"exit_healthy={exit_healthy} role=entry exclusive"
+        f"exit_healthy={exit_healthy} entry_healthy={entry_healthy} "
+        f"role=entry exclusive"
     )
     print("# NEVER two node wipe instances at once — exclusive lock enforced")
     print("# Clients: entry down → exit failover residual; entry up → re-entry preference")
+    print(
+        "# Continuity honesty: automatic residual failover — not zero packet-loss guarantee"
+    )
 
     if dry_run:
         # Demonstrate exclusive lock acquire/refuse without keeping lock
@@ -207,13 +228,23 @@ def main(argv: list[str] | None = None) -> int:
         # Refuse exit role
         ok_x, msg_x, _ = acquire_rebuild_lock("exit", install_root=args.install_root)
         print(f"# acquire exit (must refuse): ok={ok_x} {msg_x}")
+        # Structural: required live steps present when healthy
+        if exit_healthy and entry_healthy:
+            ok_steps, missing = plan_has_required_live_steps(
+                [s.id for s in plan.steps]
+            )
+            print(
+                f"# structural_live_steps: ok={ok_steps} missing={missing}"
+            )
+            if not ok_steps:
+                return 1
         print("# DRY-RUN complete — no entry wipe executed.")
         print(
             f"# Live: {live_confirm_env_name()}=yes "
             f"python scripts/weekly_entry_rebuild.py --live"
         )
-        if not exit_healthy:
-            print("# note: plan aborted path (exit unhealthy) — correct fail-closed")
+        if not exit_healthy or not entry_healthy:
+            print("# note: plan aborted path (pre-wipe gate fail) — correct fail-closed")
         return 0 if (ok1 and not ok2 and not ok_x) else 1
 
     # Live: exclusive lock for whole cycle
@@ -233,15 +264,66 @@ def main(argv: list[str] | None = None) -> int:
         return 4
     print(f"==> exclusive_lock: {msg}")
 
-    if not exit_healthy:
-        print("abort: exit unhealthy — fail closed, no entry wipe", file=sys.stderr)
+    # --- Real pre-wipe gates (fail closed before drain/rebuild) ---
+    if not args.skip_live_probes:
+        print("==> prewipe_gates: probing exit residual + entry node health")
+        gates = run_live_prewipe_gates()
+        for line in gates.reasons:
+            print(f"  # {line}")
+        print(f"  # exit: ok={gates.exit_probe.ok} {gates.exit_probe.detail}")
+        print(f"  # entry: ok={gates.entry_probe.ok} {gates.entry_probe.detail}")
+        if not gates.allow_wipe:
+            print(
+                "abort: pre-wipe gates FAILED — fail closed, no entry wipe",
+                file=sys.stderr,
+            )
+            release_rebuild_lock(
+                install_root=args.install_root,
+                expected_pid=lock_st.pid if lock_st else None,
+            )
+            return 5
+        exit_healthy = True
+        entry_healthy = True
+    else:
+        if not exit_healthy or not entry_healthy:
+            print(
+                "abort: simulated unhealthy pre-wipe gate — fail closed, no entry wipe",
+                file=sys.stderr,
+            )
+            release_rebuild_lock(
+                install_root=args.install_root,
+                expected_pid=lock_st.pid if lock_st else None,
+            )
+            return 5
+
+    # Rebuild plan if gates flipped health (should already be full plan)
+    if plan.mode == "weekly_entry_rebuild_aborted":
+        plan = build_weekly_entry_rebuild_plan(
+            period=args.period,
+            install_root=args.install_root,
+            dry_run=False,
+            rotate_keys=args.rotate_keys,
+            role=args.role,
+            exit_healthy=True,
+            entry_healthy=True,
+            provider_snapshot_cmd=os.environ.get("RPT_SNAPSHOT_CMD", ""),
+            provider_rebuild_cmd=os.environ.get("RPT_REBUILD_CMD", ""),
+        )
+
+    ok_steps, missing = plan_has_required_live_steps([s.id for s in plan.steps])
+    if not ok_steps:
+        print(
+            f"abort: plan missing required live steps {missing}",
+            file=sys.stderr,
+        )
         release_rebuild_lock(
             install_root=args.install_root,
             expected_pid=lock_st.pid if lock_st else None,
         )
-        return 5
+        return 6
 
     failures = 0
+    saw_selfhost = False
     try:
         for step in plan.steps:
             # Lock steps already applied at start / handled specially
@@ -252,6 +334,9 @@ def main(argv: list[str] | None = None) -> int:
             ):
                 print(f"==> {step.id}: {step.action} (handled by service)")
                 continue
+            if step.id in ("exit_failover_preflight", "entry_node_preflight"):
+                print(f"==> {step.id}: already verified by prewipe_gates")
+                continue
             if step.id == "mark_entry_draining":
                 update_rebuild_lock_state("draining", install_root=args.install_root)
                 print(f"==> {step.id}: draining (clients → exit failover)")
@@ -260,18 +345,29 @@ def main(argv: list[str] | None = None) -> int:
                 update_rebuild_lock_state("rebuilding", install_root=args.install_root)
                 print(f"==> {step.id}: rebuilding")
                 continue
-            if step.id == "abort_exit_unhealthy":
+            if step.id in ("abort_exit_unhealthy", "abort_entry_unhealthy"):
                 print(f"==> {step.id}: {step.action}")
                 failures += 1
                 break
             print(f"==> {step.id}: {step.action}")
+            if step.id == "selfhost_reapply":
+                saw_selfhost = True
             rc = _run_step_command(step.command, dry_run=False)
             if rc != 0:
                 print(f"step {step.id} failed rc={rc}", file=sys.stderr)
                 failures += 1
-                if step.destructive:
-                    print("stopping after destructive step failure", file=sys.stderr)
+                if step.destructive or step.id == "selfhost_reapply":
+                    print(
+                        "stopping after destructive/reinstall step failure",
+                        file=sys.stderr,
+                    )
                     break
+        if not saw_selfhost and failures == 0:
+            print(
+                "abort: package reinstall (selfhost_reapply) did not run — fail closed",
+                file=sys.stderr,
+            )
+            failures += 1
     finally:
         release_rebuild_lock(
             install_root=args.install_root,

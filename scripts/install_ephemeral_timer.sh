@@ -49,7 +49,7 @@ _rpt_cp "${SCRIPT_DIR}/ephemeral_node.py" "${INSTALL_ROOT}/scripts/ephemeral_nod
 _rpt_cp "${REPO_ROOT}/scripts/ephemeral_node.py" "${INSTALL_ROOT}/scripts/ephemeral_node.py"
 _rpt_cp "${SCRIPT_DIR}/weekly_entry_rebuild.py" "${INSTALL_ROOT}/scripts/weekly_entry_rebuild.py"
 _rpt_cp "${REPO_ROOT}/scripts/weekly_entry_rebuild.py" "${INSTALL_ROOT}/scripts/weekly_entry_rebuild.py"
-for mod in ephemeral_node.py rebuild_lock.py; do
+for mod in ephemeral_node.py rebuild_lock.py wipe_preflight.py; do
   _rpt_cp "${REPO_ROOT}/node/${mod}" "${INSTALL_ROOT}/node/${mod}"
 done
 

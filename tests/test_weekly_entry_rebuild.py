@@ -35,7 +35,7 @@ class TestWeeklyEntryPlan(unittest.TestCase):
 
     def test_weekly_plan_steps_and_lock(self):
         plan = build_weekly_entry_rebuild_plan(
-            period="7d", dry_run=True, exit_healthy=True
+            period="7d", dry_run=True, exit_healthy=True, entry_healthy=True
         )
         self.assertEqual(plan.mode, "weekly_entry_rebuild")
         self.assertEqual(plan.period_seconds, 7 * 86400)
@@ -43,8 +43,10 @@ class TestWeeklyEntryPlan(unittest.TestCase):
         self.assertIn("role_guard", ids)
         self.assertIn("exclusive_lock_acquire", ids)
         self.assertIn("exit_failover_preflight", ids)
+        self.assertIn("entry_node_preflight", ids)
         self.assertIn("mark_entry_draining", ids)
         self.assertIn("rebuild_host", ids)
+        self.assertIn("selfhost_reapply", ids)
         self.assertIn("exclusive_lock_release", ids)
         self.assertIn("schedule_next", ids)
         # Lock before rebuild; release after health
@@ -53,6 +55,12 @@ class TestWeeklyEntryPlan(unittest.TestCase):
         )
         self.assertLess(
             ids.index("exit_failover_preflight"), ids.index("rebuild_host")
+        )
+        self.assertLess(
+            ids.index("entry_node_preflight"), ids.index("rebuild_host")
+        )
+        self.assertGreater(
+            ids.index("selfhost_reapply"), ids.index("rebuild_host")
         )
         self.assertGreater(
             ids.index("exclusive_lock_release"), ids.index("health_check")
@@ -63,6 +71,7 @@ class TestWeeklyEntryPlan(unittest.TestCase):
         self.assertIn("exclusive", text)
         self.assertIn("entry", text)
         self.assertIn("failover", text)
+        self.assertIn("package", text)
 
     def test_abort_when_exit_unhealthy(self):
         plan = build_weekly_entry_rebuild_plan(

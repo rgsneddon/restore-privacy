@@ -1,0 +1,132 @@
+"""Pre-wipe health gates — fail closed before live entry wipedown."""
+
+from __future__ import annotations
+
+import sys
+import unittest
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT))
+
+from node.ephemeral_node import build_weekly_entry_rebuild_plan  # noqa: E402
+from node.wipe_preflight import (  # noqa: E402
+    HealthProbeResult,
+    check_entry_node_health,
+    check_exit_health,
+    evaluate_prewipe_gates,
+    plan_has_required_live_steps,
+    run_live_prewipe_gates,
+)
+
+
+class TestPrewipeGates(unittest.TestCase):
+    def test_both_healthy_allows_wipe(self):
+        exit_r = HealthProbeResult("exit_residual", True, "ok", "185.146.232.107", 44044)
+        entry_r = HealthProbeResult("entry_node", True, "ok", "127.0.0.1", 44044)
+        g = evaluate_prewipe_gates(exit_probe=exit_r, entry_probe=entry_r)
+        self.assertTrue(g.allow_wipe)
+        self.assertTrue(g.package_reinstall_required)
+        blob = " ".join(g.reasons).lower()
+        self.assertIn("failover", blob)
+        self.assertNotIn("zero packet", blob.replace("not zero", "XXX"))
+        # Honesty: must not claim absolute zero packet loss as guaranteed
+        d = g.to_dict()
+        self.assertIn("not absolute zero", d["continuity_honesty"])
+
+    def test_exit_unhealthy_fail_closed(self):
+        exit_r = HealthProbeResult("exit_residual", False, "down", "x", 44044)
+        entry_r = HealthProbeResult("entry_node", True, "ok", "127.0.0.1", 44044)
+        g = evaluate_prewipe_gates(exit_probe=exit_r, entry_probe=entry_r)
+        self.assertFalse(g.allow_wipe)
+        self.assertTrue(any("exit" in r.lower() for r in g.reasons))
+
+    def test_entry_unhealthy_fail_closed(self):
+        exit_r = HealthProbeResult("exit_residual", True, "ok", "x", 44044)
+        entry_r = HealthProbeResult("entry_node", False, "no listen", "127.0.0.1", 44044)
+        g = evaluate_prewipe_gates(exit_probe=exit_r, entry_probe=entry_r)
+        self.assertFalse(g.allow_wipe)
+        self.assertTrue(any("entry" in r.lower() for r in g.reasons))
+
+    def test_injected_probes_on_run_live(self):
+        def bad_exit(h, p):
+            return HealthProbeResult("udp", False, "sim fail", h, p)
+
+        def good_entry():
+            return HealthProbeResult("local", True, "sim ok", "127.0.0.1", 44044)
+
+        g = run_live_prewipe_gates(
+            exit_probe_fn=bad_exit, entry_probe_fn=good_entry
+        )
+        self.assertFalse(g.allow_wipe)
+
+        def good_exit(h, p):
+            return HealthProbeResult("udp", True, "sim ok", h, p)
+
+        g2 = run_live_prewipe_gates(
+            exit_probe_fn=good_exit, entry_probe_fn=good_entry
+        )
+        self.assertTrue(g2.allow_wipe)
+
+    def test_check_exit_uses_probe(self):
+        r = check_exit_health(
+            host="10.0.0.1",
+            port=9,
+            probe=lambda h, p: HealthProbeResult("udp", True, "x", h, p),
+        )
+        self.assertTrue(r.ok)
+        self.assertEqual(r.name, "exit_residual")
+        self.assertEqual(r.host, "10.0.0.1")
+
+    def test_check_entry_uses_probe(self):
+        r = check_entry_node_health(
+            probe=lambda: HealthProbeResult("local", False, "nope", "127.0.0.1", 44044)
+        )
+        self.assertFalse(r.ok)
+        self.assertEqual(r.name, "entry_node")
+
+
+class TestPlanStructuralGates(unittest.TestCase):
+    def test_healthy_weekly_plan_has_preflight_and_reinstall(self):
+        plan = build_weekly_entry_rebuild_plan(
+            period="7d", dry_run=True, exit_healthy=True, entry_healthy=True
+        )
+        ids = [s.id for s in plan.steps]
+        ok, missing = plan_has_required_live_steps(ids)
+        self.assertTrue(ok, missing)
+        self.assertIn("exit_failover_preflight", ids)
+        self.assertIn("entry_node_preflight", ids)
+        self.assertIn("selfhost_reapply", ids)
+        self.assertLess(ids.index("exit_failover_preflight"), ids.index("rebuild_host"))
+        self.assertLess(ids.index("entry_node_preflight"), ids.index("rebuild_host"))
+        self.assertGreater(ids.index("selfhost_reapply"), ids.index("rebuild_host"))
+        # Package reinstall wording
+        sh = next(s for s in plan.steps if s.id == "selfhost_reapply")
+        self.assertIn("package", sh.action.lower() + sh.detail.lower())
+
+    def test_abort_when_entry_unhealthy_no_rebuild(self):
+        plan = build_weekly_entry_rebuild_plan(
+            period="7d", exit_healthy=True, entry_healthy=False
+        )
+        self.assertEqual(plan.mode, "weekly_entry_rebuild_aborted")
+        ids = [s.id for s in plan.steps]
+        self.assertIn("abort_entry_unhealthy", ids)
+        self.assertNotIn("rebuild_host", ids)
+
+    def test_abort_when_exit_unhealthy_no_rebuild(self):
+        plan = build_weekly_entry_rebuild_plan(
+            period="7d", exit_healthy=False, entry_healthy=True
+        )
+        ids = [s.id for s in plan.steps]
+        self.assertIn("abort_exit_unhealthy", ids)
+        self.assertNotIn("rebuild_host", ids)
+
+    def test_plan_has_required_detects_missing(self):
+        ok, missing = plan_has_required_live_steps(["rebuild_host"])
+        self.assertFalse(ok)
+        self.assertIn("exit_failover_preflight", missing)
+        self.assertIn("selfhost_reapply", missing)
+
+
+if __name__ == "__main__":
+    unittest.main()

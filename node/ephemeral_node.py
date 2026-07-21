@@ -368,16 +368,18 @@ def build_weekly_entry_rebuild_plan(
     rotate_keys: bool = False,
     role: str = WEEKLY_ENTRY_ROLE,
     exit_healthy: bool = True,
+    entry_healthy: bool = True,
     provider_snapshot_cmd: str = "",
     provider_rebuild_cmd: str = "",
 ) -> EphemeralPlan:
-    """One-week entry-only wipe/rebuild plan with exclusive lock + exit preflight.
+    """One-week entry-only wipe/rebuild plan with exclusive lock + pre-wipe gates.
 
     Pure planner (no side effects). Live execution still requires
     ``RPT_EPHEMERAL_CONFIRM`` and must acquire the exclusive rebuild lock.
 
-    Fail closed: if ``exit_healthy`` is False, the plan includes an abort step
-    and does not schedule destructive rebuild (exit must be solid failover first).
+    Fail closed: if ``exit_healthy`` or ``entry_healthy`` is False, the plan
+    aborts without destructive rebuild (exit must be solid failover; entry must
+    pass pre-wipe health so package reinstall has a known baseline).
     """
     ok_role, role_msg = assert_weekly_entry_role_only(role)
     if not ok_role:
@@ -424,23 +426,49 @@ def build_weekly_entry_rebuild_plan(
                 "auto-failover. If exit is unhealthy: **fail closed** — do not wipe entry."
             ),
             command=(
-                "# operator: probe exit residual (UDP 44044 / HELLO) before live wipe; "
-                "abort if exit not healthy"
+                "python3 -c \"from node.wipe_preflight import check_exit_health; "
+                "r=check_exit_health(); assert r.ok, r.detail; print(r.detail)\""
                 if exit_healthy
                 else "# ABORT: exit_healthy=False — refuse entry wipe (fail closed)"
             ),
             destructive=not exit_healthy,
         )
     )
+    steps.append(
+        PlanStep(
+            id="entry_node_preflight",
+            action="Entry/node pre-wipe health (listen/status)",
+            detail=(
+                "Confirm entry product surface is healthy before wipe so rebuild + "
+                "package reinstall (selfhost) restore a known-good posture. "
+                "Fail closed if entry health cannot be confirmed."
+            ),
+            command=(
+                "python3 -c \"from node.wipe_preflight import check_entry_node_health; "
+                "r=check_entry_node_health(); assert r.ok, r.detail; print(r.detail)\""
+                if entry_healthy
+                else "# ABORT: entry_healthy=False — refuse entry wipe (fail closed)"
+            ),
+            destructive=not entry_healthy,
+        )
+    )
 
-    if not exit_healthy:
+    if not exit_healthy or not entry_healthy:
+        abort_id = (
+            "abort_exit_unhealthy" if not exit_healthy else "abort_entry_unhealthy"
+        )
+        abort_action = (
+            "Abort: exit not solid for failover"
+            if not exit_healthy
+            else "Abort: entry pre-wipe health failed"
+        )
         steps.append(
             PlanStep(
-                id="abort_exit_unhealthy",
-                action="Abort: exit not solid for failover",
+                id=abort_id,
+                action=abort_action,
                 detail=(
-                    "Entry wipe cancelled. Retain entry for clients. Fix exit first, "
-                    "then re-run weekly plan. Exclusive lock must be released."
+                    "Entry wipe cancelled. Retain current node for clients. "
+                    "Fix health first, then re-run weekly plan. Exclusive lock released."
                 ),
                 command=(
                     f"python3 -c \"from node.rebuild_lock import release_rebuild_lock; "
@@ -453,7 +481,7 @@ def build_weekly_entry_rebuild_plan(
                 id="schedule_next",
                 action="Schedule next periodic cycle",
                 detail=(
-                    f"Retry weekly cycle every {format_period(period_sec)} once exit is healthy."
+                    f"Retry weekly cycle every {format_period(period_sec)} once pre-wipe gates pass."
                 ),
                 command=(
                     f"# periodic: OnUnitActiveSec={period_sec} / cron for {format_period(period_sec)}"
@@ -478,7 +506,7 @@ def build_weekly_entry_rebuild_plan(
             honesty=honesty,
         )
 
-    # Healthy exit: full entry drain + rebuild (exclusive)
+    # Healthy exit + entry: full entry drain + rebuild (exclusive)
     base = build_ephemeral_plan(
         mode="snapshot_then_rebuild",
         period=period,
@@ -489,7 +517,7 @@ def build_weekly_entry_rebuild_plan(
         provider_rebuild_cmd=provider_rebuild_cmd,
     )
     # Insert mark draining before stop; release lock after health; skip generic preflight
-    # (we already have role_guard + lock + exit preflight)
+    # (we already have role_guard + lock + exit/entry preflight)
     steps.append(
         PlanStep(
             id="mark_entry_draining",
@@ -519,6 +547,22 @@ def build_weekly_entry_rebuild_plan(
                     ),
                 )
             )
+        # Rename clarity: selfhost is mandatory package reinstall on live path
+        if s.id == "selfhost_reapply":
+            steps.append(
+                PlanStep(
+                    id="selfhost_reapply",
+                    action="Package reinstall / re-apply product self-host (no-log)",
+                    detail=(
+                        "Mandatory after rebuild: reinstall product packages via "
+                        "selfhost_node.sh (install.sh + DNS + host-privacy + no-log). "
+                        "Bare wiped host is not acceptable."
+                    ),
+                    destructive=False,
+                    command=s.command or "sudo bash scripts/selfhost_node.sh",
+                )
+            )
+            continue
         steps.append(s)
 
     steps.append(
