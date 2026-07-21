@@ -110,6 +110,24 @@ Host + Packet Tunnel plists already declare the real product IDs:
 app, strips development `embedded.provisionprofile`s, and signs the Packet Tunnel
 appex with `PacketTunnel.entitlements`.
 
+### Residual Packet Tunnel on this Mac (Team sign)
+
+Public **Developer ID** zips omit host Network Extension so the app **opens** for all
+downloaders (restricted NE without a matching DevID profile is AMFI-killed). Residual
+public IP still requires host + appex `packet-tunnel-provider` authorized by a **Mac
+Team Provisioning Profile**:
+
+```bash
+# After flutter build macos --release
+python3 scripts/sign_macos_residual_team.py \
+  --app client_app/build/macos/Build/Products/Release/restore_privacy_client.app
+open client_app/build/macos/Build/Products/Release/restore_privacy_client.app
+# Connect → approve System Settings → Network → VPN & Filters if prompted
+```
+
+Host uses `Runner/TeamResidual.entitlements` (NE + allow-jit only — do **not** combine
+NE with `allow-unsigned-executable-memory` or `disable-library-validation`).
+
 Packet Tunnel targets are configured for **Team signing** (`CODE_SIGNING_ALLOWED = YES`, `CODE_SIGNING_REQUIRED = YES`, team `SFCBP95595`). The old ad-hoc re-sign step only runs when signing is explicitly disabled.
 
 ## Operator checklist Ã¢â‚¬â€ enable real Packet Tunnel VPN

@@ -66,8 +66,9 @@ const String kVpnPermissionDeniedMessage =
 /// Honest full-tunnel failure: system VPN never came up (residual ISP IP expected).
 const String kPacketTunnelNotActiveMessage =
     'System VPN (Packet Tunnel) did not become active — your residual public IP '
-    'will not change. Enable Network Extension signing/entitlements and approve '
-    'the VPN configuration, then try again.';
+    'will not change. Use a Team-signed residual build with Network Extension '
+    'on host + Packet Tunnel (scripts/sign_macos_residual_team.py), approve the '
+    'VPN configuration in System Settings → Network → VPN & Filters, then try again.';
 
 /// Host-only RPT2 HELLO diagnostic (node reachable, but not a full-tunnel success).
 const String kHostOnlyHelloNotFullTunnelMessage =

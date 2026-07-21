@@ -105,6 +105,52 @@ enum RptVpnChannel {
     }
   }
 
+  /// Prefer our saved manager; never reuse an unrelated VPN config.
+  private static func selectOrCreateManager(
+    from managers: [NETunnelProviderManager]?
+  ) -> NETunnelProviderManager {
+    if let existing = managers?.first(where: { shouldStopManager($0) }) {
+      return existing
+    }
+    return NETunnelProviderManager()
+  }
+
+  /// Human-readable NEVPNStatus for failure messages.
+  private static func statusName(_ status: NEVPNStatus) -> String {
+    switch status {
+    case .invalid: return "invalid"
+    case .disconnected: return "disconnected"
+    case .connecting: return "connecting"
+    case .connected: return "connected"
+    case .reasserting: return "reasserting"
+    case .disconnecting: return "disconnecting"
+    @unknown default: return "unknown(\(status.rawValue))"
+    }
+  }
+
+  /// Surface permission / entitlement failures with an actionable residual-honest path.
+  private static func describeNePreferencesError(_ error: Error) -> String {
+    let ns = error as NSError
+    let base = error.localizedDescription
+    let domain = ns.domain
+    let code = ns.code
+    // Common when host lacks Network Extension entitlement / profile, or user denied VPN config.
+    let lower = base.lowercased()
+    if lower.contains("permission")
+      || lower.contains("not authorized")
+      || lower.contains("denied")
+      || domain == NEVPNErrorDomain
+    {
+      return
+        "NE preferences failed (\(domain) \(code)): \(base). "
+        + "Approve VPN configuration in System Settings → Network → VPN & Filters "
+        + "(or General → Login Items & Extensions), and ensure this build is Team-signed "
+        + "with Packet Tunnel Network Extension entitlements on host + appex "
+        + "(see scripts/sign_macos_residual_team.py)."
+    }
+    return "NE preferences failed (\(domain) \(code)): \(base)"
+  }
+
   private static func loadOrCreateManager(
     host: String,
     port: UInt16,
@@ -112,13 +158,15 @@ enum RptVpnChannel {
   ) {
     NETunnelProviderManager.loadAllFromPreferences { managers, error in
       if let error {
-        completion(nil, error.localizedDescription)
+        completion(nil, describeNePreferencesError(error))
         return
       }
-      let manager = managers?.first ?? NETunnelProviderManager()
+      let manager = selectOrCreateManager(from: managers)
       let proto = NETunnelProviderProtocol()
       proto.providerBundleIdentifier = providerBundleId
       proto.serverAddress = "\(host):\(port)"
+      // DisconnectOnSleep false so residual session survives lid close while allowed by OS.
+      proto.disconnectOnSleep = false
       proto.providerConfiguration = [
         "host": host,
         "port": Int(port),
@@ -128,14 +176,34 @@ enum RptVpnChannel {
       manager.protocolConfiguration = proto
       manager.localizedDescription = "Restore Privacy"
       manager.isEnabled = true
+      manager.isOnDemandEnabled = false
       manager.saveToPreferences { saveErr in
         if let saveErr {
-          completion(nil, saveErr.localizedDescription)
+          completion(nil, describeNePreferencesError(saveErr))
           return
         }
+        // Required after save so connection/session objects are valid for startTunnel.
         manager.loadFromPreferences { loadErr in
           if let loadErr {
-            completion(nil, loadErr.localizedDescription)
+            completion(nil, describeNePreferencesError(loadErr))
+            return
+          }
+          // Ensure enabled after reload (some macOS versions clear it).
+          if !manager.isEnabled {
+            manager.isEnabled = true
+            manager.saveToPreferences { reSaveErr in
+              if let reSaveErr {
+                completion(nil, describeNePreferencesError(reSaveErr))
+                return
+              }
+              manager.loadFromPreferences { reLoadErr in
+                if let reLoadErr {
+                  completion(nil, describeNePreferencesError(reLoadErr))
+                  return
+                }
+                completion(manager, nil)
+              }
+            }
             return
           }
           completion(manager, nil)
@@ -152,13 +220,37 @@ enum RptVpnChannel {
   ) {
     do {
       let session = manager.connection as? NETunnelProviderSession
+      guard let session else {
+        completion(
+          RptFullTunnelResult.productConnectMap(
+            packetTunnelActive: false,
+            detailMessage:
+              "NETunnelProviderSession missing — host build may lack Network Extension "
+              + "packet-tunnel-provider entitlement/profile (Team residual sign required)."
+          )
+        )
+        return
+      }
+      // Already connected (re-entrant Connect) — treat as success.
+      if manager.connection.status == .connected {
+        queryProviderVpnIp(manager: manager) { ip in
+          let map = RptFullTunnelResult.productConnectMap(
+            packetTunnelActive: true,
+            vpnIp: ip,
+            detailMessage: ip.map { "Connected — tunnel IP \($0)" }
+          )
+          completion(map)
+        }
+        return
+      }
       let opts: [String: NSObject] = [
         "host": host as NSString,
         "port": NSNumber(value: port),
       ]
-      try session?.startTunnel(options: opts)
-      // Poll for connected (Packet Tunnel handshake + setTunnelNetworkSettings can take several seconds).
-      pollTunnelConnected(manager: manager, attempt: 0, maxAttempts: 20, interval: 0.5) { connected in
+      try session.startTunnel(options: opts)
+      // Packet Tunnel handshake + setTunnelNetworkSettings can take several seconds;
+      // user may also need to approve the VPN configuration dialog.
+      pollTunnelConnected(manager: manager, attempt: 0, maxAttempts: 40, interval: 0.5) { connected in
         if connected {
           queryProviderVpnIp(manager: manager) { ip in
             var resolved = ip
@@ -176,11 +268,14 @@ enum RptVpnChannel {
             completion(map)
           }
         } else {
-          let st = manager.connection.status.rawValue
+          let st = manager.connection.status
           completion(
             RptFullTunnelResult.productConnectMap(
               packetTunnelActive: false,
-              detailMessage: "Packet Tunnel start pending or failed (status \(st))."
+              detailMessage:
+                "Packet Tunnel start pending or failed (status \(statusName(st))/\(st.rawValue)). "
+                + "If macOS asked to allow VPN configurations, choose Allow and Connect again. "
+                + "Team residual builds: scripts/sign_macos_residual_team.py"
             )
           )
         }
@@ -189,7 +284,7 @@ enum RptVpnChannel {
       completion(
         RptFullTunnelResult.productConnectMap(
           packetTunnelActive: false,
-          detailMessage: error.localizedDescription
+          detailMessage: describeNePreferencesError(error)
         )
       )
     }
@@ -202,10 +297,12 @@ enum RptVpnChannel {
     interval: TimeInterval,
     completion: @escaping (Bool) -> Void
   ) {
-    if manager.connection.status == .connected {
+    let st = manager.connection.status
+    if st == .connected {
       completion(true)
       return
     }
+    // Still bringing the extension up — keep waiting until maxAttempts.
     if attempt >= maxAttempts {
       completion(false)
       return

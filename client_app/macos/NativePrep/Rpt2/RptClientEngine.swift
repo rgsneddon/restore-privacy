@@ -445,8 +445,9 @@ public enum RptTrafficShape {
     public static func makeCoverPayload(size: Int = productCoverSize) -> Data {
         let n = max(16, min(2048, size))
         var noise = Data(count: n - coverMagic.count)
+        let noiseCount = noise.count
         _ = noise.withUnsafeMutableBytes {
-            SecRandomCopyBytes(kSecRandomDefault, noise.count, $0.baseAddress!)
+            SecRandomCopyBytes(kSecRandomDefault, noiseCount, $0.baseAddress!)
         }
         var out = coverMagic
         out.append(noise)

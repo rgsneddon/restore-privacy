@@ -6,8 +6,9 @@ public enum RptFullTunnelResult {
     /// System VPN did not come up — residual ISP IP is expected.
     public static let packetTunnelNotActiveMessage =
         "System VPN (Packet Tunnel) did not become active — your residual public IP "
-        + "will not change. Enable Network Extension signing/entitlements and approve "
-        + "the VPN configuration, then try again."
+        + "will not change. Use a Team-signed residual build with Network Extension "
+        + "on host + Packet Tunnel (scripts/sign_macos_residual_team.py), approve the "
+        + "VPN configuration in System Settings → Network → VPN & Filters, then try again."
 
     /// Node HELLO succeeded but no system tunnel — residual IP unchanged.
     public static let hostOnlyHelloNotFullTunnelMessage =
