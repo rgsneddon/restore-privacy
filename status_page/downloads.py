@@ -13,6 +13,13 @@ RELEASE_VERSION = "1.0.0"
 GITHUB_OWNER = "rgsneddon"
 GITHUB_REPO = "RUST-IN-PRIVACY"
 RELEASE_TAG = "v1.0.0"
+# Explicit public release page (source of truth for download buttons).
+RELEASE_PAGE_URL = (
+    f"https://github.com/{GITHUB_OWNER}/{GITHUB_REPO}/releases/tag/{RELEASE_TAG}"
+)
+RELEASE_DOWNLOAD_BASE = (
+    f"https://github.com/{GITHUB_OWNER}/{GITHUB_REPO}/releases/download/{RELEASE_TAG}"
+)
 
 # Canonical public asset filenames (must match GitHub Release assets).
 WINDOWS_ZIP_FILENAME = f"restore-privacy-rust-{RELEASE_VERSION}-windows-x64.zip"
@@ -30,10 +37,8 @@ class DownloadAsset:
 
     @property
     def url(self) -> str:
-        return (
-            f"https://github.com/{GITHUB_OWNER}/{GITHUB_REPO}/releases/download/"
-            f"{RELEASE_TAG}/{self.filename}"
-        )
+        """Direct asset URL under the public v1.0.0 release (not a relative/hash link)."""
+        return f"{RELEASE_DOWNLOAD_BASE}/{self.filename}"
 
 
 RELEASE_ASSETS: tuple[DownloadAsset, ...] = (
@@ -89,9 +94,9 @@ def available_downloads(
     return out
 
 
-# Footer: link to the public Rust product repository.
-RUST_REPO_URL = "https://github.com/rgsneddon/RUST-IN-PRIVACY"
-RUST_REPO_LABEL = "Rust product (RUST-IN-PRIVACY v1.0.0)"
+# Footer: explicit link to the public v1.0.0 release page (installer source).
+RUST_REPO_URL = RELEASE_PAGE_URL
+RUST_REPO_LABEL = "All installers — RUST-IN-PRIVACY v1.0.0 release"
 
 
 def download_css() -> str:
@@ -144,7 +149,7 @@ def render_download_section_html(assets: Iterable[DownloadAsset] | None = None) 
     return f"""
   <section class="downloads" id="downloads" aria-label="Download Restore Privacy client">
     <h2>Download client v{RELEASE_VERSION}</h2>
-    <p class="dl-sub">Windows | Linux | macOS | iOS | Android - Rust host</p>
+    <p class="dl-sub">Windows | Linux | macOS | iOS | Android - from <a class="rust-link" href="{RELEASE_PAGE_URL}" rel="noopener noreferrer" target="_blank">v1.0.0 release</a></p>
     <div class="dl-buttons">
 {links_html}
 {render_rust_footer_html()}

@@ -18,6 +18,7 @@ from downloads import (  # noqa: E402
     ANDROID_APK_FILENAME,
     IOS_ZIP_FILENAME,
     MACOS_ZIP_FILENAME,
+    RELEASE_PAGE_URL,
     RUST_REPO_URL,
     WINDOWS_ZIP_FILENAME,
     available_downloads,
@@ -51,8 +52,18 @@ class TestPublicPageWithDownloads(unittest.TestCase):
         self.assertIn(ANDROID_APK_FILENAME, html)
         self.assertNotIn("apple-prep", html)
         for a in available_downloads():
-            self.assertIn(a.url, html)
+            self.assertIn(f'href="{a.url}"', html)
+            self.assertTrue(
+                a.url.startswith(
+                    "https://github.com/rgsneddon/RUST-IN-PRIVACY/releases/download/v1.0.0/"
+                )
+            )
+        self.assertEqual(
+            RELEASE_PAGE_URL,
+            "https://github.com/rgsneddon/RUST-IN-PRIVACY/releases/tag/v1.0.0",
+        )
         self.assertIn(RUST_REPO_URL, html)
+        self.assertIn(RELEASE_PAGE_URL, html)
         self.assertIn("RUST-IN-PRIVACY", html)
         self.assertIn('id="rust-repo-link"', html)
         self.assertNotIn("connect-via-web", html)

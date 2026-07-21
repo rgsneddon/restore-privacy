@@ -52,7 +52,8 @@ class TestDownloadsNoMojibake(unittest.TestCase):
         html = render_download_section_html()
         _assert_clean(html, "download html")
         self.assertIn(f"Download client v{RELEASE_VERSION}", html)
-        self.assertIn("Windows | Linux | macOS | iOS | Android - Rust host", html)
+        self.assertIn("Windows | Linux | macOS | iOS | Android - from", html)
+        self.assertIn("releases/tag/v1.0.0", html)
         self.assertNotIn("apple-prep", html)
         self.assertNotIn("Â·", html)
 
