@@ -947,12 +947,17 @@ def process_checkout_completed_event(event: dict[str, Any]) -> str | None:
     Supports server Checkout (metadata platform/filename/amount) and Payment Link
     pays that set ``client_reference_id`` to the requested platform via the
     download-button URL query.
+
+    **Only if paid:** ``payment_status`` must be ``paid`` or ``no_payment_required``.
+    **Full product price:** resolved amount must equal ``PRICE_PENCE`` (245) — underpay
+    / zero / missing amount never mint a grant.
     """
     if event.get("type") != "checkout.session.completed":
         return None
     obj = event.get("data", {}).get("object") or {}
-    payment_status = str(obj.get("payment_status") or "").lower()
-    if payment_status and payment_status not in ("paid", "no_payment_required"):
+    # Require an explicit paid status (blank/missing is not enough).
+    payment_status = str(obj.get("payment_status") or "").strip().lower()
+    if payment_status not in ("paid", "no_payment_required"):
         return None
     meta = obj.get("metadata") or {}
     if not isinstance(meta, dict):
@@ -965,32 +970,27 @@ def process_checkout_completed_event(event: dict[str, Any]) -> str | None:
         filename = platform_filename(platform) or ""
     if not platform or not filename:
         return None
+    # Resolve paid amount in pence; never invent PRICE_PENCE when zero/missing.
+    amount: int | None = None
     try:
         if meta.get("amount_pence") is not None and str(meta.get("amount_pence")).strip() != "":
             amount = int(meta.get("amount_pence"))
-            if amount != PRICE_PENCE:
-                return None
-            amount = PRICE_PENCE
-        elif obj.get("amount_total") is not None:
+        elif obj.get("amount_total") is not None and str(obj.get("amount_total")).strip() != "":
             amount = int(obj.get("amount_total"))
-            if amount <= 0:
-                amount = PRICE_PENCE
-        else:
-            amount = PRICE_PENCE
     except (TypeError, ValueError):
-        amount = PRICE_PENCE
-    currency = str(meta.get("currency") or obj.get("currency") or PRICE_CURRENCY).lower()
-    if meta.get("currency") and str(meta.get("currency")).lower() != PRICE_CURRENCY:
         return None
-    if not currency:
-        currency = PRICE_CURRENCY
+    if amount is None or amount != PRICE_PENCE:
+        return None
+    currency = str(meta.get("currency") or obj.get("currency") or "").strip().lower()
+    if currency != PRICE_CURRENCY:
+        return None
     session_id = str(obj.get("id") or "")
     return mint_download_token(
         filename=filename,
         platform=platform,
         session_id=session_id,
-        amount_pence=amount if amount > 0 else PRICE_PENCE,
-        currency=currency if currency else PRICE_CURRENCY,
+        amount_pence=PRICE_PENCE,
+        currency=PRICE_CURRENCY,
     )
 
 

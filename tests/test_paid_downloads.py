@@ -226,6 +226,7 @@ class TestWebhookAndTokens(unittest.TestCase):
                 "data": {
                     "object": {
                         "id": "cs_paid_1",
+                        "payment_status": "paid",
                         "currency": "gbp",
                         "metadata": {
                             "platform": "windows",
@@ -267,6 +268,7 @@ class TestWebhookAndTokens(unittest.TestCase):
                     "object": {
                         "id": "cs_bad_amt",
                         "payment_status": "paid",
+                        "currency": "gbp",
                         "metadata": {
                             "platform": "ios",
                             "filename": "restore-privacy-client-0.2.9-ios.zip",
@@ -311,6 +313,82 @@ class TestWebhookAndTokens(unittest.TestCase):
         self.assertEqual(grant["platform"], "windows")
         self.assertTrue(str(grant["filename"]).endswith("windows-x64-setup.exe"))
         self.assertIsNone(payments.redeem_download_token(token))
+
+    def test_payment_link_zero_amount_or_missing_status_refuses_grant(self):
+        """Only if paid at full price — zero amount / blank status must not mint."""
+        secret = "whsec_zero"
+        # amount_total=0 must not be rewritten to 245
+        payload_zero = json.dumps(
+            {
+                "type": "checkout.session.completed",
+                "data": {
+                    "object": {
+                        "id": "cs_zero_amt",
+                        "payment_status": "paid",
+                        "currency": "gbp",
+                        "amount_total": 0,
+                        "client_reference_id": "linux",
+                        "metadata": {},
+                    }
+                },
+            }
+        ).encode("utf-8")
+        r0 = payments.handle_stripe_webhook(
+            payload_zero, self._sign(payload_zero, secret), secret=secret
+        )
+        self.assertTrue(r0["ok"])
+        self.assertFalse(r0["granted"])
+        self.assertIsNone(
+            payments.process_checkout_completed_event(json.loads(payload_zero))
+        )
+        # missing payment_status must not mint
+        payload_nostatus = json.dumps(
+            {
+                "type": "checkout.session.completed",
+                "data": {
+                    "object": {
+                        "id": "cs_no_status",
+                        "currency": "gbp",
+                        "amount_total": 245,
+                        "client_reference_id": "linux",
+                        "metadata": {},
+                    }
+                },
+            }
+        ).encode("utf-8")
+        r1 = payments.handle_stripe_webhook(
+            payload_nostatus, self._sign(payload_nostatus, secret), secret=secret
+        )
+        self.assertTrue(r1["ok"])
+        self.assertFalse(r1["granted"])
+
+    def test_payment_link_underpay_amount_total_refuses_grant(self):
+        """amount_total must equal product PRICE_PENCE (245), not a lower paid amount."""
+        secret = "whsec_under"
+        payload = json.dumps(
+            {
+                "type": "checkout.session.completed",
+                "data": {
+                    "object": {
+                        "id": "cs_underpay",
+                        "payment_status": "paid",
+                        "currency": "gbp",
+                        "amount_total": 100,
+                        "client_reference_id": "linux",
+                        "metadata": {},
+                    }
+                },
+            }
+        ).encode("utf-8")
+        result = payments.handle_stripe_webhook(
+            payload, self._sign(payload, secret), secret=secret
+        )
+        self.assertTrue(result["ok"])
+        self.assertFalse(result["granted"])
+        self.assertIsNone(
+            payments.process_checkout_completed_event(json.loads(payload))
+        )
+        self.assertEqual(payments.list_recent_grants(), [])
 
 
 class TestAdminAuth(unittest.TestCase):
@@ -421,6 +499,7 @@ class TestBuyerSuccessFulfilment(unittest.TestCase):
                 "data": {
                     "object": {
                         "id": session_id,
+                        "payment_status": "paid",
                         "currency": "gbp",
                         "metadata": {
                             "platform": "linux",
@@ -456,6 +535,7 @@ class TestBuyerSuccessFulfilment(unittest.TestCase):
                 "data": {
                     "object": {
                         "id": session_id,
+                        "payment_status": "paid",
                         "currency": "gbp",
                         "metadata": {
                             "platform": "windows",
