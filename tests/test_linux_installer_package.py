@@ -70,7 +70,7 @@ class TestPackageLinuxHelpers(unittest.TestCase):
         self.assertIn(f"client_reference_id={linux.platform}", html)
         self.assertIn("donate.stripe.com", html)
         self.assertIn(linux.filename, html)
-        self.assertIn("/releases/download/0.3.2/", linux.url)
+        self.assertIn("/releases/download/0.3.3/", linux.url)
         self.assertTrue(linux.filename.endswith(".tar.gz"))
 
     def test_readme_primary_path_is_install_sh(self):

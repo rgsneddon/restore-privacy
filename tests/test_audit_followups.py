@@ -26,7 +26,7 @@ class TestDocsM1M2(unittest.TestCase):
 
 class TestReleaseGates(unittest.TestCase):
     def test_current_build_release_has_assert_no_priv(self):
-        script = (ROOT / "scripts" / "build_release_0.3.2.py").read_text(encoding="utf-8")
+        script = (ROOT / "scripts" / "build_release_0.3.3.py").read_text(encoding="utf-8")
         self.assertIn("_assert_no_priv", script)
         self.assertIn("def _assert_no_priv", script)
 
@@ -88,7 +88,7 @@ class TestAppleAndOps(unittest.TestCase):
         path = ROOT / "scripts" / "RELEASE.md"
         self.assertTrue(path.is_file())
         text = path.read_text(encoding="utf-8")
-        self.assertIn("build_release_0.3.2.py", text)
+        self.assertIn("build_release_0.3.3.py", text)
         self.assertIn("_assert_no_priv", text)
         self.assertIn("package_linux.py", text)
 

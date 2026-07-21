@@ -72,7 +72,7 @@ class TestPublicDocsRegistry(unittest.TestCase):
         self.assertIn("text/html", ctype)
         html = body.decode("utf-8")
         self.assertIn("Privacy", html)
-        self.assertIn("0.3.2", html)
+        self.assertIn("0.3.3", html)
         self.assertIn("restoreprivacy.online", html)
         # No raw markdown dump as the sole body
         self.assertIn("<h1>", html.lower() + html)  # headings rendered
@@ -88,7 +88,7 @@ class TestPublicDocsRegistry(unittest.TestCase):
         assert audit is not None
         ahtml = audit[0].decode("utf-8")
         self.assertIn("Audit", ahtml)
-        self.assertIn("0.3.2", ahtml)
+        self.assertIn("0.3.3", ahtml)
         self.assertIn("doc-table", ahtml)  # tables rendered
 
 

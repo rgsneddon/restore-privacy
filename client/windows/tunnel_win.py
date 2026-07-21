@@ -222,7 +222,7 @@ def apply_routes_for_adapter(
     fails — otherwise UDP to the node is trapped inside the tunnel (recursive
     blackhole) while the UI still claims "server pinned".
 
-    ``physical_gw`` may be prefetched (flyclient cold path overlaps HELLO).
+    ``physical_gw`` may be prefetched while HELLO runs (overlap cold attach).
     """
     cmds = windows_route_commands(
         plan, server_host, if_index=if_index, include_catchall=include_catchall
@@ -545,14 +545,14 @@ def start_full_tunnel(
     When False, Wintun is preferred but queue TUN may start session dataplane
     without changing residual public IP.
 
-    Flyclient-style: if ``prior`` already has residual routes for the same plan IP,
-    return it without re-installing dual /1. ``physical_gw`` may be prefetched
-    during HELLO to shorten the cold residual attach path.
+    If ``prior`` already has residual routes for the same plan IP, return it
+    without re-installing dual /1. ``physical_gw`` may be prefetched during HELLO
+    to shorten the residual attach path.
     """
     if not client.session:
         return WindowsTunnelResult(False, "no session", [])
 
-    # Flyclient tip: residual already applied for this session/plan
+    # Residual already applied for this session/plan (idempotent re-attach)
     if (
         prior is not None
         and prior.ok
@@ -566,7 +566,7 @@ def start_full_tunnel(
     ):
         return WindowsTunnelResult(
             ok=True,
-            message="flyclient skip — residual already applied",
+            message="residual already applied for this session",
             applied_commands=list(prior.applied_commands or []),
             tun=prior.tun,
             dataplane=prior.dataplane,

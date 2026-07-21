@@ -835,7 +835,7 @@ class TunnelClientApp:
         def work() -> None:
             # Handshake + residual tunnel attach stay off the Tk UI thread so
             # Windows does not show "(Not Responding)" while Wintun/routes run.
-            # Flyclient-style: tip residual state + prefetch physical GW during HELLO.
+            # Prefetch physical GW while HELLO runs to shorten residual attach.
             from concurrent.futures import ThreadPoolExecutor
 
             from client.windows.tunnel_win import physical_default_gateway
@@ -844,10 +844,7 @@ class TunnelClientApp:
             residual_ready = residual_ip_capture_active(prior)
             with ThreadPoolExecutor(max_workers=1) as pool:
                 gw_fut = pool.submit(physical_default_gateway)
-                result = self.client.connect(
-                    timeout=20.0,
-                    residual_ready=residual_ready,
-                )
+                result = self.client.connect(timeout=20.0)
                 try:
                     phys_gw = gw_fut.result(timeout=8)
                 except Exception:
@@ -873,7 +870,7 @@ class TunnelClientApp:
                     KIND_SESSION, f"Session ready (tunnel address {vpn_ip})"
                 )
                 if residual_ready:
-                    self._log("Flyclient tip: residual already active — fast path…")
+                    self._log("Residual already active — confirming tunnel attach…")
                 else:
                     self._log("Attaching residual tunnel (Wintun + routes)…")
 
@@ -881,7 +878,7 @@ class TunnelClientApp:
 
             try:
                 # Product residual path: Wintun + dual /1 only (never on UI thread)
-                # prior= enables flyclient skip when residual already applied
+                # prior= reuses residual routes when already applied for this session
                 tun_res = start_full_tunnel(
                     self.client,
                     result.tunnel_plan,

@@ -251,8 +251,8 @@ def start_full_tunnel(
     Product residual path (``require_system_capture=True``) refuses success without
     real TUN + dual /1. ``dry_run`` only returns the planned ``ip`` commands.
 
-    Flyclient-style: if ``prior`` already has residual routes for the same plan IP,
-    return it without re-applying routes. ``prefetched_default_route`` is
+    If ``prior`` already has residual routes for the same plan IP, return it
+    without re-applying routes. ``prefetched_default_route`` is
     ``(gw, phys_dev)`` from resolve_default_route() overlapped with HELLO.
     """
     if not client.session:
@@ -270,7 +270,7 @@ def start_full_tunnel(
     ):
         return LinuxTunnelResult(
             True,
-            "flyclient skip — residual already applied",
+            "residual already applied for this session",
             applied_commands=list(prior.applied_commands or []),
             system_capture=True,
             routes_applied=True,

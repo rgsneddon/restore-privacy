@@ -709,7 +709,7 @@ class TunnelClientApp:
 
         def work() -> None:
             # Handshake + residual TUN/routes off the Tk UI thread.
-            # Flyclient-style: tip residual state + prefetch default route during HELLO.
+            # Prefetch default route while HELLO runs to shorten residual attach.
             from concurrent.futures import ThreadPoolExecutor
 
             from client.linux.tunnel_linux import resolve_default_route
@@ -718,10 +718,7 @@ class TunnelClientApp:
             residual_ready = residual_ip_capture_active(prior)
             with ThreadPoolExecutor(max_workers=1) as pool:
                 route_fut = pool.submit(resolve_default_route)
-                result = self.client.connect(
-                    timeout=20.0,
-                    residual_ready=residual_ready,
-                )
+                result = self.client.connect(timeout=20.0)
                 try:
                     prefetched_route = route_fut.result(timeout=8)
                 except Exception:
@@ -747,7 +744,7 @@ class TunnelClientApp:
                 self._log(f"Session ready (tunnel address {vpn_ip})")
                 append_event(KIND_SESSION, f"Session ready (tunnel address {vpn_ip})")
                 if residual_ready:
-                    self._log("Flyclient tip: residual already active — fast path…")
+                    self._log("Residual already active — confirming tunnel attach…")
                 else:
                     self._log("Attaching residual tunnel (TUN + dual /1 routes)…")
 
