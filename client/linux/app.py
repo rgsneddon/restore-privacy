@@ -38,7 +38,7 @@ from client.ui_theme import (
     PANEL_PAD,
     PRIMARY,
     PRIMARY_DARK,
-    SCROLLING_PRIVACY_TEXT,
+    PRIVACY_MESSAGE_TEXT,
     STATUS_ERROR_FG,
     STATUS_OK,
     TEXT,
@@ -215,7 +215,7 @@ class TunnelClientApp:
         ).pack(anchor="w", pady=(2, 0))
         tk.Label(
             banner,
-            text=SCROLLING_PRIVACY_TEXT,
+            text=PRIVACY_MESSAGE_TEXT,
             bg=PRIMARY_DARK,
             fg=WHITE,
             font=("DejaVu Sans", 8),

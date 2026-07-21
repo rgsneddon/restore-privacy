@@ -21,7 +21,7 @@ Restore Privacy is built from the ground up using unashamed vibe coding methods 
   - **Autoconnect on launch** (opt-in; defaults off)
   - **Settings** links to the **most recent audit**, **privacy policy**, and **end user licence**
 - System tray identity **Privacy Restored** (Windows) with product **logo** icons
-- Scrolling message:  
+- Privacy message:  
   `lightweight vpn to restore your privacy - no user data is retained - your privacy is restored`
 - **Full-device VPN** when the OS grants VPN permission (Windows UAC / Wintun dual `/1`, Android VPN consent, Apple Packet Tunnel when signed)
 - Residual public IP uses the **VPN node** only when full-tunnel routes are active (**honest status** otherwise)

@@ -22,7 +22,7 @@ from client.full_tunnel import (  # noqa: E402
 )
 from client.ui_theme import (  # noqa: E402
     BANNER_BG,
-    SCROLLING_PRIVACY_TEXT,
+    PRIVACY_MESSAGE_TEXT,
     WINDOW_BG,
     WINDOW_FG,
 )
@@ -91,9 +91,9 @@ class TestFullTunnel(unittest.TestCase):
 
 
 class TestUiTheme(unittest.TestCase):
-    def test_scrolling_string_exact(self):
+    def test_privacy_message_string_exact(self):
         self.assertEqual(
-            SCROLLING_PRIVACY_TEXT,
+            PRIVACY_MESSAGE_TEXT,
             "lightweight vpn to restore your privacy - no user data is retained - your privacy is restored",
         )
         # Product shell uses restorebritain contact palette (not Win3.1-only)
@@ -107,7 +107,7 @@ class TestUiTheme(unittest.TestCase):
 
     def test_windows_app_manual_connect_and_theme_in_source(self):
         app = (ROOT / "client" / "windows" / "app.py").read_text(encoding="utf-8")
-        self.assertIn("SCROLLING_PRIVACY_TEXT", app)
+        self.assertIn("PRIVACY_MESSAGE_TEXT", app)
         self.assertIn("CHROME_BG", app)
         self.assertIn("_start_connect", app)
         self.assertIn("_start_disconnect", app)
@@ -119,7 +119,7 @@ class TestUiTheme(unittest.TestCase):
         main = (ROOT / "client_app" / "lib" / "main.dart").read_text(encoding="utf-8")
         theme = (ROOT / "client_app" / "lib" / "theme.dart").read_text(encoding="utf-8")
         vpn = (ROOT / "client_app" / "lib" / "vpn_controller.dart").read_text(encoding="utf-8")
-        self.assertIn(SCROLLING_PRIVACY_TEXT, theme)
+        self.assertIn(PRIVACY_MESSAGE_TEXT, theme)
         # Windows-aligned product shell tokens
         self.assertIn("kChromeBg", main)
         self.assertIn("kPrimary", theme)

@@ -40,7 +40,7 @@ Without elevation, the session can still handshake but OS-wide routes cannot be 
 A zero-UAC full-system VPN would need a pre-installed privileged Windows service; the
 one-click UAC re-launch is the practical workaround.
 
-Retro UI: dark blue banner, black background, white text, scrolling privacy string; **auto-connect on launch**.
+Retro UI: dark blue banner, black background, white text, static privacy message; **auto-connect on launch**.
 
 ## Android
 

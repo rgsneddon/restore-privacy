@@ -105,7 +105,7 @@ python3 scripts/inject_apple_secrets.py \
 Same Flutter UI and auto-connect as Windows/Android (`lib/main.dart`):
 
 - Banner `#000080`, black background, white monospace text  
-- Exact scrolling privacy string in `lib/theme.dart`  
+- Exact privacy message string in `lib/theme.dart`  
 - Full tunnel intent `0.0.0.0/0`  
 - UK IP gate before tunnel attach  
 - AppIcon under `Runner/Assets.xcassets/AppIcon.appiconset/`

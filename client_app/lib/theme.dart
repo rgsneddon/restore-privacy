@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 
 /// Product palette aligned with Windows client (restorebritain Cupertino chrome).
-const String kScrollingPrivacyText =
+const String kPrivacyMessageText =
     'lightweight vpn to restore your privacy - no user data is retained - your privacy is restored';
 
 const String kAppTitle = 'Restore Privacy';

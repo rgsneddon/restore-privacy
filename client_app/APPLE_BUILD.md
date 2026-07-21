@@ -17,7 +17,7 @@ Build and sign on a **Mac** with Xcode. This Windows checkout only prepares sour
 | Connect args | `host`, `port`, `fullTunnel`, `sessionName`, `route`, `autoConnect` |
 | Result map | `{ ok, message, vpnIp?, fullTunnelActive?, hostOnlySession? }` Ã¢â‚¬â€ use `lib/connect_status.dart` |
 | Residual public IP | Changes **only** when OS Packet Tunnel is `.connected`. Host-side RPT2 HELLO alone is diagnostic (`ok: false`). |
-| UI | Retro: banner `#000080`, black bg, white text; scrolling privacy string in `lib/theme.dart` |
+| UI | Retro: banner `#000080`, black bg, white text; privacy message string in `lib/theme.dart` |
 | Auto-connect | On launch (`RptConfig.autoConnectOnLaunch`) |
 | Full tunnel | `0.0.0.0/0` intent |
 | UK IP gate | **Removed** (0.1.9): no public-IP geo admission; device keys + RPT2 crypto only |

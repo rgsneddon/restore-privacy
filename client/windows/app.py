@@ -36,7 +36,7 @@ from client.ui_theme import (
     PANEL_PAD,
     PRIMARY,
     PRIMARY_DARK,
-    SCROLLING_PRIVACY_TEXT,
+    PRIVACY_MESSAGE_TEXT,
     STATUS_ERROR,
     STATUS_ERROR_FG,
     STATUS_OK,
@@ -480,7 +480,7 @@ class TunnelClientApp:
         self.output.pack(fill=tk.BOTH, expand=True)
 
         self._log(f"{APP_TITLE} - ready")
-        self._log(SCROLLING_PRIVACY_TEXT)
+        self._log(PRIVACY_MESSAGE_TEXT)
         self._log("Press Connect to start the VPN. Closing this window does not disconnect.")
         ver = read_running_version()
         self._log(f"Version {ver} (latest catalog: {catalog_latest_version()})")

@@ -102,7 +102,7 @@ class _TunnelHomeState extends State<TunnelHome> with WidgetsBindingObserver {
       await _initSettings();
       if (!mounted) return;
       _append(kAppTitle);
-      _append(kScrollingPrivacyText);
+      _append(kPrivacyMessageText);
       _append(kSeamlessHint);
       await _rehydrateSession(from: 'launch');
       if (!_licenceAccepted) {

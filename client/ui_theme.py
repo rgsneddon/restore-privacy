@@ -11,8 +11,8 @@ from __future__ import annotations
 import os
 from pathlib import Path
 
-# Exact privacy copy retained for product continuity
-SCROLLING_PRIVACY_TEXT = (
+# Exact privacy copy retained for product continuity (static banner/message — not animated)
+PRIVACY_MESSAGE_TEXT = (
     "lightweight vpn to restore your privacy - no user data is retained - your privacy is restored"
 )
 

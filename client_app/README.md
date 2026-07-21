@@ -12,7 +12,7 @@ Cross-platform UI for the **RPT2** tunnel (custom protocol — not WireGuard/Ope
 
 - Endpoint / full tunnel / auto-connect: `lib/rpt_config.dart`  
 - Method channel: `restore_privacy/vpn` (`lib/vpn_controller.dart`)  
-- Theme / scrolling privacy string: `lib/theme.dart`  
+- Theme / privacy message string: `lib/theme.dart`  
 
 ## Apple (MacBook)
 

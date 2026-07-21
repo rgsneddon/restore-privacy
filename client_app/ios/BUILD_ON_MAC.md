@@ -66,7 +66,7 @@ See `NativePrep/RptSecrets.swift` for path helper stubs.
 
 - Auto-connect on launch (`lib/main.dart` → `VpnController.autoConnectOnLaunch`)  
 - Retro UI: dark blue `#000080`, black bg, white text  
-- Scrolling string (exact):  
+- Privacy message string (exact):  
   `lightweight vpn to restore your privacy - no user data is retained - your privacy is restored`  
 - Full tunnel `0.0.0.0/0` via the Packet Tunnel settings  
 - UK public-IP gate before handshake (mirror Android `UkIpGate` / Python `client/uk_gate.py`)  
