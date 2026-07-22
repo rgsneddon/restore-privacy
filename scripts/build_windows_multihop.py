@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""One-command Windows multihop residual rebuild for catalog 0.3.8.
+"""One-command Windows multihop residual rebuild for the current catalog pin.
 
 Run **on a Windows x64 machine** (PyInstaller cannot cross-build Windows PE from macOS):
 
@@ -9,14 +9,22 @@ Or double-click / run:
 
   scripts\\build_windows_multihop.bat
 
+Version pin (first match wins):
+
+1. ``--version X.Y.Z`` CLI
+2. env ``RPT_BUILD_VERSION``
+3. monorepo ``client/VERSION`` file
+4. fallback ``0.3.9``
+
 Produces::
 
-  releases/0.3.8/restore-privacy-client-0.3.8-windows-x64-setup.exe
+  releases/{VERSION}/restore-privacy-client-{VERSION}-windows-x64-setup.exe
 
-Ships current ``client/`` (incl. multihop residual-via-exit), entry + exit ElGamal
-**public** keys only, Wintun, frozen runtime — no ``*.priv``.
+Ships **current** ``client/`` tree (privacy-scale Settings, hot-apply, node_ping,
+multihop residual-via-exit, keygen gate), entry + exit ElGamal **public** keys
+only, Wintun, frozen runtime — no ``*.priv``.
 
-See ``client/windows/WINDOWS_HANDOFF_0.3.8.md``.
+See ``client/windows/WINDOWS_HANDOFF_0.3.9.md`` (or current handoff).
 """
 
 from __future__ import annotations
@@ -25,12 +33,29 @@ import argparse
 import hashlib
 import importlib.util
 import json
+import os
 import shutil
 import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-VERSION = "0.3.8"
+
+
+def _resolve_version(cli_version: str | None = None) -> str:
+    if cli_version and str(cli_version).strip():
+        return str(cli_version).strip()
+    env = (os.environ.get("RPT_BUILD_VERSION") or "").strip()
+    if env:
+        return env
+    pin = ROOT / "client" / "VERSION"
+    if pin.is_file():
+        v = pin.read_text(encoding="utf-8").strip()
+        if v:
+            return v
+    return "0.3.9"
+
+
+VERSION = _resolve_version()
 OUT = ROOT / "releases" / VERSION
 WINDOWS_EXE_NAME = f"restore-privacy-client-{VERSION}-windows-x64-setup.exe"
 RECIPE = ROOT / "scripts" / "build_release_0.0.8.py"
@@ -119,6 +144,56 @@ def _post_check(setup: Path) -> None:
             "confirm product/exit_node_elgamal.pub was injected.",
             file=sys.stderr,
         )
+    # Prefer onedir proof for version + Settings ping strings (SFX may compress)
+    onedir = ROOT / "dist" / VERSION / f"RestorePrivacy-{VERSION}"
+    if not onedir.is_dir():
+        onedir = ROOT / "dist" / f"RestorePrivacy-{VERSION}"
+    if onedir.is_dir():
+        ver_file = onedir / "client" / "VERSION"
+        if not ver_file.is_file():
+            # PyInstaller may nest under _internal
+            cands = list(onedir.rglob("VERSION"))
+            ver_file = next((p for p in cands if p.is_file()), ver_file)
+        if ver_file.is_file():
+            pin = ver_file.read_text(encoding="utf-8", errors="replace").strip()
+            print(f"  onedir VERSION file: {ver_file} → {pin!r}")
+            if pin != VERSION:
+                raise RuntimeError(
+                    f"onedir VERSION pin {pin!r} != build VERSION {VERSION!r}"
+                )
+        # Source/strings for Settings ping must exist in frozen tree or .pyz
+        blob = b""
+        for p in onedir.rglob("*"):
+            if not p.is_file():
+                continue
+            if p.suffix.lower() in {".py", ".pyc", ".pyz", ".exe", ".dll"} or p.name in {
+                "VERSION",
+                "base_library.zip",
+            }:
+                try:
+                    if p.stat().st_size < 80_000_000:
+                        blob += p.read_bytes()
+                except OSError:
+                    continue
+        need = (
+            VERSION.encode("ascii"),
+            b"measure_settings_pings",
+            b"Ping statistics",
+            b"privacy_traffic_shape",
+            b"node_ping",
+        )
+        missing = [m.decode() for m in need if m not in blob and m not in raw]
+        if missing:
+            # Also scan setup raw once more for compressed-friendly short pins
+            missing2 = [m for m in missing if m.encode() not in raw]
+            if missing2:
+                print(
+                    f"WARNING: onedir/setup missing markers {missing2} "
+                    "(may be zip-compressed inside pyz; extract client for full proof)",
+                    file=sys.stderr,
+                )
+        else:
+            print("  onedir/setup markers: VERSION + node_ping + privacy settings OK")
     dig = sha256_file(setup)
     print(f"windows: {setup}")
     print(f"  size:   {setup.stat().st_size} bytes")
@@ -160,6 +235,14 @@ def _post_check(setup: Path) -> None:
             print(f"manifest update skipped: {exc}", file=sys.stderr)
 
 
+def _apply_version(ver: str) -> None:
+    """Update module-level version paths after CLI/env resolution."""
+    global VERSION, OUT, WINDOWS_EXE_NAME
+    VERSION = str(ver).strip()
+    OUT = ROOT / "releases" / VERSION
+    WINDOWS_EXE_NAME = f"restore-privacy-client-{VERSION}-windows-x64-setup.exe"
+
+
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument(
@@ -167,7 +250,13 @@ def main(argv: list[str] | None = None) -> int:
         action="store_true",
         help="Verify prereqs (PyInstaller, pubs, wintun) without building",
     )
+    ap.add_argument(
+        "--version",
+        default="",
+        help="Catalog version pin (default: client/VERSION or RPT_BUILD_VERSION)",
+    )
     args = ap.parse_args(argv)
+    _apply_version(_resolve_version(args.version or None))
 
     try:
         import PyInstaller  # noqa: F401
@@ -193,6 +282,7 @@ def main(argv: list[str] | None = None) -> int:
         ROOT / "product" / "exit_node_elgamal.pub",
         ROOT / "client" / "multihop.py",
         ROOT / "client" / "windows" / "app.py",
+        ROOT / "client" / "node_ping.py",
         RECIPE,
     ):
         if not p.is_file():
@@ -206,6 +296,7 @@ def main(argv: list[str] | None = None) -> int:
         print(f"  recipe={RECIPE}")
         print(f"  entry+exit pubs under product/")
         print(f"  multihop.py present")
+        print(f"  node_ping.py present")
         return 0
 
     try:

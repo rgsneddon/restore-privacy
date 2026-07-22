@@ -50,3 +50,6 @@ status_page/data/
 status_page/assets/*/
 !status_page/assets/README.md
 
+
+_tmp_pyz.pyz
+
