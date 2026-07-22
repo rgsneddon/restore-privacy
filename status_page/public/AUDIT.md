@@ -133,7 +133,7 @@ Latest automated security audit for production node **82.221.101.241** and the i
 | Live node healthy (TCP+HTTP) | YES |
 | Catalog installers AUDIT STATE | 🟩 (see top package table) |
 
-**Overall posture:** **Strong** for residual honesty (`residual_ip_capture`), no public live count, no-phones-home Connect, packaging strip of `*.priv`, tunnel DNS + DoT, Settings transparency. Multi-hop residual is **opt-in** (`RPT_MULTIHOP_ENABLED=1`): residual-via-exit (Romania); default single-hop Iceland entry — not full intermediate encapsulation. Windows **0.3.9** PE is rebuilt with multihop prep, privacy-scale Settings, and device→node ping stats. Product kill-switch is **off by default** (opt-in ``RPT_KILL_SWITCH=1`` only). Installer package confidence is the RAG table at the top of this audit.
+**Overall posture:** **Strong** for residual honesty (`residual_ip_capture`), no public live count, no-phones-home Connect, packaging strip of `*.priv`, tunnel DNS + DoT, Settings transparency. Multi-hop residual is **opt-in** (`RPT_MULTIHOP_ENABLED=1`): residual-via-exit (Romania); default single-hop Iceland entry — not full intermediate encapsulation. Windows **0.3.9** PE is rebuilt with multihop prep, privacy-scale Settings, and device-to-node ping stats. Product kill-switch is **off by default** (opt-in ``RPT_KILL_SWITCH=1`` only). Installer package confidence is the RAG table at the top of this audit.
 
 **Primary residual risks (open by design / environment):**
 
