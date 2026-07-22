@@ -99,7 +99,7 @@ class TestHowToBuyAndHttp(unittest.TestCase):
     def test_how_to_buy_html_has_payment_and_docs(self):
         html = public_docs.render_how_to_buy_html().decode("utf-8")
         self.assertIn("how-to-buy-heading", html)
-        self.assertIn("donate.stripe.com", html)
+        self.assertIn("buy.stripe.com", html)
         self.assertIn("how-to-buy-payment-page", html)
         self.assertIn("/LICENSE", html)
         self.assertIn("/PRIVACY_POLICY.md", html)

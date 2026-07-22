@@ -147,7 +147,7 @@ class TestUpgradeBanner(unittest.TestCase):
         self.assertNotIn("releases/latest", url)
         # Prefer Stripe payment page for Windows, else status host downloads.
         self.assertTrue(
-            "donate.stripe.com" in url
+            "buy.stripe.com" in url
             or "restoreprivacy.online" in url
             or "/#downloads" in url,
             msg=f"unexpected upgrade url: {url}",

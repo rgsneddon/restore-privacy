@@ -57,7 +57,7 @@ curl https://restoreprivacy.online/health/fulfilment
 | Field | Value |
 |-------|--------|
 | Payment Link id | `plink_1TvTu6JDavQ2TJW6FeL0dIh9` |
-| Public URL | `https://donate.stripe.com/cNi7sM4uOeWQ9TBe0q7kc00` |
+| Public URL | `https://buy.stripe.com/cNi7sM4uOeWQ9TBe0q7kc00` |
 | Default price id (may change after recreate) | `price_1TvTsaJDavQ2TJW6HZVIG7hg` |
 | Target | recurring **GBP**, **unit_amount 245**, interval **month**, trial **7 days** |
 

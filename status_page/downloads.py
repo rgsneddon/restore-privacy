@@ -161,7 +161,7 @@ PAY_AND_KEYGEN_CLAUSE = (
 BMC_TIP_URL = COFFEE_LINK_URL
 
 # --- Public buy-button mode ---
-# Default OFF (live Stripe Pay): platform controls open the operator Payment Link.
+# Default OFF (live Stripe subscription Pay): platform controls open subscription Payment Link.
 # Temporary "Coming soon" self-links: set CATALOG_BUY_BUTTONS_COMING_SOON = True, or
 # set env RPT_CATALOG_BUY_COMING_SOON=1. Force live anytime with RPT_CATALOG_BUY_LIVE=1.
 CATALOG_BUY_BUTTONS_COMING_SOON = False

@@ -53,7 +53,7 @@ class TestPublicPageWithDownloads(unittest.TestCase):
         self.assertNotIn("apple-prep", html)
         # Live catalog: Stripe Pay buttons (not Coming soon)
         self.assertIn("BUY - 0.3.7", html)
-        self.assertIn("donate.stripe.com", html)
+        self.assertIn("buy.stripe.com", html)
         self.assertIn('data-buy-mode="stripe-live"', html)
         self.assertNotIn("Coming soon", html)
         for a in available_downloads():
@@ -111,7 +111,7 @@ class TestPublicPageWithDownloads(unittest.TestCase):
                     self.assertIn("Download client v0.3.7", html)
                     self.assertIn(WINDOWS_ZIP_FILENAME, html)
                     self.assertIn("BUY - 0.3.7", html)
-                    self.assertIn("donate.stripe.com", html)
+                    self.assertIn("buy.stripe.com", html)
                     self.assertNotIn("Coming soon", html)
                     self.assertIn("£2.45", html)
                     self.assertNotIn('id="rust-repo-link"', html)

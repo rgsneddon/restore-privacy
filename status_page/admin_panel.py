@@ -975,7 +975,7 @@ def render_processor_settings_html(
                     f'<div id="stripe-whats-next" class="whats-next">'
                     f"<strong>What&apos;s next for paid downloads:</strong>"
                     f"<ul id=\"stripe-remaining-required\">{next_items}</ul>"
-                    f"<p class=\"muted\">Payment Link / Donate page alone does not enable "
+                    f"<p class=\"muted\">Subscription Payment Link alone does not enable "
                     f"Checkout token fulfilment — enter the secret key and webhook signing "
                     f"secret from Stripe Dashboard → Developers.</p></div>"
                 )

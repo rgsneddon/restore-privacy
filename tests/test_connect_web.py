@@ -39,7 +39,7 @@ class TestConnectViaWebBuilder(unittest.TestCase):
         # Paid VPN APP Shop paths (not free public GitHub release hrefs)
         for a in available_downloads():
             self.assertIn(a.pay_path, html)
-            self.assertIn("donate.stripe.com", a.pay_path)
+            self.assertIn("buy.stripe.com", a.pay_path)
             self.assertIn(f"client_reference_id={a.platform}", a.pay_path)
             self.assertNotIn(a.url, html)
         self.assertIn("not a full-device VPN", html)
@@ -49,7 +49,7 @@ class TestConnectViaWebBuilder(unittest.TestCase):
         actions = recommended_download_actions()
         self.assertGreaterEqual(len(actions), 2)
         for a in actions:
-            self.assertIn("donate.stripe.com", a["href"])
+            self.assertIn("buy.stripe.com", a["href"])
             self.assertIn("client_reference_id=", a["href"])
             self.assertNotIn("github.com/rgsneddon/restore-privacy/releases/download", a["href"])
 
@@ -91,13 +91,11 @@ class TestConnectViaWebHttp(unittest.TestCase):
                 self.assertIn("RESTORE PRIVACY", html)
                 self.assertNotIn("fetch('/api/status'", html)
                 self.assertNotIn("Connect via web", html)
-                # Downloads present; connect-via-web section remains off
-                self.assertTrue(
-                    "releases/tag/0.3.4" in html
-                    or "releases/download/0.3.4/" in html
-                    or "restore-privacy-client-0.3.4-" in html,
-                    html[:500],
-                )
+                # Downloads present (paid subscription Payment Link); connect-via-web off
+                self.assertIn("buy.stripe.com", html)
+                self.assertIn("client_reference_id=", html)
+                self.assertIn("BUY - 0.3.7", html)
+                self.assertNotIn("releases/download/", html)
 
 
 if __name__ == "__main__":

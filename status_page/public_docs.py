@@ -828,25 +828,28 @@ ol{{padding-left:1.25rem}}
   </nav>
 </header>
 <h1 id="how-to-buy-heading">How to buy Restore Privacy</h1>
-<p class="muted">Paid package download ({_escape(PRICE_LABEL)} / {PRICE_PENCE} pence GBP).
-No free permanent installer buttons on the VPN APP Shop.</p>
+<p class="muted">Monthly subscription ({_escape(PRICE_LABEL)} / month GBP, {PRICE_PENCE} pence) with a
+<strong>7-day trial</strong> via Stripe. No free permanent installer buttons on the VPN APP Shop.</p>
 
 <div class="card" id="how-to-buy-steps">
 <h2>Steps</h2>
 <ol>
   <li>Open the VPN APP Shop: <a href="{_escape(home)}">{_escape(home)}</a></li>
   <li>Choose your platform under <strong>Download client</strong>.
-      Each button opens the Stripe payment page with your package identity
-      (<code>client_reference_id</code>).</li>
-  <li>Pay on Stripe: <a id="how-to-buy-payment-page" href="{_escape(pay)}"
+      Each button opens the Stripe <strong>subscription</strong> Payment Link with your
+      package identity (<code>client_reference_id</code>).</li>
+  <li>Start the subscription on Stripe (trial then {_escape(PRICE_LABEL)}/month):
+      <a id="how-to-buy-payment-page" href="{_escape(pay)}"
       rel="noopener noreferrer" target="_blank">{_escape(pay)}</a></li>
-  <li>After payment succeeds, open the one-time download from the success page
+  <li>After checkout succeeds, open the one-time download from the success page
       (<code>{_escape(claim)}?session_id=…</code>) or contact support with your
-      Checkout session id. The link works <strong>once</strong> and expires.</li>
+      Checkout session id. The link works <strong>once</strong> and expires.
+      Your licence keygen is emailed separately.</li>
 </ol>
 <p class="muted">Webhook fulfilment uses
 <code>{_escape(webhook)}</code> with event <code>checkout.session.completed</code>
-(already configured on the status host).</p>
+(subscription trial or paid). Connect stays active through the paid period;
+refunds and subscription end revoke access.</p>
 </div>
 
 <div class="card" id="how-to-buy-public-docs">

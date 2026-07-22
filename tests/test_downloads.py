@@ -79,7 +79,7 @@ class TestDownloadCatalog(unittest.TestCase):
         self.assertEqual(by_plat["android"].filename, ANDROID_APK_FILENAME)
         for a in assets:
             self.assertEqual(a.url, f"{EXPECTED_DOWNLOAD_PREFIX}{a.filename}")
-            self.assertIn("donate.stripe.com", a.pay_path)
+            self.assertIn("buy.stripe.com", a.pay_path)
             self.assertIn(f"client_reference_id={a.platform}", a.pay_path)
 
     def test_labels_and_html_paid(self):
@@ -101,7 +101,7 @@ class TestDownloadCatalog(unittest.TestCase):
         self.assertIn(">macOS<", html)
         self.assertIn(">iOS<", html)
         self.assertIn(">Linux<", html)
-        self.assertIn("donate.stripe.com", html)
+        self.assertIn("buy.stripe.com", html)
         self.assertIn('data-buy-mode="stripe-live"', html)
         self.assertNotIn("Coming soon", html)
         # Free permanent GitHub installer hrefs must not appear in public HTML.
@@ -164,7 +164,7 @@ class TestDownloadCatalog(unittest.TestCase):
         self.assertNotIn('href="#"', html)
         self.assertIn("data-price-pence=\"245\"", html)
         self.assertIn("BUY - 0.3.7", html)
-        self.assertIn("donate.stripe.com", html)
+        self.assertIn("buy.stripe.com", html)
         self.assertNotIn("Coming soon", html)
 
     def test_download_section_omits_long_pay_flow_copy(self):
@@ -178,7 +178,7 @@ class TestDownloadCatalog(unittest.TestCase):
         # Platform controls present (live Stripe Pay default)
         self.assertIn("BUY - 0.3.7", html)
         self.assertIn('id="dl-windows"', html)
-        self.assertIn("donate.stripe.com", html)
+        self.assertIn("buy.stripe.com", html)
         # No bottom generic “Stripe payment page” footer link
         self.assertNotIn('id="stripe-payment-page-link"', html)
         self.assertNotIn(">Stripe payment page<", html)
@@ -263,7 +263,7 @@ class TestDownloadCatalog(unittest.TestCase):
         self.assertIn(f"Download client v{RELEASE_VERSION}", page)
         # Live default: Stripe Payment Link Pay buttons
         self.assertIn("BUY - 0.3.7", page)
-        self.assertIn("donate.stripe.com", page)
+        self.assertIn("buy.stripe.com", page)
         self.assertNotIn("Coming soon", page)
         self.assertIn("£2.45", page)
         self.assertIn(WINDOWS_ZIP_FILENAME, page)  # data-filename

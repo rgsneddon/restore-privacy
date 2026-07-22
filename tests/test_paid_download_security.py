@@ -88,7 +88,7 @@ class TestPublicHtmlNoFreeInstallerHrefs(unittest.TestCase):
         # Live catalog: Pay buttons (Stripe Payment Link); never free GitHub installers
         self.assertIn("BUY - 0.3.7", html)
         self.assertIn('data-buy-mode="stripe-live"', html)
-        self.assertIn("donate.stripe.com", html)
+        self.assertIn("buy.stripe.com", html)
         self.assertIn("client_reference_id=", html)
         self.assertNotIn("Coming soon", html)
         self.assertNotIn("releases/download/", html)
@@ -102,7 +102,7 @@ class TestPublicHtmlNoFreeInstallerHrefs(unittest.TestCase):
         page = status_app.render_html({"title": "RESTORE PRIVACY"}).decode("utf-8")
         self.assertNotIn("releases/download/", page)
         self.assertIn("BUY - 0.3.7", page)
-        self.assertIn("donate.stripe.com", page)
+        self.assertIn("buy.stripe.com", page)
         self.assertNotIn("Coming soon", page)
 
 

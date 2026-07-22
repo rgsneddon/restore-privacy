@@ -20,7 +20,7 @@ If fulfilment returns **503**, paying customers cannot download until you stage 
 ## Buyer path (seamless)
 
 1. Status downloads → Stripe Payment Link  
-   `https://donate.stripe.com/cNi7sM4uOeWQ9TBe0q7kc00?client_reference_id=<platform>`
+   `https://buy.stripe.com/cNi7sM4uOeWQ9TBe0q7kc00?client_reference_id=<platform>`
 2. Payment Link must **require email** (subscription does; or set
    `customer_creation=always` on the link — see PAID_DOWNLOADS_HOWTO §1.3b).
 3. Stripe **After payment → Redirect to**  
@@ -114,8 +114,8 @@ Fallbacks (optional): local `status_page/assets/{version}/`, or `RPT_GITHUB_TOKE
 
 Webhook grants only when paid amount is **245 pence (GBP)** and currency is **gbp**.
 
-- Prefer a **fixed £2.45 one-time** Payment Link (not a free-amount tip).
-- Variable / donate-only amounts that are not exactly 245p will **not** mint installers — the buyer pays but the success page stays on “Confirming with Stripe…”.
+- Prefer a **subscription** Payment Link: **£2.45/month GBP** + **7-day trial** (not a free-amount tip or one-time donate).
+- Variable / tip-only amounts that are not exactly 245p and lack a trial subscription id will **not** mint installers — the buyer pays but the success page stays on “Confirming with Stripe…”.
 
 ## Client in-app update
 
@@ -128,8 +128,8 @@ Webhook grants only when paid amount is **245 pence (GBP)** and currency is **gb
 curl -sI "https://github.com/rgsneddon/restore-privacy/releases/download/0.3.0/..."  → 404
 
 # Status paywall
-curl -s https://restoreprivacy.online/ | findstr /i "donate.stripe releases/download"
-  → donate.stripe present; releases/download absent
+curl -s https://restoreprivacy.online/ | findstr /i "buy.stripe client_reference_id releases/download"
+  → buy.stripe + client_reference_id present; releases/download absent
 
 # Fulfilment ready for paid proxy
 curl -s https://restoreprivacy.online/health/fulfilment

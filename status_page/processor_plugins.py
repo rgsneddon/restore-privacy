@@ -131,7 +131,10 @@ def inject_values_into_process(values: dict[str, str]) -> None:
 
 def _stripe_readiness() -> dict[str, Any]:
     from payments import (
+        CATALOG_STRIPE_PAYMENT_MODE,
         PRICE_LABEL,
+        desired_payment_link_trial_fields,
+        is_stripe_catalog_payment_page_url,
         public_base_url,
         stripe_payment_link_id,
         stripe_payment_page_url,
@@ -151,6 +154,7 @@ def _stripe_readiness() -> dict[str, Any]:
     pay_page = stripe_payment_page_url()
     plink = stripe_payment_link_id()
     remaining = stripe_remaining_required_keys()
+    desired = desired_payment_link_trial_fields()
     mode = "unconfigured"
     if secret.startswith("sk_live_"):
         mode = "live"
@@ -163,14 +167,21 @@ def _stripe_readiness() -> dict[str, Any]:
         "ready": bool(secret and webhook),
         "checkout_ready": bool(secret),
         "fulfilment_ready": bool(secret and webhook),
-        "payment_page_ready": bool(
-            pay_page.startswith("https://donate.stripe.com/")
-            or pay_page.startswith("https://buy.stripe.com/")
-            or "stripe.com" in pay_page
-        ),
+        "payment_page_ready": bool(is_stripe_catalog_payment_page_url(pay_page)),
         "payment_page_url": pay_page,
         "payment_link_id": plink,
         "payment_link_ready": bool(plink.startswith("plink_")),
+        # Catalog product is subscription (£2.45/mo + trial), not a one-time donate tip
+        "catalog_payment_mode": CATALOG_STRIPE_PAYMENT_MODE,
+        "desired_subscription": {
+            "mode": desired.get("mode"),
+            "unit_amount_pence": desired.get("unit_amount_pence"),
+            "currency": desired.get("currency"),
+            "recurring_interval": desired.get("recurring_interval"),
+            "trial_period_days": desired.get("trial_period_days"),
+            "payment_link_id": desired.get("payment_link_id"),
+            "payment_page_url": desired.get("payment_page_url"),
+        },
         "remaining_required": remaining,
         "whats_next": remaining,
         "fields": {
@@ -228,15 +239,15 @@ STRIPE_PLUGIN = ProcessorPlugin(
     display_name="Stripe",
     role="paid_downloads",
     description=(
-        "Paid package downloads (£2.45 GBP) via Stripe Checkout API. "
-        "A public Payment Link / Donate page can be registered separately; "
-        "Checkout fulfilment still needs secret key + webhook — never commit them."
+        "Paid package downloads via Stripe **subscription** Payment Link "
+        "(£2.45/month GBP + 7-day trial). Catalog BUY tiles open the public link "
+        "with client_reference_id; fulfilment needs secret key + webhook — never commit them."
     ),
     variables=(
         ProcessorVariable(
             key="STRIPE_SECRET_KEY",
             label="Secret key",
-            purpose="Create Checkout sessions (Stripe secret API key)",
+            purpose="Create Checkout sessions / recover grants (Stripe secret API key)",
             required=True,
             secret=True,
             input_type="password",
@@ -253,8 +264,8 @@ STRIPE_PLUGIN = ProcessorPlugin(
         ),
         ProcessorVariable(
             key="STRIPE_CHECKOUT_PRICE_ID",
-            label="One-time Checkout price id (optional)",
-            purpose="One-time price_… only; leave empty for unit_amount=245. Never use a recurring Payment Link price.",
+            label="Optional one-time Checkout price id",
+            purpose="Server /api/checkout only (mode=payment). Catalog uses subscription Payment Link price. Leave empty for unit_amount=245.",
             required=False,
             secret=False,
             input_type="text",
@@ -271,17 +282,17 @@ STRIPE_PLUGIN = ProcessorPlugin(
         ),
         ProcessorVariable(
             key="STRIPE_PAYMENT_PAGE_URL",
-            label="Public payment page (Payment Link / Donate)",
-            purpose="Operator Stripe donate/pay page — public URL, not a secret",
+            label="Subscription Payment Link URL",
+            purpose="Public Stripe subscription Payment Link (buy.stripe.com/…) — not a secret",
             required=False,
             secret=False,
             input_type="url",
-            placeholder="https://donate.stripe.com/…",
+            placeholder="https://buy.stripe.com/…",
         ),
         ProcessorVariable(
             key="STRIPE_PAYMENT_LINK_ID",
             label="Payment Link id",
-            purpose="Stripe object id (plink_…) for the same payment page — not a secret",
+            purpose="Stripe object id (plink_…) for the subscription Payment Link — not a secret",
             required=False,
             secret=False,
             input_type="text",

@@ -14,7 +14,7 @@ import admin_panel  # noqa: E402
 import payments  # noqa: E402
 import processor_plugins as plugins  # noqa: E402
 
-OPERATOR_PAYMENT_PAGE = "https://donate.stripe.com/cNi7sM4uOeWQ9TBe0q7kc00"
+OPERATOR_PAYMENT_PAGE = "https://buy.stripe.com/cNi7sM4uOeWQ9TBe0q7kc00"
 OPERATOR_PAYMENT_LINK_ID = "plink_1TvTu6JDavQ2TJW6FeL0dIh9"
 
 
@@ -31,10 +31,14 @@ class TestStripePaymentPageUrl(unittest.TestCase):
         ):
             os.environ.pop(k, None)
 
-    def test_default_is_operator_donate_url(self):
+    def test_default_is_operator_subscription_url(self):
         url = payments.stripe_payment_page_url()
         self.assertEqual(url, OPERATOR_PAYMENT_PAGE)
         self.assertEqual(payments.DEFAULT_STRIPE_PAYMENT_PAGE_URL, OPERATOR_PAYMENT_PAGE)
+        self.assertTrue(url.startswith("https://buy.stripe.com/"))
+        self.assertEqual(
+            payments.desired_payment_link_trial_fields()["mode"], "subscription"
+        )
 
     def test_default_payment_link_id(self):
         self.assertEqual(payments.stripe_payment_link_id(), OPERATOR_PAYMENT_LINK_ID)
@@ -44,10 +48,10 @@ class TestStripePaymentPageUrl(unittest.TestCase):
         )
 
     def test_env_override(self):
-        os.environ["STRIPE_PAYMENT_PAGE_URL"] = "https://donate.stripe.com/custom_test"
+        os.environ["STRIPE_PAYMENT_PAGE_URL"] = "https://buy.stripe.com/custom_test"
         self.assertEqual(
             payments.stripe_payment_page_url(),
-            "https://donate.stripe.com/custom_test",
+            "https://buy.stripe.com/custom_test",
         )
         os.environ["STRIPE_PAYMENT_LINK_ID"] = "plink_custom_unit_test"
         self.assertEqual(payments.stripe_payment_link_id(), "plink_custom_unit_test")

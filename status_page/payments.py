@@ -1,8 +1,9 @@
-"""Paid download fulfilment: Stripe Checkout (£2.45 GBP) + single-use tokens.
+"""Paid download fulfilment: Stripe **subscription** (£2.45/month GBP) + tokens.
 
-Stripe is the paid-download gateway (settles to the operator Stripe account when
-live keys are set). Buy Me a Coffee is tip/support only — see coffee_link.py and
-docs/PAID_DOWNLOADS_HOWTO.md.
+Catalog BUY buttons open a Stripe **subscription** Payment Link (recurring
+monthly price + 7-day trial). Webhook/recovery mints a one-time download token
+and Connect entitlement. Buy Me a Coffee is tip/support only — see coffee_link.py
+and docs/PAID_DOWNLOADS_HOWTO.md.
 """
 
 from __future__ import annotations
@@ -116,21 +117,26 @@ def stripe_payment_link_price_id() -> str:
     return DEFAULT_STRIPE_PAYMENT_LINK_PRICE_ID
 
 
-# Public Stripe Payment Link / Donate page (not a secret — operator-provided).
-# Does **not** enable Checkout token fulfilment by itself.
+# Public Stripe **subscription** Payment Link (not a secret — operator-provided).
+# Recurring £2.45/month GBP + 7-day trial. Does **not** enable fulfilment alone
+# (still need STRIPE_SECRET_KEY + STRIPE_WEBHOOK_SECRET).
+# Host is buy.stripe.com (product/subscription link), not a one-time donate page.
 DEFAULT_STRIPE_PAYMENT_PAGE_URL = (
-    "https://donate.stripe.com/cNi7sM4uOeWQ9TBe0q7kc00"
+    "https://buy.stripe.com/cNi7sM4uOeWQ9TBe0q7kc00"
 )
 # Dashboard Payment Link object id (plink_…) for the same public page.
 DEFAULT_STRIPE_PAYMENT_LINK_ID = "plink_1TvTu6JDavQ2TJW6FeL0dIh9"
-# Line item price on that Payment Link (recurring / donate) — not for payment-mode Checkout.
+# Line item price on that Payment Link (recurring monthly) — not for mode=payment Checkout.
 DEFAULT_STRIPE_PAYMENT_LINK_PRICE_ID = "price_1TvTsaJDavQ2TJW6HZVIG7hg"
+# Catalog pay product mode (single source of truth with desired_payment_link_trial_fields).
+CATALOG_STRIPE_PAYMENT_MODE = "subscription"
 
 
 def stripe_payment_page_url() -> str:
-    """Operator Stripe payment page (Payment Link / Donate). Public, non-secret.
+    """Operator Stripe **subscription** Payment Link URL. Public, non-secret.
 
     Override with ``STRIPE_PAYMENT_PAGE_URL`` or ``RPT_STRIPE_PAYMENT_PAGE_URL``.
+    Default is the catalog subscription link (buy.stripe.com), not a donate tip page.
     """
     for key in ("STRIPE_PAYMENT_PAGE_URL", "RPT_STRIPE_PAYMENT_PAGE_URL"):
         raw = os.environ.get(key, "").strip()
@@ -140,7 +146,7 @@ def stripe_payment_page_url() -> str:
 
 
 def stripe_payment_page_href_for_platform(platform: str) -> str:
-    """Payment page URL with product identity for webhook fulfilment.
+    """Subscription Payment Link URL with product identity for webhook fulfilment.
 
     Stripe Payment Links accept ``client_reference_id`` on the URL; the webhook
     reads it as the requested package platform and mints a one-time download token.
@@ -164,6 +170,19 @@ def stripe_payment_link_id() -> str:
         if raw:
             return raw
     return DEFAULT_STRIPE_PAYMENT_LINK_ID
+
+
+def is_stripe_catalog_payment_page_url(url: str) -> bool:
+    """True when *url* is a Stripe-hosted Payment Link (buy or legacy donate host)."""
+    u = (url or "").strip().lower()
+    if not u.startswith("https://"):
+        return False
+    return (
+        "buy.stripe.com/" in u
+        or "donate.stripe.com/" in u
+        or "checkout.stripe.com/" in u
+        or "stripe.com/" in u
+    )
 
 
 def stripe_remaining_required_keys() -> list[str]:
@@ -1890,10 +1909,11 @@ def assess_fulfilment_smtp_readiness(
 
 
 def desired_payment_link_trial_fields() -> dict[str, Any]:
-    """Target Stripe Payment Link / price shape for homepage trial messaging.
+    """Target Stripe **subscription** Payment Link shape (single source of truth).
 
-    Pure helper for deploy scripts + unit tests (no network). Live update uses
-    Stripe API when ``STRIPE_SECRET_KEY`` is set.
+    Catalog BUY hrefs, deploy script, and readiness checks share these fields.
+    Pure helper (no network). Live Payment Link update uses Stripe API when
+    ``STRIPE_SECRET_KEY`` is set (``scripts/configure_stripe_payment_link_trial.py``).
     """
     return {
         "payment_link_id": DEFAULT_STRIPE_PAYMENT_LINK_ID,
@@ -1903,7 +1923,7 @@ def desired_payment_link_trial_fields() -> dict[str, Any]:
         "unit_amount_pence": PRICE_PENCE,
         "recurring_interval": "month",
         "trial_period_days": 7,
-        "mode": "subscription",
+        "mode": CATALOG_STRIPE_PAYMENT_MODE,
         "homepage_trial_sentence": (
             "your monthly subscription begins after your 7 day trial"
         ),
@@ -3165,17 +3185,19 @@ def process_checkout_completed_event(
 ) -> str | None:
     """On checkout.session.completed, mint a download token. Returns token or None.
 
-    Supports server Checkout (metadata platform/filename/amount) and Payment Link
-    pays that set ``client_reference_id`` to the requested platform via the
-    download-button URL query.
+    Supports **subscription** Payment Link checkouts (catalog default: £2.45/month
+    + 7-day trial) and legacy full-price paid sessions.
 
-    **Only if paid:** ``payment_status`` must be ``paid`` or ``no_payment_required``.
-    **Full product price:** resolved amount must equal ``PRICE_PENCE`` (245) — underpay
-    / zero / missing amount never mint a grant.
+    Platform comes from ``client_reference_id`` (BUY tile) or ``metadata.platform``.
 
-    Also mints a unique **keygen** bound to the connect entitlement and attempts
-    the customer fulfilment email (keygen + PPI + download link). Email send is
-    best-effort (SMTP optional); grant + keygen still succeed without mail.
+    **Only if paid / trial:** ``payment_status`` must be ``paid`` or
+    ``no_payment_required``.
+    **Full product price:** amount must equal ``PRICE_PENCE`` (245), **or** a
+    subscription trial (£0 / no_payment_required with a ``subscription`` id).
+    Underpay without a subscription never mints a grant.
+
+    Stores ``subscription_id`` on the Connect entitlement when present. Mints a
+    unique **keygen** and attempts fulfilment email (best-effort SMTP).
     """
     if event.get("type") != "checkout.session.completed":
         return None
@@ -3216,6 +3238,7 @@ def process_checkout_completed_event(
         subscription_id = str(sub_raw or "").strip()
     # Full price (245) always OK. £0 / no_payment_required allowed only with a
     # subscription id (7-day trial then monthly) so underpay one-time never mints.
+    # mode=subscription with subscription id and full price is also OK via amount_ok.
     amount_ok = amount is not None and amount == PRICE_PENCE
     trial_ok = bool(subscription_id) and (
         payment_status == "no_payment_required"
@@ -3227,11 +3250,8 @@ def process_checkout_completed_event(
     currency = str(meta.get("currency") or obj.get("currency") or PRICE_CURRENCY).strip().lower()
     if currency and currency != PRICE_CURRENCY:
         return None
-    # Subscription checkout: usable through first period end when provided
+    # Subscription checkout: period end arrives later via subscription.updated
     valid_until = None
-    if subscription_id:
-        # session object may not include period; leave open until subscription.updated
-        valid_until = None
     token = mint_download_token(
         filename=filename,
         platform=platform,
@@ -3239,7 +3259,7 @@ def process_checkout_completed_event(
         amount_pence=PRICE_PENCE,
         currency=PRICE_CURRENCY,
     )
-    # Successful paid session → Connect entitlement active + unique keygen
+    # Successful paid/trial session → Connect entitlement active + unique keygen
     keygen = ""
     if session_id:
         keygen = activate_connect_entitlement(

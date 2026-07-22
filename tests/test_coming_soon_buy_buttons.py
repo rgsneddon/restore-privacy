@@ -44,6 +44,7 @@ class TestComingSoonBuyButtons(unittest.TestCase):
         self.assertNotIn("Pay £2.45", html)
         # No live Stripe checkout destinations on temporary buttons
         self.assertNotIn("donate.stripe.com", html)
+        self.assertNotIn("buy.stripe.com", html)
         self.assertNotIn("checkout.stripe.com", html)
         self.assertNotIn("client_reference_id=", html)
         # No free permanent GitHub installer hrefs
@@ -67,7 +68,7 @@ class TestComingSoonBuyButtons(unittest.TestCase):
             self.assertIn(f'href="{a.pay_path}"', html)
             self.assertIn(f"client_reference_id={a.platform}", html)
             self.assertNotIn(f'href="{a.url}"', html)
-        self.assertIn("donate.stripe.com", html)
+        self.assertIn("buy.stripe.com", html)
         # Still no free GitHub installer buttons
         self.assertNotIn("releases/download/", html)
 
@@ -76,7 +77,7 @@ class TestComingSoonBuyButtons(unittest.TestCase):
             self.assertFalse(catalog_buy_buttons_coming_soon())
             html = render_download_section_html()
             self.assertIn("BUY - 0.3.7", html)
-            self.assertIn("donate.stripe.com", html)
+            self.assertIn("buy.stripe.com", html)
 
     def test_single_link_helper_branches(self):
         a = available_downloads()[0]

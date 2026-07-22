@@ -50,8 +50,9 @@ Source of truth in code: `status_page/payments.py` → `STRIPE_WEBHOOK_EVENTS` a
 4. When the period ends, Stripe sends `customer.subscription.deleted` → Connect is
    **revoked** (client gate + bound device removed; node HELLO refuses that device).
 
-One-time Payment Link downloads (current default £2.45) have no period end unless
-refunded/disputed (immediate revoke).
+Catalog Payment Link is a **subscription** (£2.45/month + 7-day trial). Trial
+starts with `no_payment_required` / £0 + subscription id; after trial, invoices
+renew `valid_until`. Refunds/disputes still revoke Connect immediately.
 
 ## Node residual HELLO
 

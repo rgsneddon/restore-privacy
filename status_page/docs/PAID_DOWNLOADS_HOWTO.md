@@ -1,7 +1,8 @@
 # How to enable paid downloads (£2.45) — Stripe + Buy Me a Coffee
 
-This status site sells **one package download for £2.45 GBP** via **Stripe Checkout**.
-Funds settle in **your Stripe account** when you use **live** API keys.
+This status site sells **Restore Privacy** as a **Stripe subscription** at
+**£2.45/month GBP** with a **7-day trial** (catalog Payment Link). Funds settle
+in **your Stripe account** when you use **live** API keys.
 
 [Buy Me a Coffee](https://buymeacoffee.com/rgsneddon) is linked as **tip / support only**.
 It does **not** unlock the paid download (BMC is not the fulfilment API).
@@ -80,17 +81,18 @@ Legacy `STRIPE_PRICE_ID` is ignored for Checkout unless `STRIPE_ALLOW_LEGACY_PRI
 
 ### 1.3b Payment Link — require customer email (live BUY buttons)
 
-Buyers use the **Stripe Payment Link** (`donate.stripe.com/…`), not server Checkout.
-Email is controlled on that link (and is already required for **subscription** prices).
+Buyers use the **Stripe subscription Payment Link** (`buy.stripe.com/…`), not server Checkout.
+Email is required for **subscription** prices.
 
-1. Dashboard → **Payment links** → open the Restore Privacy link  
+1. Dashboard → **Payment links** → open the Restore Privacy **subscription** link  
    (`plink_1TvTu6JDavQ2TJW6FeL0dIh9` / URL on the status downloads page).
-2. **⋯** → **Edit** (or open settings for the link).
-3. Under **Options** / customer information:
+2. Confirm the line item is **recurring £2.45/month GBP** with **7-day trial**
+   (not a one-time donate amount). Use `scripts/configure_stripe_payment_link_trial.py` when `STRIPE_SECRET_KEY` is available.
+3. **⋯** → **Edit** (or open settings for the link).
+4. Under **Options** / customer information:
    - Ensure email is collected (subscription links always require it).
-   - Prefer **Create a Customer** / **customer_creation = always** so email stays required
-     even if you ever switch the price back to one-time.
-4. Save. New checkouts pick up the setting immediately (no app deploy needed).
+   - Prefer **Create a Customer** / **customer_creation = always**.
+5. Save. New checkouts pick up the setting immediately (no app deploy needed).
 
 API equivalent (with your live secret key, never commit it):
 

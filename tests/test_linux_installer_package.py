@@ -68,7 +68,7 @@ class TestPackageLinuxHelpers(unittest.TestCase):
         html = render_download_section_html()
         self.assertIn("Linux (x64) - Installer (.tar.gz)", html)
         self.assertIn(f"client_reference_id={linux.platform}", html)
-        self.assertIn("donate.stripe.com", html)
+        self.assertIn("buy.stripe.com", html)
         self.assertIn(linux.filename, html)
         from status_page.downloads import RELEASE_VERSION
 

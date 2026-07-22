@@ -47,13 +47,19 @@ class TestPaidDownloadUI(unittest.TestCase):
         self.assertIn("BUY - 0.3.7", html)
         pay_base = payments.stripe_payment_page_url()
         self.assertEqual(
-            pay_base, "https://donate.stripe.com/cNi7sM4uOeWQ9TBe0q7kc00"
+            pay_base, payments.desired_payment_link_trial_fields()["payment_page_url"]
+        )
+        self.assertEqual(
+            pay_base, "https://buy.stripe.com/cNi7sM4uOeWQ9TBe0q7kc00"
+        )
+        self.assertEqual(
+            payments.desired_payment_link_trial_fields()["mode"], "subscription"
         )
         for a in available_downloads():
             href = payments.stripe_payment_page_href_for_platform(a.platform)
             self.assertIn(f'href="{href}"', html)
             self.assertIn(f"client_reference_id={a.platform}", href)
-            self.assertIn("donate.stripe.com", href)
+            self.assertIn("buy.stripe.com", href)
             self.assertNotIn(f'href="{a.url}"', html)  # never free GitHub release href
             self.assertNotIn(f'href="/pay?platform={a.platform}"', html)
 
@@ -65,7 +71,7 @@ class TestPaidDownloadUI(unittest.TestCase):
         # Tip is page-bottom only (not inside download buttons)
         self.assertIn('id="bmc-tip"', page)
         self.assertIn("bmc-page-footer", page)
-        self.assertIn("donate.stripe.com/cNi7sM4uOeWQ9TBe0q7kc00", page)
+        self.assertIn("buy.stripe.com/cNi7sM4uOeWQ9TBe0q7kc00", page)
         self.assertIn("client_reference_id=windows", page)
         self.assertIn("BUY - 0.3.7", page)
         # No free GitHub installer links
