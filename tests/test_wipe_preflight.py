@@ -16,8 +16,49 @@ from node.wipe_preflight import (  # noqa: E402
     check_exit_health,
     evaluate_prewipe_gates,
     plan_has_required_live_steps,
+    probe_exit_residual,
+    probe_icmp_reachable,
+    probe_udp_reachable,
     run_live_prewipe_gates,
 )
+
+# RFC 5737 TEST-NET-3 — must not be a live residual node
+DEAD_EXIT_HOST = "203.0.113.50"
+DEAD_EXIT_PORT = 44044
+
+
+class TestRealExitProbeFailClosed(unittest.TestCase):
+    """Drive shipped default probes — no injected HealthProbeResult theater."""
+
+    def test_probe_udp_reachable_fails_without_response(self):
+        # Send-only used to return ok=True for blackholes; must fail closed now.
+        r = probe_udp_reachable(DEAD_EXIT_HOST, DEAD_EXIT_PORT, timeout_s=1.5)
+        self.assertFalse(
+            r.ok,
+            f"UDP send-only must not pass for dead host: {r.detail}",
+        )
+        self.assertIn("fail closed", r.detail.lower())
+
+    def test_probe_icmp_fails_for_testnet_dead(self):
+        r = probe_icmp_reachable(DEAD_EXIT_HOST, timeout_s=2.0)
+        self.assertFalse(r.ok, f"ICMP must fail for {DEAD_EXIT_HOST}: {r.detail}")
+
+    def test_probe_exit_residual_fails_for_dead_host(self):
+        r = probe_exit_residual(DEAD_EXIT_HOST, DEAD_EXIT_PORT, timeout_s=1.5)
+        self.assertFalse(r.ok, r.detail)
+        self.assertEqual(r.name, "exit_residual")
+
+    def test_check_exit_health_default_path_dead_host(self):
+        """Default probe path (no inject) fails closed on deliberately-dead exit."""
+        r = check_exit_health(host=DEAD_EXIT_HOST, port=DEAD_EXIT_PORT)
+        self.assertFalse(r.ok, r.detail)
+        self.assertEqual(r.host, DEAD_EXIT_HOST)
+        entry = HealthProbeResult("entry_node", True, "sim entry ok", "127.0.0.1", 44044)
+        g = evaluate_prewipe_gates(exit_probe=r, entry_probe=entry)
+        self.assertFalse(
+            g.allow_wipe,
+            "live wipe must not proceed when exit residual is dead",
+        )
 
 
 class TestPrewipeGates(unittest.TestCase):

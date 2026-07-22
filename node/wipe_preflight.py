@@ -69,6 +69,80 @@ class PrewipeGateResult:
         }
 
 
+def probe_icmp_reachable(
+    host: str,
+    *,
+    timeout_s: float = 3.0,
+    run_cmd: Optional[Callable[[list[str]], tuple[int, str]]] = None,
+) -> HealthProbeResult:
+    """ICMP echo must get a reply — fails closed for dead/unroutable hosts.
+
+    UDP send-only is fail-open (kernel accepts sendto to blackholes). ICMP reply
+    (or an alternate residual response) is required for exit failover confidence.
+    """
+    h = (host or "").strip()
+    if not h:
+        return HealthProbeResult(
+            name="icmp_reachable", ok=False, detail="missing host", host=h
+        )
+
+    def _default_run(argv: list[str]) -> tuple[int, str]:
+        try:
+            r = subprocess.run(
+                argv, capture_output=True, text=True, timeout=max(5.0, timeout_s + 2)
+            )
+            return int(r.returncode), (r.stdout or "") + (r.stderr or "")
+        except (OSError, subprocess.TimeoutExpired) as exc:
+            return 1, str(exc)
+
+    runner = run_cmd or _default_run
+    # Windows: ping -n 1 -w <ms>; Unix: ping -c 1 -W <sec>
+    if os.name == "nt":
+        ms = max(1, int(timeout_s * 1000))
+        argv = ["ping", "-n", "1", "-w", str(ms), h]
+    else:
+        # -W is deadline seconds on Linux; -c 1 one echo
+        sec = max(1, int(timeout_s))
+        argv = ["ping", "-c", "1", "-W", str(sec), h]
+    rc, out = runner(argv)
+    blob = (out or "").lower()
+    # Require process success AND reply indicators (avoid "Destination host unreachable" as ok)
+    unreachable = any(
+        x in blob
+        for x in (
+            "destination host unreachable",
+            "destination net unreachable",
+            "request timed out",
+            "100% packet loss",
+            "0 received",
+            "could not find host",
+            "unknown host",
+            "name or service not known",
+            "network is unreachable",
+        )
+    )
+    got_reply = rc == 0 and not unreachable and (
+        "ttl=" in blob
+        or "time=" in blob
+        or "time<" in blob
+        or "bytes from" in blob
+        or "reply from" in blob
+    )
+    if got_reply:
+        return HealthProbeResult(
+            name="icmp_reachable",
+            ok=True,
+            detail=f"icmp echo reply from {h}",
+            host=h,
+        )
+    return HealthProbeResult(
+        name="icmp_reachable",
+        ok=False,
+        detail=f"icmp fail closed for {h} (rc={rc}; no echo reply)",
+        host=h,
+    )
+
+
 def probe_udp_reachable(
     host: str,
     port: int,
@@ -76,10 +150,11 @@ def probe_udp_reachable(
     timeout_s: float = 3.0,
     payload: bytes = b"RPT2",
 ) -> HealthProbeResult:
-    """Best-effort UDP send probe (product residual is UDP).
+    """UDP residual probe that **requires a response** (fail closed).
 
-    Send success means the path is routable; full HELLO is not required for
-    preflight (admission keys may be absent on the timer host process).
+    ``sendto`` alone is **not** health — it succeeds for dead/blackhole
+    destinations (e.g. TEST-NET 203.0.113.0/24). Must ``recvfrom`` a reply
+    within *timeout_s*, or the probe fails closed.
     """
     h = (host or "").strip()
     p = int(port)
@@ -104,10 +179,31 @@ def probe_udp_reachable(
                     host=h,
                     port=p,
                 )
+            try:
+                data, addr = sock.recvfrom(65535)
+            except (socket.timeout, TimeoutError):
+                return HealthProbeResult(
+                    name="udp_reachable",
+                    ok=False,
+                    detail=(
+                        f"udp fail closed: sent {sent}B to {h}:{p} but no response "
+                        f"within {timeout_s}s (send-only is not health)"
+                    ),
+                    host=h,
+                    port=p,
+                )
+            if not data:
+                return HealthProbeResult(
+                    name="udp_reachable",
+                    ok=False,
+                    detail=f"udp empty response from {addr}",
+                    host=h,
+                    port=p,
+                )
             return HealthProbeResult(
                 name="udp_reachable",
                 ok=True,
-                detail=f"udp send ok bytes={sent} to {h}:{p}",
+                detail=f"udp response {len(data)}B from {addr[0]}:{addr[1]}",
                 host=h,
                 port=p,
             )
@@ -121,6 +217,55 @@ def probe_udp_reachable(
             host=h,
             port=p,
         )
+
+
+def probe_exit_residual(
+    host: str,
+    port: int,
+    *,
+    timeout_s: float = 3.0,
+    icmp_run_cmd: Optional[Callable[[list[str]], tuple[int, str]]] = None,
+) -> HealthProbeResult:
+    """Exit residual health: UDP response **or** ICMP echo (never send-only).
+
+    Fail closed when the host is down/unroutable (no ICMP reply and no UDP
+    residual response). Product residual is UDP; many nodes will not answer a
+    bare magic probe without HELLO — ICMP then proves the exit VPS is up so
+    clients can still target residual once HELLO credentials are used.
+    """
+    h = (host or "").strip()
+    p = int(port)
+    udp = probe_udp_reachable(h, p, timeout_s=timeout_s)
+    if udp.ok:
+        return HealthProbeResult(
+            name="exit_residual",
+            ok=True,
+            detail=f"udp residual ok: {udp.detail}",
+            host=h,
+            port=p,
+        )
+    icmp = probe_icmp_reachable(h, timeout_s=timeout_s, run_cmd=icmp_run_cmd)
+    if icmp.ok:
+        return HealthProbeResult(
+            name="exit_residual",
+            ok=True,
+            detail=(
+                f"icmp ok (exit host up for residual path); "
+                f"udp no bare reply: {udp.detail}"
+            ),
+            host=h,
+            port=p,
+        )
+    return HealthProbeResult(
+        name="exit_residual",
+        ok=False,
+        detail=(
+            f"fail closed: no UDP residual response and no ICMP echo — "
+            f"exit not solid for failover ({udp.detail}; {icmp.detail})"
+        ),
+        host=h,
+        port=p,
+    )
 
 
 def probe_local_udp_listen(
@@ -190,10 +335,14 @@ def check_exit_health(
     port: int | None = None,
     probe: Optional[Callable[[str, int], HealthProbeResult]] = None,
 ) -> HealthProbeResult:
-    """Exit residual health for client failover (required before entry drain)."""
+    """Exit residual health for client failover (required before entry drain).
+
+    Default probe is :func:`probe_exit_residual` (UDP response **or** ICMP echo).
+    Never treats bare UDP send success as healthy.
+    """
     h = (host if host is not None else DEFAULT_EXIT_HOST).strip()
     p = int(port if port is not None else DEFAULT_EXIT_PORT)
-    fn = probe or (lambda hh, pp: probe_udp_reachable(hh, pp))
+    fn = probe or (lambda hh, pp: probe_exit_residual(hh, pp))
     r = fn(h, p)
     return HealthProbeResult(
         name="exit_residual",
