@@ -32,14 +32,12 @@ from downloads import (  # noqa: E402
 class TestPaidDownloadUI(unittest.TestCase):
     def test_buttons_are_paid_not_free_github_href(self):
         # Default catalog: live Stripe Payment Link Pay buttons
+        # BMC tip lives in page footer (coffee_link), not inside download buttons.
         html = render_download_section_html()
         self.assertIn("£2.45", html)
         self.assertIn("GBP", html)
         self.assertIn(PRICE_LABEL, html)
         self.assertIn("data-price-pence=\"245\"", html)
-        self.assertIn(BMC_TIP_URL, html)
-        self.assertIn("buymeacoffee.com/rgsneddon", html)
-        self.assertIn("Tip / support", html)
         self.assertIn("Download client v0.3.7", html)
         self.assertIn("Windows | Linux | macOS | iOS | Android", html)
         self.assertNotIn('href="#"', html)
@@ -63,6 +61,10 @@ class TestPaidDownloadUI(unittest.TestCase):
         page = status_app.render_html({"title": "RESTORE PRIVACY"}).decode("utf-8")
         self.assertIn("£2.45", page)
         self.assertIn(BMC_TIP_URL, page)
+        self.assertIn("buymeacoffee.com/rgsneddon", page)
+        # Tip is page-bottom only (not inside download buttons)
+        self.assertIn('id="bmc-tip"', page)
+        self.assertIn("bmc-page-footer", page)
         self.assertIn("donate.stripe.com/cNi7sM4uOeWQ9TBe0q7kc00", page)
         self.assertIn("client_reference_id=windows", page)
         self.assertIn("BUY - 0.3.7", page)
