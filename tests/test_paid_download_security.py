@@ -86,7 +86,7 @@ class TestPublicHtmlNoFreeInstallerHrefs(unittest.TestCase):
         html = render_download_section_html()
         self.assertIn("data-pay-via", html)
         # Live catalog: Pay buttons (Stripe Payment Link); never free GitHub installers
-        self.assertIn("BUY - 0.3.7", html)
+        self.assertIn("BUY - 0.3.8", html)
         self.assertIn('data-buy-mode="stripe-live"', html)
         self.assertIn("buy.stripe.com", html)
         self.assertIn("client_reference_id=", html)
@@ -101,7 +101,7 @@ class TestPublicHtmlNoFreeInstallerHrefs(unittest.TestCase):
             )
         page = status_app.render_html({"title": "RESTORE PRIVACY"}).decode("utf-8")
         self.assertNotIn("releases/download/", page)
-        self.assertIn("BUY - 0.3.7", page)
+        self.assertIn("BUY - 0.3.8", page)
         self.assertIn("buy.stripe.com", page)
         self.assertNotIn("Coming soon", page)
 
@@ -176,10 +176,10 @@ class TestHttpDownloadHandlerDeniesUnpaid(unittest.TestCase):
         """Staged status_page/assets must not be reachable by bare URL."""
         name = available_downloads()[0].filename
         for path in (
-            f"/assets/0.3.7/{name}",
-            f"/static/../assets/0.3.7/{name}",
+            f"/assets/0.3.8/{name}",
+            f"/static/../assets/0.3.8/{name}",
             f"/assets/{name}",
-            f"/releases/0.3.7/{name}",
+            f"/releases/0.3.8/{name}",
         ):
             h = _FakeHandler(path)
             h.do_GET()

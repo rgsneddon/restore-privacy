@@ -57,7 +57,7 @@ class TestDownloadsNoMojibake(unittest.TestCase):
         self.assertNotIn("paid download only", html)
         self.assertNotIn("catalog-version", html)
         # Live catalog: Pay labels (no Coming soon)
-        self.assertIn("BUY - 0.3.7", html)
+        self.assertIn("BUY - 0.3.8", html)
         self.assertNotIn("Coming soon", html)
         self.assertNotIn("apple-prep", html)
         self.assertNotIn("Â·", html)

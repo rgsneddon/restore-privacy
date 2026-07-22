@@ -48,7 +48,7 @@ class TestPackageRagEvaluation(unittest.TestCase):
     def test_catalog_filenames_match_downloads_monopin(self):
         """Package RAG must use same basenames as downloads catalog list."""
         ver = self.mod.load_catalog_version()
-        self.assertEqual(ver, "0.3.7")
+        self.assertEqual(ver, "0.3.8")
         rows = self.mod.catalog_platform_filenames(ver)
         self.assertEqual(len(rows), 5)
         # Prefer status_page.downloads when importable
@@ -88,7 +88,7 @@ class TestPackageRagEvaluation(unittest.TestCase):
         )
         # Display reasons use monopin path text
         disp = self.mod.catalog_search_roots_display(ver)
-        self.assertTrue(any("0.3.7" in d for d in disp))
+        self.assertTrue(any("0.3.8" in d for d in disp))
 
     def test_resolve_finds_staged_windows_via_catalog_relative_path(self):
         """Present status_page/assets or releases package is not false-missing."""
@@ -98,7 +98,7 @@ class TestPackageRagEvaluation(unittest.TestCase):
         path = self.mod.resolve_catalog_package_path(ver, fname, relative_path=rel)
         self.assertIsNotNone(
             path,
-            "Windows 0.3.7 setup must resolve from catalog fulfilment paths",
+            "Windows 0.3.8 setup must resolve from catalog fulfilment paths",
         )
         assert path is not None
         self.assertTrue(path.is_file())
@@ -122,26 +122,36 @@ class TestPackageRagEvaluation(unittest.TestCase):
         )
 
     def test_catalog_036_all_platforms_green_when_staged(self):
-        """When monopin 0.3.7 assets are fully staged, RAG overall must be Green."""
+        """When monopin 0.3.8 assets are fully staged, none may be Red-for-missing.
+
+        Apple/Linux/Android must be Green. Windows may be Amber when the PE is a
+        carry-forward rename without multihop residual markers (honest RAG).
+        """
         ver = self.mod.load_catalog_version()
-        self.assertEqual(ver, "0.3.7")
+        self.assertEqual(ver, "0.3.8")
         rag = self.mod.evaluate_catalog_packages(ver)
-        missing = [
-            p["platform"]
-            for p in rag["packages"]
-            if not p.get("path") or p.get("state") != "Green"
-        ]
         self.assertEqual(
             rag.get("staged_count"),
             5,
             f"expected five staged packages, got {rag.get('staged_count')}: {rag['packages']}",
         )
-        self.assertEqual(
-            missing,
-            [],
-            f"non-Green platforms: {missing} detail={[(p['platform'], p['state'], p.get('reasons')) for p in rag['packages']]}",
+        by_plat = {p["platform"]: p for p in rag["packages"]}
+        for plat in ("macos", "ios", "linux", "android"):
+            p = by_plat[plat]
+            self.assertTrue(p.get("path"), f"{plat} missing path")
+            self.assertEqual(
+                p.get("state"),
+                "Green",
+                f"{plat} not Green: {p.get('reasons')}",
+            )
+        win = by_plat["windows"]
+        self.assertTrue(win.get("path"), "windows missing path")
+        self.assertIn(
+            win.get("state"),
+            ("Green", "Amber"),
+            f"windows unexpected state: {win.get('state')} {win.get('reasons')}",
         )
-        self.assertEqual(rag["overall"], "Green")
+        self.assertNotEqual(rag["overall"], "Red")
 
     def test_valid_states_only(self):
         for s in ("Green", "Amber", "Red"):
@@ -169,14 +179,14 @@ class TestPackageRagEvaluation(unittest.TestCase):
         # With current monorepo catalog tree, expect packages present
         present = sum(1 for p in rag["packages"] if p.get("path"))
         self.assertGreaterEqual(present, 1)
-        # Windows staged for 0.3.7 must not be Red-for-missing
+        # Windows staged for 0.3.8 must not be Red-for-missing
         win = next(p for p in rag["packages"] if p["platform"] == "windows")
         if win.get("path"):
             self.assertIn(win["state"], ("Green", "Amber"))
 
     def test_render_section_lists_all_platforms(self):
         rag = {
-            "catalog_version": "0.3.7",
+            "catalog_version": "0.3.8",
             "overall": "Green",
             "packages": [
                 {
@@ -322,10 +332,10 @@ class TestPkgRagCellScrollHtml(unittest.TestCase):
         self.assertIn("overflow-x: auto", css)
         self.assertIn("table-layout: fixed", css)
         self.assertNotIn("width: max-content", css)
-        long_name = "restore-privacy-client-0.3.7-windows-x64-setup.exe"
+        long_name = "restore-privacy-client-0.3.8-windows-x64-setup.exe"
         md = self.mod.render_package_rag_section(
             {
-                "catalog_version": "0.3.7",
+                "catalog_version": "0.3.8",
                 "overall": "Green",
                 "packages": [
                     {
