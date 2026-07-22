@@ -1763,8 +1763,19 @@ def client_entitlement_file_payload(session_id: str) -> dict[str, Any] | None:
     }
 
 
-def customer_email_from_checkout_object(obj: dict[str, Any]) -> str:
-    """Extract customer email from a Stripe Checkout Session object."""
+def customer_email_from_checkout_object(
+    obj: dict[str, Any],
+    *,
+    http_get: HttpGetFn | None = None,
+    secret_key: str | None = None,
+    fetch_customer: bool = True,
+) -> str:
+    """Extract customer email from a Stripe Checkout Session object.
+
+    Prefers session fields (``customer_email``, ``customer_details.email``).
+    When only a Customer id is present (common on some Payment Link payloads),
+    optionally GETs ``/v1/customers/{id}`` so fulfilment mail is not skipped.
+    """
     if not isinstance(obj, dict):
         return ""
     for key in ("customer_email", "customer_details"):
@@ -1779,12 +1790,52 @@ def customer_email_from_checkout_object(obj: dict[str, Any]) -> str:
                 if em and "@" in em:
                     return em
     # Nested customer object sometimes present
-    cust = obj.get("customer_details") or obj.get("customer")
+    cust = obj.get("customer")
     if isinstance(cust, dict):
         em = str(cust.get("email") or "").strip()
         if em and "@" in em:
             return em
+    details = obj.get("customer_details")
+    if isinstance(details, dict):
+        em = str(details.get("email") or "").strip()
+        if em and "@" in em:
+            return em
+    # Customer id only — resolve via Stripe API when secret is available
+    if fetch_customer and isinstance(cust, str) and cust.startswith("cus_"):
+        em = retrieve_customer_email(
+            cust, http_get=http_get, secret_key=secret_key
+        )
+        if em:
+            return em
     return ""
+
+
+def retrieve_customer_email(
+    customer_id: str,
+    *,
+    http_get: HttpGetFn | None = None,
+    secret_key: str | None = None,
+) -> str:
+    """GET Stripe Customer and return email, or empty string."""
+    cid = (customer_id or "").strip()
+    if not cid.startswith("cus_"):
+        return ""
+    key = (secret_key if secret_key is not None else stripe_secret_key()).strip()
+    if not key:
+        return ""
+    url = "https://api.stripe.com/v1/customers/" + urllib.parse.quote(cid, safe="")
+    getter = http_get or _default_http_get
+    status, raw = getter(url, {"Authorization": f"Bearer {key}"})
+    if status != 200 or not raw:
+        return ""
+    try:
+        data = json.loads(raw.decode("utf-8"))
+    except (UnicodeDecodeError, json.JSONDecodeError):
+        return ""
+    if not isinstance(data, dict):
+        return ""
+    em = str(data.get("email") or "").strip()
+    return em if em and "@" in em else ""
 
 
 def build_fulfilment_email_payload(
@@ -1904,6 +1955,60 @@ def fulfilment_smtp_config() -> dict[str, Any]:
         "configured": bool(host),
         "env_keys": fulfilment_smtp_env_keys(),
     }
+
+
+def probe_fulfilment_smtp_login(
+    cfg: dict[str, Any] | None = None,
+    *,
+    timeout: float = 20.0,
+) -> dict[str, Any]:
+    """Attempt real SMTP connect + STARTTLS + login (no message sent).
+
+    Proves production credentials work end-to-end against the provider without
+    delivering mail. Returns non-secret ``{ok, stage, error?}``.
+    """
+    c = cfg if isinstance(cfg, dict) else fulfilment_smtp_config()
+    host = str(c.get("host") or "").strip()
+    if not host:
+        return {
+            "ok": False,
+            "stage": "config",
+            "error": "smtp_not_configured",
+            "detail": "RPT_FULFILMENT_SMTP_HOST empty",
+        }
+    try:
+        import smtplib
+
+        port = int(c.get("port") or 587)
+        user = str(c.get("user") or "")
+        password = str(c.get("password") or "")
+        with smtplib.SMTP(host, port, timeout=float(timeout)) as smtp:
+            smtp.ehlo()
+            if c.get("use_tls"):
+                smtp.starttls()
+                smtp.ehlo()
+            if user:
+                smtp.login(user, password)
+            # quit on context exit — no send_message
+        return {
+            "ok": True,
+            "stage": "login",
+            "error": None,
+            "detail": "SMTP connect+login succeeded (no message sent)",
+            "host_set": True,
+            "tls": bool(c.get("use_tls")),
+            "auth_used": bool(user),
+        }
+    except Exception as exc:  # noqa: BLE001
+        return {
+            "ok": False,
+            "stage": "smtp",
+            "error": type(exc).__name__,
+            "detail": str(exc)[:240],
+            "host_set": True,
+            "tls": bool(c.get("use_tls")),
+            "auth_used": bool(str(c.get("user") or "")),
+        }
 
 
 def assess_fulfilment_smtp_readiness(
@@ -2803,7 +2908,11 @@ def _probe_vps_fetch_error() -> str | None:
         return f"error:{type(e).__name__}"[:120]
 
 
-def check_fulfilment_ready(*, platform: str | None = None) -> dict[str, Any]:
+def check_fulfilment_ready(
+    *,
+    platform: str | None = None,
+    smtp_probe: bool = False,
+) -> dict[str, Any]:
     """Probe that at least one catalog installer is openable (local or API).
 
     Closes the body immediately — used for production readiness evidence.
@@ -2812,6 +2921,9 @@ def check_fulfilment_ready(*, platform: str | None = None) -> dict[str, Any]:
 
     When *platform* is set (e.g. ``macos``), only that catalog package is probed
     so live-test evidence can pin the paid macOS zip.
+
+    When *smtp_probe* is True, attempts real SMTP connect+login (no mail sent)
+    and attaches ``smtp_probe`` result for operator evidence.
     """
     vps_tok = bool(vps_asset_fetch_token())
     vps_base = vps_asset_base_url()
@@ -2826,6 +2938,8 @@ def check_fulfilment_ready(*, platform: str | None = None) -> dict[str, Any]:
         "smtp_detail": smtp_ready.get("detail"),
         "smtp_missing": list(smtp_ready.get("missing_or_empty") or []),
     }
+    if smtp_probe:
+        meta["smtp_probe"] = probe_fulfilment_smtp_login()
     assets = list(available_downloads())
     want = (platform or "").strip().lower()
     if want:
@@ -3363,16 +3477,108 @@ def process_checkout_completed_event(
                     f"smtp={assess_fulfilment_smtp_readiness().get('status')!r}",
                     flush=True,
                 )
+            else:
+                print(
+                    f"fulfilment_email_sent session={session_id!r} to_domain="
+                    f"{cust_email.split('@')[-1]!r}",
+                    flush=True,
+                )
         elif token and not cust_email:
             print(
                 "fulfilment_email_skipped_no_customer_email "
-                f"session={session_id!r} keygen_minted={bool(keygen)}",
+                f"session={session_id!r} keygen_minted={bool(keygen)} "
+                f"customer_field={type(obj.get('customer')).__name__}",
                 flush=True,
             )
     except Exception as exc:  # noqa: BLE001
         # Never block grant mint on email failure
         print(f"fulfilment_email_exception session={session_id!r} err={exc!r}", flush=True)
     return token
+
+
+def admin_resend_fulfilment_email(
+    *,
+    to_email: str,
+    session_id: str = "",
+    purchase_id: str = "",
+    platform: str = "",
+    transport: Callable[[dict[str, Any]], dict[str, Any]] | None = None,
+    base_url: str | None = None,
+) -> dict[str, Any]:
+    """Operator recovery: re-send keygen + download fulfilment email.
+
+    Looks up keygen from session entitlement and mints a fresh download token
+    when *purchase_id* or *session_id* maps to a paid grant / platform.
+    Uses the real :func:`send_fulfilment_email` path (or injected *transport*).
+    """
+    to_addr = (to_email or "").strip()
+    if not to_addr or "@" not in to_addr:
+        return {"ok": False, "sent": False, "error": "missing_to_email"}
+    sid = (session_id or "").strip()
+    pid = normalize_purchase_id(purchase_id) or (purchase_id or "").strip()
+    plat = (platform or "").strip().lower()
+    keygen = ""
+    filename = ""
+    token = ""
+    if sid:
+        ent = get_connect_entitlement(sid)
+        if ent:
+            keygen = str(ent.get("keygen") or "")
+            if not plat:
+                plat = str(ent.get("platform") or "").strip().lower()
+    if pid:
+        reissued = reissue_download_for_purchase_id(pid, base_url=base_url)
+        if reissued:
+            token = str(reissued.get("token") or "")
+            filename = str(reissued.get("filename") or "")
+            plat = plat or str(reissued.get("platform") or "")
+            sid = sid or str(reissued.get("session_id") or "")
+            pid = str(reissued.get("purchase_id") or pid)
+    if not token and plat:
+        fname = platform_filename(plat)
+        if fname:
+            filename = fname
+            token = mint_download_token(
+                filename=fname,
+                platform=plat,
+                session_id=sid or f"admin_resend_{secrets.token_hex(6)}",
+                amount_pence=PRICE_PENCE,
+                currency=PRICE_CURRENCY,
+            )
+    if not keygen and sid:
+        keygen = activate_connect_entitlement(sid, platform=plat) or ""
+    if not keygen:
+        keygen = generate_keygen()
+    if not token:
+        return {
+            "ok": False,
+            "sent": False,
+            "error": "no_download_token",
+            "detail": "Provide purchase_id or platform so a download link can be minted",
+        }
+    mail = fulfil_checkout_with_email(
+        token=token,
+        session_id=sid or f"admin_resend_{secrets.token_hex(4)}",
+        platform=plat or "windows",
+        filename=filename or platform_filename(plat or "windows") or "",
+        customer_email=to_addr,
+        keygen=keygen,
+        purchase_id=pid,
+        base_url=base_url,
+        transport=transport,
+    )
+    send = (mail or {}).get("send") or {}
+    return {
+        "ok": bool(send.get("ok", True)),
+        "sent": bool(send.get("sent")),
+        "skipped": bool(send.get("skipped")),
+        "error": send.get("error"),
+        "to_domain": to_addr.split("@")[-1],
+        "keygen_prefix": (str(mail.get("keygen") or "")[:12]),
+        "has_download_url": bool(mail.get("download_url")),
+        "smtp_status": assess_fulfilment_smtp_readiness().get("status"),
+        "admin_resend": True,
+    }
 
 
 def handle_stripe_webhook(

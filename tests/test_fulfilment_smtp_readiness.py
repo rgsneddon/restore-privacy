@@ -167,6 +167,58 @@ class TestFulfilmentSmtpReadiness(unittest.TestCase):
         self.assertIn("RENDER_API_KEY", src)
         self.assertIn("email_flow_enabled", src)
 
+    def test_customer_email_fetches_customer_id(self):
+        from payments import customer_email_from_checkout_object
+
+        def fake_get(url: str, headers: dict) -> tuple[int, bytes]:
+            self.assertIn("customers/cus_abc", url)
+            return 200, b'{"email":"buyer@example.com"}'
+
+        em = customer_email_from_checkout_object(
+            {"customer": "cus_abc", "customer_details": {}},
+            http_get=fake_get,
+            secret_key="sk_test_x",
+        )
+        self.assertEqual(em, "buyer@example.com")
+
+    def test_admin_resend_uses_real_send_path(self):
+        from payments import admin_resend_fulfilment_email
+
+        payloads: list[dict] = []
+
+        def transport(p: dict) -> dict:
+            payloads.append(p)
+            return {"ok": True, "sent": True, "skipped": False}
+
+        r = admin_resend_fulfilment_email(
+            to_email="buyer@example.com",
+            platform="windows",
+            transport=transport,
+        )
+        self.assertTrue(r.get("sent"), r)
+        self.assertTrue(r.get("admin_resend"))
+        self.assertEqual(len(payloads), 1)
+        body = payloads[0].get("body") or ""
+        self.assertIn("Keygen", body)
+        self.assertIn("buyer@example.com", payloads[0].get("to", ""))
+
+    def test_smtp_probe_reports_not_configured(self):
+        from payments import probe_fulfilment_smtp_login
+
+        r = probe_fulfilment_smtp_login(
+            {
+                "host": "",
+                "port": 587,
+                "user": "",
+                "password": "",
+                "use_tls": True,
+                "configured": False,
+            }
+        )
+        self.assertFalse(r.get("ok"))
+        self.assertEqual(r.get("error"), "smtp_not_configured")
+
 
 if __name__ == "__main__":
     unittest.main()
+

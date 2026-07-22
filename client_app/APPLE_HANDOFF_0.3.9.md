@@ -53,6 +53,29 @@ Then buyers get packages via paid fulfilment only (token grant / VPS fetch secre
 
 Catalog monopin and status-host BUY buttons must stay **0.3.9** (`status_page/downloads.py` `RELEASE_VERSION`, `client/VERSION`, Flutter `productVersion`).
 
-## Honesty
+## Honesty — staged VPS Apple packages (important)
 
-Live notarization / App Store submission is **not** performed on Windows CI hosts. This handoff is the Mac operator path for catalog monopin **0.3.9**. Staged zips under `status_page/assets/0.3.9/` may be rebuild placeholders until a Mac operator re-signs/notarizes; re-run upload after Mac package refresh.
+Live notarization / App Store submission is **not** performed on Windows CI hosts. This handoff is the Mac operator path for catalog monopin **0.3.9**.
+
+**Current staged files** under `status_page/assets/0.3.9/` and VPS
+`/opt/restore-privacy/paid_assets/0.3.9/` for **macOS + iOS** are **not**
+fresh 0.3.9 product builds. Byte-identical to 0.3.6/0.3.7 placeholders;
+`CFBundleShortVersionString` inside the zips still reports **0.2.3** (macOS)
+and **0.1.7** (iOS). Paid download **filenames** say 0.3.9, but the app
+bundle version does **not**.
+
+**Mac operator must** rebuild, Developer ID + notarize (macOS), Team-sign (iOS),
+replace the two zips, then:
+
+```bash
+python scripts/host_paid_assets_vps.py --stage --upload
+```
+
+Audit helper (no Mac required):
+
+```bash
+python -c "from apple_package_audit import audit_catalog_apple_packages; import json; print(json.dumps(audit_catalog_apple_packages(version='0.3.9'), indent=2))"
+```
+
+Windows / Android / Linux 0.3.9 packages are the rebuilt monopin set; only
+Apple zips remain placeholder until Mac rebuild.

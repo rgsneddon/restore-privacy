@@ -552,8 +552,15 @@ class Handler(BaseHTTPRequestHandler):
         if path in ("/health/fulfilment", "/api/fulfilment-ready"):
             # Production readiness: can the host open a catalog installer?
             # Optional ?platform=macos pins the live-test package probe.
+            # Optional ?smtp_probe=1 attempts SMTP login (no message sent).
             plat = (query.get("platform") or "").strip() or None
-            payload = check_fulfilment_ready(platform=plat)
+            smtp_probe = (query.get("smtp_probe") or "").strip().lower() in (
+                "1",
+                "true",
+                "yes",
+                "on",
+            )
+            payload = check_fulfilment_ready(platform=plat, smtp_probe=smtp_probe)
             code = 200 if payload.get("ok") else 503
             self._send(
                 code,
@@ -1274,6 +1281,35 @@ class Handler(BaseHTTPRequestHandler):
                     ondemand_result=minted,
                     ondemand_platform=str(minted.get("platform") or plat),
                 ),
+            )
+            return
+
+        if path in ("/admin/resend-fulfilment-email", "/admin/resend-fulfilment-email/"):
+            # Operator: re-send keygen + download email via real SMTP path
+            if not admin_enabled():
+                self._send(503, "text/plain; charset=utf-8", b"admin disabled")
+                return
+            if not is_authenticated(self.headers):
+                self._send(200, "text/html; charset=utf-8", render_login_html())
+                return
+            from payments import admin_resend_fulfilment_email
+
+            form = dict(urllib.parse.parse_qsl(body.decode("utf-8", "replace")))
+            to_email = (form.get("to_email") or form.get("email") or "").strip()
+            sid = (form.get("session_id") or "").strip()
+            pid = (form.get("purchase_id") or "").strip()
+            plat = (form.get("platform") or "windows").strip().lower()
+            result = admin_resend_fulfilment_email(
+                to_email=to_email,
+                session_id=sid,
+                purchase_id=pid,
+                platform=plat,
+            )
+            code = 200 if result.get("sent") else 400
+            self._send(
+                code,
+                "application/json",
+                json.dumps(result).encode("utf-8"),
             )
             return
 
