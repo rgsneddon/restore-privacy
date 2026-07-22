@@ -766,7 +766,7 @@ def render_post_payment_thankyou_html(
     entitlement and paste <code>{sid_esc}</code>. Subscriptions stay usable
     until the paid period ends after cancel.
   </p>
-  <iframe id="auto-entitlement-frame" src="{ent_path_esc}"
+  <iframe id="auto-entitlement-frame" data-src="{ent_path_esc}" src="about:blank"
     style="width:0;height:0;border:0;position:absolute"
     title="Automatic payment entitlement download" aria-hidden="true"></iframe>"""
     # Emphasize Windows admin wording for .exe; still show admin phrase for all.
@@ -783,8 +783,9 @@ def render_post_payment_thankyou_html(
     <strong>{_escape_html_text(admin_lead)}</strong>
     {admin}
   </p>
-  <p class="msg" id="auto-download-note">Your download should start automatically…</p>
-  <!-- Sole auto-start: one iframe request to the single-use grant path. -->
+  <p class="msg" id="auto-download-note">please wait for your download.. packaging...</p>
+  <!-- Installer first (single-use grant). Entitlement file loads after a short
+       delay so the package stream is not competing for bandwidth immediately. -->
   <iframe id="auto-download-frame" src="{link_esc}" style="width:0;height:0;border:0;position:absolute"
     title="Automatic product download" aria-hidden="true"></iframe>
   <p>
@@ -794,6 +795,17 @@ def render_post_payment_thankyou_html(
       { _escape_html_text(btn) } (if it did not start)
     </a>
   </p>
+  <script>
+  (function () {{
+    var delayMs = 1800;
+    var ent = document.getElementById("auto-entitlement-frame");
+    if (!ent) return;
+    var src = ent.getAttribute("data-src") || "";
+    if (!src) return;
+    // Defer entitlement auto-fetch so the installer iframe gets first byte first.
+    setTimeout(function () {{ ent.setAttribute("src", src); }}, delayMs);
+  }})();
+  </script>
   <p class="msg muted">This link is one-time and expires. It only unlocks the package you paid for.
     Tip optional: <a href="https://buymeacoffee.com/rgsneddon">buymeacoffee.com/rgsneddon</a></p>
   <p><a href="/">Home</a></p>

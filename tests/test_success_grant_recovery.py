@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import sys
 import unittest
+import uuid
 from pathlib import Path
 from unittest import mock
 
@@ -39,7 +40,7 @@ def _paid_session(
 
 class TestEnsureGrantFromStripeSession(unittest.TestCase):
     def test_mints_when_webhook_missed(self):
-        sid = "cs_test_recovery_mint_1"
+        sid = f"cs_test_recovery_mint_{uuid.uuid4().hex[:12]}"
         sess = _paid_session(session_id=sid, platform="linux")
 
         def fake_get(url: str, headers: dict) -> tuple[int, bytes]:
@@ -59,7 +60,7 @@ class TestEnsureGrantFromStripeSession(unittest.TestCase):
         self.assertTrue(grant["token"])
 
     def test_platform_hint_when_reference_empty(self):
-        sid = "cs_test_recovery_hint_1"
+        sid = f"cs_test_recovery_hint_{uuid.uuid4().hex[:12]}"
         sess = _paid_session(session_id=sid, platform="")
         sess["client_reference_id"] = ""
 
@@ -78,7 +79,7 @@ class TestEnsureGrantFromStripeSession(unittest.TestCase):
         self.assertEqual(grant["platform"], "android")
 
     def test_unpaid_does_not_mint(self):
-        sid = "cs_test_recovery_unpaid"
+        sid = f"cs_test_recovery_unpaid_{uuid.uuid4().hex[:12]}"
         sess = _paid_session(session_id=sid)
         sess["payment_status"] = "unpaid"
 
@@ -92,7 +93,7 @@ class TestEnsureGrantFromStripeSession(unittest.TestCase):
         self.assertIsNone(grant)
 
     def test_needs_platform_picker(self):
-        sid = "cs_test_picker"
+        sid = f"cs_test_picker_{uuid.uuid4().hex[:12]}"
         sess = _paid_session(session_id=sid, platform="")
         sess["client_reference_id"] = ""
 

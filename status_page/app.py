@@ -778,15 +778,29 @@ class Handler(BaseHTTPRequestHandler):
                 if length is not None:
                     self.send_header("Content-Length", str(int(length)))
                 self.end_headers()
+                # Larger chunks + early flush so browsers show progress sooner
+                # (avoids feeling "stuck" on multi‑MB installers).
+                _chunk = 256 * 1024
                 if isinstance(body, (bytes, bytearray)):
                     self.wfile.write(body)
+                    try:
+                        self.wfile.flush()
+                    except Exception:  # noqa: BLE001
+                        pass
                 else:
                     try:
+                        first = True
                         while True:
-                            chunk = body.read(65536)
+                            chunk = body.read(_chunk)
                             if not chunk:
                                 break
                             self.wfile.write(chunk)
+                            if first:
+                                first = False
+                                try:
+                                    self.wfile.flush()
+                                except Exception:  # noqa: BLE001
+                                    pass
                     finally:
                         try:
                             body.close()
@@ -816,7 +830,8 @@ class Handler(BaseHTTPRequestHandler):
             elif session_id:
                 # Payment Link after_payment redirect lands here; webhook may lag
                 # on free-tier cold start — wait longer than a local unit test.
-                grant = wait_for_grant_by_session(session_id, timeout_sec=12.0)
+                # Short poll for webhook, then Stripe recovery (avoid long blank wait).
+                grant = wait_for_grant_by_session(session_id, timeout_sec=3.0)
                 if grant is None:
                     grant = find_grant_by_session(session_id)
                 # Recovery: verify payment with Stripe API and mint if webhook missed
@@ -919,18 +934,18 @@ class Handler(BaseHTTPRequestHandler):
                             refresh = ""  # stop spinning refresh while picker is shown
                     except Exception:  # noqa: BLE001
                         picker = ""
+                plat_bit = (
+                    f" for {_escape_html(platform)}" if platform else ""
+                )
                 inner = (
                     f"{refresh}"
                     f"{deny_note}"
                     f"{picker}"
-                    f'<p class="msg" id="pay-success-pending">Payment submitted'
-                    f'{(" for " + _escape_html(platform)) if platform else ""}. '
-                    f"Confirming with Stripe… this page refreshes automatically.</p>"
-                    f'<p class="msg">If nothing appears after ~30s, open this page again from '
-                    f"your Stripe receipt link, or contact support with session id "
-                    f"<code id=\"pending-session-id\">{_escape_html(session_id)}</code>.</p>"
-                    f'<p class="msg muted">Tip: always start checkout from a platform tile '
-                    f"(Windows / Android / …) so the package is bound to your payment.</p>"
+                    f'<p class="msg" id="pay-success-pending">Payment submitted{plat_bit}.</p>'
+                    f'<p class="msg" id="pay-success-packaging">'
+                    f"please wait for your download.. packaging...</p>"
+                    f'<p class="msg muted" id="pay-success-wait-hint">'
+                    f"Preparing your installer — this page refreshes automatically.</p>"
                     f'<p><a href="/">Home</a></p>'
                 )
             self._send(200, "text/html; charset=utf-8", _html_page("Thank you", inner))
