@@ -1,4 +1,4 @@
-"""Release download catalog + paid download UI (version 0.3.7).
+"""Release download catalog + paid download UI (version 0.3.8).
 
 Primary path: pay **£2.45** (GBP) via Stripe Checkout per package, then a
 single-use download token. Free permanent GitHub ``href`` is not used on the
@@ -6,7 +6,7 @@ public buttons. After payment the status host **proxies** the installer
 (authenticated GitHub API / local assets) so fulfilment works when the
 restore-privacy repo is **private**. Buy Me a Coffee is tip/support only.
 
-Current catalog packages: restore-privacy release **0.3.7**
+Current catalog packages: restore-privacy release **0.3.8**
 (Windows setup needs no separate Python install; macOS Developer ID notarized;
 iOS Team-signed sideload).
 """
@@ -21,10 +21,10 @@ try:
 except ImportError:  # package import path (status_page as package)
     from status_page.coffee_link import COFFEE_LINK_URL, coffee_tip_url
 
-RELEASE_VERSION = "0.3.7"
+RELEASE_VERSION = "0.3.8"
 GITHUB_OWNER = "rgsneddon"
 GITHUB_REPO = "restore-privacy"
-RELEASE_TAG = "0.3.7"
+RELEASE_TAG = "0.3.8"
 RELEASE_PAGE_URL = (
     f"https://github.com/{GITHUB_OWNER}/{GITHUB_REPO}/releases/tag/{RELEASE_TAG}"
 )
@@ -138,7 +138,7 @@ def assure_current_catalog_packages() -> dict[str, object]:
     }
 
 
-# Canonical public asset filenames (must match GitHub Release 0.3.7 assets).
+# Canonical public asset filenames (must match GitHub Release 0.3.8 assets).
 WINDOWS_EXE_FILENAME = f"restore-privacy-client-{RELEASE_VERSION}-windows-x64-setup.exe"
 ANDROID_APK_FILENAME = f"restore-privacy-client-{RELEASE_VERSION}-android.apk"
 MACOS_ZIP_FILENAME = f"restore-privacy-client-{RELEASE_VERSION}-macos.zip"
@@ -337,7 +337,7 @@ RUST_REPO_URL = PRODUCT_CATALOG_URL
 RUST_REPO_LABEL = PRODUCT_CATALOG_LABEL
 
 
-# Compatibility aliases used by older tests (map to 0.3.7 installers).
+# Compatibility aliases used by older tests (map to 0.3.8 installers).
 WINDOWS_ZIP_FILENAME = WINDOWS_EXE_FILENAME
 
 
