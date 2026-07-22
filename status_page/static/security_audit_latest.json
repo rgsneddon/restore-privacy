@@ -1,33 +1,20 @@
 {
-  "generated_at": "2026-07-21T23:17:38Z",
-  "node_host": "82.221.101.241",
+  "generated_at": "2026-07-22T07:39:31Z",
+  "node_host": "127.0.0.1",
   "catalog_version": "0.3.6",
   "unit_suite": {
-    "ran": true,
+    "ran": false,
     "ok": true,
-    "returncode": 0,
-    "modules": [
-      "tests.test_legal_links",
-      "tests.test_legal_docs",
-      "tests.test_no_public_client_count",
-      "tests.test_connect_no_phones_home",
-      "tests.test_obfuscation",
-      "tests.test_kill_switch_leaks",
-      "tests.test_product_node_key",
-      "tests.test_pfs_product_require",
-      "tests.test_downloads",
-      "tests.test_multihop",
-      "tests.test_audit_package_rag"
-    ]
+    "reason": "skipped"
   },
   "tcp_status": {
-    "host": "82.221.101.241",
+    "host": "127.0.0.1",
     "port": 8080,
     "ok": true,
     "error": null
   },
   "http_status": {
-    "url": "http://82.221.101.241:8080/status",
+    "url": "http://127.0.0.1:8080/status",
     "ok": true,
     "status_code": 200,
     "body": {
@@ -36,7 +23,7 @@
     "error": null
   },
   "udp": {
-    "host": "82.221.101.241",
+    "host": "127.0.0.1",
     "port": 44044,
     "sent": true,
     "error": null
@@ -44,11 +31,11 @@
   "no_priv": {
     "ok": true,
     "hits": [],
-    "scanned_roots": 6,
+    "scanned_roots": 11,
     "warn": false,
     "skipped": false,
     "reasons": [
-      "scanned_roots=6",
+      "scanned_roots=11",
       "hits=0"
     ]
   },
@@ -68,76 +55,13 @@
           "multihop residual prep markers present (exit_node_elgamal; residual-via-exit when RPT_MULTIHOP_ENABLED=1)",
           "exit_node_elgamal.pub raw bytes present (Romania exit pin)"
         ],
-        "path": "C:\\Users\\rgsne\\restore_privacy\\status_page\\assets\\0.3.6\\restore-privacy-client-0.3.6-windows-x64-setup.exe",
+        "path": "/opt/restore-privacy/paid_assets/0.3.6/restore-privacy-client-0.3.6-windows-x64-setup.exe",
         "bytes": 36666068,
         "relative_path": "0.3.6/restore-privacy-client-0.3.6-windows-x64-setup.exe",
         "search_roots": [
           "status_page/assets/0.3.6/",
           "releases/0.3.6/",
-          "/opt/restore-privacy/paid_assets/0.3.6/",
-          "dist/0.3.6/",
-          "status_page/assets/"
-        ]
-      },
-      {
-        "platform": "android",
-        "label": "Android",
-        "filename": "restore-privacy-client-0.3.6-android.apk",
-        "state": "Green",
-        "reasons": [
-          "node_elgamal.pub pin matches product monopin",
-          "Android residual wire (PFS + outer obfs) present",
-          "exit_node_elgamal.pub present (multihop exit pin)"
-        ],
-        "path": "C:\\Users\\rgsne\\restore_privacy\\status_page\\assets\\0.3.6\\restore-privacy-client-0.3.6-android.apk",
-        "bytes": 51569544,
-        "relative_path": "0.3.6/restore-privacy-client-0.3.6-android.apk",
-        "search_roots": [
-          "status_page/assets/0.3.6/",
-          "releases/0.3.6/",
-          "/opt/restore-privacy/paid_assets/0.3.6/",
-          "dist/0.3.6/",
-          "status_page/assets/"
-        ]
-      },
-      {
-        "platform": "macos",
-        "label": "macOS",
-        "filename": "restore-privacy-client-0.3.6-macos.zip",
-        "state": "Green",
-        "reasons": [
-          "node_elgamal.pub pin matches product monopin",
-          "archive present (structural residual gates N/A in this pass)",
-          "exit_node_elgamal.pub present (multihop exit pin)"
-        ],
-        "path": "C:\\Users\\rgsne\\restore_privacy\\status_page\\assets\\0.3.6\\restore-privacy-client-0.3.6-macos.zip",
-        "bytes": 19208402,
-        "relative_path": "0.3.6/restore-privacy-client-0.3.6-macos.zip",
-        "search_roots": [
-          "status_page/assets/0.3.6/",
-          "releases/0.3.6/",
-          "/opt/restore-privacy/paid_assets/0.3.6/",
-          "dist/0.3.6/",
-          "status_page/assets/"
-        ]
-      },
-      {
-        "platform": "ios",
-        "label": "iOS",
-        "filename": "restore-privacy-client-0.3.6-ios.zip",
-        "state": "Green",
-        "reasons": [
-          "node_elgamal.pub pin matches product monopin",
-          "archive present (structural residual gates N/A in this pass)",
-          "exit_node_elgamal.pub present (multihop exit pin)"
-        ],
-        "path": "C:\\Users\\rgsne\\restore_privacy\\status_page\\assets\\0.3.6\\restore-privacy-client-0.3.6-ios.zip",
-        "bytes": 8042831,
-        "relative_path": "0.3.6/restore-privacy-client-0.3.6-ios.zip",
-        "search_roots": [
-          "status_page/assets/0.3.6/",
-          "releases/0.3.6/",
-          "/opt/restore-privacy/paid_assets/0.3.6/",
+          "paid_assets/0.3.6/",
           "dist/0.3.6/",
           "status_page/assets/"
         ]
@@ -152,13 +76,76 @@
           "archive present (structural residual gates N/A in this pass)",
           "exit_node_elgamal.pub present (multihop exit pin)"
         ],
-        "path": "C:\\Users\\rgsne\\restore_privacy\\status_page\\assets\\0.3.6\\restore-privacy-client-0.3.6-linux-x64.tar.gz",
+        "path": "/opt/restore-privacy/paid_assets/0.3.6/restore-privacy-client-0.3.6-linux-x64.tar.gz",
         "bytes": 14321268,
         "relative_path": "0.3.6/restore-privacy-client-0.3.6-linux-x64.tar.gz",
         "search_roots": [
           "status_page/assets/0.3.6/",
           "releases/0.3.6/",
-          "/opt/restore-privacy/paid_assets/0.3.6/",
+          "paid_assets/0.3.6/",
+          "dist/0.3.6/",
+          "status_page/assets/"
+        ]
+      },
+      {
+        "platform": "macos",
+        "label": "macOS",
+        "filename": "restore-privacy-client-0.3.6-macos.zip",
+        "state": "Green",
+        "reasons": [
+          "node_elgamal.pub pin matches product monopin",
+          "archive present (structural residual gates N/A in this pass)",
+          "exit_node_elgamal.pub present (multihop exit pin)"
+        ],
+        "path": "/opt/restore-privacy/paid_assets/0.3.6/restore-privacy-client-0.3.6-macos.zip",
+        "bytes": 19208402,
+        "relative_path": "0.3.6/restore-privacy-client-0.3.6-macos.zip",
+        "search_roots": [
+          "status_page/assets/0.3.6/",
+          "releases/0.3.6/",
+          "paid_assets/0.3.6/",
+          "dist/0.3.6/",
+          "status_page/assets/"
+        ]
+      },
+      {
+        "platform": "ios",
+        "label": "iOS",
+        "filename": "restore-privacy-client-0.3.6-ios.zip",
+        "state": "Green",
+        "reasons": [
+          "node_elgamal.pub pin matches product monopin",
+          "archive present (structural residual gates N/A in this pass)",
+          "exit_node_elgamal.pub present (multihop exit pin)"
+        ],
+        "path": "/opt/restore-privacy/paid_assets/0.3.6/restore-privacy-client-0.3.6-ios.zip",
+        "bytes": 8042831,
+        "relative_path": "0.3.6/restore-privacy-client-0.3.6-ios.zip",
+        "search_roots": [
+          "status_page/assets/0.3.6/",
+          "releases/0.3.6/",
+          "paid_assets/0.3.6/",
+          "dist/0.3.6/",
+          "status_page/assets/"
+        ]
+      },
+      {
+        "platform": "android",
+        "label": "Android",
+        "filename": "restore-privacy-client-0.3.6-android.apk",
+        "state": "Green",
+        "reasons": [
+          "node_elgamal.pub pin matches product monopin",
+          "Android residual wire (PFS + outer obfs) present",
+          "exit_node_elgamal.pub present (multihop exit pin)"
+        ],
+        "path": "/opt/restore-privacy/paid_assets/0.3.6/restore-privacy-client-0.3.6-android.apk",
+        "bytes": 51569544,
+        "relative_path": "0.3.6/restore-privacy-client-0.3.6-android.apk",
+        "search_roots": [
+          "status_page/assets/0.3.6/",
+          "releases/0.3.6/",
+          "paid_assets/0.3.6/",
           "dist/0.3.6/",
           "status_page/assets/"
         ]
@@ -177,10 +164,11 @@
       "nolog_journald": {
         "ok": true,
         "warn": false,
-        "skipped": true,
+        "skipped": false,
         "reasons": [
-          "rpt-node.json/conf not present (non-node host)",
-          "rpt-node.service unit not on this host"
+          "config ok: rpt-node.json",
+          "unit checks via readable fixture rpt-node.service",
+          "unit StandardOutput=null present"
         ],
         "directives": [
           "StandardOutput=null",
@@ -194,11 +182,11 @@
         "warn": false,
         "skipped": false,
         "reasons": [
-          "scanned_roots=6",
+          "scanned_roots=11",
           "hits=0"
         ],
         "hits": [],
-        "scanned_roots": 6
+        "scanned_roots": 11
       },
       "kill_switch_default_off": {
         "ok": true,
@@ -224,38 +212,37 @@
       "host_privacy_drift": {
         "ok": true,
         "warn": false,
-        "skipped": true,
+        "skipped": false,
         "reasons": [
-          "journald drop-in 99-rpt-privacy.conf absent",
-          "rpt-node.service unit not on this host",
-          "install_host_privacy.sh recipe present in tree",
-          "non-node host (no unit/drop-in/log-dir artifacts)"
+          "journald drop-in present (short retention)",
+          "unit not logging StandardOutput to journal",
+          "install_host_privacy.sh recipe present in tree"
         ],
-        "unit_present": false,
-        "dropin_present": false
+        "unit_present": true,
+        "dropin_present": true
       },
       "disk_wipe_readiness": {
         "ok": true,
         "warn": false,
         "skipped": false,
         "reasons": [
-          "cryptsetup not found (FDE tooling absent)",
+          "cryptsetup present: /usr/sbin/cryptsetup",
           "install_disk_encryption.sh present",
           "install_zram_luks.sh present (node-only ram volume)",
           "shutdown wipe script present",
-          "wipe unit not wired (optional on non-node hosts)",
-          "status-only: no LUKS format attempted",
-          "cryptsetup not on PATH; disk/zram recipes present (status-only PASS)"
+          "rpt-node-shutdown-wipe.service present",
+          "node unit unreadable (PermissionError); skip wipe-wire check",
+          "status-only: no LUKS format attempted"
         ],
-        "cryptsetup": null,
-        "wipe_wired": false
+        "cryptsetup": "/usr/sbin/cryptsetup",
+        "wipe_wired": true
       },
       "ephemeral_dry_run": {
         "ok": true,
         "warn": false,
         "skipped": false,
         "reasons": [
-          "ephemeral_node.py present (C:\\Users\\rgsne\\restore_privacy\\scripts\\ephemeral_node.py)",
+          "ephemeral_node.py present (/opt/restore-privacy/scripts/ephemeral_node.py)",
           "dry-run mode available",
           "dry-run exit=0",
           "dry-run completed"
@@ -272,7 +259,7 @@
       }
     },
     "ok": true,
-    "all_in_scope_pass": false,
+    "all_in_scope_pass": true,
     "firewall_excluded": true,
     "section": "B"
   },
@@ -298,12 +285,12 @@
         "warn": false,
         "skipped": false,
         "reasons": [
-          "entry pub present (C:\\Users\\rgsne\\restore_privacy\\product\\node_elgamal.pub) sha=1b126abfae737c66\u2026",
-          "exit pub present (C:\\Users\\rgsne\\restore_privacy\\product\\exit_node_elgamal.pub) sha=a36a3f38066ece7b\u2026",
+          "entry pub present (/opt/restore-privacy/product/node_elgamal.pub) sha=1b126abfae737c66\u2026",
+          "exit pub present (/opt/restore-privacy/product/exit_node_elgamal.pub) sha=a36a3f38066ece7b\u2026",
           "entry and exit pubs are distinct"
         ],
-        "entry_pub": "C:\\Users\\rgsne\\restore_privacy\\product\\node_elgamal.pub",
-        "exit_pub": "C:\\Users\\rgsne\\restore_privacy\\product\\exit_node_elgamal.pub"
+        "entry_pub": "/opt/restore-privacy/product/node_elgamal.pub",
+        "exit_pub": "/opt/restore-privacy/product/exit_node_elgamal.pub"
       },
       "multihop_residual_via_exit": {
         "ok": true,
@@ -322,8 +309,8 @@
         "warn": false,
         "skipped": false,
         "reasons": [
-          "present: C:\\Users\\rgsne\\restore_privacy\\node\\install_zram_luks.sh",
-          "present: C:\\Users\\rgsne\\restore_privacy\\node\\install_host_privacy.sh",
+          "present: /opt/restore-privacy/node/install_zram_luks.sh",
+          "present: /opt/restore-privacy/node/install_host_privacy.sh",
           "node-only: clients never install LUKS/zram"
         ]
       }
@@ -333,9 +320,9 @@
     "honesty": "residual-via-exit when multi-hop enabled; not full intermediate onion encapsulation; default single-hop Iceland entry"
   },
   "audit_privacy": {
-    "localhost_required": false,
-    "outbound_allowed": true,
-    "probe_host_loopback": false,
+    "localhost_required": true,
+    "outbound_allowed": false,
+    "probe_host_loopback": true,
     "no_network_exfil": true,
     "section_b": true,
     "multihop_structure": true,

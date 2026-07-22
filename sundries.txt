@@ -241,6 +241,14 @@ SECRETS / RELEASE GATES (mandatory)
   PRIVACY_POLICY.md  â€” full privacy policy
   LICENSE            — proprietary full copyright for original project code
                        (no architecture copy/transmission; client AS IS, VPN-only use)
+
+  *** Security audit timer (~4h) + public countdown ***
+    # On entry node: systemd rpt-security-audit.timer (privacy-hardened oneshot)
+    sudo bash scripts/install_security_audit_timer.sh   # PERIOD=4h
+    # Local write only (no outbound publish from oneshot). Public site needs sync:
+    python scripts/sync_audit_artifacts_from_node.py
+    # then commit + deploy status host so generated_at advances.
+    # Countdown rolls forward by 4h when JSON is stale (status_page/audit_countdown.py)
   CREDITS.md         â€” third-party attributions (Wintun, cryptography, etc.)
   AUDIT.md           â€” static code/policy audit record (operators/reviewers)
 

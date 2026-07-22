@@ -91,6 +91,31 @@ class TestAuditCountdownMath(unittest.TestCase):
         self.assertEqual(st["remaining_seconds"], 2 * 3600 + 44 * 60 + 55)
         self.assertEqual(st["display"], format_countdown(st["remaining_seconds"]))
         self.assertEqual(st["next_audit_at"], "2026-07-21T14:47:19Z")
+        self.assertFalse(st.get("rolled_forward"))
+
+    def test_countdown_rolls_forward_when_overdue(self):
+        """Stale generated_at must not freeze remaining at 00:00:00."""
+        from audit_countdown import next_audit_at_rolling
+
+        last = datetime(2026, 7, 21, 10, 0, 0, tzinfo=timezone.utc)
+        # 10h after last → first next was +4h (overdue by 6h) → roll to +8h, then +12h?
+        # last+4h = 14:00; now=20:00 → 14:00 and 18:00 past → next 22:00 (last+12h)
+        now = datetime(2026, 7, 21, 20, 0, 0, tzinfo=timezone.utc)
+        nxt = next_audit_at_rolling(last, now=now)
+        self.assertEqual(nxt, datetime(2026, 7, 21, 22, 0, 0, tzinfo=timezone.utc))
+        st = countdown_state(now=now, last_generated_at=last)
+        self.assertTrue(st["available"])
+        self.assertGreater(st["remaining_seconds"], 0)
+        self.assertEqual(st["remaining_seconds"], 2 * 3600)
+        self.assertEqual(st["display"], "02:00:00")
+        self.assertNotEqual(st["display"], "00:00:00")
+        self.assertTrue(st.get("rolled_forward"))
+        # Fragment still ticks with period for client roll
+        html = render_audit_countdown_html(now=now, json_path=None)
+        # force state via last by writing temp is heavy; assert helper path in module source
+        src = Path(ROOT / "status_page" / "audit_countdown.py").read_text(encoding="utf-8")
+        self.assertIn("while (deadlineMs <= now)", src)
+        self.assertIn("next_audit_at_rolling", src)
 
     def test_load_from_shipped_json_when_present(self):
         json_path = ROOT / "status_page" / "static" / "security_audit_latest.json"

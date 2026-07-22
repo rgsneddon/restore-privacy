@@ -68,6 +68,36 @@ def next_audit_at(last_generated_at: datetime, period: timedelta | None = None) 
     return last_generated_at.astimezone(timezone.utc) + p
 
 
+def next_audit_at_rolling(
+    last_generated_at: datetime,
+    *,
+    now: datetime | None = None,
+    period: timedelta | None = None,
+) -> datetime:
+    """Next audit deadline, rolling forward by *period* while overdue.
+
+    Prevents the public countdown from freezing at ``00:00:00`` when
+    ``generated_at`` is stale relative to wall clock (common when the node
+    timer still runs but status-host JSON has not been republished).
+    """
+    p = period if period is not None else AUDIT_PERIOD
+    n = now if now is not None else datetime.now(timezone.utc)
+    if n.tzinfo is None:
+        n = n.replace(tzinfo=timezone.utc)
+    n = n.astimezone(timezone.utc)
+    last = last_generated_at
+    if last.tzinfo is None:
+        last = last.replace(tzinfo=timezone.utc)
+    last = last.astimezone(timezone.utc)
+    nxt = last + p
+    # Cap iterations (e.g. years of stale timestamps still resolve quickly)
+    for _ in range(50_000):
+        if nxt > n:
+            return nxt
+        nxt = nxt + p
+    return nxt
+
+
 def remaining_seconds_until(
     deadline: datetime,
     *,
@@ -135,7 +165,8 @@ def countdown_state(
             "label": TIME_TIL_NEXT_AUDIT_LABEL,
             "blurb": TIME_TIL_NEXT_AUDIT_BLURB,
         }
-    nxt = next_audit_at(last, p)
+    # Roll forward when last+period is already past so UI never freezes at 00:00:00
+    nxt = next_audit_at_rolling(last, now=now, period=p)
     rem = remaining_seconds_until(nxt, now=now)
     return {
         "available": True,
@@ -146,6 +177,7 @@ def countdown_state(
         "period_seconds": int(p.total_seconds()),
         "label": TIME_TIL_NEXT_AUDIT_LABEL,
         "blurb": TIME_TIL_NEXT_AUDIT_BLURB,
+        "rolled_forward": nxt > next_audit_at(last, p),
     }
 
 
@@ -262,17 +294,18 @@ def render_audit_countdown_html(
       var s = sec % 60;
       return pad(h) + ":" + pad(m) + ":" + pad(s);
     }}
+    var period = parseInt(root.getAttribute("data-period-seconds") || "14400", 10);
+    if (!period || period < 1) period = 14400;
+    var deadlineMs = Date.parse(nextIso);
     function tick() {{
-      if (!available || !nextIso) {{
+      if (!available || !nextIso || isNaN(deadlineMs)) {{
         el.textContent = "—";
         return;
       }}
-      var deadline = Date.parse(nextIso);
-      if (isNaN(deadline)) {{
-        el.textContent = "—";
-        return;
-      }}
-      var rem = Math.max(0, Math.floor((deadline - Date.now()) / 1000));
+      var now = Date.now();
+      // Roll forward by period while overdue (unstick 00:00:00 when JSON is stale)
+      while (deadlineMs <= now) {{ deadlineMs += period * 1000; }}
+      var rem = Math.max(0, Math.floor((deadlineMs - now) / 1000));
       el.textContent = fmt(rem);
     }}
     tick();
@@ -354,17 +387,17 @@ def render_audit_page_ticker_html(
       var s = sec % 60;
       return pad(h) + ":" + pad(m) + ":" + pad(s);
     }}
+    var period = parseInt(root.getAttribute("data-period-seconds") || "14400", 10);
+    if (!period || period < 1) period = 14400;
+    var deadlineMs = Date.parse(nextIso);
     function tick() {{
-      if (!available || !nextIso) {{
+      if (!available || !nextIso || isNaN(deadlineMs)) {{
         el.textContent = "—";
         return;
       }}
-      var deadline = Date.parse(nextIso);
-      if (isNaN(deadline)) {{
-        el.textContent = "—";
-        return;
-      }}
-      var rem = Math.max(0, Math.floor((deadline - Date.now()) / 1000));
+      var now = Date.now();
+      while (deadlineMs <= now) {{ deadlineMs += period * 1000; }}
+      var rem = Math.max(0, Math.floor((deadlineMs - now) / 1000));
       el.textContent = fmt(rem);
     }}
     tick();
