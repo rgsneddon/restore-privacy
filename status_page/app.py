@@ -302,7 +302,14 @@ def render_html(status: dict, poll_ms: int | None = None) -> bytes:
         from audit_countdown import render_audit_countdown_html
     except ImportError:  # package-style import when status_page is on path
         from status_page.audit_countdown import render_audit_countdown_html  # type: ignore
+    try:
+        from node_wipe_countdown import render_node_wipe_countdown_html
+    except ImportError:
+        from status_page.node_wipe_countdown import (  # type: ignore
+            render_node_wipe_countdown_html,
+        )
     countdown_html = render_audit_countdown_html()
+    node_wipe_html = render_node_wipe_countdown_html()
     body = f"""<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -333,6 +340,17 @@ def render_html(status: dict, poll_ms: int | None = None) -> bytes:
                               color:#6ee7b7; font-size:1.05rem; }}
     .audit-countdown-blurb {{ margin:0.4rem 0 0; font-size:0.78rem; line-height:1.4;
                               color:#9ca3af; font-weight:400; letter-spacing:0.01em; }}
+    .node-wipe-countdown {{ margin:0 0 1.35rem; text-align:center; max-width:36rem;
+                            padding:0 1rem; letter-spacing:0.03em; }}
+    .node-wipe-row {{ font-size:0.82rem; color:#fde68a; margin:0.35rem 0; line-height:1.45;
+                      display:flex; flex-wrap:wrap; justify-content:center; gap:0.35rem 0.5rem; }}
+    .node-wipe-label {{ color:#fcd34d; font-weight:700; letter-spacing:0.04em;
+                        text-transform:none; }}
+    .node-wipe-value {{ font-variant-numeric:tabular-nums; font-weight:700;
+                        color:#fbbf24; font-size:0.95rem; }}
+    .node-wipe-blurb {{ margin:0.45rem 0 0; font-size:0.72rem; line-height:1.4;
+                        color:#9ca3af; font-weight:400; max-width:34rem; margin-left:auto;
+                        margin-right:auto; }}
 {dl_css}
   </style>
 </head>
@@ -340,6 +358,7 @@ def render_html(status: dict, poll_ms: int | None = None) -> bytes:
   <img class="brand-logo" src="/logo.png" width="96" height="96" alt="Restore Privacy logo"/>
   <h1>{title_safe}</h1>
 {render_legal_links_html()}
+{node_wipe_html}
 {countdown_html}
 {downloads_html}
 </body>
