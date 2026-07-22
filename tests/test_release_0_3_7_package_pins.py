@@ -8,6 +8,7 @@ operator-built).
 from __future__ import annotations
 
 import hashlib
+import re
 import sys
 import unittest
 import zipfile
@@ -18,8 +19,12 @@ sys.path.insert(0, str(ROOT))
 
 VERSION = "0.3.7"
 REL = ROOT / "releases" / VERSION
+STATUS_ASSETS = ROOT / "status_page" / "assets" / VERSION
 WINDOWS = REL / f"restore-privacy-client-{VERSION}-windows-x64-setup.exe"
 MACOS = REL / f"restore-privacy-client-{VERSION}-macos.zip"
+IOS = REL / f"restore-privacy-client-{VERSION}-ios.zip"
+STATUS_MACOS = STATUS_ASSETS / f"restore-privacy-client-{VERSION}-macos.zip"
+STATUS_IOS = STATUS_ASSETS / f"restore-privacy-client-{VERSION}-ios.zip"
 EXIT_PUB_PIN = (
     "a36a3f38066ece7b33abfab6a57942fb998919b4a753ee0d9e9ec9c97c1c7352"
 )
@@ -32,10 +37,43 @@ class Test037SourcePins(unittest.TestCase):
 
     def test_downloads_catalog_pin(self):
         sys.path.insert(0, str(ROOT / "status_page"))
-        from downloads import RELEASE_VERSION, RELEASE_TAG
+        from downloads import (
+            RELEASE_VERSION,
+            RELEASE_TAG,
+            MACOS_ZIP_FILENAME,
+            IOS_ZIP_FILENAME,
+            RELEASE_ASSETS,
+            list_catalog_platform_packages,
+        )
 
         self.assertEqual(RELEASE_VERSION, VERSION)
         self.assertEqual(RELEASE_TAG, VERSION)
+        self.assertEqual(
+            MACOS_ZIP_FILENAME, f"restore-privacy-client-{VERSION}-macos.zip"
+        )
+        self.assertEqual(
+            IOS_ZIP_FILENAME, f"restore-privacy-client-{VERSION}-ios.zip"
+        )
+        platforms = {a.platform for a in RELEASE_ASSETS}
+        self.assertIn("macos", platforms)
+        self.assertIn("ios", platforms)
+        pkgs = list_catalog_platform_packages()
+        names = {p["filename"] for p in pkgs}
+        self.assertIn(MACOS_ZIP_FILENAME, names)
+        self.assertIn(IOS_ZIP_FILENAME, names)
+        # Filenames must embed monopin version for Apple customer packages
+        for plat in ("macos", "ios"):
+            row = next(p for p in pkgs if p["platform"] == plat)
+            self.assertIn(VERSION, row["filename"])
+            self.assertEqual(row["version"], VERSION)
+
+    def test_flutter_product_version_pin(self):
+        cfg = (ROOT / "client_app" / "lib" / "rpt_config.dart").read_text(
+            encoding="utf-8"
+        )
+        self.assertIn(f"productVersion = '{VERSION}'", cfg)
+        pub = (ROOT / "client_app" / "pubspec.yaml").read_text(encoding="utf-8")
+        self.assertRegex(pub, rf"(?m)^version:\s*{re.escape(VERSION)}\+")
 
     def test_multihop_routing_implemented(self):
         from client.multihop import MULTI_HOP_ROUTING_IMPLEMENTED, PRODUCT_EXIT_HOST
@@ -142,3 +180,59 @@ class Test037MacosPackage(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+@unittest.skipUnless(IOS.is_file(), "releases/0.3.7 iOS zip not present")
+class Test037IosPackage(unittest.TestCase):
+    def test_ios_zip_size_and_no_priv(self):
+        self.assertGreater(IOS.stat().st_size, 1_000_000)
+        with zipfile.ZipFile(IOS) as z:
+            privs = [n for n in z.namelist() if n.endswith(".priv")]
+            self.assertEqual(privs, [], f"private keys in iOS zip: {privs}")
+            self.assertTrue(
+                any("Runner.app" in n for n in z.namelist()),
+                "expected Runner.app payload in iOS zip",
+            )
+
+    def test_ios_zip_ships_entry_and_exit_pubs(self):
+        with zipfile.ZipFile(IOS) as z:
+            exit_names = [n for n in z.namelist() if n.endswith("exit_node_elgamal.pub")]
+            entry_names = [
+                n
+                for n in z.namelist()
+                if n.endswith("node_elgamal.pub") and "exit_node" not in n
+            ]
+            self.assertTrue(exit_names, "exit_node_elgamal.pub missing from iOS zip")
+            self.assertTrue(entry_names, "node_elgamal.pub missing from iOS zip")
+            exit_b = z.read(exit_names[0])
+            self.assertEqual(hashlib.sha256(exit_b).hexdigest(), EXIT_PUB_PIN)
+
+    def test_ios_cfbundle_version_is_0_3_7(self):
+        with zipfile.ZipFile(IOS) as z:
+            host = [
+                n
+                for n in z.namelist()
+                if n == "Runner.app/Info.plist" or n.endswith("Runner.app/Info.plist")
+            ]
+            self.assertTrue(host, "Runner.app Info.plist missing")
+            raw = z.read(host[0])
+            self.assertIn(VERSION.encode(), raw)
+
+
+@unittest.skipUnless(
+    STATUS_MACOS.is_file() and STATUS_IOS.is_file(),
+    "status_page/assets/0.3.7 Apple zips not staged",
+)
+class Test037StatusAppleStage(unittest.TestCase):
+    def test_staged_apple_match_releases_sizes(self):
+        self.assertGreater(STATUS_MACOS.stat().st_size, 1_000_000)
+        self.assertGreater(STATUS_IOS.stat().st_size, 1_000_000)
+        if MACOS.is_file():
+            self.assertEqual(STATUS_MACOS.stat().st_size, MACOS.stat().st_size)
+        if IOS.is_file():
+            self.assertEqual(STATUS_IOS.stat().st_size, IOS.stat().st_size)
+        for p in (STATUS_MACOS, STATUS_IOS):
+            with zipfile.ZipFile(p) as z:
+                privs = [n for n in z.namelist() if n.endswith(".priv")]
+                self.assertEqual(privs, [], f"priv in staged {p.name}")
+
