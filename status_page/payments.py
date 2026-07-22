@@ -2940,6 +2940,10 @@ def check_fulfilment_ready(
     }
     if smtp_probe:
         meta["smtp_probe"] = probe_fulfilment_smtp_login()
+    elif smtp_ready.get("email_flow_enabled"):
+        # Config looks complete; only ?smtp_probe=1 proves provider login
+        meta["smtp_login_unverified"] = True
+        meta["smtp_probe_hint"] = "GET /health/fulfilment?smtp_probe=1"
     assets = list(available_downloads())
     want = (platform or "").strip().lower()
     if want:
