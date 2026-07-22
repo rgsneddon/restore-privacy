@@ -1,4 +1,4 @@
-"""Dual-line Node A/B wipe countdown for public homepage."""
+"""Entry-only Node A wipe countdown for public homepage (exit timer removed)."""
 
 from __future__ import annotations
 
