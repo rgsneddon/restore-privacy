@@ -101,6 +101,11 @@ class MainActivity : FlutterActivity() {
                     "hasSecrets" -> {
                         result.success(mapOf("ok" to secretsPresent()))
                     }
+                    "devicePubHex" -> {
+                        // Ensure device Ed25519 exists and return 64-char pub hex for
+                        // status-host bind-device-entitlement (node payment HELLO gate).
+                        result.success(devicePubHexMap())
+                    }
                     "setRunAtStartup" -> {
                         val enabled = call.argument<Boolean>("enabled") ?: false
                         val status = StartupPrefs.setRunAtStartup(this, enabled)
@@ -127,6 +132,38 @@ class MainActivity : FlutterActivity() {
             true
         } catch (_: Exception) {
             false
+        }
+    }
+
+    /**
+     * Ensure per-install `client_ed25519.priv` exists, derive Ed25519 public key,
+     * return lowercase hex for Flutter bind-device-entitlement.
+     */
+    private fun devicePubHexMap(): Map<String, Any> {
+        return try {
+            val dir = File(filesDir, "secrets")
+            dir.mkdirs()
+            val privF = File(dir, "client_ed25519.priv")
+            if (!privF.isFile || privF.length() != 32L) {
+                val seed = ByteArray(32)
+                java.security.SecureRandom().nextBytes(seed)
+                // Validate as Ed25519 seed
+                org.bouncycastle.crypto.params.Ed25519PrivateKeyParameters(seed, 0)
+                privF.writeBytes(seed)
+            }
+            val priv = privF.readBytes()
+            if (priv.size != 32) {
+                return mapOf("ok" to false, "error" to "bad_priv_len", "devicePubHex" to "")
+            }
+            val params = org.bouncycastle.crypto.params.Ed25519PrivateKeyParameters(priv, 0)
+            val pub = params.generatePublicKey().encoded
+            if (pub == null || pub.size != 32) {
+                return mapOf("ok" to false, "error" to "bad_pub", "devicePubHex" to "")
+            }
+            val hex = pub.joinToString("") { b -> "%02x".format(b) }
+            mapOf("ok" to true, "devicePubHex" to hex, "device_pub_hex" to hex)
+        } catch (e: Exception) {
+            mapOf("ok" to false, "error" to (e.message ?: "device_pub_failed"), "devicePubHex" to "")
         }
     }
 

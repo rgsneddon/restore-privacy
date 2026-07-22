@@ -8,8 +8,16 @@ Parity with Windows/Linux desktop unlock:
 
 1. **Accept end-user licence** (local only).
 2. **Forced keygen unlock surface** when licence is accepted but payment entitlement is missing — `client_app/lib/main.dart` `_showKeygenSheet` / `LicenceGate.needsKeygenUnlock` / `importKeygenAndVerify`. **Not Settings-only.**
-3. **Download alone does not unlock residual** — node HELLO requires active entitlement (status host); residual failure copy in `connect_status.dart` guides users back to keygen when remote reset/timeout-class errors appear.
-4. Connect only while subscription active (online re-check).
+3. **Device bind after active keygen** — `importKeygenAndVerify` / `refreshEntitlementFromRemote` call `bindDeviceEntitlement` → `POST /api/bind-device-entitlement` with Ed25519 `device_pub` from native `devicePubHex` (`RptVpnChannel` on iOS/macOS; `MainActivity` on Android). Required when node has `RPT_REQUIRE_PAYMENT_ENTITLEMENT=1`.
+4. **Download alone does not unlock residual** — node HELLO requires active entitlement + bound device; residual failure copy in `connect_status.dart` guides users back to keygen when remote reset/timeout-class errors appear.
+5. Connect only while subscription active (online re-check).
+
+Verify after Mac build:
+
+```bash
+cd client_app && flutter test test/keygen_bind_device_test.dart
+# Confirm iOS/macOS channels implement method "devicePubHex"
+```
 
 ## Build on Mac (Developer ID + notarize macOS; Team-signed iOS)
 

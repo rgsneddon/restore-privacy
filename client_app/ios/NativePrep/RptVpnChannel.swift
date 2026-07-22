@@ -5,6 +5,7 @@
 import Foundation
 import Flutter
 import NetworkExtension
+import CryptoKit
 
 enum RptVpnChannel {
   static let name = "restore_privacy/vpn"
@@ -32,9 +33,25 @@ enum RptVpnChannel {
             ? "Admission secrets found"
             : "Missing admission secrets — searched: \(RptSecrets.searchedPathsDescription())",
         ] as [String: Any])
+      case "devicePubHex":
+        result(devicePubHexMap())
       default:
         result(FlutterMethodNotImplemented)
       }
+    }
+  }
+
+  /// 64-char hex Ed25519 device public key for status-host bind-device-entitlement.
+  private static func devicePubHexMap() -> [String: Any] {
+    do {
+      let material = try RptSecrets.loadAdmissionMaterial()
+      let priv = material.clientPriv
+      let signing = try Curve25519.Signing.PrivateKey(rawRepresentation: priv)
+      let pub = signing.publicKey.rawRepresentation
+      let hex = pub.map { String(format: "%02x", $0) }.joined()
+      return ["ok": true, "devicePubHex": hex, "device_pub_hex": hex]
+    } catch {
+      return ["ok": false, "error": error.localizedDescription, "devicePubHex": ""]
     }
   }
 

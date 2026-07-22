@@ -6,6 +6,8 @@ library;
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:flutter/services.dart';
+
 import 'rpt_config.dart';
 import 'settings_store.dart';
 
@@ -204,30 +206,55 @@ class LicenceGate {
     String sessionId, {
     String? baseUrl,
     Future<Map<String, dynamic>> Function(String sessionId)? fetch,
+    bool bindDevice = true,
+    Future<String> Function()? resolveDevicePub,
+    Future<Map<String, dynamic>> Function(Uri uri, List<int> body)? postBind,
   }) async {
     final sid = sessionId.trim();
     if (sid.isEmpty) return kPaymentStatusUnknown;
     await backend.setString(kKeyPaymentSessionId, sid);
     await backend.setString(kKeyPaymentStatus, kPaymentStatusUnknown);
-    return refreshEntitlementFromRemote(baseUrl: baseUrl, fetch: fetch);
+    return refreshEntitlementFromRemote(
+      baseUrl: baseUrl,
+      fetch: fetch,
+      bindDevice: bindDevice,
+      resolveDevicePub: resolveDevicePub,
+      postBind: postBind,
+    );
   }
 
   /// Enter fulfilment keygen and verify against the status host.
+  ///
+  /// On active entitlement, POSTs `/api/bind-device-entitlement` so the residual
+  /// node can admit HELLO when `RPT_REQUIRE_PAYMENT_ENTITLEMENT=1` (parity with
+  /// desktop `import_keygen_and_verify(bind_device=True)`).
   Future<String> importKeygenAndVerify(
     String keygen, {
     String? baseUrl,
     Future<Map<String, dynamic>> Function(String sessionId)? fetch,
+    bool bindDevice = true,
+    Future<String> Function()? resolveDevicePub,
+    Future<Map<String, dynamic>> Function(Uri uri, List<int> body)? postBind,
   }) async {
     final kg = keygen.trim().toUpperCase().replaceAll(' ', '');
     if (kg.isEmpty) return kPaymentStatusUnknown;
     await backend.setString(kKeyPaymentKeygen, kg);
     await backend.setString(kKeyPaymentStatus, kPaymentStatusUnknown);
-    return refreshEntitlementFromRemote(baseUrl: baseUrl, fetch: fetch);
+    return refreshEntitlementFromRemote(
+      baseUrl: baseUrl,
+      fetch: fetch,
+      bindDevice: bindDevice,
+      resolveDevicePub: resolveDevicePub,
+      postBind: postBind,
+    );
   }
 
   Future<String> refreshEntitlementFromRemote({
     String? baseUrl,
     Future<Map<String, dynamic>> Function(String sessionId)? fetch,
+    bool bindDevice = true,
+    Future<String> Function()? resolveDevicePub,
+    Future<Map<String, dynamic>> Function(Uri uri, List<int> body)? postBind,
   }) async {
     final sid = await paymentSessionId();
     final kg = await paymentKeygen();
@@ -267,9 +294,115 @@ class LicenceGate {
         return kPaymentStatusRevoked;
       }
       await recordPaymentSuccess(remoteSid, keygen: remoteKg);
+      if (bindDevice && remoteSid.trim().isNotEmpty) {
+        try {
+          await bindDeviceEntitlement(
+            remoteSid,
+            baseUrl: baseUrl,
+            resolveDevicePub: resolveDevicePub,
+            post: postBind,
+          );
+        } catch (_) {
+          // Bind best-effort: unlock still recorded; Connect may re-bind later.
+        }
+      }
       return kPaymentStatusActive;
     }
     return await paymentStatus();
+  }
+
+  /// POST `/api/bind-device-entitlement` (same contract as desktop/Python).
+  ///
+  /// [resolveDevicePub] and [post] are injectable for unit tests; production uses
+  /// native `devicePubHex` + HttpClient.
+  Future<Map<String, dynamic>> bindDeviceEntitlement(
+    String sessionId, {
+    String? devicePubHex,
+    String? baseUrl,
+    Future<String> Function()? resolveDevicePub,
+    Future<Map<String, dynamic>> Function(Uri uri, List<int> body)? post,
+    Duration timeout = const Duration(seconds: 8),
+  }) async {
+    final sid = sessionId.trim();
+    var pub = (devicePubHex ?? '').trim().toLowerCase();
+    if (pub.isEmpty && resolveDevicePub != null) {
+      pub = (await resolveDevicePub()).trim().toLowerCase();
+    }
+    if (pub.isEmpty) {
+      pub = (await resolveDevicePubHex()).trim().toLowerCase();
+    }
+    if (sid.isEmpty || pub.isEmpty || pub.length != 64) {
+      return {
+        'ok': false,
+        'error': 'missing_session_or_device',
+        'session_id': sid,
+        'device_pub_hex': pub,
+      };
+    }
+    final base = (baseUrl ??
+            Platform.environment['RPT_PUBLIC_BASE_URL'] ??
+            kDefaultPaymentStatusBaseUrl)
+        .trim()
+        .replaceAll(RegExp(r'/+$'), '');
+    final uri = Uri.parse('$base/api/bind-device-entitlement');
+    final body = utf8.encode(
+      jsonEncode({'session_id': sid, 'device_pub': pub}),
+    );
+    if (post != null) {
+      return post(uri, body);
+    }
+    return postBindDeviceEntitlement(uri, body, timeout: timeout);
+  }
+
+  /// Production HTTP POST for device bind (overridable via [bindDeviceEntitlement.post]).
+  static Future<Map<String, dynamic>> postBindDeviceEntitlement(
+    Uri uri,
+    List<int> body, {
+    Duration timeout = const Duration(seconds: 8),
+  }) async {
+    final client = HttpClient();
+    try {
+      client.connectionTimeout = timeout;
+      final req = await client.postUrl(uri);
+      req.headers.set(
+        HttpHeaders.userAgentHeader,
+        'RestorePrivacy-flutter/${RptConfig.productVersion}',
+      );
+      req.headers.set(HttpHeaders.acceptHeader, 'application/json');
+      req.headers.set(HttpHeaders.contentTypeHeader, 'application/json');
+      req.add(body);
+      final resp = await req.close().timeout(timeout);
+      final raw = await resp.transform(utf8.decoder).join();
+      final data = jsonDecode(raw);
+      if (data is Map<String, dynamic>) return data;
+      if (data is Map) return Map<String, dynamic>.from(data);
+      return {'ok': false, 'error': 'bad_response'};
+    } catch (e) {
+      return {'ok': false, 'error': e.toString()};
+    } finally {
+      client.close(force: true);
+    }
+  }
+
+  /// 64-char lowercase hex of local Ed25519 device public key (native channel).
+  static Future<String> resolveDevicePubHex() async {
+    try {
+      const channel = MethodChannel('restore_privacy/vpn');
+      final raw = await channel.invokeMethod<dynamic>('devicePubHex');
+      if (raw is Map) {
+        final hex = (raw['devicePubHex'] ?? raw['device_pub_hex'] ?? raw['pub'])
+            ?.toString()
+            .trim()
+            .toLowerCase();
+        if (hex != null && hex.length == 64) return hex;
+        if (raw['ok'] == true && hex != null) return hex;
+      }
+      if (raw is String) {
+        final hex = raw.trim().toLowerCase();
+        if (hex.length == 64) return hex;
+      }
+    } catch (_) {}
+    return '';
   }
 
   static Future<Map<String, dynamic>> fetchRemoteEntitlementStatus(

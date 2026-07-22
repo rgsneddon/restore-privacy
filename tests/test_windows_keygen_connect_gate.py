@@ -98,6 +98,28 @@ class TestNeedsKeygenUnlock(unittest.TestCase):
         self.assertIn("kKeygenPromptTitle", main)
         self.assertIn("importKeygenAndVerify", main)
         self.assertIn("keygen", status.lower())
+        # Bind path must exist (node payment HELLO gate parity with desktop)
+        self.assertIn("bindDeviceEntitlement", gate)
+        self.assertIn("bind-device-entitlement", gate)
+        self.assertIn("devicePubHex", gate)
+        self.assertTrue(
+            (ROOT / "client_app" / "test" / "keygen_bind_device_test.dart").is_file()
+        )
+        android = (
+            ROOT
+            / "client_app"
+            / "android"
+            / "app"
+            / "src"
+            / "main"
+            / "kotlin"
+            / "com"
+            / "restoreprivacy"
+            / "restore_privacy_client"
+            / "MainActivity.kt"
+        ).read_text(encoding="utf-8")
+        self.assertIn('"devicePubHex"', android)
+        self.assertIn("devicePubHexMap", android)
 
 
 class TestFormatConnectFailure10054(unittest.TestCase):
