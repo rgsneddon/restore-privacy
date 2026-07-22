@@ -85,7 +85,9 @@ class TestInjectAppleSecretsScript(unittest.TestCase):
         text = script.read_text(encoding="utf-8")
         self.assertIn("node_elgamal.pub", text)
         self.assertIn("node_elgamal.priv", text)  # forbidden name
-        self.assertIn("never a shared", text.lower())
+        # Real inject docstring: "Never copies a shared ``client_ed25519.priv``..."
+        self.assertIn("never copies a shared", text.lower())
+        self.assertIn("client_ed25519.priv", text)
         self.assertIn('"Contents"', text)
         self.assertIn('"Resources"', text)
         self.assertIn('"secrets"', text)

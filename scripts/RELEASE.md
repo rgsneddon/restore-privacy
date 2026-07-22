@@ -4,9 +4,11 @@
 
 | Tag | Script |
 |-----|--------|
-| **0.3.6** | `scripts/build_release_0.3.6.py` |
-| **0.3.6 Windows multihop PE** | `scripts/build_windows_multihop.py` / `scripts/build_windows_multihop.bat` (Windows x64 only; handoff `client/windows/WINDOWS_HANDOFF_0.3.6.md`) |
-| 0.3.4 | `scripts/build_release_0.3.4.py` |
+| **0.3.7** | `scripts/build_release_0.3.7.py` |
+| **0.3.7 Windows multihop PE** | `scripts/build_windows_multihop.py` / `scripts/build_windows_multihop.bat` (Windows x64 only; handoff `client/windows/WINDOWS_HANDOFF_0.3.7.md`) |
+| **0.3.7 Apple handoff** | `client_app/APPLE_HANDOFF_0.3.7.md` |
+| 0.3.6 | `scripts/build_release_0.3.6.py` (archive) |
+| 0.3.4 | `scripts/build_release_0.3.4.py` (archive) |
 | 0.3.3 | `scripts/build_release_0.3.3.py` (archive) |
 | 0.3.0 | `scripts/build_release_0.3.0.py` (archive) |
 | 0.2.3 | `scripts/build_release_0.2.3.py` (archive) |
@@ -16,6 +18,8 @@
 | 0.1.8 | `scripts/build_release_0.1.8.py` (archive) |
 
 Product node: **82.221.101.241:44044**. See `scripts/RELEASE_NOTES_0.3.7.md`.
+
+**0.3.7 highlights:** catalog monopin **0.3.7**; subscription keygen unlock; multi-hop residual when enabled; Apple packages via Mac handoff `client_app/APPLE_HANDOFF_0.3.7.md`.
 
 **0.3.6 highlights:** live catalog Pay £2.45; paid macOS fulfilment pin **0.3.6**.
 
@@ -35,7 +39,9 @@ Shared gates every release must keep:
 
 ```bash
 # Bump VERSION / downloads catalog / installer VERSION first
-python scripts/build_release_0.3.4.py
-# Confirm releases/0.3.4/ has windows + linux (+ android/apple if built)
-# gh release create 0.3.4 with those files
+# Mac: flutter build macos --release, then package (DevID + notarize)
+python scripts/build_release_0.3.7.py --apple-only
+# Confirm releases/0.3.7/ has macos (+ ios if built) zip(s)
+# Full catalog: python scripts/build_release_0.3.7.py
+# gh release create 0.3.7 with those files (operator)
 ```

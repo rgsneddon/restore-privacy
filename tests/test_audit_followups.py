@@ -94,11 +94,13 @@ class TestAppleAndOps(unittest.TestCase):
         path = ROOT / "scripts" / "RELEASE.md"
         self.assertTrue(path.is_file())
         text = path.read_text(encoding="utf-8")
-        # Current monopin script must be documented (0.3.4+)
-        self.assertTrue(
-            "build_release_0.3.4.py" in text or "build_release_0.3.0.py" in text,
-            "RELEASE.md must name a current build_release script",
+        # Current monopin script must be documented (catalog 0.3.7)
+        self.assertIn(
+            "build_release_0.3.7.py",
+            text,
+            "RELEASE.md must name current monopin build_release_0.3.7.py",
         )
+        self.assertIn("APPLE_HANDOFF_0.3.7.md", text)
         self.assertIn("_assert_no_priv", text)
         self.assertIn("package_linux.py", text)
 
