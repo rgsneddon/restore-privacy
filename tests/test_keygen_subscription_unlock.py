@@ -22,6 +22,7 @@ sys.path.insert(0, str(ROOT / "status_page"))
 class TestHomepageTrialSentence(unittest.TestCase):
     def test_price_block_order(self):
         from downloads import (
+            ONLY_PRICE_BANNER,
             PACKAGE_IDENTITY,
             PAY_AND_KEYGEN_CLAUSE,
             PRICE_LABEL,
@@ -33,9 +34,19 @@ class TestHomepageTrialSentence(unittest.TestCase):
         html = render_download_section_html(coming_soon=False)
         # Nested box inside #downloads
         self.assertIn('id="downloads"', html)
+        # Large green monthly callout under Download client heading
+        self.assertIn("Download client v", html)
+        self.assertIn('id="dl-only-price"', html)
+        self.assertIn('class="dl-only-price"', html)
+        self.assertIn(ONLY_PRICE_BANNER, html)
+        self.assertEqual(ONLY_PRICE_BANNER, "ONLY £2.45 per month")
+        heading_i = html.find("Download client v")
+        banner_i = html.find('id="dl-only-price"')
+        box_start = html.find('id="dl-price-box"')
+        self.assertGreater(banner_i, heading_i)
+        self.assertGreater(box_start, banner_i)
         self.assertIn('class="dl-price-box"', html)
         self.assertIn('id="dl-price-box"', html)
-        box_start = html.find('id="dl-price-box"')
         price_start = html.find('id="dl-price"', box_start)
         self.assertGreater(price_start, box_start)
         # Extract the price paragraph content from the real renderer
@@ -88,6 +99,19 @@ class TestHomepageTrialSentence(unittest.TestCase):
         self.assertRegex(
             css,
             r"@media \(max-width:\s*640px\)[\s\S]*?\.dl-price-box[\s\S]*?width:\s*100%",
+        )
+        # ONLY £2.45 banner: large, green, fancy/non-default font stack
+        self.assertIn(".dl-only-price", css)
+        self.assertIn("#22c55e", css)
+        self.assertIn("font-size:", css)
+        self.assertRegex(css, r"\.dl-only-price[\s\S]*?color:\s*#22c55e")
+        self.assertRegex(
+            css,
+            r"\.dl-only-price[\s\S]*?font-family:[\s\S]*?(Georgia|Palatino|cursive|serif)",
+        )
+        self.assertRegex(
+            css,
+            r"\.dl-only-price[\s\S]*?font-size:\s*clamp\(",
         )
 
 

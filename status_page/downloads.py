@@ -146,6 +146,8 @@ IOS_ZIP_FILENAME = f"restore-privacy-client-{RELEASE_VERSION}-ios.zip"
 LINUX_TGZ_FILENAME = f"restore-privacy-client-{RELEASE_VERSION}-linux-x64.tar.gz"
 
 PRICE_LABEL = "£2.45"
+# Large green callout under "Download client v…" on the public homepage.
+ONLY_PRICE_BANNER = "ONLY £2.45 per month"
 # Homepage download price block (single shipped contract for public #downloads).
 PACKAGE_IDENTITY = "per month subscription package — one device licence"
 TRIAL_SUBSCRIPTION_SENTENCE = (
@@ -339,6 +341,23 @@ def download_css() -> str:
     .downloads { width: 100%; text-align: center; box-sizing: border-box; }
     .downloads h2 { font-size: 1.05rem; letter-spacing: 0.1em; font-weight: 700;
                     margin: 0 0 0.35rem; color: var(--rb-cream); text-transform: uppercase; }
+    /* Large green monthly price emphasis under Download client heading */
+    .dl-only-price {
+      margin: 0.35rem auto 0.55rem;
+      padding: 0.15rem 0.5rem;
+      font-size: clamp(1.55rem, 4.5vw, 2.35rem);
+      font-weight: 800;
+      line-height: 1.2;
+      letter-spacing: 0.04em;
+      color: #22c55e;
+      text-shadow: 0 0 18px rgba(34, 197, 94, 0.35), 0 2px 0 rgba(0, 0, 0, 0.25);
+      font-family: "Palatino Linotype", Palatino, "Book Antiqua", Georgia, "Times New Roman",
+                   "Segoe Script", "Apple Chancery", "Comic Sans MS", cursive, serif;
+      font-style: italic;
+      text-align: center;
+      width: 100%;
+      box-sizing: border-box;
+    }
     .dl-sub { color: var(--rb-muted); font-size: 0.92rem; margin: 0 0 0.85rem; }
     /* Nested price box inside #downloads: ~2/3 panel width, fluid on narrow viewports */
     .dl-price-box {
@@ -439,6 +458,9 @@ def download_css() -> str:
         width: 100%;
         max-width: 100%;
         padding: 0.65rem 0.75rem;
+      }
+      .dl-only-price {
+        font-size: clamp(1.25rem, 6vw, 1.85rem);
       }
     }
 """
@@ -618,6 +640,7 @@ def render_download_section_html(
     return f"""
   <section class="downloads panel-card" id="downloads" aria-label="Download Restore Privacy client">
     <h2>Download client v{RELEASE_VERSION}</h2>
+    <p class="dl-only-price" id="dl-only-price">{ONLY_PRICE_BANNER}</p>
     <p class="dl-sub">Windows | Linux | macOS | iOS | Android</p>
     <div class="dl-price-box" id="dl-price-box">
       <p class="dl-price" id="dl-price">{price_line}</p>
