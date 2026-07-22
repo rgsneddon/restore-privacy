@@ -48,7 +48,7 @@ Restore Privacy is built from the ground up using unashamed vibe coding methods 
 
 ## How to install and use
 
-**Current catalog (v0.3.7):** pay-per-package installers on https://restoreprivacy.online/ (£2.45 GBP via Stripe). Homepage notes that **Your monthly subscription (£2.45 per month) begins after your 7 day trial**. After pay, email delivers **keygen + PPI + download link** (**USE THIS KEYGEN TO UNLOCK YOUR RESTORE PRIVACY TRIAL**). Apps: Install → accept licence → enter keygen; Connect only while subscription active.  
+**Current catalog (v0.3.7):** pay-per-package installers on https://restoreprivacy.online/ (£2.45 GBP via Stripe). Homepage notes that **Your monthly subscription begins after your 7 day trial** and that after pay, **download starts automatically and keygen is emailed to you directly**. Email delivers **keygen + PPI + download link** (**USE THIS KEYGEN TO UNLOCK YOUR RESTORE PRIVACY TRIAL**). Apps: Install → accept licence → enter keygen; Connect only while subscription active.  
 The product source repository is **private**; free permanent GitHub release downloads are not offered. After payment the status site delivers the installer once (authenticated proxy).
 
 > **STRONG DISCLAIMER — PAYMENT REQUIRED FOR CONNECT:** Access to **Connect** and residual VPN use requires **successful payment**. If payment **fails at any time** (failed checkout, failed charge, refund, dispute, or revoked entitlement), the ability to **Connect with the Restore Privacy app is cancelled** for that purchase/install until a successful payment is completed.

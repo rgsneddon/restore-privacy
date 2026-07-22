@@ -1905,7 +1905,7 @@ def desired_payment_link_trial_fields() -> dict[str, Any]:
         "trial_period_days": 7,
         "mode": "subscription",
         "homepage_trial_sentence": (
-            "Your monthly subscription (£2.45 per month) begins after your 7 day trial"
+            "Your monthly subscription begins after your 7 day trial"
         ),
     }
 

@@ -21,37 +21,74 @@ sys.path.insert(0, str(ROOT / "status_page"))
 
 class TestHomepageTrialSentence(unittest.TestCase):
     def test_price_block_order(self):
-        from downloads import PRICE_LABEL, render_download_section_html
+        from downloads import (
+            PACKAGE_IDENTITY,
+            PAY_AND_KEYGEN_CLAUSE,
+            PRICE_LABEL,
+            TRIAL_SUBSCRIPTION_SENTENCE,
+            download_css,
+            render_download_section_html,
+        )
 
         html = render_download_section_html(coming_soon=False)
-        price_start = html.find('id="dl-price"')
-        self.assertGreater(price_start, 0)
-        # Extract the price paragraph content
+        # Nested box inside #downloads
+        self.assertIn('id="downloads"', html)
+        self.assertIn('class="dl-price-box"', html)
+        self.assertIn('id="dl-price-box"', html)
+        box_start = html.find('id="dl-price-box"')
+        price_start = html.find('id="dl-price"', box_start)
+        self.assertGreater(price_start, box_start)
+        # Extract the price paragraph content from the real renderer
         p_open = html.find(">", price_start) + 1
         p_close = html.find("</p>", p_open)
         snippet = html[p_open:p_close]
-        trial = (
-            "Your monthly subscription (£2.45 per month) begins after your 7 day trial"
-        )
-        package = "per month subscription package — one device licence"
+        trial = TRIAL_SUBSCRIPTION_SENTENCE
+        package = PACKAGE_IDENTITY
         self.assertIn(f"{PRICE_LABEL} GBP", snippet)
         self.assertIn(package, snippet)
         self.assertIn("one device licence", snippet)
         self.assertIn(trial, snippet)
         self.assertIn("pay on Stripe", snippet)
+        self.assertIn("keygen is emailed to you directly", snippet)
+        # Old nested-price trial clause must not remain on homepage download block
+        self.assertNotIn(
+            "Your monthly subscription (£2.45 per month) begins after your 7 day trial",
+            snippet,
+        )
+        self.assertNotIn(
+            "Your monthly subscription (£2.45 per month) begins after your 7 day trial",
+            html,
+        )
         # Old sole identity without subscription/licence language must not remain
         self.assertNotEqual(
             snippet.strip(),
             f"{PRICE_LABEL} GBP per package — pay on Stripe, then download starts automatically",
         )
-        # Order: price → package identity → trial → pay on Stripe
+        # Order: price → package identity → trial → pay/keygen
         i_price = snippet.find(f"{PRICE_LABEL} GBP")
         i_pkg = snippet.find(package)
         i_trial = snippet.find(trial)
         i_pay = snippet.find("pay on Stripe")
+        i_keygen = snippet.find("keygen is emailed to you directly")
         self.assertLess(i_price, i_pkg)
         self.assertLess(i_pkg, i_trial)
         self.assertLess(i_trial, i_pay)
+        self.assertLess(i_pay, i_keygen)
+        self.assertIn(PAY_AND_KEYGEN_CLAUSE, snippet)
+        # Box width ~2/3 + fluid narrow rule on real CSS from shipped download_css()
+        css = download_css()
+        self.assertIn(".dl-price-box", css)
+        self.assertTrue(
+            "width: 66.67%" in css or "max-width: 66.67%" in css,
+            "price box must target ~2/3 width of downloads panel",
+        )
+        self.assertIn("max-width: 66.67%", css)
+        self.assertIn("@media (max-width: 640px)", css)
+        # Narrow viewport reflow to full panel width
+        self.assertRegex(
+            css,
+            r"@media \(max-width:\s*640px\)[\s\S]*?\.dl-price-box[\s\S]*?width:\s*100%",
+        )
 
 
 class TestKeygenMintAndEmail(unittest.TestCase):

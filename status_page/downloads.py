@@ -146,6 +146,14 @@ IOS_ZIP_FILENAME = f"restore-privacy-client-{RELEASE_VERSION}-ios.zip"
 LINUX_TGZ_FILENAME = f"restore-privacy-client-{RELEASE_VERSION}-linux-x64.tar.gz"
 
 PRICE_LABEL = "£2.45"
+# Homepage download price block (single shipped contract for public #downloads).
+PACKAGE_IDENTITY = "per month subscription package — one device licence"
+TRIAL_SUBSCRIPTION_SENTENCE = (
+    "Your monthly subscription begins after your 7 day trial"
+)
+PAY_AND_KEYGEN_CLAUSE = (
+    "pay on Stripe, then download starts automatically and keygen is emailed to you directly"
+)
 # Default tip identity; runtime public page uses coffee_tip_url() (env override).
 BMC_TIP_URL = COFFEE_LINK_URL
 
@@ -332,7 +340,26 @@ def download_css() -> str:
     .downloads h2 { font-size: 1.05rem; letter-spacing: 0.1em; font-weight: 700;
                     margin: 0 0 0.35rem; color: var(--rb-cream); text-transform: uppercase; }
     .dl-sub { color: var(--rb-muted); font-size: 0.92rem; margin: 0 0 0.85rem; }
-    .dl-price { font-size: 0.95rem; margin: 0 0 1.1rem; font-weight: 600; color: var(--rb-accent); }
+    /* Nested price box inside #downloads: ~2/3 panel width, fluid on narrow viewports */
+    .dl-price-box {
+      width: 66.67%;
+      max-width: 66.67%;
+      margin: 0 auto 1.1rem;
+      padding: 0.75rem 1rem;
+      box-sizing: border-box;
+      border: 1px solid var(--rb-card-border);
+      border-radius: 12px;
+      background: rgba(10, 22, 40, 0.45);
+      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05);
+    }
+    .dl-price {
+      font-size: 0.95rem;
+      margin: 0;
+      font-weight: 600;
+      color: var(--rb-accent);
+      line-height: 1.45;
+      text-align: center;
+    }
     .dl-payment-disclaimer {
       max-width: 36rem; margin: 1.15rem auto 0.35rem; padding: 0.65rem 0.85rem;
       font-size: 0.82rem; line-height: 1.45; font-weight: 600;
@@ -406,6 +433,12 @@ def download_css() -> str:
       a.dl, button.dl {
         flex: 0 0 5.25rem; width: 5.25rem; height: 5.25rem;
         min-width: 5.25rem; max-width: 5.25rem;
+      }
+      /* Full width of downloads panel on narrow viewports */
+      .dl-price-box {
+        width: 100%;
+        max-width: 100%;
+        padding: 0.65rem 0.75rem;
       }
     }
 """
@@ -567,12 +600,7 @@ def render_download_section_html(
     <div class="dl-row dl-row-2" id="dl-row-2" data-dl-row="2" data-dl-count="{len(row2)}">
       {row2_html}
     </div>"""
-    # Price identity: £2.45 per month subscription package + one device licence,
-    # then trial honesty, then pay-on-Stripe (homepage download section contract).
-    PACKAGE_IDENTITY = "per month subscription package — one device licence"
-    TRIAL_SUBSCRIPTION_SENTENCE = (
-        "Your monthly subscription (£2.45 per month) begins after your 7 day trial"
-    )
+    # Price identity: £2.45 package + one device licence, trial honesty, pay + keygen email.
     if coming_soon:
         price_line = (
             f"{PRICE_LABEL} GBP {PACKAGE_IDENTITY} — {TRIAL_SUBSCRIPTION_SENTENCE} — "
@@ -582,16 +610,18 @@ def render_download_section_html(
     else:
         price_line = (
             f"{PRICE_LABEL} GBP {PACKAGE_IDENTITY} — {TRIAL_SUBSCRIPTION_SENTENCE} — "
-            f"pay on Stripe, then download starts automatically"
+            f"{PAY_AND_KEYGEN_CLAUSE}"
         )
         buttons_mode = ' data-buy-mode="stripe-live"'
-    # Order: title/price → pay controls only. BMC tip is page-bottom (homepage shell).
+    # Order: title/price box → pay controls only. BMC tip is page-bottom (homepage shell).
     # Homepage omits STRONG DISCLAIMER banner (apps/licence retain payment language).
     return f"""
   <section class="downloads panel-card" id="downloads" aria-label="Download Restore Privacy client">
     <h2>Download client v{RELEASE_VERSION}</h2>
     <p class="dl-sub">Windows | Linux | macOS | iOS | Android</p>
-    <p class="dl-price" id="dl-price">{price_line}</p>
+    <div class="dl-price-box" id="dl-price-box">
+      <p class="dl-price" id="dl-price">{price_line}</p>
+    </div>
     <div class="dl-buttons" id="dl-buttons" data-dl-layout="3+2"{buttons_mode}>
     <div class="dl-row dl-row-3" id="dl-row-1" data-dl-row="1" data-dl-count="{len(row1)}">
       {row1_html}
