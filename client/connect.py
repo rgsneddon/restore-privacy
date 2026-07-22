@@ -119,28 +119,59 @@ def format_connect_failure(
 
     UDP HELLO timeouts usually mean the node is down, firewalled, or blocked;
     the message names host:port so the user can act.
+
+    WinError 10054 / connection reset on residual HELLO often means the node
+    dropped the session (payment admission, wrong keys, or host closed the
+    path) — surface that instead of only the raw socket code.
     """
     target = f"{host}:{int(port)}"
     name = type(exc).__name__
     raw = str(exc).strip() or name
+    low = raw.lower()
 
     # socket.timeout and TimeoutError both surface as "timed out" on Windows
     is_timeout = isinstance(exc, (TimeoutError, socket.timeout)) or (
         name in ("timeout", "TimeoutError")
-        or raw.lower() in ("timed out", "timeout")
-        or "timed out" in raw.lower()
+        or low in ("timed out", "timeout")
+        or "timed out" in low
     )
     if is_timeout:
         secs = int(timeout_s) if timeout_s == int(timeout_s) else timeout_s
         return (
             f"No reply from VPN node {target} within {secs}s. "
-            "Check your internet, Windows Defender Firewall/UDP, or that the node is online. "
-            "On Windows, run AllowFirewall.bat (or reinstall) if residual Connect is blocked."
+            "If you just paid: enter the keygen from your fulfilment email "
+            "(Settings → Payment entitlement / keygen, or the unlock dialog), "
+            "then Connect again so this device is bound. "
+            "Also check internet, Windows Firewall/UDP, or that the node is online. "
+            "On Windows, run AllowFirewall.bat (or reinstall) if residual is blocked."
+        )
+
+    # WSAECONNRESET / forcibly closed — common when remote drops residual HELLO
+    is_reset = (
+        isinstance(exc, ConnectionResetError)
+        or "10054" in raw
+        or "forcibly closed" in low
+        or "connection reset" in low
+        or "wsaeconnreset" in low
+    )
+    if is_reset:
+        return (
+            f"VPN node {target} closed the residual connection "
+            f"(remote reset: {raw[:80]}). "
+            "Usually: licence keygen not entered, device not bound to your paid "
+            "subscription, or node refused HELLO. Enter the keygen from your email, "
+            "tap Verify keygen / unlock Connect, then try Connect again."
         )
 
     # Secrets / admission often include useful detail already
-    if "secret" in raw.lower() or "client_ed25519" in raw.lower() or "node_elgamal" in raw.lower():
+    if "secret" in low or "client_ed25519" in low or "node_elgamal" in low:
         return raw if len(raw) <= 160 else raw[:157] + "…"
+
+    if "payment entitlement" in low or "admission" in low:
+        return (
+            f"{raw} (node {target}). Enter your keygen from the fulfilment email "
+            "and verify unlock before Connect."
+        )
 
     if len(raw) <= 120 and target not in raw:
         return f"{raw} (node {target})"

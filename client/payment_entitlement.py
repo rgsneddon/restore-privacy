@@ -399,11 +399,13 @@ def import_keygen_and_verify(
     platform: str = "",
     now: float | None = None,
     fetch: Any = None,
+    bind_device: bool = True,
 ) -> PaymentEntitlement:
     """Provision local entitlement from fulfilment **keygen** and verify remotely.
 
     Shipped first-run path after Install → accept licence → enter keygen:
     status host ``/api/connect-entitlement?keygen=…`` confirms active subscription.
+    On success, binds this device so the residual node admits HELLO.
     """
     kg = normalize_local_keygen(keygen)
     if not kg:
@@ -419,12 +421,23 @@ def import_keygen_and_verify(
         keygen=kg,
     )
     save_payment_entitlement(pending, path=path)
-    return refresh_entitlement_from_remote(
+    local = refresh_entitlement_from_remote(
         path=path,
         base_url=base_url,
         now=now,
         fetch=fetch,
     )
+    if (
+        bind_device
+        and local.status == STATUS_ACTIVE
+        and payment_allows_connect(local, require=True)
+        and local.session_id
+    ):
+        try:
+            bind_device_to_remote(local.session_id, base_url=base_url)
+        except Exception:  # noqa: BLE001
+            pass
+    return local
 
 
 def maybe_bootstrap_from_env(
@@ -540,6 +553,8 @@ def ensure_entitlement_for_connect(
         local = refresh_entitlement_from_remote(
             path=path, base_url=base_url, fetch=fetch
         )
+        # Always bind device when Connect is allowed so node residual HELLO
+        # can pass payment admission (keygen path must also set session_id).
         if (
             bind_device
             and local.status == STATUS_ACTIVE

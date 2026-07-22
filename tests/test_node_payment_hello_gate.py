@@ -62,7 +62,8 @@ class TestNodePaymentHelloGate(unittest.TestCase):
             node_complete_hello,
         )
 
-        node_priv, node_pub = generate_keypair()
+        node_priv = generate_keypair()
+        node_pub = node_priv.public
         cpriv = Ed25519PrivateKey.generate()
         frame, _, _, _ = build_client_hello(cpriv, node_pub, with_pfs=True)
         hs = NodeHandshake(node_priv, admit_unknown_devices=True, require_pfs=True)

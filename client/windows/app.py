@@ -76,11 +76,14 @@ from client.licence_gate import (
     has_accepted_licence,
     licence_url,
     may_connect,
+    needs_keygen_unlock,
     short_licence_summary,
 )
 from client.payment_entitlement import (
+    CONNECT_BLOCKED_KEYGEN_MSG,
     PAYMENT_CONNECT_DISCLAIMER_PLAIN,
     ensure_entitlement_for_connect,
+    import_keygen_and_verify,
     import_session_and_verify,
     load_payment_entitlement,
     payment_allows_connect,
@@ -691,6 +694,159 @@ class TunnelClientApp:
         except Exception:
             pass
 
+    def _show_keygen_prompt(self) -> None:
+        """Forced modal: enter fulfilment keygen to unlock Connect (not Settings-only)."""
+        win = tk.Toplevel(self.root)
+        win.title("Enter licence keygen")
+        win.configure(bg=CHROME_BG)
+        win.geometry("480x360")
+        win.transient(self.root)
+        try:
+            win.grab_set()
+        except Exception:
+            pass
+        pad = tk.Frame(win, bg=CHROME_BG, padx=16, pady=14)
+        pad.pack(fill=tk.BOTH, expand=True)
+        tk.Label(
+            pad,
+            text="Enter licence keygen",
+            bg=CHROME_BG,
+            fg=PRIMARY_DARK,
+            font=("Segoe UI", 14, "bold"),
+            anchor="w",
+        ).pack(fill=tk.X, pady=(0, 8))
+        tk.Label(
+            pad,
+            text=(
+                "Your fulfilment email includes a keygen with the text "
+                "USE THIS KEYGEN TO UNLOCK YOUR RESTORE PRIVACY TRIAL "
+                "(format RPT-KEY-…). Paste it below to unlock Connect. "
+                "Download alone does not unlock residual VPN."
+            ),
+            bg=CHROME_BG,
+            fg=TEXT,
+            font=("Segoe UI", 9),
+            anchor="w",
+            wraplength=440,
+            justify=tk.LEFT,
+        ).pack(fill=tk.X, pady=(0, 8))
+        tk.Label(
+            pad,
+            text=CONNECT_BLOCKED_KEYGEN_MSG,
+            bg=CHROME_BG,
+            fg=TEXT_MUTED,
+            font=("Segoe UI", 8),
+            anchor="w",
+            wraplength=440,
+            justify=tk.LEFT,
+        ).pack(fill=tk.X, pady=(0, 10))
+        key_var = tk.StringVar()
+        entry = tk.Entry(
+            pad,
+            textvariable=key_var,
+            font=("Segoe UI", 11),
+            bg=WHITE,
+            fg=TEXT,
+            relief=tk.SOLID,
+            bd=1,
+        )
+        entry.pack(fill=tk.X, pady=(0, 8))
+        try:
+            entry.focus_set()
+        except Exception:
+            pass
+        status_var = tk.StringVar(value="")
+        tk.Label(
+            pad,
+            textvariable=status_var,
+            bg=CHROME_BG,
+            fg=TEXT_MUTED,
+            font=("Segoe UI", 8),
+            anchor="w",
+            wraplength=440,
+            justify=tk.LEFT,
+        ).pack(fill=tk.X, pady=(0, 8))
+        btn_row = tk.Frame(pad, bg=CHROME_BG)
+        btn_row.pack(fill=tk.X, pady=(8, 0))
+
+        def _unlock() -> None:
+            raw = (key_var.get() or "").strip()
+            if not raw:
+                status_var.set("Paste the keygen from your email first.")
+                return
+            status_var.set("Verifying keygen with status host…")
+            win.update_idletasks()
+
+            def work() -> None:
+                try:
+                    ent = import_keygen_and_verify(raw, bind_device=True)
+                    ok = payment_allows_connect()
+                    msg = (
+                        f"Unlocked — Connect allowed (status={ent.status})."
+                        if ok
+                        else (
+                            f"Keygen not active (status={ent.status}). "
+                            "Check the email code and that your subscription is active."
+                        )
+                    )
+                except Exception as exc:  # noqa: BLE001
+                    ent = None
+                    ok = False
+                    msg = f"Could not verify keygen: {exc}"
+
+                def done() -> None:
+                    status_var.set(msg)
+                    self._log(msg)
+                    self._refresh_licence_badge()
+                    if ok:
+                        self.detail_var.set(
+                            "Keygen verified. Press Connect for residual protection."
+                        )
+                        try:
+                            win.destroy()
+                        except Exception:
+                            pass
+                    else:
+                        self.detail_var.set(msg)
+
+                try:
+                    self.root.after(0, done)
+                except Exception:
+                    pass
+
+            import threading
+
+            threading.Thread(target=work, daemon=True).start()
+
+        tk.Button(
+            btn_row,
+            text="Unlock Connect",
+            command=_unlock,
+            bg=PRIMARY,
+            fg=WHITE,
+            relief=tk.FLAT,
+            font=("Segoe UI", 9, "bold"),
+            padx=12,
+            pady=6,
+            cursor="hand2",
+        ).pack(side=tk.LEFT)
+        tk.Button(
+            btn_row,
+            text="Cancel",
+            command=win.destroy,
+            bg=PANEL_BG,
+            fg=TEXT,
+            relief=tk.FLAT,
+            font=("Segoe UI", 9),
+            padx=10,
+            pady=6,
+            cursor="hand2",
+        ).pack(side=tk.LEFT, padx=(8, 0))
+        try:
+            win.bind("<Return>", lambda _e: _unlock())
+        except Exception:
+            pass
+
     def _show_licence_prompt(self) -> None:
         """First-run / Settings: accept end-user licence (local only)."""
         win = tk.Toplevel(self.root)
@@ -768,11 +924,19 @@ class TunnelClientApp:
             self._log("Licence accepted (stored locally only).")
             self._connection_log("settings", "End-user licence accepted")
             self._refresh_licence_badge()
-            self.detail_var.set("Licence accepted. Press Connect when ready.")
+            self.detail_var.set(
+                "Licence accepted. Enter your keygen from the fulfilment email to unlock Connect."
+            )
             try:
                 win.destroy()
             except Exception:
                 pass
+            # Force keygen surface next — do not leave unlock buried in Settings only
+            if needs_keygen_unlock():
+                try:
+                    self.root.after(200, self._show_keygen_prompt)
+                except Exception:
+                    self._show_keygen_prompt()
 
         tk.Button(
             btn_row,
@@ -821,6 +985,9 @@ class TunnelClientApp:
             self.detail_var.set(lic_msg)
             if not has_accepted_licence():
                 self._show_licence_prompt()
+            elif needs_keygen_unlock():
+                # Forced keygen unlock modal (not Settings-only)
+                self._show_keygen_prompt()
             else:
                 self._open_settings()
             return
@@ -1825,6 +1992,8 @@ def main() -> int:
                 )
                 if not has_accepted_licence():
                     app._show_licence_prompt()
+                elif needs_keygen_unlock():
+                    app._show_keygen_prompt()
                 else:
                     app._open_settings()
                 return
@@ -1833,8 +2002,14 @@ def main() -> int:
 
         app.root.after(450, _settings_autoconnect)
     elif not may_connect():
-        # First-run seamless path: surface licence before the user hunts for it.
-        app.root.after(500, app._show_licence_prompt)
+        # First-run seamless path: licence first, then forced keygen unlock.
+        def _first_run_gates() -> None:
+            if not has_accepted_licence():
+                app._show_licence_prompt()
+            elif needs_keygen_unlock():
+                app._show_keygen_prompt()
+
+        app.root.after(500, _first_run_gates)
 
     app.run()
     return 0

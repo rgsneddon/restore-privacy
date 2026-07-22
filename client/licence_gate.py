@@ -183,6 +183,19 @@ def assert_may_connect(path: Optional[Path] = None) -> tuple[bool, str]:
     return True, ""
 
 
+def needs_keygen_unlock(path: Optional[Path] = None) -> bool:
+    """True when licence is accepted but payment/keygen unlock is still required.
+
+    Used by Windows (and other) UI to force a keygen entry surface before
+    residual Connect — not Settings-only.
+    """
+    if not has_accepted_licence(path):
+        return False
+    from client.payment_entitlement import payment_allows_connect
+
+    return not payment_allows_connect(path=path)
+
+
 def licence_url() -> str:
     return end_user_licence_url()
 
