@@ -72,6 +72,20 @@ class RptDataPlane:
         self._thread: Optional[threading.Thread] = None
         self._tun: Optional[TunIO] = None
 
+    def apply_traffic_shape(self, policy: TrafficShapePolicy | None) -> TrafficShapePolicy:
+        """Hot-apply traffic shape to the live residual DATA plane + session crypto.
+
+        Safe to call while the dataplane thread is running: the loop reads
+        ``self.traffic_shape`` each packet/cover tick; session seal/open use
+        ``crypto.traffic_shape`` for pad/cover. Does not stop residual capture.
+        """
+        pol = policy if policy is not None else DEFAULT_TRAFFIC_SHAPE
+        self.traffic_shape = pol
+        sess = getattr(self.client, "session", None)
+        if sess is not None and getattr(sess, "crypto", None) is not None:
+            sess.crypto.traffic_shape = pol
+        return pol
+
     def is_running(self) -> bool:
         return self.stats.started and not self.stats.stopped and self._thread is not None
 
@@ -198,8 +212,14 @@ class RptDataPlane:
         nonce, sealed = sess.crypto.seal_cover(self.traffic_shape.pad_bucket, aad=aad)
         from node.obfuscation import maybe_wrap
 
+        try:
+            from client.product_policy import product_outer_obfuscation_enabled
+
+            obfs = bool(product_outer_obfuscation_enabled())
+        except Exception:  # noqa: BLE001
+            obfs = None
         frame = pack_data(sess.session_id, sess.counter_out, nonce, sealed)
-        wire = maybe_wrap(frame)
+        wire = maybe_wrap(frame, enabled=obfs) if obfs is not None else maybe_wrap(frame)
         self.sock.sendto(wire, self.client.endpoint.address)
         return wire
 

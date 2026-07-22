@@ -139,7 +139,7 @@ class TestProductTrafficShapePolicy(unittest.TestCase):
         class _Client:
             def __init__(self):
                 self.session = _Sess()
-                self.sock = object()
+                self._sock = object()  # real RptClient exposes _sock for dataplane
 
         plane = RptDataPlane(_Client(), traffic_shape=pol)
         self.assertTrue(plane.traffic_shape.padding)

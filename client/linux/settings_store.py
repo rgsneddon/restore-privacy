@@ -17,6 +17,9 @@ from typing import Any, Optional
 SETTINGS_FILENAME = "settings.json"
 KEY_RUN_AT_STARTUP = "run_at_startup"
 KEY_AUTOCONNECT_ON_LAUNCH = "autoconnect_on_launch"
+KEY_PRIVACY_TRAFFIC_SHAPE = "privacy_traffic_shape"
+KEY_PRIVACY_OUTER_OBFUSCATION = "privacy_outer_obfuscation"
+KEY_PRIVACY_MULTIHOP = "privacy_multihop"
 AUTOSTART_DESKTOP_NAME = "restore-privacy.desktop"
 
 
@@ -24,6 +27,9 @@ AUTOSTART_DESKTOP_NAME = "restore-privacy.desktop"
 class ProductSettings:
     run_at_startup: bool = False
     autoconnect_on_launch: bool = False
+    privacy_traffic_shape: bool = True
+    privacy_outer_obfuscation: bool = True
+    privacy_multihop: bool = False
 
 
 def settings_dir() -> Path:
@@ -38,7 +44,13 @@ def settings_path() -> Path:
 
 
 def default_settings() -> ProductSettings:
-    return ProductSettings(run_at_startup=False, autoconnect_on_launch=False)
+    return ProductSettings(
+        run_at_startup=False,
+        autoconnect_on_launch=False,
+        privacy_traffic_shape=True,
+        privacy_outer_obfuscation=True,
+        privacy_multihop=False,
+    )
 
 
 def load_settings(path: Optional[Path] = None) -> ProductSettings:
@@ -51,6 +63,11 @@ def load_settings(path: Optional[Path] = None) -> ProductSettings:
         return ProductSettings(
             run_at_startup=bool(data.get(KEY_RUN_AT_STARTUP, False)),
             autoconnect_on_launch=bool(data.get(KEY_AUTOCONNECT_ON_LAUNCH, False)),
+            privacy_traffic_shape=bool(data.get(KEY_PRIVACY_TRAFFIC_SHAPE, True)),
+            privacy_outer_obfuscation=bool(
+                data.get(KEY_PRIVACY_OUTER_OBFUSCATION, True)
+            ),
+            privacy_multihop=bool(data.get(KEY_PRIVACY_MULTIHOP, False)),
         )
     except (OSError, json.JSONDecodeError, TypeError, ValueError):
         return default_settings()
@@ -62,6 +79,9 @@ def save_settings(settings: ProductSettings, path: Optional[Path] = None) -> Pat
     payload: dict[str, Any] = {
         KEY_RUN_AT_STARTUP: bool(settings.run_at_startup),
         KEY_AUTOCONNECT_ON_LAUNCH: bool(settings.autoconnect_on_launch),
+        KEY_PRIVACY_TRAFFIC_SHAPE: bool(settings.privacy_traffic_shape),
+        KEY_PRIVACY_OUTER_OBFUSCATION: bool(settings.privacy_outer_obfuscation),
+        KEY_PRIVACY_MULTIHOP: bool(settings.privacy_multihop),
     }
     p.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
     return p

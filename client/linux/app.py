@@ -1032,22 +1032,25 @@ class TunnelClientApp:
         ).pack(anchor="w")
 
     def _start_connect(self) -> None:
-        # Fast path: re-discover post-pay entitlement before gate (no Settings tour)
-        try:
-            bootstrap_payment_entitlement(bind_device=True)
-        except Exception:
-            pass
-        ok_lic, lic_msg = assert_may_connect()
-        if not ok_lic:
-            self._log(lic_msg)
-            self._set_status("error", detail=lic_msg)
-            self.detail_var.set(lic_msg)
-            if not has_accepted_licence():
-                self._show_licence_prompt()
-            elif needs_keygen_unlock():
-                self._show_keygen_prompt()
-            else:
-                self._open_settings()
+        # Local-only gate first (no status-host I/O on the Tk UI thread).
+        # Keygen unlock required before residual HELLO — session discovery alone
+        # does not skip the keygen surface.
+        if not has_accepted_licence():
+            msg = (
+                "Accept the end-user licence before connecting. "
+                "Open Settings or the licence prompt, review the licence, then Accept."
+            )
+            self._log(msg)
+            self._set_status("error", detail=msg)
+            self.detail_var.set(msg)
+            self._show_licence_prompt()
+            return
+        if needs_keygen_unlock():
+            msg = CONNECT_BLOCKED_KEYGEN_MSG
+            self._log(msg)
+            self._set_status("error", detail=msg)
+            self.detail_var.set(msg)
+            self._show_keygen_prompt()
             return
 
         if product_connect_requires_root() and not is_root():
@@ -1080,6 +1083,29 @@ class TunnelClientApp:
         append_event(KIND_CONNECT, "Connect started (full-tunnel residual path)")
 
         def work() -> None:
+            # Status-host refresh + residual HELLO off the Tk UI thread.
+            try:
+                bootstrap_payment_entitlement(bind_device=True)
+            except Exception:
+                pass
+            ok_lic, lic_msg = assert_may_connect()
+            if not ok_lic:
+
+                def fail_gate() -> None:
+                    self._log(lic_msg)
+                    self._set_status("error", detail=lic_msg)
+                    self.detail_var.set(lic_msg)
+                    self._apply_control(connected=False, busy=False)
+                    if not has_accepted_licence():
+                        self._show_licence_prompt()
+                    elif needs_keygen_unlock():
+                        self._show_keygen_prompt()
+                    else:
+                        self._open_settings()
+
+                self.root.after(0, fail_gate)
+                return
+
             # Handshake + residual TUN/routes off the Tk UI thread.
             # Prefetch default route while HELLO runs to shorten residual attach.
             from concurrent.futures import ThreadPoolExecutor
@@ -1271,11 +1297,14 @@ def main() -> int:
         print(f"Restore Privacy failed to open: {exc}", file=sys.stderr)
         return 1
 
-    # Import post-pay entitlement early so Connect can be one tap after licence
-    try:
-        bootstrap_payment_entitlement(bind_device=True)
-    except Exception:
-        pass
+    # Warm entitlement cache off the UI thread (never block launch on status host).
+    def _bg_bootstrap() -> None:
+        try:
+            bootstrap_payment_entitlement(bind_device=True)
+        except Exception:
+            pass
+
+    threading.Thread(target=_bg_bootstrap, daemon=True).start()
 
     if resume and is_root():
         app.root.after(350, app._start_connect)
@@ -1289,16 +1318,18 @@ def main() -> int:
         )
     elif should_autoconnect_on_launch():
         def _settings_autoconnect() -> None:
-            ok, msg = assert_may_connect()
-            if not ok:
+            # Local-only gate on UI thread; network/residual stay in _start_connect.
+            if not has_accepted_licence():
                 app._log(
-                    "Settings: autoconnect skipped — "
-                    + (msg or "accept licence / verify payment first.")
+                    "Settings: autoconnect skipped — accept licence first."
                 )
-                if not has_accepted_licence():
-                    app._show_licence_prompt()
-                elif needs_keygen_unlock():
-                    app._show_keygen_prompt()
+                app._show_licence_prompt()
+                return
+            if needs_keygen_unlock():
+                app._log(
+                    "Settings: autoconnect skipped — enter keygen to unlock Connect."
+                )
+                app._show_keygen_prompt()
                 return
             app._log("Settings: autoconnect on launch — starting Connect…")
             app._start_connect()

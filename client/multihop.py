@@ -361,21 +361,35 @@ def product_multihop_path() -> list[Hop]:
 def multihop_config_from_env(
     env: dict[str, str] | None = None,
 ) -> MultiHopConfig:
-    """Build MultiHopConfig from operator environment (opt-in).
+    """Build MultiHopConfig from operator environment and/or user Settings.
 
     - ``RPT_MULTIHOP_ENABLED=1`` — enable multi-hop residual via exit hop
+      (when this env key is set it wins over Settings)
+    - When env key is unset, product Settings ``privacy_multihop`` is used
+      (default **off** / single-hop residual baseline)
     - ``RPT_MULTIHOP_HOPS`` — CSV ``host[:port],host2[:port]``
     - ``RPT_EXIT_HOST`` / ``RPT_EXIT_PORT`` — second hop (default product exit)
     """
     import os
 
     e = env if env is not None else os.environ
-    enabled = str(e.get("RPT_MULTIHOP_ENABLED", "")).strip().lower() in (
-        "1",
-        "true",
-        "yes",
-        "on",
-    )
+    if "RPT_MULTIHOP_ENABLED" in e and str(e.get("RPT_MULTIHOP_ENABLED", "")).strip() != "":
+        enabled = str(e.get("RPT_MULTIHOP_ENABLED", "")).strip().lower() in (
+            "1",
+            "true",
+            "yes",
+            "on",
+        )
+    elif env is not None:
+        # Explicit env dict without key → treat as operator off (tests)
+        enabled = False
+    else:
+        try:
+            from client.product_policy import product_multihop_enabled
+
+            enabled = bool(product_multihop_enabled())
+        except Exception:  # noqa: BLE001
+            enabled = False
     csv = str(e.get("RPT_MULTIHOP_HOPS", "") or "").strip()
     if csv:
         hops = parse_hops_csv(csv)

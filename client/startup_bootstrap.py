@@ -1,8 +1,10 @@
-"""First-launch helpers: entitlement auto-provision for fastest Connect path.
+"""First-launch helpers: entitlement auto-provision for Connect.
 
-Call once on product UI start so post-pay ``payment_entitlement.json`` (Downloads
-or install dir) is imported and the device is bound before the user taps Connect.
-Does not bypass licence or payment gates.
+Call (preferably on a background thread) so post-pay ``payment_entitlement.json``
+(Downloads or install dir) is imported. Session-only discovery does **not**
+replace the user keygen unlock step — Connect still requires ``RPT-KEY-…`` via
+:func:`client.payment_entitlement.payment_allows_connect` /
+:func:`client.licence_gate.needs_keygen_unlock`.
 """
 
 from __future__ import annotations

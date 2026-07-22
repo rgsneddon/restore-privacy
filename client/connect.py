@@ -32,6 +32,16 @@ from node.pfs import (
     x25519_shared_secret,
 )
 from node.obfuscation import maybe_unwrap, maybe_wrap, product_obfuscation_enabled
+
+
+def _outer_obfs_enabled() -> bool:
+    """Product outer wrap: user Settings / env via product_policy when available."""
+    try:
+        from client.product_policy import product_outer_obfuscation_enabled
+
+        return bool(product_outer_obfuscation_enabled())
+    except Exception:  # noqa: BLE001
+        return bool(product_obfuscation_enabled())
 from node.protocol import (
     MAGIC,
     MsgType,
@@ -344,7 +354,7 @@ class RptClient:
             client_priv, node_pub, with_pfs=True
         )
         assert_protocol_magic()
-        wire = maybe_wrap(frame)
+        wire = maybe_wrap(frame, enabled=_outer_obfs_enabled())
 
         sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         try:
@@ -519,12 +529,12 @@ class RptClient:
         inner = pack_data(
             self.session.session_id, self.session.counter_out, nonce, sealed
         )
-        return maybe_wrap(inner)
+        return maybe_wrap(inner, enabled=_outer_obfs_enabled())
 
     def open_packet(self, frame: bytes) -> bytes:
         if not self.session:
             raise RuntimeError("not connected")
-        inner = maybe_unwrap(frame)
+        inner = maybe_unwrap(frame, enabled=_outer_obfs_enabled())
         sid, counter, nonce, sealed = parse_data(inner)
         if sid != self.session.session_id:
             raise ValueError("session mismatch")
@@ -538,7 +548,7 @@ class RptClient:
         """Open DATA (after outer unwrap); return (ip_or_None, is_cover)."""
         if not self.session:
             raise RuntimeError("not connected")
-        inner = maybe_unwrap(frame)
+        inner = maybe_unwrap(frame, enabled=_outer_obfs_enabled())
         sid, counter, nonce, sealed = parse_data(inner)
         if sid != self.session.session_id:
             raise ValueError("session mismatch")
@@ -548,7 +558,10 @@ class RptClient:
     def send_keepalive(self) -> None:
         if not self.session or not self._sock:
             return
-        wire = maybe_wrap(pack_keepalive(self.session.session_id))
+        wire = maybe_wrap(
+            pack_keepalive(self.session.session_id),
+            enabled=_outer_obfs_enabled(),
+        )
         self._sock.sendto(wire, self.endpoint.address)
 
     def disconnect(self) -> None:

@@ -391,6 +391,47 @@ def normalize_local_keygen(keygen: str) -> str:
     return s
 
 
+# Product keygen prefix (status host mints RPT-KEY-XXXX-XXXX-XXXX).
+KEYGEN_PREFIX = "RPT-KEY-"
+
+
+def status_host_timeout_s() -> float:
+    """Bounded timeout for status-host GET/POST (Connect must not hang the UI).
+
+    Default **3s** (was 8s). Override with ``RPT_STATUS_HOST_TIMEOUT`` (seconds).
+    Clamped to [1.0, 15.0] so mis-set env cannot freeze the shell for minutes.
+    """
+    raw = (os.environ.get("RPT_STATUS_HOST_TIMEOUT") or "").strip()
+    if not raw:
+        return 3.0
+    try:
+        v = float(raw)
+    except (TypeError, ValueError):
+        return 3.0
+    if v < 1.0:
+        return 1.0
+    if v > 15.0:
+        return 15.0
+    return v
+
+
+def has_keygen_unlock(
+    ent: PaymentEntitlement | None = None,
+    *,
+    path: Optional[Path] = None,
+) -> bool:
+    """True when this install has a fulfilment keygen (``RPT-KEY-…``) on file.
+
+    Product rule: Connect requires an explicit keygen unlock step. A thank-you
+    ``payment_entitlement.json`` with only ``session_id`` / status=active does
+    **not** count — the user (or a download that includes ``keygen``) must
+    satisfy this helper before residual HELLO may proceed.
+    """
+    e = ent if ent is not None else load_payment_entitlement(path)
+    kg = normalize_local_keygen(e.keygen or "")
+    return bool(kg) and kg.startswith(KEYGEN_PREFIX)
+
+
 def import_keygen_and_verify(
     keygen: str,
     *,
@@ -469,7 +510,8 @@ def payment_allows_connect(
     """True when payment entitlement does not block Connect.
 
     - failed / revoked / unpaid → False always
-    - active → True
+    - active **and** keygen unlock (``RPT-KEY-…``) → True when require
+    - active without keygen → False when require (discovery/session alone is not enough)
     - missing / unknown → False if require (product default), else True (self-host)
     """
     e = ent if ent is not None else load_payment_entitlement(path)
@@ -484,6 +526,9 @@ def payment_allows_connect(
                     return False
             except (TypeError, ValueError):
                 pass
+        # Product: residual Connect needs keygen unlock, not session file alone.
+        if req and not has_keygen_unlock(e):
+            return False
         return True
     # unknown / empty
     if not req:
@@ -494,7 +539,9 @@ def payment_allows_connect(
     if st in (STATUS_UNKNOWN, "") and (e.session_id or e.keygen):
         # Have session/keygen but never confirmed active — block when required
         return False
-    return st == STATUS_ACTIVE
+    if st == STATUS_ACTIVE and req and not has_keygen_unlock(e):
+        return False
+    return st == STATUS_ACTIVE and (not req or has_keygen_unlock(e))
 
 
 def assert_payment_may_connect(
@@ -505,11 +552,14 @@ def assert_payment_may_connect(
     base_url: str | None = None,
     fetch: Any = None,
 ) -> tuple[bool, str]:
-    """Gate Connect on payment entitlement.
+    """Gate Connect on payment entitlement + keygen unlock.
 
     When ``refresh`` is true (product default on Connect):
     - discover/import nearby entitlement file or ``RPT_PAYMENT_SESSION_ID``
     - re-query the status host so refunds/revokes cancel Connect promptly
+
+    Discovery of an active session **without** keygen still fails closed with
+    :data:`CONNECT_BLOCKED_KEYGEN_MSG` (user must enter keygen unlock).
     """
     if refresh:
         ensure_entitlement_for_connect(
@@ -520,6 +570,9 @@ def assert_payment_may_connect(
     ent = load_payment_entitlement(path)
     if is_payment_blocking_status(ent.status):
         return False, CONNECT_BLOCKED_PAYMENT_MSG
+    # Active/session present but no RPT-KEY-… unlock → force keygen surface
+    if not has_keygen_unlock(ent):
+        return False, CONNECT_BLOCKED_KEYGEN_MSG
     if not ent.session_id and not ent.keygen:
         return False, CONNECT_BLOCKED_KEYGEN_MSG
     return False, CONNECT_BLOCKED_NO_ENTITLEMENT_MSG
@@ -553,11 +606,11 @@ def ensure_entitlement_for_connect(
         local = refresh_entitlement_from_remote(
             path=path, base_url=base_url, fetch=fetch
         )
-        # Always bind device when Connect is allowed so node residual HELLO
-        # can pass payment admission (keygen path must also set session_id).
+        # Bind only when keygen unlock + active allow Connect (not session-only).
         if (
             bind_device
             and local.status == STATUS_ACTIVE
+            and has_keygen_unlock(local)
             and payment_allows_connect(local, require=True)
             and local.session_id
         ):
@@ -593,14 +646,19 @@ def fetch_remote_entitlement_status(
     session_id: str = "",
     *,
     base_url: str | None = None,
-    timeout: float = 8.0,
+    timeout: float | None = None,
     keygen: str = "",
 ) -> dict[str, Any]:
-    """GET status host entitlement; returns dict with status key."""
+    """GET status host entitlement; returns dict with status key.
+
+    Uses :func:`status_host_timeout_s` when ``timeout`` is omitted so Connect
+    never stacks multi-second unbounded waits on a dead status host.
+    """
     sid = (session_id or "").strip()
     kg = normalize_local_keygen(keygen)
     if not sid and not kg:
         return {"status": STATUS_UNKNOWN, "error": "missing_session_id_or_keygen"}
+    to = float(timeout) if timeout is not None else status_host_timeout_s()
     url = entitlement_status_url(sid, base_url=base_url, keygen=kg)
     req = urllib.request.Request(
         url,
@@ -611,7 +669,7 @@ def fetch_remote_entitlement_status(
         method="GET",
     )
     try:
-        with urllib.request.urlopen(req, timeout=timeout) as resp:  # noqa: S310
+        with urllib.request.urlopen(req, timeout=to) as resp:  # noqa: S310
             raw = resp.read().decode("utf-8", errors="replace")
         data = json.loads(raw)
         if isinstance(data, dict):
@@ -619,6 +677,27 @@ def fetch_remote_entitlement_status(
     except (urllib.error.URLError, TimeoutError, OSError, json.JSONDecodeError, ValueError) as exc:
         return {"status": STATUS_UNKNOWN, "error": str(exc)}
     return {"status": STATUS_UNKNOWN, "error": "bad_response"}
+
+
+def _merge_remote_keygen(
+    local: PaymentEntitlement,
+    remote: dict[str, Any],
+) -> str:
+    """Keygen for local cache after a status-host refresh.
+
+    Product rule: session-only / thank-you discovery must **not** gain a
+    ``RPT-KEY-…`` unlock from a remote field alone. That would skip the user
+    keygen step. Only keep/update keygen when local already has one (user
+    entered it via :func:`import_keygen_and_verify`, or a file that already
+    contained ``keygen``).
+    """
+    local_kg = normalize_local_keygen(local.keygen or "")
+    if not local_kg or not local_kg.startswith(KEYGEN_PREFIX):
+        return ""
+    remote_kg = normalize_local_keygen(str(remote.get("keygen") or ""))
+    if remote_kg and remote_kg.startswith(KEYGEN_PREFIX):
+        return remote_kg
+    return local_kg
 
 
 def refresh_entitlement_from_remote(
@@ -632,6 +711,9 @@ def refresh_entitlement_from_remote(
 
     ``fetch`` may inject a test double; production uses
     :func:`fetch_remote_entitlement_status`.
+
+    Does **not** copy a status-host ``keygen`` into a session-only local
+    entitlement (prevents silent unlock without user keygen entry).
     """
     local = load_payment_entitlement(path)
     if not local.session_id and not local.keygen:
@@ -651,7 +733,7 @@ def refresh_entitlement_from_remote(
     st = str(remote.get("status") or STATUS_UNKNOWN).strip().lower()
     t = now if now is not None else time.time()
     remote_sid = str(remote.get("session_id") or local.session_id or "").strip()
-    remote_kg = str(remote.get("keygen") or local.keygen or "").strip().upper()
+    merged_kg = _merge_remote_keygen(local, remote)
     if is_payment_blocking_status(st):
         return record_payment_failure(
             remote_sid,
@@ -660,7 +742,7 @@ def refresh_entitlement_from_remote(
             path=path,
             now=t,
             status=st if st in (STATUS_FAILED, STATUS_REVOKED, STATUS_UNPAID) else STATUS_FAILED,
-            keygen=remote_kg,
+            keygen=merged_kg,
         )
     if st == STATUS_ACTIVE:
         vu = remote.get("valid_until")
@@ -677,7 +759,7 @@ def refresh_entitlement_from_remote(
                 path=path,
                 now=t,
                 status=STATUS_REVOKED,
-                keygen=remote_kg,
+                keygen=merged_kg,
             )
         return record_payment_success(
             remote_sid or local.session_id,
@@ -685,7 +767,7 @@ def refresh_entitlement_from_remote(
             path=path,
             now=t,
             valid_until=vu_f,
-            keygen=remote_kg,
+            keygen=merged_kg,
         )
     # Unknown remote (network blip): keep last known local status
     return local
@@ -715,9 +797,12 @@ def bind_device_to_remote(
     *,
     device_pub_hex: str | None = None,
     base_url: str | None = None,
-    timeout: float = 8.0,
+    timeout: float | None = None,
 ) -> dict[str, Any]:
-    """POST /api/bind-device-entitlement so the node can admit this install."""
+    """POST /api/bind-device-entitlement so the node can admit this install.
+
+    Bounded by :func:`status_host_timeout_s` when ``timeout`` is omitted.
+    """
     sid = (session_id or "").strip()
     pub = (device_pub_hex or local_device_pub_hex() or "").strip().lower()
     if not sid or not pub:
@@ -726,6 +811,7 @@ def bind_device_to_remote(
     if not base:
         base = "https://restoreprivacy.online"
     base = base.rstrip("/")
+    to = float(timeout) if timeout is not None else status_host_timeout_s()
     url = f"{base}/api/bind-device-entitlement"
     body = json.dumps({"session_id": sid, "device_pub": pub}).encode("utf-8")
     req = urllib.request.Request(
@@ -739,7 +825,7 @@ def bind_device_to_remote(
         method="POST",
     )
     try:
-        with urllib.request.urlopen(req, timeout=timeout) as resp:  # noqa: S310
+        with urllib.request.urlopen(req, timeout=to) as resp:  # noqa: S310
             raw = resp.read().decode("utf-8", errors="replace")
         data = json.loads(raw)
         if isinstance(data, dict):

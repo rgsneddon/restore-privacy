@@ -36,7 +36,15 @@ class TestPaymentEntitlementLogic(unittest.TestCase):
 
         with tempfile.TemporaryDirectory() as td:
             p = Path(td) / "payment_entitlement.json"
+            # Active session alone is not enough — keygen unlock required
             record_payment_success("cs_test_ok", platform="windows", path=p)
+            self.assertFalse(payment_allows_connect(path=p, require=True))
+            record_payment_success(
+                "cs_test_ok",
+                platform="windows",
+                path=p,
+                keygen="RPT-KEY-AAAA-BBBB-CCCC",
+            )
             self.assertTrue(payment_allows_connect(path=p, require=True))
             ok, msg = assert_payment_may_connect(
                 path=p, require=True, refresh=False
@@ -81,13 +89,16 @@ class TestPaymentEntitlementLogic(unittest.TestCase):
         with tempfile.TemporaryDirectory() as td:
             p = Path(td) / "payment_entitlement.json"
 
-            def fake_fetch(sid: str):
+            def fake_fetch(sid: str, keygen=""):
                 self.assertEqual(sid, "cs_live_paid")
                 return {
                     "session_id": sid,
                     "status": "active",
                     "connect_allowed": True,
                     "platform": "windows",
+                    # Remote may return keygen, but session-only path must not
+                    # write it into local unlock without user keygen entry.
+                    "keygen": "RPT-KEY-1111-2222-3333",
                 }
 
             ent = import_session_and_verify(
@@ -95,7 +106,8 @@ class TestPaymentEntitlementLogic(unittest.TestCase):
             )
             self.assertEqual(ent.status, "active")
             self.assertEqual(ent.session_id, "cs_live_paid")
-            self.assertTrue(payment_allows_connect(path=p, require=True))
+            self.assertEqual(ent.keygen, "")
+            self.assertFalse(payment_allows_connect(path=p, require=True))
 
     def test_refresh_on_connect_observes_remote_revoke(self):
         """assert_payment_may_connect refreshes so refund cancels client Connect."""
@@ -106,14 +118,17 @@ class TestPaymentEntitlementLogic(unittest.TestCase):
 
         with tempfile.TemporaryDirectory() as td:
             p = Path(td) / "payment_entitlement.json"
-            record_payment_success("cs_revokeme", path=p)
+            record_payment_success(
+                "cs_revokeme", path=p, keygen="RPT-KEY-REV0-KEME-TEST"
+            )
 
-            def fake_fetch(sid: str):
+            def fake_fetch(sid: str, keygen=""):
                 return {
                     "session_id": sid,
                     "status": "revoked",
                     "reason": "charge.refunded",
                     "connect_allowed": False,
+                    "keygen": keygen,
                 }
 
             ok, msg = assert_payment_may_connect(
@@ -138,6 +153,7 @@ class TestPaymentEntitlementLogic(unittest.TestCase):
             src_dir = Path(td) / "Downloads"
             src_dir.mkdir()
             src = src_dir / ENTITLEMENT_FILENAME
+            # Session-only thank-you file must NOT unlock Connect (keygen required)
             src.write_text(
                 json.dumps(
                     {
@@ -157,6 +173,30 @@ class TestPaymentEntitlementLogic(unittest.TestCase):
                 ent = try_discover_entitlement_file(dest_path=dest)
             self.assertIsNotNone(ent)
             self.assertEqual(ent.session_id, "cs_from_download")
+            self.assertFalse(payment_allows_connect(path=dest, require=True))
+            # Same file with keygen field counts as unlock
+            src.write_text(
+                json.dumps(
+                    {
+                        "session_id": "cs_from_download",
+                        "status": "active",
+                        "platform": "linux",
+                        "reason": "payment_succeeded",
+                        "updated_at": 1.0,
+                        "keygen": "RPT-KEY-DISC-OVER-KEY1",
+                    }
+                ),
+                encoding="utf-8",
+            )
+            # Clear dest so discover re-imports
+            if dest.is_file():
+                dest.unlink()
+            with mock.patch(
+                "client.payment_entitlement.entitlement_discovery_candidates",
+                return_value=[src],
+            ):
+                ent2 = try_discover_entitlement_file(dest_path=dest)
+            self.assertIsNotNone(ent2)
             self.assertTrue(payment_allows_connect(path=dest, require=True))
 
 
@@ -338,9 +378,22 @@ class TestConnectGateChainsLicenceAndPayment(unittest.TestCase):
                     ):
                         ok2, msg2 = assert_may_connect(path=lic)
                         self.assertFalse(ok2)
-                        self.assertIn("payment", msg2.lower())
+                        # keygen required message (or payment / entitlement)
+                        self.assertTrue(
+                            "keygen" in msg2.lower() or "payment" in msg2.lower()
+                        )
 
+                        # Active session without keygen still blocked
                         record_payment_success("cs_ok", path=pay)
+                        ok2b, msg2b = assert_may_connect(path=lic)
+                        self.assertFalse(ok2b)
+                        self.assertIn("keygen", msg2b.lower())
+
+                        record_payment_success(
+                            "cs_ok",
+                            path=pay,
+                            keygen="RPT-KEY-OKAY-TEST-KEY1",
+                        )
                         ok3, msg3 = assert_may_connect(path=lic)
                         self.assertTrue(ok3)
 
@@ -361,13 +414,16 @@ class TestConnectGateChainsLicenceAndPayment(unittest.TestCase):
             lic = Path(td) / "licence_acceptance.json"
             pay = Path(td) / "payment_entitlement.json"
             accept_licence(path=lic)
-            record_payment_success("cs_was_ok", path=pay)
+            record_payment_success(
+                "cs_was_ok", path=pay, keygen="RPT-KEY-WAS0-OKAY-KEY1"
+            )
 
-            def fake_fetch(sid: str):
+            def fake_fetch(sid: str, keygen=""):
                 return {
                     "status": "failed",
                     "reason": "payment_intent.payment_failed",
                     "connect_allowed": False,
+                    "keygen": keygen,
                 }
 
             with mock.patch(
@@ -376,7 +432,9 @@ class TestConnectGateChainsLicenceAndPayment(unittest.TestCase):
             ):
                 with mock.patch(
                     "client.payment_entitlement.fetch_remote_entitlement_status",
-                    side_effect=lambda sid, **kw: fake_fetch(sid),
+                    side_effect=lambda sid="", keygen="", **kw: fake_fetch(
+                        sid, keygen=keygen
+                    ),
                 ):
                     ok, msg = assert_may_connect(path=lic)
             self.assertFalse(ok)

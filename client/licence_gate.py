@@ -188,12 +188,22 @@ def needs_keygen_unlock(path: Optional[Path] = None) -> bool:
 
     Used by Windows (and other) UI to force a keygen entry surface before
     residual Connect — not Settings-only.
+
+    Local-only (no network): true when licence is accepted and
+    :func:`client.payment_entitlement.payment_allows_connect` is false —
+    including active session/thank-you file **without** a ``RPT-KEY-…``
+    keygen unlock on file.
+
+    ``path`` is the **licence** acceptance path only (same as
+    :func:`has_accepted_licence`). Payment entitlement is always read from the
+    product entitlement path — do not pass the licence file into
+    :func:`~client.payment_entitlement.payment_allows_connect`.
     """
     if not has_accepted_licence(path):
         return False
     from client.payment_entitlement import payment_allows_connect
 
-    return not payment_allows_connect(path=path)
+    return not payment_allows_connect()
 
 
 def licence_url() -> str:

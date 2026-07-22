@@ -106,6 +106,14 @@ from client.transparency_copy import (
     LEAK_TEST_DISCLAIMER,
     LEAK_TEST_TITLE,
 )
+from client.node_ping import measure_settings_pings
+from client.privacy_live import hot_apply_privacy_scale, prefs_from_product_settings
+from client.product_policy import (
+    EXPLAINER_CORE_VPN,
+    EXPLAINER_MULTIHOP,
+    EXPLAINER_OUTER_OBFUSCATION,
+    EXPLAINER_TRAFFIC_SHAPE,
+)
 from client.windows.settings_store import (
     ProductSettings,
     apply_run_at_startup,
@@ -963,6 +971,52 @@ class TunnelClientApp:
             cursor="hand2",
         ).pack(side=tk.LEFT, padx=(10, 0))
 
+    def _reestablish_residual_for_privacy_scale(self) -> None:
+        """Multi-hop privacy-scale change while connected: re-dial residual path.
+
+        Keeps the Settings control interactive — user does not need to find
+        Disconnect first. Refreshes multihop config from Settings/env, tears
+        down residual, then runs the normal Connect path (licence/keygen still
+        enforced inside ``_start_connect``).
+        """
+        if self._busy:
+            self._log(
+                "Privacy scale: multi-hop reconnect deferred (Connect busy)."
+            )
+            return
+        self._log(
+            "Privacy scale: multi-hop path changed — re-establishing residual…"
+        )
+        self.detail_var.set(
+            "Multi-hop privacy setting changed — re-establishing residual…"
+        )
+
+        def work() -> None:
+            try:
+                self._disconnect_tunnel()
+            except Exception as exc:  # noqa: BLE001
+                self.root.after(
+                    0,
+                    lambda: self._log(
+                        f"Privacy scale reconnect teardown: {exc}"
+                    ),
+                )
+
+            def then() -> None:
+                try:
+                    from client.multihop import multihop_config_from_env
+
+                    self.client.multihop = multihop_config_from_env()
+                except Exception:  # noqa: BLE001
+                    pass
+                self._apply_control(connected=False, busy=False)
+                self._set_status("disconnected")
+                self._start_connect()
+
+            self.root.after(0, then)
+
+        threading.Thread(target=work, daemon=True).start()
+
     def _on_toggle_connect(self) -> None:
         if self._busy:
             return
@@ -972,24 +1026,26 @@ class TunnelClientApp:
             self._start_connect()
 
     def _start_connect(self) -> None:
-        # Fast path: import post-pay entitlement before gate (no Settings tour)
-        try:
-            bootstrap_payment_entitlement(bind_device=True)
-        except Exception:
-            pass
-        # Licence + payment gate — blocks Connect and autoconnect resume alike.
-        ok_lic, lic_msg = assert_may_connect()
-        if not ok_lic:
-            self._log(lic_msg)
-            self._set_status("error", detail=lic_msg)
-            self.detail_var.set(lic_msg)
-            if not has_accepted_licence():
-                self._show_licence_prompt()
-            elif needs_keygen_unlock():
-                # Forced keygen unlock modal (not Settings-only)
-                self._show_keygen_prompt()
-            else:
-                self._open_settings()
+        # Local-only gate first (no status-host I/O on the Tk UI thread).
+        # Keygen unlock is required before residual HELLO — discovery of a
+        # session-only thank-you file must not skip the keygen surface.
+        if not has_accepted_licence():
+            msg = (
+                "Accept the end-user licence before connecting. "
+                "Open Settings or the licence prompt, review the licence, then Accept."
+            )
+            self._log(msg)
+            self._set_status("error", detail=msg)
+            self.detail_var.set(msg)
+            self._show_licence_prompt()
+            return
+        if needs_keygen_unlock():
+            msg = CONNECT_BLOCKED_KEYGEN_MSG
+            self._log(msg)
+            self._set_status("error", detail=msg)
+            self.detail_var.set(msg)
+            # Forced keygen unlock modal (not Settings-only)
+            self._show_keygen_prompt()
             return
 
         # Residual public IP needs Administrator (Wintun + dual /1). Elevate first.
@@ -1026,8 +1082,32 @@ class TunnelClientApp:
         )
 
         def work() -> None:
-            # Handshake + residual tunnel attach stay off the Tk UI thread so
-            # Windows does not show "(Not Responding)" while Wintun/routes run.
+            # All status-host refresh + residual HELLO stay off the Tk UI thread
+            # so Windows does not show "(Not Responding)" or freeze browsers
+            # while stacked network waits run.
+            try:
+                bootstrap_payment_entitlement(bind_device=True)
+            except Exception:
+                pass
+            ok_lic, lic_msg = assert_may_connect()
+            if not ok_lic:
+
+                def fail_gate() -> None:
+                    self._log(lic_msg)
+                    self._set_status("error", detail=lic_msg)
+                    self.detail_var.set(lic_msg)
+                    self._apply_control(connected=False, busy=False)
+                    if not has_accepted_licence():
+                        self._show_licence_prompt()
+                    elif needs_keygen_unlock():
+                        self._show_keygen_prompt()
+                    else:
+                        self._open_settings()
+
+                self.root.after(0, fail_gate)
+                return
+
+            # Handshake + residual tunnel attach stay off the Tk UI thread.
             # Prefetch physical GW while HELLO runs to shorten residual attach.
             from concurrent.futures import ThreadPoolExecutor
 
@@ -1189,12 +1269,12 @@ class TunnelClientApp:
             self._log(f"Could not open browser: {exc}. Visit: {url}")
 
     def _open_settings(self) -> None:
-        """Settings: startup prefs, local connection log, leak test, DPI honesty."""
+        """Settings: startup prefs, privacy scale, local connection log, leak test."""
         win = tk.Toplevel(self.root)
         win.title("Settings")
         win.configure(bg=CHROME_BG)
-        win.geometry("460x720")
-        win.minsize(400, 520)
+        win.geometry("480x820")
+        win.minsize(400, 560)
         win.transient(self.root)
         try:
             win.grab_set()
@@ -1205,6 +1285,9 @@ class TunnelClientApp:
         self._settings = cur
         run_var = tk.BooleanVar(value=cur.run_at_startup)
         auto_var = tk.BooleanVar(value=cur.autoconnect_on_launch)
+        shape_var = tk.BooleanVar(value=cur.privacy_traffic_shape)
+        obfs_var = tk.BooleanVar(value=cur.privacy_outer_obfuscation)
+        multihop_var = tk.BooleanVar(value=cur.privacy_multihop)
         note_var = tk.StringVar(value="")
         leak_var = tk.StringVar(value="")
 
@@ -1277,11 +1360,17 @@ class TunnelClientApp:
             )
             sw.pack(side=tk.RIGHT, padx=(8, 0))
 
-        def _save_run() -> None:
-            s = ProductSettings(
+        def _current_settings() -> ProductSettings:
+            return ProductSettings(
                 run_at_startup=bool(run_var.get()),
                 autoconnect_on_launch=bool(auto_var.get()),
+                privacy_traffic_shape=bool(shape_var.get()),
+                privacy_outer_obfuscation=bool(obfs_var.get()),
+                privacy_multihop=bool(multihop_var.get()),
             )
+
+        def _save_run() -> None:
+            s = _current_settings()
             save_settings(s)
             self._settings = s
             st = apply_run_at_startup(s.run_at_startup)
@@ -1294,10 +1383,7 @@ class TunnelClientApp:
             self._log(f"Settings: run_at_startup={s.run_at_startup} ({st})")
 
         def _save_auto() -> None:
-            s = ProductSettings(
-                run_at_startup=bool(run_var.get()),
-                autoconnect_on_launch=bool(auto_var.get()),
-            )
+            s = _current_settings()
             save_settings(s)
             self._settings = s
             if s.autoconnect_on_launch:
@@ -1305,6 +1391,42 @@ class TunnelClientApp:
             else:
                 note_var.set("Autoconnect on launch OFF - Connect is manual.")
             self._log(f"Settings: autoconnect_on_launch={s.autoconnect_on_launch}")
+
+        def _save_privacy() -> None:
+            # Interactive while connected: persist + hot-apply shape/obfs to
+            # live residual; multi-hop path change re-establishes residual.
+            prev = self._settings if self._settings is not None else cur
+            prev_mh = bool(getattr(prev, "privacy_multihop", False))
+            s = _current_settings()
+            save_settings(s)
+            self._settings = s
+            plane = None
+            if self._tunnel is not None:
+                plane = getattr(self._tunnel, "dataplane", None)
+            result = hot_apply_privacy_scale(
+                dataplane=plane,
+                client=self.client,
+                prefs=prefs_from_product_settings(s),
+                previous_multihop=prev_mh,
+                connected=bool(self._connected),
+            )
+            note_var.set(result.message)
+            self._log(
+                "Settings: privacy_scale hot-apply "
+                f"shape={s.privacy_traffic_shape} "
+                f"obfs={s.privacy_outer_obfuscation} "
+                f"multihop={s.privacy_multihop} "
+                f"connected={self._connected} "
+                f"shaping_hot={result.shaping_hot_applied} "
+                f"mh_reconnect={result.multihop_reconnect_needed}"
+            )
+            if result.multihop_reconnect_needed and self._connected:
+                self.root.after(50, self._reestablish_residual_for_privacy_scale)
+            # Refresh ping labels after multi-hop / privacy changes
+            try:
+                _refresh_pings()
+            except NameError:
+                pass
 
         _row(
             card,
@@ -1322,6 +1444,164 @@ class TunnelClientApp:
             _save_auto,
         )
 
+        # --- Privacy scale (speed vs optional residual defenses) ---
+        priv_card = tk.Frame(
+            pad,
+            bg=PANEL_BG,
+            highlightbackground=BORDER,
+            highlightthickness=1,
+            padx=12,
+            pady=10,
+        )
+        priv_card.pack(fill=tk.X, pady=(14, 0))
+        tk.Label(
+            priv_card,
+            text="Browsing speed / privacy scale",
+            bg=PANEL_BG,
+            fg=PRIMARY_DARK,
+            font=("Segoe UI", 11, "bold"),
+            anchor="w",
+        ).pack(fill=tk.X, pady=(0, 4))
+        tk.Label(
+            priv_card,
+            text=(
+                "Turn optional residual defenses off for a snappier connection. "
+                "Defaults keep privacy layers on (except multi-hop, which is "
+                "single-hop by default). Changes apply live while connected "
+                "(shaping + obfuscation hot-apply; multi-hop re-establishes residual). "
+                "Licence, keygen, and residual tunnel cannot be disabled here."
+            ),
+            bg=PANEL_BG,
+            fg=TEXT_MUTED,
+            font=("Segoe UI", 8),
+            anchor="w",
+            wraplength=400,
+            justify=tk.LEFT,
+        ).pack(fill=tk.X, pady=(0, 8))
+        tk.Label(
+            priv_card,
+            text=EXPLAINER_CORE_VPN,
+            bg=PANEL_BG,
+            fg=TEXT,
+            font=("Segoe UI", 8),
+            anchor="w",
+            wraplength=400,
+            justify=tk.LEFT,
+        ).pack(fill=tk.X, pady=(0, 8))
+        tk.Frame(priv_card, bg=BORDER, height=1).pack(fill=tk.X, pady=4)
+        _row(
+            priv_card,
+            "Traffic shaping (pad / jitter / cover)",
+            EXPLAINER_TRAFFIC_SHAPE,
+            shape_var,
+            _save_privacy,
+        )
+        tk.Frame(priv_card, bg=BORDER, height=1).pack(fill=tk.X, pady=4)
+        _row(
+            priv_card,
+            "Outer obfuscation (QUIC-mimic wrap)",
+            EXPLAINER_OUTER_OBFUSCATION,
+            obfs_var,
+            _save_privacy,
+        )
+        tk.Frame(priv_card, bg=BORDER, height=1).pack(fill=tk.X, pady=4)
+        _row(
+            priv_card,
+            "Multi-hop residual (exit path)",
+            EXPLAINER_MULTIHOP,
+            multihop_var,
+            _save_privacy,
+        )
+
+        # Live device→node ping statistics (entry always; exit when multi-hop on)
+        tk.Frame(priv_card, bg=BORDER, height=1).pack(fill=tk.X, pady=8)
+        tk.Label(
+            priv_card,
+            text="Ping statistics (device → node)",
+            bg=PANEL_BG,
+            fg=PRIMARY_DARK,
+            font=("Segoe UI", 10, "bold"),
+            anchor="w",
+        ).pack(fill=tk.X, pady=(0, 4))
+        tk.Label(
+            priv_card,
+            text=(
+                "Best-effort RTT to product monopin hosts (UDP residual port, "
+                "else TCP status port). Not a browser speedbench. Exit shown "
+                "only when multi-hop is on in Settings."
+            ),
+            bg=PANEL_BG,
+            fg=TEXT_MUTED,
+            font=("Segoe UI", 8),
+            anchor="w",
+            wraplength=400,
+            justify=tk.LEFT,
+        ).pack(fill=tk.X, pady=(0, 6))
+        entry_ping_var = tk.StringVar(value="Entry (Iceland): —")
+        exit_ping_var = tk.StringVar(value="Exit (Romania): n/a (multi-hop off)")
+        tk.Label(
+            priv_card,
+            textvariable=entry_ping_var,
+            bg=PANEL_BG,
+            fg=TEXT,
+            font=("Segoe UI", 9),
+            anchor="w",
+        ).pack(fill=tk.X)
+        tk.Label(
+            priv_card,
+            textvariable=exit_ping_var,
+            bg=PANEL_BG,
+            fg=TEXT,
+            font=("Segoe UI", 9),
+            anchor="w",
+        ).pack(fill=tk.X, pady=(2, 6))
+
+        def _refresh_pings() -> None:
+            entry_ping_var.set("Entry (Iceland): measuring…")
+            if bool(multihop_var.get()):
+                exit_ping_var.set("Exit (Romania): measuring…")
+            else:
+                exit_ping_var.set("Exit (Romania): n/a (multi-hop off)")
+            win.update_idletasks()
+
+            def work() -> None:
+                try:
+                    snap = measure_settings_pings(
+                        multihop_enabled=bool(multihop_var.get()),
+                        timeout_s=1.5,
+                    )
+                    e_txt = f"Entry (Iceland): {snap.entry_display()}"
+                    x_txt = f"Exit (Romania): {snap.exit_display()}"
+                except Exception as exc:  # noqa: BLE001
+                    e_txt = f"Entry (Iceland): n/a ({exc})"
+                    x_txt = "Exit (Romania): n/a"
+
+                def done() -> None:
+                    entry_ping_var.set(e_txt)
+                    exit_ping_var.set(x_txt)
+
+                try:
+                    self.root.after(0, done)
+                except Exception:
+                    pass
+
+            threading.Thread(target=work, daemon=True).start()
+
+        tk.Button(
+            priv_card,
+            text="Measure ping now",
+            command=_refresh_pings,
+            bg=PRIMARY,
+            fg=WHITE,
+            relief=tk.FLAT,
+            font=("Segoe UI", 8, "bold"),
+            padx=10,
+            pady=4,
+            cursor="hand2",
+        ).pack(anchor="w", pady=(0, 4))
+        # Auto-measure once when Settings opens (off UI thread)
+        self.root.after(200, _refresh_pings)
+
         tk.Label(
             pad,
             textvariable=note_var,
@@ -1335,8 +1615,10 @@ class TunnelClientApp:
 
         tk.Label(
             pad,
-            text="Both default off. Seamless power-up needs both on. "
-            "Administrator / UAC may still be required for full tunnel.",
+            text="Startup/autoconnect default off. Seamless power-up needs both on. "
+            "Administrator / UAC may still be required for full tunnel. "
+            "Privacy-scale toggles stay active while connected and hot-apply "
+            "(multi-hop re-establishes residual when the path changes).",
             bg=CHROME_BG,
             fg=TEXT_MUTED,
             font=("Segoe UI", 8),
@@ -1956,11 +2238,15 @@ def main() -> int:
             ),
         )
 
-    # Import post-pay entitlement early (Downloads / install) for one-tap Connect
-    try:
-        bootstrap_payment_entitlement(bind_device=True)
-    except Exception:
-        pass
+    # Warm entitlement cache off the UI thread (never block launch on status host).
+    # Session-only discovery does not unlock Connect without keygen.
+    def _bg_bootstrap() -> None:
+        try:
+            bootstrap_payment_entitlement(bind_device=True)
+        except Exception:
+            pass
+
+    threading.Thread(target=_bg_bootstrap, daemon=True).start()
 
     # Cold launch: optional user autoconnect (Settings); resume after UAC Connect.
     assert non_admin_connect_allowed()
@@ -1983,19 +2269,19 @@ def main() -> int:
     elif should_autoconnect_on_launch() and not resume_after_elevate:
 
         def _settings_autoconnect() -> None:
-            # assert_may_connect inside _start_connect — never bypass licence/payment.
-            ok, msg = assert_may_connect()
-            if not ok:
+            # Local-only gate on UI thread (no status-host I/O). Full refresh +
+            # residual HELLO run inside _start_connect worker when unlock is OK.
+            if not has_accepted_licence():
                 app._log(
-                    "Settings: autoconnect skipped — "
-                    + (msg or "accept licence / verify payment first.")
+                    "Settings: autoconnect skipped — accept licence first."
                 )
-                if not has_accepted_licence():
-                    app._show_licence_prompt()
-                elif needs_keygen_unlock():
-                    app._show_keygen_prompt()
-                else:
-                    app._open_settings()
+                app._show_licence_prompt()
+                return
+            if needs_keygen_unlock():
+                app._log(
+                    "Settings: autoconnect skipped — enter keygen to unlock Connect."
+                )
+                app._show_keygen_prompt()
                 return
             app._log("Settings: autoconnect on launch - starting Connect...")
             app._start_connect()

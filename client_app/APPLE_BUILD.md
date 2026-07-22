@@ -260,3 +260,9 @@ python3 scripts/sign_and_notarize_macos.py \
 ```
 
 See [macos/BUILD_ON_MAC.md](macos/BUILD_ON_MAC.md) Ã‚Â§ Gatekeeper.
+
+
+## Catalog 0.3.9
+
+Monopin **0.3.9**. See `APPLE_HANDOFF_0.3.9.md` for keygen unlock, privacy-scale Settings (hot-apply), and Mac build steps. Privacy-scale + keygen parity with Windows is required in Flutter shells.
+

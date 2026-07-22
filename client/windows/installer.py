@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+﻿#!/usr/bin/env python3
 """Windows client installer for Restore Privacy.
 
 Deploys the bundled client (runtime + wintun + deps) into the user profile
@@ -398,7 +398,7 @@ def install(
     secrets_written = _provision_secrets(payload_dir, INSTALL_DIR)
 
     # Auto-provision Connect entitlement from pay-adjacent payment_entitlement.json
-    # (thank-you page auto-download — no manual session id paste).
+    # (thank-you page auto-download â€” no manual session id paste).
     try:
         from client.payment_entitlement import (
             default_entitlement_path,
@@ -420,7 +420,7 @@ def install(
         )
         if ent and ent.session_id:
             print(
-                f"Payment entitlement imported (session {ent.session_id[:16]}…) "
+                f"Payment entitlement imported (session {ent.session_id[:16]}â€¦) "
                 "for Connect unlock."
             )
     except Exception:
@@ -526,7 +526,7 @@ def install(
         launch_bat = installed_exe
 
     _progress(5, "Creating Start Menu and Desktop shortcuts...")
-    # Start menu + desktop shortcuts — launch via wrapper; Restore Internet = failsafe
+    # Start menu + desktop shortcuts â€” launch via wrapper; Restore Internet = failsafe
     try:
         shortcut_target = launch_bat if launch_bat.is_file() else installed_exe
         _create_shortcut(
@@ -775,3 +775,4 @@ def main() -> int:
 
 if __name__ == "__main__":
     raise SystemExit(main())
+
