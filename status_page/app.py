@@ -26,6 +26,12 @@ from admin_panel import (
     verify_credentials,
 )
 from downloads import download_css, render_bmc_tip_html, render_download_section_html
+from settings_explainer import (
+    homepage_settings_banner_css,
+    render_settings_explainer_banner_html,
+    render_settings_explainer_page_html,
+    settings_explainer_paths,
+)
 from payments import (
     PRICE_LABEL,
     PRICE_PENCE,
@@ -458,6 +464,7 @@ def render_html(status: dict, poll_ms: int | None = None) -> bytes:
       color: var(--rb-muted); max-width: 40rem;
     }}
 {dl_css}
+{homepage_settings_banner_css()}
     @media (max-width: 520px) {{
       .page-shell {{ width: min(100% - 1rem, var(--rb-max)); gap: 0.9rem; }}
       .nw-unit {{ min-width: 3rem; }}
@@ -472,6 +479,7 @@ def render_html(status: dict, poll_ms: int | None = None) -> bytes:
       <p class="tagline">lightweight vpn to restore your privacy — no user data is retained — your privacy is restored</p>
 {render_legal_links_html()}
     </header>
+{render_settings_explainer_banner_html()}
 {downloads_html}
 {node_wipe_html}
     <section class="panel-card" id="audit-panel" aria-label="Security audit countdown">
@@ -593,6 +601,13 @@ class Handler(BaseHTTPRequestHandler):
                 200,
                 "text/html; charset=utf-8",
                 render_html(fetch_upstream_status()),
+            )
+            return
+        if path in settings_explainer_paths():
+            self._send(
+                200,
+                "text/html; charset=utf-8",
+                render_settings_explainer_page_html(),
             )
             return
         static = read_static_bytes(path)
