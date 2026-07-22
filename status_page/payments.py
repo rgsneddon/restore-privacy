@@ -1871,25 +1871,29 @@ def fulfilment_smtp_env_keys() -> list[str]:
 
 
 def fulfilment_smtp_config() -> dict[str, Any]:
-    """Read optional SMTP env for transactional fulfilment email."""
-    host = os.environ.get("RPT_FULFILMENT_SMTP_HOST", "").strip()
-    port_raw = os.environ.get("RPT_FULFILMENT_SMTP_PORT", "587").strip() or "587"
+    """Read optional SMTP for transactional fulfilment email.
+
+    Uses process env first, then admin-persisted ``processor_env.json`` (same
+    path as Stripe secrets) so /admin SMTP fields work after save/restart.
+    """
+    host = _env_or_processor_store("RPT_FULFILMENT_SMTP_HOST")
+    port_raw = (
+        _env_or_processor_store("RPT_FULFILMENT_SMTP_PORT") or "587"
+    ).strip() or "587"
     try:
         port = int(port_raw)
     except ValueError:
         port = 587
-    user = os.environ.get("RPT_FULFILMENT_SMTP_USER", "").strip()
-    password = os.environ.get("RPT_FULFILMENT_SMTP_PASSWORD", "").strip()
-    from_addr = os.environ.get(
-        "RPT_FULFILMENT_FROM_EMAIL",
-        os.environ.get("RPT_FULFILMENT_SMTP_FROM", "noreply@restoreprivacy.online"),
+    user = _env_or_processor_store("RPT_FULFILMENT_SMTP_USER")
+    password = _env_or_processor_store("RPT_FULFILMENT_SMTP_PASSWORD")
+    from_addr = (
+        _env_or_processor_store("RPT_FULFILMENT_FROM_EMAIL", "RPT_FULFILMENT_SMTP_FROM")
+        or "noreply@restoreprivacy.online"
     ).strip()
-    use_tls = os.environ.get("RPT_FULFILMENT_SMTP_TLS", "1").strip().lower() not in (
-        "0",
-        "false",
-        "no",
-        "off",
-    )
+    tls_raw = (
+        _env_or_processor_store("RPT_FULFILMENT_SMTP_TLS") or "1"
+    ).strip().lower()
+    use_tls = tls_raw not in ("0", "false", "no", "off")
     return {
         "host": host,
         "port": port,
@@ -2811,10 +2815,16 @@ def check_fulfilment_ready(*, platform: str | None = None) -> dict[str, Any]:
     """
     vps_tok = bool(vps_asset_fetch_token())
     vps_base = vps_asset_base_url()
+    smtp_ready = assess_fulfilment_smtp_readiness()
     meta: dict[str, Any] = {
         "vps_token_configured": vps_tok,
         "vps_asset_base": vps_base,
         "github_token_configured": bool(github_auth_token()),
+        # Non-secret: why keygen receipt email may skip after purchase
+        "email_flow_enabled": bool(smtp_ready.get("email_flow_enabled")),
+        "smtp_status": smtp_ready.get("status"),
+        "smtp_detail": smtp_ready.get("detail"),
+        "smtp_missing": list(smtp_ready.get("missing_or_empty") or []),
     }
     assets = list(available_downloads())
     want = (platform or "").strip().lower()
@@ -3332,8 +3342,8 @@ def process_checkout_completed_event(
     # Customer fulfilment email: keygen + PPI + one-time download URL
     try:
         cust_email = customer_email_from_checkout_object(obj)
-        if token and (cust_email or keygen):
-            fulfil_checkout_with_email(
+        if token and cust_email:
+            mail = fulfil_checkout_with_email(
                 token=token,
                 session_id=session_id,
                 platform=platform,
@@ -3342,9 +3352,26 @@ def process_checkout_completed_event(
                 keygen=keygen,
                 transport=email_transport,
             )
-    except Exception:  # noqa: BLE001
+            send = (mail or {}).get("send") or {}
+            if not send.get("sent"):
+                # Best-effort diagnostics (no secrets) — Render logs
+                print(
+                    "fulfilment_email_not_sent "
+                    f"session={session_id!r} "
+                    f"skipped={send.get('skipped')} "
+                    f"error={send.get('error')!r} "
+                    f"smtp={assess_fulfilment_smtp_readiness().get('status')!r}",
+                    flush=True,
+                )
+        elif token and not cust_email:
+            print(
+                "fulfilment_email_skipped_no_customer_email "
+                f"session={session_id!r} keygen_minted={bool(keygen)}",
+                flush=True,
+            )
+    except Exception as exc:  # noqa: BLE001
         # Never block grant mint on email failure
-        pass
+        print(f"fulfilment_email_exception session={session_id!r} err={exc!r}", flush=True)
     return token
 
 

@@ -148,6 +148,8 @@ def _stripe_readiness() -> dict[str, Any]:
         STRIPE_WEBHOOK_PATH,
     )
 
+    from payments import assess_fulfilment_smtp_readiness
+
     secret = stripe_secret_key()
     webhook = stripe_webhook_secret()
     price = stripe_price_id()
@@ -155,6 +157,7 @@ def _stripe_readiness() -> dict[str, Any]:
     plink = stripe_payment_link_id()
     remaining = stripe_remaining_required_keys()
     desired = desired_payment_link_trial_fields()
+    smtp = assess_fulfilment_smtp_readiness()
     mode = "unconfigured"
     if secret.startswith("sk_live_"):
         mode = "live"
@@ -182,6 +185,11 @@ def _stripe_readiness() -> dict[str, Any]:
             "payment_link_id": desired.get("payment_link_id"),
             "payment_page_url": desired.get("payment_page_url"),
         },
+        # Keygen receipt email — missing SMTP is the usual silent skip after pay
+        "email_flow_enabled": bool(smtp.get("email_flow_enabled")),
+        "smtp_status": smtp.get("status"),
+        "smtp_detail": smtp.get("detail"),
+        "smtp_missing": list(smtp.get("missing_or_empty") or []),
         "remaining_required": remaining,
         "whats_next": remaining,
         "fields": {
@@ -200,6 +208,15 @@ def _stripe_readiness() -> dict[str, Any]:
             ),
             "STRIPE_PAYMENT_PAGE_URL": bool(pay_page),
             "STRIPE_PAYMENT_LINK_ID": bool(plink),
+            "RPT_FULFILMENT_SMTP_HOST": bool(smtp.get("keys_present", {}).get(
+                "RPT_FULFILMENT_SMTP_HOST"
+            )),
+            "RPT_FULFILMENT_SMTP_USER": bool(smtp.get("keys_present", {}).get(
+                "RPT_FULFILMENT_SMTP_USER"
+            )),
+            "RPT_FULFILMENT_SMTP_PASSWORD": bool(smtp.get("keys_present", {}).get(
+                "RPT_FULFILMENT_SMTP_PASSWORD"
+            )),
         },
         "stripe_mode": mode,
         "price_label": PRICE_LABEL,

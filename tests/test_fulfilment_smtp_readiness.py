@@ -40,14 +40,24 @@ class TestFulfilmentSmtpReadiness(unittest.TestCase):
                 "RPT_FULFILMENT_SMTP_HOST",
                 "RPT_FULFILMENT_SMTP_USER",
                 "RPT_FULFILMENT_SMTP_PASSWORD",
+                "RPT_FULFILMENT_FROM_EMAIL",
             ):
                 os.environ.pop(k, None)
-            cfg = fulfilment_smtp_config()
-            self.assertFalse(cfg["configured"])
-            v = assess_fulfilment_smtp_readiness(cfg)
-            self.assertEqual(v["status"], "disabled")
-            self.assertFalse(v["email_flow_enabled"])
-            self.assertIn("RPT_FULFILMENT_SMTP_HOST", v["missing_or_empty"])
+            with mock.patch(
+                "payments.load_stored_processor_env",
+                return_value={},
+                create=True,
+            ):
+                with mock.patch(
+                    "processor_plugins.load_stored_processor_env",
+                    return_value={},
+                ):
+                    cfg = fulfilment_smtp_config()
+                    self.assertFalse(cfg["configured"])
+                    v = assess_fulfilment_smtp_readiness(cfg)
+                    self.assertEqual(v["status"], "disabled")
+                    self.assertFalse(v["email_flow_enabled"])
+                    self.assertIn("RPT_FULFILMENT_SMTP_HOST", v["missing_or_empty"])
 
     def test_host_only_incomplete(self):
         from payments import assess_fulfilment_smtp_readiness
@@ -85,22 +95,69 @@ class TestFulfilmentSmtpReadiness(unittest.TestCase):
         self.assertTrue(v["email_flow_enabled"])
         self.assertEqual(v["missing_or_empty"], [])
 
+    def test_config_reads_admin_processor_store(self):
+        """SMTP host from processor_env.json must enable configured=True."""
+        from payments import assess_fulfilment_smtp_readiness, fulfilment_smtp_config
+
+        store = {
+            "RPT_FULFILMENT_SMTP_HOST": "smtp.store.test",
+            "RPT_FULFILMENT_SMTP_USER": "store-user",
+            "RPT_FULFILMENT_SMTP_PASSWORD": "store-pass",
+            "RPT_FULFILMENT_FROM_EMAIL": "noreply@restoreprivacy.online",
+        }
+        with mock.patch.dict(os.environ, {}, clear=False):
+            for k in store:
+                os.environ.pop(k, None)
+            with mock.patch(
+                "processor_plugins.load_stored_processor_env",
+                return_value=store,
+            ):
+                cfg = fulfilment_smtp_config()
+        self.assertEqual(cfg["host"], "smtp.store.test")
+        self.assertTrue(cfg["configured"])
+        self.assertEqual(cfg["user"], "store-user")
+        v = assess_fulfilment_smtp_readiness(cfg)
+        self.assertTrue(v["email_flow_enabled"])
+        self.assertEqual(v["status"], "ready_to_attempt_send")
+
     def test_send_skips_without_host(self):
         from payments import send_fulfilment_email
 
         with mock.patch.dict(os.environ, {"RPT_FULFILMENT_SMTP_HOST": ""}, clear=False):
             os.environ.pop("RPT_FULFILMENT_SMTP_HOST", None)
-            r = send_fulfilment_email(
-                {
-                    "to": "a@b.co",
-                    "subject": "t",
-                    "body": "b",
-                }
-            )
+            with mock.patch(
+                "processor_plugins.load_stored_processor_env",
+                return_value={},
+            ):
+                r = send_fulfilment_email(
+                    {
+                        "to": "a@b.co",
+                        "subject": "t",
+                        "body": "b",
+                    }
+                )
             self.assertTrue(r.get("ok"))
             self.assertFalse(r.get("sent"))
             self.assertTrue(r.get("skipped"))
             self.assertEqual(r.get("error"), "smtp_not_configured")
+
+    def test_check_fulfilment_ready_includes_smtp_status(self):
+        from payments import check_fulfilment_ready
+
+        with mock.patch("payments.open_release_asset", return_value=None):
+            with mock.patch(
+                "payments.assess_fulfilment_smtp_readiness",
+                return_value={
+                    "status": "disabled",
+                    "email_flow_enabled": False,
+                    "detail": "SMTP host unset",
+                    "missing_or_empty": ["RPT_FULFILMENT_SMTP_HOST"],
+                },
+            ):
+                out = check_fulfilment_ready()
+        self.assertIn("smtp_status", out)
+        self.assertEqual(out["smtp_status"], "disabled")
+        self.assertFalse(out["email_flow_enabled"])
 
     def test_check_script_exists(self):
         script = ROOT / "scripts" / "check_render_fulfilment_smtp.ps1"
