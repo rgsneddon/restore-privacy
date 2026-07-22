@@ -59,9 +59,16 @@ class TestHomepageTrialSentence(unittest.TestCase):
         self.assertIn(package, snippet)
         self.assertIn("one device licence", snippet)
         self.assertIn(trial, snippet)
+        self.assertIn("your monthly subscription begins after your 7 day trial", snippet)
         self.assertIn("pay on Stripe", snippet)
-        self.assertIn("keygen is emailed to you directly", snippet)
-        # Old nested-price trial clause must not remain on homepage download block
+        self.assertIn("download starts automatically", snippet)
+        self.assertIn(
+            "licence key and download links are emailed to you separately",
+            snippet,
+        )
+        # Old keygen-email clause and nested-price trial must not remain
+        self.assertNotIn("keygen is emailed to you directly", snippet)
+        self.assertNotIn("keygen is emailed to you directly", html)
         self.assertNotIn(
             "Your monthly subscription (£2.45 per month) begins after your 7 day trial",
             snippet,
@@ -75,16 +82,18 @@ class TestHomepageTrialSentence(unittest.TestCase):
             snippet.strip(),
             f"{PRICE_LABEL} GBP per package — pay on Stripe, then download starts automatically",
         )
-        # Order: price → package identity → trial → pay/keygen
+        # Order: price → package identity → trial → pay → licence key email clause
         i_price = snippet.find(f"{PRICE_LABEL} GBP")
         i_pkg = snippet.find(package)
         i_trial = snippet.find(trial)
         i_pay = snippet.find("pay on Stripe")
-        i_keygen = snippet.find("keygen is emailed to you directly")
+        i_links = snippet.find(
+            "licence key and download links are emailed to you separately"
+        )
         self.assertLess(i_price, i_pkg)
         self.assertLess(i_pkg, i_trial)
         self.assertLess(i_trial, i_pay)
-        self.assertLess(i_pay, i_keygen)
+        self.assertLess(i_pay, i_links)
         self.assertIn(PAY_AND_KEYGEN_CLAUSE, snippet)
         # Box width ~2/3 + fluid narrow rule on real CSS from shipped download_css()
         css = download_css()

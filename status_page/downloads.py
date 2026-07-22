@@ -151,10 +151,11 @@ ONLY_PRICE_BANNER = "ONLY £2.45 per month"
 # Homepage download price block (single shipped contract for public #downloads).
 PACKAGE_IDENTITY = "per month subscription package — one device licence"
 TRIAL_SUBSCRIPTION_SENTENCE = (
-    "Your monthly subscription begins after your 7 day trial"
+    "your monthly subscription begins after your 7 day trial"
 )
 PAY_AND_KEYGEN_CLAUSE = (
-    "pay on Stripe, then download starts automatically and keygen is emailed to you directly"
+    "pay on Stripe, then download starts automatically "
+    "(licence key and download links are emailed to you separately)"
 )
 # Default tip identity; runtime public page uses coffee_tip_url() (env override).
 BMC_TIP_URL = COFFEE_LINK_URL
