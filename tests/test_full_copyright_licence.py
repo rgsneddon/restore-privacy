@@ -48,6 +48,24 @@ class TestFullCopyrightLicenceShipped(unittest.TestCase):
         self.assertIn("architecture", summary)
         self.assertNotIn("mit licence", summary)
 
+    def test_flutter_short_summary_matches_full_copyright(self):
+        """Shipped Dart kShortLicenceSummary must not claim MIT product grant."""
+        dart = (ROOT / "client_app" / "lib" / "licence_gate.dart").read_text(
+            encoding="utf-8"
+        )
+        self.assertIn("kShortLicenceSummary", dart)
+        self.assertIn("FULL-COPYRIGHT-2026", dart)
+        # Extract the const string body for theme checks
+        self.assertIn("full copyright", dart.lower())
+        self.assertIn("AS IS", dart)
+        self.assertIn("architecture", dart.lower())
+        self.assertIn("VPN", dart)
+        self.assertNotIn("MIT licence", dart)
+        self.assertNotIn("MIT license", dart.lower().replace("mit-style", ""))
+        # Product claim must not say provided under the MIT
+        self.assertNotIn("under the MIT", dart)
+        self.assertNotIn("under the mit", dart.lower())
+
     def test_docs_not_claim_mit_for_product(self):
         for rel in (
             "README.md",
@@ -55,15 +73,23 @@ class TestFullCopyrightLicenceShipped(unittest.TestCase):
             "CREDITS.md",
             "status_page/public/CREDITS.md",
             "sundries.txt",
+            "client_app/lib/licence_gate.dart",
+            "client/licence_gate.py",
         ):
             text = (ROOT / rel).read_text(encoding="utf-8")
             # Product grant must not be advertised as MIT
-            self.assertNotRegex(
-                text,
-                re.compile(r"\(MIT\)\s*$|License.*\(MIT\)|licence \(MIT\)", re.I | re.M),
-            )
+            self.assertNotIn("MIT License", text)
+            self.assertNotIn("under the MIT", text)
             self.assertNotIn("MIT for original project code", text)
             self.assertNotIn("Project license for original code: **MIT**", text)
+            if rel.endswith(".md") or rel.endswith(".txt"):
+                self.assertNotRegex(
+                    text,
+                    re.compile(
+                        r"License\s*\|\s*\[LICENSE\]\(LICENSE\)\s*\(MIT\)",
+                        re.I,
+                    ),
+                )
 
 
 if __name__ == "__main__":

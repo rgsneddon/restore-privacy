@@ -53,9 +53,11 @@ const String kPaymentConnectDisclaimerPlain =
     'cancelled for that purchase/install until a successful payment is completed.';
 
 const String kShortLicenceSummary =
-    'Restore Privacy is provided under the MIT licence and related third-party '
-    'terms (see End user licence / LICENSE). By accepting, you agree to use the '
-    'software under those terms. Acceptance is stored only on this device. '
+    'Restore Privacy is proprietary full copyright: client packages may be used '
+    'only to run a device on the Restore Privacy VPN, with no warranty (AS IS). '
+    'Copy or transmission of the product architecture is not permitted. '
+    'Third-party components keep their own licences (see LICENSE / CREDITS). '
+    'By accepting, you agree to those terms. Acceptance is stored only on this device. '
     '$kPaymentConnectDisclaimerPlain';
 
 class LicenceAcceptance {
