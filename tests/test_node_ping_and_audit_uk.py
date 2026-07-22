@@ -107,6 +107,36 @@ class TestAuditUkPingSection(unittest.TestCase):
         self.assertIn("Approximate", audit)
         self.assertIn("typical UK", audit)
 
+    def test_audit_package_table_and_monopin_match_039(self) -> None:
+        """Shipped AUDIT package RAG must list catalog 0.3.9 filenames, not older pins."""
+        ver = (ROOT / "client" / "VERSION").read_text(encoding="utf-8").strip()
+        self.assertEqual(ver, "0.3.9")
+        paths = [
+            ROOT / "AUDIT.md",
+            ROOT / "status_page" / "AUDIT.md",
+            ROOT / "status_page" / "public" / "AUDIT.md",
+        ]
+        for path in paths:
+            text = path.read_text(encoding="utf-8")
+            self.assertTrue(
+                "catalog v0.3.9" in text.lower() or "catalog **0.3.9**" in text,
+                f"{path} missing catalog 0.3.9 heading",
+            )
+            self.assertIn("restore-privacy-client-0.3.9-windows-x64-setup.exe", text)
+            self.assertIn("restore-privacy-client-0.3.9-android.apk", text)
+            self.assertIn("restore-privacy-client-0.3.9-macos.zip", text)
+            self.assertIn("restore-privacy-client-0.3.9-ios.zip", text)
+            self.assertIn("restore-privacy-client-0.3.9-linux-x64.tar.gz", text)
+            self.assertNotIn("restore-privacy-client-0.3.7-", text)
+            self.assertNotIn("restore-privacy-client-0.3.6-", text)
+            self.assertNotIn("monopin **0.3.7**", text)
+            self.assertNotIn("assets/0.3.7/", text)
+            self.assertNotIn("Windows **0.3.6**", text)
+            self.assertIn("monopin **0.3.9**", text)
+            self.assertIn("assets/0.3.9/", text)
+            self.assertIn("Windows **0.3.9**", text)
+            self.assertIn("Catalog **0.3.9**", text)
+
 
 class TestVersion039(unittest.TestCase):
     def test_version_pin_039(self) -> None:
