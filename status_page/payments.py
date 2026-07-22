@@ -12,6 +12,7 @@ import hashlib
 import hmac
 import json
 import os
+import re
 import secrets
 import sqlite3
 import time
@@ -137,12 +138,21 @@ def stripe_payment_page_url() -> str:
 
     Override with ``STRIPE_PAYMENT_PAGE_URL`` or ``RPT_STRIPE_PAYMENT_PAGE_URL``.
     Default is the catalog subscription link (buy.stripe.com), not a donate tip page.
+    Legacy ``donate.stripe.com`` hosts are rewritten to ``buy.stripe.com`` so
+    public buy buttons always use the product Payment Link family.
     """
+    raw = ""
     for key in ("STRIPE_PAYMENT_PAGE_URL", "RPT_STRIPE_PAYMENT_PAGE_URL"):
         raw = os.environ.get(key, "").strip()
         if raw:
-            return raw.rstrip("/")
-    return DEFAULT_STRIPE_PAYMENT_PAGE_URL
+            break
+    if not raw:
+        raw = DEFAULT_STRIPE_PAYMENT_PAGE_URL
+    raw = raw.rstrip("/")
+    # Normalize legacy donate host → buy host (same path / link id)
+    if "donate.stripe.com" in raw.lower():
+        raw = re.sub(r"(?i)donate\.stripe\.com", "buy.stripe.com", raw)
+    return raw
 
 
 def stripe_payment_page_href_for_platform(platform: str) -> str:
@@ -815,16 +825,62 @@ def render_post_payment_thankyou_html(
     if kg:
         keygen_block = f"""
   <div class="msg keygen-box" id="keygen-box" role="region"
-       aria-labelledby="keygen-heading">
-    <p id="keygen-heading"><strong>{_escape_html_text(KEYGEN_UNLOCK_INSTRUCTION)}</strong></p>
-    <p class="keygen-value"><code id="product-keygen">{kg_esc}</code></p>
+       aria-labelledby="keygen-heading"
+       data-keygen-prominent="1">
+    <p id="keygen-heading" class="keygen-heading-label"><strong>{_escape_html_text(KEYGEN_UNLOCK_INSTRUCTION)}</strong></p>
+    <p class="keygen-value" id="keygen-value-line">
+      <code id="product-keygen" class="product-keygen-display">{kg_esc}</code>
+    </p>
+    <p class="keygen-copy-row">
+      <button type="button" class="keygen-copy-btn" id="keygen-copy-btn"
+              data-copy-target="product-keygen"
+              aria-label="Copy keygen to clipboard">Copy keygen</button>
+      <span class="keygen-copy-status" id="keygen-copy-status" aria-live="polite"></span>
+    </p>
     <p class="keygen-advice" id="keygen-advice">
       Install → accept licence terms → enter this keygen in the app to unlock.
-      Your monthly subscription (£2.45 per month) begins after your 7 day trial.
+      Your monthly subscription begins after your 7 day trial.
       If payment fails later, this keygen becomes useless and Connect locks until
       an active subscription is restored.
     </p>
-  </div>"""
+  </div>
+  <script>
+  (function () {{
+    var btn = document.getElementById("keygen-copy-btn");
+    var code = document.getElementById("product-keygen");
+    var status = document.getElementById("keygen-copy-status");
+    if (!btn || !code) return;
+    function done(ok) {{
+      if (status) status.textContent = ok ? "Copied!" : "Select and copy manually";
+    }}
+    btn.addEventListener("click", function () {{
+      var text = (code.textContent || "").trim();
+      if (!text) return;
+      if (navigator.clipboard && navigator.clipboard.writeText) {{
+        navigator.clipboard.writeText(text).then(function () {{ done(true); }})
+          .catch(function () {{
+            try {{
+              var r = document.createRange();
+              r.selectNodeContents(code);
+              var s = window.getSelection();
+              s.removeAllRanges();
+              s.addRange(r);
+              done(document.execCommand("copy"));
+            }} catch (e) {{ done(false); }}
+          }});
+      }} else {{
+        try {{
+          var r2 = document.createRange();
+          r2.selectNodeContents(code);
+          var s2 = window.getSelection();
+          s2.removeAllRanges();
+          s2.addRange(r2);
+          done(document.execCommand("copy"));
+        }} catch (e2) {{ done(false); }}
+      }}
+    }});
+  }})();
+  </script>"""
     ent_path = f"/api/connect-entitlement-file?session_id={urllib.parse.quote(sid)}" if sid else ""
     ent_path_esc = _escape_html_text(ent_path)
     ent_block = ""
@@ -865,12 +921,13 @@ def render_post_payment_thankyou_html(
     admin_lead = "Please run the file as administrator."
     btn = f"Download {plat_label} package"
     return f"""
-<section id="post-pay-thankyou" class="thankyou" aria-labelledby="thank-you-heading">
+<section id="post-pay-thankyou" class="thankyou" aria-labelledby="thank-you-heading"
+         data-page-lifetime="until-tab-close">
   <h1 id="thank-you-heading">Thank you</h1>
   <p class="msg" id="pay-success">Payment confirmed. Your <strong id="paid-platform-label">{_escape_html_text(plat_label)}</strong> installer is ready:</p>
   <p class="pkg" id="paid-package-name"><strong>{fname_esc}</strong></p>
-  {purchase_block}
   {keygen_block}
+  {purchase_block}
   {ent_block}
   <p class="msg admin-run" id="run-as-admin-instruction">
     <strong>{_escape_html_text(admin_lead)}</strong>
@@ -878,18 +935,21 @@ def render_post_payment_thankyou_html(
   </p>
   <p class="msg" id="auto-download-note">please wait for your download.. packaging...</p>
   <!-- Installer first (single-use grant). Entitlement file is deferred only when
-       session_id is present (script inside ent_block). No script click on package. -->
+       session_id is present (script inside ent_block). No script click on package.
+       No meta-refresh / no page-close timer: stay until user closes the tab. -->
   <iframe id="auto-download-frame" src="{link_esc}" style="width:0;height:0;border:0;position:absolute"
     title="Automatic product download" aria-hidden="true"></iframe>
   <p>
     <a class="dl" id="success-download-link" href="{link_esc}"
        data-manual-download="1" data-platform="{_escape_html_text(plat)}"
-       data-filename="{fname_esc}">
+       data-filename="{fname_esc}" data-available-until-tab-close="1">
       { _escape_html_text(btn) } (if it did not start)
     </a>
   </p>
-  <p class="msg muted">This link is one-time and expires. It only unlocks the package you paid for.
-    Tip optional: <a href="https://buymeacoffee.com/rgsneddon">buymeacoffee.com/rgsneddon</a></p>
+  <p class="msg muted" id="download-lifetime-note">This page stays open until you close the tab.
+    Keep it open until your download finishes. The download control is not disabled by a timer.
+    After a successful download the grant is one-time (security). Tip optional:
+    <a href="https://buymeacoffee.com/rgsneddon">buymeacoffee.com/rgsneddon</a></p>
   <p><a href="/">Home</a></p>
 </section>
 """

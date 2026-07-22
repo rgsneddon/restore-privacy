@@ -55,11 +55,19 @@ class TestPaidDownloadUI(unittest.TestCase):
         self.assertEqual(
             payments.desired_payment_link_trial_fields()["mode"], "subscription"
         )
+        self.assertNotIn("donate.stripe.com", html)
+        self.assertIn("buy.stripe.com", html)
+        self.assertIn('id="dl-platform-note"', html)
+        self.assertIn(
+            "please select your device platform carefully",
+            html.lower(),
+        )
         for a in available_downloads():
             href = payments.stripe_payment_page_href_for_platform(a.platform)
             self.assertIn(f'href="{href}"', html)
             self.assertIn(f"client_reference_id={a.platform}", href)
             self.assertIn("buy.stripe.com", href)
+            self.assertNotIn("donate.stripe.com", href)
             self.assertNotIn(f'href="{a.url}"', html)  # never free GitHub release href
             self.assertNotIn(f'href="/pay?platform={a.platform}"', html)
 

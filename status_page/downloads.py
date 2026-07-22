@@ -148,6 +148,11 @@ LINUX_TGZ_FILENAME = f"restore-privacy-client-{RELEASE_VERSION}-linux-x64.tar.gz
 PRICE_LABEL = "£2.45"
 # Large green callout under "Download client v…" on the public homepage.
 ONLY_PRICE_BANNER = "ONLY £2.45 per month"
+# Shown under the buy-button grid (bold bright white, price-box-like frame).
+PLATFORM_SELECT_NOTE = (
+    "please select your device platform carefully, you will only receive "
+    "the installer download relating to that platform and device"
+)
 # Homepage download price block (single shipped contract for public #downloads).
 PACKAGE_IDENTITY = "per month subscription package — one device licence"
 TRIAL_SUBSCRIPTION_SENTENCE = (
@@ -380,6 +385,27 @@ def download_css() -> str:
       line-height: 1.45;
       text-align: center;
     }
+    /* Platform care note — same visual language as .dl-price-box, under buy grid */
+    .dl-platform-note-box {
+      width: 66.67%;
+      max-width: 66.67%;
+      margin: 1rem auto 0.35rem;
+      padding: 0.75rem 1rem;
+      box-sizing: border-box;
+      border: 1px solid var(--rb-card-border);
+      border-radius: 12px;
+      background: rgba(10, 22, 40, 0.45);
+      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05);
+    }
+    .dl-platform-note {
+      margin: 0;
+      font-size: clamp(0.92rem, 2.2vw, 1.05rem);
+      font-weight: 800;
+      line-height: 1.45;
+      color: #ffffff;
+      text-align: center;
+      text-shadow: 0 1px 0 rgba(0, 0, 0, 0.35);
+    }
     .dl-payment-disclaimer {
       max-width: 36rem; margin: 1.15rem auto 0.35rem; padding: 0.65rem 0.85rem;
       font-size: 0.82rem; line-height: 1.45; font-weight: 600;
@@ -387,35 +413,40 @@ def download_css() -> str:
       border: 1px solid #b91c1c; border-radius: 12px; text-align: left;
     }
     .dl-buttons {
-      display: flex; flex-direction: column; gap: 0.85rem; align-items: stretch; width: 100%;
+      display: flex; flex-direction: column; gap: 0.95rem; align-items: stretch; width: 100%;
     }
     .dl-row {
-      display: flex; flex-direction: row; flex-wrap: wrap; gap: 0.75rem;
+      display: flex; flex-direction: row; flex-wrap: wrap; gap: 0.9rem;
       justify-content: center; align-items: stretch; width: 100%;
     }
     .dl-row-3, .dl-row-2 { max-width: 100%; }
+    /* Larger, readable buy tiles (replaces prior small fixed squares) */
     a.dl, button.dl {
       display: inline-flex; flex-direction: column; align-items: center; justify-content: center;
-      gap: 0.28rem;
-      flex: 0 0 5.65rem; width: 5.65rem; height: 5.65rem;
-      min-width: 5.65rem; max-width: 5.65rem; min-height: 5.65rem; max-height: 5.65rem;
-      padding: 0.4rem 0.3rem;
+      gap: 0.4rem;
+      flex: 0 0 clamp(7.25rem, 18vw, 8.75rem);
+      width: clamp(7.25rem, 18vw, 8.75rem);
+      height: clamp(7.25rem, 18vw, 8.75rem);
+      min-width: 7.25rem; max-width: 8.75rem;
+      min-height: 7.25rem; max-height: 8.75rem;
+      padding: 0.55rem 0.45rem;
       background: linear-gradient(180deg, var(--rb-btn) 0%, var(--rb-btn-deep) 100%);
-      color: #fff; text-decoration: none; border-radius: 12px;
-      font-weight: 700; font-size: 0.68rem; box-sizing: border-box;
-      border: 1px solid rgba(255,255,255,0.18); cursor: pointer;
-      font-family: inherit; text-align: center; line-height: 1.15;
-      box-shadow: 0 3px 10px rgba(7, 30, 60, 0.32);
+      color: #fff; text-decoration: none; border-radius: 14px;
+      font-weight: 800; font-size: 0.88rem; box-sizing: border-box;
+      border: 1px solid rgba(255,255,255,0.22); cursor: pointer;
+      font-family: inherit; text-align: center; line-height: 1.2;
+      box-shadow: 0 4px 14px rgba(7, 30, 60, 0.38);
       transition: transform 0.12s ease, box-shadow 0.12s ease, filter 0.12s ease;
       aspect-ratio: 1 / 1;
     }
     a.dl .dl-platform, button.dl .dl-platform {
-      font-size: 0.78rem; font-weight: 800; letter-spacing: 0.02em;
-      line-height: 1.1; color: #fff;
+      font-size: clamp(0.95rem, 2.6vw, 1.12rem); font-weight: 800; letter-spacing: 0.02em;
+      line-height: 1.15; color: #ffffff;
+      text-shadow: 0 1px 0 rgba(0,0,0,0.25);
     }
     a.dl .dl-buy, button.dl .dl-buy {
-      font-size: 0.62rem; font-weight: 700; opacity: 0.92;
-      letter-spacing: 0.01em;
+      font-size: clamp(0.78rem, 2.1vw, 0.92rem); font-weight: 800; opacity: 1;
+      letter-spacing: 0.02em; color: #ffffff;
     }
     a.dl:hover, button.dl:hover {
       filter: brightness(1.08);
@@ -451,11 +482,14 @@ def download_css() -> str:
     .bmc-page-footer { margin-top: 0.5rem; margin-bottom: 0.25rem; padding: 0.75rem 0.5rem 1rem; }
     @media (max-width: 640px) {
       a.dl, button.dl {
-        flex: 0 0 5.25rem; width: 5.25rem; height: 5.25rem;
-        min-width: 5.25rem; max-width: 5.25rem;
+        flex: 0 0 6.5rem; width: 6.5rem; height: 6.5rem;
+        min-width: 6.5rem; max-width: 6.5rem;
+        min-height: 6.5rem; max-height: 6.5rem;
       }
+      a.dl .dl-platform, button.dl .dl-platform { font-size: 0.95rem; }
+      a.dl .dl-buy, button.dl .dl-buy { font-size: 0.78rem; }
       /* Full width of downloads panel on narrow viewports */
-      .dl-price-box {
+      .dl-price-box, .dl-platform-note-box {
         width: 100%;
         max-width: 100%;
         padding: 0.65rem 0.75rem;
@@ -650,6 +684,9 @@ def render_download_section_html(
     <div class="dl-row dl-row-3" id="dl-row-1" data-dl-row="1" data-dl-count="{len(row1)}">
       {row1_html}
     </div>{row2_block}
+    </div>
+    <div class="dl-platform-note-box" id="dl-platform-note-box">
+      <p class="dl-platform-note" id="dl-platform-note">{PLATFORM_SELECT_NOTE}</p>
     </div>
   </section>
 """

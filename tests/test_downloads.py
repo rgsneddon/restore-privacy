@@ -209,9 +209,12 @@ class TestDownloadCatalog(unittest.TestCase):
 
         css = download_css()
         self.assertIn("aspect-ratio: 1 / 1", css)
-        self.assertIn("5.65rem", css)
+        # Larger buy tiles (no longer fixed 5.65rem-only squares)
+        self.assertIn("7.25rem", css)
+        self.assertIn("min-width: 7.25rem", css)
         self.assertIn("linear-gradient", css)
         self.assertIn("dl-platform", css)
+        self.assertIn("dl-platform-note", css)
 
     def test_homepage_bmc_tip_is_last_content_block(self):
         """Homepage: BMC tip after downloads / node-wipe / audit; single tip link."""

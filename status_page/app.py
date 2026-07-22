@@ -511,18 +511,36 @@ body{{margin:0;min-height:100vh;display:flex;flex-direction:column;align-items:c
 justify-content:center;background:#0b0f14;color:#e8eef5;font-family:system-ui,sans-serif;
 padding:2rem;text-align:center}}
 a{{color:#93c5fd}} .msg{{max-width:28rem;line-height:1.5;margin:0.65rem auto}}
-.thankyou h1{{letter-spacing:0.08em;margin:0 0 0.75rem}}
-.pkg{{font-size:1.05rem;margin:0.5rem 0 1rem}}
+.thankyou h1{{letter-spacing:0.08em;margin:0 0 0.75rem;color:#ffffff}}
+.pkg{{font-size:1.05rem;margin:0.5rem 0 1rem;color:#e8eef5}}
 .admin-run{{color:#fde68a;font-weight:500}}
 .purchase-id-box{{max-width:32rem;margin:1rem auto;padding:0.85rem 1rem;text-align:left;
 background:rgba(127,29,29,0.28);border:1px solid #b91c1c;border-radius:10px}}
 .purchase-id-value{{font-size:1.15rem;margin:0.4rem 0}}
 .purchase-id-value code{{font-size:1.05rem;letter-spacing:0.04em;color:#fecaca}}
 .purchase-id-advice{{font-size:0.88rem;line-height:1.45;color:#fecaca;margin:0.5rem 0 0}}
-a.dl{{display:inline-block;margin:0.75rem 0;padding:0.75rem 1.25rem;background:#1d4ed8;
-color:#fff;text-decoration:none;border-radius:8px;font-weight:600}}
+/* KEYGEN: large bold bright white, under ready lines */
+.keygen-box{{max-width:36rem;margin:1.1rem auto 1.25rem;padding:1.1rem 1.2rem;text-align:center;
+background:rgba(15,40,80,0.55);border:1px solid rgba(174,208,234,0.4);border-radius:14px;
+box-shadow:inset 0 1px 0 rgba(255,255,255,0.08)}}
+.keygen-heading-label{{margin:0 0 0.65rem;color:#ffffff;font-size:0.95rem}}
+.keygen-value{{margin:0.5rem 0 0.85rem}}
+.product-keygen-display,#product-keygen{{
+  display:inline-block;font-size:clamp(1.35rem,4.5vw,1.95rem);font-weight:800;
+  letter-spacing:0.06em;line-height:1.3;color:#ffffff!important;
+  background:rgba(0,0,0,0.25);padding:0.45rem 0.75rem;border-radius:10px;
+  word-break:break-all;text-shadow:0 1px 0 rgba(0,0,0,0.35)}}
+.keygen-copy-row{{margin:0.35rem 0 0.65rem;display:flex;flex-wrap:wrap;gap:0.5rem;
+justify-content:center;align-items:center}}
+.keygen-copy-btn{{cursor:pointer;border:0;border-radius:10px;padding:0.55rem 1.1rem;
+font-weight:700;font-size:0.95rem;background:#2563eb;color:#fff;font-family:inherit}}
+.keygen-copy-btn:hover{{background:#3b82f6}}
+.keygen-copy-status{{font-size:0.88rem;color:#86efac;font-weight:600;min-height:1.2em}}
+.keygen-advice{{font-size:0.88rem;line-height:1.45;color:#dbeafe;margin:0.5rem 0 0;text-align:left}}
+a.dl{{display:inline-block;margin:0.75rem 0;padding:0.85rem 1.4rem;background:#1d4ed8;
+color:#fff;text-decoration:none;border-radius:10px;font-weight:700;font-size:1rem}}
 a.dl:hover{{background:#2563eb}}
-.muted{{opacity:0.8;font-size:0.9rem}}
+.muted{{opacity:0.85;font-size:0.9rem;color:#e8eef5}}
 </style></head><body>
 {body_inner}
 </body></html>

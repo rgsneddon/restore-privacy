@@ -25,6 +25,7 @@ class TestThankYouPackagingCopy(unittest.TestCase):
             platform="windows",
             session_id="cs_test_packaging_1",
             purchase_id="RPT-PPI-TEST01",
+            keygen="RPT-KEY-AAAA-BBBB-CCCC",
         )
         self.assertIn("please wait for your download.. packaging...", html)
         self.assertIn('id="auto-download-note"', html)
@@ -36,6 +37,26 @@ class TestThankYouPackagingCopy(unittest.TestCase):
         self.assertIn('id="auto-download-frame"', html)
         self.assertIn('data-src=', html)  # entitlement deferred
         self.assertIn("setTimeout", html)
+        # KEYGEN prominent + copy control; under ready lines; no page auto-close
+        self.assertIn('id="product-keygen"', html)
+        self.assertIn("RPT-KEY-AAAA-BBBB-CCCC", html)
+        self.assertIn('id="keygen-copy-btn"', html)
+        self.assertIn("Copy keygen", html)
+        self.assertIn('id="keygen-box"', html)
+        self.assertIn('data-keygen-prominent="1"', html)
+        self.assertIn('data-page-lifetime="until-tab-close"', html)
+        self.assertIn('data-available-until-tab-close="1"', html)
+        self.assertIn('id="success-download-link"', html)
+        # KEYGEN appears after package-ready line, before PPI box
+        ready_i = html.find('id="paid-package-name"')
+        kg_i = html.find('id="keygen-box"')
+        ppi_i = html.find('id="purchase-id-box"')
+        self.assertGreater(kg_i, ready_i)
+        self.assertGreater(ppi_i, kg_i)
+        # No auto-navigation refresh header; download control stays in markup
+        self.assertNotIn('http-equiv="refresh"', html.lower())
+        self.assertNotIn("location.href", html.lower())
+        self.assertNotIn('success-download-link").disabled', html)
 
     def test_pending_success_branch_copy_via_handler_source(self):
         """Pending branch lives in app.py — assert shipped source strings."""
