@@ -462,11 +462,11 @@ def render_html(status: dict, poll_ms: int | None = None) -> bytes:
       <p class="tagline">lightweight vpn to restore your privacy — no user data is retained — your privacy is restored</p>
 {render_legal_links_html()}
     </header>
+{downloads_html}
 {node_wipe_html}
     <section class="panel-card" id="audit-panel" aria-label="Security audit countdown">
 {countdown_html}
     </section>
-{downloads_html}
   </div>
 </body>
 </html>

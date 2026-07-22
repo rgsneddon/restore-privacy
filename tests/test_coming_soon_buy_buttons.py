@@ -35,33 +35,34 @@ class TestComingSoonBuyButtons(unittest.TestCase):
 
     def test_render_coming_soon_labels_and_redundant_href(self):
         html = render_download_section_html(coming_soon=True)
-        self.assertIn("Coming soon", html)
         self.assertIn(COMING_SOON_PUBLIC_HREF, html)
         self.assertIn('data-buy-mode="coming-soon"', html)
         self.assertIn('data-pay-via="coming-soon"', html)
         self.assertIn('data-coming-soon="1"', html)
+        # Simple BUY - version label even in coming-soon mode
+        self.assertIn("BUY - 0.3.6", html)
+        self.assertNotIn("Pay £2.45", html)
         # No live Stripe checkout destinations on temporary buttons
         self.assertNotIn("donate.stripe.com", html)
         self.assertNotIn("checkout.stripe.com", html)
         self.assertNotIn("client_reference_id=", html)
-        self.assertNotIn("Pay £2.45", html)
         # No free permanent GitHub installer hrefs
         self.assertNotIn("releases/download/", html)
         self.assertNotIn("github.com/rgsneddon/restore-privacy/releases/download", html)
         for a in available_downloads():
             self.assertIn(f'id="dl-{a.platform}"', html)
-            self.assertIn(f"Coming soon - {a.label}", html)
+            self.assertIn(f'data-platform="{a.platform}"', html)
             self.assertIn(f'href="{COMING_SOON_PUBLIC_HREF}"', html)
             # Must not free-link the release asset URL
             self.assertNotIn(f'href="{a.url}"', html)
 
     def test_switch_off_restores_stripe_pay_architecture(self):
         html = render_download_section_html(coming_soon=False)
-        self.assertIn("Pay £2.45", html)
+        self.assertIn("BUY - 0.3.6", html)
         self.assertIn('data-buy-mode="stripe-live"', html)
         self.assertIn('data-pay-via="stripe-payment-page"', html)
-        self.assertNotIn("Coming soon", html)
         self.assertNotIn('data-coming-soon="1"', html)
+        self.assertNotIn('data-buy-mode="coming-soon"', html)
         for a in available_downloads():
             self.assertIn(f'href="{a.pay_path}"', html)
             self.assertIn(f"client_reference_id={a.platform}", html)
@@ -74,17 +75,18 @@ class TestComingSoonBuyButtons(unittest.TestCase):
         with mock.patch.dict(os.environ, {"RPT_CATALOG_BUY_LIVE": "1"}, clear=False):
             self.assertFalse(catalog_buy_buttons_coming_soon())
             html = render_download_section_html()
-            self.assertIn("Pay £2.45", html)
+            self.assertIn("BUY - 0.3.6", html)
             self.assertIn("donate.stripe.com", html)
 
     def test_single_link_helper_branches(self):
         a = available_downloads()[0]
         soon = _render_platform_pay_link(a, coming_soon=True)
-        self.assertIn("Coming soon", soon)
+        self.assertIn("BUY - 0.3.6", soon)
         self.assertIn(COMING_SOON_PUBLIC_HREF, soon)
         self.assertIn('data-pay-via="coming-soon"', soon)
+        self.assertIn('data-coming-soon="1"', soon)
         live = _render_platform_pay_link(a, coming_soon=False)
-        self.assertIn("Pay £2.45", live)
+        self.assertIn("BUY - 0.3.6", live)
         self.assertIn('data-pay-via="stripe-payment-page"', live)
         self.assertIn(a.pay_path, live)
 

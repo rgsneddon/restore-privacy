@@ -93,7 +93,7 @@ class TestDownloadCatalog(unittest.TestCase):
         self.assertIn("£2.45", html)
         self.assertIn(BMC_TIP_URL, html)
         # Live default: Stripe Payment Link Pay buttons
-        self.assertIn("Pay £2.45", html)
+        self.assertIn("BUY - 0.3.6", html)
         self.assertIn("donate.stripe.com", html)
         self.assertIn('data-buy-mode="stripe-live"', html)
         self.assertNotIn("Coming soon", html)
@@ -154,7 +154,7 @@ class TestDownloadCatalog(unittest.TestCase):
         self.assertIn('class="dl"', html)
         self.assertNotIn('href="#"', html)
         self.assertIn("data-price-pence=\"245\"", html)
-        self.assertIn("Pay £2.45", html)
+        self.assertIn("BUY - 0.3.6", html)
         self.assertIn("donate.stripe.com", html)
         self.assertNotIn("Coming soon", html)
 
@@ -167,7 +167,7 @@ class TestDownloadCatalog(unittest.TestCase):
         self.assertNotIn('id="dl-claim-hint"', html)
         self.assertNotIn("/download/success?session_id=", html)
         # Platform controls present (live Stripe Pay default)
-        self.assertIn("Pay £2.45", html)
+        self.assertIn("BUY - 0.3.6", html)
         self.assertIn('id="dl-windows"', html)
         self.assertIn("donate.stripe.com", html)
         # No bottom generic “Stripe payment page” footer link
@@ -209,7 +209,7 @@ class TestDownloadCatalog(unittest.TestCase):
         self.assertNotIn("clients-connected", page)
         self.assertIn(f"Download client v{RELEASE_VERSION}", page)
         # Live default: Stripe Payment Link Pay buttons
-        self.assertIn("Pay £2.45", page)
+        self.assertIn("BUY - 0.3.6", page)
         self.assertIn("donate.stripe.com", page)
         self.assertNotIn("Coming soon", page)
         self.assertIn("£2.45", page)

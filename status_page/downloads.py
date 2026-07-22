@@ -453,6 +453,9 @@ def _render_platform_pay_link(
     """
     if coming_soon is None:
         coming_soon = catalog_buy_buttons_coming_soon()
+    # Visible label is intentionally short; platform stays in id / data / aria-label.
+    buy_label = f"BUY - {RELEASE_VERSION}"
+    aria = f"{buy_label} ({a.label})"
     if coming_soon:
         href = COMING_SOON_PUBLIC_HREF
         return (
@@ -460,16 +463,17 @@ def _render_platform_pay_link(
             f'rel="noopener noreferrer" '
             f'data-platform="{a.platform}" data-filename="{a.filename}" '
             f'data-price-pence="245" data-pay-via="coming-soon" '
-            f'data-coming-soon="1">'
-            f"Coming soon - {a.label}</a>"
+            f'data-coming-soon="1" aria-label="{aria}">'
+            f"{buy_label}</a>"
         )
     href = a.pay_path
     return (
         f'<a class="dl" id="dl-{a.platform}" href="{href}" '
         f'rel="noopener noreferrer" target="_blank" '
         f'data-platform="{a.platform}" data-filename="{a.filename}" '
-        f'data-price-pence="245" data-pay-via="stripe-payment-page">'
-        f"Pay {PRICE_LABEL} - {a.label}</a>"
+        f'data-price-pence="245" data-pay-via="stripe-payment-page" '
+        f'aria-label="{aria}">'
+        f"{buy_label}</a>"
     )
 
 

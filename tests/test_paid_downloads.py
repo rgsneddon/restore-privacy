@@ -46,7 +46,7 @@ class TestPaidDownloadUI(unittest.TestCase):
         self.assertNotIn("catalog-version", html)
         self.assertIn('data-buy-mode="stripe-live"', html)
         self.assertIn('data-pay-via="stripe-payment-page"', html)
-        self.assertIn("Pay £2.45", html)
+        self.assertIn("BUY - 0.3.6", html)
         pay_base = payments.stripe_payment_page_url()
         self.assertEqual(
             pay_base, "https://donate.stripe.com/cNi7sM4uOeWQ9TBe0q7kc00"
@@ -65,7 +65,7 @@ class TestPaidDownloadUI(unittest.TestCase):
         self.assertIn(BMC_TIP_URL, page)
         self.assertIn("donate.stripe.com/cNi7sM4uOeWQ9TBe0q7kc00", page)
         self.assertIn("client_reference_id=windows", page)
-        self.assertIn("Pay £2.45", page)
+        self.assertIn("BUY - 0.3.6", page)
         # No free GitHub installer links
         self.assertNotIn(
             'href="https://github.com/rgsneddon/restore-privacy/releases/download/0.3.6/restore-privacy-client-0.3.6-windows-x64-setup.exe"',
