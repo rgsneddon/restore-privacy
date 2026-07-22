@@ -21,13 +21,16 @@ If fulfilment returns **503**, paying customers cannot download until you stage 
 
 1. Status downloads → Stripe Payment Link  
    `https://donate.stripe.com/cNi7sM4uOeWQ9TBe0q7kc00?client_reference_id=<platform>`
-2. Stripe **After payment → Redirect to**  
+2. Payment Link must **require email** (subscription does; or set
+   `customer_creation=always` on the link — see PAID_DOWNLOADS_HOWTO §1.3b).
+3. Stripe **After payment → Redirect to**  
    `https://restoreprivacy.online/download/success?session_id={CHECKOUT_SESSION_ID}`  
-   (required — already configured for seamless thank-you)
-3. Webhook `POST https://restoreprivacy.online/webhook/stripe`  
+   (required — **no** `&platform=` empty suffix; platform comes from BUY tile
+   `client_reference_id` and is filled on the success page)
+4. Webhook `POST https://restoreprivacy.online/webhook/stripe`  
    event **`checkout.session.completed`** → mints one-time token for that platform  
    (requires `payment_status` paid + **245** pence GBP + platform from `client_reference_id` / metadata)
-4. Success page shows **Download \<platform\> package** → `/download?token=…`  
+5. Success page shows **Download \<platform\> package** → `/download?token=…`  
    streams installer via **proxy** (local staged file or GitHub API token)
 
 ## Make / keep GitHub private

@@ -15,6 +15,11 @@ Success return URL template:
 
 ```
 https://restoreprivacy.online/download/success?session_id={CHECKOUT_SESSION_ID}
+
+**Do not** add `&platform=` (or empty `platform=`) to this URL. Stripe only
+substitutes `{CHECKOUT_SESSION_ID}`. Platform is set by each BUY tile as
+`client_reference_id=windows` (etc.) on the Payment Link; the success page
+reads it from the Checkout Session and fills the browser URL.
 ```
 
 ## Events to select (required)

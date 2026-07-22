@@ -19,6 +19,8 @@ from payments import (  # noqa: E402
     ensure_download_grant_for_paid_session,
     find_grant_by_session,
     paid_session_needs_platform_picker,
+    platform_from_stripe_checkout_session,
+    resolve_platform_from_checkout_session,
 )
 
 
@@ -105,6 +107,30 @@ class TestEnsureGrantFromStripeSession(unittest.TestCase):
                 paid_session_needs_platform_picker(
                     sid, http_get=fake_get, secret_key="sk_test_x"
                 )
+            )
+
+    def test_platform_from_session_client_reference(self):
+        sess = _paid_session(platform="macos")
+        self.assertEqual(platform_from_stripe_checkout_session(sess), "macos")
+        sess["client_reference_id"] = ""
+        sess["metadata"] = {"platform": "ios"}
+        self.assertEqual(platform_from_stripe_checkout_session(sess), "ios")
+        sess["metadata"] = {}
+        self.assertEqual(platform_from_stripe_checkout_session(sess), "")
+
+    def test_resolve_platform_from_checkout_session(self):
+        sid = f"cs_test_resolve_plat_{uuid.uuid4().hex[:12]}"
+        sess = _paid_session(session_id=sid, platform="linux")
+
+        def fake_get(url: str, headers: dict) -> tuple[int, bytes]:
+            return 200, json.dumps(sess).encode("utf-8")
+
+        with mock.patch("payments.stripe_secret_key", return_value="sk_test_x"):
+            self.assertEqual(
+                resolve_platform_from_checkout_session(
+                    sid, http_get=fake_get, secret_key="sk_test_x"
+                ),
+                "linux",
             )
 
 

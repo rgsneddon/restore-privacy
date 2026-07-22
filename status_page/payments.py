@@ -248,9 +248,44 @@ def production_success_return_url() -> str:
 
     Includes the Checkout session id placeholder Stripe substitutes after payment
     so the buyer lands on thank-you + auto-download on the public origin.
+
+    **Do not** append ``&platform=`` or ``&platform={anything}`` — Stripe only
+    expands ``{CHECKOUT_SESSION_ID}``. Platform is carried by Payment Link
+    ``client_reference_id`` (BUY tile query) and resolved on the success page.
     """
     base = production_public_base_url().rstrip("/")
     return f"{base}{DEFAULT_SUCCESS_PATH}?session_id={{CHECKOUT_SESSION_ID}}"
+
+
+def platform_from_stripe_checkout_session(sess: dict[str, Any] | None) -> str:
+    """Catalog platform from a Checkout Session object, or empty string.
+
+    Prefers ``client_reference_id`` (Payment Link BUY tile), then
+    ``metadata.platform`` (server Checkout). Only returns known catalog keys.
+    """
+    if not isinstance(sess, dict):
+        return ""
+    ref = str(sess.get("client_reference_id") or "").strip().lower()
+    if platform_filename(ref):
+        return ref
+    meta = sess.get("metadata") if isinstance(sess.get("metadata"), dict) else {}
+    meta_plat = str(meta.get("platform") or "").strip().lower()
+    if platform_filename(meta_plat):
+        return meta_plat
+    return ""
+
+
+def resolve_platform_from_checkout_session(
+    session_id: str,
+    *,
+    http_get: HttpGetFn | None = None,
+    secret_key: str | None = None,
+) -> str:
+    """Look up Checkout Session on Stripe and return catalog platform if known."""
+    sess = retrieve_checkout_session(
+        session_id, http_get=http_get, secret_key=secret_key
+    )
+    return platform_from_stripe_checkout_session(sess)
 
 
 def stripe_webhook_operator_guidance() -> dict[str, object]:
@@ -2272,8 +2307,8 @@ def ensure_download_grant_for_paid_session(
     )
     if not sess:
         return None
-    # Prefer Stripe's client_reference_id; fall back to hint after paid check path
-    plat = str(sess.get("client_reference_id") or "").strip().lower()
+    # Prefer Stripe client_reference_id / metadata; fall back to hint after paid path
+    plat = platform_from_stripe_checkout_session(sess)
     hint = (platform_hint or "").strip().lower()
     if not plat and hint and platform_filename(hint):
         sess = dict(sess)
@@ -2307,10 +2342,7 @@ def paid_session_needs_platform_picker(
     payment_status = str(sess.get("payment_status") or "").strip().lower()
     if payment_status not in ("paid", "no_payment_required"):
         return False
-    plat = str(sess.get("client_reference_id") or "").strip().lower()
-    meta = sess.get("metadata") if isinstance(sess.get("metadata"), dict) else {}
-    meta_plat = str(meta.get("platform") or "").strip().lower()
-    if platform_filename(plat) or platform_filename(meta_plat):
+    if platform_from_stripe_checkout_session(sess):
         return False
     return True
 
@@ -2347,6 +2379,10 @@ def build_checkout_form_body(req: CheckoutRequest) -> bytes:
         ("metadata[filename]", req.filename),
         ("metadata[amount_pence]", str(PRICE_PENCE)),
         ("metadata[currency]", PRICE_CURRENCY),
+        # Always create a Stripe Customer so Checkout requires an email
+        # (receipts, refunds, and operator contact). Guest pay without email
+        # is disabled for package downloads.
+        ("customer_creation", "always"),
     ]
     # One-time Dashboard price only (see stripe_price_id). Never use Payment Link
     # recurring price ids here.

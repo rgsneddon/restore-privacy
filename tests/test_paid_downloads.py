@@ -92,6 +92,7 @@ class TestCheckoutAmount(unittest.TestCase):
             body = payments.build_checkout_form_body(creq).decode("utf-8")
         parsed = urllib.parse.parse_qs(body)
         self.assertEqual(parsed["mode"], ["payment"])
+        self.assertEqual(parsed["customer_creation"], ["always"])
         self.assertEqual(parsed["line_items[0][price_data][unit_amount]"], ["245"])
         self.assertEqual(parsed["line_items[0][price_data][currency]"], ["gbp"])
         self.assertEqual(parsed["metadata[platform]"], ["windows"])

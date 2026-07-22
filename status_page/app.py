@@ -817,8 +817,28 @@ class Handler(BaseHTTPRequestHandler):
 
         if path in ("/download/success", "/pay/success"):
             token = (query.get("token") or "").strip()
-            platform = (query.get("platform") or "").strip()
+            platform = (query.get("platform") or "").strip().lower()
             session_id = (query.get("session_id") or "").strip()
+            # Stripe Payment Link after_completion only expands {CHECKOUT_SESSION_ID}.
+            # It cannot fill platform= — that comes from client_reference_id on the
+            # BUY tile URL. If the operator left empty &platform= on the redirect
+            # template, resolve platform from Stripe and canonicalise the URL.
+            if session_id and not platform and not token:
+                try:
+                    from payments import resolve_platform_from_checkout_session
+
+                    resolved = resolve_platform_from_checkout_session(session_id)
+                except Exception:  # noqa: BLE001
+                    resolved = ""
+                if resolved and platform_filename(resolved):
+                    q = urllib.parse.urlencode(
+                        {"session_id": session_id, "platform": resolved}
+                    )
+                    self.send_response(302)
+                    self.send_header("Location", f"/download/success?{q}")
+                    self.send_header("Cache-Control", "no-store")
+                    self.end_headers()
+                    return
             # Stripe success_url supplies session_id={CHECKOUT_SESSION_ID}; webhook
             # may still be in-flight — poll briefly for the minted grant.
             # Security: never invent a download link for an unverified token —
@@ -872,6 +892,16 @@ class Handler(BaseHTTPRequestHandler):
                         purchase_id = purchase_id_for_token(str(grant["token"])) or ""
                     except Exception:  # noqa: BLE001
                         purchase_id = ""
+                # Canonical browser URL: include platform when grant has it but query did not
+                if session_id and plat and not platform:
+                    q = urllib.parse.urlencode(
+                        {"session_id": session_id, "platform": plat}
+                    )
+                    self.send_response(302)
+                    self.send_header("Location", f"/download/success?{q}")
+                    self.send_header("Cache-Control", "no-store")
+                    self.end_headers()
+                    return
                 inner = render_post_payment_thankyou_html(
                     download_path=str(link),
                     filename=str(fname),

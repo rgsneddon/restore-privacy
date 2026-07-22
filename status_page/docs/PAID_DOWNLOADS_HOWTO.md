@@ -32,6 +32,7 @@ token; `/download` **proxies** the installer via a server-side GitHub token
 
 **Option A (simplest / default):** leave checkout price env empty.  
 The app creates Checkout line items with `mode=payment`, `unit_amount=245`, `currency=gbp`.
+Server Checkout always sets `customer_creation=always` so **email is required**.
 
 **Option B (Dashboard one-time price only):**
 
@@ -42,6 +43,30 @@ The app creates Checkout line items with `mode=payment`, `unit_amount=245`, `cur
 **Do not** put a Payment Link **recurring** price in `STRIPE_PRICE_ID` for downloads.
 That causes: *You specified payment mode but passed a recurring price*.
 Legacy `STRIPE_PRICE_ID` is ignored for Checkout unless `STRIPE_ALLOW_LEGACY_PRICE_ID=1`.
+
+### 1.3b Payment Link — require customer email (live BUY buttons)
+
+Buyers use the **Stripe Payment Link** (`donate.stripe.com/…`), not server Checkout.
+Email is controlled on that link (and is already required for **subscription** prices).
+
+1. Dashboard → **Payment links** → open the Restore Privacy link  
+   (`plink_1TvTu6JDavQ2TJW6FeL0dIh9` / URL on the status downloads page).
+2. **⋯** → **Edit** (or open settings for the link).
+3. Under **Options** / customer information:
+   - Ensure email is collected (subscription links always require it).
+   - Prefer **Create a Customer** / **customer_creation = always** so email stays required
+     even if you ever switch the price back to one-time.
+4. Save. New checkouts pick up the setting immediately (no app deploy needed).
+
+API equivalent (with your live secret key, never commit it):
+
+```bash
+curl https://api.stripe.com/v1/payment_links/plink_1TvTu6JDavQ2TJW6FeL0dIh9 \
+  -u "sk_live_…:" \
+  -d "customer_creation=always"
+```
+
+Also confirm **Settings → Customer emails** / Checkout branding still send receipts if you want them.
 
 ### 1.4 Webhook (required for fulfilment)
 
@@ -162,7 +187,13 @@ Architecture (modules):
 | `/admin/logout` | Clear session cookie |
 
 **Payment Link after payment (required for seamless UX):** redirect to  
-`https://restoreprivacy.online/download/success?session_id={CHECKOUT_SESSION_ID}`
+`https://restoreprivacy.online/download/success?session_id={CHECKOUT_SESSION_ID}`  
+
+Paste **exactly** that (no trailing `&platform=`). Stripe cannot expand a
+platform placeholder. Each homepage BUY tile already opens the Payment Link
+with `?client_reference_id=<platform>`; the success page resolves that from
+the Checkout Session so the thank-you URL becomes
+`/download/success?session_id=cs_…&platform=windows` (etc.).
 
 **Private source repo:** make GitHub **private**, then either set **`RPT_GITHUB_TOKEN`** on Render **or** stage packages  
 (`python scripts/stage_paid_assets.py` → `status_page/assets/0.3.0/`). See `docs/PRIVATE_REPO_AND_PAID_DOWNLOADS.md`.
