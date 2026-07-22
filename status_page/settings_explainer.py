@@ -204,143 +204,40 @@ def render_settings_explainer_banner_html() -> str:
 
 
 def homepage_settings_banner_css() -> str:
-    """CSS fragment injected into homepage for the mid-page settings banner."""
-    return """
-    .settings-banner {
-      text-align: center;
-      background: linear-gradient(165deg, rgba(38, 148, 232, 0.18) 0%, var(--rb-card) 60%);
-      border-color: rgba(116, 178, 226, 0.45);
-    }
-    .settings-banner-kicker {
-      margin: 0 0 0.35rem; font-size: 0.72rem; letter-spacing: 0.14em;
-      text-transform: uppercase; font-weight: 700; color: var(--rb-accent);
-    }
-    .settings-banner-title {
-      margin: 0 0 0.45rem; font-size: clamp(1.05rem, 3vw, 1.25rem);
-      font-weight: 800; color: var(--rb-cream); letter-spacing: 0.04em;
-    }
-    .settings-banner-blurb {
-      margin: 0 auto 0.85rem; max-width: 36rem; font-size: 0.88rem;
-      line-height: 1.45; color: var(--rb-muted);
-    }
-    .settings-banner-actions { margin: 0; }
-    .settings-banner-link {
-      display: inline-block; font-weight: 800; letter-spacing: 0.04em;
-      color: var(--rb-navy); background: var(--rb-accent);
-      text-decoration: none; padding: 0.55rem 1.15rem; border-radius: 999px;
-      box-shadow: 0 6px 18px rgba(0,0,0,0.25);
-    }
-    .settings-banner-link:hover {
-      background: #fff3a0; color: var(--rb-navy);
-    }
-"""
+    """Banner styles live in shared public_chrome; keep empty for import compat."""
+    return "/* settings banner styles: public_chrome.public_site_css */\n"
 
 
 def _shared_shell_css() -> str:
-    """Same navy/card/cream language as the main homepage."""
+    """Page-specific explainer CSS (shared shell CSS comes from public_head_open)."""
     return """
-    :root {
-      --rb-navy: #0a1628;
-      --rb-navy-mid: #0f2340;
-      --rb-card: #132a4a;
-      --rb-card-border: rgba(174, 208, 234, 0.28);
-      --rb-cream: #f2f5f7;
-      --rb-muted: #aed0ea;
-      --rb-link: #74b2e2;
-      --rb-link-hover: #d7ebf9;
-      --rb-accent: #f9dd34;
-      --rb-btn: #2694e8;
-      --rb-btn-deep: #1a6fad;
-      --rb-soft: #deedf7;
-      --rb-radius: 16px;
-      --rb-max: 56rem;
-    }
-    *, *::before, *::after { box-sizing: border-box; }
-    body {
-      margin: 0; min-height: 100vh; display: flex; flex-direction: column;
-      align-items: center; background:
-        radial-gradient(1200px 600px at 50% -10%, #1a3a66 0%, transparent 55%),
-        linear-gradient(180deg, var(--rb-navy-mid) 0%, var(--rb-navy) 45%, #07101c 100%);
-      color: var(--rb-cream);
-      font-family: "Segoe UI", system-ui, -apple-system, sans-serif;
-      padding: clamp(1rem, 3vw, 2.5rem) 0 3rem;
-    }
-    .page-shell {
-      width: min(100% - 1.5rem, var(--rb-max));
-      display: flex; flex-direction: column; gap: 1.15rem;
-      margin: 0 auto;
-    }
-    .panel-card {
-      background: linear-gradient(165deg, rgba(26, 58, 102, 0.55) 0%, var(--rb-card) 55%);
-      border: 1px solid var(--rb-card-border);
-      border-radius: var(--rb-radius);
-      padding: clamp(1rem, 2.5vw, 1.45rem);
-      box-shadow: 0 10px 32px rgba(4, 12, 28, 0.35);
-    }
-    .panel-title {
-      margin: 0 0 0.85rem; font-size: 0.95rem; letter-spacing: 0.12em;
-      text-transform: uppercase; font-weight: 700; color: var(--rb-soft);
-      text-align: center;
-    }
-    .brand-panel {
-      display: flex; flex-direction: column; align-items: center;
-      text-align: center; gap: 0.65rem;
-    }
-    .brand-logo {
-      width: clamp(64px, 12vw, 88px); height: clamp(64px, 12vw, 88px);
-      border-radius: 18px; object-fit: cover;
-      box-shadow: 0 8px 28px rgba(0, 0, 0, 0.35);
-      border: 2px solid rgba(174, 208, 234, 0.35);
-    }
-    h1 {
-      letter-spacing: 0.1em; font-weight: 700;
-      font-size: clamp(1.25rem, 4vw, 1.85rem);
-      margin: 0; color: var(--rb-cream);
-    }
-    .tagline {
-      margin: 0; max-width: 34rem; font-size: clamp(0.85rem, 2.4vw, 0.98rem);
-      line-height: 1.45; color: var(--rb-muted); font-weight: 500;
-    }
-    .buy-now-row { margin: 0.35rem 0 0; }
-    .buy-now-btn {
-      display: inline-block; font-weight: 800; letter-spacing: 0.06em;
-      text-transform: uppercase; text-decoration: none;
-      color: var(--rb-navy); background: var(--rb-accent);
-      padding: 0.65rem 1.4rem; border-radius: 999px;
-      box-shadow: 0 8px 22px rgba(0,0,0,0.28);
-    }
-    .buy-now-btn:hover { background: #fff3a0; color: var(--rb-navy); }
-    .explainer-list { margin: 0; padding: 0; list-style: none; }
-    .explainer-item {
-      border-top: 1px solid var(--rb-card-border);
-      padding: 0.85rem 0.15rem;
-    }
-    .explainer-item:first-child { border-top: none; padding-top: 0.15rem; }
-    .explainer-item h3 {
-      margin: 0 0 0.25rem; font-size: 1rem; color: var(--rb-cream);
-      letter-spacing: 0.02em;
-    }
-    .explainer-default {
-      margin: 0 0 0.4rem; font-size: 0.75rem; font-weight: 700;
-      letter-spacing: 0.06em; text-transform: uppercase; color: var(--rb-accent);
-    }
-    .explainer-item p {
-      margin: 0; font-size: 0.9rem; line-height: 1.5; color: var(--rb-muted);
-    }
-    .howto-steps { margin: 0; padding-left: 1.2rem; color: var(--rb-muted); }
-    .howto-steps li { margin: 0.55rem 0; line-height: 1.5; font-size: 0.92rem; }
-    .howto-steps strong { color: var(--rb-cream); }
-    .howto-note {
-      margin: 1rem 0 0; font-size: 0.82rem; line-height: 1.45; color: var(--rb-muted);
-    }
-    .footer-nav {
-      text-align: center; font-size: 0.88rem; color: var(--rb-muted);
-    }
-    .footer-nav a { color: var(--rb-link); font-weight: 600; text-decoration: none; }
-    .footer-nav a:hover { color: var(--rb-link-hover); }
-    @media (max-width: 520px) {
-      .page-shell { width: min(100% - 1rem, var(--rb-max)); gap: 0.9rem; }
-    }
+.explainer-list { margin: 0; padding: 0; list-style: none; }
+.explainer-item {
+  border-top: 1px solid var(--rb-card-border);
+  padding: 0.85rem 0.15rem;
+}
+.explainer-item:first-child { border-top: none; padding-top: 0.15rem; }
+.explainer-item h3 {
+  margin: 0 0 0.25rem; font-size: 1rem; color: var(--rb-cream);
+  letter-spacing: 0.02em;
+}
+.explainer-default {
+  margin: 0 0 0.4rem; font-size: 0.75rem; font-weight: 700;
+  letter-spacing: 0.06em; text-transform: uppercase; color: var(--rb-accent-sky, var(--rb-link));
+}
+.explainer-item p {
+  margin: 0; font-size: 0.9rem; line-height: 1.5; color: var(--rb-muted);
+}
+.howto-steps { margin: 0; padding-left: 1.2rem; color: var(--rb-muted); }
+.howto-steps li { margin: 0.55rem 0; line-height: 1.5; font-size: 0.92rem; }
+.howto-steps strong { color: var(--rb-cream); }
+.howto-note {
+  margin: 1rem 0 0; font-size: 0.82rem; line-height: 1.45; color: var(--rb-muted);
+}
+.footer-nav {
+  text-align: center; font-size: 0.88rem; color: var(--rb-muted);
+}
+.footer-nav a { color: var(--rb-link); font-weight: 600; text-decoration: none; }
 """
 
 
@@ -377,7 +274,7 @@ def render_install_howto_box_html() -> str:
       <ol class="howto-steps" id="install-howto-steps">
         <li><strong>Pay on the status page.</strong> Open
           <a href="/" style="color:var(--rb-link);font-weight:700;">restoreprivacy.online</a>
-          (or use <strong>BUY NOW</strong> above). Choose your platform and complete Stripe
+          (use <strong>Home</strong> in the header). Choose your platform and complete Stripe
           checkout (£2.45/month after the 7-day trial wording on the catalog).</li>
         <li><strong>Download starts after payment.</strong> Use the one-time download link
           (and the email with download + keygen). Packages are not free permanent public
@@ -415,50 +312,42 @@ def render_install_howto_box_html() -> str:
 
 
 def render_settings_explainer_page_html(*, title: str = "RESTORE PRIVACY") -> bytes:
-    """Full settings explainer page: homepage shell, BUY NOW → home, explainers + how-to."""
-    title_safe = _esc(title)
+    """Full settings explainer page: shared brand header (no BUY NOW), explainers + how-to."""
+    try:
+        from public_chrome import (
+            public_brand_header_html,
+            public_head_open,
+            public_page_close,
+        )
+    except ImportError:  # pragma: no cover
+        from status_page.public_chrome import (  # type: ignore
+            public_brand_header_html,
+            public_head_open,
+            public_page_close,
+        )
+
     parts = settings_parts_catalog()
     explainers = render_explainers_box_html(parts)
     howto = render_install_howto_box_html()
     css = _shared_shell_css()
-    body = f"""<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="utf-8"/>
-  <meta name="viewport" content="width=device-width, initial-scale=1"/>
-  <title>Client Settings guide — {title_safe}</title>
-  <link rel="icon" href="/favicon.ico" type="image/x-icon"/>
-  <link rel="icon" href="/favicon.png" type="image/png" sizes="32x32"/>
-  <link rel="apple-touch-icon" href="/apple-touch-icon.png"/>
-  <style>
-{css}
-  </style>
-</head>
-<body>
+    header = public_brand_header_html(
+        title=title,
+        tagline=(
+            "Client Settings guide — what every control does, and how to install & run"
+        ),
+        active="settings",
+        logo_size=88,
+    )
+    body = f"""{public_head_open(title=f"Client Settings guide — {title}", extra_css=css)}
   <div class="page-shell" id="settings-explainer-page">
-    <header class="brand-panel panel-card" id="settings-explainer-header">
-      <img class="brand-logo" src="/logo.png" width="88" height="88" alt="Restore Privacy logo"/>
-      <h1>{title_safe}</h1>
-      <p class="tagline">Client Settings guide — what every control does, and how to install &amp; run</p>
-      <p class="buy-now-row">
-        <a class="buy-now-btn" id="settings-explainer-buy-now" href="/">BUY NOW</a>
-      </p>
-      <p class="footer-nav" style="margin:0.65rem 0 0;">
-        <a href="/">← Back to status &amp; downloads</a>
-        · <a href="/AUDIT.md">Security audit</a>
-        · <a href="/PRIVACY_POLICY.md">Privacy policy</a>
-      </p>
-    </header>
+{header}
 {explainers}
 {howto}
     <section class="panel-card footer-nav" id="settings-explainer-footer">
-      <p style="margin:0 0 0.75rem;">Ready to restore your privacy?</p>
-      <a class="buy-now-btn" id="settings-explainer-buy-now-bottom" href="/">BUY NOW</a>
-      <p style="margin:0.85rem 0 0;"><a href="/">Return to homepage</a></p>
+      <p style="margin:0;">Use <strong>Home</strong> in the header to return to downloads and pay.</p>
     </section>
   </div>
-</body>
-</html>
+{public_page_close()}
 """
     return body.encode("utf-8")
 

@@ -31,12 +31,11 @@ class TestTitleLegalLinks(unittest.TestCase):
         )
         self.assertNotIn('id="beta-note"', html)
         self.assertNotIn('class="tagline"', html)
-        # New links
-        frag = status_app.render_legal_links_html()
-        self.assertIn(frag.strip(), html)
+        # Shared public nav (Home before Licence; button-style links)
         self.assertIn("LICENCE", html)
         self.assertIn("PRIVACY POLICY", html)
         self.assertIn("SECURITY AUDIT", html)
+        self.assertIn('id="home-link" href="/"', html)
         # Same-origin hrefs (status host; not absolute GitHub blob URLs in nav)
         self.assertIn('id="licence-link" href="/LICENSE"', html)
         self.assertIn('id="privacy-link" href="/PRIVACY_POLICY.md"', html)
@@ -49,7 +48,9 @@ class TestTitleLegalLinks(unittest.TestCase):
         self.assertIn('id="licence-link"', html)
         self.assertIn('id="privacy-link"', html)
         self.assertIn('id="audit-link"', html)
-        # Order: h1 then doc-links
+        self.assertIn("nav-btn", html)
+        # Order: Home before Licence; h1 then doc-links
+        self.assertLess(html.find('id="home-link"'), html.find('id="licence-link"'))
         h1_pos = html.find("<h1>")
         if h1_pos < 0:
             h1_pos = html.find("<h1 ")

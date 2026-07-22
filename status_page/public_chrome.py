@@ -1,0 +1,470 @@
+"""Shared public site chrome — brand header, nav buttons, theme (light/dark/device).
+
+Used by homepage, public documents, and Settings guide. **Not** used by /admin.
+"""
+
+from __future__ import annotations
+
+# Browser localStorage key for public theme preference
+PUBLIC_THEME_STORAGE_KEY = "rpt_public_theme"
+
+# Stable DOM ids (brand-panel / doc-links keep legacy test selectors)
+SITE_BRAND_HEADER_ID = "brand-panel"
+SITE_NAV_ID = "doc-links"
+THEME_MODE_CONTROL_ID = "theme-mode-control"
+HOME_LINK_ID = "home-link"
+LICENCE_LINK_ID = "licence-link"
+PRIVACY_LINK_ID = "privacy-link"
+AUDIT_LINK_ID = "audit-link"
+README_LINK_ID = "readme-link"
+SETTINGS_GUIDE_LINK_ID = "settings-guide-link"
+
+# Paths (keep aligned with public_docs / settings_explainer)
+HOME_PATH = "/"
+LICENSE_PATH = "/LICENSE"
+PRIVACY_PATH = "/PRIVACY_POLICY.md"
+AUDIT_PATH = "/AUDIT.md"
+README_PATH = "/README.md"
+SETTINGS_GUIDE_PATH = "/settings-explainer"
+
+
+def _esc(s: str) -> str:
+    return (
+        str(s)
+        .replace("&", "&amp;")
+        .replace("<", "&lt;")
+        .replace(">", "&gt;")
+        .replace('"', "&quot;")
+    )
+
+
+def public_site_css() -> str:
+    """Site-wide CSS variables, shell, brand header, nav buttons, light/dark themes."""
+    return f"""
+/* === Public site chrome (shared) === */
+:root, [data-theme="dark"] {{
+  --rb-navy: #0a1628;
+  --rb-navy-mid: #0f2340;
+  --rb-card: #132a4a;
+  --rb-card-border: rgba(174, 208, 234, 0.28);
+  --rb-cream: #f2f5f7;
+  --rb-muted: #aed0ea;
+  --rb-link: #74b2e2;
+  --rb-link-hover: #d7ebf9;
+  --rb-btn: #2694e8;
+  --rb-btn-deep: #1a6fad;
+  --rb-btn-text: #ffffff;
+  --rb-soft: #deedf7;
+  --rb-accent-sky: #5eb0e8;
+  --rb-accent: #5eb0e8;
+  --rb-radius: 16px;
+  --rb-max: 56rem;
+  --rb-body-fg: var(--rb-cream);
+  --rb-body-bg1: #1a3a66;
+  --rb-body-bg2: var(--rb-navy-mid);
+  --rb-body-bg3: var(--rb-navy);
+  --rb-body-bg4: #07101c;
+  --rb-panel-shadow: 0 10px 32px rgba(4, 12, 28, 0.35);
+  /* Price callouts always white (sit on navy price panels in both themes) */
+  --rb-price-white: #ffffff;
+  --rb-price-panel-bg: linear-gradient(165deg, #1a4a7a 0%, #0a1628 70%);
+  --rb-code-bg: rgba(10, 22, 40, 0.55);
+  --rb-doc-fg: var(--rb-cream);
+  --rb-doc-muted: var(--rb-muted);
+  --rb-pre-bg: rgba(10, 22, 40, 0.65);
+  --rb-pre-border: var(--rb-card-border);
+}}
+[data-theme="light"] {{
+  --rb-navy: #e8f1f8;
+  --rb-navy-mid: #f4f8fb;
+  --rb-card: #ffffff;
+  --rb-card-border: rgba(15, 35, 64, 0.14);
+  --rb-cream: #0f2340;
+  --rb-muted: #4a657a;
+  --rb-link: #1a6fad;
+  --rb-link-hover: #0a1628;
+  --rb-btn: #2694e8;
+  --rb-btn-deep: #1a6fad;
+  --rb-btn-text: #ffffff;
+  --rb-soft: #deedf7;
+  --rb-accent-sky: #2694e8;
+  --rb-accent: #2694e8;
+  --rb-body-fg: #0f2340;
+  --rb-body-bg1: #d7ebf9;
+  --rb-body-bg2: #eef5fb;
+  --rb-body-bg3: #f7fafc;
+  --rb-body-bg4: #e8eef4;
+  --rb-panel-shadow: 0 8px 28px rgba(15, 35, 64, 0.1);
+  --rb-price-white: #ffffff;
+  --rb-price-panel-bg: linear-gradient(165deg, #2a6fad 0%, #0f2340 75%);
+  --rb-code-bg: #f0f5f9;
+  --rb-doc-fg: #0f2340;
+  --rb-doc-muted: #4a657a;
+  --rb-pre-bg: #f4f8fb;
+  --rb-pre-border: rgba(15, 35, 64, 0.12);
+}}
+@media (prefers-color-scheme: light) {{
+  :root:not([data-theme="dark"]):not([data-theme="light"]) {{
+    --rb-navy: #e8f1f8;
+    --rb-navy-mid: #f4f8fb;
+    --rb-card: #ffffff;
+    --rb-card-border: rgba(15, 35, 64, 0.14);
+    --rb-cream: #0f2340;
+    --rb-muted: #4a657a;
+    --rb-link: #1a6fad;
+    --rb-link-hover: #0a1628;
+    --rb-btn: #2694e8;
+    --rb-btn-deep: #1a6fad;
+    --rb-btn-text: #ffffff;
+    --rb-soft: #deedf7;
+    --rb-accent-sky: #2694e8;
+    --rb-accent: #2694e8;
+    --rb-body-fg: #0f2340;
+    --rb-body-bg1: #d7ebf9;
+    --rb-body-bg2: #eef5fb;
+    --rb-body-bg3: #f7fafc;
+    --rb-body-bg4: #e8eef4;
+    --rb-panel-shadow: 0 8px 28px rgba(15, 35, 64, 0.1);
+    --rb-price-white: #ffffff;
+    --rb-price-panel-bg: linear-gradient(165deg, #2a6fad 0%, #0f2340 75%);
+    --rb-code-bg: #f0f5f9;
+    --rb-doc-fg: #0f2340;
+    --rb-doc-muted: #4a657a;
+    --rb-pre-bg: #f4f8fb;
+    --rb-pre-border: rgba(15, 35, 64, 0.12);
+  }}
+}}
+*, *::before, *::after {{ box-sizing: border-box; }}
+body {{
+  margin: 0; min-height: 100vh; display: flex; flex-direction: column;
+  align-items: center;
+  background:
+    radial-gradient(1200px 600px at 50% -10%, var(--rb-body-bg1) 0%, transparent 55%),
+    linear-gradient(180deg, var(--rb-body-bg2) 0%, var(--rb-body-bg3) 45%, var(--rb-body-bg4) 100%);
+  color: var(--rb-body-fg);
+  font-family: "Segoe UI", system-ui, -apple-system, sans-serif;
+  padding: clamp(1rem, 3vw, 2.5rem) 0 3rem;
+}}
+.page-shell {{
+  width: min(100% - 1.5rem, var(--rb-max));
+  display: flex; flex-direction: column; gap: 1.15rem;
+  margin: 0 auto;
+}}
+.panel-card {{
+  background: linear-gradient(165deg, color-mix(in srgb, var(--rb-card) 88%, var(--rb-soft)) 0%, var(--rb-card) 55%);
+  border: 1px solid var(--rb-card-border);
+  border-radius: var(--rb-radius);
+  padding: clamp(1rem, 2.5vw, 1.45rem);
+  box-shadow: var(--rb-panel-shadow);
+}}
+.panel-title {{
+  margin: 0 0 0.85rem; font-size: 0.95rem; letter-spacing: 0.12em;
+  text-transform: uppercase; font-weight: 700; color: var(--rb-muted);
+  text-align: center;
+}}
+#{SITE_BRAND_HEADER_ID}, .brand-panel, #site-brand-header {{
+  display: flex; flex-direction: column; align-items: center;
+  text-align: center; gap: 0.65rem;
+}}
+.brand-logo {{
+  width: clamp(72px, 14vw, 104px); height: clamp(72px, 14vw, 104px);
+  border-radius: 22px; object-fit: cover;
+  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.25);
+  border: 2px solid color-mix(in srgb, var(--rb-link) 45%, transparent);
+}}
+#{SITE_BRAND_HEADER_ID} h1, .brand-panel h1, #site-brand-header h1 {{
+  letter-spacing: 0.14em; font-weight: 700;
+  font-size: clamp(1.35rem, 4.2vw, 2.05rem);
+  margin: 0; color: var(--rb-cream);
+}}
+.brand-tagline, .tagline {{
+  margin: 0; max-width: 32rem; font-size: clamp(0.85rem, 2.4vw, 0.98rem);
+  line-height: 1.45; color: var(--rb-muted); font-weight: 500;
+}}
+/* Logo-aligned nav buttons (sky blue / navy — not yellow) */
+#{SITE_NAV_ID}, .site-nav, .doc-links, #site-nav {{
+  margin: 0.15rem 0 0; max-width: 100%;
+  display: flex; flex-wrap: wrap; justify-content: center; gap: 0.45rem;
+  padding: 0;
+}}
+.nav-btn, a.nav-btn, a.doc-link {{
+  display: inline-block;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  font-size: clamp(0.72rem, 2vw, 0.82rem);
+  text-transform: uppercase;
+  text-decoration: none;
+  color: var(--rb-btn-text) !important;
+  background: linear-gradient(180deg, var(--rb-btn) 0%, var(--rb-btn-deep) 100%);
+  border: 1px solid color-mix(in srgb, var(--rb-link) 50%, transparent);
+  border-radius: 999px;
+  padding: 0.42rem 0.85rem;
+  box-shadow: 0 4px 12px rgba(10, 22, 40, 0.2);
+  transition: filter 0.12s ease, transform 0.12s ease;
+}}
+.nav-btn:hover, a.nav-btn:hover, a.doc-link:hover {{
+  filter: brightness(1.08);
+  color: var(--rb-btn-text) !important;
+  background: linear-gradient(180deg, var(--rb-accent-sky) 0%, var(--rb-btn) 100%);
+}}
+.nav-btn.is-active, a.nav-btn.is-active {{
+  outline: 2px solid var(--rb-soft);
+  outline-offset: 2px;
+}}
+.doc-sep {{ display: none; }}
+/* Theme control */
+#{THEME_MODE_CONTROL_ID}, .theme-mode-control {{
+  display: flex; flex-wrap: wrap; align-items: center; justify-content: center;
+  gap: 0.45rem 0.75rem; margin: 0.35rem 0 0; width: 100%;
+}}
+.theme-mode-control .theme-ask {{
+  margin: 0; font-size: 0.78rem; color: var(--rb-muted); font-weight: 600;
+}}
+.theme-mode-control fieldset {{
+  margin: 0; padding: 0.2rem; border: 1px solid var(--rb-card-border);
+  border-radius: 999px; display: flex; flex-wrap: wrap; gap: 0.2rem;
+  background: color-mix(in srgb, var(--rb-code-bg) 80%, transparent);
+}}
+.theme-mode-control legend {{ position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0,0,0,0); }}
+.theme-mode-control label {{
+  display: inline-flex; align-items: center; gap: 0.25rem;
+  font-size: 0.72rem; font-weight: 700; letter-spacing: 0.03em;
+  text-transform: uppercase; color: var(--rb-muted);
+  padding: 0.28rem 0.55rem; border-radius: 999px; cursor: pointer;
+}}
+.theme-mode-control input {{ accent-color: var(--rb-btn); margin: 0; }}
+.theme-mode-control label:has(input:checked) {{
+  background: color-mix(in srgb, var(--rb-btn) 22%, transparent);
+  color: var(--rb-cream); outline: 1px solid var(--rb-btn);
+}}
+/* Settings guide banner (logo palette, not yellow) */
+.settings-banner {{
+  text-align: center;
+  background: linear-gradient(165deg, color-mix(in srgb, var(--rb-btn) 18%, var(--rb-card)) 0%, var(--rb-card) 60%);
+  border-color: color-mix(in srgb, var(--rb-link) 45%, transparent);
+}}
+.settings-banner-kicker {{
+  margin: 0 0 0.35rem; font-size: 0.72rem; letter-spacing: 0.14em;
+  text-transform: uppercase; font-weight: 700; color: var(--rb-accent-sky);
+}}
+.settings-banner-title {{
+  margin: 0 0 0.45rem; font-size: clamp(1.05rem, 3vw, 1.25rem);
+  font-weight: 800; color: var(--rb-cream); letter-spacing: 0.04em;
+}}
+.settings-banner-blurb {{
+  margin: 0 auto 0.85rem; max-width: 36rem; font-size: 0.88rem;
+  line-height: 1.45; color: var(--rb-muted);
+}}
+.settings-banner-actions {{ margin: 0; }}
+.settings-banner-link, a.settings-banner-link {{
+  display: inline-block; font-weight: 800; letter-spacing: 0.04em;
+  text-transform: uppercase; font-size: 0.82rem;
+  color: var(--rb-btn-text) !important;
+  background: linear-gradient(180deg, var(--rb-btn) 0%, var(--rb-btn-deep) 100%);
+  text-decoration: none; padding: 0.55rem 1.15rem; border-radius: 999px;
+  border: 1px solid color-mix(in srgb, var(--rb-link) 40%, transparent);
+  box-shadow: 0 6px 18px rgba(10, 22, 40, 0.22);
+}}
+.settings-banner-link:hover {{
+  filter: brightness(1.08);
+  color: var(--rb-btn-text) !important;
+}}
+/* Doc body inside box shell */
+.doc-body-panel {{
+  color: var(--rb-doc-fg);
+}}
+.doc-body-panel a {{ color: var(--rb-link); font-weight: 600; }}
+.doc-body-panel h1, .doc-body-panel h2, .doc-body-panel h3 {{
+  color: var(--rb-cream); letter-spacing: 0.02em;
+}}
+.doc-body-panel .muted, .doc-body-panel .doc-muted {{ color: var(--rb-doc-muted); }}
+.doc-plain, pre.doc-plain {{
+  white-space: pre-wrap; word-wrap: break-word;
+  font-family: ui-monospace, "Cascadia Code", "Consolas", "Courier New", monospace;
+  font-size: 0.88rem; line-height: 1.5;
+  background: var(--rb-pre-bg);
+  border: 1px solid var(--rb-pre-border);
+  border-radius: 12px;
+  padding: 1rem 1.1rem;
+  color: var(--rb-doc-fg);
+  margin: 0;
+}}
+.doc-code {{
+  background: var(--rb-pre-bg); border: 1px solid var(--rb-pre-border);
+  border-radius: 10px; padding: 0.75rem; overflow-x: auto;
+}}
+.doc-body table {{
+  width: 100%; border-collapse: collapse; font-size: 0.88rem;
+  margin: 0.75rem 0 1rem;
+}}
+.doc-body th, .doc-body td {{
+  border: 1px solid var(--rb-card-border); padding: 0.4rem 0.55rem;
+  vertical-align: top;
+}}
+.doc-body th {{ background: var(--rb-code-bg); }}
+.doc-foot {{
+  margin-top: 0.5rem; text-align: center; font-size: 0.88rem; color: var(--rb-muted);
+}}
+.doc-foot a {{ color: var(--rb-link); font-weight: 600; margin: 0 0.35rem; }}
+@media (max-width: 520px) {{
+  .page-shell {{ width: min(100% - 1rem, var(--rb-max)); gap: 0.9rem; }}
+  .nav-btn, a.nav-btn, a.doc-link {{ font-size: 0.68rem; padding: 0.38rem 0.65rem; }}
+}}
+"""
+
+
+def public_theme_boot_script() -> str:
+    """Apply stored/device theme before paint; wire radio controls site-wide."""
+    key = PUBLIC_THEME_STORAGE_KEY
+    return f"""
+<script id="public-theme-script">
+(function () {{
+  var KEY = {key!r};
+  function resolve(mode) {{
+    if (mode === "light" || mode === "dark") return mode;
+    try {{
+      return window.matchMedia("(prefers-color-scheme: light)").matches ? "light" : "dark";
+    }} catch (e) {{ return "dark"; }}
+  }}
+  function apply(mode) {{
+    var root = document.documentElement;
+    var m = (mode || "system");
+    if (m === "system" || m === "device") {{
+      root.removeAttribute("data-theme");
+      root.setAttribute("data-theme-pref", "device");
+    }} else {{
+      root.setAttribute("data-theme", m);
+      root.setAttribute("data-theme-pref", m);
+    }}
+  }}
+  function load() {{
+    try {{ return localStorage.getItem(KEY) || "device"; }} catch (e) {{ return "device"; }}
+  }}
+  function save(mode) {{
+    try {{ localStorage.setItem(KEY, mode); }} catch (e) {{}}
+  }}
+  var initial = load();
+  if (initial === "system") initial = "device";
+  apply(initial);
+  function wire() {{
+    var radios = document.querySelectorAll('input[name="public-theme"]');
+    if (!radios.length) return;
+    radios.forEach(function (r) {{
+      r.checked = (r.value === initial) || (initial === "device" && r.value === "device");
+      r.addEventListener("change", function () {{
+        if (!r.checked) return;
+        save(r.value);
+        apply(r.value);
+        initial = r.value;
+      }});
+    }});
+    try {{
+      window.matchMedia("(prefers-color-scheme: light)").addEventListener("change", function () {{
+        if ((load() || "device") === "device") apply("device");
+      }});
+    }} catch (e) {{}}
+  }}
+  if (document.readyState === "loading") {{
+    document.addEventListener("DOMContentLoaded", wire);
+  }} else {{ wire(); }}
+}})();
+</script>
+"""
+
+
+def public_theme_picker_html() -> str:
+    """Light / Dark / Device control (public pages only)."""
+    return f"""
+<div class="theme-mode-control" id="{THEME_MODE_CONTROL_ID}" role="group" aria-label="Colour mode">
+  <p class="theme-ask" id="theme-mode-ask">Colour mode</p>
+  <fieldset id="public-theme-fieldset">
+    <legend>Colour mode</legend>
+    <label><input type="radio" name="public-theme" id="theme-device" value="device" checked/> Device</label>
+    <label><input type="radio" name="public-theme" id="theme-light" value="light"/> Light</label>
+    <label><input type="radio" name="public-theme" id="theme-dark" value="dark"/> Dark</label>
+  </fieldset>
+</div>
+"""
+
+
+def public_nav_links_html(*, active: str | None = None) -> str:
+    """Button-style nav: Home before Licence, then Privacy, Audit, README, Settings.
+
+    *active* is one of: home, licence, privacy, audit, readme, settings (or None).
+    """
+    items = (
+        ("HOME", HOME_PATH, HOME_LINK_ID, "home"),
+        ("LICENCE", LICENSE_PATH, LICENCE_LINK_ID, "licence"),
+        ("PRIVACY POLICY", PRIVACY_PATH, PRIVACY_LINK_ID, "privacy"),
+        ("SECURITY AUDIT", AUDIT_PATH, AUDIT_LINK_ID, "audit"),
+        ("README", README_PATH, README_LINK_ID, "readme"),
+        ("SETTINGS GUIDE", SETTINGS_GUIDE_PATH, SETTINGS_GUIDE_LINK_ID, "settings"),
+    )
+    parts: list[str] = []
+    for label, path, el_id, key in items:
+        cls = "nav-btn doc-link"
+        if active and active == key:
+            cls += " is-active"
+        parts.append(
+            f'<a class="{cls}" id="{el_id}" href="{path}">{label}</a>'
+        )
+    return (
+        f'  <nav class="site-nav doc-links" id="{SITE_NAV_ID}" '
+        f'data-site-nav="1" aria-label="Site navigation">{"".join(parts)}</nav>'
+    )
+
+
+def public_brand_header_html(
+    *,
+    title: str = "RESTORE PRIVACY",
+    tagline: str = (
+        "lightweight vpn to restore your privacy — no user data is retained — "
+        "your privacy is restored"
+    ),
+    active: str | None = None,
+    logo_size: int = 96,
+) -> str:
+    """Static top brand panel used across all public pages."""
+    title_safe = _esc(title)
+    tag_safe = _esc(tagline)
+    return f"""    <header class="brand-panel panel-card" id="{SITE_BRAND_HEADER_ID}" data-site-header="1" data-header-alias="site-brand-header">
+      <img class="brand-logo" src="/logo.png" width="{int(logo_size)}" height="{int(logo_size)}" alt="Restore Privacy logo"/>
+      <h1>{title_safe}</h1>
+      <p class="brand-tagline">{tag_safe}</p>
+{public_nav_links_html(active=active)}
+{public_theme_picker_html()}
+    </header>
+"""
+
+
+def public_head_open(
+    *,
+    title: str,
+    extra_css: str = "",
+) -> str:
+    """Opening HTML through ``</head><body>`` with shared CSS + theme boot script."""
+    title_safe = _esc(title)
+    return f"""<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <meta name="color-scheme" content="dark light"/>
+  <title>{title_safe}</title>
+  <link rel="icon" href="/favicon.ico" type="image/x-icon"/>
+  <link rel="icon" href="/favicon.png" type="image/png" sizes="32x32"/>
+  <link rel="apple-touch-icon" href="/apple-touch-icon.png"/>
+  <style>
+{public_site_css()}
+{extra_css}
+  </style>
+{public_theme_boot_script()}
+</head>
+<body>
+"""
+
+
+def public_page_close() -> str:
+    return """</body>
+</html>
+"""

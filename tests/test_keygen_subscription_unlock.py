@@ -34,7 +34,7 @@ class TestHomepageTrialSentence(unittest.TestCase):
         html = render_download_section_html(coming_soon=False)
         # Nested box inside #downloads
         self.assertIn('id="downloads"', html)
-        # Large green monthly callout under Download client heading
+        # Large white bold monthly callout under Download client heading
         self.assertIn("Download client v", html)
         self.assertIn('id="dl-only-price"', html)
         self.assertIn('class="dl-only-price"', html)
@@ -109,11 +109,12 @@ class TestHomepageTrialSentence(unittest.TestCase):
             css,
             r"@media \(max-width:\s*640px\)[\s\S]*?\.dl-price-box[\s\S]*?width:\s*100%",
         )
-        # ONLY £2.45 banner: large, green, fancy/non-default font stack
+        # ONLY £2.45 banner: large, white, standout serif font stack
         self.assertIn(".dl-only-price", css)
-        self.assertIn("#22c55e", css)
+        self.assertIn("#ffffff", css)
         self.assertIn("font-size:", css)
-        self.assertRegex(css, r"\.dl-only-price[\s\S]*?color:\s*#22c55e")
+        self.assertRegex(css, r"\.dl-only-price[\s\S]*?color:\s*#ffffff")
+        self.assertNotRegex(css, r"\.dl-only-price[\s\S]*?color:\s*#22c55e")
         self.assertRegex(
             css,
             r"\.dl-only-price[\s\S]*?font-family:[\s\S]*?(Georgia|Palatino|cursive|serif)",
@@ -122,6 +123,8 @@ class TestHomepageTrialSentence(unittest.TestCase):
             css,
             r"\.dl-only-price[\s\S]*?font-size:\s*clamp\(",
         )
+        # Nested GBP line is also white bold
+        self.assertRegex(css, r"\.dl-price[\s\S]*?color:\s*#ffffff")
 
 
 class TestKeygenMintAndEmail(unittest.TestCase):

@@ -291,17 +291,22 @@ def fetch_upstream_status() -> dict:
 
 
 def render_html(status: dict, poll_ms: int | None = None) -> bytes:
-    """HTML: title + legal/audit links + audit countdown + downloads (no client count)."""
+    """HTML: shared brand header + downloads + audit countdown (no client count)."""
     _ = poll_ms  # retained for call-site compat; public page does not poll a count
     title = status.get("title", "RESTORE PRIVACY")
-    # Escape for embedding in HTML text (title is product constant; still sanitize)
-    title_safe = (
-        str(title)
-        .replace("&", "&amp;")
-        .replace("<", "&lt;")
-        .replace(">", "&gt;")
-        .replace('"', "&quot;")
-    )
+    try:
+        from public_chrome import (
+            public_brand_header_html,
+            public_head_open,
+            public_page_close,
+        )
+    except ImportError:  # pragma: no cover
+        from status_page.public_chrome import (  # type: ignore
+            public_brand_header_html,
+            public_head_open,
+            public_page_close,
+        )
+
     downloads_html = render_download_section_html()
     dl_css = download_css()
     try:
@@ -316,169 +321,86 @@ def render_html(status: dict, poll_ms: int | None = None) -> bytes:
         )
     countdown_html = render_audit_countdown_html()
     node_wipe_html = render_node_wipe_countdown_html()
-    # Buy Me a Coffee tip — very bottom of page (after downloads / wipe / audit)
     bmc_tip_html = render_bmc_tip_html()
-    # Palette inspired by restorebritain.org.uk/donate (navy / sky blue / cream)
-    body = f"""<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="utf-8"/>
-  <meta name="viewport" content="width=device-width, initial-scale=1"/>
-  <title>{title_safe}</title>
-  <link rel="icon" href="/favicon.ico" type="image/x-icon"/>
-  <link rel="icon" href="/favicon.png" type="image/png" sizes="32x32"/>
-  <link rel="apple-touch-icon" href="/apple-touch-icon.png"/>
-  <style>
-    :root {{
-      --rb-navy: #0a1628;
-      --rb-navy-mid: #0f2340;
-      --rb-card: #132a4a;
-      --rb-card-border: rgba(174, 208, 234, 0.28);
-      --rb-cream: #f2f5f7;
-      --rb-muted: #aed0ea;
-      --rb-link: #74b2e2;
-      --rb-link-hover: #d7ebf9;
-      --rb-accent: #f9dd34;
-      --rb-btn: #2694e8;
-      --rb-btn-deep: #1a6fad;
-      --rb-soft: #deedf7;
-      --rb-radius: 16px;
-      --rb-max: 56rem;
-    }}
-    *, *::before, *::after {{ box-sizing: border-box; }}
-    body {{
-      margin: 0; min-height: 100vh; display: flex; flex-direction: column;
-      align-items: center; background:
-        radial-gradient(1200px 600px at 50% -10%, #1a3a66 0%, transparent 55%),
-        linear-gradient(180deg, var(--rb-navy-mid) 0%, var(--rb-navy) 45%, #07101c 100%);
-      color: var(--rb-cream);
-      font-family: "Segoe UI", system-ui, -apple-system, sans-serif;
-      padding: clamp(1rem, 3vw, 2.5rem) 0 3rem;
-    }}
-    .page-shell {{
-      width: min(100% - 1.5rem, var(--rb-max));
-      display: flex; flex-direction: column; gap: 1.15rem;
-      margin: 0 auto;
-    }}
-    .panel-card {{
-      background: linear-gradient(165deg, rgba(26, 58, 102, 0.55) 0%, var(--rb-card) 55%);
-      border: 1px solid var(--rb-card-border);
-      border-radius: var(--rb-radius);
-      padding: clamp(1rem, 2.5vw, 1.45rem);
-      box-shadow: 0 10px 32px rgba(4, 12, 28, 0.35);
-    }}
-    .panel-title {{
-      margin: 0 0 0.85rem; font-size: 0.95rem; letter-spacing: 0.12em;
-      text-transform: uppercase; font-weight: 700; color: var(--rb-soft);
-      text-align: center;
-    }}
-    .brand-panel {{
-      display: flex; flex-direction: column; align-items: center;
-      text-align: center; gap: 0.65rem;
-    }}
-    .brand-logo {{
-      width: clamp(72px, 14vw, 104px); height: clamp(72px, 14vw, 104px);
-      border-radius: 22px; object-fit: cover;
-      box-shadow: 0 8px 28px rgba(0, 0, 0, 0.35);
-      border: 2px solid rgba(174, 208, 234, 0.35);
-    }}
-    h1 {{
-      letter-spacing: 0.14em; font-weight: 700;
-      font-size: clamp(1.45rem, 4.5vw, 2.15rem);
-      margin: 0; color: var(--rb-cream);
-    }}
-    .tagline {{
-      margin: 0; max-width: 28rem; font-size: clamp(0.85rem, 2.4vw, 0.98rem);
-      line-height: 1.45; color: var(--rb-muted); font-weight: 500;
-    }}
-    .doc-links {{
-      margin: 0; max-width: 100%; text-align: center; padding: 0;
-      font-size: clamp(0.82rem, 2.2vw, 0.92rem); line-height: 1.55;
-      display: flex; flex-wrap: wrap; justify-content: center; gap: 0.25rem 0.15rem;
-    }}
-    .doc-links a.doc-link {{
-      color: var(--rb-link); text-decoration: none; font-weight: 600;
-      letter-spacing: 0.03em; padding: 0.2rem 0.45rem; border-radius: 8px;
-    }}
-    .doc-links a.doc-link:hover {{
-      color: var(--rb-navy); background: var(--rb-soft);
-    }}
-    .doc-sep {{ color: rgba(174, 208, 234, 0.45); margin: 0 0.1rem; }}
-    .audit-countdown {{ text-align: center; letter-spacing: 0.02em; width: 100%; }}
-    .audit-countdown-row {{
-      font-size: 0.95rem; color: var(--rb-soft);
+    # public_head_open already injects public_site_css — only page-specific extras here
+    page_css = (
+        dl_css
+        + homepage_settings_banner_css()
+        + """
+    .audit-countdown { text-align: center; letter-spacing: 0.02em; width: 100%; }
+    .audit-countdown-row {
+      font-size: 0.95rem; color: var(--rb-soft, var(--rb-muted));
       display: flex; flex-wrap: wrap; justify-content: center; align-items: baseline;
       gap: 0.45rem 0.75rem;
-    }}
-    .audit-countdown-label {{ color: var(--rb-muted); text-transform: lowercase; }}
-    .audit-countdown-value {{
+    }
+    .audit-countdown-label { color: var(--rb-muted); text-transform: lowercase; }
+    .audit-countdown-value {
       font-variant-numeric: tabular-nums; font-weight: 700;
       color: var(--rb-cream); font-size: 1.15rem;
-      background: rgba(10, 22, 40, 0.45); border: 1px solid var(--rb-card-border);
+      background: var(--rb-code-bg, rgba(10, 22, 40, 0.45));
+      border: 1px solid var(--rb-card-border);
       border-radius: 12px; padding: 0.35rem 0.75rem;
-    }}
-    .audit-last-run {{
-      margin: 0.55rem 0 0;
-      font-size: 0.82rem;
-      color: var(--rb-muted);
-      text-align: center;
-      width: 100%;
-    }}
-    .audit-last-run time {{ color: var(--rb-cream); font-weight: 600; }}
-    .audit-countdown-blurb {{
+    }
+    .audit-last-run {
+      margin: 0.55rem 0 0; font-size: 0.82rem; color: var(--rb-muted);
+      text-align: center; width: 100%;
+    }
+    .audit-last-run time { color: var(--rb-cream); font-weight: 600; }
+    .audit-countdown-blurb {
       margin: 0.65rem 0 0; font-size: 0.78rem; line-height: 1.45;
       color: var(--rb-muted); font-weight: 400;
-    }}
-    .node-wipe-countdown {{ text-align: center; width: 100%; }}
-    .node-wipe-row {{
+    }
+    .node-wipe-countdown { text-align: center; width: 100%; }
+    .node-wipe-row {
       display: flex; flex-direction: column; align-items: center; gap: 0.55rem;
       margin: 0.75rem 0 1rem;
-    }}
-    .node-wipe-label {{
-      color: var(--rb-accent); font-weight: 700; letter-spacing: 0.03em;
+    }
+    .node-wipe-label {
+      color: var(--rb-accent-sky, var(--rb-btn)); font-weight: 700; letter-spacing: 0.03em;
       font-size: clamp(0.72rem, 2.1vw, 0.84rem); line-height: 1.4;
       max-width: 100%; padding: 0 0.25rem;
-    }}
-    .nw-units {{
+    }
+    .nw-units {
       display: flex; flex-wrap: wrap; justify-content: center; gap: 0.45rem;
-    }}
-    .nw-unit {{
+    }
+    .nw-unit {
       min-width: 3.35rem; padding: 0.45rem 0.5rem 0.4rem;
       border-radius: 12px;
-      background: rgba(10, 22, 40, 0.55);
+      background: var(--rb-code-bg, rgba(10, 22, 40, 0.55));
       border: 1px solid var(--rb-card-border);
       box-shadow: inset 0 1px 0 rgba(255,255,255,0.06);
       display: flex; flex-direction: column; align-items: center; gap: 0.15rem;
-    }}
-    .nw-unit-value {{
+    }
+    .nw-unit-value {
       font-variant-numeric: tabular-nums; font-weight: 800;
       font-size: clamp(1.05rem, 3.2vw, 1.35rem); color: var(--rb-cream);
       line-height: 1.1;
-    }}
-    .nw-unit-label {{
+    }
+    .nw-unit-label {
       font-size: 0.62rem; letter-spacing: 0.08em; font-weight: 700;
       color: var(--rb-muted);
-    }}
-    .node-wipe-blurb {{
+    }
+    .node-wipe-blurb {
       margin: 0.25rem auto 0; font-size: 0.72rem; line-height: 1.45;
       color: var(--rb-muted); max-width: 40rem;
-    }}
-{dl_css}
-{homepage_settings_banner_css()}
-    @media (max-width: 520px) {{
-      .page-shell {{ width: min(100% - 1rem, var(--rb-max)); gap: 0.9rem; }}
-      .nw-unit {{ min-width: 3rem; }}
-    }}
-  </style>
-</head>
-<body>
+    }
+    @media (max-width: 520px) {
+      .nw-unit { min-width: 3rem; }
+    }
+"""
+    )
+    header = public_brand_header_html(
+        title=str(title),
+        tagline=(
+            "lightweight vpn to restore your privacy — no user data is retained — "
+            "your privacy is restored"
+        ),
+        active="home",
+        logo_size=96,
+    )
+    body = f"""{public_head_open(title=str(title), extra_css=page_css)}
   <div class="page-shell" id="page-shell">
-    <header class="brand-panel panel-card" id="brand-panel">
-      <img class="brand-logo" src="/logo.png" width="96" height="96" alt="Restore Privacy logo"/>
-      <h1>{title_safe}</h1>
-      <p class="tagline">lightweight vpn to restore your privacy — no user data is retained — your privacy is restored</p>
-{render_legal_links_html()}
-    </header>
+{header}
 {render_settings_explainer_banner_html()}
 {downloads_html}
 {node_wipe_html}
@@ -487,8 +409,7 @@ def render_html(status: dict, poll_ms: int | None = None) -> bytes:
     </section>
 {bmc_tip_html}
   </div>
-</body>
-</html>
+{public_page_close()}
 """
     return body.encode("utf-8")
 

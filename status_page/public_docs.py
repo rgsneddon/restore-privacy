@@ -463,39 +463,28 @@ def markdownish_to_html(text: str) -> str:
 
 
 DOC_SHELL_CSS = """
-:root { color-scheme: dark; }
-* { box-sizing: border-box; }
-body {
-  margin: 0; padding: 0;
-  font-family: system-ui, -apple-system, "Segoe UI", Roboto, Ubuntu, sans-serif;
-  background: #0b0f14; color: #e8eef5;
-  line-height: 1.6; font-size: 1.02rem;
+/* Doc-body typography + tables (theme tokens from public_chrome) */
+.doc-body { line-height: 1.6; font-size: 1.02rem; color: var(--rb-doc-fg, var(--rb-cream)); }
+.doc-body h1, .doc-body h2, .doc-body h3, .doc-body h4 {
+  line-height: 1.25; color: var(--rb-cream); font-weight: 650;
 }
-.wrap { max-width: 48rem; margin: 0 auto; padding: 1.25rem 1.35rem 3rem; }
-header.doc-top {
-  display: flex; flex-wrap: wrap; gap: 0.65rem 1rem; align-items: center;
-  justify-content: space-between; margin-bottom: 1.25rem;
-  padding-bottom: 0.85rem; border-bottom: 1px solid #1f2937;
-}
-header.doc-top a { color: #93c5fd; text-decoration: none; font-weight: 600; font-size: 0.95rem; }
-header.doc-top a:hover { text-decoration: underline; }
-h1,h2,h3,h4 { line-height: 1.25; color: #f8fafc; font-weight: 650; }
-h1 { font-size: 1.55rem; margin: 0 0 1rem; }
-h2 { font-size: 1.2rem; margin: 1.75rem 0 0.65rem; }
-h3 { font-size: 1.05rem; margin: 1.35rem 0 0.5rem; }
-h4 { font-size: 1rem; margin: 1.15rem 0 0.4rem; }
-p { margin: 0.65rem 0; }
-a { color: #93c5fd; }
-ul, ol { padding-left: 1.35rem; margin: 0.5rem 0 0.85rem; }
-li { margin: 0.25rem 0; }
-hr { border: 0; border-top: 1px solid #374151; margin: 1.5rem 0; }
-code {
+.doc-body h1 { font-size: 1.55rem; margin: 0 0 1rem; }
+.doc-body h2 { font-size: 1.2rem; margin: 1.75rem 0 0.65rem; }
+.doc-body h3 { font-size: 1.05rem; margin: 1.35rem 0 0.5rem; }
+.doc-body h4 { font-size: 1rem; margin: 1.15rem 0 0.4rem; }
+.doc-body p { margin: 0.65rem 0; }
+.doc-body a { color: var(--rb-link); }
+.doc-body ul, .doc-body ol { padding-left: 1.35rem; margin: 0.5rem 0 0.85rem; }
+.doc-body li { margin: 0.25rem 0; }
+.doc-body hr { border: 0; border-top: 1px solid var(--rb-card-border); margin: 1.5rem 0; }
+.doc-body code {
   font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-  font-size: 0.9em; background: #111827; padding: 0.12rem 0.35rem; border-radius: 4px;
+  font-size: 0.9em; background: var(--rb-code-bg); padding: 0.12rem 0.35rem; border-radius: 4px;
 }
 pre.doc-code, pre.doc-plain {
-  background: #111827; border: 1px solid #1f2937; border-radius: 10px;
+  background: var(--rb-pre-bg); border: 1px solid var(--rb-pre-border); border-radius: 10px;
   padding: 0.9rem 1rem; overflow-x: auto; font-size: 0.88rem; line-height: 1.45;
+  color: var(--rb-doc-fg);
 }
 pre.doc-code code { background: transparent; padding: 0; }
 table.doc-table {
@@ -503,10 +492,14 @@ table.doc-table {
   font-size: 0.95rem; display: block; overflow-x: auto;
 }
 table.doc-table th, table.doc-table td {
-  border: 1px solid #374151; padding: 0.45rem 0.6rem; text-align: left; vertical-align: top;
+  border: 1px solid var(--rb-card-border); padding: 0.45rem 0.6rem; text-align: left; vertical-align: top;
 }
-table.doc-table th { background: #111827; color: #fde68a; font-weight: 600; }
-table.doc-table tr:nth-child(even) td { background: #0f141c; }
+table.doc-table th {
+  background: var(--rb-code-bg); color: var(--rb-accent-sky, var(--rb-link)); font-weight: 600;
+}
+table.doc-table tr:nth-child(even) td {
+  background: color-mix(in srgb, var(--rb-code-bg) 55%, transparent);
+}
 /*
  * Package AUDIT STATE (pkg-rag): fit content column; lengthy Package/Notes
  * scroll *inside the cell* — do not force full-page horizontal widen via max-content.
@@ -633,7 +626,7 @@ table.doc-table.section-b-probes .cell-scroll code {
 /* Audit page: countdown under H1 + current-run RAG colour */
 .audit-page-ticker {
   margin: 0.85rem 0 1.35rem; padding: 0.85rem 1rem;
-  background: #111827; border: 1px solid #1f2937; border-radius: 10px;
+  background: var(--rb-code-bg); border: 1px solid var(--rb-card-border); border-radius: 10px;
   max-width: 36rem;
 }
 .audit-page-countdown-row {
@@ -641,11 +634,11 @@ table.doc-table.section-b-probes .cell-scroll code {
   margin-bottom: 0.55rem;
 }
 .audit-page-countdown-label {
-  color: #9ca3af; font-size: 0.9rem; text-transform: lowercase; letter-spacing: 0.02em;
+  color: var(--rb-muted); font-size: 0.9rem; text-transform: lowercase; letter-spacing: 0.02em;
 }
 .audit-page-countdown-value {
   font-variant-numeric: tabular-nums; font-weight: 700; font-size: 1.35rem;
-  color: #6ee7b7; letter-spacing: 0.04em;
+  color: var(--rb-accent-sky, #6ee7b7); letter-spacing: 0.04em;
 }
 .audit-page-current-run {
   display: flex; align-items: center; gap: 0.55rem; flex-wrap: wrap;
@@ -654,25 +647,19 @@ table.doc-table.section-b-probes .cell-scroll code {
 .audit-page-current-run .rag-swatch {
   width: 1.15rem; height: 1.15rem; flex-shrink: 0;
 }
-.audit-page-current-run-text { color: #e8eef5; line-height: 1.4; }
+.audit-page-current-run-text { color: var(--rb-doc-fg); line-height: 1.4; }
 .audit-page-current-run-text strong { font-weight: 700; }
 .audit-page-current-run[data-rag-colour="green"] .audit-page-current-run-text strong { color: #22c55e; }
 .audit-page-current-run[data-rag-colour="amber"] .audit-page-current-run-text strong { color: #f59e0b; }
 .audit-page-current-run[data-rag-colour="red"] .audit-page-current-run-text strong { color: #ef4444; }
-.audit-page-current-run-unavailable .audit-page-current-run-text { color: #9ca3af; }
+.audit-page-current-run-unavailable .audit-page-current-run-text { color: var(--rb-muted); }
 .audit-page-ticker-blurb {
-  margin: 0.45rem 0 0; font-size: 0.78rem; line-height: 1.4; color: #9ca3af;
+  margin: 0.45rem 0 0; font-size: 0.78rem; line-height: 1.4; color: var(--rb-muted);
 }
-.muted { opacity: 0.78; font-size: 0.92rem; }
-footer.doc-foot {
-  margin-top: 2.5rem; padding-top: 1rem; border-top: 1px solid #1f2937;
-  font-size: 0.9rem; opacity: 0.85;
-}
-footer.doc-foot a { margin-right: 0.65rem; }
+.muted { color: var(--rb-muted); font-size: 0.92rem; }
 article.doc-body { word-wrap: break-word; overflow-wrap: anywhere; }
 @media (max-width: 560px) {
-  .wrap { padding: 1rem 0.9rem 2.5rem; }
-  h1 { font-size: 1.35rem; }
+  .doc-body h1 { font-size: 1.35rem; }
 }
 """
 
@@ -690,6 +677,21 @@ def _is_audit_document(*, title: str, text: str) -> bool:
     return False
 
 
+def _active_nav_for_title(title: str, *, plain: bool = False) -> str | None:
+    t = (title or "").lower()
+    if plain or "licence" in t or "license" in t:
+        return "licence"
+    if "privacy" in t:
+        return "privacy"
+    if "audit" in t:
+        return "audit"
+    if "readme" in t:
+        return "readme"
+    if "credit" in t:
+        return "readme"
+    return None
+
+
 def render_document_html(
     *,
     title: str,
@@ -697,17 +699,30 @@ def render_document_html(
     plain: bool = False,
     include_audit_ticker: bool | None = None,
 ) -> bytes:
-    """Wrap product doc bytes in a readable dark HTML shell for browsers.
+    """Wrap product doc bytes in the shared public box-style shell.
 
-    When the document is the public audit (or *include_audit_ticker* is True),
-    injects a live countdown + current-run Green/Amber/Red banner immediately
-    under the first ``h1`` (``Restore Privacy — Code & Policy Audit``).
+    Licence (``plain=True``) keeps typeform/preformatted body. When the document
+    is the public audit (or *include_audit_ticker* is True), injects the live
+    countdown ticker under the first ``h1``.
     """
+    try:
+        from public_chrome import (
+            public_brand_header_html,
+            public_head_open,
+            public_page_close,
+        )
+    except ImportError:  # pragma: no cover
+        from status_page.public_chrome import (  # type: ignore
+            public_brand_header_html,
+            public_head_open,
+            public_page_close,
+        )
+
     text = raw.decode("utf-8", errors="replace")
     if text.startswith("\ufeff"):
         text = text[1:]
     if plain:
-        body_inner = f'<pre class="doc-plain">{_escape(text)}</pre>'
+        body_inner = f'<pre class="doc-plain" id="licence-typeform">{_escape(text)}</pre>'
     else:
         body_inner = markdownish_to_html(text)
     want_ticker = (
@@ -724,45 +739,48 @@ def render_document_html(
             )
         ticker = render_audit_page_ticker_html()
         body_inner = body_inner.replace("</h1>", "</h1>\n" + ticker, 1)
-    # Ensure a leading h1 when markdown starts with # Title
-    page = f"""<!DOCTYPE html>
-<html lang="en">
-<head>
-<meta charset="utf-8"/>
-<meta name="viewport" content="width=device-width, initial-scale=1"/>
-<meta name="color-scheme" content="dark"/>
-<title>{_escape(title)}</title>
-<style>{DOC_SHELL_CSS}</style>
-</head>
-<body>
-<div class="wrap">
-<header class="doc-top">
-  <a href="/" id="doc-back-home">← Status &amp; downloads</a>
-  <nav class="doc-mini" aria-label="Documents">
-    <a href="{PRIVACY_PATH}">Privacy</a>
-    <a href="{LICENSE_PATH}">Licence</a>
-    <a href="{AUDIT_PATH}">Audit</a>
-    <a href="{README_PATH}">README</a>
-  </nav>
-</header>
-<article class="doc-body" id="doc-body">
-{body_inner}
-</article>
-<footer class="doc-foot">
-  <p class="muted">Restore Privacy public documents on this status host
-  (source repository is private). Paid installers: <a href="/#downloads">downloads</a>.</p>
-  <p>
-    <a href="{PRIVACY_PATH}">Privacy</a>
-    <a href="{LICENSE_PATH}">Licence</a>
-    <a href="{AUDIT_PATH}">Audit</a>
-    <a href="{CREDITS_PATH}">Credits</a>
-    <a href="{README_PATH}">README</a>
-  </p>
-</footer>
-</div>
-</body>
-</html>
+
+    active = _active_nav_for_title(title, plain=plain)
+    # Doc-specific table/RAG helpers still useful alongside shared chrome
+    extra = DOC_SHELL_CSS + """
+.doc-body-panel h1:first-child { margin-top: 0; }
+.rag-swatch {
+  display: inline-block; width: 1.1rem; height: 1.1rem; border-radius: 4px;
+  vertical-align: middle;
+}
+.rag-green { background: #22c55e; }
+.rag-amber { background: #f59e0b; }
+.rag-red { background: #ef4444; }
+.pkg-cell-scroll .cell-scroll { max-height: 6.5rem; overflow: auto; }
 """
+    header = public_brand_header_html(
+        title="RESTORE PRIVACY",
+        tagline=_escape(title),
+        active=active,
+        logo_size=88,
+    )
+    page = f"""{public_head_open(title=title, extra_css=extra)}
+  <div class="page-shell" id="doc-page-shell">
+{header}
+    <section class="panel-card doc-body-panel" id="doc-content-panel" aria-label="Document">
+      <article class="doc-body" id="doc-body">
+{body_inner}
+      </article>
+    </section>
+    <footer class="panel-card doc-foot" id="doc-foot">
+      <p class="muted">Restore Privacy public documents on this status host
+      (source repository is private). Paid installers:
+      <a href="/#downloads">downloads</a>.</p>
+      <p>
+        <a href="{PRIVACY_PATH}">Privacy</a>
+        <a href="{LICENSE_PATH}">Licence</a>
+        <a href="{AUDIT_PATH}">Audit</a>
+        <a href="{CREDITS_PATH}">Credits</a>
+        <a href="{README_PATH}">README</a>
+      </p>
+    </footer>
+  </div>
+{public_page_close()}"""
     return page.encode("utf-8")
 
 
@@ -798,6 +816,19 @@ def render_how_to_buy_html() -> bytes:
         stripe_webhook_endpoint_url,
     )
 
+    try:
+        from public_chrome import (
+            public_brand_header_html,
+            public_head_open,
+            public_page_close,
+        )
+    except ImportError:  # pragma: no cover
+        from status_page.public_chrome import (  # type: ignore
+            public_brand_header_html,
+            public_head_open,
+            public_page_close,
+        )
+
     pay = stripe_payment_page_url()
     claim = public_doc_absolute_url("/download/success")
     home = production_status_origin()
@@ -808,25 +839,19 @@ def render_how_to_buy_html() -> bytes:
         f'(<code>{_escape(d["url"])}</code>)</li>'
         for d in docs
     )
-    body = f"""<!DOCTYPE html>
-<html lang="en"><head>
-<meta charset="utf-8"/><meta name="viewport" content="width=device-width, initial-scale=1"/>
-<title>How to buy — Restore Privacy</title>
-<style>
-{DOC_SHELL_CSS}
-.card{{background:#111827;border-radius:12px;padding:1rem 1.15rem;margin:1rem 0;border:1px solid #1f2937}}
-ol{{padding-left:1.25rem}}
-</style></head><body>
-<div class="wrap">
-<header class="doc-top">
-  <a href="/">← Status &amp; downloads</a>
-  <nav aria-label="Documents">
-    <a href="{PRIVACY_PATH}">Privacy</a>
-    <a href="{LICENSE_PATH}">Licence</a>
-    <a href="{AUDIT_PATH}">Audit</a>
-    <a href="{README_PATH}">README</a>
-  </nav>
-</header>
+    header = public_brand_header_html(
+        title="RESTORE PRIVACY",
+        tagline="How to buy — pay on Stripe, then download",
+        active="home",
+        logo_size=88,
+    )
+    body = f"""{public_head_open(title="How to buy — Restore Privacy", extra_css='''
+.card{{background:var(--rb-card);border-radius:12px;padding:1rem 1.15rem;margin:1rem 0;border:1px solid var(--rb-card-border)}}
+ol{{padding-left:1.25rem;color:var(--rb-muted)}}
+''')}
+  <div class="page-shell" id="how-to-buy-shell">
+{header}
+<section class="panel-card doc-body-panel" id="how-to-buy-panel">
 <h1 id="how-to-buy-heading">How to buy Restore Privacy</h1>
 <p class="muted">Monthly subscription ({_escape(PRICE_LABEL)} / month GBP, {PRICE_PENCE} pence) with a
 <strong>7-day trial</strong> via Stripe. No free permanent installer buttons on the VPN APP Shop.</p>
@@ -859,7 +884,8 @@ refunds and subscription end revoke access.</p>
 </ul>
 </div>
 
-<footer class="doc-foot">
+</section>
+<footer class="panel-card doc-foot">
 <p class="muted">
 <a href="{LICENSE_PATH}">Licence</a>
 <a href="{PRIVACY_PATH}">Privacy</a>
@@ -868,26 +894,19 @@ refunds and subscription end revoke access.</p>
 <a href="{CREDITS_PATH}">Credits</a></p>
 </footer>
 </div>
-</body></html>
+{public_page_close()}
 """
     return body.encode("utf-8")
 
 
-def render_public_nav_links_html() -> str:
-    """Nav fragment: licence · privacy · audit · readme (same-origin; no How-to-buy)."""
-    items = (
-        ("LICENCE", LICENSE_PATH, "licence-link"),
-        ("PRIVACY POLICY", PRIVACY_PATH, "privacy-link"),
-        ("SECURITY AUDIT", AUDIT_PATH, "audit-link"),
-        ("README", README_PATH, "readme-link"),
-    )
-    anchors = []
-    for label, path, el_id in items:
-        anchors.append(
-            f'<a class="doc-link" id="{el_id}" href="{path}">{label}</a>'
-        )
-    joined = '<span class="doc-sep" aria-hidden="true"> · </span>'.join(anchors)
-    return (
-        f'  <nav class="doc-links" id="doc-links" aria-label="Legal and product documents">'
-        f"{joined}</nav>"
-    )
+def render_public_nav_links_html(*, active: str | None = None) -> str:
+    """Shared public nav: Home before Licence, button-style (logo palette).
+
+    Delegates to :mod:`public_chrome` so homepage and docs cannot drift.
+    """
+    try:
+        from public_chrome import public_nav_links_html
+    except ImportError:  # pragma: no cover
+        from status_page.public_chrome import public_nav_links_html  # type: ignore
+
+    return public_nav_links_html(active=active)

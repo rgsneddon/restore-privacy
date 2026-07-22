@@ -21,14 +21,16 @@ class TestSettingsExplainerPage(unittest.TestCase):
         )
 
         html = render_settings_explainer_page_html().decode("utf-8")
-        # Homepage-style shell
+        # Homepage-style shell + shared brand header (no BUY NOW — use Home nav)
         self.assertIn("--rb-navy", html)
         self.assertIn("panel-card", html)
         self.assertIn("page-shell", html)
-        # BUY NOW → home
-        self.assertIn('id="settings-explainer-buy-now"', html)
+        self.assertIn('id="brand-panel"', html)
+        self.assertIn('id="home-link"', html)
         self.assertIn('href="/"', html)
-        self.assertIn("BUY NOW", html)
+        self.assertNotIn('id="settings-explainer-buy-now"', html)
+        self.assertNotIn("BUY NOW", html)
+        self.assertIn('id="theme-mode-control"', html)
         # Explainers box + required Settings parts
         self.assertIn('id="settings-explainers-box"', html)
         ids = catalog_ids()

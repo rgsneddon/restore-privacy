@@ -146,7 +146,7 @@ IOS_ZIP_FILENAME = f"restore-privacy-client-{RELEASE_VERSION}-ios.zip"
 LINUX_TGZ_FILENAME = f"restore-privacy-client-{RELEASE_VERSION}-linux-x64.tar.gz"
 
 PRICE_LABEL = "£2.45"
-# Large green callout under "Download client v…" on the public homepage.
+# Large white bold callout under "Download client v…" on the public homepage.
 ONLY_PRICE_BANNER = "ONLY £2.45 per month"
 # Shown under the buy-button grid (bold bright white, price-box-like frame).
 PLATFORM_SELECT_NOTE = (
@@ -347,22 +347,27 @@ def download_css() -> str:
     .downloads { width: 100%; text-align: center; box-sizing: border-box; }
     .downloads h2 { font-size: 1.05rem; letter-spacing: 0.1em; font-weight: 700;
                     margin: 0 0 0.35rem; color: var(--rb-cream); text-transform: uppercase; }
-    /* Large green monthly price emphasis under Download client heading */
+    /* Large white bold monthly price emphasis under Download client heading */
     .dl-only-price {
-      margin: 0.35rem auto 0.55rem;
-      padding: 0.15rem 0.5rem;
-      font-size: clamp(1.55rem, 4.5vw, 2.35rem);
-      font-weight: 800;
-      line-height: 1.2;
-      letter-spacing: 0.04em;
-      color: #22c55e;
-      text-shadow: 0 0 18px rgba(34, 197, 94, 0.35), 0 2px 0 rgba(0, 0, 0, 0.25);
-      font-family: "Palatino Linotype", Palatino, "Book Antiqua", Georgia, "Times New Roman",
-                   "Segoe Script", "Apple Chancery", "Comic Sans MS", cursive, serif;
-      font-style: italic;
+      margin: 0.35rem auto 0.65rem;
+      padding: 0.55rem 0.85rem;
+      max-width: 22rem;
+      font-size: clamp(1.65rem, 5vw, 2.55rem);
+      font-weight: 900;
+      line-height: 1.15;
+      letter-spacing: 0.05em;
+      color: #ffffff;
+      text-shadow: 0 2px 14px rgba(0, 0, 0, 0.45), 0 0 1px rgba(0, 0, 0, 0.55);
+      font-family: Georgia, "Palatino Linotype", Palatino, "Times New Roman", serif;
+      font-style: normal;
+      text-transform: uppercase;
       text-align: center;
       width: 100%;
       box-sizing: border-box;
+      background: var(--rb-price-panel-bg, linear-gradient(165deg, #1a4a7a 0%, #0a1628 70%));
+      border: 1px solid rgba(174, 208, 234, 0.35);
+      border-radius: 14px;
+      box-shadow: 0 8px 24px rgba(4, 12, 28, 0.35);
     }
     .dl-sub { color: var(--rb-muted); font-size: 0.92rem; margin: 0 0 0.85rem; }
     /* Nested price box inside #downloads: ~2/3 panel width, fluid on narrow viewports */
@@ -372,18 +377,21 @@ def download_css() -> str:
       margin: 0 auto 1.1rem;
       padding: 0.75rem 1rem;
       box-sizing: border-box;
-      border: 1px solid var(--rb-card-border);
+      border: 1px solid rgba(174, 208, 234, 0.35);
       border-radius: 12px;
-      background: rgba(10, 22, 40, 0.45);
-      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05);
+      background: var(--rb-price-panel-bg, linear-gradient(165deg, #1a4a7a 0%, #0a1628 70%));
+      box-shadow: 0 6px 20px rgba(4, 12, 28, 0.28), inset 0 1px 0 rgba(255, 255, 255, 0.06);
     }
     .dl-price {
-      font-size: 0.95rem;
+      font-size: clamp(0.95rem, 2.4vw, 1.08rem);
       margin: 0;
-      font-weight: 600;
-      color: var(--rb-accent);
+      font-weight: 800;
+      color: #ffffff;
       line-height: 1.45;
       text-align: center;
+      letter-spacing: 0.02em;
+      text-shadow: 0 1px 8px rgba(0, 0, 0, 0.35);
+      font-family: "Segoe UI", system-ui, -apple-system, "Helvetica Neue", Arial, sans-serif;
     }
     /* Platform care note — same visual language as .dl-price-box, under buy grid */
     .dl-platform-note-box {

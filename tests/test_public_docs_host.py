@@ -62,7 +62,9 @@ class TestPublicDocsRegistry(unittest.TestCase):
             html = body.decode("utf-8", errors="replace")
             self.assertIn("<!DOCTYPE html>", html)
             self.assertIn('id="doc-body"', html)
-            self.assertIn("doc-top", html)
+            # Shared public brand header (box-style shell)
+            self.assertIn('id="brand-panel"', html)
+            self.assertIn('id="home-link"', html)
 
     def test_docs_are_readable_html_with_content(self):
         """Shipped renderer wraps privacy/audit/licence in a browser-friendly shell."""
@@ -72,11 +74,13 @@ class TestPublicDocsRegistry(unittest.TestCase):
         self.assertIn("text/html", ctype)
         html = body.decode("utf-8")
         self.assertIn("Privacy", html)
-        self.assertIn("0.3.8", html)
+        self.assertTrue("0.3.8" in html or "0.3.9" in html, "catalog version in privacy")
         self.assertIn("restoreprivacy.online", html)
         # No raw markdown dump as the sole body
         self.assertIn("<h1>", html.lower() + html)  # headings rendered
         self.assertIn("max-width", html)  # shell CSS for readability
+        self.assertIn('id="brand-panel"', html)
+        self.assertIn("nav-btn", html)
 
         licence = public_docs.document_bytes_for_path("/LICENSE")
         assert licence is not None
@@ -86,13 +90,15 @@ class TestPublicDocsRegistry(unittest.TestCase):
         self.assertIn("ARCHITECTURE", lhtml.upper())
         self.assertIn("AS IS", lhtml)
         self.assertIn("doc-plain", lhtml)
+        self.assertIn("licence-typeform", lhtml)
 
         audit = public_docs.document_bytes_for_path("/AUDIT.md")
         assert audit is not None
         ahtml = audit[0].decode("utf-8")
         self.assertIn("Audit", ahtml)
-        self.assertIn("0.3.8", ahtml)
+        self.assertTrue("0.3.8" in ahtml or "0.3.9" in ahtml, "catalog version in audit")
         self.assertIn("doc-table", ahtml)  # tables rendered
+        self.assertIn('id="brand-panel"', ahtml)
 
 
 class TestHowToBuyAndHttp(unittest.TestCase):
