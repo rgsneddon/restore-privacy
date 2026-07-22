@@ -348,16 +348,27 @@ def download_css() -> str:
     }
     .dl-row-3, .dl-row-2 { max-width: 100%; }
     a.dl, button.dl {
-      display: inline-flex; align-items: center; justify-content: center;
-      flex: 1 1 9.5rem; min-width: 8.5rem; max-width: 18rem;
-      padding: 0.95rem 1rem;
+      display: inline-flex; flex-direction: column; align-items: center; justify-content: center;
+      gap: 0.28rem;
+      flex: 0 0 5.65rem; width: 5.65rem; height: 5.65rem;
+      min-width: 5.65rem; max-width: 5.65rem; min-height: 5.65rem; max-height: 5.65rem;
+      padding: 0.4rem 0.3rem;
       background: linear-gradient(180deg, var(--rb-btn) 0%, var(--rb-btn-deep) 100%);
-      color: #fff; text-decoration: none; border-radius: 14px;
-      font-weight: 700; font-size: 0.88rem; box-sizing: border-box;
+      color: #fff; text-decoration: none; border-radius: 12px;
+      font-weight: 700; font-size: 0.68rem; box-sizing: border-box;
       border: 1px solid rgba(255,255,255,0.18); cursor: pointer;
-      font-family: inherit; text-align: center; line-height: 1.3;
-      box-shadow: 0 4px 14px rgba(7, 30, 60, 0.35);
+      font-family: inherit; text-align: center; line-height: 1.15;
+      box-shadow: 0 3px 10px rgba(7, 30, 60, 0.32);
       transition: transform 0.12s ease, box-shadow 0.12s ease, filter 0.12s ease;
+      aspect-ratio: 1 / 1;
+    }
+    a.dl .dl-platform, button.dl .dl-platform {
+      font-size: 0.78rem; font-weight: 800; letter-spacing: 0.02em;
+      line-height: 1.1; color: #fff;
+    }
+    a.dl .dl-buy, button.dl .dl-buy {
+      font-size: 0.62rem; font-weight: 700; opacity: 0.92;
+      letter-spacing: 0.01em;
     }
     a.dl:hover, button.dl:hover {
       filter: brightness(1.08);
@@ -391,7 +402,10 @@ def download_css() -> str:
     .dl-tip { margin-top: 1rem; font-size: 0.86rem; color: var(--rb-muted); width: 100%; }
     .dl-tip a { color: var(--rb-accent); text-decoration: underline; font-weight: 600; }
     @media (max-width: 640px) {
-      a.dl, button.dl { flex: 1 1 100%; max-width: 100%; }
+      a.dl, button.dl {
+        flex: 0 0 5.25rem; width: 5.25rem; height: 5.25rem;
+        min-width: 5.25rem; max-width: 5.25rem;
+      }
     }
 """
 
@@ -437,6 +451,19 @@ def render_catalog_footer_html() -> str:
 render_rust_footer_html = render_catalog_footer_html
 
 
+def platform_face_title(platform: str) -> str:
+    """Short device/platform title for pay-button face (sighted users)."""
+    key = (platform or "").strip().lower()
+    names = {
+        "windows": "Windows",
+        "android": "Android",
+        "macos": "macOS",
+        "ios": "iOS",
+        "linux": "Linux",
+    }
+    return names.get(key, key.title() if key else "Device")
+
+
 def _render_platform_pay_link(
     a: DownloadAsset,
     *,
@@ -445,17 +472,23 @@ def _render_platform_pay_link(
     """One platform control (stable id + data attrs for layout/tests).
 
     When *coming_soon* is true (default via :func:`catalog_buy_buttons_coming_soon`),
-    the control is a **Coming soon** label with a redundant href to
-    :data:`COMING_SOON_PUBLIC_HREF` (https://restoreprivacy.online) — not Stripe.
+    the control is a temporary self-link to :data:`COMING_SOON_PUBLIC_HREF`.
 
-    When *coming_soon* is false, restores the live Stripe Payment Link path
-    (``data-pay-via="stripe-payment-page"``, ``Pay £2.45 - …``).
+    When *coming_soon* is false, live Stripe Payment Link path
+    (``data-pay-via="stripe-payment-page"``).
+
+    Face shows **platform title** + compact ``BUY - {version}`` on a small square tile.
     """
     if coming_soon is None:
         coming_soon = catalog_buy_buttons_coming_soon()
-    # Visible label is intentionally short; platform stays in id / data / aria-label.
-    buy_label = f"BUY - {RELEASE_VERSION}"
-    aria = f"{buy_label} ({a.label})"
+    platform_title = platform_face_title(a.platform)
+    buy_line = f"BUY - {RELEASE_VERSION}"
+    # Stacked face: platform name + buy line (visible, distinct per control)
+    face = (
+        f'<span class="dl-platform">{platform_title}</span>'
+        f'<span class="dl-buy">{buy_line}</span>'
+    )
+    aria = f"{platform_title}: {buy_line} — {a.label}"
     if coming_soon:
         href = COMING_SOON_PUBLIC_HREF
         return (
@@ -464,7 +497,7 @@ def _render_platform_pay_link(
             f'data-platform="{a.platform}" data-filename="{a.filename}" '
             f'data-price-pence="245" data-pay-via="coming-soon" '
             f'data-coming-soon="1" aria-label="{aria}">'
-            f"{buy_label}</a>"
+            f"{face}</a>"
         )
     href = a.pay_path
     return (
@@ -473,7 +506,7 @@ def _render_platform_pay_link(
         f'data-platform="{a.platform}" data-filename="{a.filename}" '
         f'data-price-pence="245" data-pay-via="stripe-payment-page" '
         f'aria-label="{aria}">'
-        f"{buy_label}</a>"
+        f"{face}</a>"
     )
 
 

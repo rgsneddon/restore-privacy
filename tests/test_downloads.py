@@ -92,8 +92,14 @@ class TestDownloadCatalog(unittest.TestCase):
         self.assertIn('id="dl-android"', html)
         self.assertIn("£2.45", html)
         self.assertIn(BMC_TIP_URL, html)
-        # Live default: Stripe Payment Link Pay buttons
+        # Live default: Stripe Payment Link tiles — platform face + version
         self.assertIn("BUY - 0.3.6", html)
+        self.assertIn('class="dl-platform"', html)
+        self.assertIn(">Windows<", html)
+        self.assertIn(">Android<", html)
+        self.assertIn(">macOS<", html)
+        self.assertIn(">iOS<", html)
+        self.assertIn(">Linux<", html)
         self.assertIn("donate.stripe.com", html)
         self.assertIn('data-buy-mode="stripe-live"', html)
         self.assertNotIn("Coming soon", html)
@@ -200,8 +206,10 @@ class TestDownloadCatalog(unittest.TestCase):
         from downloads import download_css
 
         css = download_css()
-        self.assertIn("border-radius: 14px", css)
+        self.assertIn("aspect-ratio: 1 / 1", css)
+        self.assertIn("5.65rem", css)
         self.assertIn("linear-gradient", css)
+        self.assertIn("dl-platform", css)
 
     def test_status_page_html_includes_paid_downloads(self):
         page = status_app.render_html({"title": "RESTORE PRIVACY"}).decode("utf-8")
