@@ -60,29 +60,37 @@ SECRETS / RELEASE GATES (mandatory)
     # Skip pieces: SKIP_DNS=1 SKIP_HOST_PRIVACY=1
     # Then ship ONLY secrets/node_elgamal.pub to clients (never .priv).
 
-  *** Weekly entry wipe/rebuild (exclusive lock; exit failover) ***
+  *** Weekly entry wipe/rebuild (exclusive lock; exit failover; pre-wipe gates) ***
     # Dry-run weekly entry-only plan (safe default) — NEVER wipe exit/both:
     python scripts/weekly_entry_rebuild.py --dry-run --period 7d
     # Generic ephemeral plan still available:
     python scripts/ephemeral_node.py --dry-run --mode snapshot_then_rebuild --period 7d
-    # Periodic systemd timer (default dry-run oneshot, entry-only weekly):
+    # Periodic systemd timer (entry-only weekly; LIVE=1 only after pre-wipe gates OK):
     sudo bash scripts/install_ephemeral_timer.sh          # PERIOD=7d
     # Exclusive lock: node/rebuild_lock.py — second concurrent start fails closed
-    # Exit must be healthy before live entry drain (fail closed otherwise)
+    # Pre-wipe gates (node/wipe_preflight.py) — live path fail-closed unless BOTH:
+    #   exit residual healthy (UDP response and/or ICMP — never send-only "ok")
+    #   entry node healthy (local UDP listen / status surface)
+    # After rebuild: mandatory package reinstall (selfhost_reapply)
     # Clients: entry draining/down → residual exit failover; entry healthy → re-entry
+    #   client/multihop.py select_residual_endpoint / residual_try_order
     # Live destructive rebuild requires explicit confirm (never default):
     #   RPT_EPHEMERAL_CONFIRM=yes python scripts/weekly_entry_rebuild.py --live
     # Optional provider hooks: RPT_SNAPSHOT_CMD=...  RPT_REBUILD_CMD=...
-    # Pure helpers: node/ephemeral_node.py, node/rebuild_lock.py, client/multihop.py
+    # Pure helpers: node/ephemeral_node.py, node/rebuild_lock.py, node/wipe_preflight.py
+    # Public countdown (status homepage Node A/B): status_page/node_wipe_countdown.py
     # Honesty: does not erase provider backups/netflow; re-ship public node pin
     # if keys regenerate; re-applies no-log via selfhost on rebuild step.
 
   Optional privacy features (client/node code; defaults OFF unless noted):
     - DATA padding + send jitter: node/traffic_shape.py (TrafficShapePolicy)
-    - Optional cover traffic dummy frames (same module)
+      (product residual paths default ON — RPT_TRAFFIC_SHAPE=0 to opt out on Python)
+    - Optional cover traffic dummy frames (same module; product defaults ON)
     - PFS session keys: ephemeral X25519 in handshake (on by default for new hellos)
-    - Multi-hop hop *list* only: client/multihop.py (config/path planning; not routed yet;
-      is_multihop_active=False; status says entry-only / not residual multi-hop)
+    - Multi-hop residual-via-exit (IMPLEMENTED): client/multihop.py
+      RPT_MULTIHOP_ENABLED=1 → residual dials exit (Romania 185.146.232.107);
+      MULTI_HOP_ROUTING_IMPLEMENTED=True; default remains single-hop Iceland entry.
+      Not full intermediate encapsulation through entry — residual-via-exit selection.
 
   From a machine with SSH (never commit passwords/keys into git):
 
