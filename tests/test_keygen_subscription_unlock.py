@@ -215,6 +215,62 @@ class TestKeygenMintAndEmail(unittest.TestCase):
         self.assertIn(ent2["status"], ("revoked", "failed"))
 
 
+class TestAdminKeygenFailsafeMint(unittest.TestCase):
+    """Admin failsafe KEYGEN mint drives shipped payments helpers."""
+
+    def setUp(self):
+        self._td = tempfile.TemporaryDirectory()
+        self.data = Path(self._td.name)
+        self.env = mock.patch.dict(
+            os.environ,
+            {"RPT_PAYMENT_DATA_DIR": str(self.data)},
+            clear=False,
+        )
+        self.env.start()
+        import payments as pay
+
+        pay.init_db()
+        self.pay = pay
+
+    def tearDown(self):
+        self.env.stop()
+        self._td.cleanup()
+
+    def test_admin_mint_unique_active_keygen_lookup(self):
+        a = self.pay.admin_mint_keygen_failsafe(platform="windows", note="ticket-1")
+        b = self.pay.admin_mint_keygen_failsafe(platform="linux")
+        self.assertTrue(a.get("admin_keygen_failsafe"))
+        self.assertTrue(b.get("admin_keygen_failsafe"))
+        self.assertTrue(str(a["keygen"]).startswith(self.pay.KEYGEN_PREFIX))
+        self.assertTrue(str(b["keygen"]).startswith(self.pay.KEYGEN_PREFIX))
+        self.assertNotEqual(a["keygen"], b["keygen"])
+        self.assertNotEqual(a["session_id"], b["session_id"])
+        self.assertTrue(str(a["session_id"]).startswith("admin_keygen_"))
+        ent = self.pay.get_connect_entitlement_by_keygen(a["keygen"])
+        self.assertIsNotNone(ent)
+        assert ent is not None
+        self.assertTrue(ent["connect_allowed"])
+        self.assertEqual(ent["status"], self.pay.ENTITLEMENT_ACTIVE)
+        self.assertEqual(ent["keygen"], a["keygen"])
+        self.assertEqual(ent["session_id"], a["session_id"])
+
+    def test_admin_mint_keygen_revoke_blocks_connect(self):
+        out = self.pay.admin_mint_keygen_failsafe()
+        kg = out["keygen"]
+        sid = out["session_id"]
+        ent = self.pay.get_connect_entitlement_by_keygen(kg)
+        self.assertIsNotNone(ent)
+        assert ent is not None
+        self.assertTrue(ent["connect_allowed"])
+        self.pay.revoke_connect_entitlement(
+            sid, reason="operator_revoke", status=self.pay.ENTITLEMENT_REVOKED
+        )
+        ent2 = self.pay.get_connect_entitlement_by_keygen(kg)
+        self.assertIsNotNone(ent2)
+        assert ent2 is not None
+        self.assertFalse(ent2["connect_allowed"])
+
+
 class TestClientKeygenGate(unittest.TestCase):
     def test_licence_then_keygen_then_revoke(self):
         from client.licence_gate import (

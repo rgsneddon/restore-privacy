@@ -2424,6 +2424,68 @@ def admin_mint_download_for_platform(
     }
 
 
+def admin_mint_keygen_failsafe(
+    *,
+    platform: str = "",
+    note: str = "",
+    now: float | None = None,
+) -> dict[str, Any]:
+    """Admin failsafe: mint a fresh active KEYGEN for licence unlock recovery.
+
+    For operators helping customers who still need Connect unlock but lost their
+    emailed keygen. Creates a **new** admin-prefixed entitlement session with a
+    unique ``RPT-KEY-…`` code; does **not** require Stripe checkout or the lost
+    code. Operator-only (HTTP layer enforces auth). Not a public free unlock.
+
+    Returns ``keygen``, ``session_id``, optional ``platform`` / ``note``, and
+    ``admin_keygen_failsafe: True``.
+    """
+    t = now if now is not None else time.time()
+    plat = (platform or "").strip().lower()
+    if plat and not platform_filename(plat):
+        raise ValueError(f"unknown platform: {platform!r}")
+    # Distinct session prefix so failsafe mints are not confused with Stripe sessions
+    session_id = f"admin_keygen_{secrets.token_hex(10)}"
+    note_clean = (note or "").strip()[:200]
+    reason_note = "admin_keygen_failsafe"
+    if note_clean:
+        reason_note = f"admin_keygen_failsafe:{note_clean}"[:200]
+    keygen = activate_connect_entitlement(
+        session_id,
+        platform=plat,
+        payment_intent_id="",
+        subscription_id="",
+        valid_until=None,
+        keygen=None,
+        now=t,
+    )
+    kg = normalize_keygen(keygen)
+    if not kg or not kg.startswith(KEYGEN_PREFIX):
+        raise RuntimeError("admin_mint_keygen_failsafe failed to mint product keygen")
+    # Stamp operator reason (activate uses payment_succeeded; overwrite for audit-ish clarity)
+    conn = _connect()
+    try:
+        conn.execute(
+            "UPDATE connect_entitlements SET reason = ?, updated_at = ? WHERE session_id = ?",
+            (reason_note, t, session_id),
+        )
+    finally:
+        conn.close()
+    ent = get_connect_entitlement_by_keygen(kg, now=t)
+    if not ent or not ent.get("connect_allowed"):
+        raise RuntimeError("admin failsafe keygen not active after mint")
+    return {
+        "keygen": kg,
+        "session_id": session_id,
+        "platform": plat,
+        "note": note_clean,
+        "status": str(ent.get("status") or ENTITLEMENT_ACTIVE),
+        "connect_allowed": True,
+        "admin_keygen_failsafe": True,
+        "unlock_instruction": KEYGEN_UNLOCK_INSTRUCTION,
+    }
+
+
 def seed_test_purchase_enabled() -> bool:
     """True only when operator explicitly opts into local/staging seed tools.
 

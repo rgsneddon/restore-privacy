@@ -1323,6 +1323,54 @@ class Handler(BaseHTTPRequestHandler):
             )
             return
 
+        if path in ("/admin/mint-keygen", "/admin/mint-keygen/"):
+            # Admin failsafe: mint active KEYGEN for lost licence unlock codes
+            if not admin_enabled():
+                self._send(503, "text/plain; charset=utf-8", b"admin disabled")
+                return
+            if not is_authenticated(self.headers):
+                self._send(200, "text/html; charset=utf-8", render_login_html())
+                return
+            from payments import admin_mint_keygen_failsafe
+
+            form = dict(urllib.parse.parse_qsl(body.decode("utf-8", "replace")))
+            plat = (form.get("platform") or "").strip().lower()
+            note = (form.get("note") or "").strip()
+            try:
+                minted = admin_mint_keygen_failsafe(platform=plat, note=note)
+            except ValueError as exc:
+                self._send(
+                    400,
+                    "text/html; charset=utf-8",
+                    render_admin_html(
+                        keygen_error=str(exc),
+                        keygen_note=note,
+                        keygen_platform=plat,
+                    ),
+                )
+                return
+            except RuntimeError as exc:
+                self._send(
+                    500,
+                    "text/html; charset=utf-8",
+                    render_admin_html(
+                        keygen_error=str(exc),
+                        keygen_note=note,
+                        keygen_platform=plat,
+                    ),
+                )
+                return
+            self._send(
+                200,
+                "text/html; charset=utf-8",
+                render_admin_html(
+                    keygen_result=minted,
+                    keygen_note=note,
+                    keygen_platform=str(minted.get("platform") or plat),
+                ),
+            )
+            return
+
         if path in ("/admin/seed-test-purchase", "/admin/seed-test-purchase/"):
             if not admin_enabled():
                 self._send(503, "text/plain; charset=utf-8", b"admin disabled")

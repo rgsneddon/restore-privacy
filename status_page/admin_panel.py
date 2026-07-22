@@ -656,6 +656,80 @@ def render_admin_ondemand_mint_section_html(
 """
 
 
+def render_admin_keygen_failsafe_section_html(
+    *,
+    result: dict[str, Any] | None = None,
+    error: str = "",
+    note: str = "",
+    platform: str = "",
+) -> str:
+    """Admin failsafe: mint a fresh KEYGEN for lost licence unlock codes.
+
+    Always shown on authenticated admin page. Operator-only; not a public free unlock.
+    """
+    err = (
+        f'<p class="err" id="keygen-failsafe-error">{_escape(error)}</p>' if error else ""
+    )
+    ok = ""
+    if result and result.get("keygen"):
+        kg = _escape(str(result["keygen"]))
+        sid = _escape(str(result.get("session_id") or ""))
+        plat = _escape(str(result.get("platform") or "") or "—")
+        instr = _escape(str(result.get("unlock_instruction") or "USE THIS KEYGEN TO UNLOCK"))
+        ok = f"""
+  <div class="ok-msg" id="keygen-failsafe-result" role="status">
+    <p><strong>Admin failsafe KEYGEN minted</strong> (active Connect unlock).</p>
+    <p id="keygen-failsafe-instruction">{instr}</p>
+    <p>Keygen: <code id="admin-minted-keygen">{kg}</code></p>
+    <p class="muted">Session: <code id="keygen-failsafe-session">{sid}</code>
+      — platform: <strong id="keygen-failsafe-platform">{plat}</strong>
+      — give the customer this code only; not a free public unlock.</p>
+  </div>"""
+    note_val = _escape(note or "")
+    plat_sel = (platform or "").strip().lower()
+    options = ['<option value=""' + (" selected" if not plat_sel else "") + ">(optional) any</option>"]
+    labels = {
+        "windows": "Windows",
+        "linux": "Linux",
+        "macos": "macOS",
+        "ios": "iOS",
+        "android": "Android",
+    }
+    for p in _ADMIN_CATALOG_PLATFORMS:
+        sel = " selected" if p == plat_sel else ""
+        lab = labels.get(p, p)
+        options.append(f'<option value="{p}"{sel}>{_escape(lab)}</option>')
+    opts = "\n      ".join(options)
+    return f"""
+<section id="admin-keygen-failsafe" class="card" aria-labelledby="admin-keygen-failsafe-heading"
+         data-admin-keygen-failsafe="1">
+  <h2 id="admin-keygen-failsafe-heading">Generate KEYGEN (admin failsafe)</h2>
+  <p class="muted" id="admin-keygen-failsafe-note">
+    Mint a <strong>new active licence unlock keygen</strong> for a customer who can
+    still be validated manually but <strong>lost their emailed KEYGEN</strong>.
+    Creates an operator-only entitlement (not Stripe checkout, not free GitHub).
+    Revoke later if the recovery was wrong.
+  </p>
+  {err}
+  {ok}
+  <form method="post" action="/admin/mint-keygen" id="admin-keygen-failsafe-form">
+    <label class="field" for="keygen_failsafe_platform">
+      <span class="field-label">Platform (optional)</span>
+      <select id="keygen_failsafe_platform" name="platform">
+      {opts}
+      </select>
+    </label>
+    <label class="field" for="keygen_failsafe_note">
+      <span class="field-label">Operator note (optional)</span>
+      <input id="keygen_failsafe_note" name="note" type="text" maxlength="200"
+             placeholder="e.g. ticket #123 lost email" value="{note_val}"/>
+    </label>
+    <button type="submit" id="admin-keygen-failsafe-submit">Generate KEYGEN</button>
+  </form>
+</section>
+"""
+
+
 def render_seed_test_purchase_section_html(
     *,
     result: dict[str, Any] | None = None,
@@ -1034,6 +1108,10 @@ def render_admin_html(
     ondemand_result: dict[str, Any] | None = None,
     ondemand_error: str = "",
     ondemand_platform: str = "windows",
+    keygen_result: dict[str, Any] | None = None,
+    keygen_error: str = "",
+    keygen_note: str = "",
+    keygen_platform: str = "",
     seed_result: dict[str, Any] | None = None,
     seed_error: str = "",
     seed_platform: str = "windows",
@@ -1072,6 +1150,12 @@ def render_admin_html(
         result=ondemand_result,
         error=ondemand_error,
         platform=ondemand_platform,
+    )
+    keygen_html = render_admin_keygen_failsafe_section_html(
+        result=keygen_result,
+        error=keygen_error,
+        note=keygen_note,
+        platform=keygen_platform,
     )
     seed_html = render_seed_test_purchase_section_html(
         result=seed_result,
@@ -1118,11 +1202,11 @@ code{{font-size:0.85rem;word-break:break-all}}
 border-radius:8px;border:1px solid var(--input-border);background:var(--input-bg);color:var(--fg)}}
 .processor-form button{{margin-top:0.75rem;padding:0.55rem 1rem;border:0;border-radius:8px;
 background:var(--btn-bg);color:var(--btn-fg);font-weight:600;cursor:pointer}}
-#admin-reissue-form label.field,#admin-seed-purchase-form label.field,#admin-ondemand-mint-form label.field{{display:block;margin:0.65rem 0}}
-#admin-reissue-form .field-label,#admin-seed-purchase-form .field-label,#admin-ondemand-mint-form .field-label{{display:block;font-weight:600;font-size:0.9rem;margin-bottom:0.25rem}}
-#admin-reissue-form input,#admin-seed-purchase-form select,#admin-ondemand-mint-form select{{width:100%;max-width:28rem;box-sizing:border-box;padding:0.5rem 0.6rem;
+#admin-reissue-form label.field,#admin-seed-purchase-form label.field,#admin-ondemand-mint-form label.field,#admin-keygen-failsafe-form label.field{{display:block;margin:0.65rem 0}}
+#admin-reissue-form .field-label,#admin-seed-purchase-form .field-label,#admin-ondemand-mint-form .field-label,#admin-keygen-failsafe-form .field-label{{display:block;font-weight:600;font-size:0.9rem;margin-bottom:0.25rem}}
+#admin-reissue-form input,#admin-seed-purchase-form select,#admin-ondemand-mint-form select,#admin-keygen-failsafe-form select,#admin-keygen-failsafe-form input{{width:100%;max-width:28rem;box-sizing:border-box;padding:0.5rem 0.6rem;
 border-radius:8px;border:1px solid var(--input-border);background:var(--input-bg);color:var(--fg)}}
-#admin-reissue-form button,#admin-seed-purchase-form button,#admin-ondemand-mint-form button{{margin-top:0.75rem;padding:0.55rem 1rem;border:0;border-radius:8px;
+#admin-reissue-form button,#admin-seed-purchase-form button,#admin-ondemand-mint-form button,#admin-keygen-failsafe-form button{{margin-top:0.75rem;padding:0.55rem 1rem;border:0;border-radius:8px;
 background:var(--btn-bg);color:var(--btn-fg);font-weight:600;cursor:pointer}}
 .ok-msg{{color:var(--badge-ok-fg);background:var(--badge-ok-bg);padding:0.5rem 0.75rem;border-radius:8px}}
 .err{{color:var(--err)}}
@@ -1140,12 +1224,14 @@ background:var(--btn-bg);color:var(--btn-fg);font-weight:600;cursor:pointer}}
 <nav class="nav-local" id="admin-nav" aria-label="Admin sections">
   <a href="#admin-reissue">Re-issue by RPT-PPI</a>
   <a href="#admin-ondemand-mint">Generate download (failsafe)</a>
+  <a href="#admin-keygen-failsafe">Generate KEYGEN (failsafe)</a>
   {('<a href="#admin-seed-purchase">Seed test purchase</a>' if seed_test_purchase_enabled() else '')}
   <a href="#admin-processor-settings">Processor settings</a>
   <a href="#admin-grants">Paid download grants</a>
 </nav>
 {reissue_html}
 {ondemand_html}
+{keygen_html}
 {seed_html}
 {settings_html}
 <section id="admin-grants" class="card">

@@ -273,6 +273,110 @@ class TestAdminOndemandMint(unittest.TestCase):
         self.assertIn("/download?token=", out)
         self.assertNotIn("releases/download/", out)
 
+    def test_admin_html_has_keygen_failsafe_control(self):
+        from admin_panel import render_admin_html
+
+        page = render_admin_html().decode("utf-8")
+        self.assertIn('id="admin-keygen-failsafe"', page)
+        self.assertIn('id="admin-keygen-failsafe-form"', page)
+        self.assertIn('id="admin-keygen-failsafe-submit"', page)
+        self.assertIn('id="admin-keygen-failsafe-heading"', page)
+        self.assertIn("/admin/mint-keygen", page)
+        self.assertIn("Generate KEYGEN", page)
+        self.assertIn('data-admin-keygen-failsafe="1"', page)
+        # Result display hooks present after mint path (empty until POST)
+        self.assertIn("admin-keygen-failsafe", page)
+
+    def test_keygen_failsafe_post_requires_auth(self):
+        import io
+        import app as status_app
+
+        body = b"platform=windows&note=lost"
+
+        class FakeHandler(status_app.Handler):
+            def __init__(self):
+                self.headers = {"Content-Length": str(len(body))}
+                self.rfile = io.BytesIO(body)
+                self.wfile = io.BytesIO()
+                self.path = "/admin/mint-keygen"
+                self.command = "POST"
+                self.request_version = "HTTP/1.1"
+                self.client_address = ("127.0.0.1", 0)
+                self._code = None
+
+            def send_response(self, code, message=None):
+                self._code = code
+
+            def send_header(self, *a):
+                return
+
+            def end_headers(self):
+                return
+
+            def log_message(self, *a):
+                return
+
+        with mock.patch.object(status_app, "admin_enabled", return_value=True):
+            with mock.patch.object(status_app, "is_authenticated", return_value=False):
+                h = FakeHandler()
+                h.do_POST()
+        out = h.wfile.getvalue().decode("utf-8", errors="replace")
+        self.assertIn("admin-login-form", out)
+        self.assertNotIn("admin-minted-keygen", out)
+
+    def test_keygen_failsafe_post_mints_when_authenticated(self):
+        import io
+        import app as status_app
+
+        body = b"platform=android&note=lost-email"
+        # Ensure payment DB is isolated
+        os.environ["RPT_PAYMENT_DATA_DIR"] = self._td.name
+        self.pay.init_db()
+
+        class FakeHandler(status_app.Handler):
+            def __init__(self):
+                self.headers = {"Content-Length": str(len(body))}
+                self.rfile = io.BytesIO(body)
+                self.wfile = io.BytesIO()
+                self.path = "/admin/mint-keygen"
+                self.command = "POST"
+                self.request_version = "HTTP/1.1"
+                self.client_address = ("127.0.0.1", 0)
+                self._code = None
+
+            def send_response(self, code, message=None):
+                self._code = code
+
+            def send_header(self, *a):
+                return
+
+            def end_headers(self):
+                return
+
+            def log_message(self, *a):
+                return
+
+        with mock.patch.object(status_app, "admin_enabled", return_value=True):
+            with mock.patch.object(status_app, "is_authenticated", return_value=True):
+                h = FakeHandler()
+                h.do_POST()
+        out = h.wfile.getvalue().decode("utf-8", errors="replace")
+        self.assertEqual(h._code, 200)
+        self.assertIn("admin-minted-keygen", out)
+        self.assertIn("RPT-KEY-", out)
+        self.assertIn("keygen-failsafe-result", out)
+        # Minted code must resolve via shipped lookup
+        import re
+
+        m = re.search(r'id="admin-minted-keygen">([^<]+)<', out)
+        self.assertIsNotNone(m)
+        assert m is not None
+        kg = m.group(1).strip()
+        ent = self.pay.get_connect_entitlement_by_keygen(kg)
+        self.assertIsNotNone(ent)
+        assert ent is not None
+        self.assertTrue(ent["connect_allowed"])
+
 
 class TestSeedTestPurchase(unittest.TestCase):
     def setUp(self):
