@@ -97,14 +97,19 @@ class _SettingsScreenState extends State<SettingsScreen> {
     final licOk = await gate?.hasAcceptedLicence() ?? false;
     final payOk = await gate?.paymentAllowsConnect() ?? false;
     final st = await gate?.paymentStatus() ?? kPaymentStatusUnknown;
+    final kg = await gate?.paymentKeygen() ?? '';
     final sid = await gate?.paymentSessionId() ?? '';
     if (!mounted) return;
     setState(() {
       _licenceAccepted = licOk;
       _paymentOk = payOk;
       _paymentStatus = st;
-      if (sid.isNotEmpty && _sessionCtrl.text.isEmpty) {
-        _sessionCtrl.text = sid;
+      if (_sessionCtrl.text.isEmpty) {
+        if (kg.isNotEmpty) {
+          _sessionCtrl.text = kg;
+        } else if (sid.isNotEmpty) {
+          _sessionCtrl.text = sid;
+        }
       }
     });
   }
@@ -121,7 +126,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     setState(() {
       _licenceAccepted = true;
       _note =
-          'Licence accepted (stored locally only). Paste payment session id below if Connect is still blocked.';
+          'Licence accepted (stored locally only). Enter your keygen below to unlock Connect.';
     });
   }
 
@@ -131,24 +136,31 @@ class _SettingsScreenState extends State<SettingsScreen> {
       setState(() => _note = 'Payment store unavailable on this build.');
       return;
     }
-    final sid = _sessionCtrl.text.trim();
+    final raw = _sessionCtrl.text.trim();
     setState(() {
       _busy = true;
       _note = 'Verifying payment entitlement…';
     });
     try {
       final String st;
-      if (sid.isNotEmpty) {
-        st = await gate.importSessionAndVerify(sid);
+      final upper = raw.toUpperCase();
+      if (upper.startsWith('RPT-KEY') || upper.startsWith('RPTKEY')) {
+        st = await gate.importKeygenAndVerify(raw);
+      } else if (raw.startsWith('cs_') || raw.startsWith('cs_test')) {
+        st = await gate.importSessionAndVerify(raw);
+      } else if (raw.isNotEmpty) {
+        st = await gate.importKeygenAndVerify(raw);
       } else {
-        // Recheck existing session (if any) without forcing a paste
+        // Recheck existing keygen/session without forcing a paste
+        final existingKg = await gate.paymentKeygen();
         final existing = await gate.paymentSessionId();
-        if (existing.isEmpty) {
+        if (existingKg.isEmpty && existing.isEmpty) {
           if (mounted) {
             setState(() {
               _note =
-                  'Enter the Checkout session id (cs_…) from the thank-you page, '
-                  'or complete pay on restoreprivacy.online first.';
+                  'Enter the keygen from your fulfilment email '
+                  '($kKeygenUnlockInstruction), or complete pay on '
+                  'restoreprivacy.online first.';
               _busy = false;
             });
           }
@@ -157,17 +169,22 @@ class _SettingsScreenState extends State<SettingsScreen> {
         st = await gate.refreshEntitlementFromRemote();
       }
       final ok = await gate.paymentAllowsConnect();
+      final kg2 = await gate.paymentKeygen();
       final sid2 = await gate.paymentSessionId();
       if (!mounted) return;
       setState(() {
         _paymentOk = ok;
         _paymentStatus = st;
-        if (sid2.isNotEmpty && _sessionCtrl.text.trim().isEmpty) {
-          _sessionCtrl.text = sid2;
+        if (_sessionCtrl.text.trim().isEmpty) {
+          if (kg2.isNotEmpty) {
+            _sessionCtrl.text = kg2;
+          } else if (sid2.isNotEmpty) {
+            _sessionCtrl.text = sid2;
+          }
         }
         _note = ok
             ? 'Payment active — Connect allowed (status=$st). Press Connect on the home screen.'
-            : 'Payment not active (status=$st). Connect stays blocked until successful payment.';
+            : 'Payment not active (status=$st). Connect stays blocked until active subscription.';
       });
       widget.onLicenceChanged?.call(await gate.hasAcceptedLicence());
     } catch (e) {
@@ -396,7 +413,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
           ),
           const SizedBox(height: 20),
           Text(
-            'Payment entitlement',
+            'Payment entitlement / keygen',
             style: TextStyle(
               color: kPrimaryDark,
               fontSize: 14,
@@ -409,17 +426,22 @@ class _SettingsScreenState extends State<SettingsScreen> {
             style: TextStyle(fontSize: 12, color: kTextMuted),
           ),
           const SizedBox(height: 6),
+          const Text(
+            kKeygenUnlockInstruction,
+            style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: kText),
+          ),
+          const SizedBox(height: 6),
           Text(
             _paymentOk
                 ? 'Payment status: $_paymentStatus — Connect allowed for payment.'
-                : 'Payment status: $_paymentStatus — Connect blocked until successful payment is verified.',
+                : 'Payment status: $_paymentStatus — Connect blocked until keygen unlocks an active subscription.',
             style: const TextStyle(fontSize: 12, color: kText),
           ),
           const SizedBox(height: 8),
           TextField(
             controller: _sessionCtrl,
             decoration: const InputDecoration(
-              labelText: 'Checkout session id (cs_…)',
+              labelText: 'Keygen (RPT-KEY-…) from fulfilment email',
               border: OutlineInputBorder(),
               isDense: true,
             ),
@@ -432,7 +454,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
             child: FilledButton(
               onPressed: _busy ? null : _verifyPayment,
               style: FilledButton.styleFrom(backgroundColor: kPrimary),
-              child: const Text('Verify payment / unlock Connect'),
+              child: const Text('Verify keygen / unlock Connect'),
             ),
           ),
           const SizedBox(height: 12),

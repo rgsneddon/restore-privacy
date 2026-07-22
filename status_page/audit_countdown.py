@@ -259,17 +259,30 @@ def current_audit_rag_colour(
     }
 
 
+def format_last_audit_run_display(iso_z: str | None) -> str:
+    """Human-readable last audit run for public UI (UTC)."""
+    if not iso_z:
+        return "not available"
+    dt = parse_audit_generated_at(str(iso_z))
+    if dt is None:
+        return str(iso_z)
+    # e.g. 2026-07-22 12:45:00 UTC
+    return dt.astimezone(timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC")
+
+
 def render_audit_countdown_html(
     *,
     now: datetime | None = None,
     json_path: Path | None = None,
 ) -> str:
-    """HTML fragment: label + countdown + honest blurb (1s ``setInterval``)."""
+    """HTML fragment: label + countdown + honest blurb + last audit run."""
     state = countdown_state(now=now, json_path=json_path)
     label = html.escape(str(state["label"]))
     blurb = html.escape(str(state.get("blurb") or TIME_TIL_NEXT_AUDIT_BLURB))
     display = html.escape(str(state["display"]))
     next_iso = html.escape(str(state.get("next_audit_at") or ""))
+    last_raw = state.get("last_generated_at")
+    last_disp = html.escape(format_last_audit_run_display(last_raw if isinstance(last_raw, str) else None))
     available = "1" if state["available"] else "0"
     # data-next-audit is ISO Z used by client JS; empty when unavailable
     return f"""  <div class="audit-countdown" id="audit-countdown" data-available="{available}" data-next-audit="{next_iso}" data-period-seconds="{state['period_seconds']}">
@@ -278,6 +291,7 @@ def render_audit_countdown_html(
       <span class="audit-countdown-value" id="audit-countdown-value" aria-live="polite">{display}</span>
     </div>
     <p class="audit-countdown-blurb" id="audit-countdown-blurb">{blurb}</p>
+    <p class="audit-last-run" id="audit-last-run">last audit run: <time id="audit-last-run-time" datetime="{html.escape(str(last_raw or ''))}">{last_disp}</time></p>
   </div>
   <script>
   (function () {{

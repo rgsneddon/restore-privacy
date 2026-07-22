@@ -126,6 +126,42 @@ class TestPrewipeGates(unittest.TestCase):
         self.assertFalse(r.ok)
         self.assertEqual(r.name, "entry_node")
 
+    def test_plan_requires_selfhost_and_order(self):
+        from node.wipe_preflight import (
+            package_reinstall_required_for_live_wipe,
+            plan_has_required_live_steps,
+        )
+
+        self.assertTrue(package_reinstall_required_for_live_wipe())
+        good = [
+            "exclusive_lock_acquire",
+            "exit_failover_preflight",
+            "entry_node_preflight",
+            "rebuild_host",
+            "selfhost_reapply",
+            "health_check",
+            "exclusive_lock_release",
+        ]
+        ok, missing = plan_has_required_live_steps(good)
+        self.assertTrue(ok, missing)
+        no_sh = [x for x in good if x != "selfhost_reapply"]
+        ok2, miss2 = plan_has_required_live_steps(no_sh)
+        self.assertFalse(ok2)
+        self.assertIn("selfhost_reapply", miss2)
+        # selfhost before rebuild is invalid
+        bad_order = [
+            "exit_failover_preflight",
+            "entry_node_preflight",
+            "exclusive_lock_acquire",
+            "selfhost_reapply",
+            "rebuild_host",
+            "health_check",
+            "exclusive_lock_release",
+        ]
+        ok3, miss3 = plan_has_required_live_steps(bad_order)
+        self.assertFalse(ok3)
+        self.assertTrue(any("selfhost" in m for m in miss3))
+
 
 class TestPlanStructuralGates(unittest.TestCase):
     def test_healthy_weekly_plan_has_preflight_and_reinstall(self):

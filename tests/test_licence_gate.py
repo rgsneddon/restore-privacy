@@ -120,9 +120,10 @@ class TestLicenceGateUiWiring(unittest.TestCase):
         self.assertIn("may_connect", src)
         # Autoconnect path must not bypass
         self.assertIn("assert_may_connect", src)
-        # Payment entitlement import path (post-pay unlock)
+        # Payment entitlement / keygen import path (post-pay unlock)
         self.assertIn("import_session_and_verify", src)
         self.assertIn("Payment entitlement", src)
+        self.assertIn("keygen", src.lower())
 
     def test_flutter_connect_gated(self):
         main = (ROOT / "client_app" / "lib" / "main.dart").read_text(encoding="utf-8")
@@ -138,8 +139,9 @@ class TestLicenceGateUiWiring(unittest.TestCase):
         self.assertIn("kLicenceAcceptButton", main + screen)
         self.assertIn("Accept licence", gate)
         self.assertIn("importSessionAndVerify", gate + screen)
+        self.assertIn("importKeygenAndVerify", gate + screen)
         self.assertIn("refreshEntitlementFromRemote", gate)
-        self.assertIn("Verify payment", screen)
+        self.assertIn("Verify keygen", screen)
 
     def test_linux_connect_gated(self):
         src = (ROOT / "client" / "linux" / "app.py").read_text(encoding="utf-8")
@@ -150,6 +152,7 @@ class TestLicenceGateUiWiring(unittest.TestCase):
         self.assertIn("_open_settings", src)
         self.assertIn("import_session_and_verify", src)
         self.assertIn("Payment entitlement", src)
+        self.assertIn("keygen", src.lower())
         self.assertIn("autoconnect_on_launch", src)
         self.assertIn("LEGAL_DOC_LINKS", src)
         self.assertIn("should_autoconnect_on_launch", src)

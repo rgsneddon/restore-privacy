@@ -50,7 +50,16 @@ HONESTY_FAILOVER = (
 
 # Weekly timed service: entry wipe only (never exit/both)
 WEEKLY_ENTRY_ROLE = "entry"
+EXIT_ROLE = "exit"
 FORBIDDEN_WEEKLY_ROLES = frozenset({"exit", "both", "all"})
+
+# Shared product reinstall surface (scripts/selfhost_node.sh pipeline)
+SELFHOST_SCRIPT = "scripts/selfhost_node.sh"
+# Force full product surface after wipe (never skip DNS / host privacy on weekly path)
+SELFHOST_FULL_CMD = (
+    "sudo env SKIP_DNS=0 SKIP_HOST_PRIVACY=0 SKIP_DISK_ENCRYPTION=1 "
+    "bash scripts/selfhost_node.sh"
+)
 
 _INTERVAL_RE = re.compile(
     r"^\s*(\d+)\s*([smhdw]|sec|secs|second|seconds|min|mins|minute|minutes|"
@@ -280,13 +289,14 @@ def build_ephemeral_plan(
         steps.append(
             PlanStep(
                 id="selfhost_reapply",
-                action="Re-apply product self-host (no-log)",
+                action="Re-apply product self-host (no-log) — full reinstall",
                 detail=(
-                    "sudo bash scripts/selfhost_node.sh — install.sh + DNS + "
-                    "host-privacy + optional FDE check/wipe wiring."
+                    "Mandatory full reinstall: install.sh + tunnel DNS + "
+                    "host-privacy via selfhost (SKIP_DNS=0 SKIP_HOST_PRIVACY=0). "
+                    "Bare wiped host is not acceptable."
                 ),
                 destructive=False,
-                command="sudo bash scripts/selfhost_node.sh",
+                command=SELFHOST_FULL_CMD,
             )
         )
         if rotate_keys:
@@ -358,6 +368,358 @@ def assert_weekly_entry_role_only(role: str) -> tuple[bool, str]:
             f"weekly wipe role must be {WEEKLY_ENTRY_ROLE!r} (got {role!r})",
         )
     return True, ""
+
+
+@dataclass(frozen=True)
+class RoleReinstallRequirement:
+    """One mandatory reinstall/check item for a node role after wipe/rebuild."""
+
+    id: str
+    description: str
+    command: str = ""
+    roles: tuple[str, ...] = ("entry", "exit")
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "id": self.id,
+            "description": self.description,
+            "command": self.command,
+            "roles": list(self.roles),
+        }
+
+
+def _shared_reinstall_requirements() -> list[RoleReinstallRequirement]:
+    """Core product surface both entry and exit must restore after rebuild."""
+    return [
+        RoleReinstallRequirement(
+            id="core_node_install",
+            description=(
+                "Core node install: keys/venv/systemd/no-log via node/install.sh "
+                "(through selfhost_node.sh)"
+            ),
+            command="bash node/install.sh",
+            roles=("entry", "exit"),
+        ),
+        RoleReinstallRequirement(
+            id="tunnel_dns",
+            description=(
+                "Tunnel-only DNS (Unbound 10.88.0.1) via node/install_dns.sh — "
+                "product residual DNS; do not skip on weekly entry path"
+            ),
+            command="bash node/install_dns.sh",
+            roles=("entry", "exit"),
+        ),
+        RoleReinstallRequirement(
+            id="host_privacy",
+            description=(
+                "Host privacy hardening via node/install_host_privacy.sh "
+                "(journal/banners as shipped)"
+            ),
+            command="bash node/install_host_privacy.sh",
+            roles=("entry", "exit"),
+        ),
+        RoleReinstallRequirement(
+            id="selfhost_full",
+            description=(
+                f"Mandatory full self-host: {SELFHOST_SCRIPT} with DNS + host privacy "
+                f"(SKIP_DNS=0 SKIP_HOST_PRIVACY=0)"
+            ),
+            command=SELFHOST_FULL_CMD,
+            roles=("entry", "exit"),
+        ),
+        RoleReinstallRequirement(
+            id="udp_listen_health",
+            description="UDP residual listen on product port 44044 after reinstall",
+            command="ss -ulnp | grep 44044",
+            roles=("entry", "exit"),
+        ),
+        RoleReinstallRequirement(
+            id="status_surface_health",
+            description="Local status UI title-only surface after reinstall",
+            command="curl -s http://127.0.0.1:8080/api/status || true",
+            roles=("entry", "exit"),
+        ),
+    ]
+
+
+def entry_reinstall_requirements() -> list[RoleReinstallRequirement]:
+    """Mandatory reinstall surface for the **entry** (Iceland product) node."""
+    shared = _shared_reinstall_requirements()
+    entry_only = [
+        RoleReinstallRequirement(
+            id="entry_product_pin",
+            description=(
+                "Entry long-term ElGamal **public** pin product/node_elgamal.pub "
+                "(never ship priv); clients pin entry by default"
+            ),
+            command=(
+                "test -f secrets/node_elgamal.pub || "
+                "test -f product/node_elgamal.pub"
+            ),
+            roles=("entry",),
+        ),
+        RoleReinstallRequirement(
+            id="entry_weekly_failover_gates",
+            description=(
+                "Weekly wipe only: exit residual preflight + entry pre-wipe health "
+                "fail closed before drain (clients failover to exit)"
+            ),
+            command=(
+                "python3 -c \"from node.wipe_preflight import run_live_prewipe_gates; "
+                "g=run_live_prewipe_gates(); assert g.allow_wipe\""
+            ),
+            roles=("entry",),
+        ),
+        RoleReinstallRequirement(
+            id="entry_exclusive_rebuild_lock",
+            description=(
+                "Exclusive rebuild lock role=entry only — refuse concurrent wipe; "
+                "never wipe exit from weekly timer"
+            ),
+            command=(
+                "python3 -c \"from node.rebuild_lock import acquire_rebuild_lock; "
+                "ok,m,_=acquire_rebuild_lock('entry'); assert ok, m\""
+            ),
+            roles=("entry",),
+        ),
+        RoleReinstallRequirement(
+            id="entry_client_reentry_preference",
+            description=(
+                "After entry healthy: clients prefer re-entry residual "
+                "(multihop select_residual_endpoint); exit remains failover hop"
+            ),
+            command="# product client multihop re-entry preference (automatic)",
+            roles=("entry",),
+        ),
+    ]
+    return shared + entry_only
+
+
+def exit_reinstall_requirements() -> list[RoleReinstallRequirement]:
+    """Mandatory reinstall surface for the **exit** (Romania hop) node.
+
+    Exit is **not** on the weekly timed wipe service. Operator/manual rebuild
+    still needs full product reinstall plus exit-only key/firewall posture.
+    """
+    shared = _shared_reinstall_requirements()
+    exit_only = [
+        RoleReinstallRequirement(
+            id="exit_only_elgamal_keys",
+            description=(
+                "Exit uses **distinct** exit ElGamal key material "
+                "(product/exit_node_elgamal.pub) — not the entry product pin"
+            ),
+            command=(
+                "test -f secrets/node_elgamal.pub; "
+                "# pub must differ from product entry pin"
+            ),
+            roles=("exit",),
+        ),
+        RoleReinstallRequirement(
+            id="exit_udp_firewall_44044",
+            description=(
+                "Host/provider allow UDP 44044 for residual exit path "
+                "(ufw allow 44044/udp when ufw enabled; FlokiNET panel open)"
+            ),
+            command="ufw status || true; # confirm 44044/udp allowed when ufw on",
+            roles=("exit",),
+        ),
+        RoleReinstallRequirement(
+            id="exit_no_weekly_timer",
+            description=(
+                "Do **not** install weekly entry wipe timer on exit; "
+                "exit stays up for failover during entry drain"
+            ),
+            command=(
+                "# refuse: systemctl enable rpt-ephemeral-rebuild.timer on exit host"
+            ),
+            roles=("exit",),
+        ),
+        RoleReinstallRequirement(
+            id="exit_hop_identity",
+            description=(
+                "Exit host monopin Romania PRODUCT_EXIT_HOST (≠ entry Iceland); "
+                "see scripts/MULTIHOP_EXIT_HOP_PREP.md"
+            ),
+            command="# RPT_NODE_HOST / hop env must be exit IP not entry",
+            roles=("exit",),
+        ),
+    ]
+    return shared + exit_only
+
+
+def reinstall_requirements_for_role(role: str) -> list[RoleReinstallRequirement]:
+    """Return pure reinstall requirement list for *role* (entry|exit)."""
+    r = (role or "").strip().lower()
+    if r == WEEKLY_ENTRY_ROLE or r == "entry":
+        return entry_reinstall_requirements()
+    if r == EXIT_ROLE or r == "exit":
+        return exit_reinstall_requirements()
+    raise ValueError(f"unknown reinstall role {role!r} (entry|exit)")
+
+
+def role_reinstall_requirement_ids(role: str) -> list[str]:
+    return [req.id for req in reinstall_requirements_for_role(role)]
+
+
+def assert_role_reinstall_lists_differ() -> tuple[bool, str]:
+    """Structural honesty: entry and exit reinstall lists are not identical."""
+    e = set(role_reinstall_requirement_ids("entry"))
+    x = set(role_reinstall_requirement_ids("exit"))
+    if e == x:
+        return False, "entry and exit reinstall requirement ids are identical"
+    if not (e - x):
+        return False, "entry has no unique reinstall requirements"
+    if not (x - e):
+        return False, "exit has no unique reinstall requirements"
+    shared = e & x
+    for need in (
+        "core_node_install",
+        "tunnel_dns",
+        "host_privacy",
+        "selfhost_full",
+    ):
+        if need not in shared:
+            return False, f"shared requirement missing: {need}"
+    return True, f"entry_unique={sorted(e - x)} exit_unique={sorted(x - e)}"
+
+
+def plan_embeds_mandatory_reinstall(step_ids: Sequence[str]) -> bool:
+    """True when plan step ids include mandatory package/selfhost reinstall."""
+    ids = set(step_ids or [])
+    return "selfhost_reapply" in ids or "selfhost_full" in ids
+
+
+def build_exit_manual_reinstall_plan(
+    *,
+    install_root: str = DEFAULT_INSTALL_ROOT,
+    dry_run: bool = True,
+    rotate_keys: bool = False,
+) -> EphemeralPlan:
+    """Manual/operator exit-node reinstall plan (not weekly timed).
+
+    Distinct from :func:`build_weekly_entry_rebuild_plan`: no entry exclusive
+    weekly lock, no exit-failover preflight (this host *is* the exit), includes
+    exit-only key/firewall requirements, and must not schedule weekly entry wipe.
+    """
+    root = (install_root or DEFAULT_INSTALL_ROOT).rstrip("/") or DEFAULT_INSTALL_ROOT
+    steps: list[PlanStep] = [
+        PlanStep(
+            id="role_guard",
+            action="Exit role reinstall (manual — not weekly entry timer)",
+            detail=(
+                "Exit hop rebuild is **operator/manual**. Weekly timed wipe must "
+                "never target exit so entry can failover during its own drain."
+            ),
+            command="# role=exit manual reinstall only",
+        ),
+        PlanStep(
+            id="exit_requirements_preflight",
+            action="Exit-only reinstall requirements checklist",
+            detail="; ".join(
+                f"{r.id}: {r.description}" for r in exit_reinstall_requirements()
+            ),
+            command="# see node.ephemeral_node.exit_reinstall_requirements()",
+        ),
+        PlanStep(
+            id="stop_runtime",
+            action="Stop exit node + best-effort runtime wipe",
+            detail="systemctl stop rpt-node; runtime wipe only (not provider snapshot).",
+            command=(
+                "systemctl stop rpt-node 2>/dev/null || true; "
+                f"INSTALL_ROOT={root} bash {root}/node/rpt_shutdown_wipe.sh "
+                f"2>/dev/null || true"
+            ),
+        ),
+        PlanStep(
+            id="rebuild_host",
+            action="Rebuild / reimage exit host (operator)",
+            detail=(
+                "Provider reimage or wipe install tree. Destructive live needs "
+                "RPT_EPHEMERAL_CONFIRM=yes. Exit keys should remain exit-only."
+            ),
+            destructive=True,
+            command=(
+                "# provider reimage OR keep OS and reinstall software "
+                "(set RPT_REBUILD_CMD for live hook)"
+            ),
+        ),
+        PlanStep(
+            id="selfhost_reapply",
+            action="Package reinstall / full product self-host on exit",
+            detail=(
+                "Mandatory: install.sh + DNS + host-privacy via selfhost "
+                "(SKIP_DNS=0 SKIP_HOST_PRIVACY=0). Bare wiped host is not acceptable."
+            ),
+            command=SELFHOST_FULL_CMD,
+        ),
+        PlanStep(
+            id="exit_key_and_firewall",
+            action="Confirm exit ElGamal + UDP 44044 posture",
+            detail=(
+                "Exit pub must differ from entry product pin; ensure 44044/udp "
+                "allowed (host ufw + FlokiNET panel)."
+            ),
+            command=(
+                "test -f secrets/node_elgamal.pub; "
+                "ss -ulnp | grep 44044 || true"
+            ),
+        ),
+        PlanStep(
+            id="health_check",
+            action="Health check after exit reinstall",
+            detail="UDP listen + optional local status UI; residual exit ready for failover.",
+            command=(
+                "ss -ulnp | grep 44044 || true; "
+                "curl -s http://127.0.0.1:8080/api/status || true"
+            ),
+        ),
+        PlanStep(
+            id="no_weekly_timer",
+            action="Do not enable weekly entry wipe timer on exit",
+            detail=(
+                "Exit must stay available during entry weekly drain. "
+                "Never enable rpt-ephemeral-rebuild.timer / weekly_entry_rebuild on exit."
+            ),
+            command=(
+                "# systemctl disable --now rpt-ephemeral-rebuild.timer 2>/dev/null || true"
+            ),
+        ),
+    ]
+    if rotate_keys:
+        steps.insert(
+            5,
+            PlanStep(
+                id="rotate_keys",
+                action="Optional exit long-term key rotation",
+                detail=(
+                    "Rotate exit keys only; re-ship product/exit_node_elgamal.pub — "
+                    "never confuse with entry pin."
+                ),
+                destructive=True,
+                command=(
+                    f"python scripts/rotate_node_keys.py --secrets-dir {root}/secrets"
+                ),
+            ),
+        )
+    honesty = (
+        HONESTY_PROVIDER,
+        HONESTY_RESIDUAL,
+        HONESTY_KEYS,
+        HONESTY_NOLOG,
+        HONESTY_EXCLUSIVE,
+        HONESTY_FAILOVER,
+        "Exit reinstall is manual/operator; weekly timed wipe is entry-only.",
+    )
+    return EphemeralPlan(
+        mode="exit_manual_reinstall",
+        period_spec="manual",
+        period_seconds=0,
+        install_root=root,
+        steps=steps,
+        dry_run=dry_run,
+        honesty=honesty,
+    )
 
 
 def build_weekly_entry_rebuild_plan(
@@ -549,17 +911,52 @@ def build_weekly_entry_rebuild_plan(
             )
         # Rename clarity: selfhost is mandatory package reinstall on live path
         if s.id == "selfhost_reapply":
+            entry_req_detail = "; ".join(
+                f"{r.id}" for r in entry_reinstall_requirements()
+            )
             steps.append(
                 PlanStep(
                     id="selfhost_reapply",
-                    action="Package reinstall / re-apply product self-host (no-log)",
+                    action="Package reinstall / full product self-host (no-log)",
                     detail=(
-                        "Mandatory after rebuild: reinstall product packages via "
-                        "selfhost_node.sh (install.sh + DNS + host-privacy + no-log). "
-                        "Bare wiped host is not acceptable."
+                        "Mandatory after rebuild: full reinstall via selfhost_node.sh "
+                        "(install.sh + DNS + host-privacy + no-log; "
+                        "SKIP_DNS=0 SKIP_HOST_PRIVACY=0). Bare wiped host is not "
+                        f"acceptable. Entry requirements: {entry_req_detail}"
                     ),
                     destructive=False,
-                    command=s.command or "sudo bash scripts/selfhost_node.sh",
+                    command=SELFHOST_FULL_CMD,
+                )
+            )
+            # Explicit component checks after selfhost (entry role)
+            steps.append(
+                PlanStep(
+                    id="reinstall_core_dns_privacy_verify",
+                    action="Verify core install + tunnel DNS + host privacy surface",
+                    detail=(
+                        "Confirm product node install tree, residual DNS default, "
+                        "and host-privacy scripts were re-applied (entry requirements)."
+                    ),
+                    command=(
+                        f"test -f {root}/node/nolog.py; "
+                        f"test -f {root}/node/install.sh || test -f scripts/selfhost_node.sh; "
+                        f"test -f {root}/node/install_dns.sh || true; "
+                        f"test -f {root}/node/install_host_privacy.sh || true"
+                    ),
+                )
+            )
+            steps.append(
+                PlanStep(
+                    id="entry_product_pin_check",
+                    action="Confirm entry public pin present (no priv shipping)",
+                    detail=(
+                        "Entry ElGamal public pin must exist after reinstall; "
+                        "never distribute node_elgamal.priv."
+                    ),
+                    command=(
+                        f"test -f {root}/secrets/node_elgamal.pub || "
+                        f"test -f product/node_elgamal.pub"
+                    ),
                 )
             )
             continue

@@ -168,8 +168,8 @@ class _TunnelHomeState extends State<TunnelHome> with WidgetsBindingObserver {
       _licenceAccepted = licOk;
       if (!canConnect) {
         _status = licOk
-            ? 'Verify payment in Settings (session id or recheck), then Connect.'
-            : 'Accept the licence, then press Connect for residual protection.';
+            ? 'Enter keygen in Settings (from fulfilment email), then Connect.'
+            : 'Accept the licence, enter keygen, then Connect for residual protection.';
       } else {
         _status =
             'Ready. Press Connect when you want residual protection.';

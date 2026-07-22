@@ -1,4 +1,4 @@
-"""Release download catalog + paid download UI (version 0.3.6).
+"""Release download catalog + paid download UI (version 0.3.7).
 
 Primary path: pay **£2.45** (GBP) via Stripe Checkout per package, then a
 single-use download token. Free permanent GitHub ``href`` is not used on the
@@ -6,7 +6,7 @@ public buttons. After payment the status host **proxies** the installer
 (authenticated GitHub API / local assets) so fulfilment works when the
 restore-privacy repo is **private**. Buy Me a Coffee is tip/support only.
 
-Current catalog packages: restore-privacy release **0.3.6**
+Current catalog packages: restore-privacy release **0.3.7**
 (Windows setup needs no separate Python install; macOS Developer ID notarized;
 iOS Team-signed sideload).
 """
@@ -21,10 +21,10 @@ try:
 except ImportError:  # package import path (status_page as package)
     from status_page.coffee_link import COFFEE_LINK_URL, coffee_tip_url
 
-RELEASE_VERSION = "0.3.6"
+RELEASE_VERSION = "0.3.7"
 GITHUB_OWNER = "rgsneddon"
 GITHUB_REPO = "restore-privacy"
-RELEASE_TAG = "0.3.6"
+RELEASE_TAG = "0.3.7"
 RELEASE_PAGE_URL = (
     f"https://github.com/{GITHUB_OWNER}/{GITHUB_REPO}/releases/tag/{RELEASE_TAG}"
 )
@@ -138,7 +138,7 @@ def assure_current_catalog_packages() -> dict[str, object]:
     }
 
 
-# Canonical public asset filenames (must match GitHub Release 0.3.6 assets).
+# Canonical public asset filenames (must match GitHub Release 0.3.7 assets).
 WINDOWS_EXE_FILENAME = f"restore-privacy-client-{RELEASE_VERSION}-windows-x64-setup.exe"
 ANDROID_APK_FILENAME = f"restore-privacy-client-{RELEASE_VERSION}-android.apk"
 MACOS_ZIP_FILENAME = f"restore-privacy-client-{RELEASE_VERSION}-macos.zip"
@@ -321,7 +321,7 @@ RUST_REPO_URL = PRODUCT_CATALOG_URL
 RUST_REPO_LABEL = PRODUCT_CATALOG_LABEL
 
 
-# Compatibility aliases used by older tests (map to 0.3.6 installers).
+# Compatibility aliases used by older tests (map to 0.3.7 installers).
 WINDOWS_ZIP_FILENAME = WINDOWS_EXE_FILENAME
 
 
@@ -399,8 +399,9 @@ def download_css() -> str:
     .dl-footer { margin-top: 1.25rem; font-size: 0.9rem; line-height: 1.45; width: 100%; }
     .dl-footer a.catalog-link { color: var(--rb-link); text-decoration: underline; font-weight: 600; }
     .dl-footer a.catalog-link:hover { color: var(--rb-link-hover); }
-    .dl-tip { margin-top: 1rem; font-size: 0.86rem; color: var(--rb-muted); width: 100%; }
+    .dl-tip { margin-top: 1rem; font-size: 0.86rem; color: var(--rb-muted); width: 100%; text-align: center; }
     .dl-tip a { color: var(--rb-accent); text-decoration: underline; font-weight: 600; }
+    .bmc-page-footer { margin-top: 0.5rem; margin-bottom: 0.25rem; padding: 0.75rem 0.5rem 1rem; }
     @media (max-width: 640px) {
       a.dl, button.dl {
         flex: 0 0 5.25rem; width: 5.25rem; height: 5.25rem;
@@ -430,25 +431,34 @@ def payment_connect_disclaimer_html() -> str:
     )
 
 
-def render_catalog_footer_html() -> str:
-    """Footer under download buttons — optional tip only (no How-to-buy link).
+def render_bmc_tip_html() -> str:
+    """Buy Me a Coffee tip block (tip/support only — not a paid download control).
 
-    The old “Catalog v… — installers after £2.45…” / FULL CATALOGUE footer link
-    is intentionally **not** emitted on the public page.
-    Platform Pay buttons remain the only catalog entry; no separate catalogue link.
+    Homepage places this at the **very bottom** of the page shell (after downloads,
+    node-wipe, and audit). Stable anchors: ``#bmc-tip`` / ``#bmc-tip-link``.
     """
     tip = coffee_tip_url()
     tip_label = tip.replace("https://", "").replace("http://", "")
     return (
-        f'    <p class="dl-tip" id="bmc-tip">'
+        f'  <p class="dl-tip bmc-page-footer" id="bmc-tip">'
         f'Tip / support (not a paid download): '
         f'<a id="bmc-tip-link" href="{tip}" rel="noopener noreferrer" '
         f'target="_blank">{tip_label}</a></p>'
     )
 
 
-# Back-compat alias (historical name from RUST residual era).
-render_rust_footer_html = render_catalog_footer_html
+def render_catalog_footer_html() -> str:
+    """Under-download-buttons footer (intentionally empty on public homepage).
+
+    BMC tip is **not** rendered here so it can sit at the page bottom via
+    :func:`render_bmc_tip_html` in the homepage shell. How-to-buy / catalogue
+    links remain omitted; Pay buttons are the only catalog entry.
+    """
+    return ""
+
+
+# Back-compat: historical name still returns the tip fragment for callers/tests.
+render_rust_footer_html = render_bmc_tip_html
 
 
 def platform_face_title(platform: str) -> str:
@@ -557,20 +567,26 @@ def render_download_section_html(
     <div class="dl-row dl-row-2" id="dl-row-2" data-dl-row="2" data-dl-count="{len(row2)}">
       {row2_html}
     </div>"""
+    # Price identity: £2.45 per month subscription package + one device licence,
+    # then trial honesty, then pay-on-Stripe (homepage download section contract).
+    PACKAGE_IDENTITY = "per month subscription package — one device licence"
+    TRIAL_SUBSCRIPTION_SENTENCE = (
+        "Your monthly subscription (£2.45 per month) begins after your 7 day trial"
+    )
     if coming_soon:
         price_line = (
-            f"{PRICE_LABEL} GBP per package when available — "
+            f"{PRICE_LABEL} GBP {PACKAGE_IDENTITY} — {TRIAL_SUBSCRIPTION_SENTENCE} — "
             f"buy buttons coming soon (links return to restoreprivacy.online)"
         )
         buttons_mode = ' data-buy-mode="coming-soon"'
     else:
         price_line = (
-            f"{PRICE_LABEL} GBP per package — pay on Stripe, "
-            f"then download starts automatically"
+            f"{PRICE_LABEL} GBP {PACKAGE_IDENTITY} — {TRIAL_SUBSCRIPTION_SENTENCE} — "
+            f"pay on Stripe, then download starts automatically"
         )
         buttons_mode = ' data-buy-mode="stripe-live"'
-    # Order: title/price → pay controls → tip. Homepage omits STRONG DISCLAIMER
-    # banner (apps/licence retain payment-required language).
+    # Order: title/price → pay controls only. BMC tip is page-bottom (homepage shell).
+    # Homepage omits STRONG DISCLAIMER banner (apps/licence retain payment language).
     return f"""
   <section class="downloads panel-card" id="downloads" aria-label="Download Restore Privacy client">
     <h2>Download client v{RELEASE_VERSION}</h2>
@@ -581,6 +597,5 @@ def render_download_section_html(
       {row1_html}
     </div>{row2_block}
     </div>
-{render_catalog_footer_html()}
   </section>
 """

@@ -15,9 +15,20 @@ sys.path.insert(0, str(ROOT))
 from node.ephemeral_node import (  # noqa: E402
     HONESTY_EXCLUSIVE,
     HONESTY_FAILOVER,
+    SELFHOST_FULL_CMD,
+    assert_role_reinstall_lists_differ,
     assert_weekly_entry_role_only,
+    build_exit_manual_reinstall_plan,
     build_weekly_entry_rebuild_plan,
+    entry_reinstall_requirements,
+    exit_reinstall_requirements,
+    plan_embeds_mandatory_reinstall,
+    role_reinstall_requirement_ids,
     systemd_service_unit,
+)
+from node.wipe_preflight import (  # noqa: E402
+    package_reinstall_required_for_live_wipe,
+    plan_has_required_live_steps,
 )
 
 
@@ -72,6 +83,66 @@ class TestWeeklyEntryPlan(unittest.TestCase):
         self.assertIn("entry", text)
         self.assertIn("failover", text)
         self.assertIn("package", text)
+        self.assertTrue(plan_embeds_mandatory_reinstall(ids))
+        ok_steps, missing = plan_has_required_live_steps(ids)
+        self.assertTrue(ok_steps, missing)
+        self.assertTrue(package_reinstall_required_for_live_wipe())
+        # Full selfhost command forces DNS + host privacy
+        sh = next(s for s in plan.steps if s.id == "selfhost_reapply")
+        self.assertIn("SKIP_DNS=0", sh.command)
+        self.assertIn("SKIP_HOST_PRIVACY=0", sh.command)
+        self.assertIn("selfhost_node.sh", sh.command)
+        self.assertEqual(sh.command, SELFHOST_FULL_CMD)
+        self.assertIn("reinstall_core_dns_privacy_verify", ids)
+        self.assertIn("entry_product_pin_check", ids)
+        self.assertLess(
+            ids.index("selfhost_reapply"), ids.index("health_check")
+        )
+
+    def test_role_reinstall_entry_differs_from_exit(self):
+        ok, msg = assert_role_reinstall_lists_differ()
+        self.assertTrue(ok, msg)
+        entry_ids = set(role_reinstall_requirement_ids("entry"))
+        exit_ids = set(role_reinstall_requirement_ids("exit"))
+        self.assertNotEqual(entry_ids, exit_ids)
+        # Shared full reinstall surface
+        for need in (
+            "core_node_install",
+            "tunnel_dns",
+            "host_privacy",
+            "selfhost_full",
+        ):
+            self.assertIn(need, entry_ids)
+            self.assertIn(need, exit_ids)
+        # Entry-unique
+        self.assertIn("entry_weekly_failover_gates", entry_ids)
+        self.assertIn("entry_exclusive_rebuild_lock", entry_ids)
+        self.assertNotIn("entry_weekly_failover_gates", exit_ids)
+        # Exit-unique
+        self.assertIn("exit_only_elgamal_keys", exit_ids)
+        self.assertIn("exit_no_weekly_timer", exit_ids)
+        self.assertNotIn("exit_only_elgamal_keys", entry_ids)
+        e_desc = " ".join(r.description for r in entry_reinstall_requirements())
+        x_desc = " ".join(r.description for r in exit_reinstall_requirements())
+        self.assertIn("failover", e_desc.lower())
+        self.assertIn("exit", x_desc.lower())
+
+    def test_exit_manual_plan_not_weekly_and_has_reinstall(self):
+        plan = build_exit_manual_reinstall_plan(dry_run=True)
+        self.assertEqual(plan.mode, "exit_manual_reinstall")
+        ids = [s.id for s in plan.steps]
+        self.assertIn("selfhost_reapply", ids)
+        self.assertIn("exit_key_and_firewall", ids)
+        self.assertIn("no_weekly_timer", ids)
+        self.assertIn("health_check", ids)
+        self.assertNotIn("exit_failover_preflight", ids)
+        self.assertNotIn("exclusive_lock_acquire", ids)
+        text = plan.format_text().lower()
+        self.assertIn("exit", text)
+        self.assertIn("selfhost", text)
+        self.assertIn("not weekly", text)
+        sh = next(s for s in plan.steps if s.id == "selfhost_reapply")
+        self.assertEqual(sh.command, SELFHOST_FULL_CMD)
 
     def test_abort_when_exit_unhealthy(self):
         plan = build_weekly_entry_rebuild_plan(
@@ -126,6 +197,12 @@ class TestWeeklyCliDryRun(unittest.TestCase):
         self.assertIn("must fail closed", out)
         self.assertIn("exit failover", out)
         self.assertIn("re-entry", out)
+        self.assertIn("selfhost", out)
+        self.assertIn("package reinstall", out)
+        self.assertIn("structural_live_steps: ok=true", out)
+        self.assertIn("plan_embeds_mandatory_reinstall=true", out)
+        self.assertIn("entry-only", out)
+        self.assertIn("skip_dns=0", out)
 
     def test_cli_refuses_exit_role(self):
         script = ROOT / "scripts" / "weekly_entry_rebuild.py"

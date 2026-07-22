@@ -48,7 +48,7 @@ class TestPackageRagEvaluation(unittest.TestCase):
     def test_catalog_filenames_match_downloads_monopin(self):
         """Package RAG must use same basenames as downloads catalog list."""
         ver = self.mod.load_catalog_version()
-        self.assertEqual(ver, "0.3.6")
+        self.assertEqual(ver, "0.3.7")
         rows = self.mod.catalog_platform_filenames(ver)
         self.assertEqual(len(rows), 5)
         # Prefer status_page.downloads when importable
@@ -88,7 +88,7 @@ class TestPackageRagEvaluation(unittest.TestCase):
         )
         # Display reasons use monopin path text
         disp = self.mod.catalog_search_roots_display(ver)
-        self.assertTrue(any("0.3.6" in d for d in disp))
+        self.assertTrue(any("0.3.7" in d for d in disp))
 
     def test_resolve_finds_staged_windows_via_catalog_relative_path(self):
         """Present status_page/assets or releases package is not false-missing."""
@@ -98,7 +98,7 @@ class TestPackageRagEvaluation(unittest.TestCase):
         path = self.mod.resolve_catalog_package_path(ver, fname, relative_path=rel)
         self.assertIsNotNone(
             path,
-            "Windows 0.3.6 setup must resolve from catalog fulfilment paths",
+            "Windows 0.3.7 setup must resolve from catalog fulfilment paths",
         )
         assert path is not None
         self.assertTrue(path.is_file())
@@ -122,9 +122,9 @@ class TestPackageRagEvaluation(unittest.TestCase):
         )
 
     def test_catalog_036_all_platforms_green_when_staged(self):
-        """When monopin 0.3.6 assets are fully staged, RAG overall must be Green."""
+        """When monopin 0.3.7 assets are fully staged, RAG overall must be Green."""
         ver = self.mod.load_catalog_version()
-        self.assertEqual(ver, "0.3.6")
+        self.assertEqual(ver, "0.3.7")
         rag = self.mod.evaluate_catalog_packages(ver)
         missing = [
             p["platform"]
@@ -169,14 +169,14 @@ class TestPackageRagEvaluation(unittest.TestCase):
         # With current monorepo catalog tree, expect packages present
         present = sum(1 for p in rag["packages"] if p.get("path"))
         self.assertGreaterEqual(present, 1)
-        # Windows staged for 0.3.6 must not be Red-for-missing
+        # Windows staged for 0.3.7 must not be Red-for-missing
         win = next(p for p in rag["packages"] if p["platform"] == "windows")
         if win.get("path"):
             self.assertIn(win["state"], ("Green", "Amber"))
 
     def test_render_section_lists_all_platforms(self):
         rag = {
-            "catalog_version": "0.3.6",
+            "catalog_version": "0.3.7",
             "overall": "Green",
             "packages": [
                 {
@@ -322,10 +322,10 @@ class TestPkgRagCellScrollHtml(unittest.TestCase):
         self.assertIn("overflow-x: auto", css)
         self.assertIn("table-layout: fixed", css)
         self.assertNotIn("width: max-content", css)
-        long_name = "restore-privacy-client-0.3.6-windows-x64-setup.exe"
+        long_name = "restore-privacy-client-0.3.7-windows-x64-setup.exe"
         md = self.mod.render_package_rag_section(
             {
-                "catalog_version": "0.3.6",
+                "catalog_version": "0.3.7",
                 "overall": "Green",
                 "packages": [
                     {

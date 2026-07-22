@@ -25,7 +25,7 @@ from admin_panel import (
     render_login_html,
     verify_credentials,
 )
-from downloads import download_css, render_download_section_html
+from downloads import download_css, render_bmc_tip_html, render_download_section_html
 from payments import (
     PRICE_LABEL,
     PRICE_PENCE,
@@ -310,6 +310,8 @@ def render_html(status: dict, poll_ms: int | None = None) -> bytes:
         )
     countdown_html = render_audit_countdown_html()
     node_wipe_html = render_node_wipe_countdown_html()
+    # Buy Me a Coffee tip — very bottom of page (after downloads / wipe / audit)
+    bmc_tip_html = render_bmc_tip_html()
     # Palette inspired by restorebritain.org.uk/donate (navy / sky blue / cream)
     body = f"""<!DOCTYPE html>
 <html lang="en">
@@ -409,6 +411,14 @@ def render_html(status: dict, poll_ms: int | None = None) -> bytes:
       background: rgba(10, 22, 40, 0.45); border: 1px solid var(--rb-card-border);
       border-radius: 12px; padding: 0.35rem 0.75rem;
     }}
+    .audit-last-run {{
+      margin: 0.55rem 0 0;
+      font-size: 0.82rem;
+      color: var(--rb-muted);
+      text-align: center;
+      width: 100%;
+    }}
+    .audit-last-run time {{ color: var(--rb-cream); font-weight: 600; }}
     .audit-countdown-blurb {{
       margin: 0.65rem 0 0; font-size: 0.78rem; line-height: 1.45;
       color: var(--rb-muted); font-weight: 400;
@@ -467,6 +477,7 @@ def render_html(status: dict, poll_ms: int | None = None) -> bytes:
     <section class="panel-card" id="audit-panel" aria-label="Security audit countdown">
 {countdown_html}
     </section>
+{bmc_tip_html}
   </div>
 </body>
 </html>
@@ -598,9 +609,17 @@ class Handler(BaseHTTPRequestHandler):
             return
 
         if path in ("/api/connect-entitlement", "/connect-entitlement"):
-            # Payment entitlement for Connect gate (no PII; session_id only)
+            # Payment entitlement for Connect gate (session_id and/or keygen)
             session_id = (query.get("session_id") or "").strip()
-            if not session_id:
+            keygen = (query.get("keygen") or "").strip()
+            ent = None
+            if keygen:
+                from payments import get_connect_entitlement_by_keygen
+
+                ent = get_connect_entitlement_by_keygen(keygen)
+            elif session_id:
+                ent = get_connect_entitlement(session_id)
+            else:
                 self._send(
                     400,
                     "application/json",
@@ -608,15 +627,15 @@ class Handler(BaseHTTPRequestHandler):
                         {
                             "status": "unknown",
                             "connect_allowed": False,
-                            "error": "missing_session_id",
+                            "error": "missing_session_id_or_keygen",
                         }
                     ).encode("utf-8"),
                 )
                 return
-            ent = get_connect_entitlement(session_id)
             if not ent:
                 payload = {
-                    "session_id": session_id,
+                    "session_id": session_id or "",
+                    "keygen": keygen or "",
                     "status": "unknown",
                     "connect_allowed": False,
                     "reason": "no_entitlement",
@@ -629,6 +648,7 @@ class Handler(BaseHTTPRequestHandler):
                     "reason": ent.get("reason") or "",
                     "connect_allowed": bool(ent.get("connect_allowed")),
                     "valid_until": ent.get("valid_until"),
+                    "keygen": ent.get("keygen") or "",
                 }
             self._send(
                 200,
@@ -877,12 +897,12 @@ class Handler(BaseHTTPRequestHandler):
                     or "package"
                 )
                 plat = str(grant.get("platform") or platform or "")
-                # Ensure Connect entitlement is active for this paid session
-                if session_id:
-                    activate_connect_entitlement(session_id, platform=plat)
-                elif grant.get("session_id"):
-                    activate_connect_entitlement(
-                        str(grant["session_id"]), platform=plat
+                # Ensure Connect entitlement + keygen for this paid session
+                thankyou_keygen = ""
+                ent_sid = session_id or str(grant.get("session_id") or "")
+                if ent_sid:
+                    thankyou_keygen = (
+                        activate_connect_entitlement(ent_sid, platform=plat) or ""
                     )
                 purchase_id = str(grant.get("purchase_id") or "")
                 if not purchase_id and grant.get("token"):
@@ -908,6 +928,7 @@ class Handler(BaseHTTPRequestHandler):
                     platform=plat,
                     session_id=session_id or str(grant.get("session_id") or ""),
                     purchase_id=purchase_id,
+                    keygen=thankyou_keygen,
                 )
             else:
                 # Meta-refresh so a late webhook can still unlock the page

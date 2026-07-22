@@ -27,7 +27,8 @@ CURRENT_LICENCE_ID = "FULL-COPYRIGHT-2026"
 
 CONNECT_BLOCKED_LICENCE_MSG = (
     "Accept the end-user licence before connecting. "
-    "Open Settings or the licence prompt, review the licence, then Accept."
+    "Open Settings or the licence prompt, review the licence, then Accept. "
+    "After accepting, enter the keygen from your fulfilment email to unlock."
 )
 
 LICENCE_PROMPT_TITLE = "End-user licence"
@@ -200,6 +201,9 @@ def short_licence_summary() -> str:
         "Copy or transmission of the product architecture is not permitted. "
         "Third-party components keep their own licences (see LICENSE / CREDITS). "
         "By accepting, you agree to those terms. Acceptance is stored only on this device. "
+        "After you accept, enter the keygen from your fulfilment email "
+        "(USE THIS KEYGEN TO UNLOCK YOUR RESTORE PRIVACY TRIAL) to unlock Connect. "
+        "Your monthly subscription (£2.45 per month) begins after your 7 day trial. "
         + PAYMENT_CONNECT_DISCLAIMER_PLAIN
     )
 

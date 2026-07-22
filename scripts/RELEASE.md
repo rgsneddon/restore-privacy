@@ -15,7 +15,7 @@
 | 0.2.0 | `scripts/build_release_0.2.0.py` (archive) |
 | 0.1.8 | `scripts/build_release_0.1.8.py` (archive) |
 
-Product node: **82.221.101.241:44044**. See `scripts/RELEASE_NOTES_0.3.6.md`.
+Product node: **82.221.101.241:44044**. See `scripts/RELEASE_NOTES_0.3.7.md`.
 
 **0.3.6 highlights:** live catalog Pay £2.45; paid macOS fulfilment pin **0.3.6**.
 

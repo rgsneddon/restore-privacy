@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""One-command Windows multihop residual rebuild for catalog 0.3.6.
+"""One-command Windows multihop residual rebuild for catalog 0.3.7.
 
 Run **on a Windows x64 machine** (PyInstaller cannot cross-build Windows PE from macOS):
 
@@ -11,12 +11,12 @@ Or double-click / run:
 
 Produces::
 
-  releases/0.3.6/restore-privacy-client-0.3.6-windows-x64-setup.exe
+  releases/0.3.7/restore-privacy-client-0.3.7-windows-x64-setup.exe
 
 Ships current ``client/`` (incl. multihop residual-via-exit), entry + exit ElGamal
 **public** keys only, Wintun, frozen runtime — no ``*.priv``.
 
-See ``client/windows/WINDOWS_HANDOFF_0.3.6.md``.
+See ``client/windows/WINDOWS_HANDOFF_0.3.7.md``.
 """
 
 from __future__ import annotations
@@ -30,7 +30,7 @@ import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-VERSION = "0.3.6"
+VERSION = "0.3.7"
 OUT = ROOT / "releases" / VERSION
 WINDOWS_EXE_NAME = f"restore-privacy-client-{VERSION}-windows-x64-setup.exe"
 RECIPE = ROOT / "scripts" / "build_release_0.0.8.py"

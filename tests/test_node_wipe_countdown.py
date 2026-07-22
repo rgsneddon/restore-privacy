@@ -113,28 +113,29 @@ class TestNodeWipeHtml(unittest.TestCase):
             exit_next=now + timedelta(days=2),
         )
         self.assertIn(NODE_A_ENTRY_LABEL, html)
-        self.assertIn(NODE_B_EXIT_LABEL, html)
+        self.assertNotIn(NODE_B_EXIT_LABEL, html)
         self.assertIn('id="node-wipe-countdown"', html)
         self.assertIn('id="nw-entry-days"', html)
-        self.assertIn('id="nw-exit-seconds"', html)
+        self.assertNotIn('id="nw-exit-seconds"', html)
         self.assertIn('id="node-wipe-label-entry"', html)
-        self.assertIn('id="node-wipe-label-exit"', html)
+        self.assertNotIn('id="node-wipe-label-exit"', html)
         self.assertIn("nw-unit", html)
         self.assertIn("setInterval", html)
         self.assertIn("1000", html)
         self.assertIn("data-next-entry", html)
-        self.assertIn("data-next-exit", html)
+        self.assertIn("data-entry-only", html)
         self.assertIn(str(NODE_WIPE_PERIOD_SECONDS), html)
-        # Honesty: entry-only live wipe / not provider backup erase
+        # Honesty: entry-only live wipe / exit never wiped / not provider backup erase
         low = html.lower()
-        self.assertIn("entry-only", low)
+        self.assertIn("entry", low)
+        self.assertIn("never wiped", low)
         self.assertIn("provider", low)
 
     def test_homepage_render_includes_dual_wipe_countdown(self):
         """Drive shipped status_page.render_html entry point."""
         page = status_app.render_html({"title": "RESTORE PRIVACY"}).decode("utf-8")
         self.assertIn(NODE_A_ENTRY_LABEL, page)
-        self.assertIn(NODE_B_EXIT_LABEL, page)
+        self.assertNotIn(NODE_B_EXIT_LABEL, page)
         self.assertIn('id="node-wipe-countdown"', page)
         self.assertIn('id="nw-entry-days"', page)
         self.assertIn("nw-unit", page)

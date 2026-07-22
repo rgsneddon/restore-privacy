@@ -34,6 +34,7 @@ KEY_PLATFORM = "platform"
 KEY_REASON = "reason"
 KEY_UPDATED_AT = "updated_at"
 KEY_VALID_UNTIL = "valid_until"
+KEY_KEYGEN = "keygen"
 
 STATUS_ACTIVE = "active"
 STATUS_FAILED = "failed"
@@ -47,17 +48,25 @@ CONNECT_BLOCKED_PAYMENT_MSG = (
     "(checkout failure, failed charge, refund, dispute, or subscription period "
     "ended), the ability to Connect with the Restore Privacy app is cancelled "
     "until you complete a successful payment again on https://restoreprivacy.online/ "
-    "(re-download payment_entitlement.json from the thank-you page, or use "
-    "Settings → Payment entitlement)."
+    "(enter your keygen again after re-subscribe, re-download "
+    "payment_entitlement.json, or use Settings → Payment entitlement / keygen)."
 )
 
 CONNECT_BLOCKED_NO_ENTITLEMENT_MSG = (
     "Connect is blocked: no successful payment entitlement on this install. "
-    "After paying on https://restoreprivacy.online/, keep the auto-downloaded "
-    "payment_entitlement.json (or re-open the thank-you page) so the app can "
-    "import it automatically — then Connect. Settings → Payment entitlement "
-    "is only a fallback. Successful payment is required; if payment fails or a "
+    "After paying on https://restoreprivacy.online/, accept the licence, then "
+    "enter the keygen from your fulfilment email (USE THIS KEYGEN TO UNLOCK "
+    "YOUR RESTORE PRIVACY TRIAL) in Settings. Optional: keep "
+    "payment_entitlement.json next to the installer for auto-import. "
+    "Successful payment/active subscription is required; if payment fails or a "
     "subscription period ends, Connect is cancelled."
+)
+
+CONNECT_BLOCKED_KEYGEN_MSG = (
+    "Connect is blocked: enter a valid keygen after accepting the licence. "
+    "Your fulfilment email includes the keygen with the text "
+    "USE THIS KEYGEN TO UNLOCK YOUR RESTORE PRIVACY TRIAL. "
+    "The keygen only works while your subscription/payment is active."
 )
 
 # Strong disclaimer for README / portal / privacy / licence surfaces
@@ -87,6 +96,7 @@ class PaymentEntitlement:
     reason: str = ""
     updated_at: float = 0.0
     valid_until: float | None = None
+    keygen: str = ""
 
     def to_dict(self) -> dict[str, Any]:
         d: dict[str, Any] = {
@@ -95,6 +105,7 @@ class PaymentEntitlement:
             KEY_PLATFORM: str(self.platform or ""),
             KEY_REASON: str(self.reason or ""),
             KEY_UPDATED_AT: float(self.updated_at or 0.0),
+            KEY_KEYGEN: str(self.keygen or ""),
         }
         if self.valid_until is not None:
             d[KEY_VALID_UNTIL] = float(self.valid_until)
@@ -114,6 +125,7 @@ class PaymentEntitlement:
             reason=str(data.get(KEY_REASON) or ""),
             updated_at=float(data.get(KEY_UPDATED_AT) or 0.0),
             valid_until=vu,
+            keygen=str(data.get(KEY_KEYGEN) or "").strip().upper(),
         )
 
 
@@ -175,9 +187,11 @@ def record_payment_success(
     path: Optional[Path] = None,
     now: float | None = None,
     valid_until: float | None = None,
+    keygen: str = "",
 ) -> PaymentEntitlement:
     """Local cache after successful paid fulfilment."""
     t = now if now is not None else time.time()
+    prev = load_payment_entitlement(path)
     ent = PaymentEntitlement(
         session_id=str(session_id or "").strip(),
         status=STATUS_ACTIVE,
@@ -185,6 +199,7 @@ def record_payment_success(
         reason="payment_succeeded",
         updated_at=t,
         valid_until=valid_until,
+        keygen=str(keygen or prev.keygen or "").strip().upper(),
     )
     save_payment_entitlement(ent, path=path)
     return ent
@@ -198,6 +213,7 @@ def record_payment_failure(
     path: Optional[Path] = None,
     now: float | None = None,
     status: str = STATUS_FAILED,
+    keygen: str = "",
 ) -> PaymentEntitlement:
     """Local cache when payment failed or entitlement was revoked."""
     t = now if now is not None else time.time()
@@ -212,6 +228,7 @@ def record_payment_failure(
         platform=str(platform or prev.platform or "").strip().lower(),
         reason=str(reason or "payment_failed"),
         updated_at=t,
+        keygen=str(keygen or prev.keygen or "").strip().upper(),
     )
     save_payment_entitlement(ent, path=path)
     return ent
@@ -223,6 +240,7 @@ def store_session_pending(
     platform: str = "",
     path: Optional[Path] = None,
     now: float | None = None,
+    keygen: str = "",
 ) -> PaymentEntitlement:
     """Remember Checkout session id before remote verify (status still unknown)."""
     t = now if now is not None else time.time()
@@ -234,6 +252,7 @@ def store_session_pending(
         platform=str(platform or prev.platform or "").strip().lower(),
         reason="session_import_pending",
         updated_at=t,
+        keygen=str(keygen or prev.keygen or "").strip().upper(),
     )
     save_payment_entitlement(ent, path=path)
     return ent
@@ -255,6 +274,7 @@ def import_entitlement_from_dict(
             platform=ent.platform,
             reason=ent.reason or "imported_file",
             updated_at=t,
+            keygen=ent.keygen,
         )
     save_payment_entitlement(ent, path=path)
     return ent
@@ -347,13 +367,58 @@ def import_session_and_verify(
 ) -> PaymentEntitlement:
     """Provision local entitlement from Checkout session id and verify remotely.
 
-    This is the shipped paid-user path after Stripe success: paste/import
-    ``cs_…`` session id → status host confirms active or failed.
+    Fallback path: paste/import ``cs_…`` session id → status host confirms.
+    Preferred product path is :func:`import_keygen_and_verify`.
     """
     sid = str(session_id or "").strip()
     if not sid:
         return load_payment_entitlement(path)
     store_session_pending(sid, platform=platform, path=path, now=now)
+    return refresh_entitlement_from_remote(
+        path=path,
+        base_url=base_url,
+        now=now,
+        fetch=fetch,
+    )
+
+
+def normalize_local_keygen(keygen: str) -> str:
+    """Uppercase / strip customer-entered keygen (client-side)."""
+    s = (keygen or "").strip().upper().replace(" ", "")
+    if s.startswith("RPTKEY") and "-" not in s and len(s) == 18:
+        body = s[6:]
+        s = f"RPT-KEY-{body[0:4]}-{body[4:8]}-{body[8:12]}"
+    return s
+
+
+def import_keygen_and_verify(
+    keygen: str,
+    *,
+    path: Optional[Path] = None,
+    base_url: str | None = None,
+    platform: str = "",
+    now: float | None = None,
+    fetch: Any = None,
+) -> PaymentEntitlement:
+    """Provision local entitlement from fulfilment **keygen** and verify remotely.
+
+    Shipped first-run path after Install → accept licence → enter keygen:
+    status host ``/api/connect-entitlement?keygen=…`` confirms active subscription.
+    """
+    kg = normalize_local_keygen(keygen)
+    if not kg:
+        return load_payment_entitlement(path)
+    t = now if now is not None else time.time()
+    prev = load_payment_entitlement(path)
+    pending = PaymentEntitlement(
+        session_id=prev.session_id,
+        status=STATUS_UNKNOWN,
+        platform=str(platform or prev.platform or "").strip().lower(),
+        reason="keygen_import_pending",
+        updated_at=t,
+        keygen=kg,
+    )
+    save_payment_entitlement(pending, path=path)
     return refresh_entitlement_from_remote(
         path=path,
         base_url=base_url,
@@ -411,10 +476,10 @@ def payment_allows_connect(
     if not req:
         return True
     # Required but no successful entitlement on file
-    if not e.session_id and st in (STATUS_UNKNOWN, ""):
+    if not e.session_id and not e.keygen and st in (STATUS_UNKNOWN, ""):
         return False
-    if st in (STATUS_UNKNOWN, "") and e.session_id:
-        # Have a session but never confirmed active — block when required
+    if st in (STATUS_UNKNOWN, "") and (e.session_id or e.keygen):
+        # Have session/keygen but never confirmed active — block when required
         return False
     return st == STATUS_ACTIVE
 
@@ -442,6 +507,8 @@ def assert_payment_may_connect(
     ent = load_payment_entitlement(path)
     if is_payment_blocking_status(ent.status):
         return False, CONNECT_BLOCKED_PAYMENT_MSG
+    if not ent.session_id and not ent.keygen:
+        return False, CONNECT_BLOCKED_KEYGEN_MSG
     return False, CONNECT_BLOCKED_NO_ENTITLEMENT_MSG
 
 
@@ -456,12 +523,12 @@ def ensure_entitlement_for_connect(
 
     Auto-provisions from ``payment_entitlement.json`` next to the install or in
     Downloads (thank-you auto-download), then binds the local device pub so the
-    residual node can admit HELLO.
+    residual node can admit HELLO. Keygen-only installs refresh by keygen.
     """
     local = load_payment_entitlement(path)
-    if not local.session_id:
+    if not local.session_id and not local.keygen:
         discovered = try_discover_entitlement_file(dest_path=path)
-        if discovered is not None and discovered.session_id:
+        if discovered is not None and (discovered.session_id or discovered.keygen):
             local = discovered
         else:
             boot = maybe_bootstrap_from_env(
@@ -469,7 +536,7 @@ def ensure_entitlement_for_connect(
             )
             if boot is not None:
                 local = boot
-    if local.session_id:
+    if local.session_id or local.keygen:
         local = refresh_entitlement_from_remote(
             path=path, base_url=base_url, fetch=fetch
         )
@@ -477,6 +544,7 @@ def ensure_entitlement_for_connect(
             bind_device
             and local.status == STATUS_ACTIVE
             and payment_allows_connect(local, require=True)
+            and local.session_id
         ):
             try:
                 bind_device_to_remote(local.session_id, base_url=base_url)
@@ -487,34 +555,42 @@ def ensure_entitlement_for_connect(
 
 
 def entitlement_status_url(
-    session_id: str,
+    session_id: str = "",
     *,
     base_url: str | None = None,
+    keygen: str = "",
 ) -> str:
-    """Status-host query URL for entitlement (no secrets)."""
+    """Status-host query URL for entitlement (session_id and/or keygen)."""
     base = (base_url or os.environ.get("RPT_PUBLIC_BASE_URL") or "").strip()
     if not base:
         base = "https://restoreprivacy.online"
     base = base.rstrip("/")
-    q = urllib.parse.urlencode({"session_id": session_id})
+    params: dict[str, str] = {}
+    if (keygen or "").strip():
+        params["keygen"] = normalize_local_keygen(keygen)
+    elif (session_id or "").strip():
+        params["session_id"] = (session_id or "").strip()
+    q = urllib.parse.urlencode(params)
     return f"{base}/api/connect-entitlement?{q}"
 
 
 def fetch_remote_entitlement_status(
-    session_id: str,
+    session_id: str = "",
     *,
     base_url: str | None = None,
     timeout: float = 8.0,
+    keygen: str = "",
 ) -> dict[str, Any]:
     """GET status host entitlement; returns dict with status key."""
     sid = (session_id or "").strip()
-    if not sid:
-        return {"status": STATUS_UNKNOWN, "error": "missing_session_id"}
-    url = entitlement_status_url(sid, base_url=base_url)
+    kg = normalize_local_keygen(keygen)
+    if not sid and not kg:
+        return {"status": STATUS_UNKNOWN, "error": "missing_session_id_or_keygen"}
+    url = entitlement_status_url(sid, base_url=base_url, keygen=kg)
     req = urllib.request.Request(
         url,
         headers={
-            "User-Agent": "RestorePrivacy-payment-entitlement/0.3.4",
+            "User-Agent": "RestorePrivacy-payment-entitlement/0.3.6",
             "Accept": "application/json",
         },
         method="GET",
@@ -535,34 +611,41 @@ def refresh_entitlement_from_remote(
     *,
     base_url: str | None = None,
     now: float | None = None,
-    fetch: Callable[[str], dict[str, Any]] | None = None,
+    fetch: Callable[..., dict[str, Any]] | None = None,
 ) -> PaymentEntitlement:
-    """Refresh local cache from status host when session_id is known.
+    """Refresh local cache from status host when session_id or keygen is known.
 
     ``fetch`` may inject a test double; production uses
     :func:`fetch_remote_entitlement_status`.
     """
     local = load_payment_entitlement(path)
-    if not local.session_id:
+    if not local.session_id and not local.keygen:
         return local
     if fetch is not None:
-        remote = fetch(local.session_id)
+        # Support both session-only and keygen-aware test doubles
+        try:
+            remote = fetch(local.session_id, keygen=local.keygen)  # type: ignore[call-arg]
+        except TypeError:
+            remote = fetch(local.session_id or local.keygen)
     else:
         remote = fetch_remote_entitlement_status(
-            local.session_id, base_url=base_url
+            local.session_id, base_url=base_url, keygen=local.keygen
         )
     if not isinstance(remote, dict):
         remote = {"status": STATUS_UNKNOWN, "error": "bad_response"}
     st = str(remote.get("status") or STATUS_UNKNOWN).strip().lower()
     t = now if now is not None else time.time()
+    remote_sid = str(remote.get("session_id") or local.session_id or "").strip()
+    remote_kg = str(remote.get("keygen") or local.keygen or "").strip().upper()
     if is_payment_blocking_status(st):
         return record_payment_failure(
-            local.session_id,
+            remote_sid,
             reason=str(remote.get("reason") or st),
             platform=local.platform,
             path=path,
             now=t,
             status=st if st in (STATUS_FAILED, STATUS_REVOKED, STATUS_UNPAID) else STATUS_FAILED,
+            keygen=remote_kg,
         )
     if st == STATUS_ACTIVE:
         vu = remote.get("valid_until")
@@ -570,12 +653,24 @@ def refresh_entitlement_from_remote(
             vu_f = float(vu) if vu is not None and str(vu).strip() != "" else None
         except (TypeError, ValueError):
             vu_f = None
+        # connect_allowed false with active status should not happen; still gate
+        if remote.get("connect_allowed") is False:
+            return record_payment_failure(
+                remote_sid,
+                reason=str(remote.get("reason") or "not_allowed"),
+                platform=local.platform,
+                path=path,
+                now=t,
+                status=STATUS_REVOKED,
+                keygen=remote_kg,
+            )
         return record_payment_success(
-            local.session_id,
+            remote_sid or local.session_id,
             platform=local.platform or str(remote.get("platform") or ""),
             path=path,
             now=t,
             valid_until=vu_f,
+            keygen=remote_kg,
         )
     # Unknown remote (network blip): keep last known local status
     return local

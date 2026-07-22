@@ -728,6 +728,7 @@ def render_post_payment_thankyou_html(
     platform: str = "",
     session_id: str = "",
     purchase_id: str = "",
+    keygen: str = "",
 ) -> str:
     """Thank-you page body: auto-start one-time download + run-as-administrator copy.
 
@@ -739,6 +740,9 @@ def render_post_payment_thankyou_html(
     *purchase_id* is the durable product purchase identifier (distinct from the
     single-use download token). Buyers are **strongly advised** to note it so the
     operator can re-issue a secondary download link after software loss.
+
+    *keygen* is the subscription unlock code (also emailed). Clients require
+    licence accept then keygen entry for Connect.
     """
     link = (download_path or "").strip()
     if not link.startswith("/download"):
@@ -763,6 +767,15 @@ def render_post_payment_thankyou_html(
     sid_esc = _escape_html_text(sid)
     pid = normalize_purchase_id(purchase_id) or (purchase_id or "").strip().upper()
     pid_esc = _escape_html_text(pid)
+    kg = normalize_keygen(keygen) if keygen else ""
+    if not kg and sid:
+        try:
+            ent = get_connect_entitlement(sid)
+            if ent:
+                kg = normalize_keygen(str(ent.get("keygen") or ""))
+        except Exception:  # noqa: BLE001
+            kg = ""
+    kg_esc = _escape_html_text(kg)
     purchase_block = ""
     if pid:
         purchase_block = f"""
@@ -779,6 +792,20 @@ def render_post_payment_thankyou_html(
       Without this identifier, re-fulfilment may not be possible.
     </p>
   </div>"""
+    keygen_block = ""
+    if kg:
+        keygen_block = f"""
+  <div class="msg keygen-box" id="keygen-box" role="region"
+       aria-labelledby="keygen-heading">
+    <p id="keygen-heading"><strong>{_escape_html_text(KEYGEN_UNLOCK_INSTRUCTION)}</strong></p>
+    <p class="keygen-value"><code id="product-keygen">{kg_esc}</code></p>
+    <p class="keygen-advice" id="keygen-advice">
+      Install → accept licence terms → enter this keygen in the app to unlock.
+      Your monthly subscription (£2.45 per month) begins after your 7 day trial.
+      If payment fails later, this keygen becomes useless and Connect locks until
+      an active subscription is restored.
+    </p>
+  </div>"""
     ent_path = f"/api/connect-entitlement-file?session_id={urllib.parse.quote(sid)}" if sid else ""
     ent_path_esc = _escape_html_text(ent_path)
     ent_block = ""
@@ -792,44 +819,18 @@ def render_post_payment_thankyou_html(
     for this purchase/install until you complete a successful payment again.
   </p>
   <p class="msg" id="entitlement-import-hint">
-    <strong>Unlock Connect automatically:</strong>
+    <strong>Unlock Connect:</strong> accept the licence, then enter your
+    <strong>keygen</strong> (above / in your fulfilment email) in Settings.
+    Optional auto-import:
     <a class="dl" id="entitlement-file-link" href="{ent_path_esc}"
        download="payment_entitlement.json">payment_entitlement.json</a>
-    downloads with your package (auto-starts below). Keep it next to the
-    installer or in Downloads — the app imports it on first Connect and binds
-    this device (no manual session paste). Fallback: Settings → Payment
-    entitlement and paste <code>{sid_esc}</code>. Subscriptions stay usable
-    until the paid period ends after cancel.
+    downloads with your package. Fallback: paste keygen or session
+    <code>{sid_esc}</code>. Subscriptions stay usable until the paid period
+    ends after cancel.
   </p>
   <iframe id="auto-entitlement-frame" data-src="{ent_path_esc}" src="about:blank"
     style="width:0;height:0;border:0;position:absolute"
-    title="Automatic payment entitlement download" aria-hidden="true"></iframe>"""
-    # Emphasize Windows admin wording for .exe; still show admin phrase for all.
-    admin_lead = "Please run the file as administrator."
-    btn = f"Download {plat_label} package"
-    return f"""
-<section id="post-pay-thankyou" class="thankyou" aria-labelledby="thank-you-heading">
-  <h1 id="thank-you-heading">Thank you</h1>
-  <p class="msg" id="pay-success">Payment confirmed. Your <strong id="paid-platform-label">{_escape_html_text(plat_label)}</strong> installer is ready:</p>
-  <p class="pkg" id="paid-package-name"><strong>{fname_esc}</strong></p>
-  {purchase_block}
-  {ent_block}
-  <p class="msg admin-run" id="run-as-admin-instruction">
-    <strong>{_escape_html_text(admin_lead)}</strong>
-    {admin}
-  </p>
-  <p class="msg" id="auto-download-note">please wait for your download.. packaging...</p>
-  <!-- Installer first (single-use grant). Entitlement file loads after a short
-       delay so the package stream is not competing for bandwidth immediately. -->
-  <iframe id="auto-download-frame" src="{link_esc}" style="width:0;height:0;border:0;position:absolute"
-    title="Automatic product download" aria-hidden="true"></iframe>
-  <p>
-    <a class="dl" id="success-download-link" href="{link_esc}"
-       data-manual-download="1" data-platform="{_escape_html_text(plat)}"
-       data-filename="{fname_esc}">
-      { _escape_html_text(btn) } (if it did not start)
-    </a>
-  </p>
+    title="Automatic payment entitlement download" aria-hidden="true"></iframe>
   <script>
   (function () {{
     var delayMs = 1800;
@@ -840,7 +841,34 @@ def render_post_payment_thankyou_html(
     // Defer entitlement auto-fetch so the installer iframe gets first byte first.
     setTimeout(function () {{ ent.setAttribute("src", src); }}, delayMs);
   }})();
-  </script>
+  </script>"""
+    # Emphasize Windows admin wording for .exe; still show admin phrase for all.
+    admin_lead = "Please run the file as administrator."
+    btn = f"Download {plat_label} package"
+    return f"""
+<section id="post-pay-thankyou" class="thankyou" aria-labelledby="thank-you-heading">
+  <h1 id="thank-you-heading">Thank you</h1>
+  <p class="msg" id="pay-success">Payment confirmed. Your <strong id="paid-platform-label">{_escape_html_text(plat_label)}</strong> installer is ready:</p>
+  <p class="pkg" id="paid-package-name"><strong>{fname_esc}</strong></p>
+  {purchase_block}
+  {keygen_block}
+  {ent_block}
+  <p class="msg admin-run" id="run-as-admin-instruction">
+    <strong>{_escape_html_text(admin_lead)}</strong>
+    {admin}
+  </p>
+  <p class="msg" id="auto-download-note">please wait for your download.. packaging...</p>
+  <!-- Installer first (single-use grant). Entitlement file is deferred only when
+       session_id is present (script inside ent_block). No script click on package. -->
+  <iframe id="auto-download-frame" src="{link_esc}" style="width:0;height:0;border:0;position:absolute"
+    title="Automatic product download" aria-hidden="true"></iframe>
+  <p>
+    <a class="dl" id="success-download-link" href="{link_esc}"
+       data-manual-download="1" data-platform="{_escape_html_text(plat)}"
+       data-filename="{fname_esc}">
+      { _escape_html_text(btn) } (if it did not start)
+    </a>
+  </p>
   <p class="msg muted">This link is one-time and expires. It only unlocks the package you paid for.
     Tip optional: <a href="https://buymeacoffee.com/rgsneddon">buymeacoffee.com/rgsneddon</a></p>
   <p><a href="/">Home</a></p>
@@ -875,6 +903,44 @@ def normalize_purchase_id(purchase_id: str | None) -> str:
         # RPT + 12 hex
         body = s[3:]
         s = f"RPT-{body[0:4]}-{body[4:8]}-{body[8:12]}"
+    return s
+
+
+# --- Subscription keygen (human-enterable unlock code bound to entitlement) ---
+
+KEYGEN_UNLOCK_INSTRUCTION = (
+    "USE THIS KEYGEN TO UNLOCK YOUR RESTORE PRIVACY TRIAL"
+)
+
+# Distinct from PPI (RPT-XXXX-…) so buyers do not confuse purchase id with unlock.
+KEYGEN_PREFIX = "RPT-KEY-"
+
+
+def generate_keygen() -> str:
+    """Mint a unique human-enterable subscription keygen.
+
+    Format ``RPT-KEY-XXXX-XXXX-XXXX`` (12 hex chars after prefix). Bound to the
+    Stripe-backed connect entitlement; only active while subscription/payment
+    remains active on the status host.
+    """
+    raw = secrets.token_hex(6).upper()
+    return f"{KEYGEN_PREFIX}{raw[0:4]}-{raw[4:8]}-{raw[8:12]}"
+
+
+def normalize_keygen(keygen: str | None) -> str:
+    """Normalize customer-entered keygen for lookup (uppercase, strip spaces)."""
+    s = (keygen or "").strip().upper().replace(" ", "")
+    if not s:
+        return ""
+    # Accept RPTKEY… without separators → RPT-KEY-XXXX-XXXX-XXXX
+    if s.startswith("RPTKEY") and "-" not in s and len(s) == 18:
+        body = s[6:]
+        s = f"{KEYGEN_PREFIX}{body[0:4]}-{body[4:8]}-{body[8:12]}"
+    elif s.startswith("RPT-KEY") and s.count("-") == 1 and len(s) == 19:
+        # RPT-KEY + 12 hex no inner dashes
+        body = s.replace("RPT-KEY", "").replace("-", "")
+        if len(body) == 12:
+            s = f"{KEYGEN_PREFIX}{body[0:4]}-{body[4:8]}-{body[8:12]}"
     return s
 
 
@@ -928,8 +994,24 @@ def init_db() -> None:
         )
         _ensure_payment_intent_columns(conn)
         _migrate_grants_purchase_id(conn)
+        _ensure_keygen_column(conn)
     finally:
         conn.close()
+
+
+def _ensure_keygen_column(conn: sqlite3.Connection) -> None:
+    """Add unique keygen column on connect_entitlements (subscription unlock)."""
+    ent_cols = {
+        str(r[1]) for r in conn.execute("PRAGMA table_info(connect_entitlements)")
+    }
+    if "keygen" not in ent_cols:
+        conn.execute(
+            "ALTER TABLE connect_entitlements ADD COLUMN keygen TEXT"
+        )
+    conn.execute(
+        "CREATE UNIQUE INDEX IF NOT EXISTS idx_entitlements_keygen "
+        "ON connect_entitlements(keygen) WHERE keygen IS NOT NULL AND keygen != ''"
+    )
 
 
 def _ensure_payment_intent_columns(conn: sqlite3.Connection) -> None:
@@ -972,6 +1054,77 @@ ENTITLEMENT_FAILED = "failed"
 ENTITLEMENT_REVOKED = "revoked"
 
 
+def _mint_unique_keygen(conn: sqlite3.Connection) -> str:
+    """Generate a keygen not already stored (retry on rare collision)."""
+    for _ in range(12):
+        kg = generate_keygen()
+        row = conn.execute(
+            "SELECT 1 FROM connect_entitlements WHERE keygen = ?", (kg,)
+        ).fetchone()
+        if row is None:
+            return kg
+    # Extremely unlikely; fall back to longer entropy
+    return f"{KEYGEN_PREFIX}{secrets.token_hex(8).upper()}"
+
+
+def assign_keygen_for_session(
+    session_id: str,
+    *,
+    keygen: str | None = None,
+    now: float | None = None,
+) -> str:
+    """Ensure *session_id* has a unique keygen; return it (create if missing).
+
+    Idempotent: keeps an existing keygen on re-fulfilment so the customer email
+    and client unlock stay stable for the same paid session.
+    """
+    sid = (session_id or "").strip()
+    if not sid:
+        return ""
+    init_db()
+    t = now if now is not None else time.time()
+    want = normalize_keygen(keygen) if keygen else ""
+    conn = _connect()
+    try:
+        row = conn.execute(
+            "SELECT keygen FROM connect_entitlements WHERE session_id = ?",
+            (sid,),
+        ).fetchone()
+        if row is not None:
+            existing = normalize_keygen(str(row["keygen"] or ""))
+            if existing:
+                return existing
+            kg = want or _mint_unique_keygen(conn)
+            conn.execute(
+                "UPDATE connect_entitlements SET keygen = ?, updated_at = ? "
+                "WHERE session_id = ?",
+                (kg, t, sid),
+            )
+            return kg
+        # Entitlement row may not exist yet — create minimal active + keygen
+        kg = want or _mint_unique_keygen(conn)
+        conn.execute(
+            """
+            INSERT INTO connect_entitlements(
+                session_id, status, platform, reason, created_at, updated_at,
+                keygen
+            ) VALUES (?,?,?,?,?,?,?)
+            """,
+            (
+                sid,
+                ENTITLEMENT_ACTIVE,
+                "",
+                "payment_succeeded",
+                t,
+                t,
+                kg,
+            ),
+        )
+        return kg
+    finally:
+        conn.close()
+
+
 def activate_connect_entitlement(
     session_id: str,
     *,
@@ -979,17 +1132,20 @@ def activate_connect_entitlement(
     payment_intent_id: str = "",
     subscription_id: str = "",
     valid_until: float | None = None,
+    keygen: str | None = None,
     now: float | None = None,
-) -> None:
+) -> str:
     """Mark Checkout session as paid/active for Connect entitlement.
 
     *valid_until* is a unix timestamp after which Connect is no longer allowed
     (subscription period end). ``None`` means no time limit (one-time pay until
     refund/revoke).
+
+    Returns the bound **keygen** (minted once per session if not already set).
     """
     sid = (session_id or "").strip()
     if not sid:
-        return
+        return ""
     init_db()
     t = now if now is not None else time.time()
     plat = (platform or "").strip().lower()
@@ -998,11 +1154,12 @@ def activate_connect_entitlement(
     conn = _connect()
     try:
         cur = conn.execute(
-            "SELECT platform, payment_intent_id, subscription_id, valid_until "
+            "SELECT platform, payment_intent_id, subscription_id, valid_until, keygen "
             "FROM connect_entitlements WHERE session_id = ?",
             (sid,),
         )
         row = cur.fetchone()
+        keep_keygen = ""
         if row:
             keep_plat = plat or (row["platform"] or "")
             keep_pi = pi or (row["payment_intent_id"] or "")
@@ -1011,11 +1168,22 @@ def activate_connect_entitlement(
                 keep_vu = row["valid_until"]
             else:
                 keep_vu = float(valid_until)
+            existing_kg = ""
+            try:
+                existing_kg = normalize_keygen(str(row["keygen"] or ""))
+            except (KeyError, IndexError, TypeError):
+                existing_kg = ""
+            keep_keygen = (
+                normalize_keygen(keygen)
+                if keygen
+                else existing_kg
+            ) or existing_kg or _mint_unique_keygen(conn)
             conn.execute(
                 """
                 UPDATE connect_entitlements
                 SET status = ?, platform = ?, reason = ?, updated_at = ?,
-                    payment_intent_id = ?, subscription_id = ?, valid_until = ?
+                    payment_intent_id = ?, subscription_id = ?, valid_until = ?,
+                    keygen = ?
                 WHERE session_id = ?
                 """,
                 (
@@ -1026,16 +1194,18 @@ def activate_connect_entitlement(
                     keep_pi,
                     keep_sub,
                     keep_vu,
+                    keep_keygen,
                     sid,
                 ),
             )
         else:
+            keep_keygen = normalize_keygen(keygen) if keygen else _mint_unique_keygen(conn)
             conn.execute(
                 """
                 INSERT INTO connect_entitlements(
                     session_id, status, platform, reason, created_at, updated_at,
-                    payment_intent_id, subscription_id, valid_until
-                ) VALUES (?,?,?,?,?,?,?,?,?)
+                    payment_intent_id, subscription_id, valid_until, keygen
+                ) VALUES (?,?,?,?,?,?,?,?,?,?)
                 """,
                 (
                     sid,
@@ -1047,6 +1217,7 @@ def activate_connect_entitlement(
                     pi,
                     sub,
                     float(valid_until) if valid_until is not None else None,
+                    keep_keygen,
                 ),
             )
         if pi:
@@ -1054,6 +1225,7 @@ def activate_connect_entitlement(
                 "UPDATE grants SET payment_intent_id = ? WHERE session_id = ?",
                 (pi, sid),
             )
+        return keep_keygen
     finally:
         conn.close()
 
@@ -1145,7 +1317,7 @@ def get_connect_entitlement(
         cur = conn.execute(
             """
             SELECT session_id, status, platform, reason, created_at, updated_at,
-                   payment_intent_id, subscription_id, valid_until
+                   payment_intent_id, subscription_id, valid_until, keygen
             FROM connect_entitlements WHERE session_id = ?
             """,
             (sid,),
@@ -1175,6 +1347,10 @@ def get_connect_entitlement(
             conn.execute(
                 "DELETE FROM device_entitlements WHERE session_id = ?", (sid,)
             )
+        try:
+            kg = normalize_keygen(str(row["keygen"] or ""))
+        except (KeyError, IndexError, TypeError):
+            kg = ""
         return {
             "session_id": row["session_id"],
             "status": status,
@@ -1185,12 +1361,42 @@ def get_connect_entitlement(
             "payment_intent_id": row["payment_intent_id"] or "",
             "subscription_id": row["subscription_id"] or "",
             "valid_until": vu_f,
+            "keygen": kg,
             "connect_allowed": _entitlement_connect_allowed(status, vu_f, now=t)
             if status == ENTITLEMENT_ACTIVE
             else False,
         }
     finally:
         conn.close()
+
+
+def get_connect_entitlement_by_keygen(
+    keygen: str, *, now: float | None = None
+) -> dict[str, Any] | None:
+    """Lookup entitlement by customer keygen (subscription unlock path).
+
+    Returns the same shape as :func:`get_connect_entitlement`. When the bound
+    subscription/payment is failed/revoked or period ended, ``connect_allowed``
+    is False — the keygen is useless until a new active entitlement exists.
+    """
+    kg = normalize_keygen(keygen)
+    if not kg or not kg.startswith("RPT-KEY-"):
+        return None
+    init_db()
+    conn = _connect()
+    try:
+        row = conn.execute(
+            "SELECT session_id FROM connect_entitlements WHERE keygen = ?",
+            (kg,),
+        ).fetchone()
+        if not row:
+            return None
+        sid = str(row["session_id"] or "")
+    finally:
+        conn.close()
+    if not sid:
+        return None
+    return get_connect_entitlement(sid, now=now)
 
 
 def connect_entitlement_allows(session_id: str, *, now: float | None = None) -> bool:
@@ -1474,6 +1680,390 @@ def client_entitlement_file_payload(session_id: str) -> dict[str, Any] | None:
         "updated_at": float(ent.get("updated_at") or time.time()),
         "valid_until": ent.get("valid_until"),
         "connect_allowed": bool(ent.get("connect_allowed")),
+        "keygen": ent.get("keygen") or "",
+    }
+
+
+def customer_email_from_checkout_object(obj: dict[str, Any]) -> str:
+    """Extract customer email from a Stripe Checkout Session object."""
+    if not isinstance(obj, dict):
+        return ""
+    for key in ("customer_email", "customer_details"):
+        if key == "customer_email":
+            em = str(obj.get("customer_email") or "").strip()
+            if em and "@" in em:
+                return em
+        else:
+            details = obj.get("customer_details") or {}
+            if isinstance(details, dict):
+                em = str(details.get("email") or "").strip()
+                if em and "@" in em:
+                    return em
+    # Nested customer object sometimes present
+    cust = obj.get("customer_details") or obj.get("customer")
+    if isinstance(cust, dict):
+        em = str(cust.get("email") or "").strip()
+        if em and "@" in em:
+            return em
+    return ""
+
+
+def build_fulfilment_email_payload(
+    *,
+    to_email: str,
+    keygen: str,
+    purchase_id: str,
+    download_url: str,
+    platform: str = "",
+    session_id: str = "",
+    filename: str = "",
+) -> dict[str, Any]:
+    """Build the customer fulfilment email (keygen + PPI + download link).
+
+    Pure helper — no I/O. Used by tests and :func:`send_fulfilment_email`.
+    Body always includes :data:`KEYGEN_UNLOCK_INSTRUCTION`.
+    """
+    to_addr = (to_email or "").strip()
+    kg = normalize_keygen(keygen)
+    pid = normalize_purchase_id(purchase_id) or (purchase_id or "").strip().upper()
+    dl = (download_url or "").strip()
+    plat = (platform or "").strip().lower()
+    sid = (session_id or "").strip()
+    fname = (filename or "").strip()
+    subject = "Your Restore Privacy download and unlock keygen"
+    body_lines = [
+        "Thank you for purchasing Restore Privacy.",
+        "",
+        KEYGEN_UNLOCK_INSTRUCTION,
+        "",
+        f"Keygen: {kg}",
+        f"Product purchase identifier (PPI): {pid}",
+        f"Download link (one-time): {dl}",
+        "",
+        "Install flow: Install → accept licence terms and conditions → enter keygen → unlock.",
+        "Your monthly subscription (£2.45 per month) begins after your 7 day trial.",
+        "The keygen only unlocks Connect while your subscription/payment is active.",
+        "If payment fails later (failed charge, refund, dispute, or subscription ends),",
+        "this keygen becomes useless and the app locks until payment is active again.",
+        "",
+    ]
+    if fname:
+        body_lines.append(f"Package: {fname}")
+    if plat:
+        body_lines.append(f"Platform: {plat}")
+    if sid:
+        body_lines.append(f"Checkout session (support): {sid}")
+    body_lines.extend(
+        [
+            "",
+            "Save this email. The download link expires; the keygen stays bound to your entitlement.",
+            "— Restore Privacy",
+        ]
+    )
+    body = "\n".join(body_lines) + "\n"
+    return {
+        "to": to_addr,
+        "subject": subject,
+        "body": body,
+        "keygen": kg,
+        "purchase_id": pid,
+        "download_url": dl,
+        "platform": plat,
+        "session_id": sid,
+        "filename": fname,
+        "unlock_instruction": KEYGEN_UNLOCK_INSTRUCTION,
+    }
+
+
+# Env keys read by :func:`fulfilment_smtp_config` / send path (Render blueprint + docs).
+FULFILMENT_SMTP_ENV_KEYS: tuple[str, ...] = (
+    "RPT_FULFILMENT_SMTP_HOST",
+    "RPT_FULFILMENT_SMTP_PORT",
+    "RPT_FULFILMENT_SMTP_USER",
+    "RPT_FULFILMENT_SMTP_PASSWORD",
+    "RPT_FULFILMENT_FROM_EMAIL",
+    "RPT_FULFILMENT_SMTP_TLS",
+)
+
+
+def fulfilment_smtp_env_keys() -> list[str]:
+    """Documented SMTP env keys the fulfilment mailer actually reads (no secrets)."""
+    return list(FULFILMENT_SMTP_ENV_KEYS)
+
+
+def fulfilment_smtp_config() -> dict[str, Any]:
+    """Read optional SMTP env for transactional fulfilment email."""
+    host = os.environ.get("RPT_FULFILMENT_SMTP_HOST", "").strip()
+    port_raw = os.environ.get("RPT_FULFILMENT_SMTP_PORT", "587").strip() or "587"
+    try:
+        port = int(port_raw)
+    except ValueError:
+        port = 587
+    user = os.environ.get("RPT_FULFILMENT_SMTP_USER", "").strip()
+    password = os.environ.get("RPT_FULFILMENT_SMTP_PASSWORD", "").strip()
+    from_addr = os.environ.get(
+        "RPT_FULFILMENT_FROM_EMAIL",
+        os.environ.get("RPT_FULFILMENT_SMTP_FROM", "noreply@restoreprivacy.online"),
+    ).strip()
+    use_tls = os.environ.get("RPT_FULFILMENT_SMTP_TLS", "1").strip().lower() not in (
+        "0",
+        "false",
+        "no",
+        "off",
+    )
+    return {
+        "host": host,
+        "port": port,
+        "user": user,
+        "password": password,
+        "from_addr": from_addr,
+        "use_tls": use_tls,
+        "configured": bool(host),
+        "env_keys": fulfilment_smtp_env_keys(),
+    }
+
+
+def assess_fulfilment_smtp_readiness(
+    cfg: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    """Map SMTP env presence → operator enablement verdict (no secrets in output).
+
+    Code's ``configured`` flag is **host non-empty** only (send path skips when
+    host unset). Real provider send typically also needs user + password.
+    """
+    c = cfg if isinstance(cfg, dict) else fulfilment_smtp_config()
+    host = bool(str(c.get("host") or "").strip())
+    user = bool(str(c.get("user") or "").strip())
+    password = bool(str(c.get("password") or "").strip())
+    from_addr = bool(str(c.get("from_addr") or "").strip())
+    port = c.get("port")
+    try:
+        port_ok = int(port) > 0
+    except (TypeError, ValueError):
+        port_ok = False
+    use_tls = bool(c.get("use_tls"))
+    # Presence map only — never echo secret values
+    keys_present = {
+        "RPT_FULFILMENT_SMTP_HOST": host,
+        "RPT_FULFILMENT_SMTP_PORT": port_ok,
+        "RPT_FULFILMENT_SMTP_USER": user,
+        "RPT_FULFILMENT_SMTP_PASSWORD": password,
+        "RPT_FULFILMENT_FROM_EMAIL": from_addr,
+        "RPT_FULFILMENT_SMTP_TLS": True,  # defaulted when unset
+    }
+    if not host:
+        status = "disabled"
+        detail = (
+            "SMTP host unset — send_fulfilment_email skips with smtp_not_configured"
+        )
+        email_flow_enabled = False
+    elif host and (not user or not password):
+        status = "host_only_incomplete_auth"
+        detail = (
+            "Host set so configured=True, but user and/or password empty — "
+            "typical providers will fail login; set SMTP user + password on Render"
+        )
+        email_flow_enabled = False
+    elif host and user and password and from_addr and port_ok:
+        status = "ready_to_attempt_send"
+        detail = (
+            "Host + user + password + from + port present — fulfilment email "
+            "will attempt SMTP send (TLS=%s)" % ("on" if use_tls else "off")
+        )
+        email_flow_enabled = True
+    else:
+        status = "partial"
+        detail = "Host set but from address or port incomplete"
+        email_flow_enabled = False
+    missing = [k for k, ok in keys_present.items() if not ok and k != "RPT_FULFILMENT_SMTP_TLS"]
+    return {
+        "status": status,
+        "email_flow_enabled": email_flow_enabled,
+        "code_configured_flag": bool(c.get("configured")),
+        "keys_present": keys_present,
+        "missing_or_empty": missing,
+        "port": int(port) if port_ok else None,
+        "use_tls": use_tls,
+        "detail": detail,
+        "env_keys": fulfilment_smtp_env_keys(),
+    }
+
+
+def desired_payment_link_trial_fields() -> dict[str, Any]:
+    """Target Stripe Payment Link / price shape for homepage trial messaging.
+
+    Pure helper for deploy scripts + unit tests (no network). Live update uses
+    Stripe API when ``STRIPE_SECRET_KEY`` is set.
+    """
+    return {
+        "payment_link_id": DEFAULT_STRIPE_PAYMENT_LINK_ID,
+        "payment_page_url": DEFAULT_STRIPE_PAYMENT_PAGE_URL,
+        "price_id": DEFAULT_STRIPE_PAYMENT_LINK_PRICE_ID,
+        "currency": PRICE_CURRENCY,
+        "unit_amount_pence": PRICE_PENCE,
+        "recurring_interval": "month",
+        "trial_period_days": 7,
+        "mode": "subscription",
+        "homepage_trial_sentence": (
+            "Your monthly subscription (£2.45 per month) begins after your 7 day trial"
+        ),
+    }
+
+
+def payment_link_matches_trial_subscription(price_obj: dict[str, Any]) -> dict[str, Any]:
+    """Check a Stripe Price object against desired £2.45/mo + trial fields.
+
+    *price_obj* is a Stripe API Price dict (or redacted summary). Returns
+    ``{ok, mismatches[], observed}`` without inventing success.
+    """
+    want = desired_payment_link_trial_fields()
+    mismatches: list[str] = []
+    if not isinstance(price_obj, dict):
+        return {"ok": False, "mismatches": ["not_a_dict"], "observed": {}}
+    currency = str(price_obj.get("currency") or "").strip().lower()
+    amount = price_obj.get("unit_amount")
+    try:
+        amount_i = int(amount) if amount is not None else None
+    except (TypeError, ValueError):
+        amount_i = None
+    recurring = price_obj.get("recurring") or {}
+    if not isinstance(recurring, dict):
+        recurring = {}
+    interval = str(recurring.get("interval") or "").strip().lower()
+    trial = recurring.get("trial_period_days")
+    if trial is None:
+        trial = price_obj.get("trial_period_days")
+    try:
+        trial_i = int(trial) if trial is not None else None
+    except (TypeError, ValueError):
+        trial_i = None
+    # Some Dashboard prices put trial on the Payment Link / subscription_data
+    # rather than the Price; callers may pass trial_period_days at top level.
+    if currency != want["currency"]:
+        mismatches.append(f"currency:{currency!r}!={want['currency']!r}")
+    if amount_i != want["unit_amount_pence"]:
+        mismatches.append(f"unit_amount:{amount_i!r}!={want['unit_amount_pence']}")
+    if interval != want["recurring_interval"]:
+        mismatches.append(f"interval:{interval!r}!={want['recurring_interval']!r}")
+    # trial may live on Subscription Data of the Payment Link
+    link_trial = price_obj.get("payment_link_trial_period_days")
+    try:
+        link_trial_i = int(link_trial) if link_trial is not None else None
+    except (TypeError, ValueError):
+        link_trial_i = None
+    effective_trial = trial_i if trial_i is not None else link_trial_i
+    if effective_trial != want["trial_period_days"]:
+        mismatches.append(
+            f"trial_period_days:{effective_trial!r}!={want['trial_period_days']}"
+        )
+    observed = {
+        "currency": currency,
+        "unit_amount": amount_i,
+        "interval": interval,
+        "trial_period_days": effective_trial,
+        "price_id": str(price_obj.get("id") or ""),
+        "type": str(price_obj.get("type") or ""),
+    }
+    return {"ok": len(mismatches) == 0, "mismatches": mismatches, "observed": observed}
+
+
+def send_fulfilment_email(
+    payload: dict[str, Any],
+    *,
+    transport: Callable[[dict[str, Any]], dict[str, Any]] | None = None,
+) -> dict[str, Any]:
+    """Send fulfilment email via SMTP (or injected *transport* for tests).
+
+    Returns ``{ok, sent, error?, skipped?}``. Without SMTP host configured and
+    without a transport, returns ok with ``skipped=True`` (payload still built
+    by caller) so checkout fulfilment never fails on missing mail credentials.
+    """
+    if not isinstance(payload, dict):
+        return {"ok": False, "sent": False, "error": "bad_payload"}
+    to_addr = str(payload.get("to") or "").strip()
+    if not to_addr or "@" not in to_addr:
+        return {"ok": False, "sent": False, "error": "missing_to_email"}
+    if transport is not None:
+        try:
+            result = transport(payload)
+            if isinstance(result, dict):
+                return result
+            return {"ok": True, "sent": True}
+        except Exception as exc:  # noqa: BLE001
+            return {"ok": False, "sent": False, "error": str(exc)}
+    cfg = fulfilment_smtp_config()
+    if not cfg.get("configured"):
+        return {
+            "ok": True,
+            "sent": False,
+            "skipped": True,
+            "error": "smtp_not_configured",
+        }
+    try:
+        import smtplib
+        from email.message import EmailMessage
+
+        msg = EmailMessage()
+        msg["Subject"] = str(payload.get("subject") or "Your Restore Privacy download")
+        msg["From"] = str(cfg["from_addr"])
+        msg["To"] = to_addr
+        msg.set_content(str(payload.get("body") or ""))
+        with smtplib.SMTP(str(cfg["host"]), int(cfg["port"]), timeout=30) as smtp:
+            if cfg.get("use_tls"):
+                smtp.starttls()
+            user = str(cfg.get("user") or "")
+            password = str(cfg.get("password") or "")
+            if user:
+                smtp.login(user, password)
+            smtp.send_message(msg)
+        return {"ok": True, "sent": True, "skipped": False}
+    except Exception as exc:  # noqa: BLE001
+        return {"ok": False, "sent": False, "error": str(exc)}
+
+
+def fulfil_checkout_with_email(
+    *,
+    token: str,
+    session_id: str,
+    platform: str,
+    filename: str,
+    customer_email: str,
+    keygen: str = "",
+    purchase_id: str = "",
+    base_url: str | None = None,
+    transport: Callable[[dict[str, Any]], dict[str, Any]] | None = None,
+) -> dict[str, Any]:
+    """After paid grant: ensure keygen, build email payload, attempt send.
+
+    Returns dict with keygen, purchase_id, download_url, email payload, send result.
+    """
+    sid = (session_id or "").strip()
+    kg = normalize_keygen(keygen) if keygen else ""
+    if sid and not kg:
+        kg = assign_keygen_for_session(sid)
+    pid = normalize_purchase_id(purchase_id) if purchase_id else ""
+    if not pid and token:
+        pid = purchase_id_for_token(token) or ""
+    base = (base_url if base_url is not None else public_base_url()).rstrip("/")
+    path = f"/download?token={token}" if token else ""
+    download_url = f"{base}{path}" if path else ""
+    email_payload = build_fulfilment_email_payload(
+        to_email=customer_email,
+        keygen=kg,
+        purchase_id=pid or "",
+        download_url=download_url,
+        platform=platform,
+        session_id=sid,
+        filename=filename,
+    )
+    send_result = send_fulfilment_email(email_payload, transport=transport)
+    return {
+        "keygen": kg,
+        "purchase_id": pid or email_payload.get("purchase_id") or "",
+        "download_url": download_url,
+        "download_path": path,
+        "email": email_payload,
+        "send": send_result,
     }
 
 
@@ -2506,7 +3096,11 @@ def verify_stripe_signature(
     return False
 
 
-def process_checkout_completed_event(event: dict[str, Any]) -> str | None:
+def process_checkout_completed_event(
+    event: dict[str, Any],
+    *,
+    email_transport: Callable[[dict[str, Any]], dict[str, Any]] | None = None,
+) -> str | None:
     """On checkout.session.completed, mint a download token. Returns token or None.
 
     Supports server Checkout (metadata platform/filename/amount) and Payment Link
@@ -2516,6 +3110,10 @@ def process_checkout_completed_event(event: dict[str, Any]) -> str | None:
     **Only if paid:** ``payment_status`` must be ``paid`` or ``no_payment_required``.
     **Full product price:** resolved amount must equal ``PRICE_PENCE`` (245) — underpay
     / zero / missing amount never mint a grant.
+
+    Also mints a unique **keygen** bound to the connect entitlement and attempts
+    the customer fulfilment email (keygen + PPI + download link). Email send is
+    best-effort (SMTP optional); grant + keygen still succeed without mail.
     """
     if event.get("type") != "checkout.session.completed":
         return None
@@ -2547,11 +3145,6 @@ def process_checkout_completed_event(event: dict[str, Any]) -> str | None:
             amount = int(obj.get("amount_total"))
     except (TypeError, ValueError):
         return None
-    if amount is None or amount != PRICE_PENCE:
-        return None
-    currency = str(meta.get("currency") or obj.get("currency") or "").strip().lower()
-    if currency != PRICE_CURRENCY:
-        return None
     session_id = str(obj.get("id") or "")
     payment_intent_id = _payment_intent_id_from_stripe_object(obj)
     sub_raw = obj.get("subscription")
@@ -2559,6 +3152,19 @@ def process_checkout_completed_event(event: dict[str, Any]) -> str | None:
         subscription_id = str(sub_raw.get("id") or "")
     else:
         subscription_id = str(sub_raw or "").strip()
+    # Full price (245) always OK. £0 / no_payment_required allowed only with a
+    # subscription id (7-day trial then monthly) so underpay one-time never mints.
+    amount_ok = amount is not None and amount == PRICE_PENCE
+    trial_ok = bool(subscription_id) and (
+        payment_status == "no_payment_required"
+        or amount == 0
+        or amount is None
+    )
+    if not amount_ok and not trial_ok:
+        return None
+    currency = str(meta.get("currency") or obj.get("currency") or PRICE_CURRENCY).strip().lower()
+    if currency and currency != PRICE_CURRENCY:
+        return None
     # Subscription checkout: usable through first period end when provided
     valid_until = None
     if subscription_id:
@@ -2571,15 +3177,32 @@ def process_checkout_completed_event(event: dict[str, Any]) -> str | None:
         amount_pence=PRICE_PENCE,
         currency=PRICE_CURRENCY,
     )
-    # Successful paid session → Connect entitlement active (bind PI for refunds)
+    # Successful paid session → Connect entitlement active + unique keygen
+    keygen = ""
     if session_id:
-        activate_connect_entitlement(
+        keygen = activate_connect_entitlement(
             session_id,
             platform=platform,
             payment_intent_id=payment_intent_id,
             subscription_id=subscription_id,
             valid_until=valid_until,
-        )
+        ) or ""
+    # Customer fulfilment email: keygen + PPI + one-time download URL
+    try:
+        cust_email = customer_email_from_checkout_object(obj)
+        if token and (cust_email or keygen):
+            fulfil_checkout_with_email(
+                token=token,
+                session_id=session_id,
+                platform=platform,
+                filename=filename,
+                customer_email=cust_email,
+                keygen=keygen,
+                transport=email_transport,
+            )
+    except Exception:  # noqa: BLE001
+        # Never block grant mint on email failure
+        pass
     return token
 
 
@@ -2589,10 +3212,11 @@ def handle_stripe_webhook(
     *,
     secret: str | None = None,
     now: float | None = None,
+    email_transport: Callable[[dict[str, Any]], dict[str, Any]] | None = None,
 ) -> dict[str, Any]:
     """Verify signature; grant token on paid checkout; revoke on payment failure.
 
-    Returns {ok, granted, token?, revoked?, session_id?, error?}.
+    Returns {ok, granted, token?, keygen?, revoked?, session_id?, error?}.
     """
     wh_secret = (secret if secret is not None else stripe_webhook_secret()).strip()
     if not verify_stripe_signature(payload, sig_header, wh_secret, now=now):
@@ -2601,9 +3225,28 @@ def handle_stripe_webhook(
         event = json.loads(payload.decode("utf-8"))
     except (UnicodeDecodeError, json.JSONDecodeError):
         return {"ok": False, "granted": False, "error": "bad_json"}
-    token = process_checkout_completed_event(event)
+    token = process_checkout_completed_event(event, email_transport=email_transport)
     if token:
-        return {"ok": True, "granted": True, "token": token, "revoked": False}
+        sid = ""
+        kg = ""
+        try:
+            obj = (event.get("data") or {}).get("object") or {}
+            if isinstance(obj, dict):
+                sid = str(obj.get("id") or "")
+            if sid:
+                ent = get_connect_entitlement(sid)
+                if ent:
+                    kg = str(ent.get("keygen") or "")
+        except Exception:  # noqa: BLE001
+            pass
+        return {
+            "ok": True,
+            "granted": True,
+            "token": token,
+            "revoked": False,
+            "session_id": sid,
+            "keygen": kg,
+        }
     # Subscription cancel / renew / period end
     sub_result = process_subscription_lifecycle_event(event, now=now)
     if sub_result:

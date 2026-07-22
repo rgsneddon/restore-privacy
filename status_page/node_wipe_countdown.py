@@ -1,16 +1,14 @@
-"""Public dual-line countdown: next entry (Node A) / exit (Node B) data clear.
+"""Public countdown: next **entry** (Node A) data clear only.
 
 Display for https://restoreprivacy.online/ homepage. Period matches the product
 **weekly entry wipe** service (``OnUnitActiveSec=604800`` / ``7d``).
 
 Honesty:
 - **Node A (entry)** aligns with the real weekly entry wipe/rebuild cadence.
-- **Node B (exit)** uses the same **display** period with a phase offset — the
-  product weekly service is **entry-only** (never concurrent exit wipe from that
-  timer). Exit line is a planned clear schedule for transparency, not a claim
-  that live dual-VPS wipe is running.
-- “DATA IS CLEARED” means the product wipe/rebuild cycle; it does **not** erase
-  VPS provider off-box backups/netflow.
+- **Exit is never wiped/rebuilt by the weekly service** — no exit timer on the
+  homepage (exit stays up for residual failover during entry drain).
+- “DATA IS CLEARED” means the product entry wipe/rebuild cycle; it does **not**
+  erase VPS provider off-box backups/netflow.
 """
 
 from __future__ import annotations
@@ -22,21 +20,21 @@ from typing import Any, Optional
 
 # Exact OBJECTIVE labels (case/spacing preserved)
 NODE_A_ENTRY_LABEL = "ALL NODE A (ENTRY NODE) DATA IS CLEARED in"
+# Kept for tests/back-compat references; not rendered on the homepage (0.3.7+).
 NODE_B_EXIT_LABEL = "ALL NODE B (EXIT NODE) DATA IS CLEARED IN"
 
 # Matches weekly entry wipe timer (scripts/install_ephemeral_timer.sh PERIOD=7d)
 NODE_WIPE_PERIOD = timedelta(days=7)
 NODE_WIPE_PERIOD_SECONDS = int(NODE_WIPE_PERIOD.total_seconds())  # 604800
 
-# Phase offset for Node B display so the two lines are not identical clocks.
-# Half period keeps exit clear schedule staggered from entry (display only).
+# Legacy phase constant (unused for public HTML; exit timer removed 0.3.7)
 NODE_B_PHASE_SECONDS = NODE_WIPE_PERIOD_SECONDS // 2
 
 HONESTY_BLURB = (
-    "Node A: weekly entry wipe/rebuild cadence (~7d). "
-    "Node B: planned exit clear display schedule (same period, staggered) — "
-    "weekly live wipe service is entry-only. "
-    "Product rebuild cycle; does not erase provider backups/netflow."
+    "Entry node only: weekly wipe/rebuild cadence (~7d) with mandatory full "
+    "selfhost reinstall after rebuild. Exit node is never wiped by this timer "
+    "(stays up for residual failover). Product rebuild cycle; does not erase "
+    "provider backups/netflow."
 )
 
 
@@ -276,7 +274,7 @@ def render_node_wipe_countdown_html(
     entry_last: datetime | None = None,
     exit_last: datetime | None = None,
 ) -> str:
-    """Two-line HTML fragment + 1s client tick for remaining time."""
+    """Entry-only HTML countdown + 1s client tick (exit timer not rendered)."""
     state = dual_node_wipe_state(
         now=now,
         entry_next=entry_next,
@@ -285,28 +283,20 @@ def render_node_wipe_countdown_html(
         exit_last=exit_last,
     )
     a = state["entry"]
-    b = state["exit"]
     label_a = html.escape(str(a["label"]))
-    label_b = html.escape(str(b["label"]))
     next_a = html.escape(str(a["next_clear_at"]))
-    next_b = html.escape(str(b["next_clear_at"]))
     blurb = html.escape(str(state["blurb"]))
     period = int(state["period_seconds"])
     boxes_a = unit_boxes_html(int(a["remaining_seconds"]), value_id_prefix="nw-entry")
-    boxes_b = unit_boxes_html(int(b["remaining_seconds"]), value_id_prefix="nw-exit")
 
     return f"""  <div class="node-wipe-countdown panel-card" id="node-wipe-countdown"
        data-period-seconds="{period}"
        data-next-entry="{next_a}"
-       data-next-exit="{next_b}">
-    <h2 class="panel-title" id="node-wipe-heading">Node data clear timers</h2>
+       data-entry-only="1">
+    <h2 class="panel-title" id="node-wipe-heading">Entry node data clear timer</h2>
     <div class="node-wipe-row" id="node-wipe-row-entry">
       <span class="node-wipe-label" id="node-wipe-label-entry">{label_a}</span>
       {boxes_a}
-    </div>
-    <div class="node-wipe-row" id="node-wipe-row-exit">
-      <span class="node-wipe-label" id="node-wipe-label-exit">{label_b}</span>
-      {boxes_b}
     </div>
     <p class="node-wipe-blurb" id="node-wipe-blurb">{blurb}</p>
   </div>
@@ -315,7 +305,6 @@ def render_node_wipe_countdown_html(
     var root = document.getElementById("node-wipe-countdown");
     if (!root) return;
     var nextA = root.getAttribute("data-next-entry") || "";
-    var nextB = root.getAttribute("data-next-exit") || "";
     var period = parseInt(root.getAttribute("data-period-seconds") || "604800", 10);
     if (!period || period < 1) period = 604800;
     function pad(n) {{ return n < 10 ? "0" + n : String(n); }}
@@ -343,16 +332,11 @@ def render_node_wipe_countdown_html(
       return d;
     }}
     var deadlineA = roll(nextA);
-    var deadlineB = roll(nextB);
     function tick() {{
       var now = Date.now();
       if (deadlineA != null) {{
         while (deadlineA <= now) {{ deadlineA += period * 1000; }}
         paint("nw-entry", Math.max(0, Math.floor((deadlineA - now) / 1000)));
-      }}
-      if (deadlineB != null) {{
-        while (deadlineB <= now) {{ deadlineB += period * 1000; }}
-        paint("nw-exit", Math.max(0, Math.floor((deadlineB - now) / 1000)));
       }}
     }}
     tick();

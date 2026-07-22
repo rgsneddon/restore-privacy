@@ -11,6 +11,40 @@ permanent installer buttons. Payment grants a **single-use, expiring** download
 token; `/download` **proxies** the installer via a server-side GitHub token
 (`RPT_GITHUB_TOKEN` / `GITHUB_TOKEN`) or locally staged assets (`RPT_ASSET_DIR`).
 
+## Deploy: fulfilment SMTP + Stripe 7-day trial
+
+Operator deploy for production email + Payment Link trial is documented in
+[`docs/STATUS_HOST_SMTP_AND_TRIAL.md`](../../docs/STATUS_HOST_SMTP_AND_TRIAL.md):
+
+- Render env: `RPT_FULFILMENT_SMTP_*` (blueprint `render.yaml`; script `scripts/set_render_fulfilment_smtp.ps1`)
+- Stripe Payment Link: £2.45/month GBP + **7 day trial** (script `scripts/configure_stripe_payment_link_trial.py` when `STRIPE_SECRET_KEY` is set)
+
+## Customer journey (subscription keygen unlock)
+
+1. Homepage shows **£2.45 per package**, then:
+   **Your monthly subscription (£2.45 per month) begins after your 7 day trial**,
+   then pay-on-Stripe wording.
+2. After successful Stripe pay, the status host:
+   - mints a one-time download token
+   - activates Connect entitlement for the Checkout session
+   - mints a unique **keygen** (`RPT-KEY-…`) bound to that entitlement
+   - emails the customer: **keygen + PPI + download link**, with
+     **USE THIS KEYGEN TO UNLOCK YOUR RESTORE PRIVACY TRIAL**
+3. Client first-use flow on every platform:
+   **Install → accept licence terms and conditions → enter keygen → unlock**.
+4. Connect stays allowed only while the status host reports an **active**
+   subscription/entitlement for that keygen. Payment failure, refund, dispute,
+   or subscription end **revokes** the entitlement — the keygen becomes useless
+   and the client locks until payment is active again.
+
+### Feasibility of subscription retention
+
+**Feasible** when unlock is **online-validated** against the status host
+(keygen → entitlement row tied to Stripe webhooks). Offline-only forever
+keygens cannot reliably lock clients after payment failure. This product uses
+online re-check on Connect (`client/payment_entitlement.py` and
+`/api/connect-entitlement?keygen=…`).
+
 ---
 
 ## 1. Stripe — land money in your Stripe account
@@ -108,6 +142,11 @@ stripe trigger checkout.session.completed
 | `RPT_ASSET_FETCH_TOKEN` | Shared secret (you choose) for status host → Iceland VPS paid installer fetch; same value on VPS unit |
 | `RPT_PAYMENT_DATA_DIR` | Optional directory for SQLite grant DB (default: `status_page/data/`) |
 | `RPT_DOWNLOAD_TOKEN_TTL_SEC` | Optional token lifetime (default `3600`) |
+| `RPT_FULFILMENT_SMTP_HOST` | Optional SMTP host for customer fulfilment email (keygen + PPI + download) |
+| `RPT_FULFILMENT_SMTP_PORT` | SMTP port (default `587`) |
+| `RPT_FULFILMENT_SMTP_USER` / `RPT_FULFILMENT_SMTP_PASSWORD` | SMTP auth |
+| `RPT_FULFILMENT_FROM_EMAIL` | From address (default `noreply@restoreprivacy.online`) |
+| `RPT_FULFILMENT_SMTP_TLS` | `1` (default) enable STARTTLS |
 | `RPT_ADMIN_USER` | Admin username (default `admin`) |
 | `RPT_ADMIN_PASSWORD` | Admin password (**required** to enable `/admin`) |
 | `RPT_ADMIN_SESSION_SECRET` | Optional session HMAC secret (derived from password if omitted) |

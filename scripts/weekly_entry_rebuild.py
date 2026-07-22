@@ -33,10 +33,13 @@ if str(ROOT) not in sys.path:
 
 from node.ephemeral_node import (  # noqa: E402
     assert_live_confirm,
+    assert_role_reinstall_lists_differ,
     assert_weekly_entry_role_only,
     build_weekly_entry_rebuild_plan,
+    entry_reinstall_requirements,
     live_confirm_env_name,
     parse_period_seconds,
+    plan_embeds_mandatory_reinstall,
     systemd_service_unit,
     systemd_timer_unit,
 )
@@ -208,6 +211,16 @@ def main(argv: list[str] | None = None) -> int:
     print(
         "# Continuity honesty: automatic residual failover — not zero packet-loss guarantee"
     )
+    print("# Mandatory after wipe: full selfhost reinstall (install.sh + DNS + host privacy)")
+    print("# Weekly path is ENTRY-ONLY; exit reinstall is separate/manual (not this timer)")
+    ok_diff, diff_msg = assert_role_reinstall_lists_differ()
+    print(f"# role_reinstall_entry_vs_exit: ok={ok_diff} {diff_msg}")
+    print(
+        "# entry_reinstall_ids="
+        + ",".join(r.id for r in entry_reinstall_requirements())
+    )
+    embeds = plan_embeds_mandatory_reinstall([s.id for s in plan.steps])
+    print(f"# plan_embeds_mandatory_reinstall={embeds}")
 
     if dry_run:
         # Demonstrate exclusive lock acquire/refuse without keeping lock

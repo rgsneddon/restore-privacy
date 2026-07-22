@@ -16,29 +16,40 @@ const String kCurrentLicenceId = 'FULL-COPYRIGHT-2026';
 
 const String kConnectBlockedLicenceMsg =
     'Accept the end-user licence before connecting. '
-    'Open Settings or the licence prompt, review the licence, then Accept.';
+    'Open Settings or the licence prompt, review the licence, then Accept. '
+    'After accepting, enter the keygen from your fulfilment email to unlock.';
 
 const String kConnectBlockedPaymentMsg =
     'Connect is blocked: payment failed or entitlement was revoked for this '
     'install. Successful payment is required. If payment fails at any time, '
     'the ability to Connect with the Restore Privacy app is cancelled until '
     'you complete a successful payment again on https://restoreprivacy.online/ — '
-    'then paste the Checkout session id (cs_…) in Settings → Payment entitlement.';
+    'then enter your keygen in Settings → Payment entitlement / keygen.';
 
 const String kConnectBlockedNoEntitlementMsg =
     'Connect is blocked: no successful payment entitlement on this install. '
     'After paying on https://restoreprivacy.online/, open Settings → Payment '
-    'entitlement and paste the Checkout session id (cs_…) from the thank-you '
-    'page. Successful payment is required; if payment fails at any time, '
+    'entitlement / keygen and enter the keygen from your fulfilment email '
+    '(USE THIS KEYGEN TO UNLOCK YOUR RESTORE PRIVACY TRIAL). '
+    'Successful payment/active subscription is required; if payment fails at any time, '
     'Connect is cancelled.';
+
+const String kConnectBlockedKeygenMsg =
+    'Connect is blocked: enter a valid keygen after accepting the licence. '
+    'Your fulfilment email includes the keygen with the text '
+    'USE THIS KEYGEN TO UNLOCK YOUR RESTORE PRIVACY TRIAL.';
 
 const String kKeyPaymentStatus = 'payment_entitlement_status';
 const String kKeyPaymentSessionId = 'payment_entitlement_session_id';
+const String kKeyPaymentKeygen = 'payment_entitlement_keygen';
 const String kPaymentStatusActive = 'active';
 const String kPaymentStatusFailed = 'failed';
 const String kPaymentStatusRevoked = 'revoked';
 const String kPaymentStatusUnpaid = 'unpaid';
 const String kPaymentStatusUnknown = 'unknown';
+
+const String kKeygenUnlockInstruction =
+    'USE THIS KEYGEN TO UNLOCK YOUR RESTORE PRIVACY TRIAL';
 
 const String kDefaultPaymentStatusBaseUrl = 'https://restoreprivacy.online';
 
@@ -58,6 +69,9 @@ const String kShortLicenceSummary =
     'Copy or transmission of the product architecture is not permitted. '
     'Third-party components keep their own licences (see LICENSE / CREDITS). '
     'By accepting, you agree to those terms. Acceptance is stored only on this device. '
+    'After you accept, enter the keygen from your fulfilment email '
+    '($kKeygenUnlockInstruction) to unlock Connect. '
+    'Your monthly subscription (£2.45 per month) begins after your 7 day trial. '
     '$kPaymentConnectDisclaimerPlain';
 
 class LicenceAcceptance {
@@ -144,8 +158,23 @@ class LicenceGate {
     return (await backend.getString(kKeyPaymentSessionId) ?? '').trim();
   }
 
-  Future<void> recordPaymentSuccess(String sessionId) async {
-    await backend.setString(kKeyPaymentSessionId, sessionId);
+  Future<String> paymentKeygen() async {
+    return (await backend.getString(kKeyPaymentKeygen) ?? '').trim().toUpperCase();
+  }
+
+  Future<void> recordPaymentSuccess(
+    String sessionId, {
+    String keygen = '',
+  }) async {
+    if (sessionId.trim().isNotEmpty) {
+      await backend.setString(kKeyPaymentSessionId, sessionId.trim());
+    }
+    if (keygen.trim().isNotEmpty) {
+      await backend.setString(
+        kKeyPaymentKeygen,
+        keygen.trim().toUpperCase(),
+      );
+    }
     await backend.setString(kKeyPaymentStatus, kPaymentStatusActive);
   }
 
@@ -162,7 +191,7 @@ class LicenceGate {
 
   /// Paste Checkout session id and verify against the status host.
   ///
-  /// This is the shipped paid-user path after Stripe success.
+  /// Fallback path; preferred product path is [importKeygenAndVerify].
   Future<String> importSessionAndVerify(
     String sessionId, {
     String? baseUrl,
@@ -175,18 +204,36 @@ class LicenceGate {
     return refreshEntitlementFromRemote(baseUrl: baseUrl, fetch: fetch);
   }
 
+  /// Enter fulfilment keygen and verify against the status host.
+  Future<String> importKeygenAndVerify(
+    String keygen, {
+    String? baseUrl,
+    Future<Map<String, dynamic>> Function(String sessionId)? fetch,
+  }) async {
+    final kg = keygen.trim().toUpperCase().replaceAll(' ', '');
+    if (kg.isEmpty) return kPaymentStatusUnknown;
+    await backend.setString(kKeyPaymentKeygen, kg);
+    await backend.setString(kKeyPaymentStatus, kPaymentStatusUnknown);
+    return refreshEntitlementFromRemote(baseUrl: baseUrl, fetch: fetch);
+  }
+
   Future<String> refreshEntitlementFromRemote({
     String? baseUrl,
     Future<Map<String, dynamic>> Function(String sessionId)? fetch,
   }) async {
     final sid = await paymentSessionId();
-    if (sid.isEmpty) return await paymentStatus();
+    final kg = await paymentKeygen();
+    if (sid.isEmpty && kg.isEmpty) return await paymentStatus();
     Map<String, dynamic> remote;
     try {
       if (fetch != null) {
-        remote = await fetch(sid);
+        remote = await fetch(sid.isNotEmpty ? sid : kg);
       } else {
-        remote = await fetchRemoteEntitlementStatus(sid, baseUrl: baseUrl);
+        remote = await fetchRemoteEntitlementStatus(
+          sid,
+          baseUrl: baseUrl,
+          keygen: kg,
+        );
       }
     } catch (_) {
       return await paymentStatus();
@@ -201,7 +248,17 @@ class LicenceGate {
       return st;
     }
     if (st == kPaymentStatusActive) {
-      await recordPaymentSuccess(sid);
+      final remoteSid = remote['session_id']?.toString() ?? sid;
+      final remoteKg = remote['keygen']?.toString() ?? kg;
+      final allowed = remote['connect_allowed'];
+      if (allowed == false) {
+        await recordPaymentFailure(
+          reason: remote['reason']?.toString() ?? 'not_allowed',
+          status: kPaymentStatusRevoked,
+        );
+        return kPaymentStatusRevoked;
+      }
+      await recordPaymentSuccess(remoteSid, keygen: remoteKg);
       return kPaymentStatusActive;
     }
     return await paymentStatus();
@@ -210,20 +267,26 @@ class LicenceGate {
   static Future<Map<String, dynamic>> fetchRemoteEntitlementStatus(
     String sessionId, {
     String? baseUrl,
+    String keygen = '',
     Duration timeout = const Duration(seconds: 8),
   }) async {
     final sid = sessionId.trim();
-    if (sid.isEmpty) {
-      return {'status': kPaymentStatusUnknown, 'error': 'missing_session_id'};
+    final kg = keygen.trim().toUpperCase();
+    if (sid.isEmpty && kg.isEmpty) {
+      return {
+        'status': kPaymentStatusUnknown,
+        'error': 'missing_session_id_or_keygen',
+      };
     }
     final base = (baseUrl ??
             Platform.environment['RPT_PUBLIC_BASE_URL'] ??
             kDefaultPaymentStatusBaseUrl)
         .trim()
         .replaceAll(RegExp(r'/+$'), '');
-    final uri = Uri.parse(
-      '$base/api/connect-entitlement?session_id=${Uri.encodeQueryComponent(sid)}',
-    );
+    final query = kg.isNotEmpty
+        ? 'keygen=${Uri.encodeQueryComponent(kg)}'
+        : 'session_id=${Uri.encodeQueryComponent(sid)}';
+    final uri = Uri.parse('$base/api/connect-entitlement?$query');
     final client = HttpClient();
     try {
       client.connectionTimeout = timeout;
@@ -276,7 +339,8 @@ class LicenceGate {
     }
     if (refreshPayment) {
       final sid = await paymentSessionId();
-      if (sid.isNotEmpty) {
+      final kg = await paymentKeygen();
+      if (sid.isNotEmpty || kg.isNotEmpty) {
         await refreshEntitlementFromRemote(baseUrl: baseUrl, fetch: fetch);
       }
     }
@@ -286,6 +350,11 @@ class LicenceGate {
           st == kPaymentStatusRevoked ||
           st == kPaymentStatusUnpaid) {
         return (ok: false, message: kConnectBlockedPaymentMsg);
+      }
+      final sid = await paymentSessionId();
+      final kg = await paymentKeygen();
+      if (sid.isEmpty && kg.isEmpty) {
+        return (ok: false, message: kConnectBlockedKeygenMsg);
       }
       return (ok: false, message: kConnectBlockedNoEntitlementMsg);
     }

@@ -658,7 +658,7 @@ class TunnelClientApp:
 
         tk.Label(
             frm,
-            text="Payment entitlement",
+            text="Payment entitlement / keygen",
             bg=WHITE,
             fg=PRIMARY_DARK,
             font=("DejaVu Sans", 10, "bold"),
@@ -675,6 +675,7 @@ class TunnelClientApp:
         _pay = load_payment_entitlement()
         pay_note = tk.StringVar(
             value=f"Status: {_pay.status or 'unknown'}"
+            + (f" (keygen {_pay.keygen[:16]}…)" if _pay.keygen else "")
             + (f" ({_pay.session_id[:16]}…)" if _pay.session_id else "")
         )
         tk.Label(
@@ -686,23 +687,33 @@ class TunnelClientApp:
             wraplength=440,
             justify=tk.LEFT,
         ).pack(anchor="w", pady=(2, 2))
-        session_var = tk.StringVar(value=_pay.session_id or "")
+        session_var = tk.StringVar(value=_pay.keygen or _pay.session_id or "")
         tk.Entry(frm, textvariable=session_var, font=("DejaVu Sans", 9)).pack(
             fill=tk.X, pady=(2, 4)
         )
 
         def _verify_pay() -> None:
-            sid = (session_var.get() or "").strip()
+            from client.payment_entitlement import import_keygen_and_verify
+
+            raw = (session_var.get() or "").strip()
             pay_note.set("Verifying…")
             win.update_idletasks()
             try:
-                if sid:
-                    ent = import_session_and_verify(sid)
+                if raw.upper().startswith("RPT-KEY") or raw.upper().startswith(
+                    "RPTKEY"
+                ):
+                    ent = import_keygen_and_verify(raw)
+                elif raw.startswith("cs_") or raw.startswith("cs_test"):
+                    ent = import_session_and_verify(raw)
+                elif raw:
+                    ent = import_keygen_and_verify(raw)
                 else:
                     # Auto-import payment_entitlement.json (Downloads / install dir)
                     ent = ensure_entitlement_for_connect(bind_device=True)
                 ok = payment_allows_connect()
-                if ent and getattr(ent, "session_id", None):
+                if ent and getattr(ent, "keygen", None):
+                    session_var.set(ent.keygen)
+                elif ent and getattr(ent, "session_id", None):
                     session_var.set(ent.session_id)
                 pay_note.set(
                     f"Status: {getattr(ent, 'status', '?') if ent else load_payment_entitlement().status}"
@@ -716,7 +727,7 @@ class TunnelClientApp:
 
         tk.Button(
             frm,
-            text="Verify payment / unlock Connect",
+            text="Verify keygen / unlock Connect",
             command=_verify_pay,
             bg=PRIMARY,
             fg=WHITE,
@@ -724,7 +735,8 @@ class TunnelClientApp:
         ).pack(anchor="w", pady=(0, 2))
         tk.Label(
             frm,
-            text="Leave session blank to auto-import payment_entitlement.json from Downloads.",
+            text="Enter keygen from email (USE THIS KEYGEN TO UNLOCK YOUR RESTORE PRIVACY TRIAL). "
+            "Leave blank to auto-import payment_entitlement.json from Downloads.",
             bg=WHITE,
             fg=TEXT_MUTED,
             font=("DejaVu Sans", 8),

@@ -1,0 +1,56 @@
+# Node wipe / rebuild reinstall (entry ≠ exit)
+
+## Weekly timed wipe (~7d) — **entry only**
+
+Script: `scripts/weekly_entry_rebuild.py`  
+Planner: `node.ephemeral_node.build_weekly_entry_rebuild_plan`
+
+| Rule | Detail |
+|------|--------|
+| Role | **entry** only — `assert_weekly_entry_role_only` **refuses** `exit` / `both` / `all` |
+| Lock | Exclusive `rpt-rebuild.lock` (never two concurrent wipes) |
+| Pre-wipe | Fail closed if **exit residual** or **entry** health fails |
+| After wipe | **Mandatory full selfhost reinstall** (`SKIP_DNS=0 SKIP_HOST_PRIVACY=0 bash scripts/selfhost_node.sh`) |
+| Post | `health_check` then release lock; clients prefer re-entry when entry healthy |
+
+Full reinstall is **not** stop-only or runtime scrub alone. After rebuild the plan always includes `selfhost_reapply` (install.sh + tunnel DNS + host privacy + no-log). Live wipe is refused if `plan_has_required_live_steps` misses that step.
+
+Dry-run (safe):
+
+```bash
+python scripts/weekly_entry_rebuild.py --dry-run --period 7d
+```
+
+Live (destructive; needs confirm):
+
+```bash
+RPT_EPHEMERAL_CONFIRM=yes python scripts/weekly_entry_rebuild.py --live
+```
+
+## Entry reinstall requirements
+
+Pure helper: `entry_reinstall_requirements()`
+
+Shared with exit: core install, tunnel DNS, host privacy, full selfhost, UDP/status health.
+
+**Entry-unique:** product entry pin, weekly failover preflights, exclusive entry lock, client re-entry preference.
+
+## Exit reinstall (manual — **not** weekly timer)
+
+Pure helper: `exit_reinstall_requirements()` + `build_exit_manual_reinstall_plan()`
+
+Exit stays up so clients can residual-failover while entry drains. Do **not** enable the weekly entry wipe timer on the exit host.
+
+**Exit-unique:** distinct exit ElGamal keys (`product/exit_node_elgamal.pub`), UDP 44044 firewall/panel, hop host monopin (Romania ≠ Iceland), no weekly timer.
+
+See also `scripts/MULTIHOP_EXIT_HOP_PREP.md`.
+
+## Honesty
+
+- Provider off-box backups/netflow are **not** erased by product wipe.
+- Continuity during entry wipe is **automatic residual failover to exit**, not a zero packet-loss guarantee.
+
+
+## Homepage display (0.3.7+)
+
+Public homepage shows **entry-only** clear timer. Exit wipe countdown was removed; exit is never weekly-wiped.

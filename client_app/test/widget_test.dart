@@ -15,11 +15,14 @@ void main() {
   var statusConnected = false;
 
   setUp(() {
-    // Pre-accept licence so Connect is not blocked by the bottom sheet.
+    // Pre-accept licence + active payment so Connect is not blocked by gates.
     SharedPreferences.setMockInitialValues({
       'licence_accepted': true,
       'licence_id': 'FULL-COPYRIGHT-2026',
       'licence_accepted_at': '1',
+      'payment_entitlement_status': 'active',
+      'payment_entitlement_session_id': 'cs_test_widget',
+      'payment_entitlement_keygen': 'RPT-KEY-TEST-TEST-TEST',
     });
     statusConnected = false;
     TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger

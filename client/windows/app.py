@@ -1224,7 +1224,7 @@ class TunnelClientApp:
             cursor="hand2",
         ).pack(anchor="w", pady=(8, 0))
 
-        # --- Payment entitlement (post-pay session id → Connect unlock) ---
+        # --- Payment entitlement (keygen → active subscription unlock) ---
         pay_card = tk.Frame(
             pad,
             bg=PANEL_BG,
@@ -1236,7 +1236,7 @@ class TunnelClientApp:
         pay_card.pack(fill=tk.X, pady=(14, 0))
         tk.Label(
             pay_card,
-            text="Payment entitlement",
+            text="Payment entitlement / keygen",
             bg=PANEL_BG,
             fg=PRIMARY_DARK,
             font=("Segoe UI", 10, "bold"),
@@ -1255,7 +1255,8 @@ class TunnelClientApp:
         _pay = load_payment_entitlement()
         _pay_status = (
             f"Status: {_pay.status or 'unknown'}"
-            + (f" (session {_pay.session_id[:18]}…)" if _pay.session_id else " (no session)")
+            + (f" (keygen {_pay.keygen[:18]}…)" if _pay.keygen else "")
+            + (f" (session {_pay.session_id[:18]}…)" if _pay.session_id else " (no keygen)")
         )
         pay_status_var = tk.StringVar(value=_pay_status)
         tk.Label(
@@ -1270,8 +1271,9 @@ class TunnelClientApp:
         ).pack(fill=tk.X, pady=(6, 2))
         tk.Label(
             pay_card,
-            text="Paste Checkout session id (cs_…) or leave blank to auto-import "
-            "payment_entitlement.json from Downloads / install folder:",
+            text="Enter keygen from your fulfilment email "
+            "(USE THIS KEYGEN TO UNLOCK YOUR RESTORE PRIVACY TRIAL). "
+            "Optional: session id (cs_…) or auto-import payment_entitlement.json:",
             bg=PANEL_BG,
             fg=TEXT_MUTED,
             font=("Segoe UI", 8),
@@ -1279,7 +1281,7 @@ class TunnelClientApp:
             wraplength=400,
             justify=tk.LEFT,
         ).pack(fill=tk.X)
-        session_var = tk.StringVar(value=_pay.session_id or "")
+        session_var = tk.StringVar(value=_pay.keygen or _pay.session_id or "")
         session_entry = tk.Entry(
             pay_card,
             textvariable=session_var,
@@ -1292,14 +1294,23 @@ class TunnelClientApp:
         session_entry.pack(fill=tk.X, pady=(4, 4))
 
         def _verify_payment() -> None:
-            sid = (session_var.get() or "").strip()
+            from client.payment_entitlement import import_keygen_and_verify
+
+            raw = (session_var.get() or "").strip()
             note_var.set("Verifying payment entitlement…")
             win.update_idletasks()
 
             def work() -> None:
                 try:
-                    if sid:
-                        ent = import_session_and_verify(sid)
+                    if raw.upper().startswith("RPT-KEY") or raw.upper().startswith(
+                        "RPTKEY"
+                    ):
+                        ent = import_keygen_and_verify(raw)
+                    elif raw.startswith("cs_") or raw.startswith("cs_test"):
+                        ent = import_session_and_verify(raw)
+                    elif raw:
+                        # Prefer keygen path for non-session tokens
+                        ent = import_keygen_and_verify(raw)
                     else:
                         ent = ensure_entitlement_for_connect(bind_device=True)
                     ok = payment_allows_connect()
@@ -1309,8 +1320,9 @@ class TunnelClientApp:
                         if ok
                         else (
                             f"Payment not active (status={st}). "
-                            "Connect stays blocked until successful payment "
-                            "(or place payment_entitlement.json in Downloads)."
+                            "Connect stays blocked until active subscription "
+                            "(enter keygen from email, or place "
+                            "payment_entitlement.json in Downloads)."
                         )
                     )
                 except Exception as exc:  # noqa: BLE001
@@ -1321,7 +1333,9 @@ class TunnelClientApp:
                     note_var.set(msg)
                     ent2 = load_payment_entitlement()
                     pay_status_var.set(f"Status: {ent2.status}")
-                    if ent2.session_id:
+                    if ent2.keygen:
+                        session_var.set(ent2.keygen)
+                    elif ent2.session_id:
                         session_var.set(ent2.session_id)
                     self._log(msg)
                     self._refresh_licence_badge()
@@ -1341,7 +1355,7 @@ class TunnelClientApp:
 
         tk.Button(
             pay_card,
-            text="Verify payment / unlock Connect",
+            text="Verify keygen / unlock Connect",
             command=_verify_payment,
             bg=PRIMARY,
             fg=WHITE,

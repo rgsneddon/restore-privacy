@@ -40,13 +40,13 @@ class TestPaidDownloadUI(unittest.TestCase):
         self.assertIn(BMC_TIP_URL, html)
         self.assertIn("buymeacoffee.com/rgsneddon", html)
         self.assertIn("Tip / support", html)
-        self.assertIn("Download client v0.3.6", html)
+        self.assertIn("Download client v0.3.7", html)
         self.assertIn("Windows | Linux | macOS | iOS | Android", html)
         self.assertNotIn('href="#"', html)
         self.assertNotIn("catalog-version", html)
         self.assertIn('data-buy-mode="stripe-live"', html)
         self.assertIn('data-pay-via="stripe-payment-page"', html)
-        self.assertIn("BUY - 0.3.6", html)
+        self.assertIn("BUY - 0.3.7", html)
         pay_base = payments.stripe_payment_page_url()
         self.assertEqual(
             pay_base, "https://donate.stripe.com/cNi7sM4uOeWQ9TBe0q7kc00"
@@ -65,10 +65,10 @@ class TestPaidDownloadUI(unittest.TestCase):
         self.assertIn(BMC_TIP_URL, page)
         self.assertIn("donate.stripe.com/cNi7sM4uOeWQ9TBe0q7kc00", page)
         self.assertIn("client_reference_id=windows", page)
-        self.assertIn("BUY - 0.3.6", page)
+        self.assertIn("BUY - 0.3.7", page)
         # No free GitHub installer links
         self.assertNotIn(
-            'href="https://github.com/rgsneddon/restore-privacy/releases/download/0.3.6/restore-privacy-client-0.3.6-windows-x64-setup.exe"',
+            'href="https://github.com/rgsneddon/restore-privacy/releases/download/0.3.7/restore-privacy-client-0.3.7-windows-x64-setup.exe"',
             page,
         )
         self.assertNotIn("coming soon", page.lower())
@@ -84,7 +84,7 @@ class TestCheckoutAmount(unittest.TestCase):
     def test_checkout_form_body_includes_245_gbp_and_platform(self):
         creq = payments.CheckoutRequest(
             platform="windows",
-            filename="restore-privacy-client-0.3.6-windows-x64-setup.exe",
+            filename="restore-privacy-client-0.3.7-windows-x64-setup.exe",
             success_url="https://example.test/success",
             cancel_url="https://example.test/cancel",
         )
@@ -98,7 +98,7 @@ class TestCheckoutAmount(unittest.TestCase):
         self.assertEqual(parsed["metadata[platform]"], ["windows"])
         self.assertEqual(
             parsed["metadata[filename]"],
-            ["restore-privacy-client-0.3.6-windows-x64-setup.exe"],
+            ["restore-privacy-client-0.3.7-windows-x64-setup.exe"],
         )
         self.assertEqual(parsed["metadata[amount_pence]"], ["245"])
 
@@ -210,7 +210,7 @@ class TestWebhookAndTokens(unittest.TestCase):
                         "id": "cs_x",
                         "metadata": {
                             "platform": "linux",
-                            "filename": "restore-privacy-client-0.3.6-linux-x64.tar.gz",
+                            "filename": "restore-privacy-client-0.3.7-linux-x64.tar.gz",
                             "amount_pence": "245",
                             "currency": "gbp",
                         },
@@ -238,7 +238,7 @@ class TestWebhookAndTokens(unittest.TestCase):
                         "currency": "gbp",
                         "metadata": {
                             "platform": "windows",
-                            "filename": "restore-privacy-client-0.3.6-windows-x64-setup.exe",
+                            "filename": "restore-privacy-client-0.3.7-windows-x64-setup.exe",
                             "amount_pence": "245",
                             "currency": "gbp",
                         },
@@ -337,7 +337,7 @@ class TestWebhookAndTokens(unittest.TestCase):
                         "currency": "gbp",
                         "metadata": {
                             "platform": "ios",
-                            "filename": "restore-privacy-client-0.3.6-ios.zip",
+                            "filename": "restore-privacy-client-0.3.7-ios.zip",
                             "amount_pence": "999",
                             "currency": "gbp",
                         },
@@ -487,7 +487,7 @@ class TestAdminAuth(unittest.TestCase):
     def test_admin_html_lists_grants_callable(self):
         payments.init_db()
         payments.mint_download_token(
-            filename="restore-privacy-client-0.3.6-macos.zip",
+            filename="restore-privacy-client-0.3.7-macos.zip",
             platform="macos",
             session_id="cs_admin",
         )
@@ -569,7 +569,7 @@ class TestBuyerSuccessFulfilment(unittest.TestCase):
                         "currency": "gbp",
                         "metadata": {
                             "platform": "linux",
-                            "filename": "restore-privacy-client-0.3.6-linux-x64.tar.gz",
+                            "filename": "restore-privacy-client-0.3.7-linux-x64.tar.gz",
                             "amount_pence": "245",
                             "currency": "gbp",
                         },
@@ -605,7 +605,7 @@ class TestBuyerSuccessFulfilment(unittest.TestCase):
                         "currency": "gbp",
                         "metadata": {
                             "platform": "windows",
-                            "filename": "restore-privacy-client-0.3.6-windows-x64-setup.exe",
+                            "filename": "restore-privacy-client-0.3.7-windows-x64-setup.exe",
                             "amount_pence": "245",
                             "currency": "gbp",
                         },
@@ -778,7 +778,7 @@ class TestAdminHtmlArchitecture(unittest.TestCase):
     def test_authenticated_admin_has_settings_and_grants(self):
         payments.init_db()
         payments.mint_download_token(
-            filename="restore-privacy-client-0.3.6-android.apk",
+            filename="restore-privacy-client-0.3.7-android.apk",
             platform="android",
             session_id="cs_arch_1",
         )
@@ -798,7 +798,7 @@ class TestAdminHtmlArchitecture(unittest.TestCase):
     def test_project_grants_uses_real_store(self):
         payments.init_db()
         tok = payments.mint_download_token(
-            filename="restore-privacy-client-0.3.6-linux-x64.tar.gz",
+            filename="restore-privacy-client-0.3.7-linux-x64.tar.gz",
             platform="linux",
             session_id="cs_proj",
         )
@@ -950,7 +950,7 @@ class TestPrivateRepoProxyFulfilment(unittest.TestCase):
         self.assertEqual(payments.paid_fulfilment_mode(), "proxy")
 
     def test_open_release_asset_from_local_dir(self):
-        fname = "restore-privacy-client-0.3.6-linux-x64.tar.gz"
+        fname = "restore-privacy-client-0.3.7-linux-x64.tar.gz"
         payload = b"FAKE-LINUX-PACKAGE-BYTES-FOR-UNIT"
         (Path(self._td.name) / fname).write_bytes(payload)
         asset = payments.open_release_asset(fname)
@@ -985,12 +985,12 @@ class TestPrivateRepoProxyFulfilment(unittest.TestCase):
             )
 
     def test_open_release_asset_github_api_sends_auth_header(self):
-        fname = "restore-privacy-client-0.3.6-windows-x64-setup.exe"
+        fname = "restore-privacy-client-0.3.7-windows-x64-setup.exe"
         os.environ["RPT_GITHUB_TOKEN"] = "unit-test-token"
         # Force GitHub path: no local files, no VPS token (default base would intercept)
         os.environ.pop("RPT_ASSET_FETCH_TOKEN", None)
         os.environ.pop("RPT_VPS_ASSET_TOKEN", None)
-        # Empty search dirs so we do not pick up real releases/0.3.6 on disk
+        # Empty search dirs so we do not pick up real releases/0.3.7 on disk
         os.environ["RPT_ASSET_DIR"] = str(Path(self._td.name) / "empty_assets")
         Path(os.environ["RPT_ASSET_DIR"]).mkdir(parents=True, exist_ok=True)
         seen = []
@@ -1020,8 +1020,8 @@ class TestPrivateRepoProxyFulfilment(unittest.TestCase):
             url = req.full_url if hasattr(req, "full_url") else req.get_full_url()
             headers = {k.lower(): v for k, v in req.header_items()}
             seen.append((url, headers.get("authorization", "")))
-            # RELEASE_TAG pin is 0.3.6 (catalog monopin)
-            if "/releases/tags/0.3.6" in url:
+            # RELEASE_TAG pin is 0.3.7 (catalog monopin)
+            if "/releases/tags/0.3.7" in url:
                 body = json.dumps(
                     {"assets": [{"name": fname, "id": 424242}]}
                 ).encode()
@@ -1051,7 +1051,7 @@ class TestPrivateRepoProxyFulfilment(unittest.TestCase):
         import threading
         import urllib.request
 
-        fname = "restore-privacy-client-0.3.6-android.apk"
+        fname = "restore-privacy-client-0.3.7-android.apk"
         payload = b"APK-UNIT-PAYLOAD"
         (Path(self._td.name) / fname).write_bytes(payload)
         token = payments.mint_download_token(
@@ -1095,7 +1095,7 @@ class TestGrantNotBurnedOnFulfilmentFail(unittest.TestCase):
         payments.init_db()
 
     def test_lookup_does_not_consume(self):
-        fname = "restore-privacy-client-0.3.6-linux-x64.tar.gz"
+        fname = "restore-privacy-client-0.3.7-linux-x64.tar.gz"
         tok = payments.mint_download_token(
             filename=fname, platform="linux", session_id="cs_lookup"
         )
@@ -1113,7 +1113,7 @@ class TestGrantNotBurnedOnFulfilmentFail(unittest.TestCase):
         import urllib.error
         import urllib.request
 
-        fname = "restore-privacy-client-0.3.6-macos.zip"
+        fname = "restore-privacy-client-0.3.7-macos.zip"
         tok = payments.mint_download_token(
             filename=fname, platform="macos", session_id="cs_noburn"
         )
@@ -1166,7 +1166,7 @@ class TestGrantNotBurnedOnFulfilmentFail(unittest.TestCase):
             httpd.server_close()
 
     def test_check_fulfilment_ready_local(self):
-        fname = "restore-privacy-client-0.3.6-ios.zip"
+        fname = "restore-privacy-client-0.3.7-ios.zip"
         (Path(self._td.name) / fname).write_bytes(b"PK\x03\x04ios-unit")
         os.environ["RPT_ASSET_DIR"] = self._td.name
         os.environ.pop("RPT_ASSET_FETCH_TOKEN", None)
@@ -1178,7 +1178,7 @@ class TestGrantNotBurnedOnFulfilmentFail(unittest.TestCase):
         self.assertFalse(ready.get("vps_token_configured"))
 
     def test_check_fulfilment_ready_reports_vps_token_configured(self):
-        fname = "restore-privacy-client-0.3.6-linux-x64.tar.gz"
+        fname = "restore-privacy-client-0.3.7-linux-x64.tar.gz"
         (Path(self._td.name) / fname).write_bytes(b"FAKE-TGZ-UNIT")
         os.environ["RPT_ASSET_DIR"] = self._td.name
         os.environ["RPT_ASSET_FETCH_TOKEN"] = "unit-match-secret-not-prod"
@@ -1195,13 +1195,13 @@ class TestPostPaymentThankYouBuilder(unittest.TestCase):
     def test_builder_thankyou_admin_and_auto_start(self):
         html = payments.render_post_payment_thankyou_html(
             download_path="/download?token=unit_tok_abc",
-            filename="restore-privacy-client-0.3.6-windows-x64-setup.exe",
+            filename="restore-privacy-client-0.3.7-windows-x64-setup.exe",
             platform="windows",
         )
         self.assertIn("Thank you", html)
         self.assertIn("thank-you-heading", html)
         self.assertIn("pay-success", html)
-        self.assertIn("restore-privacy-client-0.3.6-windows-x64-setup.exe", html)
+        self.assertIn("restore-privacy-client-0.3.7-windows-x64-setup.exe", html)
         self.assertIn("run the file as administrator", html.lower())
         self.assertIn("Run as administrator", html)
         self.assertIn("auto-download-frame", html)
@@ -1223,7 +1223,7 @@ class TestPostPaymentThankYouBuilder(unittest.TestCase):
             payments.render_post_payment_thankyou_html(
                 download_path=(
                     "https://github.com/rgsneddon/restore-privacy/releases/"
-                    "download/0.3.0/restore-privacy-client-0.3.6-windows-x64-setup.exe"
+                    "download/0.3.0/restore-privacy-client-0.3.7-windows-x64-setup.exe"
                 ),
                 filename="x.exe",
                 platform="windows",
@@ -1231,12 +1231,12 @@ class TestPostPaymentThankYouBuilder(unittest.TestCase):
 
     def test_run_as_admin_windows_and_linux(self):
         w = payments.run_as_administrator_instruction(
-            filename="restore-privacy-client-0.3.6-windows-x64-setup.exe",
+            filename="restore-privacy-client-0.3.7-windows-x64-setup.exe",
             platform="windows",
         )
         self.assertIn("Run as administrator", w)
         l = payments.run_as_administrator_instruction(
-            filename="restore-privacy-client-0.3.6-linux-x64.tar.gz",
+            filename="restore-privacy-client-0.3.7-linux-x64.tar.gz",
             platform="linux",
         )
         self.assertIn("administrator", l.lower())
@@ -1246,7 +1246,7 @@ class TestPostPaymentThankYouBuilder(unittest.TestCase):
         import threading
         import urllib.request
 
-        fname = "restore-privacy-client-0.3.6-android.apk"
+        fname = "restore-privacy-client-0.3.7-android.apk"
         tok = payments.mint_download_token(
             filename=fname, platform="android", session_id="cs_thank_tok"
         )
@@ -1288,7 +1288,7 @@ class TestPostPayAutoStartSingleConsume(unittest.TestCase):
     def test_html_has_single_auto_start_iframe_not_script_click(self):
         html = payments.render_post_payment_thankyou_html(
             download_path="/download?token=once_only",
-            filename="restore-privacy-client-0.3.6-windows-x64-setup.exe",
+            filename="restore-privacy-client-0.3.7-windows-x64-setup.exe",
             platform="windows",
         )
         # Parse auto-start: only iframe src points at download; anchor is manual
@@ -1311,7 +1311,7 @@ class TestPostPayAutoStartSingleConsume(unittest.TestCase):
         import urllib.error
         import urllib.request
 
-        fname = "restore-privacy-client-0.3.6-linux-x64.tar.gz"
+        fname = "restore-privacy-client-0.3.7-linux-x64.tar.gz"
         payload = b"LINUX-UNIT-AUTO-ONCE"
         (Path(self._td.name) / fname).write_bytes(payload)
         tok = payments.mint_download_token(
@@ -1353,7 +1353,7 @@ class TestPostPayAutoStartSingleConsume(unittest.TestCase):
         import threading
         import urllib.request
 
-        fname = "restore-privacy-client-0.3.6-ios.zip"
+        fname = "restore-privacy-client-0.3.7-ios.zip"
         payload = b"PK\x03\x04IOS-MANUAL"
         (Path(self._td.name) / fname).write_bytes(payload)
         tok = payments.mint_download_token(
@@ -1463,7 +1463,7 @@ class TestAdminFullGrantsListNoDropOff(unittest.TestCase):
 
     def test_used_grant_still_listed_with_used_status(self):
         tok = payments.mint_download_token(
-            filename="restore-privacy-client-0.3.6-linux-x64.tar.gz",
+            filename="restore-privacy-client-0.3.7-linux-x64.tar.gz",
             platform="linux",
             session_id="cs_used_still_listed",
         )
@@ -1524,7 +1524,7 @@ class TestAdminFullGrantsListNoDropOff(unittest.TestCase):
                         "id": "cs_no_grant",
                         "metadata": {
                             "platform": "linux",
-                            "filename": "restore-privacy-client-0.3.6-linux-x64.tar.gz",
+                            "filename": "restore-privacy-client-0.3.7-linux-x64.tar.gz",
                             "amount_pence": "245",
                             "currency": "gbp",
                         },

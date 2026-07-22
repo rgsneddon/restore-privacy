@@ -42,6 +42,20 @@ services:
       # Optional one-time price_… ; leave unset for unit_amount=245 (£2.45) Checkout
       - key: STRIPE_CHECKOUT_PRICE_ID
         sync: false
+      # Customer fulfilment email after pay (keygen + PPI + download link).
+      # Secrets stay in Dashboard (sync: false). Non-secret defaults are safe to ship.
+      - key: RPT_FULFILMENT_SMTP_HOST
+        sync: false
+      - key: RPT_FULFILMENT_SMTP_PORT
+        value: "587"
+      - key: RPT_FULFILMENT_SMTP_USER
+        sync: false
+      - key: RPT_FULFILMENT_SMTP_PASSWORD
+        sync: false
+      - key: RPT_FULFILMENT_FROM_EMAIL
+        value: noreply@restoreprivacy.online
+      - key: RPT_FULFILMENT_SMTP_TLS
+        value: "1"
       # Private-repo installer proxy (optional fallback; prefer Iceland VPS store)
       - key: RPT_GITHUB_TOKEN
         sync: false

@@ -450,28 +450,49 @@ def run_live_prewipe_gates(
 
 
 def plan_has_required_live_steps(step_ids: list[str]) -> tuple[bool, list[str]]:
-    """Structural gate: required ordered steps for safe live weekly wipe."""
+    """Structural gate: required ordered steps for safe live weekly wipe.
+
+    Package/selfhost reinstall after rebuild is mandatory — a plan without
+    ``selfhost_reapply`` (or ``selfhost_full``) is refused for live wipe.
+    """
     missing: list[str] = []
     required = [
         "exit_failover_preflight",
         "entry_node_preflight",
         "exclusive_lock_acquire",
         "rebuild_host",
-        "selfhost_reapply",  # package reinstall / product posture
+        "selfhost_reapply",  # package reinstall / product posture (mandatory)
         "health_check",
         "exclusive_lock_release",
     ]
     ids = list(step_ids or [])
     for r in required:
         if r not in ids:
+            # Allow alternate id used by pure role helpers
+            if r == "selfhost_reapply" and "selfhost_full" in ids:
+                continue
             missing.append(r)
     if missing:
         return False, missing
-    # Ordering: preflights before rebuild; selfhost after rebuild
+    # Ordering: preflights before rebuild; selfhost after rebuild; health after selfhost
     if ids.index("exit_failover_preflight") >= ids.index("rebuild_host"):
         missing.append("order:exit_preflight_before_rebuild")
     if ids.index("entry_node_preflight") >= ids.index("rebuild_host"):
         missing.append("order:entry_preflight_before_rebuild")
-    if ids.index("selfhost_reapply") <= ids.index("rebuild_host"):
+    selfhost_idx = (
+        ids.index("selfhost_reapply")
+        if "selfhost_reapply" in ids
+        else ids.index("selfhost_full")
+    )
+    if selfhost_idx <= ids.index("rebuild_host"):
         missing.append("order:selfhost_after_rebuild")
+    if ids.index("health_check") <= selfhost_idx:
+        missing.append("order:health_after_selfhost")
+    if ids.index("exclusive_lock_release") <= ids.index("health_check"):
+        missing.append("order:lock_release_after_health")
     return (len(missing) == 0), missing
+
+
+def package_reinstall_required_for_live_wipe() -> bool:
+    """Product policy: live weekly wipe always requires package reinstall after rebuild."""
+    return True

@@ -26,7 +26,7 @@ reads it from the Checkout Session and fills the browser URL.
 
 | Event | Purpose |
 |-------|---------|
-| `checkout.session.completed` | Paid checkout → mint one-time download + **activate Connect entitlement** |
+| `checkout.session.completed` | Paid checkout → mint one-time download + **activate Connect entitlement** + **unique keygen** + fulfilment email (keygen + PPI + download) |
 | `checkout.session.async_payment_failed` | Async pay fail → **revoke Connect** |
 | `checkout.session.expired` | Expired unpaid checkout → revoke if any |
 | `payment_intent.payment_failed` | Card/charge fail → **revoke Connect** |
@@ -66,3 +66,27 @@ not entitled (`RPT_REQUIRE_PAYMENT_ENTITLEMENT=1` on the node process).
 stripe listen --forward-to localhost:10000/webhook/stripe
 stripe trigger checkout.session.completed
 ```
+
+
+## Keygen unlock (clients)
+
+On `checkout.session.completed` the status host mints a unique **keygen**
+(`RPT-KEY-…`) bound to the connect entitlement and includes it in the customer
+fulfilment email with **USE THIS KEYGEN TO UNLOCK YOUR RESTORE PRIVACY TRIAL**,
+the **PPI**, and the one-time download link.
+
+Clients: Install → accept licence → enter keygen. Connect re-checks
+`/api/connect-entitlement?keygen=…`. Refunds, failed charges, disputes, and
+subscription end revoke the entitlement — keygen unlock fails until payment is
+active again.
+
+SMTP (optional but required to deliver email in production):
+`RPT_FULFILMENT_SMTP_HOST`, `RPT_FULFILMENT_SMTP_PORT`, `RPT_FULFILMENT_SMTP_USER`,
+`RPT_FULFILMENT_SMTP_PASSWORD`, `RPT_FULFILMENT_FROM_EMAIL`.
+
+## SMTP fulfilment + Payment Link trial
+
+See [`docs/STATUS_HOST_SMTP_AND_TRIAL.md`](../../docs/STATUS_HOST_SMTP_AND_TRIAL.md)
+for Render `RPT_FULFILMENT_SMTP_*` env keys and configuring the catalog Payment
+Link for **£2.45/month + 7-day trial** (`scripts/configure_stripe_payment_link_trial.py`).
+

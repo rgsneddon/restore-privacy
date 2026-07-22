@@ -30,10 +30,10 @@ from downloads import (  # noqa: E402
 )
 
 EXPECTED_RELEASE_PAGE = (
-    "https://github.com/rgsneddon/restore-privacy/releases/tag/0.3.6"
+    "https://github.com/rgsneddon/restore-privacy/releases/tag/0.3.7"
 )
 EXPECTED_DOWNLOAD_PREFIX = (
-    "https://github.com/rgsneddon/restore-privacy/releases/download/0.3.6/"
+    "https://github.com/rgsneddon/restore-privacy/releases/download/0.3.7/"
 )
 # Public footer points at the paid status host (repo is private).
 EXPECTED_PUBLIC_CATALOG_FOOTER = (
@@ -49,8 +49,8 @@ class TestDownloadCatalog(unittest.TestCase):
             is_current_catalog_filename,
         )
 
-        self.assertEqual(RELEASE_VERSION, "0.3.6")
-        self.assertEqual(RELEASE_TAG, "0.3.6")
+        self.assertEqual(RELEASE_VERSION, "0.3.7")
+        self.assertEqual(RELEASE_TAG, "0.3.7")
         self.assertEqual(current_catalog_version(), RELEASE_VERSION)
         self.assertTrue(catalog_matches_product_pin())
         self.assertEqual(GITHUB_REPO, "restore-privacy")
@@ -91,9 +91,10 @@ class TestDownloadCatalog(unittest.TestCase):
         self.assertIn("Team-signed sideload", html)
         self.assertIn('id="dl-android"', html)
         self.assertIn("£2.45", html)
-        self.assertIn(BMC_TIP_URL, html)
+        # BMC tip URL is on homepage shell bottom, not inside downloads section
+        self.assertNotIn(BMC_TIP_URL, html)
         # Live default: Stripe Payment Link tiles — platform face + version
-        self.assertIn("BUY - 0.3.6", html)
+        self.assertIn("BUY - 0.3.7", html)
         self.assertIn('class="dl-platform"', html)
         self.assertIn(">Windows<", html)
         self.assertIn(">Android<", html)
@@ -104,7 +105,7 @@ class TestDownloadCatalog(unittest.TestCase):
         self.assertIn('data-buy-mode="stripe-live"', html)
         self.assertNotIn("Coming soon", html)
         # Free permanent GitHub installer hrefs must not appear in public HTML.
-        self.assertNotIn("releases/download/0.3.6/", html)
+        self.assertNotIn("releases/download/0.3.7/", html)
         # FULL CATALOGUE / catalog footer link must not be visible on public downloads.
         self.assertNotIn('id="rust-repo-link"', html)
         self.assertNotIn("rust-repo-footer", html)
@@ -112,7 +113,9 @@ class TestDownloadCatalog(unittest.TestCase):
         self.assertNotIn("FULL CATALOGUE", html.upper())
         self.assertNotIn("how-to-buy-footer-link", html)
         self.assertNotIn('href="/how-to-buy"', html)
-        self.assertIn("bmc-tip-link", html)
+        # BMC tip is page-bottom on homepage shell — not inside downloads section
+        self.assertNotIn("bmc-tip-link", html)
+        self.assertNotIn('id="bmc-tip"', html)
 
     def test_download_menu_is_three_then_two_rows(self):
         """Platform menu under the title: row of 3, then row of 2."""
@@ -160,7 +163,7 @@ class TestDownloadCatalog(unittest.TestCase):
         self.assertIn('class="dl"', html)
         self.assertNotIn('href="#"', html)
         self.assertIn("data-price-pence=\"245\"", html)
-        self.assertIn("BUY - 0.3.6", html)
+        self.assertIn("BUY - 0.3.7", html)
         self.assertIn("donate.stripe.com", html)
         self.assertNotIn("Coming soon", html)
 
@@ -173,7 +176,7 @@ class TestDownloadCatalog(unittest.TestCase):
         self.assertNotIn('id="dl-claim-hint"', html)
         self.assertNotIn("/download/success?session_id=", html)
         # Platform controls present (live Stripe Pay default)
-        self.assertIn("BUY - 0.3.6", html)
+        self.assertIn("BUY - 0.3.7", html)
         self.assertIn('id="dl-windows"', html)
         self.assertIn("donate.stripe.com", html)
         # No bottom generic “Stripe payment page” footer link
@@ -196,10 +199,9 @@ class TestDownloadCatalog(unittest.TestCase):
         self.assertNotIn('id="dl-payment-disclaimer"', html)
         self.assertNotIn("STRONG DISCLAIMER", html)
         pay_at = html.find('id="dl-windows"')
-        bmc_at = html.find('id="bmc-tip"')
         self.assertGreater(pay_at, 0, "pay control marker missing")
-        self.assertGreater(bmc_at, 0, "bmc tip marker missing")
-        self.assertGreater(bmc_at, pay_at)
+        # BMC tip is not mid-page in downloads (page bottom via homepage shell)
+        self.assertNotIn('id="bmc-tip"', html)
         # Section has panel-card + dl pay controls (full button CSS on homepage)
         self.assertIn("panel-card", html)
         self.assertIn('class="dl"', html)
@@ -211,13 +213,56 @@ class TestDownloadCatalog(unittest.TestCase):
         self.assertIn("linear-gradient", css)
         self.assertIn("dl-platform", css)
 
+    def test_homepage_bmc_tip_is_last_content_block(self):
+        """Homepage: BMC tip after downloads / node-wipe / audit; single tip link."""
+        from coffee_link import coffee_tip_url
+        from downloads import BMC_TIP_URL, render_bmc_tip_html
+
+        import app as status_app
+
+        page = status_app.render_html(
+            {"title": "RESTORE PRIVACY", "upstream_ok": True}
+        ).decode("utf-8")
+        self.assertEqual(page.count('id="bmc-tip-link"'), 1)
+        self.assertEqual(page.count('id="bmc-tip"'), 1)
+        tip = coffee_tip_url() or BMC_TIP_URL
+        self.assertIn(tip, page)
+        self.assertIn("Tip / support", page)
+        self.assertIn("not a paid download", page.lower())
+
+        brand_at = page.find('id="brand-panel"')
+        dl_at = page.find('id="downloads"')
+        # node wipe section markers
+        nw_at = max(
+            page.find("node-wipe"),
+            page.find("nw-countdown"),
+            page.find("node_wipe"),
+            page.find('id="node-wipe"'),
+            page.find("wipe-countdown"),
+        )
+        audit_at = page.find('id="audit-panel"')
+        bmc_at = page.find('id="bmc-tip"')
+        self.assertGreater(dl_at, brand_at)
+        self.assertGreater(audit_at, dl_at)
+        self.assertGreater(bmc_at, audit_at)
+        self.assertGreater(bmc_at, dl_at)
+        # Nothing after tip except shell close
+        after = page[bmc_at:]
+        self.assertNotIn('id="downloads"', after[20:])
+        self.assertNotIn('id="audit-panel"', after[20:])
+        self.assertNotIn('id="brand-panel"', after[20:])
+        # Pure tip helper matches homepage fragment
+        frag = render_bmc_tip_html()
+        self.assertIn('id="bmc-tip-link"', frag)
+        self.assertIn("bmc-tip-link", page)
+
     def test_status_page_html_includes_paid_downloads(self):
         page = status_app.render_html({"title": "RESTORE PRIVACY"}).decode("utf-8")
         self.assertIn("RESTORE PRIVACY", page)
         self.assertNotIn("clients-connected", page)
         self.assertIn(f"Download client v{RELEASE_VERSION}", page)
         # Live default: Stripe Payment Link Pay buttons
-        self.assertIn("BUY - 0.3.6", page)
+        self.assertIn("BUY - 0.3.7", page)
         self.assertIn("donate.stripe.com", page)
         self.assertNotIn("Coming soon", page)
         self.assertIn("£2.45", page)
