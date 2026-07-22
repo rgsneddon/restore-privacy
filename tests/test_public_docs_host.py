@@ -81,7 +81,10 @@ class TestPublicDocsRegistry(unittest.TestCase):
         licence = public_docs.document_bytes_for_path("/LICENSE")
         assert licence is not None
         lhtml = licence[0].decode("utf-8")
-        self.assertIn("MIT License", lhtml)
+        self.assertNotIn("MIT License", lhtml)
+        self.assertIn("FULL COPYRIGHT", lhtml.upper())
+        self.assertIn("ARCHITECTURE", lhtml.upper())
+        self.assertIn("AS IS", lhtml)
         self.assertIn("doc-plain", lhtml)
 
         audit = public_docs.document_bytes_for_path("/AUDIT.md")

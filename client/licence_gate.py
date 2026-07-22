@@ -23,7 +23,7 @@ KEY_ACCEPTED_AT = "licence_accepted_at"
 KEY_LICENCE_ID = "licence_id"
 
 # Bump when product licence terms change and re-acceptance is required.
-CURRENT_LICENCE_ID = "MIT-2026"
+CURRENT_LICENCE_ID = "FULL-COPYRIGHT-2026"
 
 CONNECT_BLOCKED_LICENCE_MSG = (
     "Accept the end-user licence before connecting. "
@@ -191,13 +191,15 @@ def licence_label() -> str:
 
 
 def short_licence_summary() -> str:
-    """Plain-language summary shown in the Accept dialog (not the full MIT text)."""
+    """Plain-language summary shown in the Accept dialog (not the full licence text)."""
     from client.payment_entitlement import PAYMENT_CONNECT_DISCLAIMER_PLAIN
 
     return (
-        "Restore Privacy is provided under the MIT licence and related third-party "
-        "terms (see End user licence / LICENSE). By accepting, you agree to use the "
-        "software under those terms. Acceptance is stored only on this device. "
+        "Restore Privacy is proprietary full copyright: client packages may be used "
+        "only to run a device on the Restore Privacy VPN, with no warranty (AS IS). "
+        "Copy or transmission of the product architecture is not permitted. "
+        "Third-party components keep their own licences (see LICENSE / CREDITS). "
+        "By accepting, you agree to those terms. Acceptance is stored only on this device. "
         + PAYMENT_CONNECT_DISCLAIMER_PLAIN
     )
 

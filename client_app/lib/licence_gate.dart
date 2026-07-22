@@ -12,7 +12,7 @@ import 'settings_store.dart';
 const String kKeyLicenceAccepted = 'licence_accepted';
 const String kKeyLicenceAcceptedAt = 'licence_accepted_at';
 const String kKeyLicenceId = 'licence_id';
-const String kCurrentLicenceId = 'MIT-2026';
+const String kCurrentLicenceId = 'FULL-COPYRIGHT-2026';
 
 const String kConnectBlockedLicenceMsg =
     'Accept the end-user licence before connecting. '

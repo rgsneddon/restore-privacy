@@ -231,7 +231,8 @@ SECRETS / RELEASE GATES (mandatory)
 8. RELATED LEGAL DOCS
 ---------------------
   PRIVACY_POLICY.md  â€” full privacy policy
-  LICENSE            â€” MIT for original project code
+  LICENSE            — proprietary full copyright for original project code
+                       (no architecture copy/transmission; client AS IS, VPN-only use)
   CREDITS.md         â€” third-party attributions (Wintun, cryptography, etc.)
   AUDIT.md           â€” static code/policy audit record (operators/reviewers)
 

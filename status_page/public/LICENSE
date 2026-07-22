@@ -1,37 +1,177 @@
-MIT License
+RESTORE PRIVACY — PROPRIETARY FULL COPYRIGHT LICENCE
+====================================================
 
-Copyright (c) 2026 Russell G Sneddon / Restore Privacy contributors
+Copyright (c) 2026 Russell G Sneddon / Restore Privacy.
+All rights reserved.
 
-Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software and associated documentation files (the "Software"), to deal
-in the Software without restriction, including without limitation the rights
-to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-copies of the Software, and to permit persons to whom the Software is
-furnished to do so, subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included in all
-copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-SOFTWARE.
+This document is the sole end-user and project licence for original Restore
+Privacy software, documentation, designs, and architecture as distributed in
+this product tree and in client packages. It **replaces** any prior open-source
+(MIT-style) product grant for original Restore Privacy code in current and
+future distributions of this product. (Copies of earlier releases that were
+already obtained under a prior open-source grant retain only the rights those
+copies carried at the time of receipt; this instrument governs the current
+product going forward.)
 
 -------------------------------------------------------------------------------
-THIRD-PARTY COMPONENTS
+1. DEFINITIONS
 
-This repository’s own original code (RPT protocol, node, clients, VPN APP Shop)
-is licensed under the MIT License above.
+  “Software” means the original Restore Privacy source code, binaries, scripts,
+  protocol implementations, node and client applications, VPN APP Shop surfaces,
+  documentation, trademarks presentation, and related materials authored for
+  this product, excluding Third-Party Components (Section 8).
 
-Separately, the project **utilises** third-party software and design building
-blocks. Those components remain under **their own licenses**. Attribution and
-links are collected in CREDITS.md (and summarised below). Redistribution of
-binaries that embed those components must respect their license terms.
+  “Architecture” means the Restore Privacy technical design and system structure,
+  including without limitation the RPT / RPT2 protocol design, hop/path models,
+  residual multihop selection design, handshake and session keying design,
+  admission and payment-gate design, node wipe/rebuild operational design, and
+  any substantial description or implementation thereof sufficient to recreate
+  a competing service or clone of the product design.
 
-Summary of utilised parts (see CREDITS.md for detail):
+  “Client Package” means an end-user installer, application binary, or package
+  distributed for use on a personal device to connect to Restore Privacy VPN
+  (including Windows, Android, iOS, macOS, and Linux catalog packages).
+
+  “Licensor” means Russell G Sneddon / Restore Privacy copyright owner(s).
+
+  “You” means the individual or entity obtaining or using the Software or a
+  Client Package under this licence.
+
+-------------------------------------------------------------------------------
+2. FULL COPYRIGHT — NO OPEN-SOURCE GRANT
+
+  The Software and Architecture are protected by copyright and other applicable
+  intellectual property laws. Except for the **narrow limited licence** in
+  Section 3, no rights are granted by implication, estoppel, or otherwise.
+
+  Without limiting the foregoing, this licence does **not** grant MIT-style or
+  other open-source rights to:
+    - copy, modify, merge, publish, distribute, sublicense, or sell the Software;
+    - create derivative works of the Software for redistribution;
+    - re-host, rebrand, or operate a competing VPN or privacy service using the
+      Software or Architecture;
+    - reverse engineer for the purpose of extracting or transmitting Architecture
+      for use outside licensed Client Package operation (except to the limited
+      extent mandatory local law cannot be waived).
+
+  All rights not expressly granted are reserved by the Licensor.
+
+-------------------------------------------------------------------------------
+3. LIMITED LICENCE — CLIENT PACKAGES / VPN USE ONLY
+
+  Subject to full payment (where required by product terms), acceptance of this
+  licence where prompted, and continuous compliance with this document:
+
+  3.1 You may **install and run** a Client Package **solely** for the appropriate
+      purpose of operating a personal device upon the **Restore Privacy VPN**
+      service operated by or for the Licensor (Connect / residual tunnel to the
+      product entry and, where configured, exit residual path).
+
+  3.2 You may make a reasonable number of backup copies of a Client Package
+      **only** for your own disaster recovery of that same licensed use, not for
+      redistribution.
+
+  3.3 You may not:
+      (a) redistribute, rent, lease, lend, sublicense, or publicly share Client
+          Packages or the Software;
+      (b) use the Software or Architecture to provide VPN, tunnel, or privacy
+          service to third parties as a competing product or hosted service;
+      (c) remove or obscure copyright, licence, or proprietary notices;
+      (d) use the Software after entitlement is revoked for non-payment, refund,
+          dispute, or operator cancellation (Connect is cancelled until a valid
+          paid entitlement is restored).
+
+  3.4 Source availability (if any) in a private repository or operator tree does
+      **not** expand this grant. Viewing or building for personal licensed use
+      does not authorise architecture transmission or product forking.
+
+-------------------------------------------------------------------------------
+4. NO COPY OR TRANSMISSION OF THE ARCHITECTURE
+
+  You may **not** copy, publish, transmit, disclose, license, sell, or otherwise
+  transfer the Architecture (as defined above), or any substantial portion of it,
+  to any third party, whether as documentation, diagrams, protocol
+  specifications, reimplemented services, or extracted design material.
+
+  Narrow exception: the **runtime operation** of a licensed Client Package
+  necessarily exercises protocol machinery on your device and toward product
+  nodes. That operational use is permitted under Section 3. It does **not**
+  authorise extracting, documenting for others, or transmitting the Architecture
+  for independent reimplementation, research publication of the design as a
+  competitive blueprint, or creation of a substitute service.
+
+-------------------------------------------------------------------------------
+5. NO WARRANTY — CLIENT PACKAGES AND SOFTWARE “AS IS”
+
+  CLIENT PACKAGES AND THE SOFTWARE ARE PROVIDED **“AS IS”** AND **“AS AVAILABLE”**,
+  WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO
+  THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE, TITLE,
+  NON-INFRINGEMENT, QUIET ENJOYMENT, AND ANY WARRANTY ARISING FROM COURSE OF
+  DEALING OR USAGE OF TRADE.
+
+  THE LICENSOR DOES NOT WARRANT THAT THE VPN WILL BE UNINTERRUPTED, ERROR-FREE,
+  SECURE AGAINST ALL THREATS, OR FREE OF LATENCY OR PACKET LOSS; THAT NODE
+  WIPE/REBUILD CYCLES ERASE PROVIDER BACKUPS OR NETFLOW; OR THAT ANY PARTICULAR
+  PRIVACY OR ANONYMITY OUTCOME WILL BE ACHIEVED ON YOUR NETWORK OR DEVICE.
+
+  TO THE MAXIMUM EXTENT PERMITTED BY LAW, IN NO EVENT SHALL THE LICENSOR BE
+  LIABLE FOR ANY CLAIM, DAMAGES, OR OTHER LIABILITY (INCLUDING INDIRECT,
+  INCIDENTAL, SPECIAL, CONSEQUENTIAL, OR PUNITIVE DAMAGES, OR LOSS OF PROFITS,
+  DATA, OR GOODWILL), WHETHER IN CONTRACT, TORT, OR OTHERWISE, ARISING FROM OR
+  RELATED TO THE SOFTWARE, CLIENT PACKAGES, OR USE OF THE RESTORE PRIVACY VPN.
+
+  Some jurisdictions do not allow certain limitations; in those cases liability
+  is limited to the maximum extent permitted by applicable law, and where a
+  mandatory consumer remedy cannot be excluded, that remedy is limited to
+  re-supply of the Client Package or refund of the amount you paid for the
+  affected purchase (at Licensor’s option), where a refund path exists.
+
+-------------------------------------------------------------------------------
+6. PAYMENT, CONNECT, AND ENTITLEMENT (PRODUCT TERMS)
+
+  STRONG DISCLAIMER — PAYMENT REQUIRED FOR CONNECT: Access to Connect and
+  residual VPN use requires successful payment where the product so requires.
+  If payment fails at any time (failed checkout, failed charge, refund, dispute,
+  or revoked entitlement), the ability to Connect with the Restore Privacy app
+  is cancelled for that purchase/install until a successful payment is completed.
+
+  Catalog installers may include a “Restore Internet” failsafe that restores
+  residual network settings and can erase product parts from the device. After a
+  full wipe, a new paid one-time download link may be required; contact
+  russell.gray.sneddon@gmail.com (or re-purchase on the status host).
+
+  Ordinary Disconnect / Quit is designed to restore residual routes without
+  uninstalling the product.
+
+  The failsafe is a convenience for residual recovery and complete removal; it
+  does not create a warranty of re-download rights beyond the operator’s paid
+  fulfilment process.
+
+  Product distribution: end-user installers for catalog v0.3.6 are sold via the
+  public status host (one-time download after payment). The operator source tree
+  may be private.
+
+-------------------------------------------------------------------------------
+7. ACCEPTANCE
+
+  Installing, running, or clicking “Accept licence” (or equivalent) constitutes
+  acceptance of this licence. If you do not agree, do not install or use the
+  Software or Client Packages, and remove them from your devices.
+
+  When licence terms change, the product may require re-acceptance under a new
+  licence identity before Connect is allowed.
+
+-------------------------------------------------------------------------------
+8. THIRD-PARTY COMPONENTS
+
+  Separately, the project **utilises** third-party software and design building
+  blocks. Those components remain under **their own licenses**. Attribution and
+  links are collected in CREDITS.md (and summarised below). Redistribution of
+  binaries that embed those components must respect **their** license terms.
+  Nothing in this proprietary licence re-licenses third-party code as Restore
+  Privacy original work.
+
+  Summary of utilised parts (see CREDITS.md for detail):
 
   - Wintun (virtual network adapter driver for Windows TUN I/O)
   - Python cryptography (X25519/Ed25519, ChaCha20-Poly1305, HKDF helpers as used)
@@ -44,31 +184,31 @@ Summary of utilised parts (see CREDITS.md for detail):
   - Render.com (hosting of the public VPN APP Shop and paid download fulfilment — service, not code)
   - Stripe (paid catalog checkout / Payment Link — service, not code)
 
-Product distribution: end-user installers for catalog v0.3.6 are sold via the
-public status host (one-time download after payment). The operator source tree
-may be private; this MIT grant still applies to the original code as distributed.
+  Do not confuse “uses Wintun as a TUN driver” with “is WireGuard”: the tunnel
+  protocol in this project is custom RPT, not the WireGuard protocol.
 
-End-user packaging notes (do not change the MIT grant above):
+  Windows installers may use a PE 7-Zip SFX-style self-extractor stub for
+  payload delivery; 7-Zip / LZMA SDK components remain under their own licenses
+  when redistributed (see CREDITS.md if listed).
 
-  - STRONG DISCLAIMER — PAYMENT REQUIRED FOR CONNECT: Access to Connect and
-    residual VPN use requires successful payment. If payment fails at any time
-    (failed checkout, failed charge, refund, dispute, or revoked entitlement),
-    the ability to Connect with the Restore Privacy app is cancelled for that
-    purchase/install until a successful payment is completed.
-  - Catalog installers include a “Restore Internet” failsafe that restores
-    residual network settings and can erase all product parts from the device.
-    After a full wipe, a new paid one-time download link may be required;
-    contact russell.gray.sneddon@gmail.com (or re-purchase on the status host).
-  - Ordinary Disconnect / Quit is designed to restore residual routes without
-    uninstalling the product.
-  - THE SOFTWARE IS PROVIDED “AS IS” (see warranty disclaimer above). The
-    failsafe is a convenience for residual recovery and complete removal; it
-    does not create a warranty of re-download rights beyond the operator’s
-    paid fulfilment process.
+-------------------------------------------------------------------------------
+9. TERMINATION
 
-Do not confuse “uses Wintun as a TUN driver” with “is WireGuard”: the tunnel
-protocol in this project is custom RPT, not the WireGuard protocol.
+  This licence terminates automatically if you breach it. Upon termination you
+  must cease all use of the Software and destroy Client Package copies in your
+  possession, except as mandatory law requires retention. Sections 2, 4, 5, 8,
+  and 10 survive termination.
 
-Windows installers may use a PE 7-Zip SFX-style self-extractor stub for
-payload delivery; 7-Zip / LZMA SDK components remain under their own licenses
-when redistributed (see CREDITS.md if listed).
+-------------------------------------------------------------------------------
+10. GENERAL
+
+  This licence is the entire agreement for the Software grant described herein
+  and supersedes prior open-source product grants for current distribution.
+  If any provision is held unenforceable, the remainder remains in effect.
+  Failure to enforce a provision is not a waiver. Governing law and venue are
+  those of the Licensor’s principal place of business, except where mandatory
+  consumer law of your residence applies and cannot be waived.
+
+  Contact for licence questions: russell.gray.sneddon@gmail.com
+
+END OF LICENCE

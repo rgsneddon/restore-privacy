@@ -62,6 +62,6 @@ Original RPT protocol, node, clients, and VPN APP Shop: **Russell G Sneddon** an
 contributors (operator repository **restore-privacy** is **private**; public
 docs and paid installers: https://restoreprivacy.online/).
 
-Project license for original code: **MIT** — see [`LICENSE`](LICENSE).
+Project licence for original code: **proprietary full copyright** — see [`LICENSE`](LICENSE). Third-party components remain under their own licences (table above).
 
 Privacy practices: [`PRIVACY_POLICY.md`](PRIVACY_POLICY.md).

@@ -18,7 +18,7 @@ void main() {
     // Pre-accept licence so Connect is not blocked by the bottom sheet.
     SharedPreferences.setMockInitialValues({
       'licence_accepted': true,
-      'licence_id': 'MIT-2026',
+      'licence_id': 'FULL-COPYRIGHT-2026',
       'licence_accepted_at': '1',
     });
     statusConnected = false;

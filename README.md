@@ -7,7 +7,7 @@ Restore Privacy is built from the ground up using unashamed vibe coding methods 
 |--|--|
 | **Get the app** | [Status & paid downloads](https://restoreprivacy.online/) (catalog **v0.3.6**, £2.45 per package) |
 | **Privacy** | [PRIVACY_POLICY.md](PRIVACY_POLICY.md) |
-| **License** | [LICENSE](LICENSE) (MIT) |
+| **License** | [LICENSE](LICENSE) (proprietary full copyright) |
 | **Credits** | [CREDITS.md](CREDITS.md) |
 | **Security audit** | [AUDIT.md](AUDIT.md) |
 
@@ -139,7 +139,7 @@ need residual internet restored **and** complete product removal.
 | Document | Link |
 |----------|------|
 | **Privacy policy** | [PRIVACY_POLICY.md](PRIVACY_POLICY.md) |
-| **License** | [LICENSE](LICENSE) (MIT) |
+| **License** | [LICENSE](LICENSE) (proprietary full copyright) |
 | **Credits** | [CREDITS.md](CREDITS.md) |
 | **Code & policy audit** | [AUDIT.md](AUDIT.md) |
 

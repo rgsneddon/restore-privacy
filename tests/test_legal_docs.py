@@ -76,11 +76,26 @@ class TestPrivacyPolicy(unittest.TestCase):
 
 
 class TestLicenseAndCredits(unittest.TestCase):
-    def test_license_mit_and_third_party_section(self):
+    def test_license_full_copyright_not_mit_product_grant(self):
         text = _read("LICENSE")
-        self.assertIn("MIT License", text)
+        # Not MIT product grant
+        self.assertNotIn("MIT License", text)
+        self.assertNotIn("Permission is hereby granted, free of charge", text)
+        self.assertIn("FULL COPYRIGHT", text.upper())
         self.assertIn("Copyright", text)
-        self.assertIn("PERMISSION IS HEREBY GRANTED", text.upper())
+        self.assertIn("All rights reserved", text)
+        # Architecture lock
+        up = text.upper()
+        self.assertIn("ARCHITECTURE", up)
+        self.assertTrue(
+            "NO COPY" in up or "NOT COPY" in up or "MAY NOT" in up and "ARCHITECTURE" in up
+        )
+        self.assertIn("transmission", text.lower())
+        # No warranty + VPN-only client use
+        self.assertIn("AS IS", text)
+        self.assertIn("WITHOUT WARRANTY", text.upper())
+        self.assertIn("VPN", text)
+        self.assertIn("Client Package", text)
         # Credits / third-party acknowledgment in license
         self.assertTrue(
             "THIRD-PARTY" in text.upper() or "Wintun" in text or "CREDITS" in text
@@ -88,6 +103,9 @@ class TestLicenseAndCredits(unittest.TestCase):
         # Apple stack utilised components (aligned with CREDITS.md)
         self.assertIn("CryptoKit", text)
         self.assertIn("BigInt", text)
+        # Public mirror must match
+        pub = _read("status_page/public/LICENSE")
+        self.assertEqual(text, pub)
 
     def test_credits_name_utilised_components(self):
         text = _read("CREDITS.md")
@@ -102,13 +120,17 @@ class TestLicenseAndCredits(unittest.TestCase):
         self.assertIn("Stripe", text)
         self.assertIn("restoreprivacy.online", text)
         self.assertIn("private", text.lower())
+        # Product grant is full copyright, not MIT
+        self.assertIn("full copyright", text.lower())
+        self.assertNotIn("Project license for original code: **MIT**", text)
 
     def test_license_notes_paid_catalog_distribution(self):
         text = _read("LICENSE")
-        self.assertIn("MIT License", text)
+        self.assertIn("FULL COPYRIGHT", text.upper())
         self.assertIn("Stripe", text)
         self.assertIn("0.3.6", text)
         self.assertIn("private", text.lower())
+        self.assertIn("PAYMENT REQUIRED", text.upper())
 
 
 class TestReadmeHowto(unittest.TestCase):

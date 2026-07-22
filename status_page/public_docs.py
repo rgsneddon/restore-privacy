@@ -6,7 +6,7 @@ Stable same-origin paths (no GitHub dependency for public readers):
 |------|----------|
 | ``/how-to-buy`` | How to pay and get a one-time download |
 | ``/README.md`` | Product README |
-| ``/LICENSE`` | End-user licence (MIT) |
+| ``/LICENSE`` | End-user licence (proprietary full copyright) |
 | ``/PRIVACY_POLICY.md`` | Privacy policy |
 | ``/AUDIT.md`` | Security audit |
 | ``/CREDITS.md`` | Credits / third-party components |
