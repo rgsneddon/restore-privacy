@@ -2191,6 +2191,118 @@ def wait_for_grant_by_session(
         sleeper(interval_sec)
 
 
+HttpGetFn = Callable[[str, dict[str, str]], tuple[int, bytes]]
+
+
+def _default_http_get(url: str, headers: dict[str, str]) -> tuple[int, bytes]:
+    req = urllib.request.Request(url, headers=headers, method="GET")
+    try:
+        with urllib.request.urlopen(req, timeout=30) as resp:
+            return int(resp.status), resp.read()
+    except urllib.error.HTTPError as e:
+        return int(e.code), e.read()
+    except (urllib.error.URLError, TimeoutError, OSError):
+        return 0, b""
+
+
+def retrieve_checkout_session(
+    session_id: str,
+    *,
+    http_get: HttpGetFn | None = None,
+    secret_key: str | None = None,
+) -> dict[str, Any] | None:
+    """GET Checkout Session from Stripe (server-side recovery when webhook lags).
+
+    Returns the session object dict, or None on missing config / API failure.
+    """
+    sid = (session_id or "").strip()
+    if not sid.startswith("cs_"):
+        return None
+    key = (secret_key if secret_key is not None else stripe_secret_key()).strip()
+    if not key:
+        return None
+    url = (
+        "https://api.stripe.com/v1/checkout/sessions/"
+        + urllib.parse.quote(sid, safe="")
+    )
+    getter = http_get or _default_http_get
+    status, raw = getter(url, {"Authorization": f"Bearer {key}"})
+    if status != 200 or not raw:
+        return None
+    try:
+        data = json.loads(raw.decode("utf-8"))
+    except (UnicodeDecodeError, json.JSONDecodeError):
+        return None
+    return data if isinstance(data, dict) else None
+
+
+def ensure_download_grant_for_paid_session(
+    session_id: str,
+    *,
+    platform_hint: str = "",
+    http_get: HttpGetFn | None = None,
+    secret_key: str | None = None,
+) -> dict[str, Any] | None:
+    """If webhook missed, verify payment with Stripe and mint a download grant.
+
+    Uses the live Checkout Session (payment_status, amount_total, client_reference_id).
+    Optional *platform_hint* fills empty client_reference_id only after Stripe
+    confirms the session is paid (never trusts the browser alone).
+    """
+    sid = (session_id or "").strip()
+    if not sid:
+        return None
+    existing = find_grant_by_session(sid, unused_only=True)
+    if existing is not None:
+        return existing
+    sess = retrieve_checkout_session(
+        sid, http_get=http_get, secret_key=secret_key
+    )
+    if not sess:
+        return None
+    # Prefer Stripe's client_reference_id; fall back to hint after paid check path
+    plat = str(sess.get("client_reference_id") or "").strip().lower()
+    hint = (platform_hint or "").strip().lower()
+    if not plat and hint and platform_filename(hint):
+        sess = dict(sess)
+        sess["client_reference_id"] = hint
+        meta = sess.get("metadata")
+        if not isinstance(meta, dict):
+            meta = {}
+        else:
+            meta = dict(meta)
+        meta.setdefault("platform", hint)
+        sess["metadata"] = meta
+    event = {"type": "checkout.session.completed", "data": {"object": sess}}
+    token = process_checkout_completed_event(event)
+    if not token:
+        return None
+    return find_grant_by_session(sid, unused_only=True)
+
+
+def paid_session_needs_platform_picker(
+    session_id: str,
+    *,
+    http_get: HttpGetFn | None = None,
+    secret_key: str | None = None,
+) -> bool:
+    """True when Stripe shows paid but no platform is bound (picker UI)."""
+    sess = retrieve_checkout_session(
+        session_id, http_get=http_get, secret_key=secret_key
+    )
+    if not sess:
+        return False
+    payment_status = str(sess.get("payment_status") or "").strip().lower()
+    if payment_status not in ("paid", "no_payment_required"):
+        return False
+    plat = str(sess.get("client_reference_id") or "").strip().lower()
+    meta = sess.get("metadata") if isinstance(sess.get("metadata"), dict) else {}
+    meta_plat = str(meta.get("platform") or "").strip().lower()
+    if platform_filename(plat) or platform_filename(meta_plat):
+        return False
+    return True
+
+
 # --- Stripe Checkout (stdlib HTTP) -----------------------------------------------
 
 

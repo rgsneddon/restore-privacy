@@ -808,16 +808,27 @@ class Handler(BaseHTTPRequestHandler):
             # Stripe success_url supplies session_id={CHECKOUT_SESSION_ID}; webhook
             # may still be in-flight — poll briefly for the minted grant.
             # Security: never invent a download link for an unverified token —
-            # only a DB grant (paid webhook) may unlock the thank-you download UI.
+            # only a DB grant (paid webhook **or** Stripe-verified recovery mint)
+            # may unlock the thank-you download UI.
             grant = None
             if token:
                 grant = lookup_download_token(token)
             elif session_id:
                 # Payment Link after_payment redirect lands here; webhook may lag
                 # on free-tier cold start — wait longer than a local unit test.
-                grant = wait_for_grant_by_session(session_id, timeout_sec=20.0)
+                grant = wait_for_grant_by_session(session_id, timeout_sec=12.0)
                 if grant is None:
                     grant = find_grant_by_session(session_id)
+                # Recovery: verify payment with Stripe API and mint if webhook missed
+                if grant is None:
+                    try:
+                        from payments import ensure_download_grant_for_paid_session
+
+                        grant = ensure_download_grant_for_paid_session(
+                            session_id, platform_hint=platform
+                        )
+                    except Exception:  # noqa: BLE001
+                        grant = None
             if grant and grant.get("token"):
                 tok = str(grant["token"])
                 link = grant.get("download_path") or (
@@ -861,7 +872,7 @@ class Handler(BaseHTTPRequestHandler):
                         {"session_id": session_id, "platform": platform}
                     )
                     refresh = (
-                        f'<meta http-equiv="refresh" content="3;url=/download/success?{q}"/>'
+                        f'<meta http-equiv="refresh" content="4;url=/download/success?{q}"/>'
                     )
                 deny_note = ""
                 if token and not session_id:
@@ -870,14 +881,56 @@ class Handler(BaseHTTPRequestHandler):
                         "That download link is invalid, expired, or already used. "
                         "Complete payment again to get a new link.</p>"
                     )
+                # Paid session but no platform on Payment Link → pick package once
+                picker = ""
+                if session_id and not platform:
+                    try:
+                        from payments import paid_session_needs_platform_picker
+                        from downloads import CATALOG_PLATFORMS
+
+                        if paid_session_needs_platform_picker(session_id):
+                            _titles = {
+                                "windows": "Windows",
+                                "android": "Android",
+                                "macos": "macOS",
+                                "ios": "iOS",
+                                "linux": "Linux",
+                            }
+                            opts = "".join(
+                                f'<option value="{_escape_html(p)}">'
+                                f"{_escape_html(_titles.get(p, p))}"
+                                f"</option>"
+                                for p in CATALOG_PLATFORMS
+                            )
+                            picker = (
+                                '<div class="msg" id="pay-success-platform-picker">'
+                                "<p><strong>Payment received.</strong> Choose your device "
+                                "package to finish the download:</p>"
+                                f'<form method="get" action="/download/success" '
+                                f'id="platform-pick-form">'
+                                f'<input type="hidden" name="session_id" '
+                                f'value="{_escape_html(session_id)}"/>'
+                                f'<select name="platform" id="platform-pick" required>'
+                                f'<option value="" disabled selected>Select platform…'
+                                f"</option>{opts}</select> "
+                                f'<button type="submit" id="platform-pick-submit">'
+                                f"Get installer</button></form></div>"
+                            )
+                            refresh = ""  # stop spinning refresh while picker is shown
+                    except Exception:  # noqa: BLE001
+                        picker = ""
                 inner = (
                     f"{refresh}"
                     f"{deny_note}"
+                    f"{picker}"
                     f'<p class="msg" id="pay-success-pending">Payment submitted'
                     f'{(" for " + _escape_html(platform)) if platform else ""}. '
                     f"Confirming with Stripe… this page refreshes automatically.</p>"
-                    f'<p class="msg">If nothing appears after ~30s, contact support with session id '
+                    f'<p class="msg">If nothing appears after ~30s, open this page again from '
+                    f"your Stripe receipt link, or contact support with session id "
                     f"<code id=\"pending-session-id\">{_escape_html(session_id)}</code>.</p>"
+                    f'<p class="msg muted">Tip: always start checkout from a platform tile '
+                    f"(Windows / Android / …) so the package is bound to your payment.</p>"
                     f'<p><a href="/">Home</a></p>'
                 )
             self._send(200, "text/html; charset=utf-8", _html_page("Thank you", inner))
