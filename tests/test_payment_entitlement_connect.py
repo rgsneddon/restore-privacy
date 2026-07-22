@@ -410,10 +410,9 @@ class TestDocsAndPortalDisclaimer(unittest.TestCase):
         from payments import render_post_payment_thankyou_html
 
         html = render_download_section_html()
-        self.assertIn("dl-payment-disclaimer", html)
-        self.assertIn("STRONG DISCLAIMER", html)
-        self.assertIn("fails at any time", html)
-        self.assertIn("subscription cancellation", html.lower())
+        # Homepage shop no longer embeds the red STRONG DISCLAIMER banner
+        self.assertNotIn("dl-payment-disclaimer", html)
+        self.assertNotIn("STRONG DISCLAIMER", html)
 
         ty = render_post_payment_thankyou_html(
             download_path="/download?token=abc",
@@ -426,7 +425,13 @@ class TestDocsAndPortalDisclaimer(unittest.TestCase):
         self.assertIn("entitlement-file-link", ty)
         self.assertIn("Settings", ty)
         self.assertIn("STRONG DISCLAIMER", ty)
-        self.assertIn(PAYMENT_CONNECT_DISCLAIMER.split(":")[0].replace("**", ""), html)
+        # Helper still ships full disclaimer for non-homepage surfaces
+        from downloads import payment_connect_disclaimer_html
+
+        self.assertIn(
+            PAYMENT_CONNECT_DISCLAIMER.split(":")[0].replace("**", ""),
+            payment_connect_disclaimer_html(),
+        )
 
 
 if __name__ == "__main__":

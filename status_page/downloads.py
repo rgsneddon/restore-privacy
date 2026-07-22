@@ -326,51 +326,73 @@ WINDOWS_ZIP_FILENAME = WINDOWS_EXE_FILENAME
 
 
 def download_css() -> str:
+    """CSS for catalog pay section (RB-donate inspired navy/blue palette)."""
     return """
-    .downloads { margin-top: 2.5rem; text-align: center; max-width: 52rem; padding: 0 1rem; }
-    .downloads h2 { font-size: 1.1rem; letter-spacing: 0.08em; font-weight: 600; margin: 0 0 0.4rem; }
-    .dl-sub { opacity: 0.75; font-size: 0.95rem; margin: 0 0 1.1rem; }
-    .dl-price { opacity: 0.9; font-size: 0.95rem; margin: 0 0 0.65rem; font-weight: 600; color: #fde68a; }
+    .downloads { width: 100%; text-align: center; box-sizing: border-box; }
+    .downloads h2 { font-size: 1.05rem; letter-spacing: 0.1em; font-weight: 700;
+                    margin: 0 0 0.35rem; color: var(--rb-cream); text-transform: uppercase; }
+    .dl-sub { color: var(--rb-muted); font-size: 0.92rem; margin: 0 0 0.85rem; }
+    .dl-price { font-size: 0.95rem; margin: 0 0 1.1rem; font-weight: 600; color: var(--rb-accent); }
     .dl-payment-disclaimer {
       max-width: 36rem; margin: 1.15rem auto 0.35rem; padding: 0.65rem 0.85rem;
       font-size: 0.82rem; line-height: 1.45; font-weight: 600;
       color: #fecaca; background: rgba(127, 29, 29, 0.35);
-      border: 1px solid #b91c1c; border-radius: 8px; text-align: left;
+      border: 1px solid #b91c1c; border-radius: 12px; text-align: left;
     }
-    /* Platform menu under title: row of 3, then row of 2 (not a single vertical stack). */
     .dl-buttons {
-      display: flex; flex-direction: column; gap: 0.75rem; align-items: center; width: 100%;
+      display: flex; flex-direction: column; gap: 0.85rem; align-items: stretch; width: 100%;
     }
     .dl-row {
-      display: flex; flex-direction: row; flex-wrap: nowrap; gap: 0.75rem;
+      display: flex; flex-direction: row; flex-wrap: wrap; gap: 0.75rem;
       justify-content: center; align-items: stretch; width: 100%;
     }
-    .dl-row-3 { max-width: 100%; }
-    .dl-row-2 { max-width: 70%; }
+    .dl-row-3, .dl-row-2 { max-width: 100%; }
     a.dl, button.dl {
       display: inline-flex; align-items: center; justify-content: center;
-      flex: 1 1 0; min-width: 0; max-width: 16rem;
-      padding: 0.85rem 0.75rem;
-      background: #1d4ed8; color: #fff; text-decoration: none; border-radius: 8px;
-      font-weight: 600; font-size: 0.9rem; box-sizing: border-box; border: 0; cursor: pointer;
-      font-family: inherit; text-align: center; line-height: 1.25;
+      flex: 1 1 9.5rem; min-width: 8.5rem; max-width: 18rem;
+      padding: 0.95rem 1rem;
+      background: linear-gradient(180deg, var(--rb-btn) 0%, var(--rb-btn-deep) 100%);
+      color: #fff; text-decoration: none; border-radius: 14px;
+      font-weight: 700; font-size: 0.88rem; box-sizing: border-box;
+      border: 1px solid rgba(255,255,255,0.18); cursor: pointer;
+      font-family: inherit; text-align: center; line-height: 1.3;
+      box-shadow: 0 4px 14px rgba(7, 30, 60, 0.35);
+      transition: transform 0.12s ease, box-shadow 0.12s ease, filter 0.12s ease;
     }
-    a.dl:hover, button.dl:hover { background: #2563eb; }
-    a.dl#dl-android, button.dl#dl-android { background: #047857; }
-    a.dl#dl-android:hover, button.dl#dl-android:hover { background: #059669; }
-    a.dl#dl-macos, button.dl#dl-macos { background: #4b5563; }
-    a.dl#dl-macos:hover, button.dl#dl-macos:hover { background: #6b7280; }
-    a.dl#dl-ios, button.dl#dl-ios { background: #6d28d9; }
-    a.dl#dl-ios:hover, button.dl#dl-ios:hover { background: #7c3aed; }
-    a.dl#dl-linux, button.dl#dl-linux { background: #b45309; }
-    a.dl#dl-linux:hover, button.dl#dl-linux:hover { background: #d97706; }
+    a.dl:hover, button.dl:hover {
+      filter: brightness(1.08);
+      transform: translateY(-1px);
+      box-shadow: 0 6px 18px rgba(7, 30, 60, 0.42);
+    }
+    a.dl:focus-visible, button.dl:focus-visible {
+      outline: 2px solid var(--rb-accent); outline-offset: 3px;
+    }
+    a.dl#dl-windows, button.dl#dl-windows {
+      background: linear-gradient(180deg, #2f8fd8 0%, #1a5f9e 100%);
+    }
+    a.dl#dl-android, button.dl#dl-android {
+      background: linear-gradient(180deg, #2f9e6b 0%, #1b6b48 100%);
+    }
+    a.dl#dl-macos, button.dl#dl-macos {
+      background: linear-gradient(180deg, #5b6b7c 0%, #3d4754 100%);
+    }
+    a.dl#dl-ios, button.dl#dl-ios {
+      background: linear-gradient(180deg, #5b6fd6 0%, #3b4aa8 100%);
+    }
+    a.dl#dl-linux, button.dl#dl-linux {
+      background: linear-gradient(180deg, #c9a227 0%, #8a6e12 100%);
+      color: #0a1628;
+    }
     a.dl.dl-coming-soon, button.dl.dl-coming-soon { opacity: 0.92; }
     a.dl.dl-coming-soon:hover, button.dl.dl-coming-soon:hover { opacity: 1; }
     .dl-footer { margin-top: 1.25rem; font-size: 0.9rem; line-height: 1.45; width: 100%; }
-    .dl-footer a.catalog-link { color:#93c5fd; text-decoration:underline; font-weight:600; }
-    .dl-footer a.catalog-link:hover { color:#bfdbfe; }
-    .dl-tip { margin-top: 0.85rem; font-size: 0.88rem; opacity: 0.85; width: 100%; }
-    .dl-tip a { color:#f9a8d4; text-decoration:underline; font-weight:600; }
+    .dl-footer a.catalog-link { color: var(--rb-link); text-decoration: underline; font-weight: 600; }
+    .dl-footer a.catalog-link:hover { color: var(--rb-link-hover); }
+    .dl-tip { margin-top: 1rem; font-size: 0.86rem; color: var(--rb-muted); width: 100%; }
+    .dl-tip a { color: var(--rb-accent); text-decoration: underline; font-weight: 600; }
+    @media (max-width: 640px) {
+      a.dl, button.dl { flex: 1 1 100%; max-width: 100%; }
+    }
 """
 
 
@@ -510,10 +532,10 @@ def render_download_section_html(
             f"then download starts automatically"
         )
         buttons_mode = ' data-buy-mode="stripe-live"'
-    # Order: title/price → pay controls → red payment disclaimer → BMC tip
-    # (disclaimer is bottom of the shop section, immediately above buymeacoffee).
+    # Order: title/price → pay controls → tip. Homepage omits STRONG DISCLAIMER
+    # banner (apps/licence retain payment-required language).
     return f"""
-  <section class="downloads" id="downloads" aria-label="Download Restore Privacy client">
+  <section class="downloads panel-card" id="downloads" aria-label="Download Restore Privacy client">
     <h2>Download client v{RELEASE_VERSION}</h2>
     <p class="dl-sub">Windows | Linux | macOS | iOS | Android</p>
     <p class="dl-price" id="dl-price">{price_line}</p>
@@ -522,7 +544,6 @@ def render_download_section_html(
       {row1_html}
     </div>{row2_block}
     </div>
-    {payment_connect_disclaimer_html()}
 {render_catalog_footer_html()}
   </section>
 """

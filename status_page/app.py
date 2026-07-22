@@ -310,6 +310,7 @@ def render_html(status: dict, poll_ms: int | None = None) -> bytes:
         )
     countdown_html = render_audit_countdown_html()
     node_wipe_html = render_node_wipe_countdown_html()
+    # Palette inspired by restorebritain.org.uk/donate (navy / sky blue / cream)
     body = f"""<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -320,47 +321,153 @@ def render_html(status: dict, poll_ms: int | None = None) -> bytes:
   <link rel="icon" href="/favicon.png" type="image/png" sizes="32x32"/>
   <link rel="apple-touch-icon" href="/apple-touch-icon.png"/>
   <style>
-    body {{ margin:0; min-height:100vh; display:flex; flex-direction:column;
-           align-items:center; justify-content:center; background:#0b0f14; color:#e8eef5;
-           font-family: system-ui, sans-serif; padding: 2rem 0; box-sizing: border-box; }}
-    .brand-logo {{ width:96px; height:96px; border-radius:18px; margin:0 0 1rem;
-                   object-fit:cover; box-shadow:0 4px 24px rgba(0,0,0,0.35); }}
-    h1 {{ letter-spacing:0.12em; font-weight:600; font-size:clamp(1.6rem, 4vw, 2.2rem); margin:0 0 0.65rem; }}
-    .doc-links {{ margin:0 0 1.5rem; max-width:32rem; text-align:center; padding:0 1rem;
-                  font-size:0.9rem; line-height:1.5; }}
-    .doc-links a.doc-link {{ color:#93c5fd; text-decoration:underline; font-weight:600;
-                             letter-spacing:0.04em; }}
-    .doc-links a.doc-link:hover {{ color:#bfdbfe; }}
-    .doc-sep {{ color:#6b7280; margin:0 0.15rem; }}
-    .audit-countdown {{ margin:0 0 1.25rem; text-align:center; max-width:28rem;
-                        padding:0 1rem; letter-spacing:0.02em; }}
-    .audit-countdown-row {{ font-size:0.95rem; color:#a7f3d0; }}
-    .audit-countdown-label {{ color:#9ca3af; margin-right:0.5rem; text-transform:lowercase; }}
-    .audit-countdown-value {{ font-variant-numeric:tabular-nums; font-weight:700;
-                              color:#6ee7b7; font-size:1.05rem; }}
-    .audit-countdown-blurb {{ margin:0.4rem 0 0; font-size:0.78rem; line-height:1.4;
-                              color:#9ca3af; font-weight:400; letter-spacing:0.01em; }}
-    .node-wipe-countdown {{ margin:0 0 1.35rem; text-align:center; max-width:36rem;
-                            padding:0 1rem; letter-spacing:0.03em; }}
-    .node-wipe-row {{ font-size:0.82rem; color:#fde68a; margin:0.35rem 0; line-height:1.45;
-                      display:flex; flex-wrap:wrap; justify-content:center; gap:0.35rem 0.5rem; }}
-    .node-wipe-label {{ color:#fcd34d; font-weight:700; letter-spacing:0.04em;
-                        text-transform:none; }}
-    .node-wipe-value {{ font-variant-numeric:tabular-nums; font-weight:700;
-                        color:#fbbf24; font-size:0.95rem; }}
-    .node-wipe-blurb {{ margin:0.45rem 0 0; font-size:0.72rem; line-height:1.4;
-                        color:#9ca3af; font-weight:400; max-width:34rem; margin-left:auto;
-                        margin-right:auto; }}
+    :root {{
+      --rb-navy: #0a1628;
+      --rb-navy-mid: #0f2340;
+      --rb-card: #132a4a;
+      --rb-card-border: rgba(174, 208, 234, 0.28);
+      --rb-cream: #f2f5f7;
+      --rb-muted: #aed0ea;
+      --rb-link: #74b2e2;
+      --rb-link-hover: #d7ebf9;
+      --rb-accent: #f9dd34;
+      --rb-btn: #2694e8;
+      --rb-btn-deep: #1a6fad;
+      --rb-soft: #deedf7;
+      --rb-radius: 16px;
+      --rb-max: 56rem;
+    }}
+    *, *::before, *::after {{ box-sizing: border-box; }}
+    body {{
+      margin: 0; min-height: 100vh; display: flex; flex-direction: column;
+      align-items: center; background:
+        radial-gradient(1200px 600px at 50% -10%, #1a3a66 0%, transparent 55%),
+        linear-gradient(180deg, var(--rb-navy-mid) 0%, var(--rb-navy) 45%, #07101c 100%);
+      color: var(--rb-cream);
+      font-family: "Segoe UI", system-ui, -apple-system, sans-serif;
+      padding: clamp(1rem, 3vw, 2.5rem) 0 3rem;
+    }}
+    .page-shell {{
+      width: min(100% - 1.5rem, var(--rb-max));
+      display: flex; flex-direction: column; gap: 1.15rem;
+      margin: 0 auto;
+    }}
+    .panel-card {{
+      background: linear-gradient(165deg, rgba(26, 58, 102, 0.55) 0%, var(--rb-card) 55%);
+      border: 1px solid var(--rb-card-border);
+      border-radius: var(--rb-radius);
+      padding: clamp(1rem, 2.5vw, 1.45rem);
+      box-shadow: 0 10px 32px rgba(4, 12, 28, 0.35);
+    }}
+    .panel-title {{
+      margin: 0 0 0.85rem; font-size: 0.95rem; letter-spacing: 0.12em;
+      text-transform: uppercase; font-weight: 700; color: var(--rb-soft);
+      text-align: center;
+    }}
+    .brand-panel {{
+      display: flex; flex-direction: column; align-items: center;
+      text-align: center; gap: 0.65rem;
+    }}
+    .brand-logo {{
+      width: clamp(72px, 14vw, 104px); height: clamp(72px, 14vw, 104px);
+      border-radius: 22px; object-fit: cover;
+      box-shadow: 0 8px 28px rgba(0, 0, 0, 0.35);
+      border: 2px solid rgba(174, 208, 234, 0.35);
+    }}
+    h1 {{
+      letter-spacing: 0.14em; font-weight: 700;
+      font-size: clamp(1.45rem, 4.5vw, 2.15rem);
+      margin: 0; color: var(--rb-cream);
+    }}
+    .tagline {{
+      margin: 0; max-width: 28rem; font-size: clamp(0.85rem, 2.4vw, 0.98rem);
+      line-height: 1.45; color: var(--rb-muted); font-weight: 500;
+    }}
+    .doc-links {{
+      margin: 0; max-width: 100%; text-align: center; padding: 0;
+      font-size: clamp(0.82rem, 2.2vw, 0.92rem); line-height: 1.55;
+      display: flex; flex-wrap: wrap; justify-content: center; gap: 0.25rem 0.15rem;
+    }}
+    .doc-links a.doc-link {{
+      color: var(--rb-link); text-decoration: none; font-weight: 600;
+      letter-spacing: 0.03em; padding: 0.2rem 0.45rem; border-radius: 8px;
+    }}
+    .doc-links a.doc-link:hover {{
+      color: var(--rb-navy); background: var(--rb-soft);
+    }}
+    .doc-sep {{ color: rgba(174, 208, 234, 0.45); margin: 0 0.1rem; }}
+    .audit-countdown {{ text-align: center; letter-spacing: 0.02em; width: 100%; }}
+    .audit-countdown-row {{
+      font-size: 0.95rem; color: var(--rb-soft);
+      display: flex; flex-wrap: wrap; justify-content: center; align-items: baseline;
+      gap: 0.45rem 0.75rem;
+    }}
+    .audit-countdown-label {{ color: var(--rb-muted); text-transform: lowercase; }}
+    .audit-countdown-value {{
+      font-variant-numeric: tabular-nums; font-weight: 700;
+      color: var(--rb-cream); font-size: 1.15rem;
+      background: rgba(10, 22, 40, 0.45); border: 1px solid var(--rb-card-border);
+      border-radius: 12px; padding: 0.35rem 0.75rem;
+    }}
+    .audit-countdown-blurb {{
+      margin: 0.65rem 0 0; font-size: 0.78rem; line-height: 1.45;
+      color: var(--rb-muted); font-weight: 400;
+    }}
+    .node-wipe-countdown {{ text-align: center; width: 100%; }}
+    .node-wipe-row {{
+      display: flex; flex-direction: column; align-items: center; gap: 0.55rem;
+      margin: 0.75rem 0 1rem;
+    }}
+    .node-wipe-label {{
+      color: var(--rb-accent); font-weight: 700; letter-spacing: 0.03em;
+      font-size: clamp(0.72rem, 2.1vw, 0.84rem); line-height: 1.4;
+      max-width: 100%; padding: 0 0.25rem;
+    }}
+    .nw-units {{
+      display: flex; flex-wrap: wrap; justify-content: center; gap: 0.45rem;
+    }}
+    .nw-unit {{
+      min-width: 3.35rem; padding: 0.45rem 0.5rem 0.4rem;
+      border-radius: 12px;
+      background: rgba(10, 22, 40, 0.55);
+      border: 1px solid var(--rb-card-border);
+      box-shadow: inset 0 1px 0 rgba(255,255,255,0.06);
+      display: flex; flex-direction: column; align-items: center; gap: 0.15rem;
+    }}
+    .nw-unit-value {{
+      font-variant-numeric: tabular-nums; font-weight: 800;
+      font-size: clamp(1.05rem, 3.2vw, 1.35rem); color: var(--rb-cream);
+      line-height: 1.1;
+    }}
+    .nw-unit-label {{
+      font-size: 0.62rem; letter-spacing: 0.08em; font-weight: 700;
+      color: var(--rb-muted);
+    }}
+    .node-wipe-blurb {{
+      margin: 0.25rem auto 0; font-size: 0.72rem; line-height: 1.45;
+      color: var(--rb-muted); max-width: 40rem;
+    }}
 {dl_css}
+    @media (max-width: 520px) {{
+      .page-shell {{ width: min(100% - 1rem, var(--rb-max)); gap: 0.9rem; }}
+      .nw-unit {{ min-width: 3rem; }}
+    }}
   </style>
 </head>
 <body>
-  <img class="brand-logo" src="/logo.png" width="96" height="96" alt="Restore Privacy logo"/>
-  <h1>{title_safe}</h1>
+  <div class="page-shell" id="page-shell">
+    <header class="brand-panel panel-card" id="brand-panel">
+      <img class="brand-logo" src="/logo.png" width="96" height="96" alt="Restore Privacy logo"/>
+      <h1>{title_safe}</h1>
+      <p class="tagline">lightweight vpn to restore your privacy — no user data is retained — your privacy is restored</p>
 {render_legal_links_html()}
+    </header>
 {node_wipe_html}
+    <section class="panel-card" id="audit-panel" aria-label="Security audit countdown">
 {countdown_html}
+    </section>
 {downloads_html}
+  </div>
 </body>
 </html>
 """

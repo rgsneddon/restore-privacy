@@ -174,8 +174,8 @@ class TestDownloadCatalog(unittest.TestCase):
         self.assertNotIn('id="stripe-payment-page-link"', html)
         self.assertNotIn(">Stripe payment page<", html)
 
-    def test_payment_disclaimer_subscription_and_above_bmc(self):
-        """Red disclaimer names subscription cancel; sits after pay, before BMC tip."""
+    def test_payment_disclaimer_helper_exists_but_not_on_homepage_shop(self):
+        """Helper keeps STRONG DISCLAIMER text; public downloads section omits it."""
         from downloads import payment_connect_disclaimer_html, render_download_section_html
 
         frag = payment_connect_disclaimer_html()
@@ -186,22 +186,22 @@ class TestDownloadCatalog(unittest.TestCase):
         self.assertIn("Connect with the Restore Privacy app is cancelled", frag)
 
         html = render_download_section_html()
-        self.assertIn('id="dl-payment-disclaimer"', html)
-        self.assertIn("subscription cancellation", html.lower())
+        # Homepage redesign: no strong-disclaimer banner in shop section
+        self.assertNotIn('id="dl-payment-disclaimer"', html)
+        self.assertNotIn("STRONG DISCLAIMER", html)
         pay_at = html.find('id="dl-windows"')
-        disc_at = html.find('id="dl-payment-disclaimer"')
         bmc_at = html.find('id="bmc-tip"')
-        bmc_link_at = html.find('id="bmc-tip-link"')
         self.assertGreater(pay_at, 0, "pay control marker missing")
-        self.assertGreater(disc_at, 0, "disclaimer marker missing")
         self.assertGreater(bmc_at, 0, "bmc tip marker missing")
-        # After pay buttons, immediately above BMC tip
-        self.assertGreater(disc_at, pay_at)
-        self.assertGreater(bmc_at, disc_at)
-        self.assertGreater(bmc_link_at, disc_at)
-        # Closing pay-buttons div ends before disclaimer
-        buttons_end = html.find("</div>", html.find('id="dl-buttons"'))
-        self.assertGreater(disc_at, buttons_end)
+        self.assertGreater(bmc_at, pay_at)
+        # Section has panel-card + dl pay controls (full button CSS on homepage)
+        self.assertIn("panel-card", html)
+        self.assertIn('class="dl"', html)
+        from downloads import download_css
+
+        css = download_css()
+        self.assertIn("border-radius: 14px", css)
+        self.assertIn("linear-gradient", css)
 
     def test_status_page_html_includes_paid_downloads(self):
         page = status_app.render_html({"title": "RESTORE PRIVACY"}).decode("utf-8")

@@ -78,11 +78,50 @@ def remaining_seconds_until(
 
 
 def format_countdown(seconds: int) -> str:
-    """Human countdown ``HH:MM:SS`` (hours may exceed 24)."""
-    s = max(0, int(seconds))
-    h, rem = divmod(s, 3600)
-    m, sec = divmod(rem, 60)
-    return f"{h:02d}:{m:02d}:{sec:02d}"
+    """Compact countdown string (D:HH:MM:SS when days > 0, else HH:MM:SS)."""
+    parts = split_countdown_units(seconds)
+    d, h, m, s = parts["days"], parts["hours"], parts["minutes"], parts["seconds"]
+    if d > 0:
+        return f"{d}d {h:02d}:{m:02d}:{s:02d}"
+    return f"{h:02d}:{m:02d}:{s:02d}"
+
+
+def split_countdown_units(seconds: int) -> dict[str, int]:
+    """Split remaining seconds into days, hours, minutes, seconds."""
+    total = max(0, int(seconds))
+    days, rem = divmod(total, 86400)
+    hours, rem = divmod(rem, 3600)
+    minutes, secs = divmod(rem, 60)
+    return {
+        "days": days,
+        "hours": hours,
+        "minutes": minutes,
+        "seconds": secs,
+    }
+
+
+def unit_boxes_html(seconds: int, *, value_id_prefix: str) -> str:
+    """Rounded unit boxes for D / H / M / S (server-rendered initial values)."""
+    u = split_countdown_units(seconds)
+    cells = (
+        ("days", "DAYS", u["days"]),
+        ("hours", "HRS", u["hours"]),
+        ("minutes", "MIN", u["minutes"]),
+        ("seconds", "SEC", u["seconds"]),
+    )
+    parts: list[str] = []
+    for key, lab, val in cells:
+        vid = f"{value_id_prefix}-{key}"
+        parts.append(
+            f'<div class="nw-unit" data-unit="{key}">'
+            f'<span class="nw-unit-value" id="{html.escape(vid)}">'
+            f"{int(val):02d}</span>"
+            f'<span class="nw-unit-label">{lab}</span></div>'
+        )
+    return (
+        f'<div class="nw-units" id="{html.escape(value_id_prefix)}-units" '
+        f'aria-live="polite">{"".join(parts)}</div>'
+    )
 
 
 def next_deadline_on_grid(
@@ -165,6 +204,7 @@ def node_line_state(
             now=n, period_seconds=p_sec, phase_seconds=phase_seconds
         )
     rem = remaining_seconds_until(nxt, now=n)
+    units = split_countdown_units(rem)
     return {
         "role": role,
         "label": label,
@@ -172,6 +212,7 @@ def node_line_state(
         "next_clear_at": nxt.strftime("%Y-%m-%dT%H:%M:%SZ"),
         "remaining_seconds": rem,
         "display": format_countdown(rem),
+        "units": units,
         "period_seconds": p_sec,
     }
 
@@ -247,44 +288,52 @@ def render_node_wipe_countdown_html(
     b = state["exit"]
     label_a = html.escape(str(a["label"]))
     label_b = html.escape(str(b["label"]))
-    disp_a = html.escape(str(a["display"]))
-    disp_b = html.escape(str(b["display"]))
     next_a = html.escape(str(a["next_clear_at"]))
     next_b = html.escape(str(b["next_clear_at"]))
     blurb = html.escape(str(state["blurb"]))
     period = int(state["period_seconds"])
+    boxes_a = unit_boxes_html(int(a["remaining_seconds"]), value_id_prefix="nw-entry")
+    boxes_b = unit_boxes_html(int(b["remaining_seconds"]), value_id_prefix="nw-exit")
 
-    return f"""  <div class="node-wipe-countdown" id="node-wipe-countdown"
+    return f"""  <div class="node-wipe-countdown panel-card" id="node-wipe-countdown"
        data-period-seconds="{period}"
        data-next-entry="{next_a}"
        data-next-exit="{next_b}">
+    <h2 class="panel-title" id="node-wipe-heading">Node data clear timers</h2>
     <div class="node-wipe-row" id="node-wipe-row-entry">
       <span class="node-wipe-label" id="node-wipe-label-entry">{label_a}</span>
-      <span class="node-wipe-value" id="node-wipe-value-entry" aria-live="polite">{disp_a}</span>
+      {boxes_a}
     </div>
     <div class="node-wipe-row" id="node-wipe-row-exit">
       <span class="node-wipe-label" id="node-wipe-label-exit">{label_b}</span>
-      <span class="node-wipe-value" id="node-wipe-value-exit" aria-live="polite">{disp_b}</span>
+      {boxes_b}
     </div>
     <p class="node-wipe-blurb" id="node-wipe-blurb">{blurb}</p>
   </div>
   <script>
   (function () {{
     var root = document.getElementById("node-wipe-countdown");
-    var elA = document.getElementById("node-wipe-value-entry");
-    var elB = document.getElementById("node-wipe-value-exit");
-    if (!root || !elA || !elB) return;
+    if (!root) return;
     var nextA = root.getAttribute("data-next-entry") || "";
     var nextB = root.getAttribute("data-next-exit") || "";
     var period = parseInt(root.getAttribute("data-period-seconds") || "604800", 10);
     if (!period || period < 1) period = 604800;
     function pad(n) {{ return n < 10 ? "0" + n : String(n); }}
-    function fmt(sec) {{
+    function split(sec) {{
       sec = Math.max(0, Math.floor(sec));
-      var h = Math.floor(sec / 3600);
+      var d = Math.floor(sec / 86400);
+      var h = Math.floor((sec % 86400) / 3600);
       var m = Math.floor((sec % 3600) / 60);
       var s = sec % 60;
-      return pad(h) + ":" + pad(m) + ":" + pad(s);
+      return {{ d: d, h: h, m: m, s: s }};
+    }}
+    function paint(prefix, sec) {{
+      var u = split(sec);
+      var map = {{ days: u.d, hours: u.h, minutes: u.m, seconds: u.s }};
+      Object.keys(map).forEach(function (k) {{
+        var el = document.getElementById(prefix + "-" + k);
+        if (el) el.textContent = pad(map[k]);
+      }});
     }}
     function roll(iso) {{
       var d = Date.parse(iso);
@@ -299,12 +348,12 @@ def render_node_wipe_countdown_html(
       var now = Date.now();
       if (deadlineA != null) {{
         while (deadlineA <= now) {{ deadlineA += period * 1000; }}
-        elA.textContent = fmt(Math.max(0, Math.floor((deadlineA - now) / 1000)));
-      }} else {{ elA.textContent = "—"; }}
+        paint("nw-entry", Math.max(0, Math.floor((deadlineA - now) / 1000)));
+      }}
       if (deadlineB != null) {{
         while (deadlineB <= now) {{ deadlineB += period * 1000; }}
-        elB.textContent = fmt(Math.max(0, Math.floor((deadlineB - now) / 1000)));
-      }} else {{ elB.textContent = "—"; }}
+        paint("nw-exit", Math.max(0, Math.floor((deadlineB - now) / 1000)));
+      }}
     }}
     tick();
     setInterval(tick, 1000);
