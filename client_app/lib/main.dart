@@ -110,6 +110,10 @@ class _TunnelHomeState extends State<TunnelHome> with WidgetsBindingObserver {
       if (!_licenceAccepted) {
         await _showLicenceSheet();
       }
+      // After licence, force keygen unlock surface (parity with desktop).
+      if (mounted && await (_licence?.needsKeygenUnlock() ?? false)) {
+        await _showKeygenSheet();
+      }
       await _maybeAutoconnect();
     });
   }
@@ -168,7 +172,7 @@ class _TunnelHomeState extends State<TunnelHome> with WidgetsBindingObserver {
       _licenceAccepted = licOk;
       if (!canConnect) {
         _status = licOk
-            ? 'Enter keygen in Settings (from fulfilment email), then Connect.'
+            ? 'Enter keygen from your fulfilment email (unlock dialog), then Connect.'
             : 'Accept the licence, enter keygen, then Connect for residual protection.';
       } else {
         _status =
@@ -227,10 +231,14 @@ class _TunnelHomeState extends State<TunnelHome> with WidgetsBindingObserver {
                   setState(() {
                     _licenceAccepted = true;
                     _status =
-                        'Licence accepted. Press Connect when you want protection.';
+                        'Licence accepted. Enter your keygen from the fulfilment email to unlock Connect.';
                   });
                   _append('Licence accepted (stored locally only).');
                   Navigator.of(ctx).pop();
+                  if (mounted &&
+                      await (_licence?.needsKeygenUnlock() ?? false)) {
+                    await _showKeygenSheet();
+                  }
                 },
                 style: FilledButton.styleFrom(backgroundColor: kPrimary),
                 child: const Text(kLicenceAcceptButton),
@@ -241,6 +249,107 @@ class _TunnelHomeState extends State<TunnelHome> with WidgetsBindingObserver {
               ),
             ],
           ),
+        );
+      },
+    );
+  }
+
+  /// Forced keygen unlock surface (parity with Windows/Linux desktop modals).
+  Future<void> _showKeygenSheet() async {
+    if (!mounted) return;
+    final controller = TextEditingController();
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: kPanelBg,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      builder: (ctx) {
+        var statusLine = '';
+        return StatefulBuilder(
+          builder: (ctx, setModal) {
+            return Padding(
+              padding: EdgeInsets.fromLTRB(
+                20,
+                16,
+                20,
+                28 + MediaQuery.of(ctx).viewInsets.bottom,
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Text(
+                    kKeygenPromptTitle,
+                    style: TextStyle(
+                      color: kPrimaryDark,
+                      fontSize: 18,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  const Text(kKeygenPromptBody, style: TextStyle(fontSize: 13)),
+                  const SizedBox(height: 8),
+                  const Text(
+                    kConnectBlockedKeygenMsg,
+                    style: TextStyle(fontSize: 12, color: kTextMuted),
+                  ),
+                  const SizedBox(height: 12),
+                  TextField(
+                    controller: controller,
+                    decoration: const InputDecoration(
+                      labelText: 'RPT-KEY-…',
+                      border: OutlineInputBorder(),
+                    ),
+                    autocorrect: false,
+                    enableSuggestions: false,
+                  ),
+                  if (statusLine.isNotEmpty) ...[
+                    const SizedBox(height: 8),
+                    Text(statusLine, style: const TextStyle(fontSize: 12)),
+                  ],
+                  const SizedBox(height: 16),
+                  FilledButton(
+                    onPressed: () async {
+                      final raw = controller.text.trim();
+                      if (raw.isEmpty) {
+                        setModal(() => statusLine = 'Paste the keygen first.');
+                        return;
+                      }
+                      setModal(
+                        () => statusLine =
+                            'Verifying keygen with status host…',
+                      );
+                      final st = await _licence?.importKeygenAndVerify(raw) ??
+                          kPaymentStatusUnknown;
+                      final ok = await _licence?.paymentAllowsConnect() ?? false;
+                      if (!mounted) return;
+                      if (ok) {
+                        setState(() {
+                          _status =
+                              'Keygen verified. Press Connect for residual protection.';
+                        });
+                        _append('Keygen unlocked (status=$st).');
+                        Navigator.of(ctx).pop();
+                      } else {
+                        setModal(
+                          () => statusLine =
+                              'Keygen not active (status=$st). Check email code / subscription.',
+                        );
+                      }
+                    },
+                    style: FilledButton.styleFrom(backgroundColor: kPrimary),
+                    child: const Text('Unlock Connect'),
+                  ),
+                  TextButton(
+                    onPressed: () => Navigator.of(ctx).pop(),
+                    child: const Text('Cancel'),
+                  ),
+                ],
+              ),
+            );
+          },
         );
       },
     );
@@ -257,8 +366,9 @@ class _TunnelHomeState extends State<TunnelHome> with WidgetsBindingObserver {
       final licOk = await gate.hasAcceptedLicence();
       if (!licOk) {
         await _showLicenceSheet();
+      } else if (await gate.needsKeygenUnlock()) {
+        await _showKeygenSheet();
       }
-      // Payment failures: message already points to Settings → Payment entitlement.
       return false;
     }
     return true;

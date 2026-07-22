@@ -75,6 +75,30 @@ class TestNeedsKeygenUnlock(unittest.TestCase):
         self.assertIn("elif needs_keygen_unlock():", src)
         self.assertIn("import_keygen_and_verify", src)
 
+    def test_linux_app_has_keygen_prompt_hook(self) -> None:
+        """Structural: Linux desktop mirrors Windows forced keygen modal."""
+        src = (ROOT / "client" / "linux" / "app.py").read_text(encoding="utf-8")
+        self.assertIn("def _show_keygen_prompt", src)
+        self.assertIn("needs_keygen_unlock", src)
+        self.assertIn("Enter licence keygen", src)
+        self.assertIn("elif needs_keygen_unlock():", src)
+        self.assertIn("import_keygen_and_verify", src)
+
+    def test_flutter_shell_has_keygen_unlock_surface(self) -> None:
+        """Structural: Flutter product shell forces keygen sheet (not Settings-only)."""
+        main = (ROOT / "client_app" / "lib" / "main.dart").read_text(encoding="utf-8")
+        gate = (ROOT / "client_app" / "lib" / "licence_gate.dart").read_text(
+            encoding="utf-8"
+        )
+        status = (ROOT / "client_app" / "lib" / "connect_status.dart").read_text(
+            encoding="utf-8"
+        )
+        self.assertIn("needsKeygenUnlock", gate)
+        self.assertIn("_showKeygenSheet", main)
+        self.assertIn("kKeygenPromptTitle", main)
+        self.assertIn("importKeygenAndVerify", main)
+        self.assertIn("keygen", status.lower())
+
 
 class TestFormatConnectFailure10054(unittest.TestCase):
     def test_maps_winerror_10054(self) -> None:

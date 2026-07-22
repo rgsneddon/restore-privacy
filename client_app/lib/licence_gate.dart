@@ -24,20 +24,28 @@ const String kConnectBlockedPaymentMsg =
     'install. Successful payment is required. If payment fails at any time, '
     'the ability to Connect with the Restore Privacy app is cancelled until '
     'you complete a successful payment again on https://restoreprivacy.online/ — '
-    'then enter your keygen in Settings → Payment entitlement / keygen.';
+    'then enter your keygen in the unlock dialog (or Settings → Payment entitlement / keygen).';
 
 const String kConnectBlockedNoEntitlementMsg =
     'Connect is blocked: no successful payment entitlement on this install. '
-    'After paying on https://restoreprivacy.online/, open Settings → Payment '
-    'entitlement / keygen and enter the keygen from your fulfilment email '
-    '(USE THIS KEYGEN TO UNLOCK YOUR RESTORE PRIVACY TRIAL). '
+    'After paying on https://restoreprivacy.online/, enter the keygen from your '
+    'fulfilment email in the unlock dialog (USE THIS KEYGEN TO UNLOCK YOUR '
+    'RESTORE PRIVACY TRIAL). Download alone does not unlock residual VPN. '
     'Successful payment/active subscription is required; if payment fails at any time, '
     'Connect is cancelled.';
 
 const String kConnectBlockedKeygenMsg =
     'Connect is blocked: enter a valid keygen after accepting the licence. '
     'Your fulfilment email includes the keygen with the text '
-    'USE THIS KEYGEN TO UNLOCK YOUR RESTORE PRIVACY TRIAL.';
+    'USE THIS KEYGEN TO UNLOCK YOUR RESTORE PRIVACY TRIAL. '
+    'Download alone does not unlock residual VPN.';
+
+const String kKeygenPromptTitle = 'Enter licence keygen';
+const String kKeygenPromptBody =
+    'Your fulfilment email includes a keygen with the text '
+    'USE THIS KEYGEN TO UNLOCK YOUR RESTORE PRIVACY TRIAL '
+    '(format RPT-KEY-…). Paste it below to unlock Connect. '
+    'Download alone does not unlock residual VPN.';
 
 const String kKeyPaymentStatus = 'payment_entitlement_status';
 const String kKeyPaymentSessionId = 'payment_entitlement_session_id';
@@ -326,6 +334,13 @@ class LicenceGate {
   Future<bool> mayConnect({bool requirePayment = true}) async {
     if (!await hasAcceptedLicence()) return false;
     return paymentAllowsConnect(require: requirePayment);
+  }
+
+  /// True when licence is accepted but payment/keygen unlock is still required.
+  /// Used to force a keygen entry surface before residual Connect (not Settings-only).
+  Future<bool> needsKeygenUnlock({bool requirePayment = true}) async {
+    if (!await hasAcceptedLicence()) return false;
+    return !(await paymentAllowsConnect(require: requirePayment));
   }
 
   Future<({bool ok, String message})> assertMayConnect({

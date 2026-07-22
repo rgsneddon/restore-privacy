@@ -124,8 +124,24 @@ String mapConnectStatusMessage(dynamic result) {
     if (ip.isNotEmpty) return 'Connected — tunnel IP $ip';
     return 'Connected';
   }
-  if (message.isNotEmpty) return message;
-  return 'Connect failed';
+  if (message.isNotEmpty) {
+    final low = message.toLowerCase();
+    // Parity with desktop format_connect_failure: residual reset/timeout → keygen guidance
+    if (low.contains('10054') ||
+        low.contains('forcibly closed') ||
+        low.contains('connection reset') ||
+        low.contains('timed out') ||
+        low.contains('no reply') ||
+        low.contains('timeout')) {
+      if (!low.contains('keygen')) {
+        return '$message — If you just paid: enter the keygen from your '
+            'fulfilment email (unlock dialog or Settings → Payment entitlement / keygen), '
+            'then Connect again so this device can be admitted by the node.';
+      }
+    }
+    return message;
+  }
+  return 'Connect failed — enter your keygen from the fulfilment email if Connect is blocked.';
 }
 
 /// Known failure substrings used by native Android path (for tests / docs).
