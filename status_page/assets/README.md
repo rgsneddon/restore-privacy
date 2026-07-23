@@ -6,10 +6,17 @@ GitHub repo is private without requiring a runtime `RPT_GITHUB_TOKEN`.
 
 Current ship: **0.4.1** under `0.4.1/`. Keep prior version dirs only if needed for rollback.
 
-**0.4.1 staging:** Packages staged from `releases/0.4.1/` (Windows multihop PE
-rebuilt on Windows host; Apple packages via Mac handoff
-`client_app/APPLE_HANDOFF_0.4.1.md`; Android/Linux may carry-forward under
-**0.4.1** filenames until native rebuild — see `releases/0.4.1/`). Node-only
-**zram + LUKS2** is a host deploy feature and does not change residual client packages.
+**0.4.1 staging** (from `releases/0.4.1/` — match `scripts/RELEASE_NOTES_0.4.1.md`
+Build provenance):
+
+| Platform | Provenance |
+|----------|------------|
+| **macOS** | Fresh DevID sign + notary on Darwin |
+| **iOS** | Team-signed package on Darwin — handoff `client_app/APPLE_HANDOFF_0.4.1.md` |
+| **Linux** | Rebuilt via `package_linux.py` (native 0.4.1 package) |
+| **Android** | **Carry-forward** residual-wire APK from 0.4.0 under 0.4.1 filename — Flutter/Android SDK rebuild still required for a native freeze |
+| **Windows** | **Carry-forward** from 0.4.0 PE (Darwin SFX/filename pin only; 7z extract failed) — **not** a Windows-host multihop PE rebuild. Full PE: Windows x64 `scripts/build_windows_multihop.py` |
+
+Node-only **zram + LUKS2** is a host deploy feature and does not change residual client packages.
 
 Do not put `*.priv` here. Re-stage from `releases/{VERSION}/` on each ship.
