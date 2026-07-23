@@ -33,11 +33,21 @@ class RptConfig {
     defaultValue: false,
   );
 
+  /// Runtime override from Settings privacy-scale (null = use env/compile only).
+  static bool? runtimeMultiHopOverride;
+
+  /// Apply Settings multi-hop toggle (Windows/Apple parity).
+  static void setRuntimeMultiHop(bool? enabled) {
+    runtimeMultiHopOverride = enabled;
+  }
+
   /// True when residual multi-hop (exit dial) is selected.
   ///
-  /// Enabled via `--dart-define=RPT_MULTIHOP_ENABLED=true` at build, or at
-  /// runtime with process env ``RPT_MULTIHOP_ENABLED=1`` (desktop / shell).
+  /// Order: Settings runtime override → compile-time dart-define → process env
+  /// ``RPT_MULTIHOP_ENABLED=1`` (desktop / shell).
   static bool get multiHopEnabled {
+    final o = runtimeMultiHopOverride;
+    if (o != null) return o;
     if (multiHopFromEnvironment) return true;
     final v = (Platform.environment['RPT_MULTIHOP_ENABLED'] ?? '')
         .trim()

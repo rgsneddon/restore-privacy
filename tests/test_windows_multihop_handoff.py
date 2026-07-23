@@ -13,11 +13,11 @@ sys.path.insert(0, str(ROOT))
 
 class TestWindowsMultihopHandoff(unittest.TestCase):
     def test_handoff_doc_exists_and_names_single_command(self):
-        p = ROOT / "client" / "windows" / "WINDOWS_HANDOFF_0.3.8.md"
-        self.assertTrue(p.is_file(), "missing WINDOWS_HANDOFF_0.3.8.md")
+        p = ROOT / "client" / "windows" / "WINDOWS_HANDOFF_0.3.9.md"
+        self.assertTrue(p.is_file(), "missing WINDOWS_HANDOFF_0.3.9.md")
         text = p.read_text(encoding="utf-8")
         self.assertIn("build_windows_multihop", text)
-        self.assertIn("0.3.8", text)
+        self.assertIn("0.3.9", text)
         self.assertIn("RPT_MULTIHOP_ENABLED", text)
         self.assertIn("exit_node_elgamal.pub", text)
         self.assertIn("185.146.232.107", text)
@@ -29,7 +29,7 @@ class TestWindowsMultihopHandoff(unittest.TestCase):
         self.assertTrue(py.is_file())
         self.assertTrue(bat.is_file())
         src = py.read_text(encoding="utf-8")
-        self.assertIn('VERSION = "0.3.8"', src)
+        self.assertIn('VERSION = "0.3.9"', src)
         self.assertIn("rebuild_windows_setup", src)
         self.assertIn("exit_node_elgamal.pub", src)
         self.assertIn("build_release_0.0.8.py", src)
@@ -45,7 +45,7 @@ class TestWindowsMultihopHandoff(unittest.TestCase):
         self.assertIn("inject_product_secrets", recipe)
 
     def test_release_0_3_6_has_windows_only(self):
-        src = (ROOT / "scripts" / "build_release_0.3.8.py").read_text(encoding="utf-8")
+        src = (ROOT / "scripts" / "build_release_0.3.9.py").read_text(encoding="utf-8")
         self.assertIn("--windows-only", src)
         self.assertIn("build_windows_multihop", src)
 

@@ -94,7 +94,7 @@ class TestConnectViaWebHttp(unittest.TestCase):
                 # Downloads present (paid subscription Payment Link); connect-via-web off
                 self.assertIn("buy.stripe.com", html)
                 self.assertIn("client_reference_id=", html)
-                self.assertIn("BUY - 0.3.8", html)
+                self.assertIn("BUY - 0.3.9", html)
                 self.assertNotIn("releases/download/", html)
 
 

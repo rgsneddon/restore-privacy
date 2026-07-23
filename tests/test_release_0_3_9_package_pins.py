@@ -1,13 +1,14 @@
-"""Historical catalog 0.3.8 package pins (archived monopin).
+"""Catalog 0.3.9 package pins (source monopin + optional staged packages).
 
-Live monopin is 0.3.8+ — do **not** assert client/VERSION or downloads.RELEASE_VERSION
-here. This module only checks historical handoff/release artifacts and optional
-staged packages under ``releases/0.3.8/`` when present (gitignored).
+Source pins and Apple handoff are always required. Windows multihop PE and
+macOS zip are asserted when present under ``releases/0.3.9/`` (gitignored;
+operator-built).
 """
 
 from __future__ import annotations
 
 import hashlib
+import re
 import sys
 import unittest
 import zipfile
@@ -16,7 +17,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
-VERSION = "0.3.8"
+VERSION = "0.3.9"
 REL = ROOT / "releases" / VERSION
 STATUS_ASSETS = ROOT / "status_page" / "assets" / VERSION
 WINDOWS = REL / f"restore-privacy-client-{VERSION}-windows-x64-setup.exe"
@@ -29,33 +30,52 @@ EXIT_PUB_PIN = (
 )
 
 
-class Test038HistoricalArtifacts(unittest.TestCase):
-    """Archive-only gates — independent of current monopin."""
+class Test039SourcePins(unittest.TestCase):
+    def test_client_version_pin(self):
+        ver = (ROOT / "client" / "VERSION").read_text(encoding="utf-8").strip()
+        self.assertEqual(ver, VERSION)
 
-    def test_apple_handoff_archive_present(self):
-        h = ROOT / "client_app" / "APPLE_HANDOFF_0.3.8.md"
-        self.assertTrue(h.is_file())
-        text = h.read_text(encoding="utf-8")
-        self.assertIn("0.3.8", text)
-        self.assertIn("flutter build macos", text.lower())
+    def test_downloads_catalog_pin(self):
+        sys.path.insert(0, str(ROOT / "status_page"))
+        from downloads import (
+            RELEASE_VERSION,
+            RELEASE_TAG,
+            MACOS_ZIP_FILENAME,
+            IOS_ZIP_FILENAME,
+            RELEASE_ASSETS,
+            list_catalog_platform_packages,
+        )
 
-    def test_build_release_script_archive_present(self):
-        br = ROOT / "scripts" / f"build_release_{VERSION}.py"
-        self.assertTrue(br.is_file())
-        src = br.read_text(encoding="utf-8")
-        self.assertIn(f'VERSION = "{VERSION}"', src)
-        self.assertIn("restore-privacy-client-{VERSION}-macos.zip", src)
-        self.assertIn("sign_and_notarize_macos", src)
-        self.assertIn("_assert_no_priv", src)
+        self.assertEqual(RELEASE_VERSION, VERSION)
+        self.assertEqual(RELEASE_TAG, VERSION)
+        self.assertEqual(
+            MACOS_ZIP_FILENAME, f"restore-privacy-client-{VERSION}-macos.zip"
+        )
+        self.assertEqual(
+            IOS_ZIP_FILENAME, f"restore-privacy-client-{VERSION}-ios.zip"
+        )
+        platforms = {a.platform for a in RELEASE_ASSETS}
+        self.assertIn("macos", platforms)
+        self.assertIn("ios", platforms)
+        pkgs = list_catalog_platform_packages()
+        names = {p["filename"] for p in pkgs}
+        self.assertIn(MACOS_ZIP_FILENAME, names)
+        self.assertIn(IOS_ZIP_FILENAME, names)
+        # Filenames must embed monopin version for Apple customer packages
+        for plat in ("macos", "ios"):
+            row = next(p for p in pkgs if p["platform"] == plat)
+            self.assertIn(VERSION, row["filename"])
+            self.assertEqual(row["version"], VERSION)
 
-    def test_release_notes_archive_present(self):
-        notes = ROOT / "scripts" / f"RELEASE_NOTES_{VERSION}.md"
-        self.assertTrue(notes.is_file())
-        text = notes.read_text(encoding="utf-8")
-        self.assertIn(VERSION, text)
+    def test_flutter_product_version_pin(self):
+        cfg = (ROOT / "client_app" / "lib" / "rpt_config.dart").read_text(
+            encoding="utf-8"
+        )
+        self.assertIn(f"productVersion = '{VERSION}'", cfg)
+        pub = (ROOT / "client_app" / "pubspec.yaml").read_text(encoding="utf-8")
+        self.assertRegex(pub, rf"(?m)^version:\s*{re.escape(VERSION)}\+")
 
-    def test_multihop_routing_still_implemented(self):
-        # Product capability pin (not monopin version)
+    def test_multihop_routing_implemented(self):
         from client.multihop import MULTI_HOP_ROUTING_IMPLEMENTED, PRODUCT_EXIT_HOST
 
         self.assertIs(MULTI_HOP_ROUTING_IMPLEMENTED, True)
@@ -72,16 +92,41 @@ class Test038HistoricalArtifacts(unittest.TestCase):
         self.assertNotEqual(exit_b, entry_b)
         self.assertEqual(hashlib.sha256(exit_b).hexdigest(), EXIT_PUB_PIN)
 
+    def test_apple_handoff_present(self):
+        h = ROOT / "client_app" / "APPLE_HANDOFF_0.3.9.md"
+        self.assertTrue(h.is_file())
+        text = h.read_text(encoding="utf-8")
+        self.assertIn("0.3.9", text)
+        self.assertIn("flutter build macos", text.lower())
 
-@unittest.skipUnless(WINDOWS.is_file(), "releases/0.3.8 Windows PE not present")
-class Test038WindowsPeOptional(unittest.TestCase):
+    def test_build_release_script_and_release_md(self):
+        br = ROOT / "scripts" / f"build_release_{VERSION}.py"
+        self.assertTrue(br.is_file())
+        src = br.read_text(encoding="utf-8")
+        # Real script builds filename from VERSION constant + f-string MACOS_ZIP_NAME
+        self.assertIn(f'VERSION = "{VERSION}"', src)
+        self.assertIn("restore-privacy-client-{VERSION}-macos.zip", src)
+        self.assertIn("MACOS_ZIP_NAME", src)
+        self.assertIn("sign_and_notarize_macos", src)
+        self.assertIn("_assert_no_priv", src)
+        rel = (ROOT / "scripts" / "RELEASE.md").read_text(encoding="utf-8")
+        self.assertIn(f"build_release_{VERSION}.py", rel)
+        self.assertIn(f"APPLE_HANDOFF_{VERSION}.md", rel)
+
+    def test_readme_catalog_0_3_9(self):
+        text = (ROOT / "README.md").read_text(encoding="utf-8")
+        self.assertIn("0.3.9", text)
+
+
+@unittest.skipUnless(WINDOWS.is_file(), "releases/0.3.9 Windows PE not present")
+class Test039WindowsPeOptional(unittest.TestCase):
     def test_windows_pe_built(self):
         self.assertTrue(WINDOWS.is_file(), f"missing {WINDOWS}")
         self.assertGreater(WINDOWS.stat().st_size, 1_000_000)
 
 
-@unittest.skipUnless(MACOS.is_file(), "releases/0.3.8 macOS zip not present")
-class Test038MacosPackage(unittest.TestCase):
+@unittest.skipUnless(MACOS.is_file(), "releases/0.3.9 macOS zip not present")
+class Test039MacosPackage(unittest.TestCase):
     def test_macos_zip_size_and_no_priv(self):
         self.assertGreater(MACOS.stat().st_size, 1_000_000)
         with zipfile.ZipFile(MACOS) as z:
@@ -89,7 +134,8 @@ class Test038MacosPackage(unittest.TestCase):
             privs = [n for n in names if n.endswith(".priv")]
             self.assertEqual(privs, [], f"private keys in macOS zip: {privs}")
             self.assertTrue(
-                any(".app/" in n for n in names),
+                any(n.endswith("restore_privacy_client.app/") or n.endswith(".app/") for n in names)
+                or any(".app/" in n for n in names),
                 "expected .app payload in macOS zip",
             )
 
@@ -105,9 +151,18 @@ class Test038MacosPackage(unittest.TestCase):
             self.assertTrue(entry_names, "node_elgamal.pub missing from macOS zip")
             exit_b = z.read(exit_names[0])
             self.assertEqual(hashlib.sha256(exit_b).hexdigest(), EXIT_PUB_PIN)
+            # Product inject must not ship private material alongside pubs
+            secrets_dirs = {
+                str(Path(n).parent) for n in exit_names + entry_names
+            }
+            for d in secrets_dirs:
+                for n in z.namelist():
+                    if n.startswith(d) and n.endswith(".priv"):
+                        self.fail(f"priv next to pubs in zip: {n}")
 
-    def test_macos_cfbundle_version_is_0_3_8(self):
+    def test_macos_cfbundle_version_is_0_3_9(self):
         with zipfile.ZipFile(MACOS) as z:
+            # Host app only — skip nested frameworks/plugins/appex
             host = [
                 n
                 for n in z.namelist()
@@ -115,15 +170,20 @@ class Test038MacosPackage(unittest.TestCase):
             ]
             self.assertTrue(host, "host Info.plist missing from macOS zip")
             raw = z.read(host[0])
+            # CFBundleShortVersionString marketing version
             self.assertIn(
                 VERSION.encode(),
                 raw,
-                "host Info.plist must pin catalog version 0.3.8",
+                "host Info.plist must pin catalog version 0.3.9",
             )
 
 
-@unittest.skipUnless(IOS.is_file(), "releases/0.3.8 iOS zip not present")
-class Test038IosPackage(unittest.TestCase):
+if __name__ == "__main__":
+    unittest.main()
+
+
+@unittest.skipUnless(IOS.is_file(), "releases/0.3.9 iOS zip not present")
+class Test039IosPackage(unittest.TestCase):
     def test_ios_zip_size_and_no_priv(self):
         self.assertGreater(IOS.stat().st_size, 1_000_000)
         with zipfile.ZipFile(IOS) as z:
@@ -147,7 +207,7 @@ class Test038IosPackage(unittest.TestCase):
             exit_b = z.read(exit_names[0])
             self.assertEqual(hashlib.sha256(exit_b).hexdigest(), EXIT_PUB_PIN)
 
-    def test_ios_cfbundle_version_is_0_3_8(self):
+    def test_ios_cfbundle_version_is_0_3_9(self):
         with zipfile.ZipFile(IOS) as z:
             host = [
                 n
@@ -161,9 +221,9 @@ class Test038IosPackage(unittest.TestCase):
 
 @unittest.skipUnless(
     STATUS_MACOS.is_file() and STATUS_IOS.is_file(),
-    "status_page/assets/0.3.8 Apple zips not staged",
+    "status_page/assets/0.3.9 Apple zips not staged",
 )
-class Test038StatusAppleStage(unittest.TestCase):
+class Test039StatusAppleStage(unittest.TestCase):
     def test_staged_apple_match_releases_sizes(self):
         self.assertGreater(STATUS_MACOS.stat().st_size, 1_000_000)
         self.assertGreater(STATUS_IOS.stat().st_size, 1_000_000)
@@ -176,6 +236,3 @@ class Test038StatusAppleStage(unittest.TestCase):
                 privs = [n for n in z.namelist() if n.endswith(".priv")]
                 self.assertEqual(privs, [], f"priv in staged {p.name}")
 
-
-if __name__ == "__main__":
-    unittest.main()

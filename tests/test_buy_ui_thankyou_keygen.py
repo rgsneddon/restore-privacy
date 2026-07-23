@@ -55,7 +55,7 @@ class TestThankYouKeygenProminent(unittest.TestCase):
 
         html = render_post_payment_thankyou_html(
             download_path="/download?token=tok_ui_test",
-            filename="restore-privacy-client-0.3.8-linux-x64.tar.gz",
+            filename="restore-privacy-client-0.3.9-linux-x64.tar.gz",
             platform="linux",
             session_id="cs_ui_test",
             purchase_id="RPT-AAAA-BBBB-CCCC",

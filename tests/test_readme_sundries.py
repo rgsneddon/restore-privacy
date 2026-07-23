@@ -81,7 +81,7 @@ class TestReadmePublicClientOnly(unittest.TestCase):
         self.assertTrue("macos" in lower)
         self.assertTrue("ios" in lower)
         self.assertTrue(
-            "0.3.8" in text
+            "0.3.9" in text
             or "0.3.5" in text
             or "0.3.4" in text
             or "0.2.1" in text

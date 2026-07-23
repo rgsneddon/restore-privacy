@@ -157,6 +157,7 @@ class _TunnelHomeState extends State<TunnelHome> with WidgetsBindingObserver {
       _connectionLog = ConnectionLog(MemoryConnectionLogBackend());
     }
     final loaded = await _store!.load();
+    RptConfig.setRuntimeMultiHop(loaded.privacyMultihop);
     // Refresh payment if we already have a session id (post-pay recheck)
     final sid = await _licence!.paymentSessionId();
     if (sid.isNotEmpty) {
@@ -537,11 +538,13 @@ class _TunnelHomeState extends State<TunnelHome> with WidgetsBindingObserver {
           connectionLog: _connectionLog,
           licenceGate: _licence,
           residualCaptureActive: _connected,
+          residualConnected: _connected,
           ipv6Protected: _status.toLowerCase().contains('ipv6 isp path blocked'),
           onLicenceChanged: (accepted) {
             if (mounted) setState(() => _licenceAccepted = accepted);
           },
           onChanged: (s) {
+            RptConfig.setRuntimeMultiHop(s.privacyMultihop);
             if (mounted) setState(() => _settings = s);
           },
         ),

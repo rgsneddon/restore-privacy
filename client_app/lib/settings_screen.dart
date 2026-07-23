@@ -7,7 +7,9 @@ import 'connection_log.dart';
 import 'leak_test.dart';
 import 'legal_links.dart';
 import 'licence_gate.dart';
+import 'node_ping.dart';
 import 'registration_copy.dart';
+import 'rpt_config.dart';
 import 'settings_store.dart';
 import 'theme.dart';
 import 'transparency_copy.dart';
@@ -43,6 +45,7 @@ class SettingsScreen extends StatefulWidget {
     this.onLicenceChanged,
     this.residualCaptureActive = false,
     this.ipv6Protected = false,
+    this.residualConnected = false,
   });
 
   final SettingsStore store;
@@ -57,6 +60,9 @@ class SettingsScreen extends StatefulWidget {
   /// Current tunnel residual posture (from home / native status when known).
   final bool residualCaptureActive;
   final bool ipv6Protected;
+
+  /// True when residual tunnel is active (for multihop reconnect messaging).
+  final bool residualConnected;
 
   @override
   State<SettingsScreen> createState() => _SettingsScreenState();
@@ -74,15 +80,20 @@ class _SettingsScreenState extends State<SettingsScreen> {
   bool _paymentOk = false;
   String _paymentStatus = kPaymentStatusUnknown;
   final TextEditingController _sessionCtrl = TextEditingController();
+  String _entryPing = '…';
+  String _exitPing = '…';
+  bool _pingBusy = false;
 
   @override
   void initState() {
     super.initState();
     _settings = widget.initial;
     _log = widget.connectionLog;
+    RptConfig.setRuntimeMultiHop(_settings.privacyMultihop);
     WidgetsBinding.instance.addPostFrameCallback((_) async {
       await _ensureLog();
       await _refreshLicenceAndPayment();
+      await _refreshPings();
     });
   }
 
@@ -256,6 +267,86 @@ class _SettingsScreenState extends State<SettingsScreen> {
     if (mounted) setState(() => _busy = false);
   }
 
+  Future<void> _setPrivacyScale({
+    bool? trafficShape,
+    bool? outerObfuscation,
+    bool? multihop,
+  }) async {
+    final prevMh = _settings.privacyMultihop;
+    setState(() {
+      _busy = true;
+      _settings = _settings.copyWith(
+        privacyTrafficShape: trafficShape,
+        privacyOuterObfuscation: outerObfuscation,
+        privacyMultihop: multihop,
+      );
+    });
+    await widget.store.save(_settings);
+    RptConfig.setRuntimeMultiHop(_settings.privacyMultihop);
+    // Push to native residual shell (app group / next reconnect).
+    try {
+      await _channel.invokeMethod<dynamic>('setPrivacyScale', {
+        'trafficShape': _settings.privacyTrafficShape,
+        'outerObfuscation': _settings.privacyOuterObfuscation,
+        'multihop': _settings.privacyMultihop,
+      });
+    } on MissingPluginException {
+      // Persist still valid; residual path uses Connect host from RptConfig.
+    } catch (_) {
+      // Best-effort native hot-apply.
+    }
+    final mhChanged = prevMh != _settings.privacyMultihop;
+    String note =
+        'Privacy scale saved: shape=${_settings.privacyTrafficShape} '
+        'obfs=${_settings.privacyOuterObfuscation} '
+        'multihop=${_settings.privacyMultihop}.';
+    if (mhChanged && widget.residualConnected) {
+      note +=
+          ' Multi-hop changed while connected — Disconnect then Connect to re-establish residual via the new hop.';
+    } else if (!mhChanged) {
+      note +=
+          ' Shape/obfs apply on residual path where the Packet Tunnel shell supports hot-apply; otherwise on next Connect.';
+    }
+    _note = note;
+    widget.onChanged?.call(_settings);
+    await _refreshPings();
+    if (mounted) setState(() => _busy = false);
+  }
+
+  Future<void> _refreshPings() async {
+    if (_pingBusy) return;
+    setState(() {
+      _pingBusy = true;
+      _entryPing = '…';
+      if (_settings.privacyMultihop) {
+        _exitPing = '…';
+      } else {
+        _exitPing = 'n/a (multi-hop off)';
+      }
+    });
+    try {
+      final r = await measureSettingsPings(multihopOn: _settings.privacyMultihop);
+      if (!mounted) return;
+      setState(() {
+        _entryPing = 'Entry (${RptConfig.entryHost}): ${r.entry.display()}';
+        if (r.exit != null) {
+          _exitPing = 'Exit (${RptConfig.exitHost}): ${r.exit!.display()}';
+        } else {
+          _exitPing = 'Exit: n/a (multi-hop off)';
+        }
+      });
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _entryPing = 'Entry: n/a ($e)';
+          _exitPing = 'Exit: n/a';
+        });
+      }
+    } finally {
+      if (mounted) setState(() => _pingBusy = false);
+    }
+  }
+
   Future<void> _openLegalDoc(LegalDocLink link) async {
     final uri = Uri.parse(link.url);
     try {
@@ -380,6 +471,97 @@ class _SettingsScreenState extends State<SettingsScreen> {
             '(startup launches the app; autoconnect starts the VPN). '
             'OS VPN permission / Administrator may still be required.',
             style: TextStyle(color: kTextMuted, fontSize: 12),
+          ),
+          const SizedBox(height: 20),
+          Text(
+            kPrivacyScaleTitle,
+            style: TextStyle(
+              color: kPrimaryDark,
+              fontSize: 14,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            kExplainerCoreVpn,
+            style: TextStyle(color: kTextMuted, fontSize: 12),
+          ),
+          const SizedBox(height: 10),
+          Container(
+            decoration: BoxDecoration(
+              color: kPanelBg,
+              borderRadius: BorderRadius.circular(kCornerRadius),
+              border: Border.all(color: kBorder),
+            ),
+            child: Column(
+              children: [
+                SwitchListTile(
+                  title: const Text(
+                    'Traffic shaping',
+                    style: TextStyle(fontWeight: FontWeight.w600),
+                  ),
+                  subtitle: const Text(kExplainerTrafficShape),
+                  value: _settings.privacyTrafficShape,
+                  activeThumbColor: kWhite,
+                  activeTrackColor: kPrimary,
+                  onChanged: _busy
+                      ? null
+                      : (v) => _setPrivacyScale(trafficShape: v),
+                ),
+                const Divider(height: 1),
+                SwitchListTile(
+                  title: const Text(
+                    'Outer obfuscation',
+                    style: TextStyle(fontWeight: FontWeight.w600),
+                  ),
+                  subtitle: const Text(kExplainerOuterObfuscation),
+                  value: _settings.privacyOuterObfuscation,
+                  activeThumbColor: kWhite,
+                  activeTrackColor: kPrimary,
+                  onChanged: _busy
+                      ? null
+                      : (v) => _setPrivacyScale(outerObfuscation: v),
+                ),
+                const Divider(height: 1),
+                SwitchListTile(
+                  title: const Text(
+                    'Multi-hop residual',
+                    style: TextStyle(fontWeight: FontWeight.w600),
+                  ),
+                  subtitle: const Text(kExplainerMultihop),
+                  value: _settings.privacyMultihop,
+                  activeThumbColor: kWhite,
+                  activeTrackColor: kPrimary,
+                  onChanged: _busy ? null : (v) => _setPrivacyScale(multihop: v),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 20),
+          Text(
+            kPingStatsTitle,
+            style: TextStyle(
+              color: kPrimaryDark,
+              fontSize: 14,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            kPingStatsDisclaimer,
+            style: TextStyle(color: kTextMuted, fontSize: 12),
+          ),
+          const SizedBox(height: 8),
+          Text(_entryPing, style: const TextStyle(fontSize: 13, color: kText)),
+          const SizedBox(height: 4),
+          Text(_exitPing, style: const TextStyle(fontSize: 13, color: kText)),
+          const SizedBox(height: 8),
+          Align(
+            alignment: Alignment.centerLeft,
+            child: OutlinedButton(
+              onPressed: (_busy || _pingBusy) ? null : _refreshPings,
+              child: Text(_pingBusy ? 'Probing…' : kRefreshPingsButton),
+            ),
           ),
           const SizedBox(height: 20),
           Text(

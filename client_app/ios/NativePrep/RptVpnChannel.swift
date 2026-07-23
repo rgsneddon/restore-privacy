@@ -35,6 +35,26 @@ enum RptVpnChannel {
         ] as [String: Any])
       case "devicePubHex":
         result(devicePubHexMap())
+      case "setPrivacyScale":
+        let args = call.arguments as? [String: Any] ?? [:]
+        let defaults = UserDefaults.standard
+        if let v = args["trafficShape"] as? Bool {
+          defaults.set(v, forKey: "privacy_traffic_shape")
+        }
+        if let v = args["outerObfuscation"] as? Bool {
+          defaults.set(v, forKey: "privacy_outer_obfuscation")
+        }
+        if let v = args["multihop"] as? Bool {
+          defaults.set(v, forKey: "privacy_multihop")
+        }
+        defaults.synchronize()
+        if let suite = UserDefaults(suiteName: RptSecrets.appGroupId) {
+          suite.set(defaults.object(forKey: "privacy_traffic_shape"), forKey: "privacy_traffic_shape")
+          suite.set(defaults.object(forKey: "privacy_outer_obfuscation"), forKey: "privacy_outer_obfuscation")
+          suite.set(defaults.object(forKey: "privacy_multihop"), forKey: "privacy_multihop")
+          suite.synchronize()
+        }
+        result(["ok": true] as [String: Any])
       default:
         result(FlutterMethodNotImplemented)
       }

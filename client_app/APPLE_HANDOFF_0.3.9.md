@@ -53,29 +53,26 @@ Then buyers get packages via paid fulfilment only (token grant / VPS fetch secre
 
 Catalog monopin and status-host BUY buttons must stay **0.3.9** (`status_page/downloads.py` `RELEASE_VERSION`, `client/VERSION`, Flutter `productVersion`).
 
-## Honesty — staged VPS Apple packages (important)
+## Honesty — staged Apple packages
 
-Live notarization / App Store submission is **not** performed on Windows CI hosts. This handoff is the Mac operator path for catalog monopin **0.3.9**.
+Live notarization / App Store submission is **not** performed on Windows CI hosts.
+This handoff is the Mac operator path for catalog monopin **0.3.9**.
 
-**Current staged files** under `status_page/assets/0.3.9/` and VPS
-`/opt/restore-privacy/paid_assets/0.3.9/` for **macOS + iOS** are **not**
-fresh 0.3.9 product builds. Byte-identical to 0.3.6/0.3.7 placeholders;
-`CFBundleShortVersionString` inside the zips still reports **0.2.3** (macOS)
-and **0.1.7** (iOS). Paid download **filenames** say 0.3.9, but the app
-bundle version does **not**.
+**Mac rebuild (this ship):** `restore-privacy-client-0.3.9-macos.zip` is
+Developer ID signed + notarized with `CFBundleShortVersionString` **0.3.9**.
+`restore-privacy-client-0.3.9-ios.zip` is Team-signed sideload with marketing
+version **0.3.9**. Both include product entry + exit ElGamal **pubs** only
+(no `*.priv`). Flutter Settings includes privacy-scale toggles, ping stats,
+keygen unlock + device bind (Windows/desktop parity).
 
-**Mac operator must** rebuild, Developer ID + notarize (macOS), Team-sign (iOS),
-replace the two zips, then:
+Re-stage after rebuild:
 
 ```bash
-python scripts/host_paid_assets_vps.py --stage --upload
+python scripts/host_paid_assets_vps.py --stage --upload --version 0.3.9 --force
 ```
 
-Audit helper (no Mac required):
+Audit helper:
 
 ```bash
 python -c "from apple_package_audit import audit_catalog_apple_packages; import json; print(json.dumps(audit_catalog_apple_packages(version='0.3.9'), indent=2))"
 ```
-
-Windows / Android / Linux 0.3.9 packages are the rebuilt monopin set; only
-Apple zips remain placeholder until Mac rebuild.

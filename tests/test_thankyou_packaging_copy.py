@@ -21,7 +21,7 @@ class TestThankYouPackagingCopy(unittest.TestCase):
     def test_success_thankyou_has_packaging_wait_copy(self):
         html = render_post_payment_thankyou_html(
             download_path="/download?token=abc_test_token_xyz",
-            filename="restore-privacy-client-0.3.8-windows-x64-setup.exe",
+            filename="restore-privacy-client-0.3.9-windows-x64-setup.exe",
             platform="windows",
             session_id="cs_test_packaging_1",
             purchase_id="RPT-PPI-TEST01",
