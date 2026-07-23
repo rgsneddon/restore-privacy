@@ -35,7 +35,7 @@ echo ================================================================
 echo Running Restore Internet will ERASE ALL parts of Restore Privacy
 echo from this device (app, tunnel residual, shortcuts, product secrets^).
 echo You may NOT be able to automatically re-download your subscription
-echo app afterward. Contact russell.gray.sneddon@gmail.com to obtain a
+echo app afterward. Contact rus@restoreprivacy.online to obtain a
 echo new download link.
 echo ================================================================
 echo.

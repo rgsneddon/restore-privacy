@@ -42,7 +42,7 @@ class TestRestoreInternetSources(unittest.TestCase):
         markers = restore_internet_warning_markers()
         self.assertIn(RESTORE_INTERNET_CONTACT_EMAIL, markers)
         self.assertEqual(
-            RESTORE_INTERNET_CONTACT_EMAIL, "russell.gray.sneddon@gmail.com"
+            RESTORE_INTERNET_CONTACT_EMAIL, "rus@restoreprivacy.online"
         )
         # Banner helper must expose the same contract (tests drive real helper)
         banner = "\n".join(restore_internet_warning_banner_lines())
@@ -193,7 +193,7 @@ class TestInstallerWiresRestoreInternet(unittest.TestCase):
         self.assertIn("Restore Internet.lnk", inst)
         self.assertIn("Uninstall.bat", inst)
         # Shortcut tooltip carries wipe + contact warning
-        self.assertIn("russell.gray.sneddon@gmail.com", inst)
+        self.assertIn("rus@restoreprivacy.online", inst)
         self.assertIn("erases ALL Restore Privacy", inst)
 
     def test_package_linux_writes_failsafe(self):

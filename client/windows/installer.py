@@ -551,7 +551,7 @@ def install(
         if restore_bat.is_file():
             _ri_desc = (
                 "WARNING: erases ALL Restore Privacy; contact "
-                "russell.gray.sneddon@gmail.com for a new download link"
+                "rus@restoreprivacy.online for a new download link"
             )
             _create_shortcut(
                 restore_bat,

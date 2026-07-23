@@ -15,7 +15,7 @@ ROOT = Path(__file__).resolve().parents[1]
 RESTORE_INTERNET_DISPLAY_NAME = "Restore Internet"
 
 # Contact for a new paid download link after a full wipe (OBJECTIVE email, corrected spelling)
-RESTORE_INTERNET_CONTACT_EMAIL = "russell.gray.sneddon@gmail.com"
+RESTORE_INTERNET_CONTACT_EMAIL = "rus@restoreprivacy.online"
 
 
 def restore_internet_warning_markers() -> tuple[str, ...]:

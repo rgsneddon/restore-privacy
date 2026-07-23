@@ -95,7 +95,7 @@ Every catalog installer ships a user-facing **Restore Internet** artifact (Windo
 
 This processing is **entirely on the user’s device**. It does **not** phone home, upload identity, or notify the node/status host that a wipe occurred.
 
-**BIG WARNING (user-facing):** Running **Restore Internet** **ERASES ALL** parts of Restore Privacy from the device. Paid catalog downloads use **one-time** fulfilment links. After a full wipe you may **not** be able to automatically re-download your subscription app. Contact **russell.gray.sneddon@gmail.com** to obtain a new download link (or pay again on the [status downloads](https://restoreprivacy.online/) page). Ordinary **Disconnect** does **not** perform this full wipe.
+**BIG WARNING (user-facing):** Running **Restore Internet** **ERASES ALL** parts of Restore Privacy from the device. Paid catalog downloads use **one-time** fulfilment links. After a full wipe you may **not** be able to automatically re-download your subscription app. Contact **rus@restoreprivacy.online** to obtain a new download link (or pay again on the [status downloads](https://restoreprivacy.online/) page). Ordinary **Disconnect** does **not** perform this full wipe.
 
 ---
 
@@ -177,7 +177,7 @@ The product **source repository is private**. For privacy questions about Restor
 
 - Read the public policy and audit on the [status host](https://restoreprivacy.online/) (`/PRIVACY_POLICY.md`, `/AUDIT.md`)
 - Install / pay path: [How to buy](https://restoreprivacy.online/how-to-buy)
-- **Re-download after full wipe (Restore Internet):** **russell.gray.sneddon@gmail.com**
+- **Re-download after full wipe (Restore Internet):** **rus@restoreprivacy.online**
 - Or contact the operator via their public project channels (e.g. GitHub profile `rgsneddon`)
 
 ---

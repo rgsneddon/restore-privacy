@@ -8,7 +8,7 @@ network restore **plus** complete product removal.
 > **WARNING:** Running **Restore Internet** will **ERASE ALL** parts of
 > **Restore Privacy** from the device (app, tunnel residual, shortcuts, product
 > secrets). You may **not** be able to automatically re-download your
-> subscription app afterward. Contact **russell.gray.sneddon@gmail.com** to
+> subscription app afterward. Contact **rus@restoreprivacy.online** to
 > obtain a new download link.
 
 | Platform | Artifact |
