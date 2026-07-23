@@ -77,6 +77,7 @@ from client.licence_gate import (
     licence_url,
     may_connect,
     needs_keygen_unlock,
+    needs_licence_renewal,
     short_licence_summary,
 )
 from client.payment_entitlement import (
@@ -87,6 +88,8 @@ from client.payment_entitlement import (
     import_session_and_verify,
     load_payment_entitlement,
     payment_allows_connect,
+    renew_licence_message,
+    renew_licence_url,
 )
 from client.startup_bootstrap import bootstrap_payment_entitlement
 from client.registration_copy import (
@@ -702,8 +705,104 @@ class TunnelClientApp:
         except Exception:
             pass
 
+    def _show_renew_licence_prompt(self) -> None:
+        """EXPIRED hard-lock: renew your licence *here* + platform pay portal."""
+        ent = load_payment_entitlement()
+        plat = (ent.platform or "windows").strip().lower() or "windows"
+        url = renew_licence_url(plat)
+        body = renew_licence_message(plat)
+        win = tk.Toplevel(self.root)
+        win.title("Renew your licence")
+        win.configure(bg=CHROME_BG)
+        win.geometry("500x320")
+        win.transient(self.root)
+        try:
+            win.grab_set()
+        except Exception:
+            pass
+        pad = tk.Frame(win, bg=CHROME_BG, padx=16, pady=14)
+        pad.pack(fill=tk.BOTH, expand=True)
+        tk.Label(
+            pad,
+            text="Renew your licence",
+            bg=CHROME_BG,
+            fg=PRIMARY_DARK,
+            font=("Segoe UI", 14, "bold"),
+            anchor="w",
+        ).pack(fill=tk.X, pady=(0, 8))
+        tk.Label(
+            pad,
+            text="Your subscription is EXPIRED. Renew your licence *here*:",
+            bg=CHROME_BG,
+            fg=TEXT,
+            font=("Segoe UI", 10),
+            anchor="w",
+            wraplength=460,
+            justify=tk.LEFT,
+        ).pack(fill=tk.X, pady=(0, 6))
+        link = tk.Label(
+            pad,
+            text=url,
+            bg=CHROME_BG,
+            fg=PRIMARY,
+            font=("Segoe UI", 9, "underline"),
+            cursor="hand2",
+            anchor="w",
+            wraplength=460,
+            justify=tk.LEFT,
+        )
+        link.pack(fill=tk.X, pady=(0, 8))
+
+        def _open_portal(_e: object | None = None) -> None:
+            try:
+                webbrowser.open(url)
+            except Exception as exc:  # noqa: BLE001
+                self._log(f"Could not open browser: {exc}. Visit: {url}")
+
+        link.bind("<Button-1>", _open_portal)
+        tk.Label(
+            pad,
+            text=body,
+            bg=CHROME_BG,
+            fg=TEXT_MUTED,
+            font=("Segoe UI", 8),
+            anchor="w",
+            wraplength=460,
+            justify=tk.LEFT,
+        ).pack(fill=tk.X, pady=(0, 10))
+        btn_row = tk.Frame(pad, bg=CHROME_BG)
+        btn_row.pack(fill=tk.X, pady=(8, 0))
+        tk.Button(
+            btn_row,
+            text="Open payment portal",
+            command=_open_portal,
+            bg=PRIMARY,
+            fg=WHITE,
+            relief=tk.FLAT,
+            font=("Segoe UI", 10, "bold"),
+            padx=14,
+            pady=8,
+            cursor="hand2",
+        ).pack(side=tk.LEFT)
+        tk.Button(
+            btn_row,
+            text="Close",
+            command=win.destroy,
+            bg=PANEL_BG,
+            fg=TEXT,
+            relief=tk.FLAT,
+            font=("Segoe UI", 9),
+            padx=10,
+            pady=6,
+            cursor="hand2",
+        ).pack(side=tk.LEFT, padx=(8, 0))
+
     def _show_keygen_prompt(self) -> None:
         """Forced modal: enter fulfilment keygen to unlock Connect (not Settings-only)."""
+        # EXPIRED installs must renew — never show keygen in place of renew.
+        if needs_licence_renewal():
+            self._show_renew_licence_prompt()
+            return
         win = tk.Toplevel(self.root)
         win.title("Enter licence keygen")
         win.configure(bg=CHROME_BG)
@@ -939,8 +1038,13 @@ class TunnelClientApp:
                 win.destroy()
             except Exception:
                 pass
-            # Force keygen surface next — do not leave unlock buried in Settings only
-            if needs_keygen_unlock():
+            # Next surface: renew if EXPIRED, else keygen unlock if needed
+            if needs_licence_renewal():
+                try:
+                    self.root.after(200, self._show_renew_licence_prompt)
+                except Exception:
+                    self._show_renew_licence_prompt()
+            elif needs_keygen_unlock():
                 try:
                     self.root.after(200, self._show_keygen_prompt)
                 except Exception:
@@ -1039,6 +1143,14 @@ class TunnelClientApp:
             self.detail_var.set(msg)
             self._show_licence_prompt()
             return
+        if needs_licence_renewal():
+            ent = load_payment_entitlement()
+            msg = renew_licence_message(ent.platform or "windows")
+            self._log(msg)
+            self._set_status("error", detail=msg)
+            self.detail_var.set(msg)
+            self._show_renew_licence_prompt()
+            return
         if needs_keygen_unlock():
             msg = CONNECT_BLOCKED_KEYGEN_MSG
             self._log(msg)
@@ -1099,6 +1211,8 @@ class TunnelClientApp:
                     self._apply_control(connected=False, busy=False)
                     if not has_accepted_licence():
                         self._show_licence_prompt()
+                    elif needs_licence_renewal():
+                        self._show_renew_licence_prompt()
                     elif needs_keygen_unlock():
                         self._show_keygen_prompt()
                     else:
@@ -2325,6 +2439,12 @@ def main() -> int:
                 )
                 app._show_licence_prompt()
                 return
+            if needs_licence_renewal():
+                app._log(
+                    "Settings: autoconnect skipped — renew licence (EXPIRED)."
+                )
+                app._show_renew_licence_prompt()
+                return
             if needs_keygen_unlock():
                 app._log(
                     "Settings: autoconnect skipped — enter keygen to unlock Connect."
@@ -2336,10 +2456,12 @@ def main() -> int:
 
         app.root.after(450, _settings_autoconnect)
     elif not may_connect():
-        # First-run seamless path: licence first, then forced keygen unlock.
+        # First-run seamless path: licence, then renew OR keygen.
         def _first_run_gates() -> None:
             if not has_accepted_licence():
                 app._show_licence_prompt()
+            elif needs_licence_renewal():
+                app._show_renew_licence_prompt()
             elif needs_keygen_unlock():
                 app._show_keygen_prompt()
 

@@ -52,6 +52,9 @@ const String kKeygenPromptBody =
 const String kKeyPaymentStatus = 'payment_entitlement_status';
 const String kKeyPaymentSessionId = 'payment_entitlement_session_id';
 const String kKeyPaymentKeygen = 'payment_entitlement_keygen';
+const String kKeyPaymentPlatform = 'payment_entitlement_platform';
+const String kKeyPaymentValidUntil = 'payment_entitlement_valid_until';
+const String kKeyPaymentRenewUrl = 'payment_entitlement_renew_url';
 const String kPaymentStatusActive = 'active';
 const String kPaymentStatusFailed = 'failed';
 const String kPaymentStatusRevoked = 'revoked';
@@ -67,9 +70,14 @@ const String kKeygenUnlockInstruction =
 
 const String kDefaultPaymentStatusBaseUrl = 'https://restoreprivacy.online';
 
+/// Default monthly Stripe Payment Link (aligned with status_page.payments).
+const String kDefaultStripePaymentPageUrl =
+    'https://buy.stripe.com/cNi7sM4uOeWQ9TBe0q7kc00';
+
 /// EXPIRED lock phrase — *here* is the platform payment portal.
 const String kRenewLicencePrefix = 'Renew your licence ';
 const String kRenewLicenceHere = 'here';
+const String kRenewLicencePromptTitle = 'Renew your licence';
 
 /// Normalize payment status → OK | EXPIRED.
 String licenceStatusFromPaymentStatus(String status) {
@@ -78,15 +86,56 @@ String licenceStatusFromPaymentStatus(String status) {
   return kLicenceStatusExpired;
 }
 
-/// Platform catalog pay portal (homepage — user picks monthly/yearly).
+bool isPaymentBlockingStatus(String status) {
+  final st = status.trim().toLowerCase();
+  return st == kPaymentStatusFailed ||
+      st == kPaymentStatusRevoked ||
+      st == kPaymentStatusUnpaid;
+}
+
+/// Map runtime OS to catalog platform id.
+String platformForRenew({String? override}) {
+  final o = (override ?? '').trim().toLowerCase();
+  if (o.isNotEmpty) return o;
+  if (Platform.isAndroid) return 'android';
+  if (Platform.isIOS) return 'ios';
+  if (Platform.isMacOS) return 'macos';
+  if (Platform.isWindows) return 'windows';
+  if (Platform.isLinux) return 'linux';
+  return 'android';
+}
+
+/// Platform-specific Stripe Payment Link (monthly default).
+String renewLicenceUrl({
+  String platform = '',
+  String interval = 'month',
+  String? basePaymentPageUrl,
+}) {
+  final plat = platformForRenew(override: platform);
+  final base = (basePaymentPageUrl ??
+          Platform.environment['STRIPE_PAYMENT_PAGE_URL'] ??
+          Platform.environment['RPT_STRIPE_PAYMENT_PAGE_URL'] ??
+          kDefaultStripePaymentPageUrl)
+      .trim()
+      .replaceAll(RegExp(r'/+$'), '');
+  final iv = interval.trim().toLowerCase() == 'year' ? 'year' : 'month';
+  final ref = Uri.encodeQueryComponent('$plat|$iv');
+  final sep = base.contains('?') ? '&' : '?';
+  return '$base${sep}client_reference_id=$ref';
+}
+
+/// Catalog homepage fallback (user picks platform + interval).
 String renewLicenceCatalogUrl() => kDefaultPaymentStatusBaseUrl;
 
-/// Message for EXPIRED lock screen with renew *here* link.
-String renewLicenceMessage({String platform = ''}) {
-  final plat = platform.trim().isEmpty ? 'your platform' : platform.trim();
-  return 'Renew your licence *here*: $kDefaultPaymentStatusBaseUrl/\n\n'
-      'Status: $kLicenceStatusExpired. Open the payment portal for $plat '
-      '(monthly or yearly), then re-enter your keygen to unlock Connect.';
+/// Message for EXPIRED lock screen with renew *here* + platform portal URL.
+String renewLicenceMessage({String platform = '', String? renewUrl}) {
+  final plat = platformForRenew(override: platform);
+  final url = (renewUrl ?? '').trim().isNotEmpty
+      ? renewUrl!.trim()
+      : renewLicenceUrl(platform: plat);
+  return 'Renew your licence *here*: $url\n\n'
+      'Your subscription is $kLicenceStatusExpired. Open the link to pay '
+      'monthly or yearly for $plat, then enter your new keygen to unlock Connect.';
 }
 
 const String kLicencePromptTitle = 'End-user licence';
@@ -201,6 +250,9 @@ class LicenceGate {
   Future<void> recordPaymentSuccess(
     String sessionId, {
     String keygen = '',
+    String platform = '',
+    double? validUntil,
+    String renewUrl = '',
   }) async {
     if (sessionId.trim().isNotEmpty) {
       await backend.setString(kKeyPaymentSessionId, sessionId.trim());
@@ -211,18 +263,51 @@ class LicenceGate {
         keygen.trim().toUpperCase(),
       );
     }
+    if (platform.trim().isNotEmpty) {
+      await backend.setString(kKeyPaymentPlatform, platform.trim().toLowerCase());
+    }
+    if (validUntil != null) {
+      await backend.setString(kKeyPaymentValidUntil, validUntil.toString());
+    }
+    if (renewUrl.trim().isNotEmpty) {
+      await backend.setString(kKeyPaymentRenewUrl, renewUrl.trim());
+    }
     await backend.setString(kKeyPaymentStatus, kPaymentStatusActive);
   }
 
   Future<void> recordPaymentFailure({
     String reason = 'payment_failed',
     String status = kPaymentStatusFailed,
+    String platform = '',
+    String renewUrl = '',
   }) async {
     final st = status.trim().toLowerCase();
     final write = (st == kPaymentStatusRevoked || st == kPaymentStatusUnpaid)
         ? st
         : kPaymentStatusFailed;
     await backend.setString(kKeyPaymentStatus, write);
+    if (platform.trim().isNotEmpty) {
+      await backend.setString(kKeyPaymentPlatform, platform.trim().toLowerCase());
+    }
+    if (renewUrl.trim().isNotEmpty) {
+      await backend.setString(kKeyPaymentRenewUrl, renewUrl.trim());
+    }
+  }
+
+  Future<String> paymentPlatform() async {
+    final s = await backend.getString(kKeyPaymentPlatform);
+    return (s ?? '').trim().toLowerCase();
+  }
+
+  Future<String> paymentRenewUrl() async {
+    final s = await backend.getString(kKeyPaymentRenewUrl);
+    return (s ?? '').trim();
+  }
+
+  Future<double?> paymentValidUntil() async {
+    final s = await backend.getString(kKeyPaymentValidUntil);
+    if (s == null || s.trim().isEmpty) return null;
+    return double.tryParse(s.trim());
   }
 
   /// Paste Checkout session id and verify against the status host.
@@ -302,11 +387,38 @@ class LicenceGate {
     final st = (remote['status']?.toString() ?? kPaymentStatusUnknown)
         .trim()
         .toLowerCase();
+    final remotePlat = remote['platform']?.toString() ?? '';
+    final remoteRenew = remote['renew_url']?.toString() ??
+        remote['renew_url_monthly']?.toString() ??
+        '';
+    double? remoteVu;
+    final vuRaw = remote['valid_until'];
+    if (vuRaw is num) {
+      remoteVu = vuRaw.toDouble();
+    } else if (vuRaw != null) {
+      remoteVu = double.tryParse(vuRaw.toString());
+    }
     if (st == kPaymentStatusFailed ||
         st == kPaymentStatusRevoked ||
         st == kPaymentStatusUnpaid) {
-      await recordPaymentFailure(reason: remote['reason']?.toString() ?? st, status: st);
+      await recordPaymentFailure(
+        reason: remote['reason']?.toString() ?? st,
+        status: st,
+        platform: remotePlat,
+        renewUrl: remoteRenew,
+      );
       return st;
+    }
+    // Host licence_status EXPIRED with otherwise active-looking status
+    final licRemote = remote['licence_status']?.toString().trim().toUpperCase();
+    if (licRemote == kLicenceStatusExpired) {
+      await recordPaymentFailure(
+        reason: remote['reason']?.toString() ?? 'licence_expired',
+        status: kPaymentStatusRevoked,
+        platform: remotePlat,
+        renewUrl: remoteRenew,
+      );
+      return kPaymentStatusRevoked;
     }
     if (st == kPaymentStatusActive) {
       final remoteSid = remote['session_id']?.toString() ?? sid;
@@ -316,10 +428,29 @@ class LicenceGate {
         await recordPaymentFailure(
           reason: remote['reason']?.toString() ?? 'not_allowed',
           status: kPaymentStatusRevoked,
+          platform: remotePlat,
+          renewUrl: remoteRenew,
         );
         return kPaymentStatusRevoked;
       }
-      await recordPaymentSuccess(remoteSid, keygen: remoteKg);
+      // Period ended locally if host sent valid_until in the past
+      if (remoteVu != null &&
+          remoteVu <= DateTime.now().millisecondsSinceEpoch / 1000.0) {
+        await recordPaymentFailure(
+          reason: 'period_ended',
+          status: kPaymentStatusRevoked,
+          platform: remotePlat,
+          renewUrl: remoteRenew,
+        );
+        return kPaymentStatusRevoked;
+      }
+      await recordPaymentSuccess(
+        remoteSid,
+        keygen: remoteKg,
+        platform: remotePlat,
+        validUntil: remoteVu,
+        renewUrl: remoteRenew,
+      );
       if (bindDevice && remoteSid.trim().isNotEmpty) {
         try {
           await bindDeviceEntitlement(
@@ -477,15 +608,27 @@ class LicenceGate {
   }
 
   /// Failed / revoked / unpaid always block. Missing entitlement blocks when
-  /// product requires payment (default). Active allows.
+  /// product requires payment (default). Active allows only with keygen unlock
+  /// (parity with desktop ``payment_allows_connect``).
   Future<bool> paymentAllowsConnect({bool require = true}) async {
     final st = await paymentStatus();
-    if (st == kPaymentStatusFailed ||
-        st == kPaymentStatusRevoked ||
-        st == kPaymentStatusUnpaid) {
+    if (isPaymentBlockingStatus(st)) {
       return false;
     }
-    if (st == kPaymentStatusActive) return true;
+    if (st == kPaymentStatusActive) {
+      final vu = await paymentValidUntil();
+      if (vu != null &&
+          vu <= DateTime.now().millisecondsSinceEpoch / 1000.0) {
+        return false;
+      }
+      if (require) {
+        final kg = await paymentKeygen();
+        if (kg.isEmpty || !kg.startsWith('RPT-KEY-')) {
+          return false;
+        }
+      }
+      return true;
+    }
     if (!require) return true;
     return false;
   }
@@ -493,7 +636,16 @@ class LicenceGate {
   /// Customer-facing OK | EXPIRED for this install.
   Future<String> licenceStatus() async {
     final st = await paymentStatus();
-    return licenceStatusFromPaymentStatus(st);
+    if (isPaymentBlockingStatus(st)) return kLicenceStatusExpired;
+    if (st == kPaymentStatusActive) {
+      final vu = await paymentValidUntil();
+      if (vu != null &&
+          vu <= DateTime.now().millisecondsSinceEpoch / 1000.0) {
+        return kLicenceStatusExpired;
+      }
+      return kLicenceStatusOk;
+    }
+    return kLicenceStatusExpired;
   }
 
   Future<bool> mayConnect({bool requirePayment = true}) async {
@@ -501,11 +653,47 @@ class LicenceGate {
     return paymentAllowsConnect(require: requirePayment);
   }
 
-  /// True when licence is accepted but payment/keygen unlock is still required.
-  /// Used to force a keygen entry surface before residual Connect (not Settings-only).
+  /// True when subscription is EXPIRED — show renew surface, not keygen.
+  Future<bool> needsLicenceRenewal({bool requirePayment = true}) async {
+    if (!await hasAcceptedLicence()) return false;
+    final st = await paymentStatus();
+    if (isPaymentBlockingStatus(st)) return true;
+    if (st == kPaymentStatusActive) {
+      final vu = await paymentValidUntil();
+      if (vu != null &&
+          vu <= DateTime.now().millisecondsSinceEpoch / 1000.0) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  /// True when licence is accepted but a keygen entry is still required.
+  /// False when EXPIRED (renew surface) — never confuses with keygen modal.
   Future<bool> needsKeygenUnlock({bool requirePayment = true}) async {
     if (!await hasAcceptedLicence()) return false;
+    if (await needsLicenceRenewal(requirePayment: requirePayment)) {
+      return false;
+    }
     return !(await paymentAllowsConnect(require: requirePayment));
+  }
+
+  Future<String> renewMessageForInstall() async {
+    final plat = await paymentPlatform();
+    final cached = await paymentRenewUrl();
+    return renewLicenceMessage(
+      platform: plat.isEmpty ? platformForRenew() : plat,
+      renewUrl: cached.isEmpty ? null : cached,
+    );
+  }
+
+  Future<String> renewPortalUrlForInstall() async {
+    final cached = await paymentRenewUrl();
+    if (cached.isNotEmpty) return cached;
+    final plat = await paymentPlatform();
+    return renewLicenceUrl(
+      platform: plat.isEmpty ? platformForRenew() : plat,
+    );
   }
 
   Future<({bool ok, String message})> assertMayConnect({
@@ -526,14 +714,9 @@ class LicenceGate {
     }
     if (!await paymentAllowsConnect(require: requirePayment)) {
       final st = await paymentStatus();
-      if (st == kPaymentStatusFailed ||
-          st == kPaymentStatusRevoked ||
-          st == kPaymentStatusUnpaid) {
-        // EXPIRED lock — renew your licence *here*
-        return (
-          ok: false,
-          message: renewLicenceMessage(platform: Platform.operatingSystem),
-        );
+      if (isPaymentBlockingStatus(st) || await needsLicenceRenewal()) {
+        // EXPIRED lock — renew your licence *here* + platform portal
+        return (ok: false, message: await renewMessageForInstall());
       }
       final sid = await paymentSessionId();
       final kg = await paymentKeygen();

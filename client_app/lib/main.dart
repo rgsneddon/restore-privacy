@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import 'connect_status.dart';
 import 'connection_log.dart';
@@ -111,8 +112,10 @@ class _TunnelHomeState extends State<TunnelHome> with WidgetsBindingObserver {
       if (!_licenceAccepted) {
         await _showLicenceSheet();
       }
-      // After licence, force keygen unlock surface (parity with desktop).
-      if (mounted && await (_licence?.needsKeygenUnlock() ?? false)) {
+      // After licence: renew if EXPIRED, else keygen if still required.
+      if (mounted && await (_licence?.needsLicenceRenewal() ?? false)) {
+        await _showRenewLicenceSheet();
+      } else if (mounted && await (_licence?.needsKeygenUnlock() ?? false)) {
         await _showKeygenSheet();
       }
       await _maybeAutoconnect();
@@ -238,6 +241,9 @@ class _TunnelHomeState extends State<TunnelHome> with WidgetsBindingObserver {
                   _append('Licence accepted (stored locally only).');
                   Navigator.of(ctx).pop();
                   if (mounted &&
+                      await (_licence?.needsLicenceRenewal() ?? false)) {
+                    await _showRenewLicenceSheet();
+                  } else if (mounted &&
                       await (_licence?.needsKeygenUnlock() ?? false)) {
                     await _showKeygenSheet();
                   }
@@ -256,8 +262,97 @@ class _TunnelHomeState extends State<TunnelHome> with WidgetsBindingObserver {
     );
   }
 
+  /// EXPIRED hard-lock: renew your licence *here* + platform payment portal.
+  Future<void> _showRenewLicenceSheet() async {
+    if (!mounted) return;
+    final gate = _licence;
+    final url = await gate?.renewPortalUrlForInstall() ??
+        renewLicenceUrl(platform: platformForRenew());
+    final body = await gate?.renewMessageForInstall() ??
+        renewLicenceMessage(platform: platformForRenew(), renewUrl: url);
+    if (!mounted) return;
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: kPanelBg,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      builder: (ctx) {
+        return Padding(
+          padding: EdgeInsets.fromLTRB(
+            20,
+            16,
+            20,
+            28 + MediaQuery.of(ctx).viewInsets.bottom,
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Text(
+                kRenewLicencePromptTitle,
+                style: TextStyle(
+                  color: kPrimaryDark,
+                  fontSize: 18,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+              const SizedBox(height: 10),
+              const Text(
+                'Your subscription is EXPIRED. Renew your licence *here*:',
+                style: TextStyle(fontSize: 14),
+              ),
+              const SizedBox(height: 10),
+              SelectableText(
+                url,
+                style: const TextStyle(
+                  fontSize: 13,
+                  color: kPrimary,
+                  decoration: TextDecoration.underline,
+                ),
+              ),
+              const SizedBox(height: 12),
+              Text(
+                body,
+                style: const TextStyle(fontSize: 12, color: kTextMuted),
+              ),
+              const SizedBox(height: 16),
+              FilledButton(
+                onPressed: () async {
+                  final uri = Uri.tryParse(url);
+                  if (uri != null) {
+                    try {
+                      await launchUrl(
+                        uri,
+                        mode: LaunchMode.externalApplication,
+                      );
+                    } catch (_) {
+                      _append('Could not open browser. Visit: $url');
+                    }
+                  }
+                },
+                style: FilledButton.styleFrom(backgroundColor: kPrimary),
+                child: const Text('Open payment portal'),
+              ),
+              TextButton(
+                onPressed: () => Navigator.of(ctx).pop(),
+                child: const Text('Close'),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
   /// Forced keygen unlock surface (parity with Windows/Linux desktop modals).
   Future<void> _showKeygenSheet() async {
+    // EXPIRED installs must renew — never show keygen in place of renew.
+    if (await (_licence?.needsLicenceRenewal() ?? false)) {
+      await _showRenewLicenceSheet();
+      return;
+    }
     if (!mounted) return;
     final controller = TextEditingController();
     await showModalBottomSheet<void>(
@@ -368,6 +463,8 @@ class _TunnelHomeState extends State<TunnelHome> with WidgetsBindingObserver {
       final licOk = await gate.hasAcceptedLicence();
       if (!licOk) {
         await _showLicenceSheet();
+      } else if (await gate.needsLicenceRenewal()) {
+        await _showRenewLicenceSheet();
       } else if (await gate.needsKeygenUnlock()) {
         await _showKeygenSheet();
       }

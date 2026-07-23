@@ -522,7 +522,14 @@ def licence_status_from_payment_entitlement(
     path: Optional[Path] = None,
     now: float | None = None,
 ) -> str:
-    """Normalize local entitlement to **OK** or **EXPIRED** (customer-facing)."""
+    """Normalize local entitlement to **OK** or **EXPIRED** (customer-facing).
+
+    OK = active subscription, period not ended, and (when required) keygen
+    unlock on file — full residual access may proceed after licence accept.
+    EXPIRED = failed / revoked / unpaid / period ended / missing / unknown.
+    Active session **without** keygen is EXPIRED for residual access until
+    unlock (keygen UI, not renew UI — see :func:`needs_keygen_unlock`).
+    """
     e = ent if ent is not None else load_payment_entitlement(path)
     t = now if now is not None else time.time()
     st = (e.status or STATUS_UNKNOWN).strip().lower()
@@ -537,7 +544,7 @@ def licence_status_from_payment_entitlement(
                 pass
         if has_keygen_unlock(e) or not payment_entitlement_required():
             return LICENCE_STATUS_OK
-        # Active but no keygen yet — still EXPIRED for residual until unlock
+        # Active but no keygen yet — not full access (keygen surface, not renew)
         return LICENCE_STATUS_EXPIRED
     return LICENCE_STATUS_EXPIRED
 

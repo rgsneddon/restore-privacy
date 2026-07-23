@@ -183,16 +183,50 @@ def assert_may_connect(path: Optional[Path] = None) -> tuple[bool, str]:
     return True, ""
 
 
+def needs_licence_renewal(path: Optional[Path] = None) -> bool:
+    """True when licence is accepted but subscription is EXPIRED (renew, not keygen).
+
+    Local-only: true for failed / revoked / unpaid status, or an active grant
+    whose ``valid_until`` has passed. Does **not** fire for active installs
+    that still need a keygen entry (use :func:`needs_keygen_unlock`).
+
+    ``path`` is the **licence** acceptance path only.
+    """
+    if not has_accepted_licence(path):
+        return False
+    from client.payment_entitlement import (
+        LICENCE_STATUS_EXPIRED,
+        load_payment_entitlement,
+        is_payment_blocking_status,
+        licence_status_from_payment_entitlement,
+        has_keygen_unlock,
+    )
+
+    ent = load_payment_entitlement()
+    if is_payment_blocking_status(ent.status):
+        return True
+    # Period ended (keygen already on file) — renew, do not re-prompt keygen
+    if has_keygen_unlock(ent) and (
+        licence_status_from_payment_entitlement(ent) == LICENCE_STATUS_EXPIRED
+    ):
+        return True
+    return False
+
+
 def needs_keygen_unlock(path: Optional[Path] = None) -> bool:
-    """True when licence is accepted but payment/keygen unlock is still required.
+    """True when licence is accepted but a keygen entry is still required.
 
     Used by Windows (and other) UI to force a keygen entry surface before
     residual Connect — not Settings-only.
 
-    Local-only (no network): true when licence is accepted and
+    Local-only (no network): true when licence is accepted,
+    subscription is **not** EXPIRED (see :func:`needs_licence_renewal`), and
     :func:`client.payment_entitlement.payment_allows_connect` is false —
     including active session/thank-you file **without** a ``RPT-KEY-…``
     keygen unlock on file.
+
+    Returns **False** when payment is blocking (failed/revoked/unpaid) so the
+    UI shows the renew-licence surface instead of the keygen modal.
 
     ``path`` is the **licence** acceptance path only (same as
     :func:`has_accepted_licence`). Payment entitlement is always read from the
@@ -200,6 +234,8 @@ def needs_keygen_unlock(path: Optional[Path] = None) -> bool:
     :func:`~client.payment_entitlement.payment_allows_connect`.
     """
     if not has_accepted_licence(path):
+        return False
+    if needs_licence_renewal(path):
         return False
     from client.payment_entitlement import payment_allows_connect
 
