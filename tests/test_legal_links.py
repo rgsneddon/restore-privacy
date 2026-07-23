@@ -105,6 +105,8 @@ class TestDocsTrafficShapeAligned(unittest.TestCase):
                 "on by default on every residual path",
                 "enabled by default on the product residual",
                 "are on by default on residual paths",
+                "default on all product residual",
+                "default on **all** product residual",
             ):
                 self.assertNotIn(
                     needle,
