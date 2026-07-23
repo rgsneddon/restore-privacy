@@ -103,6 +103,7 @@ class TestLicenceStatusOkExpired(unittest.TestCase):
             PaymentEntitlement,
             STATUS_ACTIVE,
             STATUS_REVOKED,
+            build_local_platform_renew_url,
             licence_status_from_payment_entitlement,
             renew_licence_message,
             renew_licence_url,
@@ -128,6 +129,11 @@ class TestLicenceStatusOkExpired(unittest.TestCase):
         url = renew_licence_url("macos")
         self.assertTrue(url.startswith("http"))
         self.assertIn("macos", url.lower())
+        # Pure local builder always embeds platform (no payments import)
+        local = build_local_platform_renew_url("macos", interval="month")
+        self.assertIn("buy.stripe.com", local)
+        self.assertIn("macos", local.lower())
+        self.assertIn("client_reference_id=", local)
 
 
 class TestExpiredVsKeygenUiGate(unittest.TestCase):
@@ -231,6 +237,106 @@ class TestExpiredVsKeygenUiGate(unittest.TestCase):
             amc_body.find("needsLicenceRenewal"),
             amc_body.find("needsKeygenUnlock"),
         )
+
+
+class TestLocalPlatformRenewUrlWithoutPayments(unittest.TestCase):
+    """Shipped desktop renew URL must be platform-specific without status_page on path."""
+
+    def test_build_local_platform_renew_url_no_payments_import(self):
+        from client.payment_entitlement import (
+            DEFAULT_STRIPE_PAYMENT_PAGE_URL,
+            build_local_platform_renew_url,
+            renew_licence_message,
+            renew_licence_url,
+        )
+
+        for plat in ("windows", "macos", "ios", "android", "linux"):
+            url = build_local_platform_renew_url(plat, interval="month")
+            self.assertTrue(url.startswith("https://buy.stripe.com/"), plat)
+            self.assertIn(DEFAULT_STRIPE_PAYMENT_PAGE_URL.split("/")[-1], url)
+            self.assertIn("client_reference_id=", url)
+            # platform appears in query (encoded or plain)
+            self.assertTrue(
+                plat in url.lower() or plat in urllib_parse_unquote(url).lower(),
+                f"{plat} missing from {url}",
+            )
+            year = build_local_platform_renew_url(plat, interval="year")
+            self.assertIn("year", year)
+            self.assertNotEqual(url, year)
+
+        # Force renew_licence_url through local path (block payments import)
+        with mock.patch.dict(sys.modules, {"payments": None}):
+            # Also ensure status_page cannot be imported as payments
+            real_import = __import__
+
+            def _block_payments(name, *a, **kw):
+                if name == "payments" or name.endswith(".payments"):
+                    raise ImportError("blocked for unit test")
+                return real_import(name, *a, **kw)
+
+            with mock.patch("builtins.__import__", side_effect=_block_payments):
+                # Clear any cached import
+                sys.modules.pop("payments", None)
+                url = renew_licence_url("macos")
+                msg = renew_licence_message("macos")
+        self.assertIn("macos", url.lower())
+        self.assertIn("buy.stripe.com", url)
+        self.assertIn("client_reference_id=", url)
+        self.assertNotEqual(url.rstrip("/"), "https://restoreprivacy.online")
+        self.assertNotEqual(url.rstrip("/"), "https://restoreprivacy.online/")
+        self.assertIn("Renew your licence *here*", msg)
+        self.assertIn(url, msg)
+
+    def test_refresh_stores_host_renew_url(self):
+        from client.payment_entitlement import (
+            load_payment_entitlement,
+            record_payment_success,
+            refresh_entitlement_from_remote,
+        )
+
+        with tempfile.TemporaryDirectory() as td:
+            pay = Path(td) / "payment_entitlement.json"
+            record_payment_success(
+                "cs_renew",
+                path=pay,
+                keygen="RPT-KEY-ABCDEF0123456789ABCDEF01",
+                platform="ios",
+            )
+
+            def fake_fetch(sid, keygen=""):
+                return {
+                    "session_id": sid,
+                    "status": "revoked",
+                    "reason": "charge.refunded",
+                    "connect_allowed": False,
+                    "platform": "ios",
+                    "keygen": keygen,
+                    "licence_status": "EXPIRED",
+                    "renew_url": (
+                        "https://buy.stripe.com/cNi7sM4uOeWQ9TBe0q7kc00"
+                        "?client_reference_id=ios%7Cmonth"
+                    ),
+                }
+
+            ent = refresh_entitlement_from_remote(path=pay, fetch=fake_fetch)
+            self.assertEqual(ent.status, "revoked")
+            self.assertIn("ios", ent.renew_url.lower())
+            self.assertIn("buy.stripe.com", ent.renew_url)
+            loaded = load_payment_entitlement(pay)
+            self.assertEqual(loaded.renew_url, ent.renew_url)
+            from client.payment_entitlement import renew_licence_url
+
+            # Cached host renew_url preferred
+            self.assertEqual(
+                renew_licence_url("ios", path=pay),
+                loaded.renew_url,
+            )
+
+
+def urllib_parse_unquote(s: str) -> str:
+    import urllib.parse
+
+    return urllib.parse.unquote(s)
 
 
 class TestAdminLicencesReadonly(unittest.TestCase):

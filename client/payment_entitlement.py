@@ -48,6 +48,12 @@ LICENCE_STATUS_EXPIRED = "EXPIRED"
 
 # Platform pay portal base (monthly default Payment Link family).
 PUBLIC_PAY_BASE = "https://restoreprivacy.online/"
+# Default monthly Stripe Payment Link (aligned with status_page.payments).
+# Shipped clients build platform renew URLs from this without importing payments.
+DEFAULT_STRIPE_PAYMENT_PAGE_URL = (
+    "https://buy.stripe.com/cNi7sM4uOeWQ9TBe0q7kc00"
+)
+KEY_RENEW_URL = "renew_url"
 
 CONNECT_BLOCKED_PAYMENT_MSG = (
     "Connect is blocked: payment failed or entitlement was revoked for this "
@@ -112,6 +118,7 @@ class PaymentEntitlement:
     updated_at: float = 0.0
     valid_until: float | None = None
     keygen: str = ""
+    renew_url: str = ""
 
     def to_dict(self) -> dict[str, Any]:
         d: dict[str, Any] = {
@@ -124,6 +131,8 @@ class PaymentEntitlement:
         }
         if self.valid_until is not None:
             d[KEY_VALID_UNTIL] = float(self.valid_until)
+        if self.renew_url:
+            d[KEY_RENEW_URL] = str(self.renew_url)
         return d
 
     @classmethod
@@ -141,6 +150,7 @@ class PaymentEntitlement:
             updated_at=float(data.get(KEY_UPDATED_AT) or 0.0),
             valid_until=vu,
             keygen=str(data.get(KEY_KEYGEN) or "").strip().upper(),
+            renew_url=str(data.get(KEY_RENEW_URL) or "").strip(),
         )
 
 
@@ -203,6 +213,7 @@ def record_payment_success(
     now: float | None = None,
     valid_until: float | None = None,
     keygen: str = "",
+    renew_url: str = "",
 ) -> PaymentEntitlement:
     """Local cache after successful paid fulfilment."""
     t = now if now is not None else time.time()
@@ -215,6 +226,7 @@ def record_payment_success(
         updated_at=t,
         valid_until=valid_until,
         keygen=str(keygen or prev.keygen or "").strip().upper(),
+        renew_url=str(renew_url or prev.renew_url or "").strip(),
     )
     save_payment_entitlement(ent, path=path)
     return ent
@@ -229,6 +241,7 @@ def record_payment_failure(
     now: float | None = None,
     status: str = STATUS_FAILED,
     keygen: str = "",
+    renew_url: str = "",
 ) -> PaymentEntitlement:
     """Local cache when payment failed or entitlement was revoked."""
     t = now if now is not None else time.time()
@@ -244,6 +257,7 @@ def record_payment_failure(
         reason=str(reason or "payment_failed"),
         updated_at=t,
         keygen=str(keygen or prev.keygen or "").strip().upper(),
+        renew_url=str(renew_url or prev.renew_url or "").strip(),
     )
     save_payment_entitlement(ent, path=path)
     return ent
@@ -549,35 +563,110 @@ def licence_status_from_payment_entitlement(
     return LICENCE_STATUS_EXPIRED
 
 
+def build_local_platform_renew_url(
+    platform: str = "",
+    *,
+    interval: str = "month",
+    base_payment_page_url: str | None = None,
+) -> str:
+    """Pure local Stripe Payment Link for *platform* (no payments import).
+
+    Shipped Windows/Linux/Flutter EXPIRED UI uses this so renew always carries
+    ``client_reference_id=platform|interval`` even when ``status_page.payments``
+    is not importable (normal frozen client PYTHONPATH).
+    """
+    plat = (platform or "").strip().lower() or "windows"
+    iv = (interval or "month").strip().lower()
+    if iv in ("year", "yearly", "annual", "annually"):
+        iv = "year"
+    else:
+        iv = "month"
+    base = (base_payment_page_url or "").strip().rstrip("/")
+    if not base:
+        if iv == "year":
+            for key in (
+                "STRIPE_PAYMENT_PAGE_URL_YEARLY",
+                "RPT_STRIPE_PAYMENT_PAGE_URL_YEARLY",
+            ):
+                base = (os.environ.get(key) or "").strip().rstrip("/")
+                if base:
+                    break
+        if not base:
+            for key in (
+                "STRIPE_PAYMENT_PAGE_URL",
+                "RPT_STRIPE_PAYMENT_PAGE_URL",
+            ):
+                base = (os.environ.get(key) or "").strip().rstrip("/")
+                if base:
+                    break
+        if not base:
+            base = DEFAULT_STRIPE_PAYMENT_PAGE_URL
+    # Encode platform + interval for Stripe client_reference_id (fulfilment)
+    ref = f"{plat}|{iv}"
+    q = urllib.parse.urlencode({"client_reference_id": ref})
+    sep = "&" if "?" in base else "?"
+    return f"{base}{sep}{q}"
+
+
 def renew_licence_url(
     platform: str = "",
     *,
     interval: str = "month",
     base_catalog: str = PUBLIC_PAY_BASE,
+    renew_url: str = "",
+    path: Optional[Path] = None,
 ) -> str:
     """Direct payment portal URL for this platform (monthly or yearly).
 
-    Prefers live Stripe Payment Link from status host helpers when importable;
-    otherwise returns the public catalog home for pay.
+    Priority:
+    1. Explicit *renew_url* (host ``renew_url`` from last status refresh)
+    2. Cached ``renew_url`` on local entitlement (when *path* / default file)
+    3. Optional monorepo ``status_page.payments`` helper when importable
+    4. :func:`build_local_platform_renew_url` (always platform-specific)
+
+    Never falls back to a bare catalog homepage without platform identity.
     """
+    cached = (renew_url or "").strip()
+    if not cached:
+        try:
+            ent = load_payment_entitlement(path)
+            cached = (ent.renew_url or "").strip()
+            if not platform:
+                platform = ent.platform or ""
+        except Exception:  # noqa: BLE001
+            pass
+    if cached and cached.startswith("http"):
+        return cached
+
     plat = (platform or "").strip().lower() or "windows"
+    # Optional: monorepo status_page.payments when present (env-aware yearly URL)
     try:
-        # Prefer status_page.payments when monorepo path available
         root = Path(__file__).resolve().parents[1]
         sp = root / "status_page"
-        if sp.is_dir() and str(root) not in sys.path:
-            sys.path.insert(0, str(sp))
+        if sp.is_dir():
+            sp_s = str(sp)
+            # Insert status_page itself so `from payments` works even when
+            # project root is already on sys.path (normal client launch).
+            if sp_s not in sys.path:
+                sys.path.insert(0, sp_s)
         from payments import stripe_payment_page_href_for_platform  # type: ignore
 
         return stripe_payment_page_href_for_platform(plat, interval=interval)
     except Exception:  # noqa: BLE001
-        # Catalog homepage — user picks platform + interval
-        return (base_catalog or PUBLIC_PAY_BASE).rstrip("/") + "/"
+        pass
+    # Pure local builder — platform-specific Stripe link (shipped client path)
+    _ = base_catalog  # kept for API compatibility; not used as bare homepage
+    return build_local_platform_renew_url(plat, interval=interval)
 
 
-def renew_licence_message(platform: str = "") -> str:
+def renew_licence_message(
+    platform: str = "",
+    *,
+    renew_url: str = "",
+    path: Optional[Path] = None,
+) -> str:
     """EXPIRED lock body: renew your licence *here* + platform portal URL."""
-    url = renew_licence_url(platform)
+    url = renew_licence_url(platform, renew_url=renew_url, path=path)
     return (
         f"Renew your licence *here*: {url}\n\n"
         "Your subscription is EXPIRED. Open the link to pay monthly or yearly "
@@ -827,15 +916,29 @@ def refresh_entitlement_from_remote(
     t = now if now is not None else time.time()
     remote_sid = str(remote.get("session_id") or local.session_id or "").strip()
     merged_kg = _merge_remote_keygen(local, remote)
+    remote_plat = str(
+        remote.get("platform") or local.platform or ""
+    ).strip().lower()
+    remote_renew = str(
+        remote.get("renew_url")
+        or remote.get("renew_url_monthly")
+        or local.renew_url
+        or ""
+    ).strip()
+    # Host may report EXPIRED while status still looks active
+    lic_remote = str(remote.get("licence_status") or "").strip().upper()
+    if lic_remote == LICENCE_STATUS_EXPIRED and not is_payment_blocking_status(st):
+        st = STATUS_REVOKED
     if is_payment_blocking_status(st):
         return record_payment_failure(
             remote_sid,
             reason=str(remote.get("reason") or st),
-            platform=local.platform,
+            platform=remote_plat or local.platform,
             path=path,
             now=t,
             status=st if st in (STATUS_FAILED, STATUS_REVOKED, STATUS_UNPAID) else STATUS_FAILED,
             keygen=merged_kg,
+            renew_url=remote_renew,
         )
     if st == STATUS_ACTIVE:
         vu = remote.get("valid_until")
@@ -848,19 +951,21 @@ def refresh_entitlement_from_remote(
             return record_payment_failure(
                 remote_sid,
                 reason=str(remote.get("reason") or "not_allowed"),
-                platform=local.platform,
+                platform=remote_plat or local.platform,
                 path=path,
                 now=t,
                 status=STATUS_REVOKED,
                 keygen=merged_kg,
+                renew_url=remote_renew,
             )
         return record_payment_success(
             remote_sid or local.session_id,
-            platform=local.platform or str(remote.get("platform") or ""),
+            platform=remote_plat or local.platform,
             path=path,
             now=t,
             valid_until=vu_f,
             keygen=merged_kg,
+            renew_url=remote_renew,
         )
     # Unknown remote (network blip): keep last known local status
     return local

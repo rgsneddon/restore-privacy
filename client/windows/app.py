@@ -709,8 +709,8 @@ class TunnelClientApp:
         """EXPIRED hard-lock: renew your licence *here* + platform pay portal."""
         ent = load_payment_entitlement()
         plat = (ent.platform or "windows").strip().lower() or "windows"
-        url = renew_licence_url(plat)
-        body = renew_licence_message(plat)
+        url = renew_licence_url(plat, renew_url=ent.renew_url)
+        body = renew_licence_message(plat, renew_url=ent.renew_url)
         win = tk.Toplevel(self.root)
         win.title("Renew your licence")
         win.configure(bg=CHROME_BG)
