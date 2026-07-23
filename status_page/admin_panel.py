@@ -21,6 +21,7 @@ from payments import (
     PRICE_LABEL,
     PRICE_PENCE,
     list_all_grants,
+    list_licences_for_admin,
     list_recent_grants,
     public_base_url,
     reissue_download_for_purchase_id,
@@ -484,6 +485,54 @@ def processor_settings_view() -> dict[str, Any]:
         # Explicit: secrets never leave the view model as values
         "secrets_in_view": False,
     }
+
+
+def render_admin_licences_section_html(
+    licences: list[dict[str, Any]] | None = None,
+) -> str:
+    """Read-only licence database: email, KEYGEN, PPI, OK|EXPIRED. No amend controls."""
+    try:
+        rows_src = licences if licences is not None else list_licences_for_admin()
+    except Exception:  # noqa: BLE001
+        rows_src = []
+    body_rows: list[str] = []
+    for row in rows_src:
+        st = str(row.get("licence_status") or "EXPIRED")
+        badge = "ok" if st == "OK" else "bad"
+        body_rows.append(
+            "<tr>"
+            f"<td>{_escape(str(row.get('email') or ''))}</td>"
+            f"<td><code>{_escape(str(row.get('keygen') or ''))}</code></td>"
+            f"<td><code>{_escape(str(row.get('purchase_id') or row.get('ppi') or ''))}</code></td>"
+            f'<td><span class="badge {badge}" '
+            f'id="licence-status-{_escape(str(row.get("session_id") or "")[:12])}">'
+            f"{_escape(st)}</span></td>"
+            f"<td>{_escape(str(row.get('platform') or ''))}</td>"
+            "</tr>"
+        )
+    table = (
+        "\n".join(body_rows)
+        if body_rows
+        else '<tr><td colspan="5">No licences yet</td></tr>'
+    )
+    return f"""
+<section id="admin-licences" class="card">
+  <h2 id="admin-licences-heading">Licence database</h2>
+  <p class="muted" id="admin-licences-blurb">
+  Customer licences (email, KEYGEN, PPI, status). <strong>Read-only</strong> —
+  no edit, revoke, or amend controls. Status is <code>OK</code> (active
+  subscription) or <code>EXPIRED</code> (revoked, failed, or period ended).
+  </p>
+  <table id="admin-licences-table" data-readonly="1">
+    <thead><tr>
+      <th>Email</th><th>KEYGEN</th><th>PPI</th><th>Status</th><th>Platform</th>
+    </tr></thead>
+    <tbody>
+{table}
+    </tbody>
+  </table>
+</section>
+"""
 
 
 def project_grants_for_admin(
@@ -1227,6 +1276,7 @@ background:var(--btn-bg);color:var(--btn-fg);font-weight:600;cursor:pointer}}
   <a href="#admin-keygen-failsafe">Generate KEYGEN (failsafe)</a>
   {('<a href="#admin-seed-purchase">Seed test purchase</a>' if seed_test_purchase_enabled() else '')}
   <a href="#admin-processor-settings">Processor settings</a>
+  <a href="#admin-licences">Licence database</a>
   <a href="#admin-grants">Paid download grants</a>
 </nav>
 {reissue_html}
@@ -1234,6 +1284,7 @@ background:var(--btn-bg);color:var(--btn-fg);font-weight:600;cursor:pointer}}
 {keygen_html}
 {seed_html}
 {settings_html}
+{render_admin_licences_section_html()}
 <section id="admin-grants" class="card">
   <h2 id="admin-grants-heading">Paid download grants</h2>
   <p class="muted" id="admin-grants-blurb">Full history of Stripe-verified download grants

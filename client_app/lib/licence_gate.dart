@@ -58,10 +58,36 @@ const String kPaymentStatusRevoked = 'revoked';
 const String kPaymentStatusUnpaid = 'unpaid';
 const String kPaymentStatusUnknown = 'unknown';
 
+/// Customer-facing licence status (host + clients).
+const String kLicenceStatusOk = 'OK';
+const String kLicenceStatusExpired = 'EXPIRED';
+
 const String kKeygenUnlockInstruction =
     'USE THIS KEYGEN TO UNLOCK YOUR RESTORE PRIVACY TRIAL';
 
 const String kDefaultPaymentStatusBaseUrl = 'https://restoreprivacy.online';
+
+/// EXPIRED lock phrase — *here* is the platform payment portal.
+const String kRenewLicencePrefix = 'Renew your licence ';
+const String kRenewLicenceHere = 'here';
+
+/// Normalize payment status → OK | EXPIRED.
+String licenceStatusFromPaymentStatus(String status) {
+  final st = status.trim().toLowerCase();
+  if (st == kPaymentStatusActive) return kLicenceStatusOk;
+  return kLicenceStatusExpired;
+}
+
+/// Platform catalog pay portal (homepage — user picks monthly/yearly).
+String renewLicenceCatalogUrl() => kDefaultPaymentStatusBaseUrl;
+
+/// Message for EXPIRED lock screen with renew *here* link.
+String renewLicenceMessage({String platform = ''}) {
+  final plat = platform.trim().isEmpty ? 'your platform' : platform.trim();
+  return 'Renew your licence *here*: $kDefaultPaymentStatusBaseUrl/\n\n'
+      'Status: $kLicenceStatusExpired. Open the payment portal for $plat '
+      '(monthly or yearly), then re-enter your keygen to unlock Connect.';
+}
 
 const String kLicencePromptTitle = 'End-user licence';
 const String kLicenceAcceptButton = 'Accept licence';
@@ -464,6 +490,12 @@ class LicenceGate {
     return false;
   }
 
+  /// Customer-facing OK | EXPIRED for this install.
+  Future<String> licenceStatus() async {
+    final st = await paymentStatus();
+    return licenceStatusFromPaymentStatus(st);
+  }
+
   Future<bool> mayConnect({bool requirePayment = true}) async {
     if (!await hasAcceptedLicence()) return false;
     return paymentAllowsConnect(require: requirePayment);
@@ -497,7 +529,11 @@ class LicenceGate {
       if (st == kPaymentStatusFailed ||
           st == kPaymentStatusRevoked ||
           st == kPaymentStatusUnpaid) {
-        return (ok: false, message: kConnectBlockedPaymentMsg);
+        // EXPIRED lock — renew your licence *here*
+        return (
+          ok: false,
+          message: renewLicenceMessage(platform: Platform.operatingSystem),
+        );
       }
       final sid = await paymentSessionId();
       final kg = await paymentKeygen();

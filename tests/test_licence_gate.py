@@ -56,7 +56,12 @@ class TestLicenceGateStore(unittest.TestCase):
                     return_value=None,
                 ):
                     self.assertFalse(may_connect(path))
-                    record_payment_success("cs_test_licence", path=pay)
+                    # Active entitlement + keygen unlock required for Connect
+                    record_payment_success(
+                        "cs_test_licence",
+                        path=pay,
+                        keygen="RPT-KEY-TEST-LICE-NCE1",
+                    )
                     self.assertTrue(may_connect(path))
                     ok, msg = assert_may_connect(path)
                     self.assertTrue(ok)
@@ -91,7 +96,11 @@ class TestLicenceGateStore(unittest.TestCase):
                     "client.payment_entitlement.ensure_entitlement_for_connect",
                     return_value=None,
                 ):
-                    record_payment_success("cs_clear", path=pay)
+                    record_payment_success(
+                        "cs_clear",
+                        path=pay,
+                        keygen="RPT-KEY-CLEAR-TEST-KEY1",
+                    )
                     self.assertTrue(may_connect(path))
                     clear_licence_acceptance(path)
                     self.assertFalse(may_connect(path))

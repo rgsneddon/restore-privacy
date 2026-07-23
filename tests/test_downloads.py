@@ -93,9 +93,14 @@ class TestDownloadCatalog(unittest.TestCase):
         self.assertIn("£2.45", html)
         # BMC tip URL is on homepage shell bottom, not inside downloads section
         self.assertNotIn(BMC_TIP_URL, html)
-        # Live default: Stripe Payment Link tiles — platform face + version
-        self.assertIn("BUY - 0.4.0", html)
-        self.assertIn('class="dl-platform"', html)
+        # Live default: dual monthly/yearly Stripe Payment Link tiles per platform
+        self.assertIn("Monthly £2.45", html)
+        self.assertIn("Yearly", html)
+        self.assertIn('class="dl dl-interval-month"', html)
+        self.assertIn('class="dl dl-interval-year"', html)
+        self.assertIn('data-billing-interval="month"', html)
+        self.assertIn('data-billing-interval="year"', html)
+        self.assertIn('class="dl-platform-label"', html)
         self.assertIn(">Windows<", html)
         self.assertIn(">Android<", html)
         self.assertIn(">macOS<", html)
@@ -103,6 +108,7 @@ class TestDownloadCatalog(unittest.TestCase):
         self.assertIn(">Linux<", html)
         self.assertIn("buy.stripe.com", html)
         self.assertIn('data-buy-mode="stripe-live"', html)
+        self.assertIn('data-billing-intervals="month,year"', html)
         self.assertNotIn("Coming soon", html)
         # Free permanent GitHub installer hrefs must not appear in public HTML.
         self.assertNotIn("releases/download/0.4.0/", html)
@@ -160,10 +166,12 @@ class TestDownloadCatalog(unittest.TestCase):
     def test_render_download_section_uses_paid_paths(self):
         html = render_download_section_html()
         self.assertIn(f"Download client v{RELEASE_VERSION}", html)
-        self.assertIn('class="dl"', html)
+        self.assertIn('class="dl dl-interval-month"', html)
+        self.assertIn('class="dl dl-interval-year"', html)
         self.assertNotIn('href="#"', html)
         self.assertIn("data-price-pence=\"245\"", html)
-        self.assertIn("BUY - 0.4.0", html)
+        self.assertIn("Monthly £2.45", html)
+        self.assertIn("Yearly", html)
         self.assertIn("buy.stripe.com", html)
         self.assertNotIn("Coming soon", html)
 
@@ -175,9 +183,11 @@ class TestDownloadCatalog(unittest.TestCase):
         self.assertNotIn('id="dl-pay-flow"', html)
         self.assertNotIn('id="dl-claim-hint"', html)
         self.assertNotIn("/download/success?session_id=", html)
-        # Platform controls present (live Stripe Pay default)
-        self.assertIn("BUY - 0.4.0", html)
+        # Platform controls present (live dual-interval Stripe Pay default)
+        self.assertIn("Monthly £2.45", html)
+        self.assertIn("Yearly", html)
         self.assertIn('id="dl-windows"', html)
+        self.assertIn('id="dl-windows-year"', html)
         self.assertIn("buy.stripe.com", html)
         # No bottom generic “Stripe payment page” footer link
         self.assertNotIn('id="stripe-payment-page-link"', html)
@@ -202,9 +212,10 @@ class TestDownloadCatalog(unittest.TestCase):
         self.assertGreater(pay_at, 0, "pay control marker missing")
         # BMC tip is not mid-page in downloads (page bottom via homepage shell)
         self.assertNotIn('id="bmc-tip"', html)
-        # Section has panel-card + dl pay controls (full button CSS on homepage)
+        # Section has panel-card + dual-interval dl pay controls
         self.assertIn("panel-card", html)
-        self.assertIn('class="dl"', html)
+        self.assertIn('class="dl dl-interval-month"', html)
+        self.assertIn('class="dl dl-interval-year"', html)
         from downloads import download_css
 
         css = download_css()
@@ -215,6 +226,7 @@ class TestDownloadCatalog(unittest.TestCase):
         self.assertIn("linear-gradient", css)
         self.assertIn("dl-platform", css)
         self.assertIn("dl-platform-note", css)
+        self.assertIn("dl-interval-row", css)
 
     def test_homepage_bmc_tip_is_last_content_block(self):
         """Homepage: BMC tip after downloads / node-wipe / audit; single tip link."""
@@ -264,8 +276,9 @@ class TestDownloadCatalog(unittest.TestCase):
         self.assertIn("RESTORE PRIVACY", page)
         self.assertNotIn("clients-connected", page)
         self.assertIn(f"Download client v{RELEASE_VERSION}", page)
-        # Live default: Stripe Payment Link Pay buttons
-        self.assertIn("BUY - 0.4.0", page)
+        # Live default: dual monthly/yearly Stripe Payment Link buttons
+        self.assertIn("Monthly £2.45", page)
+        self.assertIn("Yearly", page)
         self.assertIn("buy.stripe.com", page)
         self.assertNotIn("Coming soon", page)
         self.assertIn("£2.45", page)

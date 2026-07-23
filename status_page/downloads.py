@@ -147,14 +147,18 @@ LINUX_TGZ_FILENAME = f"restore-privacy-client-{RELEASE_VERSION}-linux-x64.tar.gz
 
 PRICE_LABEL = "£2.45"
 # Large white bold callout under "Download client v…" on the public homepage.
-ONLY_PRICE_BANNER = "ONLY £2.45 per month"
+ONLY_PRICE_BANNER = "ONLY £2.45 per month — or pay yearly"
+YEARLY_PLAN_NOTE = (
+    "Choose monthly (£2.45/mo after trial) or yearly for each platform. "
+    "Set STRIPE_PAYMENT_PAGE_URL_YEARLY to your Stripe yearly Payment Link."
+)
 # Shown under the buy-button grid (bold bright white, price-box-like frame).
 PLATFORM_SELECT_NOTE = (
     "please select your device platform carefully, you will only receive "
     "the installer download relating to that platform and device"
 )
 # Homepage download price block (single shipped contract for public #downloads).
-PACKAGE_IDENTITY = "per month subscription package — one device licence"
+PACKAGE_IDENTITY = "subscription package — one device licence"
 TRIAL_SUBSCRIPTION_SENTENCE = (
     "your monthly subscription begins after your 7 day trial"
 )
@@ -213,15 +217,16 @@ class DownloadAsset:
 
     @property
     def pay_path(self) -> str:
-        """Paid entry: Stripe payment page with platform for post-pay fulfilment.
+        """Paid entry: monthly Stripe Payment Link for this platform."""
+        return self.pay_path_for_interval("month")
 
-        Not a free GitHub href. Uses the operator Payment Link URL plus
-        ``client_reference_id=<platform>`` so the webhook can mint a token for
-        this package only.
-        """
+    def pay_path_for_interval(self, interval: str = "month") -> str:
+        """Stripe Payment Link for *interval* (``month`` or ``year``) + platform."""
         from payments import stripe_payment_page_href_for_platform
 
-        return stripe_payment_page_href_for_platform(self.platform)
+        return stripe_payment_page_href_for_platform(
+            self.platform, interval=interval
+        )
 
 
 RELEASE_ASSETS: tuple[DownloadAsset, ...] = (
@@ -428,6 +433,27 @@ def download_css() -> str:
       justify-content: center; align-items: stretch; width: 100%;
     }
     .dl-row-3, .dl-row-2 { max-width: 100%; }
+    .dl-platform-cell {
+      display: flex; flex-direction: column; align-items: center; gap: 0.4rem;
+      min-width: 8rem;
+    }
+    .dl-platform-label {
+      font-weight: 800; font-size: 0.95rem; color: var(--rb-fg, #e8f1ff);
+      letter-spacing: 0.02em;
+    }
+    .dl-interval-row {
+      display: flex; flex-direction: column; gap: 0.4rem; width: 100%;
+      align-items: stretch;
+    }
+    .dl-interval-row a.dl {
+      flex: 0 0 auto; width: 100%; max-width: 9rem; height: auto;
+      min-height: 2.6rem; max-height: none; aspect-ratio: auto;
+      padding: 0.5rem 0.65rem; border-radius: 10px;
+    }
+    .dl-interval-note {
+      font-size: 0.82rem; color: var(--rb-muted, #a8c0d8); margin: 0.35rem 0 0;
+      line-height: 1.4; max-width: 36rem; margin-left: auto; margin-right: auto;
+    }
     /* Larger, readable buy tiles (replaces prior small fixed squares) */
     a.dl, button.dl {
       display: inline-flex; flex-direction: column; align-items: center; justify-content: center;
@@ -600,21 +626,39 @@ def _render_platform_pay_link(
     if coming_soon:
         href = COMING_SOON_PUBLIC_HREF
         return (
+            f'<div class="dl-platform-cell" id="dl-cell-{a.platform}" '
+            f'data-platform="{a.platform}">'
             f'<a class="dl dl-coming-soon" id="dl-{a.platform}" href="{href}" '
             f'rel="noopener noreferrer" '
             f'data-platform="{a.platform}" data-filename="{a.filename}" '
             f'data-price-pence="245" data-pay-via="coming-soon" '
+            f'data-billing-interval="month" '
             f'data-coming-soon="1" aria-label="{aria}">'
-            f"{face}</a>"
+            f"{face}</a></div>"
         )
-    href = a.pay_path
+    href_m = a.pay_path_for_interval("month")
+    href_y = a.pay_path_for_interval("year")
+    # Dual subscription interval: monthly + yearly Payment Links
     return (
-        f'<a class="dl" id="dl-{a.platform}" href="{href}" '
+        f'<div class="dl-platform-cell" id="dl-cell-{a.platform}" '
+        f'data-platform="{a.platform}">'
+        f'<span class="dl-platform-label">{platform_title}</span>'
+        f'<div class="dl-interval-row" id="dl-interval-{a.platform}">'
+        f'<a class="dl dl-interval-month" id="dl-{a.platform}" href="{href_m}" '
         f'rel="noopener noreferrer" target="_blank" '
         f'data-platform="{a.platform}" data-filename="{a.filename}" '
         f'data-price-pence="245" data-pay-via="stripe-payment-page" '
-        f'aria-label="{aria}">'
-        f"{face}</a>"
+        f'data-billing-interval="month" '
+        f'aria-label="{platform_title}: monthly subscription — {a.label}">'
+        f'<span class="dl-buy">Monthly £2.45</span></a>'
+        f'<a class="dl dl-interval-year" id="dl-{a.platform}-year" href="{href_y}" '
+        f'rel="noopener noreferrer" target="_blank" '
+        f'data-platform="{a.platform}" data-filename="{a.filename}" '
+        f'data-pay-via="stripe-payment-page" '
+        f'data-billing-interval="year" '
+        f'aria-label="{platform_title}: yearly subscription — {a.label}">'
+        f'<span class="dl-buy">Yearly</span></a>'
+        f"</div></div>"
     )
 
 
@@ -674,10 +718,11 @@ def render_download_section_html(
         buttons_mode = ' data-buy-mode="coming-soon"'
     else:
         price_line = (
-            f"{PRICE_LABEL} GBP {PACKAGE_IDENTITY} — {TRIAL_SUBSCRIPTION_SENTENCE} — "
-            f"{PAY_AND_KEYGEN_CLAUSE}"
+            f"{PRICE_LABEL} GBP monthly {PACKAGE_IDENTITY} — "
+            f"{TRIAL_SUBSCRIPTION_SENTENCE} — "
+            f"or choose yearly — {PAY_AND_KEYGEN_CLAUSE}"
         )
-        buttons_mode = ' data-buy-mode="stripe-live"'
+        buttons_mode = ' data-buy-mode="stripe-live" data-billing-intervals="month,year"'
     # Order: title/price box → pay controls only. BMC tip is page-bottom (homepage shell).
     # Homepage omits STRONG DISCLAIMER banner (apps/licence retain payment language).
     return f"""
@@ -687,6 +732,7 @@ def render_download_section_html(
     <p class="dl-sub">Windows | Linux | macOS | iOS | Android</p>
     <div class="dl-price-box" id="dl-price-box">
       <p class="dl-price" id="dl-price">{price_line}</p>
+      <p class="dl-interval-note" id="dl-interval-note">{YEARLY_PLAN_NOTE}</p>
     </div>
     <div class="dl-buttons" id="dl-buttons" data-dl-layout="3+2"{buttons_mode}>
     <div class="dl-row dl-row-3" id="dl-row-1" data-dl-row="1" data-dl-count="{len(row1)}">

@@ -140,12 +140,15 @@ class TestPaymentPageInAdminHtml(unittest.TestCase):
         self.assertNotIn("how-to-buy-footer-link", foot)
         self.assertNotIn('href="/how-to-buy"', foot)
         self.assertIn("bmc-tip-link", foot)
-        # Public footer omits generic Stripe link; catalog uses live Pay buttons.
+        # Public footer omits generic Stripe link; catalog uses dual-interval Pay buttons.
         html = render_download_section_html()
         self.assertNotIn('id="stripe-payment-page-link"', html)
         self.assertNotIn(">Stripe payment page<", html)
-        self.assertIn("BUY - 0.4.0", html)
+        self.assertIn("Monthly £2.45", html)
+        self.assertIn("Yearly", html)
         self.assertIn("client_reference_id=windows", html)
+        self.assertIn("data-billing-interval=\"month\"", html)
+        self.assertIn("data-billing-interval=\"year\"", html)
         self.assertIn(OPERATOR_PAYMENT_PAGE, html)
         self.assertNotIn("Coming soon", html)
 

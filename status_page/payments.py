@@ -131,10 +131,27 @@ DEFAULT_STRIPE_PAYMENT_LINK_ID = "plink_1TvTu6JDavQ2TJW6FeL0dIh9"
 DEFAULT_STRIPE_PAYMENT_LINK_PRICE_ID = "price_1TvTsaJDavQ2TJW6HZVIG7hg"
 # Catalog pay product mode (single source of truth with desired_payment_link_trial_fields).
 CATALOG_STRIPE_PAYMENT_MODE = "subscription"
+# Yearly subscription Payment Link — set via env when Dashboard yearly price exists.
+# Empty default: yearly href falls back to monthly URL with interval marker in
+# client_reference_id so architecture works; operator should set real yearly link.
+DEFAULT_STRIPE_PAYMENT_PAGE_URL_YEARLY = ""
+
+# Customer-facing licence status (OK | EXPIRED) for clients + admin.
+LICENCE_STATUS_OK = "OK"
+LICENCE_STATUS_EXPIRED = "EXPIRED"
+BILLING_INTERVAL_MONTH = "month"
+BILLING_INTERVAL_YEAR = "year"
+
+
+def _normalize_stripe_pay_url(raw: str) -> str:
+    raw = (raw or "").strip().rstrip("/")
+    if "donate.stripe.com" in raw.lower():
+        raw = re.sub(r"(?i)donate\.stripe\.com", "buy.stripe.com", raw)
+    return raw
 
 
 def stripe_payment_page_url() -> str:
-    """Operator Stripe **subscription** Payment Link URL. Public, non-secret.
+    """Operator Stripe **monthly** subscription Payment Link URL. Public, non-secret.
 
     Override with ``STRIPE_PAYMENT_PAGE_URL`` or ``RPT_STRIPE_PAYMENT_PAGE_URL``.
     Default is the catalog subscription link (buy.stripe.com), not a donate tip page.
@@ -148,24 +165,85 @@ def stripe_payment_page_url() -> str:
             break
     if not raw:
         raw = DEFAULT_STRIPE_PAYMENT_PAGE_URL
-    raw = raw.rstrip("/")
-    # Normalize legacy donate host → buy host (same path / link id)
-    if "donate.stripe.com" in raw.lower():
-        raw = re.sub(r"(?i)donate\.stripe\.com", "buy.stripe.com", raw)
-    return raw
+    return _normalize_stripe_pay_url(raw)
 
 
-def stripe_payment_page_href_for_platform(platform: str) -> str:
+def stripe_payment_page_url_yearly() -> str:
+    """Yearly subscription Payment Link URL (public).
+
+    Override with ``STRIPE_PAYMENT_PAGE_URL_YEARLY`` /
+    ``RPT_STRIPE_PAYMENT_PAGE_URL_YEARLY``. When unset, falls back to monthly URL
+    (operator should configure a real yearly link in Stripe Dashboard).
+    """
+    raw = ""
+    for key in (
+        "STRIPE_PAYMENT_PAGE_URL_YEARLY",
+        "RPT_STRIPE_PAYMENT_PAGE_URL_YEARLY",
+    ):
+        raw = os.environ.get(key, "").strip()
+        if raw:
+            break
+    if not raw:
+        raw = DEFAULT_STRIPE_PAYMENT_PAGE_URL_YEARLY or stripe_payment_page_url()
+    return _normalize_stripe_pay_url(raw)
+
+
+def stripe_payment_page_url_for_interval(interval: str = BILLING_INTERVAL_MONTH) -> str:
+    """Payment Link base URL for *interval* (``month`` or ``year``)."""
+    iv = (interval or BILLING_INTERVAL_MONTH).strip().lower()
+    if iv in ("year", "yearly", "annual", "annually"):
+        return stripe_payment_page_url_yearly()
+    return stripe_payment_page_url()
+
+
+def encode_client_reference_id(
+    platform: str, *, interval: str = BILLING_INTERVAL_MONTH
+) -> str:
+    """Encode platform + billing interval for Stripe ``client_reference_id``."""
+    plat = (platform or "").strip().lower()
+    iv = (interval or BILLING_INTERVAL_MONTH).strip().lower()
+    if iv in ("year", "yearly", "annual", "annually"):
+        iv = BILLING_INTERVAL_YEAR
+    else:
+        iv = BILLING_INTERVAL_MONTH
+    if not plat:
+        return iv
+    return f"{plat}|{iv}"
+
+
+def parse_client_reference_id(ref: str) -> tuple[str, str]:
+    """Return ``(platform, interval)`` from Stripe client_reference_id."""
+    s = (ref or "").strip().lower()
+    if not s:
+        return "", BILLING_INTERVAL_MONTH
+    if "|" in s:
+        plat, _, rest = s.partition("|")
+        iv = rest.strip()
+        if iv in ("year", "yearly", "annual", "annually"):
+            return plat.strip(), BILLING_INTERVAL_YEAR
+        return plat.strip(), BILLING_INTERVAL_MONTH
+    if s.endswith("-year") or s.endswith("_year"):
+        for sep in ("-year", "_year"):
+            if s.endswith(sep):
+                return s[: -len(sep)], BILLING_INTERVAL_YEAR
+    return s, BILLING_INTERVAL_MONTH
+
+
+def stripe_payment_page_href_for_platform(
+    platform: str, *, interval: str = BILLING_INTERVAL_MONTH
+) -> str:
     """Subscription Payment Link URL with product identity for webhook fulfilment.
 
     Stripe Payment Links accept ``client_reference_id`` on the URL; the webhook
-    reads it as the requested package platform and mints a one-time download token.
+    reads platform (+ billing interval) and mints a one-time download token.
+    *interval* is ``month`` (default) or ``year``.
     """
     plat = (platform or "").strip().lower()
-    base = stripe_payment_page_url()
+    base = stripe_payment_page_url_for_interval(interval)
     if not plat:
         return base
-    q = urllib.parse.urlencode({"client_reference_id": plat})
+    ref = encode_client_reference_id(plat, interval=interval)
+    q = urllib.parse.urlencode({"client_reference_id": ref})
     sep = "&" if "?" in base else "?"
     return f"{base}{sep}{q}"
 
@@ -289,12 +367,16 @@ def production_success_return_url() -> str:
 def platform_from_stripe_checkout_session(sess: dict[str, Any] | None) -> str:
     """Catalog platform from a Checkout Session object, or empty string.
 
-    Prefers ``client_reference_id`` (Payment Link BUY tile), then
-    ``metadata.platform`` (server Checkout). Only returns known catalog keys.
+    Prefers ``client_reference_id`` (Payment Link BUY tile; may be
+    ``platform|month`` / ``platform|year``), then ``metadata.platform``.
+    Only returns known catalog keys.
     """
     if not isinstance(sess, dict):
         return ""
     ref = str(sess.get("client_reference_id") or "").strip().lower()
+    plat, _iv = parse_client_reference_id(ref)
+    if platform_filename(plat):
+        return plat
     if platform_filename(ref):
         return ref
     meta = sess.get("metadata") if isinstance(sess.get("metadata"), dict) else {}
@@ -302,6 +384,23 @@ def platform_from_stripe_checkout_session(sess: dict[str, Any] | None) -> str:
     if platform_filename(meta_plat):
         return meta_plat
     return ""
+
+
+def billing_interval_from_stripe_checkout_session(
+    sess: dict[str, Any] | None,
+) -> str:
+    """``month`` or ``year`` from session client_reference_id / metadata."""
+    if not isinstance(sess, dict):
+        return BILLING_INTERVAL_MONTH
+    ref = str(sess.get("client_reference_id") or "").strip().lower()
+    _plat, iv = parse_client_reference_id(ref)
+    if iv == BILLING_INTERVAL_YEAR:
+        return BILLING_INTERVAL_YEAR
+    meta = sess.get("metadata") if isinstance(sess.get("metadata"), dict) else {}
+    miv = str(meta.get("billing_interval") or meta.get("interval") or "").strip().lower()
+    if miv in ("year", "yearly", "annual", "annually"):
+        return BILLING_INTERVAL_YEAR
+    return BILLING_INTERVAL_MONTH
 
 
 def resolve_platform_from_checkout_session(
@@ -1110,6 +1209,14 @@ def _ensure_payment_intent_columns(conn: sqlite3.Connection) -> None:
         conn.execute(
             "ALTER TABLE connect_entitlements ADD COLUMN subscription_id TEXT"
         )
+    if "customer_email" not in ent_cols:
+        conn.execute(
+            "ALTER TABLE connect_entitlements ADD COLUMN customer_email TEXT"
+        )
+    if "billing_interval" not in ent_cols:
+        conn.execute(
+            "ALTER TABLE connect_entitlements ADD COLUMN billing_interval TEXT"
+        )
     grant_cols = {str(r[1]) for r in conn.execute("PRAGMA table_info(grants)")}
     if "payment_intent_id" not in grant_cols:
         conn.execute("ALTER TABLE grants ADD COLUMN payment_intent_id TEXT")
@@ -1212,6 +1319,8 @@ def activate_connect_entitlement(
     subscription_id: str = "",
     valid_until: float | None = None,
     keygen: str | None = None,
+    customer_email: str = "",
+    billing_interval: str = "",
     now: float | None = None,
 ) -> str:
     """Mark Checkout session as paid/active for Connect entitlement.
@@ -1230,10 +1339,17 @@ def activate_connect_entitlement(
     plat = (platform or "").strip().lower()
     pi = (payment_intent_id or "").strip()
     sub = (subscription_id or "").strip()
+    email = (customer_email or "").strip().lower()
+    iv = (billing_interval or "").strip().lower()
+    if iv in ("year", "yearly", "annual", "annually"):
+        iv = BILLING_INTERVAL_YEAR
+    elif iv:
+        iv = BILLING_INTERVAL_MONTH
     conn = _connect()
     try:
         cur = conn.execute(
-            "SELECT platform, payment_intent_id, subscription_id, valid_until, keygen "
+            "SELECT platform, payment_intent_id, subscription_id, valid_until, keygen, "
+            "customer_email, billing_interval "
             "FROM connect_entitlements WHERE session_id = ?",
             (sid,),
         )
@@ -1257,12 +1373,20 @@ def activate_connect_entitlement(
                 if keygen
                 else existing_kg
             ) or existing_kg or _mint_unique_keygen(conn)
+            try:
+                keep_email = email or str(row["customer_email"] or "")
+            except (KeyError, IndexError, TypeError):
+                keep_email = email
+            try:
+                keep_iv = iv or str(row["billing_interval"] or "") or BILLING_INTERVAL_MONTH
+            except (KeyError, IndexError, TypeError):
+                keep_iv = iv or BILLING_INTERVAL_MONTH
             conn.execute(
                 """
                 UPDATE connect_entitlements
                 SET status = ?, platform = ?, reason = ?, updated_at = ?,
                     payment_intent_id = ?, subscription_id = ?, valid_until = ?,
-                    keygen = ?
+                    keygen = ?, customer_email = ?, billing_interval = ?
                 WHERE session_id = ?
                 """,
                 (
@@ -1274,6 +1398,8 @@ def activate_connect_entitlement(
                     keep_sub,
                     keep_vu,
                     keep_keygen,
+                    keep_email,
+                    keep_iv,
                     sid,
                 ),
             )
@@ -1283,8 +1409,9 @@ def activate_connect_entitlement(
                 """
                 INSERT INTO connect_entitlements(
                     session_id, status, platform, reason, created_at, updated_at,
-                    payment_intent_id, subscription_id, valid_until, keygen
-                ) VALUES (?,?,?,?,?,?,?,?,?,?)
+                    payment_intent_id, subscription_id, valid_until, keygen,
+                    customer_email, billing_interval
+                ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)
                 """,
                 (
                     sid,
@@ -1297,6 +1424,8 @@ def activate_connect_entitlement(
                     sub,
                     float(valid_until) if valid_until is not None else None,
                     keep_keygen,
+                    email,
+                    iv or BILLING_INTERVAL_MONTH,
                 ),
             )
         if pi:
@@ -1382,6 +1511,30 @@ def _entitlement_connect_allowed(
         return False
 
 
+def licence_status_from_entitlement(
+    ent: dict[str, Any] | None,
+    *,
+    now: float | None = None,
+) -> str:
+    """Normalize grant/entitlement row to customer-facing **OK** or **EXPIRED**.
+
+    OK = Connect allowed (active subscription/payment, period not ended).
+    EXPIRED = failed, revoked, period ended, unknown, or missing entitlement.
+    """
+    if not isinstance(ent, dict) or not ent:
+        return LICENCE_STATUS_EXPIRED
+    t = now if now is not None else time.time()
+    if ent.get("connect_allowed") is True:
+        return LICENCE_STATUS_OK
+    status = str(ent.get("status") or "").strip().lower()
+    vu = ent.get("valid_until")
+    if status == ENTITLEMENT_ACTIVE and _entitlement_connect_allowed(
+        status, float(vu) if vu is not None else None, now=t
+    ):
+        return LICENCE_STATUS_OK
+    return LICENCE_STATUS_EXPIRED
+
+
 def get_connect_entitlement(
     session_id: str, *, now: float | None = None
 ) -> dict[str, Any] | None:
@@ -1396,7 +1549,8 @@ def get_connect_entitlement(
         cur = conn.execute(
             """
             SELECT session_id, status, platform, reason, created_at, updated_at,
-                   payment_intent_id, subscription_id, valid_until, keygen
+                   payment_intent_id, subscription_id, valid_until, keygen,
+                   customer_email, billing_interval
             FROM connect_entitlements WHERE session_id = ?
             """,
             (sid,),
@@ -1430,7 +1584,20 @@ def get_connect_entitlement(
             kg = normalize_keygen(str(row["keygen"] or ""))
         except (KeyError, IndexError, TypeError):
             kg = ""
-        return {
+        try:
+            email = str(row["customer_email"] or "").strip()
+        except (KeyError, IndexError, TypeError):
+            email = ""
+        try:
+            bill_iv = str(row["billing_interval"] or "").strip() or BILLING_INTERVAL_MONTH
+        except (KeyError, IndexError, TypeError):
+            bill_iv = BILLING_INTERVAL_MONTH
+        connect_ok = (
+            _entitlement_connect_allowed(status, vu_f, now=t)
+            if status == ENTITLEMENT_ACTIVE
+            else False
+        )
+        out = {
             "session_id": row["session_id"],
             "status": status,
             "platform": row["platform"] or "",
@@ -1441,10 +1608,12 @@ def get_connect_entitlement(
             "subscription_id": row["subscription_id"] or "",
             "valid_until": vu_f,
             "keygen": kg,
-            "connect_allowed": _entitlement_connect_allowed(status, vu_f, now=t)
-            if status == ENTITLEMENT_ACTIVE
-            else False,
+            "customer_email": email,
+            "billing_interval": bill_iv,
+            "connect_allowed": connect_ok,
         }
+        out["licence_status"] = licence_status_from_entitlement(out, now=t)
+        return out
     finally:
         conn.close()
 
@@ -3028,6 +3197,70 @@ def list_all_grants() -> list[dict[str, Any]]:
     return list_recent_grants(limit=None)
 
 
+def list_licences_for_admin(*, limit: int | None = None) -> list[dict[str, Any]]:
+    """Read-only licence rows for admin: email, KEYGEN, PPI, OK|EXPIRED.
+
+    Joins connect_entitlements with grants (purchase_id). Info only — no write.
+    """
+    init_db()
+    t = time.time()
+    conn = _connect()
+    try:
+        sql = """
+            SELECT e.session_id, e.status, e.platform, e.keygen, e.customer_email,
+                   e.billing_interval, e.valid_until, e.updated_at,
+                   (SELECT g.purchase_id FROM grants g
+                    WHERE g.session_id = e.session_id
+                    ORDER BY g.created_at DESC LIMIT 1) AS purchase_id
+            FROM connect_entitlements e
+            ORDER BY e.updated_at DESC
+        """
+        if limit is None:
+            rows = conn.execute(sql).fetchall()
+        else:
+            rows = conn.execute(sql + " LIMIT ?", (max(0, int(limit)),)).fetchall()
+        out: list[dict[str, Any]] = []
+        for r in rows:
+            vu = r["valid_until"]
+            try:
+                vu_f = float(vu) if vu is not None else None
+            except (TypeError, ValueError):
+                vu_f = None
+            status = str(r["status"] or "")
+            connect_ok = _entitlement_connect_allowed(status, vu_f, now=t)
+            kg = normalize_keygen(str(r["keygen"] or ""))
+            pid = ""
+            if r["purchase_id"]:
+                pid = normalize_purchase_id(str(r["purchase_id"])) or str(
+                    r["purchase_id"]
+                )
+            ent = {
+                "session_id": r["session_id"],
+                "status": status,
+                "connect_allowed": connect_ok,
+                "valid_until": vu_f,
+                "keygen": kg,
+            }
+            out.append(
+                {
+                    "email": str(r["customer_email"] or "").strip(),
+                    "keygen": kg,
+                    "purchase_id": pid,
+                    "ppi": pid,
+                    "licence_status": licence_status_from_entitlement(ent, now=t),
+                    "platform": str(r["platform"] or ""),
+                    "billing_interval": str(r["billing_interval"] or "")
+                    or BILLING_INTERVAL_MONTH,
+                    "session_id": r["session_id"],
+                    "status_raw": status,
+                    "updated_at": r["updated_at"],
+                }
+            )
+        return out
+    finally:
+        conn.close()
+
+
 def find_grant_by_session(
     session_id: str, *, now: float | None = None, unused_only: bool = True
 ) -> dict[str, Any] | None:
@@ -3397,9 +3630,8 @@ def process_checkout_completed_event(
     meta = obj.get("metadata") or {}
     if not isinstance(meta, dict):
         meta = {}
-    platform = str(
-        meta.get("platform") or obj.get("client_reference_id") or ""
-    ).strip().lower()
+    platform = platform_from_stripe_checkout_session(obj)
+    billing_interval = billing_interval_from_stripe_checkout_session(obj)
     # Always mint the **current** catalog package for the platform (pay-time truth).
     filename = resolve_paid_grant_filename(
         platform, metadata_filename=str(meta.get("filename") or "")
@@ -3427,28 +3659,35 @@ def process_checkout_completed_event(
     # Full price (245) always OK. £0 / no_payment_required allowed only with a
     # subscription id (7-day trial then monthly) so underpay one-time never mints.
     # mode=subscription with subscription id and full price is also OK via amount_ok.
+    # Yearly subscription: any positive amount_total with subscription id also OK
+    # (yearly unit amount is operator-defined in Stripe, not hardcoded here).
     amount_ok = amount is not None and amount == PRICE_PENCE
+    yearly_sub_ok = bool(subscription_id) and billing_interval == BILLING_INTERVAL_YEAR and (
+        amount is None or amount >= 0
+    )
     trial_ok = bool(subscription_id) and (
         payment_status == "no_payment_required"
         or amount == 0
         or amount is None
     )
-    if not amount_ok and not trial_ok:
+    if not amount_ok and not trial_ok and not yearly_sub_ok:
         return None
     currency = str(meta.get("currency") or obj.get("currency") or PRICE_CURRENCY).strip().lower()
     if currency and currency != PRICE_CURRENCY:
         return None
     # Subscription checkout: period end arrives later via subscription.updated
     valid_until = None
+    grant_pence = PRICE_PENCE if amount_ok or trial_ok else (int(amount) if amount is not None else PRICE_PENCE)
     token = mint_download_token(
         filename=filename,
         platform=platform,
         session_id=session_id,
-        amount_pence=PRICE_PENCE,
+        amount_pence=grant_pence,
         currency=PRICE_CURRENCY,
     )
     # Successful paid/trial session → Connect entitlement active + unique keygen
     keygen = ""
+    cust_email = customer_email_from_checkout_object(obj)
     if session_id:
         keygen = activate_connect_entitlement(
             session_id,
@@ -3456,10 +3695,11 @@ def process_checkout_completed_event(
             payment_intent_id=payment_intent_id,
             subscription_id=subscription_id,
             valid_until=valid_until,
+            customer_email=cust_email,
+            billing_interval=billing_interval,
         ) or ""
     # Customer fulfilment email: keygen + PPI + one-time download URL
     try:
-        cust_email = customer_email_from_checkout_object(obj)
         if token and cust_email:
             mail = fulfil_checkout_with_email(
                 token=token,

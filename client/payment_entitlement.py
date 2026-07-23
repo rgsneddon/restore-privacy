@@ -42,6 +42,13 @@ STATUS_REVOKED = "revoked"
 STATUS_UNKNOWN = "unknown"
 STATUS_UNPAID = "unpaid"
 
+# Customer-facing licence status (aligned with status host licence_status).
+LICENCE_STATUS_OK = "OK"
+LICENCE_STATUS_EXPIRED = "EXPIRED"
+
+# Platform pay portal base (monthly default Payment Link family).
+PUBLIC_PAY_BASE = "https://restoreprivacy.online/"
+
 CONNECT_BLOCKED_PAYMENT_MSG = (
     "Connect is blocked: payment failed or entitlement was revoked for this "
     "install. Successful payment is required. If payment fails at any time "
@@ -50,6 +57,14 @@ CONNECT_BLOCKED_PAYMENT_MSG = (
     "until you complete a successful payment again on https://restoreprivacy.online/ "
     "(enter your keygen again after re-subscribe, re-download "
     "payment_entitlement.json, or use Settings → Payment entitlement / keygen)."
+)
+
+# EXPIRED hard-lock copy — *here* is the platform payment portal link.
+RENEW_LICENCE_PREFIX = "Renew your licence "
+RENEW_LICENCE_HERE = "here"
+RENEW_LICENCE_TEMPLATE = (
+    'Renew your licence *here* — open the payment portal for this platform '
+    "to restore an active subscription, then re-enter your keygen."
 )
 
 CONNECT_BLOCKED_NO_ENTITLEMENT_MSG = (
@@ -501,6 +516,68 @@ def is_payment_blocking_status(status: str) -> bool:
     return s in (STATUS_FAILED, STATUS_REVOKED, STATUS_UNPAID)
 
 
+def licence_status_from_payment_entitlement(
+    ent: PaymentEntitlement | None = None,
+    *,
+    path: Optional[Path] = None,
+    now: float | None = None,
+) -> str:
+    """Normalize local entitlement to **OK** or **EXPIRED** (customer-facing)."""
+    e = ent if ent is not None else load_payment_entitlement(path)
+    t = now if now is not None else time.time()
+    st = (e.status or STATUS_UNKNOWN).strip().lower()
+    if is_payment_blocking_status(st):
+        return LICENCE_STATUS_EXPIRED
+    if st == STATUS_ACTIVE:
+        if e.valid_until is not None:
+            try:
+                if float(e.valid_until) <= t:
+                    return LICENCE_STATUS_EXPIRED
+            except (TypeError, ValueError):
+                pass
+        if has_keygen_unlock(e) or not payment_entitlement_required():
+            return LICENCE_STATUS_OK
+        # Active but no keygen yet — still EXPIRED for residual until unlock
+        return LICENCE_STATUS_EXPIRED
+    return LICENCE_STATUS_EXPIRED
+
+
+def renew_licence_url(
+    platform: str = "",
+    *,
+    interval: str = "month",
+    base_catalog: str = PUBLIC_PAY_BASE,
+) -> str:
+    """Direct payment portal URL for this platform (monthly or yearly).
+
+    Prefers live Stripe Payment Link from status host helpers when importable;
+    otherwise returns the public catalog home for pay.
+    """
+    plat = (platform or "").strip().lower() or "windows"
+    try:
+        # Prefer status_page.payments when monorepo path available
+        root = Path(__file__).resolve().parents[1]
+        sp = root / "status_page"
+        if sp.is_dir() and str(root) not in sys.path:
+            sys.path.insert(0, str(sp))
+        from payments import stripe_payment_page_href_for_platform  # type: ignore
+
+        return stripe_payment_page_href_for_platform(plat, interval=interval)
+    except Exception:  # noqa: BLE001
+        # Catalog homepage — user picks platform + interval
+        return (base_catalog or PUBLIC_PAY_BASE).rstrip("/") + "/"
+
+
+def renew_licence_message(platform: str = "") -> str:
+    """EXPIRED lock body: renew your licence *here* + platform portal URL."""
+    url = renew_licence_url(platform)
+    return (
+        f"Renew your licence *here*: {url}\n\n"
+        "Your subscription is EXPIRED. Open the link to pay monthly or yearly "
+        "for this platform, then enter your new keygen to unlock Connect."
+    )
+
+
 def payment_allows_connect(
     ent: PaymentEntitlement | None = None,
     *,
@@ -568,13 +645,22 @@ def assert_payment_may_connect(
     if payment_allows_connect(path=path, require=require):
         return True, ""
     ent = load_payment_entitlement(path)
+    # EXPIRED (revoked/failed/period ended) → hard lock + renew *here* URL
     if is_payment_blocking_status(ent.status):
-        return False, CONNECT_BLOCKED_PAYMENT_MSG
+        return False, renew_licence_message(ent.platform)
+    if ent.valid_until is not None:
+        try:
+            if float(ent.valid_until) <= time.time() and has_keygen_unlock(ent):
+                return False, renew_licence_message(ent.platform)
+        except (TypeError, ValueError):
+            pass
     # Active/session present but no RPT-KEY-… unlock → force keygen surface
     if not has_keygen_unlock(ent):
         return False, CONNECT_BLOCKED_KEYGEN_MSG
     if not ent.session_id and not ent.keygen:
         return False, CONNECT_BLOCKED_KEYGEN_MSG
+    if licence_status_from_payment_entitlement(ent) == LICENCE_STATUS_EXPIRED:
+        return False, renew_licence_message(ent.platform)
     return False, CONNECT_BLOCKED_NO_ENTITLEMENT_MSG
 
 

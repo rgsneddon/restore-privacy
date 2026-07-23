@@ -602,14 +602,35 @@ class Handler(BaseHTTPRequestHandler):
                     "reason": "no_entitlement",
                 }
             else:
+                from payments import (
+                    licence_status_from_entitlement,
+                    stripe_payment_page_href_for_platform,
+                )
+
+                lic = str(
+                    ent.get("licence_status")
+                    or licence_status_from_entitlement(ent)
+                )
+                plat = str(ent.get("platform") or "")
                 payload = {
                     "session_id": ent["session_id"],
                     "status": ent["status"],
-                    "platform": ent.get("platform") or "",
+                    "licence_status": lic,
+                    "platform": plat,
                     "reason": ent.get("reason") or "",
                     "connect_allowed": bool(ent.get("connect_allowed")),
                     "valid_until": ent.get("valid_until"),
                     "keygen": ent.get("keygen") or "",
+                    "customer_email": ent.get("customer_email") or "",
+                    "billing_interval": ent.get("billing_interval") or "month",
+                    # Platform renew portal (monthly default; yearly available on catalog)
+                    "renew_url": stripe_payment_page_href_for_platform(plat or "windows"),
+                    "renew_url_monthly": stripe_payment_page_href_for_platform(
+                        plat or "windows", interval="month"
+                    ),
+                    "renew_url_yearly": stripe_payment_page_href_for_platform(
+                        plat or "windows", interval="year"
+                    ),
                 }
             self._send(
                 200,

@@ -39,7 +39,8 @@ class TestHomepageTrialSentence(unittest.TestCase):
         self.assertIn('id="dl-only-price"', html)
         self.assertIn('class="dl-only-price"', html)
         self.assertIn(ONLY_PRICE_BANNER, html)
-        self.assertEqual(ONLY_PRICE_BANNER, "ONLY £2.45 per month")
+        self.assertIn("ONLY £2.45 per month", ONLY_PRICE_BANNER)
+        self.assertIn("yearly", ONLY_PRICE_BANNER.lower())
         heading_i = html.find("Download client v")
         banner_i = html.find('id="dl-only-price"')
         box_start = html.find('id="dl-price-box"')
@@ -394,7 +395,13 @@ class TestClientKeygenGate(unittest.TestCase):
                         self.assertFalse(may_connect(lic))
                         ok3, msg3 = assert_may_connect(lic)
                         self.assertFalse(ok3)
-                        self.assertIn("payment", msg3.lower())
+                        low3 = msg3.lower()
+                        self.assertTrue(
+                            "renew your licence" in low3
+                            or "expired" in low3
+                            or "payment" in low3,
+                            msg3,
+                        )
 
 
 class TestKeygenOnlineOnlySecurity(unittest.TestCase):

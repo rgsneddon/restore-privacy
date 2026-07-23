@@ -60,8 +60,11 @@ class TestPaymentEntitlementLogic(unittest.TestCase):
                 path=p, require=True, refresh=False
             )
             self.assertFalse(ok2)
-            self.assertIn("payment failed", msg2.lower())
-            self.assertEqual(msg2, CONNECT_BLOCKED_PAYMENT_MSG)
+            # EXPIRED hard-lock: renew *here* + platform payment portal
+            self.assertIn("renew your licence", msg2.lower())
+            self.assertIn("here", msg2.lower())
+            self.assertIn("expired", msg2.lower())
+            self.assertNotEqual(msg2, CONNECT_BLOCKED_PAYMENT_MSG)
 
         self.assertIn("STRONG DISCLAIMER", PAYMENT_CONNECT_DISCLAIMER)
         self.assertIn("fails at any time", PAYMENT_CONNECT_DISCLAIMER)
@@ -135,7 +138,8 @@ class TestPaymentEntitlementLogic(unittest.TestCase):
                 path=p, require=True, refresh=True, fetch=fake_fetch
             )
             self.assertFalse(ok)
-            self.assertIn("payment failed", msg.lower())
+            self.assertIn("renew your licence", msg.lower())
+            self.assertIn("expired", msg.lower())
             # Local file updated so subsequent Connect stays blocked offline
             from client.payment_entitlement import load_payment_entitlement
 
@@ -400,9 +404,13 @@ class TestConnectGateChainsLicenceAndPayment(unittest.TestCase):
                         record_payment_failure("cs_ok", path=pay)
                         ok4, msg4 = assert_may_connect(path=lic)
                         self.assertFalse(ok4)
+                        low4 = msg4.lower()
                         self.assertTrue(
-                            "cancelled" in msg4.lower()
-                            or "failed" in msg4.lower()
+                            "renew your licence" in low4
+                            or "expired" in low4
+                            or "cancelled" in low4
+                            or "failed" in low4,
+                            msg4,
                         )
 
     def test_connect_path_refresh_blocks_after_server_revoke(self):
@@ -438,7 +446,13 @@ class TestConnectGateChainsLicenceAndPayment(unittest.TestCase):
                 ):
                     ok, msg = assert_may_connect(path=lic)
             self.assertFalse(ok)
-            self.assertIn("payment", msg.lower())
+            low = msg.lower()
+            self.assertTrue(
+                "renew your licence" in low
+                or "expired" in low
+                or "payment" in low,
+                msg,
+            )
 
 
 class TestDocsAndPortalDisclaimer(unittest.TestCase):
