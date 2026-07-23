@@ -52,6 +52,31 @@ curl https://restoreprivacy.online/health
 curl https://restoreprivacy.online/health/fulfilment
 ```
 
+## Private Email (Namecheap) production map
+
+Product fulfilment (keygen + PPI + download after Stripe pay) uses **outbound SMTP only**:
+
+| Env key | Value |
+|---------|--------|
+| `RPT_FULFILMENT_SMTP_HOST` | `mail.privateemail.com` |
+| `RPT_FULFILMENT_SMTP_PORT` | `587` (STARTTLS; shipped send path) |
+| `RPT_FULFILMENT_SMTP_USER` | `rus@restoreprivacy.online` |
+| `RPT_FULFILMENT_SMTP_PASSWORD` | *(Render env only — never commit)* |
+| `RPT_FULFILMENT_FROM_EMAIL` | `rus@restoreprivacy.online` |
+| `RPT_FULFILMENT_SMTP_TLS` | `1` |
+
+**Incoming** mailbox protocols (operator mail client only — not used by Stripe or status-host send):
+
+| Protocol | Host | Port |
+|----------|------|------|
+| IMAP | `mail.privateemail.com` | **993** SSL |
+| POP3 | `mail.privateemail.com` | **995** SSL |
+| SMTP alternate | `mail.privateemail.com` | **465** SMTPS (not the default ship path) |
+
+Stripe Dashboard **customer receipts** are separate: they need a verified custom
+email domain for `restoreprivacy.online` / From `rus@…` — Stripe does **not**
+log into IMAP/POP with the mailbox password. See Dashboard → Settings → Customer emails.
+
 ## Stripe Payment Link — £2.45/month + 7-day trial
 
 | Field | Value |
