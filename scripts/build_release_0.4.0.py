@@ -281,8 +281,9 @@ def stage_windows_exe(*, force_rebuild: bool = False) -> Path:
     # Prefer already-rebuilt 0.4.0 SFX if present with correct pin
     if dest.is_file() and dest.stat().st_size > 1_000_000:
         data = dest.read_bytes()
-        if b'Title="Restore Privacy ' + VERSION.encode() + b'"' in data or b"0.3.4" not in data:
-            print(f"windows: keeping existing {dest.name}")
+        title_ok = b'Title="Restore Privacy ' + VERSION.encode() + b'"' in data
+        if title_ok and VERSION.encode() in data:
+            print(f"windows: keeping existing {dest.name} (title pin {VERSION})")
             return dest
     _stage_from_prior(
         f"restore-privacy-client-{PRIOR_TAG}-windows-x64-setup.exe", dest
@@ -292,7 +293,11 @@ def stage_windows_exe(*, force_rebuild: bool = False) -> Path:
 
 
 def _rewrite_windows_sfx_version(exe: Path) -> None:
-    """Repack 7z SFX so client/VERSION and Title pin match VERSION (same-length pins)."""
+    """Repack 7z SFX so client/VERSION and Title pin match VERSION (same-length pins).
+
+    Honest: this does **not** rebuild multihop residual PE code — only catalog
+    pin strings / VERSION files inside a carried SFX when 7z extract works.
+    """
     import re
     import subprocess
     import tempfile
@@ -307,7 +312,7 @@ def _rewrite_windows_sfx_version(exe: Path) -> None:
             # try generic 7z header used by p7zip listing Offset
             off = data.find(b"7z")
             if off < 0:
-                print("windows: not a 7z SFX; leave as staged")
+                print("windows: not a 7z SFX; leave as staged (pin filename only)")
                 return
         stub = bytearray(data[:off])
         # same-length title rewrite for any 0.x.y pin
@@ -317,9 +322,21 @@ def _rewrite_windows_sfx_version(exe: Path) -> None:
             f'Title="Restore Privacy {VERSION}"'.encode(),
             stub_bytes,
         )
-        # also plain 0.3.3 -> VERSION when same length
+        # same-length 5-char product pins (0.x.y)
+        old_pins = [
+            b"0.3.9",
+            b"0.3.8",
+            b"0.3.7",
+            b"0.3.6",
+            b"0.3.5",
+            b"0.3.4",
+            b"0.3.3",
+            b"0.3.0",
+            b"0.2.9",
+            b"0.2.3",
+        ]
         if len(VERSION) == 5:
-            for old in (b"0.3.4", b"0.3.3", b"0.3.0", b"0.2.3"):
+            for old in old_pins:
                 stub_bytes = stub_bytes.replace(old, VERSION.encode())
         payload_dir = work / "payload"
         payload_dir.mkdir()
@@ -330,9 +347,12 @@ def _rewrite_windows_sfx_version(exe: Path) -> None:
         )
         if r.returncode != 0:
             print(f"windows: 7z extract failed: {r.stderr[:200]}")
+            # Still write stub title rewrites if possible
+            if stub_bytes != bytes(stub):
+                # cannot safely recombine without payload — leave file as staged copy
+                print("windows: pin rewrite partial (stub only skipped without extract)")
             return
         # rewrite VERSION files and same-length version strings
-        old_pins = [b"0.3.4", b"0.3.3", b"0.3.0", b"0.2.3"]
         for path in payload_dir.rglob("*"):
             if not path.is_file():
                 continue

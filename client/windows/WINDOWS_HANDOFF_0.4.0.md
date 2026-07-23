@@ -134,3 +134,16 @@ Common issues:
 - Multihop unit tests: `tests/test_multihop.py`
 - Package pin honesty: `tests/test_release_0_3_6_package_pins.py` (Windows PE multihop gates run when the rebuilt setup is present under `releases/0.4.0/`)
 
+## macOS operator note (0.4.0)
+
+A **fresh multihop Windows PE cannot be frozen on Darwin**. On this Mac the
+catalog file `releases/0.4.0/restore-privacy-client-0.4.0-windows-x64-setup.exe`
+is staged by **filename pin** from the prior multihop SFX (7z extract/pin-rewrite
+is not always available for this SFX layout). Rebuild on Windows x64 with:
+
+```bat
+scripts\build_windows_multihop.bat
+```
+
+Android **0.4.0** APK is a full Flutter `assembleRelease` rebuild when JDK 17 +
+Android SDK are configured (`JAVA_HOME` / `flutter config --jdk-dir`).

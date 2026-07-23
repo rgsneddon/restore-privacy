@@ -21,10 +21,12 @@ VERSION = "0.4.0"
 REL = ROOT / "releases" / VERSION
 STATUS_ASSETS = ROOT / "status_page" / "assets" / VERSION
 WINDOWS = REL / f"restore-privacy-client-{VERSION}-windows-x64-setup.exe"
+ANDROID = REL / f"restore-privacy-client-{VERSION}-android.apk"
 MACOS = REL / f"restore-privacy-client-{VERSION}-macos.zip"
 IOS = REL / f"restore-privacy-client-{VERSION}-ios.zip"
 STATUS_MACOS = STATUS_ASSETS / f"restore-privacy-client-{VERSION}-macos.zip"
 STATUS_IOS = STATUS_ASSETS / f"restore-privacy-client-{VERSION}-ios.zip"
+STATUS_ANDROID = STATUS_ASSETS / f"restore-privacy-client-{VERSION}-android.apk"
 EXIT_PUB_PIN = (
     "a36a3f38066ece7b33abfab6a57942fb998919b4a753ee0d9e9ec9c97c1c7352"
 )
@@ -123,6 +125,28 @@ class Test040WindowsPeOptional(unittest.TestCase):
     def test_windows_pe_built(self):
         self.assertTrue(WINDOWS.is_file(), f"missing {WINDOWS}")
         self.assertGreater(WINDOWS.stat().st_size, 1_000_000)
+        # PE magic MZ (setup.exe / SFX)
+        self.assertEqual(WINDOWS.read_bytes()[:2], b"MZ")
+        self.assertIn(VERSION, WINDOWS.name)
+
+
+@unittest.skipUnless(ANDROID.is_file(), "releases/0.4.0 Android APK not present")
+class Test040AndroidApkOptional(unittest.TestCase):
+    def test_android_apk_is_release_zip_with_residual_wire(self):
+        """Real Flutter APK: zip + classes.dex residual markers (not empty rename)."""
+        self.assertGreater(ANDROID.stat().st_size, 10_000_000)
+        self.assertIn(VERSION, ANDROID.name)
+        with zipfile.ZipFile(ANDROID) as z:
+            self.assertIn("classes.dex", z.namelist())
+            dex = z.read("classes.dex")
+        # Product Connect residual markers (same as stage_android wire check)
+        self.assertIn(b"pfs-x25519", dex)
+        self.assertIn(b"RPT-OBFS-LAYER", dex)
+
+    def test_status_android_matches_releases_size(self):
+        if not STATUS_ANDROID.is_file():
+            self.skipTest("status_page/assets android not staged")
+        self.assertEqual(STATUS_ANDROID.stat().st_size, ANDROID.stat().st_size)
 
 
 @unittest.skipUnless(MACOS.is_file(), "releases/0.4.0 macOS zip not present")
@@ -178,10 +202,6 @@ class Test040MacosPackage(unittest.TestCase):
             )
 
 
-if __name__ == "__main__":
-    unittest.main()
-
-
 @unittest.skipUnless(IOS.is_file(), "releases/0.4.0 iOS zip not present")
 class Test040IosPackage(unittest.TestCase):
     def test_ios_zip_size_and_no_priv(self):
@@ -235,4 +255,8 @@ class Test040StatusAppleStage(unittest.TestCase):
             with zipfile.ZipFile(p) as z:
                 privs = [n for n in z.namelist() if n.endswith(".priv")]
                 self.assertEqual(privs, [], f"priv in staged {p.name}")
+
+
+if __name__ == "__main__":
+    unittest.main()
 
