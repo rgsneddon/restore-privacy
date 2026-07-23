@@ -1,4 +1,4 @@
-"""Release download catalog + paid download UI (version 0.4.1).
+"""Release download catalog + paid download UI (version 0.4.2).
 
 Primary path: pay **£2.45** (GBP) via Stripe Checkout per package, then a
 single-use download token. Free permanent GitHub ``href`` is not used on the
@@ -6,7 +6,7 @@ public buttons. After payment the status host **proxies** the installer
 (authenticated GitHub API / local assets) so fulfilment works when the
 restore-privacy repo is **private**. Buy Me a Coffee is tip/support only.
 
-Current catalog packages: restore-privacy release **0.4.1**
+Current catalog packages: restore-privacy release **0.4.2**
 (Windows setup needs no separate Python install; macOS Developer ID notarized;
 iOS Team-signed sideload).
 """
@@ -21,10 +21,10 @@ try:
 except ImportError:  # package import path (status_page as package)
     from status_page.coffee_link import COFFEE_LINK_URL, coffee_tip_url
 
-RELEASE_VERSION = "0.4.1"
+RELEASE_VERSION = "0.4.2"
 GITHUB_OWNER = "rgsneddon"
 GITHUB_REPO = "restore-privacy"
-RELEASE_TAG = "0.4.1"
+RELEASE_TAG = "0.4.2"
 RELEASE_PAGE_URL = (
     f"https://github.com/{GITHUB_OWNER}/{GITHUB_REPO}/releases/tag/{RELEASE_TAG}"
 )

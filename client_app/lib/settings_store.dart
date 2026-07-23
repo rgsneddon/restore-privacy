@@ -1,7 +1,8 @@
 /// Durable product settings for seamless power-up + privacy-scale prefs.
 ///
-/// Defaults: startup prefs **off**. Privacy-scale: traffic shaping + outer
-/// obfuscation **on**; multi-hop **off** (matches Windows product policy).
+/// Defaults: startup prefs **off**. Privacy-scale lean residual: traffic
+/// shaping, outer obfuscation, and multi-hop all **off** until the user opts
+/// in (matches Windows/Linux product policy). Residual VPN core stays always-on.
 library;
 
 const String kKeyRunAtStartup = 'run_at_startup';
@@ -20,8 +21,8 @@ class ProductSettings {
   const ProductSettings({
     this.runAtStartup = false,
     this.autoconnectOnLaunch = false,
-    this.privacyTrafficShape = true,
-    this.privacyOuterObfuscation = true,
+    this.privacyTrafficShape = false,
+    this.privacyOuterObfuscation = false,
     this.privacyMultihop = false,
   });
 
@@ -57,8 +58,9 @@ class ProductSettings {
     return ProductSettings(
       runAtStartup: data[kKeyRunAtStartup] == true,
       autoconnectOnLaunch: data[kKeyAutoconnectOnLaunch] == true,
-      privacyTrafficShape: data[kKeyPrivacyTrafficShape] != false,
-      privacyOuterObfuscation: data[kKeyPrivacyOuterObfuscation] != false,
+      // Missing keys → lean-off product defaults (same as load()).
+      privacyTrafficShape: data[kKeyPrivacyTrafficShape] == true,
+      privacyOuterObfuscation: data[kKeyPrivacyOuterObfuscation] == true,
       privacyMultihop: data[kKeyPrivacyMultihop] == true,
     );
   }
@@ -99,9 +101,9 @@ class SettingsStore {
     return ProductSettings(
       runAtStartup: run == true,
       autoconnectOnLaunch: auto == true,
-      // Defaults ON when never set (null) — product privacy-max for shape/obfs.
-      privacyTrafficShape: shape != false,
-      privacyOuterObfuscation: obfs != false,
+      // Defaults OFF when never set (null) — lean residual until user opts in.
+      privacyTrafficShape: shape == true,
+      privacyOuterObfuscation: obfs == true,
       privacyMultihop: mh == true,
     );
   }

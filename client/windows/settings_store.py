@@ -1,9 +1,10 @@
 """Durable product settings for Windows client (JSON under LocalAppData).
 
 Startup/autoconnect default **off** (manual Connect until the user opts in).
-Privacy-scale layers default to product privacy-max for optional residual
-defenses (traffic shaping + outer obfuscation **on**; multi-hop **off** /
-single-hop baseline).
+Privacy-scale optional layers default **off** for lean residual (traffic
+shaping, outer obfuscation, multi-hop all off / single-hop baseline) until
+the user turns them on. Residual VPN core stays always-on via policy (not
+stored as a toggle-off here).
 """
 
 from __future__ import annotations
@@ -28,9 +29,9 @@ KEY_PRIVACY_MULTIHOP = "privacy_multihop"
 class ProductSettings:
     run_at_startup: bool = False
     autoconnect_on_launch: bool = False
-    # Optional residual privacy layers (scale down for browsing speed)
-    privacy_traffic_shape: bool = True
-    privacy_outer_obfuscation: bool = True
+    # Optional residual privacy layers (off until user opts in for lean residual)
+    privacy_traffic_shape: bool = False
+    privacy_outer_obfuscation: bool = False
     privacy_multihop: bool = False
 
 
@@ -48,8 +49,8 @@ def default_settings() -> ProductSettings:
     return ProductSettings(
         run_at_startup=False,
         autoconnect_on_launch=False,
-        privacy_traffic_shape=True,
-        privacy_outer_obfuscation=True,
+        privacy_traffic_shape=False,
+        privacy_outer_obfuscation=False,
         privacy_multihop=False,
     )
 
@@ -65,10 +66,10 @@ def load_settings(path: Optional[Path] = None) -> ProductSettings:
         return ProductSettings(
             run_at_startup=bool(data.get(KEY_RUN_AT_STARTUP, False)),
             autoconnect_on_launch=bool(data.get(KEY_AUTOCONNECT_ON_LAUNCH, False)),
-            # Missing keys → privacy-max defaults (not "off")
-            privacy_traffic_shape=bool(data.get(KEY_PRIVACY_TRAFFIC_SHAPE, True)),
+            # Missing keys → lean-off product defaults
+            privacy_traffic_shape=bool(data.get(KEY_PRIVACY_TRAFFIC_SHAPE, False)),
             privacy_outer_obfuscation=bool(
-                data.get(KEY_PRIVACY_OUTER_OBFUSCATION, True)
+                data.get(KEY_PRIVACY_OUTER_OBFUSCATION, False)
             ),
             privacy_multihop=bool(data.get(KEY_PRIVACY_MULTIHOP, False)),
         )

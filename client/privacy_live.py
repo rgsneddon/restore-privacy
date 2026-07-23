@@ -49,8 +49,8 @@ class HotApplyResult:
 def prefs_from_product_settings(settings: Any) -> PrivacyScalePrefs:
     """Map ProductSettings (or any object with privacy_* attrs) to prefs."""
     return PrivacyScalePrefs(
-        traffic_shape=bool(getattr(settings, "privacy_traffic_shape", True)),
-        outer_obfuscation=bool(getattr(settings, "privacy_outer_obfuscation", True)),
+        traffic_shape=bool(getattr(settings, "privacy_traffic_shape", False)),
+        outer_obfuscation=bool(getattr(settings, "privacy_outer_obfuscation", False)),
         multihop=bool(getattr(settings, "privacy_multihop", False)),
     )
 

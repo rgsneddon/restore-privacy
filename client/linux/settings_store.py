@@ -1,7 +1,8 @@
 """Durable product settings for Linux client (JSON under XDG data).
 
-Defaults are both **off** so manual Connect remains until the user opts into
-seamless power-up (same product policy as Windows).
+Startup/autoconnect default **off** so manual Connect remains until the user
+opts in. Optional privacy-scale layers (shape / outer obfuscation / multi-hop)
+also default **off** for lean residual (same product policy as Windows).
 """
 
 from __future__ import annotations
@@ -27,8 +28,8 @@ AUTOSTART_DESKTOP_NAME = "restore-privacy.desktop"
 class ProductSettings:
     run_at_startup: bool = False
     autoconnect_on_launch: bool = False
-    privacy_traffic_shape: bool = True
-    privacy_outer_obfuscation: bool = True
+    privacy_traffic_shape: bool = False
+    privacy_outer_obfuscation: bool = False
     privacy_multihop: bool = False
 
 
@@ -47,8 +48,8 @@ def default_settings() -> ProductSettings:
     return ProductSettings(
         run_at_startup=False,
         autoconnect_on_launch=False,
-        privacy_traffic_shape=True,
-        privacy_outer_obfuscation=True,
+        privacy_traffic_shape=False,
+        privacy_outer_obfuscation=False,
         privacy_multihop=False,
     )
 
@@ -63,9 +64,9 @@ def load_settings(path: Optional[Path] = None) -> ProductSettings:
         return ProductSettings(
             run_at_startup=bool(data.get(KEY_RUN_AT_STARTUP, False)),
             autoconnect_on_launch=bool(data.get(KEY_AUTOCONNECT_ON_LAUNCH, False)),
-            privacy_traffic_shape=bool(data.get(KEY_PRIVACY_TRAFFIC_SHAPE, True)),
+            privacy_traffic_shape=bool(data.get(KEY_PRIVACY_TRAFFIC_SHAPE, False)),
             privacy_outer_obfuscation=bool(
-                data.get(KEY_PRIVACY_OUTER_OBFUSCATION, True)
+                data.get(KEY_PRIVACY_OUTER_OBFUSCATION, False)
             ),
             privacy_multihop=bool(data.get(KEY_PRIVACY_MULTIHOP, False)),
         )

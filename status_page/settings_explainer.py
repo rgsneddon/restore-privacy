@@ -55,12 +55,12 @@ def settings_parts_catalog() -> list[dict[str, str]]:
     except Exception:  # noqa: BLE001
         shape = (
             "Traffic shaping pads packet sizes, adds small send jitter, and sends "
-            "periodic cover frames. ON (default) = stronger fingerprint resistance; "
-            "OFF = snappier browsing with weaker traffic-analysis resistance."
+            "periodic cover frames. OFF (product default) = snappier browsing with "
+            "weaker traffic-analysis resistance; ON = stronger fingerprint resistance."
         )
         obfs = (
             "Outer obfuscation wraps residual UDP in a QUIC-like shell. "
-            "ON (default) = better blend with encrypted UDP; OFF = bare RPT frames."
+            "OFF (product default) = bare RPT frames; ON = better blend with encrypted UDP."
         )
         multi = (
             "Multi-hop residual routes via an exit hop so egress IP is the exit. "
@@ -102,13 +102,13 @@ def settings_parts_catalog() -> list[dict[str, str]]:
         {
             "id": "traffic-shaping",
             "title": "Traffic shaping (pad / jitter / cover)",
-            "default": "On",
+            "default": "Off",
             "body": shape,
         },
         {
             "id": "outer-obfuscation",
             "title": "Outer obfuscation (QUIC-mimic wrap)",
-            "default": "On",
+            "default": "Off",
             "body": obfs,
         },
         {

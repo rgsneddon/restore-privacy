@@ -3,32 +3,33 @@ import 'package:restore_privacy_client/residual_privacy_policy.dart';
 
 void main() {
   group('resolveResidualPrivacy', () {
-    test('product defaults: shape/obfs ON, multihop OFF', () {
+    test('product defaults: shape/obfs/multihop OFF (lean residual)', () {
       final f = resolveResidualPrivacy();
-      expect(f.padding, isTrue);
-      expect(f.cover, isTrue);
-      expect(f.sendJitter, isTrue);
-      expect(f.outerObfuscation, isTrue);
-      expect(f.multihop, isFalse);
-      expect(f.padding, ResidualPrivacyFlags.productDefaults.padding);
-    });
-
-    test('shape OFF disables padding, cover, and send jitter', () {
-      final f = resolveResidualPrivacy(trafficShape: false);
       expect(f.padding, isFalse);
       expect(f.cover, isFalse);
       expect(f.sendJitter, isFalse);
-      // Obfs independent of shape
-      expect(f.outerObfuscation, isTrue);
+      expect(f.outerObfuscation, isFalse);
       expect(f.multihop, isFalse);
+      expect(f.padding, ResidualPrivacyFlags.productDefaults.padding);
+      expect(f.outerObfuscation, ResidualPrivacyFlags.productDefaults.outerObfuscation);
     });
 
-    test('outer obfuscation OFF disables wrap only', () {
-      final f = resolveResidualPrivacy(outerObfuscation: false);
+    test('shape ON enables padding, cover, and send jitter', () {
+      final f = resolveResidualPrivacy(trafficShape: true);
       expect(f.padding, isTrue);
       expect(f.cover, isTrue);
       expect(f.sendJitter, isTrue);
+      // Obfs independent of shape — still product default off
       expect(f.outerObfuscation, isFalse);
+      expect(f.multihop, isFalse);
+    });
+
+    test('outer obfuscation ON enables wrap only', () {
+      final f = resolveResidualPrivacy(outerObfuscation: true);
+      expect(f.padding, isFalse);
+      expect(f.cover, isFalse);
+      expect(f.sendJitter, isFalse);
+      expect(f.outerObfuscation, isTrue);
     });
 
     test('both shape and obfs OFF → lean residual DATA', () {
@@ -56,10 +57,10 @@ void main() {
   });
 
   group('residualPrivacyFromStoredPrefs', () {
-    test('empty map uses product defaults', () {
+    test('empty map uses product lean-off defaults', () {
       final f = residualPrivacyFromStoredPrefs({});
-      expect(f.padding, isTrue);
-      expect(f.outerObfuscation, isTrue);
+      expect(f.padding, isFalse);
+      expect(f.outerObfuscation, isFalse);
       expect(f.multihop, isFalse);
     });
 
@@ -76,14 +77,14 @@ void main() {
       expect(f.multihop, isFalse);
     });
 
-    test('null keys treated as product defaults (shape/obfs on)', () {
+    test('null keys treated as product defaults (shape/obfs off)', () {
       final f = residualPrivacyFromStoredPrefs({
         kResidualKeyTrafficShape: null,
         kResidualKeyOuterObfuscation: null,
         kResidualKeyMultihop: null,
       });
-      expect(f.padding, isTrue);
-      expect(f.outerObfuscation, isTrue);
+      expect(f.padding, isFalse);
+      expect(f.outerObfuscation, isFalse);
       expect(f.multihop, isFalse);
     });
 
@@ -96,6 +97,19 @@ void main() {
         kResidualKeyMultihop: true,
       });
       expect(on.multihop, isTrue);
+    });
+
+    test('explicit true for shape/obfs enables residual DATA flags', () {
+      final f = residualPrivacyFromStoredPrefs({
+        kResidualKeyTrafficShape: true,
+        kResidualKeyOuterObfuscation: true,
+        kResidualKeyMultihop: false,
+      });
+      expect(f.padding, isTrue);
+      expect(f.cover, isTrue);
+      expect(f.sendJitter, isTrue);
+      expect(f.outerObfuscation, isTrue);
+      expect(f.multihop, isFalse);
     });
   });
 }

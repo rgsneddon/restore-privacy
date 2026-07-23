@@ -18,12 +18,12 @@ sys.path.insert(0, str(ROOT))
 
 
 class TestPrivacyScaleDefaultsAndPersistence(unittest.TestCase):
-    def test_defaults_privacy_max_optional_layers(self) -> None:
+    def test_defaults_lean_off_optional_layers(self) -> None:
         from client.windows.settings_store import default_settings
 
         d = default_settings()
-        self.assertTrue(d.privacy_traffic_shape)
-        self.assertTrue(d.privacy_outer_obfuscation)
+        self.assertFalse(d.privacy_traffic_shape)
+        self.assertFalse(d.privacy_outer_obfuscation)
         self.assertFalse(d.privacy_multihop)  # single-hop product baseline
         self.assertFalse(d.run_at_startup)
         self.assertFalse(d.autoconnect_on_launch)
@@ -47,14 +47,14 @@ class TestPrivacyScaleDefaultsAndPersistence(unittest.TestCase):
             self.assertFalse(loaded.privacy_traffic_shape)
             self.assertFalse(loaded.privacy_outer_obfuscation)
             self.assertTrue(loaded.privacy_multihop)
-            # Legacy file without privacy keys → privacy-max defaults
+            # Legacy file without privacy keys → lean-off product defaults
             path.write_text(
                 '{"run_at_startup": false, "autoconnect_on_launch": false}\n',
                 encoding="utf-8",
             )
             legacy = load_settings(path=path)
-            self.assertTrue(legacy.privacy_traffic_shape)
-            self.assertTrue(legacy.privacy_outer_obfuscation)
+            self.assertFalse(legacy.privacy_traffic_shape)
+            self.assertFalse(legacy.privacy_outer_obfuscation)
             self.assertFalse(legacy.privacy_multihop)
 
 
@@ -63,7 +63,7 @@ class TestResolvedPrivacyPolicy(unittest.TestCase):
         for k in ("RPT_TRAFFIC_SHAPE", "RPT_OBFS", "RPT_MULTIHOP_ENABLED"):
             os.environ.pop(k, None)
 
-    def test_defaults_resolve_privacy_on(self) -> None:
+    def test_defaults_resolve_lean_off(self) -> None:
         from client.product_policy import (
             PrivacyScalePrefs,
             product_dataplane_traffic_shape,
@@ -75,17 +75,18 @@ class TestResolvedPrivacyPolicy(unittest.TestCase):
         # Force no env keys so settings prefs apply
         for k in ("RPT_TRAFFIC_SHAPE", "RPT_OBFS", "RPT_MULTIHOP_ENABLED"):
             os.environ.pop(k, None)
-        prefs = PrivacyScalePrefs()  # product defaults
+        prefs = PrivacyScalePrefs()  # product lean-off defaults
         pol = resolve_privacy_policy(prefs=prefs)
-        self.assertTrue(pol.traffic_shape_enabled)
-        self.assertTrue(pol.outer_obfuscation_enabled)
+        self.assertFalse(pol.traffic_shape_enabled)
+        self.assertFalse(pol.outer_obfuscation_enabled)
         self.assertFalse(pol.multihop_enabled)
         self.assertTrue(pol.residual_vpn_core)
         self.assertTrue(pol.admission_and_crypto)
         shape = product_dataplane_traffic_shape(prefs=prefs)
-        self.assertTrue(shape.padding)
-        self.assertGreater(shape.jitter_ms_max, 0)
-        self.assertTrue(product_outer_obfuscation_enabled(prefs=prefs))
+        self.assertFalse(shape.padding)
+        self.assertEqual(shape.jitter_ms_max, 0)
+        self.assertEqual(shape, DEFAULT_TRAFFIC_SHAPE)
+        self.assertFalse(product_outer_obfuscation_enabled(prefs=prefs))
         # Core never off
         self.assertIsNot(shape, None)
         self.assertNotEqual(pol.residual_vpn_core, False)

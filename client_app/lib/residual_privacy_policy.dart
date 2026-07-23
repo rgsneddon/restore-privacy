@@ -4,8 +4,9 @@
 /// - traffic shaping ON → RPTP padding + cover + send jitter
 /// - outer obfuscation ON → QUIC-mimic wrap
 ///
-/// Defaults match Windows [client.product_policy.PrivacyScalePrefs] and
-/// Swift [RptResidualPrivacyPolicy]: shape/obfs ON, multihop OFF.
+/// Pre-adjustment defaults match Windows [client.product_policy.PrivacyScalePrefs]
+/// and Swift [RptResidualPrivacyPolicy]: shape/obfs/multihop all OFF (lean residual).
+/// Residual VPN core (HELLO/session/tunnel) is never disabled here.
 ///
 /// Flutter Settings persists the same keys that Packet Tunnel reads from the
 /// App Group (`privacy_traffic_shape`, `privacy_outer_obfuscation`,
@@ -34,12 +35,12 @@ class ResidualPrivacyFlags {
     required this.multihop,
   });
 
-  /// Product privacy-max residual defaults.
+  /// Product lean residual defaults (optional layers off until user opts in).
   static const ResidualPrivacyFlags productDefaults = ResidualPrivacyFlags(
-    padding: true,
-    cover: true,
-    sendJitter: true,
-    outerObfuscation: true,
+    padding: false,
+    cover: false,
+    sendJitter: false,
+    outerObfuscation: false,
     multihop: false,
   );
 
@@ -60,8 +61,8 @@ class ResidualPrivacyFlags {
 /// Core residual VPN (HELLO/session/tunnel) is never disabled here.
 /// Free tier forces [ResidualPrivacyFlags.freeTierLean] regardless of toggles.
 ResidualPrivacyFlags resolveResidualPrivacy({
-  bool trafficShape = true,
-  bool outerObfuscation = true,
+  bool trafficShape = false,
+  bool outerObfuscation = false,
   bool multihop = false,
 }) {
   if (freeTierEnabled) {
@@ -79,7 +80,7 @@ ResidualPrivacyFlags resolveResidualPrivacy({
 
 /// Load from a key/value map (SharedPreferences / App Group snapshot).
 ///
-/// Missing keys use product defaults (shape/obfs ON, multihop OFF).
+/// Missing keys use product defaults (shape/obfs/multihop all OFF).
 /// Free tier ignores stored prefs for residual DATA flags.
 ResidualPrivacyFlags residualPrivacyFromStoredPrefs(Map<String, bool?> stored) {
   if (freeTierEnabled) {
@@ -89,8 +90,8 @@ ResidualPrivacyFlags residualPrivacyFromStoredPrefs(Map<String, bool?> stored) {
   final obfs = stored[kResidualKeyOuterObfuscation];
   final mh = stored[kResidualKeyMultihop];
   return resolveResidualPrivacy(
-    trafficShape: shape != false,
-    outerObfuscation: obfs != false,
+    trafficShape: shape == true,
+    outerObfuscation: obfs == true,
     multihop: mh == true,
   );
 }

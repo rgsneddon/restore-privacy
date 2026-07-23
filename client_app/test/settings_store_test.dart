@@ -2,12 +2,12 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:restore_privacy_client/settings_store.dart';
 
 void main() {
-  test('defaults: startup off, privacy-scale shape/obfs on, multihop off', () {
+  test('defaults: startup off, privacy-scale shape/obfs/multihop off', () {
     const s = ProductSettings.defaults;
     expect(s.runAtStartup, isFalse);
     expect(s.autoconnectOnLaunch, isFalse);
-    expect(s.privacyTrafficShape, isTrue);
-    expect(s.privacyOuterObfuscation, isTrue);
+    expect(s.privacyTrafficShape, isFalse);
+    expect(s.privacyOuterObfuscation, isFalse);
     expect(s.privacyMultihop, isFalse);
   });
 
@@ -21,9 +21,10 @@ void main() {
     final loaded = await store.load();
     expect(loaded.runAtStartup, isTrue);
     expect(loaded.autoconnectOnLaunch, isTrue);
-    // Privacy defaults when never written
-    expect(loaded.privacyTrafficShape, isTrue);
-    expect(loaded.privacyOuterObfuscation, isTrue);
+    // Privacy lean-off defaults when never written for shape/obfs/multihop
+    // (save writes explicit false for those fields from ProductSettings ctor defaults)
+    expect(loaded.privacyTrafficShape, isFalse);
+    expect(loaded.privacyOuterObfuscation, isFalse);
     expect(loaded.privacyMultihop, isFalse);
 
     // Simulate process restart: new store, same backend map
@@ -40,22 +41,32 @@ void main() {
     expect(third.autoconnectOnLaunch, isTrue);
   });
 
+  test('missing keys load as lean-off (not privacy-max)', () async {
+    final empty = SettingsStore(MemorySettingsBackend({}));
+    final loaded = await empty.load();
+    expect(loaded.runAtStartup, isFalse);
+    expect(loaded.autoconnectOnLaunch, isFalse);
+    expect(loaded.privacyTrafficShape, isFalse);
+    expect(loaded.privacyOuterObfuscation, isFalse);
+    expect(loaded.privacyMultihop, isFalse);
+  });
+
   test('privacy-scale prefs roundtrip (Windows parity keys)', () async {
     final shared = <String, bool>{};
     final store = SettingsStore(MemorySettingsBackend(shared));
     await store.save(
       const ProductSettings(
-        privacyTrafficShape: false,
-        privacyOuterObfuscation: false,
+        privacyTrafficShape: true,
+        privacyOuterObfuscation: true,
         privacyMultihop: true,
       ),
     );
     final loaded = await store.load();
-    expect(loaded.privacyTrafficShape, isFalse);
-    expect(loaded.privacyOuterObfuscation, isFalse);
+    expect(loaded.privacyTrafficShape, isTrue);
+    expect(loaded.privacyOuterObfuscation, isTrue);
     expect(loaded.privacyMultihop, isTrue);
-    expect(shared[kKeyPrivacyTrafficShape], isFalse);
-    expect(shared[kKeyPrivacyOuterObfuscation], isFalse);
+    expect(shared[kKeyPrivacyTrafficShape], isTrue);
+    expect(shared[kKeyPrivacyOuterObfuscation], isTrue);
     expect(shared[kKeyPrivacyMultihop], isTrue);
   });
 

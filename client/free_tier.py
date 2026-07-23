@@ -72,8 +72,8 @@ def free_tier_settings_locked() -> bool:
 def free_tier_privacy_scale_locked_off() -> tuple[bool, bool, bool]:
     """Return (traffic_shape, outer_obfuscation, multihop) forced values when free.
 
-    When free tier is off, returns product defaults (shape/obfs on, multihop off).
+    When free tier is off, returns product defaults (shape/obfs/multihop all off).
     """
     if free_tier_enabled():
         return (False, False, False)
-    return (True, True, False)
+    return (False, False, False)

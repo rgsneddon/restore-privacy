@@ -26,22 +26,22 @@ void main() {
     expect(p.residualHost, RptConfig.entryHost);
   });
 
-  test('paid residual defaults still privacy-max when free off', () {
+  test('paid residual defaults lean-off when free off', () {
     if (freeTierEnabled) {
       final f = resolveResidualPrivacy(trafficShape: true, outerObfuscation: true);
       expect(f.padding, isFalse);
       expect(f.outerObfuscation, isFalse);
     } else {
       final f = resolveResidualPrivacy();
-      expect(f.padding, isTrue);
-      expect(f.outerObfuscation, isTrue);
+      expect(f.padding, isFalse);
+      expect(f.outerObfuscation, isFalse);
       expect(f.multihop, isFalse);
     }
   });
 
-  test('RptConfig paid productVersion is 0.4.0 catalog pin', () {
-    expect(RptConfig.productVersion, '0.4.0');
-    expect(RptConfig.displayProductVersion, freeAwareProductVersion('0.4.0'));
+  test('RptConfig paid productVersion is 0.4.2 catalog pin', () {
+    expect(RptConfig.productVersion, '0.4.2');
+    expect(RptConfig.displayProductVersion, freeAwareProductVersion('0.4.2'));
     // Free: multi-hop forced off; paid default also off without settings.
     expect(RptConfig.multiHopEnabled, isFalse);
     expect(RptConfig.host, RptConfig.entryHost);

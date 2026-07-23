@@ -6,12 +6,13 @@ Traffic shaping (padding, send jitter, cover traffic), outer obfuscation
 1. **Operator env** (when the key is set): ``RPT_TRAFFIC_SHAPE``, ``RPT_OBFS``,
    ``RPT_MULTIHOP_ENABLED`` — wins for tests / self-host.
 2. **User Settings** (when env key is unset): privacy-scale toggles in the
-   product settings store (defaults privacy-max for shaping + obfuscation;
-   multi-hop remains product single-hop default **off**).
+   product settings store (pre-adjustment defaults lean-off: shaping,
+   outer obfuscation, and multi-hop all **off**; residual VPN core stays
+   always-on and is not a user-offable Settings switch).
 
-Bounded defaults keep bandwidth impact modest; not a DPI-undetectability claim.
-Optional layers can be turned off for lower lag while residual VPN (HELLO,
-session crypto, system capture) stays required and available.
+Bounded optional layers can be turned **on** for stronger fingerprint
+resistance; residual VPN (HELLO, session crypto, system capture) stays
+required either way. Not a DPI-undetectability claim.
 """
 
 from __future__ import annotations
@@ -38,18 +39,18 @@ PRODUCT_ENABLED_TRAFFIC_SHAPE = TrafficShapePolicy(
 EXPLAINER_TRAFFIC_SHAPE = (
     "Traffic shaping pads packet sizes, adds small send jitter, and sends "
     "periodic cover (dummy) frames so traffic is harder to fingerprint. "
-    "ON (default) = stronger privacy against coarse traffic analysis; "
-    "slightly more bandwidth and latency. "
-    "OFF = leaner packets and less cover → snappier browsing; weaker against "
-    "size/timing analysis. Residual VPN crypto and tunnel still work either way."
+    "OFF (product default) = leaner packets and less cover → snappier browsing; "
+    "weaker against size/timing analysis. "
+    "ON = stronger privacy against coarse traffic analysis; slightly more "
+    "bandwidth and latency. Residual VPN crypto and tunnel still work either way."
 )
 
 EXPLAINER_OUTER_OBFUSCATION = (
     "Outer obfuscation wraps residual UDP in a QUIC-like shell so clear RPT "
     "framing is not obvious on the wire. "
-    "ON (default) = better blend with generic encrypted UDP; small CPU/header cost. "
-    "OFF = bare RPT frames (node still accepts both) → slightly less overhead; "
-    "easier for simple classifiers to spot product traffic. "
+    "OFF (product default) = bare RPT frames (node still accepts both) → "
+    "slightly less overhead; easier for simple classifiers to spot product traffic. "
+    "ON = better blend with generic encrypted UDP; small CPU/header cost. "
     "Not a claim of full DPI-undetectability either way."
 )
 
@@ -70,10 +71,10 @@ EXPLAINER_CORE_VPN = (
 
 @dataclass(frozen=True)
 class PrivacyScalePrefs:
-    """Optional residual privacy layers the customer can scale down for speed."""
+    """Optional residual privacy layers (off until the user opts in)."""
 
-    traffic_shape: bool = True
-    outer_obfuscation: bool = True
+    traffic_shape: bool = False
+    outer_obfuscation: bool = False
     multihop: bool = False  # product residual baseline: single-hop
 
     def to_dict(self) -> dict[str, bool]:
@@ -141,8 +142,8 @@ def load_privacy_scale_prefs(
 
         s = load_settings(path=settings_path)  # type: ignore[arg-type]
         return PrivacyScalePrefs(
-            traffic_shape=bool(getattr(s, "privacy_traffic_shape", True)),
-            outer_obfuscation=bool(getattr(s, "privacy_outer_obfuscation", True)),
+            traffic_shape=bool(getattr(s, "privacy_traffic_shape", False)),
+            outer_obfuscation=bool(getattr(s, "privacy_outer_obfuscation", False)),
             multihop=bool(getattr(s, "privacy_multihop", False)),
         )
     except Exception:  # noqa: BLE001
@@ -154,7 +155,7 @@ def _env_traffic_shape_raw() -> str:
 
 
 def traffic_shape_enabled_by_env() -> bool:
-    """True when env says shaping is on (legacy helper; default on if unset)."""
+    """True when env says shaping is on (only used when RPT_TRAFFIC_SHAPE is set)."""
     raw = _env_traffic_shape_raw()
     if raw in ("0", "false", "off", "no", "disabled"):
         return False
@@ -193,7 +194,7 @@ def product_outer_obfuscation_enabled(
     *,
     prefs: PrivacyScalePrefs | None = None,
 ) -> bool:
-    """Outer QUIC-mimic wrap: env ``RPT_OBFS`` if set, else user Settings (default on)."""
+    """Outer QUIC-mimic wrap: env ``RPT_OBFS`` if set, else user Settings (default off)."""
     try:
         from client.free_tier import free_tier_enabled
 

@@ -2,8 +2,8 @@
 // and Windows client/product_policy.py defaults.
 //
 // Keys (App Group + standard UserDefaults):
-//   privacy_traffic_shape      (default true)
-//   privacy_outer_obfuscation  (default true)
+//   privacy_traffic_shape      (default false — lean residual)
+//   privacy_outer_obfuscation  (default false)
 //   privacy_multihop           (default false)
 //
 // Packet Tunnel calls applyToProductFlags() so residual DATA respects Settings.
@@ -15,7 +15,7 @@ public struct RptResidualPrivacyPolicy: Equatable {
   public let outerObfuscation: Bool
   public let multihop: Bool
 
-  public init(trafficShape: Bool = true, outerObfuscation: Bool = true, multihop: Bool = false) {
+  public init(trafficShape: Bool = false, outerObfuscation: Bool = false, multihop: Bool = false) {
     self.trafficShape = trafficShape
     self.outerObfuscation = outerObfuscation
     self.multihop = multihop
@@ -23,15 +23,15 @@ public struct RptResidualPrivacyPolicy: Equatable {
 
   public static let productDefaults = RptResidualPrivacyPolicy()
 
-  /// Pure resolution: optional stored values (nil = product default).
+  /// Pure resolution: optional stored values (nil = product default lean-off).
   public static func resolve(
     trafficShape: Bool?,
     outerObfuscation: Bool?,
     multihop: Bool?
   ) -> RptResidualPrivacyPolicy {
     RptResidualPrivacyPolicy(
-      trafficShape: trafficShape ?? true,
-      outerObfuscation: outerObfuscation ?? true,
+      trafficShape: trafficShape ?? false,
+      outerObfuscation: outerObfuscation ?? false,
       multihop: multihop ?? false
     )
   }
