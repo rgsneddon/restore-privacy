@@ -53,10 +53,13 @@ class TestPrivacyPolicy(unittest.TestCase):
         self.assertIn("LICENSE", text)
         self.assertIn("README", text)
 
-    def test_policy_public_catalog_is_v0_2_9(self):
-        """User-facing policy must advertise catalog v0.4.0 as current paid ship."""
+    def test_policy_public_catalog_is_current_monopin(self):
+        """User-facing policy must advertise catalog v0.4.2 as current paid ship."""
         text = _read("PRIVACY_POLICY.md")
-        self.assertIn("0.4.0", text)
+        self.assertIn("Current packages (catalog v0.4.2)", text)
+        self.assertNotIn("Current packages (catalog v0.4.1)", text)
+        self.assertNotIn("Current packages (catalog v0.4.0)", text)
+        self.assertIn("0.4.2", text)
         self.assertIn("restoreprivacy.online", text)
         self.assertIn("Developer ID", text)
         self.assertIn("Team-signed", text)
@@ -73,6 +76,9 @@ class TestPrivacyPolicy(unittest.TestCase):
             "Current public packages:** [RUST-IN-PRIVACY v1.0.0]",
             text,
         )
+        # Public mirror stays in sync
+        pub = _read("status_page/public/PRIVACY_POLICY.md")
+        self.assertIn("Current packages (catalog v0.4.2)", pub)
 
 
 class TestLicenseAndCredits(unittest.TestCase):
@@ -128,9 +134,14 @@ class TestLicenseAndCredits(unittest.TestCase):
         text = _read("LICENSE")
         self.assertIn("FULL COPYRIGHT", text.upper())
         self.assertIn("Stripe", text)
-        self.assertIn("0.4.0", text)
+        self.assertIn("catalog v0.4.2", text)
+        self.assertNotIn("catalog v0.4.0", text)
+        self.assertNotIn("catalog v0.4.1", text)
         self.assertIn("private", text.lower())
         self.assertIn("PAYMENT REQUIRED", text.upper())
+        pub = _read("status_page/public/LICENSE")
+        self.assertEqual(text, pub)
+        self.assertIn("catalog v0.4.2", pub)
 
 
 class TestReadmeHowto(unittest.TestCase):
@@ -145,8 +156,8 @@ class TestReadmeHowto(unittest.TestCase):
         self.assertIn("android", lower)
         self.assertIn("macos", lower)
         self.assertIn("ios", lower)
-        # Catalog ship is 0.3.0 (signed packages via paid VPN APP Shop)
-        self.assertIn("0.4.0", text)
+        # Catalog ship is 0.4.2 (signed packages via paid VPN APP Shop)
+        self.assertIn("0.4.2", text)
         self.assertIn("restoreprivacy.online", text)
         self.assertIn("Developer ID", text)
         self.assertIn("Team-signed", text)
@@ -156,14 +167,24 @@ class TestReadmeHowto(unittest.TestCase):
         self.assertNotIn("prep packages only", lower)
         # Buyer path is paid status host — not free GH releases/download
         self.assertNotIn("releases/download/", text)
-        # Package basenames from the public release catalog
+        # Package basenames from the public release catalog monopin
         self.assertIn(
+            "restore-privacy-client-0.4.2-windows-x64-setup.exe",
+            text,
+        )
+        self.assertIn("restore-privacy-client-0.4.2-android.apk", text)
+        self.assertIn("restore-privacy-client-0.4.2-macos.zip", text)
+        self.assertIn("restore-privacy-client-0.4.2-ios.zip", text)
+        self.assertIn("restore-privacy-client-0.4.2-linux-x64.tar.gz", text)
+        # Must not advertise older monopin filenames as the current catalog
+        self.assertNotIn(
             "restore-privacy-client-0.4.0-windows-x64-setup.exe",
             text,
         )
-        self.assertIn("android.apk", text)
-        self.assertIn("macos.zip", text)
-        self.assertIn("ios.zip", text)
+        self.assertNotIn(
+            "restore-privacy-client-0.4.1-windows-x64-setup.exe",
+            text,
+        )
         # Links / names to legal docs
         self.assertIn("PRIVACY_POLICY", text)
         self.assertIn("LICENSE", text)
