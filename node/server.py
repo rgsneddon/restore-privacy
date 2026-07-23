@@ -304,14 +304,28 @@ class RPTNode:
         start_ui_server(self.config["ui_host"], int(self.config["ui_port"]), self.registry.status_payload)
 
         sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        try:
+            from node.udp_fast_path import (
+                apply_udp_socket_fast_path,
+                drain_udp_datagrams,
+            )
+        except ImportError:  # pragma: no cover
+            from udp_fast_path import (  # type: ignore
+                apply_udp_socket_fast_path,
+                drain_udp_datagrams,
+            )
+
+        apply_udp_socket_fast_path(sock)
         sock.bind((self.config["listen_host"], int(self.config["listen_port"])))
         self.sock = sock
-        Path("/run/rpt-node.ready").write_text(
-            f"listen={self.config['listen_host']}:{self.config['listen_port']}\n"
-            f"ui={self.config['ui_host']}:{self.config['ui_port']}\n",
-            encoding="utf-8",
-        )
+        try:
+            Path("/run/rpt-node.ready").write_text(
+                f"listen={self.config['listen_host']}:{self.config['listen_port']}\n"
+                f"ui={self.config['ui_host']}:{self.config['ui_port']}\n",
+                encoding="utf-8",
+            )
+        except OSError:
+            pass
 
         # Periodically drop idle sessions so tunnel IPs are freed for routing
         last_prune = 0.0
@@ -319,8 +333,16 @@ class RPTNode:
         while True:
             r, _, _ = select.select([sock, self.tun_fd], [], [], 1.0)
             if sock in r:
-                data, addr = sock.recvfrom(65535)
-                self.on_udp(data, addr, sock)
+                # Drain kernel queue bursts in one wake (lower residual latency)
+                batch = drain_udp_datagrams(sock)
+                if not batch:
+                    try:
+                        data, addr = sock.recvfrom(65535)
+                        batch = [(data, addr)]
+                    except OSError:
+                        batch = []
+                for data, addr in batch:
+                    self.on_udp(data, addr, sock)
             if self.tun_fd in r:
                 try:
                     packet = os.read(self.tun_fd, 65535)
