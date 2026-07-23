@@ -7,12 +7,13 @@ Catalog monopin: **0.4.0**
 Parity with Windows/Linux desktop (catalog 0.4.0 product pin):
 
 1. **Accept end-user licence** (local only).
-2. **Forced keygen unlock surface** when licence is accepted but payment entitlement is missing — `client_app/lib/main.dart` `_showKeygenSheet` / `LicenceGate.needsKeygenUnlock` / `importKeygenAndVerify`. **Not Settings-only.**
-3. **Device bind after active keygen** — `importKeygenAndVerify` / `refreshEntitlementFromRemote` call `bindDeviceEntitlement` → `POST /api/bind-device-entitlement` with Ed25519 `device_pub` from native `devicePubHex` (`RptVpnChannel` on iOS/macOS; `MainActivity` on Android). Required when node has `RPT_REQUIRE_PAYMENT_ENTITLEMENT=1`.
-4. **Download alone does not unlock residual** — node HELLO requires active entitlement + bound device; residual failure copy in `connect_status.dart` guides users back to keygen when remote reset/timeout-class errors appear.
-5. Connect only while subscription active (online re-check).
-6. **Privacy-scale Settings (0.4.0)** — traffic shaping / outer obfuscation / multi-hop toggles with honest explainers; **hot-apply** while connected where the platform residual shell supports it (multi-hop re-establishes residual).
-7. **Ping statistics (0.4.0)** — device→entry (and device→exit when multi-hop is ON) best-effort RTT from Settings; not a contractual SLA.
+2. **Connect allowed = active subscription + keygen activated.** Forced keygen unlock when licence is accepted but keygen is missing — `client_app/lib/main.dart` `_showKeygenSheet` / `LicenceGate.needsKeygenUnlock` / `importKeygenAndVerify`. **Not Settings-only.**
+3. **EXPIRED renew surface** when subscription is revoked/failed/period-ended — `_showRenewLicenceSheet` / `needsLicenceRenewal` with **renew your licence *here*** and platform Stripe payment portal (`renewLicenceUrl`). Do **not** open keygen modal for EXPIRED.
+4. **Device bind after active keygen** — `importKeygenAndVerify` / `refreshEntitlementFromRemote` call `bindDeviceEntitlement` → `POST /api/bind-device-entitlement` with Ed25519 `device_pub` from native `devicePubHex` (`RptVpnChannel` on iOS/macOS; `MainActivity` on Android). Required when node has `RPT_REQUIRE_PAYMENT_ENTITLEMENT=1`.
+5. **Download alone does not unlock residual** — node HELLO requires active entitlement + bound device; residual failure copy in `connect_status.dart` guides users back to keygen when remote reset/timeout-class errors appear.
+6. Connect only while status **OK** (online re-check); catalog pay is **monthly or yearly** per platform on the status host.
+7. **Privacy-scale Settings (0.4.0)** — traffic shaping / outer obfuscation / multi-hop toggles with honest explainers; **hot-apply** while connected where the platform residual shell supports it (multi-hop re-establishes residual).
+8. **Ping statistics (0.4.0)** — device→entry (and device→exit when multi-hop is ON) best-effort RTT from Settings; not a contractual SLA.
 
 Verify after Mac build:
 

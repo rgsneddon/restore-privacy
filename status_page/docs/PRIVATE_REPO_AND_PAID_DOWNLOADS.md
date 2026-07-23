@@ -114,7 +114,7 @@ Fallbacks (optional): local `status_page/assets/{version}/`, or `RPT_GITHUB_TOKE
 
 Webhook grants only when paid amount is **245 pence (GBP)** and currency is **gbp**.
 
-- Prefer a **subscription** Payment Link: **£2.45/month GBP** + **7-day trial** (not a free-amount tip or one-time donate).
+- Prefer **subscription** Payment Links: **monthly £2.45/month GBP** + **7-day trial**, plus optional **yearly** link via `STRIPE_PAYMENT_PAGE_URL_YEARLY` (not a free-amount tip or one-time donate).
 - Variable / tip-only amounts that are not exactly 245p and lack a trial subscription id will **not** mint installers — the buyer pays but the success page stays on “Confirming with Stripe…”.
 
 ## Client in-app update

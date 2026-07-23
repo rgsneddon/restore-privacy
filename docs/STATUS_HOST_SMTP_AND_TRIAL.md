@@ -77,7 +77,9 @@ Stripe Dashboard **customer receipts** are separate: they need a verified custom
 email domain for `restoreprivacy.online` / From `rus@…` — Stripe does **not**
 log into IMAP/POP with the mailbox password. See Dashboard → Settings → Customer emails.
 
-## Stripe Payment Link — £2.45/month + 7-day trial
+## Stripe Payment Links — monthly + yearly
+
+### Monthly — £2.45/month + 7-day trial
 
 | Field | Value |
 |-------|--------|
@@ -86,7 +88,19 @@ log into IMAP/POP with the mailbox password. See Dashboard → Settings → Cust
 | Default price id (may change after recreate) | `price_1TvTsaJDavQ2TJW6HZVIG7hg` |
 | Target | recurring **GBP**, **unit_amount 245**, interval **month**, trial **7 days** |
 
-### Dashboard steps (no API key)
+### Yearly (operator-configured)
+
+Create a **yearly** recurring price in Stripe Dashboard and a second Payment
+Link. Set on Render (or env):
+
+- `STRIPE_PAYMENT_PAGE_URL_YEARLY` (or `RPT_STRIPE_PAYMENT_PAGE_URL_YEARLY`)
+
+Yearly unit amount is **not** hard-coded in the app — use whatever price you
+configure in Stripe. If the yearly env is unset, catalog **Yearly** buttons
+still work for architecture: they reuse the monthly Payment Link URL with
+`client_reference_id=platform|year` (prefer a real yearly link in production).
+
+### Dashboard steps — monthly (no API key)
 
 1. [Stripe Dashboard → Products](https://dashboard.stripe.com/products) — product for Restore Privacy.
 2. Add **recurring** price: **£2.45**, currency **GBP**, billing period **Monthly**.
@@ -94,11 +108,12 @@ log into IMAP/POP with the mailbox password. See Dashboard → Settings → Cust
    `plink_1TvTu6JDavQ2TJW6FeL0dIh9` (or the link currently on the status downloads page).
 4. Set the line item to the monthly £2.45 price (subscription mode).
 5. Under **subscription** / trial options set **trial period = 7 days**.
-6. Save. Open the public donate URL in a private window: checkout should show
+6. Save. Open the public URL in a private window: checkout should show
    trial then **£2.45/month**.
 7. If Stripe issues a **new** Payment Link URL, set on Render:
    - `STRIPE_PAYMENT_PAGE_URL`
    - `STRIPE_PAYMENT_LINK_ID`
+   - (yearly) `STRIPE_PAYMENT_PAGE_URL_YEARLY`
    and redeploy.
 
 ### API script (when `STRIPE_SECRET_KEY` is available)

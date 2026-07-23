@@ -50,9 +50,12 @@ Source of truth in code: `status_page/payments.py` → `STRIPE_WEBHOOK_EVENTS` a
 4. When the period ends, Stripe sends `customer.subscription.deleted` → Connect is
    **revoked** (client gate + bound device removed; node HELLO refuses that device).
 
-Catalog Payment Link is a **subscription** (£2.45/month + 7-day trial). Trial
+Catalog Payment Links are **subscription** mode. **Monthly** is £2.45/month +
+7-day trial; **yearly** uses a separate Payment Link when
+`STRIPE_PAYMENT_PAGE_URL_YEARLY` is set (amount from Stripe Dashboard). Trial
 starts with `no_payment_required` / £0 + subscription id; after trial, invoices
-renew `valid_until`. Refunds/disputes still revoke Connect immediately.
+renew `valid_until`. Refunds/disputes still revoke Connect immediately
+(`licence_status` **EXPIRED** on clients).
 
 ## Node residual HELLO
 
@@ -76,18 +79,40 @@ On `checkout.session.completed` the status host mints a unique **keygen**
 fulfilment email with **USE THIS KEYGEN TO UNLOCK YOUR RESTORE PRIVACY TRIAL**,
 the **PPI**, and the one-time download link.
 
+**Connect allowed = active subscription + keygen activated** (after licence
+accept). Download alone does not unlock residual VPN.
+
 Clients: Install → accept licence → enter keygen. Connect re-checks
-`/api/connect-entitlement?keygen=…`. Refunds, failed charges, disputes, and
-subscription end revoke the entitlement — keygen unlock fails until payment is
-active again.
+`/api/connect-entitlement?keygen=…` (returns **`licence_status`**: **OK** or
+**EXPIRED**, plus platform **`renew_url`**). Refunds, failed charges, disputes,
+and subscription end revoke the entitlement → **EXPIRED** hard-lock with
+**renew your licence *here*** and a platform payment portal link until payment
+is active again.
 
 SMTP (optional but required to deliver email in production):
 `RPT_FULFILMENT_SMTP_HOST`, `RPT_FULFILMENT_SMTP_PORT`, `RPT_FULFILMENT_SMTP_USER`,
 `RPT_FULFILMENT_SMTP_PASSWORD`, `RPT_FULFILMENT_FROM_EMAIL`.
 
+## Monthly + yearly Payment Links (env)
+
+| Env | Role |
+|-----|------|
+| `STRIPE_PAYMENT_PAGE_URL` / `RPT_STRIPE_PAYMENT_PAGE_URL` | Monthly `buy.stripe.com/…` link |
+| `STRIPE_PAYMENT_PAGE_URL_YEARLY` / `RPT_STRIPE_PAYMENT_PAGE_URL_YEARLY` | Yearly Payment Link (optional; otherwise monthly URL + `\|year` ref) |
+| `STRIPE_PAYMENT_LINK_ID` | Monthly `plink_…` id for admin readiness |
+
+Catalog pay buttons encode `client_reference_id=platform|month` or
+`platform|year` for fulfilment.
+
+## Admin licence database (read-only)
+
+`/admin` → **Licence database**: email, KEYGEN, PPI, **OK|EXPIRED** — **view
+only**, no amend/edit/revoke controls on that table.
+
 ## SMTP fulfilment + Payment Link trial
 
 See [`docs/STATUS_HOST_SMTP_AND_TRIAL.md`](../../docs/STATUS_HOST_SMTP_AND_TRIAL.md)
-for Render `RPT_FULFILMENT_SMTP_*` env keys and configuring the catalog Payment
-Link for **£2.45/month + 7-day trial** (`scripts/configure_stripe_payment_link_trial.py`).
+for Render `RPT_FULFILMENT_SMTP_*` env keys and configuring the catalog monthly
+Payment Link for **£2.45/month + 7-day trial**
+(`scripts/configure_stripe_payment_link_trial.py`).
 

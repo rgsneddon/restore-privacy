@@ -5,7 +5,7 @@ Restore Privacy is built from the ground up using unashamed vibe coding methods 
 
 | | |
 |--|--|
-| **Get the app** | [Status & paid downloads](https://restoreprivacy.online/) (catalog **v0.4.0**, £2.45 per package) |
+| **Get the app** | [Status & paid downloads](https://restoreprivacy.online/) (catalog **v0.4.0** — monthly £2.45 or yearly per platform) |
 | **Privacy** | [PRIVACY_POLICY.md](PRIVACY_POLICY.md) |
 | **License** | [LICENSE](LICENSE) (proprietary full copyright) |
 | **Credits** | [CREDITS.md](CREDITS.md) |
@@ -48,12 +48,14 @@ Restore Privacy is built from the ground up using unashamed vibe coding methods 
 
 ## How to install and use
 
-**Current catalog (v0.4.0):** paid installers on https://restoreprivacy.online/ via Stripe (**not** free permanent GitHub release downloads). Homepage download section shows a large green **ONLY £2.45 per month** callout under **Download client v0.4.0**, then the trial/pay box: **your monthly subscription begins after your 7 day trial** — **pay on Stripe, then download starts automatically (licence key and download links are emailed to you separately)**. Email still delivers **keygen + PPI + download link** (**USE THIS KEYGEN TO UNLOCK YOUR RESTORE PRIVACY TRIAL**). Apps on **all platforms** (Windows, Linux, Android, macOS, iOS): Install → **accept licence** → **forced keygen unlock dialog** (not Settings-only) → Connect. **Download alone does not unlock residual VPN** — without an active keygen the node refuses HELLO. Connect only while subscription active. Weekly wipe UI is **entry-only** (no dual Node A/B wipe countdown on the homepage).  
+**Current catalog (v0.4.0):** paid installers on https://restoreprivacy.online/ via Stripe (**not** free permanent GitHub release downloads). Each platform tile offers **Monthly £2.45** and **Yearly** subscription Payment Links (yearly amount is set in Stripe / operator env — not a fixed figure in the catalog code). Homepage callout: **ONLY £2.45 per month — or pay yearly**, then the trial/pay box: **your monthly subscription begins after your 7 day trial** — **or choose yearly** — **pay on Stripe, then download starts automatically (licence key and download links are emailed to you separately)**. Email delivers **keygen + PPI + download link** (**USE THIS KEYGEN TO UNLOCK YOUR RESTORE PRIVACY TRIAL**).
+
+**Connect allowed = active subscription + keygen activated** (after end-user licence accept). Flow on **all platforms** (Windows, Linux, Android, macOS, iOS): Install → **accept licence** → **enter keygen** (forced unlock surface, not Settings-only) → Connect. **Download alone does not unlock residual VPN** — without an active keygen the node refuses HELLO. Client subscription status is **OK** (full entitled use) or **EXPIRED** (failed / revoked / period ended): **EXPIRED** hard-locks the app with **renew your licence *here*** and a **platform-specific** Stripe payment portal link (monthly or yearly for that device platform). Weekly wipe UI is **entry-only** (no dual Node A/B wipe countdown on the homepage).  
 The product source repository is **private**; free permanent GitHub release downloads are not offered. After payment the status site delivers the installer once (authenticated proxy).
 
-> **STRONG DISCLAIMER — PAYMENT REQUIRED FOR CONNECT:** Access to **Connect** and residual VPN use requires **successful payment**. If payment **fails at any time** (failed checkout, failed charge, refund, dispute, or revoked entitlement), the ability to **Connect with the Restore Privacy app is cancelled** for that purchase/install until a successful payment is completed.
+> **STRONG DISCLAIMER — PAYMENT REQUIRED FOR CONNECT:** Access to **Connect** and residual VPN use requires **successful payment** and a **keygen unlock** while the subscription is active. If payment **fails at any time** (failed checkout, failed charge, refund, dispute, or subscription period ended), status becomes **EXPIRED** and Connect is cancelled until you renew and re-enter a valid keygen.
 
-**Unlock Connect after payment:** fulfilment email has **RPT-KEY-…**. After licence accept, the app opens a **forced keygen unlock** surface (Windows/Linux modal; Flutter unlock sheet on Android/macOS/iOS). Settings → Payment entitlement remains a fallback. Optional: thank-you may still auto-download `payment_entitlement.json`. On every Connect the app re-checks the status host so a later refund/failure cancels Connect for that install. Residual errors that look like remote reset/timeout include keygen guidance.
+**Unlock Connect after payment:** fulfilment email has **RPT-KEY-…**. After licence accept, the app opens a **forced keygen unlock** surface (Windows/Linux modal; Flutter unlock sheet on Android/macOS/iOS). Settings → Payment entitlement remains a fallback. Optional: thank-you may still auto-download `payment_entitlement.json`. On every Connect the app re-checks the status host (`/api/connect-entitlement`) so a later refund/failure becomes **EXPIRED** and shows the renew surface (not a second keygen-only dialog). Residual errors that look like remote reset/timeout include keygen guidance.
 
 | Platform | Package |
 |----------|---------|
@@ -65,18 +67,18 @@ The product source repository is **private**; free permanent GitHub release down
 
 ### Windows
 
-1. On the [status downloads page](https://restoreprivacy.online/), pay **£2.45** for **Windows** and download **`restore-privacy-client-0.4.0-windows-x64-setup.exe`** (one-time link after payment).
+1. On the [status downloads page](https://restoreprivacy.online/), choose **Monthly £2.45** or **Yearly** for **Windows** and download **`restore-privacy-client-0.4.0-windows-x64-setup.exe`** (one-time link after payment).
 2. Run the installer (PE self-extracting package: frozen runtime + Wintun — no separate Python install). The package may extract as a portable tree or install under LocalAppData.
-3. Open **Settings → Payment entitlement**, paste the Checkout session id from the thank-you page (or import `payment_entitlement.json`), and **Verify payment** so Connect is allowed.
+3. **Accept the end-user licence**, then enter the **keygen** from your fulfilment email (forced unlock dialog). Settings → Payment entitlement is a fallback only. Connect is allowed only when status is **OK** (active subscription **and** keygen activated).
 4. Press **Connect** and approve **UAC** when prompted so residual public IP uses the VPN node. Scoped **Windows Defender Firewall** allows (node UDP + program) may be applied for residual Connect.
 5. Optional: **Settings** → startup / autoconnect (defaults **off**); legal links to audit / privacy / licence.
 6. **Disconnect** / **Quit** tears down dual `/1` residual routes so ordinary internet works again. For **complete removal**, use **Restore Internet** (see warning below).
 
 ### Android
 
-1. On the [status downloads page](https://restoreprivacy.online/), pay **£2.45** for **Android** and download **`restore-privacy-client-0.4.0-android.apk`** (one-time link after payment).
+1. On the [status downloads page](https://restoreprivacy.online/), choose **Monthly £2.45** or **Yearly** for **Android** and download **`restore-privacy-client-0.4.0-android.apk`** (one-time link after payment).
 2. Install the APK (allow install from unknown sources if your device asks). Catalog APK includes residual wire (**PFS + outer obfs**).
-3. Open **Restore Privacy** → **Settings → Payment entitlement**, paste the Checkout session id and **Verify payment**.
+3. **Accept the licence**, then enter the **keygen** from email (forced unlock sheet). Connect requires **OK** (active subscription + keygen).
 4. Press **Connect**, and grant **VPN** permission when prompted.
 5. Optional: **Settings** → startup / autoconnect (defaults off). Minimize keeps the VPN service running until **Disconnect**.
 6. For complete removal, open the in-package **Restore Internet** guidance and uninstall via system Settings.
@@ -85,23 +87,23 @@ The product source repository is **private**; free permanent GitHub release down
 
 Supported floor: **Ubuntu 20.04 LTS** and later (including 22.04 / 24.04 LTS).
 
-1. On the [status downloads page](https://restoreprivacy.online/), pay **£2.45** for **Linux** and download **`restore-privacy-client-0.4.0-linux-x64.tar.gz`** (one-time link after payment).
+1. On the [status downloads page](https://restoreprivacy.online/), choose **Monthly £2.45** or **Yearly** for **Linux** and download **`restore-privacy-client-0.4.0-linux-x64.tar.gz`** (one-time link after payment).
 2. Unpack and run the bundled installer:
    ```bash
    tar xzf restore-privacy-client-0.4.0-linux-x64.tar.gz
    cd restore-privacy-*-linux   # package folder name from the archive
    bash install.sh
    ```
-3. Run **`sudo ./bin/privacy-restored`** for residual public IP (TUN + dual `/1` routes).
+3. **Accept the licence** and **enter keygen** before Connect. Run **`sudo ./bin/privacy-restored`** for residual public IP (TUN + dual `/1` routes).
 4. Failsafe: **`sudo bash "./Restore Internet"`** restores normal internet and removes the product (see warning below).
 
 ### macOS
 
 Published **v0.4.0** macOS builds are **Developer ID signed and notarized**.
 
-1. On the [status downloads page](https://restoreprivacy.online/), pay **£2.45** for **macOS** and download **`restore-privacy-client-0.4.0-macos.zip`** (one-time link after payment).
+1. On the [status downloads page](https://restoreprivacy.online/), choose **Monthly £2.45** or **Yearly** for **macOS** and download **`restore-privacy-client-0.4.0-macos.zip`** (one-time link after payment).
 2. Unzip and open **`restore_privacy_client.app`**.
-3. Press **Connect** and approve the **VPN configuration** prompt.
+3. **Accept the licence** and **enter keygen**, then press **Connect** and approve the **VPN configuration** prompt.
 4. Residual public IP only changes when the Packet Tunnel is **active**. Host-only HELLO is **diagnostic** only. Residual public-IP via Packet Tunnel on a developer Mac still needs **Team residual re-sign** (`scripts/sign_macos_residual_team.py`) — the public Developer ID zip alone is not full host-NE residual (see `client_app/APPLE_HANDOFF_0.4.0.md`). **Disconnect** / **Quit** stops the system VPN.
 5. Failsafe: run **`Restore Internet.command`** in the package (or follow VPN Settings cleanup) — see warning below.
 
@@ -109,8 +111,8 @@ Published **v0.4.0** macOS builds are **Developer ID signed and notarized**.
 
 Published **v0.4.0** iOS packages are **Team-signed sideload** zips (not App Store).
 
-1. On the [status downloads page](https://restoreprivacy.online/), pay **£2.45** for **iOS** and download **`restore-privacy-client-0.4.0-ios.zip`** (one-time link after payment).
-2. Install **`Runner.app`** with device tooling; press **Connect** and grant **VPN** permission.
+1. On the [status downloads page](https://restoreprivacy.online/), choose **Monthly £2.45** or **Yearly** for **iOS** and download **`restore-privacy-client-0.4.0-ios.zip`** (one-time link after payment).
+2. Install **`Runner.app`** with device tooling; **accept licence**, **enter keygen**, then press **Connect** and grant **VPN** permission.
 3. Residual public IP only changes when the Packet Tunnel is **active**.
 4. Complete removal: follow **`Restore Internet.txt`** (Settings → VPN / Delete App) — see warning below.
 
@@ -118,8 +120,9 @@ Published **v0.4.0** iOS packages are **Team-signed sideload** zips (not App Sto
 
 https://restoreprivacy.online/
 
-- **Pay £2.45** buttons for Windows, Android, macOS, iOS, Linux — catalog **v0.4.0**  
+- **Monthly £2.45** and **Yearly** pay controls per platform (Windows, Android, macOS, iOS, Linux) — catalog **v0.4.0**  
 - Installers are delivered **after payment** (single-use link); the product repo is private  
+- Connect requires **keygen activation** on an **active** subscription (**OK**); **EXPIRED** shows **renew your licence *here*** with a platform payment portal link  
 - **No** public live session / connected-client counter  
 - A browser tab cannot run full system VPN
 

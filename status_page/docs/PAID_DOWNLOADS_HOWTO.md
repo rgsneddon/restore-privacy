@@ -1,8 +1,10 @@
-# How to enable paid downloads (£2.45) — Stripe + Buy Me a Coffee
+# How to enable paid downloads — Stripe + Buy Me a Coffee
 
-This status site sells **Restore Privacy** as a **Stripe subscription** at
-**£2.45/month GBP** with a **7-day trial** (catalog Payment Link). Funds settle
-in **your Stripe account** when you use **live** API keys.
+This status site sells **Restore Privacy** as a **Stripe subscription**. Catalog
+tiles offer **monthly** (**£2.45/month GBP** + **7-day trial**) and **yearly**
+Payment Links per platform. Yearly unit amount is set in Stripe Dashboard /
+env (`STRIPE_PAYMENT_PAGE_URL_YEARLY`) — not hard-coded as a fixed £ figure.
+Funds settle in **your Stripe account** when you use **live** API keys.
 
 [Buy Me a Coffee](https://buymeacoffee.com/rgsneddon) is linked as **tip / support only**.
 It does **not** unlock the paid download (BMC is not the fulfilment API).
@@ -18,13 +20,13 @@ Operator deploy for production email + Payment Link trial is documented in
 [`docs/STATUS_HOST_SMTP_AND_TRIAL.md`](../../docs/STATUS_HOST_SMTP_AND_TRIAL.md):
 
 - Render env: `RPT_FULFILMENT_SMTP_*` (blueprint `render.yaml`; script `scripts/set_render_fulfilment_smtp.ps1`)
-- Stripe Payment Link: £2.45/month GBP + **7 day trial** (script `scripts/configure_stripe_payment_link_trial.py` when `STRIPE_SECRET_KEY` is set)
+- Stripe monthly Payment Link: £2.45/month GBP + **7 day trial** (script `scripts/configure_stripe_payment_link_trial.py` when `STRIPE_SECRET_KEY` is set)
+- Stripe yearly Payment Link: set **`STRIPE_PAYMENT_PAGE_URL_YEARLY`** (and optional `RPT_STRIPE_PAYMENT_PAGE_URL_YEARLY`) when a Dashboard yearly price exists
 
 ## Customer journey (subscription keygen unlock)
 
-1. Homepage shows **£2.45 per package**, then:
-   **Your monthly subscription (£2.45 per month) begins after your 7 day trial**,
-   then pay-on-Stripe wording.
+1. Homepage shows **ONLY £2.45 per month — or pay yearly**, dual **Monthly** /
+   **Yearly** buttons per platform, trial wording for monthly, then pay-on-Stripe.
 2. After successful Stripe pay, the status host:
    - mints a one-time download token
    - activates Connect entitlement for the Checkout session
@@ -33,10 +35,12 @@ Operator deploy for production email + Payment Link trial is documented in
      **USE THIS KEYGEN TO UNLOCK YOUR RESTORE PRIVACY TRIAL**
 3. Client first-use flow on every platform:
    **Install → accept licence terms and conditions → enter keygen → unlock**.
-4. Connect stays allowed only while the status host reports an **active**
-   subscription/entitlement for that keygen. Payment failure, refund, dispute,
-   or subscription end **revokes** the entitlement — the keygen becomes useless
-   and the client locks until payment is active again.
+   **Connect allowed = active subscription + keygen activated** (download alone
+   does not unlock residual VPN).
+4. Clients report status **OK** or **EXPIRED** from `/api/connect-entitlement`.
+   **OK** = full entitled use. **EXPIRED** (refund, failed charge, dispute,
+   subscription end) hard-locks with **renew your licence *here*** and a
+   **platform-specific** payment portal link until payment is active again.
 
 ### Feasibility of subscription retention
 
@@ -139,6 +143,9 @@ stripe trigger checkout.session.completed
 |----------|---------|
 | `STRIPE_SECRET_KEY` | `sk_test_…` or `sk_live_…` (Dashboard → Developers → API keys) |
 | `STRIPE_WEBHOOK_SECRET` | `whsec_…` from the webhook endpoint (Dashboard → Webhooks → Signing secret) |
+| `STRIPE_PAYMENT_PAGE_URL` | Monthly catalog Payment Link URL (`buy.stripe.com/…`); also `RPT_STRIPE_PAYMENT_PAGE_URL` |
+| `STRIPE_PAYMENT_PAGE_URL_YEARLY` | Yearly catalog Payment Link URL; also `RPT_STRIPE_PAYMENT_PAGE_URL_YEARLY`. Optional — if unset, yearly tiles reuse the monthly URL with `client_reference_id=platform\|year` |
+| `STRIPE_PAYMENT_LINK_ID` | Monthly Payment Link object id (`plink_…`); also `RPT_STRIPE_PAYMENT_LINK_ID` |
 | `STRIPE_CHECKOUT_PRICE_ID` | Optional one-time `price_…` only; **leave empty** to use built-in `unit_amount=245` (£2.45) |
 | `RPT_PUBLIC_BASE_URL` | Public site origin, e.g. `https://restoreprivacy.online` (no trailing slash). Used for success/cancel URLs. |
 | `RPT_ASSET_FETCH_TOKEN` | Shared secret (you choose) for status host → Iceland VPS paid installer fetch; same value on VPS unit |
@@ -195,19 +202,21 @@ This is the **private** architecture on the same Render service — not the publ
 3. Sign in with **VPN APP Shop** credentials (not your Stripe or BMC dashboard passwords). Username defaults to `admin`.
 4. After login you get one admin surface:
    - **Payment processor settings (`#admin-processor-settings`)** — each processor is a **plugin** (Stripe paid downloads, BMC tip-only) listing the **correct env variable names** to enter, readiness, and dashboard links. Forms POST to `/admin/processors/apply` (write-only secrets; never echoed). Applied values update the running process and optional local `status_page/data/processor_env.json` (gitignored). Prefer Render env for production permanence.
+   - **Licence database (`#admin-licences`)** — **read-only** table of customer **email**, **KEYGEN**, **PPI**, and status **OK|EXPIRED** (plus platform). **Info only — no edit, revoke, or amend controls** on this table.
    - **Paid download grants** — recent Stripe-verified tokens (platform, filename, amount, used/unused, truncated token, session id) for fulfilment support.
-5. **Stripe variables:** `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, optional `STRIPE_CHECKOUT_PRICE_ID`, `RPT_PUBLIC_BASE_URL`.  
+5. **Stripe variables:** `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, `STRIPE_PAYMENT_PAGE_URL`, optional `STRIPE_PAYMENT_PAGE_URL_YEARLY`, optional `STRIPE_CHECKOUT_PRICE_ID`, `RPT_PUBLIC_BASE_URL`.  
    **VPS assets:** `RPT_ASSET_FETCH_TOKEN` (and optional `RPT_VPS_ASSET_BASE`).  
    **BMC variables:** `RPT_BMC_TIP_URL`, optional `RPT_BMC_TIP_LABEL`.
 
-Unauthenticated visitors only see the login form; grants and processor readiness are not public.
+Unauthenticated visitors only see the login form; grants, licence rows, and processor readiness are not public.
 
 Architecture (modules):
 
 | Piece | Role |
 |-------|------|
-| `admin_panel.py` | Login, session, processor settings view, grants HTML |
-| `payments.py` | Stripe Checkout, webhook grant mint, SQLite grants |
+| `admin_panel.py` | Login, session, processor settings, read-only licence DB, grants HTML |
+| `payments.py` | Stripe Payment Links / Checkout, webhook grant mint, keygen, licence_status OK\|EXPIRED |
+| `downloads.py` | Public catalog: monthly + yearly pay tiles per platform |
 | `coffee_link.py` | BMC tip URL (public footer + admin tip identity) |
 | `app.py` | Routes: public catalog + gated `/admin*` + webhook |
 
@@ -217,7 +226,7 @@ Architecture (modules):
 
 | Path | Role |
 |------|------|
-| `/` | Status + paid download buttons (£2.45) |
+| `/` | Status + monthly/yearly paid download buttons per platform |
 | `/pay?platform=windows` | Redirects to Stripe payment page for that package |
 | `/api/checkout` | JSON POST `{ "platform": "android" }` → `{ url, amount_pence: 245, … }` |
 | `/webhook/stripe` | Stripe webhook (signature required) |
