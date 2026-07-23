@@ -107,6 +107,25 @@ class TestPublicChromeModule(unittest.TestCase):
         self.assertIn('[data-theme="light"]', css)
         self.assertIn('[data-theme="dark"]', css)
         self.assertIn("--rb-btn", css)
+        # Logo data-artifact neon borders (cyan/blue + green) on panel boxes
+        self.assertIn("--rb-neon-cyan", css)
+        self.assertIn("--rb-neon-green", css)
+        self.assertIn("--rb-neon-blue", css)
+        self.assertIn("--rb-neon-border", css)
+        self.assertIn("#00e5ff", css)  # dark-theme neon cyan
+        self.assertIn("#39ff6a", css)  # dark-theme neon green
+        self.assertIn(".panel-card", css)
+        self.assertIn("var(--rb-neon-border)", css)
+        self.assertIn("var(--rb-neon-glow-cyan)", css)
+        self.assertIn("var(--rb-neon-glow-green)", css)
+        # Dual-tone border technique: padding-box fill + border-box gradient
+        self.assertIn("padding-box", css)
+        self.assertIn("border-box", css)
+        # Light theme still defines both neon tones (softer values)
+        light_i = css.index('[data-theme="light"]')
+        light_css = css[light_i : light_i + 1800]
+        self.assertIn("--rb-neon-cyan", light_css)
+        self.assertIn("--rb-neon-green", light_css)
         # No yellow palette for nav / settings banner
         self.assertNotIn("#fbbf24", css)
         self.assertNotIn("#fde68a", css)

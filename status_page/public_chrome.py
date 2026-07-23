@@ -49,7 +49,20 @@ def public_site_css() -> str:
   --rb-navy: #0a1628;
   --rb-navy-mid: #0f2340;
   --rb-card: #132a4a;
-  --rb-card-border: rgba(174, 208, 234, 0.28);
+  /* Soft fill edge under neon dual-tone border (logo circuit + key palette) */
+  --rb-card-border: rgba(0, 229, 255, 0.35);
+  /* Logo data-artifact neon: cyan/blue circuit + green key */
+  --rb-neon-cyan: #00e5ff;
+  --rb-neon-blue: #2694e8;
+  --rb-neon-green: #39ff6a;
+  --rb-neon-border: linear-gradient(
+    135deg,
+    var(--rb-neon-cyan) 0%,
+    var(--rb-neon-blue) 42%,
+    var(--rb-neon-green) 100%
+  );
+  --rb-neon-glow-cyan: rgba(0, 229, 255, 0.42);
+  --rb-neon-glow-green: rgba(57, 255, 106, 0.28);
   --rb-cream: #f2f5f7;
   --rb-muted: #aed0ea;
   --rb-link: #74b2e2;
@@ -75,13 +88,24 @@ def public_site_css() -> str:
   --rb-doc-fg: var(--rb-cream);
   --rb-doc-muted: var(--rb-muted);
   --rb-pre-bg: rgba(10, 22, 40, 0.65);
-  --rb-pre-border: var(--rb-card-border);
+  --rb-pre-border: color-mix(in srgb, var(--rb-neon-cyan) 35%, transparent);
 }}
 [data-theme="light"] {{
   --rb-navy: #e8f1f8;
   --rb-navy-mid: #f4f8fb;
   --rb-card: #ffffff;
-  --rb-card-border: rgba(15, 35, 64, 0.14);
+  --rb-card-border: rgba(0, 180, 220, 0.45);
+  --rb-neon-cyan: #00b8d4;
+  --rb-neon-blue: #1a8fd4;
+  --rb-neon-green: #12c94a;
+  --rb-neon-border: linear-gradient(
+    135deg,
+    var(--rb-neon-cyan) 0%,
+    var(--rb-neon-blue) 42%,
+    var(--rb-neon-green) 100%
+  );
+  --rb-neon-glow-cyan: rgba(0, 184, 212, 0.28);
+  --rb-neon-glow-green: rgba(18, 201, 74, 0.18);
   --rb-cream: #0f2340;
   --rb-muted: #4a657a;
   --rb-link: #1a6fad;
@@ -104,14 +128,25 @@ def public_site_css() -> str:
   --rb-doc-fg: #0f2340;
   --rb-doc-muted: #4a657a;
   --rb-pre-bg: #f4f8fb;
-  --rb-pre-border: rgba(15, 35, 64, 0.12);
+  --rb-pre-border: color-mix(in srgb, var(--rb-neon-cyan) 40%, transparent);
 }}
 @media (prefers-color-scheme: light) {{
   :root:not([data-theme="dark"]):not([data-theme="light"]) {{
     --rb-navy: #e8f1f8;
     --rb-navy-mid: #f4f8fb;
     --rb-card: #ffffff;
-    --rb-card-border: rgba(15, 35, 64, 0.14);
+    --rb-card-border: rgba(0, 180, 220, 0.45);
+    --rb-neon-cyan: #00b8d4;
+    --rb-neon-blue: #1a8fd4;
+    --rb-neon-green: #12c94a;
+    --rb-neon-border: linear-gradient(
+      135deg,
+      var(--rb-neon-cyan) 0%,
+      var(--rb-neon-blue) 42%,
+      var(--rb-neon-green) 100%
+    );
+    --rb-neon-glow-cyan: rgba(0, 184, 212, 0.28);
+    --rb-neon-glow-green: rgba(18, 201, 74, 0.18);
     --rb-cream: #0f2340;
     --rb-muted: #4a657a;
     --rb-link: #1a6fad;
@@ -134,7 +169,7 @@ def public_site_css() -> str:
     --rb-doc-fg: #0f2340;
     --rb-doc-muted: #4a657a;
     --rb-pre-bg: #f4f8fb;
-    --rb-pre-border: rgba(15, 35, 64, 0.12);
+    --rb-pre-border: color-mix(in srgb, var(--rb-neon-cyan) 40%, transparent);
   }}
 }}
 *, *::before, *::after {{ box-sizing: border-box; }}
@@ -153,12 +188,25 @@ body {{
   display: flex; flex-direction: column; gap: 1.15rem;
   margin: 0 auto;
 }}
+/* Logo data-artifact borders: neon cyan/blue → green gradient + dual glow */
 .panel-card {{
-  background: linear-gradient(165deg, color-mix(in srgb, var(--rb-card) 88%, var(--rb-soft)) 0%, var(--rb-card) 55%);
-  border: 1px solid var(--rb-card-border);
+  border: 1.5px solid transparent;
   border-radius: var(--rb-radius);
   padding: clamp(1rem, 2.5vw, 1.45rem);
-  box-shadow: var(--rb-panel-shadow);
+  background:
+    linear-gradient(
+      165deg,
+      color-mix(in srgb, var(--rb-card) 88%, var(--rb-soft)) 0%,
+      var(--rb-card) 55%
+    ) padding-box,
+    var(--rb-neon-border) border-box;
+  background-origin: border-box;
+  background-clip: padding-box, border-box;
+  box-shadow:
+    0 0 0 1px color-mix(in srgb, var(--rb-neon-cyan) 22%, transparent),
+    0 0 14px var(--rb-neon-glow-cyan),
+    0 0 26px var(--rb-neon-glow-green),
+    var(--rb-panel-shadow);
 }}
 .panel-title {{
   margin: 0 0 0.85rem; font-size: 0.95rem; letter-spacing: 0.12em;
@@ -172,8 +220,16 @@ body {{
 .brand-logo {{
   width: clamp(72px, 14vw, 104px); height: clamp(72px, 14vw, 104px);
   border-radius: 22px; object-fit: cover;
-  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.25);
-  border: 2px solid color-mix(in srgb, var(--rb-link) 45%, transparent);
+  border: 2px solid transparent;
+  background:
+    linear-gradient(var(--rb-card), var(--rb-card)) padding-box,
+    var(--rb-neon-border) border-box;
+  background-origin: border-box;
+  background-clip: padding-box, border-box;
+  box-shadow:
+    0 0 12px var(--rb-neon-glow-cyan),
+    0 0 20px var(--rb-neon-glow-green),
+    0 8px 28px rgba(0, 0, 0, 0.25);
 }}
 #{SITE_BRAND_HEADER_ID} h1, .brand-panel h1, #site-brand-header h1 {{
   letter-spacing: 0.14em; font-weight: 700;
