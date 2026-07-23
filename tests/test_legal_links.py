@@ -97,22 +97,46 @@ class TestDocsTrafficShapeAligned(unittest.TestCase):
     def test_readme_and_policy_lean_off_defaults(self):
         readme = (ROOT / "README.md").read_text(encoding="utf-8")
         privacy = (ROOT / "PRIVACY_POLICY.md").read_text(encoding="utf-8")
+        public_readme = (ROOT / "status_page" / "public" / "README.md").read_text(
+            encoding="utf-8"
+        )
+        public_privacy = (
+            ROOT / "status_page" / "public" / "PRIVACY_POLICY.md"
+        ).read_text(encoding="utf-8")
         # Product traffic-shape / outer-obfs defaults are OFF (0.4.2 lean residual)
-        for text, name in ((readme, "README"), (privacy, "PRIVACY_POLICY")):
-            lower = text.lower()
-            # Forbid "on by default" claims for shape/obfs residual layers
+        for text, name in (
+            (readme, "README"),
+            (privacy, "PRIVACY_POLICY"),
+            (public_readme, "status_page/public/README"),
+            (public_privacy, "status_page/public/PRIVACY_POLICY"),
+        ):
+            lower = text.lower().replace("**", "")
+            # Forbid ON-default residual claims (shape/obfs/pad/cover)
             for needle in (
                 "on by default on every residual path",
                 "enabled by default on the product residual",
                 "are on by default on residual paths",
                 "default on all product residual",
-                "default on **all** product residual",
+                "enable outer-layer obfuscation",
+                "enable padding / jitter / cover by default",
+                "padding / jitter / cover by default",
+                "outer-layer obfuscation and padding / jitter / cover by default",
+                "apply packet padding, timing jitter, and cover traffic by default",
+                "by default (opt out with rpt_traffic_shape=0)",
+                "opt out with rpt_traffic_shape=0",
             ):
                 self.assertNotIn(
                     needle,
                     lower,
                     f"{name} must not claim shape/obfs on by default (lean residual)",
                 )
+            # Positive lean-off anchors where residual defaults are discussed
+            self.assertTrue(
+                "off by default" in lower
+                or "default off" in lower
+                or "lean residual" in lower,
+                f"{name} should state lean-off residual defaults",
+            )
         self.assertTrue(
             "off by default" in readme.lower()
             or "default off" in readme.lower(),
@@ -126,6 +150,9 @@ class TestDocsTrafficShapeAligned(unittest.TestCase):
             or "lean residual" in privacy.lower(),
             "PRIVACY_POLICY should state shaping/obfs lean-off defaults",
         )
+        # Force-on env (not opt-out) for lean-off policy
+        self.assertIn("RPT_TRAFFIC_SHAPE=1", privacy)
+        self.assertNotIn("RPT_TRAFFIC_SHAPE=0", privacy)
         # Version surface: current catalog pin and/or historical
         self.assertTrue(
             "0.4.2" in readme
