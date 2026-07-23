@@ -11,8 +11,8 @@ Build provenance):
 
 | Platform | Provenance |
 |----------|------------|
-| **macOS** | Fresh DevID sign + notary on Darwin |
-| **iOS** | Team-signed package on Darwin — handoff `client_app/APPLE_HANDOFF_0.4.1.md` |
+| **macOS** | Fresh Flutter freeze + DevID sign + notary on Darwin (`CFBundleShortVersionString` **0.4.1**) |
+| **iOS** | Fresh Flutter freeze + Team-signed on Darwin (marketing **0.4.1**) — handoff `client_app/APPLE_HANDOFF_0.4.1.md` |
 | **Linux** | Rebuilt via `package_linux.py` (native 0.4.1 package) |
 | **Android** | **Carry-forward** residual-wire APK from 0.4.0 under 0.4.1 filename — Flutter/Android SDK rebuild still required for a native freeze |
 | **Windows** | **Carry-forward** from 0.4.0 PE (Darwin SFX/filename pin only; 7z extract failed) — **not** a Windows-host multihop PE rebuild. Full PE: Windows x64 `scripts/build_windows_multihop.py` |

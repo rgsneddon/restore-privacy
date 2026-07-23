@@ -21,9 +21,9 @@ class TestApplePackageAudit(unittest.TestCase):
         from apple_package_audit import audit_catalog_apple_packages
         from downloads import RELEASE_VERSION
 
-        self.assertEqual(RELEASE_VERSION, "0.4.0")
+        self.assertEqual(RELEASE_VERSION, "0.4.1")
         report = audit_catalog_apple_packages(version=RELEASE_VERSION)
-        self.assertEqual(report["catalog_version"], "0.4.0")
+        self.assertEqual(report["catalog_version"], "0.4.1")
         mac_exists = bool(report["macos"].get("exists"))
         ios_exists = bool(report["ios"].get("exists"))
         if not (mac_exists and ios_exists):
@@ -43,20 +43,20 @@ class TestApplePackageAudit(unittest.TestCase):
         self.assertIsNotNone(ios_v)
         # After Mac rebuild: marketing versions must match monopin (not placeholders)
         if report.get("all_match"):
-            self.assertEqual(mac_v, "0.4.0")
-            self.assertEqual(ios_v, "0.4.0")
+            self.assertEqual(mac_v, "0.4.1")
+            self.assertEqual(ios_v, "0.4.1")
             self.assertFalse(report.get("placeholder_suspected", False))
         else:
             self.assertIn("DO NOT MATCH", report.get("honesty", ""))
 
     def test_handoff_documents_mac_rebuild_ship(self) -> None:
         text = (
-            ROOT / "client_app" / "APPLE_HANDOFF_0.4.0.md"
+            ROOT / "client_app" / "APPLE_HANDOFF_0.4.1.md"
         ).read_text(encoding="utf-8")
-        self.assertIn("0.4.0", text)
+        self.assertIn("0.4.1", text)
         self.assertIn("privacy-scale", text.lower())
         self.assertIn("CFBundleShortVersionString", text)
-        # Post-rebuild handoff claims real 0.4.0 packages
+        # Post-rebuild handoff claims real 0.4.1 packages
         self.assertIn("Mac rebuild", text)
         self.assertIn("privacy-scale toggles", text.lower())
         self.assertIn("device bind", text.lower())

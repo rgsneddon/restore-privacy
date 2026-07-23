@@ -34,8 +34,8 @@ python scripts/host_paid_assets_vps.py --stage   # then --upload when SSH works
 
 | Asset | Provenance |
 |-------|------------|
-| macOS zip | Fresh DevID sign + notary on Darwin (0.4.1) |
-| iOS zip | Team re-sign package on Darwin (0.4.1) |
+| macOS zip | Fresh Flutter freeze + DevID + notary; `CFBundleShortVersionString` **0.4.1** |
+| iOS zip | Fresh Flutter freeze + Team-signed; marketing version **0.4.1** |
 | Linux tar.gz | Rebuilt via package_linux.py (0.4.1) |
 | Android APK | **Carry-forward** residual-wire APK from 0.4.0 filename rewrite — rebuild on host with Android SDK for native 0.4.1 Flutter freeze |
 | Windows setup.exe | **Carry-forward** from 0.4.0 PE (SFX pin rewrite only on Darwin) — **full multihop PE requires Windows x64** (`scripts/build_windows_multihop.py`) |
