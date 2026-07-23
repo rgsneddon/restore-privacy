@@ -14,7 +14,7 @@ Version pin (first match wins):
 1. ``--version X.Y.Z`` CLI
 2. env ``RPT_BUILD_VERSION``
 3. monorepo ``client/VERSION`` file
-4. fallback ``0.3.9``
+4. fallback ``0.4.0``
 
 Produces::
 
@@ -24,7 +24,11 @@ Ships **current** ``client/`` tree (privacy-scale Settings, hot-apply, node_ping
 multihop residual-via-exit, keygen gate), entry + exit ElGamal **public** keys
 only, Wintun, frozen runtime — no ``*.priv``.
 
-See ``client/windows/WINDOWS_HANDOFF_0.3.9.md`` (or current handoff).
+See ``client/windows/WINDOWS_HANDOFF_0.4.0.md`` and
+``scripts/LAPTOP_BUILD_CHECKLIST_0.4.0.md``.
+
+``--check-only`` verifies source readiness (pubs, multihop, wintun, pin) on any
+OS; a full PE freeze still requires **Windows x64** + PyInstaller.
 """
 
 from __future__ import annotations
@@ -52,7 +56,7 @@ def _resolve_version(cli_version: str | None = None) -> str:
         v = pin.read_text(encoding="utf-8").strip()
         if v:
             return v
-    return "0.3.9"
+    return "0.4.0"
 
 
 VERSION = _resolve_version()
@@ -243,12 +247,56 @@ def _apply_version(ver: str) -> None:
     WINDOWS_EXE_NAME = f"restore-privacy-client-{VERSION}-windows-x64-setup.exe"
 
 
+def _source_readiness_check() -> list[str]:
+    """Return list of hard errors for source readiness (no PE freeze)."""
+    errors: list[str] = []
+    wintun = ROOT / "client" / "windows" / "native" / "wintun.dll"
+    if not wintun.is_file():
+        alt = ROOT / "client" / "windows" / "native" / "wintun-amd64.dll"
+        if alt.is_file():
+            try:
+                shutil.copy2(alt, wintun)
+            except OSError as exc:
+                errors.append(f"cannot copy wintun-amd64.dll → wintun.dll: {exc}")
+        elif not wintun.is_file():
+            errors.append(f"missing {wintun}")
+    for p in (
+        ROOT / "product" / "node_elgamal.pub",
+        ROOT / "product" / "exit_node_elgamal.pub",
+        ROOT / "client" / "multihop.py",
+        ROOT / "client" / "windows" / "app.py",
+        ROOT / "client" / "node_ping.py",
+        RECIPE,
+        ROOT / "client" / "windows" / "WINDOWS_HANDOFF_0.4.0.md",
+    ):
+        if not p.is_file():
+            errors.append(f"missing required file: {p}")
+    # Multihop flag + VERSION pin (repo root must be on sys.path)
+    try:
+        root_s = str(ROOT)
+        if root_s not in sys.path:
+            sys.path.insert(0, root_s)
+        from client.multihop import MULTI_HOP_ROUTING_IMPLEMENTED
+
+        if not MULTI_HOP_ROUTING_IMPLEMENTED:
+            errors.append("MULTI_HOP_ROUTING_IMPLEMENTED is False")
+    except Exception as exc:  # noqa: BLE001
+        errors.append(f"cannot import client.multihop: {exc}")
+    pin = (ROOT / "client" / "VERSION").read_text(encoding="utf-8").strip()
+    if pin != VERSION:
+        errors.append(f"client/VERSION={pin!r} != build VERSION={VERSION!r}")
+    return errors
+
+
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument(
         "--check-only",
         action="store_true",
-        help="Verify prereqs (PyInstaller, pubs, wintun) without building",
+        help=(
+            "Verify source readiness (pubs, multihop, wintun, pin, handoff) "
+            "without building. PyInstaller optional for this mode."
+        ),
     )
     ap.add_argument(
         "--version",
@@ -258,46 +306,67 @@ def main(argv: list[str] | None = None) -> int:
     args = ap.parse_args(argv)
     _apply_version(_resolve_version(args.version or None))
 
+    src_errors = _source_readiness_check()
+    if args.check_only:
+        for err in src_errors:
+            print(f"ERROR: {err}", file=sys.stderr)
+        pyi_ok = False
+        try:
+            import PyInstaller  # noqa: F401
+
+            pyi_ok = True
+        except ImportError:
+            pyi_ok = False
+        if src_errors:
+            print("FAIL: Windows multihop source readiness incomplete", file=sys.stderr)
+            return 1
+        print("OK: Windows multihop source readiness")
+        print(f"  VERSION={VERSION}")
+        print(f"  platform={sys.platform}")
+        print(f"  recipe={RECIPE}")
+        print("  entry+exit pubs under product/")
+        print("  multihop.py + MULTI_HOP_ROUTING_IMPLEMENTED")
+        print("  node_ping.py + windows app.py")
+        print("  WINDOWS_HANDOFF_0.4.0.md present")
+        print(f"  wintun present under client/windows/native/")
+        if pyi_ok:
+            print("  PyInstaller: importable (full PE build ready if on Windows x64)")
+        else:
+            print(
+                "  PyInstaller: NOT installed "
+                "(ok for --check-only; install before PE freeze on Windows)"
+            )
+        if not sys.platform.startswith("win"):
+            print(
+                "  NOTE: full PE freeze requires Windows x64 "
+                f"(this host is {sys.platform})"
+            )
+        return 0
+
+    if src_errors:
+        for err in src_errors:
+            print(f"ERROR: {err}", file=sys.stderr)
+        return 1
+
     try:
         import PyInstaller  # noqa: F401
     except ImportError:
         print(
-            "ERROR: PyInstaller required.\n"
+            "ERROR: PyInstaller required for PE freeze.\n"
             "  python -m pip install pyinstaller cryptography\n",
             file=sys.stderr,
         )
         return 1
 
-    wintun = ROOT / "client" / "windows" / "native" / "wintun.dll"
-    if not wintun.is_file():
-        alt = ROOT / "client" / "windows" / "native" / "wintun-amd64.dll"
-        if alt.is_file():
-            shutil.copy2(alt, wintun)
-    if not wintun.is_file():
-        print(f"ERROR: missing {wintun}", file=sys.stderr)
+    if not sys.platform.startswith("win"):
+        print(
+            "ERROR: Windows PE freeze requires Windows x64 "
+            f"(this host is {sys.platform}).\n"
+            "  Use: python scripts/build_windows_multihop.py --check-only\n"
+            "  On Windows laptop: scripts\\build_windows_multihop.bat\n",
+            file=sys.stderr,
+        )
         return 1
-
-    for p in (
-        ROOT / "product" / "node_elgamal.pub",
-        ROOT / "product" / "exit_node_elgamal.pub",
-        ROOT / "client" / "multihop.py",
-        ROOT / "client" / "windows" / "app.py",
-        ROOT / "client" / "node_ping.py",
-        RECIPE,
-    ):
-        if not p.is_file():
-            print(f"ERROR: missing required file: {p}", file=sys.stderr)
-            return 1
-
-    if args.check_only:
-        print("OK: Windows multihop build prereqs present")
-        print(f"  VERSION={VERSION}")
-        print(f"  PyInstaller importable")
-        print(f"  recipe={RECIPE}")
-        print(f"  entry+exit pubs under product/")
-        print(f"  multihop.py present")
-        print(f"  node_ping.py present")
-        return 0
 
     try:
         setup = rebuild_windows_setup()

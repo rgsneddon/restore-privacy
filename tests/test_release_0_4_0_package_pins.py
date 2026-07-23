@@ -101,6 +101,37 @@ class Test040SourcePins(unittest.TestCase):
         self.assertIn("0.4.0", text)
         self.assertIn("flutter build macos", text.lower())
 
+    def test_windows_handoff_and_laptop_checklist(self):
+        """GitHub-ready Windows laptop path: handoff + checklist + one-command build."""
+        win = ROOT / "client" / "windows" / "WINDOWS_HANDOFF_0.4.0.md"
+        self.assertTrue(win.is_file(), "WINDOWS_HANDOFF_0.4.0.md missing")
+        text = win.read_text(encoding="utf-8")
+        # No mojibake from bad encoding
+        self.assertNotIn("â€", text)
+        self.assertIn("0.4.0", text)
+        self.assertIn("build_windows_multihop", text)
+        self.assertIn("--check-only", text)
+        self.assertIn("Windows x64", text)
+        # Honesty: not freezable on macOS / Darwin
+        low = text.lower()
+        self.assertTrue(
+            "not possible" in low or "filename pin" in low or "cannot" in low,
+            msg="handoff must say macOS cannot produce a fresh PE",
+        )
+        checklist = ROOT / "scripts" / "LAPTOP_BUILD_CHECKLIST_0.4.0.md"
+        self.assertTrue(checklist.is_file())
+        cl = checklist.read_text(encoding="utf-8")
+        self.assertIn("build_windows_multihop.bat", cl)
+        self.assertIn("--check-only", cl)
+        bat = (ROOT / "scripts" / "build_windows_multihop.bat").read_text(
+            encoding="utf-8", errors="replace"
+        )
+        self.assertIn("0.4.0", bat)
+        self.assertNotIn("0.3.6", bat)
+        rel = (ROOT / "scripts" / "RELEASE.md").read_text(encoding="utf-8")
+        self.assertIn("LAPTOP_BUILD_CHECKLIST_0.4.0.md", rel)
+        self.assertIn("WINDOWS_HANDOFF_0.4.0.md", rel)
+
     def test_build_release_script_and_release_md(self):
         br = ROOT / "scripts" / f"build_release_{VERSION}.py"
         self.assertTrue(br.is_file())

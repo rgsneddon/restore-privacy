@@ -1,92 +1,99 @@
-﻿# Windows handoff â€” Restore Privacy **0.4.0** (multi-hop residual)
+# Windows handoff — Restore Privacy **0.4.0** (multi-hop residual)
 
 Catalog monopin: **0.4.0**  
 Production entry (default): **82.221.101.241:44044** (Iceland)  
 Production exit (multi-hop residual): **185.146.232.107:44044** (Romania)
 
-Catalog **0.4.0** Windows multihop residual PE is built on a **Windows x64**
-machine via the one-command path below (macOS cannot freeze a Windows PE).
-Paid asset name: `restore-privacy-client-0.4.0-windows-x64-setup.exe`.
+## Honesty (read first)
 
-## One command (Windows laptop)
+| Claim | Truth |
+|-------|--------|
+| Fresh Windows multihop PE from **macOS** | **Not possible** with the shipped PyInstaller path |
+| File named `…-0.4.0-windows-x64-setup.exe` on Darwin | **Filename pin** of a prior multihop SFX — **not** a new freeze |
+| Real multihop residual PE | Build **only on Windows x64** with the one-command path below |
 
-From the **repo root** after checkout:
-
-```bat
-scripts\build_windows_multihop.bat
-```
-
-Or:
-
-```bat
-python scripts\build_windows_multihop.py
-```
-
-**Output:**
+Paid asset name after a real rebuild:
 
 ```text
 releases\0.4.0\restore-privacy-client-0.4.0-windows-x64-setup.exe
 ```
 
-That PE embeds:
+## Windows laptop — quick start
 
-- Current `client/` residual path including **`client/multihop.py`**
-  (`MULTI_HOP_ROUTING_IMPLEMENTED = True`, residual-via-exit when enabled)
-- **`product/node_elgamal.pub`** (entry) + **`product/exit_node_elgamal.pub`** (exit)
-- Wintun, frozen runtime â€” **no** `*.priv` (device Ed25519 generated on first run)
+```bat
+git clone https://github.com/rgsneddon/restore-privacy.git
+cd restore-privacy
+git checkout main
+git pull
+
+REM 1) Source readiness (no freeze)
+python scripts\build_windows_multihop.py --check-only
+
+REM 2) Full PE rebuild (installs pyinstaller in .venv via bat)
+scripts\build_windows_multihop.bat
+```
+
+Or without bat:
+
+```bat
+python -m pip install pyinstaller cryptography
+python scripts\build_windows_multihop.py
+```
+
+**Output after success:**
+
+```text
+releases\0.4.0\restore-privacy-client-0.4.0-windows-x64-setup.exe
+```
 
 ### Prereqs
 
 | Need | Notes |
 |------|--------|
-| Windows **x64** | Build host |
-| Python 3.11+ (3.12/3.14 OK if PyInstaller supports it) | `py -3` or `python` on PATH |
+| Windows **x64** | Build host (not Darwin) |
+| Python 3.11+ | `py -3` or `python` on PATH |
 | Network once | `pip install pyinstaller cryptography` (bat does this) |
-| Repo at **0.4.0** / `main` | `git checkout 0.4.0` or latest `main` with handoff |
-| Tracked pubs | `product/node_elgamal.pub`, `product/exit_node_elgamal.pub` (in git) |
-| Wintun | `client/windows/native/wintun.dll` or `wintun-amd64.dll` (in git) |
+| Repo at **0.4.0** / `main` | `git pull` latest |
+| Tracked pubs | `product/node_elgamal.pub`, `product/exit_node_elgamal.pub` |
+| Wintun | `client/windows/native/wintun.dll` or `wintun-amd64.dll` |
 
-Check without building:
+### What the PE embeds
+
+- Current `client/` residual path including **`client/multihop.py`**
+  (`MULTI_HOP_ROUTING_IMPLEMENTED = True`, residual-via-exit when enabled)
+- **`product/node_elgamal.pub`** (entry) + **`product/exit_node_elgamal.pub`** (exit)
+- Wintun, frozen runtime — **no** `*.priv` (device Ed25519 generated on first run)
+- Privacy-scale Settings, hot-apply, node ping, keygen gate
+
+## Check-only (safe on any OS)
 
 ```bat
 python scripts\build_windows_multihop.py --check-only
 ```
 
-## What the builder does
+```bash
+# same on macOS (source readiness; PE freeze still requires Windows)
+python3 scripts/build_windows_multihop.py --check-only
+```
 
-1. Pins `client/VERSION` â†’ `0.4.0`
-2. PyInstaller **onedir** of `client/windows/app.py` (hidden-import `client.multihop`, â€¦)
-3. Injects entry + exit **public** keys into `secrets/` and `product/`
-4. PyInstaller **onefile** setup wrapping `client/windows/installer.py` + payload
-5. Writes `releases/0.4.0/â€¦-windows-x64-setup.exe` and refreshes `SHA256SUMS.json` / `manifest.json` when present
+Expect: exit **0**, `VERSION=0.4.0`, entry+exit pubs, `multihop.py`, Wintun present.
+PyInstaller missing → **warning** only for `--check-only` (install before full build).
 
-Recipe core: `scripts/build_release_0.0.8.py` (version constants overridden for 0.4.0).
+## After a successful PE build
 
-## After a successful build
-
-### 1. Smoke-check the PE (on the build PC)
+### 1. Smoke-check
 
 ```bat
-python scripts\build_windows_multihop.py --check-only
 dir releases\0.4.0\restore-privacy-client-0.4.0-windows-x64-setup.exe
+python scripts\build_windows_multihop.py --check-only
 ```
 
-Optional: search the binary (PowerShell) for multihop markers:
+Install the setup.exe:
 
-```powershell
-Select-String -Path releases\0.4.0\restore-privacy-client-0.4.0-windows-x64-setup.exe -Pattern "exit_node_elgamal","185.146.232.107","multihop" -Encoding byte -ErrorAction SilentlyContinue
-# Or install and run with:
-#   set RPT_MULTIHOP_ENABLED=1
-# then Connect â€” residual should dial Romania exit when multihop is active.
-```
+- Default Connect → Iceland entry  
+- `set RPT_MULTIHOP_ENABLED=1` then Connect → residual via Romania exit when multihop active  
 
-Install the setup.exe, confirm:
-
-- Default Connect â†’ Iceland entry  
-- `RPT_MULTIHOP_ENABLED=1` â†’ residual via Romania exit  
-- No free public installers; payment/entitlement unchanged  
-
-### 2. Publish for paid downloads
+### 2. Publish (operator)
 
 ```bat
 gh release upload 0.4.0 releases\0.4.0\restore-privacy-client-0.4.0-windows-x64-setup.exe --clobber
@@ -95,23 +102,18 @@ REM when Iceland SSH works:
 REM python scripts\host_paid_assets_vps.py --stage --upload
 ```
 
-Render / status host fulfils via **private GH API** (`RPT_GITHUB_TOKEN`) and/or
-staged `status_page/assets/0.4.0/` + VPS paid_assets when configured.
+### 3. Source commits
 
-### 3. Commit / tag (if you change source while building)
-
-Usually the handoff only **produces the PE**; source is already on `main`.
-If you change Windows code, open a PR or push as usual â€” **do not commit secrets**.
+Usually you only **produce the PE**; source is already on `main`.
+Do **not** commit secrets or `*.priv`.
 
 ## Multi-hop honesty (Windows)
 
 | Mode | Behaviour |
 |------|-----------|
-| Default | Single-hop residual â†’ Iceland entry + `node_elgamal.pub` |
-| `RPT_MULTIHOP_ENABLED=1` | Residual-via-exit â†’ Romania + `exit_node_elgamal.pub` |
+| Default | Single-hop residual → Iceland entry + `node_elgamal.pub` |
+| `RPT_MULTIHOP_ENABLED=1` | Residual-via-exit → Romania + `exit_node_elgamal.pub` |
 | Not claimed | Full intermediate onion encapsulation through the entry hop |
-
-Node-only zram + LUKS2 never ships in the client package.
 
 ## Logs if build fails
 
@@ -120,30 +122,26 @@ Node-only zram + LUKS2 never ships in the client package.
 | Client freeze | `dist/0.4.0/pyinstaller_client.log` |
 | Installer freeze | `dist/0.4.0/pyinstaller_installer.log` |
 
-Common issues:
-
-- **PyInstaller missing** â†’ bat installs it; or `pip install pyinstaller`
-- **Missing exit pub** â†’ pull latest `product/exit_node_elgamal.pub` from git
-- **Wrong arch** â†’ use Windows **x64**, not ARM64-only Python unless you know you need it
-- **Antivirus** â†’ may quarantine freshly frozen PE; allowlist the repo `dist/` and `releases/`
+- **PyInstaller missing** → bat installs it; or `pip install pyinstaller`
+- **Missing exit pub** → `git pull` for `product/exit_node_elgamal.pub`
+- **Wrong arch** → Windows **x64**
+- **Antivirus** → allowlist `dist/` and `releases/`
 
 ## Related
 
-- Catalog / release notes: `scripts/RELEASE_NOTES_0.4.0.md`
-- Full multi-platform release script: `scripts/build_release_0.4.0.py` (`--windows-only` rebuilds Windows via this path)
-- Multihop unit tests: `tests/test_multihop.py`
-- Package pin honesty: `tests/test_release_0_3_6_package_pins.py` (Windows PE multihop gates run when the rebuilt setup is present under `releases/0.4.0/`)
+- Catalog notes: `scripts/RELEASE_NOTES_0.4.0.md`
+- Release index: `scripts/RELEASE.md` (platform status table)
+- Laptop checklist: `scripts/LAPTOP_BUILD_CHECKLIST_0.4.0.md`
+- Full multi-platform: `scripts/build_release_0.4.0.py`
+- Multihop tests: `tests/test_multihop.py`
+- Package pins: `tests/test_release_0_4_0_package_pins.py`
 
-## macOS operator note (0.4.0)
+## Other 0.4.0 platforms (status for operators)
 
-A **fresh multihop Windows PE cannot be frozen on Darwin**. On this Mac the
-catalog file `releases/0.4.0/restore-privacy-client-0.4.0-windows-x64-setup.exe`
-is staged by **filename pin** from the prior multihop SFX (7z extract/pin-rewrite
-is not always available for this SFX layout). Rebuild on Windows x64 with:
-
-```bat
-scripts\build_windows_multihop.bat
-```
-
-Android **0.4.0** APK is a full Flutter `assembleRelease` rebuild when JDK 17 +
-Android SDK are configured (`JAVA_HOME` / `flutter config --jdk-dir`).
+| Platform | Built on Mac? | Action on laptop if needed |
+|----------|---------------|----------------------------|
+| **Windows** | No (PE freeze) | **This handoff** — rebuild PE |
+| **Android** | Yes (Flutter APK rebuilt) | Re-upload GH if release still has pre-rebuild APK |
+| macOS | Yes (notarized) | None |
+| iOS | Yes (Team-signed zip) | None |
+| Linux | Yes | None |
