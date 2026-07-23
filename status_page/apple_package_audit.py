@@ -90,6 +90,24 @@ def audit_catalog_apple_packages(
     ios_a = inspect_apple_zip(ios, platform="ios")
     mac_ok = mac.get("primary_version") == version
     ios_ok = ios_a.get("primary_version") == version
+    missing = (not mac.get("exists")) or (not ios_a.get("exists"))
+    if mac_ok and ios_ok:
+        honesty = "Apple zips match catalog monopin"
+    elif missing:
+        honesty = (
+            "STAGED APPLE ZIPS MISSING under assets "
+            f"(macos_exists={mac.get('exists')} ios_exists={ios_a.get('exists')}) "
+            f"expected={version!r}. Re-build on Mac per client_app/APPLE_HANDOFF_"
+            f"{version}.md then re-run host_paid_assets_vps.py --upload "
+            "(status_page/assets/* is gitignored)."
+        )
+    else:
+        honesty = (
+            "STAGED APPLE ZIPS DO NOT MATCH CATALOG MONOPIN — "
+            f"macos={mac.get('primary_version')!r} ios={ios_a.get('primary_version')!r} "
+            f"expected={version!r}. Re-build on Mac per client_app/APPLE_HANDOFF_"
+            f"{version}.md then re-run host_paid_assets_vps.py --upload."
+        )
     return {
         "catalog_version": version,
         "assets_root": str(root),
@@ -99,14 +117,5 @@ def audit_catalog_apple_packages(
         "ios_matches_catalog": ios_ok,
         "all_match": bool(mac_ok and ios_ok),
         "placeholder_suspected": not (mac_ok and ios_ok),
-        "honesty": (
-            "Apple zips match catalog monopin"
-            if (mac_ok and ios_ok)
-            else (
-                "STAGED APPLE ZIPS DO NOT MATCH CATALOG MONOPIN — "
-                f"macos={mac.get('primary_version')!r} ios={ios_a.get('primary_version')!r} "
-                f"expected={version!r}. Re-build on Mac per client_app/APPLE_HANDOFF_"
-                f"{version}.md then re-run host_paid_assets_vps.py --upload."
-            )
-        ),
+        "honesty": honesty,
     }
