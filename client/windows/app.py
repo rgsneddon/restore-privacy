@@ -1393,6 +1393,17 @@ class TunnelClientApp:
             self._log(f"Settings: autoconnect_on_launch={s.autoconnect_on_launch}")
 
         def _save_privacy() -> None:
+            try:
+                from client.free_tier import free_tier_settings_locked
+
+                if free_tier_settings_locked():
+                    note_var.set(
+                        "Free edition (3.3.3): privacy options are fixed "
+                        "(Iceland single-hop, basic residual). Upgrade for full Settings."
+                    )
+                    return
+            except Exception:
+                pass
             # Interactive while connected: persist + hot-apply shape/obfs to
             # live residual; multi-hop path change re-establishes residual.
             prev = self._settings if self._settings is not None else cur
@@ -1444,6 +1455,15 @@ class TunnelClientApp:
             _save_auto,
         )
 
+        # Free 3.3.3: no user-amendable privacy-scale (locked lean Iceland).
+        _free_locked = False
+        try:
+            from client.free_tier import free_tier_settings_locked
+
+            _free_locked = bool(free_tier_settings_locked())
+        except Exception:
+            _free_locked = False
+
         # --- Privacy scale (speed vs optional residual defenses) ---
         priv_card = tk.Frame(
             pad,
@@ -1454,64 +1474,92 @@ class TunnelClientApp:
             pady=10,
         )
         priv_card.pack(fill=tk.X, pady=(14, 0))
-        tk.Label(
-            priv_card,
-            text="Browsing speed / privacy scale",
-            bg=PANEL_BG,
-            fg=PRIMARY_DARK,
-            font=("Segoe UI", 11, "bold"),
-            anchor="w",
-        ).pack(fill=tk.X, pady=(0, 4))
-        tk.Label(
-            priv_card,
-            text=(
-                "Turn optional residual defenses off for a snappier connection. "
-                "Defaults keep privacy layers on (except multi-hop, which is "
-                "single-hop by default). Changes apply live while connected "
-                "(shaping + obfuscation hot-apply; multi-hop re-establishes residual). "
-                "Licence, keygen, and residual tunnel cannot be disabled here."
-            ),
-            bg=PANEL_BG,
-            fg=TEXT_MUTED,
-            font=("Segoe UI", 8),
-            anchor="w",
-            wraplength=400,
-            justify=tk.LEFT,
-        ).pack(fill=tk.X, pady=(0, 8))
-        tk.Label(
-            priv_card,
-            text=EXPLAINER_CORE_VPN,
-            bg=PANEL_BG,
-            fg=TEXT,
-            font=("Segoe UI", 8),
-            anchor="w",
-            wraplength=400,
-            justify=tk.LEFT,
-        ).pack(fill=tk.X, pady=(0, 8))
-        tk.Frame(priv_card, bg=BORDER, height=1).pack(fill=tk.X, pady=4)
-        _row(
-            priv_card,
-            "Traffic shaping (pad / jitter / cover)",
-            EXPLAINER_TRAFFIC_SHAPE,
-            shape_var,
-            _save_privacy,
-        )
-        tk.Frame(priv_card, bg=BORDER, height=1).pack(fill=tk.X, pady=4)
-        _row(
-            priv_card,
-            "Outer obfuscation (QUIC-mimic wrap)",
-            EXPLAINER_OUTER_OBFUSCATION,
-            obfs_var,
-            _save_privacy,
-        )
-        tk.Frame(priv_card, bg=BORDER, height=1).pack(fill=tk.X, pady=4)
-        _row(
-            priv_card,
-            "Multi-hop residual (exit path)",
-            EXPLAINER_MULTIHOP,
-            multihop_var,
-            _save_privacy,
-        )
+        if _free_locked:
+            tk.Label(
+                priv_card,
+                text="Free edition (3.3.3)",
+                bg=PANEL_BG,
+                fg=PRIMARY_DARK,
+                font=("Segoe UI", 11, "bold"),
+                anchor="w",
+            ).pack(fill=tk.X, pady=(0, 4))
+            tk.Label(
+                priv_card,
+                text=(
+                    "Basic Iceland residual only — privacy options are fixed and "
+                    "cannot be changed. Single-hop entry; no multi-hop, traffic "
+                    "shaping, or outer obfuscation toggles."
+                ),
+                bg=PANEL_BG,
+                fg=TEXT_MUTED,
+                font=("Segoe UI", 8),
+                anchor="w",
+                wraplength=400,
+                justify=tk.LEFT,
+            ).pack(fill=tk.X, pady=(0, 8))
+            # Force lean vars so any residual save path cannot re-enable extras.
+            shape_var.set(False)
+            obfs_var.set(False)
+            multihop_var.set(False)
+        else:
+            tk.Label(
+                priv_card,
+                text="Browsing speed / privacy scale",
+                bg=PANEL_BG,
+                fg=PRIMARY_DARK,
+                font=("Segoe UI", 11, "bold"),
+                anchor="w",
+            ).pack(fill=tk.X, pady=(0, 4))
+            tk.Label(
+                priv_card,
+                text=(
+                    "Turn optional residual defenses off for a snappier connection. "
+                    "Defaults keep privacy layers on (except multi-hop, which is "
+                    "single-hop by default). Changes apply live while connected "
+                    "(shaping + obfuscation hot-apply; multi-hop re-establishes residual). "
+                    "Licence, keygen, and residual tunnel cannot be disabled here."
+                ),
+                bg=PANEL_BG,
+                fg=TEXT_MUTED,
+                font=("Segoe UI", 8),
+                anchor="w",
+                wraplength=400,
+                justify=tk.LEFT,
+            ).pack(fill=tk.X, pady=(0, 8))
+            tk.Label(
+                priv_card,
+                text=EXPLAINER_CORE_VPN,
+                bg=PANEL_BG,
+                fg=TEXT,
+                font=("Segoe UI", 8),
+                anchor="w",
+                wraplength=400,
+                justify=tk.LEFT,
+            ).pack(fill=tk.X, pady=(0, 8))
+            tk.Frame(priv_card, bg=BORDER, height=1).pack(fill=tk.X, pady=4)
+            _row(
+                priv_card,
+                "Traffic shaping (pad / jitter / cover)",
+                EXPLAINER_TRAFFIC_SHAPE,
+                shape_var,
+                _save_privacy,
+            )
+            tk.Frame(priv_card, bg=BORDER, height=1).pack(fill=tk.X, pady=4)
+            _row(
+                priv_card,
+                "Outer obfuscation (QUIC-mimic wrap)",
+                EXPLAINER_OUTER_OBFUSCATION,
+                obfs_var,
+                _save_privacy,
+            )
+            tk.Frame(priv_card, bg=BORDER, height=1).pack(fill=tk.X, pady=4)
+            _row(
+                priv_card,
+                "Multi-hop residual (exit path)",
+                EXPLAINER_MULTIHOP,
+                multihop_var,
+                _save_privacy,
+            )
 
         # Live device→node ping statistics (entry always; exit when multi-hop on)
         tk.Frame(priv_card, bg=BORDER, height=1).pack(fill=tk.X, pady=8)

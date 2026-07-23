@@ -31,9 +31,35 @@ from pathlib import Path
 from typing import List
 
 ROOT = Path(__file__).resolve().parents[1]
-VERSION = (ROOT / "client" / "VERSION").read_text(encoding="utf-8").strip()
-OUT = ROOT / "releases" / VERSION
-NAME = f"restore-privacy-client-{VERSION}-linux-x64.tar.gz"
+
+
+def _resolve_package_version() -> tuple[str, bool, Path, str]:
+    """Return (version, free_tier, out_dir, archive_filename).
+
+    Free tier (``RPT_FREE_TIER=1``): permanent pin **3.3.3**, output under
+    ``releases/free/3.3.3/`` with free naming. Optional ``RPT_PRODUCT_VERSION``
+    overrides the paid pin only (not free).
+    """
+    free = (os.environ.get("RPT_FREE_TIER") or "").strip().lower() in (
+        "1",
+        "true",
+        "yes",
+        "on",
+        "free",
+    )
+    if free:
+        ver = "3.3.3"
+        out = ROOT / "releases" / "free" / ver
+        name = f"restore-privacy-client-free-{ver}-linux-x64.tar.gz"
+        return ver, True, out, name
+    paid_pin = (ROOT / "client" / "VERSION").read_text(encoding="utf-8").strip()
+    ver = (os.environ.get("RPT_PRODUCT_VERSION") or paid_pin).strip() or paid_pin
+    out = ROOT / "releases" / ver
+    name = f"restore-privacy-client-{ver}-linux-x64.tar.gz"
+    return ver, False, out, name
+
+
+VERSION, FREE_TIER, OUT, NAME = _resolve_package_version()
 
 # manylinux tags + CPython versions covered by Ubuntu 20.04–24.04 (3.8–3.12)
 _PY_VERSIONS = ("38", "39", "310", "311", "312")
@@ -285,12 +311,22 @@ echo "  Or: $ROOT/bin/privacy-restored   # will request elevation on Connect"
     (stage / "install.sh").write_text(content.replace("\r\n", "\n"), encoding="utf-8")
 
 
-def write_launcher(stage: Path) -> None:
+def write_launcher(stage: Path, *, free_tier: bool = False) -> None:
     bin_dir = stage / "bin"
     bin_dir.mkdir(parents=True, exist_ok=True)
     launcher = bin_dir / "privacy-restored"
+    free_exports = ""
+    if free_tier:
+        free_exports = (
+            "export RPT_FREE_TIER=1\n"
+            "export RPT_PRODUCT_VERSION=3.3.3\n"
+            "# Free 3.3.3: lean Iceland residual; privacy-scale Settings locked off\n"
+            "export RPT_TRAFFIC_SHAPE=0\n"
+            "export RPT_OBFS=0\n"
+            "export RPT_MULTIHOP_ENABLED=0\n"
+        )
     launcher.write_text(
-        """#!/usr/bin/env bash
+        f"""#!/usr/bin/env bash
 # Launch Restore Privacy using the private venv created by install.sh
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
@@ -299,8 +335,8 @@ if [[ ! -x "$VENV_PY" ]]; then
   echo "Private venv missing. Run once: bash $ROOT/install.sh" >&2
   exit 1
 fi
-export PYTHONPATH="$ROOT${PYTHONPATH:+:$PYTHONPATH}"
-cd "$ROOT"
+export PYTHONPATH="$ROOT${{PYTHONPATH:+:$PYTHONPATH}}"
+{free_exports}cd "$ROOT"
 exec "$VENV_PY" -m client.linux "$@"
 """.replace(
             "\r\n", "\n"
@@ -437,6 +473,9 @@ def package_has_baked_deps(stage_or_extract: Path) -> bool:
 
 
 def main() -> int:
+    # Re-resolve in case env changed after import (tests / free builder).
+    global VERSION, FREE_TIER, OUT, NAME
+    VERSION, FREE_TIER, OUT, NAME = _resolve_package_version()
     OUT.mkdir(parents=True, exist_ok=True)
     dest = OUT / NAME
     with tempfile.TemporaryDirectory() as td:
@@ -467,6 +506,17 @@ def main() -> int:
             else:
                 dst.parent.mkdir(parents=True, exist_ok=True)
                 shutil.copy2(src, dst)
+
+        # Pin packaged client/VERSION to this archive's version (free stays 3.3.3).
+        ver_file = stage / "client" / "VERSION"
+        ver_file.parent.mkdir(parents=True, exist_ok=True)
+        ver_file.write_text(VERSION + "\n", encoding="utf-8")
+        if FREE_TIER:
+            (stage / "FREE_TIER").write_text("1\n", encoding="utf-8")
+            (stage / "DO_NOT_PUBLISH.txt").write_text(
+                "Free tier 3.3.3 — local only. Not for GH/VPS paid catalog.\n",
+                encoding="utf-8",
+            )
 
         sec = stage / "secrets"
         sec.mkdir(exist_ok=True)
@@ -505,7 +555,7 @@ def main() -> int:
         print(f"  {len(wheels)} wheel file(s) in wheels/")
 
         write_install_sh(stage)
-        write_launcher(stage)
+        write_launcher(stage, free_tier=FREE_TIER)
         write_restore_internet(stage)
         write_docs(stage)
 

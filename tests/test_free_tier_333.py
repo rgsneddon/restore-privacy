@@ -100,5 +100,105 @@ class TestPaidTierUnaffected(unittest.TestCase):
         self.assertTrue(product_outer_obfuscation_enabled())
 
 
+class TestPackageLinuxFreeResolve(unittest.TestCase):
+    def test_resolve_free_pins_3_3_3_and_out_dir(self):
+        import scripts.package_linux as pl
+
+        prev = os.environ.get("RPT_FREE_TIER")
+        try:
+            os.environ["RPT_FREE_TIER"] = "1"
+            ver, free, out, name = pl._resolve_package_version()
+            self.assertEqual(ver, "3.3.3")
+            self.assertTrue(free)
+            self.assertEqual(out.name, "3.3.3")
+            self.assertIn("free", out.parts)
+            self.assertEqual(name, "restore-privacy-client-free-3.3.3-linux-x64.tar.gz")
+        finally:
+            if prev is None:
+                os.environ.pop("RPT_FREE_TIER", None)
+            else:
+                os.environ["RPT_FREE_TIER"] = prev
+
+    def test_resolve_paid_uses_client_version(self):
+        import scripts.package_linux as pl
+        from pathlib import Path
+
+        prev = os.environ.pop("RPT_FREE_TIER", None)
+        prev_pv = os.environ.pop("RPT_PRODUCT_VERSION", None)
+        try:
+            pin = (Path(__file__).resolve().parents[1] / "client" / "VERSION").read_text(
+                encoding="utf-8"
+            ).strip()
+            ver, free, out, name = pl._resolve_package_version()
+            self.assertFalse(free)
+            self.assertEqual(ver, pin)
+            self.assertEqual(name, f"restore-privacy-client-{pin}-linux-x64.tar.gz")
+            self.assertEqual(out.name, pin)
+        finally:
+            if prev is not None:
+                os.environ["RPT_FREE_TIER"] = prev
+            if prev_pv is not None:
+                os.environ["RPT_PRODUCT_VERSION"] = prev_pv
+
+
+class TestFreeLinuxPackageArtifact(unittest.TestCase):
+    """Drive the *shipped* free linux tarball path when present (real package)."""
+
+    def test_free_linux_tarball_pins_3_3_3_and_enables_free_tier(self):
+        import tarfile
+        from pathlib import Path
+
+        root = Path(__file__).resolve().parents[1]
+        dest = (
+            root
+            / "releases"
+            / "free"
+            / "3.3.3"
+            / "restore-privacy-client-free-3.3.3-linux-x64.tar.gz"
+        )
+        if not dest.is_file():
+            self.skipTest("free linux package not built yet")
+        with tarfile.open(dest, "r:gz") as tf:
+            names = tf.getnames()
+            # Must not look like paid 0.x catalog root
+            self.assertTrue(
+                any("restore-privacy-3.3.3-linux" in n for n in names),
+                msg=f"unexpected archive roots: {names[:5]}",
+            )
+            ver_members = [n for n in names if n.endswith("client/VERSION")]
+            self.assertTrue(ver_members, msg="client/VERSION missing from free package")
+            ver = tf.extractfile(ver_members[0]).read().decode("utf-8").strip()
+            self.assertEqual(ver, "3.3.3")
+            launch_m = [n for n in names if n.endswith("bin/privacy-restored")]
+            self.assertTrue(launch_m)
+            launch = tf.extractfile(launch_m[0]).read().decode("utf-8")
+            self.assertIn("RPT_FREE_TIER=1", launch)
+            self.assertIn("RPT_TRAFFIC_SHAPE=0", launch)
+            self.assertIn("RPT_OBFS=0", launch)
+            self.assertIn("RPT_MULTIHOP_ENABLED=0", launch)
+            # free_tier module must be present so runtime helpers work
+            self.assertTrue(
+                any(n.endswith("client/free_tier.py") for n in names),
+                msg="client/free_tier.py missing from free package",
+            )
+
+
+class TestWindowsSettingsFreeLockSource(unittest.TestCase):
+    def test_windows_settings_gates_privacy_scale_on_free_tier(self):
+        from pathlib import Path
+
+        src = (
+            Path(__file__).resolve().parents[1]
+            / "client"
+            / "windows"
+            / "app.py"
+        ).read_text(encoding="utf-8")
+        self.assertIn("free_tier_settings_locked", src)
+        self.assertIn("Free edition (3.3.3)", src)
+        # Privacy-scale toggles only when not free-locked
+        self.assertIn("if _free_locked:", src)
+        self.assertIn("Traffic shaping (pad / jitter / cover)", src)
+
+
 if __name__ == "__main__":
     unittest.main()

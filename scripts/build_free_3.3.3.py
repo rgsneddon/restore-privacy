@@ -98,39 +98,43 @@ def stage_ios() -> Path | None:
 
 
 def stage_linux() -> Path | None:
+    """Build free Linux via package_linux with RPT_FREE_TIER (does not touch paid OUT)."""
     script = ROOT / "scripts" / "package_linux.py"
     if not script.is_file():
         return None
     env = os.environ.copy()
     env["RPT_FREE_TIER"] = "1"
     env["RPT_PRODUCT_VERSION"] = FREE_VERSION
-    # package_linux reads client/VERSION — temporarily pin free out dir only
-    # Prefer env override if package_linux supports it; else copy tree manually.
-    print("linux: invoking package_linux with RPT_FREE_TIER=1 …")
+    # Never leave free env in the parent process after package_linux.
+    print("linux: packaging free 3.3.3 via package_linux RPT_FREE_TIER=1 …")
     try:
         subprocess.check_call([sys.executable, str(script)], cwd=str(ROOT), env=env)
     except subprocess.CalledProcessError as exc:
         print(f"linux package failed: {exc}", file=sys.stderr)
         return None
-    # Locate latest linux tgz and copy under free/
-    candidates = sorted(
-        (ROOT / "releases").rglob(f"*{FREE_VERSION}*linux*.tar.gz"),
-        key=lambda p: p.stat().st_mtime,
-        reverse=True,
-    )
-    # Also try paid naming from current VERSION if free pin wasn't honored
-    if not candidates:
-        paid = ROOT / "releases" / "0.4.0"
-        if paid.is_dir():
-            for p in paid.glob("*linux*.tar.gz"):
-                candidates.append(p)
-    if not candidates:
-        print("skip linux: no tarball produced", file=sys.stderr)
-        return None
-    OUT.mkdir(parents=True, exist_ok=True)
     dest = OUT / f"restore-privacy-client-free-{FREE_VERSION}-linux-x64.tar.gz"
-    shutil.copy2(candidates[0], dest)
-    print(f"linux free: {dest}")
+    if not dest.is_file():
+        print(f"skip linux: expected {dest}", file=sys.stderr)
+        return None
+    # Structural proof: VERSION pin + free launcher markers
+    import tarfile
+
+    with tarfile.open(dest, "r:gz") as tf:
+        names = tf.getnames()
+        ver_members = [n for n in names if n.endswith("client/VERSION")]
+        if not ver_members:
+            print("ERROR: free linux missing client/VERSION", file=sys.stderr)
+            return None
+        ver = tf.extractfile(ver_members[0]).read().decode().strip()  # type: ignore[union-attr]
+        if ver != FREE_VERSION:
+            print(f"ERROR: free linux VERSION={ver!r} want {FREE_VERSION}", file=sys.stderr)
+            return None
+        launch_m = [n for n in names if n.endswith("bin/privacy-restored")]
+        launch = tf.extractfile(launch_m[0]).read().decode()  # type: ignore[union-attr]
+        if "RPT_FREE_TIER=1" not in launch:
+            print("ERROR: free launcher missing RPT_FREE_TIER=1", file=sys.stderr)
+            return None
+    print(f"linux free: {dest} (VERSION={FREE_VERSION}, free launcher ok)")
     return dest
 
 
