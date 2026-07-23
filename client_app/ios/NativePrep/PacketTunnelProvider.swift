@@ -33,6 +33,17 @@ class PacketTunnelProvider: NEPacketTunnelProvider {
     pathQueue.async { [weak self] in
       guard let self else { return }
       do {
+        // Privacy-scale Settings (App Group): shape/obfs OFF must disable residual pad/cover/wrap.
+        let privacy = RptResidualPrivacyPolicy.loadFromAppGroup()
+        privacy.applyToProductFlags()
+        if let shape = providerCfg["trafficShape"] as? Bool {
+          RptTrafficShape.productPadding = shape
+          RptTrafficShape.productCover = shape
+          RptTrafficShape.productJitterMsMax = shape ? 40 : 0
+        }
+        if let obfs = providerCfg["outerObfuscation"] as? Bool {
+          RptObfuscation.productObfsEnabled = obfs
+        }
         // 1. Load secrets (client_ed25519.priv + entry/exit pub only — never node_elgamal.priv)
         // Multi-hop residual: when host is Romania exit, HELLO uses exit_node_elgamal.pub.
         let material = try RptSecrets.loadAdmissionMaterial(residualHost: self.endpointHost)

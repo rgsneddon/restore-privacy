@@ -422,9 +422,10 @@ public enum RptTrafficShape {
     public static let productCoverSize: Int = 128
     public static let productCoverIntervalS: TimeInterval = 2.0
     /// Bounded send-side delay (ms) matching Python product policy (RPT_TRAFFIC_SHAPE).
-    public static let productJitterMsMax: Int = 40
-    public static let productPadding: Bool = true
-    public static let productCover: Bool = true
+    /// Mutable residual flags — set from Settings via RptResidualPrivacyPolicy.applyToProductFlags().
+    public static var productJitterMsMax: Int = 40
+    public static var productPadding: Bool = true
+    public static var productCover: Bool = true
 
     /// Optional product send jitter (0…productJitterMsMax). Residual DATA send only.
     public static func applySendJitter() {
@@ -520,7 +521,7 @@ public enum RptObfuscation {
         return k
     }()
 
-    public static let productObfsEnabled: Bool = true
+    public static var productObfsEnabled: Bool = true
 
     public static func looksLikeBareRpt(_ data: Data) -> Bool {
         data.count >= 5 && data.prefix(4) == rptMagic

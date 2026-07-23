@@ -14,6 +14,8 @@
 		A3E798CC69E28AD862366BD4 /* Network.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = BA98F8222A4AF392A7A4A84A /* Network.framework */; };
 		27C73F1169CD485F9D3DEEB6 /* Network.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = BA98F8222A4AF392A7A4A84A /* Network.framework */; };
 		0AD856FDC79F35AB84D2CB0D /* RptClientEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1E8ECFC3BC60269BEBC2CA40 /* RptClientEngine.swift */; };
+		A11B2C3D4E5F607182930012 /* RptResidualPrivacyPolicy.swift in Sources */ = {isa = PBXBuildFile; fileRef = A11B2C3D4E5F607182930011 /* RptResidualPrivacyPolicy.swift */; };
+		A11B2C3D4E5F607182930013 /* RptResidualPrivacyPolicy.swift in Sources */ = {isa = PBXBuildFile; fileRef = A11B2C3D4E5F607182930011 /* RptResidualPrivacyPolicy.swift */; };
 		178DFBBF8229AB5933CD28FC /* RptConnectOrchestrator.swift in Sources */ = {isa = PBXBuildFile; fileRef = B008E63BE1A87521A006D658 /* RptConnectOrchestrator.swift */; };
 		8DA5D118F1FB617796DF7BDE /* RptElgamal.swift in Sources */ = {isa = PBXBuildFile; fileRef = B7A984DE1FCFFC0139C1D464 /* RptElgamal.swift */; };
 		3C286BCE142676397F3A447C /* RptPedersen.swift in Sources */ = {isa = PBXBuildFile; fileRef = A8340F72CA3D6450BE844011 /* RptPedersen.swift */; };
@@ -126,6 +128,7 @@
 		6B6E833E61E4B8768F3C2CD1 /* RptFullTunnelResult.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = "RptFullTunnelResult.swift"; path = "NativePrep/Rpt2/RptFullTunnelResult.swift"; sourceTree = "<group>"; };
 		61BF160C0289711F5F69C626 /* PacketTunnelProvider.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = "PacketTunnelProvider.swift"; path = "NativePrep/PacketTunnelProvider.swift"; sourceTree = "<group>"; };
 		1E8ECFC3BC60269BEBC2CA40 /* RptClientEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = "RptClientEngine.swift"; path = "NativePrep/Rpt2/RptClientEngine.swift"; sourceTree = "<group>"; };
+		A11B2C3D4E5F607182930011 /* RptResidualPrivacyPolicy.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = "RptResidualPrivacyPolicy.swift"; path = "NativePrep/Rpt2/RptResidualPrivacyPolicy.swift"; sourceTree = "<group>"; };
 		B008E63BE1A87521A006D658 /* RptConnectOrchestrator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = "RptConnectOrchestrator.swift"; path = "NativePrep/Rpt2/RptConnectOrchestrator.swift"; sourceTree = "<group>"; };
 		B7A984DE1FCFFC0139C1D464 /* RptElgamal.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = "RptElgamal.swift"; path = "NativePrep/Rpt2/RptElgamal.swift"; sourceTree = "<group>"; };
 		A8340F72CA3D6450BE844011 /* RptPedersen.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = "RptPedersen.swift"; path = "NativePrep/Rpt2/RptPedersen.swift"; sourceTree = "<group>"; };
@@ -243,6 +246,7 @@
 			isa = PBXGroup;
 			children = (
 				1E8ECFC3BC60269BEBC2CA40 /* RptClientEngine.swift */,
+				A11B2C3D4E5F607182930011 /* RptResidualPrivacyPolicy.swift */,
 				B008E63BE1A87521A006D658 /* RptConnectOrchestrator.swift */,
 				B7A984DE1FCFFC0139C1D464 /* RptElgamal.swift */,
 				A8340F72CA3D6450BE844011 /* RptPedersen.swift */,
@@ -572,6 +576,7 @@ fi
 			buildActionMask = 2147483647;
 			files = (
 				0AD856FDC79F35AB84D2CB0D /* RptClientEngine.swift in Sources */,
+				A11B2C3D4E5F607182930012 /* RptResidualPrivacyPolicy.swift in Sources */,
 				178DFBBF8229AB5933CD28FC /* RptConnectOrchestrator.swift in Sources */,
 				8DA5D118F1FB617796DF7BDE /* RptElgamal.swift in Sources */,
 				3C286BCE142676397F3A447C /* RptPedersen.swift in Sources */,
@@ -617,6 +622,7 @@ fi
 			buildActionMask = 2147483647;
 			files = (
 				575107590C8330125CDF9BD8 /* RptClientEngine.swift in Sources */,
+				A11B2C3D4E5F607182930013 /* RptResidualPrivacyPolicy.swift in Sources */,
 				6D0E04054998188A656BE38F /* RptConnectOrchestrator.swift in Sources */,
 				B55667EB4080B9E1877B920F /* RptElgamal.swift in Sources */,
 				7FB1864B91278AE9C58463DB /* RptPedersen.swift in Sources */,

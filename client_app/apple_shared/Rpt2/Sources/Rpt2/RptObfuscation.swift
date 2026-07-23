@@ -18,7 +18,7 @@ public enum RptObfuscation {
         return k
     }()
 
-    public static let productObfsEnabled: Bool = true
+    public static var productObfsEnabled: Bool = true
 
     public static func looksLikeBareRpt(_ data: Data) -> Bool {
         data.count >= 5 && data.prefix(4) == rptMagic

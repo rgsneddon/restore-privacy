@@ -9,12 +9,12 @@ public enum RptTrafficShape {
     public static let padMagic = Data("RPTP".utf8)
     public static let coverMagic = Data("RPTC".utf8)
     public static let productPadBucket: Int = 128
-    public static let productCoverSize: Int = 128
-    public static let productCoverIntervalS: TimeInterval = 2.0
+    public static var productCoverSize: Int = 128
+    public static var productCoverIntervalS: TimeInterval = 2.0
     /// Bounded send-side delay (ms) matching Python product policy (RPT_TRAFFIC_SHAPE).
-    public static let productJitterMsMax: Int = 40
-    public static let productPadding: Bool = true
-    public static let productCover: Bool = true
+    public static var productJitterMsMax: Int = 40
+    public static var productPadding: Bool = true
+    public static var productCover: Bool = true
 
     /// Optional product send jitter (0…productJitterMsMax). Call on residual DATA send only.
     public static func applySendJitter() {

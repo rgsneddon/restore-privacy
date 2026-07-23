@@ -24,8 +24,9 @@ const String kExplainerTrafficShape =
     'periodic cover (dummy) frames so traffic is harder to fingerprint. '
     'ON (default) = stronger privacy against coarse traffic analysis; '
     'slightly more bandwidth and latency. '
-    'OFF = leaner packets and less cover → snappier browsing; weaker against '
-    'size/timing analysis. Residual VPN crypto and tunnel still work either way.';
+    'OFF = lean residual (no pad/cover/jitter) → snappier browsing; weaker against '
+    'size/timing analysis. Residual VPN crypto and tunnel still work either way. '
+    'Applies on next Connect (not mid-session).';
 
 /// Mirrors EXPLAINER_OUTER_OBFUSCATION.
 const String kExplainerOuterObfuscation =
@@ -34,7 +35,8 @@ const String kExplainerOuterObfuscation =
     'ON (default) = better blend with generic encrypted UDP; small CPU/header cost. '
     'OFF = bare RPT frames (node still accepts both) → slightly less overhead; '
     'easier for simple classifiers to spot product traffic. '
-    'Not a claim of full DPI-undetectability either way.';
+    'Not a claim of full DPI-undetectability either way. '
+    'Applies on next Connect (not mid-session).';
 
 /// Mirrors EXPLAINER_MULTIHOP.
 const String kExplainerMultihop =
@@ -42,7 +44,8 @@ const String kExplainerMultihop =
     'egress IP is the exit, not only the Iceland entry. '
     'OFF (product default) = single hop to the entry node — lower lag/ping. '
     'ON = extra hop path when configured — more privacy of path, higher latency. '
-    'Requires residual multi-hop routing; does not replace licence/keygen unlock.';
+    'Requires residual multi-hop routing; does not replace licence/keygen unlock. '
+    'While connected, Disconnect then Connect to re-establish via the new hop.';
 
 /// Mirrors EXPLAINER_CORE_VPN.
 const String kExplainerCoreVpn =

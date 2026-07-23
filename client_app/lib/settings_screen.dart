@@ -300,12 +300,17 @@ class _SettingsScreenState extends State<SettingsScreen> {
         'Privacy scale saved: shape=${_settings.privacyTrafficShape} '
         'obfs=${_settings.privacyOuterObfuscation} '
         'multihop=${_settings.privacyMultihop}.';
-    if (mhChanged && widget.residualConnected) {
+    // Packet Tunnel loads App Group prefs at startTunnel only — not mid-session.
+    if (widget.residualConnected) {
       note +=
-          ' Multi-hop changed while connected — Disconnect then Connect to re-establish residual via the new hop.';
-    } else if (!mhChanged) {
+          ' Disconnect then Connect for residual DATA to use the new shape/obfs'
+          '${mhChanged ? ' (and multi-hop host)' : ''}.';
+    } else if (mhChanged) {
       note +=
-          ' Shape/obfs apply on residual path where the Packet Tunnel shell supports hot-apply; otherwise on next Connect.';
+          ' Multi-hop takes effect on next Connect (entry vs exit residual host).';
+    } else {
+      note +=
+          ' Shape/obfs take effect on next Connect (Packet Tunnel reads prefs at tunnel start).';
     }
     _note = note;
     widget.onChanged?.call(_settings);
