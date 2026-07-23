@@ -30,10 +30,10 @@ from downloads import (  # noqa: E402
 )
 
 EXPECTED_RELEASE_PAGE = (
-    "https://github.com/rgsneddon/restore-privacy/releases/tag/0.3.9"
+    "https://github.com/rgsneddon/restore-privacy/releases/tag/0.4.0"
 )
 EXPECTED_DOWNLOAD_PREFIX = (
-    "https://github.com/rgsneddon/restore-privacy/releases/download/0.3.9/"
+    "https://github.com/rgsneddon/restore-privacy/releases/download/0.4.0/"
 )
 # Public footer points at the paid status host (repo is private).
 EXPECTED_PUBLIC_CATALOG_FOOTER = (
@@ -49,8 +49,8 @@ class TestDownloadCatalog(unittest.TestCase):
             is_current_catalog_filename,
         )
 
-        self.assertEqual(RELEASE_VERSION, "0.3.9")
-        self.assertEqual(RELEASE_TAG, "0.3.9")
+        self.assertEqual(RELEASE_VERSION, "0.4.0")
+        self.assertEqual(RELEASE_TAG, "0.4.0")
         self.assertEqual(current_catalog_version(), RELEASE_VERSION)
         self.assertTrue(catalog_matches_product_pin())
         self.assertEqual(GITHUB_REPO, "restore-privacy")
@@ -94,7 +94,7 @@ class TestDownloadCatalog(unittest.TestCase):
         # BMC tip URL is on homepage shell bottom, not inside downloads section
         self.assertNotIn(BMC_TIP_URL, html)
         # Live default: Stripe Payment Link tiles — platform face + version
-        self.assertIn("BUY - 0.3.9", html)
+        self.assertIn("BUY - 0.4.0", html)
         self.assertIn('class="dl-platform"', html)
         self.assertIn(">Windows<", html)
         self.assertIn(">Android<", html)
@@ -105,7 +105,7 @@ class TestDownloadCatalog(unittest.TestCase):
         self.assertIn('data-buy-mode="stripe-live"', html)
         self.assertNotIn("Coming soon", html)
         # Free permanent GitHub installer hrefs must not appear in public HTML.
-        self.assertNotIn("releases/download/0.3.9/", html)
+        self.assertNotIn("releases/download/0.4.0/", html)
         # FULL CATALOGUE / catalog footer link must not be visible on public downloads.
         self.assertNotIn('id="rust-repo-link"', html)
         self.assertNotIn("rust-repo-footer", html)
@@ -163,7 +163,7 @@ class TestDownloadCatalog(unittest.TestCase):
         self.assertIn('class="dl"', html)
         self.assertNotIn('href="#"', html)
         self.assertIn("data-price-pence=\"245\"", html)
-        self.assertIn("BUY - 0.3.9", html)
+        self.assertIn("BUY - 0.4.0", html)
         self.assertIn("buy.stripe.com", html)
         self.assertNotIn("Coming soon", html)
 
@@ -176,7 +176,7 @@ class TestDownloadCatalog(unittest.TestCase):
         self.assertNotIn('id="dl-claim-hint"', html)
         self.assertNotIn("/download/success?session_id=", html)
         # Platform controls present (live Stripe Pay default)
-        self.assertIn("BUY - 0.3.9", html)
+        self.assertIn("BUY - 0.4.0", html)
         self.assertIn('id="dl-windows"', html)
         self.assertIn("buy.stripe.com", html)
         # No bottom generic “Stripe payment page” footer link
@@ -265,7 +265,7 @@ class TestDownloadCatalog(unittest.TestCase):
         self.assertNotIn("clients-connected", page)
         self.assertIn(f"Download client v{RELEASE_VERSION}", page)
         # Live default: Stripe Payment Link Pay buttons
-        self.assertIn("BUY - 0.3.9", page)
+        self.assertIn("BUY - 0.4.0", page)
         self.assertIn("buy.stripe.com", page)
         self.assertNotIn("Coming soon", page)
         self.assertIn("£2.45", page)

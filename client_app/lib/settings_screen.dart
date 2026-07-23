@@ -4,6 +4,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import 'connection_log.dart';
+import 'free_tier.dart';
 import 'leak_test.dart';
 import 'legal_links.dart';
 import 'licence_gate.dart';
@@ -272,6 +273,15 @@ class _SettingsScreenState extends State<SettingsScreen> {
     bool? outerObfuscation,
     bool? multihop,
   }) async {
+    // Free 3.3.3: privacy-scale is locked lean; ignore user amendments.
+    if (freeTierSettingsLocked) {
+      setState(() {
+        _note =
+            'Free edition (${kFreeTierVersion}): privacy options are fixed '
+            '(Iceland single-hop, basic residual). Upgrade for full Settings.';
+      });
+      return;
+    }
     final prevMh = _settings.privacyMultihop;
     setState(() {
       _busy = true;
@@ -477,71 +487,91 @@ class _SettingsScreenState extends State<SettingsScreen> {
             'OS VPN permission / Administrator may still be required.',
             style: TextStyle(color: kTextMuted, fontSize: 12),
           ),
-          const SizedBox(height: 20),
-          Text(
-            kPrivacyScaleTitle,
-            style: TextStyle(
-              color: kPrimaryDark,
-              fontSize: 14,
-              fontWeight: FontWeight.w700,
+          if (!freeTierSettingsLocked) ...[
+            const SizedBox(height: 20),
+            Text(
+              kPrivacyScaleTitle,
+              style: TextStyle(
+                color: kPrimaryDark,
+                fontSize: 14,
+                fontWeight: FontWeight.w700,
+              ),
             ),
-          ),
-          const SizedBox(height: 6),
-          Text(
-            kExplainerCoreVpn,
-            style: TextStyle(color: kTextMuted, fontSize: 12),
-          ),
-          const SizedBox(height: 10),
-          Container(
-            decoration: BoxDecoration(
-              color: kPanelBg,
-              borderRadius: BorderRadius.circular(kCornerRadius),
-              border: Border.all(color: kBorder),
+            const SizedBox(height: 6),
+            Text(
+              kExplainerCoreVpn,
+              style: TextStyle(color: kTextMuted, fontSize: 12),
             ),
-            child: Column(
-              children: [
-                SwitchListTile(
-                  title: const Text(
-                    'Traffic shaping',
-                    style: TextStyle(fontWeight: FontWeight.w600),
+            const SizedBox(height: 10),
+            Container(
+              decoration: BoxDecoration(
+                color: kPanelBg,
+                borderRadius: BorderRadius.circular(kCornerRadius),
+                border: Border.all(color: kBorder),
+              ),
+              child: Column(
+                children: [
+                  SwitchListTile(
+                    title: const Text(
+                      'Traffic shaping',
+                      style: TextStyle(fontWeight: FontWeight.w600),
+                    ),
+                    subtitle: const Text(kExplainerTrafficShape),
+                    value: _settings.privacyTrafficShape,
+                    activeThumbColor: kWhite,
+                    activeTrackColor: kPrimary,
+                    onChanged: _busy
+                        ? null
+                        : (v) => _setPrivacyScale(trafficShape: v),
                   ),
-                  subtitle: const Text(kExplainerTrafficShape),
-                  value: _settings.privacyTrafficShape,
-                  activeThumbColor: kWhite,
-                  activeTrackColor: kPrimary,
-                  onChanged: _busy
-                      ? null
-                      : (v) => _setPrivacyScale(trafficShape: v),
-                ),
-                const Divider(height: 1),
-                SwitchListTile(
-                  title: const Text(
-                    'Outer obfuscation',
-                    style: TextStyle(fontWeight: FontWeight.w600),
+                  const Divider(height: 1),
+                  SwitchListTile(
+                    title: const Text(
+                      'Outer obfuscation',
+                      style: TextStyle(fontWeight: FontWeight.w600),
+                    ),
+                    subtitle: const Text(kExplainerOuterObfuscation),
+                    value: _settings.privacyOuterObfuscation,
+                    activeThumbColor: kWhite,
+                    activeTrackColor: kPrimary,
+                    onChanged: _busy
+                        ? null
+                        : (v) => _setPrivacyScale(outerObfuscation: v),
                   ),
-                  subtitle: const Text(kExplainerOuterObfuscation),
-                  value: _settings.privacyOuterObfuscation,
-                  activeThumbColor: kWhite,
-                  activeTrackColor: kPrimary,
-                  onChanged: _busy
-                      ? null
-                      : (v) => _setPrivacyScale(outerObfuscation: v),
-                ),
-                const Divider(height: 1),
-                SwitchListTile(
-                  title: const Text(
-                    'Multi-hop residual',
-                    style: TextStyle(fontWeight: FontWeight.w600),
+                  const Divider(height: 1),
+                  SwitchListTile(
+                    title: const Text(
+                      'Multi-hop residual',
+                      style: TextStyle(fontWeight: FontWeight.w600),
+                    ),
+                    subtitle: const Text(kExplainerMultihop),
+                    value: _settings.privacyMultihop,
+                    activeThumbColor: kWhite,
+                    activeTrackColor: kPrimary,
+                    onChanged:
+                        _busy ? null : (v) => _setPrivacyScale(multihop: v),
                   ),
-                  subtitle: const Text(kExplainerMultihop),
-                  value: _settings.privacyMultihop,
-                  activeThumbColor: kWhite,
-                  activeTrackColor: kPrimary,
-                  onChanged: _busy ? null : (v) => _setPrivacyScale(multihop: v),
-                ),
-              ],
+                ],
+              ),
             ),
-          ),
+          ] else ...[
+            const SizedBox(height: 20),
+            Text(
+              'Free edition ($kFreeTierVersion)',
+              style: TextStyle(
+                color: kPrimaryDark,
+                fontSize: 14,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+            const SizedBox(height: 6),
+            Text(
+              'Basic Iceland residual only — privacy options are fixed and '
+              'cannot be changed. Single-hop entry; no multi-hop, traffic '
+              'shaping, or outer obfuscation toggles.',
+              style: TextStyle(color: kTextMuted, fontSize: 12),
+            ),
+          ],
           const SizedBox(height: 20),
           Text(
             kPingStatsTitle,

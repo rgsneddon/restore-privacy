@@ -53,3 +53,4 @@ status_page/assets/*/
 
 _tmp_pyz.pyz
 
+.venv-brand/

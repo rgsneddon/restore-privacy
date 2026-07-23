@@ -18,7 +18,7 @@ void main() {
     expect(RptConfig.residualNodePubName, 'exit_node_elgamal.pub');
   });
 
-  test('productVersion is 0.3.9 monopin', () {
-    expect(RptConfig.productVersion, '0.3.9');
+  test('productVersion is 0.4.0 monopin', () {
+    expect(RptConfig.productVersion, '0.4.0');
   });
 }

@@ -119,7 +119,20 @@ def load_privacy_scale_prefs(
     """Load user privacy-scale toggles from the platform settings store.
 
     ``settings_path`` is an optional Path for tests (Windows/Linux store).
+    Free tier (``RPT_FREE_TIER``) forces lean Iceland-only prefs (all off).
     """
+    try:
+        from client.free_tier import free_tier_enabled, free_tier_privacy_scale_locked_off
+
+        if free_tier_enabled():
+            shape, obfs, mh = free_tier_privacy_scale_locked_off()
+            return PrivacyScalePrefs(
+                traffic_shape=shape,
+                outer_obfuscation=obfs,
+                multihop=mh,
+            )
+    except Exception:  # noqa: BLE001
+        pass
     try:
         if os.name == "nt":
             from client.windows.settings_store import load_settings
@@ -153,6 +166,13 @@ def traffic_shape_enabled(
     prefs: PrivacyScalePrefs | None = None,
 ) -> bool:
     """Resolved traffic-shaping enable: env key wins if set, else user Settings."""
+    try:
+        from client.free_tier import free_tier_enabled
+
+        if free_tier_enabled():
+            return False
+    except Exception:  # noqa: BLE001
+        pass
     if _env_key_set("RPT_TRAFFIC_SHAPE"):
         return traffic_shape_enabled_by_env()
     p = prefs if prefs is not None else load_privacy_scale_prefs()
@@ -174,6 +194,13 @@ def product_outer_obfuscation_enabled(
     prefs: PrivacyScalePrefs | None = None,
 ) -> bool:
     """Outer QUIC-mimic wrap: env ``RPT_OBFS`` if set, else user Settings (default on)."""
+    try:
+        from client.free_tier import free_tier_enabled
+
+        if free_tier_enabled():
+            return False
+    except Exception:  # noqa: BLE001
+        pass
     if _env_key_set("RPT_OBFS"):
         return product_obfuscation_enabled()
     p = prefs if prefs is not None else load_privacy_scale_prefs()
@@ -185,6 +212,13 @@ def product_multihop_enabled(
     prefs: PrivacyScalePrefs | None = None,
 ) -> bool:
     """Multi-hop residual: env ``RPT_MULTIHOP_ENABLED`` if set, else Settings (default off)."""
+    try:
+        from client.free_tier import free_tier_enabled
+
+        if free_tier_enabled():
+            return False
+    except Exception:  # noqa: BLE001
+        pass
     if _env_key_set("RPT_MULTIHOP_ENABLED"):
         return _env_truthy("RPT_MULTIHOP_ENABLED", default_on=False)
     p = prefs if prefs is not None else load_privacy_scale_prefs()

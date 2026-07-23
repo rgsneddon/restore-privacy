@@ -40,7 +40,7 @@ class TestComingSoonBuyButtons(unittest.TestCase):
         self.assertIn('data-pay-via="coming-soon"', html)
         self.assertIn('data-coming-soon="1"', html)
         # Simple BUY - version label even in coming-soon mode
-        self.assertIn("BUY - 0.3.9", html)
+        self.assertIn("BUY - 0.4.0", html)
         self.assertNotIn("Pay £2.45", html)
         # No live Stripe checkout destinations on temporary buttons
         self.assertNotIn("donate.stripe.com", html)
@@ -59,7 +59,7 @@ class TestComingSoonBuyButtons(unittest.TestCase):
 
     def test_switch_off_restores_stripe_pay_architecture(self):
         html = render_download_section_html(coming_soon=False)
-        self.assertIn("BUY - 0.3.9", html)
+        self.assertIn("BUY - 0.4.0", html)
         self.assertIn('data-buy-mode="stripe-live"', html)
         self.assertIn('data-pay-via="stripe-payment-page"', html)
         self.assertNotIn('data-coming-soon="1"', html)
@@ -76,18 +76,18 @@ class TestComingSoonBuyButtons(unittest.TestCase):
         with mock.patch.dict(os.environ, {"RPT_CATALOG_BUY_LIVE": "1"}, clear=False):
             self.assertFalse(catalog_buy_buttons_coming_soon())
             html = render_download_section_html()
-            self.assertIn("BUY - 0.3.9", html)
+            self.assertIn("BUY - 0.4.0", html)
             self.assertIn("buy.stripe.com", html)
 
     def test_single_link_helper_branches(self):
         a = available_downloads()[0]
         soon = _render_platform_pay_link(a, coming_soon=True)
-        self.assertIn("BUY - 0.3.9", soon)
+        self.assertIn("BUY - 0.4.0", soon)
         self.assertIn(COMING_SOON_PUBLIC_HREF, soon)
         self.assertIn('data-pay-via="coming-soon"', soon)
         self.assertIn('data-coming-soon="1"', soon)
         live = _render_platform_pay_link(a, coming_soon=False)
-        self.assertIn("BUY - 0.3.9", live)
+        self.assertIn("BUY - 0.4.0", live)
         self.assertIn('data-pay-via="stripe-payment-page"', live)
         self.assertIn(a.pay_path, live)
 

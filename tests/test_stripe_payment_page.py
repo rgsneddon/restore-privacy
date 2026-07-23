@@ -144,7 +144,7 @@ class TestPaymentPageInAdminHtml(unittest.TestCase):
         html = render_download_section_html()
         self.assertNotIn('id="stripe-payment-page-link"', html)
         self.assertNotIn(">Stripe payment page<", html)
-        self.assertIn("BUY - 0.3.9", html)
+        self.assertIn("BUY - 0.4.0", html)
         self.assertIn("client_reference_id=windows", html)
         self.assertIn(OPERATOR_PAYMENT_PAGE, html)
         self.assertNotIn("Coming soon", html)

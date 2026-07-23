@@ -9,6 +9,7 @@ import 'macos_window.dart';
 import 'prefs_backend.dart';
 import 'registration_copy.dart';
 import 'rpt_config.dart';
+import 'free_tier.dart';
 import 'settings_screen.dart';
 import 'settings_store.dart';
 import 'theme.dart';
@@ -105,7 +106,7 @@ class _TunnelHomeState extends State<TunnelHome> with WidgetsBindingObserver {
       _append(kAppTitle);
       _append(kPrivacyMessageText);
       _append(kSeamlessHint);
-      _append('Version ${RptConfig.productVersion}');
+      _append('Version ${RptConfig.displayProductVersion}');
       await _rehydrateSession(from: 'launch');
       if (!_licenceAccepted) {
         await _showLicenceSheet();

@@ -2,7 +2,7 @@
 
 **Last updated:** 21 July 2026  
 **Product:** Restore Privacy Tunnel (RPT / RPT2) — custom VPN node, client apps, and public VPN APP Shop  
-**Current packages (catalog v0.3.9):** paid installers (£2.45 GBP per package) via [status downloads](https://restoreprivacy.online/) (Windows · Android · macOS · iOS · Linux — macOS Developer ID notarized; iOS Team-signed sideload). The product **source repository is private**; free permanent public GitHub installer URLs are **not** offered. After payment the status host delivers a **one-time** download (authenticated proxy).  
+**Current packages (catalog v0.4.0):** paid installers (£2.45 GBP per package) via [status downloads](https://restoreprivacy.online/) (Windows · Android · macOS · iOS · Linux — macOS Developer ID notarized; iOS Team-signed sideload). The product **source repository is private**; free permanent public GitHub installer URLs are **not** offered. After payment the status host delivers a **one-time** download (authenticated proxy).  
 
 **STRONG DISCLAIMER — PAYMENT REQUIRED FOR CONNECT:** Access to **Connect** and residual VPN use requires **successful payment**. If payment **fails at any time** (failed checkout, failed charge, refund, dispute, or revoked entitlement), the ability to **Connect with the Restore Privacy app is cancelled** for that purchase/install until a successful payment is completed. Stripe Checkout session id is used as a **payment entitlement** key (not a username/password account); status host stores entitlement outcome for Connect checks.
 **Code & policy audit:** [AUDIT.md](AUDIT.md) (also served on the status host as `/AUDIT.md`)  
@@ -75,7 +75,7 @@ Process stdout/stderr for the node service is configured for **no journal sessio
 - **Payment entitlement:** after successful paid Checkout the status host records an **active** Connect entitlement for that Stripe session (and binds Stripe `payment_intent` id so refunds without session metadata still revoke). Webhook-observed **payment failures / refunds / disputes** set the entitlement to **failed/revoked** so Connect is blocked for that purchase. Clients import the session id (or `payment_entitlement.json` from the thank-you page) under **Settings → Payment entitlement**, then query `/api/connect-entitlement` on Connect to re-check status (no password account; session id only).
 - Does **not** expose a live connected-client count or poll a session metric on the public HTML surface.
 - Optional `/api/status` JSON is **title-only** (no `clients_connected`).
-- **Does not** publish free permanent GitHub `releases/download` installer buttons. Catalog **v0.3.9** packages are fulfilled **after payment** on [status downloads](https://restoreprivacy.online/) via a **one-time** proxy download (private source repository).
+- **Does not** publish free permanent GitHub `releases/download` installer buttons. Catalog **v0.4.0** packages are fulfilled **after payment** on [status downloads](https://restoreprivacy.online/) via a **one-time** proxy download (private source repository).
 - Serves same-origin legal documents (`/PRIVACY_POLICY.md`, `/LICENSE`, `/README.md`, `/CREDITS.md`, `/AUDIT.md`) so clients can open docs without a public GitHub tree. The security audit includes a **per-installer AUDIT STATE** (Green / Amber / Red) for catalog packages.
 
 ### 3.4 Operator-held secrets

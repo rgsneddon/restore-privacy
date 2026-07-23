@@ -136,7 +136,7 @@ class TestMultihopStructureProbes(unittest.TestCase):
         results = {
             "generated_at": "2026-07-22T00:00:00Z",
             "node_host": "127.0.0.1",
-            "catalog_version": "0.3.9",
+            "catalog_version": "0.4.0",
             "unit_suite": {"ran": False, "ok": True, "reason": "skipped"},
             "tcp_status": {"ok": True},
             "http_status": {
@@ -147,7 +147,7 @@ class TestMultihopStructureProbes(unittest.TestCase):
             "udp": {"sent": True},
             "no_priv": {"ok": True, "hits": []},
             "package_rag": {
-                "catalog_version": "0.3.9",
+                "catalog_version": "0.4.0",
                 "overall": "Green",
                 "packages": [],
                 "legend": {"Green": "OK", "Amber": "A", "Red": "R"},

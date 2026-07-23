@@ -1,7 +1,7 @@
-"""Catalog 0.3.9 package pins (source monopin + optional staged packages).
+"""Catalog 0.4.0 package pins (source monopin + optional staged packages).
 
 Source pins and Apple handoff are always required. Windows multihop PE and
-macOS zip are asserted when present under ``releases/0.3.9/`` (gitignored;
+macOS zip are asserted when present under ``releases/0.4.0/`` (gitignored;
 operator-built).
 """
 
@@ -17,7 +17,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
-VERSION = "0.3.9"
+VERSION = "0.4.0"
 REL = ROOT / "releases" / VERSION
 STATUS_ASSETS = ROOT / "status_page" / "assets" / VERSION
 WINDOWS = REL / f"restore-privacy-client-{VERSION}-windows-x64-setup.exe"
@@ -30,7 +30,7 @@ EXIT_PUB_PIN = (
 )
 
 
-class Test039SourcePins(unittest.TestCase):
+class Test040SourcePins(unittest.TestCase):
     def test_client_version_pin(self):
         ver = (ROOT / "client" / "VERSION").read_text(encoding="utf-8").strip()
         self.assertEqual(ver, VERSION)
@@ -93,10 +93,10 @@ class Test039SourcePins(unittest.TestCase):
         self.assertEqual(hashlib.sha256(exit_b).hexdigest(), EXIT_PUB_PIN)
 
     def test_apple_handoff_present(self):
-        h = ROOT / "client_app" / "APPLE_HANDOFF_0.3.9.md"
+        h = ROOT / "client_app" / "APPLE_HANDOFF_0.4.0.md"
         self.assertTrue(h.is_file())
         text = h.read_text(encoding="utf-8")
-        self.assertIn("0.3.9", text)
+        self.assertIn("0.4.0", text)
         self.assertIn("flutter build macos", text.lower())
 
     def test_build_release_script_and_release_md(self):
@@ -113,20 +113,20 @@ class Test039SourcePins(unittest.TestCase):
         self.assertIn(f"build_release_{VERSION}.py", rel)
         self.assertIn(f"APPLE_HANDOFF_{VERSION}.md", rel)
 
-    def test_readme_catalog_0_3_9(self):
+    def test_readme_catalog_0_4_0(self):
         text = (ROOT / "README.md").read_text(encoding="utf-8")
-        self.assertIn("0.3.9", text)
+        self.assertIn("0.4.0", text)
 
 
-@unittest.skipUnless(WINDOWS.is_file(), "releases/0.3.9 Windows PE not present")
-class Test039WindowsPeOptional(unittest.TestCase):
+@unittest.skipUnless(WINDOWS.is_file(), "releases/0.4.0 Windows PE not present")
+class Test040WindowsPeOptional(unittest.TestCase):
     def test_windows_pe_built(self):
         self.assertTrue(WINDOWS.is_file(), f"missing {WINDOWS}")
         self.assertGreater(WINDOWS.stat().st_size, 1_000_000)
 
 
-@unittest.skipUnless(MACOS.is_file(), "releases/0.3.9 macOS zip not present")
-class Test039MacosPackage(unittest.TestCase):
+@unittest.skipUnless(MACOS.is_file(), "releases/0.4.0 macOS zip not present")
+class Test040MacosPackage(unittest.TestCase):
     def test_macos_zip_size_and_no_priv(self):
         self.assertGreater(MACOS.stat().st_size, 1_000_000)
         with zipfile.ZipFile(MACOS) as z:
@@ -160,7 +160,7 @@ class Test039MacosPackage(unittest.TestCase):
                     if n.startswith(d) and n.endswith(".priv"):
                         self.fail(f"priv next to pubs in zip: {n}")
 
-    def test_macos_cfbundle_version_is_0_3_9(self):
+    def test_macos_cfbundle_version_is_0_4_0(self):
         with zipfile.ZipFile(MACOS) as z:
             # Host app only — skip nested frameworks/plugins/appex
             host = [
@@ -174,7 +174,7 @@ class Test039MacosPackage(unittest.TestCase):
             self.assertIn(
                 VERSION.encode(),
                 raw,
-                "host Info.plist must pin catalog version 0.3.9",
+                "host Info.plist must pin catalog version 0.4.0",
             )
 
 
@@ -182,8 +182,8 @@ if __name__ == "__main__":
     unittest.main()
 
 
-@unittest.skipUnless(IOS.is_file(), "releases/0.3.9 iOS zip not present")
-class Test039IosPackage(unittest.TestCase):
+@unittest.skipUnless(IOS.is_file(), "releases/0.4.0 iOS zip not present")
+class Test040IosPackage(unittest.TestCase):
     def test_ios_zip_size_and_no_priv(self):
         self.assertGreater(IOS.stat().st_size, 1_000_000)
         with zipfile.ZipFile(IOS) as z:
@@ -207,7 +207,7 @@ class Test039IosPackage(unittest.TestCase):
             exit_b = z.read(exit_names[0])
             self.assertEqual(hashlib.sha256(exit_b).hexdigest(), EXIT_PUB_PIN)
 
-    def test_ios_cfbundle_version_is_0_3_9(self):
+    def test_ios_cfbundle_version_is_0_4_0(self):
         with zipfile.ZipFile(IOS) as z:
             host = [
                 n
@@ -221,9 +221,9 @@ class Test039IosPackage(unittest.TestCase):
 
 @unittest.skipUnless(
     STATUS_MACOS.is_file() and STATUS_IOS.is_file(),
-    "status_page/assets/0.3.9 Apple zips not staged",
+    "status_page/assets/0.4.0 Apple zips not staged",
 )
-class Test039StatusAppleStage(unittest.TestCase):
+class Test040StatusAppleStage(unittest.TestCase):
     def test_staged_apple_match_releases_sizes(self):
         self.assertGreater(STATUS_MACOS.stat().st_size, 1_000_000)
         self.assertGreater(STATUS_IOS.stat().st_size, 1_000_000)

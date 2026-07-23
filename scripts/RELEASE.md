@@ -4,9 +4,9 @@
 
 | Tag | Script |
 |-----|--------|
-| **0.3.9** | `scripts/build_release_0.3.9.py` |
-| **0.3.9 Windows multihop PE** | `scripts/build_windows_multihop.py` / `scripts/build_windows_multihop.bat` (Windows x64 only; handoff `client/windows/WINDOWS_HANDOFF_0.3.9.md`) |
-| **0.3.9 Apple handoff** | `client_app/APPLE_HANDOFF_0.3.9.md` |
+| **0.4.0** | `scripts/build_release_0.4.0.py` |
+| **0.4.0 Windows multihop PE** | `scripts/build_windows_multihop.py` / `scripts/build_windows_multihop.bat` (Windows x64 only; handoff `client/windows/WINDOWS_HANDOFF_0.4.0.md`) |
+| **0.4.0 Apple handoff** | `client_app/APPLE_HANDOFF_0.4.0.md` |
 | 0.3.8 | `scripts/build_release_0.3.8.py` (archive) |
 | 0.3.7 | `scripts/build_release_0.3.7.py` (archive) |
 | 0.3.6 | `scripts/build_release_0.3.6.py` (archive) |
@@ -19,9 +19,9 @@
 | 0.2.0 | `scripts/build_release_0.2.0.py` (archive) |
 | 0.1.8 | `scripts/build_release_0.1.8.py` (archive) |
 
-Product node: **82.221.101.241:44044**. See `scripts/RELEASE_NOTES_0.3.9.md`.
+Product node: **82.221.101.241:44044**. See `scripts/RELEASE_NOTES_0.4.0.md`.
 
-**0.3.9 highlights:** privacy-scale Settings (shape/obfs/multihop), hot-apply, UK ping RAG, keygen lock, Apple Settings parity rebuild (DevID macOS + Team iOS).
+**0.4.0 highlights:** privacy-scale Settings (shape/obfs/multihop), hot-apply, UK ping RAG, keygen lock, Apple Settings parity rebuild (DevID macOS + Team iOS).
 
 **0.3.8 highlights:** catalog monopin **0.3.8**; subscription keygen unlock; multi-hop residual when enabled.
 
@@ -44,8 +44,8 @@ Shared gates every release must keep:
 ```bash
 # Bump VERSION / downloads catalog / installer VERSION first
 # Mac: flutter build macos --release, then package (DevID + notarize)
-python scripts/build_release_0.3.9.py --apple-only
-# Confirm releases/0.3.9/ has macos (+ ios if built) zip(s)
-# Full catalog: python scripts/build_release_0.3.9.py
-# gh release create 0.3.9 with those files (operator)
+python scripts/build_release_0.4.0.py --apple-only
+# Confirm releases/0.4.0/ has macos (+ ios if built) zip(s)
+# Full catalog: python scripts/build_release_0.4.0.py
+# gh release create 0.4.0 with those files (operator)
 ```

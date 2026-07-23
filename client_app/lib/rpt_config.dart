@@ -1,11 +1,15 @@
 import 'dart:io' show Platform;
 
+import 'free_tier.dart';
+
 /// RPT node endpoint and full-tunnel intent (shared with platform VPN).
 ///
 /// Multi-hop residual is **opt-in**: when [multiHopEnabled] is true, residual
 /// Connect dials the **exit** hop (Romania) with `exit_node_elgamal.pub`.
 /// Default remains single-hop Iceland entry (`node_elgamal.pub`).
 /// This is residual-via-exit selection, not full intermediate encapsulation.
+///
+/// Free tier ([freeTierEnabled]): multi-hop is forced off; host is always entry.
 class RptConfig {
   /// Product entry node (must match [client/endpoint.py] PRODUCT_NODE_HOST).
   static const String entryHost = '82.221.101.241';
@@ -17,8 +21,13 @@ class RptConfig {
   static const String protocolMagic = 'RPT2';
   static const String sessionName = 'Privacy Restored';
 
-  /// Product pin — must match monorepo ``client/VERSION`` and pubspec version.
-  static const String productVersion = '0.3.9';
+  /// Paid catalog pin — must match monorepo ``client/VERSION`` and pubspec.
+  /// Free builds report [kFreeTierVersion] via [displayProductVersion].
+  static const String productVersion = '0.4.0';
+
+  /// UI / about version (free tier always ``3.3.3``).
+  static String get displayProductVersion =>
+      freeAwareProductVersion(productVersion);
 
   /// Full tunnel: all device traffic (0.0.0.0/0).
   static const bool fullTunnel = true;
@@ -37,15 +46,20 @@ class RptConfig {
   static bool? runtimeMultiHopOverride;
 
   /// Apply Settings multi-hop toggle (Windows/Apple parity).
+  /// No-op when free tier locks multi-hop off.
   static void setRuntimeMultiHop(bool? enabled) {
+    if (freeTierEnabled) {
+      runtimeMultiHopOverride = false;
+      return;
+    }
     runtimeMultiHopOverride = enabled;
   }
 
   /// True when residual multi-hop (exit dial) is selected.
   ///
-  /// Order: Settings runtime override → compile-time dart-define → process env
-  /// ``RPT_MULTIHOP_ENABLED=1`` (desktop / shell).
+  /// Free tier: always false. Else: Settings → dart-define → env.
   static bool get multiHopEnabled {
+    if (freeTierEnabled) return false;
     final o = runtimeMultiHopOverride;
     if (o != null) return o;
     if (multiHopFromEnvironment) return true;

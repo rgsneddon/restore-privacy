@@ -45,14 +45,14 @@ class TestPublicPageWithDownloads(unittest.TestCase):
         self.assertNotIn('id="clients-connected"', html)
         self.assertNotIn("fetch('/api/status'", html)
         self.assertNotIn("setInterval(poll", html)
-        self.assertIn("Download client v0.3.9", html)
+        self.assertIn("Download client v0.4.0", html)
         self.assertIn(WINDOWS_ZIP_FILENAME, html)
         self.assertIn(MACOS_ZIP_FILENAME, html)
         self.assertIn(IOS_ZIP_FILENAME, html)
         self.assertIn(ANDROID_APK_FILENAME, html)
         self.assertNotIn("apple-prep", html)
         # Live catalog: Stripe Pay buttons (not Coming soon)
-        self.assertIn("BUY - 0.3.9", html)
+        self.assertIn("BUY - 0.4.0", html)
         self.assertIn("buy.stripe.com", html)
         self.assertIn('data-buy-mode="stripe-live"', html)
         self.assertNotIn("Coming soon", html)
@@ -63,12 +63,12 @@ class TestPublicPageWithDownloads(unittest.TestCase):
             self.assertNotIn(f'href="{a.url}"', html)
             self.assertTrue(
                 a.url.startswith(
-                    "https://github.com/rgsneddon/restore-privacy/releases/download/0.3.9/"
+                    "https://github.com/rgsneddon/restore-privacy/releases/download/0.4.0/"
                 )
             )
         self.assertEqual(
             RELEASE_PAGE_URL,
-            "https://github.com/rgsneddon/restore-privacy/releases/tag/0.3.9",
+            "https://github.com/rgsneddon/restore-privacy/releases/tag/0.4.0",
         )
         # Catalogue footer link removed — pay buttons are the only catalog entry.
         self.assertNotIn('id="rust-repo-link"', html)
@@ -108,9 +108,9 @@ class TestPublicPageWithDownloads(unittest.TestCase):
                     self.assertNotIn("BETA - test phase", html)
                     self.assertNotIn("clients-connected", html)
                     self.assertNotIn("fetch('/api/status'", html)
-                    self.assertIn("Download client v0.3.9", html)
+                    self.assertIn("Download client v0.4.0", html)
                     self.assertIn(WINDOWS_ZIP_FILENAME, html)
-                    self.assertIn("BUY - 0.3.9", html)
+                    self.assertIn("BUY - 0.4.0", html)
                     self.assertIn("buy.stripe.com", html)
                     self.assertNotIn("Coming soon", html)
                     self.assertIn("£2.45", html)
