@@ -581,6 +581,48 @@ class Handler(BaseHTTPRequestHandler):
                 ),
             )
             return
+        if path in ("/pay/start", "/pay/usd"):
+            # USD presentment start: USD Payment Link or Checkout Session in USD
+            from payments import (
+                BILLING_INTERVAL_MONTH,
+                BILLING_INTERVAL_YEAR,
+                public_base_url,
+                resolve_usd_pay_redirect_url,
+                stripe_payment_page_href_for_platform,
+            )
+
+            plat = (query.get("platform") or "windows").strip().lower()
+            iv = (query.get("interval") or BILLING_INTERVAL_MONTH).strip().lower()
+            if iv in ("year", "yearly", "annual", "annually"):
+                iv = BILLING_INTERVAL_YEAR
+            else:
+                iv = BILLING_INTERVAL_MONTH
+            ccy = (query.get("currency") or "usd").strip().lower()
+            if ccy != "usd":
+                # Non-USD: Adaptive Pricing path on GBP Payment Link
+                self._redirect(
+                    stripe_payment_page_href_for_platform(
+                        plat, interval=iv, currency=ccy
+                    )
+                )
+                return
+            try:
+                dest = resolve_usd_pay_redirect_url(
+                    plat,
+                    interval=iv,
+                    base_url=public_base_url(),
+                )
+            except ValueError as exc:
+                # No USD Payment Link and Checkout create failed (missing secret).
+                # Do not silently send visitors to the GBP Payment Link as "USD".
+                msg = (
+                    "USD pay unavailable: set STRIPE_PAYMENT_PAGE_URL_USD "
+                    f"(and yearly USD if needed) or STRIPE_SECRET_KEY. ({exc})"
+                ).encode("utf-8")
+                self._send(503, "text/plain; charset=utf-8", msg)
+                return
+            self._redirect(dest)
+            return
         if path in settings_explainer_paths():
             self._send(
                 200,

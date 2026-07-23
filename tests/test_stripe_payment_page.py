@@ -147,10 +147,18 @@ class TestPaymentPageInAdminHtml(unittest.TestCase):
         self.assertIn("Monthly", html)
         self.assertIn("Yearly", html)
         self.assertIn("we accept *", html)
-        self.assertIn("client_reference_id=windows", html)
+        self.assertTrue(
+            "client_reference_id=windows" in html
+            or ("/pay/start" in html and "platform=windows" in html),
+            html[:300],
+        )
         self.assertIn("data-billing-interval=\"month\"", html)
         self.assertIn("data-billing-interval=\"year\"", html)
-        self.assertIn(OPERATOR_PAYMENT_PAGE, html)
+        # Default catalog locale resolves to USD → /pay/start (or USD Payment Link)
+        self.assertTrue(
+            OPERATOR_PAYMENT_PAGE in html or "/pay/start" in html,
+            "expected GBP Payment Link or USD /pay/start path",
+        )
         self.assertNotIn("Coming soon", html)
 
 

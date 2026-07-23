@@ -131,7 +131,11 @@ class TestCatalogHtmlLocalCurrency(unittest.TestCase):
         self.assertIn("Yearly USD", html)
 
     def test_pay_href_uses_locale_for_presentment(self):
-        from payments import stripe_payment_page_href_for_platform
+        from payments import (
+            stripe_payment_page_href_for_platform,
+            stripe_payment_page_url,
+            usd_pay_start_path,
+        )
 
         href = stripe_payment_page_href_for_platform(
             "windows", interval="month", currency="EUR"
@@ -140,12 +144,82 @@ class TestCatalogHtmlLocalCurrency(unittest.TestCase):
         self.assertIn("windows", href)
         self.assertIn("month", href)
         self.assertIn("locale=", href)
+        # Supported local currency → GBP Payment Link family (Adaptive Pricing)
+        self.assertIn("buy.stripe.com", href)
+        self.assertTrue(
+            href.startswith(stripe_payment_page_url())
+            or stripe_payment_page_url() in href
+        )
         # Currency must not corrupt platform|interval ref
         self.assertNotIn("windows%7Cmonth%7Ceur", href.lower())
+
+        # Unsupported currency → distinct USD pay path (not same GBP link + locale=en)
         href_usd = stripe_payment_page_href_for_platform(
-            "linux", interval="year", currency="XYZ"
+            "linux", interval="year", currency="XYZ", base_url=""
         )
-        self.assertIn("locale=", href_usd)
+        href_eur = stripe_payment_page_href_for_platform(
+            "linux", interval="year", currency="EUR"
+        )
+        self.assertNotEqual(href_usd, href_eur)
+        # Must be host /pay/start USD path when USD Payment Link env unset
+        self.assertIn("/pay/start", href_usd)
+        self.assertIn("currency=usd", href_usd.lower())
+        self.assertIn("platform=linux", href_usd)
+        self.assertIn("interval=year", href_usd)
+        self.assertEqual(
+            usd_pay_start_path("linux", interval="year"),
+            "/pay/start?platform=linux&interval=year&currency=usd",
+        )
+        # Explicit USD also uses USD path (not Adaptive Pricing on GBP link alone)
+        href_us = stripe_payment_page_href_for_platform(
+            "android", interval="month", currency="USD", base_url=""
+        )
+        self.assertIn("/pay/start", href_us)
+        self.assertIn("currency=usd", href_us.lower())
+
+    def test_usd_payment_link_env_used_when_set(self):
+        import os
+        from payments import stripe_payment_page_href_for_platform
+
+        os.environ["STRIPE_PAYMENT_PAGE_URL_USD"] = (
+            "https://buy.stripe.com/test_usd_monthly_link"
+        )
+        try:
+            href = stripe_payment_page_href_for_platform(
+                "windows", interval="month", currency="XYZ"
+            )
+            self.assertIn("buy.stripe.com/test_usd_monthly_link", href)
+            self.assertIn("client_reference_id=", href)
+            self.assertIn("locale=en", href)
+            self.assertNotIn("/pay/start", href)
+            # EUR still uses default GBP monthly link family
+            href_eur = stripe_payment_page_href_for_platform(
+                "windows", interval="month", currency="EUR"
+            )
+            self.assertNotIn("test_usd_monthly_link", href_eur)
+        finally:
+            os.environ.pop("STRIPE_PAYMENT_PAGE_URL_USD", None)
+
+    def test_build_checkout_form_body_usd_is_usd(self):
+        from payments import CheckoutRequest, build_checkout_form_body_usd
+
+        import urllib.parse
+
+        body = build_checkout_form_body_usd(
+            CheckoutRequest(
+                platform="windows",
+                filename="pkg.exe",
+                success_url="https://example.com/ok",
+                cancel_url="https://example.com/cancel",
+            ),
+            amount_gbp=2.45,
+            interval="month",
+        ).decode("utf-8")
+        decoded = urllib.parse.unquote(body)
+        self.assertIn("currency]=usd", decoded)  # price_data[currency]=usd
+        self.assertIn("unit_amount]=311", decoded)  # 2.45 * 1.27 * 100
+        self.assertIn("presentment]=usd", decoded)
+        self.assertNotIn("currency]=gbp", decoded)
 
 
 class TestStripePresentmentSet(unittest.TestCase):

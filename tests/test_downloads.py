@@ -110,7 +110,7 @@ class TestDownloadCatalog(unittest.TestCase):
         self.assertIn(">macOS<", html)
         self.assertIn(">iOS<", html)
         self.assertIn(">Linux<", html)
-        self.assertIn("buy.stripe.com", html)
+        self.assertTrue("buy.stripe.com" in html or "/pay/start" in html, html[:200])
         self.assertIn('data-buy-mode="stripe-live"', html)
         self.assertIn('data-billing-intervals="month,year"', html)
         self.assertNotIn("Coming soon", html)
@@ -157,11 +157,14 @@ class TestDownloadCatalog(unittest.TestCase):
         row2_at = html.find('id="dl-row-2"')
         self.assertGreater(row1_at, head_at)
         self.assertGreater(row2_at, row1_at)
-        # Live mode: Stripe Payment Link per platform; never free GitHub
+        # Live mode: Stripe Payment Link or /pay/start USD path per platform
         for a in available_downloads():
-            # href may append locale= for Adaptive Pricing UX
-            self.assertIn(f"client_reference_id={a.platform}", html.replace("%7C", "|"))
             self.assertIn(f'id="dl-{a.platform}"', html)
+            self.assertTrue(
+                f"platform={a.platform}" in html
+                or f"client_reference_id={a.platform}" in html.replace("%7C", "|"),
+                a.platform,
+            )
             self.assertNotIn(f'href="{a.url}"', html)
 
     def test_available_downloads_have_https_github_release_urls(self):
@@ -179,7 +182,7 @@ class TestDownloadCatalog(unittest.TestCase):
         self.assertIn("Monthly", html)
         self.assertIn("Yearly", html)
         self.assertIn("we accept *", html)
-        self.assertIn("buy.stripe.com", html)
+        self.assertTrue("buy.stripe.com" in html or "/pay/start" in html, html[:200])
         self.assertNotIn("Coming soon", html)
 
     def test_download_section_omits_long_pay_flow_copy(self):
@@ -196,7 +199,7 @@ class TestDownloadCatalog(unittest.TestCase):
         self.assertIn("we accept *", html)
         self.assertIn('id="dl-windows"', html)
         self.assertIn('id="dl-windows-year"', html)
-        self.assertIn("buy.stripe.com", html)
+        self.assertTrue("buy.stripe.com" in html or "/pay/start" in html, html[:200])
         # No bottom generic “Stripe payment page” footer link
         self.assertNotIn('id="stripe-payment-page-link"', html)
         self.assertNotIn(">Stripe payment page<", html)
@@ -288,7 +291,7 @@ class TestDownloadCatalog(unittest.TestCase):
         self.assertIn("Monthly", page)
         self.assertIn("Yearly", page)
         self.assertIn("we accept *", page)
-        self.assertIn("buy.stripe.com", page)
+        self.assertTrue("buy.stripe.com" in page or "/pay/start" in page)
         self.assertNotIn("Coming soon", page)
         self.assertIn("£2.45", page)
         self.assertIn(WINDOWS_ZIP_FILENAME, page)  # data-filename

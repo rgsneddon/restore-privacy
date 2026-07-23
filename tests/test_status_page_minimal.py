@@ -54,7 +54,7 @@ class TestPublicPageWithDownloads(unittest.TestCase):
         # Live catalog: Stripe Pay buttons (not Coming soon)
         self.assertIn("Monthly", html)
         self.assertIn("Yearly", html)
-        self.assertIn("buy.stripe.com", html)
+        self.assertTrue("buy.stripe.com" in html or "/pay/start" in html, html[:200])
         self.assertIn('data-buy-mode="stripe-live"', html)
         self.assertNotIn("Coming soon", html)
         for a in available_downloads():
@@ -113,7 +113,7 @@ class TestPublicPageWithDownloads(unittest.TestCase):
                     self.assertIn(WINDOWS_ZIP_FILENAME, html)
                     self.assertIn("Monthly", html)
                     self.assertIn("Yearly", html)
-                    self.assertIn("buy.stripe.com", html)
+                    self.assertTrue("buy.stripe.com" in html or "/pay/start" in html, html[:200])
                     self.assertNotIn("Coming soon", html)
                     self.assertIn("£2.45", html)
                     self.assertNotIn('id="rust-repo-link"', html)

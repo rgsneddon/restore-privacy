@@ -140,6 +140,14 @@ CATALOG_STRIPE_PAYMENT_MODE = "subscription"
 # Empty default: yearly href falls back to monthly URL with interval marker in
 # client_reference_id so architecture works; operator should set real yearly link.
 DEFAULT_STRIPE_PAYMENT_PAGE_URL_YEARLY = ""
+# USD presentment Payment Links (required for true USD charge when Adaptive Pricing
+# cannot present the visitor currency). Override with STRIPE_PAYMENT_PAGE_URL_USD /
+# STRIPE_PAYMENT_PAGE_URL_YEARLY_USD. When unset, catalog pay buttons for USD
+# presentment use host ``/pay/start?...&currency=usd`` which creates a Stripe
+# Checkout Session in **USD** (needs STRIPE_SECRET_KEY) or redirects to the USD
+# Payment Link when configured.
+DEFAULT_STRIPE_PAYMENT_PAGE_URL_USD = ""
+DEFAULT_STRIPE_PAYMENT_PAGE_URL_YEARLY_USD = ""
 
 # Customer-facing licence status (OK | EXPIRED) for clients + admin.
 LICENCE_STATUS_OK = "OK"
@@ -201,6 +209,64 @@ def stripe_payment_page_url_for_interval(interval: str = BILLING_INTERVAL_MONTH)
     return stripe_payment_page_url()
 
 
+def stripe_payment_page_url_usd() -> str:
+    """Monthly **USD** Payment Link (public). Empty if operator has not set one.
+
+    Override with ``STRIPE_PAYMENT_PAGE_URL_USD`` / ``RPT_STRIPE_PAYMENT_PAGE_URL_USD``.
+    """
+    raw = ""
+    for key in ("STRIPE_PAYMENT_PAGE_URL_USD", "RPT_STRIPE_PAYMENT_PAGE_URL_USD"):
+        raw = os.environ.get(key, "").strip()
+        if raw:
+            break
+    if not raw:
+        raw = DEFAULT_STRIPE_PAYMENT_PAGE_URL_USD
+    return _normalize_stripe_pay_url(raw) if raw else ""
+
+
+def stripe_payment_page_url_yearly_usd() -> str:
+    """Yearly **USD** Payment Link (public). Falls back to monthly USD URL."""
+    raw = ""
+    for key in (
+        "STRIPE_PAYMENT_PAGE_URL_YEARLY_USD",
+        "RPT_STRIPE_PAYMENT_PAGE_URL_YEARLY_USD",
+    ):
+        raw = os.environ.get(key, "").strip()
+        if raw:
+            break
+    if not raw:
+        raw = DEFAULT_STRIPE_PAYMENT_PAGE_URL_YEARLY_USD or stripe_payment_page_url_usd()
+    return _normalize_stripe_pay_url(raw) if raw else ""
+
+
+def stripe_payment_page_url_usd_for_interval(
+    interval: str = BILLING_INTERVAL_MONTH,
+) -> str:
+    """USD Payment Link base for *interval*, or empty string if not configured."""
+    iv = (interval or BILLING_INTERVAL_MONTH).strip().lower()
+    if iv in ("year", "yearly", "annual", "annually"):
+        return stripe_payment_page_url_yearly_usd()
+    return stripe_payment_page_url_usd()
+
+
+def usd_pay_start_path(
+    platform: str,
+    *,
+    interval: str = BILLING_INTERVAL_MONTH,
+) -> str:
+    """Host path that starts a **USD** Checkout / Payment Link (not the GBP link)."""
+    plat = (platform or "").strip().lower() or "windows"
+    iv = (interval or BILLING_INTERVAL_MONTH).strip().lower()
+    if iv not in ("year", "yearly", "annual", "annually"):
+        iv = BILLING_INTERVAL_MONTH
+    else:
+        iv = BILLING_INTERVAL_YEAR
+    q = urllib.parse.urlencode(
+        {"platform": plat, "interval": iv, "currency": "usd"}
+    )
+    return f"/pay/start?{q}"
+
+
 def encode_client_reference_id(
     platform: str, *, interval: str = BILLING_INTERVAL_MONTH
 ) -> str:
@@ -240,39 +306,69 @@ def stripe_payment_page_href_for_platform(
     interval: str = BILLING_INTERVAL_MONTH,
     currency: str = "",
     locale: str = "",
+    base_url: str | None = None,
 ) -> str:
-    """Subscription Payment Link URL with product identity for webhook fulfilment.
+    """Subscription Payment Link / pay-start URL for catalog BUY buttons.
 
-    Stripe Payment Links accept ``client_reference_id`` on the URL; the webhook
-    reads platform (+ billing interval) and mints a one-time download token.
+    Stripe Payment Links accept ``client_reference_id`` (platform|interval).
     *interval* is ``month`` (default) or ``year``.
 
-    *currency* selects Stripe ``locale`` for Adaptive Pricing UX (USD when
-    Stripe cannot present the visitor currency — see
-    :func:`local_currency.stripe_presentment_or_usd`). Enable **Adaptive
-    Pricing** on the Dashboard Payment Link so Stripe charges available
-    currencies; unsupported locales/currencies fall back to USD presentment.
+    *currency* (visitor preference) is resolved via
+    :func:`local_currency.stripe_presentment_or_usd`:
+
+    - **USD presentment** (US visitors **or** Stripe-unsupported currency
+      fallback): use operator **USD Payment Link** env if set; otherwise a
+      distinct host path ``/pay/start?…&currency=usd`` that creates a Stripe
+      Checkout Session in **USD** (not the GBP Payment Link).
+    - **Other Stripe-supported currencies** (EUR, JPY, …): GBP-priced Payment
+      Link + ``locale`` so Dashboard **Adaptive Pricing** can present local
+      currency when enabled.
+    - **No currency** (legacy callers): GBP monthly/yearly Payment Link only.
     """
     plat = (platform or "").strip().lower()
-    base = stripe_payment_page_url_for_interval(interval)
     try:
         from local_currency import (
+            FALLBACK_CURRENCY,
             currency_to_stripe_locale,
             stripe_presentment_or_usd,
         )
     except ImportError:  # pragma: no cover
         from status_page.local_currency import (  # type: ignore
+            FALLBACK_CURRENCY,
             currency_to_stripe_locale,
             stripe_presentment_or_usd,
         )
 
-    presentment = stripe_presentment_or_usd(currency) if currency else ""
+    presentment = ""
+    if (currency or "").strip():
+        presentment = stripe_presentment_or_usd(currency)
+
+    # --- USD presentment: never rely on locale alone on the GBP Payment Link ---
+    if presentment == FALLBACK_CURRENCY:
+        usd_base = stripe_payment_page_url_usd_for_interval(interval)
+        if usd_base:
+            params: dict[str, str] = {"locale": "en"}
+            if plat:
+                params["client_reference_id"] = encode_client_reference_id(
+                    plat, interval=interval
+                )
+            q = urllib.parse.urlencode(params)
+            sep = "&" if "?" in usd_base else "?"
+            return f"{usd_base}{sep}{q}"
+        # Distinct host start URL (Checkout USD or env USD link at request time)
+        path = usd_pay_start_path(plat or "windows", interval=interval)
+        base = (base_url or public_base_url() or "").rstrip("/")
+        if base:
+            return f"{base}{path}"
+        return path
+
+    # --- GBP-priced Payment Link (+ locale for Adaptive Pricing) ---
+    base = stripe_payment_page_url_for_interval(interval)
     loc = (locale or "").strip()
     if not loc and presentment:
         loc = currency_to_stripe_locale(presentment)
-    params: dict[str, str] = {}
+    params = {}
     if plat:
-        # Keep platform|interval only (fulfilment parse_client_reference_id)
         params["client_reference_id"] = encode_client_reference_id(
             plat, interval=interval
         )
@@ -3540,15 +3636,74 @@ def build_checkout_form_body(req: CheckoutRequest) -> bytes:
     return urllib.parse.urlencode(fields).encode("utf-8")
 
 
+def build_checkout_form_body_usd(
+    req: CheckoutRequest,
+    *,
+    amount_gbp: float,
+    interval: str = BILLING_INTERVAL_MONTH,
+) -> bytes:
+    """One-time Checkout body charged in **USD** (relative to GBP anchor).
+
+    Used when Stripe cannot present the visitor currency — default presentment
+    is USD, not silent GBP. Unit amount is integer US cents from
+    :func:`local_currency.convert_gbp_to_currency`.
+    """
+    try:
+        from local_currency import FALLBACK_CURRENCY, convert_gbp_to_currency
+    except ImportError:  # pragma: no cover
+        from status_page.local_currency import (  # type: ignore
+            FALLBACK_CURRENCY,
+            convert_gbp_to_currency,
+        )
+
+    usd_amount = convert_gbp_to_currency(float(amount_gbp), FALLBACK_CURRENCY)
+    cents = max(1, int(round(usd_amount * 100)))
+    iv = (interval or BILLING_INTERVAL_MONTH).strip().lower()
+    ref = encode_client_reference_id(req.platform, interval=iv)
+    fields: list[tuple[str, str]] = [
+        ("mode", "payment"),
+        ("success_url", req.success_url),
+        ("cancel_url", req.cancel_url),
+        ("client_reference_id", ref),
+        ("metadata[platform]", req.platform),
+        ("metadata[filename]", req.filename),
+        ("metadata[amount_cents]", str(cents)),
+        ("metadata[currency]", "usd"),
+        ("metadata[gbp_anchor]", str(amount_gbp)),
+        ("metadata[billing_interval]", iv),
+        ("metadata[presentment]", "usd"),
+        ("customer_creation", "always"),
+        ("line_items[0][price_data][currency]", "usd"),
+        ("line_items[0][price_data][unit_amount]", str(cents)),
+        (
+            "line_items[0][price_data][product_data][name]",
+            f"Restore Privacy ({iv}) - {req.platform}",
+        ),
+        (
+            "line_items[0][price_data][product_data][description]",
+            req.filename,
+        ),
+        ("line_items[0][quantity]", "1"),
+    ]
+    return urllib.parse.urlencode(fields).encode("utf-8")
+
+
 def create_checkout_session(
     platform: str,
     *,
     base_url: str | None = None,
     http_post: HttpPostFn | None = None,
+    currency: str = "",
+    interval: str = BILLING_INTERVAL_MONTH,
 ) -> dict[str, Any]:
-    """Create a Stripe Checkout Session for one package at £2.45 GBP.
+    """Create a Stripe Checkout Session for one package.
 
-    Returns dict with keys: id, url (Stripe-hosted), platform, filename, amount_pence.
+    Default: one-time **£2.45 GBP**. When *currency* resolves to **USD**
+    presentment (including unsupported-currency fallback), charges the relative
+    USD amount (from :mod:`local_currency` GBP anchors) in **usd**.
+
+    Returns dict with keys: id, url (Stripe-hosted), platform, filename,
+    amount_pence (or amount_cents for USD), currency.
     Raises ValueError on bad platform or missing Stripe config / API failure.
     """
     filename = platform_filename(platform)
@@ -3570,7 +3725,46 @@ def create_checkout_session(
         success_url=success,
         cancel_url=cancel,
     )
-    body = build_checkout_form_body(creq)
+    try:
+        from local_currency import (
+            FALLBACK_CURRENCY,
+            PRICE_MONTHLY_GBP,
+            PRICE_YEARLY_GBP,
+            convert_gbp_to_currency,
+            stripe_presentment_or_usd,
+        )
+    except ImportError:  # pragma: no cover
+        from status_page.local_currency import (  # type: ignore
+            FALLBACK_CURRENCY,
+            PRICE_MONTHLY_GBP,
+            PRICE_YEARLY_GBP,
+            convert_gbp_to_currency,
+            stripe_presentment_or_usd,
+        )
+
+    presentment = (
+        stripe_presentment_or_usd(currency) if (currency or "").strip() else ""
+    )
+    iv = (interval or BILLING_INTERVAL_MONTH).strip().lower()
+    if iv in ("year", "yearly", "annual", "annually"):
+        iv = BILLING_INTERVAL_YEAR
+        gbp_amt = PRICE_YEARLY_GBP
+    else:
+        iv = BILLING_INTERVAL_MONTH
+        gbp_amt = PRICE_MONTHLY_GBP
+
+    if presentment == FALLBACK_CURRENCY:
+        body = build_checkout_form_body_usd(
+            creq, amount_gbp=gbp_amt, interval=iv
+        )
+        charge_currency = "usd"
+        unit_amount = int(
+            round(convert_gbp_to_currency(gbp_amt, FALLBACK_CURRENCY) * 100)
+        )
+    else:
+        body = build_checkout_form_body(creq)
+        charge_currency = PRICE_CURRENCY
+        unit_amount = PRICE_PENCE
 
     post = http_post or _default_http_post
     status, raw = post(
@@ -3593,9 +3787,47 @@ def create_checkout_session(
         "url": url,
         "platform": platform,
         "filename": filename,
-        "amount_pence": PRICE_PENCE,
-        "currency": PRICE_CURRENCY,
+        "amount_pence": unit_amount if charge_currency == "gbp" else PRICE_PENCE,
+        "amount_cents": unit_amount if charge_currency == "usd" else None,
+        "currency": charge_currency,
+        "billing_interval": iv,
+        "presentment": presentment or charge_currency,
     }
+
+
+def resolve_usd_pay_redirect_url(
+    platform: str,
+    *,
+    interval: str = BILLING_INTERVAL_MONTH,
+    base_url: str | None = None,
+    http_post: HttpPostFn | None = None,
+) -> str:
+    """Absolute URL for USD presentment pay: USD Payment Link or Checkout Session.
+
+    Prefer operator ``STRIPE_PAYMENT_PAGE_URL_USD`` (yearly variant for year).
+    Else create a Stripe Checkout Session charged in **usd** (relative to GBP
+    anchors). Raises ValueError if neither path is available.
+    """
+    plat = (platform or "").strip().lower() or "windows"
+    usd_base = stripe_payment_page_url_usd_for_interval(interval)
+    if usd_base:
+        params = {
+            "client_reference_id": encode_client_reference_id(
+                plat, interval=interval
+            ),
+            "locale": "en",
+        }
+        q = urllib.parse.urlencode(params)
+        sep = "&" if "?" in usd_base else "?"
+        return f"{usd_base}{sep}{q}"
+    session = create_checkout_session(
+        plat,
+        base_url=base_url,
+        http_post=http_post,
+        currency="USD",
+        interval=interval,
+    )
+    return str(session["url"])
 
 
 # --- Webhook signature + grant ---------------------------------------------------
@@ -3693,12 +3925,32 @@ def process_checkout_completed_event(
         subscription_id = str(sub_raw.get("id") or "")
     else:
         subscription_id = str(sub_raw or "").strip()
-    # Full price (245) always OK. £0 / no_payment_required allowed only with a
+    # Full price (245 GBP pence) always OK. £0 / no_payment_required allowed only with a
     # subscription id (7-day trial then monthly) so underpay one-time never mints.
     # mode=subscription with subscription id and full price is also OK via amount_ok.
     # Yearly subscription: any positive amount_total with subscription id also OK
     # (yearly unit amount is operator-defined in Stripe, not hardcoded here).
-    amount_ok = amount is not None and amount == PRICE_PENCE
+    # USD one-time: relative cents from GBP anchors (local_currency FX table).
+    currency = str(meta.get("currency") or obj.get("currency") or PRICE_CURRENCY).strip().lower()
+    amount_ok = amount is not None and amount == PRICE_PENCE and currency in ("", PRICE_CURRENCY, "gbp")
+    usd_ok = False
+    if currency == "usd" and amount is not None and amount > 0:
+        try:
+            from local_currency import (
+                PRICE_MONTHLY_GBP,
+                PRICE_YEARLY_GBP,
+                convert_gbp_to_currency,
+            )
+        except ImportError:  # pragma: no cover
+            from status_page.local_currency import (  # type: ignore
+                PRICE_MONTHLY_GBP,
+                PRICE_YEARLY_GBP,
+                convert_gbp_to_currency,
+            )
+        expect_m = int(round(convert_gbp_to_currency(PRICE_MONTHLY_GBP, "USD") * 100))
+        expect_y = int(round(convert_gbp_to_currency(PRICE_YEARLY_GBP, "USD") * 100))
+        # Allow small rounding slack (±2 cents)
+        usd_ok = abs(int(amount) - expect_m) <= 2 or abs(int(amount) - expect_y) <= 2
     yearly_sub_ok = bool(subscription_id) and billing_interval == BILLING_INTERVAL_YEAR and (
         amount is None or amount >= 0
     )
@@ -3707,14 +3959,11 @@ def process_checkout_completed_event(
         or amount == 0
         or amount is None
     )
-    if not amount_ok and not trial_ok and not yearly_sub_ok:
-        return None
-    currency = str(meta.get("currency") or obj.get("currency") or PRICE_CURRENCY).strip().lower()
-    if currency and currency != PRICE_CURRENCY:
+    if not amount_ok and not trial_ok and not yearly_sub_ok and not usd_ok:
         return None
     # Subscription checkout: period end arrives later via subscription.updated
     valid_until = None
-    grant_pence = PRICE_PENCE if amount_ok or trial_ok else (int(amount) if amount is not None else PRICE_PENCE)
+    grant_pence = PRICE_PENCE if amount_ok or trial_ok or usd_ok else (int(amount) if amount is not None else PRICE_PENCE)
     token = mint_download_token(
         filename=filename,
         platform=platform,
