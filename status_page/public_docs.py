@@ -678,17 +678,26 @@ def _is_audit_document(*, title: str, text: str) -> bool:
 
 
 def _active_nav_for_title(title: str, *, plain: bool = False) -> str | None:
-    t = (title or "").lower()
+    """Map document title → shared public nav *active* key.
+
+    Order is intentional: product titles often end with ``— Restore Privacy``,
+    so a bare ``\"privacy\" in title`` would steal Audit/README highlights.
+    Match specific docs first; Privacy Policy only via policy phrasing.
+    """
+    t = (title or "").lower().strip()
     if plain or "licence" in t or "license" in t:
         return "licence"
-    if "privacy" in t:
-        return "privacy"
-    if "audit" in t:
+    # Security audit (before privacy — product name contains "privacy")
+    if "audit" in t or "code & policy" in t or "code and policy" in t:
         return "audit"
-    if "readme" in t:
+    # README / credits
+    if "readme" in t or t.startswith("read me") or "credit" in t:
         return "readme"
-    if "credit" in t:
-        return "readme"
+    # Privacy Policy only — not every string with the product name
+    if "privacy policy" in t or "privacy_policy" in t or t.endswith("privacy policy"):
+        return "privacy"
+    if "privacy" in t and "policy" in t:
+        return "privacy"
     return None
 
 

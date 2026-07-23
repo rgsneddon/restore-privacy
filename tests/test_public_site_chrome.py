@@ -21,7 +21,9 @@ class TestPublicChromeModule(unittest.TestCase):
         self.assertIn('id="privacy-link"', html)
         self.assertIn('id="audit-link"', html)
         self.assertIn('id="readme-link"', html)
-        self.assertIn('id="settings-guide-link"', html)
+        # Top brand nav no longer includes Settings Guide
+        self.assertNotIn('id="settings-guide-link"', html)
+        self.assertNotIn("SETTINGS GUIDE", html)
         self.assertIn('id="doc-links"', html)
         self.assertIn("nav-btn", html)
         i_home = html.index('id="home-link"')
@@ -30,6 +32,40 @@ class TestPublicChromeModule(unittest.TestCase):
         self.assertIn('href="/"', html)
         self.assertIn('href="/LICENSE"', html)
         self.assertIn("is-active", html)
+
+    def test_nav_active_exactly_one_per_key(self) -> None:
+        import re
+
+        from public_chrome import public_nav_links_html
+
+        keys = ("home", "licence", "privacy", "audit", "readme")
+        expected = {
+            "home": "home-link",
+            "licence": "licence-link",
+            "privacy": "privacy-link",
+            "audit": "audit-link",
+            "readme": "readme-link",
+        }
+        for key in keys:
+            html = public_nav_links_html(active=key)
+            # Only anchor class attributes (ignore CSS selectors)
+            active_anchors = re.findall(
+                r'<a class="([^"]*is-active[^"]*)" id="([^"]+)"',
+                html,
+            )
+            self.assertEqual(
+                len(active_anchors),
+                1,
+                msg=f"active={key!r} should mark exactly one control: {active_anchors}",
+            )
+            self.assertEqual(active_anchors[0][1], expected[key])
+            self.assertNotIn("settings-guide-link", html)
+        bare = public_nav_links_html(active=None)
+        self.assertEqual(
+            len(re.findall(r'<a class="[^"]*is-active', bare)),
+            0,
+        )
+        self.assertNotIn("settings-guide-link", bare)
 
     def test_brand_header_has_theme_and_nav(self) -> None:
         from public_chrome import (
@@ -98,6 +134,7 @@ class TestDocsShareChrome(unittest.TestCase):
             self.assertIn("page-shell", html, path)
             self.assertIn("panel-card", html, path)
             self.assertIn("nav-btn", html, path)
+            self.assertNotIn("settings-guide-link", html, path)
             i_home = html.index('id="home-link"')
             i_lic = html.index('id="licence-link"')
             self.assertLess(i_home, i_lic, path)
@@ -107,6 +144,66 @@ class TestDocsShareChrome(unittest.TestCase):
         lhtml = lic[0].decode("utf-8")
         self.assertIn("doc-plain", lhtml)
         self.assertIn("licence-typeform", lhtml)
+
+    def test_audit_and_readme_highlight_correct_nav_not_privacy(self) -> None:
+        """Titles end with product name 'Restore Privacy' — must not activate Privacy."""
+        import public_docs
+        from public_docs import _active_nav_for_title
+
+        # Title helper: product suffix must not force privacy
+        self.assertEqual(
+            _active_nav_for_title("Security audit — Restore Privacy"),
+            "audit",
+        )
+        self.assertEqual(
+            _active_nav_for_title("README — Restore Privacy"),
+            "readme",
+        )
+        self.assertEqual(
+            _active_nav_for_title("Privacy Policy — Restore Privacy"),
+            "privacy",
+        )
+        self.assertEqual(
+            _active_nav_for_title("End User Licence — Restore Privacy", plain=True),
+            "licence",
+        )
+
+        for path, link_id, not_id in (
+            ("/AUDIT.md", "audit-link", "privacy-link"),
+            ("/README.md", "readme-link", "privacy-link"),
+            ("/PRIVACY_POLICY.md", "privacy-link", "audit-link"),
+            ("/LICENSE", "licence-link", "privacy-link"),
+        ):
+            got = public_docs.document_bytes_for_path(path)
+            self.assertIsNotNone(got, path)
+            assert got is not None
+            html = got[0].decode("utf-8")
+            import re
+
+            # Active class on the correct control (ignore CSS rule text)
+            active_anchors = re.findall(
+                r'<a class="([^"]*is-active[^"]*)" id="([^"]+)"',
+                html,
+            )
+            self.assertEqual(
+                len(active_anchors),
+                1,
+                msg=f"{path} active anchors={active_anchors}",
+            )
+            self.assertEqual(
+                active_anchors[0][1],
+                link_id,
+                msg=f"{path} should activate {link_id}",
+            )
+            if link_id != "privacy-link":
+                m = re.search(
+                    r'<a class="([^"]*)" id="privacy-link"',
+                    html,
+                )
+                self.assertIsNotNone(m, path)
+                assert m is not None
+                self.assertNotIn("is-active", m.group(1), msg=path)
+            self.assertNotIn("settings-guide-link", html)
 
 
 if __name__ == "__main__":
