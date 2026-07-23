@@ -31,6 +31,17 @@ class TestSettingsExplainerPage(unittest.TestCase):
         self.assertNotIn('id="settings-explainer-buy-now"', html)
         self.assertNotIn("BUY NOW", html)
         self.assertIn('id="theme-mode-control"', html)
+        # Top brand box and first panel: no tagline subtitles
+        brand_start = html.index('id="brand-panel"')
+        brand_end = html.index("</header>", brand_start)
+        brand_box = html[brand_start:brand_end]
+        self.assertNotIn("brand-tagline", brand_box)
+        self.assertNotIn('class="tagline"', brand_box)
+        self.assertNotIn("lightweight vpn to restore", brand_box.lower())
+        exp_start = html.index('id="settings-explainers-box"')
+        exp_end = html.index("</section>", exp_start)
+        explainers_box = html[exp_start:exp_end]
+        self.assertNotIn('class="tagline"', explainers_box)
         # Explainers box + required Settings parts
         self.assertIn('id="settings-explainers-box"', html)
         ids = catalog_ids()

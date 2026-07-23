@@ -164,6 +164,7 @@ class TestHomepageChrome(unittest.TestCase):
         brand_end = html.index("</header>", brand_start)
         brand_box = html[brand_start:brand_end]
         self.assertNotIn("brand-tagline", brand_box)
+        self.assertNotIn('class="tagline"', brand_box)
         self.assertNotIn("lightweight vpn to restore", brand_box.lower())
         self.assertNotIn("your privacy is restored", brand_box.lower())
         # Price white callouts present
@@ -193,6 +194,7 @@ class TestDocsShareChrome(unittest.TestCase):
             brand_end = html.index("</header>", brand_start)
             brand_box = html[brand_start:brand_end]
             self.assertNotIn("brand-tagline", brand_box, path)
+            self.assertNotIn('class="tagline"', brand_box, path)
             self.assertNotIn("lightweight vpn to restore", brand_box.lower(), path)
             i_home = html.index('id="home-link"')
             i_lic = html.index('id="licence-link"')

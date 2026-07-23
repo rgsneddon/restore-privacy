@@ -256,10 +256,6 @@ def render_explainers_box_html(parts: list[dict[str, str]] | None = None) -> str
     inner = "\n".join(rows)
     return f"""    <section class="panel-card" id="settings-explainers-box" aria-labelledby="settings-explainers-heading">
       <h2 class="panel-title" id="settings-explainers-heading">Client Settings — every control</h2>
-      <p class="tagline" style="text-align:center;margin:0 auto 1rem;display:block;">
-        Product Settings (Windows desktop primary; Linux mirrors privacy-scale where shipped).
-        Optional privacy layers can be scaled for speed; residual VPN core and keygen stay required.
-      </p>
       <ul class="explainer-list" id="settings-explainer-list">
 {inner}
       </ul>
