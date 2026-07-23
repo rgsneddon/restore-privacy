@@ -106,8 +106,8 @@ system capture) stays required. This table helps UK users set expectations.
 | off | off | off | 38–58 ms | n/a (multi-hop off) | 🟧 | single-hop residual → entry; shape off (faster feel); outer obfs off (bare RPT, ~0 ms RTT) |
 | off | off | on | 38–58 ms | 32–52 ms | 🟧 | residual dials exit when multi-hop on; shape off leaner; outer obfs off (bare RPT, ~0 ms RTT) |
 
-**Product defaults:** shape **on**, outer obfs **on**, multi-hop **off**
-(single-hop entry). Turn shape/obfs **off** for a snappier residual feel;
+**Product defaults:** shape **off**, outer obfs **off**, multi-hop **off**
+(lean single-hop entry). Turn shape/obfs **on** for stronger residual defenses;
 hot-apply while connected (multi-hop re-establishes residual).
 
 *(Generated from `client/uk_ping_estimates.py` — regenerate with

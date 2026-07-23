@@ -94,41 +94,50 @@ class TestLegalLinksHelper(unittest.TestCase):
 
 
 class TestDocsTrafficShapeAligned(unittest.TestCase):
-    def test_readme_and_policy_not_defaults_off(self):
+    def test_readme_and_policy_lean_off_defaults(self):
         readme = (ROOT / "README.md").read_text(encoding="utf-8")
         privacy = (ROOT / "PRIVACY_POLICY.md").read_text(encoding="utf-8")
-        # Product traffic-shape default is ON — no claim that shaping defaults off
+        # Product traffic-shape / outer-obfs defaults are OFF (0.4.2 lean residual)
         for text, name in ((readme, "README"), (privacy, "PRIVACY_POLICY")):
             lower = text.lower()
-            # Forbid traffic-shape "defaults off" phrasing near pad/jitter/cover
+            # Forbid "on by default" claims for shape/obfs residual layers
             for needle in (
-                "traffic-shape features (padding / jitter / cover) — **defaults off**",
-                "optional traffic-shape features (padding / jitter / cover) — **defaults off**",
-                "defaults are off** for bandwidth",
-                "defaults are off for bandwidth",
+                "on by default on every residual path",
+                "enabled by default on the product residual",
+                "are on by default on residual paths",
             ):
                 self.assertNotIn(
-                    needle.lower().replace("**", ""),
-                    lower.replace("**", ""),
-                    f"{name} must not claim traffic-shape defaults off",
+                    needle,
+                    lower,
+                    f"{name} must not claim shape/obfs on by default (lean residual)",
                 )
         self.assertTrue(
-            "on by default" in readme.lower()
-            or "enabled by default" in readme.lower(),
-            "README should state product traffic-shape is on by default",
+            "off by default" in readme.lower()
+            or "default off" in readme.lower(),
+            "README should state product traffic-shape / outer obfs are off by default",
         )
         self.assertIn("RPT_TRAFFIC_SHAPE", privacy)
         self.assertTrue(
-            "enabled by default" in privacy.lower(),
-            "PRIVACY_POLICY should state shaping enabled by default",
+            "off by default" in privacy.lower()
+            or "default off" in privacy.lower()
+            or "defaults off" in privacy.lower()
+            or "lean residual" in privacy.lower(),
+            "PRIVACY_POLICY should state shaping/obfs lean-off defaults",
         )
-        # Version surface: public v1.0.0 and/or historical 0.2.9
+        # Version surface: current catalog pin and/or historical
         self.assertTrue(
-            "1.0.0" in readme or "0.4.0" in readme or "0.2.9" in readme,
+            "0.4.2" in readme
+            or "1.0.0" in readme
+            or "0.4.0" in readme
+            or "0.2.9" in readme,
             "README must cite product version",
         )
         self.assertTrue(
-            "1.0.0" in privacy or "0.4.0" in privacy or "0.2.9" in privacy or "0.2" in privacy,
+            "1.0.0" in privacy
+            or "0.4.0" in privacy
+            or "0.2.9" in privacy
+            or "0.2" in privacy
+            or "0.4" in privacy,
             "PRIVACY_POLICY must cite a product version generation",
         )
 

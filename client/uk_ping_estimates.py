@@ -174,8 +174,8 @@ def render_audit_uk_ping_section() -> str:
     lines.extend(
         [
             "",
-            "**Product defaults:** shape **on**, outer obfs **on**, multi-hop **off**",
-            "(single-hop entry). Turn shape/obfs **off** for a snappier residual feel;",
+            "**Product defaults:** shape **off**, outer obfs **off**, multi-hop **off**",
+            "(lean single-hop entry). Turn shape/obfs **on** for stronger residual defenses;",
             "hot-apply while connected (multi-hop re-establishes residual).",
             "",
         ]
