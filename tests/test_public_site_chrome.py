@@ -75,10 +75,17 @@ class TestPublicChromeModule(unittest.TestCase):
             public_theme_boot_script,
         )
 
+        from public_chrome import PUBLIC_BRAND_TITLE
+
         header = public_brand_header_html(active="licence")
         self.assertIn('id="brand-panel"', header)
         self.assertIn("<h1>", header)
-        self.assertIn("RESTORE PRIVACY", header)
+        self.assertEqual(PUBLIC_BRAND_TITLE, "RESTORE PRIVACY VPN")
+        self.assertIn(f"<h1>{PUBLIC_BRAND_TITLE}</h1>", header)
+        # Short historical title upgrades to brand title with VPN
+        short = public_brand_header_html(title="RESTORE PRIVACY")
+        self.assertIn(f"<h1>{PUBLIC_BRAND_TITLE}</h1>", short)
+        self.assertNotRegex(short, r"<h1>RESTORE PRIVACY</h1>")
         # No under-title slogan in the top brand box
         self.assertNotIn("brand-tagline", header)
         self.assertNotIn("lightweight vpn to restore", header.lower())
@@ -113,8 +120,16 @@ class TestHomepageChrome(unittest.TestCase):
     def test_homepage_shared_header_theme_and_home_nav(self) -> None:
         from app import render_html
 
+        from public_chrome import PUBLIC_BRAND_TITLE
+
         html = render_html({"title": "RESTORE PRIVACY"}).decode("utf-8")
         self.assertIn('id="brand-panel"', html)
+        brand_start = html.index('id="brand-panel"')
+        brand_end = html.index("</header>", brand_start)
+        brand_box = html[brand_start:brand_end]
+        self.assertIn(f"<h1>{PUBLIC_BRAND_TITLE}</h1>", brand_box)
+        self.assertNotRegex(brand_box, r"<h1>RESTORE PRIVACY</h1>")
+        self.assertIn(f"<title>{PUBLIC_BRAND_TITLE}</title>", html)
         self.assertIn('id="home-link" href="/"', html)
         self.assertIn('id="licence-link" href="/LICENSE"', html)
         i_home = html.index('id="home-link"')

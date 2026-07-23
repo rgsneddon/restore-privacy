@@ -762,8 +762,13 @@ def render_document_html(
 .rag-red { background: #ef4444; }
 .pkg-cell-scroll .cell-scroll { max-height: 6.5rem; overflow: auto; }
 """
+    try:
+        from public_chrome import PUBLIC_BRAND_TITLE
+    except ImportError:  # pragma: no cover
+        from status_page.public_chrome import PUBLIC_BRAND_TITLE  # type: ignore
+
     header = public_brand_header_html(
-        title="RESTORE PRIVACY",
+        title=PUBLIC_BRAND_TITLE,
         active=active,
         logo_size=88,
     )
@@ -847,8 +852,13 @@ def render_how_to_buy_html() -> bytes:
         f'(<code>{_escape(d["url"])}</code>)</li>'
         for d in docs
     )
+    try:
+        from public_chrome import PUBLIC_BRAND_TITLE
+    except ImportError:  # pragma: no cover
+        from status_page.public_chrome import PUBLIC_BRAND_TITLE  # type: ignore
+
     header = public_brand_header_html(
-        title="RESTORE PRIVACY",
+        title=PUBLIC_BRAND_TITLE,
         active="home",
         logo_size=88,
     )

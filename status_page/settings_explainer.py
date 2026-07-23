@@ -311,31 +311,36 @@ def render_install_howto_box_html() -> str:
 """
 
 
-def render_settings_explainer_page_html(*, title: str = "RESTORE PRIVACY") -> bytes:
+def render_settings_explainer_page_html(*, title: str | None = None) -> bytes:
     """Full settings explainer page: shared brand header (no BUY NOW), explainers + how-to."""
     try:
         from public_chrome import (
+            PUBLIC_BRAND_TITLE,
             public_brand_header_html,
+            public_display_title,
             public_head_open,
             public_page_close,
         )
     except ImportError:  # pragma: no cover
         from status_page.public_chrome import (  # type: ignore
+            PUBLIC_BRAND_TITLE,
             public_brand_header_html,
+            public_display_title,
             public_head_open,
             public_page_close,
         )
 
+    brand = public_display_title(title if title is not None else PUBLIC_BRAND_TITLE)
     parts = settings_parts_catalog()
     explainers = render_explainers_box_html(parts)
     howto = render_install_howto_box_html()
     css = _shared_shell_css()
     header = public_brand_header_html(
-        title=title,
+        title=brand,
         active="settings",
         logo_size=88,
     )
-    body = f"""{public_head_open(title=f"Client Settings guide — {title}", extra_css=css)}
+    body = f"""{public_head_open(title=f"Client Settings guide — {brand}", extra_css=css)}
   <div class="page-shell" id="settings-explainer-page">
 {header}
 {explainers}

@@ -128,6 +128,7 @@ class TestPublicStatusStripsInjectedPayloads(unittest.TestCase):
             "active_sessions": 4,
         }
         out = filter_public_status(dirty)
+        # Node-side filter keeps the raw title; status-host brand upgrade is separate
         self.assertEqual(out, {"title": "RESTORE PRIVACY"})
         self.assertEqual(assert_public_status_minimal(out), [])
         self.assertEqual(ALLOWED_PUBLIC_STATUS_KEYS, frozenset({"title"}))
@@ -142,7 +143,7 @@ class TestPublicStatusStripsInjectedPayloads(unittest.TestCase):
                 "client_ip": "1.2.3.4",
             }
         )
-        self.assertEqual(out, {"title": "RESTORE PRIVACY"})
+        self.assertEqual(out, {"title": "RESTORE PRIVACY VPN"})
         pub = status_app.public_status_payload(
             {
                 "title": "RESTORE PRIVACY",
@@ -151,6 +152,7 @@ class TestPublicStatusStripsInjectedPayloads(unittest.TestCase):
             }
         )
         self.assertEqual(set(pub.keys()), {"title"})
+        self.assertEqual(pub["title"], "RESTORE PRIVACY VPN")
         for k in status_app.FORBIDDEN_STATUS_KEYS:
             self.assertNotIn(k, pub)
 

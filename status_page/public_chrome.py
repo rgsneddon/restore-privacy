@@ -19,6 +19,9 @@ AUDIT_LINK_ID = "audit-link"
 README_LINK_ID = "readme-link"
 SETTINGS_GUIDE_LINK_ID = "settings-guide-link"
 
+# Public website brand / page identity (top H1 + default document title)
+PUBLIC_BRAND_TITLE = "RESTORE PRIVACY VPN"
+
 # Paths (keep aligned with public_docs / settings_explainer)
 HOME_PATH = "/"
 LICENSE_PATH = "/LICENSE"
@@ -415,9 +418,21 @@ def public_nav_links_html(*, active: str | None = None) -> str:
     )
 
 
+def public_display_title(raw: str | None = None) -> str:
+    """Normalize product title for public brand chrome and page titles.
+
+    Short historical **RESTORE PRIVACY** (node/status payload) becomes
+    **RESTORE PRIVACY VPN**. Empty / missing → :data:`PUBLIC_BRAND_TITLE`.
+    """
+    t = (raw or "").strip()
+    if not t or t == "RESTORE PRIVACY":
+        return PUBLIC_BRAND_TITLE
+    return t
+
+
 def public_brand_header_html(
     *,
-    title: str = "RESTORE PRIVACY",
+    title: str = PUBLIC_BRAND_TITLE,
     tagline: str = "",
     active: str | None = None,
     logo_size: int = 96,
@@ -427,8 +442,9 @@ def public_brand_header_html(
     Under-title tagline is omitted by default (no lightweight-vpn slogan).
     Pass a non-empty *tagline* only if a page truly needs a header subtitle;
     public catalog/docs call sites leave it empty for a clean top box.
+    Brand H1 defaults to :data:`PUBLIC_BRAND_TITLE` (**RESTORE PRIVACY VPN**).
     """
-    title_safe = _esc(title)
+    title_safe = _esc(public_display_title(title))
     tag = (tagline or "").strip()
     tagline_html = (
         f'      <p class="brand-tagline">{_esc(tag)}</p>\n' if tag else ""

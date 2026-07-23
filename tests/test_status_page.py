@@ -28,7 +28,7 @@ class TestPublicTitleOnly(unittest.TestCase):
                 "clients_total": 100,
             }
         )
-        self.assertEqual(out, {"title": "RESTORE PRIVACY"})
+        self.assertEqual(out, {"title": "RESTORE PRIVACY VPN"})
         self.assertNotIn("clients_connected", out)
         self.assertNotIn("total", out)
 
@@ -67,7 +67,7 @@ class TestPublicTitleOnly(unittest.TestCase):
 
         with mock.patch("urllib.request.urlopen", return_value=Resp()):
             out = status_app.fetch_upstream_status()
-        self.assertEqual(out["title"], "RESTORE PRIVACY")
+        self.assertEqual(out["title"], "RESTORE PRIVACY VPN")
         self.assertNotIn("clients_connected", out)
         self.assertNotIn("ip", out)
         self.assertNotIn("total", out)
@@ -76,7 +76,7 @@ class TestPublicTitleOnly(unittest.TestCase):
     def test_fetch_upstream_fallback_on_error(self):
         with mock.patch("urllib.request.urlopen", side_effect=TimeoutError("down")):
             out = status_app.fetch_upstream_status()
-        self.assertEqual(out["title"], "RESTORE PRIVACY")
+        self.assertEqual(out["title"], "RESTORE PRIVACY VPN")
         self.assertNotIn("clients_connected", out)
 
 
@@ -125,7 +125,7 @@ class TestHttpHandlers(unittest.TestCase):
                 self.assertEqual(code, 200)
                 self.assertIn("json", ctype)
                 data = json.loads(body)
-                self.assertEqual(data, {"title": "RESTORE PRIVACY"})
+                self.assertEqual(data, {"title": "RESTORE PRIVACY VPN"})
                 self.assertNotIn("clients_connected", data)
 
                 code, ctype, html = self._get("/")

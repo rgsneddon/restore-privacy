@@ -243,8 +243,18 @@ def normalize_status(data: dict | None) -> dict:
     for key in list(data.keys()):
         if str(key).lower() in FORBIDDEN_STATUS_KEYS or str(key) in FORBIDDEN_STATUS_KEYS:
             continue
+    try:
+        from public_chrome import PUBLIC_BRAND_TITLE, public_display_title
+    except ImportError:  # pragma: no cover
+        from status_page.public_chrome import (  # type: ignore
+            PUBLIC_BRAND_TITLE,
+            public_display_title,
+        )
+
     return {
-        "title": str(data.get("title", "RESTORE PRIVACY")),
+        "title": public_display_title(
+            str(data.get("title", PUBLIC_BRAND_TITLE) or PUBLIC_BRAND_TITLE)
+        ),
     }
 
 
@@ -274,7 +284,12 @@ def fetch_upstream_status() -> dict:
             raw = resp.read().decode("utf-8", errors="replace")
         data = json.loads(raw)
         if not isinstance(data, dict):
-            return {"title": "RESTORE PRIVACY", "upstream_ok": False}
+            try:
+                from public_chrome import PUBLIC_BRAND_TITLE
+            except ImportError:  # pragma: no cover
+                from status_page.public_chrome import PUBLIC_BRAND_TITLE  # type: ignore
+
+            return {"title": PUBLIC_BRAND_TITLE, "upstream_ok": False}
         out = public_status_payload(data)
         out["upstream_ok"] = True
         return out
@@ -287,25 +302,37 @@ def fetch_upstream_status() -> dict:
         OSError,
         json.JSONDecodeError,
     ):
-        return {"title": "RESTORE PRIVACY", "upstream_ok": False}
+        try:
+            from public_chrome import PUBLIC_BRAND_TITLE
+        except ImportError:  # pragma: no cover
+            from status_page.public_chrome import PUBLIC_BRAND_TITLE  # type: ignore
+
+        return {"title": PUBLIC_BRAND_TITLE, "upstream_ok": False}
 
 
 def render_html(status: dict, poll_ms: int | None = None) -> bytes:
     """HTML: shared brand header + downloads + audit countdown (no client count)."""
     _ = poll_ms  # retained for call-site compat; public page does not poll a count
-    title = status.get("title", "RESTORE PRIVACY")
     try:
         from public_chrome import (
+            PUBLIC_BRAND_TITLE,
             public_brand_header_html,
+            public_display_title,
             public_head_open,
             public_page_close,
         )
     except ImportError:  # pragma: no cover
         from status_page.public_chrome import (  # type: ignore
+            PUBLIC_BRAND_TITLE,
             public_brand_header_html,
+            public_display_title,
             public_head_open,
             public_page_close,
         )
+
+    title = public_display_title(
+        str(status.get("title", PUBLIC_BRAND_TITLE) or PUBLIC_BRAND_TITLE)
+    )
 
     downloads_html = render_download_section_html()
     dl_css = download_css()
