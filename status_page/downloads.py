@@ -146,10 +146,13 @@ IOS_ZIP_FILENAME = f"restore-privacy-client-{RELEASE_VERSION}-ios.zip"
 LINUX_TGZ_FILENAME = f"restore-privacy-client-{RELEASE_VERSION}-linux-x64.tar.gz"
 
 PRICE_LABEL = "£2.45"
+PRICE_YEARLY_LABEL = "£29.40"  # 12 × £2.45 GBP anchor
 # Large white bold callout under "Download client v…" on the public homepage.
-ONLY_PRICE_BANNER = "ONLY £2.45 per month — or pay yearly"
+ONLY_PRICE_BANNER = "ONLY £2.45 per month — or pay yearly (£29.40)"
 YEARLY_PLAN_NOTE = (
-    "Choose monthly (£2.45/mo after trial) or yearly for each platform. "
+    "Choose monthly (£2.45/mo after trial) or yearly (£29.40) for each platform. "
+    "Prices shown convert from these GBP anchors into your local currency "
+    "(we accept your local currency when Stripe allows; otherwise USD). "
     "Set STRIPE_PAYMENT_PAGE_URL_YEARLY to your Stripe yearly Payment Link."
 )
 # Shown under the buy-button grid (bold bright white, price-box-like frame).
@@ -220,12 +223,17 @@ class DownloadAsset:
         """Paid entry: monthly Stripe Payment Link for this platform."""
         return self.pay_path_for_interval("month")
 
-    def pay_path_for_interval(self, interval: str = "month") -> str:
+    def pay_path_for_interval(
+        self,
+        interval: str = "month",
+        *,
+        currency: str = "",
+    ) -> str:
         """Stripe Payment Link for *interval* (``month`` or ``year``) + platform."""
         from payments import stripe_payment_page_href_for_platform
 
         return stripe_payment_page_href_for_platform(
-            self.platform, interval=interval
+            self.platform, interval=interval, currency=currency
         )
 
 
@@ -352,6 +360,20 @@ def download_css() -> str:
     .downloads { width: 100%; text-align: center; box-sizing: border-box; }
     .downloads h2 { font-size: 1.05rem; letter-spacing: 0.1em; font-weight: 700;
                     margin: 0 0 0.35rem; color: var(--rb-cream); text-transform: uppercase; }
+    .dl-local-price, .dl-accept-currency {
+      text-align: center;
+      color: var(--rb-cream, #f2f5f7);
+      font-weight: 600;
+      margin: 0.35rem auto 0.25rem;
+      max-width: 40rem;
+      line-height: 1.45;
+      font-size: clamp(0.9rem, 2.4vw, 1.05rem);
+    }
+    .dl-accept-currency {
+      font-style: italic;
+      letter-spacing: 0.02em;
+      color: var(--rb-muted, #aed0ea);
+    }
     /* Large white bold monthly price emphasis under Download client heading */
     .dl-only-price {
       margin: 0.35rem auto 0.65rem;
@@ -602,6 +624,7 @@ def _render_platform_pay_link(
     a: DownloadAsset,
     *,
     coming_soon: bool | None = None,
+    local_price: object | None = None,
 ) -> str:
     """One platform control (stable id + data attrs for layout/tests).
 
@@ -611,11 +634,18 @@ def _render_platform_pay_link(
     When *coming_soon* is false, live Stripe Payment Link path
     (``data-pay-via="stripe-payment-page"``).
 
-    Face shows **platform title** + compact ``BUY - {version}`` on a small square tile.
+    *local_price* is a :class:`local_currency.LocalPriceDisplay` for tile labels.
     """
     if coming_soon is None:
         coming_soon = catalog_buy_buttons_coming_soon()
     platform_title = platform_face_title(a.platform)
+    month_label = "Monthly £2.45"
+    year_label = f"Yearly {PRICE_YEARLY_LABEL}"
+    ccy = ""
+    if local_price is not None:
+        month_label = f"Monthly {getattr(local_price, 'monthly_label', month_label)}"
+        year_label = f"Yearly {getattr(local_price, 'yearly_label', year_label)}"
+        ccy = str(getattr(local_price, "currency", "") or "")
     buy_line = f"BUY - {RELEASE_VERSION}"
     # Stacked face: platform name + buy line (visible, distinct per control)
     face = (
@@ -636,8 +666,8 @@ def _render_platform_pay_link(
             f'data-coming-soon="1" aria-label="{aria}">'
             f"{face}</a></div>"
         )
-    href_m = a.pay_path_for_interval("month")
-    href_y = a.pay_path_for_interval("year")
+    href_m = a.pay_path_for_interval("month", currency=ccy)
+    href_y = a.pay_path_for_interval("year", currency=ccy)
     # Dual subscription interval: monthly + yearly Payment Links
     return (
         f'<div class="dl-platform-cell" id="dl-cell-{a.platform}" '
@@ -649,15 +679,17 @@ def _render_platform_pay_link(
         f'data-platform="{a.platform}" data-filename="{a.filename}" '
         f'data-price-pence="245" data-pay-via="stripe-payment-page" '
         f'data-billing-interval="month" '
+        f'data-display-currency="{ccy}" '
         f'aria-label="{platform_title}: monthly subscription — {a.label}">'
-        f'<span class="dl-buy">Monthly £2.45</span></a>'
+        f'<span class="dl-buy">{month_label}</span></a>'
         f'<a class="dl dl-interval-year" id="dl-{a.platform}-year" href="{href_y}" '
         f'rel="noopener noreferrer" target="_blank" '
         f'data-platform="{a.platform}" data-filename="{a.filename}" '
         f'data-pay-via="stripe-payment-page" '
         f'data-billing-interval="year" '
+        f'data-display-currency="{ccy}" '
         f'aria-label="{platform_title}: yearly subscription — {a.label}">'
-        f'<span class="dl-buy">Yearly</span></a>'
+        f'<span class="dl-buy">{year_label}</span></a>'
         f"</div></div>"
     )
 
@@ -676,6 +708,9 @@ def render_download_section_html(
     assets: Iterable[DownloadAsset] | None = None,
     *,
     coming_soon: bool | None = None,
+    accept_language: str = "",
+    country: str = "",
+    currency: str = "",
 ) -> str:
     """HTML: platform buy controls (live Stripe pay **or** temporary coming-soon).
 
@@ -683,12 +718,28 @@ def render_download_section_html(
 
     *coming_soon* defaults to :func:`catalog_buy_buttons_coming_soon`. Pass
     ``coming_soon=False`` (or env live switch) to restore Stripe Pay buttons.
+
+    Local-currency display uses GBP anchors £2.45 / £29.40 with
+    :mod:`local_currency` (Stripe-unsupported currencies → USD).
     """
     items = list(assets) if assets is not None else available_downloads()
     if not items:
         return ""
     if coming_soon is None:
         coming_soon = catalog_buy_buttons_coming_soon()
+
+    try:
+        from local_currency import resolve_local_price_display
+    except ImportError:  # pragma: no cover
+        from status_page.local_currency import (  # type: ignore
+            resolve_local_price_display,
+        )
+
+    local = resolve_local_price_display(
+        accept_language=accept_language,
+        country=country,
+        explicit_currency=currency,
+    )
 
     if not coming_soon:
         from payments import stripe_payment_page_url
@@ -698,18 +749,26 @@ def render_download_section_html(
 
     row1, row2 = download_menu_rows(items)
     row1_html = "\n      ".join(
-        _render_platform_pay_link(a, coming_soon=coming_soon) for a in row1
+        _render_platform_pay_link(a, coming_soon=coming_soon, local_price=local)
+        for a in row1
     )
     row2_block = ""
     if row2:
         row2_html = "\n      ".join(
-            _render_platform_pay_link(a, coming_soon=coming_soon) for a in row2
+            _render_platform_pay_link(a, coming_soon=coming_soon, local_price=local)
+            for a in row2
         )
         row2_block = f"""
     <div class="dl-row dl-row-2" id="dl-row-2" data-dl-row="2" data-dl-count="{len(row2)}">
       {row2_html}
     </div>"""
-    # Price identity: £2.45 package + one device licence, trial honesty, pay + keygen email.
+    # Price identity: GBP anchors + local equivalent + accept notice.
+    accept = local.accept_notice  # e.g. we accept *EUR*
+    local_line = (
+        f"Local price: monthly <strong>{local.monthly_label}</strong> · "
+        f"yearly <strong>{local.yearly_label}</strong> "
+        f"(relative to £2.45 / £29.40 GBP) — {accept}"
+    )
     if coming_soon:
         price_line = (
             f"{PRICE_LABEL} GBP {PACKAGE_IDENTITY} — {TRIAL_SUBSCRIPTION_SENTENCE} — "
@@ -718,17 +777,25 @@ def render_download_section_html(
         buttons_mode = ' data-buy-mode="coming-soon"'
     else:
         price_line = (
-            f"{PRICE_LABEL} GBP monthly {PACKAGE_IDENTITY} — "
+            f"{PRICE_LABEL} GBP monthly / {PRICE_YEARLY_LABEL} yearly "
+            f"{PACKAGE_IDENTITY} — "
             f"{TRIAL_SUBSCRIPTION_SENTENCE} — "
             f"or choose yearly — {PAY_AND_KEYGEN_CLAUSE}"
         )
-        buttons_mode = ' data-buy-mode="stripe-live" data-billing-intervals="month,year"'
+        buttons_mode = (
+            ' data-buy-mode="stripe-live" data-billing-intervals="month,year"'
+            f' data-display-currency="{local.currency}"'
+            f' data-stripe-presentment="{local.stripe_presentment_currency}"'
+        )
     # Order: title/price box → pay controls only. BMC tip is page-bottom (homepage shell).
     # Homepage omits STRONG DISCLAIMER banner (apps/licence retain payment language).
     return f"""
-  <section class="downloads panel-card" id="downloads" aria-label="Download Restore Privacy client">
+  <section class="downloads panel-card" id="downloads" aria-label="Download Restore Privacy client"
+    data-price-currency="{local.currency}" data-accept-currency="{local.currency}">
     <h2>Download client v{RELEASE_VERSION}</h2>
     <p class="dl-only-price" id="dl-only-price">{ONLY_PRICE_BANNER}</p>
+    <p class="dl-local-price" id="dl-local-price">{local_line}</p>
+    <p class="dl-accept-currency" id="dl-accept-currency">{accept}</p>
     <p class="dl-sub">Windows | Linux | macOS | iOS | Android</p>
     <div class="dl-price-box" id="dl-price-box">
       <p class="dl-price" id="dl-price">{price_line}</p>

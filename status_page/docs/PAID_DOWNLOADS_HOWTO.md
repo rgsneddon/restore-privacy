@@ -21,7 +21,8 @@ Operator deploy for production email + Payment Link trial is documented in
 
 - Render env: `RPT_FULFILMENT_SMTP_*` (blueprint `render.yaml`; script `scripts/set_render_fulfilment_smtp.ps1`)
 - Stripe monthly Payment Link: £2.45/month GBP + **7 day trial** (script `scripts/configure_stripe_payment_link_trial.py` when `STRIPE_SECRET_KEY` is set)
-- Stripe yearly Payment Link: set **`STRIPE_PAYMENT_PAGE_URL_YEARLY`** (and optional `RPT_STRIPE_PAYMENT_PAGE_URL_YEARLY`) when a Dashboard yearly price exists
+- Stripe yearly Payment Link: set **`STRIPE_PAYMENT_PAGE_URL_YEARLY`** (and optional `RPT_STRIPE_PAYMENT_PAGE_URL_YEARLY`) when a Dashboard yearly price exists — yearly GBP anchor is **£29.40** (12 × £2.45)
+- **Local currency display:** catalog converts £2.45 / £29.40 into the visitor’s currency (`status_page/local_currency.py`) and shows **we accept *CURRENCY***. Enable **Adaptive Pricing** on both Payment Links in Stripe Dashboard so Checkout can present Stripe-supported currencies; when Stripe cannot present a currency, the site defaults display + pay locale to **USD**
 
 ## Customer journey (subscription keygen unlock)
 

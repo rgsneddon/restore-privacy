@@ -310,8 +310,19 @@ def fetch_upstream_status() -> dict:
         return {"title": PUBLIC_BRAND_TITLE, "upstream_ok": False}
 
 
-def render_html(status: dict, poll_ms: int | None = None) -> bytes:
-    """HTML: shared brand header + downloads + audit countdown (no client count)."""
+def render_html(
+    status: dict,
+    poll_ms: int | None = None,
+    *,
+    accept_language: str = "",
+    country: str = "",
+    currency: str = "",
+) -> bytes:
+    """HTML: shared brand header + downloads + audit countdown (no client count).
+
+    *accept_language* / *country* / *currency* drive local-currency price display
+    (GBP anchors £2.45 / £29.40 → visitor currency; Stripe-unsupported → USD).
+    """
     _ = poll_ms  # retained for call-site compat; public page does not poll a count
     try:
         from public_chrome import (
@@ -334,7 +345,11 @@ def render_html(status: dict, poll_ms: int | None = None) -> bytes:
         str(status.get("title", PUBLIC_BRAND_TITLE) or PUBLIC_BRAND_TITLE)
     )
 
-    downloads_html = render_download_section_html()
+    downloads_html = render_download_section_html(
+        accept_language=accept_language,
+        country=country,
+        currency=currency,
+    )
     dl_css = download_css()
     try:
         from audit_countdown import render_audit_countdown_html
@@ -541,10 +556,29 @@ class Handler(BaseHTTPRequestHandler):
     def do_GET(self):  # noqa: N802
         path, query = _parse_query(self.path)
         if path in ("/", "/index.html"):
+            try:
+                from local_currency import (
+                    accept_language_from_request,
+                    country_headers_from_request,
+                )
+            except ImportError:  # pragma: no cover
+                from status_page.local_currency import (  # type: ignore
+                    accept_language_from_request,
+                    country_headers_from_request,
+                )
+
+            hdrs = {k: v for k, v in self.headers.items()}
+            # Optional ?currency=EUR override for testing presentment display
+            q_ccy = (query.get("currency") or "").strip()
             self._send(
                 200,
                 "text/html; charset=utf-8",
-                render_html(fetch_upstream_status()),
+                render_html(
+                    fetch_upstream_status(),
+                    accept_language=accept_language_from_request(hdrs),
+                    country=country_headers_from_request(hdrs),
+                    currency=q_ccy,
+                ),
             )
             return
         if path in settings_explainer_paths():

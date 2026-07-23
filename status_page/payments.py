@@ -25,10 +25,15 @@ from typing import Any, Callable
 
 from downloads import RELEASE_ASSETS, available_downloads
 
-# £2.45 per selected package download
+# £2.45 monthly / £29.40 yearly GBP anchors (display converts via local_currency)
 PRICE_PENCE = 245
+PRICE_YEARLY_PENCE = 2940  # 12 × 245
 PRICE_CURRENCY = "gbp"
 PRICE_LABEL = "£2.45"
+PRICE_YEARLY_LABEL = "£29.40"
+# Operator: enable Stripe Dashboard Adaptive Pricing on Payment Links so
+# presentment uses customer local currency when Stripe allows; unsupported → USD
+# (see local_currency.stripe_presentment_or_usd).
 
 DEFAULT_SUCCESS_PATH = "/download/success"
 DEFAULT_CANCEL_PATH = "/download/cancel"
@@ -230,20 +235,52 @@ def parse_client_reference_id(ref: str) -> tuple[str, str]:
 
 
 def stripe_payment_page_href_for_platform(
-    platform: str, *, interval: str = BILLING_INTERVAL_MONTH
+    platform: str,
+    *,
+    interval: str = BILLING_INTERVAL_MONTH,
+    currency: str = "",
+    locale: str = "",
 ) -> str:
     """Subscription Payment Link URL with product identity for webhook fulfilment.
 
     Stripe Payment Links accept ``client_reference_id`` on the URL; the webhook
     reads platform (+ billing interval) and mints a one-time download token.
     *interval* is ``month`` (default) or ``year``.
+
+    *currency* selects Stripe ``locale`` for Adaptive Pricing UX (USD when
+    Stripe cannot present the visitor currency — see
+    :func:`local_currency.stripe_presentment_or_usd`). Enable **Adaptive
+    Pricing** on the Dashboard Payment Link so Stripe charges available
+    currencies; unsupported locales/currencies fall back to USD presentment.
     """
     plat = (platform or "").strip().lower()
     base = stripe_payment_page_url_for_interval(interval)
-    if not plat:
+    try:
+        from local_currency import (
+            currency_to_stripe_locale,
+            stripe_presentment_or_usd,
+        )
+    except ImportError:  # pragma: no cover
+        from status_page.local_currency import (  # type: ignore
+            currency_to_stripe_locale,
+            stripe_presentment_or_usd,
+        )
+
+    presentment = stripe_presentment_or_usd(currency) if currency else ""
+    loc = (locale or "").strip()
+    if not loc and presentment:
+        loc = currency_to_stripe_locale(presentment)
+    params: dict[str, str] = {}
+    if plat:
+        # Keep platform|interval only (fulfilment parse_client_reference_id)
+        params["client_reference_id"] = encode_client_reference_id(
+            plat, interval=interval
+        )
+    if loc:
+        params["locale"] = loc
+    if not params:
         return base
-    ref = encode_client_reference_id(plat, interval=interval)
-    q = urllib.parse.urlencode({"client_reference_id": ref})
+    q = urllib.parse.urlencode(params)
     sep = "&" if "?" in base else "?"
     return f"{base}{sep}{q}"
 

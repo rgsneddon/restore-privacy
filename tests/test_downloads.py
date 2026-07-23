@@ -94,8 +94,12 @@ class TestDownloadCatalog(unittest.TestCase):
         # BMC tip URL is on homepage shell bottom, not inside downloads section
         self.assertNotIn(BMC_TIP_URL, html)
         # Live default: dual monthly/yearly Stripe Payment Link tiles per platform
-        self.assertIn("Monthly £2.45", html)
+        # Tile labels use local currency (default USD without Accept-Language)
+        self.assertIn("Monthly", html)
         self.assertIn("Yearly", html)
+        self.assertIn("we accept *", html)
+        self.assertIn("£2.45", html)
+        self.assertIn("£29.40", html)
         self.assertIn('class="dl dl-interval-month"', html)
         self.assertIn('class="dl dl-interval-year"', html)
         self.assertIn('data-billing-interval="month"', html)
@@ -155,7 +159,9 @@ class TestDownloadCatalog(unittest.TestCase):
         self.assertGreater(row2_at, row1_at)
         # Live mode: Stripe Payment Link per platform; never free GitHub
         for a in available_downloads():
-            self.assertIn(f'href="{a.pay_path}"', html)
+            # href may append locale= for Adaptive Pricing UX
+            self.assertIn(f"client_reference_id={a.platform}", html.replace("%7C", "|"))
+            self.assertIn(f'id="dl-{a.platform}"', html)
             self.assertNotIn(f'href="{a.url}"', html)
 
     def test_available_downloads_have_https_github_release_urls(self):
@@ -170,8 +176,9 @@ class TestDownloadCatalog(unittest.TestCase):
         self.assertIn('class="dl dl-interval-year"', html)
         self.assertNotIn('href="#"', html)
         self.assertIn("data-price-pence=\"245\"", html)
-        self.assertIn("Monthly £2.45", html)
+        self.assertIn("Monthly", html)
         self.assertIn("Yearly", html)
+        self.assertIn("we accept *", html)
         self.assertIn("buy.stripe.com", html)
         self.assertNotIn("Coming soon", html)
 
@@ -184,8 +191,9 @@ class TestDownloadCatalog(unittest.TestCase):
         self.assertNotIn('id="dl-claim-hint"', html)
         self.assertNotIn("/download/success?session_id=", html)
         # Platform controls present (live dual-interval Stripe Pay default)
-        self.assertIn("Monthly £2.45", html)
+        self.assertIn("Monthly", html)
         self.assertIn("Yearly", html)
+        self.assertIn("we accept *", html)
         self.assertIn('id="dl-windows"', html)
         self.assertIn('id="dl-windows-year"', html)
         self.assertIn("buy.stripe.com", html)
@@ -277,8 +285,9 @@ class TestDownloadCatalog(unittest.TestCase):
         self.assertNotIn("clients-connected", page)
         self.assertIn(f"Download client v{RELEASE_VERSION}", page)
         # Live default: dual monthly/yearly Stripe Payment Link buttons
-        self.assertIn("Monthly £2.45", page)
+        self.assertIn("Monthly", page)
         self.assertIn("Yearly", page)
+        self.assertIn("we accept *", page)
         self.assertIn("buy.stripe.com", page)
         self.assertNotIn("Coming soon", page)
         self.assertIn("£2.45", page)
