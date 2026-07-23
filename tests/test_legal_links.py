@@ -143,6 +143,15 @@ class TestDocsTrafficShapeAligned(unittest.TestCase):
             "README should state product traffic-shape / outer obfs are off by default",
         )
         self.assertIn("RPT_TRAFFIC_SHAPE", privacy)
+        # Live catalog pin in privacy policy (root + public mirror)
+        self.assertIn("Current packages (catalog v0.4.2)", privacy)
+        self.assertNotIn("Current packages (catalog v0.4.1)", privacy)
+        self.assertNotIn("Current packages (catalog v0.4.0)", privacy)
+        public_privacy_pin = (
+            ROOT / "status_page" / "public" / "PRIVACY_POLICY.md"
+        ).read_text(encoding="utf-8")
+        self.assertIn("Current packages (catalog v0.4.2)", public_privacy_pin)
+        self.assertNotIn("Current packages (catalog v0.4.1)", public_privacy_pin)
         self.assertTrue(
             "off by default" in privacy.lower()
             or "default off" in privacy.lower()

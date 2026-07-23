@@ -4,7 +4,7 @@
 |-------|--------|
 | **Product** | Restore Privacy Tunnel (RPT / RPT2) |
 | **Repository** | restore-privacy (**private** source; installers only via paid status host) |
-| **Public catalog version** | **0.4.0** |
+| **Public catalog version** | **0.4.2** (live paid packages; package RAG table below may lag until next full audit pass) |
 | **Production node** | **82.221.101.241:44044** (UDP); status UI TCP **8080** — **Iceland**, host **FlokiNET** |
 | **Audit generated** | **22 July 2026** (`2026-07-22T13:00:14Z`) |
 | **Cadence** | Automated security pass (~**every 4 hours** + **jitter** on privacy-hardened node timer) |
@@ -13,7 +13,7 @@
 
 ---
 
-## Installer package AUDIT STATE (catalog v0.4.0)
+## Installer package AUDIT STATE (last full RAG snapshot: catalog v0.4.0; live monopin **0.4.2**)
 
 Reader confidence for **each current paid catalog installer** after this security-audit pass.
 The **STATE** column shows a **solid colour only** (not the words Green/Amber/Red).
@@ -156,8 +156,8 @@ Latest automated security audit for production node **82.221.101.241** and the i
 | Windows / Linux | `client/windows/*` (multihop PE via `scripts/build_windows_multihop.py`), `client/linux/*` |
 | Mobile / Apple | `client_app/` Flutter + NativePrep residual engines (exit pub inject) |
 | Node | `node/*` (handshake, pfs, traffic_shape, crypto_session, nolog); node-only zram+LUKS2 |
-| Paid packages | `status_page/downloads.py` monopin **0.4.0**; assets under `status_page/assets/0.4.0/` + VPS `paid_assets` |
-| Public web | `status_page/*` catalog **0.4.0** |
+| Paid packages | `status_page/downloads.py` monopin **0.4.2**; assets under `status_page/assets/0.4.0/` + VPS `paid_assets` |
+| Public web | `status_page/*` catalog **0.4.2** |
 | Policies | `PRIVACY_POLICY.md`, `LICENSE`, `CREDITS.md`, `README.md`, `AUDIT.md` |
 
 ### 2.2 Method notes
@@ -227,7 +227,7 @@ An **ISP** performing **traffic analysis** may still observe connection timing a
 | Expectation | Notes |
 |-------------|--------|
 | Product host | **82.221.101.241** |
-| Public catalog | **0.4.0** paid installers on [status host](https://restoreprivacy.online/) (£2.45; no free GitHub release downloads) |
+| Public catalog | **0.4.2** paid installers on [status host](https://restoreprivacy.online/) (£2.45; no free GitHub release downloads) |
 | Node pub pin | `1b126abf…` |
 | No `.priv` in public package trees | OK |
 
@@ -279,6 +279,6 @@ Re-run: `python3 scripts/run_security_audit.py --write`
 |------|--|
 | Output | `AUDIT.md` (repo root); served as `/AUDIT.md` and `/audit.md` on VPN APP Shop |
 | Related | `PRIVACY_POLICY.md`, `README.md`, `scripts/run_security_audit.py` |
-| Code baseline | Catalog **0.4.0** + node **82.221.101.241** |
+| Code baseline | Catalog **0.4.2** + node **82.221.101.241** |
 | Pass date | **22 July 2026** |
 | Machine JSON | `status_page/static/security_audit_latest.json` (when `--write`) |
