@@ -418,21 +418,25 @@ def public_nav_links_html(*, active: str | None = None) -> str:
 def public_brand_header_html(
     *,
     title: str = "RESTORE PRIVACY",
-    tagline: str = (
-        "lightweight vpn to restore your privacy — no user data is retained — "
-        "your privacy is restored"
-    ),
+    tagline: str = "",
     active: str | None = None,
     logo_size: int = 96,
 ) -> str:
-    """Static top brand panel used across all public pages."""
+    """Static top brand panel used across all public pages.
+
+    Under-title tagline is omitted by default (no lightweight-vpn slogan).
+    Pass a non-empty *tagline* only if a page truly needs a header subtitle;
+    public catalog/docs call sites leave it empty for a clean top box.
+    """
     title_safe = _esc(title)
-    tag_safe = _esc(tagline)
+    tag = (tagline or "").strip()
+    tagline_html = (
+        f'      <p class="brand-tagline">{_esc(tag)}</p>\n' if tag else ""
+    )
     return f"""    <header class="brand-panel panel-card" id="{SITE_BRAND_HEADER_ID}" data-site-header="1" data-header-alias="site-brand-header">
       <img class="brand-logo" src="/logo.png" width="{int(logo_size)}" height="{int(logo_size)}" alt="Restore Privacy logo"/>
       <h1>{title_safe}</h1>
-      <p class="brand-tagline">{tag_safe}</p>
-{public_nav_links_html(active=active)}
+{tagline_html}{public_nav_links_html(active=active)}
 {public_theme_picker_html()}
     </header>
 """

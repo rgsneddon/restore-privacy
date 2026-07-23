@@ -332,9 +332,6 @@ def render_settings_explainer_page_html(*, title: str = "RESTORE PRIVACY") -> by
     css = _shared_shell_css()
     header = public_brand_header_html(
         title=title,
-        tagline=(
-            "Client Settings guide — what every control does, and how to install & run"
-        ),
         active="settings",
         logo_size=88,
     )

@@ -391,10 +391,6 @@ def render_html(status: dict, poll_ms: int | None = None) -> bytes:
     )
     header = public_brand_header_html(
         title=str(title),
-        tagline=(
-            "lightweight vpn to restore your privacy — no user data is retained — "
-            "your privacy is restored"
-        ),
         active="home",
         logo_size=96,
     )

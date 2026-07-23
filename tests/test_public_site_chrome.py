@@ -77,12 +77,25 @@ class TestPublicChromeModule(unittest.TestCase):
 
         header = public_brand_header_html(active="licence")
         self.assertIn('id="brand-panel"', header)
+        self.assertIn("<h1>", header)
+        self.assertIn("RESTORE PRIVACY", header)
+        # No under-title slogan in the top brand box
+        self.assertNotIn("brand-tagline", header)
+        self.assertNotIn("lightweight vpn to restore", header.lower())
+        self.assertNotIn("your privacy is restored", header.lower())
         self.assertIn('id="home-link"', header)
         self.assertIn('id="theme-mode-control"', header)
         self.assertIn('name="public-theme"', header)
         self.assertIn('value="light"', header)
         self.assertIn('value="dark"', header)
         self.assertIn('value="device"', header)
+        # Explicit empty tagline still omits the element
+        bare = public_brand_header_html(tagline="")
+        self.assertNotIn("brand-tagline", bare)
+        # Non-empty override still allowed for callers that need a subtitle
+        with_tag = public_brand_header_html(tagline="custom subtitle only")
+        self.assertIn('class="brand-tagline"', with_tag)
+        self.assertIn("custom subtitle only", with_tag)
         css = public_site_css()
         self.assertIn('[data-theme="light"]', css)
         self.assertIn('[data-theme="dark"]', css)
@@ -112,6 +125,13 @@ class TestHomepageChrome(unittest.TestCase):
         self.assertIn("nav-btn", html)
         self.assertIn("settings-banner", html)
         self.assertIn("settings-explainer-banner-link", html)
+        # Top brand box has no lightweight-vpn (or any) tagline line
+        brand_start = html.index('id="brand-panel"')
+        brand_end = html.index("</header>", brand_start)
+        brand_box = html[brand_start:brand_end]
+        self.assertNotIn("brand-tagline", brand_box)
+        self.assertNotIn("lightweight vpn to restore", brand_box.lower())
+        self.assertNotIn("your privacy is restored", brand_box.lower())
         # Price white callouts present
         self.assertIn('id="dl-only-price"', html)
         self.assertIn("ONLY £2.45 per month", html)
@@ -135,6 +155,11 @@ class TestDocsShareChrome(unittest.TestCase):
             self.assertIn("panel-card", html, path)
             self.assertIn("nav-btn", html, path)
             self.assertNotIn("settings-guide-link", html, path)
+            brand_start = html.index('id="brand-panel"')
+            brand_end = html.index("</header>", brand_start)
+            brand_box = html[brand_start:brand_end]
+            self.assertNotIn("brand-tagline", brand_box, path)
+            self.assertNotIn("lightweight vpn to restore", brand_box.lower(), path)
             i_home = html.index('id="home-link"')
             i_lic = html.index('id="licence-link"')
             self.assertLess(i_home, i_lic, path)

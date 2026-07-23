@@ -764,7 +764,6 @@ def render_document_html(
 """
     header = public_brand_header_html(
         title="RESTORE PRIVACY",
-        tagline=_escape(title),
         active=active,
         logo_size=88,
     )
@@ -850,7 +849,6 @@ def render_how_to_buy_html() -> bytes:
     )
     header = public_brand_header_html(
         title="RESTORE PRIVACY",
-        tagline="How to buy — pay on Stripe, then download",
         active="home",
         logo_size=88,
     )
