@@ -388,9 +388,11 @@ def public_theme_picker_html() -> str:
 
 
 def public_nav_links_html(*, active: str | None = None) -> str:
-    """Button-style nav: Home before Licence, then Privacy, Audit, README, Settings.
+    """Button-style nav: Home, Licence, Privacy Policy, Security Audit, README.
 
-    *active* is one of: home, licence, privacy, audit, readme, settings (or None).
+    *active* is one of: home, licence, privacy, audit, readme (or None).
+    Settings guide is **not** in the top brand nav (homepage banner may still
+    link to the explainer page).
     """
     items = (
         ("HOME", HOME_PATH, HOME_LINK_ID, "home"),
@@ -398,7 +400,6 @@ def public_nav_links_html(*, active: str | None = None) -> str:
         ("PRIVACY POLICY", PRIVACY_PATH, PRIVACY_LINK_ID, "privacy"),
         ("SECURITY AUDIT", AUDIT_PATH, AUDIT_LINK_ID, "audit"),
         ("README", README_PATH, README_LINK_ID, "readme"),
-        ("SETTINGS GUIDE", SETTINGS_GUIDE_PATH, SETTINGS_GUIDE_LINK_ID, "settings"),
     )
     parts: list[str] = []
     for label, path, el_id, key in items:
