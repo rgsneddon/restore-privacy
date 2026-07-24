@@ -30,6 +30,8 @@ DOWNLOADS_PKG = Path.home() / "Downloads" / "RestorePrivacy_VPN_Icons"
 # Canonical masters in-repo (after import)
 PRIMARY_DARK = BRAND_DIR / "primary_dark_1024.png"
 PRIMARY_TRANSPARENT = BRAND_DIR / "primary_transparent_1024.png"
+# Public header: transparent outside shield+key; interior holes filled dark blue.
+PRIMARY_TRANSPARENT_FILLED = BRAND_DIR / "primary_transparent_filled_1024.png"
 FLAT_DARK = BRAND_DIR / "flat_dark_1024.png"
 IOS_ROUNDED_DARK = BRAND_DIR / "rounded_dark_1024.png"
 # Legacy fallback
@@ -138,6 +140,62 @@ def load_square_rgba(path: Path) -> Image.Image:
     return img
 
 
+# Product dark navy (#0a1628) — fallback when solid plate pixel is missing.
+_FILL_NAVY = (10, 22, 40, 255)
+
+
+def fill_shield_interior_holes(
+    transparent: Image.Image,
+    solid_plate: Image.Image | None = None,
+    *,
+    navy: tuple[int, int, int, int] = _FILL_NAVY,
+) -> Image.Image:
+    """Fill fully transparent pixels *inside* the mark with dark blue; keep exterior alpha.
+
+    Outer exterior is identified by flood-filling alpha==0 from the four corners.
+    Enclosed transparent islands (holes inside the shield) become opaque navy,
+    preferably sampled from *solid_plate* at the same coordinates.
+    """
+    from PIL import ImageDraw
+
+    trans = transparent.convert("RGBA")
+    w, h = trans.size
+    solid = None
+    if solid_plate is not None:
+        solid = solid_plate.convert("RGBA")
+        if solid.size != (w, h):
+            solid = solid.resize((w, h), Image.Resampling.LANCZOS)
+
+    # Binary: fully transparent → 255; then flood exterior as 128
+    outer = Image.new("L", (w, h), 0)
+    tp = trans.load()
+    op = outer.load()
+    for y in range(h):
+        for x in range(w):
+            if tp[x, y][3] == 0:
+                op[x, y] = 255
+    for seed in ((0, 0), (w - 1, 0), (0, h - 1), (w - 1, h - 1)):
+        if outer.getpixel(seed) == 255:
+            ImageDraw.floodfill(outer, seed, 128, thresh=0)
+
+    out = trans.copy()
+    outp = out.load()
+    sp = solid.load() if solid is not None else None
+    outerp = outer.load()
+    for y in range(h):
+        for x in range(w):
+            if tp[x, y][3] != 0:
+                continue
+            if outerp[x, y] == 128:
+                continue  # exterior — stay transparent
+            if sp is not None:
+                r, g, b, a = sp[x, y]
+                outp[x, y] = (r, g, b, 255) if a >= 200 else navy
+            else:
+                outp[x, y] = navy
+    return out
+
+
 def resize_png(src: Image.Image, size: int) -> Image.Image:
     return src.resize((size, size), Image.Resampling.LANCZOS)
 
@@ -159,12 +217,21 @@ def generate_all() -> dict:
     master = load_square_rgba(source)
     # Small icons: prefer flat when available (README: simplified flat for small sizes)
     small_src = load_square_rgba(FLAT_DARK) if FLAT_DARK.is_file() else master
-    # Adaptive foreground: transparent primary
+    # Adaptive foreground: transparent primary (raw master, not interior-filled)
     fg = (
         load_square_rgba(PRIMARY_TRANSPARENT)
         if PRIMARY_TRANSPARENT.is_file()
         else master
     )
+    # Public header cutout: fill holes inside shield with dark plate colour
+    if PRIMARY_TRANSPARENT.is_file():
+        filled = fill_shield_interior_holes(
+            load_square_rgba(PRIMARY_TRANSPARENT),
+            master if PRIMARY_DARK.is_file() else None,
+        )
+        save_png(filled, PRIMARY_TRANSPARENT_FILLED)
+    else:
+        filled = None
     # iOS: prefer rounded dark if present
     ios_master = (
         load_square_rgba(IOS_ROUNDED_DARK) if IOS_ROUNDED_DARK.is_file() else master
@@ -186,9 +253,11 @@ def generate_all() -> dict:
     shutil.copy2(BRAND_DIR / "favicon-32.png", STATUS_STATIC / "favicon.png")
     shutil.copy2(BRAND_DIR / "logo-256.png", STATUS_STATIC / "logo.png")
     save_png(resize_png(master, 180), STATUS_STATIC / "apple-touch-icon.png")
-    # Public header mark: transparent shield + green key (no outer plate).
-    # Copied from primary_transparent master; opaque logo.png stays the dark plate.
-    if PRIMARY_TRANSPARENT.is_file():
+    # Public header: outer transparent; interior shield holes filled dark blue.
+    if filled is not None:
+        save_png(filled, STATUS_STATIC / "logo_transparent.png")
+        written.append(str(PRIMARY_TRANSPARENT_FILLED))
+    elif PRIMARY_TRANSPARENT.is_file():
         shutil.copy2(PRIMARY_TRANSPARENT, STATUS_STATIC / "logo_transparent.png")
     else:
         save_png(resize_png(fg, 512), STATUS_STATIC / "logo_transparent.png")

@@ -171,7 +171,7 @@ class TestPublicChromeModule(unittest.TestCase):
         self.assertIn("data-theme", script)
 
     def test_brand_logo_static_is_borderless_transparent_mark(self) -> None:
-        """Shipped header logo has clear corners (shield+key only, no outer plate)."""
+        """Header logo: outer transparent; no enclosed holes inside the shield."""
         from pathlib import Path
 
         from public_chrome import PUBLIC_BRAND_LOGO_STATIC_NAME
@@ -182,24 +182,41 @@ class TestPublicChromeModule(unittest.TestCase):
         data = path.read_bytes()
         self.assertEqual(data[:8], b"\x89PNG\r\n\x1a\n")
         try:
-            from PIL import Image
+            from PIL import Image, ImageDraw
 
             im = Image.open(path).convert("RGBA")
+            w, h = im.size
             corners = [
                 im.getpixel((0, 0))[3],
-                im.getpixel((im.width - 1, 0))[3],
-                im.getpixel((0, im.height - 1))[3],
-                im.getpixel((im.width - 1, im.height - 1))[3],
+                im.getpixel((w - 1, 0))[3],
+                im.getpixel((0, h - 1))[3],
+                im.getpixel((w - 1, h - 1))[3],
             ]
             self.assertTrue(
                 all(a < 16 for a in corners),
                 msg=f"corners must be transparent: {corners}",
             )
-            alphas = [px[3] for px in im.getdata()]
-            zeros = sum(1 for a in alphas if a == 0)
-            # Substantial transparent field outside the shield+key mark
-            self.assertGreater(zeros, len(alphas) // 2, "expected mostly transparent plate")
-            # Opaque plate logo.png must remain different
+            px = im.load()
+            outer = Image.new("L", (w, h), 0)
+            op = outer.load()
+            for y in range(h):
+                for x in range(w):
+                    if px[x, y][3] == 0:
+                        op[x, y] = 255
+            for seed in ((0, 0), (w - 1, 0), (0, h - 1), (w - 1, h - 1)):
+                if outer.getpixel(seed) == 255:
+                    ImageDraw.floodfill(outer, seed, 128, thresh=0)
+            outer_t = holes = 0
+            for y in range(h):
+                for x in range(w):
+                    if px[x, y][3] != 0:
+                        continue
+                    if outer.getpixel((x, y)) == 128:
+                        outer_t += 1
+                    else:
+                        holes += 1
+            self.assertEqual(holes, 0, "shield interior holes must be filled")
+            self.assertGreater(outer_t, w * h // 2, "outer area must stay transparent")
             solid = ROOT / "status_page" / "static" / "logo.png"
             self.assertTrue(solid.is_file())
             self.assertNotEqual(solid.read_bytes(), path.read_bytes())

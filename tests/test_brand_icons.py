@@ -28,6 +28,60 @@ def _sha256_prefix(path: Path, n: int = 16) -> str:
     return h.hexdigest()[:n]
 
 
+class TestFillShieldInteriorHoles(unittest.TestCase):
+    def test_fill_keeps_outer_transparent_and_fills_enclosed_holes(self) -> None:
+        """Drive shipped fill_shield_interior_holes from generate_brand_icons."""
+        import importlib.util
+
+        from PIL import Image, ImageDraw
+
+        gen_path = ROOT / "scripts" / "generate_brand_icons.py"
+        spec = importlib.util.spec_from_file_location("generate_brand_icons", gen_path)
+        assert spec and spec.loader
+        mod = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(mod)
+
+        # Synthetic: opaque ring (alpha 255) around a transparent hole; outer transparent
+        im = Image.new("RGBA", (64, 64), (0, 0, 0, 0))
+        solid = Image.new("RGBA", (64, 64), (10, 22, 40, 255))
+        draw = ImageDraw.Draw(im)
+        draw.ellipse((8, 8, 55, 55), fill=(0, 180, 255, 255))
+        draw.ellipse((24, 24, 39, 39), fill=(0, 0, 0, 0))  # hole
+        filled = mod.fill_shield_interior_holes(im, solid)
+        self.assertEqual(filled.getpixel((0, 0))[3], 0)
+        self.assertEqual(filled.getpixel((63, 63))[3], 0)
+        # Center of hole should now be opaque dark blue from solid plate
+        c = filled.getpixel((31, 31))
+        self.assertEqual(c[3], 255)
+        self.assertLess(c[0], 40)
+        self.assertLess(c[1], 50)
+
+    def test_shipped_logo_transparent_has_no_interior_holes(self) -> None:
+        from PIL import Image, ImageDraw
+
+        path = ROOT / "status_page" / "static" / "logo_transparent.png"
+        self.assertTrue(path.is_file())
+        im = Image.open(path).convert("RGBA")
+        w, h = im.size
+        px = im.load()
+        outer = Image.new("L", (w, h), 0)
+        op = outer.load()
+        for y in range(h):
+            for x in range(w):
+                if px[x, y][3] == 0:
+                    op[x, y] = 255
+        for seed in ((0, 0), (w - 1, 0), (0, h - 1), (w - 1, h - 1)):
+            if outer.getpixel(seed) == 255:
+                ImageDraw.floodfill(outer, seed, 128, thresh=0)
+        holes = sum(
+            1
+            for y in range(h)
+            for x in range(w)
+            if px[x, y][3] == 0 and outer.getpixel((x, y)) != 128
+        )
+        self.assertEqual(holes, 0)
+
+
 class TestBrandSourceAndDerivatives(unittest.TestCase):
     def test_master_brand_source_present(self):
         """Current brand masters live under assets/brand (primary_* preferred)."""
@@ -72,7 +126,12 @@ class TestBrandSourceAndDerivatives(unittest.TestCase):
             (static / "logo.png").read_bytes(),
             (brand / "logo-256.png").read_bytes(),
         )
+        # Public header cutout: interior-filled transparent master (not raw holes)
         self.assertEqual(
+            (static / "logo_transparent.png").read_bytes(),
+            (brand / "primary_transparent_filled_1024.png").read_bytes(),
+        )
+        self.assertNotEqual(
             (static / "logo_transparent.png").read_bytes(),
             (brand / "primary_transparent_1024.png").read_bytes(),
         )
