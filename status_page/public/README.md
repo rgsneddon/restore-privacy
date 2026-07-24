@@ -64,6 +64,14 @@ The product source repository is **private**; free permanent GitHub release down
 | macOS | `restore-privacy-client-0.4.2-macos.zip` *(Developer ID signed + notarized)* |
 | iOS | `restore-privacy-client-0.4.2-ios.zip` *(Team-signed sideload)* |
 | Ubuntu / Linux | `restore-privacy-client-0.4.2-linux-x64.tar.gz` |
+| Browser (Chromium MV3) | `restore-privacy-browser-extension-0.4.2.zip` *(browser-scoped proxy only — not OS residual TUN; see `browser_extension/README.md`)* |
+
+### Browser extension (Chromium MV3)
+
+1. Get **`restore-privacy-browser-extension-0.4.2.zip`** from the [0.4.2 release assets](https://github.com/rgsneddon/restore-privacy/releases/tag/0.4.2) (or build from `browser_extension/`).
+2. Unzip → Chromium/Chrome/Edge **Extensions** → Developer mode → **Load unpacked** → select the extension folder.
+3. Use **Connect** / **Disconnect** in the toolbar popup. This is **browser-scoped** (`chrome.proxy` / local SOCKS path) — it does **not** replace paid native residual clients for system residual public IP.
+4. Source and honesty notes: [`browser_extension/README.md`](browser_extension/README.md).
 
 ### Windows
 

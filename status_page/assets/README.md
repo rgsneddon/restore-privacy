@@ -22,3 +22,5 @@ Build provenance):
 Node-only **zram + LUKS2** is a host deploy feature and does not change residual client packages.
 
 Do not put `*.priv` here. Re-stage from `releases/{VERSION}/` on each ship.
+
+**Browser extension (0.4.2):** `restore-privacy-browser-extension-0.4.2.zip` — MV3 browser-scoped proxy; not OS residual. See `browser_extension/README.md`.
