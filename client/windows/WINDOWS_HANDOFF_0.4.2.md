@@ -36,10 +36,18 @@ Honest residual (Wintun + dual /1) **always needs OS privilege somewhere**.
 
 Product UX (0.4.2+):
 1. Desktop shortcut opens as a **standard user** (not “Run as administrator”).
-2. **Connect** prompts UAC once to re-open elevated with `--rpt-auto-connect`, **or**
-3. Settings → **Install residual helper (one-time Administrator)** registers a
-   scheduled task (`RestorePrivacy\ResidualConnect`) so later Connect uses the
-   helper without elevating the whole GUI via the shortcut.
+2. **Connect** uses `connect_residual_privilege_dispatch()` when the GUI is
+   non-admin — never falls through to `start_full_tunnel` as a standard user.
+3. If the residual helper task is installed, Connect **always** runs
+   `run_residual_helper_connect()` (schtasks `/Run` on
+   `RestorePrivacy\ResidualConnect`). It does **not** skip that path just
+   because `product_connect_requires_admin_process()` is False (that flag only
+   means “this window need not elevate”).
+4. Without a helper, Connect prompts UAC once to re-open elevated with
+   `--rpt-auto-connect`.
+5. Settings → **Install residual helper (one-time Administrator)** registers the
+   scheduled task so later Connects use the helper without elevating the whole
+   GUI via the shortcut.
 
 There is **no** fully unprivileged residual public-IP capture on stock Windows.
 

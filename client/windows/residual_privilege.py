@@ -288,12 +288,127 @@ def run_residual_helper_connect() -> dict[str, Any]:
 
 
 def product_connect_requires_admin_process() -> bool:
-    """True when *this* process must be admin to apply residual now.
+    """True when *this* GUI process must elevate (UAC) for residual.
 
-    False when already admin **or** residual helper can take residual work.
+    False when already admin **or** residual helper is installed (Connect must
+    still call :func:`run_residual_helper_connect` — never apply residual
+    system capture in a non-admin process). Residual always needs OS privilege
+    somewhere; this flag only answers "must *this* window elevate?"
     """
     if is_process_admin():
         return False
     if residual_helper_installed():
         return False
     return residual_requires_os_privilege()
+
+
+def plan_residual_connect_privilege(
+    *,
+    process_is_admin: bool | None = None,
+    helper_installed: bool | None = None,
+    elevate_disabled: bool | None = None,
+) -> dict[str, Any]:
+    """Decide how Connect must obtain residual privilege for *this* process.
+
+    Actions (always residual-honest — never ``proceed_in_process`` as non-admin):
+
+    * ``proceed_in_process`` — process is already Administrator
+    * ``run_helper`` — GUI stays standard user; call :func:`run_residual_helper_connect`
+    * ``elevate_uac`` — re-launch elevated (``--rpt-auto-connect``)
+    * ``blocked`` — cannot residual (e.g. auto-elevate disabled and no helper)
+    """
+    admin = is_process_admin() if process_is_admin is None else bool(process_is_admin)
+    helper = (
+        residual_helper_installed()
+        if helper_installed is None
+        else bool(helper_installed)
+    )
+    disabled = (
+        auto_elevate_disabled() if elevate_disabled is None else bool(elevate_disabled)
+    )
+    if admin:
+        return {
+            "action": "proceed_in_process",
+            "message": "Running elevated — residual Connect can apply Wintun routes.",
+            "process_is_admin": True,
+            "helper_installed": helper,
+            "auto_elevate_disabled": disabled,
+        }
+    # Non-admin: never proceed to start_full_tunnel(require_system_capture=True).
+    if helper:
+        # Prefer helper even if RPT_NO_AUTO_ELEVATE is set — helper is already
+        # registered elevated; GUI need not re-elevate.
+        return {
+            "action": "run_helper",
+            "message": MSG_HELPER_READY,
+            "process_is_admin": False,
+            "helper_installed": True,
+            "auto_elevate_disabled": disabled,
+        }
+    if disabled:
+        return {
+            "action": "blocked",
+            "message": MSG_ELEVATE_DISABLED,
+            "process_is_admin": False,
+            "helper_installed": False,
+            "auto_elevate_disabled": True,
+        }
+    return {
+        "action": "elevate_uac",
+        "message": MSG_RESIDUAL_NEEDS_PRIVILEGE,
+        "process_is_admin": False,
+        "helper_installed": False,
+        "auto_elevate_disabled": False,
+    }
+
+
+def connect_residual_privilege_dispatch(
+    *,
+    process_is_admin: bool | None = None,
+    helper_installed: bool | None = None,
+    elevate_disabled: bool | None = None,
+) -> dict[str, Any]:
+    """Shipped Connect residual-privilege entry (used by product UI).
+
+    When the plan is ``run_helper``, this **always** calls
+    :func:`run_residual_helper_connect` (the bug we fixed: helper-installed
+    must not skip straight into non-admin ``start_full_tunnel``).
+
+    Returns a dict with ``action``, ``ok``, ``plan``, and optional ``helper``.
+    Callers must only start residual tunnel in-process when
+    ``action == "proceed_in_process"``.
+    """
+    plan = plan_residual_connect_privilege(
+        process_is_admin=process_is_admin,
+        helper_installed=helper_installed,
+        elevate_disabled=elevate_disabled,
+    )
+    action = str(plan.get("action") or "")
+    if action == "proceed_in_process":
+        return {"action": action, "ok": True, "plan": plan, "helper": None}
+    if action == "run_helper":
+        helper = run_residual_helper_connect()
+        ok = bool(helper.get("ok"))
+        return {
+            "action": action,
+            "ok": ok,
+            "plan": plan,
+            "helper": helper,
+            "fallback": None if ok else "elevate_uac",
+            "message": helper.get("message") or plan.get("message"),
+        }
+    if action == "blocked":
+        return {
+            "action": action,
+            "ok": False,
+            "plan": plan,
+            "helper": None,
+            "message": plan.get("message") or MSG_ELEVATE_DISABLED,
+        }
+    return {
+        "action": "elevate_uac",
+        "ok": False,
+        "plan": plan,
+        "helper": None,
+        "message": plan.get("message") or MSG_RESIDUAL_NEEDS_PRIVILEGE,
+    }

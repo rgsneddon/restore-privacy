@@ -49,6 +49,7 @@ class TestResidualPrivilegeHelpers(unittest.TestCase):
     def test_status_helper_installed_allows_gui_non_admin_connect(self) -> None:
         from client.windows.residual_privilege import (
             MSG_HELPER_READY,
+            plan_residual_connect_privilege,
             product_connect_requires_admin_process,
             residual_privilege_status,
         )
@@ -65,11 +66,101 @@ class TestResidualPrivilegeHelpers(unittest.TestCase):
                 ):
                     st = residual_privilege_status()
                     needs = product_connect_requires_admin_process()
+                    plan = plan_residual_connect_privilege()
         self.assertEqual(st["mode"], "helper_installed")
         self.assertTrue(st["may_connect_without_gui_elevation"])
         self.assertIn("helper", st["message"].lower())
+        # This process need not elevate — but plan must still be run_helper
+        # (never proceed_in_process as non-admin).
         self.assertFalse(needs)
+        self.assertEqual(plan["action"], "run_helper")
+        self.assertNotEqual(plan["action"], "proceed_in_process")
         self.assertIn("Run as administrator", MSG_HELPER_READY)
+
+    def test_connect_dispatch_invokes_helper_when_installed_non_admin(self) -> None:
+        """Honest Connect path: helper installed → run_residual_helper_connect.
+
+        product_connect_requires_admin_process() is False when helper is present
+        (GUI need not elevate). Connect must still dispatch the helper — not fall
+        through to non-admin start_full_tunnel.
+        """
+        from client.windows.residual_privilege import (
+            connect_residual_privilege_dispatch,
+            product_connect_requires_admin_process,
+        )
+
+        helper_result = {
+            "ok": True,
+            "task": r"RestorePrivacy\ResidualConnect",
+            "message": "Residual helper started — finishing Connect elevated.",
+        }
+        with mock.patch(
+            "client.windows.residual_privilege.is_process_admin",
+            return_value=False,
+        ), mock.patch(
+            "client.windows.residual_privilege.residual_helper_installed",
+            return_value=True,
+        ), mock.patch(
+            "client.windows.residual_privilege.run_residual_helper_connect",
+            return_value=helper_result,
+        ) as mock_run:
+            needs = product_connect_requires_admin_process()
+            dispatched = connect_residual_privilege_dispatch()
+
+        self.assertFalse(needs)
+        self.assertEqual(dispatched["action"], "run_helper")
+        self.assertTrue(dispatched["ok"])
+        mock_run.assert_called_once()
+        self.assertEqual(dispatched["helper"], helper_result)
+
+    def test_connect_dispatch_non_admin_no_helper_is_elevate_or_blocked(self) -> None:
+        from client.windows.residual_privilege import connect_residual_privilege_dispatch
+
+        with mock.patch(
+            "client.windows.residual_privilege.is_process_admin",
+            return_value=False,
+        ), mock.patch(
+            "client.windows.residual_privilege.residual_helper_installed",
+            return_value=False,
+        ), mock.patch(
+            "client.windows.residual_privilege.auto_elevate_disabled",
+            return_value=False,
+        ), mock.patch(
+            "client.windows.residual_privilege.run_residual_helper_connect",
+        ) as mock_run:
+            dispatched = connect_residual_privilege_dispatch()
+        self.assertEqual(dispatched["action"], "elevate_uac")
+        self.assertFalse(dispatched["ok"])
+        mock_run.assert_not_called()
+
+        with mock.patch(
+            "client.windows.residual_privilege.is_process_admin",
+            return_value=False,
+        ), mock.patch(
+            "client.windows.residual_privilege.residual_helper_installed",
+            return_value=False,
+        ), mock.patch(
+            "client.windows.residual_privilege.auto_elevate_disabled",
+            return_value=True,
+        ):
+            blocked = connect_residual_privilege_dispatch()
+        self.assertEqual(blocked["action"], "blocked")
+        self.assertFalse(blocked["ok"])
+        self.assertIn("RPT_NO_AUTO_ELEVATE", blocked.get("message") or "")
+
+    def test_connect_dispatch_admin_proceeds_in_process(self) -> None:
+        from client.windows.residual_privilege import connect_residual_privilege_dispatch
+
+        with mock.patch(
+            "client.windows.residual_privilege.is_process_admin",
+            return_value=True,
+        ), mock.patch(
+            "client.windows.residual_privilege.run_residual_helper_connect",
+        ) as mock_run:
+            dispatched = connect_residual_privilege_dispatch()
+        self.assertEqual(dispatched["action"], "proceed_in_process")
+        self.assertTrue(dispatched["ok"])
+        mock_run.assert_not_called()
 
     def test_elevation_result_user_message_uac_cancelled(self) -> None:
         from client.windows.residual_privilege import (
@@ -149,6 +240,19 @@ class TestResidualPrivilegeBoundaryStructural(unittest.TestCase):
         src = (ROOT / "client" / "windows" / "app.py").read_text(encoding="utf-8")
         self.assertIn("RPT_ELEVATE_ON_LAUNCH", src)
         self.assertIn("residual_helper", src.lower() or "residual helper")
+
+    def test_app_connect_uses_dispatch_not_requires_admin_gate_alone(self) -> None:
+        """Connect must call connect_residual_privilege_dispatch when not admin.
+
+        Must not gate helper solely on product_connect_requires_admin() — that is
+        False when helper is installed and previously skipped the helper path.
+        """
+        src = (ROOT / "client" / "windows" / "app.py").read_text(encoding="utf-8")
+        self.assertIn("connect_residual_privilege_dispatch", src)
+        self.assertIn("if not is_admin():", src)
+        # The dead gate that skipped helper when installed must not be the sole check
+        dead = "if product_connect_requires_admin() and not is_admin():"
+        self.assertNotIn(dead, src)
 
 
 if __name__ == "__main__":

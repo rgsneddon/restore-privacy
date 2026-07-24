@@ -1177,37 +1177,53 @@ class TunnelClientApp:
             self._show_keygen_prompt()
             return
 
-        # Residual needs OS privilege (Wintun + dual /1). Prefer residual helper
-        # (GUI stays standard user) else one UAC re-launch with --rpt-auto-connect.
-        if product_connect_requires_admin() and not is_admin():
+        # Residual needs OS privilege (Wintun + dual /1). Non-admin must NEVER
+        # fall through to start_full_tunnel(require_system_capture=True) — that
+        # path fails "Administrator required". Use connect_residual_privilege_dispatch
+        # so helper-installed always invokes run_residual_helper_connect (not gated
+        # solely on product_connect_requires_admin(), which is False when helper
+        # is installed — that bug skipped the only helper call site).
+        if not is_admin():
             from client.windows.residual_privilege import (
+                connect_residual_privilege_dispatch,
                 elevation_result_user_message,
-                residual_helper_installed,
-                residual_privilege_status,
-                run_residual_helper_connect,
             )
 
             self._apply_control(connected=False, busy=True)
             self._set_status("connecting")
-            st = residual_privilege_status()
-            if residual_helper_installed() and not st.get("auto_elevate_disabled"):
+            dispatched = connect_residual_privilege_dispatch()
+            action = str(dispatched.get("action") or "")
+
+            if action == "run_helper" and dispatched.get("ok"):
                 self._log(
                     "Connect — starting residual via installed helper "
                     "(no Run as administrator on the app window)…"
                 )
-                helper = run_residual_helper_connect()
-                if helper.get("ok"):
-                    self._log(str(helper.get("message") or "Residual helper started."))
-                    # Helper launches elevated Connect; this standard-user UI can idle.
-                    self._set_status(
-                        "connecting",
-                        detail="Residual helper finishing Connect elevated…",
-                    )
-                    self._apply_control(connected=False, busy=False)
-                    return
+                helper = dispatched.get("helper") or {}
+                self._log(str(helper.get("message") or dispatched.get("message") or "Residual helper started."))
+                self._set_status(
+                    "connecting",
+                    detail="Residual helper finishing Connect elevated…",
+                )
+                self._apply_control(connected=False, busy=False)
+                return
+
+            if action == "run_helper" and not dispatched.get("ok"):
                 self._log(
                     "Residual helper run failed — falling back to UAC elevate…"
                 )
+
+            if action == "blocked":
+                err = str(
+                    dispatched.get("message")
+                    or elevation_result_user_message("skipped")
+                )
+                self._log(f"Could not connect: {err}")
+                self._set_status("error", detail=err)
+                self._apply_control(connected=False, busy=False)
+                return
+
+            # elevate_uac (or helper failed → UAC fallback)
             self._log(
                 "Connect — residual needs Administrator once (Wintun + routes). "
                 "Approve UAC to re-open elevated and finish Connect. "
