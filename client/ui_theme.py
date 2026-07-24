@@ -33,11 +33,13 @@ STATUS_ERROR = "#CD0A0A"  # cupertino error red  -  color for failed Connect (ne
 STATUS_ERROR_FG = STATUS_ERROR  # alias for fg= usage
 STATUS_WARN = "#A67C00"
 BORDER = "#AED0EA"  # cupertino border blue
+# Site panel-card neon accent (restoreprivacy.online boxes)
+NEON_BORDER = "#2EE6D6"
+NEON_TEAL = "#1B767E"
 BUTTON_CONNECT_BG = PRIMARY
 BUTTON_DISCONNECT_BG = "#1B767E"
 BUTTON_FG = WHITE
 DISABLED_FG = "#AAAAAA"
-
 # Legacy aliases (tests / older imports)
 BANNER_BG = PRIMARY_DARK
 BANNER_FG = WHITE

@@ -125,6 +125,17 @@ from client.first_run_flow import (
     mark_first_run_settings_completed,
     post_keygen_next_surface,
 )
+from client.windows.ui_chrome import (
+    NEON_BORDER,
+    NEON_BORDER_DIM,
+    SwitchToggle,
+    apply_centered_window,
+    make_neon_card,
+    style_primary_button,
+    surface_default_size,
+    surface_geometry_string,
+    surface_min_size,
+)
 from client.windows.settings_store import (
     ProductSettings,
     apply_run_at_startup,
@@ -232,17 +243,16 @@ class TunnelClientApp:
     """Seamless shell: hero status, Connect/Disconnect, Settings transparency."""
 
     DEFAULT_GEOMETRY = MAIN_CONNECT_GEOMETRY
-    MIN_WIDTH = 480
-    MIN_HEIGHT = 520
+    MIN_WIDTH, MIN_HEIGHT = surface_min_size("main")
 
     def __init__(self) -> None:
         self.root = tk.Tk()
         self.root.title(APP_TITLE)
-        self.root.geometry(self.DEFAULT_GEOMETRY)
         self.root.configure(bg=CHROME_BG)
-        self.root.minsize(self.MIN_WIDTH, self.MIN_HEIGHT)
         self._keygen_prompt_win: tk.Toplevel | None = None
         self._settings_win: tk.Toplevel | None = None
+        # Size + centre on primary work area (not top-left)
+        apply_centered_window(self.root, surface="main")
         self._set_window_icon()
         # UI-only close - tunnel stays up until user presses Disconnect
         self.root.protocol("WM_DELETE_WINDOW", self._on_close_ui_only)
@@ -280,6 +290,7 @@ class TunnelClientApp:
             bd=0,
             highlightthickness=0,
         )
+        style_primary_button(self.connect_btn, neon=True)
         self.connect_btn.pack(side=tk.TOP, fill=tk.X, pady=(10, 6), ipady=8)
 
         self.hint_row = tk.Frame(self.bottom, bg=CHROME_BG)
@@ -407,16 +418,11 @@ class TunnelClientApp:
                 pady=4,
             ).pack(side=tk.RIGHT, padx=(8, 0))
 
-        # --- Hero status card (plain language, residual-honest) ---
-        self.status_card = tk.Frame(
-            self.chrome,
-            bg=PANEL_BG,
-            padx=PANEL_PAD + 4,
-            pady=PANEL_PAD + 4,
-            highlightbackground=BORDER,
-            highlightthickness=1,
+        # --- Hero status card (site neon box / residual-honest) ---
+        self.status_card, self.status_card_outer = make_neon_card(
+            self.chrome, padx=PANEL_PAD + 4, pady=PANEL_PAD + 4, bg=PANEL_BG
         )
-        self.status_card.pack(side=tk.TOP, fill=tk.X, pady=(0, 10))
+        self.status_card_outer.pack(side=tk.TOP, fill=tk.X, pady=(0, 10))
 
         hero_top = tk.Frame(self.status_card, bg=PANEL_BG)
         hero_top.pack(fill=tk.X)
@@ -741,18 +747,20 @@ class TunnelClientApp:
         win = tk.Toplevel(self.root)
         win.title("Renew your licence")
         win.configure(bg=CHROME_BG)
-        win.geometry("500x320")
+        apply_centered_window(win, surface="renew")
         win.transient(self.root)
         try:
             win.grab_set()
         except Exception:
             pass
-        pad = tk.Frame(win, bg=CHROME_BG, padx=16, pady=14)
-        pad.pack(fill=tk.BOTH, expand=True)
+        shell = tk.Frame(win, bg=CHROME_BG, padx=16, pady=14)
+        shell.pack(fill=tk.BOTH, expand=True)
+        pad, card_outer = make_neon_card(shell, padx=16, pady=14)
+        card_outer.pack(fill=tk.BOTH, expand=True)
         tk.Label(
             pad,
             text="Renew your licence",
-            bg=CHROME_BG,
+            bg=PANEL_BG,
             fg=PRIMARY_DARK,
             font=("Segoe UI", 14, "bold"),
             anchor="w",
@@ -760,22 +768,22 @@ class TunnelClientApp:
         tk.Label(
             pad,
             text="Your subscription is EXPIRED. Renew your licence *here*:",
-            bg=CHROME_BG,
+            bg=PANEL_BG,
             fg=TEXT,
             font=("Segoe UI", 10),
             anchor="w",
-            wraplength=460,
+            wraplength=500,
             justify=tk.LEFT,
         ).pack(fill=tk.X, pady=(0, 6))
         link = tk.Label(
             pad,
             text=url,
-            bg=CHROME_BG,
+            bg=PANEL_BG,
             fg=PRIMARY,
             font=("Segoe UI", 9, "underline"),
             cursor="hand2",
             anchor="w",
-            wraplength=460,
+            wraplength=500,
             justify=tk.LEFT,
         )
         link.pack(fill=tk.X, pady=(0, 8))
@@ -790,16 +798,16 @@ class TunnelClientApp:
         tk.Label(
             pad,
             text=body,
-            bg=CHROME_BG,
+            bg=PANEL_BG,
             fg=TEXT_MUTED,
             font=("Segoe UI", 8),
             anchor="w",
-            wraplength=460,
+            wraplength=500,
             justify=tk.LEFT,
         ).pack(fill=tk.X, pady=(0, 10))
-        btn_row = tk.Frame(pad, bg=CHROME_BG)
+        btn_row = tk.Frame(pad, bg=PANEL_BG)
         btn_row.pack(fill=tk.X, pady=(8, 0))
-        tk.Button(
+        open_btn = tk.Button(
             btn_row,
             text="Open payment portal",
             command=_open_portal,
@@ -810,7 +818,9 @@ class TunnelClientApp:
             padx=14,
             pady=8,
             cursor="hand2",
-        ).pack(side=tk.LEFT)
+        )
+        style_primary_button(open_btn)
+        open_btn.pack(side=tk.LEFT)
         tk.Button(
             btn_row,
             text="Close",
@@ -850,13 +860,16 @@ class TunnelClientApp:
         self._keygen_prompt_win = win
         win.title("Enter licence keygen")
         win.configure(bg=CHROME_BG)
-        win.geometry("520x400")
-        win.minsize(480, 360)
+        apply_centered_window(win, surface="keygen")
         win.transient(self.root)
         try:
             win.grab_set()
         except Exception:
             pass
+
+        status_var = tk.StringVar(
+            value="Keygen is required to unlock this install before Settings and Connect."
+        )
 
         def _on_demand_close() -> None:
             # Demand keygen: refuse dismiss while unlock still required.
@@ -877,12 +890,14 @@ class TunnelClientApp:
 
         win.protocol("WM_DELETE_WINDOW", _on_demand_close)
 
-        pad = tk.Frame(win, bg=CHROME_BG, padx=16, pady=14)
-        pad.pack(fill=tk.BOTH, expand=True)
+        shell = tk.Frame(win, bg=CHROME_BG, padx=16, pady=14)
+        shell.pack(fill=tk.BOTH, expand=True)
+        pad, card_outer = make_neon_card(shell, padx=16, pady=14)
+        card_outer.pack(fill=tk.BOTH, expand=True)
         tk.Label(
             pad,
             text="Enter licence keygen",
-            bg=CHROME_BG,
+            bg=PANEL_BG,
             fg=PRIMARY_DARK,
             font=("Segoe UI", 14, "bold"),
             anchor="w",
@@ -895,21 +910,21 @@ class TunnelClientApp:
                 "(format RPT-KEY-…). Paste it below to unlock this installation. "
                 "Download alone does not unlock residual VPN."
             ),
-            bg=CHROME_BG,
+            bg=PANEL_BG,
             fg=TEXT,
             font=("Segoe UI", 9),
             anchor="w",
-            wraplength=480,
+            wraplength=500,
             justify=tk.LEFT,
         ).pack(fill=tk.X, pady=(0, 8))
         tk.Label(
             pad,
             text=CONNECT_BLOCKED_KEYGEN_MSG,
-            bg=CHROME_BG,
+            bg=PANEL_BG,
             fg=TEXT_MUTED,
             font=("Segoe UI", 8),
             anchor="w",
-            wraplength=480,
+            wraplength=500,
             justify=tk.LEFT,
         ).pack(fill=tk.X, pady=(0, 10))
         key_var = tk.StringVar()
@@ -921,26 +936,26 @@ class TunnelClientApp:
             fg=TEXT,
             relief=tk.SOLID,
             bd=1,
+            highlightthickness=1,
+            highlightbackground=NEON_BORDER,
+            highlightcolor=NEON_BORDER,
         )
         entry.pack(fill=tk.X, pady=(0, 8))
         try:
             entry.focus_set()
         except Exception:
             pass
-        status_var = tk.StringVar(
-            value="Keygen is required to unlock this install before Settings and Connect."
-        )
         tk.Label(
             pad,
             textvariable=status_var,
-            bg=CHROME_BG,
+            bg=PANEL_BG,
             fg=TEXT_MUTED,
             font=("Segoe UI", 8),
             anchor="w",
-            wraplength=480,
+            wraplength=500,
             justify=tk.LEFT,
         ).pack(fill=tk.X, pady=(0, 8))
-        btn_row = tk.Frame(pad, bg=CHROME_BG)
+        btn_row = tk.Frame(pad, bg=PANEL_BG)
         btn_row.pack(fill=tk.X, pady=(8, 0))
 
         def _unlock() -> None:
@@ -1006,7 +1021,7 @@ class TunnelClientApp:
 
             threading.Thread(target=work, daemon=True).start()
 
-        tk.Button(
+        unlock_btn = tk.Button(
             btn_row,
             text="Unlock installation",
             command=_unlock,
@@ -1017,7 +1032,9 @@ class TunnelClientApp:
             padx=12,
             pady=6,
             cursor="hand2",
-        ).pack(side=tk.LEFT)
+        )
+        style_primary_button(unlock_btn)
+        unlock_btn.pack(side=tk.LEFT)
         tk.Button(
             btn_row,
             text="Cancel",
@@ -1040,18 +1057,20 @@ class TunnelClientApp:
         win = tk.Toplevel(self.root)
         win.title(LICENCE_PROMPT_TITLE)
         win.configure(bg=CHROME_BG)
-        win.geometry("460x420")
+        apply_centered_window(win, surface="licence")
         win.transient(self.root)
         try:
             win.grab_set()
         except Exception:
             pass
-        pad = tk.Frame(win, bg=CHROME_BG, padx=16, pady=14)
-        pad.pack(fill=tk.BOTH, expand=True)
+        shell = tk.Frame(win, bg=CHROME_BG, padx=16, pady=14)
+        shell.pack(fill=tk.BOTH, expand=True)
+        pad, card_outer = make_neon_card(shell, padx=16, pady=14)
+        card_outer.pack(fill=tk.BOTH, expand=True)
         tk.Label(
             pad,
             text=LICENCE_PROMPT_TITLE,
-            bg=CHROME_BG,
+            bg=PANEL_BG,
             fg=PRIMARY_DARK,
             font=("Segoe UI", 14, "bold"),
             anchor="w",
@@ -1059,31 +1078,31 @@ class TunnelClientApp:
         tk.Label(
             pad,
             text=short_licence_summary(),
-            bg=CHROME_BG,
+            bg=PANEL_BG,
             fg=TEXT,
             font=("Segoe UI", 9),
             anchor="w",
-            wraplength=420,
+            wraplength=500,
             justify=tk.LEFT,
         ).pack(fill=tk.X, pady=(0, 8))
         tk.Label(
             pad,
             text=ANON_REGISTRATION_SUMMARY,
-            bg=CHROME_BG,
+            bg=PANEL_BG,
             fg=TEXT_MUTED,
             font=("Segoe UI", 8),
             anchor="w",
-            wraplength=420,
+            wraplength=500,
             justify=tk.LEFT,
         ).pack(fill=tk.X, pady=(0, 4))
         tk.Label(
             pad,
             text=OS_PRIVILEGE_HONESTY,
-            bg=CHROME_BG,
+            bg=PANEL_BG,
             fg=TEXT_MUTED,
             font=("Segoe UI", 8),
             anchor="w",
-            wraplength=420,
+            wraplength=500,
             justify=tk.LEFT,
         ).pack(fill=tk.X, pady=(0, 10))
 
@@ -1096,7 +1115,7 @@ class TunnelClientApp:
         tk.Label(
             pad,
             text="View full end-user licence (LICENSE)",
-            bg=CHROME_BG,
+            bg=PANEL_BG,
             fg=PRIMARY,
             font=("Segoe UI", 9, "underline"),
             cursor="hand2",
@@ -1104,7 +1123,7 @@ class TunnelClientApp:
         ).pack(fill=tk.X)
         pad.winfo_children()[-1].bind("<Button-1>", lambda _e: _open_full())
 
-        btn_row = tk.Frame(pad, bg=CHROME_BG)
+        btn_row = tk.Frame(pad, bg=PANEL_BG)
         btn_row.pack(fill=tk.X, pady=(16, 0))
 
         def _do_accept() -> None:
@@ -1122,7 +1141,7 @@ class TunnelClientApp:
             # Next surface via real first-run sequencer (keygen is mandatory when unlock-absent)
             self._present_first_run_surface(force=True)
 
-        tk.Button(
+        accept_btn = tk.Button(
             btn_row,
             text=LICENCE_ACCEPT_BUTTON,
             command=_do_accept,
@@ -1133,12 +1152,14 @@ class TunnelClientApp:
             padx=14,
             pady=8,
             cursor="hand2",
-        ).pack(side=tk.LEFT)
+        )
+        style_primary_button(accept_btn)
+        accept_btn.pack(side=tk.LEFT)
         tk.Button(
             btn_row,
             text="Not now",
             command=win.destroy,
-            bg=CHROME_BG,
+            bg=PANEL_BG,
             fg=TEXT_MUTED,
             relief=tk.FLAT,
             font=("Segoe UI", 9),
@@ -1537,12 +1558,10 @@ class TunnelClientApp:
         self._settings_win = win
         win.title("Settings" + (" — first run" if first_run else ""))
         win.configure(bg=CHROME_BG)
-        if first_run:
-            win.geometry(FIRST_RUN_SETTINGS_GEOMETRY)
-            win.minsize(*FIRST_RUN_SETTINGS_MINSIZE)
-        else:
-            win.geometry(FIRST_RUN_SETTINGS_GEOMETRY)
-            win.minsize(480, 640)
+        apply_centered_window(
+            win,
+            surface="settings_first_run" if first_run else "settings",
+        )
         win.transient(self.root)
         try:
             win.grab_set()
@@ -1596,19 +1615,12 @@ class TunnelClientApp:
             anchor="w",
         ).pack(fill=tk.X, pady=(0, 10))
 
-        card = tk.Frame(
-            pad,
-            bg=PANEL_BG,
-            highlightbackground=BORDER,
-            highlightthickness=1,
-            padx=12,
-            pady=10,
-        )
-        card.pack(fill=tk.X)
+        card, card_outer = make_neon_card(pad, padx=12, pady=10)
+        card_outer.pack(fill=tk.X)
 
         def _row(parent, text, sub, var, on_toggle) -> None:
             row = tk.Frame(parent, bg=PANEL_BG)
-            row.pack(fill=tk.X, pady=6)
+            row.pack(fill=tk.X, pady=8)
             col = tk.Frame(row, bg=PANEL_BG)
             col.pack(side=tk.LEFT, fill=tk.X, expand=True)
             tk.Label(
@@ -1626,22 +1638,17 @@ class TunnelClientApp:
                 fg=TEXT_MUTED,
                 font=("Segoe UI", 8),
                 anchor="w",
-                wraplength=280,
+                wraplength=360,
                 justify=tk.LEFT,
             ).pack(fill=tk.X)
-            sw = tk.Checkbutton(
+            # Site-style switch toggle (not stock checkbox chrome)
+            sw = SwitchToggle(
                 row,
-                variable=var,
+                var,
                 command=on_toggle,
                 bg=PANEL_BG,
-                activebackground=PANEL_BG,
-                onvalue=True,
-                offvalue=False,
-                indicatoron=True,
-                selectcolor=PRIMARY,
-                fg=PRIMARY_DARK,
             )
-            sw.pack(side=tk.RIGHT, padx=(8, 0))
+            sw.pack(side=tk.RIGHT, padx=(12, 0))
 
         def _current_settings() -> ProductSettings:
             prev_done = bool(
@@ -1752,15 +1759,8 @@ class TunnelClientApp:
             _free_locked = False
 
         # --- Privacy scale (speed vs optional residual defenses) ---
-        priv_card = tk.Frame(
-            pad,
-            bg=PANEL_BG,
-            highlightbackground=BORDER,
-            highlightthickness=1,
-            padx=12,
-            pady=10,
-        )
-        priv_card.pack(fill=tk.X, pady=(14, 0))
+        priv_card, priv_outer = make_neon_card(pad, padx=12, pady=10)
+        priv_outer.pack(fill=tk.X, pady=(14, 0))
         if _free_locked:
             tk.Label(
                 priv_card,
@@ -1963,15 +1963,9 @@ class TunnelClientApp:
         ).pack(fill=tk.X, pady=(8, 0))
 
         # --- Residual privilege (no Run-as-admin on shortcut every day) ---
-        priv_help = tk.Frame(
-            pad,
-            bg=PANEL_BG,
-            highlightbackground=BORDER,
-            highlightthickness=1,
-            padx=12,
-            pady=8,
-        )
-        priv_help.pack(fill=tk.X, pady=(14, 0))
+        priv_help, priv_help_outer = make_neon_card(pad, padx=12, pady=8)
+
+        priv_help_outer.pack(fill=tk.X, pady=(14, 0))
         tk.Label(
             priv_help,
             text="Residual privilege (Windows)",
@@ -2074,15 +2068,8 @@ class TunnelClientApp:
         self.root.after(50, _refresh_residual_priv)
 
         # --- Licence + anonymous registration honesty ---
-        lic_card = tk.Frame(
-            pad,
-            bg=PANEL_BG,
-            highlightbackground=BORDER,
-            highlightthickness=1,
-            padx=12,
-            pady=8,
-        )
-        lic_card.pack(fill=tk.X, pady=(14, 0))
+        lic_card, lic_outer = make_neon_card(pad, padx=12, pady=8)
+        lic_outer.pack(fill=tk.X, pady=(14, 0))
         tk.Label(
             lic_card,
             text=LICENCE_PROMPT_TITLE,
@@ -2120,15 +2107,9 @@ class TunnelClientApp:
         ).pack(anchor="w", pady=(8, 0))
 
         # --- Payment entitlement (keygen → active subscription unlock) ---
-        pay_card = tk.Frame(
-            pad,
-            bg=PANEL_BG,
-            highlightbackground=BORDER,
-            highlightthickness=1,
-            padx=12,
-            pady=8,
-        )
-        pay_card.pack(fill=tk.X, pady=(14, 0))
+        pay_card, pay_card_outer = make_neon_card(pad, padx=12, pady=8)
+
+        pay_card_outer.pack(fill=tk.X, pady=(14, 0))
         tk.Label(
             pay_card,
             text="Payment entitlement / keygen",
@@ -2291,15 +2272,9 @@ class TunnelClientApp:
         ).pack(fill=tk.X, pady=(4, 0))
 
         # --- Connection log (local only, exportable) ---
-        log_card = tk.Frame(
-            pad,
-            bg=PANEL_BG,
-            highlightbackground=BORDER,
-            highlightthickness=1,
-            padx=12,
-            pady=8,
-        )
-        log_card.pack(fill=tk.X, pady=(14, 0))
+        log_card, log_card_outer = make_neon_card(pad, padx=12, pady=8)
+
+        log_card_outer.pack(fill=tk.X, pady=(14, 0))
         tk.Label(
             log_card,
             text=CONNECTION_LOG_TITLE,
@@ -2397,15 +2372,9 @@ class TunnelClientApp:
         _refresh_log_view()
 
         # --- Leak test ---
-        leak_card = tk.Frame(
-            pad,
-            bg=PANEL_BG,
-            highlightbackground=BORDER,
-            highlightthickness=1,
-            padx=12,
-            pady=8,
-        )
-        leak_card.pack(fill=tk.X, pady=(14, 0))
+        leak_card, leak_card_outer = make_neon_card(pad, padx=12, pady=8)
+
+        leak_card_outer.pack(fill=tk.X, pady=(14, 0))
         tk.Label(
             leak_card,
             text=LEAK_TEST_TITLE,
@@ -2466,15 +2435,9 @@ class TunnelClientApp:
         ).pack(fill=tk.X, pady=(8, 0))
 
         # --- DPI / traffic-analysis honesty ---
-        dpi_card = tk.Frame(
-            pad,
-            bg=PANEL_BG,
-            highlightbackground=BORDER,
-            highlightthickness=1,
-            padx=12,
-            pady=8,
-        )
-        dpi_card.pack(fill=tk.X, pady=(14, 0))
+        dpi_card, dpi_card_outer = make_neon_card(pad, padx=12, pady=8)
+
+        dpi_card_outer.pack(fill=tk.X, pady=(14, 0))
         tk.Label(
             dpi_card,
             text=DPI_MITIGATION_TITLE,
@@ -2497,15 +2460,8 @@ class TunnelClientApp:
         # Legal / policy documents (stable public GitHub URLs)
         from client.legal_links import LEGAL_DOC_LINKS
 
-        docs_card = tk.Frame(
-            pad,
-            bg=PANEL_BG,
-            highlightbackground=BORDER,
-            highlightthickness=1,
-            padx=12,
-            pady=8,
-        )
-        docs_card.pack(fill=tk.X, pady=(14, 0))
+        docs_card, docs_outer = make_neon_card(pad, padx=12, pady=8)
+        docs_outer.pack(fill=tk.X, pady=(14, 0))
         tk.Label(
             docs_card,
             text="Documents",

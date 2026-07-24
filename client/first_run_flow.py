@@ -16,10 +16,11 @@ FirstRunSurface = Literal["licence", "renew", "keygen", "settings", "main"]
 # settings.json key — set only when user explicitly OK/binds first-run settings
 KEY_FIRST_RUN_SETTINGS_COMPLETED = "first_run_settings_completed"
 
-# Geometry hints for first-run settings (large enough for primary controls)
-FIRST_RUN_SETTINGS_GEOMETRY = "640x920"
-FIRST_RUN_SETTINGS_MINSIZE = (560, 720)
-MAIN_CONNECT_GEOMETRY = "560x620"
+# Geometry hints for first-run settings (large enough for primary controls).
+# Kept in sync with client.windows.ui_chrome.SURFACE_SIZES (settings_first_run / main).
+FIRST_RUN_SETTINGS_GEOMETRY = "700x920"
+FIRST_RUN_SETTINGS_MINSIZE = (620, 780)
+MAIN_CONNECT_GEOMETRY = "600x680"
 
 
 def needs_first_run_settings(
