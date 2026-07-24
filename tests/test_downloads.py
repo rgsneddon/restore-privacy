@@ -1,4 +1,4 @@
-"""Tests for shipped VPN APP Shop download catalog (restore-privacy 0.3.0) + paid UI."""
+﻿"""Tests for shipped VPN APP Shop download catalog (restore-privacy 0.3.0) + paid UI."""
 
 from __future__ import annotations
 
@@ -30,10 +30,10 @@ from downloads import (  # noqa: E402
 )
 
 EXPECTED_RELEASE_PAGE = (
-    "https://github.com/rgsneddon/restore-privacy/releases/tag/0.4.2"
+    "https://github.com/rgsneddon/restore-privacy/releases/tag/0.4.4"
 )
 EXPECTED_DOWNLOAD_PREFIX = (
-    "https://github.com/rgsneddon/restore-privacy/releases/download/0.4.2/"
+    "https://github.com/rgsneddon/restore-privacy/releases/download/0.4.4/"
 )
 # Public footer points at the paid status host (repo is private).
 EXPECTED_PUBLIC_CATALOG_FOOTER = (
@@ -50,7 +50,7 @@ class TestDownloadCatalog(unittest.TestCase):
         )
 
         pin = (ROOT / "client" / "VERSION").read_text(encoding="utf-8").strip()
-        self.assertEqual(pin, "0.4.2")
+        self.assertEqual(pin, "0.4.4")
         self.assertEqual(RELEASE_VERSION, pin)
         self.assertEqual(RELEASE_TAG, pin)
         self.assertEqual(current_catalog_version(), RELEASE_VERSION)
@@ -216,7 +216,7 @@ class TestDownloadCatalog(unittest.TestCase):
         from downloads import download_css
 
         css = download_css()
-        # Pill buy controls (post-0.4.2 tidy: not fixed square tiles)
+        # Pill buy controls (post-0.4.4 tidy: not fixed square tiles)
         self.assertTrue(
             "aspect-ratio: auto" in css or "aspect-ratio: 1 / 1" in css,
             "buy tile aspect-ratio rule missing",

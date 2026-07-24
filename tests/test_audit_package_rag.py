@@ -1,4 +1,4 @@
-"""Package AUDIT STATE (Green/Amber/Red) from the security audit writer."""
+﻿"""Package AUDIT STATE (Green/Amber/Red) from the security audit writer."""
 
 from __future__ import annotations
 
@@ -50,7 +50,7 @@ class TestPackageRagEvaluation(unittest.TestCase):
         ver = self.mod.load_catalog_version()
         pin = (ROOT / "client" / "VERSION").read_text(encoding="utf-8").strip()
         self.assertEqual(ver, pin)
-        self.assertEqual(ver, "0.4.2")
+        self.assertEqual(ver, "0.4.4")
         rows = self.mod.catalog_platform_filenames(ver)
         self.assertEqual(len(rows), 5)
         # Prefer status_page.downloads when importable
