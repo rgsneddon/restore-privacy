@@ -1,4 +1,4 @@
-# Restore Privacy VPN — browser extension (catalog 0.4.2)
+# Restore Privacy VPN — browser extension (catalog 0.4.4)
 
 Chromium **Manifest V3** extension for **browser-scoped** Connect / Disconnect.
 
@@ -30,7 +30,7 @@ Any custom browser that loads Chromium MV3 extensions can use the same package.
 
 ```bash
 cd browser_extension
-zip -r ../releases/0.4.2/restore-privacy-browser-extension-0.4.2.zip . \
+zip -r ../releases/0.4.4/restore-privacy-browser-extension-0.4.4.zip . \
   -x '*.DS_Store' -x '*__pycache__*'
 ```
 
