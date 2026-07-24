@@ -196,9 +196,12 @@ class TestKillSwitchBuilders(unittest.TestCase):
         self.assertTrue(l.apply)
 
     def test_product_default_off(self):
-        """Product residual: kill switch is off unless RPT_KILL_SWITCH=1."""
+        """Product residual: kill switch is parked — never arms on residual Connect."""
         import os
 
+        from client.kill_switch import product_kill_switch_parked
+
+        self.assertTrue(product_kill_switch_parked())
         with mock.patch.dict(os.environ, {}, clear=False):
             os.environ.pop("RPT_KILL_SWITCH", None)
             self.assertFalse(product_kill_switch_enabled())
@@ -207,9 +210,14 @@ class TestKillSwitchBuilders(unittest.TestCase):
                 "windows", server_host="1.2.3.4", tunnel_iface="RPT"
             )
             self.assertEqual(plan.apply, [])
+        # Parked: even explicit env opt-in does not enable product residual KS
         with mock.patch.dict(os.environ, {"RPT_KILL_SWITCH": "1"}, clear=False):
-            self.assertTrue(product_kill_switch_enabled())
-            self.assertTrue(default_kill_switch_policy().enabled)
+            self.assertFalse(product_kill_switch_enabled())
+            self.assertFalse(default_kill_switch_policy().enabled)
+            plan_on = build_kill_switch_plan(
+                "windows", server_host="1.2.3.4", tunnel_iface="RPT"
+            )
+            self.assertEqual(plan_on.apply, [])
 
     def test_run_kill_switch_commands_requires_success_marker(self):
         """kill_switch_applied must not be True when subprocess fails."""
@@ -320,6 +328,7 @@ class TestWebRtcAndIpv6(unittest.TestCase):
         m = webrtc_leak_mitigations()
         self.assertFalse(m["kill_switch_required"])
         self.assertFalse(m.get("kill_switch_default_on", True))
+        self.assertTrue(m.get("kill_switch_parked"))
         flags = android_kill_switch_builder_flags()
         self.assertFalse(flags["blocking"])
         self.assertTrue(flags["allowBypass"])

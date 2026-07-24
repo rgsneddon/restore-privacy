@@ -905,7 +905,8 @@ def start_full_tunnel(
             kill_switch_applied=False,
         )
 
-    # Kill-switch (opt-in RPT_KILL_SWITCH=1 only) — only after residual is active
+    # Kill-switch: PARKED for this build stage (product_kill_switch_enabled is
+    # always False). Block retained for later un-park; never arms residual KS now.
     ks_applied = False
     if routes_applied and capture and residual_ip_capture_active(result):
         try:
@@ -915,7 +916,7 @@ def start_full_tunnel(
                 run_kill_switch_commands,
             )
 
-            if product_kill_switch_enabled():
+            if product_kill_switch_enabled():  # always False while parked
                 ks = build_kill_switch_plan(
                     "windows",
                     server_host=server_host,

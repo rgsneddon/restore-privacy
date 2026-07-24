@@ -93,12 +93,13 @@ class TestSectionBProbes(unittest.TestCase):
         r = probe_kill_switch_default_off(env={}, repo_root=ROOT)
         self.assertTrue(r["ok"])
         self.assertFalse(r.get("operator_opt_in"))
+        # Parked: even RPT_KILL_SWITCH=1 does not arm product residual KS
         r2 = probe_kill_switch_default_off(
             env={"RPT_KILL_SWITCH": "1"}, repo_root=ROOT
         )
         self.assertTrue(r2["ok"])
-        self.assertTrue(r2.get("warn"))
-        self.assertTrue(r2.get("operator_opt_in"))
+        self.assertFalse(r2.get("operator_opt_in"))
+        self.assertFalse(r2.get("warn"))
 
     def test_title_only_status(self):
         ok = probe_title_only_status(

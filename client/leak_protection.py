@@ -2,8 +2,8 @@
 
 - Product full-tunnel DNS is tunnel gateway only (see ``full_tunnel``).
 - No public DNS fallback constants (1.1.1.1 / 8.8.8.8 / 9.9.9.9) on residual path.
-- WebRTC: browser/OS limited; kill-switch STUN/mDNS blocks are **opt-in only**
-  (``RPT_KILL_SWITCH=1``). Product residual no longer applies kill-switch by default.
+- WebRTC: browser/OS limited; kill-switch STUN/mDNS blocks are **parked** for this
+  build stage (product residual never arms KS). Feature code kept for later.
 """
 
 from __future__ import annotations
@@ -60,10 +60,14 @@ def dns_leak_check_plan() -> dict:
 
 
 def webrtc_leak_mitigations() -> dict:
-    """Documented WebRTC-related mitigations on product path (kill switch opt-in)."""
-    from client.kill_switch import product_kill_switch_enabled
+    """Documented WebRTC-related mitigations on product path (KS parked)."""
+    from client.kill_switch import (
+        product_kill_switch_enabled,
+        product_kill_switch_parked,
+    )
 
     ks = product_kill_switch_enabled()
+    parked = product_kill_switch_parked()
     return {
         "block_stun_udp_3478": ks,
         "block_turn_udp_5349": ks,
@@ -73,11 +77,12 @@ def webrtc_leak_mitigations() -> dict:
         "browser_webrtc_note": (
             "Browser WebRTC may still use local interfaces unless the OS VPN "
             "captures all apps (Android VpnService / Windows dual /1 routes). "
-            "Kill-switch firewall blocks are opt-in (RPT_KILL_SWITCH=1). "
+            "Kill-switch is parked for this build stage (not applied on residual). "
             "Disable WebRTC in the browser for maximum assurance."
         ),
         "kill_switch_required": False,
         "kill_switch_default_on": False,
+        "kill_switch_parked": parked,
     }
 
 

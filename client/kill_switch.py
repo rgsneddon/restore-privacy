@@ -1,10 +1,14 @@
 """Optional kill switch: block non-tunnel egress while full tunnel is expected.
 
-**Product default is OFF** (removed from residual Connect). Opt in only with
-``RPT_KILL_SWITCH=1``. When enabled, rules are fail-closed on connect path:
-apply blocks after routes; on disconnect, always roll back.
+**PARKED for this stage of the build** — :func:`product_kill_switch_enabled`
+always returns **False** so residual Connect never arms profile Block / KS
+rules. Implementation (builders, apply, rollback) is kept for later feature
+work; only the product gate is hard-off.
 
-Windows (critical):
+When un-parked later, opt-in will use ``RPT_KILL_SWITCH=1`` again. Apply is
+fail-closed when enabled; disconnect always rolls back.
+
+Windows (critical) — design when un-parked:
   Explicit unscoped ``Action=Block`` rules **defeat** scoped allows (Defender
   Firewall evaluates block before allow). So we **never** create a global
   outbound block rule. Instead:
@@ -48,10 +52,14 @@ WIN_PROFILE_DEFAULT_OUTBOUND_BLOCK = "DefaultOutboundAction Block"
 # PowerShell expression for state file (must be double-quoted in script body)
 WIN_KS_STATE_PATH_PS = '"$env:ProgramData\\RestorePrivacy\\ks-outbound-state.json"'
 
+# Product residual: hard-park kill-switch (do not arm on Connect). Flip to False
+# when the feature is ready for opt-in ``RPT_KILL_SWITCH=1`` again.
+PRODUCT_KILL_SWITCH_PARKED = True
+
 
 @dataclass(frozen=True)
 class KillSwitchPolicy:
-    """Kill-switch policy — product residual default is **disabled**."""
+    """Kill-switch policy — product residual default is **disabled** (parked)."""
 
     enabled: bool = False
     block_non_tunnel_ipv4: bool = True
@@ -60,12 +68,23 @@ class KillSwitchPolicy:
     block_stun_mdns: bool = True
 
 
-def product_kill_switch_enabled(env: Optional[dict] = None) -> bool:
-    """True only when operator explicitly opts in with RPT_KILL_SWITCH=1.
+def product_kill_switch_parked() -> bool:
+    """True while product residual must never arm kill-switch (this build stage)."""
+    return bool(PRODUCT_KILL_SWITCH_PARKED)
 
-    Default (unset / 0 / false / off) is **disabled** — residual Connect does not
-    apply firewall/iptables kill-switch or Android setBlocking.
+
+def product_kill_switch_enabled(env: Optional[dict] = None) -> bool:
+    """Whether product residual may apply kill-switch.
+
+    **Parked:** always ``False`` so residual Connect never sets profile Block /
+    RPT-KS rules (env ``RPT_KILL_SWITCH`` is ignored while parked). Builders and
+    rollback remain available for later feature work.
+
+    When :data:`PRODUCT_KILL_SWITCH_PARKED` is False, opt-in is
+    ``RPT_KILL_SWITCH=1`` only (unset / 0 / false / off stays disabled).
     """
+    if product_kill_switch_parked():
+        return False
     e = env if env is not None else os.environ
     raw = str(e.get("RPT_KILL_SWITCH", "0")).strip().lower()
     if raw in ("1", "true", "on", "yes", "enabled"):

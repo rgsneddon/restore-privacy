@@ -264,20 +264,27 @@ def probe_kill_switch_default_off(
     repo_root: Path | None = None,
     install_root: Path | None = None,
 ) -> dict[str, Any]:
-    """Product residual kill-switch must default OFF (opt-in RPT_KILL_SWITCH=1 only)."""
+    """Product residual kill-switch must stay OFF (parked this build stage)."""
     repo = repo_root or Path(__file__).resolve().parents[1]
     install = install_root or Path(
         os.environ.get("RPT_INSTALL_ROOT", str(DEFAULT_INSTALL_ROOT))
     )
     last_exc: Exception | None = None
     product_kill_switch_enabled = None  # type: ignore
+    product_kill_switch_parked = None  # type: ignore
     for base in _python_path_roots(repo, install):
         try:
             if str(base) not in sys.path:
                 sys.path.insert(0, str(base))
-            from client.kill_switch import product_kill_switch_enabled as _pks  # type: ignore
+            from client.kill_switch import (  # type: ignore
+                product_kill_switch_enabled as _pks,
+            )
+            from client.kill_switch import (  # type: ignore
+                product_kill_switch_parked as _parked,
+            )
 
             product_kill_switch_enabled = _pks
+            product_kill_switch_parked = _parked
             break
         except Exception as exc:  # noqa: BLE001
             last_exc = exc
@@ -295,11 +302,12 @@ def probe_kill_switch_default_off(
     # Explicit empty env: default must be off
     default_on = product_kill_switch_enabled(env={})
     e = dict(env) if env is not None else dict(os.environ)
-    # Simulate "unset" product default: if current env forces on, note as warn (operator opt-in)
     current_on = product_kill_switch_enabled(env=e)
+    parked = bool(product_kill_switch_parked()) if product_kill_switch_parked else False
     reasons = [
         f"default_empty_env_enabled={default_on}",
         f"current_env_enabled={current_on}",
+        f"parked={parked}",
     ]
     if default_on:
         return _status(
@@ -314,9 +322,17 @@ def probe_kill_switch_default_off(
             reasons=reasons
             + ["WARN: RPT_KILL_SWITCH is on in this environment (operator opt-in)"],
             operator_opt_in=True,
+            parked=parked,
+        )
+    if parked:
+        reasons.append("kill-switch parked (product residual never arms)")
+        return _status(
+            ok=True, warn=False, reasons=reasons, operator_opt_in=False, parked=True
         )
     reasons.append("kill-switch default off (product residual)")
-    return _status(ok=True, warn=False, reasons=reasons, operator_opt_in=False)
+    return _status(
+        ok=True, warn=False, reasons=reasons, operator_opt_in=False, parked=False
+    )
 
 
 def probe_title_only_status(http_status: Mapping[str, Any] | None) -> dict[str, Any]:

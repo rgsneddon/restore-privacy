@@ -65,8 +65,13 @@ class TestWindowsFwAllowBuilders(unittest.TestCase):
         self.assertTrue(any("Block" in x for x in v), msg=v)
 
     def test_kill_switch_default_still_off(self):
+        from client.kill_switch import product_kill_switch_parked
+
+        self.assertTrue(product_kill_switch_parked())
         self.assertFalse(product_kill_switch_enabled({}))
         self.assertFalse(product_kill_switch_enabled({"RPT_KILL_SWITCH": "0"}))
+        # Parked: RPT_KILL_SWITCH=1 does not enable product residual KS
+        self.assertFalse(product_kill_switch_enabled({"RPT_KILL_SWITCH": "1"}))
         # Allow script must not embed KS apply body
         body = windows_fw_allow_script()
         ks = windows_ks_apply_script(
