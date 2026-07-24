@@ -86,6 +86,22 @@ STATIC_ROUTES: dict[str, str] = {
     "/static/stripe_brand_logo.png": "stripe_brand_logo.png",
 }
 
+# Customer device-licence renew host (Stripe Checkout custom domain).
+# Never emit public_base_url() localhost (127.0.0.1:10000) in renew_url JSON.
+DEVICE_LICENCE_PAY_HOST = "https://pay.restoreprivacy.online"
+
+
+def _device_licence_renew_url(platform: str = "", *, interval: str = "month") -> str:
+    """Production renew link for EXPIRED / invalid licence client copy."""
+    plat = (platform or "").strip().lower() or "windows"
+    iv = (interval or "month").strip().lower()
+    if iv in ("year", "yearly", "annual", "annually"):
+        iv = "year"
+    else:
+        iv = "month"
+    q = urllib.parse.urlencode({"platform": plat, "interval": iv})
+    return f"{DEVICE_LICENCE_PAY_HOST}?{q}"
+
 
 def static_file_path(url_path: str) -> Path | None:
     """Resolve a public static URL to a file under status_page/static/."""
@@ -734,10 +750,7 @@ class Handler(BaseHTTPRequestHandler):
                     "reason": "no_entitlement",
                 }
             else:
-                from payments import (
-                    licence_status_from_entitlement,
-                    stripe_payment_page_href_for_platform,
-                )
+                from payments import licence_status_from_entitlement
 
                 lic = str(
                     ent.get("licence_status")
@@ -756,23 +769,15 @@ class Handler(BaseHTTPRequestHandler):
                     "customer_email": ent.get("customer_email") or "",
                     "billing_interval": ent.get("billing_interval") or "month",
                     # Device-licence pay host (never localhost public_base_url).
-                    # Use pay.restoreprivacy.online with platform/interval query —
-                    # not site_pay_plan_href (that adds /pay under the wrong host).
-                    def _device_renew(p: str, iv: str = "month") -> str:
-                        from urllib.parse import urlencode
-
-                        q = urlencode(
-                            {
-                                "platform": (p or "windows").strip().lower()
-                                or "windows",
-                                "interval": iv,
-                            }
-                        )
-                        return f"https://pay.restoreprivacy.online?{q}"
-
-                    "renew_url": _device_renew(plat or "windows", "month"),
-                    "renew_url_monthly": _device_renew(plat or "windows", "month"),
-                    "renew_url_yearly": _device_renew(plat or "windows", "year"),
+                    "renew_url": _device_licence_renew_url(
+                        plat or "windows", interval="month"
+                    ),
+                    "renew_url_monthly": _device_licence_renew_url(
+                        plat or "windows", interval="month"
+                    ),
+                    "renew_url_yearly": _device_licence_renew_url(
+                        plat or "windows", interval="year"
+                    ),
                 }
             self._send(
                 200,
