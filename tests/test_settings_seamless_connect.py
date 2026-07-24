@@ -20,7 +20,7 @@ class TestWindowsSettingsWiring(unittest.TestCase):
         for needle in (
             "def _open_settings",
             "Payment entitlement",
-            "Verify payment",
+            "Verify keygen",
             "import_session_and_verify",
             "ensure_entitlement_for_connect",
             "LICENCE_ACCEPT_BUTTON",
@@ -32,6 +32,8 @@ class TestWindowsSettingsWiring(unittest.TestCase):
             "DPI_MITIGATION",
             "assert_may_connect",
             "bootstrap_payment_entitlement",
+            "first_run_next_surface",
+            "_ok_bind_and_close",
         ):
             self.assertIn(needle, src, msg=f"windows missing {needle}")
         # Connect opens Settings when payment blocked (licence already ok)

@@ -23,6 +23,8 @@ KEY_AUTOCONNECT_ON_LAUNCH = "autoconnect_on_launch"
 KEY_PRIVACY_TRAFFIC_SHAPE = "privacy_traffic_shape"
 KEY_PRIVACY_OUTER_OBFUSCATION = "privacy_outer_obfuscation"
 KEY_PRIVACY_MULTIHOP = "privacy_multihop"
+# Set only when user OK's first-run settings after keygen unlock (not a bypass).
+KEY_FIRST_RUN_SETTINGS_COMPLETED = "first_run_settings_completed"
 
 
 @dataclass
@@ -33,6 +35,8 @@ class ProductSettings:
     privacy_traffic_shape: bool = False
     privacy_outer_obfuscation: bool = False
     privacy_multihop: bool = False
+    # False until user binds first-run Settings with OK (post-keygen onboarding).
+    first_run_settings_completed: bool = False
 
 
 def settings_dir() -> Path:
@@ -52,6 +56,7 @@ def default_settings() -> ProductSettings:
         privacy_traffic_shape=False,
         privacy_outer_obfuscation=False,
         privacy_multihop=False,
+        first_run_settings_completed=False,
     )
 
 
@@ -72,6 +77,10 @@ def load_settings(path: Optional[Path] = None) -> ProductSettings:
                 data.get(KEY_PRIVACY_OUTER_OBFUSCATION, False)
             ),
             privacy_multihop=bool(data.get(KEY_PRIVACY_MULTIHOP, False)),
+            # Missing key → first-run settings not completed (demand OK once).
+            first_run_settings_completed=bool(
+                data.get(KEY_FIRST_RUN_SETTINGS_COMPLETED, False)
+            ),
         )
     except (OSError, json.JSONDecodeError, TypeError, ValueError):
         return default_settings()
@@ -87,6 +96,9 @@ def save_settings(settings: ProductSettings, path: Optional[Path] = None) -> Pat
         KEY_PRIVACY_TRAFFIC_SHAPE: bool(settings.privacy_traffic_shape),
         KEY_PRIVACY_OUTER_OBFUSCATION: bool(settings.privacy_outer_obfuscation),
         KEY_PRIVACY_MULTIHOP: bool(settings.privacy_multihop),
+        KEY_FIRST_RUN_SETTINGS_COMPLETED: bool(
+            settings.first_run_settings_completed
+        ),
     }
     p.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
     return p

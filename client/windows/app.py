@@ -117,6 +117,14 @@ from client.product_policy import (
     EXPLAINER_OUTER_OBFUSCATION,
     EXPLAINER_TRAFFIC_SHAPE,
 )
+from client.first_run_flow import (
+    FIRST_RUN_SETTINGS_GEOMETRY,
+    FIRST_RUN_SETTINGS_MINSIZE,
+    MAIN_CONNECT_GEOMETRY,
+    first_run_next_surface,
+    mark_first_run_settings_completed,
+    post_keygen_next_surface,
+)
 from client.windows.settings_store import (
     ProductSettings,
     apply_run_at_startup,
@@ -223,9 +231,9 @@ def layout_pack_bottom_controls_first() -> bool:
 class TunnelClientApp:
     """Seamless shell: hero status, Connect/Disconnect, Settings transparency."""
 
-    DEFAULT_GEOMETRY = "540x560"
-    MIN_WIDTH = 420
-    MIN_HEIGHT = 480
+    DEFAULT_GEOMETRY = MAIN_CONNECT_GEOMETRY
+    MIN_WIDTH = 480
+    MIN_HEIGHT = 520
 
     def __init__(self) -> None:
         self.root = tk.Tk()
@@ -233,6 +241,8 @@ class TunnelClientApp:
         self.root.geometry(self.DEFAULT_GEOMETRY)
         self.root.configure(bg=CHROME_BG)
         self.root.minsize(self.MIN_WIDTH, self.MIN_HEIGHT)
+        self._keygen_prompt_win: tk.Toplevel | None = None
+        self._settings_win: tk.Toplevel | None = None
         self._set_window_icon()
         # UI-only close - tunnel stays up until user presses Disconnect
         self.root.protocol("WM_DELETE_WINDOW", self._on_close_ui_only)
@@ -815,20 +825,58 @@ class TunnelClientApp:
         ).pack(side=tk.LEFT, padx=(8, 0))
 
     def _show_keygen_prompt(self) -> None:
-        """Forced modal: enter fulfilment keygen to unlock Connect (not Settings-only)."""
+        """Forced modal: enter fulfilment keygen to unlock install (not Settings-only).
+
+        Demands a valid RPT-KEY-… before the window can be dismissed. After a
+        successful unlock, presents first-run Settings (OK binds → main Connect).
+        """
         # EXPIRED installs must renew — never show keygen in place of renew.
         if needs_licence_renewal():
             self._show_renew_licence_prompt()
             return
+        # Single instance — re-raise if already open
+        try:
+            if self._keygen_prompt_win is not None and self._keygen_prompt_win.winfo_exists():
+                try:
+                    self._keygen_prompt_win.lift()
+                    self._keygen_prompt_win.focus_force()
+                except Exception:
+                    pass
+                return
+        except Exception:
+            pass
+
         win = tk.Toplevel(self.root)
+        self._keygen_prompt_win = win
         win.title("Enter licence keygen")
         win.configure(bg=CHROME_BG)
-        win.geometry("480x360")
+        win.geometry("520x400")
+        win.minsize(480, 360)
         win.transient(self.root)
         try:
             win.grab_set()
         except Exception:
             pass
+
+        def _on_demand_close() -> None:
+            # Demand keygen: refuse dismiss while unlock still required.
+            if needs_keygen_unlock():
+                status_var.set(
+                    "Enter the keygen from your fulfilment email to unlock this install."
+                )
+                try:
+                    win.lift()
+                except Exception:
+                    pass
+                return
+            try:
+                win.destroy()
+            except Exception:
+                pass
+            self._keygen_prompt_win = None
+
+        win.protocol("WM_DELETE_WINDOW", _on_demand_close)
+
         pad = tk.Frame(win, bg=CHROME_BG, padx=16, pady=14)
         pad.pack(fill=tk.BOTH, expand=True)
         tk.Label(
@@ -844,14 +892,14 @@ class TunnelClientApp:
             text=(
                 "Your fulfilment email includes a keygen with the text "
                 "USE THIS KEYGEN TO UNLOCK RESTORE PRIVACY "
-                "(format RPT-KEY-…). Paste it below to unlock Connect. "
+                "(format RPT-KEY-…). Paste it below to unlock this installation. "
                 "Download alone does not unlock residual VPN."
             ),
             bg=CHROME_BG,
             fg=TEXT,
             font=("Segoe UI", 9),
             anchor="w",
-            wraplength=440,
+            wraplength=480,
             justify=tk.LEFT,
         ).pack(fill=tk.X, pady=(0, 8))
         tk.Label(
@@ -861,7 +909,7 @@ class TunnelClientApp:
             fg=TEXT_MUTED,
             font=("Segoe UI", 8),
             anchor="w",
-            wraplength=440,
+            wraplength=480,
             justify=tk.LEFT,
         ).pack(fill=tk.X, pady=(0, 10))
         key_var = tk.StringVar()
@@ -879,7 +927,9 @@ class TunnelClientApp:
             entry.focus_set()
         except Exception:
             pass
-        status_var = tk.StringVar(value="")
+        status_var = tk.StringVar(
+            value="Keygen is required to unlock this install before Settings and Connect."
+        )
         tk.Label(
             pad,
             textvariable=status_var,
@@ -887,7 +937,7 @@ class TunnelClientApp:
             fg=TEXT_MUTED,
             font=("Segoe UI", 8),
             anchor="w",
-            wraplength=440,
+            wraplength=480,
             justify=tk.LEFT,
         ).pack(fill=tk.X, pady=(0, 8))
         btn_row = tk.Frame(pad, bg=CHROME_BG)
@@ -906,7 +956,7 @@ class TunnelClientApp:
                     ent = import_keygen_and_verify(raw, bind_device=True)
                     ok = payment_allows_connect()
                     msg = (
-                        f"Unlocked — Connect allowed (status={ent.status})."
+                        f"Unlocked — installation active (status={ent.status})."
                         if ok
                         else (
                             f"Keygen not active (status={ent.status}). "
@@ -924,12 +974,28 @@ class TunnelClientApp:
                     self._refresh_licence_badge()
                     if ok:
                         self.detail_var.set(
-                            "Keygen verified. Press Connect for residual protection."
+                            "Keygen verified. Review Settings, then OK to open Connect."
                         )
                         try:
                             win.destroy()
                         except Exception:
                             pass
+                        self._keygen_prompt_win = None
+                        # Post-keygen: first-run settings (OK binds → main Connect)
+                        next_s = post_keygen_next_surface()
+                        if next_s == "settings":
+                            try:
+                                self.root.after(
+                                    200,
+                                    lambda: self._open_settings(first_run=True),
+                                )
+                            except Exception:
+                                self._open_settings(first_run=True)
+                        elif next_s == "renew":
+                            try:
+                                self.root.after(200, self._show_renew_licence_prompt)
+                            except Exception:
+                                self._show_renew_licence_prompt()
                     else:
                         self.detail_var.set(msg)
 
@@ -938,13 +1004,11 @@ class TunnelClientApp:
                 except Exception:
                     pass
 
-            import threading
-
             threading.Thread(target=work, daemon=True).start()
 
         tk.Button(
             btn_row,
-            text="Unlock Connect",
+            text="Unlock installation",
             command=_unlock,
             bg=PRIMARY,
             fg=WHITE,
@@ -957,7 +1021,7 @@ class TunnelClientApp:
         tk.Button(
             btn_row,
             text="Cancel",
-            command=win.destroy,
+            command=_on_demand_close,
             bg=PANEL_BG,
             fg=TEXT,
             relief=tk.FLAT,
@@ -1049,23 +1113,14 @@ class TunnelClientApp:
             self._connection_log("settings", "End-user licence accepted")
             self._refresh_licence_badge()
             self.detail_var.set(
-                "Licence accepted. Enter your keygen from the fulfilment email to unlock Connect."
+                "Licence accepted. Enter your keygen from the fulfilment email to unlock."
             )
             try:
                 win.destroy()
             except Exception:
                 pass
-            # Next surface: renew if EXPIRED, else keygen unlock if needed
-            if needs_licence_renewal():
-                try:
-                    self.root.after(200, self._show_renew_licence_prompt)
-                except Exception:
-                    self._show_renew_licence_prompt()
-            elif needs_keygen_unlock():
-                try:
-                    self.root.after(200, self._show_keygen_prompt)
-                except Exception:
-                    self._show_keygen_prompt()
+            # Next surface via real first-run sequencer (keygen is mandatory when unlock-absent)
+            self._present_first_run_surface(force=True)
 
         tk.Button(
             btn_row,
@@ -1439,18 +1494,69 @@ class TunnelClientApp:
         except Exception as exc:
             self._log(f"Could not open browser: {exc}. Visit: {url}")
 
-    def _open_settings(self) -> None:
-        """Settings: startup prefs, privacy scale, local connection log, leak test."""
+    def _present_first_run_surface(self, *, force: bool = False) -> None:
+        """Show the next first-run surface (licence → keygen → settings → main).
+
+        Always drives :func:`first_run_next_surface` so unlock-absent installs
+        demand keygen (not skipped when may_connect is mis-true, and not only
+        buried in Settings).
+        """
+        surface = first_run_next_surface()
+        self._log(f"First-run surface: {surface}")
+        if surface == "licence":
+            self._show_licence_prompt()
+        elif surface == "renew":
+            self._show_renew_licence_prompt()
+        elif surface == "keygen":
+            self._show_keygen_prompt()
+        elif surface == "settings":
+            self._open_settings(first_run=True)
+        elif surface == "main" and force:
+            self.detail_var.set("Ready — press Connect for residual protection.")
+        # surface == main without force: stay on main Connect shell
+
+    def _open_settings(self, *, first_run: bool = False) -> None:
+        """Settings: startup prefs, privacy scale, local connection log, leak test.
+
+        When *first_run* is True (post-keygen onboarding), the window is large
+        enough for primary controls and an **OK** button binds/persists settings
+        then closes to reveal the main Connect shell.
+        """
+        try:
+            if self._settings_win is not None and self._settings_win.winfo_exists():
+                try:
+                    self._settings_win.lift()
+                    self._settings_win.focus_force()
+                except Exception:
+                    pass
+                return
+        except Exception:
+            pass
+
         win = tk.Toplevel(self.root)
-        win.title("Settings")
+        self._settings_win = win
+        win.title("Settings" + (" — first run" if first_run else ""))
         win.configure(bg=CHROME_BG)
-        win.geometry("480x820")
-        win.minsize(400, 560)
+        if first_run:
+            win.geometry(FIRST_RUN_SETTINGS_GEOMETRY)
+            win.minsize(*FIRST_RUN_SETTINGS_MINSIZE)
+        else:
+            win.geometry(FIRST_RUN_SETTINGS_GEOMETRY)
+            win.minsize(480, 640)
         win.transient(self.root)
         try:
             win.grab_set()
         except Exception:
             pass
+
+        def _on_settings_closed() -> None:
+            self._settings_win = None
+            try:
+                win.destroy()
+            except Exception:
+                pass
+
+        win.protocol("WM_DELETE_WINDOW", _on_settings_closed)
 
         cur = load_settings()
         self._settings = cur
@@ -1459,7 +1565,13 @@ class TunnelClientApp:
         shape_var = tk.BooleanVar(value=cur.privacy_traffic_shape)
         obfs_var = tk.BooleanVar(value=cur.privacy_outer_obfuscation)
         multihop_var = tk.BooleanVar(value=cur.privacy_multihop)
-        note_var = tk.StringVar(value="")
+        note_var = tk.StringVar(
+            value=(
+                "First run: amend settings to suit you, then press OK to continue to Connect."
+                if first_run
+                else ""
+            )
+        )
         leak_var = tk.StringVar(value="")
 
         # Scrollable body for taller transparency content
@@ -1532,12 +1644,16 @@ class TunnelClientApp:
             sw.pack(side=tk.RIGHT, padx=(8, 0))
 
         def _current_settings() -> ProductSettings:
+            prev_done = bool(
+                getattr(cur, "first_run_settings_completed", False)
+            )
             return ProductSettings(
                 run_at_startup=bool(run_var.get()),
                 autoconnect_on_launch=bool(auto_var.get()),
                 privacy_traffic_shape=bool(shape_var.get()),
                 privacy_outer_obfuscation=bool(obfs_var.get()),
                 privacy_multihop=bool(multihop_var.get()),
+                first_run_settings_completed=prev_done,
             )
 
         def _save_run() -> None:
@@ -2423,18 +2539,83 @@ class TunnelClientApp:
                 lambda _e, u=link.url, t=link.label: _open_legal(u, t),
             )
 
-        tk.Button(
-            pad,
-            text="Close",
-            command=win.destroy,
-            bg=PRIMARY,
-            fg=WHITE,
-            relief=tk.FLAT,
-            font=("Segoe UI", 9, "bold"),
-            padx=14,
-            pady=6,
-            cursor="hand2",
-        ).pack(anchor="e", pady=(14, 0))
+        btn_bar = tk.Frame(pad, bg=CHROME_BG)
+        btn_bar.pack(fill=tk.X, pady=(14, 0))
+
+        def _ok_bind_and_close() -> None:
+            """Persist current toggles, mark first-run settings done, show main Connect."""
+            s = _current_settings()
+            s.first_run_settings_completed = True
+            save_settings(s)
+            self._settings = s
+            try:
+                apply_run_at_startup(s.run_at_startup)
+            except Exception:
+                pass
+            try:
+                mark_first_run_settings_completed(settings=s)
+            except Exception:
+                # save_settings already wrote completed flag on s
+                pass
+            self._log(
+                "Settings OK — preferences bound; main Connect surface ready."
+            )
+            self.detail_var.set(
+                "Settings saved. Press Connect for residual protection."
+            )
+            _on_settings_closed()
+            try:
+                self.root.lift()
+                self.root.focus_force()
+            except Exception:
+                pass
+
+        if first_run:
+            tk.Button(
+                btn_bar,
+                text="OK",
+                command=_ok_bind_and_close,
+                bg=PRIMARY,
+                fg=WHITE,
+                relief=tk.FLAT,
+                font=("Segoe UI", 11, "bold"),
+                padx=28,
+                pady=10,
+                cursor="hand2",
+            ).pack(side=tk.RIGHT)
+            tk.Label(
+                btn_bar,
+                text="OK saves your settings and opens the main Connect window.",
+                bg=CHROME_BG,
+                fg=TEXT_MUTED,
+                font=("Segoe UI", 8),
+                anchor="w",
+            ).pack(side=tk.LEFT, fill=tk.X, expand=True)
+        else:
+            tk.Button(
+                btn_bar,
+                text="OK",
+                command=_ok_bind_and_close,
+                bg=PRIMARY,
+                fg=WHITE,
+                relief=tk.FLAT,
+                font=("Segoe UI", 9, "bold"),
+                padx=14,
+                pady=6,
+                cursor="hand2",
+            ).pack(side=tk.RIGHT)
+            tk.Button(
+                btn_bar,
+                text="Close",
+                command=_on_settings_closed,
+                bg=PANEL_BG,
+                fg=TEXT,
+                relief=tk.FLAT,
+                font=("Segoe UI", 9),
+                padx=12,
+                pady=6,
+                cursor="hand2",
+            ).pack(side=tk.RIGHT, padx=(0, 8))
 
     def _on_close_ui_only(self) -> None:
         """Hide UI; keep process + tunnel alive (tray / taskbar). Disconnect is separate.
@@ -2593,12 +2774,21 @@ def main() -> int:
 
     threading.Thread(target=_bg_bootstrap, daemon=True).start()
 
-    # Cold launch: optional user autoconnect (Settings); resume after UAC Connect.
+    # Cold launch: first-run surfaces always run when install not fully unlocked
+    # (licence → keygen demand → settings OK → main). Do not gate solely on
+    # may_connect() — that previously skipped keygen when gates were inconsistent.
     assert non_admin_connect_allowed()
     if resume_after_elevate and is_admin():
 
         def _resume_user_connect() -> None:
             # User already pressed Connect before UAC (or residual elevate).
+            # Still block if keygen missing (cannot bypass unlock via elevate).
+            if needs_keygen_unlock():
+                app._log(
+                    "Elevated resume blocked — enter keygen to unlock install first."
+                )
+                app._show_keygen_prompt()
+                return
             app._log("Resuming Connect after elevation...")
             app._start_connect()
 
@@ -2611,44 +2801,26 @@ def main() -> int:
                 "press Connect again and approve UAC."
             ),
         )
-    elif should_autoconnect_on_launch() and not resume_after_elevate:
-
-        def _settings_autoconnect() -> None:
-            # Local-only gate on UI thread (no status-host I/O). Full refresh +
-            # residual HELLO run inside _start_connect worker when unlock is OK.
-            if not has_accepted_licence():
-                app._log(
-                    "Settings: autoconnect skipped — accept licence first."
-                )
-                app._show_licence_prompt()
+    else:
+        def _cold_start_first_run() -> None:
+            surface = first_run_next_surface()
+            app._log(f"Cold start first-run surface: {surface}")
+            if surface != "main":
+                # licence / renew / keygen / settings — always present when needed
+                app._present_first_run_surface()
                 return
-            if needs_licence_renewal():
-                app._log(
-                    "Settings: autoconnect skipped — renew licence (EXPIRED)."
-                )
-                app._show_renew_licence_prompt()
-                return
-            if needs_keygen_unlock():
-                app._log(
-                    "Settings: autoconnect skipped — enter keygen to unlock Connect."
-                )
-                app._show_keygen_prompt()
-                return
-            app._log("Settings: autoconnect on launch - starting Connect...")
-            app._start_connect()
+            # Fully onboarded: optional Settings autoconnect
+            if should_autoconnect_on_launch():
+                if needs_keygen_unlock():
+                    app._log(
+                        "Settings: autoconnect skipped — enter keygen to unlock."
+                    )
+                    app._show_keygen_prompt()
+                    return
+                app._log("Settings: autoconnect on launch - starting Connect...")
+                app._start_connect()
 
-        app.root.after(450, _settings_autoconnect)
-    elif not may_connect():
-        # First-run seamless path: licence, then renew OR keygen.
-        def _first_run_gates() -> None:
-            if not has_accepted_licence():
-                app._show_licence_prompt()
-            elif needs_licence_renewal():
-                app._show_renew_licence_prompt()
-            elif needs_keygen_unlock():
-                app._show_keygen_prompt()
-
-        app.root.after(500, _first_run_gates)
+        app.root.after(400, _cold_start_first_run)
 
     app.run()
     return 0

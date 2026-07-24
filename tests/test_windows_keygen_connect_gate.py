@@ -224,11 +224,12 @@ class TestNeedsKeygenUnlock(unittest.TestCase):
             connect_fn.find("def work() -> None:"),
             idx_bootstrap,
         )
-        # Settings autoconnect must not call assert_may_connect on UI thread
-        auto = src.split("def _settings_autoconnect")[1].split("app.root.after")[0]
+        # Cold-start / autoconnect must not call assert_may_connect on UI thread
+        auto = src.split("def _cold_start_first_run")[1].split("app.root.after")[0]
         self.assertNotIn("assert_may_connect()", auto)
         self.assertIn("needs_keygen_unlock()", auto)
         self.assertIn("_start_connect()", auto)
+        self.assertIn("first_run_next_surface", auto)
 
     def test_linux_app_has_keygen_prompt_hook(self) -> None:
         """Structural: Linux desktop mirrors Windows forced keygen modal."""

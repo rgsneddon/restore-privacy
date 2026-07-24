@@ -81,10 +81,12 @@ class TestAutoconnectLaunchWiring(unittest.TestCase):
     def test_app_main_honors_settings_autoconnect(self):
         src = (ROOT / "client" / "windows" / "app.py").read_text(encoding="utf-8")
         self.assertIn("should_autoconnect_on_launch", src)
-        self.assertIn("_settings_autoconnect", src)
+        self.assertIn("_cold_start_first_run", src)
         self.assertIn("_start_connect", src)
         main = src[src.index("def main") :]
         self.assertIn("should_autoconnect_on_launch()", main)
+        # Autoconnect only after first-run surface is main (keygen + settings OK)
+        self.assertIn("first_run_next_surface", main)
         # Must not hard-assert always false anymore
         self.assertNotIn("assert not auto_connect_on_launch_enabled()", main)
 
