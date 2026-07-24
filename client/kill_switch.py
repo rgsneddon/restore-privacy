@@ -202,34 +202,50 @@ def windows_ks_apply_script(
 
 
 def windows_ks_rollback_script() -> str:
-    """Multi-line PowerShell body for kill-switch rollback (pure; not argv-wrapped)."""
+    """Multi-line PowerShell body for kill-switch rollback (pure; not argv-wrapped).
+
+    Always restores **Domain / Private / Public** DefaultOutboundAction from the
+    saved state file, or **Allow** when state is missing/corrupt. Removes only
+    ``RPT-KS-*`` rules — never product ``RPT-FW-*`` allows. Idempotent and safe
+    when kill-switch was never applied (fixes orphaned profile Block left by a
+    crashed Connect).
+    """
     pfx = WIN_RULE_PREFIX
     state = WIN_KS_STATE_PATH_PS
     lines = [
         "$ErrorActionPreference = 'Continue'",
         f"$statePath = {state}",
+        "# Remove only RPT-KS-* (product RPT-FW-* allows are preserved)",
         "Get-NetFirewallRule -ErrorAction SilentlyContinue |",
         f"  Where-Object {{ $_.DisplayName -like '{pfx}-*' }} |",
         "  Remove-NetFirewallRule -ErrorAction SilentlyContinue",
+        "function Restore-RptOutboundAllow {",
+        "  param([string]$ProfileName, [string]$Action)",
+        "  if (-not $Action) { $Action = 'Allow' }",
+        "  Set-NetFirewallProfile -Name $ProfileName -DefaultOutboundAction $Action -ErrorAction SilentlyContinue",
+        "}",
         "if (Test-Path $statePath) {",
         "  try {",
         "    $prior = Get-Content -Path $statePath -Raw | ConvertFrom-Json",
         "    foreach ($name in @('Domain','Private','Public')) {",
-        "      $val = $prior.$name",
+        "      $val = [string]$prior.$name",
+        "      # Empty / missing → Allow (never leave fail-closed after product KS)",
         "      if (-not $val) { $val = 'Allow' }",
-        "      Set-NetFirewallProfile -Name $name -DefaultOutboundAction $val -ErrorAction SilentlyContinue",
+        "      Restore-RptOutboundAllow -ProfileName $name -Action $val",
         "    }",
         "    Remove-Item -Path $statePath -Force -ErrorAction SilentlyContinue",
         "  } catch {",
         "    foreach ($name in @('Domain','Private','Public')) {",
-        "      Set-NetFirewallProfile -Name $name -DefaultOutboundAction Allow -ErrorAction SilentlyContinue",
+        "      Restore-RptOutboundAllow -ProfileName $name -Action 'Allow'",
         "    }",
         "  }",
         "} else {",
+        "  # Orphaned KS / crashed Connect (no state file): force Allow so internet works",
         "  foreach ($name in @('Domain','Private','Public')) {",
-        "    Set-NetFirewallProfile -Name $name -DefaultOutboundAction Allow -ErrorAction SilentlyContinue",
+        "    Restore-RptOutboundAllow -ProfileName $name -Action 'Allow'",
         "  }",
         "}",
+        "Write-Output 'RPT_KS_ROLLBACK_OK'",
         "exit 0",
     ]
     return "\n".join(lines) + "\n"

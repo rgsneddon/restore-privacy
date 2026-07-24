@@ -845,8 +845,69 @@ def start_full_tunnel(
             msg += f"; IPv6 mitigation error: {exc}"
             ipv6_ok = False
 
+    # Build provisional result *before* kill-switch. KS must only arm after
+    # residual capture is proven — otherwise DefaultOutboundAction Block can
+    # blackhole all internet if attach fails or residual is incomplete.
+    result = WindowsTunnelResult(
+        ok=True,
+        message=msg,
+        applied_commands=applied,
+        tun=tun,
+        dataplane=plane,
+        system_capture=capture,
+        routes_applied=routes_applied,
+        plan=plan,
+        server_host=server_host,
+        if_index=if_index,
+        ipv6_mitigation_applied=ipv6_ok,
+        kill_switch_applied=False,
+    )
+
+    # Product residual-IP path: refuse queue/session-only success (ISP IP unchanged)
+    if require_system_capture and not residual_ip_capture_active(result):
+        plane.stop()
+        # Full residual restore (routes + KS rollback + re-apply RPT-FW allows).
+        # Never leave dual /1 or profile DefaultOutboundAction=Block after fail.
+        try:
+            restore_windows_residual_path(
+                server_host=server_host,
+                plan=plan,
+                if_index=if_index,
+                run_kill_switch_rollback=True,
+                run_ipv6_rollback=True,
+            )
+        except Exception:
+            if routes_applied:
+                try:
+                    rollback_full_tunnel_routes(plan, server_host, if_index)
+                except Exception:
+                    pass
+            if ipv6_ok:
+                try:
+                    rollback_ipv6_leak_mitigation(plan)
+                except Exception:
+                    pass
+        try:
+            tun.close()
+        except Exception:
+            pass
+        return WindowsTunnelResult(
+            False,
+            "Could not route device traffic via the VPN node "
+            f"(need Wintun + dual /1; system_capture={capture}, "
+            f"routes_applied={routes_applied}, if_index={if_index}). {route_msg}",
+            applied,
+            routes_applied=False,
+            plan=plan,
+            server_host=server_host,
+            if_index=if_index,
+            ipv6_mitigation_applied=False,
+            kill_switch_applied=False,
+        )
+
+    # Kill-switch (opt-in RPT_KILL_SWITCH=1 only) — only after residual is active
     ks_applied = False
-    if routes_applied and capture:
+    if routes_applied and capture and residual_ip_capture_active(result):
         try:
             from client.kill_switch import (
                 build_kill_switch_plan,
@@ -864,58 +925,39 @@ def start_full_tunnel(
                     ks.apply, shell=True, platform="windows"
                 )
                 applied.extend(ran)
+                result.applied_commands = list(applied)
                 # Only claim kill-switch on when critical rules actually installed
                 ks_applied = bool(ok)
+                result.kill_switch_applied = ks_applied
                 if ks_applied:
-                    msg += "; kill-switch on"
+                    result.message = (result.message or msg) + "; kill-switch on"
+                    # Re-assert product RPT-FW allows under profile Block defaults
+                    try:
+                        from client.windows.firewall_allow import apply_windows_fw_allows
+
+                        apply_windows_fw_allows(server_host=server_host)
+                    except Exception:
+                        pass
                 elif ks.apply:
-                    detail = (errs[0] if errs else "rules not verified")
-                    msg += f"; kill-switch incomplete ({detail})"
+                    detail = errs[0] if errs else "rules not verified"
+                    result.message = (
+                        (result.message or msg) + f"; kill-switch incomplete ({detail})"
+                    )
+                    # Incomplete KS may leave profiles blocked — roll back
+                    try:
+                        restore_windows_residual_path(
+                            server_host=server_host,
+                            plan=plan,
+                            if_index=if_index,
+                            run_kill_switch_rollback=True,
+                            run_ipv6_rollback=False,
+                        )
+                    except Exception:
+                        pass
         except Exception as exc:
-            msg += f"; kill-switch incomplete: {exc}"
+            result.message = (result.message or msg) + f"; kill-switch incomplete: {exc}"
             ks_applied = False
-
-    result = WindowsTunnelResult(
-        ok=True,
-        message=msg,
-        applied_commands=applied,
-        tun=tun,
-        dataplane=plane,
-        system_capture=capture,
-        routes_applied=routes_applied,
-        plan=plan,
-        server_host=server_host,
-        if_index=if_index,
-        ipv6_mitigation_applied=ipv6_ok,
-        kill_switch_applied=ks_applied,
-    )
-
-    # Product residual-IP path: refuse queue/session-only success (ISP IP unchanged)
-    if require_system_capture and not residual_ip_capture_active(result):
-        plane.stop()
-        if routes_applied:
-            rollback_full_tunnel_routes(plan, server_host, if_index)
-        if ipv6_ok:
-            try:
-                rollback_ipv6_leak_mitigation(plan)
-            except Exception:
-                pass
-        try:
-            tun.close()
-        except Exception:
-            pass
-        return WindowsTunnelResult(
-            False,
-            "Could not route device traffic via the VPN node "
-            f"(need Wintun + dual /1; system_capture={capture}, "
-            f"routes_applied={routes_applied}, if_index={if_index}). {route_msg}",
-            applied,
-            routes_applied=False,
-            plan=plan,
-            server_host=server_host,
-            if_index=if_index,
-            ipv6_mitigation_applied=False,
-        )
+            result.kill_switch_applied = False
 
     return result
 

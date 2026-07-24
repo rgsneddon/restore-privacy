@@ -58,7 +58,13 @@ def windows_fw_allow_script(
     server_port: int | None = None,
     program_path: str | None = None,
 ) -> str:
-    """Multi-line PowerShell body: scoped product allows for residual Connect."""
+    """Multi-line PowerShell body: durable scoped product allows for residual Connect.
+
+    Creates **Allow-only** rules on **Domain / Private / Public** (``-Profile Any``)
+    for UDP to the product node port (default **44044**) and the product exe when
+    known. Never sets DefaultOutboundAction Block and never creates Action=Block.
+    Rule names use ``RPT-FW-*`` so kill-switch rollback (``RPT-KS-*``) never removes them.
+    """
     host = _ps_escape_single((server_host or PRODUCT_NODE_HOST).strip())
     port = int(server_port if server_port is not None else PRODUCT_NODE_PORT)
     prog = (program_path if program_path is not None else resolve_product_exe_path()).strip()
@@ -67,20 +73,29 @@ def windows_fw_allow_script(
     lines = [
         "$ErrorActionPreference = 'Continue'",
         f"$pfx = '{WIN_FW_PREFIX}'",
+        f"$node = '{host}'",
+        f"$port = {port}",
         # Remove prior product allows only (never touch RPT-KS or unrelated rules)
         "Get-NetFirewallRule -ErrorAction SilentlyContinue |",
         "  Where-Object { $_.DisplayName -like ($pfx + '-*') } |",
         "  Remove-NetFirewallRule -ErrorAction SilentlyContinue",
-        # Outbound UDP to product node (HELLO + residual DATA)
+        # Outbound UDP to product node (HELLO + residual DATA) — all profiles
         (
             f"New-NetFirewallRule -DisplayName '{WIN_FW_ALLOW_NODE}' -Direction Outbound "
-            f"-Action Allow -Protocol UDP -RemoteAddress '{host}' -RemotePort {port} "
+            f"-Action Allow -Protocol UDP -RemoteAddress $node -RemotePort $port "
             f"-Enabled True -Profile Any -ErrorAction Stop | Out-Null"
         ),
-        # Also allow any outbound to the node host for residual TCP diagnostics (scoped RemoteAddress)
+        # Also allow any outbound to the node host for residual diagnostics (scoped)
         (
             f"New-NetFirewallRule -DisplayName '{WIN_FW_PREFIX}-allow-node-any' -Direction Outbound "
-            f"-Action Allow -RemoteAddress '{host}' -Enabled True -Profile Any "
+            f"-Action Allow -RemoteAddress $node -Enabled True -Profile Any "
+            f"-ErrorAction SilentlyContinue | Out-Null"
+        ),
+        # Inbound from node (responses / residual path) — scoped RemoteAddress only
+        (
+            f"New-NetFirewallRule -DisplayName '{WIN_FW_PREFIX}-allow-node-udp-in' "
+            f"-Direction Inbound -Action Allow -Protocol UDP -RemoteAddress $node "
+            f"-LocalPort $port -Enabled True -Profile Any "
             f"-ErrorAction SilentlyContinue | Out-Null"
         ),
     ]
@@ -107,6 +122,8 @@ def windows_fw_allow_script(
             f"if (-not (Get-NetFirewallRule -DisplayName '{WIN_FW_ALLOW_NODE}' -ErrorAction SilentlyContinue)) {{",
             f"  throw 'missing critical firewall allow: {WIN_FW_ALLOW_NODE}'",
             "}",
+            # Durability note for operators / tests: product allows survive KS rollback
+            f"# Durable RPT-FW allows: node UDP port {port} + optional Program; Profile Any",
             "Write-Output 'RPT_FW_ALLOW_OK'",
             "exit 0",
         ]

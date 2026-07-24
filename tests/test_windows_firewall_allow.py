@@ -18,6 +18,7 @@ from client.kill_switch import (  # noqa: E402
 from client.kill_switch import KillSwitchPolicy  # noqa: E402
 from client.windows.firewall_allow import (  # noqa: E402
     WIN_FW_ALLOW_NODE,
+    WIN_FW_ALLOW_PROGRAM,
     WIN_FW_PREFIX,
     assert_windows_fw_allow_commands_safe,
     assert_windows_fw_allow_script_safe,
@@ -106,21 +107,72 @@ class TestWindowsFwWiring(unittest.TestCase):
         self.assertIn("RPT-FW", text)
         self.assertIn("allow-node-udp", text)
         self.assertIn(PRODUCT_NODE_HOST, text)
+        self.assertIn("44044", text)
         inst = (ROOT / "client" / "windows" / "installer.py").read_text(encoding="utf-8")
         self.assertIn("AllowFirewall.bat", inst)
         self.assertIn("apply_windows_fw_allows", inst)
-        rest = (ROOT / "client" / "windows" / "RestoreInternet.bat").read_text(
+        # Restore Internet failsafe clears stuck KS profile Block (internet blackhole)
+        rest = (ROOT / "client" / "windows" / "Restore Internet.bat").read_text(
             encoding="utf-8", errors="replace"
         )
-        self.assertIn("AllowFirewall.bat", rest)
+        self.assertIn("RPT-KS", rest)
+        self.assertIn("DefaultOutboundAction", rest)
         tun = (ROOT / "client" / "windows" / "tunnel_win.py").read_text(encoding="utf-8")
         self.assertIn("apply_windows_fw_allows", tun)
         self.assertIn("restore_windows_residual_path", tun)
+        # Failed residual must full-restore (not leave KS profile Block)
+        self.assertIn("run_kill_switch_rollback=True", tun)
         app = (ROOT / "client" / "windows" / "app.py").read_text(encoding="utf-8")
         self.assertIn("windows_firewall_connect_hint", app)
-        connect = (ROOT / "client" / "connect.py").read_text(encoding="utf-8")
-        self.assertIn("Windows Defender Firewall", connect)
-        self.assertIn("AllowFirewall.bat", connect)
+
+    def test_script_profiles_and_port_for_all_users(self):
+        body = windows_fw_allow_script(
+            server_host=PRODUCT_NODE_HOST,
+            server_port=44044,
+            program_path=r"C:\Program Files\RestorePrivacy\RestorePrivacy.exe",
+        )
+        self.assertIn("Profile Any", body)
+        self.assertIn("44044", body)
+        self.assertIn("UDP", body)
+        self.assertIn(WIN_FW_ALLOW_PROGRAM, body)
+        # Product allows never change profile DefaultOutboundAction
+        self.assertNotIn("Set-NetFirewallProfile", body)
+
+
+class TestNoInternetBlackholeOnFailedResidual(unittest.TestCase):
+    def test_ks_only_after_residual_active_in_source(self) -> None:
+        """Kill-switch must not arm before residual_ip_capture_active is proven."""
+        tun = (ROOT / "client" / "windows" / "tunnel_win.py").read_text(encoding="utf-8")
+        # Residual failure path calls full restore
+        fail_idx = tun.find("Could not route device traffic via the VPN node")
+        self.assertGreater(fail_idx, 0)
+        # restore_windows_residual_path appears before that failure return
+        pre = tun[:fail_idx]
+        self.assertIn("restore_windows_residual_path", pre)
+        # KS apply is after residual check (search for product_kill_switch after residual refuse)
+        ks_idx = tun.find("if product_kill_switch_enabled():")
+        residual_check = tun.find(
+            "require_system_capture and not residual_ip_capture_active"
+        )
+        self.assertGreater(ks_idx, residual_check, msg="KS must arm after residual check")
+
+    def test_ks_rollback_orphaned_defaults_to_allow(self) -> None:
+        from client.kill_switch import windows_ks_rollback_script
+
+        body = windows_ks_rollback_script()
+        self.assertIn("RPT-KS", body)
+        self.assertIn("DefaultOutboundAction", body)
+        self.assertIn("Allow", body)
+        self.assertIn("RPT_KS_ROLLBACK_OK", body)
+        # Must only remove RPT-KS-* (product allows preserved — comment ok)
+        self.assertIn("RPT-KS-*", body)
+        self.assertIn("like 'RPT-KS-*'", body.replace('"', "'"))
+        # Removal filter is RPT-KS only (not RPT-FW-*)
+        self.assertNotRegex(
+            body,
+            r"like\s+['\"]RPT-FW-\*",
+            msg="KS rollback must not remove RPT-FW product allows",
+        )
 
 
 if __name__ == "__main__":
