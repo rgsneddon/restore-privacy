@@ -166,17 +166,18 @@ class TestStatusPageFavicon(unittest.TestCase):
         self.assertIn("/favicon.ico", html)
         self.assertIn("/favicon.png", html)
         self.assertIn("/apple-touch-icon.png", html)
-        # Header uses solid logo plate left of title (not transparent mark)
+        # Header uses borderless transparent mark (shield + key), not opaque plate
         self.assertIn(PUBLIC_BRAND_LOGO_PATH, html)
-        self.assertIn("/logo.png", html)
+        self.assertIn("/logo_transparent.png", html)
         self.assertIn('class="brand-logo"', html)
         self.assertIn('class="brand-mark"', html)
         self.assertIn(PUBLIC_BRAND_TITLE, html)
         brand_start = html.index('id="brand-panel"')
         brand_end = html.index("</header>", brand_start)
         brand = html[brand_start:brand_end]
-        self.assertIn("/logo.png", brand)
-        self.assertNotIn("logo_transparent", brand)
+        self.assertIn("/logo_transparent.png", brand)
+        self.assertNotIn('src="/logo.png"', brand)
+        self.assertNotIn('src="/logo.png?', brand)
 
     def test_static_resolution_and_bytes(self):
         for path in (
@@ -221,13 +222,13 @@ class TestStatusPageFavicon(unittest.TestCase):
                     self.assertGreater(len(data), 200)
                     self.assertTrue("image" in ctype or "icon" in ctype)
                     with urllib.request.urlopen(
-                        f"http://127.0.0.1:{port}/logo.png", timeout=5
+                        f"http://127.0.0.1:{port}/logo_transparent.png", timeout=5
                     ) as resp:
                         logo = resp.read()
                     self.assertGreater(len(logo), 1000)
-                    # Transparent master still served if requested (Stripe/legacy)
+                    # Opaque plate still served if requested (legacy / solid plate)
                     with urllib.request.urlopen(
-                        f"http://127.0.0.1:{port}/logo_transparent.png", timeout=5
+                        f"http://127.0.0.1:{port}/logo.png", timeout=5
                     ) as resp:
                         self.assertGreater(len(resp.read()), 1000)
         finally:

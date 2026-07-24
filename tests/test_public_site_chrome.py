@@ -87,7 +87,7 @@ class TestPublicChromeModule(unittest.TestCase):
         self.assertIn("<h1>", header)
         self.assertEqual(PUBLIC_BRAND_TITLE, "RESTORE PRIVACY VPN")
         self.assertIn(f"<h1>{PUBLIC_BRAND_TITLE}</h1>", header)
-        # Solid logo left of title (same brand-mark row, logo before h1)
+        # Borderless transparent mark left of title (logo before h1)
         mark_start = header.index('id="brand-mark"')
         mark_end = header.index("</div>", mark_start)
         mark = header[mark_start:mark_end]
@@ -95,8 +95,9 @@ class TestPublicChromeModule(unittest.TestCase):
         i_h1 = mark.index("<h1>")
         self.assertLess(i_logo, i_h1, "logo must sit left of title in brand-mark")
         self.assertIn(PUBLIC_BRAND_LOGO_PATH, mark)
-        self.assertIn("/logo.png", mark)
-        self.assertNotIn("logo_transparent", mark)
+        self.assertIn("logo_transparent", mark)
+        self.assertNotIn('src="/logo.png"', mark)
+        self.assertNotIn('src="/logo.png?', mark)
         self.assertIn(f'width="{PUBLIC_BRAND_LOGO_SIZE_DEFAULT}"', header)
         # Nav remains below the logo+title band
         i_mark = header.index('id="brand-mark"')
@@ -169,47 +170,21 @@ class TestPublicChromeModule(unittest.TestCase):
         self.assertIn("localStorage", script)
         self.assertIn("data-theme", script)
 
-    def test_brand_logo_static_is_solid_opaque_plate(self) -> None:
-        """Shipped header logo is a solid opaque plate (no clear corners)."""
-        import struct
-        import zlib
+    def test_brand_logo_static_is_borderless_transparent_mark(self) -> None:
+        """Shipped header logo has clear corners (shield+key only, no outer plate)."""
         from pathlib import Path
 
         from public_chrome import PUBLIC_BRAND_LOGO_STATIC_NAME
 
         path = ROOT / "status_page" / "static" / PUBLIC_BRAND_LOGO_STATIC_NAME
-        self.assertEqual(PUBLIC_BRAND_LOGO_STATIC_NAME, "logo.png")
+        self.assertEqual(PUBLIC_BRAND_LOGO_STATIC_NAME, "logo_transparent.png")
         self.assertTrue(path.is_file(), msg=f"missing {path}")
         data = path.read_bytes()
         self.assertEqual(data[:8], b"\x89PNG\r\n\x1a\n")
-        pos = 8
-        w = h = None
-        idat = b""
-        while pos < len(data):
-            length = int.from_bytes(data[pos : pos + 4], "big")
-            ctype = data[pos + 4 : pos + 8]
-            chunk = data[pos + 8 : pos + 8 + length]
-            pos += 12 + length
-            if ctype == b"IHDR":
-                w, h, _bit, color, *_rest = struct.unpack(">IIBBBBB", chunk)
-                # Truecolor with alpha (RGBA) is fine; plate must still be opaque
-                self.assertIn(color, (2, 6), f"unexpected PNG color type {color}")
-            elif ctype == b"IDAT":
-                idat += chunk
-            elif ctype == b"IEND":
-                break
-        self.assertIsNotNone(w)
-        assert w is not None and h is not None
-        # Prefer Pillow for alpha stats when available (shipped generator uses it)
         try:
             from PIL import Image
 
             im = Image.open(path).convert("RGBA")
-            alphas = [px[3] for px in im.getdata()]
-            zeros = sum(1 for a in alphas if a == 0)
-            partial = sum(1 for a in alphas if 0 < a < 255)
-            self.assertEqual(zeros, 0, "solid logo must not have fully transparent pixels")
-            self.assertEqual(partial, 0, "solid logo must not have semi-transparent pixels")
             corners = [
                 im.getpixel((0, 0))[3],
                 im.getpixel((im.width - 1, 0))[3],
@@ -217,62 +192,20 @@ class TestPublicChromeModule(unittest.TestCase):
                 im.getpixel((im.width - 1, im.height - 1))[3],
             ]
             self.assertTrue(
-                all(a == 255 for a in corners),
-                msg=f"corners must be fully opaque: {corners}",
+                all(a < 16 for a in corners),
+                msg=f"corners must be transparent: {corners}",
             )
+            alphas = [px[3] for px in im.getdata()]
+            zeros = sum(1 for a in alphas if a == 0)
+            # Substantial transparent field outside the shield+key mark
+            self.assertGreater(zeros, len(alphas) // 2, "expected mostly transparent plate")
+            # Opaque plate logo.png must remain different
+            solid = ROOT / "status_page" / "static" / "logo.png"
+            self.assertTrue(solid.is_file())
+            self.assertNotEqual(solid.read_bytes(), path.read_bytes())
             return
         except ImportError:
-            pass
-        # Fallback: decode PNG filter chain without Pillow
-        raw = zlib.decompress(idat)
-        bpp = 4
-        stride = w * bpp
-        rows: list[bytearray] = []
-        i = 0
-        prev = bytearray(stride)
-        for _y in range(h):
-            ft = raw[i]
-            i += 1
-            row = bytearray(raw[i : i + stride])
-            i += stride
-            if ft == 1:
-                for x in range(stride):
-                    left = row[x - bpp] if x >= bpp else 0
-                    row[x] = (row[x] + left) & 255
-            elif ft == 2:
-                for x in range(stride):
-                    row[x] = (row[x] + prev[x]) & 255
-            elif ft == 3:
-                for x in range(stride):
-                    left = row[x - bpp] if x >= bpp else 0
-                    row[x] = (row[x] + ((left + prev[x]) // 2)) & 255
-            elif ft == 4:
-
-                def paeth(a: int, b: int, c: int) -> int:
-                    p = a + b - c
-                    pa, pb, pc = abs(p - a), abs(p - b), abs(p - c)
-                    if pa <= pb and pa <= pc:
-                        return a
-                    if pb <= pc:
-                        return b
-                    return c
-
-                for x in range(stride):
-                    a = row[x - bpp] if x >= bpp else 0
-                    b = prev[x]
-                    c = prev[x - bpp] if x >= bpp else 0
-                    row[x] = (row[x] + paeth(a, b, c)) & 255
-            rows.append(row)
-            prev = row
-
-        def alpha(x: int, y: int) -> int:
-            return rows[y][x * 4 + 3]
-
-        corners = [alpha(0, 0), alpha(w - 1, 0), alpha(0, h - 1), alpha(w - 1, h - 1)]
-        self.assertTrue(
-            all(a == 255 for a in corners),
-            msg=f"corners must be fully opaque: {corners}",
-        )
+            self.fail("Pillow required to assert transparent logo alpha")
 
 
 class TestHomepageChrome(unittest.TestCase):

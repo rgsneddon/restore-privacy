@@ -25,10 +25,10 @@ SETTINGS_GUIDE_LINK_ID = "settings-guide-link"
 # Public website brand / page identity (top H1 + default document title)
 PUBLIC_BRAND_TITLE = "RESTORE PRIVACY VPN"
 
-# Solid-background logo plate in the top brand box (left of title).
-# Transparent masters remain for Stripe branding only — not the public site header.
-PUBLIC_BRAND_LOGO_PATH = "/logo.png"
-PUBLIC_BRAND_LOGO_STATIC_NAME = "logo.png"
+# Borderless mark: shield + protruding green key only (transparent outside).
+# Opaque logo.png remains for favicon/legacy plate uses; Stripe uses stripe_brand_*.
+PUBLIC_BRAND_LOGO_PATH = "/logo_transparent.png"
+PUBLIC_BRAND_LOGO_STATIC_NAME = "logo_transparent.png"
 # Default img width/height (CSS clamp is slightly larger than prior 96px).
 PUBLIC_BRAND_LOGO_SIZE_DEFAULT = 112
 PUBLIC_BRAND_LOGO_SIZE_MIN_CSS = 88  # clamp min — was 72
@@ -47,7 +47,7 @@ _BRAND_ASSET_VERSION_CACHE: str | None = None
 
 
 def public_brand_asset_version() -> str:
-    """Short content hash of solid logo + favicon for cache-busting query params.
+    """Short content hash of header logo + favicon for cache-busting query params.
 
     Browsers aggressively cache favicons; a stable ``?v=`` on link/img hrefs
     forces a refresh when status static brand bytes change.
@@ -70,7 +70,7 @@ def public_brand_asset_version() -> str:
 
 
 def public_brand_logo_src() -> str:
-    """Solid logo path with cache-bust query for public header ``<img>``."""
+    """Borderless logo path with cache-bust query for public header ``<img>``."""
     return f"{PUBLIC_BRAND_LOGO_PATH}?v={public_brand_asset_version()}"
 
 
@@ -552,8 +552,8 @@ def public_brand_header_html(
 ) -> str:
     """Static top brand panel used across all public pages.
 
-    Layout: **solid logo plate** to the **left** of **RESTORE PRIVACY VPN**,
-    as a centered row **above** the site nav. Logo has no border/frame.
+    Layout: **borderless shield+key mark** to the **left** of **RESTORE PRIVACY VPN**,
+    as a centered row **above** the site nav. Logo has no outer plate/frame.
     Under-title tagline is omitted by default (no lightweight-vpn slogan).
     Pass a non-empty *tagline* only if a page truly needs a header subtitle;
     public catalog/docs call sites leave it empty for a clean top box.
