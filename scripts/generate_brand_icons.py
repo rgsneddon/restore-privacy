@@ -186,7 +186,8 @@ def generate_all() -> dict:
     shutil.copy2(BRAND_DIR / "favicon-32.png", STATUS_STATIC / "favicon.png")
     shutil.copy2(BRAND_DIR / "logo-256.png", STATUS_STATIC / "logo.png")
     save_png(resize_png(master, 180), STATUS_STATIC / "apple-touch-icon.png")
-    # Public site header: transparent mark (no opaque plate)
+    # Optional transparent master for Stripe/legacy routes only — public header
+    # uses solid logo.png (primary_dark plate) via public_chrome.PUBLIC_BRAND_LOGO_PATH.
     if PRIMARY_TRANSPARENT.is_file():
         shutil.copy2(PRIMARY_TRANSPARENT, STATUS_STATIC / "logo_transparent.png")
     else:

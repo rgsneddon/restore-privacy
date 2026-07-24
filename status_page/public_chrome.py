@@ -5,6 +5,9 @@ Used by homepage, public documents, and Settings guide. **Not** used by /admin.
 
 from __future__ import annotations
 
+import hashlib
+from pathlib import Path
+
 # Browser localStorage key for public theme preference
 PUBLIC_THEME_STORAGE_KEY = "rpt_public_theme"
 
@@ -22,10 +25,10 @@ SETTINGS_GUIDE_LINK_ID = "settings-guide-link"
 # Public website brand / page identity (top H1 + default document title)
 PUBLIC_BRAND_TITLE = "RESTORE PRIVACY VPN"
 
-# Transparent-background logo in the top brand box (left of title).
-# Opaque plate logo.png is retained for favicon-style / legacy uses.
-PUBLIC_BRAND_LOGO_PATH = "/logo_transparent.png"
-PUBLIC_BRAND_LOGO_STATIC_NAME = "logo_transparent.png"
+# Solid-background logo plate in the top brand box (left of title).
+# Transparent masters remain for Stripe branding only — not the public site header.
+PUBLIC_BRAND_LOGO_PATH = "/logo.png"
+PUBLIC_BRAND_LOGO_STATIC_NAME = "logo.png"
 # Default img width/height (CSS clamp is slightly larger than prior 96px).
 PUBLIC_BRAND_LOGO_SIZE_DEFAULT = 112
 PUBLIC_BRAND_LOGO_SIZE_MIN_CSS = 88  # clamp min — was 72
@@ -38,6 +41,43 @@ PRIVACY_PATH = "/PRIVACY_POLICY.md"
 AUDIT_PATH = "/AUDIT.md"
 README_PATH = "/README.md"
 SETTINGS_GUIDE_PATH = "/settings-explainer"
+
+_STATIC_DIR = Path(__file__).resolve().parent / "static"
+_BRAND_ASSET_VERSION_CACHE: str | None = None
+
+
+def public_brand_asset_version() -> str:
+    """Short content hash of solid logo + favicon for cache-busting query params.
+
+    Browsers aggressively cache favicons; a stable ``?v=`` on link/img hrefs
+    forces a refresh when status static brand bytes change.
+    """
+    global _BRAND_ASSET_VERSION_CACHE
+    if _BRAND_ASSET_VERSION_CACHE is not None:
+        return _BRAND_ASSET_VERSION_CACHE
+    h = hashlib.sha256()
+    for name in (
+        PUBLIC_BRAND_LOGO_STATIC_NAME,
+        "favicon.ico",
+        "favicon.png",
+        "apple-touch-icon.png",
+    ):
+        p = _STATIC_DIR / name
+        if p.is_file():
+            h.update(p.read_bytes())
+    _BRAND_ASSET_VERSION_CACHE = h.hexdigest()[:12]
+    return _BRAND_ASSET_VERSION_CACHE
+
+
+def public_brand_logo_src() -> str:
+    """Solid logo path with cache-bust query for public header ``<img>``."""
+    return f"{PUBLIC_BRAND_LOGO_PATH}?v={public_brand_asset_version()}"
+
+
+def public_favicon_href(path: str) -> str:
+    """Favicon/apple-touch href with the same brand asset version."""
+    base = (path or "").strip() or "/favicon.ico"
+    return f"{base}?v={public_brand_asset_version()}"
 
 
 def _esc(s: str) -> str:
@@ -512,7 +552,7 @@ def public_brand_header_html(
 ) -> str:
     """Static top brand panel used across all public pages.
 
-    Layout: **transparent logo** to the **left** of **RESTORE PRIVACY VPN**,
+    Layout: **solid logo plate** to the **left** of **RESTORE PRIVACY VPN**,
     as a centered row **above** the site nav. Logo has no border/frame.
     Under-title tagline is omitted by default (no lightweight-vpn slogan).
     Pass a non-empty *tagline* only if a page truly needs a header subtitle;
@@ -520,7 +560,13 @@ def public_brand_header_html(
     Brand H1 defaults to :data:`PUBLIC_BRAND_TITLE` (**RESTORE PRIVACY VPN**).
     """
     title_safe = _esc(public_display_title(title))
-    src = (logo_src or PUBLIC_BRAND_LOGO_PATH).strip() or PUBLIC_BRAND_LOGO_PATH
+    raw_src = (logo_src or PUBLIC_BRAND_LOGO_PATH).strip() or PUBLIC_BRAND_LOGO_PATH
+    # Default solid logo gets cache-bust; explicit override paths are left as-is
+    # unless they are the standard solid path without a query.
+    if raw_src == PUBLIC_BRAND_LOGO_PATH or raw_src.startswith(f"{PUBLIC_BRAND_LOGO_PATH}?"):
+        src = public_brand_logo_src()
+    else:
+        src = raw_src
     sz = int(logo_size) if logo_size else PUBLIC_BRAND_LOGO_SIZE_DEFAULT
     if sz < 64:
         sz = PUBLIC_BRAND_LOGO_SIZE_DEFAULT
@@ -546,6 +592,9 @@ def public_head_open(
 ) -> str:
     """Opening HTML through ``</head><body>`` with shared CSS + theme boot script."""
     title_safe = _esc(title)
+    ico = public_favicon_href("/favicon.ico")
+    png = public_favicon_href("/favicon.png")
+    apple = public_favicon_href("/apple-touch-icon.png")
     return f"""<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -553,9 +602,9 @@ def public_head_open(
   <meta name="viewport" content="width=device-width, initial-scale=1"/>
   <meta name="color-scheme" content="dark light"/>
   <title>{title_safe}</title>
-  <link rel="icon" href="/favicon.ico" type="image/x-icon"/>
-  <link rel="icon" href="/favicon.png" type="image/png" sizes="32x32"/>
-  <link rel="apple-touch-icon" href="/apple-touch-icon.png"/>
+  <link rel="icon" href="{_esc(ico)}" type="image/x-icon"/>
+  <link rel="icon" href="{_esc(png)}" type="image/png" sizes="32x32"/>
+  <link rel="apple-touch-icon" href="{_esc(apple)}"/>
   <style>
 {public_site_css()}
 {extra_css}
