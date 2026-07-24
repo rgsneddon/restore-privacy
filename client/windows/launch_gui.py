@@ -104,7 +104,13 @@ def should_reexec_to_windowed_host() -> bool:
 
 
 def spawn_windowed_gui(extra_args: list[str] | None = None) -> bool:
-    """Start GUI under pythonw detached; return True if child was started."""
+    """Start GUI under pythonw detached; return True if child was started.
+
+    Uses ``CREATE_BREAKAWAY_FROM_JOB`` when available so a parent Job Object
+    (CI / agent shells) does not kill the GUI child when the console parent
+    exits. Optional ``RPT_LAUNCH_LOG`` path captures child stderr for diagnosis
+    (default still discards stdio so no console window appears).
+    """
     if not should_reexec_to_windowed_host():
         return False
     import subprocess
@@ -120,17 +126,44 @@ def spawn_windowed_gui(extra_args: list[str] | None = None) -> bool:
         creationflags |= subprocess.DETACHED_PROCESS  # type: ignore[attr-defined]
     if hasattr(subprocess, "CREATE_NEW_PROCESS_GROUP"):
         creationflags |= subprocess.CREATE_NEW_PROCESS_GROUP
+    # CREATE_BREAKAWAY_FROM_JOB = 0x01000000 — survive parent Job Object kill
+    creationflags |= 0x01000000
     # CREATE_NO_WINDOW = 0x08000000 — hide any residual console for child
     creationflags |= 0x08000000
-    subprocess.Popen(
-        [exe, *args],
-        cwd=cwd,
-        creationflags=creationflags,
-        close_fds=True,
-        stdin=subprocess.DEVNULL,
-        stdout=subprocess.DEVNULL,
-        stderr=subprocess.DEVNULL,
-    )
+
+    stdout = subprocess.DEVNULL
+    stderr = subprocess.DEVNULL
+    log_path = (os.environ.get("RPT_LAUNCH_LOG") or "").strip()
+    log_fh = None
+    if log_path:
+        try:
+            Path(log_path).parent.mkdir(parents=True, exist_ok=True)
+            log_fh = open(log_path, "a", encoding="utf-8")  # noqa: SIM115
+            log_fh.write(f"\n# spawn_windowed_gui {exe} {args} cwd={cwd}\n")
+            log_fh.flush()
+            stdout = log_fh
+            stderr = log_fh
+        except OSError:
+            log_fh = None
+
+    try:
+        subprocess.Popen(
+            [exe, *args],
+            cwd=cwd,
+            creationflags=creationflags,
+            close_fds=log_fh is None,
+            stdin=subprocess.DEVNULL,
+            stdout=stdout,
+            stderr=stderr,
+            env=os.environ.copy(),  # preserve LOCALAPPDATA / entitlement gates
+        )
+    except OSError:
+        if log_fh is not None:
+            try:
+                log_fh.close()
+            except OSError:
+                pass
+        return False
     return True
 
 
