@@ -46,17 +46,19 @@ STATUS_UNPAID = "unpaid"
 LICENCE_STATUS_OK = "OK"
 LICENCE_STATUS_EXPIRED = "EXPIRED"
 
-# Platform pay portal base — site-hosted plan page (Monthly | Annual).
+# Platform pay portal base — public site (catalog / docs).
 PUBLIC_PAY_BASE = "https://restoreprivacy.online/"
-# Legacy Stripe Payment Link defaults (inactive; renew prefers site /pay).
+# Legacy Stripe Payment Link defaults (inactive; renew prefers device pay host).
 DEFAULT_STRIPE_PAYMENT_PAGE_URL = (
     "https://buy.stripe.com/cNi7sM4uOeWQ9TBe0q7kc00"
 )
 DEFAULT_STRIPE_PAYMENT_PAGE_URL_YEARLY = (
     "https://buy.stripe.com/6oUbJ23qK2a43vdbSi7kc01"
 )
-# Site-hosted Select your plan entry (primary renew / catalog path).
-DEFAULT_SITE_PAY_PLAN_BASE = "https://restoreprivacy.online/pay"
+# Customer device-licence pay host (Stripe Checkout custom domain).
+# EXPIRED / invalid-licence UI must send users here — never localhost/dev ports.
+DEVICE_LICENCE_PAY_HOST = "https://pay.restoreprivacy.online"
+DEFAULT_SITE_PAY_PLAN_BASE = DEVICE_LICENCE_PAY_HOST
 KEY_RENEW_URL = "renew_url"
 
 CONNECT_BLOCKED_PAYMENT_MSG = (
@@ -567,6 +569,66 @@ def licence_status_from_payment_entitlement(
     return LICENCE_STATUS_EXPIRED
 
 
+def is_customer_safe_renew_url(url: str) -> bool:
+    """True when *url* is safe to show customers (not localhost/dev status host)."""
+    u = (url or "").strip()
+    if not u.startswith("http://") and not u.startswith("https://"):
+        return False
+    low = u.lower()
+    if "127.0.0.1" in low or "localhost" in low:
+        return False
+    # Local status-host default port (dev only — never customer-facing)
+    if ":10000" in low:
+        return False
+    # Require production device pay host or known production site pay path
+    if "pay.restoreprivacy.online" in low:
+        return True
+    if "restoreprivacy.online" in low and "/pay" in low:
+        return True
+    # Stripe Payment Links / Checkout (custom domain or buy.stripe.com)
+    if "buy.stripe.com" in low or "checkout.stripe.com" in low:
+        return True
+    return False
+
+
+def normalize_customer_renew_url(
+    url: str,
+    *,
+    platform: str = "",
+    interval: str = "month",
+) -> str:
+    """Rewrite unsafe/dev renew URLs to the production device-licence pay host."""
+    u = (url or "").strip()
+    if is_customer_safe_renew_url(u) and "pay.restoreprivacy.online" in u.lower():
+        return u
+    if is_customer_safe_renew_url(u) and "buy.stripe.com" in u.lower():
+        return u
+    if is_customer_safe_renew_url(u) and "checkout.stripe.com" in u.lower():
+        return u
+    # Site /pay on restoreprivacy.online → same path on pay. device host
+    if is_customer_safe_renew_url(u) and "restoreprivacy.online" in u.lower():
+        try:
+            parts = urllib.parse.urlsplit(u)
+            # Prefer pay. host for device licence renew copy
+            rebuilt = urllib.parse.urlunsplit(
+                (
+                    "https",
+                    "pay.restoreprivacy.online",
+                    parts.path if parts.path and parts.path != "/" else "",
+                    parts.query,
+                    parts.fragment,
+                )
+            )
+            if rebuilt.rstrip("/") == DEVICE_LICENCE_PAY_HOST.rstrip("/"):
+                return build_local_platform_renew_url(
+                    platform, interval=interval
+                )
+            return rebuilt
+        except Exception:  # noqa: BLE001
+            pass
+    return build_local_platform_renew_url(platform, interval=interval)
+
+
 def build_local_platform_renew_url(
     platform: str = "",
     *,
@@ -575,10 +637,9 @@ def build_local_platform_renew_url(
 ) -> str:
     """Pure local renew URL for *platform* (no payments import).
 
-    Primary path: site-hosted ``/pay?platform=…&interval=…`` plan page.
-    Optional *base_payment_page_url* overrides the site pay base (tests /
-    operator). Shipped Windows/Linux/Flutter EXPIRED UI uses this when
-    ``status_page.payments`` is not importable.
+    Primary path: device-licence host ``pay.restoreprivacy.online`` with
+    ``platform`` + ``interval`` query (never localhost).
+    Optional *base_payment_page_url* overrides the pay base (tests / operator).
     """
     plat = (platform or "").strip().lower() or "windows"
     iv = (interval or "month").strip().lower()
@@ -589,15 +650,24 @@ def build_local_platform_renew_url(
     base = (base_payment_page_url or "").strip().rstrip("/")
     if not base:
         for key in (
+            "RPT_DEVICE_LICENCE_PAY_URL",
             "RPT_SITE_PAY_PLAN_URL",
             "SITE_PAY_PLAN_URL",
         ):
             base = (os.environ.get(key) or "").strip().rstrip("/")
-            if base:
+            if base and is_customer_safe_renew_url(base):
                 break
+            base = ""
         if not base:
             base = DEFAULT_SITE_PAY_PLAN_BASE
-    # Site plan page: platform + optional interval preselect
+    # Drop unsafe operator overrides (e.g. RPT_SITE_PAY_PLAN_URL=http://127.0.0.1:10000/pay)
+    if not is_customer_safe_renew_url(base) and not base.startswith(
+        DEVICE_LICENCE_PAY_HOST
+    ):
+        # bare host without scheme check: treat pay host as ok
+        if "pay.restoreprivacy.online" not in base.lower():
+            base = DEFAULT_SITE_PAY_PLAN_BASE
+    # Device pay host: platform + interval preselect
     q = urllib.parse.urlencode({"platform": plat, "interval": iv})
     sep = "&" if "?" in base else "?"
     return f"{base}{sep}{q}"
@@ -611,30 +681,34 @@ def renew_licence_url(
     renew_url: str = "",
     path: Optional[Path] = None,
 ) -> str:
-    """Direct payment portal URL for this platform (monthly or yearly).
+    """Direct device-licence payment portal URL for this platform.
 
     Priority:
-    1. Explicit *renew_url* (host ``renew_url`` from last status refresh)
-    2. Cached ``renew_url`` on local entitlement (when *path* / default file)
-    3. Optional monorepo ``status_page.payments`` helper when importable
-    4. :func:`build_local_platform_renew_url` (always platform-specific)
+    1. Explicit *renew_url* when customer-safe (not localhost/dev)
+    2. Cached ``renew_url`` on local entitlement when customer-safe
+    3. Optional monorepo ``status_page.payments`` helper with **production**
+       pay host (never ``public_base_url`` localhost default)
+    4. :func:`build_local_platform_renew_url` → ``pay.restoreprivacy.online``
 
-    Never falls back to a bare catalog homepage without platform identity.
+    Never falls back to a bare catalog homepage without platform identity, and
+    never returns ``http://127.0.0.1:10000/…`` to customers.
     """
+    plat = (platform or "").strip().lower() or "windows"
     cached = (renew_url or "").strip()
     if not cached:
         try:
             ent = load_payment_entitlement(path)
             cached = (ent.renew_url or "").strip()
             if not platform:
-                platform = ent.platform or ""
+                plat = (ent.platform or plat or "windows").strip().lower() or "windows"
         except Exception:  # noqa: BLE001
             pass
-    if cached and cached.startswith("http"):
-        return cached
+    if cached and cached.startswith("http") and is_customer_safe_renew_url(cached):
+        return normalize_customer_renew_url(
+            cached, platform=plat, interval=interval
+        )
 
-    plat = (platform or "").strip().lower() or "windows"
-    # Optional: monorepo status_page.payments when present (env-aware yearly URL)
+    # Optional: monorepo status_page.payments when present — force device pay host
     try:
         root = Path(__file__).resolve().parents[1]
         sp = root / "status_page"
@@ -646,10 +720,17 @@ def renew_licence_url(
                 sys.path.insert(0, sp_s)
         from payments import stripe_payment_page_href_for_platform  # type: ignore
 
-        return stripe_payment_page_href_for_platform(plat, interval=interval)
+        href = stripe_payment_page_href_for_platform(
+            plat,
+            interval=interval,
+            base_url=DEVICE_LICENCE_PAY_HOST,
+        )
+        return normalize_customer_renew_url(
+            href, platform=plat, interval=interval
+        )
     except Exception:  # noqa: BLE001
         pass
-    # Pure local builder — platform-specific Stripe link (shipped client path)
+    # Pure local builder — device licence pay host (shipped client path)
     _ = base_catalog  # kept for API compatibility; not used as bare homepage
     return build_local_platform_renew_url(plat, interval=interval)
 

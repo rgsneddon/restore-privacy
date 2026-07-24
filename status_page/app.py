@@ -755,13 +755,20 @@ class Handler(BaseHTTPRequestHandler):
                     "keygen": ent.get("keygen") or "",
                     "customer_email": ent.get("customer_email") or "",
                     "billing_interval": ent.get("billing_interval") or "month",
-                    # Platform renew portal (monthly default; yearly available on catalog)
-                    "renew_url": stripe_payment_page_href_for_platform(plat or "windows"),
+                    # Device-licence pay host (never localhost public_base_url default)
+                    "renew_url": stripe_payment_page_href_for_platform(
+                        plat or "windows",
+                        base_url="https://pay.restoreprivacy.online",
+                    ),
                     "renew_url_monthly": stripe_payment_page_href_for_platform(
-                        plat or "windows", interval="month"
+                        plat or "windows",
+                        interval="month",
+                        base_url="https://pay.restoreprivacy.online",
                     ),
                     "renew_url_yearly": stripe_payment_page_href_for_platform(
-                        plat or "windows", interval="year"
+                        plat or "windows",
+                        interval="year",
+                        base_url="https://pay.restoreprivacy.online",
                     ),
                 }
             self._send(

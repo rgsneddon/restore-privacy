@@ -163,12 +163,15 @@ class TestLicenceStatusOkExpired(unittest.TestCase):
         msg = renew_licence_message("windows")
         self.assertIn("Renew your licence *here*", msg)
         self.assertIn("EXPIRED", msg)
+        self.assertIn("pay.restoreprivacy.online", msg)
+        self.assertNotIn("127.0.0.1", msg)
         url = renew_licence_url("macos")
         self.assertTrue(url.startswith("http"))
         self.assertIn("macos", url.lower())
+        self.assertIn("pay.restoreprivacy.online", url)
         # Pure local builder always embeds platform (no payments import)
         local = build_local_platform_renew_url("macos", interval="month")
-        self.assertIn("/pay", local)
+        self.assertIn("pay.restoreprivacy.online", local)
         self.assertIn("macos", local.lower())
         self.assertIn("platform=macos", local)
 
@@ -290,7 +293,7 @@ class TestLocalPlatformRenewUrlWithoutPayments(unittest.TestCase):
         for plat in ("windows", "macos", "ios", "android", "linux"):
             url = build_local_platform_renew_url(plat, interval="month")
             self.assertTrue(url.startswith(DEFAULT_SITE_PAY_PLAN_BASE), plat)
-            self.assertIn("/pay", url)
+            self.assertIn("pay.restoreprivacy.online", url)
             self.assertIn(f"platform={plat}", url)
             self.assertIn("interval=month", url)
             year = build_local_platform_renew_url(plat, interval="year")
@@ -313,7 +316,9 @@ class TestLocalPlatformRenewUrlWithoutPayments(unittest.TestCase):
                 url = renew_licence_url("macos")
                 msg = renew_licence_message("macos")
         self.assertIn("macos", url.lower())
-        self.assertIn("/pay", url)
+        self.assertIn("pay.restoreprivacy.online", url)
+        self.assertNotIn("127.0.0.1", url)
+        self.assertNotIn(":10000", url)
         self.assertNotEqual(url.rstrip("/"), "https://restoreprivacy.online")
         self.assertNotEqual(url.rstrip("/"), "https://restoreprivacy.online/")
         self.assertIn("Renew your licence *here*", msg)
@@ -358,11 +363,32 @@ class TestLocalPlatformRenewUrlWithoutPayments(unittest.TestCase):
             self.assertEqual(loaded.renew_url, ent.renew_url)
             from client.payment_entitlement import renew_licence_url
 
-            # Cached host renew_url preferred
+            # Cached host renew_url preferred (Stripe Payment Link is customer-safe)
             self.assertEqual(
                 renew_licence_url("ios", path=pay),
                 loaded.renew_url,
             )
+
+    def test_localhost_renew_url_rewritten_to_device_pay_host(self) -> None:
+        """Dev status-host URLs must never appear in EXPIRED / invalid-licence copy."""
+        from client.payment_entitlement import (
+            DEVICE_LICENCE_PAY_HOST,
+            is_customer_safe_renew_url,
+            renew_licence_message,
+            renew_licence_url,
+        )
+
+        bad = "http://127.0.0.1:10000/pay?platform=windows&interval=month"
+        self.assertFalse(is_customer_safe_renew_url(bad))
+        url = renew_licence_url("windows", renew_url=bad)
+        self.assertIn("pay.restoreprivacy.online", url)
+        self.assertNotIn("127.0.0.1", url)
+        self.assertNotIn(":10000", url)
+        self.assertTrue(url.startswith(DEVICE_LICENCE_PAY_HOST))
+        self.assertIn("platform=windows", url)
+        msg = renew_licence_message("windows", renew_url=bad)
+        self.assertIn("pay.restoreprivacy.online", msg)
+        self.assertNotIn("127.0.0.1", msg)
 
 
 def urllib_parse_unquote(s: str) -> str:
