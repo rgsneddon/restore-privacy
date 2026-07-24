@@ -14,7 +14,7 @@ This policy describes how the software is **designed** to handle data. It is not
 
 ## 1. Summary
 
-Restore Privacy is a **custom encrypted tunnel** (not WireGuard or OpenVPN). Product goals:
+Restore Privacy is a **custom encrypted tunnel**. Product goals:
 
 | Commitment | Meaning |
 |------------|---------|

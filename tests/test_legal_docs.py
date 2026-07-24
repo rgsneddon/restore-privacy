@@ -119,9 +119,10 @@ class TestLicenseAndCredits(unittest.TestCase):
         for name in ("Wintun", "cryptography", "Bouncy", "Flutter", "CryptoKit", "BigInt"):
             self.assertIn(name, text, f"missing credit for {name}")
         self.assertIn("wintun", text.lower())
-        self.assertIn("not", text.lower())
-        # Clarify not WireGuard protocol
-        self.assertTrue("wireguard" in text.lower() or "WireGuard" in text)
+        self.assertIn("virtual NIC", text)
+        # Public Credits must not use competitor “not WireGuard/OpenVPN” disclaimers
+        self.assertNotIn("wireguard", text.lower())
+        self.assertNotIn("openvpn", text.lower())
         # Distribution services (private source + paid status host)
         self.assertIn("Stripe", text)
         self.assertIn("restoreprivacy.online", text)

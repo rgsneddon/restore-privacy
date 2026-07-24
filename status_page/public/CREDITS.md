@@ -17,7 +17,7 @@ ElGamal and Pedersen in this project use **RFC 3526** MODP group 14 parameters: 
 
 | Component | Role | Upstream licence | More information |
 |-----------|------|------------------|------------------|
-| **Wintun** | Windows virtual NIC so sealed RPT DATA can carry IP packets — **not** the WireGuard protocol | GPL-2.0 (see Wintun site) | https://www.wintun.net/ |
+| **Wintun** | Windows virtual NIC so sealed RPT DATA can carry IP packets on a virtual adapter | GPL-2.0 (see Wintun site) | https://www.wintun.net/ |
 
 `client/windows/native/wintun.dll` (when packaged) is the upstream binary. Full-system VPN on Windows needs Administrator rights for the adapter and routes.
 
