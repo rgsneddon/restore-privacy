@@ -1,4 +1,4 @@
-import 'package:flutter_test/flutter_test.dart';
+﻿import 'package:flutter_test/flutter_test.dart';
 import 'package:restore_privacy_client/rpt_config.dart';
 
 void main() {
@@ -18,7 +18,8 @@ void main() {
     expect(RptConfig.residualNodePubName, 'exit_node_elgamal.pub');
   });
 
-  test('productVersion is 0.4.0 monopin', () {
-    expect(RptConfig.productVersion, '0.4.0');
+  test('productVersion is 0.4.4 monopin', () {
+    expect(RptConfig.productVersion, '0.4.4');
   });
 }
+

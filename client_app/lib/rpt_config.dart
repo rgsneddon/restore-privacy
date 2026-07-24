@@ -1,4 +1,4 @@
-import 'dart:io' show Platform;
+﻿import 'dart:io' show Platform;
 
 import 'free_tier.dart';
 
@@ -23,7 +23,7 @@ class RptConfig {
 
   /// Paid catalog pin — must match monorepo ``client/VERSION`` and pubspec.
   /// Free builds report [kFreeTierVersion] via [displayProductVersion].
-  static const String productVersion = '0.4.2';
+  static const String productVersion = '0.4.4';
 
   /// UI / about version (free tier always ``3.3.3``).
   static String get displayProductVersion =>
