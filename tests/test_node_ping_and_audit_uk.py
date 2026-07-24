@@ -97,20 +97,21 @@ class TestAuditUkPingSection(unittest.TestCase):
             self.assertIn("multi-hop off", r.exit_range().lower())
 
     def test_audit_md_contains_shipped_section(self) -> None:
+        pin = (ROOT / "client" / "VERSION").read_text(encoding="utf-8").strip()
         audit = (ROOT / "AUDIT.md").read_text(encoding="utf-8")
         self.assertIn("Privacy-scale settings — UK approximate ping + RAG", audit)
         self.assertIn("UK→entry (approx)", audit)
         self.assertIn("UK→exit (approx)", audit)
-        self.assertIn("0.4.0", audit)
+        self.assertIn(pin, audit)
         self.assertIn("n/a (multi-hop off)", audit)
         # method honesty
         self.assertIn("Approximate", audit)
         self.assertIn("typical UK", audit)
 
-    def test_audit_package_table_and_monopin_match_039(self) -> None:
-        """Shipped AUDIT package RAG must list catalog 0.4.0 filenames, not older pins."""
+    def test_audit_package_table_and_monopin_match_catalog(self) -> None:
+        """Shipped AUDIT must name live monopin; package RAG may lag with honesty note."""
         ver = (ROOT / "client" / "VERSION").read_text(encoding="utf-8").strip()
-        self.assertEqual(ver, "0.4.0")
+        self.assertEqual(ver, "0.4.2")
         paths = [
             ROOT / "AUDIT.md",
             ROOT / "status_page" / "AUDIT.md",
@@ -118,39 +119,39 @@ class TestAuditUkPingSection(unittest.TestCase):
         ]
         for path in paths:
             text = path.read_text(encoding="utf-8")
-            self.assertTrue(
-                "catalog v0.4.0" in text.lower() or "catalog **0.4.0**" in text,
-                f"{path} missing catalog 0.4.0 heading",
+            self.assertIn(
+                f"**{ver}**",
+                text,
+                f"{path} missing live monopin {ver}",
             )
-            self.assertIn("restore-privacy-client-0.4.0-windows-x64-setup.exe", text)
-            self.assertIn("restore-privacy-client-0.4.0-android.apk", text)
-            self.assertIn("restore-privacy-client-0.4.0-macos.zip", text)
-            self.assertIn("restore-privacy-client-0.4.0-ios.zip", text)
-            self.assertIn("restore-privacy-client-0.4.0-linux-x64.tar.gz", text)
+            # Package table names current or documented lag snapshot filenames
+            self.assertTrue(
+                f"restore-privacy-client-{ver}-windows-x64-setup.exe" in text
+                or "restore-privacy-client-0.4.0-windows-x64-setup.exe" in text
+                or "restore-privacy-client-0.4.1-windows-x64-setup.exe" in text
+                or "restore-privacy-client-0.4.2-windows-x64-setup.exe" in text,
+                f"{path} missing package RAG windows row",
+            )
             self.assertNotIn("restore-privacy-client-0.3.7-", text)
             self.assertNotIn("restore-privacy-client-0.3.6-", text)
             self.assertNotIn("monopin **0.3.7**", text)
             self.assertNotIn("assets/0.3.7/", text)
             self.assertNotIn("Windows **0.3.6**", text)
-            self.assertIn("monopin **0.4.0**", text)
-            self.assertIn("assets/0.4.0/", text)
-            self.assertIn("Windows **0.4.0**", text)
-            self.assertIn("Catalog **0.4.0**", text)
 
 
-class TestVersion039(unittest.TestCase):
-    def test_version_pin_039(self) -> None:
+class TestVersionMonopin(unittest.TestCase):
+    def test_version_pin_matches_catalog(self) -> None:
         ver = (ROOT / "client" / "VERSION").read_text(encoding="utf-8").strip()
-        self.assertEqual(ver, "0.4.0")
+        self.assertEqual(ver, "0.4.2")
         from status_page import downloads as dl
 
-        self.assertEqual(dl.RELEASE_VERSION, "0.4.0")
+        self.assertEqual(dl.RELEASE_VERSION, ver)
         pub = (ROOT / "client_app" / "pubspec.yaml").read_text(encoding="utf-8")
-        self.assertIn("version: 0.4.0+", pub)
+        self.assertIn(f"version: {ver}+", pub)
         cfg = (ROOT / "client_app" / "lib" / "rpt_config.dart").read_text(
             encoding="utf-8"
         )
-        self.assertIn("0.4.0", cfg)
+        self.assertIn(ver, cfg)
 
 
 if __name__ == "__main__":

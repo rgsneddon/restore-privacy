@@ -19,6 +19,7 @@ from downloads import (  # noqa: E402
     IOS_ZIP_FILENAME,
     MACOS_ZIP_FILENAME,
     RELEASE_PAGE_URL,
+    RELEASE_VERSION,
     RUST_REPO_URL,
     WINDOWS_ZIP_FILENAME,
     available_downloads,
@@ -45,7 +46,7 @@ class TestPublicPageWithDownloads(unittest.TestCase):
         self.assertNotIn('id="clients-connected"', html)
         self.assertNotIn("fetch('/api/status'", html)
         self.assertNotIn("setInterval(poll", html)
-        self.assertIn("Download client v0.4.1", html)
+        self.assertIn(f"Download client v{RELEASE_VERSION}", html)
         self.assertIn(WINDOWS_ZIP_FILENAME, html)
         self.assertIn(MACOS_ZIP_FILENAME, html)
         self.assertIn(IOS_ZIP_FILENAME, html)
@@ -58,25 +59,33 @@ class TestPublicPageWithDownloads(unittest.TestCase):
         self.assertIn('data-buy-mode="stripe-live"', html)
         self.assertNotIn("Coming soon", html)
         for a in available_downloads():
-            # Live mode: Stripe Payment Link with client_reference_id; never free GH href
+            # Live mode: /pay/start or Stripe Payment Link; never free GH installer href
             self.assertIn(f'id="dl-{a.platform}"', html)
-            self.assertIn(f"client_reference_id={a.platform}", html)
+            self.assertTrue(
+                f"platform={a.platform}" in html
+                or f"client_reference_id={a.platform}" in html,
+                f"missing platform marker for {a.platform}",
+            )
             self.assertNotIn(f'href="{a.url}"', html)
             self.assertTrue(
                 a.url.startswith(
-                    "https://github.com/rgsneddon/restore-privacy/releases/download/0.4.1/"
+                    f"https://github.com/rgsneddon/restore-privacy/releases/download/{RELEASE_VERSION}/"
                 )
             )
         self.assertEqual(
             RELEASE_PAGE_URL,
-            "https://github.com/rgsneddon/restore-privacy/releases/tag/0.4.1",
+            f"https://github.com/rgsneddon/restore-privacy/releases/tag/{RELEASE_VERSION}",
         )
         # Catalogue footer link removed — pay buttons are the only catalog entry.
         self.assertNotIn('id="rust-repo-link"', html)
         self.assertNotIn("rust-repo-footer", html)
         self.assertNotIn("installers after £2.45 payment only", html)
-        # Platform list remains; trailing catalog/site/paid-only clause removed
-        self.assertIn("Windows | Linux | macOS | iOS | Android", html)
+        # Platform labels on pay tiles (list string may be CSS-hidden)
+        self.assertIn(">Windows<", html)
+        self.assertIn(">Linux<", html)
+        self.assertIn(">macOS<", html)
+        self.assertIn(">iOS<", html)
+        self.assertIn(">Android<", html)
         self.assertNotIn("paid download only", html)
         self.assertNotIn('id="catalog-version"', html)
         self.assertNotIn('id="dl-site-origin"', html)
@@ -109,7 +118,7 @@ class TestPublicPageWithDownloads(unittest.TestCase):
                     self.assertNotIn("BETA - test phase", html)
                     self.assertNotIn("clients-connected", html)
                     self.assertNotIn("fetch('/api/status'", html)
-                    self.assertIn("Download client v0.4.1", html)
+                    self.assertIn(f"Download client v{RELEASE_VERSION}", html)
                     self.assertIn(WINDOWS_ZIP_FILENAME, html)
                     self.assertIn("Monthly", html)
                     self.assertIn("Yearly", html)

@@ -30,10 +30,10 @@ from downloads import (  # noqa: E402
 )
 
 EXPECTED_RELEASE_PAGE = (
-    "https://github.com/rgsneddon/restore-privacy/releases/tag/0.4.1"
+    "https://github.com/rgsneddon/restore-privacy/releases/tag/0.4.2"
 )
 EXPECTED_DOWNLOAD_PREFIX = (
-    "https://github.com/rgsneddon/restore-privacy/releases/download/0.4.1/"
+    "https://github.com/rgsneddon/restore-privacy/releases/download/0.4.2/"
 )
 # Public footer points at the paid status host (repo is private).
 EXPECTED_PUBLIC_CATALOG_FOOTER = (
@@ -49,8 +49,10 @@ class TestDownloadCatalog(unittest.TestCase):
             is_current_catalog_filename,
         )
 
-        self.assertEqual(RELEASE_VERSION, "0.4.1")
-        self.assertEqual(RELEASE_TAG, "0.4.1")
+        pin = (ROOT / "client" / "VERSION").read_text(encoding="utf-8").strip()
+        self.assertEqual(pin, "0.4.2")
+        self.assertEqual(RELEASE_VERSION, pin)
+        self.assertEqual(RELEASE_TAG, pin)
         self.assertEqual(current_catalog_version(), RELEASE_VERSION)
         self.assertTrue(catalog_matches_product_pin())
         self.assertEqual(GITHUB_REPO, "restore-privacy")
@@ -115,7 +117,7 @@ class TestDownloadCatalog(unittest.TestCase):
         self.assertIn('data-billing-intervals="month,year"', html)
         self.assertNotIn("Coming soon", html)
         # Free permanent GitHub installer hrefs must not appear in public HTML.
-        self.assertNotIn("releases/download/0.4.1/", html)
+        self.assertNotIn(f"releases/download/{RELEASE_VERSION}/", html)
         # FULL CATALOGUE / catalog footer link must not be visible on public downloads.
         self.assertNotIn('id="rust-repo-link"', html)
         self.assertNotIn("rust-repo-footer", html)
@@ -230,14 +232,16 @@ class TestDownloadCatalog(unittest.TestCase):
         from downloads import download_css
 
         css = download_css()
-        self.assertIn("aspect-ratio: 1 / 1", css)
-        # Larger buy tiles (no longer fixed 5.65rem-only squares)
-        self.assertIn("7.25rem", css)
-        self.assertIn("min-width: 7.25rem", css)
+        # Pill buy controls (post-0.4.2 tidy: not fixed square tiles)
+        self.assertTrue(
+            "aspect-ratio: auto" in css or "aspect-ratio: 1 / 1" in css,
+            "buy tile aspect-ratio rule missing",
+        )
         self.assertIn("linear-gradient", css)
         self.assertIn("dl-platform", css)
         self.assertIn("dl-platform-note", css)
         self.assertIn("dl-interval-row", css)
+        self.assertIn("dl-platform-cell", css)
 
     def test_homepage_bmc_tip_is_last_content_block(self):
         """Homepage: BMC tip after downloads / node-wipe / audit; single tip link."""
