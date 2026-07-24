@@ -149,19 +149,19 @@ PRICE_LABEL = "£2.45"
 PRICE_YEARLY_LABEL = "£29.40"  # 12 × £2.45 GBP anchor
 # Large white bold callout under "Download client v…" on the public homepage.
 ONLY_PRICE_BANNER = "ONLY £2.45 per month — or pay yearly (£29.40)"
+# Short single-line note under the price box (no re-listing of £ amounts).
 YEARLY_PLAN_NOTE = (
-    "Choose monthly (£2.45/mo after trial) or yearly (£29.40) for each platform. "
-    "Prices shown convert from these GBP anchors into your local currency "
-    "(we accept your local currency when Stripe allows; otherwise USD). "
-    "Set STRIPE_PAYMENT_PAGE_URL_YEARLY to your Stripe yearly Payment Link."
+    "Pick Monthly or Yearly for your platform. "
+    "Local currency display uses the GBP anchors above "
+    "(we accept your local currency when Stripe allows; otherwise USD)."
 )
 # Shown under the buy-button grid (bold bright white, price-box-like frame).
 PLATFORM_SELECT_NOTE = (
-    "please select your device platform carefully, you will only receive "
-    "the installer download relating to that platform and device"
+    "Please select your device platform carefully — you will only receive "
+    "the installer for that platform."
 )
 # Homepage download price block (single shipped contract for public #downloads).
-PACKAGE_IDENTITY = "subscription package — one device licence"
+PACKAGE_IDENTITY = "one device licence"
 TRIAL_SUBSCRIPTION_SENTENCE = (
     "your monthly subscription begins after your 7 day trial"
 )
@@ -359,30 +359,16 @@ def download_css() -> str:
     return """
     .downloads { width: 100%; text-align: center; box-sizing: border-box; }
     .downloads h2 { font-size: 1.05rem; letter-spacing: 0.1em; font-weight: 700;
-                    margin: 0 0 0.35rem; color: var(--rb-cream); text-transform: uppercase; }
-    .dl-local-price, .dl-accept-currency {
-      text-align: center;
-      color: var(--rb-cream, #f2f5f7);
-      font-weight: 600;
-      margin: 0.35rem auto 0.25rem;
-      max-width: 40rem;
-      line-height: 1.45;
-      font-size: clamp(0.9rem, 2.4vw, 1.05rem);
-    }
-    .dl-accept-currency {
-      font-style: italic;
-      letter-spacing: 0.02em;
-      color: var(--rb-muted, #aed0ea);
-    }
-    /* Large white bold monthly price emphasis under Download client heading */
+                    margin: 0 0 0.5rem; color: var(--rb-cream); text-transform: uppercase; }
+    /* Single large price callout — no second £ amount banner below it */
     .dl-only-price {
-      margin: 0.35rem auto 0.65rem;
+      margin: 0.25rem auto 0.55rem;
       padding: 0.55rem 0.85rem;
-      max-width: 22rem;
-      font-size: clamp(1.65rem, 5vw, 2.55rem);
+      max-width: 26rem;
+      font-size: clamp(1.35rem, 4.2vw, 2.05rem);
       font-weight: 900;
-      line-height: 1.15;
-      letter-spacing: 0.05em;
+      line-height: 1.2;
+      letter-spacing: 0.04em;
       color: #ffffff;
       text-shadow: 0 2px 14px rgba(0, 0, 0, 0.45), 0 0 1px rgba(0, 0, 0, 0.55);
       font-family: Georgia, "Palatino Linotype", Palatino, "Times New Roman", serif;
@@ -396,13 +382,24 @@ def download_css() -> str:
       border-radius: 14px;
       box-shadow: 0 8px 24px rgba(4, 12, 28, 0.35);
     }
-    .dl-sub { color: var(--rb-muted); font-size: 0.92rem; margin: 0 0 0.85rem; }
-    /* Nested price box inside #downloads: ~2/3 panel width, fluid on narrow viewports */
+    /* One local-currency line (accept notice included; no duplicate italic line) */
+    .dl-local-price {
+      text-align: center;
+      color: var(--rb-muted, #aed0ea);
+      font-weight: 600;
+      margin: 0.15rem auto 0.65rem;
+      max-width: 36rem;
+      line-height: 1.4;
+      font-size: clamp(0.82rem, 2.1vw, 0.95rem);
+    }
+    .dl-accept-currency[hidden] { display: none !important; }
+    .dl-sub { display: none; } /* platforms shown on tiles only */
+    /* Nested price box: trial + pay once (~2/3 width) */
     .dl-price-box {
       width: 66.67%;
       max-width: 66.67%;
-      margin: 0 auto 1.1rem;
-      padding: 0.75rem 1rem;
+      margin: 0 auto 1rem;
+      padding: 0.7rem 1rem;
       box-sizing: border-box;
       border: 1px solid rgba(174, 208, 234, 0.35);
       border-radius: 12px;
@@ -410,22 +407,25 @@ def download_css() -> str:
       box-shadow: 0 6px 20px rgba(4, 12, 28, 0.28), inset 0 1px 0 rgba(255, 255, 255, 0.06);
     }
     .dl-price {
-      font-size: clamp(0.95rem, 2.4vw, 1.08rem);
+      font-size: clamp(0.88rem, 2.2vw, 1rem);
       margin: 0;
-      font-weight: 800;
+      font-weight: 700;
       color: #ffffff;
-      line-height: 1.45;
+      line-height: 1.4;
       text-align: center;
-      letter-spacing: 0.02em;
+      letter-spacing: 0.01em;
       text-shadow: 0 1px 8px rgba(0, 0, 0, 0.35);
       font-family: "Segoe UI", system-ui, -apple-system, "Helvetica Neue", Arial, sans-serif;
     }
-    /* Platform care note — same visual language as .dl-price-box, under buy grid */
+    .dl-interval-note {
+      font-size: 0.8rem; color: rgba(174, 208, 234, 0.92);
+      margin: 0.45rem 0 0; line-height: 1.35; font-weight: 600;
+    }
     .dl-platform-note-box {
       width: 66.67%;
       max-width: 66.67%;
-      margin: 1rem auto 0.35rem;
-      padding: 0.75rem 1rem;
+      margin: 1rem auto 0.25rem;
+      padding: 0.65rem 0.9rem;
       box-sizing: border-box;
       border: 1px solid var(--rb-card-border);
       border-radius: 12px;
@@ -434,9 +434,9 @@ def download_css() -> str:
     }
     .dl-platform-note {
       margin: 0;
-      font-size: clamp(0.92rem, 2.2vw, 1.05rem);
-      font-weight: 800;
-      line-height: 1.45;
+      font-size: clamp(0.85rem, 2vw, 0.98rem);
+      font-weight: 700;
+      line-height: 1.4;
       color: #ffffff;
       text-align: center;
       text-shadow: 0 1px 0 rgba(0, 0, 0, 0.35);
@@ -448,85 +448,98 @@ def download_css() -> str:
       border: 1px solid #b91c1c; border-radius: 12px; text-align: left;
     }
     .dl-buttons {
-      display: flex; flex-direction: column; gap: 0.95rem; align-items: stretch; width: 100%;
+      display: flex; flex-direction: column; gap: 1rem; align-items: stretch; width: 100%;
     }
     .dl-row {
-      display: flex; flex-direction: row; flex-wrap: wrap; gap: 0.9rem;
+      display: flex; flex-direction: row; flex-wrap: wrap; gap: 1rem;
       justify-content: center; align-items: stretch; width: 100%;
     }
     .dl-row-3, .dl-row-2 { max-width: 100%; }
     .dl-platform-cell {
-      display: flex; flex-direction: column; align-items: center; gap: 0.4rem;
-      min-width: 8rem;
+      display: flex; flex-direction: column; align-items: stretch; gap: 0.45rem;
+      min-width: 9.5rem; width: clamp(9.5rem, 18vw, 11rem);
+      padding: 0.65rem 0.55rem 0.7rem;
+      border-radius: 14px;
+      background: rgba(8, 18, 32, 0.45);
+      border: 1px solid rgba(174, 208, 234, 0.18);
+      box-sizing: border-box;
     }
     .dl-platform-label {
-      font-weight: 800; font-size: 0.95rem; color: var(--rb-fg, #e8f1ff);
-      letter-spacing: 0.02em;
+      font-weight: 800; font-size: 0.98rem; color: var(--rb-fg, #e8f1ff);
+      letter-spacing: 0.03em; text-align: center; margin: 0 0 0.1rem;
     }
     .dl-interval-row {
       display: flex; flex-direction: column; gap: 0.4rem; width: 100%;
       align-items: stretch;
     }
-    .dl-interval-row a.dl {
-      flex: 0 0 auto; width: 100%; max-width: 9rem; height: auto;
-      min-height: 2.6rem; max-height: none; aspect-ratio: auto;
-      padding: 0.5rem 0.65rem; border-radius: 10px;
-    }
-    .dl-interval-note {
-      font-size: 0.82rem; color: var(--rb-muted, #a8c0d8); margin: 0.35rem 0 0;
-      line-height: 1.4; max-width: 36rem; margin-left: auto; margin-right: auto;
-    }
-    /* Larger, readable buy tiles (replaces prior small fixed squares) */
+    /* Shared buy control: pill, not square — month/year same size */
     a.dl, button.dl {
       display: inline-flex; flex-direction: column; align-items: center; justify-content: center;
-      gap: 0.4rem;
-      flex: 0 0 clamp(7.25rem, 18vw, 8.75rem);
-      width: clamp(7.25rem, 18vw, 8.75rem);
-      height: clamp(7.25rem, 18vw, 8.75rem);
-      min-width: 7.25rem; max-width: 8.75rem;
-      min-height: 7.25rem; max-height: 8.75rem;
-      padding: 0.55rem 0.45rem;
+      gap: 0.15rem;
+      width: 100%; max-width: none;
+      min-height: 2.65rem; height: auto;
+      padding: 0.55rem 0.6rem;
       background: linear-gradient(180deg, var(--rb-btn) 0%, var(--rb-btn-deep) 100%);
-      color: #fff; text-decoration: none; border-radius: 14px;
-      font-weight: 800; font-size: 0.88rem; box-sizing: border-box;
+      color: #fff; text-decoration: none; border-radius: 10px;
+      font-weight: 800; font-size: 0.86rem; box-sizing: border-box;
       border: 1px solid rgba(255,255,255,0.22); cursor: pointer;
       font-family: inherit; text-align: center; line-height: 1.2;
-      box-shadow: 0 4px 14px rgba(7, 30, 60, 0.38);
+      box-shadow: 0 3px 10px rgba(7, 30, 60, 0.32);
       transition: transform 0.12s ease, box-shadow 0.12s ease, filter 0.12s ease;
-      aspect-ratio: 1 / 1;
+      aspect-ratio: auto;
+      flex: 0 0 auto;
     }
     a.dl .dl-platform, button.dl .dl-platform {
-      font-size: clamp(0.95rem, 2.6vw, 1.12rem); font-weight: 800; letter-spacing: 0.02em;
+      font-size: 0.95rem; font-weight: 800; letter-spacing: 0.02em;
       line-height: 1.15; color: #ffffff;
-      text-shadow: 0 1px 0 rgba(0,0,0,0.25);
     }
     a.dl .dl-buy, button.dl .dl-buy {
-      font-size: clamp(0.78rem, 2.1vw, 0.92rem); font-weight: 800; opacity: 1;
-      letter-spacing: 0.02em; color: #ffffff;
+      font-size: 0.84rem; font-weight: 800; opacity: 1;
+      letter-spacing: 0.01em; color: inherit;
     }
     a.dl:hover, button.dl:hover {
       filter: brightness(1.08);
       transform: translateY(-1px);
-      box-shadow: 0 6px 18px rgba(7, 30, 60, 0.42);
+      box-shadow: 0 5px 14px rgba(7, 30, 60, 0.4);
     }
     a.dl:focus-visible, button.dl:focus-visible {
       outline: 2px solid var(--rb-accent); outline-offset: 3px;
     }
-    a.dl#dl-windows, button.dl#dl-windows {
+    /* Platform colours apply to BOTH monthly and yearly (data-platform on cell) */
+    .dl-platform-cell[data-platform="windows"] a.dl,
+    a.dl#dl-windows, button.dl#dl-windows,
+    a.dl#dl-windows-year {
       background: linear-gradient(180deg, #2f8fd8 0%, #1a5f9e 100%);
+      color: #ffffff;
     }
-    a.dl#dl-android, button.dl#dl-android {
+    .dl-platform-cell[data-platform="android"] a.dl,
+    a.dl#dl-android, button.dl#dl-android,
+    a.dl#dl-android-year {
       background: linear-gradient(180deg, #2f9e6b 0%, #1b6b48 100%);
+      color: #ffffff;
     }
-    a.dl#dl-macos, button.dl#dl-macos {
-      background: linear-gradient(180deg, #5b6b7c 0%, #3d4754 100%);
+    .dl-platform-cell[data-platform="macos"] a.dl,
+    a.dl#dl-macos, button.dl#dl-macos,
+    a.dl#dl-macos-year {
+      background: linear-gradient(180deg, #6a7a8c 0%, #3d4754 100%);
+      color: #ffffff;
     }
-    a.dl#dl-ios, button.dl#dl-ios {
+    .dl-platform-cell[data-platform="ios"] a.dl,
+    a.dl#dl-ios, button.dl#dl-ios,
+    a.dl#dl-ios-year {
       background: linear-gradient(180deg, #5b6fd6 0%, #3b4aa8 100%);
+      color: #ffffff;
     }
-    a.dl#dl-linux, button.dl#dl-linux {
-      background: linear-gradient(180deg, #c9a227 0%, #8a6e12 100%);
+    .dl-platform-cell[data-platform="linux"] a.dl,
+    a.dl#dl-linux, button.dl#dl-linux,
+    a.dl#dl-linux-year {
+      background: linear-gradient(180deg, #d4ad2e 0%, #8a6e12 100%);
       color: #0a1628;
+    }
+    /* Yearly: same hue, slightly deeper edge so month/year match family */
+    a.dl.dl-interval-year {
+      border-color: rgba(255,255,255,0.32);
+      box-shadow: 0 3px 10px rgba(7, 30, 60, 0.28), inset 0 0 0 1px rgba(0,0,0,0.12);
     }
     a.dl.dl-coming-soon, button.dl.dl-coming-soon { opacity: 0.92; }
     a.dl.dl-coming-soon:hover, button.dl.dl-coming-soon:hover { opacity: 1; }
@@ -537,25 +550,18 @@ def download_css() -> str:
     .dl-tip a { color: var(--rb-accent); text-decoration: underline; font-weight: 600; }
     .bmc-page-footer { margin-top: 0.5rem; margin-bottom: 0.25rem; padding: 0.75rem 0.5rem 1rem; }
     @media (max-width: 640px) {
-      a.dl, button.dl {
-        flex: 0 0 6.5rem; width: 6.5rem; height: 6.5rem;
-        min-width: 6.5rem; max-width: 6.5rem;
-        min-height: 6.5rem; max-height: 6.5rem;
-      }
-      a.dl .dl-platform, button.dl .dl-platform { font-size: 0.95rem; }
-      a.dl .dl-buy, button.dl .dl-buy { font-size: 0.78rem; }
-      /* Full width of downloads panel on narrow viewports */
+      .dl-platform-cell { width: min(11rem, 46vw); min-width: 8.5rem; }
+      a.dl, button.dl { min-height: 2.5rem; font-size: 0.82rem; }
       .dl-price-box, .dl-platform-note-box {
         width: 100%;
         max-width: 100%;
         padding: 0.65rem 0.75rem;
       }
       .dl-only-price {
-        font-size: clamp(1.25rem, 6vw, 1.85rem);
+        font-size: clamp(1.15rem, 5.5vw, 1.65rem);
       }
     }
 """
-
 
 def payment_connect_disclaimer_html() -> str:
     """Red STRONG DISCLAIMER box for the public downloads section.
@@ -762,41 +768,45 @@ def render_download_section_html(
     <div class="dl-row dl-row-2" id="dl-row-2" data-dl-row="2" data-dl-count="{len(row2)}">
       {row2_html}
     </div>"""
-    # Price identity: GBP anchors + local equivalent + accept notice.
+    # One local-currency line (includes accept notice — no second accept paragraph).
     accept = local.accept_notice  # e.g. we accept *EUR*
-    local_line = (
-        f"Local price: monthly <strong>{local.monthly_label}</strong> · "
-        f"yearly <strong>{local.yearly_label}</strong> "
-        f"(relative to £2.45 / £29.40 GBP) — {accept}"
-    )
+    if (local.currency or "").upper() in ("GBP", ""):
+        local_line = (
+            f"GBP catalog price · {accept}"
+            if accept
+            else "GBP catalog price"
+        )
+    else:
+        local_line = (
+            f"Local: <strong>{local.monthly_label}</strong> / mo · "
+            f"<strong>{local.yearly_label}</strong> / yr "
+            f"(from £2.45 / £29.40 GBP) · {accept}"
+        )
     if coming_soon:
         price_line = (
-            f"{PRICE_LABEL} GBP {PACKAGE_IDENTITY} — {TRIAL_SUBSCRIPTION_SENTENCE} — "
-            f"buy buttons coming soon (links return to restoreprivacy.online)"
+            f"{PRICE_LABEL} GBP · {PACKAGE_IDENTITY} — "
+            f"{TRIAL_SUBSCRIPTION_SENTENCE} — buy buttons coming soon"
         )
         buttons_mode = ' data-buy-mode="coming-soon"'
     else:
+        # £2.45 GBP once here; banner has ONLY + yearly. No third £ list.
         price_line = (
-            f"{PRICE_LABEL} GBP monthly / {PRICE_YEARLY_LABEL} yearly "
-            f"{PACKAGE_IDENTITY} — "
-            f"{TRIAL_SUBSCRIPTION_SENTENCE} — "
-            f"or choose yearly — {PAY_AND_KEYGEN_CLAUSE}"
+            f"{PRICE_LABEL} GBP · {PACKAGE_IDENTITY} — "
+            f"{TRIAL_SUBSCRIPTION_SENTENCE} — {PAY_AND_KEYGEN_CLAUSE}"
         )
         buttons_mode = (
             ' data-buy-mode="stripe-live" data-billing-intervals="month,year"'
             f' data-display-currency="{local.currency}"'
             f' data-stripe-presentment="{local.stripe_presentment_currency}"'
         )
-    # Order: title/price box → pay controls only. BMC tip is page-bottom (homepage shell).
-    # Homepage omits STRONG DISCLAIMER banner (apps/licence retain payment language).
+    # Order: title → one price banner → local line → trial box → pay tiles.
     return f"""
   <section class="downloads panel-card" id="downloads" aria-label="Download Restore Privacy client"
     data-price-currency="{local.currency}" data-accept-currency="{local.currency}">
     <h2>Download client v{RELEASE_VERSION}</h2>
     <p class="dl-only-price" id="dl-only-price">{ONLY_PRICE_BANNER}</p>
     <p class="dl-local-price" id="dl-local-price">{local_line}</p>
-    <p class="dl-accept-currency" id="dl-accept-currency">{accept}</p>
-    <p class="dl-sub">Windows | Linux | macOS | iOS | Android</p>
+    <p class="dl-accept-currency" id="dl-accept-currency" hidden>{accept}</p>
     <div class="dl-price-box" id="dl-price-box">
       <p class="dl-price" id="dl-price">{price_line}</p>
       <p class="dl-interval-note" id="dl-interval-note">{YEARLY_PLAN_NOTE}</p>
