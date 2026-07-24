@@ -704,33 +704,14 @@ def renew_licence_url(
         except Exception:  # noqa: BLE001
             pass
     if cached and cached.startswith("http") and is_customer_safe_renew_url(cached):
+        # Keep Stripe Payment Links / Checkout hosts; rewrite site /pay to
+        # the device-licence host. Never keep localhost caches.
         return normalize_customer_renew_url(
             cached, platform=plat, interval=interval
         )
 
-    # Optional: monorepo status_page.payments when present — force device pay host
-    try:
-        root = Path(__file__).resolve().parents[1]
-        sp = root / "status_page"
-        if sp.is_dir():
-            sp_s = str(sp)
-            # Insert status_page itself so `from payments` works even when
-            # project root is already on sys.path (normal client launch).
-            if sp_s not in sys.path:
-                sys.path.insert(0, sp_s)
-        from payments import stripe_payment_page_href_for_platform  # type: ignore
-
-        href = stripe_payment_page_href_for_platform(
-            plat,
-            interval=interval,
-            base_url=DEVICE_LICENCE_PAY_HOST,
-        )
-        return normalize_customer_renew_url(
-            href, platform=plat, interval=interval
-        )
-    except Exception:  # noqa: BLE001
-        pass
-    # Pure local builder — device licence pay host (shipped client path)
+    # Shipped customer path: always pay.restoreprivacy.online (not monorepo
+    # public_base_url which defaults to http://127.0.0.1:10000 in dev).
     _ = base_catalog  # kept for API compatibility; not used as bare homepage
     return build_local_platform_renew_url(plat, interval=interval)
 

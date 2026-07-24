@@ -755,21 +755,24 @@ class Handler(BaseHTTPRequestHandler):
                     "keygen": ent.get("keygen") or "",
                     "customer_email": ent.get("customer_email") or "",
                     "billing_interval": ent.get("billing_interval") or "month",
-                    # Device-licence pay host (never localhost public_base_url default)
-                    "renew_url": stripe_payment_page_href_for_platform(
-                        plat or "windows",
-                        base_url="https://pay.restoreprivacy.online",
-                    ),
-                    "renew_url_monthly": stripe_payment_page_href_for_platform(
-                        plat or "windows",
-                        interval="month",
-                        base_url="https://pay.restoreprivacy.online",
-                    ),
-                    "renew_url_yearly": stripe_payment_page_href_for_platform(
-                        plat or "windows",
-                        interval="year",
-                        base_url="https://pay.restoreprivacy.online",
-                    ),
+                    # Device-licence pay host (never localhost public_base_url).
+                    # Use pay.restoreprivacy.online with platform/interval query —
+                    # not site_pay_plan_href (that adds /pay under the wrong host).
+                    def _device_renew(p: str, iv: str = "month") -> str:
+                        from urllib.parse import urlencode
+
+                        q = urlencode(
+                            {
+                                "platform": (p or "windows").strip().lower()
+                                or "windows",
+                                "interval": iv,
+                            }
+                        )
+                        return f"https://pay.restoreprivacy.online?{q}"
+
+                    "renew_url": _device_renew(plat or "windows", "month"),
+                    "renew_url_monthly": _device_renew(plat or "windows", "month"),
+                    "renew_url_yearly": _device_renew(plat or "windows", "year"),
                 }
             self._send(
                 200,
