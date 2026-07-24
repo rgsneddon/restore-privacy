@@ -1,10 +1,10 @@
 # How to enable paid downloads — Stripe + Buy Me a Coffee
 
 This status site sells **Restore Privacy** as a **Stripe subscription**. Catalog
-tiles offer **monthly** (**£2.45/month GBP** + **7-day trial**) and **yearly**
-Payment Links per platform. Yearly unit amount is set in Stripe Dashboard /
-env (`STRIPE_PAYMENT_PAGE_URL_YEARLY`) — not hard-coded as a fixed £ figure.
-Funds settle in **your Stripe account** when you use **live** API keys.
+tiles open the site **Select your plan** page (`/pay`) for **Monthly VPN plan
+(£2.45/month GBP)** or **Yearly VPN plan (£27.93/year = 5% off 12× monthly)**.
+Checkout is a Stripe **subscription** Checkout Session (subscription starts when you pay). Funds
+settle in **your Stripe account** when you use **live** API keys.
 
 [Buy Me a Coffee](https://buymeacoffee.com/rgsneddon) is linked as **tip / support only**.
 It does **not** unlock the paid download (BMC is not the fulfilment API).
@@ -14,31 +14,39 @@ permanent installer buttons. Payment grants a **single-use, expiring** download
 token; `/download` **proxies** the installer via a server-side GitHub token
 (`RPT_GITHUB_TOKEN` / `GITHUB_TOKEN`) or locally staged assets (`RPT_ASSET_DIR`).
 
-## Deploy: fulfilment SMTP + Stripe 7-day trial
+## Stripe Custom domains + branding (logo / colours)
 
-Operator deploy for production email + Payment Link trial is documented in
+See **[`docs/STRIPE_CUSTOM_DOMAINS_AND_BRANDING.md`](../../docs/STRIPE_CUSTOM_DOMAINS_AND_BRANDING.md)**.
+
+- **Custom domains** (`Dashboard → Settings → Custom domains`): host Checkout on
+  e.g. `pay.restoreprivacy.online` via DNS — improves URL trust; **does not**
+  inject site CSS.
+- **Branding**: upload `status_page/static/logo.png`; primary `#2694e8`, secondary
+  `#0a1628` (site navy/button blue). Account API cannot self-update branding on
+  the platform account — use the Dashboard.
+- Programmatic guide: `payments.stripe_checkout_branding_guide()`.
+
+## Deploy: fulfilment SMTP + Stripe subscription (no trial)
+
+Operator deploy for production email + Stripe product prices is documented in
 [`docs/STATUS_HOST_SMTP_AND_TRIAL.md`](../../docs/STATUS_HOST_SMTP_AND_TRIAL.md):
 
 - Render env: `RPT_FULFILMENT_SMTP_*` (blueprint `render.yaml`; script `scripts/set_render_fulfilment_smtp.ps1`)
-- Stripe monthly Payment Link: £2.45/month GBP + **7 day trial** (script `scripts/configure_stripe_payment_link_trial.py` when `STRIPE_SECRET_KEY` is set)
-- Stripe yearly Payment Link: set **`STRIPE_PAYMENT_PAGE_URL_YEARLY`** (and optional `RPT_STRIPE_PAYMENT_PAGE_URL_YEARLY`) when a Dashboard yearly price exists — yearly GBP anchor is **£29.40** (12 × £2.45)
-- **Local currency display:** catalog converts £2.45 / £29.40 into the visitor’s currency (`status_page/local_currency.py`) and shows **we accept *CURRENCY***
-- **Stripe presentment:**
-  - **Supported currencies** (EUR, JPY, …): GBP-priced Payment Links + `locale` — enable **Adaptive Pricing** on those links in the Dashboard so customers pay in local currency when Stripe allows
-  - **Unsupported / fallback → USD:** catalog buttons do **not** reuse the GBP Payment Link with `locale=en` alone. They use either:
-    1. **`STRIPE_PAYMENT_PAGE_URL_USD`** / **`STRIPE_PAYMENT_PAGE_URL_YEARLY_USD`** (Dashboard Payment Links priced in USD), or
-    2. Host **`/pay/start?platform=…&interval=…&currency=usd`**, which creates a Stripe **Checkout Session charged in `usd`** (relative to the GBP anchors; needs `STRIPE_SECRET_KEY`)
+- Stripe products: **Monthly VPN plan** £2.45/month and **Yearly VPN plan** **£27.93/year** (2793 pence), **subscription starts when you pay** (script `scripts/configure_stripe_payment_link_trial.py` when `STRIPE_SECRET_KEY` is set)
+- Price ids: `STRIPE_PRICE_ID_MONTHLY` / `STRIPE_PRICE_ID_YEARLY` (defaults in `payments.py`)
+- **Local currency display:** catalog converts £2.45 / £27.93 into the visitor’s currency (`status_page/local_currency.py`) and shows **we accept *CURRENCY***
+- **Checkout presentment:** plan page → `POST /pay/checkout` creates a **subscription** Checkout Session; USD presentment uses relative cents from GBP anchors when needed (`STRIPE_SECRET_KEY` required)
 
 ## Customer journey (subscription keygen unlock)
 
-1. Homepage shows **ONLY £2.45 per month — or pay yearly**, dual **Monthly** /
-   **Yearly** buttons per platform, trial wording for monthly, then pay-on-Stripe.
+1. Homepage **Download client** box: select **device/platform** and **plan**
+   (Monthly or Annual), then **Buy now** → Stripe subscription Checkout.
 2. After successful Stripe pay, the status host:
    - mints a one-time download token
    - activates Connect entitlement for the Checkout session
    - mints a unique **keygen** (`RPT-KEY-…`) bound to that entitlement
    - emails the customer: **keygen + PPI + download link**, with
-     **USE THIS KEYGEN TO UNLOCK YOUR RESTORE PRIVACY TRIAL**
+     **USE THIS KEYGEN TO UNLOCK RESTORE PRIVACY**
 3. Client first-use flow on every platform:
    **Install → accept licence terms and conditions → enter keygen → unlock**.
    **Connect allowed = active subscription + keygen activated** (download alone
@@ -89,28 +97,26 @@ Server Checkout always sets `customer_creation=always` so **email is required**.
 That causes: *You specified payment mode but passed a recurring price*.
 Legacy `STRIPE_PRICE_ID` is ignored for Checkout unless `STRIPE_ALLOW_LEGACY_PRICE_ID=1`.
 
-### 1.3b Payment Link — require customer email (live BUY buttons)
+### 1.3b Site plan page + subscription Checkout (live BUY buttons)
 
-Buyers use the **Stripe subscription Payment Link** (`buy.stripe.com/…`), not server Checkout.
-Email is required for **subscription** prices.
+Buyers do **not** land on dual `buy.stripe.com` Payment Links from the catalog.
+Flow:
 
-1. Dashboard → **Payment links** → open the Restore Privacy **subscription** link  
-   (`plink_1TvTu6JDavQ2TJW6FeL0dIh9` / URL on the status downloads page).
-2. Confirm the line item is **recurring £2.45/month GBP** with **7-day trial**
-   (not a one-time donate amount). Use `scripts/configure_stripe_payment_link_trial.py` when `STRIPE_SECRET_KEY` is available.
-3. **⋯** → **Edit** (or open settings for the link).
-4. Under **Options** / customer information:
-   - Ensure email is collected (subscription links always require it).
-   - Prefer **Create a Customer** / **customer_creation = always**.
-5. Save. New checkouts pick up the setting immediately (no app deploy needed).
+1. Catalog tile → site **`/pay?platform=…`** (Select your plan: **Monthly** or **Annual**).
+2. Form **`POST /pay/checkout`** creates a Stripe **subscription** Checkout Session for
+   **Monthly VPN plan** (£2.45/month) or **Yearly VPN plan** (£27.93/year = 5% off).
+3. Customer pays on Stripe Checkout (**subscription starts when you pay**). Email is collected by Checkout.
 
-API equivalent (with your live secret key, never commit it):
+Dashboard products/prices:
 
-```bash
-curl https://api.stripe.com/v1/payment_links/plink_1TvTu6JDavQ2TJW6FeL0dIh9 \
-  -u "sk_live_…:" \
-  -d "customer_creation=always"
-```
+| Plan | Name | Amount | Price id (default) |
+|------|------|--------|--------------------|
+| Monthly | Monthly VPN plan | 245 pence GBP / month | `price_1TwjilJDavQ2TJW6fyxzCIkA` |
+| Yearly | Yearly VPN plan | **2793** pence GBP / year | `price_1TwjimJDavQ2TJW6wEKr4upj` |
+
+Override with `STRIPE_PRICE_ID_MONTHLY` / `STRIPE_PRICE_ID_YEARLY` if you rotate prices.
+Use `scripts/configure_stripe_payment_link_trial.py` (when `STRIPE_SECRET_KEY` is set)
+to create/reuse prices and assert **trial_period_days = 0**.
 
 Also confirm **Settings → Customer emails** / Checkout branding still send receipts if you want them.
 
@@ -147,12 +153,13 @@ stripe trigger checkout.session.completed
 
 | Variable | Purpose |
 |----------|---------|
-| `STRIPE_SECRET_KEY` | `sk_test_…` or `sk_live_…` (Dashboard → Developers → API keys) |
+| `STRIPE_SECRET_KEY` | `sk_test_…` or `sk_live_…` (Dashboard → Developers → API keys) — **required** for `/pay/checkout` Sessions |
 | `STRIPE_WEBHOOK_SECRET` | `whsec_…` from the webhook endpoint (Dashboard → Webhooks → Signing secret) |
-| `STRIPE_PAYMENT_PAGE_URL` | Monthly catalog Payment Link URL (`buy.stripe.com/…`); also `RPT_STRIPE_PAYMENT_PAGE_URL` |
-| `STRIPE_PAYMENT_PAGE_URL_YEARLY` | Yearly catalog Payment Link URL; also `RPT_STRIPE_PAYMENT_PAGE_URL_YEARLY`. Optional — if unset, yearly tiles reuse the monthly URL with `client_reference_id=platform\|year` |
-| `STRIPE_PAYMENT_LINK_ID` | Monthly Payment Link object id (`plink_…`); also `RPT_STRIPE_PAYMENT_LINK_ID` |
-| `STRIPE_CHECKOUT_PRICE_ID` | Optional one-time `price_…` only; **leave empty** to use built-in `unit_amount=245` (£2.45) |
+| `STRIPE_PRICE_ID_MONTHLY` | Recurring Monthly VPN plan price id (default shipped in `payments.py`) |
+| `STRIPE_PRICE_ID_YEARLY` | Recurring Yearly VPN plan price id (default shipped; **2793** pence) |
+| `STRIPE_PAYMENT_PAGE_URL` | Legacy monthly Payment Link URL (inactive; not catalog primary) |
+| `STRIPE_PAYMENT_PAGE_URL_YEARLY` | Legacy yearly Payment Link URL (inactive; not catalog primary) |
+| `STRIPE_CHECKOUT_PRICE_ID` | Optional **one-time** `price_…` only if forcing `RPT_CHECKOUT_ONE_TIME=1`; catalog default is subscription |
 | `RPT_PUBLIC_BASE_URL` | Public site origin, e.g. `https://restoreprivacy.online` (no trailing slash). Used for success/cancel URLs. |
 | `RPT_ASSET_FETCH_TOKEN` | Shared secret (you choose) for status host → Iceland VPS paid installer fetch; same value on VPS unit |
 | `RPT_PAYMENT_DATA_DIR` | Optional directory for SQLite grant DB (default: `status_page/data/`) |
@@ -221,10 +228,10 @@ Architecture (modules):
 | Piece | Role |
 |-------|------|
 | `admin_panel.py` | Login, session, processor settings, read-only licence DB, grants HTML |
-| `payments.py` | Stripe Payment Links / Checkout, webhook grant mint, keygen, licence_status OK\|EXPIRED |
-| `downloads.py` | Public catalog: monthly + yearly pay tiles per platform |
+| `payments.py` | Site plan page HTML, subscription Checkout Session create, webhook grant mint, keygen, licence_status OK\|EXPIRED |
+| `downloads.py` | Public catalog: one **Get licence** tile per platform → `/pay` |
 | `coffee_link.py` | BMC tip URL (public footer + admin tip identity) |
-| `app.py` | Routes: public catalog + gated `/admin*` + webhook |
+| `app.py` | Routes: public catalog + `/pay` + `/pay/checkout` + gated `/admin*` + webhook |
 
 ---
 
@@ -232,23 +239,23 @@ Architecture (modules):
 
 | Path | Role |
 |------|------|
-| `/` | Status + monthly/yearly paid download buttons per platform |
-| `/pay?platform=windows` | Redirects to Stripe payment page for that package |
-| `/api/checkout` | JSON POST `{ "platform": "android" }` → `{ url, amount_pence: 245, … }` |
+| `/` | Status + platform **Get licence** buttons → site plan page |
+| `/pay?platform=windows` | Site-hosted **Select your plan** (Monthly \| Annual); main-site style |
+| `/pay/checkout` | POST form/JSON `{platform, interval}` → subscription Checkout Session redirect |
+| `/api/checkout` | JSON POST `{ "platform": "android", "interval": "year" }` → `{ url, amount_pence, … }` |
 | `/webhook/stripe` | Stripe webhook (signature required) |
 | `/download?token=` | Single-use **proxy** download of the paid package (not a free GitHub redirect) |
-| `/download/success?session_id=` | After Payment Link redirect — **Download \<platform\> package** button |
+| `/download/success?session_id=` | After Checkout redirect — **Download \<platform\> package** button |
 | `/admin` | **Private** operator page: processor settings + grants (login required) |
 | `/admin/login` | Login form / POST credentials |
 | `/admin/logout` | Clear session cookie |
 
-**Payment Link after payment (required for seamless UX):** redirect to  
+**Checkout success URL (required for seamless UX):**  
 `https://restoreprivacy.online/download/success?session_id={CHECKOUT_SESSION_ID}`  
 
-Paste **exactly** that (no trailing `&platform=`). Stripe cannot expand a
-platform placeholder. Each homepage BUY tile already opens the Payment Link
-with `?client_reference_id=<platform>`; the success page resolves that from
-the Checkout Session so the thank-you URL becomes
+Sessions are created with `client_reference_id=platform|interval` and cancel URL
+back to `/pay?platform=…`. The success page resolves platform from the Checkout
+Session so the thank-you URL becomes
 `/download/success?session_id=cs_…&platform=windows` (etc.).
 
 **Private source repo:** make GitHub **private**, then either set **`RPT_GITHUB_TOKEN`** on Render **or** stage packages  

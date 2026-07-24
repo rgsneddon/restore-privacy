@@ -770,7 +770,7 @@ def render_document_html(
     header = public_brand_header_html(
         title=PUBLIC_BRAND_TITLE,
         active=active,
-        logo_size=88,
+        logo_size=112,
     )
     page = f"""{public_head_open(title=title, extra_css=extra)}
   <div class="page-shell" id="doc-page-shell">
@@ -824,8 +824,8 @@ def render_how_to_buy_html() -> bytes:
     # Local imports avoid cycles with payments ↔ downloads.
     from payments import (
         PRICE_LABEL,
-        PRICE_PENCE,
-        stripe_payment_page_url,
+        PRICE_YEARLY_LABEL,
+        SITE_PAY_PLAN_PATH,
         stripe_webhook_endpoint_url,
     )
 
@@ -842,7 +842,7 @@ def render_how_to_buy_html() -> bytes:
             public_page_close,
         )
 
-    pay = stripe_payment_page_url()
+    pay = public_doc_absolute_url(SITE_PAY_PLAN_PATH)
     claim = public_doc_absolute_url("/download/success")
     home = production_status_origin()
     webhook = stripe_webhook_endpoint_url(production=True)
@@ -860,7 +860,7 @@ def render_how_to_buy_html() -> bytes:
     header = public_brand_header_html(
         title=PUBLIC_BRAND_TITLE,
         active="home",
-        logo_size=88,
+        logo_size=112,
     )
     body = f"""{public_head_open(title="How to buy — Restore Privacy", extra_css='''
 .card{{background:var(--rb-card);border-radius:12px;padding:1rem 1.15rem;margin:1rem 0;border:1px solid var(--rb-card-border)}}
@@ -870,32 +870,35 @@ ol{{padding-left:1.25rem;color:var(--rb-muted)}}
 {header}
 <section class="panel-card doc-body-panel" id="how-to-buy-panel">
 <h1 id="how-to-buy-heading">How to buy Restore Privacy</h1>
-<p class="muted">Monthly subscription ({_escape(PRICE_LABEL)} / month GBP, {PRICE_PENCE} pence) with a
-<strong>7-day trial</strong> via Stripe. No free permanent installer buttons on the VPN APP Shop.</p>
+<p class="muted">Paid subscription only: <strong>Monthly VPN plan</strong>
+({_escape(PRICE_LABEL)} / month GBP) or <strong>Yearly VPN plan</strong>
+({_escape(PRICE_YEARLY_LABEL)} / year — 5% off vs paying monthly).
+There are no free permanent installer buttons on this shop.</p>
 
 <div class="card" id="how-to-buy-steps">
-<h2>Steps</h2>
+<h2>Select your plan</h2>
 <ol>
-  <li>Open the VPN APP Shop: <a href="{_escape(home)}">{_escape(home)}</a></li>
-  <li>Choose your platform under <strong>Download client</strong>.
-      Each button opens the Stripe <strong>subscription</strong> Payment Link with your
-      package identity (<code>client_reference_id</code>).</li>
-  <li>Start the subscription on Stripe (trial then {_escape(PRICE_LABEL)}/month):
+  <li>Open the shop: <a href="{_escape(home)}">{_escape(home)}</a></li>
+  <li>Under <strong>Download client</strong>, choose your device and plan
+      (Monthly VPN plan or Yearly VPN plan). You can also open the plan page at
+      <code>{_escape(SITE_PAY_PLAN_PATH)}</code> (<code>/pay</code>).</li>
+  <li>Continue to Stripe Checkout
+      ({_escape(PRICE_LABEL)}/month or {_escape(PRICE_YEARLY_LABEL)}/year):
       <a id="how-to-buy-payment-page" href="{_escape(pay)}"
-      rel="noopener noreferrer" target="_blank">{_escape(pay)}</a></li>
-  <li>After checkout succeeds, open the one-time download from the success page
-      (<code>{_escape(claim)}?session_id=…</code>) or contact support with your
-      Checkout session id. The link works <strong>once</strong> and expires.
-      Your licence keygen is emailed separately.</li>
+      rel="noopener noreferrer">{_escape(pay)}</a></li>
+  <li>After payment, use the one-time download on the success page
+      (<code>{_escape(claim)}?session_id=…</code>). The link works
+      <strong>once</strong> and expires. Your keygen arrives in email
+      separately (USE THIS KEYGEN TO UNLOCK RESTORE PRIVACY).</li>
 </ol>
-<p class="muted">Webhook fulfilment uses
-<code>{_escape(webhook)}</code> with event <code>checkout.session.completed</code>
-(subscription trial or paid). Connect stays active through the paid period;
-refunds and subscription end revoke access.</p>
+<p class="muted">Fulfilment listens for Stripe
+<code>checkout.session.completed</code> on
+<code>{_escape(webhook)}</code>. Connect stays active through the paid
+period; refunds and subscription end revoke access.</p>
 </div>
 
 <div class="card" id="how-to-buy-public-docs">
-<h2>Public documents on this site</h2>
+<h2>Documents on this site</h2>
 <ul id="public-docs-list">
 {doc_lis}
 </ul>

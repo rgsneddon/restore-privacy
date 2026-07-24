@@ -28,13 +28,16 @@ class TestCatalogSubscriptionPaymentLink(unittest.TestCase):
         ):
             os.environ.pop(k, None)
 
-    def test_desired_fields_are_subscription_245_monthly_trial(self):
+    def test_desired_fields_are_subscription_245_monthly_no_trial(self):
         from payments import (
             CATALOG_STRIPE_PAYMENT_MODE,
-            DEFAULT_STRIPE_PAYMENT_PAGE_URL,
             PRICE_PENCE,
+            PRICE_YEARLY_PENCE,
+            SITE_PAY_PLAN_PATH,
+            STRIPE_PRODUCT_NAME_MONTHLY,
+            STRIPE_PRODUCT_NAME_YEARLY,
             desired_payment_link_trial_fields,
-            stripe_payment_page_url,
+            stripe_subscription_price_id_for_interval,
         )
 
         d = desired_payment_link_trial_fields()
@@ -42,47 +45,46 @@ class TestCatalogSubscriptionPaymentLink(unittest.TestCase):
         self.assertEqual(d["mode"], CATALOG_STRIPE_PAYMENT_MODE)
         self.assertEqual(d["unit_amount_pence"], PRICE_PENCE)
         self.assertEqual(d["unit_amount_pence"], 245)
+        self.assertEqual(d["unit_amount_yearly_pence"], PRICE_YEARLY_PENCE)
+        self.assertEqual(d["unit_amount_yearly_pence"], 2793)
+        self.assertEqual(d["yearly_discount_percent"], 5)
         self.assertEqual(d["currency"], "gbp")
         self.assertEqual(d["recurring_interval"], "month")
-        self.assertEqual(d["trial_period_days"], 7)
-        self.assertEqual(d["payment_page_url"], DEFAULT_STRIPE_PAYMENT_PAGE_URL)
-        self.assertEqual(stripe_payment_page_url(), d["payment_page_url"])
-        # Product path is subscription buy host (not a one-time donate tip default)
-        self.assertTrue(
-            DEFAULT_STRIPE_PAYMENT_PAGE_URL.startswith("https://buy.stripe.com/"),
-            DEFAULT_STRIPE_PAYMENT_PAGE_URL,
+        self.assertEqual(d["recurring_interval_yearly"], "year")
+        self.assertEqual(d["trial_period_days"], 0)
+        self.assertNotEqual(d["trial_period_days"], 7)
+        self.assertEqual(d["catalog_entry"], SITE_PAY_PLAN_PATH)
+        self.assertIn("/pay", d["payment_page_url"])
+        self.assertEqual(d["product_name_monthly"], STRIPE_PRODUCT_NAME_MONTHLY)
+        self.assertEqual(d["product_name_yearly"], STRIPE_PRODUCT_NAME_YEARLY)
+        self.assertNotEqual(
+            stripe_subscription_price_id_for_interval("month"),
+            stripe_subscription_price_id_for_interval("year"),
         )
-        self.assertNotIn("donate.stripe.com", DEFAULT_STRIPE_PAYMENT_PAGE_URL)
+        self.assertNotIn("7 day trial", d["homepage_trial_sentence"].lower())
 
-    def test_platform_buy_hrefs_carry_client_reference_id(self):
+    def test_platform_buy_hrefs_go_to_site_pay_plan(self):
         from downloads import available_downloads
-        from payments import (
-            desired_payment_link_trial_fields,
-            stripe_payment_page_href_for_platform,
-            stripe_payment_page_url,
-        )
+        from payments import site_pay_plan_path, stripe_payment_page_href_for_platform
 
-        base = stripe_payment_page_url()
-        self.assertEqual(base, desired_payment_link_trial_fields()["payment_page_url"])
         for a in available_downloads():
             href = stripe_payment_page_href_for_platform(a.platform)
-            self.assertTrue(href.startswith(base), href)
-            self.assertIn(f"client_reference_id={a.platform}", href)
-            # Catalog DownloadAsset.pay_path uses the same helper
-            self.assertEqual(href, a.pay_path)
+            self.assertIn("/pay", href)
+            self.assertIn(f"platform={a.platform}", href)
+            self.assertEqual(a.pay_path, site_pay_plan_path(a.platform, interval="month"))
 
-    def test_catalog_html_uses_subscription_payment_link(self):
+    def test_catalog_html_uses_site_pay_plan(self):
         from downloads import available_downloads, render_download_section_html
-        from payments import stripe_payment_page_url
 
-        html = render_download_section_html(coming_soon=False)
-        base = stripe_payment_page_url()
-        self.assertIn(base, html)
-        self.assertIn("buy.stripe.com", html)
+        html = render_download_section_html(
+            coming_soon=False, currency="GBP", country="GB"
+        )
+        self.assertIn("/pay/checkout", html)
+        self.assertNotIn("buy.stripe.com", html)
         self.assertNotIn("donate.stripe.com", html)
-        self.assertIn('data-buy-mode="stripe-live"', html)
+        self.assertIn('data-buy-mode="homepage-buy-form"', html)
         for a in available_downloads():
-            self.assertIn(f"client_reference_id={a.platform}", html)
+            self.assertIn(f'value="{a.platform}"', html)
 
 
 class TestSubscriptionCheckoutCompleted(unittest.TestCase):
@@ -183,6 +185,39 @@ class TestSubscriptionCheckoutCompleted(unittest.TestCase):
         self.assertTrue(ent["connect_allowed"])
         self.assertEqual(ent.get("subscription_id"), "sub_paid_xyz")
         self.assertEqual(ent.get("platform"), "linux")
+
+    def test_paid_yearly_subscription_mints_without_trial(self):
+        """Catalog yearly Payment Link charge (£29.40) mints entitlement."""
+        pay = self.pay
+        event = {
+            "type": "checkout.session.completed",
+            "data": {
+                "object": {
+                    "id": "cs_test_sub_yearly_1",
+                    "mode": "subscription",
+                    "payment_status": "paid",
+                    "amount_total": pay.PRICE_YEARLY_PENCE,
+                    "currency": "gbp",
+                    "client_reference_id": "windows|year",
+                    "subscription": "sub_yearly_xyz",
+                    "customer_email": "yearly@example.com",
+                    "metadata": {},
+                }
+            },
+        }
+        token = pay.process_checkout_completed_event(event)
+        self.assertTrue(token)
+        ent = pay.get_connect_entitlement("cs_test_sub_yearly_1")
+        self.assertIsNotNone(ent)
+        assert ent is not None
+        self.assertTrue(ent["connect_allowed"])
+        self.assertEqual(ent.get("subscription_id"), "sub_yearly_xyz")
+        self.assertEqual(ent.get("platform"), "windows")
+        self.assertEqual(ent.get("billing_interval"), "year")
+        grant = pay.lookup_download_token(token)
+        self.assertIsNotNone(grant)
+        assert grant is not None
+        self.assertEqual(grant["amount_pence"], pay.PRICE_YEARLY_PENCE)
 
     def test_underpay_without_subscription_does_not_mint(self):
         pay = self.pay

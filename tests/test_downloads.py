@@ -81,39 +81,39 @@ class TestDownloadCatalog(unittest.TestCase):
         self.assertEqual(by_plat["android"].filename, ANDROID_APK_FILENAME)
         for a in assets:
             self.assertEqual(a.url, f"{EXPECTED_DOWNLOAD_PREFIX}{a.filename}")
-            self.assertIn("buy.stripe.com", a.pay_path)
-            self.assertIn(f"client_reference_id={a.platform}", a.pay_path)
+            # Primary path: site-hosted Select your plan page
+            self.assertIn("/pay", a.pay_path)
+            self.assertIn(f"platform={a.platform}", a.pay_path)
 
     def test_labels_and_html_paid(self):
         html = render_download_section_html()
-        self.assertIn("Linux (x64) - Installer (.tar.gz)", html)
-        self.assertIn('id="dl-linux"', html)
-        self.assertIn("Windows (x64) - Installer (.exe)", html)
-        self.assertIn("Developer ID + notarized", html)
-        self.assertIn("Team-signed sideload", html)
-        self.assertIn('id="dl-android"', html)
+        # Catalog filenames remain on option data-filename attrs (not long face labels)
+        self.assertIn(LINUX_TGZ_FILENAME, html)
+        self.assertIn('value="linux"', html)
+        self.assertIn(WINDOWS_ZIP_FILENAME, html)
+        self.assertIn(MACOS_ZIP_FILENAME, html)
+        self.assertIn(IOS_ZIP_FILENAME, html)
+        self.assertIn(ANDROID_APK_FILENAME, html)
+        self.assertIn('value="android"', html)
         self.assertIn("£2.45", html)
         # BMC tip URL is on homepage shell bottom, not inside downloads section
         self.assertNotIn(BMC_TIP_URL, html)
-        # Live default: dual monthly/yearly Stripe Payment Link tiles per platform
-        # Tile labels use local currency (default USD without Accept-Language)
-        self.assertIn("Monthly", html)
-        self.assertIn("Yearly", html)
+        # Live default: embedded platform + plan form + Buy now in downloads box
+        self.assertIn("Buy now", html)
         self.assertIn("we accept *", html)
         self.assertIn("£2.45", html)
-        self.assertIn("£29.40", html)
-        self.assertIn('class="dl dl-interval-month"', html)
-        self.assertIn('class="dl dl-interval-year"', html)
-        self.assertIn('data-billing-interval="month"', html)
-        self.assertIn('data-billing-interval="year"', html)
-        self.assertIn('class="dl-platform-label"', html)
-        self.assertIn(">Windows<", html)
-        self.assertIn(">Android<", html)
-        self.assertIn(">macOS<", html)
-        self.assertIn(">iOS<", html)
-        self.assertIn(">Linux<", html)
-        self.assertTrue("buy.stripe.com" in html or "/pay/start" in html, html[:200])
-        self.assertIn('data-buy-mode="stripe-live"', html)
+        self.assertIn("£27.93", html)
+        self.assertIn('id="dl-buy-form"', html)
+        self.assertIn('id="dl-platform"', html)
+        self.assertIn('id="dl-buy-now"', html)
+        self.assertIn('action="/pay/checkout"', html)
+        self.assertIn('value="windows"', html)
+        self.assertIn('value="android"', html)
+        self.assertIn('value="macos"', html)
+        self.assertIn('value="ios"', html)
+        self.assertIn('value="linux"', html)
+        self.assertNotIn("buy.stripe.com", html)
+        self.assertIn('data-buy-mode="homepage-buy-form"', html)
         self.assertIn('data-billing-intervals="month,year"', html)
         self.assertNotIn("Coming soon", html)
         # Free permanent GitHub installer hrefs must not appear in public HTML.
@@ -139,35 +139,21 @@ class TestDownloadCatalog(unittest.TestCase):
         self.assertEqual([a.platform for a in row1 + row2], [a.platform for a in assets])
 
         html = render_download_section_html()
-        self.assertIn('data-dl-layout="3+2"', html)
-        self.assertIn('id="dl-row-1"', html)
-        self.assertIn('id="dl-row-2"', html)
-        self.assertIn('data-dl-count="3"', html)
-        self.assertIn('data-dl-count="2"', html)
-        # All five platform controls still present with stable ids/attrs
+        # Homepage uses a single buy form (not a multi-tile row grid)
+        self.assertIn('id="dl-buy-form"', html)
+        self.assertIn('id="dl-platform"', html)
+        self.assertNotIn('id="dl-row-1"', html)
+        self.assertNotIn('id="dl-row-2"', html)
         for a in assets:
-            self.assertIn(f'id="dl-{a.platform}"', html)
-            self.assertIn(f'data-platform="{a.platform}"', html)
+            self.assertIn(f'value="{a.platform}"', html)
             self.assertIn(f'data-filename="{a.filename}"', html)
-        # CSS ships row layout (not a single vertical stack of five)
-        css = download_css()
-        self.assertIn(".dl-row", css)
-        self.assertIn("flex-direction: row", css)
-        # Row wrappers appear under the downloads heading
-        head_at = html.find("<h2>")
-        row1_at = html.find('id="dl-row-1"')
-        row2_at = html.find('id="dl-row-2"')
-        self.assertGreater(row1_at, head_at)
-        self.assertGreater(row2_at, row1_at)
-        # Live mode: Stripe Payment Link or /pay/start USD path per platform
-        for a in available_downloads():
-            self.assertIn(f'id="dl-{a.platform}"', html)
-            self.assertTrue(
-                f"platform={a.platform}" in html
-                or f"client_reference_id={a.platform}" in html.replace("%7C", "|"),
-                a.platform,
-            )
             self.assertNotIn(f'href="{a.url}"', html)
+        css = download_css()
+        self.assertIn(".dl-buy-form", css)
+        self.assertIn(".dl-buy-now", css)
+        head_at = html.find("<h2>")
+        form_at = html.find('id="dl-buy-form"')
+        self.assertGreater(form_at, head_at)
 
     def test_available_downloads_have_https_github_release_urls(self):
         for a in available_downloads():
@@ -177,14 +163,13 @@ class TestDownloadCatalog(unittest.TestCase):
     def test_render_download_section_uses_paid_paths(self):
         html = render_download_section_html()
         self.assertIn(f"Download client v{RELEASE_VERSION}", html)
-        self.assertIn('class="dl dl-interval-month"', html)
-        self.assertIn('class="dl dl-interval-year"', html)
+        self.assertIn('id="dl-buy-form"', html)
         self.assertNotIn('href="#"', html)
-        self.assertIn("data-price-pence=\"245\"", html)
-        self.assertIn("Monthly", html)
-        self.assertIn("Yearly", html)
+        self.assertIn("Buy now", html)
         self.assertIn("we accept *", html)
-        self.assertTrue("buy.stripe.com" in html or "/pay/start" in html, html[:200])
+        self.assertIn('action="/pay/checkout"', html)
+        self.assertIn("homepage-buy-form", html)
+        self.assertNotIn("buy.stripe.com", html)
         self.assertNotIn("Coming soon", html)
 
     def test_download_section_omits_long_pay_flow_copy(self):
@@ -195,13 +180,12 @@ class TestDownloadCatalog(unittest.TestCase):
         self.assertNotIn('id="dl-pay-flow"', html)
         self.assertNotIn('id="dl-claim-hint"', html)
         self.assertNotIn("/download/success?session_id=", html)
-        # Platform controls present (live dual-interval Stripe Pay default)
-        self.assertIn("Monthly", html)
-        self.assertIn("Yearly", html)
+        # Buy form present
+        self.assertIn("Buy now", html)
         self.assertIn("we accept *", html)
-        self.assertIn('id="dl-windows"', html)
-        self.assertIn('id="dl-windows-year"', html)
-        self.assertTrue("buy.stripe.com" in html or "/pay/start" in html, html[:200])
+        self.assertIn('id="dl-buy-form"', html)
+        self.assertNotIn('id="dl-windows-year"', html)
+        self.assertIn('action="/pay/checkout"', html)
         # No bottom generic “Stripe payment page” footer link
         self.assertNotIn('id="stripe-payment-page-link"', html)
         self.assertNotIn(">Stripe payment page<", html)
@@ -221,14 +205,14 @@ class TestDownloadCatalog(unittest.TestCase):
         # Homepage redesign: no strong-disclaimer banner in shop section
         self.assertNotIn('id="dl-payment-disclaimer"', html)
         self.assertNotIn("STRONG DISCLAIMER", html)
-        pay_at = html.find('id="dl-windows"')
-        self.assertGreater(pay_at, 0, "pay control marker missing")
+        pay_at = html.find('id="dl-buy-now"')
+        self.assertGreater(pay_at, 0, "Buy now control marker missing")
         # BMC tip is not mid-page in downloads (page bottom via homepage shell)
         self.assertNotIn('id="bmc-tip"', html)
-        # Section has panel-card + dual-interval dl pay controls
+        # Section has panel-card + homepage buy form
         self.assertIn("panel-card", html)
-        self.assertIn('class="dl dl-interval-month"', html)
-        self.assertIn('class="dl dl-interval-year"', html)
+        self.assertIn('id="dl-buy-form"', html)
+        self.assertIn('data-pay-via="homepage-buy-form"', html)
         from downloads import download_css
 
         css = download_css()
@@ -237,70 +221,67 @@ class TestDownloadCatalog(unittest.TestCase):
             "aspect-ratio: auto" in css or "aspect-ratio: 1 / 1" in css,
             "buy tile aspect-ratio rule missing",
         )
+        self.assertIn(".dl-buy-form", css)
+        self.assertIn(".dl-buy-now", css)
         self.assertIn("linear-gradient", css)
-        self.assertIn("dl-platform", css)
         self.assertIn("dl-platform-note", css)
         self.assertIn("dl-interval-row", css)
         self.assertIn("dl-platform-cell", css)
 
-    def test_homepage_bmc_tip_is_last_content_block(self):
-        """Homepage: BMC tip after downloads / node-wipe / audit; single tip link."""
-        from coffee_link import coffee_tip_url
-        from downloads import BMC_TIP_URL, render_bmc_tip_html
+    def test_homepage_copyright_footer_is_last_content_block(self):
+        """Homepage: Raskul copyright after downloads / node-wipe / audit."""
+        from coffee_link import SITE_COPYRIGHT_TEXT
+        from downloads import render_bmc_tip_html
 
         import app as status_app
 
         page = status_app.render_html(
             {"title": "RESTORE PRIVACY", "upstream_ok": True}
         ).decode("utf-8")
-        self.assertEqual(page.count('id="bmc-tip-link"'), 1)
-        self.assertEqual(page.count('id="bmc-tip"'), 1)
-        tip = coffee_tip_url() or BMC_TIP_URL
-        self.assertIn(tip, page)
-        self.assertIn("Tip / support", page)
-        self.assertIn("not a paid download", page.lower())
+        self.assertEqual(page.count('id="site-footer"'), 1)
+        self.assertIn(SITE_COPYRIGHT_TEXT, page)
+        self.assertIn("Raskul", page)
+        self.assertIn("all rights reserved", page)
+        self.assertNotIn("buymeacoffee.com", page)
+        self.assertNotIn("bmc-tip-link", page)
+        self.assertNotIn("Tip / support", page)
 
         brand_at = page.find('id="brand-panel"')
         dl_at = page.find('id="downloads"')
-        # node wipe section markers
-        nw_at = max(
-            page.find("node-wipe"),
-            page.find("nw-countdown"),
-            page.find("node_wipe"),
-            page.find('id="node-wipe"'),
-            page.find("wipe-countdown"),
-        )
         audit_at = page.find('id="audit-panel"')
-        bmc_at = page.find('id="bmc-tip"')
+        foot_at = page.find('id="site-footer"')
         self.assertGreater(dl_at, brand_at)
         self.assertGreater(audit_at, dl_at)
-        self.assertGreater(bmc_at, audit_at)
-        self.assertGreater(bmc_at, dl_at)
-        # Nothing after tip except shell close
-        after = page[bmc_at:]
+        self.assertGreater(foot_at, audit_at)
+        self.assertGreater(foot_at, dl_at)
+        after = page[foot_at:]
         self.assertNotIn('id="downloads"', after[20:])
         self.assertNotIn('id="audit-panel"', after[20:])
         self.assertNotIn('id="brand-panel"', after[20:])
-        # Pure tip helper matches homepage fragment
         frag = render_bmc_tip_html()
-        self.assertIn('id="bmc-tip-link"', frag)
-        self.assertIn("bmc-tip-link", page)
+        self.assertIn('id="site-footer"', frag)
+        self.assertIn(SITE_COPYRIGHT_TEXT, frag)
 
     def test_status_page_html_includes_paid_downloads(self):
         page = status_app.render_html({"title": "RESTORE PRIVACY"}).decode("utf-8")
         self.assertIn("RESTORE PRIVACY", page)
         self.assertNotIn("clients-connected", page)
         self.assertIn(f"Download client v{RELEASE_VERSION}", page)
-        # Live default: dual monthly/yearly Stripe Payment Link buttons
-        self.assertIn("Monthly", page)
-        self.assertIn("Yearly", page)
+        # Live default: homepage buy form (device + plan + Buy now)
+        self.assertIn("Buy now", page)
         self.assertIn("we accept *", page)
-        self.assertTrue("buy.stripe.com" in page or "/pay/start" in page)
+        self.assertIn('id="dl-buy-form"', page)
+        self.assertIn("/pay/checkout", page)
+        self.assertIn("homepage-buy-form", page)
+        self.assertNotIn("buy.stripe.com", page)
         self.assertNotIn("Coming soon", page)
         self.assertIn("£2.45", page)
+        self.assertIn("£27.93", page)
         self.assertIn(WINDOWS_ZIP_FILENAME, page)  # data-filename
         self.assertIn(ANDROID_APK_FILENAME, page)
-        self.assertIn(BMC_TIP_URL, page)
+        self.assertIn("Raskul", page)
+        self.assertIn("all rights reserved", page)
+        self.assertNotIn("buymeacoffee.com", page)
         self.assertNotIn("releases/download/", page)
 
 

@@ -76,7 +76,7 @@ stripe trigger checkout.session.completed
 
 On `checkout.session.completed` the status host mints a unique **keygen**
 (`RPT-KEY-…`) bound to the connect entitlement and includes it in the customer
-fulfilment email with **USE THIS KEYGEN TO UNLOCK YOUR RESTORE PRIVACY TRIAL**,
+fulfilment email with **USE THIS KEYGEN TO UNLOCK RESTORE PRIVACY**,
 the **PPI**, and the one-time download link.
 
 **Connect allowed = active subscription + keygen activated** (after licence
@@ -113,6 +113,6 @@ only**, no amend/edit/revoke controls on that table.
 
 See [`docs/STATUS_HOST_SMTP_AND_TRIAL.md`](../../docs/STATUS_HOST_SMTP_AND_TRIAL.md)
 for Render `RPT_FULFILMENT_SMTP_*` env keys and configuring the catalog monthly
-Payment Link for **£2.45/month + 7-day trial**
+Payment Link for **£2.45/month**
 (`scripts/configure_stripe_payment_link_trial.py`).
 

@@ -22,6 +22,15 @@ SETTINGS_GUIDE_LINK_ID = "settings-guide-link"
 # Public website brand / page identity (top H1 + default document title)
 PUBLIC_BRAND_TITLE = "RESTORE PRIVACY VPN"
 
+# Transparent-background logo in the top brand box (left of title).
+# Opaque plate logo.png is retained for favicon-style / legacy uses.
+PUBLIC_BRAND_LOGO_PATH = "/logo_transparent.png"
+PUBLIC_BRAND_LOGO_STATIC_NAME = "logo_transparent.png"
+# Default img width/height (CSS clamp is slightly larger than prior 96px).
+PUBLIC_BRAND_LOGO_SIZE_DEFAULT = 112
+PUBLIC_BRAND_LOGO_SIZE_MIN_CSS = 88  # clamp min — was 72
+PUBLIC_BRAND_LOGO_SIZE_MAX_CSS = 120  # clamp max — was 104
+
 # Paths (keep aligned with public_docs / settings_explainer)
 HOME_PATH = "/"
 LICENSE_PATH = "/LICENSE"
@@ -215,26 +224,33 @@ body {{
 }}
 #{SITE_BRAND_HEADER_ID}, .brand-panel, #site-brand-header {{
   display: flex; flex-direction: column; align-items: center;
-  text-align: center; gap: 0.65rem;
+  text-align: center; gap: 0.75rem;
+}}
+/* Logo + title row: centered above the menu */
+.brand-mark {{
+  display: flex; flex-direction: row; flex-wrap: wrap;
+  align-items: center; justify-content: center;
+  gap: clamp(0.55rem, 2vw, 0.95rem);
+  width: 100%;
+  max-width: 100%;
 }}
 .brand-logo {{
-  width: clamp(72px, 14vw, 104px); height: clamp(72px, 14vw, 104px);
-  border-radius: 22px; object-fit: cover;
-  border: 2px solid transparent;
-  background:
-    linear-gradient(var(--rb-card), var(--rb-card)) padding-box,
-    var(--rb-neon-border) border-box;
-  background-origin: border-box;
-  background-clip: padding-box, border-box;
-  box-shadow:
-    0 0 12px var(--rb-neon-glow-cyan),
-    0 0 20px var(--rb-neon-glow-green),
-    0 8px 28px rgba(0, 0, 0, 0.25);
+  /* Slightly larger than previous clamp(72–104) / default 96px */
+  width: clamp(88px, 16vw, 120px); height: clamp(88px, 16vw, 120px);
+  border: none;
+  border-radius: 0;
+  object-fit: contain;
+  background: transparent;
+  box-shadow: none;
+  flex-shrink: 0;
 }}
-#{SITE_BRAND_HEADER_ID} h1, .brand-panel h1, #site-brand-header h1 {{
+#{SITE_BRAND_HEADER_ID} h1, .brand-panel h1, #site-brand-header h1,
+.brand-mark h1 {{
   letter-spacing: 0.14em; font-weight: 700;
   font-size: clamp(1.35rem, 4.2vw, 2.05rem);
   margin: 0; color: var(--rb-cream);
+  text-align: left;
+  line-height: 1.15;
 }}
 .brand-tagline, .tagline {{
   margin: 0; max-width: 32rem; font-size: clamp(0.85rem, 2.4vw, 0.98rem);
@@ -491,23 +507,32 @@ def public_brand_header_html(
     title: str = PUBLIC_BRAND_TITLE,
     tagline: str = "",
     active: str | None = None,
-    logo_size: int = 96,
+    logo_size: int = PUBLIC_BRAND_LOGO_SIZE_DEFAULT,
+    logo_src: str = PUBLIC_BRAND_LOGO_PATH,
 ) -> str:
     """Static top brand panel used across all public pages.
 
+    Layout: **transparent logo** to the **left** of **RESTORE PRIVACY VPN**,
+    as a centered row **above** the site nav. Logo has no border/frame.
     Under-title tagline is omitted by default (no lightweight-vpn slogan).
     Pass a non-empty *tagline* only if a page truly needs a header subtitle;
     public catalog/docs call sites leave it empty for a clean top box.
     Brand H1 defaults to :data:`PUBLIC_BRAND_TITLE` (**RESTORE PRIVACY VPN**).
     """
     title_safe = _esc(public_display_title(title))
+    src = (logo_src or PUBLIC_BRAND_LOGO_PATH).strip() or PUBLIC_BRAND_LOGO_PATH
+    sz = int(logo_size) if logo_size else PUBLIC_BRAND_LOGO_SIZE_DEFAULT
+    if sz < 64:
+        sz = PUBLIC_BRAND_LOGO_SIZE_DEFAULT
     tag = (tagline or "").strip()
     tagline_html = (
         f'      <p class="brand-tagline">{_esc(tag)}</p>\n' if tag else ""
     )
     return f"""    <header class="brand-panel panel-card" id="{SITE_BRAND_HEADER_ID}" data-site-header="1" data-header-alias="site-brand-header">
-      <img class="brand-logo" src="/logo.png" width="{int(logo_size)}" height="{int(logo_size)}" alt="Restore Privacy logo"/>
-      <h1>{title_safe}</h1>
+      <div class="brand-mark" id="brand-mark" data-brand-mark="1">
+        <img class="brand-logo" src="{_esc(src)}" width="{sz}" height="{sz}" alt="Restore Privacy logo"/>
+        <h1>{title_safe}</h1>
+      </div>
 {tagline_html}{public_nav_links_html(active=active)}
 {public_theme_picker_html()}
     </header>

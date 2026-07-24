@@ -2,18 +2,19 @@
 
 ## Customer flow
 
-1. Pay on [restoreprivacy.online](https://restoreprivacy.online/). Catalog tiles
-   offer **Monthly £2.45** and **Yearly** per platform (Stripe subscription
-   Payment Links; yearly amount is operator/Stripe-configured). Homepage copy
-   includes **ONLY £2.45 per month — or pay yearly**, trial language for the
-   monthly plan, and pay-on-Stripe wording.
+1. Pay on [restoreprivacy.online](https://restoreprivacy.online/). Homepage /
+   `/pay` offer **Monthly VPN plan (£2.45)** (licence for **one month**) and
+   **Yearly VPN plan (£27.93, 5% off)** (licence for **one year**). Customers can
+   **enable or disable auto-renew** before checkout (default: on).
 2. Status host on `checkout.session.completed`:
    - mints one-time download token
-   - activates Connect entitlement for the Checkout session
-   - mints unique **keygen** (`RPT-KEY-XXXX-XXXX-XXXX`) bound to that entitlement
+   - activates Connect entitlement with **`valid_until`** = Stripe period end
+     or calendar **one month / one year** (never unlimited for paid catalog)
+   - applies auto-renew preference on the Stripe Subscription
+     (`cancel_at_period_end` when auto-renew is off)
+   - mints unique **keygen** (`RPT-KEY-…`) bound to that entitlement
    - records **PPI** (product purchase identifier) for operator recovery
-   - sends fulfilment email with **keygen + PPI + download link** and the sentence
-     **USE THIS KEYGEN TO UNLOCK YOUR RESTORE PRIVACY TRIAL**
+   - sends fulfilment email with **keygen + PPI + download link**
 3. Client: **Install → accept licence terms → enter keygen → unlock Connect**.
 4. Connect re-checks `/api/connect-entitlement?keygen=…` (or session id). The host
    returns **`licence_status`**: **OK** or **EXPIRED**.
@@ -23,8 +24,12 @@
 | Requirement | Meaning |
 |-------------|---------|
 | End-user licence accepted | Local acceptance only (not uploaded) |
-| Subscription **OK** | Active Stripe-backed entitlement; period not ended; not revoked/failed |
+| Subscription **OK** | Active Stripe-backed entitlement; **`valid_until` not passed**; not revoked/failed |
 | **Keygen activated** | User entered valid `RPT-KEY-…` on this install |
+
+**Period end without renewal:** licence becomes **EXPIRED**, Connect is denied,
+and residual use is hard-locked until a successful renewal / new paid period
+(`invoice.paid` extends `valid_until`).
 
 **Download alone does not unlock residual VPN.** A thank-you
 `payment_entitlement.json` with session id only is **not** enough — the app
@@ -38,9 +43,13 @@ catalog homepage without platform identity.
 ## Payment failure / subscription end
 
 Stripe webhooks (refund, dispute, failed charge, subscription deleted / period end)
-revoke the entitlement. Clients re-check on Connect: status becomes **EXPIRED**,
-`connect_allowed=false`, and the renew surface opens (keygen alone will not
-restore access until payment is active again).
+revoke the entitlement. **`valid_until` past** without renewal also yields
+**EXPIRED** (even if status was still `active`). Clients re-check on Connect:
+status becomes **EXPIRED**, `connect_allowed=false`, and the renew surface opens
+(keygen alone will not restore access until payment is active again).
+
+**Auto-renew off:** Stripe `cancel_at_period_end` — access remains until the paid
+period ends, then EXPIRED; no further charges after that period.
 
 ## Admin (operator) — read-only licence database
 

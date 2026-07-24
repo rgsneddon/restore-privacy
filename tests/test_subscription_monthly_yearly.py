@@ -41,22 +41,59 @@ class TestBillingIntervals(unittest.TestCase):
 
         href_m = stripe_payment_page_href_for_platform("ios", interval="month")
         href_y = stripe_payment_page_href_for_platform("ios", interval="year")
-        self.assertIn("client_reference_id=", href_m)
+        # Primary path is site-hosted plan page
+        self.assertIn("/pay", href_m)
         self.assertIn("ios", href_m)
         self.assertIn("month", href_m)
         self.assertIn("year", href_y)
         self.assertNotEqual(href_m, href_y)
 
-    def test_catalog_html_has_monthly_and_yearly_pay(self):
+    def test_month_year_checkout_use_distinct_price_ids(self):
+        """Subscription Checkout binds month vs year to distinct Stripe Price ids."""
+        from payments import (
+            DEFAULT_STRIPE_PRICE_ID_MONTHLY,
+            DEFAULT_STRIPE_PRICE_ID_YEARLY,
+            build_subscription_checkout_form_body,
+            stripe_subscription_price_id_for_interval,
+        )
+
+        mid = stripe_subscription_price_id_for_interval("month")
+        yid = stripe_subscription_price_id_for_interval("year")
+        self.assertEqual(mid, DEFAULT_STRIPE_PRICE_ID_MONTHLY)
+        self.assertEqual(yid, DEFAULT_STRIPE_PRICE_ID_YEARLY)
+        self.assertNotEqual(mid, yid)
+        bm = build_subscription_checkout_form_body(
+            "windows", "f.exe", interval="month",
+            success_url="https://x/s", cancel_url="https://x/c",
+        ).decode()
+        by = build_subscription_checkout_form_body(
+            "windows", "f.exe", interval="year",
+            success_url="https://x/s", cancel_url="https://x/c",
+        ).decode()
+        self.assertIn(mid, bm)
+        self.assertIn(yid, by)
+        self.assertNotIn(yid, bm)
+
+    def test_catalog_html_routes_to_site_pay_plan(self):
         from downloads import render_download_section_html
 
-        html = render_download_section_html(coming_soon=False)
-        self.assertIn('data-billing-interval="month"', html)
-        self.assertIn('data-billing-interval="year"', html)
-        self.assertIn("Monthly", html)
-        self.assertIn("Yearly", html)
-        self.assertIn("dl-windows-year", html)
+        html = render_download_section_html(
+            coming_soon=False, currency="GBP", country="GB"
+        )
+        self.assertIn('action="/pay/checkout"', html)
+        self.assertIn('data-buy-mode="homepage-buy-form"', html)
         self.assertIn("billing-intervals", html)
+        self.assertIn("Buy now", html)
+        self.assertIn("£27.93", html)
+        self.assertNotIn("buy.stripe.com", html)
+        self.assertNotIn("7 day trial", html.lower())
+        self.assertNotIn("begins after your 7 day trial", html.lower())
+
+        html_usd = render_download_section_html(
+            coming_soon=False, currency="USD", country="US"
+        )
+        self.assertIn("/pay/checkout", html_usd)
+        self.assertIn("homepage-buy-form", html_usd)
 
 
 class TestLicenceStatusOkExpired(unittest.TestCase):
@@ -131,9 +168,9 @@ class TestLicenceStatusOkExpired(unittest.TestCase):
         self.assertIn("macos", url.lower())
         # Pure local builder always embeds platform (no payments import)
         local = build_local_platform_renew_url("macos", interval="month")
-        self.assertIn("buy.stripe.com", local)
+        self.assertIn("/pay", local)
         self.assertIn("macos", local.lower())
-        self.assertIn("client_reference_id=", local)
+        self.assertIn("platform=macos", local)
 
 
 class TestExpiredVsKeygenUiGate(unittest.TestCase):
@@ -244,7 +281,7 @@ class TestLocalPlatformRenewUrlWithoutPayments(unittest.TestCase):
 
     def test_build_local_platform_renew_url_no_payments_import(self):
         from client.payment_entitlement import (
-            DEFAULT_STRIPE_PAYMENT_PAGE_URL,
+            DEFAULT_SITE_PAY_PLAN_BASE,
             build_local_platform_renew_url,
             renew_licence_message,
             renew_licence_url,
@@ -252,16 +289,12 @@ class TestLocalPlatformRenewUrlWithoutPayments(unittest.TestCase):
 
         for plat in ("windows", "macos", "ios", "android", "linux"):
             url = build_local_platform_renew_url(plat, interval="month")
-            self.assertTrue(url.startswith("https://buy.stripe.com/"), plat)
-            self.assertIn(DEFAULT_STRIPE_PAYMENT_PAGE_URL.split("/")[-1], url)
-            self.assertIn("client_reference_id=", url)
-            # platform appears in query (encoded or plain)
-            self.assertTrue(
-                plat in url.lower() or plat in urllib_parse_unquote(url).lower(),
-                f"{plat} missing from {url}",
-            )
+            self.assertTrue(url.startswith(DEFAULT_SITE_PAY_PLAN_BASE), plat)
+            self.assertIn("/pay", url)
+            self.assertIn(f"platform={plat}", url)
+            self.assertIn("interval=month", url)
             year = build_local_platform_renew_url(plat, interval="year")
-            self.assertIn("year", year)
+            self.assertIn("interval=year", year)
             self.assertNotEqual(url, year)
 
         # Force renew_licence_url through local path (block payments import)
@@ -280,8 +313,7 @@ class TestLocalPlatformRenewUrlWithoutPayments(unittest.TestCase):
                 url = renew_licence_url("macos")
                 msg = renew_licence_message("macos")
         self.assertIn("macos", url.lower())
-        self.assertIn("buy.stripe.com", url)
-        self.assertIn("client_reference_id=", url)
+        self.assertIn("/pay", url)
         self.assertNotEqual(url.rstrip("/"), "https://restoreprivacy.online")
         self.assertNotEqual(url.rstrip("/"), "https://restoreprivacy.online/")
         self.assertIn("Renew your licence *here*", msg)

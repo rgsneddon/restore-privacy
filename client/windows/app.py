@@ -826,7 +826,7 @@ class TunnelClientApp:
             pad,
             text=(
                 "Your fulfilment email includes a keygen with the text "
-                "USE THIS KEYGEN TO UNLOCK YOUR RESTORE PRIVACY TRIAL "
+                "USE THIS KEYGEN TO UNLOCK RESTORE PRIVACY "
                 "(format RPT-KEY-…). Paste it below to unlock Connect. "
                 "Download alone does not unlock residual VPN."
             ),
@@ -1883,7 +1883,7 @@ class TunnelClientApp:
         tk.Label(
             pay_card,
             text="Enter keygen from your fulfilment email "
-            "(USE THIS KEYGEN TO UNLOCK YOUR RESTORE PRIVACY TRIAL). "
+            "(USE THIS KEYGEN TO UNLOCK RESTORE PRIVACY). "
             "Optional: session id (cs_…) or auto-import payment_entitlement.json:",
             bg=PANEL_BG,
             fg=TEXT_MUTED,

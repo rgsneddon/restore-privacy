@@ -117,13 +117,32 @@ class TestHowToBuyAndHttp(unittest.TestCase):
     def test_how_to_buy_html_has_payment_and_docs(self):
         html = public_docs.render_how_to_buy_html().decode("utf-8")
         self.assertIn("how-to-buy-heading", html)
-        self.assertIn("buy.stripe.com", html)
+        # Site plan page primary path (not dual buy.stripe.com Payment Links)
+        self.assertIn("/pay", html)
+        self.assertIn("Select your plan", html)
+        self.assertIn("Monthly VPN plan", html)
+        self.assertIn("Yearly VPN plan", html)
+        self.assertIn("£27.93", html)
+        self.assertNotIn("buy.stripe.com", html)
+        self.assertNotIn("£29.40", html)
         self.assertIn("how-to-buy-payment-page", html)
         self.assertIn("/LICENSE", html)
         self.assertIn("/PRIVACY_POLICY.md", html)
         self.assertIn("/AUDIT.md", html)
         self.assertIn("/README.md", html)
         self.assertIn("checkout.session.completed", html)
+
+    def test_public_readme_catalog_copy_matches_site_pay_plan(self):
+        """Shipped /README.md (status_page/public) must advertise /pay + £27.93."""
+        readme = (ROOT / "status_page" / "public" / "README.md").read_text(
+            encoding="utf-8"
+        )
+        self.assertIn("/pay", readme)
+        self.assertIn("£27.93", readme)
+        self.assertIn("Monthly VPN plan", readme)
+        self.assertIn("Yearly VPN plan", readme)
+        self.assertNotIn("£29.40", readme)
+        self.assertNotIn("Payment Links (distinct Stripe bases)", readme)
 
     def test_handler_serves_docs_and_how_to_buy(self):
         httpd = ThreadingHTTPServer(("127.0.0.1", 0), status_app.Handler)

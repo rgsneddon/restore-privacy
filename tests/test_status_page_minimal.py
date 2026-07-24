@@ -52,18 +52,20 @@ class TestPublicPageWithDownloads(unittest.TestCase):
         self.assertIn(IOS_ZIP_FILENAME, html)
         self.assertIn(ANDROID_APK_FILENAME, html)
         self.assertNotIn("apple-prep", html)
-        # Live catalog: Stripe Pay buttons (not Coming soon)
+        # Live catalog: homepage buy form → /pay/checkout
         self.assertIn("Monthly", html)
         self.assertIn("Yearly", html)
-        self.assertTrue("buy.stripe.com" in html or "/pay/start" in html, html[:200])
-        self.assertIn('data-buy-mode="stripe-live"', html)
+        self.assertIn("/pay/checkout", html)
+        self.assertIn("homepage-buy-form", html)
+        self.assertIn("Buy now", html)
         self.assertNotIn("Coming soon", html)
         for a in available_downloads():
-            # Live mode: /pay/start or Stripe Payment Link; never free GH installer href
-            self.assertIn(f'id="dl-{a.platform}"', html)
+            # Live mode: homepage form platform values; never free GH installer href
+            self.assertIn(f'value="{a.platform}"', html)
             self.assertTrue(
-                f"platform={a.platform}" in html
-                or f"client_reference_id={a.platform}" in html,
+                f'id="dl-{a.platform}"' in html
+                or f"platform={a.platform}" in html
+                or f'value="{a.platform}"' in html,
                 f"missing platform marker for {a.platform}",
             )
             self.assertNotIn(f'href="{a.url}"', html)
@@ -90,7 +92,9 @@ class TestPublicPageWithDownloads(unittest.TestCase):
         self.assertNotIn('id="catalog-version"', html)
         self.assertNotIn('id="dl-site-origin"', html)
         self.assertIn("£2.45", html)
-        self.assertIn("buymeacoffee.com/rgsneddon", html)
+        self.assertIn("Raskul", html)
+        self.assertIn("all rights reserved", html)
+        self.assertNotIn("buymeacoffee.com", html)
         self.assertNotIn("how-to-buy-footer-link", html)
         self.assertNotIn('href="/how-to-buy"', html)
         self.assertNotIn("connect-via-web", html)
@@ -122,7 +126,9 @@ class TestPublicPageWithDownloads(unittest.TestCase):
                     self.assertIn(WINDOWS_ZIP_FILENAME, html)
                     self.assertIn("Monthly", html)
                     self.assertIn("Yearly", html)
-                    self.assertTrue("buy.stripe.com" in html or "/pay/start" in html, html[:200])
+                    self.assertIn("/pay/checkout", html)
+                    self.assertIn("Raskul", html)
+                    self.assertNotIn("buymeacoffee.com", html)
                     self.assertNotIn("Coming soon", html)
                     self.assertIn("£2.45", html)
                     self.assertNotIn('id="rust-repo-link"', html)

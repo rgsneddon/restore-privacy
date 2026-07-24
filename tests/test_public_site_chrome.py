@@ -69,19 +69,38 @@ class TestPublicChromeModule(unittest.TestCase):
 
     def test_brand_header_has_theme_and_nav(self) -> None:
         from public_chrome import (
+            PUBLIC_BRAND_LOGO_PATH,
+            PUBLIC_BRAND_LOGO_SIZE_DEFAULT,
+            PUBLIC_BRAND_LOGO_SIZE_MAX_CSS,
+            PUBLIC_BRAND_LOGO_SIZE_MIN_CSS,
+            PUBLIC_BRAND_TITLE,
             PUBLIC_THEME_STORAGE_KEY,
             public_brand_header_html,
             public_site_css,
             public_theme_boot_script,
         )
 
-        from public_chrome import PUBLIC_BRAND_TITLE
-
         header = public_brand_header_html(active="licence")
         self.assertIn('id="brand-panel"', header)
+        self.assertIn('id="brand-mark"', header)
+        self.assertIn('class="brand-mark"', header)
         self.assertIn("<h1>", header)
         self.assertEqual(PUBLIC_BRAND_TITLE, "RESTORE PRIVACY VPN")
         self.assertIn(f"<h1>{PUBLIC_BRAND_TITLE}</h1>", header)
+        # Transparent logo left of title (same brand-mark row, logo before h1)
+        mark_start = header.index('id="brand-mark"')
+        mark_end = header.index("</div>", mark_start)
+        mark = header[mark_start:mark_end]
+        i_logo = mark.index("brand-logo")
+        i_h1 = mark.index("<h1>")
+        self.assertLess(i_logo, i_h1, "logo must sit left of title in brand-mark")
+        self.assertIn(f'src="{PUBLIC_BRAND_LOGO_PATH}"', mark)
+        self.assertIn("logo_transparent", mark)
+        self.assertIn(f'width="{PUBLIC_BRAND_LOGO_SIZE_DEFAULT}"', header)
+        # Nav remains below the logo+title band
+        i_mark = header.index('id="brand-mark"')
+        i_nav = header.index('id="doc-links"')
+        self.assertLess(i_mark, i_nav)
         # Short historical title upgrades to brand title with VPN
         short = public_brand_header_html(title="RESTORE PRIVACY")
         self.assertIn(f"<h1>{PUBLIC_BRAND_TITLE}</h1>", short)
@@ -121,6 +140,21 @@ class TestPublicChromeModule(unittest.TestCase):
         # Dual-tone border technique: padding-box fill + border-box gradient
         self.assertIn("padding-box", css)
         self.assertIn("border-box", css)
+        # Brand logo: larger clamp, no border/frame, transparent plate
+        self.assertIn(".brand-mark", css)
+        self.assertIn("flex-direction: row", css)
+        self.assertIn(f"{PUBLIC_BRAND_LOGO_SIZE_MIN_CSS}px", css)
+        self.assertIn(f"{PUBLIC_BRAND_LOGO_SIZE_MAX_CSS}px", css)
+        self.assertGreater(PUBLIC_BRAND_LOGO_SIZE_MIN_CSS, 72)
+        self.assertGreater(PUBLIC_BRAND_LOGO_SIZE_MAX_CSS, 104)
+        self.assertGreater(PUBLIC_BRAND_LOGO_SIZE_DEFAULT, 96)
+        logo_css_i = css.index(".brand-logo")
+        logo_css = css[logo_css_i : logo_css_i + 450]
+        self.assertIn("border: none", logo_css)
+        self.assertIn("background: transparent", logo_css)
+        self.assertIn("box-shadow: none", logo_css)
+        self.assertIn("object-fit: contain", logo_css)
+        self.assertNotIn("var(--rb-neon-border)", logo_css)
         # Light theme still defines both neon tones (softer values)
         light_i = css.index('[data-theme="light"]')
         light_css = css[light_i : light_i + 1800]
@@ -133,6 +167,82 @@ class TestPublicChromeModule(unittest.TestCase):
         self.assertIn(PUBLIC_THEME_STORAGE_KEY, script)
         self.assertIn("localStorage", script)
         self.assertIn("data-theme", script)
+
+    def test_brand_logo_static_is_transparent_png(self) -> None:
+        """Shipped header logo has clear corners (RGBA), not opaque plate."""
+        import struct
+        import zlib
+        from pathlib import Path
+
+        from public_chrome import PUBLIC_BRAND_LOGO_STATIC_NAME
+
+        path = ROOT / "status_page" / "static" / PUBLIC_BRAND_LOGO_STATIC_NAME
+        self.assertTrue(path.is_file(), msg=f"missing {path}")
+        data = path.read_bytes()
+        self.assertEqual(data[:8], b"\x89PNG\r\n\x1a\n")
+        pos = 8
+        w = h = None
+        idat = b""
+        while pos < len(data):
+            length = int.from_bytes(data[pos : pos + 4], "big")
+            ctype = data[pos + 4 : pos + 8]
+            chunk = data[pos + 8 : pos + 8 + length]
+            pos += 12 + length
+            if ctype == b"IHDR":
+                w, h, _bit, color, *_rest = struct.unpack(">IIBBBBB", chunk)
+                self.assertEqual(color, 6, "color type must be RGBA")
+            elif ctype == b"IDAT":
+                idat += chunk
+            elif ctype == b"IEND":
+                break
+        self.assertIsNotNone(w)
+        assert w is not None and h is not None
+        raw = zlib.decompress(idat)
+        bpp = 4
+        stride = w * bpp
+        rows: list[bytearray] = []
+        i = 0
+        prev = bytearray(stride)
+        for _y in range(h):
+            ft = raw[i]
+            i += 1
+            row = bytearray(raw[i : i + stride])
+            i += stride
+            if ft == 1:
+                for x in range(stride):
+                    left = row[x - bpp] if x >= bpp else 0
+                    row[x] = (row[x] + left) & 255
+            elif ft == 2:
+                for x in range(stride):
+                    row[x] = (row[x] + prev[x]) & 255
+            elif ft == 3:
+                for x in range(stride):
+                    left = row[x - bpp] if x >= bpp else 0
+                    row[x] = (row[x] + ((left + prev[x]) // 2)) & 255
+            elif ft == 4:
+
+                def paeth(a: int, b: int, c: int) -> int:
+                    p = a + b - c
+                    pa, pb, pc = abs(p - a), abs(p - b), abs(p - c)
+                    if pa <= pb and pa <= pc:
+                        return a
+                    if pb <= pc:
+                        return b
+                    return c
+
+                for x in range(stride):
+                    a = row[x - bpp] if x >= bpp else 0
+                    b = prev[x]
+                    c = prev[x - bpp] if x >= bpp else 0
+                    row[x] = (row[x] + paeth(a, b, c)) & 255
+            rows.append(row)
+            prev = row
+
+        def alpha(x: int, y: int) -> int:
+            return rows[y][x * 4 + 3]
+
+        corners = [alpha(0, 0), alpha(w - 1, 0), alpha(0, h - 1), alpha(w - 1, h - 1)]
+        self.assertTrue(all(a < 16 for a in corners), msg=f"corners not clear: {corners}")
 
 
 class TestHomepageChrome(unittest.TestCase):

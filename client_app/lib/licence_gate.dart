@@ -32,20 +32,20 @@ const String kConnectBlockedNoEntitlementMsg =
     'Connect is blocked: no successful payment entitlement on this install. '
     'After paying on https://restoreprivacy.online/, enter the keygen from your '
     'fulfilment email in the unlock dialog (USE THIS KEYGEN TO UNLOCK YOUR '
-    'RESTORE PRIVACY TRIAL). Download alone does not unlock residual VPN. '
+    'RESTORE PRIVACY). Download alone does not unlock residual VPN. '
     'Successful payment/active subscription is required; if payment fails at any time, '
     'Connect is cancelled.';
 
 const String kConnectBlockedKeygenMsg =
     'Connect is blocked: enter a valid keygen after accepting the licence. '
     'Your fulfilment email includes the keygen with the text '
-    'USE THIS KEYGEN TO UNLOCK YOUR RESTORE PRIVACY TRIAL. '
+    'USE THIS KEYGEN TO UNLOCK RESTORE PRIVACY. '
     'Download alone does not unlock residual VPN.';
 
 const String kKeygenPromptTitle = 'Enter licence keygen';
 const String kKeygenPromptBody =
     'Your fulfilment email includes a keygen with the text '
-    'USE THIS KEYGEN TO UNLOCK YOUR RESTORE PRIVACY TRIAL '
+    'USE THIS KEYGEN TO UNLOCK RESTORE PRIVACY '
     '(format RPT-KEY-…). Paste it below to unlock Connect. '
     'Download alone does not unlock residual VPN.';
 
@@ -66,7 +66,7 @@ const String kLicenceStatusOk = 'OK';
 const String kLicenceStatusExpired = 'EXPIRED';
 
 const String kKeygenUnlockInstruction =
-    'USE THIS KEYGEN TO UNLOCK YOUR RESTORE PRIVACY TRIAL';
+    'USE THIS KEYGEN TO UNLOCK RESTORE PRIVACY';
 
 const String kDefaultPaymentStatusBaseUrl = 'https://restoreprivacy.online';
 
@@ -156,7 +156,7 @@ const String kShortLicenceSummary =
     'By accepting, you agree to those terms. Acceptance is stored only on this device. '
     'After you accept, enter the keygen from your fulfilment email '
     '($kKeygenUnlockInstruction) to unlock Connect. '
-    'Your monthly subscription (£2.45 per month) begins after your 7 day trial. '
+    'Your subscription (£2.45 per month or £27.93 per year, save 5% annually) starts when you pay. '
     '$kPaymentConnectDisclaimerPlain';
 
 class LicenceAcceptance {

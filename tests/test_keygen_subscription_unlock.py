@@ -40,7 +40,10 @@ class TestHomepageTrialSentence(unittest.TestCase):
         self.assertIn('class="dl-only-price"', html)
         self.assertIn(ONLY_PRICE_BANNER, html)
         self.assertIn("ONLY £2.45 per month", ONLY_PRICE_BANNER)
-        self.assertIn("yearly", ONLY_PRICE_BANNER.lower())
+        self.assertTrue(
+            "yearly" in ONLY_PRICE_BANNER.lower()
+            or "annual" in ONLY_PRICE_BANNER.lower()
+        )
         heading_i = html.find("Download client v")
         banner_i = html.find('id="dl-only-price"')
         box_start = html.find('id="dl-price-box"')
@@ -54,20 +57,27 @@ class TestHomepageTrialSentence(unittest.TestCase):
         p_open = html.find(">", price_start) + 1
         p_close = html.find("</p>", p_open)
         snippet = html[p_open:p_close]
-        trial = TRIAL_SUBSCRIPTION_SENTENCE
+        sub_sentence = TRIAL_SUBSCRIPTION_SENTENCE
         package = PACKAGE_IDENTITY
         self.assertIn(f"{PRICE_LABEL} GBP", snippet)
         self.assertIn(package, snippet)
         self.assertIn("one device licence", snippet)
-        self.assertIn(trial, snippet)
-        self.assertIn("your monthly subscription begins after your 7 day trial", snippet)
-        self.assertIn("pay on Stripe", snippet)
+        self.assertIn(sub_sentence, snippet)
+        self.assertTrue(
+            "Monthly or Annual" in snippet or "Monthly or Yearly" in snippet
+        )
+        self.assertIn("subscription starts when you pay", snippet)
+        self.assertNotIn("7 day trial", snippet.lower())
+        self.assertNotIn("7-day trial", snippet.lower())
+        self.assertTrue(
+            "Stripe" in snippet or "Buy now" in snippet or "secure" in snippet.lower()
+        )
         self.assertIn("download starts automatically", snippet)
         self.assertIn(
             "licence key and download links are emailed to you separately",
             snippet,
         )
-        # Old keygen-email clause and nested-price trial must not remain
+        # Old keygen-email clause and 7-day trial copy must not remain
         self.assertNotIn("keygen is emailed to you directly", snippet)
         self.assertNotIn("keygen is emailed to you directly", html)
         self.assertNotIn(
@@ -78,22 +88,26 @@ class TestHomepageTrialSentence(unittest.TestCase):
             "Your monthly subscription (£2.45 per month) begins after your 7 day trial",
             html,
         )
+        self.assertNotIn(
+            "your monthly subscription begins after your 7 day trial",
+            html.lower(),
+        )
         # Old sole identity without subscription/licence language must not remain
         self.assertNotEqual(
             snippet.strip(),
             f"{PRICE_LABEL} GBP per package — pay on Stripe, then download starts automatically",
         )
-        # Order: price → package identity → trial → pay → licence key email clause
+        # Order: price → package identity → subscription sentence → checkout → email clause
         i_price = snippet.find(f"{PRICE_LABEL} GBP")
         i_pkg = snippet.find(package)
-        i_trial = snippet.find(trial)
-        i_pay = snippet.find("pay on Stripe")
+        i_sub = snippet.find(sub_sentence)
+        i_pay = snippet.find("checkout") if "checkout" in snippet else snippet.find("Stripe")
         i_links = snippet.find(
             "licence key and download links are emailed to you separately"
         )
         self.assertLess(i_price, i_pkg)
-        self.assertLess(i_pkg, i_trial)
-        self.assertLess(i_trial, i_pay)
+        self.assertLess(i_pkg, i_sub)
+        self.assertLess(i_sub, i_pay)
         self.assertLess(i_pay, i_links)
         self.assertIn(PAY_AND_KEYGEN_CLAUSE, snippet)
         # Box width ~2/3 + fluid narrow rule on real CSS from shipped download_css()
@@ -208,7 +222,7 @@ class TestKeygenMintAndEmail(unittest.TestCase):
         )
         # Unlock sentence exact
         self.assertIn(
-            "USE THIS KEYGEN TO UNLOCK YOUR RESTORE PRIVACY TRIAL", body
+            "USE THIS KEYGEN TO UNLOCK RESTORE PRIVACY", body
         )
 
         # Second grant same session keeps same keygen

@@ -6,7 +6,7 @@
 
 - **Privacy-scale Settings:** traffic shaping, outer obfuscation, multi-hop toggles with explainers; **hot-apply while connected** (shaping/obfs live; multi-hop re-establishes residual). Defaults: shape+obfs **on**, multi-hop **off**. Residual VPN core + keygen lock remain required.
 - **Ping statistics:** Settings shows live device→entry (Iceland) ms; device→exit (Romania) when multi-hop is on. AUDIT adds UK approximate ping + RAG table for all privacy-scale combinations.
-- **Keygen unlock:** unique RPT-KEY-… minted on paid Stripe checkout; fulfilment email includes keygen + PPI + download link (**USE THIS KEYGEN TO UNLOCK YOUR RESTORE PRIVACY TRIAL**). Clients: Install → accept licence → **forced keygen unlock dialog** (all platforms — not Settings-only) → Connect only while subscription active. Download alone does **not** unlock residual.
+- **Keygen unlock:** unique RPT-KEY-… minted on paid Stripe checkout; fulfilment email includes keygen + PPI + download link (**USE THIS KEYGEN TO UNLOCK RESTORE PRIVACY**). Clients: Install → accept licence → **forced keygen unlock dialog** (all platforms — not Settings-only) → Connect only while subscription active. Download alone does **not** unlock residual.
 - **Connect errors:** residual remote reset / timeout messaging guides users to enter keygen and re-verify unlock (including Windows WinError 10054 class failures).
 - **Homepage:** Â£2.45 per month subscription package â€” one device licence; trial sentence; BMC tip at page bottom.
 - **Node wipe UI:** entry-only clear timer (exit wipe countdown removed; weekly service remains entry-only).

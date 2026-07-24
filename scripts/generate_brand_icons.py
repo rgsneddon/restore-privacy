@@ -39,6 +39,8 @@ STATUS_STATIC = ROOT / "status_page" / "static"
 WIN_CLIENT_ICON = ROOT / "client" / "windows" / "native" / "app_icon.ico"
 WIN_CLIENT_PNG = ROOT / "client" / "windows" / "native" / "app_icon.png"
 FLUTTER_WIN_ICO = ROOT / "client_app" / "windows" / "runner" / "resources" / "app_icon.ico"
+FLUTTER_BRAND_DIR = ROOT / "client_app" / "assets" / "brand"
+BROWSER_EXT_ICONS = ROOT / "browser_extension" / "icons"
 
 ANDROID_MIPMAPS = {
     "mipmap-mdpi": 48,
@@ -184,12 +186,18 @@ def generate_all() -> dict:
     shutil.copy2(BRAND_DIR / "favicon-32.png", STATUS_STATIC / "favicon.png")
     shutil.copy2(BRAND_DIR / "logo-256.png", STATUS_STATIC / "logo.png")
     save_png(resize_png(master, 180), STATUS_STATIC / "apple-touch-icon.png")
+    # Public site header: transparent mark (no opaque plate)
+    if PRIMARY_TRANSPARENT.is_file():
+        shutil.copy2(PRIMARY_TRANSPARENT, STATUS_STATIC / "logo_transparent.png")
+    else:
+        save_png(resize_png(fg, 512), STATUS_STATIC / "logo_transparent.png")
     written.extend(
         [
             str(STATUS_STATIC / "favicon.ico"),
             str(STATUS_STATIC / "favicon.png"),
             str(STATUS_STATIC / "logo.png"),
             str(STATUS_STATIC / "apple-touch-icon.png"),
+            str(STATUS_STATIC / "logo_transparent.png"),
         ]
     )
 
@@ -199,6 +207,25 @@ def generate_all() -> dict:
 
     save_ico(master, FLUTTER_WIN_ICO)
     written.append(str(FLUTTER_WIN_ICO))
+
+    # Flutter asset bundle brand (was historically a stale smaller plate)
+    FLUTTER_BRAND_DIR.mkdir(parents=True, exist_ok=True)
+    save_png(resize_png(master, 256), FLUTTER_BRAND_DIR / "logo-256.png")
+    save_png(resize_png(master, 512), FLUTTER_BRAND_DIR / "logo-512.png")
+    save_png(resize_png(master, 256), FLUTTER_BRAND_DIR / "app_icon.png")
+    written.extend(
+        [
+            str(FLUTTER_BRAND_DIR / "logo-256.png"),
+            str(FLUTTER_BRAND_DIR / "logo-512.png"),
+            str(FLUTTER_BRAND_DIR / "app_icon.png"),
+        ]
+    )
+
+    # Browser extension toolbar icons from current flat/primary
+    if BROWSER_EXT_ICONS.is_dir():
+        for name, px in (("icon-16.png", 16), ("icon-48.png", 48), ("icon-128.png", 128)):
+            save_png(resize_png(small_src if px <= 48 else master, px), BROWSER_EXT_ICONS / name)
+            written.append(str(BROWSER_EXT_ICONS / name))
 
     for folder, px in ANDROID_MIPMAPS.items():
         out = ANDROID_RES / folder / "ic_launcher.png"

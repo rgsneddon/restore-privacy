@@ -17,4 +17,4 @@ subscription / payment webhooks.
 ## Operator requirements
 - Stripe webhooks for checkout complete + failure/refund/subscription lifecycle.
 - Optional SMTP env for fulfilment email (keygen + PPI + download link).
-- Stripe product should use subscription + 7-day trial for messaging alignment.
+- Stripe product should use subscription for messaging alignment.

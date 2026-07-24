@@ -174,16 +174,20 @@ def _stripe_readiness() -> dict[str, Any]:
         "payment_page_url": pay_page,
         "payment_link_id": plink,
         "payment_link_ready": bool(plink.startswith("plink_")),
-        # Catalog product is subscription (£2.45/mo + trial), not a one-time donate tip
+        # Catalog product is subscription (£2.45/mo or yearly)
         "catalog_payment_mode": CATALOG_STRIPE_PAYMENT_MODE,
         "desired_subscription": {
             "mode": desired.get("mode"),
             "unit_amount_pence": desired.get("unit_amount_pence"),
+            "unit_amount_yearly_pence": desired.get("unit_amount_yearly_pence"),
             "currency": desired.get("currency"),
             "recurring_interval": desired.get("recurring_interval"),
+            "recurring_interval_yearly": desired.get("recurring_interval_yearly"),
             "trial_period_days": desired.get("trial_period_days"),
             "payment_link_id": desired.get("payment_link_id"),
             "payment_page_url": desired.get("payment_page_url"),
+            "payment_link_id_yearly": desired.get("payment_link_id_yearly"),
+            "payment_page_url_yearly": desired.get("payment_page_url_yearly"),
         },
         # Keygen receipt email — missing SMTP is the usual silent skip after pay
         "email_flow_enabled": bool(smtp.get("email_flow_enabled")),
@@ -257,7 +261,7 @@ STRIPE_PLUGIN = ProcessorPlugin(
     role="paid_downloads",
     description=(
         "Paid package downloads via Stripe **subscription** Payment Link "
-        "(£2.45/month GBP + 7-day trial). Catalog BUY tiles open the public link "
+        "(£2.45/month GBP subscription). Catalog BUY tiles open the public link "
         "with client_reference_id; fulfilment needs secret key + webhook — never commit them."
     ),
     variables=(

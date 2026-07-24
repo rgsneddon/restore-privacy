@@ -1,12 +1,12 @@
-# Status host: fulfilment SMTP + Stripe 7-day trial Payment Link
+# Status host: fulfilment SMTP + site plan page + Stripe subscription Checkout
 
 ## Goal
 
 1. Production status host can send **keygen + PPI + download** fulfilment email
    (SMTP env vars on Render).
-2. Catalog **Payment Link** is a **subscription** at **£2.45/month GBP** with a
-   **7 day trial**, matching homepage copy:
-   *Your monthly subscription (£2.45 per month) begins after your 7 day trial*.
+2. Catalog routes to the site **Select your plan** page (`/pay`) for
+   **Monthly VPN plan (£2.45/month)** or **Yearly VPN plan (£27.93/year, 5% off)**
+   with **subscription starts when you pay**, then Stripe **subscription** Checkout Session.
 
 ## SMTP env keys (shipped reader)
 
@@ -77,44 +77,28 @@ Stripe Dashboard **customer receipts** are separate: they need a verified custom
 email domain for `restoreprivacy.online` / From `rus@…` — Stripe does **not**
 log into IMAP/POP with the mailbox password. See Dashboard → Settings → Customer emails.
 
-## Stripe Payment Links — monthly + yearly
+## Stripe products — Monthly / Yearly VPN plan (no trial)
 
-### Monthly — £2.45/month + 7-day trial
+Catalog **primary path** is site-hosted `/pay` → Checkout Session (not dual
+`buy.stripe.com` Payment Links).
 
-| Field | Value |
-|-------|--------|
-| Payment Link id | `plink_1TvTu6JDavQ2TJW6FeL0dIh9` |
-| Public URL | `https://buy.stripe.com/cNi7sM4uOeWQ9TBe0q7kc00` |
-| Default price id (may change after recreate) | `price_1TvTsaJDavQ2TJW6HZVIG7hg` |
-| Target | recurring **GBP**, **unit_amount 245**, interval **month**, trial **7 days** |
+| Plan | Product name | Unit amount | Interval | Default price id |
+|------|--------------|-------------|----------|------------------|
+| Monthly | Monthly VPN plan | **245** pence (£2.45) | month | `price_1TwjilJDavQ2TJW6fyxzCIkA` |
+| Yearly | Yearly VPN plan | **2793** pence (£27.93 = 5% off 12×£2.45) | year | `price_1TwjimJDavQ2TJW6wEKr4upj` |
 
-### Yearly (operator-configured)
+Old product **download a vpn** is archived. Override price ids with
+`STRIPE_PRICE_ID_MONTHLY` / `STRIPE_PRICE_ID_YEARLY` if you rotate Dashboard prices.
 
-Create a **yearly** recurring price in Stripe Dashboard and a second Payment
-Link. Set on Render (or env):
+### Dashboard steps (no API key)
 
-- `STRIPE_PAYMENT_PAGE_URL_YEARLY` (or `RPT_STRIPE_PAYMENT_PAGE_URL_YEARLY`)
-
-Yearly unit amount is **not** hard-coded in the app — use whatever price you
-configure in Stripe. If the yearly env is unset, catalog **Yearly** buttons
-still work for architecture: they reuse the monthly Payment Link URL with
-`client_reference_id=platform|year` (prefer a real yearly link in production).
-
-### Dashboard steps — monthly (no API key)
-
-1. [Stripe Dashboard → Products](https://dashboard.stripe.com/products) — product for Restore Privacy.
-2. Add **recurring** price: **£2.45**, currency **GBP**, billing period **Monthly**.
-3. [Payment Links](https://dashboard.stripe.com/payment-links) → open
-   `plink_1TvTu6JDavQ2TJW6FeL0dIh9` (or the link currently on the status downloads page).
-4. Set the line item to the monthly £2.45 price (subscription mode).
-5. Under **subscription** / trial options set **trial period = 7 days**.
-6. Save. Open the public URL in a private window: checkout should show
-   trial then **£2.45/month**.
-7. If Stripe issues a **new** Payment Link URL, set on Render:
-   - `STRIPE_PAYMENT_PAGE_URL`
-   - `STRIPE_PAYMENT_LINK_ID`
-   - (yearly) `STRIPE_PAYMENT_PAGE_URL_YEARLY`
-   and redeploy.
+1. [Stripe Dashboard → Products](https://dashboard.stripe.com/products) — create
+   **Monthly VPN plan** and **Yearly VPN plan** (or open the shipped products).
+2. Recurring prices: **£2.45 GBP / month** and **£27.93 GBP / year** (no trial).
+3. Ensure status host has `STRIPE_SECRET_KEY` + webhook so `/pay/checkout` can
+   create subscription Checkout Sessions.
+4. Confirm catalog tiles open `/pay?platform=…` and the plan page shows
+   Select your plan Monthly | Annual with **SAVE 5%** on annual.
 
 ### API script (when `STRIPE_SECRET_KEY` is available)
 
@@ -125,9 +109,9 @@ python scripts/configure_stripe_payment_link_trial.py --out stripe_payment_link_
 python scripts/configure_stripe_payment_link_trial.py --dry-run
 ```
 
-The script reuses or creates a monthly £2.45 price and updates the Payment Link
-`subscription_data[trial_period_days]=7`. If Stripe rejects line-item mutation
-on the existing link, use Dashboard recreate (steps above) and update env URLs.
+The script reuses or creates monthly £2.45 and yearly **£27.93** (2793 pence)
+prices and asserts **subscription starts when you pay**. Prefer Checkout Session price ids over
+legacy Payment Links for catalog.
 
 ## Verification checklist
 
@@ -137,7 +121,8 @@ on the existing link, use Dashboard recreate (steps above) and update env URLs.
 | App reads same keys | `python -c "from payments import fulfilment_smtp_env_keys; print(fulfilment_smtp_env_keys())"` from `status_page/` |
 | Host healthy | `GET https://restoreprivacy.online/health` → `{"ok":true}` (twice) |
 | Fulfilment probe | `GET https://restoreprivacy.online/health/fulfilment` → `ok: true` |
-| Trial configured | Stripe Dashboard checkout preview **or** script readback JSON with `trial_period_days: 7` and `unit_amount: 245` |
+| No trial + monthly/yearly | Desired fields: `trial_period_days` 0; monthly `245`; yearly **`2793`**; products Monthly/Yearly VPN plan |
+| Catalog entry | Homepage tiles → `/pay?platform=…` (site plan page) |
 
 ## Code map
 

@@ -77,9 +77,9 @@ def settings_parts_catalog() -> list[dict[str, str]]:
             "title": "Run at device startup",
             "default": "Off",
             "body": (
-                "When ON, Privacy Restored opens when you sign in to Windows "
-                "(Startup-folder shortcut). Default OFF so the app only runs when "
-                "you open it. Does not by itself Connect residual VPN."
+                "When ON, the app opens at Windows sign-in (Startup-folder shortcut). "
+                "Default OFF — it only runs when you launch it. This does not Connect "
+                "the VPN by itself."
             ),
         },
         {
@@ -87,10 +87,8 @@ def settings_parts_catalog() -> list[dict[str, str]]:
             "title": "Autoconnect on launch",
             "default": "Off",
             "body": (
-                "When ON, a cold start of the app starts Connect automatically "
-                "(after licence + keygen unlock). Default OFF — Connect is manual. "
-                "Autoconnect still respects licence acceptance and keygen entitlement; "
-                "it never skips unlock."
+                "When ON, opening the app starts Connect automatically after licence "
+                "and keygen unlock. Default OFF — Connect is manual. Unlock is never skipped."
             ),
         },
         {
@@ -145,12 +143,11 @@ def settings_parts_catalog() -> list[dict[str, str]]:
             "title": "Payment entitlement / keygen unlock",
             "default": "Required for Connect",
             "body": (
-                "After paying on restoreprivacy.online, your email includes a keygen "
-                "(format RPT-KEY-…) with USE THIS KEYGEN TO UNLOCK YOUR RESTORE "
-                "PRIVACY TRIAL. Enter it in the forced unlock dialog (or Settings → "
-                "Payment entitlement / keygen). Download alone does not unlock "
-                "residual HELLO. Connect only works while your subscription/payment "
-                "is active; refunds or failed charges cancel Connect for that install."
+                "After you pay on restoreprivacy.online, email delivers a keygen "
+                "(RPT-KEY-…). Enter it in the forced unlock dialog (Settings → "
+                "Payment entitlement is a fallback). Download alone does not unlock "
+                "residual HELLO. Connect only works while the subscription is active; "
+                "refunds or failed charges cancel Connect until you renew."
             ),
         },
         {
@@ -158,9 +155,8 @@ def settings_parts_catalog() -> list[dict[str, str]]:
             "title": "Local connection log",
             "default": "On-device only",
             "body": (
-                "Settings can show and export a local connection event log for "
-                "transparency. Events stay on your device — they are not shipped "
-                "to the node as a user dossier."
+                "Settings can show and export a local connection log. Events stay on "
+                "your device — they are not uploaded to the node."
             ),
         },
         {
@@ -168,9 +164,8 @@ def settings_parts_catalog() -> list[dict[str, str]]:
             "title": "Leak test",
             "default": "Optional diagnostic",
             "body": (
-                "Optional product leak test from Settings checks residual honesty "
-                "signals (e.g. capture / DNS expectations). It is a local diagnostic "
-                "aid — not a third-party web leak site phone-home."
+                "Optional residual honesty checks from Settings (capture / DNS). "
+                "Local diagnostic only — not a third-party leak site."
             ),
         },
         {
@@ -178,9 +173,8 @@ def settings_parts_catalog() -> list[dict[str, str]]:
             "title": "Audit, privacy policy, and licence links",
             "default": "Open in browser",
             "body": (
-                "Settings links to the public security audit (AUDIT.md), privacy "
-                "policy, and end-user licence on the status host so you can review "
-                "product honesty documents without a public source tree."
+                "Opens the public security audit, privacy policy, and licence on the "
+                "status host so you can read them without a public source tree."
             ),
         },
     ]
@@ -264,44 +258,39 @@ def render_explainers_box_html(parts: list[dict[str, str]] | None = None) -> str
 
 
 def render_install_howto_box_html() -> str:
-    """Second box: detailed how-to install and run (below explainers)."""
+    """Second box: how to install and run (below explainers)."""
     return """    <section class="panel-card" id="install-run-howto-box" aria-labelledby="install-howto-heading">
-      <h2 class="panel-title" id="install-howto-heading">How to install and run Restore Privacy</h2>
+      <h2 class="panel-title" id="install-howto-heading">How to install and run</h2>
       <ol class="howto-steps" id="install-howto-steps">
         <li><strong>Pay on the status page.</strong> Open
-          <a href="/" style="color:var(--rb-link);font-weight:700;">restoreprivacy.online</a>
-          (use <strong>Home</strong> in the header). Choose your platform and complete Stripe
-          checkout (£2.45/month after the 7-day trial wording on the catalog).</li>
-        <li><strong>Download starts after payment.</strong> Use the one-time download link
-          (and the email with download + keygen). Packages are not free permanent public
-          GitHub installs.</li>
-        <li><strong>Install the package for your OS.</strong>
-          Windows: run the setup exe (Administrator may be required later for residual tunnel).
-          Android: allow install from the file source, then open the APK.
-          Linux: extract the tar.gz and run the product entry script.
-          macOS / iOS: follow the package README (signed/sideload per catalog notes).</li>
-        <li><strong>Accept the end-user licence</strong> on first use (Settings or the licence
-          prompt). Acceptance is local only — Connect stays blocked until you accept.</li>
-        <li><strong>Enter your keygen unlock code</strong> from the fulfilment email
-          (RPT-KEY-… / USE THIS KEYGEN TO UNLOCK YOUR RESTORE PRIVACY TRIAL).
+          <a href="/" style="color:var(--rb-link);font-weight:700;">restoreprivacy.online</a>,
+          choose your platform and plan (Monthly £2.45 or Yearly £27.93 / save 5%), and
+          complete Stripe Checkout.</li>
+        <li><strong>Download after payment.</strong> Use the one-time link on the success page
+          (email also has download + keygen). These are not free permanent GitHub installs.</li>
+        <li><strong>Install for your OS.</strong>
+          Windows: run the setup exe (Admin may be needed later for residual).
+          Android: allow the APK source, then install.
+          Linux: extract the tar.gz and run the entry script.
+          macOS / iOS: follow the package notes (signed / sideload).</li>
+        <li><strong>Accept the end-user licence</strong> on first use. Acceptance is local only —
+          Connect stays blocked until you accept.</li>
+        <li><strong>Enter the keygen</strong> from email (RPT-KEY-…).
           Use the forced unlock dialog — download alone does not unlock residual VPN.</li>
-        <li><strong>Press Connect.</strong> Approve Administrator/root elevation when asked so
-          residual public IP uses the VPN node. Wait until the app reports residual capture
-          active before relying on the tunnel.</li>
-        <li><strong>Optional — Settings privacy scale.</strong> Turn traffic shaping or outer
-          obfuscation OFF for a snappier residual feel (weaker traffic analysis resistance).
-          Multi-hop ON uses the exit path (higher latency). Changes hot-apply while connected
-          where the product supports it (multi-hop re-establishes residual).</li>
-        <li><strong>Optional — Measure ping</strong> in Settings to see device→entry (and
-          device→exit when multi-hop is on) RTT. Not a contractual speed SLA.</li>
-        <li><strong>Disconnect</strong> from the app when finished. Residual routing stops when
-          you Disconnect (or Quit, depending on platform shell).</li>
+        <li><strong>Press Connect.</strong> Approve elevation when asked so residual public IP
+          uses the VPN node. Wait until residual capture is active before relying on it.</li>
+        <li><strong>Optional Settings.</strong> Traffic shaping / outer obfuscation OFF feels
+          snappier (weaker traffic-analysis resistance). Multi-hop ON uses the exit path
+          (higher latency). Measure ping shows device→entry (and exit when multi-hop is on) —
+          not a speed SLA.</li>
+        <li><strong>Disconnect</strong> when finished. Residual routing stops on Disconnect
+          (or Quit, depending on platform).</li>
       </ol>
       <p class="howto-note" id="install-howto-note">
-        If Connect fails after payment: re-enter the keygen, confirm your subscription is
-        still active, check Windows Firewall / UDP path, and review the public
+        If Connect fails after payment: re-enter the keygen, confirm the subscription is
+        still active, check firewall / UDP path, and open the
         <a href="/AUDIT.md" style="color:var(--rb-link);">security audit</a>.
-        Support docs: Privacy Policy and licence are linked from the homepage.
+        Privacy policy and licence are linked from the homepage.
       </p>
     </section>
 """
@@ -334,7 +323,7 @@ def render_settings_explainer_page_html(*, title: str | None = None) -> bytes:
     header = public_brand_header_html(
         title=brand,
         active="settings",
-        logo_size=88,
+        logo_size=112,
     )
     body = f"""{public_head_open(title=f"Client Settings guide — {brand}", extra_css=css)}
   <div class="page-shell" id="settings-explainer-page">

@@ -1,4 +1,4 @@
-"""Tests drive shipped coffee-link builder / VPN APP Shop render."""
+"""Public footer copyright + residual BMC admin helpers."""
 
 from __future__ import annotations
 
@@ -17,32 +17,49 @@ import app as status_app  # noqa: E402
 from coffee_link import (  # noqa: E402
     COFFEE_LINK_TEXT,
     COFFEE_LINK_URL,
+    SITE_COPYRIGHT_TEXT,
     coffee_link_css,
+    coffee_tip_url,
     render_coffee_link_html,
+    render_site_copyright_footer_html,
 )
 
 
 class TestCoffeeLinkBuilder(unittest.TestCase):
-    def test_exact_text_and_url(self):
+    def test_admin_bmc_constants_still_defined(self):
+        """Admin inventory may still know the BMC URL; public footer does not use it."""
         self.assertEqual(COFFEE_LINK_TEXT, "buy rus a coffee")
         self.assertEqual(COFFEE_LINK_URL, "https://buymeacoffee.com/rgsneddon")
-        html = render_coffee_link_html()
-        self.assertIn("buy rus a coffee", html)
-        self.assertIn('href="https://buymeacoffee.com/rgsneddon"', html)
-        self.assertIn("coffee-footer", html)
-        self.assertIn("coffee-link", html)
-        self.assertNotIn('href="#"', html)
+        self.assertIn("buymeacoffee.com", coffee_tip_url())
+
+    def test_public_footer_is_raskul_copyright(self):
+        self.assertEqual(SITE_COPYRIGHT_TEXT, "(c) Raskul - all rights reserved")
+        html = render_site_copyright_footer_html()
+        self.assertIn("Raskul", html)
+        self.assertIn("all rights reserved", html)
+        self.assertIn("(c)", html)
+        self.assertIn('id="site-footer"', html)
+        self.assertNotIn("buymeacoffee.com", html)
+        self.assertNotIn("bmc-tip-link", html)
+        # render_coffee_link_html is back-compat alias → copyright
+        alias = render_coffee_link_html()
+        self.assertIn("Raskul", alias)
+        self.assertNotIn("buymeacoffee.com", alias)
         css = coffee_link_css()
         self.assertIn("text-align: center", css)
-        self.assertIn("coffee-footer", css)
+        self.assertIn("site-footer", css)
         self.assertIn("margin-top: auto", css)
 
-    def test_public_page_excludes_coffee_keeps_title_downloads(self):
+    def test_public_page_footer_copyright_no_bmc(self):
         page = status_app.render_html(
             {"title": "RESTORE PRIVACY"}
         ).decode("utf-8")
         self.assertNotIn("buy rus a coffee", page)
-        self.assertIn("buymeacoffee.com", page)  # tip/support footer (not free package href)
+        self.assertNotIn("buymeacoffee.com", page)
+        self.assertNotIn("bmc-tip-link", page)
+        self.assertIn("Raskul", page)
+        self.assertIn("all rights reserved", page)
+        self.assertIn('id="site-footer"', page)
         self.assertNotIn("fetch('/api/status'", page)
         self.assertNotIn("clients_connected", page)
         self.assertIn("RESTORE PRIVACY", page)
@@ -72,7 +89,9 @@ class TestCoffeeLinkHttp(unittest.TestCase):
                     html = resp.read().decode("utf-8")
                 self.assertNotIn("fetch('/api/status'", html)
                 self.assertNotIn("buy rus a coffee", html)
-                self.assertIn("Download client v0.3.4", html)
+                self.assertNotIn("buymeacoffee.com", html)
+                self.assertIn("Raskul", html)
+                self.assertIn("Download client", html)
 
 
 if __name__ == "__main__":

@@ -17,9 +17,19 @@ from dataclasses import dataclass
 from typing import Iterable
 
 try:
-    from coffee_link import COFFEE_LINK_URL, coffee_tip_url
+    from coffee_link import (
+        COFFEE_LINK_URL,
+        coffee_tip_url,
+        render_site_copyright_footer_html,
+        site_copyright_text,
+    )
 except ImportError:  # package import path (status_page as package)
-    from status_page.coffee_link import COFFEE_LINK_URL, coffee_tip_url
+    from status_page.coffee_link import (  # type: ignore
+        COFFEE_LINK_URL,
+        coffee_tip_url,
+        render_site_copyright_footer_html,
+        site_copyright_text,
+    )
 
 RELEASE_VERSION = "0.4.2"
 GITHUB_OWNER = "rgsneddon"
@@ -146,28 +156,49 @@ IOS_ZIP_FILENAME = f"restore-privacy-client-{RELEASE_VERSION}-ios.zip"
 LINUX_TGZ_FILENAME = f"restore-privacy-client-{RELEASE_VERSION}-linux-x64.tar.gz"
 
 PRICE_LABEL = "£2.45"
-PRICE_YEARLY_LABEL = "£29.40"  # 12 × £2.45 GBP anchor
+PRICE_YEARLY_LABEL = "£27.93"  # 5% off 12 × £2.45 GBP anchor
 # Large white bold callout under "Download client v…" on the public homepage.
-ONLY_PRICE_BANNER = "ONLY £2.45 per month — or pay yearly (£29.40)"
+ONLY_PRICE_BANNER = "ONLY £2.45 per month — or annual £27.93 (save 5%)"
 # Short single-line note under the price box (no re-listing of £ amounts).
 YEARLY_PLAN_NOTE = (
-    "Pick Monthly or Yearly for your platform. "
+    "Select your device and plan below, then Buy now. "
+    "Annual saves 5% vs paying monthly. "
     "Local currency display uses the GBP anchors above "
     "(we accept your local currency when Stripe allows; otherwise USD)."
 )
-# Shown under the buy-button grid (bold bright white, price-box-like frame).
+# Shown under the selection form (bold bright white, price-box-like frame).
 PLATFORM_SELECT_NOTE = (
     "Please select your device platform carefully — you will only receive "
     "the installer for that platform."
 )
 # Homepage download price block (single shipped contract for public #downloads).
 PACKAGE_IDENTITY = "one device licence"
+# Legacy constant name kept for import stability (no trial product / no trial copy).
 TRIAL_SUBSCRIPTION_SENTENCE = (
-    "your monthly subscription begins after your 7 day trial"
+    "Select your device and plan — Monthly or Annual (5% off yearly) — "
+    "subscription starts when you pay"
 )
+# Preferred alias (same text; avoid “trial” in new call sites).
+CATALOG_SUBSCRIPTION_SENTENCE = TRIAL_SUBSCRIPTION_SENTENCE
 PAY_AND_KEYGEN_CLAUSE = (
-    "pay on Stripe, then download starts automatically "
+    "Buy now opens secure Stripe checkout, then download starts automatically "
     "(licence key and download links are emailed to you separately)"
+)
+# Buy now label on the homepage form.
+BUY_NOW_LABEL = "Buy now"
+# Auto-renew checkbox (purchase flow → subscription_data cancel_at_period_end).
+AUTO_RENEW_LABEL = "Auto-renew this subscription"
+AUTO_RENEW_HELP = (
+    "When on, Stripe bills again at the end of each month or year. "
+    "Turn off for a single paid period (access until period end, no further charges)."
+)
+# Honest Stripe branding note (site form uses main CSS; Checkout is Stripe-hosted).
+# Custom domains (pay.yourdomain) only change the hostname — still not full CSS.
+STRIPE_CHECKOUT_BRANDING_NOTE = (
+    "Card payment opens on Stripe’s secure checkout page. "
+    "That page uses Stripe’s layout with optional Dashboard logo/colours "
+    "(and optional pay.yourdomain custom domain) — "
+    "it cannot load this website’s full CSS."
 )
 # Default tip identity; runtime public page uses coffee_tip_url() (env override).
 BMC_TIP_URL = COFFEE_LINK_URL
@@ -220,7 +251,7 @@ class DownloadAsset:
 
     @property
     def pay_path(self) -> str:
-        """Paid entry: monthly Stripe Payment Link for this platform."""
+        """Paid entry: site-hosted plan page for this platform."""
         return self.pay_path_for_interval("month")
 
     def pay_path_for_interval(
@@ -229,11 +260,18 @@ class DownloadAsset:
         *,
         currency: str = "",
     ) -> str:
-        """Stripe Payment Link for *interval* (``month`` or ``year``) + platform."""
-        from payments import stripe_payment_page_href_for_platform
+        """Site ``/pay`` plan page for *interval* preselect + platform.
 
-        return stripe_payment_page_href_for_platform(
-            self.platform, interval=interval, currency=currency
+        Catalog primary path is the status host plan page (not buy.stripe.com).
+        """
+        from payments import site_pay_plan_path, stripe_payment_page_href_for_platform
+
+        _ = currency  # presentment applied at Checkout Session create
+        # Prefer pure relative path for catalog HTML (same-origin)
+        return site_pay_plan_path(self.platform, interval=interval) or (
+            stripe_payment_page_href_for_platform(
+                self.platform, interval=interval, currency=currency
+            )
         )
 
 
@@ -394,7 +432,7 @@ def download_css() -> str:
     }
     .dl-accept-currency[hidden] { display: none !important; }
     .dl-sub { display: none; } /* platforms shown on tiles only */
-    /* Nested price box: trial + pay once (~2/3 width) */
+    /* Nested price box (~2/3 width) */
     .dl-price-box {
       width: 66.67%;
       max-width: 66.67%;
@@ -449,6 +487,73 @@ def download_css() -> str:
     }
     .dl-buttons {
       display: flex; flex-direction: column; gap: 1rem; align-items: stretch; width: 100%;
+    }
+    /* Homepage embedded buy form (platform + plan + Buy now) */
+    .dl-buy-form {
+      width: min(28rem, 100%);
+      margin: 0 auto;
+      padding: 1rem 1.1rem 1.15rem;
+      box-sizing: border-box;
+      border-radius: 14px;
+      border: 1px solid rgba(174, 208, 234, 0.28);
+      background: rgba(8, 18, 32, 0.5);
+      text-align: left;
+    }
+    .dl-buy-field { margin: 0 0 0.85rem; }
+    .dl-buy-field label.dl-buy-label {
+      display: block; font-weight: 700; font-size: 0.78rem; letter-spacing: 0.05em;
+      text-transform: uppercase; color: var(--rb-muted, #aed0ea); margin-bottom: 0.35rem;
+    }
+    .dl-buy-field select {
+      width: 100%; box-sizing: border-box; padding: 0.65rem 0.75rem;
+      border-radius: 10px; border: 1px solid rgba(174, 208, 234, 0.35);
+      background: rgba(8, 18, 32, 0.75); color: #e8f1ff; font: inherit; font-weight: 600;
+    }
+    .dl-plan-options { display: flex; flex-direction: column; gap: 0.5rem; }
+    .dl-plan-option {
+      display: block; cursor: pointer; border-radius: 12px;
+      border: 1px solid rgba(174, 208, 234, 0.25); padding: 0.7rem 0.85rem;
+      background: rgba(10, 22, 40, 0.55);
+    }
+    .dl-plan-option:has(input:checked) {
+      border-color: rgba(0, 229, 255, 0.55);
+      box-shadow: 0 0 0 1px rgba(0, 229, 255, 0.25);
+      background: rgba(20, 50, 90, 0.55);
+    }
+    .dl-plan-option input { margin-right: 0.5rem; accent-color: var(--rb-btn, #2694e8); }
+    .dl-plan-title { font-weight: 800; color: #fff; font-size: 0.98rem; }
+    .dl-plan-price { font-weight: 700; color: var(--rb-soft, #deedf7); margin-top: 0.15rem; font-size: 0.9rem; }
+    .dl-plan-save {
+      display: inline-block; margin-left: 0.35rem; padding: 0.1rem 0.4rem;
+      border-radius: 999px; font-size: 0.7rem; font-weight: 800;
+      background: rgba(57, 255, 106, 0.18); color: #39ff6a;
+    }
+    .dl-buy-now {
+      width: 100%; margin-top: 0.35rem; padding: 0.85rem 1rem; border: 0;
+      border-radius: 12px; font-weight: 800; font-size: 1.05rem; cursor: pointer;
+      font-family: inherit; color: #fff;
+      background: linear-gradient(180deg, var(--rb-btn, #2694e8) 0%, var(--rb-btn-deep, #1a6fad) 100%);
+      box-shadow: 0 4px 14px rgba(7, 30, 60, 0.4);
+    }
+    .dl-buy-now:hover { filter: brightness(1.08); }
+    .dl-auto-renew-field { margin: 0.25rem 0 0.85rem; }
+    .dl-auto-renew-label {
+      display: flex; align-items: flex-start; gap: 0.45rem; cursor: pointer;
+      font-weight: 700; color: #e8f1ff; font-size: 0.92rem;
+    }
+    .dl-auto-renew-label input { margin-top: 0.15rem; accent-color: var(--rb-btn, #2694e8); }
+    .dl-auto-renew-help {
+      margin: 0.35rem 0 0 1.45rem; font-size: 0.78rem; line-height: 1.4;
+      color: rgba(174, 208, 234, 0.9);
+    }
+    .dl-stripe-branding {
+      margin: 0.65rem 0 0; font-size: 0.78rem; line-height: 1.4;
+      color: rgba(174, 208, 234, 0.88); text-align: center;
+    }
+    .dl-pay-error {
+      color: #fecaca; background: rgba(127, 29, 29, 0.35); border: 1px solid #b91c1c;
+      border-radius: 10px; padding: 0.65rem 0.85rem; margin: 0 auto 0.85rem;
+      max-width: 28rem; text-align: left; font-weight: 600; font-size: 0.88rem;
     }
     .dl-row {
       display: flex; flex-direction: row; flex-wrap: wrap; gap: 1rem;
@@ -584,33 +689,26 @@ def payment_connect_disclaimer_html() -> str:
 
 
 def render_bmc_tip_html() -> str:
-    """Buy Me a Coffee tip block (tip/support only — not a paid download control).
+    """Public page bottom bar: ``(c) Raskul - all rights reserved``.
 
-    Homepage places this at the **very bottom** of the page shell (after downloads,
-    node-wipe, and audit). Stable anchors: ``#bmc-tip`` / ``#bmc-tip-link``.
+    Historical name retained for imports; no longer renders Buy Me a Coffee.
+    Stable anchors: ``#site-footer`` / ``#site-footer-copyright``.
     """
-    tip = coffee_tip_url()
-    tip_label = tip.replace("https://", "").replace("http://", "")
-    return (
-        f'  <p class="dl-tip bmc-page-footer" id="bmc-tip">'
-        f'Tip / support (not a paid download): '
-        f'<a id="bmc-tip-link" href="{tip}" rel="noopener noreferrer" '
-        f'target="_blank">{tip_label}</a></p>'
-    )
+    return render_site_copyright_footer_html()
 
 
 def render_catalog_footer_html() -> str:
     """Under-download-buttons footer (intentionally empty on public homepage).
 
-    BMC tip is **not** rendered here so it can sit at the page bottom via
-    :func:`render_bmc_tip_html` in the homepage shell. How-to-buy / catalogue
-    links remain omitted; Pay buttons are the only catalog entry.
+    Copyright sits at the page bottom via :func:`render_bmc_tip_html` in the
+    homepage shell. How-to-buy / catalogue links remain omitted.
     """
     return ""
 
 
-# Back-compat: historical name still returns the tip fragment for callers/tests.
+# Back-compat: historical names return the public copyright footer.
 render_rust_footer_html = render_bmc_tip_html
+render_site_footer_html = render_bmc_tip_html
 
 
 def platform_face_title(platform: str) -> str:
@@ -626,88 +724,120 @@ def platform_face_title(platform: str) -> str:
     return names.get(key, key.title() if key else "Device")
 
 
-def _render_platform_pay_link(
-    a: DownloadAsset,
-    *,
-    coming_soon: bool | None = None,
-    local_price: object | None = None,
-) -> str:
-    """One platform control (stable id + data attrs for layout/tests).
-
-    When *coming_soon* is true (default via :func:`catalog_buy_buttons_coming_soon`),
-    the control is a temporary self-link to :data:`COMING_SOON_PUBLIC_HREF`.
-
-    When *coming_soon* is false, live Stripe Payment Link path
-    (``data-pay-via="stripe-payment-page"``).
-
-    *local_price* is a :class:`local_currency.LocalPriceDisplay` for tile labels.
-    """
-    if coming_soon is None:
-        coming_soon = catalog_buy_buttons_coming_soon()
-    platform_title = platform_face_title(a.platform)
-    month_label = "Monthly £2.45"
-    year_label = f"Yearly {PRICE_YEARLY_LABEL}"
-    ccy = ""
-    if local_price is not None:
-        month_label = f"Monthly {getattr(local_price, 'monthly_label', month_label)}"
-        year_label = f"Yearly {getattr(local_price, 'yearly_label', year_label)}"
-        ccy = str(getattr(local_price, "currency", "") or "")
-    buy_line = f"BUY - {RELEASE_VERSION}"
-    # Stacked face: platform name + buy line (visible, distinct per control)
-    face = (
-        f'<span class="dl-platform">{platform_title}</span>'
-        f'<span class="dl-buy">{buy_line}</span>'
-    )
-    aria = f"{platform_title}: {buy_line} — {a.label}"
-    if coming_soon:
-        href = COMING_SOON_PUBLIC_HREF
-        return (
-            f'<div class="dl-platform-cell" id="dl-cell-{a.platform}" '
-            f'data-platform="{a.platform}">'
-            f'<a class="dl dl-coming-soon" id="dl-{a.platform}" href="{href}" '
-            f'rel="noopener noreferrer" '
-            f'data-platform="{a.platform}" data-filename="{a.filename}" '
-            f'data-price-pence="245" data-pay-via="coming-soon" '
-            f'data-billing-interval="month" '
-            f'data-coming-soon="1" aria-label="{aria}">'
-            f"{face}</a></div>"
-        )
-    href_m = a.pay_path_for_interval("month", currency=ccy)
-    href_y = a.pay_path_for_interval("year", currency=ccy)
-    # Dual subscription interval: monthly + yearly Payment Links
-    return (
-        f'<div class="dl-platform-cell" id="dl-cell-{a.platform}" '
-        f'data-platform="{a.platform}">'
-        f'<span class="dl-platform-label">{platform_title}</span>'
-        f'<div class="dl-interval-row" id="dl-interval-{a.platform}">'
-        f'<a class="dl dl-interval-month" id="dl-{a.platform}" href="{href_m}" '
-        f'rel="noopener noreferrer" target="_blank" '
-        f'data-platform="{a.platform}" data-filename="{a.filename}" '
-        f'data-price-pence="245" data-pay-via="stripe-payment-page" '
-        f'data-billing-interval="month" '
-        f'data-display-currency="{ccy}" '
-        f'aria-label="{platform_title}: monthly subscription — {a.label}">'
-        f'<span class="dl-buy">{month_label}</span></a>'
-        f'<a class="dl dl-interval-year" id="dl-{a.platform}-year" href="{href_y}" '
-        f'rel="noopener noreferrer" target="_blank" '
-        f'data-platform="{a.platform}" data-filename="{a.filename}" '
-        f'data-pay-via="stripe-payment-page" '
-        f'data-billing-interval="year" '
-        f'data-display-currency="{ccy}" '
-        f'aria-label="{platform_title}: yearly subscription — {a.label}">'
-        f'<span class="dl-buy">{year_label}</span></a>'
-        f"</div></div>"
-    )
-
-
 def download_menu_rows(
     assets: Iterable[DownloadAsset] | None = None,
 ) -> tuple[list[DownloadAsset], list[DownloadAsset]]:
-    """Split catalog into two rows under the title: three, then two."""
+    """Split catalog into two rows (legacy helper; homepage no longer grids tiles)."""
     items = list(assets) if assets is not None else available_downloads()
     if len(items) <= 3:
         return items, []
     return items[:3], items[3:]
+
+
+def _esc_html(s: str) -> str:
+    return (
+        str(s)
+        .replace("&", "&amp;")
+        .replace("<", "&lt;")
+        .replace(">", "&gt;")
+        .replace('"', "&quot;")
+    )
+
+
+def render_homepage_buy_form_html(
+    assets: Iterable[DownloadAsset] | None = None,
+    *,
+    coming_soon: bool = False,
+    local_price: object | None = None,
+    default_platform: str = "",
+    default_interval: str = "month",
+) -> str:
+    """Platform + plan selectors and Buy now form for the Download client box.
+
+    Live mode: ``POST /pay/checkout`` with ``platform`` + ``interval`` creates a
+    Stripe subscription Checkout Session for Monthly or Yearly VPN plan.
+    """
+    items = list(assets) if assets is not None else available_downloads()
+    if not items:
+        return ""
+    ccy = ""
+    month_label = PRICE_LABEL
+    year_label = PRICE_YEARLY_LABEL
+    if local_price is not None:
+        ccy = str(getattr(local_price, "currency", "") or "")
+        month_label = str(getattr(local_price, "monthly_label", month_label) or month_label)
+        year_label = str(getattr(local_price, "yearly_label", year_label) or year_label)
+
+    if coming_soon:
+        return (
+            f'<div class="dl-buy-form" id="dl-buy-form" data-buy-mode="coming-soon">'
+            f'<p class="dl-platform-note" id="dl-coming-soon-note">Buy buttons coming soon.</p>'
+            f'<a class="dl dl-coming-soon" id="dl-coming-soon" href="{COMING_SOON_PUBLIC_HREF}" '
+            f'rel="noopener noreferrer" data-pay-via="coming-soon">{BUY_NOW_LABEL}</a>'
+            f"</div>"
+        )
+
+    def_plat = (default_platform or "").strip().lower()
+    iv = (default_interval or "month").strip().lower()
+    if iv in ("year", "yearly", "annual", "annually"):
+        iv = "year"
+    else:
+        iv = "month"
+    opts = []
+    for a in items:
+        sel = " selected" if a.platform == def_plat else ""
+        title = platform_face_title(a.platform)
+        opts.append(
+            f'<option value="{_esc_html(a.platform)}"{sel} '
+            f'data-filename="{_esc_html(a.filename)}">'
+            f"{_esc_html(title)}</option>"
+        )
+    platform_options = "\n            ".join(opts)
+    month_checked = " checked" if iv == "month" else ""
+    year_checked = " checked" if iv == "year" else ""
+    return f"""
+    <form class="dl-buy-form" id="dl-buy-form" method="post" action="/pay/checkout"
+          data-pay-via="homepage-buy-form" data-billing-intervals="month,year"
+          data-display-currency="{_esc_html(ccy)}">
+      <div class="dl-buy-field" id="dl-platform-field">
+        <label class="dl-buy-label" for="dl-platform">Device / platform</label>
+        <select name="platform" id="dl-platform" required aria-required="true"
+                aria-label="Select your device platform">
+          <option value="" disabled{" selected" if not def_plat else ""}>Choose your device…</option>
+            {platform_options}
+        </select>
+      </div>
+      <div class="dl-buy-field" id="dl-plan-field">
+        <span class="dl-buy-label" id="dl-plan-label">Plan</span>
+        <div class="dl-plan-options" role="radiogroup" aria-labelledby="dl-plan-label">
+          <label class="dl-plan-option" id="dl-plan-month" data-interval="month">
+            <input type="radio" name="interval" value="month"{month_checked}
+                   aria-label="Monthly VPN plan"/>
+            <span class="dl-plan-title">Monthly VPN plan</span>
+            <div class="dl-plan-price">{_esc_html(month_label)} / month</div>
+          </label>
+          <label class="dl-plan-option" id="dl-plan-year" data-interval="year">
+            <input type="radio" name="interval" value="year"{year_checked}
+                   aria-label="Yearly VPN plan"/>
+            <span class="dl-plan-title">Yearly VPN plan
+              <span class="dl-plan-save">SAVE 5%</span></span>
+            <div class="dl-plan-price">{_esc_html(year_label)} / year</div>
+          </label>
+        </div>
+      </div>
+      <div class="dl-buy-field dl-auto-renew-field" id="dl-auto-renew-field">
+        <input type="hidden" name="auto_renew" value="0" id="dl-auto-renew-off"/>
+        <label class="dl-auto-renew-label" id="dl-auto-renew-label" for="dl-auto-renew">
+          <input type="checkbox" name="auto_renew" value="1" id="dl-auto-renew"
+                 checked aria-describedby="dl-auto-renew-help"/>
+          <span class="dl-auto-renew-title">{AUTO_RENEW_LABEL}</span>
+        </label>
+        <p class="dl-auto-renew-help" id="dl-auto-renew-help">{AUTO_RENEW_HELP}</p>
+      </div>
+      <button type="submit" class="dl-buy-now" id="dl-buy-now">{BUY_NOW_LABEL}</button>
+      <p class="dl-stripe-branding" id="dl-stripe-branding">{STRIPE_CHECKOUT_BRANDING_NOTE}</p>
+    </form>
+"""
 
 
 def render_download_section_html(
@@ -717,15 +847,15 @@ def render_download_section_html(
     accept_language: str = "",
     country: str = "",
     currency: str = "",
+    default_platform: str = "",
+    default_interval: str = "month",
 ) -> str:
-    """HTML: platform buy controls (live Stripe pay **or** temporary coming-soon).
+    """HTML: Download client box with embedded platform + plan + Buy now form.
 
-    Platform menu below the download title is **two rows**: three items, then two.
+    Live mode posts to ``/pay/checkout`` (subscription Checkout Session).
+    *coming_soon* defaults to :func:`catalog_buy_buttons_coming_soon`.
 
-    *coming_soon* defaults to :func:`catalog_buy_buttons_coming_soon`. Pass
-    ``coming_soon=False`` (or env live switch) to restore Stripe Pay buttons.
-
-    Local-currency display uses GBP anchors £2.45 / £29.40 with
+    Local-currency display uses GBP anchors £2.45 / £27.93 (5% annual off) with
     :mod:`local_currency` (Stripe-unsupported currencies → USD).
     """
     items = list(assets) if assets is not None else available_downloads()
@@ -747,27 +877,14 @@ def render_download_section_html(
         explicit_currency=currency,
     )
 
-    if not coming_soon:
-        from payments import stripe_payment_page_url
-
-        # Keep pay pipeline imported/ready; buttons use per-platform pay_path.
-        _ = stripe_payment_page_url()
-
-    row1, row2 = download_menu_rows(items)
-    row1_html = "\n      ".join(
-        _render_platform_pay_link(a, coming_soon=coming_soon, local_price=local)
-        for a in row1
+    buy_form = render_homepage_buy_form_html(
+        items,
+        coming_soon=coming_soon,
+        local_price=local,
+        default_platform=default_platform,
+        default_interval=default_interval,
     )
-    row2_block = ""
-    if row2:
-        row2_html = "\n      ".join(
-            _render_platform_pay_link(a, coming_soon=coming_soon, local_price=local)
-            for a in row2
-        )
-        row2_block = f"""
-    <div class="dl-row dl-row-2" id="dl-row-2" data-dl-row="2" data-dl-count="{len(row2)}">
-      {row2_html}
-    </div>"""
+
     # One local-currency line (includes accept notice — no second accept paragraph).
     accept = local.accept_notice  # e.g. we accept *EUR*
     if (local.currency or "").upper() in ("GBP", ""):
@@ -780,7 +897,7 @@ def render_download_section_html(
         local_line = (
             f"Local: <strong>{local.monthly_label}</strong> / mo · "
             f"<strong>{local.yearly_label}</strong> / yr "
-            f"(from £2.45 / £29.40 GBP) · {accept}"
+            f"(from £2.45 / £27.93 GBP) · {accept}"
         )
     if coming_soon:
         price_line = (
@@ -789,17 +906,16 @@ def render_download_section_html(
         )
         buttons_mode = ' data-buy-mode="coming-soon"'
     else:
-        # £2.45 GBP once here; banner has ONLY + yearly. No third £ list.
         price_line = (
             f"{PRICE_LABEL} GBP · {PACKAGE_IDENTITY} — "
             f"{TRIAL_SUBSCRIPTION_SENTENCE} — {PAY_AND_KEYGEN_CLAUSE}"
         )
         buttons_mode = (
-            ' data-buy-mode="stripe-live" data-billing-intervals="month,year"'
+            ' data-buy-mode="homepage-buy-form" data-billing-intervals="month,year"'
             f' data-display-currency="{local.currency}"'
             f' data-stripe-presentment="{local.stripe_presentment_currency}"'
         )
-    # Order: title → one price banner → local line → trial box → pay tiles.
+    # Order: title → price banner → local line → price box → buy form → note.
     return f"""
   <section class="downloads panel-card" id="downloads" aria-label="Download Restore Privacy client"
     data-price-currency="{local.currency}" data-accept-currency="{local.currency}">
@@ -811,10 +927,8 @@ def render_download_section_html(
       <p class="dl-price" id="dl-price">{price_line}</p>
       <p class="dl-interval-note" id="dl-interval-note">{YEARLY_PLAN_NOTE}</p>
     </div>
-    <div class="dl-buttons" id="dl-buttons" data-dl-layout="3+2"{buttons_mode}>
-    <div class="dl-row dl-row-3" id="dl-row-1" data-dl-row="1" data-dl-count="{len(row1)}">
-      {row1_html}
-    </div>{row2_block}
+    <div class="dl-buttons" id="dl-buttons"{buttons_mode}>
+{buy_form}
     </div>
     <div class="dl-platform-note-box" id="dl-platform-note-box">
       <p class="dl-platform-note" id="dl-platform-note">{PLATFORM_SELECT_NOTE}</p>

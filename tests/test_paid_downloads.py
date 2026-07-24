@@ -74,17 +74,17 @@ class TestPaidDownloadUI(unittest.TestCase):
     def test_status_page_html_paid_flow(self):
         page = status_app.render_html({"title": "RESTORE PRIVACY"}).decode("utf-8")
         self.assertIn("£2.45", page)
-        self.assertIn(BMC_TIP_URL, page)
-        self.assertIn("buymeacoffee.com/rgsneddon", page)
-        # Tip is page-bottom only (not inside download buttons)
-        self.assertIn('id="bmc-tip"', page)
-        self.assertIn("bmc-page-footer", page)
-        self.assertIn("buy.stripe.com/cNi7sM4uOeWQ9TBe0q7kc00", page)
-        self.assertIn("client_reference_id=windows", page)
-        self.assertIn("BUY - 0.4.0", page)
-        # No free GitHub installer links
+        # Public footer is Raskul copyright (not Buy Me a Coffee)
+        self.assertIn("Raskul", page)
+        self.assertIn("all rights reserved", page)
+        self.assertIn('id="site-footer"', page)
+        self.assertNotIn("buymeacoffee.com", page)
+        self.assertNotIn('id="bmc-tip"', page)
+        # Live homepage: buy form → /pay/checkout (not free GitHub installers)
+        self.assertIn("/pay/checkout", page)
+        self.assertIn("Buy now", page)
         self.assertNotIn(
-            'href="https://github.com/rgsneddon/restore-privacy/releases/download/0.4.0/restore-privacy-client-0.4.0-windows-x64-setup.exe"',
+            'href="https://github.com/rgsneddon/restore-privacy/releases/download/',
             page,
         )
         self.assertNotIn("coming soon", page.lower())
@@ -551,7 +551,6 @@ class TestHowtoDoc(unittest.TestCase):
         self.assertIn("webhook", text.lower())
         self.assertIn("2.45", text)
         self.assertIn("245", text)
-        self.assertIn("buymeacoffee.com/rgsneddon", text)
         self.assertIn("STRIPE_SECRET_KEY", text)
         self.assertIn("STRIPE_WEBHOOK_SECRET", text)
         self.assertIn("RPT_ADMIN_PASSWORD", text)

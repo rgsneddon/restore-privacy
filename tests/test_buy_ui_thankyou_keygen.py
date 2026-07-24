@@ -20,20 +20,29 @@ class TestBuyButtonsAndStripeHost(unittest.TestCase):
             stripe_payment_page_url,
         )
 
-        html = render_download_section_html(coming_soon=False)
+        # Catalog primary path: homepage buy form → /pay/checkout (not buy.stripe.com).
+        html = render_download_section_html(
+            coming_soon=False, currency="GBP", country="GB"
+        )
         css = download_css()
-        self.assertIn("buy.stripe.com", html)
+        self.assertIn("/pay/checkout", html)
+        self.assertIn("homepage-buy-form", html)
+        self.assertIn("Buy now", html)
         self.assertNotIn("donate.stripe.com", html)
-        self.assertIn("7.25rem", css)
-        self.assertIn("min-width: 7.25rem", css)
         self.assertIn(PLATFORM_SELECT_NOTE, html)
         self.assertIn('id="dl-platform-note-box"', html)
         self.assertIn("dl-platform-note", css)
         self.assertIn("buy.stripe.com", DEFAULT_STRIPE_PAYMENT_PAGE_URL)
         self.assertIn("buy.stripe.com", stripe_payment_page_url())
         href = stripe_payment_page_href_for_platform("windows")
-        self.assertIn("buy.stripe.com", href)
-        self.assertIn("client_reference_id=windows", href)
+        self.assertIn("/pay", href)
+        self.assertIn("platform=windows", href)
+        from payments import stripe_payment_page_href_for_platform as href_plat
+
+        self.assertNotEqual(
+            href_plat("windows", interval="month"),
+            href_plat("windows", interval="year"),
+        )
 
     def test_donate_env_normalized_to_buy(self):
         from payments import stripe_payment_page_url

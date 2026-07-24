@@ -4,7 +4,7 @@
 
 ## Highlights
 
-- **Keygen unlock:** unique RPT-KEY-… minted on paid Stripe checkout; fulfilment email includes keygen + PPI + download link (**USE THIS KEYGEN TO UNLOCK YOUR RESTORE PRIVACY TRIAL**). Clients: Install → accept licence → **forced keygen unlock dialog** (all platforms — not Settings-only) → Connect only while subscription active (online status-host re-check; device bind for residual HELLO; revoke locks product). Download alone does **not** unlock residual.
+- **Keygen unlock:** unique RPT-KEY-… minted on paid Stripe checkout; fulfilment email includes keygen + PPI + download link (**USE THIS KEYGEN TO UNLOCK RESTORE PRIVACY**). Clients: Install → accept licence → **forced keygen unlock dialog** (all platforms — not Settings-only) → Connect only while subscription active (online status-host re-check; device bind for residual HELLO; revoke locks product). Download alone does **not** unlock residual.
 - **Connect errors:** residual remote reset / timeout messaging guides users to enter keygen and re-verify unlock (including Windows WinError 10054 class failures).
 - **Homepage:** £2.45 per month subscription package — one device licence; trial sentence; BMC tip at page bottom.
 - **Node wipe UI:** entry-only clear timer (exit wipe countdown removed; weekly service remains entry-only).

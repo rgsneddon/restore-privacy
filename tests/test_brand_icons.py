@@ -1,7 +1,8 @@
-"""Brand logo / favicon: VPN APP Shop wiring + platform icon slots from vpnlogo.jpg."""
+"""Brand logo / favicon: current primary masters + status static + platform slots."""
 
 from __future__ import annotations
 
+import hashlib
 import sys
 import threading
 import unittest
@@ -15,19 +16,84 @@ sys.path.insert(0, str(ROOT / "status_page"))
 
 import app as status_app  # noqa: E402
 
+# Pre-current Flutter brand plate (smaller file); must not reappear after regen.
+_STALE_FLUTTER_APP_ICON_SHA256_PREFIX = "905639773aa76e20"
+
+
+def _sha256_prefix(path: Path, n: int = 16) -> str:
+    h = hashlib.sha256()
+    with path.open("rb") as f:
+        for chunk in iter(lambda: f.read(65536), b""):
+            h.update(chunk)
+    return h.hexdigest()[:n]
+
 
 class TestBrandSourceAndDerivatives(unittest.TestCase):
     def test_master_brand_source_present(self):
-        src = ROOT / "assets" / "brand" / "vpnlogo.jpg"
-        self.assertTrue(src.is_file(), f"missing {src}")
-        self.assertGreater(src.stat().st_size, 10_000)
+        """Current brand masters live under assets/brand (primary_* preferred)."""
+        primary = ROOT / "assets" / "brand" / "primary_dark_1024.png"
+        transparent = ROOT / "assets" / "brand" / "primary_transparent_1024.png"
+        self.assertTrue(primary.is_file(), f"missing current master {primary}")
+        self.assertGreater(primary.stat().st_size, 50_000)
+        self.assertTrue(transparent.is_file(), f"missing {transparent}")
+        self.assertGreater(transparent.stat().st_size, 50_000)
+        # Legacy jpg may remain for history but is not the status favicon source
+        legacy = ROOT / "assets" / "brand" / "vpnlogo.jpg"
+        if legacy.is_file():
+            self.assertNotEqual(
+                _sha256_prefix(primary),
+                _sha256_prefix(legacy),
+                "primary master must not be a rename of the legacy jpg plate",
+            )
 
     def test_status_static_favicon_and_logo(self):
         static = ROOT / "status_page" / "static"
-        for name in ("favicon.ico", "favicon.png", "logo.png", "apple-touch-icon.png"):
+        brand = ROOT / "assets" / "brand"
+        for name in (
+            "favicon.ico",
+            "favicon.png",
+            "logo.png",
+            "logo_transparent.png",
+            "apple-touch-icon.png",
+        ):
             p = static / name
             self.assertTrue(p.is_file(), f"missing {p}")
             self.assertGreater(p.stat().st_size, 200)
+        # Favicons/logo plate are the regenerated current set (match assets/brand)
+        self.assertEqual(
+            (static / "favicon.ico").read_bytes(),
+            (brand / "favicon.ico").read_bytes(),
+        )
+        self.assertEqual(
+            (static / "favicon.png").read_bytes(),
+            (brand / "favicon-32.png").read_bytes(),
+        )
+        self.assertEqual(
+            (static / "logo.png").read_bytes(),
+            (brand / "logo-256.png").read_bytes(),
+        )
+        self.assertEqual(
+            (static / "logo_transparent.png").read_bytes(),
+            (brand / "primary_transparent_1024.png").read_bytes(),
+        )
+        # Header transparent ≠ opaque plate
+        self.assertNotEqual(
+            (static / "logo_transparent.png").read_bytes(),
+            (static / "logo.png").read_bytes(),
+        )
+
+    def test_flutter_brand_assets_match_current_logo_plate(self):
+        """client_app brand slots must not keep the pre-current smaller plate."""
+        flutter = ROOT / "client_app" / "assets" / "brand" / "app_icon.png"
+        logo256 = ROOT / "assets" / "brand" / "logo-256.png"
+        self.assertTrue(flutter.is_file())
+        self.assertTrue(logo256.is_file())
+        self.assertEqual(flutter.read_bytes(), logo256.read_bytes())
+        self.assertNotEqual(
+            _sha256_prefix(flutter),
+            _STALE_FLUTTER_APP_ICON_SHA256_PREFIX,
+            "Flutter app_icon still matches known-stale pre-current hash",
+        )
 
     def test_android_launchers_updated(self):
         res = ROOT / "client_app" / "android" / "app" / "src" / "main" / "res"
@@ -91,17 +157,36 @@ class TestBrandSourceAndDerivatives(unittest.TestCase):
 
 class TestStatusPageFavicon(unittest.TestCase):
     def test_render_html_links_favicon(self):
+        from public_chrome import PUBLIC_BRAND_LOGO_PATH, PUBLIC_BRAND_TITLE
+
         html = status_app.render_html(
             {"title": "RESTORE PRIVACY", "clients_connected": 0}
         ).decode("utf-8")
         self.assertIn('rel="icon"', html)
         self.assertIn("/favicon.ico", html)
         self.assertIn("/favicon.png", html)
-        self.assertIn("/logo.png", html)
+        self.assertIn("/apple-touch-icon.png", html)
+        # Header uses transparent logo left of title (not opaque plate)
+        self.assertIn(PUBLIC_BRAND_LOGO_PATH, html)
+        self.assertIn("/logo_transparent.png", html)
         self.assertIn('class="brand-logo"', html)
+        self.assertIn('class="brand-mark"', html)
+        self.assertIn(PUBLIC_BRAND_TITLE, html)
+        # Primary brand img must not point at opaque plate
+        brand_start = html.index('id="brand-panel"')
+        brand_end = html.index("</header>", brand_start)
+        brand = html[brand_start:brand_end]
+        self.assertIn("/logo_transparent.png", brand)
+        self.assertNotIn('src="/logo.png"', brand)
 
     def test_static_resolution_and_bytes(self):
-        for path in ("/favicon.ico", "/favicon.png", "/logo.png", "/apple-touch-icon.png"):
+        for path in (
+            "/favicon.ico",
+            "/favicon.png",
+            "/logo.png",
+            "/logo_transparent.png",
+            "/apple-touch-icon.png",
+        ):
             resolved = status_app.static_file_path(path)
             self.assertIsNotNone(resolved, path)
             got = status_app.read_static_bytes(path)
@@ -137,10 +222,15 @@ class TestStatusPageFavicon(unittest.TestCase):
                     self.assertGreater(len(data), 200)
                     self.assertTrue("image" in ctype or "icon" in ctype)
                     with urllib.request.urlopen(
-                        f"http://127.0.0.1:{port}/logo.png", timeout=5
+                        f"http://127.0.0.1:{port}/logo_transparent.png", timeout=5
                     ) as resp:
                         logo = resp.read()
                     self.assertGreater(len(logo), 1000)
+                    # Legacy opaque plate still served if requested
+                    with urllib.request.urlopen(
+                        f"http://127.0.0.1:{port}/logo.png", timeout=5
+                    ) as resp:
+                        self.assertGreater(len(resp.read()), 1000)
         finally:
             httpd.shutdown()
             httpd.server_close()

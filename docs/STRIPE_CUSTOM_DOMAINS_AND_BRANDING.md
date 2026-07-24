@@ -1,0 +1,206 @@
+# Stripe Custom domains, seamless checkout, and site branding
+
+This note answers: what
+[Custom domains](https://dashboard.stripe.com/settings/custom-domains)
+does, whether it makes payments “seamless”, and how to brand Checkout as close
+as possible to https://restoreprivacy.online/ (logo + colours).
+
+Shipped code constants (palette + asset paths) live in
+`status_page/payments.py` → `stripe_checkout_branding_guide()`.
+
+---
+
+## 1. What Custom domains is
+
+**Location:** Stripe Dashboard → **Settings** → **Custom domains**  
+(URL shape: `…/settings/custom-domains`)
+
+**What it does**
+
+- Lets **Stripe-hosted** surfaces (Checkout, Payment Links, Customer Portal)
+  appear on a **subdomain of your own domain**, e.g.  
+  `https://pay.restoreprivacy.online/…`  
+  instead of only `https://checkout.stripe.com/…` or `https://buy.stripe.com/…`.
+- You prove domain ownership with **DNS** records Stripe shows you
+  (typically **CNAME** for the subdomain + often **TXT** for verification).
+- After verification, new Checkout Sessions / Payment Links can use that host.
+
+**What it is not**
+
+Custom domains does not inject the website’s full CSS. Summary:
+
+| Myth | Reality |
+|------|---------|
+| “Payment runs on my site origin like `/pay` HTML.” | No. Hosting is still **Stripe’s servers**; only the **hostname** is yours. |
+| “I inject the website’s full CSS into Checkout.” | No. Custom domains does not load `public_chrome` CSS, Tailwind, or any site stylesheet. |
+| “Free for all accounts.” | Custom domains is a **paid Checkout feature** (see Stripe pricing / feature availability for your country and product). |
+| “Path under the status host is enough” (e.g. `restoreprivacy.online/checkout`). | **Not supported.** You need a **subdomain** (e.g. `pay.`) pointed at Stripe via DNS, not a path on the Render status app alone. |
+
+**Seamless for the customer?**
+
+| Aspect | With Custom domains | Without |
+|--------|---------------------|---------|
+| URL trust / brand | Higher — address bar shows *your* domain | `checkout.stripe.com` / `buy.stripe.com` |
+| Visual look | Still Stripe Checkout chrome | Same |
+| Full site CSS / layout | **No** | **No** |
+| Card data handling | Still Stripe PCI scope | Same |
+
+**Recommendation for Restore Privacy**
+
+1. Keep the homepage **Download client** box (device + plan + **Buy now**) —
+   that form already uses full main-site CSS.
+2. Optionally enable **Custom domains** for `pay.restoreprivacy.online` so the
+   redirect after Buy now feels on-brand in the address bar.
+3. Always set **Branding** (logo + colours) so Checkout is as close as Stripe
+   allows to the site palette (see §2).
+
+**Operator DNS — Namecheap zone `restoreprivacy.online` (live NS)**
+
+NS today: `dns1.registrar-servers.com` / `dns2.registrar-servers.com` (Namecheap).
+
+| Type | Host (Namecheap) | Value | Purpose |
+|------|------------------|-------|---------|
+| **CNAME** | `pay` | `hosted-checkout.stripecdn.com` | Maps `pay.restoreprivacy.online` → Stripe Checkout CDN |
+| **TXT** | `_acme-challenge.pay` | *(copy from Dashboard → View instructions)* | ACME / TLS ownership proof |
+
+1. Open [Custom domains](https://dashboard.stripe.com/settings/custom-domains) →
+   **Add your domain** → `pay.restoreprivacy.online` (paid Checkout feature,
+   ~USD 10/month). Leave **Switch to this domain once added** on if you want
+   auto-enable.
+2. **View instructions** → copy the exact **TXT** value (not inventable offline).
+3. Namecheap → Domain List → **manage** → **Advanced DNS** for
+   `restoreprivacy.online` → add the CNAME + TXT rows above (TTL 5 min / Automatic).
+4. Wait until Stripe shows **Ready** / **Active**. After DNS is correct,
+   the Dashboard may say it is **making sure DNS records are stable**
+   (often **at least 3 hours**) and will email when done — leave records
+   alone unless Stripe reports a failure. TLS on
+   `https://pay.restoreprivacy.online` can succeed (valid cert) while
+   Sessions still use `checkout.stripe.com` until the domain is fully
+   enabled / switched.
+5. If DNS + TLS are fine but Checkout Session URLs still use
+   `checkout.stripe.com`, stay on the Custom domains page and **switch /
+   activate** the domain — there is no public API for that step.
+6. Verify:
+
+```bash
+dig @8.8.8.8 +short CNAME pay.restoreprivacy.online
+# → hosted-checkout.stripecdn.com.
+dig @8.8.8.8 +short TXT _acme-challenge.pay.restoreprivacy.online
+# → non-empty ACME token from Stripe
+python scripts/verify_stripe_custom_domain.py --create-session
+# session url_host should be pay.restoreprivacy.online
+# brand_trust_ready should be true
+```
+
+Shipped helpers: `payments.stripe_custom_domain_dns_expected()`,
+`verify_stripe_custom_domain_dns()`, `checkout_session_uses_custom_domain()`.
+
+Homepage **Buy now** already uses **server-side** Session create + redirect to
+`session.url` (required for custom domains).
+
+**Automation limits:** there is **no** public Stripe API to register Checkout
+custom domains or read the ACME TXT; Namecheap DNS write needs operator
+login/API credentials (not stored in this monorepo).
+
+---
+
+## 2. Branding Checkout to match the site (logo + colours)
+
+Full site-CSS parity on Stripe-hosted Checkout is **not available**. Closest path:
+
+### Dashboard locations
+
+1. **Settings → Branding** (account logo, icon, primary/secondary colours)  
+   https://dashboard.stripe.com/settings/branding  
+2. **Settings → Checkout** / Checkout appearance (where present for your account)  
+3. **Settings → Custom domains** (optional URL seamlessness — §1)
+
+Logo upload and account branding for **your own** Stripe account are done in the
+**Dashboard** (the platform Account API refuses self-updates with “connected
+accounts only”).
+
+### Logo / icon assets (Stripe Branding constraints)
+
+Stripe accepts **JPG or PNG**, each **≥ 128×128 px**, file size **&lt; 512 KB**.
+**Icon** must be **square**. **Logo** may be wider.
+
+This repo ships **transparent-background PNG (RGBA)** only for Stripe icon/logo:
+corner pixels have **alpha 0** (not a solid navy fill). Do **not** upload the
+opaque site `status_page/static/logo.png` for Stripe Branding.
+
+| Role | Path (shipped) | Notes |
+|------|----------------|-------|
+| **Icon** (square) | `assets/brand/stripe/stripe_brand_icon.png` | 512×512 **transparent** PNG from `primary_transparent_1024.png` |
+| **Logo** (wide) | `assets/brand/stripe/stripe_brand_logo.png` | 1280×512 PNG, mark centered on **transparent** canvas |
+| Public copies | `status_page/static/stripe_brand_{icon,logo}.png` | Same bytes; served as `/stripe_brand_icon.png` etc. |
+| Source master | `assets/brand/primary_transparent_1024.png` | Transparent master — do not invent alternate art |
+
+Also keep site favicon/logo for the status host itself:
+`status_page/static/logo.png`, `favicon.png`.
+
+**Automated upload (Files API)**
+
+```bash
+export STRIPE_SECRET_KEY=sk_live_...   # never commit
+python scripts/upload_stripe_branding_assets.py --out stripe_brand_upload.json
+```
+
+- Uploads with purpose `business_icon` / `business_logo`.
+- **Attach** via `POST /v1/account` often returns **403** on the platform account
+  (“connected accounts only”). File ids still appear in Stripe Files.
+- **Finish in Dashboard → Branding:** set Logo + Icon (use the shipped PNGs or
+  the uploaded files) and colours primary **`#2694e8`**, secondary **`#0a1628`**.
+
+Last uploaded file ids (refresh by re-running the script) are stored in
+`payments.py` as `STRIPE_BRAND_*_FILE_ID`.
+
+### Colour map (from public site theme)
+
+Source: `status_page/public_chrome.py` dark theme CSS variables.
+
+| Dashboard field | Hex | Site token / meaning |
+|-----------------|-----|----------------------|
+| **Primary colour** (buttons / accents) | `#2694e8` | `--rb-btn` / neon blue |
+| **Secondary colour** (backgrounds / contrast) | `#0a1628` | `--rb-navy` |
+| Optional accent reference | `#00e5ff` | `--rb-neon-cyan` (not always a Dashboard field) |
+| Button text (site) | `#ffffff` | `--rb-btn-text` |
+
+Use **dark navy + blue buttons** so Checkout feels continuous with the VPN APP Shop.
+
+Shipped single source of truth:
+
+```text
+python -c "import sys; sys.path.insert(0,'status_page'); from payments import stripe_checkout_branding_guide; import json; print(json.dumps(stripe_checkout_branding_guide(), indent=2))"
+```
+
+### What Buy now still does
+
+Homepage form → `POST /pay/checkout` → Stripe **subscription** Checkout Session
+(Monthly / Yearly VPN plan, subscription starts when you pay). Branding and custom domains do
+**not** change fulfilment webhooks or amounts.
+
+---
+
+## 3. “Can we utilise Custom domains for a seamless flow?”
+
+**Yes, for URL seamlessness — not for full UI merge.**
+
+| Goal | Achievable with Custom domains + Branding? |
+|------|--------------------------------------------|
+| Customer sees `pay.restoreprivacy.online` | Yes (after DNS + paid feature) |
+| Same navy/blue look + logo on Checkout | Yes (Dashboard Branding) |
+| Payment form looks identical to `#downloads` box HTML/CSS | **No** |
+| Card fields embedded with full site CSS (no Stripe page) | Only via **Stripe Elements / embedded Checkout** rebuild — **out of scope** here |
+
+---
+
+## 4. Related code map
+
+| Piece | Path |
+|-------|------|
+| Homepage Buy now form | `status_page/downloads.py` (`render_homepage_buy_form_html`) |
+| Checkout Session create | `status_page/payments.py` (`create_subscription_checkout_session`) |
+| Branding guide helper | `status_page/payments.py` (`stripe_checkout_branding_guide`) |
+| Customer-facing honesty line | `STRIPE_CHECKOUT_BRANDING_NOTE` in `downloads.py` |
+| Public CSS tokens | `status_page/public_chrome.py` |
+| Logo file | `status_page/static/logo.png` |

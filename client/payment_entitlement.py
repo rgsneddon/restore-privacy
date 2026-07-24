@@ -46,13 +46,17 @@ STATUS_UNPAID = "unpaid"
 LICENCE_STATUS_OK = "OK"
 LICENCE_STATUS_EXPIRED = "EXPIRED"
 
-# Platform pay portal base (monthly default Payment Link family).
+# Platform pay portal base — site-hosted plan page (Monthly | Annual).
 PUBLIC_PAY_BASE = "https://restoreprivacy.online/"
-# Default monthly Stripe Payment Link (aligned with status_page.payments).
-# Shipped clients build platform renew URLs from this without importing payments.
+# Legacy Stripe Payment Link defaults (inactive; renew prefers site /pay).
 DEFAULT_STRIPE_PAYMENT_PAGE_URL = (
     "https://buy.stripe.com/cNi7sM4uOeWQ9TBe0q7kc00"
 )
+DEFAULT_STRIPE_PAYMENT_PAGE_URL_YEARLY = (
+    "https://buy.stripe.com/6oUbJ23qK2a43vdbSi7kc01"
+)
+# Site-hosted Select your plan entry (primary renew / catalog path).
+DEFAULT_SITE_PAY_PLAN_BASE = "https://restoreprivacy.online/pay"
 KEY_RENEW_URL = "renew_url"
 
 CONNECT_BLOCKED_PAYMENT_MSG = (
@@ -77,7 +81,7 @@ CONNECT_BLOCKED_NO_ENTITLEMENT_MSG = (
     "Connect is blocked: no successful payment entitlement on this install. "
     "After paying on https://restoreprivacy.online/, accept the licence, then "
     "enter the keygen from your fulfilment email (USE THIS KEYGEN TO UNLOCK "
-    "YOUR RESTORE PRIVACY TRIAL) in Settings. Optional: keep "
+    "RESTORE PRIVACY) in Settings. Optional: keep "
     "payment_entitlement.json next to the installer for auto-import. "
     "Successful payment/active subscription is required; if payment fails or a "
     "subscription period ends, Connect is cancelled."
@@ -86,7 +90,7 @@ CONNECT_BLOCKED_NO_ENTITLEMENT_MSG = (
 CONNECT_BLOCKED_KEYGEN_MSG = (
     "Connect is blocked: enter a valid keygen after accepting the licence. "
     "Your fulfilment email includes the keygen with the text "
-    "USE THIS KEYGEN TO UNLOCK YOUR RESTORE PRIVACY TRIAL. "
+    "USE THIS KEYGEN TO UNLOCK RESTORE PRIVACY. "
     "The keygen only works while your subscription/payment is active."
 )
 
@@ -569,11 +573,12 @@ def build_local_platform_renew_url(
     interval: str = "month",
     base_payment_page_url: str | None = None,
 ) -> str:
-    """Pure local Stripe Payment Link for *platform* (no payments import).
+    """Pure local renew URL for *platform* (no payments import).
 
-    Shipped Windows/Linux/Flutter EXPIRED UI uses this so renew always carries
-    ``client_reference_id=platform|interval`` even when ``status_page.payments``
-    is not importable (normal frozen client PYTHONPATH).
+    Primary path: site-hosted ``/pay?platform=…&interval=…`` plan page.
+    Optional *base_payment_page_url* overrides the site pay base (tests /
+    operator). Shipped Windows/Linux/Flutter EXPIRED UI uses this when
+    ``status_page.payments`` is not importable.
     """
     plat = (platform or "").strip().lower() or "windows"
     iv = (interval or "month").strip().lower()
@@ -583,27 +588,17 @@ def build_local_platform_renew_url(
         iv = "month"
     base = (base_payment_page_url or "").strip().rstrip("/")
     if not base:
-        if iv == "year":
-            for key in (
-                "STRIPE_PAYMENT_PAGE_URL_YEARLY",
-                "RPT_STRIPE_PAYMENT_PAGE_URL_YEARLY",
-            ):
-                base = (os.environ.get(key) or "").strip().rstrip("/")
-                if base:
-                    break
+        for key in (
+            "RPT_SITE_PAY_PLAN_URL",
+            "SITE_PAY_PLAN_URL",
+        ):
+            base = (os.environ.get(key) or "").strip().rstrip("/")
+            if base:
+                break
         if not base:
-            for key in (
-                "STRIPE_PAYMENT_PAGE_URL",
-                "RPT_STRIPE_PAYMENT_PAGE_URL",
-            ):
-                base = (os.environ.get(key) or "").strip().rstrip("/")
-                if base:
-                    break
-        if not base:
-            base = DEFAULT_STRIPE_PAYMENT_PAGE_URL
-    # Encode platform + interval for Stripe client_reference_id (fulfilment)
-    ref = f"{plat}|{iv}"
-    q = urllib.parse.urlencode({"client_reference_id": ref})
+            base = DEFAULT_SITE_PAY_PLAN_BASE
+    # Site plan page: platform + optional interval preselect
+    q = urllib.parse.urlencode({"platform": plat, "interval": iv})
     sep = "&" if "?" in base else "?"
     return f"{base}{sep}{q}"
 

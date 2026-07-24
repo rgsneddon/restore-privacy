@@ -39,6 +39,7 @@ from payments import (
     check_fulfilment_ready,
     consume_download_token,
     create_checkout_session,
+    create_subscription_checkout_session,
     find_grant_by_session,
     get_connect_entitlement,
     handle_stripe_webhook,
@@ -46,6 +47,7 @@ from payments import (
     lookup_download_token,
     open_release_asset,
     platform_filename,
+    render_pay_plan_page_html,
     render_post_payment_thankyou_html,
     stripe_configured,
     wait_for_grant_by_session,
@@ -61,6 +63,8 @@ FAVICON_PATH = "/favicon.ico"
 FAVICON_PNG_PATH = "/favicon.png"
 APPLE_TOUCH_PATH = "/apple-touch-icon.png"
 LOGO_PATH = "/logo.png"
+# Transparent-background site header logo (left of RESTORE PRIVACY VPN)
+LOGO_TRANSPARENT_PATH = "/logo_transparent.png"
 
 # Map URL path → filename under static/
 STATIC_ROUTES: dict[str, str] = {
@@ -69,10 +73,17 @@ STATIC_ROUTES: dict[str, str] = {
     FAVICON_PNG_PATH: "favicon.png",
     APPLE_TOUCH_PATH: "apple-touch-icon.png",
     LOGO_PATH: "logo.png",
+    LOGO_TRANSPARENT_PATH: "logo_transparent.png",
     "/static/favicon.ico": "favicon.ico",
     "/static/favicon.png": "favicon.png",
     "/static/logo.png": "logo.png",
+    "/static/logo_transparent.png": "logo_transparent.png",
     "/static/apple-touch-icon.png": "apple-touch-icon.png",
+    # Stripe Dashboard Branding exports (PNG ≥128px, <512KB)
+    "/stripe_brand_icon.png": "stripe_brand_icon.png",
+    "/stripe_brand_logo.png": "stripe_brand_logo.png",
+    "/static/stripe_brand_icon.png": "stripe_brand_icon.png",
+    "/static/stripe_brand_logo.png": "stripe_brand_logo.png",
 }
 
 
@@ -317,11 +328,14 @@ def render_html(
     accept_language: str = "",
     country: str = "",
     currency: str = "",
+    default_platform: str = "",
+    default_interval: str = "month",
+    pay_error: str = "",
 ) -> bytes:
     """HTML: shared brand header + downloads + audit countdown (no client count).
 
     *accept_language* / *country* / *currency* drive local-currency price display
-    (GBP anchors £2.45 / £29.40 → visitor currency; Stripe-unsupported → USD).
+    (GBP anchors £2.45 / £27.93 → visitor currency; Stripe-unsupported → USD).
     """
     _ = poll_ms  # retained for call-site compat; public page does not poll a count
     try:
@@ -349,7 +363,20 @@ def render_html(
         accept_language=accept_language,
         country=country,
         currency=currency,
+        default_platform=default_platform,
+        default_interval=default_interval,
     )
+    if (pay_error or "").strip():
+        err = (
+            pay_error.replace("&", "&amp;")
+            .replace("<", "&lt;")
+            .replace(">", "&gt;")
+        )
+        downloads_html = downloads_html.replace(
+            '<div class="dl-buttons"',
+            f'<p class="dl-pay-error" id="dl-pay-error" role="alert">{err}</p>\n    <div class="dl-buttons"',
+            1,
+        )
     dl_css = download_css()
     try:
         from audit_countdown import render_audit_countdown_html
@@ -434,7 +461,7 @@ def render_html(
     header = public_brand_header_html(
         title=str(title),
         active="home",
-        logo_size=96,
+        logo_size=112,
     )
     body = f"""{public_head_open(title=str(title), extra_css=page_css)}
   <div class="page-shell" id="page-shell">
@@ -570,6 +597,9 @@ class Handler(BaseHTTPRequestHandler):
             hdrs = {k: v for k, v in self.headers.items()}
             # Optional ?currency=EUR override for testing presentment display
             q_ccy = (query.get("currency") or "").strip()
+            q_plat = (query.get("platform") or "").strip()
+            q_iv = (query.get("interval") or "month").strip()
+            q_err = (query.get("pay_error") or query.get("error") or "").strip()
             self._send(
                 200,
                 "text/html; charset=utf-8",
@@ -578,6 +608,9 @@ class Handler(BaseHTTPRequestHandler):
                     accept_language=accept_language_from_request(hdrs),
                     country=country_headers_from_request(hdrs),
                     currency=q_ccy,
+                    default_platform=q_plat,
+                    default_interval=q_iv,
+                    pay_error=q_err,
                 ),
             )
             return
@@ -789,20 +822,30 @@ class Handler(BaseHTTPRequestHandler):
             self.wfile.write(body)
             return
 
-        # --- Paid download flow ---
+        # --- Paid download flow: site-hosted Select your plan page ---
         if path == "/pay":
-            # Legacy path: same Stripe payment page as the download buttons.
-            from payments import stripe_payment_page_href_for_platform
-
-            platform = (query.get("platform") or "").strip()
-            if not platform or not platform_filename(platform):
+            platform = (query.get("platform") or "").strip().lower()
+            interval = (query.get("interval") or "month").strip().lower()
+            err = (query.get("error") or "").strip()
+            # Allow empty platform (picker on page); invalid platform still shows page
+            if platform and not platform_filename(platform):
                 self._send(
-                    400,
+                    200,
                     "text/html; charset=utf-8",
-                    _html_page("Pay", '<p class="msg">Unknown package.</p><p><a href="/">Back</a></p>'),
+                    render_pay_plan_page_html(
+                        "",
+                        interval=interval,
+                        error="Unknown package — choose a platform below.",
+                    ),
                 )
                 return
-            self._redirect(stripe_payment_page_href_for_platform(platform))
+            self._send(
+                200,
+                "text/html; charset=utf-8",
+                render_pay_plan_page_html(
+                    platform, interval=interval, error=err
+                ),
+            )
             return
 
         if path == "/download":
@@ -1173,6 +1216,70 @@ class Handler(BaseHTTPRequestHandler):
         path, _query = _parse_query(self.path)
         body = self._read_body()
 
+        if path == "/pay/checkout":
+            # Site plan form: platform + interval + auto_renew → subscription Checkout
+            ctype = (self.headers.get("Content-Type") or "").lower()
+            platform = ""
+            interval = "month"
+            auto_renew = True
+            if "application/json" in ctype:
+                try:
+                    data = json.loads(body.decode("utf-8") or "{}")
+                except json.JSONDecodeError:
+                    data = {}
+                if isinstance(data, dict):
+                    platform = str(data.get("platform") or "").strip()
+                    interval = str(data.get("interval") or "month").strip()
+                    if "auto_renew" in data:
+                        from payments import parse_auto_renew_choice
+
+                        auto_renew = parse_auto_renew_choice(data.get("auto_renew"))
+            else:
+                form = urllib.parse.parse_qs(body.decode("utf-8", errors="replace"))
+                platform = (form.get("platform") or [""])[0].strip()
+                interval = (form.get("interval") or ["month"])[0].strip()
+                from payments import parse_auto_renew_form_values
+
+                auto_renew = parse_auto_renew_form_values(form.get("auto_renew"))
+            if not platform or not platform_filename(platform):
+                q = urllib.parse.urlencode(
+                    {
+                        "pay_error": "Please select your device platform.",
+                        "interval": interval or "month",
+                    }
+                )
+                self._redirect(f"/?{q}#downloads")
+                return
+            if not stripe_configured():
+                q = urllib.parse.urlencode(
+                    {
+                        "platform": platform,
+                        "interval": interval or "month",
+                        "pay_error": (
+                            "Checkout is temporarily unavailable "
+                            "(payments not configured)."
+                        ),
+                    }
+                )
+                self._redirect(f"/?{q}#downloads")
+                return
+            try:
+                session = create_subscription_checkout_session(
+                    platform, interval=interval, auto_renew=auto_renew
+                )
+            except ValueError as e:
+                q = urllib.parse.urlencode(
+                    {
+                        "platform": platform,
+                        "interval": interval or "month",
+                        "pay_error": f"Could not start checkout: {e}",
+                    }
+                )
+                self._redirect(f"/?{q}#downloads")
+                return
+            self._redirect(str(session["url"]))
+            return
+
         if path == "/api/checkout":
             try:
                 data = json.loads(body.decode("utf-8") or "{}")
@@ -1180,6 +1287,12 @@ class Handler(BaseHTTPRequestHandler):
                 self._send(400, "application/json", b'{"error":"bad_json"}')
                 return
             platform = str(data.get("platform") or "").strip()
+            interval = str(data.get("interval") or "month").strip()
+            from payments import parse_auto_renew_choice
+
+            auto_renew = parse_auto_renew_choice(
+                data.get("auto_renew") if isinstance(data, dict) else True
+            )
             if not stripe_configured():
                 self._send(
                     503,
@@ -1194,7 +1307,9 @@ class Handler(BaseHTTPRequestHandler):
                 )
                 return
             try:
-                session = create_checkout_session(platform)
+                session = create_checkout_session(
+                    platform, interval=interval, auto_renew=auto_renew
+                )
             except ValueError as e:
                 self._send(
                     400,
@@ -1213,6 +1328,9 @@ class Handler(BaseHTTPRequestHandler):
                         "currency": session["currency"],
                         "platform": session["platform"],
                         "filename": session["filename"],
+                        "billing_interval": session.get("billing_interval"),
+                        "product_name": session.get("product_name"),
+                        "auto_renew": session.get("auto_renew", auto_renew),
                     }
                 ).encode("utf-8"),
             )

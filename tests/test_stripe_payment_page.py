@@ -136,29 +136,24 @@ class TestPaymentPageInAdminHtml(unittest.TestCase):
         self.assertNotIn("stripe-payment-page-link", foot)
         self.assertNotIn(">Stripe payment page<", foot)
         self.assertNotIn("/admin/processors/apply", foot)
-        # Tip remains; How-to-buy footer link is removed
+        # Copyright footer; How-to-buy footer link is removed
         self.assertNotIn("how-to-buy-footer-link", foot)
         self.assertNotIn('href="/how-to-buy"', foot)
-        self.assertIn("bmc-tip-link", foot)
-        # Public footer omits generic Stripe link; catalog uses dual-interval Pay buttons.
+        self.assertIn("site-footer", foot)
+        self.assertIn("Raskul", foot)
+        self.assertNotIn("bmc-tip-link", foot)
+        self.assertNotIn("buymeacoffee.com", foot)
+        # Public footer omits generic Stripe link; catalog uses buy form → checkout.
         html = render_download_section_html()
         self.assertNotIn('id="stripe-payment-page-link"', html)
         self.assertNotIn(">Stripe payment page<", html)
         self.assertIn("Monthly", html)
         self.assertIn("Yearly", html)
         self.assertIn("we accept *", html)
-        self.assertTrue(
-            "client_reference_id=windows" in html
-            or ("/pay/start" in html and "platform=windows" in html),
-            html[:300],
-        )
-        self.assertIn("data-billing-interval=\"month\"", html)
-        self.assertIn("data-billing-interval=\"year\"", html)
-        # Default catalog locale resolves to USD → /pay/start (or USD Payment Link)
-        self.assertTrue(
-            OPERATOR_PAYMENT_PAGE in html or "/pay/start" in html,
-            "expected GBP Payment Link or USD /pay/start path",
-        )
+        self.assertIn("/pay/checkout", html)
+        self.assertIn('data-billing-intervals="month,year"', html)
+        self.assertIn('data-interval="month"', html)
+        self.assertIn('data-interval="year"', html)
         self.assertNotIn("Coming soon", html)
 
 

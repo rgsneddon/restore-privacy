@@ -1,9 +1,10 @@
 """Paid download fulfilment: Stripe **subscription** (£2.45/month GBP) + tokens.
 
-Catalog BUY buttons open a Stripe **subscription** Payment Link (recurring
-monthly price + 7-day trial). Webhook/recovery mints a one-time download token
-and Connect entitlement. Buy Me a Coffee is tip/support only — see coffee_link.py
-and docs/PAID_DOWNLOADS_HOWTO.md.
+Catalog BUY buttons open the **site-hosted plan page** (``/pay``) where the
+visitor selects Monthly or Annual (5% off yearly = £27.93). Checkout continues
+to a Stripe **subscription** Checkout Session for the chosen plan only (products
+**Monthly VPN plan** / **Yearly VPN plan**). Webhook/recovery mints a one-time
+download token and Connect entitlement. See docs/PAID_DOWNLOADS_HOWTO.md.
 """
 
 from __future__ import annotations
@@ -19,25 +20,622 @@ import time
 import urllib.error
 import urllib.parse
 import urllib.request
+from calendar import monthrange
 from dataclasses import dataclass
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Callable
 
 from downloads import RELEASE_ASSETS, available_downloads
 
-# £2.45 monthly / £29.40 yearly GBP anchors (display converts via local_currency)
+# £2.45 monthly; annual = 5% off 12 × monthly → £27.93 (2793 pence)
 PRICE_PENCE = 245
-PRICE_YEARLY_PENCE = 2940  # 12 × 245
+YEARLY_DISCOUNT_PERCENT = 5
 PRICE_CURRENCY = "gbp"
 PRICE_LABEL = "£2.45"
-PRICE_YEARLY_LABEL = "£29.40"
-# Operator: enable Stripe Dashboard Adaptive Pricing on Payment Links so
-# presentment uses customer local currency when Stripe allows; unsupported → USD
-# (see local_currency.stripe_presentment_or_usd).
+# Operator: enable Stripe Dashboard Adaptive Pricing when presentment allows;
+# unsupported currencies → USD (see local_currency.stripe_presentment_or_usd).
+
+
+def yearly_amount_pence(
+    monthly_pence: int = PRICE_PENCE,
+    *,
+    discount_percent: int = YEARLY_DISCOUNT_PERCENT,
+) -> int:
+    """Annual unit amount in pence: 12 × monthly with *discount_percent* off."""
+    m = int(monthly_pence)
+    d = max(0, min(100, int(discount_percent)))
+    return int(round(m * 12 * (100 - d) / 100.0))
+
+
+PRICE_YEARLY_PENCE = yearly_amount_pence()  # 2793
+PRICE_YEARLY_LABEL = f"£{PRICE_YEARLY_PENCE // 100}.{PRICE_YEARLY_PENCE % 100:02d}"
+# Pre-discount 12× monthly (for “was / save 5%” display only)
+PRICE_YEARLY_FULL_PENCE = PRICE_PENCE * 12  # 2940
+PRICE_YEARLY_FULL_LABEL = (
+    f"£{PRICE_YEARLY_FULL_PENCE // 100}.{PRICE_YEARLY_FULL_PENCE % 100:02d}"
+)
 
 DEFAULT_SUCCESS_PATH = "/download/success"
 DEFAULT_CANCEL_PATH = "/download/cancel"
+# Site-hosted plan selection (main-site style) before Stripe Checkout
+SITE_PAY_PLAN_PATH = "/pay"
 TOKEN_TTL_SEC = int(os.environ.get("RPT_DOWNLOAD_TOKEN_TTL_SEC", "3600"))
+
+# --- Stripe Dashboard Branding (logo + colours) — not full site CSS ---
+# Map from status_page/public_chrome.py dark theme. Upload logo in Dashboard →
+# Settings → Branding (Account API cannot self-update branding on own account).
+# Custom domains (pay.example.com) are separate: Settings → Custom domains.
+STRIPE_BRAND_PRIMARY_COLOR = "#2694e8"  # --rb-btn
+STRIPE_BRAND_SECONDARY_COLOR = "#0a1628"  # --rb-navy
+STRIPE_BRAND_ACCENT_CYAN = "#00e5ff"  # --rb-neon-cyan (reference only)
+# Stripe Branding constraints: PNG/JPG, each ≥128×128, file <512KB; icon square.
+# Exported from assets/brand/primary_transparent_1024.png (see assets/brand/stripe/).
+STRIPE_BRAND_LOGO_RELPATH = "assets/brand/stripe/stripe_brand_logo.png"
+STRIPE_BRAND_ICON_RELPATH = "assets/brand/stripe/stripe_brand_icon.png"
+# Public copies under status host static/ (same bytes as assets/brand/stripe/).
+STRIPE_BRAND_LOGO_STATIC_RELPATH = "status_page/static/stripe_brand_logo.png"
+STRIPE_BRAND_ICON_STATIC_RELPATH = "status_page/static/stripe_brand_icon.png"
+# Last successful Files API upload ids (account-local; re-run upload script to refresh).
+STRIPE_BRAND_ICON_FILE_ID = "file_1TwkaXJDavQ2TJW6qwpCbucI"
+STRIPE_BRAND_LOGO_FILE_ID = "file_1TwkaZJDavQ2TJW6D0Uw27Fw"
+STRIPE_CUSTOM_DOMAIN_RECOMMENDED = "pay.restoreprivacy.online"
+# Active custom domain host for Checkout once DNS verifies (same as recommended).
+STRIPE_CUSTOM_DOMAIN = STRIPE_CUSTOM_DOMAIN_RECOMMENDED
+STRIPE_CUSTOM_DOMAIN_CNAME_TARGET = "hosted-checkout.stripecdn.com"
+STRIPE_CUSTOM_DOMAIN_CNAME_NAME = "pay"  # Namecheap Host field for pay.restoreprivacy.online
+STRIPE_CUSTOM_DOMAIN_TXT_NAME = "_acme-challenge.pay"
+STRIPE_CUSTOM_DOMAIN_TXT_FQDN = "_acme-challenge.pay.restoreprivacy.online"
+STRIPE_CUSTOM_DOMAIN_PAID_FEATURE = True
+STRIPE_CUSTOM_DOMAIN_MONTHLY_USD = 10  # Stripe Checkout custom domains FAQ (~USD)
+STRIPE_BRANDING_DASHBOARD_URL = "https://dashboard.stripe.com/settings/branding"
+STRIPE_CUSTOM_DOMAINS_DASHBOARD_URL = (
+    "https://dashboard.stripe.com/settings/custom-domains"
+)
+STRIPE_BRAND_MIN_PX = 128
+STRIPE_BRAND_MAX_BYTES = 512 * 1024
+# Transparent-background Stripe assets: corners must be clear; canvas mostly clear.
+STRIPE_BRAND_CORNER_ALPHA_MAX = 16  # treat as transparent
+STRIPE_BRAND_MIN_TRANSPARENT_FRACTION = 0.35  # icon/logo canvas, not solid plate
+STRIPE_BRAND_MIN_OPAQUE_PIXELS = 50  # mark must still be visible
+
+
+def stripe_custom_domain_dns_expected() -> dict[str, Any]:
+    """Expected Namecheap / public DNS records for Checkout custom domain.
+
+    Pure helper (no network). TXT **value** is issued only after Dashboard
+    → Custom domains → Add ``pay.restoreprivacy.online`` → View instructions.
+    """
+    return {
+        "domain": STRIPE_CUSTOM_DOMAIN,
+        "zone": "restoreprivacy.online",
+        "dns_provider": "Namecheap (NS dns1/dns2.registrar-servers.com)",
+        "paid_feature": STRIPE_CUSTOM_DOMAIN_PAID_FEATURE,
+        "approx_monthly_usd": STRIPE_CUSTOM_DOMAIN_MONTHLY_USD,
+        "dashboard_url": STRIPE_CUSTOM_DOMAINS_DASHBOARD_URL,
+        "cname": {
+            "type": "CNAME",
+            "host": STRIPE_CUSTOM_DOMAIN_CNAME_NAME,
+            "fqdn": STRIPE_CUSTOM_DOMAIN,
+            "value": STRIPE_CUSTOM_DOMAIN_CNAME_TARGET,
+            "value_with_trailing_dot": STRIPE_CUSTOM_DOMAIN_CNAME_TARGET + ".",
+            "ttl_sec": 300,
+        },
+        "txt": {
+            "type": "TXT",
+            "host": STRIPE_CUSTOM_DOMAIN_TXT_NAME,
+            "fqdn": STRIPE_CUSTOM_DOMAIN_TXT_FQDN,
+            "value": None,  # from Dashboard only
+            "value_source": (
+                "Stripe Dashboard → Settings → Custom domains → "
+                "View instructions for pay.restoreprivacy.online"
+            ),
+            "ttl_sec": 300,
+        },
+        "notes": [
+            "Path under restoreprivacy.online/checkout is not supported; use pay. subdomain.",
+            "Do not proxy the CNAME through Cloudflare orange-cloud if NS ever moves to CF.",
+            "Custom domains is a paid Checkout feature (~USD 10/month per Stripe FAQ).",
+            "Full website CSS is not injected; URL brand trust only.",
+            "Server-side Session create + redirect to session.url is required "
+            "(homepage Buy now already does this).",
+        ],
+    }
+
+
+def checkout_session_url_host(url: str) -> str:
+    """Return hostname of a Checkout Session ``url`` (empty if unparseable)."""
+    u = (url or "").strip()
+    if not u:
+        return ""
+    try:
+        return (urllib.parse.urlparse(u).hostname or "").lower()
+    except Exception:
+        return ""
+
+
+def checkout_session_uses_custom_domain(url: str) -> bool:
+    """True when Session URL is on the shipped custom domain host."""
+    host = checkout_session_url_host(url)
+    want = STRIPE_CUSTOM_DOMAIN.lower().rstrip(".")
+    return host == want or host.endswith("." + want)
+
+
+def verify_stripe_custom_domain_dns(
+    *,
+    dig_runner: Callable[[list[str]], str] | None = None,
+) -> dict[str, Any]:
+    """Live DNS check for pay.restoreprivacy.online CNAME + ACME TXT.
+
+    Uses ``dig +short`` when *dig_runner* is None. Tries the system
+    resolver first, then public ``@8.8.8.8`` and authoritative
+    ``@dns1.registrar-servers.com`` so local recursive lag does not
+    false-fail after Namecheap publish. Returns
+    ``{ok, cname_ok, txt_ok, observed, expected, mismatches}``.
+    """
+    import subprocess
+
+    expected = stripe_custom_domain_dns_expected()
+    mismatches: list[str] = []
+    observed: dict[str, Any] = {
+        "cname_answers": [],
+        "txt_answers": [],
+        "resolvers_tried": [],
+    }
+
+    # Prefer system path dig; fall back for restricted PATH environments.
+    dig_bin = "dig"
+    for candidate in ("/usr/bin/dig", "dig"):
+        try:
+            subprocess.run(
+                [candidate, "-v"],
+                check=False,
+                capture_output=True,
+                timeout=5,
+            )
+            dig_bin = candidate
+            break
+        except (OSError, subprocess.TimeoutExpired):
+            continue
+
+    def _dig_once(server: str | None, args: list[str]) -> str:
+        if dig_runner is not None:
+            # Injected runner: only the default (no server) call is used.
+            if server is not None:
+                return ""
+            return dig_runner(args)
+        cmd = [dig_bin, "+short", "+time=5", "+tries=1"]
+        if server:
+            cmd.append(f"@{server}")
+        cmd.extend(args)
+        try:
+            out = subprocess.run(
+                cmd,
+                check=False,
+                capture_output=True,
+                text=True,
+                timeout=20,
+            )
+            return (out.stdout or "").strip()
+        except (OSError, subprocess.TimeoutExpired) as exc:
+            return f"__error__:{exc}"
+
+    def _dig_any(args: list[str]) -> str:
+        """Return first non-empty dig answer across resolvers."""
+        servers: list[str | None] = [
+            None,
+            "8.8.8.8",
+            "1.1.1.1",
+            "dns1.registrar-servers.com",
+        ]
+        chunks: list[str] = []
+        for server in servers:
+            label = server or "system"
+            if label not in observed["resolvers_tried"]:
+                observed["resolvers_tried"].append(label)
+            raw = _dig_once(server, args)
+            if raw and not raw.startswith("__error__"):
+                return raw
+            if raw:
+                chunks.append(f"{label}:{raw}")
+        return chunks[0] if chunks else ""
+
+    cname_raw = _dig_any(["CNAME", STRIPE_CUSTOM_DOMAIN])
+    # Some resolvers return A after following CNAME; also query without type
+    if not cname_raw:
+        cname_raw = _dig_any([STRIPE_CUSTOM_DOMAIN])
+    cname_lines = [
+        ln.strip().rstrip(".").lower()
+        for ln in cname_raw.splitlines()
+        if ln.strip() and not ln.startswith("__error__")
+    ]
+    observed["cname_answers"] = cname_lines
+    target = STRIPE_CUSTOM_DOMAIN_CNAME_TARGET.lower()
+    cname_ok = any(
+        target in ln or ln.endswith(target) or ln == target for ln in cname_lines
+    )
+    if not cname_ok:
+        mismatches.append(
+            f"cname_missing_or_wrong: want {target!r} got {cname_lines!r}"
+        )
+
+    txt_raw = _dig_any(["TXT", STRIPE_CUSTOM_DOMAIN_TXT_FQDN])
+    txt_lines = []
+    for ln in txt_raw.splitlines():
+        s = ln.strip().strip('"')
+        if s and not s.startswith("__error__"):
+            txt_lines.append(s)
+    observed["txt_answers"] = txt_lines
+    txt_ok = any(len(s) >= 16 for s in txt_lines)  # ACME token non-empty
+    if not txt_ok:
+        mismatches.append(
+            f"txt_missing_or_empty: {STRIPE_CUSTOM_DOMAIN_TXT_FQDN} answers={txt_lines!r}"
+        )
+
+    return {
+        "ok": cname_ok and txt_ok,
+        "cname_ok": cname_ok,
+        "txt_ok": txt_ok,
+        "observed": observed,
+        "expected": {
+            "cname_fqdn": STRIPE_CUSTOM_DOMAIN,
+            "cname_target": STRIPE_CUSTOM_DOMAIN_CNAME_TARGET,
+            "txt_fqdn": STRIPE_CUSTOM_DOMAIN_TXT_FQDN,
+        },
+        "mismatches": mismatches,
+        "domain": STRIPE_CUSTOM_DOMAIN,
+    }
+
+
+def stripe_brand_asset_paths() -> dict[str, Path]:
+    """Absolute paths to shipped Stripe-ready icon/logo PNGs."""
+    root = Path(__file__).resolve().parents[1]
+    return {
+        "icon": root / STRIPE_BRAND_ICON_RELPATH,
+        "logo": root / STRIPE_BRAND_LOGO_RELPATH,
+        "icon_static": root / STRIPE_BRAND_ICON_STATIC_RELPATH,
+        "logo_static": root / STRIPE_BRAND_LOGO_STATIC_RELPATH,
+    }
+
+
+def _png_ihdr(raw: bytes) -> tuple[int, int, int, int] | None:
+    """Return (width, height, bit_depth, color_type) from PNG bytes or None."""
+    import struct
+
+    if len(raw) < 33 or raw[:8] != b"\x89PNG\r\n\x1a\n":
+        return None
+    # IHDR length at 8, type at 12, data at 16
+    if raw[12:16] != b"IHDR":
+        return None
+    w, h, bit, color = struct.unpack(">IIBB", raw[16:26])
+    return int(w), int(h), int(bit), int(color)
+
+
+def _png_rgba8_pixels(raw: bytes) -> tuple[int, int, bytes] | None:
+    """Decode 8-bit RGBA PNG (color type 6) to raw RGBA bytes (stdlib zlib).
+
+    Returns ``(width, height, rgba_bytes)`` or None if not supported.
+    """
+    import struct
+    import zlib
+
+    ihdr = _png_ihdr(raw)
+    if not ihdr:
+        return None
+    w, h, bit, color = ihdr
+    if bit != 8 or color != 6 or w < 1 or h < 1 or w * h > 8_000_000:
+        return None
+    # Collect IDAT
+    idat = bytearray()
+    pos = 8
+    while pos + 8 <= len(raw):
+        length = struct.unpack(">I", raw[pos : pos + 4])[0]
+        ctype = raw[pos + 4 : pos + 8]
+        data = raw[pos + 8 : pos + 8 + length]
+        pos = pos + 12 + length  # length+type+data+crc
+        if ctype == b"IEND":
+            break
+        if ctype == b"IDAT":
+            idat.extend(data)
+    if not idat:
+        return None
+    try:
+        decompressed = zlib.decompress(bytes(idat))
+    except zlib.error:
+        return None
+    stride = w * 4
+    expected = h * (1 + stride)
+    if len(decompressed) < expected:
+        return None
+    # Unfilter rows (filters 0-4)
+    out = bytearray(h * stride)
+    prev = bytearray(stride)
+
+    def paeth(a: int, b: int, c: int) -> int:
+        p = a + b - c
+        pa, pb, pc = abs(p - a), abs(p - b), abs(p - c)
+        if pa <= pb and pa <= pc:
+            return a
+        if pb <= pc:
+            return b
+        return c
+
+    for y in range(h):
+        row_start = y * (1 + stride)
+        filt = decompressed[row_start]
+        row = bytearray(decompressed[row_start + 1 : row_start + 1 + stride])
+        if filt == 0:
+            pass
+        elif filt == 1:  # Sub
+            for i in range(stride):
+                left = row[i - 4] if i >= 4 else 0
+                row[i] = (row[i] + left) & 0xFF
+        elif filt == 2:  # Up
+            for i in range(stride):
+                row[i] = (row[i] + prev[i]) & 0xFF
+        elif filt == 3:  # Average
+            for i in range(stride):
+                left = row[i - 4] if i >= 4 else 0
+                up = prev[i]
+                row[i] = (row[i] + ((left + up) // 2)) & 0xFF
+        elif filt == 4:  # Paeth
+            for i in range(stride):
+                left = row[i - 4] if i >= 4 else 0
+                up = prev[i]
+                up_left = prev[i - 4] if i >= 4 else 0
+                row[i] = (row[i] + paeth(left, up, up_left)) & 0xFF
+        else:
+            return None
+        out[y * stride : (y + 1) * stride] = row
+        prev = row
+    return w, h, bytes(out)
+
+
+def stripe_brand_asset_constraints_ok(
+    path: Path,
+    *,
+    require_square: bool = False,
+    require_transparent: bool = True,
+) -> dict[str, Any]:
+    """Check Stripe Branding image limits + optional transparent background.
+
+    Size: PNG preferred, ≥128px, <512KB; icon square when *require_square*.
+    Transparency (default on): PNG RGBA with **transparent corners** and a
+    meaningful transparent canvas fraction (not an opaque plate). JPEG cannot
+    satisfy transparency.
+
+    Uses stdlib only. Returns ``{ok, mismatches, observed}``.
+    """
+    import struct
+
+    p = Path(path)
+    mismatches: list[str] = []
+    observed: dict[str, Any] = {
+        "path": str(p),
+        "exists": p.is_file(),
+        "size_bytes": None,
+        "width": None,
+        "height": None,
+        "format": None,
+        "square": None,
+        "color_type": None,
+        "has_alpha": None,
+        "corner_alphas": None,
+        "corners_transparent": None,
+        "transparent_fraction": None,
+        "opaque_pixel_count": None,
+    }
+    if not p.is_file():
+        return {"ok": False, "mismatches": ["missing_file"], "observed": observed}
+    size = p.stat().st_size
+    observed["size_bytes"] = size
+    if size >= STRIPE_BRAND_MAX_BYTES:
+        mismatches.append(f"size_bytes:{size}>={STRIPE_BRAND_MAX_BYTES}")
+    if size < 100:
+        mismatches.append("size_bytes_too_small")
+    raw = p.read_bytes()
+    w = h = None
+    fmt = None
+    color_type = None
+    if raw[:8] == b"\x89PNG\r\n\x1a\n" and len(raw) >= 24:
+        ihdr = _png_ihdr(raw)
+        if ihdr:
+            w, h, _bit, color_type = ihdr
+        else:
+            w, h = struct.unpack(">II", raw[16:24])
+        fmt = "png"
+        observed["color_type"] = color_type
+        # 4=gray+alpha, 6=RGBA, 3=palette may have tRNS
+        observed["has_alpha"] = color_type in (4, 6) or (
+            color_type == 3 and b"tRNS" in raw
+        )
+    elif raw[:2] == b"\xff\xd8":
+        fmt = "jpg"
+        observed["has_alpha"] = False
+        i = 2
+        while i + 9 < len(raw):
+            if raw[i] != 0xFF:
+                i += 1
+                continue
+            marker = raw[i + 1]
+            if marker in (0xC0, 0xC1, 0xC2):
+                h, w = struct.unpack(">HH", raw[i + 5 : i + 9])
+                break
+            if marker == 0xD9:
+                break
+            if marker in (0xD0, 0xD1, 0xD2, 0xD3, 0xD4, 0xD5, 0xD6, 0xD7, 0x01) or marker == 0x00:
+                i += 2
+                continue
+            if i + 4 > len(raw):
+                break
+            seg_len = struct.unpack(">H", raw[i + 2 : i + 4])[0]
+            i += 2 + seg_len
+    else:
+        mismatches.append("format_not_png_or_jpg")
+    observed["width"] = w
+    observed["height"] = h
+    observed["format"] = fmt
+    if w is not None and h is not None:
+        observed["square"] = w == h
+        if w < STRIPE_BRAND_MIN_PX or h < STRIPE_BRAND_MIN_PX:
+            mismatches.append(f"dims:{w}x{h}<{STRIPE_BRAND_MIN_PX}")
+        if require_square and w != h:
+            mismatches.append(f"not_square:{w}x{h}")
+    elif fmt == "jpg" and (w is None or h is None):
+        mismatches.append("jpg_dims_unparsed")
+
+    if require_transparent:
+        if fmt != "png":
+            mismatches.append("transparent_requires_png")
+        elif color_type != 6:
+            mismatches.append(f"transparent_requires_rgba_color_type_6_got:{color_type}")
+        else:
+            decoded = _png_rgba8_pixels(raw)
+            if not decoded:
+                mismatches.append("png_rgba_decode_failed")
+            else:
+                dw, dh, rgba = decoded
+                stride = dw * 4
+
+                def alpha_at(x: int, y: int) -> int:
+                    return rgba[y * stride + x * 4 + 3]
+
+                corners = [
+                    alpha_at(0, 0),
+                    alpha_at(dw - 1, 0),
+                    alpha_at(0, dh - 1),
+                    alpha_at(dw - 1, dh - 1),
+                ]
+                observed["corner_alphas"] = corners
+                corners_ok = all(a < STRIPE_BRAND_CORNER_ALPHA_MAX for a in corners)
+                observed["corners_transparent"] = corners_ok
+                if not corners_ok:
+                    mismatches.append(f"corners_not_transparent:{corners}")
+                # Sample grid for transparent fraction + opaque mark presence
+                step_x = max(1, dw // 64)
+                step_y = max(1, dh // 64)
+                transparent = opaque = samples = 0
+                for y in range(0, dh, step_y):
+                    for x in range(0, dw, step_x):
+                        a = alpha_at(x, y)
+                        samples += 1
+                        if a < STRIPE_BRAND_CORNER_ALPHA_MAX:
+                            transparent += 1
+                        if a > 240:
+                            opaque += 1
+                frac = transparent / samples if samples else 0.0
+                observed["transparent_fraction"] = round(frac, 4)
+                observed["opaque_pixel_count"] = opaque
+                if frac < STRIPE_BRAND_MIN_TRANSPARENT_FRACTION:
+                    mismatches.append(
+                        f"transparent_fraction:{frac:.3f}<{STRIPE_BRAND_MIN_TRANSPARENT_FRACTION}"
+                    )
+                if opaque < STRIPE_BRAND_MIN_OPAQUE_PIXELS:
+                    mismatches.append(f"mark_too_transparent:opaque_samples={opaque}")
+
+    return {"ok": len(mismatches) == 0, "mismatches": mismatches, "observed": observed}
+
+
+def stripe_checkout_branding_guide() -> dict[str, Any]:
+    """Operator guide: Custom domains + Dashboard branding (pure, no network).
+
+    Custom domains put Checkout on a **subdomain** of your domain (DNS CNAME);
+    they do **not** inject website CSS. Branding (logo + primary/secondary
+    colours) is the achievable visual match to the public site.
+
+    Stripe-ready assets: ``assets/brand/stripe/stripe_brand_{icon,logo}.png``
+    (**transparent-background** PNG RGBA, ≥128px, <512KB; icon square). Files
+    API upload ids may be present; attaching them as account branding on the
+    **platform** account requires Dashboard (API 403).
+    """
+    root = Path(__file__).resolve().parents[1]
+    paths = stripe_brand_asset_paths()
+    logo = paths["logo"]
+    icon = paths["icon"]
+    icon_check = stripe_brand_asset_constraints_ok(
+        icon, require_square=True, require_transparent=True
+    )
+    logo_check = stripe_brand_asset_constraints_ok(
+        logo, require_square=False, require_transparent=True
+    )
+    return {
+        "custom_domains": {
+            "what_it_does": (
+                "Maps Stripe-hosted Checkout / Payment Links / Customer Portal "
+                "onto a subdomain of your domain (e.g. pay.restoreprivacy.online) "
+                "via DNS CNAME/TXT verification."
+            ),
+            "what_it_does_not": (
+                "Does not inject the website full CSS; does not serve Checkout as "
+                "a path under the status host origin alone; paid Checkout feature."
+            ),
+            "seamless": {
+                "url_brand_trust": True,
+                "full_site_css_on_stripe_page": False,
+            },
+            "recommended_subdomain": STRIPE_CUSTOM_DOMAIN_RECOMMENDED,
+            "domain": STRIPE_CUSTOM_DOMAIN,
+            "cname_target": STRIPE_CUSTOM_DOMAIN_CNAME_TARGET,
+            "txt_host": STRIPE_CUSTOM_DOMAIN_TXT_NAME,
+            "txt_fqdn": STRIPE_CUSTOM_DOMAIN_TXT_FQDN,
+            "paid_feature": STRIPE_CUSTOM_DOMAIN_PAID_FEATURE,
+            "approx_monthly_usd": STRIPE_CUSTOM_DOMAIN_MONTHLY_USD,
+            "dns_expected": stripe_custom_domain_dns_expected(),
+            "dashboard_url": STRIPE_CUSTOM_DOMAINS_DASHBOARD_URL,
+            "docs": "docs/STRIPE_CUSTOM_DOMAINS_AND_BRANDING.md",
+            "server_side_redirect_required": True,
+        },
+        "branding": {
+            "dashboard_url": STRIPE_BRANDING_DASHBOARD_URL,
+            "primary_color": STRIPE_BRAND_PRIMARY_COLOR,
+            "secondary_color": STRIPE_BRAND_SECONDARY_COLOR,
+            "accent_reference": STRIPE_BRAND_ACCENT_CYAN,
+            "logo_relpath": STRIPE_BRAND_LOGO_RELPATH,
+            "icon_relpath": STRIPE_BRAND_ICON_RELPATH,
+            "logo_static_relpath": STRIPE_BRAND_LOGO_STATIC_RELPATH,
+            "icon_static_relpath": STRIPE_BRAND_ICON_STATIC_RELPATH,
+            "logo_exists": logo.is_file(),
+            "icon_exists": icon.is_file(),
+            "logo_constraints_ok": bool(logo_check.get("ok")),
+            "icon_constraints_ok": bool(icon_check.get("ok")),
+            "logo_observed": logo_check.get("observed"),
+            "icon_observed": icon_check.get("observed"),
+            "requires_transparent_background": True,
+            "transparent_background": bool(
+                (icon_check.get("observed") or {}).get("corners_transparent")
+                and (logo_check.get("observed") or {}).get("corners_transparent")
+            ),
+            "stripe_file_id_logo": STRIPE_BRAND_LOGO_FILE_ID,
+            "stripe_file_id_icon": STRIPE_BRAND_ICON_FILE_ID,
+            "public_logo_url": "https://restoreprivacy.online/stripe_brand_logo.png",
+            "public_icon_url": "https://restoreprivacy.online/stripe_brand_icon.png",
+            "source_master": "assets/brand/primary_transparent_1024.png",
+            "source_theme": "status_page/public_chrome.py (--rb-btn, --rb-navy)",
+            "full_site_css_on_checkout": False,
+            "account_api_self_update": False,
+            "account_api_note": (
+                "Files API upload succeeds (business_logo / business_icon). "
+                "Attaching branding on the platform account via POST /v1/account "
+                "returns 403 (connected accounts only). Finish attach in Dashboard "
+                "→ Branding: upload the shipped PNGs or pick the uploaded files; "
+                "set primary #2694e8 secondary #0a1628."
+            ),
+            "upload_script": "scripts/upload_stripe_branding_assets.py",
+        },
+        "checkout_flow_unchanged": (
+            "Homepage Buy now → POST /pay/checkout → subscription Checkout "
+            "Session; branding/domains do not change amounts or fulfilment."
+        ),
+    }
+
+# Stripe products/prices for catalog subscription checkout (not Payment Links).
+# Names: Monthly VPN plan / Yearly VPN plan. Old “download a vpn” product archived.
+DEFAULT_STRIPE_PRODUCT_ID_MONTHLY = "prod_UwcybkCi0spmDk"
+DEFAULT_STRIPE_PRODUCT_ID_YEARLY = "prod_Uwcy4ghppuxS2C"
+DEFAULT_STRIPE_PRICE_ID_MONTHLY = "price_1TwjilJDavQ2TJW6fyxzCIkA"
+DEFAULT_STRIPE_PRICE_ID_YEARLY = "price_1TwjimJDavQ2TJW6wEKr4upj"
+STRIPE_PRODUCT_NAME_MONTHLY = "Monthly VPN plan"
+STRIPE_PRODUCT_NAME_YEARLY = "Yearly VPN plan"
 
 
 def _data_dir() -> Path:
@@ -123,23 +721,21 @@ def stripe_payment_link_price_id() -> str:
     return DEFAULT_STRIPE_PAYMENT_LINK_PRICE_ID
 
 
-# Public Stripe **subscription** Payment Link (not a secret — operator-provided).
-# Recurring £2.45/month GBP + 7-day trial. Does **not** enable fulfilment alone
-# (still need STRIPE_SECRET_KEY + STRIPE_WEBHOOK_SECRET).
-# Host is buy.stripe.com (product/subscription link), not a one-time donate page.
+# Legacy Payment Link URLs (inactive; catalog primary path is site ``/pay``).
+# Kept for env override / renew fallbacks when Checkout Session cannot be created.
 DEFAULT_STRIPE_PAYMENT_PAGE_URL = (
     "https://buy.stripe.com/cNi7sM4uOeWQ9TBe0q7kc00"
 )
-# Dashboard Payment Link object id (plink_…) for the same public page.
 DEFAULT_STRIPE_PAYMENT_LINK_ID = "plink_1TvTu6JDavQ2TJW6FeL0dIh9"
-# Line item price on that Payment Link (recurring monthly) — not for mode=payment Checkout.
-DEFAULT_STRIPE_PAYMENT_LINK_PRICE_ID = "price_1TvTsaJDavQ2TJW6HZVIG7hg"
+# Prefer new Monthly VPN plan price id; env can override.
+DEFAULT_STRIPE_PAYMENT_LINK_PRICE_ID = DEFAULT_STRIPE_PRICE_ID_MONTHLY
 # Catalog pay product mode (single source of truth with desired_payment_link_trial_fields).
 CATALOG_STRIPE_PAYMENT_MODE = "subscription"
-# Yearly subscription Payment Link — set via env when Dashboard yearly price exists.
-# Empty default: yearly href falls back to monthly URL with interval marker in
-# client_reference_id so architecture works; operator should set real yearly link.
-DEFAULT_STRIPE_PAYMENT_PAGE_URL_YEARLY = ""
+DEFAULT_STRIPE_PAYMENT_PAGE_URL_YEARLY = (
+    "https://buy.stripe.com/6oUbJ23qK2a43vdbSi7kc01"
+)
+DEFAULT_STRIPE_PAYMENT_LINK_ID_YEARLY = "plink_1TwbuPJDavQ2TJW6wl7LUUY0"
+DEFAULT_STRIPE_PAYMENT_LINK_PRICE_ID_YEARLY = DEFAULT_STRIPE_PRICE_ID_YEARLY
 # USD presentment Payment Links (required for true USD charge when Adaptive Pricing
 # cannot present the visitor currency). Override with STRIPE_PAYMENT_PAGE_URL_USD /
 # STRIPE_PAYMENT_PAGE_URL_YEARLY_USD. When unset, catalog pay buttons for USD
@@ -154,6 +750,259 @@ LICENCE_STATUS_OK = "OK"
 LICENCE_STATUS_EXPIRED = "EXPIRED"
 BILLING_INTERVAL_MONTH = "month"
 BILLING_INTERVAL_YEAR = "year"
+
+# Seconds-based bounds for tests (calendar month/year, not fixed 30d/365d).
+SECONDS_PER_DAY = 86400.0
+# One calendar month is ~28–31 days; one year ~365–366.
+MIN_MONTH_SECONDS = 27 * SECONDS_PER_DAY
+MAX_MONTH_SECONDS = 32 * SECONDS_PER_DAY
+MIN_YEAR_SECONDS = 364 * SECONDS_PER_DAY
+MAX_YEAR_SECONDS = 367 * SECONDS_PER_DAY
+
+
+def normalize_billing_interval(interval: str = BILLING_INTERVAL_MONTH) -> str:
+    """Return ``month`` or ``year`` from free-form interval labels."""
+    iv = (interval or BILLING_INTERVAL_MONTH).strip().lower()
+    if iv in ("year", "yearly", "annual", "annually"):
+        return BILLING_INTERVAL_YEAR
+    return BILLING_INTERVAL_MONTH
+
+
+def period_end_for_billing_interval(
+    start_ts: float,
+    interval: str = BILLING_INTERVAL_MONTH,
+) -> float:
+    """Unix timestamp **one calendar month** or **one calendar year** after *start_ts*.
+
+    Used as the Connect entitlement ``valid_until`` fallback when Stripe
+    ``current_period_end`` is not yet available. UTC calendar arithmetic
+    (handles month-end and leap-day edge cases).
+    """
+    iv = normalize_billing_interval(interval)
+    start = datetime.fromtimestamp(float(start_ts), tz=timezone.utc)
+    if iv == BILLING_INTERVAL_YEAR:
+        try:
+            end = start.replace(year=start.year + 1)
+        except ValueError:
+            # 29 Feb → 28 Feb next non-leap year
+            end = start.replace(year=start.year + 1, day=28)
+    else:
+        month = start.month + 1
+        year = start.year
+        if month > 12:
+            month = 1
+            year += 1
+        day = min(start.day, monthrange(year, month)[1])
+        end = start.replace(year=year, month=month, day=day)
+    return float(end.timestamp())
+
+
+def stripe_period_end_from_checkout_object(obj: dict[str, Any] | None) -> float | None:
+    """``current_period_end`` from an expanded subscription on a Checkout Session."""
+    if not isinstance(obj, dict):
+        return None
+    sub = obj.get("subscription")
+    if isinstance(sub, dict):
+        pe = sub.get("current_period_end")
+        if pe is not None:
+            try:
+                return float(pe)
+            except (TypeError, ValueError):
+                return None
+    return None
+
+
+def valid_until_for_paid_interval(
+    interval: str = BILLING_INTERVAL_MONTH,
+    *,
+    now: float | None = None,
+    stripe_period_end: float | None = None,
+) -> float:
+    """Paid catalog grant period end: Stripe period when future, else month/year fallback.
+
+    Paid monthly/yearly activations must **never** leave ``valid_until=None``
+    (unlimited). Admin failsafe keygens remain separate (explicit unlimited).
+    """
+    t = float(now if now is not None else time.time())
+    if stripe_period_end is not None:
+        try:
+            pe = float(stripe_period_end)
+            if pe > t:
+                return pe
+        except (TypeError, ValueError):
+            pass
+    return period_end_for_billing_interval(t, interval)
+
+
+def parse_auto_renew_choice(value: Any) -> bool:
+    """Customer auto-renew preference: default **True** unless explicitly off."""
+    if value is None:
+        return True
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, (int, float)):
+        return bool(value)
+    s = str(value).strip().lower()
+    if s in ("0", "false", "no", "off", "disable", "disabled", "unchecked"):
+        return False
+    if s in ("", "1", "true", "yes", "on", "enable", "enabled", "checked"):
+        return True
+    return True
+
+
+def parse_auto_renew_form_values(values: list[Any] | tuple[Any, ...] | None) -> bool:
+    """Parse multi-value form field (hidden ``0`` + checkbox ``1`` pattern).
+
+    Last value wins so an unchecked box (only hidden ``0``) disables renew.
+    """
+    if not values:
+        return True
+    return parse_auto_renew_choice(values[-1])
+
+
+def auto_renew_from_checkout_object(obj: dict[str, Any] | None) -> bool:
+    """Customer auto-renew preference from Checkout Session / subscription metadata."""
+    if not isinstance(obj, dict):
+        return True
+    meta = obj.get("metadata") if isinstance(obj.get("metadata"), dict) else {}
+    if "auto_renew" in meta:
+        return parse_auto_renew_choice(meta.get("auto_renew"))
+    sub = obj.get("subscription")
+    if isinstance(sub, dict):
+        sm = sub.get("metadata") if isinstance(sub.get("metadata"), dict) else {}
+        if "auto_renew" in sm:
+            return parse_auto_renew_choice(sm.get("auto_renew"))
+    return True
+
+
+def apply_subscription_auto_renew_preference(
+    subscription_id: str,
+    *,
+    auto_renew: bool,
+    http_post: "HttpPostFn | None" = None,
+    secret_key: str | None = None,
+) -> dict[str, Any]:
+    """Set Stripe Subscription ``cancel_at_period_end`` from customer auto-renew choice.
+
+    *auto_renew* True → cancel_at_period_end=false (keep recurring).
+    *auto_renew* False → cancel_at_period_end=true (no further charges after period).
+    Best-effort: returns ``{ok, ...}`` without raising on network errors.
+    """
+    sub = (subscription_id or "").strip()
+    if not sub:
+        return {"ok": False, "error": "missing_subscription_id"}
+    key = (secret_key or "").strip() or stripe_secret_key()
+    if not key:
+        return {"ok": False, "error": "stripe_unconfigured"}
+    cancel_at_end = "false" if auto_renew else "true"
+    body = urllib.parse.urlencode(
+        {"cancel_at_period_end": cancel_at_end}
+    ).encode("utf-8")
+    post = http_post or _default_http_post
+    try:
+        status, raw = post(
+            f"https://api.stripe.com/v1/subscriptions/{urllib.parse.quote(sub)}",
+            {
+                "Authorization": f"Bearer {key}",
+                "Content-Type": "application/x-www-form-urlencoded",
+            },
+            body,
+        )
+    except Exception as exc:  # noqa: BLE001
+        return {"ok": False, "error": f"request_failed:{exc!r}"}
+    if status >= 400:
+        return {
+            "ok": False,
+            "error": f"http_{status}",
+            "body_prefix": (raw or b"")[:200].decode("utf-8", errors="replace"),
+        }
+    try:
+        data = json.loads(raw.decode("utf-8"))
+    except (UnicodeDecodeError, json.JSONDecodeError):
+        data = {}
+    return {
+        "ok": True,
+        "subscription_id": sub,
+        "cancel_at_period_end": bool(data.get("cancel_at_period_end"))
+        if isinstance(data, dict)
+        else (not auto_renew),
+        "auto_renew": auto_renew,
+    }
+
+
+def stripe_subscription_price_id_monthly() -> str:
+    for key in (
+        "STRIPE_PRICE_ID_MONTHLY",
+        "STRIPE_SUBSCRIPTION_PRICE_ID_MONTHLY",
+        "RPT_STRIPE_PRICE_ID_MONTHLY",
+    ):
+        raw = _env_or_processor_store(key)
+        if raw:
+            return raw
+    return DEFAULT_STRIPE_PRICE_ID_MONTHLY
+
+
+def stripe_subscription_price_id_yearly() -> str:
+    for key in (
+        "STRIPE_PRICE_ID_YEARLY",
+        "STRIPE_SUBSCRIPTION_PRICE_ID_YEARLY",
+        "RPT_STRIPE_PRICE_ID_YEARLY",
+    ):
+        raw = _env_or_processor_store(key)
+        if raw:
+            return raw
+    return DEFAULT_STRIPE_PRICE_ID_YEARLY
+
+
+def stripe_subscription_price_id_for_interval(
+    interval: str = BILLING_INTERVAL_MONTH,
+) -> str:
+    """Recurring Price id for Monthly VPN plan or Yearly VPN plan."""
+    iv = (interval or BILLING_INTERVAL_MONTH).strip().lower()
+    if iv in ("year", "yearly", "annual", "annually"):
+        return stripe_subscription_price_id_yearly()
+    return stripe_subscription_price_id_monthly()
+
+
+def stripe_product_name_for_interval(interval: str = BILLING_INTERVAL_MONTH) -> str:
+    iv = (interval or BILLING_INTERVAL_MONTH).strip().lower()
+    if iv in ("year", "yearly", "annual", "annually"):
+        return STRIPE_PRODUCT_NAME_YEARLY
+    return STRIPE_PRODUCT_NAME_MONTHLY
+
+
+def site_pay_plan_path(
+    platform: str = "",
+    *,
+    interval: str = "",
+) -> str:
+    """Relative path to the site-hosted Select your plan page."""
+    plat = (platform or "").strip().lower()
+    params: dict[str, str] = {}
+    if plat:
+        params["platform"] = plat
+    iv = (interval or "").strip().lower()
+    if iv in ("year", "yearly", "annual", "annually"):
+        params["interval"] = BILLING_INTERVAL_YEAR
+    elif iv in ("month", "monthly"):
+        params["interval"] = BILLING_INTERVAL_MONTH
+    if not params:
+        return SITE_PAY_PLAN_PATH
+    return f"{SITE_PAY_PLAN_PATH}?{urllib.parse.urlencode(params)}"
+
+
+def site_pay_plan_href(
+    platform: str = "",
+    *,
+    interval: str = "",
+    base_url: str | None = None,
+) -> str:
+    """Absolute or relative URL for the site plan page (primary catalog pay entry)."""
+    path = site_pay_plan_path(platform, interval=interval)
+    base = (base_url if base_url is not None else public_base_url() or "").rstrip("/")
+    if base:
+        return f"{base}{path}"
+    return path
 
 
 def _normalize_stripe_pay_url(raw: str) -> str:
@@ -185,8 +1034,8 @@ def stripe_payment_page_url_yearly() -> str:
     """Yearly subscription Payment Link URL (public).
 
     Override with ``STRIPE_PAYMENT_PAGE_URL_YEARLY`` /
-    ``RPT_STRIPE_PAYMENT_PAGE_URL_YEARLY``. When unset, falls back to monthly URL
-    (operator should configure a real yearly link in Stripe Dashboard).
+    ``RPT_STRIPE_PAYMENT_PAGE_URL_YEARLY``. Default is the catalog yearly
+    Payment Link (distinct buy.stripe.com path from monthly).
     """
     raw = ""
     for key in (
@@ -197,8 +1046,35 @@ def stripe_payment_page_url_yearly() -> str:
         if raw:
             break
     if not raw:
-        raw = DEFAULT_STRIPE_PAYMENT_PAGE_URL_YEARLY or stripe_payment_page_url()
+        raw = DEFAULT_STRIPE_PAYMENT_PAGE_URL_YEARLY
+    if not raw:
+        # Last-resort fallback only when default empty (should not ship that way)
+        raw = stripe_payment_page_url()
     return _normalize_stripe_pay_url(raw)
+
+
+def stripe_payment_link_id_yearly() -> str:
+    """Yearly Payment Link id (plink_…). Override with env when operator rotates."""
+    for key in (
+        "STRIPE_PAYMENT_LINK_ID_YEARLY",
+        "RPT_STRIPE_PAYMENT_LINK_ID_YEARLY",
+    ):
+        raw = os.environ.get(key, "").strip()
+        if raw:
+            return raw
+    return DEFAULT_STRIPE_PAYMENT_LINK_ID_YEARLY
+
+
+def stripe_payment_link_price_id_yearly() -> str:
+    """Yearly recurring Price id on the yearly Payment Link."""
+    for key in (
+        "STRIPE_PAYMENT_LINK_PRICE_ID_YEARLY",
+        "RPT_STRIPE_PAYMENT_LINK_PRICE_ID_YEARLY",
+    ):
+        raw = os.environ.get(key, "").strip()
+        if raw:
+            return raw
+    return DEFAULT_STRIPE_PAYMENT_LINK_PRICE_ID_YEARLY
 
 
 def stripe_payment_page_url_for_interval(interval: str = BILLING_INTERVAL_MONTH) -> str:
@@ -307,25 +1183,26 @@ def stripe_payment_page_href_for_platform(
     currency: str = "",
     locale: str = "",
     base_url: str | None = None,
+    direct_stripe: bool = False,
 ) -> str:
-    """Subscription Payment Link / pay-start URL for catalog BUY buttons.
+    """Primary catalog/renew pay entry: **site-hosted** plan page (``/pay``).
 
-    Stripe Payment Links accept ``client_reference_id`` (platform|interval).
-    *interval* is ``month`` (default) or ``year``.
+    Visitors select Monthly or Annual on the status host (main-site style), then
+    checkout starts a Stripe **subscription** Session for the chosen plan only.
 
-    *currency* (visitor preference) is resolved via
-    :func:`local_currency.stripe_presentment_or_usd`:
+    *interval* pre-selects the plan on the page (``month`` or ``year``).
+    *currency* / *locale* are accepted for API compatibility (presentment is
+    applied when the Checkout Session is created).
 
-    - **USD presentment** (US visitors **or** Stripe-unsupported currency
-      fallback): use operator **USD Payment Link** env if set; otherwise a
-      distinct host path ``/pay/start?…&currency=usd`` that creates a Stripe
-      Checkout Session in **USD** (not the GBP Payment Link).
-    - **Other Stripe-supported currencies** (EUR, JPY, …): GBP-priced Payment
-      Link + ``locale`` so Dashboard **Adaptive Pricing** can present local
-      currency when enabled.
-    - **No currency** (legacy callers): GBP monthly/yearly Payment Link only.
+    Pass *direct_stripe*=True for the legacy buy.stripe.com Payment Link path
+    (inactive links; not the catalog primary route).
     """
     plat = (platform or "").strip().lower()
+    _ = (currency, locale)  # reserved for Checkout Session presentment
+    if not direct_stripe:
+        return site_pay_plan_href(plat, interval=interval, base_url=base_url)
+
+    # --- Legacy direct Stripe Payment Link (operator override / tests) ---
     try:
         from local_currency import (
             FALLBACK_CURRENCY,
@@ -343,7 +1220,6 @@ def stripe_payment_page_href_for_platform(
     if (currency or "").strip():
         presentment = stripe_presentment_or_usd(currency)
 
-    # --- USD presentment: never rely on locale alone on the GBP Payment Link ---
     if presentment == FALLBACK_CURRENCY:
         usd_base = stripe_payment_page_url_usd_for_interval(interval)
         if usd_base:
@@ -355,14 +1231,12 @@ def stripe_payment_page_href_for_platform(
             q = urllib.parse.urlencode(params)
             sep = "&" if "?" in usd_base else "?"
             return f"{usd_base}{sep}{q}"
-        # Distinct host start URL (Checkout USD or env USD link at request time)
         path = usd_pay_start_path(plat or "windows", interval=interval)
         base = (base_url or public_base_url() or "").rstrip("/")
         if base:
             return f"{base}{path}"
         return path
 
-    # --- GBP-priced Payment Link (+ locale for Adaptive Pricing) ---
     base = stripe_payment_page_url_for_interval(interval)
     loc = (locale or "").strip()
     if not loc and presentment:
@@ -1071,7 +1945,7 @@ def render_post_payment_thankyou_html(
     </p>
     <p class="keygen-advice" id="keygen-advice">
       Install → accept licence terms → enter this keygen in the app to unlock.
-      Your monthly subscription begins after your 7 day trial.
+      Your subscription is active once payment succeeds (monthly or yearly plan).
       If payment fails later, this keygen becomes useless and Connect locks until
       an active subscription is restored.
     </p>
@@ -1180,8 +2054,7 @@ def render_post_payment_thankyou_html(
   </p>
   <p class="msg muted" id="download-lifetime-note">This page stays open until you close the tab.
     Keep it open until your download finishes. The download control is not disabled by a timer.
-    After a successful download the grant is one-time (security). Tip optional:
-    <a href="https://buymeacoffee.com/rgsneddon">buymeacoffee.com/rgsneddon</a></p>
+    After a successful download the grant is one-time (security).</p>
   <p><a href="/">Home</a></p>
 </section>
 """
@@ -1220,7 +2093,7 @@ def normalize_purchase_id(purchase_id: str | None) -> str:
 # --- Subscription keygen (human-enterable unlock code bound to entitlement) ---
 
 KEYGEN_UNLOCK_INSTRUCTION = (
-    "USE THIS KEYGEN TO UNLOCK YOUR RESTORE PRIVACY TRIAL"
+    "USE THIS KEYGEN TO UNLOCK RESTORE PRIVACY"
 )
 
 # Distinct from PPI (RPT-XXXX-…) so buyers do not confuse purchase id with unlock.
@@ -1459,8 +2332,9 @@ def activate_connect_entitlement(
     """Mark Checkout session as paid/active for Connect entitlement.
 
     *valid_until* is a unix timestamp after which Connect is no longer allowed
-    (subscription period end). ``None`` means no time limit (one-time pay until
-    refund/revoke).
+    (subscription period end). ``None`` means no time limit — used only for
+    **admin failsafe** / legacy paths; paid monthly/yearly catalog grants always
+    pass a finite period from :func:`process_checkout_completed_event`.
 
     Returns the bound **keygen** (minted once per session if not already set).
     """
@@ -2173,7 +3047,8 @@ def build_fulfilment_email_payload(
         f"Download link (one-time): {dl}",
         "",
         "Install flow: Install → accept licence terms and conditions → enter keygen → unlock.",
-        "Your monthly subscription (£2.45 per month) begins after your 7 day trial.",
+        "Your subscription is active once payment succeeds "
+        "(£2.45/month or £27.93/year — Annual saves 5%).",
         "The keygen only unlocks Connect while your subscription/payment is active.",
         "If payment fails later (failed charge, refund, dispute, or subscription ends),",
         "this keygen becomes useless and the app locks until payment is active again.",
@@ -2380,32 +3255,281 @@ def assess_fulfilment_smtp_readiness(
 
 
 def desired_payment_link_trial_fields() -> dict[str, Any]:
-    """Target Stripe **subscription** Payment Link shape (single source of truth).
+    """Target Stripe **subscription** catalog shape (single source of truth).
 
-    Catalog BUY hrefs, deploy script, and readiness checks share these fields.
-    Pure helper (no network). Live Payment Link update uses Stripe API when
-    ``STRIPE_SECRET_KEY`` is set (``scripts/configure_stripe_payment_link_trial.py``).
+    Site plan page + Checkout Session use these amounts/products. Pure helper
+    (no network). Configure script can sync Dashboard prices when
+    ``STRIPE_SECRET_KEY`` is set.
+
+    ``trial_period_days`` is **0** (Stripe field; not a product trial). Annual is 5% off 12× monthly.
     """
     return {
         "payment_link_id": DEFAULT_STRIPE_PAYMENT_LINK_ID,
-        "payment_page_url": DEFAULT_STRIPE_PAYMENT_PAGE_URL,
-        "price_id": DEFAULT_STRIPE_PAYMENT_LINK_PRICE_ID,
+        "payment_page_url": site_pay_plan_path(),  # site-hosted primary entry
+        "price_id": stripe_subscription_price_id_monthly(),
+        "payment_link_id_yearly": DEFAULT_STRIPE_PAYMENT_LINK_ID_YEARLY,
+        "payment_page_url_yearly": site_pay_plan_path(interval=BILLING_INTERVAL_YEAR),
+        "price_id_yearly": stripe_subscription_price_id_yearly(),
+        "product_id_monthly": DEFAULT_STRIPE_PRODUCT_ID_MONTHLY,
+        "product_id_yearly": DEFAULT_STRIPE_PRODUCT_ID_YEARLY,
+        "product_name_monthly": STRIPE_PRODUCT_NAME_MONTHLY,
+        "product_name_yearly": STRIPE_PRODUCT_NAME_YEARLY,
         "currency": PRICE_CURRENCY,
         "unit_amount_pence": PRICE_PENCE,
+        "unit_amount_yearly_pence": PRICE_YEARLY_PENCE,
+        "yearly_discount_percent": YEARLY_DISCOUNT_PERCENT,
         "recurring_interval": "month",
-        "trial_period_days": 7,
+        "recurring_interval_yearly": "year",
+        "trial_period_days": 0,
         "mode": CATALOG_STRIPE_PAYMENT_MODE,
+        "catalog_entry": SITE_PAY_PLAN_PATH,
+        # Legacy key name kept for tests/config (no trial product / no trial copy).
         "homepage_trial_sentence": (
-            "your monthly subscription begins after your 7 day trial"
+            "Select your plan — Monthly or Annual (5% off yearly) — "
+            "subscription starts when you pay"
         ),
     }
 
 
+def render_pay_plan_page_html(
+    platform: str = "",
+    *,
+    interval: str = BILLING_INTERVAL_MONTH,
+    error: str = "",
+) -> bytes:
+    """Site-styled **Select your plan** page (Monthly | Annual) for one platform.
+
+    Pure HTML builder (no network). Continue submits to ``POST /pay/checkout``
+    which creates a Stripe subscription Checkout Session for the chosen plan.
+    """
+    try:
+        from public_chrome import (
+            PUBLIC_BRAND_TITLE,
+            public_brand_header_html,
+            public_head_open,
+            public_page_close,
+            public_site_css,
+        )
+    except ImportError:  # pragma: no cover
+        from status_page.public_chrome import (  # type: ignore
+            PUBLIC_BRAND_TITLE,
+            public_brand_header_html,
+            public_head_open,
+            public_page_close,
+            public_site_css,
+        )
+    try:
+        from downloads import available_downloads, platform_face_title
+    except ImportError:  # pragma: no cover
+        from status_page.downloads import (  # type: ignore
+            available_downloads,
+            platform_face_title,
+        )
+
+    plat = (platform or "").strip().lower()
+    iv = (interval or BILLING_INTERVAL_MONTH).strip().lower()
+    if iv in ("year", "yearly", "annual", "annually"):
+        iv = BILLING_INTERVAL_YEAR
+    else:
+        iv = BILLING_INTERVAL_MONTH
+
+    platforms = [a.platform for a in available_downloads()]
+    if plat and plat not in platforms:
+        plat = ""
+
+    def _esc(s: str) -> str:
+        return (
+            str(s)
+            .replace("&", "&amp;")
+            .replace("<", "&lt;")
+            .replace(">", "&gt;")
+            .replace('"', "&quot;")
+        )
+
+    opts = []
+    for p in platforms:
+        sel = " selected" if p == plat else ""
+        opts.append(
+            f'<option value="{_esc(p)}"{sel}>{_esc(platform_face_title(p))}</option>'
+        )
+    platform_options = "\n            ".join(opts)
+    month_checked = " checked" if iv == BILLING_INTERVAL_MONTH else ""
+    year_checked = " checked" if iv == BILLING_INTERVAL_YEAR else ""
+    err_html = ""
+    if (error or "").strip():
+        err_html = (
+            f'<p class="pay-error" id="pay-error" role="alert">'
+            f"{_esc(error.strip())}</p>"
+        )
+    save_pct = YEARLY_DISCOUNT_PERCENT
+    monthly_label = PRICE_LABEL
+    yearly_label = PRICE_YEARLY_LABEL
+    full_yearly = PRICE_YEARLY_FULL_LABEL
+    product_m = STRIPE_PRODUCT_NAME_MONTHLY
+    product_y = STRIPE_PRODUCT_NAME_YEARLY
+
+    extra_css = """
+.pay-plan-shell { max-width: 32rem; margin: 0 auto 2rem; }
+.pay-plan-card {
+  background: var(--rb-card); border-radius: var(--rb-radius);
+  border: 1px solid var(--rb-card-border); padding: 1.25rem 1.35rem;
+  box-shadow: 0 10px 28px rgba(4,12,28,0.35);
+}
+.pay-plan-card h2 {
+  margin: 0 0 0.35rem; font-size: 1.15rem; letter-spacing: 0.06em;
+  text-transform: uppercase; color: var(--rb-cream);
+}
+.pay-plan-lead { color: var(--rb-muted); font-size: 0.92rem; line-height: 1.45; margin: 0 0 1rem; }
+.pay-field { margin: 0.85rem 0; text-align: left; }
+.pay-field label.pay-label {
+  display: block; font-weight: 700; font-size: 0.82rem; letter-spacing: 0.04em;
+  text-transform: uppercase; color: var(--rb-muted); margin-bottom: 0.4rem;
+}
+.pay-field select {
+  width: 100%; box-sizing: border-box; padding: 0.65rem 0.75rem;
+  border-radius: 10px; border: 1px solid rgba(174,208,234,0.35);
+  background: rgba(8,18,32,0.65); color: var(--rb-cream); font: inherit;
+}
+.pay-plans { display: flex; flex-direction: column; gap: 0.65rem; }
+.pay-plan-option {
+  display: block; cursor: pointer; border-radius: 12px;
+  border: 1px solid rgba(174,208,234,0.28); padding: 0.85rem 0.95rem;
+  background: rgba(8,18,32,0.45); transition: border-color 0.12s, box-shadow 0.12s;
+}
+.pay-plan-option:has(input:checked) {
+  border-color: var(--rb-neon-cyan); box-shadow: 0 0 0 1px rgba(0,229,255,0.35);
+  background: rgba(20,50,90,0.55);
+}
+.pay-plan-option input { margin-right: 0.55rem; accent-color: var(--rb-btn); }
+.pay-plan-title { font-weight: 800; color: #fff; font-size: 1.02rem; }
+.pay-plan-price { font-weight: 700; color: var(--rb-soft); margin-top: 0.2rem; }
+.pay-plan-note { font-size: 0.82rem; color: var(--rb-muted); margin-top: 0.15rem; }
+.pay-save-badge {
+  display: inline-block; margin-left: 0.35rem; padding: 0.12rem 0.45rem;
+  border-radius: 999px; font-size: 0.72rem; font-weight: 800;
+  background: rgba(57,255,106,0.18); color: #39ff6a; letter-spacing: 0.03em;
+}
+.pay-was { text-decoration: line-through; opacity: 0.7; margin-right: 0.35rem; }
+.pay-submit {
+  width: 100%; margin-top: 1.15rem; padding: 0.85rem 1rem; border: 0;
+  border-radius: 12px; font-weight: 800; font-size: 1rem; cursor: pointer;
+  font-family: inherit; color: #fff;
+  background: linear-gradient(180deg, var(--rb-btn) 0%, var(--rb-btn-deep) 100%);
+  box-shadow: 0 4px 14px rgba(7,30,60,0.4);
+}
+.pay-submit:hover { filter: brightness(1.08); }
+.pay-error {
+  color: #fecaca; background: rgba(127,29,29,0.35); border: 1px solid #b91c1c;
+  border-radius: 10px; padding: 0.65rem 0.85rem; margin: 0 0 0.85rem; text-align: left;
+}
+.pay-back { display: inline-block; margin-top: 1rem; color: var(--rb-link); font-weight: 600; }
+.pay-auto-renew {
+  margin: 1rem 0 0; text-align: left; padding: 0.75rem 0.85rem;
+  border-radius: 10px; border: 1px solid rgba(174,208,234,0.22);
+  background: rgba(8,18,32,0.4);
+}
+.pay-auto-renew label {
+  display: flex; align-items: flex-start; gap: 0.5rem; cursor: pointer;
+  font-weight: 700; color: var(--rb-cream); font-size: 0.95rem;
+}
+.pay-auto-renew input { margin-top: 0.2rem; accent-color: var(--rb-btn); }
+.pay-auto-renew-help {
+  margin: 0.4rem 0 0 1.55rem; font-size: 0.8rem; color: var(--rb-muted); line-height: 1.4;
+}
+"""
+    try:
+        from downloads import AUTO_RENEW_HELP, AUTO_RENEW_LABEL
+    except ImportError:  # pragma: no cover
+        from status_page.downloads import (  # type: ignore
+            AUTO_RENEW_HELP,
+            AUTO_RENEW_LABEL,
+        )
+    body = f"""
+  <div class="page-shell pay-plan-shell" id="pay-plan-shell">
+{public_brand_header_html(title=PUBLIC_BRAND_TITLE, active=None)}
+    <section class="pay-plan-card panel-card" id="pay-plan-card" aria-labelledby="pay-plan-heading">
+      <h2 id="pay-plan-heading">Select your plan</h2>
+      <p class="pay-plan-lead" id="pay-plan-lead">
+        One device licence. Choose <strong>Monthly</strong> (access for one month) or
+        <strong>Annual</strong> (access for one year, save {save_pct}% vs paying monthly).
+        Subscription starts when you pay. Without renewal after the paid period,
+        Connect expires and the client becomes unusable until you renew.
+        You will complete card payment securely on Stripe.
+      </p>
+      {err_html}
+      <form id="pay-plan-form" class="pay-plan-form" method="post" action="/pay/checkout">
+        <div class="pay-field" id="pay-platform-field">
+          <label class="pay-label" for="pay-platform">Platform</label>
+          <select name="platform" id="pay-platform" required aria-required="true">
+            <option value="" disabled{" selected" if not plat else ""}>Choose your device…</option>
+            {platform_options}
+          </select>
+        </div>
+        <div class="pay-field" id="pay-interval-field">
+          <span class="pay-label" id="pay-interval-label">Select your plan</span>
+          <div class="pay-plans" role="radiogroup" aria-labelledby="pay-interval-label">
+            <label class="pay-plan-option" id="pay-option-month" data-interval="month">
+              <input type="radio" name="interval" value="month"{month_checked}
+                     aria-label="Monthly VPN plan"/>
+              <span class="pay-plan-title">{_esc(product_m)}</span>
+              <div class="pay-plan-price">{_esc(monthly_label)} / month</div>
+              <div class="pay-plan-note">Billed monthly · cancel anytime in Stripe</div>
+            </label>
+            <label class="pay-plan-option" id="pay-option-year" data-interval="year">
+              <input type="radio" name="interval" value="year"{year_checked}
+                     aria-label="Yearly VPN plan"/>
+              <span class="pay-plan-title">{_esc(product_y)}
+                <span class="pay-save-badge">SAVE {save_pct}%</span></span>
+              <div class="pay-plan-price">
+                <span class="pay-was">{_esc(full_yearly)}</span>{_esc(yearly_label)} / year
+              </div>
+              <div class="pay-plan-note">5% off vs 12 × monthly ({_esc(monthly_label)} × 12)</div>
+            </label>
+          </div>
+        </div>
+        <div class="pay-auto-renew" id="pay-auto-renew-field">
+          <input type="hidden" name="auto_renew" value="0" id="pay-auto-renew-off"/>
+          <label for="pay-auto-renew">
+            <input type="checkbox" name="auto_renew" value="1" id="pay-auto-renew"
+                   checked aria-describedby="pay-auto-renew-help"/>
+            <span>{_esc(AUTO_RENEW_LABEL)}</span>
+          </label>
+          <p class="pay-auto-renew-help" id="pay-auto-renew-help">{_esc(AUTO_RENEW_HELP)}</p>
+        </div>
+        <button type="submit" class="pay-submit" id="pay-submit">
+          Continue to secure checkout
+        </button>
+      </form>
+      <a class="pay-back" id="pay-back-home" href="/">← Back to catalog</a>
+    </section>
+  </div>
+"""
+    html = (
+        public_head_open(title="Select your plan — Restore Privacy", extra_css=extra_css)
+        + body
+        + public_page_close()
+    )
+    return html.encode("utf-8")
+
+
+def _normalize_trial_days(value: Any) -> int | None:
+    """Map Stripe trial_period_days to int; treat blank/None as no trial (None)."""
+    if value is None or value == "":
+        return None
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return None
+
+
 def payment_link_matches_trial_subscription(price_obj: dict[str, Any]) -> dict[str, Any]:
-    """Check a Stripe Price object against desired £2.45/mo + trial fields.
+    """Check a Stripe Price object against desired £2.45/mo + **no trial** fields.
 
     *price_obj* is a Stripe API Price dict (or redacted summary). Returns
     ``{ok, mismatches[], observed}`` without inventing success.
+
+    Desired ``trial_period_days`` is 0: observed trial may be ``None`` (absent)
+    or ``0``; any positive trial (e.g. 7) is a mismatch.
     """
     want = desired_payment_link_trial_fields()
     mismatches: list[str] = []
@@ -2421,37 +3545,35 @@ def payment_link_matches_trial_subscription(price_obj: dict[str, Any]) -> dict[s
     if not isinstance(recurring, dict):
         recurring = {}
     interval = str(recurring.get("interval") or "").strip().lower()
-    trial = recurring.get("trial_period_days")
-    if trial is None:
-        trial = price_obj.get("trial_period_days")
-    try:
-        trial_i = int(trial) if trial is not None else None
-    except (TypeError, ValueError):
-        trial_i = None
+    trial_i = _normalize_trial_days(recurring.get("trial_period_days"))
+    if trial_i is None:
+        trial_i = _normalize_trial_days(price_obj.get("trial_period_days"))
     # Some Dashboard prices put trial on the Payment Link / subscription_data
-    # rather than the Price; callers may pass trial_period_days at top level.
+    # rather than the Price; callers may pass payment_link_trial_period_days.
     if currency != want["currency"]:
         mismatches.append(f"currency:{currency!r}!={want['currency']!r}")
     if amount_i != want["unit_amount_pence"]:
         mismatches.append(f"unit_amount:{amount_i!r}!={want['unit_amount_pence']}")
     if interval != want["recurring_interval"]:
         mismatches.append(f"interval:{interval!r}!={want['recurring_interval']!r}")
-    # trial may live on Subscription Data of the Payment Link
-    link_trial = price_obj.get("payment_link_trial_period_days")
-    try:
-        link_trial_i = int(link_trial) if link_trial is not None else None
-    except (TypeError, ValueError):
-        link_trial_i = None
+    link_trial_i = _normalize_trial_days(price_obj.get("payment_link_trial_period_days"))
     effective_trial = trial_i if trial_i is not None else link_trial_i
-    if effective_trial != want["trial_period_days"]:
+    want_trial = int(want["trial_period_days"] or 0)
+    # No-trial target: None (absent) and 0 both OK; positive days fail.
+    if want_trial == 0:
+        if effective_trial is not None and int(effective_trial) != 0:
+            mismatches.append(
+                f"trial_period_days:{effective_trial!r}!=0 (must be 0)"
+            )
+    elif effective_trial != want_trial:
         mismatches.append(
-            f"trial_period_days:{effective_trial!r}!={want['trial_period_days']}"
+            f"trial_period_days:{effective_trial!r}!={want_trial}"
         )
     observed = {
         "currency": currency,
         "unit_amount": amount_i,
         "interval": interval,
-        "trial_period_days": effective_trial,
+        "trial_period_days": effective_trial if effective_trial is not None else 0,
         "price_id": str(price_obj.get("id") or ""),
         "type": str(price_obj.get("type") or ""),
     }
@@ -2719,16 +3841,24 @@ def process_subscription_lifecycle_event(
                 pe = float(obj["period_end"])
             except (TypeError, ValueError):
                 pe = None
+        # Fallback: extend by stored billing_interval (month/year) from *now*
+        if pe is None:
+            ent = get_connect_entitlement(sid)
+            iv = BILLING_INTERVAL_MONTH
+            if ent:
+                iv = normalize_billing_interval(
+                    str(ent.get("billing_interval") or BILLING_INTERVAL_MONTH)
+                )
+            pe = valid_until_for_paid_interval(iv, now=t)
         activate_connect_entitlement(
             sid,
             subscription_id=sub_id,
             valid_until=pe,
             now=t,
         )
-        if pe is not None:
-            set_entitlement_valid_until(
-                sid, pe, reason="invoice_paid_period", now=t
-            )
+        set_entitlement_valid_until(
+            sid, pe, reason="invoice_paid_period", now=t
+        )
         return {
             "action": "renewed",
             "session_id": sid,
@@ -3590,6 +4720,237 @@ def _default_http_post(
         return int(e.code), e.read()
 
 
+def build_subscription_checkout_form_body(
+    platform: str,
+    filename: str,
+    *,
+    interval: str = BILLING_INTERVAL_MONTH,
+    success_url: str,
+    cancel_url: str,
+    currency: str = PRICE_CURRENCY,
+    auto_renew: bool = True,
+) -> bytes:
+    """Stripe Checkout Session body for **subscription** Monthly/Yearly VPN plan.
+
+    Uses Dashboard Price ids for Monthly VPN plan / Yearly VPN plan. No trial.
+    *currency* may be ``usd`` for presentment conversion via price_data fallback
+    when a dedicated USD price is not configured (inline recurring price_data).
+
+    *auto_renew*: when **False**, sets ``subscription_data[cancel_at_period_end]``
+    so Stripe does not charge again after the paid month/year (customer still
+    has access until period end).
+    """
+    plat = (platform or "").strip().lower()
+    iv = normalize_billing_interval(interval)
+    if iv == BILLING_INTERVAL_YEAR:
+        amount = PRICE_YEARLY_PENCE
+        product_name = STRIPE_PRODUCT_NAME_YEARLY
+    else:
+        amount = PRICE_PENCE
+        product_name = STRIPE_PRODUCT_NAME_MONTHLY
+    ref = encode_client_reference_id(plat, interval=iv)
+    ccy = (currency or PRICE_CURRENCY).strip().lower() or PRICE_CURRENCY
+    renew = bool(auto_renew)
+    fields: list[tuple[str, str]] = [
+        ("mode", "subscription"),
+        ("success_url", success_url),
+        ("cancel_url", cancel_url),
+        ("client_reference_id", ref),
+        ("metadata[platform]", plat),
+        ("metadata[filename]", filename),
+        ("metadata[billing_interval]", iv),
+        ("metadata[amount_pence]", str(amount)),
+        ("metadata[currency]", ccy if ccy == "usd" else PRICE_CURRENCY),
+        ("metadata[product_name]", product_name),
+        ("metadata[auto_renew]", "1" if renew else "0"),
+        ("subscription_data[metadata][platform]", plat),
+        ("subscription_data[metadata][billing_interval]", iv),
+        ("subscription_data[metadata][auto_renew]", "1" if renew else "0"),
+    ]
+    # Prefer create-time cancel_at_period_end when the Stripe API version accepts
+    # it; some accounts return parameter_unknown — then fulfilment applies
+    # cancel_at_period_end on the Subscription after checkout.session.completed
+    # (see apply_subscription_auto_renew_preference).
+    if not renew:
+        fields.append(("subscription_data[cancel_at_period_end]", "true"))
+    # Prefer fixed recurring Price ids (GBP catalog products)
+    price_id = stripe_subscription_price_id_for_interval(iv)
+    if ccy == "usd":
+        # Relative USD from GBP anchors (no separate USD Price required)
+        try:
+            from local_currency import FALLBACK_CURRENCY, convert_gbp_to_currency
+        except ImportError:  # pragma: no cover
+            from status_page.local_currency import (  # type: ignore
+                FALLBACK_CURRENCY,
+                convert_gbp_to_currency,
+            )
+        gbp = amount / 100.0
+        cents = max(1, int(round(convert_gbp_to_currency(gbp, FALLBACK_CURRENCY) * 100)))
+        fields.extend(
+            [
+                ("line_items[0][price_data][currency]", "usd"),
+                ("line_items[0][price_data][unit_amount]", str(cents)),
+                (
+                    "line_items[0][price_data][recurring][interval]",
+                    iv,
+                ),
+                (
+                    "line_items[0][price_data][product_data][name]",
+                    product_name,
+                ),
+                (
+                    "line_items[0][price_data][product_data][description]",
+                    f"{filename} · {plat}",
+                ),
+                ("line_items[0][quantity]", "1"),
+            ]
+        )
+    elif price_id:
+        fields.append(("line_items[0][price]", price_id))
+        fields.append(("line_items[0][quantity]", "1"))
+    else:
+        fields.extend(
+            [
+                ("line_items[0][price_data][currency]", PRICE_CURRENCY),
+                ("line_items[0][price_data][unit_amount]", str(amount)),
+                ("line_items[0][price_data][recurring][interval]", iv),
+                (
+                    "line_items[0][price_data][product_data][name]",
+                    product_name,
+                ),
+                (
+                    "line_items[0][price_data][product_data][description]",
+                    f"{filename} · {plat}",
+                ),
+                ("line_items[0][quantity]", "1"),
+            ]
+        )
+    return urllib.parse.urlencode(fields).encode("utf-8")
+
+
+def create_subscription_checkout_session(
+    platform: str,
+    *,
+    interval: str = BILLING_INTERVAL_MONTH,
+    base_url: str | None = None,
+    http_post: HttpPostFn | None = None,
+    currency: str = "",
+    auto_renew: bool = True,
+) -> dict[str, Any]:
+    """Create a Stripe **subscription** Checkout Session for Monthly or Yearly VPN plan.
+
+    Returns dict with id, url, platform, filename, amount_pence, currency,
+    billing_interval, price_id, product_name, auto_renew.
+    """
+    filename = platform_filename(platform)
+    if not filename:
+        raise ValueError(f"unknown platform: {platform}")
+    key = stripe_secret_key()
+    if not key:
+        raise ValueError("STRIPE_SECRET_KEY not configured")
+
+    plat = (platform or "").strip().lower()
+    iv = normalize_billing_interval(interval)
+    if iv == BILLING_INTERVAL_YEAR:
+        amount = PRICE_YEARLY_PENCE
+    else:
+        amount = PRICE_PENCE
+    renew = bool(auto_renew)
+
+    base = (base_url or public_base_url()).rstrip("/")
+    success = (
+        f"{base}{DEFAULT_SUCCESS_PATH}"
+        f"?session_id={{CHECKOUT_SESSION_ID}}&platform={urllib.parse.quote(plat)}"
+    )
+    # Return to homepage Download client box (primary selection UX)
+    cancel = (
+        f"{base}/?platform={urllib.parse.quote(plat)}&interval={iv}#downloads"
+    )
+
+    presentment_ccy = PRICE_CURRENCY
+    if (currency or "").strip():
+        try:
+            from local_currency import FALLBACK_CURRENCY, stripe_presentment_or_usd
+        except ImportError:  # pragma: no cover
+            from status_page.local_currency import (  # type: ignore
+                FALLBACK_CURRENCY,
+                stripe_presentment_or_usd,
+            )
+        if stripe_presentment_or_usd(currency) == FALLBACK_CURRENCY:
+            presentment_ccy = "usd"
+
+    body = build_subscription_checkout_form_body(
+        plat,
+        filename,
+        interval=iv,
+        success_url=success,
+        cancel_url=cancel,
+        currency=presentment_ccy,
+        auto_renew=renew,
+    )
+    post = http_post or _default_http_post
+    headers = {
+        "Authorization": f"Bearer {key}",
+        "Content-Type": "application/x-www-form-urlencoded",
+    }
+    status, raw = post(
+        "https://api.stripe.com/v1/checkout/sessions",
+        headers,
+        body,
+    )
+    # Older Stripe API versions reject subscription_data[cancel_at_period_end]
+    # at Session create — retry without it; metadata auto_renew still drives
+    # post-checkout Subscription update.
+    if status >= 400 and not renew and b"cancel_at_period_end" in (raw or b""):
+        body_retry = build_subscription_checkout_form_body(
+            plat,
+            filename,
+            interval=iv,
+            success_url=success,
+            cancel_url=cancel,
+            currency=presentment_ccy,
+            auto_renew=True,  # omit create-time cancel flag
+        )
+        # Force metadata auto_renew=0 on the retry body
+        retry_fields = urllib.parse.parse_qsl(body_retry.decode("utf-8"))
+        fixed: list[tuple[str, str]] = []
+        for k, v in retry_fields:
+            if k in (
+                "metadata[auto_renew]",
+                "subscription_data[metadata][auto_renew]",
+            ):
+                fixed.append((k, "0"))
+            else:
+                fixed.append((k, v))
+        body_retry = urllib.parse.urlencode(fixed).encode("utf-8")
+        status, raw = post(
+            "https://api.stripe.com/v1/checkout/sessions",
+            headers,
+            body_retry,
+        )
+    if status >= 400:
+        raise ValueError(f"stripe checkout create failed HTTP {status}: {raw[:300]!r}")
+    data = json.loads(raw.decode("utf-8"))
+    url = data.get("url")
+    sid = data.get("id")
+    if not url or not sid:
+        raise ValueError("stripe response missing url/id")
+    charge_ccy = presentment_ccy if presentment_ccy == "usd" else PRICE_CURRENCY
+    return {
+        "id": sid,
+        "url": url,
+        "platform": plat,
+        "filename": filename,
+        "amount_pence": amount if charge_ccy != "usd" else amount,
+        "currency": charge_ccy,
+        "billing_interval": iv,
+        "price_id": stripe_subscription_price_id_for_interval(iv),
+        "product_name": stripe_product_name_for_interval(iv),
+        "mode": "subscription",
+        "auto_renew": renew,
+    }
+
+
 def build_checkout_form_body(req: CheckoutRequest) -> bytes:
     """application/x-www-form-urlencoded body for Stripe Checkout Session create.
 
@@ -3695,17 +5056,32 @@ def create_checkout_session(
     http_post: HttpPostFn | None = None,
     currency: str = "",
     interval: str = BILLING_INTERVAL_MONTH,
+    auto_renew: bool = True,
 ) -> dict[str, Any]:
     """Create a Stripe Checkout Session for one package.
 
-    Default: one-time **£2.45 GBP**. When *currency* resolves to **USD**
-    presentment (including unsupported-currency fallback), charges the relative
-    USD amount (from :mod:`local_currency` GBP anchors) in **usd**.
+    Catalog default: **subscription** Checkout for Monthly or Yearly VPN plan
+    (see :func:`create_subscription_checkout_session`). Pass
+    ``RPT_CHECKOUT_ONE_TIME=1`` to force legacy one-time payment mode.
 
-    Returns dict with keys: id, url (Stripe-hosted), platform, filename,
-    amount_pence (or amount_cents for USD), currency.
-    Raises ValueError on bad platform or missing Stripe config / API failure.
+    When *currency* resolves to **USD** presentment, subscription session uses
+    USD recurring price_data relative to GBP anchors.
     """
+    if os.environ.get("RPT_CHECKOUT_ONE_TIME", "").strip().lower() not in (
+        "1",
+        "true",
+        "yes",
+        "on",
+    ):
+        return create_subscription_checkout_session(
+            platform,
+            interval=interval,
+            base_url=base_url,
+            http_post=http_post,
+            currency=currency,
+            auto_renew=auto_renew,
+        )
+
     filename = platform_filename(platform)
     if not filename:
         raise ValueError(f"unknown platform: {platform}")
@@ -3718,7 +5094,7 @@ def create_checkout_session(
         f"{base}{DEFAULT_SUCCESS_PATH}"
         f"?session_id={{CHECKOUT_SESSION_ID}}&platform={urllib.parse.quote(platform)}"
     )
-    cancel = f"{base}{DEFAULT_CANCEL_PATH}?platform={urllib.parse.quote(platform)}"
+    cancel = f"{base}{SITE_PAY_PLAN_PATH}?platform={urllib.parse.quote(platform)}"
     creq = CheckoutRequest(
         platform=platform,
         filename=filename,
@@ -3872,22 +5248,29 @@ def process_checkout_completed_event(
     event: dict[str, Any],
     *,
     email_transport: Callable[[dict[str, Any]], dict[str, Any]] | None = None,
+    now: float | None = None,
 ) -> str | None:
     """On checkout.session.completed, mint a download token. Returns token or None.
 
-    Supports **subscription** Payment Link checkouts (catalog default: £2.45/month
-    + 7-day trial) and legacy full-price paid sessions.
+    Supports **subscription** Payment Link checkouts (catalog: £2.45/month or
+    £27.93/year) and legacy full-price paid sessions.
 
     Platform comes from ``client_reference_id`` (BUY tile) or ``metadata.platform``.
 
-    **Only if paid / trial:** ``payment_status`` must be ``paid`` or
+    **Only if paid / subscription:** ``payment_status`` must be ``paid`` or
     ``no_payment_required``.
     **Full product price:** amount must equal ``PRICE_PENCE`` (245), **or** a
-    subscription trial (£0 / no_payment_required with a ``subscription`` id).
-    Underpay without a subscription never mints a grant.
+    subscription session with a ``subscription`` id (including legacy zero-amount
+    trial checkouts that still carry a subscription id). Underpay without a
+    subscription never mints a grant.
 
     Stores ``subscription_id`` on the Connect entitlement when present. Mints a
     unique **keygen** and attempts fulfilment email (best-effort SMTP).
+
+    **Licence period:** always sets ``valid_until`` to Stripe
+    ``current_period_end`` when present, else **one calendar month** (monthly
+    plan) or **one calendar year** (yearly plan) from *now* — never unlimited
+    for paid catalog grants.
     """
     if event.get("type") != "checkout.session.completed":
         return None
@@ -3901,6 +5284,7 @@ def process_checkout_completed_event(
         meta = {}
     platform = platform_from_stripe_checkout_session(obj)
     billing_interval = billing_interval_from_stripe_checkout_session(obj)
+    t_now = float(now if now is not None else time.time())
     # Always mint the **current** catalog package for the platform (pay-time truth).
     filename = resolve_paid_grant_filename(
         platform, metadata_filename=str(meta.get("filename") or "")
@@ -3925,14 +5309,19 @@ def process_checkout_completed_event(
         subscription_id = str(sub_raw.get("id") or "")
     else:
         subscription_id = str(sub_raw or "").strip()
-    # Full price (245 GBP pence) always OK. £0 / no_payment_required allowed only with a
-    # subscription id (7-day trial then monthly) so underpay one-time never mints.
-    # mode=subscription with subscription id and full price is also OK via amount_ok.
-    # Yearly subscription: any positive amount_total with subscription id also OK
-    # (yearly unit amount is operator-defined in Stripe, not hardcoded here).
+    # Full price (245 GBP pence) always OK. Yearly catalog amount (2940) with
+    # subscription id is OK. Paid monthly/yearly subscriptions mint without a
+    # free-trial window. Legacy £0 / no_payment_required still allowed only with
+    # a subscription id so underpay one-time never mints.
     # USD one-time: relative cents from GBP anchors (local_currency FX table).
     currency = str(meta.get("currency") or obj.get("currency") or PRICE_CURRENCY).strip().lower()
     amount_ok = amount is not None and amount == PRICE_PENCE and currency in ("", PRICE_CURRENCY, "gbp")
+    yearly_amount_ok = (
+        amount is not None
+        and amount == PRICE_YEARLY_PENCE
+        and currency in ("", PRICE_CURRENCY, "gbp")
+        and bool(subscription_id)
+    )
     usd_ok = False
     if currency == "usd" and amount is not None and amount > 0:
         try:
@@ -3954,16 +5343,32 @@ def process_checkout_completed_event(
     yearly_sub_ok = bool(subscription_id) and billing_interval == BILLING_INTERVAL_YEAR and (
         amount is None or amount >= 0
     )
+    # Legacy name: subscription session with zero/no_payment_required still mints
+    # (no free-trial product path required; paid monthly/yearly use amount_ok paths).
     trial_ok = bool(subscription_id) and (
         payment_status == "no_payment_required"
         or amount == 0
         or amount is None
     )
-    if not amount_ok and not trial_ok and not yearly_sub_ok and not usd_ok:
+    if not amount_ok and not yearly_amount_ok and not trial_ok and not yearly_sub_ok and not usd_ok:
         return None
-    # Subscription checkout: period end arrives later via subscription.updated
-    valid_until = None
-    grant_pence = PRICE_PENCE if amount_ok or trial_ok or usd_ok else (int(amount) if amount is not None else PRICE_PENCE)
+    # Paid catalog: always set a finite period end (month or year).
+    stripe_pe = stripe_period_end_from_checkout_object(obj)
+    valid_until = valid_until_for_paid_interval(
+        billing_interval,
+        now=t_now,
+        stripe_period_end=stripe_pe,
+    )
+    if yearly_amount_ok:
+        grant_pence = PRICE_YEARLY_PENCE
+    elif amount_ok or trial_ok:
+        grant_pence = PRICE_PENCE
+    elif usd_ok and amount is not None:
+        grant_pence = int(amount)
+    elif amount is not None and amount > 0:
+        grant_pence = int(amount)
+    else:
+        grant_pence = PRICE_PENCE
     token = mint_download_token(
         filename=filename,
         platform=platform,
@@ -3983,7 +5388,21 @@ def process_checkout_completed_event(
             valid_until=valid_until,
             customer_email=cust_email,
             billing_interval=billing_interval,
+            now=t_now,
         ) or ""
+    # Apply purchase-flow auto-renew choice on the Subscription (cancel_at_period_end)
+    if subscription_id:
+        try:
+            renew_pref = auto_renew_from_checkout_object(obj)
+            apply_subscription_auto_renew_preference(
+                subscription_id, auto_renew=renew_pref
+            )
+        except Exception as exc:  # noqa: BLE001
+            print(
+                f"auto_renew_apply_failed session={session_id!r} sub={subscription_id!r} "
+                f"err={exc!r}",
+                flush=True,
+            )
     # Customer fulfilment email: keygen + PPI + one-time download URL
     try:
         if token and cust_email:

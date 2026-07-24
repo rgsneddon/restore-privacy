@@ -2,7 +2,7 @@
 
 Anchors (single source of truth):
   - Monthly: **£2.45** GBP
-  - Yearly:  **£29.40** GBP (12 × £2.45)
+  - Yearly:  **£27.93** GBP (5% off 12 × £2.45)
 
 Conversion uses a fixed, testable FX table (units of currency per 1 GBP).
 When the visitor currency is **not** in Stripe's presentment set for this
@@ -20,9 +20,9 @@ from typing import Iterable
 
 # --- GBP anchors (pence for integer math where useful) ---
 PRICE_MONTHLY_GBP = 2.45
-PRICE_YEARLY_GBP = 29.40  # 12 × 2.45
+PRICE_YEARLY_GBP = 27.93  # 5% off 12 × 2.45
 PRICE_MONTHLY_PENCE = 245
-PRICE_YEARLY_PENCE = 2940
+PRICE_YEARLY_PENCE = 2793
 
 FALLBACK_CURRENCY = "USD"
 BASE_CURRENCY = "GBP"

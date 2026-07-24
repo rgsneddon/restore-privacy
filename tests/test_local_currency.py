@@ -20,10 +20,13 @@ class TestGbpAnchorsAndConvert(unittest.TestCase):
         )
 
         self.assertEqual(PRICE_MONTHLY_GBP, 2.45)
-        self.assertEqual(PRICE_YEARLY_GBP, 29.40)
+        self.assertEqual(PRICE_YEARLY_GBP, 27.93)
         self.assertEqual(PRICE_MONTHLY_PENCE, 245)
-        self.assertEqual(PRICE_YEARLY_PENCE, 2940)
-        self.assertAlmostEqual(PRICE_YEARLY_GBP, 12 * PRICE_MONTHLY_GBP, places=2)
+        self.assertEqual(PRICE_YEARLY_PENCE, 2793)
+        # 5% off 12 × monthly
+        self.assertAlmostEqual(
+            PRICE_YEARLY_GBP, 12 * PRICE_MONTHLY_GBP * 0.95, places=2
+        )
 
     def test_convert_eur_and_jpy(self):
         from local_currency import (
@@ -35,8 +38,8 @@ class TestGbpAnchorsAndConvert(unittest.TestCase):
         # Fixed table: EUR 1.17 per GBP
         eur_m = convert_gbp_to_currency(2.45, "EUR")
         self.assertAlmostEqual(eur_m, 2.45 * 1.17, places=4)
-        eur_y = convert_gbp_to_currency(29.40, "EUR")
-        self.assertAlmostEqual(eur_y, 29.40 * 1.17, places=4)
+        eur_y = convert_gbp_to_currency(27.93, "EUR")
+        self.assertAlmostEqual(eur_y, 27.93 * 1.17, places=4)
         self.assertIn("EUR", format_money(eur_m, "EUR"))
 
         jpy = convert_gbp_to_currency(2.45, "JPY")
@@ -112,13 +115,12 @@ class TestCatalogHtmlLocalCurrency(unittest.TestCase):
         self.assertIn('id="dl-accept-currency"', html)
         self.assertIn("EUR", html)
         self.assertIn("£2.45", html)
-        self.assertIn("£29.40", html)
+        self.assertIn("£27.93", html)
         self.assertIn("data-display-currency=\"EUR\"", html)
-        # Monthly/Yearly tiles carry local amounts
-        self.assertIn("Monthly EUR", html)
-        self.assertIn("Yearly EUR", html)
-        self.assertIn("client_reference_id=", html)
-        self.assertIn("locale=", html)
+        # Catalog embeds buy form (local amounts on plan radio labels)
+        self.assertIn("/pay/checkout", html)
+        self.assertIn("homepage-buy-form", html)
+        self.assertIn("EUR", html)
 
     def test_usd_fallback_html(self):
         from downloads import render_download_section_html
@@ -127,57 +129,42 @@ class TestCatalogHtmlLocalCurrency(unittest.TestCase):
             coming_soon=False, currency="NOTACURRENCY"
         )
         self.assertIn("we accept *USD*", html)
-        self.assertIn("Monthly USD", html)
-        self.assertIn("Yearly USD", html)
+        self.assertIn("USD", html)
+        self.assertIn("/pay/checkout", html)
+        self.assertIn("homepage-buy-form", html)
 
-    def test_pay_href_uses_locale_for_presentment(self):
+    def test_pay_href_uses_site_plan_page(self):
         from payments import (
             stripe_payment_page_href_for_platform,
-            stripe_payment_page_url,
             usd_pay_start_path,
         )
 
         href = stripe_payment_page_href_for_platform(
             "windows", interval="month", currency="EUR"
         )
-        self.assertIn("client_reference_id=", href)
+        self.assertIn("/pay", href)
         self.assertIn("windows", href)
         self.assertIn("month", href)
-        self.assertIn("locale=", href)
-        # Supported local currency → GBP Payment Link family (Adaptive Pricing)
-        self.assertIn("buy.stripe.com", href)
-        self.assertTrue(
-            href.startswith(stripe_payment_page_url())
-            or stripe_payment_page_url() in href
-        )
-        # Currency must not corrupt platform|interval ref
-        self.assertNotIn("windows%7Cmonth%7Ceur", href.lower())
+        # Primary path is site plan page (not buy.stripe.com)
+        self.assertNotIn("buy.stripe.com", href)
 
-        # Unsupported currency → distinct USD pay path (not same GBP link + locale=en)
         href_usd = stripe_payment_page_href_for_platform(
             "linux", interval="year", currency="XYZ", base_url=""
         )
         href_eur = stripe_payment_page_href_for_platform(
             "linux", interval="year", currency="EUR"
         )
-        self.assertNotEqual(href_usd, href_eur)
-        # Must be host /pay/start USD path when USD Payment Link env unset
-        self.assertIn("/pay/start", href_usd)
-        self.assertIn("currency=usd", href_usd.lower())
-        self.assertIn("platform=linux", href_usd)
-        self.assertIn("interval=year", href_usd)
+        # Both intervals still reach site /pay with platform
+        self.assertIn("/pay", href_usd)
+        self.assertIn("linux", href_usd)
+        self.assertIn("year", href_usd)
+        self.assertIn("/pay", href_eur)
         self.assertEqual(
             usd_pay_start_path("linux", interval="year"),
             "/pay/start?platform=linux&interval=year&currency=usd",
         )
-        # Explicit USD also uses USD path (not Adaptive Pricing on GBP link alone)
-        href_us = stripe_payment_page_href_for_platform(
-            "android", interval="month", currency="USD", base_url=""
-        )
-        self.assertIn("/pay/start", href_us)
-        self.assertIn("currency=usd", href_us.lower())
 
-    def test_usd_payment_link_env_used_when_set(self):
+    def test_direct_stripe_usd_link_env_when_requested(self):
         import os
         from payments import stripe_payment_page_href_for_platform
 
@@ -186,17 +173,21 @@ class TestCatalogHtmlLocalCurrency(unittest.TestCase):
         )
         try:
             href = stripe_payment_page_href_for_platform(
-                "windows", interval="month", currency="XYZ"
+                "windows",
+                interval="month",
+                currency="XYZ",
+                direct_stripe=True,
             )
             self.assertIn("buy.stripe.com/test_usd_monthly_link", href)
             self.assertIn("client_reference_id=", href)
             self.assertIn("locale=en", href)
             self.assertNotIn("/pay/start", href)
-            # EUR still uses default GBP monthly link family
-            href_eur = stripe_payment_page_href_for_platform(
+            # Default (no direct_stripe) stays on site plan page
+            href_site = stripe_payment_page_href_for_platform(
                 "windows", interval="month", currency="EUR"
             )
-            self.assertNotIn("test_usd_monthly_link", href_eur)
+            self.assertNotIn("test_usd_monthly_link", href_site)
+            self.assertIn("/pay", href_site)
         finally:
             os.environ.pop("STRIPE_PAYMENT_PAGE_URL_USD", None)
 
