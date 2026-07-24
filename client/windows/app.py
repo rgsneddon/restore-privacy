@@ -190,12 +190,29 @@ def close_disconnects_tunnel() -> bool:
 
 def non_admin_connect_allowed() -> bool:
     """UI may open without Administrator; residual Connect elevates on demand."""
-    return True
+    try:
+        from client.windows.residual_privilege import gui_may_run_as_standard_user
+
+        return bool(gui_may_run_as_standard_user())
+    except Exception:
+        return True
 
 
 def product_connect_requires_admin() -> bool:
-    """True: product residual public IP path needs Administrator (Wintun + dual /1)."""
-    return True
+    """True when *this* GUI process must elevate (or use helper) for residual.
+
+    Residual still needs OS privilege (Wintun + dual /1), but the desktop
+    shortcut need not be "Run as administrator" every time — Connect prompts
+    UAC once or uses the one-time residual helper task.
+    """
+    try:
+        from client.windows.residual_privilege import (
+            product_connect_requires_admin_process,
+        )
+
+        return bool(product_connect_requires_admin_process())
+    except Exception:
+        return True
 
 
 def layout_pack_bottom_controls_first() -> bool:
@@ -1160,13 +1177,41 @@ class TunnelClientApp:
             self._show_keygen_prompt()
             return
 
-        # Residual public IP needs Administrator (Wintun + dual /1). Elevate first.
+        # Residual needs OS privilege (Wintun + dual /1). Prefer residual helper
+        # (GUI stays standard user) else one UAC re-launch with --rpt-auto-connect.
         if product_connect_requires_admin() and not is_admin():
+            from client.windows.residual_privilege import (
+                elevation_result_user_message,
+                residual_helper_installed,
+                residual_privilege_status,
+                run_residual_helper_connect,
+            )
+
             self._apply_control(connected=False, busy=True)
             self._set_status("connecting")
+            st = residual_privilege_status()
+            if residual_helper_installed() and not st.get("auto_elevate_disabled"):
+                self._log(
+                    "Connect — starting residual via installed helper "
+                    "(no Run as administrator on the app window)…"
+                )
+                helper = run_residual_helper_connect()
+                if helper.get("ok"):
+                    self._log(str(helper.get("message") or "Residual helper started."))
+                    # Helper launches elevated Connect; this standard-user UI can idle.
+                    self._set_status(
+                        "connecting",
+                        detail="Residual helper finishing Connect elevated…",
+                    )
+                    self._apply_control(connected=False, busy=False)
+                    return
+                self._log(
+                    "Residual helper run failed — falling back to UAC elevate…"
+                )
             self._log(
-                "Connect - Administrator required so residual public IP uses "
-                "the VPN node. Approving UAC will re-open and finish Connect..."
+                "Connect — residual needs Administrator once (Wintun + routes). "
+                "Approve UAC to re-open elevated and finish Connect. "
+                "You do not need 'Run as administrator' on the shortcut every time."
             )
             status = elevate_if_needed(extra_args=["--rpt-auto-connect"])
             if should_exit_after_elevation(status):
@@ -1176,11 +1221,7 @@ class TunnelClientApp:
                 except Exception:
                     pass
                 return
-            reason = status.split(":", 1)[-1] if status.startswith("failed:") else status
-            err = (
-                "Administrator required so your residual public IP uses the VPN node. "
-                f"Approve UAC when prompted ({reason})."
-            )
+            err = elevation_result_user_message(status)
             self._log(f"Could not connect: {err}")
             self._set_status("error", detail=err)
             self._apply_control(connected=False, busy=False)
@@ -1778,8 +1819,8 @@ class TunnelClientApp:
         tk.Label(
             pad,
             text="Startup/autoconnect default off. Seamless power-up needs both on. "
-            "Administrator / UAC may still be required for full tunnel. "
-            "Privacy-scale toggles stay active while connected and hot-apply "
+            "Open the app as a normal user; Connect requests residual privilege once "
+            "(or use residual helper). Privacy-scale toggles hot-apply while connected "
             "(multi-hop re-establishes residual when the path changes).",
             bg=CHROME_BG,
             fg=TEXT_MUTED,
@@ -1788,6 +1829,117 @@ class TunnelClientApp:
             wraplength=400,
             justify=tk.LEFT,
         ).pack(fill=tk.X, pady=(8, 0))
+
+        # --- Residual privilege (no Run-as-admin on shortcut every day) ---
+        priv_help = tk.Frame(
+            pad,
+            bg=PANEL_BG,
+            highlightbackground=BORDER,
+            highlightthickness=1,
+            padx=12,
+            pady=8,
+        )
+        priv_help.pack(fill=tk.X, pady=(14, 0))
+        tk.Label(
+            priv_help,
+            text="Residual privilege (Windows)",
+            bg=PANEL_BG,
+            fg=PRIMARY_DARK,
+            font=("Segoe UI", 10, "bold"),
+            anchor="w",
+        ).pack(fill=tk.X, pady=(0, 4))
+        residual_status_var = tk.StringVar(value="Checking residual privilege…")
+
+        def _refresh_residual_priv() -> None:
+            try:
+                from client.windows.residual_privilege import residual_privilege_status
+
+                st = residual_privilege_status()
+                if st.get("process_is_admin"):
+                    residual_status_var.set(
+                        "This window is elevated — residual Connect can apply routes."
+                    )
+                elif st.get("helper_installed"):
+                    residual_status_var.set(
+                        "Residual helper installed — day-to-day Connect need not "
+                        "Run as administrator."
+                    )
+                else:
+                    residual_status_var.set(
+                        "Helper not installed — Connect will ask for UAC once, "
+                        "or install the residual helper below (one-time admin)."
+                    )
+            except Exception as exc:  # noqa: BLE001
+                residual_status_var.set(f"Status unavailable ({exc})")
+
+        tk.Label(
+            priv_help,
+            textvariable=residual_status_var,
+            bg=PANEL_BG,
+            fg=TEXT,
+            font=("Segoe UI", 8),
+            anchor="w",
+            wraplength=400,
+            justify=tk.LEFT,
+        ).pack(fill=tk.X)
+        tk.Label(
+            priv_help,
+            text=(
+                "Honest residual (Wintun + dual /1) always needs privilege somewhere. "
+                "Install helper once so the app window stays a normal user."
+            ),
+            bg=PANEL_BG,
+            fg=TEXT_MUTED,
+            font=("Segoe UI", 8),
+            anchor="w",
+            wraplength=400,
+            justify=tk.LEFT,
+        ).pack(fill=tk.X, pady=(6, 4))
+
+        def _install_residual_helper() -> None:
+            from client.windows.elevate import elevate_if_needed, is_admin
+            from client.windows.residual_privilege import install_residual_helper
+
+            if not is_admin():
+                note_var.set(
+                    "Approving UAC re-opens elevated — then use Install residual helper again."
+                )
+                st = elevate_if_needed()
+                if should_exit_after_elevation(st):
+                    try:
+                        win.destroy()
+                        self.root.destroy()
+                    except Exception:
+                        pass
+                    return
+                note_var.set(
+                    "Need Administrator once to install the residual helper. "
+                    "Approve UAC, then try Install again."
+                )
+                return
+            res = install_residual_helper()
+            if res.get("ok"):
+                note_var.set("Residual helper installed. You can use Connect as a normal user.")
+                self._log("Settings: residual helper scheduled task installed.")
+            else:
+                note_var.set(
+                    f"Helper install failed: {res.get('error') or res.get('detail') or res}"
+                )
+            _refresh_residual_priv()
+
+        tk.Button(
+            priv_help,
+            text="Install residual helper (one-time Administrator)",
+            command=_install_residual_helper,
+            bg=PRIMARY,
+            fg=WHITE,
+            relief=tk.FLAT,
+            font=("Segoe UI", 8, "bold"),
+            padx=10,
+            pady=4,
+            cursor="hand2",
+        ).pack(anchor="w", pady=(6, 0))
+        self.root.after(50, _refresh_residual_priv)
 
         # --- Licence + anonymous registration honesty ---
         lic_card = tk.Frame(
@@ -2353,11 +2505,21 @@ def main() -> int:
     except Exception:
         pass
 
-    # Optional launch elevate so Connect can apply residual routes without a second UAC.
-    # Elevated child prefers pythonw (windowed host). If cancelled, UI still opens.
-    status = elevate_if_needed()
-    if should_exit_after_elevation(status):
-        return 0
+    # Default: keep the GUI as a standard user. Residual privilege is requested
+    # on Connect (UAC once) or via the one-time residual helper task — not by
+    # forcing "Run as administrator" on every cold start.
+    # Opt-in launch elevate: RPT_ELEVATE_ON_LAUNCH=1 (legacy / support).
+    status = "skipped"
+    want_launch_elev = os.environ.get("RPT_ELEVATE_ON_LAUNCH", "").strip().lower() in (
+        "1",
+        "true",
+        "yes",
+        "on",
+    )
+    if want_launch_elev:
+        status = elevate_if_needed()
+        if should_exit_after_elevation(status):
+            return 0
 
     try:
         app = TunnelClientApp()
@@ -2375,30 +2537,35 @@ def main() -> int:
             print(f"Restore Privacy failed to open: {exc}", file=sys.stderr)
         return 1
 
-    if status.startswith("failed:"):
-        reason = status.split(":", 1)[-1]
-
-        def _note_elev_fail() -> None:
-            app._log(
-                f"Elevation skipped at launch ({reason}). "
-                "Press Connect and approve UAC so residual public IP uses the VPN node."
-            )
-
-        app.root.after(100, _note_elev_fail)
-    elif status == "already_admin" or is_admin():
+    if is_admin():
         app.root.after(
             100,
             lambda: app._log(
-                "Running elevated - Connect will route residual public IP via the VPN node."
+                "Running elevated — Connect will route residual public IP via the VPN node."
             ),
         )
     else:
-        app.root.after(
-            100,
-            lambda: app._log(
-                "Standard user - Connect will request Administrator for residual routing."
-            ),
-        )
+        def _note_standard() -> None:
+            try:
+                from client.windows.residual_privilege import residual_privilege_status
+
+                st = residual_privilege_status()
+                if st.get("helper_installed"):
+                    app._log(
+                        "Standard user — residual helper installed; Connect uses it "
+                        "without Run as administrator on this window."
+                    )
+                else:
+                    app._log(
+                        "Standard user — open the app normally. Connect asks for "
+                        "Administrator once for residual routes (or install residual helper)."
+                    )
+            except Exception:
+                app._log(
+                    "Standard user — Connect will request Administrator for residual routing."
+                )
+
+        app.root.after(100, _note_standard)
 
     # Warm entitlement cache off the UI thread (never block launch on status host).
     # Session-only discovery does not unlock Connect without keygen.

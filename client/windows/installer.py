@@ -267,8 +267,9 @@ def _write_version(install_dir: Path) -> None:
     (install_dir / "INSTALL.txt").write_text(
         f"Restore Privacy Client {VERSION}\r\n"
         "Installed with bundled Python runtime and dependencies.\r\n"
-        "Full tunnel: double-click the shortcut (UAC prompt once) - no need to right-click Run as admin.\r\n"
-        "The app also auto-requests elevation on launch if needed.\r\n"
+        "Open the app as a normal user (no Run as administrator on the shortcut).\r\n"
+        "Connect asks for Administrator once for residual routes (Wintun), or install\r\n"
+        "the residual helper once (elevated) so day-to-day Connect needs no UAC.\r\n"
         f"Install path: {install_dir}\r\n"
         f"{sec_line}\r\n",
         encoding="utf-8",
@@ -297,16 +298,30 @@ def _create_shortcut(
     *,
     icon: Path | None = None,
     description: str | None = None,
+    run_as_admin: bool = False,
 ) -> None:
-    """Create .lnk with brand logo icon; Run as administrator for one UAC click."""
+    """Create .lnk with brand logo icon.
+
+    Default *run_as_admin* is False so day-to-day launch is a standard user;
+    residual privilege is requested on Connect (UAC once) or via residual helper.
+    """
     link_path.parent.mkdir(parents=True, exist_ok=True)
     icon_path = icon or resolve_shortcut_icon(workdir, target)
     desc = description or (
-        f"{SHORTCUT_DISPLAY_NAME} VPN Client {VERSION} (elevates for full tunnel)"
+        f"{SHORTCUT_DISPLAY_NAME} VPN Client {VERSION} "
+        "(open normally; Connect requests residual privilege)"
     )
     # Escape for PowerShell double-quoted string
     desc_ps = desc.replace("`", "``").replace('"', '`"').replace("$", "`$")
-    # PowerShell COM shortcut + IconLocation + "Run as administrator" bit (0x20 @ 0x15)
+    # PowerShell COM shortcut + IconLocation; optional "Run as administrator" bit
+    runas_bit = (
+        f"$p = {str(link_path)!r}; "
+        f"$b = [System.IO.File]::ReadAllBytes($p); "
+        f"if ($b.Length -gt 0x15) {{ $b[0x15] = $b[0x15] -bor 0x20; "
+        f"[System.IO.File]::WriteAllBytes($p, $b) }}"
+        if run_as_admin
+        else ""
+    )
     ps = (
         f'$ws = New-Object -ComObject WScript.Shell; '
         f'$s = $ws.CreateShortcut({str(link_path)!r}); '
@@ -315,10 +330,7 @@ def _create_shortcut(
         f'$s.Description = "{desc_ps}"; '
         f'$s.IconLocation = {str(icon_path)!r} + ",0"; '
         f"$s.Save(); "
-        f"$p = {str(link_path)!r}; "
-        f"$b = [System.IO.File]::ReadAllBytes($p); "
-        f"if ($b.Length -gt 0x15) {{ $b[0x15] = $b[0x15] -bor 0x20; "
-        f"[System.IO.File]::WriteAllBytes($p, $b) }}"
+        f"{runas_bit}"
     )
     subprocess.run(
         ["powershell", "-NoProfile", "-NonInteractive", "-Command", ps],
