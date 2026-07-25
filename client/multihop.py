@@ -527,13 +527,15 @@ def select_residual_endpoint(
     peer_capacity: dict[str, float] | None = None,
     near_capacity_threshold: float = DEFAULT_NEAR_CAPACITY_THRESHOLD,
     capacity_margin: float = DEFAULT_CAPACITY_MARGIN,
+    peer_health: dict[str, bool] | None = None,
+    rng: random.Random | None = None,
 ) -> ResidualSelection:
     """Prefer selected entry when healthy; failover to alternate catalog peer.
 
     Rules (pure, unit-testable):
     1. Entry healthy and not draining → **entry-primary** residual.
-    2. Entry unhealthy or draining, peer healthy → **exit_failover** to alternate peer
-       (never same host as preferred entry).
+    2. Entry unhealthy or draining → hop to a **random healthy non-preferred**
+       catalog peer (``wipe_drain_failover`` / ``exit_failover``; never same host).
     3. Multi-hop active + entry healthy: residual-via-exit dials configured exit.
     4. When the preferred residual host is **near connection capacity** and a
        healthy alternate is meaningfully freer → **capacity_migration** (never
@@ -541,9 +543,8 @@ def select_residual_endpoint(
        keep preferred (do not invent a hop / black-hole solely for load).
     5. Both unusable → raise :class:`ResidualUnavailable` (fail closed).
 
-    Fleet wipe sets preferred-entry draining so clients flip to a healthy peer.
-    Capacity hints are injectable (host → utilization 0..1); production may
-    supply probe results later without changing this pure ranking.
+    Fleet wipe sets preferred-entry draining so clients flip to a healthy peer
+    automatically (no user interaction). Capacity hints are injectable.
     """
     cfg = config or MultiHopConfig()
     entry_ok = bool(entry_healthy) and not bool(entry_draining)
@@ -555,6 +556,50 @@ def select_residual_endpoint(
         exit_ep = alternate_peer_endpoint(cfg)
         if (exit_ep.host or "").strip() == (entry_ep.host or "").strip():
             exit_ok = False
+
+    # Wipe-drain / pre-wipe: multi-peer random hop-off (background, no UI)
+    if entry_draining or (not entry_healthy and exit_ok):
+        try:
+            from client.wipe_hop import (
+                REASON_WIPE_DRAIN_FAILOVER,
+                pick_random_alternate,
+            )
+        except Exception:  # noqa: BLE001
+            from .wipe_hop import (  # type: ignore
+                REASON_WIPE_DRAIN_FAILOVER,
+                pick_random_alternate,
+            )
+        ph = dict(peer_health or {})
+        # Map legacy exit_healthy onto alternate peers when map sparse
+        if not ph:
+            for n in PRODUCT_COUNTRY_CATALOG:
+                h = (n.host or "").strip()
+                if h == (entry_ep.host or "").strip():
+                    ph[h] = bool(entry_healthy) and not bool(entry_draining)
+                else:
+                    ph[h] = bool(exit_healthy)
+        alt = pick_random_alternate(
+            entry_ep,
+            peer_health=ph,
+            catalog=PRODUCT_COUNTRY_CATALOG,
+            rng=rng,
+        )
+        if alt is not None and (alt.host or "").strip() != (entry_ep.host or "").strip():
+            reason = (
+                REASON_WIPE_DRAIN_FAILOVER
+                if entry_draining
+                else "exit_failover"
+            )
+            return ResidualSelection(
+                endpoint=alt,
+                reason=reason,
+                entry_healthy=bool(entry_healthy),
+                exit_healthy=True,
+                entry_draining=bool(entry_draining),
+                failover_active=True,
+                preferred_host=(entry_ep.host or "").strip(),
+            )
+        # Fall through to legacy exit_ep path / fail closed below
 
     # Intentional multi-hop residual-via-exit when entry is up (product path).
     if is_multihop_active(cfg) and entry_ok:

@@ -119,6 +119,22 @@ def make_handler(
                 self.end_headers()
                 self.wfile.write(data)
                 return
+            if path in ("/api/private/node-state", "/private/node-state"):
+                # Wipe drain/ready for residual hop-off/rejoin (no client counts)
+                try:
+                    from node.wipe_status import current_wipe_state
+
+                    payload = current_wipe_state()
+                except Exception:  # noqa: BLE001
+                    payload = {"state": "ready", "host": "", "role": "", "private": True}
+                data = json.dumps(payload).encode("utf-8")
+                self.send_response(200)
+                self.send_header("Content-Type", "application/json")
+                self.send_header("Content-Length", str(len(data)))
+                self.send_header("Cache-Control", "no-store")
+                self.end_headers()
+                self.wfile.write(data)
+                return
             self.send_response(404)
             self.end_headers()
 

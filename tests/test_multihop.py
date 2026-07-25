@@ -131,7 +131,7 @@ class TestMultiHopPath(unittest.TestCase):
         )
         self.assertTrue(is_multihop_active(cfg))
 
-    def test_select_residual_entry_primary_and_exit_failover(self):
+    def test_select_residual_entry_primary_and_wipe_drain(self):
         # Entry healthy → entry-primary (single-hop default)
         sel = select_residual_endpoint(
             default_single_hop(),
@@ -141,15 +141,16 @@ class TestMultiHopPath(unittest.TestCase):
         )
         self.assertEqual(sel.endpoint.host, PRODUCT_NODE_HOST)
         self.assertEqual(sel.reason, "entry_primary")
-        # Entry draining → automatic exit failover
+        # Entry draining → automatic hop to any non-preferred catalog peer
         fo = select_residual_endpoint(
             default_single_hop(),
             entry_healthy=True,
             exit_healthy=True,
             entry_draining=True,
         )
-        self.assertEqual(fo.endpoint.host, PRODUCT_EXIT_HOST)
+        self.assertNotEqual(fo.endpoint.host, PRODUCT_NODE_HOST)
         self.assertTrue(fo.failover_active)
+        self.assertEqual(fo.reason, "wipe_drain_failover")
 
 
 if __name__ == "__main__":

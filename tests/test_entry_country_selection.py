@@ -103,25 +103,32 @@ class TestResolveEntryExit(unittest.TestCase):
                 if x is not None:
                     self.assertNotEqual(e.host, x.host)
 
-    def test_single_hop_romania_failover_is_iceland_not_ro(self):
-        """Preferred entry=RO must not failover to PRODUCT_EXIT_HOST (also RO)."""
+    def test_single_hop_romania_drain_not_back_to_ro(self):
+        """Preferred entry=RO draining must hop to a non-RO catalog peer (IS/DE)."""
         from client.multihop import (
+            PRODUCT_COUNTRY_CATALOG,
             alternate_peer_endpoint,
             exit_endpoint,
             select_residual_endpoint,
         )
+        from client.wipe_hop import REASON_WIPE_DRAIN_FAILOVER
 
         cfg = multihop_config_for_entry_country(COUNTRY_RO, multihop_enabled=False)
         self.assertEqual(entry_endpoint(cfg).host, PRODUCT_EXIT_HOST)
         alt = alternate_peer_endpoint(cfg)
-        self.assertEqual(alt.host, PRODUCT_NODE_HOST)
         self.assertNotEqual(alt.host, entry_endpoint(cfg).host)
         self.assertEqual(exit_endpoint(cfg).host, PRODUCT_NODE_HOST)
         sel = select_residual_endpoint(
             cfg, entry_healthy=True, exit_healthy=True, entry_draining=True
         )
-        self.assertEqual(sel.reason, "exit_failover")
-        self.assertEqual(sel.endpoint.host, PRODUCT_NODE_HOST)
+        self.assertEqual(sel.reason, REASON_WIPE_DRAIN_FAILOVER)
+        self.assertNotEqual(sel.endpoint.host, PRODUCT_EXIT_HOST)
+        non_ro = {
+            (n.host or "").strip()
+            for n in PRODUCT_COUNTRY_CATALOG
+            if (n.host or "").strip() != PRODUCT_EXIT_HOST
+        }
+        self.assertIn(sel.endpoint.host, non_ro)
         self.assertTrue(sel.failover_active)
 
     def test_random_among_non_entry_when_catalog_expanded(self):

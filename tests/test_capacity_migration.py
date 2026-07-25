@@ -129,8 +129,11 @@ class TestCapacityResidualSelection(unittest.TestCase):
             exit_healthy=True,
             peer_capacity=caps,
         )
+        # Health/wipe hop takes precedence over capacity; alternate is any
+        # healthy non-preferred catalog peer (RO or DE), not capacity_migration.
         self.assertEqual(sel.reason, "exit_failover")
-        self.assertEqual(sel.endpoint.host, PRODUCT_EXIT_HOST)
+        self.assertNotEqual(sel.endpoint.host, PRODUCT_NODE_HOST)
+        self.assertNotEqual(sel.reason, REASON_CAPACITY_MIGRATION)
 
     def test_try_order_capacity_primary_is_freer(self):
         caps = {

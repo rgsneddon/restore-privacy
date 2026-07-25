@@ -68,6 +68,15 @@ from .multihop import (
     residual_try_order,
     select_residual_endpoint,
 )
+from .wipe_hop import (
+    REASON_WIPE_DRAIN_FAILOVER,
+    REASON_WIPE_REJOIN,
+    WipeSignal,
+    apply_wipe_signal_to_flags,
+    parse_node_status_wire,
+    parse_wipe_signal_json,
+    wipe_hop_advisory,
+)
 from .secrets_loader import (
     ensure_device_admission_key,
     load_client_private_key,
@@ -311,8 +320,12 @@ class RptClient:
         self._capacity_transport = capacity_transport
         self.last_selection_reason: str = ""
         self.last_capacity_advisory: str = ""
+        self.last_wipe_advisory: str = ""
+        self._wipe_poll_stop = threading.Event()
+        self._wipe_poll_thread: Optional[threading.Thread] = None
         # Residual dial: preference-aware (entry healthy → entry; else exit failover;
-        # near-capacity preferred → freer peer when capacity hints say so).
+        # near-capacity preferred → freer peer when capacity hints say so;
+        # wipe-drain → random alternate; ready → rejoin preferred).
         if endpoint is not None:
             self.endpoint = endpoint
             self._endpoint_pinned = True
@@ -361,6 +374,105 @@ class RptClient:
     ) -> None:
         """Inject or clear host → utilization map for capacity-aware residual pick."""
         self.peer_capacity = dict(peer_capacity) if peer_capacity else None
+
+    def apply_wipe_signal(
+        self,
+        signal: WipeSignal | None,
+        *,
+        reconnect: bool = True,
+        timeout: float = 20.0,
+    ) -> str:
+        """Apply drain/ready signal; auto hop-off or rejoin without user input.
+
+        Returns a short note of the action taken.
+        """
+        preferred = entry_endpoint(self.multihop).host
+        draining, reselect, note = apply_wipe_signal_to_flags(
+            signal,
+            preferred_host=preferred,
+            current_entry_draining=self.entry_draining,
+        )
+        self.entry_draining = draining
+        if not reselect:
+            return note
+        # Automatic residual re-select + reconnect (background; no UI confirm)
+        if reconnect:
+            try:
+                self.disconnect()
+            except Exception:  # noqa: BLE001
+                pass
+            result = self.connect(timeout=timeout, force_reconnect=True)
+            if result.ok:
+                if self.last_selection_reason == REASON_WIPE_DRAIN_FAILOVER:
+                    self.last_wipe_advisory = (
+                        f"Notice: preferred residual ({preferred}) is draining "
+                        f"for wipe/rebuild — automatically hopped to "
+                        f"{self.endpoint.host}:{self.endpoint.port}."
+                    )
+                    self._status(self.last_wipe_advisory)
+                elif note == "ready_rejoin_preferred":
+                    self.last_wipe_advisory = (
+                        f"Notice: preferred residual is ready again — automatically "
+                        f"rejoining {self.endpoint.host}:{self.endpoint.port}."
+                    )
+                    self._status(self.last_wipe_advisory)
+            return f"{note};reconnect_ok={result.ok}"
+        return note
+
+    def process_node_status_frame(self, frame: bytes) -> str:
+        """Consume residual NODE_STATUS wire frame (e.g. KEEPALIVE reply)."""
+        try:
+            inner = maybe_unwrap(frame, enabled=_outer_obfs_enabled())
+        except Exception:  # noqa: BLE001
+            inner = frame
+        signal = parse_node_status_wire(inner)
+        return self.apply_wipe_signal(signal, reconnect=True)
+
+    def poll_preferred_node_state(
+        self,
+        *,
+        url: str | None = None,
+        timeout_s: float = 2.0,
+        reconnect: bool = True,
+    ) -> str:
+        """HTTP poll private node-state for preferred residual (fail soft)."""
+        import urllib.error
+        import urllib.request
+
+        preferred = entry_endpoint(self.multihop)
+        host = (preferred.host or "").strip()
+        if not host:
+            return "no_preferred_host"
+        poll_url = (url or f"http://{host}:8080/api/private/node-state").strip()
+        try:
+            req = urllib.request.Request(poll_url, method="GET")
+            with urllib.request.urlopen(req, timeout=timeout_s) as resp:  # noqa: S310
+                body = resp.read()
+        except Exception:  # noqa: BLE001
+            return "poll_failed"
+        signal = parse_wipe_signal_json(body)
+        return self.apply_wipe_signal(signal, reconnect=reconnect)
+
+    def start_wipe_hop_watch(self, *, interval_s: float = 30.0) -> None:
+        """Background poll preferred peer drain/ready; auto hop/rejoin."""
+        if self._wipe_poll_thread and self._wipe_poll_thread.is_alive():
+            return
+        self._wipe_poll_stop.clear()
+
+        def _loop() -> None:
+            while not self._wipe_poll_stop.wait(timeout=max(5.0, float(interval_s))):
+                try:
+                    self.poll_preferred_node_state(reconnect=True)
+                except Exception:  # noqa: BLE001
+                    continue
+
+        self._wipe_poll_thread = threading.Thread(
+            target=_loop, name="rpt-wipe-hop-watch", daemon=True
+        )
+        self._wipe_poll_thread.start()
+
+    def stop_wipe_hop_watch(self) -> None:
+        self._wipe_poll_stop.set()
 
     def _refresh_capacity_from_probes(self, *, force: bool = True) -> dict[str, float]:
         """Best-effort private capacity probes → peer_capacity map (fail-soft).
@@ -414,6 +526,8 @@ class RptClient:
             entry_host = entry_endpoint(self.multihop).host
             if self.last_selection_reason == REASON_CAPACITY_MIGRATION:
                 hop_kind = "capacity migration residual"
+            elif self.last_selection_reason == REASON_WIPE_DRAIN_FAILOVER:
+                hop_kind = "wipe-drain hop residual"
             elif endpoint.host != entry_host and (
                 is_multihop_active(self.multihop)
                 or self.last_selection_reason
@@ -422,6 +536,7 @@ class RptClient:
                     "hello_failover",
                     "multihop_residual_via_exit",
                     REASON_CAPACITY_MIGRATION,
+                    REASON_WIPE_DRAIN_FAILOVER,
                 )
             ):
                 hop_kind = (
@@ -448,6 +563,12 @@ class RptClient:
             self._sock = sock
             sock = None  # ownership transferred; disconnect() closes
             self.state = ConnectState.CONNECTED
+            # Background: poll preferred peer drain/ready; hop off / rejoin
+            # automatically for scheduled wipe without user interaction.
+            try:
+                self.start_wipe_hop_watch()
+            except Exception:  # noqa: BLE001
+                pass
             pfs_note = " PFS" if session.pfs else ""
             self._status(
                 f"Connected — tunnel IP {session.vpn_ip} (full VPN{pfs_note}); {mh_note}"
@@ -532,6 +653,15 @@ class RptClient:
                 elif sel.reason == REASON_CAPACITY_MIGRATION:
                     # Defensive: reason set but advisory builder returned None
                     mh_note = f"{mh_note}; capacity migration residual"
+                elif sel.reason == REASON_WIPE_DRAIN_FAILOVER:
+                    wadv = wipe_hop_advisory(sel)
+                    if wadv:
+                        self.last_wipe_advisory = wadv
+                        self._status(wadv)
+                    mh_note = (
+                        f"{mh_note}; wipe-drain hop to "
+                        f"{sel.endpoint.host}:{sel.endpoint.port}"
+                    )
                 elif sel.failover_active:
                     mh_note = f"{mh_note}; exit failover (entry draining/down)"
                 elif sel.reason == "entry_primary":
@@ -637,10 +767,34 @@ class RptClient:
             pack_keepalive(self.session.session_id),
             enabled=_outer_obfs_enabled(),
         )
-        self._sock.sendto(wire, self.endpoint.address)
+        try:
+            self._sock.sendto(wire, self.endpoint.address)
+            # Best-effort NODE_STATUS reply (drain/ready) for background hop/rejoin
+            self._sock.settimeout(1.5)
+            try:
+                raw, _addr = self._sock.recvfrom(65535)
+            except (socket.timeout, OSError):
+                return
+            try:
+                inner = maybe_unwrap(raw, enabled=_outer_obfs_enabled())
+            except Exception:  # noqa: BLE001
+                inner = raw
+            if peek_type(inner) == MsgType.NODE_STATUS:
+                signal = parse_node_status_wire(inner)
+                # Background hop/rejoin off the keepalive recv path
+                threading.Thread(
+                    target=lambda sig=signal: self.apply_wipe_signal(
+                        sig, reconnect=True
+                    ),
+                    name="rpt-wipe-hop-ka",
+                    daemon=True,
+                ).start()
+        except OSError:
+            return
 
     def disconnect(self) -> None:
         self._stop.set()
+        self.stop_wipe_hop_watch()
         if self._sock:
             try:
                 self._sock.close()

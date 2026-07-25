@@ -272,6 +272,17 @@ class RPTNode:
                 sid = parse_keepalive(data)
                 self.registry.touch(sid, addr)
                 process_counters().record_inbound(len(data))
+                # Reply with NODE_STATUS so clients hop off before wipe and
+                # rejoin preferred after rebuild (background residual control).
+                try:
+                    from node.wipe_status import pack_current_node_status
+
+                    status_frame = pack_current_node_status(session_id=sid)
+                    out = maybe_wrap(status_frame)
+                    sock.sendto(out, addr)
+                    process_counters().record_outbound(len(out))
+                except Exception:
+                    return
         except Exception:
             return
 

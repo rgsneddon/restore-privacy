@@ -15,6 +15,8 @@ class MsgType(IntEnum):
     SERVER_HELLO = 0x02
     DATA = 0x03
     KEEPALIVE = 0x04
+    # Node → client residual control (drain before wipe / ready after rebuild)
+    NODE_STATUS = 0x05
 
 
 class ProtocolError(ValueError):
@@ -98,6 +100,57 @@ def parse_keepalive(data: bytes) -> bytes:
     if len(data) < HEADER_LEN + 8 or data[:4] != MAGIC or data[4] != MsgType.KEEPALIVE:
         raise ProtocolError("bad KEEPALIVE")
     return data[HEADER_LEN : HEADER_LEN + 8]
+
+
+# NODE_STATUS flags (bitmask)
+NODE_STATUS_DRAINING = 0x01
+NODE_STATUS_REBUILDING = 0x02
+NODE_STATUS_READY = 0x04
+
+
+def pack_node_status(
+    *,
+    flags: int,
+    host: str = "",
+    role: str = "",
+    session_id: bytes = b"\x00" * 8,
+) -> bytes:
+    """Pack residual control status (node → client).
+
+    Layout after MAGIC+type:
+      session_id[8] flags[u8] host_len[u8] host[host_len] role_len[u8] role[role_len]
+    """
+    h = (host or "").encode("utf-8")[:200]
+    r = (role or "").encode("utf-8")[:16]
+    sid = session_id if len(session_id) == 8 else (session_id + b"\x00" * 8)[:8]
+    return (
+        MAGIC
+        + bytes([MsgType.NODE_STATUS])
+        + sid
+        + bytes([flags & 0xFF, len(h)])
+        + h
+        + bytes([len(r)])
+        + r
+    )
+
+
+def parse_node_status(data: bytes) -> tuple[bytes, int, str, str]:
+    """Return (session_id, flags, host, role). Fail soft via ProtocolError."""
+    if len(data) < HEADER_LEN + 8 + 2 or data[:4] != MAGIC or data[4] != MsgType.NODE_STATUS:
+        raise ProtocolError("bad NODE_STATUS")
+    body = data[HEADER_LEN:]
+    sid = body[:8]
+    flags = body[8]
+    host_len = body[9]
+    if len(body) < 10 + host_len + 1:
+        raise ProtocolError("bad NODE_STATUS host")
+    host = body[10 : 10 + host_len].decode("utf-8", errors="replace")
+    rest = body[10 + host_len :]
+    role_len = rest[0]
+    if len(rest) < 1 + role_len:
+        raise ProtocolError("bad NODE_STATUS role")
+    role = rest[1 : 1 + role_len].decode("utf-8", errors="replace")
+    return sid, int(flags), host, role
 
 
 def peek_type(data: bytes) -> Optional[MsgType]:
