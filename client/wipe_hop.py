@@ -263,23 +263,61 @@ def select_wipe_aware_residual(
     )
 
 
+def _catalog_host_set(catalog: Sequence[CountryNode] | None = None) -> set[str]:
+    cat = list(catalog) if catalog is not None else list(product_country_catalog())
+    return {(n.host or "").strip() for n in cat if (n.host or "").strip()}
+
+
+def signal_applies_to_preferred(
+    signal: WipeSignal | None,
+    preferred_host: str,
+    *,
+    catalog: Sequence[CountryNode] | None = None,
+) -> bool:
+    """Whether a drain/ready signal should move preferred residual flags.
+
+    Rules (soft identity — do not require catalog monopin equality):
+    - empty signal host → apply (this residual / transport-bound)
+    - signal host == preferred monopin → apply
+    - signal host is a *different known catalog residual* → ignore
+    - hostname / non-catalog IP → apply (node may emit hostname when
+      outbound IP discovery fails; private poll already targets preferred)
+    """
+    if signal is None:
+        return False
+    pref = (preferred_host or "").strip()
+    sig_host = (signal.host or "").strip()
+    if not sig_host:
+        return True
+    if not pref:
+        return True
+    if sig_host == pref:
+        return True
+    known = _catalog_host_set(catalog)
+    if sig_host in known and sig_host != pref:
+        return False
+    # Non-catalog identity string (hostname, alternate iface IP, etc.)
+    return True
+
+
 def apply_wipe_signal_to_flags(
     signal: WipeSignal | None,
     *,
     preferred_host: str,
     current_entry_draining: bool = False,
+    catalog: Sequence[CountryNode] | None = None,
 ) -> tuple[bool, bool, str]:
     """Map a wipe signal to (entry_draining, should_reselect, note).
 
     Fail soft: None signal → no change (keep current_entry_draining).
-    Only signals for preferred host (or empty host = this residual) apply.
+    Empty host / hostname / non-catalog IP soft-apply; only a *different
+    catalog monopin* is treated as signal_other_host.
     """
     if signal is None:
         return bool(current_entry_draining), False, "no_signal"
-    pref = (preferred_host or "").strip()
-    sig_host = (signal.host or "").strip()
-    if sig_host and pref and sig_host != pref:
-        # Signal from a non-preferred peer — ignore for preferred drain flag
+    if not signal_applies_to_preferred(
+        signal, preferred_host, catalog=catalog
+    ):
         return bool(current_entry_draining), False, "signal_other_host"
     if signal.is_drain:
         if current_entry_draining:

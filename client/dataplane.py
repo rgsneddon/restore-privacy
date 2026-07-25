@@ -15,12 +15,13 @@ from dataclasses import dataclass, field
 from typing import Callable, Optional, Protocol
 
 from node.crypto_session import CoverFrame
-from node.protocol import pack_data
+from node.protocol import MsgType, pack_data, peek_type
 from node.traffic_shape import (
     DEFAULT_TRAFFIC_SHAPE,
     TrafficShapePolicy,
     apply_send_jitter,
 )
+from node.obfuscation import maybe_unwrap, product_obfuscation_enabled
 
 from .connect import RptClient
 
@@ -129,16 +130,42 @@ class RptDataPlane:
                 readable = []
                 fd = -1
 
-            # UDP -> unwrap+open -> TUN (always try nonblocking recv)
+            # UDP -> NODE_STATUS control | unwrap+open DATA -> TUN
+            # (nonblocking only — never steal frames via keepalive recv)
             try:
                 data, _addr = sock.recvfrom(65535)
-                # open_packet_allow_cover unwraps outer obfuscation layer
-                plain, is_cover = self.client.open_packet_allow_cover(data)
-                if is_cover:
-                    self.stats.cover_recv += 1
-                elif plain:
-                    tun.write_packet(plain)
-                    self.stats.udp_to_tun += 1
+                try:
+                    try:
+                        from client.product_policy import (
+                            product_outer_obfuscation_enabled,
+                        )
+
+                        outer_on = bool(product_outer_obfuscation_enabled())
+                    except Exception:  # noqa: BLE001
+                        outer_on = bool(product_obfuscation_enabled())
+                    inner = maybe_unwrap(data, enabled=outer_on)
+                except Exception:  # noqa: BLE001
+                    inner = data
+                if peek_type(inner) == MsgType.NODE_STATUS:
+                    # Drain/ready control — do not treat as sealed DATA
+                    try:
+                        threading.Thread(
+                            target=lambda frame=data: self.client.process_node_status_frame(
+                                frame
+                            ),
+                            name="rpt-wipe-hop-ns",
+                            daemon=True,
+                        ).start()
+                    except Exception:  # noqa: BLE001
+                        self.stats.errors += 1
+                else:
+                    # open_packet_allow_cover unwraps outer obfuscation layer
+                    plain, is_cover = self.client.open_packet_allow_cover(data)
+                    if is_cover:
+                        self.stats.cover_recv += 1
+                    elif plain:
+                        tun.write_packet(plain)
+                        self.stats.udp_to_tun += 1
             except BlockingIOError:
                 pass
             except OSError:

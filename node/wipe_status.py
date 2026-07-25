@@ -18,34 +18,21 @@ from node.protocol import (
 
 
 def current_wipe_state(install_root: str | None = None) -> dict[str, Any]:
-    """Read exclusive rebuild lock → ready|draining|rebuilding for clients."""
+    """Read exclusive rebuild lock → ready|draining|rebuilding for clients.
+
+    Host field is intentionally empty by default: clients treat empty host as
+    "this residual" (transport-bound or preferred private poll). Emitting a
+    hostname or non-catalog IP used to break monopin equality and suppress
+    hop-off/rejoin — avoid that footgun.
+    """
     try:
         from node.rebuild_lock import read_lock
     except Exception:  # noqa: BLE001
         return {"state": "ready", "host": "", "role": "", "private": True}
     root = install_root or os.environ.get("INSTALL_ROOT") or "/opt/restore-privacy"
     lock = read_lock(root)
-    host = ""
-    try:
-        import socket
-
-        host = socket.gethostname() or ""
-    except OSError:
-        host = ""
-    # Prefer primary outbound IP for monopin match when possible
-    try:
-        import socket as _s
-
-        s = _s.socket(_s.AF_INET, _s.SOCK_DGRAM)
-        try:
-            s.connect(("8.8.8.8", 80))
-            ip = s.getsockname()[0]
-            if ip and not ip.startswith("127."):
-                host = ip
-        finally:
-            s.close()
-    except OSError:
-        pass
+    # Optional monopin only when env pin is set (catalog residual IP).
+    host = (os.environ.get("RPT_RESIDUAL_HOST") or os.environ.get("RPT_NODE_HOST") or "").strip()
     if lock is None:
         return {"state": "ready", "host": host, "role": "", "private": True}
     st = (lock.state or "").strip().lower()

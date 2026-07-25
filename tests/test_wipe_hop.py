@@ -30,6 +30,7 @@ from client.wipe_hop import (  # noqa: E402
     parse_wipe_signal_json,
     pick_random_alternate,
     select_wipe_aware_residual,
+    signal_applies_to_preferred,
     wipe_hop_advisory,
 )
 from client.connect import ConnectState, RptClient  # noqa: E402
@@ -201,7 +202,7 @@ class TestWipeSignalParse(unittest.TestCase):
         self.assertFalse(ready)
         self.assertTrue(reselect2)
         self.assertEqual(note2, "ready_rejoin_preferred")
-        # Other host ignored
+        # Different catalog monopin ignored
         d3, r3, n3 = apply_wipe_signal_to_flags(
             WipeSignal(state="draining", host=PRODUCT_EXIT_HOST),
             preferred_host=PRODUCT_NODE_HOST,
@@ -210,6 +211,50 @@ class TestWipeSignalParse(unittest.TestCase):
         self.assertFalse(d3)
         self.assertFalse(r3)
         self.assertEqual(n3, "signal_other_host")
+
+    def test_empty_host_and_hostname_soft_apply(self):
+        """Node may emit empty host or hostname — still hop/rejoin preferred."""
+        self.assertTrue(
+            signal_applies_to_preferred(
+                WipeSignal(state="draining", host=""),
+                PRODUCT_NODE_HOST,
+            )
+        )
+        self.assertTrue(
+            signal_applies_to_preferred(
+                WipeSignal(state="draining", host="rpt-is-01.local"),
+                PRODUCT_NODE_HOST,
+            )
+        )
+        # Non-catalog IP (outbound discovery miss) still applies
+        self.assertTrue(
+            signal_applies_to_preferred(
+                WipeSignal(state="ready", host="10.0.0.9"),
+                PRODUCT_NODE_HOST,
+            )
+        )
+        # Different catalog residual still ignored
+        self.assertFalse(
+            signal_applies_to_preferred(
+                WipeSignal(state="draining", host=PRODUCT_DE_HOST),
+                PRODUCT_NODE_HOST,
+            )
+        )
+        d, r, n = apply_wipe_signal_to_flags(
+            WipeSignal(state="draining", host=""),
+            preferred_host=PRODUCT_NODE_HOST,
+            current_entry_draining=False,
+        )
+        self.assertTrue(d and r)
+        self.assertEqual(n, "enter_drain_hop_off")
+        d2, r2, n2 = apply_wipe_signal_to_flags(
+            WipeSignal(state="ready", host="rpt-node.hostname"),
+            preferred_host=PRODUCT_NODE_HOST,
+            current_entry_draining=True,
+        )
+        self.assertFalse(d2)
+        self.assertTrue(r2)
+        self.assertEqual(n2, "ready_rejoin_preferred")
 
     def test_fail_soft_none_signal(self):
         d, r, n = apply_wipe_signal_to_flags(
@@ -324,6 +369,41 @@ class TestNodeWipeStatus(unittest.TestCase):
         src = (ROOT / "node" / "ui.py").read_text(encoding="utf-8")
         self.assertIn("/api/private/node-state", src)
         self.assertIn("current_wipe_state", src)
+
+    def test_send_keepalive_is_send_only_no_recv(self):
+        """Keepalive must not recv/settimeout on the shared residual sock."""
+        src = (ROOT / "client" / "connect.py").read_text(encoding="utf-8")
+        start = src.find("def send_keepalive")
+        self.assertGreater(start, 0)
+        end = src.find("\n    def ", start + 1)
+        body = src[start:end] if end > start else src[start : start + 600]
+        self.assertIn("sendto", body)
+        # Code calls (not docstring prose): no sock.settimeout / sock.recvfrom
+        self.assertNotIn(".settimeout(", body)
+        self.assertNotIn(".recvfrom(", body)
+        client = RptClient(probe_capacity=False)
+        mock_sock = mock.Mock()
+        client._sock = mock_sock
+        client.session = mock.Mock(session_id=b"\x02" * 8)
+        client.endpoint = Endpoint(PRODUCT_NODE_HOST, 44044)
+        client.send_keepalive()
+        mock_sock.sendto.assert_called()
+        self.assertFalse(mock_sock.settimeout.called)
+        self.assertFalse(mock_sock.recvfrom.called)
+
+    def test_dataplane_routes_node_status_not_as_data(self):
+        src = (ROOT / "client" / "dataplane.py").read_text(encoding="utf-8")
+        self.assertIn("MsgType.NODE_STATUS", src)
+        self.assertIn("process_node_status_frame", src)
+        self.assertIn("peek_type", src)
+
+    def test_wipe_status_default_empty_host(self):
+        from node.wipe_status import current_wipe_state
+
+        with mock.patch("node.rebuild_lock.read_lock", return_value=None):
+            st = current_wipe_state(install_root="/tmp/none-root")
+        self.assertEqual(st["state"], "ready")
+        self.assertEqual(st.get("host") or "", "")
 
     def test_server_keepalive_replies_node_status(self):
         src = (ROOT / "node" / "server.py").read_text(encoding="utf-8")

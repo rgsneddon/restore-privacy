@@ -761,6 +761,12 @@ class RptClient:
         return self.session.crypto.open_allow_cover(nonce, sealed, aad=aad)
 
     def send_keepalive(self) -> None:
+        """Send KEEPALIVE only — never recv on the residual socket here.
+
+        NODE_STATUS replies are consumed on the dataplane UDP path (peek type)
+        or via private HTTP node-state poll. A blocking recvfrom here would
+        leave the shared sock timed-out/blocking and could drop DATA frames.
+        """
         if not self.session or not self._sock:
             return
         wire = maybe_wrap(
@@ -769,26 +775,6 @@ class RptClient:
         )
         try:
             self._sock.sendto(wire, self.endpoint.address)
-            # Best-effort NODE_STATUS reply (drain/ready) for background hop/rejoin
-            self._sock.settimeout(1.5)
-            try:
-                raw, _addr = self._sock.recvfrom(65535)
-            except (socket.timeout, OSError):
-                return
-            try:
-                inner = maybe_unwrap(raw, enabled=_outer_obfs_enabled())
-            except Exception:  # noqa: BLE001
-                inner = raw
-            if peek_type(inner) == MsgType.NODE_STATUS:
-                signal = parse_node_status_wire(inner)
-                # Background hop/rejoin off the keepalive recv path
-                threading.Thread(
-                    target=lambda sig=signal: self.apply_wipe_signal(
-                        sig, reconnect=True
-                    ),
-                    name="rpt-wipe-hop-ka",
-                    daemon=True,
-                ).start()
         except OSError:
             return
 
