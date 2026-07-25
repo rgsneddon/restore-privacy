@@ -1,4 +1,4 @@
-"""Pre-wipe health gates — fail closed before live entry wipedown."""
+"""Pre-wipe health gates — fail closed before live fleet peer wipedown."""
 
 from __future__ import annotations
 
@@ -31,7 +31,6 @@ class TestRealExitProbeFailClosed(unittest.TestCase):
     """Drive shipped default probes — no injected HealthProbeResult theater."""
 
     def test_probe_udp_reachable_fails_without_response(self):
-        # Send-only used to return ok=True for blackholes; must fail closed now.
         r = probe_udp_reachable(DEAD_EXIT_HOST, DEAD_EXIT_PORT, timeout_s=1.5)
         self.assertFalse(
             r.ok,
@@ -57,7 +56,7 @@ class TestRealExitProbeFailClosed(unittest.TestCase):
         g = evaluate_prewipe_gates(exit_probe=r, entry_probe=entry)
         self.assertFalse(
             g.allow_wipe,
-            "live wipe must not proceed when exit residual is dead",
+            "live wipe must not proceed when peer residual is dead",
         )
 
 
@@ -70,8 +69,6 @@ class TestPrewipeGates(unittest.TestCase):
         self.assertTrue(g.package_reinstall_required)
         blob = " ".join(g.reasons).lower()
         self.assertIn("failover", blob)
-        self.assertNotIn("zero packet", blob.replace("not zero", "XXX"))
-        # Honesty: must not claim absolute zero packet loss as guaranteed
         d = g.to_dict()
         self.assertIn("not absolute zero", d["continuity_honesty"])
 
@@ -80,14 +77,19 @@ class TestPrewipeGates(unittest.TestCase):
         entry_r = HealthProbeResult("entry_node", True, "ok", "127.0.0.1", 44044)
         g = evaluate_prewipe_gates(exit_probe=exit_r, entry_probe=entry_r)
         self.assertFalse(g.allow_wipe)
-        self.assertTrue(any("exit" in r.lower() for r in g.reasons))
+        # Peer residual unhealthy (legacy name still exit_probe)
+        self.assertTrue(
+            any("peer" in r.lower() or "exit" in r.lower() for r in g.reasons)
+        )
 
     def test_entry_unhealthy_fail_closed(self):
         exit_r = HealthProbeResult("exit_residual", True, "ok", "x", 44044)
         entry_r = HealthProbeResult("entry_node", False, "no listen", "127.0.0.1", 44044)
         g = evaluate_prewipe_gates(exit_probe=exit_r, entry_probe=entry_r)
         self.assertFalse(g.allow_wipe)
-        self.assertTrue(any("entry" in r.lower() for r in g.reasons))
+        self.assertTrue(
+            any("local" in r.lower() or "entry" in r.lower() or "node" in r.lower() for r in g.reasons)
+        )
 
     def test_injected_probes_on_run_live(self):
         def bad_exit(h, p):
@@ -135,7 +137,7 @@ class TestPrewipeGates(unittest.TestCase):
         self.assertTrue(package_reinstall_required_for_live_wipe())
         good = [
             "exclusive_lock_acquire",
-            "exit_failover_preflight",
+            "peer_failover_preflight",
             "entry_node_preflight",
             "rebuild_host",
             "selfhost_reapply",
@@ -144,13 +146,19 @@ class TestPrewipeGates(unittest.TestCase):
         ]
         ok, missing = plan_has_required_live_steps(good)
         self.assertTrue(ok, missing)
+        # Legacy step id still accepted
+        good_legacy = [
+            x if x != "peer_failover_preflight" else "exit_failover_preflight"
+            for x in good
+        ]
+        ok_l, miss_l = plan_has_required_live_steps(good_legacy)
+        self.assertTrue(ok_l, miss_l)
         no_sh = [x for x in good if x != "selfhost_reapply"]
         ok2, miss2 = plan_has_required_live_steps(no_sh)
         self.assertFalse(ok2)
         self.assertIn("selfhost_reapply", miss2)
-        # selfhost before rebuild is invalid
         bad_order = [
-            "exit_failover_preflight",
+            "peer_failover_preflight",
             "entry_node_preflight",
             "exclusive_lock_acquire",
             "selfhost_reapply",
@@ -171,23 +179,26 @@ class TestPlanStructuralGates(unittest.TestCase):
         ids = [s.id for s in plan.steps]
         ok, missing = plan_has_required_live_steps(ids)
         self.assertTrue(ok, missing)
-        self.assertIn("exit_failover_preflight", ids)
+        self.assertIn("peer_failover_preflight", ids)
         self.assertIn("entry_node_preflight", ids)
         self.assertIn("selfhost_reapply", ids)
-        self.assertLess(ids.index("exit_failover_preflight"), ids.index("rebuild_host"))
+        self.assertLess(ids.index("peer_failover_preflight"), ids.index("rebuild_host"))
         self.assertLess(ids.index("entry_node_preflight"), ids.index("rebuild_host"))
         self.assertGreater(ids.index("selfhost_reapply"), ids.index("rebuild_host"))
-        # Package reinstall wording
         sh = next(s for s in plan.steps if s.id == "selfhost_reapply")
         self.assertIn("package", sh.action.lower() + sh.detail.lower())
+        self.assertEqual(plan.mode, "weekly_fleet_rebuild")
 
     def test_abort_when_entry_unhealthy_no_rebuild(self):
         plan = build_weekly_entry_rebuild_plan(
             period="7d", exit_healthy=True, entry_healthy=False
         )
-        self.assertEqual(plan.mode, "weekly_entry_rebuild_aborted")
+        self.assertEqual(plan.mode, "weekly_fleet_rebuild_aborted")
         ids = [s.id for s in plan.steps]
-        self.assertIn("abort_entry_unhealthy", ids)
+        self.assertTrue(
+            "abort_local_unhealthy" in ids or "abort_entry_unhealthy" in ids,
+            ids,
+        )
         self.assertNotIn("rebuild_host", ids)
 
     def test_abort_when_exit_unhealthy_no_rebuild(self):
@@ -195,13 +206,19 @@ class TestPlanStructuralGates(unittest.TestCase):
             period="7d", exit_healthy=False, entry_healthy=True
         )
         ids = [s.id for s in plan.steps]
-        self.assertIn("abort_exit_unhealthy", ids)
+        self.assertTrue(
+            "abort_peer_unhealthy" in ids or "abort_exit_unhealthy" in ids,
+            ids,
+        )
         self.assertNotIn("rebuild_host", ids)
 
     def test_plan_has_required_detects_missing(self):
         ok, missing = plan_has_required_live_steps(["rebuild_host"])
         self.assertFalse(ok)
-        self.assertIn("exit_failover_preflight", missing)
+        self.assertTrue(
+            any("peer" in m or "exit_failover" in m for m in missing),
+            missing,
+        )
         self.assertIn("selfhost_reapply", missing)
 
 

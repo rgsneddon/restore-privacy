@@ -1,13 +1,14 @@
-"""Pre-wipe health gates for weekly entry wipedown (fail closed).
+"""Pre-wipe health gates for fleet peer wipedown (fail closed).
 
-Live entry wipe **must** pass both:
+Live wipe of any residual peer **must** pass:
 
-1. **Exit residual healthy** — clients need solid failover while entry drains.
-2. **Entry/node pre-wipe health** — confirm product surfaces before rebuild so
+1. **≥1 other catalog peer residual healthy** — clients need solid failover
+   while this node drains (generalizes historic “exit healthy before entry wipe”).
+2. **Local node pre-wipe health** — confirm product surfaces before rebuild so
    package reinstall targets a known-good baseline.
 
 Neither gate invents zero client packet loss. Continuity is automatic residual
-failover to exit + re-entry when entry is healthy again.
+failover to a healthy peer; re-prefer the user’s selected entry when healthy again.
 """
 
 from __future__ import annotations
@@ -385,16 +386,20 @@ def evaluate_prewipe_gates(
     entry_probe: HealthProbeResult,
     require_package_reinstall: bool = True,
 ) -> PrewipeGateResult:
-    """Fail-closed combine: both exit and entry must be healthy to allow wipe."""
+    """Fail-closed combine: peer residual + local node must be healthy to allow wipe.
+
+    Historically named exit/entry probes: *exit_probe* is any **failover peer**
+    residual health; *entry_probe* is the **node about to be wiped** (local).
+    """
     reasons: list[str] = []
     if not exit_probe.ok:
         reasons.append(
-            f"exit residual unhealthy — refuse wipe (no solid client failover): "
+            f"peer residual unhealthy — refuse wipe (no solid client failover): "
             f"{exit_probe.detail}"
         )
     if not entry_probe.ok:
         reasons.append(
-            f"entry/node pre-wipe health failed — refuse wipe: {entry_probe.detail}"
+            f"local node pre-wipe health failed — refuse wipe: {entry_probe.detail}"
         )
     if require_package_reinstall:
         reasons.append(
@@ -405,9 +410,9 @@ def evaluate_prewipe_gates(
     fail_reasons = [r for r in reasons if not r.startswith("package reinstall")]
     if allow:
         msg = [
-            "pre-wipe gates PASS: exit healthy (failover solid) + entry healthy",
+            "pre-wipe gates PASS: peer residual healthy (failover solid) + local node healthy",
             "live wipe may proceed only with RPT_EPHEMERAL_CONFIRM + exclusive lock",
-            "continuity: clients auto residual-failover to exit during drain "
+            "continuity: clients auto residual-failover to a healthy peer during drain "
             "(not zero packet-loss guarantee)",
         ]
         if require_package_reinstall:
@@ -433,6 +438,39 @@ def evaluate_prewipe_gates(
     )
 
 
+def evaluate_catalog_peer_prewipe(
+    target_code: str,
+    peer_health: dict[str, bool],
+    *,
+    local_ok: bool = True,
+    local_detail: str = "local node baseline ok",
+) -> PrewipeGateResult:
+    """Bridge pure fleet peer gate into :class:`PrewipeGateResult`.
+
+    *peer_health* maps country codes → healthy. Target must have ≥1 healthy
+    **other** peer; local node health is the second gate.
+    """
+    from node.fleet_wipe import evaluate_peer_prewipe_gate
+
+    peer = evaluate_peer_prewipe_gate(target_code, peer_health)
+    peer_probe = HealthProbeResult(
+        name="catalog_peer_residual",
+        ok=peer.allow_wipe,
+        detail="; ".join(peer.reasons) if peer.reasons else "",
+        host=",".join(peer.healthy_peers) if peer.healthy_peers else "",
+    )
+    local_probe = HealthProbeResult(
+        name="local_node",
+        ok=bool(local_ok),
+        detail=local_detail,
+        host="127.0.0.1",
+    )
+    return evaluate_prewipe_gates(
+        exit_probe=peer_probe,
+        entry_probe=local_probe,
+    )
+
+
 def run_live_prewipe_gates(
     *,
     exit_host: str | None = None,
@@ -440,12 +478,53 @@ def run_live_prewipe_gates(
     entry_port: int | None = None,
     exit_probe_fn: Optional[Callable[[str, int], HealthProbeResult]] = None,
     entry_probe_fn: Optional[Callable[[], HealthProbeResult]] = None,
+    target_code: str | None = None,
+    peer_health: dict[str, bool] | None = None,
 ) -> PrewipeGateResult:
-    """Execute real probes and evaluate fail-closed gates (live path entrypoint)."""
+    """Execute real probes and evaluate fail-closed gates (live path entrypoint).
+
+    When *target_code* is set, uses catalog peer map (:func:`evaluate_catalog_peer_prewipe`)
+    so wiping RO requires a healthy IS (or other) peer — not a hardcoded exit-only host.
+    Legacy path (no target_code) still probes DEFAULT_EXIT_HOST as the failover peer.
+    """
+    entry_r = check_entry_node_health(port=entry_port, probe=entry_probe_fn)
+    if target_code:
+        from node.fleet_wipe import fleet_country_codes
+
+        codes = fleet_country_codes()
+        want = (target_code or "").strip().upper()
+        ph: dict[str, bool] = {}
+        if peer_health is not None:
+            ph = {str(k).upper(): bool(v) for k, v in peer_health.items()}
+        else:
+            # Probe each other catalog peer via exit residual host map
+            from client.multihop import PRODUCT_COUNTRY_CATALOG
+
+            host_by_code = {
+                n.code: (n.host, int(n.port)) for n in PRODUCT_COUNTRY_CATALOG
+            }
+            for c in codes:
+                if c == want:
+                    ph[c] = bool(entry_r.ok)
+                    continue
+                host, port = host_by_code.get(c, (DEFAULT_EXIT_HOST, DEFAULT_EXIT_PORT))
+                if exit_host and c != want and len(codes) == 2:
+                    # Prefer explicit override for the single alternate
+                    host = exit_host
+                    port = int(exit_port if exit_port is not None else DEFAULT_EXIT_PORT)
+                pr = check_exit_health(
+                    host=host, port=port, probe=exit_probe_fn
+                )
+                ph[c] = bool(pr.ok)
+        return evaluate_catalog_peer_prewipe(
+            want,
+            ph,
+            local_ok=bool(entry_r.ok),
+            local_detail=entry_r.detail,
+        )
     exit_r = check_exit_health(
         host=exit_host, port=exit_port, probe=exit_probe_fn
     )
-    entry_r = check_entry_node_health(port=entry_port, probe=entry_probe_fn)
     return evaluate_prewipe_gates(exit_probe=exit_r, entry_probe=entry_r)
 
 
@@ -454,10 +533,11 @@ def plan_has_required_live_steps(step_ids: list[str]) -> tuple[bool, list[str]]:
 
     Package/selfhost reinstall after rebuild is mandatory — a plan without
     ``selfhost_reapply`` (or ``selfhost_full``) is refused for live wipe.
+    Peer preflight may be ``peer_failover_preflight`` (fleet) or legacy
+    ``exit_failover_preflight``.
     """
     missing: list[str] = []
     required = [
-        "exit_failover_preflight",
         "entry_node_preflight",
         "exclusive_lock_acquire",
         "rebuild_host",
@@ -466,6 +546,12 @@ def plan_has_required_live_steps(step_ids: list[str]) -> tuple[bool, list[str]]:
         "exclusive_lock_release",
     ]
     ids = list(step_ids or [])
+    # Peer failover preflight (catalog or legacy name)
+    if (
+        "peer_failover_preflight" not in ids
+        and "exit_failover_preflight" not in ids
+    ):
+        missing.append("peer_failover_preflight|exit_failover_preflight")
     for r in required:
         if r not in ids:
             # Allow alternate id used by pure role helpers
@@ -475,8 +561,13 @@ def plan_has_required_live_steps(step_ids: list[str]) -> tuple[bool, list[str]]:
     if missing:
         return False, missing
     # Ordering: preflights before rebuild; selfhost after rebuild; health after selfhost
-    if ids.index("exit_failover_preflight") >= ids.index("rebuild_host"):
-        missing.append("order:exit_preflight_before_rebuild")
+    peer_pf = (
+        "peer_failover_preflight"
+        if "peer_failover_preflight" in ids
+        else "exit_failover_preflight"
+    )
+    if ids.index(peer_pf) >= ids.index("rebuild_host"):
+        missing.append("order:peer_preflight_before_rebuild")
     if ids.index("entry_node_preflight") >= ids.index("rebuild_host"):
         missing.append("order:entry_preflight_before_rebuild")
     selfhost_idx = (

@@ -5,10 +5,11 @@ is **enabled** with ≥2 hops and routing is implemented, residual Connect dials
 the **exit** (last) hop so egress residual is the exit VPS; the hop list still
 names entry → exit for path honesty.
 
-**Entry downtime failover** (weekly wipe/rebuild): pure selection prefers
-**entry** when healthy; automatically residual-fails over to **exit** when entry
-is draining/down; re-prefers entry when healthy again. Fail closed if neither
-path is usable.
+**Preferred-entry downtime failover** (fleet wipe/rebuild): pure selection prefers
+the user's **selected entry** when healthy; automatically residual-fails over to
+the **other catalog peer** when preferred entry is draining/down; re-prefers
+entry when healthy again. Fail closed if neither path is usable. Iceland is not
+a fixed sole entry role for all users — peers are residual-capable.
 
 Node-only zram + LUKS2 applies on multi-hop hosts; clients never run LUKS/zram.
 
@@ -21,6 +22,7 @@ Honesty:
 
 from __future__ import annotations
 
+import random
 from dataclasses import dataclass, field
 from typing import Iterable, Optional, Sequence
 
@@ -33,6 +35,150 @@ MULTI_HOP_ROUTING_IMPLEMENTED = True
 # Product exit hop (Romania FlokiNET) — residual multi-hop egress when enabled.
 PRODUCT_EXIT_HOST = "185.146.232.107"
 PRODUCT_EXIT_PORT = PRODUCT_NODE_PORT
+
+# --- Country → node catalog (extensible as more VPS countries ship) ---
+COUNTRY_IS = "IS"
+COUNTRY_RO = "RO"
+DEFAULT_ENTRY_COUNTRY = COUNTRY_IS
+
+
+@dataclass(frozen=True)
+class CountryNode:
+    """One residual-capable product node identified by country code."""
+
+    code: str  # ISO-ish short code (IS, RO, …)
+    name: str  # User-facing country name
+    host: str
+    port: int = PRODUCT_NODE_PORT
+    pub_name: str = "node_elgamal.pub"  # product public ElGamal file (no priv)
+
+    def as_hop(self, *, role: str = "") -> "Hop":
+        return Hop(host=self.host, port=int(self.port), role=role)
+
+    def as_endpoint(self) -> Endpoint:
+        return Endpoint(host=self.host, port=int(self.port))
+
+
+# Shipped two-country catalog (Iceland entry monopin + Romania exit peer).
+PRODUCT_COUNTRY_CATALOG: tuple[CountryNode, ...] = (
+    CountryNode(
+        code=COUNTRY_IS,
+        name="Iceland",
+        host=PRODUCT_NODE_HOST,
+        port=PRODUCT_NODE_PORT,
+        pub_name="node_elgamal.pub",
+    ),
+    CountryNode(
+        code=COUNTRY_RO,
+        name="Romania",
+        host=PRODUCT_EXIT_HOST,
+        port=PRODUCT_EXIT_PORT,
+        pub_name="exit_node_elgamal.pub",
+    ),
+)
+
+
+def product_country_catalog() -> tuple[CountryNode, ...]:
+    """Current residual country catalog (extend when new nodes ship)."""
+    return PRODUCT_COUNTRY_CATALOG
+
+
+def normalize_entry_country(code: str | None) -> str:
+    """Return a valid catalog country code; unknown/empty → Iceland (default)."""
+    raw = (code or "").strip().upper()
+    if not raw:
+        return DEFAULT_ENTRY_COUNTRY
+    # Accept full names
+    aliases = {
+        "ICELAND": COUNTRY_IS,
+        "IS": COUNTRY_IS,
+        "ROMANIA": COUNTRY_RO,
+        "RO": COUNTRY_RO,
+        "ROU": COUNTRY_RO,
+    }
+    code_n = aliases.get(raw, raw)
+    for n in PRODUCT_COUNTRY_CATALOG:
+        if n.code == code_n:
+            return n.code
+    return DEFAULT_ENTRY_COUNTRY
+
+
+def country_node_for_code(
+    code: str | None,
+    *,
+    catalog: Sequence[CountryNode] | None = None,
+) -> CountryNode:
+    """Lookup catalog node for *code* (falls back to default Iceland)."""
+    cat = tuple(catalog) if catalog is not None else PRODUCT_COUNTRY_CATALOG
+    want = normalize_entry_country(code)
+    for n in cat:
+        if n.code == want:
+            return n
+    # Catalog without IS — first entry
+    return cat[0] if cat else PRODUCT_COUNTRY_CATALOG[0]
+
+
+def resolve_entry_exit(
+    entry_country: str | None,
+    *,
+    multihop_enabled: bool = False,
+    catalog: Sequence[CountryNode] | None = None,
+    rng: random.Random | None = None,
+) -> tuple[CountryNode, CountryNode | None]:
+    """Resolve residual entry (+ optional exit) for user country choice.
+
+    - **Single-hop** (multihop off): entry = selected country; exit = None.
+    - **Multi-hop** on: entry = selected country; exit = random among other
+      catalog countries (deterministic complement when only one non-entry).
+    - Exit is never the same host as entry.
+    """
+    cat = list(catalog) if catalog is not None else list(PRODUCT_COUNTRY_CATALOG)
+    if not cat:
+        raise ValueError("country catalog is empty")
+    entry = country_node_for_code(entry_country, catalog=cat)
+    if not multihop_enabled:
+        return entry, None
+    candidates = [
+        n
+        for n in cat
+        if n.host.strip() != entry.host.strip() or int(n.port) != int(entry.port)
+    ]
+    if not candidates:
+        # No peer — stay single-hop honest
+        return entry, None
+    if len(candidates) == 1:
+        return entry, candidates[0]
+    pick_rng = rng if rng is not None else random.Random()
+    exit_n = pick_rng.choice(list(candidates))
+    return entry, exit_n
+
+
+def multihop_config_for_entry_country(
+    entry_country: str | None = None,
+    *,
+    multihop_enabled: bool = False,
+    catalog: Sequence[CountryNode] | None = None,
+    rng: random.Random | None = None,
+) -> "MultiHopConfig":
+    """Build :class:`MultiHopConfig` from entry-country preference + multihop flag."""
+    entry, exit_n = resolve_entry_exit(
+        entry_country,
+        multihop_enabled=multihop_enabled,
+        catalog=catalog,
+        rng=rng,
+    )
+    if exit_n is None or not multihop_enabled:
+        return MultiHopConfig(
+            hops=[entry.as_hop(role="entry")],
+            enabled=False,
+        )
+    return MultiHopConfig(
+        hops=[
+            entry.as_hop(role="entry"),
+            exit_n.as_hop(role="exit"),
+        ],
+        enabled=True,
+    )
 
 
 @dataclass(frozen=True)
@@ -58,10 +204,16 @@ class MultiHopConfig:
     enabled: bool = False
 
     def active_hops(self) -> list[Hop]:
-        """Configured hop path (entry first when multi-hop enabled)."""
+        """Configured hop path (entry first; exit only when multi-hop enabled).
+
+        When disabled, returns **only the configured entry hop** (first hop),
+        so user entry-country selection (e.g. Romania) is honoured for
+        single-hop residual — not hard-locked to the historical Iceland monopin.
+        """
+        path = build_hop_path(self.hops)
         if not self.enabled:
-            return [Hop(PRODUCT_NODE_HOST, PRODUCT_NODE_PORT, role="entry")]
-        return build_hop_path(self.hops)
+            return [path[0]] if path else [Hop(PRODUCT_NODE_HOST, PRODUCT_NODE_PORT, role="entry")]
+        return path
 
 
 def build_hop_path(hops: Sequence[Hop] | Iterable[Hop] | None) -> list[Hop]:
@@ -139,17 +291,50 @@ class ResidualSelection:
 
 
 def entry_endpoint(config: MultiHopConfig | None = None) -> Endpoint:
-    """Entry hop endpoint (product Iceland when default)."""
+    """Preferred residual entry (user country selection / first hop)."""
     return first_hop_endpoint(config)
 
 
+def alternate_peer_endpoint(config: MultiHopConfig | None = None) -> Endpoint:
+    """Failover residual peer — **never** the same host as preferred entry.
+
+    - Multi-hop path configured: last hop when it differs from entry.
+    - Else first catalog peer whose host ≠ entry (IS↔RO when two peers).
+    - Never falls back to PRODUCT_EXIT_HOST when entry is already Romania.
+    """
+    cfg = config or MultiHopConfig()
+    entry_ep = entry_endpoint(cfg)
+    entry_host = (entry_ep.host or "").strip()
+    if hop_path_configured(cfg):
+        hops = build_hop_path(cfg.hops)
+        if len(hops) >= 2:
+            alt = hops[-1].as_endpoint()
+            if (alt.host or "").strip() != entry_host:
+                return alt
+    for n in PRODUCT_COUNTRY_CATALOG:
+        if (n.host or "").strip() != entry_host:
+            return n.as_endpoint()
+    # Single-node catalog edge: cannot invent a peer
+    if entry_host == PRODUCT_EXIT_HOST:
+        return Endpoint(host=PRODUCT_NODE_HOST, port=PRODUCT_NODE_PORT)
+    return Endpoint(host=PRODUCT_EXIT_HOST, port=PRODUCT_EXIT_PORT)
+
+
 def exit_endpoint(config: MultiHopConfig | None = None) -> Endpoint:
-    """Exit hop when multi-hop path configured; else product exit constant."""
+    """Multihop residual exit hop, or alternate catalog peer for failover.
+
+    When multi-hop is configured (≥2 hops), returns the last hop (residual-via-exit).
+    When single-hop, returns :func:`alternate_peer_endpoint` so a preferred entry
+    of Romania does **not** failover to Romania again.
+    """
     cfg = config or MultiHopConfig()
     if hop_path_configured(cfg):
         hops = build_hop_path(cfg.hops)
-        return hops[-1].as_endpoint()
-    return Endpoint(host=PRODUCT_EXIT_HOST, port=PRODUCT_EXIT_PORT)
+        last = hops[-1].as_endpoint()
+        entry = hops[0].as_endpoint()
+        if (last.host or "").strip() != (entry.host or "").strip():
+            return last
+    return alternate_peer_endpoint(cfg)
 
 
 def select_residual_endpoint(
@@ -159,24 +344,27 @@ def select_residual_endpoint(
     exit_healthy: bool = True,
     entry_draining: bool = False,
 ) -> ResidualSelection:
-    """Prefer entry when healthy; automatic exit failover when entry down/draining.
+    """Prefer selected entry when healthy; failover to alternate catalog peer.
 
     Rules (pure, unit-testable):
-    1. Entry healthy and not draining → **entry-primary** residual (re-entry after rebuild).
-    2. Entry unhealthy or draining, exit healthy → **exit failover** residual.
-    3. Multi-hop active + entry healthy: product residual-via-exit still dials exit
-       for intentional multi-hop egress (not a wipe failover).
+    1. Entry healthy and not draining → **entry-primary** residual.
+    2. Entry unhealthy or draining, peer healthy → **exit_failover** to alternate peer
+       (never same host as preferred entry).
+    3. Multi-hop active + entry healthy: residual-via-exit dials configured exit.
     4. Both unusable → raise :class:`ResidualUnavailable` (fail closed).
 
-    Weekly entry wipe sets ``entry_draining=True`` so clients flip to exit without
-    a manual user step; when entry recovers, pass ``entry_healthy=True`` /
-    ``entry_draining=False`` so preference returns to entry.
+    Fleet wipe sets preferred-entry draining so clients flip to a healthy peer.
     """
     cfg = config or MultiHopConfig()
     entry_ok = bool(entry_healthy) and not bool(entry_draining)
     exit_ok = bool(exit_healthy)
     entry_ep = entry_endpoint(cfg)
     exit_ep = exit_endpoint(cfg)
+    # Never treat same-host as a real failover peer
+    if (exit_ep.host or "").strip() == (entry_ep.host or "").strip():
+        exit_ep = alternate_peer_endpoint(cfg)
+        if (exit_ep.host or "").strip() == (entry_ep.host or "").strip():
+            exit_ok = False
 
     # Intentional multi-hop residual-via-exit when entry is up (product path).
     if is_multihop_active(cfg) and entry_ok:
@@ -210,8 +398,8 @@ def select_residual_endpoint(
             failover_active=False,
         )
 
-    # Entry down/draining → solid exit failover
-    if exit_ok:
+    # Preferred entry down/draining → solid peer failover (other catalog host)
+    if exit_ok and (exit_ep.host or "").strip() != (entry_ep.host or "").strip():
         return ResidualSelection(
             endpoint=exit_ep,
             reason="exit_failover",
@@ -222,8 +410,8 @@ def select_residual_endpoint(
         )
 
     raise ResidualUnavailable(
-        "fail closed: entry unavailable (down/draining) and exit unhealthy — "
-        "no residual path; do not invent a third hop"
+        "fail closed: preferred entry unavailable (down/draining) and no healthy "
+        "alternate catalog peer — no residual path; do not invent a third hop"
     )
 
 
@@ -367,8 +555,9 @@ def multihop_config_from_env(
       (when this env key is set it wins over Settings)
     - When env key is unset, product Settings ``privacy_multihop`` is used
       (default **off** / single-hop residual baseline)
-    - ``RPT_MULTIHOP_HOPS`` — CSV ``host[:port],host2[:port]``
-    - ``RPT_EXIT_HOST`` / ``RPT_EXIT_PORT`` — second hop (default product exit)
+    - ``RPT_ENTRY_COUNTRY`` / Settings ``entry_country`` — IS or RO (default IS)
+    - ``RPT_MULTIHOP_HOPS`` — CSV ``host[:port],host2[:port]`` (operator override)
+    - ``RPT_EXIT_HOST`` / ``RPT_EXIT_PORT`` — second hop override (legacy)
     """
     import os
 
@@ -390,22 +579,40 @@ def multihop_config_from_env(
             enabled = bool(product_multihop_enabled())
         except Exception:  # noqa: BLE001
             enabled = False
+
+    # Entry country: env wins, else product Settings (default Iceland)
+    entry_country = str(e.get("RPT_ENTRY_COUNTRY", "") or "").strip()
+    if not entry_country and env is None:
+        try:
+            from client.windows.settings_store import load_settings
+
+            entry_country = getattr(load_settings(), "entry_country", DEFAULT_ENTRY_COUNTRY)
+        except Exception:  # noqa: BLE001
+            entry_country = DEFAULT_ENTRY_COUNTRY
+    if not entry_country:
+        entry_country = DEFAULT_ENTRY_COUNTRY
+
     csv = str(e.get("RPT_MULTIHOP_HOPS", "") or "").strip()
     if csv:
         hops = parse_hops_csv(csv)
-    else:
-        exit_host = str(e.get("RPT_EXIT_HOST", "") or "").strip()
-        if not exit_host and enabled:
-            exit_host = PRODUCT_EXIT_HOST
-        if exit_host:
-            try:
-                exit_port = int(str(e.get("RPT_EXIT_PORT", "") or PRODUCT_EXIT_PORT))
-            except ValueError:
-                exit_port = PRODUCT_EXIT_PORT
-            hops = build_entry_exit_path(exit_host, exit_port=exit_port)
-        else:
-            hops = [entry_hop()]
-    return MultiHopConfig(hops=hops, enabled=enabled)
+        return MultiHopConfig(hops=hops, enabled=enabled)
+
+    # Legacy RPT_EXIT_HOST with fixed Iceland entry only when env forces exit host
+    # without country selection (operator override).
+    exit_host_env = str(e.get("RPT_EXIT_HOST", "") or "").strip()
+    if exit_host_env and "RPT_ENTRY_COUNTRY" not in e and env is not None:
+        try:
+            exit_port = int(str(e.get("RPT_EXIT_PORT", "") or PRODUCT_EXIT_PORT))
+        except ValueError:
+            exit_port = PRODUCT_EXIT_PORT
+        hops = build_entry_exit_path(exit_host_env, exit_port=exit_port)
+        return MultiHopConfig(hops=hops, enabled=enabled)
+
+    # User path: entry country + multihop → complement/random non-entry exit
+    return multihop_config_for_entry_country(
+        entry_country,
+        multihop_enabled=enabled,
+    )
 
 
 def exit_hop_label(config: MultiHopConfig | None = None) -> str | None:
@@ -420,6 +627,9 @@ def exit_hop_label(config: MultiHopConfig | None = None) -> str | None:
 def node_pub_name_for_endpoint(endpoint: Endpoint) -> str:
     """Which public key file to load for HELLO to *endpoint*."""
     host = (endpoint.host or "").strip()
+    for n in PRODUCT_COUNTRY_CATALOG:
+        if host == n.host.strip():
+            return n.pub_name
     if host == PRODUCT_EXIT_HOST or host == product_exit_hop().host:
         return "exit_node_elgamal.pub"
     return "node_elgamal.pub"
