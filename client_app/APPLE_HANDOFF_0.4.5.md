@@ -74,17 +74,17 @@ Filenames must match catalog:
 
 Windows operator may already have staged CF zips under those names; **replace** them with DevID-notarized / Team-signed builds before tagging GitHub if buyers need honest Apple packages.
 
-## Honesty Ã¢â‚¬â€ staged Apple packages
+## Honesty — staged Apple packages (0.4.5 Mac rebuild)
 
-Live notarization / App Store submission is **not** performed on Windows CI hosts.
-This handoff is the Mac operator path for catalog monopin **0.4.5**.
+**Status (2026-07-25 Mac operator):**
 
-**Mac rebuild (required for real 0.4.5 Apple packages):** rebuild with
-`CFBundleShortVersionString` **0.4.5**, lean-off residual Settings defaults, OK/EXPIRED
-licence surface, and product entry + exit ElGamal **pubs** only (no `*.priv`).
+| Package | Provenance |
+|---------|------------|
+| `restore-privacy-client-0.4.5-macos.zip` | Flutter rebuild + **Developer ID Application** + **notary Accepted** + **stapled** (submission `dcb07f98-7b2b-45c2-8173-ee4865df464e`) |
+| `restore-privacy-client-0.4.5-ios.zip` | Flutter rebuild + **Apple Distribution** Team-signed sideload; `CFBundleShortVersionString` **0.4.5** |
 
-Prior **0.4.2** Apple handoff (`APPLE_HANDOFF_0.4.2.md`) remains the last notarized
-ship notes until Mac rebuild replaces packages under `0.4.5` filenames.
+App Store submission is still out of scope (sideload / DevID only).
+Product entry + exit ElGamal **pubs** only (no `*.priv`) in packages.
 
 Re-stage after rebuild:
 
