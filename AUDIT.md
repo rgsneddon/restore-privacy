@@ -89,8 +89,8 @@ system capture) stays required. This table helps users set latency expectations.
 - **Live** RTT where probes succeeded from **this audit host** to product
   **entry** `82.221.101.241:44044` (Iceland)
   and **exit** `185.146.232.107:44044` (Romania).
-- Entry probe: **69 ms** via `tcp` (shared base across rows).
-- Exit probe: **77 ms** via `tcp` (shared base for multi-hop rows).
+- Entry probe: **68 ms** via `tcp` (shared base across rows).
+- Exit probe: **94 ms** via `tcp` (shared base for multi-hop rows).
 - Live ms are from **this host's path**, not guaranteed London UK RTT.
 - Traffic shaping **feel** may add a small band on top of live base
   (+0–5 ms labeled); outer obfs ~0 ms RTT.
@@ -100,14 +100,14 @@ system capture) stays required. This table helps users set latency expectations.
 
 | Shape | Outer obfs | Multi-hop | UK→entry (live) | UK→exit (live) | RAG | Notes |
 |-------|------------|-----------|-------------------|------------------|-----|-------|
-| on | on | off | 69–74 ms (live base + shape feel) | n/a (multi-hop off) | 🟩 | single-hop residual → entry; shape on; outer obfs on (QUIC-mimic, ~0 ms RTT); entry RTT live probe this host |
-| on | on | on | 69–74 ms (live base + shape feel) | 77–82 ms (live base + shape feel) | 🟩 | residual dials exit when multi-hop on; shape on adds modest jitter/cover feel; outer obfs on (QUIC-mimic, ~0 ms RTT); entry RTT live probe this host; exit RTT live probe this host |
-| on | off | off | 69–74 ms (live base + shape feel) | n/a (multi-hop off) | 🟩 | single-hop residual → entry; shape on; outer obfs off (bare RPT, ~0 ms RTT); entry RTT live probe this host |
-| on | off | on | 69–74 ms (live base + shape feel) | 77–82 ms (live base + shape feel) | 🟩 | residual dials exit when multi-hop on; shape on adds modest jitter/cover feel; outer obfs off (bare RPT, ~0 ms RTT); entry RTT live probe this host; exit RTT live probe this host |
-| off | on | off | 69 ms (live) | n/a (multi-hop off) | 🟩 | single-hop residual → entry; shape off (faster feel); outer obfs on (QUIC-mimic, ~0 ms RTT); entry RTT live probe this host |
-| off | on | on | 69 ms (live) | 77 ms (live) | 🟩 | residual dials exit when multi-hop on; shape off leaner; outer obfs on (QUIC-mimic, ~0 ms RTT); entry RTT live probe this host; exit RTT live probe this host |
-| off | off | off | 69 ms (live) | n/a (multi-hop off) | 🟩 | single-hop residual → entry; shape off (faster feel); outer obfs off (bare RPT, ~0 ms RTT); entry RTT live probe this host |
-| off | off | on | 69 ms (live) | 77 ms (live) | 🟩 | residual dials exit when multi-hop on; shape off leaner; outer obfs off (bare RPT, ~0 ms RTT); entry RTT live probe this host; exit RTT live probe this host |
+| on | on | on | 68–73 ms (live base + shape feel) | 94–99 ms (live base + shape feel) | 🟩 | residual dials exit when multi-hop on; shape on adds modest jitter/cover feel; outer obfs on (QUIC-mimic, ~0 ms RTT); entry RTT live probe this host; exit RTT live probe this host |
+| on | on | off | 68–73 ms (live base + shape feel) | n/a (multi-hop off) | 🟩 | single-hop residual → entry; shape on; outer obfs on (QUIC-mimic, ~0 ms RTT); entry RTT live probe this host |
+| on | off | on | 68–73 ms (live base + shape feel) | 94–99 ms (live base + shape feel) | 🟩 | residual dials exit when multi-hop on; shape on adds modest jitter/cover feel; outer obfs off (bare RPT, ~0 ms RTT); entry RTT live probe this host; exit RTT live probe this host |
+| on | off | off | 68–73 ms (live base + shape feel) | n/a (multi-hop off) | 🟩 | single-hop residual → entry; shape on; outer obfs off (bare RPT, ~0 ms RTT); entry RTT live probe this host |
+| off | on | on | 68 ms (live) | 94 ms (live) | 🟩 | residual dials exit when multi-hop on; shape off leaner; outer obfs on (QUIC-mimic, ~0 ms RTT); entry RTT live probe this host; exit RTT live probe this host |
+| off | on | off | 68 ms (live) | n/a (multi-hop off) | 🟩 | single-hop residual → entry; shape off (faster feel); outer obfs on (QUIC-mimic, ~0 ms RTT); entry RTT live probe this host |
+| off | off | on | 68 ms (live) | 94 ms (live) | 🟩 | residual dials exit when multi-hop on; shape off leaner; outer obfs off (bare RPT, ~0 ms RTT); entry RTT live probe this host; exit RTT live probe this host |
+| off | off | off | 68 ms (live) | n/a (multi-hop off) | 🟩 | single-hop residual → entry; shape off (faster feel); outer obfs off (bare RPT, ~0 ms RTT); entry RTT live probe this host |
 
 **Product defaults:** shape **off**, outer obfs **off**, multi-hop **off**
 (lean single-hop entry). Turn shape/obfs **on** for stronger residual defenses;

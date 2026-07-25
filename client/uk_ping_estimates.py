@@ -258,11 +258,16 @@ def _estimate_row(
 
 
 def all_privacy_scale_prefs() -> list[PrivacyScalePrefs]:
-    """All 8 combinations of shape × obfs × multihop."""
+    """All 8 combinations of shape × obfs × multihop.
+
+    Order is deterministic for the AUDIT table: **on before off** in each
+    column, so the first row is on/on/on and the last is off/off/off
+    (shape → outer obfs → multi-hop).
+    """
     out: list[PrivacyScalePrefs] = []
     for shape in (True, False):
         for obfs in (True, False):
-            for mh in (False, True):
+            for mh in (True, False):
                 out.append(
                     PrivacyScalePrefs(
                         traffic_shape=shape,

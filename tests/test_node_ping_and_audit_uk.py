@@ -90,7 +90,18 @@ class TestAuditUkPingSection(unittest.TestCase):
         self.assertIn("multi-hop", text.lower())
         rows = uk_ping_matrix_rows(live=LiveRttBase(entry_ms=None, exit_ms=None))
         self.assertEqual(len(rows), 8)
-        self.assertEqual(len(all_privacy_scale_prefs()), 8)
+        prefs = all_privacy_scale_prefs()
+        self.assertEqual(len(prefs), 8)
+        # Table order: on/on/on first → off/off/off last (shape, obfs, multihop)
+        first, last = prefs[0], prefs[-1]
+        self.assertTrue(first.traffic_shape and first.outer_obfuscation and first.multihop)
+        self.assertFalse(
+            last.traffic_shape or last.outer_obfuscation or last.multihop
+        )
+        self.assertEqual(
+            [(r.traffic_shape, r.outer_obfuscation, r.multihop) for r in rows],
+            [(p.traffic_shape, p.outer_obfuscation, p.multihop) for p in prefs],
+        )
         # multi-hop on rows have exit range
         mh_on = [r for r in rows if r.multihop]
         self.assertTrue(mh_on)
@@ -100,6 +111,56 @@ class TestAuditUkPingSection(unittest.TestCase):
         mh_off = [r for r in rows if not r.multihop]
         for r in mh_off:
             self.assertIn("multi-hop off", r.exit_range().lower())
+
+    def test_matrix_row_order_on_on_on_to_off_off_off(self) -> None:
+        """Shipped prefs enumeration: top all-on, bottom all-off, on-before-off."""
+        from client.uk_ping_estimates import (
+            LiveRttBase,
+            all_privacy_scale_prefs,
+            render_audit_uk_ping_section,
+            uk_ping_matrix_rows,
+        )
+
+        prefs = all_privacy_scale_prefs()
+        expected = [
+            (True, True, True),
+            (True, True, False),
+            (True, False, True),
+            (True, False, False),
+            (False, True, True),
+            (False, True, False),
+            (False, False, True),
+            (False, False, False),
+        ]
+        got = [
+            (p.traffic_shape, p.outer_obfuscation, p.multihop) for p in prefs
+        ]
+        self.assertEqual(got, expected)
+        rows = uk_ping_matrix_rows(live=LiveRttBase(entry_ms=None, exit_ms=None))
+        self.assertEqual(
+            [(r.shape_label, r.obfs_label, r.multihop_label) for r in rows],
+            [
+                ("on", "on", "on"),
+                ("on", "on", "off"),
+                ("on", "off", "on"),
+                ("on", "off", "off"),
+                ("off", "on", "on"),
+                ("off", "on", "off"),
+                ("off", "off", "on"),
+                ("off", "off", "off"),
+            ],
+        )
+        text = render_audit_uk_ping_section(
+            live=LiveRttBase(entry_ms=None, exit_ms=None), measure=False
+        )
+        data_rows = [
+            ln
+            for ln in text.splitlines()
+            if ln.startswith("| on ") or ln.startswith("| off ")
+        ]
+        self.assertEqual(len(data_rows), 8)
+        self.assertTrue(data_rows[0].startswith("| on | on | on |"), data_rows[0])
+        self.assertTrue(data_rows[-1].startswith("| off | off | off |"), data_rows[-1])
 
     def test_live_probes_use_measured_ms_in_cells(self) -> None:
         """Injected successful probes must appear as live ms, not approx-only bands."""
