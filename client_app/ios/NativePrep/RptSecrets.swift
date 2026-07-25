@@ -285,34 +285,108 @@ public enum RptSecrets {
 
     // MARK: - Load
 
+    /// Copy residual-required public pin into *writableDir* from package candidates.
+    ///
+    /// Mirrors Android always-refresh-from-package for the chosen ``pubName``.
+    /// When residual host needs RO/DE pin and App Support only has Iceland
+    /// ``node_elgamal.pub``, this refreshes ``exit_`` / ``de_node_`` from bundle
+    /// inject paths before HELLO. Fail closed if still missing (never substitute IS pin).
+    @discardableResult
+    public static func ensureResidualPubInWritableDir(
+        writableDir: URL,
+        residualHost: String,
+        candidates: [URL],
+        fileManager: FileManager = .default
+    ) throws -> URL {
+        let pubName = residualNodePubName(forHost: residualHost)
+        let dest = writableDir.appendingPathComponent(pubName)
+        try fileManager.createDirectory(at: writableDir, withIntermediateDirectories: true)
+
+        var source: URL?
+        for d in candidates {
+            let c = d.appendingPathComponent(pubName)
+            if fileManager.fileExists(atPath: c.path) {
+                // Prefer readable non-empty
+                if let attrs = try? fileManager.attributesOfItem(atPath: c.path),
+                   let size = attrs[.size] as? NSNumber, size.intValue >= 32 {
+                    source = c
+                    break
+                }
+            }
+        }
+
+        if let source {
+            if source.path != dest.path {
+                if fileManager.fileExists(atPath: dest.path) {
+                    try? fileManager.removeItem(at: dest)
+                }
+                try fileManager.copyItem(at: source, to: dest)
+            }
+            return dest
+        }
+
+        if fileManager.fileExists(atPath: dest.path) {
+            return dest
+        }
+        if pubName != nodePubName {
+            throw RptProtocol.ProtocolError(
+                "Missing \(pubName) for residual host \(residualHost.isEmpty ? "(unknown)" : residualHost) "
+                    + "— refuse Iceland entry pub fallback (DE/RO HELLO would use wrong key)"
+            )
+        }
+        throw RptProtocol.ProtocolError("Missing \(pubName) in \(writableDir.path)")
+    }
+
     /// Load product admission material (device client priv + node pub). Never loads node private key.
     /// Generates a unique Ed25519 device key on first run. Never adopts a shared priv from the app bundle.
-    /// When *residualHost* is the Romania exit, prefers ``exit_node_elgamal.pub``.
+    /// Ensures RO/DE residual pins are refreshed from package candidates into the writable dir
+    /// (App Support may only have been seeded with Iceland ``node_elgamal.pub``).
     public static func loadAdmissionMaterial(
         fileManager: FileManager = .default,
         bundle: Bundle = .main,
         residualHost: String = ""
     ) throws -> (clientPriv: Data, nodePub: Data) {
+        let candidates = Array(
+            candidateSecretsDirectories(fileManager: fileManager, bundle: bundle)
+        )
+
         // Prefer trusted writable storage that already has a device key (not bundle).
         if let dir = resolveSecretsDirectory(fileManager: fileManager, bundle: bundle) {
+            try ensureResidualPubInWritableDir(
+                writableDir: dir,
+                residualHost: residualHost,
+                candidates: candidates,
+                fileManager: fileManager
+            )
             return try loadFromDirectory(dir, residualHost: residualHost)
         }
 
         // Bootstrap: node pub from bundle → generate device key into App Support / App Group
         if let dir = try? seedApplicationSupportFromBundleIfNeeded(fileManager: fileManager, bundle: bundle) {
+            try ensureResidualPubInWritableDir(
+                writableDir: dir,
+                residualHost: residualHost,
+                candidates: candidates,
+                fileManager: fileManager
+            )
             return try loadFromDirectory(dir, residualHost: residualHost)
         }
         if let dir = try? seedAppGroupFromKnownSourcesIfNeeded(fileManager: fileManager, bundle: bundle) {
+            try ensureResidualPubInWritableDir(
+                writableDir: dir,
+                residualHost: residualHost,
+                candidates: candidates,
+                fileManager: fileManager
+            )
             return try loadFromDirectory(dir, residualHost: residualHost)
         }
 
-        // Last resort: generate device key next to the residual-correct pub only
-        // (never seed from Iceland pin when residualHost is RO/DE monopin).
+        // Last resort: generate device key next to residual-correct pub only
         if let dest = secretsDirectory(fileManager: fileManager) {
             var nodeSrc: URL?
             let want = residualNodePubName(forHost: residualHost)
             let names = (want == nodePubName) ? [nodePubName] : [want]
-            for d in candidateSecretsDirectories(fileManager: fileManager, bundle: bundle) {
+            for d in candidates {
                 for name in names {
                     let n = d.appendingPathComponent(name)
                     if fileManager.fileExists(atPath: n.path) {
@@ -324,16 +398,21 @@ public enum RptSecrets {
             }
             if let nodeSrc {
                 _ = try ensureDeviceAdmissionKey(in: dest, nodePubSource: nodeSrc, fileManager: fileManager)
+                try ensureResidualPubInWritableDir(
+                    writableDir: dest,
+                    residualHost: residualHost,
+                    candidates: candidates,
+                    fileManager: fileManager
+                )
                 return try loadFromDirectory(dest, residualHost: residualHost)
             }
         }
 
         let paths = searchedPathsDescription(fileManager: fileManager, bundle: bundle)
         throw RptProtocol.ProtocolError(
-            "Missing node_elgamal.pub — packages ship the public node key; "
-                + "a unique device Ed25519 key is generated on first run. "
-                + "Never ship node_elgamal.priv or a shared client_ed25519.priv. "
-                + "Searched: \(paths)"
+            "Missing residual public pin for host \(residualHost.isEmpty ? "default" : residualHost) — "
+                + "packages ship node/exit/de_node pubs; device Ed25519 is generated on first run. "
+                + "Never ship node_elgamal.priv. Searched: \(paths)"
         )
     }
 
@@ -349,6 +428,7 @@ public enum RptSecrets {
         let pubName = residualNodePubName(forHost: residualHost)
         let nURL = dir.appendingPathComponent(pubName)
         // Fail closed for RO/DE residual: never HELLO with Iceland pin to a non-IS monopin.
+        // Callers must run ensureResidualPubInWritableDir first when residualHost is set.
         if !FileManager.default.fileExists(atPath: nURL.path) {
             if pubName != nodePubName {
                 throw RptProtocol.ProtocolError(
