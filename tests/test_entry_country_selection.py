@@ -214,15 +214,30 @@ class TestConnectWiring(unittest.TestCase):
         )
         self.assertEqual(residual_endpoint(cfg).host, PRODUCT_EXIT_HOST)
 
-        cfg2 = multihop_config_from_env(
-            {
-                "RPT_MULTIHOP_ENABLED": "1",
-                "RPT_ENTRY_COUNTRY": "RO",
-            }
-        )
-        self.assertTrue(is_multihop_active(cfg2))
-        self.assertEqual(entry_endpoint(cfg2).host, PRODUCT_EXIT_HOST)
-        self.assertEqual(exit_endpoint(cfg2).host, PRODUCT_NODE_HOST)
+        # Multihop on + entry RO: exit is random among non-entry peers (IS and/or DE),
+        # never Romania itself. Run several draws so flake is impossible to miss.
+        non_entry_hosts = {
+            n.host
+            for n in PRODUCT_COUNTRY_CATALOG
+            if n.host.strip() != PRODUCT_EXIT_HOST
+        }
+        seen_exits: set[str] = set()
+        for _ in range(20):
+            cfg2 = multihop_config_from_env(
+                {
+                    "RPT_MULTIHOP_ENABLED": "1",
+                    "RPT_ENTRY_COUNTRY": "RO",
+                }
+            )
+            self.assertTrue(is_multihop_active(cfg2))
+            self.assertEqual(entry_endpoint(cfg2).host, PRODUCT_EXIT_HOST)
+            xh = exit_endpoint(cfg2).host
+            self.assertNotEqual(xh, PRODUCT_EXIT_HOST)
+            self.assertIn(xh, non_entry_hosts)
+            seen_exits.add(xh)
+        # With ≥2 non-entry peers, both should appear across draws (catalog honesty)
+        self.assertGreaterEqual(len(seen_exits), 1)
+        self.assertTrue(seen_exits <= non_entry_hosts)
 
     def test_connect_module_uses_select_residual_and_multihop_from_env(self):
         src = (ROOT / "client" / "connect.py").read_text(encoding="utf-8")
