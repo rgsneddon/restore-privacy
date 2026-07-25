@@ -49,6 +49,46 @@ Optional node-side soft max for `utilization = live / max`:
 RPT_NODE_MAX_SESSIONS=256
 ```
 
+Optional **operator bandwidth allowance** (bits/s) for the admin fleet panel
+(used-vs-cap). This is a product budget, **not** auto-detected NIC line-rate:
+
+```bash
+# 100 Mbps = 100000000 ; 200 Mbps = 200000000
+sudo env RPT_CAPACITY_TOKEN='…' RPT_NODE_BANDWIDTH_CAP_BPS=100000000 \
+  bash scripts/install_capacity_token_env.sh
+```
+
+Catalog product budgets (operator reference):
+
+| Peer | Host | Allowance |
+|------|------|-----------|
+| IS Iceland | `82.221.101.241` | 100 Mbps (`100000000`) |
+| RO Romania | `185.146.232.107` | 100 Mbps (`100000000`) |
+| DE Germany | `167.233.224.5` | 200 Mbps (`200000000`) |
+
+## Enable on status host (admin fleet panel)
+
+The private `/admin` fleet usage section probes each catalog peer’s
+`/api/private/capacity`. Set the **same** token on the status host (Render
+Dashboard → Environment) plus optional cap map so rows show capability even when
+a peer omits `bandwidth_cap_bps` in its private payload:
+
+```bash
+# Render / status host — never commit the real token
+RPT_CAPACITY_TOKEN=<same as residual nodes>
+# JSON host or code → bits/s (not secret; product allowances)
+RPT_BANDWIDTH_CAP_BPS_MAP={"82.221.101.241":100000000,"185.146.232.107":100000000,"167.233.224.5":200000000,"IS":100000000,"RO":100000000,"DE":200000000}
+RPT_CAPACITY_PROBE_TIMEOUT=2.5
+```
+
+Local token file (operator machine only, not git):
+`~/.restore_privacy/capacity_token.txt` (or `%USERPROFILE%\.restore_privacy\capacity_token.txt`).
+
+**Firewall:** residual UI port **8080/tcp** must be reachable from the status host
+for live admin rows. Host `ufw allow 8080/tcp` is not enough on Hetzner if a
+**Cloud Firewall** still drops 8080 — open 8080/tcp there too (SSH 22 and residual
+44044/udp already required). Public `/api/status` stays title-only either way.
+
 ## Enable on clients (probe path)
 
 Operator or env-capable Connect processes (not required inside public end-user
@@ -69,10 +109,12 @@ Default URL map (when token is set and `RPT_CAPACITY_PROBE_URLS` is unset):
 
 | Variable | Who | Purpose |
 |----------|-----|---------|
-| `RPT_CAPACITY_TOKEN` | Node + client | Shared secret for private capacity endpoint |
+| `RPT_CAPACITY_TOKEN` | Node + client + status host | Shared secret for private capacity endpoint |
 | `RPT_NODE_MAX_SESSIONS` | Node | Soft max for utilization math (default 256) |
+| `RPT_NODE_BANDWIDTH_CAP_BPS` | Node | Soft operator bandwidth allowance (bits/s) |
+| `RPT_BANDWIDTH_CAP_BPS_MAP` | Status host | JSON host/code → bits/s for admin fleet panel |
 | `RPT_CAPACITY_PROBE_URLS` | Client | JSON host→URL map (optional) |
-| `RPT_CAPACITY_PROBE_TIMEOUT` | Client | Probe timeout seconds (default ~1.5) |
+| `RPT_CAPACITY_PROBE_TIMEOUT` | Client / status host | Probe timeout seconds (default ~1.5) |
 
 ## Code map
 

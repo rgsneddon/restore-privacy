@@ -43,13 +43,20 @@ RPT_EXIT_PORT=44044
 # RPT_CAPACITY_TOKEN=replace-with-long-random-secret
 # Optional soft max for utilization = live_sessions / max (node):
 # RPT_NODE_MAX_SESSIONS=256
+# Optional per-node bandwidth allowance (bits/s) — product budget, not NIC auto-detect:
+# RPT_NODE_BANDWIDTH_CAP_BPS=100000000   # IS/RO 100 Mbps
+# RPT_NODE_BANDWIDTH_CAP_BPS=200000000   # DE 200 Mbps
+# Status host admin fleet panel: same token + cap map (host or country code → bps):
+# RPT_BANDWIDTH_CAP_BPS_MAP={"82.221.101.241":100000000,"185.146.232.107":100000000,"167.233.224.5":200000000,"IS":100000000,"RO":100000000,"DE":200000000}
 # Optional client probe URL map (JSON host → private capacity URL):
-# RPT_CAPACITY_PROBE_URLS={"82.221.101.241":"http://82.221.101.241:8080/api/private/capacity","185.146.232.107":"http://185.146.232.107:8080/api/private/capacity"}
+# RPT_CAPACITY_PROBE_URLS={"82.221.101.241":"http://82.221.101.241:8080/api/private/capacity","185.146.232.107":"http://185.146.232.107:8080/api/private/capacity","167.233.224.5":"http://167.233.224.5:8080/api/private/capacity"}
 # Optional probe timeout seconds (default ~1.5):
 # RPT_CAPACITY_PROBE_TIMEOUT=1.5
 #
 # Node install (root on residual VPS):
 #   bash scripts/install_capacity_token_env.sh
-# Client (operator / env-capable Connect process):
+#   # or with allowance:
+#   # RPT_CAPACITY_TOKEN='…' RPT_NODE_BANDWIDTH_CAP_BPS=100000000 bash scripts/install_capacity_token_env.sh
+# Client / status host (operator — same secret as nodes; never commit):
 #   export RPT_CAPACITY_TOKEN='(same secret as nodes)'
 # Docs: docs/CAPACITY_PROBES.md

@@ -80,3 +80,12 @@ services:
         value: http://82.221.101.241:8081/paid-assets
       - key: RPT_ASSET_FETCH_TOKEN
         sync: false
+      # Admin fleet usage panel: private capacity probes (same token as residual nodes).
+      # Paste token from operator machine ~/.restore_privacy/capacity_token.txt — never commit.
+      - key: RPT_CAPACITY_TOKEN
+        sync: false
+      # Product bandwidth allowances (bits/s) for used-vs-cap rows (not secret).
+      - key: RPT_BANDWIDTH_CAP_BPS_MAP
+        value: '{"82.221.101.241":100000000,"185.146.232.107":100000000,"167.233.224.5":200000000,"IS":100000000,"RO":100000000,"DE":200000000}'
+      - key: RPT_CAPACITY_PROBE_TIMEOUT
+        value: "2.5"

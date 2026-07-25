@@ -64,6 +64,8 @@ class TestCapacityTokenDocs(unittest.TestCase):
             "RPT_CAPACITY_PROBE_URLS",
             "RPT_CAPACITY_PROBE_TIMEOUT",
             "RPT_NODE_MAX_SESSIONS",
+            "RPT_NODE_BANDWIDTH_CAP_BPS",
+            "RPT_BANDWIDTH_CAP_BPS_MAP",
         ):
             self.assertIn(key, cap)
         self.assertIn("title-only", cap.lower().replace("title only", "title-only") or cap.lower())
@@ -94,6 +96,18 @@ class TestCapacityTokenDocs(unittest.TestCase):
         self.assertIn("/etc/restore-privacy", src)
         self.assertIn("EnvironmentFile", src)
         self.assertIn("do not commit", src.lower())
+        self.assertIn("RPT_NODE_BANDWIDTH_CAP_BPS", src)
+        self.assertIn("RPT_NODE_MAX_SESSIONS", src)
+
+    def test_render_blueprint_has_capacity_env_placeholders(self):
+        text = (ROOT / "render.yaml").read_text(encoding="utf-8")
+        self.assertIn("RPT_CAPACITY_TOKEN", text)
+        self.assertIn("RPT_BANDWIDTH_CAP_BPS_MAP", text)
+        # Token must be dashboard-only (sync: false), not a committed secret value
+        # Find the RPT_CAPACITY_TOKEN block and ensure sync: false nearby
+        idx = text.index("RPT_CAPACITY_TOKEN")
+        window = text[idx : idx + 80]
+        self.assertIn("sync: false", window)
 
 
 if __name__ == "__main__":

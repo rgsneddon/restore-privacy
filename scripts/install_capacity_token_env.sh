@@ -47,14 +47,25 @@ else
   echo "[rpt-capacity] using provided/existing RPT_CAPACITY_TOKEN"
 fi
 
+# Optional soft session max + operator bandwidth budget (bits/s) for admin panel.
+# RPT_NODE_BANDWIDTH_CAP_BPS is an allowance (not auto-detected NIC line-rate).
+MAX_SESSIONS="${RPT_NODE_MAX_SESSIONS:-256}"
+BW_CAP="${RPT_NODE_BANDWIDTH_CAP_BPS:-}"
+
 umask 077
-cat >"$ENV_FILE" <<EOF
-# Private residual capacity probe token — do not commit; do not publish.
-# Clients that call /api/private/capacity must set the same RPT_CAPACITY_TOKEN.
-RPT_CAPACITY_TOKEN=${TOKEN}
-# Soft max sessions for utilization = live / max (default 256 if unset)
-# RPT_NODE_MAX_SESSIONS=256
-EOF
+{
+  echo "# Private residual capacity probe token — do not commit; do not publish."
+  echo "# Clients / status admin that call /api/private/capacity need the same RPT_CAPACITY_TOKEN."
+  echo "RPT_CAPACITY_TOKEN=${TOKEN}"
+  echo "# Soft max sessions for utilization = live / max"
+  echo "RPT_NODE_MAX_SESSIONS=${MAX_SESSIONS}"
+  if [[ -n "$BW_CAP" ]]; then
+    echo "# Operator bandwidth allowance (bits/s) for admin fleet panel used-vs-cap"
+    echo "RPT_NODE_BANDWIDTH_CAP_BPS=${BW_CAP}"
+  else
+    echo "# RPT_NODE_BANDWIDTH_CAP_BPS=100000000  # e.g. 100 Mbps allowance — set when known"
+  fi
+} >"$ENV_FILE"
 chmod 600 "$ENV_FILE"
 chown root:root "$ENV_FILE"
 
