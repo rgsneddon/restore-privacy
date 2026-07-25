@@ -40,6 +40,20 @@ from payments import (
     STRIPE_WEBHOOK_PATH,
 )
 
+# Page-top return target (h1 on authenticated admin HTML).
+ADMIN_TOP_ANCHOR_ID = "admin-heading"
+ADMIN_TOP_LINK_LABEL = "^top"
+
+
+def admin_section_top_link_html() -> str:
+    """End-of-section link back to the top of the authenticated admin page."""
+    return (
+        f'<p class="admin-top-link">'
+        f'<a href="#{ADMIN_TOP_ANCHOR_ID}" class="admin-top-link-a">'
+        f"{ADMIN_TOP_LINK_LABEL}</a></p>\n"
+    )
+
+
 # Operator-facing architecture blurb (must stay current; grepped by tests).
 ADMIN_ARCHITECTURE_BLURB = (
     "Residual catalog peers: Iceland (IS, default entry), Romania (RO), "
@@ -550,7 +564,7 @@ def render_admin_licences_section_html(
 {table}
     </tbody>
   </table>
-</section>
+{admin_section_top_link_html()}</section>
 """
 
 
@@ -652,7 +666,7 @@ def render_purchase_reissue_section_html(
     </label>
     <button type="submit" id="admin-reissue-submit">Create secondary download link</button>
   </form>
-</section>
+{admin_section_top_link_html()}</section>
 """
 
 
@@ -720,7 +734,7 @@ def render_admin_ondemand_mint_section_html(
     </label>
     <button type="submit" id="admin-ondemand-mint-submit">Generate live download link</button>
   </form>
-</section>
+{admin_section_top_link_html()}</section>
 """
 
 
@@ -794,7 +808,7 @@ def render_admin_keygen_failsafe_section_html(
     </label>
     <button type="submit" id="admin-keygen-failsafe-submit">Generate KEYGEN</button>
   </form>
-</section>
+{admin_section_top_link_html()}</section>
 """
 
 
@@ -860,7 +874,7 @@ def render_seed_test_purchase_section_html(
     </label>
     <button type="submit" id="admin-seed-purchase-submit">Seed test purchase (RPT-…)</button>
   </form>
-</section>
+{admin_section_top_link_html()}</section>
 """
 
 
@@ -1161,13 +1175,14 @@ def render_processor_settings_html(
   <nav class="plugin-nav" id="processor-plugin-nav" aria-label="Processor plugins">{option_links}</nav>
   {msg_html}{err_html}
 {plugins_html}
-</section>
+{admin_section_top_link_html()}</section>
 """
     # Block only real-looking secret values, not doc prefixes (sk_test_… / whsec_…).
     if _html_contains_secret_material(frag):
         return (
-            '<section id="admin-processor-settings"><p class="err">'
-            "Settings redacted (secret material detected).</p></section>"
+            '<section id="admin-processor-settings" class="card"><p class="err">'
+            "Settings redacted (secret material detected).</p>"
+            f"{admin_section_top_link_html()}</section>"
         )
     return frag
 
@@ -1292,6 +1307,9 @@ background:var(--btn-bg);color:var(--btn-fg);font-weight:600;cursor:pointer}}
 .ok-msg{{color:var(--badge-ok-fg);background:var(--badge-ok-bg);padding:0.5rem 0.75rem;border-radius:8px}}
 .err{{color:var(--err)}}
 .plugin-nav{{margin:0.5rem 0 1rem;font-size:0.9rem}}
+.admin-top-link{{margin:0.85rem 0 0;font-size:0.85rem}}
+.admin-top-link a{{color:var(--link);text-decoration:none}}
+.admin-top-link a:hover{{text-decoration:underline}}
 .purchase-id-box,.purchase-id-advice{{/* reserved for public thank-you if mirrored */}}
 </style>
 {admin_theme_boot_script()}
@@ -1322,7 +1340,7 @@ background:var(--btn-bg);color:var(--btn-fg);font-weight:600;cursor:pointer}}
   <code>/var/data/rpt-payment</code> on the persistent disk (blueprint:
   <code>rpt-payment-data</code> mount <code>/var/data</code>) so admin history survives
   host redeploy — free instances are ephemeral and cannot attach that disk.</p>
-</section>
+{admin_section_top_link_html()}</section>
 {reissue_html}
 {ondemand_html}
 {keygen_html}
@@ -1346,7 +1364,7 @@ background:var(--btn-bg);color:var(--btn-fg);font-weight:600;cursor:pointer}}
 {table}
     </tbody>
   </table>
-</section>
+{admin_section_top_link_html()}</section>
 </body></html>
 """
     # Final secret scan on full page (real values only; keep guide prefixes)
