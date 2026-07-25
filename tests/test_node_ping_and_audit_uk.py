@@ -71,19 +71,24 @@ class TestNodePingHelper(unittest.TestCase):
 class TestAuditUkPingSection(unittest.TestCase):
     def test_render_section_has_matrix_and_method(self) -> None:
         from client.uk_ping_estimates import (
+            LiveRttBase,
             all_privacy_scale_prefs,
             render_audit_uk_ping_section,
             uk_ping_matrix_rows,
         )
 
-        text = render_audit_uk_ping_section()
-        self.assertIn("UK approximate ping", text)
+        # Pure approx path (no measure) — deterministic for CI
+        text = render_audit_uk_ping_section(
+            live=LiveRttBase(entry_ms=None, exit_ms=None),
+            measure=False,
+        )
+        self.assertIn("UK ping + RAG", text)
         self.assertIn("Method (honesty)", text)
         self.assertIn("Approximate", text)
         self.assertIn("82.221.101.241", text)
         self.assertIn("185.146.232.107", text)
         self.assertIn("multi-hop", text.lower())
-        rows = uk_ping_matrix_rows()
+        rows = uk_ping_matrix_rows(live=LiveRttBase(entry_ms=None, exit_ms=None))
         self.assertEqual(len(rows), 8)
         self.assertEqual(len(all_privacy_scale_prefs()), 8)
         # multi-hop on rows have exit range
@@ -96,17 +101,113 @@ class TestAuditUkPingSection(unittest.TestCase):
         for r in mh_off:
             self.assertIn("multi-hop off", r.exit_range().lower())
 
+    def test_live_probes_use_measured_ms_in_cells(self) -> None:
+        """Injected successful probes must appear as live ms, not approx-only bands."""
+        from client.node_ping import PingResult
+        from client.uk_ping_estimates import (
+            LiveRttBase,
+            render_audit_uk_ping_section,
+            uk_ping_matrix_rows,
+        )
+
+        live = LiveRttBase(
+            entry_ms=42.0,
+            exit_ms=50.0,
+            entry_method="tcp",
+            exit_method="tcp",
+        )
+        rows = uk_ping_matrix_rows(live=live)
+        self.assertEqual(len(rows), 8)
+        for r in rows:
+            self.assertTrue(r.entry_live)
+            self.assertIn("live", r.entry_range().lower())
+            # shape off lean: exact 42 ms; shape on: band 42–47
+            if not r.traffic_shape:
+                self.assertEqual(r.entry_ms_low, 42)
+                self.assertEqual(r.entry_ms_high, 42)
+            if r.multihop:
+                self.assertTrue(r.exit_live)
+                self.assertIn("live", r.exit_range().lower())
+                if not r.traffic_shape:
+                    self.assertEqual(r.exit_ms_low, 50)
+            else:
+                self.assertIn("multi-hop off", r.exit_range().lower())
+            # full live → green RAG
+            if r.multihop:
+                self.assertEqual(r.rag, "green")
+            else:
+                self.assertEqual(r.rag, "green")
+
+        text = render_audit_uk_ping_section(live=live, measure=False)
+        self.assertIn("42 ms", text)
+        self.assertIn("50 ms", text)
+        self.assertIn("Live", text)
+        self.assertIn("(live)", text)
+        self.assertNotIn("Approximate** RTT bands", text)
+        # injectable probe_entry path also works
+        fake_entry = PingResult(
+            host="82.221.101.241", port=44044, ok=True, rtt_ms=33.0, method="tcp"
+        )
+        fake_exit = PingResult(
+            host="185.146.232.107", port=44044, ok=True, rtt_ms=44.0, method="udp"
+        )
+        text2 = render_audit_uk_ping_section(
+            measure=True,
+            probe_entry=lambda: fake_entry,
+            probe_exit=lambda: fake_exit,
+        )
+        self.assertIn("33 ms", text2)
+        self.assertIn("44 ms", text2)
+
+    def test_probe_failure_falls_back_to_approx_no_fake_live(self) -> None:
+        from client.node_ping import PingResult
+        from client.uk_ping_estimates import render_audit_uk_ping_section
+
+        fail_e = PingResult(
+            host="82.221.101.241",
+            port=44044,
+            ok=False,
+            rtt_ms=None,
+            method="tcp",
+            error="timeout",
+        )
+        fail_x = PingResult(
+            host="185.146.232.107",
+            port=44044,
+            ok=False,
+            rtt_ms=None,
+            method="tcp",
+            error="timeout",
+        )
+        text = render_audit_uk_ping_section(
+            measure=True,
+            probe_entry=lambda: fail_e,
+            probe_exit=lambda: fail_x,
+        )
+        self.assertIn("Approximate", text)
+        self.assertIn("38–58 ms", text)  # approx band present
+        self.assertNotIn("ms (live)", text)
+        self.assertIn("failed or unavailable", text.lower())
+        # must not invent the failed rtt as a number cell like "None ms"
+        self.assertNotIn("None ms", text)
+
     def test_audit_md_contains_shipped_section(self) -> None:
         pin = (ROOT / "client" / "VERSION").read_text(encoding="utf-8").strip()
         audit = (ROOT / "AUDIT.md").read_text(encoding="utf-8")
-        self.assertIn("Privacy-scale settings — UK approximate ping + RAG", audit)
-        self.assertIn("UK→entry (approx)", audit)
-        self.assertIn("UK→exit (approx)", audit)
+        self.assertIn("Privacy-scale settings — UK", audit)
+        self.assertIn("ping + RAG", audit)
+        self.assertTrue(
+            "UK→entry (approx)" in audit
+            or "UK→entry (live)" in audit
+            or "UK→entry" in audit,
+            "entry column header missing",
+        )
         self.assertIn(pin, audit)
         self.assertIn("n/a (multi-hop off)", audit)
-        # method honesty
-        self.assertIn("Approximate", audit)
-        self.assertIn("typical UK", audit)
+        # method honesty (live and/or approximate)
+        self.assertTrue(
+            "Approximate" in audit or "Live" in audit or "live probe" in audit.lower()
+        )
 
     def test_audit_package_table_and_monopin_match_catalog(self) -> None:
         """Shipped AUDIT must name live monopin; package RAG may lag with honesty note."""

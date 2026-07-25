@@ -75,27 +75,44 @@ Honesty: residual-via-exit when multi-hop is enabled (`RPT_MULTIHOP_ENABLED=1`);
 
 ---
 
-## Privacy-scale settings — UK approximate ping
+## Privacy-scale settings — UK ping + RAG
 
-Settings can turn optional residual layers on/off. Core residual (licence/keygen, HELLO, system capture) always stays required.
+Customer **Settings → Browsing speed / privacy scale** can turn optional
+residual layers on/off. Residual VPN core (licence/keygen, HELLO crypto,
+system capture) stays required. This table helps users set latency expectations.
 
-**Method:** approximate RTT bands for a typical UK (London metro) user to entry and exit. Not live CI measurements; not a contractual SLA. Traffic shaping adds a small feel overhead; outer obfuscation is ~0 ms RTT. Multi-hop residual dials **exit**. RAG 🟧 = approximate estimate.
+### Method (honesty)
 
-| Shape | Outer obfs | Multi-hop | UK→entry (approx) | UK→exit (approx) | RAG | Notes |
+- **Live** RTT where probes succeeded from **this audit host** to product
+  **entry** `82.221.101.241:44044` (Iceland)
+  and **exit** `185.146.232.107:44044` (Romania).
+- Entry probe: **69 ms** via `tcp` (shared base across rows).
+- Exit probe: **77 ms** via `tcp` (shared base for multi-hop rows).
+- Live ms are from **this host's path**, not guaranteed London UK RTT.
+- Traffic shaping **feel** may add a small band on top of live base
+  (+0–5 ms labeled); outer obfs ~0 ms RTT.
+- **Not** a contractual SLA. Failed probes fall back to approximate UK bands
+  (never invent live ms).
+- **RAG:** 🟩 Green = live base RTT available for the row; 🟧 Amber = approximate / partial.
+
+| Shape | Outer obfs | Multi-hop | UK→entry (live) | UK→exit (live) | RAG | Notes |
 |-------|------------|-----------|-------------------|------------------|-----|-------|
-| on | on | off | 43—63 ms | n/a | 🟧 | single-hop entry; shape + outer obfs on (**QUIC-mimic**, ~0 ms RTT) |
-| on | on | on | 43—63 ms | 37—57 ms | 🟧 | residual dials exit; shape + **QUIC-mimic** |
-| on | off | off | 43—63 ms | n/a | 🟧 | shape on; bare RPT |
-| on | off | on | 43—63 ms | 37—57 ms | 🟧 | residual dials exit |
-| off | on | off | 38—58 ms | n/a | 🟧 | leaner feel; outer obfs on (**QUIC-mimic**) |
-| off | on | on | 38—58 ms | 32—52 ms | 🟧 | residual dials exit; **QUIC-mimic** |
-| off | off | off | 38—58 ms | n/a | 🟧 | lean default |
-| off | off | on | 38—58 ms | 32—52 ms | 🟧 | residual dials exit |
+| on | on | off | 69–74 ms (live base + shape feel) | n/a (multi-hop off) | 🟩 | single-hop residual → entry; shape on; outer obfs on (QUIC-mimic, ~0 ms RTT); entry RTT live probe this host |
+| on | on | on | 69–74 ms (live base + shape feel) | 77–82 ms (live base + shape feel) | 🟩 | residual dials exit when multi-hop on; shape on adds modest jitter/cover feel; outer obfs on (QUIC-mimic, ~0 ms RTT); entry RTT live probe this host; exit RTT live probe this host |
+| on | off | off | 69–74 ms (live base + shape feel) | n/a (multi-hop off) | 🟩 | single-hop residual → entry; shape on; outer obfs off (bare RPT, ~0 ms RTT); entry RTT live probe this host |
+| on | off | on | 69–74 ms (live base + shape feel) | 77–82 ms (live base + shape feel) | 🟩 | residual dials exit when multi-hop on; shape on adds modest jitter/cover feel; outer obfs off (bare RPT, ~0 ms RTT); entry RTT live probe this host; exit RTT live probe this host |
+| off | on | off | 69 ms (live) | n/a (multi-hop off) | 🟩 | single-hop residual → entry; shape off (faster feel); outer obfs on (QUIC-mimic, ~0 ms RTT); entry RTT live probe this host |
+| off | on | on | 69 ms (live) | 77 ms (live) | 🟩 | residual dials exit when multi-hop on; shape off leaner; outer obfs on (QUIC-mimic, ~0 ms RTT); entry RTT live probe this host; exit RTT live probe this host |
+| off | off | off | 69 ms (live) | n/a (multi-hop off) | 🟩 | single-hop residual → entry; shape off (faster feel); outer obfs off (bare RPT, ~0 ms RTT); entry RTT live probe this host |
+| off | off | on | 69 ms (live) | 77 ms (live) | 🟩 | residual dials exit when multi-hop on; shape off leaner; outer obfs off (bare RPT, ~0 ms RTT); entry RTT live probe this host; exit RTT live probe this host |
 
-**Product defaults:** shape **off**, outer obfs **off**, multi-hop **off** (`RPT_MULTIHOP_ENABLED` unset / off).  
-*(From `client/uk_ping_estimates.py`.)*
+**Product defaults:** shape **off**, outer obfs **off**, multi-hop **off**
+(lean single-hop entry). Turn shape/obfs **on** for stronger residual defenses;
+hot-apply while connected (multi-hop re-establishes residual).
 
----
+
+*(Generated from client/uk_ping_estimates.py — regenerate with
+python -c "from client.uk_ping_estimates import render_audit_uk_ping_section; print(render_audit_uk_ping_section())".)*
 
 ## 1. Executive summary
 
