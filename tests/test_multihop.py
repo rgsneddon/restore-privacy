@@ -150,7 +150,8 @@ class TestMultiHopPath(unittest.TestCase):
         )
         self.assertNotEqual(fo.endpoint.host, PRODUCT_NODE_HOST)
         self.assertTrue(fo.failover_active)
-        self.assertEqual(fo.reason, "wipe_drain_failover")
+        # Fleet wipe / entry drain uses exit_failover to an alternate catalog peer
+        self.assertEqual(fo.reason, "exit_failover")
 
 
 if __name__ == "__main__":

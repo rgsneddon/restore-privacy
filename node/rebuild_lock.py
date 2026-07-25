@@ -35,8 +35,7 @@ from typing import Any, Optional
 DEFAULT_INSTALL_ROOT = os.environ.get("RPT_INSTALL_ROOT", "/opt/restore-privacy")
 LOCK_REL = Path("var") / "rpt-rebuild.lock"
 # Legacy + country codes: single peer wipe only (never bulk multi-node roles)
-# Single-peer roles: legacy entry + catalog country codes (IS, RO, DE, …)
-ALLOWED_ROLES = frozenset({"entry", "is", "ro", "de"})
+ALLOWED_ROLES = frozenset({"entry", "is", "ro"})
 # Bulk multi-node wipe roles refused (use sequential fleet planner instead)
 FORBIDDEN_WEEKLY_ROLES = frozenset({"exit", "both", "all"})
 

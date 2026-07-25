@@ -54,13 +54,8 @@ class TestWeeklyEntryPlan(unittest.TestCase):
         self.assertFalse(d.allow)
         self.assertIsNone(d.target_code)
 
-    def test_auto_cycle_rolls_after_fleet_complete(self):
-        # IS+RO complete → DE next (not roll yet with 3-peer catalog)
-        d_de = resolve_weekly_target(completed=["IS", "RO"], role_hint="auto")
-        self.assertTrue(d_de.allow, d_de.reason)
-        self.assertEqual(d_de.target_code, "DE")
-        # Full cycle complete → roll to IS
-        d = resolve_weekly_target(completed=["IS", "RO", "DE"], role_hint="auto")
+    def test_auto_cycle_rolls_after_is_ro_complete(self):
+        d = resolve_weekly_target(completed=["IS", "RO"], role_hint="auto")
         self.assertTrue(d.allow, d.reason)
         self.assertEqual(d.target_code, "IS")
         self.assertEqual(d.completed, ())
@@ -121,14 +116,7 @@ class TestWeeklyEntryPlan(unittest.TestCase):
         self.assertIn("SKIP_DNS=0", sh.command)
         self.assertIn("SKIP_HOST_PRIVACY=0", sh.command)
         self.assertIn("selfhost_node.sh", sh.command)
-        # Host-identity gate prefixes selfhost on local target
-        self.assertIn("assert_local_host_is_target", sh.command)
-        self.assertTrue(
-            sh.command.endswith(SELFHOST_FULL_CMD)
-            or SELFHOST_FULL_CMD in sh.command,
-            sh.command,
-        )
-        self.assertIn("host_identity_gate", ids)
+        self.assertEqual(sh.command, SELFHOST_FULL_CMD)
         self.assertIn("reinstall_core_dns_privacy_verify", ids)
         self.assertIn("entry_product_pin_check", ids)
         self.assertLess(
@@ -196,76 +184,8 @@ class TestWeeklyEntryPlan(unittest.TestCase):
         self.assertIn("weekly_entry_rebuild.py", unit)
         self.assertIn("--dry-run", unit)
         self.assertNotIn("RPT_EPHEMERAL_CONFIRM=yes", unit)
-        # Honest fleet wording — not "entry-only never wipe RO"
-        self.assertIn("sequential fleet", unit.lower())
-        self.assertNotIn("entry-only", unit.lower())
         live = systemd_service_unit(dry_run=False, weekly_entry=True)
         self.assertIn("RPT_EPHEMERAL_CONFIRM=yes", live)
-
-    def test_host_identity_gate_ro_remote_on_orchestrator(self):
-        """When orchestrator is IS, RO destructive steps must not wipe local host."""
-        plan = build_weekly_entry_rebuild_plan(
-            period="7d",
-            dry_run=True,
-            exit_healthy=True,
-            entry_healthy=True,
-            role="auto",
-            completed=["IS"],
-            local_country="IS",
-        )
-        self.assertEqual(plan.mode, "weekly_fleet_rebuild")
-        ids = [s.id for s in plan.steps]
-        self.assertIn("host_identity_gate", ids)
-        self.assertIn("acquire_rebuild_lock('ro'", plan.format_text())
-        stop = next(s for s in plan.steps if s.id == "stop_runtime")
-        self.assertIn("REMOTE", stop.action)
-        self.assertNotIn("systemctl stop rpt-node", stop.command)
-        self.assertIn("exit 1", stop.command)
-        sh = next(s for s in plan.steps if s.id == "selfhost_reapply")
-        self.assertIn("REMOTE", sh.action)
-        self.assertNotIn(SELFHOST_FULL_CMD, sh.command)
-        # RO pin (not entry product pin)
-        self.assertIn("exit_product_pin_check", ids)
-        self.assertNotIn("entry_product_pin_check", ids)
-        pin = next(s for s in plan.steps if s.id == "exit_product_pin_check")
-        self.assertIn("exit_node_elgamal.pub", pin.detail + pin.command)
-        mark = next(s for s in plan.steps if s.id == "mark_fleet_peer_complete")
-        self.assertIn("RPT_REMOTE_WIPE_OK", mark.command)
-        self.assertIn("mark_wipe_complete('RO'", mark.command)
-
-    def test_host_identity_gate_ro_local_on_ro_host(self):
-        """When running on RO host, local destructive + exit pin OK."""
-        plan = build_weekly_entry_rebuild_plan(
-            period="7d",
-            dry_run=True,
-            exit_healthy=True,
-            entry_healthy=True,
-            role="auto",
-            completed=["IS"],
-            local_country="RO",
-        )
-        ids = [s.id for s in plan.steps]
-        stop = next(s for s in plan.steps if s.id == "stop_runtime")
-        self.assertIn("local", stop.action.lower())
-        self.assertIn("assert_local_host_is_target", stop.command)
-        self.assertIn("systemctl stop", stop.command)
-        sh = next(s for s in plan.steps if s.id == "selfhost_reapply")
-        self.assertIn(SELFHOST_FULL_CMD.split()[-1], sh.command)  # selfhost_node.sh
-        self.assertIn("assert_local_host_is_target", sh.command)
-        self.assertIn("exit_product_pin_check", ids)
-        pin = next(s for s in plan.steps if s.id == "exit_product_pin_check")
-        self.assertIn("exit_node_elgamal.pub", pin.command)
-        mark = next(s for s in plan.steps if s.id == "mark_fleet_peer_complete")
-        self.assertIn("assert_local_host_is_target", mark.command)
-        self.assertNotIn("RPT_REMOTE_WIPE_OK", mark.command)
-
-    def test_exit_no_weekly_timer_honesty_allows_sequential_ro(self):
-        """exit_no_weekly_timer must not claim RO is never fleet-wiped."""
-        x_desc = " ".join(r.description for r in exit_reinstall_requirements())
-        self.assertIn("sequential", x_desc.lower())
-        # Must not say exit is never weekly-wiped forever
-        self.assertNotIn("never weekly", x_desc.lower())
-        self.assertNotIn("not on the weekly", x_desc.lower())
 
 
 class TestWeeklyCliDryRun(unittest.TestCase):

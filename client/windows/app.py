@@ -106,7 +106,6 @@ from client.registration_copy import (
 )
 from client.transparency_copy import (
     CONNECTION_LOG_DISCLAIMER,
-    SUPPORT_LOG_FIND_HINT,
     CONNECTION_LOG_TITLE,
     DPI_MITIGATION_DISCLAIMER,
     DPI_MITIGATION_TITLE,
@@ -142,20 +141,6 @@ from client.windows.ui_chrome import (
     surface_default_size,
     surface_geometry_string,
     surface_min_size,
-)
-from client.country_select import (
-    catalog_country_options,
-    entry_country_allows_connect,
-    label_to_country_code,
-    option_label_for_code,
-    resolve_entry_country_selection,
-)
-from client.country_select import (
-    catalog_country_options,
-    entry_country_allows_connect,
-    label_to_country_code,
-    option_label_for_code,
-    resolve_entry_country_selection,
 )
 from client.windows.settings_store import (
     ProductSettings,
@@ -335,54 +320,9 @@ class TunnelClientApp:
         )
         self.chrome.pack(fill=tk.BOTH, expand=True)
 
-        # --- Bottom: country selector above Connect so it never disappears ---
+        # --- Bottom: primary control first so it never disappears ---
         self.bottom = tk.Frame(self.chrome, bg=self._t["chrome_bg"])
         self.bottom.pack(side=tk.BOTTOM, fill=tk.X)
-
-        # Entry-country dropdown (flags) — main shell, not Settings-only
-        self._country_options = catalog_country_options()
-        self._country_labels = [o.label() for o in self._country_options]
-        _init_code = normalize_entry_country(
-            getattr(self._settings, "entry_country", None)
-        )
-        self._entry_country_code = _init_code
-        self.country_frame = tk.Frame(self.bottom, bg=self._t["chrome_bg"])
-        self.country_frame.pack(side=tk.TOP, fill=tk.X, pady=(0, 4))
-        tk.Label(
-            self.country_frame,
-            text="Entry country",
-            bg=self._t["chrome_bg"],
-            fg=self._t["text_muted"],
-            font=("Segoe UI", 8),
-            anchor="w",
-        ).pack(side=tk.TOP, fill=tk.X)
-        self.country_var = tk.StringVar(value=option_label_for_code(_init_code))
-        self.country_menu = tk.OptionMenu(
-            self.country_frame,
-            self.country_var,
-            *self._country_labels,
-            command=self._on_entry_country_selected,
-        )
-        self.country_menu.configure(
-            bg=self._t["panel_bg"],
-            fg=self._t["text"],
-            activebackground=self._t["light_accent"],
-            activeforeground=self._t["text"],
-            highlightthickness=1,
-            highlightbackground=self._t.get("border", "#D0D5DD"),
-            font=("Segoe UI", 11),
-            relief=tk.FLAT,
-            anchor="w",
-            direction="above",
-        )
-        self.country_menu["menu"].configure(
-            bg=self._t["panel_bg"],
-            fg=self._t["text"],
-            activebackground=self._t["primary"],
-            activeforeground=self._t["white"],
-            font=("Segoe UI", 11),
-        )
-        self.country_menu.pack(side=tk.TOP, fill=tk.X, pady=(2, 0), ipady=4)
 
         self.btn_var = tk.StringVar(value=connect_button_label(False))
         self.connect_btn = tk.Button(
@@ -766,20 +706,10 @@ class TunnelClientApp:
         self.output.see(tk.END)
         self.output.configure(state=tk.DISABLED)
 
-    def _connection_log(
-        self, kind: str, message: str, **detail: object
-    ) -> None:
-        """Persist a user-visible connection event locally (Settings export).
-
-        Optional *detail* keys (endpoint, outcome, error, …) are stored as
-        support diagnostics in the local log only — never uploaded.
-        """
+    def _connection_log(self, kind: str, message: str) -> None:
+        """Persist a user-visible connection event locally (Settings export)."""
         try:
-            append_event(
-                kind,
-                message,
-                detail=detail if detail else None,
-            )
+            append_event(kind, message)
         except Exception:
             pass
 
@@ -1362,66 +1292,17 @@ class TunnelClientApp:
         threading.Thread(target=work, daemon=True).start()
 
     def _refresh_multihop_from_settings(self) -> None:
-        """Reload residual path from main-shell entry country + Settings multihop.
+        """Reload residual path from Settings/env (entry country + multi-hop).
 
         Must run on every Connect so a disconnected user who changes
         ``entry_country`` / multihop does not dial a stale host from app init.
         """
         try:
-            from client.multihop import multihop_config_for_entry_country
-            from client.product_policy import product_multihop_enabled
+            from client.multihop import multihop_config_from_env
 
-            code = normalize_entry_country(
-                getattr(self, "_entry_country_code", None)
-                or getattr(self._settings, "entry_country", None)
-            )
-            mh = bool(product_multihop_enabled())
-            try:
-                mh = bool(getattr(self._settings, "privacy_multihop", mh))
-            except Exception:  # noqa: BLE001
-                pass
-            self.client.multihop = multihop_config_for_entry_country(
-                code, multihop_enabled=mh
-            )
+            self.client.multihop = multihop_config_from_env()
         except Exception:  # noqa: BLE001
-            try:
-                from client.multihop import multihop_config_from_env
-
-                self.client.multihop = multihop_config_from_env()
-            except Exception:  # noqa: BLE001
-                pass
-
-    def _on_entry_country_selected(self, choice: str | None = None) -> None:
-        """Persist main-shell dropdown selection and refresh residual path."""
-        label = (choice if choice is not None else self.country_var.get()) or ""
-        code = label_to_country_code(label)
-        if code is None:
-            # Restore last valid / default Iceland
-            code = normalize_entry_country(
-                getattr(self, "_entry_country_code", None) or "IS"
-            )
-            self.country_var.set(option_label_for_code(code))
-            self._log("Entry country: invalid selection ignored — use the list.")
-            return
-        self._entry_country_code = code
-        try:
-            s = load_settings()
-            s.entry_country = code
-            save_settings(s)
-            self._settings = s
-        except Exception as exc:  # noqa: BLE001
-            self._log(f"Entry country save failed: {exc}")
-        self._refresh_multihop_from_settings()
-        self._log(f"Entry country: {option_label_for_code(code)} (next Connect)")
-
-    def _selected_entry_country_code(self) -> str:
-        """Current shell selection (label → code), default Iceland."""
-        code = label_to_country_code(self.country_var.get())
-        if code:
-            return code
-        return normalize_entry_country(
-            getattr(self, "_entry_country_code", None) or "IS"
-        )
+            pass
 
     def _on_toggle_connect(self) -> None:
         if self._busy:
@@ -1432,41 +1313,7 @@ class TunnelClientApp:
             self._start_connect()
 
     def _start_connect(self) -> None:
-        # Gate: valid catalog entry country required (empty → Iceland default).
-        raw_sel = (self.country_var.get() or "").strip()
-        code = label_to_country_code(raw_sel) if raw_sel else None
-        if code is None and not raw_sel:
-            ok, resolved, reason = resolve_entry_country_selection(
-                None, allow_default=True
-            )
-        elif code is None:
-            ok, resolved, reason = False, "", "invalid_entry_country"
-        else:
-            ok, resolved, reason = resolve_entry_country_selection(
-                code, allow_default=False
-            )
-        if not ok or not entry_country_allows_connect(
-            resolved if ok else None, allow_default=False
-        ):
-            msg = (
-                "Choose a valid entry country from the list above Connect "
-                "(Iceland is the default)."
-            )
-            self._log(msg + f" ({reason})")
-            self._set_status("error", detail=msg)
-            self.detail_var.set(msg)
-            self.country_var.set(option_label_for_code("IS"))
-            self._entry_country_code = "IS"
-            return
-        self._entry_country_code = resolved
-        try:
-            s = load_settings()
-            s.entry_country = resolved
-            save_settings(s)
-            self._settings = s
-        except Exception:  # noqa: BLE001
-            pass
-        # Always refresh residual path from shell selection before dialling.
+        # Always refresh residual path from durable Settings before dialling.
         self._refresh_multihop_from_settings()
         # Local-only gate first (no status-host I/O on the Tk UI thread).
         # Keygen unlock is required before residual HELLO — discovery of a
@@ -1568,10 +1415,7 @@ class TunnelClientApp:
         self._set_status("connecting")
         self._log("Connect - starting secure session (full-tunnel residual path)...")
         self._connection_log(
-            KIND_CONNECT,
-            "Connect started (full-tunnel residual path)",
-            outcome="start",
-            residual_capture="pending",
+            KIND_CONNECT, "Connect started (full-tunnel residual path)"
         )
 
         def work() -> None:
@@ -1633,12 +1477,7 @@ class TunnelClientApp:
 
                 def fail_hs() -> None:
                     self._log(f"Could not connect: {msg}")
-                    self._connection_log(
-                        KIND_ERROR,
-                        f"Connect failed: {msg}",
-                        outcome="fail",
-                        error=msg[:300],
-                    )
+                    self._connection_log(KIND_ERROR, f"Connect failed: {msg}")
                     self._set_status("error", detail=msg)
                     self._apply_control(connected=False, busy=False)
 
@@ -1650,11 +1489,7 @@ class TunnelClientApp:
             def note_session() -> None:
                 self._log(f"Session ready (tunnel address {vpn_ip})")
                 self._connection_log(
-                    KIND_SESSION,
-                    f"Session ready (tunnel address {vpn_ip})",
-                    outcome="ok",
-                    session_vpn_ip=str(vpn_ip or ""),
-                    residual_capture="attaching",
+                    KIND_SESSION, f"Session ready (tunnel address {vpn_ip})"
                 )
                 if residual_ready:
                     self._log("Residual already active — confirming tunnel attach…")
@@ -1680,12 +1515,7 @@ class TunnelClientApp:
 
                 def fail_exc() -> None:
                     self._log(f"Could not connect: {err[:160]}")
-                    self._connection_log(
-                        KIND_ERROR,
-                        f"Connect failed: {err[:160]}",
-                        outcome="fail",
-                        error=err[:300],
-                    )
+                    self._connection_log(KIND_ERROR, f"Connect failed: {err[:160]}")
                     self._set_status("error", detail=err)
                     self._apply_control(connected=False, busy=False)
 
@@ -2310,7 +2140,7 @@ class TunnelClientApp:
                 _save_privacy,
             )
             tk.Frame(priv_card, bg=BORDER, height=1).pack(fill=tk.X, pady=4)
-            # Entry country (IS / RO / DE) — exit is another catalog peer when multihop on
+            # Entry country (Iceland / Romania) — exit is the other when multihop on
             entry_row = tk.Frame(priv_card, bg=PANEL_BG)
             entry_row.pack(fill=tk.X, pady=8)
             entry_col = tk.Frame(entry_row, bg=PANEL_BG)
@@ -2326,9 +2156,9 @@ class TunnelClientApp:
             tk.Label(
                 entry_col,
                 text=(
-                    "Choose residual entry: Iceland, Romania, or Germany. "
-                    "With multi-hop on, exit is a different catalog country "
-                    "(random among non-entry peers)."
+                    "Choose residual entry: Iceland or Romania. "
+                    "With multi-hop on, exit is the other country "
+                    "(random among non-entry peers when more countries ship)."
                 ),
                 bg=PANEL_BG,
                 fg=TEXT_MUTED,
@@ -2342,7 +2172,6 @@ class TunnelClientApp:
                 entry_country_var,
                 "IS",
                 "RO",
-                "DE",
                 command=lambda _v: _save_privacy(),
             )
             entry_menu.configure(
@@ -2361,7 +2190,7 @@ class TunnelClientApp:
             # Friendly labels under the code menu
             tk.Label(
                 entry_col,
-                text="IS = Iceland · RO = Romania · DE = Germany",
+                text="IS = Iceland · RO = Romania",
                 bg=PANEL_BG,
                 fg=TEXT_MUTED,
                 font=("Segoe UI", 7),
@@ -2820,16 +2649,6 @@ class TunnelClientApp:
             anchor="w",
             wraplength=400,
             justify=tk.LEFT,
-        ).pack(fill=tk.X, pady=(0, 4))
-        tk.Label(
-            log_card,
-            text=SUPPORT_LOG_FIND_HINT,
-            bg=PANEL_BG,
-            fg=TEXT_MUTED,
-            font=("Segoe UI", 8),
-            anchor="w",
-            wraplength=400,
-            justify=tk.LEFT,
         ).pack(fill=tk.X, pady=(0, 6))
         log_box = tk.Text(
             log_card,
@@ -2845,12 +2664,10 @@ class TunnelClientApp:
 
         def _refresh_log_view() -> None:
             events = read_events(limit=80)
-            # Full support export body (header + diagnostics), not bare lines only.
             body = (
-                format_export(events)
+                "\n".join(ev.format_line() for ev in events)
                 if events
-                else format_export([])
-                + "(No connection events yet. Connect or Disconnect to record.)\n"
+                else "(No connection events yet. Connect or Disconnect to record.)"
             )
             log_box.configure(state=tk.NORMAL)
             log_box.delete("1.0", tk.END)

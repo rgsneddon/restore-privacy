@@ -361,15 +361,14 @@ def assert_weekly_entry_role_only(role: str) -> tuple[bool, str]:
     Legacy weekly path used role=``entry`` (Iceland first). Fleet sequential
     wipe also allows country codes (``is``, ``ro``, …) one at a time.
     ``exit``/``both``/``all`` remain refused (use sequential planner instead).
-    RO is wiped **after** IS completes — never as concurrent bulk with IS.
     """
     r = (role or "").strip().lower()
     if r in FORBIDDEN_WEEKLY_ROLES:
         return (
             False,
-            f"refusing weekly wipe for role={role!r}: sequential fleet only; "
-            f"never rebuild exit|both|all as concurrent bulk — wipe one peer at a time "
-            f"(IS complete before RO; RO is a fleet target, not bulk 'exit')",
+            f"refusing weekly wipe for role={role!r}: entry-only / sequential fleet; "
+            f"never rebuild exit/both/all as concurrent bulk — wipe one peer at a time "
+            f"(IS complete before RO)",
         )
     if r in ("", "auto", "next", "fleet"):
         return True, ""
@@ -540,10 +539,8 @@ def entry_reinstall_requirements() -> list[RoleReinstallRequirement]:
 def exit_reinstall_requirements() -> list[RoleReinstallRequirement]:
     """Mandatory reinstall surface for the **exit** (Romania hop) node.
 
-    Fleet sequential wipe includes RO **after** IS is complete (host-identity
-    gated from the orchestrator). Operator/manual rebuild still needs full
-    product reinstall plus exit-only key/firewall posture. Do not run a second
-    concurrent timer on the exit host itself.
+    Exit is **not** on the weekly timed wipe service. Operator/manual rebuild
+    still needs full product reinstall plus exit-only key/firewall posture.
     """
     shared = _shared_reinstall_requirements()
     exit_only = [
@@ -571,14 +568,11 @@ def exit_reinstall_requirements() -> list[RoleReinstallRequirement]:
         RoleReinstallRequirement(
             id="exit_no_weekly_timer",
             description=(
-                "Do **not** install a second concurrent fleet timer on the exit "
-                "peer host; sequential fleet wipe of RO runs from the orchestrator "
-                "only after IS is complete (never concurrent with IS). Exit stays "
-                "up for failover while IS drains."
+                "Do **not** install weekly entry wipe timer on exit; "
+                "exit stays up for failover during entry drain"
             ),
             command=(
-                "# honesty: RO is wiped sequentially after IS (fleet planner); "
-                "# do not enable a second concurrent timer on the exit host itself"
+                "# refuse: systemctl enable rpt-ephemeral-rebuild.timer on exit host"
             ),
             roles=("exit",),
         ),
@@ -704,14 +698,11 @@ def build_exit_manual_reinstall_plan(
             id="exit_key_and_firewall",
             action="Confirm exit ElGamal + UDP 44044 posture",
             detail=(
-                "Exit hop pin product/exit_node_elgamal.pub (or runtime "
-                "secrets/node_elgamal.pub as hop key) must exist; ensure 44044/udp "
+                "Exit pub must differ from entry product pin; ensure 44044/udp "
                 "allowed (host ufw + FlokiNET panel)."
             ),
             command=(
-                "test -f secrets/node_elgamal.pub || "
-                "test -f product/exit_node_elgamal.pub || "
-                "test -f secrets/exit_node_elgamal.pub; "
+                "test -f secrets/node_elgamal.pub; "
                 "ss -ulnp | grep 44044 || true"
             ),
         ),
@@ -726,16 +717,13 @@ def build_exit_manual_reinstall_plan(
         ),
         PlanStep(
             id="no_weekly_timer",
-            action="Do not enable a second concurrent fleet timer on exit host",
+            action="Do not enable weekly entry wipe timer on exit",
             detail=(
-                "RO is wiped **sequentially** by the fleet orchestrator after IS "
-                "completes — not concurrently. Do not install a second "
-                "rpt-ephemeral-rebuild.timer on the exit peer host itself (would "
-                "race the orchestrator). Exit stays up while IS drains."
+                "Exit must stay available during entry weekly drain. "
+                "Never enable rpt-ephemeral-rebuild.timer / weekly_entry_rebuild on exit."
             ),
             command=(
-                "# honesty: fleet sequential wipe includes RO after IS; "
-                "# do not enable concurrent timer on exit host"
+                "# systemctl disable --now rpt-ephemeral-rebuild.timer 2>/dev/null || true"
             ),
         ),
     ]
@@ -762,8 +750,8 @@ def build_exit_manual_reinstall_plan(
         HONESTY_NOLOG,
         HONESTY_EXCLUSIVE,
         HONESTY_FAILOVER,
-        "Manual exit-host reinstall remains available; fleet weekly path wipes RO "
-        "sequentially after IS is complete (host-identity gated; never concurrent).",
+        "Manual exit-host reinstall remains available; fleet weekly path now "
+        "wipes RO sequentially after IS is complete (node.fleet_wipe).",
     )
     return EphemeralPlan(
         mode="exit_manual_reinstall",
@@ -774,41 +762,6 @@ def build_exit_manual_reinstall_plan(
         dry_run=dry_run,
         honesty=honesty,
     )
-
-
-def _host_gate_assert_cmd(target: str) -> str:
-    """Shell that fails closed unless this host is the fleet wipe target peer."""
-    return (
-        "python3 -c \"from node.fleet_wipe import assert_local_host_is_target; "
-        f"assert_local_host_is_target({target!r})\""
-    )
-
-
-def _product_pin_check_cmd(target: str, install_root: str) -> tuple[str, str, str]:
-    """Return (step_id, action, command) for target-aware public pin check."""
-    from node.fleet_wipe import catalog_pub_name_for_code
-
-    pub = catalog_pub_name_for_code(target)
-    root = (install_root or DEFAULT_INSTALL_ROOT).rstrip("/") or DEFAULT_INSTALL_ROOT
-    is_exit_pin = "exit" in pub.lower() or (target or "").strip().upper() == "RO"
-    step_id = "exit_product_pin_check" if is_exit_pin else "entry_product_pin_check"
-    action = (
-        "Confirm exit hop public pin present (no priv shipping)"
-        if is_exit_pin
-        else "Confirm entry public pin present (no priv shipping)"
-    )
-    # Accept secrets/ or product/ placement for the role-correct pin
-    cmd = (
-        f"test -f {root}/secrets/{pub} || test -f product/{pub} || "
-        f"test -f {root}/product/{pub}"
-    )
-    if is_exit_pin:
-        # Exit peer may also keep runtime secrets/node_elgamal.pub as hop key
-        cmd = (
-            f"(test -f {root}/secrets/{pub} || test -f product/{pub} || "
-            f"test -f {root}/product/{pub} || test -f {root}/secrets/node_elgamal.pub)"
-        )
-    return step_id, action, cmd
 
 
 def build_weekly_entry_rebuild_plan(
@@ -825,9 +778,6 @@ def build_weekly_entry_rebuild_plan(
     completed: Sequence[str] | None = None,
     in_progress: str | None = None,
     peer_health: dict[str, bool] | None = None,
-    local_country: str | None = None,
-    local_hosts: Sequence[str] | None = None,
-    env: dict | None = None,
 ) -> EphemeralPlan:
     """Sequential fleet wipe plan (IS → RO → new peers) with exclusive lock.
 
@@ -839,19 +789,10 @@ def build_weekly_entry_rebuild_plan(
 
     Fail closed: if peer residual or local node health is False, abort without
     destructive rebuild. Concurrent / out-of-order targets are refused.
-
-    Host identity: destructive stop/selfhost/rebuild only when this machine is
-    the target peer (``local_country`` / ``RPT_FLEET_LOCAL_COUNTRY`` / host
-    match). Remote targets use ``RPT_REMOTE_WIPE_CMD`` or fail closed — the
-    orchestrator must never wipe itself while marking a different peer complete.
     """
     from node.fleet_wipe import (
         assert_raw_wipe_role_allowed,
-        catalog_host_for_code,
-        catalog_pub_name_for_code,
         evaluate_peer_prewipe_gate,
-        is_target_host_local,
-        remote_wipe_command_template,
         resolve_weekly_target,
         role_for_country_code,
     )
@@ -883,16 +824,6 @@ def build_weekly_entry_rebuild_plan(
     if not ok_role:
         raise ValueError(role_msg)
 
-    target_host = catalog_host_for_code(target) or "?"
-    target_pub = catalog_pub_name_for_code(target)
-    local_hosts_list = list(local_hosts) if local_hosts is not None else None
-    target_is_local, host_gate_msg = is_target_host_local(
-        target,
-        env=env,
-        local_hosts=local_hosts_list,
-        local_country=local_country,
-    )
-
     # Peer map: default other peers healthy when exit_healthy True
     from node.fleet_wipe import fleet_country_codes
 
@@ -918,11 +849,10 @@ def build_weekly_entry_rebuild_plan(
             detail=(
                 f"next_wipe_target / resolve_weekly_target → {target}. "
                 f"completed={list(done)} in_progress={in_progress!r}. "
-                f"target_host={target_host} pin={target_pub}. "
                 f"{decision.reason}"
             ),
             command=(
-                f"# target={target} lock_role={lock_role} host={target_host} "
+                f"# target={target} lock_role={lock_role} "
                 f"next_after={decision.next_after_complete!r}"
             ),
         )
@@ -938,33 +868,6 @@ def build_weekly_entry_rebuild_plan(
             command=(
                 f"# role={lock_role}; refuse exit|both|all concurrent multi-node wipe"
             ),
-        )
-    )
-    steps.append(
-        PlanStep(
-            id="host_identity_gate",
-            action=(
-                f"Host identity gate for target {target} "
-                f"({'local' if target_is_local else 'remote'})"
-            ),
-            detail=(
-                f"{host_gate_msg}. Destructive stop/selfhost/rebuild run only on "
-                f"the target peer host ({target_host}). Orchestrator on a different "
-                f"peer must use RPT_REMOTE_WIPE_CMD or fail closed — never wipe "
-                f"local host while marking {target} complete."
-            ),
-            command=(
-                (
-                    f"# host_identity PASS local target={target} host={target_host}"
-                )
-                if target_is_local
-                else (
-                    f"# host_identity REMOTE target={target} host={target_host}; "
-                    f"local destructive steps gated; "
-                    f"{remote_wipe_command_template(target, env=env)}"
-                )
-            ),
-            destructive=not target_is_local,
         )
     )
     steps.append(
@@ -1076,7 +979,7 @@ def build_weekly_entry_rebuild_plan(
             honesty=honesty,
         )
 
-    # Healthy peer + local health flags: full drain + rebuild for this fleet target
+    # Healthy peer + local: full drain + rebuild for this fleet target
     base = build_ephemeral_plan(
         mode="snapshot_then_rebuild",
         period=period,
@@ -1086,25 +989,13 @@ def build_weekly_entry_rebuild_plan(
         provider_snapshot_cmd=provider_snapshot_cmd,
         provider_rebuild_cmd=provider_rebuild_cmd,
     )
-    gate_cmd = _host_gate_assert_cmd(target)
-    remote_cmd = remote_wipe_command_template(target, env=env)
-    # Reinstall posture: IS/entry pin vs RO/exit pin
-    if (target or "").strip().upper() == "RO" or "exit" in target_pub.lower():
-        req_detail = "; ".join(f"{r.id}" for r in exit_reinstall_requirements())
-        req_label = "Exit/RO"
-    else:
-        req_detail = "; ".join(f"{r.id}" for r in entry_reinstall_requirements())
-        req_label = "Entry/IS"
-    pin_id, pin_action, pin_cmd = _product_pin_check_cmd(target, root)
-
     steps.append(
         PlanStep(
             id="mark_entry_draining",
             action=f"Mark {target} draining for client peer failover",
             detail=(
                 "Lock state=draining/rebuilding so clients treat preferred entry as "
-                "unavailable and residual-failover to a healthy catalog peer. "
-                "Orchestrator may update fleet state even when wipe is remote."
+                "unavailable and residual-failover to a healthy catalog peer."
             ),
             command=(
                 f"python3 -c \"from node.rebuild_lock import update_rebuild_lock_state; "
@@ -1130,231 +1021,74 @@ def build_weekly_entry_rebuild_plan(
                     ),
                 )
             )
-            if target_is_local:
-                steps.append(
-                    PlanStep(
-                        id="stop_runtime",
-                        action=f"Stop runtime on local target peer {target}",
-                        detail=(
-                            f"Host identity: local == {target} ({target_host}). "
-                            "systemctl stop rpt-node + runtime wipe only."
-                        ),
-                        command=f"{gate_cmd} && {s.command}",
-                        destructive=False,
-                    )
-                )
-            else:
-                steps.append(
-                    PlanStep(
-                        id="stop_runtime",
-                        action=f"Stop runtime on REMOTE target {target} (not orchestrator)",
-                        detail=(
-                            f"REFUSE local stop_runtime: this host is not {target} "
-                            f"({target_host}). {host_gate_msg}"
-                        ),
-                        command=remote_cmd,
-                        destructive=True,
-                    )
-                )
-            continue
-        if s.id == "rebuild_host":
-            if target_is_local:
-                steps.append(
-                    PlanStep(
-                        id="rebuild_host",
-                        action=f"Rebuild local target peer {target}",
-                        detail=s.detail,
-                        command=f"{gate_cmd} && {s.command}",
-                        destructive=True,
-                    )
-                )
-            else:
-                steps.append(
-                    PlanStep(
-                        id="rebuild_host",
-                        action=f"Rebuild REMOTE target {target} only",
-                        detail=(
-                            f"REFUSE local rebuild_host on orchestrator for {target}. "
-                            f"Remote wipe via RPT_REMOTE_WIPE_CMD or run on {target_host}."
-                        ),
-                        command=remote_cmd,
-                        destructive=True,
-                    )
-                )
-            continue
         # Rename clarity: selfhost is mandatory package reinstall on live path
         if s.id == "selfhost_reapply":
-            if target_is_local:
-                steps.append(
-                    PlanStep(
-                        id="selfhost_reapply",
-                        action=(
-                            f"Package reinstall / full product self-host on {target} "
-                            f"({req_label})"
-                        ),
-                        detail=(
-                            "Mandatory after rebuild: full reinstall via selfhost_node.sh "
-                            "(install.sh + DNS + host-privacy + no-log; "
-                            "SKIP_DNS=0 SKIP_HOST_PRIVACY=0). Bare wiped host is not "
-                            f"acceptable. {req_label} requirements: {req_detail}"
-                        ),
-                        destructive=False,
-                        command=f"{gate_cmd} && {SELFHOST_FULL_CMD}",
-                    )
-                )
-                steps.append(
-                    PlanStep(
-                        id="reinstall_core_dns_privacy_verify",
-                        action="Verify core install + tunnel DNS + host privacy surface",
-                        detail=(
-                            "Confirm product node install tree, residual DNS default, "
-                            "and host-privacy scripts were re-applied."
-                        ),
-                        command=(
-                            f"{gate_cmd} && "
-                            f"test -f {root}/node/nolog.py && "
-                            f"(test -f {root}/node/install.sh || test -f scripts/selfhost_node.sh) && "
-                            f"(test -f {root}/node/install_dns.sh || true) && "
-                            f"(test -f {root}/node/install_host_privacy.sh || true)"
-                        ),
-                    )
-                )
-                steps.append(
-                    PlanStep(
-                        id=pin_id,
-                        action=pin_action,
-                        detail=(
-                            f"Target {target} public pin ({target_pub}) must exist after "
-                            "reinstall; never distribute *.priv."
-                        ),
-                        command=f"{gate_cmd} && {pin_cmd}",
-                    )
-                )
-            else:
-                steps.append(
-                    PlanStep(
-                        id="selfhost_reapply",
-                        action=(
-                            f"Package reinstall on REMOTE {target} "
-                            f"({req_label}; not orchestrator)"
-                        ),
-                        detail=(
-                            f"REFUSE local selfhost for remote target {target}. "
-                            f"{req_label} requirements on peer: {req_detail}. "
-                            f"Pin expected: {target_pub}."
-                        ),
-                        destructive=True,
-                        command=remote_cmd,
-                    )
-                )
-                steps.append(
-                    PlanStep(
-                        id=pin_id,
-                        action=f"{pin_action} (remote target {target})",
-                        detail=(
-                            f"Remote peer {target} must present {target_pub} after "
-                            "reinstall; orchestrator does not check local entry pin."
-                        ),
-                        command=(
-                            f"# remote pin check for {target}: expect product/{target_pub}"
-                        ),
-                    )
-                )
-            continue
-        if s.id == "health_check":
-            if target_is_local:
-                steps.append(
-                    PlanStep(
-                        id="health_check",
-                        action=f"Health check after rebuild on local {target}",
-                        detail=s.detail,
-                        command=f"{gate_cmd} && {s.command}",
-                    )
-                )
-            else:
-                steps.append(
-                    PlanStep(
-                        id="health_check",
-                        action=f"Health check REMOTE target {target}",
-                        detail=(
-                            f"Probe remote peer {target_host} residual after wipe; "
-                            "do not treat orchestrator local health as RO complete."
-                        ),
-                        command=(
-                            f"# remote health for {target}@{target_host} "
-                            f"(peer residual UDP 44044)"
-                        ),
-                    )
-                )
-            continue
-        # snapshot / rotate_keys: local only when target is local
-        if s.id in ("snapshot", "rotate_keys") and not target_is_local:
+            entry_req_detail = "; ".join(
+                f"{r.id}" for r in entry_reinstall_requirements()
+            )
             steps.append(
                 PlanStep(
-                    id=s.id,
-                    action=f"{s.action} (remote target {target})",
+                    id="selfhost_reapply",
+                    action="Package reinstall / full product self-host (no-log)",
                     detail=(
-                        f"Skip local {s.id}: target {target} is remote ({target_host})."
+                        "Mandatory after rebuild: full reinstall via selfhost_node.sh "
+                        "(install.sh + DNS + host-privacy + no-log; "
+                        "SKIP_DNS=0 SKIP_HOST_PRIVACY=0). Bare wiped host is not "
+                        f"acceptable. Entry requirements: {entry_req_detail}"
                     ),
-                    command=f"# remote {s.id} for {target}@{target_host}",
-                    destructive=s.destructive,
+                    destructive=False,
+                    command=SELFHOST_FULL_CMD,
                 )
             )
-            continue
-        if s.id in ("snapshot", "rotate_keys") and target_is_local:
+            # Explicit component checks after selfhost (entry role)
             steps.append(
                 PlanStep(
-                    id=s.id,
-                    action=s.action,
-                    detail=s.detail,
-                    command=f"{gate_cmd} && {s.command}",
-                    destructive=s.destructive,
+                    id="reinstall_core_dns_privacy_verify",
+                    action="Verify core install + tunnel DNS + host privacy surface",
+                    detail=(
+                        "Confirm product node install tree, residual DNS default, "
+                        "and host-privacy scripts were re-applied (entry requirements)."
+                    ),
+                    command=(
+                        f"test -f {root}/node/nolog.py; "
+                        f"test -f {root}/node/install.sh || test -f scripts/selfhost_node.sh; "
+                        f"test -f {root}/node/install_dns.sh || true; "
+                        f"test -f {root}/node/install_host_privacy.sh || true"
+                    ),
+                )
+            )
+            steps.append(
+                PlanStep(
+                    id="entry_product_pin_check",
+                    action="Confirm entry public pin present (no priv shipping)",
+                    detail=(
+                        "Entry ElGamal public pin must exist after reinstall; "
+                        "never distribute node_elgamal.priv."
+                    ),
+                    command=(
+                        f"test -f {root}/secrets/node_elgamal.pub || "
+                        f"test -f product/node_elgamal.pub"
+                    ),
                 )
             )
             continue
         steps.append(s)
 
-    # mark complete: local path requires host identity; remote requires explicit OK
-    # Live preferred-entry (IS) mark also records public countdown last-clear anchor.
-    _mark_record = (
-        f"from node.fleet_wipe import mark_wipe_complete, save_fleet_wipe_state, "
-        f"record_entry_last_clear; "
-        f"done,nxt=mark_wipe_complete({target!r},completed={done!r}); "
-        f"print(save_fleet_wipe_state(completed=done,in_progress=None,"
-        f"install_root={root!r})); "
-        f"print(record_entry_last_clear(live=True,target={target!r},"
-        f"install_root={root!r},source='live_wipe_mark')); "
-        f"print('next',nxt)"
-    )
-    if target_is_local:
-        mark_cmd = f"{gate_cmd} && python3 -c \"{_mark_record}\""
-    else:
-        mark_cmd = (
-            "python3 -c \""
-            "import os; "
-            "assert os.environ.get('RPT_REMOTE_WIPE_OK','').strip().lower() in "
-            "('1','true','yes','on'), "
-            f"'refuse mark_wipe_complete({target!r}): remote wipe not confirmed "
-            f"(set RPT_REMOTE_WIPE_OK=yes after successful peer wipe)'; "
-            f"{_mark_record}\""
-        )
     steps.append(
         PlanStep(
             id="mark_fleet_peer_complete",
             action=f"Mark fleet wipe complete for {target}; unlock next peer",
             detail=(
-                f"After health_check on the **target peer** ({target_host}), record "
-                f"{target} complete so next_wipe_target advances "
-                f"(e.g. IS complete → RO). "
-                + (
-                    "Local host identity gate required."
-                    if target_is_local
-                    else "Remote: requires RPT_REMOTE_WIPE_OK after peer wipe — "
-                    "never mark RO complete after wiping orchestrator only."
-                )
+                f"After health_check, record {target} complete so next_wipe_target "
+                f"advances (e.g. IS complete → RO). Recursive for new catalog countries."
             ),
-            command=mark_cmd,
-            destructive=not target_is_local,
+            command=(
+                f"python3 -c \"from node.fleet_wipe import mark_wipe_complete, "
+                f"save_fleet_wipe_state; "
+                f"done,nxt=mark_wipe_complete({target!r},completed={done!r}); "
+                f"print(save_fleet_wipe_state(completed=done,in_progress=None,"
+                f"install_root={root!r})); print('next',nxt)\""
+            ),
         )
     )
     steps.append(
@@ -1443,9 +1177,8 @@ def systemd_service_unit(
 ) -> str:
     """Render oneshot service invoked by the periodic timer.
 
-    Default ``weekly_entry=True`` runs the sequential fleet wipe planner
-    (IS → RO → new peers; exclusive lock; never concurrent exit|both|all).
-    Set False for legacy generic ephemeral.
+    Default ``weekly_entry=True`` runs the entry-only weekly wipe planner
+    (exclusive lock; never exit/both). Set False for legacy generic ephemeral.
     """
     confirm = "" if dry_run else "Environment=RPT_EPHEMERAL_CONFIRM=yes\n"
     mode_flag = "--dry-run" if dry_run else "--live"
@@ -1454,17 +1187,14 @@ def systemd_service_unit(
             f"/usr/bin/env python3 {install_root}/scripts/weekly_entry_rebuild.py "
             f"{mode_flag} --period 7d"
         )
-        desc = (
-            "RPT weekly sequential fleet wipe/rebuild "
-            "(IS then RO then new; exclusive lock; peer failover)"
-        )
+        desc = "RPT weekly entry-only wipe/rebuild (exclusive lock; exit failover)"
     else:
         exec_line = (
             f"/usr/bin/env python3 {install_root}/scripts/ephemeral_node.py "
             f"{mode_flag} --mode snapshot_then_rebuild"
         )
         desc = "RPT ephemeral short-lived node snapshot/rebuild cycle"
-    return f"""# Restore Privacy — sequential fleet / weekly rebuild oneshot
+    return f"""# Restore Privacy — ephemeral / weekly entry rebuild oneshot
 [Unit]
 Description={desc}
 After=network-online.target
