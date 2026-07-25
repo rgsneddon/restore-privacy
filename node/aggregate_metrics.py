@@ -61,6 +61,13 @@ FORBIDDEN_PUBLIC_METRIC_KEYS: frozenset[str] = frozenset(
         "bytes_per_client",
         "client_bandwidth",
         "session_bandwidth",
+        # Private capacity signal — never on public status
+        "utilization",
+        "capacity",
+        "live",
+        "private",
+        "free_capacity",
+        "load",
     }
 )
 

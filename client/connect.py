@@ -55,6 +55,7 @@ from node.traffic_shape import DEFAULT_TRAFFIC_SHAPE, TrafficShapePolicy
 
 from .endpoint import DEFAULT_ENDPOINT, Endpoint
 from .full_tunnel import FullTunnelPlan, assert_full_tunnel_plan, build_full_tunnel_plan
+from .capacity_probe import probe_peer_capacity_map
 from .multihop import (
     REASON_CAPACITY_MIGRATION,
     MultiHopConfig,
@@ -291,6 +292,8 @@ class RptClient:
         exit_healthy: bool = True,
         entry_draining: bool = False,
         peer_capacity: dict[str, float] | None = None,
+        probe_capacity: bool = True,
+        capacity_transport: object | None = None,
     ):
         self.multihop = multihop if multihop is not None else multihop_config_from_env()
         # Health hints for weekly entry wipe failover (entry-primary / exit failover).
@@ -302,6 +305,10 @@ class RptClient:
         self.peer_capacity: dict[str, float] | None = (
             dict(peer_capacity) if peer_capacity else None
         )
+        # When True and peer_capacity not pre-set, best-effort private probes run
+        # before residual select (fail-soft; requires RPT_CAPACITY_TOKEN).
+        self.probe_capacity = bool(probe_capacity)
+        self._capacity_transport = capacity_transport
         self.last_selection_reason: str = ""
         self.last_capacity_advisory: str = ""
         # Residual dial: preference-aware (entry healthy → entry; else exit failover;
@@ -312,6 +319,7 @@ class RptClient:
         else:
             self._endpoint_pinned = False
             try:
+                self._refresh_capacity_from_probes(force=False)
                 sel = select_residual_endpoint(
                     self.multihop,
                     entry_healthy=self.entry_healthy,
@@ -353,6 +361,30 @@ class RptClient:
     ) -> None:
         """Inject or clear host → utilization map for capacity-aware residual pick."""
         self.peer_capacity = dict(peer_capacity) if peer_capacity else None
+
+    def _refresh_capacity_from_probes(self, *, force: bool = True) -> dict[str, float]:
+        """Best-effort private capacity probes → peer_capacity map (fail-soft).
+
+        Skips network when probe_capacity is False, or when a map was already
+        injected and *force* is False. Never raises; never invents utilization.
+        Probe failures leave the map unchanged (no synthetic full/empty load).
+        """
+        if not self.probe_capacity:
+            return dict(self.peer_capacity or {})
+        if self.peer_capacity and not force:
+            return dict(self.peer_capacity)
+        try:
+            probed = probe_peer_capacity_map(
+                transport=self._capacity_transport,  # type: ignore[arg-type]
+            )
+        except Exception:  # noqa: BLE001
+            probed = {}
+        if not probed:
+            return dict(self.peer_capacity or {})
+        base = dict(self.peer_capacity or {})
+        base.update(probed)
+        self.peer_capacity = base
+        return dict(self.peer_capacity)
 
     def _status(self, msg: str) -> None:
         self.status_cb(msg)
@@ -478,6 +510,8 @@ class RptClient:
             self.last_selection_reason = "pinned"
         else:
             try:
+                # Live private capacity probes (fail-soft) when token configured
+                self._refresh_capacity_from_probes(force=True)
                 sel = select_residual_endpoint(
                     self.multihop,
                     entry_healthy=self.entry_healthy,

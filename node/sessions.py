@@ -123,3 +123,14 @@ class SessionRegistry:
         from node.aggregate_metrics import filter_public_status
 
         return filter_public_status({"title": "RESTORE PRIVACY"})
+
+    def private_capacity_payload(self, *, host: str = "") -> dict:
+        """Token-gated capacity snapshot for residual load hints (not public).
+
+        Uses in-memory live session count vs soft max sessions. Never used by
+        public HTML/JSON status paths.
+        """
+        self.expire_stale()
+        from node.private_capacity import build_private_capacity_payload
+
+        return build_private_capacity_payload(live=self.count(), host=host)

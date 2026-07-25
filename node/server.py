@@ -301,7 +301,12 @@ class RPTNode:
         self.tun_fd, _ = open_tun(iface)
         self.apply_routing(iface)
 
-        start_ui_server(self.config["ui_host"], int(self.config["ui_port"]), self.registry.status_payload)
+        start_ui_server(
+            self.config["ui_host"],
+            int(self.config["ui_port"]),
+            self.registry.status_payload,
+            get_private_capacity=self.registry.private_capacity_payload,
+        )
 
         sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         try:
