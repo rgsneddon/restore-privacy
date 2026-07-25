@@ -638,11 +638,20 @@ STRIPE_PRODUCT_NAME_MONTHLY = "Monthly VPN plan"
 STRIPE_PRODUCT_NAME_YEARLY = "Yearly VPN plan"
 
 
+# Shipped Render blueprint mount (render.yaml disk.mountPath + subdir).
+# Free instances cannot attach disks; production uses plan starter + this path.
+RENDER_PAYMENT_DISK_MOUNT = "/var/data"
+RENDER_PAYMENT_DATA_DIR = "/var/data/rpt-payment"
+PAYMENT_DB_FILENAME = "paid_downloads.sqlite3"
+
+
 def _data_dir() -> Path:
     """Durable licence + paid-download grant store directory.
 
     Prefer ``RPT_PAYMENT_DATA_DIR`` on a **persistent** volume (Render disk /
-    host path). Default is ``status_page/data`` next to this module — **not**
+    host path). Production blueprint sets this to ``/var/data/rpt-payment`` on
+    the ``rpt-payment-data`` disk so admin history survives redeploy. Default
+    (env unset) is ``status_page/data`` next to this module for local/dev — **not**
     residual-node runtime paths. Residual fleet wipe/rebuild must not delete
     this tree (see :mod:`node.disk_encryption` payment-store protection).
     """
@@ -661,7 +670,7 @@ def payment_data_dir() -> Path:
 
 
 def db_path() -> Path:
-    return _data_dir() / "paid_downloads.sqlite3"
+    return _data_dir() / PAYMENT_DB_FILENAME
 
 
 def payment_store_paths() -> dict[str, str]:
@@ -671,8 +680,23 @@ def payment_store_paths() -> dict[str, str]:
         "data_dir": str(d),
         "db": str(db_path()),
         "env_override": "RPT_PAYMENT_DATA_DIR",
-        "filename": "paid_downloads.sqlite3",
+        "filename": PAYMENT_DB_FILENAME,
+        "render_disk_mount": RENDER_PAYMENT_DISK_MOUNT,
+        "render_data_dir": RENDER_PAYMENT_DATA_DIR,
     }
+
+
+def resolve_payment_data_dir(env: dict[str, str] | None = None) -> Path:
+    """Pure-ish path resolution for tests: env dict or process environ.
+
+    Does not create directories when *env* is provided (test-friendly);
+    production :func:`payment_data_dir` still mkdir's.
+    """
+    e = env if env is not None else os.environ
+    raw = str(e.get("RPT_PAYMENT_DATA_DIR", "") or "").strip()
+    if raw:
+        return Path(raw)
+    return Path(__file__).resolve().parent / "data"
 
 
 def wipe_targets_exclude_payment_store(

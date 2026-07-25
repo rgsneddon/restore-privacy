@@ -1318,7 +1318,10 @@ background:var(--btn-bg);color:var(--btn-fg);font-weight:600;cursor:pointer}}
   <p class="muted" id="admin-durable-store-note">Durable licence + grant DB path:
   <code id="admin-payment-data-dir">{store_esc}</code>
   (<code>paid_downloads.sqlite3</code>). Residual wipeclean targets runtime/secrets only —
-  not this store.</p>
+  not this store. On <strong>Render</strong>, set <code>RPT_PAYMENT_DATA_DIR</code> to
+  <code>/var/data/rpt-payment</code> on the persistent disk (blueprint:
+  <code>rpt-payment-data</code> mount <code>/var/data</code>) so admin history survives
+  host redeploy — free instances are ephemeral and cannot attach that disk.</p>
 </section>
 {reissue_html}
 {ondemand_html}

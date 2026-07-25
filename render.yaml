@@ -2,19 +2,33 @@
 # Public: title + paid downloads. Private /admin: operator login, payment
 # processor settings (Stripe/BMC readiness), paid-download grant admin.
 # Set secrets in the Render dashboard — never commit real keys/passwords.
+#
+# Durable admin licence + paid-download grants:
+#   Free web instances cannot attach a persistent disk. Starter (or higher)
+#   + disk below keep paid_downloads.sqlite3 across deploys/restarts.
+#   RPT_PAYMENT_DATA_DIR must point under the disk mountPath.
 services:
   - type: web
     name: restore-privacy-status
     runtime: python
-    plan: free
+    # Paid instance required for persistent disk (free plan is ephemeral only).
+    plan: starter
     rootDir: status_page
     buildCommand: pip install -r requirements.txt
     startCommand: python app.py
     healthCheckPath: /health
     autoDeploy: true
+    # Survives host redeploy/restart — licence DB + grant history for /admin
+    disk:
+      name: rpt-payment-data
+      mountPath: /var/data
+      sizeGB: 1
     envVars:
       - key: PYTHON_VERSION
         value: "3.12.0"
+      # Licence + paid download grants SQLite (admin history). Must live on disk.
+      - key: RPT_PAYMENT_DATA_DIR
+        value: /var/data/rpt-payment
       - key: RPT_STATUS_UPSTREAM
         value: http://82.221.101.241:8080/api/status
       - key: RPT_STATUS_TIMEOUT
