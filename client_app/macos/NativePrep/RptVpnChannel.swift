@@ -19,8 +19,10 @@ enum RptVpnChannel {
   /// Debounce auto-open of System Settings so a double Connect does not spam panes.
   private static var lastVpnSettingsOpenAt: Date?
   private static let vpnSettingsOpenDebounce: TimeInterval = 20
-  /// Debounce pre-Connect registration so first-run + Connect do not double-prompt Allow.
-  private static var lastPrepareAt: Date?
+  /// Debounce only after a **successful** prepare (saveToPreferences OK).
+  /// Never set this on NE permission failure — otherwise a second call within the
+  /// window would dishonestly report prepared:true after a failed save.
+  private static var lastSuccessfulPrepareAt: Date?
   private static let prepareDebounce: TimeInterval = 8
 
   static func register(with messenger: FlutterBinaryMessenger) {
@@ -107,12 +109,17 @@ enum RptVpnChannel {
   /// Pre-Connect: register Restore Privacy Packet Tunnel in System VPN preferences.
   /// Does **not** start the tunnel. macOS may still show Allow — that is required.
   /// Never configures L2TP, Cisco IPsec, or IKEv2.
+  ///
+  /// Debounce (skip re-save) applies **only** after a successful manager save.
+  /// Failed NE preferences must leave lastSuccessfulPrepareAt unset so a later
+  /// call (e.g. keygen unlock then launch prep) re-attempts registration.
   private static func preparePacketTunnelConfiguration(
     host: String,
     port: UInt16,
     completion: @escaping ([String: Any]) -> Void
   ) {
-    if let last = lastPrepareAt, Date().timeIntervalSince(last) < prepareDebounce {
+    if let last = lastSuccessfulPrepareAt,
+       Date().timeIntervalSince(last) < prepareDebounce {
       var map: [String: Any] = [
         "ok": true,
         "prepared": true,
@@ -129,12 +136,13 @@ enum RptVpnChannel {
       return
     }
     loadOrCreateManager(host: host, port: port) { manager, neError in
-      lastPrepareAt = Date()
       if let manager {
+        // Only stamp success after loadOrCreateManager returned a saved manager.
+        lastSuccessfulPrepareAt = Date()
         // Confirm product Packet Tunnel identity (not legacy VPN types).
         let proto = manager.protocolConfiguration as? NETunnelProviderProtocol
         let bid = proto?.providerBundleIdentifier ?? providerBundleId
-        var map: [String: Any] = [
+        let map: [String: Any] = [
           "ok": true,
           "prepared": true,
           "tunnelType": productTunnelType,
@@ -149,6 +157,7 @@ enum RptVpnChannel {
         completion(map)
         return
       }
+      // Failure: do NOT set lastSuccessfulPrepareAt — next prepare must re-attempt.
       let detail = neError ?? "NE preferences unavailable"
       let openSettings = isNePermissionFailureDetail(detail)
       if openSettings {

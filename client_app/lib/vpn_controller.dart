@@ -46,12 +46,10 @@ class VpnController {
         'sessionName': RptConfig.sessionName,
       });
       final msg = mapPrepareVpnStatusMessage(result);
-      // Keep failure residual-honest; prepared success is pre-Connect guidance only.
-      if (result is Map &&
-          (result['prepared'] == true || result['ok'] == true)) {
+      // Only treat dual ok+prepared as success (failed NE save is never prepared).
+      if (isPrepareVpnSuccess(result)) {
         onStatus(msg);
-        return isProductPacketTunnelPrepareResult(result) ||
-            result['prepared'] == true;
+        return isProductPacketTunnelPrepareResult(result);
       }
       onStatus(msg);
       if (shouldPromptOpenVpnSystemSettings(result)) {

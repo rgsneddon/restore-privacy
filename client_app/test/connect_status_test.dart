@@ -144,6 +144,7 @@ void main() {
         'message': kPacketTunnelPreparedMessage,
       };
       expect(isProductPacketTunnelPrepareResult(prepared), isTrue);
+      expect(isPrepareVpnSuccess(prepared), isTrue);
       expect(prepared['tunnelType'], isNot(equals('l2tp')));
       expect(prepared['tunnelType'], isNot(equals('ikev2')));
       expect(prepared['tunnelType'], isNot(equals('ipsec')));
@@ -181,11 +182,98 @@ void main() {
             '(Packet Tunnel — not L2TP / Cisco IPsec / IKEv2).',
       };
       expect(isProductPacketTunnelPrepareResult(failed), isTrue);
+      expect(isPrepareVpnSuccess(failed), isFalse);
       expect(
         productCopyDirectsToLegacyVpnTypes(mapPrepareVpnStatusMessage(failed)),
         isFalse,
       );
     });
+
+    test(
+      'failed prepare must not debounce to prepared:true (first-run double call)',
+      () {
+        // Native maps after loadOrCreateManager failure (NEVPNErrorDomain 5 class).
+        final priorFailed = {
+          'ok': false,
+          'prepared': false,
+          'tunnelType': kProductVpnTunnelType,
+          'providerBundleId': kProductVpnProviderBundleId,
+          'needsVpnSystemSettingsApproval': true,
+          'message':
+              'Could not pre-register Packet Tunnel VPN configuration: '
+              'NE preferences failed (NEVPNErrorDomain 5): permission denied.',
+        };
+        expect(isPrepareVpnSuccess(priorFailed), isFalse);
+        // Dishonest old bug: second call within 8s returned prepared:true after failure.
+        final dishonestDebounce = {
+          'ok': true,
+          'prepared': true,
+          'debounced': true,
+          'tunnelType': kProductVpnTunnelType,
+          'message':
+              'Restore Privacy Packet Tunnel configuration already registered.',
+        };
+        expect(
+          prepareFollowUpIsHonest(
+            priorResult: priorFailed,
+            nextResult: dishonestDebounce,
+          ),
+          isFalse,
+        );
+        // Honest re-attempt after failure: still failing (user has not Allowed yet).
+        final honestRetryFail = {
+          'ok': false,
+          'prepared': false,
+          'tunnelType': kProductVpnTunnelType,
+          'message': priorFailed['message'],
+        };
+        expect(
+          prepareFollowUpIsHonest(
+            priorResult: priorFailed,
+            nextResult: honestRetryFail,
+          ),
+          isTrue,
+        );
+        // Honest re-attempt after user Allowed: real success.
+        final honestRetryOk = {
+          'ok': true,
+          'prepared': true,
+          'tunnelType': kProductVpnTunnelType,
+          'providerBundleId': kProductVpnProviderBundleId,
+          'message': kPacketTunnelPreparedMessage,
+        };
+        expect(isPrepareVpnSuccess(honestRetryOk), isTrue);
+        expect(
+          prepareFollowUpIsHonest(
+            priorResult: priorFailed,
+            nextResult: honestRetryOk,
+          ),
+          isTrue,
+        );
+        // Prior success: debounce prepared:true is allowed.
+        expect(
+          prepareFollowUpIsHonest(
+            priorResult: honestRetryOk,
+            nextResult: {
+              'ok': true,
+              'prepared': true,
+              'debounced': true,
+              'tunnelType': kProductVpnTunnelType,
+            },
+          ),
+          isTrue,
+        );
+        // mapPrepareVpnStatusMessage must not treat ok:false as prepared success.
+        expect(
+          mapPrepareVpnStatusMessage(priorFailed).toLowerCase(),
+          isNot(contains('already registered')),
+        );
+        expect(
+          mapPrepareVpnStatusMessage(priorFailed).toLowerCase(),
+          contains('could not pre-register'),
+        );
+      },
+    );
 
     test(
       'open-result status strings keep Open VPN settings control via sticky flag',

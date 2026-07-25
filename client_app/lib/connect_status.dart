@@ -221,7 +221,7 @@ String mapPrepareVpnStatusMessage(dynamic result) {
     return 'Could not pre-register Packet Tunnel VPN configuration.';
   }
   final message = result['message']?.toString().trim() ?? '';
-  if (result['prepared'] == true || result['ok'] == true) {
+  if (isPrepareVpnSuccess(result)) {
     if (message.isNotEmpty) return message;
     return kPacketTunnelPreparedMessage;
   }
@@ -229,6 +229,47 @@ String mapPrepareVpnStatusMessage(dynamic result) {
   return 'Could not pre-register Packet Tunnel VPN configuration. '
       'Allow Restore Privacy under System Settings → Network → VPN & Filters '
       '(Packet Tunnel — not L2TP / Cisco IPsec / IKEv2).';
+}
+
+/// Honest prepare success: both [ok] and [prepared] true (saved NE manager).
+///
+/// A failed NE save must report prepared:false. Debounce may return prepared:true
+/// only after a prior successful save (native lastSuccessfulPrepareAt).
+bool isPrepareVpnSuccess(dynamic result) {
+  if (result is! Map) return false;
+  if (result['ok'] != true) return false;
+  if (result['prepared'] != true) return false;
+  return true;
+}
+
+/// Contract used by UI/tests: after a failed prepare, a follow-up must not treat
+/// the prior failure as success. [priorResult] is the first prepare map;
+/// [nextResult] is the second (e.g. keygen unlock then launch).
+///
+/// When prior failed, next must either succeed from a real re-attempt or fail
+/// again — never claim prepared:true via [debounced] after a failed save
+/// (native must only set lastSuccessfulPrepareAt after manager save OK).
+bool prepareFollowUpIsHonest({
+  required dynamic priorResult,
+  required dynamic nextResult,
+}) {
+  if (priorResult is! Map || nextResult is! Map) return false;
+
+  if (isPrepareVpnSuccess(priorResult)) {
+    // Prior success: debounce prepared:true is allowed.
+    return true;
+  }
+
+  // Prior failed — debounced prepared:true is always residual-dishonest.
+  if (nextResult['debounced'] == true && nextResult['prepared'] == true) {
+    return false;
+  }
+  // Real re-attempt success (user Allowed between attempts) is fine.
+  if (isPrepareVpnSuccess(nextResult)) {
+    return true;
+  }
+  // Retry still failing is honest.
+  return nextResult['prepared'] != true;
 }
 
 /// Log-only feedback after attempting to open System Settings (must not replace residual failure status).

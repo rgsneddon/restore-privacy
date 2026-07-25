@@ -93,6 +93,32 @@ class TestMacosResidualTeamSign(unittest.TestCase):
         self.assertNotIn("NEVPNProtocolL2TP", text)
         self.assertNotIn("NEVPNProtocolIKEv2", text)
         self.assertNotIn("NEVPNProtocolIPSec", text)
+        # Debounce only after successful prepare — never stamp success on failure
+        self.assertIn("lastSuccessfulPrepareAt", text)
+        self.assertNotIn("lastPrepareAt", text)
+        # lastSuccessfulPrepareAt = Date() only on manager success path
+        success_stamp = text.find("lastSuccessfulPrepareAt = Date()")
+        self.assertGreater(success_stamp, 0)
+        # Must appear after "if let manager" success branch, not before loadOrCreateManager callback body as unconditional
+        prepare_fn = text.find("func preparePacketTunnelConfiguration")
+        self.assertGreater(prepare_fn, 0)
+        # Failure path must not assign lastSuccessfulPrepareAt before return of prepared:false
+        fail_marker = 'prepared": false'
+        # Ensure we do not set lastSuccessfulPrepareAt immediately at start of callback (old bug)
+        callback_start = text.find(
+            "loadOrCreateManager(host: host, port: port) { manager, neError in",
+            prepare_fn,
+        )
+        self.assertGreater(callback_start, 0)
+        # Between callback open and "if let manager", must NOT assign lastSuccessfulPrepareAt
+        if_let = text.find("if let manager {", callback_start)
+        self.assertGreater(if_let, callback_start)
+        between = text[callback_start:if_let]
+        self.assertNotIn(
+            "lastSuccessfulPrepareAt = Date()",
+            between,
+            "must not stamp lastSuccessfulPrepareAt before success branch",
+        )
 
     def test_preconnect_prepare_wired_from_flutter_launch_path(self):
         """Launch/first-run calls prepare before Connect is the productive path."""
