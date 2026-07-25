@@ -23,7 +23,7 @@ KEY_AUTOCONNECT_ON_LAUNCH = "autoconnect_on_launch"
 KEY_PRIVACY_TRAFFIC_SHAPE = "privacy_traffic_shape"
 KEY_PRIVACY_OUTER_OBFUSCATION = "privacy_outer_obfuscation"
 KEY_PRIVACY_MULTIHOP = "privacy_multihop"
-# Residual entry country code: "IS" (Iceland, default) or "RO" (Romania).
+# Residual entry country: "IS" (Iceland, default), "RO" (Romania), "DE" (Germany).
 KEY_ENTRY_COUNTRY = "entry_country"
 # Set only when user OK's first-run settings after keygen unlock (not a bypass).
 KEY_FIRST_RUN_SETTINGS_COMPLETED = "first_run_settings_completed"
@@ -32,7 +32,7 @@ KEY_UI_MODE = "ui_mode"
 
 
 def normalize_entry_country(code: str | None) -> str:
-    """Product Settings entry-country pin (IS / RO); default Iceland."""
+    """Product Settings entry-country pin (IS / RO / DE); default Iceland."""
     from client.multihop import normalize_entry_country as _norm
 
     return _norm(code)
@@ -53,7 +53,7 @@ class ProductSettings:
     privacy_traffic_shape: bool = False
     privacy_outer_obfuscation: bool = False
     privacy_multihop: bool = False
-    # Residual entry country: IS (Iceland, default) or RO (Romania).
+    # Residual entry country: IS (Iceland, default), RO (Romania), DE (Germany).
     # Multihop exit = other catalog country (random among non-entry when >2).
     entry_country: str = "IS"
     # False until user binds first-run Settings with OK (post-keygen onboarding).

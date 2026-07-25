@@ -2140,7 +2140,7 @@ class TunnelClientApp:
                 _save_privacy,
             )
             tk.Frame(priv_card, bg=BORDER, height=1).pack(fill=tk.X, pady=4)
-            # Entry country (Iceland / Romania) — exit is the other when multihop on
+            # Entry country (IS / RO / DE) — exit is another catalog peer when multihop on
             entry_row = tk.Frame(priv_card, bg=PANEL_BG)
             entry_row.pack(fill=tk.X, pady=8)
             entry_col = tk.Frame(entry_row, bg=PANEL_BG)
@@ -2156,9 +2156,9 @@ class TunnelClientApp:
             tk.Label(
                 entry_col,
                 text=(
-                    "Choose residual entry: Iceland or Romania. "
-                    "With multi-hop on, exit is the other country "
-                    "(random among non-entry peers when more countries ship)."
+                    "Choose residual entry: Iceland, Romania, or Germany. "
+                    "With multi-hop on, exit is a different catalog country "
+                    "(random among non-entry peers)."
                 ),
                 bg=PANEL_BG,
                 fg=TEXT_MUTED,
@@ -2172,6 +2172,7 @@ class TunnelClientApp:
                 entry_country_var,
                 "IS",
                 "RO",
+                "DE",
                 command=lambda _v: _save_privacy(),
             )
             entry_menu.configure(
@@ -2190,7 +2191,7 @@ class TunnelClientApp:
             # Friendly labels under the code menu
             tk.Label(
                 entry_col,
-                text="IS = Iceland · RO = Romania",
+                text="IS = Iceland · RO = Romania · DE = Germany",
                 bg=PANEL_BG,
                 fg=TEXT_MUTED,
                 font=("Segoe UI", 7),

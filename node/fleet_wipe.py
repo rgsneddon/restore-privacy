@@ -23,7 +23,7 @@ from dataclasses import dataclass, field
 from typing import Any, Iterable, Optional, Sequence
 
 # Preferred wipe order for known peers (others append after, catalog order)
-PREFERRED_FLEET_ORDER: tuple[str, ...] = ("IS", "RO")
+PREFERRED_FLEET_ORDER: tuple[str, ...] = ("IS", "RO", "DE")
 
 
 def _load_catalog():
@@ -46,6 +46,7 @@ def _load_catalog():
         return [
             _N("IS", "Iceland", "82.221.101.241"),
             _N("RO", "Romania", "185.146.232.107"),
+            _N("DE", "Germany", "167.233.224.5"),
         ]
 
 

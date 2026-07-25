@@ -1,11 +1,17 @@
 # Example operator env for multi-hop *prep* (copy values out-of-band; do not commit secrets).
-# Entry (product default — Iceland FlokiNET):
-#   82.221.101.241:44044
+# Residual catalog peers (product monopin):
+#   IS Iceland  82.221.101.241:44044
+#   RO Romania  185.146.232.107:44044
+#   DE Germany  167.233.224.5:44044
 #
 # Exit hop (second FlokiNET country — fill when VPS is ready):
 # Romania exit hop (FlokiNET) — live when ready:
 RPT_EXIT_HOST=185.146.232.107
 RPT_EXIT_PORT=44044
+# Germany residual peer (Hetzner FSN):
+# RPT_DE_HOST=167.233.224.5
+# RPT_DE_PORT=44044
+# RPT_ENTRY_COUNTRY=DE
 # RPT_EXIT_COUNTRY=Romania
 # RPT_EXIT_ELGAMAL=new  # policy A — new exit-only keypair
 # Entry remains 82.221.101.241:44044 (Iceland)

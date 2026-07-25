@@ -17,5 +17,16 @@ drops HELLO (admission hybrid decrypt fails) and the client times out.
 **Never** put `node_elgamal.priv` here. Device Ed25519 keys are generated on the
 client at first run (not shipped shared).
 
+## `exit_node_elgamal.pub`
+
+Public ElGamal key for the **Romania** residual peer (`185.146.232.107:44044`).
+
+## `de_node_elgamal.pub`
+
+Public ElGamal key for the **Germany** residual peer (`167.233.224.5:44044`).
+
+**Never** put `*.priv` keys in this directory. Privates live only on each node
+under `/opt/restore-privacy/secrets/`.
+
 Android release builds inject this file into APK assets via
 `copyRptSecretsToAssets` (prefers `product/`, then `secrets/`).

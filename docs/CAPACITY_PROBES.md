@@ -18,7 +18,15 @@ re-select**, not a guaranteed mid-session cutover of all online clients.
 
 ## Enable on residual nodes
 
-Shared secret (same value on Iceland entry, Romania exit, and any future peers):
+**Firewall note:** If you enable `ufw`, always allow SSH **before** `--force enable`:
+
+```bash
+ufw allow OpenSSH
+ufw allow 22/tcp
+ufw allow 44044/udp
+```
+
+Shared secret (same value on Iceland entry, Romania exit, Germany, and any future peers):
 
 ```bash
 # On each residual node (root)

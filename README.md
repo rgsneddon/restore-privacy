@@ -14,7 +14,7 @@
 
 ## At a glance
 
-- **Node:** `82.221.101.241:44044` (UDP RPT2), **Iceland**, hosted on **FlokiNET**. Their public materials state **no invasive logs** and no third-party sharing of tenant traffic patterns ([privacy](https://flokinet.is/privacy/), [VPS](https://flokinet.is/vps/)) — that is host posture, not a product lab audit of FlokiNET.
+- **Nodes:** Iceland `82.221.101.241:44044` (default entry, FlokiNET), Romania `185.146.232.107:44044`, Germany `167.233.224.5:44044` — residual catalog peers (user-selectable entry; multi-hop exit is another peer). FlokiNET public materials state **no invasive logs** for their Iceland/Romania posture ([privacy](https://flokinet.is/privacy/), [VPS](https://flokinet.is/vps/)) — host posture, not a product lab audit.
 - **Connect / Disconnect** by hand. Optional Settings: run at startup, autoconnect on launch (both **off** by default). Settings also links to audit, privacy policy, and licence.
 - System tray identity **Privacy Restored** (Windows) with product logo icons.
 - Privacy message: `lightweight vpn to restore your privacy - no user data is retained - your privacy is restored`

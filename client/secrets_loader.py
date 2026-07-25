@@ -466,6 +466,15 @@ def load_node_elgamal_public(
                 return ElGamalPublicKey.import_bytes(ep.read_bytes())
         except Exception:
             pass
+    if name == "de_node_elgamal.pub":
+        try:
+            from .endpoint import product_de_node_elgamal_pub_path
+
+            dp = product_de_node_elgamal_pub_path()
+            if dp.is_file() and dp.stat().st_size >= 32:
+                return ElGamalPublicKey.import_bytes(dp.read_bytes())
+        except Exception:
+            pass
     d = resolve_secrets_dir(secrets_dir)
     path = d / name
     if not path.is_file() and name != NODE_PUB_NAME:

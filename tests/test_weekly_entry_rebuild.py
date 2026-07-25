@@ -54,8 +54,13 @@ class TestWeeklyEntryPlan(unittest.TestCase):
         self.assertFalse(d.allow)
         self.assertIsNone(d.target_code)
 
-    def test_auto_cycle_rolls_after_is_ro_complete(self):
-        d = resolve_weekly_target(completed=["IS", "RO"], role_hint="auto")
+    def test_auto_cycle_rolls_after_fleet_complete(self):
+        # IS+RO complete → DE next (not roll yet with 3-peer catalog)
+        d_de = resolve_weekly_target(completed=["IS", "RO"], role_hint="auto")
+        self.assertTrue(d_de.allow, d_de.reason)
+        self.assertEqual(d_de.target_code, "DE")
+        # Full cycle complete → roll to IS
+        d = resolve_weekly_target(completed=["IS", "RO", "DE"], role_hint="auto")
         self.assertTrue(d.allow, d.reason)
         self.assertEqual(d.target_code, "IS")
         self.assertEqual(d.completed, ())

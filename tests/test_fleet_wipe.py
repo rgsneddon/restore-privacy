@@ -32,21 +32,23 @@ from node.wipe_preflight import evaluate_catalog_peer_prewipe  # noqa: E402
 
 
 class TestFleetWipeOrder(unittest.TestCase):
-    def test_two_country_order_is_then_ro(self):
+    def test_fleet_order_is_then_ro_then_de(self):
         codes = fleet_country_codes(PRODUCT_COUNTRY_CATALOG)
-        self.assertEqual(codes, ["IS", "RO"])
+        self.assertEqual(codes, ["IS", "RO", "DE"])
         nodes = fleet_wipe_order(PRODUCT_COUNTRY_CATALOG)
         self.assertEqual(nodes[0].code, "IS")
         self.assertEqual(nodes[1].code, "RO")
+        self.assertEqual(nodes[2].code, "DE")
         self.assertEqual(nodes[0].host, PRODUCT_NODE_HOST)
         self.assertEqual(nodes[1].host, PRODUCT_EXIT_HOST)
+        self.assertEqual(nodes[2].host, "167.233.224.5")
 
     def test_third_country_appends(self):
         extra = CountryNode(
             code="XX", name="Extra", host="198.51.100.20", port=44044
         )
         cat = list(PRODUCT_COUNTRY_CATALOG) + [extra]
-        self.assertEqual(fleet_country_codes(cat), ["IS", "RO", "XX"])
+        self.assertEqual(fleet_country_codes(cat), ["IS", "RO", "DE", "XX"])
 
     def test_next_target_and_refuse_concurrent(self):
         self.assertEqual(
@@ -72,8 +74,11 @@ class TestFleetWipeOrder(unittest.TestCase):
         d4 = assert_sequential_fleet_start("RO", completed=done, in_progress=None)
         self.assertTrue(d4.allow)
         done2, nxt2 = mark_wipe_complete("RO", completed=done)
-        self.assertTrue(is_fleet_cycle_complete(done2))
-        self.assertIsNone(nxt2)
+        self.assertEqual(nxt2, "DE")
+        self.assertFalse(is_fleet_cycle_complete(done2))
+        done3, nxt3 = mark_wipe_complete("DE", completed=done2)
+        self.assertTrue(is_fleet_cycle_complete(done3))
+        self.assertIsNone(nxt3)
 
     def test_third_country_after_is_ro(self):
         extra = CountryNode(
@@ -82,6 +87,9 @@ class TestFleetWipeOrder(unittest.TestCase):
         cat = list(PRODUCT_COUNTRY_CATALOG) + [extra]
         done, nxt = mark_wipe_complete("IS", completed=[], catalog=cat)
         done, nxt = mark_wipe_complete("RO", completed=done, catalog=cat)
+        # Catalog already includes DE after RO
+        self.assertEqual(nxt, "DE")
+        done, nxt = mark_wipe_complete("DE", completed=done, catalog=cat)
         self.assertEqual(nxt, "XX")
         d = assert_sequential_fleet_start(
             "XX", completed=done, in_progress=None, catalog=cat
@@ -117,24 +125,28 @@ class TestPeerPrewipe(unittest.TestCase):
 
 class TestCatalogAlignment(unittest.TestCase):
     def test_client_residual_and_fleet_share_codes(self):
+        from client.multihop import COUNTRY_DE
+
         fleet = set(fleet_country_codes(PRODUCT_COUNTRY_CATALOG))
-        self.assertEqual(fleet, {COUNTRY_IS, COUNTRY_RO})
+        self.assertEqual(fleet, {COUNTRY_IS, COUNTRY_RO, COUNTRY_DE})
         # RO entry preference still resolves (not Iceland-hardcoded)
         e, x = resolve_entry_exit(COUNTRY_RO, multihop_enabled=False)
         self.assertEqual(e.host, PRODUCT_EXIT_HOST)
         cfg = multihop_config_for_entry_country(COUNTRY_RO, multihop_enabled=False)
         self.assertEqual(residual_endpoint(cfg).host, PRODUCT_EXIT_HOST)
-        # Multihop: entry RO exit IS
+        # Multihop: entry RO exit is not RO host
         e2, x2 = resolve_entry_exit(COUNTRY_RO, multihop_enabled=True)
         self.assertEqual(e2.code, COUNTRY_RO)
         self.assertIsNotNone(x2)
-        self.assertEqual(x2.code, COUNTRY_IS)
+        assert x2 is not None
+        self.assertNotEqual(x2.code, COUNTRY_RO)
+        self.assertNotEqual(x2.host, e2.host)
 
     def test_fleet_summary_in_ephemeral(self):
         from node.ephemeral_node import build_fleet_sequential_plan_summary
 
         s = build_fleet_sequential_plan_summary(completed=[], in_progress=None)
-        self.assertEqual(s["fleet_order"], ["IS", "RO"])
+        self.assertEqual(s["fleet_order"], ["IS", "RO", "DE"])
         self.assertEqual(s["next_target"], "IS")
         self.assertFalse(s["decisions"]["RO"]["allow"])
         self.assertTrue(s["decisions"]["IS"]["allow"])
@@ -186,22 +198,28 @@ class TestWeeklyFleetPlannerWiring(unittest.TestCase):
             build_weekly_entry_rebuild_plan(
                 role="exit", completed=["IS"], exit_healthy=True, entry_healthy=True
             )
-        # Auto rolls after full cycle
-        d_roll = resolve_weekly_target(completed=["IS", "RO"], role_hint="auto")
+        # Auto rolls after full fleet cycle (IS+RO+DE)
+        d_roll = resolve_weekly_target(
+            completed=["IS", "RO", "DE"], role_hint="auto"
+        )
         self.assertTrue(d_roll.allow)
         self.assertEqual(d_roll.target_code, "IS")
         self.assertEqual(d_roll.completed, ())
+        # After only IS+RO, next is DE (not roll yet)
+        d_de = resolve_weekly_target(completed=["IS", "RO"], role_hint="auto")
+        self.assertTrue(d_de.allow)
+        self.assertEqual(d_de.target_code, "DE")
 
     def test_plan_after_cycle_roll_embeds_empty_completed_in_mark_steps(self):
-        """After [IS,RO] auto-roll, mark_wipe_complete must not keep stale completed.
+        """After full fleet complete auto-roll, mark_wipe_complete must not keep stale completed.
 
-        Otherwise mark_wipe_complete('IS', ['IS','RO']) no-ops and next→None.
+        Otherwise mark_wipe_complete('IS', full-cycle) no-ops and next→None.
         """
         from node.ephemeral_node import build_weekly_entry_rebuild_plan
 
         plan = build_weekly_entry_rebuild_plan(
             role="auto",
-            completed=["IS", "RO"],
+            completed=["IS", "RO", "DE"],
             in_progress=None,
             exit_healthy=True,
             entry_healthy=True,
@@ -210,14 +228,13 @@ class TestWeeklyFleetPlannerWiring(unittest.TestCase):
         self.assertEqual(plan.mode, "weekly_fleet_rebuild")
         text = plan.format_text()
         self.assertIn("target=IS", text)
-        # mark steps must embed empty completed after roll (not ['IS','RO'])
+        # mark steps must embed empty completed after roll
         mark_complete = next(
             s for s in plan.steps if s.id == "mark_fleet_peer_complete"
         )
         self.assertIn("mark_wipe_complete('IS'", mark_complete.command)
         self.assertIn("completed=[]", mark_complete.command)
-        self.assertNotIn("completed=['IS', 'RO']", mark_complete.command)
-        self.assertNotIn('completed=["IS", "RO"]', mark_complete.command)
+        self.assertNotIn("completed=['IS', 'RO', 'DE']", mark_complete.command)
         drain = next(s for s in plan.steps if s.id == "mark_entry_draining")
         self.assertIn("completed=[]", drain.command)
         # fleet_target_resolve detail should show rolled empty completed

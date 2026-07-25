@@ -39,14 +39,19 @@ PRODUCT_EXIT_PORT = PRODUCT_NODE_PORT
 # --- Country → node catalog (extensible as more VPS countries ship) ---
 COUNTRY_IS = "IS"
 COUNTRY_RO = "RO"
+COUNTRY_DE = "DE"
 DEFAULT_ENTRY_COUNTRY = COUNTRY_IS
+
+# Germany residual peer (Hetzner FSN / product monopin).
+PRODUCT_DE_HOST = "167.233.224.5"
+PRODUCT_DE_PORT = PRODUCT_NODE_PORT
 
 
 @dataclass(frozen=True)
 class CountryNode:
     """One residual-capable product node identified by country code."""
 
-    code: str  # ISO-ish short code (IS, RO, …)
+    code: str  # ISO-ish short code (IS, RO, DE, …)
     name: str  # User-facing country name
     host: str
     port: int = PRODUCT_NODE_PORT
@@ -59,7 +64,7 @@ class CountryNode:
         return Endpoint(host=self.host, port=int(self.port))
 
 
-# Shipped two-country catalog (Iceland entry monopin + Romania exit peer).
+# Shipped residual catalog: Iceland, Romania, Germany (expandable).
 PRODUCT_COUNTRY_CATALOG: tuple[CountryNode, ...] = (
     CountryNode(
         code=COUNTRY_IS,
@@ -74,6 +79,13 @@ PRODUCT_COUNTRY_CATALOG: tuple[CountryNode, ...] = (
         host=PRODUCT_EXIT_HOST,
         port=PRODUCT_EXIT_PORT,
         pub_name="exit_node_elgamal.pub",
+    ),
+    CountryNode(
+        code=COUNTRY_DE,
+        name="Germany",
+        host=PRODUCT_DE_HOST,
+        port=PRODUCT_DE_PORT,
+        pub_name="de_node_elgamal.pub",
     ),
 )
 
@@ -95,6 +107,10 @@ def normalize_entry_country(code: str | None) -> str:
         "ROMANIA": COUNTRY_RO,
         "RO": COUNTRY_RO,
         "ROU": COUNTRY_RO,
+        "GERMANY": COUNTRY_DE,
+        "DE": COUNTRY_DE,
+        "DEU": COUNTRY_DE,
+        "DEUTSCHLAND": COUNTRY_DE,
     }
     code_n = aliases.get(raw, raw)
     for n in PRODUCT_COUNTRY_CATALOG:
