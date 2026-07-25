@@ -176,6 +176,156 @@ class TestPaymentStoreWipeProtection(unittest.TestCase):
                     os.environ["RPT_PAYMENT_DATA_DIR"] = prev
 
 
+class TestLegacyMigrateToDurable(unittest.TestCase):
+    def test_empty_durable_imports_legacy_grants_and_licences(self):
+        """Empty RPT_PAYMENT_DATA_DIR must not drop history still on legacy path."""
+        import sqlite3
+
+        import payments
+        import admin_panel
+
+        with tempfile.TemporaryDirectory() as legacy_td, tempfile.TemporaryDirectory() as durable_td:
+            # Build a standalone legacy file without touching process env / real store
+            legacy_db = Path(legacy_td) / "paid_downloads.sqlite3"
+            conn = sqlite3.connect(str(legacy_db))
+            try:
+                conn.executescript(
+                    """
+                    CREATE TABLE grants (
+                        token TEXT PRIMARY KEY,
+                        filename TEXT NOT NULL,
+                        platform TEXT NOT NULL,
+                        session_id TEXT,
+                        amount_pence INTEGER NOT NULL,
+                        currency TEXT NOT NULL,
+                        created_at REAL NOT NULL,
+                        expires_at REAL NOT NULL,
+                        used_at REAL,
+                        status TEXT NOT NULL,
+                        purchase_id TEXT
+                    );
+                    CREATE TABLE connect_entitlements (
+                        session_id TEXT PRIMARY KEY,
+                        status TEXT NOT NULL,
+                        platform TEXT,
+                        reason TEXT,
+                        created_at REAL NOT NULL,
+                        updated_at REAL NOT NULL,
+                        keygen TEXT,
+                        customer_email TEXT,
+                        billing_interval TEXT,
+                        valid_until REAL
+                    );
+                    """
+                )
+                conn.execute(
+                    """
+                    INSERT INTO grants (
+                      token, filename, platform, session_id, amount_pence,
+                      currency, created_at, expires_at, used_at, status, purchase_id
+                    ) VALUES (?,?,?,?,?,?,?,?,?,?,?)
+                    """,
+                    (
+                        "tok-migrate-1",
+                        "restore-privacy-client-0.4.6-windows-x64-setup.exe",
+                        "windows",
+                        "cs_migrate_1",
+                        245,
+                        "gbp",
+                        1_700_000_000.0,
+                        1_800_000_000.0,
+                        None,
+                        "granted",
+                        "RPT-MIGRATE-0001",
+                    ),
+                )
+                conn.execute(
+                    """
+                    INSERT INTO connect_entitlements (
+                      session_id, status, platform, reason, created_at, updated_at,
+                      keygen, customer_email, billing_interval, valid_until
+                    ) VALUES (?,?,?,?,?,?,?,?,?,?)
+                    """,
+                    (
+                        "cs_migrate_1",
+                        "active",
+                        "windows",
+                        "",
+                        1_700_000_000.0,
+                        1_700_000_000.0,
+                        "RPT-KEY-MIGRATE-TEST1",
+                        "migrate@example.com",
+                        "month",
+                        2_000_000_000.0,
+                    ),
+                )
+                conn.commit()
+            finally:
+                conn.close()
+            self.assertTrue(payments.payment_db_has_history(legacy_db))
+
+            durable = Path(durable_td)
+            prev = os.environ.get("RPT_PAYMENT_DATA_DIR")
+            os.environ["RPT_PAYMENT_DATA_DIR"] = str(durable)
+            try:
+                with mock.patch.object(
+                    payments,
+                    "legacy_payment_db_candidates",
+                    return_value=[legacy_db],
+                ):
+                    st = payments.ensure_payment_db_migrated_from_legacy()
+                    self.assertTrue(st.get("migrated"), st)
+                    payments.init_db()
+                    grants = payments.list_all_grants()
+                    lic = payments.list_licences_for_admin()
+                    self.assertTrue(
+                        any(g.get("token") == "tok-migrate-1" for g in grants),
+                        grants,
+                    )
+                    self.assertTrue(
+                        any(
+                            (r.get("email") or "") == "migrate@example.com"
+                            for r in lic
+                        ),
+                        lic,
+                    )
+                    payments.init_db()
+                    self.assertTrue(
+                        any(
+                            g.get("token") == "tok-migrate-1"
+                            for g in payments.list_all_grants()
+                        )
+                    )
+                    html = admin_panel.render_admin_html().decode("utf-8")
+                    self.assertIn("tok-migrate", html)
+                    self.assertIn("migrate@example.com", html)
+                    # Temp durable path is not /var/data → ephemeral-risk banner is OK
+                    self.assertTrue(
+                        "admin-payment-durable-ok" in html
+                        or "admin-payment-ephemeral-warn" in html,
+                        "admin must surface payment-store durability status",
+                    )
+            finally:
+                if prev is None:
+                    os.environ.pop("RPT_PAYMENT_DATA_DIR", None)
+                else:
+                    os.environ["RPT_PAYMENT_DATA_DIR"] = prev
+
+    def test_durability_status_flags_ephemeral_when_env_unset(self):
+        import payments
+
+        prev = os.environ.get("RPT_PAYMENT_DATA_DIR")
+        os.environ.pop("RPT_PAYMENT_DATA_DIR", None)
+        try:
+            st = payments.payment_store_durability_status()
+            self.assertFalse(st.get("env_set"))
+            self.assertTrue(st.get("ephemeral_risk"))
+            self.assertIn("db_path", st)
+        finally:
+            if prev is not None:
+                os.environ["RPT_PAYMENT_DATA_DIR"] = prev
+
+
 class TestAdminArchitectureCopy(unittest.TestCase):
     def test_admin_html_has_current_architecture_markers(self):
         import admin_panel

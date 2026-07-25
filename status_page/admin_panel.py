@@ -1289,6 +1289,35 @@ def render_admin_html(
         store_hint = str(payment_data_dir())
     except Exception:  # noqa: BLE001
         store_hint = "status_page/data (or RPT_PAYMENT_DATA_DIR)"
+    durable_banner = ""
+    try:
+        from payments import payment_store_durability_status
+
+        st = payment_store_durability_status()
+        g_n = int(st.get("grant_count") or 0)
+        l_n = int(st.get("licence_count") or 0)
+        path_s = _escape(str(st.get("db_path") or store_hint))
+        if st.get("ephemeral_risk"):
+            durable_banner = (
+                '<p class="warn" id="admin-payment-ephemeral-warn">'
+                "<strong>Warning — payment store may be ephemeral.</strong> "
+                "Set <code>RPT_PAYMENT_DATA_DIR=/var/data/rpt-payment</code> on a "
+                "Render <strong>persistent disk</strong> (blueprint "
+                "<code>rpt-payment-data</code>) so licence + grant history survives "
+                f"redeploy. Current DB: <code>{path_s}</code> "
+                f"(grants={g_n}, licences={l_n}). "
+                "See <code>status_page/docs/RENDER_PAYMENT_DISK.md</code>.</p>"
+            )
+        else:
+            durable_banner = (
+                f'<p class="muted" id="admin-payment-durable-ok">'
+                f"Durable payment store: <code>{path_s}</code> "
+                f"(grants={g_n}, licences={l_n}). "
+                "Retained across residual wipe and status redeploy when the disk "
+                "stays attached.</p>"
+            )
+    except Exception:  # noqa: BLE001
+        durable_banner = ""
     arch = _escape(ADMIN_ARCHITECTURE_BLURB)
     store_esc = _escape(store_hint)
     body = f"""<!DOCTYPE html>
@@ -1316,6 +1345,8 @@ padding:0.25rem 0;font-size:0.9rem}}
 font-weight:600}}
 .badge.ok{{background:var(--badge-ok-bg);color:var(--badge-ok-fg)}}
 .badge.bad{{background:var(--badge-bad-bg);color:var(--badge-bad-fg)}}
+.warn{{color:var(--badge-bad-fg);background:var(--badge-bad-bg);padding:0.6rem 0.75rem;
+border-radius:8px;font-size:0.9rem;line-height:1.4;margin:0.5rem 0}}
 .ops-links{{font-size:0.9rem;margin:0.75rem 0 0.25rem}}
 .nav-local a{{margin-right:0.75rem;font-size:0.9rem}}
 code{{font-size:0.85rem;word-break:break-all}}
@@ -1367,13 +1398,16 @@ background:var(--btn-bg);color:var(--btn-fg);font-weight:600;cursor:pointer}}
 <section id="admin-architecture" class="card" aria-labelledby="admin-architecture-heading">
   <h2 id="admin-architecture-heading">Product architecture (operator)</h2>
   <p class="muted" id="admin-architecture-blurb">{arch}</p>
+{durable_banner}
   <p class="muted" id="admin-durable-store-note">Durable licence + grant DB path:
   <code id="admin-payment-data-dir">{store_esc}</code>
   (<code>paid_downloads.sqlite3</code>). Residual wipeclean targets runtime/secrets only —
   not this store. On <strong>Render</strong>, set <code>RPT_PAYMENT_DATA_DIR</code> to
   <code>/var/data/rpt-payment</code> on the persistent disk (blueprint:
   <code>rpt-payment-data</code> mount <code>/var/data</code>) so admin history survives
-  host redeploy — free instances are ephemeral and cannot attach that disk.</p>
+  host redeploy — free instances are ephemeral and cannot attach that disk.
+  Empty durable volume auto-imports history from legacy
+  <code>status_page/data/paid_downloads.sqlite3</code> when that file still has rows.</p>
 {admin_section_top_link_html()}</section>
 {reissue_html}
 {ondemand_html}

@@ -49,8 +49,12 @@ If you already have grants on the old ephemeral path
 (`status_page/data/paid_downloads.sqlite3` inside the service):
 
 1. Apply the blueprint (or attach disk + env in Dashboard).
-2. Before the first deploy that only uses the new path, copy the DB onto the
-   mounted disk (Shell tab while old file still exists, or one-off job):
+2. **Automatic (shipped):** on startup, when the durable DB has **no** grant or
+   licence rows but a legacy `paid_downloads.sqlite3` still has history, the
+   status app **copies** that file into `$RPT_PAYMENT_DATA_DIR` once
+   (`payments.ensure_payment_db_migrated_from_legacy`). It never overwrites a
+   durable DB that already has rows.
+3. Manual fallback (Shell tab if auto-migrate cannot find the old path):
 
    ```bash
    mkdir -p /var/data/rpt-payment
@@ -59,8 +63,10 @@ If you already have grants on the old ephemeral path
    # Paths vary by rootDir; prefer copying from wherever paid_downloads.sqlite3 lives today.
    ```
 
-3. Confirm `/admin` → Licence database / Paid download grants still list rows.
-4. Keep `RPT_PAYMENT_DATA_DIR=/var/data/rpt-payment` set permanently.
+4. Confirm `/admin` → Licence database / Paid download grants still list rows
+   (admin shows grant/licence counts and an ephemeral-risk warning if the env
+   is not on the persistent disk).
+5. Keep `RPT_PAYMENT_DATA_DIR=/var/data/rpt-payment` set permanently.
 
 ## Honesty
 

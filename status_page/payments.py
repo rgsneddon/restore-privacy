@@ -669,7 +669,150 @@ def payment_data_dir() -> Path:
     return _data_dir()
 
 
+def legacy_payment_db_candidates() -> list[Path]:
+    """Paths that may hold a pre-disk / ephemeral paid_downloads.sqlite3.
+
+    Used only to **copy into** the durable dir when the durable DB is empty so
+    admin licence + grant history does not silently disappear after attaching
+    ``RPT_PAYMENT_DATA_DIR`` or redeploying onto a new empty volume.
+    """
+    here = Path(__file__).resolve().parent
+    out: list[Path] = [
+        here / "data" / PAYMENT_DB_FILENAME,
+        here / PAYMENT_DB_FILENAME,
+        # Common Render layout when rootDir is status_page or monorepo root
+        Path("/opt/render/project/src/status_page/data") / PAYMENT_DB_FILENAME,
+        Path("/opt/render/project/src/data") / PAYMENT_DB_FILENAME,
+        Path("/var/data") / PAYMENT_DB_FILENAME,
+    ]
+    # Dedup while preserving order
+    seen: set[str] = set()
+    uniq: list[Path] = []
+    for p in out:
+        key = str(p.resolve()) if p.exists() else str(p)
+        if key in seen:
+            continue
+        seen.add(key)
+        uniq.append(p)
+    return uniq
+
+
+def payment_db_history_counts(path: Path) -> tuple[int, int]:
+    """Return (grant_count, entitlement_count) or (0, 0) if unreadable/empty."""
+    try:
+        p = Path(path)
+        if not p.is_file() or p.stat().st_size < 64:
+            return 0, 0
+        conn = sqlite3.connect(str(p), timeout=10)
+        try:
+            try:
+                g = int(conn.execute("SELECT COUNT(*) FROM grants").fetchone()[0])
+            except sqlite3.Error:
+                g = 0
+            try:
+                e = int(
+                    conn.execute("SELECT COUNT(*) FROM connect_entitlements").fetchone()[
+                        0
+                    ]
+                )
+            except sqlite3.Error:
+                e = 0
+            return max(0, g), max(0, e)
+        finally:
+            conn.close()
+    except OSError:
+        return 0, 0
+
+
+def payment_db_has_history(path: Path) -> bool:
+    g, e = payment_db_history_counts(path)
+    return (g + e) > 0
+
+
+def ensure_payment_db_migrated_from_legacy() -> dict[str, Any]:
+    """Copy legacy ephemeral DB into durable path when durable has no history.
+
+    Idempotent. Never overwrites a durable DB that already has grants or
+    entitlements. Returns a small status dict for logs/admin honesty.
+    """
+    import shutil
+
+    dest_dir = payment_data_dir()
+    dest = dest_dir / PAYMENT_DB_FILENAME
+    status: dict[str, Any] = {
+        "dest": str(dest),
+        "migrated": False,
+        "source": "",
+        "reason": "",
+    }
+    if payment_db_has_history(dest):
+        status["reason"] = "dest_has_history"
+        return status
+
+    dest_g, dest_e = payment_db_history_counts(dest)
+    best: Path | None = None
+    best_score = dest_g + dest_e
+    for cand in legacy_payment_db_candidates():
+        try:
+            if cand.resolve() == dest.resolve():
+                continue
+        except OSError:
+            if str(cand) == str(dest):
+                continue
+        if not cand.is_file():
+            continue
+        g, e = payment_db_history_counts(cand)
+        score = g + e
+        if score > best_score:
+            best = cand
+            best_score = score
+
+    if best is None or best_score <= 0:
+        status["reason"] = "no_legacy_history"
+        return status
+
+    try:
+        # Prefer copy2; if dest exists empty, replace
+        tmp = dest.with_suffix(".sqlite3.migrate-tmp")
+        shutil.copy2(best, tmp)
+        tmp.replace(dest)
+        status["migrated"] = True
+        status["source"] = str(best)
+        status["reason"] = "copied_legacy_to_durable"
+        status["rows"] = best_score
+    except OSError as exc:
+        status["reason"] = f"copy_failed:{exc}"[:120]
+    return status
+
+
+def payment_store_durability_status() -> dict[str, Any]:
+    """Operator-facing: path, env, disk vs ephemeral, row counts."""
+    ensure_payment_db_migrated_from_legacy()
+    path = db_path()
+    env_raw = os.environ.get("RPT_PAYMENT_DATA_DIR", "").strip()
+    path_s = str(path).replace("\\", "/")
+    on_render_disk = path_s.startswith(RENDER_PAYMENT_DISK_MOUNT.rstrip("/") + "/") or (
+        path_s == RENDER_PAYMENT_DATA_DIR or path_s.startswith(RENDER_PAYMENT_DATA_DIR + "/")
+    )
+    g, e = payment_db_history_counts(path)
+    ephemeral_risk = not env_raw or not on_render_disk
+    return {
+        "db_path": str(path),
+        "data_dir": str(payment_data_dir()),
+        "env_set": bool(env_raw),
+        "env_value": env_raw or "",
+        "on_render_disk": on_render_disk,
+        "ephemeral_risk": ephemeral_risk,
+        "grant_count": g,
+        "licence_count": e,
+        "filename": PAYMENT_DB_FILENAME,
+        "render_expected_dir": RENDER_PAYMENT_DATA_DIR,
+    }
+
+
 def db_path() -> Path:
+    """Path to paid_downloads.sqlite3 (after optional legacy → durable migrate)."""
+    ensure_payment_db_migrated_from_legacy()
     return _data_dir() / PAYMENT_DB_FILENAME
 
 
@@ -2236,6 +2379,8 @@ def _migrate_grants_purchase_id(conn: sqlite3.Connection) -> None:
 
 
 def init_db() -> None:
+    # One-shot legacy → durable copy before opening (empty durable must not hide history)
+    ensure_payment_db_migrated_from_legacy()
     conn = _connect()
     try:
         conn.executescript(
