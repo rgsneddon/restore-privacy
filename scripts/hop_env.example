@@ -24,3 +24,26 @@ RPT_EXIT_PORT=44044
 # RPT_SSH_SUDO=1
 # RPT_SSH_KEY=$HOME/.ssh/id_ed25519_restore_privacy_hop
 # RPT_SSH_PASSWORD=   # one-time bootstrap only; prefer key auth
+#
+# ---------------------------------------------------------------------------
+# Private residual capacity probes (near-capacity client migration)
+# ---------------------------------------------------------------------------
+# Shared secret for token-gated GET /api/private/capacity on residual nodes.
+# Same value on **every residual node** (systemd) and on **operator clients**
+# that should probe before residual dial. Do **not** commit real tokens.
+# Missing token → probes off (empty map; no capacity migration from probes).
+# Public /api/status stays title-only — never a live client counter.
+#
+# RPT_CAPACITY_TOKEN=replace-with-long-random-secret
+# Optional soft max for utilization = live_sessions / max (node):
+# RPT_NODE_MAX_SESSIONS=256
+# Optional client probe URL map (JSON host → private capacity URL):
+# RPT_CAPACITY_PROBE_URLS={"82.221.101.241":"http://82.221.101.241:8080/api/private/capacity","185.146.232.107":"http://185.146.232.107:8080/api/private/capacity"}
+# Optional probe timeout seconds (default ~1.5):
+# RPT_CAPACITY_PROBE_TIMEOUT=1.5
+#
+# Node install (root on residual VPS):
+#   bash scripts/install_capacity_token_env.sh
+# Client (operator / env-capable Connect process):
+#   export RPT_CAPACITY_TOKEN='(same secret as nodes)'
+# Docs: docs/CAPACITY_PROBES.md

@@ -50,6 +50,20 @@ See also `scripts/MULTIHOP_EXIT_HOP_PREP.md`.
 - Provider off-box backups/netflow are **not** erased by product wipe.
 - Continuity during entry wipe is **automatic residual failover to exit**, not a zero packet-loss guarantee.
 
+## After reinstall: private capacity token
+
+Selfhost / wipe reinstall does **not** publish live client counts. If you use
+**near-capacity residual migration**, re-apply the private capacity token on
+each residual node after rebuild:
+
+```bash
+sudo bash scripts/install_capacity_token_env.sh
+# or: sudo env RPT_CAPACITY_TOKEN='…' bash scripts/install_capacity_token_env.sh
+```
+
+Operator clients that probe need the same `RPT_CAPACITY_TOKEN`. Full operator
+guide: [CAPACITY_PROBES.md](CAPACITY_PROBES.md). Template: `scripts/hop_env.example`.
+
 
 ## Homepage display (0.3.7+)
 

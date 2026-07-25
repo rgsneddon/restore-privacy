@@ -86,8 +86,14 @@ export RPT_EXIT_HOST='<EXIT_PUBLIC_IPV4>'
 export RPT_EXIT_PORT=44044
 # Or: export RPT_MULTIHOP_HOPS='82.221.101.241:44044,<EXIT_PUBLIC_IPV4>:44044'
 
+# Private capacity probes (same secret on entry + exit + operator clients)
+# export RPT_CAPACITY_TOKEN='replace-with-long-random-secret'  # never commit
+# On each residual node after deploy: sudo bash scripts/install_capacity_token_env.sh
+# See docs/CAPACITY_PROBES.md — public status stays title-only (no live client count)
+
 python3 scripts/deploy_rpt_node.py
 # Then on host: install.sh / host privacy as for entry node
+# Then: sudo bash scripts/install_capacity_token_env.sh
 ```
 
 ---
