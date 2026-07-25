@@ -765,10 +765,20 @@ class TunnelClientApp:
         self.output.see(tk.END)
         self.output.configure(state=tk.DISABLED)
 
-    def _connection_log(self, kind: str, message: str) -> None:
-        """Persist a user-visible connection event locally (Settings export)."""
+    def _connection_log(
+        self, kind: str, message: str, **detail: object
+    ) -> None:
+        """Persist a user-visible connection event locally (Settings export).
+
+        Optional *detail* keys (endpoint, outcome, error, …) are stored as
+        support diagnostics in the local log only — never uploaded.
+        """
         try:
-            append_event(kind, message)
+            append_event(
+                kind,
+                message,
+                detail=detail if detail else None,
+            )
         except Exception:
             pass
 
@@ -1557,7 +1567,10 @@ class TunnelClientApp:
         self._set_status("connecting")
         self._log("Connect - starting secure session (full-tunnel residual path)...")
         self._connection_log(
-            KIND_CONNECT, "Connect started (full-tunnel residual path)"
+            KIND_CONNECT,
+            "Connect started (full-tunnel residual path)",
+            outcome="start",
+            residual_capture="pending",
         )
 
         def work() -> None:
@@ -1619,7 +1632,12 @@ class TunnelClientApp:
 
                 def fail_hs() -> None:
                     self._log(f"Could not connect: {msg}")
-                    self._connection_log(KIND_ERROR, f"Connect failed: {msg}")
+                    self._connection_log(
+                        KIND_ERROR,
+                        f"Connect failed: {msg}",
+                        outcome="fail",
+                        error=msg[:300],
+                    )
                     self._set_status("error", detail=msg)
                     self._apply_control(connected=False, busy=False)
 
@@ -1631,7 +1649,11 @@ class TunnelClientApp:
             def note_session() -> None:
                 self._log(f"Session ready (tunnel address {vpn_ip})")
                 self._connection_log(
-                    KIND_SESSION, f"Session ready (tunnel address {vpn_ip})"
+                    KIND_SESSION,
+                    f"Session ready (tunnel address {vpn_ip})",
+                    outcome="ok",
+                    session_vpn_ip=str(vpn_ip or ""),
+                    residual_capture="attaching",
                 )
                 if residual_ready:
                     self._log("Residual already active — confirming tunnel attach…")
@@ -1657,7 +1679,12 @@ class TunnelClientApp:
 
                 def fail_exc() -> None:
                     self._log(f"Could not connect: {err[:160]}")
-                    self._connection_log(KIND_ERROR, f"Connect failed: {err[:160]}")
+                    self._connection_log(
+                        KIND_ERROR,
+                        f"Connect failed: {err[:160]}",
+                        outcome="fail",
+                        error=err[:300],
+                    )
                     self._set_status("error", detail=err)
                     self._apply_control(connected=False, busy=False)
 
@@ -2807,10 +2834,12 @@ class TunnelClientApp:
 
         def _refresh_log_view() -> None:
             events = read_events(limit=80)
+            # Full support export body (header + diagnostics), not bare lines only.
             body = (
-                "\n".join(ev.format_line() for ev in events)
+                format_export(events)
                 if events
-                else "(No connection events yet. Connect or Disconnect to record.)"
+                else format_export([])
+                + "(No connection events yet. Connect or Disconnect to record.)\n"
             )
             log_box.configure(state=tk.NORMAL)
             log_box.delete("1.0", tk.END)

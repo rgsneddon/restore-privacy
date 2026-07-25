@@ -24,9 +24,10 @@ DPI_MITIGATION_DISCLAIMER = (
 )
 
 CONNECTION_LOG_DISCLAIMER = (
-    "Connection events are stored only on this device. Restore Privacy does not "
+    "Connection events and support diagnostics (app version, platform, connect "
+    "outcome / error text) are stored only on this device. Restore Privacy does not "
     "upload this log to the node or any remote collector. Export saves a local file "
-    "you choose to keep or share."
+    "you can email to support yourself."
 )
 
 LEAK_TEST_DISCLAIMER = (

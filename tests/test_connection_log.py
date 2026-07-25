@@ -1,4 +1,4 @@
-"""Local connection log: append/read/export; no network upload path."""
+"""Local connection log: append/read/export with support diagnostics; no upload."""
 
 from __future__ import annotations
 
@@ -14,11 +14,13 @@ sys.path.insert(0, str(ROOT))
 from client.connection_log import (  # noqa: E402
     ConnectionLogEvent,
     append_event,
+    build_support_diagnostics,
     clear_events,
     default_log_path,
     export_to_file,
     format_export,
     log_module_has_no_network_upload,
+    product_client_version,
     read_events,
 )
 
@@ -124,5 +126,84 @@ class TestConnectionLogNoUpload(unittest.TestCase):
             self.assertNotIn(bad, src)
 
 
+class TestSupportDiagnosticsInExport(unittest.TestCase):
+    """Shipped append + format_export include support diagnostic fields."""
+
+    def test_build_support_diagnostics_has_version_platform(self):
+        snap = build_support_diagnostics()
+        self.assertEqual(snap.get("product"), "Restore Privacy")
+        ver = product_client_version()
+        self.assertEqual(snap.get("client_version"), ver)
+        self.assertNotEqual(ver, "")
+        self.assertIn("platform", snap)
+        self.assertIn("os_name", snap)
+        # No network keys
+        self.assertNotIn("url", snap)
+
+    def test_append_merges_diagnostics_and_caller_detail(self):
+        with tempfile.TemporaryDirectory() as td:
+            path = Path(td) / "connection_log.jsonl"
+            ev = append_event(
+                "error",
+                "Connect failed: timeout",
+                path=path,
+                ts=1_700_000_100.0,
+                detail={
+                    "outcome": "fail",
+                    "error": "timeout waiting for HELLO",
+                    "residual_host": "82.221.101.241",
+                    "residual_port": 44044,
+                },
+            )
+            self.assertEqual(ev.detail.get("outcome"), "fail")
+            self.assertEqual(ev.detail.get("error"), "timeout waiting for HELLO")
+            self.assertIn("client_version", ev.detail)
+            self.assertIn("platform", ev.detail)
+            # Round-trip through JSONL
+            events = read_events(path=path)
+            self.assertEqual(len(events), 1)
+            self.assertEqual(events[0].detail.get("residual_host"), "82.221.101.241")
+            self.assertEqual(events[0].detail.get("residual_port"), 44044)
+
+    def test_export_body_contains_diagnostics_and_support_handoff(self):
+        with tempfile.TemporaryDirectory() as td:
+            path = Path(td) / "connection_log.jsonl"
+            append_event(
+                "connect",
+                "Connect started",
+                path=path,
+                ts=1_700_000_000.0,
+                detail={"outcome": "start"},
+            )
+            append_event(
+                "error",
+                "Connect failed: no reply",
+                path=path,
+                ts=1_700_000_001.0,
+                detail={"outcome": "fail", "error": "no reply", "error_code": "timeout"},
+            )
+            dest = Path(td) / "support-export.txt"
+            export_to_file(dest, source=path)
+            body = dest.read_text(encoding="utf-8")
+            self.assertIn("client_version=", body)
+            self.assertIn("platform=", body)
+            self.assertIn(product_client_version(), body)
+            self.assertIn("outcome=fail", body)
+            self.assertIn("error=no reply", body)
+            self.assertIn("error_code=timeout", body)
+            low = body.lower()
+            self.assertIn("not uploaded", low)
+            self.assertIn("support", low)
+            self.assertIn("email", low)
+            self.assertIn("local only", low)
+
+    def test_windows_settings_export_uses_format_export(self):
+        src = (ROOT / "client" / "windows" / "app.py").read_text(encoding="utf-8")
+        self.assertIn("export_to_file", src)
+        self.assertIn("format_export", src)
+        self.assertIn("EXPORT_LOG_BUTTON", src)
+
+
 if __name__ == "__main__":
     unittest.main()
+

@@ -1191,7 +1191,11 @@ class TunnelClientApp:
         self._apply_control(connected=False, busy=True)
         self._set_status("connecting")
         self._log("Connect - starting secure session (full-tunnel residual path)...")
-        append_event(KIND_CONNECT, "Connect started (full-tunnel residual path)")
+        append_event(
+            KIND_CONNECT,
+            "Connect started (full-tunnel residual path)",
+            detail={"outcome": "start", "residual_capture": "pending"},
+        )
 
         def work() -> None:
             # Status-host refresh + residual HELLO off the Tk UI thread.
@@ -1242,7 +1246,11 @@ class TunnelClientApp:
 
                 def fail_hs() -> None:
                     self._log(f"Could not connect: {msg}")
-                    append_event(KIND_ERROR, f"Connect failed: {msg}")
+                    append_event(
+                        KIND_ERROR,
+                        f"Connect failed: {msg}",
+                        detail={"outcome": "fail", "error": msg[:300]},
+                    )
                     self._set_status("error", detail=msg)
                     self._apply_control(connected=False, busy=False)
 
@@ -1253,7 +1261,15 @@ class TunnelClientApp:
 
             def note_session() -> None:
                 self._log(f"Session ready (tunnel address {vpn_ip})")
-                append_event(KIND_SESSION, f"Session ready (tunnel address {vpn_ip})")
+                append_event(
+                    KIND_SESSION,
+                    f"Session ready (tunnel address {vpn_ip})",
+                    detail={
+                        "outcome": "ok",
+                        "session_vpn_ip": str(vpn_ip or ""),
+                        "residual_capture": "attaching",
+                    },
+                )
                 if residual_ready:
                     self._log("Residual already active — confirming tunnel attach…")
                 else:
@@ -1277,7 +1293,11 @@ class TunnelClientApp:
 
                 def fail_exc() -> None:
                     self._log(f"Could not connect: {err[:160]}")
-                    append_event(KIND_ERROR, f"Connect failed: {err[:160]}")
+                    append_event(
+                        KIND_ERROR,
+                        f"Connect failed: {err[:160]}",
+                        detail={"outcome": "fail", "error": err[:300]},
+                    )
                     self._set_status("error", detail=err)
                     self._apply_control(connected=False, busy=False)
 
@@ -1317,7 +1337,11 @@ class TunnelClientApp:
                         self._tunnel = None
                         err = attach_failure_user_message(original_err)
                         self._log(f"Could not connect: {err[:160]}")
-                        append_event(KIND_ERROR, f"Connect failed: {err[:160]}")
+                        append_event(
+                        KIND_ERROR,
+                        f"Connect failed: {err[:160]}",
+                        detail={"outcome": "fail", "error": err[:300]},
+                    )
                         self._set_status("error", detail=err)
                         self._apply_control(connected=False, busy=False)
                 finally:

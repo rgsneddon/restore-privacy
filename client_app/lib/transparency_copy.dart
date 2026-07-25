@@ -59,9 +59,10 @@ const String kPingStatsDisclaimer =
     'Not a contractual SLA or browser speedbench.';
 
 const String kConnectionLogDisclaimer =
-    'Connection events are stored only on this device. Restore Privacy does not '
+    'Connection events and support diagnostics (app version, platform, connect '
+    'outcome / error text) are stored only on this device. Restore Privacy does not '
     'upload this log to the node or any remote collector. Export saves a local file '
-    'you choose to keep or share.';
+    'you can email to support yourself.';
 
 const String kLeakTestDisclaimer =
     'Leak test checks residual public-IP capture and tunnel DNS posture on this '
