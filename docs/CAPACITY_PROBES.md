@@ -66,6 +66,10 @@ Catalog product budgets (operator reference):
 | RO Romania | `185.146.232.107` | 100 Mbps (`100000000`) |
 | DE Germany | `167.233.224.5` | 200 Mbps (`200000000`) |
 
+**RO still needs operator finalize from a host with SSH** (Mac): copy-paste
+install + verify steps in **[RO_CAPACITY_MAC_FINALIZE.md](RO_CAPACITY_MAC_FINALIZE.md)**.
+IS/DE token env were applied separately; RO was blocked from Windows keys.
+
 ## Enable on status host (admin fleet panel)
 
 The private `/admin` fleet usage section probes each catalog peer’s
@@ -127,6 +131,7 @@ Default URL map (when token is set and `RPT_CAPACITY_PROBE_URLS` is unset):
 | `client/multihop.py` | Near-capacity residual migration + CLI advisory |
 | `scripts/install_capacity_token_env.sh` | Durable node env install |
 | `scripts/hop_env.example` | Operator env template (placeholders only) |
+| `docs/RO_CAPACITY_MAC_FINALIZE.md` | RO-only Mac SSH finalize handoff |
 
 ## Verify (no secret in logs)
 

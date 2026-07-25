@@ -90,6 +90,7 @@ export RPT_EXIT_PORT=44044
 # export RPT_CAPACITY_TOKEN='replace-with-long-random-secret'  # never commit
 # On each residual node after deploy: sudo bash scripts/install_capacity_token_env.sh
 # See docs/CAPACITY_PROBES.md — public status stays title-only (no live client count)
+# RO Mac finalize (100 Mbps + shared token): docs/RO_CAPACITY_MAC_FINALIZE.md
 
 python3 scripts/deploy_rpt_node.py
 # Then on host: install.sh / host privacy as for entry node

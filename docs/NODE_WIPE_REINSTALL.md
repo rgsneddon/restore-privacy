@@ -84,6 +84,8 @@ sudo bash scripts/install_capacity_token_env.sh
 
 Operator clients that probe need the same `RPT_CAPACITY_TOKEN`. Full operator
 guide: [CAPACITY_PROBES.md](CAPACITY_PROBES.md). Template: `scripts/hop_env.example`.
+**Romania (RO) Mac SSH finalize** (100 Mbps allowance + shared token):
+[RO_CAPACITY_MAC_FINALIZE.md](RO_CAPACITY_MAC_FINALIZE.md).
 
 
 ## Homepage display (0.3.7+)

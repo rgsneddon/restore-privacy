@@ -109,6 +109,40 @@ class TestCapacityTokenDocs(unittest.TestCase):
         window = text[idx : idx + 80]
         self.assertIn("sync: false", window)
 
+    def test_ro_mac_finalize_handoff_is_committed_and_secret_free(self):
+        """RO operator handoff for Mac SSH: host, 100 Mbps, install path, no live token."""
+        handoff = ROOT / "docs" / "RO_CAPACITY_MAC_FINALIZE.md"
+        self.assertTrue(handoff.is_file(), "missing docs/RO_CAPACITY_MAC_FINALIZE.md")
+        text = handoff.read_text(encoding="utf-8")
+        self.assertIn("185.146.232.107", text)
+        self.assertIn("100000000", text)
+        self.assertIn("100 Mbps", text)
+        self.assertIn("RPT_CAPACITY_TOKEN", text)
+        self.assertIn("RPT_NODE_BANDWIDTH_CAP_BPS", text)
+        self.assertIn("install_capacity_token_env.sh", text)
+        self.assertIn("capacity_token.txt", text)
+        self.assertIn("/api/private/capacity", text)
+        self.assertIn("do not commit", text.lower())
+        # Discoverable from primary capacity doc
+        cap = (ROOT / "docs" / "CAPACITY_PROBES.md").read_text(encoding="utf-8")
+        self.assertIn("RO_CAPACITY_MAC_FINALIZE.md", cap)
+        wipe = (ROOT / "docs" / "NODE_WIPE_REINSTALL.md").read_text(encoding="utf-8")
+        self.assertIn("RO_CAPACITY_MAC_FINALIZE.md", wipe)
+        # No live 32+ hex token assignment in handoff (placeholders / env expansion only)
+        for line in text.splitlines():
+            stripped = line.strip()
+            if stripped.startswith("#"):
+                continue
+            # Reject RPT_CAPACITY_TOKEN=<long hex> as a real secret commit
+            m = re.search(
+                r"RPT_CAPACITY_TOKEN\s*=\s*['\"]?([0-9a-fA-F]{32,})['\"]?",
+                stripped,
+            )
+            self.assertIsNone(
+                m,
+                f"RO handoff must not embed a live hex token: {stripped[:60]!r}",
+            )
+
 
 if __name__ == "__main__":
     unittest.main()
