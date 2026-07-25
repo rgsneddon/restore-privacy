@@ -22,9 +22,9 @@ Last full RAG snapshot used catalog **v0.4.0** packages; live monopin is **0.4.5
 |----------|---------|-------|-------|
 | 🪟 **Windows** | `restore-privacy-client-0.4.0-windows-x64-setup.exe` | 🟩 | node_elgamal.pub pin match; PE/MZ OK; multihop residual prep markers (residual-via-exit when `RPT_MULTIHOP_ENABLED=1`); exit_node_elgamal.pub present; privacy-scale Settings + ping stats in frozen client |
 | 🤖 **Android** | `restore-privacy-client-0.4.0-android.apk` | 🟩 | node pub pin match; residual wire (PFS + outer obfs); exit pub present |
-| ðŸŽ **macOS** | `restore-privacy-client-0.4.0-macos.zip` | ðŸŸ© | node pub pin match; archive present; exit pub present; rebuild/re-sign per APPLE_HANDOFF_0.4.0 |
+| 🍎 **macOS** | `restore-privacy-client-0.4.0-macos.zip` | 🟩 | node pub pin match; archive present; exit pub present; rebuild/re-sign per APPLE_HANDOFF_0.4.0 |
 | 📱 **iOS** | `restore-privacy-client-0.4.0-ios.zip` | 🟩 | node pub pin match; archive present; exit pub present; rebuild/re-sign per APPLE_HANDOFF_0.4.0 |
-| ðŸ§ **Linux** | `restore-privacy-client-0.4.0-linux-x64.tar.gz` | ðŸŸ© | node pub pin match; archive present; exit pub present |
+| 🐧 **Linux** | `restore-privacy-client-0.4.0-linux-x64.tar.gz` | 🟩 | node pub pin match; archive present; exit pub present |
 
 **Catalog overall (worst package):** 🟩
 
@@ -83,14 +83,14 @@ Settings can turn optional residual layers on/off. Core residual (licence/keygen
 
 | Shape | Outer obfs | Multi-hop | UK→entry (approx) | UK→exit (approx) | RAG | Notes |
 |-------|------------|-----------|-------------------|------------------|-----|-------|
-| on | on | off | 43—63 ms | n/a | ðŸŸ§ | single-hop entry; shape + outer obfs on (**QUIC-mimic**, ~0 ms RTT) |
-| on | on | on | 43—63 ms | 37—57 ms | ðŸŸ§ | residual dials exit; shape + **QUIC-mimic** |
-| on | off | off | 43—63 ms | n/a | ðŸŸ§ | shape on; bare RPT |
-| on | off | on | 43—63 ms | 37—57 ms | ðŸŸ§ | residual dials exit |
-| off | on | off | 38—58 ms | n/a | ðŸŸ§ | leaner feel; outer obfs on (**QUIC-mimic**) |
-| off | on | on | 38—58 ms | 32—52 ms | ðŸŸ§ | residual dials exit; **QUIC-mimic** |
-| off | off | off | 38—58 ms | n/a | ðŸŸ§ | lean default |
-| off | off | on | 38—58 ms | 32—52 ms | ðŸŸ§ | residual dials exit |
+| on | on | off | 43—63 ms | n/a | 🟧 | single-hop entry; shape + outer obfs on (**QUIC-mimic**, ~0 ms RTT) |
+| on | on | on | 43—63 ms | 37—57 ms | 🟧 | residual dials exit; shape + **QUIC-mimic** |
+| on | off | off | 43—63 ms | n/a | 🟧 | shape on; bare RPT |
+| on | off | on | 43—63 ms | 37—57 ms | 🟧 | residual dials exit |
+| off | on | off | 38—58 ms | n/a | 🟧 | leaner feel; outer obfs on (**QUIC-mimic**) |
+| off | on | on | 38—58 ms | 32—52 ms | 🟧 | residual dials exit; **QUIC-mimic** |
+| off | off | off | 38—58 ms | n/a | 🟧 | lean default |
+| off | off | on | 38—58 ms | 32—52 ms | 🟧 | residual dials exit |
 
 **Product defaults:** shape **off**, outer obfs **off**, multi-hop **off** (`RPT_MULTIHOP_ENABLED` unset / off).  
 *(From `client/uk_ping_estimates.py`.)*

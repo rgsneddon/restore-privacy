@@ -13,6 +13,7 @@ from public_docs import (  # noqa: E402
     DOC_SHELL_CSS,
     markdownish_to_html,
     rag_swatch_html,
+    repair_audit_emoji_mojibake,
     render_document_html,
 )
 
@@ -55,6 +56,25 @@ class TestRagSwatchWordStates(unittest.TestCase):
         self.assertIsNone(rag_swatch_html("nolog_journald"))
         self.assertIsNone(rag_swatch_html("**probe_name**"))
         self.assertIsNone(rag_swatch_html(""))
+
+    def test_cp1252_mojibake_colour_squares_map_to_swatches(self):
+        """UTF-8 RAG squares mis-decoded as cp1252 must still become solid boxes."""
+        for good, css, label in (
+            ("🟩", "rag-green", "Green"),
+            ("🟧", "rag-amber", "Amber"),
+            ("🟥", "rag-red", "Red"),
+        ):
+            moj = good.encode("utf-8").decode("cp1252")
+            self.assertNotEqual(moj, good)
+            repaired = repair_audit_emoji_mojibake(moj)
+            self.assertEqual(repaired, good)
+            html = rag_swatch_html(moj)
+            self.assertIsNotNone(html)
+            assert html is not None
+            self.assertIn(f"rag-swatch {css}", html)
+            self.assertIn(f'aria-label="{label}"', html)
+            # Swatch path must not leave the wonky mojibake glyph as cell content
+            self.assertNotIn(moj, html)
 
 
 class TestSectionBProbeTableHtml(unittest.TestCase):
@@ -141,6 +161,47 @@ class TestPkgRagRegressionWithSectionB(unittest.TestCase):
         self.assertIn("restore-privacy-client-0.3.4-windows-x64-setup.exe", html)
         # Package table must not be misclassified as section B
         self.assertNotIn("section-b-probes", html)
+
+    def test_mojibake_package_state_and_platform_render_clean(self):
+        """Package table with cp1252-mojibaked STATE/platform must not show tofu."""
+        green_moj = "🟩".encode("utf-8").decode("cp1252")
+        # Mixed platform corruption observed on shipped macOS/Linux AUDIT rows
+        mac_moj = "\u00f0\u0178\u008d\u017d"
+        md = f"""
+## Installer package AUDIT STATE
+
+| Platform | Package | STATE | Notes |
+|----------|---------|-------|-------|
+| {mac_moj} **macOS** | `restore-privacy-client-0.4.0-macos.zip` | {green_moj} | pin ok |
+| 🪟 **Windows** | `restore-privacy-client-0.4.0-windows-x64-setup.exe` | 🟩 | pin ok |
+"""
+        html = markdownish_to_html(md)
+        self.assertIn("pkg-rag", html)
+        self.assertIn("rag-swatch rag-green", html)
+        self.assertIn("rag-cell", html)
+        self.assertIn("plat-icon", html)
+        self.assertIn("macOS", html)
+        # Wonky mojibake must not remain as visible STATE/platform glyph content
+        self.assertNotIn(green_moj, html)
+        self.assertNotIn(mac_moj, html)
+
+    def test_shipped_audit_package_state_cells_are_swatches_not_raw_squares(self):
+        audit = ROOT / "AUDIT.md"
+        if not audit.is_file():
+            self.skipTest("AUDIT.md missing")
+        text = audit.read_text(encoding="utf-8")
+        if "Installer package AUDIT STATE" not in text:
+            self.skipTest("package RAG section missing")
+        html = markdownish_to_html(text)
+        self.assertIn("pkg-rag", html)
+        self.assertIn("rag-swatch", html)
+        # No residual cp1252 mojibake of green/amber squares in HTML body
+        for good in ("🟩", "🟧", "🟥"):
+            moj = good.encode("utf-8").decode("cp1252")
+            self.assertNotIn(moj, html)
+        # Canonical colour-square emoji should not remain as bare STATE cell text
+        # (swatch replaces pure cells; legend may still mention colours as words)
+        self.assertNotIn("ðŸŸ", html)
 
 
 if __name__ == "__main__":

@@ -186,14 +186,94 @@ _RAG_WORD_SWATCH_MAP: dict[str, tuple[str, str]] = {
     "RED": ("rag-red", "Red"),
 }
 
+# Product RAG squares + platform column icons that may appear in AUDIT tables.
+_AUDIT_EMOJI_CANONICAL: tuple[str, ...] = (
+    "🟩",
+    "🟧",
+    "🟥",
+    "🪟",
+    "🐧",
+    "🍎",
+    "📱",
+    "🤖",
+    "📦",
+)
+
+
+def _mojibake_pairs_for_emoji(emoji: str) -> list[tuple[str, str]]:
+    """Return (corrupted, good) pairs for common UTF-8 mis-decodes of *emoji*."""
+    pairs: list[tuple[str, str]] = []
+    raw = emoji.encode("utf-8")
+    # UTF-8 bytes misread as Windows-1252 (typical editor/console mojibake)
+    try:
+        bad_cp = raw.decode("cp1252")
+        if bad_cp != emoji and "\ufffd" not in bad_cp:
+            pairs.append((bad_cp, emoji))
+    except UnicodeDecodeError:
+        pass
+    # UTF-8 bytes misread as latin-1 / ISO-8859-1
+    bad_l1 = raw.decode("latin-1")
+    if bad_l1 != emoji:
+        pairs.append((bad_l1, emoji))
+    return pairs
+
+
+def _build_audit_emoji_repairs() -> list[tuple[str, str]]:
+    """All (bad, good) replacements for AUDIT RAG/platform emoji recovery."""
+    pairs: list[tuple[str, str]] = []
+    for good in _AUDIT_EMOJI_CANONICAL:
+        pairs.extend(_mojibake_pairs_for_emoji(good))
+    # Observed mixed corruption in shipped AUDIT.md (macOS / Linux platform cells):
+    # partial cp1252 + residual C1 bytes that neither pure cp1252 nor latin-1 alone match.
+    pairs.extend(
+        (
+            ("\u00f0\u0178\u008d\u017d", "🍎"),  # macOS 🍎
+            ("\u00f0\u0178\u0090\u00a7", "🐧"),  # Linux 🐧
+        )
+    )
+    # Longest first so multi-byte sequences win over prefixes
+    pairs.sort(key=lambda item: len(item[0]), reverse=True)
+    # Dedup while preserving order
+    seen: set[str] = set()
+    out: list[tuple[str, str]] = []
+    for bad, good in pairs:
+        if not bad or bad == good or bad in seen:
+            continue
+        seen.add(bad)
+        out.append((bad, good))
+    return out
+
+
+_AUDIT_EMOJI_REPAIRS: list[tuple[str, str]] = _build_audit_emoji_repairs()
+
+
+def repair_audit_emoji_mojibake(text: str) -> str:
+    """Repair UTF-8 emoji that were mojibaked (e.g. 🟩 → ``ðŸŸ©``).
+
+    Shipped AUDIT package/UK-RAG tables sometimes store Windows-1252 mis-decodes
+    of solid colour squares and platform icons. Those fail ``rag_swatch_html``
+    and surface as wonky characters on the public audit page.
+    """
+    if not text:
+        return text
+    # Fast path: no high-bit mojibake lead-ins commonly used for these glyphs
+    if "\u00f0" not in text and "ð" not in text:
+        return text
+    out = text
+    for bad, good in _AUDIT_EMOJI_REPAIRS:
+        if bad in out:
+            out = out.replace(bad, good)
+    return out
+
 
 def rag_swatch_html(emoji_or_state: str) -> str | None:
     """Safe solid colour box HTML for a RAG/section-B state, or None.
 
     Accepts package emoji (🟩/🟧/🟥) and word states (PASS/SKIP/FAIL), including
-    markdown-bold forms such as ``**PASS**``.
+    markdown-bold forms such as ``**PASS**``. Also accepts common mojibake
+    forms of the colour squares (repaired before lookup).
     """
-    key = (emoji_or_state or "").strip()
+    key = repair_audit_emoji_mojibake((emoji_or_state or "").strip())
     if not key:
         return None
     if key in _RAG_SWATCH_MAP:
@@ -224,7 +304,8 @@ def _inline_format(escaped_line: str) -> str:
             return f'<a href="{url}">{label}</a>'
         return m.group(0)
 
-    s = re.sub(r"\[([^\]]+)\]\(([^)]+)\)", link_sub, escaped_line)
+    s = repair_audit_emoji_mojibake(escaped_line)
+    s = re.sub(r"\[([^\]]+)\]\(([^)]+)\)", link_sub, s)
     s = re.sub(r"`([^`]+)`", r"<code>\1</code>", s)
     s = re.sub(r"\*\*([^*]+)\*\*", r"<strong>\1</strong>", s)
     s = re.sub(r"(?<!\*)\*([^*]+)\*(?!\*)", r"<em>\1</em>", s)
@@ -241,7 +322,7 @@ def _inline_format(escaped_line: str) -> str:
 
 def _format_table_cell(raw_cell: str, *, header: bool = False) -> str:
     """Format one table cell; pure RAG swatch cells get centered solid fill."""
-    stripped = (raw_cell or "").strip()
+    stripped = repair_audit_emoji_mojibake((raw_cell or "").strip())
     box = rag_swatch_html(stripped)
     if box is not None and not header:
         return f'<div class="rag-cell">{box}</div>'
@@ -258,14 +339,16 @@ def _format_table_cell(raw_cell: str, *, header: bool = False) -> str:
             f'<span class="plat-icon" aria-hidden="true">{icon}</span>'
             f"<strong>{_escape(name.strip())}</strong>"
         )
-    return _inline_format(_escape(raw_cell))
+    return _inline_format(_escape(raw_cell if raw_cell is not None else ""))
 
 
 def markdownish_to_html(text: str) -> str:
     """Conservative markdown → HTML for product docs (escape-first, no script)."""
     import re
 
-    text = text.lstrip("\ufeff").replace("\r\n", "\n").replace("\r", "\n")
+    text = repair_audit_emoji_mojibake(
+        text.lstrip("\ufeff").replace("\r\n", "\n").replace("\r", "\n")
+    )
     lines = text.split("\n")
     out: list[str] = []
     i = 0
