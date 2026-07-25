@@ -135,7 +135,7 @@ python3 scripts/sign_and_notarize_macos.py \
 
 Credentials: `RP_NOTARY_KEY` / `RP_NOTARY_KEY_ID` / `RP_NOTARY_ISSUER`, or the
 App Store Connect API key under `~/Library/Developer/perccent-codesign/`.
-Identity default: `Developer ID Application: Russell Sneddon (SFCBP95595)`.
+Identity default (Apple certificate Common Name — codesign literal, not operator display name): `Developer ID Application: Russell Sneddon (SFCBP95595)`. Operator: **Raskul**.
 
 Release packaging (`scripts/build_release_0.1.3.py`) calls this same path so the
 GitHub **macos.zip** is Gatekeeper-safe.

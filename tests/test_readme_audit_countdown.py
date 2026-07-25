@@ -26,27 +26,25 @@ import app as status_app  # noqa: E402
 
 
 class TestReadmeSuperGrokTagline(unittest.TestCase):
-    def test_readme_has_vibe_coding_tagline_not_wireguard_sentence(self):
+    def test_readme_operator_raskul_and_product_identity(self):
         text = (ROOT / "README.md").read_text(encoding="utf-8")
         # Removed OBJECTIVE sentence
         self.assertNotIn(
             "Not WireGuard, OpenVPN, IPsec, or any other pre-existing VPN product.",
             text,
         )
-        # Verbatim must-haves from OBJECTIVE
-        self.assertIn("vibe coding", text)
-        self.assertIn("SuperGrok Heavy Grok-Build", text)
-        self.assertIn("Russell G Sneddon", text)
-        self.assertIn("Regular audits are scripted to run intermittently", text)
-        self.assertIn(
-            "Restore Privacy is built from the ground up using unashamed vibe coding methods",
-            text,
-        )
+        # Operator credit (concise product intro — no banned person names)
+        self.assertIn("Raskul", text)
+        self.assertNotIn("Russell G Sneddon", text)
+        self.assertNotIn("Sneddon", text)
+        self.assertIn("custom VPN", text)
+        self.assertIn("security audits", text)
         # Public mirror stays in sync when present
         pub = ROOT / "status_page" / "public" / "README.md"
         if pub.is_file():
             pub_text = pub.read_text(encoding="utf-8")
-            self.assertIn("SuperGrok Heavy Grok-Build", pub_text)
+            self.assertIn("Raskul", pub_text)
+            self.assertNotIn("Russell G Sneddon", pub_text)
             self.assertNotIn(
                 "Not WireGuard, OpenVPN, IPsec, or any other pre-existing VPN product.",
                 pub_text,

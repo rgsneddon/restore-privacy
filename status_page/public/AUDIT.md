@@ -5,7 +5,7 @@
 | **Product** | Restore Privacy Tunnel (RPT / RPT2) |
 | **Repository** | restore-privacy (**private** source; installers only via paid status host) |
 | **Public catalog version** | **0.4.5** (live paid packages; package RAG table below may lag until next full audit pass) |
-| **Production node** | **82.221.101.241:44044** (UDP); status UI TCP **8080** — **Iceland**, host **FlokiNET** |
+| **Catalog residual peers** | **IS** `82.221.101.241:44044` (default entry, FlokiNET; status TCP **8080**), **RO** `185.146.232.107:44044`, **DE** `167.233.224.5:44044` |
 | **Audit generated** | **22 July 2026** (`2026-07-22T13:00:14Z`) |
 | **Cadence** | Automated security pass (~**every 4 hours** + **jitter** on the privacy-hardened node timer) |
 | **Audit type** | Static suite + live node probes + per-installer AUDIT STATE + section B privacy probes + multihop structure |
@@ -119,7 +119,7 @@ Latest automated pass for production node **82.221.101.241** and in-repo privacy
 
 **Main residual risks (environment / design):**
 
-1. **Host / OS** — Product node is on **FlokiNET** in **Iceland**. Host public “no invasive logsâ€ posture (https://flokinet.is/privacy/, https://flokinet.is/vps/) is not a product lab audit. CDN/status and home-ISP paths may still log. Guest OS compromise can expose live RAM.  
+1. **Host / OS** — Product node is on **FlokiNET** in **Iceland**. Host public “no invasive logs” posture (https://flokinet.is/privacy/, https://flokinet.is/vps/) is not a product lab audit. CDN/status and home-ISP paths may still log. Guest OS compromise can expose live RAM.  
 2. **Apple** — residual IP needs signed Packet Tunnel / NE.  
 3. **Linux** — residual needs root + TUN/`ip`.  
 4. **Traffic analysis** — pad/obfs (**QUIC-mimic** when on) are mitigations only.  
@@ -146,7 +146,7 @@ Latest automated pass for production node **82.221.101.241** and in-repo privacy
 
 - Served on the status host as `/AUDIT.md` and `/audit.md` (source repo private).  
 - Default product host **82.221.101.241**.  
-- Node ElGamal pub pin: `product/NODE_ELGAMAL_PUB.sha256` (SHA-256 `1b126abfâ€¦`).  
+- Node ElGamal pub pin: `product/NODE_ELGAMAL_PUB.sha256` (SHA-256 `1b126abf…`).  
 - No secret material is pasted into this document.
 
 ---
@@ -207,7 +207,7 @@ An unlocked device can expose the local device key and residual config. Packages
 |-------------|--------|
 | Product host | **82.221.101.241** |
 | Public catalog | **0.4.5** paid installers on [status host](https://restoreprivacy.online/) |
-| Node pub pin | `1b126abfâ€¦` |
+| Node pub pin | `1b126abf…` |
 | No `.priv` in public package trees | OK |
 
 ---

@@ -40,7 +40,8 @@ The dark retro chrome is a visual nod to classic Windows 3.x UI — no Microsoft
 | **GitHub** | Private operator source hosting (not a free public installer CDN) | GitHub terms |
 | **Stripe** | Catalog checkout (monthly £2.45 / yearly £27.93 GBP) | https://stripe.com/ |
 | **Render** | Public status host + paid download fulfilment | https://render.com/ |
-| **FlokiNET** | Production node VPS in Iceland (`82.221.101.241`) | https://flokinet.is/privacy/ · https://flokinet.is/vps/ |
+| **FlokiNET** | Residual peers IS (`82.221.101.241`) + RO (`185.146.232.107`) | https://flokinet.is/privacy/ · https://flokinet.is/vps/ |
+| **Hetzner** | Residual peer DE (`167.233.224.5`) | https://www.hetzner.com/ |
 
 ## Standards (non-code)
 
@@ -49,7 +50,7 @@ The dark retro chrome is a visual nod to classic Windows 3.x UI — no Microsoft
 
 ## Project authorship
 
-Original RPT protocol, node, clients, and status host: **Russell G Sneddon** and contributors. Source repository **restore-privacy** is **private**. Public docs and paid installers: https://restoreprivacy.online/
+Original RPT protocol, node, clients, and status host: **Raskul** and contributors. Source repository **restore-privacy** is **private**. Public docs and paid installers: https://restoreprivacy.online/
 
 Project licence for original code: **proprietary full copyright** — see [LICENSE](LICENSE). Third-party components keep their own licences (tables above).
 

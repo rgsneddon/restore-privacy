@@ -1,4 +1,25 @@
-# Node wipe / rebuild reinstall (entry ≠ exit)
+# Node wipe / rebuild reinstall (sequential fleet)
+
+## Sequential fleet wipe (~7d) — **one peer at a time**
+
+Planner: `node/fleet_wipe.py` (`PREFERRED_FLEET_ORDER = IS → RO → DE`).  
+Orchestrator entrypoint: `scripts/weekly_entry_rebuild.py` (still hosts the timer; fleet order is multi-peer).
+
+| Rule | Detail |
+|------|--------|
+| Order | **IS first**, then **RO**, then **DE** (and any later catalog peers) — finish prior peer before starting next |
+| Concurrency | Exclusive lock — **never** concurrent multi-node wipe |
+| Continuity | Clients hop to a healthy alternate while a peer drains (not zero packet-loss) |
+| After wipe | **Mandatory full selfhost reinstall** on the wiped peer |
+| Live | Requires `RPT_EPHEMERAL_CONFIRM=yes`; dry-run is the safe default |
+
+Results snapshot: [FLEET_WIPE_RESULTS_2026-07-25.md](FLEET_WIPE_RESULTS_2026-07-25.md).
+
+---
+
+## Legacy note: weekly entry-only planner helpers
+
+Older helpers still describe **entry-only** weekly wipe (exit stays up for failover). Current product fleet wipe is sequential across catalog peers as above.
 
 ## Weekly timed wipe (~7d) — **entry only**
 

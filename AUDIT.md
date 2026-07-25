@@ -5,7 +5,7 @@
 | **Product** | Restore Privacy Tunnel (RPT / RPT2) |
 | **Repository** | restore-privacy (**private** source; installers only via paid status host) |
 | **Public catalog version** | **0.4.5** (live paid packages; package RAG table below may lag until next full audit pass) |
-| **Production node** | **82.221.101.241:44044** (UDP); status UI TCP **8080** — **Iceland**, host **FlokiNET** |
+| **Catalog residual peers** | **IS** `82.221.101.241:44044` (default entry, FlokiNET; status TCP **8080**), **RO** `185.146.232.107:44044`, **DE** `167.233.224.5:44044` |
 | **Audit generated** | **22 July 2026** (`2026-07-22T13:00:14Z`) |
 | **Cadence** | Automated security pass (~**every 4 hours** + **jitter** on privacy-hardened node timer) |
 | **Audit type** | Static suite + live node status probe + **per-installer AUDIT STATE** + **section B privacy probes** + **multihop node structure** |
@@ -67,7 +67,7 @@ Honesty: **residual-via-exit when multi-hop enabled; not full intermediate onion
 | Probe | State | Notes |
 |-------|-------|-------|
 | **multihop_module_flags** | **PASS** | MULTI_HOP_ROUTING_IMPLEMENTED=True (residual-via-exit); entry host 82.221.101.241:44044 (Iceland monopin); exit host 185.146.232.107:44044 (Romania monopin) |
-| **multihop_product_pubs** | **PASS** | entry pub present (C:\Users\rgsne\restore_privacy\product\node_elgamal.pub) sha=1b126abfae737c66â€¦; exit pub present (C:\Users\rgsne\restore_privacy\product\exit_node_elgamal.pub... |
+| **multihop_product_pubs** | **PASS** | entry pub present (C:\Users\rgsne\restore_privacy\product\node_elgamal.pub) sha=1b126abfae737c66…; exit pub present (C:\Users\rgsne\restore_privacy\product\exit_node_elgamal.pub... |
 | **multihop_residual_via_exit** | **PASS** | is_multihop_active=True for entry→exit path; residual_endpoint dials exit 185.146.232.107:44044 (residual-via-exit); multi-hop disabled residual stays entry 82.221.101.241 (defa... |
 | **multihop_node_host_layout** | **PASS** | present: C:\Users\rgsne\restore_privacy\node\install_zram_luks.sh; present: C:\Users\rgsne\restore_privacy\node\install_host_privacy.sh; node-only: clients never install LUKS/zram |
 
@@ -137,7 +137,7 @@ Latest automated security audit for production node **82.221.101.241** and the i
 
 **Primary residual risks (open by design / environment):**
 
-1. **Operational** — Product node is on **FlokiNET** in **Iceland** (strict **Icelandic** privacy / free-expression hosting norms). **As far as we can be assured** from FlokiNET’s public statements (**“No invasive logsâ€**; resource-usage monitoring only; no third-party tenant traffic/pattern sharing — https://flokinet.is/privacy/, https://flokinet.is/vps/), the host does **not** retain invasive logs of users connecting to the node. That is host-published posture, not a product forensic audit. Separate CDN/status hosts and home-ISP paths may still log. Node **OS compromise** (live RAM) remains residual.  
+1. **Operational** — Product node is on **FlokiNET** in **Iceland** (strict **Icelandic** privacy / free-expression hosting norms). **As far as we can be assured** from FlokiNET’s public statements (**“No invasive logs”**; resource-usage monitoring only; no third-party tenant traffic/pattern sharing — https://flokinet.is/privacy/, https://flokinet.is/vps/), the host does **not** retain invasive logs of users connecting to the node. That is host-published posture, not a product forensic audit. Separate CDN/status hosts and home-ISP paths may still log. Node **OS compromise** (live RAM) remains residual.  
 2. **Apple** — residual IP requires signed Packet Tunnel / NE.  
 3. **Linux privilege floor** — residual needs root + TUN/`ip`.  
 4. **Traffic analysis** — padding/jitter/cover/outer obfs are mitigations only.  
@@ -164,7 +164,7 @@ Latest automated security audit for production node **82.221.101.241** and the i
 
 - Public audit is served on the **status host** as **`/AUDIT.md`** and **`/audit.md`** (source repo is private).  
 - Product default host **82.221.101.241**.  
-- Product node ElGamal pub pin: `product/NODE_ELGAMAL_PUB.sha256` (SHA-256 `1b126abfâ€¦`).  
+- Product node ElGamal pub pin: `product/NODE_ELGAMAL_PUB.sha256` (SHA-256 `1b126abf…`).  
 - **Did not** paste secret material into this document.
 
 ---
@@ -187,7 +187,7 @@ Latest automated security audit for production node **82.221.101.241** and the i
 
 #### Scenario A — VPS compromise
 
-Production node placement: **Iceland**, hypervisor host **FlokiNET**. **As far as we can be assured** from FlokiNET’s public statements, the host does **not** retain invasive connection logs of users connecting to the node (**“No invasive logsâ€**; no third-party traffic/pattern sharing; overall resource usage only). If the **VPS guest OS / root** (production node) is fully compromised while sessions are active, **in-memory** session material may still be exposed. Product **no-log** / nolog composition reduces durable user-info logs on disk but does **not** erase live RAM. **Residual risk:** compromise of the node OS (distinct from FlokiNET’s published no-invasive-logs posture for tenant connection logging).
+Production node placement: **Iceland**, hypervisor host **FlokiNET**. **As far as we can be assured** from FlokiNET’s public statements, the host does **not** retain invasive connection logs of users connecting to the node (**“No invasive logs”**; no third-party traffic/pattern sharing; overall resource usage only). If the **VPS guest OS / root** (production node) is fully compromised while sessions are active, **in-memory** session material may still be exposed. Product **no-log** / nolog composition reduces durable user-info logs on disk but does **not** erase live RAM. **Residual risk:** compromise of the node OS (distinct from FlokiNET’s published no-invasive-logs posture for tenant connection logging).
 
 #### Scenario B — Traffic analysis by ISP
 
@@ -228,7 +228,7 @@ An **ISP** performing **traffic analysis** may still observe connection timing a
 |-------------|--------|
 | Product host | **82.221.101.241** |
 | Public catalog | **0.4.5** paid installers on [status host](https://restoreprivacy.online/) (£2.45; no free GitHub release downloads) |
-| Node pub pin | `1b126abfâ€¦` |
+| Node pub pin | `1b126abf…` |
 | No `.priv` in public package trees | OK |
 
 ---

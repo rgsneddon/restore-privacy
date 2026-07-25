@@ -12,10 +12,10 @@ Build and sign on a **Mac** with Xcode. This Windows checkout only prepares sour
 | Item | Value / location |
 |------|------------------|
 | Endpoint | `82.221.101.241:44044` UDP (`lib/rpt_config.dart`) |
-| Protocol | **RPT2** (not WireGuard / OpenVPN) Ã¢â‚¬â€ see `client/connect.py`, `node/handshake.py` |
-| Method channel | **`restore_privacy/vpn`** Ã¢â‚¬â€ methods `connect`, `disconnect` (see `lib/vpn_controller.dart`) |
+| Protocol | **RPT2** (not WireGuard / OpenVPN) Ã¢â‚¬” see `client/connect.py`, `node/handshake.py` |
+| Method channel | **`restore_privacy/vpn`** Ã¢â‚¬” methods `connect`, `disconnect` (see `lib/vpn_controller.dart`) |
 | Connect args | `host`, `port`, `fullTunnel`, `sessionName`, `route`, `autoConnect` |
-| Result map | `{ ok, message, vpnIp?, fullTunnelActive?, hostOnlySession? }` Ã¢â‚¬â€ use `lib/connect_status.dart` |
+| Result map | `{ ok, message, vpnIp?, fullTunnelActive?, hostOnlySession? }` Ã¢â‚¬” use `lib/connect_status.dart` |
 | Residual public IP | Changes **only** when OS Packet Tunnel is `.connected`. Host-side RPT2 HELLO alone is diagnostic (`ok: false`). |
 | UI | Retro: banner `#000080`, black bg, white text; privacy message string in `lib/theme.dart` |
 | Auto-connect | On launch (`RptConfig.autoConnectOnLaunch`) |
@@ -27,8 +27,8 @@ Build and sign on a **Mac** with Xcode. This Windows checkout only prepares sour
 
 Required admission files (product client, **not** node private key):
 
-- `client_ed25519.priv` Ã¢â‚¬â€ 32 raw bytes  
-- `node_elgamal.pub` Ã¢â‚¬â€ node ElGamal public key bytes  
+- `client_ed25519.priv` Ã¢â‚¬” 32 raw bytes  
+- `node_elgamal.pub` Ã¢â‚¬” node ElGamal public key bytes  
 
 **Do not** ship `node_elgamal.priv` in any app or extension.
 
@@ -46,13 +46,13 @@ Suggested placement on Mac:
 Copy from the VPN node (operator machine only):
 
 ```bash
-# example Ã¢â‚¬â€ from a machine that can SSH to the node
+# example Ã¢â‚¬” from a machine that can SSH to the node
 scp root@82.221.101.241:/opt/restore-privacy/secrets/client_ed25519.priv \
     root@82.221.101.241:/opt/restore-privacy/secrets/node_elgamal.pub \
     ~/.restore-privacy/secrets/
 ```
 
-## On your MacBook Ã¢â‚¬â€ quick start
+## On your MacBook Ã¢â‚¬” quick start
 
 ```bash
 git clone <your-repo-url> restore_privacy   # or pull latest
@@ -70,14 +70,14 @@ flutter run -d macos
 
 Then follow:
 
-- [ios/BUILD_ON_MAC.md](ios/BUILD_ON_MAC.md) Ã¢â‚¬â€ Packet Tunnel + signing  
-- [macos/BUILD_ON_MAC.md](macos/BUILD_ON_MAC.md) Ã¢â‚¬â€ Network Extension + notarization  
+- [ios/BUILD_ON_MAC.md](ios/BUILD_ON_MAC.md) Ã¢â‚¬” Packet Tunnel + signing  
+- [macos/BUILD_ON_MAC.md](macos/BUILD_ON_MAC.md) Ã¢â‚¬” Network Extension + notarization  
 
 Native prep stubs (drag into Xcode targets as described in those docs):
 
-- `ios/NativePrep/` Ã¢â‚¬â€ method channel + Packet Tunnel skeleton  
-- `macos/NativePrep/` Ã¢â‚¬â€ method channel + Packet Tunnel skeleton  
-- `ios/NativePrep/RPT_PROTOCOL.md` Ã¢â‚¬â€ handshake/DATA outline for Swift  
+- `ios/NativePrep/` Ã¢â‚¬” method channel + Packet Tunnel skeleton  
+- `macos/NativePrep/` Ã¢â‚¬” method channel + Packet Tunnel skeleton  
+- `ios/NativePrep/RPT_PROTOCOL.md` Ã¢â‚¬” handshake/DATA outline for Swift  
 
 ## What is already implemented (this tree)
 
@@ -131,7 +131,7 @@ NE with `allow-unsigned-executable-memory` or `disable-library-validation`).
 
 Packet Tunnel targets are configured for **Team signing** (`CODE_SIGNING_ALLOWED = YES`, `CODE_SIGNING_REQUIRED = YES`, team `SFCBP95595`). The old ad-hoc re-sign step only runs when signing is explicitly disabled.
 
-## Operator checklist Ã¢â‚¬â€ enable real Packet Tunnel VPN
+## Operator checklist Ã¢â‚¬” enable real Packet Tunnel VPN
 
 Do these **in order**. Entitlement *files* are already patched; you still must register them with Apple and sign with your Team.
 
@@ -147,7 +147,7 @@ Do these **in order**. Entitlement *files* are already patched; you still must r
    - Same **App Groups** entry
 5. If Xcode uses Automatic Signing, it will create Development profiles after step 2. For Mac distribution outside the Mac App Store, also ensure Developer ID + Network Extension is allowed for that App ID when Apple requires it.
 
-### 2. Xcode Ã¢â‚¬â€ pick Team (both platforms)
+### 2. Xcode Ã¢â‚¬” pick Team (both platforms)
 
 ```bash
 cd client_app
@@ -158,7 +158,7 @@ open ios/Runner.xcworkspace     # iOS
 
 For **Runner** and **PacketTunnel** on each platform:
 
-1. **Signing & Capabilities** Ã¢â€ ’ Team **SFCBP95595** (Russell Sneddon).
+1. **Signing & Capabilities** → Team **SFCBP95595** (Raskul).
 2. **Automatically manage signing** = ON.
 3. Confirm capabilities appear (Network Extensions / Packet Tunnel, App Groups). If Xcode offers to Ã¢â‚¬Å“fixÃ¢â‚¬Â entitlements mismatches, prefer keeping the repo plists above.
 4. Confirm provider bundle id stays `com.restoreprivacy.restorePrivacyClient.PacketTunnel` (matches `RptVpnChannel.providerBundleId`).
@@ -175,7 +175,7 @@ The **PacketTunnel** app extension is already created and embedded:
 | Code signing | `CODE_SIGNING_ALLOWED = YES`, team `SFCBP95595` |
 | Embed | Runner Ã¢â€ ’ **Embed Foundation Extensions** Ã¢â€ ’ `PacketTunnel.appex` |
 
-**You only need to:** open the workspace, pick Team on Runner + PacketTunnel (Automatic Signing), and ensure the portal App ID for `.PacketTunnel` exists with Network Extensions + App Group. If Xcode shows a profile error, fix the portal App ID Ã¢â‚¬â€ do not create a second Packet Tunnel target.
+**You only need to:** open the workspace, pick Team on Runner + PacketTunnel (Automatic Signing), and ensure the portal App ID for `.PacketTunnel` exists with Network Extensions + App Group. If Xcode shows a profile error, fix the portal App ID Ã¢â‚¬” do not create a second Packet Tunnel target.
 
 ### 4. Secrets the extension can read
 
@@ -222,7 +222,7 @@ Approve the VPN permission sheet. Trust the developer certificate under Settings
 
 | Check | Expected |
 |-------|----------|
-| App status | `Connected Ã¢â‚¬â€ tunnel IP 10.88.0.x` **and** system VPN indicator on |
+| App status | `Connected Ã¢â‚¬” tunnel IP 10.88.0.x` **and** system VPN indicator on |
 | macOS menu bar / iOS status bar | VPN active |
 | Browser / `curl ifconfig.me` | **Not** your home residual IP (node egress) |
 | If Packet Tunnel failed | Honest `ok: false` residual-IP message (not a false Ã¢â‚¬Å“ConnectedÃ¢â‚¬Â) |
@@ -259,7 +259,7 @@ python3 scripts/sign_and_notarize_macos.py \
   --zip releases/0.1.3/restore-privacy-client-0.1.3-macos.zip
 ```
 
-See [macos/BUILD_ON_MAC.md](macos/BUILD_ON_MAC.md) Ã‚Â§ Gatekeeper.
+See [macos/BUILD_ON_MAC.md](macos/BUILD_ON_MAC.md) Ã‚§ Gatekeeper.
 
 
 ## Catalog 0.3.9

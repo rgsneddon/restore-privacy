@@ -1,6 +1,6 @@
 # Restore Privacy
 
-**Restore Privacy Tunnel (RPT)** is a custom VPN client for private residual connectivity. It is an original product, maintained under Russell G Sneddon’s direction, with regular automated security audits.
+**Restore Privacy Tunnel (RPT)** is a custom VPN client for private residual connectivity. It is an original product, maintained under **Raskul**’s direction, with regular automated security audits.
 
 | | |
 |--|--|
@@ -14,7 +14,7 @@
 
 ## At a glance
 
-- **Node:** `82.221.101.241:44044` (UDP RPT2), **Iceland**, hosted on **FlokiNET**. Their public materials state **no invasive logs** and no third-party sharing of tenant traffic patterns ([privacy](https://flokinet.is/privacy/), [VPS](https://flokinet.is/vps/)) — that is host posture, not a product lab audit of FlokiNET.
+- **Nodes:** Iceland `82.221.101.241:44044` (default entry, FlokiNET), Romania `185.146.232.107:44044`, Germany `167.233.224.5:44044` — residual catalog peers (user-selectable entry; multi-hop exit is another peer). FlokiNET public materials state **no invasive logs** for their Iceland/Romania posture ([privacy](https://flokinet.is/privacy/), [VPS](https://flokinet.is/vps/)) — host posture, not a product lab audit.
 - **Connect / Disconnect** by hand. Optional Settings: run at startup, autoconnect on launch (both **off** by default). Settings also links to audit, privacy policy, and licence.
 - System tray identity **Privacy Restored** (Windows) with product logo icons.
 - Privacy message: `lightweight vpn to restore your privacy - no user data is retained - your privacy is restored`
@@ -28,9 +28,9 @@
 - Session **PFS** (ephemeral X25519) on residual HELLO for all product clients (Python Windows/Linux, Android, iOS/macOS Packet Tunnel).
 - **Outer obfuscation** (QUIC-mimic wrap) and **traffic shaping** (pad / jitter / cover) are **off** by default (lean residual). Turn them on in Settings (`RPT_OBFS=1` / `RPT_TRAFFIC_SHAPE=1` also force on for Python) — mitigations, not “undetectable DPI”. When on: pad bucket 128, cover ~2s, jitter ≤40ms.
 - Tunnel DNS only (`10.88.0.1`, no public DNS fallbacks) while residual capture is active.
-- Multi-hop residual is **opt-in** (`RPT_MULTIHOP_ENABLED=1`): dials the Romania exit (`185.146.232.107`); default is single-hop Iceland entry. **residual-via-exit** routing is implemented (not hop-list-only).
-- Status site shows a **live entry-node clear timer** (**Node A** / entry only, ~7 days). Exit is **never** wiped by the weekly service (stays up for residual failover) — **no exit wipe countdown**.
-- **Weekly** entry node wipe/rebuild (~7d): **exclusive** single-instance lock; clients auto residual-failover to exit while entry drains, then prefer re-entry when entry is healthy again (not zero packet-loss; not concurrent exit wipe).
+- Multi-hop residual is **opt-in** (`RPT_MULTIHOP_ENABLED=1`): exit is a **random non-entry** catalog peer (RO or DE when entry is IS). Default is single-hop on the chosen entry. **residual-via-exit** routing is implemented (not hop-list-only).
+- Status site shows a **live preferred-entry clear timer** (~7 days). Fleet wipe is **sequential** (IS → RO → DE, one peer at a time) — never concurrent multi-node wipe.
+- **Weekly** sequential fleet wipe/rebuild (~7d): exclusive lock; clients auto hop to a healthy alternate while a peer drains, then rejoin preferred when ready (not zero packet-loss).
 - Security audit documents **per-installer AUDIT STATE** (Green / Amber / Red) for catalog packages — [AUDIT.md](AUDIT.md).
 - End-user licence is **proprietary full copyright** ([LICENSE](LICENSE)): client packages **AS IS**, use only to run a device on Restore Privacy VPN; no architecture copy/transmission.
 
@@ -47,7 +47,7 @@ Installers are **paid only** on [restoreprivacy.online](https://restoreprivacy.o
 3. Install → **accept the licence** → **enter the keygen** (forced unlock on all platforms). Download alone does **not** unlock residual HELLO.
 4. **Connect** while status is **OK** (active subscription + keygen). If payment fails, refunds, or the period ends, status is **EXPIRED** — the app hard-locks with **renew your licence *here*** and a platform-specific Stripe payment portal link until you pay again and re-enter a keygen.
 
-Weekly wipe UI is **entry-only** (no dual Node A/B wipe countdown on the homepage). After payment the status site delivers the installer once (authenticated proxy).
+Weekly wipe UI shows the **preferred-entry clear timer** (no dual Node A/B wipe countdown). Fleet wipe is sequential behind the scenes. After payment the status site delivers the installer once (authenticated proxy).
 
 > **Payment required for Connect:** residual Connect needs successful payment and keygen unlock while the subscription is active. Failed checkout, failed charge, refund, dispute, or period end → **EXPIRED** until you renew and re-enter a valid keygen.
 
@@ -72,7 +72,7 @@ The app re-checks the status host (`/api/connect-entitlement`) on each Connect s
 ### Windows
 
 1. On the [status downloads page](https://restoreprivacy.online/), choose **Monthly £2.45** or **Yearly** for **Windows** and download **`restore-privacy-client-0.4.5-windows-x64-setup.exe`** (one-time link after payment).
-2. Run the installer (PE self-extracting package: frozen runtime + Wintun — no separate Python install). The package may extract as a portable tree or install under LocalAppData.
+2. Run the installer (PE self-extracting package: frozen runtime + Wintun — no separate Python install). Default install is **Program Files\\Restore Privacy** (elevation when required); per-user fallback if Program Files is unwritable.
 3. **Accept the end-user licence**, then enter the **keygen** from your fulfilment email (forced unlock dialog). Settings → Payment entitlement is a fallback only. Connect is allowed only when status is **OK** (active subscription **and** keygen activated).
 4. Press **Connect** and approve **UAC** when prompted so residual public IP uses the VPN node. Scoped **Windows Defender Firewall** allows (node UDP + program) may be applied for residual Connect.
 5. Optional: **Settings** → startup / autoconnect (defaults **off**); legal links to audit / privacy / licence.
@@ -149,7 +149,7 @@ Every catalog installer includes a **Restore Internet** failsafe (Windows/Linux 
 | **Credits** | [CREDITS.md](CREDITS.md) |
 | **Code & policy audit** | [AUDIT.md](AUDIT.md) |
 
-Core promises: **no user-info logs** by design, **minimal public status** (title + downloads + **entry-only clear timer** for Node A / entry weekly wipe — **no exit wipe countdown**; exit stays up for residual failover — **no live client count**), **device keys** (not a shared client private key), **honest residual** only when full tunnel is up, **no third-party geo** on Connect. Product residual paths on **all platforms** (Windows, Linux, Android, iOS, macOS) keep **outer-layer obfuscation** and **padding / jitter / cover** **off by default** (lean residual) until the user turns them **on** in Settings; **kill-switch is not applied by default**. **Disconnect / Quit** restores residual routes (no intentional blackhole after normal teardown). **Restore Internet** is a full wipe failsafe (not ordinary Disconnect). Multi-hop residual is **opt-in** (`RPT_MULTIHOP_ENABLED=1`): residual dials the Romania exit when multi-hop is active (routing implemented); default remains single-hop Iceland entry. **Weekly entry wipe** (~7d) with exit residual failover while entry drains. Licence is **proprietary full copyright** (not MIT for original code). Node tunnel DNS uses **DoT** upstream. Production node VPS: **Iceland / FlokiNET** — **as far as we can be assured** from host public statements, **no invasive logs** of users connecting to the node (privacy §3.1 / §4).
+Core promises: **no user-info logs** by design, **minimal public status** (title + downloads + **preferred-entry clear timer** — **no live client count**), **device keys** (not a shared client private key), **honest residual** only when full tunnel is up, **no third-party geo** on Connect. Product residual paths on **all platforms** (Windows, Linux, Android, iOS, macOS) keep **outer-layer obfuscation** and **padding / jitter / cover** **off by default** (lean residual) until the user turns them **on** in Settings; **kill-switch is not applied by default**. **Disconnect / Quit** restores residual routes (no intentional blackhole after normal teardown). **Restore Internet** is a full wipe failsafe (not ordinary Disconnect). Multi-hop residual is **opt-in** (`RPT_MULTIHOP_ENABLED=1`): exit is a **random non-entry** catalog peer; default is single-hop on the chosen entry. **Weekly sequential fleet wipe** (~7d, IS → RO → DE, one peer at a time) with auto hop to a healthy alternate while a peer drains. Licence is **proprietary full copyright** (not MIT for original code). Node tunnel DNS uses **DoT** upstream. Catalog peers: **IS/RO FlokiNET**, **DE** residual peer — host public **no invasive logs** stance where published (privacy policy).
 
 ---
 
@@ -170,8 +170,8 @@ Short user-education summary. Full policy language: **[PRIVACY_POLICY.md — Thr
 
 - **Endpoint correlation** — sites still know you via logins, cookies, and browser fingerprints; many users share one node egress IP.
 - **Behavioral analysis** — observers can still study when you connect and rough usage patterns.
-- **VPS / provider IP metadata** — product node is **FlokiNET** in **Iceland**; host public **no invasive logs** stance is not a forensic audit. Other providers (CDN/status, home ISP, destinations) may still log. Node OS compromise remains a residual risk.
-- **Traffic analysis by ISP** beyond mitigations — you still appear to use a VPN; opt-in multi-hop residual uses the Romania exit when enabled.
+- **VPS / provider IP metadata** — catalog peers include **FlokiNET** (IS/RO) and the **DE** residual host; host public **no invasive logs** stance is not a forensic audit. Other providers (CDN/status, home ISP, destinations) may still log. Node OS compromise remains a residual risk.
+- **Traffic analysis by ISP** beyond mitigations — you still appear to use a VPN; opt-in multi-hop residual dials a non-entry catalog peer when enabled.
 - **Client device seizure** — local keys, apps, and browser history on an unlocked device are out of scope for the node’s no-log promise.
 - Malware, compromised OS, or destination-site tracking.
 
@@ -193,7 +193,7 @@ Node deploy, ports, secrets, from-source builds, and tests: **[sundries.txt](sun
 
 **Post-quantum readiness:** staged hybrid Kyber/ML-KEM hook in `node/pq_hybrid.py` + plan [`docs/PQ_MIGRATION.md`](docs/PQ_MIGRATION.md) (not residual PQ on the wire until dual-wire + real ML-KEM).
 
-**Product ship (v0.4.5):** Paid installers on **[status downloads](https://restoreprivacy.online/)** (macOS Developer ID notarized; iOS Team-signed). Source repo is private. Production node **82.221.101.241:44044** (**Iceland**, **FlokiNET** VPS; host public **no invasive logs** stance as far as we can be assured — see privacy policy).
+**Product ship (v0.4.5):** Paid installers on **[status downloads](https://restoreprivacy.online/)** (macOS Developer ID notarized; iOS Team-signed). Source repo is private. Catalog residual peers: **IS** `82.221.101.241:44044` (default entry, FlokiNET), **RO** `185.146.232.107:44044`, **DE** `167.233.224.5:44044` — user-selectable entry; host public **no invasive logs** stance where published (see privacy policy).
 
 **Self-host (one shot):** `sudo bash scripts/selfhost_node.sh` — node install + tunnel DNS + host privacy. Deploy remote: `python scripts/deploy_rpt_node.py` (`RPT_SSH_HOST`, `RPT_SSH_USER`, key). Details: [sundries.txt](sundries.txt).
 
@@ -203,7 +203,7 @@ Node deploy, ports, secrets, from-source builds, and tests: **[sundries.txt](sun
 
 **Ram-only node volume (zram + LUKS2):** [node/install_zram_luks.sh](node/install_zram_luks.sh) — `check` / `dry-run` / `status` / confirm-gated `format` (`RPT_ZRAM_LUKS_CONFIRM=yes`). **Node-host only** — clients never install LUKS/zram; residual Connect is unchanged. Honesty: encrypted RAM-backed volume, not full live-root secrecy, not client FDE, not erasure of VPS provider snapshots/netflow.
 
-**Weekly entry wipe/rebuild (exclusive; exit failover):** [scripts/weekly_entry_rebuild.py](scripts/weekly_entry_rebuild.py) — **~7d** timed **entry-only** snapshot/rebuild (`--dry-run` by default). Exclusive lock ([node/rebuild_lock.py](node/rebuild_lock.py)) refuses a second concurrent wipe and **never** wipes exit/both from this service. **Pre-wipe gates** ([node/wipe_preflight.py](node/wipe_preflight.py)): live path **fail closed** unless **exit residual** and **entry node** health both pass (UDP response and/or ICMP for exit; local listen/status for entry). After rebuild, **mandatory package reinstall** via selfhost. Clients auto residual-failover to **exit** while entry drains, and **prefer re-entry** when entry is healthy again ([client/multihop.py](client/multihop.py) `select_residual_endpoint`). Public homepage **entry-only** clear timer: [status_page/node_wipe_countdown.py](status_page/node_wipe_countdown.py) (exit wipe countdown removed; weekly service never rebuilds exit). Generic plan: [scripts/ephemeral_node.py](scripts/ephemeral_node.py). Timer: [scripts/install_ephemeral_timer.sh](scripts/install_ephemeral_timer.sh). Live requires `RPT_EPHEMERAL_CONFIRM=yes`. Does not erase provider backups/netflow; re-ship **public** node pin if keys rotate.
+**Weekly sequential fleet wipe/rebuild:** [node/fleet_wipe.py](node/fleet_wipe.py) + [scripts/weekly_entry_rebuild.py](scripts/weekly_entry_rebuild.py) — **~7d** timed wipe, **one peer at a time** (**IS → RO → DE**). Exclusive lock ([node/rebuild_lock.py](node/rebuild_lock.py)) refuses concurrent multi-node wipe. **Pre-wipe gates** ([node/wipe_preflight.py](node/wipe_preflight.py)): live path **fail closed** unless alternate residual and target peer health both pass. After rebuild, **mandatory package reinstall** via selfhost. Clients auto hop to a healthy alternate while a peer drains, then rejoin preferred when ready ([client/multihop.py](client/multihop.py)). Public homepage preferred-entry clear timer: [status_page/node_wipe_countdown.py](status_page/node_wipe_countdown.py). Results log: [docs/FLEET_WIPE_RESULTS_2026-07-25.md](docs/FLEET_WIPE_RESULTS_2026-07-25.md). Live requires `RPT_EPHEMERAL_CONFIRM=yes`. Does not erase provider backups/netflow; re-ship **public** node pins if keys rotate.
 
 **Release scripts:** `scripts/build_release_0.4.5.py`. **Windows multihop PE** (x64 only): `scripts/build_windows_multihop.py` / `scripts\build_windows_multihop.bat` — handoff [`client/windows/WINDOWS_HANDOFF_0.4.5.md`](client/windows/WINDOWS_HANDOFF_0.4.5.md). Release notes: [`scripts/RELEASE_NOTES_0.4.5.md`](scripts/RELEASE_NOTES_0.4.5.md). Catalog **0.4.5** Windows paid package may be PE-carry-forward until rebuilt on Windows x64; multihop residual-via-exit remains opt-in (`RPT_MULTIHOP_ENABLED=1` / Settings multi-hop).
 
@@ -224,4 +224,4 @@ python scripts/package_linux.py  # manylinux wheels for CPython 3.8–3.12; re-r
 python scripts/build_release_0.4.5.py
 ```
 
-**Node wipe reinstall (entry ≠ exit):** [docs/NODE_WIPE_REINSTALL.md](docs/NODE_WIPE_REINSTALL.md) — weekly timed wipe is **entry-only** with mandatory full selfhost reinstall; exit is manual/failover.
+**Node wipe reinstall (sequential fleet):** [docs/NODE_WIPE_REINSTALL.md](docs/NODE_WIPE_REINSTALL.md) — weekly wipe is **one peer at a time** (IS → RO → DE) with mandatory full selfhost reinstall; never concurrent multi-node wipe.

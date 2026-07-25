@@ -1,12 +1,12 @@
 # Privacy Policy — Restore Privacy
 
-**Last updated:** 24 July 2026  
+**Last updated:** 25 July 2026  
 **Product:** Restore Privacy Tunnel (RPT / RPT2) — VPN node, client apps, and public status shop  
 **Current packages (catalog v0.4.5):** paid installers on [restoreprivacy.online](https://restoreprivacy.online/) — Monthly **£2.45 GBP** or Yearly **£27.93** (5% off) per platform (Windows, Android, macOS, iOS, Linux — macOS **Developer ID** notarized; iOS **Team-signed** sideload). Source repository is **private**; free permanent GitHub installer URLs are not offered. After payment you get a **one-time** download and email with **keygen** + **PPI**. Pre-adjustment Settings defaults (lean residual): run at startup **off**, autoconnect **off**, residual VPN core **always on**, traffic shaping / outer obfuscation / multi-hop **off**. Optional browser extension (Chromium MV3, `restore-privacy-browser-extension-0.4.5.zip`) is browser-scoped only — not OS residual TUN.
 
 **Payment and Connect:** residual Connect needs a **successful payment** and **keygen unlock** while the subscription is **OK**. If payment fails, is refunded/disputed, or the paid period ends, status is **EXPIRED**: the app **hard-locks** with **renew your licence *here*** and a **platform payment portal** link until you renew and re-enter a valid keygen. Stripe session id / keygen are entitlement keys, not a username/password account. The status host also binds Stripe **`payment_intent`** so refunds without session metadata still revoke Connect.
 
-**Related:** [AUDIT.md](AUDIT.md) · Operator: Russell G Sneddon (`rgsneddon`) · Docs and downloads: [status host](https://restoreprivacy.online/)
+**Related:** [AUDIT.md](AUDIT.md) · Operator: **Raskul** · Docs and downloads: [status host](https://restoreprivacy.online/)
 
 This policy describes how the software is **designed** to handle data. It is not legal advice and not a jurisdiction-specific compliance certificate.
 
@@ -43,8 +43,8 @@ Node process stdout/stderr is configured for no journal session streams in the s
 ### 3.1 VPN node
 
 - **Optional at-rest encryption (operator):** LUKS2 data volumes (`node/install_disk_encryption.sh`) and optional zram+LUKS2 RAM volume (`node/install_zram_luks.sh`) are **node-only**. They protect locked volumes. They are **not** live secrecy against root on an unlocked host, **not** residual tunnel crypto, and they do not erase VPS provider snapshots/netflow.
-- **Endpoint:** UDP **82.221.101.241:44044**.
-- **Location / host:** Iceland on **FlokiNET** (https://flokinet.is/). Host public materials state **no invasive logs**, root-only customer access, monitoring limited to resource usage, and no third-party sharing of tenant traffic patterns (https://flokinet.is/privacy/, https://flokinet.is/vps/). That is **host-published posture**, not a Restore Privacy forensic audit of FlokiNET. Product no-log defaults (below) are separate.
+- **Endpoints (catalog peers):** Iceland **82.221.101.241:44044** (default entry, FlokiNET), Romania **185.146.232.107:44044** (FlokiNET), Germany **167.233.224.5:44044** — user-selectable entry; multi-hop exit is another peer.
+- **Location / host:** IS/RO on **FlokiNET** (https://flokinet.is/); DE is a separate residual peer. FlokiNET public materials state **no invasive logs**, root-only customer access, monitoring limited to resource usage, and no third-party sharing of tenant traffic patterns (https://flokinet.is/privacy/, https://flokinet.is/vps/). That is **host-published posture**, not a Restore Privacy forensic audit. Product no-log defaults (below) are separate.
 - Listens for handshakes and encrypted data frames; **admits** only peers that complete the product handshake with an authorized client key (**Ed25519 allow-list** + **ElGamal / Pedersen** handshake materials).
 - Assigns a temporary tunnel IP and relays traffic while the session is active; holds **in-memory** session state only.
 - When a session ends, that memory is dropped — not designed as durable user history.
@@ -94,12 +94,12 @@ Runs **only on the device** — no phone-home wipe notification.
 
 ## 4. Limits of this privacy promise
 
-1. **Hosting and networks.** Production node is FlokiNET/Iceland. Host public “no invasive logs” stance is not a third-party forensic audit. CDN/status/DNS operators and other networks may log under their policies. Node OS compromise can still expose live memory.
+1. **Hosting and networks.** Catalog peers: FlokiNET (IS/RO) and the DE residual host. Host public “no invasive logs” stance is not a third-party forensic audit. CDN/status/DNS operators and other networks may log under their policies. Node OS compromise can still expose live memory.
 2. **Destination sites** have their own policies.
 3. **Device and OS** (VPN dialogs, crash reporters, network stacks) process data outside this app.
 4. **Misconfiguration** (verbose logs, reverse-proxy access logs) can create logs this policy assumes are off.
 5. **Device keys** identify an install, not a named human account — still treat them as secrets.
-6. **Traffic analysis mitigations are incomplete.** Pad/cover/obfs (**QUIC-mimic** when on) reduce coarse fingerprints; they do not guarantee undetectability. Multi-hop residual is opt-in (`RPT_MULTIHOP_ENABLED=1`); default is single-hop Iceland.
+6. **Traffic analysis mitigations are incomplete.** Pad/cover/obfs (**QUIC-mimic** when on) reduce coarse fingerprints; they do not guarantee undetectability. Multi-hop residual is opt-in (`RPT_MULTIHOP_ENABLED=1`); default is single-hop on the chosen entry (Iceland default).
 7. **Self-hosters** must protect long-term keys and remember provider-level IP logs. PQ hybrid is staged readiness only (`docs/PQ_MIGRATION.md`).
 8. **LUKS / zram volumes** protect locked disks/RAM only — not live secrecy against root on an unlocked host.
 
@@ -165,7 +165,7 @@ We may update this policy as the product evolves. The **Last updated** date chan
 - Public policy and audit: [status host](https://restoreprivacy.online/) (`/PRIVACY_POLICY.md`, `/AUDIT.md`)
 - How to buy: [how-to-buy](https://restoreprivacy.online/how-to-buy)
 - Re-download after Restore Internet wipe: **rus@restoreprivacy.online**
-- Or the operator’s public project channels (e.g. GitHub profile `rgsneddon`)
+- Or the operator’s public project channels (Raskul / restoreprivacy.online)
 
 ---
 
