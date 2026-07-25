@@ -1,7 +1,8 @@
 /// Thin method-channel bridge for macOS window hide-to-tray (menu bar status item).
 ///
 /// Native shell: `RptTrayController` / `restore_privacy/window` channel.
-/// Hide only after product full-tunnel success ([shouldHideToTrayAfterConnect]).
+/// Product Connect success does **not** auto-hide ([shouldHideToTrayAfterConnect]
+/// is always false); hide remains available for explicit close-to-tray UX.
 
 import 'dart:io' show Platform;
 

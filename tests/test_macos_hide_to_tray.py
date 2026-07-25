@@ -39,23 +39,40 @@ class TestMacosHideToTrayWiring(unittest.TestCase):
         self.assertIn("RptTrayController.swift", pbx)
         self.assertIn("RptTrayController.swift in Sources", pbx)
 
-    def test_flutter_wires_hide_after_product_success(self):
+    def test_flutter_does_not_auto_hide_on_connect_success(self):
+        """Connect success keeps window open; tray may still update."""
         main = (LIB / "main.dart").read_text(encoding="utf-8")
         self.assertIn("macos_window.dart", main)
         self.assertIn("shouldHideToTrayAfterConnectSuccess", main)
-        self.assertIn("hideToTray", main)
         self.assertIn("MacWindowController", main)
-        # main.dart wires the callback name; the channel method string lives in
-        # macos_window.dart / RptTrayController.swift (see tests below).
         self.assertIn("onTrayDisconnect", main)
         self.assertIn("setTrayConnected", main)
+        # Product path still gates hide behind the policy helper (now always false).
+        self.assertIn("shouldHideToTrayAfterConnectSuccess(ok)", main)
 
-    def test_pure_hide_gate_in_connect_status(self):
+    def test_pure_hide_gate_keeps_window_open(self):
         cs = (LIB / "connect_status.dart").read_text(encoding="utf-8")
         self.assertIn("shouldHideToTrayAfterConnect", cs)
         self.assertIn("shouldHideToTrayAfterConnectSuccess", cs)
-        # Gate must call isConnectSuccess semantics
-        self.assertIn("isConnectSuccess(result)", cs)
+        # Policy: return false (stay open) — not hide on isConnectSuccess.
+        self.assertIn("return false", cs)
+        # Must not re-enable hide-on-success via isConnectSuccess alone
+        hide_fn = cs.split("bool shouldHideToTrayAfterConnect(")[1].split(
+            "bool shouldHideToTrayAfterConnectSuccess"
+        )[0]
+        self.assertNotIn("isConnectSuccess(result)", hide_fn)
+
+    def test_keygen_sheet_dismisses_on_valid_unlock(self):
+        main = (LIB / "main.dart").read_text(encoding="utf-8")
+        cs = (LIB / "connect_status.dart").read_text(encoding="utf-8")
+        self.assertIn("shouldDismissKeygenSheetAfterUnlock", cs)
+        self.assertIn("shouldDismissKeygenSheetAfterUnlock", main)
+        self.assertIn("Navigator.of(ctx).pop()", main)
+        # Success path: dismiss helper before pop
+        kg = main.split("importKeygenAndVerify")[1].split("FilledButton")[0]
+        self.assertIn("shouldDismissKeygenSheetAfterUnlock", kg)
+        # pop only after valid unlock branch (paymentAllowsConnect path)
+        self.assertIn("paymentAllowsConnect", main)
 
     def test_macos_window_channel_name(self):
         mw = (LIB / "macos_window.dart").read_text(encoding="utf-8")

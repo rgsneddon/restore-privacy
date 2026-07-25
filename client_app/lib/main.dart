@@ -470,22 +470,30 @@ class _TunnelHomeState extends State<TunnelHome> with WidgetsBindingObserver {
                       final st = await _licence?.importKeygenAndVerify(raw) ??
                           kPaymentStatusUnknown;
                       final ok = await _licence?.paymentAllowsConnect() ?? false;
-                      if (!mounted) return;
-                      if (ok) {
-                        setState(() {
-                          _status =
-                              'Keygen verified. Press Connect for residual protection.';
-                        });
-                        _append('Keygen unlocked (status=$st).');
-                        Navigator.of(ctx).pop();
-                        // Register Packet Tunnel before user presses Connect.
-                        await _prepareMacosPacketTunnelBeforeConnect();
-                      } else {
-                        setModal(
-                          () => statusLine =
-                              'Keygen not active (status=$st). Check email code / subscription.',
-                        );
+                      // Dismiss sheet only on valid unlock (shipped contract).
+                      if (!shouldDismissKeygenSheetAfterUnlock(
+                        paymentAllowsConnect: ok,
+                      )) {
+                        if (ctx.mounted) {
+                          setModal(
+                            () => statusLine =
+                                'Keygen not active (status=$st). Check email code / subscription.',
+                          );
+                        }
+                        return;
                       }
+                      // Valid key: close the keygen window first so it does not block the shell.
+                      if (ctx.mounted) {
+                        Navigator.of(ctx).pop();
+                      }
+                      if (!mounted) return;
+                      setState(() {
+                        _status =
+                            'Keygen verified. Press Connect for residual protection.';
+                      });
+                      _append('Keygen unlocked (status=$st).');
+                      // Register Packet Tunnel after sheet is gone.
+                      await _prepareMacosPacketTunnelBeforeConnect();
                     },
                     style: FilledButton.styleFrom(backgroundColor: kPrimary),
                     child: const Text('Unlock Connect'),
@@ -599,9 +607,13 @@ class _TunnelHomeState extends State<TunnelHome> with WidgetsBindingObserver {
       if (ok) {
         _append(_status);
         await _connLog(kLogKindConnect, 'Connected — residual path active');
-        // macOS: hide to menu-bar tray only after product full-tunnel success.
-        if (shouldHideToTrayAfterConnectSuccess(ok)) {
+        // Keep main window open after Connect (no auto hide-to-tray / minimize).
+        // Tray icon may still update for status; user can hide manually via close→tray.
+        if (MacWindowController.isSupported) {
           await _macWindow.setTrayConnected(true);
+        }
+        if (shouldHideToTrayAfterConnectSuccess(ok)) {
+          // Policy helper is false: window stays open. Call site kept for tests/docs.
           await _macWindow.hideToTray(connected: true);
           _append('Window hidden to menu bar tray — restore via the RP tray icon.');
         }

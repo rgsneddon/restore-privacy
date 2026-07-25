@@ -75,13 +75,29 @@ bool isConnectingInProgress(dynamic result) {
       msg.contains('waiting for full tunnel');
 }
 
-/// macOS: hide main window to menu-bar tray only after **product** full-tunnel success.
+/// macOS window policy after Connect: **stay open** (do not auto-hide to tray).
 ///
-/// Must match [isConnectSuccess] — host-only HELLO / failed Packet Tunnel must not hide.
-bool shouldHideToTrayAfterConnect(dynamic result) => isConnectSuccess(result);
+/// Tray icon may still exist for manual restore/disconnect; Connect success must
+/// not call hide-to-tray / minimize. Host-only HELLO / failures never hide either.
+bool shouldHideToTrayAfterConnect(dynamic result) {
+  // Product policy (override prior hide-on-success): keep main window visible.
+  return false;
+}
 
 /// Same gate when Flutter already reduced the channel map to a bool (e.g. `_vpn.connect()`).
-bool shouldHideToTrayAfterConnectSuccess(bool productConnectOk) => productConnectOk;
+/// Always false — window stays open after product Connect success.
+bool shouldHideToTrayAfterConnectSuccess(bool productConnectOk) {
+  // Ignore [productConnectOk]; never auto-hide solely because Connect succeeded.
+  return false;
+}
+
+/// Whether the keygen unlock sheet should dismiss after verify.
+///
+/// True only when payment unlock allows Connect (valid active keygen path).
+/// Invalid / inactive keygen must leave the sheet open with failure feedback.
+bool shouldDismissKeygenSheetAfterUnlock({required bool paymentAllowsConnect}) {
+  return paymentAllowsConnect;
+}
 
 /// Human-readable status from the method-channel map (never invent "Connected"
 /// for host-only HELLO or failed Packet Tunnel).
