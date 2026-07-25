@@ -28,15 +28,18 @@ return JSON with `"private": true`.
 
 ## 1. Pull this branch on Mac
 
+Primary breadcrumb branch (pushed for this handoff):
+
 ```bash
 cd /path/to/restore-privacy   # or clone private repo
 git fetch origin
-git checkout deploy-settings-explainer
-git pull origin deploy-settings-explainer
+git checkout ro-capacity-mac-finalize
+git pull origin ro-capacity-mac-finalize
 ```
 
-Branch tip includes `scripts/install_capacity_token_env.sh` with optional
-`RPT_NODE_BANDWIDTH_CAP_BPS`. Docs: [CAPACITY_PROBES.md](CAPACITY_PROBES.md).
+Includes `scripts/install_capacity_token_env.sh` with optional
+`RPT_NODE_BANDWIDTH_CAP_BPS` and this doc. Full guide:
+[CAPACITY_PROBES.md](CAPACITY_PROBES.md).
 
 ## 2. Same token as IS/DE (out-of-band — never git)
 
