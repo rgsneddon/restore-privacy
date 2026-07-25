@@ -381,16 +381,28 @@ class RptClient:
         *,
         reconnect: bool = True,
         timeout: float = 20.0,
+        trusted_preferred: bool = False,
     ) -> str:
         """Apply drain/ready signal; auto hop-off or rejoin without user input.
+
+        ``trusted_preferred=True`` for HTTP poll of preferred node-state (empty
+        host soft-applies). UDP NODE_STATUS leaves it False so empty host means
+        the current residual only (no thrash-rejoin while on an alternate).
 
         Returns a short note of the action taken.
         """
         preferred = entry_endpoint(self.multihop).host
+        residual = ""
+        try:
+            residual = (self.endpoint.host or "").strip() if self.endpoint else ""
+        except Exception:  # noqa: BLE001
+            residual = ""
         draining, reselect, note = apply_wipe_signal_to_flags(
             signal,
             preferred_host=preferred,
             current_entry_draining=self.entry_draining,
+            residual_host=residual,
+            trusted_preferred=bool(trusted_preferred),
         )
         self.entry_draining = draining
         if not reselect:
@@ -420,13 +432,19 @@ class RptClient:
         return note
 
     def process_node_status_frame(self, frame: bytes) -> str:
-        """Consume residual NODE_STATUS wire frame (e.g. KEEPALIVE reply)."""
+        """Consume residual NODE_STATUS from current UDP residual session.
+
+        Empty host on the wire means *this residual* (``self.endpoint``), not
+        preferred-by-default. Preferred drain/ready only when residual == preferred.
+        """
         try:
             inner = maybe_unwrap(frame, enabled=_outer_obfs_enabled())
         except Exception:  # noqa: BLE001
             inner = frame
         signal = parse_node_status_wire(inner)
-        return self.apply_wipe_signal(signal, reconnect=True)
+        return self.apply_wipe_signal(
+            signal, reconnect=True, trusted_preferred=False
+        )
 
     def poll_preferred_node_state(
         self,
@@ -435,7 +453,10 @@ class RptClient:
         timeout_s: float = 2.0,
         reconnect: bool = True,
     ) -> str:
-        """HTTP poll private node-state for preferred residual (fail soft)."""
+        """HTTP poll private node-state for preferred residual (fail soft).
+
+        Trusted preferred path: empty host soft-applies (we polled preferred).
+        """
         import urllib.error
         import urllib.request
 
@@ -451,7 +472,9 @@ class RptClient:
         except Exception:  # noqa: BLE001
             return "poll_failed"
         signal = parse_wipe_signal_json(body)
-        return self.apply_wipe_signal(signal, reconnect=reconnect)
+        return self.apply_wipe_signal(
+            signal, reconnect=reconnect, trusted_preferred=True
+        )
 
     def start_wipe_hop_watch(self, *, interval_s: float = 30.0) -> None:
         """Background poll preferred peer drain/ready; auto hop/rejoin."""

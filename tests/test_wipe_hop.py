@@ -212,49 +212,101 @@ class TestWipeSignalParse(unittest.TestCase):
         self.assertFalse(r3)
         self.assertEqual(n3, "signal_other_host")
 
-    def test_empty_host_and_hostname_soft_apply(self):
-        """Node may emit empty host or hostname — still hop/rejoin preferred."""
+    def test_empty_host_udp_is_current_residual_only(self):
+        """Empty host on UDP ≡ residual_host; not preferred-by-default."""
+        # No residual context + empty host → do not apply preferred flags
+        self.assertFalse(
+            signal_applies_to_preferred(
+                WipeSignal(state="draining", host=""),
+                PRODUCT_NODE_HOST,
+                residual_host=None,
+                trusted_preferred=False,
+            )
+        )
+        # On preferred residual + empty host → apply (hop-off / ready)
         self.assertTrue(
             signal_applies_to_preferred(
                 WipeSignal(state="draining", host=""),
                 PRODUCT_NODE_HOST,
-            )
-        )
-        self.assertTrue(
-            signal_applies_to_preferred(
-                WipeSignal(state="draining", host="rpt-is-01.local"),
-                PRODUCT_NODE_HOST,
-            )
-        )
-        # Non-catalog IP (outbound discovery miss) still applies
-        self.assertTrue(
-            signal_applies_to_preferred(
-                WipeSignal(state="ready", host="10.0.0.9"),
-                PRODUCT_NODE_HOST,
-            )
-        )
-        # Different catalog residual still ignored
-        self.assertFalse(
-            signal_applies_to_preferred(
-                WipeSignal(state="draining", host=PRODUCT_DE_HOST),
-                PRODUCT_NODE_HOST,
+                residual_host=PRODUCT_NODE_HOST,
+                trusted_preferred=False,
             )
         )
         d, r, n = apply_wipe_signal_to_flags(
             WipeSignal(state="draining", host=""),
             preferred_host=PRODUCT_NODE_HOST,
             current_entry_draining=False,
+            residual_host=PRODUCT_NODE_HOST,
+            trusted_preferred=False,
         )
         self.assertTrue(d and r)
         self.assertEqual(n, "enter_drain_hop_off")
-        d2, r2, n2 = apply_wipe_signal_to_flags(
-            WipeSignal(state="ready", host="rpt-node.hostname"),
+
+    def test_alternate_empty_ready_does_not_clear_preferred_drain(self):
+        """After hop-off, alternate NODE_STATUS ready (empty host) must not thrash."""
+        # Client is on RO alternate; preferred IS still draining
+        d, r, n = apply_wipe_signal_to_flags(
+            WipeSignal(state="ready", host=""),
             preferred_host=PRODUCT_NODE_HOST,
             current_entry_draining=True,
+            residual_host=PRODUCT_EXIT_HOST,
+            trusted_preferred=False,
         )
-        self.assertFalse(d2)
-        self.assertTrue(r2)
-        self.assertEqual(n2, "ready_rejoin_preferred")
+        self.assertTrue(d)  # preferred drain flag unchanged
+        self.assertFalse(r)
+        self.assertEqual(n, "signal_other_host")
+        # Explicit empty drain from DE alternate also ignored for preferred flags
+        d2, r2, n2 = apply_wipe_signal_to_flags(
+            WipeSignal(state="draining", host=""),
+            preferred_host=PRODUCT_NODE_HOST,
+            current_entry_draining=True,
+            residual_host=PRODUCT_DE_HOST,
+            trusted_preferred=False,
+        )
+        self.assertTrue(d2)
+        self.assertFalse(r2)
+        self.assertEqual(n2, "signal_other_host")
+
+    def test_preferred_poll_empty_host_soft_applies(self):
+        """HTTP preferred poll: empty host / hostname soft-apply (trusted)."""
+        self.assertTrue(
+            signal_applies_to_preferred(
+                WipeSignal(state="ready", host=""),
+                PRODUCT_NODE_HOST,
+                trusted_preferred=True,
+            )
+        )
+        self.assertTrue(
+            signal_applies_to_preferred(
+                WipeSignal(state="draining", host="rpt-is-01.local"),
+                PRODUCT_NODE_HOST,
+                trusted_preferred=True,
+            )
+        )
+        self.assertTrue(
+            signal_applies_to_preferred(
+                WipeSignal(state="ready", host="10.0.0.9"),
+                PRODUCT_NODE_HOST,
+                trusted_preferred=True,
+            )
+        )
+        # Different catalog residual still ignored even on trusted path
+        self.assertFalse(
+            signal_applies_to_preferred(
+                WipeSignal(state="draining", host=PRODUCT_DE_HOST),
+                PRODUCT_NODE_HOST,
+                trusted_preferred=True,
+            )
+        )
+        d, r, n = apply_wipe_signal_to_flags(
+            WipeSignal(state="ready", host=""),
+            preferred_host=PRODUCT_NODE_HOST,
+            current_entry_draining=True,
+            trusted_preferred=True,
+        )
+        self.assertFalse(d)
+        self.assertTrue(r)
+        self.assertEqual(n, "ready_rejoin_preferred")
 
     def test_fail_soft_none_signal(self):
         d, r, n = apply_wipe_signal_to_flags(
@@ -305,6 +357,8 @@ class TestConnectWipePath(unittest.TestCase):
             exit_healthy=True,
             probe_capacity=False,
         )
+        # Connected residual is preferred (pre-hop)
+        client.endpoint = Endpoint(PRODUCT_NODE_HOST, 44044)
         with mock.patch.object(
             client,
             "connect",
@@ -312,8 +366,9 @@ class TestConnectWipePath(unittest.TestCase):
         ) as conn:
             with mock.patch.object(client, "disconnect"):
                 note = client.apply_wipe_signal(
-                    WipeSignal(state="draining", host=PRODUCT_NODE_HOST),
+                    WipeSignal(state="draining", host=""),
                     reconnect=True,
+                    trusted_preferred=False,
                 )
         self.assertIn("enter_drain", note)
         self.assertTrue(client.entry_draining)
@@ -331,13 +386,38 @@ class TestConnectWipePath(unittest.TestCase):
             return_value=mock.Mock(ok=True),
         ) as conn:
             with mock.patch.object(client, "disconnect"):
+                # Preferred poll path (empty host OK)
                 note = client.apply_wipe_signal(
-                    WipeSignal(state="ready", host=PRODUCT_NODE_HOST),
+                    WipeSignal(state="ready", host=""),
                     reconnect=True,
+                    trusted_preferred=True,
                 )
         self.assertIn("ready_rejoin", note)
         self.assertFalse(client.entry_draining)
         self.assertTrue(conn.called)
+
+    def test_udp_on_alternate_empty_ready_no_thrash_reconnect(self):
+        """On alternate residual, empty ready must not rejoin preferred mid-wipe."""
+        client = RptClient(
+            entry_draining=True,
+            exit_healthy=True,
+            probe_capacity=False,
+        )
+        client.endpoint = Endpoint(PRODUCT_EXIT_HOST, 44044)
+        with mock.patch.object(
+            client,
+            "connect",
+            return_value=mock.Mock(ok=True),
+        ) as conn:
+            with mock.patch.object(client, "disconnect"):
+                note = client.apply_wipe_signal(
+                    WipeSignal(state="ready", host=""),
+                    reconnect=True,
+                    trusted_preferred=False,
+                )
+        self.assertEqual(note, "signal_other_host")
+        self.assertTrue(client.entry_draining)
+        self.assertFalse(conn.called)
 
     def test_wipe_hop_advisory_only_for_wipe_reasons(self):
         sel = select_wipe_aware_residual(

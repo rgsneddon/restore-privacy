@@ -273,30 +273,55 @@ def signal_applies_to_preferred(
     preferred_host: str,
     *,
     catalog: Sequence[CountryNode] | None = None,
+    residual_host: str | None = None,
+    trusted_preferred: bool = False,
 ) -> bool:
     """Whether a drain/ready signal should move preferred residual flags.
 
-    Rules (soft identity — do not require catalog monopin equality):
-    - empty signal host → apply (this residual / transport-bound)
-    - signal host == preferred monopin → apply
-    - signal host is a *different known catalog residual* → ignore
-    - hostname / non-catalog IP → apply (node may emit hostname when
-      outbound IP discovery fails; private poll already targets preferred)
+    Identity rules:
+    - **trusted_preferred** (HTTP poll of preferred URL): empty host / hostname /
+      non-catalog IP soft-apply; only a different *catalog monopin* is ignored.
+    - **UDP / residual session** (``trusted_preferred=False``): empty signal host
+      means *current residual* (``residual_host``), never preferred-by-default.
+      Apply preferred drain/ready only when that residual is the preferred monopin.
+      After hop-off, NODE_STATUS from the alternate with empty host must not clear
+      preferred drain or force rejoin while preferred is still wiped.
     """
     if signal is None:
         return False
     pref = (preferred_host or "").strip()
     sig_host = (signal.host or "").strip()
-    if not sig_host:
-        return True
-    if not pref:
-        return True
-    if sig_host == pref:
-        return True
+    residual = (residual_host or "").strip()
     known = _catalog_host_set(catalog)
-    if sig_host in known and sig_host != pref:
+
+    if trusted_preferred:
+        # Preferred private poll — soft empty host / hostname
+        if not sig_host:
+            return True
+        if not pref:
+            return True
+        if sig_host == pref:
+            return True
+        if sig_host in known and sig_host != pref:
+            return False
+        return True
+
+    # Residual UDP path: empty host ≡ current residual endpoint only
+    effective = sig_host or residual
+    if not effective:
+        # No host identity and no residual context → cannot bind to preferred
         return False
-    # Non-catalog identity string (hostname, alternate iface IP, etc.)
+    if sig_host and sig_host in known and pref and sig_host != pref:
+        return False
+    if residual and sig_host and residual != sig_host:
+        # Explicit host disagrees with residual we are on — ignore for preferred
+        if sig_host in known and sig_host != pref:
+            return False
+        if residual != pref and sig_host != pref:
+            return False
+    # Preferred flags only when this residual *is* preferred
+    if pref:
+        return effective == pref or residual == pref
     return True
 
 
@@ -306,17 +331,25 @@ def apply_wipe_signal_to_flags(
     preferred_host: str,
     current_entry_draining: bool = False,
     catalog: Sequence[CountryNode] | None = None,
+    residual_host: str | None = None,
+    trusted_preferred: bool = False,
 ) -> tuple[bool, bool, str]:
     """Map a wipe signal to (entry_draining, should_reselect, note).
 
     Fail soft: None signal → no change (keep current_entry_draining).
-    Empty host / hostname / non-catalog IP soft-apply; only a *different
-    catalog monopin* is treated as signal_other_host.
+
+    Empty host on UDP means current residual only — pass ``residual_host`` and
+    leave ``trusted_preferred=False``. HTTP preferred poll passes
+    ``trusted_preferred=True`` so empty host soft-applies.
     """
     if signal is None:
         return bool(current_entry_draining), False, "no_signal"
     if not signal_applies_to_preferred(
-        signal, preferred_host, catalog=catalog
+        signal,
+        preferred_host,
+        catalog=catalog,
+        residual_host=residual_host,
+        trusted_preferred=trusted_preferred,
     ):
         return bool(current_entry_draining), False, "signal_other_host"
     if signal.is_drain:
