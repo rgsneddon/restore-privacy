@@ -2,7 +2,7 @@
 
 This Windows host staged the release zips and ships current Flutter + NativePrep source in the git repo. **Team signing, Packet Tunnel entitlements, and notarization must be completed on a Mac.**
 
-## Whatâ€™s in this folder
+## What’s in this folder
 
 | File | Notes |
 |------|--------|
@@ -12,9 +12,9 @@ This Windows host staged the release zips and ships current Flutter + NativePrep
 
 **Fresh source of truth for Apple work:** git clone `main` (tag `0.1.8`) and open:
 
-- `client_app/` â€” Flutter app (shared UI, Settings, Connect/Disconnect)
-- `client_app/apple_shared/Rpt2/` â€” shared Swift RPT stack
-- `client_app/ios/` + `client_app/macos/` â€” Xcode projects, Packet Tunnel targets, NativePrep
+- `client_app/` — Flutter app (shared UI, Settings, Connect/Disconnect)
+- `client_app/apple_shared/Rpt2/` — shared Swift RPT stack
+- `client_app/ios/` + `client_app/macos/` — Xcode projects, Packet Tunnel targets, NativePrep
 
 ## On your Mac
 

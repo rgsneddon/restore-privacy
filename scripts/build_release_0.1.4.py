@@ -188,7 +188,7 @@ def package_ios_zip() -> Path:
     # Team-sign when identity is available (not ad-hoc-only distribution story)
     try:
         sign_ios_app(IOS_APP)
-    except Exception as exc:  # noqa: BLE001 â€” packaging continues with best effort
+    except Exception as exc:  # noqa: BLE001 — packaging continues with best effort
         print(f"iOS codesign warning: {exc}", file=sys.stderr)
     OUT.mkdir(parents=True, exist_ok=True)
     dest = OUT / IOS_ZIP_NAME

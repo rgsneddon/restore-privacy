@@ -13,6 +13,7 @@ import sys
 import threading
 import webbrowser
 import tkinter as tk
+from collections.abc import Callable
 from pathlib import Path
 from tkinter import font as tkfont
 
@@ -45,9 +46,13 @@ from client.ui_theme import (
     WHITE,
     catalog_latest_version,
     connect_button_label,
+    normalize_ui_mode,
     plain_tunnel_status,
     read_running_version,
     resolve_logo_png,
+    theme_tokens,
+    theme_toggle_button_text,
+    theme_toggle_target,
     upgrade_available,
     upgrade_banner_text,
     upgrade_download_url,
@@ -130,6 +135,7 @@ from client.windows.ui_chrome import (
     NEON_BORDER_DIM,
     SwitchToggle,
     apply_centered_window,
+    bind_scrollable_canvas,
     make_neon_card,
     style_primary_button,
     surface_default_size,
@@ -157,6 +163,10 @@ from client.windows.tunnel_win import (
 )
 
 
+# Main status line when the user chooses Quit (button or tray).
+QUIT_STATUS_REMARK = "quitting RPT client..."
+
+
 def disconnect_full_tunnel(
     tunnel, client, *, preserve_message: bool = False
 ) -> None:
@@ -182,6 +192,41 @@ def disconnect_full_tunnel(
             restore_windows_residual_path(server_host=host)
         except Exception:
             pass
+
+
+def run_quit_residual_teardown(tunnel, client) -> None:
+    """Full residual teardown for Quit — safe to run **off** the Tk UI thread.
+
+    Always disconnects the tunnel/session and force-restores residual routes so
+    Quit never leaves dual /1 blackhole state. Call from a worker; schedule
+    ``root.destroy`` on the UI thread only after this returns.
+    """
+    try:
+        disconnect_full_tunnel(tunnel, client)
+    except Exception:
+        pass
+    try:
+        host = getattr(tunnel, "server_host", None) if tunnel is not None else None
+        restore_windows_residual_path(server_host=host)
+    except Exception:
+        pass
+
+
+def apply_quit_status_remark(status_var, detail_var=None) -> str:
+    """Set main status surface to the product Quit remark. Returns the phrase."""
+    remark = QUIT_STATUS_REMARK
+    try:
+        status_var.set(remark)
+    except Exception:
+        pass
+    if detail_var is not None:
+        try:
+            detail_var.set(
+                "Stopping residual protection and restoring normal internet..."
+            )
+        except Exception:
+            pass
+    return remark
 
 
 def attach_failure_user_message(original: str | None) -> str:
@@ -247,10 +292,14 @@ class TunnelClientApp:
 
     def __init__(self) -> None:
         self.root = tk.Tk()
+        self._settings = load_settings()
+        self._ui_mode = normalize_ui_mode(getattr(self._settings, "ui_mode", "light"))
+        self._t = theme_tokens(self._ui_mode)
         self.root.title(APP_TITLE)
-        self.root.configure(bg=CHROME_BG)
+        self.root.configure(bg=self._t["chrome_bg"])
         self._keygen_prompt_win: tk.Toplevel | None = None
         self._settings_win: tk.Toplevel | None = None
+        self._settings_scroll_unbind: Callable[[], None] | None = None
         # Size + centre on primary work area (not top-left)
         apply_centered_window(self.root, surface="main")
         self._set_window_icon()
@@ -265,11 +314,13 @@ class TunnelClientApp:
         self._start_system_tray()
 
         # Outer chrome with padding (rounded language via spacing)
-        self.chrome = tk.Frame(self.root, bg=CHROME_BG, padx=PANEL_PAD + 4, pady=PANEL_PAD + 4)
+        self.chrome = tk.Frame(
+            self.root, bg=self._t["chrome_bg"], padx=PANEL_PAD + 4, pady=PANEL_PAD + 4
+        )
         self.chrome.pack(fill=tk.BOTH, expand=True)
 
         # --- Bottom: primary control first so it never disappears ---
-        self.bottom = tk.Frame(self.chrome, bg=CHROME_BG)
+        self.bottom = tk.Frame(self.chrome, bg=self._t["chrome_bg"])
         self.bottom.pack(side=tk.BOTTOM, fill=tk.X)
 
         self.btn_var = tk.StringVar(value=connect_button_label(False))
@@ -277,11 +328,11 @@ class TunnelClientApp:
             self.bottom,
             textvariable=self.btn_var,
             command=self._on_toggle_connect,
-            bg=BUTTON_CONNECT_BG,
-            fg=BUTTON_FG,
-            activebackground=PRIMARY,
-            activeforeground=BUTTON_FG,
-            disabledforeground=DISABLED_FG,
+            bg=self._t["button_connect_bg"],
+            fg=self._t["button_fg"],
+            activebackground=self._t["primary"],
+            activeforeground=self._t["button_fg"],
+            disabledforeground=self._t["disabled_fg"],
             font=("Segoe UI", 14, "bold"),
             relief=tk.FLAT,
             cursor="hand2",
@@ -293,13 +344,13 @@ class TunnelClientApp:
         style_primary_button(self.connect_btn, neon=True)
         self.connect_btn.pack(side=tk.TOP, fill=tk.X, pady=(10, 6), ipady=8)
 
-        self.hint_row = tk.Frame(self.bottom, bg=CHROME_BG)
+        self.hint_row = tk.Frame(self.bottom, bg=self._t["chrome_bg"])
         self.hint_row.pack(side=tk.TOP, fill=tk.X)
         self.hint = tk.Label(
             self.hint_row,
             text=SEAMLESS_HINT,
-            bg=CHROME_BG,
-            fg=TEXT_MUTED,
+            bg=self._t["chrome_bg"],
+            fg=self._t["text_muted"],
             font=("Segoe UI", 8),
             anchor="w",
             wraplength=400,
@@ -310,10 +361,10 @@ class TunnelClientApp:
             self.hint_row,
             text="Quit",
             command=self._quit_app,
-            bg=CHROME_BG,
-            fg=TEXT_MUTED,
-            activebackground=LIGHT_ACCENT,
-            activeforeground=TEXT,
+            bg=self._t["chrome_bg"],
+            fg=self._t["text_muted"],
+            activebackground=self._t["light_accent"],
+            activeforeground=self._t["text"],
             relief=tk.FLAT,
             font=("Segoe UI", 8, "underline"),
             cursor="hand2",
@@ -323,10 +374,11 @@ class TunnelClientApp:
         self.quit_btn.pack(side=tk.RIGHT)
 
         # --- Header ---
-        self.header = tk.Frame(self.chrome, bg=CHROME_BG)
+        self.header = tk.Frame(self.chrome, bg=self._t["chrome_bg"])
         self.header.pack(side=tk.TOP, fill=tk.X, pady=(0, 10))
 
         self._logo_photo = None
+        self._logo_label = None
         logo = resolve_logo_png()
         if logo is not None:
             try:
@@ -335,48 +387,53 @@ class TunnelClientApp:
                     factor = max(1, img.width() // 48)
                     img = img.subsample(factor, factor)
                 self._logo_photo = img
-                tk.Label(self.header, image=self._logo_photo, bg=CHROME_BG).pack(
-                    side=tk.LEFT, padx=(0, 10)
+                self._logo_label = tk.Label(
+                    self.header, image=self._logo_photo, bg=self._t["chrome_bg"]
                 )
+                self._logo_label.pack(side=tk.LEFT, padx=(0, 10))
             except Exception:
                 self._logo_photo = None
+                self._logo_label = None
 
-        title_col = tk.Frame(self.header, bg=CHROME_BG)
-        title_col.pack(side=tk.LEFT, fill=tk.X, expand=True)
-        tk.Label(
-            title_col,
+        self.title_col = tk.Frame(self.header, bg=self._t["chrome_bg"])
+        self.title_col.pack(side=tk.LEFT, fill=tk.X, expand=True)
+        self.title_label = tk.Label(
+            self.title_col,
             text=APP_TITLE,
-            bg=CHROME_BG,
-            fg=PRIMARY_DARK,
+            bg=self._t["chrome_bg"],
+            fg=self._t["primary_dark"],
             font=("Segoe UI", 18, "bold"),
             anchor="w",
-        ).pack(fill=tk.X)
-        tk.Label(
-            title_col,
+        )
+        self.title_label.pack(fill=tk.X)
+        self.banner_label = tk.Label(
+            self.title_col,
             text=BANNER_TITLE,
-            bg=CHROME_BG,
-            fg=TEXT_MUTED,
+            bg=self._t["chrome_bg"],
+            fg=self._t["text_muted"],
             font=("Segoe UI", 9),
             anchor="w",
-        ).pack(fill=tk.X)
-        tk.Label(
-            title_col,
+        )
+        self.banner_label.pack(fill=tk.X)
+        self.tagline_label = tk.Label(
+            self.title_col,
             text=SEAMLESS_TAGLINE,
-            bg=CHROME_BG,
-            fg=PRIMARY,
+            bg=self._t["chrome_bg"],
+            fg=self._t["primary"],
             font=("Segoe UI", 8, "bold"),
             anchor="w",
-        ).pack(fill=tk.X, pady=(2, 0))
+        )
+        self.tagline_label.pack(fill=tk.X, pady=(2, 0))
 
-        # Settings cog (gear)
+        # Settings cog (gear) — pack first so it sits at the right edge
         self.settings_btn = tk.Button(
             self.header,
             text="⚙",
             command=self._open_settings,
-            bg=CHROME_BG,
-            fg=PRIMARY_DARK,
-            activebackground=LIGHT_ACCENT,
-            activeforeground=PRIMARY_DARK,
+            bg=self._t["chrome_bg"],
+            fg=self._t["primary_dark"],
+            activebackground=self._t["light_accent"],
+            activeforeground=self._t["primary_dark"],
             relief=tk.FLAT,
             font=("Segoe UI", 16),
             cursor="hand2",
@@ -384,11 +441,31 @@ class TunnelClientApp:
             padx=8,
         )
         self.settings_btn.pack(side=tk.RIGHT)
-        self._settings = load_settings()
+        # Dark/light mode switcher — beside the settings cog (same header row)
+        self.theme_btn = tk.Button(
+            self.header,
+            text=theme_toggle_button_text(self._ui_mode),
+            command=self._toggle_ui_mode,
+            bg=self._t["chrome_bg"],
+            fg=self._t["primary_dark"],
+            activebackground=self._t["light_accent"],
+            activeforeground=self._t["primary_dark"],
+            relief=tk.FLAT,
+            font=("Segoe UI", 9, "bold"),
+            cursor="hand2",
+            bd=0,
+            padx=6,
+        )
+        self.theme_btn.pack(side=tk.RIGHT, padx=(0, 2))
 
         # --- Upgrade banner (only if behind catalog) ---
         self.upgrade_frame = tk.Frame(
-            self.chrome, bg=LIGHT_ACCENT, padx=10, pady=8, highlightbackground=BORDER, highlightthickness=1
+            self.chrome,
+            bg=self._t["light_accent"],
+            padx=10,
+            pady=8,
+            highlightbackground=self._t["border"],
+            highlightthickness=1,
         )
         self._upgrade_msg = upgrade_banner_text()
         if self._upgrade_msg:
@@ -396,8 +473,8 @@ class TunnelClientApp:
             tk.Label(
                 self.upgrade_frame,
                 text=self._upgrade_msg,
-                bg=LIGHT_ACCENT,
-                fg=TEXT,
+                bg=self._t["light_accent"],
+                fg=self._t["text"],
                 font=("Segoe UI", 9),
                 anchor="w",
                 wraplength=400,
@@ -407,10 +484,10 @@ class TunnelClientApp:
                 self.upgrade_frame,
                 text="Get update",
                 command=self._open_upgrade,
-                bg=PRIMARY,
-                fg=WHITE,
-                activebackground=PRIMARY_DARK,
-                activeforeground=WHITE,
+                bg=self._t["primary"],
+                fg=self._t["white"],
+                activebackground=self._t["primary_dark"],
+                activeforeground=self._t["white"],
                 relief=tk.FLAT,
                 font=("Segoe UI", 9, "bold"),
                 cursor="hand2",
@@ -420,28 +497,32 @@ class TunnelClientApp:
 
         # --- Hero status card (site neon box / residual-honest) ---
         self.status_card, self.status_card_outer = make_neon_card(
-            self.chrome, padx=PANEL_PAD + 4, pady=PANEL_PAD + 4, bg=PANEL_BG
+            self.chrome,
+            padx=PANEL_PAD + 4,
+            pady=PANEL_PAD + 4,
+            bg=self._t["panel_bg"],
         )
         self.status_card_outer.pack(side=tk.TOP, fill=tk.X, pady=(0, 10))
 
-        hero_top = tk.Frame(self.status_card, bg=PANEL_BG)
-        hero_top.pack(fill=tk.X)
-        tk.Label(
-            hero_top,
+        self.hero_top = tk.Frame(self.status_card, bg=self._t["panel_bg"])
+        self.hero_top.pack(fill=tk.X)
+        self.vpn_status_caption = tk.Label(
+            self.hero_top,
             text="VPN status",
-            bg=PANEL_BG,
-            fg=TEXT_MUTED,
+            bg=self._t["panel_bg"],
+            fg=self._t["text_muted"],
             font=("Segoe UI", 8),
             anchor="w",
-        ).pack(side=tk.LEFT, fill=tk.X, expand=True)
+        )
+        self.vpn_status_caption.pack(side=tk.LEFT, fill=tk.X, expand=True)
         self._licence_badge_var = tk.StringVar(
             value="Licence accepted" if may_connect() else "Licence required"
         )
         self._licence_badge = tk.Label(
-            hero_top,
+            self.hero_top,
             textvariable=self._licence_badge_var,
-            bg=LIGHT_ACCENT if may_connect() else "#FDECEC",
-            fg=PRIMARY_DARK if may_connect() else STATUS_ERROR_FG,
+            bg=self._t["light_accent"] if may_connect() else "#FDECEC",
+            fg=self._t["primary_dark"] if may_connect() else self._t["status_error"],
             font=("Segoe UI", 8, "bold"),
             padx=8,
             pady=2,
@@ -452,8 +533,8 @@ class TunnelClientApp:
         self.status_label = tk.Label(
             self.status_card,
             textvariable=self.status_var,
-            bg=PANEL_BG,
-            fg=TEXT,
+            bg=self._t["panel_bg"],
+            fg=self._t["text"],
             font=("Segoe UI", 16, "bold"),
             anchor="w",
             wraplength=460,
@@ -471,8 +552,8 @@ class TunnelClientApp:
         self.detail_label = tk.Label(
             self.status_card,
             textvariable=self.detail_var,
-            bg=PANEL_BG,
-            fg=TEXT_MUTED,
+            bg=self._t["panel_bg"],
+            fg=self._t["text_muted"],
             font=("Segoe UI", 9),
             anchor="w",
             wraplength=460,
@@ -481,13 +562,13 @@ class TunnelClientApp:
         self.detail_label.pack(fill=tk.X, pady=(6, 0))
 
         # Licence CTA when not yet accepted (seamless first-run)
-        self._licence_cta = tk.Frame(self.status_card, bg=PANEL_BG)
+        self._licence_cta = tk.Frame(self.status_card, bg=self._t["panel_bg"])
         tk.Button(
             self._licence_cta,
             text=LICENCE_ACCEPT_BUTTON,
             command=self._show_licence_prompt,
-            bg=PRIMARY,
-            fg=WHITE,
+            bg=self._t["primary"],
+            fg=self._t["white"],
             relief=tk.FLAT,
             font=("Segoe UI", 9, "bold"),
             cursor="hand2",
@@ -497,8 +578,8 @@ class TunnelClientApp:
         tk.Label(
             self._licence_cta,
             text="Required once before Connect",
-            bg=PANEL_BG,
-            fg=TEXT_MUTED,
+            bg=self._t["panel_bg"],
+            fg=self._t["text_muted"],
             font=("Segoe UI", 8),
         ).pack(side=tk.LEFT, padx=(10, 0), pady=(10, 0))
         if not may_connect():
@@ -1536,6 +1617,171 @@ class TunnelClientApp:
             self.detail_var.set("Ready — press Connect for residual protection.")
         # surface == main without force: stay on main Connect shell
 
+    def _toggle_ui_mode(self) -> None:
+        """Header dark/light switcher — persist and recolor main chrome."""
+        new_mode = theme_toggle_target(self._ui_mode)
+        self._set_ui_mode(new_mode, persist=True)
+
+    def _set_ui_mode(self, mode: str, *, persist: bool = True) -> None:
+        self._ui_mode = normalize_ui_mode(mode)
+        self._t = theme_tokens(self._ui_mode)
+        if persist:
+            try:
+                cur = load_settings()
+                cur.ui_mode = self._ui_mode
+                save_settings(cur)
+                self._settings = cur
+            except Exception:
+                pass
+        self._apply_main_theme()
+        try:
+            self.theme_btn.configure(text=theme_toggle_button_text(self._ui_mode))
+        except Exception:
+            pass
+        self._log(f"UI mode: {self._ui_mode}")
+
+    def _apply_main_theme(self) -> None:
+        """Recolor main-window chrome/panel/text from ``self._t`` tokens."""
+        t = self._t
+        chrome = t["chrome_bg"]
+        panel = t["panel_bg"]
+        text = t["text"]
+        muted = t["text_muted"]
+        primary = t["primary"]
+        primary_dark = t["primary_dark"]
+        accent = t["light_accent"]
+        try:
+            self.root.configure(bg=chrome)
+        except Exception:
+            pass
+        for w in (
+            getattr(self, "chrome", None),
+            getattr(self, "bottom", None),
+            getattr(self, "header", None),
+            getattr(self, "hint_row", None),
+            getattr(self, "title_col", None),
+        ):
+            if w is not None:
+                try:
+                    w.configure(bg=chrome)
+                except Exception:
+                    pass
+        for w, kw in (
+            (getattr(self, "title_label", None), {"bg": chrome, "fg": primary_dark}),
+            (getattr(self, "banner_label", None), {"bg": chrome, "fg": muted}),
+            (getattr(self, "tagline_label", None), {"bg": chrome, "fg": primary}),
+            (getattr(self, "hint", None), {"bg": chrome, "fg": muted}),
+            (getattr(self, "_logo_label", None), {"bg": chrome}),
+        ):
+            if w is not None:
+                try:
+                    w.configure(**kw)
+                except Exception:
+                    pass
+        for btn_name, kw in (
+            (
+                "settings_btn",
+                {
+                    "bg": chrome,
+                    "fg": primary_dark,
+                    "activebackground": accent,
+                    "activeforeground": primary_dark,
+                },
+            ),
+            (
+                "theme_btn",
+                {
+                    "bg": chrome,
+                    "fg": primary_dark,
+                    "activebackground": accent,
+                    "activeforeground": primary_dark,
+                    "text": theme_toggle_button_text(self._ui_mode),
+                },
+            ),
+            (
+                "quit_btn",
+                {
+                    "bg": chrome,
+                    "fg": muted,
+                    "activebackground": accent,
+                    "activeforeground": text,
+                },
+            ),
+            (
+                "connect_btn",
+                {
+                    "bg": t["button_disconnect_bg"]
+                    if self._connected
+                    else t["button_connect_bg"],
+                    "fg": t["button_fg"],
+                    "activebackground": primary,
+                    "activeforeground": t["button_fg"],
+                    "disabledforeground": t["disabled_fg"],
+                },
+            ),
+        ):
+            btn = getattr(self, btn_name, None)
+            if btn is not None:
+                try:
+                    btn.configure(**kw)
+                except Exception:
+                    pass
+        for w in (
+            getattr(self, "status_card", None),
+            getattr(self, "hero_top", None),
+            getattr(self, "_licence_cta", None),
+        ):
+            if w is not None:
+                try:
+                    w.configure(bg=panel)
+                except Exception:
+                    pass
+        for w, kw in (
+            (getattr(self, "vpn_status_caption", None), {"bg": panel, "fg": muted}),
+            (getattr(self, "status_label", None), {"bg": panel, "fg": text}),
+            (getattr(self, "detail_label", None), {"bg": panel, "fg": muted}),
+        ):
+            if w is not None:
+                try:
+                    w.configure(**kw)
+                except Exception:
+                    pass
+        # Nested labels under licence CTA / status card
+        try:
+            if getattr(self, "status_card", None) is not None:
+                self._paint_descendant_chrome(self.status_card, panel, text, muted)
+        except Exception:
+            pass
+
+    def _paint_descendant_chrome(
+        self,
+        widget: tk.Misc,
+        panel: str,
+        text: str,
+        muted: str,
+    ) -> None:
+        """Best-effort recolor of Frame/Label children under a panel card."""
+        try:
+            kids = widget.winfo_children()
+        except Exception:
+            return
+        for ch in kids:
+            try:
+                cls = ch.winfo_class()
+            except Exception:
+                continue
+            try:
+                if cls in ("Frame", "Labelframe", "TFrame"):
+                    ch.configure(bg=panel)
+                elif cls == "Label":
+                    # Keep badge / status colors if they already use status tokens
+                    ch.configure(bg=panel)
+                elif cls == "Button":
+                    pass  # leave action buttons
+            except Exception:
+                pass
+            self._paint_descendant_chrome(ch, panel, text, muted)
+
     def _open_settings(self, *, first_run: bool = False) -> None:
         """Settings: startup prefs, privacy scale, local connection log, leak test.
 
@@ -1554,10 +1800,11 @@ class TunnelClientApp:
         except Exception:
             pass
 
+        t = theme_tokens(self._ui_mode)
         win = tk.Toplevel(self.root)
         self._settings_win = win
         win.title("Settings" + (" — first run" if first_run else ""))
-        win.configure(bg=CHROME_BG)
+        win.configure(bg=t["chrome_bg"])
         apply_centered_window(
             win,
             surface="settings_first_run" if first_run else "settings",
@@ -1569,6 +1816,13 @@ class TunnelClientApp:
             pass
 
         def _on_settings_closed() -> None:
+            unbind = getattr(self, "_settings_scroll_unbind", None)
+            if callable(unbind):
+                try:
+                    unbind()
+                except Exception:
+                    pass
+            self._settings_scroll_unbind = None
             self._settings_win = None
             try:
                 win.destroy()
@@ -1594,9 +1848,9 @@ class TunnelClientApp:
         leak_var = tk.StringVar(value="")
 
         # Scrollable body for taller transparency content
-        canvas = tk.Canvas(win, bg=CHROME_BG, highlightthickness=0)
+        canvas = tk.Canvas(win, bg=t["chrome_bg"], highlightthickness=0)
         scroll = tk.Scrollbar(win, orient=tk.VERTICAL, command=canvas.yview)
-        pad = tk.Frame(canvas, bg=CHROME_BG, padx=16, pady=14)
+        pad = tk.Frame(canvas, bg=t["chrome_bg"], padx=16, pady=14)
         pad.bind(
             "<Configure>",
             lambda e: canvas.configure(scrollregion=canvas.bbox("all")),
@@ -1609,33 +1863,33 @@ class TunnelClientApp:
         tk.Label(
             pad,
             text="Settings",
-            bg=CHROME_BG,
-            fg=PRIMARY_DARK,
+            bg=t["chrome_bg"],
+            fg=t["primary_dark"],
             font=("Segoe UI", 14, "bold"),
             anchor="w",
         ).pack(fill=tk.X, pady=(0, 10))
 
-        card, card_outer = make_neon_card(pad, padx=12, pady=10)
+        card, card_outer = make_neon_card(pad, padx=12, pady=10, bg=t["panel_bg"])
         card_outer.pack(fill=tk.X)
 
         def _row(parent, text, sub, var, on_toggle) -> None:
-            row = tk.Frame(parent, bg=PANEL_BG)
+            row = tk.Frame(parent, bg=t["panel_bg"])
             row.pack(fill=tk.X, pady=8)
-            col = tk.Frame(row, bg=PANEL_BG)
+            col = tk.Frame(row, bg=t["panel_bg"])
             col.pack(side=tk.LEFT, fill=tk.X, expand=True)
             tk.Label(
                 col,
                 text=text,
-                bg=PANEL_BG,
-                fg=TEXT,
+                bg=t["panel_bg"],
+                fg=t["text"],
                 font=("Segoe UI", 10, "bold"),
                 anchor="w",
             ).pack(fill=tk.X)
             tk.Label(
                 col,
                 text=sub,
-                bg=PANEL_BG,
-                fg=TEXT_MUTED,
+                bg=t["panel_bg"],
+                fg=t["text_muted"],
                 font=("Segoe UI", 8),
                 anchor="w",
                 wraplength=360,
@@ -1646,13 +1900,18 @@ class TunnelClientApp:
                 row,
                 var,
                 command=on_toggle,
-                bg=PANEL_BG,
+                bg=t["panel_bg"],
             )
             sw.pack(side=tk.RIGHT, padx=(12, 0))
 
         def _current_settings() -> ProductSettings:
             prev_done = bool(
                 getattr(cur, "first_run_settings_completed", False)
+            )
+            mode = normalize_ui_mode(
+                getattr(self._settings, "ui_mode", None)
+                or getattr(cur, "ui_mode", "light")
+                or self._ui_mode
             )
             return ProductSettings(
                 run_at_startup=bool(run_var.get()),
@@ -1661,6 +1920,7 @@ class TunnelClientApp:
                 privacy_outer_obfuscation=bool(obfs_var.get()),
                 privacy_multihop=bool(multihop_var.get()),
                 first_run_settings_completed=prev_done,
+                ui_mode=mode,
             )
 
         def _save_run() -> None:
@@ -2573,6 +2833,15 @@ class TunnelClientApp:
                 cursor="hand2",
             ).pack(side=tk.RIGHT, padx=(0, 8))
 
+        # Wheel / trackpad / mouse-ball scroll on body (not scrollbar-only).
+        # Bind after children exist so descendant hover targets receive events.
+        try:
+            win.update_idletasks()
+            canvas.configure(scrollregion=canvas.bbox("all"))
+        except Exception:
+            pass
+        self._settings_scroll_unbind = bind_scrollable_canvas(canvas, pad, win)
+
     def _on_close_ui_only(self) -> None:
         """Hide UI; keep process + tunnel alive (tray / taskbar). Disconnect is separate.
 
@@ -2595,34 +2864,90 @@ class TunnelClientApp:
             except Exception:
                 pass
 
+    def _show_quitting_status(self) -> None:
+        """Paint Quit remark so the UI does not look frozen during residual teardown."""
+        apply_quit_status_remark(self.status_var, self.detail_var)
+        try:
+            t = getattr(self, "_t", None) or {}
+            fg = t.get("primary_dark") or PRIMARY_DARK
+            self.status_label.configure(fg=fg)
+        except Exception:
+            pass
+        try:
+            self.btn_var.set("Quitting...")
+            self.connect_btn.configure(state=tk.DISABLED)
+            self.quit_btn.configure(state=tk.DISABLED)
+        except Exception:
+            pass
+        try:
+            # Force Tk to paint before long residual work starts off-thread.
+            self.root.update_idletasks()
+        except Exception:
+            pass
+
     def _quit_app(self) -> None:
-        """Explicit quit: full residual teardown then exit (never leave dual /1)."""
+        """Explicit quit: show status, tear down residual off UI thread, then exit.
+
+        Residual disconnect/restore previously ran **synchronously** on the button
+        callback, which froze the Tk loop and triggered Windows "Not Responding".
+        Order now: status remark → yield → tray stop (non-join) → worker teardown
+        → ``root.destroy`` on the UI thread.
+        """
+        if getattr(self, "_quitting", False):
+            return
+        self._quitting = True
         try:
             self._log("Quit - stopping tunnel and restoring internet...")
         except Exception:
             pass
-        if self._tray is not None:
+
+        # 1) Status first so the user sees intentional shutdown (not a freeze).
+        self._show_quitting_status()
+
+        # 2) Tray stop is PostMessage-based (no join) — keep off the residual path.
+        tray = self._tray
+        self._tray = None
+        if tray is not None:
             try:
-                self._tray.stop()
+                tray.stop()
             except Exception:
                 pass
-            self._tray = None
+
         tunnel = self._tunnel
         self._tunnel = None
+        client = self.client
+
+        def _teardown_worker() -> None:
+            try:
+                run_quit_residual_teardown(tunnel, client)
+            finally:
+
+                def _destroy_ui() -> None:
+                    try:
+                        self.root.destroy()
+                    except Exception:
+                        pass
+
+                try:
+                    self.root.after(0, _destroy_ui)
+                except Exception:
+                    try:
+                        self.root.destroy()
+                    except Exception:
+                        pass
+
+        def _start_teardown() -> None:
+            threading.Thread(
+                target=_teardown_worker,
+                name="rpt-quit-teardown",
+                daemon=True,
+            ).start()
+
+        # 3) Yield one event-loop turn so the quitting remark paints, then worker.
         try:
-            disconnect_full_tunnel(tunnel, self.client)
+            self.root.after(0, _start_teardown)
         except Exception:
-            pass
-        # Belt-and-suspenders: residual restore even if disconnect path skipped
-        try:
-            host = getattr(tunnel, "server_host", None) if tunnel is not None else None
-            restore_windows_residual_path(server_host=host)
-        except Exception:
-            pass
-        try:
-            self.root.destroy()
-        except Exception:
-            pass
+            _start_teardown()
 
     def run(self) -> None:
         # No finally-teardown on hide: tunnel is user-controlled (Disconnect / Quit)

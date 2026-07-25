@@ -19,27 +19,115 @@ PRIVACY_MESSAGE_TEXT = (
 # --- Palette (restorebritain.org.uk/contact -> Cupertino theme CSS) ---
 # Source: ajax.googleapis.com/.../themes/cupertino/jquery-ui.css as loaded by the contact page
 PALETTE_SOURCE_URL = "https://www.restorebritain.org.uk/contact"
-CHROME_BG = "#F2F5F7"  # cupertino #f2f5f7  -  soft page background
-PANEL_BG = "#FFFFFF"  # white cards / status panel
-PRIMARY = "#2779AA"  # cupertino primary blue
-PRIMARY_ACTIVE = "#2694E8"  # lighter interactive blue
-PRIMARY_DARK = "#0070A3"
-LIGHT_ACCENT = "#DEEDF7"  # cupertino soft blue panel
-TEXT = "#222222"  # cupertino body text
-TEXT_MUTED = "#363636"
-WHITE = "#FFFFFF"
-STATUS_OK = "#1B767E"  # site teal accent (homepage embed)  -  color for Connected
-STATUS_ERROR = "#CD0A0A"  # cupertino error red  -  color for failed Connect (never a message string)
+
+# UI mode preference (product settings ``ui_mode``)
+UI_MODE_LIGHT = "light"
+UI_MODE_DARK = "dark"
+UI_MODES = (UI_MODE_LIGHT, UI_MODE_DARK)
+
+# Light (default product chrome)
+_LIGHT_TOKENS: dict[str, str] = {
+    "chrome_bg": "#F2F5F7",  # cupertino soft page background
+    "panel_bg": "#FFFFFF",  # white cards / status panel
+    "primary": "#2779AA",
+    "primary_active": "#2694E8",
+    "primary_dark": "#0070A3",
+    "light_accent": "#DEEDF7",
+    "text": "#222222",
+    "text_muted": "#363636",
+    "white": "#FFFFFF",
+    "status_ok": "#1B767E",
+    "status_error": "#CD0A0A",
+    "status_warn": "#A67C00",
+    "border": "#AED0EA",
+    "neon_border": "#2EE6D6",
+    "neon_teal": "#1B767E",
+    "button_connect_bg": "#2779AA",
+    "button_disconnect_bg": "#1B767E",
+    "button_fg": "#FFFFFF",
+    "disabled_fg": "#AAAAAA",
+}
+
+# Dark mode — keep Connected/error readable; neon accents stay high-contrast
+_DARK_TOKENS: dict[str, str] = {
+    "chrome_bg": "#0B1218",
+    "panel_bg": "#152028",
+    "primary": "#4BA3D9",
+    "primary_active": "#6BB8E8",
+    "primary_dark": "#8EC8EA",
+    "light_accent": "#1A2A38",
+    "text": "#E8EEF2",
+    "text_muted": "#A8B4BE",
+    "white": "#FFFFFF",
+    "status_ok": "#2EE6D6",
+    "status_error": "#FF6B6B",
+    "status_warn": "#E0B84A",
+    "border": "#2A4A5C",
+    "neon_border": "#2EE6D6",
+    "neon_teal": "#1B767E",
+    "button_connect_bg": "#2779AA",
+    "button_disconnect_bg": "#1B767E",
+    "button_fg": "#FFFFFF",
+    "disabled_fg": "#6A7680",
+}
+
+
+def normalize_ui_mode(mode: str | None) -> str:
+    """Return ``light`` or ``dark``; unknown / empty → light (product default)."""
+    m = (mode or "").strip().lower()
+    if m in ("dark", "night", "black"):
+        return UI_MODE_DARK
+    return UI_MODE_LIGHT
+
+
+def theme_tokens(mode: str | None = None) -> dict[str, str]:
+    """Shipped chrome/panel/text tokens for *mode* (light or dark).
+
+    Pure map — no Tk. Status OK/error stay distinct in both modes.
+    """
+    if normalize_ui_mode(mode) == UI_MODE_DARK:
+        return dict(_DARK_TOKENS)
+    return dict(_LIGHT_TOKENS)
+
+
+def theme_mode_label(mode: str | None) -> str:
+    """Short label for the *current* mode (button chrome)."""
+    return "Dark" if normalize_ui_mode(mode) == UI_MODE_DARK else "Light"
+
+
+def theme_toggle_target(mode: str | None) -> str:
+    """Opposite mode after a user toggle."""
+    return UI_MODE_LIGHT if normalize_ui_mode(mode) == UI_MODE_DARK else UI_MODE_DARK
+
+
+def theme_toggle_button_text(mode: str | None) -> str:
+    """Header control text: shows the mode you switch *to* (sun/moon + word)."""
+    if normalize_ui_mode(mode) == UI_MODE_DARK:
+        return "☀ Light"
+    return "☾ Dark"
+
+
+# Module-level constants = light defaults (import compatibility / legacy tests)
+CHROME_BG = _LIGHT_TOKENS["chrome_bg"]
+PANEL_BG = _LIGHT_TOKENS["panel_bg"]
+PRIMARY = _LIGHT_TOKENS["primary"]
+PRIMARY_ACTIVE = _LIGHT_TOKENS["primary_active"]
+PRIMARY_DARK = _LIGHT_TOKENS["primary_dark"]
+LIGHT_ACCENT = _LIGHT_TOKENS["light_accent"]
+TEXT = _LIGHT_TOKENS["text"]
+TEXT_MUTED = _LIGHT_TOKENS["text_muted"]
+WHITE = _LIGHT_TOKENS["white"]
+STATUS_OK = _LIGHT_TOKENS["status_ok"]
+STATUS_ERROR = _LIGHT_TOKENS["status_error"]
 STATUS_ERROR_FG = STATUS_ERROR  # alias for fg= usage
-STATUS_WARN = "#A67C00"
-BORDER = "#AED0EA"  # cupertino border blue
-# Site panel-card neon accent (restoreprivacy.online boxes)
-NEON_BORDER = "#2EE6D6"
-NEON_TEAL = "#1B767E"
-BUTTON_CONNECT_BG = PRIMARY
-BUTTON_DISCONNECT_BG = "#1B767E"
-BUTTON_FG = WHITE
-DISABLED_FG = "#AAAAAA"
+STATUS_WARN = _LIGHT_TOKENS["status_warn"]
+BORDER = _LIGHT_TOKENS["border"]
+NEON_BORDER = _LIGHT_TOKENS["neon_border"]
+NEON_TEAL = _LIGHT_TOKENS["neon_teal"]
+BUTTON_CONNECT_BG = _LIGHT_TOKENS["button_connect_bg"]
+BUTTON_DISCONNECT_BG = _LIGHT_TOKENS["button_disconnect_bg"]
+BUTTON_FG = _LIGHT_TOKENS["button_fg"]
+DISABLED_FG = _LIGHT_TOKENS["disabled_fg"]
 # Legacy aliases (tests / older imports)
 BANNER_BG = PRIMARY_DARK
 BANNER_FG = WHITE

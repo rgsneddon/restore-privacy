@@ -1,7 +1,7 @@
 """Structural tests: shipped Apple distribution signing path is Gatekeeper-safe.
 
 Asserts the real packaging/signing scripts invoke Developer ID, notarytool, and
-stapler on the product app path â€” not a re-implementation of Apple's tools.
+stapler on the product app path — not a re-implementation of Apple's tools.
 """
 
 from __future__ import annotations

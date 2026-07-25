@@ -10,7 +10,7 @@ Windows/Android are staged from 0.1.2 when not rebuilt on this host.
 - iOS: zips Flutter Runner.app for sideload / device install tooling
 
 Public node key (node_elgamal.pub) may be bundled via scripts/inject_apple_secrets.py.
-Per-device Ed25519 client keys are generated on first run â€” never a shared
+Per-device Ed25519 client keys are generated on first run — never a shared
 client_ed25519.priv. Never bundles node_elgamal.priv.
 """
 

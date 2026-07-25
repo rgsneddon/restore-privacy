@@ -54,12 +54,12 @@ class TestPrivacyPolicy(unittest.TestCase):
         self.assertIn("README", text)
 
     def test_policy_public_catalog_is_current_monopin(self):
-        """User-facing policy must advertise catalog v0.4.4 as current paid ship."""
+        """User-facing policy must advertise catalog v0.4.5 as current paid ship."""
         text = _read("PRIVACY_POLICY.md")
-        self.assertIn("Current packages (catalog v0.4.4)", text)
+        self.assertIn("Current packages (catalog v0.4.5)", text)
         self.assertNotIn("Current packages (catalog v0.4.1)", text)
         self.assertNotIn("Current packages (catalog v0.4.0)", text)
-        self.assertIn("0.4.4", text)
+        self.assertIn("0.4.5", text)
         self.assertIn("restoreprivacy.online", text)
         self.assertIn("Developer ID", text)
         self.assertIn("Team-signed", text)
@@ -78,7 +78,7 @@ class TestPrivacyPolicy(unittest.TestCase):
         )
         # Public mirror stays in sync
         pub = _read("status_page/public/PRIVACY_POLICY.md")
-        self.assertIn("Current packages (catalog v0.4.4)", pub)
+        self.assertIn("Current packages (catalog v0.4.5)", pub)
 
 
 class TestLicenseAndCredits(unittest.TestCase):
@@ -120,7 +120,7 @@ class TestLicenseAndCredits(unittest.TestCase):
             self.assertIn(name, text, f"missing credit for {name}")
         self.assertIn("wintun", text.lower())
         self.assertIn("virtual NIC", text)
-        # Public Credits must not use competitor “not WireGuard/OpenVPN” disclaimers
+        # Public Credits must not use competitor “not WireGuard/OpenVPNâ€ disclaimers
         self.assertNotIn("wireguard", text.lower())
         self.assertNotIn("openvpn", text.lower())
         # Distribution services (private source + paid status host)
@@ -135,14 +135,14 @@ class TestLicenseAndCredits(unittest.TestCase):
         text = _read("LICENSE")
         self.assertIn("FULL COPYRIGHT", text.upper())
         self.assertIn("Stripe", text)
-        self.assertIn("catalog v0.4.4", text)
+        self.assertIn("catalog v0.4.5", text)
         self.assertNotIn("catalog v0.4.0", text)
         self.assertNotIn("catalog v0.4.1", text)
         self.assertIn("private", text.lower())
         self.assertIn("PAYMENT REQUIRED", text.upper())
         pub = _read("status_page/public/LICENSE")
         self.assertEqual(text, pub)
-        self.assertIn("catalog v0.4.4", pub)
+        self.assertIn("catalog v0.4.5", pub)
 
 
 class TestReadmeHowto(unittest.TestCase):
@@ -151,14 +151,14 @@ class TestReadmeHowto(unittest.TestCase):
         text = _read("README.md")
         lower = text.lower()
         self.assertTrue("how to" in lower or "install" in lower)
-        # End-user client path â€” all published platforms
+        # End-user client path Ã¢â‚¬â€ all published platforms
         self.assertIn("download", lower)
         self.assertIn("windows", lower)
         self.assertIn("android", lower)
         self.assertIn("macos", lower)
         self.assertIn("ios", lower)
-        # Catalog ship is 0.4.4 (signed packages via paid VPN APP Shop)
-        self.assertIn("0.4.4", text)
+        # Catalog ship is 0.4.5 (signed packages via paid VPN APP Shop)
+        self.assertIn("0.4.5", text)
         self.assertIn("restoreprivacy.online", text)
         self.assertIn("Developer ID", text)
         self.assertIn("Team-signed", text)
@@ -170,13 +170,13 @@ class TestReadmeHowto(unittest.TestCase):
         self.assertNotIn("releases/download/", text)
         # Package basenames from the public release catalog monopin
         self.assertIn(
-            "restore-privacy-client-0.4.4-windows-x64-setup.exe",
+            "restore-privacy-client-0.4.5-windows-x64-setup.exe",
             text,
         )
-        self.assertIn("restore-privacy-client-0.4.4-android.apk", text)
-        self.assertIn("restore-privacy-client-0.4.4-macos.zip", text)
-        self.assertIn("restore-privacy-client-0.4.4-ios.zip", text)
-        self.assertIn("restore-privacy-client-0.4.4-linux-x64.tar.gz", text)
+        self.assertIn("restore-privacy-client-0.4.5-android.apk", text)
+        self.assertIn("restore-privacy-client-0.4.5-macos.zip", text)
+        self.assertIn("restore-privacy-client-0.4.5-ios.zip", text)
+        self.assertIn("restore-privacy-client-0.4.5-linux-x64.tar.gz", text)
         # Must not advertise older monopin filenames as the current catalog
         self.assertNotIn(
             "restore-privacy-client-0.4.0-windows-x64-setup.exe",

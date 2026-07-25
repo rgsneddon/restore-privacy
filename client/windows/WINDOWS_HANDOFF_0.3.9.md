@@ -1,4 +1,4 @@
-﻿# Windows handoff â€” Restore Privacy **0.3.9** (multi-hop residual)
+﻿# Windows handoff — Restore Privacy **0.3.9** (multi-hop residual)
 
 Catalog monopin: **0.3.9**  
 Production entry (default): **82.221.101.241:44044** (Iceland)  
@@ -33,7 +33,7 @@ That PE embeds:
 - Current `client/` residual path including **`client/multihop.py`**
   (`MULTI_HOP_ROUTING_IMPLEMENTED = True`, residual-via-exit when enabled)
 - **`product/node_elgamal.pub`** (entry) + **`product/exit_node_elgamal.pub`** (exit)
-- Wintun, frozen runtime â€” **no** `*.priv` (device Ed25519 generated on first run)
+- Wintun, frozen runtime — **no** `*.priv` (device Ed25519 generated on first run)
 
 ### Prereqs
 
@@ -54,7 +54,7 @@ python scripts\build_windows_multihop.py --check-only
 
 ## What the builder does
 
-1. Pins `client/VERSION` â†’ `0.3.9`
+1. Pins `client/VERSION` → `0.3.9`
 2. PyInstaller **onedir** of `client/windows/app.py` (hidden-import `client.multihop`, â€¦)
 3. Injects entry + exit **public** keys into `secrets/` and `product/`
 4. PyInstaller **onefile** setup wrapping `client/windows/installer.py` + payload
@@ -77,13 +77,13 @@ Optional: search the binary (PowerShell) for multihop markers:
 Select-String -Path releases\0.3.9\restore-privacy-client-0.3.9-windows-x64-setup.exe -Pattern "exit_node_elgamal","185.146.232.107","multihop" -Encoding byte -ErrorAction SilentlyContinue
 # Or install and run with:
 #   set RPT_MULTIHOP_ENABLED=1
-# then Connect â€” residual should dial Romania exit when multihop is active.
+# then Connect — residual should dial Romania exit when multihop is active.
 ```
 
 Install the setup.exe, confirm:
 
-- Default Connect â†’ Iceland entry  
-- `RPT_MULTIHOP_ENABLED=1` â†’ residual via Romania exit  
+- Default Connect → Iceland entry  
+- `RPT_MULTIHOP_ENABLED=1` → residual via Romania exit  
 - No free public installers; payment/entitlement unchanged  
 
 ### 2. Publish for paid downloads
@@ -101,14 +101,14 @@ staged `status_page/assets/0.3.9/` + VPS paid_assets when configured.
 ### 3. Commit / tag (if you change source while building)
 
 Usually the handoff only **produces the PE**; source is already on `main`.
-If you change Windows code, open a PR or push as usual â€” **do not commit secrets**.
+If you change Windows code, open a PR or push as usual — **do not commit secrets**.
 
 ## Multi-hop honesty (Windows)
 
 | Mode | Behaviour |
 |------|-----------|
-| Default | Single-hop residual â†’ Iceland entry + `node_elgamal.pub` |
-| `RPT_MULTIHOP_ENABLED=1` | Residual-via-exit â†’ Romania + `exit_node_elgamal.pub` |
+| Default | Single-hop residual → Iceland entry + `node_elgamal.pub` |
+| `RPT_MULTIHOP_ENABLED=1` | Residual-via-exit → Romania + `exit_node_elgamal.pub` |
 | Not claimed | Full intermediate onion encapsulation through the entry hop |
 
 Node-only zram + LUKS2 never ships in the client package.
@@ -122,10 +122,10 @@ Node-only zram + LUKS2 never ships in the client package.
 
 Common issues:
 
-- **PyInstaller missing** â†’ bat installs it; or `pip install pyinstaller`
-- **Missing exit pub** â†’ pull latest `product/exit_node_elgamal.pub` from git
-- **Wrong arch** â†’ use Windows **x64**, not ARM64-only Python unless you know you need it
-- **Antivirus** â†’ may quarantine freshly frozen PE; allowlist the repo `dist/` and `releases/`
+- **PyInstaller missing** → bat installs it; or `pip install pyinstaller`
+- **Missing exit pub** → pull latest `product/exit_node_elgamal.pub` from git
+- **Wrong arch** → use Windows **x64**, not ARM64-only Python unless you know you need it
+- **Antivirus** → may quarantine freshly frozen PE; allowlist the repo `dist/` and `releases/`
 
 ## Related
 

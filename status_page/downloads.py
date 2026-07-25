@@ -1,4 +1,4 @@
-"""Release download catalog + paid download UI (version 0.4.4).
+"""Release download catalog + paid download UI (version 0.4.5).
 
 Primary path: pay **£2.45** (GBP) via Stripe Checkout per package, then a
 single-use download token. Free permanent GitHub ``href`` is not used on the
@@ -6,7 +6,7 @@ public buttons. After payment the status host **proxies** the installer
 (authenticated GitHub API / local assets) so fulfilment works when the
 restore-privacy repo is **private**. Buy Me a Coffee is tip/support only.
 
-Current catalog packages: restore-privacy release **0.4.4**
+Current catalog packages: restore-privacy release **0.4.5**
 (Windows setup needs no separate Python install; macOS Developer ID notarized;
 iOS Team-signed sideload).
 """
@@ -31,10 +31,10 @@ except ImportError:  # package import path (status_page as package)
         site_copyright_text,
     )
 
-RELEASE_VERSION = "0.4.4"
+RELEASE_VERSION = "0.4.5"
 GITHUB_OWNER = "rgsneddon"
 GITHUB_REPO = "restore-privacy"
-RELEASE_TAG = "0.4.4"
+RELEASE_TAG = "0.4.5"
 RELEASE_PAGE_URL = (
     f"https://github.com/{GITHUB_OWNER}/{GITHUB_REPO}/releases/tag/{RELEASE_TAG}"
 )
@@ -409,7 +409,8 @@ def download_css() -> str:
       letter-spacing: 0.04em;
       color: #ffffff;
       text-shadow: 0 2px 14px rgba(0, 0, 0, 0.45), 0 0 1px rgba(0, 0, 0, 0.55);
-      font-family: Georgia, "Palatino Linotype", Palatino, "Times New Roman", serif;
+      /* Same UI stack as .dl-price / public chrome body (not Georgia serif) */
+      font-family: "Segoe UI", system-ui, -apple-system, "Helvetica Neue", Arial, sans-serif;
       font-style: normal;
       text-transform: uppercase;
       text-align: center;

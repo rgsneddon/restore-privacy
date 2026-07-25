@@ -82,7 +82,7 @@ Native prep stubs (drag into Xcode targets as described in those docs):
 ## What is already implemented (this tree)
 
 1. Shared Swift **RPT2 engine** under `apple_shared/Rpt2/` (also copied into `ios/NativePrep/Rpt2` and `macos/NativePrep/Rpt2`) with unit tests: `cd client_app/apple_shared/Rpt2 && swift test`.  
-2. **Packet Tunnel** targets (`ios/PacketTunnel`, `macos/PacketTunnel`) implementing UK gate Ã¢â€ â€™ secrets Ã¢â€ â€™ handshake Ã¢â€ â€™ full-tunnel settings Ã¢â€ â€™ packetFlow/UDP DATA + keepalive.  
+2. **Packet Tunnel** targets (`ios/PacketTunnel`, `macos/PacketTunnel`) implementing UK gate Ã¢â€ ’ secrets Ã¢â€ ’ handshake Ã¢â€ ’ full-tunnel settings Ã¢â€ ’ packetFlow/UDP DATA + keepalive.  
 3. Host method channel `restore_privacy/vpn` registered from iOS `AppDelegate` / macOS `MainFlutterWindow`; product connect succeeds **only** when Packet Tunnel is active. Host-side RPT2 HELLO is diagnostic-only (never a false Ã¢â‚¬Å“ConnectedÃ¢â‚¬Â that leaves residual ISP IP unchanged).  
 4. Secrets helpers load **only** `client_ed25519.priv` + `node_elgamal.pub` (never `node_elgamal.priv`).
 
@@ -135,15 +135,15 @@ Packet Tunnel targets are configured for **Team signing** (`CODE_SIGNING_ALLOWED
 
 Do these **in order**. Entitlement *files* are already patched; you still must register them with Apple and sign with your Team.
 
-### 1. Developer portal ([developer.apple.com](https://developer.apple.com) Ã¢â€ â€™ Identifiers)
+### 1. Developer portal ([developer.apple.com](https://developer.apple.com) Ã¢â€ ’ Identifiers)
 
 1. Sign in with the team that owns **SFCBP95595** (or your team if you change IDs).
-2. **App Groups** Ã¢â€ â€™ create/register: `group.com.restoreprivacy.shared`.
+2. **App Groups** Ã¢â€ ’ create/register: `group.com.restoreprivacy.shared`.
 3. **App ID** `com.restoreprivacy.restorePrivacyClient` (host):
-   - Capability **Network Extensions** Ã¢â€ â€™ enable **Packet Tunnel**
-   - Capability **App Groups** Ã¢â€ â€™ select `group.com.restoreprivacy.shared`
+   - Capability **Network Extensions** Ã¢â€ ’ enable **Packet Tunnel**
+   - Capability **App Groups** Ã¢â€ ’ select `group.com.restoreprivacy.shared`
 4. **App ID** `com.restoreprivacy.restorePrivacyClient.PacketTunnel` (extension):
-   - Same **Network Extensions Ã¢â€ â€™ Packet Tunnel**
+   - Same **Network Extensions Ã¢â€ ’ Packet Tunnel**
    - Same **App Groups** entry
 5. If Xcode uses Automatic Signing, it will create Development profiles after step 2. For Mac distribution outside the Mac App Store, also ensure Developer ID + Network Extension is allowed for that App ID when Apple requires it.
 
@@ -158,7 +158,7 @@ open ios/Runner.xcworkspace     # iOS
 
 For **Runner** and **PacketTunnel** on each platform:
 
-1. **Signing & Capabilities** Ã¢â€ â€™ Team **SFCBP95595** (Russell Sneddon).
+1. **Signing & Capabilities** Ã¢â€ ’ Team **SFCBP95595** (Russell Sneddon).
 2. **Automatically manage signing** = ON.
 3. Confirm capabilities appear (Network Extensions / Packet Tunnel, App Groups). If Xcode offers to Ã¢â‚¬Å“fixÃ¢â‚¬Â entitlements mismatches, prefer keeping the repo plists above.
 4. Confirm provider bundle id stays `com.restoreprivacy.restorePrivacyClient.PacketTunnel` (matches `RptVpnChannel.providerBundleId`).
@@ -173,7 +173,7 @@ The **PacketTunnel** app extension is already created and embedded:
 | Provider class | `PacketTunnelProvider` (`NativePrep/PacketTunnelProvider.swift`) |
 | Entitlements | `PacketTunnel/PacketTunnel.entitlements` (NE + App Group) |
 | Code signing | `CODE_SIGNING_ALLOWED = YES`, team `SFCBP95595` |
-| Embed | Runner Ã¢â€ â€™ **Embed Foundation Extensions** Ã¢â€ â€™ `PacketTunnel.appex` |
+| Embed | Runner Ã¢â€ ’ **Embed Foundation Extensions** Ã¢â€ ’ `PacketTunnel.appex` |
 
 **You only need to:** open the workspace, pick Team on Runner + PacketTunnel (Automatic Signing), and ensure the portal App ID for `.PacketTunnel` exists with Network Extensions + App Group. If Xcode shows a profile error, fix the portal App ID Ã¢â‚¬â€ do not create a second Packet Tunnel target.
 

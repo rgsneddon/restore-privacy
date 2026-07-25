@@ -42,7 +42,7 @@ class TestProductPathNoSystemPython(unittest.TestCase):
         self.assertIn("_MEIPASS", src)
         self.assertIn("getattr(sys, \"frozen\"", src)
         self.assertIn("INSTALL_DIR", src)
-        # Deploys bundled client exe â€” not system python -m
+        # Deploys bundled client exe — not system python -m
         self.assertIn("_find_client_exe", src)
         self.assertNotIn("python -m client.windows", src)
 
@@ -73,7 +73,7 @@ class TestSourcePathRequiresPython(unittest.TestCase):
     def test_dev_entry_is_python_module_not_standalone_exe(self):
         main = (ROOT / "client" / "windows" / "__main__.py").read_text(encoding="utf-8")
         self.assertIn("client.windows", main)
-        # Module entry â€” requires a host interpreter to import
+        # Module entry — requires a host interpreter to import
         self.assertIn("from client.windows.app import main", main)
 
     def test_launch_gui_resolves_host_pythonw(self):

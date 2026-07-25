@@ -1,4 +1,4 @@
-"""Residual public IP must use the VPN node â€” not queue-only "Connected".
+"""Residual public IP must use the VPN node — not queue-only "Connected".
 
 Evidence targets: dual /1 + Wintun required for product Connect success;
 honest status when residual capture inactive; Disconnect tears routes down.
@@ -114,7 +114,7 @@ class TestResidualRouteGates(unittest.TestCase):
         self.assertIn("Wintun", res.message)
 
     def test_require_system_capture_fails_when_routes_not_applied(self):
-        """Admin + capture TUN but dual /1 refused â†’ product Connect fails (not fake Connected)."""
+        """Admin + capture TUN but dual /1 refused → product Connect fails (not fake Connected)."""
         client = mock.Mock()
         client.session = mock.Mock()
         client._sock = mock.Mock()

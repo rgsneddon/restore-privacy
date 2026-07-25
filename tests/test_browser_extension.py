@@ -1,4 +1,4 @@
-﻿"""Browser extension MV3: structure + shipped vpn_core enable/disable via Node.
+"""Browser extension MV3: structure + shipped vpn_core enable/disable via Node.
 
 Drives browser_extension/lib/vpn_core.js (and proxy_adapter) through the
 real Node test runner — not a re-implementation of Connect routing.
@@ -21,7 +21,7 @@ class TestBrowserExtensionStructure(unittest.TestCase):
         self.assertTrue(manifest_path.is_file(), "manifest.json missing")
         manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
         self.assertEqual(manifest.get("manifest_version"), 3)
-        self.assertEqual(manifest.get("version"), "0.4.4")
+        self.assertEqual(manifest.get("version"), "0.4.5")
         self.assertIn("proxy", manifest.get("permissions", []))
         self.assertIn("storage", manifest.get("permissions", []))
         bg = manifest.get("background") or {}

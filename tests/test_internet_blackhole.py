@@ -51,7 +51,7 @@ class TestWindowsAntiBlackholeRoutes(unittest.TestCase):
         self.assertIn("IF 17", joined)
         self.assertIn("0.0.0.0 mask 128.0.0.0 0.0.0.0 IF 17", joined)
         self.assertIn("128.0.0.0 mask 128.0.0.0 0.0.0.0 IF 17", joined)
-        # /32 address â€” no fake ARP gateway 10.88.0.1 for dual /1
+        # /32 address — no fake ARP gateway 10.88.0.1 for dual /1
         self.assertIn("255.255.255.255", joined)
         self.assertNotIn("mask 128.0.0.0 10.88.0.1", joined)
         pin_i = joined.find(server)
@@ -133,7 +133,7 @@ class TestWindowsAntiBlackholeRoutes(unittest.TestCase):
         client._sock = None  # dry_run does not start dataplane
 
         plan = build_full_tunnel_plan(session.vpn_ip)
-        # dry_run returns before needing socket for dataplane â€” patch start path
+        # dry_run returns before needing socket for dataplane — patch start path
         res = start_full_tunnel(client, plan, "82.221.101.241", dry_run=True)
         self.assertTrue(res.ok)
         joined = "\n".join(res.applied_commands)
@@ -156,7 +156,7 @@ class TestWindowsAntiBlackholeRoutes(unittest.TestCase):
             if "mask 255.255.255.255" in cmd and "route add" in cmd:
                 return mock.Mock(returncode=1, stderr="pin failed: network unreachable", stdout="")
             if "mask 128.0.0.0" in cmd:
-                # Should not be reached â€” fail test if it is
+                # Should not be reached — fail test if it is
                 return mock.Mock(returncode=0, stderr="", stdout="")
             return mock.Mock(returncode=0, stderr="", stdout="")
 

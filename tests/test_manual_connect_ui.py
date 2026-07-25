@@ -53,7 +53,7 @@ class TestManualControlPolicy(unittest.TestCase):
 
     def test_close_path_no_teardown(self):
         src = (ROOT / "client" / "windows" / "app.py").read_text(encoding="utf-8")
-        # Close hides (iconify/withdraw) â€” does not destroy process or stop tunnel
+        # Close hides (iconify/withdraw) — does not destroy process or stop tunnel
         close = src[src.index("def _on_close_ui_only") : src.index("def _quit_app")]
         self.assertNotIn("stop_full_tunnel", close)
         self.assertNotIn("disconnect_full_tunnel", close)

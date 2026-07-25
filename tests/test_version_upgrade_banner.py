@@ -129,7 +129,7 @@ class TestUpgradeBanner(unittest.TestCase):
     def test_zero_placeholder_does_not_force_upgrade_against_self(self):
         """If something still returns 0.0.0, treat as embedded package version."""
         emb = embedded_package_version()
-        # Equal after normalization â†’ no banner
+        # Equal after normalization → no banner
         self.assertFalse(upgrade_available(running="0.0.0", latest=emb))
         self.assertIsNone(upgrade_banner_text(running="0.0.0", latest=emb))
 

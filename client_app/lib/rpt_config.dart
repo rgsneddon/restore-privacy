@@ -1,4 +1,4 @@
-﻿import 'dart:io' show Platform;
+import 'dart:io' show Platform;
 
 import 'free_tier.dart';
 
@@ -23,7 +23,7 @@ class RptConfig {
 
   /// Paid catalog pin — must match monorepo ``client/VERSION`` and pubspec.
   /// Free builds report [kFreeTierVersion] via [displayProductVersion].
-  static const String productVersion = '0.4.4';
+  static const String productVersion = '0.4.5';
 
   /// UI / about version (free tier always ``3.3.3``).
   static String get displayProductVersion =>
@@ -57,7 +57,7 @@ class RptConfig {
 
   /// True when residual multi-hop (exit dial) is selected.
   ///
-  /// Free tier: always false. Else: Settings → dart-define → env.
+  /// Free tier: always false. Else: Settings ? dart-define ? env.
   static bool get multiHopEnabled {
     if (freeTierEnabled) return false;
     final o = runtimeMultiHopOverride;

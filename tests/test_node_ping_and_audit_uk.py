@@ -1,4 +1,4 @@
-﻿"""Node ping helper + AUDIT UK ping RAG section (shipped modules)."""
+"""Node ping helper + AUDIT UK ping RAG section (shipped modules)."""
 
 from __future__ import annotations
 
@@ -111,7 +111,7 @@ class TestAuditUkPingSection(unittest.TestCase):
     def test_audit_package_table_and_monopin_match_catalog(self) -> None:
         """Shipped AUDIT must name live monopin; package RAG may lag with honesty note."""
         ver = (ROOT / "client" / "VERSION").read_text(encoding="utf-8").strip()
-        self.assertEqual(ver, "0.4.4")
+        self.assertEqual(ver, "0.4.5")
         paths = [
             ROOT / "AUDIT.md",
             ROOT / "status_page" / "AUDIT.md",
@@ -129,7 +129,7 @@ class TestAuditUkPingSection(unittest.TestCase):
                 f"restore-privacy-client-{ver}-windows-x64-setup.exe" in text
                 or "restore-privacy-client-0.4.0-windows-x64-setup.exe" in text
                 or "restore-privacy-client-0.4.1-windows-x64-setup.exe" in text
-                or "restore-privacy-client-0.4.4-windows-x64-setup.exe" in text,
+                or "restore-privacy-client-0.4.5-windows-x64-setup.exe" in text,
                 f"{path} missing package RAG windows row",
             )
             self.assertNotIn("restore-privacy-client-0.3.7-", text)
@@ -142,7 +142,7 @@ class TestAuditUkPingSection(unittest.TestCase):
 class TestVersionMonopin(unittest.TestCase):
     def test_version_pin_matches_catalog(self) -> None:
         ver = (ROOT / "client" / "VERSION").read_text(encoding="utf-8").strip()
-        self.assertEqual(ver, "0.4.4")
+        self.assertEqual(ver, "0.4.5")
         from status_page import downloads as dl
 
         self.assertEqual(dl.RELEASE_VERSION, ver)

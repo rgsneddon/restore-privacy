@@ -25,6 +25,15 @@ KEY_PRIVACY_OUTER_OBFUSCATION = "privacy_outer_obfuscation"
 KEY_PRIVACY_MULTIHOP = "privacy_multihop"
 # Set only when user OK's first-run settings after keygen unlock (not a bypass).
 KEY_FIRST_RUN_SETTINGS_COMPLETED = "first_run_settings_completed"
+# Chrome appearance: "light" (default) or "dark"
+KEY_UI_MODE = "ui_mode"
+
+
+def normalize_ui_mode(mode: str | None) -> str:
+    """Product local preference: ``light`` or ``dark`` (default light)."""
+    from client.ui_theme import normalize_ui_mode as _norm
+
+    return _norm(mode)
 
 
 @dataclass
@@ -37,6 +46,8 @@ class ProductSettings:
     privacy_multihop: bool = False
     # False until user binds first-run Settings with OK (post-keygen onboarding).
     first_run_settings_completed: bool = False
+    # Main-window chrome: light (default) or dark
+    ui_mode: str = "light"
 
 
 def settings_dir() -> Path:
@@ -57,6 +68,7 @@ def default_settings() -> ProductSettings:
         privacy_outer_obfuscation=False,
         privacy_multihop=False,
         first_run_settings_completed=False,
+        ui_mode="light",
     )
 
 
@@ -81,6 +93,7 @@ def load_settings(path: Optional[Path] = None) -> ProductSettings:
             first_run_settings_completed=bool(
                 data.get(KEY_FIRST_RUN_SETTINGS_COMPLETED, False)
             ),
+            ui_mode=normalize_ui_mode(data.get(KEY_UI_MODE, "light")),
         )
     except (OSError, json.JSONDecodeError, TypeError, ValueError):
         return default_settings()
@@ -99,6 +112,7 @@ def save_settings(settings: ProductSettings, path: Optional[Path] = None) -> Pat
         KEY_FIRST_RUN_SETTINGS_COMPLETED: bool(
             settings.first_run_settings_completed
         ),
+        KEY_UI_MODE: normalize_ui_mode(getattr(settings, "ui_mode", "light")),
     }
     p.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
     return p

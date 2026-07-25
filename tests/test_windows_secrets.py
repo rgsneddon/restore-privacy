@@ -1,4 +1,4 @@
-"""Windows secrets resolution + provision â€” no 'copy from the node' dead-end when keys present."""
+"""Windows secrets resolution + provision — no 'copy from the node' dead-end when keys present."""
 
 from __future__ import annotations
 

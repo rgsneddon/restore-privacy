@@ -4,7 +4,7 @@
 
 | | |
 |--|--|
-| **Get the app** | [Paid downloads](https://restoreprivacy.online/) — catalog **v0.4.4** (£2.45/month or £27.93/year per platform) |
+| **Get the app** | [Paid downloads](https://restoreprivacy.online/) — catalog **v0.4.5** (£2.45/month or £27.93/year per platform) |
 | **Privacy** | [PRIVACY_POLICY.md](PRIVACY_POLICY.md) |
 | **Licence** | [LICENSE](LICENSE) (proprietary full copyright) |
 | **Credits** | [CREDITS.md](CREDITS.md) |
@@ -23,10 +23,10 @@
 - Windows product firewall rules are **scoped allows** only (node UDP + program). Kill-switch is **off** unless you set `RPT_KILL_SWITCH=1`.
 - **Restore Internet** failsafe in every installer completely removes the product (see warning below).
 - Admission is cryptographic (device Ed25519 + node keys) — no third-party geo lookup on Connect.
-- Connect uses the standard **HELLO** residual path (**flyclient** fast-path removed in catalog **v0.4.4**).
+- Connect uses the standard **HELLO** residual path (**flyclient** fast-path removed in catalog **v0.4.5**).
 - **Node-only** optional **zram + LUKS2** encrypted RAM volume (`node/install_zram_luks.sh`) and optional **LUKS2 disk** at-rest (`node/install_disk_encryption.sh`) — not client encryption; residual Connect unchanged.
 - Session **PFS** (ephemeral X25519) on residual HELLO for all product clients (Python Windows/Linux, Android, iOS/macOS Packet Tunnel).
-- **Outer obfuscation** (QUIC-mimic wrap) and **traffic shaping** (pad / jitter / cover) are **off** by default (lean residual). Turn them on in Settings (`RPT_OBFS=1` / `RPT_TRAFFIC_SHAPE=1` also force on for Python) — mitigations, not “undetectable DPI”. When on: pad bucket 128, cover ~2s, jitter ≤40ms.
+- **Outer obfuscation** (QUIC-mimic wrap) and **traffic shaping** (pad / jitter / cover) are **off** by default (lean residual). Turn them on in Settings (`RPT_OBFS=1` / `RPT_TRAFFIC_SHAPE=1` also force on for Python) — mitigations, not “undetectable DPIâ€. When on: pad bucket 128, cover ~2s, jitter â‰¤40ms.
 - Tunnel DNS only (`10.88.0.1`, no public DNS fallbacks) while residual capture is active.
 - Multi-hop residual is **opt-in** (`RPT_MULTIHOP_ENABLED=1`): dials the Romania exit (`185.146.232.107`); default is single-hop Iceland entry. **residual-via-exit** routing is implemented (not hop-list-only).
 - Status site shows a **live entry-node clear timer** (**Node A** / entry only, ~7 days). Exit is **never** wiped by the weekly service (stays up for residual failover) — **no exit wipe countdown**.
@@ -40,10 +40,10 @@
 
 Installers are **paid only** on [restoreprivacy.online](https://restoreprivacy.online/) (Stripe). There are no free permanent GitHub release downloads; the source repo is **private**.
 
-**Current catalog (v0.4.4):** the homepage **Download client** box has device/platform and plan selection — **Monthly VPN plan** £2.45 / **Yearly VPN plan** £27.93 (5% off) — plus **Buy now**, which opens Stripe Checkout. You can also open the plan page at **`/pay`**. Card payment uses Stripe’s hosted checkout (Dashboard branding only — not this site’s full CSS). Email delivers **keygen + PPI + download link** (**USE THIS KEYGEN TO UNLOCK RESTORE PRIVACY**).
+**Current catalog (v0.4.5):** the homepage **Download client** box has device/platform and plan selection — **Monthly VPN plan** £2.45 / **Yearly VPN plan** £27.93 (5% off) — plus **Buy now**, which opens Stripe Checkout. You can also open the plan page at **`/pay`**. Card payment uses Stripe’s hosted checkout (Dashboard branding only — not this site’s full CSS). Email delivers **keygen + PPI + download link** (**USE THIS KEYGEN TO UNLOCK RESTORE PRIVACY**).
 
 1. Pick your **device** and **plan**, then **Buy now** (or open `/pay`).
-2. Complete Stripe Checkout. You get a one-time download plus email with **keygen** (`RPT-KEY-…`) and **PPI**.
+2. Complete Stripe Checkout. You get a one-time download plus email with **keygen** (`RPT-KEY-â€¦`) and **PPI**.
 3. Install → **accept the licence** → **enter the keygen** (forced unlock on all platforms). Download alone does **not** unlock residual HELLO.
 4. **Connect** while status is **OK** (active subscription + keygen). If payment fails, refunds, or the period ends, status is **EXPIRED** — the app hard-locks with **renew your licence *here*** and a platform-specific Stripe payment portal link until you pay again and re-enter a keygen.
 
@@ -55,23 +55,23 @@ The app re-checks the status host (`/api/connect-entitlement`) on each Connect s
 
 | Platform | Package |
 |----------|---------|
-| Windows | `restore-privacy-client-0.4.4-windows-x64-setup.exe` |
-| Android | `restore-privacy-client-0.4.4-android.apk` |
-| macOS | `restore-privacy-client-0.4.4-macos.zip` *(Developer ID signed + notarized)* |
-| iOS | `restore-privacy-client-0.4.4-ios.zip` *(Team-signed sideload)* |
-| Ubuntu / Linux | `restore-privacy-client-0.4.4-linux-x64.tar.gz` |
-| Browser (Chromium MV3) | `restore-privacy-browser-extension-0.4.4.zip` — browser proxy only, not OS residual TUN |
+| Windows | `restore-privacy-client-0.4.5-windows-x64-setup.exe` |
+| Android | `restore-privacy-client-0.4.5-android.apk` |
+| macOS | `restore-privacy-client-0.4.5-macos.zip` *(Developer ID signed + notarized)* |
+| iOS | `restore-privacy-client-0.4.5-ios.zip` *(Team-signed sideload)* |
+| Ubuntu / Linux | `restore-privacy-client-0.4.5-linux-x64.tar.gz` |
+| Browser (Chromium MV3) | `restore-privacy-browser-extension-0.4.5.zip` — browser proxy only, not OS residual TUN |
 
 ### Browser extension (Chromium MV3)
 
-1. Get **`restore-privacy-browser-extension-0.4.4.zip`** from the [0.4.4 release assets](https://github.com/rgsneddon/restore-privacy/releases/tag/0.4.4) (or build from `browser_extension/`).
+1. Get **`restore-privacy-browser-extension-0.4.5.zip`** from the [0.4.5 release assets](https://github.com/rgsneddon/restore-privacy/releases/tag/0.4.5) (or build from `browser_extension/`).
 2. Unzip → Chromium/Chrome/Edge **Extensions** → Developer mode → **Load unpacked** → select the extension folder.
 3. Use **Connect** / **Disconnect** in the toolbar popup. This is **browser-scoped** (`chrome.proxy` / local SOCKS path) — it does **not** replace paid native residual clients for system residual public IP.
 4. Source and honesty notes: [`browser_extension/README.md`](browser_extension/README.md).
 
 ### Windows
 
-1. On the [status downloads page](https://restoreprivacy.online/), choose **Monthly £2.45** or **Yearly** for **Windows** and download **`restore-privacy-client-0.4.4-windows-x64-setup.exe`** (one-time link after payment).
+1. On the [status downloads page](https://restoreprivacy.online/), choose **Monthly £2.45** or **Yearly** for **Windows** and download **`restore-privacy-client-0.4.5-windows-x64-setup.exe`** (one-time link after payment).
 2. Run the installer (PE self-extracting package: frozen runtime + Wintun — no separate Python install). The package may extract as a portable tree or install under LocalAppData.
 3. **Accept the end-user licence**, then enter the **keygen** from your fulfilment email (forced unlock dialog). Settings → Payment entitlement is a fallback only. Connect is allowed only when status is **OK** (active subscription **and** keygen activated).
 4. Press **Connect** and approve **UAC** when prompted so residual public IP uses the VPN node. Scoped **Windows Defender Firewall** allows (node UDP + program) may be applied for residual Connect.
@@ -80,22 +80,22 @@ The app re-checks the status host (`/api/connect-entitlement`) on each Connect s
 
 ### Android
 
-1. On the [status downloads page](https://restoreprivacy.online/), choose **Monthly £2.45** or **Yearly** for **Android** and download **`restore-privacy-client-0.4.4-android.apk`** (one-time link after payment).
+1. On the [status downloads page](https://restoreprivacy.online/), choose **Monthly £2.45** or **Yearly** for **Android** and download **`restore-privacy-client-0.4.5-android.apk`** (one-time link after payment).
 2. Install the APK (allow install from unknown sources if your device asks). Catalog APK includes residual wire (**PFS + outer obfs**).
 3. **Accept the licence**, then enter the **keygen** from email (forced unlock sheet). Connect requires **OK** (active subscription + keygen).
 4. Press **Connect**, and grant **VPN** permission when prompted.
 5. Optional: **Settings** → startup / autoconnect (defaults off). Minimize keeps the VPN service running until **Disconnect**.
 6. For complete removal, open the in-package **Restore Internet** guidance and uninstall via system Settings.
 
-### Ubuntu and derivatives (Linux Mint, Pop!_OS, …)
+### Ubuntu and derivatives (Linux Mint, Pop!_OS, â€¦)
 
 Supported floor: **Ubuntu 20.04 LTS** and later (including 22.04 / 24.04 LTS).
 
-1. On the [status downloads page](https://restoreprivacy.online/), choose **Monthly £2.45** or **Yearly** for **Linux** and download **`restore-privacy-client-0.4.4-linux-x64.tar.gz`** (one-time link after payment).
+1. On the [status downloads page](https://restoreprivacy.online/), choose **Monthly £2.45** or **Yearly** for **Linux** and download **`restore-privacy-client-0.4.5-linux-x64.tar.gz`** (one-time link after payment).
 2. Unpack and run the bundled installer:
 
    ```bash
-   tar xzf restore-privacy-client-0.4.4-linux-x64.tar.gz
+   tar xzf restore-privacy-client-0.4.5-linux-x64.tar.gz
    cd restore-privacy-*-linux   # package folder name from the archive
    bash install.sh
    ```
@@ -105,9 +105,9 @@ Supported floor: **Ubuntu 20.04 LTS** and later (including 22.04 / 24.04 LTS).
 
 ### macOS
 
-Published **v0.4.4** macOS builds are **Developer ID signed and notarized**.
+Published **v0.4.5** macOS builds are **Developer ID signed and notarized**.
 
-1. On the [status downloads page](https://restoreprivacy.online/), choose **Monthly £2.45** or **Yearly** for **macOS** and download **`restore-privacy-client-0.4.4-macos.zip`** (one-time link after payment).
+1. On the [status downloads page](https://restoreprivacy.online/), choose **Monthly £2.45** or **Yearly** for **macOS** and download **`restore-privacy-client-0.4.5-macos.zip`** (one-time link after payment).
 2. Unzip and open **`restore_privacy_client.app`**.
 3. **Accept the licence** and **enter keygen**, then press **Connect** and approve the **VPN configuration** prompt.
 4. Residual public IP only changes when the Packet Tunnel is **active**. Host-only HELLO is **diagnostic** only. Residual public-IP via Packet Tunnel on a developer Mac still needs **Team residual re-sign** (`scripts/sign_macos_residual_team.py`) — the public Developer ID zip alone is not full host-NE residual (see `client_app/APPLE_HANDOFF_0.4.0.md`). **Disconnect** / **Quit** stops the system VPN.
@@ -115,9 +115,9 @@ Published **v0.4.4** macOS builds are **Developer ID signed and notarized**.
 
 ### iOS
 
-Published **v0.4.4** iOS packages are **Team-signed sideload** zips (not App Store).
+Published **v0.4.5** iOS packages are **Team-signed sideload** zips (not App Store).
 
-1. On the [status downloads page](https://restoreprivacy.online/), choose **Monthly £2.45** or **Yearly** for **iOS** and download **`restore-privacy-client-0.4.4-ios.zip`** (one-time link after payment).
+1. On the [status downloads page](https://restoreprivacy.online/), choose **Monthly £2.45** or **Yearly** for **iOS** and download **`restore-privacy-client-0.4.5-ios.zip`** (one-time link after payment).
 2. Install **`Runner.app`** with device tooling; **accept licence**, **enter keygen**, then press **Connect** and grant **VPN** permission.
 3. Residual public IP only changes when the Packet Tunnel is **active**.
 4. Complete removal: follow **`Restore Internet.txt`** (Settings → VPN / Delete App) — see warning below.
@@ -126,7 +126,7 @@ Published **v0.4.4** iOS packages are **Team-signed sideload** zips (not App Sto
 
 https://restoreprivacy.online/
 
-- **Monthly £2.45** and **Yearly** pay controls per platform (Windows, Android, macOS, iOS, Linux) — catalog **v0.4.4**
+- **Monthly £2.45** and **Yearly** pay controls per platform (Windows, Android, macOS, iOS, Linux) — catalog **v0.4.5**
 - Installers are delivered **after payment** (single-use link); the product repo is private
 - Connect requires **keygen activation** on an **active** subscription (**OK**); **EXPIRED** shows **renew your licence *here*** with a platform payment portal link
 - **No** public live session / connected-client counter
@@ -149,13 +149,13 @@ Every catalog installer includes a **Restore Internet** failsafe (Windows/Linux 
 | **Credits** | [CREDITS.md](CREDITS.md) |
 | **Code & policy audit** | [AUDIT.md](AUDIT.md) |
 
-Core promises: **no user-info logs** by design, **minimal public status** (title + downloads + **entry-only clear timer** for Node A / entry weekly wipe — **no exit wipe countdown**; exit stays up for residual failover — **no live client count**), **device keys** (not a shared client private key), **honest residual** only when full tunnel is up, **no third-party geo** on Connect. Product residual paths on **all platforms** (Windows, Linux, Android, iOS, macOS) keep **outer-layer obfuscation** and **padding / jitter / cover** **off by default** (lean residual) until the user turns them **on** in Settings; **kill-switch is not applied by default**. **Disconnect / Quit** restores residual routes (no intentional blackhole after normal teardown). **Restore Internet** is a full wipe failsafe (not ordinary Disconnect). Multi-hop residual is **opt-in** (`RPT_MULTIHOP_ENABLED=1`): residual dials the Romania exit when multi-hop is active (routing implemented); default remains single-hop Iceland entry. **Weekly entry wipe** (~7d) with exit residual failover while entry drains. Licence is **proprietary full copyright** (not MIT for original code). Node tunnel DNS uses **DoT** upstream. Production node VPS: **Iceland / FlokiNET** — **as far as we can be assured** from host public statements, **no invasive logs** of users connecting to the node (privacy §3.1 / §4).
+Core promises: **no user-info logs** by design, **minimal public status** (title + downloads + **entry-only clear timer** for Node A / entry weekly wipe — **no exit wipe countdown**; exit stays up for residual failover — **no live client count**), **device keys** (not a shared client private key), **honest residual** only when full tunnel is up, **no third-party geo** on Connect. Product residual paths on **all platforms** (Windows, Linux, Android, iOS, macOS) keep **outer-layer obfuscation** and **padding / jitter / cover** **off by default** (lean residual) until the user turns them **on** in Settings; **kill-switch is not applied by default**. **Disconnect / Quit** restores residual routes (no intentional blackhole after normal teardown). **Restore Internet** is a full wipe failsafe (not ordinary Disconnect). Multi-hop residual is **opt-in** (`RPT_MULTIHOP_ENABLED=1`): residual dials the Romania exit when multi-hop is active (routing implemented); default remains single-hop Iceland entry. **Weekly entry wipe** (~7d) with exit residual failover while entry drains. Licence is **proprietary full copyright** (not MIT for original code). Node tunnel DNS uses **DoT** upstream. Production node VPS: **Iceland / FlokiNET** — **as far as we can be assured** from host public statements, **no invasive logs** of users connecting to the node (privacy Â§3.1 / Â§4).
 
 ---
 
 ## Threat model
 
-Short user-education summary. Full policy language: **[PRIVACY_POLICY.md — Threat model](PRIVACY_POLICY.md)**. Scenario detail for operators/auditors: **[AUDIT.md §4.6](AUDIT.md)** (VPS compromise, traffic analysis by ISP, client device seizure).
+Short user-education summary. Full policy language: **[PRIVACY_POLICY.md — Threat model](PRIVACY_POLICY.md)**. Scenario detail for operators/auditors: **[AUDIT.md Â§4.6](AUDIT.md)** (VPS compromise, traffic analysis by ISP, client device seizure).
 
 ### What it protects against
 
@@ -175,7 +175,7 @@ Short user-education summary. Full policy language: **[PRIVACY_POLICY.md — Thr
 - **Client device seizure** — local keys, apps, and browser history on an unlocked device are out of scope for the node’s no-log promise.
 - Malware, compromised OS, or destination-site tracking.
 
-Detail: privacy policy threat model + [AUDIT.md §4.6](AUDIT.md).
+Detail: privacy policy threat model + [AUDIT.md Â§4.6](AUDIT.md).
 
 ---
 
@@ -189,11 +189,11 @@ Node deploy, ports, secrets, from-source builds, and tests: **[sundries.txt](sun
 
 **Node key protection:** `RPT_KEY_BACKEND=file|mock|sealed|tpm` — sealed/TPM-class stores long-term ElGamal under a wrap key so plaintext `.priv` is not required on disk. See `node/key_backend.py`.
 
-**Key rotation:** `python scripts/rotate_node_keys.py --secrets-dir …` updates node long-term material + `product/node_elgamal.pub` pin; clients re-provision **public** only (`reprovision_node_public`). Session **PFS** (X25519) is the product default.
+**Key rotation:** `python scripts/rotate_node_keys.py --secrets-dir â€¦` updates node long-term material + `product/node_elgamal.pub` pin; clients re-provision **public** only (`reprovision_node_public`). Session **PFS** (X25519) is the product default.
 
 **Post-quantum readiness:** staged hybrid Kyber/ML-KEM hook in `node/pq_hybrid.py` + plan [`docs/PQ_MIGRATION.md`](docs/PQ_MIGRATION.md) (not residual PQ on the wire until dual-wire + real ML-KEM).
 
-**Product ship (v0.4.4):** Paid installers on **[status downloads](https://restoreprivacy.online/)** (macOS Developer ID notarized; iOS Team-signed). Source repo is private. Production node **82.221.101.241:44044** (**Iceland**, **FlokiNET** VPS; host public **no invasive logs** stance as far as we can be assured — see privacy policy).
+**Product ship (v0.4.5):** Paid installers on **[status downloads](https://restoreprivacy.online/)** (macOS Developer ID notarized; iOS Team-signed). Source repo is private. Production node **82.221.101.241:44044** (**Iceland**, **FlokiNET** VPS; host public **no invasive logs** stance as far as we can be assured — see privacy policy).
 
 **Self-host (one shot):** `sudo bash scripts/selfhost_node.sh` — node install + tunnel DNS + host privacy. Deploy remote: `python scripts/deploy_rpt_node.py` (`RPT_SSH_HOST`, `RPT_SSH_USER`, key). Details: [sundries.txt](sundries.txt).
 
@@ -205,7 +205,7 @@ Node deploy, ports, secrets, from-source builds, and tests: **[sundries.txt](sun
 
 **Weekly entry wipe/rebuild (exclusive; exit failover):** [scripts/weekly_entry_rebuild.py](scripts/weekly_entry_rebuild.py) — **~7d** timed **entry-only** snapshot/rebuild (`--dry-run` by default). Exclusive lock ([node/rebuild_lock.py](node/rebuild_lock.py)) refuses a second concurrent wipe and **never** wipes exit/both from this service. **Pre-wipe gates** ([node/wipe_preflight.py](node/wipe_preflight.py)): live path **fail closed** unless **exit residual** and **entry node** health both pass (UDP response and/or ICMP for exit; local listen/status for entry). After rebuild, **mandatory package reinstall** via selfhost. Clients auto residual-failover to **exit** while entry drains, and **prefer re-entry** when entry is healthy again ([client/multihop.py](client/multihop.py) `select_residual_endpoint`). Public homepage **entry-only** clear timer: [status_page/node_wipe_countdown.py](status_page/node_wipe_countdown.py) (exit wipe countdown removed; weekly service never rebuilds exit). Generic plan: [scripts/ephemeral_node.py](scripts/ephemeral_node.py). Timer: [scripts/install_ephemeral_timer.sh](scripts/install_ephemeral_timer.sh). Live requires `RPT_EPHEMERAL_CONFIRM=yes`. Does not erase provider backups/netflow; re-ship **public** node pin if keys rotate.
 
-**Release scripts:** `scripts/build_release_0.4.4.py`. **Windows multihop PE** (x64 only): `scripts/build_windows_multihop.py` / `scripts\build_windows_multihop.bat` — handoff [`client/windows/WINDOWS_HANDOFF_0.4.4.md`](client/windows/WINDOWS_HANDOFF_0.4.4.md). Release notes: [`scripts/RELEASE_NOTES_0.4.4.md`](scripts/RELEASE_NOTES_0.4.4.md). Catalog **0.4.4** Windows paid package may be PE-carry-forward until rebuilt on Windows x64; multihop residual-via-exit remains opt-in (`RPT_MULTIHOP_ENABLED=1` / Settings multi-hop).
+**Release scripts:** `scripts/build_release_0.4.5.py`. **Windows multihop PE** (x64 only): `scripts/build_windows_multihop.py` / `scripts\build_windows_multihop.bat` — handoff [`client/windows/WINDOWS_HANDOFF_0.4.5.md`](client/windows/WINDOWS_HANDOFF_0.4.5.md). Release notes: [`scripts/RELEASE_NOTES_0.4.5.md`](scripts/RELEASE_NOTES_0.4.5.md). Catalog **0.4.5** Windows paid package may be PE-carry-forward until rebuilt on Windows x64; multihop residual-via-exit remains opt-in (`RPT_MULTIHOP_ENABLED=1` / Settings multi-hop).
 
 ```bash
 # Windows GUI (requires system Python)
@@ -218,10 +218,10 @@ python scripts/build_windows_multihop.py
 sudo PYTHONPATH=. python3 -m client.linux
 
 # Linux installer package with baked-in crypto wheels (re-run each release)
-python scripts/package_linux.py  # manylinux wheels for CPython 3.8–3.12; re-run each release
+python scripts/package_linux.py  # manylinux wheels for CPython 3.8—3.12; re-run each release
 
 # Release packages (current tag)
-python scripts/build_release_0.4.4.py
+python scripts/build_release_0.4.5.py
 ```
 
-**Node wipe reinstall (entry ≠ exit):** [docs/NODE_WIPE_REINSTALL.md](docs/NODE_WIPE_REINSTALL.md) — weekly timed wipe is **entry-only** with mandatory full selfhost reinstall; exit is manual/failover.
+**Node wipe reinstall (entry â‰  exit):** [docs/NODE_WIPE_REINSTALL.md](docs/NODE_WIPE_REINSTALL.md) — weekly timed wipe is **entry-only** with mandatory full selfhost reinstall; exit is manual/failover.

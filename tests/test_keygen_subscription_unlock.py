@@ -124,22 +124,31 @@ class TestHomepageTrialSentence(unittest.TestCase):
             css,
             r"@media \(max-width:\s*640px\)[\s\S]*?\.dl-price-box[\s\S]*?width:\s*100%",
         )
-        # ONLY £2.45 banner: large, white, standout serif font stack
+        # ONLY £2.45 banner: large, white, same sans-serif stack as page/dl-price
         self.assertIn(".dl-only-price", css)
         self.assertIn("#ffffff", css)
         self.assertIn("font-size:", css)
         self.assertRegex(css, r"\.dl-only-price[\s\S]*?color:\s*#ffffff")
         self.assertNotRegex(css, r"\.dl-only-price[\s\S]*?color:\s*#22c55e")
+        # Must match primary UI stack (Segoe UI / system-ui) — not Georgia serif
         self.assertRegex(
             css,
-            r"\.dl-only-price[\s\S]*?font-family:[\s\S]*?(Georgia|Palatino|cursive|serif)",
+            r'\.dl-only-price[\s\S]*?font-family:\s*"Segoe UI",\s*system-ui',
+        )
+        self.assertNotRegex(
+            css,
+            r"\.dl-only-price[\s\S]*?font-family:[\s\S]*?Georgia",
         )
         self.assertRegex(
             css,
             r"\.dl-only-price[\s\S]*?font-size:\s*clamp\(",
         )
-        # Nested GBP line is also white bold
+        # Nested GBP line is also white bold + same font family stack
         self.assertRegex(css, r"\.dl-price[\s\S]*?color:\s*#ffffff")
+        self.assertRegex(
+            css,
+            r'\.dl-price[\s\S]*?font-family:\s*"Segoe UI",\s*system-ui',
+        )
 
 
 class TestKeygenMintAndEmail(unittest.TestCase):

@@ -4,7 +4,7 @@ Catalog packages under `{VERSION}/` are served by the status host after payment
 (`open_release_asset` → local source). This keeps fulfilment working when the
 GitHub repo is private without requiring a runtime `RPT_GITHUB_TOKEN`.
 
-Current ship: **0.4.2** under `0.4.2/`. Keep prior version dirs only if needed for rollback.
+Current ship: **0.4.5** under `0.4.5/`. Keep prior version dirs only if needed for rollback.
 
 **0.4.2 staging** (from `releases/0.4.2/` — match `scripts/RELEASE_NOTES_0.4.2.md`
 Build provenance):

@@ -1,4 +1,4 @@
-"""Full tunnel teardown on app close â€” Windows routes/stop + Android disconnect wiring.
+"""Full tunnel teardown on app close — Windows routes/stop + Android disconnect wiring.
 
 Tests drive the shipped teardown helpers and source control-flow (not reimplementations).
 """
@@ -59,7 +59,7 @@ class TestWindowsRouteDeleteCommands(unittest.TestCase):
 
 
 class TestStopFullTunnel(unittest.TestCase):
-    """stop_full_tunnel: routes first, then dataplane, TUN, session â€” idempotent."""
+    """stop_full_tunnel: routes first, then dataplane, TUN, session — idempotent."""
 
     def test_stop_with_no_tunnel_is_safe(self):
         client = RptClient()
@@ -313,7 +313,7 @@ class TestAndroidTeardownWiring(unittest.TestCase):
         self.assertIn("isSessionActive", act)
 
     def test_flutter_dispose_does_not_stop_tunnel(self):
-        """Product: dispose/lifecycle rehydrate only â€” Disconnect button stops VPN."""
+        """Product: dispose/lifecycle rehydrate only — Disconnect button stops VPN."""
         main = (self.LIB / "main.dart").read_text(encoding="utf-8")
         self.assertIn("WidgetsBindingObserver", main)
         self.assertIn("shouldStopTunnelOnAppLifecycle", main)
