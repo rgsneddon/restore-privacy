@@ -105,6 +105,13 @@ enum RptVpnChannel {
         }
         return
       }
+      // Host pre-seed: copy IS/RO/DE pubs into App Group + home secrets so the
+      // Packet Tunnel (IS-only historical seed) can HELLO to residual host.
+      do {
+        try RptSecrets.preseedSharedWritableSecretsForResidualHost(residualHost: host)
+      } catch {
+        // Best-effort; tunnel load may still find inject/package pins
+      }
       startTunnel(manager: manager, host: host, port: port) { map in
         if RptFullTunnelResult.isProductSuccess(map) {
           flutterResult(map)

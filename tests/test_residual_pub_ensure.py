@@ -118,6 +118,107 @@ class TestResidualPubEnsureFixture(unittest.TestCase):
         )
 
 
+class TestPacketTunnelLayoutFixture(unittest.TestCase):
+    """Host inject + IS-only App Group + empty tunnel bundle → DE HELLO after preseed.
+
+    Models skeptic Packet Tunnel path: host package has DE; tunnel Bundle.main
+    does not; App Group starts IS-only; host preseed then tunnel load from App Group.
+    """
+
+    def setUp(self) -> None:
+        self._tmp = tempfile.TemporaryDirectory()
+        self.root = Path(self._tmp.name)
+        self.host_pkg = self.root / "Runner.app" / "Contents" / "Resources" / "secrets"
+        self.tunnel_pkg = (
+            self.root
+            / "Runner.app"
+            / "Contents"
+            / "PlugIns"
+            / "PacketTunnel.appex"
+            / "Contents"
+            / "Resources"
+            / "secrets"
+        )
+        self.app_group = self.root / "AppGroup" / "group.com.restoreprivacy.shared" / "secrets"
+        self.host_pkg.mkdir(parents=True)
+        self.tunnel_pkg.mkdir(parents=True)
+        self.app_group.mkdir(parents=True)
+        product = ROOT / "product"
+        self.is_pub = (product / "node_elgamal.pub").read_bytes()
+        self.de_pub = (product / "de_node_elgamal.pub").read_bytes()
+        self.ro_pub = (product / "exit_node_elgamal.pub").read_bytes()
+        # Host inject (main app) has all pins
+        for name, data in (
+            ("node_elgamal.pub", self.is_pub),
+            ("exit_node_elgamal.pub", self.ro_pub),
+            ("de_node_elgamal.pub", self.de_pub),
+        ):
+            (self.host_pkg / name).write_bytes(data)
+        # Tunnel appex: Iceland only (historical seed / incomplete inject)
+        (self.tunnel_pkg / "node_elgamal.pub").write_bytes(self.is_pub)
+        # App Group: IS only + device priv (tunnel resolveSecretsDirectory hit)
+        (self.app_group / "node_elgamal.pub").write_bytes(self.is_pub)
+        (self.app_group / "client_ed25519.priv").write_bytes(b"\x02" * 32)
+
+    def tearDown(self) -> None:
+        self._tmp.cleanup()
+
+    def test_tunnel_cannot_load_de_without_host_preseed(self):
+        # Tunnel candidates: appex + app group only (no host package in NE process)
+        with self.assertRaises(ResidualPubError):
+            load_residual_node_pub(
+                self.app_group,
+                PRODUCT_DE_HOST,
+                [self.tunnel_pkg, self.app_group],
+            )
+
+    def test_host_preseed_then_tunnel_loads_de_from_app_group(self):
+        from client.residual_pub_ensure import preseed_shared_writable_for_residual_host
+
+        data = preseed_shared_writable_for_residual_host(
+            PRODUCT_DE_HOST,
+            host_package_secrets=self.host_pkg,
+            shared_writable_dirs=[self.app_group],
+            tunnel_bundle_secrets=self.tunnel_pkg,
+        )
+        self.assertEqual(data, self.de_pub)
+        # App Group now has DE pin for tunnel process
+        self.assertTrue((self.app_group / "de_node_elgamal.pub").is_file())
+        # Tunnel-only candidates after preseed succeed
+        again = load_residual_node_pub(
+            self.app_group,
+            PRODUCT_DE_HOST,
+            [self.tunnel_pkg, self.app_group],
+        )
+        self.assertEqual(again, self.de_pub)
+
+    def test_inject_script_targets_appex(self):
+        inject = (ROOT / "scripts" / "inject_apple_secrets.py").read_text(
+            encoding="utf-8"
+        )
+        self.assertIn("*.appex", inject)
+        self.assertIn("PlugIns", inject)
+        self.assertIn("_inject_into_secrets_dir", inject)
+
+    def test_swift_host_preseed_and_seed_catalog(self):
+        for rel in (
+            "client_app/macos/NativePrep/RptSecrets.swift",
+            "client_app/ios/NativePrep/RptSecrets.swift",
+        ):
+            sw = (ROOT / rel).read_text(encoding="utf-8")
+            self.assertIn("preseedSharedWritableSecretsForResidualHost", sw, rel)
+            self.assertIn("seedCatalogPublicKeys", sw, rel)
+            self.assertIn("deNodePubName", sw, rel)
+        for rel in (
+            "client_app/macos/NativePrep/RptVpnChannel.swift",
+            "client_app/ios/NativePrep/RptVpnChannel.swift",
+        ):
+            ch = (ROOT / rel).read_text(encoding="utf-8")
+            self.assertIn(
+                "preseedSharedWritableSecretsForResidualHost", ch, rel
+            )
+
+
 class TestCatalogPubInventory(unittest.TestCase):
     """Every catalog code → host → required pub covered by inject/gradle/product."""
 

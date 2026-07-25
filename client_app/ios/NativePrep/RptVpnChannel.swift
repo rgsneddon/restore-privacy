@@ -97,6 +97,13 @@ enum RptVpnChannel {
         }
         return
       }
+      // Host pre-seed: copy IS/RO/DE pubs into App Group so Packet Tunnel HELLO
+      // can use residual host pin (appex Bundle.main often only has Iceland).
+      do {
+        try RptSecrets.preseedSharedWritableSecretsForResidualHost(residualHost: host)
+      } catch {
+        // Best-effort; tunnel load may still find inject/package pins
+      }
       startTunnel(manager: manager, host: host, port: port) { map in
         if RptFullTunnelResult.isProductSuccess(map) {
           flutterResult(map)

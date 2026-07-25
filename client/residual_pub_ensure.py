@@ -108,3 +108,91 @@ def load_residual_node_pub(
             f"loaded {path.name} but residual host requires {want}"
         )
     return data
+
+
+# Catalog public pin basenames (IS / RO / DE) — never private keys.
+CATALOG_PUBLIC_PUBS: tuple[str, ...] = (
+    "node_elgamal.pub",
+    "exit_node_elgamal.pub",
+    "de_node_elgamal.pub",
+)
+
+
+def seed_catalog_public_keys(
+    dest_dir: Path | str,
+    candidate_dirs: Sequence[Path | str],
+    *,
+    min_size: int = 32,
+    overwrite: bool = True,
+) -> list[str]:
+    """Copy all catalog public pins found in *candidate_dirs* into *dest_dir*.
+
+    Used by host pre-seed into App Group / ``~/.restore-privacy/secrets`` so the
+    Packet Tunnel extension (IS-only seed historically) can HELLO to RO/DE.
+    Returns list of basenames installed.
+    """
+    dest = Path(dest_dir)
+    dest.mkdir(parents=True, exist_ok=True)
+    installed: list[str] = []
+    for name in CATALOG_PUBLIC_PUBS:
+        source: Path | None = None
+        for raw in candidate_dirs:
+            cand = Path(raw) / name
+            if cand.is_file() and cand.stat().st_size >= min_size:
+                source = cand
+                break
+        if source is None:
+            continue
+        out = dest / name
+        if overwrite or not out.is_file():
+            if source.resolve() != out.resolve():
+                shutil.copy2(source, out)
+        if out.is_file() and out.stat().st_size >= min_size:
+            installed.append(name)
+    return installed
+
+
+def preseed_shared_writable_for_residual_host(
+    residual_host: str,
+    *,
+    host_package_secrets: Path | str,
+    shared_writable_dirs: Sequence[Path | str],
+    tunnel_bundle_secrets: Path | str | None = None,
+    min_size: int = 32,
+) -> bytes:
+    """Host-side pre-seed before Packet Tunnel start (integrated layout).
+
+    Layout modeled after production:
+    - *host_package_secrets*: main app Resources/secrets (inject_apple_secrets)
+    - *tunnel_bundle_secrets*: PacketTunnel.appex secrets (often missing RO/DE)
+    - *shared_writable_dirs*: App Group and/or ``~/.restore-privacy/secrets``
+      that the tunnel will load from (may start as IS-only)
+
+    Seeds all catalog pubs from host package into each shared writable dir,
+    then ensure+load residual pin for *residual_host*. Tunnel bundle alone is
+    **not** required to contain DE when shared dirs were pre-seeded by host.
+    """
+    host_pkg = Path(host_package_secrets)
+    candidates: list[Path] = [host_pkg]
+    if tunnel_bundle_secrets is not None:
+        candidates.append(Path(tunnel_bundle_secrets))
+
+    for raw in shared_writable_dirs:
+        w = Path(raw)
+        seed_catalog_public_keys(w, candidates, min_size=min_size, overwrite=True)
+        # Also ensure residual-specific pin (idempotent refresh)
+        ensure_residual_pub_in_writable_dir(
+            w, residual_host, candidates, min_size=min_size
+        )
+
+    # Tunnel load path: first shared writable only (App Group first)
+    if not shared_writable_dirs:
+        raise ResidualPubError("no shared writable dirs for tunnel residual HELLO")
+    primary = Path(shared_writable_dirs[0])
+    # Tunnel candidates: package may be invisible; shared writable must suffice
+    return load_residual_node_pub(
+        primary,
+        residual_host,
+        [primary, host_pkg],
+        min_size=min_size,
+    )

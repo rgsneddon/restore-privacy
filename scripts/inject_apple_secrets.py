@@ -68,30 +68,21 @@ def resolve_source(explicit: Path | None) -> Path:
     return entry.parent
 
 
-def inject(app: Path, source: Path, ios: bool) -> Path:
-    if not app.is_dir():
-        raise FileNotFoundError(f"app not found: {app}")
-    if ios:
-        dest = app / "secrets"
-    else:
-        dest = app / "Contents" / "Resources" / "secrets"
+def _inject_into_secrets_dir(dest: Path, source: Path) -> None:
+    """Write PUBLIC_PUBS into *dest* (creates dir). Never private keys."""
     dest.mkdir(parents=True, exist_ok=True)
-    # Catalog residual public keys (never private keys): IS + RO + DE
     for name in PUBLIC_PUBS:
         src = resolve_pub(name, source if source.is_dir() else source.parent)
         if src is None and name == NODE_PUB:
-            # required
             src = source / NODE_PUB if (source / NODE_PUB).is_file() else None
         if src is None:
             if name == NODE_PUB:
                 raise FileNotFoundError(f"missing required {NODE_PUB}")
-            # RO/DE required for catalog residual HELLO — warn, do not invent IS pin
             print(f"warn: missing {name} (RO/DE residual HELLO will fail closed)")
             continue
         dst = dest / name
         shutil.copy2(src, dst)
         print(f"injected {name} -> {dst} ({dst.stat().st_size} bytes)")
-    # Never leave private keys in the bundle
     for leftover in list(dest.glob("*.priv")):
         leftover.unlink()
         print(f"removed priv from package: {leftover.name}")
@@ -99,6 +90,38 @@ def inject(app: Path, source: Path, ios: bool) -> Path:
     if forbidden.is_file():
         forbidden.unlink()
         print(f"removed accidental {FORBIDDEN}")
+
+
+def inject(app: Path, source: Path, ios: bool) -> Path:
+    if not app.is_dir():
+        raise FileNotFoundError(f"app not found: {app}")
+    if ios:
+        dest = app / "secrets"
+    else:
+        dest = app / "Contents" / "Resources" / "secrets"
+    # Catalog residual public keys (never private keys): IS + RO + DE
+    _inject_into_secrets_dir(dest, source)
+
+    # Packet Tunnel extension has its own Bundle.main — inject there too so
+    # loadAdmissionMaterial candidates can see RO/DE pins without relying solely
+    # on host App Group pre-seed (still required for sandboxed NE).
+    plugins_roots: list[Path] = []
+    if ios:
+        plugins_roots.append(app / "PlugIns")
+    else:
+        plugins_roots.append(app / "Contents" / "PlugIns")
+        plugins_roots.append(app / "Contents" / "Library" / "SystemExtensions")
+    for proot in plugins_roots:
+        if not proot.is_dir():
+            continue
+        for appex in sorted(proot.glob("*.appex")):
+            if ios:
+                ape_dest = appex / "secrets"
+            else:
+                ape_dest = appex / "Contents" / "Resources" / "secrets"
+            print(f"inject PacketTunnel appex: {appex.name}")
+            _inject_into_secrets_dir(ape_dest, source)
+
     return dest
 
 

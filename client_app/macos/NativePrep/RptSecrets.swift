@@ -44,6 +44,85 @@ public enum RptSecrets {
         return nodePubName
     }
 
+    /// All catalog residual public pin basenames (never private keys).
+    public static let catalogPublicPubNames: [String] = [
+        nodePubName, exitNodePubName, deNodePubName,
+    ]
+
+    /// Copy every catalog public pin found in *candidates* into *dest*.
+    /// Host uses this so Packet Tunnel App Group / home secrets can HELLO to RO/DE
+    /// even when the appex bundle only ever saw Iceland ``node_elgamal.pub``.
+    public static func seedCatalogPublicKeys(
+        into dest: URL,
+        candidates: [URL],
+        fileManager: FileManager = .default
+    ) {
+        try? fileManager.createDirectory(at: dest, withIntermediateDirectories: true)
+        for name in catalogPublicPubNames {
+            var source: URL?
+            for d in candidates {
+                let c = d.appendingPathComponent(name)
+                if fileManager.fileExists(atPath: c.path),
+                   let attrs = try? fileManager.attributesOfItem(atPath: c.path),
+                   let size = attrs[.size] as? NSNumber, size.intValue >= 32 {
+                    source = c
+                    break
+                }
+            }
+            guard let source else { continue }
+            let out = dest.appendingPathComponent(name)
+            if source.path != out.path {
+                if fileManager.fileExists(atPath: out.path) {
+                    try? fileManager.removeItem(at: out)
+                }
+                try? fileManager.copyItem(at: source, to: out)
+            }
+        }
+    }
+
+    /// Host pre-seed before Packet Tunnel start: App Group + home + App Support.
+    ///
+    /// Tunnel Bundle.main often lacks RO/DE pins; shared writable dirs historically
+    /// only held Iceland. Call from host Connect path with the residual dial host.
+    public static func preseedSharedWritableSecretsForResidualHost(
+        residualHost: String,
+        fileManager: FileManager = .default,
+        bundle: Bundle = .main
+    ) throws {
+        let candidates = Array(
+            candidateSecretsDirectories(fileManager: fileManager, bundle: bundle)
+        )
+        var writables: [URL] = []
+        if let groupBase = fileManager.containerURL(
+            forSecurityApplicationGroupIdentifier: appGroupId
+        ) {
+            writables.append(groupBase.appendingPathComponent("secrets", isDirectory: true))
+        }
+        if let realHome = realUserHomeDirectory() {
+            writables.append(
+                realHome
+                    .appendingPathComponent(".restore-privacy", isDirectory: true)
+                    .appendingPathComponent("secrets", isDirectory: true)
+            )
+        }
+        if let support = fileManager.urls(for: .applicationSupportDirectory, in: .userDomainMask).first {
+            writables.append(
+                support
+                    .appendingPathComponent(appSupportFolderName, isDirectory: true)
+                    .appendingPathComponent("secrets", isDirectory: true)
+            )
+        }
+        for dest in writables {
+            seedCatalogPublicKeys(into: dest, candidates: candidates, fileManager: fileManager)
+            try ensureResidualPubInWritableDir(
+                writableDir: dest,
+                residualHost: residualHost,
+                candidates: candidates,
+                fileManager: fileManager
+            )
+        }
+    }
+
     public static var appGroupId: String { "group.com.restoreprivacy.shared" }
 
     /// Product-relative secrets folder name under Application Support / bundle.
@@ -513,6 +592,11 @@ public enum RptSecrets {
         if !fileManager.fileExists(atPath: nodeDest.path) {
             try fileManager.copyItem(at: nodeSrc, to: nodeDest)
         }
+        // Catalog residual pubs (RO/DE) — Packet Tunnel HELLO needs these in App Group
+        let candidates = Array(
+            candidateSecretsDirectories(fileManager: fileManager, bundle: bundle)
+        )
+        seedCatalogPublicKeys(into: dest, candidates: candidates, fileManager: fileManager)
         let privDest = dest.appendingPathComponent(clientPrivName)
         if let privSrc, !fileManager.fileExists(atPath: privDest.path) {
             try fileManager.copyItem(at: privSrc, to: privDest)
@@ -577,6 +661,11 @@ public enum RptSecrets {
         if !fileManager.fileExists(atPath: nodeDest.path) {
             try fileManager.copyItem(at: nodeSrc, to: nodeDest)
         }
+        // Catalog residual pubs (RO/DE) for Packet Tunnel home-relative secrets path
+        let candidates = Array(
+            candidateSecretsDirectories(fileManager: fileManager, bundle: bundle)
+        )
+        seedCatalogPublicKeys(into: dest, candidates: candidates, fileManager: fileManager)
         let privDest = dest.appendingPathComponent(clientPrivName)
         if let privSrc, !fileManager.fileExists(atPath: privDest.path) {
             try fileManager.copyItem(at: privSrc, to: privDest)
