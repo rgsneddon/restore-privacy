@@ -106,6 +106,7 @@ from client.registration_copy import (
 )
 from client.transparency_copy import (
     CONNECTION_LOG_DISCLAIMER,
+    SUPPORT_LOG_FIND_HINT,
     CONNECTION_LOG_TITLE,
     DPI_MITIGATION_DISCLAIMER,
     DPI_MITIGATION_TITLE,
@@ -2813,6 +2814,16 @@ class TunnelClientApp:
         tk.Label(
             log_card,
             text=CONNECTION_LOG_DISCLAIMER,
+            bg=PANEL_BG,
+            fg=TEXT_MUTED,
+            font=("Segoe UI", 8),
+            anchor="w",
+            wraplength=400,
+            justify=tk.LEFT,
+        ).pack(fill=tk.X, pady=(0, 4))
+        tk.Label(
+            log_card,
+            text=SUPPORT_LOG_FIND_HINT,
             bg=PANEL_BG,
             fg=TEXT_MUTED,
             font=("Segoe UI", 8),

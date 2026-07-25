@@ -25,9 +25,21 @@ DPI_MITIGATION_DISCLAIMER = (
 
 CONNECTION_LOG_DISCLAIMER = (
     "Connection events and support diagnostics (app version, platform, connect "
-    "outcome / error text) are stored only on this device. Restore Privacy does not "
-    "upload this log to the node or any remote collector. Export saves a local file "
-    "you can email to support yourself."
+    "outcome / error text) are stored only on this device in a hidden file "
+    "(.rpt_support_log.jsonl under the product data folder). Restore Privacy does "
+    "not upload this log to the node or any remote collector. Use Export log, or "
+    "copy the hidden file, and email it to support yourself."
+)
+
+# Where to find the on-device support log (user handoff — no auto-upload).
+SUPPORT_LOG_PATH_WINDOWS = r"%LOCALAPPDATA%\RestorePrivacy\.rpt_support_log.jsonl"
+SUPPORT_LOG_PATH_LINUX = "~/.local/share/restore-privacy/.rpt_support_log.jsonl"
+SUPPORT_LOG_FIND_HINT = (
+    "Hidden support log (device only): Windows "
+    + SUPPORT_LOG_PATH_WINDOWS
+    + " · Linux "
+    + SUPPORT_LOG_PATH_LINUX
+    + " · or Settings → Export log, then email the file yourself."
 )
 
 LEAK_TEST_DISCLAIMER = (

@@ -707,6 +707,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
             kConnectionLogDisclaimer,
             style: TextStyle(color: kTextMuted, fontSize: 12),
           ),
+          const SizedBox(height: 4),
+          Text(
+            kSupportLogFindHint,
+            style: TextStyle(color: kTextMuted, fontSize: 11),
+          ),
           const SizedBox(height: 8),
           Container(
             width: double.infinity,

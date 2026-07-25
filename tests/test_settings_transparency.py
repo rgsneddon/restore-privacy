@@ -35,6 +35,8 @@ class TestTransparencyCopy(unittest.TestCase):
     def test_connection_log_local_only_copy(self):
         self.assertIn("this device", CONNECTION_LOG_DISCLAIMER.lower())
         self.assertIn("does not upload", CONNECTION_LOG_DISCLAIMER.lower())
+        self.assertIn("hidden", CONNECTION_LOG_DISCLAIMER.lower())
+        self.assertIn(".rpt_support_log.jsonl", CONNECTION_LOG_DISCLAIMER)
 
 
 class TestSettingsUiTransparencyWiring(unittest.TestCase):

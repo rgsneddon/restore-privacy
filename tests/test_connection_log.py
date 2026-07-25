@@ -12,6 +12,8 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
 from client.connection_log import (  # noqa: E402
+    LEGACY_LOG_FILENAME,
+    LOG_FILENAME,
     ConnectionLogEvent,
     append_event,
     build_support_diagnostics,
@@ -19,9 +21,12 @@ from client.connection_log import (  # noqa: E402
     default_log_path,
     export_to_file,
     format_export,
+    is_hidden_log_filename,
     log_module_has_no_network_upload,
+    migrate_legacy_log_if_needed,
     product_client_version,
     read_events,
+    support_log_path_patterns,
 )
 
 
@@ -87,14 +92,31 @@ class TestConnectionLogLocalStore(unittest.TestCase):
             self.assertEqual(read_events(path=path), [])
             self.assertIn("local only", format_export(path=path).lower())
 
-    def test_default_path_is_local_product_dir(self):
+    def test_default_path_is_hidden_local_product_dir(self):
         p = default_log_path()
-        self.assertEqual(p.name, "connection_log.jsonl")
+        self.assertEqual(p.name, LOG_FILENAME)
+        self.assertTrue(p.name.startswith("."), "default log must be a hidden filename")
+        self.assertTrue(is_hidden_log_filename(p.name))
+        self.assertNotEqual(LOG_FILENAME, LEGACY_LOG_FILENAME)
         s = str(p).replace("\\", "/").lower()
         self.assertTrue(
             "restoreprivacy" in s or "restore-privacy" in s,
             f"expected product-local path, got {p}",
         )
+
+    def test_migrate_legacy_plain_name_to_hidden(self):
+        with tempfile.TemporaryDirectory() as td:
+            d = Path(td)
+            legacy = d / LEGACY_LOG_FILENAME
+            legacy.write_text(
+                '{"ts":1,"kind":"info","message":"legacy"}\n', encoding="utf-8"
+            )
+            out = migrate_legacy_log_if_needed(directory=d)
+            self.assertIsNotNone(out)
+            hidden = d / LOG_FILENAME
+            self.assertTrue(hidden.is_file())
+            self.assertFalse(legacy.is_file())
+            self.assertIn("legacy", hidden.read_text(encoding="utf-8"))
 
 
 class TestConnectionLogNoUpload(unittest.TestCase):
@@ -202,6 +224,29 @@ class TestSupportDiagnosticsInExport(unittest.TestCase):
         self.assertIn("export_to_file", src)
         self.assertIn("format_export", src)
         self.assertIn("EXPORT_LOG_BUTTON", src)
+        self.assertIn("SUPPORT_LOG_FIND_HINT", src)
+
+    def test_export_documents_hidden_path_patterns(self):
+        paths = support_log_path_patterns()
+        self.assertIn(".rpt_support_log.jsonl", paths["windows"])
+        self.assertIn(".rpt_support_log.jsonl", paths["linux"])
+        body = format_export([])
+        self.assertIn(paths["windows"], body)
+        self.assertIn(paths["linux"], body)
+        self.assertIn("hidden", body.lower())
+
+    def test_docs_name_hidden_support_log_paths(self):
+        readme = (ROOT / "README.md").read_text(encoding="utf-8")
+        privacy = (ROOT / "PRIVACY_POLICY.md").read_text(encoding="utf-8")
+        for text in (readme, privacy):
+            self.assertIn(".rpt_support_log.jsonl", text)
+            self.assertIn("%LOCALAPPDATA%", text)
+            self.assertIn(".local/share/restore-privacy", text)
+            self.assertIn("email", text.lower())
+        self.assertIn("Support logs", readme)
+        copy = (ROOT / "client" / "transparency_copy.py").read_text(encoding="utf-8")
+        self.assertIn("SUPPORT_LOG_PATH_WINDOWS", copy)
+        self.assertIn("SUPPORT_LOG_FIND_HINT", copy)
 
 
 if __name__ == "__main__":

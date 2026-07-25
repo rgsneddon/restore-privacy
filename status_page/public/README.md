@@ -140,6 +140,19 @@ Every catalog installer includes a **Restore Internet** failsafe (Windows/Linux 
 
 ---
 
+### Support logs (on your device only)
+
+Connect/session diagnostics stay **only on your device** in a **hidden** file. The app does **not** upload them. If support asks for logs, export from Settings (**Export log**) or copy the hidden file, then **email it yourself**.
+
+| Platform | Hidden on-device path |
+|----------|----------------------|
+| **Windows** | `%LOCALAPPDATA%\RestorePrivacy\.rpt_support_log.jsonl` |
+| **Linux** | `~/.local/share/restore-privacy/.rpt_support_log.jsonl` (or `$XDG_DATA_HOME/restore-privacy/.rpt_support_log.jsonl`) |
+
+On Windows, enable **View → Hidden items** in File Explorer if the file is not visible. Filename always starts with a dot (`.rpt_support_log.jsonl`). Older installs may still have `connection_log.jsonl` in the same folder until the app migrates it to the hidden name.
+
+---
+
 ## Privacy in one page
 
 | Document | Link |

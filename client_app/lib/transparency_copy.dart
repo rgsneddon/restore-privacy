@@ -60,9 +60,19 @@ const String kPingStatsDisclaimer =
 
 const String kConnectionLogDisclaimer =
     'Connection events and support diagnostics (app version, platform, connect '
-    'outcome / error text) are stored only on this device. Restore Privacy does not '
-    'upload this log to the node or any remote collector. Export saves a local file '
-    'you can email to support yourself.';
+    'outcome / error text) are stored only on this device in a hidden file '
+    '(.rpt_support_log.jsonl under the product data folder). Restore Privacy does '
+    'not upload this log to the node or any remote collector. Use Export log, or '
+    'copy the hidden file, and email it to support yourself.';
+
+/// Where to find the on-device support log (user email handoff — no auto-upload).
+const String kSupportLogPathWindows =
+    r'%LOCALAPPDATA%\RestorePrivacy\.rpt_support_log.jsonl';
+const String kSupportLogPathLinux =
+    '~/.local/share/restore-privacy/.rpt_support_log.jsonl';
+const String kSupportLogFindHint =
+    'Hidden support log (device only): Windows $kSupportLogPathWindows · '
+    'Linux $kSupportLogPathLinux · or Settings → Export log, then email the file yourself.';
 
 const String kLeakTestDisclaimer =
     'Leak test checks residual public-IP capture and tunnel DNS posture on this '

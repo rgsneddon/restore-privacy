@@ -97,6 +97,7 @@ from client.registration_copy import (
 from client.startup_bootstrap import bootstrap_payment_entitlement
 from client.transparency_copy import (
     CONNECTION_LOG_DISCLAIMER,
+    SUPPORT_LOG_FIND_HINT,
     CONNECTION_LOG_TITLE,
     DPI_MITIGATION_DISCLAIMER,
     DPI_MITIGATION_TITLE,
@@ -1047,6 +1048,15 @@ class TunnelClientApp:
             wraplength=440,
             justify=tk.LEFT,
         ).pack(anchor="w")
+        tk.Label(
+            frm,
+            text=SUPPORT_LOG_FIND_HINT,
+            bg=WHITE,
+            fg=TEXT_MUTED,
+            font=("DejaVu Sans", 8),
+            wraplength=440,
+            justify=tk.LEFT,
+        ).pack(anchor="w", pady=(2, 0))
         log_box = tk.Text(
             frm,
             height=8,

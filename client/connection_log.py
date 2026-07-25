@@ -18,7 +18,10 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Iterable, Mapping, Optional
 
-LOG_FILENAME = "connection_log.jsonl"
+# Hidden on-disk name (Unix dotfile; Windows also gets FILE_ATTRIBUTE_HIDDEN).
+LOG_FILENAME = ".rpt_support_log.jsonl"
+# Pre-hidden name — migrated once into LOG_FILENAME if still present.
+LEGACY_LOG_FILENAME = "connection_log.jsonl"
 DEFAULT_MAX_EVENTS = 500
 
 # Kinds used by the product UI / Settings surface.
@@ -183,7 +186,83 @@ def log_dir() -> Path:
     return Path.home() / ".local" / "share" / "restore-privacy"
 
 
+def is_hidden_log_filename(name: str) -> bool:
+    """True when *name* is the product hidden support-log filename (dotfile)."""
+    base = Path(str(name or "")).name
+    return base.startswith(".") and base == LOG_FILENAME
+
+
+def support_log_path_patterns() -> dict[str, str]:
+    """Documented path patterns (env placeholders — not one user's home)."""
+    return {
+        "windows": r"%LOCALAPPDATA%\RestorePrivacy\.rpt_support_log.jsonl",
+        "linux": "~/.local/share/restore-privacy/.rpt_support_log.jsonl",
+        "linux_xdg": "$XDG_DATA_HOME/restore-privacy/.rpt_support_log.jsonl",
+        "filename": LOG_FILENAME,
+        "legacy_filename": LEGACY_LOG_FILENAME,
+    }
+
+
+def mark_path_hidden(path: Path) -> None:
+    """Best-effort OS hidden attribute (Windows). Unix relies on leading '.'."""
+    p = Path(path)
+    if os.name != "nt":
+        return
+    try:
+        import ctypes
+
+        GetFileAttributesW = ctypes.windll.kernel32.GetFileAttributesW
+        SetFileAttributesW = ctypes.windll.kernel32.SetFileAttributesW
+        GetFileAttributesW.argtypes = [ctypes.c_wchar_p]
+        GetFileAttributesW.restype = ctypes.c_uint32
+        SetFileAttributesW.argtypes = [ctypes.c_wchar_p, ctypes.c_uint32]
+        SetFileAttributesW.restype = ctypes.c_int
+        INVALID = 0xFFFFFFFF
+        FILE_ATTRIBUTE_HIDDEN = 0x2
+        attrs = GetFileAttributesW(str(p))
+        if attrs == INVALID:
+            return
+        if attrs & FILE_ATTRIBUTE_HIDDEN:
+            return
+        SetFileAttributesW(str(p), attrs | FILE_ATTRIBUTE_HIDDEN)
+    except Exception:  # noqa: BLE001
+        pass
+
+
+def migrate_legacy_log_if_needed(*, directory: Path | None = None) -> Path | None:
+    """Rename plain ``connection_log.jsonl`` → hidden ``.rpt_support_log.jsonl``.
+
+    Only when the hidden file is missing and the legacy file exists. Returns
+    the path written/kept, or None if nothing to migrate.
+    """
+    d = directory if directory is not None else log_dir()
+    hidden = d / LOG_FILENAME
+    legacy = d / LEGACY_LOG_FILENAME
+    if hidden.is_file():
+        mark_path_hidden(hidden)
+        return hidden
+    if not legacy.is_file():
+        return None
+    try:
+        d.mkdir(parents=True, exist_ok=True)
+        # Prefer rename; fall back to copy+unlink
+        try:
+            legacy.replace(hidden)
+        except OSError:
+            hidden.write_bytes(legacy.read_bytes())
+            try:
+                legacy.unlink()
+            except OSError:
+                pass
+        mark_path_hidden(hidden)
+        return hidden
+    except OSError:
+        return None
+
+
 def default_log_path() -> Path:
+    """Hidden support log under the product data dir (migrates legacy name)."""
+    migrate_legacy_log_if_needed()
     return log_dir() / LOG_FILENAME
 
 
@@ -201,6 +280,7 @@ def append_event(
 
     When *include_diagnostics* is true (default), merges a support diagnostic
     snapshot (version / platform) with any caller *detail* (endpoint, error, …).
+    Default path is a **hidden** file on the device only (never uploaded).
     """
     merged: dict[str, Any] = {}
     if include_diagnostics:
@@ -228,6 +308,9 @@ def append_event(
         fh.write(json.dumps(event.to_dict(), ensure_ascii=False) + "\n")
     if max_events > 0:
         _trim_log(p, max_events=max_events)
+    # Default product path: keep hidden after write
+    if path is None or Path(p).name == LOG_FILENAME:
+        mark_path_hidden(p)
     return event
 
 
@@ -239,7 +322,14 @@ def read_events(
     """Read events from the local log (oldest first). ``limit`` keeps the newest N."""
     p = path or default_log_path()
     if not p.is_file():
-        return []
+        # Try legacy path once if caller used default
+        if path is None:
+            legacy = log_dir() / LEGACY_LOG_FILENAME
+            if legacy.is_file():
+                migrate_legacy_log_if_needed()
+                p = default_log_path()
+        if not p.is_file():
+            return []
     events: list[ConnectionLogEvent] = []
     try:
         text = p.read_text(encoding="utf-8")
@@ -271,10 +361,14 @@ def format_export(
         events = read_events(path=path)
     event_list = list(events)
     snap = build_support_diagnostics(extra=diagnostics)
+    paths = support_log_path_patterns()
     header_lines = [
-        "# Restore Privacy connection log (local only)",
+        "# Restore Privacy support log (local only — hidden on-device file)",
         "# Not uploaded by the client. User-exported file for support handoff.",
-        "# Support: email this file to support yourself (no automatic upload).",
+        "# Support: email this export (or the hidden on-device file) yourself.",
+        f"# On-device path (Windows): {paths['windows']}",
+        f"# On-device path (Linux): {paths['linux']}",
+        f"# Hidden filename: {paths['filename']}",
         f"# product={snap.get('product')} client_version={snap.get('client_version')}",
         f"# platform={snap.get('platform')} os_name={snap.get('os_name')} "
         f"python={snap.get('python')}",
@@ -304,12 +398,19 @@ def export_to_file(
 
 def clear_events(*, path: Optional[Path] = None) -> None:
     """Erase the local log file (user-initiated clear)."""
-    p = path or default_log_path()
-    try:
-        if p.is_file():
-            p.unlink()
-    except OSError:
-        pass
+    targets: list[Path] = []
+    if path is not None:
+        targets.append(Path(path))
+    else:
+        d = log_dir()
+        targets.append(d / LOG_FILENAME)
+        targets.append(d / LEGACY_LOG_FILENAME)
+    for p in targets:
+        try:
+            if p.is_file():
+                p.unlink()
+        except OSError:
+            pass
 
 
 def log_module_has_no_network_upload() -> bool:
