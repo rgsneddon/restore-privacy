@@ -4,16 +4,19 @@ import Foundation
 /// is active. Host-side RPT2 HELLO alone must never be reported as product success.
 public enum RptFullTunnelResult {
     /// System VPN did not come up — residual ISP IP is expected.
+    /// End-user Allow path first; Team residual re-sign is operator/dev guidance.
     public static let packetTunnelNotActiveMessage =
-        "System VPN (Packet Tunnel) did not become active — your residual public IP "
-        + "will not change. Use a Team-signed residual build with Network Extension "
-        + "on host + Packet Tunnel (scripts/sign_macos_residual_team.py), approve the "
-        + "VPN configuration in System Settings → Network → VPN & Filters, then try again."
+        "System VPN (Packet Tunnel) did not become active — residual public IP will not "
+        + "change. Allow VPN for Restore Privacy in System Settings → Network → VPN & Filters "
+        + "(and Login Items & Extensions if prompted). Settings opens when possible — then "
+        + "press Connect again. Residual Packet Tunnel needs a Team-signed host + appex with "
+        + "Network Extension (developers: scripts/sign_macos_residual_team.py)."
 
     /// Node HELLO succeeded but no system tunnel — residual IP unchanged.
     public static let hostOnlyHelloNotFullTunnelMessage =
         "Node session was assigned but the system Packet Tunnel is not carrying traffic — "
-        + "residual public IP is unchanged. Full-tunnel requires an active OS VPN extension."
+        + "residual public IP is unchanged. Full-tunnel requires an active OS VPN extension. "
+        + "Approve VPN configuration in System Settings → Network → VPN & Filters, then Connect again."
 
     /// Build the method-channel map for a full-tunnel product connect attempt.
     /// - Parameter packetTunnelActive: true only when NE tunnel status is connected.

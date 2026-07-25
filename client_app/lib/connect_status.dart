@@ -152,16 +152,56 @@ const String kVpnPermissionDeniedMessage =
     'VPN permission denied — grant once for full tunnel';
 
 /// Honest full-tunnel failure: system VPN never came up (residual ISP IP expected).
+/// End-user path first (System Settings Allow); Team residual re-sign is operator/dev.
 const String kPacketTunnelNotActiveMessage =
-    'System VPN (Packet Tunnel) did not become active — your residual public IP '
-    'will not change. Use a Team-signed residual build with Network Extension '
-    'on host + Packet Tunnel (scripts/sign_macos_residual_team.py), approve the '
-    'VPN configuration in System Settings → Network → VPN & Filters, then try again.';
+    'System VPN (Packet Tunnel) did not become active — residual public IP will not '
+    'change. Allow VPN for Restore Privacy in System Settings → Network → VPN & Filters '
+    '(and Login Items & Extensions if prompted). Settings opens when possible — then '
+    'press Connect again. Residual Packet Tunnel needs a Team-signed host + appex with '
+    'Network Extension (developers: scripts/sign_macos_residual_team.py).';
 
 /// Host-only RPT2 HELLO diagnostic (node reachable, but not a full-tunnel success).
 const String kHostOnlyHelloNotFullTunnelMessage =
     'Node session was assigned but the system Packet Tunnel is not carrying traffic — '
-    'residual public IP is unchanged. Full-tunnel requires an active OS VPN extension.';
+    'residual public IP is unchanged. Full-tunnel requires an active OS VPN extension. '
+    'Approve VPN configuration in System Settings → Network → VPN & Filters, then Connect again.';
+
+/// Button / channel label when the user must Allow the OS VPN configuration.
+const String kOpenVpnSettingsLabel = 'Open VPN settings';
+
+/// True when a connect failure message is the NE permission / Packet Tunnel approval class
+/// (NEVPNErrorDomain 5, permission denied, host-only HELLO without active tunnel, etc.).
+bool isNeVpnPermissionFailureMessage(String message) {
+  final m = message.toLowerCase();
+  if (m.isEmpty) return false;
+  return m.contains('nevpnerrordomain') ||
+      m.contains('permission denied') ||
+      m.contains('not authorized') ||
+      m.contains('ne preferences failed') ||
+      m.contains('approve vpn configuration') ||
+      m.contains('packet tunnel is not carrying') ||
+      m.contains('did not become active') ||
+      m.contains('allow vpn') ||
+      (m.contains('vpn configuration') &&
+          (m.contains('system settings') || m.contains('allow')));
+}
+
+/// True when the channel map is a failed connect that should open System Settings.
+///
+/// Drives auto-open + optional [kOpenVpnSettingsLabel] control. Never true on product success.
+bool shouldPromptOpenVpnSystemSettings(dynamic result) {
+  if (isConnectSuccess(result)) return false;
+  if (result is! Map) return false;
+  if (result['needsVpnSystemSettingsApproval'] == true) return true;
+  if (result['openedVpnSettings'] == true) return true;
+  if (result['hostOnlySession'] == true) return true;
+  if (result['fullTunnelActive'] == false) {
+    final msg = result['message']?.toString() ?? '';
+    if (isNeVpnPermissionFailureMessage(msg)) return true;
+  }
+  final msg = result['message']?.toString() ?? '';
+  return isNeVpnPermissionFailureMessage(msg);
+}
 
 /// Build a product connect result map for full-tunnel honesty rules.
 /// Pure helper — used by tests and documents the contract native channels must match.

@@ -6,10 +6,14 @@ import Foundation
 import FlutterMacOS
 import NetworkExtension
 import CryptoKit
+import AppKit
 
 enum RptVpnChannel {
   static let name = "restore_privacy/vpn"
   static let providerBundleId = "com.restoreprivacy.restorePrivacyClient.PacketTunnel"
+  /// Debounce auto-open of System Settings so a double Connect does not spam panes.
+  private static var lastVpnSettingsOpenAt: Date?
+  private static let vpnSettingsOpenDebounce: TimeInterval = 20
 
   static func register(with messenger: FlutterBinaryMessenger) {
     // Seed Application Support + App Group + ~/.restore-privacy so Packet Tunnel
@@ -29,6 +33,16 @@ enum RptVpnChannel {
       case "disconnect":
         // Same stop path as app-quit / terminate hooks.
         stopAllTunnels { map in result(map) }
+      case "openVpnSettings", "openVpnSystemSettings":
+        // Explicit UI / Flutter retry — always attempt open (no debounce skip).
+        let opened = openVpnSystemSettings(force: true)
+        result([
+          "ok": opened,
+          "opened": opened,
+          "message": opened
+            ? "Opened System Settings (Network / VPN). Allow Restore Privacy, then Connect again."
+            : "Could not open System Settings automatically — go to System Settings → Network → VPN & Filters.",
+        ] as [String: Any])
       case "hasSecrets":
         result([
           "ok": RptSecrets.filesPresent(),
@@ -66,6 +80,80 @@ enum RptVpnChannel {
     }
   }
 
+  /// Best-effort System Settings deep-links for Network / VPN & Filters (macOS version varies).
+  /// Pure list so tests can assert the shipped candidates without opening UI.
+  static func vpnSystemSettingsURLCandidates() -> [String] {
+    [
+      // Ventura+ Network settings (VPN & Filters lives under Network).
+      "x-apple.systempreferences:com.apple.Network-Settings.extension",
+      // Older System Preferences Network pane.
+      "x-apple.systempreferences:com.apple.preference.network",
+      // Extensions / Login Items (where some NE prompts surface).
+      "x-apple.systempreferences:com.apple.LoginItems-Settings.extension",
+      "x-apple.systempreferences:com.apple.ExtensionsPreferences",
+    ]
+  }
+
+  /// Open Network / VPN System Settings so the user can Allow VPN configuration.
+  /// Cannot silently enable Packet Tunnel — macOS requires user Allow.
+  @discardableResult
+  static func openVpnSystemSettings(force: Bool = false) -> Bool {
+    if !force, let last = lastVpnSettingsOpenAt,
+       Date().timeIntervalSince(last) < vpnSettingsOpenDebounce {
+      return true // recently opened — treat as ok for callers
+    }
+    var opened = false
+    for s in vpnSystemSettingsURLCandidates() {
+      if let u = URL(string: s), NSWorkspace.shared.open(u) {
+        opened = true
+        break
+      }
+    }
+    if !opened {
+      let pane = URL(fileURLWithPath: "/System/Library/PreferencePanes/Network.prefPane")
+      opened = NSWorkspace.shared.open(pane)
+    }
+    if opened {
+      lastVpnSettingsOpenAt = Date()
+    }
+    return opened
+  }
+
+  /// True for NEVPNErrorDomain permission / not-authorized / denied class (incl. code 5).
+  static func isNePermissionFailure(_ error: Error) -> Bool {
+    let ns = error as NSError
+    let lower = error.localizedDescription.lowercased()
+    if ns.domain == NEVPNErrorDomain { return true }
+    return lower.contains("permission")
+      || lower.contains("not authorized")
+      || lower.contains("denied")
+  }
+
+  static func isNePermissionFailureDetail(_ detail: String?) -> Bool {
+    guard let d = detail?.lowercased(), !d.isEmpty else { return false }
+    return d.contains("nevpnerrordomain")
+      || d.contains("permission")
+      || d.contains("not authorized")
+      || d.contains("denied")
+      || d.contains("ne preferences failed")
+      || d.contains("approve vpn")
+      || d.contains("allow vpn")
+  }
+
+  /// Annotate a failed connect map and optionally open System Settings (debounced).
+  private static func annotateNeedsVpnSettings(
+    _ map: [String: Any],
+    openSettings: Bool
+  ) -> [String: Any] {
+    var out = map
+    out["needsVpnSystemSettingsApproval"] = true
+    if openSettings {
+      let opened = openVpnSystemSettings(force: false)
+      out["openedVpnSettings"] = opened
+    }
+    return out
+  }
+
   /// 64-char hex Ed25519 device public key for status-host bind-device-entitlement.
   private static func devicePubHexMap() -> [String: Any] {
     do {
@@ -100,7 +188,13 @@ enum RptVpnChannel {
     loadOrCreateManager(host: host, port: port) { manager, neError in
       guard let manager else {
         let detail = neError.map { "NE preferences: \($0)" }
-        hostSideDiagnostic(host: host, port: port, detail: detail) { map in
+        // Missing NE manager (incl. NEVPNErrorDomain 5) — open Settings so user can Allow.
+        hostSideDiagnostic(
+          host: host,
+          port: port,
+          detail: detail,
+          openVpnSettings: true
+        ) { map in
           flutterResult(map)
         }
         return
@@ -117,9 +211,14 @@ enum RptVpnChannel {
           flutterResult(map)
           return
         }
-        // Tunnel not active — optional diagnostic HELLO (still ok:false).
+        // Tunnel not active — diagnostic HELLO (still ok:false) + open Settings so user can Allow.
         let detail = map["message"] as? String
-        hostSideDiagnostic(host: host, port: port, detail: detail) { diag in
+        hostSideDiagnostic(
+          host: host,
+          port: port,
+          detail: detail,
+          openVpnSettings: true
+        ) { diag in
           flutterResult(diag)
         }
       }
@@ -128,10 +227,12 @@ enum RptVpnChannel {
 
   /// Host RPT2 HELLO for diagnostics only — always ok:false for full-tunnel product.
   /// Closes transport immediately; residual public IP does not change.
+  /// When [openVpnSettings] is true, opens System Settings (debounced) so the user can Allow VPN.
   private static func hostSideDiagnostic(
     host: String,
     port: UInt16,
     detail: String? = nil,
+    openVpnSettings: Bool = false,
     completion: @escaping ([String: Any]) -> Void
   ) {
     DispatchQueue.global(qos: .userInitiated).async {
@@ -152,6 +253,18 @@ enum RptVpnChannel {
         hostOnlyHello: outcome.ok,
         nodeDiagnostic: nodeDiag
       )
+      // Host-only HELLO or NE prefs failure: user must Allow VPN config for residual IP change.
+      let shouldOpen = openVpnSettings
+        || outcome.ok
+        || isNePermissionFailureDetail(detail)
+      if shouldOpen {
+        // Open on main so NSWorkspace is happy; annotate map for Flutter button.
+        DispatchQueue.main.async {
+          let annotated = annotateNeedsVpnSettings(map, openSettings: true)
+          completion(annotated)
+        }
+        return
+      }
       DispatchQueue.main.async { completion(map) }
     }
   }
@@ -180,24 +293,22 @@ enum RptVpnChannel {
   }
 
   /// Surface permission / entitlement failures with an actionable residual-honest path.
+  /// End-user: Allow in System Settings (auto-opened). Operators: Team residual re-sign.
   private static func describeNePreferencesError(_ error: Error) -> String {
     let ns = error as NSError
     let base = error.localizedDescription
     let domain = ns.domain
     let code = ns.code
     // Common when host lacks Network Extension entitlement / profile, or user denied VPN config.
-    let lower = base.lowercased()
-    if lower.contains("permission")
-      || lower.contains("not authorized")
-      || lower.contains("denied")
-      || domain == NEVPNErrorDomain
-    {
+    if isNePermissionFailure(error) {
       return
         "NE preferences failed (\(domain) \(code)): \(base). "
         + "Approve VPN configuration in System Settings → Network → VPN & Filters "
-        + "(or General → Login Items & Extensions), and ensure this build is Team-signed "
-        + "with Packet Tunnel Network Extension entitlements on host + appex "
-        + "(see scripts/sign_macos_residual_team.py)."
+        + "(or Login Items & Extensions). Settings opens automatically when possible — "
+        + "Allow Restore Privacy, then press Connect again. "
+        + "If Allow never appears, this build may need Team residual signing with "
+        + "Packet Tunnel Network Extension on host + appex "
+        + "(developers: scripts/sign_macos_residual_team.py)."
     }
     return "NE preferences failed (\(domain) \(code)): \(base)"
   }
@@ -320,23 +431,25 @@ enum RptVpnChannel {
           }
         } else {
           let st = manager.connection.status
-          completion(
-            RptFullTunnelResult.productConnectMap(
-              packetTunnelActive: false,
-              detailMessage:
-                "Packet Tunnel start pending or failed (status \(statusName(st))/\(st.rawValue)). "
-                + "If macOS asked to allow VPN configurations, choose Allow and Connect again. "
-                + "Team residual builds: scripts/sign_macos_residual_team.py"
-            )
+          let map = RptFullTunnelResult.productConnectMap(
+            packetTunnelActive: false,
+            detailMessage:
+              "Packet Tunnel start pending or failed (status \(statusName(st))/\(st.rawValue)). "
+              + "If macOS asked to allow VPN configurations, choose Allow in System Settings "
+              + "→ Network → VPN & Filters, then Connect again. "
+              + "Developers: Team residual re-sign via scripts/sign_macos_residual_team.py"
           )
+          // User may still need to Allow — open Settings (debounced).
+          completion(annotateNeedsVpnSettings(map, openSettings: true))
         }
       }
     } catch {
+      let map = RptFullTunnelResult.productConnectMap(
+        packetTunnelActive: false,
+        detailMessage: describeNePreferencesError(error)
+      )
       completion(
-        RptFullTunnelResult.productConnectMap(
-          packetTunnelActive: false,
-          detailMessage: describeNePreferencesError(error)
-        )
+        annotateNeedsVpnSettings(map, openSettings: isNePermissionFailure(error))
       )
     }
   }
