@@ -55,6 +55,15 @@ FORBIDDEN_WIPE_PREFIXES: tuple[str, ...] = (
     "/var/lib/apt",
 )
 
+# Licence database + paid-download grants (admin). Residual fleet wipe/rebuild
+# must never delete these even when co-located under INSTALL_ROOT.
+PAYMENT_STORE_WIPE_PROTECTED_RELATIVE: tuple[str, ...] = (
+    "status_page/data",
+    "status_page/data/paid_downloads.sqlite3",
+    "status_page/data/processor_env.json",
+    "paid_downloads.sqlite3",
+)
+
 HONESTY_AT_REST = (
     "LUKS/dm-crypt protects node disk data **at rest** when the volume is locked "
     "or the host is powered off. It does not protect secrets in RAM on a running, "
@@ -124,6 +133,39 @@ def _posix_norm(path: str) -> str:
     return s
 
 
+def is_payment_store_wipe_protected(
+    path: str | Path,
+    *,
+    install_root: str = DEFAULT_INSTALL_ROOT,
+) -> bool:
+    """True if *path* is licence/grant payment-store data (never wipe)."""
+    raw = str(path).strip()
+    if not raw:
+        return False
+    if raw.startswith("/") or (len(raw) > 1 and raw[1] == ":"):
+        resolved = _posix_norm(raw)
+    else:
+        resolved = _posix_norm(f"{install_root.rstrip('/')}/{raw}")
+    root = _posix_norm(install_root) or DEFAULT_INSTALL_ROOT
+    low = resolved.lower()
+    # Absolute filename markers (any host layout)
+    if low.endswith("/paid_downloads.sqlite3") or low.endswith(
+        "\\paid_downloads.sqlite3"
+    ):
+        return True
+    if low.endswith("/processor_env.json") and "status_page" in low:
+        return True
+    # Under install root status_page/data/**
+    for rel in PAYMENT_STORE_WIPE_PROTECTED_RELATIVE:
+        protected = _posix_norm(f"{root}/{rel}")
+        if resolved == protected or resolved.startswith(protected + "/"):
+            return True
+    # Basename-only paid DB under any data dir named status_page/data
+    if "/status_page/data/" in low or low.endswith("/status_page/data"):
+        return True
+    return False
+
+
 def is_safe_wipe_path(
     path: str | Path,
     *,
@@ -133,7 +175,8 @@ def is_safe_wipe_path(
     """True if product wipe scripts may target this path.
 
     Allows paths under ``install_root`` and a small absolute runtime allow-list.
-    Rejects bare ``/`` and critical system prefixes outside the allow-list.
+    Rejects bare ``/``, critical system prefixes, and **payment/licence store**
+    paths (admin grants + keygen DB must survive residual wipeclean).
     """
     raw = str(path).strip()
     if not raw or raw == ".":
@@ -150,6 +193,11 @@ def is_safe_wipe_path(
     root = _posix_norm(install_root) or DEFAULT_INSTALL_ROOT
     if resolved == root:
         return False
+
+    # Always protect licence DB + paid download grants
+    if is_payment_store_wipe_protected(resolved, install_root=root):
+        return False
+
     if resolved.startswith(root + "/"):
         return True
 

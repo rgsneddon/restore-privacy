@@ -20,9 +20,11 @@ from coffee_link import COFFEE_LINK_TEXT, coffee_tip_url
 from payments import (
     PRICE_LABEL,
     PRICE_PENCE,
+    PRICE_YEARLY_LABEL,
     list_all_grants,
     list_licences_for_admin,
     list_recent_grants,
+    payment_data_dir,
     public_base_url,
     reissue_download_for_purchase_id,
     seed_test_purchase_enabled,
@@ -36,6 +38,19 @@ from payments import (
     stripe_webhook_secret,
     STRIPE_WEBHOOK_EVENTS,
     STRIPE_WEBHOOK_PATH,
+)
+
+# Operator-facing architecture blurb (must stay current; grepped by tests).
+ADMIN_ARCHITECTURE_BLURB = (
+    "Residual catalog peers: Iceland (IS, default entry), Romania (RO), "
+    "Germany (DE) — user-selectable entry; multi-hop opt-in uses a random "
+    "non-entry peer. Weekly fleet wipe is sequential IS → RO → DE (exclusive "
+    "lock; never concurrent multi-node wipe). Paid Stripe Checkout "
+    f"(Monthly {PRICE_LABEL} / Yearly {PRICE_YEARLY_LABEL} GBP) + keygen unlock; "
+    "no free permanent GitHub installers. Public status is title-only (no live "
+    "client count). Licence database and paid download grants live in the "
+    "durable payment store and are retained across residual node wipeclean/"
+    "rebuild — they are not residual-runtime scratch."
 )
 
 # Catalog device packages for admin failsafe dropdown (current ship pin).
@@ -519,9 +534,13 @@ def render_admin_licences_section_html(
 <section id="admin-licences" class="card">
   <h2 id="admin-licences-heading">Licence database</h2>
   <p class="muted" id="admin-licences-blurb">
-  Customer licences (email, KEYGEN, PPI, status). <strong>Read-only</strong> —
-  no edit, revoke, or amend controls. Status is <code>OK</code> (active
-  subscription) or <code>EXPIRED</code> (revoked, failed, or period ended).
+  Customer licences (email, KEYGEN, PPI, status) from the <strong>durable
+  payment store</strong> (<code>RPT_PAYMENT_DATA_DIR</code> / status_page data).
+  <strong>Retained across residual fleet wipe/rebuild</strong> — not cleared by
+  node wipeclean. <strong>Read-only</strong> here: no edit, revoke, or amend
+  controls. Status is <code>OK</code> (active subscription) or
+  <code>EXPIRED</code> (revoked, failed, or period ended). Keygen unlocks
+  residual Connect on any catalog peer (IS / RO / DE), not a single-node product.
   </p>
   <table id="admin-licences-table" data-readonly="1">
     <thead><tr>
@@ -879,8 +898,9 @@ h1{{font-size:1.1rem;margin:0 0 0.5rem;color:var(--fg)}}
 {admin_theme_picker_html()}
 <form method="post" action="/admin/login" id="admin-login-form">
   <h1>Operator admin</h1>
-  <p class="note" id="admin-login-note">Private page: payment processor settings
-  and paid-download administration. Not the public catalog.</p>
+  <p class="note" id="admin-login-note">Private page: Stripe processor settings,
+  licence database, and paid-download grants for the multi-peer residual catalog
+  (IS / RO / DE). Not the public shop.</p>
   {err}
   <label for="username">Username</label>
   <input id="username" name="username" autocomplete="username" required/>
@@ -1109,8 +1129,10 @@ def render_processor_settings_html(
 <section id="admin-processor-settings" class="card">
   <h2>Payment processor settings</h2>
   <p class="muted">Each connection option is a <strong>processor plugin</strong> with the correct
-  variables to enter for that payment path. Secrets stay on the server — never shown after save.
-  Prefer host/Render env for production permanence; local apply wires the running process.</p>
+  variables for that payment path. Secrets stay on the server — never shown after save.
+  Prefer host/Render env for production permanence (survives redeploy); local apply
+  wires the running process. Licence/grant SQLite is separate durable state — residual
+  peer wipe does not erase it.</p>
   <div class="muted" id="admin-key-howto" style="margin:0.75rem 0 1rem;padding:0.75rem 0.9rem;border:1px solid var(--border);border-radius:10px">
     <p style="margin:0 0 0.5rem"><strong>Where to find keys (one at a time)</strong> — never commit secrets to git.</p>
     <ol style="margin:0;padding-left:1.25rem;line-height:1.45">
@@ -1122,11 +1144,15 @@ def render_processor_settings_html(
         → your endpoint (or add one to <code>…/webhook/stripe</code>) → Signing secret
         (<code>whsec_…</code>). Paste → Save Stripe.</li>
       <li><code>STRIPE_CHECKOUT_PRICE_ID</code> — <strong>optional</strong>. Leave empty to use
-        built-in £2.45 unit_amount Checkout. Only set a <em>one-time</em> Price id from
-        Products → Prices if you deliberately use Dashboard Prices (not a recurring Payment Link price).</li>
+        built-in Monthly {_escape(PRICE_LABEL)} / Yearly {_escape(PRICE_YEARLY_LABEL)} Checkout
+        unit amounts. Only set a Dashboard Price id if you deliberately override catalog pricing.</li>
       <li><code>RPT_ASSET_FETCH_TOKEN</code> — shared secret you choose (long random string).
-        Set the <strong>same</strong> value on the Iceland VPS paid-asset service and here
-        (or as Render env). Not from Stripe. Generate with a password manager if you do not have one yet.</li>
+        Set the <strong>same</strong> value on residual paid-asset hosts (e.g. IS VPS
+        <code>host_paid_assets</code>) and on this status host (or Render env). Not from Stripe.
+        Generate with a password manager if you do not have one yet.</li>
+      <li><code>RPT_PAYMENT_DATA_DIR</code> — optional path for the durable licence + grant
+        SQLite store. Prefer a persistent disk so admin history survives host redeploy;
+        residual fleet wipe never targets this DB.</li>
     </ol>
     <p style="margin:0.5rem 0 0">After each Save, confirm the table badge flips to
     <strong>set</strong> (secret boxes stay empty on purpose). Also set the same keys on
@@ -1212,6 +1238,12 @@ def render_admin_html(
         platform=seed_platform,
     )
     settings_html = render_processor_settings_html(message=message, error=error)
+    try:
+        store_hint = str(payment_data_dir())
+    except Exception:  # noqa: BLE001
+        store_hint = "status_page/data (or RPT_PAYMENT_DATA_DIR)"
+    arch = _escape(ADMIN_ARCHITECTURE_BLURB)
+    store_esc = _escape(store_hint)
     body = f"""<!DOCTYPE html>
 <html lang="en"><head>
 <meta charset="utf-8"/><meta name="viewport" content="width=device-width, initial-scale=1"/>
@@ -1271,6 +1303,7 @@ background:var(--btn-bg);color:var(--btn-fg);font-weight:600;cursor:pointer}}
   <a href="/">VPN APP Shop</a>
 </div>
 <nav class="nav-local" id="admin-nav" aria-label="Admin sections">
+  <a href="#admin-architecture">Architecture</a>
   <a href="#admin-reissue">Re-issue by RPT-PPI</a>
   <a href="#admin-ondemand-mint">Generate download (failsafe)</a>
   <a href="#admin-keygen-failsafe">Generate KEYGEN (failsafe)</a>
@@ -1279,6 +1312,14 @@ background:var(--btn-bg);color:var(--btn-fg);font-weight:600;cursor:pointer}}
   <a href="#admin-licences">Licence database</a>
   <a href="#admin-grants">Paid download grants</a>
 </nav>
+<section id="admin-architecture" class="card" aria-labelledby="admin-architecture-heading">
+  <h2 id="admin-architecture-heading">Product architecture (operator)</h2>
+  <p class="muted" id="admin-architecture-blurb">{arch}</p>
+  <p class="muted" id="admin-durable-store-note">Durable licence + grant DB path:
+  <code id="admin-payment-data-dir">{store_esc}</code>
+  (<code>paid_downloads.sqlite3</code>). Residual wipeclean targets runtime/secrets only —
+  not this store.</p>
+</section>
 {reissue_html}
 {ondemand_html}
 {keygen_html}
@@ -1288,8 +1329,11 @@ background:var(--btn-bg);color:var(--btn-fg);font-weight:600;cursor:pointer}}
 <section id="admin-grants" class="card">
   <h2 id="admin-grants-heading">Paid download grants</h2>
   <p class="muted" id="admin-grants-blurb">Full history of Stripe-verified download grants
-  ({_escape(PRICE_LABEL)} GBP each) — every completed payment grant in the store.
-  Used single-use tokens stay listed (status <code>used</code>); purchase identifier is durable.
+  (Monthly {_escape(PRICE_LABEL)} / Yearly {_escape(PRICE_YEARLY_LABEL)} GBP by plan) —
+  every completed payment grant in the durable store. <strong>Retained across residual
+  fleet wipe/rebuild</strong> (IS → RO → DE sequential). Used single-use tokens stay
+  listed (status <code>used</code>); purchase identifier (RPT-PPI) is durable.
+  Catalog installers are multi-platform residual clients, not free GitHub assets.
   Secrets never shown.</p>
   <table id="admin-grants-table">
     <thead><tr>

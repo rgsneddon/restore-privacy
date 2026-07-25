@@ -639,6 +639,13 @@ STRIPE_PRODUCT_NAME_YEARLY = "Yearly VPN plan"
 
 
 def _data_dir() -> Path:
+    """Durable licence + paid-download grant store directory.
+
+    Prefer ``RPT_PAYMENT_DATA_DIR`` on a **persistent** volume (Render disk /
+    host path). Default is ``status_page/data`` next to this module — **not**
+    residual-node runtime paths. Residual fleet wipe/rebuild must not delete
+    this tree (see :mod:`node.disk_encryption` payment-store protection).
+    """
     raw = os.environ.get("RPT_PAYMENT_DATA_DIR", "").strip()
     if raw:
         p = Path(raw)
@@ -648,8 +655,75 @@ def _data_dir() -> Path:
     return p
 
 
+def payment_data_dir() -> Path:
+    """Public alias: durable admin licence/grants directory."""
+    return _data_dir()
+
+
 def db_path() -> Path:
     return _data_dir() / "paid_downloads.sqlite3"
+
+
+def payment_store_paths() -> dict[str, str]:
+    """Paths for operator docs / wipe exclusion (string form)."""
+    d = payment_data_dir()
+    return {
+        "data_dir": str(d),
+        "db": str(db_path()),
+        "env_override": "RPT_PAYMENT_DATA_DIR",
+        "filename": "paid_downloads.sqlite3",
+    }
+
+
+def wipe_targets_exclude_payment_store(
+    targets: list[str] | tuple[str, ...] | None,
+    *,
+    install_root: str = "/opt/restore-privacy",
+) -> list[str]:
+    """Drop any wipe candidates that would erase licence/grant admin data."""
+    try:
+        from node.disk_encryption import is_payment_store_wipe_protected
+    except Exception:  # noqa: BLE001
+
+        def is_payment_store_wipe_protected(  # type: ignore[misc]
+            path: str, *, install_root: str = install_root
+        ) -> bool:
+            s = str(path).replace("\\", "/").lower()
+            return "paid_downloads.sqlite3" in s or "/status_page/data" in s
+
+    out: list[str] = []
+    for t in targets or ():
+        s = str(t)
+        if is_payment_store_wipe_protected(s, install_root=install_root):
+            continue
+        out.append(s)
+    return out
+
+
+def payment_store_survives_residual_wipe() -> bool:
+    """Honesty helper: product residual wipe plans must not list the payment DB."""
+    try:
+        from node.disk_encryption import plan_wipe
+
+        plan = plan_wipe(install_root="/opt/restore-privacy", aggressive_secrets=True)
+        remaining = wipe_targets_exclude_payment_store(
+            plan.get("targets") or [], install_root="/opt/restore-privacy"
+        )
+        # All planned targets should already exclude payment store; if any
+        # payment path remained after exclude, something is wrong.
+        protected_hits = [
+            t
+            for t in (plan.get("targets") or [])
+            if t not in remaining
+        ]
+        # surviving means: no payment path in raw plan (exclude is no-op)
+        return len(protected_hits) == 0 and all(
+            "paid_downloads" not in str(t).lower()
+            and "status_page/data" not in str(t).replace("\\", "/").lower()
+            for t in (plan.get("targets") or [])
+        )
+    except Exception:  # noqa: BLE001
+        return False
 
 
 def _env_or_processor_store(*keys: str) -> str:

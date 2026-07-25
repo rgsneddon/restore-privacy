@@ -438,7 +438,7 @@ def _vps_assets_readiness() -> dict[str, Any]:
 
 VPS_ASSETS_PLUGIN = ProcessorPlugin(
     id="vps_assets",
-    display_name="Iceland VPS paid installers",
+    display_name="Residual VPS paid installers (IS host)",
     role="paid_installer_fetch",
     description=(
         "Shared secret for status host → Iceland VPS paid-asset HTTP fetch "
