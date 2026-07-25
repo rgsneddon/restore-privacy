@@ -20,6 +20,29 @@ container filesystem.
 The status app creates the directory and opens  
 `$RPT_PAYMENT_DATA_DIR/paid_downloads.sqlite3` via `payments.payment_data_dir()`.
 
+## Apply to live service
+
+### A) Script (API key)
+
+```powershell
+$env:RENDER_API_KEY = 'rnd_...'   # Dashboard → Account Settings → API Keys
+cd path\to\restore_privacy
+.\scripts\apply_render_payment_disk.ps1
+```
+
+Sets `RPT_PAYMENT_DATA_DIR=/var/data/rpt-payment`, tries disk create via API, triggers deploy.
+Use `-WhatIf` to list the service without changes. Exit `2` if the API key is missing.
+
+### B) Dashboard Blueprint
+
+Blueprints → open the repo blueprint → **Apply** / sync so `render.yaml` disk + env land on
+`restore-privacy-status`. Service plan must be **starter+** before disk attach succeeds.
+
+### C) Manual Disks page
+
+Service → **Disks** → add disk mount `/var/data` → Environment →  
+`RPT_PAYMENT_DATA_DIR=/var/data/rpt-payment` → deploy.
+
 ## One-shot migration (existing free/ephemeral DB)
 
 If you already have grants on the old ephemeral path
