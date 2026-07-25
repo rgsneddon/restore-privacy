@@ -2,9 +2,16 @@
 
 Catalog monopin: **0.4.6**
 
-Windows may have staged **carry-forward** macOS/iOS zips renamed to 0.4.6 for catalog
-filenames. **Replace** them with DevID-notarized macOS + Team-signed iOS before
-buyers should treat Apple packages as native 0.4.6 product builds.
+## Shipped status (Mac rebuild complete)
+
+Native Apple packages for **0.4.6** are built, signed, and hosted:
+
+| Package | Status |
+|---------|--------|
+| `restore-privacy-client-0.4.6-macos.zip` | **Developer ID** signed, **notarized + stapled** (notary id `4f883906-9e22-406d-a4dd-7379686643bd`, Accepted); Gatekeeper `Notarized Developer ID` |
+| `restore-privacy-client-0.4.6-ios.zip` | **Apple Distribution / Team-signed** sideload; `CFBundleShortVersionString` **0.4.6** |
+
+Hosted at GitHub release **0.4.6** and Iceland VPS `/opt/restore-privacy/paid_assets/0.4.6/` (paid fulfilment only).
 
 ## Product behaviour (must ship in macOS + iOS builds)
 
@@ -96,20 +103,23 @@ Filenames must match catalog:
 
 After iOS rebuild confirm CFBundleShortVersionString **0.4.6** in Info.plist.
 
-## Honesty — staged Apple packages (pre-Mac)
+## Honesty — shipped Apple packages (post-Mac)
 
-| Package | Provenance on Windows ship host |
-|---------|--------------------------------|
-| `restore-privacy-client-0.4.6-macos.zip` | **Carry-forward** filename pin from 0.4.5 until Mac rebuild + DevID + notarize |
-| `restore-privacy-client-0.4.6-ios.zip` | **Carry-forward** filename pin from 0.4.5 until Mac Team-signed rebuild |
+| Package | Provenance |
+|---------|------------|
+| `restore-privacy-client-0.4.6-macos.zip` | **Native** Flutter release build from monopin **0.4.6** tree; Developer ID Application (SFCBP95595); notarized + stapled |
+| `restore-privacy-client-0.4.6-ios.zip` | **Native** Flutter release build from monopin **0.4.6** tree; Apple Distribution Team-signed sideload |
+
+Earlier Windows-host **carry-forward** filename pins from 0.4.5 were **replaced** on GH release **0.4.6** and VPS paid_assets.
 
 App Store submission remains out of scope (sideload / DevID only).
 Product entry + exit ElGamal **pubs** only (no `*.priv`) in packages.
 
-Re-stage after rebuild:
+Re-stage if rebuilding again:
 
 ```bash
 python scripts/host_paid_assets_vps.py --stage --upload --version 0.4.6 --force
+# If script SSH as root times out: use Host restore-privacy-iceland (raskul) + scp
 ```
 
 Audit helper:
