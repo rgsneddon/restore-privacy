@@ -43,8 +43,7 @@ NODE_WIPE_HEADING = "Node data clear timer"
 HONESTY_BLURB = (
     "About every week we wipe and rebuild residual nodes one at a time "
     "(IS then RO then DE) so clients can hop while a peer drains. "
-    "This clock is that cycle — not a simultaneous all-node wipe, and not "
-    "a dry-run. Provider backups and netflow are not erased."
+    "This clock is that cycle."
 )
 
 

@@ -131,14 +131,16 @@ class TestNodeWipeHtml(unittest.TestCase):
         self.assertIn("data-next-entry", html)
         self.assertIn("data-fleet-sequential", html)
         self.assertIn(str(NODE_WIPE_PERIOD_SECONDS), html)
-        # Honesty: sequential fleet / all nodes / not provider backup erase
+        # Honesty: sequential fleet / all nodes (short blurb)
         low = html.lower()
         self.assertIn("one at a time", low)
-        self.assertIn("provider", low)
+        self.assertNotIn("simultaneous all-node wipe", low)
+        self.assertNotIn("provider backups and netflow are not erased", low)
         self.assertTrue(
             "is" in low and "ro" in low and "de" in low,
             "blurb should name fleet peers",
         )
+        self.assertIn(HONESTY_BLURB, html)
 
     def test_homepage_render_includes_dual_wipe_countdown(self):
         """Drive shipped status_page.render_html entry point."""
