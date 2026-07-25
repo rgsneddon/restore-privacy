@@ -11,9 +11,11 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "status_page"))
 
 from node_wipe_countdown import (  # noqa: E402
+    ALL_NODES_DATA_CLEARED_LABEL,
     HONESTY_BLURB,
     NODE_A_ENTRY_LABEL,
     NODE_B_EXIT_LABEL,
+    NODE_WIPE_HEADING,
     NODE_WIPE_PERIOD,
     NODE_WIPE_PERIOD_SECONDS,
     dual_node_wipe_state,
@@ -112,8 +114,12 @@ class TestNodeWipeHtml(unittest.TestCase):
             entry_next=now + timedelta(days=1),
             exit_next=now + timedelta(days=2),
         )
-        self.assertIn(NODE_A_ENTRY_LABEL, html)
+        self.assertEqual(ALL_NODES_DATA_CLEARED_LABEL, "ALL NODES DATA CLEARED IN")
+        self.assertEqual(NODE_A_ENTRY_LABEL, ALL_NODES_DATA_CLEARED_LABEL)
+        self.assertIn(ALL_NODES_DATA_CLEARED_LABEL, html)
         self.assertNotIn(NODE_B_EXIT_LABEL, html)
+        self.assertNotIn("ALL NODE A (ENTRY NODE)", html)
+        self.assertIn(NODE_WIPE_HEADING, html)
         self.assertIn('id="node-wipe-countdown"', html)
         self.assertIn('id="nw-entry-days"', html)
         self.assertNotIn('id="nw-exit-seconds"', html)
@@ -123,18 +129,21 @@ class TestNodeWipeHtml(unittest.TestCase):
         self.assertIn("setInterval", html)
         self.assertIn("1000", html)
         self.assertIn("data-next-entry", html)
-        self.assertIn("data-entry-only", html)
+        self.assertIn("data-fleet-sequential", html)
         self.assertIn(str(NODE_WIPE_PERIOD_SECONDS), html)
-        # Honesty: entry-only live wipe / exit never wiped / not provider backup erase
+        # Honesty: sequential fleet / all nodes / not provider backup erase
         low = html.lower()
-        self.assertIn("entry", low)
-        self.assertIn("never wiped", low)
+        self.assertIn("one at a time", low)
         self.assertIn("provider", low)
+        self.assertTrue(
+            "is" in low and "ro" in low and "de" in low,
+            "blurb should name fleet peers",
+        )
 
     def test_homepage_render_includes_dual_wipe_countdown(self):
         """Drive shipped status_page.render_html entry point."""
         page = status_app.render_html({"title": "RESTORE PRIVACY"}).decode("utf-8")
-        self.assertIn(NODE_A_ENTRY_LABEL, page)
+        self.assertIn(ALL_NODES_DATA_CLEARED_LABEL, page)
         self.assertNotIn(NODE_B_EXIT_LABEL, page)
         self.assertIn('id="node-wipe-countdown"', page)
         self.assertIn('id="nw-entry-days"', page)

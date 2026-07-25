@@ -1,15 +1,13 @@
-"""Public countdown: next **entry** (Node A) data clear only.
+"""Public countdown: fleet / all-nodes data clear (~7d).
 
 Display for https://restoreprivacy.online/ homepage. Period matches the product
-**weekly entry wipe** service (``OnUnitActiveSec=604800`` / ``7d``).
+**weekly sequential fleet wipe** service (``OnUnitActiveSec=604800`` / ``7d``).
 
 Honesty:
-- **Node A (entry)** aligns with the real weekly entry wipe/rebuild cadence.
-- **Exit is never wiped/rebuilt by the weekly service** — no exit timer on the
-  homepage (exit stays up for residual failover during entry drain).
-- “DATA IS CLEARED” means a **live** preferred-entry wipe/rebuild completion
-  (not dry-run timer fires). Without a last-clear anchor the UI uses a fixed
-  ~7d epoch grid (mid-period remaining is expected).
+- Label covers **all catalog residual peers** (IS → RO → DE) over the cycle.
+- Wipe is **one peer at a time** (never concurrent multi-node wipe).
+- Live completion advances the clear clock when recorded; dry-run does not.
+- Without a last-clear anchor the UI uses a fixed ~7d epoch grid.
 - Does **not** erase VPS provider off-box backups/netflow.
 """
 
@@ -21,12 +19,14 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any, Optional
 
-# Exact OBJECTIVE labels (case/spacing preserved)
-NODE_A_ENTRY_LABEL = "ALL NODE A (ENTRY NODE) DATA IS CLEARED in"
+# Public homepage label (exact casing/spacing)
+ALL_NODES_DATA_CLEARED_LABEL = "ALL NODES DATA CLEARED IN"
+# Back-compat alias used by state helpers / older tests
+NODE_A_ENTRY_LABEL = ALL_NODES_DATA_CLEARED_LABEL
 # Kept for tests/back-compat references; not rendered on the homepage (0.3.7+).
 NODE_B_EXIT_LABEL = "ALL NODE B (EXIT NODE) DATA IS CLEARED IN"
 
-# Matches weekly entry wipe timer (scripts/install_ephemeral_timer.sh PERIOD=7d)
+# Matches weekly fleet wipe timer (scripts/install_ephemeral_timer.sh PERIOD=7d)
 NODE_WIPE_PERIOD = timedelta(days=7)
 NODE_WIPE_PERIOD_SECONDS = int(NODE_WIPE_PERIOD.total_seconds())  # 604800
 
@@ -38,11 +38,13 @@ ENTRY_LAST_CLEAR_ENV = "RPT_NODE_A_LAST_CLEAR"
 ENTRY_LAST_CLEAR_FILE_ENV = "RPT_NODE_A_LAST_CLEAR_FILE"
 ENTRY_LAST_CLEAR_REL = "var/rpt-node-a-last-clear.json"
 
+NODE_WIPE_HEADING = "Node data clear timer"
+
 HONESTY_BLURB = (
-    "Preferred entry: ~7d live wipe/rebuild cadence (full selfhost reinstall). "
-    "Countdown resets from last live clear when recorded; otherwise a fixed "
-    "weekly grid. Dry-run timer fires do not clear data. Exit is never wiped "
-    "by this timer (failover). Does not erase provider backups/netflow."
+    "About every week we wipe and rebuild residual nodes one at a time "
+    "(IS then RO then DE) so clients can hop while a peer drains. "
+    "This clock is that cycle — not a simultaneous all-node wipe, and not "
+    "a dry-run. Provider backups and netflow are not erased."
 )
 
 
@@ -355,11 +357,12 @@ def render_node_wipe_countdown_html(
     period = int(state["period_seconds"])
     boxes_a = unit_boxes_html(int(a["remaining_seconds"]), value_id_prefix="nw-entry")
 
+    heading = html.escape(NODE_WIPE_HEADING)
     return f"""  <div class="node-wipe-countdown panel-card" id="node-wipe-countdown"
        data-period-seconds="{period}"
        data-next-entry="{next_a}"
-       data-entry-only="1">
-    <h2 class="panel-title" id="node-wipe-heading">Entry node data clear timer</h2>
+       data-fleet-sequential="1">
+    <h2 class="panel-title" id="node-wipe-heading">{heading}</h2>
     <div class="node-wipe-row" id="node-wipe-row-entry">
       <span class="node-wipe-label" id="node-wipe-label-entry">{label_a}</span>
       {boxes_a}
