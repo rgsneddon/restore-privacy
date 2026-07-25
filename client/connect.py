@@ -56,7 +56,9 @@ from node.traffic_shape import DEFAULT_TRAFFIC_SHAPE, TrafficShapePolicy
 from .endpoint import DEFAULT_ENDPOINT, Endpoint
 from .full_tunnel import FullTunnelPlan, assert_full_tunnel_plan, build_full_tunnel_plan
 from .multihop import (
+    REASON_CAPACITY_MIGRATION,
     MultiHopConfig,
+    capacity_migration_advisory,
     entry_endpoint,
     is_multihop_active,
     multihop_config_from_env,
@@ -288,13 +290,22 @@ class RptClient:
         entry_healthy: bool = True,
         exit_healthy: bool = True,
         entry_draining: bool = False,
+        peer_capacity: dict[str, float] | None = None,
     ):
         self.multihop = multihop if multihop is not None else multihop_config_from_env()
         # Health hints for weekly entry wipe failover (entry-primary / exit failover).
         self.entry_healthy = bool(entry_healthy)
         self.exit_healthy = bool(exit_healthy)
         self.entry_draining = bool(entry_draining)
-        # Residual dial: preference-aware (entry healthy → entry; else exit failover).
+        # Optional host → utilization (0..1) for near-capacity residual migration.
+        # Missing map → no capacity migration (default product path unchanged).
+        self.peer_capacity: dict[str, float] | None = (
+            dict(peer_capacity) if peer_capacity else None
+        )
+        self.last_selection_reason: str = ""
+        self.last_capacity_advisory: str = ""
+        # Residual dial: preference-aware (entry healthy → entry; else exit failover;
+        # near-capacity preferred → freer peer when capacity hints say so).
         if endpoint is not None:
             self.endpoint = endpoint
             self._endpoint_pinned = True
@@ -306,8 +317,10 @@ class RptClient:
                     entry_healthy=self.entry_healthy,
                     exit_healthy=self.exit_healthy,
                     entry_draining=self.entry_draining,
+                    peer_capacity=self.peer_capacity,
                 )
                 self.endpoint = sel.endpoint
+                self.last_selection_reason = sel.reason
             except Exception:
                 self.endpoint = residual_endpoint(self.multihop)
         self.secrets_dir = Path(secrets_dir) if secrets_dir else None
@@ -318,7 +331,6 @@ class RptClient:
         self._sock: Optional[socket.socket] = None
         self._stop = threading.Event()
         self._io_thread: Optional[threading.Thread] = None
-        self.last_selection_reason: str = ""
 
     def set_node_health(
         self,
@@ -334,6 +346,13 @@ class RptClient:
             self.exit_healthy = bool(exit_healthy)
         if entry_draining is not None:
             self.entry_draining = bool(entry_draining)
+
+    def set_peer_capacity(
+        self,
+        peer_capacity: dict[str, float] | None,
+    ) -> None:
+        """Inject or clear host → utilization map for capacity-aware residual pick."""
+        self.peer_capacity = dict(peer_capacity) if peer_capacity else None
 
     def _status(self, msg: str) -> None:
         self.status_cb(msg)
@@ -361,10 +380,17 @@ class RptClient:
             sock.settimeout(timeout)
             sock.sendto(wire, endpoint.address)
             entry_host = entry_endpoint(self.multihop).host
-            if endpoint.host != entry_host and (
+            if self.last_selection_reason == REASON_CAPACITY_MIGRATION:
+                hop_kind = "capacity migration residual"
+            elif endpoint.host != entry_host and (
                 is_multihop_active(self.multihop)
                 or self.last_selection_reason
-                in ("exit_failover", "hello_failover", "multihop_residual_via_exit")
+                in (
+                    "exit_failover",
+                    "hello_failover",
+                    "multihop_residual_via_exit",
+                    REASON_CAPACITY_MIGRATION,
+                )
             ):
                 hop_kind = (
                     "exit failover"
@@ -420,6 +446,7 @@ class RptClient:
         Preference (automatic, no manual user step):
         - Entry healthy (not draining) → prefer **entry** residual (re-entry after rebuild).
         - Entry down/draining → **exit failover** residual so flow is retained.
+        - Preferred residual near connection capacity + freer peer → **capacity migration**.
         - Multi-hop active + entry up → residual-via-exit product path.
         - HELLO failure on primary → try alternate hop when healthy (solid failover).
         - Fail closed if neither path succeeds.
@@ -444,6 +471,7 @@ class RptClient:
 
         self.state = ConnectState.CONNECTING
         mh_note = multihop_status_text(self.multihop)
+        self.last_capacity_advisory = ""
 
         if self._endpoint_pinned:
             targets = [self.endpoint]
@@ -455,10 +483,22 @@ class RptClient:
                     entry_healthy=self.entry_healthy,
                     exit_healthy=self.exit_healthy,
                     entry_draining=self.entry_draining,
+                    peer_capacity=self.peer_capacity,
                 )
                 self.last_selection_reason = sel.reason
                 self.endpoint = sel.endpoint
-                if sel.failover_active:
+                advisory = capacity_migration_advisory(sel)
+                if advisory:
+                    self.last_capacity_advisory = advisory
+                    self._status(advisory)
+                    mh_note = (
+                        f"{mh_note}; capacity migration to freer peer "
+                        f"{sel.endpoint.host}:{sel.endpoint.port}"
+                    )
+                elif sel.reason == REASON_CAPACITY_MIGRATION:
+                    # Defensive: reason set but advisory builder returned None
+                    mh_note = f"{mh_note}; capacity migration residual"
+                elif sel.failover_active:
                     mh_note = f"{mh_note}; exit failover (entry draining/down)"
                 elif sel.reason == "entry_primary":
                     mh_note = f"{mh_note}; entry-primary residual"
@@ -474,6 +514,7 @@ class RptClient:
                 entry_healthy=self.entry_healthy,
                 exit_healthy=self.exit_healthy,
                 entry_draining=self.entry_draining,
+                peer_capacity=self.peer_capacity,
             )
             if not targets:
                 targets = [self.endpoint]
