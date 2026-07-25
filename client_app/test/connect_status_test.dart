@@ -134,6 +134,91 @@ void main() {
       expect(kOpenVpnSettingsLabel.toLowerCase(), contains('vpn'));
     });
 
+    test(
+      'open-result status strings keep Open VPN settings control via sticky flag',
+      () {
+        // After open attempt, product status must stay residual failure OR sticky
+        // keeps the control when only open feedback would be shown.
+        const neFailure =
+            'NE preferences failed (NEVPNErrorDomain 5): permission denied. '
+            'Approve VPN configuration in System Settings → Network → VPN & Filters';
+        expect(isNeVpnPermissionFailureMessage(neFailure), isTrue);
+        expect(isOpenVpnSettingsFeedbackMessage(kOpenVpnSettingsOpenedFeedback), isTrue);
+        expect(isOpenVpnSettingsFeedbackMessage(kOpenVpnSettingsFailedFeedback), isTrue);
+        // Open feedback alone is NOT a residual failure class (must not invent NE).
+        expect(
+          isNeVpnPermissionFailureMessage(kOpenVpnSettingsOpenedFeedback),
+          isFalse,
+        );
+        expect(
+          isNeVpnPermissionFailureMessage(kOpenVpnSettingsFailedFeedback),
+          isFalse,
+        );
+        // Without sticky, open feedback must not show the control (avoids false UI).
+        expect(
+          shouldShowOpenVpnSettingsControl(
+            connected: false,
+            needsVpnSystemSettingsApproval: false,
+            statusMessage: kOpenVpnSettingsOpenedFeedback,
+          ),
+          isFalse,
+        );
+        // With sticky (set on Connect NE failure), control survives open success/failure.
+        expect(
+          shouldShowOpenVpnSettingsControl(
+            connected: false,
+            needsVpnSystemSettingsApproval: true,
+            statusMessage: kOpenVpnSettingsOpenedFeedback,
+          ),
+          isTrue,
+        );
+        expect(
+          shouldShowOpenVpnSettingsControl(
+            connected: false,
+            needsVpnSystemSettingsApproval: true,
+            statusMessage: kOpenVpnSettingsFailedFeedback,
+          ),
+          isTrue,
+        );
+        // Prefer keeping real NE failure as card status; control still shows.
+        expect(
+          shouldShowOpenVpnSettingsControl(
+            connected: false,
+            needsVpnSystemSettingsApproval: true,
+            statusMessage: neFailure,
+          ),
+          isTrue,
+        );
+        // Product Connect success clears the control even if sticky was true.
+        expect(
+          shouldShowOpenVpnSettingsControl(
+            connected: true,
+            needsVpnSystemSettingsApproval: true,
+            statusMessage: 'Connected — IPv4 via VPN; IPv6 not protected',
+          ),
+          isFalse,
+        );
+        // Card status should remain residual-honest after open (log-only feedback).
+        final map = buildFullTunnelConnectResult(
+          packetTunnelActive: false,
+          vpnIp: '10.88.0.2',
+          hostOnlyHello: true,
+          detailMessage: neFailure,
+        );
+        final card = mapConnectStatusMessage(map);
+        expect(isNeVpnPermissionFailureMessage(card), isTrue);
+        expect(isOpenVpnSettingsFeedbackMessage(card), isFalse);
+        expect(
+          shouldShowOpenVpnSettingsControl(
+            connected: false,
+            needsVpnSystemSettingsApproval: true,
+            statusMessage: card,
+          ),
+          isTrue,
+        );
+      },
+    );
+
     test('success includes VPN IP when provided', () {
       final msg = mapConnectStatusMessage({
         'ok': true,

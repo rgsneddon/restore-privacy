@@ -73,14 +73,16 @@ class VpnController {
       }
 
       final ok = isConnectSuccess(result);
+      // Keep residual-honest failure/success as product status — never overwrite
+      // with open-settings feedback (that would hide Open VPN settings UI).
       onStatus(mapConnectStatusMessage(result));
-      // macOS NE permission / host-only HELLO: native opens Settings; Flutter retries open
-      // if the map asks for approval (covers platforms that only return the flag).
+      // macOS NE permission / host-only HELLO: native usually opens Settings;
+      // if not, open without replacing the failure status (log-only feedback).
       if (!ok && shouldPromptOpenVpnSystemSettings(result)) {
         final already =
             result is Map && result['openedVpnSettings'] == true;
         if (!already) {
-          await openVpnSystemSettings();
+          await openVpnSystemSettings(reportStatus: false);
         }
       }
       return ok;
@@ -103,33 +105,47 @@ class VpnController {
   }
 
   /// Open System Settings → Network / VPN so the user can Allow the configuration.
-  /// macOS: native `openVpnSettings` (NSWorkspace deep-link). Other platforms: no-op ok:false.
-  Future<bool> openVpnSystemSettings() async {
+  ///
+  /// macOS: native `openVpnSettings` (NSWorkspace deep-link). Other platforms: no-op.
+  ///
+  /// By default **does not** call [onStatus] — open feedback must stay log-only so the
+  /// residual NE failure status (and Open VPN settings control) remain visible.
+  /// Pass [reportStatus]: true only for callers that intentionally replace the card.
+  Future<bool> openVpnSystemSettings({bool reportStatus = false}) async {
     try {
       final result = await _channel.invokeMethod<dynamic>('openVpnSettings');
       if (result is Map) {
         final opened = result['opened'] == true || result['ok'] == true;
-        final msg = result['message']?.toString().trim();
-        if (msg != null && msg.isNotEmpty) {
-          onStatus(msg);
-        } else if (opened) {
-          onStatus(
-            'Opened System Settings (Network / VPN). Allow Restore Privacy, then Connect again.',
-          );
+        if (reportStatus) {
+          final msg = result['message']?.toString().trim();
+          if (msg != null && msg.isNotEmpty) {
+            onStatus(msg);
+          } else {
+            onStatus(
+              opened
+                  ? kOpenVpnSettingsOpenedFeedback
+                  : kOpenVpnSettingsFailedFeedback,
+            );
+          }
         }
         return opened;
       }
+      if (reportStatus) onStatus(kOpenVpnSettingsFailedFeedback);
       return false;
     } on MissingPluginException {
-      onStatus(
-        'Open System Settings → Network → VPN & Filters, Allow Restore Privacy, then Connect again.',
-      );
+      if (reportStatus) {
+        onStatus(
+          'Open System Settings → Network → VPN & Filters, Allow Restore Privacy, then Connect again.',
+        );
+      }
       return false;
     } on PlatformException catch (e) {
-      onStatus(
-        'Could not open System Settings (${e.message ?? e.code}). '
-        'Manually: System Settings → Network → VPN & Filters.',
-      );
+      if (reportStatus) {
+        onStatus(
+          'Could not open System Settings (${e.message ?? e.code}). '
+          'Manually: System Settings → Network → VPN & Filters.',
+        );
+      }
       return false;
     }
   }

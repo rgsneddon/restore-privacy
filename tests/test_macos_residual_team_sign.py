@@ -92,8 +92,17 @@ class TestMacosResidualTeamSign(unittest.TestCase):
         self.assertIn("sign_macos_residual_team", dart)
         self.assertIn("VPN & Filters", dart)
         self.assertIn("shouldPromptOpenVpnSystemSettings", dart)
+        self.assertIn("shouldShowOpenVpnSettingsControl", dart)
         self.assertIn("isNeVpnPermissionFailureMessage", dart)
+        self.assertIn("isOpenVpnSettingsFeedbackMessage", dart)
         self.assertIn("kOpenVpnSettingsLabel", dart)
+        self.assertIn("kOpenVpnSettingsOpenedFeedback", dart)
+        self.assertIn("kOpenVpnSettingsFailedFeedback", dart)
+        # Open feedback must not be the sole residual status (sticky control contract)
+        self.assertIn("reportStatus", (
+            ROOT / "client_app" / "lib" / "vpn_controller.dart"
+        ).read_text(encoding="utf-8"))
+
         swift = (
             ROOT
             / "client_app"

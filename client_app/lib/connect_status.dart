@@ -169,6 +169,14 @@ const String kHostOnlyHelloNotFullTunnelMessage =
 /// Button / channel label when the user must Allow the OS VPN configuration.
 const String kOpenVpnSettingsLabel = 'Open VPN settings';
 
+/// Log-only feedback after attempting to open System Settings (must not replace residual failure status).
+const String kOpenVpnSettingsOpenedFeedback =
+    'Opened System Settings (Network / VPN). Allow Restore Privacy, then Connect again.';
+
+/// Log-only when automatic open failed — user still needs the retry control.
+const String kOpenVpnSettingsFailedFeedback =
+    'Could not open System Settings automatically — use System Settings → Network → VPN & Filters.';
+
 /// True when a connect failure message is the NE permission / Packet Tunnel approval class
 /// (NEVPNErrorDomain 5, permission denied, host-only HELLO without active tunnel, etc.).
 bool isNeVpnPermissionFailureMessage(String message) {
@@ -186,9 +194,22 @@ bool isNeVpnPermissionFailureMessage(String message) {
           (m.contains('system settings') || m.contains('allow')));
 }
 
+/// True when [message] is only open-settings feedback (not residual failure truth).
+bool isOpenVpnSettingsFeedbackMessage(String message) {
+  final m = message.trim();
+  if (m.isEmpty) return false;
+  if (m == kOpenVpnSettingsOpenedFeedback || m == kOpenVpnSettingsFailedFeedback) {
+    return true;
+  }
+  final low = m.toLowerCase();
+  return low.startsWith('opened system settings') ||
+      low.startsWith('could not open system settings') ||
+      (low.contains('could not open') && low.contains('system settings'));
+}
+
 /// True when the channel map is a failed connect that should open System Settings.
 ///
-/// Drives auto-open + optional [kOpenVpnSettingsLabel] control. Never true on product success.
+/// Drives auto-open + sticky UI approval flag. Never true on product success.
 bool shouldPromptOpenVpnSystemSettings(dynamic result) {
   if (isConnectSuccess(result)) return false;
   if (result is! Map) return false;
@@ -201,6 +222,23 @@ bool shouldPromptOpenVpnSystemSettings(dynamic result) {
   }
   final msg = result['message']?.toString() ?? '';
   return isNeVpnPermissionFailureMessage(msg);
+}
+
+/// Whether the **Open VPN settings** control should stay visible.
+///
+/// [needsVpnSystemSettingsApproval] is sticky until product Connect succeeds so
+/// open-settings feedback (which must not replace residual failure status) cannot
+/// hide the retry button when the OS open fails or only logs feedback.
+bool shouldShowOpenVpnSettingsControl({
+  required bool connected,
+  required bool needsVpnSystemSettingsApproval,
+  required String statusMessage,
+}) {
+  if (connected) return false;
+  if (needsVpnSystemSettingsApproval) return true;
+  // Without sticky flag, only show for real NE residual failure status.
+  if (isOpenVpnSettingsFeedbackMessage(statusMessage)) return false;
+  return isNeVpnPermissionFailureMessage(statusMessage);
 }
 
 /// Build a product connect result map for full-tunnel honesty rules.

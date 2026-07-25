@@ -86,6 +86,8 @@ class _TunnelHomeState extends State<TunnelHome> with WidgetsBindingObserver {
   bool _busy = false;
   bool _autoconnectAttempted = false;
   bool _licenceAccepted = false;
+  /// Sticky until product Connect succeeds so Open VPN settings survives open feedback.
+  bool _needsVpnSystemSettingsApproval = false;
 
   @override
   void initState() {
@@ -532,6 +534,7 @@ class _TunnelHomeState extends State<TunnelHome> with WidgetsBindingObserver {
       setState(() {
         _connected = ok;
         if (ok) {
+          _needsVpnSystemSettingsApproval = false;
           final ipMatch = RegExp(r'10\.\d+\.\d+\.\d+').firstMatch(_status);
           _vpnIp = ipMatch?.group(0);
           final v6Not = _status.toLowerCase().contains('ipv6 not protected');
@@ -541,6 +544,14 @@ class _TunnelHomeState extends State<TunnelHome> with WidgetsBindingObserver {
             residual: true,
             ipv6Protected: v6Not ? false : (v6Ok ? true : null),
           );
+        } else if (isNeVpnPermissionFailureMessage(_status) ||
+            shouldPromptOpenVpnSystemSettings({
+              'ok': false,
+              'message': _status,
+              'fullTunnelActive': false,
+            })) {
+          // Sticky so Open VPN settings remains after log-only open feedback.
+          _needsVpnSystemSettingsApproval = true;
         }
       });
       if (ok) {
@@ -608,8 +619,17 @@ class _TunnelHomeState extends State<TunnelHome> with WidgetsBindingObserver {
   void _onStatus(String msg) {
     if (!mounted) return;
     setState(() {
+      // Open-settings feedback is log-only — never replace residual failure card text
+      // (that would hide the Open VPN settings control).
+      if (isOpenVpnSettingsFeedbackMessage(msg)) {
+        _log.add(msg);
+        return;
+      }
       _status = msg;
       _log.add(msg);
+      if (isNeVpnPermissionFailureMessage(msg)) {
+        _needsVpnSystemSettingsApproval = true;
+      }
     });
     _scrollLogToEnd();
   }
@@ -865,8 +885,13 @@ class _TunnelHomeState extends State<TunnelHome> with WidgetsBindingObserver {
                       ),
                     ],
                     // macOS NE permission / host-only HELLO: open System Settings so user can Allow VPN.
-                    if (!_connected &&
-                        isNeVpnPermissionFailureMessage(_status)) ...[
+                    // Sticky flag keeps the control after open success/failure feedback (log-only).
+                    if (shouldShowOpenVpnSettingsControl(
+                      connected: _connected,
+                      needsVpnSystemSettingsApproval:
+                          _needsVpnSystemSettingsApproval,
+                      statusMessage: _status,
+                    )) ...[
                       const SizedBox(height: 10),
                       Align(
                         alignment: Alignment.centerLeft,
@@ -877,13 +902,19 @@ class _TunnelHomeState extends State<TunnelHome> with WidgetsBindingObserver {
                                   _append(
                                     'Opening System Settings → Network / VPN…',
                                   );
-                                  final opened =
-                                      await _vpn.openVpnSystemSettings();
+                                  // reportStatus: false — keep residual failure on the card.
+                                  final opened = await _vpn
+                                      .openVpnSystemSettings(
+                                    reportStatus: false,
+                                  );
                                   if (!mounted) return;
+                                  setState(() {
+                                    _needsVpnSystemSettingsApproval = true;
+                                  });
                                   _append(
                                     opened
-                                        ? 'System Settings opened — Allow Restore Privacy, then Connect again.'
-                                        : 'Could not open Settings automatically — use System Settings → Network → VPN & Filters.',
+                                        ? kOpenVpnSettingsOpenedFeedback
+                                        : kOpenVpnSettingsFailedFeedback,
                                   );
                                 },
                           icon: const Icon(Icons.settings_ethernet, size: 18),
