@@ -441,9 +441,10 @@ VPS_ASSETS_PLUGIN = ProcessorPlugin(
     display_name="Residual VPS paid installers (IS host)",
     role="paid_installer_fetch",
     description=(
-        "Shared secret for status host → Iceland VPS paid-asset HTTP fetch "
-        "(X-RPT-Asset-Token). Must match rpt-paid-assets.service on the VPS. "
-        "Never commit the token; set here or as Render env RPT_ASSET_FETCH_TOKEN."
+        "Shared secret for status host → residual peer paid-asset HTTP fetch "
+        "(X-RPT-Asset-Token), typically the IS host installer store. "
+        "Must match rpt-paid-assets.service on that VPS. Never commit the token; "
+        "set here or as Render env RPT_ASSET_FETCH_TOKEN."
     ),
     variables=(
         ProcessorVariable(
