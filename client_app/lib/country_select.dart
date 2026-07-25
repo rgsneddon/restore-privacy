@@ -122,3 +122,26 @@ String residualHostForEntryCountry(String? code, {bool multiHop = false}) {
   }
   return entry?.host ?? kProductCountryCatalog.first.host;
 }
+
+/// ElGamal public pin basename for residual HELLO from dial *host* monopin.
+///
+/// IS → `node_elgamal.pub`; RO → `exit_node_elgamal.pub`; DE → `de_node_elgamal.pub`.
+String residualNodePubNameForHost(String host) {
+  final h = host.trim();
+  for (final o in kProductCountryCatalog) {
+    if (o.host.isNotEmpty && (h == o.host || h.endsWith(o.host))) {
+      switch (o.code) {
+        case kCountryRomania:
+          return 'exit_node_elgamal.pub';
+        case kCountryGermany:
+          return 'de_node_elgamal.pub';
+        default:
+          return 'node_elgamal.pub';
+      }
+    }
+  }
+  // Legacy host constants without catalog match
+  if (h == '185.146.232.107') return 'exit_node_elgamal.pub';
+  if (h == '167.233.224.5') return 'de_node_elgamal.pub';
+  return 'node_elgamal.pub';
+}

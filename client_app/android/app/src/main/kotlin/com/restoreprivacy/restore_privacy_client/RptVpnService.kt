@@ -160,9 +160,9 @@ class RptVpnService : VpnService() {
     /**
      * Load device Ed25519 priv + node ElGamal pub for residual HELLO.
      * Generates a unique client key on first run (never uses a shared APK-embedded priv).
-     * Packages ship `node_elgamal.pub` (entry) and optionally `exit_node_elgamal.pub` (multi-hop).
+     * Packages ship `node_elgamal.pub` (IS), `exit_node_elgamal.pub` (RO), `de_node_elgamal.pub` (DE).
      *
-     * When *residualHost* is the product Romania exit, load exit pub; otherwise entry pub.
+     * Pub basename is chosen from residual dial *host* (catalog monopin), not entry code alone.
      * **Always** refreshes the chosen pub from APK assets (overwrite). Device Ed25519 private
      * key is never overwritten once generated.
      */
@@ -171,12 +171,7 @@ class RptVpnService : VpnService() {
         dir.mkdirs()
         val privF = File(dir, "client_ed25519.priv")
         val host = residualHost.trim()
-        val pubName =
-            if (host == PRODUCT_EXIT_HOST || host.endsWith(PRODUCT_EXIT_HOST)) {
-                "exit_node_elgamal.pub"
-            } else {
-                "node_elgamal.pub"
-            }
+        val pubName = residualNodePubNameForHost(host)
         val pubF = File(dir, pubName)
 
         // Always copy package pub → filesDir (heals stale key after APK upgrade).
@@ -252,7 +247,8 @@ class RptVpnService : VpnService() {
             report(
                 false,
                 "Missing node public key — package must include node_elgamal.pub " +
-                    "(and exit_node_elgamal.pub for multi-hop residual); device Ed25519 is auto-generated",
+                    "(plus exit_node_elgamal.pub / de_node_elgamal.pub for RO/DE residual); " +
+                    "device Ed25519 is auto-generated",
             )
             stopForeground(STOP_FOREGROUND_REMOVE)
             stopSelf()
@@ -575,8 +571,26 @@ class RptVpnService : VpnService() {
     }
 
     companion object {
-        /** Product Romania exit hop (multi-hop residual when Flutter passes this host). */
+        /** Product residual monopins (must match Flutter country_select / multihop catalog). */
+        const val PRODUCT_ENTRY_HOST = "82.221.101.241"
         const val PRODUCT_EXIT_HOST = "185.146.232.107"
+        const val PRODUCT_DE_HOST = "167.233.224.5"
+
+        /**
+         * ElGamal public pin basename for residual HELLO from dial host.
+         * IS → node_elgamal.pub; RO → exit_node_elgamal.pub; DE → de_node_elgamal.pub.
+         */
+        @JvmStatic
+        fun residualNodePubNameForHost(host: String): String {
+            val h = host.trim()
+            if (h == PRODUCT_EXIT_HOST || h.endsWith(PRODUCT_EXIT_HOST)) {
+                return "exit_node_elgamal.pub"
+            }
+            if (h == PRODUCT_DE_HOST || h.endsWith(PRODUCT_DE_HOST)) {
+                return "de_node_elgamal.pub"
+            }
+            return "node_elgamal.pub"
+        }
 
         /**
          * Always write package [assetBytes] to [pubFile] (overwrite).

@@ -167,6 +167,61 @@ class TestConnectPathUsesSelection(unittest.TestCase):
         self.assertIn("Iceland", sel)
         self.assertIn("defaultEntryCountry", sel)
 
+    def test_de_pub_bundled_and_native_host_map(self):
+        """DE catalog option must ship de_node_elgamal.pub + host→pub mapping."""
+        de_asset = (
+            ROOT
+            / "client_app"
+            / "android"
+            / "app"
+            / "src"
+            / "main"
+            / "assets"
+            / "secrets"
+            / "de_node_elgamal.pub"
+        )
+        self.assertTrue(de_asset.is_file(), "Android assets missing de_node_elgamal.pub")
+        self.assertGreaterEqual(de_asset.stat().st_size, 32)
+        product_de = ROOT / "product" / "de_node_elgamal.pub"
+        self.assertTrue(product_de.is_file())
+        # Android residual HELLO maps DE monopin host → de pub
+        vpn = (
+            ROOT
+            / "client_app"
+            / "android"
+            / "app"
+            / "src"
+            / "main"
+            / "kotlin"
+            / "com"
+            / "restoreprivacy"
+            / "restore_privacy_client"
+            / "RptVpnService.kt"
+        ).read_text(encoding="utf-8")
+        self.assertIn("de_node_elgamal.pub", vpn)
+        self.assertIn("PRODUCT_DE_HOST", vpn)
+        self.assertIn("167.233.224.5", vpn)
+        self.assertIn("residualNodePubNameForHost", vpn)
+        # Flutter derives pub from dial host (not entry-only multi-hop guess)
+        sel = (ROOT / "client_app" / "lib" / "country_select.dart").read_text(
+            encoding="utf-8"
+        )
+        self.assertIn("residualNodePubNameForHost", sel)
+        self.assertIn("de_node_elgamal.pub", sel)
+        cfg = (ROOT / "client_app" / "lib" / "rpt_config.dart").read_text(
+            encoding="utf-8"
+        )
+        self.assertIn("residualNodePubNameForHost(host)", cfg)
+        # Apple native maps DE host
+        for rel in (
+            "client_app/macos/NativePrep/RptSecrets.swift",
+            "client_app/ios/NativePrep/RptSecrets.swift",
+            "client_app/apple_shared/Rpt2/Sources/Rpt2/RptSecrets.swift",
+        ):
+            sw = (ROOT / rel).read_text(encoding="utf-8")
+            self.assertIn("de_node_elgamal.pub", sw, rel)
+            self.assertIn("167.233.224.5", sw, rel)
+
 
 if __name__ == "__main__":
     unittest.main()

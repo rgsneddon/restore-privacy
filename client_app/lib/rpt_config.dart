@@ -86,15 +86,8 @@ class RptConfig {
       );
 
   /// Bundled ElGamal public key basename for residual HELLO.
-  static String get residualNodePubName {
-    final code = normalizeEntryCountry(runtimeEntryCountry);
-    if (multiHopEnabled) {
-      // Non-entry peer pin
-      if (code == kCountryRomania) return 'node_elgamal.pub';
-      return 'exit_node_elgamal.pub';
-    }
-    if (code == kCountryRomania) return 'exit_node_elgamal.pub';
-    if (code == kCountryGermany) return 'de_node_elgamal.pub';
-    return 'node_elgamal.pub';
-  }
+  ///
+  /// Always derived from the residual dial [host] so multi-hop / DE entry
+  /// cannot pair the wrong peer pin (e.g. DE multi-hop dials IS → node pub).
+  static String get residualNodePubName => residualNodePubNameForHost(host);
 }
