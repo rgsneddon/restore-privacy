@@ -2,8 +2,9 @@
 """Inject public node material into a macOS/iOS app bundle.
 
 Copies **public** ElGamal keys only:
-  - ``node_elgamal.pub`` (Iceland entry)
-  - ``exit_node_elgamal.pub`` (Romania exit, multi-hop residual)
+  - ``node_elgamal.pub`` (Iceland residual)
+  - ``exit_node_elgamal.pub`` (Romania residual)
+  - ``de_node_elgamal.pub`` (Germany residual)
 
 Never copies a shared ``client_ed25519.priv`` or ``node_elgamal.priv``.
 Per-device Ed25519 keys are generated on first run by the client.
@@ -28,7 +29,8 @@ ROOT = Path(__file__).resolve().parents[1]
 CLIENT_PRIV = "client_ed25519.priv"
 NODE_PUB = "node_elgamal.pub"
 EXIT_PUB = "exit_node_elgamal.pub"
-PUBLIC_PUBS = (NODE_PUB, EXIT_PUB)
+DE_PUB = "de_node_elgamal.pub"
+PUBLIC_PUBS = (NODE_PUB, EXIT_PUB, DE_PUB)
 FORBIDDEN = "node_elgamal.priv"
 
 
@@ -74,7 +76,7 @@ def inject(app: Path, source: Path, ios: bool) -> Path:
     else:
         dest = app / "Contents" / "Resources" / "secrets"
     dest.mkdir(parents=True, exist_ok=True)
-    # Entry + exit public keys (never private keys)
+    # Catalog residual public keys (never private keys): IS + RO + DE
     for name in PUBLIC_PUBS:
         src = resolve_pub(name, source if source.is_dir() else source.parent)
         if src is None and name == NODE_PUB:
@@ -83,7 +85,8 @@ def inject(app: Path, source: Path, ios: bool) -> Path:
         if src is None:
             if name == NODE_PUB:
                 raise FileNotFoundError(f"missing required {NODE_PUB}")
-            print(f"skip optional {name} (not found)")
+            # RO/DE required for catalog residual HELLO — warn, do not invent IS pin
+            print(f"warn: missing {name} (RO/DE residual HELLO will fail closed)")
             continue
         dst = dest / name
         shutil.copy2(src, dst)

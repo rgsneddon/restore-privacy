@@ -307,12 +307,14 @@ public enum RptSecrets {
             return try loadFromDirectory(dir, residualHost: residualHost)
         }
 
-        // Last resort: generate device key in preferred writable dir next to any node pub
+        // Last resort: generate device key next to the residual-correct pub only
+        // (never seed from Iceland pin when residualHost is RO/DE monopin).
         if let dest = secretsDirectory(fileManager: fileManager) {
             var nodeSrc: URL?
             let want = residualNodePubName(forHost: residualHost)
+            let names = (want == nodePubName) ? [nodePubName] : [want]
             for d in candidateSecretsDirectories(fileManager: fileManager, bundle: bundle) {
-                for name in [want, nodePubName] {
+                for name in names {
                     let n = d.appendingPathComponent(name)
                     if fileManager.fileExists(atPath: n.path) {
                         nodeSrc = n
@@ -346,10 +348,16 @@ public enum RptSecrets {
     ) throws -> (clientPriv: Data, nodePub: Data) {
         let cURL = dir.appendingPathComponent(clientPrivName)
         let pubName = residualNodePubName(forHost: residualHost)
-        var nURL = dir.appendingPathComponent(pubName)
-        // Fall back to entry pub if exit pub missing
-        if !FileManager.default.fileExists(atPath: nURL.path), pubName != nodePubName {
-            nURL = dir.appendingPathComponent(nodePubName)
+        let nURL = dir.appendingPathComponent(pubName)
+        // Fail closed for RO/DE residual: never HELLO with Iceland pin to a non-IS monopin.
+        if !FileManager.default.fileExists(atPath: nURL.path) {
+            if pubName != nodePubName {
+                throw RptProtocol.ProtocolError(
+                    "Missing \(pubName) for residual host \(residualHost.isEmpty ? "(unknown)" : residualHost) "
+                        + "— refuse Iceland entry pub fallback (DE/RO HELLO would use wrong key)"
+                )
+            }
+            throw RptProtocol.ProtocolError("Missing \(pubName) in \(dir.path)")
         }
         // Explicitly do not open node_elgamal.priv
         let clientPriv = try Data(contentsOf: cURL)

@@ -175,6 +175,7 @@ class RptVpnService : VpnService() {
         val pubF = File(dir, pubName)
 
         // Always copy package pub → filesDir (heals stale key after APK upgrade).
+        // Fail closed for RO/DE residual: never HELLO with Iceland pin to non-IS monopin.
         try {
             assets.open("secrets/$pubName").use { inp ->
                 if (!refreshNodeElgamalPub(pubF, inp.readBytes())) {
@@ -182,19 +183,9 @@ class RptVpnService : VpnService() {
                 }
             }
         } catch (_: Exception) {
-            // Fall back to entry pub if exit asset missing
             if (pubName != "node_elgamal.pub") {
-                try {
-                    assets.open("secrets/node_elgamal.pub").use { inp ->
-                        val entryF = File(dir, "node_elgamal.pub")
-                        if (!refreshNodeElgamalPub(entryF, inp.readBytes())) {
-                            return null
-                        }
-                        return loadSecretsAfterPub(privF, entryF)
-                    }
-                } catch (_: Exception) {
-                    /* continue */
-                }
+                // Missing RO/DE pin — do not fall back to Iceland entry pub
+                return null
             }
             if (!pubF.isFile || pubF.length() < 32L) return null
         }

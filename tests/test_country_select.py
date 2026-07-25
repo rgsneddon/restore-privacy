@@ -202,6 +202,19 @@ class TestConnectPathUsesSelection(unittest.TestCase):
         self.assertIn("PRODUCT_DE_HOST", vpn)
         self.assertIn("167.233.224.5", vpn)
         self.assertIn("residualNodePubNameForHost", vpn)
+        # preBuild inject must re-heal DE pin (not only force-tracked asset)
+        gradle = (
+            ROOT / "client_app" / "android" / "app" / "build.gradle.kts"
+        ).read_text(encoding="utf-8")
+        self.assertIn("de_node_elgamal.pub", gradle)
+        self.assertIn("copyRptSecretsToAssets", gradle)
+        # Apple inject ships DE pub
+        inject = (ROOT / "scripts" / "inject_apple_secrets.py").read_text(
+            encoding="utf-8"
+        )
+        self.assertIn("de_node_elgamal.pub", inject)
+        self.assertIn("PUBLIC_PUBS", inject)
+        self.assertIn("DE_PUB", inject)
         # Flutter derives pub from dial host (not entry-only multi-hop guess)
         sel = (ROOT / "client_app" / "lib" / "country_select.dart").read_text(
             encoding="utf-8"
@@ -212,7 +225,7 @@ class TestConnectPathUsesSelection(unittest.TestCase):
             encoding="utf-8"
         )
         self.assertIn("residualNodePubNameForHost(host)", cfg)
-        # Apple native maps DE host
+        # Apple native maps DE host + fail closed (no IS fallback for DE)
         for rel in (
             "client_app/macos/NativePrep/RptSecrets.swift",
             "client_app/ios/NativePrep/RptSecrets.swift",
@@ -221,6 +234,32 @@ class TestConnectPathUsesSelection(unittest.TestCase):
             sw = (ROOT / rel).read_text(encoding="utf-8")
             self.assertIn("de_node_elgamal.pub", sw, rel)
             self.assertIn("167.233.224.5", sw, rel)
+        for rel in (
+            "client_app/macos/NativePrep/RptSecrets.swift",
+            "client_app/ios/NativePrep/RptSecrets.swift",
+        ):
+            sw = (ROOT / rel).read_text(encoding="utf-8")
+            self.assertIn("refuse Iceland entry pub fallback", sw, rel)
+            self.assertNotIn("Fall back to entry pub if exit pub missing", sw, rel)
+
+    def test_inject_apple_and_android_include_de_pub(self):
+        """Shipped inject paths list de_node so rebuilds re-heal DE pin."""
+        inject = (ROOT / "scripts" / "inject_apple_secrets.py").read_text(
+            encoding="utf-8"
+        )
+        # PUBLIC_PUBS must include all three catalog pins
+        self.assertIn('DE_PUB = "de_node_elgamal.pub"', inject)
+        self.assertIn("PUBLIC_PUBS = (NODE_PUB, EXIT_PUB, DE_PUB)", inject)
+        # Runnable: resolve product DE pub
+        sys.path.insert(0, str(ROOT / "scripts"))
+        import inject_apple_secrets as ias  # noqa: E402
+
+        self.assertIn(ias.DE_PUB, ias.PUBLIC_PUBS)
+        p = ias.resolve_pub(ias.DE_PUB, None)
+        self.assertIsNotNone(p)
+        assert p is not None
+        self.assertTrue(p.is_file())
+        self.assertGreaterEqual(p.stat().st_size, 32)
 
 
 if __name__ == "__main__":
