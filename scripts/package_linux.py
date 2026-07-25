@@ -177,10 +177,17 @@ def download_linux_wheels(dest: Path) -> List[Path]:
 
 
 def write_install_sh(stage: Path) -> None:
-    """Offline installer: private venv from bundled wheels + launcher."""
+    """Offline installer: private venv from bundled wheels + launcher.
+
+    Default: install in the extracted package directory (portable).
+    System layout: ``RPT_SYSTEM_INSTALL=1`` as root → ``/opt/restore-privacy``
+    (see ``client.install_paths.default_linux_install_dir``).
+    Bundle always includes ``Restore Internet`` failsafe next to the client launcher.
+    """
     content = r'''#!/usr/bin/env bash
 # Restore Privacy Linux installer — uses BUNDLED wheels only (no network pip).
 # Remaining system packages (python3, venv, tk, ip): installed via apt if missing.
+# Standard system path: RPT_SYSTEM_INSTALL=1 sudo bash install.sh → /opt/restore-privacy
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")" && pwd)"
@@ -190,6 +197,19 @@ REQ="$ROOT/requirements.txt"
 
 echo "=== Restore Privacy Linux installer (deps baked in) ==="
 echo "Package root: $ROOT"
+# Standard system install root (optional): /opt/restore-privacy when run as root
+# with RPT_SYSTEM_INSTALL=1; default remains this portable package directory.
+if [[ "${RPT_SYSTEM_INSTALL:-}" == "1" ]] && [[ "$(id -u)" -eq 0 ]]; then
+  SYS_ROOT="${RPT_INSTALL_DIR:-/opt/restore-privacy}"
+  echo "System install mode → $SYS_ROOT"
+  mkdir -p "$SYS_ROOT"
+  # shellcheck disable=SC2086
+  cp -a "$ROOT"/. "$SYS_ROOT"/ 2>/dev/null || true
+  ROOT="$SYS_ROOT"
+  VENV="$ROOT/.venv"
+  WHEELS="$ROOT/wheels"
+  REQ="$ROOT/requirements.txt"
+fi
 
 if ! command -v python3 >/dev/null 2>&1; then
   echo "ERROR: python3 is required (Ubuntu 20.04+). sudo apt-get install -y python3"
@@ -253,7 +273,7 @@ python -c "import cryptography; print('cryptography', cryptography.__version__, 
 # Secrets (entry + exit pubs for multi-hop residual; never private keys)
 SECRETS_DIR="${HOME}/.restore-privacy/secrets"
 mkdir -p "$SECRETS_DIR"
-for pub in node_elgamal.pub exit_node_elgamal.pub; do
+for pub in node_elgamal.pub exit_node_elgamal.pub de_node_elgamal.pub; do
   if [[ -f "$ROOT/product/$pub" ]]; then
     cp -f "$ROOT/product/$pub" "$SECRETS_DIR/"
     echo "Installed $pub from product/ to $SECRETS_DIR"

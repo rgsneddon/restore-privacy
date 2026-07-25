@@ -1,9 +1,14 @@
 #!/usr/bin/env python3
 """Windows client installer for Restore Privacy.
 
-Deploys the bundled client (runtime + wintun + deps) into the user profile
-and launches it. Designed to run as a PyInstaller onefile that embeds the
-prebuilt onedir client payload under payload/.
+Deploys the bundled client (runtime + wintun + deps) into the standard machine
+program folder **Program Files\\Restore Privacy** (bundle: client exe +
+Restore Internet failsafe). Designed to run as a PyInstaller onefile that
+embeds the prebuilt onedir client payload under payload/.
+
+Elevation: Program Files typically requires Administrator. Without rights the
+installer falls soft to the per-user LocalAppData path (honest message) unless
+``RPT_INSTALL_DIR`` / ``RPT_INSTALL_PER_USER`` forces a root.
 """
 
 from __future__ import annotations
@@ -15,6 +20,15 @@ import sys
 import traceback
 from collections.abc import Callable
 from pathlib import Path
+
+from client.install_paths import (
+    PRODUCT_FOLDER_DISPLAY,
+    PRODUCT_FOLDER_LEGACY_ID,
+    default_windows_install_dir,
+    inventory_install_bundle,
+    is_under_program_files,
+    per_user_windows_install_dir,
+)
 
 APP_NAME = "RestorePrivacy"
 def _product_version_pin() -> str:
@@ -30,8 +44,8 @@ def _product_version_pin() -> str:
 VERSION = _product_version_pin()
 # User-facing shortcut / tray product name (logo icon on Start Menu + Desktop)
 SHORTCUT_DISPLAY_NAME = "Privacy Restored"
-# Install under LocalAppData so no elevation is required for deploy.
-INSTALL_DIR = Path(os.environ.get("LOCALAPPDATA", str(Path.home()))) / "Programs" / APP_NAME
+# Default: Program Files\Restore Privacy (see client.install_paths).
+INSTALL_DIR = default_windows_install_dir()
 USER_SECRETS = Path.home() / ".restore-privacy" / "secrets"
 START_MENU = (
     Path(os.environ.get("APPDATA", str(Path.home() / "AppData" / "Roaming")))
@@ -144,6 +158,41 @@ def _copy_tree(src: Path, dst: Path) -> None:
             f"Could not copy product files to {dst}. "
             f"Close any running Restore Privacy app and retry. ({exc})"
         ) from exc
+
+
+def resolve_install_dir(
+    *,
+    prefer_program_files: bool = True,
+    env: dict[str, str] | None = None,
+) -> Path:
+    """Choose install destination: Program Files by default, LocalAppData if unwritable.
+
+    Pure path pick when *env* is injected; on a live Windows box, probes write
+    access to Program Files\\Restore Privacy and falls soft to per-user.
+    """
+    e = env if env is not None else os.environ
+    if (e.get("RPT_INSTALL_DIR") or "").strip():
+        return default_windows_install_dir(e)
+    if (e.get("RPT_INSTALL_PER_USER") or "").strip().lower() in (
+        "1",
+        "true",
+        "yes",
+        "on",
+    ):
+        return per_user_windows_install_dir(e)
+    if not prefer_program_files:
+        return per_user_windows_install_dir(e)
+    primary = default_windows_install_dir(e)
+    # Probe: can we create the product folder?
+    try:
+        primary.mkdir(parents=True, exist_ok=True)
+        probe = primary / ".rpt_write_probe"
+        probe.write_text("ok", encoding="utf-8")
+        probe.unlink(missing_ok=True)
+        return primary
+    except OSError:
+        fallback = per_user_windows_install_dir(e)
+        return fallback
 
 
 def read_installed_version(install_dir: Path | None = None) -> str | None:
@@ -375,11 +424,23 @@ def install(
     launch: bool = True,
     *,
     progress_cb: Callable[[int, int, str], None] | None = None,
+    install_dir: Path | None = None,
 ) -> Path:
-    """Deploy bundled client to INSTALL_DIR and optionally launch it.
+    """Deploy bundled client to Program Files\\Restore Privacy (or fallback).
 
+    Bundle: main client executable + Restore Internet failsafe in the same tree.
     ``progress_cb(step_index, total, status_text)`` is invoked for GUI progress.
     """
+    global INSTALL_DIR
+    target = install_dir if install_dir is not None else resolve_install_dir()
+    INSTALL_DIR = target
+    if is_under_program_files(target):
+        loc_note = f"Program Files product folder ({PRODUCT_FOLDER_DISPLAY})"
+    else:
+        loc_note = (
+            f"per-user folder (Program Files not writable without elevation; "
+            f"{PRODUCT_FOLDER_LEGACY_ID})"
+        )
 
     def _progress(step: int, status: str) -> None:
         total = install_step_count()
@@ -401,7 +462,7 @@ def install(
     if skip_copy:
         _progress(2, f"Already at v{VERSION} - skipping bulk file copy...")
     else:
-        _progress(2, f"Copying files to {INSTALL_DIR}...")
+        _progress(2, f"Copying files to {INSTALL_DIR} ({loc_note})...")
         _copy_tree(payload_dir, INSTALL_DIR)
     # Belt-and-suspenders: never leave shared .priv from old payloads
     strip_all_private_keys(INSTALL_DIR)
@@ -503,16 +564,27 @@ def install(
         if not restore_bat.is_file() and restore_alias.is_file():
             shutil.copy2(restore_alias, restore_bat)
         if not restore_bat.is_file():
+            # Failsafe removes this install tree (Program Files or per-user)
             restore_bat.write_text(
                 "@echo off\r\n"
                 "route delete 0.0.0.0 mask 128.0.0.0\r\n"
                 "route delete 128.0.0.0 mask 128.0.0.0\r\n"
                 "route delete 82.221.101.241 mask 255.255.255.255\r\n"
-                "rmdir /s /q \"%LOCALAPPDATA%\\Programs\\RestorePrivacy\"\r\n",
+                f'rmdir /s /q "{INSTALL_DIR}"\r\n',
                 encoding="utf-8",
             )
     except Exception:
         pass
+    # Assert client + Restore Internet co-bundle (honest install inventory)
+    inv = inventory_install_bundle(INSTALL_DIR, platform="win32")
+    if not inv.restore_internet_entry and restore_bat.is_file():
+        inv = inventory_install_bundle(INSTALL_DIR, platform="win32")
+    if not inv.complete:
+        print(
+            "WARNING: install bundle incomplete — need client .exe and "
+            f"Restore Internet under {INSTALL_DIR} "
+            f"(client={inv.client_entry!r} restore={inv.restore_internet_entry!r})"
+        )
 
     # Best-effort: scoped Windows Defender Firewall allows for residual Connect
     try:
