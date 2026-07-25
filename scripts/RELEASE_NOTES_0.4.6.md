@@ -23,18 +23,18 @@
 - Version monopin **0.4.6** across Windows PE / Linux package / Flutter / catalog filenames
 - Behaviour parity with 0.4.5 residual + Settings lean defaults (optional scale off by default)
 
-## Platform build honesty (this Windows operator host)
+## Platform build honesty
 
 | Platform | 0.4.6 status |
 |----------|----------------|
 | **Windows** | Native multihop PE via `scripts/build_windows_multihop.py` when rebuild succeeds; else CF pin from 0.4.5 with honest note |
 | **Linux** | Rebuild via `package_linux.py` when tools present; else CF from 0.4.5 + VERSION/pub rewrite |
 | **Android** | Residual-wire APK carry-forward from 0.4.5 (or wire-complete prior) when Flutter APK rebuild not run |
-| **macOS** | **CF filename pin** from 0.4.5 until Mac DevID + notarize rebuild — see `client_app/APPLE_HANDOFF_0.4.6.md` |
-| **iOS** | **CF filename pin** from 0.4.5 until Mac Team-signed rebuild — same handoff |
+| **macOS** | **Native** Flutter **0.4.6** — Developer ID + **notarized + stapled** (notary `4f883906-9e22-406d-a4dd-7379686643bd`) — see `client_app/APPLE_HANDOFF_0.4.6.md` |
+| **iOS** | **Native** Flutter **0.4.6** — Apple Distribution **Team-signed** sideload — same handoff |
 | **Browser extension** | MV3 zip pin **0.4.6** when staged from `browser_extension/` |
 
-Never claim notarized Apple packages or a native PE that this host did not produce.
+Apple CF placeholders from the Windows ship host were replaced after the Mac rebuild. Never claim notarized packages that this process did not produce.
 
 ## Operator
 ```bash
