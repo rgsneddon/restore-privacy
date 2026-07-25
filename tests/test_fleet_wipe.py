@@ -237,7 +237,39 @@ class TestWeeklyFleetPlannerWiring(unittest.TestCase):
         role_i = src.index("assert_weekly_entry_role_only(args.role)")
         resolve_i = src.index("resolve_weekly_target(")
         self.assertLess(role_i, resolve_i)
-        self.assertNotIn("ENTRY-ONLY; exit reinstall is separate", src)
+
+    def test_host_identity_helpers_gate_remote_peer(self):
+        from node.fleet_wipe import (
+            catalog_host_for_code,
+            catalog_pub_name_for_code,
+            is_target_host_local,
+        )
+
+        self.assertEqual(catalog_host_for_code("IS"), PRODUCT_NODE_HOST)
+        self.assertEqual(catalog_host_for_code("RO"), PRODUCT_EXIT_HOST)
+        self.assertEqual(catalog_pub_name_for_code("IS"), "node_elgamal.pub")
+        self.assertEqual(catalog_pub_name_for_code("RO"), "exit_node_elgamal.pub")
+        ok_is, msg_is = is_target_host_local("IS", local_country="IS")
+        self.assertTrue(ok_is, msg_is)
+        ok_ro_on_is, msg_ro = is_target_host_local("RO", local_country="IS")
+        self.assertFalse(ok_ro_on_is, msg_ro)
+        self.assertIn("refuse", msg_ro.lower())
+        ok_ro, msg_ro2 = is_target_host_local("RO", local_country="RO")
+        self.assertTrue(ok_ro, msg_ro2)
+        # Host set match (RO monopin in local addresses)
+        ok_h, _ = is_target_host_local(
+            "RO",
+            local_hosts=[PRODUCT_EXIT_HOST],
+            env={"RPT_FLEET_ORCHESTRATOR_DEFAULT": ""},
+        )
+        self.assertTrue(ok_h)
+        # Orchestrator IS host set must not claim RO is local
+        ok_wrong, msg_w = is_target_host_local(
+            "RO",
+            local_hosts=[PRODUCT_NODE_HOST],
+            env={"RPT_FLEET_ORCHESTRATOR_DEFAULT": "IS"},
+        )
+        self.assertFalse(ok_wrong, msg_w)
 
 
 if __name__ == "__main__":

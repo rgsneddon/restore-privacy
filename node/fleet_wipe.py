@@ -316,6 +316,251 @@ def mark_wipe_complete(
     return done, nxt
 
 
+# ---------------------------------------------------------------------------
+# Host-identity gate (orchestrator must not wipe a different peer locally)
+# ---------------------------------------------------------------------------
+
+
+def catalog_host_for_code(
+    code: str,
+    *,
+    catalog: Sequence[Any] | None = None,
+) -> str | None:
+    """Return catalog monopin host for *code*, or None if unknown."""
+    want = (code or "").strip().upper()
+    if not want:
+        return None
+    for n in fleet_wipe_order(catalog):
+        if str(getattr(n, "code", "") or "").strip().upper() == want:
+            return str(getattr(n, "host", "") or "").strip() or None
+    return None
+
+
+def catalog_pub_name_for_code(
+    code: str,
+    *,
+    catalog: Sequence[Any] | None = None,
+) -> str:
+    """Public pin filename for a catalog peer (entry vs exit hop).
+
+    IS → ``node_elgamal.pub``; RO → ``exit_node_elgamal.pub``; others use
+    catalog ``pub_name`` when present, else node_elgamal.pub.
+    """
+    want = (code or "").strip().upper()
+    for n in fleet_wipe_order(catalog):
+        if str(getattr(n, "code", "") or "").strip().upper() == want:
+            pub = str(getattr(n, "pub_name", "") or "").strip()
+            if pub:
+                return pub
+            break
+    if want == "RO":
+        return "exit_node_elgamal.pub"
+    return "node_elgamal.pub"
+
+
+def local_identity_hosts(
+    *,
+    env: dict | None = None,
+    extra_hosts: Iterable[str] | None = None,
+) -> set[str]:
+    """Best-effort local host identifiers (IPs / RPT_NODE_HOST / hostname).
+
+    Pure when *env* and *extra_hosts* fully specify identity; otherwise may
+    probe the OS for addresses (never raises).
+    """
+    import os
+    import socket
+
+    e = env if env is not None else os.environ
+    hosts: set[str] = set()
+    for key in (
+        "RPT_NODE_HOST",
+        "RPT_FLEET_LOCAL_HOST",
+        "RPT_LOCAL_HOST",
+    ):
+        v = str(e.get(key, "") or "").strip()
+        if v:
+            hosts.add(v)
+    if extra_hosts:
+        for h in extra_hosts:
+            s = str(h or "").strip()
+            if s:
+                hosts.add(s)
+    # OS best-effort (skipped when env forces country-only via RPT_FLEET_LOCAL_COUNTRY
+    # and callers only need that — still cheap to collect)
+    try:
+        hn = socket.gethostname()
+        if hn:
+            hosts.add(hn)
+        try:
+            hosts.add(socket.gethostbyname(hn))
+        except OSError:
+            pass
+    except OSError:
+        pass
+    try:
+        # Primary outbound IP heuristic (does not send packets)
+        s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        try:
+            s.connect(("8.8.8.8", 80))
+            ip = s.getsockname()[0]
+            if ip and not ip.startswith("127."):
+                hosts.add(ip)
+        finally:
+            s.close()
+    except OSError:
+        pass
+    return {h for h in hosts if h}
+
+
+def resolve_local_country_code(
+    *,
+    env: dict | None = None,
+    local_hosts: Iterable[str] | None = None,
+    local_country: str | None = None,
+    catalog: Sequence[Any] | None = None,
+    allow_orchestrator_default: bool = True,
+) -> str | None:
+    """Infer which catalog country this host is, if any.
+
+    Priority:
+    1. Explicit *local_country* argument
+    2. ``RPT_FLEET_LOCAL_COUNTRY`` env
+    3. Host match against catalog monopins via *local_hosts* / env / OS
+    4. When still unknown and *allow_orchestrator_default*:
+       ``RPT_FLEET_ORCHESTRATOR_DEFAULT`` (default **IS**) — fleet timer runs
+       on the Iceland orchestrator; RO remains remote-gated until host match.
+    """
+    import os
+
+    e = env if env is not None else os.environ
+    if local_country is not None and str(local_country).strip():
+        return str(local_country).strip().upper()
+    env_cc = str(e.get("RPT_FLEET_LOCAL_COUNTRY", "") or "").strip().upper()
+    if env_cc:
+        return env_cc
+    hosts = set(local_hosts) if local_hosts is not None else local_identity_hosts(env=e)
+    hosts_n = {h.strip() for h in hosts if h and str(h).strip()}
+    for n in fleet_wipe_order(catalog):
+        h = str(getattr(n, "host", "") or "").strip()
+        if h and h in hosts_n:
+            return str(getattr(n, "code", "") or "").strip().upper() or None
+    if allow_orchestrator_default:
+        default = str(
+            e.get("RPT_FLEET_ORCHESTRATOR_DEFAULT", "IS") or "IS"
+        ).strip().upper()
+        return default or None
+    return None
+
+
+def is_target_host_local(
+    code: str,
+    *,
+    env: dict | None = None,
+    local_hosts: Iterable[str] | None = None,
+    local_country: str | None = None,
+    catalog: Sequence[Any] | None = None,
+) -> tuple[bool, str]:
+    """True when this machine is the catalog peer for *code*.
+
+    Fail closed when identity cannot be established: orchestrator must not
+    treat an unknown host as the remote peer (would wipe the wrong box).
+    """
+    want = (code or "").strip().upper()
+    if not want:
+        return False, "empty target country code"
+    target_host = catalog_host_for_code(want, catalog=catalog)
+    local_cc = resolve_local_country_code(
+        env=env,
+        local_hosts=local_hosts,
+        local_country=local_country,
+        catalog=catalog,
+    )
+    if local_cc is not None:
+        if local_cc == want:
+            return (
+                True,
+                f"host_identity: local_country={local_cc} matches target={want} "
+                f"(host={target_host or '?'})",
+            )
+        return (
+            False,
+            f"host_identity: local_country={local_cc} != target={want} "
+            f"(target_host={target_host or '?'}) — refuse local destructive wipe "
+            f"on orchestrator; use remote peer wipe for {want}",
+        )
+    # No country override: compare host strings
+    import os
+
+    e = env if env is not None else os.environ
+    hosts = set(local_hosts) if local_hosts is not None else local_identity_hosts(env=e)
+    if target_host and target_host in hosts:
+        return (
+            True,
+            f"host_identity: local address set includes target host {target_host} "
+            f"for {want}",
+        )
+    if target_host:
+        return (
+            False,
+            f"host_identity: target={want} host={target_host} not in local "
+            f"identities {sorted(hosts)[:8]} — refuse local stop/selfhost/rebuild; "
+            f"orchestrator must not wipe a different peer",
+        )
+    return False, f"host_identity: unknown catalog host for target={want}"
+
+
+def assert_local_host_is_target(
+    code: str,
+    *,
+    env: dict | None = None,
+    local_hosts: Iterable[str] | None = None,
+    local_country: str | None = None,
+    catalog: Sequence[Any] | None = None,
+) -> None:
+    """Raise AssertionError unless this host is the fleet wipe target peer."""
+    ok, msg = is_target_host_local(
+        code,
+        env=env,
+        local_hosts=local_hosts,
+        local_country=local_country,
+        catalog=catalog,
+    )
+    if not ok:
+        raise AssertionError(msg)
+
+
+def remote_wipe_command_template(
+    code: str,
+    *,
+    env: dict | None = None,
+    catalog: Sequence[Any] | None = None,
+) -> str:
+    """Shell template for wiping a remote peer (or fail-closed comment).
+
+    Honors ``RPT_REMOTE_WIPE_CMD`` with ``{host}`` / ``{code}`` placeholders.
+    Without it, returns a fail-closed command (non-zero exit).
+    """
+    import os
+    import shlex
+
+    e = env if env is not None else os.environ
+    want = (code or "").strip().upper()
+    host = catalog_host_for_code(want, catalog=catalog) or ""
+    tmpl = str(e.get("RPT_REMOTE_WIPE_CMD", "") or "").strip()
+    if tmpl:
+        try:
+            return tmpl.format(host=host, code=want)
+        except (KeyError, ValueError):
+            return tmpl.replace("{host}", host).replace("{code}", want)
+    # Fail closed: do not pretend local wipe is remote success
+    return (
+        f"echo 'host_identity_gate: target={want} host={host} is remote; "
+        f"set RPT_REMOTE_WIPE_CMD to wipe peer (e.g. ssh root@{{host}} …) "
+        f"or run weekly rebuild on that host'; exit 1"
+    ).format(host=host)
+
+
 def is_fleet_cycle_complete(
     completed: Iterable[str],
     *,
