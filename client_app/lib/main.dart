@@ -5,6 +5,7 @@ import 'package:url_launcher/url_launcher.dart';
 
 import 'connect_status.dart';
 import 'connection_log.dart';
+import 'country_select.dart';
 import 'licence_gate.dart';
 import 'macos_window.dart';
 import 'prefs_backend.dart';
@@ -162,6 +163,12 @@ class _TunnelHomeState extends State<TunnelHome> with WidgetsBindingObserver {
     }
     final loaded = await _store!.load();
     RptConfig.setRuntimeMultiHop(loaded.privacyMultihop);
+    RptConfig.setRuntimeEntryCountry(loaded.entryCountry);
+    if (mounted) {
+      setState(() => _settings = loaded);
+    } else {
+      _settings = loaded;
+    }
     // Refresh payment if we already have a session id (post-pay recheck)
     final sid = await _licence!.paymentSessionId();
     if (sid.isNotEmpty) {
@@ -493,10 +500,32 @@ class _TunnelHomeState extends State<TunnelHome> with WidgetsBindingObserver {
   Future<void> _onToggleConnectOnly() async {
     // Connect path only (used by autoconnect)
     if (_busy || _connected) return;
+    // Gate: valid catalog entry country (empty → Iceland default).
+    final resolved = resolveEntryCountrySelection(
+      _settings.entryCountry,
+      allowDefault: true,
+    );
+    if (!resolved.ok ||
+        !entryCountryAllowsConnect(resolved.code, allowDefault: false)) {
+      final msg =
+          'Choose a valid entry country above Connect (Iceland is the default).';
+      _append(msg);
+      setState(() {
+        _status = msg;
+        _settings = _settings.copyWith(entryCountry: kDefaultEntryCountry);
+      });
+      RptConfig.setRuntimeEntryCountry(kDefaultEntryCountry);
+      await _store?.save(_settings);
+      return;
+    }
+    RptConfig.setRuntimeEntryCountry(resolved.code);
+    RptConfig.setRuntimeMultiHop(_settings.privacyMultihop);
     if (!await assertMayConnect()) return;
     setState(() => _busy = true);
     try {
-      _append('Connect — starting RPT full tunnel…');
+      _append(
+        'Connect — entry ${countryOptionForCode(resolved.code)?.label ?? resolved.code}…',
+      );
       await _connLog(kLogKindConnect, 'Connect started (RPT full tunnel)');
       final ok = await _vpn.connect();
       if (!mounted) return;
@@ -862,6 +891,55 @@ class _TunnelHomeState extends State<TunnelHome> with WidgetsBindingObserver {
                 ),
               ),
               const SizedBox(height: 14),
+              // Entry country (flags) — main shell above Connect, not Settings-only
+              Text(
+                'Entry country',
+                style: TextStyle(
+                  color: kTextMuted,
+                  fontSize: 11,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              const SizedBox(height: 4),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12),
+                decoration: BoxDecoration(
+                  color: kPanelBg,
+                  borderRadius: BorderRadius.circular(kCornerRadius),
+                  border: Border.all(color: kBorder),
+                ),
+                child: DropdownButtonHideUnderline(
+                  child: DropdownButton<String>(
+                    isExpanded: true,
+                    value: normalizeEntryCountry(_settings.entryCountry),
+                    items: [
+                      for (final o in kProductCountryCatalog)
+                        DropdownMenuItem<String>(
+                          value: o.code,
+                          child: Text(
+                            o.label,
+                            style: const TextStyle(fontSize: 15),
+                          ),
+                        ),
+                    ],
+                    onChanged: _busy
+                        ? null
+                        : (code) async {
+                            if (code == null) return;
+                            final next = normalizeEntryCountry(code);
+                            final updated =
+                                _settings.copyWith(entryCountry: next);
+                            setState(() => _settings = updated);
+                            RptConfig.setRuntimeEntryCountry(next);
+                            await _store?.save(updated);
+                            _append(
+                              'Entry country: ${countryOptionForCode(next)?.label ?? next} (next Connect)',
+                            );
+                          },
+                  ),
+                ),
+              ),
+              const SizedBox(height: 10),
               SizedBox(
                 height: 52,
                 child: ElevatedButton(

@@ -2,12 +2,14 @@ import 'dart:io' show Platform;
 
 import 'free_tier.dart';
 
+import 'country_select.dart';
+
 /// RPT node endpoint and full-tunnel intent (shared with platform VPN).
 ///
 /// Multi-hop residual is **opt-in**: when [multiHopEnabled] is true, residual
-/// Connect dials the **exit** hop (Romania) with `exit_node_elgamal.pub`.
-/// Default remains single-hop Iceland entry (`node_elgamal.pub`).
-/// This is residual-via-exit selection, not full intermediate encapsulation.
+/// Connect dials a non-entry catalog peer. Default remains single-hop Iceland
+/// entry (`node_elgamal.pub`). This is residual-via-exit selection, not full
+/// intermediate encapsulation.
 ///
 /// Free tier ([freeTierEnabled]): multi-hop is forced off; host is always entry.
 class RptConfig {
@@ -45,6 +47,9 @@ class RptConfig {
   /// Runtime override from Settings privacy-scale (null = use env/compile only).
   static bool? runtimeMultiHopOverride;
 
+  /// Main-shell entry country (IS default); drives residual dial host.
+  static String runtimeEntryCountry = kDefaultEntryCountry;
+
   /// Apply Settings multi-hop toggle (Windows/Apple parity).
   /// No-op when free tier locks multi-hop off.
   static void setRuntimeMultiHop(bool? enabled) {
@@ -53,6 +58,11 @@ class RptConfig {
       return;
     }
     runtimeMultiHopOverride = enabled;
+  }
+
+  /// Apply main-shell entry-country selection (Iceland default).
+  static void setRuntimeEntryCountry(String? code) {
+    runtimeEntryCountry = normalizeEntryCountry(code);
   }
 
   /// True when residual multi-hop (exit dial) is selected.
@@ -69,10 +79,22 @@ class RptConfig {
     return v == '1' || v == 'true' || v == 'yes' || v == 'on';
   }
 
-  /// Residual dial host: exit when multi-hop active, else entry.
-  static String get host => multiHopEnabled ? exitHost : entryHost;
+  /// Residual dial host from entry-country selection (+ multi-hop when on).
+  static String get host => residualHostForEntryCountry(
+        runtimeEntryCountry,
+        multiHop: multiHopEnabled,
+      );
 
   /// Bundled ElGamal public key basename for residual HELLO.
-  static String get residualNodePubName =>
-      multiHopEnabled ? 'exit_node_elgamal.pub' : 'node_elgamal.pub';
+  static String get residualNodePubName {
+    final code = normalizeEntryCountry(runtimeEntryCountry);
+    if (multiHopEnabled) {
+      // Non-entry peer pin
+      if (code == kCountryRomania) return 'node_elgamal.pub';
+      return 'exit_node_elgamal.pub';
+    }
+    if (code == kCountryRomania) return 'exit_node_elgamal.pub';
+    if (code == kCountryGermany) return 'de_node_elgamal.pub';
+    return 'node_elgamal.pub';
+  }
 }

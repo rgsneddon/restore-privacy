@@ -20,4 +20,12 @@ class SharedPreferencesBackend implements SettingsBackend {
   Future<void> setBool(String key, bool value) async {
     await _prefs.setBool(key, value);
   }
+
+  @override
+  Future<String?> getString(String key) async => _prefs.getString(key);
+
+  @override
+  Future<void> setString(String key, String value) async {
+    await _prefs.setString(key, value);
+  }
 }

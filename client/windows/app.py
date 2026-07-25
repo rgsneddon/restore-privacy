@@ -142,6 +142,20 @@ from client.windows.ui_chrome import (
     surface_geometry_string,
     surface_min_size,
 )
+from client.country_select import (
+    catalog_country_options,
+    entry_country_allows_connect,
+    label_to_country_code,
+    option_label_for_code,
+    resolve_entry_country_selection,
+)
+from client.country_select import (
+    catalog_country_options,
+    entry_country_allows_connect,
+    label_to_country_code,
+    option_label_for_code,
+    resolve_entry_country_selection,
+)
 from client.windows.settings_store import (
     ProductSettings,
     apply_run_at_startup,
@@ -320,9 +334,54 @@ class TunnelClientApp:
         )
         self.chrome.pack(fill=tk.BOTH, expand=True)
 
-        # --- Bottom: primary control first so it never disappears ---
+        # --- Bottom: country selector above Connect so it never disappears ---
         self.bottom = tk.Frame(self.chrome, bg=self._t["chrome_bg"])
         self.bottom.pack(side=tk.BOTTOM, fill=tk.X)
+
+        # Entry-country dropdown (flags) — main shell, not Settings-only
+        self._country_options = catalog_country_options()
+        self._country_labels = [o.label() for o in self._country_options]
+        _init_code = normalize_entry_country(
+            getattr(self._settings, "entry_country", None)
+        )
+        self._entry_country_code = _init_code
+        self.country_frame = tk.Frame(self.bottom, bg=self._t["chrome_bg"])
+        self.country_frame.pack(side=tk.TOP, fill=tk.X, pady=(0, 4))
+        tk.Label(
+            self.country_frame,
+            text="Entry country",
+            bg=self._t["chrome_bg"],
+            fg=self._t["text_muted"],
+            font=("Segoe UI", 8),
+            anchor="w",
+        ).pack(side=tk.TOP, fill=tk.X)
+        self.country_var = tk.StringVar(value=option_label_for_code(_init_code))
+        self.country_menu = tk.OptionMenu(
+            self.country_frame,
+            self.country_var,
+            *self._country_labels,
+            command=self._on_entry_country_selected,
+        )
+        self.country_menu.configure(
+            bg=self._t["panel_bg"],
+            fg=self._t["text"],
+            activebackground=self._t["light_accent"],
+            activeforeground=self._t["text"],
+            highlightthickness=1,
+            highlightbackground=self._t.get("border", "#D0D5DD"),
+            font=("Segoe UI", 11),
+            relief=tk.FLAT,
+            anchor="w",
+            direction="above",
+        )
+        self.country_menu["menu"].configure(
+            bg=self._t["panel_bg"],
+            fg=self._t["text"],
+            activebackground=self._t["primary"],
+            activeforeground=self._t["white"],
+            font=("Segoe UI", 11),
+        )
+        self.country_menu.pack(side=tk.TOP, fill=tk.X, pady=(2, 0), ipady=4)
 
         self.btn_var = tk.StringVar(value=connect_button_label(False))
         self.connect_btn = tk.Button(
@@ -1292,17 +1351,66 @@ class TunnelClientApp:
         threading.Thread(target=work, daemon=True).start()
 
     def _refresh_multihop_from_settings(self) -> None:
-        """Reload residual path from Settings/env (entry country + multi-hop).
+        """Reload residual path from main-shell entry country + Settings multihop.
 
         Must run on every Connect so a disconnected user who changes
         ``entry_country`` / multihop does not dial a stale host from app init.
         """
         try:
-            from client.multihop import multihop_config_from_env
+            from client.multihop import multihop_config_for_entry_country
+            from client.product_policy import product_multihop_enabled
 
-            self.client.multihop = multihop_config_from_env()
+            code = normalize_entry_country(
+                getattr(self, "_entry_country_code", None)
+                or getattr(self._settings, "entry_country", None)
+            )
+            mh = bool(product_multihop_enabled())
+            try:
+                mh = bool(getattr(self._settings, "privacy_multihop", mh))
+            except Exception:  # noqa: BLE001
+                pass
+            self.client.multihop = multihop_config_for_entry_country(
+                code, multihop_enabled=mh
+            )
         except Exception:  # noqa: BLE001
-            pass
+            try:
+                from client.multihop import multihop_config_from_env
+
+                self.client.multihop = multihop_config_from_env()
+            except Exception:  # noqa: BLE001
+                pass
+
+    def _on_entry_country_selected(self, choice: str | None = None) -> None:
+        """Persist main-shell dropdown selection and refresh residual path."""
+        label = (choice if choice is not None else self.country_var.get()) or ""
+        code = label_to_country_code(label)
+        if code is None:
+            # Restore last valid / default Iceland
+            code = normalize_entry_country(
+                getattr(self, "_entry_country_code", None) or "IS"
+            )
+            self.country_var.set(option_label_for_code(code))
+            self._log("Entry country: invalid selection ignored — use the list.")
+            return
+        self._entry_country_code = code
+        try:
+            s = load_settings()
+            s.entry_country = code
+            save_settings(s)
+            self._settings = s
+        except Exception as exc:  # noqa: BLE001
+            self._log(f"Entry country save failed: {exc}")
+        self._refresh_multihop_from_settings()
+        self._log(f"Entry country: {option_label_for_code(code)} (next Connect)")
+
+    def _selected_entry_country_code(self) -> str:
+        """Current shell selection (label → code), default Iceland."""
+        code = label_to_country_code(self.country_var.get())
+        if code:
+            return code
+        return normalize_entry_country(
+            getattr(self, "_entry_country_code", None) or "IS"
+        )
 
     def _on_toggle_connect(self) -> None:
         if self._busy:
@@ -1313,7 +1421,41 @@ class TunnelClientApp:
             self._start_connect()
 
     def _start_connect(self) -> None:
-        # Always refresh residual path from durable Settings before dialling.
+        # Gate: valid catalog entry country required (empty → Iceland default).
+        raw_sel = (self.country_var.get() or "").strip()
+        code = label_to_country_code(raw_sel) if raw_sel else None
+        if code is None and not raw_sel:
+            ok, resolved, reason = resolve_entry_country_selection(
+                None, allow_default=True
+            )
+        elif code is None:
+            ok, resolved, reason = False, "", "invalid_entry_country"
+        else:
+            ok, resolved, reason = resolve_entry_country_selection(
+                code, allow_default=False
+            )
+        if not ok or not entry_country_allows_connect(
+            resolved if ok else None, allow_default=False
+        ):
+            msg = (
+                "Choose a valid entry country from the list above Connect "
+                "(Iceland is the default)."
+            )
+            self._log(msg + f" ({reason})")
+            self._set_status("error", detail=msg)
+            self.detail_var.set(msg)
+            self.country_var.set(option_label_for_code("IS"))
+            self._entry_country_code = "IS"
+            return
+        self._entry_country_code = resolved
+        try:
+            s = load_settings()
+            s.entry_country = resolved
+            save_settings(s)
+            self._settings = s
+        except Exception:  # noqa: BLE001
+            pass
+        # Always refresh residual path from shell selection before dialling.
         self._refresh_multihop_from_settings()
         # Local-only gate first (no status-host I/O on the Tk UI thread).
         # Keygen unlock is required before residual HELLO — discovery of a
