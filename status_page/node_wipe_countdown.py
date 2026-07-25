@@ -7,8 +7,10 @@ Honesty:
 - **Node A (entry)** aligns with the real weekly entry wipe/rebuild cadence.
 - **Exit is never wiped/rebuilt by the weekly service** — no exit timer on the
   homepage (exit stays up for residual failover during entry drain).
-- “DATA IS CLEARED” means the product entry wipe/rebuild cycle; it does **not**
-  erase VPS provider off-box backups/netflow.
+- “DATA IS CLEARED” means a **live** preferred-entry wipe/rebuild completion
+  (not dry-run timer fires). Without a last-clear anchor the UI uses a fixed
+  ~7d epoch grid (mid-period remaining is expected).
+- Does **not** erase VPS provider off-box backups/netflow.
 """
 
 from __future__ import annotations
@@ -16,6 +18,7 @@ from __future__ import annotations
 import html
 import os
 from datetime import datetime, timedelta, timezone
+from pathlib import Path
 from typing import Any, Optional
 
 # Exact OBJECTIVE labels (case/spacing preserved)
@@ -30,11 +33,16 @@ NODE_WIPE_PERIOD_SECONDS = int(NODE_WIPE_PERIOD.total_seconds())  # 604800
 # Legacy phase constant (unused for public HTML; exit timer removed 0.3.7)
 NODE_B_PHASE_SECONDS = NODE_WIPE_PERIOD_SECONDS // 2
 
+# Durable last-clear (written by live preferred-entry wipe completion)
+ENTRY_LAST_CLEAR_ENV = "RPT_NODE_A_LAST_CLEAR"
+ENTRY_LAST_CLEAR_FILE_ENV = "RPT_NODE_A_LAST_CLEAR_FILE"
+ENTRY_LAST_CLEAR_REL = "var/rpt-node-a-last-clear.json"
+
 HONESTY_BLURB = (
-    "Entry node only: weekly wipe/rebuild cadence (~7d) with mandatory full "
-    "selfhost reinstall after rebuild. Exit node is never wiped by this timer "
-    "(stays up for residual failover). Product rebuild cycle; does not erase "
-    "provider backups/netflow."
+    "Preferred entry: ~7d live wipe/rebuild cadence (full selfhost reinstall). "
+    "Countdown resets from last live clear when recorded; otherwise a fixed "
+    "weekly grid. Dry-run timer fires do not clear data. Exit is never wiped "
+    "by this timer (failover). Does not erase provider backups/netflow."
 )
 
 
@@ -173,6 +181,64 @@ def _env_last_clear(env_name: str) -> datetime | None:
     return parse_iso_utc(os.environ.get(env_name, "") or None)
 
 
+def _read_last_clear_file(path: str | Path) -> datetime | None:
+    """Parse durable last-clear JSON ``{last_clear_at: ISO}``."""
+    try:
+        p = Path(path)
+        if not p.is_file():
+            return None
+        import json
+
+        blob = json.loads(p.read_text(encoding="utf-8"))
+        if not isinstance(blob, dict):
+            return None
+        return parse_iso_utc(str(blob.get("last_clear_at") or "") or None)
+    except Exception:  # noqa: BLE001
+        return None
+
+
+def resolve_entry_last_clear(
+    *,
+    install_root: str | None = None,
+    explicit: datetime | None = None,
+) -> datetime | None:
+    """Preferred-entry last-clear for the public countdown.
+
+    Priority:
+    1. *explicit* argument (tests / caller)
+    2. ``RPT_NODE_A_LAST_CLEAR`` env (status host / Render override)
+    3. ``RPT_NODE_A_LAST_CLEAR_FILE`` path
+    4. ``{install_root}/var/rpt-node-a-last-clear.json`` (live wipe durable write)
+    5. default install root ``/opt/restore-privacy/var/rpt-node-a-last-clear.json``
+    """
+    if explicit is not None:
+        return explicit
+    env_dt = _env_last_clear(ENTRY_LAST_CLEAR_ENV)
+    if env_dt is not None:
+        return env_dt
+    file_env = (os.environ.get(ENTRY_LAST_CLEAR_FILE_ENV) or "").strip()
+    if file_env:
+        dt = _read_last_clear_file(file_env)
+        if dt is not None:
+            return dt
+    roots: list[str] = []
+    if install_root:
+        roots.append(install_root.rstrip("/") or install_root)
+    env_root = (os.environ.get("INSTALL_ROOT") or os.environ.get("RPT_INSTALL_ROOT") or "").strip()
+    if env_root:
+        roots.append(env_root.rstrip("/"))
+    roots.append("/opt/restore-privacy")
+    seen: set[str] = set()
+    for root in roots:
+        if root in seen:
+            continue
+        seen.add(root)
+        dt = _read_last_clear_file(f"{root}/{ENTRY_LAST_CLEAR_REL}")
+        if dt is not None:
+            return dt
+    return None
+
+
 def node_line_state(
     *,
     role: str,
@@ -226,9 +292,9 @@ def dual_node_wipe_state(
 ) -> dict[str, Any]:
     """State for both Node A (entry) and Node B (exit) countdown lines."""
     p_sec = int(period_seconds if period_seconds is not None else NODE_WIPE_PERIOD_SECONDS)
-    # Optional env anchors (operator override)
+    # Optional anchors: explicit args → env / durable last-clear file → grid
     if entry_last is None:
-        entry_last = _env_last_clear("RPT_NODE_A_LAST_CLEAR")
+        entry_last = resolve_entry_last_clear()
     if exit_last is None:
         exit_last = _env_last_clear("RPT_NODE_B_LAST_CLEAR")
     if entry_next is None:

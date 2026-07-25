@@ -1315,15 +1315,19 @@ def build_weekly_entry_rebuild_plan(
         steps.append(s)
 
     # mark complete: local path requires host identity; remote requires explicit OK
+    # Live preferred-entry (IS) mark also records public countdown last-clear anchor.
+    _mark_record = (
+        f"from node.fleet_wipe import mark_wipe_complete, save_fleet_wipe_state, "
+        f"record_entry_last_clear; "
+        f"done,nxt=mark_wipe_complete({target!r},completed={done!r}); "
+        f"print(save_fleet_wipe_state(completed=done,in_progress=None,"
+        f"install_root={root!r})); "
+        f"print(record_entry_last_clear(live=True,target={target!r},"
+        f"install_root={root!r},source='live_wipe_mark')); "
+        f"print('next',nxt)"
+    )
     if target_is_local:
-        mark_cmd = (
-            f"{gate_cmd} && "
-            f"python3 -c \"from node.fleet_wipe import mark_wipe_complete, "
-            f"save_fleet_wipe_state; "
-            f"done,nxt=mark_wipe_complete({target!r},completed={done!r}); "
-            f"print(save_fleet_wipe_state(completed=done,in_progress=None,"
-            f"install_root={root!r})); print('next',nxt)\""
-        )
+        mark_cmd = f"{gate_cmd} && python3 -c \"{_mark_record}\""
     else:
         mark_cmd = (
             "python3 -c \""
@@ -1332,10 +1336,7 @@ def build_weekly_entry_rebuild_plan(
             "('1','true','yes','on'), "
             f"'refuse mark_wipe_complete({target!r}): remote wipe not confirmed "
             f"(set RPT_REMOTE_WIPE_OK=yes after successful peer wipe)'; "
-            "from node.fleet_wipe import mark_wipe_complete, save_fleet_wipe_state; "
-            f"done,nxt=mark_wipe_complete({target!r},completed={done!r}); "
-            f"print(save_fleet_wipe_state(completed=done,in_progress=None,"
-            f"install_root={root!r})); print('next',nxt)\""
+            f"{_mark_record}\""
         )
     steps.append(
         PlanStep(

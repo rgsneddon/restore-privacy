@@ -615,11 +615,109 @@ def country_code_for_legacy_role(role: str) -> str:
 
 # Durable fleet-cycle state (orchestrator host)
 FLEET_STATE_REL = "var/rpt-fleet-wipe-state.json"
+# Public homepage preferred-entry clear anchor (live wipe only — not dry-run)
+ENTRY_LAST_CLEAR_REL = "var/rpt-node-a-last-clear.json"
+# Preferred entry country whose clear advances the public countdown
+PUBLIC_CLEAR_TARGET = "IS"
 
 
 def fleet_state_path(install_root: str | None = None) -> str:
     root = (install_root or "/opt/restore-privacy").rstrip("/") or "/opt/restore-privacy"
     return f"{root}/{FLEET_STATE_REL}"
+
+
+def entry_last_clear_path(install_root: str | None = None) -> str:
+    """Path to durable preferred-entry last-clear JSON (status countdown anchor)."""
+    root = (install_root or "/opt/restore-privacy").rstrip("/") or "/opt/restore-privacy"
+    return f"{root}/{ENTRY_LAST_CLEAR_REL}"
+
+
+def load_entry_last_clear(
+    install_root: str | None = None,
+    *,
+    raw: dict | None = None,
+    path: str | None = None,
+) -> dict[str, Any] | None:
+    """Load preferred-entry last-clear record (ISO *last_clear_at*).
+
+    Pure when *raw* is passed; otherwise best-effort file read.
+    """
+    if raw is not None:
+        data = raw
+    else:
+        data = None
+        try:
+            from pathlib import Path
+
+            p = Path(path or entry_last_clear_path(install_root))
+            if p.is_file():
+                import json
+
+                blob = json.loads(p.read_text(encoding="utf-8"))
+                if isinstance(blob, dict):
+                    data = blob
+        except Exception:  # noqa: BLE001
+            data = None
+    if not isinstance(data, dict):
+        return None
+    iso = str(data.get("last_clear_at") or "").strip()
+    if not iso:
+        return None
+    return {
+        "last_clear_at": iso,
+        "target": str(data.get("target") or PUBLIC_CLEAR_TARGET).strip().upper(),
+        "source": str(data.get("source") or "live_wipe").strip(),
+        "live": bool(data.get("live", True)),
+    }
+
+
+def record_entry_last_clear(
+    *,
+    when: str | None = None,
+    install_root: str | None = None,
+    live: bool = True,
+    target: str = PUBLIC_CLEAR_TARGET,
+    source: str = "live_wipe",
+) -> dict[str, Any] | None:
+    """Persist preferred-entry last-clear after a **live** successful wipe.
+
+    Dry-run must not advance the public “DATA IS CLEARED” clock — returns None
+    when *live* is false. Only the preferred-entry target (default IS) records.
+    """
+    if not live:
+        return None
+    code = (target or "").strip().upper()
+    if code != PUBLIC_CLEAR_TARGET:
+        return None
+    from datetime import datetime, timezone
+    import json
+    from pathlib import Path
+
+    if when and str(when).strip():
+        iso = str(when).strip()
+        if iso.endswith("Z"):
+            pass
+        else:
+            # Normalize offset form to Z when possible
+            try:
+                dt = datetime.fromisoformat(iso.replace("Z", "+00:00"))
+                if dt.tzinfo is None:
+                    dt = dt.replace(tzinfo=timezone.utc)
+                iso = dt.astimezone(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+            except ValueError:
+                iso = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+    else:
+        iso = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+    payload = {
+        "last_clear_at": iso,
+        "target": PUBLIC_CLEAR_TARGET,
+        "source": source or "live_wipe",
+        "live": True,
+    }
+    path = Path(entry_last_clear_path(install_root))
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
+    return payload
 
 
 def load_fleet_wipe_state(

@@ -233,6 +233,7 @@ class TestWeeklyFleetPlannerWiring(unittest.TestCase):
             s for s in plan.steps if s.id == "mark_fleet_peer_complete"
         )
         self.assertIn("mark_wipe_complete('IS'", mark_complete.command)
+        self.assertIn("record_entry_last_clear", mark_complete.command)
         self.assertIn("completed=[]", mark_complete.command)
         self.assertNotIn("completed=['IS', 'RO', 'DE']", mark_complete.command)
         drain = next(s for s in plan.steps if s.id == "mark_entry_draining")

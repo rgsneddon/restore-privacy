@@ -163,5 +163,131 @@ class TestNodeWipeHtml(unittest.TestCase):
         self.assertIn("nw-entry-days", html)
 
 
+class TestLastClearResetsPeriod(unittest.TestCase):
+    """Acceptance: post-completion remaining ≈ full period; mid-grid without anchor."""
+
+    def test_mid_grid_without_anchor_nonzero(self):
+        """No last-clear → epoch grid; remaining in (0, period] (e.g. ~3d class)."""
+        # Epoch-aligned: 3.5 days into a 7d period from a known boundary
+        # 2026-07-23 12:00 UTC is mid-period if boundary is 2026-07-23 00:00? Use pure grid.
+        now = datetime(2026, 7, 23, 12, 0, 0, tzinfo=timezone.utc)
+        nxt = next_deadline_on_grid(
+            now=now, period_seconds=NODE_WIPE_PERIOD_SECONDS, phase_seconds=0
+        )
+        rem = remaining_seconds_until(nxt, now=now)
+        self.assertGreater(rem, 0)
+        self.assertLessEqual(rem, NODE_WIPE_PERIOD_SECONDS)
+        st = dual_node_wipe_state(
+            now=now, entry_last=None, entry_next=None
+        )
+        # dual_node may still pick env/file — force pure grid via next_deadline
+        self.assertGreater(st["entry"]["remaining_seconds"], 0)
+        self.assertLessEqual(st["entry"]["remaining_seconds"], NODE_WIPE_PERIOD_SECONDS)
+
+    def test_last_clear_at_now_full_period_remaining(self):
+        """After successful clear at *now*, next deadline is ~now+7d."""
+        now = datetime(2026, 7, 25, 18, 0, 0, tzinfo=timezone.utc)
+        st = dual_node_wipe_state(
+            now=now,
+            entry_last=now,
+            entry_next=None,
+        )
+        rem = st["entry"]["remaining_seconds"]
+        # Full period ± 1s (integer seconds)
+        self.assertGreaterEqual(rem, NODE_WIPE_PERIOD_SECONDS - 1)
+        self.assertLessEqual(rem, NODE_WIPE_PERIOD_SECONDS)
+        nxt = datetime.fromisoformat(
+            st["entry"]["next_clear_at"].replace("Z", "+00:00")
+        )
+        self.assertAlmostEqual(
+            (nxt - now).total_seconds(),
+            float(NODE_WIPE_PERIOD_SECONDS),
+            delta=1.0,
+        )
+
+    def test_resolve_entry_last_clear_from_file(self):
+        import json
+        import os
+        import tempfile
+        from node_wipe_countdown import resolve_entry_last_clear
+
+        now = datetime(2026, 7, 25, 12, 0, 0, tzinfo=timezone.utc)
+        with tempfile.TemporaryDirectory() as td:
+            path = Path(td) / "var" / "rpt-node-a-last-clear.json"
+            path.parent.mkdir(parents=True)
+            path.write_text(
+                json.dumps(
+                    {
+                        "last_clear_at": now.strftime("%Y-%m-%dT%H:%M:%SZ"),
+                        "target": "IS",
+                        "live": True,
+                    }
+                ),
+                encoding="utf-8",
+            )
+            prev = os.environ.pop("RPT_NODE_A_LAST_CLEAR", None)
+            prev_f = os.environ.pop("RPT_NODE_A_LAST_CLEAR_FILE", None)
+            try:
+                got = resolve_entry_last_clear(install_root=td)
+                self.assertEqual(got, now)
+                st = dual_node_wipe_state(
+                    now=now + timedelta(hours=1),
+                    entry_last=got,
+                )
+                self.assertGreater(
+                    st["entry"]["remaining_seconds"],
+                    NODE_WIPE_PERIOD_SECONDS - 3700,
+                )
+            finally:
+                if prev is not None:
+                    os.environ["RPT_NODE_A_LAST_CLEAR"] = prev
+                if prev_f is not None:
+                    os.environ["RPT_NODE_A_LAST_CLEAR_FILE"] = prev_f
+
+
+class TestRecordEntryLastClearLiveOnly(unittest.TestCase):
+    def test_dry_run_does_not_write_and_live_is_writes(self):
+        import json
+        import tempfile
+
+        from node.fleet_wipe import (  # noqa: E402
+            entry_last_clear_path,
+            load_entry_last_clear,
+            record_entry_last_clear,
+        )
+
+        with tempfile.TemporaryDirectory() as td:
+            self.assertIsNone(
+                record_entry_last_clear(
+                    live=False,
+                    install_root=td,
+                    when="2026-07-25T18:00:00Z",
+                )
+            )
+            self.assertFalse(Path(entry_last_clear_path(td)).is_file())
+            # RO target must not advance public entry clear
+            self.assertIsNone(
+                record_entry_last_clear(
+                    live=True, target="RO", install_root=td, when="2026-07-25T18:00:00Z"
+                )
+            )
+            rec = record_entry_last_clear(
+                live=True,
+                target="IS",
+                install_root=td,
+                when="2026-07-25T18:00:00Z",
+                source="unit_test",
+            )
+            self.assertIsNotNone(rec)
+            assert rec is not None
+            self.assertEqual(rec["last_clear_at"], "2026-07-25T18:00:00Z")
+            loaded = load_entry_last_clear(install_root=td)
+            self.assertIsNotNone(loaded)
+            assert loaded is not None
+            self.assertEqual(loaded["last_clear_at"], "2026-07-25T18:00:00Z")
+            blob = json.loads(Path(entry_last_clear_path(td)).read_text(encoding="utf-8"))
+            self.assertTrue(blob.get("live"))
+
+
 if __name__ == "__main__":
     unittest.main()
