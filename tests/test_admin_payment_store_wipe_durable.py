@@ -177,6 +177,110 @@ class TestPaymentStoreWipeProtection(unittest.TestCase):
 
 
 class TestLegacyMigrateToDurable(unittest.TestCase):
+    def setUp(self) -> None:
+        import payments
+
+        payments.reset_payment_migrate_once_for_tests()
+
+    def test_probe_unknown_on_operational_error_not_empty(self):
+        """Locked/error DB must be unknown — never migrate target."""
+        import payments
+
+        with tempfile.TemporaryDirectory() as td:
+            p = Path(td) / "paid_downloads.sqlite3"
+            p.write_bytes(b"not-a-valid-sqlite-but-nonzero-size" + b"\x00" * 100)
+            # Invalid sqlite file → unknown or empty-without-tables depending on open
+            probe = payments.payment_db_probe(p)
+            # Must not claim has_history for garbage; and safe_migrate only if empty/absent
+            self.assertIn(
+                probe["state"],
+                ("unknown", "empty"),
+                probe,
+            )
+            if probe["state"] == "unknown":
+                self.assertFalse(payments.payment_db_is_safe_migrate_dest(p))
+
+    def test_locked_dest_refuses_legacy_overwrite(self):
+        """If dest probe is unknown (e.g. mock lock/error), do not replace file."""
+        import payments
+
+        with tempfile.TemporaryDirectory() as durable_td, tempfile.TemporaryDirectory() as legacy_td:
+            durable = Path(durable_td)
+            dest = durable / "paid_downloads.sqlite3"
+            # Non-empty durable-looking file with real history
+            prev = os.environ.get("RPT_PAYMENT_DATA_DIR")
+            os.environ["RPT_PAYMENT_DATA_DIR"] = str(durable)
+            try:
+                payments.reset_payment_migrate_once_for_tests()
+                payments.init_db()
+                payments.activate_connect_entitlement(
+                    session_id="cs_keep_1",
+                    platform="windows",
+                    valid_until=2_000_000_000.0,
+                    customer_email="keep@example.com",
+                    billing_interval="month",
+                    keygen="RPT-KEY-KEEP-DEST001",
+                )
+                self.assertTrue(dest.is_file())
+                before = dest.read_bytes()
+                legacy = Path(legacy_td) / "paid_downloads.sqlite3"
+                legacy.write_bytes(b"LEGACY_SHOULD_NOT_OVERWRITE" + b"\x00" * 200)
+
+                payments.reset_payment_migrate_once_for_tests()
+                with mock.patch.object(
+                    payments,
+                    "payment_db_probe",
+                    side_effect=lambda path: {
+                        "state": "unknown",
+                        "grants": 0,
+                        "entitlements": 0,
+                        "error": "database is locked",
+                    }
+                    if Path(path) == dest
+                    else {
+                        "state": "has_history",
+                        "grants": 99,
+                        "entitlements": 1,
+                        "error": "",
+                    },
+                ):
+                    with mock.patch.object(
+                        payments,
+                        "legacy_payment_db_candidates",
+                        return_value=[legacy],
+                    ):
+                        st = payments.ensure_payment_db_migrated_from_legacy()
+                self.assertFalse(st.get("migrated"), st)
+                self.assertIn("unknown", st.get("reason", ""))
+                self.assertEqual(dest.read_bytes(), before)
+            finally:
+                if prev is None:
+                    os.environ.pop("RPT_PAYMENT_DATA_DIR", None)
+                else:
+                    os.environ["RPT_PAYMENT_DATA_DIR"] = prev
+
+    def test_db_path_does_not_run_migrate(self):
+        """db_path() must not side-effect migrate (only init_db)."""
+        import payments
+
+        with tempfile.TemporaryDirectory() as td:
+            prev = os.environ.get("RPT_PAYMENT_DATA_DIR")
+            os.environ["RPT_PAYMENT_DATA_DIR"] = td
+            payments.reset_payment_migrate_once_for_tests()
+            try:
+                with mock.patch.object(
+                    payments,
+                    "ensure_payment_db_migrated_from_legacy",
+                    side_effect=AssertionError("migrate must not run from db_path"),
+                ):
+                    p = payments.db_path()
+                    self.assertTrue(str(p).endswith("paid_downloads.sqlite3"))
+            finally:
+                if prev is None:
+                    os.environ.pop("RPT_PAYMENT_DATA_DIR", None)
+                else:
+                    os.environ["RPT_PAYMENT_DATA_DIR"] = prev
+
     def test_empty_durable_imports_legacy_grants_and_licences(self):
         """Empty RPT_PAYMENT_DATA_DIR must not drop history still on legacy path."""
         import sqlite3
@@ -184,6 +288,7 @@ class TestLegacyMigrateToDurable(unittest.TestCase):
         import payments
         import admin_panel
 
+        payments.reset_payment_migrate_once_for_tests()
         with tempfile.TemporaryDirectory() as legacy_td, tempfile.TemporaryDirectory() as durable_td:
             # Build a standalone legacy file without touching process env / real store
             legacy_db = Path(legacy_td) / "paid_downloads.sqlite3"
@@ -268,6 +373,7 @@ class TestLegacyMigrateToDurable(unittest.TestCase):
             prev = os.environ.get("RPT_PAYMENT_DATA_DIR")
             os.environ["RPT_PAYMENT_DATA_DIR"] = str(durable)
             try:
+                payments.reset_payment_migrate_once_for_tests()
                 with mock.patch.object(
                     payments,
                     "legacy_payment_db_candidates",

@@ -672,9 +672,9 @@ def payment_data_dir() -> Path:
 def legacy_payment_db_candidates() -> list[Path]:
     """Paths that may hold a pre-disk / ephemeral paid_downloads.sqlite3.
 
-    Used only to **copy into** the durable dir when the durable DB is empty so
-    admin licence + grant history does not silently disappear after attaching
-    ``RPT_PAYMENT_DATA_DIR`` or redeploying onto a new empty volume.
+    Used only to **copy into** the durable dir when the durable DB is clearly
+    absent/empty so admin history does not silently disappear after attaching
+    ``RPT_PAYMENT_DATA_DIR``. Never used to overwrite a non-empty durable file.
     """
     here = Path(__file__).resolve().parent
     out: list[Path] = [
@@ -697,44 +697,245 @@ def legacy_payment_db_candidates() -> list[Path]:
     return uniq
 
 
-def payment_db_history_counts(path: Path) -> tuple[int, int]:
-    """Return (grant_count, entitlement_count) or (0, 0) if unreadable/empty."""
+# Probe result for migrate safety: never treat lock/error as "empty".
+_DB_PROBE_ABSENT = "absent"
+_DB_PROBE_EMPTY = "empty"
+_DB_PROBE_HAS_HISTORY = "has_history"
+_DB_PROBE_UNKNOWN = "unknown"
+
+_migrate_once_lock = __import__("threading").Lock()
+_migrate_once_done = False
+
+
+def payment_db_probe(path: Path) -> dict[str, Any]:
+    """Classify payment DB file for safe migrate decisions.
+
+    Returns keys:
+      state: absent | empty | has_history | unknown
+      grants, entitlements: int counts when known (else 0)
+      error: optional short message when unknown
+
+    **Critical:** sqlite lock / OperationalError → ``unknown`` (not empty).
+    Only absent / verified-empty may be replaced by legacy copy.
+    """
+    p = Path(path)
     try:
-        p = Path(path)
-        if not p.is_file() or p.stat().st_size < 64:
-            return 0, 0
-        conn = sqlite3.connect(str(p), timeout=10)
+        if not p.is_file():
+            return {
+                "state": _DB_PROBE_ABSENT,
+                "grants": 0,
+                "entitlements": 0,
+                "error": "",
+            }
+        size = p.stat().st_size
+        if size == 0:
+            return {
+                "state": _DB_PROBE_EMPTY,
+                "grants": 0,
+                "entitlements": 0,
+                "error": "",
+            }
+        if size < 64:
+            # Too small for a real SQLite header — treat as empty shell
+            return {
+                "state": _DB_PROBE_EMPTY,
+                "grants": 0,
+                "entitlements": 0,
+                "error": "",
+            }
+    except OSError as exc:
+        return {
+            "state": _DB_PROBE_UNKNOWN,
+            "grants": 0,
+            "entitlements": 0,
+            "error": f"stat:{exc}"[:80],
+        }
+
+    try:
+        # timeout short; do not hang forever under lock contention
+        # as_uri() → file:///… works on Windows and POSIX
+        uri = p.resolve().as_uri() + "?mode=ro"
+        conn = sqlite3.connect(uri, uri=True, timeout=2.0)
         try:
+            # Confirm SQLite header / readable schema
+            try:
+                conn.execute("SELECT 1").fetchone()
+            except sqlite3.Error as exc:
+                return {
+                    "state": _DB_PROBE_UNKNOWN,
+                    "grants": 0,
+                    "entitlements": 0,
+                    "error": f"open:{exc}"[:80],
+                }
             try:
                 g = int(conn.execute("SELECT COUNT(*) FROM grants").fetchone()[0])
-            except sqlite3.Error:
-                g = 0
+            except sqlite3.OperationalError as exc:
+                # missing table → empty schema, not lock
+                msg = str(exc).lower()
+                if "no such table" in msg:
+                    g = 0
+                else:
+                    return {
+                        "state": _DB_PROBE_UNKNOWN,
+                        "grants": 0,
+                        "entitlements": 0,
+                        "error": f"grants:{exc}"[:80],
+                    }
+            except sqlite3.Error as exc:
+                return {
+                    "state": _DB_PROBE_UNKNOWN,
+                    "grants": 0,
+                    "entitlements": 0,
+                    "error": f"grants:{exc}"[:80],
+                }
             try:
                 e = int(
                     conn.execute("SELECT COUNT(*) FROM connect_entitlements").fetchone()[
                         0
                     ]
                 )
-            except sqlite3.Error:
-                e = 0
-            return max(0, g), max(0, e)
+            except sqlite3.OperationalError as exc:
+                msg = str(exc).lower()
+                if "no such table" in msg:
+                    e = 0
+                else:
+                    return {
+                        "state": _DB_PROBE_UNKNOWN,
+                        "grants": 0,
+                        "entitlements": 0,
+                        "error": f"ents:{exc}"[:80],
+                    }
+            except sqlite3.Error as exc:
+                return {
+                    "state": _DB_PROBE_UNKNOWN,
+                    "grants": 0,
+                    "entitlements": 0,
+                    "error": f"ents:{exc}"[:80],
+                }
+            g = max(0, g)
+            e = max(0, e)
+            if g + e > 0:
+                return {
+                    "state": _DB_PROBE_HAS_HISTORY,
+                    "grants": g,
+                    "entitlements": e,
+                    "error": "",
+                }
+            return {
+                "state": _DB_PROBE_EMPTY,
+                "grants": 0,
+                "entitlements": 0,
+                "error": "",
+            }
         finally:
             conn.close()
-    except OSError:
-        return 0, 0
+    except sqlite3.OperationalError as exc:
+        # locked database / busy → must NOT migrate over
+        return {
+            "state": _DB_PROBE_UNKNOWN,
+            "grants": 0,
+            "entitlements": 0,
+            "error": f"op:{exc}"[:80],
+        }
+    except sqlite3.Error as exc:
+        return {
+            "state": _DB_PROBE_UNKNOWN,
+            "grants": 0,
+            "entitlements": 0,
+            "error": f"sql:{exc}"[:80],
+        }
+    except OSError as exc:
+        return {
+            "state": _DB_PROBE_UNKNOWN,
+            "grants": 0,
+            "entitlements": 0,
+            "error": f"os:{exc}"[:80],
+        }
+
+
+def payment_db_history_counts(path: Path) -> tuple[int, int]:
+    """Return (grant_count, entitlement_count).
+
+    On probe failure returns (0, 0) for display only — callers that decide
+    migrate must use :func:`payment_db_probe` and refuse ``unknown``.
+    """
+    probe = payment_db_probe(path)
+    if probe["state"] in (_DB_PROBE_HAS_HISTORY, _DB_PROBE_EMPTY):
+        return int(probe["grants"]), int(probe["entitlements"])
+    return 0, 0
 
 
 def payment_db_has_history(path: Path) -> bool:
-    g, e = payment_db_history_counts(path)
-    return (g + e) > 0
+    return payment_db_probe(path)["state"] == _DB_PROBE_HAS_HISTORY
+
+
+def payment_db_is_safe_migrate_dest(path: Path) -> bool:
+    """True only when dest is absent or verified empty (never unknown/locked)."""
+    return payment_db_probe(path)["state"] in (_DB_PROBE_ABSENT, _DB_PROBE_EMPTY)
+
+
+def _acquire_migrate_file_lock(lock_path: Path):
+    """Cross-platform exclusive file lock for one-shot migrate (context manager)."""
+    import contextlib
+
+    @contextlib.contextmanager
+    def _cm():
+        lock_path.parent.mkdir(parents=True, exist_ok=True)
+        fh = open(lock_path, "a+b")
+        try:
+            try:
+                if os.name == "nt":
+                    import msvcrt
+
+                    fh.seek(0)
+                    if fh.read(1) == b"":
+                        fh.write(b"0")
+                        fh.flush()
+                    fh.seek(0)
+                    msvcrt.locking(fh.fileno(), msvcrt.LK_NBLCK, 1)
+                else:
+                    import fcntl
+
+                    fcntl.flock(fh.fileno(), fcntl.LOCK_EX)
+            except OSError as exc:
+                # Could not lock — skip migrate this call (do not overwrite)
+                yield False, f"lock_failed:{exc}"[:80]
+                return
+            yield True, ""
+        finally:
+            try:
+                if os.name == "nt":
+                    import msvcrt
+
+                    fh.seek(0)
+                    try:
+                        msvcrt.locking(fh.fileno(), msvcrt.LK_UNLCK, 1)
+                    except OSError:
+                        pass
+                else:
+                    import fcntl
+
+                    fcntl.flock(fh.fileno(), fcntl.LOCK_UN)
+            except OSError:
+                pass
+            try:
+                fh.close()
+            except OSError:
+                pass
+
+    return _cm()
 
 
 def ensure_payment_db_migrated_from_legacy() -> dict[str, Any]:
-    """Copy legacy ephemeral DB into durable path when durable has no history.
+    """One-shot copy of legacy DB into durable path when dest is clearly empty.
 
-    Idempotent. Never overwrites a durable DB that already has grants or
-    entitlements. Returns a small status dict for logs/admin honesty.
+    Safety rules (must not destroy live history):
+    - Only when dest probe is ``absent`` or ``empty`` (verified zero rows / no file).
+    - Never when dest is ``has_history`` or ``unknown`` (lock/error/busy).
+    - Process-level once flag + exclusive file lock around the check+copy.
+    - Not invoked from :func:`db_path` on every open — only :func:`init_db`.
     """
+    global _migrate_once_done
     import shutil
 
     dest_dir = payment_data_dir()
@@ -745,56 +946,117 @@ def ensure_payment_db_migrated_from_legacy() -> dict[str, Any]:
         "source": "",
         "reason": "",
     }
-    if payment_db_has_history(dest):
-        status["reason"] = "dest_has_history"
+
+    if _migrate_once_done:
+        status["reason"] = "already_ran"
         return status
 
-    dest_g, dest_e = payment_db_history_counts(dest)
-    best: Path | None = None
-    best_score = dest_g + dest_e
-    for cand in legacy_payment_db_candidates():
-        try:
-            if cand.resolve() == dest.resolve():
-                continue
-        except OSError:
-            if str(cand) == str(dest):
-                continue
-        if not cand.is_file():
-            continue
-        g, e = payment_db_history_counts(cand)
-        score = g + e
-        if score > best_score:
-            best = cand
-            best_score = score
+    with _migrate_once_lock:
+        if _migrate_once_done:
+            status["reason"] = "already_ran"
+            return status
 
-    if best is None or best_score <= 0:
-        status["reason"] = "no_legacy_history"
-        return status
+        lock_path = dest_dir / ".paid_downloads.migrate.lock"
+        with _acquire_migrate_file_lock(lock_path) as (locked, lock_err):
+            if not locked:
+                status["reason"] = lock_err or "lock_failed"
+                # Do not set _migrate_once_done — allow retry next init
+                return status
 
-    try:
-        # Prefer copy2; if dest exists empty, replace
-        tmp = dest.with_suffix(".sqlite3.migrate-tmp")
-        shutil.copy2(best, tmp)
-        tmp.replace(dest)
-        status["migrated"] = True
-        status["source"] = str(best)
-        status["reason"] = "copied_legacy_to_durable"
-        status["rows"] = best_score
-    except OSError as exc:
-        status["reason"] = f"copy_failed:{exc}"[:120]
-    return status
+            dest_probe = payment_db_probe(dest)
+            status["dest_state"] = dest_probe["state"]
+            if dest_probe["state"] == _DB_PROBE_HAS_HISTORY:
+                status["reason"] = "dest_has_history"
+                _migrate_once_done = True
+                return status
+            if dest_probe["state"] == _DB_PROBE_UNKNOWN:
+                # Locked / unreadable durable file — refuse overwrite
+                status["reason"] = f"dest_unknown:{dest_probe.get('error') or ''}"[:120]
+                _migrate_once_done = True
+                return status
+            if dest_probe["state"] not in (_DB_PROBE_ABSENT, _DB_PROBE_EMPTY):
+                status["reason"] = f"dest_not_migratable:{dest_probe['state']}"
+                _migrate_once_done = True
+                return status
+
+            best: Path | None = None
+            best_score = 0
+            for cand in legacy_payment_db_candidates():
+                try:
+                    if cand.resolve() == dest.resolve():
+                        continue
+                except OSError:
+                    if str(cand) == str(dest):
+                        continue
+                if not cand.is_file():
+                    continue
+                cp = payment_db_probe(cand)
+                if cp["state"] != _DB_PROBE_HAS_HISTORY:
+                    continue
+                score = int(cp["grants"]) + int(cp["entitlements"])
+                if score > best_score:
+                    best = cand
+                    best_score = score
+
+            if best is None or best_score <= 0:
+                status["reason"] = "no_legacy_history"
+                _migrate_once_done = True
+                return status
+
+            # Re-check dest immediately before replace (TOCTOU)
+            dest_probe2 = payment_db_probe(dest)
+            if dest_probe2["state"] not in (_DB_PROBE_ABSENT, _DB_PROBE_EMPTY):
+                status["reason"] = f"dest_changed:{dest_probe2['state']}"
+                _migrate_once_done = True
+                return status
+
+            try:
+                tmp = dest.with_suffix(".sqlite3.migrate-tmp")
+                shutil.copy2(best, tmp)
+                # Atomic replace only after successful copy
+                os.replace(str(tmp), str(dest))
+                status["migrated"] = True
+                status["source"] = str(best)
+                status["reason"] = "copied_legacy_to_durable"
+                status["rows"] = best_score
+            except OSError as exc:
+                status["reason"] = f"copy_failed:{exc}"[:120]
+                try:
+                    tmp = dest.with_suffix(".sqlite3.migrate-tmp")
+                    if tmp.is_file():
+                        tmp.unlink(missing_ok=True)  # type: ignore[arg-type]
+                except OSError:
+                    pass
+
+            _migrate_once_done = True
+            return status
+
+
+def reset_payment_migrate_once_for_tests() -> None:
+    """Test helper: allow another migrate attempt in-process."""
+    global _migrate_once_done
+    _migrate_once_done = False
 
 
 def payment_store_durability_status() -> dict[str, Any]:
     """Operator-facing: path, env, disk vs ephemeral, row counts."""
-    ensure_payment_db_migrated_from_legacy()
+    # One-shot migrate only via init_db path (do not re-run on every status read
+    # beyond the once-flag; init_db is safe and list helpers call it).
+    init_db()
     path = db_path()
     env_raw = os.environ.get("RPT_PAYMENT_DATA_DIR", "").strip()
     path_s = str(path).replace("\\", "/")
     on_render_disk = path_s.startswith(RENDER_PAYMENT_DISK_MOUNT.rstrip("/") + "/") or (
-        path_s == RENDER_PAYMENT_DATA_DIR or path_s.startswith(RENDER_PAYMENT_DATA_DIR + "/")
+        path_s == RENDER_PAYMENT_DATA_DIR
+        or path_s.startswith(RENDER_PAYMENT_DATA_DIR + "/")
     )
-    g, e = payment_db_history_counts(path)
+    probe = payment_db_probe(path)
+    g = int(probe.get("grants") or 0) if probe["state"] != _DB_PROBE_UNKNOWN else 0
+    e = (
+        int(probe.get("entitlements") or 0)
+        if probe["state"] != _DB_PROBE_UNKNOWN
+        else 0
+    )
     ephemeral_risk = not env_raw or not on_render_disk
     return {
         "db_path": str(path),
@@ -805,14 +1067,14 @@ def payment_store_durability_status() -> dict[str, Any]:
         "ephemeral_risk": ephemeral_risk,
         "grant_count": g,
         "licence_count": e,
+        "db_state": probe["state"],
         "filename": PAYMENT_DB_FILENAME,
         "render_expected_dir": RENDER_PAYMENT_DATA_DIR,
     }
 
 
 def db_path() -> Path:
-    """Path to paid_downloads.sqlite3 (after optional legacy → durable migrate)."""
-    ensure_payment_db_migrated_from_legacy()
+    """Path to paid_downloads.sqlite3 (no migrate side-effect on every open)."""
     return _data_dir() / PAYMENT_DB_FILENAME
 
 
