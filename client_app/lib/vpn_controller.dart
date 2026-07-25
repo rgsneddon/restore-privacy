@@ -74,6 +74,15 @@ class VpnController {
 
       final ok = isConnectSuccess(result);
       onStatus(mapConnectStatusMessage(result));
+      // macOS NE permission / host-only HELLO: native opens Settings; Flutter retries open
+      // if the map asks for approval (covers platforms that only return the flag).
+      if (!ok && shouldPromptOpenVpnSystemSettings(result)) {
+        final already =
+            result is Map && result['openedVpnSettings'] == true;
+        if (!already) {
+          await openVpnSystemSettings();
+        }
+      }
       return ok;
     } on PlatformException catch (e) {
       progress?.cancel();
@@ -90,6 +99,38 @@ class VpnController {
       return false;
     } finally {
       progress?.cancel();
+    }
+  }
+
+  /// Open System Settings → Network / VPN so the user can Allow the configuration.
+  /// macOS: native `openVpnSettings` (NSWorkspace deep-link). Other platforms: no-op ok:false.
+  Future<bool> openVpnSystemSettings() async {
+    try {
+      final result = await _channel.invokeMethod<dynamic>('openVpnSettings');
+      if (result is Map) {
+        final opened = result['opened'] == true || result['ok'] == true;
+        final msg = result['message']?.toString().trim();
+        if (msg != null && msg.isNotEmpty) {
+          onStatus(msg);
+        } else if (opened) {
+          onStatus(
+            'Opened System Settings (Network / VPN). Allow Restore Privacy, then Connect again.',
+          );
+        }
+        return opened;
+      }
+      return false;
+    } on MissingPluginException {
+      onStatus(
+        'Open System Settings → Network → VPN & Filters, Allow Restore Privacy, then Connect again.',
+      );
+      return false;
+    } on PlatformException catch (e) {
+      onStatus(
+        'Could not open System Settings (${e.message ?? e.code}). '
+        'Manually: System Settings → Network → VPN & Filters.',
+      );
+      return false;
     }
   }
 

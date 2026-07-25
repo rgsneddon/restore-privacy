@@ -76,6 +76,13 @@ class TestMacosResidualTeamSign(unittest.TestCase):
         self.assertIn("maxAttempts: 40", text)
         # Must not blindly use managers?.first for unrelated VPN configs
         self.assertIn("shouldStopManager", text)
+        # NE permission / host-only HELLO: open System Settings for user Allow
+        self.assertIn("openVpnSystemSettings", text)
+        self.assertIn("vpnSystemSettingsURLCandidates", text)
+        self.assertIn("openVpnSettings", text)
+        self.assertIn("needsVpnSystemSettingsApproval", text)
+        self.assertIn("Network-Settings.extension", text)
+        self.assertIn("annotateNeedsVpnSettings", text)
 
     def test_honesty_message_mentions_team_residual_and_system_settings(self):
         dart = (ROOT / "client_app" / "lib" / "connect_status.dart").read_text(
@@ -84,6 +91,9 @@ class TestMacosResidualTeamSign(unittest.TestCase):
         self.assertIn("System VPN (Packet Tunnel) did not become active", dart)
         self.assertIn("sign_macos_residual_team", dart)
         self.assertIn("VPN & Filters", dart)
+        self.assertIn("shouldPromptOpenVpnSystemSettings", dart)
+        self.assertIn("isNeVpnPermissionFailureMessage", dart)
+        self.assertIn("kOpenVpnSettingsLabel", dart)
         swift = (
             ROOT
             / "client_app"
@@ -94,6 +104,19 @@ class TestMacosResidualTeamSign(unittest.TestCase):
             / "RptFullTunnelResult.swift"
         ).read_text(encoding="utf-8")
         self.assertIn("sign_macos_residual_team", swift)
+        self.assertIn("VPN & Filters", swift)
+
+    def test_open_vpn_settings_candidates_are_shipped_urls(self):
+        """Shipped helper lists real macOS Settings deep-links (no live UI required)."""
+        text = CHANNEL.read_text(encoding="utf-8")
+        # Candidate list is pure data inside open helper
+        for needle in (
+            "x-apple.systempreferences:com.apple.Network-Settings.extension",
+            "x-apple.systempreferences:com.apple.preference.network",
+            "x-apple.systempreferences:com.apple.LoginItems-Settings.extension",
+            "Network.prefPane",
+        ):
+            self.assertIn(needle, text, f"missing settings candidate: {needle}")
 
     def test_catalog_handoff_and_build_docs_name_team_residual_resign(self):
         """Operator-facing residual docs: Packet Tunnel residual needs Team re-sign."""

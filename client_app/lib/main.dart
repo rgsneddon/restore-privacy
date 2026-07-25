@@ -864,6 +864,33 @@ class _TunnelHomeState extends State<TunnelHome> with WidgetsBindingObserver {
                         ),
                       ),
                     ],
+                    // macOS NE permission / host-only HELLO: open System Settings so user can Allow VPN.
+                    if (!_connected &&
+                        isNeVpnPermissionFailureMessage(_status)) ...[
+                      const SizedBox(height: 10),
+                      Align(
+                        alignment: Alignment.centerLeft,
+                        child: OutlinedButton.icon(
+                          onPressed: _busy
+                              ? null
+                              : () async {
+                                  _append(
+                                    'Opening System Settings → Network / VPN…',
+                                  );
+                                  final opened =
+                                      await _vpn.openVpnSystemSettings();
+                                  if (!mounted) return;
+                                  _append(
+                                    opened
+                                        ? 'System Settings opened — Allow Restore Privacy, then Connect again.'
+                                        : 'Could not open Settings automatically — use System Settings → Network → VPN & Filters.',
+                                  );
+                                },
+                          icon: const Icon(Icons.settings_ethernet, size: 18),
+                          label: const Text(kOpenVpnSettingsLabel),
+                        ),
+                      ),
+                    ],
                   ],
                 ),
               ),

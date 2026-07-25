@@ -81,6 +81,59 @@ void main() {
       expect(msg, contains('VPN permission denied'));
     });
 
+    test('NEVPNErrorDomain 5 maps to open-VPN-settings failure class', () {
+      const detail =
+          'NE preferences failed (NEVPNErrorDomain 5): permission denied. '
+          'Approve VPN configuration in System Settings → Network → VPN & Filters';
+      expect(isNeVpnPermissionFailureMessage(detail), isTrue);
+      final map = buildFullTunnelConnectResult(
+        packetTunnelActive: false,
+        vpnIp: '10.88.0.2',
+        hostOnlyHello: true,
+        detailMessage: detail,
+        nodeDiagnostic:
+            'Node reachable; session assigned 10.88.0.2 via 82.221.101.241:44044 (HELLO-only, transport closed).',
+      );
+      expect(isConnectSuccess(map), isFalse);
+      expect(shouldPromptOpenVpnSystemSettings(map), isTrue);
+      final msg = mapConnectStatusMessage(map);
+      expect(msg, contains('residual public IP'));
+      expect(msg, contains('10.88.0.2'));
+      expect(msg.toLowerCase(), contains('system settings'));
+      expect(msg.toLowerCase(), contains('vpn'));
+      // End-user path is present (not operator-script-only).
+      expect(msg, contains('VPN & Filters'));
+    });
+
+    test('needsVpnSystemSettingsApproval flag prompts open settings', () {
+      expect(
+        shouldPromptOpenVpnSystemSettings({
+          'ok': false,
+          'message': 'something failed',
+          'fullTunnelActive': false,
+          'needsVpnSystemSettingsApproval': true,
+        }),
+        isTrue,
+      );
+      expect(
+        shouldPromptOpenVpnSystemSettings({
+          'ok': true,
+          'message': 'Connected',
+          'fullTunnelActive': true,
+          'needsVpnSystemSettingsApproval': true,
+        }),
+        isFalse,
+      );
+    });
+
+    test('packet tunnel not active message includes Settings then Connect', () {
+      expect(kPacketTunnelNotActiveMessage, contains('VPN & Filters'));
+      expect(kPacketTunnelNotActiveMessage, contains('Connect again'));
+      expect(kPacketTunnelNotActiveMessage, contains('sign_macos_residual_team'));
+      expect(kHostOnlyHelloNotFullTunnelMessage, contains('System Settings'));
+      expect(kOpenVpnSettingsLabel.toLowerCase(), contains('vpn'));
+    });
+
     test('success includes VPN IP when provided', () {
       final msg = mapConnectStatusMessage({
         'ok': true,
