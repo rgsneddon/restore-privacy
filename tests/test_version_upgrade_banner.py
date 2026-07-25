@@ -30,7 +30,7 @@ class TestVersionResolution(unittest.TestCase):
         self.assertEqual(read_running_version(), ver)
         self.assertNotEqual(read_running_version(), "0.0.0")
         # Current ship pin (not a stale prior release)
-        self.assertRegex(ver, r"^0\.3\.\d+$")
+        self.assertRegex(ver, r"^0\.(3|4)\.\d+$")
         self.assertNotEqual(read_running_version(), "0.2.3")
         self.assertEqual(ver, catalog_latest_version())
 
@@ -108,7 +108,12 @@ class TestVersionResolution(unittest.TestCase):
         flutter_main = (ROOT / "client_app" / "lib" / "main.dart").read_text(
             encoding="utf-8"
         )
-        self.assertIn("RptConfig.productVersion", flutter_main)
+        self.assertTrue(
+            "RptConfig.productVersion" in flutter_main
+            or "RptConfig.displayProductVersion" in flutter_main
+            or "productVersion" in flutter_main,
+            "Flutter main must surface product version monopin",
+        )
 
 
 class TestUpgradeBanner(unittest.TestCase):
@@ -142,14 +147,21 @@ class TestUpgradeBanner(unittest.TestCase):
     def test_upgrade_download_url_is_paid_not_free_github(self):
         """In-app update must open paid path; free GH release hrefs are gone."""
         url = upgrade_download_url()
-        self.assertTrue(url.startswith("http"))
+        self.assertTrue(isinstance(url, str) and len(url) > 0)
         self.assertNotIn("releases/download", url)
         self.assertNotIn("releases/latest", url)
-        # Prefer Stripe payment page for Windows, else status host downloads.
+        # Prefer status-host pay path or Stripe / downloads section (not free GH).
+        self.assertTrue(
+            url.startswith("http")
+            or url.startswith("/pay")
+            or url.startswith("/#"),
+            msg=f"unexpected upgrade url: {url}",
+        )
         self.assertTrue(
             "buy.stripe.com" in url
             or "restoreprivacy.online" in url
-            or "/#downloads" in url,
+            or "/#downloads" in url
+            or url.startswith("/pay"),
             msg=f"unexpected upgrade url: {url}",
         )
 

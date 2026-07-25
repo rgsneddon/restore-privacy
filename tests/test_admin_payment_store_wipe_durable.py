@@ -102,7 +102,7 @@ class TestPaymentStoreWipeProtection(unittest.TestCase):
                         """,
                         (
                             "tok-wipe-test-1",
-                            "restore-privacy-client-0.4.5-windows-x64-setup.exe",
+                            "restore-privacy-client-0.4.6-windows-x64-setup.exe",
                             "windows",
                             "cs_wipe_test_1",
                             245,

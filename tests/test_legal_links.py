@@ -103,7 +103,7 @@ class TestDocsTrafficShapeAligned(unittest.TestCase):
         public_privacy = (
             ROOT / "status_page" / "public" / "PRIVACY_POLICY.md"
         ).read_text(encoding="utf-8")
-        # Product traffic-shape / outer-obfs defaults are OFF (0.4.5 lean residual)
+        # Product traffic-shape / outer-obfs defaults are OFF (0.4.6 lean residual)
         for text, name in (
             (readme, "README"),
             (privacy, "PRIVACY_POLICY"),
@@ -144,13 +144,13 @@ class TestDocsTrafficShapeAligned(unittest.TestCase):
         )
         self.assertIn("RPT_TRAFFIC_SHAPE", privacy)
         # Live catalog pin in privacy policy (root + public mirror)
-        self.assertIn("Current packages (catalog v0.4.5)", privacy)
+        self.assertIn("Current packages (catalog v0.4.6)", privacy)
         self.assertNotIn("Current packages (catalog v0.4.1)", privacy)
         self.assertNotIn("Current packages (catalog v0.4.0)", privacy)
         public_privacy_pin = (
             ROOT / "status_page" / "public" / "PRIVACY_POLICY.md"
         ).read_text(encoding="utf-8")
-        self.assertIn("Current packages (catalog v0.4.5)", public_privacy_pin)
+        self.assertIn("Current packages (catalog v0.4.6)", public_privacy_pin)
         self.assertNotIn("Current packages (catalog v0.4.1)", public_privacy_pin)
         self.assertTrue(
             "off by default" in privacy.lower()
@@ -164,7 +164,7 @@ class TestDocsTrafficShapeAligned(unittest.TestCase):
         self.assertNotIn("RPT_TRAFFIC_SHAPE=0", privacy)
         # Version surface: current catalog pin and/or historical
         self.assertTrue(
-            "0.4.5" in readme
+            "0.4.6" in readme
             or "1.0.0" in readme
             or "0.4.0" in readme
             or "0.2.9" in readme,

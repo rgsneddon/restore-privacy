@@ -18,8 +18,8 @@ void main() {
     expect(RptConfig.residualNodePubName, 'exit_node_elgamal.pub');
   });
 
-  test('productVersion is 0.4.5 monopin', () {
-    expect(RptConfig.productVersion, '0.4.5');
+  test('productVersion is 0.4.6 monopin', () {
+    expect(RptConfig.productVersion, '0.4.6');
   });
 }
 
