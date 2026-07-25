@@ -134,6 +134,59 @@ void main() {
       expect(kOpenVpnSettingsLabel.toLowerCase(), contains('vpn'));
     });
 
+    test('prepare Packet Tunnel is product tunnel type never L2TP/IKEv2', () {
+      final prepared = {
+        'ok': true,
+        'prepared': true,
+        'tunnelType': kProductVpnTunnelType,
+        'providerBundleId': kProductVpnProviderBundleId,
+        'localizedDescription': kProductVpnLocalizedDescription,
+        'message': kPacketTunnelPreparedMessage,
+      };
+      expect(isProductPacketTunnelPrepareResult(prepared), isTrue);
+      expect(prepared['tunnelType'], isNot(equals('l2tp')));
+      expect(prepared['tunnelType'], isNot(equals('ikev2')));
+      expect(prepared['tunnelType'], isNot(equals('ipsec')));
+      final msg = mapPrepareVpnStatusMessage(prepared);
+      expect(msg.toLowerCase(), contains('packet tunnel'));
+      expect(productCopyDirectsToLegacyVpnTypes(msg), isFalse);
+      expect(productCopyDirectsToLegacyVpnTypes(kPacketTunnelPreparedMessage), isFalse);
+      // Positive "add L2TP" style is rejected for product copy.
+      expect(
+        productCopyDirectsToLegacyVpnTypes(
+          'Add L2TP over IPsec configuration for Restore Privacy',
+        ),
+        isTrue,
+      );
+      expect(
+        productCopyDirectsToLegacyVpnTypes(
+          'Choose IKEv2 as the VPN type',
+        ),
+        isTrue,
+      );
+      // Contrast copy is allowed.
+      expect(
+        productCopyDirectsToLegacyVpnTypes(
+          'Do not add L2TP, Cisco IPsec, or IKEv2',
+        ),
+        isFalse,
+      );
+      final failed = {
+        'ok': false,
+        'prepared': false,
+        'tunnelType': kProductVpnTunnelType,
+        'providerBundleId': kProductVpnProviderBundleId,
+        'message':
+            'Could not pre-register Packet Tunnel. Allow under VPN & Filters '
+            '(Packet Tunnel — not L2TP / Cisco IPsec / IKEv2).',
+      };
+      expect(isProductPacketTunnelPrepareResult(failed), isTrue);
+      expect(
+        productCopyDirectsToLegacyVpnTypes(mapPrepareVpnStatusMessage(failed)),
+        isFalse,
+      );
+    });
+
     test(
       'open-result status strings keep Open VPN settings control via sticky flag',
       () {

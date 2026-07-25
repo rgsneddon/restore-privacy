@@ -31,6 +31,49 @@ class VpnController {
     return connect();
   }
 
+  /// Pre-Connect (macOS): register the product **Packet Tunnel** profile in OS VPN
+  /// preferences so configuration exists before Connect. Does not start the tunnel.
+  /// Never configures L2TP / Cisco IPsec / IKEv2.
+  ///
+  /// Returns true when native reports prepared/ok. Permission failures still return
+  /// false but set [onStatus] with Allow guidance.
+  Future<bool> preparePacketTunnelConfiguration() async {
+    try {
+      final result = await _channel.invokeMethod<dynamic>('prepareVpn', {
+        'host': RptConfig.host,
+        'port': RptConfig.port,
+        'fullTunnel': true,
+        'sessionName': RptConfig.sessionName,
+      });
+      final msg = mapPrepareVpnStatusMessage(result);
+      // Keep failure residual-honest; prepared success is pre-Connect guidance only.
+      if (result is Map &&
+          (result['prepared'] == true || result['ok'] == true)) {
+        onStatus(msg);
+        return isProductPacketTunnelPrepareResult(result) ||
+            result['prepared'] == true;
+      }
+      onStatus(msg);
+      if (shouldPromptOpenVpnSystemSettings(result)) {
+        final already =
+            result is Map && result['openedVpnSettings'] == true;
+        if (!already) {
+          await openVpnSystemSettings(reportStatus: false);
+        }
+      }
+      return false;
+    } on MissingPluginException {
+      // Non-macOS / host without channel — nothing to prepare.
+      return false;
+    } on PlatformException catch (e) {
+      onStatus(
+        'Could not pre-register Packet Tunnel (${e.message ?? e.code}). '
+        'Allow Restore Privacy under VPN & Filters if asked — not L2TP/IKEv2.',
+      );
+      return false;
+    }
+  }
+
   /// Product Connect: keep **Connecting** status until native full-tunnel result.
   ///
   /// Android HELLO + TUN can take tens of seconds on mobile UDP — do not drop

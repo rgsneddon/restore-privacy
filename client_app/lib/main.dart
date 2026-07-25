@@ -121,8 +121,48 @@ class _TunnelHomeState extends State<TunnelHome> with WidgetsBindingObserver {
       } else if (mounted && await (_licence?.needsKeygenUnlock() ?? false)) {
         await _showKeygenSheet();
       }
+      // macOS: register Packet Tunnel NE profile in OS VPN prefs before Connect
+      // (not L2TP / Cisco IPsec / IKEv2 — those are manual System Settings types).
+      await _prepareMacosPacketTunnelBeforeConnect();
       await _maybeAutoconnect();
     });
+  }
+
+  /// First-run / post-install style prep: save product Packet Tunnel to OS prefs.
+  Future<void> _prepareMacosPacketTunnelBeforeConnect() async {
+    if (!MacosWindow.isSupported) return;
+    if (!mounted) return;
+    _append(
+      'Preparing system VPN profile (Restore Privacy Packet Tunnel)…',
+    );
+    final ok = await _vpn.preparePacketTunnelConfiguration();
+    if (!mounted) return;
+    if (ok) {
+      _append(
+        'Packet Tunnel configuration ready — Allow if macOS asks, then Connect. '
+        'Do not add L2TP, Cisco IPsec, or IKEv2.',
+      );
+      // Prefer prepared guidance on the card when still disconnected.
+      if (!_connected &&
+          (_status.toLowerCase().contains('ready') ||
+              _status.toLowerCase().contains('press connect') ||
+              _status.toLowerCase().contains('not connected'))) {
+        setState(() {
+          _status = kPacketTunnelPreparedMessage;
+        });
+      }
+    } else if (isNeVpnPermissionFailureMessage(_status) ||
+        shouldPromptOpenVpnSystemSettings({
+          'ok': false,
+          'message': _status,
+          'fullTunnelActive': false,
+        })) {
+      setState(() => _needsVpnSystemSettingsApproval = true);
+      _append(
+        'Allow Restore Privacy under System Settings → Network → VPN & Filters '
+        '(Packet Tunnel), then Connect. Do not choose L2TP / IKEv2 manually.',
+      );
+    }
   }
 
   Future<void> _initSettings() async {
@@ -438,6 +478,8 @@ class _TunnelHomeState extends State<TunnelHome> with WidgetsBindingObserver {
                         });
                         _append('Keygen unlocked (status=$st).');
                         Navigator.of(ctx).pop();
+                        // Register Packet Tunnel before user presses Connect.
+                        await _prepareMacosPacketTunnelBeforeConnect();
                       } else {
                         setModal(
                           () => statusLine =

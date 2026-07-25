@@ -169,6 +169,68 @@ const String kHostOnlyHelloNotFullTunnelMessage =
 /// Button / channel label when the user must Allow the OS VPN configuration.
 const String kOpenVpnSettingsLabel = 'Open VPN settings';
 
+/// Product macOS residual tunnel type — Packet Tunnel Network Extension only.
+/// Never L2TP, Cisco IPsec, or IKEv2 (those are System Settings manual types).
+const String kProductVpnTunnelType = 'packet-tunnel';
+
+/// Packet Tunnel provider bundle id registered in OS VPN preferences.
+const String kProductVpnProviderBundleId =
+    'com.restoreprivacy.restorePrivacyClient.PacketTunnel';
+
+/// Localized name of the system VPN configuration (matches native save).
+const String kProductVpnLocalizedDescription = 'Restore Privacy';
+
+/// Pre-Connect status when Packet Tunnel profile is registered (not yet connected).
+const String kPacketTunnelPreparedMessage =
+    'Restore Privacy Packet Tunnel registered in System VPN preferences. '
+    'If macOS asks to Allow VPN configuration, choose Allow — '
+    'do not add L2TP, Cisco IPsec, or IKEv2. Then press Connect.';
+
+/// True when a native prepare map describes the product Packet Tunnel (not legacy VPN).
+bool isProductPacketTunnelPrepareResult(dynamic result) {
+  if (result is! Map) return false;
+  final type = result['tunnelType']?.toString().toLowerCase() ?? '';
+  final bid = result['providerBundleId']?.toString() ?? '';
+  if (type == kProductVpnTunnelType) return true;
+  if (bid == kProductVpnProviderBundleId) return true;
+  return false;
+}
+
+/// True when [message] wrongly steers users to manual L2TP / Cisco IPsec / IKEv2 as product.
+bool productCopyDirectsToLegacyVpnTypes(String message) {
+  final m = message.toLowerCase();
+  // Contrast/negation is OK ("do not add L2TP"); positive "add L2TP" style is not.
+  if (m.contains('do not add l2tp') ||
+      m.contains('not l2tp') ||
+      m.contains('— not l2tp') ||
+      m.contains('- not l2tp') ||
+      m.contains('never l2tp') ||
+      m.contains('not configure l2tp')) {
+    return false;
+  }
+  final positiveLegacy = RegExp(
+    r'\b(add|choose|select|use|configure)\b.{0,40}\b(l2tp|ikev2|cisco\s*ipsec)\b',
+    caseSensitive: false,
+  );
+  return positiveLegacy.hasMatch(message);
+}
+
+/// Human status from prepareVpn / preparePacketTunnel channel map.
+String mapPrepareVpnStatusMessage(dynamic result) {
+  if (result is! Map) {
+    return 'Could not pre-register Packet Tunnel VPN configuration.';
+  }
+  final message = result['message']?.toString().trim() ?? '';
+  if (result['prepared'] == true || result['ok'] == true) {
+    if (message.isNotEmpty) return message;
+    return kPacketTunnelPreparedMessage;
+  }
+  if (message.isNotEmpty) return message;
+  return 'Could not pre-register Packet Tunnel VPN configuration. '
+      'Allow Restore Privacy under System Settings → Network → VPN & Filters '
+      '(Packet Tunnel — not L2TP / Cisco IPsec / IKEv2).';
+}
+
 /// Log-only feedback after attempting to open System Settings (must not replace residual failure status).
 const String kOpenVpnSettingsOpenedFeedback =
     'Opened System Settings (Network / VPN). Allow Restore Privacy, then Connect again.';

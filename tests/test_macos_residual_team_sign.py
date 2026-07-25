@@ -83,6 +83,38 @@ class TestMacosResidualTeamSign(unittest.TestCase):
         self.assertIn("needsVpnSystemSettingsApproval", text)
         self.assertIn("Network-Settings.extension", text)
         self.assertIn("annotateNeedsVpnSettings", text)
+        # Pre-Connect Packet Tunnel registration (not L2TP/IKEv2)
+        self.assertIn("preparePacketTunnelConfiguration", text)
+        self.assertIn("prepareVpn", text)
+        self.assertIn("applyProductPacketTunnelProtocol", text)
+        self.assertIn("productTunnelType", text)
+        self.assertIn("packet-tunnel", text)
+        self.assertIn("NETunnelProviderProtocol", text)
+        self.assertNotIn("NEVPNProtocolL2TP", text)
+        self.assertNotIn("NEVPNProtocolIKEv2", text)
+        self.assertNotIn("NEVPNProtocolIPSec", text)
+
+    def test_preconnect_prepare_wired_from_flutter_launch_path(self):
+        """Launch/first-run calls prepare before Connect is the productive path."""
+        main = (ROOT / "client_app" / "lib" / "main.dart").read_text(encoding="utf-8")
+        vpn = (ROOT / "client_app" / "lib" / "vpn_controller.dart").read_text(
+            encoding="utf-8"
+        )
+        status = (ROOT / "client_app" / "lib" / "connect_status.dart").read_text(
+            encoding="utf-8"
+        )
+        self.assertIn("preparePacketTunnelConfiguration", vpn)
+        self.assertIn("prepareVpn", vpn)
+        self.assertIn("_prepareMacosPacketTunnelBeforeConnect", main)
+        self.assertIn("preparePacketTunnelConfiguration", main)
+        self.assertIn("kProductVpnTunnelType", status)
+        self.assertIn("packet-tunnel", status)
+        self.assertIn("kProductVpnProviderBundleId", status)
+        # Product copy must not instruct adding legacy manual VPN types
+        combined = (status + main).lower()
+        self.assertIn("do not add l2tp", combined)
+        self.assertIn("isProductPacketTunnelPrepareResult", status)
+        self.assertIn("mapPrepareVpnStatusMessage", status)
 
     def test_honesty_message_mentions_team_residual_and_system_settings(self):
         dart = (ROOT / "client_app" / "lib" / "connect_status.dart").read_text(

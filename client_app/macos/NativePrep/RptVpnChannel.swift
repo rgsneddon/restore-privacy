@@ -10,10 +10,18 @@ import AppKit
 
 enum RptVpnChannel {
   static let name = "restore_privacy/vpn"
+  /// Packet Tunnel Network Extension provider — product residual path (not L2TP/IKEv2/IPsec).
   static let providerBundleId = "com.restoreprivacy.restorePrivacyClient.PacketTunnel"
+  /// System VPN preferences display name for the product manager.
+  static let productLocalizedDescription = "Restore Privacy"
+  /// Tunnel type token returned to Flutter / tests (never l2tp / ikev2 / ipsec).
+  static let productTunnelType = "packet-tunnel"
   /// Debounce auto-open of System Settings so a double Connect does not spam panes.
   private static var lastVpnSettingsOpenAt: Date?
   private static let vpnSettingsOpenDebounce: TimeInterval = 20
+  /// Debounce pre-Connect registration so first-run + Connect do not double-prompt Allow.
+  private static var lastPrepareAt: Date?
+  private static let prepareDebounce: TimeInterval = 8
 
   static func register(with messenger: FlutterBinaryMessenger) {
     // Seed Application Support + App Group + ~/.restore-privacy so Packet Tunnel
@@ -33,6 +41,13 @@ enum RptVpnChannel {
       case "disconnect":
         // Same stop path as app-quit / terminate hooks.
         stopAllTunnels { map in result(map) }
+      case "prepareVpn", "preparePacketTunnel", "registerVpnConfiguration":
+        // Pre-Connect: save Packet Tunnel NE profile into OS VPN prefs (not L2TP/IKEv2).
+        let args = call.arguments as? [String: Any] ?? [:]
+        let ep = RptEndpoint.resolve(from: args)
+        preparePacketTunnelConfiguration(host: ep.host, port: ep.port) { map in
+          result(map)
+        }
       case "openVpnSettings", "openVpnSystemSettings":
         // Explicit UI / Flutter retry — always attempt open (no debounce skip).
         let opened = openVpnSystemSettings(force: true)
@@ -40,8 +55,8 @@ enum RptVpnChannel {
           "ok": opened,
           "opened": opened,
           "message": opened
-            ? "Opened System Settings (Network / VPN). Allow Restore Privacy, then Connect again."
-            : "Could not open System Settings automatically — go to System Settings → Network → VPN & Filters.",
+            ? "Opened System Settings (Network / VPN). Allow Restore Privacy Packet Tunnel if prompted — do not add L2TP, Cisco IPsec, or IKEv2 manually."
+            : "Could not open System Settings automatically — go to System Settings → Network → VPN & Filters and Allow Restore Privacy (Packet Tunnel). Do not add L2TP/IKEv2.",
         ] as [String: Any])
       case "hasSecrets":
         result([
@@ -77,6 +92,82 @@ enum RptVpnChannel {
       default:
         result(FlutterMethodNotImplemented)
       }
+    }
+  }
+
+  /// Identity of the product VPN manager saved to OS preferences (Packet Tunnel only).
+  static func productVpnIdentity() -> [String: String] {
+    [
+      "tunnelType": productTunnelType,
+      "providerBundleId": providerBundleId,
+      "localizedDescription": productLocalizedDescription,
+    ]
+  }
+
+  /// Pre-Connect: register Restore Privacy Packet Tunnel in System VPN preferences.
+  /// Does **not** start the tunnel. macOS may still show Allow — that is required.
+  /// Never configures L2TP, Cisco IPsec, or IKEv2.
+  private static func preparePacketTunnelConfiguration(
+    host: String,
+    port: UInt16,
+    completion: @escaping ([String: Any]) -> Void
+  ) {
+    if let last = lastPrepareAt, Date().timeIntervalSince(last) < prepareDebounce {
+      var map: [String: Any] = [
+        "ok": true,
+        "prepared": true,
+        "debounced": true,
+        "tunnelType": productTunnelType,
+        "providerBundleId": providerBundleId,
+        "localizedDescription": productLocalizedDescription,
+        "message":
+          "Restore Privacy Packet Tunnel configuration already registered. "
+          + "Press Connect when ready (Allow in System Settings if macOS asks).",
+      ]
+      for (k, v) in productVpnIdentity() { map[k] = v }
+      completion(map)
+      return
+    }
+    loadOrCreateManager(host: host, port: port) { manager, neError in
+      lastPrepareAt = Date()
+      if let manager {
+        // Confirm product Packet Tunnel identity (not legacy VPN types).
+        let proto = manager.protocolConfiguration as? NETunnelProviderProtocol
+        let bid = proto?.providerBundleIdentifier ?? providerBundleId
+        var map: [String: Any] = [
+          "ok": true,
+          "prepared": true,
+          "tunnelType": productTunnelType,
+          "providerBundleId": bid,
+          "localizedDescription": manager.localizedDescription ?? productLocalizedDescription,
+          "enabled": manager.isEnabled,
+          "message":
+            "Restore Privacy Packet Tunnel registered in System VPN preferences. "
+            + "If macOS asked to Allow VPN configuration, choose Allow — "
+            + "do not add L2TP, Cisco IPsec, or IKEv2. Then press Connect.",
+        ]
+        completion(map)
+        return
+      }
+      let detail = neError ?? "NE preferences unavailable"
+      let openSettings = isNePermissionFailureDetail(detail)
+      if openSettings {
+        _ = openVpnSystemSettings(force: false)
+      }
+      var map: [String: Any] = [
+        "ok": false,
+        "prepared": false,
+        "tunnelType": productTunnelType,
+        "providerBundleId": providerBundleId,
+        "localizedDescription": productLocalizedDescription,
+        "needsVpnSystemSettingsApproval": true,
+        "openedVpnSettings": openSettings,
+        "message":
+          "Could not pre-register Packet Tunnel VPN configuration: \(detail). "
+          + "Allow Restore Privacy under System Settings → Network → VPN & Filters "
+          + "(Packet Tunnel Network Extension — not L2TP / Cisco IPsec / IKEv2), then relaunch or Connect.",
+      ]
+      completion(annotateNeedsVpnSettings(map, openSettings: false))
     }
   }
 
@@ -279,6 +370,28 @@ enum RptVpnChannel {
     return NETunnelProviderManager()
   }
 
+  /// Apply product Packet Tunnel protocol identity (shared by prepare + Connect).
+  private static func applyProductPacketTunnelProtocol(
+    to manager: NETunnelProviderManager,
+    host: String,
+    port: UInt16
+  ) {
+    let proto = NETunnelProviderProtocol()
+    proto.providerBundleIdentifier = providerBundleId
+    proto.serverAddress = "\(host):\(port)"
+    // DisconnectOnSleep false so residual session survives lid close while allowed by OS.
+    proto.disconnectOnSleep = false
+    proto.providerConfiguration = [
+      "host": host,
+      "port": Int(port),
+      "fullTunnel": true,
+      "sessionName": productLocalizedDescription,
+      "tunnelType": productTunnelType,
+    ]
+    manager.protocolConfiguration = proto
+    manager.localizedDescription = productLocalizedDescription
+  }
+
   /// Human-readable NEVPNStatus for failure messages.
   private static func statusName(_ status: NEVPNStatus) -> String {
     switch status {
@@ -324,19 +437,8 @@ enum RptVpnChannel {
         return
       }
       let manager = selectOrCreateManager(from: managers)
-      let proto = NETunnelProviderProtocol()
-      proto.providerBundleIdentifier = providerBundleId
-      proto.serverAddress = "\(host):\(port)"
-      // DisconnectOnSleep false so residual session survives lid close while allowed by OS.
-      proto.disconnectOnSleep = false
-      proto.providerConfiguration = [
-        "host": host,
-        "port": Int(port),
-        "fullTunnel": true,
-        "sessionName": "Restore Privacy",
-      ]
-      manager.protocolConfiguration = proto
-      manager.localizedDescription = "Restore Privacy"
+      // Product residual: Packet Tunnel Network Extension only (never L2TP/IKEv2/IPsec).
+      applyProductPacketTunnelProtocol(to: manager, host: host, port: port)
       manager.isEnabled = true
       manager.isOnDemandEnabled = false
       manager.saveToPreferences { saveErr in
@@ -509,7 +611,9 @@ enum RptVpnChannel {
   static func shouldStopManager(_ manager: NETunnelProviderManager) -> Bool {
     let proto = manager.protocolConfiguration as? NETunnelProviderProtocol
     let bid = proto?.providerBundleIdentifier ?? ""
-    return bid.isEmpty || bid == providerBundleId || manager.localizedDescription == "Restore Privacy"
+    return bid.isEmpty
+      || bid == providerBundleId
+      || manager.localizedDescription == productLocalizedDescription
   }
 
   /// Stop every Restore Privacy Packet Tunnel session (channel disconnect + app quit).
