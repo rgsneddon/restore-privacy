@@ -146,6 +146,7 @@ from client.windows.settings_store import (
     ProductSettings,
     apply_run_at_startup,
     load_settings,
+    normalize_entry_country,
     save_settings,
     should_autoconnect_on_launch,
 )
@@ -1281,12 +1282,7 @@ class TunnelClientApp:
                 )
 
             def then() -> None:
-                try:
-                    from client.multihop import multihop_config_from_env
-
-                    self.client.multihop = multihop_config_from_env()
-                except Exception:  # noqa: BLE001
-                    pass
+                self._refresh_multihop_from_settings()
                 self._apply_control(connected=False, busy=False)
                 self._set_status("disconnected")
                 self._start_connect()
@@ -1294,6 +1290,19 @@ class TunnelClientApp:
             self.root.after(0, then)
 
         threading.Thread(target=work, daemon=True).start()
+
+    def _refresh_multihop_from_settings(self) -> None:
+        """Reload residual path from Settings/env (entry country + multi-hop).
+
+        Must run on every Connect so a disconnected user who changes
+        ``entry_country`` / multihop does not dial a stale host from app init.
+        """
+        try:
+            from client.multihop import multihop_config_from_env
+
+            self.client.multihop = multihop_config_from_env()
+        except Exception:  # noqa: BLE001
+            pass
 
     def _on_toggle_connect(self) -> None:
         if self._busy:
@@ -1304,6 +1313,8 @@ class TunnelClientApp:
             self._start_connect()
 
     def _start_connect(self) -> None:
+        # Always refresh residual path from durable Settings before dialling.
+        self._refresh_multihop_from_settings()
         # Local-only gate first (no status-host I/O on the Tk UI thread).
         # Keygen unlock is required before residual HELLO — discovery of a
         # session-only thank-you file must not skip the keygen surface.
@@ -1838,6 +1849,9 @@ class TunnelClientApp:
         shape_var = tk.BooleanVar(value=cur.privacy_traffic_shape)
         obfs_var = tk.BooleanVar(value=cur.privacy_outer_obfuscation)
         multihop_var = tk.BooleanVar(value=cur.privacy_multihop)
+        entry_country_var = tk.StringVar(
+            value=normalize_entry_country(getattr(cur, "entry_country", "IS"))
+        )
         note_var = tk.StringVar(
             value=(
                 "First run: amend settings to suit you, then press OK to continue to Connect."
@@ -1919,6 +1933,7 @@ class TunnelClientApp:
                 privacy_traffic_shape=bool(shape_var.get()),
                 privacy_outer_obfuscation=bool(obfs_var.get()),
                 privacy_multihop=bool(multihop_var.get()),
+                entry_country=normalize_entry_country(entry_country_var.get()),
                 first_run_settings_completed=prev_done,
                 ui_mode=mode,
             )
@@ -1959,12 +1974,18 @@ class TunnelClientApp:
             except Exception:
                 pass
             # Interactive while connected: persist + hot-apply shape/obfs to
-            # live residual; multi-hop path change re-establishes residual.
+            # live residual; multi-hop / entry-country path change re-establishes residual.
             prev = self._settings if self._settings is not None else cur
             prev_mh = bool(getattr(prev, "privacy_multihop", False))
+            prev_entry = normalize_entry_country(
+                getattr(prev, "entry_country", "IS")
+            )
             s = _current_settings()
             save_settings(s)
             self._settings = s
+            # Keep RptClient path in sync even while disconnected so next Connect
+            # does not dial a stale entry host from app init.
+            self._refresh_multihop_from_settings()
             plane = None
             if self._tunnel is not None:
                 plane = getattr(self._tunnel, "dataplane", None)
@@ -1975,17 +1996,35 @@ class TunnelClientApp:
                 previous_multihop=prev_mh,
                 connected=bool(self._connected),
             )
+            entry_changed = prev_entry != normalize_entry_country(s.entry_country)
             note_var.set(result.message)
+            if entry_changed:
+                from client.multihop import country_node_for_code
+
+                node = country_node_for_code(s.entry_country)
+                note_var.set(
+                    f"Entry country: {node.name}. "
+                    + (
+                        "Multi-hop exit is the other catalog country. "
+                        if s.privacy_multihop
+                        else "Single-hop residual uses this entry. "
+                    )
+                    + (result.message or "")
+                )
             self._log(
                 "Settings: privacy_scale hot-apply "
                 f"shape={s.privacy_traffic_shape} "
                 f"obfs={s.privacy_outer_obfuscation} "
                 f"multihop={s.privacy_multihop} "
+                f"entry={s.entry_country} "
                 f"connected={self._connected} "
                 f"shaping_hot={result.shaping_hot_applied} "
-                f"mh_reconnect={result.multihop_reconnect_needed}"
+                f"mh_reconnect={result.multihop_reconnect_needed} "
+                f"entry_changed={entry_changed}"
             )
-            if result.multihop_reconnect_needed and self._connected:
+            if self._connected and (
+                result.multihop_reconnect_needed or entry_changed
+            ):
                 self.root.after(50, self._reestablish_residual_for_privacy_scale)
             # Refresh ping labels after multi-hop / privacy changes
             try:
@@ -2048,6 +2087,7 @@ class TunnelClientApp:
             shape_var.set(False)
             obfs_var.set(False)
             multihop_var.set(False)
+            entry_country_var.set("IS")
         else:
             tk.Label(
                 priv_card,
@@ -2099,6 +2139,63 @@ class TunnelClientApp:
                 obfs_var,
                 _save_privacy,
             )
+            tk.Frame(priv_card, bg=BORDER, height=1).pack(fill=tk.X, pady=4)
+            # Entry country (Iceland / Romania) — exit is the other when multihop on
+            entry_row = tk.Frame(priv_card, bg=PANEL_BG)
+            entry_row.pack(fill=tk.X, pady=8)
+            entry_col = tk.Frame(entry_row, bg=PANEL_BG)
+            entry_col.pack(side=tk.LEFT, fill=tk.X, expand=True)
+            tk.Label(
+                entry_col,
+                text="Entry country (node)",
+                bg=PANEL_BG,
+                fg=TEXT,
+                font=("Segoe UI", 10, "bold"),
+                anchor="w",
+            ).pack(fill=tk.X)
+            tk.Label(
+                entry_col,
+                text=(
+                    "Choose residual entry: Iceland or Romania. "
+                    "With multi-hop on, exit is the other country "
+                    "(random among non-entry peers when more countries ship)."
+                ),
+                bg=PANEL_BG,
+                fg=TEXT_MUTED,
+                font=("Segoe UI", 8),
+                anchor="w",
+                wraplength=360,
+                justify=tk.LEFT,
+            ).pack(fill=tk.X)
+            entry_menu = tk.OptionMenu(
+                entry_row,
+                entry_country_var,
+                "IS",
+                "RO",
+                command=lambda _v: _save_privacy(),
+            )
+            entry_menu.configure(
+                bg=PANEL_BG,
+                fg=TEXT,
+                activebackground=LIGHT_ACCENT,
+                activeforeground=TEXT,
+                highlightthickness=0,
+                font=("Segoe UI", 9, "bold"),
+            )
+            try:
+                entry_menu["menu"].configure(bg=PANEL_BG, fg=TEXT)
+            except Exception:
+                pass
+            entry_menu.pack(side=tk.RIGHT, padx=(12, 0))
+            # Friendly labels under the code menu
+            tk.Label(
+                entry_col,
+                text="IS = Iceland · RO = Romania",
+                bg=PANEL_BG,
+                fg=TEXT_MUTED,
+                font=("Segoe UI", 7),
+                anchor="w",
+            ).pack(fill=tk.X, pady=(2, 0))
             tk.Frame(priv_card, bg=BORDER, height=1).pack(fill=tk.X, pady=4)
             _row(
                 priv_card,

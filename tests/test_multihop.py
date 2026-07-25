@@ -75,15 +75,19 @@ class TestMultiHopPath(unittest.TestCase):
         self.assertEqual(hops[1].host, "b.example")
         self.assertEqual(hops[2].port, 9)
 
-    def test_disabled_ignores_extra_hops(self):
+    def test_disabled_uses_configured_entry_only(self):
+        """Multi-hop off: residual uses first configured hop (user entry country).
+
+        Extra exit hops are not dialed; entry may be Romania or a custom host.
+        """
         cfg = MultiHopConfig(
             hops=[Hop("9.9.9.9"), Hop("8.8.8.8")],
             enabled=False,
         )
         hops = cfg.active_hops()
         self.assertEqual(len(hops), 1)
-        self.assertEqual(hops[0].host, PRODUCT_NODE_HOST)
-        self.assertEqual(residual_endpoint(cfg).host, PRODUCT_NODE_HOST)
+        self.assertEqual(hops[0].host, "9.9.9.9")
+        self.assertEqual(residual_endpoint(cfg).host, "9.9.9.9")
 
     def test_product_entry_exit_romania(self):
         path = build_entry_exit_path(PRODUCT_EXIT_HOST)

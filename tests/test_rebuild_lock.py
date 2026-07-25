@@ -54,8 +54,20 @@ class TestExclusiveRebuildLock(unittest.TestCase):
             ok, msg, st = acquire_rebuild_lock(role, install_root=self.root)
             self.assertFalse(ok, role)
             self.assertIsNone(st)
-            self.assertIn("entry only", msg.lower())
+            self.assertTrue(
+                "never" in msg.lower() or "refuse" in msg.lower() or "concurrent" in msg.lower(),
+                msg,
+            )
         self.assertFalse(is_locked(self.root))
+
+    def test_allow_country_roles_sequentially(self):
+        ok, msg, st = acquire_rebuild_lock("is", install_root=self.root, state="draining")
+        self.assertTrue(ok, msg)
+        self.assertEqual(st.role, "is")
+        # Concurrent second peer refused
+        ok2, msg2, _ = acquire_rebuild_lock("ro", install_root=self.root)
+        self.assertFalse(ok2)
+        self.assertIn("already active", msg2.lower())
 
     def test_update_state_and_release(self):
         ok, _, st = acquire_rebuild_lock(

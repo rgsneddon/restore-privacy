@@ -1,12 +1,15 @@
 """Exclusive rebuild / wipe lock — never two node instances at once.
 
-The weekly entry wipe/rebuild service **must** hold this lock for role
-``entry`` only. Exit-node wipe is **refused** by the weekly planner.
+Fleet wipedown is **sequential** across peer residual countries (Iceland first,
+then Romania, then new catalog peers). Each wipe holds this exclusive lock for
+one country role (``entry``/``is``/``ro``/…). Concurrent multi-node wipe is
+refused. Legacy bulk roles ``exit``/``both``/``all`` are still refused so two
+nodes cannot be wiped as one operation.
 
 Lock file (default ``$INSTALL_ROOT/var/rpt-rebuild.lock``) is JSON::
 
     {
-      "role": "entry",
+      "role": "entry" | "is" | "ro" | …,
       "pid": 1234,
       "state": "draining" | "rebuilding" | "held",
       "started_at": "...",
@@ -15,7 +18,7 @@ Lock file (default ``$INSTALL_ROOT/var/rpt-rebuild.lock``) is JSON::
 
 Honesty: this is host-local mutual exclusion, not a distributed consensus
 across two VPS boxes. Operators must not run a second wipe from another host
-without coordinating.
+without coordinating (fleet planner enforces IS→RO order at the orchestrator).
 """
 
 from __future__ import annotations
@@ -31,8 +34,9 @@ from typing import Any, Optional
 
 DEFAULT_INSTALL_ROOT = os.environ.get("RPT_INSTALL_ROOT", "/opt/restore-privacy")
 LOCK_REL = Path("var") / "rpt-rebuild.lock"
-ALLOWED_ROLES = frozenset({"entry"})  # weekly service: entry only
-# Exit rebuild is never started by the weekly entry service (hard refuse)
+# Legacy + country codes: single peer wipe only (never bulk multi-node roles)
+ALLOWED_ROLES = frozenset({"entry", "is", "ro"})
+# Bulk multi-node wipe roles refused (use sequential fleet planner instead)
 FORBIDDEN_WEEKLY_ROLES = frozenset({"exit", "both", "all"})
 
 
@@ -68,7 +72,8 @@ class RebuildLockState:
 
     @property
     def entry_draining(self) -> bool:
-        return self.role == "entry" and self.state in (
+        """True when this host is mid-wipe (any peer role) — clients should failover."""
+        return self.state in (
             "draining",
             "rebuilding",
             "held",
@@ -103,6 +108,28 @@ def is_locked(install_root: str | Path | None = None) -> bool:
     return read_lock(install_root) is not None
 
 
+def _normalize_lock_role(role: str) -> str:
+    r = (role or "").strip().lower()
+    if r in ("iceland",):
+        return "is"
+    if r in ("romania",):
+        return "ro"
+    return r
+
+
+def is_allowed_rebuild_role(role: str) -> bool:
+    """True for single-peer wipe roles (entry/IS/RO or future catalog codes)."""
+    role_n = _normalize_lock_role(role)
+    if role_n in FORBIDDEN_WEEKLY_ROLES:
+        return False
+    if role_n in ALLOWED_ROLES:
+        return True
+    # Future catalog country codes (2–3 letter) — single peer only
+    if 2 <= len(role_n) <= 3 and role_n.isalpha():
+        return True
+    return False
+
+
 def acquire_rebuild_lock(
     role: str = "entry",
     *,
@@ -114,14 +141,15 @@ def acquire_rebuild_lock(
     """Acquire exclusive rebuild lock.
 
     Returns (ok, message, state). Second concurrent acquire **fails closed**.
-    Weekly service must use role=``entry`` only.
+    Fleet wipe uses one country role at a time (IS then RO then new peers).
+    Bulk roles ``exit``/``both``/``all`` are refused.
     """
-    role_n = (role or "").strip().lower()
-    if role_n in FORBIDDEN_WEEKLY_ROLES or role_n not in ALLOWED_ROLES:
+    role_n = _normalize_lock_role(role)
+    if role_n in FORBIDDEN_WEEKLY_ROLES or not is_allowed_rebuild_role(role_n):
         return (
             False,
             f"refusing rebuild lock for role={role!r} "
-            f"(weekly service allows entry only; never exit/both concurrent)",
+            f"(single peer only; sequential fleet wipe — never exit/both/all concurrent)",
             None,
         )
     path = lock_path(install_root)

@@ -23,10 +23,19 @@ KEY_AUTOCONNECT_ON_LAUNCH = "autoconnect_on_launch"
 KEY_PRIVACY_TRAFFIC_SHAPE = "privacy_traffic_shape"
 KEY_PRIVACY_OUTER_OBFUSCATION = "privacy_outer_obfuscation"
 KEY_PRIVACY_MULTIHOP = "privacy_multihop"
+# Residual entry country code: "IS" (Iceland, default) or "RO" (Romania).
+KEY_ENTRY_COUNTRY = "entry_country"
 # Set only when user OK's first-run settings after keygen unlock (not a bypass).
 KEY_FIRST_RUN_SETTINGS_COMPLETED = "first_run_settings_completed"
 # Chrome appearance: "light" (default) or "dark"
 KEY_UI_MODE = "ui_mode"
+
+
+def normalize_entry_country(code: str | None) -> str:
+    """Product Settings entry-country pin (IS / RO); default Iceland."""
+    from client.multihop import normalize_entry_country as _norm
+
+    return _norm(code)
 
 
 def normalize_ui_mode(mode: str | None) -> str:
@@ -44,6 +53,9 @@ class ProductSettings:
     privacy_traffic_shape: bool = False
     privacy_outer_obfuscation: bool = False
     privacy_multihop: bool = False
+    # Residual entry country: IS (Iceland, default) or RO (Romania).
+    # Multihop exit = other catalog country (random among non-entry when >2).
+    entry_country: str = "IS"
     # False until user binds first-run Settings with OK (post-keygen onboarding).
     first_run_settings_completed: bool = False
     # Main-window chrome: light (default) or dark
@@ -67,6 +79,7 @@ def default_settings() -> ProductSettings:
         privacy_traffic_shape=False,
         privacy_outer_obfuscation=False,
         privacy_multihop=False,
+        entry_country="IS",
         first_run_settings_completed=False,
         ui_mode="light",
     )
@@ -89,6 +102,9 @@ def load_settings(path: Optional[Path] = None) -> ProductSettings:
                 data.get(KEY_PRIVACY_OUTER_OBFUSCATION, False)
             ),
             privacy_multihop=bool(data.get(KEY_PRIVACY_MULTIHOP, False)),
+            entry_country=normalize_entry_country(
+                data.get(KEY_ENTRY_COUNTRY, "IS")
+            ),
             # Missing key → first-run settings not completed (demand OK once).
             first_run_settings_completed=bool(
                 data.get(KEY_FIRST_RUN_SETTINGS_COMPLETED, False)
@@ -109,6 +125,9 @@ def save_settings(settings: ProductSettings, path: Optional[Path] = None) -> Pat
         KEY_PRIVACY_TRAFFIC_SHAPE: bool(settings.privacy_traffic_shape),
         KEY_PRIVACY_OUTER_OBFUSCATION: bool(settings.privacy_outer_obfuscation),
         KEY_PRIVACY_MULTIHOP: bool(settings.privacy_multihop),
+        KEY_ENTRY_COUNTRY: normalize_entry_country(
+            getattr(settings, "entry_country", "IS")
+        ),
         KEY_FIRST_RUN_SETTINGS_COMPLETED: bool(
             settings.first_run_settings_completed
         ),

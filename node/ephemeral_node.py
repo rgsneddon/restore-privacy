@@ -16,7 +16,7 @@ from __future__ import annotations
 import os
 import re
 from dataclasses import dataclass, field
-from typing import Any, Optional, Sequence
+from typing import Any, Optional, Sequence  # noqa: F401 — Sequence used by fleet summary
 
 DEFAULT_PERIOD = "7d"
 DEFAULT_INSTALL_ROOT = "/opt/restore-privacy"
@@ -38,17 +38,19 @@ HONESTY_NOLOG = (
     "(no connection/session/user-info log sinks)."
 )
 HONESTY_EXCLUSIVE = (
-    "Weekly entry wipe/rebuild holds an exclusive rebuild lock (role=entry only). "
-    "Never run two node wipe/rebuild instances at once; exit wipe is refused by "
-    "this service so entry and exit cannot be rebuilt concurrently."
+    "Fleet wipe/rebuild holds an exclusive rebuild lock for **one peer at a time**. "
+    "Never run two node wipe/rebuild instances at once. Sequential order: Iceland "
+    "first, then Romania only after Iceland is fully rebuilt, then any new catalog "
+    "countries in the same recursive order (node.fleet_wipe)."
 )
 HONESTY_FAILOVER = (
-    "While entry is draining/down, clients automatically residual-failover to the "
-    "exit hop; when entry is healthy again they prefer re-entry. Fail closed if "
-    "exit is unhealthy before entry drain (do not wipe entry into a black hole)."
+    "While a peer is draining/down, clients automatically residual-failover to a "
+    "healthy catalog peer; when the preferred entry is healthy again they re-prefer "
+    "it. Fail closed if no peer is healthy before wipe (do not wipe the last residual "
+    "path into a black hole)."
 )
 
-# Weekly timed service: entry wipe only (never exit/both)
+# Weekly/fleet timed service: single peer roles (legacy entry = IS first)
 WEEKLY_ENTRY_ROLE = "entry"
 EXIT_ROLE = "exit"
 FORBIDDEN_WEEKLY_ROLES = frozenset({"exit", "both", "all"})
@@ -354,20 +356,59 @@ def build_ephemeral_plan(
 
 
 def assert_weekly_entry_role_only(role: str) -> tuple[bool, str]:
-    """Hard refuse exit/both for the weekly timed service (never concurrent roles)."""
+    """Refuse bulk multi-node roles; allow single-peer fleet roles.
+
+    Legacy weekly path used role=``entry`` (Iceland first). Fleet sequential
+    wipe also allows country codes (``is``, ``ro``, …) one at a time.
+    ``exit``/``both``/``all`` remain refused (use sequential planner instead).
+    """
     r = (role or "").strip().lower()
     if r in FORBIDDEN_WEEKLY_ROLES:
         return (
             False,
-            f"refusing weekly wipe for role={role!r}: entry-only service; "
-            f"never rebuild exit (or both) from this timer — exclusive single instance",
+            f"refusing weekly wipe for role={role!r}: entry-only / sequential fleet; "
+            f"never rebuild exit/both/all as concurrent bulk — wipe one peer at a time "
+            f"(IS complete before RO)",
         )
-    if r != WEEKLY_ENTRY_ROLE:
-        return (
-            False,
-            f"weekly wipe role must be {WEEKLY_ENTRY_ROLE!r} (got {role!r})",
-        )
-    return True, ""
+    if r in ("", "auto", "next", "fleet"):
+        return True, ""
+    if r == WEEKLY_ENTRY_ROLE or r in ("is", "ro") or (2 <= len(r) <= 3 and r.isalpha()):
+        return True, ""
+    return (
+        False,
+        f"weekly/fleet wipe role must be auto|entry|is|ro|<country> (got {role!r})",
+    )
+
+
+def build_fleet_sequential_plan_summary(
+    *,
+    completed: Sequence[str] | None = None,
+    in_progress: str | None = None,
+) -> dict[str, Any]:
+    """Dry-run fleet wipe state (pure) for operator/timer orchestration."""
+    from node.fleet_wipe import (
+        assert_sequential_fleet_start,
+        fleet_country_codes,
+        next_wipe_target,
+    )
+
+    done = list(completed or [])
+    order = fleet_country_codes()
+    nxt = next_wipe_target(completed=done, in_progress=in_progress)
+    decisions = {
+        code: assert_sequential_fleet_start(
+            code, completed=done, in_progress=in_progress
+        ).to_dict()
+        for code in order
+    }
+    return {
+        "fleet_order": order,
+        "completed": done,
+        "in_progress": in_progress,
+        "next_target": nxt,
+        "decisions": decisions,
+        "honesty": [HONESTY_EXCLUSIVE, HONESTY_FAILOVER],
+    }
 
 
 @dataclass(frozen=True)
@@ -709,7 +750,8 @@ def build_exit_manual_reinstall_plan(
         HONESTY_NOLOG,
         HONESTY_EXCLUSIVE,
         HONESTY_FAILOVER,
-        "Exit reinstall is manual/operator; weekly timed wipe is entry-only.",
+        "Manual exit-host reinstall remains available; fleet weekly path now "
+        "wipes RO sequentially after IS is complete (node.fleet_wipe).",
     )
     return EphemeralPlan(
         mode="exit_manual_reinstall",
@@ -728,109 +770,177 @@ def build_weekly_entry_rebuild_plan(
     install_root: str = DEFAULT_INSTALL_ROOT,
     dry_run: bool = True,
     rotate_keys: bool = False,
-    role: str = WEEKLY_ENTRY_ROLE,
+    role: str = "auto",
     exit_healthy: bool = True,
     entry_healthy: bool = True,
     provider_snapshot_cmd: str = "",
     provider_rebuild_cmd: str = "",
+    completed: Sequence[str] | None = None,
+    in_progress: str | None = None,
+    peer_health: dict[str, bool] | None = None,
 ) -> EphemeralPlan:
-    """One-week entry-only wipe/rebuild plan with exclusive lock + pre-wipe gates.
+    """Sequential fleet wipe plan (IS → RO → new peers) with exclusive lock.
 
     Pure planner (no side effects). Live execution still requires
-    ``RPT_EPHEMERAL_CONFIRM`` and must acquire the exclusive rebuild lock.
+    ``RPT_EPHEMERAL_CONFIRM`` and exclusive rebuild lock.
 
-    Fail closed: if ``exit_healthy`` or ``entry_healthy`` is False, the plan
-    aborts without destructive rebuild (exit must be solid failover; entry must
-    pass pre-wipe health so package reinstall has a known baseline).
+    Target country comes from :func:`node.fleet_wipe.resolve_weekly_target`
+    (``role=auto`` picks next incomplete peer; ``role=is|ro|entry`` validates order).
+
+    Fail closed: if peer residual or local node health is False, abort without
+    destructive rebuild. Concurrent / out-of-order targets are refused.
     """
-    ok_role, role_msg = assert_weekly_entry_role_only(role)
-    if not ok_role:
-        raise ValueError(role_msg)
+    from node.fleet_wipe import (
+        assert_raw_wipe_role_allowed,
+        evaluate_peer_prewipe_gate,
+        resolve_weekly_target,
+        role_for_country_code,
+    )
+
+    # Refuse bulk roles before any country mapping (exit must not become RO)
+    ok_raw, raw_msg = assert_raw_wipe_role_allowed(role)
+    if not ok_raw:
+        raise ValueError(raw_msg)
+    ok_role0, role_msg0 = assert_weekly_entry_role_only(role)
+    if not ok_role0:
+        raise ValueError(role_msg0)
 
     period_sec = parse_period_seconds(period)
     root = (install_root or DEFAULT_INSTALL_ROOT).rstrip("/") or DEFAULT_INSTALL_ROOT
-    steps: list[PlanStep] = []
+    done_in = list(completed or [])
+    decision = resolve_weekly_target(
+        completed=done_in, in_progress=in_progress, role_hint=role
+    )
+    if not decision.allow or not decision.target_code:
+        raise ValueError(
+            decision.reason
+            or "fleet wipe refused (cycle complete or invalid target)"
+        )
+    # Authoritative completed list for this plan (auto cycle-roll clears to [])
+    done = list(decision.completed)
+    target = decision.target_code
+    lock_role = role_for_country_code(target)
+    ok_role, role_msg = assert_weekly_entry_role_only(lock_role)
+    if not ok_role:
+        raise ValueError(role_msg)
 
+    # Peer map: default other peers healthy when exit_healthy True
+    from node.fleet_wipe import fleet_country_codes
+
+    all_codes = fleet_country_codes()
+    ph: dict[str, bool] = {}
+    if peer_health is not None:
+        ph = {str(k).upper(): bool(v) for k, v in peer_health.items()}
+    else:
+        for c in all_codes:
+            if c == target:
+                ph[c] = bool(entry_healthy)
+            else:
+                ph[c] = bool(exit_healthy)
+    peer_gate = evaluate_peer_prewipe_gate(target, ph)
+    peer_ok = bool(peer_gate.allow_wipe) and bool(exit_healthy)
+    local_ok = bool(entry_healthy)
+
+    steps: list[PlanStep] = []
+    steps.append(
+        PlanStep(
+            id="fleet_target_resolve",
+            action=f"Fleet wipe target = {target} (sequential IS→RO→new)",
+            detail=(
+                f"next_wipe_target / resolve_weekly_target → {target}. "
+                f"completed={list(done)} in_progress={in_progress!r}. "
+                f"{decision.reason}"
+            ),
+            command=(
+                f"# target={target} lock_role={lock_role} "
+                f"next_after={decision.next_after_complete!r}"
+            ),
+        )
+    )
     steps.append(
         PlanStep(
             id="role_guard",
-            action="Entry-only role guard (refuse exit/both)",
+            action=f"Single-peer role guard ({lock_role}) — refuse bulk concurrent",
             detail=(
-                "Weekly timed service targets **entry** only. Exit (and dual-role) "
-                "wipe is hard-refused so two node instances are never wiped at once."
+                "Sequential fleet wipe: one catalog peer at a time. "
+                "Refuse exit|both|all bulk roles; RO only after IS complete."
             ),
             command=(
-                f"# role={WEEKLY_ENTRY_ROLE} only; refuse exit|both|all"
+                f"# role={lock_role}; refuse exit|both|all concurrent multi-node wipe"
             ),
         )
     )
     steps.append(
         PlanStep(
             id="exclusive_lock_acquire",
-            action="Acquire exclusive rebuild lock (entry)",
+            action=f"Acquire exclusive rebuild lock ({lock_role})",
             detail=(
                 "Single-instance mutual exclusion via var/rpt-rebuild.lock. "
                 "Second concurrent start fails closed (never two wipe instances)."
             ),
             command=(
                 f"python3 -c \"from node.rebuild_lock import acquire_rebuild_lock; "
-                f"ok,m,s=acquire_rebuild_lock('entry',install_root={root!r},state='draining'); "
-                f"assert ok, m; print(m)\""
+                f"ok,m,s=acquire_rebuild_lock({lock_role!r},install_root={root!r},"
+                f"state='draining'); assert ok, m; print(m)\""
             ),
         )
     )
     steps.append(
         PlanStep(
-            id="exit_failover_preflight",
-            action="Exit health preflight (solid failover required)",
+            id="peer_failover_preflight",
+            action="Catalog peer health preflight (≥1 healthy peer required)",
             detail=(
-                "Before draining entry, confirm exit residual is healthy so clients "
-                "auto-failover. If exit is unhealthy: **fail closed** — do not wipe entry."
+                f"Before draining {target}, confirm ≥1 other catalog peer residual is "
+                f"healthy for client failover. Healthy peers: "
+                f"{list(peer_gate.healthy_peers)}. Fail closed if none."
             ),
             command=(
-                "python3 -c \"from node.wipe_preflight import check_exit_health; "
-                "r=check_exit_health(); assert r.ok, r.detail; print(r.detail)\""
-                if exit_healthy
-                else "# ABORT: exit_healthy=False — refuse entry wipe (fail closed)"
+                (
+                    f"python3 -c \"from node.wipe_preflight import "
+                    f"evaluate_catalog_peer_prewipe; "
+                    f"g=evaluate_catalog_peer_prewipe({target!r},{ph!r}); "
+                    f"assert g.allow_wipe, g.reasons; print(g.reasons)\""
+                )
+                if peer_ok
+                else f"# ABORT: peer residual unhealthy — refuse wipe of {target}"
             ),
-            destructive=not exit_healthy,
+            destructive=not peer_ok,
         )
     )
     steps.append(
         PlanStep(
             id="entry_node_preflight",
-            action="Entry/node pre-wipe health (listen/status)",
+            action=f"Local node pre-wipe health for {target}",
             detail=(
-                "Confirm entry product surface is healthy before wipe so rebuild + "
-                "package reinstall (selfhost) restore a known-good posture. "
-                "Fail closed if entry health cannot be confirmed."
+                "Confirm product surface is healthy before wipe so rebuild + "
+                "package reinstall restore a known-good posture."
             ),
             command=(
                 "python3 -c \"from node.wipe_preflight import check_entry_node_health; "
                 "r=check_entry_node_health(); assert r.ok, r.detail; print(r.detail)\""
-                if entry_healthy
-                else "# ABORT: entry_healthy=False — refuse entry wipe (fail closed)"
+                if local_ok
+                else f"# ABORT: local health failed — refuse wipe of {target}"
             ),
-            destructive=not entry_healthy,
+            destructive=not local_ok,
         )
     )
 
-    if not exit_healthy or not entry_healthy:
+    if not peer_ok or not local_ok:
         abort_id = (
-            "abort_exit_unhealthy" if not exit_healthy else "abort_entry_unhealthy"
+            "abort_peer_unhealthy" if not peer_ok else "abort_local_unhealthy"
         )
         abort_action = (
-            "Abort: exit not solid for failover"
-            if not exit_healthy
-            else "Abort: entry pre-wipe health failed"
+            f"Abort: no healthy peer for failover while wiping {target}"
+            if not peer_ok
+            else f"Abort: local pre-wipe health failed for {target}"
         )
         steps.append(
             PlanStep(
                 id=abort_id,
                 action=abort_action,
                 detail=(
-                    "Entry wipe cancelled. Retain current node for clients. "
-                    "Fix health first, then re-run weekly plan. Exclusive lock released."
+                    "Peer wipe cancelled. Retain current node for clients. "
+                    "Fix health first, then re-run fleet plan. Exclusive lock released."
                 ),
                 command=(
                     f"python3 -c \"from node.rebuild_lock import release_rebuild_lock; "
@@ -841,9 +951,10 @@ def build_weekly_entry_rebuild_plan(
         steps.append(
             PlanStep(
                 id="schedule_next",
-                action="Schedule next periodic cycle",
+                action="Schedule next periodic fleet cycle",
                 detail=(
-                    f"Retry weekly cycle every {format_period(period_sec)} once pre-wipe gates pass."
+                    f"Retry every {format_period(period_sec)} once pre-wipe gates pass. "
+                    f"Target remains {target} until complete."
                 ),
                 command=(
                     f"# periodic: OnUnitActiveSec={period_sec} / cron for {format_period(period_sec)}"
@@ -859,7 +970,7 @@ def build_weekly_entry_rebuild_plan(
             HONESTY_FAILOVER,
         )
         return EphemeralPlan(
-            mode="weekly_entry_rebuild_aborted",
+            mode="weekly_fleet_rebuild_aborted",
             period_spec=period,
             period_seconds=period_sec,
             install_root=root,
@@ -868,7 +979,7 @@ def build_weekly_entry_rebuild_plan(
             honesty=honesty,
         )
 
-    # Healthy exit + entry: full entry drain + rebuild (exclusive)
+    # Healthy peer + local: full drain + rebuild for this fleet target
     base = build_ephemeral_plan(
         mode="snapshot_then_rebuild",
         period=period,
@@ -878,19 +989,20 @@ def build_weekly_entry_rebuild_plan(
         provider_snapshot_cmd=provider_snapshot_cmd,
         provider_rebuild_cmd=provider_rebuild_cmd,
     )
-    # Insert mark draining before stop; release lock after health; skip generic preflight
-    # (we already have role_guard + lock + exit/entry preflight)
     steps.append(
         PlanStep(
             id="mark_entry_draining",
-            action="Mark entry draining for client failover",
+            action=f"Mark {target} draining for client peer failover",
             detail=(
-                "Lock state=draining/rebuilding so clients treat entry as unavailable "
-                "and residual-failover to exit automatically."
+                "Lock state=draining/rebuilding so clients treat preferred entry as "
+                "unavailable and residual-failover to a healthy catalog peer."
             ),
             command=(
                 f"python3 -c \"from node.rebuild_lock import update_rebuild_lock_state; "
-                f"print(update_rebuild_lock_state('draining',install_root={root!r}))\""
+                f"from node.fleet_wipe import save_fleet_wipe_state; "
+                f"print(update_rebuild_lock_state('draining',install_root={root!r})); "
+                f"print(save_fleet_wipe_state(completed={done!r},"
+                f"in_progress={target!r},install_root={root!r}))\""
             ),
         )
     )
@@ -964,11 +1076,29 @@ def build_weekly_entry_rebuild_plan(
 
     steps.append(
         PlanStep(
+            id="mark_fleet_peer_complete",
+            action=f"Mark fleet wipe complete for {target}; unlock next peer",
+            detail=(
+                f"After health_check, record {target} complete so next_wipe_target "
+                f"advances (e.g. IS complete → RO). Recursive for new catalog countries."
+            ),
+            command=(
+                f"python3 -c \"from node.fleet_wipe import mark_wipe_complete, "
+                f"save_fleet_wipe_state; "
+                f"done,nxt=mark_wipe_complete({target!r},completed={done!r}); "
+                f"print(save_fleet_wipe_state(completed=done,in_progress=None,"
+                f"install_root={root!r})); print('next',nxt)\""
+            ),
+        )
+    )
+    steps.append(
+        PlanStep(
             id="exclusive_lock_release",
             action="Release exclusive rebuild lock",
             detail=(
-                "Entry healthy again → clients automatically prefer re-entry residual. "
-                "Only release after health_check so failover ends cleanly."
+                "Peer healthy again → clients may re-prefer this country as entry. "
+                "Only release after health_check so failover ends cleanly. "
+                "Next fleet peer wipe may then start (never concurrent)."
             ),
             command=(
                 f"python3 -c \"from node.rebuild_lock import release_rebuild_lock; "
@@ -979,15 +1109,16 @@ def build_weekly_entry_rebuild_plan(
     steps.append(
         PlanStep(
             id="schedule_next",
-            action="Schedule next weekly entry cycle",
+            action="Schedule next sequential fleet wipe cycle",
             detail=(
                 f"Repeat every {format_period(period_sec)} via systemd timer "
                 f"(install_ephemeral_timer.sh / weekly_entry_rebuild). "
-                f"Never schedule concurrent exit wipe."
+                f"Next target after {target}: {decision.next_after_complete or 'cycle complete'}. "
+                f"Never concurrent multi-node wipe."
             ),
             command=(
                 f"# periodic: OnUnitActiveSec={period_sec} for {format_period(period_sec)} "
-                f"entry-only weekly wipe"
+                f"sequential fleet wipe target={target}"
             ),
         )
     )
@@ -1001,7 +1132,7 @@ def build_weekly_entry_rebuild_plan(
         HONESTY_FAILOVER,
     )
     return EphemeralPlan(
-        mode="weekly_entry_rebuild",
+        mode="weekly_fleet_rebuild",
         period_spec=period,
         period_seconds=period_sec,
         install_root=root,
