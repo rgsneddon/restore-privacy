@@ -127,10 +127,20 @@ class SessionRegistry:
     def private_capacity_payload(self, *, host: str = "") -> dict:
         """Token-gated capacity snapshot for residual load hints (not public).
 
-        Uses in-memory live session count vs soft max sessions. Never used by
-        public HTML/JSON status paths.
+        Uses in-memory live session count vs soft max sessions, plus process-wide
+        byte counters for operator admin bandwidth used-vs-capability. Never used
+        by public HTML/JSON status paths.
         """
         self.expire_stale()
+        from node.aggregate_metrics import process_counters
         from node.private_capacity import build_private_capacity_payload
 
-        return build_private_capacity_payload(live=self.count(), host=host)
+        snap = process_counters().snapshot()
+        return build_private_capacity_payload(
+            live=self.count(),
+            host=host,
+            total_bytes_in=int(snap.get("total_bytes_in") or 0),
+            total_bytes_out=int(snap.get("total_bytes_out") or 0),
+            total_bytes_relayed=int(snap.get("total_bytes_relayed") or 0),
+            process_uptime_sec=int(snap.get("process_uptime_sec") or 0),
+        )

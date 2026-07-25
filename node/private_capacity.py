@@ -43,14 +43,40 @@ def utilization_from_counts(
     return float(u)
 
 
+def bandwidth_cap_bps(env: Mapping[str, str] | None = None) -> int | None:
+    """Optional process-wide bandwidth capability (bits/s) for admin utilization.
+
+    ``RPT_NODE_BANDWIDTH_CAP_BPS`` — soft operator-configured link budget, not
+    measured NIC line-rate unless the operator sets it to that.
+    """
+    e = env if env is not None else os.environ
+    raw = str(e.get("RPT_NODE_BANDWIDTH_CAP_BPS", "") or "").strip()
+    if not raw:
+        return None
+    try:
+        n = int(raw)
+    except ValueError:
+        return None
+    return n if n > 0 else None
+
+
 def build_private_capacity_payload(
     *,
     live: int,
     capacity: int | None = None,
     host: str = "",
     env: Mapping[str, str] | None = None,
+    total_bytes_in: int | None = None,
+    total_bytes_out: int | None = None,
+    total_bytes_relayed: int | None = None,
+    process_uptime_sec: int | None = None,
+    bandwidth_cap_bps_value: int | None = None,
 ) -> dict[str, Any]:
-    """JSON body for private capacity endpoint (not for public status)."""
+    """JSON body for private capacity endpoint (not for public status).
+
+    Includes session utilization plus optional process-wide byte counters for
+    operator admin bandwidth used-vs-capability (never public status).
+    """
     cap = int(capacity) if capacity is not None else default_max_sessions(env)
     util = utilization_from_counts(live, cap)
     out: dict[str, Any] = {
@@ -62,6 +88,26 @@ def build_private_capacity_payload(
     h = (host or "").strip()
     if h:
         out["host"] = h
+    # Process-wide aggregates (operator / admin only)
+    if total_bytes_in is not None:
+        out["total_bytes_in"] = max(0, int(total_bytes_in))
+    if total_bytes_out is not None:
+        out["total_bytes_out"] = max(0, int(total_bytes_out))
+    if total_bytes_relayed is not None:
+        out["total_bytes_relayed"] = max(0, int(total_bytes_relayed))
+    elif total_bytes_in is not None or total_bytes_out is not None:
+        bi = max(0, int(total_bytes_in or 0))
+        bo = max(0, int(total_bytes_out or 0))
+        out["total_bytes_relayed"] = bi + bo
+    if process_uptime_sec is not None:
+        out["process_uptime_sec"] = max(0, int(process_uptime_sec))
+    bcap = (
+        bandwidth_cap_bps_value
+        if bandwidth_cap_bps_value is not None
+        else bandwidth_cap_bps(env)
+    )
+    if bcap is not None and bcap > 0:
+        out["bandwidth_cap_bps"] = int(bcap)
     return out
 
 

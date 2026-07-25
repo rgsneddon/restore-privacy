@@ -1187,6 +1187,33 @@ def render_processor_settings_html(
     return frag
 
 
+def _render_node_usage_section(
+    node_usage_rows: list[Any] | None = None,
+    *,
+    live: bool = True,
+) -> str:
+    """Fleet bandwidth panel (below nav). Injected rows skip live HTTP probes."""
+    try:
+        from admin_node_usage import render_admin_node_usage_section_html
+    except Exception:  # noqa: BLE001
+        try:
+            from status_page.admin_node_usage import (  # type: ignore
+                render_admin_node_usage_section_html,
+            )
+        except Exception as exc:  # noqa: BLE001
+            return (
+                f'<section id="admin-node-usage" class="card">'
+                f"<p class=\"err\">Node usage panel unavailable: "
+                f"{_escape(str(exc)[:120])}</p>"
+                f"{admin_section_top_link_html()}</section>"
+            )
+    return render_admin_node_usage_section_html(
+        node_usage_rows,
+        live=live if node_usage_rows is None else False,
+        top_link_html=admin_section_top_link_html(),
+    )
+
+
 def render_admin_html(
     grants: list[dict[str, Any]] | None = None,
     *,
@@ -1205,9 +1232,14 @@ def render_admin_html(
     seed_result: dict[str, Any] | None = None,
     seed_error: str = "",
     seed_platform: str = "windows",
+    node_usage_rows: list[Any] | None = None,
+    node_usage_live: bool = True,
 ) -> bytes:
     """Full private admin page: reissue by purchase id, processor settings, grants."""
     projected = project_grants_for_admin(grants)
+    node_usage_html = _render_node_usage_section(
+        node_usage_rows, live=node_usage_live
+    )
     rows = []
     for g in projected:
         tok = str(g.get("token") or "")
@@ -1321,6 +1353,7 @@ background:var(--btn-bg);color:var(--btn-fg);font-weight:600;cursor:pointer}}
   <a href="/">VPN APP Shop</a>
 </div>
 <nav class="nav-local" id="admin-nav" aria-label="Admin sections">
+  <a href="#admin-node-usage">Fleet usage</a>
   <a href="#admin-architecture">Architecture</a>
   <a href="#admin-reissue">Re-issue by RPT-PPI</a>
   <a href="#admin-ondemand-mint">Generate download (failsafe)</a>
@@ -1330,6 +1363,7 @@ background:var(--btn-bg);color:var(--btn-fg);font-weight:600;cursor:pointer}}
   <a href="#admin-licences">Licence database</a>
   <a href="#admin-grants">Paid download grants</a>
 </nav>
+{node_usage_html}
 <section id="admin-architecture" class="card" aria-labelledby="admin-architecture-heading">
   <h2 id="admin-architecture-heading">Product architecture (operator)</h2>
   <p class="muted" id="admin-architecture-blurb">{arch}</p>
