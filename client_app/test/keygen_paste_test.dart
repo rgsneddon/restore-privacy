@@ -203,4 +203,12 @@ void main() {
       isFalse,
     );
   });
+
+  test('looksLikeProductKeygen recognizes fulfilment keygens', () {
+    expect(looksLikeProductKeygen(sampleKeygen), isTrue);
+    expect(looksLikeProductKeygen('  $sampleKeygen  '), isTrue);
+    expect(looksLikeProductKeygen('RPT-KEY-'), isFalse);
+    expect(looksLikeProductKeygen('not-a-key'), isFalse);
+    expect(looksLikeProductKeygen(''), isFalse);
+  });
 }

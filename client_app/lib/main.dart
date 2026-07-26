@@ -401,6 +401,10 @@ class _TunnelHomeState extends State<TunnelHome> with WidgetsBindingObserver {
   /// On **valid** keygen the sheet is fully dismissed (returns) **before** any
   /// Packet Tunnel prepare / System Settings Allow path runs — so Network
   /// Settings never opens on top of a stuck keygen window.
+  ///
+  /// Navigator pairing: sheet uses [useRootNavigator] true and must be popped
+  /// with the **same** navigator (root). Popping root while the sheet is on a
+  /// nested navigator leaves the keygen window stuck open.
   Future<void> _showKeygenSheet() async {
     // EXPIRED installs must renew — never show keygen in place of renew.
     if (await (_licence?.needsLicenceRenewal() ?? false)) {
@@ -409,20 +413,59 @@ class _TunnelHomeState extends State<TunnelHome> with WidgetsBindingObserver {
     }
     if (!mounted) return;
     final controller = TextEditingController();
+    // true = use root navigator for push AND pop (must match).
+    const useRoot = true;
     final unlocked = await showModalBottomSheet<bool>(
       context: context,
       isScrollControlled: true,
       isDismissible: false,
       enableDrag: false,
+      useRootNavigator: useRoot,
       backgroundColor: kPanelBg,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
       ),
-      builder: (ctx) {
+      builder: (sheetContext) {
         var statusLine = '';
         var busy = false;
         return StatefulBuilder(
           builder: (ctx, setModal) {
+            Future<void> tryUnlock() async {
+              if (busy) return;
+              final raw = controller.text.trim();
+              if (raw.isEmpty) {
+                setModal(() => statusLine = 'Paste the keygen first.');
+                return;
+              }
+              setModal(() {
+                busy = true;
+                statusLine = 'Verifying keygen with status host…';
+              });
+              final st = await _licence?.importKeygenAndVerify(raw) ??
+                  kPaymentStatusUnknown;
+              final ok = await _licence?.paymentAllowsConnect() ?? false;
+              // Dismiss only on valid unlock (shipped contract).
+              if (!shouldDismissKeygenSheetAfterUnlock(
+                paymentAllowsConnect: ok,
+                paymentStatus: st,
+              )) {
+                if (ctx.mounted) {
+                  setModal(() {
+                    busy = false;
+                    statusLine =
+                        'Keygen not active (status=$st). Check email code / subscription.';
+                  });
+                }
+                return;
+              }
+              // Valid key: pop the **same** navigator that owns this sheet.
+              if (sheetContext.mounted) {
+                Navigator.of(sheetContext, rootNavigator: useRoot).pop(true);
+              } else if (ctx.mounted) {
+                Navigator.of(ctx, rootNavigator: useRoot).pop(true);
+              }
+            }
+
             return Padding(
               padding: EdgeInsets.fromLTRB(
                 20,
@@ -455,6 +498,19 @@ class _TunnelHomeState extends State<TunnelHome> with WidgetsBindingObserver {
                     autofocus: true,
                     labelText: 'RPT-KEY-…',
                     enabled: !busy,
+                    // Paste of a full product keygen → verify + dismiss automatically.
+                    onPasted: (text) {
+                      if (looksLikeProductKeygen(text)) {
+                        tryUnlock();
+                      }
+                    },
+                    onChanged: (text) {
+                      // Enter / submit on field also unlocks when it looks complete.
+                      if (looksLikeProductKeygen(text) &&
+                          text.trim().endsWith('\n')) {
+                        tryUnlock();
+                      }
+                    },
                   ),
                   if (statusLine.isNotEmpty) ...[
                     const SizedBox(height: 8),
@@ -462,54 +518,19 @@ class _TunnelHomeState extends State<TunnelHome> with WidgetsBindingObserver {
                   ],
                   const SizedBox(height: 16),
                   FilledButton(
-                    onPressed: busy
-                        ? null
-                        : () async {
-                            final raw = controller.text.trim();
-                            if (raw.isEmpty) {
-                              setModal(
-                                () => statusLine = 'Paste the keygen first.',
-                              );
-                              return;
-                            }
-                            setModal(() {
-                              busy = true;
-                              statusLine =
-                                  'Verifying keygen with status host…';
-                            });
-                            final st =
-                                await _licence?.importKeygenAndVerify(raw) ??
-                                    kPaymentStatusUnknown;
-                            final ok =
-                                await _licence?.paymentAllowsConnect() ?? false;
-                            // Dismiss only on valid unlock (shipped contract).
-                            if (!shouldDismissKeygenSheetAfterUnlock(
-                              paymentAllowsConnect: ok,
-                              paymentStatus: st,
-                            )) {
-                              if (ctx.mounted) {
-                                setModal(() {
-                                  busy = false;
-                                  statusLine =
-                                      'Keygen not active (status=$st). Check email code / subscription.';
-                                });
-                              }
-                              return;
-                            }
-                            // Valid key: pop sheet completely first. VPN prepare /
-                            // Allow / Network Settings run only after this Future
-                            // completes (see below) so the keygen UI cannot stick.
-                            if (ctx.mounted) {
-                              Navigator.of(ctx, rootNavigator: true).pop(true);
-                            }
-                          },
+                    onPressed: busy ? null : tryUnlock,
                     style: FilledButton.styleFrom(backgroundColor: kPrimary),
                     child: Text(busy ? 'Verifying…' : 'Unlock Connect'),
                   ),
                   TextButton(
                     onPressed: busy
                         ? null
-                        : () => Navigator.of(ctx, rootNavigator: true).pop(false),
+                        : () {
+                            Navigator.of(
+                              sheetContext,
+                              rootNavigator: useRoot,
+                            ).pop(false);
+                          },
                     child: const Text('Cancel'),
                   ),
                 ],

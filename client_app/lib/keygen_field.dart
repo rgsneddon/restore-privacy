@@ -20,6 +20,16 @@ const Key kKeygenPasteButtonKey = Key('keygen_entry_paste_button');
 /// Tooltip / semantics for the Paste control.
 const String kKeygenPasteTooltip = 'Paste keygen from clipboard';
 
+/// True when [raw] looks like a product keygen worth verifying/dismissing.
+///
+/// Accepts optional whitespace; normalization happens in [LicenceGate].
+bool looksLikeProductKeygen(String raw) {
+  final kg = raw.trim().toUpperCase().replaceAll(' ', '');
+  if (!kg.startsWith('RPT-KEY-')) return false;
+  // RPT-KEY- + at least one more segment (e.g. RPT-KEY-AAAA-…)
+  return kg.length >= 12 && kg.contains('-', 8);
+}
+
 /// Read plain text from the system clipboard into [controller].
 ///
 /// Returns true when non-empty clipboard text was applied. Does not trim or
@@ -62,6 +72,8 @@ class KeygenEntryField extends StatelessWidget {
     this.isDense = false,
     this.style,
     this.onChanged,
+    /// Called after a successful clipboard paste with the field text.
+    this.onPasted,
   });
 
   final TextEditingController controller;
@@ -71,6 +83,7 @@ class KeygenEntryField extends StatelessWidget {
   final bool isDense;
   final TextStyle? style;
   final ValueChanged<String>? onChanged;
+  final ValueChanged<String>? onPasted;
 
   @override
   Widget build(BuildContext context) {
@@ -92,6 +105,7 @@ class KeygenEntryField extends StatelessWidget {
       textInputAction: TextInputAction.done,
       style: style,
       onChanged: onChanged,
+      onSubmitted: onChanged,
       // Default toolbar includes Paste; keep explicit for desktop/modal sheets.
       contextMenuBuilder: (context, editableTextState) {
         return AdaptiveTextSelectionToolbar.editableText(
@@ -109,7 +123,11 @@ class KeygenEntryField extends StatelessWidget {
           onPressed: !enabled
               ? null
               : () async {
-                  await pasteKeygenFromClipboard(controller);
+                  final ok = await pasteKeygenFromClipboard(controller);
+                  if (!ok) return;
+                  final text = controller.text;
+                  onChanged?.call(text);
+                  onPasted?.call(text);
                 },
         ),
       ),
