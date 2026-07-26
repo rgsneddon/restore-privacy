@@ -38,7 +38,7 @@ class RptVpnService : VpnService() {
             ACTION_CONNECT -> {
                 userStopped.set(false)
                 desiredConnected = true
-                val host = intent.getStringExtra(EXTRA_HOST) ?: "82.221.101.241"
+                val host = intent.getStringExtra(EXTRA_HOST) ?: PRODUCT_US_HOST
                 val port = intent.getIntExtra(EXTRA_PORT, 44044)
                 val fullTunnel = intent.getBooleanExtra(EXTRA_FULL_TUNNEL, true)
                 val session = intent.getStringExtra(EXTRA_SESSION) ?: "Privacy Restored"
@@ -564,7 +564,9 @@ class RptVpnService : VpnService() {
 
     companion object {
         /** Product residual monopins (must match Flutter country_select / multihop catalog). */
-        const val PRODUCT_ENTRY_HOST = "82.221.101.241"
+        /** Default residual entry = United States monopin. */
+        const val PRODUCT_ENTRY_HOST = "5.161.242.85"
+        const val PRODUCT_ICELAND_HOST = "82.221.101.241"
         const val PRODUCT_EXIT_HOST = "185.146.232.107"
         const val PRODUCT_US_HOST = "5.161.242.85"
 

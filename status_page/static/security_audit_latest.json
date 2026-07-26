@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-07-26T23:31:29Z",
+  "generated_at": "2026-07-26T23:44:46Z",
   "node_host": "Iceland (IS)",
   "catalog_version": "0.4.10",
   "unit_suite": {
@@ -48,95 +48,111 @@
         "platform": "windows",
         "label": "Windows",
         "filename": "restore-privacy-client-0.4.10-windows-x64-setup.exe",
-        "state": "Red",
+        "state": "Green",
         "reasons": [
-          "catalog monopin asset not staged (looked for restore-privacy-client-0.4.10-windows-x64-setup.exe / relative_path 0.4.10/restore-privacy-client-0.4.10-windows-x64-setup.exe under status_page/assets/0.4.10/, releases/0.4.10/, /opt/restore-privacy/paid_assets/0.4.10/, dist/0.4.10/, status_page/assets/; paid host may still fulfil via private GH / VPS HTTP when uploaded)"
+          "node_elgamal.pub embedded (raw product pin match)",
+          "PE/MZ magic OK",
+          "multihop residual prep markers present (exit_node_elgamal; residual-via-exit when RPT_MULTIHOP_ENABLED=1)",
+          "exit_node_elgamal.pub raw bytes present (Romania exit pin)"
         ],
-        "path": null,
+        "path": "C:\\Users\\rgsne\\restore_privacy\\status_page\\assets\\0.4.10\\restore-privacy-client-0.4.10-windows-x64-setup.exe",
+        "bytes": 38476782,
+        "relative_path": "0.4.10/restore-privacy-client-0.4.10-windows-x64-setup.exe",
         "search_roots": [
           "status_page/assets/0.4.10/",
           "releases/0.4.10/",
           "/opt/restore-privacy/paid_assets/0.4.10/",
           "dist/0.4.10/",
           "status_page/assets/"
-        ],
-        "relative_path": "0.4.10/restore-privacy-client-0.4.10-windows-x64-setup.exe"
+        ]
       },
       {
         "platform": "android",
         "label": "Android",
         "filename": "restore-privacy-client-0.4.10-android.apk",
-        "state": "Red",
+        "state": "Green",
         "reasons": [
-          "catalog monopin asset not staged (looked for restore-privacy-client-0.4.10-android.apk / relative_path 0.4.10/restore-privacy-client-0.4.10-android.apk under status_page/assets/0.4.10/, releases/0.4.10/, /opt/restore-privacy/paid_assets/0.4.10/, dist/0.4.10/, status_page/assets/; paid host may still fulfil via private GH / VPS HTTP when uploaded)"
+          "node_elgamal.pub pin matches product monopin",
+          "Android residual wire (PFS + outer obfs) present",
+          "exit_node_elgamal.pub present (multihop exit pin)"
         ],
-        "path": null,
+        "path": "C:\\Users\\rgsne\\restore_privacy\\status_page\\assets\\0.4.10\\restore-privacy-client-0.4.10-android.apk",
+        "bytes": 51551849,
+        "relative_path": "0.4.10/restore-privacy-client-0.4.10-android.apk",
         "search_roots": [
           "status_page/assets/0.4.10/",
           "releases/0.4.10/",
           "/opt/restore-privacy/paid_assets/0.4.10/",
           "dist/0.4.10/",
           "status_page/assets/"
-        ],
-        "relative_path": "0.4.10/restore-privacy-client-0.4.10-android.apk"
+        ]
       },
       {
         "platform": "macos",
         "label": "macOS",
         "filename": "restore-privacy-client-0.4.10-macos.zip",
-        "state": "Red",
+        "state": "Green",
         "reasons": [
-          "catalog monopin asset not staged (looked for restore-privacy-client-0.4.10-macos.zip / relative_path 0.4.10/restore-privacy-client-0.4.10-macos.zip under status_page/assets/0.4.10/, releases/0.4.10/, /opt/restore-privacy/paid_assets/0.4.10/, dist/0.4.10/, status_page/assets/; paid host may still fulfil via private GH / VPS HTTP when uploaded)"
+          "node_elgamal.pub pin matches product monopin",
+          "archive present (structural residual gates N/A in this pass)",
+          "exit_node_elgamal.pub present (multihop exit pin)"
         ],
-        "path": null,
+        "path": "C:\\Users\\rgsne\\restore_privacy\\status_page\\assets\\0.4.10\\restore-privacy-client-0.4.10-macos.zip",
+        "bytes": 19208402,
+        "relative_path": "0.4.10/restore-privacy-client-0.4.10-macos.zip",
         "search_roots": [
           "status_page/assets/0.4.10/",
           "releases/0.4.10/",
           "/opt/restore-privacy/paid_assets/0.4.10/",
           "dist/0.4.10/",
           "status_page/assets/"
-        ],
-        "relative_path": "0.4.10/restore-privacy-client-0.4.10-macos.zip"
+        ]
       },
       {
         "platform": "ios",
         "label": "iOS",
         "filename": "restore-privacy-client-0.4.10-ios.zip",
-        "state": "Red",
+        "state": "Green",
         "reasons": [
-          "catalog monopin asset not staged (looked for restore-privacy-client-0.4.10-ios.zip / relative_path 0.4.10/restore-privacy-client-0.4.10-ios.zip under status_page/assets/0.4.10/, releases/0.4.10/, /opt/restore-privacy/paid_assets/0.4.10/, dist/0.4.10/, status_page/assets/; paid host may still fulfil via private GH / VPS HTTP when uploaded)"
+          "node_elgamal.pub pin matches product monopin",
+          "archive present (structural residual gates N/A in this pass)",
+          "exit_node_elgamal.pub present (multihop exit pin)"
         ],
-        "path": null,
+        "path": "C:\\Users\\rgsne\\restore_privacy\\status_page\\assets\\0.4.10\\restore-privacy-client-0.4.10-ios.zip",
+        "bytes": 8042831,
+        "relative_path": "0.4.10/restore-privacy-client-0.4.10-ios.zip",
         "search_roots": [
           "status_page/assets/0.4.10/",
           "releases/0.4.10/",
           "/opt/restore-privacy/paid_assets/0.4.10/",
           "dist/0.4.10/",
           "status_page/assets/"
-        ],
-        "relative_path": "0.4.10/restore-privacy-client-0.4.10-ios.zip"
+        ]
       },
       {
         "platform": "linux",
         "label": "Linux",
         "filename": "restore-privacy-client-0.4.10-linux-x64.tar.gz",
-        "state": "Red",
+        "state": "Green",
         "reasons": [
-          "catalog monopin asset not staged (looked for restore-privacy-client-0.4.10-linux-x64.tar.gz / relative_path 0.4.10/restore-privacy-client-0.4.10-linux-x64.tar.gz under status_page/assets/0.4.10/, releases/0.4.10/, /opt/restore-privacy/paid_assets/0.4.10/, dist/0.4.10/, status_page/assets/; paid host may still fulfil via private GH / VPS HTTP when uploaded)"
+          "node_elgamal.pub pin matches product monopin",
+          "archive present (structural residual gates N/A in this pass)",
+          "exit_node_elgamal.pub present (multihop exit pin)"
         ],
-        "path": null,
+        "path": "C:\\Users\\rgsne\\restore_privacy\\status_page\\assets\\0.4.10\\restore-privacy-client-0.4.10-linux-x64.tar.gz",
+        "bytes": 14399993,
+        "relative_path": "0.4.10/restore-privacy-client-0.4.10-linux-x64.tar.gz",
         "search_roots": [
           "status_page/assets/0.4.10/",
           "releases/0.4.10/",
           "/opt/restore-privacy/paid_assets/0.4.10/",
           "dist/0.4.10/",
           "status_page/assets/"
-        ],
-        "relative_path": "0.4.10/restore-privacy-client-0.4.10-linux-x64.tar.gz"
+        ]
       }
     ],
-    "staged_count": 0,
-    "overall": "Red",
+    "staged_count": 5,
+    "overall": "Green",
     "legend": {
       "Green": "Present, no *.priv, product node pub pin match, platform structural gate pass (Windows multihop markers when PE)",
       "Amber": "Present but pin/structural check incomplete or soft warning",
@@ -303,7 +319,7 @@
     },
     "ok": true,
     "section": "multihop_node_structure",
-    "honesty": "residual-via-exit when multi-hop enabled; not full intermediate onion encapsulation; default single-hop Iceland entry"
+    "honesty": "residual-via-exit when multi-hop enabled; not full intermediate onion encapsulation; default single-hop United States entry"
   },
   "audit_privacy": {
     "localhost_required": false,

@@ -861,7 +861,7 @@ def multihop_config_from_env(
         except Exception:  # noqa: BLE001
             enabled = False
 
-    # Entry country: env wins, else product Settings (default Iceland)
+    # Entry country: env wins, else product Settings (default United States)
     entry_country = str(e.get("RPT_ENTRY_COUNTRY", "") or "").strip()
     if not entry_country and env is None:
         try:

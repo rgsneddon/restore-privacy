@@ -158,7 +158,7 @@ def probe_entry_rtt_ms(
     timeout_s: float = DEFAULT_PROBE_TIMEOUT_S,
     entry_country: str | None = None,
 ) -> PingResult:
-    """Device → selected residual entry node (default Iceland monopin)."""
+    """Device → selected residual entry node (default United States monopin)."""
     node = country_node_for_code(entry_country)
     return probe_node_rtt_ms(
         node.host or PRODUCT_NODE_HOST,

@@ -361,7 +361,7 @@ def run_all_multihop_structure_probes(
         "honesty": (
             "residual-via-exit when multi-hop enabled; "
             "not full intermediate onion encapsulation; "
-            "default single-hop Iceland entry"
+            "default single-hop United States entry"
         ),
     }
 

@@ -7,14 +7,17 @@ import 'country_select.dart';
 /// RPT node endpoint and full-tunnel intent (shared with platform VPN).
 ///
 /// Multi-hop residual is **opt-in**: when [multiHopEnabled] is true, residual
-/// Connect dials a non-entry catalog peer. Default remains single-hop **Iceland**
-/// entry (`node_elgamal.pub` / [kDefaultEntryCountry]). Residual-via-exit
+/// Connect dials a non-entry catalog peer. Default is single-hop **United States**
+/// entry (`us_node_elgamal.pub` / [kDefaultEntryCountry]). Residual-via-exit
 /// selection is not full intermediate encapsulation.
 ///
 /// Free tier ([freeTierEnabled]): multi-hop is forced off; host is always entry.
 class RptConfig {
-  /// Product entry node (must match [client/endpoint.py] PRODUCT_NODE_HOST).
-  static const String entryHost = '82.221.101.241';
+  /// Product default residual entry (United States monopin).
+  static const String entryHost = '5.161.242.85';
+
+  /// Iceland residual peer (selectable entry / multihop alternate).
+  static const String icelandHost = '82.221.101.241';
 
   /// Product exit hop (Romania FlokiNET) for multi-hop residual when enabled.
   static const String exitHost = '185.146.232.107';
@@ -25,7 +28,7 @@ class RptConfig {
 
   /// Paid catalog pin — must match monorepo ``client/VERSION`` and pubspec.
   /// Free builds report [kFreeTierVersion] via [displayProductVersion].
-  static const String productVersion = '0.4.8';
+  static const String productVersion = '0.4.10';
 
   /// UI / about version (free tier always ``3.3.3``).
   static String get displayProductVersion =>
@@ -47,7 +50,7 @@ class RptConfig {
   /// Runtime override from Settings privacy-scale (null = use env/compile only).
   static bool? runtimeMultiHopOverride;
 
-  /// Main-shell entry country (IS product default); drives residual dial host.
+  /// Main-shell entry country (US product default); drives residual dial host.
   static String runtimeEntryCountry = kDefaultEntryCountry;
 
   /// Apply Settings multi-hop toggle (Windows/Apple parity).

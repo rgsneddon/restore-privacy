@@ -42,7 +42,7 @@ NODE_WIPE_HEADING = "Node data clear timer"
 
 HONESTY_BLURB = (
     "About every week we wipe and rebuild residual nodes one at a time "
-    "(IS then RO then DE) so clients can hop while a peer drains. "
+    "(IS then RO then US) so clients can hop while a peer drains. "
     "This clock is that cycle."
 )
 

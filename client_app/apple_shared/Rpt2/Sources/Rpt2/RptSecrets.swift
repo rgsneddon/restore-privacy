@@ -23,22 +23,25 @@ public enum RptSecrets {
     public static let nodePubName = "node_elgamal.pub"
     /// Romania residual hop public key (HELLO when residual host is RO monopin).
     public static let exitNodePubName = "exit_node_elgamal.pub"
-    /// Germany residual hop public key (HELLO when residual host is DE monopin).
-    public static let deNodePubName = "de_node_elgamal.pub"
-    public static let productEntryHost = "82.221.101.241"
+    /// United States residual hop public key (HELLO when residual host is US monopin).
+    public static let usNodePubName = "us_node_elgamal.pub"
+    /// Product default residual entry (United States monopin).
+    public static let productEntryHost = "5.161.242.85"
+    public static let productIcelandHost = "82.221.101.241"
     public static let productExitHost = "185.146.232.107"
-    public static let productDeHost = "167.233.224.5"
+    public static let productUsHost = "5.161.242.85"
     /// Must never be loaded by product clients.
     public static let nodePrivName = "node_elgamal.priv"
 
     /// Public key basename for residual HELLO from dial host monopin.
+    /// IS → node; RO → exit; US → us (never invent pin from entry code alone).
     public static func residualNodePubName(forHost host: String) -> String {
         let h = host.trimmingCharacters(in: .whitespacesAndNewlines)
         if h == productExitHost || h.hasSuffix(productExitHost) {
             return exitNodePubName
         }
-        if h == productDeHost || h.hasSuffix(productDeHost) {
-            return deNodePubName
+        if h == productUsHost || h.hasSuffix(productUsHost) {
+            return usNodePubName
         }
         return nodePubName
     }

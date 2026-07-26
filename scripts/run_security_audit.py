@@ -1203,7 +1203,8 @@ def build_markdown(results: dict) -> str:
 | **Product** | Restore Privacy Tunnel (RPT / RPT2) |
 | **Repository** | restore-privacy (**private** source; installers only via paid status host) |
 | **Public catalog version** | **{catalog}** |
-| **Production node** | **{host}:{UDP_PORT}** (UDP); status UI TCP **{STATUS_PORT}** — **Iceland**, host **FlokiNET** |
+| **Default residual entry** | **United States (US)** (product default on all clients) |
+| **Live probe peer** | **{host}:{UDP_PORT}** (UDP); status UI TCP **{STATUS_PORT}** |
 | **Audit generated** | **{human_date()}** (`{now}`) |
 | **Cadence** | Automated security pass (~**every 4 hours** + **jitter** on privacy-hardened node timer) |
 | **Audit type** | Static suite + live node status probe + **per-installer AUDIT STATE** + **section B privacy probes** + **multihop node structure** |
@@ -1234,7 +1235,7 @@ Latest automated security audit for production node **{host}** and the in-repo p
 | Live node healthy (TCP+HTTP) | {"YES" if node_ok else "NO"} |
 | Catalog installers AUDIT STATE | {package_state_cell_markup(pkg_overall if pkg_overall in VALID_PACKAGE_STATES else "Red")} (see top package table) |
 
-**Overall posture:** **Strong** for residual honesty (`residual_ip_capture`), no public live count, no-phones-home Connect, packaging strip of `*.priv`, tunnel DNS + DoT, Settings transparency. Multi-hop residual is **opt-in** (`RPT_MULTIHOP_ENABLED=1`): residual-via-exit (Romania); default single-hop Iceland entry — not full intermediate encapsulation. Windows **0.3.6** PE is rebuilt with multihop prep. Product kill-switch is **off by default** (opt-in ``RPT_KILL_SWITCH=1`` only). Installer package confidence is the RAG table at the top of this audit.
+**Overall posture:** **Strong** for residual honesty (`residual_ip_capture`), no public live count, no-phones-home Connect, packaging strip of `*.priv`, tunnel DNS + DoT, Settings transparency. Multi-hop residual is **opt-in** (`RPT_MULTIHOP_ENABLED=1`): residual-via-exit among non-entry catalog peers; default single-hop **United States (US)** entry — not full intermediate encapsulation. Catalog monopin **0.4.10**. Product kill-switch is **off by default** (opt-in ``RPT_KILL_SWITCH=1`` only). Installer package confidence is the RAG table at the top of this audit.
 
 **Primary residual risks (open by design / environment):**
 
@@ -1264,7 +1265,8 @@ Latest automated security audit for production node **{host}** and the in-repo p
 ### 2.2 Method notes
 
 - Public audit is served on the **status host** as **`/AUDIT.md`** and **`/audit.md`** (source repo is private).  
-- Product default host **{host}**.  
+- Product default residual entry **United States (US)** (catalog monopin; live probe host may be another peer).  
+- Live probe host **{host}**.  
 - Product node ElGamal pub pin: `product/NODE_ELGAMAL_PUB.sha256` (SHA-256 `1b126abf…`).  
 - **Did not** paste secret material into this document.
 

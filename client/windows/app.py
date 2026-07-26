@@ -41,6 +41,7 @@ from client.ui_theme import (
     STATUS_ERROR,
     STATUS_ERROR_FG,
     STATUS_OK,
+    STATUS_WARN,
     TEXT,
     TEXT_MUTED,
     WHITE,
@@ -161,6 +162,7 @@ from client.windows.settings_store import (
 from client.windows.tray_win import (
     TRAY_DISPLAY_NAME,
     WindowsSystemTray,
+    purge_product_tray_icon,
     resolve_tray_icon_path,
 )
 from client.windows.tunnel_win import (
@@ -170,6 +172,7 @@ from client.windows.tunnel_win import (
     start_full_tunnel,
     stop_full_tunnel,
 )
+from client.windows.window_foreground import bring_tk_window_forward
 
 
 # Main status line when the user chooses Quit (button or tray).
@@ -345,8 +348,15 @@ class TunnelClientApp:
         self._busy = False
         self._tunnel = None
         self._tray: WindowsSystemTray | None = None
+        # Last status headline colour (theme re-apply must not wipe Connected teal)
+        self._status_headline_fg: str = TEXT
         self.client = RptClient(status_cb=self._on_client_status)
-        self._start_system_tray()
+        # Defer tray until after main chrome exists — avoids racing Win32
+        # RegisterClass/CreateWindow with Tk widget construction (seen as AV).
+        try:
+            self.root.after_idle(self._start_system_tray)
+        except Exception:
+            self._start_system_tray()
 
         # Outer chrome with padding (rounded language via spacing)
         self.chrome = tk.Frame(
@@ -379,6 +389,23 @@ class TunnelClientApp:
         ).pack(side=tk.TOP, fill=tk.X)
         self._country_row = tk.Frame(self.country_frame, bg=self._t["chrome_bg"])
         self._country_row.pack(side=tk.TOP, fill=tk.X, pady=(2, 0))
+        # Visible flag glyph (Segoe UI Emoji) — OptionMenu alone often blanks flags
+        # on Windows when the control uses plain Segoe UI.
+        from client.country_select import country_flag_emoji
+
+        self._flag_var = tk.StringVar(
+            value=country_flag_emoji(init_entry) or f"[{init_entry}]"
+        )
+        self.flag_label = tk.Label(
+            self._country_row,
+            textvariable=self._flag_var,
+            bg=self._t["chrome_bg"],
+            fg=self._t["text"],
+            font=("Segoe UI Emoji", 16),
+            width=3,
+            anchor="center",
+        )
+        self.flag_label.pack(side=tk.LEFT, padx=(0, 6))
         self.country_menu = tk.OptionMenu(
             self._country_row,
             self._entry_label_var,
@@ -392,10 +419,11 @@ class TunnelClientApp:
             activeforeground=self._t["text"],
             highlightthickness=1,
             highlightbackground=self._t["border"] if "border" in self._t else BORDER,
-            font=("Segoe UI", 10, "bold"),
+            # Emoji font so 🇮🇸 / 🇷🇴 / 🇩🇪 render in the dropdown value
+            font=("Segoe UI Emoji", 10),
             anchor="w",
         )
-        self.country_menu.pack(side=tk.TOP, fill=tk.X)
+        self.country_menu.pack(side=tk.LEFT, fill=tk.X, expand=True)
 
         self.btn_var = tk.StringVar(value=connect_button_label(False))
         self.connect_btn = tk.Button(
@@ -707,6 +735,7 @@ class TunnelClientApp:
             return False
 
     def _set_window_icon(self) -> None:
+        """Taskbar/title-bar brand icon — prefer shipped app_icon.ico/png."""
         native = Path(__file__).resolve().parent / "native"
         ico = native / "app_icon.ico"
         png = native / "app_icon.png"
@@ -718,17 +747,45 @@ class TunnelClientApp:
             png = brand
         try:
             if ico.is_file():
-                self.root.iconbitmap(default=str(ico))
+                # Absolute path: relative iconbitmap can fail and leave default icon
+                self.root.iconbitmap(default=str(ico.resolve()))
+        except Exception:
+            try:
+                if ico.is_file():
+                    self.root.iconbitmap(str(ico.resolve()))
+            except Exception:
+                pass
+        try:
             if png.is_file():
-                img = tk.PhotoImage(file=str(png))
+                img = tk.PhotoImage(file=str(png.resolve()))
                 self.root.iconphoto(True, img)
                 self._icon_photo = img
+            elif ico.is_file():
+                # Some Tk builds pick taskbar from iconphoto better than iconbitmap
+                pass
         except Exception:
             pass
 
     def _start_system_tray(self) -> None:
-        """Tray identity: Privacy Restored + product logo."""
+        """Tray identity: Privacy Restored + product logo (one system-wide icon)."""
         try:
+            # Drop any orphan / other-process product icon (fixed GUID).
+            try:
+                purge_product_tray_icon()
+            except Exception:
+                pass
+            # Idempotent: never stack a second notify icon in this process.
+            if self._tray is not None:
+                try:
+                    if getattr(self._tray, "is_running", lambda: True)():
+                        return
+                except Exception:
+                    pass
+                try:
+                    self._tray.stop()
+                except Exception:
+                    pass
+                self._tray = None
             tray = WindowsSystemTray(
                 on_show=lambda: self.root.after(0, self._restore_from_tray),
                 on_quit=lambda: self.root.after(0, self._quit_app),
@@ -741,13 +798,77 @@ class TunnelClientApp:
         except Exception:
             self._tray = None
 
-    def _restore_from_tray(self) -> None:
+    def _stop_system_tray(self) -> None:
+        """Remove the process tray icon before exit / elevated re-launch."""
+        tray = self._tray
+        self._tray = None
+        if tray is not None:
+            try:
+                tray.stop()
+            except Exception:
+                pass
+        # Always purge by product GUID so handoff cannot leave a ghost icon.
         try:
-            self.root.deiconify()
-            self.root.lift()
-            self.root.focus_force()
+            purge_product_tray_icon()
         except Exception:
             pass
+
+    def _handoff_elevated_connect_exit(self) -> None:
+        """Leave residual Connect to the elevated child process (one UI/tray).
+
+        Called when UAC re-launch or residual helper started a new elevated
+        product instance with ``--rpt-auto-connect``. Stops this process's tray
+        and destroys the shell so the user does not see a second icon or a
+        "restarted behind" non-admin window.
+        """
+        try:
+            self._stop_system_tray()
+        except Exception:
+            pass
+        try:
+            purge_product_tray_icon()
+        except Exception:
+            pass
+        try:
+            # Withdraw first so the window does not flash under other apps
+            # while the elevated child maps.
+            self.root.withdraw()
+        except Exception:
+            pass
+        try:
+            self.root.destroy()
+        except Exception:
+            pass
+
+    def _bring_shell_forward(self, *, force_visible: bool = False) -> str:
+        """Raise main shell when user is still using it (no permanent topmost)."""
+        try:
+            return bring_tk_window_forward(
+                self.root, force_visible=bool(force_visible)
+            )
+        except Exception:  # noqa: BLE001
+            return "error:bring_shell"
+
+    def _bring_window_forward(self, win, *, force_visible: bool = False) -> str:
+        """Raise a Toplevel (Settings / keygen) without permanent always-on-top."""
+        try:
+            return bring_tk_window_forward(
+                win, force_visible=bool(force_visible)
+            )
+        except Exception:  # noqa: BLE001
+            return "error:bring_window"
+
+    def _restore_from_tray(self) -> None:
+        # Tray Show is an explicit user order to restore — force visible + raise.
+        try:
+            self._bring_shell_forward(force_visible=True)
+        except Exception:
+            try:
+                self.root.deiconify()
+                self.root.lift()
+                self.root.focus_force()
+            except Exception:
+                pass
 
     def _tray_connect(self) -> None:
         if not self._connected and not self._busy:
@@ -774,8 +895,15 @@ class TunnelClientApp:
             pass
 
     def _log(self, line: str) -> None:
+        # Activity pane is user-visible — never show residual monopin IPv4
+        try:
+            from client.residual_public import redact_residual_hosts_in_text
+
+            text = redact_residual_hosts_in_text(str(line or ""))
+        except Exception:
+            text = str(line or "")
         self.output.configure(state=tk.NORMAL)
-        self.output.insert(tk.END, line + "\n")
+        self.output.insert(tk.END, text + "\n")
         self.output.see(tk.END)
         self.output.configure(state=tk.DISABLED)
 
@@ -814,41 +942,72 @@ class TunnelClientApp:
                 ipv6_protected=ipv6_protected,
             )
         )
+        # Headline colour: residual Connect success is always product teal
+        # (STATUS_OK). Never paint Connected residual in error-red — that read as
+        # "broken" even when residual public IP was on the VPN. IPv6 honesty stays
+        # in the detail line (muted), not the big status label.
         if s == "connected" and residual_capture is not False:
+            ok = (self._t or {}).get("status_ok") or STATUS_OK
+            self._status_headline_fg = ok
+            self.status_label.configure(fg=ok)
             if ipv6_protected is False:
-                self.status_label.configure(fg=STATUS_ERROR_FG)
                 self.detail_var.set(
-                    "IPv4 uses the VPN node, but IPv6 may still use your ISP - not fully protected."
+                    "Connected — residual public IP uses the VPN. "
+                    "Note: IPv6 may still use your ISP (not fully blocked)."
                 )
             else:
-                self.status_label.configure(fg=STATUS_OK)
                 self.detail_var.set(
-                    "Your residual public IP uses the VPN node; IPv6 ISP path is blocked."
+                    "Connected — residual public IP uses the VPN node; "
+                    "IPv6 ISP path is blocked."
                 )
             # Pass connected=True explicitly - _apply_control may not have run yet
             self._sync_tray_status(connected=True, residual=True)
         elif s == "connected":
-            self.status_label.configure(fg=STATUS_ERROR_FG)
+            # Session without residual — amber warning (not hard-error red)
+            warn = (self._t or {}).get("status_warn") or STATUS_WARN
+            self._status_headline_fg = warn
+            self.status_label.configure(fg=warn)
             self.detail_var.set(
                 "Session up but residual public IP still uses your ISP - not fully protected."
             )
             self._sync_tray_status(connected=True, residual=False)
         elif s == "connecting":
-            self.status_label.configure(fg=PRIMARY_DARK)
-            self.detail_var.set("Please wait... setting up a secure connection.")
+            pd = (self._t or {}).get("primary_dark") or PRIMARY_DARK
+            self._status_headline_fg = pd
+            self.status_label.configure(fg=pd)
+            self.detail_var.set(
+                detail
+                or "Please wait... setting up a secure connection."
+            )
             self._sync_tray_status(connected=False, residual=False)
+            # User started Connect from the shell — keep status visible mid-path
+            # (not only after Connected). Respect minimize / hide-to-tray.
+            try:
+                self._bring_shell_forward(force_visible=False)
+            except Exception:
+                pass
         elif s == "disconnecting":
-            self.status_label.configure(fg=PRIMARY_DARK)
+            pd = (self._t or {}).get("primary_dark") or PRIMARY_DARK
+            self._status_headline_fg = pd
+            self.status_label.configure(fg=pd)
             self.detail_var.set("Stopping the tunnel and restoring normal internet...")
             # Still show connected tray until teardown finishes
             self._sync_tray_status(connected=True, residual=True)
+            try:
+                self._bring_shell_forward(force_visible=False)
+            except Exception:
+                pass
         elif s in ("error", "failed"):
-            self.status_label.configure(fg=STATUS_ERROR_FG)
+            err = (self._t or {}).get("status_error") or STATUS_ERROR_FG
+            self._status_headline_fg = err
+            self.status_label.configure(fg=err)
             self.detail_var.set(detail or "Check the activity log, then try Connect again.")
             self._sync_tray_status(connected=False, residual=False)
         else:
             # disconnected
-            self.status_label.configure(fg=TEXT)
+            tx = (self._t or {}).get("text") or TEXT
+            self._status_headline_fg = tx
+            self.status_label.configure(fg=tx)
             self.detail_var.set("Not connected. Press Connect when you want protection.")
             self._sync_tray_status(connected=False, residual=False)
 
@@ -906,6 +1065,10 @@ class TunnelClientApp:
         win.transient(self.root)
         try:
             win.grab_set()
+        except Exception:
+            pass
+        try:
+            self._bring_window_forward(win, force_visible=True)
         except Exception:
             pass
         shell = tk.Frame(win, bg=CHROME_BG, padx=16, pady=14)
@@ -989,6 +1152,51 @@ class TunnelClientApp:
             cursor="hand2",
         ).pack(side=tk.LEFT, padx=(8, 0))
 
+    def _present_post_keygen_surface(self, next_s: str) -> None:
+        """After valid keygen: open next first-run surface and keep it in front.
+
+        Does **not** restart the process. Closes only the keygen modal; main
+        shell stays alive. Raises Settings/renew/main so the transition is not
+        buried under other apps.
+        """
+        surface = (next_s or "").strip().lower() or "settings"
+        try:
+            self._bring_shell_forward(force_visible=True)
+        except Exception:
+            pass
+        if surface == "settings":
+            try:
+                self._open_settings(first_run=True)
+            except Exception as exc:  # noqa: BLE001
+                self._log(f"Post-keygen Settings open failed: {exc}")
+            # Settings open may create a new Toplevel — force it forward again
+            # (immediate + one idle tick for grab/map settle).
+            def _raise_settings() -> None:
+                try:
+                    sw = getattr(self, "_settings_win", None)
+                    if sw is not None and sw.winfo_exists():
+                        self._bring_window_forward(sw, force_visible=True)
+                except Exception:
+                    pass
+
+            _raise_settings()
+            try:
+                self.root.after(50, _raise_settings)
+            except Exception:
+                pass
+            return
+        if surface == "renew":
+            try:
+                self._show_renew_licence_prompt()
+            except Exception as exc:  # noqa: BLE001
+                self._log(f"Post-keygen renew open failed: {exc}")
+            return
+        # main (or unknown): keep main Connect shell visible in front
+        try:
+            self._bring_shell_forward(force_visible=True)
+        except Exception:
+            pass
+
     def _show_keygen_prompt(self) -> None:
         """Forced modal: enter fulfilment keygen to unlock install (not Settings-only).
 
@@ -1003,8 +1211,9 @@ class TunnelClientApp:
         try:
             if self._keygen_prompt_win is not None and self._keygen_prompt_win.winfo_exists():
                 try:
-                    self._keygen_prompt_win.lift()
-                    self._keygen_prompt_win.focus_force()
+                    self._bring_window_forward(
+                        self._keygen_prompt_win, force_visible=True
+                    )
                 except Exception:
                     pass
                 return
@@ -1021,6 +1230,10 @@ class TunnelClientApp:
             win.grab_set()
         except Exception:
             pass
+        try:
+            self._bring_window_forward(win, force_visible=True)
+        except Exception:
+            pass
 
         status_var = tk.StringVar(
             value="Keygen is required to unlock this install before Settings and Connect."
@@ -1033,7 +1246,7 @@ class TunnelClientApp:
                     "Enter the keygen from your fulfilment email to unlock this install."
                 )
                 try:
-                    win.lift()
+                    self._bring_window_forward(win, force_visible=True)
                 except Exception:
                     pass
                 return
@@ -1146,28 +1359,32 @@ class TunnelClientApp:
                         self.detail_var.set(
                             "Keygen verified. Review Settings, then OK to open Connect."
                         )
+                        # Close keygen modal, then open next surface *immediately*
+                        # with a real raise. A delayed after(200) left a gap where
+                        # the modal vanished and Settings/main opened buried —
+                        # users read that as “app closed and restarted behind”.
                         try:
+                            try:
+                                win.grab_release()
+                            except Exception:
+                                pass
                             win.destroy()
                         except Exception:
                             pass
                         self._keygen_prompt_win = None
-                        # Post-keygen: first-run settings (OK binds → main Connect)
+                        try:
+                            self._bring_shell_forward(force_visible=True)
+                        except Exception:
+                            pass
                         next_s = post_keygen_next_surface()
-                        if next_s == "settings":
-                            try:
-                                self.root.after(
-                                    200,
-                                    lambda: self._open_settings(first_run=True),
-                                )
-                            except Exception:
-                                self._open_settings(first_run=True)
-                        elif next_s == "renew":
-                            try:
-                                self.root.after(200, self._show_renew_licence_prompt)
-                            except Exception:
-                                self._show_renew_licence_prompt()
+                        self._log(f"Post-keygen next surface: {next_s}")
+                        self._present_post_keygen_surface(next_s)
                     else:
                         self.detail_var.set(msg)
+                        try:
+                            self._bring_window_forward(win, force_visible=True)
+                        except Exception:
+                            pass
 
                 try:
                     self.root.after(0, done)
@@ -1216,6 +1433,10 @@ class TunnelClientApp:
         win.transient(self.root)
         try:
             win.grab_set()
+        except Exception:
+            pass
+        try:
+            self._bring_window_forward(win, force_visible=True)
         except Exception:
             pass
         shell = tk.Frame(win, bg=CHROME_BG, padx=16, pady=14)
@@ -1290,7 +1511,15 @@ class TunnelClientApp:
                 "Licence accepted. Enter your keygen from the fulfilment email to unlock."
             )
             try:
+                try:
+                    win.grab_release()
+                except Exception:
+                    pass
                 win.destroy()
+            except Exception:
+                pass
+            try:
+                self._bring_shell_forward(force_visible=True)
             except Exception:
                 pass
             # Next surface via real first-run sequencer (keygen is mandatory when unlock-absent)
@@ -1377,9 +1606,42 @@ class TunnelClientApp:
         except Exception:  # noqa: BLE001
             pass
 
+    def _sync_main_entry_from_settings(self) -> str:
+        """Align main-shell picker + residual path with durable Settings.
+
+        Durable ``settings.json`` is the residual source of truth. First-run
+        Settings OK (and other save paths) must call this so a stale main-shell
+        Iceland label cannot overwrite DE/RO on the next Connect.
+        Returns the normalized entry country code.
+        """
+        try:
+            cur = load_settings()
+        except Exception:
+            cur = self._settings
+        code = normalize_entry_country(
+            getattr(cur, "entry_country", default_entry_country())
+        )
+        try:
+            if getattr(self, "_entry_label_var", None) is not None:
+                self._entry_label_var.set(option_label_for_code(code))
+        except Exception:
+            pass
+        try:
+            from client.country_select import country_flag_emoji
+
+            if getattr(self, "_flag_var", None) is not None:
+                self._flag_var.set(country_flag_emoji(code) or f"[{code}]")
+        except Exception:
+            pass
+        self._settings = cur
+        self._refresh_multihop_from_settings()
+        return code
+
     def _on_main_entry_country_changed(self, _label: str | None = None) -> None:
         """Persist main-shell country picker and refresh residual path for next Connect."""
         try:
+            from client.country_select import country_flag_emoji
+
             label = self._entry_label_var.get()
             code = label_to_country_code(label) or default_entry_country()
             code = normalize_entry_country(code)
@@ -1388,6 +1650,10 @@ class TunnelClientApp:
             save_settings(cur)
             self._settings = cur
             self._entry_label_var.set(option_label_for_code(code))
+            try:
+                self._flag_var.set(country_flag_emoji(code) or f"[{code}]")
+            except Exception:
+                pass
             self._refresh_multihop_from_settings()
             self._log(
                 f"Entry country: {option_label_for_code(code)} (next Connect)"
@@ -1404,23 +1670,29 @@ class TunnelClientApp:
             self._start_connect()
 
     def _start_connect(self) -> None:
-        # Persist any pending main-shell country selection before path refresh.
+        # Durable Settings is residual truth. Do **not** rewrite settings from a
+        # stale main-shell Iceland label (first-run Settings OK race). Align the
+        # picker to disk, then dial the configured entry country.
         try:
-            self._on_main_entry_country_changed()
+            entry_code = self._sync_main_entry_from_settings()
         except Exception:
-            pass
-        # Always refresh residual path from durable Settings before dialling.
-        self._refresh_multihop_from_settings()
-        # Entry country must be a live catalog monopin (default Iceland).
+            try:
+                entry_code = normalize_entry_country(
+                    getattr(load_settings(), "entry_country", "") or ""
+                )
+            except Exception:
+                entry_code = ""
+            self._refresh_multihop_from_settings()
+        # Entry country must be a live catalog monopin (default United States/US).
         try:
-            cur_entry = getattr(load_settings(), "entry_country", "") or ""
+            cur_entry = getattr(load_settings(), "entry_country", "") or entry_code
         except Exception:
-            cur_entry = ""
+            cur_entry = entry_code
         ok_entry, entry_code, _reason = resolve_entry_country_selection(cur_entry)
         if not ok_entry or not entry_country_allows_connect(entry_code):
             msg = (
                 "Choose a valid entry country above Connect "
-                "(Iceland is the default)."
+                "(Iceland is the product default)."
             )
             self._log(msg)
             self._set_status("error", detail=msg)
@@ -1470,21 +1742,34 @@ class TunnelClientApp:
 
             self._apply_control(connected=False, busy=True)
             self._set_status("connecting")
+            try:
+                self._bring_shell_forward(force_visible=False)
+            except Exception:
+                pass
             dispatched = connect_residual_privilege_dispatch()
             action = str(dispatched.get("action") or "")
 
             if action == "run_helper" and dispatched.get("ok"):
+                # Helper task starts an *elevated* product process with
+                # --rpt-auto-connect (full GUI + tray). This non-admin shell
+                # must hand off completely — otherwise two windows/tray icons.
                 self._log(
-                    "Connect — starting residual via installed helper "
-                    "(no Run as administrator on the app window)…"
+                    "Connect — residual helper started elevated; handing off "
+                    "(this window exits so only one tray icon remains)…"
                 )
                 helper = dispatched.get("helper") or {}
-                self._log(str(helper.get("message") or dispatched.get("message") or "Residual helper started."))
+                self._log(
+                    str(
+                        helper.get("message")
+                        or dispatched.get("message")
+                        or "Residual helper started."
+                    )
+                )
                 self._set_status(
                     "connecting",
-                    detail="Residual helper finishing Connect elevated…",
+                    detail="Elevated Connect opening — approve if prompted…",
                 )
-                self._apply_control(connected=False, busy=False)
+                self._handoff_elevated_connect_exit()
                 return
 
             if action == "run_helper" and not dispatched.get("ok"):
@@ -1508,13 +1793,14 @@ class TunnelClientApp:
                 "Approve UAC to re-open elevated and finish Connect. "
                 "You do not need 'Run as administrator' on the shortcut every time."
             )
+            try:
+                self._bring_shell_forward(force_visible=False)
+            except Exception:
+                pass
             status = elevate_if_needed(extra_args=["--rpt-auto-connect"])
             if should_exit_after_elevation(status):
-                # Elevated child resumes Connect via --rpt-auto-connect
-                try:
-                    self.root.destroy()
-                except Exception:
-                    pass
+                # Elevated child resumes Connect via --rpt-auto-connect.
+                self._handoff_elevated_connect_exit()
                 return
             err = elevation_result_user_message(status)
             self._log(f"Could not connect: {err}")
@@ -1524,10 +1810,40 @@ class TunnelClientApp:
 
         self._apply_control(connected=False, busy=True)
         self._set_status("connecting")
-        self._log("Connect - starting secure session (full-tunnel residual path)...")
-        self._connection_log(
-            KIND_CONNECT, "Connect started (full-tunnel residual path)"
-        )
+        try:
+            self._bring_shell_forward(force_visible=False)
+        except Exception:
+            pass
+        try:
+            from client.multihop import (
+                country_node_for_code,
+                entry_endpoint,
+                residual_endpoint,
+            )
+
+            _mh = getattr(self.client, "multihop", None)
+            _entry_n = country_node_for_code(entry_code)
+            _res_ep = residual_endpoint(_mh) if _mh is not None else entry_endpoint(_mh)
+            # Dial host is private (Connect path only); UI/support log use country label
+            from client.residual_public import public_label_for_code
+
+            _pub = public_label_for_code(
+                _entry_n.code, name=getattr(_entry_n, "name", None)
+            )
+            self._log(
+                f"Connect — entry {_pub} (full-tunnel residual)…"
+            )
+            self._connection_log(
+                KIND_CONNECT,
+                f"Connect started — entry {_entry_n.code}",
+            )
+        except Exception:
+            self._log(
+                "Connect - starting secure session (full-tunnel residual path)..."
+            )
+            self._connection_log(
+                KIND_CONNECT, "Connect started (full-tunnel residual path)"
+            )
 
         def work() -> None:
             # Status-host + residual HELLO stay off the Tk UI thread so Windows
@@ -1623,9 +1939,22 @@ class TunnelClientApp:
             vpn_ip = result.session.vpn_ip
 
             def note_session() -> None:
-                self._log(f"Session ready (tunnel address {vpn_ip})")
+                entry_note = ""
+                try:
+                    from client.residual_public import public_label_for_code
+
+                    ec = normalize_entry_country(
+                        getattr(load_settings(), "entry_country", "") or ""
+                    )
+                    entry_note = f" entry={public_label_for_code(ec)}"
+                except Exception:
+                    entry_note = ""
+                self._log(
+                    f"Session ready (tunnel address {vpn_ip};{entry_note})"
+                )
                 self._connection_log(
-                    KIND_SESSION, f"Session ready (tunnel address {vpn_ip})"
+                    KIND_SESSION,
+                    f"Session ready (tunnel address {vpn_ip};{entry_note})",
                 )
                 if residual_ready:
                     self._log("Residual already active — confirming tunnel attach…")
@@ -1663,15 +1992,26 @@ class TunnelClientApp:
                     self._tunnel = tun_res
                     if residual_ip_capture_active(tun_res):
                         v6 = ipv6_residual_protected(tun_res)
+                        # Never paint residual monopin IPv4 in activity / support log
+                        entry_bit = ""
+                        try:
+                            from client.residual_public import public_label_for_code
+
+                            ec = normalize_entry_country(
+                                getattr(load_settings(), "entry_country", "") or ""
+                            )
+                            entry_bit = f" entry={public_label_for_code(ec)}"
+                        except Exception:
+                            entry_bit = ""
                         self._log(
                             "Tunnel active - residual public IP uses the VPN node "
                             f"(IF={getattr(tun_res, 'if_index', '?')}; "
-                            f"ipv6_protected={v6})"
+                            f"ipv6_protected={v6};{entry_bit})"
                         )
                         self._connection_log(
                             KIND_CONNECT,
                             "Connected — residual public IP uses the VPN node "
-                            f"(ipv6_protected={v6})",
+                            f"(ipv6_protected={v6};{entry_bit})",
                         )
                         # Apply control first so _connected is True, then status+tray
                         self._apply_control(connected=True, busy=False)
@@ -1681,6 +2021,11 @@ class TunnelClientApp:
                             residual_capture=True,
                             ipv6_protected=v6,
                         )
+                        # Keep shell in front after Connect work (user initiated).
+                        try:
+                            self._bring_shell_forward(force_visible=False)
+                        except Exception:
+                            pass
                     else:
                         # Capture attach failure BEFORE teardown overwrites tun_res.message
                         original_err = getattr(tun_res, "message", None)
@@ -1699,6 +2044,10 @@ class TunnelClientApp:
                         )
                         self._set_status("error", detail=err)
                         self._apply_control(connected=False, busy=False)
+                        try:
+                            self._bring_shell_forward(force_visible=False)
+                        except Exception:
+                            pass
                 finally:
                     if self._busy:
                         self._apply_control(connected=self._connected, busy=False)
@@ -1730,6 +2079,10 @@ class TunnelClientApp:
                     self._sync_tray_status(connected=False, residual=False)
                     self._log("Disconnected.")
                     self._connection_log(KIND_DISCONNECT, "Disconnected")
+                    try:
+                        self._bring_shell_forward(force_visible=False)
+                    except Exception:
+                        pass
 
                 self.root.after(0, done)
 
@@ -1752,6 +2105,11 @@ class TunnelClientApp:
         """
         surface = first_run_next_surface()
         self._log(f"First-run surface: {surface}")
+        # Keep product chrome visible when stepping between first-run modals.
+        try:
+            self._bring_shell_forward(force_visible=True)
+        except Exception:
+            pass
         if surface == "licence":
             self._show_licence_prompt()
         elif surface == "renew":
@@ -1760,8 +2118,18 @@ class TunnelClientApp:
             self._show_keygen_prompt()
         elif surface == "settings":
             self._open_settings(first_run=True)
+            try:
+                sw = getattr(self, "_settings_win", None)
+                if sw is not None and sw.winfo_exists():
+                    self._bring_window_forward(sw, force_visible=True)
+            except Exception:
+                pass
         elif surface == "main" and force:
             self.detail_var.set("Ready — press Connect for residual protection.")
+            try:
+                self._bring_shell_forward(force_visible=True)
+            except Exception:
+                pass
         # surface == main without force: stay on main Connect shell
 
     def _toggle_ui_mode(self) -> None:
@@ -1883,9 +2251,10 @@ class TunnelClientApp:
                     w.configure(bg=panel)
                 except Exception:
                     pass
+        status_fg = getattr(self, "_status_headline_fg", None) or text
         for w, kw in (
             (getattr(self, "vpn_status_caption", None), {"bg": panel, "fg": muted}),
-            (getattr(self, "status_label", None), {"bg": panel, "fg": text}),
+            (getattr(self, "status_label", None), {"bg": panel, "fg": status_fg}),
             (getattr(self, "detail_label", None), {"bg": panel, "fg": muted}),
         ):
             if w is not None:
@@ -1897,6 +2266,12 @@ class TunnelClientApp:
         try:
             if getattr(self, "status_card", None) is not None:
                 self._paint_descendant_chrome(self.status_card, panel, text, muted)
+        except Exception:
+            pass
+        # Re-assert headline colour after descendant paint (status_label is inside card)
+        try:
+            if getattr(self, "status_label", None) is not None:
+                self.status_label.configure(bg=panel, fg=status_fg)
         except Exception:
             pass
 
@@ -1939,8 +2314,9 @@ class TunnelClientApp:
         try:
             if self._settings_win is not None and self._settings_win.winfo_exists():
                 try:
-                    self._settings_win.lift()
-                    self._settings_win.focus_force()
+                    self._bring_window_forward(
+                        self._settings_win, force_visible=True
+                    )
                 except Exception:
                     pass
                 return
@@ -1961,6 +2337,10 @@ class TunnelClientApp:
             win.grab_set()
         except Exception:
             pass
+        try:
+            self._bring_window_forward(win, force_visible=True)
+        except Exception:
+            pass
 
         def _on_settings_closed() -> None:
             unbind = getattr(self, "_settings_scroll_unbind", None)
@@ -1973,6 +2353,11 @@ class TunnelClientApp:
             self._settings_win = None
             try:
                 win.destroy()
+            except Exception:
+                pass
+            # Return focus to main shell (user still in product, not minimized).
+            try:
+                self._bring_shell_forward(force_visible=False)
             except Exception:
                 pass
 
@@ -2289,7 +2674,7 @@ class TunnelClientApp:
                 _save_privacy,
             )
             tk.Frame(priv_card, bg=BORDER, height=1).pack(fill=tk.X, pady=4)
-            # Entry country (IS / RO / DE + flags) — also on main shell above Connect
+            # Entry country (IS / RO / US + flags) — also on main shell above Connect
             entry_row = tk.Frame(priv_card, bg=PANEL_BG)
             entry_row.pack(fill=tk.X, pady=8)
             entry_col = tk.Frame(entry_row, bg=PANEL_BG)
@@ -2305,9 +2690,8 @@ class TunnelClientApp:
             tk.Label(
                 entry_col,
                 text=(
-                    "Choose residual entry: Iceland, Romania, or Germany. "
-                    "With multi-hop on, exit is another catalog country "
-                    "(random among non-entry peers)."
+                    "Choose residual entry: Iceland, Romania, or United States. "
+                    "With multi-hop on, exit is another catalog country."
                 ),
                 bg=PANEL_BG,
                 fg=TEXT_MUTED,
@@ -2339,7 +2723,7 @@ class TunnelClientApp:
             # Friendly labels under the code menu
             tk.Label(
                 entry_col,
-                text="IS = Iceland · RO = Romania",
+                text="IS = Iceland · RO = Romania · US = United States",
                 bg=PANEL_BG,
                 fg=TEXT_MUTED,
                 font=("Segoe UI", 7),
@@ -2378,8 +2762,27 @@ class TunnelClientApp:
             wraplength=400,
             justify=tk.LEFT,
         ).pack(fill=tk.X, pady=(0, 6))
-        entry_ping_var = tk.StringVar(value="Entry (Iceland): —")
-        exit_ping_var = tk.StringVar(value="Exit (Romania): n/a (multi-hop off)")
+        def _entry_code_for_ping() -> str:
+            try:
+                return normalize_entry_country(
+                    label_to_country_code(entry_country_var.get())
+                    or entry_country_var.get()
+                    or getattr(load_settings(), "entry_country", "IS")
+                )
+            except Exception:
+                return "IS"
+
+        _init_ping_code = _entry_code_for_ping()
+        try:
+            from client.multihop import country_node_for_code as _cn
+
+            _init_name = _cn(_init_ping_code).name
+        except Exception:
+            _init_name = _init_ping_code
+        entry_ping_var = tk.StringVar(
+            value=f"Entry ({_init_name} / {_init_ping_code}): —"
+        )
+        exit_ping_var = tk.StringVar(value="Exit: n/a (multi-hop off)")
         tk.Label(
             priv_card,
             textvariable=entry_ping_var,
@@ -2398,11 +2801,18 @@ class TunnelClientApp:
         ).pack(fill=tk.X, pady=(2, 6))
 
         def _refresh_pings() -> None:
-            entry_ping_var.set("Entry (Iceland): measuring…")
+            code = _entry_code_for_ping()
+            try:
+                from client.multihop import country_node_for_code as _cn2
+
+                ename = _cn2(code).name
+            except Exception:
+                ename = code
+            entry_ping_var.set(f"Entry ({ename} / {code}): measuring…")
             if bool(multihop_var.get()):
-                exit_ping_var.set("Exit (Romania): measuring…")
+                exit_ping_var.set("Exit: measuring…")
             else:
-                exit_ping_var.set("Exit (Romania): n/a (multi-hop off)")
+                exit_ping_var.set("Exit: n/a (multi-hop off)")
             win.update_idletasks()
 
             def work() -> None:
@@ -2410,12 +2820,13 @@ class TunnelClientApp:
                     snap = measure_settings_pings(
                         multihop_enabled=bool(multihop_var.get()),
                         timeout_s=1.5,
+                        entry_country=code,
                     )
-                    e_txt = f"Entry (Iceland): {snap.entry_display()}"
-                    x_txt = f"Exit (Romania): {snap.exit_display()}"
+                    e_txt = f"{snap.entry_label()}: {snap.entry_display()}"
+                    x_txt = f"{snap.exit_label()}: {snap.exit_display()}"
                 except Exception as exc:  # noqa: BLE001
-                    e_txt = f"Entry (Iceland): n/a ({exc})"
-                    x_txt = "Exit (Romania): n/a"
+                    e_txt = f"Entry ({ename} / {code}): n/a ({exc})"
+                    x_txt = "Exit: n/a"
 
                 def done() -> None:
                     entry_ping_var.set(e_txt)
@@ -3019,16 +3430,31 @@ class TunnelClientApp:
             except Exception:
                 # save_settings already wrote completed flag on s
                 pass
+            # Critical: first-run OK must align main-shell picker + multihop with
+            # the just-saved entry_country (DE/RO), not leave stale Iceland.
+            try:
+                self._sync_main_entry_from_settings()
+            except Exception:
+                try:
+                    if getattr(self, "_entry_label_var", None) is not None:
+                        self._entry_label_var.set(
+                            option_label_for_code(s.entry_country)
+                        )
+                    self._refresh_multihop_from_settings()
+                except Exception:
+                    pass
             self._log(
-                "Settings OK — preferences bound; main Connect surface ready."
+                "Settings OK — preferences bound; main Connect surface ready "
+                f"(entry={normalize_entry_country(s.entry_country)})."
             )
             self.detail_var.set(
                 "Settings saved. Press Connect for residual protection."
             )
             _on_settings_closed()
+            # _on_settings_closed already raises main shell; pulse again after OK
+            # so first-run return is not buried under other apps.
             try:
-                self.root.lift()
-                self.root.focus_force()
+                self._bring_shell_forward(force_visible=False)
             except Exception:
                 pass
 
@@ -3151,13 +3577,10 @@ class TunnelClientApp:
         self._show_quitting_status()
 
         # 2) Tray stop is PostMessage-based (no join) — keep off the residual path.
-        tray = self._tray
-        self._tray = None
-        if tray is not None:
-            try:
-                tray.stop()
-            except Exception:
-                pass
+        try:
+            self._stop_system_tray()
+        except Exception:
+            pass
 
         tunnel = self._tunnel
         self._tunnel = None
@@ -3204,14 +3627,74 @@ class TunnelClientApp:
 RetroClientApp = TunnelClientApp
 
 
+def _launch_diag(message: str) -> None:
+    """Append one line to local launch log (diagnose instant-exit vs crash)."""
+    try:
+        from pathlib import Path
+        import time
+
+        base = os.environ.get("LOCALAPPDATA") or str(
+            Path.home() / "AppData" / "Local"
+        )
+        p = Path(base) / "RestorePrivacy" / "launch.log"
+        p.parent.mkdir(parents=True, exist_ok=True)
+        with p.open("a", encoding="utf-8") as f:
+            f.write(f"{time.time():.3f} {message}\n")
+    except Exception:
+        pass
+
+
+def _enable_crash_fault_log() -> None:
+    """Always-on faulthandler → %LOCALAPPDATA%\\RestorePrivacy\\fault.log."""
+    try:
+        import faulthandler
+        from pathlib import Path
+
+        base = os.environ.get("LOCALAPPDATA") or str(
+            Path.home() / "AppData" / "Local"
+        )
+        p = Path(base) / "RestorePrivacy" / "fault.log"
+        p.parent.mkdir(parents=True, exist_ok=True)
+        # Keep handle alive for process lifetime (module attr)
+        _enable_crash_fault_log._fh = p.open("a", encoding="utf-8", buffering=1)  # type: ignore[attr-defined]
+        fh = _enable_crash_fault_log._fh  # type: ignore[attr-defined]
+        faulthandler.enable(file=fh, all_threads=True)
+        fh.write(f"\n--- fault log enable pid={os.getpid()} ---\n")
+        fh.flush()
+    except Exception:
+        pass
+
+
 def main() -> int:
     """Launch UI; residual Connect elevates (Wintun + dual /1). No cold auto-connect."""
+    _enable_crash_fault_log()
+    # Detect handoff *before* stripping flags (single-instance allows handoff).
+    resume_after_elevate = "--rpt-auto-connect" in sys.argv
+    is_elev_flag = "--rpt-elevated" in sys.argv
     if "--rpt-elevated" in sys.argv:
         sys.argv = [a for a in sys.argv if a != "--rpt-elevated"]
     # User pressed Connect then approved UAC - resume that one Connect only.
-    resume_after_elevate = "--rpt-auto-connect" in sys.argv
     if resume_after_elevate:
         sys.argv = [a for a in sys.argv if a != "--rpt-auto-connect"]
+
+    # One cold-start GUI: second launch focuses existing window and exits
+    # (elevated --rpt-auto-connect handoff is allowed as a second process).
+    try:
+        from client.windows.single_instance import guard_single_instance_or_activate
+
+        cont, si_reason = guard_single_instance_or_activate(
+            window_title=APP_TITLE,
+            allow_handoff=bool(resume_after_elevate or is_elev_flag),
+        )
+        if not cont:
+            # Second launch: existing window focused — exit quietly (not a crash).
+            try:
+                _launch_diag(f"single_instance_exit reason={si_reason}")
+            except Exception:
+                pass
+            return 0
+    except Exception:
+        si_reason = "guard_failed"
 
     root = Path(__file__).resolve().parents[2]
     if str(root) not in sys.path:
@@ -3246,8 +3729,14 @@ def main() -> int:
             return 0
 
     try:
+        _launch_diag(f"creating_app si_reason={si_reason!r}")
         app = TunnelClientApp()
+        _launch_diag("app_created")
     except Exception as exc:
+        try:
+            _launch_diag(f"app_create_failed {type(exc).__name__}: {exc}")
+        except Exception:
+            pass
         try:
             import ctypes
 
@@ -3306,10 +3795,22 @@ def main() -> int:
     # may_connect() — that previously skipped keygen when gates were inconsistent.
     assert non_admin_connect_allowed()
     if resume_after_elevate and is_admin():
+        # Elevated handoff: surface immediately (user just clicked Connect).
+        def _raise_elevated_shell() -> None:
+            try:
+                app._bring_shell_forward(force_visible=True)
+            except Exception:
+                pass
+
+        app.root.after(50, _raise_elevated_shell)
 
         def _resume_user_connect() -> None:
             # User already pressed Connect before UAC (or residual elevate).
             # Still block if keygen missing (cannot bypass unlock via elevate).
+            try:
+                app._bring_shell_forward(force_visible=True)
+            except Exception:
+                pass
             if needs_keygen_unlock():
                 app._log(
                     "Elevated resume blocked — enter keygen to unlock install first."
@@ -3349,7 +3850,15 @@ def main() -> int:
 
         app.root.after(400, _cold_start_first_run)
 
+    try:
+        _launch_diag("mainloop_enter")
+    except Exception:
+        pass
     app.run()
+    try:
+        _launch_diag("mainloop_exit")
+    except Exception:
+        pass
     return 0
 
 
