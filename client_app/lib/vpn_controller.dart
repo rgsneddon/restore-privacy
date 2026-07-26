@@ -231,11 +231,45 @@ class VpnController {
   }
 
   /// Stop system VPN (explicit Disconnect only — not on minimize).
+  ///
+  /// Native path must tear down the OS Packet Tunnel so Network settings
+  /// toggles off with the app. Polls status briefly so UI does not claim
+  /// disconnected while the system tunnel is still Connected.
   Future<void> disconnect() async {
     try {
       final result = await _channel.invokeMethod<dynamic>('disconnect');
+      // Confirm system tunnel is down (status channel / residual still-live).
+      for (var i = 0; i < 15; i++) {
+        final snap = await querySession();
+        if (!snap.connected && !snap.connecting) break;
+        await Future<void>.delayed(const Duration(milliseconds: 150));
+        if (i == 7) {
+          // Second native stop if still live mid-poll.
+          try {
+            await _channel.invokeMethod<dynamic>('disconnect');
+          } catch (_) {}
+        }
+      }
+      final still = await querySession();
+      if (still.connected || still.connecting) {
+        onStatus(
+          'Disconnect issued but system VPN may still be active — '
+          'toggle off Restore Privacy in System Settings → Network → VPN & Filters, '
+          'or press Disconnect again.',
+        );
+        return;
+      }
       if (result is Map) {
         final msg = result['message']?.toString().trim();
+        final stopped = result['systemVpnStopped'];
+        if (stopped == false) {
+          onStatus(
+            (msg != null && msg.isNotEmpty)
+                ? msg
+                : 'Disconnect issued but system VPN may still be active.',
+          );
+          return;
+        }
         onStatus(
           (msg != null && msg.isNotEmpty)
               ? msg

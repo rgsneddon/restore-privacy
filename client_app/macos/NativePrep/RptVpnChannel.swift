@@ -42,8 +42,11 @@ enum RptVpnChannel {
         let fullTunnel = (args["fullTunnel"] as? Bool) ?? true
         connect(host: ep.host, port: ep.port, fullTunnel: fullTunnel, flutterResult: result)
       case "disconnect":
-        // Same stop path as app-quit / terminate hooks.
+        // Same stop path as app-quit / terminate hooks — must stop system Network VPN.
         stopAllTunnels { map in result(map) }
+      case "status":
+        // Session rehydrate / post-disconnect verification.
+        queryProductSessionStatus { map in result(map) }
       case "prepareVpn", "preparePacketTunnel", "registerVpnConfiguration":
         // Pre-Connect: save Packet Tunnel NE profile into OS VPN prefs (not L2TP/IKEv2).
         let args = call.arguments as? [String: Any] ?? [:]
@@ -865,37 +868,240 @@ enum RptVpnChannel {
   }
 
   /// Whether a saved VPN manager is ours (product Packet Tunnel) — used for stop/disconnect.
+  /// Broader than [isProductManager]: also match by display name / bundle substring so
+  /// Disconnect always tears down the Network connection the user sees as Restore Privacy.
   static func shouldStopManager(_ manager: NETunnelProviderManager) -> Bool {
-    isProductManager(manager)
+    if isProductManager(manager) { return true }
+    let desc = manager.localizedDescription ?? ""
+    if desc == productLocalizedDescription { return true }
+    if desc.range(of: "Restore Privacy", options: .caseInsensitive) != nil {
+      return true
+    }
+    let proto = manager.protocolConfiguration as? NETunnelProviderProtocol
+    let bid = proto?.providerBundleIdentifier ?? ""
+    if bid == providerBundleId { return true }
+    if bid.range(of: "restorePrivacyClient", options: .caseInsensitive) != nil {
+      return true
+    }
+    if bid.range(of: "restoreprivacy", options: .caseInsensitive) != nil {
+      return true
+    }
+    return false
+  }
+
+  /// Product session snapshot for Flutter status / post-disconnect checks.
+  private static func queryProductSessionStatus(
+    completion: @escaping ([String: Any]) -> Void
+  ) {
+    let work = {
+      NETunnelProviderManager.loadAllFromPreferences { managers, error in
+        if let error {
+          completion([
+            "ok": false,
+            "connected": false,
+            "fullTunnelActive": false,
+            "message": "Status unavailable: \(error.localizedDescription)",
+          ] as [String: Any])
+          return
+        }
+        let ours = (managers ?? []).filter { shouldStopManager($0) }
+        let active = ours.first(where: {
+          let st = $0.connection.status
+          return st == .connected || st == .connecting || st == .reasserting
+        })
+        if let active {
+          let st = active.connection.status
+          let connecting = st == .connecting || st == .reasserting
+          completion([
+            "ok": st == .connected,
+            "connected": st == .connected,
+            "connecting": connecting,
+            "fullTunnelActive": st == .connected,
+            "message": st == .connected
+              ? "Connected — system Packet Tunnel active"
+              : "VPN \(statusName(st))",
+          ] as [String: Any])
+          return
+        }
+        completion([
+          "ok": false,
+          "connected": false,
+          "connecting": false,
+          "fullTunnelActive": false,
+          "message": "Disconnected",
+        ] as [String: Any])
+      }
+    }
+    if Thread.isMainThread {
+      work()
+    } else {
+      DispatchQueue.main.async(execute: work)
+    }
   }
 
   /// Stop every Restore Privacy Packet Tunnel session (channel disconnect + app quit).
+  /// Must turn **off** the system Network VPN toggle, not only update Flutter UI.
   /// Residual public IP reverts when the OS tears down the NE session.
   static func stopAllTunnels(completion: (([String: Any]) -> Void)? = nil) {
     let finish: ([String: Any]) -> Void = { map in
-      completion?(map)
+      if Thread.isMainThread {
+        completion?(map)
+      } else {
+        DispatchQueue.main.async { completion?(map) }
+      }
     }
-    NETunnelProviderManager.loadAllFromPreferences { managers, error in
-      if let error {
-        finish([
-          "ok": false,
-          "message": "Disconnect failed: \(error.localizedDescription)",
-          "fullTunnelActive": false,
-          "hostOnlySession": false,
-        ] as [String: Any])
-        return
+    let begin = {
+      NETunnelProviderManager.loadAllFromPreferences { managers, error in
+        if let error {
+          finish([
+            "ok": false,
+            "message": "Disconnect failed: \(error.localizedDescription)",
+            "fullTunnelActive": false,
+            "hostOnlySession": false,
+            "systemVpnStopped": false,
+          ] as [String: Any])
+          return
+        }
+        let all = managers ?? []
+        var targets = all.filter { shouldStopManager($0) }
+        // Fallback: any still-connected tunnel provider that looks like ours by name.
+        if targets.isEmpty {
+          targets = all.filter { m in
+            let st = m.connection.status
+            let live = st == .connected || st == .connecting || st == .reasserting
+              || st == .disconnecting
+            guard live else { return false }
+            let desc = m.localizedDescription ?? ""
+            return desc.range(of: "Restore Privacy", options: .caseInsensitive) != nil
+              || desc.range(of: "Packet Tunnel", options: .caseInsensitive) != nil
+          }
+        }
+        if targets.isEmpty {
+          // Nothing to stop — already down (or profile removed).
+          var map = RptFullTunnelResult.disconnectResultMap()
+          map["systemVpnStopped"] = true
+          map["stoppedCount"] = 0
+          finish(map)
+          return
+        }
+        issueStopOnManagers(targets) {
+          waitUntilManagersDisconnected(targets, attempt: 0, maxAttempts: 30, interval: 0.15) {
+            stillLive in
+            var map = RptFullTunnelResult.disconnectResultMap()
+            map["stoppedCount"] = targets.count
+            map["systemVpnStopped"] = !stillLive
+            if stillLive {
+              // Second hard stop pass
+              issueStopOnManagers(targets) {
+                waitUntilManagersDisconnected(
+                  targets, attempt: 0, maxAttempts: 20, interval: 0.15
+                ) { still2 in
+                  map["systemVpnStopped"] = !still2
+                  if still2 {
+                    map["ok"] = false
+                    map["message"] =
+                      "Disconnect issued but system VPN still active — "
+                      + "toggle off Restore Privacy in System Settings → Network → VPN & Filters, "
+                      + "or press Disconnect again."
+                    map["fullTunnelActive"] = true
+                  }
+                  finish(map)
+                }
+              }
+              return
+            }
+            finish(map)
+          }
+        }
       }
-      for manager in managers ?? [] where shouldStopManager(manager) {
-        manager.connection.stopVPNTunnel()
-      }
-      finish(RptFullTunnelResult.disconnectResultMap())
+    }
+    if Thread.isMainThread {
+      begin()
+    } else {
+      DispatchQueue.main.async(execute: begin)
     }
   }
 
-  /// Blocking stop for terminate hooks — waits until `stopVPNTunnel` is issued
-  /// (or timeout) so process exit does not race the async preferences load.
+  /// Load each manager then `stopVPNTunnel` (required for reliable Network toggle off).
+  private static func issueStopOnManagers(
+    _ managers: [NETunnelProviderManager],
+    completion: @escaping () -> Void
+  ) {
+    guard !managers.isEmpty else {
+      completion()
+      return
+    }
+    let group = DispatchGroup()
+    for manager in managers {
+      group.enter()
+      manager.loadFromPreferences { _ in
+        // Stop regardless of load error — best effort for user Disconnect.
+        let st = manager.connection.status
+        if st != .disconnected && st != .invalid {
+          manager.connection.stopVPNTunnel()
+        } else {
+          // Already down — still call stop for stubborn residual sessions.
+          manager.connection.stopVPNTunnel()
+        }
+        group.leave()
+      }
+    }
+    group.notify(queue: .main) {
+      completion()
+    }
+  }
+
+  /// True if any target is still connecting/connected/reasserting/disconnecting.
+  private static func anyManagerStillLive(_ managers: [NETunnelProviderManager]) -> Bool {
+    for m in managers {
+      switch m.connection.status {
+      case .connected, .connecting, .reasserting, .disconnecting:
+        return true
+      default:
+        continue
+      }
+    }
+    return false
+  }
+
+  private static func waitUntilManagersDisconnected(
+    _ managers: [NETunnelProviderManager],
+    attempt: Int,
+    maxAttempts: Int,
+    interval: TimeInterval,
+    completion: @escaping (_ stillLive: Bool) -> Void
+  ) {
+    // Refresh status via loadAll so connection objects are current.
+    NETunnelProviderManager.loadAllFromPreferences { all, _ in
+      let liveTargets: [NETunnelProviderManager]
+      if let all {
+        liveTargets = all.filter { shouldStopManager($0) }
+      } else {
+        liveTargets = managers
+      }
+      if !anyManagerStillLive(liveTargets) {
+        completion(false)
+        return
+      }
+      if attempt >= maxAttempts {
+        completion(true)
+        return
+      }
+      DispatchQueue.main.asyncAfter(deadline: .now() + interval) {
+        waitUntilManagersDisconnected(
+          managers,
+          attempt: attempt + 1,
+          maxAttempts: maxAttempts,
+          interval: interval,
+          completion: completion
+        )
+      }
+    }
+  }
+
+  /// Blocking stop for terminate hooks — waits until tunnels are down (or timeout).
   @discardableResult
-  static func stopAllTunnelsAndWait(timeout: TimeInterval = 2.0) -> [String: Any] {
+  static func stopAllTunnelsAndWait(timeout: TimeInterval = 4.0) -> [String: Any] {
     let sem = DispatchSemaphore(value: 0)
     var resultMap = RptFullTunnelResult.disconnectResultMap()
     stopAllTunnels { map in

@@ -208,6 +208,22 @@ class TestMacosResidualTeamSign(unittest.TestCase):
             text.index("loadAllFromPreferences"),
         )
 
+    def test_disconnect_stops_system_network_vpn(self):
+        """Disconnect must stopVPNTunnel and wait for system VPN down."""
+        text = CHANNEL.read_text(encoding="utf-8")
+        for needle in (
+            "stopAllTunnels",
+            "stopVPNTunnel",
+            "issueStopOnManagers",
+            "waitUntilManagersDisconnected",
+            "systemVpnStopped",
+            "shouldStopManager",
+            # Broader match so Network row always tears down
+            "restorePrivacyClient",
+            "case \"status\"",
+        ):
+            self.assertIn(needle, text, f"missing disconnect system-stop: {needle}")
+
     def test_connect_enables_system_vpn_then_starts_tunnel(self):
         """Connect must re-register/enable Network VPN and startTunnel in tandem."""
         text = CHANNEL.read_text(encoding="utf-8")

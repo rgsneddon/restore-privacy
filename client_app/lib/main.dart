@@ -727,18 +727,33 @@ class _TunnelHomeState extends State<TunnelHome> with WidgetsBindingObserver {
     if (_connected) {
       setState(() => _busy = true);
       try {
-        _append('Disconnect — tearing down tunnel…');
+        _append('Disconnect — tearing down system Packet Tunnel…');
         await _connLog(kLogKindDisconnect, 'Disconnect started');
         await _vpn.disconnect();
         if (!mounted) return;
-        setState(() {
-          _connected = false;
-          _vpnIp = null;
-          _status = 'Disconnected. Press Connect when you want protection.';
-        });
-        _append('Disconnected.');
-        await _connLog(kLogKindDisconnect, 'Disconnected');
-        await _macWindow.setTrayConnected(false);
+        // Confirm OS VPN is down (native stop + status poll).
+        final snap = await _vpn.querySession();
+        if (!mounted) return;
+        if (snap.connected || snap.connecting) {
+          setState(() {
+            _connected = true;
+            _status = snap.message ??
+                'Disconnect issued but system VPN still active — try Disconnect again.';
+          });
+          _append(_status);
+          await _connLog(kLogKindDisconnect, 'System VPN still active after disconnect');
+          await _macWindow.setTrayConnected(true);
+        } else {
+          setState(() {
+            _connected = false;
+            _vpnIp = null;
+            _status =
+                'Disconnected — system VPN stopped. Press Connect when you want protection.';
+          });
+          _append('Disconnected — system Network VPN off.');
+          await _connLog(kLogKindDisconnect, 'Disconnected system VPN stopped');
+          await _macWindow.setTrayConnected(false);
+        }
         // Restore UI after explicit disconnect so status is visible.
         await _macWindow.showFromTray();
       } finally {
