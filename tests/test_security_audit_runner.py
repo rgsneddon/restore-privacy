@@ -252,6 +252,103 @@ class TestAuditTimerPrivacySectionA(unittest.TestCase):
         finally:
             shutil.rmtree(td, ignore_errors=True)
 
+    def test_write_outputs_aligns_audit_generated_iso_across_mirrors(self):
+        """Markdown **Audit generated** ISO must match JSON generated_at on all mirrors."""
+        import re
+        import shutil
+        import tempfile
+        from pathlib import Path
+
+        mod = _load_audit_mod()
+        td = Path(tempfile.mkdtemp(prefix="rpt-audit-gen-align-"))
+        try:
+            (td / "status_page" / "static").mkdir(parents=True)
+            (td / "status_page" / "public").mkdir(parents=True)
+            old_root = mod.ROOT
+            mod.ROOT = td
+            gen = "2026-07-27T12:34:56Z"
+            results = {
+                "generated_at": gen,
+                "node_host": "82.221.101.241",
+                "catalog_version": "0.4.8",
+                "unit_suite": {
+                    "ran": True,
+                    "ok": True,
+                    "returncode": 0,
+                    "modules": ["tests.test_legal_links"],
+                },
+                "tcp_status": {
+                    "ok": True,
+                    "error": None,
+                    "host": "82.221.101.241",
+                    "port": 8080,
+                },
+                "http_status": {
+                    "ok": True,
+                    "status_code": 200,
+                    "body": {"title": "RESTORE PRIVACY"},
+                    "error": None,
+                },
+                "udp": {"sent": True, "error": None},
+                "no_priv": {"ok": True, "hits": []},
+                "section_b": {"ok": True},
+                "multihop_structure": {"ok": True},
+                "package_rag": {
+                    "catalog_version": "0.4.8",
+                    "overall": "Green",
+                    "packages": [],
+                    "legend": {"Green": "OK", "Amber": "P", "Red": "F"},
+                },
+            }
+            out = td / "AUDIT.md"
+            mod.write_outputs(results, out)
+            jpath = td / "status_page" / "static" / "security_audit_latest.json"
+            self.assertTrue(jpath.is_file())
+            data = json.loads(jpath.read_text(encoding="utf-8"))
+            self.assertEqual(data.get("generated_at"), gen)
+            pat = re.compile(r"\*\*Audit generated\*\*[^\n]*`([0-9T:\-Z]+)`")
+            for rel in (
+                out,
+                td / "status_page" / "AUDIT.md",
+                td / "status_page" / "public" / "AUDIT.md",
+            ):
+                text = rel.read_text(encoding="utf-8")
+                m = pat.search(text)
+                self.assertIsNotNone(m, rel)
+                assert m is not None
+                self.assertEqual(m.group(1), gen, rel)
+                self.assertEqual(m.group(1), data["generated_at"], rel)
+            mod.ROOT = old_root
+        finally:
+            shutil.rmtree(td, ignore_errors=True)
+
+    def test_shipped_audit_mirrors_share_current_generated_at(self):
+        """Live repo mirrors must agree; stuck 22 July 2026 stamp is not current."""
+        import re
+        from datetime import datetime, timezone
+
+        stuck = datetime(2026, 7, 22, 13, 0, 14, tzinfo=timezone.utc)
+        jpath = ROOT / "status_page" / "static" / "security_audit_latest.json"
+        self.assertTrue(jpath.is_file())
+        data = json.loads(jpath.read_text(encoding="utf-8"))
+        gen = str(data.get("generated_at") or "")
+        self.assertTrue(gen)
+        dt = datetime.fromisoformat(gen.replace("Z", "+00:00"))
+        self.assertGreater(dt, stuck)
+        self.assertNotEqual(gen, "2026-07-22T13:00:14Z")
+        pat = re.compile(r"\*\*Audit generated\*\*[^\n]*`([0-9T:\-Z]+)`")
+        for rel in (
+            ROOT / "AUDIT.md",
+            ROOT / "status_page" / "AUDIT.md",
+            ROOT / "status_page" / "public" / "AUDIT.md",
+        ):
+            text = rel.read_text(encoding="utf-8")
+            m = pat.search(text)
+            self.assertIsNotNone(m, rel)
+            assert m is not None
+            self.assertEqual(m.group(1), gen, rel)
+            self.assertNotIn("2026-07-22T13:00:14Z", m.group(0))
+
     def test_audit_md_and_status_copy_present(self):
         audit = ROOT / "AUDIT.md"
         self.assertTrue(audit.is_file())
@@ -276,7 +373,14 @@ class TestAuditTimerPrivacySectionA(unittest.TestCase):
         data = status_app.audit_document_bytes()
         self.assertIsNotNone(data)
         self.assertIn(b"Restore Privacy", data)
-        self.assertIn(b"82.221.101.241", data)
+        # Public AUDIT may redact monopin IPv4 (Iceland (IS) label) — either form OK
+        self.assertTrue(
+            b"82.221.101.241" in data or b"Iceland" in data,
+            "audit body must name product residual peer (host or public label)",
+        )
+        self.assertIn(b"Audit generated", data)
+        # Must not serve the stuck July 22 run as current
+        self.assertNotIn(b"2026-07-22T13:00:14Z", data)
         # Public GH host must be restore-privacy (not private RUST-IN-PRIVACY)
         self.assertIn("restore-privacy", status_app.GITHUB_BLOB_MAIN)
         self.assertNotIn("RUST-IN-PRIVACY", status_app.GITHUB_BLOB_MAIN)
