@@ -6,6 +6,7 @@ import 'package:url_launcher/url_launcher.dart';
 import 'connect_status.dart';
 import 'connection_log.dart';
 import 'country_select.dart';
+import 'keygen_field.dart';
 import 'licence_gate.dart';
 import 'macos_window.dart';
 import 'prefs_backend.dart';
@@ -442,14 +443,10 @@ class _TunnelHomeState extends State<TunnelHome> with WidgetsBindingObserver {
                     style: TextStyle(fontSize: 12, color: kTextMuted),
                   ),
                   const SizedBox(height: 12),
-                  TextField(
+                  KeygenEntryField(
                     controller: controller,
-                    decoration: const InputDecoration(
-                      labelText: 'RPT-KEY-…',
-                      border: OutlineInputBorder(),
-                    ),
-                    autocorrect: false,
-                    enableSuggestions: false,
+                    autofocus: true,
+                    labelText: 'RPT-KEY-…',
                   ),
                   if (statusLine.isNotEmpty) ...[
                     const SizedBox(height: 8),
