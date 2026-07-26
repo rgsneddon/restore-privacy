@@ -59,3 +59,8 @@ _tmp_pyz.pyz
 product/.*.priv*
 *.priv.deploy
 
+
+# Stripe Dashboard-issued DNS (local only)
+stripe_email_domain_dns.local.json
+stripe_email_dns_report.json
+
