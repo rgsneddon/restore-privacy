@@ -21,6 +21,9 @@ class TestApplyRenderPaymentDiskScript(unittest.TestCase):
         self.assertIn("rpt-payment-data", text)
         self.assertIn("/var/data", text)
         self.assertIn("restore-privacy-status", text)
+        # Correct Render disks API (not /services/{id}/disks which 404s)
+        self.assertIn("https://api.render.com/v1/disks", text)
+        self.assertIn("serviceId", text)
 
     def test_script_exits_nonzero_without_api_key(self):
         """Drive real PowerShell entry without secrets — must not claim success."""

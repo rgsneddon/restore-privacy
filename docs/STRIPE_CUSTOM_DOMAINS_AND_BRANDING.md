@@ -1,12 +1,106 @@
-# Stripe Custom domains, seamless checkout, and site branding
+# Stripe Custom domains, custom email domain, DMARC, and branding
 
 This note answers: what
 [Custom domains](https://dashboard.stripe.com/settings/custom-domains)
-does, whether it makes payments “seamless”, and how to brand Checkout as close
-as possible to https://restoreprivacy.online/ (logo + colours).
+does, how to verify **Customer emails** custom domain DNS (ownership / mail-from /
+DKIM), how to publish **DMARC**, whether payments feel “seamless”, and how to
+brand Checkout as close as possible to https://restoreprivacy.online/
+(logo + colours).
 
-Shipped code constants (palette + asset paths) live in
-`status_page/payments.py` → `stripe_checkout_branding_guide()`.
+Shipped code constants (palette + asset paths + DNS helpers) live in
+`status_page/payments.py` → `stripe_checkout_branding_guide()`,
+`stripe_email_domain_dns_expected()`, `dmarc_policy_expected()`.
+
+**DNS zone:** `restoreprivacy.online`  
+**Nameservers (live):** `dns1.registrar-servers.com` / `dns2.registrar-servers.com` (Namecheap).  
+**Mailbox provider:** PrivateEmail (`mx1`/`mx2.privateemail.com`, SPF
+`include:spf.privateemail.com`) — keep for `rus@` + status-host SMTP; do **not**
+replace root SPF when adding Stripe email CNAMEs.
+
+---
+
+## 0. Operator DNS map (Namecheap Advanced DNS)
+
+Paste values **from Stripe Dashboard** where marked *(Dashboard)*. Never invent
+ACME / ownership / DKIM targets offline. Namecheap **Host** = left label only
+(provider appends `.restoreprivacy.online` — **do not double-append**).
+
+### A) Checkout custom domain (`pay.`)
+
+Dashboard: [Custom domains](https://dashboard.stripe.com/settings/custom-domains)
+
+| Type | Host (Namecheap) | Value | Purpose |
+|------|------------------|-------|---------|
+| **CNAME** | `pay` | `hosted-checkout.stripecdn.com` | `pay.restoreprivacy.online` → Stripe Checkout CDN |
+| **TXT** | `_acme-challenge.pay` | *(Dashboard → View instructions)* | ACME / TLS ownership |
+
+### B) Customer emails custom domain
+
+Dashboard: [Customer emails](https://dashboard.stripe.com/settings/emails) → add
+`restoreprivacy.online` → **View instructions**. Docs:
+[Custom email domain](https://docs.stripe.com/get-started/account/email-domain).
+
+| Category | Type | Host (Namecheap) | Value | Purpose |
+|----------|------|------------------|-------|---------|
+| Ownership | **TXT** | *(from Dashboard)* | *(from Dashboard)* | Stripe proof-of-ownership |
+| Mail From | **CNAME** | *(from Dashboard, e.g. bounce…)* | *(from Dashboard)* | Bounce / mail-from for SPF path |
+| DKIM | **CNAME** | *(from Dashboard, often `*._domainkey`…)* | *(from Dashboard)* | Message signing (usually several rows) |
+
+**Rules**
+
+- CNAME host must not already have A/AAAA/MX/TXT at the **same** name.
+- Do not Cloudflare-proxy (orange cloud) Stripe CNAMEs if NS ever moves to CF.
+- TTL Automatic or 5 minutes while verifying; can take up to **72 hours**.
+- After Stripe shows **Verified**, leave records in place (Stripe re-checks).
+
+### C) DMARC (required for Stripe custom email domain)
+
+Stripe requires a DMARC policy and does **not** support strict SPF alignment —
+**do not** set `aspf=s`.
+
+| Type | Host (Namecheap) | Value |
+|------|------------------|-------|
+| **TXT** | `_dmarc` | `v=DMARC1; p=none; rua=mailto:rus@restoreprivacy.online; pct=100` |
+
+Start with `p=none` (monitor). Later raise to `quarantine` / `reject` when
+reports look clean. This coexists with existing PrivateEmail SPF/MX.
+
+### D) Existing mail (leave alone unless Dashboard explicitly says otherwise)
+
+| Type | Host | Value (live) | Purpose |
+|------|------|--------------|---------|
+| **MX** | `@` | `mx1` / `mx2.privateemail.com` | Inbox for `rus@…` |
+| **TXT** (SPF) | `@` | `v=spf1 include:spf.privateemail.com ~all` | Authorised senders for mailbox SMTP |
+| **CNAME** | `mail` | `privateemail.com` | PrivateEmail host alias |
+
+Stripe email-domain setup uses **its own CNAME set** for mail-from/DKIM — do
+**not** delete PrivateEmail SPF just to “make Stripe happy.” Only merge root SPF
+if Dashboard explicitly shows a second SPF include (rare; prefer Stripe CNAMEs).
+
+### Verify (shipped)
+
+```bash
+# DMARC + SPF + optional Dashboard rows + pay Checkout DNS
+python scripts/verify_stripe_email_domain_dns.py
+python scripts/verify_stripe_email_domain_dns.py --out stripe_email_dns_report.json
+
+# Optional: after you paste Dashboard rows into a local JSON (do not commit):
+# [{"category":"ownership","type":"TXT","host":"…","value":"…"}, …]
+python scripts/verify_stripe_email_domain_dns.py --records stripe_email_domain_dns.local.json
+
+# Checkout custom domain only (+ optional live Session host)
+python scripts/verify_stripe_custom_domain.py
+# STRIPE_SECRET_KEY=sk_live_... python scripts/verify_stripe_custom_domain.py --create-session
+```
+
+Helpers: `payments.dmarc_policy_expected()`, `parse_dmarc_policy()`,
+`stripe_email_domain_dns_expected()`, `verify_dmarc_dns()`,
+`verify_stripe_email_domain_dns()`, `verify_stripe_custom_domain_dns()`.
+
+**Automation limits:** no public Stripe API for Customer emails DNS tokens or
+Custom domains ACME TXT; Namecheap write needs operator login (no monorepo API
+token). Repo work ships structure + public verify + Namecheap paste steps —
+Dashboard **Verified** appears only after Stripe accepts your live DNS.
 
 ---
 

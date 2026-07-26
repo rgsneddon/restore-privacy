@@ -103,22 +103,45 @@ Write-Log 'RPT_PAYMENT_DATA_DIR set.'
 $diskApplied = $false
 $diskError = ''
 try {
+  # Correct Render API: POST /v1/disks with serviceId in body (not /services/{id}/disks).
+  # Fails with 400 if a deploy is still pending — wait or retry after live.
   $diskBody = @{
     name      = $DiskName
     mountPath = $DiskMountPath
     sizeGB    = $DiskSizeGB
+    serviceId = $sid
   } | ConvertTo-Json
-  Write-Log "POST disk $DiskName @ $DiskMountPath (${DiskSizeGB}GB)..."
+  Write-Log "POST /v1/disks $DiskName @ $DiskMountPath (${DiskSizeGB}GB) serviceId=$sid ..."
   Invoke-RestMethod -Method Post `
-    -Uri "https://api.render.com/v1/services/$sid/disks" `
+    -Uri 'https://api.render.com/v1/disks' `
     -Headers $putHeaders -Body $diskBody | Out-Null
   $diskApplied = $true
-  Write-Log 'Disk create/attach accepted by API.'
+  Write-Log 'Disk create/attach accepted by API (redeploy required for mount).'
 } catch {
   $diskError = $_.Exception.Message
-  Write-Log "Disk API note (env still set): $diskError"
-  Write-Log 'If disk missing: Dashboard -> service -> Disks -> Add disk mountPath=/var/data'
-  Write-Log 'Or Blueprints -> Apply render.yaml (plan starter + disk block). Free plan cannot attach disks.'
+  # Idempotent: disk already attached is success for our purposes
+  try {
+    $existing = Invoke-RestMethod -Uri "https://api.render.com/v1/disks?serviceId=$sid" -Headers $headers
+    $found = $false
+    foreach ($item in @($existing)) {
+      $disk = if ($item.disk) { $item.disk } else { $item }
+      if ($disk.mountPath -eq $DiskMountPath -or $disk.name -eq $DiskName) {
+        $found = $true
+        $diskApplied = $true
+        Write-Log ("Disk already present: id={0} name={1} mount={2}" -f $disk.id, $disk.name, $disk.mountPath)
+        break
+      }
+    }
+    if (-not $found) {
+      Write-Log "Disk API note (env still set): $diskError"
+      Write-Log 'If disk missing: Dashboard -> service -> Disks -> Add disk mountPath=/var/data'
+      Write-Log 'Or Blueprints -> Apply render.yaml (plan starter + disk block). Free plan cannot attach disks.'
+      Write-Log 'Note: cannot add disk while deploys are pending — wait for live then re-run.'
+    }
+  } catch {
+    Write-Log "Disk API note (env still set): $diskError"
+    Write-Log 'If disk missing: Dashboard -> service -> Disks -> Add disk mountPath=/var/data'
+  }
 }
 
 if (-not $SkipDeploy) {

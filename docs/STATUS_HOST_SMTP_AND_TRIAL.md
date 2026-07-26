@@ -75,7 +75,11 @@ Product fulfilment (keygen + PPI + download after Stripe pay) uses **outbound SM
 
 Stripe Dashboard **customer receipts** are separate: they need a verified custom
 email domain for `restoreprivacy.online` / From `rus@…` — Stripe does **not**
-log into IMAP/POP with the mailbox password. See Dashboard → Settings → Customer emails.
+log into IMAP/POP with the mailbox password. See Dashboard → Settings → Customer emails
+and the full DNS table (ownership TXT, mail-from/DKIM CNAMEs, **DMARC** at `_dmarc`,
+Checkout `pay.` rows) in
+[STRIPE_CUSTOM_DOMAINS_AND_BRANDING.md](STRIPE_CUSTOM_DOMAINS_AND_BRANDING.md) §0.
+Verify with `python scripts/verify_stripe_email_domain_dns.py`.
 
 ## Stripe products — Monthly / Yearly VPN plan (no trial)
 

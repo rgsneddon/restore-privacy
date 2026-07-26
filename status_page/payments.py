@@ -92,6 +92,30 @@ STRIPE_BRANDING_DASHBOARD_URL = "https://dashboard.stripe.com/settings/branding"
 STRIPE_CUSTOM_DOMAINS_DASHBOARD_URL = (
     "https://dashboard.stripe.com/settings/custom-domains"
 )
+# --- Custom email domain (Customer emails) + DMARC ---
+# Dashboard: https://dashboard.stripe.com/settings/emails — values are account-specific.
+STRIPE_EMAIL_DOMAIN_ZONE = "restoreprivacy.online"
+STRIPE_EMAIL_DOMAIN_DASHBOARD_URL = "https://dashboard.stripe.com/settings/emails"
+STRIPE_EMAIL_DOMAIN_DOCS_URL = (
+    "https://docs.stripe.com/get-started/account/email-domain"
+)
+# Existing mailbox provider (do not replace root SPF with Stripe-only).
+STRIPE_EMAIL_EXISTING_SPF = "v=spf1 include:spf.privateemail.com ~all"
+STRIPE_EMAIL_EXISTING_MX = ("mx1.privateemail.com", "mx2.privateemail.com")
+# Namecheap zone uses registrar-servers.com nameservers.
+STRIPE_DNS_NAMECHEAP_NS = (
+    "dns1.registrar-servers.com",
+    "dns2.registrar-servers.com",
+)
+# Shipped DMARC for Stripe custom email domain (must start with v=DMARC1, include p=,
+# must NOT include aspf=s — Stripe does not support strict SPF alignment).
+DMARC_HOST = "_dmarc"
+DMARC_FQDN = f"_dmarc.{STRIPE_EMAIL_DOMAIN_ZONE}"
+DMARC_POLICY_P = "none"  # monitoring first; later quarantine/reject when ready
+DMARC_RUA = "mailto:rus@restoreprivacy.online"
+DMARC_POLICY_VALUE = (
+    f"v=DMARC1; p={DMARC_POLICY_P}; rua={DMARC_RUA}; pct=100"
+)
 STRIPE_BRAND_MIN_PX = 128
 STRIPE_BRAND_MAX_BYTES = 512 * 1024
 # Transparent-background Stripe assets: corners must be clear; canvas mostly clear.
@@ -108,7 +132,7 @@ def stripe_custom_domain_dns_expected() -> dict[str, Any]:
     """
     return {
         "domain": STRIPE_CUSTOM_DOMAIN,
-        "zone": "restoreprivacy.online",
+        "zone": STRIPE_EMAIL_DOMAIN_ZONE,
         "dns_provider": "Namecheap (NS dns1/dns2.registrar-servers.com)",
         "paid_feature": STRIPE_CUSTOM_DOMAIN_PAID_FEATURE,
         "approx_monthly_usd": STRIPE_CUSTOM_DOMAIN_MONTHLY_USD,
@@ -139,7 +163,130 @@ def stripe_custom_domain_dns_expected() -> dict[str, Any]:
             "Full website CSS is not injected; URL brand trust only.",
             "Server-side Session create + redirect to session.url is required "
             "(homepage Buy now already does this).",
+            "Namecheap Host field: enter only the left label (pay, _acme-challenge.pay) "
+            "— do not append .restoreprivacy.online (provider adds the zone).",
         ],
+    }
+
+
+def dmarc_policy_expected() -> dict[str, Any]:
+    """Shipped DMARC TXT for Stripe custom email domain (pure, no network).
+
+    Stripe requires a DMARC policy and rejects ``aspf=s`` (strict SPF alignment).
+    """
+    return {
+        "type": "TXT",
+        "host": DMARC_HOST,  # Namecheap Host field
+        "fqdn": DMARC_FQDN,
+        "value": DMARC_POLICY_VALUE,
+        "policy": DMARC_POLICY_P,
+        "rua": DMARC_RUA,
+        "forbids_aspf_strict": True,
+        "notes": [
+            "Stripe: do not set aspf=s on DMARC.",
+            "Start with p=none; raise to quarantine/reject after monitoring.",
+            "Coexists with PrivateEmail SPF/MX — do not delete root SPF or MX.",
+        ],
+    }
+
+
+def parse_dmarc_policy(txt: str) -> dict[str, Any]:
+    """Parse a DMARC TXT value into tags; validate Stripe-safe shape."""
+    raw = (txt or "").strip().strip('"').strip()
+    tags: dict[str, str] = {}
+    for part in re.split(r"\s*;\s*", raw):
+        part = part.strip()
+        if not part or "=" not in part:
+            continue
+        k, _, v = part.partition("=")
+        tags[k.strip().lower()] = v.strip()
+    v_ok = tags.get("v", "").upper() == "DMARC1"
+    p = tags.get("p", "").lower()
+    p_ok = p in ("none", "quarantine", "reject")
+    aspf = tags.get("aspf", "").lower()
+    aspf_strict = aspf == "s"
+    ok = bool(raw) and v_ok and p_ok and not aspf_strict
+    return {
+        "raw": raw,
+        "tags": tags,
+        "ok": ok,
+        "v_ok": v_ok,
+        "p_ok": p_ok,
+        "p": p,
+        "aspf_strict": aspf_strict,
+        "starts_with_v_dmarc1": raw.upper().startswith("V=DMARC1"),
+    }
+
+
+def stripe_email_domain_dns_expected(
+    *,
+    dashboard_records: list[dict[str, Any]] | None = None,
+) -> dict[str, Any]:
+    """Expected structure for Stripe Customer emails custom domain DNS.
+
+    Pure helper. Stripe issues ownership TXT, mail-from CNAME(s), and DKIM
+    CNAME(s) only in Dashboard → Customer emails → View instructions. Pass
+    *dashboard_records* (list of {category,type,host,value}) when the operator
+    has pasted those values; otherwise placeholders describe categories only.
+    """
+    categories = [
+        {
+            "category": "ownership",
+            "type": "TXT",
+            "purpose": "Stripe proof-of-ownership before sending from the domain",
+            "host": None,  # Dashboard-issued
+            "value": None,
+            "value_source": (
+                "Stripe Dashboard → Settings → Customer emails → "
+                f"Add {STRIPE_EMAIL_DOMAIN_ZONE} → View instructions"
+            ),
+        },
+        {
+            "category": "mail_from",
+            "type": "CNAME",
+            "purpose": "Mail-From domain (SPF path for Stripe-sent mail)",
+            "host": None,
+            "value": None,
+            "value_source": "Dashboard View instructions (often a bounce.* host)",
+        },
+        {
+            "category": "dkim",
+            "type": "CNAME",
+            "purpose": "DKIM public key CNAMEs (usually multiple)",
+            "host": None,
+            "value": None,
+            "value_source": "Dashboard View instructions (*._domainkey…)",
+        },
+    ]
+    dmarc = dmarc_policy_expected()
+    return {
+        "zone": STRIPE_EMAIL_DOMAIN_ZONE,
+        "dns_provider": "Namecheap (NS dns1/dns2.registrar-servers.com)",
+        "namecheap_ns": list(STRIPE_DNS_NAMECHEAP_NS),
+        "dashboard_url": STRIPE_EMAIL_DOMAIN_DASHBOARD_URL,
+        "docs_url": STRIPE_EMAIL_DOMAIN_DOCS_URL,
+        "categories": categories,
+        "dashboard_records": list(dashboard_records or []),
+        "dmarc": dmarc,
+        "existing_mail": {
+            "spf": STRIPE_EMAIL_EXISTING_SPF,
+            "mx": list(STRIPE_EMAIL_EXISTING_MX),
+            "note": (
+                "Keep PrivateEmail SPF/MX for rus@ mailbox + status-host SMTP. "
+                "Stripe email domain uses its own CNAME set (not a second root SPF "
+                "unless Dashboard explicitly asks for a TXT SPF change)."
+            ),
+        },
+        "checkout_custom_domain": stripe_custom_domain_dns_expected(),
+        "namecheap_rules": [
+            "Host field: only the label Stripe shows (e.g. bounce, _dmarc, "
+            "xxx._domainkey) — Namecheap appends .restoreprivacy.online.",
+            "Never create CNAME name that already has A/AAAA/MX/TXT at the same host.",
+            "Do not Cloudflare-proxy (orange cloud) Stripe CNAMEs if NS ever moves to CF.",
+            "TTL Automatic or 5 min while verifying.",
+            "DMARC Host=_dmarc Value=" + DMARC_POLICY_VALUE,
+        ],
+        "secrets_not_in_repo": True,
     }
 
 
@@ -167,10 +314,8 @@ def verify_stripe_custom_domain_dns(
 ) -> dict[str, Any]:
     """Live DNS check for pay.restoreprivacy.online CNAME + ACME TXT.
 
-    Uses ``dig +short`` when *dig_runner* is None. Tries the system
-    resolver first, then public ``@8.8.8.8`` and authoritative
-    ``@dns1.registrar-servers.com`` so local recursive lag does not
-    false-fail after Namecheap publish. Returns
+    Uses ``dig +short`` when available; on Windows without dig falls back to
+    ``nslookup``. Injected *dig_runner* is used for unit tests. Returns
     ``{ok, cname_ok, txt_ok, observed, expected, mismatches}``.
     """
     import subprocess
@@ -183,27 +328,28 @@ def verify_stripe_custom_domain_dns(
         "resolvers_tried": [],
     }
 
-    # Prefer system path dig; fall back for restricted PATH environments.
-    dig_bin = "dig"
-    for candidate in ("/usr/bin/dig", "dig"):
-        try:
-            subprocess.run(
-                [candidate, "-v"],
-                check=False,
-                capture_output=True,
-                timeout=5,
-            )
-            dig_bin = candidate
-            break
-        except (OSError, subprocess.TimeoutExpired):
-            continue
+    dig_bin = ""
+    if dig_runner is None:
+        for candidate in ("/usr/bin/dig", "dig"):
+            try:
+                subprocess.run(
+                    [candidate, "-v"],
+                    check=False,
+                    capture_output=True,
+                    timeout=5,
+                )
+                dig_bin = candidate
+                break
+            except (OSError, subprocess.TimeoutExpired):
+                continue
 
     def _dig_once(server: str | None, args: list[str]) -> str:
         if dig_runner is not None:
-            # Injected runner: only the default (no server) call is used.
             if server is not None:
                 return ""
             return dig_runner(args)
+        if not dig_bin:
+            return ""
         cmd = [dig_bin, "+short", "+time=5", "+tries=1"]
         if server:
             cmd.append(f"@{server}")
@@ -240,15 +386,38 @@ def verify_stripe_custom_domain_dns(
                 chunks.append(f"{label}:{raw}")
         return chunks[0] if chunks else ""
 
+    def _nslookup_cname(fqdn: str) -> list[str]:
+        try:
+            proc = subprocess.run(
+                ["nslookup", "-type=CNAME", fqdn],
+                check=False,
+                capture_output=True,
+                text=True,
+                timeout=25,
+            )
+            blob = (proc.stdout or "") + "\n" + (proc.stderr or "")
+        except (OSError, subprocess.TimeoutExpired):
+            return []
+        found: list[str] = []
+        for m in re.finditer(
+            r"canonical name\s*=\s*(\S+)",
+            blob,
+            flags=re.IGNORECASE,
+        ):
+            found.append(m.group(1).strip().rstrip(".").lower())
+        return found
+
     cname_raw = _dig_any(["CNAME", STRIPE_CUSTOM_DOMAIN])
-    # Some resolvers return A after following CNAME; also query without type
     if not cname_raw:
         cname_raw = _dig_any([STRIPE_CUSTOM_DOMAIN])
     cname_lines = [
         ln.strip().rstrip(".").lower()
         for ln in cname_raw.splitlines()
-        if ln.strip() and not ln.startswith("__error__")
+        if ln.strip() and not ln.startswith("__error__") and "__error__" not in ln
     ]
+    if not cname_lines and dig_runner is None:
+        observed["resolvers_tried"].append("nslookup")
+        cname_lines = _nslookup_cname(STRIPE_CUSTOM_DOMAIN)
     observed["cname_answers"] = cname_lines
     target = STRIPE_CUSTOM_DOMAIN_CNAME_TARGET.lower()
     cname_ok = any(
@@ -259,12 +428,17 @@ def verify_stripe_custom_domain_dns(
             f"cname_missing_or_wrong: want {target!r} got {cname_lines!r}"
         )
 
-    txt_raw = _dig_any(["TXT", STRIPE_CUSTOM_DOMAIN_TXT_FQDN])
-    txt_lines = []
-    for ln in txt_raw.splitlines():
-        s = ln.strip().strip('"')
-        if s and not s.startswith("__error__"):
-            txt_lines.append(s)
+    txt_lines: list[str] = []
+    if dig_runner is not None or dig_bin:
+        txt_raw = _dig_any(["TXT", STRIPE_CUSTOM_DOMAIN_TXT_FQDN])
+        for ln in txt_raw.splitlines():
+            s = ln.strip().strip('"')
+            if s and not s.startswith("__error__") and "__error__" not in s:
+                txt_lines.append(s)
+    if not txt_lines and dig_runner is None:
+        if "nslookup" not in observed["resolvers_tried"]:
+            observed["resolvers_tried"].append("nslookup")
+        txt_lines = _dns_txt_answers(STRIPE_CUSTOM_DOMAIN_TXT_FQDN)
     observed["txt_answers"] = txt_lines
     txt_ok = any(len(s) >= 16 for s in txt_lines)  # ACME token non-empty
     if not txt_ok:
@@ -284,6 +458,256 @@ def verify_stripe_custom_domain_dns(
         },
         "mismatches": mismatches,
         "domain": STRIPE_CUSTOM_DOMAIN,
+    }
+
+
+def _dns_txt_answers(
+    fqdn: str,
+    *,
+    dig_runner: Callable[[list[str]], str] | None = None,
+) -> list[str]:
+    """Public TXT answers for *fqdn* via dig or Windows nslookup fallback."""
+    import subprocess
+
+    if dig_runner is not None:
+        raw = dig_runner(["TXT", fqdn])
+        out: list[str] = []
+        for ln in (raw or "").splitlines():
+            s = ln.strip().strip('"')
+            if s and not s.startswith("__error__"):
+                out.append(s)
+        return out
+
+    dig_bin = "dig"
+    for candidate in ("/usr/bin/dig", "dig"):
+        try:
+            subprocess.run(
+                [candidate, "-v"],
+                check=False,
+                capture_output=True,
+                timeout=5,
+            )
+            dig_bin = candidate
+            break
+        except (OSError, subprocess.TimeoutExpired):
+            dig_bin = ""
+            continue
+
+    lines: list[str] = []
+    if dig_bin:
+        for server in (None, "8.8.8.8", "dns1.registrar-servers.com"):
+            cmd = [dig_bin, "+short", "+time=5", "+tries=1"]
+            if server:
+                cmd.append(f"@{server}")
+            cmd.extend(["TXT", fqdn])
+            try:
+                proc = subprocess.run(
+                    cmd,
+                    check=False,
+                    capture_output=True,
+                    text=True,
+                    timeout=20,
+                )
+                raw = (proc.stdout or "").strip()
+            except (OSError, subprocess.TimeoutExpired):
+                raw = ""
+            for ln in raw.splitlines():
+                s = ln.strip().strip('"')
+                if s:
+                    lines.append(s)
+            if lines:
+                return lines
+
+    # Windows: nslookup -type=TXT
+    try:
+        proc = subprocess.run(
+            ["nslookup", "-type=TXT", fqdn],
+            check=False,
+            capture_output=True,
+            text=True,
+            timeout=25,
+        )
+        blob = (proc.stdout or "") + "\n" + (proc.stderr or "")
+        # nslookup prints text = "..." possibly multi-line quoted
+        for m in re.finditer(
+            r'text\s*=\s*"([^"]*)"',
+            blob,
+            flags=re.IGNORECASE,
+        ):
+            s = m.group(1).strip()
+            if s:
+                lines.append(s)
+        # Also unquoted: text = v=spf1 ...
+        for m in re.finditer(
+            r"text\s*=\s*(\S.+)$",
+            blob,
+            flags=re.IGNORECASE | re.MULTILINE,
+        ):
+            s = m.group(1).strip().strip('"')
+            if s and s not in lines:
+                lines.append(s)
+    except (OSError, subprocess.TimeoutExpired):
+        pass
+    return lines
+
+
+def verify_dmarc_dns(
+    *,
+    dig_runner: Callable[[list[str]], str] | None = None,
+) -> dict[str, Any]:
+    """Live public DNS check for ``_dmarc.restoreprivacy.online`` TXT.
+
+    Returns ``{ok, published, parsed, expected_value, observed, mismatches}``.
+    Honest fail when missing (operator must publish Namecheap TXT).
+    """
+    expected = dmarc_policy_expected()
+    answers = _dns_txt_answers(DMARC_FQDN, dig_runner=dig_runner)
+    mismatches: list[str] = []
+    parsed_any: dict[str, Any] | None = None
+    ok = False
+    for ans in answers:
+        parsed = parse_dmarc_policy(ans)
+        if parsed["ok"]:
+            ok = True
+            parsed_any = parsed
+            break
+        parsed_any = parsed
+    if not answers:
+        mismatches.append(f"dmarc_missing: no TXT at {DMARC_FQDN}")
+    elif not ok:
+        mismatches.append(
+            f"dmarc_invalid: answers={answers!r} "
+            f"(need v=DMARC1; p=none|quarantine|reject; no aspf=s)"
+        )
+    return {
+        "ok": ok,
+        "published": bool(answers),
+        "fqdn": DMARC_FQDN,
+        "host": DMARC_HOST,
+        "expected_value": expected["value"],
+        "observed": answers,
+        "parsed": parsed_any,
+        "mismatches": mismatches,
+        "namecheap": {
+            "type": "TXT",
+            "host": DMARC_HOST,
+            "value": expected["value"],
+        },
+    }
+
+
+def verify_stripe_email_domain_dns(
+    *,
+    dig_runner: Callable[[list[str]], str] | None = None,
+    dashboard_records: list[dict[str, Any]] | None = None,
+) -> dict[str, Any]:
+    """Public DNS for DMARC + optional Dashboard-issued Stripe email records.
+
+    Without *dashboard_records*, only DMARC (and structural guide) is checked —
+    ownership/DKIM/mail-from values are never invented. When records are
+    provided (host+type+optional value), each host is looked up.
+    """
+    expected = stripe_email_domain_dns_expected(
+        dashboard_records=dashboard_records
+    )
+    dmarc = verify_dmarc_dns(dig_runner=dig_runner)
+    record_results: list[dict[str, Any]] = []
+    for rec in list(dashboard_records or []):
+        host = str(rec.get("host") or "").strip().rstrip(".")
+        rtype = str(rec.get("type") or "TXT").strip().upper()
+        want = (rec.get("value") or "").strip().rstrip(".")
+        if not host:
+            continue
+        fqdn = host if host.endswith("." + STRIPE_EMAIL_DOMAIN_ZONE) or host == STRIPE_EMAIL_DOMAIN_ZONE else f"{host}.{STRIPE_EMAIL_DOMAIN_ZONE}"
+        if rtype == "TXT":
+            answers = _dns_txt_answers(fqdn, dig_runner=dig_runner)
+            published = bool(answers)
+            match = (
+                (not want and published)
+                or any(want.lower() in a.lower() for a in answers)
+            )
+        else:
+            # CNAME: dig CNAME or nslookup
+            answers = []
+            import subprocess
+
+            if dig_runner is not None:
+                raw = dig_runner(["CNAME", fqdn])
+                answers = [
+                    ln.strip().rstrip(".").lower()
+                    for ln in (raw or "").splitlines()
+                    if ln.strip()
+                ]
+            else:
+                try:
+                    proc = subprocess.run(
+                        ["nslookup", "-type=CNAME", fqdn],
+                        check=False,
+                        capture_output=True,
+                        text=True,
+                        timeout=25,
+                    )
+                    blob = (proc.stdout or "") + "\n" + (proc.stderr or "")
+                    for m in re.finditer(
+                        r"canonical name\s*=\s*(\S+)",
+                        blob,
+                        flags=re.IGNORECASE,
+                    ):
+                        answers.append(m.group(1).strip().rstrip(".").lower())
+                except (OSError, subprocess.TimeoutExpired):
+                    pass
+            published = bool(answers)
+            match = (
+                (not want and published)
+                or any(want.lower().rstrip(".") in a for a in answers)
+            )
+        record_results.append(
+            {
+                "host": host,
+                "fqdn": fqdn,
+                "type": rtype,
+                "want_value": want or None,
+                "observed": answers,
+                "published": published,
+                "ok": match,
+                "category": rec.get("category"),
+            }
+        )
+
+    # Root SPF coexistence (must still be PrivateEmail when present)
+    spf_answers = _dns_txt_answers(STRIPE_EMAIL_DOMAIN_ZONE, dig_runner=dig_runner)
+    spf_ok = any(
+        "v=spf1" in a.lower() and "privateemail" in a.lower() for a in spf_answers
+    )
+    spf_status = {
+        "ok": spf_ok,
+        "observed": spf_answers,
+        "expected_include": "include:spf.privateemail.com",
+        "mismatches": (
+            []
+            if spf_ok
+            else ["spf_missing_or_not_privateemail: " + repr(spf_answers)]
+        ),
+    }
+
+    dash_ok = all(r["ok"] for r in record_results) if record_results else True
+    overall = bool(dmarc["ok"] and spf_ok and dash_ok)
+    return {
+        "ok": overall,
+        "dmarc": dmarc,
+        "spf": spf_status,
+        "dashboard_record_checks": record_results,
+        "expected": expected,
+        "stripe_verified_claim": False,  # never claim Dashboard Verified without evidence
+        "operator_if_not_ok": [
+            f"Namecheap → Advanced DNS for {STRIPE_EMAIL_DOMAIN_ZONE}",
+            f"Add TXT Host=_dmarc Value={DMARC_POLICY_VALUE}",
+            f"Open {STRIPE_EMAIL_DOMAIN_DASHBOARD_URL} → Add domain → View instructions",
+            "Paste ownership TXT + mail-from/DKIM CNAMEs (Host = left label only)",
+            "Do not invent Stripe token values offline; do not double-append zone",
+            "Keep existing SPF: " + STRIPE_EMAIL_EXISTING_SPF,
+            "Re-run: python scripts/verify_stripe_email_domain_dns.py",
+        ],
     }
 
 
