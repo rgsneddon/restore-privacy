@@ -173,6 +173,11 @@ class TestSettingsEntryCountryPersist(unittest.TestCase):
         self.assertIn("Entry country (node)", src)
         self.assertIn("OptionMenu", src)
         self.assertIn("entry_country=", src)
+        # Main shell + Settings list all three catalog countries with flags
+        self.assertIn("catalog_country_options", src)
+        self.assertIn("country_frame", src)
+        self.assertIn("Germany", src)
+        self.assertIn("Iceland, Romania, or Germany", src)
 
 
 class TestConnectWiring(unittest.TestCase):

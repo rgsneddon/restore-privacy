@@ -80,14 +80,15 @@ class TestCountrySelectPure(unittest.TestCase):
     def test_flags_and_catalog_options(self):
         opts = catalog_country_options(PRODUCT_COUNTRY_CATALOG)
         codes = [o.code for o in opts]
-        self.assertIn(COUNTRY_IS, codes)
-        self.assertIn(COUNTRY_RO, codes)
-        self.assertIn(COUNTRY_DE, codes)
+        self.assertEqual(set(codes), {COUNTRY_IS, COUNTRY_RO, COUNTRY_DE})
+        self.assertEqual(len(opts), 3)
         for o in opts:
             self.assertTrue(o.flag, o.code)
             self.assertIn(o.code, o.label())
             self.assertIn(o.name, o.label())
             self.assertEqual(country_flag_emoji(o.code), o.flag)
+            # Flag appears before name in menu label
+            self.assertTrue(o.label().startswith(o.flag))
         # label round-trip
         for o in opts:
             self.assertEqual(label_to_country_code(o.label()), o.code)
@@ -165,7 +166,35 @@ class TestConnectPathUsesSelection(unittest.TestCase):
             encoding="utf-8"
         )
         self.assertIn("Iceland", sel)
+        self.assertIn("Romania", sel)
+        self.assertIn("Germany", sel)
         self.assertIn("defaultEntryCountry", sel)
+        self.assertIn("kCountryGermany", sel)
+        # Three catalog codes with flag emojis in shared Flutter list
+        self.assertIn("kProductCountryCatalog", sel)
+        self.assertIn("'IS'", sel)
+        self.assertIn("'RO'", sel)
+        self.assertIn("'DE'", sel)
+
+    def test_linux_app_struct_country_above_connect(self):
+        src = (ROOT / "client" / "linux" / "app.py").read_text(encoding="utf-8")
+        self.assertIn("country_select", src)
+        self.assertIn("catalog_country_options", src)
+        self.assertIn("entry_country_allows_connect", src)
+        c_i = src.find("country_frame")
+        if c_i < 0:
+            c_i = src.find("_country_row")
+        if c_i < 0:
+            c_i = src.find("country_menu")
+        b_i = src.find("connect_btn.pack")
+        self.assertGreater(c_i, 0, "Linux main shell must build a country control")
+        self.assertGreater(b_i, 0)
+        self.assertLess(c_i, b_i)
+        store = (ROOT / "client" / "linux" / "settings_store.py").read_text(
+            encoding="utf-8"
+        )
+        self.assertIn("entry_country", store)
+        self.assertIn("KEY_ENTRY_COUNTRY", store)
 
     def test_de_pub_bundled_and_native_host_map(self):
         """DE catalog option must ship de_node_elgamal.pub + host→pub mapping."""

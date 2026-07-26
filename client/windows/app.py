@@ -142,6 +142,14 @@ from client.windows.ui_chrome import (
     surface_geometry_string,
     surface_min_size,
 )
+from client.country_select import (
+    catalog_country_options,
+    default_entry_country,
+    entry_country_allows_connect,
+    label_to_country_code,
+    option_label_for_code,
+    resolve_entry_country_selection,
+)
 from client.windows.settings_store import (
     ProductSettings,
     apply_run_at_startup,
@@ -323,6 +331,45 @@ class TunnelClientApp:
         # --- Bottom: primary control first so it never disappears ---
         self.bottom = tk.Frame(self.chrome, bg=self._t["chrome_bg"])
         self.bottom.pack(side=tk.BOTTOM, fill=tk.X)
+
+        # Entry country (flags) — main shell above Connect, not Settings-only
+        self._country_opts = catalog_country_options()
+        self._country_labels = [o.label() for o in self._country_opts]
+        init_entry = normalize_entry_country(
+            getattr(self._settings, "entry_country", default_entry_country())
+        )
+        self._entry_label_var = tk.StringVar(
+            value=option_label_for_code(init_entry)
+        )
+        self.country_frame = tk.Frame(self.bottom, bg=self._t["chrome_bg"])
+        self.country_frame.pack(side=tk.TOP, fill=tk.X, pady=(0, 2))
+        tk.Label(
+            self.country_frame,
+            text="Entry country",
+            bg=self._t["chrome_bg"],
+            fg=self._t["text_muted"],
+            font=("Segoe UI", 9, "bold"),
+            anchor="w",
+        ).pack(side=tk.TOP, fill=tk.X)
+        self._country_row = tk.Frame(self.country_frame, bg=self._t["chrome_bg"])
+        self._country_row.pack(side=tk.TOP, fill=tk.X, pady=(2, 0))
+        self.country_menu = tk.OptionMenu(
+            self._country_row,
+            self._entry_label_var,
+            *self._country_labels,
+            command=self._on_main_entry_country_changed,
+        )
+        self.country_menu.configure(
+            bg=self._t["panel_bg"],
+            fg=self._t["text"],
+            activebackground=self._t["light_accent"],
+            activeforeground=self._t["text"],
+            highlightthickness=1,
+            highlightbackground=self._t["border"] if "border" in self._t else BORDER,
+            font=("Segoe UI", 10, "bold"),
+            anchor="w",
+        )
+        self.country_menu.pack(side=tk.TOP, fill=tk.X)
 
         self.btn_var = tk.StringVar(value=connect_button_label(False))
         self.connect_btn = tk.Button(
@@ -1304,6 +1351,24 @@ class TunnelClientApp:
         except Exception:  # noqa: BLE001
             pass
 
+    def _on_main_entry_country_changed(self, _label: str | None = None) -> None:
+        """Persist main-shell country picker and refresh residual path for next Connect."""
+        try:
+            label = self._entry_label_var.get()
+            code = label_to_country_code(label) or default_entry_country()
+            code = normalize_entry_country(code)
+            cur = load_settings()
+            cur.entry_country = code
+            save_settings(cur)
+            self._settings = cur
+            self._entry_label_var.set(option_label_for_code(code))
+            self._refresh_multihop_from_settings()
+            self._log(
+                f"Entry country: {option_label_for_code(code)} (next Connect)"
+            )
+        except Exception as exc:  # noqa: BLE001
+            self._log(f"Could not save entry country: {exc}")
+
     def _on_toggle_connect(self) -> None:
         if self._busy:
             return
@@ -1313,8 +1378,28 @@ class TunnelClientApp:
             self._start_connect()
 
     def _start_connect(self) -> None:
+        # Persist any pending main-shell country selection before path refresh.
+        try:
+            self._on_main_entry_country_changed()
+        except Exception:
+            pass
         # Always refresh residual path from durable Settings before dialling.
         self._refresh_multihop_from_settings()
+        # Entry country must be a live catalog monopin (default Iceland).
+        try:
+            cur_entry = getattr(load_settings(), "entry_country", "") or ""
+        except Exception:
+            cur_entry = ""
+        ok_entry, entry_code, _reason = resolve_entry_country_selection(cur_entry)
+        if not ok_entry or not entry_country_allows_connect(entry_code):
+            msg = (
+                "Choose a valid entry country above Connect "
+                "(Iceland is the default)."
+            )
+            self._log(msg)
+            self._set_status("error", detail=msg)
+            self.detail_var.set(msg)
+            return
         # Local-only gate first (no status-host I/O on the Tk UI thread).
         # Keygen unlock is required before residual HELLO — discovery of a
         # session-only thank-you file must not skip the keygen surface.
@@ -1850,7 +1935,9 @@ class TunnelClientApp:
         obfs_var = tk.BooleanVar(value=cur.privacy_outer_obfuscation)
         multihop_var = tk.BooleanVar(value=cur.privacy_multihop)
         entry_country_var = tk.StringVar(
-            value=normalize_entry_country(getattr(cur, "entry_country", "IS"))
+            value=option_label_for_code(
+                normalize_entry_country(getattr(cur, "entry_country", "IS"))
+            )
         )
         note_var = tk.StringVar(
             value=(
@@ -1933,7 +2020,10 @@ class TunnelClientApp:
                 privacy_traffic_shape=bool(shape_var.get()),
                 privacy_outer_obfuscation=bool(obfs_var.get()),
                 privacy_multihop=bool(multihop_var.get()),
-                entry_country=normalize_entry_country(entry_country_var.get()),
+                entry_country=normalize_entry_country(
+                    label_to_country_code(entry_country_var.get())
+                    or entry_country_var.get()
+                ),
                 first_run_settings_completed=prev_done,
                 ui_mode=mode,
             )
@@ -2011,6 +2101,14 @@ class TunnelClientApp:
                     )
                     + (result.message or "")
                 )
+                # Keep main-shell country picker aligned with Settings
+                try:
+                    if getattr(self, "_entry_label_var", None) is not None:
+                        self._entry_label_var.set(
+                            option_label_for_code(s.entry_country)
+                        )
+                except Exception:
+                    pass
             self._log(
                 "Settings: privacy_scale hot-apply "
                 f"shape={s.privacy_traffic_shape} "
@@ -2087,7 +2185,7 @@ class TunnelClientApp:
             shape_var.set(False)
             obfs_var.set(False)
             multihop_var.set(False)
-            entry_country_var.set("IS")
+            entry_country_var.set(option_label_for_code(default_entry_country()))
         else:
             tk.Label(
                 priv_card,
@@ -2140,7 +2238,7 @@ class TunnelClientApp:
                 _save_privacy,
             )
             tk.Frame(priv_card, bg=BORDER, height=1).pack(fill=tk.X, pady=4)
-            # Entry country (Iceland / Romania) — exit is the other when multihop on
+            # Entry country (IS / RO / DE + flags) — also on main shell above Connect
             entry_row = tk.Frame(priv_card, bg=PANEL_BG)
             entry_row.pack(fill=tk.X, pady=8)
             entry_col = tk.Frame(entry_row, bg=PANEL_BG)
@@ -2156,9 +2254,9 @@ class TunnelClientApp:
             tk.Label(
                 entry_col,
                 text=(
-                    "Choose residual entry: Iceland or Romania. "
-                    "With multi-hop on, exit is the other country "
-                    "(random among non-entry peers when more countries ship)."
+                    "Choose residual entry: Iceland, Romania, or Germany. "
+                    "With multi-hop on, exit is another catalog country "
+                    "(random among non-entry peers)."
                 ),
                 bg=PANEL_BG,
                 fg=TEXT_MUTED,
@@ -2167,11 +2265,11 @@ class TunnelClientApp:
                 wraplength=360,
                 justify=tk.LEFT,
             ).pack(fill=tk.X)
+            _entry_labels = [o.label() for o in catalog_country_options()]
             entry_menu = tk.OptionMenu(
                 entry_row,
                 entry_country_var,
-                "IS",
-                "RO",
+                *_entry_labels,
                 command=lambda _v: _save_privacy(),
             )
             entry_menu.configure(

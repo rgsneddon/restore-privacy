@@ -21,7 +21,15 @@ KEY_AUTOCONNECT_ON_LAUNCH = "autoconnect_on_launch"
 KEY_PRIVACY_TRAFFIC_SHAPE = "privacy_traffic_shape"
 KEY_PRIVACY_OUTER_OBFUSCATION = "privacy_outer_obfuscation"
 KEY_PRIVACY_MULTIHOP = "privacy_multihop"
+KEY_ENTRY_COUNTRY = "entry_country"
 AUTOSTART_DESKTOP_NAME = "restore-privacy.desktop"
+
+
+def normalize_entry_country(code: str | None) -> str:
+    """Product Settings entry-country pin (IS / RO / DE); default Iceland."""
+    from client.multihop import normalize_entry_country as _norm
+
+    return _norm(code)
 
 
 @dataclass
@@ -31,6 +39,8 @@ class ProductSettings:
     privacy_traffic_shape: bool = False
     privacy_outer_obfuscation: bool = False
     privacy_multihop: bool = False
+    # Residual entry country: IS (default), RO, or DE.
+    entry_country: str = "IS"
 
 
 def settings_dir() -> Path:
@@ -51,6 +61,7 @@ def default_settings() -> ProductSettings:
         privacy_traffic_shape=False,
         privacy_outer_obfuscation=False,
         privacy_multihop=False,
+        entry_country="IS",
     )
 
 
@@ -69,6 +80,9 @@ def load_settings(path: Optional[Path] = None) -> ProductSettings:
                 data.get(KEY_PRIVACY_OUTER_OBFUSCATION, False)
             ),
             privacy_multihop=bool(data.get(KEY_PRIVACY_MULTIHOP, False)),
+            entry_country=normalize_entry_country(
+                data.get(KEY_ENTRY_COUNTRY, "IS")
+            ),
         )
     except (OSError, json.JSONDecodeError, TypeError, ValueError):
         return default_settings()
@@ -83,6 +97,9 @@ def save_settings(settings: ProductSettings, path: Optional[Path] = None) -> Pat
         KEY_PRIVACY_TRAFFIC_SHAPE: bool(settings.privacy_traffic_shape),
         KEY_PRIVACY_OUTER_OBFUSCATION: bool(settings.privacy_outer_obfuscation),
         KEY_PRIVACY_MULTIHOP: bool(settings.privacy_multihop),
+        KEY_ENTRY_COUNTRY: normalize_entry_country(
+            getattr(settings, "entry_country", "IS")
+        ),
     }
     p.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
     return p

@@ -827,9 +827,16 @@ def multihop_config_from_env(
     entry_country = str(e.get("RPT_ENTRY_COUNTRY", "") or "").strip()
     if not entry_country and env is None:
         try:
-            from client.windows.settings_store import load_settings
+            import sys as _sys
 
-            entry_country = getattr(load_settings(), "entry_country", DEFAULT_ENTRY_COUNTRY)
+            if _sys.platform == "win32":
+                from client.windows.settings_store import load_settings as _load_s
+            else:
+                from client.linux.settings_store import load_settings as _load_s
+
+            entry_country = getattr(
+                _load_s(), "entry_country", DEFAULT_ENTRY_COUNTRY
+            )
         except Exception:  # noqa: BLE001
             entry_country = DEFAULT_ENTRY_COUNTRY
     if not entry_country:
