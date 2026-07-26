@@ -185,6 +185,29 @@ class TestMacosResidualTeamSign(unittest.TestCase):
         ):
             self.assertIn(needle, text, f"missing settings candidate: {needle}")
 
+    def test_prepare_detects_host_missing_packet_tunnel_entitlement(self):
+        """Prepare must refuse registration when host lacks packet-tunnel-provider.
+
+        Public DevID host omits NE so AMFI does not kill launch; residual
+        registration then fails unless Team residual re-sign is applied.
+        """
+        text = CHANNEL.read_text(encoding="utf-8")
+        for needle in (
+            "hostHasPacketTunnelNetworkExtensionEntitlement",
+            "hostMissingNeEntitlementMessage",
+            "needsTeamResidualSign",
+            "packet-tunnel-provider",
+            "sign_macos_residual_team.py",
+            # After save, re-assert isEnabled so Network settings is not stuck inactive
+            "Packet Tunnel saved but remains disabled",
+        ):
+            self.assertIn(needle, text, f"missing prepare residual contract: {needle}")
+        # loadOrCreateManager gates on host entitlement before loadAllFromPreferences
+        self.assertLess(
+            text.index("hostHasPacketTunnelNetworkExtensionEntitlement"),
+            text.index("loadAllFromPreferences"),
+        )
+
     def test_catalog_handoff_and_build_docs_name_team_residual_resign(self):
         """Operator-facing residual docs: Packet Tunnel residual needs Team re-sign."""
         handoff = (ROOT / "client_app" / "APPLE_HANDOFF_0.3.4.md").read_text(

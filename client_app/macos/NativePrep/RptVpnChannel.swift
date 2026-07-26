@@ -7,6 +7,7 @@ import FlutterMacOS
 import NetworkExtension
 import CryptoKit
 import AppKit
+import Security
 
 enum RptVpnChannel {
   static let name = "restore_privacy/vpn"
@@ -106,6 +107,48 @@ enum RptVpnChannel {
     ]
   }
 
+  /// True when this host process is signed with `packet-tunnel-provider`.
+  /// Public Developer ID packages omit host NE (AMFI); residual requires
+  /// Team residual re-sign (`scripts/sign_macos_residual_team.py`).
+  static func hostHasPacketTunnelNetworkExtensionEntitlement() -> Bool {
+    var code: SecCode?
+    guard SecCodeCopySelf([], &code) == errSecSuccess, let code else {
+      return false
+    }
+    var staticCode: SecStaticCode?
+    guard SecCodeCopyStaticCode(code, SecCSFlags(rawValue: 0), &staticCode) == errSecSuccess,
+          let staticCode
+    else {
+      return false
+    }
+    var infoCF: CFDictionary?
+    let flags = SecCSFlags(rawValue: kSecCSSigningInformation)
+    guard SecCodeCopySigningInformation(staticCode, flags, &infoCF) == errSecSuccess,
+          let info = infoCF as? [String: Any]
+    else {
+      return false
+    }
+    // Entitlements dict key (CFString bridging).
+    let entsKey = kSecCodeInfoEntitlementsDict as String
+    guard let ents = info[entsKey] as? [String: Any],
+          let ne = ents["com.apple.developer.networking.networkextension"] as? [String]
+    else {
+      return false
+    }
+    return ne.contains("packet-tunnel-provider")
+  }
+
+  /// Actionable copy when host lacks Network Extension for NETunnelProviderManager.
+  static func hostMissingNeEntitlementMessage() -> String {
+    "This app build cannot register or activate Packet Tunnel in Network settings: "
+      + "the host is missing the packet-tunnel-provider Network Extension entitlement. "
+      + "Public Developer ID downloads intentionally omit host NE so the app opens for all users. "
+      + "On a developer Mac, re-sign for residual with: "
+      + "python3 scripts/sign_macos_residual_team.py --app path/to/restore_privacy_client.app "
+      + "then relaunch, Allow VPN if macOS asks, and Connect. "
+      + "Do not add L2TP / Cisco IPsec / IKEv2 manually."
+  }
+
   /// Pre-Connect: register Restore Privacy Packet Tunnel in System VPN preferences.
   /// Does **not** start the tunnel. macOS may still show Allow — that is required.
   /// Never configures L2TP, Cisco IPsec, or IKEv2.
@@ -118,6 +161,17 @@ enum RptVpnChannel {
     port: UInt16,
     completion: @escaping ([String: Any]) -> Void
   ) {
+    if !hostHasPacketTunnelNetworkExtensionEntitlement() {
+      var map: [String: Any] = productVpnIdentity()
+      map["ok"] = false
+      map["prepared"] = false
+      map["needsVpnSystemSettingsApproval"] = false
+      map["needsTeamResidualSign"] = true
+      map["hostHasPacketTunnelEntitlement"] = false
+      map["message"] = hostMissingNeEntitlementMessage()
+      completion(map)
+      return
+    }
     if let last = lastSuccessfulPrepareAt,
        Date().timeIntervalSince(last) < prepareDebounce {
       var map: [String: Any] = [
@@ -127,6 +181,7 @@ enum RptVpnChannel {
         "tunnelType": productTunnelType,
         "providerBundleId": providerBundleId,
         "localizedDescription": productLocalizedDescription,
+        "hostHasPacketTunnelEntitlement": true,
         "message":
           "Restore Privacy Packet Tunnel configuration already registered. "
           + "Press Connect when ready (Allow in System Settings if macOS asks).",
@@ -149,6 +204,8 @@ enum RptVpnChannel {
           "providerBundleId": bid,
           "localizedDescription": manager.localizedDescription ?? productLocalizedDescription,
           "enabled": manager.isEnabled,
+          "hostHasPacketTunnelEntitlement": true,
+          "connectionStatus": statusName(manager.connection.status),
           "message":
             "Restore Privacy Packet Tunnel registered in System VPN preferences. "
             + "If macOS asked to Allow VPN configuration, choose Allow — "
@@ -440,6 +497,10 @@ enum RptVpnChannel {
     port: UInt16,
     completion: @escaping (NETunnelProviderManager?, String?) -> Void
   ) {
+    if !hostHasPacketTunnelNetworkExtensionEntitlement() {
+      completion(nil, hostMissingNeEntitlementMessage())
+      return
+    }
     NETunnelProviderManager.loadAllFromPreferences { managers, error in
       if let error {
         completion(nil, describeNePreferencesError(error))
@@ -448,6 +509,7 @@ enum RptVpnChannel {
       let manager = selectOrCreateManager(from: managers)
       // Product residual: Packet Tunnel Network Extension only (never L2TP/IKEv2/IPsec).
       applyProductPacketTunnelProtocol(to: manager, host: host, port: port)
+      // Must be enabled in preferences or Network settings shows the config as inactive.
       manager.isEnabled = true
       manager.isOnDemandEnabled = false
       manager.saveToPreferences { saveErr in
@@ -461,25 +523,38 @@ enum RptVpnChannel {
             completion(nil, describeNePreferencesError(loadErr))
             return
           }
-          // Ensure enabled after reload (some macOS versions clear it).
-          if !manager.isEnabled {
-            manager.isEnabled = true
-            manager.saveToPreferences { reSaveErr in
-              if let reSaveErr {
-                completion(nil, describeNePreferencesError(reSaveErr))
-                return
-              }
-              manager.loadFromPreferences { reLoadErr in
-                if let reLoadErr {
-                  completion(nil, describeNePreferencesError(reLoadErr))
-                  return
-                }
-                completion(manager, nil)
-              }
-            }
+          // Re-assert product identity + enabled after reload (macOS may clear either).
+          let proto = manager.protocolConfiguration as? NETunnelProviderProtocol
+          let bidOk = (proto?.providerBundleIdentifier ?? "") == providerBundleId
+          if manager.isEnabled, bidOk {
+            completion(manager, nil)
             return
           }
-          completion(manager, nil)
+          applyProductPacketTunnelProtocol(to: manager, host: host, port: port)
+          manager.isEnabled = true
+          manager.isOnDemandEnabled = false
+          manager.saveToPreferences { reSaveErr in
+            if let reSaveErr {
+              completion(nil, describeNePreferencesError(reSaveErr))
+              return
+            }
+            manager.loadFromPreferences { reLoadErr in
+              if let reLoadErr {
+                completion(nil, describeNePreferencesError(reLoadErr))
+                return
+              }
+              if !manager.isEnabled {
+                completion(
+                  nil,
+                  "Packet Tunnel saved but remains disabled in System VPN preferences. "
+                    + "Open System Settings → Network → VPN & Filters, enable Restore Privacy, "
+                    + "Allow if prompted, then Connect again."
+                )
+                return
+              }
+              completion(manager, nil)
+            }
+          }
         }
       }
     }
