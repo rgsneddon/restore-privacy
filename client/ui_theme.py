@@ -147,7 +147,7 @@ BUTTON_BG_ARGB = 0xFF2779AA
 BUTTON_ACTIVE_ARGB = 0xFF1B767E
 
 APP_TITLE = "Restore Privacy"
-BANNER_TITLE = "Restore Privacy - UK VPN"
+BANNER_TITLE = "Restore Privacy - Virtual Private Network"
 
 # Rounded-edge visual language (Tk approximates with padx/pady + relief)
 CORNER_RADIUS = 14

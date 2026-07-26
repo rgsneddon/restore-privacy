@@ -5,7 +5,7 @@ const String kPrivacyMessageText =
     'lightweight vpn to restore your privacy - no user data is retained - your privacy is restored';
 
 const String kAppTitle = 'Restore Privacy';
-const String kBannerTitle = 'Restore Privacy — UK VPN';
+const String kBannerTitle = 'Restore Privacy — Virtual Private Network';
 const String kTrayProductName = 'Privacy Restored';
 
 // Cupertino / Windows product shell

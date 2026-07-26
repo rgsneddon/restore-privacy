@@ -103,6 +103,32 @@ class TestAppStatusLabelsClean(unittest.TestCase):
         _assert_clean(st, "plain connected")
         self.assertIn("10.0.0.1", st)
 
+    def test_banner_title_virtual_private_network_not_uk_vpn(self):
+        """Product chrome brands as Virtual Private Network, not UK VPN."""
+        self.assertIn("Virtual Private Network", BANNER_TITLE)
+        self.assertNotIn("UK VPN", BANNER_TITLE)
+        self.assertNotIn("uk vpn", BANNER_TITLE.lower())
+        self.assertTrue(BANNER_TITLE.startswith("Restore Privacy"))
+
+
+class TestFlutterBannerTitleShipped(unittest.TestCase):
+    """Flutter kBannerTitle (client_app) matches Virtual Private Network branding."""
+
+    def test_k_banner_title_constant_not_uk_vpn(self):
+        theme = (ROOT / "client_app" / "lib" / "theme.dart").read_text(encoding="utf-8")
+        main = (ROOT / "client_app" / "lib" / "main.dart").read_text(encoding="utf-8")
+        m = re.search(r"const String kBannerTitle = '([^']+)'", theme)
+        self.assertIsNotNone(m, "kBannerTitle constant missing from theme.dart")
+        assert m is not None
+        banner = m.group(1)
+        self.assertIn("Virtual Private Network", banner)
+        self.assertNotIn("UK VPN", banner)
+        self.assertNotIn("uk vpn", banner.lower())
+        self.assertTrue(banner.startswith("Restore Privacy"))
+        # Live UI must reference the shared constant (not a hard-coded old phrase).
+        self.assertIn("kBannerTitle", main)
+        self.assertNotIn("UK VPN", main)
+
 
 if __name__ == "__main__":
     unittest.main()

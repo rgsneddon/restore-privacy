@@ -70,6 +70,8 @@ void main() {
 
     expect(find.text(kAppTitle), findsWidgets);
     expect(find.text(kBannerTitle), findsOneWidget);
+    expect(kBannerTitle.contains('Virtual Private Network'), isTrue);
+    expect(kBannerTitle.toLowerCase().contains('uk vpn'), isFalse);
     expect(find.text(connectButtonLabel(false)), findsOneWidget);
     expect(find.textContaining('lightweight vpn to restore your privacy'), findsWidgets);
     expect(find.byIcon(Icons.settings), findsOneWidget);
