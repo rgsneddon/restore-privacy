@@ -12,9 +12,11 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
 from client.multihop import (  # noqa: E402
+    COUNTRY_DE,
     COUNTRY_IS,
     COUNTRY_RO,
     PRODUCT_COUNTRY_CATALOG,
+    PRODUCT_DE_HOST,
     PRODUCT_EXIT_HOST,
     PRODUCT_NODE_HOST,
     CountryNode,
@@ -58,36 +60,45 @@ class TestResolveEntryExit(unittest.TestCase):
             "exit_node_elgamal.pub",
         )
 
-    def test_multihop_iceland_entry_romania_exit(self):
-        entry, exit_n = resolve_entry_exit(COUNTRY_IS, multihop_enabled=True)
+    def test_multihop_iceland_entry_non_entry_exit(self):
+        # Three-peer catalog: exit is random among non-entry peers (RO or DE).
+        entry, exit_n = resolve_entry_exit(
+            COUNTRY_IS, multihop_enabled=True, rng=random.Random(0)
+        )
         self.assertEqual(entry.code, COUNTRY_IS)
         self.assertIsNotNone(exit_n)
         assert exit_n is not None
-        self.assertEqual(exit_n.code, COUNTRY_RO)
+        self.assertIn(exit_n.code, (COUNTRY_RO, COUNTRY_DE))
         self.assertNotEqual(entry.host, exit_n.host)
-        cfg = multihop_config_for_entry_country(COUNTRY_IS, multihop_enabled=True)
+        cfg = multihop_config_for_entry_country(
+            COUNTRY_IS, multihop_enabled=True, rng=random.Random(0)
+        )
         self.assertTrue(is_multihop_active(cfg))
         self.assertEqual(entry_endpoint(cfg).host, PRODUCT_NODE_HOST)
-        self.assertEqual(exit_endpoint(cfg).host, PRODUCT_EXIT_HOST)
+        self.assertNotEqual(exit_endpoint(cfg).host, PRODUCT_NODE_HOST)
         # Residual-via-exit when multihop active
-        self.assertEqual(residual_endpoint(cfg).host, PRODUCT_EXIT_HOST)
+        self.assertEqual(residual_endpoint(cfg).host, exit_endpoint(cfg).host)
 
-    def test_multihop_romania_entry_iceland_exit(self):
-        entry, exit_n = resolve_entry_exit(COUNTRY_RO, multihop_enabled=True)
+    def test_multihop_romania_entry_non_entry_exit(self):
+        entry, exit_n = resolve_entry_exit(
+            COUNTRY_RO, multihop_enabled=True, rng=random.Random(1)
+        )
         self.assertEqual(entry.code, COUNTRY_RO)
         self.assertIsNotNone(exit_n)
         assert exit_n is not None
-        self.assertEqual(exit_n.code, COUNTRY_IS)
-        cfg = multihop_config_for_entry_country(COUNTRY_RO, multihop_enabled=True)
+        self.assertIn(exit_n.code, (COUNTRY_IS, COUNTRY_DE))
+        cfg = multihop_config_for_entry_country(
+            COUNTRY_RO, multihop_enabled=True, rng=random.Random(1)
+        )
         self.assertTrue(is_multihop_active(cfg))
         self.assertEqual(entry_endpoint(cfg).host, PRODUCT_EXIT_HOST)
-        self.assertEqual(exit_endpoint(cfg).host, PRODUCT_NODE_HOST)
-        self.assertEqual(residual_endpoint(cfg).host, PRODUCT_NODE_HOST)
+        self.assertNotEqual(exit_endpoint(cfg).host, PRODUCT_EXIT_HOST)
+        self.assertEqual(residual_endpoint(cfg).host, exit_endpoint(cfg).host)
 
     def test_exit_never_equals_entry(self):
-        for code in (COUNTRY_IS, COUNTRY_RO):
+        for code in (COUNTRY_IS, COUNTRY_RO, COUNTRY_DE):
             for mh in (False, True):
-                e, x = resolve_entry_exit(code, multihop_enabled=mh)
+                e, x = resolve_entry_exit(code, multihop_enabled=mh, rng=random.Random(2))
                 if x is not None:
                     self.assertNotEqual(e.host, x.host)
 
