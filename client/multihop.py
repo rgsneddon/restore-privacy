@@ -267,16 +267,27 @@ class ResidualUnavailable(Exception):
     """Neither entry nor exit residual is usable (fail closed)."""
 
 
+# Near-capacity residual migration (connection load hints; not multi-VPS consensus).
+# Utilization is 0.0 (idle) … 1.0 (full). Prefer freer peer when preferred is high.
+DEFAULT_NEAR_CAPACITY_THRESHOLD = 0.85
+# Alternate must be at least this much freer (lower util) to trigger migration.
+DEFAULT_CAPACITY_MARGIN = 0.05
+REASON_CAPACITY_MIGRATION = "capacity_migration"
+
+
 @dataclass(frozen=True)
 class ResidualSelection:
-    """Result of entry-primary / exit-failover residual preference."""
+    """Result of entry-primary / exit-failover / capacity residual preference."""
 
     endpoint: Endpoint
-    reason: str  # entry_primary | exit_failover | multihop_residual_via_exit | entry_fallback
+    reason: str  # entry_primary | exit_failover | multihop_residual_via_exit | entry_fallback | capacity_migration
     entry_healthy: bool
     exit_healthy: bool
     entry_draining: bool
     failover_active: bool
+    preferred_host: str = ""
+    capacity_util_preferred: float | None = None
+    capacity_util_selected: float | None = None
 
     def to_dict(self) -> dict:
         return {
@@ -287,7 +298,117 @@ class ResidualSelection:
             "exit_healthy": self.exit_healthy,
             "entry_draining": self.entry_draining,
             "failover_active": self.failover_active,
+            "preferred_host": self.preferred_host,
+            "capacity_util_preferred": self.capacity_util_preferred,
+            "capacity_util_selected": self.capacity_util_selected,
         }
+
+
+def normalize_peer_capacity(
+    peer_capacity: dict[str, float] | None,
+) -> dict[str, float]:
+    """Normalize host → utilization map (0.0–1.0); drop empty hosts."""
+    if not peer_capacity:
+        return {}
+    out: dict[str, float] = {}
+    for host, util in peer_capacity.items():
+        h = (host or "").strip()
+        if not h:
+            continue
+        try:
+            u = float(util)
+        except (TypeError, ValueError):
+            continue
+        if u < 0.0:
+            u = 0.0
+        if u > 1.0:
+            u = 1.0
+        out[h] = u
+    return out
+
+
+def peer_utilization(
+    host: str,
+    peer_capacity: dict[str, float] | None,
+) -> float | None:
+    """Return utilization for *host* if known, else None (no signal)."""
+    caps = normalize_peer_capacity(peer_capacity)
+    h = (host or "").strip()
+    if not h:
+        return None
+    if h in caps:
+        return caps[h]
+    return None
+
+
+def is_near_capacity(
+    util: float | None,
+    *,
+    threshold: float = DEFAULT_NEAR_CAPACITY_THRESHOLD,
+) -> bool:
+    """True when utilization is known and at/above near-capacity threshold.
+
+    Missing capacity signal → False (do not migrate without evidence).
+    """
+    if util is None:
+        return False
+    try:
+        t = float(threshold)
+    except (TypeError, ValueError):
+        t = DEFAULT_NEAR_CAPACITY_THRESHOLD
+    if t < 0.0:
+        t = 0.0
+    if t > 1.0:
+        t = 1.0
+    return float(util) >= t
+
+
+def is_freer_capacity(
+    candidate_util: float | None,
+    preferred_util: float | None,
+    *,
+    margin: float = DEFAULT_CAPACITY_MARGIN,
+) -> bool:
+    """True when *candidate* has meaningfully more free capacity than preferred.
+
+    Both must be known; candidate utilization must be lower by at least *margin*.
+    """
+    if candidate_util is None or preferred_util is None:
+        return False
+    try:
+        m = float(margin)
+    except (TypeError, ValueError):
+        m = DEFAULT_CAPACITY_MARGIN
+    if m < 0.0:
+        m = 0.0
+    return float(candidate_util) <= float(preferred_util) - m
+
+
+def capacity_migration_advisory(selection: ResidualSelection | None) -> str | None:
+    """Human-readable CLI/status line when residual pick was capacity-driven.
+
+    Returns None for ordinary entry-primary / multihop / health failover reasons
+    so non-capacity residual paths stay silent about capacity.
+    """
+    if selection is None:
+        return None
+    if selection.reason != REASON_CAPACITY_MIGRATION:
+        return None
+    pref = (selection.preferred_host or "").strip() or "preferred residual"
+    host = selection.endpoint.host
+    port = selection.endpoint.port
+    util_p = selection.capacity_util_preferred
+    util_s = selection.capacity_util_selected
+    util_bits = ""
+    if util_p is not None and util_s is not None:
+        util_bits = (
+            f" (preferred ~{int(round(util_p * 100))}% load → "
+            f"peer ~{int(round(util_s * 100))}%)"
+        )
+    return (
+        f"Notice: preferred residual node ({pref}) was near connection capacity; "
+        f"automatically moved you to freer peer {host}:{port}{util_bits}."
+    )
 
 
 def entry_endpoint(config: MultiHopConfig | None = None) -> Endpoint:
@@ -337,12 +458,59 @@ def exit_endpoint(config: MultiHopConfig | None = None) -> Endpoint:
     return alternate_peer_endpoint(cfg)
 
 
+def _maybe_capacity_migrate(
+    *,
+    preferred: Endpoint,
+    alternate: Endpoint,
+    preferred_healthy: bool,
+    alternate_healthy: bool,
+    peer_capacity: dict[str, float] | None,
+    near_capacity_threshold: float,
+    capacity_margin: float,
+    entry_healthy: bool,
+    exit_healthy: bool,
+    entry_draining: bool,
+) -> ResidualSelection | None:
+    """If preferred residual is near capacity and alternate is freer, migrate.
+
+    Returns a capacity_migration selection, or None to keep the non-capacity pick.
+    Never migrates to the same host. No freer peer → None (keep preferred; do not
+    black-hole solely because preferred is busy).
+    """
+    if not preferred_healthy or not alternate_healthy:
+        return None
+    pref_host = (preferred.host or "").strip()
+    alt_host = (alternate.host or "").strip()
+    if not pref_host or not alt_host or pref_host == alt_host:
+        return None
+    util_p = peer_utilization(pref_host, peer_capacity)
+    util_a = peer_utilization(alt_host, peer_capacity)
+    if not is_near_capacity(util_p, threshold=near_capacity_threshold):
+        return None
+    if not is_freer_capacity(util_a, util_p, margin=capacity_margin):
+        return None
+    return ResidualSelection(
+        endpoint=alternate,
+        reason=REASON_CAPACITY_MIGRATION,
+        entry_healthy=bool(entry_healthy),
+        exit_healthy=bool(exit_healthy),
+        entry_draining=bool(entry_draining),
+        failover_active=True,
+        preferred_host=pref_host,
+        capacity_util_preferred=util_p,
+        capacity_util_selected=util_a,
+    )
+
+
 def select_residual_endpoint(
     config: MultiHopConfig | None = None,
     *,
     entry_healthy: bool = True,
     exit_healthy: bool = True,
     entry_draining: bool = False,
+    peer_capacity: dict[str, float] | None = None,
+    near_capacity_threshold: float = DEFAULT_NEAR_CAPACITY_THRESHOLD,
+    capacity_margin: float = DEFAULT_CAPACITY_MARGIN,
 ) -> ResidualSelection:
     """Prefer selected entry when healthy; failover to alternate catalog peer.
 
@@ -351,9 +519,15 @@ def select_residual_endpoint(
     2. Entry unhealthy or draining, peer healthy → **exit_failover** to alternate peer
        (never same host as preferred entry).
     3. Multi-hop active + entry healthy: residual-via-exit dials configured exit.
-    4. Both unusable → raise :class:`ResidualUnavailable` (fail closed).
+    4. When the preferred residual host is **near connection capacity** and a
+       healthy alternate is meaningfully freer → **capacity_migration** (never
+       same host). Missing capacity signal does not migrate. No freer peer →
+       keep preferred (do not invent a hop / black-hole solely for load).
+    5. Both unusable → raise :class:`ResidualUnavailable` (fail closed).
 
     Fleet wipe sets preferred-entry draining so clients flip to a healthy peer.
+    Capacity hints are injectable (host → utilization 0..1); production may
+    supply probe results later without changing this pure ranking.
     """
     cfg = config or MultiHopConfig()
     entry_ok = bool(entry_healthy) and not bool(entry_draining)
@@ -369,13 +543,30 @@ def select_residual_endpoint(
     # Intentional multi-hop residual-via-exit when entry is up (product path).
     if is_multihop_active(cfg) and entry_ok:
         if exit_ok:
+            residual = residual_endpoint(cfg)
+            # Capacity: if exit residual is near full, migrate to freer entry peer
+            migrated = _maybe_capacity_migrate(
+                preferred=residual,
+                alternate=entry_ep,
+                preferred_healthy=True,
+                alternate_healthy=True,
+                peer_capacity=peer_capacity,
+                near_capacity_threshold=near_capacity_threshold,
+                capacity_margin=capacity_margin,
+                entry_healthy=True,
+                exit_healthy=True,
+                entry_draining=bool(entry_draining),
+            )
+            if migrated is not None:
+                return migrated
             return ResidualSelection(
-                endpoint=residual_endpoint(cfg),
+                endpoint=residual,
                 reason="multihop_residual_via_exit",
                 entry_healthy=True,
                 exit_healthy=True,
                 entry_draining=bool(entry_draining),
                 failover_active=False,
+                preferred_host=(residual.host or "").strip(),
             )
         # Multihop wants exit but exit down — fall back to entry if still up
         return ResidualSelection(
@@ -385,10 +576,25 @@ def select_residual_endpoint(
             exit_healthy=False,
             entry_draining=bool(entry_draining),
             failover_active=False,
+            preferred_host=(entry_ep.host or "").strip(),
         )
 
     # Entry-primary (single-hop default and post-rebuild re-entry)
     if entry_ok:
+        migrated = _maybe_capacity_migrate(
+            preferred=entry_ep,
+            alternate=exit_ep,
+            preferred_healthy=True,
+            alternate_healthy=exit_ok,
+            peer_capacity=peer_capacity,
+            near_capacity_threshold=near_capacity_threshold,
+            capacity_margin=capacity_margin,
+            entry_healthy=True,
+            exit_healthy=exit_ok,
+            entry_draining=False,
+        )
+        if migrated is not None:
+            return migrated
         return ResidualSelection(
             endpoint=entry_ep,
             reason="entry_primary",
@@ -396,6 +602,7 @@ def select_residual_endpoint(
             exit_healthy=exit_ok,
             entry_draining=False,
             failover_active=False,
+            preferred_host=(entry_ep.host or "").strip(),
         )
 
     # Preferred entry down/draining → solid peer failover (other catalog host)
@@ -407,6 +614,7 @@ def select_residual_endpoint(
             exit_healthy=True,
             entry_draining=bool(entry_draining),
             failover_active=True,
+            preferred_host=(entry_ep.host or "").strip(),
         )
 
     raise ResidualUnavailable(
@@ -421,6 +629,9 @@ def residual_try_order(
     entry_healthy: bool = True,
     exit_healthy: bool = True,
     entry_draining: bool = False,
+    peer_capacity: dict[str, float] | None = None,
+    near_capacity_threshold: float = DEFAULT_NEAR_CAPACITY_THRESHOLD,
+    capacity_margin: float = DEFAULT_CAPACITY_MARGIN,
 ) -> list[Endpoint]:
     """Ordered residual dial targets for HELLO failover (unique endpoints).
 
@@ -434,6 +645,9 @@ def residual_try_order(
             entry_healthy=entry_healthy,
             exit_healthy=exit_healthy,
             entry_draining=entry_draining,
+            peer_capacity=peer_capacity,
+            near_capacity_threshold=near_capacity_threshold,
+            capacity_margin=capacity_margin,
         ).endpoint
     except ResidualUnavailable:
         return []
