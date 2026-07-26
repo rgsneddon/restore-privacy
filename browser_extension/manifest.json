@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "Restore Privacy VPN",
   "short_name": "RPT VPN",
-  "version": "0.4.6",
+  "version": "0.4.7",
   "description": "Browser-scoped Restore Privacy VPN (Connect/Disconnect). Not OS residual TUN — use paid native clients for system residual.",
   "action": {
     "default_title": "Restore Privacy VPN",

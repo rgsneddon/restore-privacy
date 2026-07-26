@@ -130,7 +130,7 @@ class _TunnelHomeState extends State<TunnelHome> with WidgetsBindingObserver {
 
   /// First-run / post-install style prep: save product Packet Tunnel to OS prefs.
   Future<void> _prepareMacosPacketTunnelBeforeConnect() async {
-    if (!MacosWindow.isSupported) return;
+    if (!MacWindowController.isSupported) return;
     if (!mounted) return;
     _append(
       'Preparing system VPN profile (Restore Privacy Packet Tunnel)…',
