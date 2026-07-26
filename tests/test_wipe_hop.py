@@ -14,8 +14,8 @@ sys.path.insert(0, str(ROOT))
 from client.endpoint import PRODUCT_NODE_HOST, Endpoint  # noqa: E402
 from client.multihop import (  # noqa: E402
     PRODUCT_COUNTRY_CATALOG,
-    PRODUCT_DE_HOST,
     PRODUCT_EXIT_HOST,
+    PRODUCT_US_HOST,
     MultiHopConfig,
     ResidualUnavailable,
     select_residual_endpoint,
@@ -54,7 +54,6 @@ class TestWipeHopSelection(unittest.TestCase):
             peer_health={
                 PRODUCT_NODE_HOST: True,
                 PRODUCT_EXIT_HOST: True,
-                PRODUCT_DE_HOST: True,
             },
             rng=random.Random(0),
         )
@@ -82,35 +81,33 @@ class TestWipeHopSelection(unittest.TestCase):
                 peer_health={
                     PRODUCT_NODE_HOST: False,
                     PRODUCT_EXIT_HOST: True,
-                    PRODUCT_DE_HOST: True,
                 },
                 rng=random.Random(seed),
             )
             self.assertNotEqual(sel.endpoint.host, PRODUCT_NODE_HOST)
 
-    def test_multi_peer_alternates_not_fixed_single(self):
+    def test_catalog_alternates_include_ro_and_us(self):
+        """Three-peer catalog: RO and US eligible when preferred is IS."""
         preferred = Endpoint(host=PRODUCT_NODE_HOST, port=44044)
         alts = eligible_wipe_alternates(
             preferred,
             peer_health={
                 PRODUCT_NODE_HOST: True,
                 PRODUCT_EXIT_HOST: True,
-                PRODUCT_DE_HOST: True,
+                PRODUCT_US_HOST: True,
             },
             catalog=PRODUCT_COUNTRY_CATALOG,
         )
         hosts = {a.host for a in alts}
-        self.assertIn(PRODUCT_EXIT_HOST, hosts)
-        self.assertIn(PRODUCT_DE_HOST, hosts)
+        self.assertEqual(hosts, {PRODUCT_EXIT_HOST, PRODUCT_US_HOST})
         self.assertNotIn(PRODUCT_NODE_HOST, hosts)
-        # Random among both
         seen: set[str] = set()
         for seed in range(40):
             ep = pick_random_alternate(
                 preferred,
                 peer_health={
                     PRODUCT_EXIT_HOST: True,
-                    PRODUCT_DE_HOST: True,
+                    PRODUCT_US_HOST: True,
                 },
                 catalog=PRODUCT_COUNTRY_CATALOG,
                 rng=random.Random(seed),
@@ -118,6 +115,8 @@ class TestWipeHopSelection(unittest.TestCase):
             assert ep is not None
             seen.add(ep.host)
         self.assertGreaterEqual(len(seen), 2)
+        self.assertIn(PRODUCT_EXIT_HOST, seen)
+        self.assertIn(PRODUCT_US_HOST, seen)
 
     def test_select_residual_endpoint_drain_multi_peer(self):
         seen: set[str] = set()
@@ -145,7 +144,7 @@ class TestWipeHopSelection(unittest.TestCase):
                 peer_health={
                     PRODUCT_NODE_HOST: True,
                     PRODUCT_EXIT_HOST: False,
-                    PRODUCT_DE_HOST: False,
+                    PRODUCT_US_HOST: False,
                 },
             )
 
@@ -255,12 +254,12 @@ class TestWipeSignalParse(unittest.TestCase):
         self.assertTrue(d)  # preferred drain flag unchanged
         self.assertFalse(r)
         self.assertEqual(n, "signal_other_host")
-        # Explicit empty drain from DE alternate also ignored for preferred flags
+        # Explicit empty drain from non-preferred alternate also ignored
         d2, r2, n2 = apply_wipe_signal_to_flags(
             WipeSignal(state="draining", host=""),
             preferred_host=PRODUCT_NODE_HOST,
             current_entry_draining=True,
-            residual_host=PRODUCT_DE_HOST,
+            residual_host=PRODUCT_EXIT_HOST,
             trusted_preferred=False,
         )
         self.assertTrue(d2)
@@ -293,7 +292,7 @@ class TestWipeSignalParse(unittest.TestCase):
         # Different catalog residual still ignored even on trusted path
         self.assertFalse(
             signal_applies_to_preferred(
-                WipeSignal(state="draining", host=PRODUCT_DE_HOST),
+                WipeSignal(state="draining", host=PRODUCT_EXIT_HOST),
                 PRODUCT_NODE_HOST,
                 trusted_preferred=True,
             )

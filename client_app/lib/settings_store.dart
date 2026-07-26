@@ -3,7 +3,7 @@
 /// Defaults: startup prefs **off**. Privacy-scale lean residual: traffic
 /// shaping, outer obfuscation, and multi-hop all **off** until the user opts
 /// in (matches Windows/Linux product policy). Residual VPN core stays always-on.
-/// Entry country defaults to Iceland (`IS`) on every client.
+/// Entry country defaults to United States (`US`) on every client.
 library;
 
 import 'country_select.dart';
@@ -21,7 +21,7 @@ class ProductSettings {
   final bool privacyTrafficShape;
   final bool privacyOuterObfuscation;
   final bool privacyMultihop;
-  /// Catalog entry country code (IS / RO / DE); default Iceland.
+  /// Catalog entry country code (US / IS / RO); default United States/US.
   final String entryCountry;
 
   const ProductSettings({

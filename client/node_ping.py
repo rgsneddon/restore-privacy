@@ -1,7 +1,8 @@
 """Best-effort device→node RTT probes for Settings ping statistics.
 
-Measures approximate latency to product **entry** (Iceland) and **exit**
-(Romania) hosts. Residual VPN uses UDP **44044**; this helper prefers a short
+Measures approximate latency to the **selected residual entry** (Settings
+``entry_country`` — IS / RO / US) and, when multi-hop is on, the complementary
+**exit** peer. Residual VPN uses UDP **44044**; this helper prefers a short
 UDP probe and falls back to TCP connect RTT on the node status port when UDP
 yields no reply. Results are **probe RTT**, not a browser speedbench SLA.
 """
@@ -14,7 +15,14 @@ from dataclasses import dataclass
 from typing import Optional
 
 from client.endpoint import PRODUCT_NODE_HOST, PRODUCT_NODE_PORT
-from client.multihop import PRODUCT_EXIT_HOST, PRODUCT_EXIT_PORT
+from client.multihop import (
+    PRODUCT_EXIT_HOST,
+    PRODUCT_EXIT_PORT,
+    country_node_for_code,
+    multihop_config_for_entry_country,
+    normalize_entry_country,
+    residual_endpoint,
+)
 
 # Node status UI often listens on TCP 8080 — used only as reachability RTT fallback.
 STATUS_TCP_PORT = 8080
@@ -145,22 +153,40 @@ def probe_node_rtt_ms(
     )
 
 
-def probe_entry_rtt_ms(*, timeout_s: float = DEFAULT_PROBE_TIMEOUT_S) -> PingResult:
-    """Device → product entry node (Iceland monopin)."""
+def probe_entry_rtt_ms(
+    *,
+    timeout_s: float = DEFAULT_PROBE_TIMEOUT_S,
+    entry_country: str | None = None,
+) -> PingResult:
+    """Device → selected residual entry node (default Iceland monopin)."""
+    node = country_node_for_code(entry_country)
     return probe_node_rtt_ms(
-        PRODUCT_NODE_HOST,
-        udp_port=PRODUCT_NODE_PORT,
+        node.host or PRODUCT_NODE_HOST,
+        udp_port=int(node.port or PRODUCT_NODE_PORT),
         timeout_s=timeout_s,
     )
 
 
-def probe_exit_rtt_ms(*, timeout_s: float = DEFAULT_PROBE_TIMEOUT_S) -> PingResult:
-    """Device → product exit node (Romania monopin; multi-hop residual)."""
-    return probe_node_rtt_ms(
-        PRODUCT_EXIT_HOST,
-        udp_port=PRODUCT_EXIT_PORT,
-        timeout_s=timeout_s,
+def probe_exit_rtt_ms(
+    *,
+    timeout_s: float = DEFAULT_PROBE_TIMEOUT_S,
+    entry_country: str | None = None,
+    multihop_enabled: bool = True,
+) -> PingResult:
+    """Device → multi-hop residual exit (or alternate peer when multihop on)."""
+    cfg = multihop_config_for_entry_country(
+        entry_country,
+        multihop_enabled=bool(multihop_enabled),
     )
+    # residual_endpoint under multihop active is exit; otherwise alternate RO default.
+    if bool(multihop_enabled) and cfg.enabled:
+        ep = residual_endpoint(cfg)
+        host = (ep.host or PRODUCT_EXIT_HOST).strip()
+        port = int(ep.port or PRODUCT_EXIT_PORT)
+    else:
+        host = PRODUCT_EXIT_HOST
+        port = PRODUCT_EXIT_PORT
+    return probe_node_rtt_ms(host, udp_port=port, timeout_s=timeout_s)
 
 
 @dataclass(frozen=True)
@@ -171,6 +197,9 @@ class SettingsPingSnapshot:
     exit: Optional[PingResult]
     multihop_enabled: bool
     measured_at: float
+    entry_country: str = "US"
+    entry_name: str = "Iceland"
+    exit_name: str = "Romania"
 
     def entry_display(self) -> str:
         return self.entry.display()
@@ -182,20 +211,49 @@ class SettingsPingSnapshot:
             return "n/a"
         return self.exit.display()
 
+    def entry_label(self) -> str:
+        code = (self.entry_country or "IS").strip().upper() or "IS"
+        name = (self.entry_name or code).strip() or code
+        return f"Entry ({name} / {code})"
+
+    def exit_label(self) -> str:
+        name = (self.exit_name or "exit").strip() or "exit"
+        return f"Exit ({name})"
+
 
 def measure_settings_pings(
     *,
     multihop_enabled: bool,
     timeout_s: float = DEFAULT_PROBE_TIMEOUT_S,
+    entry_country: str | None = None,
 ) -> SettingsPingSnapshot:
-    """Probe entry always; probe exit when multi-hop is enabled in Settings."""
-    entry = probe_entry_rtt_ms(timeout_s=timeout_s)
+    """Probe selected entry always; probe exit when multi-hop is enabled."""
+    code = normalize_entry_country(entry_country)
+    entry_node = country_node_for_code(code)
+    entry = probe_entry_rtt_ms(timeout_s=timeout_s, entry_country=code)
     exit_r: Optional[PingResult] = None
+    exit_name = "Romania"
     if multihop_enabled:
-        exit_r = probe_exit_rtt_ms(timeout_s=timeout_s)
+        exit_r = probe_exit_rtt_ms(
+            timeout_s=timeout_s,
+            entry_country=code,
+            multihop_enabled=True,
+        )
+        if exit_r is not None and exit_r.host:
+            # Label exit by catalog name when known
+            for n in (
+                country_node_for_code("IS"),
+                country_node_for_code("RO"),
+            ):
+                if (n.host or "").strip() == (exit_r.host or "").strip():
+                    exit_name = n.name
+                    break
     return SettingsPingSnapshot(
         entry=entry,
         exit=exit_r,
         multihop_enabled=bool(multihop_enabled),
         measured_at=time.time(),
+        entry_country=code,
+        entry_name=str(entry_node.name or code),
+        exit_name=exit_name,
     )

@@ -2,7 +2,7 @@
 
 Mirrors Android ``always open secrets/$pubName from package`` and the Apple
 ``ensureResidualPubInWritableDir`` path: when the residual dial host needs
-RO/DE pin, copy that basename from package/candidate dirs into the writable
+the RO/US pin, copy that basename from package/candidate dirs into the writable
 secrets directory before load. Never fall back to Iceland ``node_elgamal.pub``
 for a non-IS monopin.
 
@@ -26,8 +26,8 @@ def residual_node_pub_name_for_host(host: str) -> str:
     h = (host or "").strip()
     if h == "185.146.232.107" or h.endswith("185.146.232.107"):
         return "exit_node_elgamal.pub"
-    if h == "167.233.224.5" or h.endswith("167.233.224.5"):
-        return "de_node_elgamal.pub"
+    if h == "5.161.242.85" or h.endswith("5.161.242.85"):
+        return "us_node_elgamal.pub"
     return "node_elgamal.pub"
 
 
@@ -46,7 +46,7 @@ def ensure_residual_pub_in_writable_dir(
     Always refreshes from the first candidate that has the basename when found
     (heals stale keys). If no package candidate has the pin:
     - IS (node_elgamal.pub): keep existing writable file if valid
-    - RO/DE: raise :class:`ResidualPubError` (never substitute Iceland pin)
+    - RO/US: raise :class:`ResidualPubError` (never substitute Iceland pin)
 
     Returns path to the pin under *writable_dir*.
     """
@@ -79,7 +79,7 @@ def ensure_residual_pub_in_writable_dir(
     if pub_name != NODE_PUB:
         raise ResidualPubError(
             f"Missing {pub_name} for residual host {residual_host or '(unknown)'} "
-            f"— refuse Iceland entry pub fallback (DE/RO HELLO would use wrong key)"
+            f"— refuse Iceland entry pub fallback (RO/US HELLO would use wrong key)"
         )
     raise ResidualPubError(f"Missing {pub_name} in {wdir}")
 
@@ -110,11 +110,11 @@ def load_residual_node_pub(
     return data
 
 
-# Catalog public pin basenames (IS / RO / DE) — never private keys.
+# Catalog public pin basenames (IS / RO / US) — never private keys.
 CATALOG_PUBLIC_PUBS: tuple[str, ...] = (
     "node_elgamal.pub",
     "exit_node_elgamal.pub",
-    "de_node_elgamal.pub",
+    "us_node_elgamal.pub",
 )
 
 

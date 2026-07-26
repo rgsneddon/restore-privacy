@@ -7,9 +7,9 @@ import 'country_select.dart';
 /// RPT node endpoint and full-tunnel intent (shared with platform VPN).
 ///
 /// Multi-hop residual is **opt-in**: when [multiHopEnabled] is true, residual
-/// Connect dials a non-entry catalog peer. Default remains single-hop Iceland
-/// entry (`node_elgamal.pub`). This is residual-via-exit selection, not full
-/// intermediate encapsulation.
+/// Connect dials a non-entry catalog peer. Default remains single-hop **Iceland**
+/// entry (`node_elgamal.pub` / [kDefaultEntryCountry]). Residual-via-exit
+/// selection is not full intermediate encapsulation.
 ///
 /// Free tier ([freeTierEnabled]): multi-hop is forced off; host is always entry.
 class RptConfig {
@@ -47,7 +47,7 @@ class RptConfig {
   /// Runtime override from Settings privacy-scale (null = use env/compile only).
   static bool? runtimeMultiHopOverride;
 
-  /// Main-shell entry country (IS default); drives residual dial host.
+  /// Main-shell entry country (IS product default); drives residual dial host.
   static String runtimeEntryCountry = kDefaultEntryCountry;
 
   /// Apply Settings multi-hop toggle (Windows/Apple parity).
@@ -60,7 +60,7 @@ class RptConfig {
     runtimeMultiHopOverride = enabled;
   }
 
-  /// Apply main-shell entry-country selection (Iceland default).
+  /// Apply main-shell entry-country selection (United States/US product default).
   static void setRuntimeEntryCountry(String? code) {
     runtimeEntryCountry = normalizeEntryCountry(code);
   }

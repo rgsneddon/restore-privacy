@@ -1,9 +1,9 @@
 """Multi-hop path configuration and residual routing selection.
 
-Product default remains **single hop** to the Iceland entry node. When multi-hop
-is **enabled** with ≥2 hops and routing is implemented, residual Connect dials
-the **exit** (last) hop so egress residual is the exit VPS; the hop list still
-names entry → exit for path honesty.
+Product default is **single hop** to the **United States (US)** residual entry.
+When multi-hop is **enabled** with ≥2 hops and routing is implemented, residual
+Connect dials the **exit** (last) hop so egress residual is the exit VPS; the
+hop list still names entry → exit for path honesty.
 
 **Preferred-entry downtime failover** (fleet wipe/rebuild): pure selection prefers
 the user's **selected entry** when healthy; automatically residual-fails over to
@@ -36,13 +36,21 @@ MULTI_HOP_ROUTING_IMPLEMENTED = True
 PRODUCT_EXIT_HOST = "185.146.232.107"
 PRODUCT_EXIT_PORT = PRODUCT_NODE_PORT
 
+# USA residual peer (Hetzner Ashburn) — product default residual entry.
+PRODUCT_US_HOST = "5.161.242.85"
+PRODUCT_US_PORT = PRODUCT_NODE_PORT
+
 # --- Country → node catalog (extensible as more VPS countries ship) ---
 COUNTRY_IS = "IS"
 COUNTRY_RO = "RO"
+COUNTRY_US = "US"
+# Historical code (removed residual peer) — normalize maps DE → product default.
 COUNTRY_DE = "DE"
-DEFAULT_ENTRY_COUNTRY = COUNTRY_IS
+# Product default residual entry (empty prefs / fresh install) — United States monopin.
+DEFAULT_ENTRY_COUNTRY = COUNTRY_US
 
-# Germany residual peer (Hetzner FSN / product monopin).
+# Retired Germany monopin (no longer in product catalog). Kept for redaction of
+# old support logs only — do not dial or offer as entry.
 PRODUCT_DE_HOST = "167.233.224.5"
 PRODUCT_DE_PORT = PRODUCT_NODE_PORT
 
@@ -51,7 +59,7 @@ PRODUCT_DE_PORT = PRODUCT_NODE_PORT
 class CountryNode:
     """One residual-capable product node identified by country code."""
 
-    code: str  # ISO-ish short code (IS, RO, DE, …)
+    code: str  # ISO-ish short code (IS, RO, US, …)
     name: str  # User-facing country name
     host: str
     port: int = PRODUCT_NODE_PORT
@@ -64,7 +72,7 @@ class CountryNode:
         return Endpoint(host=self.host, port=int(self.port))
 
 
-# Shipped residual catalog: Iceland, Romania, Germany (expandable).
+# Shipped residual catalog: Iceland + Romania + USA (Germany peer removed).
 PRODUCT_COUNTRY_CATALOG: tuple[CountryNode, ...] = (
     CountryNode(
         code=COUNTRY_IS,
@@ -81,11 +89,11 @@ PRODUCT_COUNTRY_CATALOG: tuple[CountryNode, ...] = (
         pub_name="exit_node_elgamal.pub",
     ),
     CountryNode(
-        code=COUNTRY_DE,
-        name="Germany",
-        host=PRODUCT_DE_HOST,
-        port=PRODUCT_DE_PORT,
-        pub_name="de_node_elgamal.pub",
+        code=COUNTRY_US,
+        name="United States",
+        host=PRODUCT_US_HOST,
+        port=PRODUCT_US_PORT,
+        pub_name="us_node_elgamal.pub",
     ),
 )
 
@@ -96,21 +104,27 @@ def product_country_catalog() -> tuple[CountryNode, ...]:
 
 
 def normalize_entry_country(code: str | None) -> str:
-    """Return a valid catalog country code; unknown/empty → Iceland (default)."""
+    """Return a valid catalog country code; unknown/empty/stale DE → IS default."""
     raw = (code or "").strip().upper()
     if not raw:
         return DEFAULT_ENTRY_COUNTRY
-    # Accept full names
+    # Accept full names; retired DE/Germany map to default (no dial path).
     aliases = {
         "ICELAND": COUNTRY_IS,
         "IS": COUNTRY_IS,
         "ROMANIA": COUNTRY_RO,
         "RO": COUNTRY_RO,
         "ROU": COUNTRY_RO,
-        "GERMANY": COUNTRY_DE,
-        "DE": COUNTRY_DE,
-        "DEU": COUNTRY_DE,
-        "DEUTSCHLAND": COUNTRY_DE,
+        "UNITED STATES": COUNTRY_US,
+        "UNITED STATES OF AMERICA": COUNTRY_US,
+        "USA": COUNTRY_US,
+        "US": COUNTRY_US,
+        "AMERICA": COUNTRY_US,
+        # Stale prefs after DE peer removal
+        "GERMANY": DEFAULT_ENTRY_COUNTRY,
+        "DE": DEFAULT_ENTRY_COUNTRY,
+        "DEU": DEFAULT_ENTRY_COUNTRY,
+        "DEUTSCHLAND": DEFAULT_ENTRY_COUNTRY,
     }
     code_n = aliases.get(raw, raw)
     for n in PRODUCT_COUNTRY_CATALOG:
@@ -124,13 +138,16 @@ def country_node_for_code(
     *,
     catalog: Sequence[CountryNode] | None = None,
 ) -> CountryNode:
-    """Lookup catalog node for *code* (falls back to default Iceland)."""
+    """Lookup catalog node for *code* (falls back to product default IS)."""
     cat = tuple(catalog) if catalog is not None else PRODUCT_COUNTRY_CATALOG
     want = normalize_entry_country(code)
     for n in cat:
         if n.code == want:
             return n
-    # Catalog without IS — first entry
+    # Prefer default IS in catalog, else first entry
+    for n in cat:
+        if n.code == DEFAULT_ENTRY_COUNTRY:
+            return n
     return cat[0] if cat else PRODUCT_COUNTRY_CATALOG[0]
 
 
@@ -209,7 +226,22 @@ class Hop:
         return Endpoint(host=self.host, port=int(self.port))
 
     def label(self) -> str:
-        return f"{self.host}:{int(self.port)}"
+        """User-facing hop label — country name for monopin peers, never raw IP."""
+        try:
+            from client.residual_public import (
+                is_residual_monopin_host,
+                public_label_for_host,
+            )
+
+            if is_residual_monopin_host(self.host):
+                return public_label_for_host(self.host)
+        except Exception:  # noqa: BLE001
+            pass
+        # Non-catalog hop: avoid echoing dotted-quad IPs in status text
+        h = (self.host or "").strip()
+        if h and h.replace(".", "").isdigit():
+            return "VPN hop"
+        return f"{h}:{int(self.port)}" if h else "VPN hop"
 
 
 @dataclass
@@ -713,9 +745,15 @@ def multihop_status_text(config: MultiHopConfig | None = None) -> str:
         return f"multi-hop path configured (not routed; entry-only): {labels}"
     if is_multihop_active(cfg):
         residual = residual_endpoint(cfg)
+        try:
+            from client.residual_public import public_label_for_host
+
+            via = public_label_for_host(residual.host)
+        except Exception:  # noqa: BLE001
+            via = "VPN node"
         return (
             f"multi-hop active ({len(hops)} hops): {labels} "
-            f"(residual via {residual.host}:{residual.port})"
+            f"(residual via {via})"
         )
     return f"multi-hop path configured (not active): {labels}"
 
@@ -798,7 +836,7 @@ def multihop_config_from_env(
       (when this env key is set it wins over Settings)
     - When env key is unset, product Settings ``privacy_multihop`` is used
       (default **off** / single-hop residual baseline)
-    - ``RPT_ENTRY_COUNTRY`` / Settings ``entry_country`` — IS or RO (default IS)
+    - ``RPT_ENTRY_COUNTRY`` / Settings ``entry_country`` — IS, RO, or DE (default IS)
     - ``RPT_MULTIHOP_HOPS`` — CSV ``host[:port],host2[:port]`` (operator override)
     - ``RPT_EXIT_HOST`` / ``RPT_EXIT_PORT`` — second hop override (legacy)
     """
@@ -882,4 +920,6 @@ def node_pub_name_for_endpoint(endpoint: Endpoint) -> str:
             return n.pub_name
     if host == PRODUCT_EXIT_HOST or host == product_exit_hop().host:
         return "exit_node_elgamal.pub"
+    if host == PRODUCT_US_HOST:
+        return "us_node_elgamal.pub"
     return "node_elgamal.pub"

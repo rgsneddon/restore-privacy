@@ -160,7 +160,8 @@ class RptVpnService : VpnService() {
     /**
      * Load device Ed25519 priv + node ElGamal pub for residual HELLO.
      * Generates a unique client key on first run (never uses a shared APK-embedded priv).
-     * Packages ship `node_elgamal.pub` (IS), `exit_node_elgamal.pub` (RO), `de_node_elgamal.pub` (DE).
+     * Packages ship `node_elgamal.pub` (IS), `exit_node_elgamal.pub` (RO),
+     * `us_node_elgamal.pub` (US).
      *
      * Pub basename is chosen from residual dial *host* (catalog monopin), not entry code alone.
      * **Always** refreshes the chosen pub from APK assets (overwrite). Device Ed25519 private
@@ -175,7 +176,7 @@ class RptVpnService : VpnService() {
         val pubF = File(dir, pubName)
 
         // Always copy package pub → filesDir (heals stale key after APK upgrade).
-        // Fail closed for RO/DE residual: never HELLO with Iceland pin to non-IS monopin.
+        // Fail closed for RO/US residual: never HELLO with Iceland pin to non-IS monopin.
         try {
             assets.open("secrets/$pubName").use { inp ->
                 if (!refreshNodeElgamalPub(pubF, inp.readBytes())) {
@@ -184,7 +185,7 @@ class RptVpnService : VpnService() {
             }
         } catch (_: Exception) {
             if (pubName != "node_elgamal.pub") {
-                // Missing RO/DE pin — do not fall back to Iceland entry pub
+                // Missing RO/US pin — do not fall back to Iceland entry pub
                 return null
             }
             if (!pubF.isFile || pubF.length() < 32L) return null
@@ -238,7 +239,7 @@ class RptVpnService : VpnService() {
             report(
                 false,
                 "Missing node public key — package must include node_elgamal.pub " +
-                    "(plus exit_node_elgamal.pub / de_node_elgamal.pub for RO/DE residual); " +
+                    "(plus exit_node_elgamal.pub / us_node_elgamal.pub for RO/US residual); " +
                     "device Ed25519 is auto-generated",
             )
             stopForeground(STOP_FOREGROUND_REMOVE)
@@ -565,11 +566,11 @@ class RptVpnService : VpnService() {
         /** Product residual monopins (must match Flutter country_select / multihop catalog). */
         const val PRODUCT_ENTRY_HOST = "82.221.101.241"
         const val PRODUCT_EXIT_HOST = "185.146.232.107"
-        const val PRODUCT_DE_HOST = "167.233.224.5"
+        const val PRODUCT_US_HOST = "5.161.242.85"
 
         /**
          * ElGamal public pin basename for residual HELLO from dial host.
-         * IS → node_elgamal.pub; RO → exit_node_elgamal.pub; DE → de_node_elgamal.pub.
+         * IS → node_elgamal.pub; RO → exit_node_elgamal.pub; US → us_node_elgamal.pub.
          */
         @JvmStatic
         fun residualNodePubNameForHost(host: String): String {
@@ -577,8 +578,8 @@ class RptVpnService : VpnService() {
             if (h == PRODUCT_EXIT_HOST || h.endsWith(PRODUCT_EXIT_HOST)) {
                 return "exit_node_elgamal.pub"
             }
-            if (h == PRODUCT_DE_HOST || h.endsWith(PRODUCT_DE_HOST)) {
-                return "de_node_elgamal.pub"
+            if (h == PRODUCT_US_HOST || h.endsWith(PRODUCT_US_HOST)) {
+                return "us_node_elgamal.pub"
             }
             return "node_elgamal.pub"
         }

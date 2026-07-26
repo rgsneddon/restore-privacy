@@ -23,7 +23,7 @@ KEY_AUTOCONNECT_ON_LAUNCH = "autoconnect_on_launch"
 KEY_PRIVACY_TRAFFIC_SHAPE = "privacy_traffic_shape"
 KEY_PRIVACY_OUTER_OBFUSCATION = "privacy_outer_obfuscation"
 KEY_PRIVACY_MULTIHOP = "privacy_multihop"
-# Residual entry country code: "IS" (Iceland, default) or "RO" (Romania).
+# Residual entry country code: "IS" (Iceland, default) or "RO".
 KEY_ENTRY_COUNTRY = "entry_country"
 # Set only when user OK's first-run settings after keygen unlock (not a bypass).
 KEY_FIRST_RUN_SETTINGS_COMPLETED = "first_run_settings_completed"
@@ -32,7 +32,7 @@ KEY_UI_MODE = "ui_mode"
 
 
 def normalize_entry_country(code: str | None) -> str:
-    """Product Settings entry-country pin (IS / RO); default Iceland."""
+    """Product Settings entry-country pin (IS / RO); stale DE → IS."""
     from client.multihop import normalize_entry_country as _norm
 
     return _norm(code)
@@ -53,9 +53,10 @@ class ProductSettings:
     privacy_traffic_shape: bool = False
     privacy_outer_obfuscation: bool = False
     privacy_multihop: bool = False
-    # Residual entry country: IS (Iceland, default) or RO (Romania).
+    # Residual entry country: US (United States, product default), IS, or RO.
     # Multihop exit = other catalog country (random among non-entry when >2).
-    entry_country: str = "IS"
+    # Empty/missing key → normalize to US; stale "DE" normalizes to default US.
+    entry_country: str = "US"
     # False until user binds first-run Settings with OK (post-keygen onboarding).
     first_run_settings_completed: bool = False
     # Main-window chrome: light (default) or dark
@@ -73,13 +74,15 @@ def settings_path() -> Path:
 
 
 def default_settings() -> ProductSettings:
+    from client.multihop import DEFAULT_ENTRY_COUNTRY
+
     return ProductSettings(
         run_at_startup=False,
         autoconnect_on_launch=False,
         privacy_traffic_shape=False,
         privacy_outer_obfuscation=False,
         privacy_multihop=False,
-        entry_country="IS",
+        entry_country=DEFAULT_ENTRY_COUNTRY,
         first_run_settings_completed=False,
         ui_mode="light",
     )
@@ -93,6 +96,7 @@ def load_settings(path: Optional[Path] = None) -> ProductSettings:
         data = json.loads(raw)
         if not isinstance(data, dict):
             return default_settings()
+        # Missing entry_country key → empty → normalize → IS; stale DE → IS
         return ProductSettings(
             run_at_startup=bool(data.get(KEY_RUN_AT_STARTUP, False)),
             autoconnect_on_launch=bool(data.get(KEY_AUTOCONNECT_ON_LAUNCH, False)),
@@ -102,9 +106,7 @@ def load_settings(path: Optional[Path] = None) -> ProductSettings:
                 data.get(KEY_PRIVACY_OUTER_OBFUSCATION, False)
             ),
             privacy_multihop=bool(data.get(KEY_PRIVACY_MULTIHOP, False)),
-            entry_country=normalize_entry_country(
-                data.get(KEY_ENTRY_COUNTRY, "IS")
-            ),
+            entry_country=normalize_entry_country(data.get(KEY_ENTRY_COUNTRY)),
             # Missing key → first-run settings not completed (demand OK once).
             first_run_settings_completed=bool(
                 data.get(KEY_FIRST_RUN_SETTINGS_COMPLETED, False)
@@ -117,6 +119,8 @@ def load_settings(path: Optional[Path] = None) -> ProductSettings:
 
 def save_settings(settings: ProductSettings, path: Optional[Path] = None) -> Path:
     """Persist settings; returns path written."""
+    from client.multihop import DEFAULT_ENTRY_COUNTRY
+
     p = path or settings_path()
     p.parent.mkdir(parents=True, exist_ok=True)
     payload: dict[str, Any] = {
@@ -126,7 +130,7 @@ def save_settings(settings: ProductSettings, path: Optional[Path] = None) -> Pat
         KEY_PRIVACY_OUTER_OBFUSCATION: bool(settings.privacy_outer_obfuscation),
         KEY_PRIVACY_MULTIHOP: bool(settings.privacy_multihop),
         KEY_ENTRY_COUNTRY: normalize_entry_country(
-            getattr(settings, "entry_country", "IS")
+            getattr(settings, "entry_country", DEFAULT_ENTRY_COUNTRY)
         ),
         KEY_FIRST_RUN_SETTINGS_COMPLETED: bool(
             settings.first_run_settings_completed
@@ -213,9 +217,20 @@ def apply_run_at_startup(enabled: bool) -> str:
             f'$s.Description = "Privacy Restored — start with Windows"; '
             f"$s.Save();"
         )
-        r = subprocess.run(
-            ["powershell", "-NoProfile", "-NonInteractive", "-Command", ps],
-            capture_output=True,
+        from client.windows.hidden_subprocess import run_hidden
+
+        r = run_hidden(
+            [
+                "powershell",
+                "-NoLogo",
+                "-NoProfile",
+                "-NonInteractive",
+                "-WindowStyle",
+                "Hidden",
+                "-Command",
+                ps,
+            ],
+            shell=False,
             text=True,
             timeout=30,
         )

@@ -12,13 +12,13 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
 from client.multihop import (  # noqa: E402
-    COUNTRY_DE,
     COUNTRY_IS,
     COUNTRY_RO,
+    COUNTRY_US,
     PRODUCT_COUNTRY_CATALOG,
-    PRODUCT_DE_HOST,
     PRODUCT_EXIT_HOST,
     PRODUCT_NODE_HOST,
+    PRODUCT_US_HOST,
     CountryNode,
     entry_endpoint,
     exit_endpoint,
@@ -61,14 +61,14 @@ class TestResolveEntryExit(unittest.TestCase):
         )
 
     def test_multihop_iceland_entry_non_entry_exit(self):
-        # Three-peer catalog: exit is random among non-entry peers (RO or DE).
+        # Three-peer catalog: exit is RNG among non-entry peers (RO or US).
         entry, exit_n = resolve_entry_exit(
             COUNTRY_IS, multihop_enabled=True, rng=random.Random(0)
         )
         self.assertEqual(entry.code, COUNTRY_IS)
         self.assertIsNotNone(exit_n)
         assert exit_n is not None
-        self.assertIn(exit_n.code, (COUNTRY_RO, COUNTRY_DE))
+        self.assertIn(exit_n.code, (COUNTRY_RO, COUNTRY_US))
         self.assertNotEqual(entry.host, exit_n.host)
         cfg = multihop_config_for_entry_country(
             COUNTRY_IS, multihop_enabled=True, rng=random.Random(0)
@@ -79,6 +79,32 @@ class TestResolveEntryExit(unittest.TestCase):
         # Residual-via-exit when multihop active
         self.assertEqual(residual_endpoint(cfg).host, exit_endpoint(cfg).host)
 
+    def test_single_hop_united_states(self):
+        entry, exit_n = resolve_entry_exit(COUNTRY_US, multihop_enabled=False)
+        self.assertEqual(entry.code, COUNTRY_US)
+        self.assertEqual(entry.host, PRODUCT_US_HOST)
+        self.assertIsNone(exit_n)
+        cfg = multihop_config_for_entry_country(COUNTRY_US, multihop_enabled=False)
+        self.assertFalse(is_multihop_active(cfg))
+        self.assertEqual(residual_endpoint(cfg).host, PRODUCT_US_HOST)
+        self.assertEqual(
+            node_pub_name_for_endpoint(residual_endpoint(cfg)),
+            "us_node_elgamal.pub",
+        )
+
+    def test_multihop_is_can_pick_us_exit(self):
+        """With ≥3 peers, multihop exit among non-entry can include US."""
+        seen: set[str] = set()
+        for seed in range(40):
+            _e, x = resolve_entry_exit(
+                COUNTRY_IS, multihop_enabled=True, rng=random.Random(seed)
+            )
+            assert x is not None
+            seen.add(x.code)
+        self.assertIn(COUNTRY_RO, seen)
+        self.assertIn(COUNTRY_US, seen)
+        self.assertNotIn(COUNTRY_IS, seen)
+
     def test_multihop_romania_entry_non_entry_exit(self):
         entry, exit_n = resolve_entry_exit(
             COUNTRY_RO, multihop_enabled=True, rng=random.Random(1)
@@ -86,7 +112,7 @@ class TestResolveEntryExit(unittest.TestCase):
         self.assertEqual(entry.code, COUNTRY_RO)
         self.assertIsNotNone(exit_n)
         assert exit_n is not None
-        self.assertIn(exit_n.code, (COUNTRY_IS, COUNTRY_DE))
+        self.assertEqual(exit_n.code, COUNTRY_IS)
         cfg = multihop_config_for_entry_country(
             COUNTRY_RO, multihop_enabled=True, rng=random.Random(1)
         )
@@ -96,7 +122,7 @@ class TestResolveEntryExit(unittest.TestCase):
         self.assertEqual(residual_endpoint(cfg).host, exit_endpoint(cfg).host)
 
     def test_exit_never_equals_entry(self):
-        for code in (COUNTRY_IS, COUNTRY_RO, COUNTRY_DE):
+        for code in (COUNTRY_IS, COUNTRY_RO):
             for mh in (False, True):
                 e, x = resolve_entry_exit(code, multihop_enabled=mh, rng=random.Random(2))
                 if x is not None:
@@ -149,14 +175,16 @@ class TestResolveEntryExit(unittest.TestCase):
     def test_normalize_aliases(self):
         self.assertEqual(normalize_entry_country("iceland"), COUNTRY_IS)
         self.assertEqual(normalize_entry_country("Romania"), COUNTRY_RO)
-        self.assertEqual(normalize_entry_country("weird"), COUNTRY_IS)
+        self.assertEqual(normalize_entry_country("USA"), COUNTRY_US)
+        self.assertEqual(normalize_entry_country("United States"), COUNTRY_US)
+        self.assertEqual(normalize_entry_country("weird"), COUNTRY_US)
 
 
 class TestSettingsEntryCountryPersist(unittest.TestCase):
-    def test_default_is_iceland(self):
+    def test_default_is_united_states(self):
         from client.windows.settings_store import default_settings
 
-        self.assertEqual(default_settings().entry_country, COUNTRY_IS)
+        self.assertEqual(default_settings().entry_country, COUNTRY_US)
 
     def test_save_load_roundtrip(self):
         with tempfile.TemporaryDirectory() as td:
@@ -176,8 +204,8 @@ class TestSettingsEntryCountryPersist(unittest.TestCase):
         # Main shell + Settings list all three catalog countries with flags
         self.assertIn("catalog_country_options", src)
         self.assertIn("country_frame", src)
-        self.assertIn("Germany", src)
-        self.assertIn("Iceland, Romania, or Germany", src)
+        self.assertIn("Iceland", src)
+        self.assertIn("Romania", src)
 
 
 class TestConnectWiring(unittest.TestCase):

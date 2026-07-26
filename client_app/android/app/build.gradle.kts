@@ -51,7 +51,7 @@ dependencies {
 
 // Inject public node keys into APK assets only. Per-device Ed25519 client keys
 // are generated on first run (never a shared client_ed25519.priv in every APK).
-// IS: product/node_elgamal.pub; RO: exit_node_elgamal.pub; DE: de_node_elgamal.pub.
+// IS: node_elgamal.pub; RO: exit_node_elgamal.pub; US: us_node_elgamal.pub.
 // Wrong pub → hybrid decrypt fail → silent node drop → timeout.
 // rootProject = client_app/android → ../.. = restore_privacy
 tasks.register("copyRptSecretsToAssets") {
@@ -60,10 +60,12 @@ tasks.register("copyRptSecretsToAssets") {
         destDir.mkdirs()
         // Remove any previously injected shared client priv from assets tree
         file("src/main/assets/secrets/client_ed25519.priv").let { if (it.exists()) it.delete() }
+        // Drop retired DE pin if left from older builds
+        file("src/main/assets/secrets/de_node_elgamal.pub").let { if (it.exists()) it.delete() }
         val names = listOf(
             "node_elgamal.pub",
             "exit_node_elgamal.pub",
-            "de_node_elgamal.pub",
+            "us_node_elgamal.pub",
         )
         for (name in names) {
             val candidates = listOf(
@@ -80,7 +82,7 @@ tasks.register("copyRptSecretsToAssets") {
                     "copyRptSecretsToAssets: missing product/ and secrets/ $name — APK handshake will fail"
                 )
             } else {
-                // RO/DE pins required for catalog residual; warn loudly if missing
+                // RO pin required for catalog residual; warn loudly if missing
                 logger.warn(
                     "copyRptSecretsToAssets: missing $name — $name residual HELLO will fail closed"
                 )

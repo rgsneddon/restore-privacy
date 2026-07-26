@@ -26,9 +26,9 @@ def product_exit_node_elgamal_pub_path() -> Path:
     return Path(__file__).resolve().parents[1] / "product" / "exit_node_elgamal.pub"
 
 
-def product_de_node_elgamal_pub_path() -> Path:
-    """Tracked Germany residual peer public key (public only; never priv)."""
-    return Path(__file__).resolve().parents[1] / "product" / "de_node_elgamal.pub"
+def product_us_node_elgamal_pub_path() -> Path:
+    """Tracked USA residual peer public key (public only; never priv)."""
+    return Path(__file__).resolve().parents[1] / "product" / "us_node_elgamal.pub"
 
 
 @dataclass(frozen=True)

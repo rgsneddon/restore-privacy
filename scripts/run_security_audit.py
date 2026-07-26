@@ -127,9 +127,9 @@ _RE_PEM_BLOCK = re.compile(
 def redact_audit_text(text: str) -> str:
     """Strip sensitive fragments from strings destined for AUDIT.md / public JSON.
 
-    Removes home paths, token-like secrets, PEM private blocks, and softens
-    user@host SSH-style identities. Product monopin hosts (e.g. 82.221.101.241),
-    SHA-256 pins, and public status titles are left intact.
+    Removes home paths, token-like secrets, PEM private blocks, residual monopin
+    IPv4s (IS/RO/US/retired DE), and softens user@host SSH-style identities.
+    SHA-256 pins and public status titles stay; hosts become country labels.
     """
     if not text:
         return text
@@ -139,6 +139,19 @@ def redact_audit_text(text: str) -> str:
     s = _RE_BEARER.sub(r"\1[REDACTED_TOKEN]", s)
     s = _RE_TOKENISH.sub(r"\1[REDACTED]", s)
     s = _RE_SSH_USER_AT.sub(r"[REDACTED_USER]@\2", s)
+    # Residual monopin IPv4s must not appear on public audit/docs surfaces
+    try:
+        from client.residual_public import redact_residual_hosts_in_text
+
+        s = redact_residual_hosts_in_text(s)
+    except Exception:  # noqa: BLE001
+        for host, label in (
+            ("82.221.101.241", "Iceland (IS)"),
+            ("185.146.232.107", "Romania (RO)"),
+            ("5.161.242.85", "United States (US)"),
+            ("167.233.224.5", "VPN node"),
+        ):
+            s = s.replace(host, label)
     return s
 
 

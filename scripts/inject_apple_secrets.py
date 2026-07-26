@@ -4,7 +4,7 @@
 Copies **public** ElGamal keys only:
   - ``node_elgamal.pub`` (Iceland residual)
   - ``exit_node_elgamal.pub`` (Romania residual)
-  - ``de_node_elgamal.pub`` (Germany residual)
+  - ``us_node_elgamal.pub`` (United States residual)
 
 Never copies a shared ``client_ed25519.priv`` or ``node_elgamal.priv``.
 Per-device Ed25519 keys are generated on first run by the client.
@@ -29,8 +29,8 @@ ROOT = Path(__file__).resolve().parents[1]
 CLIENT_PRIV = "client_ed25519.priv"
 NODE_PUB = "node_elgamal.pub"
 EXIT_PUB = "exit_node_elgamal.pub"
-DE_PUB = "de_node_elgamal.pub"
-PUBLIC_PUBS = (NODE_PUB, EXIT_PUB, DE_PUB)
+US_PUB = "us_node_elgamal.pub"
+PUBLIC_PUBS = (NODE_PUB, EXIT_PUB, US_PUB)
 FORBIDDEN = "node_elgamal.priv"
 
 
@@ -78,7 +78,7 @@ def _inject_into_secrets_dir(dest: Path, source: Path) -> None:
         if src is None:
             if name == NODE_PUB:
                 raise FileNotFoundError(f"missing required {NODE_PUB}")
-            print(f"warn: missing {name} (RO/DE residual HELLO will fail closed)")
+            print(f"warn: missing {name} (RO/US residual HELLO will fail closed)")
             continue
         dst = dest / name
         shutil.copy2(src, dst)
@@ -99,11 +99,11 @@ def inject(app: Path, source: Path, ios: bool) -> Path:
         dest = app / "secrets"
     else:
         dest = app / "Contents" / "Resources" / "secrets"
-    # Catalog residual public keys (never private keys): IS + RO + DE
+    # Catalog residual public keys (never private keys): IS + RO + US
     _inject_into_secrets_dir(dest, source)
 
     # Packet Tunnel extension has its own Bundle.main — inject there too so
-    # loadAdmissionMaterial candidates can see RO/DE pins without relying solely
+    # loadAdmissionMaterial candidates can see RO/US pins without relying solely
     # on host App Group pre-seed (still required for sandboxed NE).
     plugins_roots: list[Path] = []
     if ios:

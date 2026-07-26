@@ -21,12 +21,19 @@ client at first run (not shipped shared).
 
 Public ElGamal key for the **Romania** residual peer (`185.146.232.107:44044`).
 
+## `us_node_elgamal.pub`
+
+Public ElGamal key for the **United States** residual peer (`5.161.242.85:44044`).
+Copied from the live US node `/opt/restore-privacy/secrets/node_elgamal.pub`
+(256 bytes; HELLO must match that on-box private).
+
 ## `de_node_elgamal.pub`
 
-Public ElGamal key for the **Germany** residual peer (`167.233.224.5:44044`).
+Archived public key for the **retired Germany** residual peer (`167.233.224.5`).
+No longer a catalog dial peer.
 
 **Never** put `*.priv` keys in this directory. Privates live only on each node
 under `/opt/restore-privacy/secrets/`.
 
-Android release builds inject this file into APK assets via
+Android release builds inject catalog pubs into APK assets via
 `copyRptSecretsToAssets` (prefers `product/`, then `secrets/`).

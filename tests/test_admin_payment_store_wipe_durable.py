@@ -450,13 +450,13 @@ class TestAdminArchitectureCopy(unittest.TestCase):
         # Current architecture
         for marker in (
             "admin-architecture",
-            "Germany",
+            "United States",
             "Romania",
             "Iceland",
             "sequential",
             "IS",
             "RO",
-            "DE",
+            "US",
             "keygen",
             "Stripe",
             "durable",
@@ -466,6 +466,8 @@ class TestAdminArchitectureCopy(unittest.TestCase):
             PRICE_SNIPPET_YEAR,
         ):
             self.assertIn(marker, html, f"missing marker {marker!r}")
+        self.assertNotIn("Germany", html)
+        self.assertNotIn("167.233.224.5", html)
 
         # Honesty: no free permanent installers; multi-peer not Iceland-only
         low = html.lower()

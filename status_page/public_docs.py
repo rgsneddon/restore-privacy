@@ -164,12 +164,13 @@ def _redact_public_doc_text(text: str) -> str:
         return redact_residual_hosts_in_text(text)
     except Exception:  # noqa: BLE001
         # Fail closed: still blank known monopin IPs without client package
-        for host in (
-            "82.221.101.241",
-            "185.146.232.107",
-            "167.233.224.5",
+        for host, label in (
+            ("82.221.101.241", "Iceland (IS)"),
+            ("185.146.232.107", "Romania (RO)"),
+            ("5.161.242.85", "United States (US)"),
+            ("167.233.224.5", "VPN node"),
         ):
-            text = text.replace(host, "VPN node")
+            text = text.replace(host, label)
         return text
 
 

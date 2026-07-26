@@ -1,10 +1,11 @@
-"""Entry-country selector helpers (flags, default Iceland, Connect gate).
+"""Entry-country selector helpers (flags, default Iceland/IS, Connect gate).
 
 Used by the main Connect shell dropdown (not Settings-only). Pure and
 unit-testable without GUI.
 
 Honesty: emoji flags may not render on every Windows font — option labels
 always include country code + name; flag glyph is best-effort decoration.
+Prefer Segoe UI Emoji on Windows so regional-indicator flags show in the menu.
 """
 
 from __future__ import annotations
@@ -13,9 +14,9 @@ from dataclasses import dataclass
 from typing import Any, Sequence
 
 from .multihop import (
-    COUNTRY_DE,
     COUNTRY_IS,
     COUNTRY_RO,
+    COUNTRY_US,
     DEFAULT_ENTRY_COUNTRY,
     PRODUCT_COUNTRY_CATALOG,
     CountryNode,
@@ -23,11 +24,11 @@ from .multihop import (
     product_country_catalog,
 )
 
-# Regional-indicator flag sequences (IS / RO / DE). Safe as unicode text.
+# Regional-indicator flag sequences (IS / RO / US). Safe as unicode text.
 _FLAG_BY_CODE: dict[str, str] = {
     COUNTRY_IS: "\U0001f1ee\U0001f1f8",  # 🇮🇸
     COUNTRY_RO: "\U0001f1f7\U0001f1f4",  # 🇷🇴
-    COUNTRY_DE: "\U0001f1e9\U0001f1ea",  # 🇩🇪
+    COUNTRY_US: "\U0001f1fa\U0001f1f8",  # 🇺🇸
 }
 
 
@@ -49,14 +50,17 @@ class CountryOption:
             return f"{flag}  {name} ({code})"
         return f"{name} ({code})"
 
-    def to_dict(self) -> dict[str, str]:
-        return {
-            "code": self.code,
-            "name": self.name,
-            "flag": self.flag,
-            "host": self.host,
-            "label": self.label(),
-        }
+    def to_dict(self, *, admin: bool = False) -> dict[str, str]:
+        """UI/JSON dict. Non-admin omits residual monopin *host* (presentation hygiene)."""
+        from client.residual_public import public_country_option_dict
+
+        return public_country_option_dict(
+            code=self.code,
+            name=self.name,
+            flag=self.flag,
+            host=self.host,
+            admin=admin,
+        )
 
 
 def country_flag_emoji(code: str | None) -> str:
@@ -81,7 +85,7 @@ def parse_catalog_country_code(
     """Return catalog code if *raw* is a known entry country; else None.
 
     Unlike :func:`normalize_entry_country`, does **not** default unknown/empty
-    to Iceland — used for Connect gate and strict validation.
+    to DE — used for Connect gate and strict validation.
     """
     raw_s = (raw or "").strip()
     if not raw_s:
@@ -99,10 +103,11 @@ def parse_catalog_country_code(
         "ROMANIA": COUNTRY_RO,
         "RO": COUNTRY_RO,
         "ROU": COUNTRY_RO,
-        "GERMANY": COUNTRY_DE,
-        "DE": COUNTRY_DE,
-        "DEU": COUNTRY_DE,
-        "DEUTSCHLAND": COUNTRY_DE,
+        "UNITED STATES": COUNTRY_US,
+        "UNITED STATES OF AMERICA": COUNTRY_US,
+        "USA": COUNTRY_US,
+        "US": COUNTRY_US,
+        "AMERICA": COUNTRY_US,
     }
     want = aliases.get(upper, upper)
     if want in codes:
@@ -114,8 +119,17 @@ def parse_catalog_country_code(
 
 
 def default_entry_country() -> str:
-    """Product default entry: Iceland on every client."""
-    return DEFAULT_ENTRY_COUNTRY  # IS
+    """Product default entry: United States (US) on every client."""
+    return DEFAULT_ENTRY_COUNTRY
+
+
+def default_entry_reason() -> str:
+    """Reason token when empty selection falls back to product default."""
+    if DEFAULT_ENTRY_COUNTRY == COUNTRY_US:
+        return "default_united_states"
+    if DEFAULT_ENTRY_COUNTRY == COUNTRY_IS:
+        return "default_iceland"
+    return "default_entry"
 
 
 def resolve_entry_country_selection(
@@ -134,7 +148,7 @@ def resolve_entry_country_selection(
     raw_s = (raw or "").strip()
     if not raw_s:
         if allow_default:
-            return True, default_entry_country(), "default_iceland"
+            return True, default_entry_country(), default_entry_reason()
         return False, "", "missing_entry_country"
     code = parse_catalog_country_code(raw_s, catalog=catalog)
     if code is None:
@@ -148,7 +162,7 @@ def entry_country_allows_connect(
     catalog: Sequence[CountryNode] | None = None,
     allow_default: bool = True,
 ) -> bool:
-    """True when Connect may dial for this selection (valid or default Iceland)."""
+    """True when Connect may dial for this selection (valid or product default)."""
     ok, _code, _reason = resolve_entry_country_selection(
         raw, catalog=catalog, allow_default=allow_default
     )
@@ -169,21 +183,26 @@ def catalog_country_options(
         seen.add(code)
         name = str(getattr(n, "name", "") or code).strip() or code
         host = str(getattr(n, "host", "") or "").strip()
+        flag = country_flag_emoji(code)
+        # Always expose a non-empty flag field for catalog codes (emoji or fallback)
+        if not flag:
+            flag = f"[{code}]"
         out.append(
             CountryOption(
                 code=code,
                 name=name,
-                flag=country_flag_emoji(code),
+                flag=flag,
                 host=host,
             )
         )
     if not out:
-        # Fail soft: still offer Iceland
+        # Fail soft: still offer product default IS
+        code = default_entry_country()
         out.append(
             CountryOption(
-                code=COUNTRY_IS,
-                name="Iceland",
-                flag=country_flag_emoji(COUNTRY_IS),
+                code=code,
+                name="Iceland" if code == COUNTRY_IS else code,
+                flag=country_flag_emoji(code) or f"[{code}]",
                 host="",
             )
         )
@@ -195,7 +214,7 @@ def option_label_for_code(
     *,
     catalog: Sequence[CountryNode] | None = None,
 ) -> str:
-    """Human label for a stored code (default Iceland when empty)."""
+    """Human label for a stored code (product default IS when empty)."""
     ok, resolved, _ = resolve_entry_country_selection(
         code, catalog=catalog, allow_default=True
     )

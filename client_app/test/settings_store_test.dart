@@ -2,14 +2,14 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:restore_privacy_client/settings_store.dart';
 
 void main() {
-  test('defaults: startup off, privacy-scale shape/obfs/multihop off, IS entry', () {
+  test('defaults: startup off, privacy-scale shape/obfs/multihop off, US entry', () {
     const s = ProductSettings.defaults;
     expect(s.runAtStartup, isFalse);
     expect(s.autoconnectOnLaunch, isFalse);
     expect(s.privacyTrafficShape, isFalse);
     expect(s.privacyOuterObfuscation, isFalse);
     expect(s.privacyMultihop, isFalse);
-    expect(s.entryCountry, 'IS');
+    expect(s.entryCountry, 'US');
   });
 
   test('save and load roundtrip via real SettingsStore API', () async {
@@ -50,7 +50,7 @@ void main() {
     expect(loaded.privacyTrafficShape, isFalse);
     expect(loaded.privacyOuterObfuscation, isFalse);
     expect(loaded.privacyMultihop, isFalse);
-    expect(loaded.entryCountry, 'IS');
+    expect(loaded.entryCountry, 'US');
   });
 
   test('privacy-scale prefs roundtrip (Windows parity keys)', () async {

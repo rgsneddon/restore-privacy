@@ -56,8 +56,8 @@ def admin_section_top_link_html() -> str:
 
 # Operator-facing architecture blurb (must stay current; grepped by tests).
 ADMIN_ARCHITECTURE_BLURB = (
-    "Residual catalog peers: Iceland (IS, default entry), Romania (RO), "
-    "United States (US) — user-selectable entry; multi-hop opt-in uses a random "
+    "Residual catalog peers: United States (US, default entry), Iceland (IS), "
+    "Romania (RO) — user-selectable entry; multi-hop opt-in uses a random "
     "non-entry peer. Weekly fleet wipe is sequential IS → RO → US (exclusive "
     "lock; never concurrent multi-node wipe). Paid Stripe Checkout "
     f"(Monthly {PRICE_LABEL} / Yearly {PRICE_YEARLY_LABEL} GBP) + keygen unlock; "

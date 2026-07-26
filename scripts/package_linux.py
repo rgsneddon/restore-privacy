@@ -273,7 +273,7 @@ python -c "import cryptography; print('cryptography', cryptography.__version__, 
 # Secrets (entry + exit pubs for multi-hop residual; never private keys)
 SECRETS_DIR="${HOME}/.restore-privacy/secrets"
 mkdir -p "$SECRETS_DIR"
-for pub in node_elgamal.pub exit_node_elgamal.pub de_node_elgamal.pub; do
+for pub in node_elgamal.pub exit_node_elgamal.pub us_node_elgamal.pub; do
   if [[ -f "$ROOT/product/$pub" ]]; then
     cp -f "$ROOT/product/$pub" "$SECRETS_DIR/"
     echo "Installed $pub from product/ to $SECRETS_DIR"

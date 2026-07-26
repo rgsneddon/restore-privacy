@@ -37,12 +37,13 @@ class TestBandwidthMath(unittest.TestCase):
 
 
 class TestFleetRows(unittest.TestCase):
-    def test_rows_cover_catalog_is_ro_de(self):
+    def test_rows_cover_catalog_is_ro_us(self):
         from admin_node_usage import build_fleet_usage_rows, product_catalog_peers
 
         peers = product_catalog_peers()
         codes = {p["code"] for p in peers}
-        self.assertTrue({"IS", "RO", "DE"}.issubset(codes))
+        self.assertEqual(codes, {"IS", "RO", "US"})
+        self.assertNotIn("DE", codes)
         # Inject bandwidth payload for IS only
         probes = {
             "82.221.101.241": {
@@ -63,14 +64,16 @@ class TestFleetRows(unittest.TestCase):
         by_code = {r.code: r for r in rows}
         self.assertIn("IS", by_code)
         self.assertIn("RO", by_code)
-        self.assertIn("DE", by_code)
+        self.assertIn("US", by_code)
+        self.assertNotIn("DE", by_code)
         is_row = by_code["IS"]
         self.assertEqual(is_row.status, "ok")
         self.assertIsNotNone(is_row.bandwidth_used_bps)
         self.assertIsNotNone(is_row.bandwidth_cap_bps)
         self.assertIsNotNone(is_row.bandwidth_util)
-        # RO/DE unknown without probe
+        # RO/US unknown without probe
         self.assertIn(by_code["RO"].status, ("unknown", "error"))
+        self.assertIn(by_code["US"].status, ("unknown", "error"))
 
 
 class TestAdminHtmlSection(unittest.TestCase):
@@ -110,21 +113,6 @@ class TestAdminHtmlSection(unittest.TestCase):
                 status="unknown",
                 detail="not probed",
             ),
-            NodeUsageRow(
-                code="DE",
-                name="Germany",
-                host="167.233.224.5",
-                port=44044,
-                bandwidth_used_bps=500_000.0,
-                bandwidth_cap_bps=10_000_000,
-                bandwidth_util=0.05,
-                bytes_relayed=1_000_000,
-                uptime_sec=16,
-                sessions_live=1,
-                sessions_cap=256,
-                session_util=1 / 256,
-                status="ok",
-            ),
         ]
         with tempfile.TemporaryDirectory() as td:
             prev = os.environ.get("RPT_PAYMENT_DATA_DIR")
@@ -149,10 +137,11 @@ class TestAdminHtmlSection(unittest.TestCase):
         arch_i = html.find('id="admin-architecture"')
         self.assertGreater(usage_i, nav_i)
         self.assertGreater(arch_i, usage_i)
-        for code in ("IS", "RO", "DE"):
+        for code in ("IS", "RO"):
             self.assertIn(code, html)
             self.assertIn(f"admin-node-bw-used-{code}", html)
             self.assertIn(f"admin-node-bw-cap-{code}", html)
+        self.assertNotIn("admin-node-bw-used-DE", html)
         self.assertIn("Mbps", html)  # formatted used/cap
         # Public shop must not get this block from admin render alone is fine;
         # ensure section is admin-only marker

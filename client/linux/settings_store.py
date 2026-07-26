@@ -26,7 +26,7 @@ AUTOSTART_DESKTOP_NAME = "restore-privacy.desktop"
 
 
 def normalize_entry_country(code: str | None) -> str:
-    """Product Settings entry-country pin (IS / RO / DE); default Iceland."""
+    """Product Settings entry-country pin (IS / RO); stale DE → IS."""
     from client.multihop import normalize_entry_country as _norm
 
     return _norm(code)
@@ -39,8 +39,8 @@ class ProductSettings:
     privacy_traffic_shape: bool = False
     privacy_outer_obfuscation: bool = False
     privacy_multihop: bool = False
-    # Residual entry country: IS (default), RO, or DE.
-    entry_country: str = "IS"
+    # Residual entry country: IS (product default) or RO.
+    entry_country: str = "US"
 
 
 def settings_dir() -> Path:
@@ -55,13 +55,15 @@ def settings_path() -> Path:
 
 
 def default_settings() -> ProductSettings:
+    from client.multihop import DEFAULT_ENTRY_COUNTRY
+
     return ProductSettings(
         run_at_startup=False,
         autoconnect_on_launch=False,
         privacy_traffic_shape=False,
         privacy_outer_obfuscation=False,
         privacy_multihop=False,
-        entry_country="IS",
+        entry_country=DEFAULT_ENTRY_COUNTRY,
     )
 
 
@@ -80,15 +82,16 @@ def load_settings(path: Optional[Path] = None) -> ProductSettings:
                 data.get(KEY_PRIVACY_OUTER_OBFUSCATION, False)
             ),
             privacy_multihop=bool(data.get(KEY_PRIVACY_MULTIHOP, False)),
-            entry_country=normalize_entry_country(
-                data.get(KEY_ENTRY_COUNTRY, "IS")
-            ),
+            # Missing key → empty → DE; explicit saved IS kept
+            entry_country=normalize_entry_country(data.get(KEY_ENTRY_COUNTRY)),
         )
     except (OSError, json.JSONDecodeError, TypeError, ValueError):
         return default_settings()
 
 
 def save_settings(settings: ProductSettings, path: Optional[Path] = None) -> Path:
+    from client.multihop import DEFAULT_ENTRY_COUNTRY
+
     p = path or settings_path()
     p.parent.mkdir(parents=True, exist_ok=True)
     payload: dict[str, Any] = {
@@ -98,7 +101,7 @@ def save_settings(settings: ProductSettings, path: Optional[Path] = None) -> Pat
         KEY_PRIVACY_OUTER_OBFUSCATION: bool(settings.privacy_outer_obfuscation),
         KEY_PRIVACY_MULTIHOP: bool(settings.privacy_multihop),
         KEY_ENTRY_COUNTRY: normalize_entry_country(
-            getattr(settings, "entry_country", "IS")
+            getattr(settings, "entry_country", DEFAULT_ENTRY_COUNTRY)
         ),
     }
     p.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")

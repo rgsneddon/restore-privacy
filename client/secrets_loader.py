@@ -466,19 +466,24 @@ def load_node_elgamal_public(
                 return ElGamalPublicKey.import_bytes(ep.read_bytes())
         except Exception:
             pass
-    if name == "de_node_elgamal.pub":
+    if name == "us_node_elgamal.pub":
         try:
-            from .endpoint import product_de_node_elgamal_pub_path
+            from .endpoint import product_us_node_elgamal_pub_path
 
-            dp = product_de_node_elgamal_pub_path()
-            if dp.is_file() and dp.stat().st_size >= 32:
-                return ElGamalPublicKey.import_bytes(dp.read_bytes())
+            up = product_us_node_elgamal_pub_path()
+            if up.is_file() and up.stat().st_size >= 32:
+                return ElGamalPublicKey.import_bytes(up.read_bytes())
         except Exception:
             pass
     d = resolve_secrets_dir(secrets_dir)
     path = d / name
     if not path.is_file() and name != NODE_PUB_NAME:
-        # fall back to entry pub only if exit missing (will fail HELLO to exit)
+        # Non-IS pins must not silently use Iceland entry pub (HELLO would fail closed
+        # on the node, but fail early here for RO/US dedicated pins).
+        if name in ("exit_node_elgamal.pub", "us_node_elgamal.pub"):
+            raise SecretsError(
+                f"Missing {name} — refuse Iceland entry pub fallback"
+            )
         path = d / NODE_PUB_NAME
     raw = path.read_bytes()
     return ElGamalPublicKey.import_bytes(raw)
