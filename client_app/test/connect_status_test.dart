@@ -105,15 +105,49 @@ void main() {
       expect(msg, contains('VPN & Filters'));
     });
 
-    test('needsVpnSystemSettingsApproval flag prompts open settings', () {
+    test('auto-open Settings only on strict permission denial', () {
+      // Flag alone without permission-class message must NOT auto-open.
       expect(
-        shouldPromptOpenVpnSystemSettings({
+        shouldAutoOpenVpnSystemSettings({
           'ok': false,
           'message': 'something failed',
           'fullTunnelActive': false,
           'needsVpnSystemSettingsApproval': true,
         }),
+        isFalse,
+      );
+      expect(
+        shouldAutoOpenVpnSystemSettings({
+          'ok': false,
+          'message':
+              'NE preferences failed (NEVPNErrorDomain 5): permission denied. '
+              'Approve VPN configuration in System Settings → Network → VPN & Filters',
+          'fullTunnelActive': false,
+          'needsVpnSystemSettingsApproval': true,
+        }),
         isTrue,
+      );
+      // Host-only HELLO / generic tunnel fail: no auto-open.
+      expect(
+        shouldAutoOpenVpnSystemSettings({
+          'ok': false,
+          'message': 'Packet Tunnel did not become Connected (status disconnected)',
+          'fullTunnelActive': false,
+          'hostOnlySession': true,
+        }),
+        isFalse,
+      );
+      // Missing host NE / Team residual: no auto-open.
+      expect(
+        shouldAutoOpenVpnSystemSettings({
+          'ok': false,
+          'message':
+              'host is missing the packet-tunnel-provider Network Extension. '
+              'scripts/sign_macos_residual_team.py',
+          'needsTeamResidualSign': true,
+          'hostHasPacketTunnelEntitlement': false,
+        }),
+        isFalse,
       );
       expect(
         shouldPromptOpenVpnSystemSettings({

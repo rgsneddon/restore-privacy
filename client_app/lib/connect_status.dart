@@ -303,8 +303,8 @@ const String kOpenVpnSettingsOpenedFeedback =
 const String kOpenVpnSettingsFailedFeedback =
     'Could not open System Settings automatically — use System Settings → Network → VPN & Filters.';
 
-/// True when a connect failure message is the NE permission / Packet Tunnel approval class
-/// (NEVPNErrorDomain 5, permission denied, host-only HELLO without active tunnel, etc.).
+/// True when a connect failure message is residual / Packet Tunnel failure class
+/// (for sticky **Open VPN settings** control — not necessarily auto-open).
 bool isNeVpnPermissionFailureMessage(String message) {
   final m = message.toLowerCase();
   if (m.isEmpty) return false;
@@ -315,9 +315,36 @@ bool isNeVpnPermissionFailureMessage(String message) {
       m.contains('approve vpn configuration') ||
       m.contains('packet tunnel is not carrying') ||
       m.contains('did not become active') ||
+      m.contains('did not become connected') ||
       m.contains('allow vpn') ||
+      m.contains('team residual') ||
+      m.contains('packet-tunnel-provider') ||
       (m.contains('vpn configuration') &&
           (m.contains('system settings') || m.contains('allow')));
+}
+
+/// Strict permission-denial class for **auto-opening** System Settings.
+///
+/// Ordinary tunnel start failures, host-only HELLO diagnostics, and missing host
+/// NE entitlement (Team residual re-sign) must **not** auto-open Network Settings.
+bool isStrictVpnPermissionDenialMessage(String message) {
+  final m = message.toLowerCase();
+  if (m.isEmpty) return false;
+  // Residual re-sign / missing host NE — Settings cannot fix this alone.
+  if (m.contains('team residual') ||
+      m.contains('sign_macos_residual') ||
+      m.contains('missing the packet-tunnel-provider') ||
+      (m.contains('host is missing') && m.contains('network extension'))) {
+    return false;
+  }
+  return m.contains('nevpnerrordomain') ||
+      m.contains('permission denied') ||
+      m.contains('not authorized') ||
+      m.contains('ne preferences failed') ||
+      (m.contains('approve vpn configuration') &&
+          (m.contains('system settings') ||
+              m.contains('vpn & filters') ||
+              m.contains('allow')));
 }
 
 /// True when [message] is only open-settings feedback (not residual failure truth).
@@ -333,21 +360,36 @@ bool isOpenVpnSettingsFeedbackMessage(String message) {
       (low.contains('could not open') && low.contains('system settings'));
 }
 
-/// True when the channel map is a failed connect that should open System Settings.
+/// True when the channel map is a failed connect that should **auto-open**
+/// System Settings (permission-class only). Never true on product success.
 ///
-/// Drives auto-open + sticky UI approval flag. Never true on product success.
+/// Sticky UI / manual **Open VPN settings** uses [shouldShowOpenVpnSettingsControl]
+/// + [isNeVpnPermissionFailureMessage] — broader than auto-open.
 bool shouldPromptOpenVpnSystemSettings(dynamic result) {
+  return shouldAutoOpenVpnSystemSettings(result);
+}
+
+/// Auto-open Network / VPN Settings only on real NE/VPN authorization denial.
+///
+/// Does **not** auto-open for: host-only HELLO, generic tunnel start failure,
+/// missing host `packet-tunnel-provider` (needs Team residual re-sign), or when
+/// native already opened Settings (`openedVpnSettings`).
+bool shouldAutoOpenVpnSystemSettings(dynamic result) {
   if (isConnectSuccess(result)) return false;
   if (result is! Map) return false;
-  if (result['needsVpnSystemSettingsApproval'] == true) return true;
-  if (result['openedVpnSettings'] == true) return true;
-  if (result['hostOnlySession'] == true) return true;
-  if (result['fullTunnelActive'] == false) {
-    final msg = result['message']?.toString() ?? '';
-    if (isNeVpnPermissionFailureMessage(msg)) return true;
-  }
+  if (result['needsTeamResidualSign'] == true) return false;
+  if (result['hostHasPacketTunnelEntitlement'] == false) return false;
+  // Native already opened — do not open again from Flutter.
+  if (result['openedVpnSettings'] == true) return false;
   final msg = result['message']?.toString() ?? '';
-  return isNeVpnPermissionFailureMessage(msg);
+  if (isStrictVpnPermissionDenialMessage(msg)) return true;
+  // Flag alone is insufficient without permission-class message (avoids opening
+  // Settings on every residual-honest fullTunnelActive:false map).
+  if (result['needsVpnSystemSettingsApproval'] == true &&
+      isStrictVpnPermissionDenialMessage(msg)) {
+    return true;
+  }
+  return false;
 }
 
 /// Whether the **Open VPN settings** control should stay visible.

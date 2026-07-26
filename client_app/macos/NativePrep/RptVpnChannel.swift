@@ -219,8 +219,9 @@ enum RptVpnChannel {
       }
       // Failure: do NOT set lastSuccessfulPrepareAt — next prepare must re-attempt.
       let detail = neError ?? "NE preferences unavailable"
-      let openSettings = isNePermissionFailureDetail(detail)
-      if openSettings {
+      let permissionClass = isNePermissionFailureDetail(detail)
+      // Auto-open Settings only on real permission denial.
+      if permissionClass {
         _ = openVpnSystemSettings(force: false)
       }
       var map: [String: Any] = [
@@ -229,14 +230,17 @@ enum RptVpnChannel {
         "tunnelType": productTunnelType,
         "providerBundleId": providerBundleId,
         "localizedDescription": productLocalizedDescription,
-        "needsVpnSystemSettingsApproval": true,
-        "openedVpnSettings": openSettings,
+        "needsVpnSystemSettingsApproval": permissionClass,
+        "openedVpnSettings": permissionClass,
         "message":
           "Could not pre-register Packet Tunnel VPN configuration: \(detail). "
-          + "Allow Restore Privacy under System Settings → Network → VPN & Filters "
-          + "(Packet Tunnel Network Extension — not L2TP / Cisco IPsec / IKEv2), then relaunch or Connect.",
+          + (permissionClass
+            ? "Allow Restore Privacy under System Settings → Network → VPN & Filters "
+              + "(Packet Tunnel — not L2TP / Cisco IPsec / IKEv2), then Connect."
+            : "Press Connect again. If this build lacks host Network Extension, "
+              + "use scripts/sign_macos_residual_team.py (public DevID omits host NE)."),
       ]
-      completion(annotateNeedsVpnSettings(map, openSettings: false))
+      completion(map)
     }
   }
 
@@ -356,11 +360,26 @@ enum RptVpnChannel {
         return
       }
       let detail = map["message"] as? String
+      // Auto-open Settings only on real NE/VPN permission denial — not on every
+      // residual-honest start failure (that trapped users in Network Settings).
+      let permissionClass = isNePermissionFailureDetail(detail)
+      if permissionClass {
+        hostSideDiagnostic(
+          host: host,
+          port: port,
+          detail: detail,
+          openVpnSettings: true
+        ) { diag in
+          flutterResult(diag)
+        }
+        return
+      }
+      // Host-only HELLO diagnostic for residual honesty; do not open Settings.
       hostSideDiagnostic(
         host: host,
         port: port,
         detail: detail,
-        openVpnSettings: true
+        openVpnSettings: false
       ) { diag in
         flutterResult(diag)
       }
@@ -532,19 +551,24 @@ enum RptVpnChannel {
         hostOnlyHello: outcome.ok,
         nodeDiagnostic: nodeDiag
       )
-      // Host-only HELLO or NE prefs failure: user must Allow VPN config for residual IP change.
-      let shouldOpen = openVpnSettings
-        || outcome.ok
-        || isNePermissionFailureDetail(detail)
+      // Auto-open Settings only when caller asked AND detail is permission-class.
+      // Host-only HELLO (outcome.ok) alone must not open Network Settings.
+      let shouldOpen = openVpnSettings && isNePermissionFailureDetail(detail)
       if shouldOpen {
-        // Open on main so NSWorkspace is happy; annotate map for Flutter button.
         DispatchQueue.main.async {
           let annotated = annotateNeedsVpnSettings(map, openSettings: true)
           completion(annotated)
         }
         return
       }
-      DispatchQueue.main.async { completion(map) }
+      DispatchQueue.main.async {
+        // Sticky button only for permission-class residual messages.
+        if isNePermissionFailureDetail(detail) {
+          completion(annotateNeedsVpnSettings(map, openSettings: false))
+        } else {
+          completion(map)
+        }
+      }
     }
   }
 
@@ -744,16 +768,15 @@ enum RptVpnChannel {
                 )
               }
             } else {
+              let stMsg =
+                "Packet Tunnel still connecting/failed (status "
+                + "\(statusName(manager.connection.status))). "
+                + "Press Connect again. If macOS has not Allowed VPN for Restore Privacy, "
+                + "use Open VPN settings once, Allow, then Connect."
               completion(
-                annotateNeedsVpnSettings(
-                  RptFullTunnelResult.productConnectMap(
-                    packetTunnelActive: false,
-                    detailMessage:
-                      "Packet Tunnel still connecting/failed (status "
-                      + "\(statusName(manager.connection.status))). "
-                      + "Allow Restore Privacy in System Settings if asked, then Connect again."
-                  ),
-                  openSettings: true
+                RptFullTunnelResult.productConnectMap(
+                  packetTunnelActive: false,
+                  detailMessage: stMsg
                 )
               )
             }
@@ -767,7 +790,7 @@ enum RptVpnChannel {
         // This enables the system VPN connection in Network settings (when allowed).
         try session.startTunnel(options: opts)
         // Packet Tunnel handshake + setTunnelNetworkSettings can take several seconds;
-        // first run may show the system Allow VPN configuration dialog.
+        // first run may show the system Allow VPN configuration dialog (OS-owned).
         pollTunnelConnected(manager: manager, attempt: 0, maxAttempts: 50, interval: 0.5) {
           connected in
           if connected {
@@ -792,11 +815,12 @@ enum RptVpnChannel {
               packetTunnelActive: false,
               detailMessage:
                 "Packet Tunnel did not become Connected (status \(statusName(st))/\(st.rawValue)). "
-                + "Connect re-creates and enables the Network VPN profile automatically. "
-                + "If macOS showed Allow VPN configuration, choose Allow, then press Connect again. "
-                + "Developers: Team residual re-sign via scripts/sign_macos_residual_team.py"
+                + "Press Connect again after Allowing the OS VPN dialog if it appeared. "
+                + "Do not use L2TP/IKEv2. Developers: scripts/sign_macos_residual_team.py "
+                + "if host lacks packet-tunnel-provider."
             )
-            completion(annotateNeedsVpnSettings(map, openSettings: true))
+            // Do not auto-open Network Settings — residual-honest status only.
+            completion(map)
           }
         }
       } catch {

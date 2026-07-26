@@ -52,12 +52,9 @@ class VpnController {
         return isProductPacketTunnelPrepareResult(result);
       }
       onStatus(msg);
-      if (shouldPromptOpenVpnSystemSettings(result)) {
-        final already =
-            result is Map && result['openedVpnSettings'] == true;
-        if (!already) {
-          await openVpnSystemSettings(reportStatus: false);
-        }
+      // Auto-open Settings only on real permission denial — not every prepare fail.
+      if (shouldAutoOpenVpnSystemSettings(result)) {
+        await openVpnSystemSettings(reportStatus: false);
       }
       return false;
     } on MissingPluginException {
@@ -117,14 +114,10 @@ class VpnController {
       // Keep residual-honest failure/success as product status — never overwrite
       // with open-settings feedback (that would hide Open VPN settings UI).
       onStatus(mapConnectStatusMessage(result));
-      // macOS NE permission / host-only HELLO: native usually opens Settings;
-      // if not, open without replacing the failure status (log-only feedback).
-      if (!ok && shouldPromptOpenVpnSystemSettings(result)) {
-        final already =
-            result is Map && result['openedVpnSettings'] == true;
-        if (!already) {
-          await openVpnSystemSettings(reportStatus: false);
-        }
+      // Auto-open Settings only on strict NE permission denial — never on ordinary
+      // tunnel start failure or missing host NE (Team residual re-sign).
+      if (!ok && shouldAutoOpenVpnSystemSettings(result)) {
+        await openVpnSystemSettings(reportStatus: false);
       }
       return ok;
     } on PlatformException catch (e) {
