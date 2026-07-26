@@ -32,7 +32,8 @@ class TestQuitStatusRemark(unittest.TestCase):
 
 
 class TestQuitResidualTeardown(unittest.TestCase):
-    def test_calls_disconnect_then_restore(self):
+    def test_single_disconnect_pass_no_extra_restore(self):
+        """Quit must not serialize a second full restore after disconnect."""
         tunnel = mock.Mock()
         tunnel.server_host = "82.221.101.241"
         client = mock.Mock()
@@ -45,7 +46,6 @@ class TestQuitResidualTeardown(unittest.TestCase):
 
         def _restore(**kw):
             order.append("restore")
-            self.assertEqual(kw.get("server_host"), "82.221.101.241")
 
         with mock.patch(
             "client.windows.app.disconnect_full_tunnel", side_effect=_disc
@@ -53,9 +53,11 @@ class TestQuitResidualTeardown(unittest.TestCase):
             "client.windows.app.restore_windows_residual_path", side_effect=_restore
         ):
             run_quit_residual_teardown(tunnel, client)
-        self.assertEqual(order, ["disconnect", "restore"])
+        self.assertEqual(order, ["disconnect"])
+        self.assertNotIn("restore", order)
 
-    def test_none_tunnel_still_restores(self):
+    def test_none_tunnel_still_disconnects(self):
+        """None tunnel still goes through disconnect_full_tunnel (restore inside)."""
         with mock.patch(
             "client.windows.app.disconnect_full_tunnel"
         ) as disc, mock.patch(
@@ -63,8 +65,8 @@ class TestQuitResidualTeardown(unittest.TestCase):
         ) as rest:
             run_quit_residual_teardown(None, mock.Mock())
             disc.assert_called_once()
-            rest.assert_called_once()
-            self.assertIsNone(rest.call_args.kwargs.get("server_host"))
+            # No top-level second restore — residual restore is inside stop_full_tunnel
+            rest.assert_not_called()
 
 
 class TestQuitAppSourceOrder(unittest.TestCase):

@@ -203,20 +203,46 @@ def disconnect_full_tunnel(
             pass
 
 
+def windows_disconnect_quit_teardown_plan() -> list[dict]:
+    """Ordered Disconnect/Quit residual stages (pure; for tests/instrumentation).
+
+    Quit uses a **single** ``disconnect_full_tunnel`` pass (which already runs
+    residual restore inside ``stop_full_tunnel``). A second top-level restore
+    after disconnect is **not** on the critical path (removed as redundant).
+    """
+    return [
+        {
+            "stage": "disconnect_full_tunnel",
+            "blocks_exit": True,
+            "includes_residual_restore": True,
+            "note": "stop_full_tunnel: full restore → TUN close → route-only re-pass",
+        },
+        {
+            "stage": "extra_restore_after_disconnect",
+            "blocks_exit": False,
+            "skipped": True,
+            "note": "removed: duplicate full restore after disconnect_full_tunnel",
+        },
+        {
+            "stage": "session_udp_close",
+            "blocks_exit": True,
+            "note": "inside stop_full_tunnel / client.disconnect",
+        },
+    ]
+
+
 def run_quit_residual_teardown(tunnel, client) -> None:
     """Full residual teardown for Quit — safe to run **off** the Tk UI thread.
 
-    Always disconnects the tunnel/session and force-restores residual routes so
-    Quit never leaves dual /1 blackhole state. Call from a worker; schedule
-    ``root.destroy`` on the UI thread only after this returns.
+    Single-pass: ``disconnect_full_tunnel`` → ``stop_full_tunnel`` already
+    restores residual routes (dual /1, KS, IPv6) before and (routes-only) after
+    TUN close. A second full restore here was pure serial dead time on Quit.
+
+    When *tunnel* is None, ``stop_full_tunnel`` still runs a full residual
+    restore so dual /1 is not left applied.
     """
     try:
         disconnect_full_tunnel(tunnel, client)
-    except Exception:
-        pass
-    try:
-        host = getattr(tunnel, "server_host", None) if tunnel is not None else None
-        restore_windows_residual_path(server_host=host)
     except Exception:
         pass
 

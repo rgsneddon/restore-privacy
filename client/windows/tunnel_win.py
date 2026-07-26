@@ -313,6 +313,16 @@ def rollback_full_tunnel_routes(
     return applied
 
 
+# Shell timeout for idempotent residual teardown cmds (route delete / KS no-ops).
+# Was 20s — hung Disconnect/Quit when netsh/PowerShell stalled; 5s is enough to fail soft.
+RESIDUAL_RESTORE_CMD_TIMEOUT_S = 5.0
+
+
+def residual_restore_cmd_timeout_s() -> float:
+    """Bounded timeout for residual restore shell commands (Disconnect/Quit)."""
+    return float(RESIDUAL_RESTORE_CMD_TIMEOUT_S)
+
+
 def restore_windows_residual_path(
     *,
     server_host: Optional[str] = None,
@@ -320,11 +330,15 @@ def restore_windows_residual_path(
     if_index: Optional[int] = None,
     run_kill_switch_rollback: bool = True,
     run_ipv6_rollback: bool = True,
+    reapply_fw_allows: bool = True,
 ) -> list[str]:
     """Always attempt residual restore so Disconnect/Quit never leave a blackhole.
 
     Does **not** depend on ``routes_applied`` / ``kill_switch_applied`` flags.
     Safe and idempotent when residual was never applied (route delete no-ops).
+
+    *reapply_fw_allows*: when False, skip RPT-FW re-apply (use on post-TUN race
+    second pass after a full restore already re-applied allows).
     """
     applied: list[str] = []
     try:
@@ -335,6 +349,7 @@ def restore_windows_residual_path(
         windows_residual_restore_route_commands = None  # type: ignore[assignment]
 
     host = (server_host or "").strip() or str(PRODUCT_NODE_HOST)
+    cmd_timeout = residual_restore_cmd_timeout_s()
 
     # 1) Dual /1 + server pin (use plan-aware builder when available, else product defaults)
     try:
@@ -371,7 +386,12 @@ def restore_windows_residual_path(
 
             for cmd in windows_kill_switch_rollback_commands():
                 try:
-                    subprocess.run(cmd, shell=True, capture_output=True, timeout=20)
+                    subprocess.run(
+                        cmd,
+                        shell=True,
+                        capture_output=True,
+                        timeout=cmd_timeout,
+                    )
                     applied.append(cmd)
                 except Exception:
                     pass
@@ -380,13 +400,14 @@ def restore_windows_residual_path(
 
     # 4) Re-apply scoped product Defender Firewall allows (RPT-FW-*) so residual
     # Connect is not left blocked after KS rollback / first install.
-    try:
-        from client.windows.firewall_allow import apply_windows_fw_allows
+    if reapply_fw_allows:
+        try:
+            from client.windows.firewall_allow import apply_windows_fw_allows
 
-        _ran, _ok, _errs = apply_windows_fw_allows(server_host=host)
-        applied.extend(_ran)
-    except Exception:
-        pass
+            _ran, _ok, _errs = apply_windows_fw_allows(server_host=host)
+            applied.extend(_ran)
+        except Exception:
+            pass
 
     return applied
 
@@ -423,7 +444,7 @@ def stop_full_tunnel(
     host = server_host or (res.server_host if res else None)
     idx = if_index if if_index is not None else (res.if_index if res else None)
 
-    # 1) Always restore residual path first (routes / KS / IPv6) — flag-independent.
+    # 1) Full residual restore first (routes / KS / IPv6 / FW) — flag-independent.
     try:
         applied.extend(
             restore_windows_residual_path(
@@ -432,6 +453,7 @@ def stop_full_tunnel(
                 if_index=idx,
                 run_kill_switch_rollback=True,
                 run_ipv6_rollback=True,
+                reapply_fw_allows=True,
             )
         )
     except Exception:
@@ -457,15 +479,17 @@ def stop_full_tunnel(
         except Exception:
             pass
 
-    # 3b) Routes again after TUN close (covers race where delete raced adapter teardown)
+    # 3b) Route deletes only after TUN close (race: dual /1 may reappear briefly).
+    # Do **not** re-run KS rollback or FW re-apply — already done in pass 1.
     try:
         applied.extend(
             restore_windows_residual_path(
                 server_host=host,
                 plan=plan_obj,
                 if_index=idx,
-                run_kill_switch_rollback=True,
-                run_ipv6_rollback=False,  # already re-enabled above
+                run_kill_switch_rollback=False,
+                run_ipv6_rollback=False,
+                reapply_fw_allows=False,
             )
         )
     except Exception:
