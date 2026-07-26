@@ -58,8 +58,8 @@ The app re-checks the status host (`/api/connect-entitlement`) on each Connect s
 |----------|---------|
 | Windows | `restore-privacy-client-0.4.8-windows-x64-setup.exe` |
 | Android | `restore-privacy-client-0.4.8-android.apk` |
-| macOS | `restore-privacy-client-0.4.8-macos.zip` *(Developer ID signed + notarized)* |
-| iOS | `restore-privacy-client-0.4.8-ios.zip` *(Team-signed sideload)* |
+| macOS | `restore-privacy-client-0.4.8-macos.zip` *(filename pin / CF until Mac **Developer ID** notarize — see handoff)* |
+| iOS | `restore-privacy-client-0.4.8-ios.zip` *(filename pin / CF until Mac **Team-signed** sideload — see handoff)* |
 | Ubuntu / Linux | `restore-privacy-client-0.4.8-linux-x64.tar.gz` |
 | Browser (Chromium MV3) | `restore-privacy-browser-extension-0.4.8.zip` — browser proxy only, not OS residual TUN |
 
@@ -106,7 +106,7 @@ Supported floor: **Ubuntu 20.04 LTS** and later (including 22.04 / 24.04 LTS).
 
 ### macOS
 
-Published **v0.4.8** macOS builds are **Developer ID signed and notarized**.
+Published **v0.4.8** macOS catalog zips may be **carry-forward (CF)** until a Mac rebuild notarizes a true 0.4.8 seal (see `client_app/APPLE_HANDOFF_0.4.8.md`).
 
 1. On the [status downloads page](https://restoreprivacy.online/), choose **Monthly £2.45** or **Yearly** for **macOS** and download **`restore-privacy-client-0.4.8-macos.zip`** (one-time link after payment).
 2. Unzip and open **`restore_privacy_client.app`**.
@@ -116,7 +116,7 @@ Published **v0.4.8** macOS builds are **Developer ID signed and notarized**.
 
 ### iOS
 
-Published **v0.4.8** iOS packages are **Team-signed sideload** zips (not App Store).
+Published **v0.4.8** iOS packages are catalog **filename pins** (Team-sign on Mac for a true 0.4.8 sideload — not App Store).
 
 1. On the [status downloads page](https://restoreprivacy.online/), choose **Monthly £2.45** or **Yearly** for **iOS** and download **`restore-privacy-client-0.4.8-ios.zip`** (one-time link after payment).
 2. Install **`Runner.app`** with device tooling; **accept licence**, **enter keygen**, then press **Connect** and grant **VPN** permission.
@@ -205,7 +205,7 @@ Node deploy, ports, secrets, from-source builds, and tests: **[sundries.txt](sun
 
 **Post-quantum readiness:** staged hybrid Kyber/ML-KEM hook in `node/pq_hybrid.py` + plan [`docs/PQ_MIGRATION.md`](docs/PQ_MIGRATION.md) (not residual PQ on the wire until dual-wire + real ML-KEM).
 
-**Product ship (v0.4.8):** Paid installers on **[status downloads](https://restoreprivacy.online/)** (macOS Developer ID notarized; iOS Team-signed). Source repo is private. Catalog residual peers: **IS** `82.221.101.241:44044` (default entry, FlokiNET), **RO** `185.146.232.107:44044`, **DE** `167.233.224.5:44044` — user-selectable entry; host public **no invasive logs** stance where published (see privacy policy).
+**Product ship (v0.4.8):** Paid installers on **[status downloads](https://restoreprivacy.online/)**. Windows native multihop PE + Linux rebuild on this pin; macOS/iOS catalog zips are **honest CF** until Mac re-sign/notarize (see `APPLE_HANDOFF_0.4.8.md`). Source repo is private. Catalog residual peers: **IS** `82.221.101.241:44044` (default entry, FlokiNET), **RO** `185.146.232.107:44044`, **DE** `167.233.224.5:44044` — user-selectable entry; host public **no invasive logs** stance where published (see privacy policy).
 
 **Self-host (one shot):** `sudo bash scripts/selfhost_node.sh` — node install + tunnel DNS + host privacy. Deploy remote: `python scripts/deploy_rpt_node.py` (`RPT_SSH_HOST`, `RPT_SSH_USER`, key). Details: [sundries.txt](sundries.txt).
 

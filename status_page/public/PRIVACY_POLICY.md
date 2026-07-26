@@ -2,7 +2,7 @@
 
 **Last updated:** 25 July 2026  
 **Product:** Restore Privacy Tunnel (RPT / RPT2) — VPN node, client apps, and public status shop  
-**Current packages (catalog v0.4.6):** paid installers on [restoreprivacy.online](https://restoreprivacy.online/) — Monthly **£2.45 GBP** or Yearly **£27.93** (5% off) per platform (Windows, Android, macOS, iOS, Linux — macOS **Developer ID** notarized; iOS **Team-signed** sideload). Source repository is **private**; free permanent GitHub installer URLs are not offered. After payment you get a **one-time** download and email with **keygen** + **PPI**. Pre-adjustment Settings defaults (lean residual): run at startup **off**, autoconnect **off**, residual VPN core **always on**, traffic shaping / outer obfuscation / multi-hop **off**. Optional browser extension (Chromium MV3, `restore-privacy-browser-extension-0.4.6.zip`) is browser-scoped only — not OS residual TUN.
+**Current packages (catalog v0.4.8):** paid installers on [restoreprivacy.online](https://restoreprivacy.online/) — Monthly **£2.45 GBP** or Yearly **£27.93** (5% off) per platform (Windows, Android, macOS, iOS, Linux). macOS/iOS catalog zips are **filename pins** until a Mac rebuild produces a true **0.4.8** seal (**Developer ID** notarization on macOS; **Team-signed** sideload on iOS — see APPLE_HANDOFF_0.4.8.md). Source repository is **private**; free permanent GitHub installer URLs are not offered. After payment you get a **one-time** download and email with **keygen** + **PPI**. Pre-adjustment Settings defaults (lean residual): run at startup **off**, autoconnect **off**, residual VPN core **always on**, traffic shaping / outer obfuscation / multi-hop **off**. Optional browser extension (Chromium MV3, `restore-privacy-browser-extension-0.4.8.zip`) is browser-scoped only — not OS residual TUN.
 
 **Payment and Connect:** residual Connect needs a **successful payment** and **keygen unlock** while the subscription is **OK**. If payment fails, is refunded/disputed, or the paid period ends, status is **EXPIRED**: the app **hard-locks** with **renew your licence *here*** and a **platform payment portal** link until you renew and re-enter a valid keygen. Stripe session id / keygen are entitlement keys, not a username/password account. The status host also binds Stripe **`payment_intent`** so refunds without session metadata still revoke Connect.
 
@@ -71,7 +71,7 @@ Node process stdout/stderr is configured for no journal session streams in the s
 - Shows product title and paid download entry. Platform line is names only — not a live metric.
 - After paid Checkout: active Connect entitlement (binds Stripe **`payment_intent`** so refunds without session metadata still revoke), **keygen** mint, email with keygen + PPI + download. Licence accept + keygen required for Connect (**OK**). Failures/refunds/disputes/period end → **EXPIRED**: apps hard-lock with **renew your licence *here*** and a platform payment portal link. Clients re-check `/api/connect-entitlement` on Connect.
 - Optional `/api/status` JSON is **title-only** (no `clients_connected`).
-- Does not publish free permanent GitHub installer buttons. Catalog v0.4.6 is fulfilled after payment via one-time proxy.
+- Does not publish free permanent GitHub installer buttons. Catalog v0.4.8 is fulfilled after payment via one-time proxy.
 - Serves same-origin legal docs (`/PRIVACY_POLICY.md`, `/LICENSE`, `/README.md`, `/CREDITS.md`, `/AUDIT.md`).
 
 ### 3.4 Operator secrets
