@@ -334,17 +334,34 @@ bool isStrictVpnPermissionDenialMessage(String message) {
   if (m.contains('team residual') ||
       m.contains('sign_macos_residual') ||
       m.contains('missing the packet-tunnel-provider') ||
-      (m.contains('host is missing') && m.contains('network extension'))) {
+      m.contains('packet-tunnel-provider') ||
+      (m.contains('host is missing') && m.contains('network extension')) ||
+      m.contains('public developer id')) {
     return false;
   }
-  return m.contains('nevpnerrordomain') ||
-      m.contains('permission denied') ||
+  // Explicit auth denial
+  if (m.contains('permission denied') ||
       m.contains('not authorized') ||
-      m.contains('ne preferences failed') ||
-      (m.contains('approve vpn configuration') &&
-          (m.contains('system settings') ||
-              m.contains('vpn & filters') ||
-              m.contains('allow')));
+      m.contains('user denied')) {
+    return true;
+  }
+  // NEVPNErrorDomain code 5 only (configuration read/write / typical Allow denial)
+  if (m.contains('nevpnerrordomain')) {
+    if (m.contains(' 5)') ||
+        m.contains(' 5:') ||
+        m.contains('code 5') ||
+        m.contains('errordomain 5')) {
+      return true;
+    }
+    return m.contains('permission') || m.contains('denied');
+  }
+  // Approve guidance with System Settings / VPN & Filters
+  if (m.contains('approve vpn configuration') &&
+      (m.contains('system settings') || m.contains('vpn & filters'))) {
+    return true;
+  }
+  // Do not match bare "allow vpn", generic "ne preferences failed", or other NE codes.
+  return false;
 }
 
 /// True when [message] is only open-settings feedback (not residual failure truth).

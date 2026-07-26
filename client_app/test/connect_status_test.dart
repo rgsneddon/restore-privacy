@@ -137,7 +137,7 @@ void main() {
         }),
         isFalse,
       );
-      // Missing host NE / Team residual: no auto-open.
+      // Missing host NE / Team residual: no auto-open (even without flags).
       expect(
         shouldAutoOpenVpnSystemSettings({
           'ok': false,
@@ -147,6 +147,21 @@ void main() {
           'needsTeamResidualSign': true,
           'hostHasPacketTunnelEntitlement': false,
         }),
+        isFalse,
+      );
+      expect(
+        isStrictVpnPermissionDenialMessage(
+          'This app build cannot register or activate Packet Tunnel: '
+          'the host is missing the packet-tunnel-provider Network Extension. '
+          'sign_macos_residual_team.py then relaunch and Connect.',
+        ),
+        isFalse,
+      );
+      // Generic NE preferences error without auth language: no auto-open.
+      expect(
+        isStrictVpnPermissionDenialMessage(
+          'NE preferences error (NEVPNErrorDomain 3): connection failed',
+        ),
         isFalse,
       );
       expect(

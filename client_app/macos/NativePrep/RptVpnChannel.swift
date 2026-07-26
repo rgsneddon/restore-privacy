@@ -143,13 +143,16 @@ enum RptVpnChannel {
 
   /// Actionable copy when host lacks Network Extension for NETunnelProviderManager.
   static func hostMissingNeEntitlementMessage() -> String {
+    // Wording avoids bare allow-vpn phrasing so isNePermissionFailureDetail
+    // does not mis-classify residual re-sign as a permission denial that opens Settings.
     "This app build cannot register or activate Packet Tunnel in Network settings: "
       + "the host is missing the packet-tunnel-provider Network Extension entitlement. "
       + "Public Developer ID downloads intentionally omit host NE so the app opens for all users. "
       + "On a developer Mac, re-sign for residual with: "
       + "python3 scripts/sign_macos_residual_team.py --app path/to/restore_privacy_client.app "
-      + "then relaunch, Allow VPN if macOS asks, and Connect. "
-      + "Do not add L2TP / Cisco IPsec / IKEv2 manually."
+      + "then relaunch and press Connect. "
+      + "If the OS shows a VPN configuration dialog, complete it, then Connect again. "
+      + "Do not add L2TP / Cisco IPsec / IKEv2 manually. Network Settings alone cannot fix missing host NE."
   }
 
   /// Pre-Connect: register Restore Privacy Packet Tunnel in System VPN preferences.
@@ -283,25 +286,70 @@ enum RptVpnChannel {
     return opened
   }
 
-  /// True for NEVPNErrorDomain permission / not-authorized / denied class (incl. code 5).
+  /// Residual re-sign / missing host NE — Settings cannot enable residual alone.
+  /// Pure string classifier for tests and Settings auto-open gates.
+  static func isTeamResidualOrMissingHostNeDetail(_ detail: String?) -> Bool {
+    guard let d = detail?.lowercased(), !d.isEmpty else { return false }
+    return d.contains("packet-tunnel-provider")
+      || d.contains("sign_macos_residual")
+      || d.contains("team residual")
+      || d.contains("missing the packet-tunnel")
+      || d.contains("host is missing")
+      || d.contains("public developer id")
+      || d.contains("needs team residual")
+      || d.contains("host lacks packet-tunnel")
+  }
+
+  /// True only for user VPN-configuration authorization denial (not all NE errors).
+  ///
+  /// NEVPNErrorDomain alone is **not** enough — code 5 (configuration read/write)
+  /// with permission language, or explicit not-authorized / permission denied.
   static func isNePermissionFailure(_ error: Error) -> Bool {
     let ns = error as NSError
     let lower = error.localizedDescription.lowercased()
-    if ns.domain == NEVPNErrorDomain { return true }
-    return lower.contains("permission")
+    if isTeamResidualOrMissingHostNeDetail(lower) { return false }
+    let authLanguage = lower.contains("permission denied")
       || lower.contains("not authorized")
-      || lower.contains("denied")
+      || lower.contains("user denied")
+      || (lower.contains("permission") && lower.contains("denied"))
+    if ns.domain == NEVPNErrorDomain {
+      // NEVPNErrorConfigurationReadWriteFailed == 5 (typical after user denies Allow).
+      // Other domain codes (invalid/stale/connection failed) are not auto-Settings.
+      if ns.code == 5 {
+        return true
+      }
+      return authLanguage
+    }
+    return authLanguage
   }
 
+  /// String form of [isNePermissionFailure] for channel maps / host-side diagnostics.
+  /// Does **not** treat residual re-sign copy, bare "allow vpn", or generic
+  /// "NE preferences failed" without auth language as permission denial.
   static func isNePermissionFailureDetail(_ detail: String?) -> Bool {
-    guard let d = detail?.lowercased(), !d.isEmpty else { return false }
-    return d.contains("nevpnerrordomain")
-      || d.contains("permission")
+    guard let raw = detail, !raw.isEmpty else { return false }
+    let d = raw.lowercased()
+    if isTeamResidualOrMissingHostNeDetail(d) { return false }
+    // Explicit auth denial
+    if d.contains("permission denied")
       || d.contains("not authorized")
-      || d.contains("denied")
-      || d.contains("ne preferences failed")
-      || d.contains("approve vpn")
-      || d.contains("allow vpn")
+      || d.contains("user denied") {
+      return true
+    }
+    // NEVPNErrorDomain code 5 (or spelled-out) with denial context
+    if d.contains("nevpnerrordomain") {
+      let code5 = d.contains(" 5)") || d.contains(" 5:") || d.contains("code 5")
+        || d.contains("errordomain 5")
+      if code5 { return true }
+      return d.contains("permission") || d.contains("denied") || d.contains("not authorized")
+    }
+    // Approve guidance only with System Settings / VPN & Filters context
+    if d.contains("approve vpn configuration")
+      && (d.contains("system settings") || d.contains("vpn & filters")) {
+      return true
+    }
+    // Do NOT match: bare "allow vpn", generic "ne preferences failed", host-missing NE.
+    return false
   }
 
   /// Annotate a failed connect map and optionally open System Settings (debounced).
@@ -396,12 +444,25 @@ enum RptVpnChannel {
     loadOrCreateManager(host: host, port: port) { manager, neError in
       guard manager != nil else {
         let detail = neError ?? "NE preferences unavailable"
-        completion(
-          RptFullTunnelResult.productConnectMap(
-            packetTunnelActive: false,
-            detailMessage: "Could not enable system VPN for Connect: \(detail)"
-          )
+        let full = "Could not enable system VPN for Connect: \(detail)"
+        var map = RptFullTunnelResult.productConnectMap(
+          packetTunnelActive: false,
+          detailMessage: full
         )
+        // Residual-honest flags when host lacks packet-tunnel-provider (prepare parity).
+        if isTeamResidualOrMissingHostNeDetail(detail)
+          || isTeamResidualOrMissingHostNeDetail(full)
+          || !hostHasPacketTunnelNetworkExtensionEntitlement() {
+          map["needsTeamResidualSign"] = true
+          map["hostHasPacketTunnelEntitlement"] = false
+          map["needsVpnSystemSettingsApproval"] = false
+          map["openedVpnSettings"] = false
+          // Prefer the explicit residual message when entitlement check fails.
+          if !hostHasPacketTunnelNetworkExtensionEntitlement() {
+            map["message"] = hostMissingNeEntitlementMessage()
+          }
+        }
+        completion(map)
         return
       }
       // Host pre-seed: copy IS/RO/DE pubs into App Group + home secrets so the
@@ -630,25 +691,24 @@ enum RptVpnChannel {
     }
   }
 
-  /// Surface permission / entitlement failures with an actionable residual-honest path.
-  /// End-user: Allow in System Settings (auto-opened). Operators: Team residual re-sign.
+  /// Surface NE preference errors with residual-honest copy.
+  /// Permission-class: Approve in System Settings. Other NE errors: no Settings claim.
   private static func describeNePreferencesError(_ error: Error) -> String {
     let ns = error as NSError
     let base = error.localizedDescription
     let domain = ns.domain
     let code = ns.code
-    // Common when host lacks Network Extension entitlement / profile, or user denied VPN config.
     if isNePermissionFailure(error) {
       return
         "NE preferences failed (\(domain) \(code)): \(base). "
         + "Approve VPN configuration in System Settings → Network → VPN & Filters "
-        + "(or Login Items & Extensions). Settings opens automatically when possible — "
-        + "Allow Restore Privacy, then press Connect again. "
-        + "If Allow never appears, this build may need Team residual signing with "
-        + "Packet Tunnel Network Extension on host + appex "
-        + "(developers: scripts/sign_macos_residual_team.py)."
+        + "(or Login Items & Extensions). Allow Restore Privacy, then press Connect again."
     }
-    return "NE preferences failed (\(domain) \(code)): \(base)"
+    // Non-permission NE errors (stale config, connection failed, etc.) — no auto-Settings claim.
+    return
+      "NE preferences error (\(domain) \(code)): \(base). "
+      + "Press Connect again. If residual never activates on a developer Mac, "
+      + "re-sign with scripts/sign_macos_residual_team.py (public DevID omits host NE)."
   }
 
   private static func loadOrCreateManager(
