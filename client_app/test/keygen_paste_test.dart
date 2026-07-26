@@ -9,6 +9,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import 'package:restore_privacy_client/connect_status.dart';
 import 'package:restore_privacy_client/keygen_field.dart';
 import 'package:restore_privacy_client/licence_gate.dart';
 import 'package:restore_privacy_client/main.dart';
@@ -180,5 +181,26 @@ void main() {
 
     expect(find.text('Unlock Connect'), findsOneWidget);
     expect(find.text(kAppTitle), findsWidgets);
+  });
+
+  test('shouldDismissKeygenSheetAfterUnlock: active status closes sheet', () {
+    expect(
+      shouldDismissKeygenSheetAfterUnlock(paymentAllowsConnect: true),
+      isTrue,
+    );
+    expect(
+      shouldDismissKeygenSheetAfterUnlock(
+        paymentAllowsConnect: false,
+        paymentStatus: 'active',
+      ),
+      isTrue,
+    );
+    expect(
+      shouldDismissKeygenSheetAfterUnlock(
+        paymentAllowsConnect: false,
+        paymentStatus: 'failed',
+      ),
+      isFalse,
+    );
   });
 }

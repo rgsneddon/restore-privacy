@@ -458,6 +458,21 @@ void main() {
         shouldDismissKeygenSheetAfterUnlock(paymentAllowsConnect: false),
         isFalse,
       );
+      // Active verify status dismisses even if secondary allow flag races false
+      expect(
+        shouldDismissKeygenSheetAfterUnlock(
+          paymentAllowsConnect: false,
+          paymentStatus: 'active',
+        ),
+        isTrue,
+      );
+      expect(
+        shouldDismissKeygenSheetAfterUnlock(
+          paymentAllowsConnect: false,
+          paymentStatus: 'unknown',
+        ),
+        isFalse,
+      );
     });
 
     test('legacy hostOnlySession flag rejects ok:true maps', () {

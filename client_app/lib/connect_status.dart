@@ -93,10 +93,17 @@ bool shouldHideToTrayAfterConnectSuccess(bool productConnectOk) {
 
 /// Whether the keygen unlock sheet should dismiss after verify.
 ///
-/// True only when payment unlock allows Connect (valid active keygen path).
+/// True when payment unlock allows Connect (valid active keygen path), or when
+/// the just-completed verify returned an active entitlement status (belt-and-
+/// suspenders if a secondary [paymentAllowsConnect] read races).
 /// Invalid / inactive keygen must leave the sheet open with failure feedback.
-bool shouldDismissKeygenSheetAfterUnlock({required bool paymentAllowsConnect}) {
-  return paymentAllowsConnect;
+bool shouldDismissKeygenSheetAfterUnlock({
+  required bool paymentAllowsConnect,
+  String? paymentStatus,
+}) {
+  if (paymentAllowsConnect) return true;
+  final st = (paymentStatus ?? '').trim().toLowerCase();
+  return st == 'active';
 }
 
 /// Human-readable status from the method-channel map (never invent "Connected"

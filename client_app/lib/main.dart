@@ -397,6 +397,10 @@ class _TunnelHomeState extends State<TunnelHome> with WidgetsBindingObserver {
   }
 
   /// Forced keygen unlock surface (parity with Windows/Linux desktop modals).
+  ///
+  /// On **valid** keygen the sheet is fully dismissed (returns) **before** any
+  /// Packet Tunnel prepare / System Settings Allow path runs — so Network
+  /// Settings never opens on top of a stuck keygen window.
   Future<void> _showKeygenSheet() async {
     // EXPIRED installs must renew — never show keygen in place of renew.
     if (await (_licence?.needsLicenceRenewal() ?? false)) {
@@ -405,15 +409,18 @@ class _TunnelHomeState extends State<TunnelHome> with WidgetsBindingObserver {
     }
     if (!mounted) return;
     final controller = TextEditingController();
-    await showModalBottomSheet<void>(
+    final unlocked = await showModalBottomSheet<bool>(
       context: context,
       isScrollControlled: true,
+      isDismissible: false,
+      enableDrag: false,
       backgroundColor: kPanelBg,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
       ),
       builder: (ctx) {
         var statusLine = '';
+        var busy = false;
         return StatefulBuilder(
           builder: (ctx, setModal) {
             return Padding(
@@ -447,6 +454,7 @@ class _TunnelHomeState extends State<TunnelHome> with WidgetsBindingObserver {
                     controller: controller,
                     autofocus: true,
                     labelText: 'RPT-KEY-…',
+                    enabled: !busy,
                   ),
                   if (statusLine.isNotEmpty) ...[
                     const SizedBox(height: 8),
@@ -454,49 +462,54 @@ class _TunnelHomeState extends State<TunnelHome> with WidgetsBindingObserver {
                   ],
                   const SizedBox(height: 16),
                   FilledButton(
-                    onPressed: () async {
-                      final raw = controller.text.trim();
-                      if (raw.isEmpty) {
-                        setModal(() => statusLine = 'Paste the keygen first.');
-                        return;
-                      }
-                      setModal(
-                        () => statusLine =
-                            'Verifying keygen with status host…',
-                      );
-                      final st = await _licence?.importKeygenAndVerify(raw) ??
-                          kPaymentStatusUnknown;
-                      final ok = await _licence?.paymentAllowsConnect() ?? false;
-                      // Dismiss sheet only on valid unlock (shipped contract).
-                      if (!shouldDismissKeygenSheetAfterUnlock(
-                        paymentAllowsConnect: ok,
-                      )) {
-                        if (ctx.mounted) {
-                          setModal(
-                            () => statusLine =
-                                'Keygen not active (status=$st). Check email code / subscription.',
-                          );
-                        }
-                        return;
-                      }
-                      // Valid key: close the keygen window first so it does not block the shell.
-                      if (ctx.mounted) {
-                        Navigator.of(ctx).pop();
-                      }
-                      if (!mounted) return;
-                      setState(() {
-                        _status =
-                            'Keygen verified. Press Connect for residual protection.';
-                      });
-                      _append('Keygen unlocked (status=$st).');
-                      // Register Packet Tunnel after sheet is gone.
-                      await _prepareMacosPacketTunnelBeforeConnect();
-                    },
+                    onPressed: busy
+                        ? null
+                        : () async {
+                            final raw = controller.text.trim();
+                            if (raw.isEmpty) {
+                              setModal(
+                                () => statusLine = 'Paste the keygen first.',
+                              );
+                              return;
+                            }
+                            setModal(() {
+                              busy = true;
+                              statusLine =
+                                  'Verifying keygen with status host…';
+                            });
+                            final st =
+                                await _licence?.importKeygenAndVerify(raw) ??
+                                    kPaymentStatusUnknown;
+                            final ok =
+                                await _licence?.paymentAllowsConnect() ?? false;
+                            // Dismiss only on valid unlock (shipped contract).
+                            if (!shouldDismissKeygenSheetAfterUnlock(
+                              paymentAllowsConnect: ok,
+                              paymentStatus: st,
+                            )) {
+                              if (ctx.mounted) {
+                                setModal(() {
+                                  busy = false;
+                                  statusLine =
+                                      'Keygen not active (status=$st). Check email code / subscription.';
+                                });
+                              }
+                              return;
+                            }
+                            // Valid key: pop sheet completely first. VPN prepare /
+                            // Allow / Network Settings run only after this Future
+                            // completes (see below) so the keygen UI cannot stick.
+                            if (ctx.mounted) {
+                              Navigator.of(ctx, rootNavigator: true).pop(true);
+                            }
+                          },
                     style: FilledButton.styleFrom(backgroundColor: kPrimary),
-                    child: const Text('Unlock Connect'),
+                    child: Text(busy ? 'Verifying…' : 'Unlock Connect'),
                   ),
                   TextButton(
-                    onPressed: () => Navigator.of(ctx).pop(),
+                    onPressed: busy
+                        ? null
+                        : () => Navigator.of(ctx, rootNavigator: true).pop(false),
                     child: const Text('Cancel'),
                   ),
                 ],
@@ -506,6 +519,17 @@ class _TunnelHomeState extends State<TunnelHome> with WidgetsBindingObserver {
         );
       },
     );
+    controller.dispose();
+    if (!mounted) return;
+    if (unlocked == true) {
+      setState(() {
+        _status =
+            'Keygen verified. Press Connect for residual protection.';
+      });
+      _append('Keygen unlocked.');
+      // Sheet is fully closed — safe to register Packet Tunnel / open Settings.
+      await _prepareMacosPacketTunnelBeforeConnect();
+    }
   }
 
   Future<bool> assertMayConnect() async {
