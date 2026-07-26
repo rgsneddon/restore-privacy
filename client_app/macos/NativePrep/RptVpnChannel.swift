@@ -342,42 +342,161 @@ enum RptVpnChannel {
       return
     }
 
+    // Connect always re-registers the system VPN profile (handles user-deleted
+    // Network configs) and enables it, then starts the Packet Tunnel so the
+    // Network settings toggle turns on in tandem with the app Connect button.
+    lastSuccessfulPrepareAt = nil
+
+    enableProductVpnAndStartTunnel(host: host, port: port) { map in
+      if RptFullTunnelResult.isProductSuccess(map) {
+        flutterResult(map)
+        return
+      }
+      let detail = map["message"] as? String
+      hostSideDiagnostic(
+        host: host,
+        port: port,
+        detail: detail,
+        openVpnSettings: true
+      ) { diag in
+        flutterResult(diag)
+      }
+    }
+  }
+
+  /// Save/enable product Packet Tunnel in System VPN prefs (recreate if deleted),
+  /// then `startTunnel` so Network settings and the app connect together.
+  private static func enableProductVpnAndStartTunnel(
+    host: String,
+    port: UInt16,
+    completion: @escaping ([String: Any]) -> Void
+  ) {
     loadOrCreateManager(host: host, port: port) { manager, neError in
-      guard let manager else {
-        let detail = neError.map { "NE preferences: \($0)" }
-        // Missing NE manager (incl. NEVPNErrorDomain 5) — open Settings so user can Allow.
-        hostSideDiagnostic(
-          host: host,
-          port: port,
-          detail: detail,
-          openVpnSettings: true
-        ) { map in
-          flutterResult(map)
-        }
+      guard manager != nil else {
+        let detail = neError ?? "NE preferences unavailable"
+        completion(
+          RptFullTunnelResult.productConnectMap(
+            packetTunnelActive: false,
+            detailMessage: "Could not enable system VPN for Connect: \(detail)"
+          )
+        )
         return
       }
       // Host pre-seed: copy IS/RO/DE pubs into App Group + home secrets so the
-      // Packet Tunnel (IS-only historical seed) can HELLO to residual host.
+      // Packet Tunnel can HELLO to residual host.
       do {
         try RptSecrets.preseedSharedWritableSecretsForResidualHost(residualHost: host)
       } catch {
         // Best-effort; tunnel load may still find inject/package pins
       }
-      startTunnel(manager: manager, host: host, port: port) { map in
-        if RptFullTunnelResult.isProductSuccess(map) {
-          flutterResult(map)
+      // Apple: after save, prefer a freshly loaded manager instance for startTunnel.
+      reloadProductManager(host: host, port: port) { live, reloadErr in
+        guard let live else {
+          completion(
+            RptFullTunnelResult.productConnectMap(
+              packetTunnelActive: false,
+              detailMessage: reloadErr
+                ?? "System VPN profile missing after save — Allow Restore Privacy in "
+                + "System Settings → Network → VPN & Filters, then Connect again."
+            )
+          )
           return
         }
-        // Tunnel not active — diagnostic HELLO (still ok:false) + open Settings so user can Allow.
-        let detail = map["message"] as? String
-        hostSideDiagnostic(
-          host: host,
-          port: port,
-          detail: detail,
-          openVpnSettings: true
-        ) { diag in
-          flutterResult(diag)
+        ensureEnabledThenStartTunnel(manager: live, host: host, port: port, completion: completion)
+      }
+    }
+  }
+
+  /// Load product manager from prefs after save (must match provider bundle id).
+  private static func reloadProductManager(
+    host: String,
+    port: UInt16,
+    completion: @escaping (NETunnelProviderManager?, String?) -> Void
+  ) {
+    NETunnelProviderManager.loadAllFromPreferences { managers, error in
+      if let error {
+        completion(nil, describeNePreferencesError(error))
+        return
+      }
+      if let existing = managers?.first(where: { isProductManager($0) }) {
+        // Refresh endpoint on the live object so startTunnel options match.
+        applyProductPacketTunnelProtocol(to: existing, host: host, port: port)
+        existing.isEnabled = true
+        existing.isOnDemandEnabled = false
+        existing.saveToPreferences { saveErr in
+          if saveErr != nil {
+            // Still try start with existing if only endpoint refresh failed.
+            completion(existing, nil)
+            return
+          }
+          existing.loadFromPreferences { loadErr in
+            if let loadErr {
+              completion(nil, describeNePreferencesError(loadErr))
+              return
+            }
+            completion(existing, nil)
+          }
         }
+        return
+      }
+      completion(
+        nil,
+        "Restore Privacy Packet Tunnel is not in System VPN preferences after registration. "
+          + "If macOS showed an Allow dialog, choose Allow, then press Connect again."
+      )
+    }
+  }
+
+  /// Ensure preferences show enabled, then start tunnel (turns Network VPN on).
+  private static func ensureEnabledThenStartTunnel(
+    manager: NETunnelProviderManager,
+    host: String,
+    port: UInt16,
+    completion: @escaping ([String: Any]) -> Void
+  ) {
+    let start = {
+      startTunnel(manager: manager, host: host, port: port, completion: completion)
+    }
+    if manager.isEnabled, manager.connection.status != .invalid {
+      start()
+      return
+    }
+    applyProductPacketTunnelProtocol(to: manager, host: host, port: port)
+    manager.isEnabled = true
+    manager.isOnDemandEnabled = false
+    manager.saveToPreferences { saveErr in
+      if let saveErr {
+        completion(
+          RptFullTunnelResult.productConnectMap(
+            packetTunnelActive: false,
+            detailMessage: describeNePreferencesError(saveErr)
+          )
+        )
+        return
+      }
+      manager.loadFromPreferences { loadErr in
+        if let loadErr {
+          completion(
+            RptFullTunnelResult.productConnectMap(
+              packetTunnelActive: false,
+              detailMessage: describeNePreferencesError(loadErr)
+            )
+          )
+          return
+        }
+        if !manager.isEnabled {
+          completion(
+            RptFullTunnelResult.productConnectMap(
+              packetTunnelActive: false,
+              detailMessage:
+                "System VPN profile is present but still disabled. "
+                + "Allow Restore Privacy under System Settings → Network → VPN & Filters, "
+                + "then press Connect — the app will start the tunnel automatically."
+            )
+          )
+          return
+        }
+        start()
       }
     }
   }
@@ -430,10 +549,23 @@ enum RptVpnChannel {
   private static func selectOrCreateManager(
     from managers: [NETunnelProviderManager]?
   ) -> NETunnelProviderManager {
-    if let existing = managers?.first(where: { shouldStopManager($0) }) {
+    if let existing = managers?.first(where: { isProductManager($0) }) {
       return existing
     }
     return NETunnelProviderManager()
+  }
+
+  /// True when a manager is the product Restore Privacy Packet Tunnel.
+  /// Does **not** match empty/unknown providers (avoids hijacking other VPN rows).
+  static func isProductManager(_ manager: NETunnelProviderManager) -> Bool {
+    let proto = manager.protocolConfiguration as? NETunnelProviderProtocol
+    let bid = proto?.providerBundleIdentifier ?? ""
+    if bid == providerBundleId { return true }
+    if manager.localizedDescription == productLocalizedDescription,
+       bid.isEmpty || bid == providerBundleId {
+      return true
+    }
+    return false
   }
 
   /// Apply product Packet Tunnel protocol identity (shared by prepare + Connect).
@@ -566,77 +698,118 @@ enum RptVpnChannel {
     port: UInt16,
     completion: @escaping ([String: Any]) -> Void
   ) {
-    do {
-      let session = manager.connection as? NETunnelProviderSession
-      guard let session else {
-        completion(
-          RptFullTunnelResult.productConnectMap(
-            packetTunnelActive: false,
-            detailMessage:
-              "NETunnelProviderSession missing — host build may lack Network Extension "
-              + "packet-tunnel-provider entitlement/profile (Team residual sign required)."
+    // startTunnel must run on main; Network settings toggle follows this session.
+    let work = {
+      do {
+        let session = manager.connection as? NETunnelProviderSession
+        guard let session else {
+          completion(
+            RptFullTunnelResult.productConnectMap(
+              packetTunnelActive: false,
+              detailMessage:
+                "NETunnelProviderSession missing — host build may lack Network Extension "
+                + "packet-tunnel-provider entitlement/profile (Team residual sign required)."
+            )
           )
-        )
-        return
-      }
-      // Already connected (re-entrant Connect) — treat as success.
-      if manager.connection.status == .connected {
-        queryProviderVpnIp(manager: manager) { ip in
-          let map = RptFullTunnelResult.productConnectMap(
-            packetTunnelActive: true,
-            vpnIp: ip,
-            detailMessage: ip.map { "Connected — tunnel IP \($0)" }
-          )
-          completion(map)
+          return
         }
-        return
-      }
-      let opts: [String: NSObject] = [
-        "host": host as NSString,
-        "port": NSNumber(value: port),
-      ]
-      try session.startTunnel(options: opts)
-      // Packet Tunnel handshake + setTunnelNetworkSettings can take several seconds;
-      // user may also need to approve the VPN configuration dialog.
-      pollTunnelConnected(manager: manager, attempt: 0, maxAttempts: 40, interval: 0.5) { connected in
-        if connected {
+        // Already connected (re-entrant Connect) — treat as success.
+        if manager.connection.status == .connected {
           queryProviderVpnIp(manager: manager) { ip in
-            var resolved = ip
-            if resolved == nil || resolved?.isEmpty == true,
-               let cfg = (manager.protocolConfiguration as? NETunnelProviderProtocol)?
-                 .providerConfiguration,
-               let cfgIp = cfg["vpnIp"] as? String, !cfgIp.isEmpty {
-              resolved = cfgIp
-            }
             let map = RptFullTunnelResult.productConnectMap(
               packetTunnelActive: true,
-              vpnIp: resolved,
-              detailMessage: resolved.map { "Connected — tunnel IP \($0)" }
+              vpnIp: ip,
+              detailMessage: ip.map { "Connected — tunnel IP \($0)" }
             )
             completion(map)
           }
-        } else {
-          let st = manager.connection.status
-          let map = RptFullTunnelResult.productConnectMap(
-            packetTunnelActive: false,
-            detailMessage:
-              "Packet Tunnel start pending or failed (status \(statusName(st))/\(st.rawValue)). "
-              + "If macOS asked to allow VPN configurations, choose Allow in System Settings "
-              + "→ Network → VPN & Filters, then Connect again. "
-              + "Developers: Team residual re-sign via scripts/sign_macos_residual_team.py"
-          )
-          // User may still need to Allow — open Settings (debounced).
-          completion(annotateNeedsVpnSettings(map, openSettings: true))
+          return
         }
+        // Connecting already — wait for connected instead of double-start.
+        if manager.connection.status == .connecting
+          || manager.connection.status == .reasserting {
+          pollTunnelConnected(manager: manager, attempt: 0, maxAttempts: 40, interval: 0.5) {
+            connected in
+            if connected {
+              queryProviderVpnIp(manager: manager) { ip in
+                completion(
+                  RptFullTunnelResult.productConnectMap(
+                    packetTunnelActive: true,
+                    vpnIp: ip,
+                    detailMessage: ip.map { "Connected — tunnel IP \($0)" }
+                  )
+                )
+              }
+            } else {
+              completion(
+                annotateNeedsVpnSettings(
+                  RptFullTunnelResult.productConnectMap(
+                    packetTunnelActive: false,
+                    detailMessage:
+                      "Packet Tunnel still connecting/failed (status "
+                      + "\(statusName(manager.connection.status))). "
+                      + "Allow Restore Privacy in System Settings if asked, then Connect again."
+                  ),
+                  openSettings: true
+                )
+              )
+            }
+          }
+          return
+        }
+        let opts: [String: NSObject] = [
+          "host": host as NSString,
+          "port": NSNumber(value: port),
+        ]
+        // This enables the system VPN connection in Network settings (when allowed).
+        try session.startTunnel(options: opts)
+        // Packet Tunnel handshake + setTunnelNetworkSettings can take several seconds;
+        // first run may show the system Allow VPN configuration dialog.
+        pollTunnelConnected(manager: manager, attempt: 0, maxAttempts: 50, interval: 0.5) {
+          connected in
+          if connected {
+            queryProviderVpnIp(manager: manager) { ip in
+              var resolved = ip
+              if resolved == nil || resolved?.isEmpty == true,
+                 let cfg = (manager.protocolConfiguration as? NETunnelProviderProtocol)?
+                   .providerConfiguration,
+                 let cfgIp = cfg["vpnIp"] as? String, !cfgIp.isEmpty {
+                resolved = cfgIp
+              }
+              let map = RptFullTunnelResult.productConnectMap(
+                packetTunnelActive: true,
+                vpnIp: resolved,
+                detailMessage: resolved.map { "Connected — tunnel IP \($0)" }
+              )
+              completion(map)
+            }
+          } else {
+            let st = manager.connection.status
+            let map = RptFullTunnelResult.productConnectMap(
+              packetTunnelActive: false,
+              detailMessage:
+                "Packet Tunnel did not become Connected (status \(statusName(st))/\(st.rawValue)). "
+                + "Connect re-creates and enables the Network VPN profile automatically. "
+                + "If macOS showed Allow VPN configuration, choose Allow, then press Connect again. "
+                + "Developers: Team residual re-sign via scripts/sign_macos_residual_team.py"
+            )
+            completion(annotateNeedsVpnSettings(map, openSettings: true))
+          }
+        }
+      } catch {
+        let map = RptFullTunnelResult.productConnectMap(
+          packetTunnelActive: false,
+          detailMessage: describeNePreferencesError(error)
+        )
+        completion(
+          annotateNeedsVpnSettings(map, openSettings: isNePermissionFailure(error))
+        )
       }
-    } catch {
-      let map = RptFullTunnelResult.productConnectMap(
-        packetTunnelActive: false,
-        detailMessage: describeNePreferencesError(error)
-      )
-      completion(
-        annotateNeedsVpnSettings(map, openSettings: isNePermissionFailure(error))
-      )
+    }
+    if Thread.isMainThread {
+      work()
+    } else {
+      DispatchQueue.main.async(execute: work)
     }
   }
 
@@ -691,13 +864,9 @@ enum RptVpnChannel {
     }
   }
 
-  /// Whether a saved VPN manager is ours (product Packet Tunnel).
+  /// Whether a saved VPN manager is ours (product Packet Tunnel) — used for stop/disconnect.
   static func shouldStopManager(_ manager: NETunnelProviderManager) -> Bool {
-    let proto = manager.protocolConfiguration as? NETunnelProviderProtocol
-    let bid = proto?.providerBundleIdentifier ?? ""
-    return bid.isEmpty
-      || bid == providerBundleId
-      || manager.localizedDescription == productLocalizedDescription
+    isProductManager(manager)
   }
 
   /// Stop every Restore Privacy Packet Tunnel session (channel disconnect + app quit).
