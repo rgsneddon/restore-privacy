@@ -7,7 +7,7 @@ Catalog monopin: **0.4.8**
 | Package | Status |
 |---------|--------|
 | `restore-privacy-client-0.4.8-macos.zip` | **Developer ID** signed, **notarized + stapled** (notary id `69a13d19-f47e-48bd-9647-404e8872d6de`, Accepted); Gatekeeper `Notarized Developer ID` |
-| `restore-privacy-client-0.4.8-ios.zip` | **Apple Distribution / Team-signed** sideload; `CFBundleShortVersionString` **0.4.8** |
+| `restore-privacy-client-0.4.8-ios.zip` | **Apple Distribution / Team-signed** sideload; `CFBundleShortVersionString` **0.4.8**; native channel parity with macOS Connect enable+start / Disconnect stop+wait (iOS Settings Allow for VPN — not macOS Network pane) |
 
 Hosted at GitHub release **0.4.8** and Iceland VPS `/opt/restore-privacy/paid_assets/0.4.8/` (paid fulfilment only).
 

@@ -28,7 +28,7 @@
 | **Linux** | Rebuild via `package_linux.py` when tools present; else CF from 0.4.7 |
 | **Android** | Residual-wire APK carry-forward from 0.4.7 when Flutter APK rebuild not run |
 | **macOS** | **Native** Flutter **0.4.8** — Developer ID + **notarized + stapled** (notary `69a13d19-f47e-48bd-9647-404e8872d6de`) — see `client_app/APPLE_HANDOFF_0.4.8.md` |
-| **iOS** | **Native** Flutter **0.4.8** — Apple Distribution **Team-signed** sideload — same handoff |
+| **iOS** | **Native** Flutter **0.4.8** — Apple Distribution **Team-signed** sideload; Connect enables + starts system Packet Tunnel, Disconnect stops it (parity with macOS product outcomes; Allow via iOS system VPN prompt / Settings) — same handoff |
 | **Browser extension** | MV3 zip pin **0.4.8** when staged from `browser_extension/` |
 
 Public DevID macOS packages omit host Network Extension so the app opens for all downloaders. Residual public IP on a developer Mac still requires Team residual re-sign (`scripts/sign_macos_residual_team.py`). Never claim notarized packages this process did not produce.
