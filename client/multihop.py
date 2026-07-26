@@ -39,14 +39,19 @@ PRODUCT_EXIT_PORT = PRODUCT_NODE_PORT
 # --- Country → node catalog (extensible as more VPS countries ship) ---
 COUNTRY_IS = "IS"
 COUNTRY_RO = "RO"
+COUNTRY_DE = "DE"
 DEFAULT_ENTRY_COUNTRY = COUNTRY_IS
+
+# Germany residual peer (Hetzner FSN / product monopin).
+PRODUCT_DE_HOST = "167.233.224.5"
+PRODUCT_DE_PORT = PRODUCT_NODE_PORT
 
 
 @dataclass(frozen=True)
 class CountryNode:
     """One residual-capable product node identified by country code."""
 
-    code: str  # ISO-ish short code (IS, RO, …)
+    code: str  # ISO-ish short code (IS, RO, DE, …)
     name: str  # User-facing country name
     host: str
     port: int = PRODUCT_NODE_PORT
@@ -59,7 +64,7 @@ class CountryNode:
         return Endpoint(host=self.host, port=int(self.port))
 
 
-# Shipped two-country catalog (Iceland entry monopin + Romania exit peer).
+# Shipped residual catalog: Iceland, Romania, Germany (expandable).
 PRODUCT_COUNTRY_CATALOG: tuple[CountryNode, ...] = (
     CountryNode(
         code=COUNTRY_IS,
@@ -74,6 +79,13 @@ PRODUCT_COUNTRY_CATALOG: tuple[CountryNode, ...] = (
         host=PRODUCT_EXIT_HOST,
         port=PRODUCT_EXIT_PORT,
         pub_name="exit_node_elgamal.pub",
+    ),
+    CountryNode(
+        code=COUNTRY_DE,
+        name="Germany",
+        host=PRODUCT_DE_HOST,
+        port=PRODUCT_DE_PORT,
+        pub_name="de_node_elgamal.pub",
     ),
 )
 
@@ -95,6 +107,10 @@ def normalize_entry_country(code: str | None) -> str:
         "ROMANIA": COUNTRY_RO,
         "RO": COUNTRY_RO,
         "ROU": COUNTRY_RO,
+        "GERMANY": COUNTRY_DE,
+        "DE": COUNTRY_DE,
+        "DEU": COUNTRY_DE,
+        "DEUTSCHLAND": COUNTRY_DE,
     }
     code_n = aliases.get(raw, raw)
     for n in PRODUCT_COUNTRY_CATALOG:
@@ -511,6 +527,7 @@ def select_residual_endpoint(
     peer_capacity: dict[str, float] | None = None,
     near_capacity_threshold: float = DEFAULT_NEAR_CAPACITY_THRESHOLD,
     capacity_margin: float = DEFAULT_CAPACITY_MARGIN,
+    rng: random.Random | None = None,
 ) -> ResidualSelection:
     """Prefer selected entry when healthy; failover to alternate catalog peer.
 
@@ -605,10 +622,22 @@ def select_residual_endpoint(
             preferred_host=(entry_ep.host or "").strip(),
         )
 
-    # Preferred entry down/draining → solid peer failover (other catalog host)
+    # Preferred entry down/draining → solid peer failover (other catalog host).
+    # When *rng* is provided and multiple catalog peers exist, pick among
+    # non-preferred hosts so multi-peer wipe hop-off is not stuck on one alternate.
     if exit_ok and (exit_ep.host or "").strip() != (entry_ep.host or "").strip():
+        failover_ep = exit_ep
+        if rng is not None:
+            alts = [
+                n.as_endpoint()
+                for n in PRODUCT_COUNTRY_CATALOG
+                if (n.host or "").strip()
+                and (n.host or "").strip() != (entry_ep.host or "").strip()
+            ]
+            if alts:
+                failover_ep = rng.choice(alts)
         return ResidualSelection(
-            endpoint=exit_ep,
+            endpoint=failover_ep,
             reason="exit_failover",
             entry_healthy=bool(entry_healthy),
             exit_healthy=True,

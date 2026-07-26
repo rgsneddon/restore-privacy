@@ -182,7 +182,9 @@ class TestConnectWiring(unittest.TestCase):
         )
         self.assertTrue(is_multihop_active(cfg2))
         self.assertEqual(entry_endpoint(cfg2).host, PRODUCT_EXIT_HOST)
-        self.assertEqual(exit_endpoint(cfg2).host, PRODUCT_NODE_HOST)
+        # Multi-hop exit is a non-entry catalog peer (IS or DE when three peers).
+        self.assertNotEqual(exit_endpoint(cfg2).host, PRODUCT_EXIT_HOST)
+        self.assertNotEqual(exit_endpoint(cfg2).host, entry_endpoint(cfg2).host)
 
     def test_connect_module_uses_select_residual_and_multihop_from_env(self):
         src = (ROOT / "client" / "connect.py").read_text(encoding="utf-8")
