@@ -654,8 +654,10 @@ class RptClient:
             self.last_selection_reason = "pinned"
         else:
             try:
-                # Live private capacity probes (fail-soft) when token configured
-                self._refresh_capacity_from_probes(force=True)
+                # Capacity probes: only when map empty (force=False). Avoid
+                # serial re-probe of every peer on every Connect when a warm
+                # map already exists; no token → probe_peer_capacity_map is {}.
+                self._refresh_capacity_from_probes(force=False)
                 sel = select_residual_endpoint(
                     self.multihop,
                     entry_healthy=self.entry_healthy,

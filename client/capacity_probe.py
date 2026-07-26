@@ -206,8 +206,11 @@ def probe_peer_capacity_map(
         return {}
     t = float(timeout_s) if timeout_s is not None else probe_timeout_seconds(e)
     out: dict[str, float] = {}
-    for host, url in urls.items():
-        h_default = (host or "").strip()
+    items = [(str(h or "").strip(), str(u or "").strip()) for h, u in urls.items()]
+    items = [(h, u) for h, u in items if h and u]
+
+    def _one(pair: tuple[str, str]) -> tuple[str, float] | None:
+        h_default, url = pair
         got_host, util = probe_one_peer(
             url,
             token=token,
@@ -216,11 +219,33 @@ def probe_peer_capacity_map(
             default_host=h_default,
         )
         if util is None:
-            continue
+            return None
         key = (got_host or h_default or "").strip()
         if not key:
-            continue
-        out[key] = float(util)
+            return None
+        return key, float(util)
+
+    # Parallel peer probes (wall time ≈ max single timeout, not sum).
+    if len(items) > 1:
+        try:
+            from concurrent.futures import ThreadPoolExecutor, as_completed
+
+            with ThreadPoolExecutor(max_workers=min(8, len(items))) as pool:
+                futs = [pool.submit(_one, it) for it in items]
+                for fut in as_completed(futs):
+                    try:
+                        got = fut.result()
+                    except Exception:  # noqa: BLE001
+                        continue
+                    if got is not None:
+                        out[got[0]] = got[1]
+            return out
+        except Exception:  # noqa: BLE001 — fall back serial
+            pass
+    for it in items:
+        got = _one(it)
+        if got is not None:
+            out[got[0]] = got[1]
     return out
 
 

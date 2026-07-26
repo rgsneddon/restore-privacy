@@ -774,24 +774,112 @@ def payment_allows_connect(
     return st == STATUS_ACTIVE and (not req or has_keygen_unlock(e))
 
 
+def connect_status_host_refresh_needed(
+    path: Optional[Path] = None,
+    *,
+    require: bool | None = None,
+    now: float | None = None,
+) -> bool:
+    """True when Connect must wait on status-host before residual HELLO.
+
+    **Warm path (False):** local cache already allows Connect (active + keygen
+    unlock, period not ended). Status-host refresh/bind can run in the
+    background after HELLO starts without blocking residual dial.
+
+    **Cold path (True):** missing/unknown entitlement, no keygen, blocking
+    status, or ``valid_until`` within one hour (refresh before Connect so
+    near-expiry / renew surfaces stay honest).
+    """
+    e = load_payment_entitlement(path)
+    t = float(now if now is not None else time.time())
+    if e.valid_until is not None:
+        try:
+            if float(e.valid_until) - t <= 3600.0:
+                return True
+        except (TypeError, ValueError):
+            return True
+    # Local gate already green → skip serial status-host on critical path
+    if payment_allows_connect(e, path=path, require=require):
+        return False
+    return True
+
+
+def windows_connect_critical_path_plan(
+    *,
+    local_payment_ready: bool | None = None,
+    path: Optional[Path] = None,
+) -> list[dict[str, Any]]:
+    """Ordered Connect stages and whether each blocks residual HELLO.
+
+    Pure planning helper for tests/instrumentation — does not perform network.
+    When *local_payment_ready* is None, derives from local entitlement cache.
+    """
+    if local_payment_ready is None:
+        need = connect_status_host_refresh_needed(path=path)
+        local_payment_ready = not need
+    else:
+        need = not bool(local_payment_ready)
+    return [
+        {
+            "stage": "status_host_bootstrap_bind",
+            "blocks_hello": bool(need),
+            "note": (
+                "skip when local active+keygen already allows Connect"
+                if not need
+                else "serial ensure_entitlement + optional device bind"
+            ),
+        },
+        {
+            "stage": "assert_may_connect",
+            "blocks_hello": True,
+            "remote_refresh": bool(need),
+            "note": "local licence+payment gate always; remote only when needed",
+        },
+        {
+            "stage": "capacity_probes",
+            "blocks_hello": False,
+            "note": "non-force / empty-map only; parallel peers; no token → skip",
+        },
+        {
+            "stage": "residual_hello",
+            "blocks_hello": True,
+            "note": "UDP HELLO to selected residual peer",
+        },
+        {
+            "stage": "wintun_dual_slash1_attach",
+            "blocks_hello": True,
+            "note": "after HELLO success only",
+        },
+    ]
+
+
 def assert_payment_may_connect(
     path: Optional[Path] = None,
     *,
     require: bool | None = None,
-    refresh: bool = True,
+    refresh: bool | None = None,
     base_url: str | None = None,
     fetch: Any = None,
 ) -> tuple[bool, str]:
     """Gate Connect on payment entitlement + keygen unlock.
 
-    When ``refresh`` is true (product default on Connect):
+    When ``refresh`` is true:
     - discover/import nearby entitlement file or ``RPT_PAYMENT_SESSION_ID``
     - re-query the status host so refunds/revokes cancel Connect promptly
+
+    When ``refresh`` is None (product default): refresh only if
+    :func:`connect_status_host_refresh_needed` (warm local entitlement skips
+    the serial status-host wait on the HELLO critical path).
 
     Discovery of an active session **without** keygen still fails closed with
     :data:`CONNECT_BLOCKED_KEYGEN_MSG` (user must enter keygen unlock).
     """
-    if refresh:
+    do_refresh = (
+        bool(refresh)
+        if refresh is not None
+        else connect_status_host_refresh_needed(path=path, require=require)
+    )
+    if do_refresh:
         ensure_entitlement_for_connect(
             path=path, base_url=base_url, fetch=fetch
         )

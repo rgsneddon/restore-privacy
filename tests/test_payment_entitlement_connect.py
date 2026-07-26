@@ -414,7 +414,12 @@ class TestConnectGateChainsLicenceAndPayment(unittest.TestCase):
                         )
 
     def test_connect_path_refresh_blocks_after_server_revoke(self):
-        """Shipped assert_may_connect (Connect path) observes remote revoke."""
+        """Forced status-host refresh observes remote revoke (cold / Settings path).
+
+        Warm Connect may skip serial refresh when local entitlement already
+        allows Connect; pass ``refresh=True`` to force re-check (also used when
+        ``connect_status_host_refresh_needed`` is true).
+        """
         from client.licence_gate import accept_licence, assert_may_connect
         from client.payment_entitlement import record_payment_success
 
@@ -444,7 +449,7 @@ class TestConnectGateChainsLicenceAndPayment(unittest.TestCase):
                         sid, keygen=keygen
                     ),
                 ):
-                    ok, msg = assert_may_connect(path=lic)
+                    ok, msg = assert_may_connect(path=lic, refresh=True)
             self.assertFalse(ok)
             low = msg.lower()
             self.assertTrue(

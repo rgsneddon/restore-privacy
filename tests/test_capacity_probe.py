@@ -168,8 +168,13 @@ class TestProbeInjectsSelection(unittest.TestCase):
                 return json.dumps({"utilization": 0.97, "host": PRODUCT_NODE_HOST})
             return json.dumps({"utilization": 0.1, "host": PRODUCT_EXIT_HOST})
 
+        from client.multihop import MultiHopConfig
+
+        # Pin single-hop default catalog (ignore host Settings entry_country)
+        mh = MultiHopConfig()
         client = RptClient(
             status_cb=lines.append,
+            multihop=mh,
             probe_capacity=True,
             capacity_transport=transport,
             peer_capacity=None,
@@ -187,6 +192,7 @@ class TestProbeInjectsSelection(unittest.TestCase):
         ):
             client2 = RptClient(
                 status_cb=lines.append,
+                multihop=MultiHopConfig(),
                 probe_capacity=True,
                 peer_capacity=None,
             )
@@ -210,6 +216,8 @@ class TestProbeInjectsSelection(unittest.TestCase):
             self.assertIn("capacity", client2.last_capacity_advisory.lower())
 
     def test_probe_failure_failsoft_no_migration_no_crash(self):
+        from client.multihop import MultiHopConfig
+
         lines: list[str] = []
         with mock.patch(
             "client.connect.probe_peer_capacity_map",
@@ -217,6 +225,7 @@ class TestProbeInjectsSelection(unittest.TestCase):
         ):
             client = RptClient(
                 status_cb=lines.append,
+                multihop=MultiHopConfig(),
                 probe_capacity=True,
                 peer_capacity=None,
             )

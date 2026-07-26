@@ -1504,14 +1504,24 @@ class TunnelClientApp:
         )
 
         def work() -> None:
-            # All status-host refresh + residual HELLO stay off the Tk UI thread
-            # so Windows does not show "(Not Responding)" or freeze browsers
-            # while stacked network waits run.
+            # Status-host + residual HELLO stay off the Tk UI thread so Windows
+            # does not show "(Not Responding)" during network waits.
+            #
+            # Warm path: when local entitlement already allows Connect (active
+            # + keygen), skip serial bootstrap/refresh before HELLO. Background
+            # refresh still runs after dial starts so revokes surface soon.
+            from client.payment_entitlement import (
+                connect_status_host_refresh_needed,
+            )
+
+            need_status_host = True
             try:
-                bootstrap_payment_entitlement(bind_device=True)
+                need_status_host = bool(connect_status_host_refresh_needed())
             except Exception:
-                pass
-            ok_lic, lic_msg = assert_may_connect()
+                need_status_host = True
+            # Cold: ensure_entitlement inside assert_may_connect(refresh=True).
+            # Warm: local gate only (no serial status-host); bg refresh after.
+            ok_lic, lic_msg = assert_may_connect(refresh=need_status_host)
             if not ok_lic:
 
                 def fail_gate() -> None:
@@ -1530,6 +1540,21 @@ class TunnelClientApp:
 
                 self.root.after(0, fail_gate)
                 return
+
+            # Warm-path: re-check entitlement in background (non-blocking HELLO).
+            if not need_status_host:
+
+                def _bg_entitlement_refresh() -> None:
+                    try:
+                        bootstrap_payment_entitlement(bind_device=True)
+                    except Exception:
+                        pass
+
+                threading.Thread(
+                    target=_bg_entitlement_refresh,
+                    name="rpt-connect-entitlement-bg",
+                    daemon=True,
+                ).start()
 
             # Handshake + residual tunnel attach stay off the Tk UI thread.
             # Prefetch physical GW while HELLO runs to shorten residual attach.

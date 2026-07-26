@@ -167,17 +167,23 @@ def may_connect(path: Optional[Path] = None, *, refresh_payment: bool = False) -
     return payment_allows_connect()
 
 
-def assert_may_connect(path: Optional[Path] = None) -> tuple[bool, str]:
+def assert_may_connect(
+    path: Optional[Path] = None,
+    *,
+    refresh: bool | None = None,
+) -> tuple[bool, str]:
     """Return ``(True, \"\")`` if Connect may proceed; else ``(False, message)``.
 
-    Always re-checks payment entitlement (remote refresh when session id is
-    known) so refunds / failed charges cancel Connect for that install.
+    Payment entitlement: remote refresh when needed for cold path / near
+    expiry (see :func:`client.payment_entitlement.connect_status_host_refresh_needed`).
+    Pass ``refresh=True`` to force status-host re-check (e.g. Settings verify).
     """
     if not has_accepted_licence(path):
         return False, CONNECT_BLOCKED_LICENCE_MSG
     from client.payment_entitlement import assert_payment_may_connect
 
-    ok_pay, pay_msg = assert_payment_may_connect(refresh=True)
+    # Payment store is always the product entitlement path (not licence path).
+    ok_pay, pay_msg = assert_payment_may_connect(refresh=refresh)
     if not ok_pay:
         return False, pay_msg
     return True, ""
