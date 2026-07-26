@@ -18,24 +18,34 @@ public enum RptFullTunnelResult {
         + "residual public IP is unchanged. Full-tunnel requires an active OS VPN extension. "
         + "Approve VPN configuration in System Settings → Network → VPN & Filters, then Connect again."
 
+    /// Product residual success with IPv6 ISP leak mitigation installed in Packet Tunnel.
+    public static let ipv6IspPathBlockedMessage =
+        "Connected — VPN active; IPv6 ISP path blocked"
+
     /// Build the method-channel map for a full-tunnel product connect attempt.
     /// - Parameter packetTunnelActive: true only when NE tunnel status is connected.
     /// - Parameter hostOnlyHello: true when map describes a diagnostic HELLO (never success).
+    /// - Parameter ipv6Protected: true when Packet Tunnel installs IPv6 ISP mitigation
+    ///   (default-route capture / blackhole intent). Node residual remains IPv4 session.
     public static func productConnectMap(
         packetTunnelActive: Bool,
         vpnIp: String? = nil,
         detailMessage: String? = nil,
         hostOnlyHello: Bool = false,
-        nodeDiagnostic: String? = nil
+        nodeDiagnostic: String? = nil,
+        ipv6Protected: Bool = true
     ) -> [String: Any] {
         let ip = (vpnIp ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
         if packetTunnelActive && !hostOnlyHello {
-            // Apple residual is IPv4-only: do not claim IPv6 ISP path blocked / kill-switch.
             let base: String
             if let d = detailMessage?.trimmingCharacters(in: .whitespacesAndNewlines),
                !d.isEmpty,
                d.lowercased().contains("ipv6") {
                 base = d
+            } else if ipv6Protected {
+                base = !ip.isEmpty
+                    ? "\(ipv6IspPathBlockedMessage) (\(ip))"
+                    : ipv6IspPathBlockedMessage
             } else if !ip.isEmpty {
                 base = "Connected — IPv4 via VPN; IPv6 not protected (\(ip))"
             } else {
@@ -46,7 +56,7 @@ public enum RptFullTunnelResult {
                 "message": base,
                 "fullTunnelActive": true,
                 "hostOnlySession": false,
-                "ipv6Protected": false,
+                "ipv6Protected": ipv6Protected,
             ]
             if !ip.isEmpty { m["vpnIp"] = ip }
             return m

@@ -67,9 +67,10 @@ class PacketTunnelProvider: NEPacketTunnelProvider {
         ipv4.includedRoutes = [defaultRoute]
         ipv4.excludedRoutes = [NEIPv4Route(destinationAddress: self.endpointHost, subnetMask: "255.255.255.255")]
         settings.ipv4Settings = ipv4
-        // No IPv6 kill-switch / default-route blackhole: the node is IPv4 residual only.
-        // Leaving NEIPv6Settings unset keeps ISP IPv6 available (honestly unprotected).
-        settings.ipv6Settings = nil
+        // IPv6 residual protection (ISP leak mitigation): claim default IPv6 via tunnel.
+        // Node residual session remains IPv4-only RPT2 — not dual-stack residual routing.
+        // Capturing ::/0 on the tunnel blocks ISP IPv6 egress while residual is up.
+        settings.ipv6Settings = Self.ipv6IspLeakMitigationSettings()
         // Node tunnel DNS (Unbound on 10.88.0.1) — not third-party public resolvers
         settings.dnsSettings = NEDNSSettings(servers: ["10.88.0.1"])
         settings.mtu = 1280
@@ -80,7 +81,7 @@ class PacketTunnelProvider: NEPacketTunnelProvider {
             completionHandler(err)
             return
           }
-          self.setTunnelNetworkSettingsDone(vpnIp: session.vpnIp)
+          self.setTunnelNetworkSettingsDone(vpnIp: session.vpnIp, ipv6Protected: true)
           self.running = true
           // Transport already connected + ready (BSD connect completed before HELLO reply)
           self.startPacketLoops()
@@ -94,11 +95,23 @@ class PacketTunnelProvider: NEPacketTunnelProvider {
     }
   }
 
-  private func setTunnelNetworkSettingsDone(vpnIp: String) {
+  /// Product residual IPv6 ISP leak mitigation settings (parity with desktop block_isp).
+  static func ipv6IspLeakMitigationSettings() -> NEIPv6Settings {
+    // Stable ULA host address for the tunnel interface (not a public residual IPv6).
+    let ipv6 = NEIPv6Settings(
+      addresses: ["fd00:5274:7074::1"],
+      networkPrefixLengths: [128]
+    )
+    ipv6.includedRoutes = [NEIPv6Route.default()]
+    return ipv6
+  }
+
+  private func setTunnelNetworkSettingsDone(vpnIp: String, ipv6Protected: Bool = true) {
     if let proto = protocolConfiguration as? NETunnelProviderProtocol {
       var cfg = proto.providerConfiguration ?? [:]
       cfg["vpnIp"] = vpnIp
       cfg["ok"] = true
+      cfg["ipv6Protected"] = ipv6Protected
       proto.providerConfiguration = cfg
     }
   }
@@ -121,9 +134,9 @@ class PacketTunnelProvider: NEPacketTunnelProvider {
     if let s = session {
       let info: [String: Any] = [
         "ok": true,
-        "message": "Connected — IPv4 via VPN; IPv6 not protected (\(s.vpnIp))",
+        "message": "Connected — VPN active; IPv6 ISP path blocked (\(s.vpnIp))",
         "vpnIp": s.vpnIp,
-        "ipv6Protected": false,
+        "ipv6Protected": true,
         "fullTunnelActive": true,
       ]
       completionHandler?(try? JSONSerialization.data(withJSONObject: info))

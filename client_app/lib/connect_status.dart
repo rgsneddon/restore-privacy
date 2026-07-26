@@ -434,9 +434,10 @@ Map<String, dynamic> buildFullTunnelConnectResult({
   String? detailMessage,
   bool hostOnlyHello = false,
   String? nodeDiagnostic,
-  /// Apple residual is IPv4-only (no IPv6 kill-switch). Default false for honesty.
-  /// Platforms that install real IPv6 protection may pass true.
-  bool ipv6Protected = false,
+  /// Product residual installs IPv6 ISP leak mitigation in Packet Tunnel.
+  /// Default true matches Apple residual success after protection is applied.
+  /// Pass false only when protection was not installed.
+  bool ipv6Protected = true,
 }) {
   if (packetTunnelActive && !hostOnlyHello) {
     final ip = (vpnIp ?? '').trim();
@@ -444,16 +445,16 @@ Map<String, dynamic> buildFullTunnelConnectResult({
     final String base;
     if (detail.isNotEmpty && detail.toLowerCase().contains('ipv6')) {
       base = detail;
-    } else if (!ipv6Protected) {
+    } else if (ipv6Protected) {
       base = ip.isNotEmpty
-          ? 'Connected — IPv4 via VPN; IPv6 not protected ($ip)'
-          : 'Connected — IPv4 via VPN; IPv6 not protected';
+          ? 'Connected — VPN active; IPv6 ISP path blocked ($ip)'
+          : 'Connected — VPN active; IPv6 ISP path blocked';
     } else if (detail.isNotEmpty) {
       base = detail;
     } else {
       base = ip.isNotEmpty
-          ? 'Connected — tunnel IP $ip'
-          : 'Connected — Packet Tunnel active';
+          ? 'Connected — IPv4 via VPN; IPv6 not protected ($ip)'
+          : 'Connected — IPv4 via VPN; IPv6 not protected';
     }
     return {
       'ok': true,

@@ -446,16 +446,27 @@ void main() {
       expect(map['ok'], isTrue);
       expect(map['fullTunnelActive'], isTrue);
       expect(map['hostOnlySession'], isFalse);
-      expect(map['ipv6Protected'], isFalse);
+      // Product residual installs IPv6 ISP leak mitigation in Packet Tunnel.
+      expect(map['ipv6Protected'], isTrue);
       expect(isConnectSuccess(map), isTrue);
       final msg = mapConnectStatusMessage(map);
       expect(msg, contains('10.88.0.19'));
-      // Apple residual honesty: IPv4 via VPN; no IPv6 kill-switch claim
-      expect(msg, contains('IPv6 not protected'));
-      expect(msg.toLowerCase(), isNot(contains('ipv6 isp path blocked')));
+      expect(msg.toLowerCase(), contains('ipv6 isp path blocked'));
+      expect(msg.toLowerCase(), isNot(contains('ipv6 not protected')));
       // Window stays open after product Connect (no auto hide-to-tray)
       expect(shouldHideToTrayAfterConnect(map), isFalse);
       expect(shouldHideToTrayAfterConnectSuccess(true), isFalse);
+    });
+
+    test('product success without IPv6 protection stays honest', () {
+      final map = buildFullTunnelConnectResult(
+        packetTunnelActive: true,
+        vpnIp: '10.88.0.20',
+        ipv6Protected: false,
+      );
+      expect(map['ipv6Protected'], isFalse);
+      final msg = mapConnectStatusMessage(map);
+      expect(msg, contains('IPv6 not protected'));
     });
 
     test('(c) NE start failed is ok:false with residual-IP honest message', () {
