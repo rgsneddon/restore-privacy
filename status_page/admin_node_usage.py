@@ -1,6 +1,6 @@
 """Admin fleet node usage: bandwidth used vs capability (authenticated only).
 
-Public status stays title-only. This module builds operator rows for IS/RO/DE
+Public status stays title-only. This module builds operator rows for IS/RO/US
 from the product country catalog and optional private capacity probes.
 """
 
@@ -77,7 +77,7 @@ def product_catalog_peers() -> list[dict[str, Any]]:
         return [
             {"code": "IS", "name": "Iceland", "host": "82.221.101.241", "port": 44044},
             {"code": "RO", "name": "Romania", "host": "185.146.232.107", "port": 44044},
-            {"code": "DE", "name": "Germany", "host": "167.233.224.5", "port": 44044},
+            {"code": "US", "name": "United States", "host": "5.161.242.85", "port": 44044},
         ]
     out: list[dict[str, Any]] = []
     for n in cat:
@@ -511,7 +511,7 @@ def render_admin_node_usage_section_html(
          data-admin-node-usage="1">
   <h2 id="admin-node-usage-heading">Fleet node usage (bandwidth)</h2>
   <p class="muted" id="admin-node-usage-blurb">
-  Residual catalog peers (IS / RO / DE). <strong>Bandwidth used</strong> is average
+  Residual catalog peers (IS / RO / US). <strong>Bandwidth used</strong> is average
   process-wide relay rate since node start (bits/s from private counters).
   <strong>Capacity</strong> is operator-configured budget
   (<code>RPT_NODE_BANDWIDTH_CAP_BPS</code> or per-host

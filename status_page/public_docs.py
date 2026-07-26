@@ -150,12 +150,48 @@ def _candidate_paths(filename: str) -> list[Path]:
     ]
 
 
+def _redact_public_doc_text(text: str) -> str:
+    """Strip residual monopin IPv4s from public markdown (AUDIT/CREDITS/etc.)."""
+    try:
+        # Prefer monorepo client helper when available on the status host
+        import sys
+
+        root = str(REPO_ROOT)
+        if root not in sys.path:
+            sys.path.insert(0, root)
+        from client.residual_public import redact_residual_hosts_in_text
+
+        return redact_residual_hosts_in_text(text)
+    except Exception:  # noqa: BLE001
+        # Fail closed: still blank known monopin IPs without client package
+        for host in (
+            "82.221.101.241",
+            "185.146.232.107",
+            "167.233.224.5",
+        ):
+            text = text.replace(host, "VPN node")
+        return text
+
+
 def load_public_document_bytes(filename: str, *, min_size: int = 20) -> bytes | None:
-    """Load a public document from status_page/public, status_page, or repo root."""
+    """Load a public document from status_page/public, status_page, or repo root.
+
+    User-facing public docs are redacted of residual monopin IPv4s before serve.
+    """
     for path in _candidate_paths(filename):
         try:
             if path.is_file() and path.stat().st_size >= min_size:
-                return path.read_bytes()
+                raw = path.read_bytes()
+                name = path.name.upper()
+                # Redact residual hosts from public-facing text docs
+                if name.endswith(".MD") or name in ("LICENSE", "CREDITS.MD", "AUDIT.MD"):
+                    try:
+                        text = raw.decode("utf-8")
+                        text = _redact_public_doc_text(text)
+                        return text.encode("utf-8")
+                    except UnicodeDecodeError:
+                        return raw
+                return raw
         except OSError:
             continue
     return None

@@ -183,8 +183,14 @@ def countdown_state(
 
 def load_security_audit_latest(
     path: Path | None = None,
+    *,
+    public: bool = True,
 ) -> dict[str, Any] | None:
-    """Load ``security_audit_latest.json`` when present (dict or None)."""
+    """Load ``security_audit_latest.json`` when present (dict or None).
+
+    When *public* is True (default), residual monopin IPv4s are redacted for
+    any public consumer. Pass ``public=False`` for operator/admin tooling.
+    """
     p = path if path is not None else _DEFAULT_JSON
     try:
         if not p.is_file():
@@ -192,7 +198,29 @@ def load_security_audit_latest(
         data = json.loads(p.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError, TypeError, ValueError):
         return None
-    return data if isinstance(data, dict) else None
+    if not isinstance(data, dict):
+        return None
+    if public:
+        try:
+            import sys
+            from pathlib import Path as _P
+
+            root = str(_P(__file__).resolve().parents[1])
+            if root not in sys.path:
+                sys.path.insert(0, root)
+            from client.residual_public import public_security_audit_payload
+
+            return public_security_audit_payload(data)
+        except Exception:  # noqa: BLE001
+            # Fail closed: blank known monopin hosts
+            for key in ("node_host",):
+                if key in data and isinstance(data[key], str):
+                    data[key] = "VPN node"
+            for sec_name in ("tcp_status", "udp", "http_status"):
+                sec = data.get(sec_name)
+                if isinstance(sec, dict) and "host" in sec:
+                    sec["host"] = "VPN node"
+    return data
 
 
 def current_audit_rag_colour(

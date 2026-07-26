@@ -4,7 +4,7 @@ Display for https://restoreprivacy.online/ homepage. Period matches the product
 **weekly sequential fleet wipe** service (``OnUnitActiveSec=604800`` / ``7d``).
 
 Honesty:
-- Label covers **all catalog residual peers** (IS → RO → DE) over the cycle.
+- Label covers **all catalog residual peers** (IS → RO → US) over the cycle.
 - Wipe is **one peer at a time** (never concurrent multi-node wipe).
 - Live completion advances the clear clock when recorded; dry-run does not.
 - Without a last-clear anchor the UI uses a fixed ~7d epoch grid.

@@ -57,8 +57,8 @@ def admin_section_top_link_html() -> str:
 # Operator-facing architecture blurb (must stay current; grepped by tests).
 ADMIN_ARCHITECTURE_BLURB = (
     "Residual catalog peers: Iceland (IS, default entry), Romania (RO), "
-    "Germany (DE) — user-selectable entry; multi-hop opt-in uses a random "
-    "non-entry peer. Weekly fleet wipe is sequential IS → RO → DE (exclusive "
+    "United States (US) — user-selectable entry; multi-hop opt-in uses a random "
+    "non-entry peer. Weekly fleet wipe is sequential IS → RO → US (exclusive "
     "lock; never concurrent multi-node wipe). Paid Stripe Checkout "
     f"(Monthly {PRICE_LABEL} / Yearly {PRICE_YEARLY_LABEL} GBP) + keygen unlock; "
     "no free permanent GitHub installers. Public status is title-only (no live "
@@ -554,7 +554,7 @@ def render_admin_licences_section_html(
   node wipeclean. <strong>Read-only</strong> here: no edit, revoke, or amend
   controls. Status is <code>OK</code> (active subscription) or
   <code>EXPIRED</code> (revoked, failed, or period ended). Keygen unlocks
-  residual Connect on any catalog peer (IS / RO / DE), not a single-node product.
+  residual Connect on any catalog peer (IS / RO / US), not a single-node product.
   </p>
   <table id="admin-licences-table" data-readonly="1">
     <thead><tr>
@@ -914,7 +914,7 @@ h1{{font-size:1.1rem;margin:0 0 0.5rem;color:var(--fg)}}
   <h1>Operator admin</h1>
   <p class="note" id="admin-login-note">Private page: Stripe processor settings,
   licence database, and paid-download grants for the multi-peer residual catalog
-  (IS / RO / DE). Not the public shop.</p>
+  (IS / RO / US). Not the public shop.</p>
   {err}
   <label for="username">Username</label>
   <input id="username" name="username" autocomplete="username" required/>
@@ -1420,7 +1420,7 @@ background:var(--btn-bg);color:var(--btn-fg);font-weight:600;cursor:pointer}}
   <p class="muted" id="admin-grants-blurb">Full history of Stripe-verified download grants
   (Monthly {_escape(PRICE_LABEL)} / Yearly {_escape(PRICE_YEARLY_LABEL)} GBP by plan) —
   every completed payment grant in the durable store. <strong>Retained across residual
-  fleet wipe/rebuild</strong> (IS → RO → DE sequential). Used single-use tokens stay
+  fleet wipe/rebuild</strong> (IS → RO → US sequential). Used single-use tokens stay
   listed (status <code>used</code>); purchase identifier (RPT-PPI) is durable.
   Catalog installers are multi-platform residual clients, not free GitHub assets.
   Secrets never shown.</p>
