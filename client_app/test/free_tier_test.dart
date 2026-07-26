@@ -39,9 +39,9 @@ void main() {
     }
   });
 
-  test('RptConfig paid productVersion is 0.4.6 catalog pin', () {
-    expect(RptConfig.productVersion, '0.4.6');
-    expect(RptConfig.displayProductVersion, freeAwareProductVersion('0.4.6'));
+  test('RptConfig paid productVersion is 0.4.8 catalog pin', () {
+    expect(RptConfig.productVersion, '0.4.8');
+    expect(RptConfig.displayProductVersion, freeAwareProductVersion('0.4.8'));
     // Free: multi-hop forced off; paid default also off without settings.
     expect(RptConfig.multiHopEnabled, isFalse);
     expect(RptConfig.host, RptConfig.entryHost);

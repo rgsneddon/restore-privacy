@@ -102,7 +102,7 @@ class TestPaymentStoreWipeProtection(unittest.TestCase):
                         """,
                         (
                             "tok-wipe-test-1",
-                            "restore-privacy-client-0.4.6-windows-x64-setup.exe",
+                            "restore-privacy-client-0.4.8-windows-x64-setup.exe",
                             "windows",
                             "cs_wipe_test_1",
                             245,
@@ -332,7 +332,7 @@ class TestLegacyMigrateToDurable(unittest.TestCase):
                     """,
                     (
                         "tok-migrate-1",
-                        "restore-privacy-client-0.4.6-windows-x64-setup.exe",
+                        "restore-privacy-client-0.4.8-windows-x64-setup.exe",
                         "windows",
                         "cs_migrate_1",
                         245,

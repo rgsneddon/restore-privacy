@@ -5,6 +5,7 @@ import 'package:url_launcher/url_launcher.dart';
 
 import 'connection_log.dart';
 import 'free_tier.dart';
+import 'keygen_field.dart';
 import 'leak_test.dart';
 import 'legal_links.dart';
 import 'licence_gate.dart';
@@ -655,13 +656,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
             style: const TextStyle(fontSize: 12, color: kText),
           ),
           const SizedBox(height: 8),
-          TextField(
+          KeygenEntryField(
             controller: _sessionCtrl,
-            decoration: const InputDecoration(
-              labelText: 'Keygen (RPT-KEY-…) from fulfilment email',
-              border: OutlineInputBorder(),
-              isDense: true,
-            ),
+            labelText: 'Keygen (RPT-KEY-…) from fulfilment email',
+            isDense: true,
             style: const TextStyle(fontSize: 13),
             enabled: !_busy,
           ),

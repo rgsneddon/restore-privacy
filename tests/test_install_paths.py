@@ -115,7 +115,7 @@ class TestBundleInventory(unittest.TestCase):
     def test_inventory_incomplete_without_restore_internet(self):
         with tempfile.TemporaryDirectory() as td:
             root = Path(td)
-            (root / "RestorePrivacy-0.4.6.exe").write_bytes(b"MZ")
+            (root / "RestorePrivacy-0.4.8.exe").write_bytes(b"MZ")
             inv = inventory_install_bundle(root, platform="win32")
             self.assertIsNotNone(inv.client_entry)
             self.assertIsNone(inv.restore_internet_entry)

@@ -6,6 +6,7 @@ import 'package:url_launcher/url_launcher.dart';
 import 'connect_status.dart';
 import 'connection_log.dart';
 import 'country_select.dart';
+import 'keygen_field.dart';
 import 'licence_gate.dart';
 import 'macos_window.dart';
 import 'prefs_backend.dart';
@@ -130,7 +131,7 @@ class _TunnelHomeState extends State<TunnelHome> with WidgetsBindingObserver {
 
   /// First-run / post-install style prep: save product Packet Tunnel to OS prefs.
   Future<void> _prepareMacosPacketTunnelBeforeConnect() async {
-    if (!MacosWindow.isSupported) return;
+    if (!MacWindowController.isSupported) return;
     if (!mounted) return;
     _append(
       'Preparing system VPN profile (Restore Privacy Packet Tunnel)…',
@@ -396,6 +397,14 @@ class _TunnelHomeState extends State<TunnelHome> with WidgetsBindingObserver {
   }
 
   /// Forced keygen unlock surface (parity with Windows/Linux desktop modals).
+  ///
+  /// On **valid** keygen the sheet is fully dismissed (returns) **before** any
+  /// Packet Tunnel prepare / System Settings Allow path runs — so Network
+  /// Settings never opens on top of a stuck keygen window.
+  ///
+  /// Navigator pairing: sheet uses [useRootNavigator] true and must be popped
+  /// with the **same** navigator (root). Popping root while the sheet is on a
+  /// nested navigator leaves the keygen window stuck open.
   Future<void> _showKeygenSheet() async {
     // EXPIRED installs must renew — never show keygen in place of renew.
     if (await (_licence?.needsLicenceRenewal() ?? false)) {
@@ -404,17 +413,59 @@ class _TunnelHomeState extends State<TunnelHome> with WidgetsBindingObserver {
     }
     if (!mounted) return;
     final controller = TextEditingController();
-    await showModalBottomSheet<void>(
+    // true = use root navigator for push AND pop (must match).
+    const useRoot = true;
+    final unlocked = await showModalBottomSheet<bool>(
       context: context,
       isScrollControlled: true,
+      isDismissible: false,
+      enableDrag: false,
+      useRootNavigator: useRoot,
       backgroundColor: kPanelBg,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
       ),
-      builder: (ctx) {
+      builder: (sheetContext) {
         var statusLine = '';
+        var busy = false;
         return StatefulBuilder(
           builder: (ctx, setModal) {
+            Future<void> tryUnlock() async {
+              if (busy) return;
+              final raw = controller.text.trim();
+              if (raw.isEmpty) {
+                setModal(() => statusLine = 'Paste the keygen first.');
+                return;
+              }
+              setModal(() {
+                busy = true;
+                statusLine = 'Verifying keygen with status host…';
+              });
+              final st = await _licence?.importKeygenAndVerify(raw) ??
+                  kPaymentStatusUnknown;
+              final ok = await _licence?.paymentAllowsConnect() ?? false;
+              // Dismiss only on valid unlock (shipped contract).
+              if (!shouldDismissKeygenSheetAfterUnlock(
+                paymentAllowsConnect: ok,
+                paymentStatus: st,
+              )) {
+                if (ctx.mounted) {
+                  setModal(() {
+                    busy = false;
+                    statusLine =
+                        'Keygen not active (status=$st). Check email code / subscription.';
+                  });
+                }
+                return;
+              }
+              // Valid key: pop the **same** navigator that owns this sheet.
+              if (sheetContext.mounted) {
+                Navigator.of(sheetContext, rootNavigator: useRoot).pop(true);
+              } else if (ctx.mounted) {
+                Navigator.of(ctx, rootNavigator: useRoot).pop(true);
+              }
+            }
+
             return Padding(
               padding: EdgeInsets.fromLTRB(
                 20,
@@ -442,14 +493,24 @@ class _TunnelHomeState extends State<TunnelHome> with WidgetsBindingObserver {
                     style: TextStyle(fontSize: 12, color: kTextMuted),
                   ),
                   const SizedBox(height: 12),
-                  TextField(
+                  KeygenEntryField(
                     controller: controller,
-                    decoration: const InputDecoration(
-                      labelText: 'RPT-KEY-…',
-                      border: OutlineInputBorder(),
-                    ),
-                    autocorrect: false,
-                    enableSuggestions: false,
+                    autofocus: true,
+                    labelText: 'RPT-KEY-…',
+                    enabled: !busy,
+                    // Paste of a full product keygen → verify + dismiss automatically.
+                    onPasted: (text) {
+                      if (looksLikeProductKeygen(text)) {
+                        tryUnlock();
+                      }
+                    },
+                    onChanged: (text) {
+                      // Enter / submit on field also unlocks when it looks complete.
+                      if (looksLikeProductKeygen(text) &&
+                          text.trim().endsWith('\n')) {
+                        tryUnlock();
+                      }
+                    },
                   ),
                   if (statusLine.isNotEmpty) ...[
                     const SizedBox(height: 8),
@@ -457,41 +518,19 @@ class _TunnelHomeState extends State<TunnelHome> with WidgetsBindingObserver {
                   ],
                   const SizedBox(height: 16),
                   FilledButton(
-                    onPressed: () async {
-                      final raw = controller.text.trim();
-                      if (raw.isEmpty) {
-                        setModal(() => statusLine = 'Paste the keygen first.');
-                        return;
-                      }
-                      setModal(
-                        () => statusLine =
-                            'Verifying keygen with status host…',
-                      );
-                      final st = await _licence?.importKeygenAndVerify(raw) ??
-                          kPaymentStatusUnknown;
-                      final ok = await _licence?.paymentAllowsConnect() ?? false;
-                      if (!mounted) return;
-                      if (ok) {
-                        setState(() {
-                          _status =
-                              'Keygen verified. Press Connect for residual protection.';
-                        });
-                        _append('Keygen unlocked (status=$st).');
-                        Navigator.of(ctx).pop();
-                        // Register Packet Tunnel before user presses Connect.
-                        await _prepareMacosPacketTunnelBeforeConnect();
-                      } else {
-                        setModal(
-                          () => statusLine =
-                              'Keygen not active (status=$st). Check email code / subscription.',
-                        );
-                      }
-                    },
+                    onPressed: busy ? null : tryUnlock,
                     style: FilledButton.styleFrom(backgroundColor: kPrimary),
-                    child: const Text('Unlock Connect'),
+                    child: Text(busy ? 'Verifying…' : 'Unlock Connect'),
                   ),
                   TextButton(
-                    onPressed: () => Navigator.of(ctx).pop(),
+                    onPressed: busy
+                        ? null
+                        : () {
+                            Navigator.of(
+                              sheetContext,
+                              rootNavigator: useRoot,
+                            ).pop(false);
+                          },
                     child: const Text('Cancel'),
                   ),
                 ],
@@ -501,6 +540,17 @@ class _TunnelHomeState extends State<TunnelHome> with WidgetsBindingObserver {
         );
       },
     );
+    controller.dispose();
+    if (!mounted) return;
+    if (unlocked == true) {
+      setState(() {
+        _status =
+            'Keygen verified. Press Connect for residual protection.';
+      });
+      _append('Keygen unlocked.');
+      // Sheet is fully closed — safe to register Packet Tunnel / open Settings.
+      await _prepareMacosPacketTunnelBeforeConnect();
+    }
   }
 
   Future<bool> assertMayConnect() async {
@@ -599,9 +649,13 @@ class _TunnelHomeState extends State<TunnelHome> with WidgetsBindingObserver {
       if (ok) {
         _append(_status);
         await _connLog(kLogKindConnect, 'Connected — residual path active');
-        // macOS: hide to menu-bar tray only after product full-tunnel success.
-        if (shouldHideToTrayAfterConnectSuccess(ok)) {
+        // Keep main window open after Connect (no auto hide-to-tray / minimize).
+        // Tray icon may still update for status; user can hide manually via close→tray.
+        if (MacWindowController.isSupported) {
           await _macWindow.setTrayConnected(true);
+        }
+        if (shouldHideToTrayAfterConnectSuccess(ok)) {
+          // Policy helper is false: window stays open. Call site kept for tests/docs.
           await _macWindow.hideToTray(connected: true);
           _append('Window hidden to menu bar tray — restore via the RP tray icon.');
         }
@@ -694,18 +748,33 @@ class _TunnelHomeState extends State<TunnelHome> with WidgetsBindingObserver {
     if (_connected) {
       setState(() => _busy = true);
       try {
-        _append('Disconnect — tearing down tunnel…');
+        _append('Disconnect — tearing down system Packet Tunnel…');
         await _connLog(kLogKindDisconnect, 'Disconnect started');
         await _vpn.disconnect();
         if (!mounted) return;
-        setState(() {
-          _connected = false;
-          _vpnIp = null;
-          _status = 'Disconnected. Press Connect when you want protection.';
-        });
-        _append('Disconnected.');
-        await _connLog(kLogKindDisconnect, 'Disconnected');
-        await _macWindow.setTrayConnected(false);
+        // Confirm OS VPN is down (native stop + status poll).
+        final snap = await _vpn.querySession();
+        if (!mounted) return;
+        if (snap.connected || snap.connecting) {
+          setState(() {
+            _connected = true;
+            _status = snap.message ??
+                'Disconnect issued but system VPN still active — try Disconnect again.';
+          });
+          _append(_status);
+          await _connLog(kLogKindDisconnect, 'System VPN still active after disconnect');
+          await _macWindow.setTrayConnected(true);
+        } else {
+          setState(() {
+            _connected = false;
+            _vpnIp = null;
+            _status =
+                'Disconnected — system VPN stopped. Press Connect when you want protection.';
+          });
+          _append('Disconnected — system Network VPN off.');
+          await _connLog(kLogKindDisconnect, 'Disconnected system VPN stopped');
+          await _macWindow.setTrayConnected(false);
+        }
         // Restore UI after explicit disconnect so status is visible.
         await _macWindow.showFromTray();
       } finally {

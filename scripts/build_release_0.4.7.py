@@ -1,20 +1,20 @@
 #!/usr/bin/env python3
-"""Build / stage Restore Privacy client packages for release 0.4.8.
+"""Build / stage Restore Privacy client packages for release 0.4.7.
 
-**0.4.8** multi-hop residual catalog. Apple packages are Flutter-built then
+**0.4.7** multi-hop residual catalog. Apple packages are Flutter-built then
 DevID/notarized (macOS) / Team-signed (iOS). Linux is rebuilt via package_linux.
 **Windows multihop PE** must be built on Windows x64::
 
   python scripts/build_windows_multihop.py
   # or:  scripts\\build_windows_multihop.bat
-  # or:  python scripts/build_release_0.4.8.py --windows-only
+  # or:  python scripts/build_release_0.4.7.py --windows-only
 
 If PyInstaller rebuild is unavailable, Windows falls back to carry-forward /
 SFX pin rewrite (honest: no multihop residual *code* until native rebuild).
 
 Never bundles node_elgamal.priv or shared client_ed25519.priv.
 
-Handoff: ``client/windows/WINDOWS_HANDOFF_0.4.8.md``
+Handoff: ``client/windows/WINDOWS_HANDOFF_0.4.7.md``
 """
 
 from __future__ import annotations
@@ -30,7 +30,7 @@ import zipfile
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-VERSION = "0.4.8"
+VERSION = "0.4.7"
 OUT = ROOT / "releases" / VERSION
 WINDOWS_EXE_NAME = f"restore-privacy-client-{VERSION}-windows-x64-setup.exe"
 ANDROID_APK_NAME = f"restore-privacy-client-{VERSION}-android.apk"
@@ -50,7 +50,7 @@ MACOS_APP = (
 )
 IOS_APP = ROOT / "client_app" / "build" / "ios" / "iphoneos" / "Runner.app"
 
-# Carry-forward non-Apple platforms from last full catalog pin on this host
+# Carry-forward non-Apple platforms from last full catalog pin
 PRIOR_TAG = "0.4.6"
 PRIOR_DOWNLOAD = (
     f"https://github.com/rgsneddon/restore-privacy/releases/download/{PRIOR_TAG}"
@@ -81,7 +81,6 @@ def write_version_files() -> None:
         t = inst.read_text(encoding="utf-8")
         t2 = t
         for old in (
-            "0.4.7",
             "0.4.6",
             "0.4.5",
             "0.4.4",
@@ -285,7 +284,7 @@ def stage_windows_exe(*, force_rebuild: bool = False) -> Path:
             )
             if force_rebuild:
                 raise
-    # Prefer already-rebuilt 0.4.8 SFX if present with correct pin
+    # Prefer already-rebuilt 0.4.7 SFX if present with correct pin
     if dest.is_file() and dest.stat().st_size > 1_000_000:
         data = dest.read_bytes()
         title_ok = b'Title="Restore Privacy ' + VERSION.encode() + b'"' in data
@@ -559,7 +558,7 @@ def stage_macos_zip() -> Path:
     except Exception as exc:  # noqa: BLE001
         print(
             f"macos native package unavailable ({exc}); "
-            f"carry-forward prior zip → {dest.name} (Mac must rebuild/sign for real 0.4.8)",
+            f"carry-forward prior zip → {dest.name} (Mac must rebuild/sign for real 0.4.7)",
             file=sys.stderr,
         )
         return _stage_from_prior(
@@ -575,7 +574,7 @@ def stage_ios_zip() -> Path:
     except Exception as exc:  # noqa: BLE001
         print(
             f"ios native package unavailable ({exc}); "
-            f"carry-forward prior zip → {dest.name} (Mac must rebuild/sign for real 0.4.8)",
+            f"carry-forward prior zip → {dest.name} (Mac must rebuild/sign for real 0.4.7)",
             file=sys.stderr,
         )
         return _stage_from_prior(
@@ -598,7 +597,7 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument(
         "--with-carry-forward",
         action="store_true",
-        help="Also stage Windows/Android/Linux under 0.4.8 names (default if not apple/windows-only)",
+        help="Also stage Windows/Android/Linux under 0.4.7 names (default if not apple/windows-only)",
     )
     args = ap.parse_args(argv)
 
@@ -625,7 +624,7 @@ def main(argv: list[str] | None = None) -> int:
                 }
                 for name, dig in artifacts.items()
             ],
-            "notes": "0.4.8 Windows multihop residual PE (build_windows_multihop / --windows-only)",
+            "notes": "0.4.7 Windows multihop residual PE (build_windows_multihop / --windows-only)",
         }
         # Merge with existing manifest assets when present
         if man_path.is_file():
@@ -693,11 +692,9 @@ def main(argv: list[str] | None = None) -> int:
             for name, dig in artifacts.items()
         ],
         "notes": (
-            "0.4.8: Windows native multihop PE + Connect/Disconnect speed + country picker; "
-            "macOS/iOS catalog zips honest CF until Mac Developer ID notarize / Team-sign; "
-            "keygen paste/dismiss and Connect/Disconnect system VPN tandem from Apple host branch; "
+            "0.4.7: native Apple rebuild (keygen dismiss + stay open after Connect + NE prep); non-Apple CF from 0.4.6; Developer ID notarized macOS + iOS Team-signed sideload; "
             "public host without NE, Packet Tunnel appex with packet-tunnel-provider; "
-            "Linux rebuilt; Android residual-wire rebuild when SDK present else prior wire-complete APK."
+            "Linux rebuilt; Windows SFX pin-rewritten; Android residual-wire rebuild when SDK present else prior wire-complete APK."
         ),
     }
     man_path = OUT / "SHA256SUMS.json"

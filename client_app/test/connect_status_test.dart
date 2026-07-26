@@ -404,9 +404,9 @@ void main() {
       // Apple residual honesty: IPv4 via VPN; no IPv6 kill-switch claim
       expect(msg, contains('IPv6 not protected'));
       expect(msg.toLowerCase(), isNot(contains('ipv6 isp path blocked')));
-      // macOS hide-to-tray only after product full-tunnel success
-      expect(shouldHideToTrayAfterConnect(map), isTrue);
-      expect(shouldHideToTrayAfterConnectSuccess(true), isTrue);
+      // Window stays open after product Connect (no auto hide-to-tray)
+      expect(shouldHideToTrayAfterConnect(map), isFalse);
+      expect(shouldHideToTrayAfterConnectSuccess(true), isFalse);
     });
 
     test('(c) NE start failed is ok:false with residual-IP honest message', () {
@@ -434,6 +434,45 @@ void main() {
       );
       expect(isConnectSuccess(map), isFalse);
       expect(shouldHideToTrayAfterConnect(map), isFalse);
+    });
+
+    test('product Connect success never auto-hides window', () {
+      expect(shouldHideToTrayAfterConnectSuccess(true), isFalse);
+      expect(shouldHideToTrayAfterConnectSuccess(false), isFalse);
+      expect(
+        shouldHideToTrayAfterConnect({
+          'ok': true,
+          'fullTunnelActive': true,
+          'message': 'Connected',
+        }),
+        isFalse,
+      );
+    });
+
+    test('valid keygen unlock dismisses sheet; invalid keeps it open', () {
+      expect(
+        shouldDismissKeygenSheetAfterUnlock(paymentAllowsConnect: true),
+        isTrue,
+      );
+      expect(
+        shouldDismissKeygenSheetAfterUnlock(paymentAllowsConnect: false),
+        isFalse,
+      );
+      // Active verify status dismisses even if secondary allow flag races false
+      expect(
+        shouldDismissKeygenSheetAfterUnlock(
+          paymentAllowsConnect: false,
+          paymentStatus: 'active',
+        ),
+        isTrue,
+      );
+      expect(
+        shouldDismissKeygenSheetAfterUnlock(
+          paymentAllowsConnect: false,
+          paymentStatus: 'unknown',
+        ),
+        isFalse,
+      );
     });
 
     test('legacy hostOnlySession flag rejects ok:true maps', () {

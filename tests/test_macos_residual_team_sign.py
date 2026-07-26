@@ -185,6 +185,69 @@ class TestMacosResidualTeamSign(unittest.TestCase):
         ):
             self.assertIn(needle, text, f"missing settings candidate: {needle}")
 
+    def test_prepare_detects_host_missing_packet_tunnel_entitlement(self):
+        """Prepare must refuse registration when host lacks packet-tunnel-provider.
+
+        Public DevID host omits NE so AMFI does not kill launch; residual
+        registration then fails unless Team residual re-sign is applied.
+        """
+        text = CHANNEL.read_text(encoding="utf-8")
+        for needle in (
+            "hostHasPacketTunnelNetworkExtensionEntitlement",
+            "hostMissingNeEntitlementMessage",
+            "needsTeamResidualSign",
+            "packet-tunnel-provider",
+            "sign_macos_residual_team.py",
+            # After save, re-assert isEnabled so Network settings is not stuck inactive
+            "Packet Tunnel saved but remains disabled",
+        ):
+            self.assertIn(needle, text, f"missing prepare residual contract: {needle}")
+        # loadOrCreateManager gates on host entitlement before loadAllFromPreferences
+        self.assertLess(
+            text.index("hostHasPacketTunnelNetworkExtensionEntitlement"),
+            text.index("loadAllFromPreferences"),
+        )
+
+    def test_disconnect_stops_system_network_vpn(self):
+        """Disconnect must stopVPNTunnel and wait for system VPN down."""
+        text = CHANNEL.read_text(encoding="utf-8")
+        for needle in (
+            "stopAllTunnels",
+            "stopVPNTunnel",
+            "issueStopOnManagers",
+            "waitUntilManagersDisconnected",
+            "systemVpnStopped",
+            "shouldStopManager",
+            # Broader match so Network row always tears down
+            "restorePrivacyClient",
+            "case \"status\"",
+        ):
+            self.assertIn(needle, text, f"missing disconnect system-stop: {needle}")
+
+    def test_connect_enables_system_vpn_then_starts_tunnel(self):
+        """Connect must re-register/enable Network VPN and startTunnel in tandem."""
+        text = CHANNEL.read_text(encoding="utf-8")
+        for needle in (
+            "enableProductVpnAndStartTunnel",
+            "reloadProductManager",
+            "ensureEnabledThenStartTunnel",
+            "isProductManager",
+            "lastSuccessfulPrepareAt = nil",
+            "startTunnel(options:",
+            # User-deleted config is recreated on Connect
+            "re-registers the system VPN profile",
+            # Network toggle turns on with startTunnel when allowed
+            "enables the system VPN connection in Network settings",
+        ):
+            self.assertIn(needle, text, f"missing connect tandem path: {needle}")
+        # Product manager matching must not hijack empty-provider rows
+        self.assertIn("bid == providerBundleId", text)
+        # Connect entry calls enable helper (not bare loadOrCreate alone)
+        connect_fn = text.split("private static func connect(", 1)[1].split(
+            "private static func enableProductVpnAndStartTunnel", 1
+        )[0]
+        self.assertIn("enableProductVpnAndStartTunnel", connect_fn)
+
     def test_catalog_handoff_and_build_docs_name_team_residual_resign(self):
         """Operator-facing residual docs: Packet Tunnel residual needs Team re-sign."""
         handoff = (ROOT / "client_app" / "APPLE_HANDOFF_0.3.4.md").read_text(
