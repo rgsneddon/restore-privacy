@@ -22,7 +22,7 @@ class TestApplePackageAudit(unittest.TestCase):
         from downloads import RELEASE_VERSION
 
         pin = (ROOT / "client" / "VERSION").read_text(encoding="utf-8").strip()
-        self.assertEqual(pin, "0.4.7")
+        self.assertEqual(pin, "0.4.8")
         self.assertEqual(RELEASE_VERSION, pin)
         report = audit_catalog_apple_packages(version=RELEASE_VERSION)
         self.assertEqual(report["catalog_version"], pin)
@@ -58,7 +58,7 @@ class TestApplePackageAudit(unittest.TestCase):
         # Prefer current monopin handoff; fall back to latest 0.4.x ship notes
         candidates = [
             ROOT / "client_app" / f"APPLE_HANDOFF_{pin}.md",
-            ROOT / "client_app" / "APPLE_HANDOFF_0.4.7.md",
+            ROOT / "client_app" / "APPLE_HANDOFF_0.4.8.md",
             ROOT / "client_app" / "APPLE_HANDOFF_0.4.1.md",
         ]
         path = next((p for p in candidates if p.is_file()), None)
