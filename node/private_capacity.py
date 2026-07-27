@@ -7,12 +7,14 @@ Product soft budgets (operator allowance — not auto NIC line-rate):
 
 | Peer | Bandwidth budget | Session soft max |
 |------|------------------|------------------|
-| IS / RO | 100 Mbps | 256 (base) |
-| US | 200 Mbps (2× IS/RO) | 512 (2× base) |
+| RO Romania | **unlimited-class** (extendable at cost) | 256 (base) |
+| IS Iceland | **unlimited-class** (extendable at cost; larger peer) | 512 (IS > RO) |
+| US | 200 Mbps fixed product budget | 512 |
 
 Session numbers are a **soft** utilization hint for residual routing, not a hard
-public admission lock. Bandwidth figures are the operator product allowance
-for admin used-vs-cap, not measured line-rate unless you set them to that.
+public admission lock. IS/RO bandwidth is essentially unlimited in product terms
+because extended bandwidth is available at extra cost — not a fixed 100 Mbps
+product budget. US keeps a fixed 200 Mbps operator allowance.
 """
 
 from __future__ import annotations
@@ -22,32 +24,35 @@ import os
 from typing import Any, Mapping, Optional
 
 # Soft cap for utilization math (not a hard admission gate).
-# Product base = IS/RO; US is 2× because product bandwidth allowance is 2×.
-DEFAULT_MAX_SESSIONS = 256
-DEFAULT_MAX_SESSIONS_US = DEFAULT_MAX_SESSIONS * 2  # 512
+# RO base; IS larger (Iceland > Romania); US matches IS session soft max.
+DEFAULT_MAX_SESSIONS = 256  # RO base
+DEFAULT_MAX_SESSIONS_IS = 512  # Iceland larger than Romania
+DEFAULT_MAX_SESSIONS_US = 512
 ENV_CAPACITY_TOKEN = "RPT_CAPACITY_TOKEN"
 ENV_MAX_SESSIONS = "RPT_NODE_MAX_SESSIONS"
 ENV_PEER_CODE = "RPT_NODE_PEER_CODE"  # IS | RO | US
 ENV_NODE_HOST = "RPT_NODE_HOST"
 
-# Mbps product allowances (operator budget)
+# Mbps product allowances (operator budget). IS/RO omitted = unlimited-class.
 _MBPS = 1_000_000
 PRODUCT_BANDWIDTH_CAP_BPS: dict[str, int] = {
-    "IS": 100 * _MBPS,
-    "RO": 100 * _MBPS,
     "US": 200 * _MBPS,
-    "82.221.101.241": 100 * _MBPS,
-    "185.146.232.107": 100 * _MBPS,
     "5.161.242.85": 200 * _MBPS,
 }
 
-# Session soft max: US = 2 × IS/RO base
+# Peers with extendable bandwidth at cost — no fixed product Mbps budget.
+PRODUCT_UNLIMITED_BANDWIDTH_CODES = frozenset({"IS", "RO"})
+PRODUCT_UNLIMITED_BANDWIDTH_HOSTS = frozenset(
+    {"82.221.101.241", "185.146.232.107"}
+)
+
+# Session soft max: IS > RO (Iceland larger); US = 512
 PRODUCT_SESSION_SOFT_MAX: dict[str, int] = {
-    "IS": DEFAULT_MAX_SESSIONS,
     "RO": DEFAULT_MAX_SESSIONS,
+    "IS": DEFAULT_MAX_SESSIONS_IS,
     "US": DEFAULT_MAX_SESSIONS_US,
-    "82.221.101.241": DEFAULT_MAX_SESSIONS,
     "185.146.232.107": DEFAULT_MAX_SESSIONS,
+    "82.221.101.241": DEFAULT_MAX_SESSIONS_IS,
     "5.161.242.85": DEFAULT_MAX_SESSIONS_US,
 }
 
@@ -74,12 +79,33 @@ def product_session_soft_max(
     return _lookup_product_map(PRODUCT_SESSION_SOFT_MAX, code, host)
 
 
+def product_bandwidth_unlimited(
+    *,
+    code: str = "",
+    host: str = "",
+) -> bool:
+    """True when product treats peer bandwidth as unlimited-class (IS/RO)."""
+    c = (code or "").strip().upper()
+    h = (host or "").strip()
+    if c in PRODUCT_UNLIMITED_BANDWIDTH_CODES:
+        return True
+    if h in PRODUCT_UNLIMITED_BANDWIDTH_HOSTS:
+        return True
+    return False
+
+
 def product_bandwidth_cap_bps(
     *,
     code: str = "",
     host: str = "",
 ) -> int | None:
-    """Product bandwidth allowance (bits/s) for a catalog peer."""
+    """Product bandwidth allowance (bits/s), or None if unlimited-class / unknown.
+
+    IS/RO return None (extendable bandwidth at cost — no fixed product budget).
+    US returns 200 Mbps.
+    """
+    if product_bandwidth_unlimited(code=code, host=host):
+        return None
     return _lookup_product_map(PRODUCT_BANDWIDTH_CAP_BPS, code, host)
 
 
@@ -116,7 +142,7 @@ def default_max_sessions(
 
     Priority:
       1. ``RPT_NODE_MAX_SESSIONS`` (explicit operator override)
-      2. Product map for peer code/host (US = 2× IS/RO base)
+      2. Product map for peer code/host (IS > RO; US = 512)
       3. Flat ``DEFAULT_MAX_SESSIONS`` (256) for unknown peers
     """
     e = env if env is not None else os.environ
@@ -159,11 +185,15 @@ def bandwidth_cap_bps(
 
     ``RPT_NODE_BANDWIDTH_CAP_BPS`` — soft operator-configured link budget, not
     measured NIC line-rate unless the operator sets it to that. When unset,
-    falls back to product peer allowance (IS/RO 100 Mbps, US 200 Mbps).
+    falls back to product peer allowance (IS/RO unlimited-class → None;
+    US 200 Mbps). Explicit env still wins if set (legacy host pin).
     """
     e = env if env is not None else os.environ
     raw = str(e.get("RPT_NODE_BANDWIDTH_CAP_BPS", "") or "").strip()
     if raw:
+        # 0 or "unlimited" → treat as no fixed budget
+        if raw.lower() in ("0", "unlimited", "none", "-"):
+            return None
         try:
             n = int(raw)
         except ValueError:

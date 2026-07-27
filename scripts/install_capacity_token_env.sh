@@ -48,8 +48,9 @@ else
 fi
 
 # Per-peer product budgets (operator allowance — not auto NIC line-rate):
-#   IS/RO: 100 Mbps, session soft max 256
-#   US:    200 Mbps, session soft max 512 (2× because 2× bandwidth budget)
+#   RO: unlimited-class bandwidth, session soft max 256
+#   IS: unlimited-class bandwidth, session soft max 512 (Iceland > Romania)
+#   US: 200 Mbps fixed budget, session soft max 512
 # Override with RPT_NODE_PEER_CODE=IS|RO|US, RPT_NODE_MAX_SESSIONS, RPT_NODE_BANDWIDTH_CAP_BPS.
 PEER_CODE="${RPT_NODE_PEER_CODE:-${RPT_PEER_CODE:-}}"
 if [[ -z "$PEER_CODE" ]]; then
@@ -67,9 +68,13 @@ case "${PEER_CODE}" in
     DEFAULT_MAX=512
     DEFAULT_BW=200000000
     ;;
-  IS|RO)
+  IS)
+    DEFAULT_MAX=512
+    DEFAULT_BW=""  # unlimited-class (extendable at cost)
+    ;;
+  RO)
     DEFAULT_MAX=256
-    DEFAULT_BW=100000000
+    DEFAULT_BW=""  # unlimited-class (extendable at cost)
     ;;
   *)
     DEFAULT_MAX=256
@@ -77,7 +82,12 @@ case "${PEER_CODE}" in
     ;;
 esac
 MAX_SESSIONS="${RPT_NODE_MAX_SESSIONS:-${DEFAULT_MAX}}"
-BW_CAP="${RPT_NODE_BANDWIDTH_CAP_BPS:-${DEFAULT_BW}}"
+# Empty DEFAULT_BW + unset env → omit fixed product budget (IS/RO unlimited-class)
+if [[ -n "${RPT_NODE_BANDWIDTH_CAP_BPS+x}" ]]; then
+  BW_CAP="${RPT_NODE_BANDWIDTH_CAP_BPS}"
+else
+  BW_CAP="${DEFAULT_BW}"
+fi
 
 umask 077
 {
@@ -85,20 +95,21 @@ umask 077
   echo "# Clients / status admin that call /api/private/capacity need the same RPT_CAPACITY_TOKEN."
   echo "RPT_CAPACITY_TOKEN=${TOKEN}"
   if [[ -n "$PEER_CODE" ]]; then
-    echo "# Catalog peer identity for product soft budgets (IS/RO 1×, US 2×)"
+    echo "# Catalog peer identity (RO 256 sessions; IS 512; US 512 + 200 Mbps budget)"
     echo "RPT_NODE_PEER_CODE=${PEER_CODE}"
   fi
-  echo "# Soft max sessions for utilization = live / max (product: IS/RO 256, US 512)"
+  echo "# Soft max sessions for utilization = live / max (product: RO 256, IS/US 512)"
   echo "RPT_NODE_MAX_SESSIONS=${MAX_SESSIONS}"
   if [[ -n "$BW_CAP" ]]; then
     echo "# Operator bandwidth allowance (bits/s) for admin fleet panel used-vs-cap"
-    echo "# Product: IS/RO 100 Mbps (100000000), US 200 Mbps (200000000)"
+    echo "# Product: IS/RO unlimited-class (omit this key); US 200 Mbps (200000000)"
     echo "RPT_NODE_BANDWIDTH_CAP_BPS=${BW_CAP}"
   else
-    echo "# RPT_NODE_BANDWIDTH_CAP_BPS=100000000  # IS/RO 100 Mbps; US use 200000000"
+    echo "# No fixed RPT_NODE_BANDWIDTH_CAP_BPS — product unlimited-class for IS/RO"
+    echo "# (extendable bandwidth at cost). US install sets 200000000."
   fi
 } >"$ENV_FILE"
-echo "[rpt-capacity] peer=${PEER_CODE:-unknown} max_sessions=${MAX_SESSIONS} bw_cap_bps=${BW_CAP:-unset}"
+echo "[rpt-capacity] peer=${PEER_CODE:-unknown} max_sessions=${MAX_SESSIONS} bw_cap_bps=${BW_CAP:-unlimited-class}"
 chmod 600 "$ENV_FILE"
 chown root:root "$ENV_FILE"
 

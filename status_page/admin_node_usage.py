@@ -4,10 +4,10 @@ Public status stays title-only. This module builds operator rows for IS/RO/US
 from the product country catalog and optional private capacity probes.
 
 Limits are **per-peer**:
-  - **Bandwidth budget** — operator product allowance (IS/RO 100 Mbps, US 200 Mbps);
-    not auto-detected NIC line-rate unless you set it to that.
-  - **Session soft max** — utilization / residual routing hint (IS/RO 256, US 512 =
-    2× base because US has 2× bandwidth budget). Not a hard public admission lock.
+  - **Bandwidth** — IS/RO product **unlimited-class** (extendable at cost); US fixed
+    200 Mbps product budget. Not auto-detected NIC line-rate.
+  - **Session soft max** — utilization / residual routing hint (RO 256, IS 512 so
+    Iceland > Romania; US 512). Not a hard public admission lock.
 """
 
 from __future__ import annotations
@@ -41,45 +41,55 @@ def _product_maps():
     try:
         from node.private_capacity import (
             DEFAULT_MAX_SESSIONS,
+            DEFAULT_MAX_SESSIONS_IS,
             DEFAULT_MAX_SESSIONS_US,
             PRODUCT_BANDWIDTH_CAP_BPS,
             PRODUCT_SESSION_SOFT_MAX,
             product_bandwidth_cap_bps,
+            product_bandwidth_unlimited,
             product_session_soft_max,
         )
     except Exception:  # noqa: BLE001
-        # Status-host-only trees may still import via package path
         try:
             from private_capacity import (  # type: ignore
                 DEFAULT_MAX_SESSIONS,
+                DEFAULT_MAX_SESSIONS_IS,
                 DEFAULT_MAX_SESSIONS_US,
                 PRODUCT_BANDWIDTH_CAP_BPS,
                 PRODUCT_SESSION_SOFT_MAX,
                 product_bandwidth_cap_bps,
+                product_bandwidth_unlimited,
                 product_session_soft_max,
             )
         except Exception:  # noqa: BLE001
             _MBPS = 1_000_000
             DEFAULT_MAX_SESSIONS = 256
+            DEFAULT_MAX_SESSIONS_IS = 512
             DEFAULT_MAX_SESSIONS_US = 512
             PRODUCT_BANDWIDTH_CAP_BPS = {
-                "IS": 100 * _MBPS,
-                "RO": 100 * _MBPS,
                 "US": 200 * _MBPS,
-                "82.221.101.241": 100 * _MBPS,
-                "185.146.232.107": 100 * _MBPS,
                 "5.161.242.85": 200 * _MBPS,
             }
             PRODUCT_SESSION_SOFT_MAX = {
-                "IS": 256,
                 "RO": 256,
+                "IS": 512,
                 "US": 512,
-                "82.221.101.241": 256,
                 "185.146.232.107": 256,
+                "82.221.101.241": 512,
                 "5.161.242.85": 512,
             }
 
+            def product_bandwidth_unlimited(*, code: str = "", host: str = ""):
+                c = (code or "").strip().upper()
+                h = (host or "").strip()
+                return c in {"IS", "RO"} or h in {
+                    "82.221.101.241",
+                    "185.146.232.107",
+                }
+
             def product_bandwidth_cap_bps(*, code: str = "", host: str = ""):
+                if product_bandwidth_unlimited(code=code, host=host):
+                    return None
                 for k in (code, host, code.upper()):
                     if k and k in PRODUCT_BANDWIDTH_CAP_BPS:
                         return PRODUCT_BANDWIDTH_CAP_BPS[k]
@@ -93,10 +103,12 @@ def _product_maps():
 
     return {
         "DEFAULT_MAX_SESSIONS": DEFAULT_MAX_SESSIONS,
+        "DEFAULT_MAX_SESSIONS_IS": DEFAULT_MAX_SESSIONS_IS,
         "DEFAULT_MAX_SESSIONS_US": DEFAULT_MAX_SESSIONS_US,
         "PRODUCT_BANDWIDTH_CAP_BPS": PRODUCT_BANDWIDTH_CAP_BPS,
         "PRODUCT_SESSION_SOFT_MAX": PRODUCT_SESSION_SOFT_MAX,
         "product_bandwidth_cap_bps": product_bandwidth_cap_bps,
+        "product_bandwidth_unlimited": product_bandwidth_unlimited,
         "product_session_soft_max": product_session_soft_max,
     }
 
@@ -140,10 +152,8 @@ class NodeUsageRow:
             "detail": self.detail,
             # Preformatted cells for live UI refresh
             "bandwidth_used_display": format_bps(self.bandwidth_used_bps),
-            "bandwidth_cap_display": format_bps(
-                float(self.bandwidth_cap_bps)
-                if self.bandwidth_cap_bps is not None
-                else None
+            "bandwidth_cap_display": format_bandwidth_cap(
+                self.bandwidth_cap_bps, code=self.code, host=self.host
             ),
             "bandwidth_util_display": format_pct(self.bandwidth_util),
             "bytes_relayed_display": format_bytes(self.bytes_relayed),
@@ -219,26 +229,36 @@ def resolve_bandwidth_cap_bps(
 ) -> int | None:
     """Resolve operator bandwidth budget for a peer.
 
-    Priority: env map → flat default env → product peer allowance (IS/RO 100 Mbps,
-    US 200 Mbps).
+    Priority: env map (host/code) → product peer allowance.
+    Product: IS/RO unlimited-class (None); US 200 Mbps.
+    Status host flat ``RPT_NODE_BANDWIDTH_CAP_BPS`` alone does **not** pin every
+    peer — that would re-impose a single budget on unlimited-class IS/RO.
     """
     e = env if env is not None else os.environ
     m = dict(caps) if caps is not None else parse_bandwidth_cap_map(
         e.get(ENV_BANDWIDTH_CAP_MAP, "")
     )
     for key in (host, code, code.upper(), host.strip()):
-        if key in m and m[key] > 0:
-            return int(m[key])
+        if key in m:
+            v = int(m[key])
+            # 0 in map → unlimited-class for that peer
+            return v if v > 0 else None
+    maps = _product_maps()
+    # Product unlimited-class wins over a legacy global default env
+    if maps["product_bandwidth_unlimited"](code=code, host=host):
+        return None
+    prod = maps["product_bandwidth_cap_bps"](code=code, host=host)
+    if prod is not None:
+        return prod
     raw = str(e.get(ENV_BANDWIDTH_CAP_DEFAULT, "") or "").strip()
-    if raw:
+    if raw and raw.lower() not in ("0", "unlimited", "none", "-"):
         try:
             n = int(raw)
             if n > 0:
                 return n
         except ValueError:
             pass
-    maps = _product_maps()
-    return maps["product_bandwidth_cap_bps"](code=code, host=host)
+    return None
 
 
 def resolve_session_soft_max(
@@ -248,7 +268,7 @@ def resolve_session_soft_max(
     env: Mapping[str, str] | None = None,
     caps: Mapping[str, int] | None = None,
 ) -> int:
-    """Resolve session soft max for a peer (US = 2× IS/RO product base).
+    """Resolve session soft max for a peer (IS > RO; US = 512).
 
     Priority: ``RPT_SESSION_SOFT_MAX_MAP`` → product map → base 256.
     """
@@ -305,6 +325,23 @@ def format_bps(bps: float | None) -> str:
     if x < 1_000_000_000:
         return f"{x / 1_000_000:.2f} Mbps"
     return f"{x / 1_000_000_000:.2f} Gbps"
+
+
+def format_bandwidth_cap(
+    bps: int | float | None,
+    *,
+    code: str = "",
+    host: str = "",
+) -> str:
+    """Display bandwidth capacity; product unlimited-class → ``unlimited``."""
+    maps = _product_maps()
+    if bps is None or (isinstance(bps, (int, float)) and bps <= 0):
+        if maps["product_bandwidth_unlimited"](code=code, host=host) or bps is None:
+            # Unlimited-class peers, or no budget set
+            if maps["product_bandwidth_unlimited"](code=code, host=host):
+                return "unlimited"
+            return "—"
+    return format_bps(float(bps) if bps is not None else None)
 
 
 def format_bytes(n: int | None) -> str:
@@ -415,8 +452,13 @@ def row_from_probe_payload(
     except (TypeError, ValueError):
         uptime = None
     used_bps = average_bps_from_bytes(bytes_relayed, uptime)
+    maps = _product_maps()
+    unlimited = maps["product_bandwidth_unlimited"](code=code, host=host)
     cap = bandwidth_cap_bps
-    if cap is None and payload.get("bandwidth_cap_bps") is not None:
+    # Product unlimited-class (IS/RO): do not re-pin a legacy node-reported Mbps budget
+    if unlimited:
+        cap = None
+    elif cap is None and payload.get("bandwidth_cap_bps") is not None:
         try:
             cap = int(payload["bandwidth_cap_bps"])
         except (TypeError, ValueError):
@@ -675,9 +717,6 @@ def render_admin_node_usage_section_html(
     else:
         row_list = list(rows)
 
-    maps = _product_maps()
-    base_sess = int(maps["DEFAULT_MAX_SESSIONS"])
-    us_sess = int(maps["DEFAULT_MAX_SESSIONS_US"])
     refresh_ms = fleet_refresh_interval_ms(env)
 
     body_rows: list[str] = []
@@ -688,27 +727,19 @@ def render_admin_node_usage_section_html(
             "error": "bad",
         }.get(r.status, "bad")
         used_s = format_bps(r.bandwidth_used_bps)
-        cap_s = format_bps(
-            float(r.bandwidth_cap_bps) if r.bandwidth_cap_bps is not None else None
+        cap_s = format_bandwidth_cap(
+            r.bandwidth_cap_bps, code=r.code, host=r.host
         )
         util_s = format_pct(r.bandwidth_util)
         bytes_s = format_bytes(r.bytes_relayed)
         sess_s = format_sessions(r.sessions_live, r.sessions_cap, r.session_util)
         detail = _escape(r.detail) if r.detail else ""
         code_e = _escape(r.code)
-        # Per-peer why: bandwidth budget + session soft max (product map)
-        why = (
-            f"Budget: bandwidth allowance is operator product cap "
-            f"({cap_s}); session soft max is {r.sessions_cap if r.sessions_cap is not None else '—'} "
-            f"(utilization/routing hint, not hard admission). "
-            f"Peers differ: IS/RO 100&nbsp;Mbps / {base_sess} sessions; "
-            f"US 200&nbsp;Mbps / {us_sess} sessions (2×)."
-        )
+        # Node column: short label only (code + name) — no long why blurb
         body_rows.append(
             "<tr>"
             f"<td><strong>{code_e}</strong><br/>"
-            f"<span class=\"muted\">{_escape(r.name)}</span><br/>"
-            f"<span class=\"muted admin-node-why\" id=\"admin-node-why-{code_e}\">{why}</span>"
+            f"<span class=\"muted\">{_escape(r.name)}</span>"
             f"</td>"
             f"<td><code>{_escape(r.host)}</code></td>"
             f"<td id=\"admin-node-bw-used-{code_e}\">{_escape(used_s)}</td>"
@@ -738,32 +769,10 @@ def render_admin_node_usage_section_html(
          data-fleet-refresh-ms="{refresh_ms}"
          data-fleet-usage-api="{FLEET_USAGE_API_PATH}">
   <h2 id="admin-node-usage-heading">Fleet node usage (bandwidth)</h2>
-  <p class="muted" id="admin-node-usage-blurb">
-  Residual catalog peers (IS / RO / US). Limits are <strong>per peer</strong> for two
-  separate reasons:
-  </p>
-  <ul class="muted" id="admin-node-usage-limits-why">
-    <li id="admin-node-limit-bandwidth"><strong>Bandwidth budget</strong> — operator
-      product allowance for used-vs-cap math
-      (<code>RPT_NODE_BANDWIDTH_CAP_BPS</code> or
-      <code>RPT_BANDWIDTH_CAP_BPS_MAP</code>), not auto-detected NIC line-rate unless
-      you set it to that. Product defaults: <strong>IS/RO 100&nbsp;Mbps</strong>,
-      <strong>US 200&nbsp;Mbps</strong> (US has twice the traffic capacity).</li>
-    <li id="admin-node-limit-sessions"><strong>Session soft max</strong> — soft
-      utilization / residual-routing hint
-      (<code>live / capacity</code> on private probes), <em>not</em> a hard public
-      admission lock. Product defaults: <strong>IS/RO {base_sess}</strong>,
-      <strong>US {us_sess}</strong> (2× base because US has 2× bandwidth budget).
-      Override with <code>RPT_NODE_MAX_SESSIONS</code> on the node or
-      <code>RPT_SESSION_SOFT_MAX_MAP</code> on the status host.</li>
-  </ul>
   <p class="muted" id="admin-node-usage-probe-note">
-  <strong>Bandwidth used</strong> is average process-wide relay rate since node start.
-  Probes use token-gated <code>/api/private/capacity</code>
-  (<code>RPT_CAPACITY_TOKEN</code>). Fail-soft: unavailable peers show
-  <code>unknown</code> / error — never invented load. Table refreshes about every
-  {refresh_ms // 1000}s while this page is open
-  (<span id="admin-node-usage-refreshed">—</span>). Not shown on the public shop.
+  Residual peers (IS / RO / US). Avg used rate from private probes; table refreshes
+  about every {refresh_ms // 1000}s
+  (<span id="admin-node-usage-refreshed">—</span>). Not on the public shop.
   </p>
   <table id="admin-node-usage-table">
     <thead><tr>
