@@ -88,6 +88,7 @@ def render_browser_page_html() -> bytes:
         title=c["PRODUCT_BROWSER_TITLE"],
         active=None,
         product_active=c["PRODUCT_BROWSER_KEY"],
+        include_site_nav=False,
     )
     body = product_coming_body_html(
         line1=BROWSER_LINE_1,
@@ -112,6 +113,7 @@ def render_vault_page_html() -> bytes:
         title=c["PRODUCT_VAULT_TITLE"],
         active=None,
         product_active=c["PRODUCT_VAULT_KEY"],
+        include_site_nav=False,
     )
     body = product_coming_body_html(
         line1=VAULT_LINE_1,

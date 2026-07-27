@@ -41,10 +41,15 @@ class TestProductTabsChrome(unittest.TestCase):
         self.assertIn('id="product-tab-vpn"', html)
         self.assertIn("product-tab is-active", html)
         self.assertIn('data-product="vpn"', html)
-        # CSS card language for tabs
+        # CSS: equal full-shell width (no narrow max-width cap on tabs)
         css = public_site_css()
         self.assertIn(".product-tab", css)
         self.assertIn("product-tabs", css)
+        self.assertIn("flex: 1 1 0", css)
+        self.assertIn("max-width: none", css)
+        self.assertIn("width: 100%", css)
+        # Must not re-introduce a short cluster cap on tabs
+        self.assertNotIn("max-width: 15rem", css)
         # Injected at top of brand header chrome
         header = public_brand_header_html(product_active="browser")
         self.assertLess(header.index("product-tabs"), header.index("brand-panel"))
@@ -74,6 +79,13 @@ class TestBrowserVaultBodies(unittest.TestCase):
         self.assertNotIn("node-wipe-countdown", html)
         self.assertNotIn("settings-explainer-banner", html)
         self.assertNotIn("admin-node-usage", html)
+        # No site menu buttons (Home / Licence / Privacy / Audit / README)
+        self.assertNotIn('id="doc-links"', html)
+        self.assertNotIn('id="home-link"', html)
+        self.assertNotIn('id="licence-link"', html)
+        self.assertNotIn('id="privacy-link"', html)
+        self.assertNotIn('id="audit-link"', html)
+        self.assertNotIn('id="readme-link"', html)
 
     def test_vault_three_lines_no_vpn_structure(self) -> None:
         from product_family import (
@@ -92,6 +104,12 @@ class TestBrowserVaultBodies(unittest.TestCase):
         self.assertNotIn("dl-buy-form", html)
         self.assertNotIn("audit-countdown", html)
         self.assertNotIn("node-wipe-countdown", html)
+        self.assertNotIn('id="doc-links"', html)
+        self.assertNotIn('id="home-link"', html)
+        self.assertNotIn('id="licence-link"', html)
+        self.assertNotIn('id="privacy-link"', html)
+        self.assertNotIn('id="audit-link"', html)
+        self.assertNotIn('id="readme-link"', html)
 
 
 class TestHomepageStillVpn(unittest.TestCase):
@@ -106,6 +124,13 @@ class TestHomepageStillVpn(unittest.TestCase):
         self.assertIn('id="product-tab-vpn"', html)
         self.assertIn("dl-buy-form", html)  # VPN shop still present
         self.assertIn("audit-countdown", html)
+        # VPN retains site menu buttons
+        self.assertIn('id="doc-links"', html)
+        self.assertIn('id="home-link"', html)
+        self.assertIn('id="licence-link"', html)
+        self.assertIn('id="privacy-link"', html)
+        self.assertIn('id="audit-link"', html)
+        self.assertIn('id="readme-link"', html)
 
 
 class TestAppEntryRoutes(unittest.TestCase):

@@ -255,26 +255,30 @@ body {{
   display: flex; flex-direction: column; gap: 1.15rem;
   margin: 0 auto;
 }}
-/* Product family tabs (VPN / Browser / Vault) — card boxes at very top */
+/* Product family tabs (VPN / Browser / Vault) — equal full shell width */
 #{PRODUCT_TABS_ID}, .product-tabs {{
-  display: flex; flex-wrap: wrap; justify-content: center;
-  gap: 0.65rem; width: 100%; margin: 0;
-  padding: 0;
+  display: flex; flex-wrap: nowrap; justify-content: stretch;
+  align-items: stretch;
+  gap: 0.65rem; width: 100%; max-width: 100%;
+  margin: 0; padding: 0;
+  box-sizing: border-box;
 }}
 a.product-tab, .product-tab {{
-  flex: 1 1 9.5rem;
-  max-width: 15rem;
-  min-width: 8.5rem;
+  flex: 1 1 0;
+  width: 0; /* equal share of full shell row */
+  min-width: 0;
+  max-width: none;
   text-align: center;
   text-decoration: none;
   color: var(--rb-cream);
   font-weight: 700;
   letter-spacing: 0.04em;
-  font-size: clamp(0.72rem, 2vw, 0.88rem);
+  font-size: clamp(0.68rem, 1.8vw, 0.88rem);
   line-height: 1.25;
-  padding: 0.85rem 0.75rem;
+  padding: 0.85rem 0.5rem;
   border-radius: var(--rb-radius);
   border: 1.5px solid transparent;
+  box-sizing: border-box;
   background:
     linear-gradient(
       165deg,
@@ -681,17 +685,20 @@ def public_brand_header_html(
     logo_src: str = PUBLIC_BRAND_LOGO_PATH,
     product_active: str = PRODUCT_VPN_KEY,
     include_product_tabs: bool = True,
+    include_site_nav: bool = True,
 ) -> str:
     """Static top brand panel used across all public pages.
 
     Layout: **product tabs** (VPN / Browser / Vault) at the very top, then
     **borderless shield+key mark** to the **left** of the brand H1, as a centered
-    row **above** the site nav. Logo has no outer plate/frame.
+    row **above** the site nav (when included). Logo has no outer plate/frame.
     Under-title tagline is omitted by default (no lightweight-vpn slogan).
     Pass a non-empty *tagline* only if a page truly needs a header subtitle;
     public catalog/docs call sites leave it empty for a clean top box.
     Brand H1 defaults to :data:`PUBLIC_BRAND_TITLE` (**RESTORE PRIVACY VPN**).
     *product_active* is vpn | browser | vault for the top product tabs.
+    *include_site_nav* controls Home/Licence/Privacy/Audit/README menu buttons
+    (VPN homepage keeps them; Browser/Vault omit them).
     """
     # Product landings pass full product titles; VPN home normalizes short titles.
     raw_title = (title or "").strip()
@@ -716,12 +723,13 @@ def public_brand_header_html(
     tabs = (
         public_product_tabs_html(active=product_active) if include_product_tabs else ""
     )
+    nav_html = public_nav_links_html(active=active) if include_site_nav else ""
     return f"""{tabs}    <header class="brand-panel panel-card" id="{SITE_BRAND_HEADER_ID}" data-site-header="1" data-header-alias="site-brand-header">
       <div class="brand-mark" id="brand-mark" data-brand-mark="1">
         <img class="brand-logo" src="{_esc(src)}" width="{sz}" height="{sz}" alt="Restore Privacy logo"/>
         <h1>{title_safe}</h1>
       </div>
-{tagline_html}{public_nav_links_html(active=active)}
+{tagline_html}{nav_html}
 {public_theme_picker_html()}
     </header>
 """
