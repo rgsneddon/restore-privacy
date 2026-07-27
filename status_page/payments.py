@@ -2629,25 +2629,57 @@ def open_release_asset(
         except OSError:
             continue
 
-    # 2) Iceland VPS HTTP store (status on Render → fetch from product host)
+    # 2) Iceland VPS HTTP store (status on Render → fetch from product host).
+    # Spool the full object before returning so a VPS mid-stream reset does not
+    # leave the browser with a partial body after the grant was opened (paired
+    # with consume-after-successful-client-stream in app.py /download).
     vps_token = vps_asset_fetch_token()
     if vps_token:
         try:
+            import tempfile
+
             vps_url = vps_asset_url(filename)
             headers = {
                 "User-Agent": "restore-privacy-status-fulfilment",
                 "X-RPT-Asset-Token": vps_token,
             }
             req = urllib.request.Request(vps_url, headers=headers)
-            resp = open_url(req, timeout=120)
-            length = resp.headers.get("Content-Length")
-            return {
-                "filename": filename,
-                "content_type": content_type_for_filename(filename),
-                "content_length": int(length) if length and length.isdigit() else None,
-                "body": resp,
-                "source": "vps",
-            }
+            resp = open_url(req, timeout=180)
+            try:
+                # 8 MiB memory spool then disk — fine for catalog installers
+                spool = tempfile.SpooledTemporaryFile(max_size=8 * 1024 * 1024)
+                total = 0
+                while True:
+                    chunk = resp.read(256 * 1024)
+                    if not chunk:
+                        break
+                    spool.write(chunk)
+                    total += len(chunk)
+                spool.seek(0)
+                hdr_len = resp.headers.get("Content-Length")
+                clen = (
+                    int(hdr_len)
+                    if hdr_len and str(hdr_len).isdigit()
+                    else (total if total > 0 else None)
+                )
+                if total <= 0:
+                    try:
+                        spool.close()
+                    except Exception:  # noqa: BLE001
+                        pass
+                    raise OSError("empty_vps_asset_body")
+                return {
+                    "filename": filename,
+                    "content_type": content_type_for_filename(filename),
+                    "content_length": clen,
+                    "body": spool,
+                    "source": "vps",
+                }
+            finally:
+                try:
+                    resp.close()
+                except Exception:  # noqa: BLE001
+                    pass
         except (urllib.error.URLError, urllib.error.HTTPError, TimeoutError, OSError):
             pass
 
@@ -2796,8 +2828,9 @@ def render_post_payment_thankyou_html(
 
     **Exactly one** auto-start mechanism: a hidden iframe whose ``src`` is the paid
     ``/download?token=…`` path. The visible fallback anchor is **manual only** (no
-    script click / meta-refresh) so if the browser blocks the iframe the grant is
-    still unused and the user can click once to download.
+    script click / meta-refresh). The grant is consumed only after a **successful
+    full stream** (see app ``/download``), so a blocked iframe or a mid-proxy
+    failure leaves the manual link usable for a single successful transfer.
 
     *purchase_id* is the durable product purchase identifier (distinct from the
     single-use download token). Buyers are **strongly advised** to note it so the

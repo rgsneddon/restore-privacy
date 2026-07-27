@@ -94,12 +94,16 @@ class Handler(BaseHTTPRequestHandler):
         self.send_header("Content-Disposition", f'attachment; filename="{filename}"')
         self.send_header("Cache-Control", "no-store")
         self.end_headers()
-        with fpath.open("rb") as fh:
-            while True:
-                chunk = fh.read(65536)
-                if not chunk:
-                    break
-                self.wfile.write(chunk)
+        try:
+            with fpath.open("rb") as fh:
+                while True:
+                    chunk = fh.read(65536)
+                    if not chunk:
+                        break
+                    self.wfile.write(chunk)
+        except (BrokenPipeError, ConnectionResetError, ConnectionAbortedError):
+            # Client (status host proxy) dropped mid-transfer — not a server fault.
+            return
 
 
 def main() -> int:

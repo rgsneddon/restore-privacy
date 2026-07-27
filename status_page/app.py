@@ -951,6 +951,13 @@ class Handler(BaseHTTPRequestHandler):
             # Paid proxy: stream installer from local/API (works when repo is private).
             # Do NOT redirect unpaid browsers to free public github.com/releases/download.
             # open_release_asset must never be called without a validated paid grant.
+            #
+            # **Consume only after a successful full stream to the client.**
+            # Burning the grant when the source merely opens (old behaviour) left
+            # users with 403 on the manual thank-you link when: the auto-download
+            # iframe opened then failed mid-transfer (VPS ConnectionReset / proxy
+            # timeout), or the browser blocked the iframe attachment and the user
+            # clicked the fallback once.
             asset = open_release_asset(str(fname))
             if asset is None:
                 self._send(
@@ -959,14 +966,14 @@ class Handler(BaseHTTPRequestHandler):
                     _html_page(
                         "Fulfilment error",
                         '<p class="msg" id="download-fulfil-failed">Paid download could not be fetched. '
-                        "Operators: set RPT_GITHUB_TOKEN (or GITHUB_TOKEN) with contents:read, "
-                        "or stage packages under status_page/assets/.</p>"
+                        "Operators: confirm Iceland VPS paid-assets (RPT_ASSET_FETCH_TOKEN match + "
+                        "rpt-paid-assets.service) or stage status_page/assets/{version}/.</p>"
                         '<p><a href="/">Home</a></p>',
                     ),
                 )
                 return
-            # Consume only after the installer source is open (single-use starts here).
-            if not consume_download_token(token):
+            # Still valid + unused at send time (no consume yet)
+            if lookup_download_token(token) is None:
                 try:
                     body_fail = asset.get("body")
                     if hasattr(body_fail, "close"):
@@ -987,6 +994,7 @@ class Handler(BaseHTTPRequestHandler):
             ctype = str(asset.get("content_type") or "application/octet-stream")
             length = asset.get("content_length")
             disp = f'attachment; filename="{fname}"'
+            stream_ok = False
             try:
                 self.send_response(200)
                 self.send_header("Content-Type", ctype)
@@ -1005,6 +1013,7 @@ class Handler(BaseHTTPRequestHandler):
                         self.wfile.flush()
                     except Exception:  # noqa: BLE001
                         pass
+                    stream_ok = True
                 else:
                     try:
                         first = True
@@ -1019,11 +1028,20 @@ class Handler(BaseHTTPRequestHandler):
                                     self.wfile.flush()
                                 except Exception:  # noqa: BLE001
                                     pass
+                        stream_ok = True
                     finally:
                         try:
                             body.close()
                         except Exception:  # noqa: BLE001
                             pass
+            except (BrokenPipeError, ConnectionResetError, ConnectionAbortedError):
+                # Client/proxy dropped mid-transfer — leave grant unused for retry.
+                try:
+                    if hasattr(body, "close"):
+                        body.close()
+                except Exception:  # noqa: BLE001
+                    pass
+                stream_ok = False
             except Exception:  # noqa: BLE001
                 try:
                     if hasattr(body, "close"):
@@ -1031,6 +1049,9 @@ class Handler(BaseHTTPRequestHandler):
                 except Exception:  # noqa: BLE001
                     pass
                 raise
+            if stream_ok:
+                # Single-use starts only after the browser received the full body.
+                consume_download_token(token)
             return
 
         if path in ("/download/success", "/pay/success"):

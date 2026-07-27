@@ -85,11 +85,11 @@ class TestPublicHtmlNoFreeInstallerHrefs(unittest.TestCase):
     def test_homepage_downloads_html_is_paid_only(self):
         html = render_download_section_html()
         self.assertIn("data-pay-via", html)
-        # Live catalog: Pay buttons (Stripe Payment Link); never free GitHub installers
-        self.assertIn("BUY - 0.4.0", html)
-        self.assertIn('data-buy-mode="stripe-live"', html)
-        self.assertIn("buy.stripe.com", html)
-        self.assertIn("client_reference_id=", html)
+        # Current catalog: homepage buy form → /pay/checkout (not free GitHub installers)
+        self.assertIn("Download client v", html)
+        self.assertIn('data-buy-mode="homepage-buy-form"', html)
+        self.assertIn('action="/pay/checkout"', html)
+        self.assertIn("Buy now", html)
         self.assertNotIn("Coming soon", html)
         self.assertNotIn("releases/download/", html)
         for a in available_downloads():
@@ -101,8 +101,9 @@ class TestPublicHtmlNoFreeInstallerHrefs(unittest.TestCase):
             )
         page = status_app.render_html({"title": "RESTORE PRIVACY"}).decode("utf-8")
         self.assertNotIn("releases/download/", page)
-        self.assertIn("BUY - 0.4.0", page)
-        self.assertIn("buy.stripe.com", page)
+        self.assertIn("Download client v", page)
+        self.assertIn('action="/pay/checkout"', page)
+        self.assertIn("Buy now", page)
         self.assertNotIn("Coming soon", page)
 
 
@@ -245,6 +246,84 @@ class TestHttpDownloadHandlerDeniesUnpaid(unittest.TestCase):
 
             del os.environ["RPT_PAYMENT_DATA_DIR"]
 
+    def test_mid_stream_failure_does_not_burn_grant(self):
+        """VPS/proxy disconnect mid-write must leave the token retryable."""
+        with tempfile.TemporaryDirectory() as td:
+            os.environ["RPT_PAYMENT_DATA_DIR"] = td
+            tok = pay.process_checkout_completed_event(
+                _paid_event("cs_midstream_fail", platform="macos")
+            )
+            self.assertTrue(tok)
+            g = pay.lookup_download_token(tok)
+            self.assertIsNotNone(g)
+            fname = g["filename"]
+
+            class _FlakyBody:
+                def __init__(self):
+                    self._n = 0
+
+                def read(self, n: int = -1):
+                    self._n += 1
+                    if self._n == 1:
+                        return b"PARTIAL"
+                    raise ConnectionResetError("simulated peer reset")
+
+                def close(self):
+                    return None
+
+            def fake_open(name, **kwargs):
+                return {
+                    "filename": fname,
+                    "content_type": "application/zip",
+                    "content_length": 100,
+                    "body": _FlakyBody(),
+                    "source": "vps",
+                }
+
+            with mock.patch("app.open_release_asset", side_effect=fake_open):
+                h = _FakeHandler(f"/download?token={tok}")
+                # First attempt: mid-stream ConnectionReset → grant remains
+                try:
+                    h.do_GET()
+                except ConnectionResetError:
+                    pass
+            # Token must still be redeemable
+            self.assertIsNotNone(pay.lookup_download_token(tok))
+
+            # Successful second attempt consumes
+            ok_body = BytesIO(b"FULL-INSTALLER")
+
+            def fake_open_ok(name, **kwargs):
+                return {
+                    "filename": fname,
+                    "content_type": "application/zip",
+                    "content_length": 14,
+                    "body": ok_body,
+                    "source": "vps",
+                }
+
+            with mock.patch("app.open_release_asset", side_effect=fake_open_ok):
+                h2 = _FakeHandler(f"/download?token={tok}")
+                h2.do_GET()
+            self.assertEqual(h2.code, 200)
+            self.assertEqual(h2.wfile.getvalue(), b"FULL-INSTALLER")
+            self.assertIsNone(pay.lookup_download_token(tok))
+
+            del os.environ["RPT_PAYMENT_DATA_DIR"]
+
+    def test_open_failure_does_not_burn_grant(self):
+        with tempfile.TemporaryDirectory() as td:
+            os.environ["RPT_PAYMENT_DATA_DIR"] = td
+            tok = pay.process_checkout_completed_event(
+                _paid_event("cs_open_fail", platform="linux")
+            )
+            with mock.patch("app.open_release_asset", return_value=None):
+                h = _FakeHandler(f"/download?token={tok}")
+                h.do_GET()
+            self.assertEqual(h.code, 502)
+            self.assertIsNotNone(pay.lookup_download_token(tok))
+            del os.environ["RPT_PAYMENT_DATA_DIR"]
+
 
 class TestServePaidAssetsRequiresToken(unittest.TestCase):
     def test_vps_handler_source_requires_token_and_safe_path(self):
@@ -253,6 +332,8 @@ class TestServePaidAssetsRequiresToken(unittest.TestCase):
         self.assertIn("unauthorized", src)
         self.assertIn("relative_to", src)
         self.assertIn("paid-assets", src)
+        # Mid-transfer client drop is soft-handled (Iceland VPS logs)
+        self.assertIn("ConnectionResetError", src)
 
 
 if __name__ == "__main__":
