@@ -2,12 +2,12 @@
 
 ## Sequential fleet wipe (~7d) — **one peer at a time**
 
-Planner: `node/fleet_wipe.py` (`PREFERRED_FLEET_ORDER = IS → RO → DE`).  
+Planner: `node/fleet_wipe.py` (`PREFERRED_FLEET_ORDER = IS → RO → US`).  
 Orchestrator entrypoint: `scripts/weekly_entry_rebuild.py` (still hosts the timer; fleet order is multi-peer).
 
 | Rule | Detail |
 |------|--------|
-| Order | **IS first**, then **RO**, then **DE** (and any later catalog peers) — finish prior peer before starting next |
+| Order | **IS first**, then **RO**, then **US** (and any later catalog peers) — finish prior peer before starting next |
 | Concurrency | Exclusive lock — **never** concurrent multi-node wipe |
 | Continuity | Clients hop to a healthy alternate while a peer drains (not zero packet-loss) |
 | After wipe | **Mandatory full selfhost reinstall** on the wiped peer |

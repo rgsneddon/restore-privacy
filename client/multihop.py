@@ -836,7 +836,7 @@ def multihop_config_from_env(
       (when this env key is set it wins over Settings)
     - When env key is unset, product Settings ``privacy_multihop`` is used
       (default **off** / single-hop residual baseline)
-    - ``RPT_ENTRY_COUNTRY`` / Settings ``entry_country`` — IS, RO, or DE (default IS)
+    - ``RPT_ENTRY_COUNTRY`` / Settings ``entry_country`` — IS, RO, or US (default US)
     - ``RPT_MULTIHOP_HOPS`` — CSV ``host[:port],host2[:port]`` (operator override)
     - ``RPT_EXIT_HOST`` / ``RPT_EXIT_PORT`` — second hop override (legacy)
     """

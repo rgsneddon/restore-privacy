@@ -70,7 +70,7 @@ If you already have grants on the old ephemeral path
 
 ## Honesty
 
-- Residual fleet wipe (IS → RO → DE) is separate; payment store is wipe-protected
+- Residual fleet wipe (IS → RO → US) is separate; payment store is wipe-protected
   in product wipe helpers.
 - Without a paid plan + disk, redeploys reset admin history even if residual
   peers are untouched.

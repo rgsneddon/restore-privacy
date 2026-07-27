@@ -26,7 +26,7 @@ ufw allow 22/tcp
 ufw allow 44044/udp
 ```
 
-Shared secret (same value on Iceland entry, Romania exit, Germany, and any future peers):
+Shared secret (same value on United States, Iceland, Romania, and any future peers):
 
 ```bash
 # On each residual node (root)
@@ -64,11 +64,11 @@ Catalog product budgets (operator reference):
 |------|------|-----------|
 | IS Iceland | `82.221.101.241` | 100 Mbps (`100000000`) |
 | RO Romania | `185.146.232.107` | 100 Mbps (`100000000`) |
-| DE Germany | `167.233.224.5` | 200 Mbps (`200000000`) |
+| US United States | `5.161.242.85` | 200 Mbps (`200000000`) |
 
 **RO still needs operator finalize from a host with SSH** (Mac): copy-paste
 install + verify steps in **[RO_CAPACITY_MAC_FINALIZE.md](RO_CAPACITY_MAC_FINALIZE.md)**.
-IS/DE token env were applied separately; RO was blocked from Windows keys.
+IS/US token env were applied separately; RO was blocked from Windows keys.
 
 ## Enable on status host (admin fleet panel)
 
@@ -81,7 +81,7 @@ a peer omits `bandwidth_cap_bps` in its private payload:
 # Render / status host — never commit the real token
 RPT_CAPACITY_TOKEN=<same as residual nodes>
 # JSON host or code → bits/s (not secret; product allowances)
-RPT_BANDWIDTH_CAP_BPS_MAP={"82.221.101.241":100000000,"185.146.232.107":100000000,"167.233.224.5":200000000,"IS":100000000,"RO":100000000,"DE":200000000}
+RPT_BANDWIDTH_CAP_BPS_MAP={"82.221.101.241":100000000,"185.146.232.107":100000000,"5.161.242.85":200000000,"IS":100000000,"RO":100000000,"US":200000000}
 RPT_CAPACITY_PROBE_TIMEOUT=2.5
 ```
 

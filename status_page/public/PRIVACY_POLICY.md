@@ -43,8 +43,8 @@ Node process stdout/stderr is configured for no journal session streams in the s
 ### 3.1 VPN node
 
 - **Optional at-rest encryption (operator):** LUKS2 data volumes (`node/install_disk_encryption.sh`) and optional zram+LUKS2 RAM volume (`node/install_zram_luks.sh`) are **node-only**. They protect locked volumes. They are **not** live secrecy against root on an unlocked host, **not** residual tunnel crypto, and they do not erase VPS provider snapshots/netflow.
-- **Endpoints (catalog peers):** Iceland **82.221.101.241:44044** (default entry, FlokiNET), Romania **185.146.232.107:44044** (FlokiNET), Germany **167.233.224.5:44044** — user-selectable entry; multi-hop exit is another peer.
-- **Location / host:** IS/RO on **FlokiNET** (https://flokinet.is/); DE is a separate residual peer. FlokiNET public materials state **no invasive logs**, root-only customer access, monitoring limited to resource usage, and no third-party sharing of tenant traffic patterns (https://flokinet.is/privacy/, https://flokinet.is/vps/). That is **host-published posture**, not a Restore Privacy forensic audit. Product no-log defaults (below) are separate.
+- **Endpoints (catalog peers):** United States **5.161.242.85:44044** (default entry), Iceland **82.221.101.241:44044** (FlokiNET), Romania **185.146.232.107:44044** (FlokiNET) — user-selectable entry; multi-hop exit is another peer.
+- **Location / host:** IS/RO on **FlokiNET** (https://flokinet.is/); US is a separate residual peer (default entry). FlokiNET public materials state **no invasive logs**, root-only customer access, monitoring limited to resource usage, and no third-party sharing of tenant traffic patterns (https://flokinet.is/privacy/, https://flokinet.is/vps/). That is **host-published posture**, not a Restore Privacy forensic audit. Product no-log defaults (below) are separate.
 - Listens for handshakes and encrypted data frames; **admits** only peers that complete the product handshake with an authorized client key (**Ed25519 allow-list** + **ElGamal / Pedersen** handshake materials).
 - Assigns a temporary tunnel IP and relays traffic while the session is active; holds **in-memory** session state only.
 - When a session ends, that memory is dropped — not designed as durable user history.
@@ -95,12 +95,12 @@ Runs **only on the device** — no phone-home wipe notification.
 
 ## 4. Limits of this privacy promise
 
-1. **Hosting and networks.** (VPS provider / CDN logging may sit outside this application's no-log defaults.) Catalog peers: FlokiNET (IS/RO) and the DE residual host. Host public “no invasive logs” stance is not a third-party forensic audit. CDN/status/DNS operators and other networks may log under their policies. Node OS compromise can still expose live memory.
+1. **Hosting and networks.** (VPS provider / CDN logging may sit outside this application's no-log defaults.) Catalog peers: FlokiNET (IS/RO) and the US residual host (default entry). Host public “no invasive logs” stance is not a third-party forensic audit. CDN/status/DNS operators and other networks may log under their policies. Node OS compromise can still expose live memory.
 2. **Destination sites** have their own policies.
 3. **Device and OS** (VPN dialogs, crash reporters, network stacks) process data outside this app.
 4. **Misconfiguration** (verbose logs, reverse-proxy access logs) can create logs this policy assumes are off.
 5. **Device keys** identify an install, not a named human account — still treat them as secrets.
-6. **Traffic analysis mitigations are incomplete.** Pad/cover/obfs (**QUIC-mimic** when on) reduce coarse fingerprints; they do not guarantee undetectability. Multi-hop residual is opt-in (`RPT_MULTIHOP_ENABLED=1`); default is single-hop on the chosen entry (Iceland default).
+6. **Traffic analysis mitigations are incomplete.** Pad/cover/obfs (**QUIC-mimic** when on) reduce coarse fingerprints; they do not guarantee undetectability. Multi-hop residual is opt-in (`RPT_MULTIHOP_ENABLED=1`); default is single-hop on the chosen entry (United States default).
 7. **Self-hosters** must protect long-term keys and remember provider-level IP logs. PQ hybrid is staged readiness only (`docs/PQ_MIGRATION.md`).
 8. **LUKS / zram volumes** protect locked disks/RAM only — not live secrecy against root on an unlocked host.
 

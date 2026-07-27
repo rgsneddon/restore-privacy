@@ -18,7 +18,7 @@ already has SSH to RO (e.g. Mac). **Do not commit** real tokens.
 | Peer | Host | Cap | Capacity token env |
 |------|------|-----|--------------------|
 | IS | `82.221.101.241` | 100 Mbps | Applied (Windows operator session) |
-| DE | `167.233.224.5` | 200 Mbps | Applied on-box; external **8080** may still need Hetzner **Cloud Firewall** |
+| US | `5.161.242.85` | 200 Mbps | Applied on-box; external **8080** may still need Hetzner **Cloud Firewall** |
 | **RO** | `185.146.232.107` | **100 Mbps** | **This doc — apply from Mac SSH** |
 
 Windows residual keys could not auth to RO (`publickey denied`). Private capacity
@@ -163,7 +163,7 @@ in git):
 
 ```bash
 RPT_CAPACITY_TOKEN=<same as residual nodes>
-RPT_BANDWIDTH_CAP_BPS_MAP={"82.221.101.241":100000000,"185.146.232.107":100000000,"167.233.224.5":200000000,"IS":100000000,"RO":100000000,"DE":200000000}
+RPT_BANDWIDTH_CAP_BPS_MAP={"82.221.101.241":100000000,"185.146.232.107":100000000,"5.161.242.85":200000000,"IS":100000000,"RO":100000000,"US":200000000}
 RPT_CAPACITY_PROBE_TIMEOUT=2.5
 ```
 

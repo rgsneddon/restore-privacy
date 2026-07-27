@@ -109,13 +109,18 @@ class TestDocsOperatorRaskul(unittest.TestCase):
 
     def test_readme_multi_peer_currency(self):
         text = (ROOT / "README.md").read_text(encoding="utf-8")
-        self.assertIn("167.233.224.5", text)
-        self.assertIn("Germany", text)
+        self.assertIn("5.161.242.85", text)
+        self.assertIn("United States", text)
+        self.assertNotIn("Germany", text)
+        self.assertNotIn("167.233.224.5", text)
         self.assertIn("Raskul", text)
         pub = (ROOT / "status_page" / "public" / "README.md").read_text(
             encoding="utf-8"
         )
-        self.assertIn("167.233.224.5", pub)
+        self.assertIn("5.161.242.85", pub)
+        self.assertIn("United States", pub)
+        self.assertNotIn("Germany", pub)
+        self.assertNotIn("167.233.224.5", pub)
         self.assertIn("Raskul", pub)
 
 
