@@ -50,7 +50,7 @@ class TestPackageRagEvaluation(unittest.TestCase):
         ver = self.mod.load_catalog_version()
         pin = (ROOT / "client" / "VERSION").read_text(encoding="utf-8").strip()
         self.assertEqual(ver, pin)
-        self.assertEqual(ver, "0.4.8")
+        self.assertEqual(ver, "0.4.10")
         rows = self.mod.catalog_platform_filenames(ver)
         self.assertEqual(len(rows), 5)
         # Prefer status_page.downloads when importable

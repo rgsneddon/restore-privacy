@@ -7,7 +7,7 @@
 | **Public catalog version** | **0.4.10** |
 | **Default residual entry** | **United States (US)** (product default on all clients) |
 | **Live probe peer** | **Iceland (IS):44044** (UDP); status UI TCP **8080** |
-| **Audit generated** | **26 July 2026** (`2026-07-26T23:44:46Z`) |
+| **Audit generated** | **26 July 2026** (`2026-07-26T23:59:36Z`) |
 | **Cadence** | Automated security pass (~**every 4 hours** + **jitter** on privacy-hardened node timer) |
 | **Audit type** | Static suite + live node status probe + **per-installer AUDIT STATE** + **section B privacy probes** + **multihop node structure** |
 | **Auditor method** | `scripts/run_security_audit.py` — unittest privacy/security modules + TCP/HTTP/UDP probes + no-`.priv` scan + catalog package RAG + section B + multihop structure (no firewall scan) |
@@ -67,17 +67,18 @@ Honesty: **residual-via-exit when multi-hop enabled; not full intermediate onion
 
 | Probe | State | Notes |
 |-------|-------|-------|
-| **multihop_module_flags** | **PASS** | MULTI_HOP_ROUTING_IMPLEMENTED=True (residual-via-exit); entry host Iceland (IS) (Iceland monopin); exit host Romania (RO) (Romania monopin) |
-| **multihop_product_pubs** | **PASS** | entry pub present (C:\Users\rgsne\restore_privacy\product\node_elgamal.pub) sha=1b126abfae737c66…; exit pub present (C:\Users\rgsne\restore_privacy\product\exit_node_elgamal.pub... |
-| **multihop_residual_via_exit** | **PASS** | is_multihop_active=True for entry→exit path; residual_endpoint dials exit Romania (RO) (residual-via-exit); multi-hop disabled residual stays entry Iceland (IS) (default single-... |
+| **multihop_module_flags** | **PASS** | MULTI_HOP_ROUTING_IMPLEMENTED=True (residual-via-exit); Iceland peer Iceland (IS) (IS monopin); Romania peer Romania (RO) (RO monopin); United States peer United States (US) (US... |
+| **multihop_product_pubs** | **PASS** | IS pub present (C:\Users\rgsne\restore_privacy\product\node_elgamal.pub) sha=1b126abfae737c66…; RO pub present (C:\Users\rgsne\restore_privacy\product\exit_node_elgamal.pub) sha... |
+| **multihop_residual_via_exit** | **PASS** | is_multihop_active=True for US→RO entry→exit path; residual_endpoint dials exit Romania (RO) (residual-via-exit); multi-hop disabled residual stays entry United States (US) (def... |
 | **multihop_node_host_layout** | **PASS** | present: C:\Users\rgsne\restore_privacy\node\install_zram_luks.sh; present: C:\Users\rgsne\restore_privacy\node\install_host_privacy.sh; node-only: clients never install LUKS/zram |
 
 **Multihop structure overall:** **PASS**
 
 | Role | Host | Public key |
 |------|------|------------|
-| **Entry** (Iceland) | `Iceland (IS)` | `product/node_elgamal.pub` |
-| **Exit** (Romania) | `Romania (RO)` | `product/exit_node_elgamal.pub` |
+| **Default entry** (United States) | `United States (US)` | `product/us_node_elgamal.pub` |
+| **Catalog peer** (Iceland) | `Iceland (IS)` | `product/node_elgamal.pub` |
+| **Catalog peer / exit** (Romania) | `Romania (RO)` | `product/exit_node_elgamal.pub` |
 
 
 ## 1. Executive summary
@@ -90,7 +91,7 @@ Latest automated security audit for production node **Iceland (IS)** and the in-
 
 | Check | Result |
 |-------|--------|
-| Security unit suite | **PASS** (0 modules) |
+| Security unit suite | **PASS** (11 modules) |
 | Node status TCP :8080 | reachable |
 | Node `/status` HTTP | OK — title-only=True |
 | UDP product port :44044 | probe sent |
@@ -119,7 +120,7 @@ Latest automated security audit for production node **Iceland (IS)** and the in-
 | Area | Paths |
 |------|--------|
 | Shared client | `client/connect.py`, `client/endpoint.py`, `client/full_tunnel.py`, `client/multihop.py`, `client/secrets_loader.py`, `client/legal_links.py`, residual honesty / `residual_ip_capture` |
-| Multi-hop residual | Opt-in residual-via-exit (`RPT_MULTIHOP_ENABLED=1`); entry Iceland + exit Romania pubs under `product/` |
+| Multi-hop residual | Opt-in residual-via-exit (`RPT_MULTIHOP_ENABLED=1`); catalog pubs IS/RO/US under `product/` (default entry US) |
 | Windows / Linux | `client/windows/*` (multihop PE via `scripts/build_windows_multihop.py`), `client/linux/*` |
 | Mobile / Apple | `client_app/` Flutter + NativePrep residual engines (exit pub inject) |
 | Node | `node/*` (handshake, pfs, traffic_shape, crypto_session, nolog); node-only zram+LUKS2 |
@@ -171,7 +172,7 @@ An **ISP** performing **traffic analysis** may still observe connection timing a
 
 | Severity | Finding | Status |
 |----------|---------|--------|
-| **Info** | Automated pass at `2026-07-26T23:44:46Z` | Recorded |
+| **Info** | Automated pass at `2026-07-26T23:59:36Z` | Recorded |
 | **High** | Public client count on status | Closed (title-only) |
 | **Medium** | Shared client priv in packages | Closed (no .priv hits) |
 | **Low** | Unit suite failure | N/A |
@@ -185,8 +186,8 @@ An **ISP** performing **traffic analysis** may still observe connection timing a
 
 | Result | Detail |
 |--------|--------|
-| **Unit suite** | **PASS** (0 modules) |
-| **Return code** | n/a |
+| **Unit suite** | **PASS** (11 modules) |
+| **Return code** | 0 |
 | **Log** | operator SCRATCH / `security_audit.log` / node journal `rpt-security-audit.service` |
 | **Generator** | `scripts/run_security_audit.py` |
 
@@ -223,7 +224,7 @@ An **ISP** performing **traffic analysis** may still observe connection timing a
 
 ## 9. Conclusion
 
-Automated security audit at **2026-07-26T23:44:46Z** against node **Iceland (IS)** and in-repo privacy gates. Public **SECURITY AUDIT** links must resolve on the **status host** (`/AUDIT.md` / `/audit.md`). Source repository is **private**; paid catalog installers are fulfilled on the status host only. Core privacy promises hold when the suite passes and status remains title-only.
+Automated security audit at **2026-07-26T23:59:36Z** against node **Iceland (IS)** and in-repo privacy gates. Public **SECURITY AUDIT** links must resolve on the **status host** (`/AUDIT.md` / `/audit.md`). Source repository is **private**; paid catalog installers are fulfilled on the status host only. Core privacy promises hold when the suite passes and status remains title-only.
 
 Re-run: `python3 scripts/run_security_audit.py --write`
 

@@ -30,10 +30,10 @@ from downloads import (  # noqa: E402
 )
 
 EXPECTED_RELEASE_PAGE = (
-    "https://github.com/rgsneddon/restore-privacy/releases/tag/0.4.8"
+    "https://github.com/rgsneddon/restore-privacy/releases/tag/0.4.10"
 )
 EXPECTED_DOWNLOAD_PREFIX = (
-    "https://github.com/rgsneddon/restore-privacy/releases/download/0.4.8/"
+    "https://github.com/rgsneddon/restore-privacy/releases/download/0.4.10/"
 )
 # Public footer points at the paid status host (repo is private).
 EXPECTED_PUBLIC_CATALOG_FOOTER = (
@@ -50,7 +50,7 @@ class TestDownloadCatalog(unittest.TestCase):
         )
 
         pin = (ROOT / "client" / "VERSION").read_text(encoding="utf-8").strip()
-        self.assertEqual(pin, "0.4.8")
+        self.assertEqual(pin, "0.4.10")
         self.assertEqual(RELEASE_VERSION, pin)
         self.assertEqual(RELEASE_TAG, pin)
         self.assertEqual(current_catalog_version(), RELEASE_VERSION)

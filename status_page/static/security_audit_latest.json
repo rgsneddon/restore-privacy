@@ -1,11 +1,24 @@
 {
-  "generated_at": "2026-07-26T23:44:46Z",
+  "generated_at": "2026-07-26T23:59:36Z",
   "node_host": "Iceland (IS)",
   "catalog_version": "0.4.10",
   "unit_suite": {
-    "ran": false,
+    "ran": true,
     "ok": true,
-    "reason": "skipped"
+    "returncode": 0,
+    "modules": [
+      "tests.test_legal_links",
+      "tests.test_legal_docs",
+      "tests.test_no_public_client_count",
+      "tests.test_connect_no_phones_home",
+      "tests.test_obfuscation",
+      "tests.test_kill_switch_leaks",
+      "tests.test_product_node_key",
+      "tests.test_pfs_product_require",
+      "tests.test_downloads",
+      "tests.test_multihop",
+      "tests.test_audit_package_rag"
+    ]
   },
   "tcp_status": {
     "host": "Iceland (IS)",
@@ -273,13 +286,17 @@
         "skipped": false,
         "reasons": [
           "MULTI_HOP_ROUTING_IMPLEMENTED=True (residual-via-exit)",
-          "entry host Iceland (IS) (Iceland monopin)",
-          "exit host Romania (RO) (Romania monopin)"
+          "Iceland peer Iceland (IS) (IS monopin)",
+          "Romania peer Romania (RO) (RO monopin)",
+          "United States peer United States (US) (US monopin)",
+          "DEFAULT_ENTRY_COUNTRY=US (product default residual entry)"
         ],
         "entry_host": "Iceland (IS)",
         "exit_host": "Romania (RO)",
+        "us_host": "United States (US)",
         "entry_port": 44044,
         "exit_port": 44044,
+        "us_port": 44044,
         "routing_implemented": true
       },
       "multihop_product_pubs": {
@@ -287,24 +304,26 @@
         "warn": false,
         "skipped": false,
         "reasons": [
-          "entry pub present (C:\\Users\\rgsne\\restore_privacy\\product\\node_elgamal.pub) sha=1b126abfae737c66\u2026",
-          "exit pub present (C:\\Users\\rgsne\\restore_privacy\\product\\exit_node_elgamal.pub) sha=a36a3f38066ece7b\u2026",
-          "entry and exit pubs are distinct"
+          "IS pub present (C:\\Users\\rgsne\\restore_privacy\\product\\node_elgamal.pub) sha=1b126abfae737c66\u2026",
+          "RO pub present (C:\\Users\\rgsne\\restore_privacy\\product\\exit_node_elgamal.pub) sha=a36a3f38066ece7b\u2026",
+          "US pub present (C:\\Users\\rgsne\\restore_privacy\\product\\us_node_elgamal.pub) sha=9864211dc29e8b21\u2026",
+          "IS/RO/US pubs present and pairwise distinct"
         ],
         "entry_pub": "C:\\Users\\rgsne\\restore_privacy\\product\\node_elgamal.pub",
-        "exit_pub": "C:\\Users\\rgsne\\restore_privacy\\product\\exit_node_elgamal.pub"
+        "exit_pub": "C:\\Users\\rgsne\\restore_privacy\\product\\exit_node_elgamal.pub",
+        "us_pub": "C:\\Users\\rgsne\\restore_privacy\\product\\us_node_elgamal.pub"
       },
       "multihop_residual_via_exit": {
         "ok": true,
         "warn": false,
         "skipped": false,
         "reasons": [
-          "is_multihop_active=True for entry\u2192exit path",
+          "is_multihop_active=True for US\u2192RO entry\u2192exit path",
           "residual_endpoint dials exit Romania (RO) (residual-via-exit)",
-          "multi-hop disabled residual stays entry Iceland (IS) (default single-hop)",
-          "status text: multi-hop active (2 hops): Iceland (IS) \u2192 Romania (RO) (residual via Romania (RO))"
+          "multi-hop disabled residual stays entry United States (US) (default single-hop)",
+          "status text: multi-hop active (2 hops): United States (US) \u2192 Romania (RO) (residual via Romania (RO))"
         ],
-        "status_text": "multi-hop active (2 hops): Iceland (IS) \u2192 Romania (RO) (residual via Romania (RO))"
+        "status_text": "multi-hop active (2 hops): United States (US) \u2192 Romania (RO) (residual via Romania (RO))"
       },
       "multihop_node_host_layout": {
         "ok": true,

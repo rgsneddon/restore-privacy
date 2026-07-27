@@ -84,6 +84,53 @@ from .secrets_loader import (
 )
 
 
+def _http_get_body(url: str, *, timeout_s: float = 2.0) -> bytes | None:
+    """Minimal HTTP/1.0 GET over TCP — no urllib/requests (Connect no-phones-home)."""
+    # urlparse without urllib: scheme://host:port/path
+    raw = (url or "").strip()
+    if not raw.startswith("http://"):
+        return None
+    rest = raw[len("http://") :]
+    hostport, _, path = rest.partition("/")
+    path = "/" + path if path or rest.endswith("/") else "/"
+    if ":" in hostport:
+        host, port_s = hostport.rsplit(":", 1)
+        try:
+            port = int(port_s)
+        except ValueError:
+            return None
+    else:
+        host, port = hostport, 80
+    if not host:
+        return None
+    req = (
+        f"GET {path} HTTP/1.0\r\n"
+        f"Host: {host}\r\n"
+        f"Connection: close\r\n"
+        f"\r\n"
+    ).encode("ascii")
+    sock = socket.create_connection((host, port), timeout=timeout_s)
+    try:
+        sock.settimeout(timeout_s)
+        sock.sendall(req)
+        chunks: list[bytes] = []
+        while True:
+            part = sock.recv(65536)
+            if not part:
+                break
+            chunks.append(part)
+        blob = b"".join(chunks)
+    finally:
+        try:
+            sock.close()
+        except OSError:
+            pass
+    if b"\r\n\r\n" not in blob:
+        return None
+    _hdr, body = blob.split(b"\r\n\r\n", 1)
+    return body
+
+
 def _tunnel_plan_for_session(
     existing: Optional[FullTunnelPlan], vpn_ip: str
 ) -> FullTunnelPlan:
@@ -456,20 +503,18 @@ class RptClient:
         """HTTP poll private node-state for preferred residual (fail soft).
 
         Trusted preferred path: empty host soft-applies (we polled preferred).
+        Uses raw sockets only (no urllib/http clients — no phones-home surface).
         """
-        import urllib.error
-        import urllib.request
-
         preferred = entry_endpoint(self.multihop)
         host = (preferred.host or "").strip()
         if not host:
             return "no_preferred_host"
         poll_url = (url or f"http://{host}:8080/api/private/node-state").strip()
         try:
-            req = urllib.request.Request(poll_url, method="GET")
-            with urllib.request.urlopen(req, timeout=timeout_s) as resp:  # noqa: S310
-                body = resp.read()
+            body = _http_get_body(poll_url, timeout_s=float(timeout_s))
         except Exception:  # noqa: BLE001
+            return "poll_failed"
+        if body is None:
             return "poll_failed"
         signal = parse_wipe_signal_json(body)
         return self.apply_wipe_signal(
@@ -522,7 +567,14 @@ class RptClient:
         return dict(self.peer_capacity)
 
     def _status(self, msg: str) -> None:
-        self.status_cb(msg)
+        # status_cb may paint UI / logs — never forward residual monopin IPv4
+        try:
+            from client.residual_public import redact_residual_hosts_in_text
+
+            text = redact_residual_hosts_in_text(str(msg or ""))
+        except Exception:  # noqa: BLE001
+            text = str(msg or "")
+        self.status_cb(text)
 
     def _hello_to_endpoint(
         self,
@@ -717,9 +769,14 @@ class RptClient:
             for i, ep in enumerate(targets):
                 try:
                     if i > 0:
+                        try:
+                            from client.residual_public import public_label_for_host
+
+                            peer = public_label_for_host(ep.host)
+                        except Exception:  # noqa: BLE001
+                            peer = "VPN node"
                         self._status(
-                            f"Primary residual failed — trying failover "
-                            f"{ep.host}:{ep.port}"
+                            f"Primary residual failed — trying failover {peer}"
                         )
                         self.last_selection_reason = "hello_failover"
                     return self._hello_to_endpoint(

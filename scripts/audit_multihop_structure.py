@@ -3,9 +3,10 @@
 Structural / product-layout checks only. Does **not** claim live dual-relay residual
 IP proof or full intermediate onion encapsulation.
 
-Honesty baseline (0.3.6+):
-  - Entry: Iceland ``PRODUCT_NODE_HOST`` + ``product/node_elgamal.pub``
-  - Exit: Romania ``PRODUCT_EXIT_HOST`` + ``product/exit_node_elgamal.pub`` (distinct)
+Honesty baseline (0.4.10+ catalog):
+  - Default residual entry: United States ``PRODUCT_US_HOST`` + ``product/us_node_elgamal.pub``
+  - Iceland ``PRODUCT_NODE_HOST`` + ``product/node_elgamal.pub``
+  - Romania ``PRODUCT_EXIT_HOST`` + ``product/exit_node_elgamal.pub`` (distinct)
   - ``MULTI_HOP_ROUTING_IMPLEMENTED`` residual-via-exit when multi-hop is active
   - Default remains single-hop entry when multi-hop is not enabled
 """
@@ -21,8 +22,10 @@ from typing import Any, Mapping
 DEFAULT_INSTALL_ROOT = Path(os.environ.get("RPT_INSTALL_ROOT", "/opt/restore-privacy"))
 
 # Product monopin facts (must match client/multihop.py + client/endpoint.py)
-EXPECTED_ENTRY_HOST = "82.221.101.241"
+EXPECTED_ICELAND_HOST = "82.221.101.241"
+EXPECTED_ENTRY_HOST = EXPECTED_ICELAND_HOST  # historical alias: Iceland monopin
 EXPECTED_EXIT_HOST = "185.146.232.107"
+EXPECTED_US_HOST = "5.161.242.85"
 EXPECTED_PORT = 44044
 
 
@@ -83,18 +86,24 @@ def _import_endpoint(repo: Path, install: Path):
     raise ImportError(f"client.endpoint unavailable: {last}")
 
 
-def _pub_paths(repo: Path, install: Path) -> tuple[Path | None, Path | None]:
-    """Locate entry/exit public keys under product/ (repo or install seed)."""
+def _pub_paths(
+    repo: Path, install: Path
+) -> tuple[Path | None, Path | None, Path | None]:
+    """Locate IS/RO/US public keys under product/ (repo or install seed)."""
     entry = None
     exit_p = None
+    us_p = None
     for base in (repo, install):
         e = base / "product" / "node_elgamal.pub"
         x = base / "product" / "exit_node_elgamal.pub"
+        u = base / "product" / "us_node_elgamal.pub"
         if entry is None and e.is_file() and e.stat().st_size >= 32:
             entry = e
         if exit_p is None and x.is_file() and x.stat().st_size >= 32:
             exit_p = x
-    return entry, exit_p
+        if us_p is None and u.is_file() and u.stat().st_size >= 32:
+            us_p = u
+    return entry, exit_p, us_p
 
 
 def _sha256_file(path: Path) -> str:
@@ -129,22 +138,24 @@ def probe_multihop_module_flags(
     else:
         reasons.append("MULTI_HOP_ROUTING_IMPLEMENTED=True (residual-via-exit)")
 
-    entry_host = getattr(ep, "PRODUCT_NODE_HOST", None) or getattr(
-        mh, "PRODUCT_NODE_HOST", None
+    # Catalog peers (IS / RO / US) — not "product default entry" alone
+    iceland_host = getattr(mh, "PRODUCT_NODE_HOST", None) or getattr(
+        ep, "PRODUCT_NODE_HOST", None
     )
-    # multihop imports PRODUCT_NODE_HOST from endpoint
-    entry_host = getattr(mh, "PRODUCT_NODE_HOST", entry_host)
     exit_host = getattr(mh, "PRODUCT_EXIT_HOST", None)
+    us_host = getattr(mh, "PRODUCT_US_HOST", None)
     entry_port = int(getattr(ep, "PRODUCT_NODE_PORT", EXPECTED_PORT) or EXPECTED_PORT)
     exit_port = int(getattr(mh, "PRODUCT_EXIT_PORT", entry_port) or entry_port)
+    us_port = int(getattr(mh, "PRODUCT_US_PORT", entry_port) or entry_port)
+    default_country = str(getattr(mh, "DEFAULT_ENTRY_COUNTRY", "") or "")
 
-    if entry_host != EXPECTED_ENTRY_HOST:
+    if iceland_host != EXPECTED_ICELAND_HOST:
         ok = False
         reasons.append(
-            f"entry host {entry_host!r} != product Iceland pin {EXPECTED_ENTRY_HOST}"
+            f"Iceland host {iceland_host!r} != product pin {EXPECTED_ICELAND_HOST}"
         )
     else:
-        reasons.append(f"entry host {entry_host}:{entry_port} (Iceland monopin)")
+        reasons.append(f"Iceland peer {iceland_host}:{entry_port} (IS monopin)")
 
     if exit_host != EXPECTED_EXIT_HOST:
         ok = False
@@ -152,20 +163,36 @@ def probe_multihop_module_flags(
             f"exit host {exit_host!r} != product Romania pin {EXPECTED_EXIT_HOST}"
         )
     else:
-        reasons.append(f"exit host {exit_host}:{exit_port} (Romania monopin)")
+        reasons.append(f"Romania peer {exit_host}:{exit_port} (RO monopin)")
 
-    if entry_host == exit_host:
+    if us_host != EXPECTED_US_HOST:
         ok = False
-        reasons.append("entry and exit hosts must differ")
+        reasons.append(
+            f"US host {us_host!r} != product United States pin {EXPECTED_US_HOST}"
+        )
+    else:
+        reasons.append(f"United States peer {us_host}:{us_port} (US monopin)")
+
+    if default_country != "US":
+        ok = False
+        reasons.append(f"DEFAULT_ENTRY_COUNTRY={default_country!r} expected 'US'")
+    else:
+        reasons.append("DEFAULT_ENTRY_COUNTRY=US (product default residual entry)")
+
+    if iceland_host == exit_host:
+        ok = False
+        reasons.append("Iceland and Romania hosts must differ")
 
     return _status(
         ok=ok,
         skipped=False,
         reasons=reasons,
-        entry_host=entry_host,
+        entry_host=iceland_host,
         exit_host=exit_host,
+        us_host=us_host,
         entry_port=entry_port,
         exit_port=exit_port,
+        us_port=us_port,
         routing_implemented=bool(getattr(mh, "MULTI_HOP_ROUTING_IMPLEMENTED", False)),
     )
 
@@ -175,36 +202,50 @@ def probe_multihop_product_pubs(
     repo_root: Path | None = None,
     install_root: Path | None = None,
 ) -> dict[str, Any]:
-    """Tracked entry + exit ElGamal public keys present, distinct, non-empty."""
+    """Tracked IS/RO/US ElGamal public keys present, distinct, non-empty."""
     repo = repo_root or Path(__file__).resolve().parents[1]
     install = install_root or Path(
         os.environ.get("RPT_INSTALL_ROOT", str(DEFAULT_INSTALL_ROOT))
     )
-    entry, exit_p = _pub_paths(repo, install)
+    entry, exit_p, us_p = _pub_paths(repo, install)
     reasons: list[str] = []
     ok = True
     if entry is None:
         ok = False
         reasons.append("product/node_elgamal.pub missing or too small")
     else:
-        reasons.append(f"entry pub present ({entry}) sha={_sha256_file(entry)[:16]}…")
+        reasons.append(f"IS pub present ({entry}) sha={_sha256_file(entry)[:16]}…")
     if exit_p is None:
         ok = False
         reasons.append("product/exit_node_elgamal.pub missing or too small")
     else:
-        reasons.append(f"exit pub present ({exit_p}) sha={_sha256_file(exit_p)[:16]}…")
+        reasons.append(f"RO pub present ({exit_p}) sha={_sha256_file(exit_p)[:16]}…")
+    if us_p is None:
+        ok = False
+        reasons.append("product/us_node_elgamal.pub missing or too small")
+    else:
+        reasons.append(f"US pub present ({us_p}) sha={_sha256_file(us_p)[:16]}…")
     if entry is not None and exit_p is not None:
         if entry.read_bytes() == exit_p.read_bytes():
             ok = False
-            reasons.append("entry and exit pubs must be distinct key material")
-        else:
-            reasons.append("entry and exit pubs are distinct")
+            reasons.append("IS and RO pubs must be distinct key material")
+    if us_p is not None and entry is not None:
+        if us_p.read_bytes() == entry.read_bytes():
+            ok = False
+            reasons.append("US and IS pubs must be distinct key material")
+    if us_p is not None and exit_p is not None:
+        if us_p.read_bytes() == exit_p.read_bytes():
+            ok = False
+            reasons.append("US and RO pubs must be distinct key material")
+    if entry is not None and exit_p is not None and us_p is not None:
+        reasons.append("IS/RO/US pubs present and pairwise distinct")
     return _status(
         ok=ok,
-        skipped=False if (entry or exit_p) else True,
+        skipped=False if (entry or exit_p or us_p) else True,
         reasons=reasons,
         entry_pub=str(entry) if entry else None,
         exit_pub=str(exit_p) if exit_p else None,
+        us_pub=str(us_p) if us_p else None,
     )
 
 
@@ -224,8 +265,11 @@ def probe_multihop_residual_via_exit(
     except ImportError as exc:
         return _status(ok=False, skipped=True, reasons=[str(exc)])
 
+    # Prefer product default entry (US) → RO exit for residual-via-exit check
+    us_host = getattr(mh, "PRODUCT_US_HOST", None) or EXPECTED_US_HOST
+    us_port = int(getattr(mh, "PRODUCT_US_PORT", EXPECTED_PORT) or EXPECTED_PORT)
     hops = [
-        mh.Hop(mh.PRODUCT_NODE_HOST, mh.PRODUCT_NODE_PORT, role="entry"),
+        mh.Hop(us_host, us_port, role="entry"),
         mh.Hop(mh.PRODUCT_EXIT_HOST, mh.PRODUCT_EXIT_PORT, role="exit"),
     ]
     cfg = mh.MultiHopConfig(hops=hops, enabled=True)
@@ -234,7 +278,7 @@ def probe_multihop_residual_via_exit(
         ok = False
         reasons.append("is_multihop_active(enabled, 2 hops) is False")
     else:
-        reasons.append("is_multihop_active=True for entry→exit path")
+        reasons.append("is_multihop_active=True for US→RO entry→exit path")
 
     residual = mh.residual_endpoint(cfg)
     if residual.host != mh.PRODUCT_EXIT_HOST:
@@ -248,13 +292,13 @@ def probe_multihop_residual_via_exit(
             "(residual-via-exit)"
         )
 
-    # Default single-hop honesty
-    cfg_off = mh.MultiHopConfig(hops=hops, enabled=False)
-    single = mh.residual_endpoint(cfg_off)
-    if single.host != mh.PRODUCT_NODE_HOST:
+    # Default single-hop honesty: product default country → US monopin
+    cfg_def = mh.multihop_config_for_entry_country(None, multihop_enabled=False)
+    single = mh.residual_endpoint(cfg_def)
+    if single.host != us_host:
         ok = False
         reasons.append(
-            f"disabled multi-hop residual {single.host!r} != entry {mh.PRODUCT_NODE_HOST}"
+            f"default single-hop residual {single.host!r} != US {us_host}"
         )
     else:
         reasons.append(
@@ -407,7 +451,8 @@ Honesty: **{honesty}**.
 
 | Role | Host | Public key |
 |------|------|------------|
-| **Entry** (Iceland) | `{EXPECTED_ENTRY_HOST}:{EXPECTED_PORT}` | `product/node_elgamal.pub` |
-| **Exit** (Romania) | `{EXPECTED_EXIT_HOST}:{EXPECTED_PORT}` | `product/exit_node_elgamal.pub` |
+| **Default entry** (United States) | `United States (US)` | `product/us_node_elgamal.pub` |
+| **Catalog peer** (Iceland) | `Iceland (IS)` | `product/node_elgamal.pub` |
+| **Catalog peer / exit** (Romania) | `Romania (RO)` | `product/exit_node_elgamal.pub` |
 
 """
