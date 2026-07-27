@@ -204,6 +204,66 @@ void main() {
     );
   });
 
+  test('shouldPresentKeygenUnlockSheet: no second sheet after unlock', () {
+    // Successful unlock → needsKeygenUnlock false → do not present again.
+    expect(
+      shouldPresentKeygenUnlockSheet(
+        needsKeygenUnlock: false,
+        keygenSheetAlreadyOpen: false,
+      ),
+      isFalse,
+    );
+    // Concurrent Accept + launch race: sheet already open → no second sheet.
+    expect(
+      shouldPresentKeygenUnlockSheet(
+        needsKeygenUnlock: true,
+        keygenSheetAlreadyOpen: true,
+      ),
+      isFalse,
+    );
+    // First prompt when still required.
+    expect(
+      shouldPresentKeygenUnlockSheet(
+        needsKeygenUnlock: true,
+        keygenSheetAlreadyOpen: false,
+      ),
+      isTrue,
+    );
+  });
+
+  test('needsKeygenUnlock false after successful import (memory backend)',
+      () async {
+    final backend = MemoryLicenceBackend();
+    final gate = LicenceGate(backend);
+    await gate.acceptLicence();
+    expect(await gate.needsKeygenUnlock(), isTrue);
+
+    // Real import path with injectable fetch (status host active).
+    final st = await gate.importKeygenAndVerify(
+      'RPT-KEY-TEST-TEST-TEST',
+      fetch: (_) async => {
+        'status': 'active',
+        'connect_allowed': true,
+        'session_id': 'cs_test_local',
+        'keygen': 'RPT-KEY-TEST-TEST-TEST',
+        'valid_until':
+            (DateTime.now().millisecondsSinceEpoch / 1000.0) + 86400.0,
+      },
+      bindDevice: false,
+    );
+    expect(st, kPaymentStatusActive);
+    expect(await gate.paymentAllowsConnect(), isTrue);
+    expect(await gate.needsKeygenUnlock(), isFalse);
+    // Orchestration: would not re-present sheet after unlock.
+    expect(
+      shouldPresentKeygenUnlockSheet(
+        needsKeygenUnlock: await gate.needsKeygenUnlock(),
+        keygenSheetAlreadyOpen: false,
+      ),
+      isFalse,
+    );
+  });
+
   test('looksLikeProductKeygen recognizes fulfilment keygens', () {
     expect(looksLikeProductKeygen(sampleKeygen), isTrue);
     expect(looksLikeProductKeygen('  $sampleKeygen  '), isTrue);

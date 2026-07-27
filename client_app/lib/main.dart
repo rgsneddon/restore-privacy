@@ -89,6 +89,8 @@ class _TunnelHomeState extends State<TunnelHome> with WidgetsBindingObserver {
   bool _licenceAccepted = false;
   /// Sticky until product Connect succeeds so Open VPN settings survives open feedback.
   bool _needsVpnSystemSettingsApproval = false;
+  /// Guards double presentation of the keygen sheet (licence Accept + launch race).
+  bool _keygenSheetOpen = false;
 
   @override
   void initState() {
@@ -116,17 +118,27 @@ class _TunnelHomeState extends State<TunnelHome> with WidgetsBindingObserver {
       if (!_licenceAccepted) {
         await _showLicenceSheet();
       }
-      // After licence: renew if EXPIRED, else keygen if still required.
-      if (mounted && await (_licence?.needsLicenceRenewal() ?? false)) {
-        await _showRenewLicenceSheet();
-      } else if (mounted && await (_licence?.needsKeygenUnlock() ?? false)) {
-        await _showKeygenSheet();
-      }
+      // Single post-licence unlock entry (never from Accept button too — double sheet).
+      await _promptPaymentUnlockIfNeeded();
       // macOS: register Packet Tunnel NE profile in OS VPN prefs before Connect
       // (not L2TP / Cisco IPsec / IKEv2 — those are manual System Settings types).
       await _prepareMacosPacketTunnelBeforeConnect();
       await _maybeAutoconnect();
     });
+  }
+
+  /// Renew (EXPIRED) or keygen unlock — at most one surface; re-entrant safe.
+  Future<void> _promptPaymentUnlockIfNeeded() async {
+    if (!mounted) return;
+    final gate = _licence;
+    if (gate == null) return;
+    if (await gate.needsLicenceRenewal()) {
+      await _showRenewLicenceSheet();
+      return;
+    }
+    if (await gate.needsKeygenUnlock()) {
+      await _showKeygenSheet();
+    }
   }
 
   /// First-run / post-install style prep: save product Packet Tunnel to OS prefs.
@@ -289,14 +301,10 @@ class _TunnelHomeState extends State<TunnelHome> with WidgetsBindingObserver {
                         'Licence accepted. Enter your keygen from the fulfilment email to unlock Connect.';
                   });
                   _append('Licence accepted (stored locally only).');
+                  // Pop only — do not open keygen here. Caller (launch /
+                  // assertMayConnect) runs _promptPaymentUnlockIfNeeded once
+                  // after this sheet returns so we never stack two keygen sheets.
                   Navigator.of(ctx).pop();
-                  if (mounted &&
-                      await (_licence?.needsLicenceRenewal() ?? false)) {
-                    await _showRenewLicenceSheet();
-                  } else if (mounted &&
-                      await (_licence?.needsKeygenUnlock() ?? false)) {
-                    await _showKeygenSheet();
-                  }
                 },
                 style: FilledButton.styleFrom(backgroundColor: kPrimary),
                 child: const Text(kLicenceAcceptButton),
@@ -411,138 +419,160 @@ class _TunnelHomeState extends State<TunnelHome> with WidgetsBindingObserver {
       await _showRenewLicenceSheet();
       return;
     }
+    final bool needs = _licence == null
+        ? false
+        : await _licence!.needsKeygenUnlock();
+    if (!shouldPresentKeygenUnlockSheet(
+      needsKeygenUnlock: needs,
+      keygenSheetAlreadyOpen: _keygenSheetOpen,
+    )) {
+      return;
+    }
     if (!mounted) return;
+    _keygenSheetOpen = true;
     final controller = TextEditingController();
     // true = use root navigator for push AND pop (must match).
     const useRoot = true;
-    final unlocked = await showModalBottomSheet<bool>(
-      context: context,
-      isScrollControlled: true,
-      isDismissible: false,
-      enableDrag: false,
-      useRootNavigator: useRoot,
-      backgroundColor: kPanelBg,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
-      ),
-      builder: (sheetContext) {
-        var statusLine = '';
-        var busy = false;
-        return StatefulBuilder(
-          builder: (ctx, setModal) {
-            Future<void> tryUnlock() async {
-              if (busy) return;
-              final raw = controller.text.trim();
-              if (raw.isEmpty) {
-                setModal(() => statusLine = 'Paste the keygen first.');
-                return;
-              }
-              setModal(() {
-                busy = true;
-                statusLine = 'Verifying keygen with status host…';
-              });
-              final st = await _licence?.importKeygenAndVerify(raw) ??
-                  kPaymentStatusUnknown;
-              final ok = await _licence?.paymentAllowsConnect() ?? false;
-              // Dismiss only on valid unlock (shipped contract).
-              if (!shouldDismissKeygenSheetAfterUnlock(
-                paymentAllowsConnect: ok,
-                paymentStatus: st,
-              )) {
-                if (ctx.mounted) {
-                  setModal(() {
-                    busy = false;
-                    statusLine =
-                        'Keygen not active (status=$st). Check email code / subscription.';
-                  });
-                }
-                return;
-              }
-              // Valid key: pop the **same** navigator that owns this sheet.
-              if (sheetContext.mounted) {
-                Navigator.of(sheetContext, rootNavigator: useRoot).pop(true);
-              } else if (ctx.mounted) {
-                Navigator.of(ctx, rootNavigator: useRoot).pop(true);
-              }
-            }
+    bool unlocked = false;
+    try {
+      unlocked = await showModalBottomSheet<bool>(
+            context: context,
+            isScrollControlled: true,
+            isDismissible: false,
+            enableDrag: false,
+            useRootNavigator: useRoot,
+            backgroundColor: kPanelBg,
+            shape: const RoundedRectangleBorder(
+              borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+            ),
+            builder: (sheetContext) {
+              var statusLine = '';
+              var busy = false;
+              return StatefulBuilder(
+                builder: (ctx, setModal) {
+                  Future<void> tryUnlock() async {
+                    if (busy) return;
+                    final raw = controller.text.trim();
+                    if (raw.isEmpty) {
+                      setModal(() => statusLine = 'Paste the keygen first.');
+                      return;
+                    }
+                    setModal(() {
+                      busy = true;
+                      statusLine = 'Verifying keygen with status host…';
+                    });
+                    final st = await _licence?.importKeygenAndVerify(raw) ??
+                        kPaymentStatusUnknown;
+                    final ok = await _licence?.paymentAllowsConnect() ?? false;
+                    // Dismiss only on valid unlock (shipped contract).
+                    if (!shouldDismissKeygenSheetAfterUnlock(
+                      paymentAllowsConnect: ok,
+                      paymentStatus: st,
+                    )) {
+                      if (ctx.mounted) {
+                        setModal(() {
+                          busy = false;
+                          statusLine =
+                              'Keygen not active (status=$st). Check email code / subscription.';
+                        });
+                      }
+                      return;
+                    }
+                    // Valid key: pop the **same** navigator that owns this sheet.
+                    if (sheetContext.mounted) {
+                      Navigator.of(sheetContext, rootNavigator: useRoot)
+                          .pop(true);
+                    } else if (ctx.mounted) {
+                      Navigator.of(ctx, rootNavigator: useRoot).pop(true);
+                    }
+                  }
 
-            return Padding(
-              padding: EdgeInsets.fromLTRB(
-                20,
-                16,
-                20,
-                28 + MediaQuery.of(ctx).viewInsets.bottom,
-              ),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  Text(
-                    kKeygenPromptTitle,
-                    style: TextStyle(
-                      color: kPrimaryDark,
-                      fontSize: 18,
-                      fontWeight: FontWeight.w700,
+                  return Padding(
+                    padding: EdgeInsets.fromLTRB(
+                      20,
+                      16,
+                      20,
+                      28 + MediaQuery.of(ctx).viewInsets.bottom,
                     ),
-                  ),
-                  const SizedBox(height: 10),
-                  const Text(kKeygenPromptBody, style: TextStyle(fontSize: 13)),
-                  const SizedBox(height: 8),
-                  const Text(
-                    kConnectBlockedKeygenMsg,
-                    style: TextStyle(fontSize: 12, color: kTextMuted),
-                  ),
-                  const SizedBox(height: 12),
-                  KeygenEntryField(
-                    controller: controller,
-                    autofocus: true,
-                    labelText: 'RPT-KEY-…',
-                    enabled: !busy,
-                    // Paste of a full product keygen → verify + dismiss automatically.
-                    onPasted: (text) {
-                      if (looksLikeProductKeygen(text)) {
-                        tryUnlock();
-                      }
-                    },
-                    onChanged: (text) {
-                      // Enter / submit on field also unlocks when it looks complete.
-                      if (looksLikeProductKeygen(text) &&
-                          text.trim().endsWith('\n')) {
-                        tryUnlock();
-                      }
-                    },
-                  ),
-                  if (statusLine.isNotEmpty) ...[
-                    const SizedBox(height: 8),
-                    Text(statusLine, style: const TextStyle(fontSize: 12)),
-                  ],
-                  const SizedBox(height: 16),
-                  FilledButton(
-                    onPressed: busy ? null : tryUnlock,
-                    style: FilledButton.styleFrom(backgroundColor: kPrimary),
-                    child: Text(busy ? 'Verifying…' : 'Unlock Connect'),
-                  ),
-                  TextButton(
-                    onPressed: busy
-                        ? null
-                        : () {
-                            Navigator.of(
-                              sheetContext,
-                              rootNavigator: useRoot,
-                            ).pop(false);
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        Text(
+                          kKeygenPromptTitle,
+                          style: TextStyle(
+                            color: kPrimaryDark,
+                            fontSize: 18,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                        const SizedBox(height: 10),
+                        const Text(
+                          kKeygenPromptBody,
+                          style: TextStyle(fontSize: 13),
+                        ),
+                        const SizedBox(height: 8),
+                        const Text(
+                          kConnectBlockedKeygenMsg,
+                          style: TextStyle(fontSize: 12, color: kTextMuted),
+                        ),
+                        const SizedBox(height: 12),
+                        KeygenEntryField(
+                          controller: controller,
+                          autofocus: true,
+                          labelText: 'RPT-KEY-…',
+                          enabled: !busy,
+                          // Paste of a full product keygen → verify + dismiss automatically.
+                          onPasted: (text) {
+                            if (looksLikeProductKeygen(text)) {
+                              tryUnlock();
+                            }
                           },
-                    child: const Text('Cancel'),
-                  ),
-                ],
-              ),
-            );
-          },
-        );
-      },
-    );
-    controller.dispose();
+                          onChanged: (text) {
+                            // Enter / submit on field also unlocks when it looks complete.
+                            if (looksLikeProductKeygen(text) &&
+                                text.trim().endsWith('\n')) {
+                              tryUnlock();
+                            }
+                          },
+                        ),
+                        if (statusLine.isNotEmpty) ...[
+                          const SizedBox(height: 8),
+                          Text(statusLine, style: const TextStyle(fontSize: 12)),
+                        ],
+                        const SizedBox(height: 16),
+                        FilledButton(
+                          onPressed: busy ? null : tryUnlock,
+                          style:
+                              FilledButton.styleFrom(backgroundColor: kPrimary),
+                          child: Text(busy ? 'Verifying…' : 'Unlock Connect'),
+                        ),
+                        TextButton(
+                          onPressed: busy
+                              ? null
+                              : () {
+                                  Navigator.of(
+                                    sheetContext,
+                                    rootNavigator: useRoot,
+                                  ).pop(false);
+                                },
+                          child: const Text('Cancel'),
+                        ),
+                      ],
+                    ),
+                  );
+                },
+              );
+            },
+          ) ??
+          false;
+    } finally {
+      controller.dispose();
+      _keygenSheetOpen = false;
+    }
     if (!mounted) return;
     if (unlocked == true) {
+      // Belt: if entitlement still reads unlock-required, do not re-open.
       setState(() {
         _status =
             'Keygen verified. Press Connect for residual protection.';
@@ -558,20 +588,20 @@ class _TunnelHomeState extends State<TunnelHome> with WidgetsBindingObserver {
     if (gate == null) return false;
     // Refreshes remote payment entitlement so refunds cancel Connect.
     final r = await gate.assertMayConnect(refreshPayment: true);
-    if (!r.ok) {
-      _append(r.message);
-      setState(() => _status = r.message);
-      final licOk = await gate.hasAcceptedLicence();
-      if (!licOk) {
-        await _showLicenceSheet();
-      } else if (await gate.needsLicenceRenewal()) {
-        await _showRenewLicenceSheet();
-      } else if (await gate.needsKeygenUnlock()) {
-        await _showKeygenSheet();
-      }
-      return false;
+    if (r.ok) return true;
+    _append(r.message);
+    setState(() => _status = r.message);
+    final licOk = await gate.hasAcceptedLicence();
+    if (!licOk) {
+      await _showLicenceSheet();
     }
-    return true;
+    // One renew/keygen prompt after licence sheet (no double keygen from Accept).
+    await _promptPaymentUnlockIfNeeded();
+    final r2 = await gate.assertMayConnect(refreshPayment: false);
+    if (!r2.ok && mounted) {
+      setState(() => _status = r2.message);
+    }
+    return r2.ok;
   }
 
   Future<void> _maybeAutoconnect() async {

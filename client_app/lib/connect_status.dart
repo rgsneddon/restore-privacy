@@ -106,6 +106,18 @@ bool shouldDismissKeygenSheetAfterUnlock({
   return st == 'active';
 }
 
+/// Whether the forced keygen unlock sheet should be presented.
+///
+/// False when a sheet is already open (re-entrancy / double launch+accept race)
+/// or when keygen is no longer required (after a successful unlock).
+bool shouldPresentKeygenUnlockSheet({
+  required bool needsKeygenUnlock,
+  required bool keygenSheetAlreadyOpen,
+}) {
+  if (keygenSheetAlreadyOpen) return false;
+  return needsKeygenUnlock;
+}
+
 /// Human-readable status from the method-channel map (never invent "Connected"
 /// for host-only HELLO or failed Packet Tunnel).
 String mapConnectStatusMessage(dynamic result) {
