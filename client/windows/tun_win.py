@@ -8,7 +8,6 @@ from __future__ import annotations
 
 import ctypes
 import os
-import subprocess
 import sys
 import threading
 from ctypes import wintypes
@@ -89,14 +88,22 @@ class WintunTun:
         self._lock = threading.Lock()
         self._closed = False
 
-        # Create adapter (requires Administrator)
+        # Open existing adapter first (leftover RPT from crash/zombie), else create.
+        # Create-only can hang or fail slowly when the name is already allocated.
         name_w = ctypes.c_wchar_p(name)
         type_w = ctypes.c_wchar_p(tunnel_type)
-        adapter = self._WintunCreateAdapter(name_w, type_w, None)
+        adapter = None
+        if self._WintunOpenAdapter is not None:
+            try:
+                adapter = self._WintunOpenAdapter(name_w)
+            except Exception:
+                adapter = None
+        if not adapter:
+            adapter = self._WintunCreateAdapter(name_w, type_w, None)
         if not adapter:
             err = ctypes.get_last_error()
             raise WintunError(
-                f"WintunCreateAdapter failed (winerr={err}). "
+                f"WintunCreateAdapter/OpenAdapter failed (winerr={err}). "
                 "Run as Administrator and ensure the Wintun driver can load."
             )
         self._adapter = adapter
@@ -114,6 +121,13 @@ class WintunTun:
         self._WintunCreateAdapter = d.WintunCreateAdapter
         self._WintunCreateAdapter.argtypes = [wintypes.LPCWSTR, wintypes.LPCWSTR, ctypes.POINTER(GUID)]
         self._WintunCreateAdapter.restype = HADAPTER
+
+        # Optional: reopen existing adapter (present on modern wintun.dll)
+        self._WintunOpenAdapter = None
+        if hasattr(d, "WintunOpenAdapter"):
+            self._WintunOpenAdapter = d.WintunOpenAdapter
+            self._WintunOpenAdapter.argtypes = [wintypes.LPCWSTR]
+            self._WintunOpenAdapter.restype = HADAPTER
 
         self._WintunCloseAdapter = d.WintunCloseAdapter
         self._WintunCloseAdapter.argtypes = [HADAPTER]
@@ -180,8 +194,12 @@ class WintunTun:
         cmds.append(
             f'netsh interface set interface name="{self.name}" admin=ENABLED'
         )
+        from client.windows.hidden_subprocess import run_hidden
+
         for c in cmds:
-            subprocess.run(c, shell=True, capture_output=True, text=True)
+            # netsh is a console app — must use run_hidden or a large blue
+            # console flashes on Connect (pythonw has no console to inherit).
+            run_hidden(c, shell=True, text=True, timeout=30)
         return cmds
 
     def read_packet(self, max_size: int = 65535) -> Optional[bytes]:
@@ -328,33 +346,40 @@ def resolve_interface_index(name: str) -> Optional[int]:
     """Resolve Windows interface index by adapter name (for route IF binding)."""
     if sys.platform != "win32":
         return None
-    # PowerShell Get-NetAdapter is reliable for Wintun names
+    from client.windows.hidden_subprocess import run_hidden
+
+    # PowerShell Get-NetAdapter is reliable for Wintun names (hidden host)
     try:
-        out = subprocess.check_output(
+        r = run_hidden(
             [
                 "powershell",
+                "-NoLogo",
                 "-NoProfile",
                 "-NonInteractive",
+                "-WindowStyle",
+                "Hidden",
                 "-Command",
                 f"(Get-NetAdapter -Name '{name}' -ErrorAction SilentlyContinue | "
                 f"Select-Object -First 1).ifIndex",
             ],
+            shell=False,
             text=True,
-            stderr=subprocess.DEVNULL,
             timeout=15,
-        ).strip()
+        )
+        out = (r.stdout or "").strip()
         if out.isdigit():
             return int(out)
     except Exception:
         pass
-    # Fallback: netsh show interfaces
+    # Fallback: netsh show interfaces (also console — keep hidden)
     try:
-        out = subprocess.check_output(
+        r = run_hidden(
             ["netsh", "interface", "ipv4", "show", "interfaces"],
+            shell=False,
             text=True,
-            stderr=subprocess.DEVNULL,
             timeout=15,
         )
+        out = r.stdout or ""
         for line in out.splitlines():
             # Idx  Met  MTU   State        Name
             parts = line.split()

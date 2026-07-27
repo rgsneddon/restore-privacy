@@ -165,6 +165,11 @@ from client.windows.tray_win import (
     purge_product_tray_icon,
     resolve_tray_icon_path,
 )
+from client.windows.window_icon import (
+    apply_brand_window_icon,
+    set_process_app_user_model_id,
+)
+from client.flag_images import flag_image_path
 from client.windows.tunnel_win import (
     ipv6_residual_protected,
     residual_ip_capture_active,
@@ -347,6 +352,7 @@ class TunnelClientApp:
         self._connected = False
         self._busy = False
         self._tunnel = None
+        self._connect_gen: int = 0
         self._tray: WindowsSystemTray | None = None
         # Last status headline colour (theme re-apply must not wipe Connected teal)
         self._status_headline_fg: str = TEXT
@@ -368,14 +374,27 @@ class TunnelClientApp:
         self.bottom = tk.Frame(self.chrome, bg=self._t["chrome_bg"])
         self.bottom.pack(side=tk.BOTTOM, fill=tk.X)
 
-        # Entry country (flags) — main shell above Connect, not Settings-only
+        # Entry country (national flag images) — main shell above Connect.
         self._country_opts = catalog_country_options()
         self._country_labels = [o.label() for o in self._country_opts]
+        self._flag_photos: dict[str, tk.PhotoImage] = {}
+        for _opt in self._country_opts:
+            _fp = flag_image_path(_opt.code)
+            if _fp is not None:
+                try:
+                    self._flag_photos[_opt.code] = tk.PhotoImage(file=str(_fp))
+                except Exception:
+                    pass
         init_entry = normalize_entry_country(
             getattr(self._settings, "entry_country", default_entry_country())
         )
         self._entry_label_var = tk.StringVar(
             value=option_label_for_code(init_entry)
+        )
+        from client.country_select import country_flag_emoji
+
+        self._flag_var = tk.StringVar(
+            value=country_flag_emoji(init_entry) or f"[{init_entry}]"
         )
         self.country_frame = tk.Frame(self.bottom, bg=self._t["chrome_bg"])
         self.country_frame.pack(side=tk.TOP, fill=tk.X, pady=(0, 2))
@@ -389,41 +408,45 @@ class TunnelClientApp:
         ).pack(side=tk.TOP, fill=tk.X)
         self._country_row = tk.Frame(self.country_frame, bg=self._t["chrome_bg"])
         self._country_row.pack(side=tk.TOP, fill=tk.X, pady=(2, 0))
-        # Visible flag glyph (Segoe UI Emoji) — OptionMenu alone often blanks flags
-        # on Windows when the control uses plain Segoe UI.
-        from client.country_select import country_flag_emoji
-
-        self._flag_var = tk.StringVar(
-            value=country_flag_emoji(init_entry) or f"[{init_entry}]"
-        )
-        self.flag_label = tk.Label(
+        self.country_menu = tk.Menubutton(
             self._country_row,
-            textvariable=self._flag_var,
-            bg=self._t["chrome_bg"],
-            fg=self._t["text"],
-            font=("Segoe UI Emoji", 16),
-            width=3,
-            anchor="center",
-        )
-        self.flag_label.pack(side=tk.LEFT, padx=(0, 6))
-        self.country_menu = tk.OptionMenu(
-            self._country_row,
-            self._entry_label_var,
-            *self._country_labels,
-            command=self._on_main_entry_country_changed,
-        )
-        self.country_menu.configure(
+            textvariable=self._entry_label_var,
+            image=self._flag_photos.get(init_entry),
+            compound=tk.LEFT,
             bg=self._t["panel_bg"],
             fg=self._t["text"],
             activebackground=self._t["light_accent"],
             activeforeground=self._t["text"],
             highlightthickness=1,
             highlightbackground=self._t["border"] if "border" in self._t else BORDER,
-            # Emoji font so 🇮🇸 / 🇷🇴 / 🇩🇪 render in the dropdown value
-            font=("Segoe UI Emoji", 10),
+            font=("Segoe UI", 10),
             anchor="w",
+            relief=tk.RAISED,
+            bd=1,
+            direction="below",
+            indicatoron=True,
         )
+        _cmenu = tk.Menu(
+            self.country_menu,
+            tearoff=0,
+            bg=self._t["panel_bg"],
+            fg=self._t["text"],
+            activebackground=self._t["light_accent"],
+            activeforeground=self._t["text"],
+            font=("Segoe UI", 10),
+        )
+        for _opt in self._country_opts:
+            _img = self._flag_photos.get(_opt.code)
+            _cmenu.add_command(
+                label=f"  {_opt.name} ({_opt.code})",
+                image=_img,
+                compound=tk.LEFT if _img is not None else tk.NONE,
+                command=lambda c=_opt.code: self._select_main_entry_country(c),
+            )
+        self.country_menu.configure(menu=_cmenu)
+        self._country_menu_obj = _cmenu
         self.country_menu.pack(side=tk.LEFT, fill=tk.X, expand=True)
+        self.flag_label = None
 
         self.btn_var = tk.StringVar(value=connect_button_label(False))
         self.connect_btn = tk.Button(
@@ -735,36 +758,31 @@ class TunnelClientApp:
             return False
 
     def _set_window_icon(self) -> None:
-        """Taskbar/title-bar brand icon — prefer shipped app_icon.ico/png."""
-        native = Path(__file__).resolve().parent / "native"
-        ico = native / "app_icon.ico"
-        png = native / "app_icon.png"
-        # Prefer brand logo path (same as tray / shortcuts)
-        brand = resolve_tray_icon_path()
-        if brand is not None and brand.suffix.lower() == ".ico":
-            ico = brand
-        elif brand is not None and brand.suffix.lower() == ".png":
-            png = brand
+        """Taskbar/title-bar brand logo (not the Python/Tk feather)."""
         try:
-            if ico.is_file():
-                # Absolute path: relative iconbitmap can fail and leave default icon
-                self.root.iconbitmap(default=str(ico.resolve()))
-        except Exception:
+            status = apply_brand_window_icon(self.root)
+            self._icon_status = status
+            if status.get("iconphoto") or status.get("iconbitmap"):
+                self._icon_photo = getattr(self.root, "_rpt_icon_photo", None)
+
+            def _reapply_brand_icon() -> None:
+                try:
+                    if not self.root.winfo_exists():
+                        return
+                except Exception:
+                    return
+                try:
+                    apply_brand_window_icon(self.root)
+                except Exception:
+                    pass
+
             try:
-                if ico.is_file():
-                    self.root.iconbitmap(str(ico.resolve()))
+                self._icon_reapply_after_id = self.root.after(200, _reapply_brand_icon)
             except Exception:
-                pass
-        try:
-            if png.is_file():
-                img = tk.PhotoImage(file=str(png.resolve()))
-                self.root.iconphoto(True, img)
-                self._icon_photo = img
-            elif ico.is_file():
-                # Some Tk builds pick taskbar from iconphoto better than iconbitmap
-                pass
+                self._icon_reapply_after_id = None
         except Exception:
-            pass
+            self._icon_status = {"error": True}
+
 
     def _start_system_tray(self) -> None:
         """Tray identity: Privacy Restored + product logo (one system-wide icon)."""
@@ -1637,6 +1655,35 @@ class TunnelClientApp:
         self._refresh_multihop_from_settings()
         return code
 
+
+    def _select_main_entry_country(self, code: str | None) -> None:
+        """Persist entry from flag menu selection (code) and refresh chrome."""
+        try:
+            from client.country_select import country_flag_emoji
+
+            code_n = normalize_entry_country(code or default_entry_country())
+            cur = load_settings()
+            cur.entry_country = code_n
+            save_settings(cur)
+            self._settings = cur
+            self._entry_label_var.set(option_label_for_code(code_n))
+            try:
+                self._flag_var.set(country_flag_emoji(code_n) or f"[{code_n}]")
+            except Exception:
+                pass
+            try:
+                img = getattr(self, "_flag_photos", {}).get(code_n)
+                if img is not None and getattr(self, "country_menu", None) is not None:
+                    self.country_menu.configure(image=img, compound=tk.LEFT)
+            except Exception:
+                pass
+            self._refresh_multihop_from_settings()
+            self._log(
+                f"Entry country: {option_label_for_code(code_n)} (next Connect)"
+            )
+        except Exception as exc:  # noqa: BLE001
+            self._log(f"Could not save entry country: {exc}")
+
     def _on_main_entry_country_changed(self, _label: str | None = None) -> None:
         """Persist main-shell country picker and refresh residual path for next Connect."""
         try:
@@ -1844,6 +1891,12 @@ class TunnelClientApp:
             self._connection_log(
                 KIND_CONNECT, "Connect started (full-tunnel residual path)"
             )
+
+        self._connect_gen = int(getattr(self, "_connect_gen", 0)) + 1
+        connect_gen = self._connect_gen
+
+        def _connect_still_current() -> bool:
+            return int(getattr(self, "_connect_gen", 0)) == connect_gen
 
         def work() -> None:
             # Status-host + residual HELLO stay off the Tk UI thread so Windows
@@ -2063,6 +2116,8 @@ class TunnelClientApp:
         disconnect_full_tunnel(tunnel, self.client)
 
     def _start_disconnect(self) -> None:
+        # Invalidate any in-flight Connect worker (cancel before / during attach)
+        self._connect_gen = int(getattr(self, "_connect_gen", 0)) + 1
         self._apply_control(connected=True, busy=True)
         self._set_status("disconnecting")
         self._log("Disconnect - stopping tunnel...")
@@ -3668,6 +3723,10 @@ def _enable_crash_fault_log() -> None:
 def main() -> int:
     """Launch UI; residual Connect elevates (Wintun + dual /1). No cold auto-connect."""
     _enable_crash_fault_log()
+    try:
+        set_process_app_user_model_id()
+    except Exception:
+        pass
     # Detect handoff *before* stripping flags (single-instance allows handoff).
     resume_after_elevate = "--rpt-auto-connect" in sys.argv
     is_elev_flag = "--rpt-elevated" in sys.argv
