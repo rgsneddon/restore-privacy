@@ -42,6 +42,24 @@ AUDIT_PATH = "/AUDIT.md"
 README_PATH = "/README.md"
 SETTINGS_GUIDE_PATH = "/settings-explainer"
 
+# Product family landings (paths; optional Host aliases for browser./vault.)
+PRODUCT_VPN_PATH = "/"
+PRODUCT_BROWSER_PATH = "/browser"
+PRODUCT_VAULT_PATH = "/vault"
+PRODUCT_VPN_KEY = "vpn"
+PRODUCT_BROWSER_KEY = "browser"
+PRODUCT_VAULT_KEY = "vault"
+PRODUCT_VPN_LABEL = "Restore Privacy VPN"
+PRODUCT_BROWSER_LABEL = "Restore Privacy Browser"
+PRODUCT_VAULT_LABEL = "Restore Privacy Vault"
+PRODUCT_VPN_TITLE = "RESTORE PRIVACY VPN"
+PRODUCT_BROWSER_TITLE = "RESTORE PRIVACY BROWSER"
+PRODUCT_VAULT_TITLE = "RESTORE PRIVACY VAULT"
+PRODUCT_TABS_ID = "product-tabs"
+PRODUCT_TAB_VPN_ID = "product-tab-vpn"
+PRODUCT_TAB_BROWSER_ID = "product-tab-browser"
+PRODUCT_TAB_VAULT_ID = "product-tab-vault"
+
 _STATIC_DIR = Path(__file__).resolve().parent / "static"
 _BRAND_ASSET_VERSION_CACHE: str | None = None
 
@@ -236,6 +254,78 @@ body {{
   width: min(100% - 1.5rem, var(--rb-max));
   display: flex; flex-direction: column; gap: 1.15rem;
   margin: 0 auto;
+}}
+/* Product family tabs (VPN / Browser / Vault) — card boxes at very top */
+#{PRODUCT_TABS_ID}, .product-tabs {{
+  display: flex; flex-wrap: wrap; justify-content: center;
+  gap: 0.65rem; width: 100%; margin: 0;
+  padding: 0;
+}}
+a.product-tab, .product-tab {{
+  flex: 1 1 9.5rem;
+  max-width: 15rem;
+  min-width: 8.5rem;
+  text-align: center;
+  text-decoration: none;
+  color: var(--rb-cream);
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  font-size: clamp(0.72rem, 2vw, 0.88rem);
+  line-height: 1.25;
+  padding: 0.85rem 0.75rem;
+  border-radius: var(--rb-radius);
+  border: 1.5px solid transparent;
+  background:
+    linear-gradient(
+      165deg,
+      color-mix(in srgb, var(--rb-card) 88%, var(--rb-soft)) 0%,
+      var(--rb-card) 55%
+    ) padding-box,
+    var(--rb-neon-border) border-box;
+  background-origin: border-box;
+  background-clip: padding-box, border-box;
+  box-shadow:
+    0 0 0 1px color-mix(in srgb, var(--rb-neon-cyan) 18%, transparent),
+    0 0 10px var(--rb-neon-glow-cyan),
+    var(--rb-panel-shadow);
+  transition: transform 0.12s ease, box-shadow 0.12s ease;
+}}
+a.product-tab:hover, .product-tab:hover {{
+  transform: translateY(-1px);
+  color: var(--rb-cream);
+  box-shadow:
+    0 0 0 1px color-mix(in srgb, var(--rb-neon-cyan) 35%, transparent),
+    0 0 16px var(--rb-neon-glow-cyan),
+    0 0 22px var(--rb-neon-glow-green),
+    var(--rb-panel-shadow);
+}}
+a.product-tab.is-active, .product-tab.is-active {{
+  box-shadow:
+    0 0 0 2px color-mix(in srgb, var(--rb-neon-green) 55%, transparent),
+    0 0 18px var(--rb-neon-glow-cyan),
+    0 0 28px var(--rb-neon-glow-green),
+    var(--rb-panel-shadow);
+  outline: none;
+}}
+.product-tab-label {{ display: block; }}
+/* Coming-soon product body (Browser / Vault) — brand lettering weight like H1 */
+.product-coming-card {{
+  text-align: center;
+  padding: clamp(1.5rem, 4vw, 2.5rem) clamp(1rem, 3vw, 1.75rem);
+}}
+.product-coming-title {{
+  letter-spacing: 0.14em; font-weight: 700;
+  font-size: clamp(1.35rem, 4.2vw, 2.05rem);
+  margin: 0 0 0.85rem; color: var(--rb-cream);
+  line-height: 1.15;
+}}
+.product-coming-line {{
+  margin: 0.35rem 0 0; font-size: clamp(0.95rem, 2.6vw, 1.15rem);
+  line-height: 1.45; color: var(--rb-cream); font-weight: 600;
+}}
+.product-coming-schedule {{
+  margin: 0.55rem 0 0; font-size: clamp(0.9rem, 2.4vw, 1.05rem);
+  line-height: 1.45; color: var(--rb-muted); font-weight: 500;
 }}
 /* Logo data-artifact borders: neon cyan/blue → green gradient + dual glow */
 .panel-card {{
@@ -502,6 +592,46 @@ def public_theme_picker_html() -> str:
 """
 
 
+def public_product_tabs_html(*, active: str = PRODUCT_VPN_KEY) -> str:
+    """Three product family tabs (VPN / Browser / Vault) in panel-card box style.
+
+    *active* is one of: vpn, browser, vault. Placed at the very top of public pages.
+    """
+    key = (active or PRODUCT_VPN_KEY).strip().lower()
+    if key not in (PRODUCT_VPN_KEY, PRODUCT_BROWSER_KEY, PRODUCT_VAULT_KEY):
+        key = PRODUCT_VPN_KEY
+    items = (
+        (PRODUCT_VPN_KEY, PRODUCT_VPN_PATH, PRODUCT_TAB_VPN_ID, PRODUCT_VPN_LABEL),
+        (
+            PRODUCT_BROWSER_KEY,
+            PRODUCT_BROWSER_PATH,
+            PRODUCT_TAB_BROWSER_ID,
+            PRODUCT_BROWSER_LABEL,
+        ),
+        (
+            PRODUCT_VAULT_KEY,
+            PRODUCT_VAULT_PATH,
+            PRODUCT_TAB_VAULT_ID,
+            PRODUCT_VAULT_LABEL,
+        ),
+    )
+    parts: list[str] = []
+    for k, path, el_id, label in items:
+        cls = "product-tab"
+        if k == key:
+            cls += " is-active"
+        aria = ' aria-current="page"' if k == key else ""
+        parts.append(
+            f'<a class="{cls}" id="{el_id}" href="{path}" data-product="{k}"{aria}>'
+            f'<span class="product-tab-label">{_esc(label)}</span></a>'
+        )
+    return (
+        f'  <nav class="product-tabs" id="{PRODUCT_TABS_ID}" '
+        f'data-product-tabs="1" aria-label="Product family">'
+        f"{''.join(parts)}</nav>\n"
+    )
+
+
 def public_nav_links_html(*, active: str | None = None) -> str:
     """Button-style nav: Home, Licence, Privacy Policy, Security Audit, README.
 
@@ -549,17 +679,26 @@ def public_brand_header_html(
     active: str | None = None,
     logo_size: int = PUBLIC_BRAND_LOGO_SIZE_DEFAULT,
     logo_src: str = PUBLIC_BRAND_LOGO_PATH,
+    product_active: str = PRODUCT_VPN_KEY,
+    include_product_tabs: bool = True,
 ) -> str:
     """Static top brand panel used across all public pages.
 
-    Layout: **borderless shield+key mark** to the **left** of **RESTORE PRIVACY VPN**,
-    as a centered row **above** the site nav. Logo has no outer plate/frame.
+    Layout: **product tabs** (VPN / Browser / Vault) at the very top, then
+    **borderless shield+key mark** to the **left** of the brand H1, as a centered
+    row **above** the site nav. Logo has no outer plate/frame.
     Under-title tagline is omitted by default (no lightweight-vpn slogan).
     Pass a non-empty *tagline* only if a page truly needs a header subtitle;
     public catalog/docs call sites leave it empty for a clean top box.
     Brand H1 defaults to :data:`PUBLIC_BRAND_TITLE` (**RESTORE PRIVACY VPN**).
+    *product_active* is vpn | browser | vault for the top product tabs.
     """
-    title_safe = _esc(public_display_title(title))
+    # Product landings pass full product titles; VPN home normalizes short titles.
+    raw_title = (title or "").strip()
+    if raw_title in (PRODUCT_BROWSER_TITLE, PRODUCT_VAULT_TITLE):
+        title_safe = _esc(raw_title)
+    else:
+        title_safe = _esc(public_display_title(title))
     raw_src = (logo_src or PUBLIC_BRAND_LOGO_PATH).strip() or PUBLIC_BRAND_LOGO_PATH
     # Default solid logo gets cache-bust; explicit override paths are left as-is
     # unless they are the standard solid path without a query.
@@ -574,7 +713,10 @@ def public_brand_header_html(
     tagline_html = (
         f'      <p class="brand-tagline">{_esc(tag)}</p>\n' if tag else ""
     )
-    return f"""    <header class="brand-panel panel-card" id="{SITE_BRAND_HEADER_ID}" data-site-header="1" data-header-alias="site-brand-header">
+    tabs = (
+        public_product_tabs_html(active=product_active) if include_product_tabs else ""
+    )
+    return f"""{tabs}    <header class="brand-panel panel-card" id="{SITE_BRAND_HEADER_ID}" data-site-header="1" data-header-alias="site-brand-header">
       <div class="brand-mark" id="brand-mark" data-brand-mark="1">
         <img class="brand-logo" src="{_esc(src)}" width="{sz}" height="{sz}" alt="Restore Privacy logo"/>
         <h1>{title_safe}</h1>

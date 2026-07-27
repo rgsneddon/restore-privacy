@@ -478,6 +478,7 @@ def render_html(
         title=str(title),
         active="home",
         logo_size=112,
+        product_active="vpn",
     )
     body = f"""{public_head_open(title=str(title), extra_css=page_css)}
   <div class="page-shell" id="page-shell">
@@ -598,6 +599,42 @@ class Handler(BaseHTTPRequestHandler):
 
     def do_GET(self):  # noqa: N802
         path, query = _parse_query(self.path)
+        # Product family: paths /browser /vault; optional Host browser.* / vault.*
+        try:
+            from product_family import (
+                product_key_from_host,
+                render_browser_page_html,
+                render_vault_page_html,
+            )
+        except ImportError:  # pragma: no cover
+            from status_page.product_family import (  # type: ignore
+                product_key_from_host,
+                render_browser_page_html,
+                render_vault_page_html,
+            )
+        host_product = product_key_from_host((self.headers.get("Host") or "").strip())
+        if host_product == "browser" and path in (
+            "/",
+            "/index.html",
+            "/browser",
+            "/browser/",
+        ):
+            self._send(200, "text/html; charset=utf-8", render_browser_page_html())
+            return
+        if host_product == "vault" and path in (
+            "/",
+            "/index.html",
+            "/vault",
+            "/vault/",
+        ):
+            self._send(200, "text/html; charset=utf-8", render_vault_page_html())
+            return
+        if path in ("/browser", "/browser/"):
+            self._send(200, "text/html; charset=utf-8", render_browser_page_html())
+            return
+        if path in ("/vault", "/vault/"):
+            self._send(200, "text/html; charset=utf-8", render_vault_page_html())
+            return
         if path in ("/", "/index.html"):
             try:
                 from local_currency import (

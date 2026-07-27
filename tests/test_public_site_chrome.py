@@ -331,21 +331,24 @@ class TestDocsShareChrome(unittest.TestCase):
             html = got[0].decode("utf-8")
             import re
 
-            # Active class on the correct control (ignore CSS rule text)
+            # Active class on site nav only (product-family tabs also use is-active)
             active_anchors = re.findall(
-                r'<a class="([^"]*is-active[^"]*)" id="([^"]+)"',
+                r'<a class="([^"]*nav-btn[^"]*is-active[^"]*)" id="([^"]+)"',
                 html,
             )
             self.assertEqual(
                 len(active_anchors),
                 1,
-                msg=f"{path} active anchors={active_anchors}",
+                msg=f"{path} active nav anchors={active_anchors}",
             )
             self.assertEqual(
                 active_anchors[0][1],
                 link_id,
                 msg=f"{path} should activate {link_id}",
             )
+            # Product tabs present on public docs
+            self.assertIn("product-tabs", html)
+            self.assertIn("product-tab-vpn", html)
             if link_id != "privacy-link":
                 m = re.search(
                     r'<a class="([^"]*)" id="privacy-link"',
