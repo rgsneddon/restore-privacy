@@ -6,7 +6,7 @@ Catalog monopin: **0.5.0**
 
 | Package | Status |
 |---------|--------|
-| `restore-privacy-client-0.5.0-macos.zip` | **Developer ID signed + notarized + stapled** (public catalog seal when secrets present) |
+| `restore-privacy-client-0.5.0-macos.zip` | **Developer ID signed + notarized + stapled** (public catalog seal) |
 | `restore-privacy-client-0.5.0-ios.zip` | **Team-signed sideload** (not App Store) |
 
 Hosted at VPS `/opt/restore-privacy/paid_assets/0.5.0/` for paid fulfilment. Default residual entry: **United States**.
