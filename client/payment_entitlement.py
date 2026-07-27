@@ -467,6 +467,16 @@ def has_keygen_unlock(
     return bool(kg) and kg.startswith(KEYGEN_PREFIX)
 
 
+def keygen_unlock_is_version_agnostic() -> bool:
+    """Product rule: fulfilment keygen is subscription-scoped, not app-version-scoped.
+
+    An active (non-EXPIRED) ``RPT-KEY-…`` from an older monopin remains valid on a
+    newer catalog build. Unlock/verify never requires a fresh mint solely because
+    ``client/VERSION`` advanced.
+    """
+    return True
+
+
 def import_keygen_and_verify(
     keygen: str,
     *,
@@ -476,13 +486,18 @@ def import_keygen_and_verify(
     now: float | None = None,
     fetch: Any = None,
     bind_device: bool = True,
+    app_version: str = "",
 ) -> PaymentEntitlement:
     """Provision local entitlement from fulfilment **keygen** and verify remotely.
 
     Shipped first-run path after Install → accept licence → enter keygen:
     status host ``/api/connect-entitlement?keygen=…`` confirms active subscription.
     On success, binds this device so the residual node admits HELLO.
+
+    *app_version* is accepted for call-site clarity but **never** sent to the
+    status host and does **not** affect unlock success (version-agnostic keygen).
     """
+    _ = app_version  # intentionally unused — keygen is not monopin-scoped
     kg = normalize_local_keygen(keygen)
     if not kg:
         return load_payment_entitlement(path)

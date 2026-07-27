@@ -30,9 +30,12 @@ class TestVersionResolution(unittest.TestCase):
         self.assertEqual(read_running_version(), ver)
         self.assertNotEqual(read_running_version(), "0.0.0")
         # Current ship pin (not a stale prior release)
-        self.assertRegex(ver, r"^0\.(3|4)\.\d+$")
+        self.assertRegex(ver, r"^0\.(3|4|5)\.\d+$")
         self.assertNotEqual(read_running_version(), "0.2.3")
-        self.assertEqual(ver, catalog_latest_version())
+        # Prefer local catalog when comparing monorepo pins (remote may lag/env)
+        from client.ui_theme import catalog_latest_version as cat
+
+        self.assertEqual(ver, cat(prefer_remote=False))
 
     def test_stale_version_file_does_not_override_newer_package_pin(self):
         """Leftover 0.2.3 VERSION must not win over package 0.3.4 pin."""
@@ -84,12 +87,16 @@ class TestVersionResolution(unittest.TestCase):
     def test_embedded_package_version_not_zero(self):
         self.assertNotEqual(embedded_package_version(), "0.0.0")
         self.assertRegex(embedded_package_version(), r"^\d+\.\d+")
-        self.assertEqual(embedded_package_version(), catalog_latest_version())
+        self.assertEqual(
+            embedded_package_version(),
+            catalog_latest_version(prefer_remote=False),
+        )
 
     def test_all_product_pins_match_monorepo(self):
         """Windows installer, catalog, Flutter pubspec/RptConfig share client/VERSION."""
         pin = (ROOT / "client" / "VERSION").read_text(encoding="utf-8").strip()
-        self.assertEqual(pin, catalog_latest_version())
+        # Local monorepo pin (ignore remote cache from other tests)
+        self.assertEqual(pin, catalog_latest_version(prefer_remote=False))
         # Installer loads pin from client/VERSION
         from client.windows import installer as inst
 
@@ -126,6 +133,7 @@ class TestUpgradeBanner(unittest.TestCase):
         msg = upgrade_banner_text(running="0.1.0", latest="0.1.8")
         self.assertIsNotNone(msg)
         assert msg is not None
+        self.assertIn("New version available", msg)
         self.assertIn("0.1.0", msg)
         self.assertIn("0.1.8", msg)
         self.assertNotIn("0.0.0", msg)
@@ -150,18 +158,16 @@ class TestUpgradeBanner(unittest.TestCase):
         self.assertTrue(isinstance(url, str) and len(url) > 0)
         self.assertNotIn("releases/download", url)
         self.assertNotIn("releases/latest", url)
-        # Prefer status-host pay path or Stripe / downloads section (not free GH).
+        # Absolute https only — webbrowser.open cannot open relative /pay?…
         self.assertTrue(
-            url.startswith("http")
-            or url.startswith("/pay")
-            or url.startswith("/#"),
-            msg=f"unexpected upgrade url: {url}",
+            url.startswith("https://"),
+            msg=f"expected absolute https upgrade url: {url!r}",
         )
+        self.assertFalse(url.startswith("/pay"), msg=f"relative pay path: {url!r}")
         self.assertTrue(
             "buy.stripe.com" in url
             or "restoreprivacy.online" in url
-            or "/#downloads" in url
-            or url.startswith("/pay"),
+            or "#downloads" in url,
             msg=f"unexpected upgrade url: {url}",
         )
 

@@ -2144,7 +2144,7 @@ class TunnelClientApp:
         threading.Thread(target=work, daemon=True).start()
 
     def _open_upgrade(self) -> None:
-        url = upgrade_download_url()
+        url = upgrade_download_url(platform="windows")
         self._log(f"Opening download page...")
         try:
             webbrowser.open(url)

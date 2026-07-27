@@ -339,6 +339,10 @@ class LicenceGate {
   /// On active entitlement, POSTs `/api/bind-device-entitlement` so the residual
   /// node can admit HELLO when `RPT_REQUIRE_PAYMENT_ENTITLEMENT=1` (parity with
   /// desktop `import_keygen_and_verify(bind_device=True)`).
+  ///
+  /// **Version-agnostic:** unlock is subscription-scoped. The same `RPT-KEY-…`
+  /// from an older monopin re-applies on a newer build; app version is never
+  /// sent to `/api/connect-entitlement` and does not gate unlock success.
   Future<String> importKeygenAndVerify(
     String keygen, {
     String? baseUrl,

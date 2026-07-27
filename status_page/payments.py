@@ -3638,6 +3638,10 @@ def get_connect_entitlement_by_keygen(
 
     First successful lookup stamps ``keygen_activated_at`` (client keygen
     activation path) so tester licences can appear in the admin licence list.
+
+    **App version is not a factor:** the same ``RPT-KEY-…`` remains valid across
+    monopin upgrades while the subscription is active. Clients must re-enter
+    the original keygen on a newer build without needing a new mint.
     """
     kg = normalize_keygen(keygen)
     if not kg or not kg.startswith("RPT-KEY-"):

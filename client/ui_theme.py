@@ -381,14 +381,65 @@ def read_running_version(version_file: Path | None = None) -> str:
     return max(found, key=version_tuple)
 
 
-def catalog_latest_version() -> str:
-    """Latest published product version from status_page downloads catalog."""
+# Process-lifetime cache for remote monopin (avoids hammering status host).
+_REMOTE_CATALOG_VERSION_CACHE: str | None = None
+_REMOTE_CATALOG_FETCHED: bool = False
+
+PUBLIC_STATUS_BASE_URL = "https://restoreprivacy.online"
+CATALOG_VERSION_API_PATH = "/api/catalog-version"
+
+
+def fetch_remote_catalog_version(
+    *,
+    base_url: str | None = None,
+    timeout: float = 2.0,
+    force: bool = False,
+) -> str | None:
+    """GET public ``/api/catalog-version`` for live monopin (fail-soft).
+
+    Lets older frozen builds learn about a newer catalog pin without shipping
+    a new ``status_page.downloads`` module. Returns None on any network/parse error.
+    """
+    global _REMOTE_CATALOG_VERSION_CACHE, _REMOTE_CATALOG_FETCHED
+    if _REMOTE_CATALOG_FETCHED and not force:
+        return _REMOTE_CATALOG_VERSION_CACHE
+    base = (base_url or PUBLIC_STATUS_BASE_URL).rstrip("/")
+    url = f"{base}{CATALOG_VERSION_API_PATH}"
+    try:
+        import json
+        import urllib.request
+
+        req = urllib.request.Request(
+            url,
+            headers={"Accept": "application/json", "User-Agent": "RestorePrivacy-client"},
+            method="GET",
+        )
+        with urllib.request.urlopen(req, timeout=float(timeout)) as resp:  # noqa: S310
+            raw = resp.read().decode("utf-8", errors="replace")
+        data = json.loads(raw)
+        ver = str((data or {}).get("catalog_version") or "").strip().lstrip("vV")
+        if ver and ver[0].isdigit():
+            _REMOTE_CATALOG_VERSION_CACHE = ver
+            _REMOTE_CATALOG_FETCHED = True
+            return ver
+    except Exception:  # noqa: BLE001
+        pass
+    _REMOTE_CATALOG_FETCHED = True
+    return _REMOTE_CATALOG_VERSION_CACHE
+
+
+def catalog_latest_version(*, prefer_remote: bool = True) -> str:
+    """Latest published product monopin (remote status host, then local catalog)."""
+    if prefer_remote:
+        remote = fetch_remote_catalog_version()
+        if remote:
+            return remote
     try:
         from status_page.downloads import RELEASE_VERSION
 
         return str(RELEASE_VERSION).strip()
     except Exception:
-        # Frozen clients may lack status_page  -  treat package version as catalog
+        # Frozen clients may lack status_page — treat package version as catalog
         return embedded_package_version()
 
 
@@ -403,33 +454,71 @@ def upgrade_available(running: str | None = None, latest: str | None = None) -> 
     return version_is_behind(run, lat)
 
 
-def upgrade_download_url() -> str:
-    """Paid catalog / Windows pay entry (repo is private — never free GH releases).
-
-    Prefer the Stripe payment page for the Windows package so an in-app
-    "update" opens the same seamless pay → webhook → one-time proxy path as
-    the public status downloads. Fall back to the status host downloads
-    section when the catalog module is unavailable (frozen clients).
-    """
-    try:
-        from status_page.downloads import available_downloads
-
-        for a in available_downloads():
-            if a.platform == "windows":
-                # pay_path, not a.url (a.url is bookkeeping-only GitHub asset URL)
-                return a.pay_path
-    except Exception:
-        pass
+def _public_status_base_url() -> str:
+    """Absolute https origin for paid catalog / pay links (never relative)."""
     try:
         from status_page.payments import DEFAULT_PRODUCTION_PUBLIC_BASE_URL
 
-        return f"{DEFAULT_PRODUCTION_PUBLIC_BASE_URL}/#downloads"
+        return str(DEFAULT_PRODUCTION_PUBLIC_BASE_URL).rstrip("/")
     except Exception:
-        return "https://restoreprivacy.online/#downloads"
+        return PUBLIC_STATUS_BASE_URL.rstrip("/")
+
+
+def absolute_status_url(path_or_url: str, *, base: str | None = None) -> str:
+    """Ensure *path_or_url* is an absolute https URL openable by webbrowser.
+
+    Catalog ``pay_path`` is same-origin relative (``/pay?platform=…``) for HTML.
+    Desktop/mobile shells must open absolute ``https://restoreprivacy.online/…``.
+    """
+    s = (path_or_url or "").strip()
+    if not s:
+        return f"{(base or _public_status_base_url()).rstrip('/')}/#downloads"
+    if s.startswith("https://") or s.startswith("http://"):
+        return s
+    origin = (base or _public_status_base_url()).rstrip("/")
+    if s.startswith("/"):
+        return f"{origin}{s}"
+    return f"{origin}/{s}"
+
+
+def upgrade_download_url(platform: str | None = None) -> str:
+    """Paid catalog / platform pay entry (repo is private — never free GH releases).
+
+    Prefer the platform payment path so an in-app "new version available" opens
+    the same pay → webhook → one-time proxy flow as the public shop. Falls back
+    to the status host ``#downloads`` section.
+
+    Always returns an **absolute** ``https://`` URL so Windows/Linux
+    ``webbrowser.open`` and Flutter ``url_launcher`` can open it (catalog
+    ``pay_path`` alone is relative for same-origin HTML).
+    """
+    plat = (platform or "").strip().lower()
+    if not plat:
+        plat = (os.environ.get("RPT_CLIENT_PLATFORM") or "").strip().lower()
+    base = _public_status_base_url()
+    try:
+        from status_page.downloads import available_downloads
+
+        assets = list(available_downloads())
+        if plat:
+            for a in assets:
+                if a.platform == plat:
+                    return absolute_status_url(a.pay_path, base=base)
+        # Prefer any known paid path rather than free GH
+        if assets:
+            return absolute_status_url(assets[0].pay_path, base=base)
+    except Exception:
+        pass
+    if plat:
+        return absolute_status_url(f"/pay?platform={plat}", base=base)
+    return absolute_status_url("/#downloads", base=base)
 
 
 def upgrade_banner_text(running: str | None = None, latest: str | None = None) -> str | None:
-    """Human message when upgrade is available; None if current."""
+    """Human message when upgrade is available; None if current.
+
+    Wording includes **New version available** so all shells share a clear prompt.
+    """
     run = running if running is not None else read_running_version()
     lat = latest if latest is not None else catalog_latest_version()
     if not run or run in ("0.0.0", "0", "unknown"):
@@ -438,4 +527,15 @@ def upgrade_banner_text(running: str | None = None, latest: str | None = None) -
         lat = embedded_package_version()
     if not version_is_behind(run, lat):
         return None
-    return f"Update available: you have v{run}, latest is v{lat}"
+    return f"New version available: you have v{run}, latest is v{lat}"
+
+
+def upgrade_surfaces() -> dict[str, str]:
+    """Map of product shell → how upgrade messaging is wired (docs/tests)."""
+    return {
+        "windows": "client/windows/app.py upgrade_frame + upgrade_banner_text",
+        "linux": "client/linux/app.py upgrade banner + upgrade_banner_text",
+        "macos": "client_app/lib/main.dart UpgradeBanner (Flutter)",
+        "ios": "client_app/lib/main.dart UpgradeBanner (Flutter)",
+        "android": "client_app/lib/main.dart UpgradeBanner (Flutter)",
+    }

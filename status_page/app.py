@@ -731,6 +731,28 @@ class Handler(BaseHTTPRequestHandler):
             safe = public_status_payload(status)
             self._send(200, "application/json", json.dumps(safe).encode("utf-8"))
             return
+        if path in ("/api/catalog-version", "/catalog-version"):
+            # Public monopin for in-app "new version available" (not a client count).
+            try:
+                from downloads import current_catalog_version
+            except ImportError:  # pragma: no cover
+                from status_page.downloads import current_catalog_version  # type: ignore
+            try:
+                from payments import DEFAULT_PRODUCTION_PUBLIC_BASE_URL
+            except ImportError:  # pragma: no cover
+                DEFAULT_PRODUCTION_PUBLIC_BASE_URL = "https://restoreprivacy.online"
+            ver = current_catalog_version()
+            payload = {
+                "catalog_version": ver,
+                "downloads_url": f"{DEFAULT_PRODUCTION_PUBLIC_BASE_URL.rstrip('/')}/#downloads",
+            }
+            self._send(
+                200,
+                "application/json; charset=utf-8",
+                json.dumps(payload).encode("utf-8"),
+                extra_headers=[("Cache-Control", "public, max-age=300")],
+            )
+            return
         if path in ("/health", "/healthz"):
             self._send(200, "application/json", b'{"ok":true}')
             return

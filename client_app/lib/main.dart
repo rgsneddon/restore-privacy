@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import 'app_quit.dart';
 import 'connect_status.dart';
 import 'connection_log.dart';
 import 'country_select.dart';
@@ -16,6 +17,7 @@ import 'free_tier.dart';
 import 'settings_screen.dart';
 import 'settings_store.dart';
 import 'theme.dart';
+import 'upgrade_banner.dart';
 import 'vpn_controller.dart';
 
 void main() {
@@ -59,14 +61,28 @@ class RestorePrivacyApp extends StatelessWidget {
 
 /// Seamless product shell: hero status, Connect/Disconnect, Settings transparency.
 ///
-/// Minimize / background does **not** stop the tunnel — only Disconnect does.
+/// Minimize / background does **not** stop the tunnel — only Disconnect or Quit
+/// do. Quit (macOS/iOS main screen, bottom-right) stops the tunnel then exits.
 /// Licence acceptance is required before Connect; autoconnect cannot bypass it.
 class TunnelHome extends StatefulWidget {
-  const TunnelHome({super.key, this.settingsStore, this.licenceGate});
+  const TunnelHome({
+    super.key,
+    this.settingsStore,
+    this.licenceGate,
+    this.vpnController,
+    this.onQuitExit,
+  });
 
   /// Injectable store for tests; production loads SharedPreferences.
   final SettingsStore? settingsStore;
   final LicenceGate? licenceGate;
+
+  /// Injectable VPN controller (tests); production creates [VpnController].
+  final VpnController? vpnController;
+
+  /// Injectable process exit after tunnel stop (tests); production uses
+  /// [exitAppProcess].
+  final void Function()? onQuitExit;
 
   @override
   State<TunnelHome> createState() => _TunnelHomeState();
@@ -96,7 +112,7 @@ class _TunnelHomeState extends State<TunnelHome> with WidgetsBindingObserver {
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
-    _vpn = VpnController(onStatus: _onStatus);
+    _vpn = widget.vpnController ?? VpnController(onStatus: _onStatus);
     // macOS menu bar tray → Flutter Disconnect / Show
     _macWindow.setHandlers(
       onTrayDisconnect: () {
@@ -815,6 +831,33 @@ class _TunnelHomeState extends State<TunnelHome> with WidgetsBindingObserver {
     }
   }
 
+  /// Discrete main-screen Quit (macOS/iOS): stop Packet Tunnel, then exit process.
+  ///
+  /// Does **not** hide-to-tray. Order is enforced by [performQuitSequence].
+  Future<void> _onQuit() async {
+    if (_busy) return;
+    setState(() => _busy = true);
+    _append('Quit — stopping residual tunnel, then closing the app…');
+    try {
+      await performQuitSequence(
+        stopTunnel: () async {
+          try {
+            await _vpn.disconnect();
+          } catch (_) {
+            // Best-effort stop; still exit so UI does not leave a half-state.
+          }
+          try {
+            await _macWindow.setTrayConnected(false);
+          } catch (_) {}
+        },
+        exitApp: widget.onQuitExit ?? exitAppProcess,
+      );
+    } finally {
+      // Only reached if exit was injected (tests) or exit failed.
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
   Future<void> _openSettings() async {
     final store = _store;
     if (store == null) return;
@@ -948,6 +991,8 @@ class _TunnelHomeState extends State<TunnelHome> with WidgetsBindingObserver {
                 ],
               ),
               const SizedBox(height: 14),
+              // New version available (paid catalog) — macOS / iOS / Android shell
+              const UpgradeBanner(),
               Container(
                 decoration: BoxDecoration(
                   color: kPanelBg,
@@ -1168,6 +1213,35 @@ class _TunnelHomeState extends State<TunnelHome> with WidgetsBindingObserver {
                   fontSize: 11,
                 ),
               ),
+              // Discrete Quit — bottom-right of main connection screen (macOS + iOS).
+              // Placement marker: kQuitButtonPlacement == bottomRight
+              if (showsMainScreenQuitOnThisDevice()) ...[
+                const SizedBox(height: 4),
+                Align(
+                  alignment: Alignment.centerRight, // bottomRight of column
+                  child: TextButton(
+                    key: const Key('main_quit_button'),
+                    onPressed: _busy ? null : _onQuit,
+                    style: TextButton.styleFrom(
+                      foregroundColor: kTextMuted,
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 4,
+                      ),
+                      minimumSize: const Size(0, 28),
+                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                      visualDensity: VisualDensity.compact,
+                    ),
+                    child: const Text(
+                      kQuitButtonLabel,
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
             ],
           ),
         ),

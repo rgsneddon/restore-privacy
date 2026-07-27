@@ -1482,7 +1482,7 @@ class TunnelClientApp:
         threading.Thread(target=work, daemon=True).start()
 
     def _open_upgrade(self) -> None:
-        url = upgrade_download_url()
+        url = upgrade_download_url(platform="linux")
         self._log("Opening download page...")
         try:
             webbrowser.open(url)
