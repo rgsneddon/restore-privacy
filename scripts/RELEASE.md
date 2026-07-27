@@ -16,13 +16,17 @@
 
 Product residual peers: **IS** `82.221.101.241:44044`, **RO** `185.146.232.107:44044`, **US** `5.161.242.85:44044`. See `scripts/RELEASE_NOTES_0.5.0.md`.
 
-### 0.5.0 platform build status
+### 0.5.0 platform build status (this Windows host ship)
 
-| Asset | This Mac host |
-|-------|---------------|
-| macOS zip | **Developer ID + notarized** when secrets present |
-| iOS zip | **Team-signed sideload** when secrets present |
-| Windows / Android / Linux | Honest carry-forward from **0.4.10** until native rebuild |
+| Asset | Honesty on this ship |
+|-------|----------------------|
+| Windows setup.exe | **Native multihop PE rebuild** (`build_windows_multihop` / `build_release_0.5.0.py` on Windows x64) |
+| Linux tar.gz | **Native rebuild** (`package_linux.py`) |
+| Android APK | **Honest carry-forward** residual-wire from **0.4.10** (renamed to 0.5.0) when SDK rebuild absent |
+| macOS zip | **Honest carry-forward** from prior Apple zip (catalog filename **0.5.0** only). Internal `CFBundleShortVersionString` may still be pre-0.5.0 (e.g. **0.2.3**). **Not** Developer ID / notarized native 0.5.0 until Mac handoff |
+| iOS zip | **Honest carry-forward** from prior Team-signed zip (filename **0.5.0** only). Internal bundle version may still be pre-0.5.0. **Not** native monopin 0.5.0 until Mac Team-sign rebuild |
+
+See `client_app/APPLE_HANDOFF_0.5.0.md` for Mac rebuild/notarize steps. Do not claim native Apple 0.5.0 seals while CF zips are what VPS hosts.
 
 ### Security audit timer (0.5.0)
 
