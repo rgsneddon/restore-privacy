@@ -170,7 +170,8 @@ class TestMultihopStructureProbes(unittest.TestCase):
         self.assertIn("client/multihop.py", text)
         self.assertIn("client/endpoint.py", text)
         self.assertIn("run_security_audit.py", text)
-        self.assertIn("4h", text)
+        self.assertIn("1d", text)
+        self.assertIn('PERIOD="${PERIOD:-1d}"', text)
 
 
 if __name__ == "__main__":

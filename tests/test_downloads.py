@@ -29,16 +29,24 @@ from downloads import (  # noqa: E402
     render_download_section_html,
 )
 
-EXPECTED_RELEASE_PAGE = (
-    "https://github.com/rgsneddon/restore-privacy/releases/tag/0.4.10"
-)
-EXPECTED_DOWNLOAD_PREFIX = (
-    "https://github.com/rgsneddon/restore-privacy/releases/download/0.4.10/"
-)
 # Public footer points at the paid status host (repo is private).
 EXPECTED_PUBLIC_CATALOG_FOOTER = (
     "https://restoreprivacy.online/#downloads"
 )
+
+
+def _product_pin() -> str:
+    return (ROOT / "client" / "VERSION").read_text(encoding="utf-8").strip()
+
+
+def _expected_release_page(pin: str) -> str:
+    return f"https://github.com/rgsneddon/restore-privacy/releases/tag/{pin}"
+
+
+def _expected_download_prefix(pin: str) -> str:
+    return (
+        f"https://github.com/rgsneddon/restore-privacy/releases/download/{pin}/"
+    )
 
 
 class TestDownloadCatalog(unittest.TestCase):
@@ -49,15 +57,16 @@ class TestDownloadCatalog(unittest.TestCase):
             is_current_catalog_filename,
         )
 
-        pin = (ROOT / "client" / "VERSION").read_text(encoding="utf-8").strip()
-        self.assertEqual(pin, "0.4.10")
+        pin = _product_pin()
         self.assertEqual(RELEASE_VERSION, pin)
         self.assertEqual(RELEASE_TAG, pin)
         self.assertEqual(current_catalog_version(), RELEASE_VERSION)
         self.assertTrue(catalog_matches_product_pin())
         self.assertEqual(GITHUB_REPO, "restore-privacy")
-        self.assertEqual(RELEASE_PAGE_URL, EXPECTED_RELEASE_PAGE)
-        self.assertEqual(RELEASE_DOWNLOAD_BASE, EXPECTED_DOWNLOAD_PREFIX.rstrip("/"))
+        self.assertEqual(RELEASE_PAGE_URL, _expected_release_page(pin))
+        self.assertEqual(
+            RELEASE_DOWNLOAD_BASE, _expected_download_prefix(pin).rstrip("/")
+        )
         self.assertEqual(RUST_REPO_URL, EXPECTED_PUBLIC_CATALOG_FOOTER)
         for a in available_downloads():
             self.assertTrue(is_current_catalog_filename(a.filename))
@@ -79,8 +88,9 @@ class TestDownloadCatalog(unittest.TestCase):
         self.assertEqual(by_plat["macos"].filename, MACOS_ZIP_FILENAME)
         self.assertEqual(by_plat["ios"].filename, IOS_ZIP_FILENAME)
         self.assertEqual(by_plat["android"].filename, ANDROID_APK_FILENAME)
+        prefix = _expected_download_prefix(_product_pin())
         for a in assets:
-            self.assertEqual(a.url, f"{EXPECTED_DOWNLOAD_PREFIX}{a.filename}")
+            self.assertEqual(a.url, f"{prefix}{a.filename}")
             # Primary path: site-hosted Select your plan page
             self.assertIn("/pay", a.pay_path)
             self.assertIn(f"platform={a.platform}", a.pay_path)
@@ -156,9 +166,10 @@ class TestDownloadCatalog(unittest.TestCase):
         self.assertGreater(form_at, head_at)
 
     def test_available_downloads_have_https_github_release_urls(self):
+        prefix = _expected_download_prefix(_product_pin())
         for a in available_downloads():
-            self.assertTrue(a.url.startswith(EXPECTED_DOWNLOAD_PREFIX))
-            self.assertEqual(a.url, f"{EXPECTED_DOWNLOAD_PREFIX}{a.filename}")
+            self.assertTrue(a.url.startswith(prefix))
+            self.assertEqual(a.url, f"{prefix}{a.filename}")
 
     def test_render_download_section_uses_paid_paths(self):
         html = render_download_section_html()

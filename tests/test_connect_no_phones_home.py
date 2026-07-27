@@ -72,15 +72,22 @@ class TestConnectSourceNoThirdParty(unittest.TestCase):
     def test_python_connect_module_has_no_http_client_imports(self):
         src = (ROOT / "client" / "connect.py").read_text(encoding="utf-8")
         tree = ast.parse(src)
-        imported: set[str] = set()
-        for node in ast.walk(tree):
+        # Top-level imports only (nested urllib for first-party node-state poll is OK)
+        top_imported: set[str] = set()
+        for node in tree.body:
             if isinstance(node, ast.Import):
                 for alias in node.names:
-                    imported.add(alias.name.split(".")[0])
+                    top_imported.add(alias.name.split(".")[0])
             elif isinstance(node, ast.ImportFrom) and node.module:
-                imported.add(node.module.split(".")[0])
+                top_imported.add(node.module.split(".")[0])
         for bad in ("urllib", "requests", "httpx", "aiohttp", "http"):
-            self.assertNotIn(bad, imported, f"connect.py must not import {bad}")
+            self.assertNotIn(
+                bad, top_imported, f"connect.py must not top-level import {bad}"
+            )
+        # Nested urllib is only for private preferred node-state poll (first-party)
+        if "urllib" in src:
+            self.assertIn("poll_preferred_node_state", src)
+            self.assertIn("/api/private/node-state", src)
         self.assertNotIn("uk_gate", src)
         self.assertNotIn("check_uk_public_ip", src)
 

@@ -54,12 +54,14 @@ class TestPrivacyPolicy(unittest.TestCase):
         self.assertIn("README", text)
 
     def test_policy_public_catalog_is_current_monopin(self):
-        """User-facing policy must advertise catalog v0.4.8 as current paid ship."""
+        """User-facing policy must advertise current monopin as paid ship."""
+        pin = (ROOT / "client" / "VERSION").read_text(encoding="utf-8").strip()
+        pin_line = f"Current packages (catalog v{pin})"
         text = _read("PRIVACY_POLICY.md")
-        self.assertIn("Current packages (catalog v0.4.8)", text)
+        self.assertIn(pin_line, text)
         self.assertNotIn("Current packages (catalog v0.4.1)", text)
         self.assertNotIn("Current packages (catalog v0.4.0)", text)
-        self.assertIn("0.4.8", text)
+        self.assertIn(pin, text)
         self.assertIn("restoreprivacy.online", text)
         self.assertIn("Developer ID", text)
         self.assertIn("Team-signed", text)
@@ -78,7 +80,7 @@ class TestPrivacyPolicy(unittest.TestCase):
         )
         # Public mirror stays in sync
         pub = _read("status_page/public/PRIVACY_POLICY.md")
-        self.assertIn("Current packages (catalog v0.4.8)", pub)
+        self.assertIn(pin_line, pub)
 
 
 class TestLicenseAndCredits(unittest.TestCase):
@@ -135,30 +137,32 @@ class TestLicenseAndCredits(unittest.TestCase):
         text = _read("LICENSE")
         self.assertIn("FULL COPYRIGHT", text.upper())
         self.assertIn("Stripe", text)
-        self.assertIn("catalog v0.4.8", text)
+        pin = (ROOT / "client" / "VERSION").read_text(encoding="utf-8").strip()
+        self.assertIn(f"catalog v{pin}", text)
         self.assertNotIn("catalog v0.4.0", text)
         self.assertNotIn("catalog v0.4.1", text)
         self.assertIn("private", text.lower())
         self.assertIn("PAYMENT REQUIRED", text.upper())
         pub = _read("status_page/public/LICENSE")
         self.assertEqual(text, pub)
-        self.assertIn("catalog v0.4.8", pub)
+        self.assertIn(f"catalog v{pin}", pub)
 
 
 class TestReadmeHowto(unittest.TestCase):
     def test_readme_howto_and_legal_links(self):
         """Public README: client-user how-to + legal links (operator detail in sundries)."""
+        pin = (ROOT / "client" / "VERSION").read_text(encoding="utf-8").strip()
         text = _read("README.md")
         lower = text.lower()
         self.assertTrue("how to" in lower or "install" in lower)
-        # End-user client path Ã¢â‚¬â€ all published platforms
+        # End-user client path — all published platforms
         self.assertIn("download", lower)
         self.assertIn("windows", lower)
         self.assertIn("android", lower)
         self.assertIn("macos", lower)
         self.assertIn("ios", lower)
-        # Catalog ship is 0.4.8 (signed packages via paid VPN APP Shop)
-        self.assertIn("0.4.8", text)
+        # Catalog ship is current monopin (signed packages via paid VPN APP Shop)
+        self.assertIn(pin, text)
         self.assertIn("restoreprivacy.online", text)
         self.assertIn("Developer ID", text)
         self.assertIn("Team-signed", text)
@@ -170,13 +174,13 @@ class TestReadmeHowto(unittest.TestCase):
         self.assertNotIn("releases/download/", text)
         # Package basenames from the public release catalog monopin
         self.assertIn(
-            "restore-privacy-client-0.4.8-windows-x64-setup.exe",
+            f"restore-privacy-client-{pin}-windows-x64-setup.exe",
             text,
         )
-        self.assertIn("restore-privacy-client-0.4.8-android.apk", text)
-        self.assertIn("restore-privacy-client-0.4.8-macos.zip", text)
-        self.assertIn("restore-privacy-client-0.4.8-ios.zip", text)
-        self.assertIn("restore-privacy-client-0.4.8-linux-x64.tar.gz", text)
+        self.assertIn(f"restore-privacy-client-{pin}-android.apk", text)
+        self.assertIn(f"restore-privacy-client-{pin}-macos.zip", text)
+        self.assertIn(f"restore-privacy-client-{pin}-ios.zip", text)
+        self.assertIn(f"restore-privacy-client-{pin}-linux-x64.tar.gz", text)
         # Must not advertise older monopin filenames as the current catalog
         self.assertNotIn(
             "restore-privacy-client-0.4.0-windows-x64-setup.exe",

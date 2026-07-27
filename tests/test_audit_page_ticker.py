@@ -88,8 +88,9 @@ class TestAuditPageTickerHtml(unittest.TestCase):
         self.assertIn('id="audit-page-current-run-colour"', html)
         self.assertIn(">Green<", html)
         self.assertIn('data-rag-colour="green"', html)
-        # Remaining 3h
-        self.assertIn("03:00:00", html)
+        # Remaining ~23h of 1-day period (display always includes days)
+        self.assertIn("0d 23:00:00", html)
+        self.assertIn('data-period-seconds="86400"', html)
 
     def test_amber_and_red_discrete_text(self):
         for colour, css in (("Amber", "rag-amber"), ("Red", "rag-red")):
@@ -177,9 +178,11 @@ class TestCountdownMathStillHonest(unittest.TestCase):
         last = datetime(2026, 7, 21, 12, 0, 0, tzinfo=timezone.utc)
         now = datetime(2026, 7, 21, 13, 30, 0, tzinfo=timezone.utc)
         st = countdown_state(now=now, last_generated_at=last)
-        self.assertEqual(st["remaining_seconds"], 2 * 3600 + 30 * 60)
+        # 1d - 1h30m = 22h30m
+        self.assertEqual(st["remaining_seconds"], 22 * 3600 + 30 * 60)
         self.assertEqual(st["display"], format_countdown(st["remaining_seconds"]))
-        self.assertEqual(st["display"], "02:30:00")
+        self.assertEqual(st["display"], "0d 22:30:00")
+        self.assertEqual(st["period_seconds"], 86400)
 
 
 if __name__ == "__main__":

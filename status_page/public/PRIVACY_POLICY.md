@@ -2,7 +2,7 @@
 
 **Last updated:** 25 July 2026  
 **Product:** Restore Privacy Tunnel (RPT / RPT2) — VPN node, client apps, and public status shop  
-**Current packages (catalog v0.4.8):** paid installers on [restoreprivacy.online](https://restoreprivacy.online/) — Monthly **£2.45 GBP** or Yearly **£27.93** (5% off) per platform (Windows, Android, macOS, iOS, Linux). macOS/iOS catalog zips are **filename pins** until a Mac rebuild produces a true **0.4.8** seal (**Developer ID** notarization on macOS; **Team-signed** sideload on iOS — see APPLE_HANDOFF_0.4.8.md). Source repository is **private**; free permanent GitHub installer URLs are not offered. After payment you get a **one-time** download and email with **keygen** + **PPI**. Pre-adjustment Settings defaults (lean residual): run at startup **off**, autoconnect **off**, residual VPN core **always on**, traffic shaping / outer obfuscation / multi-hop **off**. Optional browser extension (Chromium MV3, `restore-privacy-browser-extension-0.4.8.zip`) is browser-scoped only — not OS residual TUN.
+**Current packages (catalog v0.5.0):** paid installers on [restoreprivacy.online](https://restoreprivacy.online/) — Monthly **£2.45 GBP** or Yearly **£27.93** (5% off) per platform (Windows, Android, macOS, iOS, Linux). macOS catalog zip is **Developer ID signed + notarized** (0.5.0 Mac seal); iOS catalog zip is **Team-signed sideload** (see APPLE_HANDOFF_0.5.0.md). Source repository is **private**; free permanent GitHub installer URLs are not offered. After payment you get a **one-time** download and email with **keygen** + **PPI**. Pre-adjustment Settings defaults (lean residual): run at startup **off**, autoconnect **off**, residual VPN core **always on**, traffic shaping / outer obfuscation / multi-hop **off**. Optional browser extension (Chromium MV3, `restore-privacy-browser-extension-0.5.0.zip`) is browser-scoped only — not OS residual TUN.
 
 **Payment and Connect:** residual Connect needs a **successful payment** and **keygen unlock** while the subscription is **OK**. If payment fails, is refunded/disputed, or the paid period ends, status is **EXPIRED**: the app **hard-locks** with **renew your licence *here*** and a **platform payment portal** link until you renew and re-enter a valid keygen. Stripe session id / keygen are entitlement keys, not a username/password account. The status host also binds Stripe **`payment_intent`** so refunds without session metadata still revoke Connect.
 
@@ -43,8 +43,8 @@ Node process stdout/stderr is configured for no journal session streams in the s
 ### 3.1 VPN node
 
 - **Optional at-rest encryption (operator):** LUKS2 data volumes (`node/install_disk_encryption.sh`) and optional zram+LUKS2 RAM volume (`node/install_zram_luks.sh`) are **node-only**. They protect locked volumes. They are **not** live secrecy against root on an unlocked host, **not** residual tunnel crypto, and they do not erase VPS provider snapshots/netflow.
-- **Endpoints (catalog peers):** United States **5.161.242.85:44044** (default entry), Iceland **82.221.101.241:44044** (FlokiNET), Romania **185.146.232.107:44044** (FlokiNET) — user-selectable entry; multi-hop exit is another peer.
-- **Location / host:** IS/RO on **FlokiNET** (https://flokinet.is/); US is a separate residual peer (default entry). FlokiNET public materials state **no invasive logs**, root-only customer access, monitoring limited to resource usage, and no third-party sharing of tenant traffic patterns (https://flokinet.is/privacy/, https://flokinet.is/vps/). That is **host-published posture**, not a Restore Privacy forensic audit. Product no-log defaults (below) are separate.
+- **Endpoints (catalog peers):** Iceland **82.221.101.241:44044** (selectable; default residual is United States), Romania **185.146.232.107:44044** (FlokiNET), United States **5.161.242.85:44044** — user-selectable entry; multi-hop exit is another peer.
+- **Location / host:** IS/RO on **FlokiNET** (https://flokinet.is/); US is a separate residual peer (Hetzner). FlokiNET public materials state **no invasive logs**, root-only customer access, monitoring limited to resource usage, and no third-party sharing of tenant traffic patterns (https://flokinet.is/privacy/, https://flokinet.is/vps/). That is **host-published posture**, not a Restore Privacy forensic audit. Product no-log defaults (below) are separate.
 - Listens for handshakes and encrypted data frames; **admits** only peers that complete the product handshake with an authorized client key (**Ed25519 allow-list** + **ElGamal / Pedersen** handshake materials).
 - Assigns a temporary tunnel IP and relays traffic while the session is active; holds **in-memory** session state only.
 - When a session ends, that memory is dropped — not designed as durable user history.
@@ -71,7 +71,7 @@ Node process stdout/stderr is configured for no journal session streams in the s
 - Shows product title and paid download entry. Platform line is names only — not a live metric.
 - After paid Checkout: active Connect entitlement (binds Stripe **`payment_intent`** so refunds without session metadata still revoke), **keygen** mint, email with keygen + PPI + download. Licence accept + keygen required for Connect (**OK**). Failures/refunds/disputes/period end → **EXPIRED**: apps hard-lock with **renew your licence *here*** and a platform payment portal link. Clients re-check `/api/connect-entitlement` on Connect.
 - Optional `/api/status` JSON is **title-only** (no `clients_connected`).
-- Does not publish free permanent GitHub installer buttons. Catalog v0.4.8 is fulfilled after payment via one-time proxy.
+- Does not publish free permanent GitHub installer buttons. Catalog v0.5.0 is fulfilled after payment via one-time proxy.
 - Serves same-origin legal docs (`/PRIVACY_POLICY.md`, `/LICENSE`, `/README.md`, `/CREDITS.md`, `/AUDIT.md`).
 
 ### 3.4 Operator secrets
@@ -95,7 +95,7 @@ Runs **only on the device** — no phone-home wipe notification.
 
 ## 4. Limits of this privacy promise
 
-1. **Hosting and networks.** (VPS provider / CDN logging may sit outside this application's no-log defaults.) Catalog peers: FlokiNET (IS/RO) and the US residual host (default entry). Host public “no invasive logs” stance is not a third-party forensic audit. CDN/status/DNS operators and other networks may log under their policies. Node OS compromise can still expose live memory.
+1. **Hosting and networks.** (VPS provider / CDN logging may sit outside this application's no-log defaults.) Catalog peers: FlokiNET (IS/RO) and the US residual host. Host public “no invasive logs” stance is not a third-party forensic audit. CDN/status/DNS operators and other networks may log under their policies. Node OS compromise can still expose live memory.
 2. **Destination sites** have their own policies.
 3. **Device and OS** (VPN dialogs, crash reporters, network stacks) process data outside this app.
 4. **Misconfiguration** (verbose logs, reverse-proxy access logs) can create logs this policy assumes are off.

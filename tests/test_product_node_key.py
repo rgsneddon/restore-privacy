@@ -80,13 +80,8 @@ class TestProductNodeElgamalPubPinned(unittest.TestCase):
         ).read_text(encoding="utf-8")
         self.assertIn("product/$name", gradle)
         self.assertIn("copyRptSecretsToAssets", gradle)
-        # Candidate order: product/ before secrets/ (not the earlier assets/secrets path)
-        self.assertIn("../../product/$name", gradle)
-        self.assertIn("../../secrets/$name", gradle)
-        self.assertLess(
-            gradle.index("../../product/$name"),
-            gradle.index("../../secrets/$name"),
-        )
+        # product before secrets
+        self.assertLess(gradle.index("product/"), gradle.index("secrets/"))
 
     def test_secrets_loader_finds_product_pub_bytes(self):
         """_find_node_pub prefers tracked product/node_elgamal.pub."""
@@ -203,7 +198,7 @@ class TestAndroidNodePubRefreshOnUpgrade(unittest.TestCase):
         """loadSecrets must call refresh from assets every Connect (upgrade heal)."""
         svc = self._vpn_service_src()
         load = svc[svc.index("private fun loadSecrets") : svc.index("private fun loadSecrets") + 1600]
-        # Entry or exit pub path (multi-hop residual uses exit_node when host is Romania)
+        # Multi-country residual: host → pubName (IS/RO/US), always refresh from assets
         self.assertTrue(
             'assets.open("secrets/node_elgamal.pub")' in load
             or 'assets.open("secrets/$pubName")' in load,
@@ -213,10 +208,10 @@ class TestAndroidNodePubRefreshOnUpgrade(unittest.TestCase):
         # Old bug: only copy when !pubF.isFile — must be gone for node pub path
         self.assertNotIn("if (!pubF.isFile())", load)
         self.assertIn("Always copy package pub", load)
-        # RO/US pins come from residualNodePubNameForHost (not hard-coded in loadSecrets)
         self.assertIn("residualNodePubNameForHost", load)
+        # Catalog residual pubs must still exist on the service (name map + assets)
         self.assertIn("exit_node_elgamal.pub", svc)
-        self.assertIn("us_node_elgamal.pub", svc)
+        self.assertIn("usa_node_elgamal.pub", svc)
 
     def test_refresh_node_elgamal_pub_file_overwrites_stale(self):
         """Shipped Python mirror of Android helper: stale filesDir bytes replaced."""

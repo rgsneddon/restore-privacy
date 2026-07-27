@@ -1,9 +1,9 @@
-"""Next security-audit countdown (4h cadence from last audit write).
+"""Next security-audit countdown (1-day cadence from last audit write).
 
 Used by the public VPN APP Shop real-time counter.
 Source of truth for last run: ``status_page/static/security_audit_latest.json``
 ``generated_at`` (written by ``scripts/run_security_audit.py --write``).
-Period matches ``scripts/install_security_audit_timer.sh`` default ``PERIOD=4h``.
+Period matches ``scripts/install_security_audit_timer.sh`` default ``PERIOD=1d``.
 
 Honest job: security audit probes + public AUDIT refresh + temporary audit
 scratch wipe — not a full VPS disk wipe or end-user **Restore Internet**.
@@ -19,13 +19,13 @@ from pathlib import Path
 from typing import Any
 
 # Matches install_security_audit_timer.sh default and AUDIT.md cadence.
-AUDIT_PERIOD = timedelta(hours=4)
-AUDIT_PERIOD_SECONDS = int(AUDIT_PERIOD.total_seconds())  # 14400
+AUDIT_PERIOD = timedelta(days=1)
+AUDIT_PERIOD_SECONDS = int(AUDIT_PERIOD.total_seconds())  # 86400
 
-# Portal homepage: short label + one-line honesty (what the ~4h timer actually does)
+# Portal homepage: short label + one-line honesty (what the ~1d timer actually does)
 TIME_TIL_NEXT_AUDIT_LABEL = "time til next audit / wipedown"
 TIME_TIL_NEXT_AUDIT_BLURB = (
-    "~every 4h: security audit (node probes, package confidence, privacy checks) "
+    "~every 1 day: security audit (node probes, package confidence, privacy checks) "
     "refreshes the public audit; temporary audit scratch is wiped — "
     "not a full server or device erase"
 )
@@ -113,12 +113,25 @@ def remaining_seconds_until(
     return max(0, int(delta.total_seconds()))
 
 
+def split_countdown_units(seconds: int) -> dict[str, int]:
+    """Split remaining seconds into days, hours, minutes, seconds."""
+    total = max(0, int(seconds))
+    days, rem = divmod(total, 86400)
+    hours, rem = divmod(rem, 3600)
+    minutes, secs = divmod(rem, 60)
+    return {
+        "days": days,
+        "hours": hours,
+        "minutes": minutes,
+        "seconds": secs,
+    }
+
+
 def format_countdown(seconds: int) -> str:
-    """Human countdown ``HH:MM:SS`` (hours may exceed 24 for long periods)."""
-    s = max(0, int(seconds))
-    h, rem = divmod(s, 3600)
-    m, sec = divmod(rem, 60)
-    return f"{h:02d}:{m:02d}:{sec:02d}"
+    """Human countdown ``Dd HH:MM:SS`` (always includes days, hours, minutes, seconds)."""
+    parts = split_countdown_units(seconds)
+    d, h, m, s = parts["days"], parts["hours"], parts["minutes"], parts["seconds"]
+    return f"{d}d {h:02d}:{m:02d}:{s:02d}"
 
 
 def load_last_audit_generated_at(
@@ -331,13 +344,14 @@ def render_audit_countdown_html(
     function pad(n) {{ return n < 10 ? "0" + n : String(n); }}
     function fmt(sec) {{
       sec = Math.max(0, Math.floor(sec));
-      var h = Math.floor(sec / 3600);
+      var d = Math.floor(sec / 86400);
+      var h = Math.floor((sec % 86400) / 3600);
       var m = Math.floor((sec % 3600) / 60);
       var s = sec % 60;
-      return pad(h) + ":" + pad(m) + ":" + pad(s);
+      return d + "d " + pad(h) + ":" + pad(m) + ":" + pad(s);
     }}
-    var period = parseInt(root.getAttribute("data-period-seconds") || "14400", 10);
-    if (!period || period < 1) period = 14400;
+    var period = parseInt(root.getAttribute("data-period-seconds") || "86400", 10);
+    if (!period || period < 1) period = 86400;
     var deadlineMs = Date.parse(nextIso);
     function tick() {{
       if (!available || !nextIso || isNaN(deadlineMs)) {{
@@ -345,7 +359,7 @@ def render_audit_countdown_html(
         return;
       }}
       var now = Date.now();
-      // Roll forward by period while overdue (unstick 00:00:00 when JSON is stale)
+      // Roll forward by period while overdue (unstick 0d 00:00:00 when JSON is stale)
       while (deadlineMs <= now) {{ deadlineMs += period * 1000; }}
       var rem = Math.max(0, Math.floor((deadlineMs - now) / 1000));
       el.textContent = fmt(rem);
@@ -410,7 +424,7 @@ def render_audit_page_ticker_html(
     </div>
     {rag_block}
     <p class="audit-page-ticker-blurb" id="audit-page-ticker-blurb">
-      ~every 4h automated security pass (node probes, package confidence, privacy
+      ~every 1 day automated security pass (node probes, package confidence, privacy
       checks). Countdown from last written audit timestamp.
     </p>
   </div>
@@ -424,13 +438,14 @@ def render_audit_page_ticker_html(
     function pad(n) {{ return n < 10 ? "0" + n : String(n); }}
     function fmt(sec) {{
       sec = Math.max(0, Math.floor(sec));
-      var h = Math.floor(sec / 3600);
+      var d = Math.floor(sec / 86400);
+      var h = Math.floor((sec % 86400) / 3600);
       var m = Math.floor((sec % 3600) / 60);
       var s = sec % 60;
-      return pad(h) + ":" + pad(m) + ":" + pad(s);
+      return d + "d " + pad(h) + ":" + pad(m) + ":" + pad(s);
     }}
-    var period = parseInt(root.getAttribute("data-period-seconds") || "14400", 10);
-    if (!period || period < 1) period = 14400;
+    var period = parseInt(root.getAttribute("data-period-seconds") || "86400", 10);
+    if (!period || period < 1) period = 86400;
     var deadlineMs = Date.parse(nextIso);
     function tick() {{
       if (!available || !nextIso || isNaN(deadlineMs)) {{

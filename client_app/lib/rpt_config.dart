@@ -28,7 +28,7 @@ class RptConfig {
 
   /// Paid catalog pin — must match monorepo ``client/VERSION`` and pubspec.
   /// Free builds report [kFreeTierVersion] via [displayProductVersion].
-  static const String productVersion = '0.4.10';
+  static const String productVersion = '0.5.0';
 
   /// UI / about version (free tier always ``3.3.3``).
   static String get displayProductVersion =>

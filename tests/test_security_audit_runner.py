@@ -38,16 +38,17 @@ class TestSecurityAuditArtifacts(unittest.TestCase):
         self.assertIn("build_windows_multihop", text)
         self.assertIn("tests.test_multihop", text)
 
-    def test_timer_install_script_four_hours(self):
+    def test_timer_install_script_one_day(self):
         p = ROOT / "scripts" / "install_security_audit_timer.sh"
         self.assertTrue(p.is_file())
         text = p.read_text(encoding="utf-8")
-        self.assertIn("4h", text)
+        self.assertIn('PERIOD="${PERIOD:-1d}"', text)
         self.assertIn("PERIOD=", text)
         self.assertIn("OnUnitActiveSec=${PERIOD}", text)
         self.assertIn("rpt-security-audit", text)
         self.assertIn("run_security_audit.py", text)
         self.assertIn("rpt-security-audit.timer", text)
+        self.assertNotIn('PERIOD="${PERIOD:-4h}"', text)
 
     def test_catalog_version_matches_product_pin(self):
         """Runner monopin must track downloads / client VERSION (not a stale hardcode)."""

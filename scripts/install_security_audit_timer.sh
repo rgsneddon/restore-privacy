@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Install systemd timer: run security audit ~every 4 hours on the node.
+# Install systemd timer: run security audit ~every 1 day on the node.
 #
 # Privacy section A (audit run must not become a leak):
 #   - Probes localhost only (RPT_NODE_HOST=127.0.0.1 + RPT_AUDIT_REQUIRE_LOCALHOST)
@@ -16,11 +16,11 @@
 #
 # Usage (root on production node):
 #   bash scripts/install_security_audit_timer.sh
-#   PERIOD=4h bash scripts/install_security_audit_timer.sh
+#   PERIOD=1d bash scripts/install_security_audit_timer.sh
 set -euo pipefail
 
 INSTALL_ROOT="${INSTALL_ROOT:-/opt/restore-privacy}"
-PERIOD="${PERIOD:-4h}"
+PERIOD="${PERIOD:-1d}"
 # Jitter window so fire times are not a fixed fingerprint (±15–30 min class)
 JITTER_SEC="${JITTER_SEC:-1800}"
 AUDIT_USER="${AUDIT_USER:-rpt-audit}"
@@ -37,9 +37,9 @@ if [[ "$(id -u)" -ne 0 ]]; then
 fi
 
 echo "[rpt-audit] security audit timer (period=${PERIOD}, jitter<=${JITTER_SEC}s)"
-# Default cadence is 4 hours (OnUnitActiveSec=4h) unless PERIOD is overridden.
-if [[ "${PERIOD}" != "4h" && "${PERIOD}" != "4hour" && "${PERIOD}" != "4 hours" ]]; then
-  echo "[rpt-audit] NOTE: non-default PERIOD=${PERIOD} (product default is 4h)" >&2
+# Default cadence is 1 day (OnUnitActiveSec=1d) unless PERIOD is overridden.
+if [[ "${PERIOD}" != "1d" && "${PERIOD}" != "1day" && "${PERIOD}" != "1 day" && "${PERIOD}" != "24h" ]]; then
+  echo "[rpt-audit] NOTE: non-default PERIOD=${PERIOD} (product default is 1d)" >&2
 fi
 mkdir -p \
   "${INSTALL_ROOT}/scripts" \

@@ -52,9 +52,26 @@ class TestReadmeSuperGrokTagline(unittest.TestCase):
 
 
 class TestAuditCountdownMath(unittest.TestCase):
-    def test_period_is_four_hours(self):
-        self.assertEqual(AUDIT_PERIOD_SECONDS, 4 * 3600)
-        self.assertEqual(AUDIT_PERIOD, timedelta(hours=4))
+    def test_period_is_one_day(self):
+        self.assertEqual(AUDIT_PERIOD_SECONDS, 86400)
+        self.assertEqual(AUDIT_PERIOD, timedelta(days=1))
+
+    def test_format_countdown_includes_days_hours_minutes_seconds(self):
+        """Display always exposes days, hours, minutes, seconds (not HH:MM:SS-only)."""
+        from audit_countdown import split_countdown_units
+
+        # Sub-day remainder
+        self.assertEqual(format_countdown(3600), "0d 01:00:00")
+        self.assertEqual(format_countdown(0), "0d 00:00:00")
+        self.assertEqual(format_countdown(90), "0d 00:01:30")
+        # Multi-day remainder
+        self.assertEqual(format_countdown(86400 + 3661), "1d 01:01:01")
+        self.assertEqual(format_countdown(2 * 86400 + 5), "2d 00:00:05")
+        units = split_countdown_units(90061)  # 1d 1h 1m 1s
+        self.assertEqual(units["days"], 1)
+        self.assertEqual(units["hours"], 1)
+        self.assertEqual(units["minutes"], 1)
+        self.assertEqual(units["seconds"], 1)
 
     def test_parse_and_remaining_from_known_timestamp(self):
         last = parse_audit_generated_at("2026-07-21T10:00:00Z")
@@ -63,17 +80,17 @@ class TestAuditCountdownMath(unittest.TestCase):
         nxt = next_audit_at(last)
         self.assertEqual(
             nxt,
-            datetime(2026, 7, 21, 14, 0, 0, tzinfo=timezone.utc),
+            datetime(2026, 7, 22, 10, 0, 0, tzinfo=timezone.utc),
         )
         # Exactly 1h before deadline
-        now = datetime(2026, 7, 21, 13, 0, 0, tzinfo=timezone.utc)
+        now = datetime(2026, 7, 22, 9, 0, 0, tzinfo=timezone.utc)
         rem = remaining_seconds_until(nxt, now=now)
         self.assertEqual(rem, 3600)
-        self.assertEqual(format_countdown(rem), "01:00:00")
+        self.assertEqual(format_countdown(rem), "0d 01:00:00")
         # Overdue → 0
-        late = datetime(2026, 7, 21, 15, 0, 0, tzinfo=timezone.utc)
+        late = datetime(2026, 7, 22, 11, 0, 0, tzinfo=timezone.utc)
         self.assertEqual(remaining_seconds_until(nxt, now=late), 0)
-        self.assertEqual(format_countdown(0), "00:00:00")
+        self.assertEqual(format_countdown(0), "0d 00:00:00")
 
     def test_countdown_state_drives_real_helper(self):
         last = datetime(2026, 7, 21, 10, 47, 19, tzinfo=timezone.utc)
@@ -85,28 +102,28 @@ class TestAuditCountdownMath(unittest.TestCase):
         self.assertIn("wipedown", st["label"])
         self.assertEqual(st["blurb"], TIME_TIL_NEXT_AUDIT_BLURB)
         self.assertEqual(st["period_seconds"], AUDIT_PERIOD_SECONDS)
-        # 4h - 1h15m5s = 2h44m55s = 9895s
-        self.assertEqual(st["remaining_seconds"], 2 * 3600 + 44 * 60 + 55)
+        # 1d - 1h15m5s = 22h44m55s
+        self.assertEqual(st["remaining_seconds"], 22 * 3600 + 44 * 60 + 55)
         self.assertEqual(st["display"], format_countdown(st["remaining_seconds"]))
-        self.assertEqual(st["next_audit_at"], "2026-07-21T14:47:19Z")
+        self.assertEqual(st["display"], "0d 22:44:55")
+        self.assertEqual(st["next_audit_at"], "2026-07-22T10:47:19Z")
         self.assertFalse(st.get("rolled_forward"))
 
     def test_countdown_rolls_forward_when_overdue(self):
-        """Stale generated_at must not freeze remaining at 00:00:00."""
+        """Stale generated_at must not freeze remaining at 0d 00:00:00."""
         from audit_countdown import next_audit_at_rolling
 
         last = datetime(2026, 7, 21, 10, 0, 0, tzinfo=timezone.utc)
-        # 10h after last → first next was +4h (overdue by 6h) → roll to +8h, then +12h?
-        # last+4h = 14:00; now=20:00 → 14:00 and 18:00 past → next 22:00 (last+12h)
-        now = datetime(2026, 7, 21, 20, 0, 0, tzinfo=timezone.utc)
+        # 30h after last → last+1d = 22nd 10:00 past → next 23rd 10:00 (last+2d)
+        now = datetime(2026, 7, 22, 16, 0, 0, tzinfo=timezone.utc)
         nxt = next_audit_at_rolling(last, now=now)
-        self.assertEqual(nxt, datetime(2026, 7, 21, 22, 0, 0, tzinfo=timezone.utc))
+        self.assertEqual(nxt, datetime(2026, 7, 23, 10, 0, 0, tzinfo=timezone.utc))
         st = countdown_state(now=now, last_generated_at=last)
         self.assertTrue(st["available"])
         self.assertGreater(st["remaining_seconds"], 0)
-        self.assertEqual(st["remaining_seconds"], 2 * 3600)
-        self.assertEqual(st["display"], "02:00:00")
-        self.assertNotEqual(st["display"], "00:00:00")
+        self.assertEqual(st["remaining_seconds"], 18 * 3600)
+        self.assertEqual(st["display"], "0d 18:00:00")
+        self.assertNotEqual(st["display"], "0d 00:00:00")
         self.assertTrue(st.get("rolled_forward"))
         # Fragment still ticks with period for client roll
         html = render_audit_countdown_html(now=now, json_path=None)
@@ -114,6 +131,7 @@ class TestAuditCountdownMath(unittest.TestCase):
         src = Path(ROOT / "status_page" / "audit_countdown.py").read_text(encoding="utf-8")
         self.assertIn("while (deadlineMs <= now)", src)
         self.assertIn("next_audit_at_rolling", src)
+        self.assertIn("86400", src)
 
     def test_load_from_shipped_json_when_present(self):
         json_path = ROOT / "status_page" / "static" / "security_audit_latest.json"
@@ -122,7 +140,7 @@ class TestAuditCountdownMath(unittest.TestCase):
         st = countdown_state(json_path=json_path)
         self.assertTrue(st["available"], msg="shipped JSON should have generated_at")
         self.assertIsInstance(st["remaining_seconds"], int)
-        self.assertRegex(st["display"], r"^\d{2,}:\d{2}:\d{2}$")
+        self.assertRegex(st["display"], r"^\d+d \d{2}:\d{2}:\d{2}$")
 
 
 class TestAuditCountdownUi(unittest.TestCase):
@@ -140,14 +158,15 @@ class TestAuditCountdownUi(unittest.TestCase):
         self.assertIn("setInterval", html)
         self.assertIn("1000", html)
         self.assertIn("data-next-audit", html)
-        # Honest 4h job: security audit + temp scratch; not full erase
+        # Honest 1-day job: security audit + temp scratch; not full erase
         low = html.lower()
         self.assertIn("security audit", low)
-        self.assertIn("4h", low)
+        self.assertTrue("1 day" in low or "1d" in low)
         self.assertIn("scratch", low)
         self.assertIn("not a full", low)
         self.assertNotIn("restore internet", low)
         self.assertNotIn("full disk wipe", low)
+        self.assertNotIn("~every 4h", low)
 
     def test_status_render_html_includes_live_countdown(self):
         """Drive shipped status_page.render_html entry point."""
@@ -168,7 +187,8 @@ class TestAuditCountdownUi(unittest.TestCase):
         """Canonical blurb: audit + period + scratch wipe; no full host/device wipe claim."""
         blurb = TIME_TIL_NEXT_AUDIT_BLURB.lower()
         self.assertIn("security audit", blurb)
-        self.assertIn("4h", blurb)
+        self.assertTrue("1 day" in blurb or "1d" in blurb)
+        self.assertNotIn("4h", blurb)
         self.assertTrue("scratch" in blurb or "temporary" in blurb)
         self.assertIn("not a full", blurb)
         self.assertNotIn("restore internet", blurb)

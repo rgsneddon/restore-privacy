@@ -144,13 +144,15 @@ class TestDocsTrafficShapeAligned(unittest.TestCase):
         )
         self.assertIn("RPT_TRAFFIC_SHAPE", privacy)
         # Live catalog pin in privacy policy (root + public mirror)
-        self.assertIn("Current packages (catalog v0.4.8)", privacy)
+        pin = (ROOT / "client" / "VERSION").read_text(encoding="utf-8").strip()
+        pin_line = f"Current packages (catalog v{pin})"
+        self.assertIn(pin_line, privacy)
         self.assertNotIn("Current packages (catalog v0.4.1)", privacy)
         self.assertNotIn("Current packages (catalog v0.4.0)", privacy)
         public_privacy_pin = (
             ROOT / "status_page" / "public" / "PRIVACY_POLICY.md"
         ).read_text(encoding="utf-8")
-        self.assertIn("Current packages (catalog v0.4.8)", public_privacy_pin)
+        self.assertIn(pin_line, public_privacy_pin)
         self.assertNotIn("Current packages (catalog v0.4.1)", public_privacy_pin)
         self.assertTrue(
             "off by default" in privacy.lower()
@@ -164,18 +166,20 @@ class TestDocsTrafficShapeAligned(unittest.TestCase):
         self.assertNotIn("RPT_TRAFFIC_SHAPE=0", privacy)
         # Version surface: current catalog pin and/or historical
         self.assertTrue(
-            "0.4.8" in readme
+            pin in readme
             or "1.0.0" in readme
             or "0.4.0" in readme
             or "0.2.9" in readme,
             "README must cite product version",
         )
         self.assertTrue(
-            "1.0.0" in privacy
+            pin in privacy
+            or "1.0.0" in privacy
             or "0.4.0" in privacy
             or "0.2.9" in privacy
             or "0.2" in privacy
-            or "0.4" in privacy,
+            or "0.4" in privacy
+            or "0.5" in privacy,
             "PRIVACY_POLICY must cite a product version generation",
         )
 
