@@ -2,6 +2,12 @@
 
 Public status stays title-only. This module builds operator rows for IS/RO/US
 from the product country catalog and optional private capacity probes.
+
+Limits are **per-peer**:
+  - **Bandwidth budget** — operator product allowance (IS/RO 100 Mbps, US 200 Mbps);
+    not auto-detected NIC line-rate unless you set it to that.
+  - **Session soft max** — utilization / residual routing hint (IS/RO 256, US 512 =
+    2× base because US has 2× bandwidth budget). Not a hard public admission lock.
 """
 
 from __future__ import annotations
@@ -11,19 +17,88 @@ import os
 import urllib.error
 import urllib.request
 from dataclasses import dataclass
+from datetime import datetime, timezone
 from typing import Any, Callable, Mapping, Optional, Sequence
-from urllib.parse import urlparse
 
 ENV_CAPACITY_TOKEN = "RPT_CAPACITY_TOKEN"
 ENV_BANDWIDTH_CAP_MAP = "RPT_BANDWIDTH_CAP_BPS_MAP"  # JSON host→bps or code→bps
+ENV_SESSION_SOFT_MAX_MAP = "RPT_SESSION_SOFT_MAX_MAP"  # JSON host/code → sessions
 ENV_BANDWIDTH_CAP_DEFAULT = "RPT_NODE_BANDWIDTH_CAP_BPS"
 ENV_PROBE_TIMEOUT = "RPT_CAPACITY_PROBE_TIMEOUT"
+ENV_FLEET_REFRESH_MS = "RPT_ADMIN_FLEET_REFRESH_MS"
 DEFAULT_PROBE_TIMEOUT = 2.0
 DEFAULT_UI_PORT = 8080
+DEFAULT_FLEET_REFRESH_MS = 5000  # real-time admin table poll
 PRIVATE_CAPACITY_PATH = "/api/private/capacity"
+FLEET_USAGE_API_PATH = "/admin/api/fleet-usage"
 
 # Injectable: (url, headers, timeout_s) -> body text
 TransportFn = Callable[[str, dict[str, str], float], str]
+
+
+def _product_maps():
+    """Lazy import product budgets from node.private_capacity (single source)."""
+    try:
+        from node.private_capacity import (
+            DEFAULT_MAX_SESSIONS,
+            DEFAULT_MAX_SESSIONS_US,
+            PRODUCT_BANDWIDTH_CAP_BPS,
+            PRODUCT_SESSION_SOFT_MAX,
+            product_bandwidth_cap_bps,
+            product_session_soft_max,
+        )
+    except Exception:  # noqa: BLE001
+        # Status-host-only trees may still import via package path
+        try:
+            from private_capacity import (  # type: ignore
+                DEFAULT_MAX_SESSIONS,
+                DEFAULT_MAX_SESSIONS_US,
+                PRODUCT_BANDWIDTH_CAP_BPS,
+                PRODUCT_SESSION_SOFT_MAX,
+                product_bandwidth_cap_bps,
+                product_session_soft_max,
+            )
+        except Exception:  # noqa: BLE001
+            _MBPS = 1_000_000
+            DEFAULT_MAX_SESSIONS = 256
+            DEFAULT_MAX_SESSIONS_US = 512
+            PRODUCT_BANDWIDTH_CAP_BPS = {
+                "IS": 100 * _MBPS,
+                "RO": 100 * _MBPS,
+                "US": 200 * _MBPS,
+                "82.221.101.241": 100 * _MBPS,
+                "185.146.232.107": 100 * _MBPS,
+                "5.161.242.85": 200 * _MBPS,
+            }
+            PRODUCT_SESSION_SOFT_MAX = {
+                "IS": 256,
+                "RO": 256,
+                "US": 512,
+                "82.221.101.241": 256,
+                "185.146.232.107": 256,
+                "5.161.242.85": 512,
+            }
+
+            def product_bandwidth_cap_bps(*, code: str = "", host: str = ""):
+                for k in (code, host, code.upper()):
+                    if k and k in PRODUCT_BANDWIDTH_CAP_BPS:
+                        return PRODUCT_BANDWIDTH_CAP_BPS[k]
+                return None
+
+            def product_session_soft_max(*, code: str = "", host: str = ""):
+                for k in (code, host, code.upper()):
+                    if k and k in PRODUCT_SESSION_SOFT_MAX:
+                        return PRODUCT_SESSION_SOFT_MAX[k]
+                return None
+
+    return {
+        "DEFAULT_MAX_SESSIONS": DEFAULT_MAX_SESSIONS,
+        "DEFAULT_MAX_SESSIONS_US": DEFAULT_MAX_SESSIONS_US,
+        "PRODUCT_BANDWIDTH_CAP_BPS": PRODUCT_BANDWIDTH_CAP_BPS,
+        "PRODUCT_SESSION_SOFT_MAX": PRODUCT_SESSION_SOFT_MAX,
+        "product_bandwidth_cap_bps": product_bandwidth_cap_bps,
+        "product_session_soft_max": product_session_soft_max,
+    }
 
 
 @dataclass(frozen=True)
@@ -63,6 +138,18 @@ class NodeUsageRow:
             "session_util": self.session_util,
             "status": self.status,
             "detail": self.detail,
+            # Preformatted cells for live UI refresh
+            "bandwidth_used_display": format_bps(self.bandwidth_used_bps),
+            "bandwidth_cap_display": format_bps(
+                float(self.bandwidth_cap_bps)
+                if self.bandwidth_cap_bps is not None
+                else None
+            ),
+            "bandwidth_util_display": format_pct(self.bandwidth_util),
+            "bytes_relayed_display": format_bytes(self.bytes_relayed),
+            "sessions_display": format_sessions(
+                self.sessions_live, self.sessions_cap, self.session_util
+            ),
         }
 
 
@@ -92,8 +179,8 @@ def product_catalog_peers() -> list[dict[str, Any]]:
     return [p for p in out if p["code"] and p["host"]]
 
 
-def parse_bandwidth_cap_map(raw: str | None) -> dict[str, int]:
-    """Parse JSON map of host or country code → bps capability."""
+def parse_int_map(raw: str | None) -> dict[str, int]:
+    """Parse JSON map of host or country code → positive int."""
     text = (raw or "").strip()
     if not text:
         return {}
@@ -109,13 +196,18 @@ def parse_bandwidth_cap_map(raw: str | None) -> dict[str, int]:
         if not key:
             continue
         try:
-            bps = int(v)
+            n = int(v)
         except (TypeError, ValueError):
             continue
-        if bps > 0:
-            out[key] = bps
-            out[key.upper()] = bps
+        if n > 0:
+            out[key] = n
+            out[key.upper()] = n
     return out
+
+
+def parse_bandwidth_cap_map(raw: str | None) -> dict[str, int]:
+    """Parse JSON map of host or country code → bps capability."""
+    return parse_int_map(raw)
 
 
 def resolve_bandwidth_cap_bps(
@@ -125,6 +217,11 @@ def resolve_bandwidth_cap_bps(
     env: Mapping[str, str] | None = None,
     caps: Mapping[str, int] | None = None,
 ) -> int | None:
+    """Resolve operator bandwidth budget for a peer.
+
+    Priority: env map → flat default env → product peer allowance (IS/RO 100 Mbps,
+    US 200 Mbps).
+    """
     e = env if env is not None else os.environ
     m = dict(caps) if caps is not None else parse_bandwidth_cap_map(
         e.get(ENV_BANDWIDTH_CAP_MAP, "")
@@ -136,10 +233,37 @@ def resolve_bandwidth_cap_bps(
     if raw:
         try:
             n = int(raw)
-            return n if n > 0 else None
+            if n > 0:
+                return n
         except ValueError:
-            return None
-    return None
+            pass
+    maps = _product_maps()
+    return maps["product_bandwidth_cap_bps"](code=code, host=host)
+
+
+def resolve_session_soft_max(
+    *,
+    code: str,
+    host: str,
+    env: Mapping[str, str] | None = None,
+    caps: Mapping[str, int] | None = None,
+) -> int:
+    """Resolve session soft max for a peer (US = 2× IS/RO product base).
+
+    Priority: ``RPT_SESSION_SOFT_MAX_MAP`` → product map → base 256.
+    """
+    e = env if env is not None else os.environ
+    m = dict(caps) if caps is not None else parse_int_map(
+        e.get(ENV_SESSION_SOFT_MAX_MAP, "")
+    )
+    for key in (host, code, code.upper(), host.strip()):
+        if key in m and m[key] > 0:
+            return max(1, int(m[key]))
+    maps = _product_maps()
+    prod = maps["product_session_soft_max"](code=code, host=host)
+    if prod is not None:
+        return max(1, int(prod))
+    return max(1, int(maps["DEFAULT_MAX_SESSIONS"]))
 
 
 def average_bps_from_bytes(
@@ -202,11 +326,40 @@ def format_pct(util: float | None) -> str:
     return f"{100.0 * float(util):.1f}%"
 
 
+def format_sessions(
+    live: int | None,
+    cap: int | None,
+    util: float | None = None,
+) -> str:
+    if live is not None and cap is not None:
+        s = f"{live}/{cap}"
+        if util is not None:
+            s += f" ({format_pct(util)})"
+        return s
+    if cap is not None:
+        return f"—/{cap}"
+    return "—"
+
+
+def fleet_refresh_interval_ms(env: Mapping[str, str] | None = None) -> int:
+    """Admin table poll interval (ms). Min 2000 so probes are not a stampede."""
+    e = env if env is not None else os.environ
+    raw = str(e.get(ENV_FLEET_REFRESH_MS, "") or "").strip()
+    if raw:
+        try:
+            n = int(raw)
+            return max(2000, min(n, 120_000))
+        except ValueError:
+            pass
+    return DEFAULT_FLEET_REFRESH_MS
+
+
 def row_from_probe_payload(
     peer: Mapping[str, Any],
     payload: Mapping[str, Any] | None,
     *,
     bandwidth_cap_bps: int | None = None,
+    sessions_cap: int | None = None,
     status: str = "ok",
     detail: str = "",
 ) -> NodeUsageRow:
@@ -215,6 +368,11 @@ def row_from_probe_payload(
     name = str(peer.get("name") or code).strip()
     host = str(peer.get("host") or "").strip()
     port = int(peer.get("port") or 44044)
+    # Product / map soft max is the admin budget column (peers differ)
+    product_sess = sessions_cap
+    if product_sess is None:
+        product_sess = resolve_session_soft_max(code=code, host=host)
+
     if payload is None:
         return NodeUsageRow(
             code=code,
@@ -227,7 +385,7 @@ def row_from_probe_payload(
             bytes_relayed=None,
             uptime_sec=None,
             sessions_live=None,
-            sessions_cap=None,
+            sessions_cap=product_sess,
             session_util=None,
             status=status if status != "ok" else "unknown",
             detail=detail or "no probe data",
@@ -265,23 +423,32 @@ def row_from_probe_payload(
             cap = None
     bw_util = bandwidth_utilization(used_bps, cap)
 
-    sess_live = sess_cap = sess_util = None
+    sess_live = None
+    sess_cap = product_sess
+    sess_util = None
+    extra_detail = detail
     try:
         if payload.get("live") is not None:
             sess_live = max(0, int(payload["live"]))
+        node_cap = None
         if payload.get("capacity") is not None:
-            sess_cap = max(1, int(payload["capacity"]))
-        if payload.get("utilization") is not None:
-            sess_util = float(payload["utilization"])
-        elif sess_live is not None and sess_cap is not None:
+            node_cap = max(1, int(payload["capacity"]))
+        # Prefer product soft max so US is 2× IS/RO even when a node still has
+        # a flat env of 256; note node-reported capacity when it differs.
+        if node_cap is not None and product_sess is not None and node_cap != product_sess:
+            note = f"node reports capacity={node_cap}"
+            extra_detail = f"{extra_detail}; {note}" if extra_detail else note
+        if sess_live is not None and sess_cap is not None:
             sess_util = min(1.0, sess_live / float(sess_cap))
+        elif payload.get("utilization") is not None and sess_live is None:
+            sess_util = float(payload["utilization"])
     except (TypeError, ValueError):
         pass
 
     st = status
     if st == "ok" and used_bps is None and sess_live is None:
         st = "unknown"
-        detail = detail or "probe missing bandwidth and session fields"
+        extra_detail = extra_detail or "probe missing bandwidth and session fields"
 
     return NodeUsageRow(
         code=code,
@@ -297,7 +464,7 @@ def row_from_probe_payload(
         sessions_cap=sess_cap,
         session_util=sess_util,
         status=st,
-        detail=detail,
+        detail=extra_detail,
     )
 
 
@@ -313,12 +480,18 @@ def build_fleet_usage_rows(
     probes = dict(probes_by_host or {})
     errs = dict(errors_by_host or {})
     e = env if env is not None else os.environ
-    caps = parse_bandwidth_cap_map(e.get(ENV_BANDWIDTH_CAP_MAP, ""))
+    bw_caps = parse_bandwidth_cap_map(e.get(ENV_BANDWIDTH_CAP_MAP, ""))
+    sess_caps = parse_int_map(e.get(ENV_SESSION_SOFT_MAX_MAP, ""))
     rows: list[NodeUsageRow] = []
     for p in catalog:
         host = str(p.get("host") or "").strip()
         code = str(p.get("code") or "").strip().upper()
-        cap = resolve_bandwidth_cap_bps(code=code, host=host, env=e, caps=caps)
+        bw_cap = resolve_bandwidth_cap_bps(
+            code=code, host=host, env=e, caps=bw_caps
+        )
+        sess_cap = resolve_session_soft_max(
+            code=code, host=host, env=e, caps=sess_caps
+        )
         payload = probes.get(host)
         if payload is None and code in probes:
             payload = probes.get(code)
@@ -326,7 +499,12 @@ def build_fleet_usage_rows(
         if payload is None and err:
             rows.append(
                 row_from_probe_payload(
-                    p, None, bandwidth_cap_bps=cap, status="error", detail=err
+                    p,
+                    None,
+                    bandwidth_cap_bps=bw_cap,
+                    sessions_cap=sess_cap,
+                    status="error",
+                    detail=err,
                 )
             )
         elif payload is None:
@@ -334,14 +512,21 @@ def build_fleet_usage_rows(
                 row_from_probe_payload(
                     p,
                     None,
-                    bandwidth_cap_bps=cap,
+                    bandwidth_cap_bps=bw_cap,
+                    sessions_cap=sess_cap,
                     status="unknown",
                     detail="not probed",
                 )
             )
         else:
             rows.append(
-                row_from_probe_payload(p, payload, bandwidth_cap_bps=cap, status="ok")
+                row_from_probe_payload(
+                    p,
+                    payload,
+                    bandwidth_cap_bps=bw_cap,
+                    sessions_cap=sess_cap,
+                    status="ok",
+                )
             )
     return rows
 
@@ -434,6 +619,36 @@ def collect_live_fleet_usage_rows(
     )
 
 
+def fleet_usage_json_payload(
+    rows: Sequence[NodeUsageRow] | None = None,
+    *,
+    live: bool = True,
+    env: Mapping[str, str] | None = None,
+    transport: TransportFn | None = None,
+) -> dict[str, Any]:
+    """JSON for authenticated ``GET /admin/api/fleet-usage`` (live refresh)."""
+    if rows is None and live:
+        try:
+            row_list = collect_live_fleet_usage_rows(env=env, transport=transport)
+        except Exception as exc:  # noqa: BLE001
+            err = str(exc)[:120]
+            row_list = build_fleet_usage_rows(
+                peers=product_catalog_peers(),
+                env=env,
+                errors_by_host={p["host"]: err for p in product_catalog_peers()},
+            )
+    elif rows is None:
+        row_list = build_fleet_usage_rows(peers=product_catalog_peers(), env=env)
+    else:
+        row_list = list(rows)
+    now = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+    return {
+        "refreshed_at": now,
+        "refresh_ms": fleet_refresh_interval_ms(env),
+        "rows": [r.to_dict() for r in row_list],
+    }
+
+
 def render_admin_node_usage_section_html(
     rows: Sequence[NodeUsageRow] | None = None,
     *,
@@ -460,6 +675,11 @@ def render_admin_node_usage_section_html(
     else:
         row_list = list(rows)
 
+    maps = _product_maps()
+    base_sess = int(maps["DEFAULT_MAX_SESSIONS"])
+    us_sess = int(maps["DEFAULT_MAX_SESSIONS_US"])
+    refresh_ms = fleet_refresh_interval_ms(env)
+
     body_rows: list[str] = []
     for r in row_list:
         badge = {
@@ -473,26 +693,32 @@ def render_admin_node_usage_section_html(
         )
         util_s = format_pct(r.bandwidth_util)
         bytes_s = format_bytes(r.bytes_relayed)
-        if r.sessions_live is not None and r.sessions_cap is not None:
-            sess_s = f"{r.sessions_live}/{r.sessions_cap}"
-            if r.session_util is not None:
-                sess_s += f" ({format_pct(r.session_util)})"
-        else:
-            sess_s = "—"
+        sess_s = format_sessions(r.sessions_live, r.sessions_cap, r.session_util)
         detail = _escape(r.detail) if r.detail else ""
+        code_e = _escape(r.code)
+        # Per-peer why: bandwidth budget + session soft max (product map)
+        why = (
+            f"Budget: bandwidth allowance is operator product cap "
+            f"({cap_s}); session soft max is {r.sessions_cap if r.sessions_cap is not None else '—'} "
+            f"(utilization/routing hint, not hard admission). "
+            f"Peers differ: IS/RO 100&nbsp;Mbps / {base_sess} sessions; "
+            f"US 200&nbsp;Mbps / {us_sess} sessions (2×)."
+        )
         body_rows.append(
             "<tr>"
-            f"<td><strong>{_escape(r.code)}</strong><br/>"
-            f"<span class=\"muted\">{_escape(r.name)}</span></td>"
+            f"<td><strong>{code_e}</strong><br/>"
+            f"<span class=\"muted\">{_escape(r.name)}</span><br/>"
+            f"<span class=\"muted admin-node-why\" id=\"admin-node-why-{code_e}\">{why}</span>"
+            f"</td>"
             f"<td><code>{_escape(r.host)}</code></td>"
-            f"<td id=\"admin-node-bw-used-{_escape(r.code)}\">{_escape(used_s)}</td>"
-            f"<td id=\"admin-node-bw-cap-{_escape(r.code)}\">{_escape(cap_s)}</td>"
-            f"<td id=\"admin-node-bw-util-{_escape(r.code)}\">{_escape(util_s)}</td>"
-            f"<td>{_escape(bytes_s)}</td>"
-            f"<td>{_escape(sess_s)}</td>"
+            f"<td id=\"admin-node-bw-used-{code_e}\">{_escape(used_s)}</td>"
+            f"<td id=\"admin-node-bw-cap-{code_e}\">{_escape(cap_s)}</td>"
+            f"<td id=\"admin-node-bw-util-{code_e}\">{_escape(util_s)}</td>"
+            f"<td id=\"admin-node-bytes-{code_e}\">{_escape(bytes_s)}</td>"
+            f"<td id=\"admin-node-sess-{code_e}\">{_escape(sess_s)}</td>"
             f'<td><span class="badge {badge}" '
-            f'id="admin-node-status-{_escape(r.code)}">{_escape(r.status)}</span>'
-            f"{('<br/><span class=\"muted\">' + detail + '</span>') if detail else ''}"
+            f'id="admin-node-status-{code_e}">{_escape(r.status)}</span>'
+            f"{('<br/><span class=\"muted\" id=\"admin-node-detail-' + code_e + '\">' + detail + '</span>') if detail else ('<br/><span class=\"muted\" id=\"admin-node-detail-' + code_e + '\"></span>')}"
             f"</td>"
             "</tr>"
         )
@@ -508,18 +734,36 @@ def render_admin_node_usage_section_html(
 
     return f"""
 <section id="admin-node-usage" class="card" aria-labelledby="admin-node-usage-heading"
-         data-admin-node-usage="1">
+         data-admin-node-usage="1"
+         data-fleet-refresh-ms="{refresh_ms}"
+         data-fleet-usage-api="{FLEET_USAGE_API_PATH}">
   <h2 id="admin-node-usage-heading">Fleet node usage (bandwidth)</h2>
   <p class="muted" id="admin-node-usage-blurb">
-  Residual catalog peers (IS / RO / US). <strong>Bandwidth used</strong> is average
-  process-wide relay rate since node start (bits/s from private counters).
-  <strong>Capacity</strong> is operator-configured budget
-  (<code>RPT_NODE_BANDWIDTH_CAP_BPS</code> or per-host
-  <code>RPT_BANDWIDTH_CAP_BPS_MAP</code>) — not auto-detected NIC line-rate unless
-  you set it. Probes use token-gated
-  <code>/api/private/capacity</code> (<code>RPT_CAPACITY_TOKEN</code> on status host
-  and nodes). Fail-soft: unavailable peers show <code>unknown</code> / error — never
-  invented load. Not shown on the public shop.
+  Residual catalog peers (IS / RO / US). Limits are <strong>per peer</strong> for two
+  separate reasons:
+  </p>
+  <ul class="muted" id="admin-node-usage-limits-why">
+    <li id="admin-node-limit-bandwidth"><strong>Bandwidth budget</strong> — operator
+      product allowance for used-vs-cap math
+      (<code>RPT_NODE_BANDWIDTH_CAP_BPS</code> or
+      <code>RPT_BANDWIDTH_CAP_BPS_MAP</code>), not auto-detected NIC line-rate unless
+      you set it to that. Product defaults: <strong>IS/RO 100&nbsp;Mbps</strong>,
+      <strong>US 200&nbsp;Mbps</strong> (US has twice the traffic capacity).</li>
+    <li id="admin-node-limit-sessions"><strong>Session soft max</strong> — soft
+      utilization / residual-routing hint
+      (<code>live / capacity</code> on private probes), <em>not</em> a hard public
+      admission lock. Product defaults: <strong>IS/RO {base_sess}</strong>,
+      <strong>US {us_sess}</strong> (2× base because US has 2× bandwidth budget).
+      Override with <code>RPT_NODE_MAX_SESSIONS</code> on the node or
+      <code>RPT_SESSION_SOFT_MAX_MAP</code> on the status host.</li>
+  </ul>
+  <p class="muted" id="admin-node-usage-probe-note">
+  <strong>Bandwidth used</strong> is average process-wide relay rate since node start.
+  Probes use token-gated <code>/api/private/capacity</code>
+  (<code>RPT_CAPACITY_TOKEN</code>). Fail-soft: unavailable peers show
+  <code>unknown</code> / error — never invented load. Table refreshes about every
+  {refresh_ms // 1000}s while this page is open
+  (<span id="admin-node-usage-refreshed">—</span>). Not shown on the public shop.
   </p>
   <table id="admin-node-usage-table">
     <thead><tr>
@@ -531,7 +775,55 @@ def render_admin_node_usage_section_html(
 {table}
     </tbody>
   </table>
-{top}</section>
+{top}<script>
+(function () {{
+  var root = document.getElementById("admin-node-usage");
+  if (!root) return;
+  var api = root.getAttribute("data-fleet-usage-api") || "{FLEET_USAGE_API_PATH}";
+  var ms = parseInt(root.getAttribute("data-fleet-refresh-ms") || "{refresh_ms}", 10);
+  if (!ms || ms < 2000) ms = {DEFAULT_FLEET_REFRESH_MS};
+  var stamp = document.getElementById("admin-node-usage-refreshed");
+  function setText(id, text) {{
+    var el = document.getElementById(id);
+    if (el) el.textContent = text == null ? "—" : String(text);
+  }}
+  function applyRow(r) {{
+    if (!r || !r.code) return;
+    var c = r.code;
+    setText("admin-node-bw-used-" + c, r.bandwidth_used_display);
+    setText("admin-node-bw-cap-" + c, r.bandwidth_cap_display);
+    setText("admin-node-bw-util-" + c, r.bandwidth_util_display);
+    setText("admin-node-bytes-" + c, r.bytes_relayed_display);
+    setText("admin-node-sess-" + c, r.sessions_display);
+    var st = document.getElementById("admin-node-status-" + c);
+    if (st) {{
+      st.textContent = r.status || "unknown";
+      st.className = "badge " + (r.status === "ok" ? "ok" : "bad");
+    }}
+    setText("admin-node-detail-" + c, r.detail || "");
+  }}
+  function tick() {{
+    fetch(api, {{ credentials: "same-origin", headers: {{ "Accept": "application/json" }}, cache: "no-store" }})
+      .then(function (resp) {{
+        if (!resp.ok) throw new Error("HTTP " + resp.status);
+        return resp.json();
+      }})
+      .then(function (data) {{
+        if (!data || !data.rows) return;
+        data.rows.forEach(applyRow);
+        if (stamp) stamp.textContent = "last refresh " + (data.refreshed_at || "—");
+        if (data.refresh_ms && data.refresh_ms >= 2000) ms = data.refresh_ms;
+      }})
+      .catch(function () {{
+        if (stamp) stamp.textContent = "refresh failed (will retry)";
+      }});
+  }}
+  setInterval(tick, ms);
+  // First poll shortly after paint so values move without full page reload
+  setTimeout(tick, Math.min(1500, ms));
+}})();
+</script>
+</section>
 """
 
 

@@ -41,22 +41,26 @@ RPT_EXIT_PORT=44044
 # Public /api/status stays title-only — never a live client counter.
 #
 # RPT_CAPACITY_TOKEN=replace-with-long-random-secret
-# Optional soft max for utilization = live_sessions / max (node):
-# RPT_NODE_MAX_SESSIONS=256
+# Optional peer identity + soft max for utilization = live_sessions / max (node):
+# RPT_NODE_PEER_CODE=IS                 # IS | RO | US
+# RPT_NODE_MAX_SESSIONS=256             # product: IS/RO 256, US 512 (2× bandwidth budget)
 # Optional per-node bandwidth allowance (bits/s) — product budget, not NIC auto-detect:
 # RPT_NODE_BANDWIDTH_CAP_BPS=100000000   # IS/RO 100 Mbps
-# RPT_NODE_BANDWIDTH_CAP_BPS=200000000   # DE 200 Mbps
+# RPT_NODE_BANDWIDTH_CAP_BPS=200000000   # US 200 Mbps (2× traffic capacity)
 # Status host admin fleet panel: same token + cap map (host or country code → bps):
-# RPT_BANDWIDTH_CAP_BPS_MAP={"82.221.101.241":100000000,"185.146.232.107":100000000,"167.233.224.5":200000000,"IS":100000000,"RO":100000000,"DE":200000000}
+# RPT_BANDWIDTH_CAP_BPS_MAP={"82.221.101.241":100000000,"185.146.232.107":100000000,"5.161.242.85":200000000,"IS":100000000,"RO":100000000,"US":200000000}
+# RPT_SESSION_SOFT_MAX_MAP={"IS":256,"RO":256,"US":512,"82.221.101.241":256,"185.146.232.107":256,"5.161.242.85":512}
 # Optional client probe URL map (JSON host → private capacity URL):
-# RPT_CAPACITY_PROBE_URLS={"82.221.101.241":"http://82.221.101.241:8080/api/private/capacity","185.146.232.107":"http://185.146.232.107:8080/api/private/capacity","167.233.224.5":"http://167.233.224.5:8080/api/private/capacity"}
+# RPT_CAPACITY_PROBE_URLS={"82.221.101.241":"http://82.221.101.241:8080/api/private/capacity","185.146.232.107":"http://185.146.232.107:8080/api/private/capacity","5.161.242.85":"http://5.161.242.85:8080/api/private/capacity"}
 # Optional probe timeout seconds (default ~1.5):
 # RPT_CAPACITY_PROBE_TIMEOUT=1.5
+# Admin fleet live poll (ms; default 5000):
+# RPT_ADMIN_FLEET_REFRESH_MS=5000
 #
 # Node install (root on residual VPS):
 #   bash scripts/install_capacity_token_env.sh
 #   # or with allowance:
-#   # RPT_CAPACITY_TOKEN='…' RPT_NODE_BANDWIDTH_CAP_BPS=100000000 bash scripts/install_capacity_token_env.sh
+#   # RPT_CAPACITY_TOKEN='…' RPT_NODE_PEER_CODE=US RPT_NODE_BANDWIDTH_CAP_BPS=200000000 bash scripts/install_capacity_token_env.sh
 # Client / status host (operator — same secret as nodes; never commit):
 #   export RPT_CAPACITY_TOKEN='(same secret as nodes)'
 # Docs: docs/CAPACITY_PROBES.md

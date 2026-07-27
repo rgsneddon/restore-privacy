@@ -1203,6 +1203,46 @@ class Handler(BaseHTTPRequestHandler):
                 return
             self._send(200, "text/html; charset=utf-8", render_admin_html())
             return
+        if path in ("/admin/api/fleet-usage", "/admin/api/fleet-usage/"):
+            # Authenticated JSON for live fleet usage table refresh (admin only).
+            if not admin_enabled():
+                self._send(
+                    503,
+                    "application/json; charset=utf-8",
+                    b'{"error":"admin disabled"}',
+                )
+                return
+            if not is_authenticated(self.headers):
+                self._send(
+                    401,
+                    "application/json; charset=utf-8",
+                    b'{"error":"unauthorized"}',
+                )
+                return
+            try:
+                from admin_node_usage import fleet_usage_json_payload
+            except ImportError:
+                from status_page.admin_node_usage import (  # type: ignore
+                    fleet_usage_json_payload,
+                )
+            try:
+                payload = fleet_usage_json_payload(live=True)
+            except Exception as exc:  # noqa: BLE001
+                payload = {
+                    "error": str(exc)[:200],
+                    "refreshed_at": None,
+                    "rows": [],
+                }
+            body = json.dumps(payload, separators=(",", ":")).encode("utf-8")
+            self._send(
+                200,
+                "application/json; charset=utf-8",
+                body,
+                extra_headers=[
+                    ("Cache-Control", "no-store"),
+                ],
+            )
+            return
         if path == "/admin/login":
             # GET shows login form
             if not admin_enabled():
