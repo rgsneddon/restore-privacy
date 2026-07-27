@@ -9,17 +9,17 @@ already has SSH to RO (e.g. Mac). **Do not commit** real tokens.
 | Host | `185.146.232.107` |
 | Residual port | `44044/udp` (product tunnel) |
 | UI / private capacity | `http://185.146.232.107:8080/api/private/capacity` |
-| Product bandwidth allowance | **100 Mbps** = `RPT_NODE_BANDWIDTH_CAP_BPS=100000000` |
-| Soft session max | `RPT_NODE_MAX_SESSIONS=256` (default) |
-| Shared secret | Same `RPT_CAPACITY_TOKEN` as **IS** and **DE** (and status host) |
+| Product bandwidth | **unlimited-class** (extendable at cost) — **omit** `RPT_NODE_BANDWIDTH_CAP_BPS` |
+| Soft session max | `RPT_NODE_MAX_SESSIONS=256` (RO base; IS is 512) |
+| Shared secret | Same `RPT_CAPACITY_TOKEN` as **IS** and **US** (and status host) |
 
 ## Status elsewhere (context — not this Mac step)
 
-| Peer | Host | Cap | Capacity token env |
-|------|------|-----|--------------------|
-| IS | `82.221.101.241` | 100 Mbps | Applied (Windows operator session) |
-| US | `5.161.242.85` | 200 Mbps | Applied on-box; external **8080** may still need Hetzner **Cloud Firewall** |
-| **RO** | `185.146.232.107` | **100 Mbps** | **This doc — apply from Mac SSH** |
+| Peer | Host | Bandwidth (product) | Capacity token env |
+|------|------|---------------------|--------------------|
+| IS | `82.221.101.241` | unlimited-class (extendable at cost); sessions **512** | Applied |
+| US | `5.161.242.85` | **200 Mbps** fixed budget; sessions **512** | Applied on-box; external **8080** may still need Hetzner **Cloud Firewall** |
+| **RO** | `185.146.232.107` | **unlimited-class**; sessions **256** | **This doc — apply from Mac SSH** |
 
 Windows residual keys could not auth to RO (`publickey denied`). Private capacity
 from the public internet previously returned **HTTP 404** (old UI without the
@@ -89,8 +89,10 @@ scp scripts/install_capacity_token_env.sh "${RO_SSH_USER:-raskul}@${RO_HOST}:/tm
 ssh "${RO_SSH_USER:-raskul}@${RO_HOST}" 'bash -s' <<EOF
 set -euo pipefail
 export RPT_CAPACITY_TOKEN='${RPT_CAPACITY_TOKEN}'
-export RPT_NODE_BANDWIDTH_CAP_BPS=100000000
+export RPT_NODE_PEER_CODE=RO
 export RPT_NODE_MAX_SESSIONS=256
+# Product unlimited-class for RO — do NOT set RPT_NODE_BANDWIDTH_CAP_BPS
+unset RPT_NODE_BANDWIDTH_CAP_BPS || true
 # Prefer tree install if present:
 if [[ -f /opt/restore-privacy/scripts/install_capacity_token_env.sh ]]; then
   sudo -E bash /opt/restore-privacy/scripts/install_capacity_token_env.sh
@@ -110,7 +112,7 @@ EOF
 
 What the install script writes (mode `600`):
 
-- `/etc/restore-privacy/capacity.env` — `RPT_CAPACITY_TOKEN`, `RPT_NODE_MAX_SESSIONS`, `RPT_NODE_BANDWIDTH_CAP_BPS`
+- `/etc/restore-privacy/capacity.env` — `RPT_CAPACITY_TOKEN`, `RPT_NODE_PEER_CODE`, `RPT_NODE_MAX_SESSIONS` (no fixed `RPT_NODE_BANDWIDTH_CAP_BPS` for RO unlimited-class)
 - systemd drop-in `rpt-node.service.d/capacity-token.conf` → `EnvironmentFile=`
 - restarts `rpt-node` when active
 
@@ -138,8 +140,8 @@ EOF
 Expect:
 
 - `unauth_http=401` (or refuse) when token configured
-- `auth_http=200` and JSON including `"private": true`, `"capacity"`, `"live"`
-- `bw_cap=100000000`
+- `auth_http=200` and JSON including `"private": true`, `"capacity"` (product **256** for RO), `"live"`
+- `bw_cap=unset` (product **unlimited-class** for RO — no fixed Mbps budget)
 - public body title-only, e.g. `{"title": "RESTORE PRIVACY"}`
 
 External check from Mac:
@@ -163,7 +165,9 @@ in git):
 
 ```bash
 RPT_CAPACITY_TOKEN=<same as residual nodes>
-RPT_BANDWIDTH_CAP_BPS_MAP={"82.221.101.241":100000000,"185.146.232.107":100000000,"5.161.242.85":200000000,"IS":100000000,"RO":100000000,"US":200000000}
+# US fixed budget only; IS/RO product unlimited-class (omit or 0)
+RPT_BANDWIDTH_CAP_BPS_MAP={"5.161.242.85":200000000,"US":200000000}
+RPT_SESSION_SOFT_MAX_MAP={"RO":256,"IS":512,"US":512}
 RPT_CAPACITY_PROBE_TIMEOUT=2.5
 ```
 

@@ -110,22 +110,35 @@ class TestCapacityTokenDocs(unittest.TestCase):
         self.assertIn("sync: false", window)
 
     def test_ro_mac_finalize_handoff_is_committed_and_secret_free(self):
-        """RO operator handoff for Mac SSH: host, 100 Mbps, install path, no live token."""
+        """RO operator handoff for Mac SSH: host, unlimited-class bw, sessions 256, no live token."""
         handoff = ROOT / "docs" / "RO_CAPACITY_MAC_FINALIZE.md"
         self.assertTrue(handoff.is_file(), "missing docs/RO_CAPACITY_MAC_FINALIZE.md")
         text = handoff.read_text(encoding="utf-8")
         self.assertIn("185.146.232.107", text)
-        self.assertIn("100000000", text)
-        self.assertIn("100 Mbps", text)
+        # Product: RO unlimited-class bandwidth (extendable at cost) — not fixed 100 Mbps
+        self.assertIn("unlimited-class", text.lower())
+        self.assertIn("RPT_NODE_MAX_SESSIONS=256", text)
+        self.assertNotIn("RPT_NODE_BANDWIDTH_CAP_BPS=100000000", text)
+        self.assertNotIn("**100 Mbps**", text)
         self.assertIn("RPT_CAPACITY_TOKEN", text)
-        self.assertIn("RPT_NODE_BANDWIDTH_CAP_BPS", text)
         self.assertIn("install_capacity_token_env.sh", text)
         self.assertIn("capacity_token.txt", text)
         self.assertIn("/api/private/capacity", text)
         self.assertIn("do not commit", text.lower())
+        # Align with product maps (private_capacity / CAPACITY_PROBES)
+        from node.private_capacity import (
+            product_bandwidth_unlimited,
+            product_session_soft_max,
+        )
+
+        self.assertTrue(product_bandwidth_unlimited(code="RO"))
+        self.assertTrue(product_bandwidth_unlimited(code="IS"))
+        self.assertEqual(product_session_soft_max(code="RO"), 256)
+        self.assertGreater(product_session_soft_max(code="IS") or 0, 256)
         # Discoverable from primary capacity doc
         cap = (ROOT / "docs" / "CAPACITY_PROBES.md").read_text(encoding="utf-8")
         self.assertIn("RO_CAPACITY_MAC_FINALIZE.md", cap)
+        self.assertIn("unlimited-class", cap.lower())
         wipe = (ROOT / "docs" / "NODE_WIPE_REINSTALL.md").read_text(encoding="utf-8")
         self.assertIn("RO_CAPACITY_MAC_FINALIZE.md", wipe)
         # No live 32+ hex token assignment in handoff (placeholders / env expansion only)
