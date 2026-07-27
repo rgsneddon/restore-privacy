@@ -812,6 +812,88 @@ def render_admin_keygen_failsafe_section_html(
 """
 
 
+def render_admin_tester_month_section_html(
+    *,
+    result: dict[str, Any] | None = None,
+    error: str = "",
+    platform: str = "windows",
+) -> str:
+    """Admin: mint one-month free tester subscription (download + keygen).
+
+    PPI is always the literal label ``TESTER - one month``. Not listed in Paid
+    download grants; Licence database shows the row only after keygen activation.
+    """
+    err = (
+        f'<p class="err" id="tester-month-error">{_escape(error)}</p>' if error else ""
+    )
+    ok = ""
+    if result and (result.get("download_url") or result.get("keygen")):
+        url = _escape(str(result.get("download_url") or ""))
+        path = _escape(str(result.get("download_path") or ""))
+        plat = _escape(str(result.get("platform") or ""))
+        fname = _escape(str(result.get("filename") or ""))
+        kg = _escape(str(result.get("keygen") or ""))
+        ppi = _escape(str(result.get("ppi") or result.get("purchase_id") or "TESTER - one month"))
+        vu = result.get("valid_until")
+        try:
+            vu_s = _escape(str(float(vu))) if vu is not None else ""
+        except (TypeError, ValueError):
+            vu_s = ""
+        ok = f"""
+  <div class="ok-msg" id="tester-month-result" role="status">
+    <p><strong>One-month tester subscription minted</strong> for
+      <strong id="tester-month-result-platform">{plat}</strong>
+      (<code id="tester-month-result-filename">{fname}</code>).</p>
+    <p>PPI: <code id="tester-month-ppi">{ppi}</code>
+      — expires after one month (valid_until
+      <code id="tester-month-valid-until">{vu_s}</code>).</p>
+    <p>Keygen: <code id="tester-month-keygen">{kg}</code></p>
+    <p>Download (single-use status-host token, not free GitHub):</p>
+    <p><a id="tester-month-download-link" href="{url}" rel="noopener noreferrer">{url}</a></p>
+    <p class="muted">Path: <code id="tester-month-download-path">{path}</code>
+      — not listed under Paid download grants; Licence database lists this key
+      only after the tester activates it in the app.</p>
+  </div>"""
+    plat_sel = (platform or "windows").strip().lower()
+    options = []
+    labels = {
+        "windows": "Windows (x64) installer",
+        "linux": "Linux (x64) installer",
+        "macos": "macOS app package",
+        "ios": "iOS app package",
+        "android": "Android APK",
+    }
+    for p in _ADMIN_CATALOG_PLATFORMS:
+        sel = " selected" if p == plat_sel else ""
+        lab = labels.get(p, p)
+        options.append(f'<option value="{p}"{sel}>{_escape(lab)}</option>')
+    opts = "\n      ".join(options)
+    return f"""
+<section id="admin-tester-month" class="card" aria-labelledby="admin-tester-month-heading"
+         data-admin-tester-month="1">
+  <h2 id="admin-tester-month-heading">One-month tester subscription</h2>
+  <p class="muted" id="admin-tester-month-note">
+    Mint a <strong>one-month free</strong> Connect subscription for build testing:
+    platform installer download + keygen with PPI
+    <code>TESTER - one month</code>. Expires after one calendar month.
+    Does <strong>not</strong> appear in Paid download grants (paid customers only).
+    Appears in Licence database only after the keygen is activated.
+  </p>
+  {err}
+  {ok}
+  <form method="post" action="/admin/mint-tester-month" id="admin-tester-month-form">
+    <label class="field" for="tester_month_platform">
+      <span class="field-label">Package / device</span>
+      <select id="tester_month_platform" name="platform" required>
+      {opts}
+      </select>
+    </label>
+    <button type="submit" id="admin-tester-month-submit">Generate one-month tester</button>
+  </form>
+{admin_section_top_link_html()}</section>
+"""
+
+
 def render_seed_test_purchase_section_html(
     *,
     result: dict[str, Any] | None = None,
@@ -1229,6 +1311,9 @@ def render_admin_html(
     keygen_error: str = "",
     keygen_note: str = "",
     keygen_platform: str = "",
+    tester_result: dict[str, Any] | None = None,
+    tester_error: str = "",
+    tester_platform: str = "windows",
     seed_result: dict[str, Any] | None = None,
     seed_error: str = "",
     seed_platform: str = "windows",
@@ -1278,6 +1363,11 @@ def render_admin_html(
         error=keygen_error,
         note=keygen_note,
         platform=keygen_platform,
+    )
+    tester_html = render_admin_tester_month_section_html(
+        result=tester_result,
+        error=tester_error,
+        platform=tester_platform,
     )
     seed_html = render_seed_test_purchase_section_html(
         result=seed_result,
@@ -1389,6 +1479,7 @@ background:var(--btn-bg);color:var(--btn-fg);font-weight:600;cursor:pointer}}
   <a href="#admin-reissue">Re-issue by RPT-PPI</a>
   <a href="#admin-ondemand-mint">Generate download (failsafe)</a>
   <a href="#admin-keygen-failsafe">Generate KEYGEN (failsafe)</a>
+  <a href="#admin-tester-month">One-month tester</a>
   {('<a href="#admin-seed-purchase">Seed test purchase</a>' if seed_test_purchase_enabled() else '')}
   <a href="#admin-processor-settings">Processor settings</a>
   <a href="#admin-licences">Licence database</a>
@@ -1412,6 +1503,7 @@ background:var(--btn-bg);color:var(--btn-fg);font-weight:600;cursor:pointer}}
 {reissue_html}
 {ondemand_html}
 {keygen_html}
+{tester_html}
 {seed_html}
 {settings_html}
 {render_admin_licences_section_html()}

@@ -3026,6 +3026,11 @@ KEYGEN_UNLOCK_INSTRUCTION = (
 # Distinct from PPI (RPT-XXXX-…) so buyers do not confuse purchase id with unlock.
 KEYGEN_PREFIX = "RPT-KEY-"
 
+# Admin one-month free tester subscription (not a paid customer grant).
+TESTER_MONTH_PPI = "TESTER - one month"
+TESTER_MONTH_SESSION_PREFIX = "tester_month_"
+TESTER_MONTH_REASON = "tester_one_month"
+
 
 def generate_keygen() -> str:
     """Mint a unique human-enterable subscription keygen.
@@ -3108,6 +3113,7 @@ def init_db() -> None:
         _ensure_payment_intent_columns(conn)
         _migrate_grants_purchase_id(conn)
         _ensure_keygen_column(conn)
+        _ensure_keygen_activated_at_column(conn)
     finally:
         conn.close()
 
@@ -3125,6 +3131,43 @@ def _ensure_keygen_column(conn: sqlite3.Connection) -> None:
         "CREATE UNIQUE INDEX IF NOT EXISTS idx_entitlements_keygen "
         "ON connect_entitlements(keygen) WHERE keygen IS NOT NULL AND keygen != ''"
     )
+
+
+def _ensure_keygen_activated_at_column(conn: sqlite3.Connection) -> None:
+    """First successful client keygen verify stamp (tester licence list gate)."""
+    ent_cols = {
+        str(r[1]) for r in conn.execute("PRAGMA table_info(connect_entitlements)")
+    }
+    if "keygen_activated_at" not in ent_cols:
+        conn.execute(
+            "ALTER TABLE connect_entitlements ADD COLUMN keygen_activated_at REAL"
+        )
+
+
+def is_tester_month_session(session_id: str | None) -> bool:
+    """True for admin one-month tester mint sessions (not paid customers)."""
+    return str(session_id or "").startswith(TESTER_MONTH_SESSION_PREFIX)
+
+
+def is_tester_month_ppi(purchase_id: str | None) -> bool:
+    """True when grant/licence PPI is the tester one-month label."""
+    raw = (purchase_id or "").strip()
+    if raw == TESTER_MONTH_PPI:
+        return True
+    # Tolerate normalize_purchase_id style (upper, no spaces)
+    compact = raw.upper().replace(" ", "")
+    return compact == "TESTER-ONEMONTH"
+
+
+def is_tester_month_grant(row: dict[str, Any] | None) -> bool:
+    """True when a grant row belongs to a one-month tester mint."""
+    if not isinstance(row, dict):
+        return False
+    if is_tester_month_session(str(row.get("session_id") or "")):
+        return True
+    if is_tester_month_ppi(str(row.get("purchase_id") or "")):
+        return True
+    return False
 
 
 def _ensure_payment_intent_columns(conn: sqlite3.Connection) -> None:
@@ -3554,6 +3597,36 @@ def get_connect_entitlement(
         conn.close()
 
 
+def mark_keygen_activated(
+    session_id: str, *, now: float | None = None
+) -> bool:
+    """Stamp first successful keygen activation (idempotent).
+
+    Used so admin **Licence database** can show tester mints only after the
+    client has successfully verified the keygen (not at operator mint time).
+    Returns True when a stamp was written (first activation).
+    """
+    sid = (session_id or "").strip()
+    if not sid:
+        return False
+    init_db()
+    t = float(now if now is not None else time.time())
+    conn = _connect()
+    try:
+        cur = conn.execute(
+            """
+            UPDATE connect_entitlements
+            SET keygen_activated_at = ?, updated_at = ?
+            WHERE session_id = ?
+              AND (keygen_activated_at IS NULL OR keygen_activated_at = 0)
+            """,
+            (t, t, sid),
+        )
+        return int(cur.rowcount or 0) > 0
+    finally:
+        conn.close()
+
+
 def get_connect_entitlement_by_keygen(
     keygen: str, *, now: float | None = None
 ) -> dict[str, Any] | None:
@@ -3562,11 +3635,15 @@ def get_connect_entitlement_by_keygen(
     Returns the same shape as :func:`get_connect_entitlement`. When the bound
     subscription/payment is failed/revoked or period ended, ``connect_allowed``
     is False — the keygen is useless until a new active entitlement exists.
+
+    First successful lookup stamps ``keygen_activated_at`` (client keygen
+    activation path) so tester licences can appear in the admin licence list.
     """
     kg = normalize_keygen(keygen)
     if not kg or not kg.startswith("RPT-KEY-"):
         return None
     init_db()
+    t = now if now is not None else time.time()
     conn = _connect()
     try:
         row = conn.execute(
@@ -3580,7 +3657,9 @@ def get_connect_entitlement_by_keygen(
         conn.close()
     if not sid:
         return None
-    return get_connect_entitlement(sid, now=now)
+    # Real client activation path: first successful keygen verify.
+    mark_keygen_activated(sid, now=t)
+    return get_connect_entitlement(sid, now=t)
 
 
 def connect_entitlement_allows(session_id: str, *, now: float | None = None) -> bool:
@@ -4815,7 +4894,8 @@ def mint_download_token(
 
     Assigns a durable :func:`generate_purchase_id` when *purchase_id* is omitted
     (new paid purchase). Pass an existing id when re-issuing a secondary download
-    for the same paid purchase.
+    for the same paid purchase. Tester mints pass :data:`TESTER_MONTH_PPI`
+    (stored literally; not a paid RPT-PPI).
     """
     plat = (platform or "").strip().lower()
     bound = resolve_paid_grant_filename(plat, metadata_filename=filename)
@@ -4826,9 +4906,12 @@ def mint_download_token(
     init_db()
     t = now if now is not None else time.time()
     token = secrets.token_urlsafe(32)
-    pid = normalize_purchase_id(purchase_id) if purchase_id else ""
-    if not pid:
-        pid = generate_purchase_id()
+    if is_tester_month_ppi(purchase_id):
+        pid = TESTER_MONTH_PPI
+    else:
+        pid = normalize_purchase_id(purchase_id) if purchase_id else ""
+        if not pid:
+            pid = generate_purchase_id()
     conn = _connect()
     try:
         conn.execute(
@@ -5021,7 +5104,9 @@ def admin_mint_keygen_failsafe(
         )
     finally:
         conn.close()
-    ent = get_connect_entitlement_by_keygen(kg, now=t)
+    # Failsafe: verify via session (not by-keygen) so mint does not auto-activate
+    # for licence-list gating (activation is client-path only).
+    ent = get_connect_entitlement(session_id, now=t)
     if not ent or not ent.get("connect_allowed"):
         raise RuntimeError("admin failsafe keygen not active after mint")
     return {
@@ -5033,6 +5118,93 @@ def admin_mint_keygen_failsafe(
         "connect_allowed": True,
         "admin_keygen_failsafe": True,
         "unlock_instruction": KEYGEN_UNLOCK_INSTRUCTION,
+    }
+
+
+def admin_mint_one_month_tester(
+    platform: str,
+    *,
+    now: float | None = None,
+    base_url: str | None = None,
+    ttl_sec: int = TOKEN_TTL_SEC,
+) -> dict[str, Any]:
+    """Admin: mint a **one-month free tester** subscription for a catalog platform.
+
+    Returns both a status-host single-use **download link** and a product
+    **keygen**, with PPI label :data:`TESTER_MONTH_PPI`. Entitlement
+    ``valid_until`` is one calendar month after *now* (same helper as paid
+    monthly). Download token exists for ``/download?token=`` fulfilment but is
+    **excluded** from the admin Paid download grants list (paid customers only).
+    Licence database lists the row only after first successful client keygen
+    activation (:func:`get_connect_entitlement_by_keygen`).
+
+    Operator-only (HTTP layer enforces auth). Not a free permanent GitHub URL.
+    """
+    t = float(now if now is not None else time.time())
+    plat = (platform or "").strip().lower()
+    fname = platform_filename(plat)
+    if not fname:
+        raise ValueError(f"unknown platform: {platform!r}")
+    session_id = f"{TESTER_MONTH_SESSION_PREFIX}{secrets.token_hex(10)}"
+    valid_until = period_end_for_billing_interval(t, BILLING_INTERVAL_MONTH)
+    keygen = activate_connect_entitlement(
+        session_id,
+        platform=plat,
+        payment_intent_id="",
+        subscription_id="",
+        valid_until=valid_until,
+        keygen=None,
+        billing_interval=BILLING_INTERVAL_MONTH,
+        now=t,
+    )
+    kg = normalize_keygen(keygen)
+    if not kg or not kg.startswith(KEYGEN_PREFIX):
+        raise RuntimeError("admin_mint_one_month_tester failed to mint product keygen")
+    conn = _connect()
+    try:
+        conn.execute(
+            "UPDATE connect_entitlements SET reason = ?, updated_at = ? WHERE session_id = ?",
+            (TESTER_MONTH_REASON, t, session_id),
+        )
+    finally:
+        conn.close()
+    token = mint_download_token(
+        filename=fname,
+        platform=plat,
+        session_id=session_id,
+        amount_pence=0,
+        currency=PRICE_CURRENCY,
+        ttl_sec=ttl_sec,
+        now=t,
+        purchase_id=TESTER_MONTH_PPI,
+    )
+    path = f"/download?token={token}"
+    base = (base_url if base_url is not None else public_base_url()).rstrip("/")
+    url = f"{base}{path}"
+    if "github.com" in url.lower() and "releases/download" in url.lower():
+        raise RuntimeError(
+            "refusing free GitHub release URL from admin_mint_one_month_tester"
+        )
+    ent = get_connect_entitlement(session_id, now=t)
+    if not ent or not ent.get("connect_allowed"):
+        raise RuntimeError("tester entitlement not active after mint")
+    return {
+        "token": token,
+        "download_path": path,
+        "download_url": url,
+        "platform": plat,
+        "filename": fname,
+        "session_id": session_id,
+        "keygen": kg,
+        "purchase_id": TESTER_MONTH_PPI,
+        "ppi": TESTER_MONTH_PPI,
+        "valid_until": float(ent.get("valid_until") or valid_until),
+        "billing_interval": BILLING_INTERVAL_MONTH,
+        "status": str(ent.get("status") or ENTITLEMENT_ACTIVE),
+        "connect_allowed": True,
+        "admin_tester_month": True,
+        "unlock_instruction": KEYGEN_UNLOCK_INSTRUCTION,
+        "amount_pence": 0,
     }
 
 
@@ -5357,6 +5529,10 @@ def list_recent_grants(limit: int | None = 50) -> list[dict[str, Any]]:
     *limit* caps the row count when a positive int. Pass ``limit=None`` for the
     **full** completed-payment grant history (authenticated admin list). Used
     tokens remain in the store and are returned with status/used_at set.
+
+    **Excludes** one-month tester mints (session ``tester_month_*`` / PPI
+    :data:`TESTER_MONTH_PPI`) — Paid download grants UI is for paid customers
+    only. Tester download tokens remain redeemable via ``/download?token=``.
     """
     init_db()
     conn = _connect()
@@ -5366,26 +5542,32 @@ def list_recent_grants(limit: int | None = 50) -> list[dict[str, Any]]:
                    created_at, expires_at, used_at, status, purchase_id
             FROM grants ORDER BY created_at DESC
         """
-        if limit is None:
-            rows = conn.execute(sql).fetchall()
-        else:
-            lim = max(0, int(limit))
-            rows = conn.execute(sql + " LIMIT ?", (lim,)).fetchall()
+        # Fetch all matching rows then filter tester; apply limit after filter so
+        # paid grants are not starved by intermixed tester rows.
+        rows = conn.execute(sql).fetchall()
         out = []
         for r in rows:
             d = {k: r[k] for k in r.keys()}
             if d.get("purchase_id"):
-                d["purchase_id"] = (
-                    normalize_purchase_id(str(d["purchase_id"])) or d["purchase_id"]
-                )
+                raw_pid = str(d["purchase_id"])
+                if is_tester_month_ppi(raw_pid):
+                    d["purchase_id"] = TESTER_MONTH_PPI
+                else:
+                    d["purchase_id"] = (
+                        normalize_purchase_id(raw_pid) or raw_pid
+                    )
+            if is_tester_month_grant(d):
+                continue
             out.append(d)
+            if limit is not None and len(out) >= max(0, int(limit)):
+                break
         return out
     finally:
         conn.close()
 
 
 def list_all_grants() -> list[dict[str, Any]]:
-    """Full grant history for operator admin (no silent row drop-off)."""
+    """Full **paid** grant history for operator admin (tester mints excluded)."""
     return list_recent_grants(limit=None)
 
 
@@ -5393,6 +5575,10 @@ def list_licences_for_admin(*, limit: int | None = None) -> list[dict[str, Any]]
     """Read-only licence rows for admin: email, KEYGEN, PPI, OK|EXPIRED.
 
     Joins connect_entitlements with grants (purchase_id). Info only — no write.
+
+    One-month **tester** entitlements appear only after first successful
+    keygen activation (``keygen_activated_at`` set by
+    :func:`get_connect_entitlement_by_keygen`). Unused tester keys stay hidden.
     """
     init_db()
     t = time.time()
@@ -5401,18 +5587,25 @@ def list_licences_for_admin(*, limit: int | None = None) -> list[dict[str, Any]]
         sql = """
             SELECT e.session_id, e.status, e.platform, e.keygen, e.customer_email,
                    e.billing_interval, e.valid_until, e.updated_at,
+                   e.keygen_activated_at,
                    (SELECT g.purchase_id FROM grants g
                     WHERE g.session_id = e.session_id
                     ORDER BY g.created_at DESC LIMIT 1) AS purchase_id
             FROM connect_entitlements e
             ORDER BY e.updated_at DESC
         """
-        if limit is None:
-            rows = conn.execute(sql).fetchall()
-        else:
-            rows = conn.execute(sql + " LIMIT ?", (max(0, int(limit)),)).fetchall()
+        rows = conn.execute(sql).fetchall()
         out: list[dict[str, Any]] = []
         for r in rows:
+            sid = str(r["session_id"] or "")
+            try:
+                activated_at = r["keygen_activated_at"]
+            except (KeyError, IndexError, TypeError):
+                activated_at = None
+            # Tester: licence list only after keygen activation.
+            if is_tester_month_session(sid):
+                if activated_at is None or float(activated_at or 0) <= 0:
+                    continue
             vu = r["valid_until"]
             try:
                 vu_f = float(vu) if vu is not None else None
@@ -5423,11 +5616,15 @@ def list_licences_for_admin(*, limit: int | None = None) -> list[dict[str, Any]]
             kg = normalize_keygen(str(r["keygen"] or ""))
             pid = ""
             if r["purchase_id"]:
-                pid = normalize_purchase_id(str(r["purchase_id"])) or str(
-                    r["purchase_id"]
-                )
+                raw_pid = str(r["purchase_id"])
+                if is_tester_month_ppi(raw_pid) or is_tester_month_session(sid):
+                    pid = TESTER_MONTH_PPI
+                else:
+                    pid = normalize_purchase_id(raw_pid) or raw_pid
+            elif is_tester_month_session(sid):
+                pid = TESTER_MONTH_PPI
             ent = {
-                "session_id": r["session_id"],
+                "session_id": sid,
                 "status": status,
                 "connect_allowed": connect_ok,
                 "valid_until": vu_f,
@@ -5443,11 +5640,16 @@ def list_licences_for_admin(*, limit: int | None = None) -> list[dict[str, Any]]
                     "platform": str(r["platform"] or ""),
                     "billing_interval": str(r["billing_interval"] or "")
                     or BILLING_INTERVAL_MONTH,
-                    "session_id": r["session_id"],
+                    "session_id": sid,
                     "status_raw": status,
                     "updated_at": r["updated_at"],
+                    "keygen_activated_at": (
+                        float(activated_at) if activated_at is not None else None
+                    ),
                 }
             )
+            if limit is not None and len(out) >= max(0, int(limit)):
+                break
         return out
     finally:
         conn.close()
