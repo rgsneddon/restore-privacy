@@ -7,7 +7,7 @@
 | **Public catalog version** | **0.4.10** |
 | **Default residual entry** | **United States (US)** (product default on all clients) |
 | **Live probe peer** | **Iceland (IS):44044** (UDP); status UI TCP **8080** |
-| **Audit generated** | **26 July 2026** (`2026-07-26T23:59:36Z`) |
+| **Audit generated** | **27 July 2026** (`2026-07-27T00:10:35Z`) |
 | **Cadence** | Automated security pass (~**every 4 hours** + **jitter** on privacy-hardened node timer) |
 | **Audit type** | Static suite + live node status probe + **per-installer AUDIT STATE** + **section B privacy probes** + **multihop node structure** |
 | **Auditor method** | `scripts/run_security_audit.py` — unittest privacy/security modules + TCP/HTTP/UDP probes + no-`.priv` scan + catalog package RAG + section B + multihop structure (no firewall scan) |
@@ -172,7 +172,7 @@ An **ISP** performing **traffic analysis** may still observe connection timing a
 
 | Severity | Finding | Status |
 |----------|---------|--------|
-| **Info** | Automated pass at `2026-07-26T23:59:36Z` | Recorded |
+| **Info** | Automated pass at `2026-07-27T00:10:35Z` | Recorded |
 | **High** | Public client count on status | Closed (title-only) |
 | **Medium** | Shared client priv in packages | Closed (no .priv hits) |
 | **Low** | Unit suite failure | N/A |
@@ -180,7 +180,7 @@ An **ISP** performing **traffic analysis** may still observe connection timing a
 
 ---
 
-## 6. Automated checks (this pass — 26 July 2026)
+## 6. Automated checks (this pass — 27 July 2026)
 
 **Modules:** `tests.test_legal_links`, `tests.test_legal_docs`, `tests.test_no_public_client_count`, `tests.test_connect_no_phones_home`, `tests.test_obfuscation`, `tests.test_kill_switch_leaks`, `tests.test_product_node_key`, `tests.test_pfs_product_require`, `tests.test_downloads`, `tests.test_multihop`, `tests.test_audit_package_rag`
 
@@ -224,7 +224,7 @@ An **ISP** performing **traffic analysis** may still observe connection timing a
 
 ## 9. Conclusion
 
-Automated security audit at **2026-07-26T23:59:36Z** against node **Iceland (IS)** and in-repo privacy gates. Public **SECURITY AUDIT** links must resolve on the **status host** (`/AUDIT.md` / `/audit.md`). Source repository is **private**; paid catalog installers are fulfilled on the status host only. Core privacy promises hold when the suite passes and status remains title-only.
+Automated security audit at **2026-07-27T00:10:35Z** against node **Iceland (IS)** and in-repo privacy gates. Public **SECURITY AUDIT** links must resolve on the **status host** (`/AUDIT.md` / `/audit.md`). Source repository is **private**; paid catalog installers are fulfilled on the status host only. Core privacy promises hold when the suite passes and status remains title-only.
 
 Re-run: `python3 scripts/run_security_audit.py --write`
 
@@ -249,5 +249,5 @@ Re-run: `python3 scripts/run_security_audit.py --write`
 | Output | `AUDIT.md` (repo root); served as `/AUDIT.md` and `/audit.md` on VPN APP Shop |
 | Related | `PRIVACY_POLICY.md`, `README.md`, `scripts/run_security_audit.py` |
 | Code baseline | Catalog **0.4.10** + node **Iceland (IS)** |
-| Pass date | **26 July 2026** |
+| Pass date | **27 July 2026** |
 | Machine JSON | `status_page/static/security_audit_latest.json` (when `--write`) |
