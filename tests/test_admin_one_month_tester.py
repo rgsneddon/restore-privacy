@@ -154,9 +154,9 @@ class TestAdminMintOneMonthTester(_TempPaymentDB):
 
 class TestAdminTesterMonthHtml(_TempPaymentDB):
     def test_admin_html_has_tester_section_and_platforms(self):
-        from admin_panel import render_admin_html
+        from admin_panel import render_admin_link_generation_html
 
-        page = render_admin_html().decode("utf-8")
+        page = render_admin_link_generation_html().decode("utf-8")
         self.assertIn('id="admin-tester-month"', page)
         self.assertIn('id="admin-tester-month-form"', page)
         self.assertIn('action="/admin/mint-tester-month"', page)
@@ -168,9 +168,9 @@ class TestAdminTesterMonthHtml(_TempPaymentDB):
 
     def test_tester_section_immediately_below_keygen_failsafe(self):
         """Product placement: one-month tester sits just under Generate KEYGEN failsafe."""
-        from admin_panel import render_admin_html
+        from admin_panel import render_admin_link_generation_html
 
-        page = render_admin_html().decode("utf-8")
+        page = render_admin_link_generation_html().decode("utf-8")
         ik = page.find('id="admin-keygen-failsafe"')
         it = page.find('id="admin-tester-month"')
         self.assertGreaterEqual(ik, 0, "keygen failsafe section missing")
@@ -187,12 +187,9 @@ class TestAdminTesterMonthHtml(_TempPaymentDB):
         self.assertNotIn('id="admin-seed-purchase"', between)
         self.assertNotIn('id="admin-grants"', between)
         self.assertNotIn('id="admin-licences"', between)
-        # Nav link present next to keygen failsafe
-        self.assertIn('href="#admin-tester-month"', page)
-        nav_k = page.find('href="#admin-keygen-failsafe"')
-        nav_t = page.find('href="#admin-tester-month"')
-        self.assertGreaterEqual(nav_k, 0)
-        self.assertGreater(nav_t, nav_k)
+        # Sidebar points at Link Generation tester anchor
+        self.assertIn("admin-tester-month", page)
+        self.assertIn("/admin/link-generation", page)
 
     def test_success_render_shows_download_keygen_ppi(self):
         from admin_panel import render_admin_tester_month_section_html

@@ -1281,7 +1281,59 @@ class Handler(BaseHTTPRequestHandler):
             if not is_authenticated(self.headers):
                 self._send(200, "text/html; charset=utf-8", render_login_html())
                 return
-            self._send(200, "text/html; charset=utf-8", render_admin_html())
+            from admin_panel import render_admin_home_html
+
+            self._send(200, "text/html; charset=utf-8", render_admin_home_html())
+            return
+        if path in ("/admin/link-generation", "/admin/link-generation/"):
+            if not admin_enabled():
+                self._send(503, "text/plain; charset=utf-8", b"admin disabled")
+                return
+            if not is_authenticated(self.headers):
+                self._send(200, "text/html; charset=utf-8", render_login_html())
+                return
+            from admin_panel import render_admin_link_generation_html
+
+            self._send(
+                200, "text/html; charset=utf-8", render_admin_link_generation_html()
+            )
+            return
+        if path in ("/admin/licences", "/admin/licences/", "/admin/active-licences", "/admin/active-licences/"):
+            if not admin_enabled():
+                self._send(503, "text/plain; charset=utf-8", b"admin disabled")
+                return
+            if not is_authenticated(self.headers):
+                self._send(200, "text/html; charset=utf-8", render_login_html())
+                return
+            from admin_panel import render_admin_licences_page_html
+
+            self._send(
+                200, "text/html; charset=utf-8", render_admin_licences_page_html()
+            )
+            return
+        if path in ("/admin/processors", "/admin/processors/"):
+            if not admin_enabled():
+                self._send(503, "text/plain; charset=utf-8", b"admin disabled")
+                return
+            if not is_authenticated(self.headers):
+                self._send(200, "text/html; charset=utf-8", render_login_html())
+                return
+            from admin_panel import render_admin_processors_page_html
+
+            self._send(
+                200, "text/html; charset=utf-8", render_admin_processors_page_html()
+            )
+            return
+        if path in ("/admin/fleet", "/admin/fleet/"):
+            if not admin_enabled():
+                self._send(503, "text/plain; charset=utf-8", b"admin disabled")
+                return
+            if not is_authenticated(self.headers):
+                self._send(200, "text/html; charset=utf-8", render_login_html())
+                return
+            from admin_panel import render_admin_fleet_page_html
+
+            self._send(200, "text/html; charset=utf-8", render_admin_fleet_page_html())
             return
         if path in ("/admin/api/fleet-usage", "/admin/api/fleet-usage/"):
             # Authenticated JSON for live fleet usage table refresh (admin only).

@@ -5575,12 +5575,19 @@ def list_recent_grants(limit: int | None = 50) -> list[dict[str, Any]]:
     conn = _connect()
     try:
         sql = """
-            SELECT token, filename, platform, session_id, amount_pence, currency,
-                   created_at, expires_at, used_at, status, purchase_id
-            FROM grants ORDER BY created_at DESC
+            SELECT g.token, g.filename, g.platform, g.session_id, g.amount_pence,
+                   g.currency, g.created_at, g.expires_at, g.used_at, g.status,
+                   g.purchase_id,
+                   e.valid_until AS entitlement_valid_until,
+                   e.created_at AS entitlement_created_at,
+                   e.status AS entitlement_status
+            FROM grants g
+            LEFT JOIN connect_entitlements e ON e.session_id = g.session_id
+            ORDER BY g.created_at DESC
         """
         # Fetch all matching rows then filter tester; apply limit after filter so
         # paid grants are not starved by intermixed tester rows.
+        t_now = time.time()
         rows = conn.execute(sql).fetchall()
         out = []
         for r in rows:
@@ -5595,6 +5602,45 @@ def list_recent_grants(limit: int | None = 50) -> list[dict[str, Any]]:
                     )
             if is_tester_month_grant(d):
                 continue
+            # Licence period from entitlement when present
+            try:
+                vu_f = (
+                    float(d["entitlement_valid_until"])
+                    if d.get("entitlement_valid_until") is not None
+                    else None
+                )
+            except (TypeError, ValueError):
+                vu_f = None
+            try:
+                init_f = (
+                    float(d["entitlement_created_at"])
+                    if d.get("entitlement_created_at") is not None
+                    else float(d["created_at"]) if d.get("created_at") is not None else None
+                )
+            except (TypeError, ValueError):
+                init_f = None
+            ent_st = str(d.get("entitlement_status") or "")
+            connect_ok = (
+                _entitlement_connect_allowed(ent_st, vu_f, now=t_now)
+                if ent_st
+                else (vu_f is None or vu_f > t_now)
+            )
+            raw_status = str(d.get("status") or "")
+            if not connect_ok or (
+                vu_f is not None and vu_f <= t_now
+            ) or ent_st in (ENTITLEMENT_REVOKED, ENTITLEMENT_FAILED):
+                display_status = "ENDED"
+            elif d.get("used_at") is not None:
+                display_status = "used"
+            else:
+                display_status = raw_status or "granted"
+            d["initiated_at"] = init_f
+            d["initiated_date"] = format_admin_unix_date(init_f)
+            d["expiry_at"] = vu_f
+            d["expiry_date"] = format_admin_unix_date(vu_f)
+            d["valid_until"] = vu_f
+            d["display_status"] = display_status
+            d["status"] = display_status
             out.append(d)
             if limit is not None and len(out) >= max(0, int(limit)):
                 break
@@ -5608,14 +5654,43 @@ def list_all_grants() -> list[dict[str, Any]]:
     return list_recent_grants(limit=None)
 
 
+def format_admin_unix_date(ts: float | None) -> str:
+    """UTC calendar date ``YYYY-MM-DD`` for admin tables; empty if unknown."""
+    if ts is None:
+        return ""
+    try:
+        f = float(ts)
+    except (TypeError, ValueError):
+        return ""
+    if f <= 0:
+        return ""
+    try:
+        return datetime.fromtimestamp(f, tz=timezone.utc).strftime("%Y-%m-%d")
+    except (OverflowError, OSError, ValueError):
+        return ""
+
+
+def admin_licence_display_status(
+    *,
+    connect_allowed: bool,
+    licence_status: str = "",
+) -> str:
+    """Admin list status: ``OK`` while Connect allowed, else ``ENDED``."""
+    if connect_allowed or str(licence_status or "").upper() == LICENCE_STATUS_OK:
+        return "OK"
+    return "ENDED"
+
+
 def list_licences_for_admin(*, limit: int | None = None) -> list[dict[str, Any]]:
-    """Read-only licence rows for admin: email, KEYGEN, PPI, OK|EXPIRED.
+    """Read-only licence rows for admin: email, KEYGEN, PPI, OK|ENDED + dates.
 
     Joins connect_entitlements with grants (purchase_id). Info only — no write.
 
     One-month **tester** entitlements appear only after first successful
     keygen activation (``keygen_activated_at`` set by
     :func:`get_connect_entitlement_by_keygen`). Unused tester keys stay hidden.
+
+    Expired / revoked rows remain listed with status **ENDED** (not hidden).
     """
     init_db()
     t = time.time()
@@ -5623,7 +5698,7 @@ def list_licences_for_admin(*, limit: int | None = None) -> list[dict[str, Any]]
     try:
         sql = """
             SELECT e.session_id, e.status, e.platform, e.keygen, e.customer_email,
-                   e.billing_interval, e.valid_until, e.updated_at,
+                   e.billing_interval, e.valid_until, e.updated_at, e.created_at,
                    e.keygen_activated_at,
                    (SELECT g.purchase_id FROM grants g
                     WHERE g.session_id = e.session_id
@@ -5648,6 +5723,10 @@ def list_licences_for_admin(*, limit: int | None = None) -> list[dict[str, Any]]
                 vu_f = float(vu) if vu is not None else None
             except (TypeError, ValueError):
                 vu_f = None
+            try:
+                created_f = float(r["created_at"]) if r["created_at"] is not None else None
+            except (TypeError, ValueError, KeyError, IndexError):
+                created_f = None
             status = str(r["status"] or "")
             connect_ok = _entitlement_connect_allowed(status, vu_f, now=t)
             kg = normalize_keygen(str(r["keygen"] or ""))
@@ -5667,19 +5746,30 @@ def list_licences_for_admin(*, limit: int | None = None) -> list[dict[str, Any]]
                 "valid_until": vu_f,
                 "keygen": kg,
             }
+            raw_ls = licence_status_from_entitlement(ent, now=t)
+            display = admin_licence_display_status(
+                connect_allowed=connect_ok, licence_status=raw_ls
+            )
             out.append(
                 {
                     "email": str(r["customer_email"] or "").strip(),
                     "keygen": kg,
                     "purchase_id": pid,
                     "ppi": pid,
-                    "licence_status": licence_status_from_entitlement(ent, now=t),
+                    "licence_status": display,
+                    "licence_status_raw": raw_ls,
                     "platform": str(r["platform"] or ""),
                     "billing_interval": str(r["billing_interval"] or "")
                     or BILLING_INTERVAL_MONTH,
                     "session_id": sid,
                     "status_raw": status,
                     "updated_at": r["updated_at"],
+                    "created_at": created_f,
+                    "initiated_at": created_f,
+                    "initiated_date": format_admin_unix_date(created_f),
+                    "expiry_at": vu_f,
+                    "expiry_date": format_admin_unix_date(vu_f),
+                    "valid_until": vu_f,
                     "keygen_activated_at": (
                         float(activated_at) if activated_at is not None else None
                     ),
