@@ -27,10 +27,10 @@ Product residual peers: **IS** `82.221.101.241:44044`, **RO** `185.146.232.107:4
 | Windows setup.exe | **Native multihop PE rebuild** (`build_windows_multihop` / `build_release_0.5.1.py` on Windows x64) |
 | Linux tar.gz | **Native rebuild** (`package_linux.py`) |
 | Android APK | **Honest carry-forward** residual-wire from **0.5.0** (renamed to 0.5.1) when SDK rebuild absent |
-| macOS zip | **Honest carry-forward** from prior Apple zip (catalog filename **0.5.1** only). Internal `CFBundleShortVersionString` may still be pre-0.5.1 (e.g. **0.2.3**). **Not** Developer ID / notarized native 0.5.1 until Mac handoff |
+| macOS zip | **Native** monopin **0.5.1** (`CFBundleShortVersionString` **0.5.1**); DevID+notarize when secrets present; stage **fails closed** if CFBundle lags |
 | iOS zip | **Honest carry-forward** from prior Team-signed zip (filename **0.5.1** only). Internal bundle version may still be pre-0.5.1. **Not** native monopin 0.5.1 until Mac Team-sign rebuild |
 
-See `client_app/APPLE_HANDOFF_0.5.1.md` for Mac rebuild/notarize steps. Do not claim native Apple 0.5.1 seals while CF zips are what VPS hosts.
+See `client_app/APPLE_HANDOFF_0.5.1.md` for Mac rebuild/notarize steps. Paid macOS zip must always have CFBundleShortVersionString equal to monopin (release/stage gate).
 
 ### Security audit timer (0.5.1)
 

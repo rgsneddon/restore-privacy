@@ -75,6 +75,36 @@ def inspect_apple_zip(path: Path, *, platform: str) -> dict[str, Any]:
     return out
 
 
+def macos_zip_cfbundle_short_version(path: Path | str) -> str | None:
+    """Host app ``CFBundleShortVersionString`` from a macOS catalog zip (or None)."""
+    info = inspect_apple_zip(Path(path), platform="macos")
+    ver = info.get("primary_version")
+    return str(ver).strip() if ver else None
+
+
+def require_macos_zip_matches_monopin(path: Path | str, monopin: str) -> str:
+    """Fail closed when paid macOS zip CFBundle lags (or leads) the catalog monopin.
+
+    Used by release/stage and paid-asset upload so a carry-forward rename cannot
+    become the current catalog installer with a stale internal CFBundle.
+    """
+    pin = (monopin or "").strip()
+    p = Path(path)
+    if not pin:
+        raise ValueError("monopin required")
+    if not p.is_file():
+        raise FileNotFoundError(f"macOS catalog zip missing: {p}")
+    found = macos_zip_cfbundle_short_version(p)
+    if found != pin:
+        raise RuntimeError(
+            f"macOS CFBundleShortVersionString {found!r} != monopin {pin!r} "
+            f"in {p}; refuse catalog publish — rebuild Flutter macOS release "
+            f"so FLUTTER_BUILD_NAME/pubspec product version is {pin} "
+            f"(scripts/build_release_{pin}.py --apple-only on Darwin)."
+        )
+    return found
+
+
 def audit_catalog_apple_packages(
     *,
     version: str,
@@ -116,6 +146,10 @@ def audit_catalog_apple_packages(
         "macos_matches_catalog": mac_ok,
         "ios_matches_catalog": ios_ok,
         "all_match": bool(mac_ok and ios_ok),
-        "placeholder_suspected": not (mac_ok and ios_ok),
+        # True only when files exist but CFBundle/marketing version lags monopin
+        "placeholder_suspected": bool(
+            (mac.get("exists") and not mac_ok)
+            or (ios_a.get("exists") and not ios_ok)
+        ),
         "honesty": honesty,
     }

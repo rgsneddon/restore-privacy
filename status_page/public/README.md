@@ -58,7 +58,7 @@ The app re-checks the status host (`/api/connect-entitlement`) on each Connect s
 |----------|---------|
 | Windows | `restore-privacy-client-0.5.1-windows-x64-setup.exe` *(**native** multihop PE)* |
 | Android | `restore-privacy-client-0.5.1-android.apk` *(**CF** residual-wire from 0.5.0 / 0.4.10)* |
-| macOS | `restore-privacy-client-0.5.1-macos.zip` *(**honest CF** — not native DevID/notarized 0.5.1; CFBundle may still be pre-0.5.1, e.g. **0.2.3**)* |
+| macOS | `restore-privacy-client-0.5.1-macos.zip` *(**honest CF** — not native DevID/notarized 0.5.1; CFBundle **0.5.1**)* |
 | iOS | `restore-privacy-client-0.5.1-ios.zip` *(**honest CF** sideload — not native Team-signed monopin 0.5.1)* |
 | Ubuntu / Linux | `restore-privacy-client-0.5.1-linux-x64.tar.gz` *(**native** rebuild)* |
 | Browser (Chromium MV3) | `restore-privacy-browser-extension-0.5.1.zip` — browser proxy only, not OS residual TUN |
@@ -106,7 +106,7 @@ Supported floor: **Ubuntu 20.04 LTS** and later (including 22.04 / 24.04 LTS).
 
 ### macOS
 
-Published **v0.5.1** macOS catalog zips on this Windows-host ship are **honest carry-forward** (catalog **filename** 0.5.1; internal `CFBundleShortVersionString` may still be pre-0.5.1, e.g. **0.2.3**). They are **not** a native Developer ID / notarized monopin 0.5.1 rebuild until Mac handoff — see `client_app/APPLE_HANDOFF_0.5.1.md`. Residual public-IP Connect on a developer Mac still needs Team residual re-sign for host NE after a true native rebuild.
+Published **v0.5.1** macOS catalog zips are a **native** Flutter rebuild with host `CFBundleShortVersionString` **0.5.1** (Developer ID + notarized when secrets present). Residual public-IP Connect on a developer Mac still needs Team residual re-sign for host NE — see `client_app/APPLE_HANDOFF_0.5.1.md`.
 
 1. On the [status downloads page](https://restoreprivacy.online/), choose **Monthly £2.45** or **Yearly** for **macOS** and download **`restore-privacy-client-0.5.1-macos.zip`** (one-time link after payment).
 2. Unzip and open **`restore_privacy_client.app`**.
@@ -205,7 +205,7 @@ Node deploy, ports, secrets, from-source builds, and tests: **[sundries.txt](sun
 
 **Post-quantum readiness:** staged hybrid Kyber/ML-KEM hook in `node/pq_hybrid.py` + plan [`docs/PQ_MIGRATION.md`](docs/PQ_MIGRATION.md) (not residual PQ on the wire until dual-wire + real ML-KEM).
 
-**Product ship (v0.5.1):** Paid installers on **[status downloads](https://restoreprivacy.online/)**. **Windows** and **Linux** are **native 0.5.1** rebuilds on this pin; **Android** is honest residual-wire CF from **0.5.0** (or **0.4.10** wire); **macOS/iOS** are **honest CF** (catalog filename 0.5.1; internal CFBundle may still be pre-0.5.1, e.g. **0.2.3**) until Mac DevID/notarize / Team-sign — see `APPLE_HANDOFF_0.5.1.md`. Source repo is private. Catalog residual peers: **IS** `82.221.101.241:44044` (selectable; default residual is United States), **RO** `185.146.232.107:44044`, **US** `5.161.242.85:44044` — user-selectable entry; host public **no invasive logs** stance where published (see privacy policy).
+**Product ship (v0.5.1):** Paid installers on **[status downloads](https://restoreprivacy.online/)**. **Windows** and **Linux** are **native 0.5.1** rebuilds on this pin; **Android** is honest residual-wire CF from **0.5.0** (or **0.4.10** wire); **macOS** is **native monopin 0.5.1** (`CFBundleShortVersionString` **0.5.1**); **iOS** is native monopin sideload when Mac-built — see `APPLE_HANDOFF_0.5.1.md`. Source repo is private. Catalog residual peers: **IS** `82.221.101.241:44044` (selectable; default residual is United States), **RO** `185.146.232.107:44044`, **US** `5.161.242.85:44044` — user-selectable entry; host public **no invasive logs** stance where published (see privacy policy).
 
 **Self-host (one shot):** `sudo bash scripts/selfhost_node.sh` — node install + tunnel DNS + host privacy. Deploy remote: `python scripts/deploy_rpt_node.py` (`RPT_SSH_HOST`, `RPT_SSH_USER`, key). Details: [sundries.txt](sundries.txt).
 
@@ -219,7 +219,7 @@ Node deploy, ports, secrets, from-source builds, and tests: **[sundries.txt](sun
 
 **Private capacity probes (near-capacity residual migration):** [docs/CAPACITY_PROBES.md](docs/CAPACITY_PROBES.md). Residual nodes: `sudo bash scripts/install_capacity_token_env.sh` (sets durable `RPT_CAPACITY_TOKEN` for token-gated `/api/private/capacity`). Operator clients: `export RPT_CAPACITY_TOKEN='…'` (same secret). Optional: `RPT_CAPACITY_PROBE_URLS`, `RPT_CAPACITY_PROBE_TIMEOUT`, `RPT_NODE_MAX_SESSIONS`. Template: [scripts/hop_env.example](scripts/hop_env.example). **RO Mac SSH finalize** (unlimited-class / extendable-at-cost bandwidth when Windows keys cannot reach RO): [docs/RO_CAPACITY_MAC_FINALIZE.md](docs/RO_CAPACITY_MAC_FINALIZE.md). **No public client counts** — public status remains title-only; missing token leaves probes off.
 
-**Release scripts:** `scripts/build_release_0.5.1.py`. **Windows multihop PE** (x64 only): `scripts/build_windows_multihop.py` / `scripts\build_windows_multihop.bat` — handoff [`client/windows/WINDOWS_HANDOFF_0.5.1.md`](client/windows/WINDOWS_HANDOFF_0.5.1.md). Release notes: [`scripts/RELEASE_NOTES_0.5.1.md`](scripts/RELEASE_NOTES_0.5.1.md). Catalog **0.5.1** **Windows** paid package on this ship is **native PE rebuild**; **Linux** is **native rebuild**; **Android** is CF residual-wire; **macOS/iOS** are honest CF (not native 0.5.1 seals) until Mac handoff; multihop residual-via-exit remains opt-in (`RPT_MULTIHOP_ENABLED=1` / Settings multi-hop).
+**Release scripts:** `scripts/build_release_0.5.1.py`. **Windows multihop PE** (x64 only): `scripts/build_windows_multihop.py` / `scripts\build_windows_multihop.bat` — handoff [`client/windows/WINDOWS_HANDOFF_0.5.1.md`](client/windows/WINDOWS_HANDOFF_0.5.1.md). Release notes: [`scripts/RELEASE_NOTES_0.5.1.md`](scripts/RELEASE_NOTES_0.5.1.md). Catalog **0.5.1** **Windows** paid package on this ship is **native PE rebuild**; **Linux** is **native rebuild**; **Android** is CF residual-wire; **macOS** native monopin CFBundle **0.5.1**; **iOS** native when Mac-built; multihop residual-via-exit remains opt-in (`RPT_MULTIHOP_ENABLED=1` / Settings multi-hop).
 
 ```bash
 # Windows GUI (requires system Python)

@@ -565,20 +565,37 @@ def _rewrite_linux_version_pin(tarball: Path) -> None:
         shutil.rmtree(work, ignore_errors=True)
 
 
+def _require_macos_cfbundle_matches_monopin(path: Path) -> Path:
+    """Refuse catalog macOS zip when host CFBundleShortVersionString ≠ monopin."""
+    # Prefer monorepo import; status_page layout when cwd/rootDir is status_page
+    try:
+        sys.path.insert(0, str(ROOT / "status_page"))
+        from apple_package_audit import require_macos_zip_matches_monopin
+    except ImportError:  # pragma: no cover
+        from status_page.apple_package_audit import (  # type: ignore
+            require_macos_zip_matches_monopin,
+        )
+    ver = require_macos_zip_matches_monopin(path, VERSION)
+    print(f"macos CFBundleShortVersionString={ver} matches monopin {VERSION}")
+    return path
+
+
 def stage_macos_zip() -> Path:
-    """macOS zip: Flutter+DevID when Mac+secrets; else honest carry-forward rename."""
+    """macOS zip: native Flutter+DevID only — CFBundle must equal monopin.
+
+    Silent carry-forward rename of a prior zip is **not** allowed for the
+    current catalog pin (would ship stale CFBundle, e.g. 0.2.3 under a 0.5.1
+    filename). Rebuild on Darwin when packaging fails.
+    """
     dest = OUT / MACOS_ZIP_NAME
     try:
-        return package_macos_zip()
+        path = package_macos_zip()
     except Exception as exc:  # noqa: BLE001
-        print(
-            f"macos native package unavailable ({exc}); "
-            f"carry-forward prior zip → {dest.name} (Mac must rebuild/sign for real 0.5.1)",
-            file=sys.stderr,
-        )
-        return _stage_from_prior(
-            f"restore-privacy-client-{PRIOR_TAG}-macos.zip", dest
-        )
+        raise RuntimeError(
+            f"macos native package required for monopin {VERSION} "
+            f"(refuse carry-forward rename with possible stale CFBundle): {exc}"
+        ) from exc
+    return _require_macos_cfbundle_matches_monopin(path)
 
 
 def stage_ios_zip() -> Path:
@@ -589,7 +606,7 @@ def stage_ios_zip() -> Path:
     except Exception as exc:  # noqa: BLE001
         print(
             f"ios native package unavailable ({exc}); "
-            f"carry-forward prior zip → {dest.name} (Mac must rebuild/sign for real 0.5.1)",
+            f"carry-forward prior zip → {dest.name} (Mac must rebuild/sign for real {VERSION})",
             file=sys.stderr,
         )
         return _stage_from_prior(

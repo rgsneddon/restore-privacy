@@ -90,6 +90,14 @@ def _candidate_sources(version: str, filename: str) -> list[Path]:
     ]
 
 
+def _assert_macos_cfbundle(path: Path, monopin: str) -> None:
+    """Fail closed: paid macOS zip host CFBundle must equal catalog monopin."""
+    from apple_package_audit import require_macos_zip_matches_monopin
+
+    ver = require_macos_zip_matches_monopin(path, monopin)
+    print(f"macos CFBundleShortVersionString={ver} matches monopin {monopin}")
+
+
 def stage_packages(*, version: str | None = None) -> list[Path]:
     """Copy each platform installer into status_page/assets/{version}/."""
     pkgs = list_packages(version)
@@ -112,6 +120,8 @@ def stage_packages(*, version: str | None = None) -> list[Path]:
         dst = dst_dir / fname
         if src.resolve() != dst.resolve():
             shutil.copy2(src, dst)
+        if p["platform"] == "macos":
+            _assert_macos_cfbundle(dst, ver)
         staged.append(dst)
         print(f"staged platform={p['platform']} {dst} ({dst.stat().st_size} bytes)")
     # refuse privs
@@ -483,6 +493,12 @@ def upload_packages(
             print(f"missing or tiny local stage: {f}", file=sys.stderr)
             print("Run with --stage first.", file=sys.stderr)
             return 1
+        if p["platform"] == "macos":
+            try:
+                _assert_macos_cfbundle(f, ver)
+            except (RuntimeError, FileNotFoundError, ValueError) as e:
+                print(f"ERROR: {e}", file=sys.stderr)
+                return 1
 
     remote_root = os.environ.get(
         "RPT_VPS_ASSET_REMOTE_ROOT", DEFAULT_VPS_ASSET_REMOTE_ROOT

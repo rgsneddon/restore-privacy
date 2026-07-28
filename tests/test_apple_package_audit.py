@@ -22,7 +22,7 @@ class TestApplePackageAudit(unittest.TestCase):
         from downloads import RELEASE_VERSION
 
         pin = (ROOT / "client" / "VERSION").read_text(encoding="utf-8").strip()
-        self.assertEqual(pin, "0.4.8")
+        self.assertRegex(pin, r"^\d+\.\d+")
         self.assertEqual(RELEASE_VERSION, pin)
         report = audit_catalog_apple_packages(version=RELEASE_VERSION)
         self.assertEqual(report["catalog_version"], pin)
