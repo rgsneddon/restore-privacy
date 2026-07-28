@@ -58,8 +58,8 @@ The app re-checks the status host (`/api/connect-entitlement`) on each Connect s
 |----------|---------|
 | Windows | `restore-privacy-client-0.5.1-windows-x64-setup.exe` *(**native** multihop PE)* |
 | Android | `restore-privacy-client-0.5.1-android.apk` *(**CF** residual-wire from 0.5.0 / 0.4.10)* |
-| macOS | `restore-privacy-client-0.5.1-macos.zip` *(**honest CF** — not native DevID/notarized 0.5.1; CFBundle **0.5.1**)* |
-| iOS | `restore-privacy-client-0.5.1-ios.zip` *(**honest CF** sideload — not native Team-signed monopin 0.5.1)* |
+| macOS | `restore-privacy-client-0.5.1-macos.zip` *(**native** monopin **0.5.1**; `CFBundleShortVersionString` **0.5.1**; DevID + notarized when sealed)* |
+| iOS | `restore-privacy-client-0.5.1-ios.zip` *(**native** monopin **0.5.1** sideload when Mac-built)* |
 | Ubuntu / Linux | `restore-privacy-client-0.5.1-linux-x64.tar.gz` *(**native** rebuild)* |
 | Browser (Chromium MV3) | `restore-privacy-browser-extension-0.5.1.zip` — browser proxy only, not OS residual TUN |
 

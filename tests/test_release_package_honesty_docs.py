@@ -68,6 +68,24 @@ class TestReleasePackageHonestyDocs(unittest.TestCase):
                 t,
                 r"(?i)CFBundle may still be pre-0\.5\.1.*0\.2\.3",
             )
+            # Package table must not label current monopin macOS as honest CF / non-native
+            self.assertNotRegex(
+                t,
+                rf"(?i)restore-privacy-client-{re.escape(VERSION)}-macos\.zip` \*\(\*\*honest CF\*\*",
+            )
+            self.assertNotRegex(
+                t,
+                rf"(?i)macos\.zip` \*\(\*\*honest CF\*\*.*not native DevID",
+            )
+            # Positive: table row claims native monopin + CFBundle monopin
+            self.assertRegex(
+                t,
+                rf"(?i)\| macOS \| `restore-privacy-client-{re.escape(VERSION)}-macos\.zip` \*\(\*\*native\*\*",
+            )
+            self.assertRegex(
+                t,
+                rf"(?i)CFBundleShortVersionString` \*\*{re.escape(VERSION)}\*\*|CFBundleShortVersionString.*\*\*{re.escape(VERSION)}\*\*",
+            )
 
     def test_staged_macos_cfbundle_equals_monopin_when_present(self):
         from apple_package_audit import macos_zip_cfbundle_short_version
