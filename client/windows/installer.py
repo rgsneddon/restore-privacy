@@ -31,14 +31,58 @@ from client.install_paths import (
 )
 
 APP_NAME = "RestorePrivacy"
+# Baked by scripts/build_release_*.py write_version_files (monopin). Never use a
+# stale historical pin as the only identity when client/VERSION is missing.
+PRODUCT_VERSION_EMBEDDED = "0.5.1"
+
+
 def _product_version_pin() -> str:
-    """Load monorepo pin from client/VERSION (single source of truth)."""
-    pin = Path(__file__).resolve().parents[1] / "VERSION"
+    """Resolve product monopin for installer UI and VERSION files.
+
+    Order: env override → client/VERSION near source → frozen PyInstaller
+    datas (``client/VERSION`` / ``VERSION`` under ``_MEIPASS`` and payload) →
+    :data:`PRODUCT_VERSION_EMBEDDED` (current monopin, rewritten at release).
+    """
+    env = (os.environ.get("RPT_PRODUCT_VERSION") or "").strip().lstrip("vV")
+    if env:
+        return env
+
+    candidates: list[Path] = []
     try:
-        line = pin.read_text(encoding="utf-8").strip().splitlines()[0].strip()
-        return line.lstrip("vV") or "0.3.6"
-    except (OSError, IndexError):
-        return "0.3.6"
+        here = Path(__file__).resolve()
+        # Dev: client/VERSION (installer lives in client/windows/)
+        candidates.append(here.parents[1] / "VERSION")
+        # Repo root client/VERSION when layout differs
+        if len(here.parents) > 2:
+            candidates.append(here.parents[2] / "client" / "VERSION")
+    except Exception:
+        pass
+    if getattr(sys, "frozen", False) and hasattr(sys, "_MEIPASS"):
+        try:
+            mei = Path(sys._MEIPASS)  # type: ignore[attr-defined]
+            candidates.extend(
+                [
+                    mei / "client" / "VERSION",
+                    mei / "VERSION",
+                    mei / "payload" / "VERSION",
+                    mei / "payload" / "client" / "VERSION",
+                    mei / "payload" / "_internal" / "client" / "VERSION",
+                ]
+            )
+        except Exception:
+            pass
+
+    for pin in candidates:
+        try:
+            if not pin.is_file():
+                continue
+            line = pin.read_text(encoding="utf-8").strip().splitlines()[0].strip()
+            v = line.lstrip("vV")
+            if v:
+                return v
+        except (OSError, IndexError, TypeError, ValueError):
+            continue
+    return (PRODUCT_VERSION_EMBEDDED or "0.0.0").strip().lstrip("vV") or "0.0.0"
 
 
 VERSION = _product_version_pin()
@@ -83,7 +127,8 @@ def _payload_root() -> Path:
         if d.is_dir():
             return d
     raise FileNotFoundError(
-        "Client payload not found. Build with scripts/build_release_0.3.6.py first."
+        "Client payload not found. Build with scripts/build_release_"
+        f"{PRODUCT_VERSION_EMBEDDED}.py (or build_windows_multihop) first."
     )
 
 
@@ -449,7 +494,13 @@ def install(
                 progress_cb(step, total, status)
             except Exception:
                 pass
-        print(f"[{step}/{total}] {status}")
+        # Windowed setup: avoid console chatter (no attached console on --noconsole)
+        if sys.stdout is not None and hasattr(sys.stdout, "isatty"):
+            try:
+                if sys.stdout.isatty():
+                    print(f"[{step}/{total}] {status}")
+            except Exception:
+                pass
 
     _progress(1, "Locating product files...")
     payload = _payload_root()
@@ -470,8 +521,7 @@ def install(
     _progress(3, "Installing admission secrets...")
     secrets_written = _provision_secrets(payload_dir, INSTALL_DIR)
 
-    # Auto-provision Connect entitlement from pay-adjacent payment_entitlement.json
-    # (thank-you page auto-download  -  no manual session id paste).
+    # Auto-provision Connect entitlement (fast path only — no full Downloads walk).
     try:
         from client.payment_entitlement import (
             default_entitlement_path,
@@ -483,19 +533,18 @@ def install(
             payload_dir,
             Path(sys.argv[0]).resolve().parent if sys.argv else Path.cwd(),
         ]
-        # Also Downloads (Stripe thank-you often lands there)
+        # Single known thank-you filename only (avoid scanning whole Downloads tree)
         try:
-            search.append(Path.home() / "Downloads")
+            dl = Path.home() / "Downloads" / "payment_entitlement.json"
+            if dl.is_file():
+                search.append(dl.parent)
         except Exception:
             pass
         ent = provision_entitlement_from_installer_dirs(
             *search, dest_path=default_entitlement_path()
         )
         if ent and ent.session_id:
-            print(
-                f"Payment entitlement imported (session {ent.session_id[:16]}...) "
-                "for Connect unlock."
-            )
+            pass  # silent — GUI progress already shows secrets/version steps
     except Exception:
         pass
 
@@ -527,21 +576,20 @@ def install(
             f"Place {CLIENT_PRIV} and {NODE_PUB} under {INSTALL_DIR / 'secrets'}"
         )
 
-    # Ensure brand logo ICO sits next to installed exe for shortcut IconLocation
+    # Brand logo ICO next to installed exe (known paths only — no full-tree rglob)
     try:
-        for src_name in (
-            Path(__file__).resolve().parent / "native" / "app_icon.ico",
-        ):
-            if src_name.is_file():
-                dest_ico = INSTALL_DIR / "app_icon.ico"
-                if not dest_ico.is_file():
-                    shutil.copy2(src_name, dest_ico)
-                break
-        # Copy from payload tree if native icon was bundled under client path
-        for hit in INSTALL_DIR.rglob("app_icon.ico"):
-            if hit.is_file():
-                shutil.copy2(hit, INSTALL_DIR / "app_icon.ico")
-                break
+        dest_ico = INSTALL_DIR / "app_icon.ico"
+        if not dest_ico.is_file():
+            for cand in (
+                Path(__file__).resolve().parent / "native" / "app_icon.ico",
+                payload_dir / "app_icon.ico",
+                payload_dir / "native" / "app_icon.ico",
+                INSTALL_DIR / "native" / "app_icon.ico",
+                INSTALL_DIR / "_internal" / "client" / "windows" / "native" / "app_icon.ico",
+            ):
+                if cand.is_file():
+                    shutil.copy2(cand, dest_ico)
+                    break
     except Exception:
         pass
 
@@ -683,11 +731,27 @@ def install(
 
     _progress(6, "Finishing install...")
     if launch and installed_exe.is_file():
-        subprocess.Popen(
-            [str(installed_exe)],
-            cwd=str(INSTALL_DIR),
-            close_fds=True,
-        )
+        # Detach GUI client: no console flash, installer can exit cleanly
+        creation = 0
+        if sys.platform == "win32":
+            creation = getattr(subprocess, "DETACHED_PROCESS", 0x00000008)
+            creation |= getattr(subprocess, "CREATE_NEW_PROCESS_GROUP", 0x00000200)
+        try:
+            subprocess.Popen(
+                [str(installed_exe)],
+                cwd=str(INSTALL_DIR),
+                close_fds=True,
+                creationflags=creation,
+                stdin=subprocess.DEVNULL,
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+            )
+        except TypeError:
+            subprocess.Popen(
+                [str(installed_exe)],
+                cwd=str(INSTALL_DIR),
+                close_fds=True,
+            )
     return installed_exe
 
 
@@ -696,6 +760,19 @@ def run_installer_progress_ui(*, launch: bool = True) -> int:
     import threading
     import tkinter as tk
     from tkinter import ttk
+
+    # Drop any leftover console host (dev launches / legacy --console builds)
+    try:
+        from client.windows.launch_gui import free_console_if_attached
+
+        free_console_if_attached()
+    except Exception:
+        try:
+            import ctypes
+
+            ctypes.windll.kernel32.FreeConsole()
+        except Exception:
+            pass
 
     root = tk.Tk()
     root.title(f"{SHORTCUT_DISPLAY_NAME} Setup")

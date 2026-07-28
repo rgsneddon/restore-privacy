@@ -285,8 +285,12 @@ def build_windows_installer_exe(client_onedir: Path) -> Path:
         elif old.is_dir():
             shutil.rmtree(old)
 
-    # onefile installer with payload as data
+    # onefile installer with payload as data + monopin VERSION for frozen pin
     add_data = f"{dest_payload};payload"
+    ver_file = ROOT / "client" / "VERSION"
+    if not ver_file.is_file():
+        ver_file.write_text(f"{VERSION}\n", encoding="utf-8")
+    # Seamless double-click: no console flash; progress is the Tk Setup window
     cmd = [
         sys.executable,
         "-m",
@@ -294,7 +298,8 @@ def build_windows_installer_exe(client_onedir: Path) -> Path:
         "--noconfirm",
         "--clean",
         "--onefile",
-        "--console",  # show install progress; still double-clickable
+        "--windowed",
+        "--noconsole",
         "--name",
         setup_name,
         "--paths",
@@ -307,6 +312,8 @@ def build_windows_installer_exe(client_onedir: Path) -> Path:
         str(DIST),
         "--add-data",
         add_data,
+        "--add-data",
+        f"{ver_file};client",
         str(installer_entry),
     ]
     r = subprocess.run(cmd, cwd=ROOT, capture_output=True, text=True)

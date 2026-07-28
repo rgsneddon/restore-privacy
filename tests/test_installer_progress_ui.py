@@ -46,8 +46,8 @@ class TestInstallerProgressWiring(unittest.TestCase):
             install_dir = Path(td) / "install"
 
             with mock.patch.object(inst, "_payload_root", return_value=fake_payload), mock.patch.object(
-                inst, "INSTALL_DIR", install_dir
-            ), mock.patch.object(inst, "START_MENU", Path(td) / "start"), mock.patch.object(
+                inst, "START_MENU", Path(td) / "start"
+            ), mock.patch.object(
                 inst, "DESKTOP", Path(td) / "desk"
             ), mock.patch.object(
                 inst, "_create_shortcut"
@@ -58,13 +58,16 @@ class TestInstallerProgressWiring(unittest.TestCase):
             ), mock.patch.object(
                 inst.subprocess, "Popen"
             ):
-                path = inst.install(launch=False, progress_cb=cb)
+                path = inst.install(
+                    launch=False, progress_cb=cb, install_dir=install_dir
+                )
 
             self.assertTrue(path.is_file() or path.exists())
             self.assertTrue((install_dir / "VERSION").is_file())
             ver = (install_dir / "VERSION").read_text(encoding="utf-8").strip()
             self.assertEqual(ver, inst.VERSION)
             self.assertNotEqual(ver, "0.0.0")
+            self.assertNotEqual(ver, "0.3.6")
             self.assertGreaterEqual(len(steps), inst.install_step_count())
             # Status text present
             texts = " ".join(s[2] for s in steps)
@@ -77,6 +80,20 @@ class TestInstallerProgressWiring(unittest.TestCase):
         self.assertIn("client", recipe)
         self.assertIn("add-data", recipe.replace("_", "-") or recipe)
         self.assertIn("ver_file", recipe)
+        # Seamless setup: no black console host before Tk progress UI
+        self.assertIn("--windowed", recipe)
+        self.assertIn("--noconsole", recipe)
+        self.assertNotIn('"--console"', recipe)
+
+    def test_product_version_pin_not_stale_036(self):
+        """Frozen/missing VERSION must not fall back to historical 0.3.6."""
+        self.assertNotEqual(inst.PRODUCT_VERSION_EMBEDDED, "0.3.6")
+        self.assertNotEqual(inst.VERSION, "0.3.6")
+        src = (ROOT / "client" / "windows" / "installer.py").read_text(encoding="utf-8")
+        self.assertIn("PRODUCT_VERSION_EMBEDDED", src)
+        self.assertIn("_MEIPASS", src)
+        # Stale default removed from fallback path
+        self.assertNotRegex(src, r'return\s+"0\.3\.6"')
 
 
 class TestInstallerFailureUi(unittest.TestCase):
@@ -134,12 +151,10 @@ class TestInstallerFailureUi(unittest.TestCase):
             install_dir = Path(td) / "install"
 
             with mock.patch.object(inst, "_payload_root", return_value=fake_payload), mock.patch.object(
-                inst, "INSTALL_DIR", install_dir
-            ), mock.patch.object(
                 inst, "_copy_tree", side_effect=RuntimeError("Could not copy product files")
             ):
                 with self.assertRaises(RuntimeError) as cm:
-                    inst.install(launch=False)
+                    inst.install(launch=False, install_dir=install_dir)
             self.assertIn("Could not copy", str(cm.exception))
             # Failure formatter still works for UI
             ui = inst.format_install_failure_status(str(cm.exception))

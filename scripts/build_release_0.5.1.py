@@ -23,6 +23,7 @@ import argparse
 import hashlib
 import json
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -80,7 +81,15 @@ def write_version_files() -> None:
     if inst.is_file():
         t = inst.read_text(encoding="utf-8")
         t2 = t
+        # Baked monopin for frozen setup when client/VERSION datas miss
+        t2 = re.sub(
+            r'PRODUCT_VERSION_EMBEDDED\s*=\s*["\'][^"\']*["\']',
+            f'PRODUCT_VERSION_EMBEDDED = "{VERSION}"',
+            t2,
+            count=1,
+        )
         for old in (
+            "0.5.1",
             "0.5.0",
             "0.4.10",
             "0.4.9",
@@ -92,6 +101,7 @@ def write_version_files() -> None:
             "0.4.2",
             "0.4.1",
             "0.4.0",
+            "0.3.6",
             "0.3.4",
             "0.3.0",
             "0.2.9",
