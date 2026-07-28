@@ -3,20 +3,109 @@
 Uses Shell_NotifyIcon via ctypes - no extra pip deps (safe for frozen onedir).
 Tray shows the product logo ICO; connected vs disconnected differ by tooltip and
 a small status dot on the logo (never a blank solid square).
+
+**Single icon:** fixed ``NIF_GUID`` so elevated re-launch / helper handoff cannot
+stack a second notify icon — DELETE+ADD target the same system-wide identity.
 """
 
 from __future__ import annotations
 
 import sys
 import threading
+import uuid
 from pathlib import Path
 from typing import Callable, Optional
 
 # Product tray identity (distinct from window title "Restore Privacy")
 TRAY_DISPLAY_NAME = "Privacy Restored"
 
+# Fixed product GUID (do not change — sole Privacy Restored tray across elevate).
+PRODUCT_TRAY_ICON_GUID = uuid.UUID("a7c3e91f-2b4d-4e8a-9f01-6d5c8b3a1e72")
+
+# Shell_NotifyIcon flags / commands
+NIF_MESSAGE = 0x00000001
+NIF_ICON = 0x00000002
+NIF_TIP = 0x00000004
+NIF_GUID = 0x00000020
+NIF_SHOWTIP = 0x00000080
+NIM_ADD = 0x00000000
+NIM_MODIFY = 0x00000001
+NIM_DELETE = 0x00000002
+NIM_SETVERSION = 0x00000004
+NOTIFYICON_VERSION_4 = 4
+
 # Private message to apply status updates on the tray thread
 _WM_RPT_TRAY_STATUS = 0x0400 + 99  # WM_USER + 99
+
+
+def product_tray_guid_bytes() -> bytes:
+    """16-byte Windows GUID for the product tray icon (little-endian)."""
+    return PRODUCT_TRAY_ICON_GUID.bytes_le
+
+
+def _fill_guid_item(guid_field, u: uuid.UUID | None = None) -> None:
+    """Copy UUID into a ``c_byte * 16`` NOTIFYICONDATA.guidItem field."""
+    raw = (u or PRODUCT_TRAY_ICON_GUID).bytes_le
+    for i, b in enumerate(raw):
+        guid_field[i] = b
+
+
+def purge_product_tray_icon() -> bool:
+    """Remove any Privacy Restored tray icon under :data:`PRODUCT_TRAY_ICON_GUID`.
+
+    Clears orphan icons left by crashed processes or elevate handoff where the
+    parent died without NIM_DELETE. Safe before ADD or after stop.
+
+    Uses GUID-only NIM_DELETE (Vista+). Returns True when DELETE was attempted
+    on Windows; False off-platform or on failure.
+    """
+    if sys.platform != "win32":
+        return False
+    try:
+        import ctypes
+        from ctypes import wintypes
+
+        shell32 = ctypes.windll.shell32
+
+        class NOTIFYICONDATAW(ctypes.Structure):
+            _fields_ = [
+                ("cbSize", wintypes.DWORD),
+                ("hWnd", wintypes.HWND),
+                ("uID", wintypes.UINT),
+                ("uFlags", wintypes.UINT),
+                ("uCallbackMessage", wintypes.UINT),
+                ("hIcon", wintypes.HICON),
+                ("szTip", wintypes.WCHAR * 128),
+                ("dwState", wintypes.DWORD),
+                ("dwStateMask", wintypes.DWORD),
+                ("szInfo", wintypes.WCHAR * 256),
+                ("uVersion", wintypes.UINT),
+                ("szInfoTitle", wintypes.WCHAR * 64),
+                ("dwInfoFlags", wintypes.DWORD),
+                ("guidItem", ctypes.c_byte * 16),
+                ("hBalloonIcon", wintypes.HICON),
+            ]
+
+        nid = NOTIFYICONDATAW()
+        nid.cbSize = ctypes.sizeof(NOTIFYICONDATAW)
+        nid.hWnd = None
+        nid.uID = 0
+        nid.uFlags = NIF_GUID
+        _fill_guid_item(nid.guidItem)
+        shell32.Shell_NotifyIconW(NIM_DELETE, ctypes.byref(nid))
+        return True
+    except Exception:
+        return False
+
+
+def should_nim_add_notify_icon(*, running: bool) -> bool:
+    """True only when the tray is still supposed to be live at hwnd ready."""
+    return bool(running)
+
+
+def tray_post_loop_must_delete_icon() -> bool:
+    """Always NIM_DELETE after the tray message loop (idempotent)."""
+    return True
 
 
 def resolve_tray_icon_path() -> Optional[Path]:
@@ -349,21 +438,18 @@ class WindowsSystemTray:
                     ("hBalloonIcon", wintypes.HICON),
                 ]
 
-            NIF_ICON = 0x00000002
-            NIF_TIP = 0x00000004
-            NIF_SHOWTIP = 0x00000080
-            NIM_MODIFY = 0x00000001
             hicon = self._icon_for_state(connected=connected, residual=residual)
             nid = NOTIFYICONDATAW()
             nid.cbSize = ctypes.sizeof(NOTIFYICONDATAW)
             nid.hWnd = self._hwnd
             nid.uID = 1
             # Always refresh tip; refresh icon when we have a handle (logo + status dot)
-            flags = NIF_TIP | NIF_SHOWTIP
+            flags = NIF_TIP | NIF_SHOWTIP | NIF_GUID
             if hicon:
                 flags |= NIF_ICON
             nid.uFlags = flags
             nid.hIcon = hicon or 0
+            _fill_guid_item(nid.guidItem)
             # WCHAR tip: assign via buffer to avoid silent truncate issues
             buf = (tip + ("\0" * 128))[:128]
             nid.szTip = buf
@@ -372,7 +458,8 @@ class WindowsSystemTray:
             )
             if not ok and hicon:
                 # Retry tip-only if icon swap rejected
-                nid.uFlags = NIF_TIP | NIF_SHOWTIP
+                nid.uFlags = NIF_TIP | NIF_SHOWTIP | NIF_GUID
+                _fill_guid_item(nid.guidItem)
                 ctypes.windll.shell32.Shell_NotifyIconW(
                     NIM_MODIFY, ctypes.byref(nid)
                 )
@@ -422,12 +509,6 @@ class WindowsSystemTray:
         WM_RBUTTONUP = 0x0205
         WM_LBUTTONDBLCLK = 0x0203
         WM_LBUTTONUP = 0x0202
-
-        NIF_MESSAGE = 0x00000001
-        NIF_ICON = 0x00000002
-        NIF_TIP = 0x00000004
-        NIM_ADD = 0x00000000
-        NIM_DELETE = 0x00000002
 
         ID_SHOW = 1001
         ID_CONNECT = 1002
@@ -527,7 +608,16 @@ class WindowsSystemTray:
                     nid.cbSize = ctypes.sizeof(NOTIFYICONDATAW)
                     nid.hWnd = hwnd
                     nid.uID = 1
+                    nid.uFlags = NIF_GUID
+                    _fill_guid_item(nid.guidItem)
                     shell32.Shell_NotifyIconW(NIM_DELETE, ctypes.byref(nid))
+                    # Legacy hwnd/uID path (pre-GUID builds)
+                    nid2 = NOTIFYICONDATAW()
+                    nid2.cbSize = ctypes.sizeof(NOTIFYICONDATAW)
+                    nid2.hWnd = hwnd
+                    nid2.uID = 1
+                    shell32.Shell_NotifyIconW(NIM_DELETE, ctypes.byref(nid2))
+                    purge_product_tray_icon()
                     user32.PostQuitMessage(0)
                     return 0
                 return user32.DefWindowProcW(hwnd, msg, wparam, lparam)
@@ -568,6 +658,16 @@ class WindowsSystemTray:
             return
         self._hwnd = hwnd
 
+        # stop() may have cleared _running before hwnd existed — never ADD then.
+        if not should_nim_add_notify_icon(running=self._running):
+            try:
+                user32.DestroyWindow(hwnd)
+            except Exception:
+                pass
+            self._hwnd = None
+            self._running = False
+            return
+
         # Logo + status-dot variants (never blank solid squares)
         base = self._load_base_icon()
         self._hicon_disconnected = (
@@ -578,19 +678,30 @@ class WindowsSystemTray:
         )
         self._hicon = self._hicon_disconnected or base
 
-        NIF_SHOWTIP = 0x00000080
-        NIM_SETVERSION = 0x00000004
-        NOTIFYICON_VERSION_4 = 4
-
         nid = NOTIFYICONDATAW()
         nid.cbSize = ctypes.sizeof(NOTIFYICONDATAW)
         nid.hWnd = hwnd
         nid.uID = 1
-        nid.uFlags = NIF_MESSAGE | NIF_ICON | NIF_TIP | NIF_SHOWTIP
+        # Fixed product GUID — one icon across elevate handoff / restarts
+        nid.uFlags = NIF_MESSAGE | NIF_ICON | NIF_TIP | NIF_SHOWTIP | NIF_GUID
         nid.uCallbackMessage = WM_TRAY
         nid.hIcon = self._hicon
         tip = (self._tooltip or TRAY_DISPLAY_NAME)[:127]
         nid.szTip = (tip + ("\0" * 128))[:128]
+        _fill_guid_item(nid.guidItem)
+        # Purge any existing product icon (other process / orphan), then ADD.
+        purge_product_tray_icon()
+        shell32.Shell_NotifyIconW(NIM_DELETE, ctypes.byref(nid))
+        if not should_nim_add_notify_icon(running=self._running):
+            shell32.Shell_NotifyIconW(NIM_DELETE, ctypes.byref(nid))
+            purge_product_tray_icon()
+            try:
+                user32.DestroyWindow(hwnd)
+            except Exception:
+                pass
+            self._hwnd = None
+            self._running = False
+            return
         shell32.Shell_NotifyIconW(NIM_ADD, ctypes.byref(nid))
         # Modern tip behaviour (hover text updates reliably)
         try:
@@ -603,12 +714,25 @@ class WindowsSystemTray:
         # Apply any status that arrived before hwnd was ready
         with self._lock:
             pending = self._pending
-        if pending is not None:
+        if pending is not None and self._running:
             self._apply_notify_modify()
 
         msg = wintypes.MSG()
         while self._running and user32.GetMessageW(ctypes.byref(msg), None, 0, 0) != 0:
             user32.TranslateMessage(ctypes.byref(msg))
             user32.DispatchMessageW(ctypes.byref(msg))
+
+        if tray_post_loop_must_delete_icon():
+            try:
+                nid_del = NOTIFYICONDATAW()
+                nid_del.cbSize = ctypes.sizeof(NOTIFYICONDATAW)
+                nid_del.hWnd = hwnd
+                nid_del.uID = 1
+                nid_del.uFlags = NIF_GUID
+                _fill_guid_item(nid_del.guidItem)
+                shell32.Shell_NotifyIconW(NIM_DELETE, ctypes.byref(nid_del))
+            except Exception:
+                pass
+            purge_product_tray_icon()
 
         self._running = False

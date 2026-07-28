@@ -55,6 +55,7 @@ def admin_section_top_link_html() -> str:
 
 
 # Operator-facing architecture blurb (must stay current; grepped by tests).
+# Short form kept for greps; full home copy is ADMIN_ARCHITECTURE_FULL.
 ADMIN_ARCHITECTURE_BLURB = (
     "Residual catalog peers: United States (US, default entry), Iceland (IS), "
     "Romania (RO) — user-selectable entry; multi-hop opt-in uses a random "
@@ -65,6 +66,32 @@ ADMIN_ARCHITECTURE_BLURB = (
     "client count). Licence database and paid download grants live in the "
     "durable payment store and are retained across residual node wipeclean/"
     "rebuild — they are not residual-runtime scratch."
+)
+
+# Human-cadence product architecture copy for the admin home main pane.
+ADMIN_ARCHITECTURE_FULL = (
+    "Restore Privacy is a paid residual VPN product. Customers pick a platform, "
+    "pay on Stripe (monthly or yearly), then unlock Connect with the keygen from "
+    "their fulfilment email. Installers are never free permanent GitHub downloads — "
+    "each package is handed out through a single-use paid link on the status host.\n\n"
+    "Where residual traffic lands: the live catalog has three peers — United States "
+    "(default entry), Iceland, and Romania. Users choose their entry country in the "
+    "app. Multi-hop is optional: when turned on, exit is another catalog peer, not a "
+    "second product they buy. The old DE residual peer is retired and must not "
+    "reappear as a live pin.\n\n"
+    "How the fleet is kept honest: about once a week the operator path wipes and "
+    "rebuilds residual peers one at a time (Iceland → Romania → United States), never "
+    "all three at once. Clients can hop to a healthy peer while one is rebuilding. "
+    "Public status pages stay title-only — we do not publish a live client count.\n\n"
+    "What you manage here: payment processor readiness, one-off download and keygen "
+    "tools under Link Generation, and the durable licence + grant history under "
+    "Active Licences. That payment database survives residual node wipe and Render "
+    "redeploys when it sits on the attached disk path — it is not residual scratch.\n\n"
+    f"Catalog prices on this pin: Monthly {PRICE_LABEL} GBP and Yearly "
+    f"{PRICE_YEARLY_LABEL} GBP. Connect stays allowed only while a licence is OK "
+    "(paid period still open and keygen activated). When a period ends or a "
+    "subscription is revoked, rows stay visible as ENDED so operators can still "
+    "audit history."
 )
 
 # Catalog device packages for admin failsafe dropdown (current ship pin).
@@ -519,14 +546,14 @@ def processor_settings_view() -> dict[str, Any]:
 def render_admin_licences_section_html(
     licences: list[dict[str, Any]] | None = None,
 ) -> str:
-    """Read-only licence database: email, KEYGEN, PPI, OK|EXPIRED. No amend controls."""
+    """Read-only licence database: email, KEYGEN, PPI, OK|ENDED, dates."""
     try:
         rows_src = licences if licences is not None else list_licences_for_admin()
     except Exception:  # noqa: BLE001
         rows_src = []
     body_rows: list[str] = []
     for row in rows_src:
-        st = str(row.get("licence_status") or "EXPIRED")
+        st = str(row.get("licence_status") or "ENDED")
         badge = "ok" if st == "OK" else "bad"
         body_rows.append(
             "<tr>"
@@ -537,28 +564,30 @@ def render_admin_licences_section_html(
             f'id="licence-status-{_escape(str(row.get("session_id") or "")[:12])}">'
             f"{_escape(st)}</span></td>"
             f"<td>{_escape(str(row.get('platform') or ''))}</td>"
+            f"<td class=\"licence-initiated\">{_escape(str(row.get('initiated_date') or ''))}</td>"
+            f"<td class=\"licence-expiry\">{_escape(str(row.get('expiry_date') or ''))}</td>"
             "</tr>"
         )
     table = (
         "\n".join(body_rows)
         if body_rows
-        else '<tr><td colspan="5">No licences yet</td></tr>'
+        else '<tr><td colspan="7">No licences yet</td></tr>'
     )
     return f"""
 <section id="admin-licences" class="card">
   <h2 id="admin-licences-heading">Licence database</h2>
   <p class="muted" id="admin-licences-blurb">
-  Customer licences (email, KEYGEN, PPI, status) from the <strong>durable
-  payment store</strong> (<code>RPT_PAYMENT_DATA_DIR</code> / status_page data).
-  <strong>Retained across residual fleet wipe/rebuild</strong> — not cleared by
-  node wipeclean. <strong>Read-only</strong> here: no edit, revoke, or amend
-  controls. Status is <code>OK</code> (active subscription) or
-  <code>EXPIRED</code> (revoked, failed, or period ended). Keygen unlocks
-  residual Connect on any catalog peer (IS / RO / US), not a single-node product.
+  Customer licences from the <strong>durable payment store</strong>.
+  <strong>Retained across residual fleet wipe/rebuild</strong>.
+  <strong>Read-only</strong>: no edit or revoke here. Status is
+  <code>OK</code> while Connect is allowed, or <code>ENDED</code> when the
+  period finished or the licence was revoked (rows stay listed). Columns
+  <strong>Initiated</strong> and <strong>Expiry</strong> are UTC calendar dates.
   </p>
   <table id="admin-licences-table" data-readonly="1">
     <thead><tr>
       <th>Email</th><th>KEYGEN</th><th>PPI</th><th>Status</th><th>Platform</th>
+      <th>Initiated</th><th>Expiry</th>
     </tr></thead>
     <tbody>
 {table}
@@ -571,13 +600,7 @@ def render_admin_licences_section_html(
 def project_grants_for_admin(
     grants: list[dict[str, Any]] | None = None, *, limit: int | None = None
 ) -> list[dict[str, Any]]:
-    """Project grant rows for admin UI.
-
-    Default loads the **full** completed-payment grant history from the shipped
-    store (no silent drop past a short window). Pass *limit* only when a caller
-    intentionally wants a truncated sample. Full token is kept for operator
-    support; HTML truncates the display value only.
-    """
+    """Project grant rows for admin UI (includes initiated/expiry + ENDED)."""
     if grants is not None:
         raw = grants
     elif limit is None:
@@ -586,18 +609,24 @@ def project_grants_for_admin(
         raw = list_recent_grants(limit)
     out: list[dict[str, Any]] = []
     for g in raw:
+        st = str(g.get("display_status") or g.get("status") or "")
         out.append(
             {
                 "platform": g.get("platform") or "",
                 "filename": g.get("filename") or "",
                 "amount_pence": int(g.get("amount_pence") or 0),
                 "currency": g.get("currency") or "",
-                "status": g.get("status") or "",
+                "status": st,
                 "used_at": g.get("used_at"),
                 "token": g.get("token") or "",
                 "session_id": g.get("session_id") or "",
                 "purchase_id": g.get("purchase_id") or "",
                 "created_at": g.get("created_at"),
+                "initiated_at": g.get("initiated_at"),
+                "initiated_date": g.get("initiated_date") or "",
+                "expiry_at": g.get("expiry_at") or g.get("valid_until"),
+                "expiry_date": g.get("expiry_date") or "",
+                "valid_until": g.get("valid_until"),
             }
         )
     return out
@@ -1296,6 +1325,268 @@ def _render_node_usage_section(
     )
 
 
+
+def _admin_shared_css() -> str:
+    """Shared admin layout CSS (sidebar + cards + forms)."""
+    return f"""
+{admin_theme_css()}
+*{{box-sizing:border-box}}
+body{{margin:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;
+  background:var(--bg);color:var(--fg);min-height:100vh}}
+a{{color:var(--link)}}
+.admin-shell{{display:flex;min-height:100vh}}
+.admin-sidebar{{width:16.5rem;flex-shrink:0;background:var(--bg-elevated);
+  border-right:1px solid var(--border);padding:1rem 0.75rem;display:flex;flex-direction:column;gap:0.35rem}}
+.admin-sidebar.collapsed{{width:3.25rem}}
+.admin-sidebar.collapsed .sb-label,.admin-sidebar.collapsed .sb-sub,
+.admin-sidebar.collapsed .sb-group-title{{display:none}}
+.admin-sidebar.collapsed .sb-btn{{justify-content:center;padding:0.55rem}}
+.sb-brand{{font-weight:700;font-size:0.95rem;padding:0.35rem 0.5rem 0.75rem;color:var(--fg)}}
+.sb-toggle{{border:1px solid var(--border);background:var(--input-bg);color:var(--fg);
+  border-radius:8px;padding:0.4rem 0.55rem;cursor:pointer;font-size:0.8rem;margin-bottom:0.5rem}}
+.sb-btn{{display:flex;align-items:center;gap:0.5rem;width:100%;text-align:left;
+  border:1px solid transparent;background:transparent;color:var(--fg);border-radius:10px;
+  padding:0.55rem 0.65rem;cursor:pointer;font-size:0.9rem;font-weight:600;text-decoration:none}}
+.sb-btn:hover{{background:var(--badge-ok-bg);border-color:var(--border)}}
+.sb-btn.active{{background:var(--btn-bg);color:var(--btn-fg);border-color:var(--btn-bg)}}
+.sb-btn .sb-ico{{width:1.25rem;text-align:center;opacity:0.9}}
+.sb-group{{border:1px solid var(--border);border-radius:12px;margin:0.25rem 0;overflow:hidden;
+  background:var(--bg)}}
+.sb-group > summary{{list-style:none;cursor:pointer}}
+.sb-group > summary::-webkit-details-marker{{display:none}}
+.sb-group-title{{display:flex;align-items:center;gap:0.5rem;padding:0.55rem 0.65rem;
+  font-weight:700;font-size:0.88rem}}
+.sb-sub{{display:flex;flex-direction:column;padding:0.25rem 0.4rem 0.5rem;gap:0.2rem}}
+.sb-sub a{{display:block;padding:0.4rem 0.55rem;border-radius:8px;font-size:0.82rem;
+  text-decoration:none;color:var(--fg);border:1px solid transparent}}
+.sb-sub a:hover{{background:var(--badge-ok-bg);border-color:var(--border)}}
+.admin-main{{flex:1;padding:1.25rem 1.5rem 2.5rem;min-width:0}}
+.top{{display:flex;gap:1rem;align-items:center;margin-bottom:1rem;flex-wrap:wrap}}
+h1{{font-size:1.25rem;margin:0}} h2{{font-size:1.05rem;margin:0 0 0.5rem}}
+table{{border-collapse:collapse;width:100%;max-width:64rem;font-size:0.9rem}}
+th,td{{border-bottom:1px solid var(--table-border);padding:0.45rem 0.5rem;text-align:left}}
+th{{color:var(--fg-muted);font-weight:600}}
+.card{{background:var(--bg-elevated);border:1px solid var(--border);border-radius:12px;
+padding:1rem 1.15rem;margin:1rem 0;max-width:64rem}}
+.muted{{color:var(--fg-muted);font-size:0.95rem;line-height:1.55}}
+.badge{{display:inline-block;padding:0.15rem 0.5rem;border-radius:6px;font-size:0.8rem;font-weight:600}}
+.badge.ok{{background:var(--badge-ok-bg);color:var(--badge-ok-fg)}}
+.badge.bad{{background:var(--badge-bad-bg);color:var(--badge-bad-fg)}}
+.warn{{color:var(--badge-bad-fg);background:var(--badge-bad-bg);padding:0.6rem 0.75rem;
+border-radius:8px;font-size:0.9rem;line-height:1.4;margin:0.5rem 0}}
+code{{font-size:0.85rem;word-break:break-all}}
+.ok-msg{{color:var(--badge-ok-fg);background:var(--badge-ok-bg);padding:0.5rem 0.75rem;border-radius:8px}}
+.err{{color:var(--err)}}
+.admin-top-link{{margin:0.85rem 0 0;font-size:0.85rem}}
+.admin-arch-body p{{margin:0 0 0.85rem;line-height:1.55}}
+#admin-reissue-form label.field,#admin-seed-purchase-form label.field,#admin-ondemand-mint-form label.field,
+#admin-keygen-failsafe-form label.field,#admin-tester-month-form label.field{{display:block;margin:0.65rem 0}}
+#admin-reissue-form .field-label,#admin-seed-purchase-form .field-label,#admin-ondemand-mint-form .field-label,
+#admin-keygen-failsafe-form .field-label,#admin-tester-month-form .field-label{{display:block;font-weight:600;font-size:0.9rem;margin-bottom:0.25rem}}
+#admin-reissue-form input,#admin-seed-purchase-form select,#admin-ondemand-mint-form select,
+#admin-keygen-failsafe-form select,#admin-keygen-failsafe-form input,#admin-tester-month-form select
+{{width:100%;max-width:28rem;box-sizing:border-box;padding:0.5rem 0.6rem;border-radius:8px;
+border:1px solid var(--input-border);background:var(--input-bg);color:var(--fg)}}
+#admin-reissue-form button,#admin-seed-purchase-form button,#admin-ondemand-mint-form button,
+#admin-keygen-failsafe-form button,#admin-tester-month-form button{{margin-top:0.75rem;padding:0.55rem 1rem;
+border:0;border-radius:8px;background:var(--btn-bg);color:var(--btn-fg);font-weight:600;cursor:pointer}}
+.processor-form label.field{{display:block;margin:0.65rem 0}}
+.processor-form input{{width:100%;max-width:28rem;box-sizing:border-box;padding:0.5rem 0.6rem;
+border-radius:8px;border:1px solid var(--input-border);background:var(--input-bg);color:var(--fg)}}
+.processor-form button{{margin-top:0.75rem;padding:0.55rem 1rem;border:0;border-radius:8px;
+background:var(--btn-bg);color:var(--btn-fg);font-weight:600;cursor:pointer}}
+@media (max-width:800px){{.admin-shell{{flex-direction:column}}.admin-sidebar{{width:100%}}}}
+"""
+
+
+def _admin_sidebar_html(*, active: str = "home") -> str:
+    """Left collapsible sidebar with button-style expandable nav groups."""
+    home_cls = "sb-btn active" if active == "home" else "sb-btn"
+    link_open = " open" if active == "link-generation" else ""
+    lic_open = " open" if active == "licences" else ""
+    proc_cls = "sb-btn active" if active == "processors" else "sb-btn"
+    fleet_cls = "sb-btn active" if active == "fleet" else "sb-btn"
+    seed = ""
+    if seed_test_purchase_enabled():
+        seed = (
+            '<a href="/admin/link-generation#admin-seed-purchase">'
+            "Seed test purchase</a>"
+        )
+    return f"""
+<aside class="admin-sidebar" id="admin-sidebar" data-admin-sidebar="1">
+  <div class="sb-brand" id="admin-sidebar-brand">Admin</div>
+  <button type="button" class="sb-toggle" id="admin-sidebar-toggle" aria-expanded="true"
+    aria-controls="admin-sidebar">Collapse</button>
+  <a class="{home_cls}" id="admin-nav-home" href="/admin"><span class="sb-ico">&#8962;</span>
+    <span class="sb-label">Architecture</span></a>
+  <details class="sb-group" id="admin-nav-link-generation"{link_open}>
+    <summary class="sb-group-title"><span class="sb-ico">&#128279;</span>
+      <span class="sb-label">Link Generation</span></summary>
+    <div class="sb-sub">
+      <a href="/admin/link-generation">Open Link Generation</a>
+      <a href="/admin/link-generation#admin-reissue">Re-issue by purchase ID</a>
+      <a href="/admin/link-generation#admin-ondemand-mint">Generate download (failsafe)</a>
+      <a href="/admin/link-generation#admin-keygen-failsafe">Generate KEYGEN (failsafe)</a>
+      <a href="/admin/link-generation#admin-tester-month">One-month tester</a>
+      {seed}
+    </div>
+  </details>
+  <details class="sb-group" id="admin-nav-active-licences"{lic_open}>
+    <summary class="sb-group-title"><span class="sb-ico">&#9638;</span>
+      <span class="sb-label">Active Licences</span></summary>
+    <div class="sb-sub">
+      <a href="/admin/licences">Open Active Licences</a>
+      <a href="/admin/licences#admin-licences">Licence database</a>
+      <a href="/admin/licences#admin-grants">Paid download grants</a>
+    </div>
+  </details>
+  <a class="{fleet_cls}" id="admin-nav-fleet" href="/admin/fleet"><span class="sb-ico">&#9678;</span>
+    <span class="sb-label">Fleet usage</span></a>
+  <a class="{proc_cls}" id="admin-nav-processors" href="/admin/processors"><span class="sb-ico">&#9881;</span>
+    <span class="sb-label">Processor settings</span></a>
+  <a class="sb-btn" href="/admin/logout" id="admin-logout"><span class="sb-ico">&#9099;</span>
+    <span class="sb-label">Log out</span></a>
+  <a class="sb-btn" href="/"><span class="sb-ico">&#8599;</span>
+    <span class="sb-label">VPN APP Shop</span></a>
+</aside>
+<script>
+(function(){{
+  var sb=document.getElementById('admin-sidebar');
+  var btn=document.getElementById('admin-sidebar-toggle');
+  if(!sb||!btn) return;
+  var key='rpt_admin_sidebar_collapsed';
+  function apply(c){{
+    if(c){{sb.classList.add('collapsed');btn.setAttribute('aria-expanded','false');btn.textContent='\\u00bb';}}
+    else{{sb.classList.remove('collapsed');btn.setAttribute('aria-expanded','true');btn.textContent='Collapse';}}
+  }}
+  try{{apply(localStorage.getItem(key)==='1');}}catch(e){{}}
+  btn.addEventListener('click',function(){{
+    var c=!sb.classList.contains('collapsed');
+    apply(c);
+    try{{localStorage.setItem(key,c?'1':'0');}}catch(e){{}}
+  }});
+}})();
+</script>
+"""
+
+
+def _admin_page_shell(
+    *,
+    title: str,
+    active: str,
+    main_html: str,
+) -> bytes:
+    """Full HTML document with left sidebar + main pane."""
+    body = f"""<!DOCTYPE html>
+<html lang="en"><head>
+<meta charset="utf-8"/><meta name="viewport" content="width=device-width, initial-scale=1"/>
+<meta name="color-scheme" content="light dark"/>
+<title>{_escape(title)}</title>
+<style>
+{_admin_shared_css()}
+</style>
+{admin_theme_boot_script()}
+</head><body>
+{admin_theme_picker_html()}
+<div class="admin-shell" id="admin-shell">
+{_admin_sidebar_html(active=active)}
+<main class="admin-main" id="admin-main">
+<div class="top">
+  <h1 id="admin-heading">{_escape(title)}</h1>
+</div>
+{main_html}
+</main>
+</div>
+</body></html>
+"""
+    body = _redact_secret_material(body)
+    return body.encode("utf-8")
+
+
+def _durable_store_banner() -> tuple[str, str]:
+    try:
+        store_hint = str(payment_data_dir())
+    except Exception:  # noqa: BLE001
+        store_hint = "status_page/data (or RPT_PAYMENT_DATA_DIR)"
+    durable_banner = ""
+    try:
+        from payments import payment_store_durability_status
+
+        st = payment_store_durability_status()
+        g_n = int(st.get("grant_count") or 0)
+        l_n = int(st.get("licence_count") or 0)
+        path_s = _escape(str(st.get("db_path") or store_hint))
+        if st.get("ephemeral_risk"):
+            durable_banner = (
+                '<p class="warn" id="admin-payment-ephemeral-warn">'
+                "<strong>Warning — payment store may be ephemeral.</strong> "
+                "Set <code>RPT_PAYMENT_DATA_DIR=/var/data/rpt-payment</code> on a "
+                "Render <strong>persistent disk</strong> so licence + grant history survives "
+                f"redeploy. Current DB: <code>{path_s}</code> "
+                f"(grants={g_n}, licences={l_n}).</p>"
+            )
+        else:
+            durable_banner = (
+                f'<p class="muted" id="admin-payment-durable-ok">'
+                f"Durable payment store: <code>{path_s}</code> "
+                f"(grants={g_n}, licences={l_n}).</p>"
+            )
+    except Exception:  # noqa: BLE001
+        durable_banner = ""
+    return durable_banner, _escape(store_hint)
+
+
+def render_admin_grants_section_html(
+    grants: list[dict[str, Any]] | None = None,
+) -> str:
+    """Paid download grants table with initiated/expiry + ENDED status."""
+    projected = project_grants_for_admin(grants)
+    rows = []
+    for g in projected:
+        tok = str(g.get("token") or "")
+        tok_short = (tok[:10] + "…") if len(tok) > 12 else tok
+        st = str(g.get("status") or "")
+        badge = "ok" if st in ("granted", "OK", "used") else "bad"
+        if st == "ENDED":
+            badge = "bad"
+        pid = str(g.get("purchase_id") or "")
+        rows.append(
+            "<tr>"
+            f"<td><code>{_escape(pid)}</code></td>"
+            f"<td>{_escape(str(g.get('platform') or ''))}</td>"
+            f"<td>{_escape(str(g.get('filename') or ''))}</td>"
+            f"<td>{int(g.get('amount_pence') or 0)} {_escape(str(g.get('currency') or ''))}</td>"
+            f'<td><span class="badge {badge}">{_escape(st)}</span></td>'
+            f"<td class=\"grant-initiated\">{_escape(str(g.get('initiated_date') or ''))}</td>"
+            f"<td class=\"grant-expiry\">{_escape(str(g.get('expiry_date') or ''))}</td>"
+            f"<td title=\"{_escape(tok)}\">{_escape(tok_short)}</td>"
+            f"<td>{_escape(str(g.get('session_id') or '')[:18])}</td>"
+            "</tr>"
+        )
+    table = (
+        "\n".join(rows)
+        if rows
+        else '<tr><td colspan="9">No grants yet</td></tr>'
+    )
+    return f"""
+<section id="admin-grants" class="card">
+  <h2 id="admin-grants-heading">Paid download grants</h2>
+  <p class="muted" id="admin-grants-blurb">Full history of Stripe-verified download grants from the durable store
+  (not a recent-only window). Status <code>ENDED</code> means the linked licence period finished or was revoked
+  (still listed). <strong>Initiated</strong> / <strong>Expiry</strong> are UTC dates from the licence period when known.</p>
+  <table id="admin-grants-table">
+    <thead><tr>
+      <th>Purchase ID</th><th>Platform</th><th>Filename</th><th>Amount</th><th>Status</th>
+      <th>Initiated</th><th>Expiry</th><th>Token</th><th>Session</th>
+    </tr></thead>
+    <tbody>
+{table}
+    </tbody>
+  </table>
+{admin_section_top_link_html()}</section>
+"""
+
+
 def render_admin_html(
     grants: list[dict[str, Any]] | None = None,
     *,
@@ -1319,35 +1610,115 @@ def render_admin_html(
     seed_platform: str = "windows",
     node_usage_rows: list[Any] | None = None,
     node_usage_live: bool = True,
+    page: str | None = None,
 ) -> bytes:
-    """Full private admin page: reissue by purchase id, processor settings, grants."""
-    projected = project_grants_for_admin(grants)
-    node_usage_html = _render_node_usage_section(
-        node_usage_rows, live=node_usage_live
-    )
-    rows = []
-    for g in projected:
-        tok = str(g.get("token") or "")
-        tok_short = (tok[:10] + "…") if len(tok) > 12 else tok
-        used = g.get("used_at")
-        used_s = "used" if used else str(g.get("status") or "")
-        pid = str(g.get("purchase_id") or "")
-        rows.append(
-            "<tr>"
-            f"<td><code>{_escape(pid)}</code></td>"
-            f"<td>{_escape(str(g.get('platform') or ''))}</td>"
-            f"<td>{_escape(str(g.get('filename') or ''))}</td>"
-            f"<td>{int(g.get('amount_pence') or 0)} {_escape(str(g.get('currency') or ''))}</td>"
-            f"<td>{_escape(used_s)}</td>"
-            f"<td title=\"{_escape(tok)}\">{_escape(tok_short)}</td>"
-            f"<td>{_escape(str(g.get('session_id') or '')[:18])}</td>"
-            "</tr>"
+    """Admin HTML router: home / link-generation / licences / fleet / processors.
+
+    When mint/reissue result kwargs are set, defaults to the Link Generation page
+    so POST handlers keep working. Explicit *page* wins.
+    """
+    minty = any(
+        x is not None
+        for x in (
+            reissue_result,
+            ondemand_result,
+            keygen_result,
+            tester_result,
+            seed_result,
         )
-    table = (
-        "\n".join(rows)
-        if rows
-        else '<tr><td colspan="7">No grants yet</td></tr>'
+    ) or bool(
+        reissue_error
+        or ondemand_error
+        or keygen_error
+        or tester_error
+        or seed_error
     )
+    settings_hit = bool(message or error)
+    if page is None:
+        if minty:
+            page = "link-generation"
+        elif settings_hit:
+            page = "processors"
+        else:
+            page = "home"
+
+    if page == "link-generation":
+        return render_admin_link_generation_html(
+            reissue_result=reissue_result,
+            reissue_error=reissue_error,
+            reissue_form_value=reissue_form_value,
+            ondemand_result=ondemand_result,
+            ondemand_error=ondemand_error,
+            ondemand_platform=ondemand_platform,
+            keygen_result=keygen_result,
+            keygen_error=keygen_error,
+            keygen_note=keygen_note,
+            keygen_platform=keygen_platform,
+            tester_result=tester_result,
+            tester_error=tester_error,
+            tester_platform=tester_platform,
+            seed_result=seed_result,
+            seed_error=seed_error,
+            seed_platform=seed_platform,
+        )
+    if page == "licences":
+        return render_admin_licences_page_html(grants=grants)
+    if page == "processors":
+        return render_admin_processors_page_html(message=message, error=error)
+    if page == "fleet":
+        return render_admin_fleet_page_html(
+            node_usage_rows=node_usage_rows, node_usage_live=node_usage_live
+        )
+    return render_admin_home_html()
+
+
+def render_admin_home_html() -> bytes:
+    """Admin home: architecture only (human-cadence) + sidebar."""
+    durable_banner, store_esc = _durable_store_banner()
+    arch_short = _escape(ADMIN_ARCHITECTURE_BLURB)
+    paras = []
+    for block in ADMIN_ARCHITECTURE_FULL.strip().split("\n\n"):
+        paras.append(f"<p>{_escape(block.strip())}</p>")
+    arch_body = "\n".join(paras)
+    main = f"""
+<section id="admin-architecture" class="card" aria-labelledby="admin-architecture-heading">
+  <h2 id="admin-architecture-heading">Product architecture (operator)</h2>
+  <div class="admin-arch-body" id="admin-architecture-full">{arch_body}</div>
+  <p class="muted" id="admin-architecture-blurb" hidden>{arch_short}</p>
+{durable_banner}
+  <p class="muted" id="admin-durable-store-note">Payment DB path:
+  <code id="admin-payment-data-dir">{store_esc}</code>
+  (<code>paid_downloads.sqlite3</code>). Use the sidebar for Link Generation and
+  Active Licences tools.</p>
+</section>
+"""
+    return _admin_page_shell(
+        title="Payment administration",
+        active="home",
+        main_html=main,
+    )
+
+
+def render_admin_link_generation_html(
+    *,
+    reissue_result: dict[str, Any] | None = None,
+    reissue_error: str = "",
+    reissue_form_value: str = "",
+    ondemand_result: dict[str, Any] | None = None,
+    ondemand_error: str = "",
+    ondemand_platform: str = "windows",
+    keygen_result: dict[str, Any] | None = None,
+    keygen_error: str = "",
+    keygen_note: str = "",
+    keygen_platform: str = "",
+    tester_result: dict[str, Any] | None = None,
+    tester_error: str = "",
+    tester_platform: str = "windows",
+    seed_result: dict[str, Any] | None = None,
+    seed_error: str = "",
+    seed_platform: str = "windows",
+) -> bytes:
+    """Link Generation page: reissue + failsafe download/keygen + tester mint."""
     reissue_html = render_purchase_reissue_section_html(
         result=reissue_result,
         error=reissue_error,
@@ -1374,162 +1745,60 @@ def render_admin_html(
         error=seed_error,
         platform=seed_platform,
     )
-    settings_html = render_processor_settings_html(message=message, error=error)
-    try:
-        store_hint = str(payment_data_dir())
-    except Exception:  # noqa: BLE001
-        store_hint = "status_page/data (or RPT_PAYMENT_DATA_DIR)"
-    durable_banner = ""
-    try:
-        from payments import payment_store_durability_status
-
-        st = payment_store_durability_status()
-        g_n = int(st.get("grant_count") or 0)
-        l_n = int(st.get("licence_count") or 0)
-        path_s = _escape(str(st.get("db_path") or store_hint))
-        if st.get("ephemeral_risk"):
-            durable_banner = (
-                '<p class="warn" id="admin-payment-ephemeral-warn">'
-                "<strong>Warning — payment store may be ephemeral.</strong> "
-                "Set <code>RPT_PAYMENT_DATA_DIR=/var/data/rpt-payment</code> on a "
-                "Render <strong>persistent disk</strong> (blueprint "
-                "<code>rpt-payment-data</code>) so licence + grant history survives "
-                f"redeploy. Current DB: <code>{path_s}</code> "
-                f"(grants={g_n}, licences={l_n}). "
-                "See <code>status_page/docs/RENDER_PAYMENT_DISK.md</code>.</p>"
-            )
-        else:
-            durable_banner = (
-                f'<p class="muted" id="admin-payment-durable-ok">'
-                f"Durable payment store: <code>{path_s}</code> "
-                f"(grants={g_n}, licences={l_n}). "
-                "Retained across residual wipe and status redeploy when the disk "
-                "stays attached.</p>"
-            )
-    except Exception:  # noqa: BLE001
-        durable_banner = ""
-    arch = _escape(ADMIN_ARCHITECTURE_BLURB)
-    store_esc = _escape(store_hint)
-    body = f"""<!DOCTYPE html>
-<html lang="en"><head>
-<meta charset="utf-8"/><meta name="viewport" content="width=device-width, initial-scale=1"/>
-<meta name="color-scheme" content="light dark"/>
-<title>Admin — payments &amp; processors</title>
-<style>
-{admin_theme_css()}
-body{{margin:0;padding:1.5rem}}
-h1{{font-size:1.25rem;margin:0}} h2{{font-size:1.05rem;margin:0 0 0.5rem}}
-h3{{font-size:0.95rem;margin:1rem 0 0.4rem}} h4{{font-size:0.9rem;margin:0.75rem 0 0.35rem}}
-table{{border-collapse:collapse;width:100%;max-width:56rem;font-size:0.9rem}}
-th,td{{border-bottom:1px solid var(--table-border);padding:0.45rem 0.5rem;text-align:left}}
-th{{color:var(--fg-muted);font-weight:600}}
-.top{{display:flex;gap:1rem;align-items:center;margin-bottom:0.75rem;flex-wrap:wrap}}
-.card{{background:var(--bg-elevated);border:1px solid var(--border);border-radius:12px;
-padding:1rem 1.15rem;margin:1rem 0;max-width:56rem}}
-.muted{{color:var(--fg-muted);font-size:0.9rem;line-height:1.4}}
-.status-list{{margin:0.5rem 0}}
-.status-list > div{{display:grid;grid-template-columns:12rem 1fr;gap:0.35rem 0.75rem;
-padding:0.25rem 0;font-size:0.9rem}}
-.status-list dt{{color:var(--fg-muted)}}
-.badge{{display:inline-block;padding:0.15rem 0.5rem;border-radius:6px;font-size:0.8rem;
-font-weight:600}}
-.badge.ok{{background:var(--badge-ok-bg);color:var(--badge-ok-fg)}}
-.badge.bad{{background:var(--badge-bad-bg);color:var(--badge-bad-fg)}}
-.warn{{color:var(--badge-bad-fg);background:var(--badge-bad-bg);padding:0.6rem 0.75rem;
-border-radius:8px;font-size:0.9rem;line-height:1.4;margin:0.5rem 0}}
-.ops-links{{font-size:0.9rem;margin:0.75rem 0 0.25rem}}
-.nav-local a{{margin-right:0.75rem;font-size:0.9rem}}
-code{{font-size:0.85rem;word-break:break-all}}
-.processor-plugin{{border-top:1px solid var(--border);margin-top:1.25rem;padding-top:1rem}}
-.plugin-head{{display:flex;flex-wrap:wrap;gap:0.5rem 0.75rem;align-items:center}}
-.plugin-role{{font-size:0.8rem;color:var(--fg-muted)}}
-.var-table{{margin:0.5rem 0 1rem;font-size:0.85rem}}
-.processor-form label.field{{display:block;margin:0.65rem 0}}
-.processor-form .field-label{{display:block;font-weight:600;font-size:0.9rem}}
-.processor-form .field-key{{display:block;font-size:0.8rem;margin:0.15rem 0}}
-.processor-form input{{width:100%;max-width:28rem;box-sizing:border-box;padding:0.5rem 0.6rem;
-border-radius:8px;border:1px solid var(--input-border);background:var(--input-bg);color:var(--fg)}}
-.processor-form button{{margin-top:0.75rem;padding:0.55rem 1rem;border:0;border-radius:8px;
-background:var(--btn-bg);color:var(--btn-fg);font-weight:600;cursor:pointer}}
-#admin-reissue-form label.field,#admin-seed-purchase-form label.field,#admin-ondemand-mint-form label.field,#admin-keygen-failsafe-form label.field{{display:block;margin:0.65rem 0}}
-#admin-reissue-form .field-label,#admin-seed-purchase-form .field-label,#admin-ondemand-mint-form .field-label,#admin-keygen-failsafe-form .field-label{{display:block;font-weight:600;font-size:0.9rem;margin-bottom:0.25rem}}
-#admin-reissue-form input,#admin-seed-purchase-form select,#admin-ondemand-mint-form select,#admin-keygen-failsafe-form select,#admin-keygen-failsafe-form input{{width:100%;max-width:28rem;box-sizing:border-box;padding:0.5rem 0.6rem;
-border-radius:8px;border:1px solid var(--input-border);background:var(--input-bg);color:var(--fg)}}
-#admin-reissue-form button,#admin-seed-purchase-form button,#admin-ondemand-mint-form button,#admin-keygen-failsafe-form button{{margin-top:0.75rem;padding:0.55rem 1rem;border:0;border-radius:8px;
-background:var(--btn-bg);color:var(--btn-fg);font-weight:600;cursor:pointer}}
-.ok-msg{{color:var(--badge-ok-fg);background:var(--badge-ok-bg);padding:0.5rem 0.75rem;border-radius:8px}}
-.err{{color:var(--err)}}
-.plugin-nav{{margin:0.5rem 0 1rem;font-size:0.9rem}}
-.admin-top-link{{margin:0.85rem 0 0;font-size:0.85rem}}
-.admin-top-link a{{color:var(--link);text-decoration:none}}
-.admin-top-link a:hover{{text-decoration:underline}}
-.purchase-id-box,.purchase-id-advice{{/* reserved for public thank-you if mirrored */}}
-</style>
-{admin_theme_boot_script()}
-</head><body>
-{admin_theme_picker_html()}
-<div class="top">
-  <h1 id="admin-heading">Payment administration</h1>
-  <a href="/admin/logout" id="admin-logout">Log out</a>
-  <a href="/">VPN APP Shop</a>
-</div>
-<nav class="nav-local" id="admin-nav" aria-label="Admin sections">
-  <a href="#admin-node-usage">Fleet usage</a>
-  <a href="#admin-architecture">Architecture</a>
-  <a href="#admin-reissue">Re-issue by RPT-PPI</a>
-  <a href="#admin-ondemand-mint">Generate download (failsafe)</a>
-  <a href="#admin-keygen-failsafe">Generate KEYGEN (failsafe)</a>
-  <a href="#admin-tester-month">One-month tester</a>
-  {('<a href="#admin-seed-purchase">Seed test purchase</a>' if seed_test_purchase_enabled() else '')}
-  <a href="#admin-processor-settings">Processor settings</a>
-  <a href="#admin-licences">Licence database</a>
-  <a href="#admin-grants">Paid download grants</a>
-</nav>
-{node_usage_html}
-<section id="admin-architecture" class="card" aria-labelledby="admin-architecture-heading">
-  <h2 id="admin-architecture-heading">Product architecture (operator)</h2>
-  <p class="muted" id="admin-architecture-blurb">{arch}</p>
-{durable_banner}
-  <p class="muted" id="admin-durable-store-note">Durable licence + grant DB path:
-  <code id="admin-payment-data-dir">{store_esc}</code>
-  (<code>paid_downloads.sqlite3</code>). Residual wipeclean targets runtime/secrets only —
-  not this store. On <strong>Render</strong>, set <code>RPT_PAYMENT_DATA_DIR</code> to
-  <code>/var/data/rpt-payment</code> on the persistent disk (blueprint:
-  <code>rpt-payment-data</code> mount <code>/var/data</code>) so admin history survives
-  host redeploy — free instances are ephemeral and cannot attach that disk.
-  Empty durable volume auto-imports history from legacy
-  <code>status_page/data/paid_downloads.sqlite3</code> when that file still has rows.</p>
-{admin_section_top_link_html()}</section>
+    main = f"""
+<p class="muted" id="admin-link-generation-intro">Mint and re-issue customer download
+links and keygens. These tools write the durable payment store; they are not free public unlocks.</p>
 {reissue_html}
 {ondemand_html}
 {keygen_html}
 {tester_html}
 {seed_html}
-{settings_html}
-{render_admin_licences_section_html()}
-<section id="admin-grants" class="card">
-  <h2 id="admin-grants-heading">Paid download grants</h2>
-  <p class="muted" id="admin-grants-blurb">Full history of Stripe-verified download grants
-  (Monthly {_escape(PRICE_LABEL)} / Yearly {_escape(PRICE_YEARLY_LABEL)} GBP by plan) —
-  every completed payment grant in the durable store. <strong>Retained across residual
-  fleet wipe/rebuild</strong> (IS → RO → US sequential). Used single-use tokens stay
-  listed (status <code>used</code>); purchase identifier (RPT-PPI) is durable.
-  Catalog installers are multi-platform residual clients, not free GitHub assets.
-  Secrets never shown.</p>
-  <table id="admin-grants-table">
-    <thead><tr>
-      <th>Purchase ID</th><th>Platform</th><th>Filename</th><th>Amount</th><th>Status</th><th>Token</th><th>Session</th>
-    </tr></thead>
-    <tbody>
-{table}
-    </tbody>
-  </table>
-{admin_section_top_link_html()}</section>
-</body></html>
 """
-    # Final secret scan on full page (real values only; keep guide prefixes)
-    body = _redact_secret_material(body)
-    return body.encode("utf-8")
+    return _admin_page_shell(
+        title="Link Generation",
+        active="link-generation",
+        main_html=main,
+    )
+
+
+def render_admin_licences_page_html(
+    grants: list[dict[str, Any]] | None = None,
+) -> bytes:
+    """Active Licences page: licence database + paid download grants."""
+    main = (
+        render_admin_licences_section_html()
+        + render_admin_grants_section_html(grants)
+    )
+    return _admin_page_shell(
+        title="Active Licences",
+        active="licences",
+        main_html=main,
+    )
+
+
+def render_admin_processors_page_html(*, message: str = "", error: str = "") -> bytes:
+    settings_html = render_processor_settings_html(message=message, error=error)
+    return _admin_page_shell(
+        title="Processor settings",
+        active="processors",
+        main_html=settings_html,
+    )
+
+
+def render_admin_fleet_page_html(
+    *,
+    node_usage_rows: list[Any] | None = None,
+    node_usage_live: bool = True,
+) -> bytes:
+    node_usage_html = _render_node_usage_section(
+        node_usage_rows, live=node_usage_live
+    )
+    return _admin_page_shell(
+        title="Fleet usage",
+        active="fleet",
+        main_html=node_usage_html,
+    )
+
 
 
 def _escape(s: str) -> str:

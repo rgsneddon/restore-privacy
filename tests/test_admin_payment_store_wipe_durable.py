@@ -164,7 +164,7 @@ class TestPaymentStoreWipeProtection(unittest.TestCase):
                 # Admin HTML still lists them
                 import admin_panel
 
-                html = admin_panel.render_admin_html().decode("utf-8")
+                html = admin_panel.render_admin_html(page="licences").decode("utf-8")
                 self.assertIn("tok-wipe-test", html)
                 self.assertIn("wipe-test@example.com", html)
                 self.assertIn("admin-licences", html)
@@ -402,12 +402,17 @@ class TestLegacyMigrateToDurable(unittest.TestCase):
                             for g in payments.list_all_grants()
                         )
                     )
-                    html = admin_panel.render_admin_html().decode("utf-8")
+                    html = admin_panel.render_admin_html(page="licences").decode(
+                        "utf-8"
+                    )
+                    home = admin_panel.render_admin_home_html().decode("utf-8")
                     self.assertIn("tok-migrate", html)
                     self.assertIn("migrate@example.com", html)
-                    # Temp durable path is not /var/data → ephemeral-risk banner is OK
+                    # Durability banner lives on home (and licences when store status loads)
                     self.assertTrue(
-                        "admin-payment-durable-ok" in html
+                        "admin-payment-durable-ok" in home
+                        or "admin-payment-ephemeral-warn" in home
+                        or "admin-payment-durable-ok" in html
                         or "admin-payment-ephemeral-warn" in html,
                         "admin must surface payment-store durability status",
                     )
@@ -434,22 +439,28 @@ class TestLegacyMigrateToDurable(unittest.TestCase):
 
 class TestAdminArchitectureCopy(unittest.TestCase):
     def test_admin_html_has_current_architecture_markers(self):
+        """Home = architecture + sidebar; licences/grants on Active Licences page."""
         import admin_panel
 
         with tempfile.TemporaryDirectory() as td:
             prev = os.environ.get("RPT_PAYMENT_DATA_DIR")
             os.environ["RPT_PAYMENT_DATA_DIR"] = td
             try:
+                # Default render_admin_html → home (no mint kwargs)
                 html = admin_panel.render_admin_html(grants=[]).decode("utf-8")
+                lic_html = admin_panel.render_admin_licences_page_html(
+                    grants=[]
+                ).decode("utf-8")
             finally:
                 if prev is None:
                     os.environ.pop("RPT_PAYMENT_DATA_DIR", None)
                 else:
                     os.environ["RPT_PAYMENT_DATA_DIR"] = prev
 
-        # Current architecture
+        # Home: architecture + collapsible sidebar (not full mint/grant stack)
         for marker in (
             "admin-architecture",
+            "admin-sidebar",
             "United States",
             "Romania",
             "Iceland",
@@ -460,14 +471,17 @@ class TestAdminArchitectureCopy(unittest.TestCase):
             "keygen",
             "Stripe",
             "durable",
-            "admin-licences",
-            "admin-grants",
+            "Link Generation",
+            "Active Licences",
             PRICE_SNIPPET_MONTH,
             PRICE_SNIPPET_YEAR,
         ):
             self.assertIn(marker, html, f"missing marker {marker!r}")
         self.assertNotIn("Germany", html)
         self.assertNotIn("167.233.224.5", html)
+        # Mint tools live on Link Generation, not home monostack
+        self.assertNotIn('id="admin-tester-month"', html)
+        self.assertNotIn('id="admin-grants-table"', html)
 
         # Honesty: no free permanent installers; multi-peer not Iceland-only
         low = html.lower()
@@ -478,6 +492,12 @@ class TestAdminArchitectureCopy(unittest.TestCase):
         self.assertNotIn("exit wipe countdown", low)
         self.assertIn("retained across residual", low)
         self.assertIn(admin_panel.ADMIN_ARCHITECTURE_BLURB.split(";")[0][:40], html)
+
+        # Active Licences page holds licence DB + paid grants tables
+        self.assertIn("admin-licences", lic_html)
+        self.assertIn("admin-grants", lic_html)
+        self.assertIn("Initiated", lic_html)
+        self.assertIn("Expiry", lic_html)
 
 
 # Avoid importing PRICE constants at module load if payments side-effects

@@ -290,7 +290,12 @@ def build_windows_installer_exe(client_onedir: Path) -> Path:
     ver_file = ROOT / "client" / "VERSION"
     if not ver_file.is_file():
         ver_file.write_text(f"{VERSION}\n", encoding="utf-8")
-    # Seamless double-click: no console flash; progress is the Tk Setup window
+    # Brand splash while the bootloader unpacks the onefile (avoids "frozen" blank hang)
+    splash = ROOT / "client" / "windows" / "native" / "installer_splash.png"
+    if not splash.is_file():
+        # Fall back to product icon if splash art missing
+        splash = ROOT / "client" / "windows" / "native" / "app_icon.png"
+    # Seamless double-click: no console flash; splash then Tk Setup window
     cmd = [
         sys.executable,
         "-m",
@@ -314,8 +319,13 @@ def build_windows_installer_exe(client_onedir: Path) -> Path:
         add_data,
         "--add-data",
         f"{ver_file};client",
-        str(installer_entry),
     ]
+    if splash.is_file():
+        cmd.extend(["--splash", str(splash)])
+    icon = ROOT / "client" / "windows" / "native" / "app_icon.ico"
+    if icon.is_file():
+        cmd.extend(["--icon", str(icon)])
+    cmd.append(str(installer_entry))
     r = subprocess.run(cmd, cwd=ROOT, capture_output=True, text=True)
     log = DIST / "pyinstaller_installer.log"
     log.write_text((r.stdout or "") + "\n" + (r.stderr or ""), encoding="utf-8")

@@ -507,7 +507,7 @@ class TestAdminAuth(unittest.TestCase):
             platform="macos",
             session_id="cs_admin",
         )
-        html = admin_panel.render_admin_html().decode("utf-8")
+        html = admin_panel.render_admin_html(page="licences").decode("utf-8")
         self.assertIn("admin-grants-table", html)
         self.assertIn("macos", html)
         self.assertIn("245", html)
@@ -777,7 +777,8 @@ class TestAdminHtmlArchitecture(unittest.TestCase):
         self._td = tempfile.TemporaryDirectory()
         self.addCleanup(self._td.cleanup)
         os.environ["RPT_PAYMENT_DATA_DIR"] = self._td.name
-        os.environ["RPT_ADMIN_PASSWORD"] = "admin-arch"
+        # Password must not collide with HTML ids/classes like admin-architecture
+        os.environ["RPT_ADMIN_PASSWORD"] = "s3cret-arch-pass!"
         os.environ["RPT_ADMIN_SESSION_SECRET"] = "admin-arch-sess"
         os.environ.pop("STRIPE_SECRET_KEY", None)
         os.environ.pop("STRIPE_WEBHOOK_SECRET", None)
@@ -797,18 +798,21 @@ class TestAdminHtmlArchitecture(unittest.TestCase):
             platform="android",
             session_id="cs_arch_1",
         )
-        html = admin_panel.render_admin_html().decode("utf-8")
-        self.assertIn("admin-processor-settings", html)
-        self.assertIn("admin-grants-table", html)
-        self.assertIn("Payment administration", html)
-        self.assertIn("android", html)
-        self.assertIn("245", html)
-        self.assertIn("bmc-tip-url", html)
-        self.assertIn("stripe-checkout-ready", html)
+        # Multi-page admin: processors vs Active Licences (grants) are separate routes
+        proc = admin_panel.render_admin_html(page="processors").decode("utf-8")
+        grants = admin_panel.render_admin_html(page="licences").decode("utf-8")
+        self.assertIn("admin-processor-settings", proc)
+        self.assertIn("bmc-tip-url", proc)
+        self.assertIn("stripe-checkout-ready", proc)
+        self.assertIn("admin-grants-table", grants)
+        self.assertIn("Active Licences", grants)
+        self.assertIn("android", grants)
+        self.assertIn("245", grants)
         # Guide may show prefix+ellipsis; ban real-looking secret values only
-        self.assertNotRegex(html, r"sk_(?:live|test)_[A-Za-z0-9]{10,}")
-        self.assertNotRegex(html, r"whsec_[A-Za-z0-9]{10,}")
-        self.assertNotIn("admin-arch", html)  # password must not appear
+        for html in (proc, grants):
+            self.assertNotRegex(html, r"sk_(?:live|test)_[A-Za-z0-9]{10,}")
+            self.assertNotRegex(html, r"whsec_[A-Za-z0-9]{10,}")
+            self.assertNotIn("s3cret-arch-pass!", html)  # password must not appear
 
     def test_project_grants_uses_real_store(self):
         payments.init_db()
@@ -1463,7 +1467,7 @@ class TestAdminFullGrantsListNoDropOff(unittest.TestCase):
             self.assertIn(m["token"], row_tokens)
             self.assertIn(m["session_id"], row_sids)
 
-        html = admin_panel.render_admin_html().decode("utf-8")
+        html = admin_panel.render_admin_html(page="licences").decode("utf-8")
         self.assertIn("admin-grants-table", html)
         self.assertIn("admin-grants-blurb", html)
         self.assertIn("Full history", html)
@@ -1492,7 +1496,7 @@ class TestAdminFullGrantsListNoDropOff(unittest.TestCase):
 
         rows = admin_panel.project_grants_for_admin()
         self.assertTrue(any(r["token"] == tok for r in rows))
-        html = admin_panel.render_admin_html().decode("utf-8")
+        html = admin_panel.render_admin_html(page="licences").decode("utf-8")
         self.assertIn("cs_used_still_listed"[:18], html)
         self.assertIn(">used<", html)
         self.assertIn("admin-grants-table", html)

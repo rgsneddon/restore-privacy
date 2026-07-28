@@ -115,7 +115,10 @@ class TestWindowsFwWiring(unittest.TestCase):
         self.assertIn("44044", text)
         inst = (ROOT / "client" / "windows" / "installer.py").read_text(encoding="utf-8")
         self.assertIn("AllowFirewall.bat", inst)
-        self.assertIn("apply_windows_fw_allows", inst)
+        # Setup stages AllowFirewall.bat + launch wrapper; netsh apply is deferred
+        # (Connect / AllowFirewall.bat) so install is not blocked on firewall probes.
+        self.assertIn("LaunchPrivacyRestored.bat", inst)
+        self.assertIn("AllowFirewall.bat", inst)
         # Restore Internet failsafe clears stuck KS profile Block (internet blackhole)
         rest = (ROOT / "client" / "windows" / "Restore Internet.bat").read_text(
             encoding="utf-8", errors="replace"

@@ -84,6 +84,18 @@ class TestInstallerProgressWiring(unittest.TestCase):
         self.assertIn("--windowed", recipe)
         self.assertIn("--noconsole", recipe)
         self.assertNotIn('"--console"', recipe)
+        # Bootloader splash so onefile unpack is not a blank hang
+        self.assertIn("--splash", recipe)
+        self.assertIn("installer_splash", recipe)
+
+    def test_install_uses_fast_copy_and_batched_shortcuts(self):
+        src = (ROOT / "client" / "windows" / "installer.py").read_text(encoding="utf-8")
+        self.assertIn("robocopy", src)
+        self.assertIn("_create_shortcuts_batch", src)
+        self.assertIn("_close_pyi_splash", src)
+        # No full-tree rglob in hot install paths
+        self.assertNotIn('root.rglob("*.priv")', src)
+        self.assertNotIn('root.rglob("*.exe")', src)
 
     def test_product_version_pin_not_stale_036(self):
         """Frozen/missing VERSION must not fall back to historical 0.3.6."""

@@ -14,9 +14,16 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
 from client.windows.tray_win import (  # noqa: E402
+    NIF_GUID,
+    NIF_ICON,
+    NIF_SHOWTIP,
+    NIF_TIP,
+    PRODUCT_TRAY_ICON_GUID,
     TRAY_DISPLAY_NAME,
     WindowsSystemTray,
     make_status_icon_handle,
+    product_tray_guid_bytes,
+    purge_product_tray_icon,
     resolve_tray_icon_path,
     tray_icon_state_key,
     tray_tooltip_for_state,
@@ -137,12 +144,11 @@ class TestTrayStatusUpdate(unittest.TestCase):
         ):
             tray._apply_notify_modify()
 
-        NIF_ICON = 0x00000002
-        NIF_TIP = 0x00000004
-        NIF_SHOWTIP = 0x00000080
         NIM_MODIFY = 0x00000001
         self.assertEqual(captured.get("cmd"), NIM_MODIFY)
-        self.assertEqual(captured.get("flags"), NIF_TIP | NIF_ICON | NIF_SHOWTIP)
+        self.assertEqual(
+            captured.get("flags"), NIF_TIP | NIF_ICON | NIF_SHOWTIP | NIF_GUID
+        )
         self.assertIn("connected", (captured.get("tip") or "").lower())
         self.assertEqual(captured.get("hicon"), 99)
 
@@ -203,6 +209,51 @@ class TestTrayStatusUpdate(unittest.TestCase):
         set_status = src[src.index("def _set_status") : src.index("def _apply_control")]
         self.assertIn("_sync_tray_status(connected=True", set_status)
         self.assertIn("_sync_tray_status(connected=False", set_status)
+
+
+class TestPurgeProductTrayIcon(unittest.TestCase):
+    """App imports purge_product_tray_icon; must exist on shipped tray_win."""
+
+    def test_import_purge_product_tray_icon(self):
+        from client.windows.tray_win import purge_product_tray_icon as fn
+
+        self.assertTrue(callable(fn))
+        self.assertIs(fn, purge_product_tray_icon)
+
+    def test_product_guid_stable(self):
+        self.assertEqual(
+            str(PRODUCT_TRAY_ICON_GUID),
+            "a7c3e91f-2b4d-4e8a-9f01-6d5c8b3a1e72",
+        )
+        raw = product_tray_guid_bytes()
+        self.assertEqual(len(raw), 16)
+        self.assertEqual(raw, PRODUCT_TRAY_ICON_GUID.bytes_le)
+
+    def test_purge_returns_bool_and_safe_off_or_on_windows(self):
+        # Drives the real function (not a reimplementation)
+        result = purge_product_tray_icon()
+        self.assertIsInstance(result, bool)
+        if sys.platform != "win32":
+            self.assertFalse(result)
+
+    def test_app_imports_purge_from_tray_win(self):
+        src = (ROOT / "client" / "windows" / "app.py").read_text(encoding="utf-8")
+        self.assertIn("purge_product_tray_icon", src)
+        self.assertIn("from client.windows.tray_win import", src)
+        # Real import path that failed in frozen install smoke
+        import importlib
+
+        tray = importlib.import_module("client.windows.tray_win")
+        self.assertTrue(hasattr(tray, "purge_product_tray_icon"))
+        # Import the name the same way app.py does
+        from client.windows.tray_win import (  # noqa: F401
+            TRAY_DISPLAY_NAME as _,
+            WindowsSystemTray as __,
+            purge_product_tray_icon as purge,
+            resolve_tray_icon_path as ___,
+        )
+
+        self.assertTrue(callable(purge))
 
 
 class TestShortcutLogo(unittest.TestCase):

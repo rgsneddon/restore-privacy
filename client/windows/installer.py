@@ -137,12 +137,22 @@ def _find_client_exe(root: Path) -> Path:
         p = root / name
         if p.is_file():
             return p
-    # Search one level deep
-    for p in root.rglob("*.exe"):
-        if "uninstall" in p.name.lower():
-            continue
-        if APP_NAME.lower() in p.name.lower() or "restore" in p.name.lower():
-            return p
+    # Shallow only (onedir layout) — never full-tree rglob (slow on large payloads)
+    try:
+        for child in root.iterdir():
+            if not child.is_dir():
+                continue
+            for name in (f"{APP_NAME}-{VERSION}.exe", f"{APP_NAME}.exe", "RestorePrivacy.exe"):
+                p = child / name
+                if p.is_file():
+                    return p
+            for p in child.glob("*.exe"):
+                if "uninstall" in p.name.lower():
+                    continue
+                if APP_NAME.lower() in p.name.lower() or "restore" in p.name.lower():
+                    return p
+    except OSError:
+        pass
     raise FileNotFoundError(f"No client .exe under {root}")
 
 
@@ -185,6 +195,7 @@ def _rmtree_best_effort(path: Path) -> None:
 
 
 def _copy_tree(src: Path, dst: Path) -> None:
+    """Copy product tree quickly (robocopy multi-thread on Windows when available)."""
     _rmtree_best_effort(dst)
     # Never copy any .priv (shared client_ed25519.priv or node_elgamal.priv)
     def _ignore(directory: str, names: list[str]) -> set[str]:
@@ -196,7 +207,51 @@ def _copy_tree(src: Path, dst: Path) -> None:
                 ignored.add(n)
         return ignored
 
+    if sys.platform == "win32":
+        try:
+            # /MT multi-thread copy is much faster than shutil for large onedir payloads
+            dst.mkdir(parents=True, exist_ok=True)
+            cmd = [
+                "robocopy",
+                str(src),
+                str(dst),
+                "/E",
+                "/NFL",
+                "/NDL",
+                "/NJH",
+                "/NJS",
+                "/NC",
+                "/NS",
+                "/NP",
+                "/R:1",
+                "/W:1",
+                "/MT:8",
+                "/XF",
+                "*.priv",
+                "*.pyc",
+                "/XD",
+                "__pycache__",
+            ]
+            # DEVNULL avoids rare communicate() edge cases under test/CI pipes
+            r = subprocess.run(
+                cmd,
+                check=False,
+                stdin=subprocess.DEVNULL,
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+                timeout=300,
+            )
+            # robocopy: 0–7 = success with optional extras; ≥8 = failure
+            if r.returncode < 8 and dst.is_dir() and any(dst.iterdir()):
+                return
+        except Exception:
+            # Any robocopy issue → shutil fallback
+            pass
+
     try:
+        # If robocopy left a partial tree, clear before shutil
+        if dst.exists():
+            _rmtree_best_effort(dst)
         shutil.copytree(src, dst, ignore=_ignore)
     except OSError as exc:
         raise RuntimeError(
@@ -290,14 +345,27 @@ def should_skip_bulk_tree_copy(
 
 
 def strip_all_private_keys(root: Path) -> list[str]:
-    """Remove every *.priv under root (shared client + node). Returns removed paths."""
+    """Remove known *.priv slip-ins (shared client + node). Avoids full-tree rglob."""
     removed: list[str] = []
     if not root.is_dir():
         return removed
-    for p in root.rglob("*.priv"):
+    # Known layouts only — full rglob on a frozen onedir is multi-second on HDDs
+    candidates = (
+        root / "secrets",
+        root / "_internal" / "secrets",
+        root / "client" / "secrets",
+        root / "payload" / "secrets",
+    )
+    for folder in candidates:
+        if not folder.is_dir():
+            continue
         try:
-            p.unlink()
-            removed.append(str(p))
+            for p in folder.glob("*.priv"):
+                try:
+                    p.unlink()
+                    removed.append(str(p))
+                except OSError:
+                    pass
         except OSError:
             pass
     return removed
@@ -308,13 +376,21 @@ def _find_payload_secrets(payload_dir: Path) -> Path | None:
     for cand in (
         payload_dir / "secrets",
         payload_dir.parent / "secrets",
+        payload_dir / "_internal" / "secrets",
+        payload_dir / "client" / "secrets",
     ):
         if (cand / NODE_PUB).is_file():
             return cand
-    for p in payload_dir.rglob(NODE_PUB):
-        parent = p.parent
-        if parent.name == "secrets":
-            return parent
+    # One shallow level only (no full-tree rglob)
+    try:
+        for child in payload_dir.iterdir():
+            if not child.is_dir():
+                continue
+            for cand in (child / "secrets", child / "_internal" / "secrets"):
+                if (cand / NODE_PUB).is_file():
+                    return cand
+    except OSError:
+        pass
     return None
 
 
@@ -385,6 +461,59 @@ def resolve_shortcut_icon(install_dir: Path, target: Path) -> Path:
     return target
 
 
+def _ps_escape_double(s: str) -> str:
+    """Escape for PowerShell double-quoted string."""
+    return s.replace("`", "``").replace('"', '`"').replace("$", "`$")
+
+
+def _create_shortcuts_batch(
+    items: list[tuple[Path, Path, Path, Path | None, str | None, bool]],
+) -> None:
+    """Create many .lnk files in one PowerShell process (avoids multi-second cold starts).
+
+    Each item: (target, link_path, workdir, icon_or_None, description_or_None, run_as_admin).
+    """
+    if not items:
+        return
+    for _t, link_path, _w, _i, _d, _r in items:
+        try:
+            link_path.parent.mkdir(parents=True, exist_ok=True)
+        except OSError:
+            pass
+
+    parts = ["$ws = New-Object -ComObject WScript.Shell"]
+    for target, link_path, workdir, icon, description, run_as_admin in items:
+        icon_path = icon or resolve_shortcut_icon(workdir, target)
+        desc = description or (
+            f"{SHORTCUT_DISPLAY_NAME} VPN Client {VERSION} "
+            "(open normally; Connect requests residual privilege)"
+        )
+        desc_ps = _ps_escape_double(desc)
+        parts.append(
+            f"$s = $ws.CreateShortcut({str(link_path)!r}); "
+            f"$s.TargetPath = {str(target)!r}; "
+            f"$s.WorkingDirectory = {str(workdir)!r}; "
+            f'$s.Description = "{desc_ps}"; '
+            f"$s.IconLocation = {str(icon_path)!r} + ',0'; "
+            f"$s.Save()"
+        )
+        if run_as_admin:
+            parts.append(
+                f"$p = {str(link_path)!r}; "
+                f"$b = [System.IO.File]::ReadAllBytes($p); "
+                f"if ($b.Length -gt 0x15) {{ $b[0x15] = $b[0x15] -bor 0x20; "
+                f"[System.IO.File]::WriteAllBytes($p, $b) }}"
+            )
+    ps = "; ".join(parts)
+    subprocess.run(
+        ["powershell", "-NoProfile", "-NonInteractive", "-Command", ps],
+        check=False,
+        capture_output=True,
+        text=True,
+        timeout=45,
+    )
+
+
 def _create_shortcut(
     target: Path,
     link_path: Path,
@@ -394,44 +523,9 @@ def _create_shortcut(
     description: str | None = None,
     run_as_admin: bool = False,
 ) -> None:
-    """Create .lnk with brand logo icon.
-
-    Default *run_as_admin* is False so day-to-day launch is a standard user;
-    residual privilege is requested on Connect (UAC once) or via residual helper.
-    """
-    link_path.parent.mkdir(parents=True, exist_ok=True)
-    icon_path = icon or resolve_shortcut_icon(workdir, target)
-    desc = description or (
-        f"{SHORTCUT_DISPLAY_NAME} VPN Client {VERSION} "
-        "(open normally; Connect requests residual privilege)"
-    )
-    # Escape for PowerShell double-quoted string
-    desc_ps = desc.replace("`", "``").replace('"', '`"').replace("$", "`$")
-    # PowerShell COM shortcut + IconLocation; optional "Run as administrator" bit
-    runas_bit = (
-        f"$p = {str(link_path)!r}; "
-        f"$b = [System.IO.File]::ReadAllBytes($p); "
-        f"if ($b.Length -gt 0x15) {{ $b[0x15] = $b[0x15] -bor 0x20; "
-        f"[System.IO.File]::WriteAllBytes($p, $b) }}"
-        if run_as_admin
-        else ""
-    )
-    ps = (
-        f'$ws = New-Object -ComObject WScript.Shell; '
-        f'$s = $ws.CreateShortcut({str(link_path)!r}); '
-        f'$s.TargetPath = {str(target)!r}; '
-        f'$s.WorkingDirectory = {str(workdir)!r}; '
-        f'$s.Description = "{desc_ps}"; '
-        f'$s.IconLocation = {str(icon_path)!r} + ",0"; '
-        f"$s.Save(); "
-        f"{runas_bit}"
-    )
-    subprocess.run(
-        ["powershell", "-NoProfile", "-NonInteractive", "-Command", ps],
-        check=False,
-        capture_output=True,
-        text=True,
-        timeout=30,
+    """Create one .lnk with brand logo icon (thin wrapper around batch helper)."""
+    _create_shortcuts_batch(
+        [(target, link_path, workdir, icon, description, run_as_admin)]
     )
 
 
@@ -570,11 +664,15 @@ def install(
         installed_exe = candidates[0]
 
     if not secrets_written:
-        # Still launch, but user will see a clear secrets error from the app
-        print(
-            "WARNING: admission secrets not found in installer payload. "
-            f"Place {CLIENT_PRIV} and {NODE_PUB} under {INSTALL_DIR / 'secrets'}"
-        )
+        # Still launch; app surfaces secrets error. Avoid console I/O on windowed builds.
+        try:
+            if sys.stdout is not None and sys.stdout.isatty():
+                print(
+                    "WARNING: admission secrets not found in installer payload. "
+                    f"Place {CLIENT_PRIV} and {NODE_PUB} under {INSTALL_DIR / 'secrets'}"
+                )
+        except Exception:
+            pass
 
     # Brand logo ICO next to installed exe (known paths only — no full-tree rglob)
     try:
@@ -628,20 +726,18 @@ def install(
     if not inv.restore_internet_entry and restore_bat.is_file():
         inv = inventory_install_bundle(INSTALL_DIR, platform="win32")
     if not inv.complete:
-        print(
-            "WARNING: install bundle incomplete — need client .exe and "
-            f"Restore Internet under {INSTALL_DIR} "
-            f"(client={inv.client_entry!r} restore={inv.restore_internet_entry!r})"
-        )
+        try:
+            if sys.stdout is not None and sys.stdout.isatty():
+                print(
+                    "WARNING: install bundle incomplete — need client .exe and "
+                    f"Restore Internet under {INSTALL_DIR} "
+                    f"(client={inv.client_entry!r} restore={inv.restore_internet_entry!r})"
+                )
+        except Exception:
+            pass
 
-    # Best-effort: scoped Windows Defender Firewall allows for residual Connect
-    try:
-        from client.windows.firewall_allow import apply_windows_fw_allows
-
-        apply_windows_fw_allows(program_path=str(installed_exe))
-    except Exception:
-        # May fail without elevation; AllowFirewall.bat / UAC Connect still applies
-        pass
+    # Skip heavy firewall probe during setup (AllowFirewall.bat / Connect UAC covers it).
+    # netsh under install was a common multi-second hang before progress advanced.
 
     # Launch wrapper: allow FW, run app, residual restore on exit (Quit path)
     launch_bat = INSTALL_DIR / "LaunchPrivacyRestored.bat"
@@ -658,54 +754,73 @@ def install(
         launch_bat = installed_exe
 
     _progress(5, "Creating Start Menu and Desktop shortcuts...")
-    # Start menu + desktop shortcuts  -  launch via wrapper; Restore Internet = failsafe
+    # One PowerShell process for all .lnk files (six separate spawns were multi-second)
     try:
         shortcut_target = launch_bat if launch_bat.is_file() else installed_exe
-        _create_shortcut(
-            shortcut_target,
-            START_MENU / f"{SHORTCUT_DISPLAY_NAME}.lnk",
-            INSTALL_DIR,
-            icon=icon,
-        )
-        _create_shortcut(
-            shortcut_target,
-            DESKTOP / f"{SHORTCUT_DISPLAY_NAME}.lnk",
-            INSTALL_DIR,
-            icon=icon,
-        )
-        # Also keep legacy RestorePrivacy.lnk for upgrades that look for old name
-        _create_shortcut(
-            shortcut_target,
-            START_MENU / f"{APP_NAME}.lnk",
-            INSTALL_DIR,
-            icon=icon,
-        )
+        batch: list[tuple[Path, Path, Path, Path | None, str | None, bool]] = [
+            (
+                shortcut_target,
+                START_MENU / f"{SHORTCUT_DISPLAY_NAME}.lnk",
+                INSTALL_DIR,
+                icon,
+                None,
+                False,
+            ),
+            (
+                shortcut_target,
+                DESKTOP / f"{SHORTCUT_DISPLAY_NAME}.lnk",
+                INSTALL_DIR,
+                icon,
+                None,
+                False,
+            ),
+            # Legacy name for upgrades that look for old Start Menu entry
+            (
+                shortcut_target,
+                START_MENU / f"{APP_NAME}.lnk",
+                INSTALL_DIR,
+                icon,
+                None,
+                False,
+            ),
+        ]
         if restore_bat.is_file():
             _ri_desc = (
                 "WARNING: erases ALL Restore Privacy; contact "
                 "rus@restoreprivacy.online for a new download link"
             )
-            _create_shortcut(
-                restore_bat,
-                START_MENU / "Restore Internet.lnk",
-                INSTALL_DIR,
-                icon=icon,
-                description=_ri_desc,
+            batch.append(
+                (
+                    restore_bat,
+                    START_MENU / "Restore Internet.lnk",
+                    INSTALL_DIR,
+                    icon,
+                    _ri_desc,
+                    False,
+                )
             )
-            _create_shortcut(
-                restore_bat,
-                DESKTOP / "Restore Internet.lnk",
-                INSTALL_DIR,
-                icon=icon,
-                description=_ri_desc,
+            batch.append(
+                (
+                    restore_bat,
+                    DESKTOP / "Restore Internet.lnk",
+                    INSTALL_DIR,
+                    icon,
+                    _ri_desc,
+                    False,
+                )
             )
         if allow_bat.is_file():
-            _create_shortcut(
-                allow_bat,
-                START_MENU / "Allow Firewall for Privacy Restored.lnk",
-                INSTALL_DIR,
-                icon=icon,
+            batch.append(
+                (
+                    allow_bat,
+                    START_MENU / "Allow Firewall for Privacy Restored.lnk",
+                    INSTALL_DIR,
+                    icon,
+                    None,
+                    False,
+                )
             )
+        _create_shortcuts_batch(batch)
     except Exception:
         # Shortcuts are nice-to-have; install still succeeds
         pass
@@ -755,6 +870,21 @@ def install(
     return installed_exe
 
 
+def _close_pyi_splash(status: str | None = None) -> None:
+    """Close PyInstaller bootloader splash once Tk (or console fallback) is ready."""
+    try:
+        import pyi_splash  # type: ignore[import-not-found]
+
+        if status:
+            try:
+                pyi_splash.update_text(status)
+            except Exception:
+                pass
+        pyi_splash.close()
+    except Exception:
+        pass
+
+
 def run_installer_progress_ui(*, launch: bool = True) -> int:
     """Standard installer window: title, status line, determinate progress bar."""
     import threading
@@ -774,8 +904,10 @@ def run_installer_progress_ui(*, launch: bool = True) -> int:
         except Exception:
             pass
 
+    _close_pyi_splash("Starting setup…")
+
     root = tk.Tk()
-    root.title(f"{SHORTCUT_DISPLAY_NAME} Setup")
+    root.title(f"{SHORTCUT_DISPLAY_NAME} Setup v{VERSION}")
     root.geometry("480x220")
     root.resizable(False, False)
     try:
@@ -908,9 +1040,17 @@ def main() -> int:
     # Prefer standard progress window (double-click / frozen setup)
     if sys.platform == "win32":
         try:
+            # Splash (if any) stays up until Tk window builds inside run_installer_progress_ui
             return run_installer_progress_ui(launch=True)
         except Exception as gui_exc:
-            print(f"Installer GUI unavailable ({gui_exc}); using console path.", file=sys.stderr)
+            _close_pyi_splash()
+            try:
+                print(
+                    f"Installer GUI unavailable ({gui_exc}); using console path.",
+                    file=sys.stderr,
+                )
+            except Exception:
+                pass
 
     try:
         path = install(launch=True)
