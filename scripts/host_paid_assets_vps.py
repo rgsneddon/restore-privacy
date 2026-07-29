@@ -1,14 +1,16 @@
 #!/usr/bin/env python3
-"""Collect per-device product installers and host them on the Iceland VPS.
+"""Collect per-device product installers and host them on the Helsinki store.
 
 Enumerates the shipped catalog (one package per platform: windows, android,
 macos, ios, linux), stages files under ``status_page/assets/{VERSION}/``, and
-optionally uploads to **82.221.101.241** at::
+optionally uploads to the **dedicated Helsinki** paid-asset host (default
+``135.181.152.10``) at::
 
   /opt/restore-privacy/paid_assets/{VERSION}/{filename}
 
-The status host (Render) completes paid downloads by proxying from that store
-(``open_release_asset`` → local or Iceland HTTP with ``RPT_ASSET_FETCH_TOKEN``).
+The Iceland residual monopin (``82.221.101.241``) is **node-only** — do not use
+it as the installer CDN. Status host (Render) proxies paid downloads from the
+Helsinki store (``open_release_asset`` + ``RPT_ASSET_FETCH_TOKEN``).
 
 Usage::
 
@@ -18,19 +20,25 @@ Usage::
   # Stage from releases/{VERSION} or existing status_page/assets into paid layout
   python scripts/host_paid_assets_vps.py --stage
 
-  # Upload to Iceland VPS + install/restart token-gated serve (needs SSH)
-  export RPT_SSH_USER=raskul RPT_SSH_SUDO=1 RPT_SSH_KEY=~/.ssh/id_ed25519_restore_privacy_vps
+  # Upload to Helsinki store + install/restart token-gated serve (needs SSH)
+  export RPT_SSH_HOST=135.181.152.10 RPT_SSH_USER=root
+  export RPT_SSH_KEY=~/.ssh/id_ed25519_20260725
   export RPT_ASSET_FETCH_TOKEN='long-random-secret'
   python scripts/host_paid_assets_vps.py --stage --upload --install-serve
 
   # Dry-run upload plan
   python scripts/host_paid_assets_vps.py --upload --dry-run
 
-Environment (SSH — same as deploy_rpt_node.py):
-  RPT_SSH_HOST  default 82.221.101.241
-  RPT_SSH_USER  default root (FlokiNET often raskul + RPT_SSH_SUDO=1)
+  # Remove paid-assets tree + unit from Iceland residual node (node-only cleanup)
+  export RPT_SSH_HOST=82.221.101.241 RPT_SSH_USER=raskul RPT_SSH_SUDO=1
+  export RPT_SSH_KEY=~/.ssh/id_ed25519_restore_privacy_vps
+  python scripts/host_paid_assets_vps.py --remove-iceland-paid-assets
+
+Environment (SSH):
+  RPT_SSH_HOST  default Helsinki store host (payments.DEFAULT_VPS_ASSET_HOST)
+  RPT_SSH_USER  default root
   RPT_SSH_KEY / RPT_SSH_PASSWORD
-  RPT_ASSET_FETCH_TOKEN  shared secret for VPS HTTP serve + Render fetch
+  RPT_ASSET_FETCH_TOKEN  shared secret for store HTTP serve + Render fetch
 """
 
 from __future__ import annotations
@@ -140,7 +148,8 @@ def _ssh_target() -> tuple[str, str, str | None, Path | None]:
     if key_path is None or not key_path.is_file():
         home = Path.home() / ".ssh"
         for name in (
-            "id_ed25519_restore_privacy_vps",
+            "id_ed25519_20260725",  # Helsinki store
+            "id_ed25519_restore_privacy_vps",  # Iceland residual node
             "id_ed25519",
             "id_rsa",
         ):
@@ -151,9 +160,84 @@ def _ssh_target() -> tuple[str, str, str | None, Path | None]:
     if not password and (key_path is None or not key_path.is_file()):
         raise SystemExit(
             "Need RPT_SSH_PASSWORD or SSH key (RPT_SSH_KEY / "
-            "~/.ssh/id_ed25519_restore_privacy_vps)"
+            "~/.ssh/id_ed25519_20260725 or id_ed25519_restore_privacy_vps)"
         )
     return host, user, password, key_path
+
+
+# Iceland residual monopin — node-only; paid installers live on Helsinki.
+ICELAND_RESIDUAL_SSH_HOST = "82.221.101.241"
+ICELAND_PAID_ASSETS_ROOT = "/opt/restore-privacy/paid_assets"
+
+
+def remove_iceland_paid_assets(*, dry_run: bool = False) -> int:
+    """Stop paid-asset serve on Iceland residual host and delete installer tree.
+
+    Does **not** touch residual node software, keys, or wipe timers — only the
+    paid_assets directory and ``rpt-paid-assets`` systemd unit.
+    """
+    host = (
+        os.environ.get("RPT_SSH_HOST", ICELAND_RESIDUAL_SSH_HOST).strip()
+        or ICELAND_RESIDUAL_SSH_HOST
+    )
+    # Force Iceland residual defaults for this op unless operator overrode user/key
+    if not os.environ.get("RPT_SSH_HOST", "").strip():
+        os.environ["RPT_SSH_HOST"] = ICELAND_RESIDUAL_SSH_HOST
+    if not os.environ.get("RPT_SSH_USER", "").strip():
+        os.environ["RPT_SSH_USER"] = "raskul"
+    if not os.environ.get("RPT_SSH_SUDO", "").strip():
+        os.environ["RPT_SSH_SUDO"] = "1"
+
+    remote_root = ICELAND_PAID_ASSETS_ROOT
+    unit = UNIT_NAME
+    print(f"iceland_cleanup host={host} root={remote_root} unit={unit}")
+    if dry_run:
+        print("dry-run: would stop/disable unit, remove unit file, rm -rf paid_assets")
+        return 0
+
+    host, user, password, key_path = _ssh_target()
+    use_openssh = password is None and key_path is not None and _openssh_available()
+    script = (
+        f"set -e; "
+        f"systemctl stop {unit} 2>/dev/null || true; "
+        f"systemctl disable {unit} 2>/dev/null || true; "
+        f"rm -f /etc/systemd/system/{unit}; "
+        f"systemctl daemon-reload 2>/dev/null || true; "
+        f"rm -rf {remote_root}; "
+        f"echo REMOVED_ROOT; "
+        f"test ! -e {remote_root} && echo paid_assets_absent=yes || echo paid_assets_absent=no; "
+        f"systemctl is-active {unit} 2>/dev/null || echo unit_inactive; "
+        f"ss -lntp 2>/dev/null | grep -E ':8081|:44044' || true; "
+        f"pgrep -af 'rpt|node|serve_paid' 2>/dev/null | head -20 || true"
+    )
+    if use_openssh:
+        assert key_path is not None
+        code, out = _ssh_run_openssh(
+            script, host=host, user=user, key_path=key_path, sudo=True
+        )
+        print(out)
+        if code != 0:
+            print(f"ERROR iceland cleanup failed code={code}", file=sys.stderr)
+            return 1
+        if "paid_assets_absent=yes" not in out and "REMOVED_ROOT" not in out:
+            # tolerate partial if tree already gone
+            if "paid_assets_absent=no" in out:
+                print("ERROR paid_assets still present", file=sys.stderr)
+                return 1
+        print(f"iceland_cleanup_ok host={host}")
+        return 0
+
+    client, host, user = _ssh_connect()
+    use_sudo = _want_sudo(user)
+    try:
+        code, out = _run(client, script, sudo=use_sudo, user=user)
+        print(out)
+        if code != 0:
+            return 1
+        print(f"iceland_cleanup_ok host={host}")
+        return 0
+    finally:
+        client.close()
 
 
 def _ssh_connect():
@@ -487,19 +571,6 @@ def upload_packages(
     pkgs = list_packages(version)
     ver = pkgs[0]["version"]
     local_dir = STATUS / "assets" / ver
-    for p in pkgs:
-        f = local_dir / p["filename"]
-        if not f.is_file() or f.stat().st_size < 1_000_000:
-            print(f"missing or tiny local stage: {f}", file=sys.stderr)
-            print("Run with --stage first.", file=sys.stderr)
-            return 1
-        if p["platform"] == "macos":
-            try:
-                _assert_macos_cfbundle(f, ver)
-            except (RuntimeError, FileNotFoundError, ValueError) as e:
-                print(f"ERROR: {e}", file=sys.stderr)
-                return 1
-
     remote_root = os.environ.get(
         "RPT_VPS_ASSET_REMOTE_ROOT", DEFAULT_VPS_ASSET_REMOTE_ROOT
     ).strip() or DEFAULT_VPS_ASSET_REMOTE_ROOT
@@ -513,6 +584,19 @@ def upload_packages(
     if dry_run:
         print("dry-run: no SSH")
         return 0
+
+    for p in pkgs:
+        f = local_dir / p["filename"]
+        if not f.is_file() or f.stat().st_size < 1_000_000:
+            print(f"missing or tiny local stage: {f}", file=sys.stderr)
+            print("Run with --stage first.", file=sys.stderr)
+            return 1
+        if p["platform"] == "macos":
+            try:
+                _assert_macos_cfbundle(f, ver)
+            except (RuntimeError, FileNotFoundError, ValueError) as e:
+                print(f"ERROR: {e}", file=sys.stderr)
+                return 1
 
     host, user, password, key_path = _ssh_target()
     use_openssh = (
@@ -667,7 +751,10 @@ WantedBy=multi-user.target
 
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(
-        description="Stage per-device installers and host them on the Iceland VPS"
+        description=(
+            "Stage per-device installers and host them on the Helsinki paid store "
+            "(not the Iceland residual node)"
+        )
     )
     ap.add_argument(
         "--version",
@@ -687,17 +774,17 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument(
         "--upload",
         action="store_true",
-        help="Upload staged packages to Iceland VPS paid_assets path",
+        help="Upload staged packages to Helsinki paid_assets path",
     )
     ap.add_argument(
         "--install-serve",
         action="store_true",
-        help="Install/restart token-gated HTTP serve on VPS (with --upload)",
+        help="Install/restart token-gated HTTP serve on store host (with --upload)",
     )
     ap.add_argument(
         "--dry-run",
         action="store_true",
-        help="With --upload: print plan only (no SSH)",
+        help="With --upload or --remove-iceland-paid-assets: print plan only (no SSH)",
     )
     ap.add_argument(
         "--force",
@@ -707,10 +794,21 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument(
         "--install-serve-only",
         action="store_true",
-        help="Only install/restart the token-gated VPS HTTP serve (no package upload)",
+        help="Only install/restart the token-gated store HTTP serve (no package upload)",
+    )
+    ap.add_argument(
+        "--remove-iceland-paid-assets",
+        action="store_true",
+        help=(
+            "On Iceland residual host: stop/disable rpt-paid-assets and delete "
+            "/opt/restore-privacy/paid_assets only (node-only cleanup)"
+        ),
     )
     args = ap.parse_args(argv)
     ver = (args.version or "").strip() or None
+
+    if args.remove_iceland_paid_assets:
+        return remove_iceland_paid_assets(dry_run=args.dry_run)
 
     if args.install_serve_only:
         return install_serve_only(version=ver)

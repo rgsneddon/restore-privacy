@@ -1,4 +1,4 @@
-"""Per-device catalog + Iceland VPS paid-asset host path (shipped helpers)."""
+"""Per-device catalog + Helsinki paid-asset host path (shipped helpers)."""
 
 from __future__ import annotations
 
@@ -87,9 +87,19 @@ class TestVpsAssetOpen(unittest.TestCase):
     def test_vps_url_per_device_filename(self):
         for a in available_downloads():
             url = payments.vps_asset_url(a.filename)
-            self.assertIn("82.221.101.241", url)
+            # Default store is dedicated Helsinki — not Iceland residual node
+            self.assertNotIn("82.221.101.241", url)
+            self.assertIn("135.181.152.10", url)
             self.assertIn("/paid-assets/", url)
             self.assertTrue(url.endswith(f"/{RELEASE_VERSION}/{a.filename}"))
+
+    def test_default_base_is_helsinki_not_iceland_node(self):
+        base = payments.vps_asset_base_url()
+        self.assertEqual(base, payments.DEFAULT_VPS_ASSET_BASE.rstrip("/"))
+        self.assertIn("135.181.152.10", base)
+        self.assertNotIn("82.221.101.241", base)
+        self.assertEqual(payments.DEFAULT_VPS_ASSET_HOST, "135.181.152.10")
+        self.assertEqual(payments.ICELAND_RESIDUAL_NODE_HOST, "82.221.101.241")
 
     def test_open_prefers_local_vps_layout_dir(self):
         # Mirror Iceland on-disk layout under a temp RPT_ASSET_DIR
@@ -112,7 +122,7 @@ class TestVpsAssetOpen(unittest.TestCase):
     def test_open_vps_http_with_token(self):
         fname = next(a.filename for a in available_downloads() if a.platform == "windows")
         os.environ["RPT_ASSET_FETCH_TOKEN"] = "unit-vps-secret"
-        os.environ["RPT_VPS_ASSET_BASE"] = "http://82.221.101.241:8081/paid-assets"
+        os.environ["RPT_VPS_ASSET_BASE"] = "https://135.181.152.10.sslip.io/paid-assets"
         # Empty local search
         empty = Path(self._td.name) / "empty"
         empty.mkdir()
@@ -175,12 +185,14 @@ class TestHostScriptStructural(unittest.TestCase):
     def test_script_wires_five_devices_and_vps_path(self):
         text = (ROOT / "scripts" / "host_paid_assets_vps.py").read_text(encoding="utf-8")
         self.assertIn("list_catalog_platform_packages", text)
-        self.assertIn("82.221.101.241", text)
+        self.assertIn("135.181.152.10", text)
         self.assertIn("paid_assets", text)
         self.assertIn("--list", text)
         self.assertIn("--stage", text)
         self.assertIn("--upload", text)
         self.assertIn("--install-serve-only", text)
+        self.assertIn("--remove-iceland-paid-assets", text)
+        self.assertIn("remove_iceland_paid_assets", text)
         self.assertIn("install_serve_only", text)
         self.assertIn("skip_if_present", text)
         for plat in ("windows", "android", "macos", "ios", "linux"):

@@ -2452,16 +2452,21 @@ def github_auth_token() -> str:
     return ""
 
 
-# Iceland product VPS (same host as RPT node) — paid installer store.
-DEFAULT_VPS_ASSET_HOST = "82.221.101.241"
+# Dedicated Helsinki paid-installer store (NOT the Iceland residual node).
+# Iceland residual monopin remains 82.221.101.241:44044 for VPN only.
+DEFAULT_VPS_ASSET_HOST = "135.181.152.10"
 DEFAULT_VPS_ASSET_PORT = 8081
 DEFAULT_VPS_ASSET_REMOTE_ROOT = "/opt/restore-privacy/paid_assets"
-# HTTP path prefix on the VPS paid-asset server.
+# Preferred public base (HTTPS via sslip.io) when RPT_VPS_ASSET_BASE is unset.
+DEFAULT_VPS_ASSET_BASE = "https://135.181.152.10.sslip.io/paid-assets"
+# HTTP path prefix on the paid-asset server.
 VPS_ASSET_HTTP_PREFIX = "/paid-assets"
+# Residual node IP — never use as the default paid-installer CDN.
+ICELAND_RESIDUAL_NODE_HOST = "82.221.101.241"
 
 
 def vps_asset_fetch_token() -> str:
-    """Shared secret for status host → Iceland VPS asset fetch (never browser-facing).
+    """Shared secret for status host → Helsinki paid-asset fetch (never browser-facing).
 
     Reads process env first, then admin-persisted processor store (same keys),
     so a token saved via ``/admin`` works without a Render dashboard API key.
@@ -2484,10 +2489,12 @@ def vps_asset_fetch_token() -> str:
 
 
 def vps_asset_base_url() -> str:
-    """Base URL for Iceland-hosted paid installers (no trailing slash).
+    """Base URL for Helsinki paid installers (no trailing slash).
 
     Override with ``RPT_VPS_ASSET_BASE`` e.g.
-    ``http://82.221.101.241:8081/paid-assets``.
+    ``https://135.181.152.10.sslip.io/paid-assets`` or
+    ``http://135.181.152.10:8081/paid-assets``.
+    Default is the dedicated store host — **not** the Iceland residual node.
     """
     raw = os.environ.get("RPT_VPS_ASSET_BASE", "").strip().rstrip("/")
     if not raw:
@@ -2499,13 +2506,18 @@ def vps_asset_base_url() -> str:
             raw = ""
     if raw:
         return raw
-    host = os.environ.get("RPT_VPS_ASSET_HOST", DEFAULT_VPS_ASSET_HOST).strip()
-    port = os.environ.get("RPT_VPS_ASSET_PORT", str(DEFAULT_VPS_ASSET_PORT)).strip()
+    # Prefer full default base (HTTPS) when host/port env not overridden
+    host_env = (os.environ.get("RPT_VPS_ASSET_HOST") or "").strip()
+    port_env = (os.environ.get("RPT_VPS_ASSET_PORT") or "").strip()
+    if not host_env and not port_env:
+        return DEFAULT_VPS_ASSET_BASE.rstrip("/")
+    host = host_env or DEFAULT_VPS_ASSET_HOST
+    port = port_env or str(DEFAULT_VPS_ASSET_PORT)
     return f"http://{host}:{port}{VPS_ASSET_HTTP_PREFIX}"
 
 
 def vps_asset_url(filename: str, *, version: str | None = None) -> str:
-    """Full URL for one catalog installer on the Iceland VPS paid-asset store."""
+    """Full URL for one catalog installer on the Helsinki paid-asset store."""
     from downloads import RELEASE_VERSION
 
     ver = (version or RELEASE_VERSION).strip()
@@ -2527,7 +2539,8 @@ def asset_search_dirs() -> list[Path]:
 
     Prefer ``status_page/assets/{VERSION}/`` first — that path is what Render can
     ship when ``rootDir`` is ``status_page`` (repo ``releases/`` is not deployed).
-    Also includes the Iceland VPS on-disk layout when status runs on that host
+    Also includes the dedicated store on-disk layout when status runs co-located
+    with the Helsinki paid-asset host
     (``/opt/restore-privacy/paid_assets/{VERSION}``).
     """
     out: list[Path] = []
@@ -2541,7 +2554,7 @@ def asset_search_dirs() -> list[Path]:
     out.append(status / "assets" / RELEASE_VERSION)
     # Monorepo checkout: releases/{VERSION} (gitignored; local/dev only)
     out.append(status.parent / "releases" / RELEASE_VERSION)
-    # Iceland VPS layout (when paid fulfilment runs co-located with the node)
+    # Helsinki store layout (when fulfilment is co-located with the asset host)
     remote_root = os.environ.get(
         "RPT_VPS_ASSET_REMOTE_ROOT", DEFAULT_VPS_ASSET_REMOTE_ROOT
     ).strip()
@@ -2594,7 +2607,7 @@ def open_release_asset(
 
     Resolution order:
       1. Local file under :func:`asset_search_dirs` (operator-staged / VPS on-disk)
-      2. Iceland VPS paid-asset HTTP store (:func:`vps_asset_url` + fetch token)
+      2. Helsinki paid-asset HTTP store (:func:`vps_asset_url` + fetch token)
       3. GitHub Releases API with :func:`github_auth_token` (private repos)
       4. Direct release download URL with the same token (fallback)
 
@@ -2629,7 +2642,7 @@ def open_release_asset(
         except OSError:
             continue
 
-    # 2) Iceland VPS HTTP store (status on Render → fetch from product host).
+    # 2) Helsinki paid-asset HTTP store (status on Render → dedicated store host).
     # Spool the full object before returning so a VPS mid-stream reset does not
     # leave the browser with a partial body after the grant was opened (paired
     # with consume-after-successful-client-stream in app.py /download).
@@ -5551,7 +5564,7 @@ def check_fulfilment_ready(
         "ok": False,
         "error": "no_asset_source",
         "hint": (
-            "Set RPT_ASSET_FETCH_TOKEN + host installers on Iceland VPS "
+            "Set RPT_ASSET_FETCH_TOKEN + host installers on Helsinki store "
             "(scripts/host_paid_assets_vps.py), or stage status_page/assets/{version}/, "
             "or set RPT_GITHUB_TOKEN for private GitHub Release assets"
         ),

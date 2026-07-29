@@ -438,12 +438,12 @@ def _vps_assets_readiness() -> dict[str, Any]:
 
 VPS_ASSETS_PLUGIN = ProcessorPlugin(
     id="vps_assets",
-    display_name="Residual VPS paid installers (IS host)",
+    display_name="Helsinki paid installers (dedicated store)",
     role="paid_installer_fetch",
     description=(
-        "Shared secret for status host → residual peer paid-asset HTTP fetch "
-        "(X-RPT-Asset-Token), typically the IS host installer store. "
-        "Must match rpt-paid-assets.service on that VPS. Never commit the token; "
+        "Shared secret for status host → dedicated Helsinki paid-asset HTTP fetch "
+        "(X-RPT-Asset-Token). Not the Iceland residual node. "
+        "Must match rpt-paid-assets.service on the store host. Never commit the token; "
         "set here or as Render env RPT_ASSET_FETCH_TOKEN."
     ),
     variables=(
@@ -458,12 +458,12 @@ VPS_ASSETS_PLUGIN = ProcessorPlugin(
         ),
         ProcessorVariable(
             key="RPT_VPS_ASSET_BASE",
-            label="VPS paid-asset base URL (optional)",
-            purpose="Default http://82.221.101.241:8081/paid-assets",
+            label="Paid-asset base URL (optional)",
+            purpose="Default https://135.181.152.10.sslip.io/paid-assets (Helsinki store)",
             required=False,
             secret=False,
             input_type="text",
-            placeholder="http://82.221.101.241:8081/paid-assets",
+            placeholder="https://135.181.152.10.sslip.io/paid-assets",
         ),
     ),
     dashboard_links=(),

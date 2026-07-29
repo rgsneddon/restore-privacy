@@ -45,9 +45,9 @@ Collaborators and Render still need a token (or staged files) for fulfilment.
 
 This environment cannot flip visibility without `gh auth` / `GH_TOKEN`.
 
-## Fulfilment when the repo is private (preferred: Iceland VPS)
+## Fulfilment when the repo is private (preferred: Helsinki store)
 
-Paid installers for **each device** (windows / android / macos / ios / linux) are hosted on the product VPS and streamed by the status host after Stripe pays.
+Paid installers for **each device** (windows / android / macos / ios / linux) are hosted on a **dedicated Helsinki** store host and streamed by the status host after Stripe pays. The Iceland residual monopin (`82.221.101.241`) is **node-only** — not an installer CDN.
 
 ### Every commit: assure current per-device packages
 
@@ -63,39 +63,45 @@ python scripts/assure_current_packages.py --check
 python scripts/assure_current_packages.py --list
 ```
 
-After a real release version bump, re-stage and upload to Iceland
+After a real release version bump, re-stage and upload to **Helsinki**
 (`host_paid_assets_vps.py`) so fulfilment binaries match the new pin.
 
-### Operator: collect + host on Iceland (`82.221.101.241`)
+### Operator: collect + host on Helsinki (`135.181.152.10`)
 
 ```bash
 # List one package per platform
 python scripts/host_paid_assets_vps.py --list
 
-# Stage from releases/0.3.0 → status_page/assets/0.3.0
+# Stage from releases/{VERSION} → status_page/assets/{VERSION}
 python scripts/host_paid_assets_vps.py --stage
 
-# Upload each device package to /opt/restore-privacy/paid_assets/0.3.0/
-# and install token-gated HTTP serve on :8081
-export RPT_SSH_USER=raskul RPT_SSH_SUDO=1
-export RPT_SSH_KEY=~/.ssh/id_ed25519_restore_privacy_vps
+# Upload each device package to /opt/restore-privacy/paid_assets/{VERSION}/
+# and install token-gated HTTP serve on the store host
+export RPT_SSH_HOST=135.181.152.10 RPT_SSH_USER=root
+export RPT_SSH_KEY=~/.ssh/id_ed25519_20260725
 export RPT_ASSET_FETCH_TOKEN='long-random-secret'   # same value on Render
 python scripts/host_paid_assets_vps.py --stage --upload --install-serve
 
 # If packages already uploaded: only (re)start the serve unit
 python scripts/host_paid_assets_vps.py --install-serve-only
+
+# One-time: remove paid installer tree from Iceland residual node
+export RPT_SSH_HOST=82.221.101.241 RPT_SSH_USER=raskul RPT_SSH_SUDO=1
+export RPT_SSH_KEY=~/.ssh/id_ed25519_restore_privacy_vps
+python scripts/host_paid_assets_vps.py --remove-iceland-paid-assets
 ```
 
-Layout on VPS: `/opt/restore-privacy/paid_assets/{version}/{filename}`  
-HTTP (token only): `http://82.221.101.241:8081/paid-assets/{version}/{filename}`  
+Layout on store: `/opt/restore-privacy/paid_assets/{version}/{filename}`  
+HTTP (token only): `https://135.181.152.10.sslip.io/paid-assets/{version}/{filename}`  
+(or `http://135.181.152.10:8081/paid-assets/...`)  
 Header: `X-RPT-Asset-Token: <RPT_ASSET_FETCH_TOKEN>` — **401 without token** (not free).
 
 ### Render env (status host)
 
 | Variable | Purpose |
 |----------|---------|
-| `RPT_VPS_ASSET_BASE` | `http://82.221.101.241:8081/paid-assets` |
-| `RPT_ASSET_FETCH_TOKEN` | Same secret as VPS `rpt-paid-assets.service` |
+| `RPT_VPS_ASSET_BASE` | `https://135.181.152.10.sslip.io/paid-assets` |
+| `RPT_ASSET_FETCH_TOKEN` | Same secret as store `rpt-paid-assets.service` |
 | `STRIPE_SECRET_KEY` | Optional server Checkout; webhook verification uses signing secret |
 | `STRIPE_WEBHOOK_SECRET` | Required for grants (`whsec_…`) |
 
