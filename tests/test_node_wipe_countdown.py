@@ -135,15 +135,19 @@ class TestNodeWipeHtml(unittest.TestCase):
         self.assertIn("data-next-entry", html)
         self.assertIn("data-fleet-sequential", html)
         self.assertIn(str(NODE_WIPE_PERIOD_SECONDS), html)
-        # Honesty: sequential fleet / all nodes (short blurb)
+        # Honesty: sequential fleet / all nodes (short blurb) + hop failsafe
         low = html.lower()
         self.assertIn("one at a time", low)
         self.assertNotIn("simultaneous all-node wipe", low)
         self.assertNotIn("provider backups and netflow are not erased", low)
         self.assertTrue(
-            "is" in low and "ro" in low and "de" in low,
-            "blurb should name fleet peers",
+            "is" in low and "de" in low and "us" in low,
+            "blurb should name monopin fleet peers IS/DE/US",
         )
+        self.assertNotIn("is then ro then us", low)
+        self.assertIn("manual reconnection", low)
+        self.assertIn("weekly", low)
+        self.assertIn("disconnect", low)
         self.assertIn(HONESTY_BLURB, html)
 
     def test_homepage_render_includes_dual_wipe_countdown(self):

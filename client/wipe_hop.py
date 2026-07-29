@@ -1,10 +1,13 @@
-"""Background wipe-drain hop-off and preferred rejoin (no user interaction).
+"""Background wipe-drain hop-off and preferred rejoin (best-effort).
 
-When the preferred residual peer enters drain (scheduled wipe), clients hop to a
-healthy alternate catalog peer. When that peer is residual-ready again, clients
-rejoin preferred automatically.
+When the preferred residual peer enters drain (scheduled weekly wipe), clients
+**attempt** hop to a healthy alternate catalog peer. When that peer is
+residual-ready again, clients may rejoin preferred.
 
-Honesty: residual re-select + reconnect — not zero packet-loss mid-tunnel cutover.
+Honesty: residual re-select + reconnect — not zero packet-loss mid-tunnel
+cutover; hop is **not guaranteed**. Failsafe: if hop does not succeed, the
+client may disconnect or restart and will require **manual reconnection**
+whilst privacy-preserving weekly node wipedown occurs.
 """
 
 from __future__ import annotations

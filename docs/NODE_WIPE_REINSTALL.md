@@ -2,14 +2,15 @@
 
 ## Sequential fleet wipe (~7d) — **one peer at a time**
 
-Planner: `node/fleet_wipe.py` (`PREFERRED_FLEET_ORDER = IS → RO → US`).  
+Planner: `node/fleet_wipe.py` (`PREFERRED_FLEET_ORDER = IS → DE → US`).  
 Orchestrator entrypoint: `scripts/weekly_entry_rebuild.py` (still hosts the timer; fleet order is multi-peer).
 
 | Rule | Detail |
 |------|--------|
-| Order | **IS first**, then **RO**, then **US** (and any later catalog peers) — finish prior peer before starting next |
+| Order | **IS first**, then **DE**, then **US** (and any later catalog peers) — finish prior peer before starting next |
 | Concurrency | Exclusive lock — **never** concurrent multi-node wipe |
-| Continuity | Clients hop to a healthy alternate while a peer drains (not zero packet-loss) |
+| Continuity | **Best-effort** hop to a healthy alternate while a peer drains (not zero packet-loss; hop is not guaranteed) |
+| Failsafe | If hop does not succeed, the client may disconnect or restart and will require **manual reconnection** whilst privacy-preserving weekly node wipedown occurs |
 | After wipe | **Mandatory full selfhost reinstall** on the wiped peer |
 | Live | Requires `RPT_EPHEMERAL_CONFIRM=yes`; dry-run is the safe default |
 
@@ -69,7 +70,8 @@ See also `scripts/MULTIHOP_EXIT_HOP_PREP.md`.
 ## Honesty
 
 - Provider off-box backups/netflow are **not** erased by product wipe.
-- Continuity during entry wipe is **automatic residual failover to exit**, not a zero packet-loss guarantee.
+- Continuity during weekly fleet wipe is **best-effort residual hop** to a healthy catalog peer (not zero packet-loss; not a guaranteed seamless hop).
+- **Failsafe:** if hop does not succeed, the client may disconnect or restart and will require **manual reconnection** whilst privacy-preserving weekly node wipedown occurs. Press Connect again when a peer is residual-ready (full hop redesign is deferred).
 
 ## After reinstall: private capacity token
 

@@ -42,8 +42,10 @@ NODE_WIPE_HEADING = "Node data clear timer"
 
 HONESTY_BLURB = (
     "About every week we wipe and rebuild residual nodes one at a time "
-    "(IS then RO then US) so clients can hop while a peer drains. "
-    "This clock is that cycle."
+    "(IS then DE then US). Hop to another peer while one drains is best-effort "
+    "(not guaranteed). If hop does not succeed, the client may disconnect or "
+    "restart and will require manual reconnection whilst privacy-preserving "
+    "weekly node wipedown occurs. This clock is that cycle."
 )
 
 
