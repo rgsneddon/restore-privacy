@@ -512,10 +512,12 @@ class TestManualEntryAndDelete(unittest.TestCase):
     def test_mixed_order_and_running_end_balance(self) -> None:
         from accounting import (
             OPENING_BALANCE_PENCE,
+            LedgerRow,
             add_manual_entry,
             build_ledger,
             compute_net_pence,
             estimate_stripe_fee_pence,
+            sort_ledger_oldest_first,
         )
         import payments
         from datetime import datetime, timezone
@@ -541,6 +543,9 @@ class TestManualEntryAndDelete(unittest.TestCase):
         self.assertEqual(rows[0].kind, "setup")
         self.assertEqual(rows[-1].description, "Later manual")
         self.assertEqual(rows[-1].date_iso, "2026-09-01")
+        # Dates strictly non-decreasing (oldest → newest last)
+        dates = [r.date_iso for r in rows]
+        self.assertEqual(dates, sorted(dates))
         fee_pos = estimate_stripe_fee_pence(245)
         expected = OPENING_BALANCE_PENCE + compute_net_pence(245, -fee_pos) + 100
         self.assertEqual(rows[-1].balance_pence, expected)
@@ -551,6 +556,24 @@ class TestManualEntryAndDelete(unittest.TestCase):
         # Sale description names Stripe fee (not the Fees column header)
         sale = next(r for r in rows if r.kind == "sale")
         self.assertIn("Stripe fee", sale.description)
+
+        # Pure sort helper: reverse input still ends newest last
+        shuffled = list(reversed(rows))
+        ordered = sort_ledger_oldest_first(shuffled)
+        self.assertEqual(ordered[-1].date_iso, rows[-1].date_iso)
+        self.assertEqual([r.row_id for r in ordered], [r.row_id for r in rows])
+
+        # Admin HTML tbody: bottom date cell is most recent
+        from admin_panel import render_admin_accounting_page_html
+        import re
+
+        html = render_admin_accounting_page_html(rows=rows).decode("utf-8")
+        html_dates = re.findall(
+            r'<tr data-row-id="[^"]*">\s*<td>(\d{4}-\d{2}-\d{2})</td>',
+            html,
+        )
+        self.assertEqual(html_dates, dates)
+        self.assertEqual(html_dates[-1], "2026-09-01")
 
     def test_delete_manual_and_hide_setup_recompute(self) -> None:
         from accounting import (

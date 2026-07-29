@@ -676,19 +676,27 @@ def build_ledger(
                 created_at=ca,
             )
         )
-    # Oldest first, most recent last; setup first on opening day
+    lines = sort_ledger_oldest_first(lines)
+    return recompute_running_balances(lines)
+
+
+def sort_ledger_oldest_first(lines: Sequence[LedgerRow]) -> list[LedgerRow]:
+    """Stable chronological order: oldest first, **most recent last** (bottom of table).
+
+    Primary key is ``date_iso`` ascending; then ``created_at``; then kind
+    (setup before same-day sales/manuals); then ``row_id``.
+    """
     kind_order = {"setup": 0, "sale": 1, "manual": 2}
 
     def _sort_key(r: LedgerRow) -> tuple:
         return (
-            r.date_iso,
+            str(r.date_iso or ""),
             float(r.created_at or 0),
             kind_order.get(r.kind, 9),
-            r.row_id or "",
+            str(r.row_id or ""),
         )
 
-    lines.sort(key=_sort_key)
-    return recompute_running_balances(lines)
+    return sorted(lines, key=_sort_key)
 
 
 def load_grants_for_accounting() -> list[dict[str, Any]]:
