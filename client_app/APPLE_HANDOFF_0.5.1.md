@@ -2,7 +2,21 @@
 
 Catalog monopin: **0.5.1**
 
-## Catalog honesty (current paid assets on VPS)
+> **Helsinki breadcrumbs vault** is the MacBook source of truth for “what needs
+> updating” (macOS / iOS). Do **not** use a private GitHub pull of this handoff
+> as the primary task queue.
+>
+> ```bash
+> # On the Mac (token = same class as paid-assets):
+> export RPT_ASSET_FETCH_TOKEN='…'
+> python3 scripts/breadcrumbs_vault.py check --fetch
+> # or: curl -fsS -H "X-RPT-Asset-Token: $RPT_ASSET_FETCH_TOKEN" \
+> #   https://135.181.152.10.sslip.io/breadcrumbs/current/manifest.json
+> ```
+>
+> Windows operator publish: `python scripts/breadcrumbs_vault.py publish`
+
+## Catalog honesty (current paid assets on Helsinki store)
 
 | Package | Status on VPS **now** |
 |---------|------------------------|

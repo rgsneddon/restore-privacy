@@ -33,3 +33,20 @@ RPT_SSH_USER=raskul RPT_SSH_SUDO=1 python3 scripts/host_paid_assets_vps.py --sta
 ## Docs
 - `client_app/APPLE_HANDOFF_0.5.1.md`
 - `client/windows/WINDOWS_HANDOFF_0.5.1.md`
+
+## Apple breadcrumbs (Helsinki vault — not GitHub)
+
+Mac/iOS “what to update” tasks are published to the **Helsinki breadcrumbs vault**
+(not private GitHub handoff pull as the primary queue):
+
+```bash
+# Windows/Linux operator: publish live monopin snapshot
+python scripts/breadcrumbs_vault.py publish
+
+# MacBook: check needs work
+export RPT_ASSET_FETCH_TOKEN='…'   # same secret class as paid-assets
+python3 scripts/breadcrumbs_vault.py check --fetch
+```
+
+Vault URL: `https://135.181.152.10.sslip.io/breadcrumbs/current/manifest.json`
+(header `X-RPT-Asset-Token`).

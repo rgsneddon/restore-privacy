@@ -60,7 +60,6 @@ from downloads import (  # noqa: E402
 )
 from payments import (  # noqa: E402
     DEFAULT_VPS_ASSET_HOST,
-    DEFAULT_VPS_ASSET_PORT,
     DEFAULT_VPS_ASSET_REMOTE_ROOT,
     VPS_ASSET_HTTP_PREFIX,
     catalog_filenames,
@@ -69,6 +68,11 @@ from payments import (  # noqa: E402
 SERVE_SCRIPT_LOCAL = ROOT / "node" / "serve_paid_assets.py"
 SERVE_SCRIPT_REMOTE = f"{DEFAULT_VPS_ASSET_REMOTE_ROOT}/serve_paid_assets.py"
 UNIT_NAME = "rpt-paid-assets.service"
+# Backend binds loopback only; nginx owns public 443/8081 and proxies here.
+# Do NOT default install-serve to 8081/0.0.0.0 — that fights nginx and 502s the store.
+DEFAULT_SERVE_BACKEND_PORT = 18081
+DEFAULT_SERVE_BACKEND_BIND = "127.0.0.1"
+DEFAULT_BREADCRUMBS_REMOTE_ROOT = "/opt/restore-privacy/breadcrumbs"
 
 
 def list_packages(version: str | None = None) -> list[dict[str, str]]:
@@ -565,7 +569,15 @@ def install_serve_only(
             f"generated RPT_ASSET_FETCH_TOKEN (set on Render too): {token}",
             file=sys.stderr,
         )
-    port = os.environ.get("RPT_VPS_ASSET_PORT", str(DEFAULT_VPS_ASSET_PORT)).strip()
+    port = os.environ.get(
+        "RPT_VPS_ASSET_PORT", str(DEFAULT_SERVE_BACKEND_PORT)
+    ).strip()
+    bind = os.environ.get(
+        "RPT_VPS_ASSET_BIND", DEFAULT_SERVE_BACKEND_BIND
+    ).strip() or DEFAULT_SERVE_BACKEND_BIND
+    bc_root = os.environ.get(
+        "RPT_BREADCRUMBS_REMOTE_ROOT", DEFAULT_BREADCRUMBS_REMOTE_ROOT
+    ).strip() or DEFAULT_BREADCRUMBS_REMOTE_ROOT
     unit = f"""[Unit]
 Description=Restore Privacy paid asset server (token-gated)
 After=network.target
@@ -575,7 +587,8 @@ Type=simple
 Environment=RPT_ASSET_FETCH_TOKEN={token}
 Environment=RPT_VPS_ASSET_REMOTE_ROOT={remote_root}
 Environment=RPT_VPS_ASSET_PORT={port}
-Environment=RPT_VPS_ASSET_BIND=0.0.0.0
+Environment=RPT_VPS_ASSET_BIND={bind}
+Environment=RPT_BREADCRUMBS_REMOTE_ROOT={bc_root}
 Environment=RPT_CATALOG_VERSION={ver}
 ExecStart=/usr/bin/python3 {SERVE_SCRIPT_REMOTE}
 Restart=on-failure
@@ -723,8 +736,14 @@ def upload_packages(
                     file=sys.stderr,
                 )
             port = os.environ.get(
-                "RPT_VPS_ASSET_PORT", str(DEFAULT_VPS_ASSET_PORT)
+                "RPT_VPS_ASSET_PORT", str(DEFAULT_SERVE_BACKEND_PORT)
             ).strip()
+            bind = os.environ.get(
+                "RPT_VPS_ASSET_BIND", DEFAULT_SERVE_BACKEND_BIND
+            ).strip() or DEFAULT_SERVE_BACKEND_BIND
+            bc_root = os.environ.get(
+                "RPT_BREADCRUMBS_REMOTE_ROOT", DEFAULT_BREADCRUMBS_REMOTE_ROOT
+            ).strip() or DEFAULT_BREADCRUMBS_REMOTE_ROOT
             unit = f"""[Unit]
 Description=Restore Privacy paid asset server (token-gated)
 After=network.target
@@ -734,7 +753,8 @@ Type=simple
 Environment=RPT_ASSET_FETCH_TOKEN={token}
 Environment=RPT_VPS_ASSET_REMOTE_ROOT={remote_root}
 Environment=RPT_VPS_ASSET_PORT={port}
-Environment=RPT_VPS_ASSET_BIND=0.0.0.0
+Environment=RPT_VPS_ASSET_BIND={bind}
+Environment=RPT_BREADCRUMBS_REMOTE_ROOT={bc_root}
 Environment=RPT_CATALOG_VERSION={ver}
 ExecStart=/usr/bin/python3 {SERVE_SCRIPT_REMOTE}
 Restart=on-failure

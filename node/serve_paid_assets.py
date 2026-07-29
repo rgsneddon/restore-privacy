@@ -25,13 +25,31 @@ from pathlib import Path
 from urllib.parse import unquote
 
 DEFAULT_ROOT = "/opt/restore-privacy/paid_assets"
+DEFAULT_BREADCRUMBS_ROOT = "/opt/restore-privacy/breadcrumbs"
 DEFAULT_PORT = 8081
 PREFIX = "/paid-assets"
+BREADCRUMBS_PREFIX = "/breadcrumbs"
+# Safe vault file names only (no installer blobs)
+BREADCRUMB_FILES = frozenset(
+    {
+        "manifest.json",
+        "honesty.json",
+        "checklist.md",
+        "APPLE_HANDOFF.md",
+    }
+)
 
 
 def _root() -> Path:
     raw = os.environ.get("RPT_VPS_ASSET_REMOTE_ROOT", DEFAULT_ROOT).strip()
     return Path(raw or DEFAULT_ROOT).resolve()
+
+
+def _breadcrumbs_root() -> Path:
+    raw = os.environ.get(
+        "RPT_BREADCRUMBS_REMOTE_ROOT", DEFAULT_BREADCRUMBS_ROOT
+    ).strip()
+    return Path(raw or DEFAULT_BREADCRUMBS_ROOT).resolve()
 
 
 def _token() -> str:
@@ -62,10 +80,59 @@ def path_allowed_for_catalog(
     return True
 
 
+def breadcrumbs_path_allowed(rel_parts: list[str]) -> bool:
+    """Pure: allow only current|{version}/known vault filenames."""
+    if len(rel_parts) != 2:
+        return False
+    folder, name = rel_parts
+    if not folder or not name or name != Path(name).name:
+        return False
+    if ".." in folder or ".." in name:
+        return False
+    if name not in BREADCRUMB_FILES:
+        return False
+    # folder is monopin or the literal "current"
+    if folder == "current":
+        return True
+    pin = _catalog_version_pin()
+    if pin and folder != pin:
+        return False
+    return True
+
+
 class Handler(BaseHTTPRequestHandler):
     def log_message(self, format: str, *args) -> None:  # noqa: A003
         # No user-info access logs
         return
+
+    def _send_file(self, fpath: Path, *, as_attachment: bool) -> None:
+        ctype, _ = mimetypes.guess_type(str(fpath))
+        if not ctype:
+            if fpath.suffix == ".json":
+                ctype = "application/json"
+            elif fpath.suffix == ".md":
+                ctype = "text/markdown; charset=utf-8"
+            else:
+                ctype = "application/octet-stream"
+        data_len = fpath.stat().st_size
+        self.send_response(200)
+        self.send_header("Content-Type", ctype)
+        self.send_header("Content-Length", str(data_len))
+        if as_attachment:
+            self.send_header(
+                "Content-Disposition", f'attachment; filename="{fpath.name}"'
+            )
+        self.send_header("Cache-Control", "no-store")
+        self.end_headers()
+        try:
+            with fpath.open("rb") as fh:
+                while True:
+                    chunk = fh.read(65536)
+                    if not chunk:
+                        break
+                    self.wfile.write(chunk)
+        except (BrokenPipeError, ConnectionResetError, ConnectionAbortedError):
+            return
 
     def do_GET(self) -> None:  # noqa: N802
         expected = _token()
@@ -77,6 +144,30 @@ class Handler(BaseHTTPRequestHandler):
             self.send_error(401, "unauthorized")
             return
         path = unquote(self.path.split("?", 1)[0])
+
+        # --- Apple breadcrumbs vault (task metadata only) ---
+        if path.startswith(BREADCRUMBS_PREFIX + "/"):
+            rel = path[len(BREADCRUMBS_PREFIX) + 1 :].lstrip("/")
+            parts = [p for p in rel.split("/") if p and p not in (".", "..")]
+            if not breadcrumbs_path_allowed(parts):
+                self.send_error(404, "not found")
+                return
+            folder, name = parts
+            root = _breadcrumbs_root()
+            fpath = (root / folder / name).resolve()
+            try:
+                fpath.relative_to(root)
+                fpath.relative_to((root / folder).resolve())
+            except ValueError:
+                self.send_error(400, "bad path")
+                return
+            if not fpath.is_file():
+                self.send_error(404, "not found")
+                return
+            self._send_file(fpath, as_attachment=False)
+            return
+
+        # --- Paid installers ---
         if not path.startswith(PREFIX + "/"):
             self.send_error(404, "not found")
             return
@@ -115,26 +206,7 @@ class Handler(BaseHTTPRequestHandler):
         if not fpath.is_file():
             self.send_error(404, "not found")
             return
-        ctype, _ = mimetypes.guess_type(str(fpath))
-        if not ctype:
-            ctype = "application/octet-stream"
-        data_len = fpath.stat().st_size
-        self.send_response(200)
-        self.send_header("Content-Type", ctype)
-        self.send_header("Content-Length", str(data_len))
-        self.send_header("Content-Disposition", f'attachment; filename="{filename}"')
-        self.send_header("Cache-Control", "no-store")
-        self.end_headers()
-        try:
-            with fpath.open("rb") as fh:
-                while True:
-                    chunk = fh.read(65536)
-                    if not chunk:
-                        break
-                    self.wfile.write(chunk)
-        except (BrokenPipeError, ConnectionResetError, ConnectionAbortedError):
-            # Client (status host proxy) dropped mid-transfer — not a server fault.
-            return
+        self._send_file(fpath, as_attachment=True)
 
 
 def main() -> int:
@@ -143,10 +215,14 @@ def main() -> int:
         return 2
     root = _root()
     root.mkdir(parents=True, exist_ok=True)
+    _breadcrumbs_root().mkdir(parents=True, exist_ok=True)
     bind = os.environ.get("RPT_VPS_ASSET_BIND", "0.0.0.0").strip() or "0.0.0.0"
     port = int(os.environ.get("RPT_VPS_ASSET_PORT", str(DEFAULT_PORT)).strip() or DEFAULT_PORT)
     httpd = ThreadingHTTPServer((bind, port), Handler)
-    print(f"paid-assets serve root={root} bind={bind}:{port} prefix={PREFIX}")
+    print(
+        f"paid-assets serve root={root} breadcrumbs={_breadcrumbs_root()} "
+        f"bind={bind}:{port} prefixes={PREFIX},{BREADCRUMBS_PREFIX}"
+    )
     httpd.serve_forever()
     return 0
 
