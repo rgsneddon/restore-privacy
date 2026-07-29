@@ -1530,8 +1530,18 @@ def _durable_store_banner() -> tuple[str, str]:
 
 def render_admin_grants_section_html(
     grants: list[dict[str, Any]] | None = None,
+    *,
+    clear_message: str = "",
+    clear_error: str = "",
 ) -> str:
-    """Paid download grants table with initiated/expiry + ENDED status."""
+    """Paid download grants table with initiated/expiry + ENDED + clear-all."""
+    try:
+        from payments import CLEAR_ALL_GRANTS_CONFIRM  # type: ignore
+    except Exception:  # noqa: BLE001
+        try:
+            from status_page.payments import CLEAR_ALL_GRANTS_CONFIRM  # type: ignore
+        except Exception:  # noqa: BLE001
+            CLEAR_ALL_GRANTS_CONFIRM = "CLEAR_ALL_GRANTS"
     projected = project_grants_for_admin(grants)
     rows = []
     for g in projected:
@@ -1560,12 +1570,25 @@ def render_admin_grants_section_html(
         if rows
         else '<tr><td colspan="9">No grants yet</td></tr>'
     )
+    msg_html = (
+        f'<p class="ok-msg" id="admin-grants-clear-ok">{_escape(clear_message)}</p>'
+        if clear_message
+        else ""
+    )
+    err_html = (
+        f'<p class="err" id="admin-grants-clear-error">{_escape(clear_error)}</p>'
+        if clear_error
+        else ""
+    )
+    confirm_token = _escape(str(CLEAR_ALL_GRANTS_CONFIRM))
+    n = len(projected)
     return f"""
 <section id="admin-grants" class="card">
   <h2 id="admin-grants-heading">Paid download grants</h2>
   <p class="muted" id="admin-grants-blurb">Full history of Stripe-verified download grants from the durable store
   (not a recent-only window). Status <code>ENDED</code> means the linked licence period finished or was revoked
-  (still listed). <strong>Initiated</strong> / <strong>Expiry</strong> are UTC dates from the licence period when known.</p>
+  (still listed). <strong>Initiated</strong> / <strong>Expiry</strong> are UTC dates from the licence period when known.
+  Rows: <strong id="admin-grants-count">{n}</strong>.</p>
   <table id="admin-grants-table">
     <thead><tr>
       <th>Purchase ID</th><th>Platform</th><th>Filename</th><th>Amount</th><th>Status</th>
@@ -1575,6 +1598,24 @@ def render_admin_grants_section_html(
 {table}
     </tbody>
   </table>
+  {msg_html}
+  {err_html}
+  <form method="post" action="/admin/clear-grants" id="admin-clear-grants-form"
+        data-admin-clear-grants="1"
+        onsubmit="return confirm('Delete ALL paid download grants? This cannot be undone.');">
+    <p class="muted" id="admin-clear-grants-blurb">
+      <strong>Clear all grants</strong> (BETA cleanup): permanently deletes every
+      download token/grant row so this table is empty. Does not erase Connect
+      licence entitlements. Type
+      <code id="admin-clear-grants-token">{confirm_token}</code> to confirm.
+    </p>
+    <label class="field" for="clear_grants_confirm">
+      <span class="field-label">Confirm phrase</span>
+      <input id="clear_grants_confirm" name="confirm" type="text" autocomplete="off"
+             maxlength="64" required placeholder="{confirm_token}">
+    </label>
+    <button type="submit" id="admin-clear-grants-submit">Clear all grants</button>
+  </form>
 {admin_section_top_link_html()}</section>
 """
 
@@ -1758,6 +1799,8 @@ def render_admin_licences_page_html(
     *,
     licence_clear_message: str = "",
     licence_clear_error: str = "",
+    grant_clear_message: str = "",
+    grant_clear_error: str = "",
 ) -> bytes:
     """Active Licences page: licence database + paid download grants."""
     main = (
@@ -1765,7 +1808,11 @@ def render_admin_licences_page_html(
             clear_message=licence_clear_message,
             clear_error=licence_clear_error,
         )
-        + render_admin_grants_section_html(grants)
+        + render_admin_grants_section_html(
+            grants,
+            clear_message=grant_clear_message,
+            clear_error=grant_clear_error,
+        )
     )
     return _admin_page_shell(
         title="Active Licences",

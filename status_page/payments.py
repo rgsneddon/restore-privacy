@@ -5837,6 +5837,50 @@ def clear_all_licences_for_admin(
     }
 
 
+# Explicit confirm token for clear_all_grants_for_admin (no silent wipe).
+CLEAR_ALL_GRANTS_CONFIRM = "CLEAR_ALL_GRANTS"
+
+
+def clear_all_grants_for_admin(
+    *,
+    confirm: str,
+    now: float | None = None,
+) -> dict[str, Any]:
+    """Delete all paid download grant rows so admin grants table is empty.
+
+    Pre-BETA operator cleanup of self-test download tokens/history. Requires
+    ``confirm == CLEAR_ALL_GRANTS_CONFIRM`` — refuses otherwise.
+
+    Deletes every row from ``grants`` only. Does **not** touch
+    ``connect_entitlements`` / licences (use :func:`clear_all_licences_for_admin`).
+
+    Returns counts deleted and the durable DB path used.
+    """
+    if (confirm or "").strip() != CLEAR_ALL_GRANTS_CONFIRM:
+        raise ValueError(
+            "clear_all_grants_for_admin refused: confirm must be "
+            f"{CLEAR_ALL_GRANTS_CONFIRM!r} (got {confirm!r})"
+        )
+    init_db()
+    t = now if now is not None else time.time()
+    path = db_path()
+    conn = _connect()
+    try:
+        n_g = int(conn.execute("SELECT COUNT(*) FROM grants").fetchone()[0])
+        conn.execute("DELETE FROM grants")
+        remaining = int(conn.execute("SELECT COUNT(*) FROM grants").fetchone()[0])
+    finally:
+        conn.close()
+    return {
+        "ok": True,
+        "confirm": CLEAR_ALL_GRANTS_CONFIRM,
+        "db_path": str(path),
+        "deleted_grants": n_g,
+        "remaining_grants": remaining,
+        "cleared_at": t,
+    }
+
+
 def find_grant_by_session(
     session_id: str, *, now: float | None = None, unused_only: bool = True
 ) -> dict[str, Any] | None:
