@@ -1,15 +1,16 @@
 """RASKUL LTD admin accounting — paid sales ledger net of Stripe fees.
 
-Opening books: **1 August 2026** line **SET UP COSTS −£6,000.00** (starting balance).
-Sales auto-load from durable payment grants (gross ``amount_pence``). Net cash =
-gross − Stripe fee (fee shown as a negative amount).
+Opening books: **1 July 2026** line **SET UP COSTS −£6,000.00** (starting balance).
+Sales auto-load from durable payment grants as soon as Stripe Checkout is fulfilled
+(webhook mint → same payment store). Net cash = gross − Stripe fee (fees as minus).
 
 Stripe UK standard card fee (estimate when actual fee not stored):
   **1.5% + £0.20** per successful charge (GBP catalog).
   Source: Stripe UK pricing (standard online card). International cards may be higher;
   page labels estimate vs stored fee.
 
-Pre–1 Aug 2026 grants are excluded so the setup line is the true start of books.
+Pre–opening grants are excluded so the setup line is the true start of books.
+Admin ``/admin/accounting`` rebuilds from the store on each request — no manual import.
 """
 
 from __future__ import annotations
@@ -33,7 +34,8 @@ from xml.sax.saxutils import escape as xml_escape
 # --- Policy constants -------------------------------------------------------
 
 ENTITY_NAME = "RASKUL LTD"
-OPENING_DATE = date(2026, 8, 1)
+# Books open when live customer sales began (must not sit after current trades).
+OPENING_DATE = date(2026, 7, 1)
 OPENING_DESCRIPTION = "SET UP COSTS"
 OPENING_BALANCE_PENCE = -600_000  # −£6,000.00
 
@@ -171,6 +173,10 @@ def sales_from_grants(
     opening: date = OPENING_DATE,
 ) -> list[dict[str, Any]]:
     """Normalize paid grant rows into sale dicts on/after opening date.
+
+    Called after every ledger rebuild (admin accounting page). Real Checkout
+    grants minted by the Stripe webhook appear here immediately — no second
+    import path.
 
     Deduplicates reissues: multiple download tokens for the same purchase_id
     (or same Checkout session_id) count as **one** sale — earliest grant wins.

@@ -100,7 +100,8 @@ class TestLedgerBuild(unittest.TestCase):
         import payments
 
         payments.init_db()
-        ts = datetime(2026, 7, 1, 12, 0, tzinfo=timezone.utc).timestamp()
+        # Day before OPENING_DATE (2026-07-01)
+        ts = datetime(2026, 6, 15, 12, 0, tzinfo=timezone.utc).timestamp()
         payments.mint_download_token(
             filename="restore-privacy-client-0.5.2-windows-x64-setup.exe",
             platform="windows",
@@ -110,10 +111,86 @@ class TestLedgerBuild(unittest.TestCase):
             now=ts,
         )
         sales = sales_from_grants(payments.list_all_grants())
-        self.assertEqual(sales, [])
+        # Must not include pre-opening cash
+        self.assertFalse(
+            any(s.get("session_id") == "cs_live_pre_opening" for s in sales)
+        )
         rows = build_ledger(grants=payments.list_all_grants())
-        self.assertEqual(len(rows), 1)
         self.assertEqual(rows[0].kind, "setup")
+        self.assertFalse(
+            any(
+                r.kind == "sale" and r.session_id == "cs_live_pre_opening"
+                for r in rows
+            )
+        )
+
+    def test_stripe_webhook_grant_appears_as_sale_immediately(self) -> None:
+        """Paid Checkout fulfilment → ledger sale on next rebuild (no import)."""
+        from accounting import (
+            OPENING_BALANCE_PENCE,
+            build_ledger,
+            build_ledger_from_payment_store,
+            estimate_stripe_fee_pence,
+            sales_from_grants,
+        )
+        import payments
+
+        payments.init_db()
+        sid = "cs_live_webhook_accounting_immediate"
+        event = {
+            "type": "checkout.session.completed",
+            "data": {
+                "object": {
+                    "id": sid,
+                    "payment_status": "paid",
+                    "amount_total": payments.PRICE_PENCE,
+                    "currency": "gbp",
+                    "customer_email": "buyer@example.com",
+                    "client_reference_id": "windows",
+                    "metadata": {
+                        "platform": "windows",
+                        "amount_pence": str(payments.PRICE_PENCE),
+                        "currency": "gbp",
+                    },
+                }
+            },
+        }
+        tok = payments.process_checkout_completed_event(
+            event,
+            email_transport=lambda _p: {
+                "ok": True,
+                "sent": False,
+                "skipped": True,
+            },
+        )
+        self.assertTrue(tok)
+        grants = payments.list_all_grants()
+        match = [g for g in grants if str(g.get("session_id") or "") == sid]
+        self.assertEqual(len(match), 1)
+        self.assertEqual(int(match[0]["amount_pence"]), payments.PRICE_PENCE)
+        sales = sales_from_grants(grants)
+        sale_match = [s for s in sales if s.get("session_id") == sid]
+        self.assertEqual(len(sale_match), 1, sale_match)
+        self.assertEqual(int(sale_match[0]["gross_pence"]), payments.PRICE_PENCE)
+        # Full ledger path used by /admin/accounting
+        rows = build_ledger_from_payment_store()
+        sale_rows = [r for r in rows if r.kind == "sale" and r.session_id == sid]
+        self.assertEqual(len(sale_rows), 1)
+        fee = estimate_stripe_fee_pence(payments.PRICE_PENCE)
+        self.assertEqual(sale_rows[0].gross_pence, payments.PRICE_PENCE)
+        self.assertEqual(sale_rows[0].fee_pence, -fee)
+        self.assertEqual(sale_rows[0].net_pence, payments.PRICE_PENCE - fee)
+        # Running balance includes setup + this sale
+        self.assertEqual(
+            rows[-1].balance_pence,
+            OPENING_BALANCE_PENCE + (payments.PRICE_PENCE - fee),
+        )
+        # Direct build_ledger agrees
+        rows2 = build_ledger(grants=grants)
+        self.assertEqual(
+            len([r for r in rows2 if r.kind == "sale" and r.session_id == sid]),
+            1,
+        )
 
     def test_reissue_same_purchase_id_counts_once(self) -> None:
         """Two download tokens for one purchase_id = one ledger sale (not N)."""
@@ -217,10 +294,21 @@ class TestLedgerBuild(unittest.TestCase):
         self.assertNotIn("admin_resend_cafebabe02", sids)
         self.assertNotIn("admin_keygen_ignored03", sids)
         self.assertIn("cs_live_real_checkout_only", sids)
-        self.assertEqual(len(sales), 1)
+        # Only the Checkout control sale among the sids we minted
+        minted = {
+            "admin_ondemand_deadbeef01",
+            "admin_resend_cafebabe02",
+            "admin_keygen_ignored03",
+            "cs_live_real_checkout_only",
+        }
+        sales_from_minted = [s for s in sales if s.get("session_id") in minted]
+        self.assertEqual(len(sales_from_minted), 1)
         rows = build_ledger(grants=grants)
-        self.assertEqual(sum(1 for r in rows if r.kind == "sale"), 1)
-        self.assertEqual(rows[-1].session_id, "cs_live_real_checkout_only")
+        sale_minted = [
+            r for r in rows if r.kind == "sale" and r.session_id in minted
+        ]
+        self.assertEqual(len(sale_minted), 1)
+        self.assertEqual(sale_minted[0].session_id, "cs_live_real_checkout_only")
 
 
 class TestAccountingExport(unittest.TestCase):
@@ -270,16 +358,19 @@ class TestAccountingExport(unittest.TestCase):
             self.assertGreater(len(body), 40, fmt)
             self.assertTrue(ctype)
             self.assertEqual(ext, fmt if fmt != "excel" else "xlsx")
-        # Month filter: August only → setup + first sale
+        # Month filter: August only → Aug sale (setup is on OPENING_DATE July 1)
         aug = filter_ledger_by_period(rows, year=2026, month=8)
-        self.assertEqual(len(aug), 2)
-        self.assertEqual(aug[0].kind, "setup")
-        self.assertEqual(aug[1].purchase_id, "RPT-AAA")
-        # Range Aug–Sep
+        self.assertEqual(len(aug), 1)
+        self.assertEqual(aug[0].purchase_id, "RPT-AAA")
+        # July includes setup line
+        jul = filter_ledger_by_period(rows, year=2026, month=7)
+        self.assertGreaterEqual(len(jul), 1)
+        self.assertEqual(jul[0].kind, "setup")
+        # Range Aug–Sep → two sales (no setup)
         rng = filter_ledger_by_period(
             rows, from_year=2026, from_month=8, to_year=2026, to_month=9
         )
-        self.assertEqual(len(rng), 3)
+        self.assertEqual(len(rng), 2)
         period = parse_export_period(
             {"period_mode": "month", "year": "2026", "month": "8"}
         )

@@ -2208,7 +2208,8 @@ def render_admin_accounting_page_html(
   <p class="muted" id="admin-accounting-blurb">
     Business books from <strong>{_escape(OPENING_DATE.isoformat())}</strong>.
     Opening line: <strong>SET UP COSTS −£6,000.00</strong> (starting deficit).
-    Paid customer sales load automatically from the durable payment store.
+    Paid Stripe Checkout sales load automatically as soon as the webhook mints a
+    grant (refresh this page after a purchase — no manual import).
     Each line shows <strong>gross</strong>, <strong>fees</strong> (as a minus), and
     <strong>net</strong> (= this row’s gross ± fees only).
     <strong>END BALANCE</strong> is the <em>running total of all nets so far</em>
