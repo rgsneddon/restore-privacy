@@ -540,7 +540,7 @@ def main() -> int:
 
         sec = stage / "secrets"
         sec.mkdir(exist_ok=True)
-        # Entry + exit ElGamal pubs (public only) for single-hop / multi-hop residual
+        # Catalog residual pubs (public only): IS + RO exit + US default entry
         for name, candidates in (
             (
                 "node_elgamal.pub",
@@ -556,6 +556,13 @@ def main() -> int:
                     ROOT / "secrets" / "exit_node_elgamal.pub",
                 ),
             ),
+            (
+                "us_node_elgamal.pub",
+                (
+                    ROOT / "product" / "us_node_elgamal.pub",
+                    ROOT / "secrets" / "us_node_elgamal.pub",
+                ),
+            ),
         ):
             for src in candidates:
                 if src.is_file() and src.stat().st_size >= 32:
@@ -564,7 +571,11 @@ def main() -> int:
         # Also ship product/ tree pubs when present (load_node prefers product/)
         prod = stage / "product"
         prod.mkdir(exist_ok=True)
-        for name in ("node_elgamal.pub", "exit_node_elgamal.pub"):
+        for name in (
+            "node_elgamal.pub",
+            "exit_node_elgamal.pub",
+            "us_node_elgamal.pub",
+        ):
             src = ROOT / "product" / name
             if src.is_file():
                 shutil.copy2(src, prod / name)

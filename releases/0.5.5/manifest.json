@@ -4,13 +4,18 @@
   "assets": [
     {
       "filename": "restore-privacy-client-0.5.5-windows-x64-setup.exe",
-      "sha256": "cb235f4bb36fc870f28e087dd805a069fd233eeccbdb4cb01b03b6fbbce3f726",
-      "bytes": 38595307
+      "sha256": "e39b2cf867609b70ba7ee0146c296a680486351388cc57c098db68c5ded89451",
+      "bytes": 38603385
     },
     {
       "filename": "restore-privacy-client-0.5.5-android.apk",
       "sha256": "86b587c8b59533fb1da217a9589263b68f5eac87656ca68d1c4e44b816f8b7ac",
       "bytes": 52371453
+    },
+    {
+      "filename": "restore-privacy-client-0.5.5-linux-x64.tar.gz",
+      "sha256": "423a0d62fd61bc91642b613bc2cc4a8a6645689d5e9f9d8f333fd1b7451c0284",
+      "bytes": 14409975
     },
     {
       "filename": "restore-privacy-client-0.5.5-macos.zip",
@@ -21,12 +26,7 @@
       "filename": "restore-privacy-client-0.5.5-ios.zip",
       "sha256": "87a3b29666a8eab16217d374131acdf241ddb73d3e6b2f5bb86a0c39fc76a416",
       "bytes": 9343888
-    },
-    {
-      "filename": "restore-privacy-client-0.5.5-linux-x64.tar.gz",
-      "sha256": "92e824b8aaa22d5ebd12d66f794d710a9e96bf7b81b9651f99687abbe15f0b03",
-      "bytes": 14408570
     }
   ],
-  "notes": "0.5.5 connect-log fix + residual stack startTunnel options; Win PE rebuilt on Windows host"
+  "notes": "0.5.5: Windows PE rebuild ships us_node_elgamal.pub (default US residual entry); Linux catalog includes IS/RO/US pubs; Android residual wire + US pin; macOS/iOS carry-forward (parallel Apple residual fix)."
 }

@@ -477,34 +477,52 @@ def stage_android_apk() -> Path:
 
 
 def _rewrite_linux_node_elgamal_pub(tarball: Path) -> None:
-    """Ensure every node_elgamal.pub inside the Linux tarball matches product pin.
+    """Ensure catalog residual public pins inside the Linux tarball match product/.
 
-    Carry-forward priors may ship a stale pub (HELLO hybrid decrypt fails).
+    Ships IS (node_elgamal.pub), RO (exit_node_elgamal.pub), and US
+    (us_node_elgamal.pub — product default residual entry). Carry-forward
+    priors may only have Iceland + Romania; missing US pin forces false
+    primary HELLO fail on default entry.
     """
     import tarfile
     import tempfile
 
-    product = ROOT / "product" / "node_elgamal.pub"
-    if not product.is_file() or product.stat().st_size < 32:
-        raise FileNotFoundError(f"missing product node pub: {product}")
-    pub_bytes = product.read_bytes()
+    catalog = (
+        "node_elgamal.pub",
+        "exit_node_elgamal.pub",
+        "us_node_elgamal.pub",
+    )
+    pub_bytes: dict[str, bytes] = {}
+    for name in catalog:
+        p = ROOT / "product" / name
+        if not p.is_file() or p.stat().st_size < 32:
+            if name == "node_elgamal.pub":
+                raise FileNotFoundError(f"missing product node pub: {p}")
+            continue
+        pub_bytes[name] = p.read_bytes()
+    if "us_node_elgamal.pub" not in pub_bytes:
+        raise FileNotFoundError(
+            f"missing product/us_node_elgamal.pub — required for default US residual entry"
+        )
     work = Path(tempfile.mkdtemp(prefix="rpt-linux-pub-"))
     try:
         with tarfile.open(tarball, "r:gz") as tf:
             tf.extractall(work)
         replaced = 0
-        for p in work.rglob("node_elgamal.pub"):
-            p.write_bytes(pub_bytes)
-            replaced += 1
-        # Prefer product/ + secrets/ so secrets_loader finds the correct key
+        for name, raw in pub_bytes.items():
+            for p in work.rglob(name):
+                p.write_bytes(raw)
+                replaced += 1
+        # Prefer product/ + secrets/ so secrets_loader finds the correct keys
         for top in [d for d in work.iterdir() if d.is_dir()]:
             for sub in ("product", "secrets"):
                 d = top / sub
                 d.mkdir(parents=True, exist_ok=True)
-                (d / "node_elgamal.pub").write_bytes(pub_bytes)
-                replaced += 1
+                for name, raw in pub_bytes.items():
+                    (d / name).write_bytes(raw)
+                    replaced += 1
         if replaced == 0:
-            raise RuntimeError(f"no node_elgamal.pub in {tarball}")
+            raise RuntimeError(f"no catalog pubs written into {tarball}")
         tmp_out = work / "repacked.tar.gz"
         with tarfile.open(tmp_out, "w:gz") as tf:
             for child in sorted(work.iterdir()):
@@ -512,7 +530,10 @@ def _rewrite_linux_node_elgamal_pub(tarball: Path) -> None:
                     continue
                 tf.add(child, arcname=child.name)
         shutil.copy2(tmp_out, tarball)
-        print(f"rewrote node_elgamal.pub in {tarball.name} ({replaced} path(s))")
+        print(
+            f"rewrote catalog residual pubs in {tarball.name} "
+            f"({', '.join(pub_bytes)}; {replaced} path(s))"
+        )
     finally:
         shutil.rmtree(work, ignore_errors=True)
 
