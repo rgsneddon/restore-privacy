@@ -40,7 +40,7 @@ class TestAdmin2faQr(unittest.TestCase):
         self.assertIn("data-otpauth-uri", html)
         self.assertIn("otpauth://totp/", html)
         self.assertIn(secret, html)
-        self.assertIn("admin-security-extra-advice", html)
+        # Setup may still show short operational labels; QR uses real otpauth
         # QR data-url is built from the real URI (shared helper)
         self.assertEqual(
             qr_data_url_svg(uri),
@@ -50,16 +50,18 @@ class TestAdmin2faQr(unittest.TestCase):
         self.assertNotIn("chart.googleapis", html)
         self.assertNotIn("api.qrserver", html)
 
-    def test_login_has_security_advice(self) -> None:
-        from admin_panel import (
-            ADMIN_SECURITY_EXTRA_ADVICE,
-            render_login_html,
-        )
+    def test_login_is_minimal_heading_and_fields(self) -> None:
+        from admin_panel import render_login_html
 
         html = render_login_html().decode("utf-8")
-        self.assertIn("admin-security-extra-advice", html)
-        self.assertIn(ADMIN_SECURITY_EXTRA_ADVICE[:40], html)
-        self.assertIn("admin-2fa-security-blurb", html)
+        self.assertIn("OPERATOR ADMIN PAGES", html)
+        self.assertIn('id="admin-login-heading"', html)
+        self.assertIn('name="username"', html)
+        self.assertIn('name="password"', html)
+        self.assertIn("admin-login-form", html)
+        self.assertNotIn("admin-login-note", html)
+        self.assertNotIn("admin-2fa-security-blurb", html)
+        self.assertNotIn("admin-security-extra-advice", html)
 
 
 class TestMediaKit(unittest.TestCase):

@@ -89,7 +89,6 @@ class TestAdmin2faAuthPath(unittest.TestCase):
             verify_session_token,
             format_session_cookie,
             SESSION_COOKIE,
-            ADMIN_2FA_SECURITY_BLURB,
             render_login_html,
             render_2fa_setup_html,
             render_2fa_verify_html,
@@ -135,8 +134,14 @@ class TestAdmin2faAuthPath(unittest.TestCase):
 
         # HTML: blurb + no secret on login; setup has secret only when passed
         login = render_login_html().decode("utf-8")
-        self.assertIn(ADMIN_2FA_SECURITY_BLURB[:40], login)
-        self.assertIn("admin-2fa-security-blurb", login)
+        self.assertIn("OPERATOR ADMIN PAGES", login)
+        self.assertIn('id="admin-login-heading"', login)
+        self.assertIn('name="username"', login)
+        self.assertIn('name="password"', login)
+        # Login page stays bare (no security essays)
+        self.assertNotIn("admin-login-note", login)
+        self.assertNotIn("admin-2fa-security-blurb", login)
+        self.assertNotIn("admin-security-extra-advice", login)
         self.assertNotIn(secret, login)
         setup = render_2fa_setup_html(secret_b32=secret).decode("utf-8")
         self.assertIn(secret, setup)

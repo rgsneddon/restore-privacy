@@ -1146,16 +1146,15 @@ border:1px solid var(--border)}}
 
 
 def render_login_html(*, error: str = "") -> bytes:
+    """Minimal login: heading + username/password only (no security blurbs)."""
     err = (
         f'<p class="err" id="admin-error">{_escape(error)}</p>' if error else ""
     )
-    blurb = _escape(ADMIN_2FA_SECURITY_BLURB)
-    extra = _escape(ADMIN_SECURITY_EXTRA_ADVICE)
     body = f"""<!DOCTYPE html>
 <html lang="en"><head>
 <meta charset="utf-8"/><meta name="viewport" content="width=device-width, initial-scale=1"/>
 <meta name="color-scheme" content="light dark"/>
-<title>Admin login — Restore Privacy</title>
+<title>OPERATOR ADMIN PAGES</title>
 <style>
 {_admin_auth_shell_css()}
 </style>
@@ -1163,14 +1162,9 @@ def render_login_html(*, error: str = "") -> bytes:
 </head><body>
 <div class="login-wrap">
 {admin_theme_picker_html()}
-<form method="post" action="/admin/login" id="admin-login-form" class="admin-auth-form">
-  <h1>Operator admin</h1>
-  <p class="note" id="admin-login-note">Private page: Stripe processor settings,
-  licence database, accounting, fleet, and paid-download grants.
-  Not the public shop. After password, authenticator (TOTP) setup or a 6-digit code
-  is required before any admin tools load.</p>
-  <p class="note" id="admin-2fa-security-blurb">{blurb}</p>
-  <p class="note" id="admin-security-extra-advice">{extra}</p>
+<form method="post" action="/admin/login" id="admin-login-form" class="admin-auth-form"
+      data-admin-login="1">
+  <h1 id="admin-login-heading">OPERATOR ADMIN PAGES</h1>
   {err}
   <label for="username">Username</label>
   <input id="username" name="username" autocomplete="username" required/>
