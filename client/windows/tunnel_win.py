@@ -546,15 +546,36 @@ def residual_ip_capture_active(result: Optional[WindowsTunnelResult]) -> bool:
     """True only when device residual public IP can change via full tunnel.
 
     Requires system-capture TUN + dual /1 routes applied + dataplane — not
-    handshake-only or in-process queue dataplane.
+    handshake-only, pin-only, or Settings residual IPv4 OFF sessions.
     """
     if result is None:
         return False
-    return bool(
-        result.ok
-        and result.routes_applied
-        and result.system_capture
-        and result.dataplane is not None
+    from client.residual_stack import residual_ip_capture_from_fields
+
+    return residual_ip_capture_from_fields(
+        ok=bool(result.ok),
+        routes_applied=bool(result.routes_applied),
+        system_capture=bool(result.system_capture),
+        has_dataplane=result.dataplane is not None,
+        plan=getattr(result, "plan", None),
+    )
+
+
+def session_ok_without_residual_capture(
+    result: Optional[WindowsTunnelResult],
+) -> bool:
+    """True when tunnel session is up but Settings residual IPv4 is intentionally OFF.
+
+    Connect must stay connected (session-only honesty) — do not tear down as failure.
+    """
+    if result is None:
+        return False
+    from client.residual_stack import session_only_from_fields
+
+    return session_only_from_fields(
+        ok=bool(result.ok),
+        has_dataplane=result.dataplane is not None,
+        plan=getattr(result, "plan", None),
     )
 
 
@@ -809,8 +830,14 @@ def start_full_tunnel(
         )
         applied.extend(cmds)
         if full_ok:
-            routes_applied = True
-            route_msg = f"full-tunnel routes applied (IF={if_index}, server pinned)"
+            # residual capture only when dual /1 was requested and applied
+            routes_applied = bool(want_ipv4_catchall)
+            if want_ipv4_catchall:
+                route_msg = f"full-tunnel routes applied (IF={if_index}, server pinned)"
+            else:
+                route_msg = (
+                    f"server pin only (Settings residual IPv4 off; IF={if_index})"
+                )
             # Non-critical netsh warnings only
             warns = [e for e in errs if e.startswith("setup warn:")]
             if warns:
@@ -875,7 +902,11 @@ def start_full_tunnel(
         )
 
     ipv6_ok = False
-    if routes_applied and capture:
+    from client.residual_stack import plan_wants_ipv6_isp_block
+
+    # IPv6 residual is independent of IPv4 dual /1; apply when Settings IPv6 ON
+    # and system TUN is up. Intentional IPv6 OFF → no "incomplete" wording.
+    if capture and plan_wants_ipv6_isp_block(plan):
         try:
             v6_cmds, ipv6_ok = apply_ipv6_leak_mitigation(plan)
             applied.extend(v6_cmds)
@@ -886,6 +917,8 @@ def start_full_tunnel(
         except Exception as exc:
             msg += f"; IPv6 mitigation error: {exc}"
             ipv6_ok = False
+    elif capture and not plan_wants_ipv6_isp_block(plan):
+        msg += "; IPv6 residual off (Settings)"
 
     # Build provisional result *before* kill-switch. KS must only arm after
     # residual capture is proven — otherwise DefaultOutboundAction Block can

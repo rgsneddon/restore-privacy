@@ -284,6 +284,9 @@ class RptVpnService : VpnService() {
                 // DNS: node tunnel gateway recursive resolver (10.88.0.1 / unbound on residual node)
                 // Kill switch removed from product residual (no VpnService blocking mode).
                 // IPv4-only residual: do NOT install ::/0 without a TUN IPv6 address.
+                // Settings dual-stack residual (defaults both ON).
+                val residualIpv4 = StartupPrefs.residualIpv4Enabled(this)
+                val residualIpv6 = StartupPrefs.residualIpv6Enabled(this)
                 val builder = Builder()
                     .setSession(sessionName)
                     .setMtu(1280)
@@ -294,9 +297,17 @@ class RptVpnService : VpnService() {
                     builder.allowFamily(OsConstants.AF_INET)
                 } catch (_: Exception) {
                 }
-                val ipv6RouteOk = false
-                if (fullTunnel) {
+                // IPv6 residual ON would claim ::/0 when product carries IPv6 TUN (not yet).
+                // Keep ipv6RouteOk honest: only true when IPv6 residual is on AND a route is installed.
+                var ipv6RouteOk = false
+                if (fullTunnel && residualIpv4) {
+                    // Full-tunnel IPv4 residual capture (Settings residual_ipv4 ON)
                     builder.addRoute("0.0.0.0", 0)
+                }
+                // Product residual TUN is IPv4-only; do not install ::/0 without IPv6 TUN addr.
+                // residualIpv6 is still recorded for honesty (not protected until dual-stack TUN).
+                if (fullTunnel && residualIpv6) {
+                    ipv6RouteOk = false // honest: ISP IPv6 not claimed blocked on Android IPv4 TUN
                 }
                 try {
                     // Keep our app off the VPN loop so UDP to node works
@@ -351,15 +362,31 @@ class RptVpnService : VpnService() {
 
                 isSessionActive = true
                 activeVpnIp = session.vpnIp
-                activeIpv6Protected = if (fullTunnel) ipv6RouteOk else null
-                startForeground(NOTIFICATION_ID, buildNotification(sessionName, connecting = false))
-                val msg = if (!fullTunnel) {
-                    "Connected — RPT tunnel up (VPN IP ${session.vpnIp})"
-                } else {
-                    // IPv4 residual only (AF_INET); ISP IPv6 is not claimed protected
-                    "Connected — IPv4 via VPN; IPv6 not protected (VPN IP ${session.vpnIp})"
+                // Residual IPv4 capture only when fullTunnel + Settings residual_ipv4 ON
+                val residualCapture = fullTunnel && residualIpv4
+                activeIpv6Protected = when {
+                    !fullTunnel || !residualCapture -> null
+                    residualIpv6 -> ipv6RouteOk
+                    else -> false
                 }
-                report(true, msg, session.vpnIp, ipv6Protected = if (fullTunnel) ipv6RouteOk else null)
+                startForeground(NOTIFICATION_ID, buildNotification(sessionName, connecting = false))
+                val msg = when {
+                    !fullTunnel ->
+                        "Connected — RPT tunnel up (VPN IP ${session.vpnIp})"
+                    !residualIpv4 ->
+                        "Connected — session only; residual IPv4 off (VPN IP ${session.vpnIp})"
+                    residualIpv6 && ipv6RouteOk ->
+                        "Connected — VPN active; IPv6 ISP path blocked (VPN IP ${session.vpnIp})"
+                    else ->
+                        // IPv4 residual capture; ISP IPv6 not claimed protected on IPv4-only TUN
+                        "Connected — IPv4 via VPN; IPv6 not protected (VPN IP ${session.vpnIp})"
+                }
+                report(
+                    true,
+                    msg,
+                    session.vpnIp,
+                    ipv6Protected = if (residualCapture) activeIpv6Protected else null,
+                )
 
                 // Two threads: TUN→UDP and UDP→TUN.
                 // Do NOT use FileInputStream.available() — on Android VPN it often

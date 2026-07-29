@@ -52,14 +52,36 @@ def product_connect_requires_root() -> bool:
 
 
 def residual_ip_capture_active(result: Optional[LinuxTunnelResult]) -> bool:
-    """True only when residual public IP can change via full tunnel."""
+    """True only when residual public IP can change via full tunnel.
+
+    Requires dual /1 residual capture (Settings residual IPv4 ON) — not pin-only
+    or intentional IPv4-off sessions.
+    """
     if result is None:
         return False
-    return bool(
-        result.ok
-        and result.routes_applied
-        and result.system_capture
-        and result.dataplane is not None
+    from client.residual_stack import residual_ip_capture_from_fields
+
+    return residual_ip_capture_from_fields(
+        ok=bool(result.ok),
+        routes_applied=bool(result.routes_applied),
+        system_capture=bool(result.system_capture),
+        has_dataplane=result.dataplane is not None,
+        plan=getattr(result, "plan", None),
+    )
+
+
+def session_ok_without_residual_capture(
+    result: Optional[LinuxTunnelResult],
+) -> bool:
+    """Session up with Settings residual IPv4 intentionally OFF (do not tear down)."""
+    if result is None:
+        return False
+    from client.residual_stack import session_only_from_fields
+
+    return session_only_from_fields(
+        ok=bool(result.ok),
+        has_dataplane=result.dataplane is not None,
+        plan=getattr(result, "plan", None),
     )
 
 
@@ -459,16 +481,21 @@ def start_full_tunnel(
         )
 
     ipv6_ok = False
+    from client.residual_stack import plan_wants_ipv6_isp_block
+
     try:
         v6_cmds, ipv6_ok = apply_ipv6_leak_mitigation(iface, plan=plan)
         applied.extend(v6_cmds)
     except Exception:
         ipv6_ok = False
     msg = f"full tunnel active on {iface} ({tun_msg})"
-    if ipv6_ok:
-        msg += "; IPv6 ISP path blocked"
+    if plan_wants_ipv6_isp_block(plan):
+        if ipv6_ok:
+            msg += "; IPv6 ISP path blocked"
+        else:
+            msg += "; IPv6 leak mitigation incomplete"
     else:
-        msg += "; IPv6 leak mitigation incomplete"
+        msg += "; IPv6 residual off (Settings)"
 
     ks_applied = False
     try:
@@ -497,6 +524,8 @@ def start_full_tunnel(
     except Exception:
         ks_applied = False
 
+    # residual capture flag only when dual /1 was requested and installed
+    routes_applied = bool(want_ipv4_catchall)
     return LinuxTunnelResult(
         True,
         msg,
@@ -504,7 +533,7 @@ def start_full_tunnel(
         tun=tun,
         dataplane=plane,
         system_capture=True,
-        routes_applied=True,
+        routes_applied=routes_applied,
         plan=plan,
         server_host=server_host,
         iface=iface,

@@ -150,3 +150,40 @@ def plan_wants_ipv6_isp_block(plan: FullTunnelPlan | None) -> bool:
     return str(getattr(plan, "ipv6_leak_policy", DEFAULT_IPV6_LEAK_POLICY)) == (
         IPV6_LEAK_POLICY_BLOCK_ISP
     )
+
+
+def residual_ip_capture_from_fields(
+    *,
+    ok: bool,
+    routes_applied: bool,
+    system_capture: bool,
+    has_dataplane: bool,
+    plan: FullTunnelPlan | None,
+) -> bool:
+    """Pure residual-capture honesty gate (Windows/Linux ``residual_ip_capture_active``).
+
+    True only when dual /1 residual IPv4 capture is intended (Settings residual_ipv4
+    ON → plan.default_routes carry dual /1) **and** routes/system TUN/dataplane
+    report success. Pin-only or Settings IPv4 OFF → False (session-only honesty).
+    """
+    from client.full_tunnel import plan_wants_ipv4_catchall
+
+    if not (ok and routes_applied and system_capture and has_dataplane):
+        return False
+    if plan is not None and not plan_wants_ipv4_catchall(plan):
+        return False
+    return True
+
+
+def session_only_from_fields(
+    *,
+    ok: bool,
+    has_dataplane: bool,
+    plan: FullTunnelPlan | None,
+) -> bool:
+    """True when session/dataplane is up with Settings residual IPv4 intentionally OFF."""
+    from client.full_tunnel import plan_wants_ipv4_catchall
+
+    if not ok or not has_dataplane or plan is None:
+        return False
+    return not plan_wants_ipv4_catchall(plan)

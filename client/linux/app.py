@@ -61,6 +61,7 @@ from client.linux.elevate import (
 from client.linux.tunnel_linux import (
     product_connect_requires_root,
     ipv6_residual_protected,
+    session_ok_without_residual_capture,
     residual_ip_capture_active,
     start_full_tunnel,
     stop_full_tunnel,
@@ -1476,6 +1477,22 @@ class TunnelClientApp:
                             vpn_ip=vpn_ip,
                             residual_capture=True,
                             ipv6_protected=v6,
+                        )
+                    elif session_ok_without_residual_capture(tun_res):
+                        self._log(
+                            "Tunnel session up — residual IPv4 capture off (Settings); "
+                            "public IP still uses ISP for IPv4"
+                        )
+                        append_event(
+                            KIND_CONNECT,
+                            "Connected — session only (residual IPv4 off in Settings)",
+                        )
+                        self._apply_control(connected=True, busy=False)
+                        self._set_status(
+                            "connected",
+                            vpn_ip=vpn_ip,
+                            residual_capture=False,
+                            ipv6_protected=False,
                         )
                     else:
                         original_err = getattr(tun_res, "message", None)

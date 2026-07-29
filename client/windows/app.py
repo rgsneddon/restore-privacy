@@ -174,6 +174,7 @@ from client.windows.tunnel_win import (
     ipv6_residual_protected,
     residual_ip_capture_active,
     restore_windows_residual_path,
+    session_ok_without_residual_capture,
     start_full_tunnel,
     stop_full_tunnel,
 )
@@ -2075,6 +2076,27 @@ class TunnelClientApp:
                             ipv6_protected=v6,
                         )
                         # Keep shell in front after Connect work (user initiated).
+                        try:
+                            self._bring_shell_forward(force_visible=False)
+                        except Exception:
+                            pass
+                    elif session_ok_without_residual_capture(tun_res):
+                        # Settings residual IPv4 OFF — session/dataplane up, not residual capture
+                        self._log(
+                            "Tunnel session up — residual IPv4 capture off (Settings); "
+                            "public IP still uses ISP for IPv4"
+                        )
+                        self._connection_log(
+                            KIND_CONNECT,
+                            "Connected — session only (residual IPv4 off in Settings)",
+                        )
+                        self._apply_control(connected=True, busy=False)
+                        self._set_status(
+                            "connected",
+                            vpn_ip=vpn_ip,
+                            residual_capture=False,
+                            ipv6_protected=False,
+                        )
                         try:
                             self._bring_shell_forward(force_visible=False)
                         except Exception:

@@ -165,6 +165,106 @@ class TestResidualStackPrefs(unittest.TestCase):
             self.assertIn("ipv6Protected: stack.ipv6", text)
             self.assertIn("stack.ipv4", text)
 
+    def test_android_vpn_service_reads_residual_stack_prefs(self):
+        svc = (
+            ROOT
+            / "client_app/android/app/src/main/kotlin/com/restoreprivacy/"
+            "restore_privacy_client/RptVpnService.kt"
+        ).read_text(encoding="utf-8")
+        prefs = (
+            ROOT
+            / "client_app/android/app/src/main/kotlin/com/restoreprivacy/"
+            "restore_privacy_client/StartupPrefs.kt"
+        ).read_text(encoding="utf-8")
+        main = (
+            ROOT
+            / "client_app/android/app/src/main/kotlin/com/restoreprivacy/"
+            "restore_privacy_client/MainActivity.kt"
+        ).read_text(encoding="utf-8")
+        self.assertIn("residualIpv4Enabled", svc)
+        self.assertIn("residualIpv4", svc)
+        self.assertIn('addRoute("0.0.0.0", 0)', svc)
+        self.assertIn("fullTunnel && residualIpv4", svc)
+        self.assertIn("KEY_RESIDUAL_IPV4", prefs)
+        self.assertIn('"setResidualStack"', main)
+
+    def test_residual_ip_capture_active_false_when_ipv4_settings_off(self):
+        """Pin-only / IPv4-off plans must not claim residual public IP on VPN."""
+        from client.residual_stack import (
+            residual_ip_capture_from_fields,
+            session_only_from_fields,
+        )
+        from client.ui_theme import plain_tunnel_status
+
+        plan_off = build_full_tunnel_plan(
+            "10.88.0.5", ipv4_enabled=False, ipv6_enabled=True
+        )
+        self.assertFalse(plan_wants_ipv4_catchall(plan_off))
+
+        # routes_applied=True without dual /1 must still be capture-inactive
+        self.assertFalse(
+            residual_ip_capture_from_fields(
+                ok=True,
+                routes_applied=True,
+                system_capture=True,
+                has_dataplane=True,
+                plan=plan_off,
+            )
+        )
+        self.assertTrue(
+            session_only_from_fields(
+                ok=True, has_dataplane=True, plan=plan_off
+            )
+        )
+
+        # Shipped Windows/Linux helpers must call the pure gate (structural)
+        win_src = (ROOT / "client/windows/tunnel_win.py").read_text(encoding="utf-8")
+        lin_src = (ROOT / "client/linux/tunnel_linux.py").read_text(encoding="utf-8")
+        self.assertIn("residual_ip_capture_from_fields", win_src)
+        self.assertIn("session_only_from_fields", win_src)
+        self.assertIn("residual_ip_capture_from_fields", lin_src)
+        self.assertIn("session_only_from_fields", lin_src)
+        self.assertIn("session_ok_without_residual_capture", win_src)
+        # Connect shells must not tear down intentional IPv4-off sessions
+        self.assertIn(
+            "session_ok_without_residual_capture",
+            (ROOT / "client/windows/app.py").read_text(encoding="utf-8"),
+        )
+        self.assertIn(
+            "session_ok_without_residual_capture",
+            (ROOT / "client/linux/app.py").read_text(encoding="utf-8"),
+        )
+
+        # Honesty: residual_capture=False must not claim IPv4 via VPN
+        st = plain_tunnel_status(
+            "connected",
+            vpn_ip="10.88.0.5",
+            residual_capture=False,
+            ipv6_protected=False,
+        )
+        self.assertIn("Session only", st)
+        self.assertNotIn("IPv4 via VPN", st)
+
+        plan_on = build_full_tunnel_plan(
+            "10.88.0.5", ipv4_enabled=True, ipv6_enabled=False
+        )
+        self.assertTrue(
+            residual_ip_capture_from_fields(
+                ok=True,
+                routes_applied=True,
+                system_capture=True,
+                has_dataplane=True,
+                plan=plan_on,
+            )
+        )
+        st2 = plain_tunnel_status(
+            "connected",
+            vpn_ip="10.88.0.5",
+            residual_capture=True,
+            ipv6_protected=False,
+        )
+        self.assertIn("IPv4 via VPN", st2)
+
 
 class TestWindowsLinuxSettingsStoreDualStack(unittest.TestCase):
     def test_windows_load_save_defaults_and_flip(self):

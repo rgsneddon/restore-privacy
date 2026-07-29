@@ -116,6 +116,19 @@ class MainActivity : FlutterActivity() {
                             ),
                         )
                     }
+                    "setResidualStack" -> {
+                        // Dual-stack residual Settings (defaults both ON).
+                        val ipv4 = call.argument<Boolean>("ipv4")
+                        val ipv6 = call.argument<Boolean>("ipv6")
+                        StartupPrefs.setResidualStack(this, ipv4, ipv6)
+                        result.success(
+                            mapOf(
+                                "ok" to true,
+                                "residual_ipv4" to StartupPrefs.residualIpv4Enabled(this),
+                                "residual_ipv6" to StartupPrefs.residualIpv6Enabled(this),
+                            ),
+                        )
+                    }
                     else -> result.notImplemented()
                 }
             }

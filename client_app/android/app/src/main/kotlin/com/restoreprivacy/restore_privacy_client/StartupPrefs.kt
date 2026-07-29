@@ -13,6 +13,9 @@ object StartupPrefs {
     const val PREFS = "rpt_product_settings"
     const val KEY_RUN_AT_STARTUP = "run_at_startup"
     const val KEY_AUTOCONNECT = "autoconnect_on_launch"
+    /** Residual dual-stack (Flutter Settings residual_ipv4 / residual_ipv6). Default both ON. */
+    const val KEY_RESIDUAL_IPV4 = "residual_ipv4"
+    const val KEY_RESIDUAL_IPV6 = "residual_ipv6"
 
     fun setRunAtStartup(context: Context, enabled: Boolean): String {
         return try {
@@ -53,5 +56,56 @@ object StartupPrefs {
     fun isAutoconnectEnabled(context: Context): Boolean {
         return context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
             .getBoolean(KEY_AUTOCONNECT, false)
+    }
+
+    /**
+     * Residual dual-stack prefs. Missing keys → both ON (product dual-stack default).
+     * Also checks Flutter SharedPreferences store (flutter.residual_ipv4) when present.
+     */
+    fun residualIpv4Enabled(context: Context): Boolean {
+        return dualStackPref(context, KEY_RESIDUAL_IPV4, default = true)
+    }
+
+    fun residualIpv6Enabled(context: Context): Boolean {
+        return dualStackPref(context, KEY_RESIDUAL_IPV6, default = true)
+    }
+
+    fun setResidualStack(context: Context, ipv4: Boolean?, ipv6: Boolean?) {
+        val ed = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit()
+        if (ipv4 != null) ed.putBoolean(KEY_RESIDUAL_IPV4, ipv4)
+        if (ipv6 != null) ed.putBoolean(KEY_RESIDUAL_IPV6, ipv6)
+        ed.apply()
+        // Mirror into Flutter SharedPreferences so Dart load() sees the same values.
+        try {
+            val flutterPrefs = context.getSharedPreferences(
+                "FlutterSharedPreferences",
+                Context.MODE_PRIVATE,
+            )
+            val fed = flutterPrefs.edit()
+            if (ipv4 != null) fed.putBoolean("flutter.$KEY_RESIDUAL_IPV4", ipv4)
+            if (ipv6 != null) fed.putBoolean("flutter.$KEY_RESIDUAL_IPV6", ipv6)
+            fed.apply()
+        } catch (_: Exception) {
+        }
+    }
+
+    private fun dualStackPref(context: Context, key: String, default: Boolean): Boolean {
+        val native = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+        if (native.contains(key)) {
+            return native.getBoolean(key, default)
+        }
+        // Flutter shared_preferences plugin prefixes keys with "flutter."
+        try {
+            val flutterPrefs = context.getSharedPreferences(
+                "FlutterSharedPreferences",
+                Context.MODE_PRIVATE,
+            )
+            val fk = "flutter.$key"
+            if (flutterPrefs.contains(fk)) {
+                return flutterPrefs.getBoolean(fk, default)
+            }
+        } catch (_: Exception) {
+        }
+        return default
     }
 }
