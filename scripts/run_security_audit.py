@@ -14,7 +14,7 @@ Usage:
   python3 scripts/run_security_audit.py --write --out AUDIT.md
 
 Environment:
-  RPT_NODE_HOST     default 82.221.101.241 (timer forces 127.0.0.1 on node)
+  RPT_NODE_HOST     default 185.146.232.107 Romania residual (timer forces 127.0.0.1 on node)
   RPT_STATUS_PORT   default 8080
   RPT_UDP_PORT      default 44044
   RPT_AUDIT_PATH    override output path
@@ -40,9 +40,12 @@ from pathlib import Path
 from typing import Any
 
 ROOT = Path(__file__).resolve().parents[1]
-DEFAULT_HOST = os.environ.get("RPT_NODE_HOST", "82.221.101.241")
+# Default live probe peer when not on the node timer (localhost-only there).
+# Audit timer home is Romania residual monopin (lowest-spec fleet peer).
+DEFAULT_HOST = os.environ.get("RPT_NODE_HOST", "185.146.232.107")
 STATUS_PORT = int(os.environ.get("RPT_STATUS_PORT", "8080"))
 UDP_PORT = int(os.environ.get("RPT_UDP_PORT", "44044"))
+
 
 # Loopback hosts allowed when RPT_AUDIT_REQUIRE_LOCALHOST=1 (node timer policy)
 _LOOPBACK_HOSTS = frozenset({"127.0.0.1", "::1", "localhost"})
@@ -1434,18 +1437,9 @@ def collect(node_only: bool = False) -> dict:
 
 
 def write_outputs(results: dict, out_path: Path) -> None:
-    """Write AUDIT.md + mirrors + JSON with section-A redaction (no suite tails).
-
-    Always stamps a fresh ``generated_at`` at write time so the public Audit
-    page last-run advances after **every** ``--write`` (not only when collect()
-    started). Mirrors: root AUDIT.md, status_page/AUDIT.md, public/AUDIT.md,
-    and ``status_page/static/security_audit_latest.json``.
-    """
-    # Fresh write timestamp (source of truth for countdown / last-run UI)
-    stamped = dict(results)
-    stamped["generated_at"] = iso_z()
+    """Write AUDIT.md + mirrors + JSON with section-A redaction (no suite tails)."""
     # Redact nested error strings before markdown so tails never leak home paths
-    safe_results = redact_audit_value(stamped)
+    safe_results = redact_audit_value(dict(results))
     md = redact_audit_text(build_markdown(safe_results))
     out_path.parent.mkdir(parents=True, exist_ok=True)
     out_path.write_text(md, encoding="utf-8")

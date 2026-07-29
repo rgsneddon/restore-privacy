@@ -1,5 +1,10 @@
 #!/usr/bin/env bash
-# Install systemd timer: run security audit ~every 1 day on the node.
+# Install systemd timer: run security audit ~every 1 day on the residual node.
+#
+# Default fleet home for this timer: **Romania** residual monopin
+# (185.146.232.107) — lowest-spec peer; install by running this script as root
+# *on that host*. Oneshot always probes localhost only (never hardcodes a
+# remote residual IP in the unit environment).
 #
 # Privacy section A (audit run must not become a leak):
 #   - Probes localhost only (RPT_NODE_HOST=127.0.0.1 + RPT_AUDIT_REQUIRE_LOCALHOST)
@@ -13,8 +18,9 @@
 #
 # Writes ${INSTALL_ROOT}/AUDIT.md and status_page copies when present.
 # VPN APP Shop can serve local AUDIT.md at /AUDIT.md and /audit.md.
+# Operator pull defaults (sync_audit_artifacts_from_node.py) → Romania monopin.
 #
-# Usage (root on production node):
+# Usage (root on Romania residual node — audit-timer home):
 #   bash scripts/install_security_audit_timer.sh
 #   PERIOD=1d bash scripts/install_security_audit_timer.sh
 set -euo pipefail
@@ -77,7 +83,8 @@ if [[ -f "${REPO_ROOT}/status_page/downloads.py" ]]; then
     "${INSTALL_ROOT}/status_page/downloads.py"
 fi
 # Product pubs for PE pin / multihop exit pin honesty in package RAG
-for _pub in node_elgamal.pub exit_node_elgamal.pub NODE_ELGAMAL_PUB.sha256; do
+# Include US pub so multihop_product_pubs PASS on lean residual nodes (RO home).
+for _pub in node_elgamal.pub exit_node_elgamal.pub us_node_elgamal.pub NODE_ELGAMAL_PUB.sha256; do
   if [[ -f "${REPO_ROOT}/product/${_pub}" ]]; then
     _rpt_audit_cp "${REPO_ROOT}/product/${_pub}" \
       "${INSTALL_ROOT}/product/${_pub}"
@@ -88,6 +95,9 @@ _rpt_audit_cp "${REPO_ROOT}/client/__init__.py" "${INSTALL_ROOT}/client/__init__
 _rpt_audit_cp "${REPO_ROOT}/client/kill_switch.py" "${INSTALL_ROOT}/client/kill_switch.py"
 _rpt_audit_cp "${REPO_ROOT}/client/multihop.py" "${INSTALL_ROOT}/client/multihop.py"
 _rpt_audit_cp "${REPO_ROOT}/client/endpoint.py" "${INSTALL_ROOT}/client/endpoint.py"
+# Multihop public labels (country names, not raw IPs) for residual honesty text
+_rpt_audit_cp "${REPO_ROOT}/client/residual_public.py" "${INSTALL_ROOT}/client/residual_public.py"
+
 _rpt_audit_cp "${REPO_ROOT}/scripts/ephemeral_node.py" "${INSTALL_ROOT}/scripts/ephemeral_node.py"
 for _nscript in nolog.py install_host_privacy.sh install_disk_encryption.sh \
   install_zram_luks.sh install_shutdown_wipe.sh ephemeral_node.py; do

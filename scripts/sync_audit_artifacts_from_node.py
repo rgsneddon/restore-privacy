@@ -1,15 +1,18 @@
 #!/usr/bin/env python3
-"""Pull security audit artifacts from the entry node into this repo (operator).
+"""Pull security audit artifacts from the audit-timer residual node (operator).
 
-The hardened ``rpt-security-audit`` oneshot writes **local** AUDIT.md +
-``security_audit_latest.json`` on the node only (no outbound git/HTTP publish).
-Public homepage countdown reads ``status_page/static/security_audit_latest.json``
-from the status host deploy — so without this sync (or an equivalent publish),
-the public ``generated_at`` goes stale while the node timer still runs.
+Default audit home is the **Romania** residual monopin (lowest-spec fleet peer)
+where ``rpt-security-audit.timer`` is installed. The hardened oneshot writes
+**local** AUDIT.md + ``security_audit_latest.json`` on that node only (no
+outbound git/HTTP publish). Public homepage countdown reads
+``status_page/static/security_audit_latest.json`` from the status host deploy —
+so without this sync (or an equivalent publish), the public ``generated_at``
+goes stale while the node timer still runs.
 
 Usage (from a machine with SSH access)::
 
   python scripts/sync_audit_artifacts_from_node.py
+  # Override only when pulling from a non-default peer:
   RPT_SSH_HOST=82.221.101.241 RPT_SSH_USER=raskul python scripts/sync_audit_artifacts_from_node.py
 
 Does not upload secrets. Copies only:
@@ -25,7 +28,8 @@ import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-DEFAULT_HOST = "82.221.101.241"
+# Default audit-timer host: Romania residual monopin (PRODUCT_EXIT / RO peer).
+DEFAULT_HOST = "185.146.232.107"
 DEFAULT_USER = "raskul"
 REMOTE_JSON = "/opt/restore-privacy/status_page/static/security_audit_latest.json"
 REMOTE_AUDIT = "/opt/restore-privacy/AUDIT.md"
@@ -40,10 +44,16 @@ def _ssh_base() -> list[str]:
     if key:
         cmd.extend(["-i", key])
     else:
-        # Prefer product VPS key if present
-        cand = Path.home() / ".ssh" / "id_ed25519_restore_privacy_vps"
-        if cand.is_file():
-            cmd.extend(["-i", str(cand)])
+        # Prefer hop key (RO) then product VPS key if present
+        for name in (
+            "id_ed25519_restore_privacy_hop",
+            "id_ed25519_restore_privacy_vps",
+            "id_ed25519_restore_privacy_eu",
+        ):
+            cand = Path.home() / ".ssh" / name
+            if cand.is_file():
+                cmd.extend(["-i", str(cand)])
+                break
     return cmd, remote
 
 
