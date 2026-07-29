@@ -938,47 +938,66 @@ def start_full_tunnel(
         kill_switch_applied=False,
     )
 
-    # Product residual-IP path: refuse queue/session-only success (ISP IP unchanged)
-    if require_system_capture and not residual_ip_capture_active(result):
-        plane.stop()
-        # Full residual restore (routes + KS rollback + re-apply RPT-FW allows).
-        # Never leave dual /1 or profile DefaultOutboundAction=Block after fail.
-        try:
-            restore_windows_residual_path(
-                server_host=server_host,
-                plan=plan,
-                if_index=if_index,
-                run_kill_switch_rollback=True,
-                run_ipv6_rollback=True,
-            )
-        except Exception:
-            if routes_applied:
-                try:
-                    rollback_full_tunnel_routes(plan, server_host, if_index)
-                except Exception:
-                    pass
-            if ipv6_ok:
-                try:
-                    rollback_ipv6_leak_mitigation(plan)
-                except Exception:
-                    pass
-        try:
-            tun.close()
-        except Exception:
-            pass
-        return WindowsTunnelResult(
-            False,
-            "Could not route device traffic via the VPN node "
-            f"(need Wintun + dual /1; system_capture={capture}, "
-            f"routes_applied={routes_applied}, if_index={if_index}). {route_msg}",
-            applied,
-            routes_applied=False,
+    # Product residual-IP path: single pure decision table (residual_stack).
+    # SESSION_ONLY_OK (Settings residual IPv4 OFF + dataplane up) keeps the session —
+    # do not tear down. FAIL tears down. RESIDUAL_OK continues to kill-switch arm.
+    if require_system_capture:
+        from client.residual_stack import ResidualAttachOutcome, residual_attach_outcome
+
+        attach = residual_attach_outcome(
+            ok=bool(result.ok),
+            routes_applied=bool(result.routes_applied),
+            system_capture=bool(result.system_capture),
+            has_dataplane=result.dataplane is not None,
             plan=plan,
-            server_host=server_host,
-            if_index=if_index,
-            ipv6_mitigation_applied=False,
-            kill_switch_applied=False,
         )
+        if attach == ResidualAttachOutcome.SESSION_ONLY_OK:
+            # Intentional residual IPv4 off: live session, honesty residual_capture=False
+            result.message = (result.message or msg) + (
+                "; residual IPv4 off (Settings) — session only, ISP IPv4 path unchanged"
+            )
+            # Keep ok=True, tun/dataplane live; routes_applied already False when IPv4 off
+        elif attach == ResidualAttachOutcome.FAIL:
+            plane.stop()
+            # Full residual restore (routes + KS rollback + re-apply RPT-FW allows).
+            # Never leave dual /1 or profile DefaultOutboundAction=Block after fail.
+            try:
+                restore_windows_residual_path(
+                    server_host=server_host,
+                    plan=plan,
+                    if_index=if_index,
+                    run_kill_switch_rollback=True,
+                    run_ipv6_rollback=True,
+                )
+            except Exception:
+                if routes_applied:
+                    try:
+                        rollback_full_tunnel_routes(plan, server_host, if_index)
+                    except Exception:
+                        pass
+                if ipv6_ok:
+                    try:
+                        rollback_ipv6_leak_mitigation(plan)
+                    except Exception:
+                        pass
+            try:
+                tun.close()
+            except Exception:
+                pass
+            return WindowsTunnelResult(
+                False,
+                "Could not route device traffic via the VPN node "
+                f"(need Wintun + dual /1; system_capture={capture}, "
+                f"routes_applied={routes_applied}, if_index={if_index}). {route_msg}",
+                applied,
+                routes_applied=False,
+                plan=plan,
+                server_host=server_host,
+                if_index=if_index,
+                ipv6_mitigation_applied=False,
+                kill_switch_applied=False,
+            )
+        # RESIDUAL_OK: fall through to kill-switch path
 
     # Kill-switch: PARKED for this build stage (product_kill_switch_enabled is
     # always False). Block retained for later un-park; never arms residual KS now.

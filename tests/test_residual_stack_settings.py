@@ -188,9 +188,11 @@ class TestResidualStackPrefs(unittest.TestCase):
         self.assertIn("KEY_RESIDUAL_IPV4", prefs)
         self.assertIn('"setResidualStack"', main)
 
-    def test_residual_ip_capture_active_false_when_ipv4_settings_off(self):
-        """Pin-only / IPv4-off plans must not claim residual public IP on VPN."""
+    def test_residual_attach_outcome_matrix(self):
+        """Shipped residual_attach_outcome decision table (single source of truth)."""
         from client.residual_stack import (
+            ResidualAttachOutcome,
+            residual_attach_outcome,
             residual_ip_capture_from_fields,
             session_only_from_fields,
         )
@@ -199,9 +201,32 @@ class TestResidualStackPrefs(unittest.TestCase):
         plan_off = build_full_tunnel_plan(
             "10.88.0.5", ipv4_enabled=False, ipv6_enabled=True
         )
+        plan_on = build_full_tunnel_plan(
+            "10.88.0.5", ipv4_enabled=True, ipv6_enabled=True
+        )
         self.assertFalse(plan_wants_ipv4_catchall(plan_off))
+        self.assertTrue(plan_wants_ipv4_catchall(plan_on))
 
-        # routes_applied=True without dual /1 must still be capture-inactive
+        # IPv4-off + pin-only success → SESSION_ONLY_OK (no teardown)
+        out_off = residual_attach_outcome(
+            ok=True,
+            routes_applied=False,
+            system_capture=True,
+            has_dataplane=True,
+            plan=plan_off,
+        )
+        self.assertEqual(out_off, ResidualAttachOutcome.SESSION_ONLY_OK)
+        # even if routes_applied is wrongly True, still session-only (no dual /1 intent)
+        self.assertEqual(
+            residual_attach_outcome(
+                ok=True,
+                routes_applied=True,
+                system_capture=True,
+                has_dataplane=True,
+                plan=plan_off,
+            ),
+            ResidualAttachOutcome.SESSION_ONLY_OK,
+        )
         self.assertFalse(
             residual_ip_capture_from_fields(
                 ok=True,
@@ -212,42 +237,18 @@ class TestResidualStackPrefs(unittest.TestCase):
             )
         )
         self.assertTrue(
-            session_only_from_fields(
-                ok=True, has_dataplane=True, plan=plan_off
-            )
+            session_only_from_fields(ok=True, has_dataplane=True, plan=plan_off)
         )
 
-        # Shipped Windows/Linux helpers must call the pure gate (structural)
-        win_src = (ROOT / "client/windows/tunnel_win.py").read_text(encoding="utf-8")
-        lin_src = (ROOT / "client/linux/tunnel_linux.py").read_text(encoding="utf-8")
-        self.assertIn("residual_ip_capture_from_fields", win_src)
-        self.assertIn("session_only_from_fields", win_src)
-        self.assertIn("residual_ip_capture_from_fields", lin_src)
-        self.assertIn("session_only_from_fields", lin_src)
-        self.assertIn("session_ok_without_residual_capture", win_src)
-        # Connect shells must not tear down intentional IPv4-off sessions
-        self.assertIn(
-            "session_ok_without_residual_capture",
-            (ROOT / "client/windows/app.py").read_text(encoding="utf-8"),
+        # IPv4-on + dual /1 applied → RESIDUAL_OK
+        out_ok = residual_attach_outcome(
+            ok=True,
+            routes_applied=True,
+            system_capture=True,
+            has_dataplane=True,
+            plan=plan_on,
         )
-        self.assertIn(
-            "session_ok_without_residual_capture",
-            (ROOT / "client/linux/app.py").read_text(encoding="utf-8"),
-        )
-
-        # Honesty: residual_capture=False must not claim IPv4 via VPN
-        st = plain_tunnel_status(
-            "connected",
-            vpn_ip="10.88.0.5",
-            residual_capture=False,
-            ipv6_protected=False,
-        )
-        self.assertIn("Session only", st)
-        self.assertNotIn("IPv4 via VPN", st)
-
-        plan_on = build_full_tunnel_plan(
-            "10.88.0.5", ipv4_enabled=True, ipv6_enabled=False
-        )
+        self.assertEqual(out_ok, ResidualAttachOutcome.RESIDUAL_OK)
         self.assertTrue(
             residual_ip_capture_from_fields(
                 ok=True,
@@ -257,6 +258,42 @@ class TestResidualStackPrefs(unittest.TestCase):
                 plan=plan_on,
             )
         )
+
+        # IPv4-on + no capture → FAIL (teardown)
+        out_fail = residual_attach_outcome(
+            ok=True,
+            routes_applied=False,
+            system_capture=True,
+            has_dataplane=True,
+            plan=plan_on,
+        )
+        self.assertEqual(out_fail, ResidualAttachOutcome.FAIL)
+        out_fail2 = residual_attach_outcome(
+            ok=False,
+            routes_applied=True,
+            system_capture=True,
+            has_dataplane=True,
+            plan=plan_on,
+        )
+        self.assertEqual(out_fail2, ResidualAttachOutcome.FAIL)
+        out_fail3 = residual_attach_outcome(
+            ok=True,
+            routes_applied=True,
+            system_capture=True,
+            has_dataplane=False,
+            plan=plan_on,
+        )
+        self.assertEqual(out_fail3, ResidualAttachOutcome.FAIL)
+
+        # Honesty strings for session-only vs residual
+        st = plain_tunnel_status(
+            "connected",
+            vpn_ip="10.88.0.5",
+            residual_capture=False,
+            ipv6_protected=False,
+        )
+        self.assertIn("Session only", st)
+        self.assertNotIn("IPv4 via VPN", st)
         st2 = plain_tunnel_status(
             "connected",
             vpn_ip="10.88.0.5",
@@ -264,6 +301,25 @@ class TestResidualStackPrefs(unittest.TestCase):
             ipv6_protected=False,
         )
         self.assertIn("IPv4 via VPN", st2)
+
+    def test_windows_start_full_tunnel_gate_uses_residual_attach_outcome(self):
+        """Shipped require_system_capture gate must call residual_attach_outcome (not bare capture)."""
+        win_src = (ROOT / "client/windows/tunnel_win.py").read_text(encoding="utf-8")
+        # Gate must use the pure decision table
+        self.assertIn("residual_attach_outcome", win_src)
+        self.assertIn("ResidualAttachOutcome", win_src)
+        self.assertIn("SESSION_ONLY_OK", win_src)
+        # SESSION_ONLY_OK must not tear down (no plane.stop immediately for that branch)
+        # Locate the require_system_capture block and ensure SESSION_ONLY keeps session
+        idx = win_src.index("if require_system_capture:")
+        gate = win_src[idx : idx + 2500]
+        self.assertIn("residual_attach_outcome", gate)
+        self.assertIn("SESSION_ONLY_OK", gate)
+        self.assertIn("FAIL", gate)
+        # Fail path still tears down
+        self.assertIn("plane.stop()", gate)
+        # Session-only path must not return ok=False for IPv4-off
+        self.assertIn("residual IPv4 off", gate)
 
 
 class TestWindowsLinuxSettingsStoreDualStack(unittest.TestCase):

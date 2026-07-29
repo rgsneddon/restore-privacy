@@ -152,6 +152,51 @@ def plan_wants_ipv6_isp_block(plan: FullTunnelPlan | None) -> bool:
     )
 
 
+class ResidualAttachOutcome:
+    """Shipped attach decision for residual Connect (single source of truth).
+
+    - ``RESIDUAL_OK``: dual /1 intended + capture active → residual_capture=True
+    - ``SESSION_ONLY_OK``: Settings residual IPv4 OFF + dataplane up → keep session,
+      residual_capture=False (no teardown)
+    - ``FAIL``: residual IPv4 ON but capture incomplete, or session not up → teardown
+    """
+
+    RESIDUAL_OK = "residual_ok"
+    SESSION_ONLY_OK = "session_only_ok"
+    FAIL = "fail"
+
+
+def residual_attach_outcome(
+    *,
+    ok: bool,
+    routes_applied: bool,
+    system_capture: bool,
+    has_dataplane: bool,
+    plan: FullTunnelPlan | None,
+) -> str:
+    """Pure residual attach decision used by Windows ``start_full_tunnel`` and honesty.
+
+    Call sites must not re-implement this table. Settings residual_ipv4 OFF
+    (empty dual /1 on *plan*) with a live dataplane is ``SESSION_ONLY_OK`` —
+    never ``FAIL`` (do not tear down).
+    """
+    from client.full_tunnel import plan_wants_ipv4_catchall
+
+    if not ok or not has_dataplane:
+        return ResidualAttachOutcome.FAIL
+
+    wants_ipv4 = plan is None or plan_wants_ipv4_catchall(plan)
+
+    if not wants_ipv4:
+        # Settings residual IPv4 OFF: session/dataplane success without dual /1
+        return ResidualAttachOutcome.SESSION_ONLY_OK
+
+    # Residual IPv4 ON: require system capture + dual /1 applied
+    if routes_applied and system_capture:
+        return ResidualAttachOutcome.RESIDUAL_OK
+    return ResidualAttachOutcome.FAIL
+
+
 def residual_ip_capture_from_fields(
     *,
     ok: bool,
@@ -162,17 +207,18 @@ def residual_ip_capture_from_fields(
 ) -> bool:
     """Pure residual-capture honesty gate (Windows/Linux ``residual_ip_capture_active``).
 
-    True only when dual /1 residual IPv4 capture is intended (Settings residual_ipv4
-    ON → plan.default_routes carry dual /1) **and** routes/system TUN/dataplane
-    report success. Pin-only or Settings IPv4 OFF → False (session-only honesty).
+    True only for :attr:`ResidualAttachOutcome.RESIDUAL_OK`.
     """
-    from client.full_tunnel import plan_wants_ipv4_catchall
-
-    if not (ok and routes_applied and system_capture and has_dataplane):
-        return False
-    if plan is not None and not plan_wants_ipv4_catchall(plan):
-        return False
-    return True
+    return (
+        residual_attach_outcome(
+            ok=ok,
+            routes_applied=routes_applied,
+            system_capture=system_capture,
+            has_dataplane=has_dataplane,
+            plan=plan,
+        )
+        == ResidualAttachOutcome.RESIDUAL_OK
+    )
 
 
 def session_only_from_fields(
@@ -182,8 +228,13 @@ def session_only_from_fields(
     plan: FullTunnelPlan | None,
 ) -> bool:
     """True when session/dataplane is up with Settings residual IPv4 intentionally OFF."""
-    from client.full_tunnel import plan_wants_ipv4_catchall
-
-    if not ok or not has_dataplane or plan is None:
-        return False
-    return not plan_wants_ipv4_catchall(plan)
+    return (
+        residual_attach_outcome(
+            ok=ok,
+            routes_applied=False,  # unused for SESSION_ONLY_OK path
+            system_capture=False,
+            has_dataplane=has_dataplane,
+            plan=plan,
+        )
+        == ResidualAttachOutcome.SESSION_ONLY_OK
+    )
