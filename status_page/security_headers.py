@@ -10,6 +10,19 @@ from __future__ import annotations
 
 # Verbatim probe values (criterion 1).
 STRICT_TRANSPORT_SECURITY = "max-age=31536000; includeSubDomains; preload"
+
+# form-action must allow Stripe Checkout hosts: Chrome/Safari enforce form-action
+# against *redirect targets* after a form POST. Homepage Buy now → POST
+# /pay/checkout → 302 to pay.restoreprivacy.online (or checkout.stripe.com) is
+# blocked if only 'self' is listed — Buy now appears dead while curl works.
+# Keep this list minimal (Checkout navigation only; not script-src/connect-src).
+FORM_ACTION_DIRECTIVE = (
+    "form-action 'self' "
+    "https://pay.restoreprivacy.online "
+    "https://checkout.stripe.com "
+    "https://buy.stripe.com"
+)
+
 CONTENT_SECURITY_POLICY = (
     "default-src 'self'; "
     "script-src 'self'; "
@@ -20,7 +33,7 @@ CONTENT_SECURITY_POLICY = (
     "object-src 'none'; "
     "base-uri 'self'; "
     "frame-ancestors 'none'; "
-    "form-action 'self'; "
+    f"{FORM_ACTION_DIRECTIVE}; "
     "upgrade-insecure-requests"
 )
 # Same CSP but same-origin framing allowed (binary download / attachment).
@@ -34,7 +47,7 @@ CONTENT_SECURITY_POLICY_FRAMEABLE = (
     "object-src 'none'; "
     "base-uri 'self'; "
     "frame-ancestors 'self'; "
-    "form-action 'self'; "
+    f"{FORM_ACTION_DIRECTIVE}; "
     "upgrade-insecure-requests"
 )
 X_FRAME_OPTIONS = "DENY"

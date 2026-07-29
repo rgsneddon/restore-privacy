@@ -38,6 +38,24 @@ class TestSecurityHeaderConstants(unittest.TestCase):
             self.assertEqual(pairs[name], value, msg=name)
         self.assertEqual(set(pairs.keys()), set(EXPECTED.keys()))
 
+    def test_form_action_allows_stripe_checkout_redirect_hosts(self):
+        """Buy now POST → 302 Checkout needs Stripe hosts in form-action (Chrome)."""
+        csp = sh.CONTENT_SECURITY_POLICY
+        frameable = sh.CONTENT_SECURITY_POLICY_FRAMEABLE
+        for policy in (csp, frameable, sh.FORM_ACTION_DIRECTIVE):
+            self.assertIn("form-action", policy)
+            self.assertIn("'self'", policy)
+            self.assertIn("https://pay.restoreprivacy.online", policy)
+            self.assertIn("https://checkout.stripe.com", policy)
+            self.assertIn("https://buy.stripe.com", policy)
+        # Still not a wildcard form-action
+        self.assertNotIn("form-action *", csp)
+        self.assertNotIn("form-action 'self' *", csp)
+        # Checkout hosts must appear only in form-action, not as script/connect widen
+        self.assertNotIn("script-src 'self' https://checkout.stripe.com", csp)
+        self.assertIn(sh.FORM_ACTION_DIRECTIVE, csp)
+        self.assertIn(sh.FORM_ACTION_DIRECTIVE, frameable)
+
     def test_frameable_omits_xfo_deny_uses_self_ancestors(self):
         pairs = dict(sh.security_headers(allow_framing=True))
         self.assertNotIn("X-Frame-Options", pairs)
@@ -47,6 +65,10 @@ class TestSecurityHeaderConstants(unittest.TestCase):
         )
         self.assertEqual(
             pairs["Strict-Transport-Security"], EXPECTED["Strict-Transport-Security"]
+        )
+        self.assertIn(
+            "https://pay.restoreprivacy.online",
+            pairs["Content-Security-Policy"],
         )
 
 
