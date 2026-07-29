@@ -828,11 +828,11 @@ def render_admin_ondemand_mint_section_html(
   <div class="ok-msg" id="ondemand-result" role="status" data-admin-focus-result="1" tabindex="-1">
     <p><strong>Admin failsafe link minted</strong> for <strong id="ondemand-result-platform">{plat}</strong>
       (<code id="ondemand-result-filename">{fname}</code>).</p>
-    <p>One-time paid download (not free GitHub):</p>
+    <p>1-hour reusable paid download (not free GitHub; retry if connection drops):</p>
     <p><a id="ondemand-download-link" href="{url}" rel="noopener noreferrer">{url}</a>
       {copy_url}</p>
     <p class="muted">Path: <code id="ondemand-download-path">{path}</code>
-      — time-limited (1 hour); not written as a customer RPT-PPI recovery event.</p>
+      — valid for 1 hour; not written as a customer RPT-PPI recovery event.</p>
   </div>"""
     plat_sel = (platform or "windows").strip().lower()
     options = []
@@ -1079,11 +1079,12 @@ def render_seed_test_purchase_section_html(
       <code id="seed-purchase-id">{pid}</code> {copy_pid}</p>
     <p>Platform: <strong id="seed-purchase-platform">{plat}</strong>
       — <code id="seed-purchase-filename">{fname}</code></p>
-    <p>One-time paid download (not free GitHub):
+    <p>1-hour reusable paid download (not free GitHub):
       <a id="seed-download-link" href="{url}" rel="noopener noreferrer">{url}</a>
       {copy_url}</p>
     <p class="muted">Path: <code id="seed-download-path">{path}</code>
-      — use the purchase ID above in the re-issue form after consuming the token.</p>
+      — valid for 1 hour (audit stamp does not burn the link). Use the purchase ID
+      above in the re-issue form after the window expires or if a new token is needed.</p>
   </div>"""
     plat_sel = (platform or "windows").strip().lower()
     options = []

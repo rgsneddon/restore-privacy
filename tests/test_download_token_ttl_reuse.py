@@ -110,6 +110,8 @@ class TestDownloadTokenTtlReuse(unittest.TestCase):
         )
         self.assertIn("1-hour reusable", howto)
         self.assertNotIn("Shows a **one-time** link", howto)
+        self.assertNotIn("Single-use **proxy** download", howto)
+        self.assertIn("1-hour reusable proxy", howto.lower().replace("**", ""))
         readme = (root / "README.md").read_text(encoding="utf-8")
         self.assertNotIn("one-time link after payment", readme)
         self.assertIn("1-hour download link after payment", readme)
@@ -121,6 +123,16 @@ class TestDownloadTokenTtlReuse(unittest.TestCase):
         self.assertIn("1-hour reusable", admin)
         self.assertNotIn("Pass this <strong>one-time</strong> link", admin)
         self.assertNotIn("open the one-time URL", admin)
+        self.assertNotIn("One-time paid download", admin)
+        self.assertNotIn("after consuming the token", admin)
+        privacy = (root / "PRIVACY_POLICY.md").read_text(encoding="utf-8")
+        self.assertNotIn("One-time download links will not reappear", privacy)
+        self.assertIn("Time-limited (1 hour) download links", privacy)
+        pub_privacy = (
+            root / "status_page" / "public" / "PRIVACY_POLICY.md"
+        ).read_text(encoding="utf-8")
+        self.assertNotIn("One-time download links will not reappear", pub_privacy)
+        self.assertIn("Time-limited (1 hour) download links", pub_privacy)
 
 
 if __name__ == "__main__":

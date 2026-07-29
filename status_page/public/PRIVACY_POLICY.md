@@ -89,7 +89,7 @@ Every installer ships a **Restore Internet** failsafe (script or guidance).
 
 Runs **only on the device** — no phone-home wipe notification.
 
-**Warning:** Restore Internet **erases all** Restore Privacy material. One-time download links will not reappear automatically. Contact **rus@restoreprivacy.online** or pay again. Ordinary Disconnect is not this wipe.
+**Warning:** Restore Internet **erases all** Restore Privacy material. Time-limited (1 hour) download links will not reappear automatically after wipe. Contact **rus@restoreprivacy.online** with your product purchase identifier (PPI) or pay again. Ordinary Disconnect is not this wipe.
 
 ---
 

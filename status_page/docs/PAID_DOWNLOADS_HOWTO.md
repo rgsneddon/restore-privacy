@@ -247,7 +247,7 @@ Architecture (modules):
 | `/pay/checkout` | POST form/JSON `{platform, interval}` → subscription Checkout Session redirect |
 | `/api/checkout` | JSON POST `{ "platform": "android", "interval": "year" }` → `{ url, amount_pence, … }` |
 | `/webhook/stripe` | Stripe webhook (signature required) |
-| `/download?token=` | Single-use **proxy** download of the paid package (not a free GitHub redirect) |
+| `/download?token=` | **1-hour reusable proxy** download of the paid package (retry if connection drops; not a free GitHub redirect) |
 | `/download/success?session_id=` | After Checkout redirect — **Download \<platform\> package** button |
 | `/admin` | **Private** operator page: processor settings + grants (login required) |
 | `/admin/login` | Login form / POST credentials |
