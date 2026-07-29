@@ -224,8 +224,12 @@ def apply_routes_for_adapter(
 
     ``physical_gw`` may be prefetched while HELLO runs (overlap cold attach).
     """
+    from client.full_tunnel import plan_wants_ipv4_catchall
+
+    # Honour Settings residual IPv4: empty plan.default_routes → no dual /1.
+    effective_catchall = include_catchall and plan_wants_ipv4_catchall(plan)
     cmds = windows_route_commands(
-        plan, server_host, if_index=if_index, include_catchall=include_catchall
+        plan, server_host, if_index=if_index, include_catchall=effective_catchall
     )
     gw = physical_gw or physical_default_gateway()
     if not gw:
@@ -242,7 +246,9 @@ def apply_routes_for_adapter(
     errors: list[str] = []
     pin_ok = False
     catchall_applied = 0
-    catchall_wanted = include_catchall and if_index is not None and int(if_index) > 0
+    catchall_wanted = (
+        effective_catchall and if_index is not None and int(if_index) > 0
+    )
 
     for cmd in cmds:
         if "PHYSICAL_GW" in cmd:
@@ -770,9 +776,14 @@ def start_full_tunnel(
     route_msg = "routes skipped"
     routes_applied = False
 
+    from client.full_tunnel import plan_wants_ipv4_catchall
+
+    # Settings residual IPv4 OFF → never install dual /1 (even with valid IF).
+    want_ipv4_catchall = plan_wants_ipv4_catchall(plan)
+
     if routes_would_blackhole_without_system_capture(capture, True):
         route_msg = "no OS TUN capture — full-tunnel routes NOT applied (prevents blackhole)"
-    elif routes_would_blackhole_without_if_index(if_index, True):
+    elif want_ipv4_catchall and routes_would_blackhole_without_if_index(if_index, True):
         # Server pin only (keep UDP path); no dual /1
         if is_admin():
             cmds, errs, _pin_ok = apply_routes_for_adapter(
@@ -793,7 +804,7 @@ def start_full_tunnel(
             plan,
             server_host,
             if_index=if_index,
-            include_catchall=True,
+            include_catchall=want_ipv4_catchall,
             physical_gw=physical_gw,
         )
         applied.extend(cmds)
@@ -1008,7 +1019,14 @@ def apply_full_tunnel_routes(
             windows_route_commands(plan, server_host, if_index=None, include_catchall=False),
             routes_applied=False,
         )
-    cmds = windows_route_commands(plan, server_host, if_index=if_index)
+    from client.full_tunnel import plan_wants_ipv4_catchall
+
+    cmds = windows_route_commands(
+        plan,
+        server_host,
+        if_index=if_index,
+        include_catchall=plan_wants_ipv4_catchall(plan),
+    )
     gw = physical_default_gateway() or "0.0.0.0"
     cmds = [c.replace("PHYSICAL_GW", gw) for c in cmds]
     if dry_run or not is_admin():

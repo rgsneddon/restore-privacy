@@ -16,6 +16,9 @@ from client.full_tunnel import (  # noqa: E402
     IPV6_LEAK_POLICY_BLOCK_ISP,
     android_vpn_builder_config,
     build_full_tunnel_plan,
+    linux_route_commands,
+    plan_wants_ipv4_catchall,
+    windows_route_commands,
 )
 from client.residual_stack import (  # noqa: E402
     KEY_RESIDUAL_IPV4,
@@ -90,6 +93,77 @@ class TestResidualStackPrefs(unittest.TestCase):
         self.assertIs(honesty_ipv6_protected(stack_ipv6_enabled=False, mitigation_applied=True), False)
         self.assertIs(honesty_ipv6_protected(stack_ipv6_enabled=True, mitigation_applied=True), True)
         self.assertIs(honesty_ipv6_protected(stack_ipv6_enabled=True, mitigation_applied=False), False)
+
+    def test_windows_route_commands_omit_dual_slash1_when_ipv4_off(self):
+        """Shipped windows_route_commands must honour plan.default_routes (not only include_catchall)."""
+        off = build_full_tunnel_plan("10.88.0.5", ipv4_enabled=False, ipv6_enabled=True)
+        self.assertFalse(plan_wants_ipv4_catchall(off))
+        # include_catchall=True would previously ignore empty default_routes — must not now.
+        cmds = windows_route_commands(off, "1.2.3.4", if_index=12, include_catchall=True)
+        joined = "\n".join(cmds)
+        self.assertNotIn("0.0.0.0 mask 128.0.0.0", joined)
+        self.assertNotIn("128.0.0.0 mask 128.0.0.0", joined)
+        # Server pin + address still present
+        self.assertIn("1.2.3.4", joined)
+        self.assertIn("10.88.0.5", joined)
+        # IPv4 ON still emits dual /1
+        on = build_full_tunnel_plan("10.88.0.5", ipv4_enabled=True, ipv6_enabled=True)
+        cmds_on = windows_route_commands(on, "1.2.3.4", if_index=12, include_catchall=True)
+        joined_on = "\n".join(cmds_on)
+        self.assertIn("0.0.0.0 mask 128.0.0.0 0.0.0.0 IF 12", joined_on)
+        self.assertIn("128.0.0.0 mask 128.0.0.0 0.0.0.0 IF 12", joined_on)
+
+    def test_linux_route_commands_omit_dual_slash1_when_ipv4_off(self):
+        off = build_full_tunnel_plan(
+            "10.88.0.5", tunnel_iface="rpt0", ipv4_enabled=False, ipv6_enabled=True
+        )
+        cmds = linux_route_commands(
+            off,
+            "1.2.3.4",
+            iface="rpt0",
+            physical_dev="eth0",
+            physical_gw="192.168.1.1",
+            include_catchall=True,
+        )
+        joined = "\n".join(cmds)
+        self.assertNotIn("0.0.0.0/1", joined)
+        self.assertNotIn("128.0.0.0/1", joined)
+        on = build_full_tunnel_plan(
+            "10.88.0.5", tunnel_iface="rpt0", ipv4_enabled=True, ipv6_enabled=False
+        )
+        cmds_on = linux_route_commands(
+            on,
+            "1.2.3.4",
+            iface="rpt0",
+            physical_dev="eth0",
+            physical_gw="192.168.1.1",
+            include_catchall=True,
+        )
+        joined_on = "\n".join(cmds_on)
+        self.assertIn("0.0.0.0/1", joined_on)
+        self.assertIn("128.0.0.0/1", joined_on)
+
+    def test_flutter_native_set_residual_stack_wiring(self):
+        """Host channel + Packet Tunnel must persist/honour residual_ipv4/ipv6 (not cosmetic)."""
+        for rel in (
+            "client_app/macos/NativePrep/RptVpnChannel.swift",
+            "client_app/ios/NativePrep/RptVpnChannel.swift",
+        ):
+            text = (ROOT / rel).read_text(encoding="utf-8")
+            self.assertIn('case "setResidualStack"', text)
+            self.assertIn("residual_ipv4", text)
+            self.assertIn("residual_ipv6", text)
+        for rel in (
+            "client_app/macos/NativePrep/PacketTunnelProvider.swift",
+            "client_app/ios/NativePrep/PacketTunnelProvider.swift",
+        ):
+            text = (ROOT / rel).read_text(encoding="utf-8")
+            self.assertIn("loadResidualStackPrefs", text)
+            self.assertIn("residual_ipv4", text)
+            self.assertIn("residual_ipv6", text)
+            # Must not hardcode ipv6Protected:true on tunnel start path only
+            self.assertIn("ipv6Protected: stack.ipv6", text)
+            self.assertIn("stack.ipv4", text)
 
 
 class TestWindowsLinuxSettingsStoreDualStack(unittest.TestCase):

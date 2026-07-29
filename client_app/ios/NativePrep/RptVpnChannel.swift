@@ -101,6 +101,31 @@ enum RptVpnChannel {
           suite.synchronize()
         }
         result(["ok": true] as [String: Any])
+      case "setResidualStack":
+        // Dual-stack residual IPv4/IPv6 Settings (defaults both ON; App Group for Packet Tunnel).
+        let args = call.arguments as? [String: Any] ?? [:]
+        let defaults = UserDefaults.standard
+        if let v = args["ipv4"] as? Bool {
+          defaults.set(v, forKey: "residual_ipv4")
+        }
+        if let v = args["ipv6"] as? Bool {
+          defaults.set(v, forKey: "residual_ipv6")
+        }
+        defaults.synchronize()
+        if let suite = UserDefaults(suiteName: RptSecrets.appGroupId) {
+          if let v = args["ipv4"] as? Bool {
+            suite.set(v, forKey: "residual_ipv4")
+          }
+          if let v = args["ipv6"] as? Bool {
+            suite.set(v, forKey: "residual_ipv6")
+          }
+          suite.synchronize()
+        }
+        result([
+          "ok": true,
+          "residual_ipv4": defaults.object(forKey: "residual_ipv4") as? Bool ?? true,
+          "residual_ipv6": defaults.object(forKey: "residual_ipv6") as? Bool ?? true,
+        ] as [String: Any])
       default:
         result(FlutterMethodNotImplemented)
       }

@@ -60,17 +60,26 @@ class PacketTunnelProvider: NEPacketTunnelProvider {
         self.engine = engine
         self.session = session
 
-        // 4. Full-tunnel settings: assigned VPN IP + default route intent 0.0.0.0/0
+        // 4. Tunnel network settings honour Settings dual-stack residual prefs
+        // (residual_ipv4 / residual_ipv6 — defaults both ON).
+        let stack = Self.loadResidualStackPrefs()
         let settings = NEPacketTunnelNetworkSettings(tunnelRemoteAddress: self.endpointHost)
         let ipv4 = NEIPv4Settings(addresses: [session.vpnIp], subnetMasks: ["255.255.255.255"])
-        let defaultRoute = NEIPv4Route.default()
-        ipv4.includedRoutes = [defaultRoute]
         ipv4.excludedRoutes = [NEIPv4Route(destinationAddress: self.endpointHost, subnetMask: "255.255.255.255")]
+        if stack.ipv4 {
+          // Full-tunnel IPv4 capture (product residual dual /1 intent via default route)
+          ipv4.includedRoutes = [NEIPv4Route.default()]
+        } else {
+          // Session/tunnel IP only — no IPv4 residual capture of ISP traffic
+          ipv4.includedRoutes = []
+        }
         settings.ipv4Settings = ipv4
-        // IPv6 residual protection (ISP leak mitigation): claim default IPv6 via tunnel.
-        // Node residual session remains IPv4-only RPT2 — not dual-stack residual routing.
-        // Capturing ::/0 on the tunnel blocks ISP IPv6 egress while residual is up.
-        settings.ipv6Settings = Self.ipv6IspLeakMitigationSettings()
+        // IPv6 residual protection: claim ::/0 only when Settings IPv6 residual is ON.
+        if stack.ipv6 {
+          settings.ipv6Settings = Self.ipv6IspLeakMitigationSettings()
+        } else {
+          settings.ipv6Settings = nil
+        }
         // Node tunnel DNS (Unbound on 10.88.0.1) — not third-party public resolvers
         settings.dnsSettings = NEDNSSettings(servers: ["10.88.0.1"])
         settings.mtu = 1280
@@ -81,7 +90,11 @@ class PacketTunnelProvider: NEPacketTunnelProvider {
             completionHandler(err)
             return
           }
-          self.setTunnelNetworkSettingsDone(vpnIp: session.vpnIp, ipv6Protected: true)
+          self.setTunnelNetworkSettingsDone(
+            vpnIp: session.vpnIp,
+            ipv6Protected: stack.ipv6,
+            ipv4Residual: stack.ipv4
+          )
           self.running = true
           // Transport already connected + ready (BSD connect completed before HELLO reply)
           self.startPacketLoops()
@@ -106,12 +119,35 @@ class PacketTunnelProvider: NEPacketTunnelProvider {
     return ipv6
   }
 
-  private func setTunnelNetworkSettingsDone(vpnIp: String, ipv6Protected: Bool = true) {
+  /// Settings dual-stack residual prefs (defaults both ON when keys unset).
+  /// Reads App Group first (written by host setResidualStack), then standard.
+  static func loadResidualStackPrefs(
+    appGroupId: String = "group.com.restoreprivacy.shared"
+  ) -> (ipv4: Bool, ipv6: Bool) {
+    func dualOn(_ defaults: UserDefaults, _ key: String) -> Bool {
+      if defaults.object(forKey: key) == nil { return true }
+      return defaults.bool(forKey: key)
+    }
+    if let suite = UserDefaults(suiteName: appGroupId),
+       suite.object(forKey: "residual_ipv4") != nil
+         || suite.object(forKey: "residual_ipv6") != nil {
+      return (dualOn(suite, "residual_ipv4"), dualOn(suite, "residual_ipv6"))
+    }
+    let std = UserDefaults.standard
+    return (dualOn(std, "residual_ipv4"), dualOn(std, "residual_ipv6"))
+  }
+
+  private func setTunnelNetworkSettingsDone(
+    vpnIp: String,
+    ipv6Protected: Bool = true,
+    ipv4Residual: Bool = true
+  ) {
     if let proto = protocolConfiguration as? NETunnelProviderProtocol {
       var cfg = proto.providerConfiguration ?? [:]
       cfg["vpnIp"] = vpnIp
       cfg["ok"] = true
       cfg["ipv6Protected"] = ipv6Protected
+      cfg["ipv4Residual"] = ipv4Residual
       proto.providerConfiguration = cfg
     }
   }
@@ -132,12 +168,27 @@ class PacketTunnelProvider: NEPacketTunnelProvider {
 
   override func handleAppMessage(_ messageData: Data, completionHandler: ((Data?) -> Void)?) {
     if let s = session {
+      let proto = protocolConfiguration as? NETunnelProviderProtocol
+      let cfg = proto?.providerConfiguration ?? [:]
+      let v6 = (cfg["ipv6Protected"] as? Bool) ?? Self.loadResidualStackPrefs().ipv6
+      let v4 = (cfg["ipv4Residual"] as? Bool) ?? Self.loadResidualStackPrefs().ipv4
+      let msg: String
+      if v4 && v6 {
+        msg = "Connected — VPN active; IPv6 ISP path blocked (\(s.vpnIp))"
+      } else if v4 && !v6 {
+        msg = "Connected — IPv4 via VPN; IPv6 not protected (\(s.vpnIp))"
+      } else if !v4 && v6 {
+        msg = "Connected — IPv4 residual off; IPv6 ISP path blocked (\(s.vpnIp))"
+      } else {
+        msg = "Connected — residual dual-stack off (\(s.vpnIp))"
+      }
       let info: [String: Any] = [
         "ok": true,
-        "message": "Connected — VPN active; IPv6 ISP path blocked (\(s.vpnIp))",
+        "message": msg,
         "vpnIp": s.vpnIp,
-        "ipv6Protected": true,
-        "fullTunnelActive": true,
+        "ipv6Protected": v6,
+        "ipv4Residual": v4,
+        "fullTunnelActive": v4,
       ]
       completionHandler?(try? JSONSerialization.data(withJSONObject: info))
     } else {

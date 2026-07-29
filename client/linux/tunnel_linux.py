@@ -118,18 +118,25 @@ def build_linux_route_plan_cmds(
     physical_dev: str,
     include_catchall: bool = True,
 ) -> list[str]:
-    """Build concrete ``ip`` commands (testable without root)."""
+    """Build concrete ``ip`` commands (testable without root).
+
+    Dual /1 is only emitted when *include_catchall* is True **and** the plan
+    still carries dual /1 routes (Settings residual IPv4 ON).
+    """
+    from client.full_tunnel import plan_wants_ipv4_catchall
+
     iface = plan.tunnel_iface if plan.tunnel_iface else "rpt0"
     if iface.upper() == "RPT":
         iface = "rpt0"
         plan.tunnel_iface = iface
+    effective = include_catchall and plan_wants_ipv4_catchall(plan)
     return linux_route_commands(
         plan,
         server_host,
         iface=iface,
         physical_dev=physical_dev,
         physical_gw=physical_gw,
-        include_catchall=include_catchall,
+        include_catchall=effective,
     )
 
 
@@ -313,12 +320,14 @@ def start_full_tunnel(
     else:
         gw, phys_dev = resolve_default_route()
     if dry_run:
+        from client.full_tunnel import plan_wants_ipv4_catchall
+
         cmds = build_linux_route_plan_cmds(
             plan,
             server_host,
             physical_gw=gw or "192.168.1.1",
             physical_dev=phys_dev or "eth0",
-            include_catchall=True,
+            include_catchall=plan_wants_ipv4_catchall(plan),
         )
         return LinuxTunnelResult(
             True,
@@ -385,17 +394,25 @@ def start_full_tunnel(
     # On-link default (no via): pin with dev only
     pin_gw = gw if gw else "ONLINK"
 
+    from client.full_tunnel import plan_wants_ipv4_catchall
+
+    # Settings residual IPv4 OFF → omit dual /1 (do not fail the session for catch_ok).
+    want_ipv4_catchall = plan_wants_ipv4_catchall(plan)
     cmds = build_linux_route_plan_cmds(
         plan,
         server_host,
         physical_gw=pin_gw,
         physical_dev=phys_dev,
-        include_catchall=True,
+        include_catchall=want_ipv4_catchall,
     )
     applied, errors = _run_cmds(cmds)
-    catch_ok = any("0.0.0.0/1" in c for c in applied) and any(
-        "128.0.0.0/1" in c for c in applied
-    )
+    if want_ipv4_catchall:
+        catch_ok = any("0.0.0.0/1" in c for c in applied) and any(
+            "128.0.0.0/1" in c for c in applied
+        )
+    else:
+        # Pin-only residual path (IPv4 residual Settings off)
+        catch_ok = True
     if not catch_ok:
         try:
             rollback_full_tunnel_routes(plan, server_host, iface)

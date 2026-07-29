@@ -94,6 +94,12 @@ def build_full_tunnel_plan(
     )
 
 
+def plan_wants_ipv4_catchall(plan: FullTunnelPlan) -> bool:
+    """True when Settings IPv4 residual is ON (plan carries dual /1 default routes)."""
+    routes = list(plan.default_routes or [])
+    return "0.0.0.0/1" in routes and "128.0.0.0/1" in routes
+
+
 def windows_route_commands(
     plan: FullTunnelPlan,
     server_host: str,
@@ -105,6 +111,10 @@ def windows_route_commands(
 
     When ``if_index`` is missing, only server-pin + address/DNS cmds are emitted
     (no dual /1). Callers must treat missing if_index as "cannot full-tunnel".
+
+    Dual /1 catch-alls are emitted only when *include_catchall* is True **and**
+    ``plan.default_routes`` still requests them (Settings residual IPv4 ON).
+    Empty ``default_routes`` (IPv4 residual OFF) never installs dual /1.
     """
     cmds: list[str] = [
         # /32 only — no fake gateway 10.88.0.1 (Wintun cannot ARP that host)
@@ -114,12 +124,13 @@ def windows_route_commands(
         f"route add {server_host} mask 255.255.255.255 PHYSICAL_GW metric 1",
     ]
 
-    if include_catchall and if_index is not None and int(if_index) > 0:
+    want_catchall = include_catchall and plan_wants_ipv4_catchall(plan)
+    if want_catchall and if_index is not None and int(if_index) > 0:
         idx = int(if_index)
         # On-link dual /1 into the TUN adapter (WireGuard/Wintun-style)
         cmds.append(f"route add 0.0.0.0 mask 128.0.0.0 0.0.0.0 IF {idx} metric 5")
         cmds.append(f"route add 128.0.0.0 mask 128.0.0.0 0.0.0.0 IF {idx} metric 5")
-    # else: intentionally omit catch-alls (prevents ARP blackhole via 10.88.0.1)
+    # else: intentionally omit catch-alls (Settings IPv4 off or ARP blackhole guard)
 
     for i, dns in enumerate(plan.dns_servers, start=1):
         if i == 1:
@@ -216,7 +227,9 @@ def linux_route_commands(
         cmds.append(
             f"ip route replace {server_host}/32 via {gw} dev {physical_dev}"
         )
-    if include_catchall:
+    # Dual /1 only when caller asks *and* plan still has IPv4 residual routes
+    # (Settings residual_ipv4 OFF → empty default_routes → no catch-alls).
+    if include_catchall and plan_wants_ipv4_catchall(plan):
         cmds.append(f"ip route replace 0.0.0.0/1 dev {tun}")
         cmds.append(f"ip route replace 128.0.0.0/1 dev {tun}")
     # Point interface DNS at the node tunnel resolver (default 10.88.0.1)
