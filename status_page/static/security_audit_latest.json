@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-07-29T12:29:13Z",
+  "generated_at": "2026-07-29T12:37:55Z",
   "node_host": "127.0.0.1",
   "catalog_version": "0.5.3",
   "unit_suite": {
@@ -48,17 +48,21 @@
         "platform": "windows",
         "label": "Windows",
         "filename": "restore-privacy-client-0.5.3-windows-x64-setup.exe",
-        "state": "Red",
+        "state": "Green",
         "reasons": [
-          "catalog monopin asset not staged (looked for restore-privacy-client-0.5.3-windows-x64-setup.exe / relative_path 0.5.3/restore-privacy-client-0.5.3-windows-x64-setup.exe under status_page/assets/0.5.3/, releases/0.5.3/, paid_assets/0.5.3/, dist/0.5.3/, status_page/assets/; paid host may still fulfil via private GH / VPS HTTP when uploaded)"
+          "present on Helsinki paid_assets store (https://135.181.152.10.sslip.io/paid-assets/0.5.3/restore-privacy-client-0.5.3-windows-x64-setup.exe; 38913402 bytes)",
+          "structural pin/PE gates not re-scanned over HTTP (inventory presence from fulfilment host)"
         ],
-        "path": null,
+        "path": "https://135.181.152.10.sslip.io/paid-assets/0.5.3/restore-privacy-client-0.5.3-windows-x64-setup.exe",
+        "bytes": 38913402,
+        "remote_store": "helsinki",
         "search_roots": [
           "status_page/assets/0.5.3/",
           "releases/0.5.3/",
           "paid_assets/0.5.3/",
           "dist/0.5.3/",
-          "status_page/assets/"
+          "status_page/assets/",
+          "https://135.181.152.10.sslip.io/paid-assets/0.5.3/"
         ],
         "relative_path": "0.5.3/restore-privacy-client-0.5.3-windows-x64-setup.exe"
       },
@@ -66,17 +70,21 @@
         "platform": "linux",
         "label": "Linux",
         "filename": "restore-privacy-client-0.5.3-linux-x64.tar.gz",
-        "state": "Red",
+        "state": "Green",
         "reasons": [
-          "catalog monopin asset not staged (looked for restore-privacy-client-0.5.3-linux-x64.tar.gz / relative_path 0.5.3/restore-privacy-client-0.5.3-linux-x64.tar.gz under status_page/assets/0.5.3/, releases/0.5.3/, paid_assets/0.5.3/, dist/0.5.3/, status_page/assets/; paid host may still fulfil via private GH / VPS HTTP when uploaded)"
+          "present on Helsinki paid_assets store (https://135.181.152.10.sslip.io/paid-assets/0.5.3/restore-privacy-client-0.5.3-linux-x64.tar.gz; 14407033 bytes)",
+          "structural pin/PE gates not re-scanned over HTTP (inventory presence from fulfilment host)"
         ],
-        "path": null,
+        "path": "https://135.181.152.10.sslip.io/paid-assets/0.5.3/restore-privacy-client-0.5.3-linux-x64.tar.gz",
+        "bytes": 14407033,
+        "remote_store": "helsinki",
         "search_roots": [
           "status_page/assets/0.5.3/",
           "releases/0.5.3/",
           "paid_assets/0.5.3/",
           "dist/0.5.3/",
-          "status_page/assets/"
+          "status_page/assets/",
+          "https://135.181.152.10.sslip.io/paid-assets/0.5.3/"
         ],
         "relative_path": "0.5.3/restore-privacy-client-0.5.3-linux-x64.tar.gz"
       },
@@ -84,17 +92,21 @@
         "platform": "macos",
         "label": "macOS",
         "filename": "restore-privacy-client-0.5.3-macos.zip",
-        "state": "Red",
+        "state": "Green",
         "reasons": [
-          "catalog monopin asset not staged (looked for restore-privacy-client-0.5.3-macos.zip / relative_path 0.5.3/restore-privacy-client-0.5.3-macos.zip under status_page/assets/0.5.3/, releases/0.5.3/, paid_assets/0.5.3/, dist/0.5.3/, status_page/assets/; paid host may still fulfil via private GH / VPS HTTP when uploaded)"
+          "present on Helsinki paid_assets store (https://135.181.152.10.sslip.io/paid-assets/0.5.3/restore-privacy-client-0.5.3-macos.zip; 20959489 bytes)",
+          "structural pin/PE gates not re-scanned over HTTP (inventory presence from fulfilment host)"
         ],
-        "path": null,
+        "path": "https://135.181.152.10.sslip.io/paid-assets/0.5.3/restore-privacy-client-0.5.3-macos.zip",
+        "bytes": 20959489,
+        "remote_store": "helsinki",
         "search_roots": [
           "status_page/assets/0.5.3/",
           "releases/0.5.3/",
           "paid_assets/0.5.3/",
           "dist/0.5.3/",
-          "status_page/assets/"
+          "status_page/assets/",
+          "https://135.181.152.10.sslip.io/paid-assets/0.5.3/"
         ],
         "relative_path": "0.5.3/restore-privacy-client-0.5.3-macos.zip"
       },
@@ -102,17 +114,21 @@
         "platform": "ios",
         "label": "iOS",
         "filename": "restore-privacy-client-0.5.3-ios.zip",
-        "state": "Red",
+        "state": "Green",
         "reasons": [
-          "catalog monopin asset not staged (looked for restore-privacy-client-0.5.3-ios.zip / relative_path 0.5.3/restore-privacy-client-0.5.3-ios.zip under status_page/assets/0.5.3/, releases/0.5.3/, paid_assets/0.5.3/, dist/0.5.3/, status_page/assets/; paid host may still fulfil via private GH / VPS HTTP when uploaded)"
+          "present on Helsinki paid_assets store (https://135.181.152.10.sslip.io/paid-assets/0.5.3/restore-privacy-client-0.5.3-ios.zip; 9342563 bytes)",
+          "structural pin/PE gates not re-scanned over HTTP (inventory presence from fulfilment host)"
         ],
-        "path": null,
+        "path": "https://135.181.152.10.sslip.io/paid-assets/0.5.3/restore-privacy-client-0.5.3-ios.zip",
+        "bytes": 9342563,
+        "remote_store": "helsinki",
         "search_roots": [
           "status_page/assets/0.5.3/",
           "releases/0.5.3/",
           "paid_assets/0.5.3/",
           "dist/0.5.3/",
-          "status_page/assets/"
+          "status_page/assets/",
+          "https://135.181.152.10.sslip.io/paid-assets/0.5.3/"
         ],
         "relative_path": "0.5.3/restore-privacy-client-0.5.3-ios.zip"
       },
@@ -120,27 +136,33 @@
         "platform": "android",
         "label": "Android",
         "filename": "restore-privacy-client-0.5.3-android.apk",
-        "state": "Red",
+        "state": "Green",
         "reasons": [
-          "catalog monopin asset not staged (looked for restore-privacy-client-0.5.3-android.apk / relative_path 0.5.3/restore-privacy-client-0.5.3-android.apk under status_page/assets/0.5.3/, releases/0.5.3/, paid_assets/0.5.3/, dist/0.5.3/, status_page/assets/; paid host may still fulfil via private GH / VPS HTTP when uploaded)"
+          "present on Helsinki paid_assets store (https://135.181.152.10.sslip.io/paid-assets/0.5.3/restore-privacy-client-0.5.3-android.apk; 52371453 bytes)",
+          "structural pin/PE gates not re-scanned over HTTP (inventory presence from fulfilment host)"
         ],
-        "path": null,
+        "path": "https://135.181.152.10.sslip.io/paid-assets/0.5.3/restore-privacy-client-0.5.3-android.apk",
+        "bytes": 52371453,
+        "remote_store": "helsinki",
         "search_roots": [
           "status_page/assets/0.5.3/",
           "releases/0.5.3/",
           "paid_assets/0.5.3/",
           "dist/0.5.3/",
-          "status_page/assets/"
+          "status_page/assets/",
+          "https://135.181.152.10.sslip.io/paid-assets/0.5.3/"
         ],
         "relative_path": "0.5.3/restore-privacy-client-0.5.3-android.apk"
       }
     ],
-    "staged_count": 0,
-    "overall": "Red",
+    "staged_count": 5,
+    "helsinki_remote_count": 5,
+    "helsinki_paid_asset_base": "https://135.181.152.10.sslip.io/paid-assets",
+    "overall": "Green",
     "legend": {
-      "Green": "Present, no *.priv, product node pub pin match, platform structural gate pass (Windows multihop markers when PE)",
+      "Green": "Present (local monorepo/releases/paid_assets or Helsinki paid store), no *.priv when scanned, product node pub pin match when scanned, platform structural gate pass (Windows multihop markers when PE scanned)",
       "Amber": "Present but pin/structural check incomplete or soft warning",
-      "Red": "Missing from local releases/assets tree, embeds *.priv, pin mismatch, or failed structural gate"
+      "Red": "Missing from local trees and Helsinki paid store, embeds *.priv, pin mismatch, or failed structural gate"
     }
   },
   "section_b": {

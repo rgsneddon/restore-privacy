@@ -91,6 +91,39 @@ class TestPackageRagEvaluation(unittest.TestCase):
         # Display reasons use monopin path text
         disp = self.mod.catalog_search_roots_display(ver)
         self.assertTrue(any(ver in d for d in disp))
+        # Helsinki fulfilment host must appear in display roots (false-Red prevention)
+        self.assertTrue(
+            any("135.181.152.10" in d or "paid-assets" in d for d in disp),
+            f"display roots must cite Helsinki paid store: {disp}",
+        )
+        self.assertEqual(
+            self.mod.helsinki_paid_asset_base_url(),
+            self.mod.DEFAULT_HELSINKI_PAID_ASSET_BASE.rstrip("/"),
+        )
+
+    def test_helsinki_remote_presence_avoids_false_red(self):
+        """When local path is missing, Helsinki probe Green is not Red-for-missing."""
+        ver = self.mod.load_catalog_version()
+        fname = f"restore-privacy-client-{ver}-macos.zip"
+        remote = {
+            "url": f"https://135.181.152.10.sslip.io/paid-assets/{ver}/{fname}",
+            "bytes": 2_000_000,
+            "host": "135.181.152.10",
+            "store": "helsinki_paid_assets",
+            "filename": fname,
+            "version": ver,
+        }
+        with mock.patch.object(
+            self.mod, "probe_helsinki_paid_package", return_value=remote
+        ):
+            st = self.mod.evaluate_package_audit_state(
+                "macos", None, pin="abc", expected_filename=fname
+            )
+        self.assertEqual(st["state"], "Green")
+        why = " ".join(st["reasons"]).lower()
+        self.assertIn("helsinki", why)
+        self.assertNotIn("not staged", why)
+        self.assertEqual(st.get("remote_store"), "helsinki")
 
     def test_resolve_finds_staged_windows_via_catalog_relative_path(self):
         """Present status_page/assets or releases package is not false-missing."""

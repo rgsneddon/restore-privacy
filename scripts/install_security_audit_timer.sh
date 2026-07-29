@@ -206,9 +206,15 @@ export RPT_AUDIT_NO_OUTBOUND=1
 export RPT_HOST_STATEMENTS_OFFLINE=1
 export RPT_CATALOG_VERSION="${CATALOG_PIN}"
 export RPT_VPS_ASSET_REMOTE_ROOT="${INSTALL_ROOT}/paid_assets"
+# Package RAG: inventory on dedicated Helsinki paid store (not residual node disk)
+export RPT_VPS_ASSET_BASE="\${RPT_VPS_ASSET_BASE:-https://135.181.152.10.sslip.io/paid-assets}"
+# Optional token file (0600) — never commit; enables Helsinki presence probe
+if [[ -z "\${RPT_ASSET_FETCH_TOKEN:-}" && -r "${INSTALL_ROOT}/var/rpt_asset_fetch_token" ]]; then
+  export RPT_ASSET_FETCH_TOKEN="\$(tr -d ' \\t\\r\\n' <"${INSTALL_ROOT}/var/rpt_asset_fetch_token")"
+fi
 export TMPDIR="${INSTALL_ROOT}/var/audit-scratch"
 mkdir -p "\${TMPDIR}"
-# Never git push / curl upload from this job
+# Never git push / curl upload AUDIT.md from this job
 unset GIT_ASKPASS SSH_ASKPASS
 rc=0
 "${PY}" "${INSTALL_ROOT}/scripts/run_security_audit.py" --node-only --write --out "${INSTALL_ROOT}/AUDIT.md" \\
@@ -249,8 +255,10 @@ Environment=RPT_AUDIT_NO_OUTBOUND=1
 Environment=RPT_HOST_STATEMENTS_OFFLINE=1
 Environment=RPT_CATALOG_VERSION=${CATALOG_PIN}
 Environment=RPT_VPS_ASSET_REMOTE_ROOT=${INSTALL_ROOT}/paid_assets
+Environment=RPT_VPS_ASSET_BASE=https://135.181.152.10.sslip.io/paid-assets
 Environment=TMPDIR=${INSTALL_ROOT}/var/audit-scratch
 # Local write only — do not add ExecStartPost git push / curl upload
+# Helsinki package inventory: token from ${INSTALL_ROOT}/var/rpt_asset_fetch_token (wrapper)
 ExecStart=${WRAPPER}
 Nice=10
 IOSchedulingClass=best-effort
