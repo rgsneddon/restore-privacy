@@ -33,10 +33,14 @@ class TestThankYouPackagingCopy(unittest.TestCase):
         self.assertIn("/download?token=", html)
         self.assertNotIn("If nothing appears after ~30s", html)
         self.assertNotIn("contact support with session id", html.lower())
-        # Installer iframe has immediate src; entitlement deferred
+        # Installer iframe has immediate src; entitlement deferred (external JS for CSP)
         self.assertIn('id="auto-download-frame"', html)
         self.assertIn('data-src=', html)  # entitlement deferred
-        self.assertIn("setTimeout", html)
+        self.assertIn("/static/thankyou_entitlement.js", html)
+        ent_js = (
+            ROOT / "status_page" / "static" / "thankyou_entitlement.js"
+        ).read_text(encoding="utf-8")
+        self.assertIn("setTimeout", ent_js)
         # KEYGEN prominent + copy control; under ready lines; no page auto-close
         self.assertIn('id="product-keygen"', html)
         self.assertIn("RPT-KEY-AAAA-BBBB-CCCC", html)
