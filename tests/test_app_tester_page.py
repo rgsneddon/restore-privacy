@@ -36,10 +36,25 @@ class TestAppTesterPage(unittest.TestCase):
             "windows",
             claim_id=cid,
             accepted=False,
+            reports_consent=True,
             base_url="https://restoreprivacy.online",
         )
         self.assertFalse(out.get("ok"))
         self.assertEqual(out.get("error"), "not_accepted")
+        self.assertFalse(self.tp.has_claimed(cid))
+
+    def test_missing_reports_consent_does_not_mint(self) -> None:
+        cid = self.tp.new_claim_id()
+        out = self.tp.mint_for_tester(
+            "windows",
+            claim_id=cid,
+            accepted=True,
+            reports_consent=False,
+            base_url="https://restoreprivacy.online",
+        )
+        self.assertFalse(out.get("ok"))
+        self.assertEqual(out.get("error"), "reports_required")
+        self.assertIn(self.tp.REPORTS_EMAIL, out.get("message", ""))
         self.assertFalse(self.tp.has_claimed(cid))
 
     def test_first_mint_returns_download_and_keygen(self) -> None:
@@ -48,6 +63,7 @@ class TestAppTesterPage(unittest.TestCase):
             "windows",
             claim_id=cid,
             accepted=True,
+            reports_consent=True,
             base_url="https://restoreprivacy.online",
             now=1_700_000_000.0,
         )
@@ -64,6 +80,7 @@ class TestAppTesterPage(unittest.TestCase):
             "windows",
             claim_id=cid,
             accepted=True,
+            reports_consent=True,
             base_url="https://restoreprivacy.online",
         )
         self.assertTrue(first.get("ok"), first)
@@ -71,6 +88,7 @@ class TestAppTesterPage(unittest.TestCase):
             "android",
             claim_id=cid,
             accepted=True,
+            reports_consent=True,
             base_url="https://restoreprivacy.online",
         )
         self.assertFalse(second.get("ok"))
@@ -84,26 +102,57 @@ class TestAppTesterPage(unittest.TestCase):
         self.assertIsInstance(raw, (bytes, bytearray))
         page = raw.decode("utf-8")
         self.assertIn("licence-scroll", page)
+        self.assertIn("data-scroll-gate", page)
         self.assertIn(self.tp.ACCEPT_FIELD, page)
-        self.assertIn("read the licence", page.lower())
+        self.assertIn(self.tp.REPORTS_FIELD, page)
+        self.assertIn(self.tp.DO_NOT_SHARE_NOTICE, page)
+        self.assertIn("do-not-share", page)
+        self.assertIn(self.tp.REPORTS_EMAIL, page)
+        self.assertIn("scrolledToBottom", page)
+        self.assertIn("packageEnabled", page)
+        self.assertIn("read and understand", page.lower())
         self.assertIn("disclaimer", page.lower())
         self.assertIn('id="accept-box"', page)
+        self.assertIn('id="reports-box"', page)
         self.assertIn('id="generator"', page)
         self.assertIn("pointer-events:none", page.replace(" ", ""))
         self.assertIn(self.tp.TESTER_MINT_PATH, page)
-        # Generator disabled until accept (radios disabled in HTML)
+        # Generator + both checkboxes start disabled until gates open
         self.assertIn("disabled", page)
         refuse = self.tp.render_already_used_html()
         self.assertIsInstance(refuse, (bytes, bytearray))
         self.assertIn(self.tp.ALREADY_USED_MESSAGE, refuse.decode("utf-8"))
+        # Pure client-gate mirror
+        self.assertFalse(
+            self.tp.package_ui_enabled(
+                scrolled_to_bottom=False, read_accepted=True, reports_accepted=True
+            )
+        )
+        self.assertFalse(
+            self.tp.package_ui_enabled(
+                scrolled_to_bottom=True, read_accepted=True, reports_accepted=False
+            )
+        )
+        self.assertTrue(
+            self.tp.package_ui_enabled(
+                scrolled_to_bottom=True, read_accepted=True, reports_accepted=True
+            )
+        )
 
     def test_accept_checked_and_platform_parse(self) -> None:
         form = self.tp.parse_form_body(
-            f"{self.tp.ACCEPT_FIELD}=1&{self.tp.PLATFORM_FIELD}=android"
+            f"{self.tp.ACCEPT_FIELD}=1&{self.tp.REPORTS_FIELD}=1"
+            f"&{self.tp.PLATFORM_FIELD}=android"
         )
         self.assertTrue(self.tp.accept_checked(form))
+        self.assertTrue(self.tp.reports_consent_checked(form))
+        self.assertTrue(self.tp.consents_ok(form))
         self.assertEqual(self.tp.selected_platform(form), "android")
         self.assertFalse(self.tp.accept_checked({}))
+        self.assertFalse(self.tp.reports_consent_checked({}))
+        self.assertFalse(
+            self.tp.consents_ok(self.tp.parse_form_body(f"{self.tp.ACCEPT_FIELD}=1"))
+        )
         self.assertEqual(self.tp.selected_platform({"platform": ["commodore"]}), "")
 
     def test_public_pages_do_not_link_tester(self) -> None:
@@ -257,7 +306,11 @@ class TestAppTesterHttpHandler(unittest.TestCase):
         text = h.body_text()
         self.assertIn("licence-scroll", text)
         self.assertIn(self.tp.ACCEPT_FIELD, text)
+        self.assertIn(self.tp.REPORTS_FIELD, text)
+        self.assertIn(self.tp.DO_NOT_SHARE_NOTICE, text)
         self.assertIn("accept-box", text)
+        self.assertIn("reports-box", text)
+        self.assertIn("scrolledToBottom", text)
         # Cookie issued for claim identity
         self.assertTrue(
             any("rpt_app_tester_claim=" in c for c in h._extra_cookies)
@@ -282,7 +335,8 @@ class TestAppTesterHttpHandler(unittest.TestCase):
         self.assertTrue(claim, "expected claim cookie from GET")
 
         form = (
-            f"{self.tp.ACCEPT_FIELD}=1&{self.tp.PLATFORM_FIELD}=windows"
+            f"{self.tp.ACCEPT_FIELD}=1&{self.tp.REPORTS_FIELD}=1"
+            f"&{self.tp.PLATFORM_FIELD}=windows"
         ).encode("utf-8")
         p1 = _RealSendHandler("/app-testers/mint", method="POST", body=form)
         p1.headers["Cookie"] = f"rpt_app_tester_claim={claim}"
@@ -299,7 +353,8 @@ class TestAppTesterHttpHandler(unittest.TestCase):
         )
 
         form2 = (
-            f"{self.tp.ACCEPT_FIELD}=1&{self.tp.PLATFORM_FIELD}=android"
+            f"{self.tp.ACCEPT_FIELD}=1&{self.tp.REPORTS_FIELD}=1"
+            f"&{self.tp.PLATFORM_FIELD}=android"
         ).encode("utf-8")
         p2 = _RealSendHandler("/app-testers/mint", method="POST", body=form2)
         p2.headers["Cookie"] = f"rpt_app_tester_claim={claim}"
@@ -319,7 +374,9 @@ class TestAppTesterHttpHandler(unittest.TestCase):
             if "rpt_app_tester_claim=" in c:
                 claim = c.split(";", 1)[0].split("=", 1)[1]
                 break
-        form = f"{self.tp.PLATFORM_FIELD}=windows".encode("utf-8")
+        form = (
+            f"{self.tp.REPORTS_FIELD}=1&{self.tp.PLATFORM_FIELD}=windows"
+        ).encode("utf-8")
         p = _RealSendHandler("/app-testers/mint", method="POST", body=form)
         if claim:
             p.headers["Cookie"] = f"rpt_app_tester_claim={claim}"
@@ -327,8 +384,32 @@ class TestAppTesterHttpHandler(unittest.TestCase):
         p.do_POST()
         self.assertEqual(p.code, 200)
         text = p.body_text()
-        self.assertIn("read the licence", text.lower())
         self.assertNotIn("Your one-month tester grant", text)
+        self.assertTrue(
+            "read" in text.lower() or "understand" in text.lower() or "agreements" in text.lower(),
+            text[:600],
+        )
+
+    def test_post_without_reports_consent_does_not_mint(self) -> None:
+        g = _RealSendHandler("/app-testers")
+        g.do_GET()
+        claim = None
+        for c in g._extra_cookies:
+            if "rpt_app_tester_claim=" in c:
+                claim = c.split(";", 1)[0].split("=", 1)[1]
+                break
+        form = (
+            f"{self.tp.ACCEPT_FIELD}=1&{self.tp.PLATFORM_FIELD}=windows"
+        ).encode("utf-8")
+        p = _RealSendHandler("/app-testers/mint", method="POST", body=form)
+        if claim:
+            p.headers["Cookie"] = f"rpt_app_tester_claim={claim}"
+        p.headers["Content-Type"] = "application/x-www-form-urlencoded"
+        p.do_POST()
+        self.assertEqual(p.code, 200)
+        text = p.body_text()
+        self.assertNotIn("Your one-month tester grant", text)
+        self.assertIn(self.tp.REPORTS_EMAIL, text)
 
 
 if __name__ == "__main__":

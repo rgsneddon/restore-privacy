@@ -32,7 +32,11 @@ ALREADY_USED_MESSAGE = (
 )
 
 ACCEPT_FIELD = "read_licence_fully"
+REPORTS_FIELD = "agree_app_reports"
 PLATFORM_FIELD = "platform"
+# Verbatim banner under the page title (yellow notice)
+DO_NOT_SHARE_NOTICE = "PLEASE DO NOT SHARE THIS PAGE"
+REPORTS_EMAIL = "rus@restoreprivacy.online"
 
 CATALOG_PLATFORMS: tuple[tuple[str, str], ...] = (
     ("windows", "Windows"),
@@ -278,16 +282,41 @@ By accepting below you confirm that:
     return body.rstrip() + "\n" + disclaimer
 
 
-def accept_checked(form: dict[str, list[str]] | None) -> bool:
-    """True when the form asserts the user read the licence/disclaimer fully."""
+def _truthy_form_field(form: dict[str, list[str]] | None, *names: str) -> bool:
     if not form:
         return False
-    vals = form.get(ACCEPT_FIELD) or form.get("accept") or []
-    for v in vals:
-        s = str(v).strip().lower()
-        if s in ("1", "on", "yes", "true", "checked"):
-            return True
+    for name in names:
+        vals = form.get(name) or []
+        for v in vals:
+            s = str(v).strip().lower()
+            if s in ("1", "on", "yes", "true", "checked"):
+                return True
     return False
+
+
+def accept_checked(form: dict[str, list[str]] | None) -> bool:
+    """True when the form asserts the user read and understands the agreements."""
+    return _truthy_form_field(form, ACCEPT_FIELD, "accept")
+
+
+def reports_consent_checked(form: dict[str, list[str]] | None) -> bool:
+    """True when the form consents to send app reports to REPORTS_EMAIL."""
+    return _truthy_form_field(form, REPORTS_FIELD, "app_reports", "reports_consent")
+
+
+def package_ui_enabled(
+    *,
+    scrolled_to_bottom: bool,
+    read_accepted: bool,
+    reports_accepted: bool,
+) -> bool:
+    """Client-gate mirror: package select only when scroll + both checkboxes."""
+    return bool(scrolled_to_bottom and read_accepted and reports_accepted)
+
+
+def consents_ok(form: dict[str, list[str]] | None) -> bool:
+    """Server-side: both required consent fields present and truthy."""
+    return accept_checked(form) and reports_consent_checked(form)
 
 
 def selected_platform(form: dict[str, list[str]] | None) -> str:
@@ -314,21 +343,38 @@ def mint_for_tester(
     *,
     claim_id: str,
     accepted: bool,
+    reports_consent: bool = False,
     base_url: str | None = None,
     now: float | None = None,
 ) -> dict[str, Any]:
     """Gate + one-shot mint. Pure decision + real payments mint.
 
+    Requires *accepted* (read/understand agreements) **and** *reports_consent*
+    (send app reports to rus@restoreprivacy.online). Scroll-to-bottom is enforced
+    in the browser before those checkboxes can be set.
+
     Returns:
       ``{"ok": True, ...mint fields, "claim_id": ...}``
-      ``{"ok": False, "error": "not_accepted"|"already_claimed"|"bad_platform"|"mint_failed",
+      ``{"ok": False, "error": "not_accepted"|"reports_required"|"already_claimed"|...,
          "message": str}``
     """
     if not accepted:
         return {
             "ok": False,
             "error": "not_accepted",
-            "message": "You must confirm you have read the licence and disclaimer fully.",
+            "message": (
+                "You must scroll the agreements to the bottom and confirm you have "
+                "read and understand them fully."
+            ),
+        }
+    if not reports_consent:
+        return {
+            "ok": False,
+            "error": "reports_required",
+            "message": (
+                f"You must agree to send app reports to {REPORTS_EMAIL} "
+                "before selecting a package."
+            ),
         }
     cid = (claim_id or "").strip()
     if not cid:
@@ -404,14 +450,20 @@ background:var(--bg);color:var(--text);line-height:1.5}
 .wrap{max-width:46rem;margin:0 auto;padding:1.5rem 1.1rem 3rem}
 h1{font-size:1.45rem;margin:0 0 0.5rem}
 .lead{color:var(--muted);margin:0 0 1.25rem;font-size:0.95rem}
+.do-not-share{margin:0.35rem 0 1.1rem;padding:0.7rem 0.95rem;border-radius:10px;
+background:#fef08a;color:#713f12;border:2px solid #eab308;font-weight:800;
+letter-spacing:0.04em;text-align:center;font-size:0.98rem}
 .card{background:var(--card);border:1px solid var(--border);border-radius:12px;
 padding:1.1rem 1.15rem;margin:0 0 1.25rem}
 .licence-scroll{max-height:22rem;overflow:auto;padding:0.85rem 1rem;
 background:#07101c;border:1px solid var(--border);border-radius:10px;
 white-space:pre-wrap;font-size:0.82rem;line-height:1.45;color:#dbeafe}
-label.check{display:flex;gap:0.65rem;align-items:flex-start;margin:1rem 0;
+.scroll-hint{font-size:0.85rem;color:var(--warn);margin:0.55rem 0 0}
+.scroll-hint.done{color:#86efac}
+label.check{display:flex;gap:0.65rem;align-items:flex-start;margin:0.85rem 0;
 font-size:0.95rem;cursor:pointer}
 label.check input{margin-top:0.25rem;width:1.15rem;height:1.15rem;flex-shrink:0}
+label.check.disabled-check{opacity:0.45;cursor:not-allowed}
 .gen{opacity:0.45;pointer-events:none;transition:opacity .15s}
 .gen.enabled{opacity:1;pointer-events:auto}
 .plats{display:flex;flex-direction:column;gap:0.55rem;margin:0.75rem 0 1rem}
@@ -503,9 +555,11 @@ def render_tester_page_html(
     error: str = "",
     claim_already: bool = False,
 ) -> bytes:
-    """Main gate page: scrollable licence + accept checkbox + gated generator.
+    """Main gate page: scroll + dual consents, then package select.
 
-    Returns **bytes** (utf-8) so ``Handler._send`` can write the body directly.
+    Package radios/submit enable only after: (1) licence pane scrolled to bottom,
+    (2) read/understand agreements checkbox, (3) app-reports consent to
+    rus@restoreprivacy.online. Returns **bytes** for ``Handler._send``.
     """
     if claim_already:
         return render_already_used_html()
@@ -513,6 +567,8 @@ def render_tester_page_html(
     err = ""
     if error:
         err = f'<div class="err" role="alert">{html.escape(error)}</div>'
+    notice = html.escape(DO_NOT_SHARE_NOTICE)
+    reports_email = html.escape(REPORTS_EMAIL)
     opts = []
     for code, label in CATALOG_PLATFORMS:
         opts.append(
@@ -532,20 +588,28 @@ def render_tester_page_html(
 <body>
 <main class="wrap">
   <h1>Restore Privacy — app testers</h1>
-  <p class="lead">Read the full licence and tester disclaimer below. After you confirm
-  you have read them fully, you may generate a <strong>one-month</strong> tester
-  download link and KEYGEN for <strong>one</strong> package only.</p>
+  <p class="do-not-share" id="do-not-share" role="status">{notice}</p>
+  <p class="lead">Scroll the full licence and tester disclaimer to the bottom, then
+  confirm both checkboxes. Only then can you select <strong>one</strong> package for a
+  <strong>one-month</strong> tester download link and KEYGEN.</p>
   {err}
   <div class="card">
     <h2 style="font-size:1.05rem;margin:0 0 0.65rem">Licence agreement &amp; disclaimer</h2>
-    <div class="licence-scroll" id="licence-scroll" tabindex="0">{lic}</div>
+    <div class="licence-scroll" id="licence-scroll" tabindex="0"
+         data-scroll-gate="1" aria-describedby="scroll-hint">{lic}</div>
+    <p class="scroll-hint" id="scroll-hint">Scroll to the bottom of the agreements to continue.</p>
     <form method="post" action="{TESTER_MINT_PATH}" id="tester-mint-form">
-      <label class="check">
-        <input type="checkbox" name="{ACCEPT_FIELD}" id="accept-box" value="1"/>
-        <span>I have read the licence agreement and disclaimer <strong>fully</strong>
-        (including all scrolled content) and accept them for this one-month tester grant.</span>
+      <label class="check disabled-check" id="accept-label">
+        <input type="checkbox" name="{ACCEPT_FIELD}" id="accept-box" value="1" disabled/>
+        <span>I have read and understand the licence agreement and disclaimer
+        <strong>fully</strong> (after scrolling to the bottom).</span>
       </label>
-      <div class="gen" id="generator">
+      <label class="check disabled-check" id="reports-label">
+        <input type="checkbox" name="{REPORTS_FIELD}" id="reports-box" value="1" disabled/>
+        <span>I agree to send app reports to <strong>{reports_email}</strong>
+        for this tester period.</span>
+      </label>
+      <div class="gen" id="generator" data-package-gate="1">
         <p style="margin:0 0 0.4rem;font-weight:600">Select one package</p>
         <div class="plats">
           {platforms}
@@ -559,17 +623,66 @@ def render_tester_page_html(
 </main>
 <script>
 (function(){{
+  var scrollEl = document.getElementById('licence-scroll');
+  var hint = document.getElementById('scroll-hint');
   var box = document.getElementById('accept-box');
+  var reports = document.getElementById('reports-box');
+  var acceptLabel = document.getElementById('accept-label');
+  var reportsLabel = document.getElementById('reports-label');
   var gen = document.getElementById('generator');
   var btn = document.getElementById('mint-btn');
   var radios = document.querySelectorAll('.plat-radio');
+  var scrolledToBottom = false;
+  var SCROLL_SLACK = 12;
+
+  function atBottom(el){{
+    if (!el) return false;
+    // Short content that needs no scroll counts as already at bottom
+    if (el.scrollHeight <= el.clientHeight + SCROLL_SLACK) return true;
+    return (el.scrollTop + el.clientHeight) >= (el.scrollHeight - SCROLL_SLACK);
+  }}
+
+  function packageEnabled(){{
+    return !!(scrolledToBottom && box && box.checked && reports && reports.checked);
+  }}
+
   function sync(){{
-    var on = !!(box && box.checked);
+    scrolledToBottom = atBottom(scrollEl);
+    if (hint){{
+      if (scrolledToBottom){{
+        hint.textContent = 'Agreements scrolled — check both boxes below to select a package.';
+        hint.classList.add('done');
+      }} else {{
+        hint.textContent = 'Scroll to the bottom of the agreements to continue.';
+        hint.classList.remove('done');
+      }}
+    }}
+    // Checkboxes only after scroll-to-bottom
+    [box, reports].forEach(function(el){{
+      if (!el) return;
+      el.disabled = !scrolledToBottom;
+    }});
+    [acceptLabel, reportsLabel].forEach(function(el){{
+      if (!el) return;
+      if (scrolledToBottom) el.classList.remove('disabled-check');
+      else el.classList.add('disabled-check');
+    }});
+    // If user re-scrolls away (rare), uncheck is optional — keep values but gate packages
+    var on = packageEnabled();
     if (gen) gen.classList.toggle('enabled', on);
     radios.forEach(function(r){{ r.disabled = !on; }});
     if (btn) btn.disabled = !on;
   }}
+
+  if (scrollEl){{
+    scrollEl.addEventListener('scroll', sync, {{passive: true}});
+  }}
   if (box) box.addEventListener('change', sync);
+  if (reports) reports.addEventListener('change', sync);
+  // Initial layout may finish after fonts/paint
+  if (typeof requestAnimationFrame === 'function'){{
+    requestAnimationFrame(function(){{ sync(); }});
+  }}
   sync();
 }})();
 </script>

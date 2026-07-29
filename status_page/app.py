@@ -1713,6 +1713,7 @@ class Handler(BaseHTTPRequestHandler):
                 render_already_used_html,
                 render_success_html,
                 render_tester_page_html,
+                reports_consent_checked,
                 selected_platform,
             )
         except ImportError:  # pragma: no cover
@@ -1730,6 +1731,7 @@ class Handler(BaseHTTPRequestHandler):
                 render_already_used_html,
                 render_success_html,
                 render_tester_page_html,
+                reports_consent_checked,
                 selected_platform,
             )
         npath = normalize_tester_path(path)
@@ -1752,6 +1754,7 @@ class Handler(BaseHTTPRequestHandler):
                 selected_platform(form),
                 claim_id=claim_id,
                 accepted=accept_checked(form),
+                reports_consent=reports_consent_checked(form),
             )
             if not result.get("ok"):
                 if result.get("error") == "already_claimed":
