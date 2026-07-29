@@ -265,6 +265,7 @@ def _source_readiness_check() -> list[str]:
         ROOT / "product" / "exit_node_elgamal.pub",
         ROOT / "client" / "multihop.py",
         ROOT / "client" / "windows" / "app.py",
+        ROOT / "client" / "windows" / "window_foreground.py",
         ROOT / "client" / "node_ping.py",
         RECIPE,
         ROOT / "client" / "windows" / "WINDOWS_HANDOFF_0.4.0.md",
@@ -280,8 +281,13 @@ def _source_readiness_check() -> list[str]:
 
         if not MULTI_HOP_ROUTING_IMPLEMENTED:
             errors.append("MULTI_HOP_ROUTING_IMPLEMENTED is False")
+        # Same import the frozen app.py performs (line ~180) — fail check if missing.
+        from client.windows.window_foreground import bring_tk_window_forward
+
+        if not callable(bring_tk_window_forward):
+            errors.append("bring_tk_window_forward is not callable")
     except Exception as exc:  # noqa: BLE001
-        errors.append(f"cannot import client.multihop: {exc}")
+        errors.append(f"cannot import client.multihop / window_foreground: {exc}")
     pin = (ROOT / "client" / "VERSION").read_text(encoding="utf-8").strip()
     if pin != VERSION:
         errors.append(f"client/VERSION={pin!r} != build VERSION={VERSION!r}")

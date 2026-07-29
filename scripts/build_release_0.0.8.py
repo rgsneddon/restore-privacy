@@ -154,6 +154,8 @@ def build_client_onedir() -> Path:
         "client.payment_entitlement",
         "--hidden-import",
         "client.windows.settings_store",
+        "--hidden-import",
+        "client.windows.window_foreground",
         "--clean",
         str(entry),
     ]
