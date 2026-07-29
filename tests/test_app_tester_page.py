@@ -108,8 +108,10 @@ class TestAppTesterPage(unittest.TestCase):
         self.assertIn(self.tp.DO_NOT_SHARE_NOTICE, page)
         self.assertIn("do-not-share", page)
         self.assertIn(self.tp.REPORTS_EMAIL, page)
-        self.assertIn("scrolledToBottom", page)
-        self.assertIn("packageEnabled", page)
+        # CSP-safe: external gate script (not blocked inline)
+        self.assertIn(self.tp.TESTER_GATE_SCRIPT_PATH, page)
+        self.assertIn('src="/static/tester_page_gate.js"', page)
+        self.assertNotIn("scrolledToBottom", page)  # logic lives in external JS
         self.assertIn("read and understand", page.lower())
         self.assertIn("disclaimer", page.lower())
         self.assertIn('id="accept-box"', page)
@@ -138,6 +140,10 @@ class TestAppTesterPage(unittest.TestCase):
                 scrolled_to_bottom=True, read_accepted=True, reports_accepted=True
             )
         )
+        # Scroll metrics (mirrors JS): not at bottom / at bottom / short content
+        self.assertFalse(self.tp.at_bottom_metrics(0, 100, 500, slack=16))
+        self.assertTrue(self.tp.at_bottom_metrics(400, 100, 500, slack=16))
+        self.assertTrue(self.tp.at_bottom_metrics(0, 200, 180, slack=16))  # no overflow
 
     def test_accept_checked_and_platform_parse(self) -> None:
         form = self.tp.parse_form_body(
@@ -209,6 +215,15 @@ class TestAppTesterPage(unittest.TestCase):
         self.assertIn("mint_for_tester", src)
         self.assertIn("render_tester_page_html", src)
         self.assertIn("TESTER_MINT_PATH", src)
+        self.assertIn("tester_page_gate.js", src)
+        js = (ROOT / "status_page" / "static" / "tester_page_gate.js").read_text(
+            encoding="utf-8"
+        )
+        self.assertIn("atBottomMetrics", js)
+        self.assertIn("scrolledToBottom", js)
+        self.assertIn("packageEnabled", js)
+        self.assertIn("accept-box", js)
+        self.assertIn("reports-box", js)
 
 
 class _RealSendHandler:
@@ -310,7 +325,7 @@ class TestAppTesterHttpHandler(unittest.TestCase):
         self.assertIn(self.tp.DO_NOT_SHARE_NOTICE, text)
         self.assertIn("accept-box", text)
         self.assertIn("reports-box", text)
-        self.assertIn("scrolledToBottom", text)
+        self.assertIn("/static/tester_page_gate.js", text)
         # Cookie issued for claim identity
         self.assertTrue(
             any("rpt_app_tester_claim=" in c for c in h._extra_cookies)
@@ -388,6 +403,22 @@ class TestAppTesterHttpHandler(unittest.TestCase):
         self.assertTrue(
             "read" in text.lower() or "understand" in text.lower() or "agreements" in text.lower(),
             text[:600],
+        )
+
+    def test_static_gate_js_served_as_javascript(self) -> None:
+        """CSP script-src 'self' requires /static/tester_page_gate.js to be served."""
+        h = _RealSendHandler("/static/tester_page_gate.js")
+        h.do_GET()
+        self.assertEqual(h.code, 200, h.body_text()[:200])
+        body = h.body_bytes()
+        self.assertGreater(len(body), 100)
+        text = body.decode("utf-8", errors="replace")
+        self.assertIn("atBottomMetrics", text)
+        self.assertIn("scrolledToBottom", text)
+        ctype = (h.sent_headers.get("Content-Type") or "").lower()
+        self.assertTrue(
+            "javascript" in ctype or "ecmascript" in ctype or "text/" in ctype,
+            h.sent_headers,
         )
 
     def test_post_without_reports_consent_does_not_mint(self) -> None:

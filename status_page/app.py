@@ -113,6 +113,7 @@ STATIC_ROUTES: dict[str, str] = {
     "/static/thankyou_entitlement.js": "thankyou_entitlement.js",
     "/static/admin_fleet_usage.js": "admin_fleet_usage.js",
     "/static/admin_link_generation.js": "admin_link_generation.js",
+    "/static/tester_page_gate.js": "tester_page_gate.js",
 }
 
 # Customer device-licence renew host (Stripe Checkout custom domain).

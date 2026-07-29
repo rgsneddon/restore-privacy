@@ -314,6 +314,33 @@ def package_ui_enabled(
     return bool(scrolled_to_bottom and read_accepted and reports_accepted)
 
 
+def at_bottom_metrics(
+    scroll_top: float,
+    client_height: float,
+    scroll_height: float,
+    *,
+    slack: float = 16.0,
+) -> bool:
+    """Pure scroll-bottom detection (mirrors static/tester_page_gate.js).
+
+    Short content (no overflow) counts as already at bottom so checkboxes
+    are not permanently locked when the pane does not scroll.
+    """
+    st = float(scroll_top or 0.0)
+    ch = float(client_height or 0.0)
+    sh = float(scroll_height or 0.0)
+    s = float(slack)
+    if s < 0:
+        s = 0.0
+    if sh <= ch + s:
+        return True
+    return st + ch >= sh - s
+
+
+# External gate script (CSP script-src 'self' — no inline scripts)
+TESTER_GATE_SCRIPT_PATH = "/static/tester_page_gate.js"
+
+
 def consents_ok(form: dict[str, list[str]] | None) -> bool:
     """Server-side: both required consent fields present and truthy."""
     return accept_checked(form) and reports_consent_checked(form)
@@ -621,71 +648,8 @@ def render_tester_page_html(
   <p class="foot">This page is not linked from the public site. Direct URL only.
   Not a paid checkout — free one-month tester programme.</p>
 </main>
-<script>
-(function(){{
-  var scrollEl = document.getElementById('licence-scroll');
-  var hint = document.getElementById('scroll-hint');
-  var box = document.getElementById('accept-box');
-  var reports = document.getElementById('reports-box');
-  var acceptLabel = document.getElementById('accept-label');
-  var reportsLabel = document.getElementById('reports-label');
-  var gen = document.getElementById('generator');
-  var btn = document.getElementById('mint-btn');
-  var radios = document.querySelectorAll('.plat-radio');
-  var scrolledToBottom = false;
-  var SCROLL_SLACK = 12;
-
-  function atBottom(el){{
-    if (!el) return false;
-    // Short content that needs no scroll counts as already at bottom
-    if (el.scrollHeight <= el.clientHeight + SCROLL_SLACK) return true;
-    return (el.scrollTop + el.clientHeight) >= (el.scrollHeight - SCROLL_SLACK);
-  }}
-
-  function packageEnabled(){{
-    return !!(scrolledToBottom && box && box.checked && reports && reports.checked);
-  }}
-
-  function sync(){{
-    scrolledToBottom = atBottom(scrollEl);
-    if (hint){{
-      if (scrolledToBottom){{
-        hint.textContent = 'Agreements scrolled — check both boxes below to select a package.';
-        hint.classList.add('done');
-      }} else {{
-        hint.textContent = 'Scroll to the bottom of the agreements to continue.';
-        hint.classList.remove('done');
-      }}
-    }}
-    // Checkboxes only after scroll-to-bottom
-    [box, reports].forEach(function(el){{
-      if (!el) return;
-      el.disabled = !scrolledToBottom;
-    }});
-    [acceptLabel, reportsLabel].forEach(function(el){{
-      if (!el) return;
-      if (scrolledToBottom) el.classList.remove('disabled-check');
-      else el.classList.add('disabled-check');
-    }});
-    // If user re-scrolls away (rare), uncheck is optional — keep values but gate packages
-    var on = packageEnabled();
-    if (gen) gen.classList.toggle('enabled', on);
-    radios.forEach(function(r){{ r.disabled = !on; }});
-    if (btn) btn.disabled = !on;
-  }}
-
-  if (scrollEl){{
-    scrollEl.addEventListener('scroll', sync, {{passive: true}});
-  }}
-  if (box) box.addEventListener('change', sync);
-  if (reports) reports.addEventListener('change', sync);
-  // Initial layout may finish after fonts/paint
-  if (typeof requestAnimationFrame === 'function'){{
-    requestAnimationFrame(function(){{ sync(); }});
-  }}
-  sync();
-}})();
-</script>
+<!-- External gate script (CSP script-src 'self' blocks inline scripts). -->
+<script src="{TESTER_GATE_SCRIPT_PATH}" defer></script>
 </body>
 </html>
 """
