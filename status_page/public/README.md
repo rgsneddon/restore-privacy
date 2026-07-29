@@ -58,8 +58,8 @@ The app re-checks the status host (`/api/connect-entitlement`) on each Connect s
 |----------|---------|
 | Windows | `restore-privacy-client-0.5.4-windows-x64-setup.exe` *(**native** multihop PE)* |
 | Android | `restore-privacy-client-0.5.4-android.apk` *(**CF** residual-wire from 0.5.0 / 0.4.10)* |
-| macOS | `restore-privacy-client-0.5.4-macos.zip` *(**native** monopin **0.5.4**; `CFBundleShortVersionString` **0.5.1**; DevID + notarized when sealed)* |
-| iOS | `restore-privacy-client-0.5.4-ios.zip` *(**native** monopin **0.5.4** sideload when Mac-built)* |
+| macOS | `restore-privacy-client-0.5.4-macos.zip` *(**not published yet** — Mac native seal required; see APPLE_HANDOFF_0.5.4 / breadcrumbs)* |
+| iOS | `restore-privacy-client-0.5.4-ios.zip` *(**not published yet** — Mac Team-sign required; see APPLE_HANDOFF_0.5.4 / breadcrumbs)* |
 | Ubuntu / Linux | `restore-privacy-client-0.5.4-linux-x64.tar.gz` *(**native** rebuild)* |
 | Browser (Chromium MV3) | `restore-privacy-browser-extension-0.5.4.zip` — browser proxy only, not OS residual TUN |
 
@@ -106,7 +106,7 @@ Supported floor: **Ubuntu 20.04 LTS** and later (including 22.04 / 24.04 LTS).
 
 ### macOS
 
-Published **v0.5.4** macOS catalog zips are a **native** Flutter rebuild with host `CFBundleShortVersionString` **0.5.2** (Developer ID + notarized when secrets present). Residual public-IP Connect on a developer Mac still needs Team residual re-sign for host NE — see `client_app/APPLE_HANDOFF_0.5.4.md`.
+**Monopin 0.5.4 macOS is not on the paid store yet.** A Mac-native Developer ID + notarized seal is required (`client_app/APPLE_HANDOFF_0.5.4.md`, Helsinki breadcrumbs). Until published under `paid_assets/0.5.4/`, there is **no** live download.
 
 1. On the [status downloads page](https://restoreprivacy.online/), choose **Monthly £2.45** or **Yearly** for **macOS** and download **`restore-privacy-client-0.5.4-macos.zip`** (one-time link after payment).
 2. Unzip and open **`restore_privacy_client.app`**.
@@ -116,7 +116,7 @@ Published **v0.5.4** macOS catalog zips are a **native** Flutter rebuild with ho
 
 ### iOS
 
-Published **v0.5.4** iOS packages on this Windows-host ship are **honest carry-forward** sideload zips (catalog filename 0.5.2; internal bundle version may still be pre-0.5.1). **Not** a native Team-signed monopin 0.5.4 rebuild until Mac handoff (not App Store).
+**Monopin 0.5.4 iOS is not on the paid store yet.** A Mac Team-signed sideload zip is required (client_app/APPLE_HANDOFF_0.5.4.md, Helsinki breadcrumbs). Until published under paid_assets/0.5.4/, there is **no** live download.
 
 1. On the [status downloads page](https://restoreprivacy.online/), choose **Monthly £2.45** or **Yearly** for **iOS** and download **`restore-privacy-client-0.5.4-ios.zip`** (one-time link after payment).
 2. Install **`Runner.app`** with device tooling; **accept licence**, **enter keygen**, then press **Connect** and grant **VPN** permission.
