@@ -2060,6 +2060,105 @@ class Handler(BaseHTTPRequestHandler):
             )
             return
 
+        if path in (
+            "/admin/accounting/manual-entry",
+            "/admin/accounting/manual-entry/",
+        ):
+            # Durable manual ledger line on RASKUL LTD accounting page
+            if not admin_enabled():
+                self._send(503, "text/plain; charset=utf-8", b"admin disabled")
+                return
+            if not is_authenticated(self.headers):
+                self._send(200, "text/html; charset=utf-8", render_login_html())
+                return
+            from accounting import add_manual_entry, parse_money_to_pence
+            from admin_panel import render_admin_accounting_page_html
+
+            form = dict(urllib.parse.parse_qsl(body.decode("utf-8", "replace")))
+            try:
+                gross = parse_money_to_pence(form.get("gross") or "0")
+                fee_raw = (form.get("fee") or "").strip()
+                fee = parse_money_to_pence(fee_raw) if fee_raw else 0
+                net_raw = (form.get("net") or "").strip()
+                net = parse_money_to_pence(net_raw) if net_raw else None
+                added = add_manual_entry(
+                    date_iso=(form.get("date_iso") or "").strip(),
+                    description=(form.get("description") or "").strip(),
+                    gross_pence=gross,
+                    fee_pence=fee,
+                    net_pence=net,
+                    purchase_id=(form.get("purchase_id") or "").strip(),
+                    platform=(form.get("platform") or "").strip(),
+                )
+            except ValueError as exc:
+                self._send(
+                    400,
+                    "text/html; charset=utf-8",
+                    render_admin_accounting_page_html(error=str(exc)),
+                )
+                return
+            except Exception as exc:  # noqa: BLE001
+                self._send(
+                    500,
+                    "text/html; charset=utf-8",
+                    render_admin_accounting_page_html(
+                        error=f"manual entry failed: {exc}"[:240]
+                    ),
+                )
+                return
+            self._send(
+                200,
+                "text/html; charset=utf-8",
+                render_admin_accounting_page_html(
+                    message=(
+                        f"Added manual entry {added.get('id')}: "
+                        f"{added.get('description')}"
+                    ),
+                ),
+            )
+            return
+
+        if path in ("/admin/accounting/delete", "/admin/accounting/delete/"):
+            # Delete manual row or hide auto setup/sale; balances recompute
+            if not admin_enabled():
+                self._send(503, "text/plain; charset=utf-8", b"admin disabled")
+                return
+            if not is_authenticated(self.headers):
+                self._send(200, "text/html; charset=utf-8", render_login_html())
+                return
+            from accounting import delete_ledger_row
+            from admin_panel import render_admin_accounting_page_html
+
+            form = dict(urllib.parse.parse_qsl(body.decode("utf-8", "replace")))
+            row_id = (form.get("row_id") or "").strip()
+            try:
+                result = delete_ledger_row(row_id)
+            except ValueError as exc:
+                self._send(
+                    400,
+                    "text/html; charset=utf-8",
+                    render_admin_accounting_page_html(error=str(exc)),
+                )
+                return
+            except Exception as exc:  # noqa: BLE001
+                self._send(
+                    500,
+                    "text/html; charset=utf-8",
+                    render_admin_accounting_page_html(
+                        error=f"delete failed: {exc}"[:240]
+                    ),
+                )
+                return
+            action = str(result.get("action") or "removed")
+            self._send(
+                200,
+                "text/html; charset=utf-8",
+                render_admin_accounting_page_html(
+                    message=f"Ledger row {row_id} {action}.",
+                ),
+            )
+            return
+
         self._send(404, "text/plain; charset=utf-8", b"not found")
 
 

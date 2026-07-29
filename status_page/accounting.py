@@ -18,6 +18,11 @@ import csv
 import html
 import io
 import json
+import os
+import re
+import secrets
+import sqlite3
+import time
 import zipfile
 from dataclasses import asdict, dataclass
 from datetime import date, datetime, timezone
@@ -53,12 +58,13 @@ class LedgerRow:
     fee_pence: int  # negative or 0 (Stripe fee as minus)
     net_pence: int  # cash movement (gross + fee, fee ≤ 0)
     balance_pence: int  # running balance after this line
-    kind: str  # setup | sale
-    fee_source: str  # estimate | stored | n/a
+    kind: str  # setup | sale | manual
+    fee_source: str  # estimate | stored | n/a | manual
     session_id: str = ""
     purchase_id: str = ""
     platform: str = ""
     amount_currency: str = CURRENCY
+    row_id: str = ""  # setup | sale:… | manual:… for delete
 
 
 def pence_to_pounds_str(pence: int) -> str:
@@ -240,6 +246,289 @@ def sales_from_grants(
     return out
 
 
+def sale_row_id(purchase_id: str = "", session_id: str = "") -> str:
+    """Stable row id for an auto sale (used by delete/hide)."""
+    pid = (purchase_id or "").strip()
+    if pid:
+        return f"sale:pid:{pid}"
+    sid = (session_id or "").strip()
+    if sid:
+        return f"sale:sid:{sid}"
+    return f"sale:unknown:{secrets.token_hex(4)}"
+
+
+def _accounting_data_dir() -> Path:
+    """Same durable dir family as paid_downloads (RPT_PAYMENT_DATA_DIR)."""
+    try:
+        from payments import payment_data_dir  # type: ignore
+
+        return Path(payment_data_dir())
+    except Exception:  # noqa: BLE001
+        try:
+            from status_page.payments import payment_data_dir  # type: ignore
+
+            return Path(payment_data_dir())
+        except Exception:  # noqa: BLE001
+            raw = str(os.environ.get("RPT_PAYMENT_DATA_DIR", "") or "").strip()
+            if raw:
+                p = Path(raw)
+                p.mkdir(parents=True, exist_ok=True)
+                return p
+            p = Path(__file__).resolve().parent / "data"
+            p.mkdir(parents=True, exist_ok=True)
+            return p
+
+
+def accounting_db_path() -> Path:
+    """SQLite for manual lines + hidden auto rows (sibling of payment DB)."""
+    return _accounting_data_dir() / "accounting_manual.sqlite3"
+
+
+def _acct_connect() -> sqlite3.Connection:
+    path = accounting_db_path()
+    path.parent.mkdir(parents=True, exist_ok=True)
+    conn = sqlite3.connect(str(path), timeout=30)
+    conn.row_factory = sqlite3.Row
+    conn.execute("PRAGMA journal_mode=WAL")
+    conn.execute(
+        """
+        CREATE TABLE IF NOT EXISTS manual_entries (
+            id TEXT PRIMARY KEY,
+            date_iso TEXT NOT NULL,
+            description TEXT NOT NULL,
+            gross_pence INTEGER NOT NULL,
+            fee_pence INTEGER NOT NULL,
+            net_pence INTEGER NOT NULL,
+            fee_source TEXT NOT NULL,
+            purchase_id TEXT NOT NULL DEFAULT '',
+            platform TEXT NOT NULL DEFAULT '',
+            currency TEXT NOT NULL DEFAULT 'GBP',
+            created_at REAL NOT NULL
+        )
+        """
+    )
+    conn.execute(
+        """
+        CREATE TABLE IF NOT EXISTS hidden_rows (
+            row_id TEXT PRIMARY KEY,
+            hidden_at REAL NOT NULL
+        )
+        """
+    )
+    conn.commit()
+    return conn
+
+
+def list_hidden_row_ids() -> set[str]:
+    conn = _acct_connect()
+    try:
+        rows = conn.execute("SELECT row_id FROM hidden_rows").fetchall()
+        return {str(r["row_id"]) for r in rows}
+    finally:
+        conn.close()
+
+
+def list_manual_entries() -> list[dict[str, Any]]:
+    conn = _acct_connect()
+    try:
+        rows = conn.execute(
+            "SELECT * FROM manual_entries ORDER BY date_iso ASC, created_at ASC"
+        ).fetchall()
+        return [dict(r) for r in rows]
+    finally:
+        conn.close()
+
+
+def parse_money_to_pence(raw: str | int | float | None) -> int:
+    """Parse £ / pounds string (or int pence) to signed pence.
+
+    Accepts ``12.34``, ``-12.34``, ``£12.34``, ``(12.34)``, plain ints as pence
+    only when already int-typed; bare digit strings with a decimal are pounds.
+    """
+    if raw is None:
+        return 0
+    if isinstance(raw, bool):
+        raise ValueError("invalid money")
+    if isinstance(raw, int):
+        return int(raw)
+    if isinstance(raw, float):
+        return int(round(raw * 100))
+    s = str(raw).strip()
+    if not s:
+        return 0
+    s = s.replace("£", "").replace(",", "").replace("GBP", "").replace("gbp", "").strip()
+    neg = False
+    if s.startswith("(") and s.endswith(")"):
+        neg = True
+        s = s[1:-1].strip()
+    if s.startswith("-"):
+        neg = True
+        s = s[1:].strip()
+    if s.startswith("+"):
+        s = s[1:].strip()
+    if not s:
+        return 0
+    if not re.fullmatch(r"\d+(\.\d{1,2})?", s):
+        raise ValueError(f"invalid money amount: {raw!r}")
+    if "." in s:
+        pounds, frac = s.split(".", 1)
+        frac = (frac + "00")[:2]
+        pence = int(pounds or "0") * 100 + int(frac)
+    else:
+        # Whole pounds when no decimal (operator UI enters pounds)
+        pence = int(s) * 100
+    return -pence if neg else pence
+
+
+def add_manual_entry(
+    *,
+    date_iso: str,
+    description: str,
+    gross_pence: int = 0,
+    fee_pence: int = 0,
+    net_pence: int | None = None,
+    fee_source: str = "manual",
+    purchase_id: str = "",
+    platform: str = "",
+    currency: str = CURRENCY,
+    entry_id: str | None = None,
+    now: float | None = None,
+) -> dict[str, Any]:
+    """Insert a durable manual ledger line. Fee should be ≤ 0 (minus).
+
+    If *net_pence* is None, net = gross_pence + fee_pence.
+    """
+    d = (date_iso or "").strip()
+    try:
+        date.fromisoformat(d)
+    except ValueError as exc:
+        raise ValueError(f"invalid date_iso: {date_iso!r}") from exc
+    desc = (description or "").strip()
+    if not desc:
+        raise ValueError("description required")
+    gross = int(gross_pence)
+    fee = int(fee_pence)
+    # Normalize fee to non-positive (operator may enter positive fee amount)
+    if fee > 0:
+        fee = -fee
+    if net_pence is None:
+        net = gross + fee
+    else:
+        net = int(net_pence)
+    eid = (entry_id or "").strip() or f"manual:{secrets.token_hex(8)}"
+    if not eid.startswith("manual:"):
+        eid = f"manual:{eid}"
+    t = now if now is not None else time.time()
+    conn = _acct_connect()
+    try:
+        conn.execute(
+            """
+            INSERT INTO manual_entries(
+                id, date_iso, description, gross_pence, fee_pence, net_pence,
+                fee_source, purchase_id, platform, currency, created_at
+            ) VALUES (?,?,?,?,?,?,?,?,?,?,?)
+            """,
+            (
+                eid,
+                d,
+                desc[:500],
+                gross,
+                fee,
+                net,
+                (fee_source or "manual")[:40],
+                (purchase_id or "")[:120],
+                (platform or "")[:40],
+                (currency or CURRENCY)[:8],
+                float(t),
+            ),
+        )
+        conn.commit()
+    finally:
+        conn.close()
+    return {
+        "ok": True,
+        "id": eid,
+        "date_iso": d,
+        "description": desc,
+        "gross_pence": gross,
+        "fee_pence": fee,
+        "net_pence": net,
+    }
+
+
+def hide_ledger_row(row_id: str, *, now: float | None = None) -> dict[str, Any]:
+    """Hide an auto setup/sale row (or no-op if already hidden)."""
+    rid = (row_id or "").strip()
+    if not rid:
+        raise ValueError("row_id required")
+    t = now if now is not None else time.time()
+    conn = _acct_connect()
+    try:
+        conn.execute(
+            "INSERT OR IGNORE INTO hidden_rows(row_id, hidden_at) VALUES (?,?)",
+            (rid, float(t)),
+        )
+        conn.commit()
+    finally:
+        conn.close()
+    return {"ok": True, "row_id": rid, "action": "hidden"}
+
+
+def delete_manual_entry(entry_id: str) -> dict[str, Any]:
+    """Permanently delete a manual entry by id."""
+    eid = (entry_id or "").strip()
+    if not eid:
+        raise ValueError("entry_id required")
+    if not eid.startswith("manual:"):
+        eid = f"manual:{eid}"
+    conn = _acct_connect()
+    try:
+        cur = conn.execute("DELETE FROM manual_entries WHERE id = ?", (eid,))
+        conn.commit()
+        n = int(cur.rowcount or 0)
+    finally:
+        conn.close()
+    if n <= 0:
+        raise ValueError(f"manual entry not found: {eid}")
+    return {"ok": True, "row_id": eid, "action": "deleted", "deleted": n}
+
+
+def delete_ledger_row(row_id: str, *, now: float | None = None) -> dict[str, Any]:
+    """Delete manual entry or hide auto setup/sale so balances recompute."""
+    rid = (row_id or "").strip()
+    if not rid:
+        raise ValueError("row_id required")
+    if rid.startswith("manual:"):
+        return delete_manual_entry(rid)
+    return hide_ledger_row(rid, now=now)
+
+
+def recompute_running_balances(lines: Sequence[LedgerRow]) -> list[LedgerRow]:
+    """Recompute balance_pence from nets in order (pure)."""
+    bal = 0
+    out: list[LedgerRow] = []
+    for r in lines:
+        bal = bal + int(r.net_pence)
+        out.append(
+            LedgerRow(
+                date_iso=r.date_iso,
+                description=r.description,
+                gross_pence=r.gross_pence,
+                fee_pence=r.fee_pence,
+                net_pence=r.net_pence,
+                balance_pence=bal,
+                kind=r.kind,
+                fee_source=r.fee_source,
+                session_id=r.session_id,
+                purchase_id=r.purchase_id,
+                platform=r.platform,
+                amount_currency=r.amount_currency,
+                row_id=r.row_id,
+            )
+        )
+    return out
+
+
 def build_ledger(
     sales: Sequence[dict[str, Any]] | None = None,
     *,
@@ -247,49 +536,107 @@ def build_ledger(
     opening_date: date = OPENING_DATE,
     opening_balance_pence: int = OPENING_BALANCE_PENCE,
     opening_description: str = OPENING_DESCRIPTION,
+    manual_entries: Sequence[dict[str, Any]] | None = None,
+    hidden_row_ids: Sequence[str] | set[str] | None = None,
+    include_manual_store: bool = False,
 ) -> list[LedgerRow]:
-    """Build full ledger: setup line then sales with running balance.
+    """Build full ledger: setup + sales + manual lines with running balance.
 
     If *sales* is None, derive from *grants* via :func:`sales_from_grants`.
+    When *include_manual_store* is True, load durable manual/hidden from disk
+    (unless *manual_entries* / *hidden_row_ids* are passed explicitly).
     """
     if sales is None:
         sales = sales_from_grants(grants, opening=opening_date)
 
-    rows: list[LedgerRow] = []
-    bal = int(opening_balance_pence)
+    hidden: set[str]
+    if hidden_row_ids is not None:
+        hidden = set(str(x) for x in hidden_row_ids)
+    elif include_manual_store:
+        hidden = list_hidden_row_ids()
+    else:
+        hidden = set()
+
+    manuals: list[dict[str, Any]]
+    if manual_entries is not None:
+        manuals = list(manual_entries)
+    elif include_manual_store:
+        manuals = list_manual_entries()
+    else:
+        manuals = []
+
+    lines: list[LedgerRow] = []
     # Setup is a pure debit (no gross/fee split)
-    rows.append(
-        LedgerRow(
-            date_iso=opening_date.isoformat(),
-            description=opening_description,
-            gross_pence=0,
-            fee_pence=0,
-            net_pence=bal,
-            balance_pence=bal,
-            kind="setup",
-            fee_source="n/a",
+    if "setup" not in hidden:
+        lines.append(
+            LedgerRow(
+                date_iso=opening_date.isoformat(),
+                description=opening_description,
+                gross_pence=0,
+                fee_pence=0,
+                net_pence=int(opening_balance_pence),
+                balance_pence=0,  # filled by recompute
+                kind="setup",
+                fee_source="n/a",
+                row_id="setup",
+            )
         )
-    )
     for s in sales:
-        net = int(s["net_pence"])
-        bal = bal + net
-        rows.append(
+        rid = sale_row_id(
+            purchase_id=str(s.get("purchase_id") or ""),
+            session_id=str(s.get("session_id") or ""),
+        )
+        if rid in hidden:
+            continue
+        lines.append(
             LedgerRow(
                 date_iso=str(s["date_iso"]),
                 description=str(s["description"]),
                 gross_pence=int(s["gross_pence"]),
                 fee_pence=int(s["fee_pence"]),
-                net_pence=net,
-                balance_pence=bal,
+                net_pence=int(s["net_pence"]),
+                balance_pence=0,
                 kind="sale",
                 fee_source=str(s.get("fee_source") or "estimate"),
                 session_id=str(s.get("session_id") or ""),
                 purchase_id=str(s.get("purchase_id") or ""),
                 platform=str(s.get("platform") or ""),
                 amount_currency=str(s.get("currency") or CURRENCY),
+                row_id=rid,
             )
         )
-    return rows
+    for m in manuals:
+        mid = str(m.get("id") or "")
+        if not mid or mid in hidden:
+            continue
+        lines.append(
+            LedgerRow(
+                date_iso=str(m.get("date_iso") or ""),
+                description=str(m.get("description") or ""),
+                gross_pence=int(m.get("gross_pence") or 0),
+                fee_pence=int(m.get("fee_pence") or 0),
+                net_pence=int(m.get("net_pence") or 0),
+                balance_pence=0,
+                kind="manual",
+                fee_source=str(m.get("fee_source") or "manual"),
+                purchase_id=str(m.get("purchase_id") or ""),
+                platform=str(m.get("platform") or ""),
+                amount_currency=str(m.get("currency") or CURRENCY),
+                row_id=mid,
+            )
+        )
+    # Stable chronological order; setup before same-day sales/manual
+    kind_order = {"setup": 0, "sale": 1, "manual": 2}
+
+    def _sort_key(r: LedgerRow) -> tuple:
+        return (
+            r.date_iso,
+            kind_order.get(r.kind, 9),
+            r.row_id or "",
+        )
+
+    lines.sort(key=_sort_key)
+    return recompute_running_balances(lines)
 
 
 def load_grants_for_accounting() -> list[dict[str, Any]]:
@@ -302,8 +649,11 @@ def load_grants_for_accounting() -> list[dict[str, Any]]:
 
 
 def build_ledger_from_payment_store() -> list[LedgerRow]:
-    """Ledger from durable grants + opening setup costs."""
-    return build_ledger(grants=load_grants_for_accounting())
+    """Ledger from durable grants + setup + manual entries − hidden rows."""
+    return build_ledger(
+        grants=load_grants_for_accounting(),
+        include_manual_store=True,
+    )
 
 
 def filter_ledger_by_period(
@@ -333,28 +683,7 @@ def filter_ledger_by_period(
         return True
 
     selected = [r for r in rows if in_range(date.fromisoformat(r.date_iso))]
-    # Re-run balance from first selected row's own net sequence
-    bal = 0
-    out: list[LedgerRow] = []
-    for r in selected:
-        bal = bal + int(r.net_pence)
-        out.append(
-            LedgerRow(
-                date_iso=r.date_iso,
-                description=r.description,
-                gross_pence=r.gross_pence,
-                fee_pence=r.fee_pence,
-                net_pence=r.net_pence,
-                balance_pence=bal,
-                kind=r.kind,
-                fee_source=r.fee_source,
-                session_id=r.session_id,
-                purchase_id=r.purchase_id,
-                platform=r.platform,
-                amount_currency=r.amount_currency,
-            )
-        )
-    return out
+    return recompute_running_balances(selected)
 
 
 def ledger_to_dicts(rows: Sequence[LedgerRow]) -> list[dict[str, Any]]:
@@ -381,11 +710,16 @@ def _export_headers() -> list[str]:
 
 
 def _export_cells(row: LedgerRow) -> list[str]:
+    show_money = row.kind in ("sale", "manual")
     return [
         row.date_iso,
         row.description,
-        pence_to_pounds_str(row.gross_pence) if row.kind == "sale" else "",
-        pence_to_pounds_str(row.fee_pence) if row.fee_pence else ("£0.00" if row.kind == "sale" else ""),
+        pence_to_pounds_str(row.gross_pence) if show_money else "",
+        (
+            pence_to_pounds_str(row.fee_pence)
+            if row.fee_pence
+            else ("£0.00" if show_money else "")
+        ),
         pence_to_pounds_str(row.net_pence),
         pence_to_pounds_str(row.balance_pence),
         row.fee_source,

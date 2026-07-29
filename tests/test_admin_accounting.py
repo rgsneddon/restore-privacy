@@ -309,16 +309,26 @@ class TestAccountingAdminWiring(unittest.TestCase):
         app = (ROOT / "status_page" / "app.py").read_text(encoding="utf-8")
         self.assertIn("/admin/accounting", app)
         self.assertIn("/admin/accounting/export", app)
+        self.assertIn("/admin/accounting/manual-entry", app)
+        self.assertIn("/admin/accounting/delete", app)
+        self.assertIn("add_manual_entry", app)
+        self.assertIn("delete_ledger_row", app)
         self.assertIn("render_admin_accounting_page_html", app)
         self.assertIn("export_ledger", app)
         panel = (ROOT / "status_page" / "admin_panel.py").read_text(encoding="utf-8")
         self.assertIn("admin-nav-accounting", panel)
         self.assertIn("RASKUL LTD", panel)
         self.assertIn("admin-accounting-export", panel)
+        self.assertIn("admin-accounting-manual-entry", panel)
+        self.assertIn('action="/admin/accounting/manual-entry"', panel)
+        self.assertIn('action="/admin/accounting/delete"', panel)
+        self.assertIn("Delete row", panel)
         self.assertIn("SET UP COSTS", panel)
         acct = (ROOT / "status_page" / "accounting.py").read_text(encoding="utf-8")
         self.assertIn("1.5%", acct)
         self.assertIn("OPENING_BALANCE_PENCE = -600_000", acct)
+        self.assertIn("def add_manual_entry", acct)
+        self.assertIn("def delete_ledger_row", acct)
 
         import sys
 
@@ -333,6 +343,7 @@ class TestAccountingAdminWiring(unittest.TestCase):
         self.assertIn("RASKUL LTD", html)
         self.assertIn("SET UP COSTS", html)
         self.assertIn("admin-accounting-export-form", html)
+        self.assertIn("admin-accounting-manual-entry-form", html)
         self.assertIn('id="export-format"', html)
         self.assertIn("xlsx", html)
         self.assertIn("pdf", html)
@@ -340,6 +351,160 @@ class TestAccountingAdminWiring(unittest.TestCase):
         self.assertIn("−£6,000.00", html.replace("-£6,000.00", "−£6,000.00") or html)
         # balance shown
         self.assertIn("admin-accounting-balance-value", html)
+        # Manual entry between export and table
+        exp_i = html.find("admin-accounting-export")
+        man_i = html.find("admin-accounting-manual-entry")
+        tbl_i = html.find("admin-accounting-table")
+        self.assertGreater(man_i, exp_i)
+        self.assertGreater(tbl_i, man_i)
+        self.assertIn("btn-delete-row", html)
+        self.assertIn('name="row_id"', html)
+        self.assertIn('value="setup"', html)
+
+
+class TestManualEntryAndDelete(unittest.TestCase):
+    """Drive shipped add/delete helpers used by admin POST routes."""
+
+    def setUp(self) -> None:
+        self._td = tempfile.TemporaryDirectory()
+        self._prev = os.environ.get("RPT_PAYMENT_DATA_DIR")
+        os.environ["RPT_PAYMENT_DATA_DIR"] = self._td.name
+        import sys
+
+        sys.path.insert(0, str(ROOT / "status_page"))
+
+    def tearDown(self) -> None:
+        if self._prev is None:
+            os.environ.pop("RPT_PAYMENT_DATA_DIR", None)
+        else:
+            os.environ["RPT_PAYMENT_DATA_DIR"] = self._prev
+        self._td.cleanup()
+
+    def test_parse_money_and_add_updates_balance(self) -> None:
+        from accounting import (
+            OPENING_BALANCE_PENCE,
+            add_manual_entry,
+            build_ledger,
+            build_ledger_from_payment_store,
+            parse_money_to_pence,
+        )
+        import payments
+
+        payments.init_db()
+        self.assertEqual(parse_money_to_pence("12.34"), 1234)
+        self.assertEqual(parse_money_to_pence("-0.24"), -24)
+        self.assertEqual(parse_money_to_pence("£1.50"), 150)
+
+        prior = build_ledger(sales=[], include_manual_store=True)
+        self.assertEqual(len(prior), 1)
+        prior_bal = prior[-1].balance_pence
+        self.assertEqual(prior_bal, OPENING_BALANCE_PENCE)
+
+        # Same shape as form POST: pounds strings → pence via parse_money_to_pence
+        gross = parse_money_to_pence("10.00")
+        fee = parse_money_to_pence("0.35")  # positive; add_manual_entry negates
+        added = add_manual_entry(
+            date_iso="2026-08-10",
+            description="Bank adjustment",
+            gross_pence=gross,
+            fee_pence=fee,
+            net_pence=None,
+            purchase_id="MANUAL-1",
+            platform="n/a",
+        )
+        self.assertTrue(str(added["id"]).startswith("manual:"))
+        self.assertEqual(added["fee_pence"], -35)
+        self.assertEqual(added["net_pence"], 1000 - 35)
+
+        rows = build_ledger_from_payment_store()
+        manuals = [r for r in rows if r.kind == "manual"]
+        self.assertEqual(len(manuals), 1)
+        self.assertEqual(manuals[0].description, "Bank adjustment")
+        self.assertEqual(manuals[0].row_id, added["id"])
+        self.assertEqual(
+            rows[-1].balance_pence,
+            prior_bal + added["net_pence"],
+        )
+        # Running balances consistent
+        bal = 0
+        for r in rows:
+            bal += r.net_pence
+            self.assertEqual(r.balance_pence, bal)
+
+    def test_delete_manual_and_hide_setup_recompute(self) -> None:
+        from accounting import (
+            OPENING_BALANCE_PENCE,
+            add_manual_entry,
+            build_ledger,
+            build_ledger_from_payment_store,
+            delete_ledger_row,
+            estimate_stripe_fee_pence,
+        )
+        import payments
+        from datetime import datetime, timezone
+
+        payments.init_db()
+        ts = datetime(2026, 8, 15, 12, 0, tzinfo=timezone.utc).timestamp()
+        payments.mint_download_token(
+            filename="restore-privacy-client-0.5.2-windows-x64-setup.exe",
+            platform="windows",
+            session_id="cs_live_manual_del_1",
+            amount_pence=245,
+            currency="gbp",
+            now=ts,
+        )
+        added = add_manual_entry(
+            date_iso="2026-08-20",
+            description="Office supplies",
+            gross_pence=500,
+            fee_pence=0,
+            net_pence=-500,  # expense
+        )
+        full = build_ledger_from_payment_store()
+        n_before = len(full)
+        self.assertGreaterEqual(n_before, 3)  # setup + sale + manual
+        fee_pos = estimate_stripe_fee_pence(245)
+        expected = OPENING_BALANCE_PENCE + (245 - fee_pos) + (-500)
+        self.assertEqual(full[-1].balance_pence, expected)
+
+        # Delete manual via shipped delete path
+        delete_ledger_row(added["id"])
+        after_manual = build_ledger_from_payment_store()
+        self.assertEqual(len(after_manual), n_before - 1)
+        self.assertFalse(any(r.row_id == added["id"] for r in after_manual))
+        self.assertEqual(
+            after_manual[-1].balance_pence,
+            OPENING_BALANCE_PENCE + (245 - fee_pos),
+        )
+
+        # Delete setup (hide auto row)
+        delete_ledger_row("setup")
+        after_setup = build_ledger_from_payment_store()
+        self.assertEqual(len(after_setup), len(after_manual) - 1)
+        self.assertFalse(any(r.kind == "setup" for r in after_setup))
+        bal = 0
+        for r in after_setup:
+            bal += r.net_pence
+            self.assertEqual(r.balance_pence, bal)
+        self.assertEqual(after_setup[-1].balance_pence, 245 - fee_pos)
+
+        # Delete sale by row_id
+        sale = next(r for r in after_setup if r.kind == "sale")
+        delete_ledger_row(sale.row_id)
+        emptyish = build_ledger_from_payment_store()
+        self.assertEqual(len(emptyish), 0)
+
+    def test_invalid_manual_refuses_without_corrupt(self) -> None:
+        from accounting import add_manual_entry, build_ledger, list_manual_entries
+
+        with self.assertRaises(ValueError):
+            add_manual_entry(date_iso="not-a-date", description="x")
+        with self.assertRaises(ValueError):
+            add_manual_entry(date_iso="2026-08-01", description="")
+        self.assertEqual(list_manual_entries(), [])
+        rows = build_ledger(sales=[], include_manual_store=True)
+        self.assertEqual(len(rows), 1)
+        self.assertEqual(rows[0].kind, "setup")
 
 
 if __name__ == "__main__":

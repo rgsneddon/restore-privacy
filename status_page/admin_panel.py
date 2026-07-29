@@ -1832,8 +1832,11 @@ def render_admin_processors_page_html(*, message: str = "", error: str = "") -> 
 
 def render_admin_accounting_page_html(
     rows: list[Any] | None = None,
+    *,
+    message: str = "",
+    error: str = "",
 ) -> bytes:
-    """RASKUL LTD ledger: setup costs + paid sales net of Stripe fees + export."""
+    """RASKUL LTD ledger: setup costs + paid sales + manual entry + export."""
     try:
         from accounting import (  # type: ignore
             ENTITY_NAME,
@@ -1865,23 +1868,31 @@ def render_admin_accounting_page_html(
 
     body_rows: list[str] = []
     for r in ledger:
+        rid = _escape(getattr(r, "row_id", "") or "")
+        show_money = r.kind in ("sale", "manual")
         body_rows.append(
-            "<tr>"
+            "<tr data-row-id=\"" + rid + "\">"
             f"<td>{_escape(r.date_iso)}</td>"
             f"<td>{_escape(r.description)}</td>"
-            f"<td class='num'>{_escape(pence_to_pounds_str(r.gross_pence) if r.kind == 'sale' else '—')}</td>"
-            f"<td class='num fee'>{_escape(pence_to_pounds_str(r.fee_pence) if r.kind == 'sale' else '—')}</td>"
+            f"<td class='num'>{_escape(pence_to_pounds_str(r.gross_pence) if show_money else '—')}</td>"
+            f"<td class='num fee'>{_escape(pence_to_pounds_str(r.fee_pence) if show_money else '—')}</td>"
             f"<td class='num'>{_escape(pence_to_pounds_str(r.net_pence))}</td>"
             f"<td class='num bal'>{_escape(pence_to_pounds_str(r.balance_pence))}</td>"
             f"<td>{_escape(r.fee_source)}</td>"
             f"<td><code>{_escape(r.purchase_id)}</code></td>"
             f"<td>{_escape(r.platform)}</td>"
+            f"<td class='row-actions'>"
+            f'<form method="post" action="/admin/accounting/delete" class="admin-accounting-delete-form" '
+            f'onsubmit="return confirm(\'Delete this ledger row?\');">'
+            f'<input type="hidden" name="row_id" value="{rid}"/>'
+            f'<button type="submit" class="btn-delete-row" id="admin-accounting-delete-{rid}">'
+            f"Delete row</button></form></td>"
             "</tr>"
         )
     table_body = (
         "\n".join(body_rows)
         if body_rows
-        else '<tr><td colspan="9">No ledger rows</td></tr>'
+        else '<tr><td colspan="10">No ledger rows</td></tr>'
     )
     final_bal = pence_to_pounds_str(ledger[-1].balance_pence) if ledger else "—"
     y0 = OPENING_DATE.year
@@ -1894,6 +1905,23 @@ def render_admin_accounting_page_html(
         f'<option value="{m}"{" selected" if m == m0 else ""}>{m:02d}</option>'
         for m in range(1, 13)
     )
+    msg_html = (
+        f'<p class="ok-msg" id="admin-accounting-message">{_escape(message)}</p>'
+        if message
+        else ""
+    )
+    err_html = (
+        f'<p class="err" id="admin-accounting-error">{_escape(error)}</p>'
+        if error
+        else ""
+    )
+    today = OPENING_DATE.isoformat()  # default date field to books start
+    try:
+        from datetime import date as _date
+
+        today = _date.today().isoformat()
+    except Exception:  # noqa: BLE001
+        pass
     main = f"""
 <section class="card" id="admin-accounting" data-admin-accounting="1">
   <h2 id="admin-accounting-heading">{_escape(ENTITY_NAME)} — accounting</h2>
@@ -1903,12 +1931,14 @@ def render_admin_accounting_page_html(
     Paid customer sales load automatically from the durable payment store.
     Each sale shows <strong>gross</strong>, <strong>Stripe fee as a minus</strong>, and
     <strong>net</strong> (= gross − fee). Running balance starts at −£6,000 and rises
-    toward break-even then profit.
+    toward break-even then profit. Manual lines and deletes are durable.
   </p>
   <p class="muted" id="admin-accounting-fee-policy">{_escape(STRIPE_FEE_POLICY_LABEL)}</p>
   <p id="admin-accounting-balance">Current balance:
     <strong id="admin-accounting-balance-value">{_escape(final_bal)}</strong>
   </p>
+  {msg_html}
+  {err_html}
 
   <div class="accounting-export" id="admin-accounting-export">
     <h3 id="admin-accounting-export-heading">Export</h3>
@@ -1954,10 +1984,50 @@ def render_admin_accounting_page_html(
     </form>
   </div>
 
+  <div class="accounting-manual-entry" id="admin-accounting-manual-entry">
+    <h3 id="admin-accounting-manual-entry-heading">Manual entry</h3>
+    <p class="muted" id="admin-accounting-manual-entry-blurb">
+      Add a ledger line (date, description, gross, Stripe fee as a minus, net).
+      Leave <strong>Net</strong> blank to use gross + fee. Fee may be entered as a
+      positive amount (stored as a minus) or already negative.
+    </p>
+    <form method="post" action="/admin/accounting/manual-entry"
+          id="admin-accounting-manual-entry-form" data-admin-accounting-manual="1">
+      <label class="field" for="manual_date">Date
+        <input id="manual_date" name="date_iso" type="date" required value="{_escape(today)}"/>
+      </label>
+      <label class="field" for="manual_description">Description
+        <input id="manual_description" name="description" type="text" required maxlength="500"
+               placeholder="e.g. Bank charge / adjustment"/>
+      </label>
+      <label class="field" for="manual_gross">Gross (£)
+        <input id="manual_gross" name="gross" type="text" inputmode="decimal"
+               placeholder="0.00"/>
+      </label>
+      <label class="field" for="manual_fee">Stripe fee (£, as minus)
+        <input id="manual_fee" name="fee" type="text" inputmode="decimal"
+               placeholder="0.00 or -0.24"/>
+      </label>
+      <label class="field" for="manual_net">Net (£, optional)
+        <input id="manual_net" name="net" type="text" inputmode="decimal"
+               placeholder="auto if blank"/>
+      </label>
+      <label class="field" for="manual_purchase_id">Purchase ID
+        <input id="manual_purchase_id" name="purchase_id" type="text" maxlength="120"/>
+      </label>
+      <label class="field" for="manual_platform">Platform
+        <input id="manual_platform" name="platform" type="text" maxlength="40"
+               placeholder="windows / android / …"/>
+      </label>
+      <button type="submit" id="admin-accounting-manual-entry-submit">Add entry</button>
+    </form>
+  </div>
+
   <table id="admin-accounting-table">
     <thead><tr>
       <th>Date</th><th>Description</th><th>Gross</th><th>Stripe fee</th>
       <th>Net</th><th>Balance</th><th>Fee source</th><th>Purchase ID</th><th>Platform</th>
+      <th>Actions</th>
     </tr></thead>
     <tbody>
 {table_body}
@@ -1967,10 +2037,15 @@ def render_admin_accounting_page_html(
 <style>
 #admin-accounting-table .num{{text-align:right;font-variant-numeric:tabular-nums}}
 #admin-accounting-table .fee{{color:#b45309}}
-#admin-accounting-export form{{display:flex;flex-wrap:wrap;gap:0.75rem;align-items:flex-end;margin:1rem 0}}
-#admin-accounting-export .field{{display:flex;flex-direction:column;font-size:0.85rem;gap:0.25rem}}
-#admin-accounting-export select,#admin-accounting-export button{{padding:0.45rem 0.6rem;border-radius:8px}}
-#admin-accounting-export button{{background:var(--btn-bg);color:var(--btn-fg);border:0;font-weight:600;cursor:pointer}}
+#admin-accounting-export form,#admin-accounting-manual-entry-form{{display:flex;flex-wrap:wrap;gap:0.75rem;align-items:flex-end;margin:1rem 0}}
+#admin-accounting-export .field,#admin-accounting-manual-entry .field{{display:flex;flex-direction:column;font-size:0.85rem;gap:0.25rem}}
+#admin-accounting-export select,#admin-accounting-export button,
+#admin-accounting-manual-entry input,#admin-accounting-manual-entry button,
+.btn-delete-row{{padding:0.45rem 0.6rem;border-radius:8px}}
+#admin-accounting-export button,#admin-accounting-manual-entry-submit{{background:var(--btn-bg);color:var(--btn-fg);border:0;font-weight:600;cursor:pointer}}
+.btn-delete-row{{background:#7f1d1d;color:#fff;border:0;cursor:pointer;font-size:0.8rem}}
+#admin-accounting-manual-entry{{margin:1.25rem 0;padding-top:0.5rem;border-top:1px solid var(--border,#3333)}}
+.admin-accounting-delete-form{{display:inline;margin:0}}
 </style>
 """
     return _admin_page_shell(
