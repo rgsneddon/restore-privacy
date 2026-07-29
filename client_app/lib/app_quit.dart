@@ -22,22 +22,25 @@ const String kQuitButtonTooltip =
 
 /// True when this platform shows the main-screen discrete Quit control.
 ///
-/// Shared Flutter shell also runs on Android; Quit is Apple residual only
-/// (macOS + iOS) per product scope for this monopin.
+/// Shown on macOS, iOS, and Android residual shells (disconnect then process exit).
 bool showsMainScreenQuitButton({
   bool? isMacOS,
   bool? isIOS,
+  bool? isAndroid,
 }) {
   if (kIsWeb) return false;
   final mac = isMacOS ?? (!kIsWeb && Platform.isMacOS);
   final ios = isIOS ?? (!kIsWeb && Platform.isIOS);
-  return mac || ios;
+  final android = isAndroid ?? (!kIsWeb && Platform.isAndroid);
+  return mac || ios || android;
 }
 
 /// Same as [showsMainScreenQuitButton] using Flutter's target platform
 /// (useful when [Platform] is unavailable in some test harnesses).
 bool showsMainScreenQuitForTarget(TargetPlatform platform) {
-  return platform == TargetPlatform.macOS || platform == TargetPlatform.iOS;
+  return platform == TargetPlatform.macOS ||
+      platform == TargetPlatform.iOS ||
+      platform == TargetPlatform.android;
 }
 
 /// Running-platform helper for UI wiring (no inject).

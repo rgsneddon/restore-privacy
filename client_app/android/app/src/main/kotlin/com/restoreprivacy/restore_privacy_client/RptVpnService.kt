@@ -38,7 +38,7 @@ class RptVpnService : VpnService() {
             ACTION_CONNECT -> {
                 userStopped.set(false)
                 desiredConnected = true
-                val host = intent.getStringExtra(EXTRA_HOST) ?: PRODUCT_US_HOST
+                val host = intent.getStringExtra(EXTRA_HOST) ?: PRODUCT_ENTRY_HOST
                 val port = intent.getIntExtra(EXTRA_PORT, 44044)
                 val fullTunnel = intent.getBooleanExtra(EXTRA_FULL_TUNNEL, true)
                 val session = intent.getStringExtra(EXTRA_SESSION) ?: "Privacy Restored"
@@ -282,41 +282,34 @@ class RptVpnService : VpnService() {
                 }
 
                 // DNS: node tunnel gateway recursive resolver (10.88.0.1 / unbound on residual node)
-                // Kill switch removed from product residual (no VpnService blocking mode).
-                // Settings dual-stack residual (defaults both ON).
-                val residualIpv4 = StartupPrefs.residualIpv4Enabled(this)
+                // Residual IPv4 always-on full-tunnel capture.
+                // Residual IPv6 ON installs ULA + ::/0 (ISP IPv6 blackhole / leak mitigation).
+                val residualIpv4 = StartupPrefs.residualIpv4Enabled(this) // always true
                 val residualIpv6 = StartupPrefs.residualIpv6Enabled(this)
                 val builder = Builder()
                     .setSession(sessionName)
                     .setMtu(1280)
                     .addAddress(session.vpnIp, 32)
                     .addDnsServer("10.88.0.1")
-                // Prefer IPv4 residual path (product node DATA/TUN is IPv4).
                 try {
                     builder.allowFamily(OsConstants.AF_INET)
                 } catch (_: Exception) {
                 }
-                // ipv6RouteOk true only when Settings IPv6 ON and ISP IPv6 path is routed into TUN.
                 var ipv6RouteOk = false
                 if (fullTunnel && residualIpv4) {
-                    // Full-tunnel IPv4 residual capture (Settings residual_ipv4 ON)
+                    // Full-tunnel IPv4 residual capture (always on)
                     builder.addRoute("0.0.0.0", 0)
                 }
-                // Settings residual IPv6 ON: block ISP IPv6 leaks by installing a TUN ULA
-                // address + catch-all ::/0 (VpnService requires an IPv6 addr before ::/0).
-                // Residual DATA stays IPv4; IPv6 packets into TUN are not forwarded to ISP.
                 if (fullTunnel && residualIpv6) {
                     try {
-                        builder.allowFamily(OsConstants.AF_INET6)
-                    } catch (_: Exception) {
-                    }
-                    try {
-                        // fd72:7074::/64 — product ULA (RPT-ish); not a public residual IPv6 peer
-                        builder.addAddress("fd72:7074::2", 64)
+                        builder.addAddress("fd00:5274:7074::1", 128)
                         builder.addRoute("::", 0)
+                        try {
+                            builder.allowFamily(OsConstants.AF_INET6)
+                        } catch (_: Exception) {
+                        }
                         ipv6RouteOk = true
                     } catch (_: Exception) {
-                        // Establish may still succeed without IPv6 block — stay honest
                         ipv6RouteOk = false
                     }
                 }
@@ -388,11 +381,8 @@ class RptVpnService : VpnService() {
                         "Connected — session only; residual IPv4 off (VPN IP ${session.vpnIp})"
                     residualIpv6 && ipv6RouteOk ->
                         "Connected — VPN active; IPv6 ISP path blocked (VPN IP ${session.vpnIp})"
-                    residualIpv6 && !ipv6RouteOk ->
-                        // Settings ON but ::/0 install failed — do not claim protected
-                        "Connected — IPv4 via VPN; IPv6 not protected (VPN IP ${session.vpnIp})"
                     else ->
-                        // Settings residual IPv6 OFF — honest not protected
+                        // IPv4 residual capture; ISP IPv6 not claimed protected on IPv4-only TUN
                         "Connected — IPv4 via VPN; IPv6 not protected (VPN IP ${session.vpnIp})"
                 }
                 report(
@@ -605,24 +595,37 @@ class RptVpnService : VpnService() {
 
     companion object {
         /** Product residual monopins (must match Flutter country_select / multihop catalog). */
-        /** Default residual entry = United States monopin. */
-        const val PRODUCT_ENTRY_HOST = "5.161.242.85"
+        /** Default residual entry = Germany monopin. */
+        const val PRODUCT_ENTRY_HOST = "178.105.187.178"
         const val PRODUCT_ICELAND_HOST = "82.221.101.241"
-        const val PRODUCT_EXIT_HOST = "185.146.232.107"
+        const val PRODUCT_DE_HOST = "178.105.187.178"
+        /** Multi-hop exit = Germany (same monopin as DE entry). */
+        const val PRODUCT_EXIT_HOST = "178.105.187.178"
         const val PRODUCT_US_HOST = "5.161.242.85"
+        /** Retired Romania monopin — never dial; map only for heal of stale strings. */
+        const val PRODUCT_RO_LEGACY_HOST = "185.146.232.107"
 
         /**
          * ElGamal public pin basename for residual HELLO from dial host.
-         * IS → node_elgamal.pub; RO → exit_node_elgamal.pub; US → us_node_elgamal.pub.
+         * IS → node_elgamal.pub; DE → de_node_elgamal.pub; US → us_node_elgamal.pub.
          */
         @JvmStatic
         fun residualNodePubNameForHost(host: String): String {
             val h = host.trim()
-            if (h == PRODUCT_EXIT_HOST || h.endsWith(PRODUCT_EXIT_HOST)) {
-                return "exit_node_elgamal.pub"
+            if (h == PRODUCT_DE_HOST || h.endsWith(PRODUCT_DE_HOST)
+                || h == PRODUCT_EXIT_HOST || h.endsWith(PRODUCT_EXIT_HOST)
+            ) {
+                return "de_node_elgamal.pub"
             }
             if (h == PRODUCT_US_HOST || h.endsWith(PRODUCT_US_HOST)) {
                 return "us_node_elgamal.pub"
+            }
+            if (h == PRODUCT_ICELAND_HOST || h.endsWith(PRODUCT_ICELAND_HOST)) {
+                return "node_elgamal.pub"
+            }
+            // Stale RO host: exit pin file holds DE material after 0.5.7 reassign
+            if (h == PRODUCT_RO_LEGACY_HOST || h.endsWith(PRODUCT_RO_LEGACY_HOST)) {
+                return "exit_node_elgamal.pub"
             }
             return "node_elgamal.pub"
         }

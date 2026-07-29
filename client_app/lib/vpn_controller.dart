@@ -73,7 +73,11 @@ class VpnController {
   ///
   /// Android HELLO + TUN can take tens of seconds on mobile UDP — do not drop
   /// the Connecting line early. Progress ticks update the subtitle only.
-  Future<bool> connect() async {
+  Future<bool> connect({
+    /// Optional residual stack override so Connect uses Flutter Settings, not stale native defaults.
+    bool? residualIpv4,
+    bool? residualIpv6,
+  }) async {
     Timer? progress;
     final started = DateTime.now();
     void tickConnecting() {
@@ -88,6 +92,13 @@ class VpnController {
     }
 
     try {
+      // Push dual-stack prefs into App Group before startTunnel options are built.
+      if (residualIpv4 != null || residualIpv6 != null) {
+        await syncProductSettingsToNative(
+          residualIpv4: residualIpv4 ?? true,
+          residualIpv6: residualIpv6 ?? true,
+        );
+      }
       tickConnecting();
       progress = Timer.periodic(connectingProgressInterval, (_) {
         tickConnecting();
@@ -276,6 +287,41 @@ class VpnController {
     }
   }
 
+  /// Push product Settings dual-stack + privacy scale into native App Group
+  /// so Packet Tunnel / Connect success maps match Flutter SharedPreferences.
+  Future<void> syncProductSettingsToNative({
+    required bool residualIpv4,
+    required bool residualIpv6,
+    bool? privacyTrafficShape,
+    bool? privacyOuterObfuscation,
+    bool? privacyMultihop,
+  }) async {
+    try {
+      await _channel.invokeMethod<dynamic>('setResidualStack', {
+        'ipv4': residualIpv4,
+        'ipv6': residualIpv6,
+      });
+    } on MissingPluginException {
+      // Non-Apple / host without channel.
+    } catch (_) {
+      // Best-effort — Connect still reads App Group defaults.
+    }
+    if (privacyTrafficShape == null &&
+        privacyOuterObfuscation == null &&
+        privacyMultihop == null) {
+      return;
+    }
+    try {
+      await _channel.invokeMethod<dynamic>('setPrivacyScale', {
+        if (privacyTrafficShape != null) 'trafficShape': privacyTrafficShape,
+        if (privacyOuterObfuscation != null)
+          'outerObfuscation': privacyOuterObfuscation,
+        if (privacyMultihop != null) 'multihop': privacyMultihop,
+      });
+    } on MissingPluginException {
+    } catch (_) {}
+  }
+
   /// Rehydrate UI after resume/minimize — does **not** start or stop the tunnel.
   Future<VpnSessionSnapshot> querySession() async {
     try {
@@ -286,12 +332,24 @@ class VpnController {
         final ok = !connecting &&
             (result['connected'] == true || isConnectSuccess(result));
         final ip = result['vpnIp']?.toString().trim() ?? '';
-        final msg = result['message']?.toString().trim() ?? '';
+        final rawMsg = result['message']?.toString().trim() ?? '';
+        // Rebuild honesty from flags when present (status rehydrate contract).
+        final msg = ok ? mapConnectStatusMessage(result) : rawMsg;
+        bool? ipv6;
+        if (result['ipv6Protected'] is bool) {
+          ipv6 = result['ipv6Protected'] as bool;
+        }
+        bool? ipv4;
+        if (result['ipv4Residual'] is bool) {
+          ipv4 = result['ipv4Residual'] as bool;
+        }
         return VpnSessionSnapshot(
           connected: ok,
           connecting: connecting,
           vpnIp: ip.isEmpty ? null : ip,
           message: msg.isEmpty ? null : msg,
+          ipv6Protected: ipv6,
+          ipv4Residual: ipv4,
         );
       }
     } on MissingPluginException {
@@ -307,11 +365,15 @@ class VpnSessionSnapshot {
   final bool connecting;
   final String? vpnIp;
   final String? message;
+  final bool? ipv6Protected;
+  final bool? ipv4Residual;
 
   const VpnSessionSnapshot({
     required this.connected,
     this.connecting = false,
     this.vpnIp,
     this.message,
+    this.ipv6Protected,
+    this.ipv4Residual,
   });
 }

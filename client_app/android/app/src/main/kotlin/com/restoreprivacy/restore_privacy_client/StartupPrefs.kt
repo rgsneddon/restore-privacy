@@ -13,9 +13,12 @@ object StartupPrefs {
     const val PREFS = "rpt_product_settings"
     const val KEY_RUN_AT_STARTUP = "run_at_startup"
     const val KEY_AUTOCONNECT = "autoconnect_on_launch"
-    /** Residual dual-stack (Flutter Settings residual_ipv4 / residual_ipv6). Default both ON. */
+    /** Residual IPv4 is product always-on (key kept for migrate only). */
     const val KEY_RESIDUAL_IPV4 = "residual_ipv4"
+    /** Residual IPv6 ISP-leak protection; default ON when unset. */
     const val KEY_RESIDUAL_IPV6 = "residual_ipv6"
+    /** Product policy: residual IPv4 capture is never user-off. */
+    const val RESIDUAL_IPV4_ALWAYS_ON = true
 
     fun setRunAtStartup(context: Context, enabled: Boolean): String {
         return try {
@@ -59,11 +62,10 @@ object StartupPrefs {
     }
 
     /**
-     * Residual IPv4 capture is product policy always ON (not user-adjustable).
-     * Legacy residual_ipv4=false prefs are ignored.
+     * Residual IPv4 is always ON (product policy) — ignore stale false prefs.
      */
     fun residualIpv4Enabled(context: Context): Boolean {
-        return true
+        return RESIDUAL_IPV4_ALWAYS_ON
     }
 
     fun residualIpv6Enabled(context: Context): Boolean {
@@ -72,8 +74,8 @@ object StartupPrefs {
 
     fun setResidualStack(context: Context, ipv4: Boolean?, ipv6: Boolean?) {
         val ed = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit()
-        // Always persist residual IPv4 ON (product policy).
-        ed.putBoolean(KEY_RESIDUAL_IPV4, true)
+        // Always persist residual IPv4 ON so stale false cannot disable capture.
+        ed.putBoolean(KEY_RESIDUAL_IPV4, RESIDUAL_IPV4_ALWAYS_ON)
         if (ipv6 != null) ed.putBoolean(KEY_RESIDUAL_IPV6, ipv6)
         ed.apply()
         // Mirror into Flutter SharedPreferences so Dart load() sees the same values.
@@ -83,7 +85,7 @@ object StartupPrefs {
                 Context.MODE_PRIVATE,
             )
             val fed = flutterPrefs.edit()
-            fed.putBoolean("flutter.$KEY_RESIDUAL_IPV4", true)
+            fed.putBoolean("flutter.$KEY_RESIDUAL_IPV4", RESIDUAL_IPV4_ALWAYS_ON)
             if (ipv6 != null) fed.putBoolean("flutter.$KEY_RESIDUAL_IPV6", ipv6)
             fed.apply()
         } catch (_: Exception) {

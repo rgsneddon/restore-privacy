@@ -1,8 +1,16 @@
-﻿#!/usr/bin/env python3
+#!/usr/bin/env python3
 """Build / stage Restore Privacy client packages for release 0.5.6.
 
-**0.5.6** multi-hop residual catalog. Apple packages are Flutter-built then
-DevID/notarized (macOS) / Team-signed (iOS). Linux is rebuilt via package_linux.
+**0.5.6** multi-hop residual catalog. Apple ship path (``--apple-only``) always:
+
+  1. Inject product pubs / assert no ``*.priv``
+  2. **Team residual NE re-sign** of a *copy* of the Flutter app
+     (``scripts/sign_macos_residual_team.py`` via ``apple_ship_gates``) —
+     **fail-closed** unless ``RPT_SKIP_RESIDUAL_TEAM=1``
+  3. **DevID + notarize + staple** public catalog macOS zip (no host residual NE)
+  4. **iOS Team-sign** sideload zip when Darwin-built
+
+Optional ``--host-paid`` uploads monopin packages to Helsinki paid_assets.
 **Windows multihop PE** must be built on Windows x64::
 
   python scripts/build_windows_multihop.py
@@ -52,7 +60,7 @@ MACOS_APP = (
 IOS_APP = ROOT / "client_app" / "build" / "ios" / "iphoneos" / "Runner.app"
 
 # Carry-forward non-Apple platforms from last full catalog pin on this host
-PRIOR_TAG = "0.5.5"
+PRIOR_TAG = "0.5.4"
 PRIOR_DOWNLOAD = (
     f"https://github.com/rgsneddon/restore-privacy/releases/download/{PRIOR_TAG}"
 )
@@ -89,6 +97,7 @@ def write_version_files() -> None:
             count=1,
         )
         for old in (
+            "0.5.5",
             "0.5.3",
             "0.5.2",
             "0.5.0",
@@ -168,8 +177,31 @@ def package_macos_zip() -> Path:
         )
     inject_product_secrets(MACOS_APP, ios=False)
     _assert_no_priv(MACOS_APP)
+    # Required ship gate: Team residual NE re-sign of a **copy** of the app
+    # (residual Connect on this Mac). Public catalog zip remains DevID-only.
+    # Fail-closed unless RPT_SKIP_RESIDUAL_TEAM=1 (non-residual CI only).
+    try:
+        sys.path.insert(0, str(ROOT / "scripts"))
+        from apple_ship_gates import run_residual_team_resign  # type: ignore
+
+        residual = run_residual_team_resign(MACOS_APP, require=True)
+        if residual.get("skipped"):
+            print(
+                f"[apple-ship] residual Team NE: SKIPPED ({residual.get('reason')})",
+                flush=True,
+            )
+        else:
+            print(
+                f"[apple-ship] residual Team NE OK → {residual.get('path')}",
+                flush=True,
+            )
+    except Exception as exc:  # noqa: BLE001
+        raise RuntimeError(
+            f"macOS residual Team NE re-sign required for ship (fail-closed): {exc}"
+        ) from exc
     OUT.mkdir(parents=True, exist_ok=True)
     dest = OUT / MACOS_ZIP_NAME
+    # Public catalog zip: DevID + notarize (no host residual NE in the zip).
     sign_and_notarize_macos(MACOS_APP, dest)
     if not dest.is_file():
         raise RuntimeError(f"sign_and_notarize_macos did not produce {dest}")
@@ -233,7 +265,7 @@ def package_ios_zip() -> Path:
 def _stage_from_prior(prior_name: str, dest: Path) -> Path:
     """Copy prior release asset and rename to current VERSION filename."""
     dest.parent.mkdir(parents=True, exist_ok=True)
-    # Prefer local monorepo staged assets (private repo â€” GitHub release may 404)
+    # Prefer local monorepo staged assets (private repo — GitHub release may 404)
     candidates = [
         ROOT / "releases" / PRIOR_TAG / prior_name,
         ROOT / "status_page" / "assets" / PRIOR_TAG / prior_name,
@@ -245,7 +277,7 @@ def _stage_from_prior(prior_name: str, dest: Path) -> Path:
     for local in candidates:
         if local.is_file() and local.stat().st_size > 1_000_000:
             shutil.copy2(local, dest)
-            print(f"staged from local {local}: â†’ {dest.name}")
+            print(f"staged from local {local}: → {dest.name}")
             return dest
     # download prior then rename (public release only)
     import urllib.request
@@ -264,7 +296,7 @@ def _stage_from_prior(prior_name: str, dest: Path) -> Path:
             dest.unlink()
         tmp.rename(dest)
     if not dest.is_file() or dest.stat().st_size < 1_000_000:
-        raise FileNotFoundError(f"failed to stage {prior_name} â†’ {dest}")
+        raise FileNotFoundError(f"failed to stage {prior_name} → {dest}")
     return dest
 
 
@@ -282,7 +314,7 @@ def rebuild_windows_setup() -> Path:
 
 
 def stage_windows_exe(*, force_rebuild: bool = False) -> Path:
-    """Stage Windows setup.exe â€” prefer live multihop rebuild, else carry-forward."""
+    """Stage Windows setup.exe — prefer live multihop rebuild, else carry-forward."""
     dest = OUT / WINDOWS_EXE_NAME
     OUT.mkdir(parents=True, exist_ok=True)
     if force_rebuild or sys.platform.startswith("win"):
@@ -295,7 +327,7 @@ def stage_windows_exe(*, force_rebuild: bool = False) -> Path:
         except Exception as exc:  # noqa: BLE001
             print(
                 f"windows multihop rebuild failed ({exc}); "
-                f"falling back to carry-forwardâ€¦",
+                f"falling back to carry-forward…",
                 file=sys.stderr,
             )
             if force_rebuild:
@@ -317,7 +349,7 @@ def stage_windows_exe(*, force_rebuild: bool = False) -> Path:
 def _rewrite_windows_sfx_version(exe: Path) -> None:
     """Repack 7z SFX so client/VERSION and Title pin match VERSION (same-length pins).
 
-    Honest: this does **not** rebuild multihop residual PE code â€” only catalog
+    Honest: this does **not** rebuild multihop residual PE code — only catalog
     pin strings / VERSION files inside a carried SFX when 7z extract works.
     """
     import re
@@ -376,7 +408,7 @@ def _rewrite_windows_sfx_version(exe: Path) -> None:
             print(f"windows: 7z extract failed: {r.stderr[:200]}")
             # Still write stub title rewrites if possible
             if stub_bytes != bytes(stub):
-                # cannot safely recombine without payload â€” leave file as staged copy
+                # cannot safely recombine without payload — leave file as staged copy
                 print("windows: pin rewrite partial (stub only skipped without extract)")
             return
         # rewrite VERSION files and same-length version strings
@@ -405,7 +437,7 @@ def _rewrite_windows_sfx_version(exe: Path) -> None:
             capture_output=True,
         )
         exe.write_bytes(stub_bytes + arc.read_bytes())
-        print(f"windows: repacked SFX with pin {VERSION} â†’ {exe.name}")
+        print(f"windows: repacked SFX with pin {VERSION} → {exe.name}")
     finally:
         shutil.rmtree(work, ignore_errors=True)
 
@@ -426,7 +458,7 @@ def stage_android_apk() -> Path:
     """Stage Android APK that embeds product residual wire (PFS + outer obfs).
 
     Carry-forward of pre-PFS APKs causes silent HELLO drop on the live node
-    (require_pfs=True) â†’ on-device Poll timed out / Connect failure. Prefer a
+    (require_pfs=True) → on-device Poll timed out / Connect failure. Prefer a
     wire-complete prior (e.g. status_page/assets/0.3.0) over a broken rename.
     """
     dest = OUT / ANDROID_APK_NAME
@@ -463,8 +495,8 @@ def stage_android_apk() -> Path:
             ) from exc
         if not _android_apk_has_residual_wire(staged):
             raise RuntimeError(
-                f"{staged.name} lacks PFS/outer-obfs residual wire â€” refusing to ship "
-                "(node require_pfs silent-drops HELLO â†’ Connect timeout)"
+                f"{staged.name} lacks PFS/outer-obfs residual wire — refusing to ship "
+                "(node require_pfs silent-drops HELLO → Connect timeout)"
             )
         return staged
     dest.parent.mkdir(parents=True, exist_ok=True)
@@ -477,52 +509,34 @@ def stage_android_apk() -> Path:
 
 
 def _rewrite_linux_node_elgamal_pub(tarball: Path) -> None:
-    """Ensure catalog residual public pins inside the Linux tarball match product/.
+    """Ensure every node_elgamal.pub inside the Linux tarball matches product pin.
 
-    Ships IS (node_elgamal.pub), RO (exit_node_elgamal.pub), and US
-    (us_node_elgamal.pub â€” product default residual entry). Carry-forward
-    priors may only have Iceland + Romania; missing US pin forces false
-    primary HELLO fail on default entry.
+    Carry-forward priors may ship a stale pub (HELLO hybrid decrypt fails).
     """
     import tarfile
     import tempfile
 
-    catalog = (
-        "node_elgamal.pub",
-        "exit_node_elgamal.pub",
-        "us_node_elgamal.pub",
-    )
-    pub_bytes: dict[str, bytes] = {}
-    for name in catalog:
-        p = ROOT / "product" / name
-        if not p.is_file() or p.stat().st_size < 32:
-            if name == "node_elgamal.pub":
-                raise FileNotFoundError(f"missing product node pub: {p}")
-            continue
-        pub_bytes[name] = p.read_bytes()
-    if "us_node_elgamal.pub" not in pub_bytes:
-        raise FileNotFoundError(
-            f"missing product/us_node_elgamal.pub â€” required for default US residual entry"
-        )
+    product = ROOT / "product" / "node_elgamal.pub"
+    if not product.is_file() or product.stat().st_size < 32:
+        raise FileNotFoundError(f"missing product node pub: {product}")
+    pub_bytes = product.read_bytes()
     work = Path(tempfile.mkdtemp(prefix="rpt-linux-pub-"))
     try:
         with tarfile.open(tarball, "r:gz") as tf:
             tf.extractall(work)
         replaced = 0
-        for name, raw in pub_bytes.items():
-            for p in work.rglob(name):
-                p.write_bytes(raw)
-                replaced += 1
-        # Prefer product/ + secrets/ so secrets_loader finds the correct keys
+        for p in work.rglob("node_elgamal.pub"):
+            p.write_bytes(pub_bytes)
+            replaced += 1
+        # Prefer product/ + secrets/ so secrets_loader finds the correct key
         for top in [d for d in work.iterdir() if d.is_dir()]:
             for sub in ("product", "secrets"):
                 d = top / sub
                 d.mkdir(parents=True, exist_ok=True)
-                for name, raw in pub_bytes.items():
-                    (d / name).write_bytes(raw)
-                    replaced += 1
+                (d / "node_elgamal.pub").write_bytes(pub_bytes)
+                replaced += 1
         if replaced == 0:
-            raise RuntimeError(f"no catalog pubs written into {tarball}")
+            raise RuntimeError(f"no node_elgamal.pub in {tarball}")
         tmp_out = work / "repacked.tar.gz"
         with tarfile.open(tmp_out, "w:gz") as tf:
             for child in sorted(work.iterdir()):
@@ -530,10 +544,7 @@ def _rewrite_linux_node_elgamal_pub(tarball: Path) -> None:
                     continue
                 tf.add(child, arcname=child.name)
         shutil.copy2(tmp_out, tarball)
-        print(
-            f"rewrote catalog residual pubs in {tarball.name} "
-            f"({', '.join(pub_bytes)}; {replaced} path(s))"
-        )
+        print(f"rewrote node_elgamal.pub in {tarball.name} ({replaced} path(s))")
     finally:
         shutil.rmtree(work, ignore_errors=True)
 
@@ -543,7 +554,7 @@ def stage_linux_tgz() -> Path:
     dest = OUT / LINUX_TGZ_NAME
     script = ROOT / "scripts" / "package_linux.py"
     if script.is_file():
-        print("linux: rebuilding via package_linux.py â€¦")
+        print("linux: rebuilding via package_linux.py …")
         subprocess.run([sys.executable, str(script)], check=True, cwd=str(ROOT))
         if dest.is_file():
             # ensure product pub (package_linux already copies secrets pub)
@@ -593,7 +604,7 @@ def _rewrite_linux_version_pin(tarball: Path) -> None:
 
 
 def _require_macos_cfbundle_matches_monopin(path: Path) -> Path:
-    """Refuse catalog macOS zip when host CFBundleShortVersionString â‰  monopin."""
+    """Refuse catalog macOS zip when host CFBundleShortVersionString ≠ monopin."""
     # Prefer monorepo import; status_page layout when cwd/rootDir is status_page
     try:
         sys.path.insert(0, str(ROOT / "status_page"))
@@ -608,7 +619,7 @@ def _require_macos_cfbundle_matches_monopin(path: Path) -> Path:
 
 
 def stage_macos_zip() -> Path:
-    """macOS zip: native Flutter+DevID only â€” CFBundle must equal monopin.
+    """macOS zip: native Flutter+DevID only — CFBundle must equal monopin.
 
     Silent carry-forward rename of a prior zip is **not** allowed for the
     current catalog pin (would ship stale CFBundle, e.g. 0.2.3 under a 0.5.2
@@ -633,7 +644,7 @@ def stage_ios_zip() -> Path:
     except Exception as exc:  # noqa: BLE001
         print(
             f"ios native package unavailable ({exc}); "
-            f"carry-forward prior zip â†’ {dest.name} (Mac must rebuild/sign for real {VERSION})",
+            f"carry-forward prior zip → {dest.name} (Mac must rebuild/sign for real {VERSION})",
             file=sys.stderr,
         )
         return _stage_from_prior(
@@ -663,7 +674,20 @@ def main(argv: list[str] | None = None) -> int:
         action="store_true",
         help="Also stage Windows/Android/Linux under 0.5.2 names (default if not apple/windows-only)",
     )
+    ap.add_argument(
+        "--host-paid",
+        action="store_true",
+        help="After packaging, stage+upload monopin packages to Helsinki paid_assets "
+        "(scripts/host_paid_assets_vps.py --stage --upload --force)",
+    )
+    ap.add_argument(
+        "--skip-residual-team",
+        action="store_true",
+        help="Skip Team residual NE re-sign (sets RPT_SKIP_RESIDUAL_TEAM=1; CI only)",
+    )
     args = ap.parse_args(argv)
+    if args.skip_residual_team:
+        os.environ["RPT_SKIP_RESIDUAL_TEAM"] = "1"
 
     write_version_files()
     OUT.mkdir(parents=True, exist_ok=True)
@@ -768,10 +792,8 @@ def main(argv: list[str] | None = None) -> int:
             for name, dig in artifacts.items()
         ],
         "notes": (
-            "0.5.6: Windows native PE (window_foreground fix); Linux/Android CF from 0.5.3 when not rebuilt; "
-            "admin licence clear-all; dual-stack Settings + lean residual defaults; "
-            "audit last-run from security_audit_latest.json after every --write; "
-            "macOS/iOS via Helsinki breadcrumbs (native seal on Mac)."
+            "0.5.6: residual IPv4/IPv6 Settings; macOS DevID notarize + Team residual NE "
+            "re-sign (local residual copy); iOS Team-sign; dual-stack; host paid_assets."
         ),
     }
     man_path = OUT / "SHA256SUMS.json"
@@ -781,6 +803,31 @@ def main(argv: list[str] | None = None) -> int:
     )
     print(f"manifest: {man_path}")
     print("OK:", list(artifacts.keys()))
+
+    if args.host_paid:
+        host_script = ROOT / "scripts" / "host_paid_assets_vps.py"
+        if not host_script.is_file():
+            print(f"ERROR: missing {host_script}", file=sys.stderr)
+            return 1
+        cmd = [
+            sys.executable,
+            str(host_script),
+            "--stage",
+            "--upload",
+            "--version",
+            VERSION,
+            "--force",
+            "--allow-missing",
+        ]
+        print(f"[apple-ship] host paid assets: {' '.join(cmd)}", flush=True)
+        r = subprocess.run(cmd, cwd=str(ROOT))
+        if r.returncode != 0:
+            print(
+                f"ERROR: host_paid_assets_vps failed rc={r.returncode}",
+                file=sys.stderr,
+            )
+            return r.returncode
+        print(f"[apple-ship] Helsinki paid_assets/{VERSION}/ upload OK", flush=True)
     return 0
 
 

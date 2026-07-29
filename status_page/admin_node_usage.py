@@ -180,7 +180,7 @@ def product_catalog_peers() -> list[dict[str, Any]]:
         # Minimal fallback if client tree unavailable on status host
         return [
             {"code": "IS", "name": "Iceland", "host": "82.221.101.241", "port": 44044},
-            {"code": "RO", "name": "Romania", "host": "185.146.232.107", "port": 44044},
+            {"code": "DE", "name": "Germany", "host": "178.105.187.178", "port": 44044},
             {"code": "US", "name": "United States", "host": "5.161.242.85", "port": 44044},
         ]
     out: list[dict[str, Any]] = []

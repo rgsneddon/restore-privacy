@@ -27,14 +27,21 @@ void main() {
     statusConnected = false;
     TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
         .setMockMethodCallHandler(channel, (call) async {
+      // Settings → App Group sync (load / Connect / Settings switches).
+      if (call.method == 'setResidualStack' || call.method == 'setPrivacyScale') {
+        return {'ok': true};
+      }
       if (call.method == 'connect') {
         statusConnected = true;
         return {
           'ok': true,
-          'message': 'Connected — test harness',
+          'message': 'Connected — VPN active; IPv6 ISP path blocked (10.88.0.2)',
           'vpnIp': '10.88.0.2',
           'fullTunnelActive': true,
           'connected': true,
+          'hostOnlySession': false,
+          'ipv6Protected': true,
+          'ipv4Residual': true,
         };
       }
       if (call.method == 'disconnect') {
@@ -43,6 +50,7 @@ void main() {
           'ok': true,
           'message': 'Disconnected — system VPN stopped; residual public IP restored',
           'connected': false,
+          'fullTunnelActive': false,
         };
       }
       if (call.method == 'status') {
@@ -51,10 +59,24 @@ void main() {
           'connected': statusConnected,
           'fullTunnelActive': statusConnected,
           'vpnIp': statusConnected ? '10.88.0.2' : '',
-          'message': statusConnected ? 'Connected — protected' : 'Disconnected',
+          'message': statusConnected
+              ? 'Connected — VPN active; IPv6 ISP path blocked (10.88.0.2)'
+              : 'Disconnected',
+          if (statusConnected) 'ipv6Protected': true,
+          if (statusConnected) 'ipv4Residual': true,
         };
       }
-      return null;
+      // prepareVpn / openVpnSettings / other optional methods
+      if (call.method == 'prepareVpn' ||
+          call.method == 'preparePacketTunnel' ||
+          call.method == 'registerVpnConfiguration') {
+        return {
+          'ok': true,
+          'prepared': true,
+          'tunnelType': 'packet-tunnel',
+        };
+      }
+      return {'ok': true};
     });
   });
 

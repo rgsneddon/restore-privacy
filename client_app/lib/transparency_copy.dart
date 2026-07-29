@@ -54,11 +54,13 @@ const String kExplainerCoreVpn =
     'system residual tunnel (capture your public IP through the VPN node). '
     'Those cannot be turned off here — without them this is not a working VPN.';
 
-/// Residual stack explainers (IPv4 always on; IPv6 adjustable).
+/// Residual IPv4 is product always-on (not user-adjustable).
 const String kExplainerResidualIpv4 =
     'IPv4 residual is always on: full-tunnel IPv4 capture via dual /1 routes so '
-    'residual public IPv4 uses the VPN node. This cannot be turned off in Settings.';
+    'residual public IPv4 uses the VPN node. This is core residual protection '
+    'and cannot be turned off in Settings.';
 
+/// Residual IPv6 remains user-toggleable (default ON).
 const String kExplainerResidualIpv6 =
     'IPv6 residual blocks the ISP IPv6 path while residual is connected so '
     'dual-stack devices do not leak over IPv6. ON (default) = IPv6 ISP path '
@@ -66,7 +68,7 @@ const String kExplainerResidualIpv6 =
     'claim IPv6 is protected. Takes effect on next Connect.';
 
 const String kTooltipResidualIpv4 =
-    'Always on: residual IPv4 routes through the VPN. Not adjustable.';
+    'Residual IPv4 capture is always on (product policy).';
 
 const String kTooltipResidualIpv6 =
     'When on, residual sessions block ISP IPv6 leaks. When off, IPv6 may bypass '

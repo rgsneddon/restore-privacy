@@ -1,5 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:restore_privacy_client/connect_status.dart';
+import 'package:restore_privacy_client/theme.dart';
 
 void main() {
   group('connect status mapping (shipped helper)', () {
@@ -467,6 +468,186 @@ void main() {
       expect(map['ipv6Protected'], isFalse);
       final msg = mapConnectStatusMessage(map);
       expect(msg, contains('IPv6 not protected'));
+      expect(msg.toLowerCase(), isNot(contains('path blocked')));
+    });
+
+    test('residual IPv6 OFF never claims ISP path blocked', () {
+      final map = buildFullTunnelConnectResult(
+        packetTunnelActive: true,
+        vpnIp: '10.88.0.30',
+        detailMessage: 'Connected — tunnel IP 10.88.0.30',
+        ipv6Protected: false,
+        ipv4Residual: true,
+      );
+      expect(map['ipv6Protected'], isFalse);
+      final msg = mapConnectStatusMessage(map);
+      expect(msg.toLowerCase(), contains('ipv6 not protected'));
+      expect(msg.toLowerCase(), isNot(contains('path blocked')));
+      expect(
+        connectedHonestyMessage(
+          vpnIp: '10.88.0.30',
+          ipv6Protected: false,
+        ).toLowerCase(),
+        isNot(contains('path blocked')),
+      );
+    });
+
+    test('residual IPv6 ON claims ISP path blocked', () {
+      final map = buildFullTunnelConnectResult(
+        packetTunnelActive: true,
+        vpnIp: '10.88.0.31',
+        ipv6Protected: true,
+        ipv4Residual: true,
+      );
+      final msg = mapConnectStatusMessage(map);
+      expect(msg.toLowerCase(), contains('ipv6 isp path blocked'));
+      expect(msg.toLowerCase(), isNot(contains('ipv6 not protected')));
+    });
+
+    test('mapConnectStatusMessage honours ipv6Protected false flag over generic message',
+        () {
+      final msg = mapConnectStatusMessage({
+        'ok': true,
+        'fullTunnelActive': true,
+        'hostOnlySession': false,
+        'vpnIp': '10.88.0.32',
+        'ipv6Protected': false,
+        'ipv4Residual': true,
+        'message': 'Connected — system Packet Tunnel active',
+      });
+      expect(msg.toLowerCase(), contains('ipv6 not protected'));
+      expect(msg.toLowerCase(), isNot(contains('path blocked')));
+    });
+
+    test('residual IPv4 OFF + IPv6 ON is IPv4 residual off honesty', () {
+      final map = buildFullTunnelConnectResult(
+        packetTunnelActive: true,
+        vpnIp: '10.88.0.33',
+        ipv6Protected: true,
+        ipv4Residual: false,
+      );
+      expect(map['ipv4Residual'], isFalse);
+      expect(map['ipv6Protected'], isTrue);
+      final msg = mapConnectStatusMessage(map);
+      expect(msg.toLowerCase(), contains('ipv4 residual off'));
+      expect(msg.toLowerCase(), contains('ipv6 isp path blocked'));
+      expect(msg.toLowerCase(), isNot(contains('ipv4 via vpn')));
+      expect(
+        connectedHonestyMessage(
+          vpnIp: '10.88.0.33',
+          ipv4Residual: false,
+          ipv6Protected: true,
+        ).toLowerCase(),
+        contains('ipv4 residual off'),
+      );
+    });
+
+    test('residual dual-stack OFF honesty (both IPv4 and IPv6 off)', () {
+      final map = buildFullTunnelConnectResult(
+        packetTunnelActive: true,
+        vpnIp: '10.88.0.34',
+        ipv6Protected: false,
+        ipv4Residual: false,
+      );
+      final msg = mapConnectStatusMessage(map);
+      expect(msg.toLowerCase(), contains('dual-stack off'));
+      expect(msg.toLowerCase(), isNot(contains('path blocked')));
+      expect(msg.toLowerCase(), isNot(contains('ipv4 via vpn')));
+    });
+
+    test('Connect success UI path preserves dual-stack native honesty', () {
+      // Native already honest (IPv4 OFF + IPv6 OFF) — must not be overwritten
+      // with "IPv4 via VPN; IPv6 not protected".
+      final native = mapConnectStatusMessage({
+        'ok': true,
+        'fullTunnelActive': true,
+        'hostOnlySession': false,
+        'vpnIp': '10.88.0.35',
+        'ipv6Protected': false,
+        'ipv4Residual': false,
+        'message': 'Connected — residual dual-stack off (10.88.0.35)',
+      });
+      final ui = resolveConnectedStatusAfterSuccess(
+        nativeStatus: native,
+        vpnIp: '10.88.0.35',
+        residualIpv4: false,
+        residualIpv6: false,
+      );
+      expect(ui.toLowerCase(), contains('dual-stack off'));
+      expect(ui.toLowerCase(), isNot(contains('ipv4 via vpn')));
+      expect(ui.toLowerCase(), isNot(contains('path blocked')));
+    });
+
+    test('Connect success UI path preserves IPv4 residual off native honesty',
+        () {
+      final native = mapConnectStatusMessage({
+        'ok': true,
+        'fullTunnelActive': true,
+        'hostOnlySession': false,
+        'vpnIp': '10.88.0.36',
+        'ipv6Protected': true,
+        'ipv4Residual': false,
+      });
+      final ui = resolveConnectedStatusAfterSuccess(
+        nativeStatus: native,
+        residualIpv4: false,
+        residualIpv6: true,
+      );
+      expect(ui.toLowerCase(), contains('ipv4 residual off'));
+      expect(ui.toLowerCase(), isNot(contains('ipv4 via vpn')));
+    });
+
+    test('Connect success UI rebuilds from Settings when native message is generic',
+        () {
+      // Product Settings always pass residualIpv4 true.
+      final uiOff = resolveConnectedStatusAfterSuccess(
+        nativeStatus: 'Connected — system Packet Tunnel active',
+        vpnIp: '10.88.0.37',
+        residualIpv4: true,
+        residualIpv6: false,
+      );
+      expect(uiOff.toLowerCase(), contains('ipv6 not protected'));
+      expect(uiOff.toLowerCase(), isNot(contains('path blocked')));
+      expect(uiOff.toLowerCase(), isNot(contains('dual-stack off')));
+      final uiOn = resolveConnectedStatusAfterSuccess(
+        nativeStatus: 'Connected — system Packet Tunnel active',
+        vpnIp: '10.88.0.37',
+        residualIpv4: true,
+        residualIpv6: true,
+      );
+      expect(uiOn.toLowerCase(), contains('ipv6 isp path blocked'));
+    });
+
+    test('product path plainConnectedStatus never claims IPv4 residual off',
+        () {
+      // Product always-on IPv4 + IPv6 OFF
+      expect(
+        plainConnectedStatus(
+          vpnIp: '10.88.0.40',
+          residual: true,
+          ipv4Residual: true,
+          ipv6Protected: false,
+        ).toLowerCase(),
+        contains('ipv6 not protected'),
+      );
+      expect(
+        plainConnectedStatus(
+          vpnIp: '10.88.0.41',
+          residual: true,
+          ipv4Residual: true,
+          ipv6Protected: true,
+        ).toLowerCase(),
+        contains('ipv6 isp path blocked'),
+      );
+      // Pure dual-stack builders may still model IPv4 off for diagnostics.
+      expect(
+        connectedHonestyMessage(
+          vpnIp: '10.88.0.38',
+          ipv4Residual: false,
+          ipv6Protected: false,
+        ).toLowerCase(),
+        contains('dual-stack off'),
+      );
     });
 
     test('(c) NE start failed is ok:false with residual-IP honest message', () {

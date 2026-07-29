@@ -58,27 +58,18 @@ class PacketTunnelProvider: NEPacketTunnelProvider {
         self.engine = engine
         self.session = session
 
-        // 4. Tunnel network settings honour Settings dual-stack residual prefs
-        // (residual_ipv4 / residual_ipv6 — defaults both ON).
+        // 4. Residual IPv4 always-on; residual IPv6 from Settings (default ON).
         var stack = Self.loadResidualStackPrefs()
-        if let o4 = options?["residual_ipv4"] as? Bool {
-          stack = (o4, stack.ipv6)
-        } else if let o4 = options?["residual_ipv4"] as? NSNumber {
-          stack = (o4.boolValue, stack.ipv6)
-        }
+        stack = (true, stack.ipv6)
         if let o6 = options?["residual_ipv6"] as? Bool {
-          stack = (stack.ipv4, o6)
+          stack = (true, o6)
         } else if let o6 = options?["residual_ipv6"] as? NSNumber {
-          stack = (stack.ipv4, o6.boolValue)
+          stack = (true, o6.boolValue)
         }
         let settings = NEPacketTunnelNetworkSettings(tunnelRemoteAddress: self.endpointHost)
         let ipv4 = NEIPv4Settings(addresses: [session.vpnIp], subnetMasks: ["255.255.255.255"])
         ipv4.excludedRoutes = [NEIPv4Route(destinationAddress: self.endpointHost, subnetMask: "255.255.255.255")]
-        if stack.ipv4 {
-          ipv4.includedRoutes = [NEIPv4Route.default()]
-        } else {
-          ipv4.includedRoutes = []
-        }
+        ipv4.includedRoutes = [NEIPv4Route.default()]
         settings.ipv4Settings = ipv4
         if stack.ipv6 {
           settings.ipv6Settings = Self.ipv6IspLeakMitigationSettings()
@@ -124,7 +115,7 @@ class PacketTunnelProvider: NEPacketTunnelProvider {
     return ipv6
   }
 
-  /// Settings dual-stack residual prefs (defaults both ON when keys unset).
+  /// Residual prefs: IPv4 always ON; IPv6 defaults ON when unset.
   static func loadResidualStackPrefs(
     appGroupId: String = "group.com.restoreprivacy.shared"
   ) -> (ipv4: Bool, ipv6: Bool) {
@@ -133,12 +124,11 @@ class PacketTunnelProvider: NEPacketTunnelProvider {
       return defaults.bool(forKey: key)
     }
     if let suite = UserDefaults(suiteName: appGroupId),
-       suite.object(forKey: "residual_ipv4") != nil
-         || suite.object(forKey: "residual_ipv6") != nil {
-      return (dualOn(suite, "residual_ipv4"), dualOn(suite, "residual_ipv6"))
+       suite.object(forKey: "residual_ipv6") != nil {
+      return (true, dualOn(suite, "residual_ipv6"))
     }
     let std = UserDefaults.standard
-    return (dualOn(std, "residual_ipv4"), dualOn(std, "residual_ipv6"))
+    return (true, dualOn(std, "residual_ipv6"))
   }
 
   /// Store vpnIp so handleAppMessage / host can return criterion-3 maps.

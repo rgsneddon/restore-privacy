@@ -1,8 +1,10 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:restore_privacy_client/connect_status.dart';
 import 'package:restore_privacy_client/settings_store.dart';
 
 void main() {
-  test('defaults: startup off, privacy-scale lean off, dual-stack ON, US entry', () {
+  test('defaults: startup off, privacy-scale lean off, IPv4 always on, IPv6 ON, DE entry',
+      () {
     const s = ProductSettings.defaults;
     expect(s.runAtStartup, isFalse);
     expect(s.autoconnectOnLaunch, isFalse);
@@ -10,8 +12,9 @@ void main() {
     expect(s.privacyOuterObfuscation, isFalse);
     expect(s.privacyMultihop, isFalse);
     expect(s.residualIpv4, isTrue);
+    expect(s.residualIpv4, kResidualIpv4AlwaysOn);
     expect(s.residualIpv6, isTrue);
-    expect(s.entryCountry, 'US');
+    expect(s.entryCountry, 'DE');
   });
 
   test('save and load roundtrip via real SettingsStore API', () async {
@@ -24,13 +27,11 @@ void main() {
     final loaded = await store.load();
     expect(loaded.runAtStartup, isTrue);
     expect(loaded.autoconnectOnLaunch, isTrue);
-    // Privacy lean-off defaults when never written for shape/obfs/multihop
-    // (save writes explicit false for those fields from ProductSettings ctor defaults)
     expect(loaded.privacyTrafficShape, isFalse);
     expect(loaded.privacyOuterObfuscation, isFalse);
     expect(loaded.privacyMultihop, isFalse);
+    expect(loaded.residualIpv4, isTrue);
 
-    // Simulate process restart: new store, same backend map
     final store2 = SettingsStore(MemorySettingsBackend(shared));
     final again = await store2.load();
     expect(again.runAtStartup, isTrue);
@@ -44,7 +45,8 @@ void main() {
     expect(third.autoconnectOnLaunch, isTrue);
   });
 
-  test('missing keys load as lean-off privacy + dual-stack ON', () async {
+  test('missing keys load as lean-off privacy + IPv4 always on + IPv6 ON',
+      () async {
     final empty = SettingsStore(MemorySettingsBackend({}));
     final loaded = await empty.load();
     expect(loaded.runAtStartup, isFalse);
@@ -54,31 +56,49 @@ void main() {
     expect(loaded.privacyMultihop, isFalse);
     expect(loaded.residualIpv4, isTrue);
     expect(loaded.residualIpv6, isTrue);
-    expect(loaded.entryCountry, 'US');
+    expect(loaded.entryCountry, 'DE');
   });
 
-  test('residual IPv4 always ON; IPv6 remains adjustable', () async {
-    final shared = <String, dynamic>{};
+  test('residual IPv4 always ON even when stale false key is stored', () async {
+    final shared = <String, dynamic>{
+      kKeyResidualIpv4: false,
+      kKeyResidualIpv6: true,
+    };
     final store = SettingsStore(MemorySettingsBackend(shared));
-    // Attempt to save residualIpv4: false — product policy forces true.
-    await store.save(
-      const ProductSettings(residualIpv4: false, residualIpv6: true),
-    );
     final loaded = await store.load();
     expect(loaded.residualIpv4, isTrue);
     expect(loaded.residualIpv6, isTrue);
+
+    // copyWith cannot turn IPv4 off.
+    final forced = loaded.copyWith(residualIpv4: false, residualIpv6: false);
+    expect(forced.residualIpv4, isTrue);
+    expect(forced.residualIpv6, isFalse);
+
+    await store.save(forced);
     expect(shared[kKeyResidualIpv4], isTrue);
-    expect(shared[kKeyResidualIpv6], isTrue);
-    // Legacy false on disk still loads as ON
-    shared[kKeyResidualIpv4] = false;
-    final legacy = await SettingsStore(MemorySettingsBackend(shared)).load();
-    expect(legacy.residualIpv4, isTrue);
+    expect(shared[kKeyResidualIpv6], isFalse);
+    final again = await store.load();
+    expect(again.residualIpv4, isTrue);
+    expect(again.residualIpv6, isFalse);
+  });
+
+  test('residual IPv6 toggle roundtrip while IPv4 stays always on', () async {
+    final shared = <String, dynamic>{};
+    final store = SettingsStore(MemorySettingsBackend(shared));
     await store.save(
-      const ProductSettings(residualIpv4: true, residualIpv6: false),
+      const ProductSettings(residualIpv6: false),
+    );
+    final loaded = await store.load();
+    expect(loaded.residualIpv4, isTrue);
+    expect(loaded.residualIpv6, isFalse);
+    expect(shared[kKeyResidualIpv4], isTrue);
+    expect(shared[kKeyResidualIpv6], isFalse);
+    await store.save(
+      const ProductSettings(residualIpv6: true),
     );
     final again = await SettingsStore(MemorySettingsBackend(shared)).load();
     expect(again.residualIpv4, isTrue);
-    expect(again.residualIpv6, isFalse);
+    expect(again.residualIpv6, isTrue);
   });
 
   test('privacy-scale prefs roundtrip (Windows parity keys)', () async {
@@ -89,18 +109,18 @@ void main() {
         privacyTrafficShape: true,
         privacyOuterObfuscation: true,
         privacyMultihop: true,
-        entryCountry: 'RO',
+        entryCountry: 'US',
       ),
     );
     final loaded = await store.load();
     expect(loaded.privacyTrafficShape, isTrue);
     expect(loaded.privacyOuterObfuscation, isTrue);
     expect(loaded.privacyMultihop, isTrue);
-    expect(loaded.entryCountry, 'RO');
+    expect(loaded.entryCountry, 'US');
     expect(shared[kKeyPrivacyTrafficShape], isTrue);
     expect(shared[kKeyPrivacyOuterObfuscation], isTrue);
     expect(shared[kKeyPrivacyMultihop], isTrue);
-    expect(shared[kKeyEntryCountry], 'RO');
+    expect(shared[kKeyEntryCountry], 'US');
   });
 
   test('shouldAutoconnect helpers', () {
@@ -119,5 +139,50 @@ void main() {
       store.shouldRunAtStartup(const ProductSettings(runAtStartup: true)),
       isTrue,
     );
+  });
+
+  test('product Settings path: IPv4 always on + residual IPv6 ON/OFF honesty',
+      () async {
+    final shared = <String, dynamic>{};
+    final store = SettingsStore(MemorySettingsBackend(shared));
+    await store.save(
+      const ProductSettings(residualIpv6: false),
+    );
+    final s = await store.load();
+    expect(s.residualIpv4, isTrue);
+    expect(s.residualIpv6, isFalse);
+    final map = buildFullTunnelConnectResult(
+      packetTunnelActive: true,
+      vpnIp: '10.88.0.40',
+      ipv6Protected: s.residualIpv6,
+      ipv4Residual: s.residualIpv4,
+    );
+    final msg = mapConnectStatusMessage(map);
+    expect(msg.toLowerCase(), contains('ipv6 not protected'));
+    expect(msg.toLowerCase(), isNot(contains('path blocked')));
+    expect(msg.toLowerCase(), isNot(contains('ipv4 residual off')));
+    expect(msg.toLowerCase(), isNot(contains('dual-stack off')));
+
+    await store.save(const ProductSettings(residualIpv6: true));
+    final on = await store.load();
+    final mapOn = buildFullTunnelConnectResult(
+      packetTunnelActive: true,
+      vpnIp: '10.88.0.41',
+      ipv6Protected: on.residualIpv6,
+      ipv4Residual: on.residualIpv4,
+    );
+    final msgOn = mapConnectStatusMessage(mapOn);
+    expect(msgOn.toLowerCase(), contains('ipv6 isp path blocked'));
+    expect(msgOn.toLowerCase(), isNot(contains('ipv6 not protected')));
+
+    // Connect UI path uses always-on IPv4.
+    final ui = resolveConnectedStatusAfterSuccess(
+      nativeStatus: msg,
+      vpnIp: '10.88.0.40',
+      residualIpv4: kResidualIpv4AlwaysOn,
+      residualIpv6: s.residualIpv6,
+    );
+    expect(ui.toLowerCase(), contains('ipv6 not protected'));
+    expect(ui.toLowerCase(), isNot(contains('ipv4 residual off')));
   });
 }

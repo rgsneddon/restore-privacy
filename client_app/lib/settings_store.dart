@@ -3,9 +3,9 @@
 /// Defaults: startup prefs **off**. Privacy-scale lean residual: traffic
 /// shaping, outer obfuscation, and multi-hop all **off** until the user opts
 /// in (matches Windows/Linux product policy). Residual VPN core stays always-on.
-/// Residual **IPv4** is always ON (not user-adjustable). Residual **IPv6**
-/// defaults ON and remains adjustable.
-/// Entry country defaults to United States (`US`) on every client.
+/// Residual **IPv4** capture is **always ON** (not user-adjustable). Residual
+/// **IPv6** remains user-toggleable (default ON).
+/// Entry country defaults to Germany (`DE`) on every client.
 library;
 
 import 'country_select.dart';
@@ -15,11 +15,14 @@ const String kKeyAutoconnectOnLaunch = 'autoconnect_on_launch';
 const String kKeyPrivacyTrafficShape = 'privacy_traffic_shape';
 const String kKeyPrivacyOuterObfuscation = 'privacy_outer_obfuscation';
 const String kKeyPrivacyMultihop = 'privacy_multihop';
-/// Residual IPv4 full-tunnel capture (dual /1). Always ON (product policy).
+/// Residual IPv4 full-tunnel capture (dual /1). Product always ON (key kept for migrate).
 const String kKeyResidualIpv4 = 'residual_ipv4';
 /// Residual IPv6 ISP-leak protection while residual is up. Default ON when unset.
 const String kKeyResidualIpv6 = 'residual_ipv6';
 const String kKeyEntryCountry = 'entry_country';
+
+/// Product policy: residual IPv4 capture is never user-off.
+const bool kResidualIpv4AlwaysOn = true;
 
 class ProductSettings {
   final bool runAtStartup;
@@ -27,11 +30,11 @@ class ProductSettings {
   final bool privacyTrafficShape;
   final bool privacyOuterObfuscation;
   final bool privacyMultihop;
-  /// Residual IPv4 capture path (full-tunnel dual /1). Always ON (product policy).
+  /// Residual IPv4 capture path (full-tunnel dual /1). Always true (product constant).
   final bool residualIpv4;
   /// Residual IPv6 ISP path block while residual is up. Product default ON.
   final bool residualIpv6;
-  /// Catalog entry country code (US / IS / RO); default United States/US.
+  /// Catalog entry country code (DE / IS / US); default Germany/DE.
   final String entryCountry;
 
   const ProductSettings({
@@ -40,11 +43,11 @@ class ProductSettings {
     this.privacyTrafficShape = false,
     this.privacyOuterObfuscation = false,
     this.privacyMultihop = false,
-    // residualIpv4 ignored for policy — always treated as true by load/save.
-    this.residualIpv4 = true,
+    /// Ignored for product path — always forced to [kResidualIpv4AlwaysOn].
+    bool residualIpv4 = true,
     this.residualIpv6 = true,
     this.entryCountry = kDefaultEntryCountry,
-  });
+  }) : residualIpv4 = kResidualIpv4AlwaysOn;
 
   static const ProductSettings defaults = ProductSettings();
 
@@ -65,8 +68,8 @@ class ProductSettings {
       privacyOuterObfuscation:
           privacyOuterObfuscation ?? this.privacyOuterObfuscation,
       privacyMultihop: privacyMultihop ?? this.privacyMultihop,
-      // IPv4 residual is product-forced ON (ignore residualIpv4: false).
-      residualIpv4: true,
+      // residualIpv4 always forced ON in constructor (argument ignored)
+      residualIpv4: kResidualIpv4AlwaysOn,
       residualIpv6: residualIpv6 ?? this.residualIpv6,
       entryCountry: entryCountry != null
           ? normalizeEntryCountry(entryCountry)
@@ -80,14 +83,14 @@ class ProductSettings {
         kKeyPrivacyTrafficShape: privacyTrafficShape,
         kKeyPrivacyOuterObfuscation: privacyOuterObfuscation,
         kKeyPrivacyMultihop: privacyMultihop,
-        kKeyResidualIpv4: true,
+        kKeyResidualIpv4: kResidualIpv4AlwaysOn,
         kKeyResidualIpv6: residualIpv6,
         kKeyEntryCountry: normalizeEntryCountry(entryCountry),
       };
 
   factory ProductSettings.fromJson(Map<String, dynamic>? data) {
     if (data == null) return defaults;
-    // IPv6: missing key → ON; IPv4 always ON (legacy false ignored).
+    // Residual IPv6: missing key → ON
     bool dualOn(Object? v) => v != false;
     return ProductSettings(
       runAtStartup: data[kKeyRunAtStartup] == true,
@@ -95,7 +98,8 @@ class ProductSettings {
       privacyTrafficShape: data[kKeyPrivacyTrafficShape] == true,
       privacyOuterObfuscation: data[kKeyPrivacyOuterObfuscation] == true,
       privacyMultihop: data[kKeyPrivacyMultihop] == true,
-      residualIpv4: true,
+      // Always-on product policy (ignore stale false keys).
+      residualIpv4: kResidualIpv4AlwaysOn,
       residualIpv6: !data.containsKey(kKeyResidualIpv6) || dualOn(data[kKeyResidualIpv6]),
       entryCountry: normalizeEntryCountry(
         data[kKeyEntryCountry]?.toString(),
@@ -155,7 +159,6 @@ class SettingsStore {
     final shape = await backend.getBool(kKeyPrivacyTrafficShape);
     final obfs = await backend.getBool(kKeyPrivacyOuterObfuscation);
     final mh = await backend.getBool(kKeyPrivacyMultihop);
-    // residual_ipv4 key may still exist in storage; product policy always ON.
     final ipv6 = await backend.getBool(kKeyResidualIpv6);
     final entry = await backend.getString(kKeyEntryCountry);
     return ProductSettings(
@@ -164,9 +167,8 @@ class SettingsStore {
       privacyTrafficShape: shape == true,
       privacyOuterObfuscation: obfs == true,
       privacyMultihop: mh == true,
-      // Product policy: residual IPv4 always ON (legacy false ignored).
-      residualIpv4: true,
-      // null (missing) → product default ON for IPv6
+      // Residual IPv4 is always ON (ignore stale false prefs).
+      residualIpv4: kResidualIpv4AlwaysOn,
       residualIpv6: ipv6 != false,
       entryCountry: normalizeEntryCountry(entry),
     );
@@ -181,8 +183,8 @@ class SettingsStore {
       settings.privacyOuterObfuscation,
     );
     await backend.setBool(kKeyPrivacyMultihop, settings.privacyMultihop);
-    // Always persist residual IPv4 ON (product policy).
-    await backend.setBool(kKeyResidualIpv4, true);
+    // Always persist residual IPv4 ON so stale false cannot disable capture.
+    await backend.setBool(kKeyResidualIpv4, kResidualIpv4AlwaysOn);
     await backend.setBool(kKeyResidualIpv6, settings.residualIpv6);
     await backend.setString(
       kKeyEntryCountry,

@@ -1,37 +1,28 @@
-# Windows handoff — Restore Privacy **0.5.6**
+﻿# Windows handoff — Restore Privacy **0.5.6**
 
 Catalog monopin: **0.5.6**
 
-| Platform | Package | Notes |
-|----------|---------|--------|
-| Windows | `restore-privacy-client-0.5.6-windows-x64-setup.exe` | **native** multihop PE — US residual pin (`us_node_elgamal.pub`), lean residual defaults |
-| Android | `restore-privacy-client-0.5.6-android.apk` | **native** Flutter rebuild — residual wire + US pin |
-| Linux | `restore-privacy-client-0.5.6-linux-x64.tar.gz` | catalog pin with IS/RO/US pubs |
-| macOS / iOS | not sealed on this host for 0.5.6 | Apple residual seal separate |
+## Split ship (0.5.6)
 
-## Build
+| Platform | Who | File / host path |
+|----------|-----|------------------|
+| **macOS / iOS / Linux** | Mac | Helsinki `paid_assets/0.5.6/…-macos.zip`, `…-ios.zip`, `…-linux-x64.tar.gz` (already hosted from Darwin) |
+| **Windows / Android** | **This Windows machine** | Native PE + APK → re-upload same monopin basenames |
 
-```text
-python scripts\build_windows_multihop.py
-# or
+Do **not** leave Darwin carry-forward Win/Android as the final paid seal.
+
+## Build + host (Windows machine)
+
+```powershell
 python scripts\build_release_0.5.6.py --windows-only
+# Android native APK when ready, then:
+$env:RPT_SSH_HOST="135.181.152.10"
+$env:RPT_SSH_USER="root"
+$env:RPT_SSH_KEY="$HOME\.ssh\id_ed25519_restore_privacy_eu"   # or store key that works as root@Helsinki
+python scripts\host_paid_assets_vps.py --stage --upload --version 0.5.6 --force
 ```
 
-Android:
+## Fixes carried in monopin 0.5.6 tree
 
-```text
-cd client_app
-flutter build apk --release
-copy build\app\outputs\flutter-apk\app-release.apk ..\releases\0.5.6\restore-privacy-client-0.5.6-android.apk
-```
-
-## Host
-
-```text
-python scripts\host_paid_assets_vps.py --stage --upload --version 0.5.6 --force --allow-missing
-```
-
-## App testers (unlinked)
-
-Direct URL only: `https://restoreprivacy.online/app-testers`  
-Not linked from homepage/downloads/footer. Licence accept → one package → KEYGEN + download. Second package refused.
+- Connect: `client.windows.hidden_subprocess` (configure_address)
+- Settings: IPv4 residual + IPv6 residual are the **top** switches in privacy scale

@@ -14,6 +14,7 @@ from dataclasses import dataclass
 from typing import Any, Sequence
 
 from .multihop import (
+    COUNTRY_DE,
     COUNTRY_IS,
     COUNTRY_RO,
     COUNTRY_US,
@@ -24,11 +25,13 @@ from .multihop import (
     product_country_catalog,
 )
 
-# Regional-indicator flag sequences (IS / RO / US). Safe as unicode text.
+# Regional-indicator flag sequences (IS / DE / US). Safe as unicode text.
 _FLAG_BY_CODE: dict[str, str] = {
     COUNTRY_IS: "\U0001f1ee\U0001f1f8",  # 🇮🇸
-    COUNTRY_RO: "\U0001f1f7\U0001f1f4",  # 🇷🇴
+    COUNTRY_DE: "\U0001f1e9\U0001f1ea",  # 🇩🇪
     COUNTRY_US: "\U0001f1fa\U0001f1f8",  # 🇺🇸
+    # Retired RO flag kept for any legacy admin display only
+    COUNTRY_RO: "\U0001f1f7\U0001f1f4",  # 🇷🇴
 }
 
 
@@ -100,14 +103,19 @@ def parse_catalog_country_code(
     aliases = {
         "ICELAND": COUNTRY_IS,
         "IS": COUNTRY_IS,
-        "ROMANIA": COUNTRY_RO,
-        "RO": COUNTRY_RO,
-        "ROU": COUNTRY_RO,
+        "GERMANY": COUNTRY_DE,
+        "DE": COUNTRY_DE,
+        "DEU": COUNTRY_DE,
+        "DEUTSCHLAND": COUNTRY_DE,
         "UNITED STATES": COUNTRY_US,
         "UNITED STATES OF AMERICA": COUNTRY_US,
         "USA": COUNTRY_US,
         "US": COUNTRY_US,
         "AMERICA": COUNTRY_US,
+        # Stale RO is not a catalog member (normalize maps RO → DE)
+        "ROMANIA": COUNTRY_RO,
+        "RO": COUNTRY_RO,
+        "ROU": COUNTRY_RO,
     }
     want = aliases.get(upper, upper)
     if want in codes:
@@ -119,12 +127,14 @@ def parse_catalog_country_code(
 
 
 def default_entry_country() -> str:
-    """Product default entry: United States (US) on every client."""
+    """Product default entry: Germany (DE) on every client."""
     return DEFAULT_ENTRY_COUNTRY
 
 
 def default_entry_reason() -> str:
     """Reason token when empty selection falls back to product default."""
+    if DEFAULT_ENTRY_COUNTRY == COUNTRY_DE:
+        return "default_germany"
     if DEFAULT_ENTRY_COUNTRY == COUNTRY_US:
         return "default_united_states"
     if DEFAULT_ENTRY_COUNTRY == COUNTRY_IS:

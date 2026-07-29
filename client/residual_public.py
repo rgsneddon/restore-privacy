@@ -18,10 +18,11 @@ from typing import Any, Mapping, Optional, Sequence
 # Listed here as well so redaction works even if multihop import fails on status host.
 _FALLBACK_MONOPIN_HOSTS: tuple[str, ...] = (
     "82.221.101.241",  # IS
-    "185.146.232.107",  # RO
+    "178.105.187.178",  # DE
     "5.161.242.85",  # US
-    # Retired DE monopin — still redact if it appears in old logs/strings
-    "167.233.224.5",
+    # Retired monopin hosts — still redact if they appear in old logs/strings
+    "185.146.232.107",  # former RO
+    "167.233.224.5",  # former DE
 )
 
 # IPv4 dotted-quad (for generic residual host redaction when known monopin).

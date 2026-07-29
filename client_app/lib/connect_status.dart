@@ -34,18 +34,53 @@ String statusCardTitle({
   String? vpnIp,
   bool residual = true,
   bool? ipv6Protected,
+  bool? ipv4Residual,
 }) {
   if (connected) {
     return plainConnectedStatus(
       vpnIp: vpnIp,
       residual: residual,
       ipv6Protected: ipv6Protected,
+      ipv4Residual: ipv4Residual,
     );
   }
   if (busyConnecting) {
     return kConnectingTitle;
   }
   return 'Disconnected';
+}
+
+/// True when a status line already encodes dual-stack residual honesty
+/// (IPv6 path blocked / not protected, IPv4 residual off, dual-stack off).
+bool isDualStackHonestConnectedMessage(String message) {
+  final low = message.toLowerCase();
+  if (low.isEmpty) return false;
+  return low.contains('ipv6') ||
+      low.contains('dual-stack') ||
+      low.contains('residual off');
+}
+
+/// Resolve Connected card status after product Connect success (UI path).
+///
+/// Prefer an already-honest native channel message (from
+/// [mapConnectStatusMessage]); otherwise build dual-stack honesty from the
+/// product Settings residual switches used for that session.
+String resolveConnectedStatusAfterSuccess({
+  required String nativeStatus,
+  String? vpnIp,
+  required bool residualIpv4,
+  required bool residualIpv6,
+}) {
+  final ipMatch = RegExp(r'10\.\d+\.\d+\.\d+').firstMatch(nativeStatus);
+  final ip = (vpnIp ?? ipMatch?.group(0) ?? '').trim();
+  if (isDualStackHonestConnectedMessage(nativeStatus)) {
+    return nativeStatus;
+  }
+  return connectedHonestyMessage(
+    vpnIp: ip.isEmpty ? null : ip,
+    ipv4Residual: residualIpv4,
+    ipv6Protected: residualIpv6,
+  );
 }
 
 /// Short card title while the native VPN is still coming up.
@@ -133,24 +168,25 @@ String mapConnectStatusMessage(dynamic result) {
   final ok = isConnectSuccess(result);
   if (ok) {
     final ip = result['vpnIp']?.toString().trim() ?? '';
-    // Prefer explicit native honesty about IPv6 when present
+    // Prefer explicit native honesty about dual-stack residual when present.
     final v6 = result['ipv6Protected'];
-    if (v6 == false) {
-      if (message.toLowerCase().contains('ipv6 not protected')) {
+    final v4 = result['ipv4Residual'];
+    if (v6 is bool || v4 is bool) {
+      final ipv6On = v6 is bool ? v6 : true;
+      final ipv4On = v4 is bool ? v4 : true;
+      final low = message.toLowerCase();
+      // Keep an already-honest dual-stack message from native.
+      if (message.isNotEmpty &&
+          (low.contains('ipv6') ||
+              low.contains('dual-stack') ||
+              low.contains('residual off'))) {
         return message;
       }
-      return ip.isNotEmpty
-          ? 'Connected — IPv4 via VPN; IPv6 not protected ($ip)'
-          : 'Connected — IPv4 via VPN; IPv6 not protected';
-    }
-    if (v6 == true) {
-      if (message.toLowerCase().contains('ipv6 isp path blocked') ||
-          message.toLowerCase().contains('ipv6')) {
-        return message.isNotEmpty ? message : 'Connected — VPN active; IPv6 ISP path blocked';
-      }
-      return ip.isNotEmpty
-          ? 'Connected — VPN active; IPv6 ISP path blocked ($ip)'
-          : 'Connected — VPN active; IPv6 ISP path blocked';
+      return connectedHonestyMessage(
+        vpnIp: ip.isEmpty ? null : ip,
+        ipv4Residual: ipv4On,
+        ipv6Protected: ipv6On,
+      );
     }
     if (message.isNotEmpty && ip.isNotEmpty) {
       return message.contains(ip) ? message : '$message (VPN IP $ip)';
@@ -438,6 +474,27 @@ bool shouldShowOpenVpnSettingsControl({
   return isNeVpnPermissionFailureMessage(statusMessage);
 }
 
+/// Honest Connected card line from session dual-stack residual flags.
+/// Never claims "IPv6 ISP path blocked" when residual IPv6 protection is off.
+String connectedHonestyMessage({
+  String? vpnIp,
+  bool ipv4Residual = true,
+  bool ipv6Protected = true,
+}) {
+  final ip = (vpnIp ?? '').trim();
+  final suffix = ip.isEmpty ? '' : ' ($ip)';
+  if (ipv4Residual && ipv6Protected) {
+    return 'Connected — VPN active; IPv6 ISP path blocked$suffix';
+  }
+  if (ipv4Residual && !ipv6Protected) {
+    return 'Connected — IPv4 via VPN; IPv6 not protected$suffix';
+  }
+  if (!ipv4Residual && ipv6Protected) {
+    return 'Connected — IPv4 residual off; IPv6 ISP path blocked$suffix';
+  }
+  return 'Connected — residual dual-stack off$suffix';
+}
+
 /// Build a product connect result map for full-tunnel honesty rules.
 /// Pure helper — used by tests and documents the contract native channels must match.
 Map<String, dynamic> buildFullTunnelConnectResult({
@@ -450,23 +507,25 @@ Map<String, dynamic> buildFullTunnelConnectResult({
   /// Default true matches Apple residual success after protection is applied.
   /// Pass false only when protection was not installed.
   bool ipv6Protected = true,
+  /// Full IPv4 residual capture. Default true; false = session/tunnel IP only.
+  bool ipv4Residual = true,
 }) {
   if (packetTunnelActive && !hostOnlyHello) {
     final ip = (vpnIp ?? '').trim();
     final detail = (detailMessage ?? '').trim();
+    final detailLow = detail.toLowerCase();
     final String base;
-    if (detail.isNotEmpty && detail.toLowerCase().contains('ipv6')) {
-      base = detail;
-    } else if (ipv6Protected) {
-      base = ip.isNotEmpty
-          ? 'Connected — VPN active; IPv6 ISP path blocked ($ip)'
-          : 'Connected — VPN active; IPv6 ISP path blocked';
-    } else if (detail.isNotEmpty) {
+    if (detail.isNotEmpty &&
+        (detailLow.contains('ipv6') ||
+            detailLow.contains('dual-stack') ||
+            detailLow.contains('residual off'))) {
       base = detail;
     } else {
-      base = ip.isNotEmpty
-          ? 'Connected — IPv4 via VPN; IPv6 not protected ($ip)'
-          : 'Connected — IPv4 via VPN; IPv6 not protected';
+      base = connectedHonestyMessage(
+        vpnIp: ip.isEmpty ? null : ip,
+        ipv4Residual: ipv4Residual,
+        ipv6Protected: ipv6Protected,
+      );
     }
     return {
       'ok': true,
@@ -474,6 +533,7 @@ Map<String, dynamic> buildFullTunnelConnectResult({
       'fullTunnelActive': true,
       'hostOnlySession': false,
       'ipv6Protected': ipv6Protected,
+      'ipv4Residual': ipv4Residual,
       if (ip.isNotEmpty) 'vpnIp': ip,
     };
   }

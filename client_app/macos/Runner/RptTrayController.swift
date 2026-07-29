@@ -49,6 +49,11 @@ enum RptTrayController {
     !trayMode
   }
 
+  /// True while menu-bar tray keep-alive is active (hide-to-tray / connected).
+  static var isTrayMode: Bool { trayMode }
+
+  private static var statusMenu: NSMenu?
+
   private static func ensureStatusItem() {
     if statusItem != nil { return }
     let item = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
@@ -60,7 +65,12 @@ enum RptTrayController {
         button.imagePosition = .imageLeading
       }
       button.title = " RP"
-      button.toolTip = "Restore Privacy"
+      button.toolTip = "Restore Privacy — click to show window"
+      // Left-click restores window; right-click / Ctrl-click shows menu.
+      // (Assigning item.menu would steal left-click and only open the menu.)
+      button.target = StatusMenuTarget.shared
+      button.action = #selector(StatusMenuTarget.statusItemClicked(_:))
+      button.sendAction(on: [.leftMouseUp, .rightMouseUp])
     }
     let menu = NSMenu()
     menu.addItem(NSMenuItem(
@@ -79,12 +89,12 @@ enum RptTrayController {
       action: #selector(StatusMenuTarget.quitApp(_:)),
       keyEquivalent: "q"
     ))
-    // Target must outlive menu — use shared singleton target.
     let target = StatusMenuTarget.shared
-    for item in menu.items where item.action != nil {
-      item.target = target
+    for mi in menu.items where mi.action != nil {
+      mi.target = target
     }
-    item.menu = menu
+    statusMenu = menu
+    // Do not set item.menu — left-click must call statusItemClicked → showMainWindow.
     statusItem = item
   }
 
@@ -100,19 +110,43 @@ enum RptTrayController {
 
   private static func hideMainWindow() {
     for window in NSApp.windows {
+      // Prefer orderOut so the window instance survives (not destroyed).
       window.orderOut(nil)
     }
     // Keep dock icon; user restores via tray or dock.
     NSApp.hide(nil)
   }
 
+  /// Restore the main Flutter window after hide-to-tray or minimize.
+  /// Does **not** stop the Packet Tunnel (product: Disconnect only).
   static func showMainWindow() {
+    // Keep tray mode so last-window-close still does not quit while connected UX remains.
     NSApp.unhide(nil)
     NSApp.activate(ignoringOtherApps: true)
-    if let window = NSApp.windows.first(where: { $0 is MainFlutterWindow })
-      ?? NSApp.windows.first {
+
+    // Prefer MainFlutterWindow; fall back to any app window (dialogs, etc.).
+    let flutterWindows = NSApp.windows.filter { $0 is MainFlutterWindow }
+    let targets: [NSWindow] = flutterWindows.isEmpty ? Array(NSApp.windows) : flutterWindows
+
+    if targets.isEmpty {
+      // No window object left — nothing to order front (should not happen after orderOut hide).
+      return
+    }
+
+    for window in targets {
+      if window.isMiniaturized {
+        window.deminiaturize(nil)
+      }
+      // Ensure non-visible / ordered-out windows return to the screen.
+      if !window.isVisible {
+        window.orderFrontRegardless()
+      }
       window.makeKeyAndOrderFront(nil)
       window.orderFrontRegardless()
+      // Focus the content view for keyboard input.
+      if let content = window.contentView {
+        window.makeFirstResponder(content)
+      }
     }
   }
 
@@ -128,11 +162,34 @@ enum RptTrayController {
     channel.invokeMethod("trayShow", arguments: nil)
   }
 
-  /// Menu target for NSStatusItem actions.
+  /// Menu / status-item target for NSStatusItem actions.
   final class StatusMenuTarget: NSObject {
     static let shared = StatusMenuTarget()
 
+    @objc func statusItemClicked(_ sender: Any?) {
+      guard let event = NSApp.currentEvent else {
+        showWindow(sender)
+        return
+      }
+      // Right-click or control-click → menu (Disconnect / Quit).
+      if event.type == .rightMouseUp
+        || event.modifierFlags.contains(.control) {
+        if let button = RptTrayController.statusItem?.button,
+           let menu = RptTrayController.statusMenu {
+          menu.popUp(
+            positioning: nil,
+            at: NSPoint(x: 0, y: button.bounds.height),
+            in: button
+          )
+        }
+        return
+      }
+      // Left-click → restore main window (primary user path).
+      showWindow(sender)
+    }
+
     @objc func showWindow(_ sender: Any?) {
+      // Native must deminiaturize/order-front; Flutter only rehydrates UI state.
       RptTrayController.showMainWindow()
       RptTrayController.requestFlutterShow()
     }

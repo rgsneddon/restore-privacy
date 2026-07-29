@@ -24,10 +24,15 @@ class ResidualPubError(Exception):
 # Catalog monopin → public pin basename (same as Flutter residualNodePubNameForHost)
 def residual_node_pub_name_for_host(host: str) -> str:
     h = (host or "").strip()
-    if h == "185.146.232.107" or h.endswith("185.146.232.107"):
-        return "exit_node_elgamal.pub"
+    if h == "178.105.187.178" or h.endswith("178.105.187.178"):
+        return "de_node_elgamal.pub"
     if h == "5.161.242.85" or h.endswith("5.161.242.85"):
         return "us_node_elgamal.pub"
+    # Stale RO host: exit pin file now holds DE public material
+    if h == "185.146.232.107" or h.endswith("185.146.232.107"):
+        return "exit_node_elgamal.pub"
+    if h == "82.221.101.241" or h.endswith("82.221.101.241"):
+        return "node_elgamal.pub"
     return "node_elgamal.pub"
 
 
@@ -110,9 +115,11 @@ def load_residual_node_pub(
     return data
 
 
-# Catalog public pin basenames (IS / RO / US) — never private keys.
+# Catalog public pin basenames (IS / DE / US) — never private keys.
+# exit_node_elgamal.pub mirrors DE pin for multi-hop residual-via-exit.
 CATALOG_PUBLIC_PUBS: tuple[str, ...] = (
     "node_elgamal.pub",
+    "de_node_elgamal.pub",
     "exit_node_elgamal.pub",
     "us_node_elgamal.pub",
 )

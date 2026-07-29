@@ -3,7 +3,8 @@
 
 Copies **public** ElGamal keys only:
   - ``node_elgamal.pub`` (Iceland residual)
-  - ``exit_node_elgamal.pub`` (Romania residual)
+  - ``de_node_elgamal.pub`` (Germany residual / default entry)
+  - ``exit_node_elgamal.pub`` (multi-hop exit; DE pin material)
   - ``us_node_elgamal.pub`` (United States residual)
 
 Never copies a shared ``client_ed25519.priv`` or ``node_elgamal.priv``.
@@ -28,9 +29,10 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 CLIENT_PRIV = "client_ed25519.priv"
 NODE_PUB = "node_elgamal.pub"
+DE_PUB = "de_node_elgamal.pub"
 EXIT_PUB = "exit_node_elgamal.pub"
 US_PUB = "us_node_elgamal.pub"
-PUBLIC_PUBS = (NODE_PUB, EXIT_PUB, US_PUB)
+PUBLIC_PUBS = (NODE_PUB, DE_PUB, EXIT_PUB, US_PUB)
 FORBIDDEN = "node_elgamal.priv"
 
 
@@ -78,7 +80,7 @@ def _inject_into_secrets_dir(dest: Path, source: Path) -> None:
         if src is None:
             if name == NODE_PUB:
                 raise FileNotFoundError(f"missing required {NODE_PUB}")
-            print(f"warn: missing {name} (RO/US residual HELLO will fail closed)")
+            print(f"warn: missing {name} (DE/US residual HELLO will fail closed)")
             continue
         dst = dest / name
         shutil.copy2(src, dst)

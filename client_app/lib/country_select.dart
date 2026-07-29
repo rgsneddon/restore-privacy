@@ -1,15 +1,15 @@
-/// Entry-country selector helpers (flags, United States/US default, Connect gate).
+/// Entry-country selector helpers (flags, Germany/DE default, Connect gate).
 ///
-/// Catalog mirrors [client/multihop.py] PRODUCT_COUNTRY_CATALOG (IS/RO/US).
+/// Catalog mirrors [client/multihop.py] PRODUCT_COUNTRY_CATALOG (IS/DE/US).
 library;
 
 /// Product default residual entry (empty prefs / fresh install).
-const String kDefaultEntryCountry = 'US';
+const String kDefaultEntryCountry = 'DE';
 const String kCountryIceland = 'IS';
-const String kCountryRomania = 'RO';
-const String kCountryUnitedStates = 'US';
-/// Retired residual peer code — [normalizeEntryCountry] maps DE → default US.
 const String kCountryGermany = 'DE';
+const String kCountryUnitedStates = 'US';
+/// Retired residual peer code — [normalizeEntryCountry] maps RO → default DE.
+const String kCountryRomania = 'RO';
 
 /// Product residual entry peers (code, name, flag emoji, monopin host).
 class CountryOption {
@@ -41,10 +41,10 @@ const List<CountryOption> kProductCountryCatalog = [
     host: '82.221.101.241',
   ),
   CountryOption(
-    code: kCountryRomania,
-    name: 'Romania',
-    flag: '🇷🇴',
-    host: '185.146.232.107',
+    code: kCountryGermany,
+    name: 'Germany',
+    flag: '🇩🇪',
+    host: '178.105.187.178',
   ),
   CountryOption(
     code: kCountryUnitedStates,
@@ -56,23 +56,23 @@ const List<CountryOption> kProductCountryCatalog = [
 
 String defaultEntryCountry() => kDefaultEntryCountry;
 
-/// Strict parse — unknown/empty/stale DE → null (does not default).
+/// Strict parse — unknown/empty/stale RO → null (does not default).
 String? parseCatalogCountryCode(String? raw) {
   final upper = (raw ?? '').trim().toUpperCase();
   if (upper.isEmpty) return null;
-  // Stale DE prefs are not a catalog member
-  if (upper == 'DE' ||
-      upper == 'GERMANY' ||
-      upper == 'DEU' ||
-      upper == 'DEUTSCHLAND') {
+  // Stale RO prefs are not a catalog member
+  if (upper == 'RO' ||
+      upper == 'ROMANIA' ||
+      upper == 'ROU') {
     return null;
   }
   const aliases = {
     'ICELAND': kCountryIceland,
     'IS': kCountryIceland,
-    'ROMANIA': kCountryRomania,
-    'RO': kCountryRomania,
-    'ROU': kCountryRomania,
+    'GERMANY': kCountryGermany,
+    'DE': kCountryGermany,
+    'DEU': kCountryGermany,
+    'DEUTSCHLAND': kCountryGermany,
     'UNITED STATES': kCountryUnitedStates,
     'UNITED STATES OF AMERICA': kCountryUnitedStates,
     'USA': kCountryUnitedStates,
@@ -86,7 +86,7 @@ String? parseCatalogCountryCode(String? raw) {
   return null;
 }
 
-/// Normalize: empty/unknown/stale DE → United States/US (durable prefs default).
+/// Normalize: empty/unknown/stale RO → Germany/DE (durable prefs default).
 String normalizeEntryCountry(String? raw) {
   final c = parseCatalogCountryCode(raw);
   return c ?? kDefaultEntryCountry;
@@ -103,37 +103,41 @@ String normalizeEntryCountry(String? raw) {
       return (
         ok: true,
         code: kDefaultEntryCountry,
-        reason: 'default_united_states',
+        reason: 'default_germany',
       );
     }
     return (ok: false, code: '', reason: 'missing_entry_country');
   }
   final code = parseCatalogCountryCode(trimmed);
   if (code == null) {
-    // Stale DE / unknown: when allowDefault, map to product default US
+    // Stale RO / unknown: when allowDefault, map to product default DE
     if (allowDefault) {
       final upper = trimmed.toUpperCase();
-      if (upper == 'DE' ||
-          upper == 'GERMANY' ||
-          upper == 'DEU' ||
-          upper == 'DEUTSCHLAND') {
+      if (upper == 'RO' ||
+          upper == 'ROMANIA' ||
+          upper == 'ROU' ||
+          upper == 'US' ||
+          upper == 'USA' ||
+          upper == 'UNITED STATES') {
+        // RO stale → DE; bare unknown falls through
+      }
+      if (upper == 'RO' || upper == 'ROMANIA' || upper == 'ROU') {
         return (
           ok: true,
           code: kDefaultEntryCountry,
-          reason: 'default_united_states',
+          reason: 'stale_ro_to_default_germany',
         );
       }
+      // Other unknown → product default
+      return (
+        ok: true,
+        code: kDefaultEntryCountry,
+        reason: 'unknown_to_default_germany',
+      );
     }
-    return (ok: false, code: '', reason: 'invalid_entry_country');
+    return (ok: false, code: '', reason: 'unknown_entry_country');
   }
-  return (ok: true, code: code, reason: 'ok');
-}
-
-bool entryCountryAllowsConnect(
-  String? raw, {
-  bool allowDefault = true,
-}) {
-  return resolveEntryCountrySelection(raw, allowDefault: allowDefault).ok;
+  return (ok: true, code: code, reason: 'catalog');
 }
 
 CountryOption? countryOptionForCode(String? code) {
@@ -141,7 +145,63 @@ CountryOption? countryOptionForCode(String? code) {
   for (final o in kProductCountryCatalog) {
     if (o.code == c) return o;
   }
-  return kProductCountryCatalog.first;
+  return null;
+}
+
+/// Product exit hop for multi-hop residual (Germany monopin).
+const String kProductExitHost = '178.105.187.178';
+
+/// Residual dial host for entry *code* (+ multi-hop when on).
+///
+/// Multi-hop ON: dial [kProductExitHost] (DE) when entry is not already DE;
+/// if entry is DE, stay on DE (exit == entry).
+String residualHostForEntryCountry(
+  String? code, {
+  bool multiHop = false,
+}) {
+  final c = normalizeEntryCountry(code);
+  if (multiHop) {
+    // Residual-via-exit: dial DE exit when entry is not DE.
+    if (c != kCountryGermany) {
+      return kProductExitHost;
+    }
+  }
+  for (final o in kProductCountryCatalog) {
+    if (o.code == c) return o.host;
+  }
+  return kProductExitHost; // default DE
+}
+
+/// Public ElGamal pin basename for residual HELLO to *host*.
+String residualNodePubNameForHost(String host) {
+  final h = host.trim();
+  for (final o in kProductCountryCatalog) {
+    if (o.host == h) {
+      switch (o.code) {
+        case kCountryIceland:
+          return 'node_elgamal.pub';
+        case kCountryGermany:
+          return 'de_node_elgamal.pub';
+        case kCountryUnitedStates:
+          return 'us_node_elgamal.pub';
+      }
+    }
+  }
+  if (h == kProductExitHost || h == '178.105.187.178') {
+    return 'de_node_elgamal.pub';
+  }
+  if (h == '5.161.242.85') return 'us_node_elgamal.pub';
+  if (h == '82.221.101.241') return 'node_elgamal.pub';
+  // Stale RO host still maps to exit pin file (now DE content) for heal path only.
+  if (h == '185.146.232.107') return 'exit_node_elgamal.pub';
+  return 'node_elgamal.pub';
+}
+
+bool entryCountryAllowsConnect(
+  String? raw, {
+  bool allowDefault = true,
+}) {
+  return resolveEntryCountrySelection(raw, allowDefault: allowDefault).ok;
 }
 
 /// User-facing residual entry label — never a monopin IPv4.
@@ -162,44 +222,8 @@ String publicLabelForResidualHost(String? host) {
       return residualEntryPublicLabel(o.code);
     }
   }
-  // Any bare IPv4 (or unknown host) — never echo monopin IP in UI.
   if (RegExp(r'^\d+\.\d+\.\d+\.\d+$').hasMatch(h)) {
     return 'VPN node';
   }
   return 'VPN node';
-}
-
-String residualHostForEntryCountry(String? code, {bool multiHop = false}) {
-  // Multi-hop residual dials a non-entry peer; single-hop uses entry monopin.
-  final entry = countryOptionForCode(code);
-  if (!multiHop) return entry?.host ?? kProductCountryCatalog.first.host;
-  for (final o in kProductCountryCatalog) {
-    if (o.code != (entry?.code ?? kDefaultEntryCountry) && o.host.isNotEmpty) {
-      return o.host;
-    }
-  }
-  return entry?.host ?? kProductCountryCatalog.first.host;
-}
-
-/// ElGamal public pin basename for residual HELLO from dial *host* monopin.
-///
-/// IS → `node_elgamal.pub`; RO → `exit_node_elgamal.pub`; US → `us_node_elgamal.pub`.
-String residualNodePubNameForHost(String host) {
-  final h = host.trim();
-  for (final o in kProductCountryCatalog) {
-    if (o.host.isNotEmpty && (h == o.host || h.endsWith(o.host))) {
-      switch (o.code) {
-        case kCountryRomania:
-          return 'exit_node_elgamal.pub';
-        case kCountryUnitedStates:
-          return 'us_node_elgamal.pub';
-        default:
-          return 'node_elgamal.pub';
-      }
-    }
-  }
-  // Legacy host constants without catalog match
-  if (h == '185.146.232.107') return 'exit_node_elgamal.pub';
-  if (h == '5.161.242.85') return 'us_node_elgamal.pub';
-  return 'node_elgamal.pub';
 }

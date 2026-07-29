@@ -45,8 +45,9 @@ String connectButtonLabel(bool connected) =>
 
 /// Plain-language **connected** status card title (not used while connecting).
 ///
-/// When [residual] is true and [ipv6Protected] is false, do not claim full
-/// protection (IPv6 may still use the ISP path).
+/// When [residual] is true, dual-stack honesty follows [ipv4Residual] /
+/// [ipv6Protected]: never claim "IPv6 ISP path blocked" when residual IPv6 is
+/// off, and never claim "IPv4 via VPN" when residual IPv4 capture is off.
 ///
 /// For Connecting vs Disconnected while busy, use [statusCardTitle] in
 /// `connect_status.dart` so Android long handshakes stay on Connecting.
@@ -54,21 +55,29 @@ String plainConnectedStatus({
   String? vpnIp,
   bool residual = true,
   bool? ipv6Protected,
+  bool? ipv4Residual,
 }) {
   if (!residual) {
     return vpnIp == null || vpnIp.isEmpty
         ? 'Session only — residual IP still on ISP'
         : 'Session only — residual IP still on ISP ($vpnIp)';
   }
-  if (ipv6Protected == false) {
-    return vpnIp != null && vpnIp.isNotEmpty
-        ? 'Connected — IPv4 via VPN; IPv6 not protected ($vpnIp)'
-        : 'Connected — IPv4 via VPN; IPv6 not protected';
-  }
-  if (ipv6Protected == true) {
-    return vpnIp != null && vpnIp.isNotEmpty
-        ? 'Connected — VPN active; IPv6 ISP path blocked ($vpnIp)'
-        : 'Connected — VPN active; IPv6 ISP path blocked';
+  // Full dual-stack honesty when either stack flag is known.
+  if (ipv6Protected != null || ipv4Residual != null) {
+    final v4 = ipv4Residual ?? true;
+    final v6 = ipv6Protected ?? true;
+    final ip = (vpnIp ?? '').trim();
+    final suffix = ip.isEmpty ? '' : ' ($ip)';
+    if (v4 && v6) {
+      return 'Connected — VPN active; IPv6 ISP path blocked$suffix';
+    }
+    if (v4 && !v6) {
+      return 'Connected — IPv4 via VPN; IPv6 not protected$suffix';
+    }
+    if (!v4 && v6) {
+      return 'Connected — IPv4 residual off; IPv6 ISP path blocked$suffix';
+    }
+    return 'Connected — residual dual-stack off$suffix';
   }
   if (vpnIp != null && vpnIp.isNotEmpty) {
     return 'Connected — your traffic uses the VPN ($vpnIp)';

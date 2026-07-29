@@ -361,6 +361,39 @@ final class Rpt2Tests: XCTestCase {
         XCTAssertEqual(map["ipv6Protected"] as? Bool, false)
         let msg = map["message"] as? String ?? ""
         XCTAssertTrue(msg.contains("IPv6 not protected"))
+        XCTAssertFalse(msg.lowercased().contains("path blocked"))
+    }
+
+    func testConnectedHonestyMessageIpv6OffNeverPathBlocked() {
+        let off = RptFullTunnelResult.connectedHonestyMessage(
+            vpnIp: "10.88.0.22",
+            ipv4Residual: true,
+            ipv6Protected: false
+        )
+        XCTAssertTrue(off.contains("IPv6 not protected"))
+        XCTAssertFalse(off.lowercased().contains("path blocked"))
+        let on = RptFullTunnelResult.connectedHonestyMessage(
+            vpnIp: "10.88.0.22",
+            ipv4Residual: true,
+            ipv6Protected: true
+        )
+        XCTAssertTrue(on.lowercased().contains("ipv6 isp path blocked"))
+        XCTAssertFalse(on.contains("IPv6 not protected"))
+    }
+
+    func testProductConnectMapTunnelIpDetailUsesSessionFlags() {
+        // Generic tunnel-IP detail must not override residual IPv6 OFF honesty.
+        let map = RptFullTunnelResult.productConnectMap(
+            packetTunnelActive: true,
+            vpnIp: "10.88.0.23",
+            detailMessage: "Connected — tunnel IP 10.88.0.23",
+            ipv6Protected: false,
+            ipv4Residual: true
+        )
+        XCTAssertEqual(map["ipv6Protected"] as? Bool, false)
+        let msg = map["message"] as? String ?? ""
+        XCTAssertTrue(msg.contains("IPv6 not protected"))
+        XCTAssertFalse(msg.lowercased().contains("path blocked"))
     }
 
     func testFullTunnelHonestyNeFailureResidualIpMessage() {

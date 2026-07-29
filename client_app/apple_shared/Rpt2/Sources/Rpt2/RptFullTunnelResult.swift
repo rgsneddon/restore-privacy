@@ -22,34 +22,58 @@ public enum RptFullTunnelResult {
     public static let ipv6IspPathBlockedMessage =
         "Connected — VPN active; IPv6 ISP path blocked"
 
+    /// Honest Connected card line from session dual-stack residual flags.
+    /// Never claims "IPv6 ISP path blocked" when residual IPv6 protection is off.
+    public static func connectedHonestyMessage(
+        vpnIp: String? = nil,
+        ipv4Residual: Bool = true,
+        ipv6Protected: Bool = true
+    ) -> String {
+        let ip = (vpnIp ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+        let suffix = ip.isEmpty ? "" : " (\(ip))"
+        if ipv4Residual && ipv6Protected {
+            return ipv6IspPathBlockedMessage + suffix
+        }
+        if ipv4Residual && !ipv6Protected {
+            return "Connected — IPv4 via VPN; IPv6 not protected" + suffix
+        }
+        if !ipv4Residual && ipv6Protected {
+            return "Connected — IPv4 residual off; IPv6 ISP path blocked" + suffix
+        }
+        return "Connected — residual dual-stack off" + suffix
+    }
+
     /// Build the method-channel map for a full-tunnel product connect attempt.
     /// - Parameter packetTunnelActive: true only when NE tunnel status is connected.
     /// - Parameter hostOnlyHello: true when map describes a diagnostic HELLO (never success).
     /// - Parameter ipv6Protected: true when Packet Tunnel installs IPv6 ISP mitigation
     ///   (default-route capture / blackhole intent). Node residual remains IPv4 session.
+    /// - Parameter ipv4Residual: true when Packet Tunnel captures full IPv4 residual traffic.
     public static func productConnectMap(
         packetTunnelActive: Bool,
         vpnIp: String? = nil,
         detailMessage: String? = nil,
         hostOnlyHello: Bool = false,
         nodeDiagnostic: String? = nil,
-        ipv6Protected: Bool = true
+        ipv6Protected: Bool = true,
+        ipv4Residual: Bool = true
     ) -> [String: Any] {
         let ip = (vpnIp ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
         if packetTunnelActive && !hostOnlyHello {
             let base: String
             if let d = detailMessage?.trimmingCharacters(in: .whitespacesAndNewlines),
                !d.isEmpty,
-               d.lowercased().contains("ipv6") {
+               (d.lowercased().contains("ipv6")
+                || d.lowercased().contains("dual-stack")
+                || d.lowercased().contains("residual off")) {
+                // Trust an already-honest dual-stack detail from the Packet Tunnel.
                 base = d
-            } else if ipv6Protected {
-                base = !ip.isEmpty
-                    ? "\(ipv6IspPathBlockedMessage) (\(ip))"
-                    : ipv6IspPathBlockedMessage
-            } else if !ip.isEmpty {
-                base = "Connected — IPv4 via VPN; IPv6 not protected (\(ip))"
             } else {
-                base = "Connected — IPv4 via VPN; IPv6 not protected"
+                base = connectedHonestyMessage(
+                    vpnIp: ip.isEmpty ? nil : ip,
+                    ipv4Residual: ipv4Residual,
+                    ipv6Protected: ipv6Protected
+                )
             }
             var m: [String: Any] = [
                 "ok": true,
@@ -57,6 +81,7 @@ public enum RptFullTunnelResult {
                 "fullTunnelActive": true,
                 "hostOnlySession": false,
                 "ipv6Protected": ipv6Protected,
+                "ipv4Residual": ipv4Residual,
             ]
             if !ip.isEmpty { m["vpnIp"] = ip }
             return m

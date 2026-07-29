@@ -288,6 +288,22 @@ def stage_vault(*, monopin: str | None = None, out_root: Path | None = None) -> 
     if "Breadcrumbs vault (Helsinki)" not in handoff_text:
         handoff_text = handoff_text.rstrip() + banner
 
+    # Windows PE follow-up for split-ship (read on Windows machine from Helsinki)
+    win_src = ROOT / f"client/windows/WINDOWS_HANDOFF_{pin}.md"
+    if not win_src.is_file():
+        win_src = ROOT / "client" / "windows" / "WINDOWS_HANDOFF.md"
+    win_text = (
+        win_src.read_text(encoding="utf-8")
+        if win_src.is_file()
+        else (
+            f"# WINDOWS_HANDOFF_{pin}.md missing\n\n"
+            f"Monopin {pin}: build native PE on Windows and upload to "
+            f"paid_assets/{pin}/.\n"
+        )
+    )
+    if "Breadcrumbs vault (Helsinki)" not in win_text:
+        win_text = win_text.rstrip() + banner
+
     for dest in (ver_dir, cur_dir):
         (dest / "manifest.json").write_text(
             json.dumps(manifest, indent=2) + "\n", encoding="utf-8"
@@ -297,6 +313,7 @@ def stage_vault(*, monopin: str | None = None, out_root: Path | None = None) -> 
         )
         (dest / "checklist.md").write_text(checklist, encoding="utf-8")
         (dest / "APPLE_HANDOFF.md").write_text(handoff_text, encoding="utf-8")
+        (dest / "WINDOWS_HANDOFF.md").write_text(win_text, encoding="utf-8")
 
     # Tidy: remove other monopin dirs under dist/breadcrumbs except current
     for child in list(base.iterdir()):
@@ -435,7 +452,13 @@ def publish_vault(*, monopin: str | None = None, dry_run: bool = False) -> int:
         return 1
 
     home = "/root" if user == "root" else f"/home/{user}"
-    for name in ("manifest.json", "honesty.json", "checklist.md", "APPLE_HANDOFF.md"):
+    for name in (
+        "manifest.json",
+        "honesty.json",
+        "checklist.md",
+        "APPLE_HANDOFF.md",
+        "WINDOWS_HANDOFF.md",
+    ):
         local_f = local / name
         if not local_f.is_file():
             continue

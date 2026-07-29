@@ -7,20 +7,22 @@ import 'country_select.dart';
 /// RPT node endpoint and full-tunnel intent (shared with platform VPN).
 ///
 /// Multi-hop residual is **opt-in**: when [multiHopEnabled] is true, residual
-/// Connect dials a non-entry catalog peer. Default is single-hop **United States**
-/// entry (`us_node_elgamal.pub` / [kDefaultEntryCountry]). Residual-via-exit
-/// selection is not full intermediate encapsulation.
+/// Connect dials the product exit peer (Germany). Default is single-hop
+/// **Germany** entry (`de_node_elgamal.pub` / [kDefaultEntryCountry]).
 ///
 /// Free tier ([freeTierEnabled]): multi-hop is forced off; host is always entry.
 class RptConfig {
-  /// Product default residual entry (United States monopin).
-  static const String entryHost = '5.161.242.85';
+  /// Product default residual entry (Germany monopin).
+  static const String entryHost = '178.105.187.178';
 
   /// Iceland residual peer (selectable entry / multihop alternate).
   static const String icelandHost = '82.221.101.241';
 
-  /// Product exit hop (Romania FlokiNET) for multi-hop residual when enabled.
-  static const String exitHost = '185.146.232.107';
+  /// Product exit hop (Germany DE) for multi-hop residual when enabled.
+  static const String exitHost = '178.105.187.178';
+
+  /// United States residual peer.
+  static const String usHost = '5.161.242.85';
 
   static const int port = 44044;
   static const String protocolMagic = 'RPT2';
@@ -28,7 +30,7 @@ class RptConfig {
 
   /// Paid catalog pin — must match monorepo ``client/VERSION`` and pubspec.
   /// Free builds report [kFreeTierVersion] via [displayProductVersion].
-  static const String productVersion = '0.5.6';
+  static const String productVersion = '0.5.7';
 
   /// UI / about version (free tier always ``3.3.3``).
   static String get displayProductVersion =>
@@ -50,7 +52,7 @@ class RptConfig {
   /// Runtime override from Settings privacy-scale (null = use env/compile only).
   static bool? runtimeMultiHopOverride;
 
-  /// Main-shell entry country (US product default); drives residual dial host.
+  /// Main-shell entry country (DE product default); drives residual dial host.
   static String runtimeEntryCountry = kDefaultEntryCountry;
 
   /// Apply Settings multi-hop toggle (Windows/Apple parity).
@@ -63,7 +65,7 @@ class RptConfig {
     runtimeMultiHopOverride = enabled;
   }
 
-  /// Apply main-shell entry-country selection (United States/US product default).
+  /// Apply main-shell entry-country selection (Germany/DE product default).
   static void setRuntimeEntryCountry(String? code) {
     runtimeEntryCountry = normalizeEntryCountry(code);
   }
@@ -91,6 +93,6 @@ class RptConfig {
   /// Bundled ElGamal public key basename for residual HELLO.
   ///
   /// Always derived from the residual dial [host] so multi-hop / DE entry
-  /// cannot pair the wrong peer pin (e.g. DE multi-hop dials IS → node pub).
+  /// cannot pair the wrong peer pin.
   static String get residualNodePubName => residualNodePubNameForHost(host);
 }

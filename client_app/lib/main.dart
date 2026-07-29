@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -120,7 +122,9 @@ class _TunnelHomeState extends State<TunnelHome> with WidgetsBindingObserver {
         _onToggle();
       },
       onTrayShow: () {
-        // Native already orders the window front; keep Flutter mounted.
+        // Native already deminiaturizes/orders the window front (RptTrayController).
+        // Rehydrate connection UI only — never disconnect on show-from-tray.
+        _rehydrateSession(from: 'tray_show');
       },
     );
     WidgetsBinding.instance.addPostFrameCallback((_) async {
@@ -243,6 +247,15 @@ class _TunnelHomeState extends State<TunnelHome> with WidgetsBindingObserver {
     final loaded = await _store!.load();
     RptConfig.setRuntimeMultiHop(loaded.privacyMultihop);
     RptConfig.setRuntimeEntryCountry(loaded.entryCountry);
+    // Push Flutter Settings into native App Group so Packet Tunnel / Connect
+    // honesty match product switches (cannot desync after cold start).
+    await _vpn.syncProductSettingsToNative(
+      residualIpv4: kResidualIpv4AlwaysOn,
+      residualIpv6: loaded.residualIpv6,
+      privacyTrafficShape: loaded.privacyTrafficShape,
+      privacyOuterObfuscation: loaded.privacyOuterObfuscation,
+      privacyMultihop: loaded.privacyMultihop,
+    );
     if (mounted) {
       setState(() => _settings = loaded);
     } else {
@@ -675,20 +688,24 @@ class _TunnelHomeState extends State<TunnelHome> with WidgetsBindingObserver {
         'Connect — entry ${countryOptionForCode(resolved.code)?.label ?? resolved.code}…',
       );
       await _connLog(kLogKindConnect, 'Connect started (RPT full tunnel)');
-      final ok = await _vpn.connect();
+      final ok = await _vpn.connect(
+        residualIpv4: kResidualIpv4AlwaysOn,
+        residualIpv6: _settings.residualIpv6,
+      );
       if (!mounted) return;
       setState(() {
         _connected = ok;
         if (ok) {
           _needsVpnSystemSettingsApproval = false;
           final ipMatch = RegExp(r'10\.\d+\.\d+\.\d+').firstMatch(_status);
-          _vpnIp = ipMatch?.group(0);
-          final v6Not = _status.toLowerCase().contains('ipv6 not protected');
-          final v6Ok = _status.toLowerCase().contains('ipv6 isp path blocked');
-          _status = plainConnectedStatus(
+          if (ipMatch != null) _vpnIp = ipMatch.group(0);
+          // Dual-stack honesty: keep native message or rebuild from Settings
+          // residual IPv4+IPv6 (never IPv6-only overwrite).
+          _status = resolveConnectedStatusAfterSuccess(
+            nativeStatus: _status,
             vpnIp: _vpnIp,
-            residual: true,
-            ipv6Protected: v6Not ? false : (v6Ok ? true : null),
+            residualIpv4: kResidualIpv4AlwaysOn,
+            residualIpv6: _settings.residualIpv6,
           );
         } else if (isNeVpnPermissionFailureMessage(_status) ||
             shouldPromptOpenVpnSystemSettings({
@@ -752,14 +769,18 @@ class _TunnelHomeState extends State<TunnelHome> with WidgetsBindingObserver {
       _connected = snap.connected;
       _vpnIp = snap.vpnIp;
       if (snap.connected) {
-        final msg = (snap.message ?? '').toLowerCase();
-        final v6Not = msg.contains('ipv6 not protected');
-        final v6Ok = msg.contains('ipv6 isp path blocked');
-        _status = plainConnectedStatus(
-          vpnIp: snap.vpnIp,
-          residual: true,
-          ipv6Protected: v6Not ? false : (v6Ok ? true : null),
-        );
+        // Prefer already-honest native message (provider dual-stack flags).
+        final nativeMsg = snap.message ?? '';
+        if (isDualStackHonestConnectedMessage(nativeMsg)) {
+          _status = nativeMsg;
+        } else {
+          final ipv6Flag = snap.ipv6Protected ?? _settings.residualIpv6;
+          _status = connectedHonestyMessage(
+            vpnIp: snap.vpnIp,
+            ipv4Residual: kResidualIpv4AlwaysOn,
+            ipv6Protected: ipv6Flag,
+          );
+        }
       } else if (snap.connecting) {
         _status = snap.message ?? connectingStatusMessage();
       } else if (from == 'resume' && !_busy) {
@@ -885,13 +906,26 @@ class _TunnelHomeState extends State<TunnelHome> with WidgetsBindingObserver {
           licenceGate: _licence,
           residualCaptureActive: _connected,
           residualConnected: _connected,
-          ipv6Protected: _status.toLowerCase().contains('ipv6 isp path blocked'),
+          ipv6Protected: _connected &&
+              (_status.toLowerCase().contains('ipv6 isp path blocked') ||
+                  (_settings.residualIpv6 &&
+                      !_status.toLowerCase().contains('ipv6 not protected'))),
           onLicenceChanged: (accepted) {
             if (mounted) setState(() => _licenceAccepted = accepted);
           },
           onChanged: (s) {
             RptConfig.setRuntimeMultiHop(s.privacyMultihop);
             if (mounted) setState(() => _settings = s);
+            // Keep native App Group aligned when Settings change outside Connect.
+            unawaited(
+              _vpn.syncProductSettingsToNative(
+                residualIpv4: kResidualIpv4AlwaysOn,
+                residualIpv6: s.residualIpv6,
+                privacyTrafficShape: s.privacyTrafficShape,
+                privacyOuterObfuscation: s.privacyOuterObfuscation,
+                privacyMultihop: s.privacyMultihop,
+              ),
+            );
           },
         ),
       ),

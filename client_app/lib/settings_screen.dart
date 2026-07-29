@@ -277,16 +277,19 @@ class _SettingsScreenState extends State<SettingsScreen> {
     if (mounted) setState(() => _busy = false);
   }
 
+  /// Residual IPv6 only (IPv4 residual is product always-on, not adjustable).
   Future<void> _setResidualStack({bool? ipv6}) async {
     setState(() {
       _busy = true;
-      // residualIpv4 is product-forced ON via copyWith/load/save.
-      _settings = _settings.copyWith(residualIpv6: ipv6);
+      _settings = _settings.copyWith(
+        residualIpv4: kResidualIpv4AlwaysOn,
+        residualIpv6: ipv6,
+      );
     });
     await widget.store.save(_settings);
     try {
       await _channel.invokeMethod<dynamic>('setResidualStack', {
-        'ipv4': true,
+        'ipv4': kResidualIpv4AlwaysOn,
         'ipv6': _settings.residualIpv6,
       });
     } on MissingPluginException {
@@ -295,12 +298,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
       // Best-effort native hot-apply.
     }
     String note =
-        'Residual stack saved: IPv4=always on '
-        'IPv6=${_settings.residualIpv6}.';
+        'Residual IPv6 saved: ${_settings.residualIpv6} '
+        '(IPv4 residual is always on).';
     if (widget.residualConnected) {
       note +=
           ' Disconnect then Connect for residual routes / IPv6 leak policy '
-          'to match these settings.';
+          'to match this switch.';
     } else {
       note += ' Takes effect on next Connect.';
     }
@@ -556,26 +559,23 @@ class _SettingsScreenState extends State<SettingsScreen> {
               ),
               child: Column(
                 children: [
-                  // IPv4 residual always on (non-interactive); IPv6 remains a switch.
-                  Tooltip(
-                    message: kTooltipResidualIpv4,
-                    waitDuration: const Duration(milliseconds: 400),
-                    child: ListTile(
-                      title: const Text(
-                        'IPv4 residual',
-                        style: TextStyle(fontWeight: FontWeight.w600),
-                      ),
-                      subtitle: const Text(kExplainerResidualIpv4),
-                      trailing: Text(
-                        'Always on',
-                        style: TextStyle(
-                          color: kPrimary,
-                          fontWeight: FontWeight.w600,
-                        ),
+                  // Residual IPv4 is product always-on (not adjustable).
+                  ListTile(
+                    title: const Text(
+                      'IPv4 residual',
+                      style: TextStyle(fontWeight: FontWeight.w600),
+                    ),
+                    subtitle: const Text(kExplainerResidualIpv4),
+                    trailing: const Text(
+                      'Always on',
+                      style: TextStyle(
+                        fontWeight: FontWeight.w600,
+                        color: kPrimary,
                       ),
                     ),
                   ),
                   const Divider(height: 1),
+                  // Residual IPv6 remains user-toggleable.
                   Tooltip(
                     message: kTooltipResidualIpv6,
                     waitDuration: const Duration(milliseconds: 400),

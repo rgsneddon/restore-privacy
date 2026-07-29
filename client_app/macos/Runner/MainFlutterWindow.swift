@@ -21,10 +21,18 @@ class MainFlutterWindow: NSWindow {
   override func close() {
     if !RptTrayController.shouldTerminateAfterLastWindowClosed {
       // Tray mode: hide without destroying the window / process.
+      // Use orderOut (not miniaturize) so showMainWindow can orderFront cleanly.
       orderOut(nil)
       NSApp.hide(nil)
       return
     }
     super.close()
+  }
+
+  /// Yellow minimize: still keep process; tray/dock Show must deminiaturize (see RptTrayController).
+  override func miniaturize(_ sender: Any?) {
+    super.miniaturize(sender)
+    // Ensure status item exists so user can restore if dock behavior is unclear.
+    // Does not stop Packet Tunnel.
   }
 }

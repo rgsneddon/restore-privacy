@@ -4,16 +4,17 @@ import 'package:restore_privacy_client/app_quit.dart';
 
 void main() {
   group('showsMainScreenQuitButton', () {
-    test('macOS and iOS show Quit; others do not', () {
-      expect(showsMainScreenQuitButton(isMacOS: true, isIOS: false), isTrue);
-      expect(showsMainScreenQuitButton(isMacOS: false, isIOS: true), isTrue);
-      expect(showsMainScreenQuitButton(isMacOS: false, isIOS: false), isFalse);
+    test('macOS, iOS, and Android show Quit; desktop Windows/Linux do not', () {
+      expect(showsMainScreenQuitButton(isMacOS: true, isIOS: false, isAndroid: false), isTrue);
+      expect(showsMainScreenQuitButton(isMacOS: false, isIOS: true, isAndroid: false), isTrue);
+      expect(showsMainScreenQuitButton(isMacOS: false, isIOS: false, isAndroid: true), isTrue);
+      expect(showsMainScreenQuitButton(isMacOS: false, isIOS: false, isAndroid: false), isFalse);
     });
 
-    test('target platform helper matches Apple residual shells', () {
+    test('target platform helper matches residual shells including Android', () {
       expect(showsMainScreenQuitForTarget(TargetPlatform.macOS), isTrue);
       expect(showsMainScreenQuitForTarget(TargetPlatform.iOS), isTrue);
-      expect(showsMainScreenQuitForTarget(TargetPlatform.android), isFalse);
+      expect(showsMainScreenQuitForTarget(TargetPlatform.android), isTrue);
       expect(showsMainScreenQuitForTarget(TargetPlatform.windows), isFalse);
       expect(showsMainScreenQuitForTarget(TargetPlatform.linux), isFalse);
     });

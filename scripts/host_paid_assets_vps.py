@@ -96,9 +96,15 @@ def print_catalog(version: str | None = None) -> None:
 
 
 def _candidate_sources(version: str, filename: str) -> list[Path]:
+    """Prefer sealed ``releases/{ver}/`` over an older stage copy.
+
+    ``status_page/assets`` is the upload stage dest; if it is listed first, a
+    stale prior stage permanently shadows freshly notarized zips under
+    ``releases/`` and re-hosts old Apple seals even with ``--force``.
+    """
     return [
-        STATUS / "assets" / version / filename,
         ROOT / "releases" / version / filename,
+        STATUS / "assets" / version / filename,
         STATUS / "assets" / RELEASE_VERSION / filename.replace(version, RELEASE_VERSION, 1)
         if version != RELEASE_VERSION
         else STATUS / "assets" / RELEASE_VERSION / filename,
@@ -552,6 +558,51 @@ def _upload_one_installer_openssh(
     raise RuntimeError(f"upload failed after retries: {local.name}: {last_err}")
 
 
+def _sync_remote_catalog_version(
+    ver: str,
+    *,
+    host: str,
+    user: str,
+    key_path: Path,
+) -> None:
+    """Patch RPT_CATALOG_VERSION on rpt-paid-assets.service and restart if unit exists.
+
+    Upload without ``--install-serve`` used to leave a stale pin (e.g. 0.5.5) while
+    packages only lived under ``paid_assets/0.5.6/`` — serve then 404'd every paid
+    download. Preserve token/bind/port; only bump the pin.
+    """
+    ver = (ver or "").strip()
+    if not ver:
+        return
+    unit_path = f"/etc/systemd/system/{UNIT_NAME}"
+    # sed in-place if key present; else append Environment= under [Service]
+    script = (
+        f"set -e; "
+        f"U={unit_path}; "
+        f"test -f \"$U\" || {{ echo no_unit; exit 0; }}; "
+        f"if grep -q '^Environment=RPT_CATALOG_VERSION=' \"$U\"; then "
+        f"  sed -i 's/^Environment=RPT_CATALOG_VERSION=.*/Environment=RPT_CATALOG_VERSION={ver}/' \"$U\"; "
+        f"else "
+        f"  sed -i '/^\\[Service\\]/a Environment=RPT_CATALOG_VERSION={ver}' \"$U\"; "
+        f"fi; "
+        f"systemctl daemon-reload; "
+        f"systemctl restart {UNIT_NAME}; "
+        f"systemctl is-active {UNIT_NAME}; "
+        f"echo catalog_pin={ver}"
+    )
+    code, out = _ssh_run_openssh(
+        script, host=host, user=user, key_path=key_path, sudo=True
+    )
+    if out:
+        print(out.strip())
+    if code != 0:
+        print(
+            f"WARN: could not sync RPT_CATALOG_VERSION={ver} on host "
+            f"(paid downloads may 404 until --install-serve-only): {out}",
+            file=sys.stderr,
+        )
+
+
 def install_serve_only(
     *,
     version: str | None = None,
@@ -866,6 +917,11 @@ WantedBy=multi-user.target
             )
             if tout:
                 print(tout)
+            # Keep token-gated serve pin in sync with monopin (avoids 404 when
+            # packages are under paid_assets/{ver}/ but unit still has old pin).
+            _sync_remote_catalog_version(
+                ver, host=host, user=user, key_path=key_path
+            )
         print(f"upload complete host={host} version={ver}")
         return 0
 

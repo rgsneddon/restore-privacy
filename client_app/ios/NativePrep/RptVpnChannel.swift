@@ -102,20 +102,16 @@ enum RptVpnChannel {
         }
         result(["ok": true] as [String: Any])
       case "setResidualStack":
-        // Dual-stack residual IPv4/IPv6 Settings (defaults both ON; App Group for Packet Tunnel).
+        // Residual IPv4 is product always-on; only residual IPv6 is adjustable.
         let args = call.arguments as? [String: Any] ?? [:]
         let defaults = UserDefaults.standard
-        if let v = args["ipv4"] as? Bool {
-          defaults.set(v, forKey: "residual_ipv4")
-        }
+        defaults.set(true, forKey: "residual_ipv4")
         if let v = args["ipv6"] as? Bool {
           defaults.set(v, forKey: "residual_ipv6")
         }
         defaults.synchronize()
         if let suite = UserDefaults(suiteName: RptSecrets.appGroupId) {
-          if let v = args["ipv4"] as? Bool {
-            suite.set(v, forKey: "residual_ipv4")
-          }
+          suite.set(true, forKey: "residual_ipv4")
           if let v = args["ipv6"] as? Bool {
             suite.set(v, forKey: "residual_ipv6")
           }
@@ -123,7 +119,7 @@ enum RptVpnChannel {
         }
         result([
           "ok": true,
-          "residual_ipv4": defaults.object(forKey: "residual_ipv4") as? Bool ?? true,
+          "residual_ipv4": true,
           "residual_ipv6": defaults.object(forKey: "residual_ipv6") as? Bool ?? true,
         ] as [String: Any])
       default:
@@ -132,19 +128,59 @@ enum RptVpnChannel {
     }
   }
 
-  /// Dual-stack residual prefs for Packet Tunnel start options (defaults both ON).
+  /// Dual-stack residual prefs for Packet Tunnel start options.
+  /// Residual IPv4 is always ON (product policy); IPv6 defaults ON when unset.
   static func residualStackOptionsForTunnel() -> (ipv4: Bool, ipv6: Bool) {
     func dualOn(_ defaults: UserDefaults, _ key: String) -> Bool {
       if defaults.object(forKey: key) == nil { return true }
       return defaults.bool(forKey: key)
     }
     if let suite = UserDefaults(suiteName: RptSecrets.appGroupId),
-       suite.object(forKey: "residual_ipv4") != nil
-         || suite.object(forKey: "residual_ipv6") != nil {
-      return (dualOn(suite, "residual_ipv4"), dualOn(suite, "residual_ipv6"))
+       suite.object(forKey: "residual_ipv6") != nil {
+      return (true, dualOn(suite, "residual_ipv6"))
     }
     let std = UserDefaults.standard
-    return (dualOn(std, "residual_ipv4"), dualOn(std, "residual_ipv6"))
+    return (true, dualOn(std, "residual_ipv6"))
+  }
+
+  /// Session dual-stack flags for product success maps.
+  /// Residual IPv4 is always ON; IPv6 prefers providerConfiguration then prefs.
+  static func residualStackForSession(
+    manager: NETunnelProviderManager?,
+    providerIpv4: Bool? = nil,
+    providerIpv6: Bool? = nil
+  ) -> (ipv4: Bool, ipv6: Bool) {
+    let prefs = residualStackOptionsForTunnel()
+    // Product policy: residual IPv4 always ON (ignore stale provider/prefs false).
+    if let v6 = providerIpv6 {
+      return (true, v6)
+    }
+    if let proto = manager?.protocolConfiguration as? NETunnelProviderProtocol,
+       let cfg = proto.providerConfiguration {
+      let v6 = (cfg["ipv6Protected"] as? Bool) ?? prefs.ipv6
+      return (true, v6)
+    }
+    return (true, prefs.ipv6)
+  }
+
+  /// Full-tunnel product success map with session residual honesty (never default IPv6 ON alone).
+  static func productSuccessConnectMap(
+    vpnIp: String?,
+    manager: NETunnelProviderManager? = nil,
+    providerIpv4: Bool? = nil,
+    providerIpv6: Bool? = nil
+  ) -> [String: Any] {
+    let stack = residualStackForSession(
+      manager: manager,
+      providerIpv4: providerIpv4,
+      providerIpv6: providerIpv6
+    )
+    return RptFullTunnelResult.productConnectMap(
+      packetTunnelActive: true,
+      vpnIp: vpnIp,
+      ipv6Protected: stack.ipv6,
+      ipv4Residual: stack.ipv4
+    )
   }
 
   /// Best-effort open Settings so the user can Allow VPN configuration.
@@ -509,12 +545,13 @@ enum RptVpnChannel {
           return
         }
         if manager.connection.status == .connected {
-          queryProviderVpnIp(manager: manager) { ip in
+          queryProviderSession(manager: manager) { ip, v4, v6 in
             completion(
-              RptFullTunnelResult.productConnectMap(
-                packetTunnelActive: true,
+              productSuccessConnectMap(
                 vpnIp: ip,
-                detailMessage: ip.map { "Connected — tunnel IP \($0)" }
+                manager: manager,
+                providerIpv4: v4,
+                providerIpv6: v6
               )
             )
           }
@@ -525,12 +562,13 @@ enum RptVpnChannel {
           pollTunnelConnected(manager: manager, attempt: 0, maxAttempts: 40, interval: 0.5) {
             connected in
             if connected {
-              queryProviderVpnIp(manager: manager) { ip in
+              queryProviderSession(manager: manager) { ip, v4, v6 in
                 completion(
-                  RptFullTunnelResult.productConnectMap(
-                    packetTunnelActive: true,
+                  productSuccessConnectMap(
                     vpnIp: ip,
-                    detailMessage: ip.map { "Connected — tunnel IP \($0)" }
+                    manager: manager,
+                    providerIpv4: v4,
+                    providerIpv6: v6
                   )
                 )
               }
@@ -560,7 +598,7 @@ enum RptVpnChannel {
         pollTunnelConnected(manager: manager, attempt: 0, maxAttempts: 50, interval: 0.5) {
           connected in
           if connected {
-            queryProviderVpnIp(manager: manager) { ip in
+            queryProviderSession(manager: manager) { ip, v4, v6 in
               var resolved = ip
               if resolved == nil || resolved?.isEmpty == true,
                  let cfg = (manager.protocolConfiguration as? NETunnelProviderProtocol)?
@@ -569,10 +607,11 @@ enum RptVpnChannel {
                 resolved = cfgIp
               }
               completion(
-                RptFullTunnelResult.productConnectMap(
-                  packetTunnelActive: true,
+                productSuccessConnectMap(
                   vpnIp: resolved,
-                  detailMessage: resolved.map { "Connected — tunnel IP \($0)" }
+                  manager: manager,
+                  providerIpv4: v4 ?? stack.ipv4,
+                  providerIpv6: v6 ?? stack.ipv6
                 )
               )
             }
@@ -638,8 +677,18 @@ enum RptVpnChannel {
     manager: NETunnelProviderManager,
     completion: @escaping (String?) -> Void
   ) {
+    queryProviderSession(manager: manager) { ip, _, _ in
+      completion(ip)
+    }
+  }
+
+  /// Provider session honesty: tunnel IP + dual-stack residual flags from the extension.
+  private static func queryProviderSession(
+    manager: NETunnelProviderManager,
+    completion: @escaping (_ vpnIp: String?, _ ipv4Residual: Bool?, _ ipv6Protected: Bool?) -> Void
+  ) {
     guard let session = manager.connection as? NETunnelProviderSession else {
-      completion(nil)
+      completion(nil, nil, nil)
       return
     }
     let msg = Data("status".utf8)
@@ -647,13 +696,17 @@ enum RptVpnChannel {
       try session.sendProviderMessage(msg) { response in
         guard let response,
               let obj = try? JSONSerialization.jsonObject(with: response) as? [String: Any] else {
-          completion(nil)
+          completion(nil, nil, nil)
           return
         }
-        completion(obj["vpnIp"] as? String)
+        completion(
+          obj["vpnIp"] as? String,
+          obj["ipv4Residual"] as? Bool,
+          obj["ipv6Protected"] as? Bool
+        )
       }
     } catch {
-      completion(nil)
+      completion(nil, nil, nil)
     }
   }
 
@@ -701,14 +754,26 @@ enum RptVpnChannel {
         if let active {
           let st = active.connection.status
           let connecting = st == .connecting || st == .reasserting
+          if st == .connected {
+            queryProviderSession(manager: active) { ip, v4, v6 in
+              var map = productSuccessConnectMap(
+                vpnIp: ip,
+                manager: active,
+                providerIpv4: v4,
+                providerIpv6: v6
+              )
+              map["connected"] = true
+              map["connecting"] = false
+              completion(map)
+            }
+            return
+          }
           completion([
-            "ok": st == .connected,
-            "connected": st == .connected,
+            "ok": false,
+            "connected": false,
             "connecting": connecting,
-            "fullTunnelActive": st == .connected,
-            "message": st == .connected
-              ? "Connected — system Packet Tunnel active"
-              : "VPN \(statusName(st))",
+            "fullTunnelActive": false,
+            "message": "VPN \(statusName(st))",
           ] as [String: Any])
           return
         }

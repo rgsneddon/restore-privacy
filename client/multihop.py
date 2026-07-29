@@ -32,27 +32,30 @@ from .endpoint import DEFAULT_ENDPOINT, PRODUCT_NODE_HOST, PRODUCT_NODE_PORT, En
 # dials the last hop (exit) for residual tunnel after the path is configured.
 MULTI_HOP_ROUTING_IMPLEMENTED = True
 
-# Product exit hop (Romania FlokiNET) — residual multi-hop egress when enabled.
-PRODUCT_EXIT_HOST = "185.146.232.107"
+# Product exit hop (Germany DE) — residual multi-hop egress when enabled.
+PRODUCT_EXIT_HOST = "178.105.187.178"
 PRODUCT_EXIT_PORT = PRODUCT_NODE_PORT
 
-# USA residual peer (Hetzner Ashburn) — product default residual entry.
+# USA residual peer (Hetzner Ashburn).
 PRODUCT_US_HOST = "5.161.242.85"
 PRODUCT_US_PORT = PRODUCT_NODE_PORT
 
+# Germany residual peer (Hetzner DE dedicated) — product default residual entry.
+PRODUCT_DE_HOST = "178.105.187.178"
+PRODUCT_DE_PORT = PRODUCT_NODE_PORT
+
 # --- Country → node catalog (extensible as more VPS countries ship) ---
 COUNTRY_IS = "IS"
-COUNTRY_RO = "RO"
 COUNTRY_US = "US"
-# Historical code (removed residual peer) — normalize maps DE → product default.
 COUNTRY_DE = "DE"
-# Product default residual entry (empty prefs / fresh install) — United States monopin.
-DEFAULT_ENTRY_COUNTRY = COUNTRY_US
+# Historical Romania monopin (removed) — normalize maps RO → product default DE.
+COUNTRY_RO = "RO"
+# Product default residual entry (empty prefs / fresh install) — Germany monopin.
+DEFAULT_ENTRY_COUNTRY = COUNTRY_DE
 
-# Retired Germany monopin (no longer in product catalog). Kept for redaction of
-# old support logs only — do not dial or offer as entry.
-PRODUCT_DE_HOST = "167.233.224.5"
-PRODUCT_DE_PORT = PRODUCT_NODE_PORT
+# Retired monopin hosts (redaction only — not dialable catalog peers).
+PRODUCT_RO_HOST = "185.146.232.107"  # former Romania FlokiNET
+PRODUCT_DE_LEGACY_HOST = "167.233.224.5"  # former retired DE monopin
 
 
 @dataclass(frozen=True)
@@ -72,7 +75,7 @@ class CountryNode:
         return Endpoint(host=self.host, port=int(self.port))
 
 
-# Shipped residual catalog: Iceland + Romania + USA (Germany peer removed).
+# Shipped residual catalog: Iceland + Germany + USA (Romania peer removed).
 PRODUCT_COUNTRY_CATALOG: tuple[CountryNode, ...] = (
     CountryNode(
         code=COUNTRY_IS,
@@ -82,11 +85,11 @@ PRODUCT_COUNTRY_CATALOG: tuple[CountryNode, ...] = (
         pub_name="node_elgamal.pub",
     ),
     CountryNode(
-        code=COUNTRY_RO,
-        name="Romania",
-        host=PRODUCT_EXIT_HOST,
-        port=PRODUCT_EXIT_PORT,
-        pub_name="exit_node_elgamal.pub",
+        code=COUNTRY_DE,
+        name="Germany",
+        host=PRODUCT_DE_HOST,
+        port=PRODUCT_DE_PORT,
+        pub_name="de_node_elgamal.pub",
     ),
     CountryNode(
         code=COUNTRY_US,
@@ -104,27 +107,27 @@ def product_country_catalog() -> tuple[CountryNode, ...]:
 
 
 def normalize_entry_country(code: str | None) -> str:
-    """Return a valid catalog country code; unknown/empty/stale DE → IS default."""
+    """Return a valid catalog country code; unknown/empty/stale RO → DE default."""
     raw = (code or "").strip().upper()
     if not raw:
         return DEFAULT_ENTRY_COUNTRY
-    # Accept full names; retired DE/Germany map to default (no dial path).
+    # Accept full names; retired RO/Romania map to default DE.
     aliases = {
         "ICELAND": COUNTRY_IS,
         "IS": COUNTRY_IS,
-        "ROMANIA": COUNTRY_RO,
-        "RO": COUNTRY_RO,
-        "ROU": COUNTRY_RO,
+        "GERMANY": COUNTRY_DE,
+        "DE": COUNTRY_DE,
+        "DEU": COUNTRY_DE,
+        "DEUTSCHLAND": COUNTRY_DE,
         "UNITED STATES": COUNTRY_US,
         "UNITED STATES OF AMERICA": COUNTRY_US,
         "USA": COUNTRY_US,
         "US": COUNTRY_US,
         "AMERICA": COUNTRY_US,
-        # Stale prefs after DE peer removal
-        "GERMANY": DEFAULT_ENTRY_COUNTRY,
-        "DE": DEFAULT_ENTRY_COUNTRY,
-        "DEU": DEFAULT_ENTRY_COUNTRY,
-        "DEUTSCHLAND": DEFAULT_ENTRY_COUNTRY,
+        # Stale prefs after RO peer removal → product default DE
+        "ROMANIA": DEFAULT_ENTRY_COUNTRY,
+        "RO": DEFAULT_ENTRY_COUNTRY,
+        "ROU": DEFAULT_ENTRY_COUNTRY,
     }
     code_n = aliases.get(raw, raw)
     for n in PRODUCT_COUNTRY_CATALOG:
@@ -926,8 +929,10 @@ def node_pub_name_for_endpoint(endpoint: Endpoint) -> str:
     for n in PRODUCT_COUNTRY_CATALOG:
         if host == n.host.strip():
             return n.pub_name
-    if host == PRODUCT_EXIT_HOST or host == product_exit_hop().host:
-        return "exit_node_elgamal.pub"
+    if host == PRODUCT_DE_HOST or host == PRODUCT_EXIT_HOST:
+        return "de_node_elgamal.pub"
     if host == PRODUCT_US_HOST:
         return "us_node_elgamal.pub"
+    if host == PRODUCT_RO_HOST:
+        return "exit_node_elgamal.pub"  # stale RO → exit pin (now DE material)
     return "node_elgamal.pub"
