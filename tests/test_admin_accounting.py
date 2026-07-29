@@ -115,6 +115,113 @@ class TestLedgerBuild(unittest.TestCase):
         self.assertEqual(len(rows), 1)
         self.assertEqual(rows[0].kind, "setup")
 
+    def test_reissue_same_purchase_id_counts_once(self) -> None:
+        """Two download tokens for one purchase_id = one ledger sale (not N)."""
+        from datetime import datetime, timezone
+
+        from accounting import (
+            OPENING_BALANCE_PENCE,
+            build_ledger,
+            estimate_stripe_fee_pence,
+            sales_from_grants,
+        )
+        import payments
+
+        payments.init_db()
+        t0 = datetime(2026, 8, 10, 10, 0, tzinfo=timezone.utc).timestamp()
+        t1 = datetime(2026, 8, 12, 10, 0, tzinfo=timezone.utc).timestamp()
+        pid = "RPT-AAAA-REISSUE-TEST"
+        # Original paid grant
+        payments.mint_download_token(
+            filename="restore-privacy-client-0.5.2-windows-x64-setup.exe",
+            platform="windows",
+            session_id="cs_live_reissue_parent",
+            amount_pence=245,
+            currency="gbp",
+            now=t0,
+            purchase_id=pid,
+        )
+        # Reissue: second token, same purchase_id + session (real reissue path)
+        payments.mint_download_token(
+            filename="restore-privacy-client-0.5.2-windows-x64-setup.exe",
+            platform="windows",
+            session_id="cs_live_reissue_parent",
+            amount_pence=245,
+            currency="gbp",
+            now=t1,
+            purchase_id=pid,
+        )
+        grants = payments.list_all_grants()
+        matching = [
+            g
+            for g in grants
+            if str(g.get("purchase_id") or "") == pid
+            or str(g.get("session_id") or "") == "cs_live_reissue_parent"
+        ]
+        self.assertGreaterEqual(len(matching), 2, "fixture must seed two grants")
+        sales = sales_from_grants(grants)
+        sale_rows = [s for s in sales if s.get("purchase_id") == pid]
+        self.assertEqual(
+            len(sale_rows),
+            1,
+            f"expected one sale for reissued purchase, got {sale_rows!r}",
+        )
+        rows = build_ledger(grants=grants)
+        sales_in_ledger = [r for r in rows if r.kind == "sale" and r.purchase_id == pid]
+        self.assertEqual(len(sales_in_ledger), 1)
+        fee = estimate_stripe_fee_pence(245)
+        expected_bal = OPENING_BALANCE_PENCE + (245 - fee)
+        self.assertEqual(rows[-1].balance_pence, expected_bal)
+        # Not double-counted: −6000 + 2*221 would be −5558 path; one sale is −6000+221
+        self.assertNotEqual(
+            rows[-1].balance_pence,
+            OPENING_BALANCE_PENCE + 2 * (245 - fee),
+        )
+
+    def test_admin_ondemand_and_resend_not_sales(self) -> None:
+        """Operator recovery mints must not appear as customer revenue."""
+        from datetime import datetime, timezone
+
+        from accounting import build_ledger, sales_from_grants
+        import payments
+
+        payments.init_db()
+        ts = datetime(2026, 8, 20, 12, 0, tzinfo=timezone.utc).timestamp()
+        for sid in (
+            "admin_ondemand_deadbeef01",
+            "admin_resend_cafebabe02",
+            "admin_keygen_ignored03",
+        ):
+            payments.mint_download_token(
+                filename="restore-privacy-client-0.5.2-windows-x64-setup.exe",
+                platform="windows",
+                session_id=sid,
+                amount_pence=245,
+                currency="gbp",
+                now=ts,
+            )
+        # One real Checkout-shaped session for control
+        payments.mint_download_token(
+            filename="restore-privacy-client-0.5.2-android.apk",
+            platform="android",
+            session_id="cs_live_real_checkout_only",
+            amount_pence=245,
+            currency="gbp",
+            now=ts,
+            purchase_id="RPT-REAL-ONLY-0001",
+        )
+        grants = payments.list_all_grants()
+        sales = sales_from_grants(grants)
+        sids = {s.get("session_id") for s in sales}
+        self.assertNotIn("admin_ondemand_deadbeef01", sids)
+        self.assertNotIn("admin_resend_cafebabe02", sids)
+        self.assertNotIn("admin_keygen_ignored03", sids)
+        self.assertIn("cs_live_real_checkout_only", sids)
+        self.assertEqual(len(sales), 1)
+        rows = build_ledger(grants=grants)
+        self.assertEqual(sum(1 for r in rows if r.kind == "sale"), 1)
+        self.assertEqual(rows[-1].session_id, "cs_live_real_checkout_only")
+
 
 class TestAccountingExport(unittest.TestCase):
     def test_all_formats_nonempty_and_export_filters(self) -> None:

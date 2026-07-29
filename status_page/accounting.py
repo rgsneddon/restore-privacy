@@ -106,8 +106,24 @@ def _utc_date_from_created(created_at: Any) -> date | None:
     return datetime.fromtimestamp(ts, tz=timezone.utc).date()
 
 
+# Operator / lab session prefixes — not customer Stripe Checkout cash.
+_NON_CHECKOUT_SESSION_PREFIXES = (
+    "seed_test_",
+    "admin_keygen_",
+    "admin_ondemand_",
+    "admin_resend_",
+    "admin_",  # any other admin_* mint/recovery path
+    "tester_",
+    "tester_month_",
+)
+
+
 def _is_real_paid_grant(g: dict[str, Any]) -> bool:
-    """Exclude seeds, free testers, revoked empty rows."""
+    """Exclude seeds, admin recovery mints, free testers, revoked empty rows.
+
+    Real books only count customer Checkout (or equivalent cash) sessions —
+    not re-downloads, on-demand failsafe mints, or fulfilment resends.
+    """
     st = str(g.get("status") or g.get("display_status") or "").strip().lower()
     if st in ("revoked", "expired", "failed"):
         return False
@@ -118,10 +134,11 @@ def _is_real_paid_grant(g: dict[str, Any]) -> bool:
     if amount <= 0:
         return False
     sid = str(g.get("session_id") or "")
-    # Lab / admin tooling — not customer Checkout
-    if sid.startswith("seed_test_") or sid.startswith("admin_keygen_"):
-        return False
-    if sid.startswith("tester_") or "tester_month" in sid:
+    sid_l = sid.lower()
+    for pref in _NON_CHECKOUT_SESSION_PREFIXES:
+        if sid_l.startswith(pref):
+            return False
+    if "tester_month" in sid_l:
         return False
     pid = str(g.get("purchase_id") or "")
     if pid.upper().startswith("RPT-TESTER") or pid == "TESTER":
@@ -129,13 +146,29 @@ def _is_real_paid_grant(g: dict[str, Any]) -> bool:
     return True
 
 
+def _sale_dedupe_key(g: dict[str, Any]) -> str:
+    """One cash sale per purchase_id; else per session_id (Checkout session)."""
+    pid = str(g.get("purchase_id") or "").strip()
+    if pid:
+        return f"pid:{pid}"
+    sid = str(g.get("session_id") or "").strip()
+    if sid:
+        return f"sid:{sid}"
+    # Last resort: token (unique grant) — should be rare
+    return f"tok:{g.get('token') or id(g)}"
+
+
 def sales_from_grants(
     grants: Sequence[dict[str, Any]] | None,
     *,
     opening: date = OPENING_DATE,
 ) -> list[dict[str, Any]]:
-    """Normalize paid grant rows into sale dicts on/after opening date."""
-    out: list[dict[str, Any]] = []
+    """Normalize paid grant rows into sale dicts on/after opening date.
+
+    Deduplicates reissues: multiple download tokens for the same purchase_id
+    (or same Checkout session_id) count as **one** sale — earliest grant wins.
+    """
+    candidates: list[dict[str, Any]] = []
     for g in grants or ():
         if not isinstance(g, dict) or not _is_real_paid_grant(g):
             continue
@@ -146,6 +179,32 @@ def sales_from_grants(
             gross = int(g.get("amount_pence") or 0)
         except (TypeError, ValueError):
             continue
+        if gross <= 0:
+            continue
+        candidates.append(g)
+
+    # Earliest created_at per purchase/session (reissue mints share purchase_id)
+    def _created_key(g: dict[str, Any]) -> float:
+        try:
+            return float(g.get("created_at") or 0)
+        except (TypeError, ValueError):
+            return 0.0
+
+    candidates.sort(key=lambda g: (_sale_dedupe_key(g), _created_key(g)))
+    seen: set[str] = set()
+    chosen: list[dict[str, Any]] = []
+    for g in candidates:
+        key = _sale_dedupe_key(g)
+        if key in seen:
+            continue
+        seen.add(key)
+        chosen.append(g)
+
+    out: list[dict[str, Any]] = []
+    for g in chosen:
+        d = _utc_date_from_created(g.get("created_at"))
+        assert d is not None  # filtered above
+        gross = int(g.get("amount_pence") or 0)
         stored_fee = g.get("stripe_fee_pence")
         if stored_fee is None:
             stored_fee = g.get("fee_pence")
