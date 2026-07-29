@@ -44,6 +44,22 @@ from payments import (
 ADMIN_TOP_ANCHOR_ID = "admin-heading"
 ADMIN_TOP_LINK_LABEL = "^top"
 
+# Link Generation: external script for copy + post-mint scroll (CSP script-src self).
+ADMIN_LINK_GENERATION_SCRIPT = "/static/admin_link_generation.js"
+
+
+def admin_copy_control_html(target_id: str, *, label: str = "Copy") -> str:
+    """One-click copy control bound to element *target_id* (data-copy-target)."""
+    tid = _escape(target_id)
+    lab = _escape(label)
+    return (
+        f'<span class="admin-copy-row" data-admin-copy-row="1">'
+        f'<button type="button" class="admin-copy-btn" '
+        f'data-copy-target="{tid}" id="{tid}-copy-btn">{lab}</button>'
+        f'<span class="admin-copy-status" data-copy-status-for="{tid}" '
+        f'aria-live="polite"></span></span>'
+    )
+
 
 def admin_section_top_link_html() -> str:
     """End-of-section link back to the top of the authenticated admin page."""
@@ -649,7 +665,10 @@ def render_purchase_reissue_section_html(
     Fail-closed: unknown IDs show *error* without inventing a download URL.
     """
     err = (
-        f'<p class="err" id="reissue-error">{_escape(error)}</p>' if error else ""
+        f'<p class="err" id="reissue-error" data-admin-focus-result="1">'
+        f"{_escape(error)}</p>"
+        if error
+        else ""
     )
     ok = ""
     if result and result.get("download_url"):
@@ -658,13 +677,20 @@ def render_purchase_reissue_section_html(
         pid = _escape(str(result.get("purchase_id") or ""))
         plat = _escape(str(result.get("platform") or ""))
         fname = _escape(str(result.get("filename") or ""))
+        copy_pid = admin_copy_control_html(
+            "reissue-result-purchase-id", label="Copy purchase ID"
+        )
+        copy_url = admin_copy_control_html(
+            "reissue-download-link", label="Copy download link"
+        )
         ok = f"""
-  <div class="ok-msg" id="reissue-result" role="status">
+  <div class="ok-msg" id="reissue-result" role="status" data-admin-focus-result="1" tabindex="-1">
     <p><strong>Secondary download link minted</strong> for purchase
-    <code id="reissue-result-purchase-id">{pid}</code>
+    <code id="reissue-result-purchase-id">{pid}</code> {copy_pid}
     ({plat} — <code>{fname}</code>).</p>
     <p>Pass this <strong>one-time</strong> link to the buyer (not a free GitHub URL):</p>
-    <p><a id="reissue-download-link" href="{url}" rel="noopener noreferrer">{url}</a></p>
+    <p><a id="reissue-download-link" href="{url}" rel="noopener noreferrer">{url}</a>
+      {copy_url}</p>
     <p class="muted">Path only: <code id="reissue-download-path">{path}</code></p>
   </div>"""
     val = _escape(form_value)
@@ -689,7 +715,7 @@ def render_purchase_reissue_section_html(
   </p>
   {err}
   {ok}
-  <form method="post" action="/admin/reissue-download" id="admin-reissue-form">
+  <form method="post" action="/admin/reissue-download#admin-reissue" id="admin-reissue-form">
     <label class="field" for="purchase_id">
       <span class="field-label">Product purchase identifier (RPT-PPI)</span>
       <input id="purchase_id" name="purchase_id" type="text"
@@ -717,7 +743,10 @@ def render_admin_ondemand_mint_section_html(
     Does not write a customer-recovery audit log; short failsafe copy only.
     """
     err = (
-        f'<p class="err" id="ondemand-error">{_escape(error)}</p>' if error else ""
+        f'<p class="err" id="ondemand-error" data-admin-focus-result="1">'
+        f"{_escape(error)}</p>"
+        if error
+        else ""
     )
     ok = ""
     if result and result.get("download_url"):
@@ -725,12 +754,16 @@ def render_admin_ondemand_mint_section_html(
         path = _escape(str(result.get("download_path") or ""))
         plat = _escape(str(result.get("platform") or ""))
         fname = _escape(str(result.get("filename") or ""))
+        copy_url = admin_copy_control_html(
+            "ondemand-download-link", label="Copy download link"
+        )
         ok = f"""
-  <div class="ok-msg" id="ondemand-result" role="status">
+  <div class="ok-msg" id="ondemand-result" role="status" data-admin-focus-result="1" tabindex="-1">
     <p><strong>Admin failsafe link minted</strong> for <strong id="ondemand-result-platform">{plat}</strong>
       (<code id="ondemand-result-filename">{fname}</code>).</p>
     <p>One-time paid download (not free GitHub):</p>
-    <p><a id="ondemand-download-link" href="{url}" rel="noopener noreferrer">{url}</a></p>
+    <p><a id="ondemand-download-link" href="{url}" rel="noopener noreferrer">{url}</a>
+      {copy_url}</p>
     <p class="muted">Path: <code id="ondemand-download-path">{path}</code>
       — single-use; not written as a customer RPT-PPI recovery event.</p>
   </div>"""
@@ -760,7 +793,7 @@ def render_admin_ondemand_mint_section_html(
   </p>
   {err}
   {ok}
-  <form method="post" action="/admin/mint-download" id="admin-ondemand-mint-form">
+  <form method="post" action="/admin/mint-download#admin-ondemand-mint" id="admin-ondemand-mint-form">
     <label class="field" for="ondemand_platform">
       <span class="field-label">Package / device</span>
       <select id="ondemand_platform" name="platform" required>
@@ -785,7 +818,10 @@ def render_admin_keygen_failsafe_section_html(
     Always shown on authenticated admin page. Operator-only; not a public free unlock.
     """
     err = (
-        f'<p class="err" id="keygen-failsafe-error">{_escape(error)}</p>' if error else ""
+        f'<p class="err" id="keygen-failsafe-error" data-admin-focus-result="1">'
+        f"{_escape(error)}</p>"
+        if error
+        else ""
     )
     ok = ""
     if result and result.get("keygen"):
@@ -793,11 +829,12 @@ def render_admin_keygen_failsafe_section_html(
         sid = _escape(str(result.get("session_id") or ""))
         plat = _escape(str(result.get("platform") or "") or "—")
         instr = _escape(str(result.get("unlock_instruction") or "USE THIS KEYGEN TO UNLOCK"))
+        copy_kg = admin_copy_control_html("admin-minted-keygen", label="Copy keygen")
         ok = f"""
-  <div class="ok-msg" id="keygen-failsafe-result" role="status">
+  <div class="ok-msg" id="keygen-failsafe-result" role="status" data-admin-focus-result="1" tabindex="-1">
     <p><strong>Admin failsafe KEYGEN minted</strong> (active Connect unlock).</p>
     <p id="keygen-failsafe-instruction">{instr}</p>
-    <p>Keygen: <code id="admin-minted-keygen">{kg}</code></p>
+    <p>Keygen: <code id="admin-minted-keygen">{kg}</code> {copy_kg}</p>
     <p class="muted">Session: <code id="keygen-failsafe-session">{sid}</code>
       — platform: <strong id="keygen-failsafe-platform">{plat}</strong>
       — give the customer this code only; not a free public unlock.</p>
@@ -829,7 +866,7 @@ def render_admin_keygen_failsafe_section_html(
   </p>
   {err}
   {ok}
-  <form method="post" action="/admin/mint-keygen" id="admin-keygen-failsafe-form">
+  <form method="post" action="/admin/mint-keygen#admin-keygen-failsafe" id="admin-keygen-failsafe-form">
     <label class="field" for="keygen_failsafe_platform">
       <span class="field-label">Platform (optional)</span>
       <select id="keygen_failsafe_platform" name="platform">
@@ -859,7 +896,10 @@ def render_admin_tester_month_section_html(
     download grants; Licence database shows the row only after keygen activation.
     """
     err = (
-        f'<p class="err" id="tester-month-error">{_escape(error)}</p>' if error else ""
+        f'<p class="err" id="tester-month-error" data-admin-focus-result="1">'
+        f"{_escape(error)}</p>"
+        if error
+        else ""
     )
     ok = ""
     if result and (result.get("download_url") or result.get("keygen")):
@@ -874,17 +914,23 @@ def render_admin_tester_month_section_html(
             vu_s = _escape(str(float(vu))) if vu is not None else ""
         except (TypeError, ValueError):
             vu_s = ""
+        copy_kg = admin_copy_control_html("tester-month-keygen", label="Copy keygen")
+        copy_url = admin_copy_control_html(
+            "tester-month-download-link", label="Copy download link"
+        )
+        copy_ppi = admin_copy_control_html("tester-month-ppi", label="Copy PPI")
         ok = f"""
-  <div class="ok-msg" id="tester-month-result" role="status">
+  <div class="ok-msg" id="tester-month-result" role="status" data-admin-focus-result="1" tabindex="-1">
     <p><strong>One-month tester subscription minted</strong> for
       <strong id="tester-month-result-platform">{plat}</strong>
       (<code id="tester-month-result-filename">{fname}</code>).</p>
-    <p>PPI: <code id="tester-month-ppi">{ppi}</code>
+    <p>PPI: <code id="tester-month-ppi">{ppi}</code> {copy_ppi}
       — expires after one month (valid_until
       <code id="tester-month-valid-until">{vu_s}</code>).</p>
-    <p>Keygen: <code id="tester-month-keygen">{kg}</code></p>
+    <p>Keygen: <code id="tester-month-keygen">{kg}</code> {copy_kg}</p>
     <p>Download (single-use status-host token, not free GitHub):</p>
-    <p><a id="tester-month-download-link" href="{url}" rel="noopener noreferrer">{url}</a></p>
+    <p><a id="tester-month-download-link" href="{url}" rel="noopener noreferrer">{url}</a>
+      {copy_url}</p>
     <p class="muted">Path: <code id="tester-month-download-path">{path}</code>
       — not listed under Paid download grants; Licence database lists this key
       only after the tester activates it in the app.</p>
@@ -916,7 +962,7 @@ def render_admin_tester_month_section_html(
   </p>
   {err}
   {ok}
-  <form method="post" action="/admin/mint-tester-month" id="admin-tester-month-form">
+  <form method="post" action="/admin/mint-tester-month#admin-tester-month" id="admin-tester-month-form">
     <label class="field" for="tester_month_platform">
       <span class="field-label">Package / device</span>
       <select id="tester_month_platform" name="platform" required>
@@ -943,7 +989,10 @@ def render_seed_test_purchase_section_html(
     if not seed_test_purchase_enabled():
         return ""
     err = (
-        f'<p class="err" id="seed-purchase-error">{_escape(error)}</p>' if error else ""
+        f'<p class="err" id="seed-purchase-error" data-admin-focus-result="1">'
+        f"{_escape(error)}</p>"
+        if error
+        else ""
     )
     ok = ""
     if result and result.get("purchase_id"):
@@ -952,15 +1001,20 @@ def render_seed_test_purchase_section_html(
         fname = _escape(str(result.get("filename") or ""))
         url = _escape(str(result.get("download_url") or ""))
         path = _escape(str(result.get("download_path") or ""))
+        copy_pid = admin_copy_control_html("seed-purchase-id", label="Copy purchase ID")
+        copy_url = admin_copy_control_html(
+            "seed-download-link", label="Copy download link"
+        )
         ok = f"""
-  <div class="ok-msg" id="seed-purchase-result" role="status">
+  <div class="ok-msg" id="seed-purchase-result" role="status" data-admin-focus-result="1" tabindex="-1">
     <p><strong>Test purchase seeded</strong> (local/staging only).</p>
     <p>Product purchase identifier:
-      <code id="seed-purchase-id">{pid}</code></p>
+      <code id="seed-purchase-id">{pid}</code> {copy_pid}</p>
     <p>Platform: <strong id="seed-purchase-platform">{plat}</strong>
       — <code id="seed-purchase-filename">{fname}</code></p>
     <p>One-time paid download (not free GitHub):
-      <a id="seed-download-link" href="{url}" rel="noopener noreferrer">{url}</a></p>
+      <a id="seed-download-link" href="{url}" rel="noopener noreferrer">{url}</a>
+      {copy_url}</p>
     <p class="muted">Path: <code id="seed-download-path">{path}</code>
       — use the purchase ID above in the re-issue form after consuming the token.</p>
   </div>"""
@@ -982,7 +1036,7 @@ def render_seed_test_purchase_section_html(
   </p>
   {err}
   {ok}
-  <form method="post" action="/admin/seed-test-purchase" id="admin-seed-purchase-form">
+  <form method="post" action="/admin/seed-test-purchase#admin-seed-purchase" id="admin-seed-purchase-form">
     <label class="field" for="seed_platform">
       <span class="field-label">Platform</span>
       <select id="seed_platform" name="platform" required>
@@ -1383,6 +1437,12 @@ border-radius:8px;font-size:0.9rem;line-height:1.4;margin:0.5rem 0}}
 code{{font-size:0.85rem;word-break:break-all}}
 .ok-msg{{color:var(--badge-ok-fg);background:var(--badge-ok-bg);padding:0.5rem 0.75rem;border-radius:8px}}
 .err{{color:var(--err)}}
+.admin-copy-row{{display:inline-flex;align-items:center;gap:0.4rem;flex-wrap:wrap;
+margin-left:0.35rem;vertical-align:middle}}
+.admin-copy-btn{{cursor:pointer;border:0;border-radius:8px;padding:0.3rem 0.65rem;
+font-size:0.8rem;font-weight:600;background:var(--btn-bg);color:var(--btn-fg)}}
+.admin-copy-btn:hover{{filter:brightness(1.08)}}
+.admin-copy-status{{font-size:0.8rem;font-weight:600;color:var(--badge-ok-fg);min-height:1em}}
 .admin-top-link{{margin:0.85rem 0 0;font-size:0.85rem}}
 .admin-arch-body p{{margin:0 0 0.85rem;line-height:1.55}}
 #admin-reissue-form label.field,#admin-seed-purchase-form label.field,#admin-ondemand-mint-form label.field,
@@ -1786,6 +1846,7 @@ links and keygens. These tools write the durable payment store; they are not fre
 {keygen_html}
 {tester_html}
 {seed_html}
+<script id="admin-link-generation-script" src="{ADMIN_LINK_GENERATION_SCRIPT}"></script>
 """
     return _admin_page_shell(
         title="Link Generation",

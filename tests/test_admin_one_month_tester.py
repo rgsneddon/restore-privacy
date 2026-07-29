@@ -159,7 +159,11 @@ class TestAdminTesterMonthHtml(_TempPaymentDB):
         page = render_admin_link_generation_html().decode("utf-8")
         self.assertIn('id="admin-tester-month"', page)
         self.assertIn('id="admin-tester-month-form"', page)
-        self.assertIn('action="/admin/mint-tester-month"', page)
+        # Form posts to mint route; section hash keeps operator on the card after submit
+        self.assertIn("/admin/mint-tester-month", page)
+        self.assertIn(
+            'action="/admin/mint-tester-month#admin-tester-month"', page
+        )
         self.assertIn('id="tester_month_platform"', page)
         self.assertIn("admin-tester-month-submit", page)
         self.assertIn("TESTER - one month", page)
