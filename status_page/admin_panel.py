@@ -511,8 +511,18 @@ def processor_settings_view() -> dict[str, Any]:
 
 def render_admin_licences_section_html(
     licences: list[dict[str, Any]] | None = None,
+    *,
+    clear_message: str = "",
+    clear_error: str = "",
 ) -> str:
-    """Read-only licence database: email, KEYGEN, PPI, OK|ENDED, dates."""
+    """Licence database: email, KEYGEN, PPI, OK|ENDED, dates + confirmed clear-all."""
+    try:
+        from payments import CLEAR_ALL_LICENCES_CONFIRM  # type: ignore
+    except Exception:  # noqa: BLE001
+        try:
+            from status_page.payments import CLEAR_ALL_LICENCES_CONFIRM  # type: ignore
+        except Exception:  # noqa: BLE001
+            CLEAR_ALL_LICENCES_CONFIRM = "CLEAR_ALL_LICENCES"
     try:
         rows_src = licences if licences is not None else list_licences_for_admin()
     except Exception:  # noqa: BLE001
@@ -539,18 +549,30 @@ def render_admin_licences_section_html(
         if body_rows
         else '<tr><td colspan="7">No licences yet</td></tr>'
     )
+    msg_html = (
+        f'<p class="ok-msg" id="admin-licences-clear-ok">{_escape(clear_message)}</p>'
+        if clear_message
+        else ""
+    )
+    err_html = (
+        f'<p class="err" id="admin-licences-clear-error">{_escape(clear_error)}</p>'
+        if clear_error
+        else ""
+    )
+    confirm_token = _escape(str(CLEAR_ALL_LICENCES_CONFIRM))
+    n = len(rows_src)
     return f"""
 <section id="admin-licences" class="card">
   <h2 id="admin-licences-heading">Licence database</h2>
   <p class="muted" id="admin-licences-blurb">
   Customer licences from the <strong>durable payment store</strong>.
   <strong>Retained across residual fleet wipe/rebuild</strong>.
-  <strong>Read-only</strong>: no edit or revoke here. Status is
-  <code>OK</code> while Connect is allowed, or <code>ENDED</code> when the
+  Status is <code>OK</code> while Connect is allowed, or <code>ENDED</code> when the
   period finished or the licence was revoked (rows stay listed). Columns
   <strong>Initiated</strong> and <strong>Expiry</strong> are UTC calendar dates.
+  Rows: <strong id="admin-licences-count">{n}</strong>.
   </p>
-  <table id="admin-licences-table" data-readonly="1">
+  <table id="admin-licences-table">
     <thead><tr>
       <th>Email</th><th>KEYGEN</th><th>PPI</th><th>Status</th><th>Platform</th>
       <th>Initiated</th><th>Expiry</th>
@@ -559,6 +581,24 @@ def render_admin_licences_section_html(
 {table}
     </tbody>
   </table>
+  {msg_html}
+  {err_html}
+  <form method="post" action="/admin/clear-licences" id="admin-clear-licences-form"
+        data-admin-clear-licences="1"
+        onsubmit="return confirm('Delete ALL licence rows? This cannot be undone.');">
+    <p class="muted" id="admin-clear-licences-blurb">
+      <strong>Clear all licences</strong> (BETA cleanup): permanently deletes every
+      Connect entitlement and device binding so this table is empty. Does not erase
+      paid download grants. Type <code id="admin-clear-licences-token">{confirm_token}</code>
+      to confirm.
+    </p>
+    <label class="field" for="clear_licences_confirm">
+      <span class="field-label">Confirm phrase</span>
+      <input id="clear_licences_confirm" name="confirm" type="text" autocomplete="off"
+             maxlength="64" required placeholder="{confirm_token}">
+    </label>
+    <button type="submit" id="admin-clear-licences-submit">Clear all licences</button>
+  </form>
 {admin_section_top_link_html()}</section>
 """
 
@@ -1712,10 +1752,16 @@ links and keygens. These tools write the durable payment store; they are not fre
 
 def render_admin_licences_page_html(
     grants: list[dict[str, Any]] | None = None,
+    *,
+    licence_clear_message: str = "",
+    licence_clear_error: str = "",
 ) -> bytes:
     """Active Licences page: licence database + paid download grants."""
     main = (
-        render_admin_licences_section_html()
+        render_admin_licences_section_html(
+            clear_message=licence_clear_message,
+            clear_error=licence_clear_error,
+        )
         + render_admin_grants_section_html(grants)
     )
     return _admin_page_shell(

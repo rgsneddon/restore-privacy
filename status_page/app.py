@@ -1812,6 +1812,51 @@ class Handler(BaseHTTPRequestHandler):
             )
             return
 
+        if path in ("/admin/clear-licences", "/admin/clear-licences/"):
+            # Operator BETA cleanup: empty connect_entitlements (+ device bindings)
+            if not admin_enabled():
+                self._send(503, "text/plain; charset=utf-8", b"admin disabled")
+                return
+            if not is_authenticated(self.headers):
+                self._send(200, "text/html; charset=utf-8", render_login_html())
+                return
+            from payments import clear_all_licences_for_admin
+            from admin_panel import render_admin_licences_page_html
+
+            form = dict(urllib.parse.parse_qsl(body.decode("utf-8", "replace")))
+            confirm = (form.get("confirm") or "").strip()
+            try:
+                cleared = clear_all_licences_for_admin(confirm=confirm)
+            except ValueError as exc:
+                self._send(
+                    400,
+                    "text/html; charset=utf-8",
+                    render_admin_licences_page_html(licence_clear_error=str(exc)),
+                )
+                return
+            except Exception as exc:  # noqa: BLE001
+                self._send(
+                    500,
+                    "text/html; charset=utf-8",
+                    render_admin_licences_page_html(
+                        licence_clear_error=f"clear failed: {exc}"[:240]
+                    ),
+                )
+                return
+            n = int(cleared.get("deleted_connect_entitlements") or 0)
+            nd = int(cleared.get("deleted_device_entitlements") or 0)
+            self._send(
+                200,
+                "text/html; charset=utf-8",
+                render_admin_licences_page_html(
+                    licence_clear_message=(
+                        f"Cleared licence table: deleted {n} connect entitlement(s) "
+                        f"and {nd} device binding(s). Paid download grants kept."
+                    ),
+                ),
+            )
+            return
+
         if path in ("/admin/mint-tester-month", "/admin/mint-tester-month/"):
             # Admin: one-month free tester sub (download + keygen, PPI TESTER)
             if not admin_enabled():

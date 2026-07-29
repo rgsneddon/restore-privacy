@@ -5779,6 +5779,64 @@ def list_licences_for_admin(*, limit: int | None = None) -> list[dict[str, Any]]
         conn.close()
 
 
+# Explicit confirm token required by clear_all_licences_for_admin (no silent wipe).
+CLEAR_ALL_LICENCES_CONFIRM = "CLEAR_ALL_LICENCES"
+
+
+def clear_all_licences_for_admin(
+    *,
+    confirm: str,
+    now: float | None = None,
+) -> dict[str, Any]:
+    """Delete all Connect licence rows so admin Licence database is empty.
+
+    Intended for pre-BETA operator cleanup of self-test rows. Requires
+    ``confirm == CLEAR_ALL_LICENCES_CONFIRM`` — refuses otherwise (no silent wipe).
+
+    Removes every row from ``connect_entitlements`` and ``device_entitlements``
+    so KEYGEN / device bindings cannot keep Connect live. Does **not** delete
+    paid download ``grants`` history (separate admin table).
+
+    Returns counts deleted and the durable DB path used.
+    """
+    if (confirm or "").strip() != CLEAR_ALL_LICENCES_CONFIRM:
+        raise ValueError(
+            "clear_all_licences_for_admin refused: confirm must be "
+            f"{CLEAR_ALL_LICENCES_CONFIRM!r} (got {confirm!r})"
+        )
+    init_db()
+    t = now if now is not None else time.time()
+    path = db_path()
+    conn = _connect()
+    try:
+        n_ent = int(
+            conn.execute("SELECT COUNT(*) FROM connect_entitlements").fetchone()[0]
+        )
+        n_dev = int(
+            conn.execute("SELECT COUNT(*) FROM device_entitlements").fetchone()[0]
+        )
+        conn.execute("DELETE FROM device_entitlements")
+        conn.execute("DELETE FROM connect_entitlements")
+        remaining_ent = int(
+            conn.execute("SELECT COUNT(*) FROM connect_entitlements").fetchone()[0]
+        )
+        remaining_dev = int(
+            conn.execute("SELECT COUNT(*) FROM device_entitlements").fetchone()[0]
+        )
+    finally:
+        conn.close()
+    return {
+        "ok": True,
+        "confirm": CLEAR_ALL_LICENCES_CONFIRM,
+        "db_path": str(path),
+        "deleted_connect_entitlements": n_ent,
+        "deleted_device_entitlements": n_dev,
+        "remaining_connect_entitlements": remaining_ent,
+        "remaining_device_entitlements": remaining_dev,
+        "cleared_at": t,
+    }
+
+
 def find_grant_by_session(
     session_id: str, *, now: float | None = None, unused_only: bool = True
 ) -> dict[str, Any] | None:
