@@ -246,10 +246,126 @@ class TestHostDeliveryPure(unittest.TestCase):
         i_open = app_src.find("open_release_asset(str(fname))")
         self.assertGreater(i_plan, 0)
         self.assertGreater(i_open, i_plan)
+        # Must not burn grant on 302 (thank-you iframe + manual share one token)
+        host_block = app_src[i_plan:i_open]
+        self.assertIn("probe=True", host_block)
+        self.assertNotIn("consume_download_token(token)", host_block)
+        self.assertIn("Do not consume the grant on 302", app_src)
+        self.assertIn("no consume yet", host_block)
         serve = (ROOT / "node" / "serve_paid_assets.py").read_text(encoding="utf-8")
         self.assertIn("request_authorized", serve)
         self.assertIn("verify_delivery_signature", serve)
         self.assertIn("short-lived", serve.lower() or "signed query")
+
+    def test_probe_failure_returns_none_plan(self) -> None:
+        from host_delivery import host_delivery_plan, build_host_delivery_url
+        from downloads import WINDOWS_EXE_FILENAME
+
+        url = build_host_delivery_url(
+            WINDOWS_EXE_FILENAME,
+            secret="sec",
+            base_url="https://example.test/paid-assets",
+            nonce="n1",
+            now=1_700_000_000.0,
+        )
+        self.assertIsNotNone(url)
+
+        def _boom(*_a, **_k):
+            raise OSError("helsinki down")
+
+        plan = host_delivery_plan(
+            WINDOWS_EXE_FILENAME,
+            force_enabled=True,
+            probe=True,
+            urlopen=_boom,
+        )
+        # force_enabled still needs secret/base from env or build — inject via mock
+        with mock.patch(
+            "host_delivery.build_host_delivery_url", return_value=url
+        ):
+            with mock.patch(
+                "host_delivery.safe_catalog_version_and_filename",
+                return_value=("0.5.4", WINDOWS_EXE_FILENAME),
+            ):
+                plan = host_delivery_plan(
+                    WINDOWS_EXE_FILENAME,
+                    force_enabled=True,
+                    probe=True,
+                    urlopen=_boom,
+                )
+                self.assertIsNone(plan)
+
+    def test_probe_success_keeps_plan(self) -> None:
+        from host_delivery import host_delivery_plan
+        from downloads import WINDOWS_EXE_FILENAME
+
+        class _Resp:
+            status = 200
+
+            def read(self, n: int = -1):
+                return b"M"
+
+            def __enter__(self):
+                return self
+
+            def __exit__(self, *a):
+                return False
+
+            def getcode(self):
+                return 200
+
+        def _ok(req, timeout=8.0):
+            return _Resp()
+
+        url = (
+            "https://example.test/paid-assets/0.5.4/"
+            + WINDOWS_EXE_FILENAME
+            + "?exp=9999999999&n=ab&sig=cd"
+        )
+        with mock.patch(
+            "host_delivery.build_host_delivery_url", return_value=url
+        ):
+            with mock.patch(
+                "host_delivery.safe_catalog_version_and_filename",
+                return_value=("0.5.4", WINDOWS_EXE_FILENAME),
+            ):
+                plan = host_delivery_plan(
+                    WINDOWS_EXE_FILENAME,
+                    force_enabled=True,
+                    probe=True,
+                    urlopen=_ok,
+                )
+                self.assertIsNotNone(plan)
+                assert plan is not None
+                self.assertEqual(plan["source"], "helsinki_host")
+
+    def test_thankyou_allows_signed_helsinki_url(self) -> None:
+        from payments import render_post_payment_thankyou_html
+        from host_delivery import is_signed_helsinki_delivery_url
+
+        bad = "https://github.com/rgsneddon/restore-privacy/releases/download/x/y.exe"
+        self.assertFalse(is_signed_helsinki_delivery_url(bad))
+        good = (
+            "https://135.181.152.10.sslip.io/paid-assets/0.5.4/"
+            "restore-privacy-client-0.5.4-windows-x64-setup.exe"
+            "?exp=999&n=aa&sig=bb"
+        )
+        self.assertTrue(is_signed_helsinki_delivery_url(good))
+        html = render_post_payment_thankyou_html(
+            download_path=good,
+            filename="restore-privacy-client-0.5.4-windows-x64-setup.exe",
+            platform="windows",
+        )
+        self.assertIn("auto-download-frame", html)
+        self.assertIn(good.split("?", 1)[0], html)
+        # Same href for iframe and manual
+        self.assertIn('id="success-download-link"', html)
+        with self.assertRaises(ValueError):
+            render_post_payment_thankyou_html(
+                download_path=bad,
+                filename="x.exe",
+                platform="windows",
+            )
 
 
 if __name__ == "__main__":

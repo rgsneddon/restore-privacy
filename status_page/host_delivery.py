@@ -230,11 +230,18 @@ def host_delivery_plan(
     filename: str,
     *,
     force_enabled: bool | None = None,
+    probe: bool = False,
+    urlopen: Any | None = None,
+    probe_timeout: float = 8.0,
 ) -> dict[str, Any] | None:
     """If host delivery should be used for *filename*, return plan dict.
 
     Keys: ``url``, ``version``, ``filename``, ``source`` (= ``helsinki_host``).
     Returns None when disabled, misconfigured, or filename not catalog-safe.
+
+    When *probe* is True, mint a URL and require a quick Helsinki reachability
+    check (first byte). On probe failure return None so the status host can fall
+    back to ``open_release_asset`` proxy/local path.
     """
     enabled = host_delivery_enabled() if force_enabled is None else bool(force_enabled)
     if not enabled:
@@ -246,9 +253,62 @@ def host_delivery_plan(
     if not pair:
         return None
     ver, name = pair
+    if probe and not probe_host_asset_reachable(
+        url, urlopen=urlopen, timeout=probe_timeout
+    ):
+        return None
     return {
         "url": url,
         "version": ver,
         "filename": name,
         "source": "helsinki_host",
     }
+
+
+def probe_host_asset_reachable(
+    url: str,
+    *,
+    urlopen: Any | None = None,
+    timeout: float = 8.0,
+) -> bool:
+    """True if *url* responds with HTTP 200/206 and at least one body byte.
+
+    Used before 302 so a dead Helsinki store falls back to status-host proxy.
+    *urlopen* is injectable for unit tests.
+    """
+    import urllib.request
+
+    target = (url or "").strip()
+    if not target.startswith("http://") and not target.startswith("https://"):
+        return False
+    open_url = urlopen or urllib.request.urlopen
+    try:
+        req = urllib.request.Request(
+            target,
+            headers={"User-Agent": "restore-privacy-host-delivery-probe"},
+            method="GET",
+        )
+        with open_url(req, timeout=float(timeout)) as resp:
+            code = int(getattr(resp, "status", None) or resp.getcode() or 0)
+            if code not in (200, 206):
+                return False
+            chunk = resp.read(1)
+            return bool(chunk)
+    except Exception:  # noqa: BLE001
+        return False
+
+
+def is_signed_helsinki_delivery_url(url: str) -> bool:
+    """True when *url* looks like a paid-assets signed delivery link (not free GitHub)."""
+    u = (url or "").strip()
+    if not u.startswith("https://") and not u.startswith("http://"):
+        return False
+    low = u.lower()
+    if "github.com" in low:
+        return False
+    if "/paid-assets/" not in low:
+        return False
+    # Must carry short-lived signature params (not a bare permanent path)
+    if "sig=" not in low or "exp=" not in low:
+        return False
+    return True

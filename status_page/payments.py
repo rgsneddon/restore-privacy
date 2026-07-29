@@ -2858,10 +2858,15 @@ def render_post_payment_thankyou_html(
     """Thank-you page body: auto-start one-time download + run-as-administrator copy.
 
     **Exactly one** auto-start mechanism: a hidden iframe whose ``src`` is the paid
-    ``/download?token=…`` path. The visible fallback anchor is **manual only** (no
-    script click / meta-refresh). The grant is consumed only after a **successful
-    full stream** (see app ``/download``), so a blocked iframe or a mid-proxy
-    failure leaves the manual link usable for a single successful transfer.
+    ``/download?token=…`` path (or a short-lived signed Helsinki host URL minted
+    for the same grant). The visible fallback anchor is **manual only** (no
+    script click / meta-refresh) and uses the **same** href as the iframe.
+
+    Grant consumption (see app ``/download``):
+      * **Proxy stream** — consume only after a **successful full stream** so a
+        blocked iframe or mid-proxy failure leaves the manual link usable.
+      * **Helsinki host 302** — does **not** consume on redirect (redirect is not
+        a completed transfer); iframe + manual may both hit ``/download`` safely.
 
     *purchase_id* is the durable product purchase identifier (distinct from the
     single-use download token). Buyers are **strongly advised** to note it so the
@@ -2871,9 +2876,28 @@ def render_post_payment_thankyou_html(
     licence accept then keygen entry for Connect.
     """
     link = (download_path or "").strip()
-    if not link.startswith("/download"):
-        raise ValueError("download_path must be a paid /download?token= path")
-    if "github.com" in link.lower() or link.startswith("http"):
+    try:
+        from host_delivery import is_signed_helsinki_delivery_url  # type: ignore
+    except Exception:  # noqa: BLE001
+        try:
+            from status_page.host_delivery import (  # type: ignore
+                is_signed_helsinki_delivery_url,
+            )
+        except Exception:  # noqa: BLE001
+
+            def is_signed_helsinki_delivery_url(u: str) -> bool:  # type: ignore
+                return False
+
+    if link.startswith("/download"):
+        pass  # normal paid grant path
+    elif is_signed_helsinki_delivery_url(link):
+        pass  # browser→Helsinki (short-lived sig); not free public GitHub
+    else:
+        raise ValueError(
+            "download_path must be a paid /download?token= path "
+            "or a signed Helsinki paid-assets delivery URL"
+        )
+    if "github.com" in link.lower():
         raise ValueError("download_path must not be an external free release URL")
     fname = (filename or "package").strip() or "package"
     fname_esc = _escape_html_text(fname)

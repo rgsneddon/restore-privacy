@@ -1031,7 +1031,13 @@ class Handler(BaseHTTPRequestHandler):
                 return
             # Prefer browser→Helsinki host delivery (short-lived signed URL) so
             # multi-MB installers are not double-proxied through Render.
-            # Fall back to open_release_asset (local / Helsinki fetch / GitHub).
+            # Probe Helsinki first; on failure fall through to open_release_asset.
+            #
+            # **Do not consume the grant on 302.** Thank-you loads the same
+            # ``/download?token=`` in a hidden iframe and a manual fallback; the
+            # contract is consume only after a successful full stream (proxy path)
+            # so a blocked iframe / mid-transfer drop leaves the manual link usable.
+            # Host 302 is not a completed transfer — grant stays for retry until TTL.
             try:
                 from host_delivery import host_delivery_plan  # type: ignore
             except Exception:  # noqa: BLE001
@@ -1040,9 +1046,9 @@ class Handler(BaseHTTPRequestHandler):
                 except Exception:  # noqa: BLE001
                     host_delivery_plan = None  # type: ignore
             if host_delivery_plan is not None:
-                plan = host_delivery_plan(str(fname))
+                plan = host_delivery_plan(str(fname), probe=True)
                 if plan and plan.get("url"):
-                    # Consume once we hand the browser a valid host URL (single-use).
+                    # Still unused at redirect time (no consume yet)
                     if lookup_download_token(token) is None:
                         self._send(
                             403,
@@ -1054,7 +1060,6 @@ class Handler(BaseHTTPRequestHandler):
                             ),
                         )
                         return
-                    consume_download_token(token)
                     self.send_response(302)
                     self.send_header("Location", str(plan["url"]))
                     self.send_header("Cache-Control", "no-store")
