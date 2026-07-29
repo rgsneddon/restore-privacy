@@ -7,7 +7,7 @@
 | **Public catalog version** | **0.5.3** |
 | **Default residual entry** | **United States (US)** (product default on all clients) |
 | **Live probe peer** | **Iceland (IS):44044** (UDP); status UI TCP **8080** |
-| **Audit generated** | **29 July 2026** (`2026-07-29T12:05:13Z`) |
+| **Audit generated** | **29 July 2026** (`2026-07-29T12:13:58Z`) |
 | **Cadence** | Automated security pass (~**every 1 day** + **jitter** on privacy-hardened node timer) |
 | **Audit type** | Static suite + live node status probe + **per-installer AUDIT STATE** + **section B privacy probes** + **multihop node structure** |
 | **Auditor method** | `scripts/run_security_audit.py` — unittest privacy/security modules + TCP/HTTP/UDP probes + no-`.priv` scan + catalog package RAG + section B + multihop structure (no firewall scan) |
@@ -91,7 +91,7 @@ Latest automated security audit for production node **Iceland (IS)** and the in-
 
 | Check | Result |
 |-------|--------|
-| Security unit suite | **FAIL** |
+| Security unit suite | **PASS** (11 modules) |
 | Node status TCP :8080 | reachable |
 | Node `/status` HTTP | OK — title-only=True |
 | UDP product port :44044 | probe sent |
@@ -172,10 +172,10 @@ An **ISP** performing **traffic analysis** may still observe connection timing a
 
 | Severity | Finding | Status |
 |----------|---------|--------|
-| **Info** | Automated pass at `2026-07-29T12:05:13Z` | Recorded |
+| **Info** | Automated pass at `2026-07-29T12:13:58Z` | Recorded |
 | **High** | Public client count on status | Closed (title-only) |
 | **Medium** | Shared client priv in packages | Closed (no .priv hits) |
-| **Low** | Unit suite failure | OPEN — see suite log |
+| **Low** | Unit suite failure | N/A |
 | **Info** | Multi-hop residual | Opt-in residual-via-exit (Romania); Windows PE multihop rebuild shipped in catalog when package present |
 
 ---
@@ -186,8 +186,8 @@ An **ISP** performing **traffic analysis** may still observe connection timing a
 
 | Result | Detail |
 |--------|--------|
-| **Unit suite** | **FAIL** |
-| **Return code** | 1 |
+| **Unit suite** | **PASS** (11 modules) |
+| **Return code** | 0 |
 | **Log** | operator SCRATCH / `security_audit.log` / node journal `rpt-security-audit.service` |
 | **Generator** | `scripts/run_security_audit.py` |
 
@@ -224,7 +224,7 @@ An **ISP** performing **traffic analysis** may still observe connection timing a
 
 ## 9. Conclusion
 
-Automated security audit at **2026-07-29T12:05:13Z** against node **Iceland (IS)** and in-repo privacy gates. Public **SECURITY AUDIT** links must resolve on the **status host** (`/AUDIT.md` / `/audit.md`). Source repository is **private**; paid catalog installers are fulfilled on the status host only. Core privacy promises hold when the suite passes and status remains title-only.
+Automated security audit at **2026-07-29T12:13:58Z** against node **Iceland (IS)** and in-repo privacy gates. Public **SECURITY AUDIT** links must resolve on the **status host** (`/AUDIT.md` / `/audit.md`). Source repository is **private**; paid catalog installers are fulfilled on the status host only. Core privacy promises hold when the suite passes and status remains title-only.
 
 Re-run: `python3 scripts/run_security_audit.py --write`
 

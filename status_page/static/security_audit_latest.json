@@ -1,11 +1,11 @@
 {
-  "generated_at": "2026-07-29T12:05:13Z",
+  "generated_at": "2026-07-29T12:13:58Z",
   "node_host": "Iceland (IS)",
   "catalog_version": "0.5.3",
   "unit_suite": {
     "ran": true,
-    "ok": false,
-    "returncode": 1,
+    "ok": true,
+    "returncode": 0,
     "modules": [
       "tests.test_legal_links",
       "tests.test_legal_docs",
@@ -349,7 +349,7 @@
     "multihop_structure": true,
     "firewall_probe_excluded": true
   },
-  "overall_ok": false,
+  "overall_ok": true,
   "privacy": {
     "redacted": true,
     "no_suite_tails": true,
