@@ -126,6 +126,16 @@ from processor_plugins import (
 SESSION_COOKIE = "rpt_admin_session"
 SESSION_TTL_SEC = 8 * 3600
 
+# Honest operator guidance: authenticator is strong, not absolute immunity.
+ADMIN_2FA_SECURITY_BLURB = (
+    "Authenticator apps (TOTP, e.g. Google Authenticator, Authy, 1Password) are a "
+    "standard, strong second factor for admin panels: an attacker needs your password "
+    "and a fresh code from your device. This is not absolute immunity — protect the "
+    "phone/app, avoid phishing of live codes, use a long unique password, and keep "
+    "the host/account secrets private. Lost device: an operator with Render access "
+    "must clear the durable 2FA store or rotate credentials before re-enrollment."
+)
+
 # Appearance: follow device/OS colour scheme by default; operator may pick light/dark.
 THEME_STORAGE_KEY = "rpt_admin_theme"
 THEME_MODES = frozenset({"system", "light", "dark"})
@@ -451,13 +461,50 @@ def session_from_headers(headers: Any) -> str:
 
 
 def is_authenticated(headers: Any, *, now: float | None = None) -> bool:
+    """True only for a full admin session (password + completed 2FA/setup)."""
     return verify_session_token(session_from_headers(headers), now=now)
+
+
+def admin_cookie_secure() -> bool:
+    """Set Secure on session cookies when public origin is HTTPS (or forced)."""
+    force = os.environ.get("RPT_ADMIN_COOKIE_SECURE", "").strip().lower()
+    if force in ("1", "true", "yes"):
+        return True
+    if force in ("0", "false", "no"):
+        return False
+    base = (os.environ.get("RPT_PUBLIC_BASE_URL", "") or "").strip().lower()
+    return base.startswith("https://")
+
+
+def format_session_cookie(
+    token: str,
+    *,
+    max_age: int = SESSION_TTL_SEC,
+    clear: bool = False,
+    cookie_name: str | None = None,
+) -> str:
+    """Build Set-Cookie value: HttpOnly, SameSite=Strict, Secure when HTTPS."""
+    name = cookie_name or SESSION_COOKIE
+    if clear:
+        parts = [f"{name}=", "Path=/", "HttpOnly", "SameSite=Strict", "Max-Age=0"]
+    else:
+        parts = [
+            f"{name}={token}",
+            "Path=/",
+            "HttpOnly",
+            "SameSite=Strict",
+            f"Max-Age={int(max_age)}",
+        ]
+    if admin_cookie_secure():
+        parts.append("Secure")
+    return "; ".join(parts)
 
 
 def admin_page_access(*, authenticated: bool, enabled: bool | None = None) -> str:
     """Pure access decision for /admin content.
 
     Returns one of: ``disabled``, ``login_required``, ``granted``.
+    Full session only — pending 2FA cookies must not set authenticated=True.
     """
     if enabled is None:
         enabled = admin_enabled()
@@ -1049,49 +1096,163 @@ def render_seed_test_purchase_section_html(
 """
 
 
+def _admin_auth_shell_css() -> str:
+    return f"""
+{admin_theme_css()}
+body{{margin:0;min-height:100vh;display:flex;flex-direction:column;align-items:center;
+justify-content:center;padding:1rem;box-sizing:border-box}}
+.login-wrap{{width:100%;max-width:26rem}}
+form.admin-auth-form{{background:var(--bg-elevated);padding:1.5rem 1.75rem;border-radius:12px;
+border:1px solid var(--border);width:100%;box-sizing:border-box}}
+form.admin-auth-form > label{{display:block;font-size:0.85rem;margin:0.6rem 0 0.25rem;
+color:var(--fg-muted)}}
+form.admin-auth-form input[type="text"],
+form.admin-auth-form input[type="password"],
+form.admin-auth-form input:not([type]){{width:100%;box-sizing:border-box;padding:0.55rem 0.65rem;
+border-radius:8px;border:1px solid var(--input-border);background:var(--input-bg);color:var(--fg)}}
+button{{margin-top:1rem;width:100%;padding:0.7rem;border:0;border-radius:8px;
+background:var(--btn-bg);color:var(--btn-fg);font-weight:600;cursor:pointer}}
+.err{{color:var(--err);font-size:0.9rem}}
+.ok-msg{{color:var(--badge-ok-fg);background:var(--badge-ok-bg);padding:0.5rem 0.65rem;
+border-radius:8px;font-size:0.88rem;line-height:1.4}}
+h1{{font-size:1.1rem;margin:0 0 0.5rem;color:var(--fg)}}
+.note{{color:var(--fg-muted);font-size:0.85rem;margin:0 0 0.75rem;line-height:1.35}}
+.secret-box{{font-family:ui-monospace,Consolas,monospace;font-size:0.95rem;word-break:break-all;
+background:var(--input-bg);border:1px solid var(--input-border);padding:0.65rem;border-radius:8px;
+margin:0.5rem 0;user-select:all}}
+.uri-box{{font-size:0.72rem;word-break:break-all;color:var(--fg-muted);margin:0.35rem 0 0.75rem}}
+"""
+
+
 def render_login_html(*, error: str = "") -> bytes:
     err = (
         f'<p class="err" id="admin-error">{_escape(error)}</p>' if error else ""
     )
+    blurb = _escape(ADMIN_2FA_SECURITY_BLURB)
     body = f"""<!DOCTYPE html>
 <html lang="en"><head>
 <meta charset="utf-8"/><meta name="viewport" content="width=device-width, initial-scale=1"/>
 <meta name="color-scheme" content="light dark"/>
 <title>Admin login — Restore Privacy</title>
 <style>
-{admin_theme_css()}
-body{{margin:0;min-height:100vh;display:flex;flex-direction:column;align-items:center;
-justify-content:center;padding:1rem;box-sizing:border-box}}
-.login-wrap{{width:100%;max-width:22rem}}
-form#admin-login-form{{background:var(--bg-elevated);padding:1.5rem 1.75rem;border-radius:12px;
-border:1px solid var(--border);width:100%;box-sizing:border-box}}
-form#admin-login-form > label{{display:block;font-size:0.85rem;margin:0.6rem 0 0.25rem;
-color:var(--fg-muted)}}
-form#admin-login-form input[type="text"],
-form#admin-login-form input[type="password"],
-form#admin-login-form input:not([type]){{width:100%;box-sizing:border-box;padding:0.55rem 0.65rem;
-border-radius:8px;border:1px solid var(--input-border);background:var(--input-bg);color:var(--fg)}}
-button{{margin-top:1rem;width:100%;padding:0.7rem;border:0;border-radius:8px;
-background:var(--btn-bg);color:var(--btn-fg);font-weight:600;cursor:pointer}}
-.err{{color:var(--err);font-size:0.9rem}}
-h1{{font-size:1.1rem;margin:0 0 0.5rem;color:var(--fg)}}
-.note{{color:var(--fg-muted);font-size:0.85rem;margin:0 0 0.75rem;line-height:1.35}}
+{_admin_auth_shell_css()}
 </style>
 {admin_theme_boot_script()}
 </head><body>
 <div class="login-wrap">
 {admin_theme_picker_html()}
-<form method="post" action="/admin/login" id="admin-login-form">
+<form method="post" action="/admin/login" id="admin-login-form" class="admin-auth-form">
   <h1>Operator admin</h1>
   <p class="note" id="admin-login-note">Private page: Stripe processor settings,
-  licence database, and paid-download grants for the multi-peer residual catalog
-  (IS / RO / US). Not the public shop.</p>
+  licence database, accounting, fleet, and paid-download grants.
+  Not the public shop. After password, authenticator (TOTP) setup or a 6-digit code
+  is required before any admin tools load.</p>
+  <p class="note" id="admin-2fa-security-blurb">{blurb}</p>
   {err}
   <label for="username">Username</label>
   <input id="username" name="username" autocomplete="username" required/>
   <label for="password">Password</label>
   <input id="password" name="password" type="password" autocomplete="current-password" required/>
-  <button type="submit">Sign in</button>
+  <button type="submit" id="admin-login-submit">Sign in</button>
+</form>
+</div>
+</body></html>
+"""
+    return body.encode("utf-8")
+
+
+def render_2fa_setup_html(
+    *,
+    secret_b32: str,
+    otpauth: str = "",
+    account: str = "admin",
+    error: str = "",
+    message: str = "",
+) -> bytes:
+    """Enrollment after password when no authenticator is enrolled yet."""
+    try:
+        from admin_2fa import otpauth_uri  # type: ignore
+    except Exception:  # noqa: BLE001
+        from status_page.admin_2fa import otpauth_uri  # type: ignore
+
+    uri = otpauth or otpauth_uri(secret_b32, account=account)
+    err = f'<p class="err" id="admin-2fa-setup-error">{_escape(error)}</p>' if error else ""
+    msg = (
+        f'<p class="ok-msg" id="admin-2fa-setup-message">{_escape(message)}</p>'
+        if message
+        else ""
+    )
+    blurb = _escape(ADMIN_2FA_SECURITY_BLURB)
+    body = f"""<!DOCTYPE html>
+<html lang="en"><head>
+<meta charset="utf-8"/><meta name="viewport" content="width=device-width, initial-scale=1"/>
+<meta name="color-scheme" content="light dark"/>
+<title>Set up authenticator — Admin</title>
+<style>
+{_admin_auth_shell_css()}
+</style>
+{admin_theme_boot_script()}
+</head><body>
+<div class="login-wrap">
+{admin_theme_picker_html()}
+<form method="post" action="/admin/2fa/setup" id="admin-2fa-setup-form" class="admin-auth-form"
+      data-admin-2fa-setup="1">
+  <h1 id="admin-2fa-setup-heading">Set up authenticator</h1>
+  <p class="note" id="admin-2fa-setup-note">
+    Add this account in your authenticator app (Google Authenticator, Authy,
+    Microsoft Authenticator, 1Password, etc.), then enter the 6-digit code to
+    finish. The secret is shown <strong>once</strong> for enrollment — store it
+    only in your authenticator; it is never embedded in the public shop.
+  </p>
+  <p class="note" id="admin-2fa-security-blurb">{blurb}</p>
+  {msg}{err}
+  <p class="note"><strong>Secret (manual entry)</strong></p>
+  <div class="secret-box" id="admin-2fa-secret" data-totp-secret="1">{_escape(secret_b32)}</div>
+  <p class="note">App link (otpauth):</p>
+  <p class="uri-box" id="admin-2fa-otpauth">{_escape(uri)}</p>
+  <label for="totp_code">6-digit code from app</label>
+  <input id="totp_code" name="totp_code" type="text" inputmode="numeric"
+         pattern="[0-9]{{6}}" maxlength="8" autocomplete="one-time-code" required
+         placeholder="123456"/>
+  <button type="submit" id="admin-2fa-setup-submit">Confirm and open admin</button>
+</form>
+</div>
+</body></html>
+"""
+    return body.encode("utf-8")
+
+
+def render_2fa_verify_html(*, error: str = "") -> bytes:
+    """Challenge after password when authenticator is already enrolled."""
+    err = f'<p class="err" id="admin-2fa-verify-error">{_escape(error)}</p>' if error else ""
+    blurb = _escape(ADMIN_2FA_SECURITY_BLURB)
+    body = f"""<!DOCTYPE html>
+<html lang="en"><head>
+<meta charset="utf-8"/><meta name="viewport" content="width=device-width, initial-scale=1"/>
+<meta name="color-scheme" content="light dark"/>
+<title>Authenticator code — Admin</title>
+<style>
+{_admin_auth_shell_css()}
+</style>
+{admin_theme_boot_script()}
+</head><body>
+<div class="login-wrap">
+{admin_theme_picker_html()}
+<form method="post" action="/admin/2fa/verify" id="admin-2fa-verify-form" class="admin-auth-form"
+      data-admin-2fa-verify="1">
+  <h1 id="admin-2fa-verify-heading">Authenticator code</h1>
+  <p class="note" id="admin-2fa-verify-note">
+    Password accepted. Enter the current 6-digit code from your authenticator app
+    to open the admin console. Password alone cannot access licences, accounting,
+    or other operator tools.
+  </p>
+  <p class="note" id="admin-2fa-security-blurb">{blurb}</p>
+  {err}
+  <label for="totp_code">6-digit code</label>
+  <input id="totp_code" name="totp_code" type="text" inputmode="numeric"
+         pattern="[0-9]{{6}}" maxlength="8" autocomplete="one-time-code" required
+         placeholder="123456" autofocus/>
+  <button type="submit" id="admin-2fa-verify-submit">Verify and open admin</button>
 </form>
 </div>
 </body></html>

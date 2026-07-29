@@ -19,11 +19,24 @@ from pathlib import Path
 from admin_panel import (
     SESSION_COOKIE,
     admin_enabled,
+    format_session_cookie,
     is_authenticated,
     mint_session_token,
+    render_2fa_setup_html,
+    render_2fa_verify_html,
     render_admin_html,
     render_login_html,
     verify_credentials,
+)
+from admin_2fa import (
+    PENDING_COOKIE,
+    PENDING_TTL_SEC,
+    begin_login_after_password,
+    complete_setup,
+    complete_verify,
+    otpauth_uri,
+    pending_from_headers,
+    verify_pending_token,
 )
 from downloads import download_css, render_bmc_tip_html, render_download_section_html
 from settings_explainer import (
@@ -1465,11 +1478,66 @@ class Handler(BaseHTTPRequestHandler):
                 extra_headers=[
                     (
                         "Set-Cookie",
-                        f"{SESSION_COOKIE}=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0",
+                        format_session_cookie("", clear=True),
+                    ),
+                    (
+                        "Set-Cookie",
+                        format_session_cookie(
+                            "", clear=True, cookie_name=PENDING_COOKIE
+                        ),
                     ),
                     ("Location", "/admin/login"),
                 ],
             )
+            return
+        if path in ("/admin/2fa/setup", "/admin/2fa/setup/"):
+            # GET: show enrollment when pending setup cookie present
+            if not admin_enabled():
+                self._send(503, "text/plain; charset=utf-8", b"admin disabled")
+                return
+            if is_authenticated(self.headers):
+                self._redirect("/admin")
+                return
+            pending = pending_from_headers(self.headers)
+            info = verify_pending_token(pending, expect_stage="setup")
+            if not info or not info.get("secret_b32"):
+                self._send(
+                    200,
+                    "text/html; charset=utf-8",
+                    render_login_html(
+                        error="Authenticator setup expired — sign in with password again."
+                    ),
+                )
+                return
+            secret = str(info["secret_b32"])
+            self._send(
+                200,
+                "text/html; charset=utf-8",
+                render_2fa_setup_html(
+                    secret_b32=secret,
+                    otpauth=otpauth_uri(secret),
+                ),
+            )
+            return
+        if path in ("/admin/2fa/verify", "/admin/2fa/verify/"):
+            if not admin_enabled():
+                self._send(503, "text/plain; charset=utf-8", b"admin disabled")
+                return
+            if is_authenticated(self.headers):
+                self._redirect("/admin")
+                return
+            pending = pending_from_headers(self.headers)
+            info = verify_pending_token(pending, expect_stage="verify")
+            if not info:
+                self._send(
+                    200,
+                    "text/html; charset=utf-8",
+                    render_login_html(
+                        error="Authenticator step expired — sign in with password again."
+                    ),
+                )
+                return
+            self._send(200, "text/html; charset=utf-8", render_2fa_verify_html())
             return
 
         self._send(404, "text/plain; charset=utf-8", b"not found")
@@ -1652,12 +1720,135 @@ class Handler(BaseHTTPRequestHandler):
                     render_login_html(error="Invalid username or password"),
                 )
                 return
+            # Password alone is never enough: pending cookie → setup or TOTP
+            step = begin_login_after_password()
+            pending = str(step["pending_token"])
+            stage = str(step["stage"])
+            if stage == "setup":
+                secret = str(step.get("secret_b32") or "")
+                self._send(
+                    200,
+                    "text/html; charset=utf-8",
+                    render_2fa_setup_html(
+                        secret_b32=secret,
+                        otpauth=otpauth_uri(secret),
+                    ),
+                    extra_headers=[
+                        (
+                            "Set-Cookie",
+                            format_session_cookie(
+                                pending,
+                                max_age=PENDING_TTL_SEC,
+                                cookie_name=PENDING_COOKIE,
+                            ),
+                        ),
+                        # Ensure no leftover full session
+                        (
+                            "Set-Cookie",
+                            format_session_cookie("", clear=True),
+                        ),
+                    ],
+                )
+                return
+            self._send(
+                200,
+                "text/html; charset=utf-8",
+                render_2fa_verify_html(),
+                extra_headers=[
+                    (
+                        "Set-Cookie",
+                        format_session_cookie(
+                            pending,
+                            max_age=PENDING_TTL_SEC,
+                            cookie_name=PENDING_COOKIE,
+                        ),
+                    ),
+                    (
+                        "Set-Cookie",
+                        format_session_cookie("", clear=True),
+                    ),
+                ],
+            )
+            return
+
+        if path in ("/admin/2fa/setup", "/admin/2fa/setup/"):
+            if not admin_enabled():
+                self._send(503, "text/plain; charset=utf-8", b"admin disabled")
+                return
+            pending = pending_from_headers(self.headers)
+            form = dict(urllib.parse.parse_qsl(body.decode("utf-8", "replace")))
+            code = (form.get("totp_code") or form.get("code") or "").strip()
+            info = verify_pending_token(pending, expect_stage="setup")
+            secret_for_retry = (
+                str(info.get("secret_b32") or "") if info else ""
+            )
+            try:
+                complete_setup(pending, code)
+            except ValueError as exc:
+                if secret_for_retry:
+                    self._send(
+                        401,
+                        "text/html; charset=utf-8",
+                        render_2fa_setup_html(
+                            secret_b32=secret_for_retry,
+                            otpauth=otpauth_uri(secret_for_retry),
+                            error=str(exc),
+                        ),
+                    )
+                else:
+                    self._send(
+                        401,
+                        "text/html; charset=utf-8",
+                        render_login_html(error=str(exc)),
+                    )
+                return
             token = mint_session_token()
             self.send_response(302)
             self.send_header("Location", "/admin")
             self.send_header(
                 "Set-Cookie",
-                f"{SESSION_COOKIE}={token}; Path=/; HttpOnly; SameSite=Lax; Max-Age=28800",
+                format_session_cookie(token),
+            )
+            self.send_header(
+                "Set-Cookie",
+                format_session_cookie(
+                    "", clear=True, cookie_name=PENDING_COOKIE
+                ),
+            )
+            self.send_header("Content-Length", "0")
+            self.send_header("Cache-Control", "no-store")
+            self._security_headers()
+            self.end_headers()
+            return
+
+        if path in ("/admin/2fa/verify", "/admin/2fa/verify/"):
+            if not admin_enabled():
+                self._send(503, "text/plain; charset=utf-8", b"admin disabled")
+                return
+            pending = pending_from_headers(self.headers)
+            form = dict(urllib.parse.parse_qsl(body.decode("utf-8", "replace")))
+            code = (form.get("totp_code") or form.get("code") or "").strip()
+            try:
+                complete_verify(pending, code)
+            except ValueError as exc:
+                self._send(
+                    401,
+                    "text/html; charset=utf-8",
+                    render_2fa_verify_html(error=str(exc)),
+                )
+                return
+            token = mint_session_token()
+            self.send_response(302)
+            self.send_header("Location", "/admin")
+            self.send_header(
+                "Set-Cookie",
+                format_session_cookie(token),
+            )
+            self.send_header(
+                "Set-Cookie",
+                format_session_cookie(
+                    "", clear=True, cookie_name=PENDING_COOKIE
+                ),
             )
             self.send_header("Content-Length", "0")
             self.send_header("Cache-Control", "no-store")
