@@ -10,7 +10,7 @@
 | 2. **Team residual NE re-sign** (required) | `build_release_0.5.5.py --apple-only` runs `apple_ship_gates.run_residual_team_resign` → copy `restore_privacy_client.residual-team.app` signed with **Apple Development** + Mac Team NE profiles | Residual Connect works on **this Mac** |
 | 3. **DevID + notarize** (public zip) | Same `--apple-only` then `sign_and_notarize_macos.py` on the **original** Flutter app | Catalog `…-macos.zip` (no host residual NE — AMFI-safe) |
 | 4. **iOS Team-sign** | Same `--apple-only` codesigns Runner + PacketTunnel with **Apple Distribution** | Catalog `…-ios.zip` sideload |
-| 5. **Host paid assets** | `build_release_0.5.5.py --apple-only --host-paid` **or** `host_paid_assets_vps.py --stage --upload --version 0.5.5 --force` | Helsinki `paid_assets/0.5.5/` |
+| 5. **Host paid assets** | `build_release_0.5.5.py --apple-only --host-paid` **or** `host_paid_assets_vps.py --stage --upload --version 0.5.5 --force` with `RPT_SSH_KEY=~/.ssh/id_ed25519_restore_privacy_eu` (root@135.181.152.10) | Helsinki `paid_assets/0.5.5/` |
 | 6. Catalog pin | `client/VERSION` + `downloads.RELEASE_VERSION` = **0.5.5**; live `/api/catalog-version` after Render deploy | Download links = monopin only |
 
 **Do not skip step 2** for residual Connect testing. Opt-out only for non-residual CI:

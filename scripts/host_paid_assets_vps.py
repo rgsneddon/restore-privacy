@@ -22,7 +22,10 @@ Usage::
 
   # Upload to Helsinki store + install/restart token-gated serve (needs SSH)
   export RPT_SSH_HOST=135.181.152.10 RPT_SSH_USER=root
-  export RPT_SSH_KEY=~/.ssh/id_ed25519_20260725
+  # Working store keys on operator Macs (try in order if RPT_SSH_KEY unset):
+  #   id_ed25519_restore_privacy_eu  (Helsinki store — current)
+  #   id_ed25519_20260725            (legacy name if present)
+  export RPT_SSH_KEY=~/.ssh/id_ed25519_restore_privacy_eu
   export RPT_ASSET_FETCH_TOKEN='long-random-secret'
   python scripts/host_paid_assets_vps.py --stage --upload --install-serve
 
@@ -222,7 +225,8 @@ def _ssh_target() -> tuple[str, str, str | None, Path | None]:
     if key_path is None or not key_path.is_file():
         home = Path.home() / ".ssh"
         for name in (
-            "id_ed25519_20260725",  # Helsinki store
+            "id_ed25519_restore_privacy_eu",  # Helsinki store (current Macs)
+            "id_ed25519_20260725",  # Helsinki store (legacy filename)
             "id_ed25519_restore_privacy_vps",  # Iceland residual node
             "id_ed25519",
             "id_rsa",
@@ -234,7 +238,7 @@ def _ssh_target() -> tuple[str, str, str | None, Path | None]:
     if not password and (key_path is None or not key_path.is_file()):
         raise SystemExit(
             "Need RPT_SSH_PASSWORD or SSH key (RPT_SSH_KEY / "
-            "~/.ssh/id_ed25519_20260725 or id_ed25519_restore_privacy_vps)"
+            "~/.ssh/id_ed25519_restore_privacy_eu or id_ed25519_20260725)"
         )
     return host, user, password, key_path
 
