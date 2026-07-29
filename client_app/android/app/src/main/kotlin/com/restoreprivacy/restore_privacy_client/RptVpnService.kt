@@ -283,7 +283,6 @@ class RptVpnService : VpnService() {
 
                 // DNS: node tunnel gateway recursive resolver (10.88.0.1 / unbound on residual node)
                 // Kill switch removed from product residual (no VpnService blocking mode).
-                // IPv4-only residual: do NOT install ::/0 without a TUN IPv6 address.
                 // Settings dual-stack residual (defaults both ON).
                 val residualIpv4 = StartupPrefs.residualIpv4Enabled(this)
                 val residualIpv6 = StartupPrefs.residualIpv6Enabled(this)
@@ -297,17 +296,29 @@ class RptVpnService : VpnService() {
                     builder.allowFamily(OsConstants.AF_INET)
                 } catch (_: Exception) {
                 }
-                // IPv6 residual ON would claim ::/0 when product carries IPv6 TUN (not yet).
-                // Keep ipv6RouteOk honest: only true when IPv6 residual is on AND a route is installed.
+                // ipv6RouteOk true only when Settings IPv6 ON and ISP IPv6 path is routed into TUN.
                 var ipv6RouteOk = false
                 if (fullTunnel && residualIpv4) {
                     // Full-tunnel IPv4 residual capture (Settings residual_ipv4 ON)
                     builder.addRoute("0.0.0.0", 0)
                 }
-                // Product residual TUN is IPv4-only; do not install ::/0 without IPv6 TUN addr.
-                // residualIpv6 is still recorded for honesty (not protected until dual-stack TUN).
+                // Settings residual IPv6 ON: block ISP IPv6 leaks by installing a TUN ULA
+                // address + catch-all ::/0 (VpnService requires an IPv6 addr before ::/0).
+                // Residual DATA stays IPv4; IPv6 packets into TUN are not forwarded to ISP.
                 if (fullTunnel && residualIpv6) {
-                    ipv6RouteOk = false // honest: ISP IPv6 not claimed blocked on Android IPv4 TUN
+                    try {
+                        builder.allowFamily(OsConstants.AF_INET6)
+                    } catch (_: Exception) {
+                    }
+                    try {
+                        // fd72:7074::/64 — product ULA (RPT-ish); not a public residual IPv6 peer
+                        builder.addAddress("fd72:7074::2", 64)
+                        builder.addRoute("::", 0)
+                        ipv6RouteOk = true
+                    } catch (_: Exception) {
+                        // Establish may still succeed without IPv6 block — stay honest
+                        ipv6RouteOk = false
+                    }
                 }
                 try {
                     // Keep our app off the VPN loop so UDP to node works
@@ -377,8 +388,11 @@ class RptVpnService : VpnService() {
                         "Connected — session only; residual IPv4 off (VPN IP ${session.vpnIp})"
                     residualIpv6 && ipv6RouteOk ->
                         "Connected — VPN active; IPv6 ISP path blocked (VPN IP ${session.vpnIp})"
+                    residualIpv6 && !ipv6RouteOk ->
+                        // Settings ON but ::/0 install failed — do not claim protected
+                        "Connected — IPv4 via VPN; IPv6 not protected (VPN IP ${session.vpnIp})"
                     else ->
-                        // IPv4 residual capture; ISP IPv6 not claimed protected on IPv4-only TUN
+                        // Settings residual IPv6 OFF — honest not protected
                         "Connected — IPv4 via VPN; IPv6 not protected (VPN IP ${session.vpnIp})"
                 }
                 report(

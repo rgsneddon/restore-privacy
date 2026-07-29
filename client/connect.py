@@ -160,18 +160,31 @@ def _residual_stack_prefs():
 def _tunnel_plan_for_session(
     existing: Optional[FullTunnelPlan], vpn_ip: str
 ) -> FullTunnelPlan:
-    """Reuse plan only when VPN IP still matches; otherwise build a fresh plan."""
+    """Reuse plan only when VPN IP and dual-stack Settings still match.
+
+    Never reuse a plan whose IPv4 catch-all or IPv6 leak policy disagrees with
+    current Settings (e.g. leftover allow_isp after user turns IPv6 residual ON).
+    """
     ip = (vpn_ip or "").strip()
     stack = _residual_stack_prefs()
-    if (
-        existing is not None
-        and existing.tunnel_client_ip == ip
-        and existing.is_full_tunnel()
-        and stack.ipv4_enabled
-        and stack.ipv6_enabled
-        and not assert_full_tunnel_plan(existing)
-    ):
-        return existing
+    if existing is not None and existing.tunnel_client_ip == ip:
+        try:
+            from client.full_tunnel import plan_wants_ipv4_catchall
+            from client.residual_stack import plan_wants_ipv6_isp_block
+
+            v4_ok = plan_wants_ipv4_catchall(existing) == bool(stack.ipv4_enabled)
+            v6_ok = plan_wants_ipv6_isp_block(existing) == bool(stack.ipv6_enabled)
+            # Full-tunnel assert only when IPv4 residual ON (empty routes when OFF)
+            if stack.ipv4_enabled:
+                plan_ok = existing.is_full_tunnel() and not assert_full_tunnel_plan(
+                    existing
+                )
+            else:
+                plan_ok = not plan_wants_ipv4_catchall(existing)
+            if v4_ok and v6_ok and plan_ok:
+                return existing
+        except Exception:
+            pass
     return build_full_tunnel_plan(
         ip,
         ipv4_enabled=stack.ipv4_enabled,

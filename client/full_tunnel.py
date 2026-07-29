@@ -282,6 +282,8 @@ def windows_ipv6_disable_powershell(*, tunnel_iface: str = "RPT") -> str:
 
     - Does **not** use ``-ErrorAction SilentlyContinue`` on Disable-NetAdapterBinding
       (that would exit 0 with zero effect).
+    - Counts adapters that are **already** IPv6-disabled as protected (so a second
+      Connect / Settings ON does not report false failure).
     - Prints ``RPT_IPV6_DISABLED=<n>`` where n is adapters verified disabled.
     - Exits **1** when n==0 (no adapter protected) so callers cannot claim success.
     """
@@ -295,11 +297,14 @@ def windows_ipv6_disable_powershell(*, tunnel_iface: str = "RPT") -> str:
         "Where-Object { $_.Status -eq 'Up' -and $_.Name -ne $tun }); "
         "foreach ($a in $adapters) { "
         "  try { "
-        "    Disable-NetAdapterBinding -Name $a.Name -ComponentID ms_tcpip6 "
-        "      -Confirm:$false -ErrorAction Stop; "
         "    $b=Get-NetAdapterBinding -Name $a.Name -ComponentID ms_tcpip6 "
         "      -ErrorAction Stop; "
-        "    if (-not $b.Enabled) { $disabled++ } "
+        "    if (-not $b.Enabled) { $disabled++; continue } "
+        "    Disable-NetAdapterBinding -Name $a.Name -ComponentID ms_tcpip6 "
+        "      -Confirm:$false -ErrorAction Stop; "
+        "    $b2=Get-NetAdapterBinding -Name $a.Name -ComponentID ms_tcpip6 "
+        "      -ErrorAction Stop; "
+        "    if (-not $b2.Enabled) { $disabled++ } "
         "  } catch { } "
         "}; "
         f"Write-Output ('{RPT_IPV6_DISABLED_PREFIX}' + $disabled); "
@@ -390,15 +395,19 @@ def linux_ipv6_leak_rollback_commands(*, iface: str = "rpt0") -> list[str]:
 
 def android_vpn_builder_config(plan: FullTunnelPlan) -> dict[str, Any]:
     """Config dict consumed by Android VpnService.Builder (full tunnel)."""
-    # IPv6 ::/0 into the VPN so residual IPv6 is not left on the ISP (may blackhole
-    # until the node carries IPv6 — privacy preference over silent leak).
+    # IPv6 ::/0 into the VPN so residual IPv6 is not left on the ISP. Requires a
+    # TUN IPv6 address (ULA) before Builder accepts addRoute("::", 0).
     routes: list[dict[str, Any]] = [{"addr": "0.0.0.0", "prefix": 0}]
+    addresses: list[dict[str, Any]] = [
+        {"addr": plan.tunnel_client_ip, "prefix": 32},
+    ]
     if plan.ipv6_leak_policy == IPV6_LEAK_POLICY_BLOCK_ISP:
+        addresses.append({"addr": "fd72:7074::2", "prefix": 64})
         routes.append({"addr": "::", "prefix": 0})
     return {
         "session": plan.session_name,
         "mtu": plan.mtu,
-        "addresses": [{"addr": plan.tunnel_client_ip, "prefix": 32}],
+        "addresses": addresses,
         "routes": routes,
         "dns": list(plan.dns_servers),
         "allowAllApps": plan.allow_all_apps,

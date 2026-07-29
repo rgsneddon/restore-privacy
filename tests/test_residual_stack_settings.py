@@ -94,6 +94,15 @@ class TestResidualStackPrefs(unittest.TestCase):
         self.assertIs(honesty_ipv6_protected(stack_ipv6_enabled=True, mitigation_applied=True), True)
         self.assertIs(honesty_ipv6_protected(stack_ipv6_enabled=True, mitigation_applied=False), False)
 
+    def test_build_plan_ipv6_on_block_isp(self):
+        plan = build_full_tunnel_plan("10.88.0.5", ipv4_enabled=True, ipv6_enabled=True)
+        self.assertEqual(plan.ipv6_leak_policy, IPV6_LEAK_POLICY_BLOCK_ISP)
+        self.assertTrue(plan_wants_ipv6_isp_block(plan))
+        cfg = android_vpn_builder_config(plan)
+        self.assertTrue(cfg.get("ipv6Protected"))
+        routes = cfg.get("routes") or []
+        self.assertIn({"addr": "::", "prefix": 0}, routes)
+
     def test_windows_route_commands_omit_dual_slash1_when_ipv4_off(self):
         """Shipped windows_route_commands must honour plan.default_routes (not only include_catchall)."""
         off = build_full_tunnel_plan("10.88.0.5", ipv4_enabled=False, ipv6_enabled=True)

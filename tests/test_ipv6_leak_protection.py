@@ -48,6 +48,9 @@ class TestIpv6LeakCommandBuilders(unittest.TestCase):
         self.assertIn("Disable-NetAdapterBinding", critical)
         self.assertNotIn("SilentlyContinue", critical)
         self.assertIn(RPT_IPV6_DISABLED_PREFIX, critical)
+        # Already-disabled adapters must count (reconnect / Settings ON honesty)
+        self.assertIn("continue", critical)
+        self.assertIn("Get-NetAdapterBinding", critical)
         self.assertIn("exit 1", critical)
         self.assertIn("Get-NetAdapterBinding", critical)
 
@@ -233,7 +236,7 @@ class TestProductSourceIpv6Wiring(unittest.TestCase):
             self.assertIn("ipv6_residual_protected", text)
 
     def test_android_adds_ipv6_route(self):
-        """Android residual is IPv4-only: no bare ::/0 (blackhole risk); honesty flags remain."""
+        """Settings residual IPv6 ON installs TUN ULA + ::/0 ISP block; honesty flags remain."""
         path = (
             ROOT
             / "client_app"
@@ -248,14 +251,23 @@ class TestProductSourceIpv6Wiring(unittest.TestCase):
             / "RptVpnService.kt"
         )
         text = path.read_text(encoding="utf-8")
-        # Product anti-blackhole: do not install ::/0 without TUN IPv6
-        self.assertNotIn('addRoute("::", 0)', text)
-        self.assertIn("::/0", text)  # documented in comments / honesty path
+        # Product residual IPv6 ON: ULA address required before catch-all ::/0
+        self.assertIn('addRoute("::", 0)', text)
+        self.assertIn("addAddress", text)
+        self.assertIn("fd72:7074", text)
         self.assertIn("ipv6RouteOk", text)
         self.assertIn("IPv6 not protected", text)
+        self.assertIn("IPv6 ISP path blocked", text)
         self.assertIn("EXTRA_IPV6_PROTECTED", text)
         self.assertIn("activeIpv6Protected", text)
         self.assertIn('addRoute("0.0.0.0", 0)', text)
+        # Must not hard-code permanent not-protected when residualIpv6 ON
+        self.assertNotIn(
+            "ipv6RouteOk = false // honest: ISP IPv6 not claimed blocked",
+            text,
+        )
+        self.assertIn("residualIpv6", text)
+        self.assertIn("StartupPrefs.residualIpv6Enabled", text)
 
     def test_flutter_plain_connected_status_ipv6_honest(self):
         theme = (ROOT / "client_app" / "lib" / "theme.dart").read_text(encoding="utf-8")
@@ -267,16 +279,22 @@ class TestProductSourceIpv6Wiring(unittest.TestCase):
         self.assertIn("ipv6Protected", cs)
         self.assertIn("IPv6 not protected", cs)
 
-    def test_apple_packet_tunnel_no_ipv6_killswitch(self):
-        """Apple residual must not install IPv6 default-route kill-switch/blackhole."""
+    def test_apple_packet_tunnel_ipv6_follows_settings(self):
+        """Apple residual IPv6 ISP block only when Settings residual_ipv6 ON."""
         for rel in (
             "client_app/ios/NativePrep/PacketTunnelProvider.swift",
             "client_app/macos/NativePrep/PacketTunnelProvider.swift",
         ):
-            text = (ROOT / rel).read_text(encoding="utf-8")
-            # No catch-all IPv6 route into the tunnel
-            self.assertNotIn("NEIPv6Route.default()", text)
-            self.assertNotIn("NEIPv6Settings(addresses:", text)
+            path = ROOT / rel
+            if not path.is_file():
+                continue
+            text = path.read_text(encoding="utf-8")
+            # Product residual IPv6 ON installs ULA + default IPv6 route (ISP block)
+            self.assertIn("NEIPv6Route.default()", text)
+            self.assertIn("residual_ipv6", text)
+            # OFF path must clear ipv6Settings (not force block when user opts out)
+            self.assertIn("ipv6Settings = nil", text)
+            self.assertIn("ipv6Protected", text)
             self.assertIn("settings.ipv6Settings = nil", text)
             # Still full IPv4 residual + tunnel DNS
             self.assertIn("NEIPv4Route.default()", text)
