@@ -136,6 +136,24 @@ ADMIN_2FA_SECURITY_BLURB = (
     "must clear the durable 2FA store or rotate credentials before re-enrollment."
 )
 
+# Extra practical controls (advice only — not all implemented in-product).
+ADMIN_SECURITY_EXTRA_ADVICE = (
+    "Further harden admin access: (1) long unique password in a password manager, "
+    "rotated if ever shared; (2) keep RPT_ADMIN_PASSWORD / session secrets only in "
+    "Render env (never git or screenshots); (3) complete authenticator enrollment "
+    "promptly and do not leave the setup secret on disk; (4) sign out when done; "
+    "avoid shared browsers; (5) treat live 6-digit codes as passwords — never paste "
+    "them into chat/email; (6) optional host-side controls (Render IP allowlist, "
+    "VPN/SSH tunnel only, separate operator device) reduce exposure further; "
+    "(7) WebAuthn/hardware keys are stronger than TOTP if you add them later. "
+    "TOTP + strong password is industry-standard for panels like this; nothing "
+    "gives zero risk if the server or phone is fully compromised."
+)
+
+# Public media kit (brand logos / favicons) — no auth required.
+MEDIA_KIT_PUBLIC_PATH = "/media-kit/restore-privacy-media-kit.zip"
+MEDIA_KIT_FILENAME = "restore-privacy-media-kit.zip"
+
 # Appearance: follow device/OS colour scheme by default; operator may pick light/dark.
 THEME_STORAGE_KEY = "rpt_admin_theme"
 THEME_MODES = frozenset({"system", "light", "dark"})
@@ -1121,6 +1139,9 @@ h1{{font-size:1.1rem;margin:0 0 0.5rem;color:var(--fg)}}
 background:var(--input-bg);border:1px solid var(--input-border);padding:0.65rem;border-radius:8px;
 margin:0.5rem 0;user-select:all}}
 .uri-box{{font-size:0.72rem;word-break:break-all;color:var(--fg-muted);margin:0.35rem 0 0.75rem}}
+.qr-wrap{{text-align:center;margin:0.75rem 0}}
+.qr-wrap img{{max-width:14rem;height:auto;background:#fff;padding:0.5rem;border-radius:8px;
+border:1px solid var(--border)}}
 """
 
 
@@ -1129,6 +1150,7 @@ def render_login_html(*, error: str = "") -> bytes:
         f'<p class="err" id="admin-error">{_escape(error)}</p>' if error else ""
     )
     blurb = _escape(ADMIN_2FA_SECURITY_BLURB)
+    extra = _escape(ADMIN_SECURITY_EXTRA_ADVICE)
     body = f"""<!DOCTYPE html>
 <html lang="en"><head>
 <meta charset="utf-8"/><meta name="viewport" content="width=device-width, initial-scale=1"/>
@@ -1148,6 +1170,7 @@ def render_login_html(*, error: str = "") -> bytes:
   Not the public shop. After password, authenticator (TOTP) setup or a 6-digit code
   is required before any admin tools load.</p>
   <p class="note" id="admin-2fa-security-blurb">{blurb}</p>
+  <p class="note" id="admin-security-extra-advice">{extra}</p>
   {err}
   <label for="username">Username</label>
   <input id="username" name="username" autocomplete="username" required/>
@@ -1174,8 +1197,13 @@ def render_2fa_setup_html(
         from admin_2fa import otpauth_uri  # type: ignore
     except Exception:  # noqa: BLE001
         from status_page.admin_2fa import otpauth_uri  # type: ignore
+    try:
+        from qr_encode import qr_data_url_svg  # type: ignore
+    except Exception:  # noqa: BLE001
+        from status_page.qr_encode import qr_data_url_svg  # type: ignore
 
     uri = otpauth or otpauth_uri(secret_b32, account=account)
+    qr_src = qr_data_url_svg(uri)
     err = f'<p class="err" id="admin-2fa-setup-error">{_escape(error)}</p>' if error else ""
     msg = (
         f'<p class="ok-msg" id="admin-2fa-setup-message">{_escape(message)}</p>'
@@ -1183,6 +1211,7 @@ def render_2fa_setup_html(
         else ""
     )
     blurb = _escape(ADMIN_2FA_SECURITY_BLURB)
+    extra = _escape(ADMIN_SECURITY_EXTRA_ADVICE)
     body = f"""<!DOCTYPE html>
 <html lang="en"><head>
 <meta charset="utf-8"/><meta name="viewport" content="width=device-width, initial-scale=1"/>
@@ -1199,17 +1228,23 @@ def render_2fa_setup_html(
       data-admin-2fa-setup="1">
   <h1 id="admin-2fa-setup-heading">Set up authenticator</h1>
   <p class="note" id="admin-2fa-setup-note">
-    Add this account in your authenticator app (Google Authenticator, Authy,
-    Microsoft Authenticator, 1Password, etc.), then enter the 6-digit code to
-    finish. The secret is shown <strong>once</strong> for enrollment — store it
-    only in your authenticator; it is never embedded in the public shop.
+    Scan the QR code with your authenticator app (Google Authenticator, Authy,
+    Microsoft Authenticator, 1Password, etc.), or enter the secret manually,
+    then confirm with the 6-digit code. The secret is shown <strong>once</strong>
+    for enrollment — store it only in your authenticator; it is never on the public shop.
   </p>
   <p class="note" id="admin-2fa-security-blurb">{blurb}</p>
+  <p class="note" id="admin-security-extra-advice">{extra}</p>
   {msg}{err}
+  <div class="qr-wrap" id="admin-2fa-qr-wrap">
+    <img id="admin-2fa-qr" alt="Authenticator QR code" width="220" height="220"
+         src="{qr_src}" data-otpauth-qr="1"/>
+    <p class="note" id="admin-2fa-qr-hint">Scan with your authenticator app</p>
+  </div>
   <p class="note"><strong>Secret (manual entry)</strong></p>
   <div class="secret-box" id="admin-2fa-secret" data-totp-secret="1">{_escape(secret_b32)}</div>
   <p class="note">App link (otpauth):</p>
-  <p class="uri-box" id="admin-2fa-otpauth">{_escape(uri)}</p>
+  <p class="uri-box" id="admin-2fa-otpauth" data-otpauth-uri="1">{_escape(uri)}</p>
   <label for="totp_code">6-digit code from app</label>
   <input id="totp_code" name="totp_code" type="text" inputmode="numeric"
          pattern="[0-9]{{6}}" maxlength="8" autocomplete="one-time-code" required
@@ -1247,6 +1282,7 @@ def render_2fa_verify_html(*, error: str = "") -> bytes:
     or other operator tools.
   </p>
   <p class="note" id="admin-2fa-security-blurb">{blurb}</p>
+  <p class="note" id="admin-security-extra-advice">{_escape(ADMIN_SECURITY_EXTRA_ADVICE)}</p>
   {err}
   <label for="totp_code">6-digit code</label>
   <input id="totp_code" name="totp_code" type="text" inputmode="numeric"
@@ -2000,6 +2036,12 @@ def render_admin_link_generation_html(
         platform=seed_platform,
     )
     main = f"""
+<p class="ok-msg" id="admin-media-kit-banner" data-admin-media-kit="1" style="margin:0 0 1rem">
+  <strong>Media kit</strong> (public logos, favicons, brand PNGs for press/partners):
+  <a id="admin-media-kit-link" href="{MEDIA_KIT_PUBLIC_PATH}" download="{MEDIA_KIT_FILENAME}">
+  Download restore-privacy media kit (ZIP)</a>
+  — also at <code>{MEDIA_KIT_PUBLIC_PATH}</code> (no admin login required).
+</p>
 <p class="muted" id="admin-link-generation-intro">Mint and re-issue customer download
 links and keygens. These tools write the durable payment store; they are not free public unlocks.</p>
 {reissue_html}

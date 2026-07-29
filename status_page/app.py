@@ -756,6 +756,39 @@ class Handler(BaseHTTPRequestHandler):
                 render_settings_explainer_page_html(),
             )
             return
+        # Public media kit (logos/favicons) — no admin auth
+        if path in (
+            "/media-kit/restore-privacy-media-kit.zip",
+            "/media-kit/",
+            "/media-kit",
+        ):
+            try:
+                from media_kit import (  # type: ignore
+                    KIT_FILENAME,
+                    media_kit_file_path,
+                )
+            except ImportError:  # pragma: no cover
+                from status_page.media_kit import (  # type: ignore
+                    KIT_FILENAME,
+                    media_kit_file_path,
+                )
+            if path in ("/media-kit", "/media-kit/"):
+                self._redirect("/media-kit/restore-privacy-media-kit.zip")
+                return
+            kit_path = media_kit_file_path()
+            data = kit_path.read_bytes()
+            self.send_response(200)
+            self.send_header("Content-Type", "application/zip")
+            self.send_header("Content-Length", str(len(data)))
+            self.send_header(
+                "Content-Disposition",
+                f'attachment; filename="{KIT_FILENAME}"',
+            )
+            self.send_header("Cache-Control", "public, max-age=3600")
+            self._security_headers()
+            self.end_headers()
+            self.wfile.write(data)
+            return
         static = read_static_bytes(path)
         if static is not None:
             data, ctype = static

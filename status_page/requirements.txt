@@ -1,1 +1,2 @@
-# Stdlib-only app; file kept so Render pip install succeeds.
+# Status host: keep deps minimal. qrcode = pure-Python SVG for admin TOTP setup.
+qrcode>=7.4
