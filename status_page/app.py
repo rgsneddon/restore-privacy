@@ -90,6 +90,8 @@ STATIC_ROUTES: dict[str, str] = {
     "/static/admin_sidebar.js": "admin_sidebar.js",
     "/static/audit_countdown.js": "audit_countdown.js",
     "/static/audit_page_ticker.js": "audit_page_ticker.js",
+    # Written by scripts/run_security_audit.py --write; public Audit page + countdown
+    "/static/security_audit_latest.json": "security_audit_latest.json",
     "/static/node_wipe_countdown.js": "node_wipe_countdown.js",
     "/static/thankyou_keygen_copy.js": "thankyou_keygen_copy.js",
     "/static/thankyou_entitlement.js": "thankyou_entitlement.js",

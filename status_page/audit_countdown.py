@@ -344,10 +344,13 @@ def render_audit_page_ticker_html(
     json_path: Path | None = None,
     rag: dict[str, Any] | None = None,
 ) -> str:
-    """Countdown + current-run RAG colour for the public **/AUDIT.md** page.
+    """Countdown + last-run + current-run RAG for the public **/AUDIT.md** page.
 
     Placed under the audit H1. Uses unique element ids so it does not collide
     with the homepage ``#audit-countdown`` widget.
+
+    **Last-run** always comes from ``security_audit_latest.json`` ``generated_at``
+    (updated by every ``run_security_audit.py --write``), not a stale markdown cell.
     """
     state = countdown_state(now=now, json_path=json_path)
     rag_state = rag if rag is not None else current_audit_rag_colour(json_path=json_path)
@@ -355,6 +358,11 @@ def render_audit_page_ticker_html(
     next_iso = html.escape(str(state.get("next_audit_at") or ""))
     available = "1" if state["available"] else "0"
     period = int(state["period_seconds"])
+    last_raw = state.get("last_generated_at")
+    last_iso = html.escape(str(last_raw or ""))
+    last_disp = html.escape(
+        format_last_audit_run_display(last_raw if isinstance(last_raw, str) else None)
+    )
 
     if rag_state.get("available") and rag_state.get("css") and rag_state.get("colour"):
         css = html.escape(str(rag_state["css"]))
@@ -381,7 +389,7 @@ def render_audit_page_ticker_html(
     return f"""
   <div class="audit-page-ticker" id="audit-page-ticker"
        data-available="{available}" data-next-audit="{next_iso}"
-       data-period-seconds="{period}">
+       data-period-seconds="{period}" data-last-audit="{last_iso}">
     <div class="audit-page-countdown-row">
       <span class="audit-page-countdown-label" id="audit-page-countdown-label">
         Time until next audit
@@ -389,11 +397,62 @@ def render_audit_page_ticker_html(
       <span class="audit-page-countdown-value" id="audit-page-countdown-value"
             aria-live="polite">{display}</span>
     </div>
+    <p class="audit-page-last-run" id="audit-page-last-run">
+      last audit run:
+      <time id="audit-page-last-run-time" datetime="{last_iso}">{last_disp}</time>
+    </p>
     {rag_block}
     <p class="audit-page-ticker-blurb" id="audit-page-ticker-blurb">
       ~every 1 day automated security pass (node probes, package confidence, privacy
-      checks). Countdown from last written audit timestamp.
+      checks). Last-run timestamp refreshes on every
+      <code>run_security_audit.py --write</code> via
+      <code>/static/security_audit_latest.json</code>.
     </p>
   </div>
   <script id="audit-page-ticker-script" src="/static/audit_page_ticker.js"></script>
 """
+
+
+def overlay_audit_generated_in_markdown_html(
+    body_html: str,
+    *,
+    json_path: Path | None = None,
+) -> str:
+    """Replace stale **Audit generated** table cells with live JSON ``generated_at``.
+
+    The AUDIT.md body is regenerated on ``--write``, but status hosts can lag.
+    The public HTML shell always prefers ``security_audit_latest.json`` so the
+    visible last-run date advances after every successful audit write.
+    """
+    last = load_last_audit_generated_at(json_path)
+    if last is None or not body_html:
+        return body_html
+    iso = last.astimezone(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+    # Human day line matches build_markdown style: "29 July 2026"
+    human = last.astimezone(timezone.utc).strftime("%d %B %Y").lstrip("0")
+    # Common markdownish table cell patterns after conversion
+    patterns = [
+        # <strong>27 July 2026</strong> (<code>2026-07-27T08:27:28Z</code>)
+        (
+            re.compile(
+                r"(Audit generated</strong></td><td><strong>)[^<]+"
+                r"(</strong>\s*\(<code>)[0-9T:\-Z]+(</code>)",
+                re.IGNORECASE,
+            ),
+            rf"\g<1>{human}\g<2>{iso}\g<3>",
+        ),
+        (
+            re.compile(
+                r"(<strong>Audit generated</strong></td>\s*<td>)[^<]*"
+                r"(<code>)[0-9T:\-Z]+(</code>)",
+                re.IGNORECASE,
+            ),
+            rf"\g<1><strong>{human}</strong> (\g<2>{iso}\g<3>)",
+        ),
+    ]
+    out = body_html
+    for pat, repl in patterns:
+        out2, n = pat.subn(repl, out, count=1)
+        if n:
+            return out2
+    return out

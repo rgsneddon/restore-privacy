@@ -861,11 +861,17 @@ def render_document_html(
     )
     if want_ticker and not plain and "</h1>" in body_inner:
         try:
-            from audit_countdown import render_audit_page_ticker_html
-        except ImportError:  # pragma: no cover
-            from status_page.audit_countdown import (  # type: ignore
+            from audit_countdown import (
+                overlay_audit_generated_in_markdown_html,
                 render_audit_page_ticker_html,
             )
+        except ImportError:  # pragma: no cover
+            from status_page.audit_countdown import (  # type: ignore
+                overlay_audit_generated_in_markdown_html,
+                render_audit_page_ticker_html,
+            )
+        # Prefer live JSON generated_at over stale AUDIT.md table cells
+        body_inner = overlay_audit_generated_in_markdown_html(body_inner)
         ticker = render_audit_page_ticker_html()
         body_inner = body_inner.replace("</h1>", "</h1>\n" + ticker, 1)
 

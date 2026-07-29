@@ -98,6 +98,18 @@ def settings_parts_catalog() -> list[dict[str, str]]:
             "body": core,
         },
         {
+            "id": "protect-ipv4-ipv6",
+            "title": "Protect both IPv4 & IPv6",
+            "default": "On (dual-stack)",
+            "body": (
+                "ON (product default) = residual privacy protection for both IPv4 and IPv6. "
+                "IPv4-only is only for networks that refuse IPv6 privacy protection — "
+                "USING IPV4 ONLY MAY CAUSE DATA LEAKS. Confirm risk before switching off. "
+                "Changing Settings while residual is connected disconnects first, then "
+                "saves for the next Connect (no mid-session hot-apply)."
+            ),
+        },
+        {
             "id": "traffic-shaping",
             "title": "Traffic shaping (pad / jitter / cover)",
             "default": "Off",

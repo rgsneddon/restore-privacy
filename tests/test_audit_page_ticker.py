@@ -16,6 +16,7 @@ from audit_countdown import (  # noqa: E402
     countdown_state,
     current_audit_rag_colour,
     format_countdown,
+    overlay_audit_generated_in_markdown_html,
     remaining_seconds_until,
     render_audit_page_ticker_html,
 )
@@ -92,9 +93,37 @@ class TestAuditPageTickerHtml(unittest.TestCase):
         self.assertIn('id="audit-page-current-run-colour"', html)
         self.assertIn(">Green<", html)
         self.assertIn('data-rag-colour="green"', html)
+        # Last-run from JSON (not stale markdown)
+        self.assertIn('id="audit-page-last-run-time"', html)
+        self.assertIn('datetime="2026-07-21T10:00:00Z"', html)
+        self.assertIn("2026-07-21 10:00:00 UTC", html)
         # Remaining ~23h of 1-day period (display always includes days)
         self.assertIn("0d 23:00:00", html)
         self.assertIn('data-period-seconds="86400"', html)
+
+    def test_overlay_prefers_json_generated_at_over_stale_markdown_cell(self):
+        with tempfile.TemporaryDirectory() as td:
+            p = Path(td) / "security_audit_latest.json"
+            p.write_text(
+                json.dumps({"generated_at": "2026-07-29T12:00:00Z"}),
+                encoding="utf-8",
+            )
+            stale = (
+                "<tr><td><strong>Audit generated</strong></td>"
+                "<td><strong>27 July 2026</strong> "
+                "(<code>2026-07-27T08:27:28Z</code>)</td></tr>"
+            )
+            out = overlay_audit_generated_in_markdown_html(stale, json_path=p)
+            self.assertIn("2026-07-29T12:00:00Z", out)
+            self.assertIn("29 July 2026", out)
+            self.assertNotIn("2026-07-27T08:27:28Z", out)
+
+    def test_static_route_allows_security_audit_json(self):
+        app = (ROOT / "status_page" / "app.py").read_text(encoding="utf-8")
+        self.assertIn(
+            '"/static/security_audit_latest.json": "security_audit_latest.json"',
+            app,
+        )
 
     def test_amber_and_red_discrete_text(self):
         for colour, css in (("Amber", "rag-amber"), ("Red", "rag-red")):

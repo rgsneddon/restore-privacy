@@ -184,10 +184,21 @@ def build_vault_manifest(*, monopin: str | None = None) -> dict[str, Any]:
         "needs_any_apple_work": bool(macos.get("needs_work") or ios.get("needs_work")),
         "handoff_file": handoff_rel if handoff_path.is_file() else None,
         "checklist": [
+            f"BUILT (this build monopin {pin}): Windows setup.exe, Linux tar.gz, "
+            f"Android APK as restore-privacy-client-{pin}-* (this host). "
+            f"Apple packages not sealed here — Mac rebuild/sign required.",
+            f"UPDATE THESE DOCS to monopin {pin}: client_app/APPLE_HANDOFF_{pin}.md, "
+            f"scripts/RELEASE_NOTES_{pin}.md, PRIVACY_POLICY.md, AUDIT.md, "
+            f"status_page/settings_explainer.py (Settings guide), "
+            f"status_page/downloads.py RELEASE_VERSION, client/VERSION.",
+            f"PUBLISH ALL to the version number of this build ({pin}): stage/upload "
+            f"every platform package under paid_assets/{pin}/ and status_page/assets/{pin}/ "
+            f"(Windows + Linux + Android already built; macOS + iOS after native seal). "
+            f"No separate commit/version guess — use monopin {pin} everywhere.",
             "1. Fetch vault: breadcrumbs_vault.py check --fetch",
             "2. If macos needs_work: flutter build macos + notarize per APPLE_HANDOFF",
             "3. If ios needs_work: flutter build ios + Team-sign per APPLE_HANDOFF",
-            "4. Stage/upload paid assets (Helsinki), then re-publish breadcrumbs",
+            f"4. Stage/upload paid assets for {pin} (Helsinki), then re-publish breadcrumbs",
             "5. Re-run check until needs_any_apple_work is false",
         ],
     }
@@ -202,6 +213,17 @@ def render_checklist_md(manifest: dict[str, Any]) -> str:
         f"Generated: {manifest.get('generated_at')}",
         f"Source of truth: **{manifest.get('source_of_truth')}** "
         f"(GitHub breadcrumb pull: **{manifest.get('github_breadcrumb_flow')}**)",
+        "",
+        f"## Operator mandate (monopin {pin})",
+        "",
+        f"- **Built this:** Windows / Linux / Android packages for **{pin}** "
+        f"(restore-privacy-client-{pin}-windows-x64-setup.exe, "
+        f"…-linux-x64.tar.gz, …-android.apk).",
+        f"- **Update these docs:** APPLE_HANDOFF_{pin}.md, RELEASE_NOTES_{pin}.md, "
+        f"PRIVACY_POLICY, AUDIT, settings explainer, downloads monopin — all to **{pin}**.",
+        f"- **Publish all to the version number of this build ({pin}):** every platform "
+        f"installer under paid_assets/{pin}/ and status assets — macOS + iOS after Mac seal. "
+        f"Do not invent a different version or wait for a separate commit command.",
         "",
         "## Actions",
     ]

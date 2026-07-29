@@ -1434,9 +1434,18 @@ def collect(node_only: bool = False) -> dict:
 
 
 def write_outputs(results: dict, out_path: Path) -> None:
-    """Write AUDIT.md + mirrors + JSON with section-A redaction (no suite tails)."""
+    """Write AUDIT.md + mirrors + JSON with section-A redaction (no suite tails).
+
+    Always stamps a fresh ``generated_at`` at write time so the public Audit
+    page last-run advances after **every** ``--write`` (not only when collect()
+    started). Mirrors: root AUDIT.md, status_page/AUDIT.md, public/AUDIT.md,
+    and ``status_page/static/security_audit_latest.json``.
+    """
+    # Fresh write timestamp (source of truth for countdown / last-run UI)
+    stamped = dict(results)
+    stamped["generated_at"] = iso_z()
     # Redact nested error strings before markdown so tails never leak home paths
-    safe_results = redact_audit_value(dict(results))
+    safe_results = redact_audit_value(stamped)
     md = redact_audit_text(build_markdown(safe_results))
     out_path.parent.mkdir(parents=True, exist_ok=True)
     out_path.write_text(md, encoding="utf-8")

@@ -254,10 +254,15 @@ class TestAuditTimerPrivacySectionA(unittest.TestCase):
             shutil.rmtree(td, ignore_errors=True)
 
     def test_write_outputs_aligns_audit_generated_iso_across_mirrors(self):
-        """Markdown **Audit generated** ISO must match JSON generated_at on all mirrors."""
+        """Markdown **Audit generated** ISO must match JSON generated_at on all mirrors.
+
+        ``write_outputs`` always stamps a *fresh* generated_at at write time so
+        the Audit page last-run advances after every --write.
+        """
         import re
         import shutil
         import tempfile
+        import time
         from pathlib import Path
 
         mod = _load_audit_mod()
@@ -267,9 +272,9 @@ class TestAuditTimerPrivacySectionA(unittest.TestCase):
             (td / "status_page" / "public").mkdir(parents=True)
             old_root = mod.ROOT
             mod.ROOT = td
-            gen = "2026-07-27T12:34:56Z"
+            stale_gen = "2026-07-27T12:34:56Z"
             results = {
-                "generated_at": gen,
+                "generated_at": stale_gen,
                 "node_host": "82.221.101.241",
                 "catalog_version": "0.4.8",
                 "unit_suite": {
@@ -302,11 +307,21 @@ class TestAuditTimerPrivacySectionA(unittest.TestCase):
                 },
             }
             out = td / "AUDIT.md"
+            before = time.time()
             mod.write_outputs(results, out)
+            after = time.time()
             jpath = td / "status_page" / "static" / "security_audit_latest.json"
             self.assertTrue(jpath.is_file())
             data = json.loads(jpath.read_text(encoding="utf-8"))
-            self.assertEqual(data.get("generated_at"), gen)
+            gen = str(data.get("generated_at") or "")
+            # Fresh stamp — not the stale collect-time value
+            self.assertNotEqual(gen, stale_gen)
+            self.assertTrue(gen.endswith("Z"))
+            from datetime import datetime, timezone
+
+            dt = datetime.fromisoformat(gen.replace("Z", "+00:00"))
+            self.assertGreaterEqual(dt.timestamp(), before - 2)
+            self.assertLessEqual(dt.timestamp(), after + 2)
             pat = re.compile(r"\*\*Audit generated\*\*[^\n]*`([0-9T:\-Z]+)`")
             for rel in (
                 out,
@@ -319,6 +334,11 @@ class TestAuditTimerPrivacySectionA(unittest.TestCase):
                 assert m is not None
                 self.assertEqual(m.group(1), gen, rel)
                 self.assertEqual(m.group(1), data["generated_at"], rel)
+            # Second write advances generated_at again
+            time.sleep(1.05)
+            mod.write_outputs(results, out)
+            data2 = json.loads(jpath.read_text(encoding="utf-8"))
+            self.assertNotEqual(data2.get("generated_at"), gen)
             mod.ROOT = old_root
         finally:
             shutil.rmtree(td, ignore_errors=True)
