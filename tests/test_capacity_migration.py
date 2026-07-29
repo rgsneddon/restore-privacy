@@ -179,12 +179,16 @@ class TestConnectCapacityPath(unittest.TestCase):
             PRODUCT_NODE_HOST: 0.97,
             PRODUCT_EXIT_HOST: 0.12,
         }
+        # Explicit single-hop Iceland entry (empty MultiHopConfig) so capacity
+        # map keys match preferred residual; do not use env/Settings default US.
         client = RptClient(
             status_cb=lines.append,
+            multihop=MultiHopConfig(),
             peer_capacity=caps,
             entry_healthy=True,
             exit_healthy=True,
             entry_draining=False,
+            probe_capacity=False,
         )
         # Constructor selection already capacity-aware
         self.assertEqual(client.endpoint.host, PRODUCT_EXIT_HOST)
@@ -221,9 +225,11 @@ class TestConnectCapacityPath(unittest.TestCase):
         lines: list[str] = []
         client = RptClient(
             status_cb=lines.append,
+            multihop=MultiHopConfig(),
             peer_capacity={PRODUCT_NODE_HOST: 0.3, PRODUCT_EXIT_HOST: 0.1},
             entry_healthy=True,
             exit_healthy=True,
+            probe_capacity=False,
         )
         self.assertEqual(client.endpoint.host, PRODUCT_NODE_HOST)
         from client.connect import ConnectState

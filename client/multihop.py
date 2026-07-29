@@ -657,6 +657,7 @@ def select_residual_endpoint(
     # Preferred entry down/draining → solid peer failover (other catalog host).
     # When *rng* is provided and multiple catalog peers exist, pick among
     # non-preferred hosts so multi-peer wipe hop-off is not stuck on one alternate.
+    # Drain (fleet wipe) is labeled wipe_drain_failover; plain down is exit_failover.
     if exit_ok and (exit_ep.host or "").strip() != (entry_ep.host or "").strip():
         failover_ep = exit_ep
         if rng is not None:
@@ -668,9 +669,16 @@ def select_residual_endpoint(
             ]
             if alts:
                 failover_ep = rng.choice(alts)
+        try:
+            from client.wipe_hop import REASON_WIPE_DRAIN_FAILOVER as _wipe_reason
+        except Exception:  # noqa: BLE001
+            _wipe_reason = "wipe_drain_failover"
+        reason = (
+            _wipe_reason if bool(entry_draining) else "exit_failover"
+        )
         return ResidualSelection(
             endpoint=failover_ep,
-            reason="exit_failover",
+            reason=reason,
             entry_healthy=bool(entry_healthy),
             exit_healthy=True,
             entry_draining=bool(entry_draining),

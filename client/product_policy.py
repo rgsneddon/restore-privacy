@@ -151,15 +151,18 @@ def load_privacy_scale_prefs(
 
 
 def _env_traffic_shape_raw() -> str:
-    return os.environ.get("RPT_TRAFFIC_SHAPE", "1").strip().lower()
+    # Lean residual baseline when env is set without a value-like toggle.
+    return os.environ.get("RPT_TRAFFIC_SHAPE", "0").strip().lower()
 
 
 def traffic_shape_enabled_by_env() -> bool:
     """True when env says shaping is on (only used when RPT_TRAFFIC_SHAPE is set)."""
     raw = _env_traffic_shape_raw()
-    if raw in ("0", "false", "off", "no", "disabled"):
+    if raw in ("0", "false", "off", "no", "disabled", ""):
         return False
-    return True
+    if raw in ("1", "true", "on", "yes", "enabled"):
+        return True
+    return False
 
 
 def traffic_shape_enabled(

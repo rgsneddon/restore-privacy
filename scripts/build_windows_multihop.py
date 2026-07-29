@@ -98,11 +98,16 @@ def rebuild_windows_setup() -> Path:
     (ROOT / "client" / "VERSION").write_text(VERSION + "\n", encoding="utf-8")
     entry = ROOT / "product" / "node_elgamal.pub"
     exit_p = ROOT / "product" / "exit_node_elgamal.pub"
+    us_p = ROOT / "product" / "us_node_elgamal.pub"
     if not entry.is_file() or entry.stat().st_size < 32:
         raise FileNotFoundError(f"missing entry pub: {entry}")
     if not exit_p.is_file() or exit_p.stat().st_size < 32:
         raise FileNotFoundError(
             f"missing exit pub (required for multihop residual package): {exit_p}"
+        )
+    if not us_p.is_file() or us_p.stat().st_size < 32:
+        raise FileNotFoundError(
+            f"missing US residual pub (product default entry): {us_p}"
         )
     m = _load_recipe()
     print(f"=== Windows multihop rebuild {VERSION} (PyInstaller) ===")
@@ -146,6 +151,13 @@ def _post_check(setup: Path) -> None:
         print(
             "WARNING: setup.exe missing exit hop markers; "
             "confirm product/exit_node_elgamal.pub was injected.",
+            file=sys.stderr,
+        )
+    if b"us_node_elgamal" not in raw and b"5.161.242.85" not in raw:
+        print(
+            "WARNING: setup.exe missing US residual markers; "
+            "confirm product/us_node_elgamal.pub was injected "
+            "(default entry HELLO will fail without it).",
             file=sys.stderr,
         )
     # Prefer onedir proof for version + Settings ping strings (SFX may compress)

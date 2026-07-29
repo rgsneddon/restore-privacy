@@ -170,9 +170,13 @@ def build_client_onedir() -> Path:
     ver_file = ROOT / "client" / "VERSION"
     if ver_file.is_file():
         cmd.extend(["--add-data", f"{ver_file};client"])
-    # Public ElGamal keys only (entry + exit for multi-hop residual; never *.priv)
-    # Prefer tracked product/ so Windows packages match production entry/exit nodes.
-    for pub_name in ("node_elgamal.pub", "exit_node_elgamal.pub"):
+    # Public ElGamal keys only (IS + RO exit + US default entry; never *.priv)
+    # Prefer tracked product/ so Windows packages match production residual peers.
+    for pub_name in (
+        "node_elgamal.pub",
+        "exit_node_elgamal.pub",
+        "us_node_elgamal.pub",
+    ):
         pub = ROOT / "product" / pub_name
         if not pub.is_file():
             pub = ROOT / "secrets" / pub_name
@@ -208,14 +212,19 @@ def inject_product_secrets(target_dir: Path) -> None:
     """Copy public ElGamal pubs only — device Ed25519 keys are generated on first run.
 
     Ships:
-      - ``node_elgamal.pub`` (Iceland entry)
-      - ``exit_node_elgamal.pub`` (Romania exit, multi-hop residual) when present
+      - ``node_elgamal.pub`` (Iceland catalog peer)
+      - ``exit_node_elgamal.pub`` (Romania exit / multi-hop residual) when present
+      - ``us_node_elgamal.pub`` (United States default residual entry) when present
 
     Never ships a shared client_ed25519.priv (impersonation risk) or node_elgamal.priv.
     Strips **all** ``*.priv`` under the entire package tree (incl. ``_internal/secrets``).
     """
     pubs: list[tuple[str, Path]] = []
-    for name in ("node_elgamal.pub", "exit_node_elgamal.pub"):
+    for name in (
+        "node_elgamal.pub",
+        "exit_node_elgamal.pub",
+        "us_node_elgamal.pub",
+    ):
         p = ROOT / "product" / name
         if not p.is_file():
             p = ROOT / "secrets" / name
@@ -225,6 +234,11 @@ def inject_product_secrets(target_dir: Path) -> None:
         raise RuntimeError(
             "Build requires product/node_elgamal.pub (or secrets/node_elgamal.pub). "
             "Refusing to ship without node public key matching production."
+        )
+    if not any(n == "us_node_elgamal.pub" for n, _ in pubs):
+        raise RuntimeError(
+            "Build requires product/us_node_elgamal.pub — product default residual "
+            "entry is United States; missing US pin forces false primary HELLO fail."
         )
     # Top-level secrets/ + product/ (secrets_loader prefers product/ when frozen)
     for sub_name in ("secrets", "product"):

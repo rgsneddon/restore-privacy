@@ -103,6 +103,12 @@ DESKTOP = Path(os.environ.get("USERPROFILE", str(Path.home()))) / "Desktop"
 # Product admission keys only (never node_elgamal.priv)
 CLIENT_PRIV = "client_ed25519.priv"
 NODE_PUB = "node_elgamal.pub"
+# Catalog residual public pins (IS + RO exit + US default entry)
+CATALOG_NODE_PUBS = (
+    "node_elgamal.pub",
+    "exit_node_elgamal.pub",
+    "us_node_elgamal.pub",
+)
 
 
 def _payload_root() -> Path:
@@ -413,11 +419,29 @@ def _provision_secrets(payload_dir: Path, install_dir: Path) -> list[str]:
     for dest in (install_dir / "secrets", USER_SECRETS):
         dest.mkdir(parents=True, exist_ok=True)
         if src is not None:
-            sp = src / NODE_PUB
-            if sp.is_file():
-                target = dest / NODE_PUB
-                target.write_bytes(sp.read_bytes())
-                written.append(str(target))
+            for pub_name in CATALOG_NODE_PUBS:
+                sp = src / pub_name
+                if sp.is_file() and sp.stat().st_size >= 32:
+                    target = dest / pub_name
+                    target.write_bytes(sp.read_bytes())
+                    written.append(str(target))
+        # Also seed from payload product/ (frozen layout keeps pins there)
+        for prod_root in (
+            payload_dir / "product",
+            payload_dir / "_internal" / "product",
+            install_dir / "product",
+            install_dir / "_internal" / "product",
+        ):
+            if not prod_root.is_dir():
+                continue
+            for pub_name in CATALOG_NODE_PUBS:
+                sp = prod_root / pub_name
+                if not sp.is_file() or sp.stat().st_size < 32:
+                    continue
+                target = dest / pub_name
+                if not target.is_file() or target.stat().st_size < 32:
+                    target.write_bytes(sp.read_bytes())
+                    written.append(str(target))
 
     # Strip package-resident shared priv under install (incl. _internal) AND user secrets.
     # USER_SECRETS may still hold the pre-0.1.3 universal client_ed25519.priv after upgrade.

@@ -25,6 +25,14 @@ from node.handshake import (
 CLIENT_PRIV_NAME = "client_ed25519.priv"
 CLIENT_PUB_NAME = "client_ed25519.pub"
 NODE_PUB_NAME = "node_elgamal.pub"
+# Catalog residual public pins (IS entry + RO exit + US default entry). Never priv.
+EXIT_NODE_PUB_NAME = "exit_node_elgamal.pub"
+US_NODE_PUB_NAME = "us_node_elgamal.pub"
+CATALOG_NODE_PUB_NAMES: tuple[str, ...] = (
+    NODE_PUB_NAME,
+    EXIT_NODE_PUB_NAME,
+    US_NODE_PUB_NAME,
+)
 # Never load or expect node private key on the client
 NODE_PRIV_NAME = "node_elgamal.priv"
 
@@ -231,17 +239,69 @@ def refresh_node_elgamal_pub_file(pub_path: Path, asset_bytes: bytes) -> bool:
         return False
 
 
+def _product_pub_path_for_name(name: str) -> Path | None:
+    """Tracked product/ path for a catalog public pin basename, if known."""
+    try:
+        from .endpoint import (
+            product_exit_node_elgamal_pub_path,
+            product_node_elgamal_pub_path,
+            product_us_node_elgamal_pub_path,
+        )
+    except Exception:
+        return None
+    mapping = {
+        NODE_PUB_NAME: product_node_elgamal_pub_path,
+        EXIT_NODE_PUB_NAME: product_exit_node_elgamal_pub_path,
+        US_NODE_PUB_NAME: product_us_node_elgamal_pub_path,
+    }
+    fn = mapping.get(name)
+    if fn is None:
+        return None
+    try:
+        return fn()
+    except Exception:
+        return None
+
+
 def sync_product_node_pub_into(dest_dir: Path) -> bool:
     """If tracked product pub exists, always overwrite ``dest_dir/node_elgamal.pub``."""
-    try:
-        from .endpoint import product_node_elgamal_pub_path
-
-        src = product_node_elgamal_pub_path()
-    except Exception:
-        return False
-    if not src.is_file():
+    src = _product_pub_path_for_name(NODE_PUB_NAME)
+    if src is None or not src.is_file():
         return False
     return refresh_node_elgamal_pub_file(Path(dest_dir) / NODE_PUB_NAME, src.read_bytes())
+
+
+def sync_catalog_public_pubs_into(dest_dir: Path) -> list[str]:
+    """Refresh all catalog residual public pins (IS/RO/US) into *dest_dir*.
+
+    Default Windows entry is United States — without ``us_node_elgamal.pub``
+    HELLO to the primary residual fails closed and Connect falls over to
+    Iceland. Heal install trees that only shipped the Iceland entry pub.
+    Returns basenames successfully written/refreshed.
+    """
+    dest = Path(dest_dir)
+    dest.mkdir(parents=True, exist_ok=True)
+    installed: list[str] = []
+    for name in CATALOG_NODE_PUB_NAMES:
+        src = _product_pub_path_for_name(name)
+        if src is None or not src.is_file() or src.stat().st_size < 32:
+            # Fall back to any candidate secrets dir that already has the pin
+            raw: bytes | None = None
+            for d in candidate_secrets_dirs(dest):
+                p = Path(d) / name
+                try:
+                    if p.is_file() and p.stat().st_size >= 32:
+                        raw = p.read_bytes()
+                        break
+                except OSError:
+                    continue
+            if raw is None:
+                continue
+        else:
+            raw = src.read_bytes()
+        if refresh_node_elgamal_pub_file(dest / name, raw):
+            installed.append(name)
+    return installed
 
 
 def generate_and_persist_device_key(dest_dir: Path) -> Ed25519PrivateKey:
@@ -347,11 +407,11 @@ def ensure_device_admission_key(
         # Product Connect always uses this path (RptClient.secrets_dir may be set).
         dest = Path(secrets_dir)
         dest.mkdir(parents=True, exist_ok=True)
-        # If a node pub is already present, always refresh from product pin when
-        # available (heals stale keys after package upgrade). Do not invent a pub
-        # into an empty explicit dir — that stays fail-closed for tests/custom installs.
+        # If a node pub is already present, always refresh catalog pins from product
+        # (heals stale keys + missing US/RO pubs after package upgrade). Do not invent
+        # a pub into an empty explicit dir — that stays fail-closed for tests/custom installs.
         if (dest / NODE_PUB_NAME).is_file():
-            sync_product_node_pub_into(dest)
+            sync_catalog_public_pubs_into(dest)
         if not (dest / NODE_PUB_NAME).is_file():
             raise SecretsError(
                 f"secrets dir incomplete: {dest} "
@@ -376,20 +436,17 @@ def ensure_device_admission_key(
     # Only reuse a client priv from trusted writable storage — never package/_internal
     for d in candidates:
         if dir_has_client_secrets(d) and is_trusted_device_key_dir(d):
-            # Heal stale node pub on every Connect (product pin wins over install copy).
+            # Heal catalog pubs on every Connect (product pins win; seed missing US/RO).
             if (d / NODE_PUB_NAME).is_file():
-                sync_product_node_pub_into(d)
+                sync_catalog_public_pubs_into(d)
             _rotate_device_key_if_shared(d, candidates)
             if dir_has_client_secrets(d):
                 return d
 
     dest = preferred_writable_secrets_dir()
     dest.mkdir(parents=True, exist_ok=True)
-    # First-time: seed node pub from product when available; else require package provision.
-    if not (dest / NODE_PUB_NAME).is_file():
-        sync_product_node_pub_into(dest)
-    elif (dest / NODE_PUB_NAME).is_file():
-        sync_product_node_pub_into(dest)
+    # First-time: seed all catalog public pins from product when available.
+    sync_catalog_public_pubs_into(dest)
 
     if not (dest / NODE_PUB_NAME).is_file():
         raw = _find_node_pub(candidates)

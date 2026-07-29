@@ -244,9 +244,10 @@ class RptDataPlane:
 
             obfs = bool(product_outer_obfuscation_enabled())
         except Exception:  # noqa: BLE001
-            obfs = None
+            # Lean residual baseline when policy import fails (no accidental wrap).
+            obfs = False
         frame = pack_data(sess.session_id, sess.counter_out, nonce, sealed)
-        wire = maybe_wrap(frame, enabled=obfs) if obfs is not None else maybe_wrap(frame)
+        wire = maybe_wrap(frame, enabled=obfs)
         self.sock.sendto(wire, self.client.endpoint.address)
         return wire
 

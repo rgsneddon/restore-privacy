@@ -47,12 +47,19 @@ class ObfuscationError(ValueError):
 
 
 def product_obfuscation_enabled(env: Optional[dict] = None) -> bool:
-    """True when product clients/nodes should wrap UDP frames (default on)."""
+    """True when product clients/nodes should wrap UDP frames.
+
+    Product lean residual baseline is **off** (bare RPT2) when ``RPT_OBFS`` is
+    unset — matches privacy-scale defaults (outer obfuscation opt-in). Set
+    ``RPT_OBFS=1`` (or user Settings) to enable QUIC-mimic wrap.
+    """
     e = env if env is not None else os.environ
-    raw = str(e.get("RPT_OBFS", "1")).strip().lower()
-    if raw in ("0", "false", "off", "no", "disabled"):
+    raw = str(e.get("RPT_OBFS", "0")).strip().lower()
+    if raw in ("0", "false", "off", "no", "disabled", ""):
         return False
-    return True
+    if raw in ("1", "true", "on", "yes", "enabled"):
+        return True
+    return False
 
 
 def _stream_mask(nonce: bytes, length: int, key: bytes = _PRODUCT_OBFS_KEY) -> bytes:

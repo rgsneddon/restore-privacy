@@ -55,12 +55,13 @@ class TestObfuscationCodec(unittest.TestCase):
             self.assertNotEqual(w[:4], MAGIC)
             self.assertEqual(maybe_unwrap(w), inner)
 
-    def test_product_default_enabled(self):
+    def test_product_default_lean_off(self):
+        """Product residual baseline: outer wrap off when RPT_OBFS unset."""
         with mock.patch.dict("os.environ", {}, clear=False):
             import os
 
             os.environ.pop("RPT_OBFS", None)
-            self.assertTrue(product_obfuscation_enabled())
+            self.assertFalse(product_obfuscation_enabled())
 
 
 class TestObfuscationWiring(unittest.TestCase):
