@@ -106,6 +106,8 @@ class VpnController {
       final result = await _channel.invokeMethod<dynamic>('connect', {
         'host': RptConfig.host,
         'port': RptConfig.port,
+        // Wipe-drain / preferred-down: native tries these after preferred HELLO fails
+        'alternateHosts': RptConfig.alternateHosts,
         'fullTunnel': RptConfig.fullTunnel,
         'sessionName': RptConfig.sessionName,
         'route': RptConfig.defaultRoute,

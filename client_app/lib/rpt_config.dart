@@ -90,6 +90,13 @@ class RptConfig {
         multiHop: multiHopEnabled,
       );
 
+  /// Catalog residual hosts other than [host] for wipe-drain failover Connect.
+  ///
+  /// Native Packet Tunnel / host channel try preferred first, then these when
+  /// residual HELLO is unreachable (fleet wipe of preferred peer).
+  static List<String> get alternateHosts =>
+      alternateResidualHosts(excluding: host);
+
   /// Bundled ElGamal public key basename for residual HELLO.
   ///
   /// Always derived from the residual dial [host] so multi-hop / DE entry

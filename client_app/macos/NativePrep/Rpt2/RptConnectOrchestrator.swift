@@ -38,10 +38,78 @@ public enum RptConnectOrchestrator {
         secretsDir: URL? = nil,
         timeout: TimeInterval = 15
     ) -> ConnectOutcome {
+        connectWithWipeFailover(
+            preferredHost: host,
+            port: port,
+            alternates: nil,
+            secretsDir: secretsDir,
+            timeout: timeout
+        )
+    }
+
+    /// Preferred residual first; on unreachable HELLO, try catalog alternates
+    /// (wipe-drain / preferred-down failover — not zero packet-loss mid-tunnel).
+    public static func connectWithWipeFailover(
+        preferredHost: String,
+        port: UInt16 = RptEndpoint.port,
+        alternates: [String]? = nil,
+        secretsDir: URL? = nil,
+        timeout: TimeInterval = 15
+    ) -> ConnectOutcome {
+        let order = RptEndpoint.connectHostOrder(
+            preferred: preferredHost,
+            alternates: alternates
+        )
+        var lastFail: ConnectOutcome?
+        for (idx, host) in order.enumerated() {
+            let outcome = connectOnce(
+                host: host,
+                port: port,
+                secretsDir: secretsDir,
+                timeout: timeout
+            )
+            if outcome.ok {
+                if idx > 0 {
+                    // Annotate wipe-drain style failover for status/logs
+                    let pref = preferredHost.trimmingCharacters(in: .whitespacesAndNewlines)
+                    let msg =
+                        "\(outcome.message) [wipe_drain_failover preferred=\(pref) active=\(host)]"
+                    return ConnectOutcome(
+                        ok: true,
+                        message: msg,
+                        vpnIp: outcome.vpnIp,
+                        session: outcome.session,
+                        engine: outcome.engine
+                    )
+                }
+                return outcome
+            }
+            lastFail = outcome
+            // Only continue to alternate when residual looks down/unreachable
+            if !RptEndpoint.isResidualUnreachableFailure(outcome.message) {
+                return outcome
+            }
+        }
+        return lastFail
+            ?? ConnectOutcome(
+                ok: false,
+                message: "Connect failed: no residual catalog peer available",
+                vpnIp: nil,
+                session: nil,
+                engine: nil
+            )
+    }
+
+    private static func connectOnce(
+        host: String,
+        port: UInt16,
+        secretsDir: URL?,
+        timeout: TimeInterval
+    ) -> ConnectOutcome {
         let target = "\(host):\(port)"
 
         // 1. Load secrets (client priv + residual host pub pin).
-        // Must pass residualHost so US/RO HELLO uses us_node/exit_node_elgamal.pub —
+        // Must pass residualHost so US/DE HELLO uses us_node/de_node_elgamal.pub —
         // Iceland node_elgamal.pub against 5.161.242.85 yields UDP receive timeout.
         let material: (Data, Data)
         do {

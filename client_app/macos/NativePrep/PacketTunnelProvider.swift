@@ -46,15 +46,55 @@ class PacketTunnelProvider: NEPacketTunnelProvider {
         if let obfs = providerCfg["outerObfuscation"] as? Bool {
           RptObfuscation.productObfsEnabled = obfs
         }
-        // 1. Load secrets (client_ed25519.priv + entry/exit pub only — never node_elgamal.priv)
-        // Multi-hop residual: when host is Romania exit, HELLO uses exit_node_elgamal.pub.
-        let material = try RptSecrets.loadAdmissionMaterial(residualHost: self.endpointHost)
-        let engine = try RptClientEngine(clientPrivRaw: material.clientPriv, nodeElgamalPubRaw: material.nodePub)
-
-        // 2. RPT2 handshake on a long-lived connected UDP socket (kept open for DATA/KEEPALIVE)
-        let session = try engine.handshake(host: self.endpointHost, port: self.endpointPort, timeout: 20)
-        guard engine.transport?.isConnected == true else {
-          completionHandler(Self.error("UDP transport not ready after HELLO", code: 12))
+        // 1–2. HELLO with wipe-drain failover: preferred host first, then catalog peers
+        // when residual is down (fleet wipe). Not a mid-tunnel zero-loss hop.
+        let preferred = self.endpointHost
+        var altFromCfg: [String] = []
+        if let raw = providerCfg["alternateHosts"] as? [String] {
+          altFromCfg = raw
+        } else if let raw = providerCfg["alternateHosts"] as? NSArray {
+          altFromCfg = raw.compactMap { $0 as? String }
+        }
+        let order = RptEndpoint.connectHostOrder(
+          preferred: preferred,
+          alternates: altFromCfg.isEmpty ? nil : altFromCfg
+        )
+        var session: RptClientEngine.Session?
+        var engine: RptClientEngine?
+        var lastError: Error?
+        for host in order {
+          do {
+            let material = try RptSecrets.loadAdmissionMaterial(residualHost: host)
+            let eng = try RptClientEngine(
+              clientPrivRaw: material.clientPriv,
+              nodeElgamalPubRaw: material.nodePub
+            )
+            let sess = try eng.handshake(host: host, port: self.endpointPort, timeout: 20)
+            guard eng.transport?.isConnected == true else {
+              eng.closeTransport()
+              lastError = Self.error("UDP transport not ready after HELLO", code: 12)
+              continue
+            }
+            self.endpointHost = host
+            engine = eng
+            session = sess
+            break
+          } catch {
+            lastError = error
+            // Try next catalog peer only when residual looks unreachable
+            if !RptEndpoint.isResidualUnreachableFailure(error.localizedDescription) {
+              throw error
+            }
+          }
+        }
+        guard let engine, let session else {
+          completionHandler(
+            lastError
+              ?? Self.error(
+                "Connect failed: preferred residual and catalog alternates unreachable",
+                code: 11
+              )
+          )
           return
         }
         self.engine = engine

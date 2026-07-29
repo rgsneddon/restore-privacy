@@ -40,7 +40,14 @@ enum RptVpnChannel {
         let args = call.arguments as? [String: Any] ?? [:]
         let ep = RptEndpoint.resolve(from: args)
         let fullTunnel = (args["fullTunnel"] as? Bool) ?? true
-        connect(host: ep.host, port: ep.port, fullTunnel: fullTunnel, flutterResult: result)
+        let alts = RptEndpoint.alternateHosts(from: args)
+        connect(
+          host: ep.host,
+          port: ep.port,
+          fullTunnel: fullTunnel,
+          alternateHosts: alts,
+          flutterResult: result
+        )
       case "disconnect":
         // Same stop path as app-quit / terminate hooks — must stop system Network VPN.
         stopAllTunnels { map in result(map) }
@@ -462,12 +469,15 @@ enum RptVpnChannel {
     host: String,
     port: UInt16,
     fullTunnel: Bool,
+    alternateHosts: [String] = [],
     flutterResult: @escaping FlutterResult
   ) {
     // Product path is full tunnel — residual public IP only changes via Packet Tunnel.
     if !fullTunnel {
       // Explicit non-full-tunnel: diagnostic HELLO only (never product success).
-      hostSideDiagnostic(host: host, port: port) { map in
+      // Still try wipe-drain failover order for honesty diagnostics.
+      let order = RptEndpoint.connectHostOrder(preferred: host, alternates: alternateHosts)
+      hostSideDiagnostic(host: order.first ?? host, port: port) { map in
         flutterResult(map)
       }
       return
@@ -478,18 +488,40 @@ enum RptVpnChannel {
     // Network settings toggle turns on in tandem with the app Connect button.
     lastSuccessfulPrepareAt = nil
 
-    enableProductVpnAndStartTunnel(host: host, port: port) { map in
-      if RptFullTunnelResult.isProductSuccess(map) {
-        flutterResult(map)
-        return
-      }
+    // Wipe-drain / preferred-down: try preferred residual first, then catalog
+    // alternates so DE wipe does not hard-fail Connect when IS/US are healthy.
+    let order = RptEndpoint.connectHostOrder(preferred: host, alternates: alternateHosts)
+    attemptTunnelConnectHosts(
+      hosts: order,
+      preferred: host,
+      port: port,
+      index: 0,
+      lastMap: nil,
+      flutterResult: flutterResult
+    )
+  }
+
+  /// Sequential Packet Tunnel start across residual catalog hosts.
+  private static func attemptTunnelConnectHosts(
+    hosts: [String],
+    preferred: String,
+    port: UInt16,
+    index: Int,
+    lastMap: [String: Any]?,
+    flutterResult: @escaping FlutterResult
+  ) {
+    guard index < hosts.count else {
+      // Exhausted alternates — surface last failure (or generic).
+      let map = lastMap ?? RptFullTunnelResult.productConnectMap(
+        packetTunnelActive: false,
+        detailMessage:
+          "Connect failed: preferred residual and all catalog alternates unreachable "
+          + "(wipe-drain failover exhausted). Try again when a peer is healthy."
+      )
       let detail = map["message"] as? String
-      // Auto-open Settings only on real NE/VPN permission denial — not on every
-      // residual-honest start failure (that trapped users in Network Settings).
-      let permissionClass = isNePermissionFailureDetail(detail)
-      if permissionClass {
+      if isNePermissionFailureDetail(detail) {
         hostSideDiagnostic(
-          host: host,
+          host: preferred,
           port: port,
           detail: detail,
           openVpnSettings: true
@@ -498,9 +530,66 @@ enum RptVpnChannel {
         }
         return
       }
-      // Host-only HELLO diagnostic for residual honesty; do not open Settings.
       hostSideDiagnostic(
-        host: host,
+        host: preferred,
+        port: port,
+        detail: detail,
+        openVpnSettings: false
+      ) { diag in
+        flutterResult(diag)
+      }
+      return
+    }
+
+    let tryHost = hosts[index]
+    enableProductVpnAndStartTunnel(host: tryHost, port: port) { map in
+      if RptFullTunnelResult.isProductSuccess(map) {
+        var out = map
+        if tryHost != preferred {
+          out["wipeDrainFailover"] = true
+          out["wipe_drain_failover"] = true
+          out["preferredHost"] = preferred
+          out["activeResidualHost"] = tryHost
+          out["failoverHost"] = tryHost
+          let base = (map["message"] as? String) ?? "Connected"
+          out["message"] =
+            "\(base) — wipe_drain_failover preferred=\(preferred) active=\(tryHost)"
+        } else {
+          out["activeResidualHost"] = tryHost
+        }
+        flutterResult(out)
+        return
+      }
+      let detail = map["message"] as? String
+      // Permission / Team residual: stop — failover cannot fix NE entitlement.
+      if isNePermissionFailureDetail(detail)
+        || isTeamResidualOrMissingHostNeDetail(detail ?? "")
+      {
+        hostSideDiagnostic(
+          host: tryHost,
+          port: port,
+          detail: detail,
+          openVpnSettings: isNePermissionFailureDetail(detail)
+        ) { diag in
+          flutterResult(diag)
+        }
+        return
+      }
+      // Residual unreachable → try next catalog peer
+      if RptEndpoint.isResidualUnreachableFailure(detail) {
+        attemptTunnelConnectHosts(
+          hosts: hosts,
+          preferred: preferred,
+          port: port,
+          index: index + 1,
+          lastMap: map,
+          flutterResult: flutterResult
+        )
+        return
+      }
+      // Other failure (secrets, etc.) — do not silently hop
+      hostSideDiagnostic(
+        host: tryHost,
         port: port,
         detail: detail,
         openVpnSettings: false
@@ -749,6 +838,8 @@ enum RptVpnChannel {
       "fullTunnel": true,
       "sessionName": productLocalizedDescription,
       "tunnelType": productTunnelType,
+      // Catalog peers for Packet Tunnel wipe-drain HELLO failover
+      "alternateHosts": RptEndpoint.alternateHosts(excluding: host),
     ]
     manager.protocolConfiguration = proto
     manager.localizedDescription = productLocalizedDescription
@@ -924,11 +1015,13 @@ enum RptVpnChannel {
         }
         // Pass dual-stack residual prefs into the extension (parity with App Group).
         let stack = residualStackOptionsForTunnel()
+        let alts = RptEndpoint.alternateHosts(excluding: host)
         let opts: [String: NSObject] = [
           "host": host as NSString,
           "port": NSNumber(value: port),
           "residual_ipv4": NSNumber(value: stack.ipv4),
           "residual_ipv6": NSNumber(value: stack.ipv6),
+          "alternateHosts": alts as NSArray,
         ]
         // This enables the system VPN connection in Network settings (when allowed).
         try session.startTunnel(options: opts)

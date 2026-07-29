@@ -172,6 +172,17 @@ String residualHostForEntryCountry(
   return kProductExitHost; // default DE
 }
 
+/// Other catalog residual monopin hosts for wipe-drain Connect failover.
+///
+/// Never includes [excluding] (preferred entry). Order follows product catalog.
+List<String> alternateResidualHosts({String excluding = ''}) {
+  final skip = excluding.trim();
+  return [
+    for (final o in kProductCountryCatalog)
+      if (o.host.isNotEmpty && o.host != skip) o.host,
+  ];
+}
+
 /// Public ElGamal pin basename for residual HELLO to *host*.
 String residualNodePubNameForHost(String host) {
   final h = host.trim();
