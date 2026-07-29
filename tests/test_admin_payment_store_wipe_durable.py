@@ -462,11 +462,11 @@ class TestAdminArchitectureCopy(unittest.TestCase):
             "admin-architecture",
             "admin-sidebar",
             "United States",
-            "Romania",
+            "Germany",
             "Iceland",
             "sequential",
             "IS",
-            "RO",
+            "DE",
             "US",
             "keygen",
             "Stripe",
@@ -477,7 +477,9 @@ class TestAdminArchitectureCopy(unittest.TestCase):
             PRICE_SNIPPET_YEAR,
         ):
             self.assertIn(marker, html, f"missing marker {marker!r}")
-        self.assertNotIn("Germany", html)
+        # RO may appear only as deprecated; live catalog is DE not RO
+        self.assertIn("deprecated", html.lower())
+        self.assertIn("Romania (RO) residual peer is deprecated", html)
         self.assertNotIn("167.233.224.5", html)
         # Mint tools live on Link Generation, not home monostack
         self.assertNotIn('id="admin-tester-month"', html)

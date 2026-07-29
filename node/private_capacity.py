@@ -7,14 +7,19 @@ Product soft budgets (operator allowance — not auto NIC line-rate):
 
 | Peer | Bandwidth budget | Session soft max |
 |------|------------------|------------------|
-| RO Romania | **unlimited-class** (extendable at cost) | 256 (base) |
-| IS Iceland | **unlimited-class** (extendable at cost; larger peer) | 512 (IS > RO) |
+| RO Romania (legacy) | **unlimited-class** (extendable at cost) | 256 (base) |
+| IS Iceland | **unlimited-class** (extendable at cost) | 512 |
+| DE Germany (dedicated) | **unlimited-class** (30 TB class entitlement) | 1024 |
 | US | 200 Mbps fixed product budget | 512 |
 
 Session numbers are a **soft** utilization hint for residual routing, not a hard
-public admission lock. IS/RO bandwidth is essentially unlimited in product terms
+public admission lock. IS/DE/RO bandwidth is essentially unlimited in product terms
 because extended bandwidth is available at extra cost — not a fixed 100 Mbps
 product budget. US keeps a fixed 200 Mbps operator allowance.
+
+DE session soft max (1024) is sized for the dedicated residual host
+(8 vCPU / 32 GB RAM / 30 TB traffic class): above IS/US 512, soft utilization
+only — not a hard admission lock.
 """
 
 from __future__ import annotations
@@ -24,16 +29,17 @@ import os
 from typing import Any, Mapping, Optional
 
 # Soft cap for utilization math (not a hard admission gate).
-# RO base; IS larger (Iceland > Romania); US matches IS session soft max.
-DEFAULT_MAX_SESSIONS = 256  # RO base
-DEFAULT_MAX_SESSIONS_IS = 512  # Iceland larger than Romania
+# RO base; IS/US 512; DE dedicated (8 vCPU / 32 GB) → 1024.
+DEFAULT_MAX_SESSIONS = 256  # RO base (legacy peer)
+DEFAULT_MAX_SESSIONS_IS = 512  # Iceland
 DEFAULT_MAX_SESSIONS_US = 512
+DEFAULT_MAX_SESSIONS_DE = 1024  # dedicated DE residual host
 ENV_CAPACITY_TOKEN = "RPT_CAPACITY_TOKEN"
 ENV_MAX_SESSIONS = "RPT_NODE_MAX_SESSIONS"
-ENV_PEER_CODE = "RPT_NODE_PEER_CODE"  # IS | RO | US
+ENV_PEER_CODE = "RPT_NODE_PEER_CODE"  # IS | DE | US | RO
 ENV_NODE_HOST = "RPT_NODE_HOST"
 
-# Mbps product allowances (operator budget). IS/RO omitted = unlimited-class.
+# Mbps product allowances (operator budget). IS/DE/RO omitted = unlimited-class.
 _MBPS = 1_000_000
 PRODUCT_BANDWIDTH_CAP_BPS: dict[str, int] = {
     "US": 200 * _MBPS,
@@ -41,19 +47,21 @@ PRODUCT_BANDWIDTH_CAP_BPS: dict[str, int] = {
 }
 
 # Peers with extendable bandwidth at cost — no fixed product Mbps budget.
-PRODUCT_UNLIMITED_BANDWIDTH_CODES = frozenset({"IS", "RO"})
+PRODUCT_UNLIMITED_BANDWIDTH_CODES = frozenset({"IS", "DE", "RO"})
 PRODUCT_UNLIMITED_BANDWIDTH_HOSTS = frozenset(
-    {"82.221.101.241", "185.146.232.107"}
+    {"82.221.101.241", "178.105.187.178", "185.146.232.107"}
 )
 
-# Session soft max: IS > RO (Iceland larger); US = 512
+# Session soft max: DE dedicated > IS/US; RO base (legacy)
 PRODUCT_SESSION_SOFT_MAX: dict[str, int] = {
     "RO": DEFAULT_MAX_SESSIONS,
     "IS": DEFAULT_MAX_SESSIONS_IS,
     "US": DEFAULT_MAX_SESSIONS_US,
+    "DE": DEFAULT_MAX_SESSIONS_DE,
     "185.146.232.107": DEFAULT_MAX_SESSIONS,
     "82.221.101.241": DEFAULT_MAX_SESSIONS_IS,
     "5.161.242.85": DEFAULT_MAX_SESSIONS_US,
+    "178.105.187.178": DEFAULT_MAX_SESSIONS_DE,
 }
 
 
@@ -84,7 +92,7 @@ def product_bandwidth_unlimited(
     code: str = "",
     host: str = "",
 ) -> bool:
-    """True when product treats peer bandwidth as unlimited-class (IS/RO)."""
+    """True when product treats peer bandwidth as unlimited-class (IS/DE/RO)."""
     c = (code or "").strip().upper()
     h = (host or "").strip()
     if c in PRODUCT_UNLIMITED_BANDWIDTH_CODES:
@@ -101,7 +109,7 @@ def product_bandwidth_cap_bps(
 ) -> int | None:
     """Product bandwidth allowance (bits/s), or None if unlimited-class / unknown.
 
-    IS/RO return None (extendable bandwidth at cost — no fixed product budget).
+    IS/DE/RO return None (extendable bandwidth at cost — no fixed product budget).
     US returns 200 Mbps.
     """
     if product_bandwidth_unlimited(code=code, host=host):
@@ -123,6 +131,7 @@ def resolve_peer_identity(
         # Infer code from known catalog hosts
         for k, v in (
             ("82.221.101.241", "IS"),
+            ("178.105.187.178", "DE"),
             ("185.146.232.107", "RO"),
             ("5.161.242.85", "US"),
         ):
@@ -142,7 +151,7 @@ def default_max_sessions(
 
     Priority:
       1. ``RPT_NODE_MAX_SESSIONS`` (explicit operator override)
-      2. Product map for peer code/host (IS > RO; US = 512)
+      2. Product map for peer code/host (DE 1024; IS/US 512; RO 256)
       3. Flat ``DEFAULT_MAX_SESSIONS`` (256) for unknown peers
     """
     e = env if env is not None else os.environ
@@ -185,7 +194,7 @@ def bandwidth_cap_bps(
 
     ``RPT_NODE_BANDWIDTH_CAP_BPS`` — soft operator-configured link budget, not
     measured NIC line-rate unless the operator sets it to that. When unset,
-    falls back to product peer allowance (IS/RO unlimited-class → None;
+    falls back to product peer allowance (IS/DE/RO unlimited-class → None;
     US 200 Mbps). Explicit env still wins if set (legacy host pin).
     """
     e = env if env is not None else os.environ

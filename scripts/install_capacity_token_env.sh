@@ -48,16 +48,19 @@ else
 fi
 
 # Per-peer product budgets (operator allowance — not auto NIC line-rate):
-#   RO: unlimited-class bandwidth, session soft max 256
-#   IS: unlimited-class bandwidth, session soft max 512 (Iceland > Romania)
+#   RO: unlimited-class bandwidth, session soft max 256 (legacy)
+#   IS: unlimited-class bandwidth, session soft max 512
+#   DE: unlimited-class bandwidth (30 TB class), session soft max 1024
+#       (dedicated 8 vCPU / 32 GB residual host)
 #   US: 200 Mbps fixed budget, session soft max 512
-# Override with RPT_NODE_PEER_CODE=IS|RO|US, RPT_NODE_MAX_SESSIONS, RPT_NODE_BANDWIDTH_CAP_BPS.
+# Override with RPT_NODE_PEER_CODE=IS|DE|US|RO, RPT_NODE_MAX_SESSIONS, RPT_NODE_BANDWIDTH_CAP_BPS.
 PEER_CODE="${RPT_NODE_PEER_CODE:-${RPT_PEER_CODE:-}}"
 if [[ -z "$PEER_CODE" ]]; then
   # Best-effort: match primary IPv4 to catalog residual hosts
   DETECTED_IP="$(hostname -I 2>/dev/null | awk '{print $1}')"
   case "${DETECTED_IP}" in
     82.221.101.241) PEER_CODE=IS ;;
+    178.105.187.178) PEER_CODE=DE ;;
     185.146.232.107) PEER_CODE=RO ;;
     5.161.242.85) PEER_CODE=US ;;
   esac
@@ -71,6 +74,10 @@ case "${PEER_CODE}" in
   IS)
     DEFAULT_MAX=512
     DEFAULT_BW=""  # unlimited-class (extendable at cost)
+    ;;
+  DE)
+    DEFAULT_MAX=1024
+    DEFAULT_BW=""  # unlimited-class (30 TB entitlement; extendable at cost)
     ;;
   RO)
     DEFAULT_MAX=256
@@ -95,17 +102,17 @@ umask 077
   echo "# Clients / status admin that call /api/private/capacity need the same RPT_CAPACITY_TOKEN."
   echo "RPT_CAPACITY_TOKEN=${TOKEN}"
   if [[ -n "$PEER_CODE" ]]; then
-    echo "# Catalog peer identity (RO 256 sessions; IS 512; US 512 + 200 Mbps budget)"
+    echo "# Catalog peer identity (DE 1024; IS/US 512; RO 256; US + 200 Mbps budget)"
     echo "RPT_NODE_PEER_CODE=${PEER_CODE}"
   fi
-  echo "# Soft max sessions for utilization = live / max (product: RO 256, IS/US 512)"
+  echo "# Soft max sessions for utilization = live / max (product: DE 1024, IS/US 512, RO 256)"
   echo "RPT_NODE_MAX_SESSIONS=${MAX_SESSIONS}"
   if [[ -n "$BW_CAP" ]]; then
     echo "# Operator bandwidth allowance (bits/s) for admin fleet panel used-vs-cap"
-    echo "# Product: IS/RO unlimited-class (omit this key); US 200 Mbps (200000000)"
+    echo "# Product: IS/DE/RO unlimited-class (omit this key); US 200 Mbps (200000000)"
     echo "RPT_NODE_BANDWIDTH_CAP_BPS=${BW_CAP}"
   else
-    echo "# No fixed RPT_NODE_BANDWIDTH_CAP_BPS — product unlimited-class for IS/RO"
+    echo "# No fixed RPT_NODE_BANDWIDTH_CAP_BPS — product unlimited-class for IS/DE/RO"
     echo "# (extendable bandwidth at cost). US install sets 200000000."
   fi
 } >"$ENV_FILE"

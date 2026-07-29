@@ -34,19 +34,19 @@ class TestBandwidthMath(unittest.TestCase):
         self.assertIsNone(average_bps_from_bytes(None, 10))
         self.assertIsNone(bandwidth_utilization(100.0, None))
         self.assertEqual(format_bandwidth_cap(None, code="IS"), "unlimited")
-        self.assertEqual(format_bandwidth_cap(None, code="RO"), "unlimited")
+        self.assertEqual(format_bandwidth_cap(None, code="DE"), "unlimited")
         self.assertEqual(
             format_bandwidth_cap(200_000_000, code="US"), "200.00 Mbps"
         )
 
 
 class TestProductPerPeerCaps(unittest.TestCase):
-    """IS > RO sessions; IS/RO bandwidth unlimited-class; US fixed 200 Mbps."""
+    """DE > IS/US sessions; IS/DE bandwidth unlimited-class; US fixed 200 Mbps."""
 
-    def test_session_soft_max_iceland_larger_than_romania(self):
+    def test_session_soft_max_de_dedicated_above_is_us(self):
         from admin_node_usage import resolve_session_soft_max
         from node.private_capacity import (
-            DEFAULT_MAX_SESSIONS,
+            DEFAULT_MAX_SESSIONS_DE,
             DEFAULT_MAX_SESSIONS_IS,
             DEFAULT_MAX_SESSIONS_US,
             default_max_sessions,
@@ -55,18 +55,18 @@ class TestProductPerPeerCaps(unittest.TestCase):
 
         env = {}
         is_cap = resolve_session_soft_max(code="IS", host="82.221.101.241", env=env)
-        ro_cap = resolve_session_soft_max(code="RO", host="185.146.232.107", env=env)
+        de_cap = resolve_session_soft_max(code="DE", host="178.105.187.178", env=env)
         us_cap = resolve_session_soft_max(code="US", host="5.161.242.85", env=env)
-        self.assertEqual(ro_cap, DEFAULT_MAX_SESSIONS)
+        self.assertEqual(de_cap, DEFAULT_MAX_SESSIONS_DE)
         self.assertEqual(is_cap, DEFAULT_MAX_SESSIONS_IS)
         self.assertEqual(us_cap, DEFAULT_MAX_SESSIONS_US)
-        self.assertGreater(is_cap, ro_cap)
+        self.assertGreater(de_cap, is_cap)
         self.assertEqual(product_session_soft_max(code="IS"), is_cap)
-        self.assertEqual(product_session_soft_max(code="RO"), ro_cap)
+        self.assertEqual(product_session_soft_max(code="DE"), de_cap)
         self.assertEqual(default_max_sessions({"RPT_NODE_PEER_CODE": "IS"}), is_cap)
-        self.assertEqual(default_max_sessions({"RPT_NODE_PEER_CODE": "RO"}), ro_cap)
+        self.assertEqual(default_max_sessions({"RPT_NODE_PEER_CODE": "DE"}), de_cap)
 
-    def test_is_ro_bandwidth_unlimited_class_us_fixed(self):
+    def test_is_de_bandwidth_unlimited_class_us_fixed(self):
         from admin_node_usage import resolve_bandwidth_cap_bps, format_bandwidth_cap
         from node.private_capacity import (
             product_bandwidth_cap_bps,
@@ -75,27 +75,30 @@ class TestProductPerPeerCaps(unittest.TestCase):
 
         env = {}
         self.assertTrue(product_bandwidth_unlimited(code="IS"))
-        self.assertTrue(product_bandwidth_unlimited(code="RO"))
+        self.assertTrue(product_bandwidth_unlimited(code="DE"))
         self.assertFalse(product_bandwidth_unlimited(code="US"))
         self.assertIsNone(
             resolve_bandwidth_cap_bps(code="IS", host="82.221.101.241", env=env)
         )
         self.assertIsNone(
-            resolve_bandwidth_cap_bps(code="RO", host="185.146.232.107", env=env)
+            resolve_bandwidth_cap_bps(code="DE", host="178.105.187.178", env=env)
         )
         self.assertEqual(
             resolve_bandwidth_cap_bps(code="US", host="5.161.242.85", env=env),
             200_000_000,
         )
         self.assertIsNone(product_bandwidth_cap_bps(code="IS"))
-        self.assertIsNone(product_bandwidth_cap_bps(code="RO"))
+        self.assertIsNone(product_bandwidth_cap_bps(code="DE"))
         self.assertEqual(product_bandwidth_cap_bps(code="US"), 200_000_000)
-        # Must not treat flat 100 Mbps as product truth for IS/RO
+        # Must not treat flat 100 Mbps as product truth for IS/DE
         self.assertNotEqual(
             resolve_bandwidth_cap_bps(code="IS", host="82.221.101.241", env=env),
             100_000_000,
         )
         self.assertEqual(format_bandwidth_cap(None, code="IS", host="82.221.101.241"), "unlimited")
+        self.assertEqual(
+            format_bandwidth_cap(None, code="DE", host="178.105.187.178"), "unlimited"
+        )
 
     def test_fleet_rows_use_per_peer_caps(self):
         from admin_node_usage import build_fleet_usage_rows, product_catalog_peers
@@ -110,9 +113,9 @@ class TestProductPerPeerCaps(unittest.TestCase):
                 "bandwidth_cap_bps": 100_000_000,  # legacy node pin — ignored for IS
                 "private": True,
             },
-            "185.146.232.107": {
+            "178.105.187.178": {
                 "live": 5,
-                "capacity": 256,
+                "capacity": 1024,
                 "bandwidth_cap_bps": 100_000_000,
                 "private": True,
             },
@@ -124,25 +127,25 @@ class TestProductPerPeerCaps(unittest.TestCase):
         }
         rows = build_fleet_usage_rows(probes_by_host=probes, peers=peers, env={})
         by = {r.code: r for r in rows}
-        self.assertEqual(by["RO"].sessions_cap, 256)
+        self.assertEqual(by["DE"].sessions_cap, 1024)
         self.assertEqual(by["IS"].sessions_cap, 512)
         self.assertEqual(by["US"].sessions_cap, 512)
-        self.assertGreater(by["IS"].sessions_cap, by["RO"].sessions_cap)
-        # IS/RO product unlimited — no fixed Mbps budget even if node reported one
+        self.assertGreater(by["DE"].sessions_cap, by["IS"].sessions_cap)
+        # IS/DE product unlimited — no fixed Mbps budget even if node reported one
         self.assertIsNone(by["IS"].bandwidth_cap_bps)
-        self.assertIsNone(by["RO"].bandwidth_cap_bps)
+        self.assertIsNone(by["DE"].bandwidth_cap_bps)
         self.assertIsNone(by["IS"].bandwidth_util)
         self.assertEqual(by["US"].bandwidth_cap_bps, 200_000_000)
 
 
 class TestFleetRows(unittest.TestCase):
-    def test_rows_cover_catalog_is_ro_us(self):
+    def test_rows_cover_catalog_is_de_us(self):
         from admin_node_usage import build_fleet_usage_rows, product_catalog_peers
 
         peers = product_catalog_peers()
         codes = {p["code"] for p in peers}
-        self.assertEqual(codes, {"IS", "RO", "US"})
-        self.assertNotIn("DE", codes)
+        self.assertEqual(codes, {"IS", "DE", "US"})
+        self.assertNotIn("RO", codes)
         probes = {
             "82.221.101.241": {
                 "live": 10,
@@ -161,9 +164,9 @@ class TestFleetRows(unittest.TestCase):
         self.assertEqual(by_code["IS"].status, "ok")
         self.assertIsNotNone(by_code["IS"].bandwidth_used_bps)
         self.assertIsNone(by_code["IS"].bandwidth_cap_bps)  # unlimited-class
-        self.assertIn(by_code["RO"].status, ("unknown", "error"))
+        self.assertIn(by_code["DE"].status, ("unknown", "error"))
         self.assertEqual(by_code["US"].sessions_cap, 512)
-        self.assertEqual(by_code["RO"].sessions_cap, 256)
+        self.assertEqual(by_code["DE"].sessions_cap, 1024)
 
 
 class TestAdminHtmlSection(unittest.TestCase):
@@ -188,9 +191,9 @@ class TestAdminHtmlSection(unittest.TestCase):
                 status="ok",
             ),
             NodeUsageRow(
-                code="RO",
-                name="Romania",
-                host="185.146.232.107",
+                code="DE",
+                name="Germany",
+                host="178.105.187.178",
                 port=44044,
                 bandwidth_used_bps=None,
                 bandwidth_cap_bps=None,
@@ -198,7 +201,7 @@ class TestAdminHtmlSection(unittest.TestCase):
                 bytes_relayed=None,
                 uptime_sec=None,
                 sessions_live=None,
-                sessions_cap=256,
+                sessions_cap=1024,
                 session_util=None,
                 status="unknown",
                 detail="not probed",
@@ -244,8 +247,9 @@ class TestAdminHtmlSection(unittest.TestCase):
         self.assertNotIn("Session soft max — soft", html)
         # Short node labels remain
         self.assertIn("Iceland", html)
-        self.assertIn("Romania", html)
-        self.assertIn("unlimited", html)  # IS/RO capacity display
+        self.assertIn("Germany", html)
+        self.assertNotIn("Romania", html)
+        self.assertIn("unlimited", html)  # IS/DE capacity display
         self.assertIn("200.00 Mbps", html)  # US
         # Live refresh still present (script externalized for CSP)
         self.assertIn("data-fleet-refresh-ms", html)
@@ -392,7 +396,7 @@ class TestPublicStatusSafe(unittest.TestCase):
         self.assertEqual(payload.get("total_bytes_relayed"), 3000)
         self.assertTrue(payload.get("private"))
 
-    def test_is_ro_us_private_payload_defaults(self):
+    def test_is_de_us_private_payload_defaults(self):
         from node.private_capacity import build_private_capacity_payload
 
         p_us = build_private_capacity_payload(live=1, host="5.161.242.85", env={})
@@ -401,10 +405,10 @@ class TestPublicStatusSafe(unittest.TestCase):
         p_is = build_private_capacity_payload(live=1, host="82.221.101.241", env={})
         self.assertEqual(p_is["capacity"], 512)
         self.assertNotIn("bandwidth_cap_bps", p_is)  # unlimited-class
-        p_ro = build_private_capacity_payload(live=1, host="185.146.232.107", env={})
-        self.assertEqual(p_ro["capacity"], 256)
-        self.assertNotIn("bandwidth_cap_bps", p_ro)
-        self.assertGreater(p_is["capacity"], p_ro["capacity"])
+        p_de = build_private_capacity_payload(live=1, host="178.105.187.178", env={})
+        self.assertEqual(p_de["capacity"], 1024)
+        self.assertNotIn("bandwidth_cap_bps", p_de)
+        self.assertGreater(p_de["capacity"], p_is["capacity"])
 
 
 class TestInstallScriptDefaults(unittest.TestCase):
@@ -413,9 +417,11 @@ class TestInstallScriptDefaults(unittest.TestCase):
             encoding="utf-8"
         )
         self.assertIn("DEFAULT_MAX=512", text)
+        self.assertIn("DEFAULT_MAX=1024", text)
         self.assertIn("DEFAULT_MAX=256", text)
         self.assertIn("unlimited-class", text)
         self.assertIn("200000000", text)
+        self.assertIn("178.105.187.178) PEER_CODE=DE", text)
         # IS is not pinned to flat 100 Mbps default
         self.assertNotIn("IS|RO)\n    DEFAULT_MAX=256\n    DEFAULT_BW=100000000", text)
 

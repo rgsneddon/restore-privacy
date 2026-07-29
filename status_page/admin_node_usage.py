@@ -1,13 +1,14 @@
 """Admin fleet node usage: bandwidth used vs capability (authenticated only).
 
-Public status stays title-only. This module builds operator rows for IS/RO/US
+Public status stays title-only. This module builds operator rows for IS/DE/US
 from the product country catalog and optional private capacity probes.
 
 Limits are **per-peer**:
-  - **Bandwidth** — IS/RO product **unlimited-class** (extendable at cost); US fixed
-    200 Mbps product budget. Not auto-detected NIC line-rate.
-  - **Session soft max** — utilization / residual routing hint (RO 256, IS 512 so
-    Iceland > Romania; US 512). Not a hard public admission lock.
+  - **Bandwidth** — IS/DE product **unlimited-class** (extendable at cost; DE has
+    30 TB class entitlement); US fixed 200 Mbps product budget. Not auto-detected
+    NIC line-rate.
+  - **Session soft max** — utilization / residual routing hint (IS/US 512;
+    DE dedicated 8 vCPU / 32 GB → 1024). Not a hard public admission lock.
 """
 
 from __future__ import annotations
@@ -48,6 +49,7 @@ def _product_maps():
     try:
         from node.private_capacity import (
             DEFAULT_MAX_SESSIONS,
+            DEFAULT_MAX_SESSIONS_DE,
             DEFAULT_MAX_SESSIONS_IS,
             DEFAULT_MAX_SESSIONS_US,
             PRODUCT_BANDWIDTH_CAP_BPS,
@@ -60,6 +62,7 @@ def _product_maps():
         try:
             from private_capacity import (  # type: ignore
                 DEFAULT_MAX_SESSIONS,
+                DEFAULT_MAX_SESSIONS_DE,
                 DEFAULT_MAX_SESSIONS_IS,
                 DEFAULT_MAX_SESSIONS_US,
                 PRODUCT_BANDWIDTH_CAP_BPS,
@@ -73,6 +76,7 @@ def _product_maps():
             DEFAULT_MAX_SESSIONS = 256
             DEFAULT_MAX_SESSIONS_IS = 512
             DEFAULT_MAX_SESSIONS_US = 512
+            DEFAULT_MAX_SESSIONS_DE = 1024
             PRODUCT_BANDWIDTH_CAP_BPS = {
                 "US": 200 * _MBPS,
                 "5.161.242.85": 200 * _MBPS,
@@ -81,16 +85,19 @@ def _product_maps():
                 "RO": 256,
                 "IS": 512,
                 "US": 512,
+                "DE": 1024,
                 "185.146.232.107": 256,
                 "82.221.101.241": 512,
                 "5.161.242.85": 512,
+                "178.105.187.178": 1024,
             }
 
             def product_bandwidth_unlimited(*, code: str = "", host: str = ""):
                 c = (code or "").strip().upper()
                 h = (host or "").strip()
-                return c in {"IS", "RO"} or h in {
+                return c in {"IS", "DE", "RO"} or h in {
                     "82.221.101.241",
+                    "178.105.187.178",
                     "185.146.232.107",
                 }
 
@@ -112,6 +119,7 @@ def _product_maps():
         "DEFAULT_MAX_SESSIONS": DEFAULT_MAX_SESSIONS,
         "DEFAULT_MAX_SESSIONS_IS": DEFAULT_MAX_SESSIONS_IS,
         "DEFAULT_MAX_SESSIONS_US": DEFAULT_MAX_SESSIONS_US,
+        "DEFAULT_MAX_SESSIONS_DE": DEFAULT_MAX_SESSIONS_DE,
         "PRODUCT_BANDWIDTH_CAP_BPS": PRODUCT_BANDWIDTH_CAP_BPS,
         "PRODUCT_SESSION_SOFT_MAX": PRODUCT_SESSION_SOFT_MAX,
         "product_bandwidth_cap_bps": product_bandwidth_cap_bps,
@@ -237,9 +245,9 @@ def resolve_bandwidth_cap_bps(
     """Resolve operator bandwidth budget for a peer.
 
     Priority: env map (host/code) → product peer allowance.
-    Product: IS/RO unlimited-class (None); US 200 Mbps.
+    Product: IS/DE unlimited-class (None); US 200 Mbps.
     Status host flat ``RPT_NODE_BANDWIDTH_CAP_BPS`` alone does **not** pin every
-    peer — that would re-impose a single budget on unlimited-class IS/RO.
+    peer — that would re-impose a single budget on unlimited-class IS/DE.
     """
     e = env if env is not None else os.environ
     m = dict(caps) if caps is not None else parse_bandwidth_cap_map(
@@ -275,7 +283,7 @@ def resolve_session_soft_max(
     env: Mapping[str, str] | None = None,
     caps: Mapping[str, int] | None = None,
 ) -> int:
-    """Resolve session soft max for a peer (IS > RO; US = 512).
+    """Resolve session soft max for a peer (DE 1024; IS/US 512; RO 256).
 
     Priority: ``RPT_SESSION_SOFT_MAX_MAP`` → product map → base 256.
     """
