@@ -156,10 +156,15 @@ class TestAuditTimerPrivacySectionA(unittest.TestCase):
         self.assertIn("[REDACTED_USER]@vps.example.com", clean)
         self.assertNotIn("BEGIN PRIVATE KEY", clean)
         self.assertIn("[REDACTED_PRIVATE_KEY]", clean)
-        # Product public facts survive
+        # Monopin residual IPs are public-labeled (never raw in audit text);
+        # product title survives.
         keep = mod.redact_audit_text("node 82.221.101.241 title RESTORE PRIVACY")
-        self.assertIn("82.221.101.241", keep)
         self.assertIn("RESTORE PRIVACY", keep)
+        self.assertTrue(
+            "Iceland" in keep or "82.221.101.241" in keep,
+            keep,
+        )
+        self.assertNotIn("/home/alice", keep)
 
     def test_slim_json_drops_suite_tails(self):
         mod = _load_audit_mod()
@@ -375,7 +380,11 @@ class TestAuditTimerPrivacySectionA(unittest.TestCase):
         self.assertTrue(audit.is_file())
         text = audit.read_text(encoding="utf-8")
         self.assertGreater(len(text), 3000)
-        self.assertIn("82.221.101.241", text)
+        # Public audit uses monopin country labels (Iceland (IS)), not raw IPv4
+        self.assertTrue(
+            "82.221.101.241" in text or "Iceland" in text,
+            "audit must name residual peer host or public label",
+        )
         self.assertIn("residual_ip_capture", text)
         self.assertIn("Findings", text)
         # VPN APP Shop copy used for /AUDIT.md and /audit.md
