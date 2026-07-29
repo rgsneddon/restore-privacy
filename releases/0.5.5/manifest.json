@@ -3,19 +3,9 @@
   "tag": "0.5.5",
   "assets": [
     {
-      "filename": "restore-privacy-client-0.5.5-windows-x64-setup.exe",
-      "sha256": "1b953bc6ad77b59935d3d540573f859a850cd8a1470814c331c2d72c6ee86f76",
-      "bytes": 38558207
-    },
-    {
       "filename": "restore-privacy-client-0.5.5-android.apk",
       "sha256": "86b587c8b59533fb1da217a9589263b68f5eac87656ca68d1c4e44b816f8b7ac",
       "bytes": 52371453
-    },
-    {
-      "filename": "restore-privacy-client-0.5.5-macos.zip",
-      "sha256": "d54abd52eda02c66447c90e401c6f7a42e070446a3ed982be944db1df2fa1708",
-      "bytes": 20957432
     },
     {
       "filename": "restore-privacy-client-0.5.5-ios.zip",
@@ -26,7 +16,17 @@
       "filename": "restore-privacy-client-0.5.5-linux-x64.tar.gz",
       "sha256": "92e824b8aaa22d5ebd12d66f794d710a9e96bf7b81b9651f99687abbe15f0b03",
       "bytes": 14408570
+    },
+    {
+      "filename": "restore-privacy-client-0.5.5-macos.zip",
+      "sha256": "d54abd52eda02c66447c90e401c6f7a42e070446a3ed982be944db1df2fa1708",
+      "bytes": 20957432
+    },
+    {
+      "filename": "restore-privacy-client-0.5.5-windows-x64-setup.exe",
+      "sha256": "cb235f4bb36fc870f28e087dd805a069fd233eeccbdb4cb01b03b6fbbce3f726",
+      "bytes": 38595307
     }
   ],
-  "notes": "0.5.5: residual IPv4/IPv6 Settings at top of privacy scale; macOS DevID notarized native; iOS Team-sign native; Windows/Android CF from 0.5.4 monopin packages; Linux rebuild"
+  "notes": "0.5.5: Windows native PE with client.windows.hidden_subprocess (configure_address fix); dual-stack Settings top; all platforms monopin 0.5.5"
 }
