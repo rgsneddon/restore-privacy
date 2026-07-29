@@ -1029,6 +1029,44 @@ class Handler(BaseHTTPRequestHandler):
                     ),
                 )
                 return
+            # Prefer browser→Helsinki host delivery (short-lived signed URL) so
+            # multi-MB installers are not double-proxied through Render.
+            # Fall back to open_release_asset (local / Helsinki fetch / GitHub).
+            try:
+                from host_delivery import host_delivery_plan  # type: ignore
+            except Exception:  # noqa: BLE001
+                try:
+                    from status_page.host_delivery import host_delivery_plan  # type: ignore
+                except Exception:  # noqa: BLE001
+                    host_delivery_plan = None  # type: ignore
+            if host_delivery_plan is not None:
+                plan = host_delivery_plan(str(fname))
+                if plan and plan.get("url"):
+                    # Consume once we hand the browser a valid host URL (single-use).
+                    if lookup_download_token(token) is None:
+                        self._send(
+                            403,
+                            "text/html; charset=utf-8",
+                            _html_page(
+                                "Download unavailable",
+                                '<p class="msg" id="download-denied">Invalid, expired, or already-used download link.</p>'
+                                '<p><a href="/">Get a new download</a></p>',
+                            ),
+                        )
+                        return
+                    consume_download_token(token)
+                    self.send_response(302)
+                    self.send_header("Location", str(plan["url"]))
+                    self.send_header("Cache-Control", "no-store")
+                    self.send_header(
+                        "X-RPT-Fulfilment",
+                        str(plan.get("source") or "helsinki_host"),
+                    )
+                    self.send_header("Content-Length", "0")
+                    # Framing OK for thank-you auto-download iframe → redirect.
+                    self._security_headers(allow_framing=True)
+                    self.end_headers()
+                    return
             # Paid proxy: stream installer from local/API (works when repo is private).
             # Do NOT redirect unpaid browsers to free public github.com/releases/download.
             # open_release_asset must never be called without a validated paid grant.

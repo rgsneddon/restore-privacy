@@ -1,8 +1,14 @@
 #!/usr/bin/env python3
 """Token-gated HTTP server for paid product installers (Helsinki store).
 
-Serves only ``/paid-assets/{version}/{filename}`` when the request carries a
-matching ``X-RPT-Asset-Token`` header. Not a free public download surface.
+Serves only ``/paid-assets/{version}/{filename}`` when the request carries:
+
+  * matching ``X-RPT-Asset-Token`` header (status-host proxy / operator tools), or
+  * a short-lived signed query (``exp``, ``n``, ``sig``) minted by the status
+    host after a paid grant — so browsers pull multi‑MB installers **directly**
+    from this host without the long-lived secret in the URL.
+
+Not a free public download surface.
 
 When ``RPT_CATALOG_VERSION`` is set (install-serve sets it to the ship pin),
 only that version directory is served — older pin paths return 404.
@@ -17,14 +23,17 @@ Environment:
 
 from __future__ import annotations
 
+import hashlib
+import hmac
 import json
 import mimetypes
 import os
 import shutil
 import sys
+import time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
-from urllib.parse import unquote
+from urllib.parse import parse_qs, unquote, urlparse
 
 DEFAULT_ROOT = "/opt/restore-privacy/paid_assets"
 DEFAULT_BREADCRUMBS_ROOT = "/opt/restore-privacy/breadcrumbs"
@@ -65,6 +74,88 @@ def _token() -> str:
 def _catalog_version_pin() -> str:
     """Live catalog pin for tidy store (empty = do not pin-filter versions)."""
     return (os.environ.get("RPT_CATALOG_VERSION") or "").strip()
+
+
+# Keep in sync with status_page/host_delivery.py (mint/verify).
+_MAX_DELIVERY_TTL_SEC = 7200
+
+
+def delivery_message(
+    *,
+    version: str,
+    filename: str,
+    exp: int | str,
+    nonce: str,
+) -> bytes:
+    ver = (version or "").strip()
+    name = (filename or "").strip()
+    return f"{ver}\n{name}\n{exp}\n{nonce}".encode("utf-8")
+
+
+def verify_delivery_signature(
+    *,
+    version: str,
+    filename: str,
+    exp: int | str,
+    nonce: str,
+    sig: str,
+    secret: str,
+    now: float | None = None,
+) -> bool:
+    """Short-lived browser delivery token (HMAC-SHA256); pure for tests."""
+    if not (secret and sig and nonce and version and filename):
+        return False
+    try:
+        exp_i = int(exp)
+    except (TypeError, ValueError):
+        return False
+    t = time.time() if now is None else float(now)
+    if exp_i < int(t):
+        return False
+    if exp_i > int(t) + _MAX_DELIVERY_TTL_SEC + 120:
+        return False
+    expected = hmac.new(
+        secret.encode("utf-8"),
+        delivery_message(
+            version=version, filename=filename, exp=exp_i, nonce=nonce
+        ),
+        hashlib.sha256,
+    ).hexdigest()
+    got = (sig or "").strip()
+    return hmac.compare_digest(expected, got) or hmac.compare_digest(
+        expected, got.lower()
+    )
+
+
+def request_authorized(
+    *,
+    header_token: str,
+    expected_token: str,
+    version: str,
+    filename: str,
+    query: dict[str, list[str]] | None,
+    now: float | None = None,
+) -> bool:
+    """Pure: header long-lived secret **or** valid short-lived signed query."""
+    exp_tok = (expected_token or "").strip()
+    if not exp_tok:
+        return False
+    hdr = (header_token or "").strip()
+    if hdr and hmac.compare_digest(hdr, exp_tok):
+        return True
+    q = query or {}
+    exp = (q.get("exp") or [""])[0]
+    nonce = (q.get("n") or q.get("nonce") or [""])[0]
+    sig = (q.get("sig") or [""])[0]
+    return verify_delivery_signature(
+        version=version,
+        filename=filename,
+        exp=exp,
+        nonce=nonce,
+        sig=sig,
+        secret=exp_tok,
+        now=now,
+    )
 
 
 def path_allowed_for_catalog(
@@ -195,9 +286,10 @@ class Handler(BaseHTTPRequestHandler):
         self.send_header("Cache-Control", "no-store")
         self.end_headers()
         try:
+            # Larger chunks for multi-MB installers (browser←Helsinki path).
             with fpath.open("rb") as fh:
                 while True:
-                    chunk = fh.read(65536)
+                    chunk = fh.read(256 * 1024)
                     if not chunk:
                         break
                     self.wfile.write(chunk)
@@ -209,19 +301,26 @@ class Handler(BaseHTTPRequestHandler):
         if not expected:
             self.send_error(503, "asset token not configured")
             return
-        got = (self.headers.get("X-RPT-Asset-Token") or "").strip()
-        if not got or got != expected:
-            self.send_error(401, "unauthorized")
-            return
-        path = unquote(self.path.split("?", 1)[0])
+        parsed = urlparse(self.path)
+        path = unquote(parsed.path)
+        query = parse_qs(parsed.query or "")
 
         # --- Host load + drive only (admin fleet package-store table) ---
+        # Metrics always require the long-lived header secret (no signed query).
         if path.rstrip("/") == HOST_METRICS_PATH.rstrip("/"):
+            got = (self.headers.get("X-RPT-Asset-Token") or "").strip()
+            if not got or not hmac.compare_digest(got, expected):
+                self.send_error(401, "unauthorized")
+                return
             self._send_json(200, collect_host_metrics())
             return
 
         # --- Apple breadcrumbs vault (task metadata only) ---
         if path.startswith(BREADCRUMBS_PREFIX + "/"):
+            got = (self.headers.get("X-RPT-Asset-Token") or "").strip()
+            if not got or not hmac.compare_digest(got, expected):
+                self.send_error(401, "unauthorized")
+                return
             rel = path[len(BREADCRUMBS_PREFIX) + 1 :].lstrip("/")
             parts = [p for p in rel.split("/") if p and p not in (".", "..")]
             if not breadcrumbs_path_allowed(parts):
@@ -264,6 +363,16 @@ class Handler(BaseHTTPRequestHandler):
             version, filename, catalog_version=_catalog_version_pin()
         ):
             self.send_error(404, "not found")
+            return
+        got_hdr = (self.headers.get("X-RPT-Asset-Token") or "").strip()
+        if not request_authorized(
+            header_token=got_hdr,
+            expected_token=expected,
+            version=version,
+            filename=filename,
+            query=query,
+        ):
+            self.send_error(401, "unauthorized")
             return
         root = _root()
         fpath = (root / version / filename).resolve()
