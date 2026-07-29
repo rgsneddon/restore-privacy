@@ -3,7 +3,8 @@
 /// Defaults: startup prefs **off**. Privacy-scale lean residual: traffic
 /// shaping, outer obfuscation, and multi-hop all **off** until the user opts
 /// in (matches Windows/Linux product policy). Residual VPN core stays always-on.
-/// Dual-stack residual (**IPv4** + **IPv6**) defaults **both ON**.
+/// Residual **IPv4** is always ON (not user-adjustable). Residual **IPv6**
+/// defaults ON and remains adjustable.
 /// Entry country defaults to United States (`US`) on every client.
 library;
 
@@ -14,7 +15,7 @@ const String kKeyAutoconnectOnLaunch = 'autoconnect_on_launch';
 const String kKeyPrivacyTrafficShape = 'privacy_traffic_shape';
 const String kKeyPrivacyOuterObfuscation = 'privacy_outer_obfuscation';
 const String kKeyPrivacyMultihop = 'privacy_multihop';
-/// Residual IPv4 full-tunnel capture (dual /1). Default ON when unset.
+/// Residual IPv4 full-tunnel capture (dual /1). Always ON (product policy).
 const String kKeyResidualIpv4 = 'residual_ipv4';
 /// Residual IPv6 ISP-leak protection while residual is up. Default ON when unset.
 const String kKeyResidualIpv6 = 'residual_ipv6';
@@ -26,7 +27,7 @@ class ProductSettings {
   final bool privacyTrafficShape;
   final bool privacyOuterObfuscation;
   final bool privacyMultihop;
-  /// Residual IPv4 capture path (full-tunnel dual /1). Product default ON.
+  /// Residual IPv4 capture path (full-tunnel dual /1). Always ON (product policy).
   final bool residualIpv4;
   /// Residual IPv6 ISP path block while residual is up. Product default ON.
   final bool residualIpv6;
@@ -39,6 +40,7 @@ class ProductSettings {
     this.privacyTrafficShape = false,
     this.privacyOuterObfuscation = false,
     this.privacyMultihop = false,
+    // residualIpv4 ignored for policy — always treated as true by load/save.
     this.residualIpv4 = true,
     this.residualIpv6 = true,
     this.entryCountry = kDefaultEntryCountry,
@@ -63,7 +65,8 @@ class ProductSettings {
       privacyOuterObfuscation:
           privacyOuterObfuscation ?? this.privacyOuterObfuscation,
       privacyMultihop: privacyMultihop ?? this.privacyMultihop,
-      residualIpv4: residualIpv4 ?? this.residualIpv4,
+      // IPv4 residual is product-forced ON (ignore residualIpv4: false).
+      residualIpv4: true,
       residualIpv6: residualIpv6 ?? this.residualIpv6,
       entryCountry: entryCountry != null
           ? normalizeEntryCountry(entryCountry)
@@ -77,14 +80,14 @@ class ProductSettings {
         kKeyPrivacyTrafficShape: privacyTrafficShape,
         kKeyPrivacyOuterObfuscation: privacyOuterObfuscation,
         kKeyPrivacyMultihop: privacyMultihop,
-        kKeyResidualIpv4: residualIpv4,
+        kKeyResidualIpv4: true,
         kKeyResidualIpv6: residualIpv6,
         kKeyEntryCountry: normalizeEntryCountry(entryCountry),
       };
 
   factory ProductSettings.fromJson(Map<String, dynamic>? data) {
     if (data == null) return defaults;
-    // Dual-stack: missing key → ON (product default both true)
+    // IPv6: missing key → ON; IPv4 always ON (legacy false ignored).
     bool dualOn(Object? v) => v != false;
     return ProductSettings(
       runAtStartup: data[kKeyRunAtStartup] == true,
@@ -92,7 +95,7 @@ class ProductSettings {
       privacyTrafficShape: data[kKeyPrivacyTrafficShape] == true,
       privacyOuterObfuscation: data[kKeyPrivacyOuterObfuscation] == true,
       privacyMultihop: data[kKeyPrivacyMultihop] == true,
-      residualIpv4: !data.containsKey(kKeyResidualIpv4) || dualOn(data[kKeyResidualIpv4]),
+      residualIpv4: true,
       residualIpv6: !data.containsKey(kKeyResidualIpv6) || dualOn(data[kKeyResidualIpv6]),
       entryCountry: normalizeEntryCountry(
         data[kKeyEntryCountry]?.toString(),
@@ -152,7 +155,7 @@ class SettingsStore {
     final shape = await backend.getBool(kKeyPrivacyTrafficShape);
     final obfs = await backend.getBool(kKeyPrivacyOuterObfuscation);
     final mh = await backend.getBool(kKeyPrivacyMultihop);
-    final ipv4 = await backend.getBool(kKeyResidualIpv4);
+    // residual_ipv4 key may still exist in storage; product policy always ON.
     final ipv6 = await backend.getBool(kKeyResidualIpv6);
     final entry = await backend.getString(kKeyEntryCountry);
     return ProductSettings(
@@ -161,8 +164,9 @@ class SettingsStore {
       privacyTrafficShape: shape == true,
       privacyOuterObfuscation: obfs == true,
       privacyMultihop: mh == true,
-      // null (missing) → product default ON
-      residualIpv4: ipv4 != false,
+      // Product policy: residual IPv4 always ON (legacy false ignored).
+      residualIpv4: true,
+      // null (missing) → product default ON for IPv6
       residualIpv6: ipv6 != false,
       entryCountry: normalizeEntryCountry(entry),
     );
@@ -177,7 +181,8 @@ class SettingsStore {
       settings.privacyOuterObfuscation,
     );
     await backend.setBool(kKeyPrivacyMultihop, settings.privacyMultihop);
-    await backend.setBool(kKeyResidualIpv4, settings.residualIpv4);
+    // Always persist residual IPv4 ON (product policy).
+    await backend.setBool(kKeyResidualIpv4, true);
     await backend.setBool(kKeyResidualIpv6, settings.residualIpv6);
     await backend.setString(
       kKeyEntryCountry,

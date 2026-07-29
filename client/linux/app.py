@@ -914,7 +914,7 @@ class TunnelClientApp:
         cur = load_settings()
         run_var = tk.BooleanVar(value=cur.run_at_startup)
         auto_var = tk.BooleanVar(value=cur.autoconnect_on_launch)
-        ipv4_var = tk.BooleanVar(value=bool(getattr(cur, "residual_ipv4", True)))
+        # Residual IPv4 always ON (no switch). IPv6 remains adjustable.
         ipv6_var = tk.BooleanVar(value=bool(getattr(cur, "residual_ipv6", True)))
         note_var = tk.StringVar(value="")
 
@@ -937,7 +937,7 @@ class TunnelClientApp:
             s = ProductSettings(
                 run_at_startup=bool(run_var.get()),
                 autoconnect_on_launch=bool(auto_var.get()),
-                residual_ipv4=bool(ipv4_var.get()),
+                residual_ipv4=True,  # product policy: always on
                 residual_ipv6=bool(ipv6_var.get()),
                 privacy_traffic_shape=bool(
                     getattr(cur, "privacy_traffic_shape", False)
@@ -953,13 +953,13 @@ class TunnelClientApp:
             note_var.set(
                 f"Saved. Run at startup: {st}. "
                 f"Autoconnect: {'on' if s.autoconnect_on_launch else 'off'}. "
-                f"IPv4 residual: {'on' if s.residual_ipv4 else 'off'}. "
+                f"IPv4 residual: always on. "
                 f"IPv6 residual: {'on' if s.residual_ipv6 else 'off'}."
             )
             self._log(
                 f"Settings: run_at_startup={s.run_at_startup} ({st}); "
                 f"autoconnect={s.autoconnect_on_launch}; "
-                f"residual_ipv4={s.residual_ipv4}; residual_ipv6={s.residual_ipv6}"
+                f"residual_ipv4=always_on; residual_ipv6={s.residual_ipv6}"
             )
 
         tk.Checkbutton(
@@ -988,22 +988,20 @@ class TunnelClientApp:
         ).pack(fill=tk.X, pady=(0, 4))
         tk.Label(
             frm,
-            text="Residual dual-stack (both default ON)",
+            text="Residual stack (IPv4 always on; IPv6 optional)",
             bg=WHITE,
             fg=PRIMARY_DARK,
             font=("DejaVu Sans", 10, "bold"),
         ).pack(anchor="w", pady=(10, 2))
-        tk.Checkbutton(
+        tk.Label(
             frm,
-            text="IPv4 residual (full-tunnel dual /1 capture)",
-            variable=ipv4_var,
-            command=_save_prefs,
+            text="IPv4 residual — always on (full-tunnel dual /1 capture; not adjustable)",
             bg=WHITE,
             fg=TEXT,
-            activebackground=WHITE,
-            selectcolor=WHITE,
             font=("DejaVu Sans", 9),
             anchor="w",
+            wraplength=440,
+            justify=tk.LEFT,
         ).pack(fill=tk.X, pady=(2, 0))
         tk.Checkbutton(
             frm,

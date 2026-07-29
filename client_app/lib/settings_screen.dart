@@ -277,18 +277,16 @@ class _SettingsScreenState extends State<SettingsScreen> {
     if (mounted) setState(() => _busy = false);
   }
 
-  Future<void> _setResidualStack({bool? ipv4, bool? ipv6}) async {
+  Future<void> _setResidualStack({bool? ipv6}) async {
     setState(() {
       _busy = true;
-      _settings = _settings.copyWith(
-        residualIpv4: ipv4,
-        residualIpv6: ipv6,
-      );
+      // residualIpv4 is product-forced ON via copyWith/load/save.
+      _settings = _settings.copyWith(residualIpv6: ipv6);
     });
     await widget.store.save(_settings);
     try {
       await _channel.invokeMethod<dynamic>('setResidualStack', {
-        'ipv4': _settings.residualIpv4,
+        'ipv4': true,
         'ipv6': _settings.residualIpv6,
       });
     } on MissingPluginException {
@@ -297,12 +295,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
       // Best-effort native hot-apply.
     }
     String note =
-        'Residual stack saved: IPv4=${_settings.residualIpv4} '
+        'Residual stack saved: IPv4=always on '
         'IPv6=${_settings.residualIpv6}.';
     if (widget.residualConnected) {
       note +=
           ' Disconnect then Connect for residual routes / IPv6 leak policy '
-          'to match these switches.';
+          'to match these settings.';
     } else {
       note += ' Takes effect on next Connect.';
     }
@@ -558,22 +556,23 @@ class _SettingsScreenState extends State<SettingsScreen> {
               ),
               child: Column(
                 children: [
-                  // Residual IPv4/IPv6 first in the privacy-scale list
+                  // IPv4 residual always on (non-interactive); IPv6 remains a switch.
                   Tooltip(
                     message: kTooltipResidualIpv4,
                     waitDuration: const Duration(milliseconds: 400),
-                    child: SwitchListTile(
+                    child: ListTile(
                       title: const Text(
                         'IPv4 residual',
                         style: TextStyle(fontWeight: FontWeight.w600),
                       ),
                       subtitle: const Text(kExplainerResidualIpv4),
-                      value: _settings.residualIpv4,
-                      activeThumbColor: kWhite,
-                      activeTrackColor: kPrimary,
-                      onChanged: _busy
-                          ? null
-                          : (v) => _setResidualStack(ipv4: v),
+                      trailing: Text(
+                        'Always on',
+                        style: TextStyle(
+                          color: kPrimary,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
                     ),
                   ),
                   const Divider(height: 1),

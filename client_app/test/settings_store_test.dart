@@ -57,17 +57,22 @@ void main() {
     expect(loaded.entryCountry, 'US');
   });
 
-  test('residual IPv4/IPv6 dual-stack prefs roundtrip independently', () async {
+  test('residual IPv4 always ON; IPv6 remains adjustable', () async {
     final shared = <String, dynamic>{};
     final store = SettingsStore(MemorySettingsBackend(shared));
+    // Attempt to save residualIpv4: false — product policy forces true.
     await store.save(
       const ProductSettings(residualIpv4: false, residualIpv6: true),
     );
     final loaded = await store.load();
-    expect(loaded.residualIpv4, isFalse);
+    expect(loaded.residualIpv4, isTrue);
     expect(loaded.residualIpv6, isTrue);
-    expect(shared[kKeyResidualIpv4], isFalse);
+    expect(shared[kKeyResidualIpv4], isTrue);
     expect(shared[kKeyResidualIpv6], isTrue);
+    // Legacy false on disk still loads as ON
+    shared[kKeyResidualIpv4] = false;
+    final legacy = await SettingsStore(MemorySettingsBackend(shared)).load();
+    expect(legacy.residualIpv4, isTrue);
     await store.save(
       const ProductSettings(residualIpv4: true, residualIpv6: false),
     );

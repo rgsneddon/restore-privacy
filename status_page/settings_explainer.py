@@ -99,14 +99,16 @@ def settings_parts_catalog() -> list[dict[str, str]]:
         },
         {
             "id": "protect-ipv4-ipv6",
-            "title": "Protect both IPv4 & IPv6",
-            "default": "On (dual-stack)",
+            "title": "IPv4 residual (always on) & IPv6 residual",
+            "default": "IPv4 always on; IPv6 on by default",
             "body": (
-                "ON (product default) = residual privacy protection for both IPv4 and IPv6. "
-                "IPv4-only is only for networks that refuse IPv6 privacy protection — "
-                "USING IPV4 ONLY MAY CAUSE DATA LEAKS. Confirm risk before switching off. "
-                "Changing Settings while residual is connected disconnects first, then "
-                "saves for the next Connect (no mid-session hot-apply)."
+                "IPv4 residual capture is always on (full-tunnel dual /1 routes) and "
+                "cannot be turned off in Settings. IPv6 residual ISP-leak protection "
+                "defaults ON and remains optional — turning IPv6 residual OFF means "
+                "IPv6 may use the ISP and Connected status will not claim IPv6 is "
+                "protected. USING IPV4 ONLY MAY CAUSE DATA LEAKS on dual-stack networks. "
+                "Changing IPv6 Settings while residual is connected disconnects first, "
+                "then saves for the next Connect (no mid-session hot-apply)."
             ),
         },
         {

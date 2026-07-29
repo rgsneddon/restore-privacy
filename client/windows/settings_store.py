@@ -56,8 +56,9 @@ class ProductSettings:
     privacy_traffic_shape: bool = False
     privacy_outer_obfuscation: bool = False
     privacy_multihop: bool = False
-    # Residual dual-stack: IPv4 full-tunnel capture + IPv6 ISP leak block (both ON).
+    # Residual IPv4 full-tunnel capture is always ON (not user-adjustable).
     residual_ipv4: bool = True
+    # Residual IPv6 ISP leak block (user-adjustable; default ON).
     residual_ipv6: bool = True
     # Residual entry country: US (United States, product default), IS, or RO.
     # Multihop exit = other catalog country (random among non-entry when >2).
@@ -105,12 +106,8 @@ def load_settings(path: Optional[Path] = None) -> ProductSettings:
         if not isinstance(data, dict):
             return default_settings()
         # Missing entry_country key → empty → normalize → IS; stale DE → IS
-        # Dual-stack: missing key → ON (product default both true)
-        ipv4 = (
-            True
-            if KEY_RESIDUAL_IPV4 not in data
-            else bool(data.get(KEY_RESIDUAL_IPV4))
-        )
+        # Residual IPv4 always ON (legacy residual_ipv4=false ignored).
+        # IPv6: missing key → ON (product default).
         ipv6 = (
             True
             if KEY_RESIDUAL_IPV6 not in data
@@ -125,7 +122,7 @@ def load_settings(path: Optional[Path] = None) -> ProductSettings:
                 data.get(KEY_PRIVACY_OUTER_OBFUSCATION, False)
             ),
             privacy_multihop=bool(data.get(KEY_PRIVACY_MULTIHOP, False)),
-            residual_ipv4=ipv4,
+            residual_ipv4=True,
             residual_ipv6=ipv6,
             entry_country=normalize_entry_country(data.get(KEY_ENTRY_COUNTRY)),
             # Missing key → first-run settings not completed (demand OK once).
@@ -150,7 +147,8 @@ def save_settings(settings: ProductSettings, path: Optional[Path] = None) -> Pat
         KEY_PRIVACY_TRAFFIC_SHAPE: bool(settings.privacy_traffic_shape),
         KEY_PRIVACY_OUTER_OBFUSCATION: bool(settings.privacy_outer_obfuscation),
         KEY_PRIVACY_MULTIHOP: bool(settings.privacy_multihop),
-        KEY_RESIDUAL_IPV4: bool(getattr(settings, "residual_ipv4", True)),
+        # Always persist residual IPv4 ON (product policy; not user-adjustable).
+        KEY_RESIDUAL_IPV4: True,
         KEY_RESIDUAL_IPV6: bool(getattr(settings, "residual_ipv6", True)),
         KEY_ENTRY_COUNTRY: normalize_entry_country(
             getattr(settings, "entry_country", DEFAULT_ENTRY_COUNTRY)

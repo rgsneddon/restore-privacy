@@ -2,15 +2,15 @@
 
 Purpose
 -------
-- **IPv4 ON** (default): residual full-tunnel capture uses dual /1 IPv4 routes
-  into the product TUN so ISP IPv4 is not the residual egress path.
-- **IPv4 OFF**: omit IPv4 catch-all residual routes (no full IPv4 residual claim).
-- **IPv6 ON** (default): while residual is up, block ISP IPv6 egress
+- **IPv4 always ON** (product policy, not user-adjustable): residual full-tunnel
+  capture always uses dual /1 IPv4 routes into the product TUN so ISP IPv4 is
+  not the residual egress path. Legacy ``residual_ipv4=false`` prefs are ignored.
+- **IPv6 ON** (default, adjustable): while residual is up, block ISP IPv6 egress
   (``ipv6_leak_policy=block_isp`` — Windows adapter binding / Linux blackhole /
   Android ``::/0``).
 - **IPv6 OFF**: do not apply IPv6 ISP block; honesty must not claim IPv6 protected.
 
-Missing durable keys default **both ON** (product dual-stack residual).
+Missing durable keys: IPv4 residual always ON; IPv6 residual defaults ON.
 """
 
 from __future__ import annotations
@@ -35,42 +35,47 @@ IPV6_LEAK_POLICY_ALLOW_ISP = "allow_isp"
 
 @dataclass(frozen=True)
 class ResidualStackPrefs:
-    """User dual-stack residual intent (Settings switches)."""
+    """Residual stack intent. IPv4 is product-forced ON; IPv6 is user-adjustable."""
 
     ipv4_enabled: bool = True
     ipv6_enabled: bool = True
 
+    def __post_init__(self) -> None:
+        # Product policy: residual IPv4 capture is never off.
+        if not self.ipv4_enabled:
+            object.__setattr__(self, "ipv4_enabled", True)
+
 
 def _missing_defaults_true(data: Mapping[str, Any], key: str) -> bool:
-    """Product default ON when key absent; explicit false stays false."""
+    """Product default ON when key absent; explicit false stays false (IPv6 only)."""
     if key not in data:
         return True
     return bool(data[key])
 
 
 def residual_stack_from_mapping(data: Optional[Mapping[str, Any]]) -> ResidualStackPrefs:
-    """Parse durable prefs map; missing keys → both ON."""
+    """Parse durable prefs map; residual IPv4 always ON; missing IPv6 → ON."""
     if not data:
         return ResidualStackPrefs()
     return ResidualStackPrefs(
-        ipv4_enabled=_missing_defaults_true(data, KEY_RESIDUAL_IPV4),
+        # Legacy residual_ipv4=false is ignored (always ON).
+        ipv4_enabled=True,
         ipv6_enabled=_missing_defaults_true(data, KEY_RESIDUAL_IPV6),
     )
 
 
 def residual_stack_from_product_settings(settings: Any) -> ResidualStackPrefs:
-    """Read residual_ipv4 / residual_ipv6 attrs from ProductSettings-like object."""
+    """Read residual stack from ProductSettings-like object; IPv4 always ON."""
     if settings is None:
         return ResidualStackPrefs()
-    # Prefer explicit attributes; fall back to both ON
+    # Prefer explicit attributes; IPv4 forced ON regardless of stored false.
     if hasattr(settings, "residual_ipv4") or hasattr(settings, "residual_ipv6"):
-        v4 = getattr(settings, "residual_ipv4", True)
         v6 = getattr(settings, "residual_ipv6", True)
-        return ResidualStackPrefs(ipv4_enabled=bool(v4), ipv6_enabled=bool(v6))
+        return ResidualStackPrefs(ipv4_enabled=True, ipv6_enabled=bool(v6))
     # Flutter-style camelCase if ever passed through
     if hasattr(settings, "residualIpv4") or hasattr(settings, "residualIpv6"):
         return ResidualStackPrefs(
-            ipv4_enabled=bool(getattr(settings, "residualIpv4", True)),
+            ipv4_enabled=True,
             ipv6_enabled=bool(getattr(settings, "residualIpv6", True)),
         )
     return ResidualStackPrefs()
@@ -79,13 +84,10 @@ def residual_stack_from_product_settings(settings: Any) -> ResidualStackPrefs:
 def apply_residual_stack_to_plan(
     plan: FullTunnelPlan, stack: ResidualStackPrefs
 ) -> FullTunnelPlan:
-    """Return a copy of *plan* with routes / IPv6 leak policy from *stack*."""
-    routes = (
-        list(plan.default_routes)
-        if stack.ipv4_enabled
-        else []
-    )
-    if stack.ipv4_enabled and not routes:
+    """Return a copy of *plan* with IPv4 residual routes always + IPv6 from *stack*."""
+    # Product policy: always apply residual IPv4 catch-all dual /1.
+    routes = list(plan.default_routes) if plan.default_routes else []
+    if not routes or "0.0.0.0/1" not in routes:
         routes = ["0.0.0.0/1", "128.0.0.0/1"]
     v6_policy = (
         IPV6_LEAK_POLICY_BLOCK_ISP

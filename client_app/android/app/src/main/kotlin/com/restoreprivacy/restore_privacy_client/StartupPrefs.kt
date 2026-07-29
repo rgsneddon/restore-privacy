@@ -59,11 +59,11 @@ object StartupPrefs {
     }
 
     /**
-     * Residual dual-stack prefs. Missing keys → both ON (product dual-stack default).
-     * Also checks Flutter SharedPreferences store (flutter.residual_ipv4) when present.
+     * Residual IPv4 capture is product policy always ON (not user-adjustable).
+     * Legacy residual_ipv4=false prefs are ignored.
      */
     fun residualIpv4Enabled(context: Context): Boolean {
-        return dualStackPref(context, KEY_RESIDUAL_IPV4, default = true)
+        return true
     }
 
     fun residualIpv6Enabled(context: Context): Boolean {
@@ -72,7 +72,8 @@ object StartupPrefs {
 
     fun setResidualStack(context: Context, ipv4: Boolean?, ipv6: Boolean?) {
         val ed = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit()
-        if (ipv4 != null) ed.putBoolean(KEY_RESIDUAL_IPV4, ipv4)
+        // Always persist residual IPv4 ON (product policy).
+        ed.putBoolean(KEY_RESIDUAL_IPV4, true)
         if (ipv6 != null) ed.putBoolean(KEY_RESIDUAL_IPV6, ipv6)
         ed.apply()
         // Mirror into Flutter SharedPreferences so Dart load() sees the same values.
@@ -82,7 +83,7 @@ object StartupPrefs {
                 Context.MODE_PRIVATE,
             )
             val fed = flutterPrefs.edit()
-            if (ipv4 != null) fed.putBoolean("flutter.$KEY_RESIDUAL_IPV4", ipv4)
+            fed.putBoolean("flutter.$KEY_RESIDUAL_IPV4", true)
             if (ipv6 != null) fed.putBoolean("flutter.$KEY_RESIDUAL_IPV6", ipv6)
             fed.apply()
         } catch (_: Exception) {

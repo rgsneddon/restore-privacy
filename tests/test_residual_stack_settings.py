@@ -44,8 +44,9 @@ class TestResidualStackPrefs(unittest.TestCase):
             residual_stack_from_mapping({}), ResidualStackPrefs(True, True)
         )
 
-    def test_missing_keys_default_on_explicit_false_honoured(self):
-        self.assertFalse(
+    def test_missing_keys_default_on_legacy_ipv4_false_forced_on(self):
+        # Product policy: residual IPv4 always ON even when stored false.
+        self.assertTrue(
             residual_stack_from_mapping({KEY_RESIDUAL_IPV4: False}).ipv4_enabled
         )
         self.assertTrue(
@@ -54,6 +55,8 @@ class TestResidualStackPrefs(unittest.TestCase):
         self.assertFalse(
             residual_stack_from_mapping({KEY_RESIDUAL_IPV6: False}).ipv6_enabled
         )
+        # ResidualStackPrefs constructor also clamps IPv4 to ON.
+        self.assertTrue(ResidualStackPrefs(ipv4_enabled=False).ipv4_enabled)
 
     def test_from_product_settings_attrs(self):
         class S:
@@ -61,14 +64,20 @@ class TestResidualStackPrefs(unittest.TestCase):
             residual_ipv6 = True
 
         stack = residual_stack_from_product_settings(S())
-        self.assertFalse(stack.ipv4_enabled)
+        self.assertTrue(stack.ipv4_enabled)  # forced ON
         self.assertTrue(stack.ipv6_enabled)
 
-    def test_build_plan_ipv4_off_omits_dual_slash1(self):
-        plan = build_full_tunnel_plan("10.88.0.5", ipv4_enabled=False, ipv6_enabled=True)
-        self.assertEqual(plan.default_routes, [])
-        self.assertFalse(plan.is_full_tunnel())
-        self.assertEqual(plan.ipv6_leak_policy, IPV6_LEAK_POLICY_BLOCK_ISP)
+    def test_apply_stack_forces_ipv4_routes_even_when_prefs_false(self):
+        """Shipped apply_residual_stack_to_plan always keeps dual /1 IPv4 routes."""
+        base = build_full_tunnel_plan("10.88.0.5", ipv4_enabled=False, ipv6_enabled=True)
+        self.assertEqual(base.default_routes, [])  # low-level builder can still omit
+        forced = apply_residual_stack_to_plan(
+            base, ResidualStackPrefs(ipv4_enabled=False, ipv6_enabled=True)
+        )
+        self.assertIn("0.0.0.0/1", forced.default_routes)
+        self.assertIn("128.0.0.0/1", forced.default_routes)
+        self.assertTrue(plan_wants_ipv4_catchall(forced))
+        self.assertEqual(forced.ipv6_leak_policy, IPV6_LEAK_POLICY_BLOCK_ISP)
 
     def test_build_plan_ipv6_off_allow_isp(self):
         plan = build_full_tunnel_plan("10.88.0.5", ipv4_enabled=True, ipv6_enabled=False)
@@ -351,15 +360,31 @@ class TestWindowsLinuxSettingsStoreDualStack(unittest.TestCase):
             loaded = ws.load_settings(path)
             self.assertTrue(loaded.residual_ipv4)
             self.assertTrue(loaded.residual_ipv6)
-            # Independent flip
+            # Legacy residual_ipv4=false on disk → load clamps to ON; save writes true.
+            path.write_text(
+                json.dumps(
+                    {
+                        ws.KEY_RESIDUAL_IPV4: False,
+                        ws.KEY_RESIDUAL_IPV6: True,
+                    }
+                ),
+                encoding="utf-8",
+            )
+            again = ws.load_settings(path)
+            self.assertTrue(again.residual_ipv4)
+            self.assertTrue(again.residual_ipv6)
+            # Explicit ProductSettings residual_ipv4=False still saves as True
             flipped = ws.ProductSettings(
                 residual_ipv4=False,
-                residual_ipv6=True,
+                residual_ipv6=False,
             )
             ws.save_settings(flipped, path)
-            again = ws.load_settings(path)
-            self.assertFalse(again.residual_ipv4)
-            self.assertTrue(again.residual_ipv6)
+            raw2 = json.loads(path.read_text(encoding="utf-8"))
+            self.assertTrue(raw2[ws.KEY_RESIDUAL_IPV4])
+            self.assertFalse(raw2[ws.KEY_RESIDUAL_IPV6])
+            loaded2 = ws.load_settings(path)
+            self.assertTrue(loaded2.residual_ipv4)
+            self.assertFalse(loaded2.residual_ipv6)
 
     def test_linux_load_save_defaults_and_flip(self):
         from client.linux import settings_store as ls
@@ -368,14 +393,17 @@ class TestWindowsLinuxSettingsStoreDualStack(unittest.TestCase):
             path = Path(td) / "settings.json"
             d = ls.default_settings()
             self.assertTrue(d.residual_ipv4 and d.residual_ipv6)
-            flipped = ls.ProductSettings(residual_ipv4=True, residual_ipv6=False)
+            # IPv6 still adjustable; IPv4 always ON on load/save
+            flipped = ls.ProductSettings(residual_ipv4=False, residual_ipv6=False)
             ls.save_settings(flipped, path)
             again = ls.load_settings(path)
             self.assertTrue(again.residual_ipv4)
             self.assertFalse(again.residual_ipv6)
+            raw = json.loads(path.read_text(encoding="utf-8"))
+            self.assertTrue(raw[ls.KEY_RESIDUAL_IPV4])
 
     def test_settings_ui_source_contains_ipv4_ipv6_labels(self):
-        """Structural: primary platform Settings shells expose dual-stack switches."""
+        """Structural: IPv4 residual is non-interactive always-on; IPv6 remains switch."""
         win = (ROOT / "client" / "windows" / "app.py").read_text(encoding="utf-8")
         linux = (ROOT / "client" / "linux" / "app.py").read_text(encoding="utf-8")
         flutter = (ROOT / "client_app" / "lib" / "settings_screen.dart").read_text(
@@ -389,9 +417,21 @@ class TestWindowsLinuxSettingsStoreDualStack(unittest.TestCase):
             self.assertIn(label, flutter)
         self.assertIn("IPv4 residual", linux)
         self.assertIn("IPv6 residual", linux)
+        # No adjustable IPv4 switch: Windows/Flutter must not bind IPv4 to Switch/Checkbutton
+        self.assertNotIn("ipv4_var", win)
+        self.assertNotIn("ipv4_var", linux)
+        self.assertNotIn("_setResidualStack(ipv4:", flutter)
+        # Flutter IPv4 row is ListTile (not SwitchListTile for IPv4)
+        ipv4_block = flutter[
+            flutter.index("IPv4 residual") - 200 : flutter.index("IPv4 residual") + 400
+        ]
+        self.assertIn("ListTile", ipv4_block)
+        self.assertNotIn("SwitchListTile", ipv4_block)
+        self.assertIn("Always on", flutter)
+        self.assertIn("Always on", win)
         self.assertIn("residualIpv4", store)
         self.assertIn("residualIpv6", store)
-        self.assertIn("residual_ipv4", win)
+        self.assertIn("residual_ipv4=always_on", win)
         self.assertIn("residual_ipv6", win)
 
     def test_privacy_scale_list_orders_residual_stack_before_shape_obfs_multihop(self):

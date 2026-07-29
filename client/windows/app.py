@@ -2447,7 +2447,7 @@ class TunnelClientApp:
         shape_var = tk.BooleanVar(value=cur.privacy_traffic_shape)
         obfs_var = tk.BooleanVar(value=cur.privacy_outer_obfuscation)
         multihop_var = tk.BooleanVar(value=cur.privacy_multihop)
-        ipv4_var = tk.BooleanVar(value=bool(getattr(cur, "residual_ipv4", True)))
+        # Residual IPv4 is always ON (no user switch). IPv6 remains adjustable.
         ipv6_var = tk.BooleanVar(value=bool(getattr(cur, "residual_ipv6", True)))
         entry_country_var = tk.StringVar(
             value=option_label_for_code(
@@ -2535,7 +2535,7 @@ class TunnelClientApp:
                 privacy_traffic_shape=bool(shape_var.get()),
                 privacy_outer_obfuscation=bool(obfs_var.get()),
                 privacy_multihop=bool(multihop_var.get()),
-                residual_ipv4=bool(ipv4_var.get()),
+                residual_ipv4=True,  # product policy: always on
                 residual_ipv6=bool(ipv6_var.get()),
                 entry_country=normalize_entry_country(
                     label_to_country_code(entry_country_var.get())
@@ -2668,7 +2668,7 @@ class TunnelClientApp:
             save_settings(s)
             self._settings = s
             note_var.set(
-                f"Residual stack: IPv4={'on' if s.residual_ipv4 else 'off'}, "
+                f"Residual stack: IPv4=always on, "
                 f"IPv6={'on' if s.residual_ipv6 else 'off'}. "
                 "Takes effect on next Connect"
                 + (
@@ -2678,7 +2678,7 @@ class TunnelClientApp:
                 )
             )
             self._log(
-                f"Settings: residual_ipv4={s.residual_ipv4} "
+                f"Settings: residual_ipv4=always_on "
                 f"residual_ipv6={s.residual_ipv6}"
             )
 
@@ -2731,17 +2731,38 @@ class TunnelClientApp:
                 font=("Segoe UI", 11, "bold"),
                 anchor="w",
             ).pack(fill=tk.X, pady=(0, 4))
-            # Dual-stack switchers FIRST (top of box) — residual IPv4 / IPv6.
-            # User request: top controls in this card before blurbs / other toggles.
-            _row(
-                priv_card,
-                "IPv4 residual",
-                "Full-tunnel IPv4 capture (dual /1 residual routes into the VPN). "
-                "ON (default). OFF: honest status — no residual IPv4 claim. "
-                "Takes effect on next Connect.",
-                ipv4_var,
-                _save_residual_stack,
-            )
+            # IPv4 residual always on (label only); IPv6 residual remains adjustable.
+            ipv4_info = tk.Frame(priv_card, bg=PANEL_BG)
+            ipv4_info.pack(fill=tk.X, pady=8)
+            tk.Label(
+                ipv4_info,
+                text="IPv4 residual",
+                bg=PANEL_BG,
+                fg=TEXT,
+                font=("Segoe UI", 10, "bold"),
+                anchor="w",
+            ).pack(fill=tk.X)
+            tk.Label(
+                ipv4_info,
+                text=(
+                    "Always on: full-tunnel IPv4 capture (dual /1 residual routes "
+                    "into the VPN). This cannot be turned off."
+                ),
+                bg=PANEL_BG,
+                fg=TEXT_MUTED,
+                font=("Segoe UI", 8),
+                anchor="w",
+                wraplength=360,
+                justify=tk.LEFT,
+            ).pack(fill=tk.X)
+            tk.Label(
+                ipv4_info,
+                text="Always on",
+                bg=PANEL_BG,
+                fg=PRIMARY_DARK,
+                font=("Segoe UI", 9, "bold"),
+                anchor="e",
+            ).pack(anchor="e", pady=(4, 0))
             tk.Frame(priv_card, bg=BORDER, height=1).pack(fill=tk.X, pady=4)
             _row(
                 priv_card,
