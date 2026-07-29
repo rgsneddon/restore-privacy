@@ -2425,6 +2425,8 @@ class TunnelClientApp:
         shape_var = tk.BooleanVar(value=cur.privacy_traffic_shape)
         obfs_var = tk.BooleanVar(value=cur.privacy_outer_obfuscation)
         multihop_var = tk.BooleanVar(value=cur.privacy_multihop)
+        ipv4_var = tk.BooleanVar(value=bool(getattr(cur, "residual_ipv4", True)))
+        ipv6_var = tk.BooleanVar(value=bool(getattr(cur, "residual_ipv6", True)))
         entry_country_var = tk.StringVar(
             value=option_label_for_code(
                 normalize_entry_country(getattr(cur, "entry_country", "IS"))
@@ -2511,6 +2513,8 @@ class TunnelClientApp:
                 privacy_traffic_shape=bool(shape_var.get()),
                 privacy_outer_obfuscation=bool(obfs_var.get()),
                 privacy_multihop=bool(multihop_var.get()),
+                residual_ipv4=bool(ipv4_var.get()),
+                residual_ipv6=bool(ipv6_var.get()),
                 entry_country=normalize_entry_country(
                     label_to_country_code(entry_country_var.get())
                     or entry_country_var.get()
@@ -2635,6 +2639,42 @@ class TunnelClientApp:
             "When the app opens, start Connect automatically",
             auto_var,
             _save_auto,
+        )
+        tk.Frame(card, bg=BORDER, height=1).pack(fill=tk.X, pady=4)
+
+        def _save_residual_stack() -> None:
+            s = _current_settings()
+            save_settings(s)
+            self._settings = s
+            note_var.set(
+                f"Residual stack: IPv4={'on' if s.residual_ipv4 else 'off'}, "
+                f"IPv6={'on' if s.residual_ipv6 else 'off'}. "
+                "Takes effect on next Connect"
+                + (
+                    " (disconnect first if currently residual-connected)."
+                    if self._connected
+                    else "."
+                )
+            )
+            self._log(
+                f"Settings: residual_ipv4={s.residual_ipv4} "
+                f"residual_ipv6={s.residual_ipv6}"
+            )
+
+        _row(
+            card,
+            "IPv4 residual",
+            "Full-tunnel IPv4 capture (dual /1 residual routes into the VPN)",
+            ipv4_var,
+            _save_residual_stack,
+        )
+        tk.Frame(card, bg=BORDER, height=1).pack(fill=tk.X, pady=4)
+        _row(
+            card,
+            "IPv6 residual",
+            "Block ISP IPv6 while residual is connected (dual-stack leak protection)",
+            ipv6_var,
+            _save_residual_stack,
         )
 
         # Free 3.3.3: no user-amendable privacy-scale (locked lean Iceland).

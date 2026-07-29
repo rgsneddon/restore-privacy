@@ -1,0 +1,160 @@
+"""Dual-stack residual IPv4/IPv6 Settings prefs → full-tunnel policy."""
+
+from __future__ import annotations
+
+import json
+import sys
+import tempfile
+import unittest
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT))
+
+from client.full_tunnel import (  # noqa: E402
+    IPV6_LEAK_POLICY_ALLOW_ISP,
+    IPV6_LEAK_POLICY_BLOCK_ISP,
+    android_vpn_builder_config,
+    build_full_tunnel_plan,
+)
+from client.residual_stack import (  # noqa: E402
+    KEY_RESIDUAL_IPV4,
+    KEY_RESIDUAL_IPV6,
+    ResidualStackPrefs,
+    apply_residual_stack_to_plan,
+    honesty_ipv6_protected,
+    plan_wants_ipv6_isp_block,
+    residual_stack_from_mapping,
+    residual_stack_from_product_settings,
+)
+
+
+class TestResidualStackPrefs(unittest.TestCase):
+    def test_defaults_both_on(self):
+        s = ResidualStackPrefs()
+        self.assertTrue(s.ipv4_enabled)
+        self.assertTrue(s.ipv6_enabled)
+        self.assertEqual(
+            residual_stack_from_mapping(None), ResidualStackPrefs(True, True)
+        )
+        self.assertEqual(
+            residual_stack_from_mapping({}), ResidualStackPrefs(True, True)
+        )
+
+    def test_missing_keys_default_on_explicit_false_honoured(self):
+        self.assertFalse(
+            residual_stack_from_mapping({KEY_RESIDUAL_IPV4: False}).ipv4_enabled
+        )
+        self.assertTrue(
+            residual_stack_from_mapping({KEY_RESIDUAL_IPV4: False}).ipv6_enabled
+        )
+        self.assertFalse(
+            residual_stack_from_mapping({KEY_RESIDUAL_IPV6: False}).ipv6_enabled
+        )
+
+    def test_from_product_settings_attrs(self):
+        class S:
+            residual_ipv4 = False
+            residual_ipv6 = True
+
+        stack = residual_stack_from_product_settings(S())
+        self.assertFalse(stack.ipv4_enabled)
+        self.assertTrue(stack.ipv6_enabled)
+
+    def test_build_plan_ipv4_off_omits_dual_slash1(self):
+        plan = build_full_tunnel_plan("10.88.0.5", ipv4_enabled=False, ipv6_enabled=True)
+        self.assertEqual(plan.default_routes, [])
+        self.assertFalse(plan.is_full_tunnel())
+        self.assertEqual(plan.ipv6_leak_policy, IPV6_LEAK_POLICY_BLOCK_ISP)
+
+    def test_build_plan_ipv6_off_allow_isp(self):
+        plan = build_full_tunnel_plan("10.88.0.5", ipv4_enabled=True, ipv6_enabled=False)
+        self.assertIn("0.0.0.0/1", plan.default_routes)
+        self.assertEqual(plan.ipv6_leak_policy, IPV6_LEAK_POLICY_ALLOW_ISP)
+        self.assertFalse(plan_wants_ipv6_isp_block(plan))
+        cfg = android_vpn_builder_config(plan)
+        routes = cfg.get("routes") or []
+        self.assertIn({"addr": "0.0.0.0", "prefix": 0}, routes)
+        self.assertNotIn({"addr": "::", "prefix": 0}, routes)
+        self.assertFalse(cfg.get("ipv6Protected"))
+
+    def test_apply_stack_to_existing_plan(self):
+        base = build_full_tunnel_plan("10.88.0.9")
+        off = apply_residual_stack_to_plan(
+            base, ResidualStackPrefs(ipv4_enabled=True, ipv6_enabled=False)
+        )
+        self.assertEqual(off.ipv6_leak_policy, IPV6_LEAK_POLICY_ALLOW_ISP)
+        self.assertTrue(base.default_routes)  # original unchanged intent via new plan
+
+    def test_honesty_ipv6_never_true_when_settings_off(self):
+        self.assertIs(honesty_ipv6_protected(stack_ipv6_enabled=False, mitigation_applied=True), False)
+        self.assertIs(honesty_ipv6_protected(stack_ipv6_enabled=True, mitigation_applied=True), True)
+        self.assertIs(honesty_ipv6_protected(stack_ipv6_enabled=True, mitigation_applied=False), False)
+
+
+class TestWindowsLinuxSettingsStoreDualStack(unittest.TestCase):
+    def test_windows_load_save_defaults_and_flip(self):
+        from client.windows import settings_store as ws
+
+        with tempfile.TemporaryDirectory() as td:
+            path = Path(td) / "settings.json"
+            d = ws.default_settings()
+            self.assertTrue(d.residual_ipv4)
+            self.assertTrue(d.residual_ipv6)
+            ws.save_settings(d, path)
+            raw = json.loads(path.read_text(encoding="utf-8"))
+            self.assertTrue(raw[ws.KEY_RESIDUAL_IPV4])
+            self.assertTrue(raw[ws.KEY_RESIDUAL_IPV6])
+            # Missing dual-stack keys still load as ON
+            del raw[ws.KEY_RESIDUAL_IPV4]
+            del raw[ws.KEY_RESIDUAL_IPV6]
+            path.write_text(json.dumps(raw), encoding="utf-8")
+            loaded = ws.load_settings(path)
+            self.assertTrue(loaded.residual_ipv4)
+            self.assertTrue(loaded.residual_ipv6)
+            # Independent flip
+            flipped = ws.ProductSettings(
+                residual_ipv4=False,
+                residual_ipv6=True,
+            )
+            ws.save_settings(flipped, path)
+            again = ws.load_settings(path)
+            self.assertFalse(again.residual_ipv4)
+            self.assertTrue(again.residual_ipv6)
+
+    def test_linux_load_save_defaults_and_flip(self):
+        from client.linux import settings_store as ls
+
+        with tempfile.TemporaryDirectory() as td:
+            path = Path(td) / "settings.json"
+            d = ls.default_settings()
+            self.assertTrue(d.residual_ipv4 and d.residual_ipv6)
+            flipped = ls.ProductSettings(residual_ipv4=True, residual_ipv6=False)
+            ls.save_settings(flipped, path)
+            again = ls.load_settings(path)
+            self.assertTrue(again.residual_ipv4)
+            self.assertFalse(again.residual_ipv6)
+
+    def test_settings_ui_source_contains_ipv4_ipv6_labels(self):
+        """Structural: primary platform Settings shells expose dual-stack switches."""
+        win = (ROOT / "client" / "windows" / "app.py").read_text(encoding="utf-8")
+        linux = (ROOT / "client" / "linux" / "app.py").read_text(encoding="utf-8")
+        flutter = (ROOT / "client_app" / "lib" / "settings_screen.dart").read_text(
+            encoding="utf-8"
+        )
+        store = (ROOT / "client_app" / "lib" / "settings_store.dart").read_text(
+            encoding="utf-8"
+        )
+        for label in ("IPv4 residual", "IPv6 residual"):
+            self.assertIn(label, win)
+            self.assertIn(label, flutter)
+        self.assertIn("IPv4 residual", linux)
+        self.assertIn("IPv6 residual", linux)
+        self.assertIn("residualIpv4", store)
+        self.assertIn("residualIpv6", store)
+        self.assertIn("residual_ipv4", win)
+        self.assertIn("residual_ipv6", win)
+
+
+if __name__ == "__main__":
+    unittest.main()

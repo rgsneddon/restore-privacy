@@ -21,6 +21,8 @@ KEY_AUTOCONNECT_ON_LAUNCH = "autoconnect_on_launch"
 KEY_PRIVACY_TRAFFIC_SHAPE = "privacy_traffic_shape"
 KEY_PRIVACY_OUTER_OBFUSCATION = "privacy_outer_obfuscation"
 KEY_PRIVACY_MULTIHOP = "privacy_multihop"
+KEY_RESIDUAL_IPV4 = "residual_ipv4"
+KEY_RESIDUAL_IPV6 = "residual_ipv6"
 KEY_ENTRY_COUNTRY = "entry_country"
 AUTOSTART_DESKTOP_NAME = "restore-privacy.desktop"
 
@@ -39,6 +41,9 @@ class ProductSettings:
     privacy_traffic_shape: bool = False
     privacy_outer_obfuscation: bool = False
     privacy_multihop: bool = False
+    # Residual dual-stack: IPv4 capture + IPv6 ISP leak block (both ON).
+    residual_ipv4: bool = True
+    residual_ipv6: bool = True
     # Residual entry country: IS (product default) or RO.
     entry_country: str = "US"
 
@@ -63,6 +68,8 @@ def default_settings() -> ProductSettings:
         privacy_traffic_shape=False,
         privacy_outer_obfuscation=False,
         privacy_multihop=False,
+        residual_ipv4=True,
+        residual_ipv6=True,
         entry_country=DEFAULT_ENTRY_COUNTRY,
     )
 
@@ -74,6 +81,16 @@ def load_settings(path: Optional[Path] = None) -> ProductSettings:
         data = json.loads(raw)
         if not isinstance(data, dict):
             return default_settings()
+        ipv4 = (
+            True
+            if KEY_RESIDUAL_IPV4 not in data
+            else bool(data.get(KEY_RESIDUAL_IPV4))
+        )
+        ipv6 = (
+            True
+            if KEY_RESIDUAL_IPV6 not in data
+            else bool(data.get(KEY_RESIDUAL_IPV6))
+        )
         return ProductSettings(
             run_at_startup=bool(data.get(KEY_RUN_AT_STARTUP, False)),
             autoconnect_on_launch=bool(data.get(KEY_AUTOCONNECT_ON_LAUNCH, False)),
@@ -82,6 +99,8 @@ def load_settings(path: Optional[Path] = None) -> ProductSettings:
                 data.get(KEY_PRIVACY_OUTER_OBFUSCATION, False)
             ),
             privacy_multihop=bool(data.get(KEY_PRIVACY_MULTIHOP, False)),
+            residual_ipv4=ipv4,
+            residual_ipv6=ipv6,
             # Missing key → empty → DE; explicit saved IS kept
             entry_country=normalize_entry_country(data.get(KEY_ENTRY_COUNTRY)),
         )
@@ -100,6 +119,8 @@ def save_settings(settings: ProductSettings, path: Optional[Path] = None) -> Pat
         KEY_PRIVACY_TRAFFIC_SHAPE: bool(settings.privacy_traffic_shape),
         KEY_PRIVACY_OUTER_OBFUSCATION: bool(settings.privacy_outer_obfuscation),
         KEY_PRIVACY_MULTIHOP: bool(settings.privacy_multihop),
+        KEY_RESIDUAL_IPV4: bool(getattr(settings, "residual_ipv4", True)),
+        KEY_RESIDUAL_IPV6: bool(getattr(settings, "residual_ipv6", True)),
         KEY_ENTRY_COUNTRY: normalize_entry_country(
             getattr(settings, "entry_country", DEFAULT_ENTRY_COUNTRY)
         ),

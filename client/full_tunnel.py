@@ -28,6 +28,8 @@ def default_tunnel_dns_servers() -> list[str]:
 
 # Product residual full tunnel must address IPv6 ISP leaks (IPv4 dual /1 alone is not enough).
 IPV6_LEAK_POLICY_BLOCK_ISP = "block_isp"
+# User Settings IPv6 OFF — residual session does not install ISP IPv6 block.
+IPV6_LEAK_POLICY_ALLOW_ISP = "allow_isp"
 DEFAULT_IPV6_LEAK_POLICY = IPV6_LEAK_POLICY_BLOCK_ISP
 
 
@@ -64,7 +66,22 @@ def build_full_tunnel_plan(
     tunnel_iface: str = "RPT",
     gateway: str = DEFAULT_TUNNEL_GATEWAY,
     dns_servers: list[str] | None = None,
+    *,
+    ipv4_enabled: bool = True,
+    ipv6_enabled: bool = True,
 ) -> FullTunnelPlan:
+    """Build residual full-tunnel plan.
+
+    *ipv4_enabled* / *ipv6_enabled* mirror Settings dual-stack switches
+    (default both ON). When IPv4 is off, catch-all dual /1 routes are omitted.
+    When IPv6 is off, ``ipv6_leak_policy`` is ``allow_isp`` (no ISP IPv6 block).
+    """
+    routes = ["0.0.0.0/1", "128.0.0.0/1"] if ipv4_enabled else []
+    v6 = (
+        IPV6_LEAK_POLICY_BLOCK_ISP
+        if ipv6_enabled
+        else IPV6_LEAK_POLICY_ALLOW_ISP
+    )
     return FullTunnelPlan(
         tunnel_iface=tunnel_iface,
         tunnel_client_ip=client_vpn_ip,
@@ -72,7 +89,8 @@ def build_full_tunnel_plan(
         dns_servers=list(dns_servers) if dns_servers is not None else default_tunnel_dns_servers(),
         allow_all_apps=True,
         disallowed_apps=[],
-        default_routes=["0.0.0.0/1", "128.0.0.0/1"],
+        default_routes=routes,
+        ipv6_leak_policy=v6,
     )
 
 

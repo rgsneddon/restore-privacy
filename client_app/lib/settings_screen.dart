@@ -269,6 +269,44 @@ class _SettingsScreenState extends State<SettingsScreen> {
     if (mounted) setState(() => _busy = false);
   }
 
+  Future<void> _setResidualStack({bool? ipv4, bool? ipv6}) async {
+    setState(() {
+      _busy = true;
+      _settings = _settings.copyWith(
+        residualIpv4: ipv4,
+        residualIpv6: ipv6,
+      );
+    });
+    await widget.store.save(_settings);
+    try {
+      await _channel.invokeMethod<dynamic>('setResidualStack', {
+        'ipv4': _settings.residualIpv4,
+        'ipv6': _settings.residualIpv6,
+      });
+    } on MissingPluginException {
+      // Persist still valid; Connect rebuilds plan from prefs on next attach.
+    } catch (_) {
+      // Best-effort native hot-apply.
+    }
+    String note =
+        'Residual stack saved: IPv4=${_settings.residualIpv4} '
+        'IPv6=${_settings.residualIpv6}.';
+    if (widget.residualConnected) {
+      note +=
+          ' Disconnect then Connect for residual routes / IPv6 leak policy '
+          'to match these switches.';
+    } else {
+      note += ' Takes effect on next Connect.';
+    }
+    if (!_settings.residualIpv6) {
+      note +=
+          ' With IPv6 off, Connected will not claim IPv6 ISP path blocked.';
+    }
+    _note = note;
+    widget.onChanged?.call(_settings);
+    if (mounted) setState(() => _busy = false);
+  }
+
   Future<void> _setPrivacyScale({
     bool? trafficShape,
     bool? outerObfuscation,
@@ -487,6 +525,65 @@ class _SettingsScreenState extends State<SettingsScreen> {
             '(startup launches the app; autoconnect starts the VPN). '
             'OS VPN permission / Administrator may still be required.',
             style: TextStyle(color: kTextMuted, fontSize: 12),
+          ),
+          const SizedBox(height: 20),
+          Text(
+            'Residual dual-stack',
+            style: TextStyle(
+              color: kPrimaryDark,
+              fontSize: 14,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            'IPv4 routes residual traffic into the VPN tunnel. IPv6 blocks the '
+            'ISP IPv6 path while residual is up so dual-stack leaks do not '
+            'bypass the tunnel. Both default ON.',
+            style: TextStyle(color: kTextMuted, fontSize: 12),
+          ),
+          const SizedBox(height: 10),
+          Container(
+            decoration: BoxDecoration(
+              color: kPanelBg,
+              borderRadius: BorderRadius.circular(kCornerRadius),
+              border: Border.all(color: kBorder),
+            ),
+            child: Column(
+              children: [
+                SwitchListTile(
+                  title: const Text(
+                    'IPv4 residual',
+                    style: TextStyle(fontWeight: FontWeight.w600),
+                  ),
+                  subtitle: const Text(
+                    'Full-tunnel IPv4 capture (dual /1 residual routes)',
+                  ),
+                  value: _settings.residualIpv4,
+                  activeThumbColor: kWhite,
+                  activeTrackColor: kPrimary,
+                  onChanged: _busy
+                      ? null
+                      : (v) => _setResidualStack(ipv4: v),
+                ),
+                const Divider(height: 1),
+                SwitchListTile(
+                  title: const Text(
+                    'IPv6 residual',
+                    style: TextStyle(fontWeight: FontWeight.w600),
+                  ),
+                  subtitle: const Text(
+                    'Block ISP IPv6 while residual is connected',
+                  ),
+                  value: _settings.residualIpv6,
+                  activeThumbColor: kWhite,
+                  activeTrackColor: kPrimary,
+                  onChanged: _busy
+                      ? null
+                      : (v) => _setResidualStack(ipv6: v),
+                ),
+              ],
+            ),
           ),
           if (!freeTierSettingsLocked) ...[
             const SizedBox(height: 20),

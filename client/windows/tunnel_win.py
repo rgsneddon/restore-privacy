@@ -567,6 +567,8 @@ def _cmd_exit_ok(returncode: int, stderr: str, stdout: str) -> bool:
 def apply_ipv6_leak_mitigation(plan: FullTunnelPlan) -> tuple[list[str], bool]:
     """Run IPv6 ISP-block commands; return (successful_cmds, mitigation_ok).
 
+    No-op when Settings IPv6 residual is off (``ipv6_leak_policy`` ≠ block_isp).
+
     ``mitigation_ok`` is True only when the **critical** verified PowerShell
     disable reports ``RPT_IPV6_DISABLED>=1`` and exit 0 (see
     ``parse_windows_ipv6_disable_result``). Zero-effect runs (SilentlyContinue /
@@ -574,9 +576,14 @@ def apply_ipv6_leak_mitigation(plan: FullTunnelPlan) -> tuple[list[str], bool]:
     exit were 0 without a positive count. Transition tech is best-effort only.
     """
     from client.full_tunnel import (
+        IPV6_LEAK_POLICY_BLOCK_ISP,
         parse_windows_ipv6_disable_result,
         windows_ipv6_disable_powershell,
     )
+
+    # Settings IPv6 OFF → plan.ipv6_leak_policy is allow_isp; skip mitigation.
+    if str(getattr(plan, "ipv6_leak_policy", "")) != IPV6_LEAK_POLICY_BLOCK_ISP:
+        return [], False
 
     cmds = windows_ipv6_leak_block_commands(tunnel_iface=plan.tunnel_iface or "RPT")
     critical_ps = windows_ipv6_disable_powershell(

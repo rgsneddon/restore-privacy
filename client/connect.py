@@ -131,19 +131,52 @@ def _http_get_body(url: str, *, timeout_s: float = 2.0) -> bytes | None:
     return body
 
 
+def _residual_stack_prefs():
+    """Load dual-stack Settings prefs (defaults both ON). Best-effort."""
+    try:
+        from client.residual_stack import residual_stack_from_product_settings
+
+        settings = None
+        try:
+            import sys
+
+            if sys.platform == "win32":
+                from client.windows.settings_store import load_settings
+
+                settings = load_settings()
+            elif sys.platform.startswith("linux"):
+                from client.linux.settings_store import load_settings
+
+                settings = load_settings()
+        except Exception:
+            settings = None
+        return residual_stack_from_product_settings(settings)
+    except Exception:
+        from client.residual_stack import ResidualStackPrefs
+
+        return ResidualStackPrefs()
+
+
 def _tunnel_plan_for_session(
     existing: Optional[FullTunnelPlan], vpn_ip: str
 ) -> FullTunnelPlan:
     """Reuse plan only when VPN IP still matches; otherwise build a fresh plan."""
     ip = (vpn_ip or "").strip()
+    stack = _residual_stack_prefs()
     if (
         existing is not None
         and existing.tunnel_client_ip == ip
         and existing.is_full_tunnel()
+        and stack.ipv4_enabled
+        and stack.ipv6_enabled
         and not assert_full_tunnel_plan(existing)
     ):
         return existing
-    return build_full_tunnel_plan(ip)
+    return build_full_tunnel_plan(
+        ip,
+        ipv4_enabled=stack.ipv4_enabled,
+        ipv6_enabled=stack.ipv6_enabled,
+    )
 
 
 class ConnectState(str, Enum):

@@ -913,6 +913,8 @@ class TunnelClientApp:
         cur = load_settings()
         run_var = tk.BooleanVar(value=cur.run_at_startup)
         auto_var = tk.BooleanVar(value=cur.autoconnect_on_launch)
+        ipv4_var = tk.BooleanVar(value=bool(getattr(cur, "residual_ipv4", True)))
+        ipv6_var = tk.BooleanVar(value=bool(getattr(cur, "residual_ipv6", True)))
         note_var = tk.StringVar(value="")
 
         tk.Label(
@@ -934,16 +936,29 @@ class TunnelClientApp:
             s = ProductSettings(
                 run_at_startup=bool(run_var.get()),
                 autoconnect_on_launch=bool(auto_var.get()),
+                residual_ipv4=bool(ipv4_var.get()),
+                residual_ipv6=bool(ipv6_var.get()),
+                privacy_traffic_shape=bool(
+                    getattr(cur, "privacy_traffic_shape", False)
+                ),
+                privacy_outer_obfuscation=bool(
+                    getattr(cur, "privacy_outer_obfuscation", False)
+                ),
+                privacy_multihop=bool(getattr(cur, "privacy_multihop", False)),
+                entry_country=getattr(cur, "entry_country", "US"),
             )
             save_settings(s)
             st = apply_run_at_startup(s.run_at_startup)
             note_var.set(
                 f"Saved. Run at startup: {st}. "
-                f"Autoconnect: {'on' if s.autoconnect_on_launch else 'off'}."
+                f"Autoconnect: {'on' if s.autoconnect_on_launch else 'off'}. "
+                f"IPv4 residual: {'on' if s.residual_ipv4 else 'off'}. "
+                f"IPv6 residual: {'on' if s.residual_ipv6 else 'off'}."
             )
             self._log(
                 f"Settings: run_at_startup={s.run_at_startup} ({st}); "
-                f"autoconnect={s.autoconnect_on_launch}"
+                f"autoconnect={s.autoconnect_on_launch}; "
+                f"residual_ipv4={s.residual_ipv4}; residual_ipv6={s.residual_ipv6}"
             )
 
         tk.Checkbutton(
@@ -962,6 +977,37 @@ class TunnelClientApp:
             frm,
             text="Autoconnect on launch (same Connect gates)",
             variable=auto_var,
+            command=_save_prefs,
+            bg=WHITE,
+            fg=TEXT,
+            activebackground=WHITE,
+            selectcolor=WHITE,
+            font=("DejaVu Sans", 9),
+            anchor="w",
+        ).pack(fill=tk.X, pady=(0, 4))
+        tk.Label(
+            frm,
+            text="Residual dual-stack (both default ON)",
+            bg=WHITE,
+            fg=PRIMARY_DARK,
+            font=("DejaVu Sans", 10, "bold"),
+        ).pack(anchor="w", pady=(10, 2))
+        tk.Checkbutton(
+            frm,
+            text="IPv4 residual (full-tunnel dual /1 capture)",
+            variable=ipv4_var,
+            command=_save_prefs,
+            bg=WHITE,
+            fg=TEXT,
+            activebackground=WHITE,
+            selectcolor=WHITE,
+            font=("DejaVu Sans", 9),
+            anchor="w",
+        ).pack(fill=tk.X, pady=(2, 0))
+        tk.Checkbutton(
+            frm,
+            text="IPv6 residual (block ISP IPv6 while connected)",
+            variable=ipv6_var,
             command=_save_prefs,
             bg=WHITE,
             fg=TEXT,

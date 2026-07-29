@@ -69,8 +69,22 @@ def ipv6_residual_protected(result: Optional[LinuxTunnelResult]) -> bool:
     return bool(result and result.ipv6_mitigation_applied)
 
 
-def apply_ipv6_leak_mitigation(iface: str = "rpt0") -> tuple[list[str], bool]:
-    """Install IPv6 blackhole; ok only if a blackhole default route command succeeded."""
+def apply_ipv6_leak_mitigation(
+    iface: str = "rpt0",
+    *,
+    plan: Optional[FullTunnelPlan] = None,
+) -> tuple[list[str], bool]:
+    """Install IPv6 blackhole; ok only if a blackhole default route command succeeded.
+
+    When *plan* has ``ipv6_leak_policy`` other than block_isp (Settings IPv6 OFF),
+    no commands run.
+    """
+    from client.full_tunnel import IPV6_LEAK_POLICY_BLOCK_ISP
+
+    if plan is not None and str(
+        getattr(plan, "ipv6_leak_policy", IPV6_LEAK_POLICY_BLOCK_ISP)
+    ) != IPV6_LEAK_POLICY_BLOCK_ISP:
+        return [], False
     cmds = linux_ipv6_leak_block_commands(iface=iface)
     applied, _errs = _run_cmds(cmds)
     # linux _run_cmds only appends returncode==0 (or known-idempotent) to applied —
@@ -429,7 +443,7 @@ def start_full_tunnel(
 
     ipv6_ok = False
     try:
-        v6_cmds, ipv6_ok = apply_ipv6_leak_mitigation(iface)
+        v6_cmds, ipv6_ok = apply_ipv6_leak_mitigation(iface, plan=plan)
         applied.extend(v6_cmds)
     except Exception:
         ipv6_ok = False
