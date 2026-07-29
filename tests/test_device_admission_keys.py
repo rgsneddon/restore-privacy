@@ -362,6 +362,45 @@ class TestNoSharedPrivPackaging(unittest.TestCase):
             self.assertFalse(any(tree.rglob("*.priv")), list(tree.rglob("*.priv")))
             self.assertTrue((tree / "secrets" / NODE_PUB_NAME).is_file())
 
+    def test_windows_inject_product_secrets_ships_is_de_us_pubs(self):
+        """Shipped Windows inject_product_secrets embeds IS/DE/US residual pubs (never .priv)."""
+        import importlib.util
+
+        path = ROOT / "scripts" / "build_release_0.0.8.py"
+        spec = importlib.util.spec_from_file_location("br08_de", path)
+        assert spec and spec.loader
+        m = importlib.util.module_from_spec(spec)
+        for name in (
+            "node_elgamal.pub",
+            "de_node_elgamal.pub",
+            "us_node_elgamal.pub",
+            "exit_node_elgamal.pub",
+        ):
+            if not (ROOT / "product" / name).is_file():
+                self.skipTest(f"product/{name} missing")
+        spec.loader.exec_module(m)
+        with tempfile.TemporaryDirectory() as td:
+            tree = Path(td)
+            m.inject_product_secrets(tree)
+            for name in (
+                "node_elgamal.pub",
+                "de_node_elgamal.pub",
+                "us_node_elgamal.pub",
+                "exit_node_elgamal.pub",
+            ):
+                for sub in ("product", "secrets"):
+                    p = tree / sub / name
+                    self.assertTrue(p.is_file(), f"missing {sub}/{name}")
+                    self.assertGreaterEqual(p.stat().st_size, 32, name)
+                    product = (ROOT / "product" / name).read_bytes()
+                    self.assertEqual(p.read_bytes(), product, name)
+            self.assertFalse(any(tree.rglob("*.priv")), list(tree.rglob("*.priv")))
+            # Recipe source must list DE pin for PyInstaller --add-data and inject list
+            src = path.read_text(encoding="utf-8")
+            self.assertIn("de_node_elgamal.pub", src)
+            self.assertIn("entry is Germany (DE)", src)
+            self.assertIn('"de_node_elgamal.pub"', src)
+
 
 class TestDeviceKeyHandshake(unittest.TestCase):
     def test_fresh_device_key_admitted_when_unknown_allowed(self):
