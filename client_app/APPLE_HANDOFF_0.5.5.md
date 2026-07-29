@@ -2,19 +2,20 @@
 
 **Monopin / this build:** `0.5.5`
 
-## Settings (all platforms)
-Residual **IPv4** / **IPv6** switches are at the **top** of Settings → privacy scale
-(with explainers / hover tooltips). Defaults ON. Honest residual attach when either
-toggle is off.
+## Windows host ship
+
+| Platform | Filename | Status |
+|----------|----------|--------|
+| Windows | `restore-privacy-client-0.5.5-windows-x64-setup.exe` | **native** multihop PE (`hidden_subprocess` Connect fix + dual-stack Settings top) |
+| Linux | `restore-privacy-client-0.5.5-linux-x64.tar.gz` | staged monopin (CF if not native rebuild) |
+| Android | `restore-privacy-client-0.5.5-android.apk` | staged monopin (CF if not native rebuild) |
+| macOS | `restore-privacy-client-0.5.5-macos.zip` | **Mac native seal required** (CFBundle must = 0.5.5) |
+| iOS | `restore-privacy-client-0.5.5-ios.zip` | **Mac Team-sign required** |
 
 ## Mac rebuild
 
 ```bash
-cd client_app
-flutter build macos --release
-flutter build ios --release --no-codesign
-cd ..
 python3 scripts/build_release_0.5.5.py --apple-only
+python3 scripts/host_paid_assets_vps.py --stage --upload --version 0.5.5 --force
+python3 scripts/breadcrumbs_vault.py publish --version 0.5.5
 ```
-
-CFBundleShortVersionString must equal **0.5.5**. Refuse carry-forward renames.

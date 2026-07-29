@@ -266,6 +266,7 @@ def _source_readiness_check() -> list[str]:
         ROOT / "client" / "multihop.py",
         ROOT / "client" / "windows" / "app.py",
         ROOT / "client" / "windows" / "window_foreground.py",
+        ROOT / "client" / "windows" / "hidden_subprocess.py",
         ROOT / "client" / "node_ping.py",
         RECIPE,
         ROOT / "client" / "windows" / "WINDOWS_HANDOFF_0.4.0.md",
@@ -286,8 +287,15 @@ def _source_readiness_check() -> list[str]:
 
         if not callable(bring_tk_window_forward):
             errors.append("bring_tk_window_forward is not callable")
+        # Connect residual netsh/PowerShell path (configure_address) — freeze miss = hard fail
+        from client.windows.hidden_subprocess import run_hidden
+
+        if not callable(run_hidden):
+            errors.append("run_hidden is not callable")
     except Exception as exc:  # noqa: BLE001
-        errors.append(f"cannot import client.multihop / window_foreground: {exc}")
+        errors.append(
+            f"cannot import client.multihop / window_foreground / hidden_subprocess: {exc}"
+        )
     pin = (ROOT / "client" / "VERSION").read_text(encoding="utf-8").strip()
     if pin != VERSION:
         errors.append(f"client/VERSION={pin!r} != build VERSION={VERSION!r}")

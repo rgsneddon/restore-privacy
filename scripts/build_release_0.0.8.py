@@ -156,6 +156,8 @@ def build_client_onedir() -> Path:
         "client.windows.settings_store",
         "--hidden-import",
         "client.windows.window_foreground",
+        "--hidden-import",
+        "client.windows.hidden_subprocess",
         "--clean",
         str(entry),
     ]
