@@ -110,13 +110,22 @@ def _assert_macos_cfbundle(path: Path, monopin: str) -> None:
     print(f"macos CFBundleShortVersionString={ver} matches monopin {monopin}")
 
 
-def stage_packages(*, version: str | None = None) -> list[Path]:
-    """Copy each platform installer into status_page/assets/{version}/."""
+def stage_packages(
+    *,
+    version: str | None = None,
+    allow_missing: bool = False,
+) -> list[Path]:
+    """Copy each platform installer into status_page/assets/{version}/.
+
+    When *allow_missing* is True, platforms without a local package are skipped
+    (honest partial monopin stage — typical while Apple waits on Mac seal).
+    """
     pkgs = list_packages(version)
     ver = pkgs[0]["version"]
     dst_dir = STATUS / "assets" / ver
     dst_dir.mkdir(parents=True, exist_ok=True)
     staged: list[Path] = []
+    skipped: list[str] = []
     for p in pkgs:
         fname = p["filename"]
         src = None
@@ -125,10 +134,15 @@ def stage_packages(*, version: str | None = None) -> list[Path]:
                 src = cand
                 break
         if src is None:
-            raise FileNotFoundError(
+            msg = (
                 f"missing installer for platform={p['platform']}: {fname} "
                 f"(looked under status_page/assets/ and releases/)"
             )
+            if allow_missing:
+                print(f"skip_missing {msg}")
+                skipped.append(p["platform"])
+                continue
+            raise FileNotFoundError(msg)
         dst = dst_dir / fname
         if src.resolve() != dst.resolve():
             shutil.copy2(src, dst)
@@ -136,6 +150,12 @@ def stage_packages(*, version: str | None = None) -> list[Path]:
             _assert_macos_cfbundle(dst, ver)
         staged.append(dst)
         print(f"staged platform={p['platform']} {dst} ({dst.stat().st_size} bytes)")
+    if not staged:
+        raise FileNotFoundError(
+            f"no installers staged for version={ver} (all platforms missing)"
+        )
+    if skipped:
+        print(f"allow_missing skipped platforms={','.join(skipped)}")
     # refuse privs
     for p in dst_dir.rglob("*.priv"):
         raise RuntimeError(f"refusing to stage private key: {p}")
@@ -647,6 +667,7 @@ def upload_packages(
     dry_run: bool = False,
     install_serve: bool = False,
     force: bool = False,
+    allow_missing: bool = False,
 ) -> int:
     pkgs = list_packages(version)
     ver = pkgs[0]["version"]
@@ -657,20 +678,34 @@ def upload_packages(
     remote_ver = f"{remote_root.rstrip('/')}/{ver}"
     host_default = DEFAULT_VPS_ASSET_HOST
 
-    print(f"upload plan: {len(pkgs)} files -> {host_default}:{remote_ver}/")
+    present: list[dict[str, str]] = []
     for p in pkgs:
+        f = local_dir / p["filename"]
+        if f.is_file() and f.stat().st_size >= 1_000_000:
+            present.append(p)
+        elif allow_missing:
+            print(
+                f"skip_missing upload platform={p['platform']} file={p['filename']}"
+            )
+        else:
+            print(f"missing or tiny local stage: {f}", file=sys.stderr)
+            print("Run with --stage first (or --allow-missing).", file=sys.stderr)
+            return 1
+
+    if not present:
+        print("ERROR: no staged packages to upload", file=sys.stderr)
+        return 1
+
+    print(f"upload plan: {len(present)}/{len(pkgs)} files -> {host_default}:{remote_ver}/")
+    for p in present:
         print(f"  {p['platform']}: {p['filename']}")
 
     if dry_run:
         print("dry-run: no SSH")
         return 0
 
-    for p in pkgs:
+    for p in present:
         f = local_dir / p["filename"]
-        if not f.is_file() or f.stat().st_size < 1_000_000:
-            print(f"missing or tiny local stage: {f}", file=sys.stderr)
-            print("Run with --stage first.", file=sys.stderr)
-            return 1
         if p["platform"] == "macos":
             try:
                 _assert_macos_cfbundle(f, ver)
@@ -696,7 +731,7 @@ def upload_packages(
         if code != 0:
             print("ERROR: could not prepare remote paid_assets dir", file=sys.stderr)
             return 1
-        for p in pkgs:
+        for p in present:
             local = local_dir / p["filename"]
             remote = f"{remote_ver}/{p['filename']}"
             print(
@@ -842,7 +877,7 @@ WantedBy=multi-user.target
                 sudo=True,
                 user=user,
             )
-        for p in pkgs:
+        for p in present:
             local = local_dir / p["filename"]
             remote = f"{remote_ver}/{p['filename']}"
             print(
@@ -918,6 +953,14 @@ def main(argv: list[str] | None = None) -> int:
         help="Re-upload even when remote size already matches local",
     )
     ap.add_argument(
+        "--allow-missing",
+        action="store_true",
+        help=(
+            "Stage/upload only packages present locally (skip missing platforms). "
+            "Use when Apple zips await Mac seal under the same monopin."
+        ),
+    )
+    ap.add_argument(
         "--install-serve-only",
         action="store_true",
         help="Only install/restart the token-gated store HTTP serve (no package upload)",
@@ -946,14 +989,18 @@ def main(argv: list[str] | None = None) -> int:
 
     if args.stage:
         try:
-            stage_packages(version=ver)
+            stage_packages(version=ver, allow_missing=args.allow_missing)
         except (FileNotFoundError, RuntimeError) as e:
             print(f"ERROR: {e}", file=sys.stderr)
             return 1
-        # Sanity: catalog filenames match staged
+        # Sanity: catalog filenames match staged (full set unless allow_missing)
         pkgs = list_packages(ver)
         names = {p["filename"] for p in pkgs}
-        if names != set(catalog_filenames()) and (ver is None or ver == RELEASE_VERSION):
+        if (
+            not args.allow_missing
+            and names != set(catalog_filenames())
+            and (ver is None or ver == RELEASE_VERSION)
+        ):
             # only enforce exact catalog set for current RELEASE_VERSION
             missing = set(catalog_filenames()) - names
             if missing:
@@ -966,6 +1013,7 @@ def main(argv: list[str] | None = None) -> int:
             dry_run=args.dry_run,
             install_serve=args.install_serve,
             force=args.force,
+            allow_missing=args.allow_missing,
         )
     return 0
 

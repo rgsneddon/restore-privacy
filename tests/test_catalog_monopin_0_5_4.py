@@ -29,6 +29,20 @@ class TestCatalogMonopin054(unittest.TestCase):
         )
         self.assertIn("0.5.4", downloads.WINDOWS_EXE_FILENAME)
         self.assertNotIn("0.5.3", downloads.WINDOWS_EXE_FILENAME)
+        # Real catalog helper — all five shop basenames are 0.5.4
+        pkgs = downloads.list_catalog_platform_packages()
+        self.assertEqual(len(pkgs), 5)
+        for p in pkgs:
+            self.assertEqual(p["version"], "0.5.4")
+            self.assertIn("0.5.4", p["filename"])
+            self.assertNotIn("0.5.3", p["filename"])
+        names = {p["platform"]: p["filename"] for p in pkgs}
+        self.assertEqual(
+            names["windows"],
+            "restore-privacy-client-0.5.4-windows-x64-setup.exe",
+        )
+        self.assertTrue(names["macos"].endswith("-macos.zip"))
+        self.assertTrue(names["ios"].endswith("-ios.zip"))
 
     def test_installer_embedded_pin(self) -> None:
         src = (ROOT / "client" / "windows" / "installer.py").read_text(
@@ -57,14 +71,20 @@ class TestCatalogMonopin054(unittest.TestCase):
     def test_handoff_and_release_notes(self) -> None:
         handoff = ROOT / "client" / "windows" / "WINDOWS_HANDOFF_0.5.4.md"
         notes = ROOT / "scripts" / "RELEASE_NOTES_0.5.4.md"
+        apple = ROOT / "client_app" / "APPLE_HANDOFF_0.5.4.md"
         self.assertTrue(handoff.is_file(), handoff)
         self.assertTrue(notes.is_file(), notes)
+        self.assertTrue(apple.is_file(), apple)
         h = handoff.read_text(encoding="utf-8")
         self.assertIn("0.5.4", h)
         self.assertIn("window_foreground", h)
         self.assertIn(
             "restore-privacy-client-0.5.4-windows-x64-setup.exe", h
         )
+        a = apple.read_text(encoding="utf-8")
+        self.assertIn("0.5.4", a)
+        self.assertIn("macos.zip", a)
+        self.assertIn("ios.zip", a)
 
     def test_local_windows_setup_artifact_when_present(self) -> None:
         """If a local PE was built this ship, it must be the 0.5.4 basename."""
