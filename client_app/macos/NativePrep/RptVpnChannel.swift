@@ -126,6 +126,21 @@ enum RptVpnChannel {
     }
   }
 
+  /// Dual-stack residual prefs for Packet Tunnel start options (defaults both ON).
+  static func residualStackOptionsForTunnel() -> (ipv4: Bool, ipv6: Bool) {
+    func dualOn(_ defaults: UserDefaults, _ key: String) -> Bool {
+      if defaults.object(forKey: key) == nil { return true }
+      return defaults.bool(forKey: key)
+    }
+    if let suite = UserDefaults(suiteName: RptSecrets.appGroupId),
+       suite.object(forKey: "residual_ipv4") != nil
+         || suite.object(forKey: "residual_ipv6") != nil {
+      return (dualOn(suite, "residual_ipv4"), dualOn(suite, "residual_ipv6"))
+    }
+    let std = UserDefaults.standard
+    return (dualOn(std, "residual_ipv4"), dualOn(std, "residual_ipv6"))
+  }
+
   /// Identity of the product VPN manager saved to OS preferences (Packet Tunnel only).
   static func productVpnIdentity() -> [String: String] {
     [
@@ -868,9 +883,13 @@ enum RptVpnChannel {
           }
           return
         }
+        // Pass dual-stack residual prefs into the extension (parity with App Group).
+        let stack = residualStackOptionsForTunnel()
         let opts: [String: NSObject] = [
           "host": host as NSString,
           "port": NSNumber(value: port),
+          "residual_ipv4": NSNumber(value: stack.ipv4),
+          "residual_ipv6": NSNumber(value: stack.ipv6),
         ]
         // This enables the system VPN connection in Network settings (when allowed).
         try session.startTunnel(options: opts)
@@ -896,13 +915,16 @@ enum RptVpnChannel {
             }
           } else {
             let st = manager.connection.status
+            let detail =
+              "Packet Tunnel did not become Connected (status \(statusName(st))/\(st.rawValue)). "
+              + "Press Connect again after Allowing the OS VPN dialog if it appeared. "
+              + "Do not use L2TP/IKEv2. Developers: scripts/sign_macos_residual_team.py "
+              + "if host lacks packet-tunnel-provider. "
+              + "If residual HELLO timed out (~15s): check network/UDP 44044, "
+              + "keygen unlock, and Team residual Network Extension signing."
             let map = RptFullTunnelResult.productConnectMap(
               packetTunnelActive: false,
-              detailMessage:
-                "Packet Tunnel did not become Connected (status \(statusName(st))/\(st.rawValue)). "
-                + "Press Connect again after Allowing the OS VPN dialog if it appeared. "
-                + "Do not use L2TP/IKEv2. Developers: scripts/sign_macos_residual_team.py "
-                + "if host lacks packet-tunnel-provider."
+              detailMessage: detail
             )
             // Do not auto-open Network Settings — residual-honest status only.
             completion(map)

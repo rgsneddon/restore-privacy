@@ -132,6 +132,21 @@ enum RptVpnChannel {
     }
   }
 
+  /// Dual-stack residual prefs for Packet Tunnel start options (defaults both ON).
+  static func residualStackOptionsForTunnel() -> (ipv4: Bool, ipv6: Bool) {
+    func dualOn(_ defaults: UserDefaults, _ key: String) -> Bool {
+      if defaults.object(forKey: key) == nil { return true }
+      return defaults.bool(forKey: key)
+    }
+    if let suite = UserDefaults(suiteName: RptSecrets.appGroupId),
+       suite.object(forKey: "residual_ipv4") != nil
+         || suite.object(forKey: "residual_ipv6") != nil {
+      return (dualOn(suite, "residual_ipv4"), dualOn(suite, "residual_ipv6"))
+    }
+    let std = UserDefaults.standard
+    return (dualOn(std, "residual_ipv4"), dualOn(std, "residual_ipv6"))
+  }
+
   /// Best-effort open Settings so the user can Allow VPN configuration.
   @discardableResult
   static func openVpnSystemSettings() -> Bool {
@@ -533,9 +548,12 @@ enum RptVpnChannel {
           }
           return
         }
+        let stack = residualStackOptionsForTunnel()
         let opts: [String: NSObject] = [
           "host": host as NSString,
           "port": NSNumber(value: port),
+          "residual_ipv4": NSNumber(value: stack.ipv4),
+          "residual_ipv6": NSNumber(value: stack.ipv6),
         ]
         // Enables the system VPN connection when the user has Allowed the config.
         try session.startTunnel(options: opts)
@@ -560,13 +578,16 @@ enum RptVpnChannel {
             }
           } else {
             let st = manager.connection.status
+            let detail =
+              "Packet Tunnel did not become Connected (status \(statusName(st))/\(st.rawValue)). "
+              + "Connect re-creates and enables the VPN profile automatically. "
+              + "If iOS asked to Allow VPN configuration, choose Allow, then Connect again. "
+              + "If residual HELLO timed out (~15s): check network/UDP 44044, "
+              + "keygen unlock, and Network Extension entitlements."
             completion(
               RptFullTunnelResult.productConnectMap(
                 packetTunnelActive: false,
-                detailMessage:
-                  "Packet Tunnel did not become Connected (status \(statusName(st))/\(st.rawValue)). "
-                  + "Connect re-creates and enables the VPN profile automatically. "
-                  + "If iOS asked to Allow VPN configuration, choose Allow, then Connect again."
+                detailMessage: detail
               )
             )
           }

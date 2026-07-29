@@ -60,7 +60,17 @@ class PacketTunnelProvider: NEPacketTunnelProvider {
 
         // 4. Tunnel network settings honour Settings dual-stack residual prefs
         // (residual_ipv4 / residual_ipv6 — defaults both ON).
-        let stack = Self.loadResidualStackPrefs()
+        var stack = Self.loadResidualStackPrefs()
+        if let o4 = options?["residual_ipv4"] as? Bool {
+          stack = (o4, stack.ipv6)
+        } else if let o4 = options?["residual_ipv4"] as? NSNumber {
+          stack = (o4.boolValue, stack.ipv6)
+        }
+        if let o6 = options?["residual_ipv6"] as? Bool {
+          stack = (stack.ipv4, o6)
+        } else if let o6 = options?["residual_ipv6"] as? NSNumber {
+          stack = (stack.ipv4, o6.boolValue)
+        }
         let settings = NEPacketTunnelNetworkSettings(tunnelRemoteAddress: self.endpointHost)
         let ipv4 = NEIPv4Settings(addresses: [session.vpnIp], subnetMasks: ["255.255.255.255"])
         ipv4.excludedRoutes = [NEIPv4Route(destinationAddress: self.endpointHost, subnetMask: "255.255.255.255")]

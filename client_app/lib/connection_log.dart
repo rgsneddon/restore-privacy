@@ -5,6 +5,8 @@
 /// outcome) are for that manual handoff only.
 library;
 
+import 'dart:io' show Platform;
+
 const String kLogKindConnect = 'connect';
 const String kLogKindDisconnect = 'disconnect';
 const String kLogKindSession = 'session';
@@ -107,13 +109,45 @@ Map<String, String> buildSupportDiagnostics({
 }) {
   final snap = <String, String>{
     'product': 'Restore Privacy',
-    'client_version': clientVersion,
-    'platform': platform,
+    'client_version': clientVersion.isEmpty ? 'unknown' : clientVersion,
+    'platform': platform.isEmpty ? 'flutter' : platform,
   };
   if (extra != null) {
     snap.addAll(extra);
   }
   return snap;
+}
+
+/// Failure line for local connection-log export (support handoff).
+///
+/// Prefer residual-honest UI / native status over a bare `Connect failed` token
+/// so exports match what the user saw and are actionable for support.
+String connectionLogConnectFailureMessage(
+  String? uiOrNativeStatus, {
+  String fallback = 'Connect failed',
+}) {
+  final s = (uiOrNativeStatus ?? '').trim();
+  if (s.isEmpty) return fallback;
+  final low = s.toLowerCase();
+  // Connecting progress is not a terminal failure detail by itself
+  if (low.startsWith('connecting') || low.contains('still connecting')) {
+    return '$fallback — tunnel did not complete (last status: $s)';
+  }
+  // Already a bare failure with no extra detail
+  if (low == 'connect failed' || low == fallback.toLowerCase()) {
+    return s;
+  }
+  // Prefer residual-honest status as the error body (do not prefix if already detailed)
+  if (low.contains('connect failed')) return s;
+  return s;
+}
+
+/// Platform label for connection-log / support export (macOS vs iOS vs other).
+String connectionLogPlatformLabel() {
+  if (Platform.isMacOS) return 'macos';
+  if (Platform.isIOS) return 'ios';
+  if (Platform.isAndroid) return 'android';
+  return 'flutter';
 }
 
 class ConnectionLog {

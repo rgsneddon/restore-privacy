@@ -228,9 +228,17 @@ class _TunnelHomeState extends State<TunnelHome> with WidgetsBindingObserver {
     }
     try {
       final prefs = await SharedPreferences.getInstance();
-      _connectionLog = ConnectionLog(PrefsConnectionLogBackend(prefs));
+      _connectionLog = ConnectionLog(
+        PrefsConnectionLogBackend(prefs),
+        clientVersion: RptConfig.displayProductVersion,
+        platformLabel: connectionLogPlatformLabel(),
+      );
     } catch (_) {
-      _connectionLog = ConnectionLog(MemoryConnectionLogBackend());
+      _connectionLog = ConnectionLog(
+        MemoryConnectionLogBackend(),
+        clientVersion: RptConfig.displayProductVersion,
+        platformLabel: connectionLogPlatformLabel(),
+      );
     }
     final loaded = await _store!.load();
     RptConfig.setRuntimeMultiHop(loaded.privacyMultihop);
@@ -706,7 +714,14 @@ class _TunnelHomeState extends State<TunnelHome> with WidgetsBindingObserver {
           _append('Window hidden to menu bar tray — restore via the RP tray icon.');
         }
       } else {
-        await _connLog(kLogKindError, 'Connect failed');
+        // Persist residual-honest native/UI status for support export — never bare
+        // "Connect failed" when a detailed status is already on the card.
+        final failMsg = connectionLogConnectFailureMessage(_status);
+        await _connLog(kLogKindError, failMsg);
+        if (_status.trim().isNotEmpty &&
+            _status.trim().toLowerCase() != 'connect failed') {
+          _append(_status);
+        }
       }
     } finally {
       if (mounted) setState(() => _busy = false);

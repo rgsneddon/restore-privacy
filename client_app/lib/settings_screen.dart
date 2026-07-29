@@ -214,9 +214,17 @@ class _SettingsScreenState extends State<SettingsScreen> {
     }
     try {
       final prefs = await SharedPreferences.getInstance();
-      _log = ConnectionLog(PrefsConnectionLogBackend(prefs));
+      _log = ConnectionLog(
+        PrefsConnectionLogBackend(prefs),
+        clientVersion: RptConfig.displayProductVersion,
+        platformLabel: connectionLogPlatformLabel(),
+      );
     } catch (_) {
-      _log = ConnectionLog(MemoryConnectionLogBackend());
+      _log = ConnectionLog(
+        MemoryConnectionLogBackend(),
+        clientVersion: RptConfig.displayProductVersion,
+        platformLabel: connectionLogPlatformLabel(),
+      );
     }
     await _refreshLog();
   }
