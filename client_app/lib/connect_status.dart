@@ -479,32 +479,129 @@ Map<String, dynamic> buildFullTunnelConnectResult({
   }
 
   // Host-only HELLO or NE failure — never product success.
-  final buf = StringBuffer();
-  if (hostOnlyHello) {
-    buf.write(kHostOnlyHelloNotFullTunnelMessage);
-    final ip = (vpnIp ?? '').trim();
-    if (ip.isNotEmpty) {
-      buf.write(' (node assigned $ip)');
-    }
-  } else {
-    buf.write(kPacketTunnelNotActiveMessage);
-  }
-  if (detailMessage != null && detailMessage.trim().isNotEmpty) {
-    buf.write(' ');
-    buf.write(detailMessage.trim());
-  }
-  if (nodeDiagnostic != null && nodeDiagnostic.trim().isNotEmpty) {
-    buf.write(' ');
-    buf.write(nodeDiagnostic.trim());
-  }
+  // Single primary root cause (no NE + Settings + UDP wall of text).
   final ip = (vpnIp ?? '').trim();
+  final message = composeConnectFailurePrimaryMessage(
+    hostOnlyHello: hostOnlyHello,
+    vpnIp: ip.isEmpty ? null : ip,
+    detailMessage: detailMessage,
+    nodeDiagnostic: nodeDiagnostic,
+  );
   return {
     'ok': false,
-    'message': buf.toString(),
+    'message': message,
     'fullTunnelActive': false,
     'hostOnlySession': hostOnlyHello,
     if (ip.isNotEmpty) 'vpnIp': ip,
   };
+}
+
+/// True when text is missing host packet-tunnel-provider / Team residual class.
+bool isMissingHostNeDetail(String text) {
+  final m = text.toLowerCase();
+  if (m.isEmpty) return false;
+  return m.contains('packet-tunnel-provider') ||
+      m.contains('sign_macos_residual') ||
+      m.contains('team residual') ||
+      m.contains('needs team residual') ||
+      (m.contains('host is missing') && m.contains('network extension')) ||
+      m.contains('public developer id downloads intentionally omit');
+}
+
+/// Single primary root-cause for Connect failure (mirrors native RptFullTunnelResult).
+///
+/// Prefer residual-honest re-sign guidance over stacking Allow-VPN + UDP timeout.
+String composeConnectFailurePrimaryMessage({
+  required bool hostOnlyHello,
+  String? vpnIp,
+  String? detailMessage,
+  String? nodeDiagnostic,
+}) {
+  final detail = (detailMessage ?? '').trim();
+  final node = (nodeDiagnostic ?? '').trim();
+  final ip = (vpnIp ?? '').trim();
+  final detailLow = detail.toLowerCase();
+  final nodeLow = node.toLowerCase();
+
+  if (isMissingHostNeDetail(detail) || isMissingHostNeDetail(node)) {
+    if (detail.isNotEmpty && isMissingHostNeDetail(detail)) return detail;
+    if (node.isNotEmpty && isMissingHostNeDetail(node)) return node;
+    return detail.isEmpty ? kPacketTunnelNotActiveMessage : detail;
+  }
+
+  if (hostOnlyHello) {
+    var line = kHostOnlyHelloNotFullTunnelMessage;
+    if (ip.isNotEmpty) line = '$line (node assigned $ip)';
+    if (detail.isNotEmpty && !line.toLowerCase().contains(detailLow)) {
+      line = '$line $detail';
+    }
+    return line;
+  }
+
+  if (detail.isNotEmpty) {
+    final hasResidualHonesty = detailLow.contains('residual public ip') ||
+        detailLow.contains('did not become active') ||
+        detailLow.contains('system vpn (packet tunnel)');
+    final base = hasResidualHonesty
+        ? detail
+        : '$kPacketTunnelNotActiveMessage $detail';
+    if (node.isNotEmpty &&
+        !_isRedundantNodeDiagnostic(node: node, detail: base)) {
+      // Detail already residual-honest: keep primary without node noise when NE explained.
+      if (hasResidualHonesty &&
+          (detailLow.contains('did not become') ||
+              detailLow.contains('system vpn'))) {
+        return base;
+      }
+      return '$base $node';
+    }
+    return base;
+  }
+
+  if (node.isNotEmpty) {
+    final nodePrimary = primaryNodeConnectFailureMessage(node);
+    // When residual-capable host already failed only at HELLO, prefer node/keygen
+    // as the single primary (avoid stacking full PT boilerplate + long node line).
+    if (nodePrimary != node ||
+        nodeLow.contains('udp receive timeout') ||
+        nodeLow.contains('payment entitlement') ||
+        nodeLow.contains('keygen')) {
+      return nodePrimary;
+    }
+    return '$kPacketTunnelNotActiveMessage $node';
+  }
+  return kPacketTunnelNotActiveMessage;
+}
+
+/// Prefer keygen / entitlement wording for residual HELLO UDP silence.
+String primaryNodeConnectFailureMessage(String nodeDiagnostic) {
+  final n = nodeDiagnostic.trim();
+  if (n.isEmpty) return n;
+  final low = n.toLowerCase();
+  if (low.contains('udp receive timeout') ||
+      low.contains('udp receive failed') ||
+      low.contains('no reply')) {
+    if (low.contains('keygen') || low.contains('entitlement')) {
+      return n;
+    }
+    return '$n — residual HELLO got no reply. Product residual nodes refuse HELLO '
+        'until this device is bound to an active paid entitlement. If you just paid: '
+        'enter the keygen from your fulfilment email (unlock dialog or Settings → '
+        'Payment entitlement / keygen), then Connect again.';
+  }
+  return n;
+}
+
+bool _isRedundantNodeDiagnostic({
+  required String node,
+  required String detail,
+}) {
+  final n = node.toLowerCase();
+  final d = detail.toLowerCase();
+  if (n.isEmpty) return true;
+  if (d.contains(n)) return true;
+  if (isMissingHostNeDetail(detail)) return true;
+  return false;
 }
 
 /// True when a channel failure message is the UK location gate.

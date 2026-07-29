@@ -288,44 +288,59 @@ public enum RptSecrets {
 
     // MARK: - Load
 
-    /// Load product admission material (device client priv + node pub). Never loads node private key.
+    /// Load product admission material (device client priv + residual host pub).
+    /// Pass residualHost so US/RO HELLO loads us_node/exit_node_elgamal.pub (not Iceland-only).
     /// Generates a unique Ed25519 device key on first run. Never adopts a shared priv from the app bundle.
     public static func loadAdmissionMaterial(
         fileManager: FileManager = .default,
-        bundle: Bundle = .main
+        bundle: Bundle = .main,
+        residualHost: String = ""
     ) throws -> (clientPriv: Data, nodePub: Data) {
+        let pubName = residualNodePubName(forHost: residualHost)
         // Prefer trusted writable storage that already has a device key (not bundle).
         if let dir = resolveSecretsDirectory(fileManager: fileManager, bundle: bundle) {
-            return try loadFromDirectory(dir)
+            return try loadFromDirectory(dir, residualHost: residualHost)
         }
 
         // Bootstrap: node pub from bundle → generate device key into App Support / App Group
         if let dir = try? seedApplicationSupportFromBundleIfNeeded(fileManager: fileManager, bundle: bundle) {
-            return try loadFromDirectory(dir)
+            return try loadFromDirectory(dir, residualHost: residualHost)
         }
         if let dir = try? seedAppGroupFromKnownSourcesIfNeeded(fileManager: fileManager, bundle: bundle) {
-            return try loadFromDirectory(dir)
+            return try loadFromDirectory(dir, residualHost: residualHost)
         }
 
-        // Last resort: generate device key in preferred writable dir next to any node pub
+        // Last resort: generate device key in preferred writable dir next to residual pub
         if let dest = secretsDirectory(fileManager: fileManager) {
             var nodeSrc: URL?
+            let names = (pubName == nodePubName) ? [nodePubName] : [pubName, nodePubName]
             for d in candidateSecretsDirectories(fileManager: fileManager, bundle: bundle) {
-                let n = d.appendingPathComponent(nodePubName)
-                if fileManager.fileExists(atPath: n.path) {
-                    nodeSrc = n
-                    break
+                for name in names {
+                    let n = d.appendingPathComponent(name)
+                    if fileManager.fileExists(atPath: n.path) {
+                        nodeSrc = n
+                        break
+                    }
                 }
+                if nodeSrc != nil { break }
             }
             if let nodeSrc {
                 _ = try ensureDeviceAdmissionKey(in: dest, nodePubSource: nodeSrc, fileManager: fileManager)
-                return try loadFromDirectory(dest)
+                // Also place residual pin basename when distinct from Iceland node_elgamal.pub
+                if pubName != nodePubName {
+                    let residualDest = dest.appendingPathComponent(pubName)
+                    if !fileManager.fileExists(atPath: residualDest.path) {
+                        try? fileManager.copyItem(at: nodeSrc, to: residualDest)
+                    }
+                }
+                return try loadFromDirectory(dest, residualHost: residualHost)
             }
         }
 
         let paths = searchedPathsDescription(fileManager: fileManager, bundle: bundle)
         throw RptProtocol.ProtocolError(
-            "Missing node_elgamal.pub — packages ship the public node key; "
+            "Missing \(pubName) for residual host \(residualHost.isEmpty ? "default" : residualHost) — "
+                + "packages ship the public node key; "
                 + "a unique device Ed25519 key is generated on first run. "
                 + "Never ship node_elgamal.priv or a shared client_ed25519.priv. "
                 + "Searched: \(paths)"
@@ -333,16 +348,33 @@ public enum RptSecrets {
     }
 
     public static func loadFromDirectory(_ dir: URL) throws -> (clientPriv: Data, nodePub: Data) {
+        try loadFromDirectory(dir, residualHost: "")
+    }
+
+    public static func loadFromDirectory(
+        _ dir: URL,
+        residualHost: String
+    ) throws -> (clientPriv: Data, nodePub: Data) {
         let cURL = dir.appendingPathComponent(clientPrivName)
-        let nURL = dir.appendingPathComponent(nodePubName)
+        let pubName = residualNodePubName(forHost: residualHost)
+        let nURL = dir.appendingPathComponent(pubName)
         // Explicitly do not open node_elgamal.priv
+        if !FileManager.default.fileExists(atPath: nURL.path) {
+            if pubName != nodePubName {
+                throw RptProtocol.ProtocolError(
+                    "Missing \(pubName) for residual host \(residualHost.isEmpty ? "(unknown)" : residualHost) "
+                        + "— refuse Iceland entry pub fallback (US/RO HELLO would use wrong key)"
+                )
+            }
+            throw RptProtocol.ProtocolError("Missing \(pubName) in \(dir.path)")
+        }
         let clientPriv = try Data(contentsOf: cURL)
         let nodePub = try Data(contentsOf: nURL)
         guard clientPriv.count == 32 else {
             throw RptProtocol.ProtocolError("client_ed25519.priv must be 32 raw bytes")
         }
         guard nodePub.count == 256 else {
-            throw RptProtocol.ProtocolError("node_elgamal.pub must be 256 bytes")
+            throw RptProtocol.ProtocolError("\(pubName) must be 256 bytes")
         }
         return (clientPriv, nodePub)
     }

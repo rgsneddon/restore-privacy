@@ -122,6 +122,8 @@ Map<String, String> buildSupportDiagnostics({
 ///
 /// Prefer residual-honest UI / native status over a bare `Connect failed` token
 /// so exports match what the user saw and are actionable for support.
+/// When a multi-fault wall is still present (legacy native), collapse to a
+/// primary root cause via [collapseConnectFailurePrimaryForExport].
 String connectionLogConnectFailureMessage(
   String? uiOrNativeStatus, {
   String fallback = 'Connect failed',
@@ -137,8 +139,51 @@ String connectionLogConnectFailureMessage(
   if (low == 'connect failed' || low == fallback.toLowerCase()) {
     return s;
   }
-  // Prefer residual-honest status as the error body (do not prefix if already detailed)
-  if (low.contains('connect failed')) return s;
+  // Collapse contradictory multi-fault exports to one primary root cause.
+  return collapseConnectFailurePrimaryForExport(s);
+}
+
+/// Collapse a residual-honest (or legacy multi-fault) Connect status for export.
+///
+/// Missing host NE / Team residual re-sign wins over UDP HELLO noise and
+/// generic Allow-VPN walls when both appear in one line.
+String collapseConnectFailurePrimaryForExport(String status) {
+  final s = status.trim();
+  if (s.isEmpty) return s;
+  final low = s.toLowerCase();
+  final missingNe = low.contains('packet-tunnel-provider') ||
+      low.contains('sign_macos_residual') ||
+      low.contains('public developer id downloads intentionally omit') ||
+      (low.contains('host is missing') && low.contains('network extension'));
+  if (missingNe) {
+    // Prefer the explicit host-missing-NE sentence through re-sign guidance.
+    const marker =
+        'This app build cannot register or activate Packet Tunnel';
+    final idx = s.indexOf(marker);
+    if (idx >= 0) {
+      // Drop leading System VPN boilerplate if present before the marker.
+      var body = s.substring(idx).trim();
+      // Strip trailing Node diagnostic when NE is primary.
+      final nodeIdx = body.toLowerCase().indexOf('node diagnostic:');
+      if (nodeIdx > 0) {
+        body = body.substring(0, nodeIdx).trim();
+      }
+      return body;
+    }
+    // Fallback: strip Node diagnostic suffix from multi-fault lines.
+    final nodeIdx = low.indexOf('node diagnostic:');
+    if (nodeIdx > 0) {
+      return s.substring(0, nodeIdx).trim();
+    }
+  }
+  // Residual-capable host: UDP silence / entitlement is the primary root cause.
+  if ((low.contains('udp receive timeout') || low.contains('payment entitlement')) &&
+      !missingNe) {
+    final nodeIdx = low.indexOf('node diagnostic:');
+    if (nodeIdx >= 0) {
+      return s.substring(nodeIdx).trim();
+    }
+  }
   return s;
 }
 

@@ -52,5 +52,43 @@ void main() {
       expect(body, contains('Packet Tunnel'));
       expect(body, isNot(contains('error: Connect failed\n')));
     });
+
+    test('UDP timeout export prefers keygen/entitlement primary when residual-capable',
+        () {
+      const status =
+          'System VPN (Packet Tunnel) did not become active — residual public IP will not change. '
+          'Node diagnostic: Connect failed to 5.161.242.85:44044: UDP receive timeout — residual HELLO got no reply. '
+          'Product residual nodes refuse HELLO until this device is bound to an active paid entitlement. '
+          'If you just paid: enter the keygen';
+      final msg = connectionLogConnectFailureMessage(status);
+      expect(msg.toLowerCase(), contains('udp receive timeout'));
+      expect(msg.toLowerCase(), contains('keygen'));
+      expect(msg.toLowerCase(), contains('entitlement'));
+      // Not a bare token
+      expect(msg.toLowerCase(), isNot(equals('connect failed')));
+    });
+
+    test('multi-fault public DevID export collapses to host NE primary', () {
+      const multi =
+          'System VPN (Packet Tunnel) did not become active — residual public IP will not change. '
+          'Allow VPN for Restore Privacy in System Settings → Network → VPN & Filters. '
+          'This app build cannot register or activate Packet Tunnel in Network settings: '
+          'the host is missing the packet-tunnel-provider Network Extension entitlement. '
+          'Public Developer ID downloads intentionally omit host NE so the app opens for all users. '
+          'On a developer Mac, re-sign for residual with: '
+          'python3 scripts/sign_macos_residual_team.py --app path/to/restore_privacy_client.app '
+          'then relaunch and press Connect. '
+          'Node diagnostic: Connect failed to 5.161.242.85:44044: UDP receive timeout';
+      final msg = connectionLogConnectFailureMessage(multi);
+      expect(msg.toLowerCase(), contains('packet-tunnel-provider'));
+      expect(msg.toLowerCase(), contains('sign_macos_residual_team'));
+      expect(msg.toLowerCase(), isNot(contains('udp receive timeout')));
+      expect(msg.toLowerCase(), isNot(equals('connect failed')));
+      expect(
+        msg.startsWith('This app build cannot register'),
+        isTrue,
+        reason: 'primary root cause is missing host NE, not Settings wall',
+      );
+    });
   });
 }

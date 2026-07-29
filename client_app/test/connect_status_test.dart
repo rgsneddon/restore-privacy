@@ -486,6 +486,35 @@ void main() {
       expect(shouldHideToTrayAfterConnectSuccess(false), isFalse);
     });
 
+    test('missing host NE is primary over UDP node diagnostic wall', () {
+      const neDetail =
+          'This app build cannot register or activate Packet Tunnel in Network settings: '
+          'the host is missing the packet-tunnel-provider Network Extension entitlement. '
+          'Public Developer ID downloads intentionally omit host NE so the app opens for all users. '
+          'On a developer Mac, re-sign for residual with: '
+          'python3 scripts/sign_macos_residual_team.py --app path/to/app then relaunch.';
+      final map = buildFullTunnelConnectResult(
+        packetTunnelActive: false,
+        detailMessage: neDetail,
+        nodeDiagnostic:
+            'Node diagnostic: Connect failed to 5.161.242.85:44044: UDP receive timeout',
+      );
+      expect(isConnectSuccess(map), isFalse);
+      final msg = mapConnectStatusMessage(map);
+      expect(msg, contains('packet-tunnel-provider'));
+      expect(msg, contains('sign_macos_residual_team'));
+      expect(msg.toLowerCase(), isNot(contains('udp receive timeout')));
+      expect(
+        composeConnectFailurePrimaryMessage(
+          hostOnlyHello: false,
+          detailMessage: neDetail,
+          nodeDiagnostic:
+              'Node diagnostic: Connect failed to 5.161.242.85:44044: UDP receive timeout',
+        ),
+        neDetail,
+      );
+    });
+
     test('host-only HELLO does not hide to tray', () {
       final map = buildFullTunnelConnectResult(
         packetTunnelActive: false,

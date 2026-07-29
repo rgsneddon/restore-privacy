@@ -62,28 +62,99 @@ public enum RptFullTunnelResult {
             return m
         }
 
-        var parts: [String] = []
-        if hostOnlyHello {
-            var line = hostOnlyHelloNotFullTunnelMessage
-            if !ip.isEmpty { line += " (node assigned \(ip))" }
-            parts.append(line)
-        } else {
-            parts.append(packetTunnelNotActiveMessage)
-        }
-        if let d = detailMessage?.trimmingCharacters(in: .whitespacesAndNewlines), !d.isEmpty {
-            parts.append(d)
-        }
-        if let n = nodeDiagnostic?.trimmingCharacters(in: .whitespacesAndNewlines), !n.isEmpty {
-            parts.append(n)
-        }
+        let message = composeConnectFailurePrimaryMessage(
+            hostOnlyHello: hostOnlyHello,
+            vpnIp: ip.isEmpty ? nil : ip,
+            detailMessage: detailMessage,
+            nodeDiagnostic: nodeDiagnostic
+        )
         var m: [String: Any] = [
             "ok": false,
-            "message": parts.joined(separator: " "),
+            "message": message,
             "fullTunnelActive": false,
             "hostOnlySession": hostOnlyHello,
         ]
         if !ip.isEmpty { m["vpnIp"] = ip }
         return m
+    }
+
+    /// Single primary root-cause for Connect failure (support export + UI).
+    /// Avoid stacking missing-host-NE + Allow-Settings + UDP timeout walls of text.
+    public static func composeConnectFailurePrimaryMessage(
+        hostOnlyHello: Bool,
+        vpnIp: String? = nil,
+        detailMessage: String? = nil,
+        nodeDiagnostic: String? = nil
+    ) -> String {
+        let detail = (detailMessage ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+        let node = (nodeDiagnostic ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+        let ip = (vpnIp ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+        let detailLow = detail.lowercased()
+        let nodeLow = node.lowercased()
+
+        if isMissingHostNeDetail(detail) || isMissingHostNeDetail(node) {
+            if !detail.isEmpty, isMissingHostNeDetail(detail) {
+                return detail
+            }
+            if !node.isEmpty, isMissingHostNeDetail(node) {
+                return node
+            }
+            return detail.isEmpty ? packetTunnelNotActiveMessage : detail
+        }
+
+        if hostOnlyHello {
+            var line = hostOnlyHelloNotFullTunnelMessage
+            if !ip.isEmpty { line += " (node assigned \(ip))" }
+            if !detail.isEmpty, !line.lowercased().contains(detailLow) {
+                line += " \(detail)"
+            }
+            return line
+        }
+
+        if !detail.isEmpty {
+            let hasResidualHonesty =
+                detailLow.contains("residual public ip")
+                || detailLow.contains("did not become active")
+                || detailLow.contains("system vpn (packet tunnel)")
+            let base = hasResidualHonesty ? detail : "\(packetTunnelNotActiveMessage) \(detail)"
+            if !node.isEmpty, !isRedundantNodeDiagnostic(node: node, detail: base) {
+                if hasResidualHonesty,
+                   detailLow.contains("did not become") || detailLow.contains("system vpn") {
+                    return base
+                }
+                return "\(base) \(node)"
+            }
+            return base
+        }
+
+        if !node.isEmpty {
+            if nodeLow.contains("udp receive timeout") || nodeLow.contains("connect failed to") {
+                return "\(packetTunnelNotActiveMessage) \(node)"
+            }
+            return "\(packetTunnelNotActiveMessage) \(node)"
+        }
+
+        return packetTunnelNotActiveMessage
+    }
+
+    public static func isMissingHostNeDetail(_ text: String) -> Bool {
+        let m = text.lowercased()
+        if m.isEmpty { return false }
+        return m.contains("packet-tunnel-provider")
+            || m.contains("sign_macos_residual")
+            || m.contains("team residual")
+            || m.contains("needs team residual")
+            || (m.contains("host is missing") && m.contains("network extension"))
+            || m.contains("public developer id downloads intentionally omit")
+    }
+
+    private static func isRedundantNodeDiagnostic(node: String, detail: String) -> Bool {
+        let n = node.lowercased()
+        let d = detail.lowercased()
+        if n.isEmpty { return true }
+        if d.contains(n) { return true }
+        if isMissingHostNeDetail(detail) { return true }
+        return false
     }
 
     /// True when a channel map is a product full-tunnel success (mirrors Dart `isConnectSuccess`).

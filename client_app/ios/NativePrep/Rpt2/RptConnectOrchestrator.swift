@@ -40,13 +40,15 @@ public enum RptConnectOrchestrator {
     ) -> ConnectOutcome {
         let target = "\(host):\(port)"
 
-        // 1. Load secrets (client priv + node pub only)
+        // 1. Load secrets (client priv + residual host pub pin).
+        // Must pass residualHost so US/RO HELLO uses us_node/exit_node_elgamal.pub —
+        // Iceland node_elgamal.pub against 5.161.242.85 yields UDP receive timeout.
         let material: (Data, Data)
         do {
             if let secretsDir {
-                material = try RptSecrets.loadFromDirectory(secretsDir)
+                material = try RptSecrets.loadFromDirectory(secretsDir, residualHost: host)
             } else {
-                material = try RptSecrets.loadAdmissionMaterial()
+                material = try RptSecrets.loadAdmissionMaterial(residualHost: host)
             }
         } catch {
             return ConnectOutcome(
@@ -71,9 +73,19 @@ public enum RptConnectOrchestrator {
                 engine: engine
             )
         } catch {
+            var detail = error.localizedDescription
+            let low = detail.lowercased()
+            if low.contains("udp receive timeout") || low.contains("udp receive failed") {
+                detail =
+                    "\(detail) — residual HELLO got no reply from \(target). "
+                    + "Product residual nodes refuse HELLO until this device is bound to an "
+                    + "active paid entitlement. If you just paid: enter the keygen from your "
+                    + "fulfilment email (unlock dialog or Settings → Payment entitlement / keygen), "
+                    + "then Connect again."
+            }
             return ConnectOutcome(
                 ok: false,
-                message: "Connect failed to \(target): \(error.localizedDescription)",
+                message: "Connect failed to \(target): \(detail)",
                 vpnIp: nil,
                 session: nil,
                 engine: nil
