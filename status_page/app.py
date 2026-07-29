@@ -1039,15 +1039,29 @@ class Handler(BaseHTTPRequestHandler):
             # so a blocked iframe / mid-transfer drop leaves the manual link usable.
             # Host 302 is not a completed transfer — grant stays for retry until TTL.
             try:
-                from host_delivery import host_delivery_plan  # type: ignore
+                from host_delivery import (  # type: ignore
+                    host_delivery_plan,
+                    is_browser_safe_https_url,
+                )
             except Exception:  # noqa: BLE001
                 try:
-                    from status_page.host_delivery import host_delivery_plan  # type: ignore
+                    from status_page.host_delivery import (  # type: ignore
+                        host_delivery_plan,
+                        is_browser_safe_https_url,
+                    )
                 except Exception:  # noqa: BLE001
                     host_delivery_plan = None  # type: ignore
+                    is_browser_safe_https_url = None  # type: ignore
             if host_delivery_plan is not None:
                 plan = host_delivery_plan(str(fname), probe=True)
-                if plan and plan.get("url"):
+                loc = str((plan or {}).get("url") or "").strip()
+                # HTTPS shop must never 302 to http:// (Chrome mixed-content block).
+                safe_https = (
+                    is_browser_safe_https_url(loc)
+                    if callable(is_browser_safe_https_url)
+                    else loc.lower().startswith("https://")
+                )
+                if plan and loc and safe_https:
                     # Still unused at redirect time (no consume yet)
                     if lookup_download_token(token) is None:
                         self._send(
@@ -1061,7 +1075,7 @@ class Handler(BaseHTTPRequestHandler):
                         )
                         return
                     self.send_response(302)
-                    self.send_header("Location", str(plan["url"]))
+                    self.send_header("Location", loc)
                     self.send_header("Cache-Control", "no-store")
                     self.send_header(
                         "X-RPT-Fulfilment",
@@ -1072,6 +1086,7 @@ class Handler(BaseHTTPRequestHandler):
                     self._security_headers(allow_framing=True)
                     self.end_headers()
                     return
+                # Non-HTTPS plan or probe fail → same-origin open_release_asset below
             # Paid proxy: stream installer from local/API (works when repo is private).
             # Do NOT redirect unpaid browsers to free public github.com/releases/download.
             # open_release_asset must never be called without a validated paid grant.

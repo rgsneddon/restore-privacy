@@ -2524,13 +2524,19 @@ def vps_asset_base_url() -> str:
             raw = ""
     if raw:
         return raw
-    # Prefer full default base (HTTPS) when host/port env not overridden
+    # Prefer full default base (HTTPS) when host/port env not overridden.
+    # When only host/port are set, still prefer the public HTTPS sslip default for
+    # browser-facing helpers; server-side proxy may override via RPT_VPS_ASSET_BASE.
     host_env = (os.environ.get("RPT_VPS_ASSET_HOST") or "").strip()
     port_env = (os.environ.get("RPT_VPS_ASSET_PORT") or "").strip()
     if not host_env and not port_env:
         return DEFAULT_VPS_ASSET_BASE.rstrip("/")
+    # Explicit host without BASE: if it is the default store host, use HTTPS base
     host = host_env or DEFAULT_VPS_ASSET_HOST
+    if host in (DEFAULT_VPS_ASSET_HOST, "135.181.152.10") and not port_env:
+        return DEFAULT_VPS_ASSET_BASE.rstrip("/")
     port = port_env or str(DEFAULT_VPS_ASSET_PORT)
+    # Loopback / private operator override may stay HTTP for server-side fetch only
     return f"http://{host}:{port}{VPS_ASSET_HTTP_PREFIX}"
 
 

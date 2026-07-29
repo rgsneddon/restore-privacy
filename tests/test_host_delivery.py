@@ -154,11 +154,21 @@ class TestHostDeliveryPure(unittest.TestCase):
                 base_url="https://example.test/paid-assets",
             )
         )
+        from downloads import WINDOWS_EXE_FILENAME
+
         self.assertIsNone(
             build_host_delivery_url(
-                "restore-privacy-client-0.5.4-windows-x64-setup.exe",
+                WINDOWS_EXE_FILENAME,
                 secret="",
                 base_url="https://example.test/paid-assets",
+            )
+        )
+        # Plain HTTP base refused for browser delivery (mixed content)
+        self.assertIsNone(
+            build_host_delivery_url(
+                WINDOWS_EXE_FILENAME,
+                secret="sec",
+                base_url="http://135.181.152.10:8081/paid-assets",
             )
         )
 
@@ -342,18 +352,23 @@ class TestHostDeliveryPure(unittest.TestCase):
     def test_thankyou_allows_signed_helsinki_url(self) -> None:
         from payments import render_post_payment_thankyou_html
         from host_delivery import is_signed_helsinki_delivery_url
+        from downloads import WINDOWS_EXE_FILENAME, RELEASE_VERSION
 
         bad = "https://github.com/rgsneddon/restore-privacy/releases/download/x/y.exe"
         self.assertFalse(is_signed_helsinki_delivery_url(bad))
+        http_bad = (
+            f"http://135.181.152.10.sslip.io/paid-assets/{RELEASE_VERSION}/"
+            f"{WINDOWS_EXE_FILENAME}?exp=999&n=aa&sig=bb"
+        )
+        self.assertFalse(is_signed_helsinki_delivery_url(http_bad))
         good = (
-            "https://135.181.152.10.sslip.io/paid-assets/0.5.4/"
-            "restore-privacy-client-0.5.4-windows-x64-setup.exe"
-            "?exp=999&n=aa&sig=bb"
+            f"https://135.181.152.10.sslip.io/paid-assets/{RELEASE_VERSION}/"
+            f"{WINDOWS_EXE_FILENAME}?exp=999&n=aa&sig=bb"
         )
         self.assertTrue(is_signed_helsinki_delivery_url(good))
         html = render_post_payment_thankyou_html(
             download_path=good,
-            filename="restore-privacy-client-0.5.4-windows-x64-setup.exe",
+            filename=WINDOWS_EXE_FILENAME,
             platform="windows",
         )
         self.assertIn("auto-download-frame", html)
@@ -366,6 +381,93 @@ class TestHostDeliveryPure(unittest.TestCase):
                 filename="x.exe",
                 platform="windows",
             )
+        with self.assertRaises(ValueError):
+            render_post_payment_thankyou_html(
+                download_path=http_bad,
+                filename=WINDOWS_EXE_FILENAME,
+                platform="windows",
+            )
+
+    def test_https_only_browser_delivery_helpers(self) -> None:
+        """HTTPS shop must not get http:// host delivery for Windows setup."""
+        from host_delivery import (
+            build_host_delivery_url,
+            is_browser_safe_https_url,
+            browser_host_base_url,
+            host_delivery_plan,
+        )
+        from downloads import WINDOWS_EXE_FILENAME
+
+        self.assertTrue(
+            is_browser_safe_https_url(
+                "https://135.181.152.10.sslip.io/paid-assets/x.exe?exp=1&n=a&sig=b"
+            )
+        )
+        self.assertFalse(
+            is_browser_safe_https_url(
+                "http://135.181.152.10:8081/paid-assets/x.exe"
+            )
+        )
+        self.assertIsNone(
+            browser_host_base_url("http://135.181.152.10:8081/paid-assets")
+        )
+        self.assertEqual(
+            browser_host_base_url("https://example.test/paid-assets"),
+            "https://example.test/paid-assets",
+        )
+        https_url = build_host_delivery_url(
+            WINDOWS_EXE_FILENAME,
+            secret="sec",
+            base_url="https://example.test/paid-assets",
+            nonce="n1",
+            now=1_700_000_000.0,
+        )
+        self.assertIsNotNone(https_url)
+        assert https_url is not None
+        self.assertTrue(https_url.startswith("https://"))
+        self.assertIsNone(
+            build_host_delivery_url(
+                WINDOWS_EXE_FILENAME,
+                secret="sec",
+                base_url="http://example.test/paid-assets",
+                nonce="n1",
+            )
+        )
+        # Plan with HTTP env base must not offer browser 302
+        with mock.patch.dict(
+            os.environ,
+            {
+                "RPT_HOST_DELIVERY": "1",
+                "RPT_ASSET_FETCH_TOKEN": "tok",
+                "RPT_VPS_ASSET_BASE": "http://135.181.152.10:8081/paid-assets",
+            },
+            clear=False,
+        ):
+            import host_delivery as hd
+            import importlib
+
+            importlib.reload(hd)
+            self.assertIsNone(hd.browser_host_base_url())
+            self.assertIsNone(hd.host_delivery_plan(WINDOWS_EXE_FILENAME))
+
+    def test_download_route_https_gate_structural(self) -> None:
+        app_src = (ROOT / "status_page" / "app.py").read_text(encoding="utf-8")
+        self.assertIn("is_browser_safe_https_url", app_src)
+        self.assertIn("safe_https", app_src)
+        # 302 only after HTTPS check
+        i_safe = app_src.find("safe_https")
+        i_302 = app_src.find("self.send_response(302)", i_safe)
+        self.assertGreater(i_safe, 0)
+        self.assertGreater(i_302, i_safe)
+        # Attachment disposition remains on proxy byte path
+        self.assertIn('attachment; filename="', app_src)
+        from payments import content_type_for_filename
+        from downloads import WINDOWS_EXE_FILENAME
+
+        self.assertIn(
+            "portable-executable",
+            content_type_for_filename(WINDOWS_EXE_FILENAME),
+        )
 
 
 if __name__ == "__main__":

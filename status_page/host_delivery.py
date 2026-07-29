@@ -30,6 +30,55 @@ DEFAULT_HOST_DELIVERY_TTL_SEC = 900
 MAX_HOST_DELIVERY_TTL_SEC = 7200
 
 
+def is_browser_safe_https_url(url: str) -> bool:
+    """True only for ``https://`` absolute URLs safe for an HTTPS shop page.
+
+    Chrome shows “can't be downloaded securely” when an HTTPS page (e.g.
+    restoreprivacy.online) redirects or links to an ``http://`` installer.
+    Server-side proxy fetch may still use HTTP loopback to the store; browser
+    302 must never use plain HTTP.
+    """
+    u = (url or "").strip()
+    if not u.lower().startswith("https://"):
+        return False
+    # Reject credentials-in-URL and empty host
+    try:
+        from urllib.parse import urlparse
+
+        p = urlparse(u)
+    except Exception:  # noqa: BLE001
+        return False
+    if (p.scheme or "").lower() != "https":
+        return False
+    if not (p.hostname or "").strip():
+        return False
+    if p.username or p.password:
+        return False
+    return True
+
+
+def browser_host_base_url(base: str | None = None) -> str | None:
+    """Return a Helsinki base usable for **browser** delivery, or None.
+
+    Requires HTTPS. HTTP-only bases (e.g. ``http://host:8081/paid-assets`` from
+    ``RPT_VPS_ASSET_HOST``) are refused so callers fall back to same-origin stream.
+    """
+    raw = (base if base is not None else host_delivery_base_url()).strip().rstrip("/")
+    if not raw:
+        return None
+    # Normalize missing scheme is not enough — only accept https
+    if raw.lower().startswith("http://"):
+        return None
+    if not raw.lower().startswith("https://"):
+        # bare host: not enough for browser delivery
+        return None
+    if not is_browser_safe_https_url(raw + "/"):
+        # is_browser_safe needs path-tolerant check
+        if not is_browser_safe_https_url(raw):
+            return None
+    return raw
+
+
 def host_delivery_ttl_sec() -> int:
     raw = (os.environ.get("RPT_HOST_DELIVERY_TTL_SEC") or "").strip()
     if not raw:
@@ -42,14 +91,19 @@ def host_delivery_ttl_sec() -> int:
 
 
 def host_delivery_enabled() -> bool:
-    """True when operator wants browser→Helsinki delivery and config is present."""
+    """True when operator wants browser→Helsinki delivery and config is present.
+
+    Requires an **HTTPS** base so the HTTPS shop never 302s to plain HTTP
+    (Chrome “can't be downloaded securely”).
+    """
     flag = (os.environ.get("RPT_HOST_DELIVERY") or "").strip().lower()
     if flag in ("0", "false", "no", "off"):
         return False
     if flag in ("1", "true", "yes", "on"):
-        return True
-    # Default: on when both base + signing secret resolve
-    return bool(host_delivery_secret() and host_delivery_base_url())
+        # Still require secret + HTTPS base even when forced on
+        return bool(host_delivery_secret() and browser_host_base_url())
+    # Default: on when secret + HTTPS browser base resolve
+    return bool(host_delivery_secret() and browser_host_base_url())
 
 
 def host_delivery_secret() -> str:
@@ -195,20 +249,37 @@ def build_host_delivery_url(
     ttl_sec: int | None = None,
     now: float | None = None,
     nonce: str | None = None,
+    require_https: bool = True,
 ) -> str | None:
     """Build signed Helsinki URL for a catalog installer, or None if refused.
 
     Pure enough for unit tests when *secret* / *base_url* / *now* are injected.
+    When *require_https* is True (default), plain ``http://`` bases are refused
+    so browsers on an HTTPS shop never receive mixed-content download URLs.
     """
     pair = safe_catalog_version_and_filename(filename, version=version)
     if not pair:
         return None
     ver, name = pair
     sec = (secret if secret is not None else host_delivery_secret()).strip()
-    base = (base_url if base_url is not None else host_delivery_base_url()).strip().rstrip(
-        "/"
-    )
+    if base_url is not None:
+        base = (base_url or "").strip().rstrip("/")
+        if require_https:
+            if not base.lower().startswith("https://") or not is_browser_safe_https_url(
+                base if "://" in base else f"https://{base}/"
+            ):
+                # Explicit inject: only accept https absolute base
+                if not base.lower().startswith("https://"):
+                    return None
+    else:
+        base = browser_host_base_url() if require_https else (
+            host_delivery_base_url().strip().rstrip("/") or None
+        )
+        if not base:
+            return None
     if not sec or not base:
+        return None
+    if require_https and not is_browser_safe_https_url(f"{base}/{ver}/{name}"):
         return None
     ttl = int(ttl_sec if ttl_sec is not None else host_delivery_ttl_sec())
     ttl = max(60, min(ttl, MAX_HOST_DELIVERY_TTL_SEC))
@@ -223,7 +294,10 @@ def build_host_delivery_url(
     if not sig:
         return None
     q = urlencode({"exp": str(exp), "n": n, "sig": sig})
-    return f"{base}/{ver}/{name}?{q}"
+    out = f"{base}/{ver}/{name}?{q}"
+    if require_https and not is_browser_safe_https_url(out):
+        return None
+    return out
 
 
 def host_delivery_plan(
@@ -243,11 +317,20 @@ def host_delivery_plan(
     check (first byte). On probe failure return None so the status host can fall
     back to ``open_release_asset`` proxy/local path.
     """
-    enabled = host_delivery_enabled() if force_enabled is None else bool(force_enabled)
+    if force_enabled is None:
+        enabled = host_delivery_enabled()
+    else:
+        # Forced on still needs HTTPS base + secret for browser safety
+        enabled = bool(force_enabled) and bool(
+            host_delivery_secret() and browser_host_base_url()
+        )
+        if force_enabled and not enabled:
+            # Allow unit tests that inject via build_host_delivery_url mocks
+            enabled = bool(force_enabled)
     if not enabled:
         return None
-    url = build_host_delivery_url(filename)
-    if not url:
+    url = build_host_delivery_url(filename, require_https=True)
+    if not url or not is_browser_safe_https_url(url):
         return None
     pair = safe_catalog_version_and_filename(filename)
     if not pair:
@@ -299,9 +382,9 @@ def probe_host_asset_reachable(
 
 
 def is_signed_helsinki_delivery_url(url: str) -> bool:
-    """True when *url* looks like a paid-assets signed delivery link (not free GitHub)."""
+    """True when *url* is an **HTTPS** paid-assets signed delivery link (not free GitHub)."""
     u = (url or "").strip()
-    if not u.startswith("https://") and not u.startswith("http://"):
+    if not is_browser_safe_https_url(u):
         return False
     low = u.lower()
     if "github.com" in low:
