@@ -1146,7 +1146,7 @@ border:1px solid var(--border)}}
 
 
 def render_login_html(*, error: str = "") -> bytes:
-    """Minimal login: heading + username/password only (no security blurbs)."""
+    """Login: heading + username + password + 6-digit TOTP (when enrolled)."""
     err = (
         f'<p class="err" id="admin-error">{_escape(error)}</p>' if error else ""
     )
@@ -1170,6 +1170,10 @@ def render_login_html(*, error: str = "") -> bytes:
   <input id="username" name="username" autocomplete="username" required/>
   <label for="password">Password</label>
   <input id="password" name="password" type="password" autocomplete="current-password" required/>
+  <label for="totp_code">Authenticator code</label>
+  <input id="totp_code" name="totp_code" type="text" inputmode="numeric"
+         pattern="[0-9]{{6}}" maxlength="8" autocomplete="one-time-code"
+         placeholder="123456" data-admin-login-totp="1"/>
   <button type="submit" id="admin-login-submit">Sign in</button>
 </form>
 </div>
@@ -1186,7 +1190,7 @@ def render_2fa_setup_html(
     error: str = "",
     message: str = "",
 ) -> bytes:
-    """Enrollment after password when no authenticator is enrolled yet."""
+    """Bare enrollment: QR + secret + 6-digit code (no prose blurbs)."""
     try:
         from admin_2fa import otpauth_uri  # type: ignore
     except Exception:  # noqa: BLE001
@@ -1204,13 +1208,11 @@ def render_2fa_setup_html(
         if message
         else ""
     )
-    blurb = _escape(ADMIN_2FA_SECURITY_BLURB)
-    extra = _escape(ADMIN_SECURITY_EXTRA_ADVICE)
     body = f"""<!DOCTYPE html>
 <html lang="en"><head>
 <meta charset="utf-8"/><meta name="viewport" content="width=device-width, initial-scale=1"/>
 <meta name="color-scheme" content="light dark"/>
-<title>Set up authenticator — Admin</title>
+<title>Set up authenticator</title>
 <style>
 {_admin_auth_shell_css()}
 </style>
@@ -1221,29 +1223,18 @@ def render_2fa_setup_html(
 <form method="post" action="/admin/2fa/setup" id="admin-2fa-setup-form" class="admin-auth-form"
       data-admin-2fa-setup="1">
   <h1 id="admin-2fa-setup-heading">Set up authenticator</h1>
-  <p class="note" id="admin-2fa-setup-note">
-    Scan the QR code with your authenticator app (Google Authenticator, Authy,
-    Microsoft Authenticator, 1Password, etc.), or enter the secret manually,
-    then confirm with the 6-digit code. The secret is shown <strong>once</strong>
-    for enrollment — store it only in your authenticator; it is never on the public shop.
-  </p>
-  <p class="note" id="admin-2fa-security-blurb">{blurb}</p>
-  <p class="note" id="admin-security-extra-advice">{extra}</p>
   {msg}{err}
   <div class="qr-wrap" id="admin-2fa-qr-wrap">
     <img id="admin-2fa-qr" alt="Authenticator QR code" width="220" height="220"
          src="{qr_src}" data-otpauth-qr="1"/>
-    <p class="note" id="admin-2fa-qr-hint">Scan with your authenticator app</p>
   </div>
-  <p class="note"><strong>Secret (manual entry)</strong></p>
   <div class="secret-box" id="admin-2fa-secret" data-totp-secret="1">{_escape(secret_b32)}</div>
-  <p class="note">App link (otpauth):</p>
-  <p class="uri-box" id="admin-2fa-otpauth" data-otpauth-uri="1">{_escape(uri)}</p>
-  <label for="totp_code">6-digit code from app</label>
+  <p class="uri-box" id="admin-2fa-otpauth" data-otpauth-uri="1" hidden>{_escape(uri)}</p>
+  <label for="totp_code">Code</label>
   <input id="totp_code" name="totp_code" type="text" inputmode="numeric"
          pattern="[0-9]{{6}}" maxlength="8" autocomplete="one-time-code" required
          placeholder="123456"/>
-  <button type="submit" id="admin-2fa-setup-submit">Confirm and open admin</button>
+  <button type="submit" id="admin-2fa-setup-submit">Confirm</button>
 </form>
 </div>
 </body></html>
@@ -1252,14 +1243,13 @@ def render_2fa_setup_html(
 
 
 def render_2fa_verify_html(*, error: str = "") -> bytes:
-    """Challenge after password when authenticator is already enrolled."""
+    """Legacy bare TOTP-only form (enrolled users use login with password+code)."""
     err = f'<p class="err" id="admin-2fa-verify-error">{_escape(error)}</p>' if error else ""
-    blurb = _escape(ADMIN_2FA_SECURITY_BLURB)
     body = f"""<!DOCTYPE html>
 <html lang="en"><head>
 <meta charset="utf-8"/><meta name="viewport" content="width=device-width, initial-scale=1"/>
 <meta name="color-scheme" content="light dark"/>
-<title>Authenticator code — Admin</title>
+<title>Authenticator code</title>
 <style>
 {_admin_auth_shell_css()}
 </style>
@@ -1270,19 +1260,12 @@ def render_2fa_verify_html(*, error: str = "") -> bytes:
 <form method="post" action="/admin/2fa/verify" id="admin-2fa-verify-form" class="admin-auth-form"
       data-admin-2fa-verify="1">
   <h1 id="admin-2fa-verify-heading">Authenticator code</h1>
-  <p class="note" id="admin-2fa-verify-note">
-    Password accepted. Enter the current 6-digit code from your authenticator app
-    to open the admin console. Password alone cannot access licences, accounting,
-    or other operator tools.
-  </p>
-  <p class="note" id="admin-2fa-security-blurb">{blurb}</p>
-  <p class="note" id="admin-security-extra-advice">{_escape(ADMIN_SECURITY_EXTRA_ADVICE)}</p>
   {err}
-  <label for="totp_code">6-digit code</label>
+  <label for="totp_code">Code</label>
   <input id="totp_code" name="totp_code" type="text" inputmode="numeric"
          pattern="[0-9]{{6}}" maxlength="8" autocomplete="one-time-code" required
          placeholder="123456" autofocus/>
-  <button type="submit" id="admin-2fa-verify-submit">Verify and open admin</button>
+  <button type="submit" id="admin-2fa-verify-submit">Verify</button>
 </form>
 </div>
 </body></html>

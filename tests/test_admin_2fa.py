@@ -132,24 +132,26 @@ class TestAdmin2faAuthPath(unittest.TestCase):
         self.assertIn("Secure", sc)
         self.assertIn(SESSION_COOKIE + "=", sc)
 
-        # HTML: blurb + no secret on login; setup has secret only when passed
+        # Login: heading + password + TOTP field; no security essays
         login = render_login_html().decode("utf-8")
         self.assertIn("OPERATOR ADMIN PAGES", login)
         self.assertIn('id="admin-login-heading"', login)
         self.assertIn('name="username"', login)
         self.assertIn('name="password"', login)
-        # Login page stays bare (no security essays)
+        self.assertIn('name="totp_code"', login)
+        self.assertIn("data-admin-login-totp", login)
         self.assertNotIn("admin-login-note", login)
         self.assertNotIn("admin-2fa-security-blurb", login)
         self.assertNotIn("admin-security-extra-advice", login)
         self.assertNotIn(secret, login)
+        # Setup: QR + secret + code only
         setup = render_2fa_setup_html(secret_b32=secret).decode("utf-8")
         self.assertIn(secret, setup)
         self.assertIn("admin-2fa-setup-form", setup)
-        self.assertIn("otpauth://", setup)
-        verify_html = render_2fa_verify_html().decode("utf-8")
-        self.assertIn("admin-2fa-verify-form", verify_html)
-        self.assertNotIn(secret, verify_html)
+        self.assertIn('id="admin-2fa-qr"', setup)
+        self.assertNotIn("admin-2fa-setup-note", setup)
+        self.assertNotIn("admin-2fa-security-blurb", setup)
+        self.assertNotIn("admin-security-extra-advice", setup)
 
     def test_http_login_does_not_grant_admin_without_2fa(self) -> None:
         import re
@@ -224,36 +226,57 @@ class TestAdmin2faAuthPath(unittest.TestCase):
             self.assertIn("admin-sidebar", home)
             self.assertNotIn("admin-login-form", home)
 
-            # Wrong TOTP after re-login does not grant full session
+            # Enrolled: password alone (no/wrong TOTP) must not grant session
             jar2 = CookieJar()
             op2 = request.build_opener(request.HTTPCookieProcessor(jar2))
-            op2.open(
-                request.Request(
-                    f"http://127.0.0.1:{port}/admin/login",
-                    data=data,
-                    method="POST",
-                ),
-                timeout=5,
-            )
             denied = False
             try:
                 op2.open(
                     request.Request(
-                        f"http://127.0.0.1:{port}/admin/2fa/verify",
-                        data=parse.urlencode({"totp_code": "000000"}).encode(),
+                        f"http://127.0.0.1:{port}/admin/login",
+                        data=parse.urlencode(
+                            {
+                                "username": "admin",
+                                "password": "test-2fa-password-not-real",
+                                "totp_code": "000000",
+                            }
+                        ).encode(),
                         method="POST",
                     ),
                     timeout=5,
                 )
             except error.HTTPError as e:
                 denied = e.code == 401
-                self.assertIn("admin-2fa-verify", e.read().decode("utf-8"))
+                body_e = e.read().decode("utf-8")
+                self.assertIn("admin-login-form", body_e)
             self.assertTrue(denied)
             self.assertNotIn("rpt_admin_session", {c.name for c in jar2})
-            blocked = op2.open(
+
+            # Password + valid TOTP on same form → full session
+            from admin_2fa import get_enrolled_secret
+
+            good = totp_code_at(get_enrolled_secret() or "", time.time())
+            jar3 = CookieJar()
+            op3 = request.build_opener(request.HTTPCookieProcessor(jar3))
+            op3.open(
+                request.Request(
+                    f"http://127.0.0.1:{port}/admin/login",
+                    data=parse.urlencode(
+                        {
+                            "username": "admin",
+                            "password": "test-2fa-password-not-real",
+                            "totp_code": good,
+                        }
+                    ).encode(),
+                    method="POST",
+                ),
+                timeout=5,
+            )
+            self.assertIn("rpt_admin_session", {c.name for c in jar3})
+            home2 = op3.open(
                 f"http://127.0.0.1:{port}/admin", timeout=5
             ).read().decode("utf-8")
-            self.assertIn("admin-login-form", blocked)
+            self.assertIn("admin-sidebar", home2)
         finally:
             httpd.shutdown()
             httpd.server_close()

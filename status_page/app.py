@@ -34,9 +34,12 @@ from admin_2fa import (
     begin_login_after_password,
     complete_setup,
     complete_verify,
+    get_enrolled_secret,
+    is_totp_enrolled,
     otpauth_uri,
     pending_from_headers,
     verify_pending_token,
+    verify_totp,
 )
 from downloads import download_css, render_bmc_tip_html, render_download_section_html
 from settings_explainer import (
@@ -1746,47 +1749,50 @@ class Handler(BaseHTTPRequestHandler):
             form = dict(urllib.parse.parse_qsl(body.decode("utf-8", "replace")))
             user = form.get("username") or ""
             password = form.get("password") or ""
+            totp_code = (form.get("totp_code") or form.get("code") or "").strip()
             if not verify_credentials(user, password):
                 self._send(
                     401,
                     "text/html; charset=utf-8",
-                    render_login_html(error="Invalid username or password"),
+                    render_login_html(error="Invalid credentials"),
                 )
                 return
-            # Password alone is never enough: pending cookie → setup or TOTP
+            # Enrolled: password + 6-digit TOTP on this same form → full session
+            if is_totp_enrolled():
+                secret = get_enrolled_secret()
+                if not secret or not verify_totp(secret, totp_code):
+                    self._send(
+                        401,
+                        "text/html; charset=utf-8",
+                        render_login_html(error="Invalid credentials"),
+                    )
+                    return
+                token = mint_session_token()
+                self.send_response(302)
+                self.send_header("Location", "/admin")
+                self.send_header("Set-Cookie", format_session_cookie(token))
+                self.send_header(
+                    "Set-Cookie",
+                    format_session_cookie(
+                        "", clear=True, cookie_name=PENDING_COOKIE
+                    ),
+                )
+                self.send_header("Content-Length", "0")
+                self.send_header("Cache-Control", "no-store")
+                self._security_headers()
+                self.end_headers()
+                return
+            # Not enrolled yet: after password only → bare setup (QR + code)
             step = begin_login_after_password()
             pending = str(step["pending_token"])
-            stage = str(step["stage"])
-            if stage == "setup":
-                secret = str(step.get("secret_b32") or "")
-                self._send(
-                    200,
-                    "text/html; charset=utf-8",
-                    render_2fa_setup_html(
-                        secret_b32=secret,
-                        otpauth=otpauth_uri(secret),
-                    ),
-                    extra_headers=[
-                        (
-                            "Set-Cookie",
-                            format_session_cookie(
-                                pending,
-                                max_age=PENDING_TTL_SEC,
-                                cookie_name=PENDING_COOKIE,
-                            ),
-                        ),
-                        # Ensure no leftover full session
-                        (
-                            "Set-Cookie",
-                            format_session_cookie("", clear=True),
-                        ),
-                    ],
-                )
-                return
+            secret = str(step.get("secret_b32") or "")
             self._send(
                 200,
                 "text/html; charset=utf-8",
-                render_2fa_verify_html(),
+                render_2fa_setup_html(
+                    secret_b32=secret,
+                    otpauth=otpauth_uri(secret) if secret else "",
+                ),
                 extra_headers=[
                     (
                         "Set-Cookie",
