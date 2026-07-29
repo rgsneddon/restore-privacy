@@ -1412,6 +1412,7 @@ def _admin_sidebar_html(*, active: str = "home") -> str:
     lic_open = " open" if active == "licences" else ""
     proc_cls = "sb-btn active" if active == "processors" else "sb-btn"
     fleet_cls = "sb-btn active" if active == "fleet" else "sb-btn"
+    acct_cls = "sb-btn active" if active == "accounting" else "sb-btn"
     seed = ""
     if seed_test_purchase_enabled():
         seed = (
@@ -1448,6 +1449,8 @@ def _admin_sidebar_html(*, active: str = "home") -> str:
   </details>
   <a class="{fleet_cls}" id="admin-nav-fleet" href="/admin/fleet"><span class="sb-ico">&#9678;</span>
     <span class="sb-label">Fleet usage</span></a>
+  <a class="{acct_cls}" id="admin-nav-accounting" href="/admin/accounting"><span class="sb-ico">&#163;</span>
+    <span class="sb-label">RASKUL LTD accounts</span></a>
   <a class="{proc_cls}" id="admin-nav-processors" href="/admin/processors"><span class="sb-ico">&#9881;</span>
     <span class="sb-label">Processor settings</span></a>
   <a class="sb-btn" href="/admin/logout" id="admin-logout"><span class="sb-ico">&#9099;</span>
@@ -1777,6 +1780,156 @@ def render_admin_processors_page_html(*, message: str = "", error: str = "") -> 
         title="Processor settings",
         active="processors",
         main_html=settings_html,
+    )
+
+
+def render_admin_accounting_page_html(
+    rows: list[Any] | None = None,
+) -> bytes:
+    """RASKUL LTD ledger: setup costs + paid sales net of Stripe fees + export."""
+    try:
+        from accounting import (  # type: ignore
+            ENTITY_NAME,
+            OPENING_DATE,
+            STRIPE_FEE_POLICY_LABEL,
+            build_ledger_from_payment_store,
+            pence_to_pounds_str,
+        )
+    except Exception:  # noqa: BLE001
+        from status_page.accounting import (  # type: ignore
+            ENTITY_NAME,
+            OPENING_DATE,
+            STRIPE_FEE_POLICY_LABEL,
+            build_ledger_from_payment_store,
+            pence_to_pounds_str,
+        )
+    try:
+        ledger = rows if rows is not None else build_ledger_from_payment_store()
+    except Exception as exc:  # noqa: BLE001
+        err = _escape(str(exc)[:200])
+        main = (
+            f'<section class="card" id="admin-accounting">'
+            f"<h2>RASKUL LTD accounting</h2>"
+            f'<p class="err">Ledger unavailable: {err}</p></section>'
+        )
+        return _admin_page_shell(
+            title="RASKUL LTD accounting", active="accounting", main_html=main
+        )
+
+    body_rows: list[str] = []
+    for r in ledger:
+        body_rows.append(
+            "<tr>"
+            f"<td>{_escape(r.date_iso)}</td>"
+            f"<td>{_escape(r.description)}</td>"
+            f"<td class='num'>{_escape(pence_to_pounds_str(r.gross_pence) if r.kind == 'sale' else '—')}</td>"
+            f"<td class='num fee'>{_escape(pence_to_pounds_str(r.fee_pence) if r.kind == 'sale' else '—')}</td>"
+            f"<td class='num'>{_escape(pence_to_pounds_str(r.net_pence))}</td>"
+            f"<td class='num bal'>{_escape(pence_to_pounds_str(r.balance_pence))}</td>"
+            f"<td>{_escape(r.fee_source)}</td>"
+            f"<td><code>{_escape(r.purchase_id)}</code></td>"
+            f"<td>{_escape(r.platform)}</td>"
+            "</tr>"
+        )
+    table_body = (
+        "\n".join(body_rows)
+        if body_rows
+        else '<tr><td colspan="9">No ledger rows</td></tr>'
+    )
+    final_bal = pence_to_pounds_str(ledger[-1].balance_pence) if ledger else "—"
+    y0 = OPENING_DATE.year
+    m0 = OPENING_DATE.month
+    year_opts = "".join(
+        f'<option value="{y}"{" selected" if y == y0 else ""}>{y}</option>'
+        for y in range(y0, y0 + 6)
+    )
+    month_opts = "".join(
+        f'<option value="{m}"{" selected" if m == m0 else ""}>{m:02d}</option>'
+        for m in range(1, 13)
+    )
+    main = f"""
+<section class="card" id="admin-accounting" data-admin-accounting="1">
+  <h2 id="admin-accounting-heading">{_escape(ENTITY_NAME)} — accounting</h2>
+  <p class="muted" id="admin-accounting-blurb">
+    Business books from <strong>{_escape(OPENING_DATE.isoformat())}</strong>.
+    Opening line: <strong>SET UP COSTS −£6,000.00</strong> (starting balance / deficit).
+    Paid customer sales load automatically from the durable payment store.
+    Each sale shows <strong>gross</strong>, <strong>Stripe fee as a minus</strong>, and
+    <strong>net</strong> (= gross − fee). Running balance starts at −£6,000 and rises
+    toward break-even then profit.
+  </p>
+  <p class="muted" id="admin-accounting-fee-policy">{_escape(STRIPE_FEE_POLICY_LABEL)}</p>
+  <p id="admin-accounting-balance">Current balance:
+    <strong id="admin-accounting-balance-value">{_escape(final_bal)}</strong>
+  </p>
+
+  <div class="accounting-export" id="admin-accounting-export">
+    <h3 id="admin-accounting-export-heading">Export</h3>
+    <form method="get" action="/admin/accounting/export" id="admin-accounting-export-form">
+      <label class="field">Period mode
+        <select name="period_mode" id="export-period-mode">
+          <option value="month" selected>Single month</option>
+          <option value="range">Month range (from → to)</option>
+        </select>
+      </label>
+      <label class="field">Year
+        <select name="year" id="export-year">{year_opts}</select>
+      </label>
+      <label class="field">Month (single-month mode)
+        <select name="month" id="export-month">{month_opts}</select>
+      </label>
+      <label class="field">From year
+        <select name="from_year" id="export-from-year">{year_opts}</select>
+      </label>
+      <label class="field">From month
+        <select name="from_month" id="export-from-month">{month_opts}</select>
+      </label>
+      <label class="field">To year
+        <select name="to_year" id="export-to-year">{year_opts}</select>
+      </label>
+      <label class="field">To month
+        <select name="to_month" id="export-to-month">
+          {"".join(f'<option value="{m}"{" selected" if m == 12 else ""}>{m:02d}</option>' for m in range(1, 13))}
+        </select>
+      </label>
+      <label class="field">Format
+        <select name="format" id="export-format">
+          <option value="xlsx" selected>Excel (.xlsx)</option>
+          <option value="xls">Excel 2003 XML (.xls)</option>
+          <option value="csv">CSV</option>
+          <option value="pdf">PDF</option>
+          <option value="rtf">RTF (Word)</option>
+          <option value="html">HTML</option>
+          <option value="json">JSON</option>
+        </select>
+      </label>
+      <button type="submit" id="admin-accounting-export-submit">Export accounts</button>
+    </form>
+  </div>
+
+  <table id="admin-accounting-table">
+    <thead><tr>
+      <th>Date</th><th>Description</th><th>Gross</th><th>Stripe fee</th>
+      <th>Net</th><th>Balance</th><th>Fee source</th><th>Purchase ID</th><th>Platform</th>
+    </tr></thead>
+    <tbody>
+{table_body}
+    </tbody>
+  </table>
+{admin_section_top_link_html()}</section>
+<style>
+#admin-accounting-table .num{{text-align:right;font-variant-numeric:tabular-nums}}
+#admin-accounting-table .fee{{color:#b45309}}
+#admin-accounting-export form{{display:flex;flex-wrap:wrap;gap:0.75rem;align-items:flex-end;margin:1rem 0}}
+#admin-accounting-export .field{{display:flex;flex-direction:column;font-size:0.85rem;gap:0.25rem}}
+#admin-accounting-export select,#admin-accounting-export button{{padding:0.45rem 0.6rem;border-radius:8px}}
+#admin-accounting-export button{{background:var(--btn-bg);color:var(--btn-fg);border:0;font-weight:600;cursor:pointer}}
+</style>
+"""
+    return _admin_page_shell(
+        title=f"{ENTITY_NAME} accounting",
+        active="accounting",
+        main_html=main,
     )
 
 

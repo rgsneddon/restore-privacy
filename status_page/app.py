@@ -1351,6 +1351,53 @@ class Handler(BaseHTTPRequestHandler):
                 200, "text/html; charset=utf-8", render_admin_processors_page_html()
             )
             return
+        if path in ("/admin/accounting", "/admin/accounting/"):
+            if not admin_enabled():
+                self._send(503, "text/plain; charset=utf-8", b"admin disabled")
+                return
+            if not is_authenticated(self.headers):
+                self._send(200, "text/html; charset=utf-8", render_login_html())
+                return
+            from admin_panel import render_admin_accounting_page_html
+
+            self._send(
+                200,
+                "text/html; charset=utf-8",
+                render_admin_accounting_page_html(),
+            )
+            return
+        if path in ("/admin/accounting/export", "/admin/accounting/export/"):
+            if not admin_enabled():
+                self._send(503, "text/plain; charset=utf-8", b"admin disabled")
+                return
+            if not is_authenticated(self.headers):
+                self._send(200, "text/html; charset=utf-8", render_login_html())
+                return
+            from accounting import (
+                build_ledger_from_payment_store,
+                export_ledger,
+                filter_ledger_by_period,
+                parse_export_period,
+            )
+
+            q = urllib.parse.parse_qs(parsed.query)
+            form = {k: (v[0] if v else "") for k, v in q.items()}
+            period = parse_export_period(form)
+            fmt = (form.get("format") or "xlsx").strip().lower()
+            full = build_ledger_from_payment_store()
+            filtered = filter_ledger_by_period(full, **period["filter"])
+            body, content_type, ext = export_ledger(filtered, fmt=fmt)
+            fname = f"raskul_ltd_accounts_{period['stem']}.{ext}"
+            self.send_response(200)
+            self.send_header("Content-Type", content_type)
+            self.send_header(
+                "Content-Disposition", f'attachment; filename="{fname}"'
+            )
+            self.send_header("Content-Length", str(len(body)))
+            self.send_header("Cache-Control", "no-store")
+            self.end_headers()
+            self.wfile.write(body)
+            return
         if path in ("/admin/fleet", "/admin/fleet/"):
             if not admin_enabled():
                 self._send(503, "text/plain; charset=utf-8", b"admin disabled")
