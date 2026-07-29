@@ -526,65 +526,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
             'OS VPN permission / Administrator may still be required.',
             style: TextStyle(color: kTextMuted, fontSize: 12),
           ),
-          const SizedBox(height: 20),
-          Text(
-            'Residual dual-stack',
-            style: TextStyle(
-              color: kPrimaryDark,
-              fontSize: 14,
-              fontWeight: FontWeight.w700,
-            ),
-          ),
-          const SizedBox(height: 6),
-          Text(
-            'IPv4 routes residual traffic into the VPN tunnel. IPv6 blocks the '
-            'ISP IPv6 path while residual is up so dual-stack leaks do not '
-            'bypass the tunnel. Both default ON.',
-            style: TextStyle(color: kTextMuted, fontSize: 12),
-          ),
-          const SizedBox(height: 10),
-          Container(
-            decoration: BoxDecoration(
-              color: kPanelBg,
-              borderRadius: BorderRadius.circular(kCornerRadius),
-              border: Border.all(color: kBorder),
-            ),
-            child: Column(
-              children: [
-                SwitchListTile(
-                  title: const Text(
-                    'IPv4 residual',
-                    style: TextStyle(fontWeight: FontWeight.w600),
-                  ),
-                  subtitle: const Text(
-                    'Full-tunnel IPv4 capture (dual /1 residual routes)',
-                  ),
-                  value: _settings.residualIpv4,
-                  activeThumbColor: kWhite,
-                  activeTrackColor: kPrimary,
-                  onChanged: _busy
-                      ? null
-                      : (v) => _setResidualStack(ipv4: v),
-                ),
-                const Divider(height: 1),
-                SwitchListTile(
-                  title: const Text(
-                    'IPv6 residual',
-                    style: TextStyle(fontWeight: FontWeight.w600),
-                  ),
-                  subtitle: const Text(
-                    'Block ISP IPv6 while residual is connected',
-                  ),
-                  value: _settings.residualIpv6,
-                  activeThumbColor: kWhite,
-                  activeTrackColor: kPrimary,
-                  onChanged: _busy
-                      ? null
-                      : (v) => _setResidualStack(ipv6: v),
-                ),
-              ],
-            ),
-          ),
           if (!freeTierSettingsLocked) ...[
             const SizedBox(height: 20),
             Text(
@@ -609,6 +550,43 @@ class _SettingsScreenState extends State<SettingsScreen> {
               ),
               child: Column(
                 children: [
+                  // Residual IPv4/IPv6 first in the privacy-scale list
+                  Tooltip(
+                    message: kTooltipResidualIpv4,
+                    waitDuration: const Duration(milliseconds: 400),
+                    child: SwitchListTile(
+                      title: const Text(
+                        'IPv4 residual',
+                        style: TextStyle(fontWeight: FontWeight.w600),
+                      ),
+                      subtitle: const Text(kExplainerResidualIpv4),
+                      value: _settings.residualIpv4,
+                      activeThumbColor: kWhite,
+                      activeTrackColor: kPrimary,
+                      onChanged: _busy
+                          ? null
+                          : (v) => _setResidualStack(ipv4: v),
+                    ),
+                  ),
+                  const Divider(height: 1),
+                  Tooltip(
+                    message: kTooltipResidualIpv6,
+                    waitDuration: const Duration(milliseconds: 400),
+                    child: SwitchListTile(
+                      title: const Text(
+                        'IPv6 residual',
+                        style: TextStyle(fontWeight: FontWeight.w600),
+                      ),
+                      subtitle: const Text(kExplainerResidualIpv6),
+                      value: _settings.residualIpv6,
+                      activeThumbColor: kWhite,
+                      activeTrackColor: kPrimary,
+                      onChanged: _busy
+                          ? null
+                          : (v) => _setResidualStack(ipv6: v),
+                    ),
+                  ),
+                  const Divider(height: 1),
                   SwitchListTile(
                     title: const Text(
                       'Traffic shaping',

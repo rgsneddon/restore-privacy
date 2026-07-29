@@ -54,6 +54,27 @@ const String kExplainerCoreVpn =
     'system residual tunnel (capture your public IP through the VPN node). '
     'Those cannot be turned off here — without them this is not a working VPN.';
 
+/// Residual dual-stack toggles (top of privacy-scale list). Defaults ON.
+const String kExplainerResidualIpv4 =
+    'IPv4 residual captures full-tunnel IPv4 via dual /1 routes so residual '
+    'public IPv4 uses the VPN node. ON (default) = full residual IPv4 capture. '
+    'OFF = session may stay up for diagnostics/dataplane but status is honest: '
+    'IPv4 residual is not claimed when capture is off. Takes effect on next Connect.';
+
+const String kExplainerResidualIpv6 =
+    'IPv6 residual blocks the ISP IPv6 path while residual is connected so '
+    'dual-stack devices do not leak over IPv6. ON (default) = IPv6 ISP path '
+    'blocked for residual sessions. OFF = IPv6 may use the ISP; status will not '
+    'claim IPv6 is protected. Takes effect on next Connect.';
+
+const String kTooltipResidualIpv4 =
+    'When on, residual IPv4 routes through the VPN. When off, Connect stays '
+    'honest about residual capture.';
+
+const String kTooltipResidualIpv6 =
+    'When on, residual sessions block ISP IPv6 leaks. When off, IPv6 may bypass '
+    'the tunnel.';
+
 const String kPingStatsDisclaimer =
     'Best-effort TCP probe RTT to product entry (and exit when multi-hop is ON). '
     'Not a contractual SLA or browser speedbench.';

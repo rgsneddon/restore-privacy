@@ -2662,7 +2662,6 @@ class TunnelClientApp:
             auto_var,
             _save_auto,
         )
-        tk.Frame(card, bg=BORDER, height=1).pack(fill=tk.X, pady=4)
 
         def _save_residual_stack() -> None:
             s = _current_settings()
@@ -2683,22 +2682,6 @@ class TunnelClientApp:
                 f"residual_ipv6={s.residual_ipv6}"
             )
 
-        _row(
-            card,
-            "IPv4 residual",
-            "Full-tunnel IPv4 capture (dual /1 residual routes into the VPN)",
-            ipv4_var,
-            _save_residual_stack,
-        )
-        tk.Frame(card, bg=BORDER, height=1).pack(fill=tk.X, pady=4)
-        _row(
-            card,
-            "IPv6 residual",
-            "Block ISP IPv6 while residual is connected (dual-stack leak protection)",
-            ipv6_var,
-            _save_residual_stack,
-        )
-
         # Free 3.3.3: no user-amendable privacy-scale (locked lean Iceland).
         _free_locked = False
         try:
@@ -2708,7 +2691,7 @@ class TunnelClientApp:
         except Exception:
             _free_locked = False
 
-        # --- Privacy scale (speed vs optional residual defenses) ---
+        # --- Privacy scale (IPv4/IPv6 first, then optional residual defenses) ---
         priv_card, priv_outer = make_neon_card(pad, padx=12, pady=10)
         priv_outer.pack(fill=tk.X, pady=(14, 0))
         if _free_locked:
@@ -2774,6 +2757,27 @@ class TunnelClientApp:
                 wraplength=400,
                 justify=tk.LEFT,
             ).pack(fill=tk.X, pady=(0, 8))
+            # Residual dual-stack first in privacy-scale list (defaults ON)
+            tk.Frame(priv_card, bg=BORDER, height=1).pack(fill=tk.X, pady=4)
+            _row(
+                priv_card,
+                "IPv4 residual",
+                "Full-tunnel IPv4 capture (dual /1 residual routes into the VPN). "
+                "ON (default). OFF: honest status — no residual IPv4 claim. "
+                "Hover/subtitle: dual /1 residual routes; takes effect on next Connect.",
+                ipv4_var,
+                _save_residual_stack,
+            )
+            tk.Frame(priv_card, bg=BORDER, height=1).pack(fill=tk.X, pady=4)
+            _row(
+                priv_card,
+                "IPv6 residual",
+                "Block ISP IPv6 while residual is connected (dual-stack leak protection). "
+                "ON (default). OFF: IPv6 may use ISP; status will not claim IPv6 protected. "
+                "Hover/subtitle: leak protection; takes effect on next Connect.",
+                ipv6_var,
+                _save_residual_stack,
+            )
             tk.Frame(priv_card, bg=BORDER, height=1).pack(fill=tk.X, pady=4)
             _row(
                 priv_card,

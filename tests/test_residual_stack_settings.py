@@ -385,6 +385,37 @@ class TestWindowsLinuxSettingsStoreDualStack(unittest.TestCase):
         self.assertIn("residual_ipv4", win)
         self.assertIn("residual_ipv6", win)
 
+    def test_privacy_scale_list_orders_residual_stack_before_shape_obfs_multihop(self):
+        """IPv4/IPv6 residual must appear above shape/obfs/multihop in Settings source."""
+        fl = (ROOT / "client_app" / "lib" / "settings_screen.dart").read_text(
+            encoding="utf-8"
+        )
+        i4 = fl.index("IPv4 residual")
+        i6 = fl.index("IPv6 residual")
+        shape = fl.index("Traffic shaping")
+        obfs = fl.index("Outer obfuscation")
+        mh = fl.index("Multi-hop residual")
+        self.assertLess(i4, i6)
+        self.assertLess(i6, shape)
+        self.assertLess(shape, obfs)
+        self.assertLess(obfs, mh)
+        # Hover / tooltip explainers present for dual-stack rows
+        self.assertIn("kTooltipResidualIpv4", fl)
+        self.assertIn("kTooltipResidualIpv6", fl)
+        self.assertIn("kExplainerResidualIpv4", fl)
+        self.assertIn("kExplainerResidualIpv6", fl)
+        win = (ROOT / "client" / "windows" / "app.py").read_text(encoding="utf-8")
+        priv_idx = win.index("Browsing speed / privacy scale")
+        self.assertGreater(win.index("IPv4 residual", priv_idx), priv_idx)
+        self.assertLess(
+            win.index("IPv4 residual", priv_idx),
+            win.index("Traffic shaping (pad / jitter / cover)", priv_idx),
+        )
+        self.assertLess(
+            win.index("IPv6 residual", priv_idx),
+            win.index("Traffic shaping (pad / jitter / cover)", priv_idx),
+        )
+
 
 if __name__ == "__main__":
     unittest.main()
