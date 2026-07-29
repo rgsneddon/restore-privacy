@@ -4,7 +4,7 @@ Stable same-origin paths (no GitHub dependency for public readers):
 
 | Path | Document |
 |------|----------|
-| ``/how-to-buy`` | How to pay and get a one-time download |
+| ``/how-to-buy`` | How to pay and get a time-limited download link |
 | ``/README.md`` | Product README |
 | ``/LICENSE`` | End-user licence (proprietary full copyright) |
 | ``/PRIVACY_POLICY.md`` | Privacy policy |
@@ -1012,9 +1012,10 @@ There are no free permanent installer buttons on this shop.</p>
       ({_escape(PRICE_LABEL)}/month or {_escape(PRICE_YEARLY_LABEL)}/year):
       <a id="how-to-buy-payment-page" href="{_escape(pay)}"
       rel="noopener noreferrer">{_escape(pay)}</a></li>
-  <li>After payment, use the one-time download on the success page
-      (<code>{_escape(claim)}?session_id=…</code>). The link works
-      <strong>once</strong> and expires. Your keygen arrives in email
+  <li>After payment, use the download on the success page
+      (<code>{_escape(claim)}?session_id=…</code>). The link is valid for
+      <strong>1 hour</strong> and can be used again if the connection drops
+      mid-download (not single-use). Your keygen arrives in email
       separately (USE THIS KEYGEN TO UNLOCK RESTORE PRIVACY).</li>
 </ol>
 <p class="muted">Fulfilment listens for Stripe

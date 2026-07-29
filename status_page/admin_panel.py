@@ -89,7 +89,8 @@ ADMIN_ARCHITECTURE_FULL = (
     "Restore Privacy is a paid residual VPN product. Customers pick a platform, "
     "pay on Stripe (monthly or yearly), then unlock Connect with the keygen from "
     "their fulfilment email. Installers are never free permanent GitHub downloads — "
-    "each package is handed out through a single-use paid link on the status host.\n\n"
+    "each package is handed out through a time-limited paid link on the status host "
+    "(default 1 hour, reusable until it expires).\n\n"
     "Where residual traffic lands: the live catalog has three peers — Germany "
     "(default entry), Iceland, and United States. Users choose their entry country "
     "in the app. Multi-hop is optional: when turned on, exit is another catalog "
@@ -766,7 +767,7 @@ def render_purchase_reissue_section_html(
     <strong>Customer recovery (RPT-PPI).</strong> When a buyer loses their installer,
     they should quote the <strong>product purchase identifier</strong> from the thank-you
     page (format <code>RPT-XXXX-XXXX-XXXX</code>). Enter it below to mint a
-    <strong>secondary single-use download link</strong> for the same package they paid for.
+    <strong>secondary time-limited download link</strong> for the same package they paid for.
     Tell the buyer: open the link once on a trusted device, save the installer, and keep
     their RPT-… ID for any future recovery. This is the preferred recovery path when the
     customer still has their purchase identifier.
@@ -830,7 +831,7 @@ def render_admin_ondemand_mint_section_html(
     <p><a id="ondemand-download-link" href="{url}" rel="noopener noreferrer">{url}</a>
       {copy_url}</p>
     <p class="muted">Path: <code id="ondemand-download-path">{path}</code>
-      — single-use; not written as a customer RPT-PPI recovery event.</p>
+      — time-limited (1 hour); not written as a customer RPT-PPI recovery event.</p>
   </div>"""
     plat_sel = (platform or "windows").strip().lower()
     options = []
@@ -851,7 +852,7 @@ def render_admin_ondemand_mint_section_html(
          data-admin-failsafe="1">
   <h2 id="admin-ondemand-heading">Generate download link (admin failsafe)</h2>
   <p class="muted" id="admin-ondemand-note">
-    Mint a <strong>live single-use</strong> download for the current catalog package
+    Mint a <strong>live time-limited</strong> download for the current catalog package
     <strong>without</strong> a customer RPT purchase identifier. Use when you need an
     on-demand installer link. Prefer <a href="#admin-reissue">RPT-PPI re-issue</a> when
     the buyer still has their purchase ID. Not a free public unlock.
@@ -993,7 +994,7 @@ def render_admin_tester_month_section_html(
       — expires after one month (valid_until
       <code id="tester-month-valid-until">{vu_s}</code>).</p>
     <p>Keygen: <code id="tester-month-keygen">{kg}</code> {copy_kg}</p>
-    <p>Download (single-use status-host token, not free GitHub):</p>
+    <p>Download (1-hour status-host token, reusable until expiry; not free GitHub):</p>
     <p><a id="tester-month-download-link" href="{url}" rel="noopener noreferrer">{url}</a>
       {copy_url}</p>
     <p class="muted">Path: <code id="tester-month-download-path">{path}</code>
@@ -1049,7 +1050,7 @@ def render_seed_test_purchase_section_html(
     """Dev/staging-only card: seed a paid test grant (RPT-… + platform).
 
     Hidden unless :func:`seed_test_purchase_enabled` (``RPT_ADMIN_SEED_PURCHASE=1``).
-    Still creates a full-price paid grant + single-use token — never a free public unlock.
+    Still creates a full-price paid grant + 1-hour download token — never a free public unlock.
     """
     if not seed_test_purchase_enabled():
         return ""
@@ -1097,7 +1098,7 @@ def render_seed_test_purchase_section_html(
     <strong>Dev-only.</strong> Creates a full-price paid grant with a unique
     <code>RPT-…</code> product purchase identifier for testing re-issue.
     Enabled only when <code>RPT_ADMIN_SEED_PURCHASE=1</code>.
-    Does <strong>not</strong> open free public unlocks — download still needs the single-use token.
+    Does <strong>not</strong> open free public unlocks — download still needs the time-limited token.
   </p>
   {err}
   {ok}

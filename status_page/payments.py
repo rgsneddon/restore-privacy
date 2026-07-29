@@ -61,6 +61,19 @@ DEFAULT_CANCEL_PATH = "/download/cancel"
 # Site-hosted plan selection (main-site style) before Stripe Checkout
 SITE_PAY_PLAN_PATH = "/pay"
 TOKEN_TTL_SEC = int(os.environ.get("RPT_DOWNLOAD_TOKEN_TTL_SEC", "3600"))
+# Buyer-facing window for the paid fulfilment link (default 1 hour).
+DOWNLOAD_LINK_TTL_HOURS = max(1, int(round(TOKEN_TTL_SEC / 3600.0)) or 1)
+DOWNLOAD_LINK_VALIDITY_ADVICE = (
+    f"Your download link is valid for {DOWNLOAD_LINK_TTL_HOURS} hour"
+    f"{'s' if DOWNLOAD_LINK_TTL_HOURS != 1 else ''} from when it was created. "
+    "You can download again if the connection drops — the same link works until "
+    "it expires (not a one-time use)."
+)
+DOWNLOAD_DENIED_MSG = (
+    "Invalid or expired download link. Links stay valid for "
+    f"{DOWNLOAD_LINK_TTL_HOURS} hour"
+    f"{'s' if DOWNLOAD_LINK_TTL_HOURS != 1 else ''} and can be retried until they expire."
+)
 
 # --- Stripe Dashboard Branding (logo + colours) — not full site CSS ---
 # Map from status_page/public_chrome.py dark theme. Upload logo in Dashboard →
@@ -2861,22 +2874,23 @@ def render_post_payment_thankyou_html(
     purchase_id: str = "",
     keygen: str = "",
 ) -> str:
-    """Thank-you page body: auto-start one-time download + run-as-administrator copy.
+    """Thank-you page body: auto-start download + run-as-administrator copy.
 
     **Exactly one** auto-start mechanism: a hidden iframe whose ``src`` is the paid
     ``/download?token=…`` path (or a short-lived signed Helsinki host URL minted
     for the same grant). The visible fallback anchor is **manual only** (no
     script click / meta-refresh) and uses the **same** href as the iframe.
 
-    Grant consumption (see app ``/download``):
-      * **Proxy stream** — consume only after a **successful full stream** so a
-        blocked iframe or mid-proxy failure leaves the manual link usable.
-      * **Helsinki host 302** — does **not** consume on redirect (redirect is not
-        a completed transfer); iframe + manual may both hit ``/download`` safely.
+    Grant validity (see app ``/download`` + :func:`lookup_download_token`):
+      * Time-window only (default **1 hour** via ``RPT_DOWNLOAD_TOKEN_TTL_SEC``).
+      * Same token may be fetched **multiple times** while unexpired (retry if
+        the connection drops mid-download).
+      * ``used_at`` is audit bookkeeping only and does **not** invalidate the link.
 
     *purchase_id* is the durable product purchase identifier (distinct from the
-    single-use download token). Buyers are **strongly advised** to note it so the
-    operator can re-issue a secondary download link after software loss.
+    time-limited download token). Buyers are **strongly advised** to note it so the
+    operator can re-issue a secondary download link after the window expires or
+    the installer is lost.
 
     *keygen* is the subscription unlock code (also emailed). Clients require
     licence accept then keygen entry for Connect.
@@ -2942,9 +2956,9 @@ def render_post_payment_thankyou_html(
     <p class="purchase-id-advice" id="purchase-id-advice">
       <strong>STRONG ADVICE — SAVE THIS IDENTIFIER NOW:</strong>
       write it down or store it somewhere safe (password manager, email to yourself).
-      It is <strong>not</strong> your one-time download link. If you lose the
-      installer later, contact the operator with this identifier so a
-      <strong>secondary download link</strong> can be recreated for you.
+      It is <strong>not</strong> your download link. If the installer is lost
+      after the download window expires, contact the operator with this
+      identifier so a <strong>secondary download link</strong> can be recreated.
       Without this identifier, re-fulfilment may not be possible.
     </p>
   </div>"""
@@ -3015,21 +3029,25 @@ def render_post_payment_thankyou_html(
     {admin}
   </p>
   <p class="msg" id="auto-download-note">please wait for your download.. packaging...</p>
-  <!-- Installer first (single-use grant). Entitlement file is deferred only when
-       session_id is present (script inside ent_block). No script click on package.
-       No meta-refresh / no page-close timer: stay until user closes the tab. -->
+  <!-- Installer first (time-limited grant, reusable within TTL). Entitlement file
+       is deferred only when session_id is present (script inside ent_block).
+       No script click on package. No meta-refresh / no page-close timer. -->
   <iframe id="auto-download-frame" src="{link_esc}" style="width:0;height:0;border:0;position:absolute"
     title="Automatic product download" aria-hidden="true"></iframe>
   <p>
     <a class="dl" id="success-download-link" href="{link_esc}"
        data-manual-download="1" data-platform="{_escape_html_text(plat)}"
-       data-filename="{fname_esc}" data-available-until-tab-close="1">
+       data-filename="{fname_esc}" data-available-until-tab-close="1"
+       data-download-ttl-hours="{DOWNLOAD_LINK_TTL_HOURS}">
       { _escape_html_text(btn) } (if it did not start)
     </a>
   </p>
-  <p class="msg muted" id="download-lifetime-note">This page stays open until you close the tab.
-    Keep it open until your download finishes. The download control is not disabled by a timer.
-    After a successful download the grant is one-time (security).</p>
+  <p class="msg" id="download-lifetime-note" data-download-ttl-hours="{DOWNLOAD_LINK_TTL_HOURS}">
+    <strong>Download link validity:</strong>
+    {_escape_html_text(DOWNLOAD_LINK_VALIDITY_ADVICE)}
+    This page stays open until you close the tab. Keep it open until your
+    download finishes; if the connection drops, use the same link again
+    within the window.</p>
   <p><a href="/">Home</a></p>
 </section>
 """
@@ -3048,7 +3066,7 @@ def generate_purchase_id() -> str:
     """Mint a unique durable product purchase identifier (not a download token).
 
     Format ``RPT-XXXX-XXXX-XXXX`` (12 hex chars) — stable across re-issued
-    single-use download tokens for the same paid purchase.
+    download tokens for the same paid purchase.
     """
     raw = secrets.token_hex(6).upper()
     return f"RPT-{raw[0:4]}-{raw[4:8]}-{raw[8:12]}"
@@ -4104,7 +4122,10 @@ def build_fulfilment_email_payload(
         "",
         f"Keygen: {kg}",
         f"Product purchase identifier (PPI): {pid}",
-        f"Download link (one-time): {dl}",
+        f"Download link (valid {DOWNLOAD_LINK_TTL_HOURS} hour"
+        f"{'s' if DOWNLOAD_LINK_TTL_HOURS != 1 else ''}; re-download if interrupted): {dl}",
+        "",
+        DOWNLOAD_LINK_VALIDITY_ADVICE,
         "",
         "Install flow: Install → accept licence terms and conditions → enter keygen → unlock.",
         "Your subscription is active once payment succeeds "
@@ -4123,7 +4144,8 @@ def build_fulfilment_email_payload(
     body_lines.extend(
         [
             "",
-            "Save this email. The download link expires; the keygen stays bound to your entitlement.",
+            "Save this email. The download link expires after the time window above; "
+            "the keygen stays bound to your entitlement.",
             "— Restore Privacy",
         ]
     )
@@ -4939,7 +4961,10 @@ def mint_download_token(
     now: float | None = None,
     purchase_id: str | None = None,
 ) -> str:
-    """Create a single-use expiring download token bound to a **current catalog** asset.
+    """Create a time-limited download token bound to a **current catalog** asset.
+
+    Valid for *ttl_sec* (default :data:`TOKEN_TTL_SEC` = 1 hour). The same token
+    may be used for multiple downloads until ``expires_at``; usage does not burn it.
 
     Re-resolves the platform to the live catalog filename so callers cannot mint
     a stale version string. Raises ``ValueError`` if the platform is unknown.
@@ -5065,7 +5090,7 @@ def admin_mint_download_for_platform(
     base_url: str | None = None,
     ttl_sec: int = TOKEN_TTL_SEC,
 ) -> dict[str, Any]:
-    """Admin failsafe: mint a live single-use download for a catalog platform.
+    """Admin failsafe: mint a live time-limited download for a catalog platform.
 
     Does **not** require an RPT product purchase identifier. Intended for
     authenticated operators only (enforced at the HTTP layer). Creates a
@@ -5182,7 +5207,7 @@ def admin_mint_one_month_tester(
 ) -> dict[str, Any]:
     """Admin: mint a **one-month free tester** subscription for a catalog platform.
 
-    Returns both a status-host single-use **download link** and a product
+    Returns both a status-host time-limited **download link** and a product
     **keygen**, with PPI label :data:`TESTER_MONTH_PPI`. Entitlement
     ``valid_until`` is one calendar month after *now* (same helper as paid
     monthly). Download token exists for ``/download?token=`` fulfilment but is
@@ -5265,7 +5290,7 @@ def seed_test_purchase_enabled() -> bool:
 
     Requires ``RPT_ADMIN_SEED_PURCHASE=1`` (or ``true``/``yes``/``on``).
     Never on by default — production must set the env deliberately.
-    Seeded grants still require a single-use ``/download?token=`` (no free unlock).
+    Seeded grants still require a time-limited ``/download?token=`` (no free unlock).
     """
     return os.environ.get("RPT_ADMIN_SEED_PURCHASE", "").strip().lower() in (
         "1",
@@ -5284,7 +5309,7 @@ def seed_test_purchase(
 ) -> dict[str, Any]:
     """Mint a **paid** test grant (full price) for admin reissue / recovery tests.
 
-    Creates a durable product purchase identifier + single-use download token for
+    Creates a durable product purchase identifier + time-limited download token for
     a catalog platform. Does **not** expose free permanent GitHub installer URLs.
 
     Raises ``ValueError`` if seeding is disabled or the platform is unknown.
@@ -5333,7 +5358,7 @@ def reissue_download_for_purchase_id(
     now: float | None = None,
     base_url: str | None = None,
 ) -> dict[str, Any] | None:
-    """Mint a **new** single-use download token for a paid purchase_id.
+    """Mint a **new** time-limited download token for a paid purchase_id.
 
     Returns dict with ``token``, ``download_path``, ``download_url``,
     ``purchase_id``, ``platform``, ``filename`` — or **None** if unknown/unpaid.
@@ -5392,10 +5417,14 @@ def _grant_dict_from_row(row: sqlite3.Row) -> dict[str, Any]:
 def lookup_download_token(
     token: str, *, now: float | None = None
 ) -> dict[str, Any] | None:
-    """Return grant if valid, unused, and non-expired — **does not** mark used.
+    """Return grant if valid and non-expired — **does not** mark used.
 
-    Use before opening the installer so a failed proxy does not burn the grant.
-    Call :func:`consume_download_token` only after the asset is opened successfully.
+    Time-window only (default 1 hour from mint). Prior downloads (``used_at``)
+    do **not** invalidate the token while ``expires_at`` is still in the future.
+    Revoked/unknown/expired tokens return ``None``.
+
+    Use before opening the installer. Call :func:`consume_download_token` after a
+    successful stream for **audit** (last-used timestamp); it does not gate reuse.
 
     ``filename`` is the **current catalog** package for the grant platform (never
     a stale pin still sitting in the SQLite row).
@@ -5412,7 +5441,9 @@ def lookup_download_token(
         ).fetchone()
         if row is None:
             return None
-        if row["status"] != "granted" or row["used_at"] is not None:
+        st = str(row["status"] or "").strip().lower()
+        # granted = fresh; used = downloaded at least once (still valid until expiry)
+        if st not in ("granted", "used"):
             return None
         if float(row["expires_at"]) < t:
             return None
@@ -5426,7 +5457,12 @@ def lookup_download_token(
 
 
 def consume_download_token(token: str, *, now: float | None = None) -> bool:
-    """Mark a still-valid grant as used. Returns True if this call consumed it."""
+    """Record a download use for audit (``used_at`` / status).
+
+    Does **not** invalidate the grant within its TTL — the same token remains
+    redeemable until ``expires_at``. Returns True if the token is still within
+    its validity window and the audit stamp was written.
+    """
     init_db()
     t = now if now is not None else time.time()
     tok = (token or "").strip()
@@ -5440,13 +5476,14 @@ def consume_download_token(token: str, *, now: float | None = None) -> bool:
         ).fetchone()
         if row is None:
             return False
-        if row["status"] != "granted" or row["used_at"] is not None:
+        st = str(row["status"] or "").strip().lower()
+        if st not in ("granted", "used"):
             return False
         if float(row["expires_at"]) < t:
             return False
         cur = conn.execute(
             "UPDATE grants SET used_at = ?, status = 'used' "
-            "WHERE token = ? AND status = 'granted' AND used_at IS NULL",
+            "WHERE token = ? AND status IN ('granted', 'used')",
             (t, tok),
         )
         return cur.rowcount == 1
@@ -5457,10 +5494,11 @@ def consume_download_token(token: str, *, now: float | None = None) -> bool:
 def redeem_download_token(
     token: str, *, now: float | None = None
 ) -> dict[str, Any] | None:
-    """Lookup + consume in one step (legacy helpers / tests).
+    """Lookup + audit-stamp in one step (helpers / tests).
 
+    Within the TTL window this may succeed on **every** call (time-limited reuse).
     HTTP /download should use :func:`lookup_download_token` then
-    :func:`consume_download_token` only after :func:`open_release_asset` succeeds.
+    :func:`consume_download_token` after a successful stream for audit only.
     """
     grant = lookup_download_token(token, now=now)
     if grant is None:

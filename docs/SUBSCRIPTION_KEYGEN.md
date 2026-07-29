@@ -7,7 +7,7 @@
    **Yearly VPN plan (£27.93, 5% off)** (licence for **one year**). Customers can
    **enable or disable auto-renew** before checkout (default: on).
 2. Status host on `checkout.session.completed`:
-   - mints one-time download token
+   - mints a **1-hour** download token (reusable until expiry)
    - activates Connect entitlement with **`valid_until`** = Stripe period end
      or calendar **one month / one year** (never unlimited for paid catalog)
    - applies auto-renew preference on the Stripe Subscription

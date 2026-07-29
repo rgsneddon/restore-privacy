@@ -49,6 +49,7 @@ from settings_explainer import (
     settings_explainer_paths,
 )
 from payments import (
+    DOWNLOAD_DENIED_MSG,
     PRICE_LABEL,
     PRICE_PENCE,
     activate_connect_entitlement,
@@ -1082,7 +1083,7 @@ class Handler(BaseHTTPRequestHandler):
                     "text/html; charset=utf-8",
                     _html_page(
                         "Download unavailable",
-                        '<p class="msg" id="download-denied">Invalid, expired, or already-used download link.</p>'
+                        f'<p class="msg" id="download-denied">{DOWNLOAD_DENIED_MSG}</p>'
                         '<p><a href="/">Get a new download</a></p>',
                     ),
                 )
@@ -1091,11 +1092,9 @@ class Handler(BaseHTTPRequestHandler):
             # multi-MB installers are not double-proxied through Render.
             # Probe Helsinki first; on failure fall through to open_release_asset.
             #
-            # **Do not consume the grant on 302.** Thank-you loads the same
-            # ``/download?token=`` in a hidden iframe and a manual fallback; the
-            # contract is consume only after a successful full stream (proxy path)
-            # so a blocked iframe / mid-transfer drop leaves the manual link usable.
-            # Host 302 is not a completed transfer — grant stays for retry until TTL.
+            # Grant is **time-limited (default 1 hour)**, not single-use. Audit
+            # stamp via consume after a full proxy stream; host 302 does not
+            # stamp. Re-hits of ``/download?token=`` work until expires_at.
             try:
                 from host_delivery import (  # type: ignore
                     host_delivery_plan,
@@ -1120,14 +1119,14 @@ class Handler(BaseHTTPRequestHandler):
                     else loc.lower().startswith("https://")
                 )
                 if plan and loc and safe_https:
-                    # Still unused at redirect time (no consume yet)
+                    # Confirm grant still within TTL before redirect
                     if lookup_download_token(token) is None:
                         self._send(
                             403,
                             "text/html; charset=utf-8",
                             _html_page(
                                 "Download unavailable",
-                                '<p class="msg" id="download-denied">Invalid, expired, or already-used download link.</p>'
+                                f'<p class="msg" id="download-denied">{DOWNLOAD_DENIED_MSG}</p>'
                                 '<p><a href="/">Get a new download</a></p>',
                             ),
                         )
@@ -1169,7 +1168,7 @@ class Handler(BaseHTTPRequestHandler):
                     ),
                 )
                 return
-            # Still valid + unused at send time (no consume yet)
+            # Still valid at send time (time window; prior uses do not block)
             if lookup_download_token(token) is None:
                 try:
                     body_fail = asset.get("body")
@@ -1182,7 +1181,7 @@ class Handler(BaseHTTPRequestHandler):
                     "text/html; charset=utf-8",
                     _html_page(
                         "Download unavailable",
-                        '<p class="msg" id="download-denied">Invalid, expired, or already-used download link.</p>'
+                        f'<p class="msg" id="download-denied">{DOWNLOAD_DENIED_MSG}</p>'
                         '<p><a href="/">Get a new download</a></p>',
                     ),
                 )
@@ -1234,7 +1233,7 @@ class Handler(BaseHTTPRequestHandler):
                         except Exception:  # noqa: BLE001
                             pass
             except (BrokenPipeError, ConnectionResetError, ConnectionAbortedError):
-                # Client/proxy dropped mid-transfer — leave grant unused for retry.
+                # Client/proxy dropped mid-transfer — token remains valid until TTL.
                 try:
                     if hasattr(body, "close"):
                         body.close()
@@ -1249,7 +1248,7 @@ class Handler(BaseHTTPRequestHandler):
                     pass
                 raise
             if stream_ok:
-                # Single-use starts only after the browser received the full body.
+                # Audit last-used only; link stays redeemable until expires_at.
                 consume_download_token(token)
             return
 
@@ -1356,8 +1355,10 @@ class Handler(BaseHTTPRequestHandler):
                 if token and not session_id:
                     deny_note = (
                         '<p class="msg" id="pay-success-invalid-token">'
-                        "That download link is invalid, expired, or already used. "
-                        "Complete payment again to get a new link.</p>"
+                        "That download link is invalid or expired "
+                        f"({DOWNLOAD_DENIED_MSG}). "
+                        "Complete payment again or contact support with your "
+                        "product purchase identifier for a new link.</p>"
                     )
                 # Paid session but no platform on Payment Link → pick package once
                 picker = ""

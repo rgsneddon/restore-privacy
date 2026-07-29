@@ -44,11 +44,11 @@ Installers are **paid only** on [restoreprivacy.online](https://restoreprivacy.o
 **Current catalog (v0.5.7):** the homepage **Download client** box has device/platform and plan selection — **Monthly VPN plan** £2.45 / **Yearly VPN plan** £27.93 (5% off) — plus **Buy now**, which opens Stripe Checkout. You can also open the plan page at **`/pay`**. Card payment uses Stripe’s hosted checkout (Dashboard branding only — not this site’s full CSS). Email delivers **keygen + PPI + download link** (**USE THIS KEYGEN TO UNLOCK RESTORE PRIVACY**).
 
 1. Pick your **device** and **plan**, then **Buy now** (or open `/pay`).
-2. Complete Stripe Checkout. You get a one-time download plus email with **keygen** (`RPT-KEY-…`) and **PPI**.
+2. Complete Stripe Checkout. You get a download link valid for **1 hour** (retry if the connection drops) plus email with **keygen** (`RPT-KEY-…`) and **PPI**.
 3. Install → **accept the licence** → **enter the keygen** (forced unlock on all platforms). Download alone does **not** unlock residual HELLO.
 4. **Connect** while status is **OK** (active subscription + keygen). If payment fails, refunds, or the period ends, status is **EXPIRED** — the app hard-locks with **renew your licence *here*** and a platform-specific Stripe payment portal link until you pay again and re-enter a keygen.
 
-Weekly wipe UI shows the **preferred-entry clear timer** (no dual Node A/B wipe countdown). Fleet wipe is sequential behind the scenes. After payment the status site delivers the installer once (authenticated proxy).
+Weekly wipe UI shows the **preferred-entry clear timer** (no dual Node A/B wipe countdown). Fleet wipe is sequential behind the scenes. After payment the status site delivers the installer via a 1-hour download link (authenticated proxy; retry if the connection drops).
 
 > **Payment required for Connect:** residual Connect needs successful payment and keygen unlock while the subscription is active. Failed checkout, failed charge, refund, dispute, or period end → **EXPIRED** until you renew and re-enter a valid keygen.
 
@@ -128,7 +128,7 @@ Supported floor: **Ubuntu 20.04 LTS** and later (including 22.04 / 24.04 LTS).
 https://restoreprivacy.online/
 
 - **Monthly £2.45** and **Yearly** pay controls per platform (Windows, Android, macOS, iOS, Linux) — catalog **v0.5.7**
-- Installers are delivered **after payment** (single-use link); the product repo is private
+- Installers are delivered **after payment** (link valid for 1 hour, reusable until expiry); the product repo is private
 - Connect requires **keygen activation** on an **active** subscription (**OK**); **EXPIRED** shows **renew your licence *here*** with a platform payment portal link
 - **No** public live session / connected-client counter
 - A browser tab cannot run full system VPN

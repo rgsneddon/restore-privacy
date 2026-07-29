@@ -9,6 +9,7 @@ from __future__ import annotations
 import os
 import sys
 import tempfile
+import time
 import unittest
 from io import BytesIO
 from pathlib import Path
@@ -125,15 +126,20 @@ class TestDownloadTokenDeniesUnpaid(unittest.TestCase):
             under["data"]["object"]["metadata"]["amount_pence"] = "1"
             self.assertIsNone(pay.process_checkout_completed_event(under))
 
-            # Paid mints; single-use
+            # Paid mints; time-limited reuse (audit consume does not burn)
             tok = pay.process_checkout_completed_event(_paid_event())
             self.assertTrue(tok)
             g = pay.lookup_download_token(tok)
             self.assertIsNotNone(g)
             self.assertIn(g["filename"], pay.catalog_filenames())
             self.assertTrue(pay.consume_download_token(tok))
-            self.assertIsNone(pay.lookup_download_token(tok))
-            self.assertFalse(pay.consume_download_token(tok))
+            # Still redeemable within TTL after first use
+            self.assertIsNotNone(pay.lookup_download_token(tok))
+            self.assertTrue(pay.consume_download_token(tok))
+            # Past expiry: refused
+            t_exp = time.time() + pay.TOKEN_TTL_SEC + 5
+            self.assertIsNone(pay.lookup_download_token(tok, now=t_exp))
+            self.assertFalse(pay.consume_download_token(tok, now=t_exp))
 
             # Revoke blocks remaining grants
             tok2 = pay.process_checkout_completed_event(
@@ -205,8 +211,8 @@ class TestHttpDownloadHandlerDeniesUnpaid(unittest.TestCase):
         # Must not link /download?token=forged as a fulfilment path
         self.assertNotIn("/download?token=forged", body)
 
-    def test_paid_grant_still_redeems_once(self):
-        """Happy path undisturbed: paid mint → /download streams once."""
+    def test_paid_grant_redeems_multiple_times_within_ttl(self):
+        """Paid mint → /download streams repeatedly while unexpired."""
         with tempfile.TemporaryDirectory() as td:
             os.environ["RPT_PAYMENT_DATA_DIR"] = td
             tok = pay.process_checkout_completed_event(_paid_event("cs_happy"))
@@ -215,16 +221,13 @@ class TestHttpDownloadHandlerDeniesUnpaid(unittest.TestCase):
             self.assertIsNotNone(g)
             fname = g["filename"]
 
-            # Mock asset open so we do not depend on huge staged binaries
-            fake_body = BytesIO(b"FAKE-INSTALLER-BYTES")
-
             def fake_open(name, **kwargs):
                 self.assertEqual(name, fname)
                 return {
                     "filename": fname,
                     "content_type": "application/octet-stream",
                     "content_length": 19,
-                    "body": fake_body,
+                    "body": BytesIO(b"FAKE-INSTALLER-BYTES"),
                     "source": "test",
                 }
 
@@ -238,11 +241,17 @@ class TestHttpDownloadHandlerDeniesUnpaid(unittest.TestCase):
                         h.do_GET()
             self.assertEqual(h.code, 200)
             self.assertEqual(h.wfile.getvalue(), b"FAKE-INSTALLER-BYTES")
-            # Second redeem denied
+            # Second fetch still allowed within TTL (connection-drop retry)
             h2 = _FakeHandler(f"/download?token={tok}")
             with mock.patch("app.open_release_asset", side_effect=fake_open):
                 h2.do_GET()
-            self.assertEqual(h2.code, 403)
+            self.assertEqual(h2.code, 200)
+            self.assertEqual(h2.wfile.getvalue(), b"FAKE-INSTALLER-BYTES")
+            self.assertIsNotNone(pay.lookup_download_token(tok))
+            # After TTL: denied by shipped lookup
+            self.assertIsNone(
+                pay.lookup_download_token(tok, now=time.time() + pay.TOKEN_TTL_SEC + 10)
+            )
 
             del os.environ["RPT_PAYMENT_DATA_DIR"]
 
@@ -307,7 +316,8 @@ class TestHttpDownloadHandlerDeniesUnpaid(unittest.TestCase):
                 h2.do_GET()
             self.assertEqual(h2.code, 200)
             self.assertEqual(h2.wfile.getvalue(), b"FULL-INSTALLER")
-            self.assertIsNone(pay.lookup_download_token(tok))
+            # Successful stream does not burn the link within TTL
+            self.assertIsNotNone(pay.lookup_download_token(tok))
 
             del os.environ["RPT_PAYMENT_DATA_DIR"]
 

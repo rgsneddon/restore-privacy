@@ -1,10 +1,11 @@
 """Release download catalog + paid download UI (version 0.5.7).
 
 Primary path: pay **£2.45** (GBP) via Stripe Checkout per package, then a
-single-use download token. Free permanent GitHub ``href`` is not used on the
-public buttons. After payment the status host **proxies** the installer
-(authenticated GitHub API / local assets) so fulfilment works when the
-restore-privacy repo is **private**. Buy Me a Coffee is tip/support only.
+time-limited download token (default **1 hour**, reusable until expiry).
+Free permanent GitHub ``href`` is not used on the public buttons. After payment
+the status host **proxies** the installer (authenticated GitHub API / local
+assets) so fulfilment works when the restore-privacy repo is **private**.
+Buy Me a Coffee is tip/support only.
 
 Current catalog packages: restore-privacy release **0.5.7**
 (Windows setup needs no separate Python install; macOS Developer ID notarized;

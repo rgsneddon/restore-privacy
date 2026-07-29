@@ -54,10 +54,10 @@ class TestPurchaseIdStoreAndReissue(unittest.TestCase):
         )
         pid = self.pay.purchase_id_for_token(tok)
         self.assertIsNotNone(pid)
-        # Consume original token
+        # Audit stamp original token — still redeemable within TTL
         self.assertTrue(self.pay.consume_download_token(tok))
-        self.assertIsNone(self.pay.lookup_download_token(tok))
-        # Reissue secondary link
+        self.assertIsNotNone(self.pay.lookup_download_token(tok))
+        # Reissue secondary link (e.g. after window expires / lost installer)
         issued = self.pay.reissue_download_for_purchase_id(
             str(pid), base_url="https://restoreprivacy.online"
         )

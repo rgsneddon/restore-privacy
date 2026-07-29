@@ -1,4 +1,4 @@
-"""Paid download: Stripe checkout fields, webhook grant, single-use tokens, admin auth."""
+"""Paid download: Stripe checkout fields, webhook grant, time-limited tokens, admin auth."""
 
 from __future__ import annotations
 
@@ -242,7 +242,7 @@ class TestWebhookAndTokens(unittest.TestCase):
         self.assertEqual(result.get("error"), "invalid_signature")
         self.assertEqual(payments.list_recent_grants(), [])
 
-    def test_valid_signature_grants_token_and_single_use(self):
+    def test_valid_signature_grants_token_and_ttl_reuse(self):
         secret = "whsec_unit_secret"
         payload = json.dumps(
             {
@@ -280,8 +280,13 @@ class TestWebhookAndTokens(unittest.TestCase):
         )
         self.assertEqual(first["amount_pence"], 245)
 
+        # Reusable within TTL (not single-use)
         second = payments.redeem_download_token(token)
-        self.assertIsNone(second, "token must be single-use")
+        self.assertIsNotNone(second, "token must remain redeemable within TTL")
+        # After window: refused
+        past = time.time() + payments.TOKEN_TTL_SEC + 5
+        third = payments.redeem_download_token(token, now=past)
+        self.assertIsNone(third, "token must expire after TTL")
         # Grant must embed the live catalog version
         from downloads import RELEASE_VERSION
 
@@ -394,7 +399,11 @@ class TestWebhookAndTokens(unittest.TestCase):
         assert grant is not None
         self.assertEqual(grant["platform"], "windows")
         self.assertTrue(str(grant["filename"]).endswith("windows-x64-setup.exe"))
-        self.assertIsNone(payments.redeem_download_token(token))
+        # Reusable within TTL
+        again = payments.redeem_download_token(token)
+        self.assertIsNotNone(again)
+        past = time.time() + payments.TOKEN_TTL_SEC + 5
+        self.assertIsNone(payments.redeem_download_token(token, now=past))
 
     def test_payment_link_zero_amount_or_missing_status_refuses_grant(self):
         """Only if paid at full price — zero amount / blank status must not mint."""
@@ -557,7 +566,7 @@ class TestHowtoDoc(unittest.TestCase):
 
 
 class TestBuyerSuccessFulfilment(unittest.TestCase):
-    """After pay, /download/success?session_id=… must surface the real one-time link."""
+    """After pay, /download/success?session_id=… must surface the real download link."""
 
     def setUp(self):
         self._td = tempfile.TemporaryDirectory()
@@ -1094,10 +1103,12 @@ class TestPrivateRepoProxyFulfilment(unittest.TestCase):
                 disp = resp.headers.get("Content-Disposition", "")
             self.assertEqual(body, payload)
             self.assertIn(fname, disp)
-            with self.assertRaises(Exception):
-                urllib.request.urlopen(
-                    f"http://127.0.0.1:{port}/download?token={token}", timeout=5
-                )
+            # Same token still works within the 1-hour window
+            with urllib.request.urlopen(
+                f"http://127.0.0.1:{port}/download?token={token}", timeout=5
+            ) as resp2:
+                self.assertEqual(resp2.status, 200)
+                self.assertEqual(resp2.read(), payload)
         finally:
             httpd.shutdown()
             httpd.server_close()
@@ -1105,7 +1116,7 @@ class TestPrivateRepoProxyFulfilment(unittest.TestCase):
 
 
 class TestGrantNotBurnedOnFulfilmentFail(unittest.TestCase):
-    """Proxy failure must not consume the single-use grant (lookup then consume)."""
+    """Proxy failure must not invalidate the time-limited grant (lookup then audit)."""
 
     def setUp(self):
         self._td = tempfile.TemporaryDirectory()
@@ -1118,72 +1129,77 @@ class TestGrantNotBurnedOnFulfilmentFail(unittest.TestCase):
         payments.init_db()
 
     def test_lookup_does_not_consume(self):
-        fname = "restore-privacy-client-0.4.0-linux-x64.tar.gz"
+        from downloads import available_downloads
+
+        live = next(a for a in available_downloads() if a.platform == "linux")
         tok = payments.mint_download_token(
-            filename=fname, platform="linux", session_id="cs_lookup"
+            filename=live.filename, platform="linux", session_id="cs_lookup"
         )
         g1 = payments.lookup_download_token(tok)
         g2 = payments.lookup_download_token(tok)
         self.assertIsNotNone(g1)
         self.assertIsNotNone(g2)
-        self.assertEqual(g1["filename"], fname)
-        # still consumable
+        self.assertEqual(g1["filename"], live.filename)
+        # audit stamp still leaves token redeemable within TTL
         self.assertTrue(payments.consume_download_token(tok))
-        self.assertIsNone(payments.lookup_download_token(tok))
+        self.assertIsNotNone(payments.lookup_download_token(tok))
 
     def test_http_502_leaves_token_reusable_then_success(self):
         import threading
         import urllib.error
         import urllib.request
+        from io import BytesIO
 
-        fname = "restore-privacy-client-0.4.0-macos.zip"
+        from downloads import available_downloads
+
+        live = next(a for a in available_downloads() if a.platform == "macos")
+        fname = live.filename
         tok = payments.mint_download_token(
             filename=fname, platform="macos", session_id="cs_noburn"
         )
-        # No local asset, no token → open fails
-        with mock.patch.object(
-            payments, "asset_search_dirs", return_value=[Path(self._td.name) / "empty"]
-        ):
-            with mock.patch.object(payments, "github_auth_token", return_value=""):
-                with mock.patch.object(
-                    payments, "open_release_asset", return_value=None
-                ):
-                    # Need app to call open_release_asset from payments module
-                    pass
-        # Patch on status_app.open_release_asset since app imports the symbol
         httpd = ThreadingHTTPServer(("127.0.0.1", 0), status_app.Handler)
         port = httpd.server_address[1]
         threading.Thread(target=httpd.serve_forever, daemon=True).start()
+
+        def _no_host(*_a, **_k):
+            return None
+
         try:
-            with mock.patch.object(status_app, "open_release_asset", return_value=None):
-                try:
-                    urllib.request.urlopen(
-                        f"http://127.0.0.1:{port}/download?token={tok}", timeout=10
-                    )
-                    self.fail("expected HTTPError 502")
-                except urllib.error.HTTPError as e:
-                    self.assertEqual(e.code, 502)
-                    body = e.read().decode("utf-8", errors="replace")
-                    self.assertIn("download-fulfil-failed", body)
+            with mock.patch("host_delivery.host_delivery_plan", side_effect=_no_host):
+                with mock.patch("app.open_release_asset", return_value=None):
+                    try:
+                        urllib.request.urlopen(
+                            f"http://127.0.0.1:{port}/download?token={tok}",
+                            timeout=10,
+                        )
+                        self.fail("expected HTTPError 502")
+                    except urllib.error.HTTPError as e:
+                        self.assertEqual(e.code, 502)
+                        body = e.read().decode("utf-8", errors="replace")
+                        self.assertIn("download-fulfil-failed", body)
             # Grant still valid
             self.assertIsNotNone(payments.lookup_download_token(tok))
-            # Stage asset and succeed
             payload = b"MACOS-ZIP-UNIT"
-            (Path(self._td.name) / fname).write_bytes(payload)
-            os.environ["RPT_ASSET_DIR"] = self._td.name
-            with mock.patch.object(
-                status_app,
-                "open_release_asset",
-                side_effect=lambda fn, **kw: payments.open_release_asset(fn, **kw),
-            ):
-                with urllib.request.urlopen(
-                    f"http://127.0.0.1:{port}/download?token={tok}", timeout=10
-                ) as resp:
-                    self.assertEqual(resp.status, 200)
-                    data = resp.read()
+
+            def _open(name, **kwargs):
+                return {
+                    "filename": fname,
+                    "content_type": "application/zip",
+                    "content_length": len(payload),
+                    "body": BytesIO(payload),
+                    "source": "test",
+                }
+
+            with mock.patch("host_delivery.host_delivery_plan", side_effect=_no_host):
+                with mock.patch("app.open_release_asset", side_effect=_open):
+                    with urllib.request.urlopen(
+                        f"http://127.0.0.1:{port}/download?token={tok}", timeout=10
+                    ) as resp:
+                        self.assertEqual(resp.status, 200)
+                        data = resp.read()
             self.assertEqual(data, payload)
-            # Now burned
-            self.assertIsNone(payments.lookup_download_token(tok))
+            # Still valid within TTL after successful stream
+            self.assertIsNotNone(payments.lookup_download_token(tok))
         finally:
             httpd.shutdown()
             httpd.server_close()
@@ -1297,7 +1313,7 @@ class TestPostPaymentThankYouBuilder(unittest.TestCase):
 
 
 class TestPostPayAutoStartSingleConsume(unittest.TestCase):
-    """Auto-start may consume the grant at most once; manual link is not pre-fired."""
+    """Auto-start iframe uses one src; manual link is not pre-fired by script."""
 
     def setUp(self):
         self._td = tempfile.TemporaryDirectory()
@@ -1324,19 +1340,20 @@ class TestPostPayAutoStartSingleConsume(unittest.TestCase):
         # One paid path occurrence in iframe src + one in manual href = 2 href-like refs
         self.assertEqual(html.count("/download?token=once_only"), 2)
 
-    def test_auto_start_path_consumes_grant_once_only(self):
-        """Simulate iframe auto-start: one successful /download, second is 403.
+    def test_auto_start_path_allows_retry_within_ttl(self):
+        """Simulate iframe auto-start then manual retry: both succeed within TTL.
 
-        Happy path needs only that single request; manual link is not required
-        and is not pre-fired by the success page HTML.
+        Connection-drop recovery uses the same link; not single-use.
         """
         import threading
-        import urllib.error
         import urllib.request
+        from io import BytesIO
 
-        fname = "restore-privacy-client-0.4.0-linux-x64.tar.gz"
+        from downloads import available_downloads
+
+        live = next(a for a in available_downloads() if a.platform == "linux")
+        fname = live.filename
         payload = b"LINUX-UNIT-AUTO-ONCE"
-        (Path(self._td.name) / fname).write_bytes(payload)
         tok = payments.mint_download_token(
             filename=fname, platform="linux", session_id="cs_auto_once"
         )
@@ -1348,25 +1365,38 @@ class TestPostPayAutoStartSingleConsume(unittest.TestCase):
         )
         self.assertIsNotNone(payments.lookup_download_token(tok))
         self.assertNotIn(".click()", success_html)
+        self.assertIn("1 hour", success_html)
+
+        def _open(name, **kwargs):
+            return {
+                "filename": fname,
+                "content_type": "application/gzip",
+                "content_length": len(payload),
+                "body": BytesIO(payload),
+                "source": "test",
+            }
 
         httpd = ThreadingHTTPServer(("127.0.0.1", 0), status_app.Handler)
         port = httpd.server_address[1]
         threading.Thread(target=httpd.serve_forever, daemon=True).start()
         try:
-            # HIT1: auto-start (iframe would load this URL once)
-            with urllib.request.urlopen(
-                f"http://127.0.0.1:{port}/download?token={tok}", timeout=15
-            ) as resp:
-                self.assertEqual(resp.status, 200)
-                body = resp.read()
-            self.assertEqual(body, payload)
-            self.assertIsNone(payments.lookup_download_token(tok))
-            # HIT2: second request (e.g. accidental dual auto-start) fails
-            with self.assertRaises(urllib.error.HTTPError) as ctx:
-                urllib.request.urlopen(
+            with mock.patch(
+                "host_delivery.host_delivery_plan", return_value=None
+            ), mock.patch("app.open_release_asset", side_effect=_open):
+                # HIT1: auto-start (iframe would load this URL)
+                with urllib.request.urlopen(
+                    f"http://127.0.0.1:{port}/download?token={tok}", timeout=15
+                ) as resp:
+                    self.assertEqual(resp.status, 200)
+                    body = resp.read()
+                self.assertEqual(body, payload)
+                self.assertIsNotNone(payments.lookup_download_token(tok))
+                # HIT2: retry (connection drop / manual fallback) still works
+                with urllib.request.urlopen(
                     f"http://127.0.0.1:{port}/download?token={tok}", timeout=10
-                )
-            self.assertEqual(ctx.exception.code, 403)
+                ) as resp2:
+                    self.assertEqual(resp2.status, 200)
+                    self.assertEqual(resp2.read(), payload)
         finally:
             httpd.shutdown()
             httpd.server_close()
@@ -1375,10 +1405,13 @@ class TestPostPayAutoStartSingleConsume(unittest.TestCase):
         """If iframe is blocked, grant remains and one manual click delivers."""
         import threading
         import urllib.request
+        from io import BytesIO
 
-        fname = "restore-privacy-client-0.4.0-ios.zip"
+        from downloads import available_downloads
+
+        live = next(a for a in available_downloads() if a.platform == "ios")
+        fname = live.filename
         payload = b"PK\x03\x04IOS-MANUAL"
-        (Path(self._td.name) / fname).write_bytes(payload)
         tok = payments.mint_download_token(
             filename=fname, platform="ios", session_id="cs_manual_only"
         )
@@ -1391,16 +1424,28 @@ class TestPostPayAutoStartSingleConsume(unittest.TestCase):
         self.assertIn("auto-download-frame", page)
         self.assertIsNotNone(payments.lookup_download_token(tok))
 
+        def _open(name, **kwargs):
+            return {
+                "filename": fname,
+                "content_type": "application/zip",
+                "content_length": len(payload),
+                "body": BytesIO(payload),
+                "source": "test",
+            }
+
         httpd = ThreadingHTTPServer(("127.0.0.1", 0), status_app.Handler)
         port = httpd.server_address[1]
         threading.Thread(target=httpd.serve_forever, daemon=True).start()
         try:
-            # User clicks manual link only (no prior auto-start request)
-            with urllib.request.urlopen(
-                f"http://127.0.0.1:{port}/download?token={tok}", timeout=15
-            ) as resp:
-                self.assertEqual(resp.status, 200)
-                self.assertEqual(resp.read(), payload)
+            with mock.patch(
+                "host_delivery.host_delivery_plan", return_value=None
+            ), mock.patch("app.open_release_asset", side_effect=_open):
+                # User clicks manual link only (no prior auto-start request)
+                with urllib.request.urlopen(
+                    f"http://127.0.0.1:{port}/download?token={tok}", timeout=15
+                ) as resp:
+                    self.assertEqual(resp.status, 200)
+                    self.assertEqual(resp.read(), payload)
         finally:
             httpd.shutdown()
             httpd.server_close()
