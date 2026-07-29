@@ -1,11 +1,11 @@
 {
-  "generated_at": "2026-07-29T11:46:30Z",
+  "generated_at": "2026-07-29T12:05:13Z",
   "node_host": "Iceland (IS)",
   "catalog_version": "0.5.3",
   "unit_suite": {
     "ran": true,
-    "ok": true,
-    "returncode": 0,
+    "ok": false,
+    "returncode": 1,
     "modules": [
       "tests.test_legal_links",
       "tests.test_legal_docs",
@@ -68,8 +68,8 @@
           "multihop residual prep markers present (exit_node_elgamal; residual-via-exit when RPT_MULTIHOP_ENABLED=1)",
           "exit_node_elgamal.pub raw bytes present (Romania exit pin)"
         ],
-        "path": "C:\\Users\\rgsne\\restore_privacy\\status_page\\assets\\0.5.3\\restore-privacy-client-0.5.3-windows-x64-setup.exe",
-        "bytes": 38549309,
+        "path": "/Users/russellsneddon/restore-privacy/status_page/assets/0.5.3/restore-privacy-client-0.5.3-windows-x64-setup.exe",
+        "bytes": 38913402,
         "relative_path": "0.5.3/restore-privacy-client-0.5.3-windows-x64-setup.exe",
         "search_roots": [
           "status_page/assets/0.5.3/",
@@ -89,7 +89,7 @@
           "Android residual wire (PFS + outer obfs) present",
           "exit_node_elgamal.pub present (multihop exit pin)"
         ],
-        "path": "C:\\Users\\rgsne\\restore_privacy\\status_page\\assets\\0.5.3\\restore-privacy-client-0.5.3-android.apk",
+        "path": "/Users/russellsneddon/restore-privacy/status_page/assets/0.5.3/restore-privacy-client-0.5.3-android.apk",
         "bytes": 52371453,
         "relative_path": "0.5.3/restore-privacy-client-0.5.3-android.apk",
         "search_roots": [
@@ -104,37 +104,43 @@
         "platform": "macos",
         "label": "macOS",
         "filename": "restore-privacy-client-0.5.3-macos.zip",
-        "state": "Red",
+        "state": "Green",
         "reasons": [
-          "catalog monopin asset not staged (looked for restore-privacy-client-0.5.3-macos.zip / relative_path 0.5.3/restore-privacy-client-0.5.3-macos.zip under status_page/assets/0.5.3/, releases/0.5.3/, /opt/restore-privacy/paid_assets/0.5.3/, dist/0.5.3/, status_page/assets/; paid host may still fulfil via private GH / VPS HTTP when uploaded)"
+          "node_elgamal.pub pin matches product monopin",
+          "archive present (structural residual gates N/A in this pass)",
+          "exit_node_elgamal.pub present (multihop exit pin)"
         ],
-        "path": null,
+        "path": "/Users/russellsneddon/restore-privacy/status_page/assets/0.5.3/restore-privacy-client-0.5.3-macos.zip",
+        "bytes": 20959489,
+        "relative_path": "0.5.3/restore-privacy-client-0.5.3-macos.zip",
         "search_roots": [
           "status_page/assets/0.5.3/",
           "releases/0.5.3/",
           "/opt/restore-privacy/paid_assets/0.5.3/",
           "dist/0.5.3/",
           "status_page/assets/"
-        ],
-        "relative_path": "0.5.3/restore-privacy-client-0.5.3-macos.zip"
+        ]
       },
       {
         "platform": "ios",
         "label": "iOS",
         "filename": "restore-privacy-client-0.5.3-ios.zip",
-        "state": "Red",
+        "state": "Green",
         "reasons": [
-          "catalog monopin asset not staged (looked for restore-privacy-client-0.5.3-ios.zip / relative_path 0.5.3/restore-privacy-client-0.5.3-ios.zip under status_page/assets/0.5.3/, releases/0.5.3/, /opt/restore-privacy/paid_assets/0.5.3/, dist/0.5.3/, status_page/assets/; paid host may still fulfil via private GH / VPS HTTP when uploaded)"
+          "node_elgamal.pub pin matches product monopin",
+          "archive present (structural residual gates N/A in this pass)",
+          "exit_node_elgamal.pub present (multihop exit pin)"
         ],
-        "path": null,
+        "path": "/Users/russellsneddon/restore-privacy/status_page/assets/0.5.3/restore-privacy-client-0.5.3-ios.zip",
+        "bytes": 9342563,
+        "relative_path": "0.5.3/restore-privacy-client-0.5.3-ios.zip",
         "search_roots": [
           "status_page/assets/0.5.3/",
           "releases/0.5.3/",
           "/opt/restore-privacy/paid_assets/0.5.3/",
           "dist/0.5.3/",
           "status_page/assets/"
-        ],
-        "relative_path": "0.5.3/restore-privacy-client-0.5.3-ios.zip"
+        ]
       },
       {
         "platform": "linux",
@@ -146,8 +152,8 @@
           "archive present (structural residual gates N/A in this pass)",
           "exit_node_elgamal.pub present (multihop exit pin)"
         ],
-        "path": "C:\\Users\\rgsne\\restore_privacy\\status_page\\assets\\0.5.3\\restore-privacy-client-0.5.3-linux-x64.tar.gz",
-        "bytes": 14403894,
+        "path": "/Users/russellsneddon/restore-privacy/status_page/assets/0.5.3/restore-privacy-client-0.5.3-linux-x64.tar.gz",
+        "bytes": 14407033,
         "relative_path": "0.5.3/restore-privacy-client-0.5.3-linux-x64.tar.gz",
         "search_roots": [
           "status_page/assets/0.5.3/",
@@ -158,8 +164,8 @@
         ]
       }
     ],
-    "staged_count": 3,
-    "overall": "Red",
+    "staged_count": 5,
+    "overall": "Green",
     "legend": {
       "Green": "Present, no *.priv, product node pub pin match, platform structural gate pass (Windows multihop markers when PE)",
       "Amber": "Present but pin/structural check incomplete or soft warning",
@@ -251,7 +257,7 @@
         "warn": false,
         "skipped": false,
         "reasons": [
-          "ephemeral_node.py present (C:\\Users\\rgsne\\restore_privacy\\scripts\\ephemeral_node.py)",
+          "ephemeral_node.py present (/Users/russellsneddon/restore-privacy/scripts/ephemeral_node.py)",
           "dry-run mode available",
           "dry-run exit=0",
           "dry-run completed"
@@ -298,14 +304,14 @@
         "warn": false,
         "skipped": false,
         "reasons": [
-          "IS pub present (C:\\Users\\rgsne\\restore_privacy\\product\\node_elgamal.pub) sha=1b126abfae737c66\u2026",
-          "RO pub present (C:\\Users\\rgsne\\restore_privacy\\product\\exit_node_elgamal.pub) sha=a36a3f38066ece7b\u2026",
-          "US pub present (C:\\Users\\rgsne\\restore_privacy\\product\\us_node_elgamal.pub) sha=9864211dc29e8b21\u2026",
+          "IS pub present (/Users/russellsneddon/restore-privacy/product/node_elgamal.pub) sha=1b126abfae737c66\u2026",
+          "RO pub present (/Users/russellsneddon/restore-privacy/product/exit_node_elgamal.pub) sha=a36a3f38066ece7b\u2026",
+          "US pub present (/Users/russellsneddon/restore-privacy/product/us_node_elgamal.pub) sha=9864211dc29e8b21\u2026",
           "IS/RO/US pubs present and pairwise distinct"
         ],
-        "entry_pub": "C:\\Users\\rgsne\\restore_privacy\\product\\node_elgamal.pub",
-        "exit_pub": "C:\\Users\\rgsne\\restore_privacy\\product\\exit_node_elgamal.pub",
-        "us_pub": "C:\\Users\\rgsne\\restore_privacy\\product\\us_node_elgamal.pub"
+        "entry_pub": "/Users/russellsneddon/restore-privacy/product/node_elgamal.pub",
+        "exit_pub": "/Users/russellsneddon/restore-privacy/product/exit_node_elgamal.pub",
+        "us_pub": "/Users/russellsneddon/restore-privacy/product/us_node_elgamal.pub"
       },
       "multihop_residual_via_exit": {
         "ok": true,
@@ -324,8 +330,8 @@
         "warn": false,
         "skipped": false,
         "reasons": [
-          "present: C:\\Users\\rgsne\\restore_privacy\\node\\install_zram_luks.sh",
-          "present: C:\\Users\\rgsne\\restore_privacy\\node\\install_host_privacy.sh",
+          "present: /Users/russellsneddon/restore-privacy/node/install_zram_luks.sh",
+          "present: /Users/russellsneddon/restore-privacy/node/install_host_privacy.sh",
           "node-only: clients never install LUKS/zram"
         ]
       }
@@ -343,7 +349,7 @@
     "multihop_structure": true,
     "firewall_probe_excluded": true
   },
-  "overall_ok": true,
+  "overall_ok": false,
   "privacy": {
     "redacted": true,
     "no_suite_tails": true,
