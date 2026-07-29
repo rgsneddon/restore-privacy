@@ -1,8 +1,16 @@
 #!/usr/bin/env python3
 """Build / stage Restore Privacy client packages for release 0.5.5.
 
-**0.5.5** multi-hop residual catalog. Apple packages are Flutter-built then
-DevID/notarized (macOS) / Team-signed (iOS). Linux is rebuilt via package_linux.
+**0.5.5** multi-hop residual catalog. Apple ship path (``--apple-only``) always:
+
+  1. Inject product pubs / assert no ``*.priv``
+  2. **Team residual NE re-sign** of a *copy* of the Flutter app
+     (``scripts/sign_macos_residual_team.py`` via ``apple_ship_gates``) —
+     **fail-closed** unless ``RPT_SKIP_RESIDUAL_TEAM=1``
+  3. **DevID + notarize + staple** public catalog macOS zip (no host residual NE)
+  4. **iOS Team-sign** sideload zip when Darwin-built
+
+Optional ``--host-paid`` uploads monopin packages to Helsinki paid_assets.
 **Windows multihop PE** must be built on Windows x64::
 
   python scripts/build_windows_multihop.py
@@ -168,8 +176,31 @@ def package_macos_zip() -> Path:
         )
     inject_product_secrets(MACOS_APP, ios=False)
     _assert_no_priv(MACOS_APP)
+    # Required ship gate: Team residual NE re-sign of a **copy** of the app
+    # (residual Connect on this Mac). Public catalog zip remains DevID-only.
+    # Fail-closed unless RPT_SKIP_RESIDUAL_TEAM=1 (non-residual CI only).
+    try:
+        sys.path.insert(0, str(ROOT / "scripts"))
+        from apple_ship_gates import run_residual_team_resign  # type: ignore
+
+        residual = run_residual_team_resign(MACOS_APP, require=True)
+        if residual.get("skipped"):
+            print(
+                f"[apple-ship] residual Team NE: SKIPPED ({residual.get('reason')})",
+                flush=True,
+            )
+        else:
+            print(
+                f"[apple-ship] residual Team NE OK → {residual.get('path')}",
+                flush=True,
+            )
+    except Exception as exc:  # noqa: BLE001
+        raise RuntimeError(
+            f"macOS residual Team NE re-sign required for ship (fail-closed): {exc}"
+        ) from exc
     OUT.mkdir(parents=True, exist_ok=True)
     dest = OUT / MACOS_ZIP_NAME
+    # Public catalog zip: DevID + notarize (no host residual NE in the zip).
     sign_and_notarize_macos(MACOS_APP, dest)
     if not dest.is_file():
         raise RuntimeError(f"sign_and_notarize_macos did not produce {dest}")
@@ -663,7 +694,20 @@ def main(argv: list[str] | None = None) -> int:
         action="store_true",
         help="Also stage Windows/Android/Linux under 0.5.2 names (default if not apple/windows-only)",
     )
+    ap.add_argument(
+        "--host-paid",
+        action="store_true",
+        help="After packaging, stage+upload monopin packages to Helsinki paid_assets "
+        "(scripts/host_paid_assets_vps.py --stage --upload --force)",
+    )
+    ap.add_argument(
+        "--skip-residual-team",
+        action="store_true",
+        help="Skip Team residual NE re-sign (sets RPT_SKIP_RESIDUAL_TEAM=1; CI only)",
+    )
     args = ap.parse_args(argv)
+    if args.skip_residual_team:
+        os.environ["RPT_SKIP_RESIDUAL_TEAM"] = "1"
 
     write_version_files()
     OUT.mkdir(parents=True, exist_ok=True)
@@ -768,10 +812,8 @@ def main(argv: list[str] | None = None) -> int:
             for name, dig in artifacts.items()
         ],
         "notes": (
-            "0.5.5: Windows native PE (window_foreground fix); Linux/Android CF from 0.5.3 when not rebuilt; "
-            "admin licence clear-all; dual-stack Settings + lean residual defaults; "
-            "audit last-run from security_audit_latest.json after every --write; "
-            "macOS/iOS via Helsinki breadcrumbs (native seal on Mac)."
+            "0.5.5: residual IPv4/IPv6 Settings; macOS DevID notarize + Team residual NE "
+            "re-sign (local residual copy); iOS Team-sign; dual-stack; host paid_assets."
         ),
     }
     man_path = OUT / "SHA256SUMS.json"
@@ -781,6 +823,31 @@ def main(argv: list[str] | None = None) -> int:
     )
     print(f"manifest: {man_path}")
     print("OK:", list(artifacts.keys()))
+
+    if args.host_paid:
+        host_script = ROOT / "scripts" / "host_paid_assets_vps.py"
+        if not host_script.is_file():
+            print(f"ERROR: missing {host_script}", file=sys.stderr)
+            return 1
+        cmd = [
+            sys.executable,
+            str(host_script),
+            "--stage",
+            "--upload",
+            "--version",
+            VERSION,
+            "--force",
+            "--allow-missing",
+        ]
+        print(f"[apple-ship] host paid assets: {' '.join(cmd)}", flush=True)
+        r = subprocess.run(cmd, cwd=str(ROOT))
+        if r.returncode != 0:
+            print(
+                f"ERROR: host_paid_assets_vps failed rc={r.returncode}",
+                file=sys.stderr,
+            )
+            return r.returncode
+        print(f"[apple-ship] Helsinki paid_assets/{VERSION}/ upload OK", flush=True)
     return 0
 
 
