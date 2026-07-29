@@ -34,6 +34,9 @@ class TestFulfilmentEmailDownloadLink(unittest.TestCase):
         self.assertEqual(payload["to"], "buyer@example.com")
         self.assertIn(url, body)
         self.assertTrue(payload["has_download_url"])
+        self.assertTrue(payload["has_keygen"])
+        self.assertIn("RPT-KEY-AAAA-BBBB-CCCC", body)
+        self.assertIn("Keygen: RPT-KEY-AAAA-BBBB-CCCC", body)
         self.assertIn(pay.DOWNLOAD_LINK_VALIDITY_ADVICE, body)
         self.assertIn("1 hour", body)
         self.assertIn("connection drops", body.lower())
@@ -47,6 +50,7 @@ class TestFulfilmentEmailDownloadLink(unittest.TestCase):
         self.assertIn("receipt", body.lower())
         self.assertIn("invoice", body.lower())
         self.assertIn("this** email", body)
+        self.assertIn("KEYGEN", body)
 
     def test_relative_download_path_becomes_absolute(self):
         payload = pay.build_fulfilment_email_payload(
@@ -94,9 +98,14 @@ class TestFulfilmentEmailDownloadLink(unittest.TestCase):
             )
             self.assertTrue(out["send"].get("sent"))
             self.assertIn("grantTok99", out["download_url"])
+            self.assertTrue(out.get("has_keygen"))
+            self.assertTrue(out.get("has_download_url"))
+            self.assertTrue(str(out.get("keygen") or "").startswith("RPT-KEY-"))
             self.assertEqual(len(captured), 1)
             body = captured[0]["body"]
             self.assertIn("grantTok99", body)
+            self.assertIn(out["keygen"], body)
+            self.assertIn(f"Keygen: {out['keygen']}", body)
             self.assertIn(pay.DOWNLOAD_LINK_VALIDITY_ADVICE, body)
             self.assertIn(pay.SUPPORT_EMAIL, body)
             del os.environ["RPT_PAYMENT_DATA_DIR"]
@@ -157,11 +166,51 @@ class TestFulfilmentEmailDownloadLink(unittest.TestCase):
             self.assertTrue(tok)
             self.assertEqual(len(captured), 1)
             body = captured[0]["body"]
+            kg = str(captured[0].get("keygen") or "")
+            self.assertTrue(kg.startswith("RPT-KEY-"), kg)
+            self.assertIn(kg, body)
+            self.assertIn(f"Keygen: {kg}", body)
+            self.assertIn(pay.KEYGEN_UNLOCK_INSTRUCTION, body)
             self.assertIn(tok, body)
             self.assertIn("/download?token=", body)
             self.assertIn(pay.DOWNLOAD_LINK_VALIDITY_ADVICE, body)
             self.assertIn("1 hour", body)
             self.assertIn(pay.SUPPORT_EMAIL, body)
+            self.assertTrue(captured[0].get("has_keygen"))
+            self.assertTrue(captured[0].get("has_download_url"))
+            del os.environ["RPT_PAYMENT_DATA_DIR"]
+
+    def test_fulfil_without_passed_keygen_still_mints_and_emails(self):
+        """Empty keygen arg still yields RPT-KEY-… in body when session exists."""
+        with tempfile.TemporaryDirectory() as td:
+            os.environ["RPT_PAYMENT_DATA_DIR"] = td
+            pay.init_db()
+            captured: list[dict] = []
+
+            def transport(payload: dict) -> dict:
+                captured.append(payload)
+                return {"ok": True, "sent": True}
+
+            # Create entitlement first via activate
+            pay.activate_connect_entitlement(
+                "cs_empty_kg_arg", platform="macos"
+            )
+            out = pay.fulfil_checkout_with_email(
+                token="tokEmptyKg",
+                session_id="cs_empty_kg_arg",
+                platform="macos",
+                filename="restore-privacy-client-0.5.7-macos.zip",
+                customer_email="buyer@example.com",
+                keygen="",  # not passed from caller
+                base_url="https://restoreprivacy.online",
+                transport=transport,
+            )
+            self.assertTrue(out["has_keygen"])
+            self.assertTrue(out["has_download_url"])
+            kg = out["keygen"]
+            self.assertTrue(kg.startswith("RPT-KEY-"), kg)
+            self.assertIn(f"Keygen: {kg}", captured[0]["body"])
+            self.assertIn("tokEmptyKg", captured[0]["body"])
             del os.environ["RPT_PAYMENT_DATA_DIR"]
 
     def test_stripe_public_business_guide_raskul_and_rus(self):

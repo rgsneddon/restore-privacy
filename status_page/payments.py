@@ -4304,11 +4304,13 @@ def build_fulfilment_email_payload(
     """Build the customer fulfilment email (keygen + PPI + download link).
 
     Pure helper — no I/O. Used by tests and :func:`send_fulfilment_email`.
-    Body always includes :data:`KEYGEN_UNLOCK_INSTRUCTION`, the absolute
-    download URL (when provided), :data:`DOWNLOAD_LINK_VALIDITY_ADVICE`
-    (1-hour reusable), and support contact :data:`SUPPORT_EMAIL` (``rus@…``).
+    Body always includes :data:`KEYGEN_UNLOCK_INSTRUCTION`, the customer
+    **KEYGEN** (``RPT-KEY-…``), the absolute download URL (when provided),
+    :data:`DOWNLOAD_LINK_VALIDITY_ADVICE` (1-hour reusable), and support
+    contact :data:`SUPPORT_EMAIL` (``rus@…``).
 
-    **Not** Stripe's receipt/invoice PDF — those cannot carry the paid token.
+    **Not** Stripe's receipt/invoice PDF — those cannot carry KEYGEN or the
+    paid download token.
     """
     to_addr = (to_email or "").strip()
     kg = normalize_keygen(keygen)
@@ -4326,11 +4328,21 @@ def build_fulfilment_email_payload(
     plat = (platform or "").strip().lower()
     sid = (session_id or "").strip()
     fname = (filename or "").strip()
-    subject = f"Your {PUBLIC_BUSINESS_NAME} Restore Privacy download and unlock keygen"
+    subject = (
+        f"Your {PUBLIC_BUSINESS_NAME} Restore Privacy download, KEYGEN, and unlock"
+    )
     ttl_label = (
         f"{DOWNLOAD_LINK_TTL_HOURS} hour"
         f"{'s' if DOWNLOAD_LINK_TTL_HOURS != 1 else ''}"
     )
+    has_keygen = bool(kg and kg.upper().startswith("RPT-KEY-"))
+    if has_keygen:
+        kg_line = f"Keygen: {kg}"
+    else:
+        # Should not happen after a successful paid session; keep observable
+        kg_line = (
+            f"Keygen: (missing — contact {SUPPORT_EMAIL} with your PPI for a new keygen)"
+        )
     if dl:
         dl_line = (
             f"Download link (valid {ttl_label}; re-download if interrupted): {dl}"
@@ -4343,9 +4355,12 @@ def build_fulfilment_email_payload(
     body_lines = [
         f"Thank you for purchasing Restore Privacy from {PUBLIC_BUSINESS_NAME}.",
         "",
+        "This email contains your **KEYGEN** (to unlock the app) and your "
+        f"**download link** (valid for {ttl_label}).",
+        "",
         KEYGEN_UNLOCK_INSTRUCTION,
         "",
-        f"Keygen: {kg}",
+        kg_line,
         f"Product purchase identifier (PPI): {pid}",
         dl_line,
         "",
@@ -4359,8 +4374,8 @@ def build_fulfilment_email_payload(
         "this keygen becomes useless and the app locks until payment is active again.",
         "",
         "Note: Stripe's own receipt / invoice email is only a payment record "
-        f"(PDF). Your installer download link is in **this** email and is valid "
-        f"for {ttl_label} only.",
+        f"(PDF). Your KEYGEN and installer download link are in **this** email "
+        f"(download link valid for {ttl_label} only).",
         "",
     ]
     if fname:
@@ -4372,8 +4387,8 @@ def build_fulfilment_email_payload(
     body_lines.extend(
         [
             "",
-            "Save this email. The download link expires after the time window above; "
-            "the keygen stays bound to your entitlement.",
+            "Save this email. Keep your KEYGEN; the download link expires after "
+            "the time window above while the keygen stays bound to your entitlement.",
             "",
             FULFILMENT_SUPPORT_FOOTER,
             f"— {PUBLIC_BUSINESS_NAME}",
@@ -4391,6 +4406,7 @@ def build_fulfilment_email_payload(
         "session_id": sid,
         "filename": fname,
         "unlock_instruction": KEYGEN_UNLOCK_INSTRUCTION,
+        "has_keygen": has_keygen,
         "support_email": SUPPORT_EMAIL,
         "business_name": PUBLIC_BUSINESS_NAME,
         "has_download_url": bool(dl and "/download?token=" in dl),
@@ -4924,13 +4940,22 @@ def send_fulfilment_email(
         return {"ok": False, "sent": False, "error": "missing_to_email"}
     body = str(payload.get("body") or "")
     dl = str(payload.get("download_url") or "").strip()
+    kg = str(payload.get("keygen") or "").strip()
     if not dl or "/download?token=" not in dl:
-        # Observable skip when grant mint forgot the link — never pretend success
+        # Observable when grant mint forgot the link — never pretend success
         if transport is None:
             print(
                 "fulfilment_email_missing_download_url "
                 f"to_domain={to_addr.split('@')[-1]!r} "
                 f"has_body={bool(body)}",
+                flush=True,
+            )
+    if not kg or not kg.upper().startswith("RPT-KEY-"):
+        if transport is None:
+            print(
+                "fulfilment_email_missing_keygen "
+                f"to_domain={to_addr.split('@')[-1]!r} "
+                f"has_download={bool(dl and '/download?token=' in dl)}",
                 flush=True,
             )
     if transport is not None:
@@ -4992,16 +5017,28 @@ def fulfil_checkout_with_email(
     base_url: str | None = None,
     transport: Callable[[dict[str, Any]], dict[str, Any]] | None = None,
 ) -> dict[str, Any]:
-    """After paid grant: ensure keygen, build email payload, attempt send.
+    """After paid grant: ensure **KEYGEN** + absolute download URL, then send.
 
-    Always builds an **absolute** download URL when *token* is present (never
-    omits the link solely because base URL was loopback). Returns dict with
-    keygen, purchase_id, download_url, email payload, send result.
+    Order of work:
+      1. Normalize / look up / mint keygen for the Checkout session (never leave
+         blank when *session_id* exists after a paid grant).
+      2. Build absolute ``/download?token=…`` URL when *token* is present.
+      3. Build payload (body always has KEYGEN line + download line) and send.
+
+    Returns dict with keygen, purchase_id, download_url, email payload, send result.
     """
     sid = (session_id or "").strip()
+    plat = (platform or "").strip().lower()
     kg = normalize_keygen(keygen) if keygen else ""
     if sid and not kg:
-        kg = assign_keygen_for_session(sid)
+        kg = normalize_keygen(assign_keygen_for_session(sid)) or ""
+    # Still empty: force activate/mint so post-pay email never has blank Keygen
+    if sid and not kg:
+        kg = normalize_keygen(
+            activate_connect_entitlement(sid, platform=plat)
+        ) or ""
+    if sid and not kg:
+        kg = normalize_keygen(assign_keygen_for_session(sid)) or ""
     pid = normalize_purchase_id(purchase_id) if purchase_id else ""
     if not pid and token:
         pid = purchase_id_for_token(token) or ""
@@ -5013,23 +5050,33 @@ def fulfil_checkout_with_email(
             f"fulfilment_download_url_empty session={sid!r} token_len={len(tok)}",
             flush=True,
         )
+    if not kg:
+        print(
+            "fulfilment_email_missing_keygen "
+            f"session={sid!r} has_token={bool(tok)}",
+            flush=True,
+        )
     email_payload = build_fulfilment_email_payload(
         to_email=customer_email,
         keygen=kg,
         purchase_id=pid or "",
         download_url=download_url,
-        platform=platform,
+        platform=plat or platform,
         session_id=sid,
         filename=filename,
     )
+    # Prefer values normalized by the builder (canonical RPT-KEY- form)
+    kg_out = str(email_payload.get("keygen") or kg or "")
     send_result = send_fulfilment_email(email_payload, transport=transport)
     return {
-        "keygen": kg,
+        "keygen": kg_out,
         "purchase_id": pid or email_payload.get("purchase_id") or "",
         "download_url": download_url or str(email_payload.get("download_url") or ""),
         "download_path": path,
         "email": email_payload,
         "send": send_result,
+        "has_keygen": bool(email_payload.get("has_keygen")),
+        "has_download_url": bool(email_payload.get("has_download_url")),
     }
 
 
@@ -7099,9 +7146,12 @@ def process_checkout_completed_event(
                 f"err={exc!r}",
                 flush=True,
             )
-    # Customer fulfilment email: keygen + PPI + 1-hour download URL
+    # Customer fulfilment email: KEYGEN + PPI + 1-hour download URL
     try:
         if token and cust_email:
+            # Ensure keygen exists before email even if activate returned empty
+            if not keygen and session_id:
+                keygen = assign_keygen_for_session(session_id) or keygen
             mail = fulfil_checkout_with_email(
                 token=token,
                 session_id=session_id,
@@ -7112,6 +7162,8 @@ def process_checkout_completed_event(
                 transport=email_transport,
             )
             send = (mail or {}).get("send") or {}
+            mail_kg = str((mail or {}).get("keygen") or "")
+            mail_dl = str((mail or {}).get("download_url") or "")
             if not send.get("sent"):
                 # Best-effort diagnostics (no secrets) — Render logs
                 print(
@@ -7119,13 +7171,17 @@ def process_checkout_completed_event(
                     f"session={session_id!r} "
                     f"skipped={send.get('skipped')} "
                     f"error={send.get('error')!r} "
+                    f"has_keygen={bool(mail_kg)} "
+                    f"has_download={bool(mail_dl and '/download?token=' in mail_dl)} "
                     f"smtp={assess_fulfilment_smtp_readiness().get('status')!r}",
                     flush=True,
                 )
             else:
                 print(
                     f"fulfilment_email_sent session={session_id!r} to_domain="
-                    f"{cust_email.split('@')[-1]!r}",
+                    f"{cust_email.split('@')[-1]!r} "
+                    f"has_keygen={bool(mail_kg)} "
+                    f"has_download={bool(mail_dl and '/download?token=' in mail_dl)}",
                     flush=True,
                 )
         elif token and not cust_email:
