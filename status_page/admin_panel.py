@@ -2086,6 +2086,7 @@ def render_admin_accounting_page_html(
             build_ledger_from_payment_store,
             ensure_ledger_oldest_first,
             pence_to_pounds_str,
+            total_end_balance_pence,
         )
     except Exception:  # noqa: BLE001
         from status_page.accounting import (  # type: ignore
@@ -2095,10 +2096,11 @@ def render_admin_accounting_page_html(
             build_ledger_from_payment_store,
             ensure_ledger_oldest_first,
             pence_to_pounds_str,
+            total_end_balance_pence,
         )
     try:
         raw = rows if rows is not None else build_ledger_from_payment_store()
-        # Always re-sort on render so HTML cannot show newest-first by accident.
+        # Always re-sort + recompute running END BALANCE on render.
         ledger = ensure_ledger_oldest_first(list(raw))
     except Exception as exc:  # noqa: BLE001
         err = _escape(str(exc)[:200])
@@ -2112,22 +2114,25 @@ def render_admin_accounting_page_html(
         )
 
     body_rows: list[str] = []
+    # END BALANCE column = cumulative sum of nets through this row (not this row alone).
     for r in ledger:
         rid = _escape(getattr(r, "row_id", "") or "")
         show_money = r.kind in ("sale", "manual")
-        # Money cols then meta; END BALANCE is rightmost money/result col before Actions
+        net_s = pence_to_pounds_str(r.net_pence)
+        bal_s = pence_to_pounds_str(r.balance_pence)
         body_rows.append(
-            "<tr data-row-id=\"" + rid + "\" data-date=\"" + _escape(r.date_iso) + "\">"
+            "<tr data-row-id=\"" + rid + "\" data-date=\"" + _escape(r.date_iso) + "\""
+            f' data-net-pence="{int(r.net_pence)}" data-running-balance-pence="{int(r.balance_pence)}">'
             f"<td class='ledger-date'>{_escape(r.date_iso)}</td>"
             f"<td>{_escape(r.description)}</td>"
             f"<td class='num'>{_escape(pence_to_pounds_str(r.gross_pence) if show_money else '—')}</td>"
             f"<td class='num fee'>{_escape(pence_to_pounds_str(r.fee_pence) if show_money else '—')}</td>"
-            f"<td class='num'>{_escape(pence_to_pounds_str(r.net_pence))}</td>"
+            f"<td class='num ledger-net'>{_escape(net_s)}</td>"
             f"<td>{_escape(r.fee_source)}</td>"
             f"<td><code>{_escape(r.purchase_id)}</code></td>"
             f"<td>{_escape(r.platform)}</td>"
-            f"<td class='num bal end-balance'>"
-            f"{_escape(pence_to_pounds_str(r.balance_pence))}</td>"
+            f"<td class='num bal end-balance' title='Running total of all nets through this row'>"
+            f"{_escape(bal_s)}</td>"
             f"<td class='row-actions'>"
             f'<form method="post" action="/admin/accounting/delete" class="admin-accounting-delete-form" '
             f'onsubmit="return confirm(\'Delete this ledger row?\');">'
@@ -2142,9 +2147,28 @@ def render_admin_accounting_page_html(
         if body_rows
         else '<tr><td colspan="10">No ledger rows</td></tr>'
     )
-    final_bal = pence_to_pounds_str(ledger[-1].balance_pence) if ledger else "—"
+    # Source of truth: sum of every row's net (matches last running END BALANCE).
+    total_pence = total_end_balance_pence(ledger) if ledger else 0
+    final_bal = pence_to_pounds_str(total_pence) if ledger else "—"
+    if ledger and int(ledger[-1].balance_pence) != int(total_pence):
+        # Defensive: last running cell must match full sum
+        final_bal = pence_to_pounds_str(total_pence)
     first_date = str(ledger[0].date_iso) if ledger else ""
     last_date = str(ledger[-1].date_iso) if ledger else ""
+    footer_html = ""
+    if ledger:
+        footer_html = (
+            '<tfoot id="admin-accounting-tfoot">'
+            '<tr id="admin-accounting-total-row" data-total-end-balance="1">'
+            '<td colspan="4"><strong>END BALANCE (running total of all rows)</strong></td>'
+            f'<td class="num" id="admin-accounting-total-net">'
+            f'{_escape(pence_to_pounds_str(total_pence))}</td>'
+            '<td colspan="3"></td>'
+            f'<td class="num bal end-balance" id="admin-accounting-total-end-balance">'
+            f'{_escape(final_bal)}</td>'
+            '<td></td>'
+            "</tr></tfoot>"
+        )
     y0 = OPENING_DATE.year
     m0 = OPENING_DATE.month
     year_opts = "".join(
@@ -2183,13 +2207,17 @@ def render_admin_accounting_page_html(
     Opening line: <strong>SET UP COSTS −£6,000.00</strong> (starting deficit).
     Paid customer sales load automatically from the durable payment store.
     Each line shows <strong>gross</strong>, <strong>fees</strong> (as a minus), and
-    <strong>net</strong> (= gross ± fees). <strong>END BALANCE</strong> is the running
-    total. Stripe card fees on auto sales are named in the description; the Fees
+    <strong>net</strong> (= this row’s gross ± fees only).
+    <strong>END BALANCE</strong> is the <em>running total of all nets so far</em>
+    (not this row alone) — last row / footer = sum of every line.
+    Stripe card fees on auto sales are named in the description; the Fees
     column is for any fee. Manual lines and deletes are durable.
   </p>
   <p class="muted" id="admin-accounting-fee-policy">{_escape(STRIPE_FEE_POLICY_LABEL)}</p>
-  <p id="admin-accounting-balance">Current END BALANCE:
-    <strong id="admin-accounting-balance-value">{_escape(final_bal)}</strong>
+  <p id="admin-accounting-balance">Current END BALANCE
+    <span class="muted">(sum of all row nets)</span>:
+    <strong id="admin-accounting-balance-value"
+            data-total-pence="{int(total_pence) if ledger else 0}">{_escape(final_bal)}</strong>
   </p>
   <p class="muted" id="admin-accounting-order-note">
     <strong>Date order:</strong> oldest first → most recent last
@@ -2201,9 +2229,11 @@ def render_admin_accounting_page_html(
   {msg_html}
   {err_html}
 
-  <table id="admin-accounting-table" data-order="asc" data-sort="date-asc">
+  <table id="admin-accounting-table" data-order="asc" data-sort="date-asc"
+         data-end-balance-mode="running-total">
     <caption id="admin-accounting-table-caption" class="muted">
-      Ledger rows in date order (first → most recent)
+      Date order oldest→newest. Net = this row only.
+      END BALANCE = running total of all nets through that row.
     </caption>
     <thead><tr>
       <th>Date</th><th>Description</th><th>Gross</th><th>Fees</th>
@@ -2214,6 +2244,7 @@ def render_admin_accounting_page_html(
     <tbody id="admin-accounting-tbody">
 {table_body}
     </tbody>
+{footer_html}
   </table>
 
   <div class="accounting-manual-entry" id="admin-accounting-manual-entry">
@@ -2310,6 +2341,8 @@ def render_admin_accounting_page_html(
 #admin-accounting-table .end-balance{{font-weight:700}}
 #admin-accounting-table caption{{caption-side:top;text-align:left;padding:0.35rem 0 0.65rem;font-size:0.9rem}}
 #admin-accounting-tbody{{display:table-row-group}}
+#admin-accounting-tfoot td{{border-top:2px solid var(--border,#3333);padding-top:0.55rem;font-weight:600}}
+#admin-accounting-total-end-balance{{font-size:1.05rem}}
 #admin-accounting-export form,#admin-accounting-manual-entry-form{{display:flex;flex-wrap:wrap;gap:0.75rem;align-items:flex-end;margin:1rem 0}}
 #admin-accounting-export .field,#admin-accounting-manual-entry .field{{display:flex;flex-direction:column;font-size:0.85rem;gap:0.25rem}}
 #admin-accounting-export select,#admin-accounting-export button,

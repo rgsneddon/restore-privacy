@@ -539,20 +539,35 @@ def delete_ledger_row(row_id: str, *, now: float | None = None) -> dict[str, Any
     return hide_ledger_row(rid, now=now)
 
 
+def row_net_pence(r: LedgerRow) -> int:
+    """Cash movement for one row (setup uses stored net; others gross ± fees)."""
+    kind = str(r.kind or "")
+    if kind == "setup":
+        return int(r.net_pence)
+    return compute_net_pence(int(r.gross_pence or 0), int(r.fee_pence or 0))
+
+
 def recompute_running_balances(lines: Sequence[LedgerRow]) -> list[LedgerRow]:
-    """Recompute END BALANCE (balance_pence) from nets in order (pure)."""
+    """Recompute each row's net and END BALANCE as a running total of all nets.
+
+    END BALANCE on row *i* is sum(net[0]…net[i]), **not** that row's net alone.
+    Final books total = last row's END BALANCE = sum of every row's net.
+    """
     bal = 0
     out: list[LedgerRow] = []
     for r in lines:
-        bal = bal + int(r.net_pence)
+        net = row_net_pence(r)
+        bal = bal + net
         out.append(
             LedgerRow(
                 date_iso=r.date_iso,
                 description=r.description,
-                gross_pence=r.gross_pence,
-                fee_pence=r.fee_pence,
-                net_pence=r.net_pence,
-                balance_pence=bal,
+                gross_pence=int(r.gross_pence or 0),
+                fee_pence=normalize_fee_pence(int(r.fee_pence or 0))
+                if str(r.kind or "") != "setup"
+                else int(r.fee_pence or 0),
+                net_pence=net,
+                balance_pence=bal,  # cumulative total through this row
                 kind=r.kind,
                 fee_source=r.fee_source,
                 session_id=r.session_id,
@@ -564,6 +579,11 @@ def recompute_running_balances(lines: Sequence[LedgerRow]) -> list[LedgerRow]:
             )
         )
     return out
+
+
+def total_end_balance_pence(lines: Sequence[LedgerRow]) -> int:
+    """Books total = sum of every row net (same as last running END BALANCE)."""
+    return sum(row_net_pence(r) for r in lines)
 
 
 def build_ledger(

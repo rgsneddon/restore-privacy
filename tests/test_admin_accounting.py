@@ -352,11 +352,14 @@ class TestAccountingAdminWiring(unittest.TestCase):
         self.assertIn("pdf", html)
         self.assertIn("rtf", html)
         self.assertIn("−£6,000.00", html.replace("-£6,000.00", "−£6,000.00") or html)
-        # END BALANCE column + summary
+        # END BALANCE column + summary (running total of all rows)
         self.assertIn("admin-accounting-balance-value", html)
         self.assertIn("END BALANCE", html)
         self.assertIn("admin-accounting-end-balance-col", html)
         self.assertIn("Current END BALANCE", html)
+        self.assertIn("sum of all row nets", html)
+        self.assertIn("admin-accounting-total-end-balance", html)
+        self.assertIn('data-end-balance-mode="running-total"', html)
         # Fees (not Stripe fee) on table + manual form
         self.assertIn(">Fees</th>", html)
         self.assertNotIn("Stripe fee", html)
@@ -501,14 +504,32 @@ class TestManualEntryAndDelete(unittest.TestCase):
         self.assertEqual(after_minus[-1].description, "Penny debit")
         self.assertLess(after_minus[-2].date_iso, after_minus[-1].date_iso)
 
-        # HTML path shows END BALANCE value
+        # HTML path shows END BALANCE as running total (sum of all nets)
         from admin_panel import render_admin_accounting_page_html
+        from accounting import total_end_balance_pence, pence_to_pounds_str
+        import re
 
         html = render_admin_accounting_page_html().decode("utf-8")
         self.assertIn("END BALANCE", html)
         self.assertIn("Penny debit", html)
         self.assertIn("end-balance", html)
         self.assertIn("admin-accounting-end-balance-col", html)
+        self.assertIn("admin-accounting-total-end-balance", html)
+        total = total_end_balance_pence(after_minus)
+        self.assertEqual(total, after_minus[-1].balance_pence)
+        # Each body row: running balance != that row's net alone once multiple rows
+        runnings = [
+            int(x)
+            for x in re.findall(r'data-running-balance-pence="(-?\d+)"', html)
+        ]
+        nets = [int(x) for x in re.findall(r'data-net-pence="(-?\d+)"', html)]
+        self.assertEqual(len(runnings), len(after_minus))
+        cum = 0
+        for i, n in enumerate(nets):
+            cum += n
+            self.assertEqual(runnings[i], cum, f"row {i} should be running total")
+        self.assertEqual(runnings[-1], total)
+        self.assertIn(pence_to_pounds_str(total), html)
 
     def test_mixed_order_and_running_end_balance(self) -> None:
         from accounting import (
