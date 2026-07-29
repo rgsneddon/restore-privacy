@@ -50,14 +50,14 @@ CURRENCY = "GBP"
 
 @dataclass(frozen=True)
 class LedgerRow:
-    """One accounting line with running balance after this row."""
+    """One accounting line with running END BALANCE after this row."""
 
     date_iso: str  # YYYY-MM-DD
     description: str
-    gross_pence: int  # sale gross (0 for setup/fees-only)
-    fee_pence: int  # negative or 0 (Stripe fee as minus)
-    net_pence: int  # cash movement (gross + fee, fee ≤ 0)
-    balance_pence: int  # running balance after this line
+    gross_pence: int  # signed cash gross (0 for setup/fees-only)
+    fee_pence: int  # fees as minus (≤ 0) or 0
+    net_pence: int  # cash movement = gross + fee (fee ≤ 0)
+    balance_pence: int  # running END BALANCE after this line
     kind: str  # setup | sale | manual
     fee_source: str  # estimate | stored | n/a | manual
     session_id: str = ""
@@ -65,6 +65,7 @@ class LedgerRow:
     platform: str = ""
     amount_currency: str = CURRENCY
     row_id: str = ""  # setup | sale:… | manual:… for delete
+    created_at: float = 0.0  # sort key: oldest first, newest last
 
 
 def pence_to_pounds_str(pence: int) -> str:
@@ -223,9 +224,15 @@ def sales_from_grants(
         plat = str(g.get("platform") or "")
         pid = str(g.get("purchase_id") or "")
         sid = str(g.get("session_id") or "")
+        # Stripe context lives in Description so the Fees column stays generic
         desc = f"Paid sale ({plat or 'platform'})"
         if pid:
             desc += f" {pid}"
+        if fee_pos > 0:
+            if fee_src == "stored":
+                desc += " — Stripe fee (stored)"
+            else:
+                desc += " — Stripe fee (estimate 1.5% + £0.20)"
         out.append(
             {
                 "date": d,
@@ -233,7 +240,7 @@ def sales_from_grants(
                 "description": desc,
                 "gross_pence": gross,
                 "fee_pence": -fee_pos,
-                "net_pence": gross - fee_pos,
+                "net_pence": compute_net_pence(gross, -fee_pos),
                 "fee_source": fee_src,
                 "session_id": sid,
                 "purchase_id": pid,
@@ -380,13 +387,45 @@ def parse_money_to_pence(raw: str | int | float | None) -> int:
     return -pence if neg else pence
 
 
+def normalize_fee_pence(fee_pence: int) -> int:
+    """Fees always reduce cash: store as ≤ 0 (positive form input → minus)."""
+    fee = int(fee_pence)
+    if fee > 0:
+        return -fee
+    return fee
+
+
+def compute_net_pence(gross_pence: int, fee_pence: int = 0) -> int:
+    """Net cash movement = gross ± fees (fees are ≤ 0 after normalize)."""
+    return int(gross_pence) + normalize_fee_pence(fee_pence)
+
+
+def resolve_manual_gross_pence(
+    gross_raw: str | int | float | None,
+    *,
+    sign: str = "+",
+) -> int:
+    """Gross for manual entry: + adds to END BALANCE, − deducts.
+
+    Explicit minus (or parentheses) in the amount field wins over the sign
+    control. Otherwise *sign* ``+`` / ``-`` applies to the absolute amount.
+    """
+    parsed = parse_money_to_pence(gross_raw)
+    if parsed < 0:
+        return parsed
+    s = (sign or "+").strip().lower()
+    if s in ("-", "minus", "debit", "out", "−"):
+        return -abs(parsed)
+    return abs(parsed)
+
+
 def add_manual_entry(
     *,
     date_iso: str,
     description: str,
     gross_pence: int = 0,
     fee_pence: int = 0,
-    net_pence: int | None = None,
+    net_pence: int | None = None,  # ignored: net always gross ± fees
     fee_source: str = "manual",
     purchase_id: str = "",
     platform: str = "",
@@ -394,10 +433,13 @@ def add_manual_entry(
     entry_id: str | None = None,
     now: float | None = None,
 ) -> dict[str, Any]:
-    """Insert a durable manual ledger line. Fee should be ≤ 0 (minus).
+    """Insert a durable manual ledger line.
 
-    If *net_pence* is None, net = gross_pence + fee_pence.
+    Net is **always** :func:`compute_net_pence` (gross ± fees). *net_pence* is
+    accepted for API compatibility but never used — avoids stale overrides that
+    leave END BALANCE unchanged when gross is set.
     """
+    del net_pence  # always derived from gross + fees
     d = (date_iso or "").strip()
     try:
         date.fromisoformat(d)
@@ -407,14 +449,8 @@ def add_manual_entry(
     if not desc:
         raise ValueError("description required")
     gross = int(gross_pence)
-    fee = int(fee_pence)
-    # Normalize fee to non-positive (operator may enter positive fee amount)
-    if fee > 0:
-        fee = -fee
-    if net_pence is None:
-        net = gross + fee
-    else:
-        net = int(net_pence)
+    fee = normalize_fee_pence(fee_pence)
+    net = compute_net_pence(gross, fee)
     eid = (entry_id or "").strip() or f"manual:{secrets.token_hex(8)}"
     if not eid.startswith("manual:"):
         eid = f"manual:{eid}"
@@ -504,7 +540,7 @@ def delete_ledger_row(row_id: str, *, now: float | None = None) -> dict[str, Any
 
 
 def recompute_running_balances(lines: Sequence[LedgerRow]) -> list[LedgerRow]:
-    """Recompute balance_pence from nets in order (pure)."""
+    """Recompute END BALANCE (balance_pence) from nets in order (pure)."""
     bal = 0
     out: list[LedgerRow] = []
     for r in lines:
@@ -524,6 +560,7 @@ def recompute_running_balances(lines: Sequence[LedgerRow]) -> list[LedgerRow]:
                 platform=r.platform,
                 amount_currency=r.amount_currency,
                 row_id=r.row_id,
+                created_at=r.created_at,
             )
         )
     return out
@@ -540,11 +577,10 @@ def build_ledger(
     hidden_row_ids: Sequence[str] | set[str] | None = None,
     include_manual_store: bool = False,
 ) -> list[LedgerRow]:
-    """Build full ledger: setup + sales + manual lines with running balance.
+    """Build full ledger: setup + sales + manual lines with running END BALANCE.
 
-    If *sales* is None, derive from *grants* via :func:`sales_from_grants`.
-    When *include_manual_store* is True, load durable manual/hidden from disk
-    (unless *manual_entries* / *hidden_row_ids* are passed explicitly).
+    Order is oldest → newest (most recent last). Net for every non-setup row is
+    recomputed as gross ± fees so display and export stay consistent.
     """
     if sales is None:
         sales = sales_from_grants(grants, opening=opening_date)
@@ -579,6 +615,7 @@ def build_ledger(
                 kind="setup",
                 fee_source="n/a",
                 row_id="setup",
+                created_at=0.0,
             )
         )
     for s in sales:
@@ -588,13 +625,19 @@ def build_ledger(
         )
         if rid in hidden:
             continue
+        try:
+            ca = float(s.get("created_at") or 0)
+        except (TypeError, ValueError):
+            ca = 0.0
+        g = int(s["gross_pence"])
+        f = normalize_fee_pence(int(s["fee_pence"]))
         lines.append(
             LedgerRow(
                 date_iso=str(s["date_iso"]),
                 description=str(s["description"]),
-                gross_pence=int(s["gross_pence"]),
-                fee_pence=int(s["fee_pence"]),
-                net_pence=int(s["net_pence"]),
+                gross_pence=g,
+                fee_pence=f,
+                net_pence=compute_net_pence(g, f),
                 balance_pence=0,
                 kind="sale",
                 fee_source=str(s.get("fee_source") or "estimate"),
@@ -603,19 +646,26 @@ def build_ledger(
                 platform=str(s.get("platform") or ""),
                 amount_currency=str(s.get("currency") or CURRENCY),
                 row_id=rid,
+                created_at=ca,
             )
         )
     for m in manuals:
         mid = str(m.get("id") or "")
         if not mid or mid in hidden:
             continue
+        try:
+            ca = float(m.get("created_at") or 0)
+        except (TypeError, ValueError):
+            ca = 0.0
+        g = int(m.get("gross_pence") or 0)
+        f = normalize_fee_pence(int(m.get("fee_pence") or 0))
         lines.append(
             LedgerRow(
                 date_iso=str(m.get("date_iso") or ""),
                 description=str(m.get("description") or ""),
-                gross_pence=int(m.get("gross_pence") or 0),
-                fee_pence=int(m.get("fee_pence") or 0),
-                net_pence=int(m.get("net_pence") or 0),
+                gross_pence=g,
+                fee_pence=f,
+                net_pence=compute_net_pence(g, f),
                 balance_pence=0,
                 kind="manual",
                 fee_source=str(m.get("fee_source") or "manual"),
@@ -623,14 +673,16 @@ def build_ledger(
                 platform=str(m.get("platform") or ""),
                 amount_currency=str(m.get("currency") or CURRENCY),
                 row_id=mid,
+                created_at=ca,
             )
         )
-    # Stable chronological order; setup before same-day sales/manual
+    # Oldest first, most recent last; setup first on opening day
     kind_order = {"setup": 0, "sale": 1, "manual": 2}
 
     def _sort_key(r: LedgerRow) -> tuple:
         return (
             r.date_iso,
+            float(r.created_at or 0),
             kind_order.get(r.kind, 9),
             r.row_id or "",
         )
@@ -700,12 +752,12 @@ def _export_headers() -> list[str]:
         "Date",
         "Description",
         "Gross",
-        "Stripe fee",
+        "Fees",
         "Net",
-        "Balance",
         "Fee source",
         "Purchase ID",
         "Platform",
+        "END BALANCE",
     ]
 
 
@@ -721,10 +773,10 @@ def _export_cells(row: LedgerRow) -> list[str]:
             else ("£0.00" if show_money else "")
         ),
         pence_to_pounds_str(row.net_pence),
-        pence_to_pounds_str(row.balance_pence),
         row.fee_source,
         row.purchase_id,
         row.platform,
+        pence_to_pounds_str(row.balance_pence),
     ]
 
 

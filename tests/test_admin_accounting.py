@@ -295,11 +295,14 @@ class TestAccountingExport(unittest.TestCase):
             }
         )
         self.assertEqual(period2["filter"]["to_month"], 12)
-        # CSV contains setup costs and fee minus
+        # CSV contains setup costs, Fees header, END BALANCE
         csv_b, _, _ = export_ledger(rows, fmt="csv")
         text = csv_b.decode("utf-8")
         self.assertIn("SET UP COSTS", text)
         self.assertIn("RASKUL" if False else "Paid sale", text)
+        self.assertIn("Fees", text.splitlines()[0])
+        self.assertIn("END BALANCE", text.splitlines()[0])
+        self.assertNotIn("Stripe fee", text.splitlines()[0])
         self.assertIn("-£", text.replace("\ufeff", ""))  # fee or balance negative
         self.assertEqual(rows[0].balance_pence, OPENING_BALANCE_PENCE)
 
@@ -349,8 +352,18 @@ class TestAccountingAdminWiring(unittest.TestCase):
         self.assertIn("pdf", html)
         self.assertIn("rtf", html)
         self.assertIn("−£6,000.00", html.replace("-£6,000.00", "−£6,000.00") or html)
-        # balance shown
+        # END BALANCE column + summary
         self.assertIn("admin-accounting-balance-value", html)
+        self.assertIn("END BALANCE", html)
+        self.assertIn("admin-accounting-end-balance-col", html)
+        self.assertIn("Current END BALANCE", html)
+        # Fees (not Stripe fee) on table + manual form
+        self.assertIn(">Fees</th>", html)
+        self.assertNotIn("Stripe fee", html)
+        self.assertNotIn('id="manual_net"', html)
+        self.assertNotIn('name="net"', html)
+        self.assertIn('name="gross_sign"', html)
+        self.assertIn('id="manual_gross_sign"', html)
         # Manual entry between export and table
         exp_i = html.find("admin-accounting-export")
         man_i = html.find("admin-accounting-manual-entry")
@@ -360,6 +373,13 @@ class TestAccountingAdminWiring(unittest.TestCase):
         self.assertIn("btn-delete-row", html)
         self.assertIn('name="row_id"', html)
         self.assertIn('value="setup"', html)
+        # END BALANCE header is last money col before Actions
+        thead = html[html.find("<thead>") : html.find("</thead>")]
+        end_i = thead.find("END BALANCE")
+        act_i = thead.find("Actions")
+        self.assertGreater(end_i, 0)
+        self.assertGreater(act_i, end_i)
+        self.assertNotIn("<th>Balance</th>", thead)
 
 
 class TestManualEntryAndDelete(unittest.TestCase):
@@ -386,7 +406,9 @@ class TestManualEntryAndDelete(unittest.TestCase):
             add_manual_entry,
             build_ledger,
             build_ledger_from_payment_store,
+            compute_net_pence,
             parse_money_to_pence,
+            resolve_manual_gross_pence,
         )
         import payments
 
@@ -394,21 +416,26 @@ class TestManualEntryAndDelete(unittest.TestCase):
         self.assertEqual(parse_money_to_pence("12.34"), 1234)
         self.assertEqual(parse_money_to_pence("-0.24"), -24)
         self.assertEqual(parse_money_to_pence("£1.50"), 150)
+        self.assertEqual(resolve_manual_gross_pence("0.01", sign="+"), 1)
+        self.assertEqual(resolve_manual_gross_pence("0.01", sign="-"), -1)
+        self.assertEqual(resolve_manual_gross_pence("-0.01", sign="+"), -1)
+        self.assertEqual(compute_net_pence(1, 0), 1)
+        self.assertEqual(compute_net_pence(1000, 35), 1000 - 35)
 
         prior = build_ledger(sales=[], include_manual_store=True)
         self.assertEqual(len(prior), 1)
         prior_bal = prior[-1].balance_pence
         self.assertEqual(prior_bal, OPENING_BALANCE_PENCE)
 
-        # Same shape as form POST: pounds strings → pence via parse_money_to_pence
-        gross = parse_money_to_pence("10.00")
+        # Same shape as form POST: pounds strings → pence; net always gross ± fees
+        gross = resolve_manual_gross_pence("10.00", sign="+")
         fee = parse_money_to_pence("0.35")  # positive; add_manual_entry negates
         added = add_manual_entry(
             date_iso="2026-08-10",
             description="Bank adjustment",
             gross_pence=gross,
             fee_pence=fee,
-            net_pence=None,
+            net_pence=999999,  # must be ignored
             purchase_id="MANUAL-1",
             platform="n/a",
         )
@@ -425,11 +452,105 @@ class TestManualEntryAndDelete(unittest.TestCase):
             rows[-1].balance_pence,
             prior_bal + added["net_pence"],
         )
-        # Running balances consistent
+        # Running END BALANCE consistent
         bal = 0
         for r in rows:
             bal += r.net_pence
             self.assertEqual(r.balance_pence, bal)
+
+    def test_penny_plus_and_minus_update_end_balance(self) -> None:
+        """£0.01 + and − must change END BALANCE (the reported live bug)."""
+        from accounting import (
+            OPENING_BALANCE_PENCE,
+            add_manual_entry,
+            build_ledger_from_payment_store,
+            resolve_manual_gross_pence,
+        )
+        import payments
+
+        payments.init_db()
+        prior = build_ledger_from_payment_store()[-1].balance_pence
+        self.assertEqual(prior, OPENING_BALANCE_PENCE)
+
+        g_plus = resolve_manual_gross_pence("0.01", sign="+")
+        add_manual_entry(
+            date_iso="2026-08-02",
+            description="Penny credit",
+            gross_pence=g_plus,
+            fee_pence=0,
+            now=1.0,
+        )
+        after_plus = build_ledger_from_payment_store()
+        self.assertEqual(after_plus[-1].net_pence, 1)
+        self.assertEqual(after_plus[-1].balance_pence, prior + 1)
+        self.assertEqual(after_plus[-1].kind, "manual")
+
+        g_minus = resolve_manual_gross_pence("0.01", sign="-")
+        add_manual_entry(
+            date_iso="2026-08-03",
+            description="Penny debit",
+            gross_pence=g_minus,
+            fee_pence=0,
+            now=2.0,
+        )
+        after_minus = build_ledger_from_payment_store()
+        self.assertEqual(after_minus[-1].net_pence, -1)
+        self.assertEqual(after_minus[-1].balance_pence, prior + 1 - 1)
+        # Most recent last
+        self.assertEqual(after_minus[-1].description, "Penny debit")
+        self.assertLess(after_minus[-2].date_iso, after_minus[-1].date_iso)
+
+        # HTML path shows END BALANCE value
+        from admin_panel import render_admin_accounting_page_html
+
+        html = render_admin_accounting_page_html().decode("utf-8")
+        self.assertIn("END BALANCE", html)
+        self.assertIn("Penny debit", html)
+        self.assertIn("end-balance", html)
+        self.assertIn("admin-accounting-end-balance-col", html)
+
+    def test_mixed_order_and_running_end_balance(self) -> None:
+        from accounting import (
+            OPENING_BALANCE_PENCE,
+            add_manual_entry,
+            build_ledger,
+            compute_net_pence,
+            estimate_stripe_fee_pence,
+        )
+        import payments
+        from datetime import datetime, timezone
+
+        payments.init_db()
+        ts = datetime(2026, 8, 10, 12, 0, tzinfo=timezone.utc).timestamp()
+        payments.mint_download_token(
+            filename="restore-privacy-client-0.5.2-windows-x64-setup.exe",
+            platform="windows",
+            session_id="cs_live_order_bal_1",
+            amount_pence=245,
+            currency="gbp",
+            now=ts,
+        )
+        add_manual_entry(
+            date_iso="2026-09-01",
+            description="Later manual",
+            gross_pence=100,
+            fee_pence=0,
+            now=ts + 100,
+        )
+        rows = build_ledger(grants=payments.list_all_grants(), include_manual_store=True)
+        self.assertEqual(rows[0].kind, "setup")
+        self.assertEqual(rows[-1].description, "Later manual")
+        self.assertEqual(rows[-1].date_iso, "2026-09-01")
+        fee_pos = estimate_stripe_fee_pence(245)
+        expected = OPENING_BALANCE_PENCE + compute_net_pence(245, -fee_pos) + 100
+        self.assertEqual(rows[-1].balance_pence, expected)
+        running = 0
+        for r in rows:
+            running += r.net_pence
+            self.assertEqual(r.balance_pence, running)
+        # Sale description names Stripe fee (not the Fees column header)
+        sale = next(r for r in rows if r.kind == "sale")
+        self.assertIn("Stripe fee", sale.description)
 
     def test_delete_manual_and_hide_setup_recompute(self) -> None:
         from accounting import (
@@ -453,12 +574,12 @@ class TestManualEntryAndDelete(unittest.TestCase):
             currency="gbp",
             now=ts,
         )
+        # Expense: negative gross (net override is ignored)
         added = add_manual_entry(
             date_iso="2026-08-20",
             description="Office supplies",
-            gross_pence=500,
+            gross_pence=-500,
             fee_pence=0,
-            net_pence=-500,  # expense
         )
         full = build_ledger_from_payment_store()
         n_before = len(full)

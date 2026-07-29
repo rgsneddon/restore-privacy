@@ -2072,22 +2072,27 @@ class Handler(BaseHTTPRequestHandler):
             if not is_authenticated(self.headers):
                 self._send(200, "text/html; charset=utf-8", render_login_html())
                 return
-            from accounting import add_manual_entry, parse_money_to_pence
+            from accounting import (
+                add_manual_entry,
+                parse_money_to_pence,
+                resolve_manual_gross_pence,
+            )
             from admin_panel import render_admin_accounting_page_html
 
             form = dict(urllib.parse.parse_qsl(body.decode("utf-8", "replace")))
             try:
-                gross = parse_money_to_pence(form.get("gross") or "0")
+                # Net is never taken from the form — always gross ± fees
+                gross = resolve_manual_gross_pence(
+                    form.get("gross") or "0",
+                    sign=(form.get("gross_sign") or "+").strip(),
+                )
                 fee_raw = (form.get("fee") or "").strip()
                 fee = parse_money_to_pence(fee_raw) if fee_raw else 0
-                net_raw = (form.get("net") or "").strip()
-                net = parse_money_to_pence(net_raw) if net_raw else None
                 added = add_manual_entry(
                     date_iso=(form.get("date_iso") or "").strip(),
                     description=(form.get("description") or "").strip(),
                     gross_pence=gross,
                     fee_pence=fee,
-                    net_pence=net,
                     purchase_id=(form.get("purchase_id") or "").strip(),
                     platform=(form.get("platform") or "").strip(),
                 )
