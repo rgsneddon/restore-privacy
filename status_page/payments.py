@@ -74,6 +74,23 @@ DOWNLOAD_DENIED_MSG = (
     f"{DOWNLOAD_LINK_TTL_HOURS} hour"
     f"{'s' if DOWNLOAD_LINK_TTL_HOURS != 1 else ''} and can be retried until they expire."
 )
+# Customer-facing business / support identity (status-host email + Stripe Dashboard).
+# Stripe receipt/invoice PDFs do **not** carry the paid download token — that lives
+# only in the status-host fulfilment email and thank-you page.
+PUBLIC_BUSINESS_NAME = "RASKUL"
+SUPPORT_EMAIL = "rus@restoreprivacy.online"
+FULFILMENT_SUPPORT_FOOTER = (
+    f"Questions? Contact us at {SUPPORT_EMAIL}."
+)
+STRIPE_PUBLIC_DETAILS_DASHBOARD_URL = (
+    "https://dashboard.stripe.com/settings/public"
+)
+STRIPE_CUSTOMER_EMAILS_DASHBOARD_URL = (
+    "https://dashboard.stripe.com/settings/emails"
+)
+STRIPE_ACCOUNT_SETTINGS_DASHBOARD_URL = (
+    "https://dashboard.stripe.com/settings/account"
+)
 
 # --- Stripe Dashboard Branding (logo + colours) — not full site CSS ---
 # Map from status_page/public_chrome.py dark theme. Upload logo in Dashboard →
@@ -1047,6 +1064,8 @@ def stripe_checkout_branding_guide() -> dict[str, Any]:
             "public_logo_url": "https://restoreprivacy.online/stripe_brand_logo.png",
             "public_icon_url": "https://restoreprivacy.online/stripe_brand_icon.png",
             "source_master": "assets/brand/primary_transparent_1024.png",
+            "public_business_name": PUBLIC_BUSINESS_NAME,
+            "support_email": SUPPORT_EMAIL,
             "source_theme": "status_page/public_chrome.py (--rb-btn, --rb-navy)",
             "full_site_css_on_checkout": False,
             "account_api_self_update": False,
@@ -1063,7 +1082,163 @@ def stripe_checkout_branding_guide() -> dict[str, Any]:
             "Homepage Buy now → POST /pay/checkout → subscription Checkout "
             "Session; branding/domains do not change amounts or fulfilment."
         ),
+        "customer_emails_vs_fulfilment": (
+            "Stripe receipt/invoice emails are payment records (PDF). The paid "
+            f"installer download token is only in the status-host fulfilment SMTP "
+            f"email (keygen + PPI + 1-hour download link). Set public name to "
+            f"{PUBLIC_BUSINESS_NAME} and support to {SUPPORT_EMAIL} in Stripe "
+            "so receipt footers match the product brand."
+        ),
     }
+
+
+def stripe_public_business_guide() -> dict[str, Any]:
+    """Operator steps: show **RASKUL** and **rus@…** on Stripe customer emails.
+
+    Stripe's native receipt/invoice HTML cannot include a per-purchase download
+    token. Branding/support only. Pure helper (no network).
+    """
+    return {
+        "public_business_name": PUBLIC_BUSINESS_NAME,
+        "support_email": SUPPORT_EMAIL,
+        "what_customers_see": (
+            f"Checkout and Stripe receipt/invoice footers should show "
+            f"{PUBLIC_BUSINESS_NAME} (not a personal legal name) and "
+            f"Questions? Contact us at {SUPPORT_EMAIL}."
+        ),
+        "dashboard": {
+            "public_details": STRIPE_PUBLIC_DETAILS_DASHBOARD_URL,
+            "customer_emails": STRIPE_CUSTOMER_EMAILS_DASHBOARD_URL,
+            "account_settings": STRIPE_ACCOUNT_SETTINGS_DASHBOARD_URL,
+            "steps": [
+                (
+                    "Settings → Public details (or Business settings → Public info): "
+                    f"set **Public business name** / statement descriptor brand to "
+                    f"**{PUBLIC_BUSINESS_NAME}**."
+                ),
+                (
+                    "Settings → Customer emails / Public details: set **Support email** "
+                    f"(and “Questions? Contact us at…”) to **{SUPPORT_EMAIL}**."
+                ),
+                (
+                    "Settings → Customer emails → custom domain: verify "
+                    "restoreprivacy.online so receipts From-address is on-brand "
+                    "(see stripe_email_domain_dns_expected / DMARC)."
+                ),
+                (
+                    "Do **not** expect the Stripe receipt PDF to include "
+                    "/download?token=… — that link is only in the status-host "
+                    "fulfilment email after checkout.session.completed."
+                ),
+            ],
+        },
+        "account_api": {
+            "endpoint": "POST https://api.stripe.com/v1/accounts",
+            "fields": {
+                "business_profile[name]": PUBLIC_BUSINESS_NAME,
+                "business_profile[support_email]": SUPPORT_EMAIL,
+                "settings[dashboard][display_name]": PUBLIC_BUSINESS_NAME,
+            },
+            "note": (
+                "Platform accounts may reject some fields with 403; complete "
+                "remaining fields in Dashboard. Script: "
+                "scripts/configure_stripe_public_profile.py"
+            ),
+            "update_helper": "update_stripe_account_public_profile",
+        },
+        "status_host_fulfilment": {
+            "from_display": PUBLIC_BUSINESS_NAME,
+            "reply_to": SUPPORT_EMAIL,
+            "body_footer": FULFILMENT_SUPPORT_FOOTER,
+            "includes_download_token": True,
+            "download_ttl_hours": DOWNLOAD_LINK_TTL_HOURS,
+        },
+    }
+
+
+def update_stripe_account_public_profile(
+    *,
+    secret_key: str | None = None,
+    http_post: HttpPostFn | None = None,
+    business_name: str = PUBLIC_BUSINESS_NAME,
+    support_email: str = SUPPORT_EMAIL,
+) -> dict[str, Any]:
+    """Best-effort POST /v1/account to set public name + support email.
+
+    Returns ``{ok, status, error?, applied?}``. Platform accounts may 403 on
+    some settings — then Dashboard steps in :func:`stripe_public_business_guide`
+    remain authoritative. Never logs the secret key.
+    """
+    key = (secret_key if secret_key is not None else stripe_secret_key()).strip()
+    if not key:
+        return {
+            "ok": False,
+            "status": 0,
+            "error": "STRIPE_SECRET_KEY not configured",
+            "applied": False,
+            "guide": stripe_public_business_guide()["dashboard"],
+        }
+    name = (business_name or PUBLIC_BUSINESS_NAME).strip() or PUBLIC_BUSINESS_NAME
+    email = (support_email or SUPPORT_EMAIL).strip() or SUPPORT_EMAIL
+    body = urllib.parse.urlencode(
+        [
+            ("business_profile[name]", name),
+            ("business_profile[support_email]", email),
+            ("settings[dashboard][display_name]", name),
+        ]
+    ).encode("utf-8")
+    post = http_post or _default_http_post
+    headers = {
+        "Authorization": f"Bearer {key}",
+        "Content-Type": "application/x-www-form-urlencoded",
+    }
+    # Stripe Account API for the platform account is often GET/POST /v1/account
+    status, raw = post(
+        "https://api.stripe.com/v1/account",
+        headers,
+        body,
+    )
+    if status >= 400:
+        # Retry with only business_profile fields (some accounts reject dashboard settings)
+        body2 = urllib.parse.urlencode(
+            [
+                ("business_profile[name]", name),
+                ("business_profile[support_email]", email),
+            ]
+        ).encode("utf-8")
+        status2, raw2 = post(
+            "https://api.stripe.com/v1/account",
+            headers,
+            body2,
+        )
+        if status2 >= 400:
+            return {
+                "ok": False,
+                "status": status2,
+                "error": (raw2 or raw or b"")[:400].decode("utf-8", errors="replace"),
+                "applied": False,
+                "wanted_name": name,
+                "wanted_support_email": email,
+                "guide": stripe_public_business_guide()["dashboard"],
+            }
+        status, raw = status2, raw2
+    try:
+        data = json.loads(raw.decode("utf-8")) if raw else {}
+    except (UnicodeDecodeError, json.JSONDecodeError):
+        data = {}
+    bp = data.get("business_profile") if isinstance(data, dict) else {}
+    if not isinstance(bp, dict):
+        bp = {}
+    return {
+        "ok": True,
+        "status": status,
+        "applied": True,
+        "observed_name": str(bp.get("name") or ""),
+        "observed_support_email": str(bp.get("support_email") or ""),
+        "wanted_name": name,
+        "wanted_support_email": email,
+    }
+
 
 # Stripe products/prices for catalog subscription checkout (not Payment Links).
 # Names: Monthly VPN plan / Yearly VPN plan. Old “download a vpn” product archived.
@@ -4092,6 +4267,30 @@ def retrieve_customer_email(
     return em if em and "@" in em else ""
 
 
+def absolute_download_url(token: str, *, base_url: str | None = None) -> str:
+    """Build a public absolute ``/download?token=…`` URL for fulfilment email.
+
+    Prefers *base_url*, then :func:`public_base_url`. When that is still a local
+    loopback default, falls back to :func:`production_public_base_url` so
+    customers never receive ``http://127.0.0.1/…`` download links.
+    """
+    tok = (token or "").strip()
+    if not tok:
+        return ""
+    base = (base_url if base_url is not None else public_base_url()).rstrip("/")
+    low = base.lower()
+    if (
+        not base
+        or low.startswith("http://127.0.0.1")
+        or low.startswith("http://localhost")
+        or low.startswith("https://127.0.0.1")
+        or low.startswith("https://localhost")
+    ):
+        base = production_public_base_url().rstrip("/")
+    q = urllib.parse.quote(tok, safe="")
+    return f"{base}/download?token={q}"
+
+
 def build_fulfilment_email_payload(
     *,
     to_email: str,
@@ -4105,25 +4304,50 @@ def build_fulfilment_email_payload(
     """Build the customer fulfilment email (keygen + PPI + download link).
 
     Pure helper — no I/O. Used by tests and :func:`send_fulfilment_email`.
-    Body always includes :data:`KEYGEN_UNLOCK_INSTRUCTION`.
+    Body always includes :data:`KEYGEN_UNLOCK_INSTRUCTION`, the absolute
+    download URL (when provided), :data:`DOWNLOAD_LINK_VALIDITY_ADVICE`
+    (1-hour reusable), and support contact :data:`SUPPORT_EMAIL` (``rus@…``).
+
+    **Not** Stripe's receipt/invoice PDF — those cannot carry the paid token.
     """
     to_addr = (to_email or "").strip()
     kg = normalize_keygen(keygen)
     pid = normalize_purchase_id(purchase_id) or (purchase_id or "").strip().upper()
     dl = (download_url or "").strip()
+    # Relative path → absolute production URL for the customer inbox
+    if dl.startswith("/download"):
+        dl = absolute_download_url(
+            urllib.parse.parse_qs(urllib.parse.urlparse(dl).query).get("token", [""])[0]
+            or "",
+        ) or (production_public_base_url().rstrip("/") + dl)
+    elif dl and not (dl.startswith("http://") or dl.startswith("https://")):
+        base = production_public_base_url().rstrip("/")
+        dl = f"{base}/{dl.lstrip('/')}"
     plat = (platform or "").strip().lower()
     sid = (session_id or "").strip()
     fname = (filename or "").strip()
-    subject = "Your Restore Privacy download and unlock keygen"
+    subject = f"Your {PUBLIC_BUSINESS_NAME} Restore Privacy download and unlock keygen"
+    ttl_label = (
+        f"{DOWNLOAD_LINK_TTL_HOURS} hour"
+        f"{'s' if DOWNLOAD_LINK_TTL_HOURS != 1 else ''}"
+    )
+    if dl:
+        dl_line = (
+            f"Download link (valid {ttl_label}; re-download if interrupted): {dl}"
+        )
+    else:
+        # Should not happen after a successful grant; keep observable for support
+        dl_line = (
+            f"Download link: (missing — contact {SUPPORT_EMAIL} with your PPI)"
+        )
     body_lines = [
-        "Thank you for purchasing Restore Privacy.",
+        f"Thank you for purchasing Restore Privacy from {PUBLIC_BUSINESS_NAME}.",
         "",
         KEYGEN_UNLOCK_INSTRUCTION,
         "",
         f"Keygen: {kg}",
         f"Product purchase identifier (PPI): {pid}",
-        f"Download link (valid {DOWNLOAD_LINK_TTL_HOURS} hour"
-        f"{'s' if DOWNLOAD_LINK_TTL_HOURS != 1 else ''}; re-download if interrupted): {dl}",
+        dl_line,
         "",
         DOWNLOAD_LINK_VALIDITY_ADVICE,
         "",
@@ -4133,6 +4357,10 @@ def build_fulfilment_email_payload(
         "The keygen only unlocks Connect while your subscription/payment is active.",
         "If payment fails later (failed charge, refund, dispute, or subscription ends),",
         "this keygen becomes useless and the app locks until payment is active again.",
+        "",
+        "Note: Stripe's own receipt / invoice email is only a payment record "
+        f"(PDF). Your installer download link is in **this** email and is valid "
+        f"for {ttl_label} only.",
         "",
     ]
     if fname:
@@ -4146,7 +4374,9 @@ def build_fulfilment_email_payload(
             "",
             "Save this email. The download link expires after the time window above; "
             "the keygen stays bound to your entitlement.",
-            "— Restore Privacy",
+            "",
+            FULFILMENT_SUPPORT_FOOTER,
+            f"— {PUBLIC_BUSINESS_NAME}",
         ]
     )
     body = "\n".join(body_lines) + "\n"
@@ -4161,6 +4391,9 @@ def build_fulfilment_email_payload(
         "session_id": sid,
         "filename": fname,
         "unlock_instruction": KEYGEN_UNLOCK_INSTRUCTION,
+        "support_email": SUPPORT_EMAIL,
+        "business_name": PUBLIC_BUSINESS_NAME,
+        "has_download_url": bool(dl and "/download?token=" in dl),
     }
 
 
@@ -4662,6 +4895,14 @@ def payment_link_matches_trial_subscription(price_obj: dict[str, Any]) -> dict[s
     return {"ok": len(mismatches) == 0, "mismatches": mismatches, "observed": observed}
 
 
+def _fulfilment_from_header(from_addr: str) -> str:
+    """RFC-ish From with public business display name when address is bare."""
+    raw = (from_addr or "").strip() or SUPPORT_EMAIL
+    if "<" in raw and ">" in raw:
+        return raw
+    return f"{PUBLIC_BUSINESS_NAME} <{raw}>"
+
+
 def send_fulfilment_email(
     payload: dict[str, Any],
     *,
@@ -4672,12 +4913,26 @@ def send_fulfilment_email(
     Returns ``{ok, sent, error?, skipped?}``. Without SMTP host configured and
     without a transport, returns ok with ``skipped=True`` (payload still built
     by caller) so checkout fulfilment never fails on missing mail credentials.
+
+    Sets **Reply-To** to :data:`SUPPORT_EMAIL` (``rus@restoreprivacy.online``)
+    so customers can answer the fulfilment message.
     """
     if not isinstance(payload, dict):
         return {"ok": False, "sent": False, "error": "bad_payload"}
     to_addr = str(payload.get("to") or "").strip()
     if not to_addr or "@" not in to_addr:
         return {"ok": False, "sent": False, "error": "missing_to_email"}
+    body = str(payload.get("body") or "")
+    dl = str(payload.get("download_url") or "").strip()
+    if not dl or "/download?token=" not in dl:
+        # Observable skip when grant mint forgot the link — never pretend success
+        if transport is None:
+            print(
+                "fulfilment_email_missing_download_url "
+                f"to_domain={to_addr.split('@')[-1]!r} "
+                f"has_body={bool(body)}",
+                flush=True,
+            )
     if transport is not None:
         try:
             result = transport(payload)
@@ -4699,10 +4954,14 @@ def send_fulfilment_email(
         from email.message import EmailMessage
 
         msg = EmailMessage()
-        msg["Subject"] = str(payload.get("subject") or "Your Restore Privacy download")
-        msg["From"] = str(cfg["from_addr"])
+        msg["Subject"] = str(
+            payload.get("subject")
+            or f"Your {PUBLIC_BUSINESS_NAME} Restore Privacy download"
+        )
+        msg["From"] = _fulfilment_from_header(str(cfg["from_addr"]))
         msg["To"] = to_addr
-        msg.set_content(str(payload.get("body") or ""))
+        msg["Reply-To"] = SUPPORT_EMAIL
+        msg.set_content(body)
         with smtplib.SMTP(str(cfg["host"]), int(cfg["port"]), timeout=30) as smtp:
             if cfg.get("use_tls"):
                 smtp.starttls()
@@ -4711,7 +4970,12 @@ def send_fulfilment_email(
             if user:
                 smtp.login(user, password)
             smtp.send_message(msg)
-        return {"ok": True, "sent": True, "skipped": False}
+        return {
+            "ok": True,
+            "sent": True,
+            "skipped": False,
+            "has_download_url": bool(dl and "/download?token=" in dl),
+        }
     except Exception as exc:  # noqa: BLE001
         return {"ok": False, "sent": False, "error": str(exc)}
 
@@ -4730,7 +4994,9 @@ def fulfil_checkout_with_email(
 ) -> dict[str, Any]:
     """After paid grant: ensure keygen, build email payload, attempt send.
 
-    Returns dict with keygen, purchase_id, download_url, email payload, send result.
+    Always builds an **absolute** download URL when *token* is present (never
+    omits the link solely because base URL was loopback). Returns dict with
+    keygen, purchase_id, download_url, email payload, send result.
     """
     sid = (session_id or "").strip()
     kg = normalize_keygen(keygen) if keygen else ""
@@ -4739,9 +5005,14 @@ def fulfil_checkout_with_email(
     pid = normalize_purchase_id(purchase_id) if purchase_id else ""
     if not pid and token:
         pid = purchase_id_for_token(token) or ""
-    base = (base_url if base_url is not None else public_base_url()).rstrip("/")
-    path = f"/download?token={token}" if token else ""
-    download_url = f"{base}{path}" if path else ""
+    tok = (token or "").strip()
+    download_url = absolute_download_url(tok, base_url=base_url) if tok else ""
+    path = f"/download?token={tok}" if tok else ""
+    if tok and not download_url:
+        print(
+            f"fulfilment_download_url_empty session={sid!r} token_len={len(tok)}",
+            flush=True,
+        )
     email_payload = build_fulfilment_email_payload(
         to_email=customer_email,
         keygen=kg,
@@ -4755,7 +5026,7 @@ def fulfil_checkout_with_email(
     return {
         "keygen": kg,
         "purchase_id": pid or email_payload.get("purchase_id") or "",
-        "download_url": download_url,
+        "download_url": download_url or str(email_payload.get("download_url") or ""),
         "download_path": path,
         "email": email_payload,
         "send": send_result,

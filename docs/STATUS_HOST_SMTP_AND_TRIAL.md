@@ -73,11 +73,42 @@ Product fulfilment (keygen + PPI + download after Stripe pay) uses **outbound SM
 | POP3 | `mail.privateemail.com` | **995** SSL |
 | SMTP alternate | `mail.privateemail.com` | **465** SMTPS (not the default ship path) |
 
-Stripe Dashboard **customer receipts** are separate: they need a verified custom
-email domain for `restoreprivacy.online` / From `rus@…` — Stripe does **not**
-log into IMAP/POP with the mailbox password. See Dashboard → Settings → Customer emails
-and the full DNS table (ownership TXT, mail-from/DKIM CNAMEs, **DMARC** at `_dmarc`,
-Checkout `pay.` rows) in
+### Two emails after pay (do not confuse them)
+
+| Channel | What the customer gets | Download token? |
+|---------|------------------------|-----------------|
+| **Stripe receipt / invoice** | Payment PDF, amount, “Questions? Contact us…” | **No** — Stripe cannot host `/download?token=…` |
+| **Status-host fulfilment SMTP** | Keygen + PPI + **absolute download link** + **1-hour** retry advice | **Yes** — only place the installer link is emailed |
+
+After `checkout.session.completed`, the status host builds and sends the fulfilment
+email (`build_fulfilment_email_payload` / `send_fulfilment_email`) when SMTP is
+configured and Checkout has a customer email. Body includes
+`DOWNLOAD_LINK_VALIDITY_ADVICE` (1 hour, re-download if interrupted) and
+`Questions? Contact us at rus@restoreprivacy.online`. From display name **RASKUL**,
+Reply-To **rus@restoreprivacy.online**.
+
+### Stripe public brand (receipt footer “Russell Sneddon” → RASKUL)
+
+Stripe shows the account **public business name** on Checkout and receipt footers.
+Set it to **RASKUL** and support email to **rus@restoreprivacy.online**:
+
+1. [Public details](https://dashboard.stripe.com/settings/public) → **Public business name** = `RASKUL`
+2. Same page / Customer emails → **Support email** = `rus@restoreprivacy.online` (Questions? Contact us at…)
+3. Optional API (when `STRIPE_SECRET_KEY` is set):
+
+```bash
+python scripts/configure_stripe_public_profile.py --dry-run
+python scripts/configure_stripe_public_profile.py
+```
+
+Platform accounts may 403 some Account API fields — finish remaining fields in Dashboard.
+Shipped guide: `payments.stripe_public_business_guide()`.
+
+Stripe Dashboard **customer receipts** still need a verified custom email domain for
+`restoreprivacy.online` / From `rus@…` — Stripe does **not** log into IMAP/POP with
+the mailbox password. See Dashboard → Settings → Customer emails and the full DNS
+table (ownership TXT, mail-from/DKIM CNAMEs, **DMARC** at `_dmarc`, Checkout `pay.`
+rows) in
 [STRIPE_CUSTOM_DOMAINS_AND_BRANDING.md](STRIPE_CUSTOM_DOMAINS_AND_BRANDING.md) §0.
 Verify with `python scripts/verify_stripe_email_domain_dns.py`.
 

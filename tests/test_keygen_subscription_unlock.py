@@ -257,6 +257,9 @@ class TestKeygenMintAndEmail(unittest.TestCase):
         self.assertIn(pay.KEYGEN_UNLOCK_INSTRUCTION, payload["body"])
         self.assertIn("RPT-KEY-AAAA-BBBB-CCCC", payload["body"])
         self.assertIn("RPT-1111-2222-3333", payload["body"])
+        self.assertIn(pay.DOWNLOAD_LINK_VALIDITY_ADVICE, payload["body"])
+        self.assertIn(pay.SUPPORT_EMAIL, payload["body"])
+        self.assertIn(pay.PUBLIC_BUSINESS_NAME, payload["body"])
 
     def test_revoke_makes_keygen_useless(self):
         import payments as pay

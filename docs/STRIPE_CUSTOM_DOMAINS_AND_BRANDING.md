@@ -17,6 +17,17 @@ Shipped code constants (palette + asset paths + DNS helpers) live in
 `include:spf.privateemail.com`) — keep for `rus@` + status-host SMTP; do **not**
 replace root SPF when adding Stripe email CNAMEs.
 
+### Public business name + support (what customers see on Stripe emails)
+
+| Setting | Value | Where |
+|---------|-------|--------|
+| Public business name | **RASKUL** (not a personal legal name) | [Public details](https://dashboard.stripe.com/settings/public) |
+| Support / “Questions? Contact us at…” | **rus@restoreprivacy.online** | Public details / Customer emails |
+| Paid installer download link | **Not in Stripe receipts** | Status-host fulfilment email only (1-hour token) |
+
+API helper: `payments.update_stripe_account_public_profile` /
+`scripts/configure_stripe_public_profile.py`. Guide: `payments.stripe_public_business_guide()`.
+
 ---
 
 ## 0. Operator DNS map (Namecheap Advanced DNS)

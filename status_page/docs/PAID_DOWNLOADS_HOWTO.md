@@ -47,8 +47,13 @@ Operator deploy for production email + Stripe product prices is documented in
    - mints a **1-hour** download token (reusable until expiry)
    - activates Connect entitlement for the Checkout session
    - mints a unique **keygen** (`RPT-KEY-…`) bound to that entitlement
-   - emails the customer: **keygen + PPI + download link** (with retry advice), with
-     **USE THIS KEYGEN TO UNLOCK RESTORE PRIVACY**
+   - emails the customer (**status-host fulfilment SMTP**, not the Stripe receipt PDF):
+     **keygen + PPI + absolute download link** + **1-hour / retry-if-drop** advice,
+     support line **Questions? Contact us at rus@restoreprivacy.online**, signed **RASKUL**,
+     with **USE THIS KEYGEN TO UNLOCK RESTORE PRIVACY**
+   - Stripe’s own receipt/invoice email remains PDF-only (no download token). Brand it
+     **RASKUL** + **rus@…** via Dashboard Public details (see
+     `docs/STATUS_HOST_SMTP_AND_TRIAL.md` and `payments.stripe_public_business_guide()`).
 3. Client first-use flow on every platform:
    **Install → accept licence terms and conditions → enter keygen → unlock**.
    **Connect allowed = active subscription + keygen activated** (download alone
