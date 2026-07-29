@@ -1,0 +1,22 @@
+{
+  "version": "0.5.6",
+  "tag": "0.5.6",
+  "assets": [
+    {
+      "filename": "restore-privacy-client-0.5.6-windows-x64-setup.exe",
+      "sha256": "88609828a5cf4ff4e133b4bea7a075d0ee2c20b36d33d1e2fda440f20f926d95",
+      "bytes": 38604057
+    },
+    {
+      "filename": "restore-privacy-client-0.5.6-android.apk",
+      "sha256": "c1d703e85529765758a1f8ab45af5af51037f5f7ff1a0fe29e6b085b7340ed1f",
+      "bytes": 52387837
+    },
+    {
+      "filename": "restore-privacy-client-0.5.6-linux-x64.tar.gz",
+      "sha256": "423a0d62fd61bc91642b613bc2cc4a8a6645689d5e9f9d8f333fd1b7451c0284",
+      "bytes": 14409975
+    }
+  ],
+  "notes": "0.5.6 Win/Android rebuilt; Linux CF with US pin; Apple pending Mac seal. /app-testers unlinked."
+}

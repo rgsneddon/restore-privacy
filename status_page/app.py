@@ -759,6 +759,63 @@ class Handler(BaseHTTPRequestHandler):
                 render_settings_explainer_page_html(),
             )
             return
+        # App testers (direct URL only — not linked from public pages)
+        try:
+            from tester_page import (
+                TESTER_ALREADY_PATH,
+                format_claim_cookie,
+                has_claimed,
+                is_tester_page_path,
+                new_claim_id,
+                normalize_tester_path,
+                parse_cookie_header,
+                render_already_used_html,
+                render_tester_page_html,
+            )
+        except ImportError:  # pragma: no cover
+            from status_page.tester_page import (  # type: ignore
+                TESTER_ALREADY_PATH,
+                format_claim_cookie,
+                has_claimed,
+                is_tester_page_path,
+                new_claim_id,
+                normalize_tester_path,
+                parse_cookie_header,
+                render_already_used_html,
+                render_tester_page_html,
+            )
+        if is_tester_page_path(path):
+            npath = normalize_tester_path(path)
+            cookie_hdr = self.headers.get("Cookie") or ""
+            claim_id = parse_cookie_header(cookie_hdr)
+            extra: list[tuple[str, str]] = []
+            if not claim_id:
+                claim_id = new_claim_id()
+                host = (self.headers.get("Host") or "").lower()
+                secure = not (
+                    host.startswith("127.")
+                    or host.startswith("localhost")
+                    or host.startswith("[::1]")
+                )
+                extra.append(
+                    ("Set-Cookie", format_claim_cookie(claim_id, secure=secure))
+                )
+            if npath == TESTER_ALREADY_PATH or has_claimed(claim_id):
+                self._send(
+                    200,
+                    "text/html; charset=utf-8",
+                    render_already_used_html(),
+                    extra_headers=extra or None,
+                )
+                return
+            err = (query.get("error") or "").strip()
+            self._send(
+                200,
+                "text/html; charset=utf-8",
+                render_tester_page_html(error=err),
+                extra_headers=extra or None,
+            )
+            return
         # Public media kit (logos/favicons) — no admin auth
         if path in (
             "/media-kit/restore-privacy-media-kit.zip",
@@ -1639,6 +1696,88 @@ class Handler(BaseHTTPRequestHandler):
     def do_POST(self):  # noqa: N802
         path, _query = _parse_query(self.path)
         body = self._read_body()
+
+        # App testers mint (direct URL only)
+        try:
+            from tester_page import (
+                TESTER_ALREADY_PATH,
+                TESTER_MINT_PATH,
+                TESTER_PAGE_PATH,
+                accept_checked,
+                format_claim_cookie,
+                mint_for_tester,
+                new_claim_id,
+                normalize_tester_path,
+                parse_cookie_header,
+                parse_form_body,
+                render_already_used_html,
+                render_success_html,
+                render_tester_page_html,
+                selected_platform,
+            )
+        except ImportError:  # pragma: no cover
+            from status_page.tester_page import (  # type: ignore
+                TESTER_ALREADY_PATH,
+                TESTER_MINT_PATH,
+                TESTER_PAGE_PATH,
+                accept_checked,
+                format_claim_cookie,
+                mint_for_tester,
+                new_claim_id,
+                normalize_tester_path,
+                parse_cookie_header,
+                parse_form_body,
+                render_already_used_html,
+                render_success_html,
+                render_tester_page_html,
+                selected_platform,
+            )
+        npath = normalize_tester_path(path)
+        if npath in (TESTER_MINT_PATH, TESTER_PAGE_PATH):
+            form = parse_form_body(body)
+            claim_id = parse_cookie_header(self.headers.get("Cookie") or "")
+            extra: list[tuple[str, str]] = []
+            if not claim_id:
+                claim_id = new_claim_id()
+                host = (self.headers.get("Host") or "").lower()
+                secure = not (
+                    host.startswith("127.")
+                    or host.startswith("localhost")
+                    or host.startswith("[::1]")
+                )
+                extra.append(
+                    ("Set-Cookie", format_claim_cookie(claim_id, secure=secure))
+                )
+            result = mint_for_tester(
+                selected_platform(form),
+                claim_id=claim_id,
+                accepted=accept_checked(form),
+            )
+            if not result.get("ok"):
+                if result.get("error") == "already_claimed":
+                    self._send(
+                        200,
+                        "text/html; charset=utf-8",
+                        render_already_used_html(),
+                        extra_headers=extra or None,
+                    )
+                    return
+                self._send(
+                    200,
+                    "text/html; charset=utf-8",
+                    render_tester_page_html(
+                        error=str(result.get("message") or "Request refused")
+                    ),
+                    extra_headers=extra or None,
+                )
+                return
+            self._send(
+                200,
+                "text/html; charset=utf-8",
+                render_success_html(result),
+                extra_headers=extra or None,
+            )
+            return
 
         if path == "/pay/checkout":
             # Site plan form: platform + interval + auto_renew → subscription Checkout

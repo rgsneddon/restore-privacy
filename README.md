@@ -4,7 +4,7 @@
 
 | | |
 |--|--|
-| **Get the app** | [Paid downloads](https://restoreprivacy.online/) — catalog **v0.5.5** (£2.45/month or £27.93/year per platform) |
+| **Get the app** | [Paid downloads](https://restoreprivacy.online/) — catalog **v0.5.6** (£2.45/month or £27.93/year per platform) |
 | **Privacy** | [PRIVACY_POLICY.md](PRIVACY_POLICY.md) |
 | **Licence** | [LICENSE](LICENSE) (proprietary full copyright) |
 | **Credits** | [CREDITS.md](CREDITS.md) |
@@ -41,7 +41,7 @@
 
 Installers are **paid only** on [restoreprivacy.online](https://restoreprivacy.online/) (Stripe). There are no free permanent GitHub release downloads; the source repo is **private**.
 
-**Current catalog (v0.5.5):** the homepage **Download client** box has device/platform and plan selection — **Monthly VPN plan** £2.45 / **Yearly VPN plan** £27.93 (5% off) — plus **Buy now**, which opens Stripe Checkout. You can also open the plan page at **`/pay`**. Card payment uses Stripe’s hosted checkout (Dashboard branding only — not this site’s full CSS). Email delivers **keygen + PPI + download link** (**USE THIS KEYGEN TO UNLOCK RESTORE PRIVACY**).
+**Current catalog (v0.5.6):** the homepage **Download client** box has device/platform and plan selection — **Monthly VPN plan** £2.45 / **Yearly VPN plan** £27.93 (5% off) — plus **Buy now**, which opens Stripe Checkout. You can also open the plan page at **`/pay`**. Card payment uses Stripe’s hosted checkout (Dashboard branding only — not this site’s full CSS). Email delivers **keygen + PPI + download link** (**USE THIS KEYGEN TO UNLOCK RESTORE PRIVACY**).
 
 1. Pick your **device** and **plan**, then **Buy now** (or open `/pay`).
 2. Complete Stripe Checkout. You get a one-time download plus email with **keygen** (`RPT-KEY-…`) and **PPI**.
@@ -56,11 +56,11 @@ The app re-checks the status host (`/api/connect-entitlement`) on each Connect s
 
 | Platform | Package |
 |----------|---------|
-| Windows | `restore-privacy-client-0.5.5-windows-x64-setup.exe` *(**native** multihop PE; includes window_foreground)* |
-| Android | `restore-privacy-client-0.5.5-android.apk` *(**CF** residual-wire from 0.5.0 / 0.4.10)* |
-| macOS | `restore-privacy-client-0.5.5-macos.zip` *(**not published yet** — Mac native seal required; see APPLE_HANDOFF_0.5.5 / breadcrumbs)* |
-| iOS | `restore-privacy-client-0.5.5-ios.zip` *(**not published yet** — Mac Team-sign required; see APPLE_HANDOFF_0.5.5 / breadcrumbs)* |
-| Ubuntu / Linux | `restore-privacy-client-0.5.5-linux-x64.tar.gz` *(**native** rebuild)* |
+| Windows | `restore-privacy-client-0.5.6-windows-x64-setup.exe` *(**native** multihop PE; US residual pin + lean residual)* |
+| Android | `restore-privacy-client-0.5.6-android.apk` *(**native** Flutter rebuild; residual wire + US pin)* |
+| macOS | `restore-privacy-client-0.5.6-macos.zip` *(**not published yet** — Mac native seal required; see APPLE_HANDOFF_0.5.5 until 0.5.6 seal)* |
+| iOS | `restore-privacy-client-0.5.6-ios.zip` *(**not published yet** — Mac Team-sign required)* |
+| Ubuntu / Linux | `restore-privacy-client-0.5.6-linux-x64.tar.gz` *(catalog pin; US residual pubs)* |
 | Browser (Chromium MV3) | `restore-privacy-browser-extension-0.5.5.zip` — browser proxy only, not OS residual TUN |
 
 ### Browser extension (Chromium MV3)
@@ -72,7 +72,7 @@ The app re-checks the status host (`/api/connect-entitlement`) on each Connect s
 
 ### Windows
 
-1. On the [status downloads page](https://restoreprivacy.online/), choose **Monthly £2.45** or **Yearly** for **Windows** and download **`restore-privacy-client-0.5.5-windows-x64-setup.exe`** (one-time link after payment).
+1. On the [status downloads page](https://restoreprivacy.online/), choose **Monthly £2.45** or **Yearly** for **Windows** and download **`restore-privacy-client-0.5.6-windows-x64-setup.exe`** (one-time link after payment).
 2. Run the installer (PE self-extracting package: frozen runtime + Wintun — no separate Python install). Default install is **Program Files\\Restore Privacy** (elevation when required); per-user fallback if Program Files is unwritable.
 3. **Accept the end-user licence**, then enter the **keygen** from your fulfilment email (forced unlock dialog). Settings → Payment entitlement is a fallback only. Connect is allowed only when status is **OK** (active subscription **and** keygen activated).
 4. Press **Connect** and approve **UAC** when prompted so residual public IP uses the VPN node. Scoped **Windows Defender Firewall** allows (node UDP + program) may be applied for residual Connect.
@@ -81,7 +81,7 @@ The app re-checks the status host (`/api/connect-entitlement`) on each Connect s
 
 ### Android
 
-1. On the [status downloads page](https://restoreprivacy.online/), choose **Monthly £2.45** or **Yearly** for **Android** and download **`restore-privacy-client-0.5.5-android.apk`** (one-time link after payment).
+1. On the [status downloads page](https://restoreprivacy.online/), choose **Monthly £2.45** or **Yearly** for **Android** and download **`restore-privacy-client-0.5.6-android.apk`** (one-time link after payment).
 2. Install the APK (allow install from unknown sources if your device asks). Catalog APK includes residual wire (**PFS + outer obfs**).
 3. **Accept the licence**, then enter the **keygen** from email (forced unlock sheet). Connect requires **OK** (active subscription + keygen).
 4. Press **Connect**, and grant **VPN** permission when prompted.
