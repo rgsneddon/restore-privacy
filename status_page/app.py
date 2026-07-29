@@ -84,6 +84,16 @@ STATIC_ROUTES: dict[str, str] = {
     "/stripe_brand_logo.png": "stripe_brand_logo.png",
     "/static/stripe_brand_icon.png": "stripe_brand_icon.png",
     "/static/stripe_brand_logo.png": "stripe_brand_logo.png",
+    # Same-origin JS for CSP script-src 'self' (no inline scripts)
+    "/static/public_theme.js": "public_theme.js",
+    "/static/admin_theme.js": "admin_theme.js",
+    "/static/admin_sidebar.js": "admin_sidebar.js",
+    "/static/audit_countdown.js": "audit_countdown.js",
+    "/static/audit_page_ticker.js": "audit_page_ticker.js",
+    "/static/node_wipe_countdown.js": "node_wipe_countdown.js",
+    "/static/thankyou_keygen_copy.js": "thankyou_keygen_copy.js",
+    "/static/thankyou_entitlement.js": "thankyou_entitlement.js",
+    "/static/admin_fleet_usage.js": "admin_fleet_usage.js",
 }
 
 # Customer device-licence renew host (Stripe Checkout custom domain).
@@ -122,7 +132,9 @@ def read_static_bytes(url_path: str) -> tuple[bytes, str] | None:
         return None
     data = path.read_bytes()
     ctype, _ = mimetypes.guess_type(str(path))
-    if not ctype:
+    if path.suffix.lower() == ".js":
+        ctype = "application/javascript; charset=utf-8"
+    elif not ctype:
         if path.suffix.lower() == ".ico":
             ctype = "image/x-icon"
         elif path.suffix.lower() == ".png":
@@ -563,6 +575,15 @@ class Handler(BaseHTTPRequestHandler):
         # No access / user-info logs
         return
 
+    def _security_headers(self, *, allow_framing: bool = False) -> None:
+        try:
+            from security_headers import apply_security_headers
+        except ImportError:  # pragma: no cover
+            from status_page.security_headers import (  # type: ignore
+                apply_security_headers,
+            )
+        apply_security_headers(self, allow_framing=allow_framing)
+
     def _send(
         self,
         code: int,
@@ -570,11 +591,13 @@ class Handler(BaseHTTPRequestHandler):
         data: bytes,
         *,
         extra_headers: list[tuple[str, str]] | None = None,
+        allow_framing: bool = False,
     ) -> None:
         self.send_response(code)
         self.send_header("Content-Type", content_type)
         self.send_header("Content-Length", str(len(data)))
         self.send_header("Cache-Control", "no-store")
+        self._security_headers(allow_framing=allow_framing)
         if extra_headers:
             for k, v in extra_headers:
                 self.send_header(k, v)
@@ -586,6 +609,7 @@ class Handler(BaseHTTPRequestHandler):
         self.send_header("Location", location)
         self.send_header("Content-Length", "0")
         self.send_header("Cache-Control", "no-store")
+        self._security_headers()
         self.end_headers()
 
     def _read_body(self) -> bytes:
@@ -723,6 +747,7 @@ class Handler(BaseHTTPRequestHandler):
             self.send_header("Content-Type", ctype)
             self.send_header("Content-Length", str(len(data)))
             self.send_header("Cache-Control", "public, max-age=3600")
+            self._security_headers()
             self.end_headers()
             self.wfile.write(data)
             return
@@ -892,6 +917,8 @@ class Handler(BaseHTTPRequestHandler):
             )
             self.send_header("Content-Length", str(len(body)))
             self.send_header("Cache-Control", "no-store")
+            # Same-origin iframe on thank-you must be allowed to load this file.
+            self._security_headers(allow_framing=True)
             self.end_headers()
             self.wfile.write(body)
             return
@@ -1005,6 +1032,8 @@ class Handler(BaseHTTPRequestHandler):
                 self.send_header("X-RPT-Fulfilment", str(asset.get("source") or "proxy"))
                 if length is not None:
                     self.send_header("Content-Length", str(int(length)))
+                # Omit X-Frame-Options DENY so thank-you auto-download iframe works.
+                self._security_headers(allow_framing=True)
                 self.end_headers()
                 # Larger chunks + early flush so browsers show progress sooner
                 # (avoids feeling "stuck" on multi‑MB installers).
@@ -1075,10 +1104,7 @@ class Handler(BaseHTTPRequestHandler):
                     q = urllib.parse.urlencode(
                         {"session_id": session_id, "platform": resolved}
                     )
-                    self.send_response(302)
-                    self.send_header("Location", f"/download/success?{q}")
-                    self.send_header("Cache-Control", "no-store")
-                    self.end_headers()
+                    self._redirect(f"/download/success?{q}")
                     return
             # Stripe success_url supplies session_id={CHECKOUT_SESSION_ID}; webhook
             # may still be in-flight — poll briefly for the minted grant.
@@ -1138,10 +1164,7 @@ class Handler(BaseHTTPRequestHandler):
                     q = urllib.parse.urlencode(
                         {"session_id": session_id, "platform": plat}
                     )
-                    self.send_response(302)
-                    self.send_header("Location", f"/download/success?{q}")
-                    self.send_header("Cache-Control", "no-store")
-                    self.end_headers()
+                    self._redirect(f"/download/success?{q}")
                     return
                 inner = render_post_payment_thankyou_html(
                     download_path=str(link),
@@ -1588,6 +1611,7 @@ class Handler(BaseHTTPRequestHandler):
             )
             self.send_header("Content-Length", "0")
             self.send_header("Cache-Control", "no-store")
+            self._security_headers()
             self.end_headers()
             return
 

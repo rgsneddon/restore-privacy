@@ -2941,43 +2941,7 @@ def render_post_payment_thankyou_html(
       an active subscription is restored.
     </p>
   </div>
-  <script>
-  (function () {{
-    var btn = document.getElementById("keygen-copy-btn");
-    var code = document.getElementById("product-keygen");
-    var status = document.getElementById("keygen-copy-status");
-    if (!btn || !code) return;
-    function done(ok) {{
-      if (status) status.textContent = ok ? "Copied!" : "Select and copy manually";
-    }}
-    btn.addEventListener("click", function () {{
-      var text = (code.textContent || "").trim();
-      if (!text) return;
-      if (navigator.clipboard && navigator.clipboard.writeText) {{
-        navigator.clipboard.writeText(text).then(function () {{ done(true); }})
-          .catch(function () {{
-            try {{
-              var r = document.createRange();
-              r.selectNodeContents(code);
-              var s = window.getSelection();
-              s.removeAllRanges();
-              s.addRange(r);
-              done(document.execCommand("copy"));
-            }} catch (e) {{ done(false); }}
-          }});
-      }} else {{
-        try {{
-          var r2 = document.createRange();
-          r2.selectNodeContents(code);
-          var s2 = window.getSelection();
-          s2.removeAllRanges();
-          s2.addRange(r2);
-          done(document.execCommand("copy"));
-        }} catch (e2) {{ done(false); }}
-      }}
-    }});
-  }})();
-  </script>"""
+  <script id="thankyou-keygen-copy-script" src="/static/thankyou_keygen_copy.js"></script>"""
     ent_path = f"/api/connect-entitlement-file?session_id={urllib.parse.quote(sid)}" if sid else ""
     ent_path_esc = _escape_html_text(ent_path)
     ent_block = ""
@@ -3003,17 +2967,7 @@ def render_post_payment_thankyou_html(
   <iframe id="auto-entitlement-frame" data-src="{ent_path_esc}" src="about:blank"
     style="width:0;height:0;border:0;position:absolute"
     title="Automatic payment entitlement download" aria-hidden="true"></iframe>
-  <script>
-  (function () {{
-    var delayMs = 1800;
-    var ent = document.getElementById("auto-entitlement-frame");
-    if (!ent) return;
-    var src = ent.getAttribute("data-src") || "";
-    if (!src) return;
-    // Defer entitlement auto-fetch so the installer iframe gets first byte first.
-    setTimeout(function () {{ ent.setAttribute("src", src); }}, delayMs);
-  }})();
-  </script>"""
+  <script id="thankyou-entitlement-script" src="/static/thankyou_entitlement.js"></script>"""
     # Emphasize Windows admin wording for .exe; still show admin phrase for all.
     admin_lead = "Please run the file as administrator."
     btn = f"Download {plat_label} package"

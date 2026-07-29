@@ -167,8 +167,13 @@ class TestPublicChromeModule(unittest.TestCase):
         self.assertNotIn("#fde68a", css)
         script = public_theme_boot_script()
         self.assertIn(PUBLIC_THEME_STORAGE_KEY, script)
-        self.assertIn("localStorage", script)
-        self.assertIn("data-theme", script)
+        self.assertIn("/static/public_theme.js", script)
+        self.assertIn("public-theme-script", script)
+        js = (ROOT / "status_page" / "static" / "public_theme.js").read_text(
+            encoding="utf-8"
+        )
+        self.assertIn("localStorage", js)
+        self.assertIn("data-theme", js)
 
     def test_brand_logo_static_is_borderless_transparent_mark(self) -> None:
         """Header logo: outer transparent; no enclosed holes inside the shield."""

@@ -125,11 +125,14 @@ class TestAuditCountdownMath(unittest.TestCase):
         self.assertEqual(st["display"], "0d 18:00:00")
         self.assertNotEqual(st["display"], "0d 00:00:00")
         self.assertTrue(st.get("rolled_forward"))
-        # Fragment still ticks with period for client roll
+        # Fragment still ticks with period for client roll (JS externalized for CSP)
         html = render_audit_countdown_html(now=now, json_path=None)
-        # force state via last by writing temp is heavy; assert helper path in module source
+        self.assertIn("/static/audit_countdown.js", html)
+        js = (ROOT / "status_page" / "static" / "audit_countdown.js").read_text(
+            encoding="utf-8"
+        )
+        self.assertIn("while (deadlineMs <= now)", js)
         src = Path(ROOT / "status_page" / "audit_countdown.py").read_text(encoding="utf-8")
-        self.assertIn("while (deadlineMs <= now)", src)
         self.assertIn("next_audit_at_rolling", src)
         self.assertIn("86400", src)
 
@@ -155,8 +158,12 @@ class TestAuditCountdownUi(unittest.TestCase):
         self.assertIn('id="audit-countdown"', html)
         self.assertIn('id="audit-countdown-value"', html)
         self.assertIn('id="audit-countdown-blurb"', html)
-        self.assertIn("setInterval", html)
-        self.assertIn("1000", html)
+        self.assertIn("/static/audit_countdown.js", html)
+        js = (ROOT / "status_page" / "static" / "audit_countdown.js").read_text(
+            encoding="utf-8"
+        )
+        self.assertIn("setInterval", js)
+        self.assertIn("1000", js)
         self.assertIn("data-next-audit", html)
         # Honest 1-day job: security audit + temp scratch; not full erase
         low = html.lower()
@@ -177,7 +184,7 @@ class TestAuditCountdownUi(unittest.TestCase):
         self.assertIn('id="audit-countdown-value"', page)
         self.assertIn('id="audit-countdown-blurb"', page)
         self.assertIn("security audit", page.lower())
-        self.assertIn("setInterval", page)
+        self.assertIn("/static/audit_countdown.js", page)
         self.assertIn("audit-countdown-blurb", page)
         # Still no client count poll
         self.assertNotIn("clients-connected", page)

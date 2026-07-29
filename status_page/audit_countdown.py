@@ -334,40 +334,7 @@ def render_audit_countdown_html(
     <p class="audit-countdown-blurb" id="audit-countdown-blurb">{blurb}</p>
     <p class="audit-last-run" id="audit-last-run">last audit run: <time id="audit-last-run-time" datetime="{html.escape(str(last_raw or ''))}">{last_disp}</time></p>
   </div>
-  <script>
-  (function () {{
-    var root = document.getElementById("audit-countdown");
-    var el = document.getElementById("audit-countdown-value");
-    if (!root || !el) return;
-    var nextIso = root.getAttribute("data-next-audit") || "";
-    var available = root.getAttribute("data-available") === "1";
-    function pad(n) {{ return n < 10 ? "0" + n : String(n); }}
-    function fmt(sec) {{
-      sec = Math.max(0, Math.floor(sec));
-      var d = Math.floor(sec / 86400);
-      var h = Math.floor((sec % 86400) / 3600);
-      var m = Math.floor((sec % 3600) / 60);
-      var s = sec % 60;
-      return d + "d " + pad(h) + ":" + pad(m) + ":" + pad(s);
-    }}
-    var period = parseInt(root.getAttribute("data-period-seconds") || "86400", 10);
-    if (!period || period < 1) period = 86400;
-    var deadlineMs = Date.parse(nextIso);
-    function tick() {{
-      if (!available || !nextIso || isNaN(deadlineMs)) {{
-        el.textContent = "—";
-        return;
-      }}
-      var now = Date.now();
-      // Roll forward by period while overdue (unstick 0d 00:00:00 when JSON is stale)
-      while (deadlineMs <= now) {{ deadlineMs += period * 1000; }}
-      var rem = Math.max(0, Math.floor((deadlineMs - now) / 1000));
-      el.textContent = fmt(rem);
-    }}
-    tick();
-    setInterval(tick, 1000);
-  }})();
-  </script>
+  <script id="audit-countdown-script" src="/static/audit_countdown.js"></script>
 """
 
 
@@ -428,37 +395,5 @@ def render_audit_page_ticker_html(
       checks). Countdown from last written audit timestamp.
     </p>
   </div>
-  <script>
-  (function () {{
-    var root = document.getElementById("audit-page-ticker");
-    var el = document.getElementById("audit-page-countdown-value");
-    if (!root || !el) return;
-    var nextIso = root.getAttribute("data-next-audit") || "";
-    var available = root.getAttribute("data-available") === "1";
-    function pad(n) {{ return n < 10 ? "0" + n : String(n); }}
-    function fmt(sec) {{
-      sec = Math.max(0, Math.floor(sec));
-      var d = Math.floor(sec / 86400);
-      var h = Math.floor((sec % 86400) / 3600);
-      var m = Math.floor((sec % 3600) / 60);
-      var s = sec % 60;
-      return d + "d " + pad(h) + ":" + pad(m) + ":" + pad(s);
-    }}
-    var period = parseInt(root.getAttribute("data-period-seconds") || "86400", 10);
-    if (!period || period < 1) period = 86400;
-    var deadlineMs = Date.parse(nextIso);
-    function tick() {{
-      if (!available || !nextIso || isNaN(deadlineMs)) {{
-        el.textContent = "—";
-        return;
-      }}
-      var now = Date.now();
-      while (deadlineMs <= now) {{ deadlineMs += period * 1000; }}
-      var rem = Math.max(0, Math.floor((deadlineMs - now) / 1000));
-      el.textContent = fmt(rem);
-    }}
-    tick();
-    setInterval(tick, 1000);
-  }})();
-  </script>
+  <script id="audit-page-ticker-script" src="/static/audit_page_ticker.js"></script>
 """

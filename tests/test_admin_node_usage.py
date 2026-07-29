@@ -223,8 +223,8 @@ class TestAdminHtmlSection(unittest.TestCase):
             prev = os.environ.get("RPT_PAYMENT_DATA_DIR")
             os.environ["RPT_PAYMENT_DATA_DIR"] = td
             try:
-                html = admin_panel.render_admin_html(
-                    grants=[],
+                # Fleet usage lives on /admin/fleet (multi-page admin shell)
+                html = admin_panel.render_admin_fleet_page_html(
                     node_usage_rows=rows,
                     node_usage_live=False,
                 ).decode("utf-8")
@@ -247,10 +247,14 @@ class TestAdminHtmlSection(unittest.TestCase):
         self.assertIn("Romania", html)
         self.assertIn("unlimited", html)  # IS/RO capacity display
         self.assertIn("200.00 Mbps", html)  # US
-        # Live refresh still present
+        # Live refresh still present (script externalized for CSP)
         self.assertIn("data-fleet-refresh-ms", html)
         self.assertIn("/admin/api/fleet-usage", html)
-        self.assertIn("setInterval", html)
+        self.assertIn("/static/admin_fleet_usage.js", html)
+        js = (ROOT / "status_page" / "static" / "admin_fleet_usage.js").read_text(
+            encoding="utf-8"
+        )
+        self.assertIn("setInterval", js)
 
     def test_section_html_short_labels_only(self):
         from admin_node_usage import (
@@ -279,7 +283,11 @@ class TestAdminHtmlSection(unittest.TestCase):
         self.assertNotIn("admin-node-why", html)
         self.assertNotIn("operator product allowance", html.lower())
         self.assertIn("United States", html)
-        self.assertIn("setInterval", html)
+        self.assertIn("/static/admin_fleet_usage.js", html)
+        js = (ROOT / "status_page" / "static" / "admin_fleet_usage.js").read_text(
+            encoding="utf-8"
+        )
+        self.assertIn("setInterval", js)
 
 
 class TestLiveRefreshContract(unittest.TestCase):

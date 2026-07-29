@@ -523,62 +523,12 @@ a.product-tab.is-active, .product-tab.is-active {{
 
 
 def public_theme_boot_script() -> str:
-    """Apply stored/device theme before paint; wire radio controls site-wide."""
+    """Same-origin theme script tag (CSP script-src 'self'; logic in static JS)."""
     key = PUBLIC_THEME_STORAGE_KEY
-    return f"""
-<script id="public-theme-script">
-(function () {{
-  var KEY = {key!r};
-  function resolve(mode) {{
-    if (mode === "light" || mode === "dark") return mode;
-    try {{
-      return window.matchMedia("(prefers-color-scheme: light)").matches ? "light" : "dark";
-    }} catch (e) {{ return "dark"; }}
-  }}
-  function apply(mode) {{
-    var root = document.documentElement;
-    var m = (mode || "system");
-    if (m === "system" || m === "device") {{
-      root.removeAttribute("data-theme");
-      root.setAttribute("data-theme-pref", "device");
-    }} else {{
-      root.setAttribute("data-theme", m);
-      root.setAttribute("data-theme-pref", m);
-    }}
-  }}
-  function load() {{
-    try {{ return localStorage.getItem(KEY) || "device"; }} catch (e) {{ return "device"; }}
-  }}
-  function save(mode) {{
-    try {{ localStorage.setItem(KEY, mode); }} catch (e) {{}}
-  }}
-  var initial = load();
-  if (initial === "system") initial = "device";
-  apply(initial);
-  function wire() {{
-    var radios = document.querySelectorAll('input[name="public-theme"]');
-    if (!radios.length) return;
-    radios.forEach(function (r) {{
-      r.checked = (r.value === initial) || (initial === "device" && r.value === "device");
-      r.addEventListener("change", function () {{
-        if (!r.checked) return;
-        save(r.value);
-        apply(r.value);
-        initial = r.value;
-      }});
-    }});
-    try {{
-      window.matchMedia("(prefers-color-scheme: light)").addEventListener("change", function () {{
-        if ((load() || "device") === "device") apply("device");
-      }});
-    }} catch (e) {{}}
-  }}
-  if (document.readyState === "loading") {{
-    document.addEventListener("DOMContentLoaded", wire);
-  }} else {{ wire(); }}
-}})();
-</script>
-"""
+    return (
+        f'<script id="public-theme-script" src="/static/public_theme.js" '
+        f'data-storage-key="{key}"></script>\n'
+    )
 
 
 def public_theme_picker_html() -> str:

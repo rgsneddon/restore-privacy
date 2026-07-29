@@ -79,7 +79,11 @@ class TestAuditPageTickerHtml(unittest.TestCase):
         self.assertIn('id="audit-page-ticker"', html)
         self.assertIn('id="audit-page-countdown-value"', html)
         self.assertIn("data-next-audit", html)
-        self.assertIn("setInterval", html)
+        self.assertIn("/static/audit_page_ticker.js", html)
+        js = (ROOT / "status_page" / "static" / "audit_page_ticker.js").read_text(
+            encoding="utf-8"
+        )
+        self.assertIn("setInterval", js)
         self.assertIn("Time until next audit", html)
         # Unique ids (not homepage collision)
         self.assertNotIn('id="audit-countdown"', html)

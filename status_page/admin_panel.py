@@ -263,46 +263,12 @@ def admin_theme_picker_html() -> str:
 
 
 def admin_theme_boot_script() -> str:
-    """Apply stored or system theme before paint; wire radio controls."""
+    """Same-origin theme script tag (CSP script-src 'self'; logic in static JS)."""
     key = THEME_STORAGE_KEY
-    return f"""
-<script id="admin-theme-script">
-(function () {{
-  var KEY = {json_dumps_str(key)};
-  var root = document.documentElement;
-  function normalize(m) {{
-    m = (m || "").toLowerCase();
-    if (m === "light" || m === "dark" || m === "system") return m;
-    return "system";
-  }}
-  function apply(mode) {{
-    mode = normalize(mode);
-    if (mode === "system") {{
-      root.removeAttribute("data-theme");
-    }} else {{
-      root.setAttribute("data-theme", mode);
-    }}
-    try {{ localStorage.setItem(KEY, mode); }} catch (e) {{}}
-    var radios = document.querySelectorAll('input[name="admin-theme"]');
-    for (var i = 0; i < radios.length; i++) {{
-      radios[i].checked = (radios[i].value === mode);
-    }}
-  }}
-  var saved = "system";
-  try {{ saved = normalize(localStorage.getItem(KEY)); }} catch (e) {{}}
-  apply(saved);
-  document.addEventListener("DOMContentLoaded", function () {{
-    apply(saved);
-    var radios = document.querySelectorAll('input[name="admin-theme"]');
-    for (var i = 0; i < radios.length; i++) {{
-      radios[i].addEventListener("change", function (ev) {{
-        if (ev.target && ev.target.checked) apply(ev.target.value);
-      }});
-    }}
-  }});
-}})();
-</script>
-"""
+    return (
+        f'<script id="admin-theme-script" src="/static/admin_theme.js" '
+        f'data-storage-key="{key}"></script>\n'
+    )
 
 
 def json_dumps_str(s: str) -> str:
@@ -1449,24 +1415,7 @@ def _admin_sidebar_html(*, active: str = "home") -> str:
   <a class="sb-btn" href="/"><span class="sb-ico">&#8599;</span>
     <span class="sb-label">VPN APP Shop</span></a>
 </aside>
-<script>
-(function(){{
-  var sb=document.getElementById('admin-sidebar');
-  var btn=document.getElementById('admin-sidebar-toggle');
-  if(!sb||!btn) return;
-  var key='rpt_admin_sidebar_collapsed';
-  function apply(c){{
-    if(c){{sb.classList.add('collapsed');btn.setAttribute('aria-expanded','false');btn.textContent='\\u00bb';}}
-    else{{sb.classList.remove('collapsed');btn.setAttribute('aria-expanded','true');btn.textContent='Collapse';}}
-  }}
-  try{{apply(localStorage.getItem(key)==='1');}}catch(e){{}}
-  btn.addEventListener('click',function(){{
-    var c=!sb.classList.contains('collapsed');
-    apply(c);
-    try{{localStorage.setItem(key,c?'1':'0');}}catch(e){{}}
-  }});
-}})();
-</script>
+<script id="admin-sidebar-script" src="/static/admin_sidebar.js"></script>
 """
 
 

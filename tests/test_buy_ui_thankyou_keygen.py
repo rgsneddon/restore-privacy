@@ -76,7 +76,11 @@ class TestThankYouKeygenProminent(unittest.TestCase):
         self.assertIn('id="product-keygen"', html)
         self.assertIn("product-keygen-display", html)
         self.assertIn('id="keygen-copy-btn"', html)
-        self.assertIn("navigator.clipboard", html)
+        self.assertIn("/static/thankyou_keygen_copy.js", html)
+        js = (ROOT / "status_page" / "static" / "thankyou_keygen_copy.js").read_text(
+            encoding="utf-8"
+        )
+        self.assertIn("navigator.clipboard", js)
         self.assertIn('id="success-download-link"', html)
         self.assertIn("until you close the tab", html.lower())
         self.assertNotIn('http-equiv="refresh"', html.lower())

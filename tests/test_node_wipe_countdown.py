@@ -126,8 +126,12 @@ class TestNodeWipeHtml(unittest.TestCase):
         self.assertIn('id="node-wipe-label-entry"', html)
         self.assertNotIn('id="node-wipe-label-exit"', html)
         self.assertIn("nw-unit", html)
-        self.assertIn("setInterval", html)
-        self.assertIn("1000", html)
+        self.assertIn("/static/node_wipe_countdown.js", html)
+        js = (ROOT / "status_page" / "static" / "node_wipe_countdown.js").read_text(
+            encoding="utf-8"
+        )
+        self.assertIn("setInterval", js)
+        self.assertIn("1000", js)
         self.assertIn("data-next-entry", html)
         self.assertIn("data-fleet-sequential", html)
         self.assertIn(str(NODE_WIPE_PERIOD_SECONDS), html)
@@ -150,7 +154,7 @@ class TestNodeWipeHtml(unittest.TestCase):
         self.assertIn('id="node-wipe-countdown"', page)
         self.assertIn('id="nw-entry-days"', page)
         self.assertIn("nw-unit", page)
-        self.assertIn("setInterval", page)
+        self.assertIn("/static/node_wipe_countdown.js", page)
         # Coexists with audit countdown
         self.assertIn('id="audit-countdown"', page)
         self.assertIn(HONESTY_BLURB.split(".")[0], page)

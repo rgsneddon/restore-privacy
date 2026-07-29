@@ -870,7 +870,11 @@ class TestAdminThemeAppearance(unittest.TestCase):
                 self.assertIn("color-scheme", html)
                 self.assertIn(admin_panel.THEME_STORAGE_KEY, html)
                 self.assertIn("admin-theme-script", html)
-                self.assertIn("localStorage", html)
+                self.assertIn("/static/admin_theme.js", html)
+                js = (
+                    ROOT / "status_page" / "static" / "admin_theme.js"
+                ).read_text(encoding="utf-8")
+                self.assertIn("localStorage", js)
 
 
 class TestAdminBootstrapDigest(unittest.TestCase):
