@@ -102,6 +102,26 @@ class TestDownloadTokenTtlReuse(unittest.TestCase):
         self.assertIn("hour", pay.DOWNLOAD_DENIED_MSG.lower())
         self.assertIn(pay.DOWNLOAD_LINK_VALIDITY_ADVICE[:20], pay.DOWNLOAD_LINK_VALIDITY_ADVICE)
 
+    def test_product_docs_drop_one_time_download_claims(self):
+        """Shipped product docs no longer describe download tokens as one-time."""
+        root = Path(__file__).resolve().parents[1]
+        howto = (root / "status_page" / "docs" / "PAID_DOWNLOADS_HOWTO.md").read_text(
+            encoding="utf-8"
+        )
+        self.assertIn("1-hour reusable", howto)
+        self.assertNotIn("Shows a **one-time** link", howto)
+        readme = (root / "README.md").read_text(encoding="utf-8")
+        self.assertNotIn("one-time link after payment", readme)
+        self.assertIn("1-hour download link after payment", readme)
+        public_readme = (
+            root / "status_page" / "public" / "README.md"
+        ).read_text(encoding="utf-8")
+        self.assertNotIn("one-time link after payment", public_readme)
+        admin = (root / "status_page" / "admin_panel.py").read_text(encoding="utf-8")
+        self.assertIn("1-hour reusable", admin)
+        self.assertNotIn("Pass this <strong>one-time</strong> link", admin)
+        self.assertNotIn("open the one-time URL", admin)
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -28,7 +28,7 @@ If fulfilment returns **503**, paying customers cannot download until you stage 
    (required — **no** `&platform=` empty suffix; platform comes from BUY tile
    `client_reference_id` and is filled on the success page)
 4. Webhook `POST https://restoreprivacy.online/webhook/stripe`  
-   event **`checkout.session.completed`** → mints one-time token for that platform  
+   event **`checkout.session.completed`** → mints 1-hour reusable token for that platform  
    (requires `payment_status` paid + **245** pence GBP + platform from `client_reference_id` / metadata)
 5. Success page shows **Download \<platform\> package** → `/download?token=…`  
    streams installer via **proxy** (local staged file or GitHub API token)

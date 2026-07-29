@@ -72,7 +72,7 @@ The app re-checks the status host (`/api/connect-entitlement`) on each Connect s
 
 ### Windows
 
-1. On the [status downloads page](https://restoreprivacy.online/), choose **Monthly £2.45** or **Yearly** for **Windows** and download **`restore-privacy-client-0.5.7-windows-x64-setup.exe`** (one-time link after payment).
+1. On the [status downloads page](https://restoreprivacy.online/), choose **Monthly £2.45** or **Yearly** for **Windows** and download **`restore-privacy-client-0.5.7-windows-x64-setup.exe`** (1-hour download link after payment; retry if connection drops).
 2. Run the installer (PE self-extracting package: frozen runtime + Wintun — no separate Python install). Default install is **Program Files\\Restore Privacy** (elevation when required); per-user fallback if Program Files is unwritable.
 3. **Accept the end-user licence**, then enter the **keygen** from your fulfilment email (forced unlock dialog). Settings → Payment entitlement is a fallback only. Connect is allowed only when status is **OK** (active subscription **and** keygen activated).
 4. Press **Connect** and approve **UAC** when prompted so residual public IP uses the VPN node. Scoped **Windows Defender Firewall** allows (node UDP + program) may be applied for residual Connect.
@@ -81,7 +81,7 @@ The app re-checks the status host (`/api/connect-entitlement`) on each Connect s
 
 ### Android
 
-1. On the [status downloads page](https://restoreprivacy.online/), choose **Monthly £2.45** or **Yearly** for **Android** and download **`restore-privacy-client-0.5.7-android.apk`** (one-time link after payment).
+1. On the [status downloads page](https://restoreprivacy.online/), choose **Monthly £2.45** or **Yearly** for **Android** and download **`restore-privacy-client-0.5.7-android.apk`** (1-hour download link after payment; retry if connection drops).
 2. Install the APK (allow install from unknown sources if your device asks). Catalog APK includes residual wire (**PFS + outer obfs**).
 3. **Accept the licence**, then enter the **keygen** from email (forced unlock sheet). Connect requires **OK** (active subscription + keygen).
 4. Press **Connect**, and grant **VPN** permission when prompted.
@@ -92,7 +92,7 @@ The app re-checks the status host (`/api/connect-entitlement`) on each Connect s
 
 Supported floor: **Ubuntu 20.04 LTS** and later (including 22.04 / 24.04 LTS).
 
-1. On the [status downloads page](https://restoreprivacy.online/), choose **Monthly £2.45** or **Yearly** for **Linux** and download **`restore-privacy-client-0.5.7-linux-x64.tar.gz`** (one-time link after payment).
+1. On the [status downloads page](https://restoreprivacy.online/), choose **Monthly £2.45** or **Yearly** for **Linux** and download **`restore-privacy-client-0.5.7-linux-x64.tar.gz`** (1-hour download link after payment; retry if connection drops).
 2. Unpack and run the bundled installer:
 
    ```bash
@@ -110,7 +110,7 @@ Supported floor: **Ubuntu 20.04 LTS** and later (including 22.04 / 24.04 LTS).
 
 When the Mac zip is published:
 
-1. On the [status downloads page](https://restoreprivacy.online/), choose **Monthly £2.45** or **Yearly** for **macOS** and download **`restore-privacy-client-0.5.7-macos.zip`** (one-time link after payment).
+1. On the [status downloads page](https://restoreprivacy.online/), choose **Monthly £2.45** or **Yearly** for **macOS** and download **`restore-privacy-client-0.5.7-macos.zip`** (1-hour download link after payment; retry if connection drops).
 2. Unzip and open **`restore_privacy_client.app`**.
 3. **Accept the licence** and **enter keygen**, then press **Connect** and approve the **VPN configuration** prompt.
 4. Residual public IP only changes when the Packet Tunnel is **active**. Host-only HELLO is **diagnostic** only. **Disconnect** / **Quit** stops the system VPN. See `client_app/APPLE_HANDOFF_0.5.7.md`.
@@ -122,7 +122,7 @@ When the Mac zip is published:
 
 When the iOS zip is published:
 
-1. On the [status downloads page](https://restoreprivacy.online/), choose **Monthly £2.45** or **Yearly** for **iOS** and download **`restore-privacy-client-0.5.7-ios.zip`** (one-time link after payment).
+1. On the [status downloads page](https://restoreprivacy.online/), choose **Monthly £2.45** or **Yearly** for **iOS** and download **`restore-privacy-client-0.5.7-ios.zip`** (1-hour download link after payment; retry if connection drops).
 2. Install **`Runner.app`** with device tooling; **accept licence**, **enter keygen**, then press **Connect** and grant **VPN** permission.
 3. Residual public IP only changes when the Packet Tunnel is **active**.
 4. Complete removal: follow **`Restore Internet.txt`** (Settings → VPN / Delete App) — see warning below.

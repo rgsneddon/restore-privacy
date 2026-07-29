@@ -280,8 +280,9 @@ def render_install_howto_box_html() -> str:
           <a href="/" style="color:var(--rb-link);font-weight:700;">restoreprivacy.online</a>,
           choose your platform and plan (Monthly £2.45 or Yearly £27.93 / save 5%), and
           complete Stripe Checkout.</li>
-        <li><strong>Download after payment.</strong> Use the one-time link on the success page
-          (email also has download + keygen). These are not free permanent GitHub installs.</li>
+        <li><strong>Download after payment.</strong> Use the 1-hour download link on the success page
+          (retry if the connection drops; email also has download + keygen).
+          These are not free permanent GitHub installs.</li>
         <li><strong>Install for your OS.</strong>
           Windows: run the setup exe (Admin may be needed later for residual).
           Android: allow the APK source, then install.

@@ -3,7 +3,7 @@
 Catalog BUY buttons open the **site-hosted plan page** (``/pay``) where the
 visitor selects Monthly or Annual (5% off yearly = £27.93). Checkout continues
 to a Stripe **subscription** Checkout Session for the chosen plan only (products
-**Monthly VPN plan** / **Yearly VPN plan**). Webhook/recovery mints a one-time
+**Monthly VPN plan** / **Yearly VPN plan**). Webhook/recovery mints a time-limited
 download token and Connect entitlement. See docs/PAID_DOWNLOADS_HOWTO.md.
 """
 
@@ -6828,7 +6828,7 @@ def process_checkout_completed_event(
                 f"err={exc!r}",
                 flush=True,
             )
-    # Customer fulfilment email: keygen + PPI + one-time download URL
+    # Customer fulfilment email: keygen + PPI + 1-hour download URL
     try:
         if token and cust_email:
             mail = fulfil_checkout_with_email(

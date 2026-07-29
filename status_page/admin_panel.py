@@ -754,7 +754,7 @@ def render_purchase_reissue_section_html(
     <p><strong>Secondary download link minted</strong> for purchase
     <code id="reissue-result-purchase-id">{pid}</code> {copy_pid}
     ({plat} — <code>{fname}</code>).</p>
-    <p>Pass this <strong>one-time</strong> link to the buyer (not a free GitHub URL):</p>
+    <p>Pass this <strong>1-hour reusable</strong> link to the buyer (not a free GitHub URL):</p>
     <p><a id="reissue-download-link" href="{url}" rel="noopener noreferrer">{url}</a>
       {copy_url}</p>
     <p class="muted">Path only: <code id="reissue-download-path">{path}</code></p>
@@ -768,12 +768,13 @@ def render_purchase_reissue_section_html(
     they should quote the <strong>product purchase identifier</strong> from the thank-you
     page (format <code>RPT-XXXX-XXXX-XXXX</code>). Enter it below to mint a
     <strong>secondary time-limited download link</strong> for the same package they paid for.
-    Tell the buyer: open the link once on a trusted device, save the installer, and keep
-    their RPT-… ID for any future recovery. This is the preferred recovery path when the
-    customer still has their purchase identifier.
+    Tell the buyer: open the link on a trusted device within 1 hour (re-download if
+    interrupted), save the installer, and keep their RPT-… ID for any future recovery.
+    This is the preferred recovery path when the customer still has their purchase identifier.
   </p>
   <p class="muted" id="admin-reissue-elaborate">
-    Steps for the buyer after you send the link: (1) open the one-time URL,
+    Steps for the buyer after you send the link: (1) open the 1-hour download URL
+    (retry if the connection drops — same link works until it expires),
     (2) download starts or use the on-page button, (3) run/install the package,
     (4) for Connect, use payment entitlement as on the original thank-you page if needed.
     Do <strong>not</strong> post free GitHub release URLs — only the paid

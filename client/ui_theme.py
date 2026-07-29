@@ -485,7 +485,7 @@ def upgrade_download_url(platform: str | None = None) -> str:
     """Paid catalog / platform pay entry (repo is private — never free GH releases).
 
     Prefer the platform payment path so an in-app "new version available" opens
-    the same pay → webhook → one-time proxy flow as the public shop. Falls back
+    the same pay → webhook → 1-hour download proxy flow as the public shop. Falls back
     to the status host ``#downloads`` section.
 
     Always returns an **absolute** ``https://`` URL so Windows/Linux
