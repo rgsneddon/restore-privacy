@@ -430,9 +430,10 @@ word-break:break-all;color:#fff;margin:0.5rem 0 1rem}
 """
 
 
-def render_already_used_html() -> str:
+def render_already_used_html() -> bytes:
+    """HTTP body for the second-claim refusal page (bytes for Handler._send)."""
     msg = html.escape(ALREADY_USED_MESSAGE)
-    return f"""<!DOCTYPE html>
+    body = f"""<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="utf-8"/>
@@ -452,9 +453,11 @@ def render_already_used_html() -> str:
 </body>
 </html>
 """
+    return body.encode("utf-8")
 
 
-def render_success_html(mint: dict[str, Any]) -> str:
+def render_success_html(mint: dict[str, Any]) -> bytes:
+    """HTTP body after a successful one-package mint (bytes for Handler._send)."""
     kg = html.escape(str(mint.get("keygen") or ""))
     url = html.escape(str(mint.get("download_url") or mint.get("download_path") or ""))
     plat = html.escape(str(mint.get("platform") or ""))
@@ -465,7 +468,7 @@ def render_success_html(mint: dict[str, Any]) -> str:
             or "Enter the KEYGEN in the client to unlock Connect."
         )
     )
-    return f"""<!DOCTYPE html>
+    body = f"""<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="utf-8"/>
@@ -492,14 +495,18 @@ def render_success_html(mint: dict[str, Any]) -> str:
 </body>
 </html>
 """
+    return body.encode("utf-8")
 
 
 def render_tester_page_html(
     *,
     error: str = "",
     claim_already: bool = False,
-) -> str:
-    """Main gate page: scrollable licence + accept checkbox + gated generator."""
+) -> bytes:
+    """Main gate page: scrollable licence + accept checkbox + gated generator.
+
+    Returns **bytes** (utf-8) so ``Handler._send`` can write the body directly.
+    """
     if claim_already:
         return render_already_used_html()
     lic = html.escape(licence_and_disclaimer_text())
@@ -513,7 +520,7 @@ def render_tester_page_html(
             f'required disabled class="plat-radio"/> {html.escape(label)}</label>'
         )
     platforms = "\n".join(opts)
-    return f"""<!DOCTYPE html>
+    body = f"""<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="utf-8"/>
@@ -569,6 +576,7 @@ def render_tester_page_html(
 </body>
 </html>
 """
+    return body.encode("utf-8")
 
 
 def public_html_must_not_link_tester(html_src: str | bytes | None) -> bool:
