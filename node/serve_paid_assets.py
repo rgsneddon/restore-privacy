@@ -17,8 +17,10 @@ Environment:
 
 from __future__ import annotations
 
+import json
 import mimetypes
 import os
+import shutil
 import sys
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
@@ -29,6 +31,8 @@ DEFAULT_BREADCRUMBS_ROOT = "/opt/restore-privacy/breadcrumbs"
 DEFAULT_PORT = 8081
 PREFIX = "/paid-assets"
 BREADCRUMBS_PREFIX = "/breadcrumbs"
+# Token-gated host load/disk only (no file paths) for admin fleet package-store table
+HOST_METRICS_PATH = "/api/private/host-metrics"
 # Safe vault file names only (no installer blobs)
 BREADCRUMB_FILES = frozenset(
     {
@@ -100,10 +104,76 @@ def breadcrumbs_path_allowed(rel_parts: list[str]) -> bool:
     return True
 
 
+def collect_host_metrics(
+    *,
+    loadavg_path: str | Path = "/proc/loadavg",
+    uptime_path: str | Path = "/proc/uptime",
+    disk_path: str = "/",
+) -> dict:
+    """Pure-ish host stats for admin: load averages + root volume usage.
+
+    **Never** includes directory paths, package filenames, or asset trees —
+    only relative load and drive capacity/used/free aggregates.
+    """
+    out: dict = {
+        "ok": True,
+        "role": "package_store",
+        "load_1": None,
+        "load_5": None,
+        "load_15": None,
+        "uptime_sec": None,
+        "disk_total_bytes": None,
+        "disk_used_bytes": None,
+        "disk_avail_bytes": None,
+        "disk_util": None,
+    }
+    try:
+        raw = Path(loadavg_path).read_text(encoding="utf-8").strip().split()
+        if len(raw) >= 3:
+            out["load_1"] = float(raw[0])
+            out["load_5"] = float(raw[1])
+            out["load_15"] = float(raw[2])
+    except (OSError, ValueError, TypeError):
+        pass
+    try:
+        u = Path(uptime_path).read_text(encoding="utf-8").strip().split()
+        if u:
+            out["uptime_sec"] = int(float(u[0]))
+    except (OSError, ValueError, TypeError):
+        pass
+    try:
+        usage = shutil.disk_usage(disk_path)
+        total = int(usage.total)
+        used = int(usage.used)
+        free = int(usage.free)
+        out["disk_total_bytes"] = total
+        out["disk_used_bytes"] = used
+        out["disk_avail_bytes"] = free
+        if total > 0:
+            out["disk_util"] = min(1.0, max(0.0, used / float(total)))
+    except (OSError, ValueError, TypeError):
+        pass
+    if out["load_1"] is None and out["disk_total_bytes"] is None:
+        out["ok"] = False
+    return out
+
+
 class Handler(BaseHTTPRequestHandler):
     def log_message(self, format: str, *args) -> None:  # noqa: A003
         # No user-info access logs
         return
+
+    def _send_json(self, code: int, payload: dict) -> None:
+        data = json.dumps(payload, separators=(",", ":")).encode("utf-8")
+        self.send_response(code)
+        self.send_header("Content-Type", "application/json")
+        self.send_header("Content-Length", str(len(data)))
+        self.send_header("Cache-Control", "no-store")
+        self.end_headers()
+        try:
+            self.wfile.write(data)
+        except (BrokenPipeError, ConnectionResetError, ConnectionAbortedError):
+            return
 
     def _send_file(self, fpath: Path, *, as_attachment: bool) -> None:
         ctype, _ = mimetypes.guess_type(str(fpath))
@@ -144,6 +214,11 @@ class Handler(BaseHTTPRequestHandler):
             self.send_error(401, "unauthorized")
             return
         path = unquote(self.path.split("?", 1)[0])
+
+        # --- Host load + drive only (admin fleet package-store table) ---
+        if path.rstrip("/") == HOST_METRICS_PATH.rstrip("/"):
+            self._send_json(200, collect_host_metrics())
+            return
 
         # --- Apple breadcrumbs vault (task metadata only) ---
         if path.startswith(BREADCRUMBS_PREFIX + "/"):
@@ -221,7 +296,8 @@ def main() -> int:
     httpd = ThreadingHTTPServer((bind, port), Handler)
     print(
         f"paid-assets serve root={root} breadcrumbs={_breadcrumbs_root()} "
-        f"bind={bind}:{port} prefixes={PREFIX},{BREADCRUMBS_PREFIX}"
+        f"bind={bind}:{port} prefixes={PREFIX},{BREADCRUMBS_PREFIX},"
+        f"{HOST_METRICS_PATH}"
     )
     httpd.serve_forever()
     return 0

@@ -1,4 +1,4 @@
-/* Admin fleet usage live refresh. CSP: script-src 'self' only. */
+/* Admin fleet usage live refresh (residual peers + package store). CSP: 'self'. */
 (function () {
   var root = document.getElementById("admin-node-usage");
   if (!root) return;
@@ -26,6 +26,24 @@
     }
     setText("admin-node-detail-" + c, r.detail || "");
   }
+  function applyPackageHost(r) {
+    if (!r || !r.id) return;
+    var id = r.id;
+    setText("admin-pkg-label-" + id, r.label);
+    setText("admin-pkg-host-" + id, r.host);
+    setText("admin-pkg-load-" + id, r.load_display);
+    setText("admin-pkg-disk-used-" + id, r.disk_used_display);
+    setText("admin-pkg-disk-total-" + id, r.disk_total_display);
+    setText("admin-pkg-disk-avail-" + id, r.disk_avail_display);
+    setText("admin-pkg-disk-util-" + id, r.disk_util_display);
+    setText("admin-pkg-uptime-" + id, r.uptime_display);
+    var st = document.getElementById("admin-pkg-status-" + id);
+    if (st) {
+      st.textContent = r.status || "unknown";
+      st.className = "badge " + (r.status === "ok" ? "ok" : "bad");
+    }
+    setText("admin-pkg-detail-" + id, r.detail || "");
+  }
   function tick() {
     fetch(api, {
       credentials: "same-origin",
@@ -37,8 +55,9 @@
         return resp.json();
       })
       .then(function (data) {
-        if (!data || !data.rows) return;
-        data.rows.forEach(applyRow);
+        if (!data) return;
+        if (data.rows) data.rows.forEach(applyRow);
+        if (data.package_hosts) data.package_hosts.forEach(applyPackageHost);
         if (stamp)
           stamp.textContent = "last refresh " + (data.refreshed_at || "—");
         if (data.refresh_ms && data.refresh_ms >= 2000) ms = data.refresh_ms;

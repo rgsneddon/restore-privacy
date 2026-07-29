@@ -31,6 +31,13 @@ DEFAULT_UI_PORT = 8080
 DEFAULT_FLEET_REFRESH_MS = 5000  # real-time admin table poll
 PRIVATE_CAPACITY_PATH = "/api/private/capacity"
 FLEET_USAGE_API_PATH = "/admin/api/fleet-usage"
+# Paid installer package host (Helsinki storage box) — load + disk only
+PACKAGE_HOST_METRICS_PATH = "/api/private/host-metrics"
+ENV_ASSET_TOKEN = "RPT_ASSET_FETCH_TOKEN"
+ENV_VPS_ASSET_BASE = "RPT_VPS_ASSET_BASE"
+ENV_PACKAGE_HOST_LABEL = "RPT_PACKAGE_HOST_LABEL"
+DEFAULT_PACKAGE_HOST_BASE = "https://135.181.152.10.sslip.io"
+DEFAULT_PACKAGE_HOST_LABEL = "Package store (HEL1)"
 
 # Injectable: (url, headers, timeout_s) -> body text
 TransportFn = Callable[[str, dict[str, str], float], str]
@@ -661,12 +668,267 @@ def collect_live_fleet_usage_rows(
     )
 
 
+@dataclass(frozen=True)
+class PackageHostRow:
+    """Installer package host (storage box): load + drive only — no paths."""
+
+    id: str
+    label: str
+    host: str
+    load_1: float | None
+    load_5: float | None
+    load_15: float | None
+    disk_total_bytes: int | None
+    disk_used_bytes: int | None
+    disk_avail_bytes: int | None
+    disk_util: float | None
+    uptime_sec: int | None
+    status: str  # ok | unknown | error
+    detail: str = ""
+
+    def to_dict(self) -> dict[str, Any]:
+        """Public row shape for admin JSON/HTML — never includes file paths."""
+        return {
+            "id": self.id,
+            "label": self.label,
+            "host": self.host,
+            "load_1": self.load_1,
+            "load_5": self.load_5,
+            "load_15": self.load_15,
+            "disk_total_bytes": self.disk_total_bytes,
+            "disk_used_bytes": self.disk_used_bytes,
+            "disk_avail_bytes": self.disk_avail_bytes,
+            "disk_util": self.disk_util,
+            "uptime_sec": self.uptime_sec,
+            "status": self.status,
+            "detail": self.detail,
+            "load_display": format_load_triple(self.load_1, self.load_5, self.load_15),
+            "disk_used_display": format_bytes(self.disk_used_bytes),
+            "disk_total_display": format_bytes(self.disk_total_bytes),
+            "disk_avail_display": format_bytes(self.disk_avail_bytes),
+            "disk_util_display": format_pct(self.disk_util),
+            "uptime_display": format_uptime(self.uptime_sec),
+        }
+
+
+def format_load_triple(
+    a: float | None, b: float | None, c: float | None
+) -> str:
+    """Load averages 1/5/15 as a single cell."""
+    parts: list[str] = []
+    for x in (a, b, c):
+        if x is None:
+            parts.append("—")
+        else:
+            parts.append(f"{float(x):.2f}")
+    if all(p == "—" for p in parts):
+        return "—"
+    return " / ".join(parts)
+
+
+def format_uptime(sec: int | None) -> str:
+    if sec is None:
+        return "—"
+    s = max(0, int(sec))
+    days, rem = divmod(s, 86400)
+    hours, rem = divmod(rem, 3600)
+    mins, _ = divmod(rem, 60)
+    if days:
+        return f"{days}d {hours}h"
+    if hours:
+        return f"{hours}h {mins}m"
+    return f"{mins}m"
+
+
+def package_host_row_from_metrics(
+    *,
+    host_id: str = "pkg-store",
+    label: str = DEFAULT_PACKAGE_HOST_LABEL,
+    host: str = "",
+    metrics: Mapping[str, Any] | None = None,
+    status: str = "ok",
+    detail: str = "",
+) -> PackageHostRow:
+    """Pure: build package-host row from host-metrics JSON (load + disk only)."""
+    m = dict(metrics or {}) if metrics else {}
+    if not metrics and status == "ok":
+        status = "unknown"
+        detail = detail or "no probe data"
+
+    def _f(key: str) -> float | None:
+        v = m.get(key)
+        if v is None:
+            return None
+        try:
+            return float(v)
+        except (TypeError, ValueError):
+            return None
+
+    def _i(key: str) -> int | None:
+        v = m.get(key)
+        if v is None:
+            return None
+        try:
+            return int(v)
+        except (TypeError, ValueError):
+            return None
+
+    load_1, load_5, load_15 = _f("load_1"), _f("load_5"), _f("load_15")
+    disk_total = _i("disk_total_bytes")
+    disk_used = _i("disk_used_bytes")
+    disk_avail = _i("disk_avail_bytes")
+    disk_util = _f("disk_util")
+    if disk_util is None and disk_total and disk_total > 0 and disk_used is not None:
+        disk_util = min(1.0, max(0.0, disk_used / float(disk_total)))
+    uptime = _i("uptime_sec")
+
+    st = status
+    if st == "ok" and load_1 is None and disk_total is None:
+        st = "unknown"
+        detail = detail or "metrics empty"
+
+    return PackageHostRow(
+        id=str(host_id or "pkg-store"),
+        label=str(label or DEFAULT_PACKAGE_HOST_LABEL),
+        host=str(host or "").strip(),
+        load_1=load_1,
+        load_5=load_5,
+        load_15=load_15,
+        disk_total_bytes=disk_total,
+        disk_used_bytes=disk_used,
+        disk_avail_bytes=disk_avail,
+        disk_util=disk_util,
+        uptime_sec=uptime,
+        status=st,
+        detail=detail,
+    )
+
+
+def package_host_base_url(env: Mapping[str, str] | None = None) -> str:
+    """Public base for the package store (no path suffix required)."""
+    e = env if env is not None else os.environ
+    raw = str(e.get(ENV_VPS_ASSET_BASE, "") or "").strip()
+    if raw:
+        # Strip /paid-assets suffix if present so we can join metrics path
+        base = raw.rstrip("/")
+        if base.endswith("/paid-assets"):
+            base = base[: -len("/paid-assets")]
+        return base.rstrip("/")
+    return DEFAULT_PACKAGE_HOST_BASE
+
+
+def package_host_metrics_url(env: Mapping[str, str] | None = None) -> str:
+    return f"{package_host_base_url(env)}{PACKAGE_HOST_METRICS_PATH}"
+
+
+def probe_package_host_metrics(
+    *,
+    env: Mapping[str, str] | None = None,
+    transport: TransportFn | None = None,
+    timeout_s: float | None = None,
+) -> tuple[dict[str, Any] | None, str]:
+    """Token-gated GET host-metrics on package store; (payload, error)."""
+    e = env if env is not None else os.environ
+    tok = str(e.get(ENV_ASSET_TOKEN, "") or "").strip()
+    if not tok:
+        return None, "RPT_ASSET_FETCH_TOKEN not set"
+    try:
+        t = (
+            float(timeout_s)
+            if timeout_s is not None
+            else float(e.get(ENV_PROBE_TIMEOUT, "") or DEFAULT_PROBE_TIMEOUT)
+        )
+    except ValueError:
+        t = DEFAULT_PROBE_TIMEOUT
+    url = package_host_metrics_url(e)
+    headers = {
+        "X-RPT-Asset-Token": tok,
+        "Accept": "application/json",
+        "User-Agent": "RestorePrivacy-admin-package-host/1",
+    }
+    fn = transport or _default_transport
+    try:
+        body = fn(url, headers, t)
+        data = json.loads(body)
+        if not isinstance(data, dict):
+            return None, "invalid host-metrics JSON"
+        return data, ""
+    except urllib.error.HTTPError as exc:
+        return None, f"HTTP {exc.code}"
+    except urllib.error.URLError as exc:
+        return None, f"unreachable ({exc.reason})"
+    except TimeoutError:
+        return None, "timeout"
+    except json.JSONDecodeError:
+        return None, "invalid JSON"
+    except Exception as exc:  # noqa: BLE001
+        return None, str(exc)[:120]
+
+
+def collect_package_host_rows(
+    *,
+    env: Mapping[str, str] | None = None,
+    transport: TransportFn | None = None,
+    metrics: Mapping[str, Any] | None = None,
+    error: str = "",
+) -> list[PackageHostRow]:
+    """One row for the configured package store host (or honest unavailable)."""
+    e = env if env is not None else os.environ
+    base = package_host_base_url(e)
+    # Display host only (hostname), never full URL paths
+    host_disp = base.replace("https://", "").replace("http://", "").split("/")[0]
+    label = str(e.get(ENV_PACKAGE_HOST_LABEL, "") or "").strip() or DEFAULT_PACKAGE_HOST_LABEL
+    if metrics is not None:
+        return [
+            package_host_row_from_metrics(
+                host_id="pkg-store",
+                label=label,
+                host=host_disp,
+                metrics=metrics,
+                status="ok" if metrics.get("ok", True) else "unknown",
+            )
+        ]
+    if error:
+        return [
+            package_host_row_from_metrics(
+                host_id="pkg-store",
+                label=label,
+                host=host_disp,
+                metrics=None,
+                status="error",
+                detail=error,
+            )
+        ]
+    payload, err = probe_package_host_metrics(env=e, transport=transport)
+    if payload is not None:
+        return [
+            package_host_row_from_metrics(
+                host_id="pkg-store",
+                label=label,
+                host=host_disp,
+                metrics=payload,
+                status="ok" if payload.get("ok", True) else "unknown",
+            )
+        ]
+    return [
+        package_host_row_from_metrics(
+            host_id="pkg-store",
+            label=label,
+            host=host_disp,
+            metrics=None,
+            status="error" if err else "unknown",
+            detail=err or "not probed",
+        )
+    ]
+
+
 def fleet_usage_json_payload(
     rows: Sequence[NodeUsageRow] | None = None,
     *,
     live: bool = True,
     env: Mapping[str, str] | None = None,
     transport: TransportFn | None = None,
+    package_host_rows: Sequence[PackageHostRow] | None = None,
 ) -> dict[str, Any]:
     """JSON for authenticated ``GET /admin/api/fleet-usage`` (live refresh)."""
     if rows is None and live:
@@ -683,12 +945,97 @@ def fleet_usage_json_payload(
         row_list = build_fleet_usage_rows(peers=product_catalog_peers(), env=env)
     else:
         row_list = list(rows)
+
+    if package_host_rows is not None:
+        pkg_rows = list(package_host_rows)
+    elif live:
+        try:
+            pkg_rows = collect_package_host_rows(env=env, transport=transport)
+        except Exception as exc:  # noqa: BLE001
+            pkg_rows = collect_package_host_rows(
+                env=env, error=str(exc)[:120]
+            )
+    else:
+        pkg_rows = collect_package_host_rows(env=env, error="not probed")
+
     now = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
     return {
         "refreshed_at": now,
         "refresh_ms": fleet_refresh_interval_ms(env),
         "rows": [r.to_dict() for r in row_list],
+        "package_hosts": [r.to_dict() for r in pkg_rows],
     }
+
+
+def render_package_host_usage_section_html(
+    rows: Sequence[PackageHostRow] | None = None,
+    *,
+    live: bool = True,
+    env: Mapping[str, str] | None = None,
+    transport: TransportFn | None = None,
+) -> str:
+    """Second fleet table: package-store host load + drive (no paths/filenames)."""
+    if rows is None and live:
+        try:
+            row_list = collect_package_host_rows(env=env, transport=transport)
+        except Exception as exc:  # noqa: BLE001
+            row_list = collect_package_host_rows(env=env, error=str(exc)[:120])
+    elif rows is None:
+        row_list = collect_package_host_rows(env=env, error="not probed")
+    else:
+        row_list = list(rows)
+
+    body_rows: list[str] = []
+    for r in row_list:
+        badge = {"ok": "ok", "unknown": "bad", "error": "bad"}.get(r.status, "bad")
+        rid = _escape(r.id)
+        detail = _escape(r.detail) if r.detail else ""
+        d = r.to_dict()
+        body_rows.append(
+            "<tr>"
+            f"<td><strong id=\"admin-pkg-label-{rid}\">{_escape(r.label)}</strong></td>"
+            f"<td><code id=\"admin-pkg-host-{rid}\">{_escape(r.host)}</code></td>"
+            f"<td id=\"admin-pkg-load-{rid}\">{_escape(d['load_display'])}</td>"
+            f"<td id=\"admin-pkg-disk-used-{rid}\">{_escape(d['disk_used_display'])}</td>"
+            f"<td id=\"admin-pkg-disk-total-{rid}\">{_escape(d['disk_total_display'])}</td>"
+            f"<td id=\"admin-pkg-disk-avail-{rid}\">{_escape(d['disk_avail_display'])}</td>"
+            f"<td id=\"admin-pkg-disk-util-{rid}\">{_escape(d['disk_util_display'])}</td>"
+            f"<td id=\"admin-pkg-uptime-{rid}\">{_escape(d['uptime_display'])}</td>"
+            f'<td><span class="badge {badge}" id="admin-pkg-status-{rid}">'
+            f"{_escape(r.status)}</span>"
+            f"<br/><span class=\"muted\" id=\"admin-pkg-detail-{rid}\">{detail}</span>"
+            f"</td>"
+            "</tr>"
+        )
+    table = (
+        "\n".join(body_rows)
+        if body_rows
+        else '<tr><td colspan="9">No package host configured</td></tr>'
+    )
+    return f"""
+<section id="admin-package-host-usage" class="card"
+         aria-labelledby="admin-package-host-usage-heading"
+         data-admin-package-host-usage="1">
+  <h2 id="admin-package-host-usage-heading">Installer package host (storage)</h2>
+  <p class="muted" id="admin-package-host-usage-blurb">
+  Server(s) that hold paid installer packages (storage box).
+  <strong>Load</strong> and <strong>drive</strong> utilisation only —
+  no file paths, package directories, or filenames.
+  Refreshes with the residual fleet table.
+  </p>
+  <table id="admin-package-host-usage-table">
+    <thead><tr>
+      <th>Role</th><th>Host</th>
+      <th>Load (1 / 5 / 15)</th>
+      <th>Disk used</th><th>Disk total</th><th>Disk free</th><th>Disk util</th>
+      <th>Uptime</th><th>Status</th>
+    </tr></thead>
+    <tbody>
+{table}
+    </tbody>
+  </table>
+</section>
+"""
 
 
 def render_admin_node_usage_section_html(
@@ -698,6 +1045,7 @@ def render_admin_node_usage_section_html(
     env: Mapping[str, str] | None = None,
     transport: TransportFn | None = None,
     top_link_html: str = "",
+    package_host_rows: Sequence[PackageHostRow] | None = None,
 ) -> str:
     """HTML section: fleet bandwidth used vs capability (admin only)."""
     if rows is None and live:
@@ -762,6 +1110,12 @@ def render_admin_node_usage_section_html(
         '<p class="admin-top-link">'
         '<a href="#admin-heading" class="admin-top-link-a">^top</a></p>\n'
     )
+    pkg_html = render_package_host_usage_section_html(
+        package_host_rows,
+        live=live,
+        env=env,
+        transport=transport,
+    )
 
     return f"""
 <section id="admin-node-usage" class="card" aria-labelledby="admin-node-usage-heading"
@@ -784,6 +1138,7 @@ def render_admin_node_usage_section_html(
 {table}
     </tbody>
   </table>
+{pkg_html}
 {top}<script id="admin-fleet-usage-script" src="/static/admin_fleet_usage.js"></script>
 </section>
 """
