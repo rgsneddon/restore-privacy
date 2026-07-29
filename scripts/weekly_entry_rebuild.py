@@ -309,10 +309,23 @@ def main(argv: list[str] | None = None) -> int:
             )
         return 0
 
-    # Live: execute plan steps in order
+    # Live: execute plan steps in order. Fail closed on lock / drain / preflight
+    # (not only on [DESTRUCTIVE] steps) so a missed exclusive lock cannot race a
+    # second concurrent wipe start.
+    _fail_closed_ids = frozenset(
+        {
+            "exclusive_lock_acquire",
+            "peer_failover_preflight",
+            "entry_node_preflight",
+            "mark_entry_draining",
+            "mark_rebuilding",
+            "mark_fleet_peer_complete",
+            "exclusive_lock_release",
+        }
+    )
     for step in plan.steps:
         rc = _run_step_command(step.command, dry_run=False)
-        if rc != 0 and step.destructive:
+        if rc != 0 and (step.destructive or step.id in _fail_closed_ids):
             print(f"step {step.id} failed rc={rc}", file=sys.stderr)
             release_rebuild_lock(install_root=args.install_root)
             return rc or 1

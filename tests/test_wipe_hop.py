@@ -14,10 +14,12 @@ sys.path.insert(0, str(ROOT))
 from client.endpoint import PRODUCT_NODE_HOST, Endpoint  # noqa: E402
 from client.multihop import (  # noqa: E402
     PRODUCT_COUNTRY_CATALOG,
+    PRODUCT_DE_HOST,
     PRODUCT_EXIT_HOST,
     PRODUCT_US_HOST,
     MultiHopConfig,
     ResidualUnavailable,
+    multihop_config_for_entry_country,
     select_residual_endpoint,
 )
 from client.wipe_hop import (  # noqa: E402
@@ -33,7 +35,6 @@ from client.wipe_hop import (  # noqa: E402
     signal_applies_to_preferred,
     wipe_hop_advisory,
 )
-from client.connect import ConnectState, RptClient  # noqa: E402
 from node.protocol import (  # noqa: E402
     NODE_STATUS_DRAINING,
     NODE_STATUS_READY,
@@ -43,6 +44,13 @@ from node.protocol import (  # noqa: E402
     parse_node_status,
     peek_type,
 )
+
+# Optional: connect path needs cryptography; selection/signal tests do not.
+try:
+    from client.connect import ConnectState, RptClient  # noqa: E402
+except Exception:  # noqa: BLE001
+    ConnectState = None  # type: ignore
+    RptClient = None  # type: ignore
 
 
 class TestWipeHopSelection(unittest.TestCase):
@@ -86,27 +94,27 @@ class TestWipeHopSelection(unittest.TestCase):
             )
             self.assertNotEqual(sel.endpoint.host, PRODUCT_NODE_HOST)
 
-    def test_catalog_alternates_include_ro_and_us(self):
-        """Three-peer catalog: RO and US eligible when preferred is IS."""
+    def test_catalog_alternates_include_de_and_us(self):
+        """Three-peer catalog: DE and US eligible when preferred is IS."""
         preferred = Endpoint(host=PRODUCT_NODE_HOST, port=44044)
         alts = eligible_wipe_alternates(
             preferred,
             peer_health={
                 PRODUCT_NODE_HOST: True,
-                PRODUCT_EXIT_HOST: True,
+                PRODUCT_DE_HOST: True,
                 PRODUCT_US_HOST: True,
             },
             catalog=PRODUCT_COUNTRY_CATALOG,
         )
         hosts = {a.host for a in alts}
-        self.assertEqual(hosts, {PRODUCT_EXIT_HOST, PRODUCT_US_HOST})
+        self.assertEqual(hosts, {PRODUCT_DE_HOST, PRODUCT_US_HOST})
         self.assertNotIn(PRODUCT_NODE_HOST, hosts)
         seen: set[str] = set()
         for seed in range(40):
             ep = pick_random_alternate(
                 preferred,
                 peer_health={
-                    PRODUCT_EXIT_HOST: True,
+                    PRODUCT_DE_HOST: True,
                     PRODUCT_US_HOST: True,
                 },
                 catalog=PRODUCT_COUNTRY_CATALOG,
@@ -115,8 +123,39 @@ class TestWipeHopSelection(unittest.TestCase):
             assert ep is not None
             seen.add(ep.host)
         self.assertGreaterEqual(len(seen), 2)
-        self.assertIn(PRODUCT_EXIT_HOST, seen)
+        self.assertIn(PRODUCT_DE_HOST, seen)
         self.assertIn(PRODUCT_US_HOST, seen)
+
+    def test_de_preferred_drain_hops_to_is_or_us(self):
+        """Monopin DE preferred draining → alternate is IS or US (not DE)."""
+        cfg = multihop_config_for_entry_country("DE", multihop_enabled=False)
+        sel = select_wipe_aware_residual(
+            cfg,
+            preferred_draining=True,
+            preferred_healthy=True,
+            peer_health={
+                PRODUCT_NODE_HOST: True,
+                PRODUCT_DE_HOST: True,
+                PRODUCT_US_HOST: True,
+            },
+            rng=random.Random(1),
+        )
+        self.assertEqual(sel.reason, REASON_WIPE_DRAIN_FAILOVER)
+        self.assertIn(sel.endpoint.host, {PRODUCT_NODE_HOST, PRODUCT_US_HOST})
+        self.assertNotEqual(sel.endpoint.host, PRODUCT_DE_HOST)
+        # rejoin preferred DE when ready
+        sel2 = select_wipe_aware_residual(
+            cfg,
+            preferred_draining=False,
+            preferred_healthy=True,
+            peer_health={
+                PRODUCT_NODE_HOST: True,
+                PRODUCT_DE_HOST: True,
+                PRODUCT_US_HOST: True,
+            },
+        )
+        self.assertEqual(sel2.reason, REASON_WIPE_REJOIN)
+        self.assertEqual(sel2.endpoint.host, PRODUCT_DE_HOST)
 
     def test_select_residual_endpoint_drain_multi_peer(self):
         seen: set[str] = set()
@@ -143,8 +182,9 @@ class TestWipeHopSelection(unittest.TestCase):
                 preferred_draining=True,
                 peer_health={
                     PRODUCT_NODE_HOST: True,
-                    PRODUCT_EXIT_HOST: False,
+                    PRODUCT_DE_HOST: False,
                     PRODUCT_US_HOST: False,
+                    PRODUCT_EXIT_HOST: False,
                 },
             )
 
@@ -316,6 +356,7 @@ class TestWipeSignalParse(unittest.TestCase):
         self.assertEqual(n, "no_signal")
 
 
+@unittest.skipIf(RptClient is None, "cryptography not installed for RptClient")
 class TestConnectWipePath(unittest.TestCase):
     def test_connect_hops_when_entry_draining(self):
         lines: list[str] = []
@@ -460,6 +501,8 @@ class TestNodeWipeStatus(unittest.TestCase):
         # Code calls (not docstring prose): no sock.settimeout / sock.recvfrom
         self.assertNotIn(".settimeout(", body)
         self.assertNotIn(".recvfrom(", body)
+        if RptClient is None:
+            self.skipTest("cryptography not installed for RptClient")
         client = RptClient(probe_capacity=False)
         mock_sock = mock.Mock()
         client._sock = mock_sock
