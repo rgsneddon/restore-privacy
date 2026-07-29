@@ -496,21 +496,51 @@ Map<String, dynamic> buildFullTunnelConnectResult({
   };
 }
 
-/// True when text is missing host packet-tunnel-provider / Team residual class.
+/// True only for **actual** missing-host-NE / public DevID product dual-path copy.
+///
+/// Must **not** match residual-capable Packet Tunnel boilerplate that merely
+/// *mentions* `sign_macos_residual_team` or `packet-tunnel-provider` as a tip
+/// ([kPacketTunnelNotActiveMessage], residual-team startTunnel tips). Those are
+/// residual-capable failures — UDP/keygen/entitlement may still be primary.
 bool isMissingHostNeDetail(String text) {
   final m = text.toLowerCase();
   if (m.isEmpty) return false;
-  return m.contains('packet-tunnel-provider') ||
-      m.contains('sign_macos_residual') ||
-      m.contains('team residual') ||
-      m.contains('needs team residual') ||
-      (m.contains('host is missing') && m.contains('network extension')) ||
-      m.contains('public developer id downloads intentionally omit');
+  // Explicit host-cannot-register / host-missing entitlement (public DevID).
+  if (m.contains('this app build cannot register or activate packet tunnel')) {
+    return true;
+  }
+  if (m.contains('host is missing the packet-tunnel-provider') ||
+      m.contains('host is missing the packet-tunnel-provider network extension')) {
+    return true;
+  }
+  if (m.contains('public developer id downloads intentionally omit')) {
+    return true;
+  }
+  // Flag-style detail without PT-not-active boilerplate.
+  if (m.contains('needsteamresidualsign') ||
+      m.contains('needs team residual sign')) {
+    return true;
+  }
+  // Do NOT match bare packet-tunnel-provider / sign_macos_residual / team residual
+  // — those appear as conditional tips on residual-capable hosts.
+  return false;
+}
+
+/// True when [nodeDiagnostic] is residual HELLO / admission silence (keygen path).
+bool isNodeHelloAdmissionFailure(String nodeDiagnostic) {
+  final low = nodeDiagnostic.toLowerCase();
+  if (low.isEmpty) return false;
+  return low.contains('udp receive timeout') ||
+      low.contains('udp receive failed') ||
+      low.contains('no reply') ||
+      low.contains('payment entitlement') ||
+      (low.contains('keygen') && low.contains('connect failed'));
 }
 
 /// Single primary root-cause for Connect failure (mirrors native RptFullTunnelResult).
 ///
-/// Prefer residual-honest re-sign guidance over stacking Allow-VPN + UDP timeout.
+/// Residual-capable hosts: HELLO UDP silence / entitlement beats PT tip boilerplate.
+/// Public DevID: explicit missing-host-NE beats UDP noise.
 String composeConnectFailurePrimaryMessage({
   required bool hostOnlyHello,
   String? vpnIp,
@@ -521,14 +551,15 @@ String composeConnectFailurePrimaryMessage({
   final node = (nodeDiagnostic ?? '').trim();
   final ip = (vpnIp ?? '').trim();
   final detailLow = detail.toLowerCase();
-  final nodeLow = node.toLowerCase();
 
+  // 1) True public-DevID missing host NE only (strict).
   if (isMissingHostNeDetail(detail) || isMissingHostNeDetail(node)) {
     if (detail.isNotEmpty && isMissingHostNeDetail(detail)) return detail;
     if (node.isNotEmpty && isMissingHostNeDetail(node)) return node;
     return detail.isEmpty ? kPacketTunnelNotActiveMessage : detail;
   }
 
+  // 2) Host-only HELLO (node up, no system tunnel).
   if (hostOnlyHello) {
     var line = kHostOnlyHelloNotFullTunnelMessage;
     if (ip.isNotEmpty) line = '$line (node assigned $ip)';
@@ -538,6 +569,13 @@ String composeConnectFailurePrimaryMessage({
     return line;
   }
 
+  // 3) Residual-capable: node HELLO/admission failure is primary over PT tips.
+  //    (kPacketTunnelNotActiveMessage mentions sign_macos_residual as a tip only.)
+  if (node.isNotEmpty && isNodeHelloAdmissionFailure(node)) {
+    return primaryNodeConnectFailureMessage(node);
+  }
+
+  // 4) Explicit tunnel/NE detail without node HELLO noise.
   if (detail.isNotEmpty) {
     final hasResidualHonesty = detailLow.contains('residual public ip') ||
         detailLow.contains('did not become active') ||
@@ -547,28 +585,13 @@ String composeConnectFailurePrimaryMessage({
         : '$kPacketTunnelNotActiveMessage $detail';
     if (node.isNotEmpty &&
         !_isRedundantNodeDiagnostic(node: node, detail: base)) {
-      // Detail already residual-honest: keep primary without node noise when NE explained.
-      if (hasResidualHonesty &&
-          (detailLow.contains('did not become') ||
-              detailLow.contains('system vpn'))) {
-        return base;
-      }
       return '$base $node';
     }
     return base;
   }
 
   if (node.isNotEmpty) {
-    final nodePrimary = primaryNodeConnectFailureMessage(node);
-    // When residual-capable host already failed only at HELLO, prefer node/keygen
-    // as the single primary (avoid stacking full PT boilerplate + long node line).
-    if (nodePrimary != node ||
-        nodeLow.contains('udp receive timeout') ||
-        nodeLow.contains('payment entitlement') ||
-        nodeLow.contains('keygen')) {
-      return nodePrimary;
-    }
-    return '$kPacketTunnelNotActiveMessage $node';
+    return primaryNodeConnectFailureMessage(node);
   }
   return kPacketTunnelNotActiveMessage;
 }

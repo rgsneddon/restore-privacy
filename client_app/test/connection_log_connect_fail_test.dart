@@ -55,8 +55,14 @@ void main() {
 
     test('UDP timeout export prefers keygen/entitlement primary when residual-capable',
         () {
+      // Residual-team PT boilerplate mentions sign_macos_residual_team as a tip
+      // only — must NOT strip Node diagnostic / keygen.
       const status =
           'System VPN (Packet Tunnel) did not become active — residual public IP will not change. '
+          'Allow VPN for Restore Privacy in System Settings → Network → VPN & Filters '
+          '(and Login Items & Extensions if prompted). Settings opens when possible — then '
+          'press Connect again. Residual Packet Tunnel needs a Team-signed host + appex with '
+          'Network Extension (developers: scripts/sign_macos_residual_team.py). '
           'Node diagnostic: Connect failed to 5.161.242.85:44044: UDP receive timeout — residual HELLO got no reply. '
           'Product residual nodes refuse HELLO until this device is bound to an active paid entitlement. '
           'If you just paid: enter the keygen';
@@ -64,8 +70,28 @@ void main() {
       expect(msg.toLowerCase(), contains('udp receive timeout'));
       expect(msg.toLowerCase(), contains('keygen'));
       expect(msg.toLowerCase(), contains('entitlement'));
-      // Not a bare token
+      expect(msg.toLowerCase(), contains('node diagnostic:'));
+      // Not collapsed to bare PT tip-only line
+      expect(
+        msg.toLowerCase().startsWith('system vpn (packet tunnel) did not become active'),
+        isFalse,
+        reason: 'residual-capable export must not drop Node diagnostic for PT tips',
+      );
       expect(msg.toLowerCase(), isNot(equals('connect failed')));
+    });
+
+    test('PT tip boilerplate alone is not treated as missing host NE export', () {
+      // kPacketTunnelNotActiveMessage body (residual-capable tip)
+      const tipOnly =
+          'System VPN (Packet Tunnel) did not become active — residual public IP will not change. '
+          'Residual Packet Tunnel needs a Team-signed host + appex with Network Extension '
+          '(developers: scripts/sign_macos_residual_team.py).';
+      final msg = connectionLogConnectFailureMessage(tipOnly);
+      expect(msg, tipOnly);
+      expect(
+        collapseConnectFailurePrimaryForExport(tipOnly),
+        tipOnly,
+      );
     });
 
     test('multi-fault public DevID export collapses to host NE primary', () {

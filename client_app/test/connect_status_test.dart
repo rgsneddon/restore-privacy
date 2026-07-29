@@ -515,6 +515,45 @@ void main() {
       );
     });
 
+    test('PT tip boilerplate is not missing host NE (residual-capable)', () {
+      // kPacketTunnelNotActiveMessage mentions sign_macos_residual_team as a tip.
+      expect(isMissingHostNeDetail(kPacketTunnelNotActiveMessage), isFalse);
+      expect(
+        isMissingHostNeDetail(
+          'Packet Tunnel did not become Connected. '
+          'developers: scripts/sign_macos_residual_team.py',
+        ),
+        isFalse,
+      );
+    });
+
+    test('residual-capable PT fail + UDP node keeps keygen primary', () {
+      // Residual-team host already has NE; unpaid HELLO silent-drop is primary.
+      final msg = composeConnectFailurePrimaryMessage(
+        hostOnlyHello: false,
+        detailMessage: kPacketTunnelNotActiveMessage,
+        nodeDiagnostic:
+            'Node diagnostic: Connect failed to 5.161.242.85:44044: UDP receive timeout',
+      );
+      expect(msg.toLowerCase(), contains('udp receive timeout'));
+      expect(msg.toLowerCase(), contains('keygen'));
+      expect(msg.toLowerCase(), contains('entitlement'));
+      // Must not drop node for PT tip classification
+      expect(
+        msg,
+        isNot(equals(kPacketTunnelNotActiveMessage)),
+      );
+      final map = buildFullTunnelConnectResult(
+        packetTunnelActive: false,
+        detailMessage: kPacketTunnelNotActiveMessage,
+        nodeDiagnostic:
+            'Node diagnostic: Connect failed to 5.161.242.85:44044: UDP receive timeout',
+      );
+      final card = mapConnectStatusMessage(map);
+      expect(card.toLowerCase(), contains('udp receive timeout'));
+      expect(card.toLowerCase(), contains('keygen'));
+    });
+
     test('host-only HELLO does not hide to tray', () {
       final map = buildFullTunnelConnectResult(
         packetTunnelActive: false,

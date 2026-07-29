@@ -145,44 +145,50 @@ String connectionLogConnectFailureMessage(
 
 /// Collapse a residual-honest (or legacy multi-fault) Connect status for export.
 ///
-/// Missing host NE / Team residual re-sign wins over UDP HELLO noise and
-/// generic Allow-VPN walls when both appear in one line.
+/// **Strict** missing-host-NE (public DevID) wins over UDP noise.
+/// Residual-capable PT boilerplate that only *mentions* `sign_macos_residual_team`
+/// must **not** strip Node diagnostic / keygen primary.
 String collapseConnectFailurePrimaryForExport(String status) {
   final s = status.trim();
   if (s.isEmpty) return s;
   final low = s.toLowerCase();
-  final missingNe = low.contains('packet-tunnel-provider') ||
-      low.contains('sign_macos_residual') ||
-      low.contains('public developer id downloads intentionally omit') ||
-      (low.contains('host is missing') && low.contains('network extension'));
-  if (missingNe) {
-    // Prefer the explicit host-missing-NE sentence through re-sign guidance.
+
+  // Strict public-DevID missing host NE only (same contract as isMissingHostNeDetail).
+  final trueMissingNe =
+      low.contains('this app build cannot register or activate packet tunnel') ||
+          low.contains('host is missing the packet-tunnel-provider') ||
+          low.contains('public developer id downloads intentionally omit');
+
+  if (trueMissingNe) {
     const marker =
         'This app build cannot register or activate Packet Tunnel';
     final idx = s.indexOf(marker);
     if (idx >= 0) {
-      // Drop leading System VPN boilerplate if present before the marker.
       var body = s.substring(idx).trim();
-      // Strip trailing Node diagnostic when NE is primary.
       final nodeIdx = body.toLowerCase().indexOf('node diagnostic:');
       if (nodeIdx > 0) {
         body = body.substring(0, nodeIdx).trim();
       }
       return body;
     }
-    // Fallback: strip Node diagnostic suffix from multi-fault lines.
+    // Explicit host-is-missing without the long marker prefix.
     final nodeIdx = low.indexOf('node diagnostic:');
     if (nodeIdx > 0) {
       return s.substring(0, nodeIdx).trim();
     }
+    return s;
   }
-  // Residual-capable host: UDP silence / entitlement is the primary root cause.
-  if ((low.contains('udp receive timeout') || low.contains('payment entitlement')) &&
-      !missingNe) {
+
+  // Residual-capable: keep / prefer Node diagnostic (UDP / keygen / entitlement).
+  if (low.contains('udp receive timeout') ||
+      low.contains('payment entitlement') ||
+      low.contains('keygen')) {
     final nodeIdx = low.indexOf('node diagnostic:');
     if (nodeIdx >= 0) {
       return s.substring(nodeIdx).trim();
     }
+    // Whole status may already be the node/keygen line.
+    return s;
   }
   return s;
 }

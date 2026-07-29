@@ -79,7 +79,8 @@ public enum RptFullTunnelResult {
     }
 
     /// Single primary root-cause for Connect failure (support export + UI).
-    /// Avoid stacking missing-host-NE + Allow-Settings + UDP timeout walls of text.
+    /// Residual-capable: HELLO UDP silence / entitlement beats PT tip boilerplate.
+    /// Public DevID: explicit missing-host-NE only (not bare sign_macos_residual tips).
     public static func composeConnectFailurePrimaryMessage(
         hostOnlyHello: Bool,
         vpnIp: String? = nil,
@@ -90,9 +91,8 @@ public enum RptFullTunnelResult {
         let node = (nodeDiagnostic ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
         let ip = (vpnIp ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
         let detailLow = detail.lowercased()
-        let nodeLow = node.lowercased()
 
-        // 1) Missing host NE / Team residual re-sign — only that path (Settings cannot fix).
+        // 1) Strict public-DevID missing host NE only.
         if isMissingHostNeDetail(detail) || isMissingHostNeDetail(node) {
             if !detail.isEmpty, isMissingHostNeDetail(detail) {
                 return detail
@@ -113,7 +113,12 @@ public enum RptFullTunnelResult {
             return line
         }
 
-        // 3) Explicit NE/tunnel detail without node noise.
+        // 3) Residual-capable: node HELLO/admission failure is primary over PT tips.
+        if !node.isEmpty, isNodeHelloAdmissionFailure(node) {
+            return primaryNodeConnectFailureMessage(node)
+        }
+
+        // 4) Explicit tunnel/NE detail without node HELLO noise.
         if !detail.isEmpty {
             let hasResidualHonesty =
                 detailLow.contains("residual public ip")
@@ -121,37 +126,64 @@ public enum RptFullTunnelResult {
                 || detailLow.contains("system vpn (packet tunnel)")
             let base = hasResidualHonesty ? detail : "\(packetTunnelNotActiveMessage) \(detail)"
             if !node.isEmpty, !isRedundantNodeDiagnostic(node: node, detail: base) {
-                if hasResidualHonesty,
-                   detailLow.contains("did not become") || detailLow.contains("system vpn") {
-                    return base
-                }
                 return "\(base) \(node)"
             }
             return base
         }
 
-        // 4) Node HELLO failure alone (residual-capable host, tunnel not up).
         if !node.isEmpty {
-            // Prefix brief PT context so export is residual-honest, not bare node timeout.
-            if nodeLow.contains("udp receive timeout") || nodeLow.contains("connect failed to") {
-                return "\(packetTunnelNotActiveMessage) \(node)"
-            }
-            return "\(packetTunnelNotActiveMessage) \(node)"
+            return primaryNodeConnectFailureMessage(node)
         }
 
         return packetTunnelNotActiveMessage
     }
 
-    /// True when text is missing host packet-tunnel-provider / Team residual re-sign class.
+    /// True only for actual missing-host-NE / public DevID dual-path copy.
+    /// Must not match residual-capable PT boilerplate that mentions residual tips.
     public static func isMissingHostNeDetail(_ text: String) -> Bool {
         let m = text.lowercased()
         if m.isEmpty { return false }
-        return m.contains("packet-tunnel-provider")
-            || m.contains("sign_macos_residual")
-            || m.contains("team residual")
-            || m.contains("needs team residual")
-            || (m.contains("host is missing") && m.contains("network extension"))
-            || m.contains("public developer id downloads intentionally omit")
+        if m.contains("this app build cannot register or activate packet tunnel") {
+            return true
+        }
+        if m.contains("host is missing the packet-tunnel-provider") {
+            return true
+        }
+        if m.contains("public developer id downloads intentionally omit") {
+            return true
+        }
+        if m.contains("needs team residual sign") || m.contains("needsteamresidualsign") {
+            return true
+        }
+        return false
+    }
+
+    public static func isNodeHelloAdmissionFailure(_ nodeDiagnostic: String) -> Bool {
+        let low = nodeDiagnostic.lowercased()
+        if low.isEmpty { return false }
+        return low.contains("udp receive timeout")
+            || low.contains("udp receive failed")
+            || low.contains("no reply")
+            || low.contains("payment entitlement")
+            || (low.contains("keygen") && low.contains("connect failed"))
+    }
+
+    public static func primaryNodeConnectFailureMessage(_ nodeDiagnostic: String) -> String {
+        let n = nodeDiagnostic.trimmingCharacters(in: .whitespacesAndNewlines)
+        if n.isEmpty { return n }
+        let low = n.lowercased()
+        if low.contains("udp receive timeout")
+            || low.contains("udp receive failed")
+            || low.contains("no reply") {
+            if low.contains("keygen") || low.contains("entitlement") {
+                return n
+            }
+            return "\(n) — residual HELLO got no reply. Product residual nodes refuse HELLO "
+                + "until this device is bound to an active paid entitlement. If you just paid: "
+                + "enter the keygen from your fulfilment email (unlock dialog or Settings → "
+                + "Payment entitlement / keygen), then Connect again."
+        }
+        return n
     }
 
     private static func isRedundantNodeDiagnostic(node: String, detail: String) -> Bool {
@@ -159,7 +191,6 @@ public enum RptFullTunnelResult {
         let d = detail.lowercased()
         if n.isEmpty { return true }
         if d.contains(n) { return true }
-        // When detail already says missing host NE, UDP/HELLO noise is redundant.
         if isMissingHostNeDetail(detail) { return true }
         return false
     }
