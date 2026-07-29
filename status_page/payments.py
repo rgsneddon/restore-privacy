@@ -2427,6 +2427,24 @@ def resolve_paid_grant_filename(
     return current
 
 
+def grant_delivery_filename(
+    *, platform: str = "", stored_filename: str = ""
+) -> str | None:
+    """Installer name for fulfilling a paid download token.
+
+    Prefer live :func:`platform_filename` for a known platform so a grant row
+    that still stores an older pin (e.g. ``…-0.2.9-…``) never streams that
+    binary. Falls back to :func:`_safe_catalog_filename` only when the stored
+    name is already in the current catalog set.
+    """
+    plat = (platform or "").strip().lower()
+    if plat:
+        current = platform_filename(plat)
+        if current:
+            return current
+    return _safe_catalog_filename(stored_filename)
+
+
 def asset_download_url(filename: str) -> str | None:
     """Canonical GitHub release asset URL (bookkeeping only — not a free public href).
 
@@ -5369,14 +5387,19 @@ def _grant_dict_from_row(row: sqlite3.Row) -> dict[str, Any]:
     pid = ""
     if "purchase_id" in keys and row["purchase_id"]:
         pid = normalize_purchase_id(str(row["purchase_id"])) or str(row["purchase_id"])
+    stored = str(row["filename"] or "")
+    plat = str(row["platform"] or "")
+    # Delivery always rebinds to live catalog for known platforms
+    live = grant_delivery_filename(platform=plat, stored_filename=stored) or stored
     return {
         "token": row["token"],
-        "filename": row["filename"],
+        "filename": live,
+        "stored_filename": stored,
         "platform": row["platform"],
         "session_id": row["session_id"],
         "amount_pence": row["amount_pence"],
         "currency": row["currency"],
-        "url": asset_download_url(row["filename"]),
+        "url": asset_download_url(live),
         "purchase_id": pid,
         "download_path": f"/download?token={row['token']}",
     }
@@ -5389,6 +5412,9 @@ def lookup_download_token(
 
     Use before opening the installer so a failed proxy does not burn the grant.
     Call :func:`consume_download_token` only after the asset is opened successfully.
+
+    ``filename`` is the **current catalog** package for the grant platform (never
+    a stale pin still sitting in the SQLite row).
     """
     init_db()
     t = now if now is not None else time.time()
@@ -5406,7 +5432,11 @@ def lookup_download_token(
             return None
         if float(row["expires_at"]) < t:
             return None
-        return _grant_dict_from_row(row)
+        d = _grant_dict_from_row(row)
+        # Fail closed if we cannot deliver a current-catalog name
+        if not _safe_catalog_filename(str(d.get("filename") or "")):
+            return None
+        return d
     finally:
         conn.close()
 

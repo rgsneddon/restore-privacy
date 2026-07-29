@@ -201,7 +201,9 @@ class TestOpenPrefersCurrentVersionStore(unittest.TestCase):
         self.assertIn(f"Download client v{RELEASE_VERSION}", html)
         self.assertNotIn('id="catalog-version"', html)
         self.assertNotIn("paid download only", html)
-        self.assertIn("Windows | Linux | macOS | iOS | Android", html)
+        # Homepage buy form lists each current-catalog platform (not free GH hrefs)
+        for label in ("Windows", "Linux", "macOS", "iOS", "Android"):
+            self.assertIn(label, html)
         for a in available_downloads():
             self.assertIn(a.filename, html)
             self.assertNotIn(f'href="{a.url}"', html)
@@ -209,6 +211,128 @@ class TestOpenPrefersCurrentVersionStore(unittest.TestCase):
         self.assertEqual(len(pkgs), 5)
         for p in pkgs:
             self.assertEqual(p["version"], RELEASE_VERSION)
+
+
+class TestLookupRebindsStaleGrantFilename(unittest.TestCase):
+    def setUp(self):
+        self._td = tempfile.TemporaryDirectory()
+        self.addCleanup(self._td.cleanup)
+        os.environ["RPT_PAYMENT_DATA_DIR"] = self._td.name
+        payments.init_db()
+
+    def test_lookup_delivers_current_filename_when_row_stale(self):
+        """Active download tokens always open the live catalog package."""
+        current = payments.platform_filename("windows")
+        self.assertIsNotNone(current)
+        assert current is not None
+        stale = "restore-privacy-client-0.2.9-windows-x64-setup.exe"
+        # Mint with correct binding first…
+        tok = payments.mint_download_token(
+            filename=current,
+            platform="windows",
+            session_id="cs_stale_row",
+        )
+        # …then corrupt the stored filename as if left from an older pin.
+        conn = payments._connect()
+        try:
+            conn.execute(
+                "UPDATE grants SET filename = ? WHERE token = ?",
+                (stale, tok),
+            )
+            conn.commit()
+            row = conn.execute(
+                "SELECT filename FROM grants WHERE token = ?", (tok,)
+            ).fetchone()
+            self.assertEqual(row["filename"], stale)
+        finally:
+            conn.close()
+        grant = payments.lookup_download_token(tok)
+        self.assertIsNotNone(grant)
+        assert grant is not None
+        self.assertEqual(grant["filename"], current)
+        self.assertIn(RELEASE_VERSION, grant["filename"])
+        self.assertNotIn("0.2.9", grant["filename"])
+        self.assertEqual(grant.get("stored_filename"), stale)
+        # Delivery helper matches
+        live = payments.grant_delivery_filename(
+            platform="windows", stored_filename=stale
+        )
+        self.assertEqual(live, current)
+        # open_release_asset still rejects the stale name itself
+        self.assertIsNone(payments.open_release_asset(stale))
+
+    def test_admin_mint_uses_current_filename(self):
+        result = payments.admin_mint_download_for_platform("linux")
+        self.assertTrue(result.get("token") or result.get("download_token") or result)
+        # API shape varies — inspect DB via minted token when present
+        tok = (
+            result.get("token")
+            or result.get("download_token")
+            or (result.get("grant") or {}).get("token")
+        )
+        if not tok and isinstance(result, dict):
+            # fall back: download_url may embed token=
+            url = str(result.get("download_url") or result.get("url") or "")
+            if "token=" in url:
+                tok = url.split("token=", 1)[-1].split("&", 1)[0]
+        self.assertTrue(tok, result)
+        g = payments.lookup_download_token(str(tok))
+        self.assertIsNotNone(g)
+        assert g is not None
+        self.assertEqual(g["filename"], payments.platform_filename("linux"))
+
+
+class TestServePathCatalogPin(unittest.TestCase):
+    def test_path_allowed_refuses_stale_version(self):
+        # Load pure helper from serve script without starting HTTP server
+        import importlib.util
+
+        path = ROOT / "node" / "serve_paid_assets.py"
+        spec = importlib.util.spec_from_file_location("serve_paid_assets", path)
+        assert spec and spec.loader
+        mod = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(mod)
+        pin = RELEASE_VERSION
+        fname = f"restore-privacy-client-{pin}-windows-x64-setup.exe"
+        self.assertTrue(
+            mod.path_allowed_for_catalog(pin, fname, catalog_version=pin)
+        )
+        self.assertFalse(
+            mod.path_allowed_for_catalog("0.2.9", fname, catalog_version=pin)
+        )
+        self.assertFalse(
+            mod.path_allowed_for_catalog(
+                pin,
+                "restore-privacy-client-0.2.9-windows-x64-setup.exe",
+                catalog_version=pin,
+            )
+        )
+
+
+class TestStoreTidyCurrentOnly(unittest.TestCase):
+    def test_tidy_removes_non_current_version_dirs(self):
+        import importlib.util
+
+        path = ROOT / "scripts" / "host_paid_assets_vps.py"
+        spec = importlib.util.spec_from_file_location("host_paid_assets_vps", path)
+        assert spec and spec.loader
+        mod = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(mod)
+        root = Path(tempfile.mkdtemp())
+        self.addCleanup(lambda: __import__("shutil").rmtree(root, ignore_errors=True))
+        (root / "0.2.9").mkdir()
+        (root / "0.4.10").mkdir()
+        (root / RELEASE_VERSION).mkdir()
+        (root / RELEASE_VERSION / "keep.txt").write_text("ok", encoding="utf-8")
+        (root / "0.2.9" / "old.bin").write_bytes(b"x")
+        dry = mod.tidy_paid_assets_root(root, RELEASE_VERSION, dry_run=True)
+        self.assertEqual(len(dry), 2)
+        self.assertTrue((root / "0.2.9").is_dir())
+        removed = mod.tidy_paid_assets_root(root, RELEASE_VERSION, dry_run=False)
+        self.assertEqual(len(removed), 2)
+        self.assertFalse((root / "0.2.9").exists())
+        self.assertFalse((root / "0.4.10").exists())
+        self.assertTrue((root / RELEASE_VERSION / "keep.txt").is_file())
 
 
 if __name__ == "__main__":

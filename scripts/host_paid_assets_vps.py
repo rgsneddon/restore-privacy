@@ -135,7 +135,57 @@ def stage_packages(*, version: str | None = None) -> list[Path]:
     # refuse privs
     for p in dst_dir.rglob("*.priv"):
         raise RuntimeError(f"refusing to stage private key: {p}")
+    # Keep stage root tidy: only current catalog version directory
+    removed = tidy_paid_assets_root(STATUS / "assets", ver, dry_run=False)
+    for r in removed:
+        print(f"tidy_stage_removed {r}")
     return staged
+
+
+def version_dirs_under_paid_root(root: Path) -> list[Path]:
+    """Immediate child dirs of a paid_assets (or status assets) root."""
+    if not root.is_dir():
+        return []
+    out: list[Path] = []
+    for p in sorted(root.iterdir()):
+        if not p.is_dir():
+            continue
+        name = p.name
+        if name.startswith(".") or name in ("lost+found",):
+            continue
+        # Version-like dirs (semver) or any non-hidden dir used as pin folders
+        out.append(p)
+    return out
+
+
+def stale_paid_asset_version_dirs(
+    root: Path, current_version: str
+) -> list[Path]:
+    """Dirs under *root* that are not the live catalog pin (pure helper)."""
+    cur = (current_version or "").strip()
+    if not cur:
+        return []
+    return [p for p in version_dirs_under_paid_root(root) if p.name != cur]
+
+
+def tidy_paid_assets_root(
+    root: Path,
+    current_version: str,
+    *,
+    dry_run: bool = False,
+) -> list[str]:
+    """Remove non-current version trees so the store only holds the live pin.
+
+    Returns paths removed (or that would be removed when *dry_run*).
+    Does not delete *root* itself or files at the root level (e.g. serve script).
+    """
+    removed: list[str] = []
+    for d in stale_paid_asset_version_dirs(root, current_version):
+        removed.append(str(d))
+        if dry_run:
+            continue
+        shutil.rmtree(d)
+    return removed
 
 
 def _ssh_target() -> tuple[str, str, str | None, Path | None]:
@@ -526,6 +576,7 @@ Environment=RPT_ASSET_FETCH_TOKEN={token}
 Environment=RPT_VPS_ASSET_REMOTE_ROOT={remote_root}
 Environment=RPT_VPS_ASSET_PORT={port}
 Environment=RPT_VPS_ASSET_BIND=0.0.0.0
+Environment=RPT_CATALOG_VERSION={ver}
 ExecStart=/usr/bin/python3 {SERVE_SCRIPT_REMOTE}
 Restart=on-failure
 RestartSec=3
@@ -534,6 +585,22 @@ RestartSec=3
 WantedBy=multi-user.target
 """
     import base64
+
+    # Drop non-current version trees before (re)starting serve
+    tidy_remote = (
+        f"set -e; "
+        f"for d in {remote_root}/*; do "
+        f"[ -d \"$d\" ] || continue; "
+        f"bn=$(basename \"$d\"); "
+        f"[ \"$bn\" = '{ver}' ] && continue; "
+        f"rm -rf \"$d\"; echo tidy_removed=$bn; "
+        f"done"
+    )
+    _tc, tout = _ssh_run_openssh(
+        tidy_remote, host=host, user=user, key_path=key_path, sudo=True
+    )
+    if tout:
+        print(tout)
 
     b64 = base64.b64encode(unit.encode("utf-8")).decode("ascii")
     code, out = _ssh_run_openssh(
@@ -668,6 +735,7 @@ Environment=RPT_ASSET_FETCH_TOKEN={token}
 Environment=RPT_VPS_ASSET_REMOTE_ROOT={remote_root}
 Environment=RPT_VPS_ASSET_PORT={port}
 Environment=RPT_VPS_ASSET_BIND=0.0.0.0
+Environment=RPT_CATALOG_VERSION={ver}
 ExecStart=/usr/bin/python3 {SERVE_SCRIPT_REMOTE}
 Restart=on-failure
 RestartSec=3
@@ -678,6 +746,24 @@ WantedBy=multi-user.target
             import base64
 
             b64 = base64.b64encode(unit.encode("utf-8")).decode("ascii")
+            tidy_remote = (
+                f"set -e; "
+                f"for d in {remote_root}/*; do "
+                f"[ -d \"$d\" ] || continue; "
+                f"bn=$(basename \"$d\"); "
+                f"[ \"$bn\" = '{ver}' ] && continue; "
+                f"rm -rf \"$d\"; echo tidy_removed=$bn; "
+                f"done"
+            )
+            _tc, tout = _ssh_run_openssh(
+                tidy_remote,
+                host=host,
+                user=user,
+                key_path=key_path,
+                sudo=True,
+            )
+            if tout:
+                print(tout)
             code, out = _ssh_run_openssh(
                 f"set -e; "
                 f"mv -f {tmp_serve} {SERVE_SCRIPT_REMOTE}; "
@@ -701,6 +787,26 @@ WantedBy=multi-user.target
             )
             print("Render env: RPT_VPS_ASSET_BASE + RPT_ASSET_FETCH_TOKEN")
             print(f"token_len={len(token)}")
+        else:
+            # Packages uploaded without unit rewrite — still drop old pin trees
+            tidy_remote = (
+                f"set -e; "
+                f"for d in {remote_root}/*; do "
+                f"[ -d \"$d\" ] || continue; "
+                f"bn=$(basename \"$d\"); "
+                f"[ \"$bn\" = '{ver}' ] && continue; "
+                f"rm -rf \"$d\"; echo tidy_removed=$bn; "
+                f"done"
+            )
+            _tc, tout = _ssh_run_openssh(
+                tidy_remote,
+                host=host,
+                user=user,
+                key_path=key_path,
+                sudo=True,
+            )
+            if tout:
+                print(tout)
         print(f"upload complete host={host} version={ver}")
         return 0
 

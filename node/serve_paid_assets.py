@@ -1,14 +1,18 @@
 #!/usr/bin/env python3
-"""Token-gated HTTP server for paid product installers on the Iceland VPS.
+"""Token-gated HTTP server for paid product installers (Helsinki store).
 
 Serves only ``/paid-assets/{version}/{filename}`` when the request carries a
 matching ``X-RPT-Asset-Token`` header. Not a free public download surface.
+
+When ``RPT_CATALOG_VERSION`` is set (install-serve sets it to the ship pin),
+only that version directory is served — older pin paths return 404.
 
 Environment:
   RPT_ASSET_FETCH_TOKEN   required shared secret (same as status host)
   RPT_VPS_ASSET_REMOTE_ROOT  default /opt/restore-privacy/paid_assets
   RPT_VPS_ASSET_PORT         default 8081
   RPT_VPS_ASSET_BIND         default 0.0.0.0
+  RPT_CATALOG_VERSION        when set, only this version segment is served
 """
 
 from __future__ import annotations
@@ -34,6 +38,28 @@ def _token() -> str:
     return os.environ.get("RPT_ASSET_FETCH_TOKEN", "").strip() or os.environ.get(
         "RPT_VPS_ASSET_TOKEN", ""
     ).strip()
+
+
+def _catalog_version_pin() -> str:
+    """Live catalog pin for tidy store (empty = do not pin-filter versions)."""
+    return (os.environ.get("RPT_CATALOG_VERSION") or "").strip()
+
+
+def path_allowed_for_catalog(
+    version: str, filename: str, *, catalog_version: str = ""
+) -> bool:
+    """Pure: refuse stale version dirs and filenames that omit the pin."""
+    ver = (version or "").strip()
+    name = (filename or "").strip()
+    if not ver or not name or name != Path(name).name:
+        return False
+    pin = (catalog_version or "").strip()
+    if pin:
+        if ver != pin:
+            return False
+        if pin not in name:
+            return False
+    return True
 
 
 class Handler(BaseHTTPRequestHandler):
@@ -67,6 +93,11 @@ class Handler(BaseHTTPRequestHandler):
         # Filenames only — no nested paths under version/
         if Path(filename).name != filename:
             self.send_error(400, "bad path")
+            return
+        if not path_allowed_for_catalog(
+            version, filename, catalog_version=_catalog_version_pin()
+        ):
+            self.send_error(404, "not found")
             return
         root = _root()
         fpath = (root / version / filename).resolve()

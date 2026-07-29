@@ -927,16 +927,18 @@ class Handler(BaseHTTPRequestHandler):
             # Lookup without consuming so proxy failure does not burn the grant.
             # Filename is taken only from the paid grant row — never from query string.
             grant = lookup_download_token(token) if token else None
-            fname = (grant or {}).get("filename") if grant else None
-            # Reject path traversal / non-catalog names even if a grant row were corrupted
-            if grant and fname:
-                from payments import _safe_catalog_filename
+            # Always current-catalog filename (lookup rebinds platform → live pin)
+            fname = None
+            if grant:
+                from payments import grant_delivery_filename, _safe_catalog_filename
 
-                safe = _safe_catalog_filename(str(fname))
-                if not safe:
-                    fname = None
-                else:
-                    fname = safe
+                fname = grant_delivery_filename(
+                    platform=str(grant.get("platform") or ""),
+                    stored_filename=str(
+                        grant.get("filename") or grant.get("stored_filename") or ""
+                    ),
+                )
+                fname = _safe_catalog_filename(str(fname or "")) or None
             if not grant or not fname:
                 self._send(
                     403,
@@ -966,7 +968,7 @@ class Handler(BaseHTTPRequestHandler):
                     _html_page(
                         "Fulfilment error",
                         '<p class="msg" id="download-fulfil-failed">Paid download could not be fetched. '
-                        "Operators: confirm Iceland VPS paid-assets (RPT_ASSET_FETCH_TOKEN match + "
+                        "Operators: confirm Helsinki paid-assets (RPT_ASSET_FETCH_TOKEN match + "
                         "rpt-paid-assets.service) or stage status_page/assets/{version}/.</p>"
                         '<p><a href="/">Home</a></p>',
                     ),
