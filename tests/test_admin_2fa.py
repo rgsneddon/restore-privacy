@@ -253,6 +253,44 @@ class TestAdmin2faAuthPath(unittest.TestCase):
             httpd.shutdown()
             httpd.server_close()
 
+    def test_second_setup_pending_cannot_overwrite_enrolled_secret(self) -> None:
+        """Two setup pendings: first enrolls; second complete_setup must fail."""
+        from admin_2fa import (
+            begin_login_after_password,
+            complete_setup,
+            get_enrolled_secret,
+            is_totp_enrolled,
+            mint_pending_token,
+            totp_code_at,
+        )
+
+        t0 = 1_800_000_000.0
+        # Simulate two concurrent password logins before either finishes setup
+        step_a = begin_login_after_password(now=t0)
+        self.assertEqual(step_a["stage"], "setup")
+        secret_a = step_a["secret_b32"]
+        pending_a = step_a["pending_token"]
+        # Second setup secret without going through begin (still unenrolled)
+        secret_b = __import__("admin_2fa", fromlist=["generate_totp_secret"]).generate_totp_secret()
+        pending_b = mint_pending_token(
+            stage="setup", secret_b32=secret_b, now=t0 + 1
+        )
+        self.assertNotEqual(secret_a, secret_b)
+
+        code_a = totp_code_at(secret_a, t0 + 2)
+        complete_setup(pending_a, code_a, now=t0 + 2)
+        self.assertTrue(is_totp_enrolled())
+        enrolled = get_enrolled_secret()
+        self.assertEqual(enrolled, secret_a)
+
+        code_b = totp_code_at(secret_b, t0 + 3)
+        with self.assertRaises(ValueError) as ctx:
+            complete_setup(pending_b, code_b, now=t0 + 3)
+        self.assertIn("already enrolled", str(ctx.exception).lower())
+        # First secret still enrolled — not replaced by secret_b
+        self.assertEqual(get_enrolled_secret(), secret_a)
+        self.assertNotEqual(get_enrolled_secret(), secret_b)
+
     def test_structure_routes_and_cookie_helper(self) -> None:
         app = (ROOT / "status_page" / "app.py").read_text(encoding="utf-8")
         self.assertIn("/admin/2fa/setup", app)

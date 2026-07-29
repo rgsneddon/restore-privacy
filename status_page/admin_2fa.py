@@ -181,8 +181,23 @@ def get_enrolled_secret() -> str | None:
         conn.close()
 
 
+def clear_all_pending() -> None:
+    """Drop all pending setup/verify tokens (after successful enroll)."""
+    conn = _connect()
+    try:
+        conn.execute("DELETE FROM admin_pending")
+        conn.commit()
+    finally:
+        conn.close()
+
+
 def enroll_totp_secret(secret_b32: str, *, now: float | None = None) -> dict[str, Any]:
-    """Persist enrolled TOTP secret (idempotent replace of single admin row)."""
+    """Persist enrolled TOTP secret once. Refuses if already enrolled.
+
+    Does **not** overwrite an existing enrolled secret (blocks leftover setup
+    pendings from replacing the authenticator). Clears all pending tokens on
+    success.
+    """
     s = re.sub(r"\s+", "", (secret_b32 or "").strip().upper()).rstrip("=")
     if len(s) < 16:
         raise ValueError("secret too short")
@@ -191,6 +206,13 @@ def enroll_totp_secret(secret_b32: str, *, now: float | None = None) -> dict[str
     t = float(now if now is not None else time.time())
     conn = _connect()
     try:
+        row = conn.execute(
+            "SELECT enrolled, secret_b32 FROM admin_totp WHERE id = 1"
+        ).fetchone()
+        if row and int(row["enrolled"]) and str(row["secret_b32"] or "").strip():
+            raise ValueError(
+                "authenticator already enrolled — sign in with your existing app code"
+            )
         conn.execute(
             """
             INSERT INTO admin_totp(id, secret_b32, enrolled, enrolled_at)
@@ -199,9 +221,23 @@ def enroll_totp_secret(secret_b32: str, *, now: float | None = None) -> dict[str
                 secret_b32 = excluded.secret_b32,
                 enrolled = 1,
                 enrolled_at = excluded.enrolled_at
+            WHERE admin_totp.enrolled = 0 OR admin_totp.secret_b32 = ''
             """,
             (s, t),
         )
+        # Re-check: if still not enrolled, concurrent enroll won
+        check = conn.execute(
+            "SELECT enrolled, secret_b32 FROM admin_totp WHERE id = 1"
+        ).fetchone()
+        if not check or not int(check["enrolled"]):
+            raise ValueError(
+                "authenticator already enrolled — sign in with your existing app code"
+            )
+        if str(check["secret_b32"] or "").strip() != s:
+            raise ValueError(
+                "authenticator already enrolled — sign in with your existing app code"
+            )
+        conn.execute("DELETE FROM admin_pending")
         conn.commit()
     finally:
         conn.close()
@@ -348,15 +384,25 @@ def complete_setup(
     *,
     now: float | None = None,
 ) -> dict[str, Any]:
-    """Verify first TOTP against pending secret and enroll durably."""
+    """Verify first TOTP against pending secret and enroll durably.
+
+    Refuses if an authenticator is already enrolled (leftover setup pendings
+    cannot replace the secret).
+    """
+    if is_totp_enrolled():
+        consume_pending_token(pending_token)
+        clear_all_pending()
+        raise ValueError(
+            "authenticator already enrolled — sign in with your existing app code"
+        )
     info = verify_pending_token(pending_token, now=now, expect_stage="setup")
     if not info or not info.get("secret_b32"):
         raise ValueError("setup session expired or invalid — sign in again")
     secret = str(info["secret_b32"])
     if not verify_totp(secret, code, now=now):
         raise ValueError("invalid authenticator code")
+    # enroll_totp_secret refuses overwrite + clears all pending rows
     enroll_totp_secret(secret, now=now)
-    consume_pending_token(pending_token)
     return {"ok": True, "enrolled": True}
 
 
