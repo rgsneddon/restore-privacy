@@ -2084,6 +2084,7 @@ def render_admin_accounting_page_html(
             OPENING_DATE,
             STRIPE_FEE_POLICY_LABEL,
             build_ledger_from_payment_store,
+            ensure_ledger_oldest_first,
             pence_to_pounds_str,
         )
     except Exception:  # noqa: BLE001
@@ -2092,10 +2093,13 @@ def render_admin_accounting_page_html(
             OPENING_DATE,
             STRIPE_FEE_POLICY_LABEL,
             build_ledger_from_payment_store,
+            ensure_ledger_oldest_first,
             pence_to_pounds_str,
         )
     try:
-        ledger = rows if rows is not None else build_ledger_from_payment_store()
+        raw = rows if rows is not None else build_ledger_from_payment_store()
+        # Always re-sort on render so HTML cannot show newest-first by accident.
+        ledger = ensure_ledger_oldest_first(list(raw))
     except Exception as exc:  # noqa: BLE001
         err = _escape(str(exc)[:200])
         main = (
@@ -2113,8 +2117,8 @@ def render_admin_accounting_page_html(
         show_money = r.kind in ("sale", "manual")
         # Money cols then meta; END BALANCE is rightmost money/result col before Actions
         body_rows.append(
-            "<tr data-row-id=\"" + rid + "\">"
-            f"<td>{_escape(r.date_iso)}</td>"
+            "<tr data-row-id=\"" + rid + "\" data-date=\"" + _escape(r.date_iso) + "\">"
+            f"<td class='ledger-date'>{_escape(r.date_iso)}</td>"
             f"<td>{_escape(r.description)}</td>"
             f"<td class='num'>{_escape(pence_to_pounds_str(r.gross_pence) if show_money else '—')}</td>"
             f"<td class='num fee'>{_escape(pence_to_pounds_str(r.fee_pence) if show_money else '—')}</td>"
@@ -2132,12 +2136,15 @@ def render_admin_accounting_page_html(
             f"Delete row</button></form></td>"
             "</tr>"
         )
+    # Join in list order only (oldest first). Do not reverse.
     table_body = (
         "\n".join(body_rows)
         if body_rows
         else '<tr><td colspan="10">No ledger rows</td></tr>'
     )
     final_bal = pence_to_pounds_str(ledger[-1].balance_pence) if ledger else "—"
+    first_date = str(ledger[0].date_iso) if ledger else ""
+    last_date = str(ledger[-1].date_iso) if ledger else ""
     y0 = OPENING_DATE.year
     m0 = OPENING_DATE.month
     year_opts = "".join(
@@ -2166,7 +2173,10 @@ def render_admin_accounting_page_html(
     except Exception:  # noqa: BLE001
         pass
     main = f"""
-<section class="card" id="admin-accounting" data-admin-accounting="1">
+<section class="card" id="admin-accounting" data-admin-accounting="1"
+         data-ledger-order="oldest-first"
+         data-ledger-first-date="{_escape(first_date)}"
+         data-ledger-last-date="{_escape(last_date)}">
   <h2 id="admin-accounting-heading">{_escape(ENTITY_NAME)} — accounting</h2>
   <p class="muted" id="admin-accounting-blurb">
     Business books from <strong>{_escape(OPENING_DATE.isoformat())}</strong>.
@@ -2174,15 +2184,81 @@ def render_admin_accounting_page_html(
     Paid customer sales load automatically from the durable payment store.
     Each line shows <strong>gross</strong>, <strong>fees</strong> (as a minus), and
     <strong>net</strong> (= gross ± fees). <strong>END BALANCE</strong> is the running
-    total (oldest first, most recent last). Stripe card fees on auto sales are named
-    in the description; the Fees column is for any fee. Manual lines and deletes are durable.
+    total. Stripe card fees on auto sales are named in the description; the Fees
+    column is for any fee. Manual lines and deletes are durable.
   </p>
   <p class="muted" id="admin-accounting-fee-policy">{_escape(STRIPE_FEE_POLICY_LABEL)}</p>
   <p id="admin-accounting-balance">Current END BALANCE:
     <strong id="admin-accounting-balance-value">{_escape(final_bal)}</strong>
   </p>
+  <p class="muted" id="admin-accounting-order-note">
+    <strong>Date order:</strong> oldest first → most recent last
+    (top = first transaction
+    {f'<code id="admin-accounting-first-date">{_escape(first_date)}</code>' if first_date else ''},
+    bottom = most recent
+    {f'<code id="admin-accounting-last-date">{_escape(last_date)}</code>' if last_date else ''}).
+  </p>
   {msg_html}
   {err_html}
+
+  <table id="admin-accounting-table" data-order="asc" data-sort="date-asc">
+    <caption id="admin-accounting-table-caption" class="muted">
+      Ledger rows in date order (first → most recent)
+    </caption>
+    <thead><tr>
+      <th>Date</th><th>Description</th><th>Gross</th><th>Fees</th>
+      <th>Net</th><th>Fee source</th><th>Purchase ID</th><th>Platform</th>
+      <th id="admin-accounting-end-balance-col">END BALANCE</th>
+      <th>Actions</th>
+    </tr></thead>
+    <tbody id="admin-accounting-tbody">
+{table_body}
+    </tbody>
+  </table>
+
+  <div class="accounting-manual-entry" id="admin-accounting-manual-entry">
+    <h3 id="admin-accounting-manual-entry-heading">Manual entry</h3>
+    <p class="muted" id="admin-accounting-manual-entry-blurb">
+      Add a ledger line (date, description, gross, fees). New rows slot in by
+      <strong>date</strong> (most recent dates appear at the bottom of the table above).
+      <strong>Net</strong> is calculated automatically as <strong>gross ± fees</strong>
+      (fees reduce cash). Choose <strong>+</strong> to add gross to END BALANCE or
+      <strong>−</strong> to deduct (or type a negative gross). If the fee is a Stripe
+      charge, say so in the description — the Fees column is for any fee type.
+    </p>
+    <form method="post" action="/admin/accounting/manual-entry"
+          id="admin-accounting-manual-entry-form" data-admin-accounting-manual="1">
+      <label class="field" for="manual_date">Date
+        <input id="manual_date" name="date_iso" type="date" required value="{_escape(today)}"/>
+      </label>
+      <label class="field" for="manual_description">Description
+        <input id="manual_description" name="description" type="text" required maxlength="500"
+               placeholder="e.g. Bank charge / card fee / adjustment"/>
+      </label>
+      <label class="field" for="manual_gross_sign">Gross sign
+        <select id="manual_gross_sign" name="gross_sign" title="Add or deduct gross">
+          <option value="+" selected>+ (add to balance)</option>
+          <option value="-">− (deduct from balance)</option>
+        </select>
+      </label>
+      <label class="field" for="manual_gross">Gross (£)
+        <input id="manual_gross" name="gross" type="text" inputmode="decimal"
+               placeholder="0.00" required/>
+      </label>
+      <label class="field" for="manual_fee">Fees (£)
+        <input id="manual_fee" name="fee" type="text" inputmode="decimal"
+               placeholder="0.00 (stored as minus)"/>
+      </label>
+      <label class="field" for="manual_purchase_id">Purchase ID
+        <input id="manual_purchase_id" name="purchase_id" type="text" maxlength="120"/>
+      </label>
+      <label class="field" for="manual_platform">Platform
+        <input id="manual_platform" name="platform" type="text" maxlength="40"
+               placeholder="windows / android / …"/>
+      </label>
+      <button type="submit" id="admin-accounting-manual-entry-submit">Add entry</button>
+    </form>
+  </div>
 
   <div class="accounting-export" id="admin-accounting-export">
     <h3 id="admin-accounting-export-heading">Export</h3>
@@ -2227,66 +2303,13 @@ def render_admin_accounting_page_html(
       <button type="submit" id="admin-accounting-export-submit">Export accounts</button>
     </form>
   </div>
-
-  <div class="accounting-manual-entry" id="admin-accounting-manual-entry">
-    <h3 id="admin-accounting-manual-entry-heading">Manual entry</h3>
-    <p class="muted" id="admin-accounting-manual-entry-blurb">
-      Add a ledger line (date, description, gross, fees).
-      <strong>Net</strong> is calculated automatically as <strong>gross ± fees</strong>
-      (fees reduce cash). Choose <strong>+</strong> to add gross to END BALANCE or
-      <strong>−</strong> to deduct (or type a negative gross). If the fee is a Stripe
-      charge, say so in the description — the Fees column is for any fee type.
-    </p>
-    <form method="post" action="/admin/accounting/manual-entry"
-          id="admin-accounting-manual-entry-form" data-admin-accounting-manual="1">
-      <label class="field" for="manual_date">Date
-        <input id="manual_date" name="date_iso" type="date" required value="{_escape(today)}"/>
-      </label>
-      <label class="field" for="manual_description">Description
-        <input id="manual_description" name="description" type="text" required maxlength="500"
-               placeholder="e.g. Bank charge / card fee / adjustment"/>
-      </label>
-      <label class="field" for="manual_gross_sign">Gross sign
-        <select id="manual_gross_sign" name="gross_sign" title="Add or deduct gross">
-          <option value="+" selected>+ (add to balance)</option>
-          <option value="-">− (deduct from balance)</option>
-        </select>
-      </label>
-      <label class="field" for="manual_gross">Gross (£)
-        <input id="manual_gross" name="gross" type="text" inputmode="decimal"
-               placeholder="0.00" required/>
-      </label>
-      <label class="field" for="manual_fee">Fees (£)
-        <input id="manual_fee" name="fee" type="text" inputmode="decimal"
-               placeholder="0.00 (stored as minus)"/>
-      </label>
-      <label class="field" for="manual_purchase_id">Purchase ID
-        <input id="manual_purchase_id" name="purchase_id" type="text" maxlength="120"/>
-      </label>
-      <label class="field" for="manual_platform">Platform
-        <input id="manual_platform" name="platform" type="text" maxlength="40"
-               placeholder="windows / android / …"/>
-      </label>
-      <button type="submit" id="admin-accounting-manual-entry-submit">Add entry</button>
-    </form>
-  </div>
-
-  <table id="admin-accounting-table">
-    <thead><tr>
-      <th>Date</th><th>Description</th><th>Gross</th><th>Fees</th>
-      <th>Net</th><th>Fee source</th><th>Purchase ID</th><th>Platform</th>
-      <th id="admin-accounting-end-balance-col">END BALANCE</th>
-      <th>Actions</th>
-    </tr></thead>
-    <tbody>
-{table_body}
-    </tbody>
-  </table>
 {admin_section_top_link_html()}</section>
 <style>
 #admin-accounting-table .num{{text-align:right;font-variant-numeric:tabular-nums}}
 #admin-accounting-table .fee{{color:#b45309}}
 #admin-accounting-table .end-balance{{font-weight:700}}
+#admin-accounting-table caption{{caption-side:top;text-align:left;padding:0.35rem 0 0.65rem;font-size:0.9rem}}
+#admin-accounting-tbody{{display:table-row-group}}
 #admin-accounting-export form,#admin-accounting-manual-entry-form{{display:flex;flex-wrap:wrap;gap:0.75rem;align-items:flex-end;margin:1rem 0}}
 #admin-accounting-export .field,#admin-accounting-manual-entry .field{{display:flex;flex-direction:column;font-size:0.85rem;gap:0.25rem}}
 #admin-accounting-export select,#admin-accounting-export button,
@@ -2295,7 +2318,7 @@ def render_admin_accounting_page_html(
 .btn-delete-row{{padding:0.45rem 0.6rem;border-radius:8px}}
 #admin-accounting-export button,#admin-accounting-manual-entry-submit{{background:var(--btn-bg);color:var(--btn-fg);border:0;font-weight:600;cursor:pointer}}
 .btn-delete-row{{background:#7f1d1d;color:#fff;border:0;cursor:pointer;font-size:0.8rem}}
-#admin-accounting-manual-entry{{margin:1.25rem 0;padding-top:0.5rem;border-top:1px solid var(--border,#3333)}}
+#admin-accounting-manual-entry,#admin-accounting-export{{margin:1.25rem 0;padding-top:0.5rem;border-top:1px solid var(--border,#3333)}}
 .admin-accounting-delete-form{{display:inline;margin:0}}
 </style>
 """

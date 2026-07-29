@@ -680,23 +680,46 @@ def build_ledger(
     return recompute_running_balances(lines)
 
 
+def _parse_ledger_date(date_iso: str) -> date:
+    """Parse YYYY-MM-DD for sort; unknown/empty → far-future so they sink last."""
+    raw = str(date_iso or "").strip()
+    if not raw:
+        return date(9999, 12, 31)
+    try:
+        return date.fromisoformat(raw[:10])
+    except ValueError:
+        # Last resort: keep lexicographic fallback via epoch-like sentinel
+        return date(9999, 12, 30)
+
+
 def sort_ledger_oldest_first(lines: Sequence[LedgerRow]) -> list[LedgerRow]:
     """Stable chronological order: oldest first, **most recent last** (bottom of table).
 
-    Primary key is ``date_iso`` ascending; then ``created_at``; then kind
+    Primary key is calendar date ascending; then ``created_at``; then kind
     (setup before same-day sales/manuals); then ``row_id``.
+    Never reverse=True — books read top→bottom as first transaction → newest.
     """
     kind_order = {"setup": 0, "sale": 1, "manual": 2}
 
     def _sort_key(r: LedgerRow) -> tuple:
+        try:
+            ca = float(r.created_at or 0)
+        except (TypeError, ValueError):
+            ca = 0.0
         return (
-            str(r.date_iso or ""),
-            float(r.created_at or 0),
-            kind_order.get(r.kind, 9),
+            _parse_ledger_date(str(r.date_iso or "")),
+            ca,
+            kind_order.get(str(r.kind or ""), 9),
             str(r.row_id or ""),
         )
 
-    return sorted(lines, key=_sort_key)
+    # Explicit reverse=False so display cannot silently flip to newest-first.
+    return sorted(lines, key=_sort_key, reverse=False)
+
+
+def ensure_ledger_oldest_first(lines: Sequence[LedgerRow]) -> list[LedgerRow]:
+    """Sort oldest→newest and recompute END BALANCE (safe for render/export paths)."""
+    return recompute_running_balances(sort_ledger_oldest_first(list(lines)))
 
 
 def load_grants_for_accounting() -> list[dict[str, Any]]:
@@ -743,7 +766,8 @@ def filter_ledger_by_period(
         return True
 
     selected = [r for r in rows if in_range(date.fromisoformat(r.date_iso))]
-    return recompute_running_balances(selected)
+    # Keep chronological order after filter (oldest → newest).
+    return ensure_ledger_oldest_first(selected)
 
 
 def ledger_to_dicts(rows: Sequence[LedgerRow]) -> list[dict[str, Any]]:

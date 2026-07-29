@@ -364,12 +364,13 @@ class TestAccountingAdminWiring(unittest.TestCase):
         self.assertNotIn('name="net"', html)
         self.assertIn('name="gross_sign"', html)
         self.assertIn('id="manual_gross_sign"', html)
-        # Manual entry between export and table
+        # Table first (oldest→newest), then manual entry, then export
         exp_i = html.find("admin-accounting-export")
         man_i = html.find("admin-accounting-manual-entry")
         tbl_i = html.find("admin-accounting-table")
-        self.assertGreater(man_i, exp_i)
-        self.assertGreater(tbl_i, man_i)
+        self.assertLess(tbl_i, man_i)
+        self.assertLess(man_i, exp_i)
+        self.assertIn("admin-accounting-order-note", html)
         self.assertIn("btn-delete-row", html)
         self.assertIn('name="row_id"', html)
         self.assertIn('value="setup"', html)
@@ -563,17 +564,38 @@ class TestManualEntryAndDelete(unittest.TestCase):
         self.assertEqual(ordered[-1].date_iso, rows[-1].date_iso)
         self.assertEqual([r.row_id for r in ordered], [r.row_id for r in rows])
 
-        # Admin HTML tbody: bottom date cell is most recent
+        # Admin HTML tbody: bottom date cell is most recent; top is setup/first
         from admin_panel import render_admin_accounting_page_html
         import re
 
         html = render_admin_accounting_page_html(rows=rows).decode("utf-8")
+        self.assertIn('data-ledger-order="oldest-first"', html)
+        self.assertIn('data-order="asc"', html)
+        self.assertIn("admin-accounting-order-note", html)
+        # Table appears before manual entry form (newest near form at bottom)
+        self.assertLess(
+            html.find('id="admin-accounting-table"'),
+            html.find('id="admin-accounting-manual-entry"'),
+        )
         html_dates = re.findall(
-            r'<tr data-row-id="[^"]*">\s*<td>(\d{4}-\d{2}-\d{2})</td>',
+            r'<tr data-row-id="[^"]*"[^>]*>\s*<td class=\'ledger-date\'>'
+            r'(\d{4}-\d{2}-\d{2})</td>',
             html,
         )
+        if not html_dates:
+            html_dates = re.findall(
+                r'data-date="(\d{4}-\d{2}-\d{2})"',
+                html,
+            )
         self.assertEqual(html_dates, dates)
+        self.assertEqual(html_dates[0], dates[0])
         self.assertEqual(html_dates[-1], "2026-09-01")
+        # Reversed input still renders oldest→newest after ensure path
+        html_rev = render_admin_accounting_page_html(
+            rows=list(reversed(rows))
+        ).decode("utf-8")
+        rev_dates = re.findall(r'data-date="(\d{4}-\d{2}-\d{2})"', html_rev)
+        self.assertEqual(rev_dates, dates)
 
     def test_delete_manual_and_hide_setup_recompute(self) -> None:
         from accounting import (
