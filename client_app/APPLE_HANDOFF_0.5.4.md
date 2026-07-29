@@ -53,3 +53,22 @@ python scripts/breadcrumbs_vault.py stage --version 0.5.4
 python scripts/breadcrumbs_vault.py publish --version 0.5.4
 python scripts/breadcrumbs_vault.py check --fetch
 ```
+
+
+## Mac native seal completed (2026-07-29T13:34Z)
+
+| Platform | Filename | Status |
+|----------|----------|--------|
+| macOS | `restore-privacy-client-0.5.4-macos.zip` | **native** monopin **0.5.4** — `CFBundleShortVersionString` **0.5.4**; Developer ID + **notarized + stapled** |
+| iOS | `restore-privacy-client-0.5.4-ios.zip` | **native** monopin **0.5.4** — Team-signed (**Apple Distribution** SFCBP95595) sideload |
+
+Built on Darwin via:
+
+```bash
+cd client_app && flutter build macos --release
+cd client_app && flutter build ios --release --no-codesign
+python3 scripts/build_release_0.5.4.py --apple-only
+```
+
+Artifacts: `releases/0.5.4/restore-privacy-client-0.5.4-macos.zip` and
+`releases/0.5.4/restore-privacy-client-0.5.4-ios.zip` (+ SHA256SUMS.json).
