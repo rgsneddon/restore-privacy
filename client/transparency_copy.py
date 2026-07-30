@@ -14,6 +14,15 @@ LEAK_TEST_BUTTON = "Run leak test"
 EXPORT_LOG_BUTTON = "Export log"
 
 # Plain-language disclaimer: mitigation ≠ undetectability
+# Connected residual still encrypts OS traffic — honest power/CPU note (P2).
+CONNECTED_IDLE_POWER_HONESTY = (
+    "While Connected, residual full-tunnel protection stays active even if you are not "
+    "browsing: background app and system traffic still goes through the VPN crypto path, "
+    "which uses battery and CPU. Disconnect when you do not need protection. "
+    "Traffic shaping ON also sends periodic cover frames (~every 2s), which uses a little "
+    "extra power and data."
+)
+
 DPI_MITIGATION_DISCLAIMER = (
     "Traffic shaping (padding, send jitter, and cover traffic) and outer obfuscation "
     "default off on residual paths (lean residual) until you turn them on in Settings. "

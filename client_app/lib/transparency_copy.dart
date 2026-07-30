@@ -19,6 +19,14 @@ const String kDpiMitigationDisclaimer =
     '(for example obfs4, meek, or V2Ray). A determined network observer may still '
     'fingerprint the tunnel.';
 
+/// Connected residual still encrypts OS traffic — honest power/CPU note (P2).
+const String kConnectedIdlePowerHonesty =
+    'While Connected, residual full-tunnel protection stays active even if you are not '
+    'browsing: background app and system traffic still goes through the VPN crypto path, '
+    'which uses battery and CPU. Disconnect when you do not need protection. '
+    'Traffic shaping ON also sends periodic cover frames (~every 2s), which uses a little '
+    'extra power and data.';
+
 /// Mirrors EXPLAINER_TRAFFIC_SHAPE in product_policy.py.
 const String kExplainerTrafficShape =
     'Traffic shaping pads packet sizes, adds small send jitter, and sends '

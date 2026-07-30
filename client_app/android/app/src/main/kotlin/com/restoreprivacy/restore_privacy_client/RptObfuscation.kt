@@ -19,7 +19,12 @@ object RptObfuscation {
                 0x9a.toByte(), 0x3c, 0x7e, 0x11, 0xd4.toByte(), 0x55, 0x88.toByte(), 0x02,
             )
 
-    const val PRODUCT_OBFS_ENABLED: Boolean = true
+    /**
+     * Runtime outer wrap flag — default **OFF** (lean residual) until Settings
+     * enables outer obfuscation (parity with desktop/Apple privacy scale).
+     */
+    @Volatile
+    var productObfsEnabled: Boolean = false
 
     private val rnd = SecureRandom()
 
@@ -102,9 +107,13 @@ object RptObfuscation {
         return xor(body, mask)
     }
 
-    fun maybeWrap(inner: ByteArray, enabled: Boolean = PRODUCT_OBFS_ENABLED): ByteArray =
+    fun applyPrivacyScale(outerObfuscation: Boolean) {
+        productObfsEnabled = outerObfuscation
+    }
+
+    fun maybeWrap(inner: ByteArray, enabled: Boolean = productObfsEnabled): ByteArray =
         if (enabled) wrapFrame(inner) else inner
 
-    fun maybeUnwrap(outer: ByteArray, enabled: Boolean = PRODUCT_OBFS_ENABLED): ByteArray =
+    fun maybeUnwrap(outer: ByteArray, enabled: Boolean = productObfsEnabled): ByteArray =
         unwrapFrame(outer, allowBare = true)
 }

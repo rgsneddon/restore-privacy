@@ -97,6 +97,7 @@ from client.registration_copy import (
 )
 from client.startup_bootstrap import bootstrap_payment_entitlement
 from client.transparency_copy import (
+    CONNECTED_IDLE_POWER_HONESTY,
     CONNECTION_LOG_DISCLAIMER,
     SUPPORT_LOG_FIND_HINT,
     CONNECTION_LOG_TITLE,
@@ -1263,6 +1264,15 @@ class TunnelClientApp:
             wraplength=440,
             justify=tk.LEFT,
         ).pack(anchor="w")
+        tk.Label(
+            frm,
+            text=CONNECTED_IDLE_POWER_HONESTY,
+            bg=WHITE,
+            fg=TEXT_MUTED,
+            font=("DejaVu Sans", 8),
+            wraplength=440,
+            justify=tk.LEFT,
+        ).pack(anchor="w", pady=(4, 0))
 
     def _start_connect(self) -> None:
         # Persist main-shell country selection and refresh residual path.
@@ -1543,8 +1553,17 @@ class TunnelClientApp:
         threading.Thread(target=work, daemon=True).start()
 
     def _open_upgrade(self) -> None:
-        url = upgrade_download_url(platform="linux")
-        self._log("Opening download page...")
+        """Open platform monopin installer download (not /pay Checkout)."""
+        from client.payment_entitlement import load_payment_entitlement
+        from client.ui_theme import resolve_upgrade_download_url
+
+        ent = load_payment_entitlement()
+        url = resolve_upgrade_download_url(
+            "linux",
+            keygen=str(getattr(ent, "keygen", "") or ""),
+            session_id=str(getattr(ent, "session_id", "") or ""),
+        )
+        self._log("Opening monopin installer download…")
         try:
             webbrowser.open(url)
         except Exception as exc:

@@ -77,6 +77,10 @@ class VpnController {
     /// Optional residual stack override so Connect uses Flutter Settings, not stale native defaults.
     bool? residualIpv4,
     bool? residualIpv6,
+    /// Privacy-scale (Android + Apple): lean residual defaults OFF when null/false.
+    bool? privacyTrafficShape,
+    bool? privacyOuterObfuscation,
+    bool? privacyMultihop,
   }) async {
     Timer? progress;
     final started = DateTime.now();
@@ -92,13 +96,14 @@ class VpnController {
     }
 
     try {
-      // Push dual-stack prefs into App Group before startTunnel options are built.
-      if (residualIpv4 != null || residualIpv6 != null) {
-        await syncProductSettingsToNative(
-          residualIpv4: residualIpv4 ?? true,
-          residualIpv6: residualIpv6 ?? true,
-        );
-      }
+      // Push dual-stack + privacy-scale prefs before native tunnel starts.
+      await syncProductSettingsToNative(
+        residualIpv4: residualIpv4 ?? true,
+        residualIpv6: residualIpv6 ?? true,
+        privacyTrafficShape: privacyTrafficShape,
+        privacyOuterObfuscation: privacyOuterObfuscation,
+        privacyMultihop: privacyMultihop,
+      );
       tickConnecting();
       progress = Timer.periodic(connectingProgressInterval, (_) {
         tickConnecting();
@@ -112,6 +117,9 @@ class VpnController {
         'sessionName': RptConfig.sessionName,
         'route': RptConfig.defaultRoute,
         'autoConnect': false,
+        // Android privacy-scale lean defaults OFF unless Settings enabled.
+        'trafficShape': privacyTrafficShape ?? false,
+        'outerObfuscation': privacyOuterObfuscation ?? false,
       });
       progress.cancel();
       progress = null;

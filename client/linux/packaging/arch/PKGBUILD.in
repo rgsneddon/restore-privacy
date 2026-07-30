@@ -1,0 +1,76 @@
+# Maintainer: Restore Privacy <rus@restoreprivacy.online>
+# Arch / CachyOS package wrapping the monopin residual Linux client tarball.
+#
+# Build on Arch or CachyOS (requires makepkg + the monopin source tarball):
+#   cd client/linux/packaging/arch
+#   # place restore-privacy-client-@VERSION@-linux-x64.tar.gz in this directory
+#   # or set source=() to a local path
+#   makepkg -si
+#
+# This is **not** an AUR publication step — local/operator seal only.
+# Product residual code matches the Ubuntu-family linux-x64 tar.gz monopin.
+
+pkgname=restore-privacy-client
+pkgver=@VERSION@
+pkgrel=1
+pkgdesc="Restore Privacy residual VPN client (Linux monopin @VERSION@)"
+arch=('x86_64')
+url="https://restoreprivacy.online/"
+license=('LicenseRef-proprietary')
+depends=('python' 'tk' 'iproute2')
+# cryptography ships as manylinux wheels inside the tarball (private .venv)
+optdepends=(
+  'polkit: pkexec elevation for full-tunnel Connect'
+)
+options=('!strip')
+# Operator places the monopin tarball next to this PKGBUILD before makepkg.
+source=("restore-privacy-client-${pkgver}-linux-x64.tar.gz")
+sha256sums=('@SHA256@')
+
+package() {
+  local extract="restore-privacy-${pkgver}-linux"
+  # package_linux.py stages folder restore-privacy-<ver>-linux/
+  if [[ ! -d "${srcdir}/${extract}" ]]; then
+    # fallback: first directory under srcdir
+    extract="$(find "${srcdir}" -mindepth 1 -maxdepth 1 -type d ! -name '.*' | head -1)"
+    extract="$(basename "$extract")"
+  fi
+  install -d "${pkgdir}/opt/restore-privacy"
+  cp -a "${srcdir}/${extract}/." "${pkgdir}/opt/restore-privacy/"
+
+  # Run offline installer layout once into /opt (venv created at package install time
+  # would be root-owned; users re-run install.sh on first use if needed)
+  install -d "${pkgdir}/usr/bin"
+  cat > "${pkgdir}/usr/bin/privacy-restored" <<'EOF'
+#!/usr/bin/env bash
+set -euo pipefail
+ROOT="/opt/restore-privacy"
+if [[ ! -x "$ROOT/.venv/bin/python" ]]; then
+  echo "First run: create private venv from bundled wheels..."
+  bash "$ROOT/install.sh" || true
+fi
+if [[ -x "$ROOT/bin/privacy-restored" ]]; then
+  exec "$ROOT/bin/privacy-restored" "$@"
+fi
+export PYTHONPATH="$ROOT${PYTHONPATH:+:$PYTHONPATH}"
+exec python -m client.linux "$@"
+EOF
+  chmod 755 "${pkgdir}/usr/bin/privacy-restored"
+
+  install -d "${pkgdir}/usr/share/licenses/${pkgname}"
+  if [[ -f "${pkgdir}/opt/restore-privacy/LICENSE" ]]; then
+    install -m644 "${pkgdir}/opt/restore-privacy/LICENSE" \
+      "${pkgdir}/usr/share/licenses/${pkgname}/LICENSE"
+  fi
+
+  install -d "${pkgdir}/usr/share/applications"
+  cat > "${pkgdir}/usr/share/applications/privacy-restored.desktop" <<EOF
+[Desktop Entry]
+Type=Application
+Name=Privacy Restored
+Comment=Restore Privacy VPN residual client (Arch monopin ${pkgver})
+Exec=pkexec env DISPLAY=\$DISPLAY XAUTHORITY=\$XAUTHORITY /usr/bin/privacy-restored
+Terminal=false
+Categories=Network;Security;
+EOF
+}

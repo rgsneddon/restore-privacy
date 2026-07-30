@@ -61,11 +61,12 @@ def _resolve_package_version() -> tuple[str, bool, Path, str]:
 
 VERSION, FREE_TIER, OUT, NAME = _resolve_package_version()
 
-# manylinux tags + CPython versions covered by Ubuntu 20.04–24.04 (3.8–3.12)
-_PY_VERSIONS = ("38", "39", "310", "311", "312")
+# manylinux tags + CPython versions: Ubuntu 20.04–24.04 (3.8–3.12) + Arch/CachyOS 3.13
+_PY_VERSIONS = ("38", "39", "310", "311", "312", "313")
 _PLATFORMS = (
     "manylinux2014_x86_64",
     "manylinux_2_17_x86_64",
+    "manylinux_2_28_x86_64",
 )
 
 
@@ -186,7 +187,7 @@ def write_install_sh(stage: Path) -> None:
     """
     content = r'''#!/usr/bin/env bash
 # Restore Privacy Linux installer — uses BUNDLED wheels only (no network pip).
-# Remaining system packages (python3, venv, tk, ip): installed via apt if missing.
+# System floor (python, venv, tk, ip): apt (Ubuntu/Mint) or pacman (Arch/CachyOS).
 # Standard system path: RPT_SYSTEM_INSTALL=1 sudo bash install.sh → /opt/restore-privacy
 set -euo pipefail
 
@@ -211,41 +212,57 @@ if [[ "${RPT_SYSTEM_INSTALL:-}" == "1" ]] && [[ "$(id -u)" -eq 0 ]]; then
   REQ="$ROOT/requirements.txt"
 fi
 
-if ! command -v python3 >/dev/null 2>&1; then
-  echo "ERROR: python3 is required (Ubuntu 20.04+). sudo apt-get install -y python3"
+# Arch ships `python` as 3.x; Ubuntu uses python3
+if command -v python3 >/dev/null 2>&1; then
+  PY=python3
+elif command -v python >/dev/null 2>&1; then
+  PY=python
+else
+  echo "ERROR: python3/python is required."
+  echo "  Ubuntu: sudo apt-get install -y python3"
+  echo "  Arch/CachyOS: sudo pacman -S --needed python"
   exit 1
 fi
 
-PY_OK="$(python3 -c 'import sys; print(1 if sys.version_info >= (3, 8) else 0)')"
+PY_OK="$($PY -c 'import sys; print(1 if sys.version_info >= (3, 8) else 0)')"
 if [[ "$PY_OK" != "1" ]]; then
-  echo "ERROR: Need Python 3.8+ (Ubuntu 20.04 LTS or newer)."
+  echo "ERROR: Need Python 3.8+ (Ubuntu 20.04+ or Arch/CachyOS current)."
   exit 1
 fi
 
 # System floor only — app deps come from wheels/
-need_apt=0
-command -v ip >/dev/null 2>&1 || need_apt=1
-python3 -c "import venv" 2>/dev/null || need_apt=1
-python3 -c "import tkinter" 2>/dev/null || need_apt=1
-if [[ "$need_apt" -eq 1 ]]; then
+need_sys=0
+command -v ip >/dev/null 2>&1 || need_sys=1
+$PY -c "import venv" 2>/dev/null || need_sys=1
+$PY -c "import tkinter" 2>/dev/null || need_sys=1
+if [[ "$need_sys" -eq 1 ]]; then
   if command -v apt-get >/dev/null 2>&1; then
-    echo "Installing system packages: python3-venv python3-tk iproute2..."
+    echo "Installing system packages (apt): python3-venv python3-tk iproute2..."
     sudo apt-get update -y
     sudo DEBIAN_FRONTEND=noninteractive apt-get install -y \
       python3-venv python3-tk iproute2 || true
+  elif command -v pacman >/dev/null 2>&1; then
+    echo "Installing system packages (pacman / Arch-CachyOS): python tk iproute2..."
+    sudo pacman -S --needed --noconfirm python tk iproute2 || true
   fi
 fi
 
-if ! python3 -c "import venv" 2>/dev/null; then
-  echo "ERROR: python3-venv missing. sudo apt-get install -y python3-venv"
+if ! $PY -c "import venv" 2>/dev/null; then
+  echo "ERROR: venv module missing."
+  echo "  Ubuntu: sudo apt-get install -y python3-venv"
+  echo "  Arch/CachyOS: sudo pacman -S --needed python"
   exit 1
 fi
-if ! python3 -c "import tkinter" 2>/dev/null; then
-  echo "ERROR: python3-tk missing (GUI). sudo apt-get install -y python3-tk"
+if ! $PY -c "import tkinter" 2>/dev/null; then
+  echo "ERROR: tkinter missing (GUI)."
+  echo "  Ubuntu: sudo apt-get install -y python3-tk"
+  echo "  Arch/CachyOS: sudo pacman -S --needed tk"
   exit 1
 fi
 if ! command -v ip >/dev/null 2>&1; then
-  echo "ERROR: ip (iproute2) missing. sudo apt-get install -y iproute2"
+  echo "ERROR: ip (iproute2) missing."
+  echo "  Ubuntu: sudo apt-get install -y iproute2"
+  echo "  Arch/CachyOS: sudo pacman -S --needed iproute2"
   exit 1
 fi
 
@@ -256,7 +273,7 @@ fi
 
 echo "Creating private virtualenv at $VENV (offline install from wheels/)..."
 rm -rf "$VENV"
-python3 -m venv "$VENV"
+$PY -m venv "$VENV"
 # shellcheck disable=SC1091
 source "$VENV/bin/activate"
 python -m pip install --upgrade pip --no-index --find-links="$WHEELS" 2>/dev/null || true
@@ -417,18 +434,22 @@ You do **not** need `apt install python3-cryptography` or network `pip install`
 for the app’s Python crypto stack.
 
 ### Supported wheeled Python ABIs (x86_64)
-The packager downloads **manylinux2014 / manylinux_2_17** wheels for **CPython 3.8, 3.9, 3.10, 3.11, and 3.12**
-(see ``_PY_VERSIONS`` / ``_PLATFORMS`` in ``scripts/package_linux.py``).
-``cryptography`` is typically **abi3** (one wheel covers many Python versions);
-``cffi`` is often **version-specific** — the archive includes multiple ``cp3x`` tags when available.
+The packager downloads **manylinux** wheels for **CPython 3.8–3.13** (Ubuntu LTS +
+Arch/CachyOS current; see ``_PY_VERSIONS`` / ``_PLATFORMS`` in ``scripts/package_linux.py``).
+``cryptography`` is typically **abi3**; ``cffi`` is often **version-specific**.
 
 **Publishers:** re-run ``python scripts/package_linux.py`` on **every** release so wheels
 match current PyPI tags. Do not reuse an old ``wheels/`` directory across major crypto upgrades.
 
 ## Still provided by the OS
-- `python3` + `python3-venv` + `python3-tk` (GUI)
+- Python 3.8+ with venv + tkinter (GUI)
 - `iproute2` (`ip` for dual /1 routes)
 - Kernel TUN (`/dev/net/tun`) and **root** for full-tunnel residual IP
+
+| Family | System packages |
+|--------|-----------------|
+| Ubuntu / Mint / Pop | `python3 python3-venv python3-tk iproute2` |
+| Arch / **CachyOS** / EndeavourOS | `python tk iproute2` (pacman) |
 
 ## Install (Ubuntu 20.04+ / Mint / Pop!_OS)
 ```bash
@@ -437,6 +458,18 @@ cd restore-privacy-{VERSION}-linux
 bash install.sh
 sudo ./bin/privacy-restored
 ```
+
+## Install (Arch / CachyOS / EndeavourOS / Manjaro)
+Same monopin tarball. `install.sh` auto-detects **pacman**:
+```bash
+tar xzf restore-privacy-client-{VERSION}-linux-x64.tar.gz
+cd restore-privacy-{VERSION}-linux
+bash install.sh
+# or: bash install_linux_arch.sh   # / install_linux_cachyos.sh
+sudo ./bin/privacy-restored
+```
+Optional pacman package sources (build **on Arch/CachyOS only**): see
+`releases/{VERSION}/arch/PKGBUILD` after running `scripts/package_arch_linux.py`.
 
 Press **Connect**. Residual public IP changes only when TUN + dual /1 are active.
 
@@ -593,13 +626,19 @@ def main() -> int:
         write_restore_internet(stage)
         write_docs(stage)
 
-        # Keep ubuntu/mint script names as thin pointers to install.sh
-        for name in ("install_linux_ubuntu.sh", "install_linux_mint.sh"):
+        # Distro install helpers — all use install.sh (apt or pacman auto-detect)
+        for name in (
+            "install_linux_ubuntu.sh",
+            "install_linux_mint.sh",
+            "install_linux_arch.sh",
+            "install_linux_cachyos.sh",
+        ):
             (stage / name).write_text(
                 "#!/usr/bin/env bash\n"
                 'exec bash "$(cd "$(dirname "$0")" && pwd)/install.sh" "$@"\n',
                 encoding="utf-8",
             )
+            (stage / name).chmod((stage / name).stat().st_mode | 0o111)
 
         for p in stage.rglob("*.priv"):
             raise RuntimeError(f"refusing private key in package: {p}")
@@ -619,6 +658,22 @@ def main() -> int:
     if size < 500_000:
         print("WARNING: package smaller than expected for wheeled bundle", file=sys.stderr)
         return 1
+    # Stage Arch/CachyOS packaging sources next to the tarball (no makepkg here)
+    try:
+        from package_arch_linux import stage_arch_packaging
+
+        arch_info = stage_arch_packaging(version=VERSION, copy_tarball=True)
+        print(f"arch packaging staged: {arch_info.get('out_dir')}")
+    except Exception as exc:  # noqa: BLE001
+        # Allow direct import when run as script
+        try:
+            sys.path.insert(0, str(ROOT / "scripts"))
+            from package_arch_linux import stage_arch_packaging
+
+            arch_info = stage_arch_packaging(version=VERSION, copy_tarball=True)
+            print(f"arch packaging staged: {arch_info.get('out_dir')}")
+        except Exception as exc2:  # noqa: BLE001
+            print(f"WARNING: arch packaging stage skipped: {exc2}", file=sys.stderr)
     return 0
 
 

@@ -7,6 +7,7 @@ Does **not** expose a connected-client count or poll a live session metric.
 
 from __future__ import annotations
 
+import html
 import json
 import mimetypes
 import os
@@ -42,6 +43,30 @@ from admin_2fa import (
     verify_totp,
 )
 from downloads import download_css, render_bmc_tip_html, render_download_section_html
+
+
+def upgrade_download_form_html(platform: str) -> str:
+    """Browser form for /upgrade-download when keygen/session are missing.
+
+    Pure helper (no request state) so tests can drive the no-credential path
+    without starting the HTTP server. Uses module :mod:`html` for escaping —
+    must never bind a local name ``html`` in callers.
+    """
+    plat_safe = html.escape((platform or "").strip().lower() or "windows")
+    return (
+        "<!DOCTYPE html><html><head><meta charset=utf-8>"
+        "<title>Restore Privacy — Get update</title></head><body>"
+        "<h1>Get update</h1>"
+        "<p>Enter the keygen from your fulfilment email to download "
+        f"the current <strong>{plat_safe}</strong> installer. "
+        "This is not a new purchase.</p>"
+        f'<form method="get" action="/upgrade-download">'
+        f'<input type="hidden" name="platform" value="{plat_safe}"/>'
+        '<label>Keygen <input name="keygen" required '
+        'placeholder="RPT-KEY-…" size="40"/></label> '
+        '<button type="submit">Download update</button></form>'
+        "</body></html>"
+    )
 from settings_explainer import (
     homepage_settings_banner_css,
     render_settings_explainer_banner_html,
@@ -881,6 +906,8 @@ class Handler(BaseHTTPRequestHandler):
             payload = {
                 "catalog_version": ver,
                 "downloads_url": f"{DEFAULT_PRODUCTION_PUBLIC_BASE_URL.rstrip('/')}/#downloads",
+                # Platform-matched upgrade entry (not /pay) — clients mint with keygen.
+                "upgrade_download_path": "/upgrade-download",
             }
             self._send(
                 200,
@@ -889,6 +916,102 @@ class Handler(BaseHTTPRequestHandler):
                 extra_headers=[("Cache-Control", "public, max-age=300")],
             )
             return
+
+        # Subscriber upgrade: mint monopin installer grant → immediate /download.
+        if path in (
+            "/upgrade-download",
+            "/upgrade-download/",
+            "/api/subscriber-upgrade-download",
+            "/subscriber-upgrade-download",
+        ):
+            plat = (query.get("platform") or "").strip().lower()
+            keygen = (query.get("keygen") or "").strip()
+            session_id = (query.get("session_id") or "").strip()
+            want_json = (
+                path.startswith("/api/")
+                or (query.get("format") or "").strip().lower() == "json"
+                or "application/json" in (self.headers.get("Accept") or "").lower()
+            )
+            if not plat:
+                if want_json:
+                    self._send(
+                        400,
+                        "application/json",
+                        json.dumps({"ok": False, "error": "missing_platform"}).encode(
+                            "utf-8"
+                        ),
+                    )
+                else:
+                    self._send(
+                        400,
+                        "text/plain; charset=utf-8",
+                        b"missing platform (e.g. ?platform=macos)",
+                    )
+                return
+            if not keygen and not session_id:
+                # Honest form: active subscribers paste keygen once to start download.
+                if want_json:
+                    self._send(
+                        400,
+                        "application/json",
+                        json.dumps(
+                            {
+                                "ok": False,
+                                "error": "missing_keygen_or_session_id",
+                                "hint": "Pass keygen=RPT-KEY-… or session_id= from the entitled install",
+                            }
+                        ).encode("utf-8"),
+                    )
+                else:
+                    body_html = upgrade_download_form_html(plat)
+                    self._send(200, "text/html; charset=utf-8", body_html.encode("utf-8"))
+                return
+            try:
+                from payments import mint_subscriber_upgrade_download
+
+                minted = mint_subscriber_upgrade_download(
+                    platform=plat,
+                    keygen=keygen,
+                    session_id=session_id,
+                )
+            except ValueError as exc:
+                err = str(exc) or "upgrade_mint_failed"
+                if want_json:
+                    self._send(
+                        403 if "entitlement" in err else 400,
+                        "application/json",
+                        json.dumps({"ok": False, "error": err}).encode("utf-8"),
+                    )
+                else:
+                    self._send(
+                        403 if "entitlement" in err else 400,
+                        "text/plain; charset=utf-8",
+                        f"Upgrade download refused: {err}".encode("utf-8"),
+                    )
+                return
+            except Exception as exc:  # noqa: BLE001
+                if want_json:
+                    self._send(
+                        500,
+                        "application/json",
+                        json.dumps(
+                            {"ok": False, "error": f"mint_failed:{exc}"[:200]}
+                        ).encode("utf-8"),
+                    )
+                else:
+                    self._send(500, "text/plain; charset=utf-8", b"mint failed")
+                return
+            if want_json:
+                self._send(
+                    200,
+                    "application/json",
+                    json.dumps(minted).encode("utf-8"),
+                )
+                return
+            # Browser/OS: immediate redirect so download starts (not /pay).
+            self._redirect(str(minted.get("download_path") or "/"))
+            return
+
         if path in ("/health", "/healthz"):
             self._send(200, "application/json", b'{"ok":true}')
             return

@@ -68,6 +68,15 @@ EXPLAINER_CORE_VPN = (
     "Those cannot be turned off here — without them this is not a working VPN."
 )
 
+# Connected residual still encrypts OS traffic — honest power/CPU note (P2).
+EXPLAINER_CONNECTED_IDLE_POWER = (
+    "While Connected, residual full-tunnel protection stays active even if you are not "
+    "browsing: background app and system traffic still goes through the VPN crypto path, "
+    "which uses battery and CPU. Disconnect when you do not need protection. "
+    "Traffic shaping ON also sends periodic cover frames (~every 2s), which uses a little "
+    "extra power and data."
+)
+
 
 @dataclass(frozen=True)
 class PrivacyScalePrefs:

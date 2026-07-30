@@ -691,6 +691,9 @@ class _TunnelHomeState extends State<TunnelHome> with WidgetsBindingObserver {
       final ok = await _vpn.connect(
         residualIpv4: kResidualIpv4AlwaysOn,
         residualIpv6: _settings.residualIpv6,
+        privacyTrafficShape: _settings.privacyTrafficShape,
+        privacyOuterObfuscation: _settings.privacyOuterObfuscation,
+        privacyMultihop: _settings.privacyMultihop,
       );
       if (!mounted) return;
       setState(() {

@@ -25,9 +25,12 @@ class TestUpgradeHelpers(unittest.TestCase):
         self.assertTrue(upgrade_available(running="0.4.10", latest="0.5.0"))
         self.assertFalse(upgrade_available(running="0.5.0", latest="0.5.0"))
 
-    def test_upgrade_url_platform_paid_paths(self):
-        """Paid paths must be absolute https — webbrowser cannot open /pay?… alone."""
-        from client.ui_theme import upgrade_download_url
+    def test_upgrade_url_platform_monopin_download_not_pay(self):
+        """Get update opens platform monopin upgrade-download — not /pay Checkout."""
+        from client.ui_theme import (
+            catalog_installer_filename,
+            upgrade_download_url,
+        )
 
         for plat in ("windows", "linux", "macos", "ios", "android"):
             url = upgrade_download_url(platform=plat)
@@ -37,30 +40,36 @@ class TestUpgradeHelpers(unittest.TestCase):
                 msg=f"{plat}: expected absolute https, got {url!r}",
             )
             self.assertIn("restoreprivacy.online", url)
+            # Primary hop is upgrade-download or /download?token= — never /pay
+            self.assertNotIn("/pay?", url, msg=f"{plat}: {url}")
+            self.assertNotIn("/pay&", url)
             self.assertTrue(
-                "/pay" in url or "#downloads" in url,
+                "/upgrade-download" in url or "/download?token=" in url,
                 msg=f"{plat}: {url}",
             )
-            # Never leave a bare relative path (catalog pay_path shape)
-            self.assertFalse(
-                url.startswith("/pay"),
-                msg=f"{plat}: relative pay path unusable by webbrowser: {url!r}",
-            )
-            if "/pay" in url:
-                self.assertIn(f"platform={plat}", url)
+            self.assertIn(f"platform={plat}", url)
+            fname = catalog_installer_filename(plat)
+            self.assertIsNotNone(fname)
+            self.assertIn(plat if plat != "windows" else "windows", fname or "")
+
+    def test_upgrade_url_with_token_is_direct_download(self):
+        from client.ui_theme import upgrade_download_url
+
+        url = upgrade_download_url(platform="macos", token="testToken123")
+        self.assertIn("/download?token=", url)
+        self.assertNotIn("/pay", url)
+        self.assertTrue(url.startswith("https://"))
 
     def test_upgrade_url_absolute_when_downloads_module_importable(self):
-        """Reproduce preferred path: status_page.downloads available → still absolute."""
+        """Preferred path: monopin upgrade-download still absolute https."""
         import importlib
         import sys
 
-        # Ensure downloads is importable the same way frozen/dev PYTHONPATH may be
         root = str(ROOT)
         sp = str(ROOT / "status_page")
         for p in (root, sp):
             if p not in sys.path:
                 sys.path.insert(0, p)
-        # Force re-import path used by upgrade_download_url
         import client.ui_theme as ui_theme
 
         importlib.reload(ui_theme)
@@ -68,8 +77,9 @@ class TestUpgradeHelpers(unittest.TestCase):
             url = ui_theme.upgrade_download_url(platform=plat)
             self.assertTrue(url.startswith("https://"), msg=url)
             self.assertIn("restoreprivacy.online", url)
-            self.assertIn("/pay", url)
+            self.assertIn("/upgrade-download", url)
             self.assertIn(f"platform={plat}", url)
+            self.assertNotIn("/pay?", url)
             self.assertFalse(url.startswith("/"))
 
     def test_upgrade_surfaces_lists_all_five_platforms(self):

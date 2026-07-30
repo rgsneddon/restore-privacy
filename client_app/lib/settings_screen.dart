@@ -874,9 +874,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
               borderRadius: BorderRadius.circular(kCornerRadius),
               border: Border.all(color: kBorder),
             ),
-            child: const Text(
-              kDpiMitigationDisclaimer,
-              style: TextStyle(fontSize: 12, color: kText),
+            child: Text(
+              '$kDpiMitigationDisclaimer\n\n$kConnectedIdlePowerHonesty',
+              style: const TextStyle(fontSize: 12, color: kText),
             ),
           ),
           const SizedBox(height: 20),

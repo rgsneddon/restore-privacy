@@ -293,22 +293,19 @@ class PacketTunnelProvider: NEPacketTunnelProvider {
     keepaliveTimer = timer
   }
 
-  /// Product residual cover traffic (RPTC) at productCoverIntervalS — default on.
+  /// Product residual cover traffic (RPTC) only when privacy-scale shape is ON.
+  /// Timer fires at productCoverIntervalS (not sub-second spin checks).
   private func startCoverTraffic() {
     guard RptTrafficShape.productCover else { return }
-    let interval = max(0.2, RptTrafficShape.productCoverIntervalS)
+    let interval = max(0.5, RptTrafficShape.productCoverIntervalS)
     let timer = DispatchSource.makeTimerSource(queue: pathQueue)
-    timer.schedule(deadline: .now() + interval, repeating: 0.25)
+    timer.schedule(deadline: .now() + interval, repeating: interval)
     timer.setEventHandler { [weak self] in
       guard let self, self.running, let engine = self.engine else { return }
       guard RptTrafficShape.productCover else { return }
-      let now = Date()
-      if now.timeIntervalSince(self.lastCoverSent) < RptTrafficShape.productCoverIntervalS {
-        return
-      }
       do {
         try engine.sendCoverFrame()
-        self.lastCoverSent = now
+        self.lastCoverSent = Date()
       } catch {}
     }
     timer.resume()

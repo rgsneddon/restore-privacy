@@ -32,6 +32,9 @@ class MainActivity : FlutterActivity() {
                         val port = call.argument<Int>("port") ?: 44044
                         val fullTunnel = call.argument<Boolean>("fullTunnel") ?: true
                         val sessionName = call.argument<String>("sessionName") ?: "Restore Privacy"
+                        // Lean residual defaults OFF (parity with desktop/Apple privacy scale).
+                        val trafficShape = call.argument<Boolean>("trafficShape") ?: false
+                        val outerObfs = call.argument<Boolean>("outerObfuscation") ?: false
                         // Fail fast if admission material is missing
                         if (!secretsPresent()) {
                             result.success(
@@ -45,7 +48,24 @@ class MainActivity : FlutterActivity() {
                             )
                             return@setMethodCallHandler
                         }
-                        prepareAndStart(host, port, fullTunnel, sessionName, result)
+                        prepareAndStart(
+                            host, port, fullTunnel, sessionName, result,
+                            trafficShape = trafficShape,
+                            outerObfs = outerObfs,
+                        )
+                    }
+                    "setPrivacyScale" -> {
+                        val shape = call.argument<Boolean>("trafficShape") ?: false
+                        val obfs = call.argument<Boolean>("outerObfuscation") ?: false
+                        RptTrafficShape.applyPrivacyScale(shape)
+                        RptObfuscation.applyPrivacyScale(obfs)
+                        result.success(
+                            mapOf(
+                                "ok" to true,
+                                "trafficShape" to RptTrafficShape.productPadding,
+                                "outerObfuscation" to RptObfuscation.productObfsEnabled,
+                            ),
+                        )
                     }
                     "disconnect" -> {
                         // ACTION_DISCONNECT runs stopTunnel (close TUN + stopSelf)
@@ -206,6 +226,8 @@ class MainActivity : FlutterActivity() {
         fullTunnel: Boolean,
         sessionName: String,
         result: MethodChannel.Result,
+        trafficShape: Boolean = false,
+        outerObfs: Boolean = false,
     ) {
         val intent = VpnService.prepare(this)
         if (intent != null) {
@@ -214,10 +236,16 @@ class MainActivity : FlutterActivity() {
             pendingPort = port
             pendingFullTunnel = fullTunnel
             pendingSession = sessionName
+            pendingTrafficShape = trafficShape
+            pendingOuterObfs = outerObfs
             @Suppress("DEPRECATION")
             startActivityForResult(intent, vpnRequestCode)
         } else {
-            startVpn(host, port, fullTunnel, sessionName, result)
+            startVpn(
+                host, port, fullTunnel, sessionName, result,
+                trafficShape = trafficShape,
+                outerObfs = outerObfs,
+            )
         }
     }
 
@@ -225,6 +253,8 @@ class MainActivity : FlutterActivity() {
     private var pendingPort: Int = 44044
     private var pendingFullTunnel: Boolean = true
     private var pendingSession: String = "Restore Privacy"
+    private var pendingTrafficShape: Boolean = false
+    private var pendingOuterObfs: Boolean = false
 
     @Deprecated("Deprecated in Java")
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
@@ -233,7 +263,11 @@ class MainActivity : FlutterActivity() {
             val res = pendingResult
             pendingResult = null
             if (resultCode == Activity.RESULT_OK && res != null) {
-                startVpn(pendingHost, pendingPort, pendingFullTunnel, pendingSession, res)
+                startVpn(
+                    pendingHost, pendingPort, pendingFullTunnel, pendingSession, res,
+                    trafficShape = pendingTrafficShape,
+                    outerObfs = pendingOuterObfs,
+                )
             } else {
                 res?.success(
                     mapOf(
@@ -251,6 +285,8 @@ class MainActivity : FlutterActivity() {
         fullTunnel: Boolean,
         sessionName: String,
         result: MethodChannel.Result,
+        trafficShape: Boolean = false,
+        outerObfs: Boolean = false,
     ) {
         // Reply only after service reports handshake/TUN outcome
         val receiver = object : ResultReceiver(Handler(Looper.getMainLooper())) {
@@ -298,6 +334,8 @@ class MainActivity : FlutterActivity() {
             putExtra(RptVpnService.EXTRA_PORT, port)
             putExtra(RptVpnService.EXTRA_FULL_TUNNEL, fullTunnel)
             putExtra(RptVpnService.EXTRA_SESSION, sessionName)
+            putExtra(RptVpnService.EXTRA_TRAFFIC_SHAPE, trafficShape)
+            putExtra(RptVpnService.EXTRA_OUTER_OBFS, outerObfs)
             putExtra(RptVpnService.EXTRA_RECEIVER, receiver)
         }
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {

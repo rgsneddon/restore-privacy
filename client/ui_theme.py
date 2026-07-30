@@ -9,7 +9,9 @@ padding (Tk has limited native rounded widgets).
 from __future__ import annotations
 
 import os
+import urllib.parse
 from pathlib import Path
+from typing import Any
 
 # Exact privacy copy retained for product continuity (static banner/message — not animated)
 PRIVACY_MESSAGE_TEXT = (
@@ -481,37 +483,162 @@ def absolute_status_url(path_or_url: str, *, base: str | None = None) -> str:
     return f"{origin}/{s}"
 
 
-def upgrade_download_url(platform: str | None = None) -> str:
-    """Paid catalog / platform pay entry (repo is private — never free GH releases).
+def catalog_installer_filename(platform: str, version: str | None = None) -> str | None:
+    """Current (or *version*) monopin installer basename for *platform*.
 
-    Prefer the platform payment path so an in-app "new version available" opens
-    the same pay → webhook → 1-hour download proxy flow as the public shop. Falls back
-    to the status host ``#downloads`` section.
-
-    Always returns an **absolute** ``https://`` URL so Windows/Linux
-    ``webbrowser.open`` and Flutter ``url_launcher`` can open it (catalog
-    ``pay_path`` alone is relative for same-origin HTML).
+    Pure path for tests and upgrade CTA honesty — never a free GitHub URL.
     """
     plat = (platform or "").strip().lower()
     if not plat:
-        plat = (os.environ.get("RPT_CLIENT_PLATFORM") or "").strip().lower()
-    base = _public_status_base_url()
-    try:
-        from status_page.downloads import available_downloads
+        return None
+    ver = (version or "").strip().lstrip("vV")
+    if not ver:
+        try:
+            ver = catalog_latest_version(prefer_remote=False)
+        except Exception:  # noqa: BLE001
+            ver = embedded_package_version()
+    # Canonical basenames (must match status_page.downloads RELEASE_ASSETS)
+    suffix = {
+        "windows": f"windows-x64-setup.exe",
+        "android": "android.apk",
+        "macos": "macos.zip",
+        "ios": "ios.zip",
+        "linux": "linux-x64.tar.gz",
+    }.get(plat)
+    if not suffix:
+        return None
+    return f"restore-privacy-client-{ver}-{suffix}"
 
-        assets = list(available_downloads())
-        if plat:
-            for a in assets:
-                if a.platform == plat:
-                    return absolute_status_url(a.pay_path, base=base)
-        # Prefer any known paid path rather than free GH
-        if assets:
-            return absolute_status_url(assets[0].pay_path, base=base)
-    except Exception:
+
+def upgrade_download_path(
+    platform: str | None = None,
+    *,
+    keygen: str = "",
+    session_id: str = "",
+    token: str = "",
+) -> str:
+    """Relative status-host path that starts a **platform monopin installer** fetch.
+
+    Prefer ``/download?token=`` when a grant token is already minted.
+    Otherwise ``/upgrade-download?platform=…`` (+ keygen/session when known) so
+    the host mints a grant and redirects — **not** ``/pay`` Checkout.
+    """
+    tok = (token or "").strip()
+    if tok:
+        return f"/download?token={urllib.parse.quote(tok, safe='')}"
+    plat = (platform or "").strip().lower()
+    if not plat:
+        plat = (os.environ.get("RPT_CLIENT_PLATFORM") or "").strip().lower() or "windows"
+    q: list[tuple[str, str]] = [("platform", plat)]
+    kg = (keygen or "").strip()
+    sid = (session_id or "").strip()
+    if kg:
+        q.append(("keygen", kg))
+    elif sid:
+        q.append(("session_id", sid))
+    # Embed monopin basename for operators/tests (host always re-resolves live pin)
+    fname = catalog_installer_filename(plat)
+    if fname:
+        q.append(("filename", fname))
+    return "/upgrade-download?" + urllib.parse.urlencode(q)
+
+
+def upgrade_download_url(
+    platform: str | None = None,
+    *,
+    keygen: str = "",
+    session_id: str = "",
+    token: str = "",
+    base_url: str | None = None,
+) -> str:
+    """Absolute URL that retrieves the platform monopin installer (not /pay).
+
+    With *token*: opens ``/download?token=…`` (browser starts package retrieval).
+    With *keygen* / *session_id*: opens ``/upgrade-download`` which mints a grant
+    for active subscribers and 302s to the installer.
+    Without credentials: still ``/upgrade-download?platform=…`` (keygen form on
+    host) — never Stripe Checkout as the primary hop.
+
+    Always absolute ``https://`` for webbrowser / url_launcher.
+    """
+    base = (base_url or _public_status_base_url()).rstrip("/")
+    path = upgrade_download_path(
+        platform, keygen=keygen, session_id=session_id, token=token
+    )
+    return absolute_status_url(path, base=base)
+
+
+def resolve_upgrade_download_url(
+    platform: str | None = None,
+    *,
+    keygen: str = "",
+    session_id: str = "",
+    base_url: str | None = None,
+    mint_fn: Any = None,
+    timeout: float = 8.0,
+) -> str:
+    """Best-effort mint → direct ``/download?token=`` URL for active subscribers.
+
+    When mint succeeds the browser opens the grant URL and the OS begins the
+    installer download immediately. Falls soft to :func:`upgrade_download_url`
+    (still not /pay) on network/entitlement failure.
+    """
+    plat = (platform or "").strip().lower() or (
+        (os.environ.get("RPT_CLIENT_PLATFORM") or "").strip().lower() or "windows"
+    )
+    base = (base_url or _public_status_base_url()).rstrip("/")
+    kg = (keygen or "").strip()
+    sid = (session_id or "").strip()
+    if not kg and not sid:
+        return upgrade_download_url(plat, base_url=base)
+    if mint_fn is not None:
+        try:
+            minted = mint_fn(platform=plat, keygen=kg, session_id=sid)
+            if isinstance(minted, dict):
+                url = str(minted.get("download_url") or "").strip()
+                tok = str(minted.get("token") or "").strip()
+                if url.startswith("http"):
+                    return url
+                if tok:
+                    return upgrade_download_url(plat, token=tok, base_url=base)
+        except Exception:  # noqa: BLE001
+            pass
+        return upgrade_download_url(
+            plat, keygen=kg, session_id=sid, base_url=base
+        )
+    # Live HTTP mint (JSON)
+    try:
+        import json
+        import urllib.request
+
+        q = urllib.parse.urlencode(
+            {
+                "platform": plat,
+                **({"keygen": kg} if kg else {}),
+                **({"session_id": sid} if sid and not kg else {}),
+                "format": "json",
+            }
+        )
+        req = urllib.request.Request(
+            f"{base}/api/subscriber-upgrade-download?{q}",
+            headers={
+                "Accept": "application/json",
+                "User-Agent": "RestorePrivacy-client-upgrade",
+            },
+            method="GET",
+        )
+        with urllib.request.urlopen(req, timeout=float(timeout)) as resp:  # noqa: S310
+            data = json.loads(resp.read().decode("utf-8", errors="replace"))
+        if isinstance(data, dict) and data.get("ok"):
+            url = str(data.get("download_url") or "").strip()
+            if url.startswith("http") and "/download?token=" in url:
+                return url
+            tok = str(data.get("token") or "").strip()
+            if tok:
+                return upgrade_download_url(plat, token=tok, base_url=base)
+    except Exception:  # noqa: BLE001
         pass
-    if plat:
-        return absolute_status_url(f"/pay?platform={plat}", base=base)
-    return absolute_status_url("/#downloads", base=base)
+    return upgrade_download_url(plat, keygen=kg, session_id=sid, base_url=base)
 
 
 def upgrade_banner_text(running: str | None = None, latest: str | None = None) -> str | None:

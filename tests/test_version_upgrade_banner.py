@@ -152,22 +152,20 @@ class TestUpgradeBanner(unittest.TestCase):
         self.assertIn("if self._upgrade_msg", src)
         self.assertIn("upgrade_frame.pack", src)
 
-    def test_upgrade_download_url_is_paid_not_free_github(self):
-        """In-app update must open paid path; free GH release hrefs are gone."""
+    def test_upgrade_download_url_is_monopin_not_pay_or_free_github(self):
+        """In-app update opens monopin installer path; never free GH or /pay."""
         url = upgrade_download_url()
         self.assertTrue(isinstance(url, str) and len(url) > 0)
         self.assertNotIn("releases/download", url)
         self.assertNotIn("releases/latest", url)
-        # Absolute https only — webbrowser.open cannot open relative /pay?…
         self.assertTrue(
             url.startswith("https://"),
             msg=f"expected absolute https upgrade url: {url!r}",
         )
-        self.assertFalse(url.startswith("/pay"), msg=f"relative pay path: {url!r}")
+        self.assertNotIn("/pay?", url)
+        self.assertIn("restoreprivacy.online", url)
         self.assertTrue(
-            "buy.stripe.com" in url
-            or "restoreprivacy.online" in url
-            or "#downloads" in url,
+            "/upgrade-download" in url or "/download?token=" in url,
             msg=f"unexpected upgrade url: {url}",
         )
 

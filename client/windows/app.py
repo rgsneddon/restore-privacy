@@ -106,6 +106,7 @@ from client.registration_copy import (
     SEAMLESS_TAGLINE,
 )
 from client.transparency_copy import (
+    CONNECTED_IDLE_POWER_HONESTY,
     CONNECTION_LOG_DISCLAIMER,
     CONNECTION_LOG_TITLE,
     DPI_MITIGATION_DISCLAIMER,
@@ -2166,8 +2167,17 @@ class TunnelClientApp:
         threading.Thread(target=work, daemon=True).start()
 
     def _open_upgrade(self) -> None:
-        url = upgrade_download_url(platform="windows")
-        self._log(f"Opening download page...")
+        """Open platform monopin installer download (not /pay Checkout)."""
+        from client.payment_entitlement import load_payment_entitlement
+        from client.ui_theme import resolve_upgrade_download_url
+
+        ent = load_payment_entitlement()
+        url = resolve_upgrade_download_url(
+            "windows",
+            keygen=str(getattr(ent, "keygen", "") or ""),
+            session_id=str(getattr(ent, "session_id", "") or ""),
+        )
+        self._log("Opening monopin installer download…")
         try:
             webbrowser.open(url)
         except Exception as exc:
@@ -3516,6 +3526,16 @@ class TunnelClientApp:
             wraplength=400,
             justify=tk.LEFT,
         ).pack(fill=tk.X)
+        tk.Label(
+            dpi_card,
+            text=CONNECTED_IDLE_POWER_HONESTY,
+            bg=PANEL_BG,
+            fg=TEXT,
+            font=("Segoe UI", 8),
+            anchor="w",
+            wraplength=400,
+            justify=tk.LEFT,
+        ).pack(fill=tk.X, pady=(6, 0))
 
         # Legal / policy documents (stable public GitHub URLs)
         from client.legal_links import LEGAL_DOC_LINKS

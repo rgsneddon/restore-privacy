@@ -477,6 +477,35 @@ def keygen_unlock_is_version_agnostic() -> bool:
     return True
 
 
+def should_force_keygen_after_upgrade(
+    *,
+    licence_accepted: bool,
+    has_keygen: bool,
+    payment_status: str,
+    previous_app_version: str = "",
+    current_app_version: str = "",
+) -> bool:
+    """Whether a post-upgrade cold start must force the keygen sheet.
+
+    Pure policy helper: a monopin/package version bump alone **never** forces
+    re-entry when durable local licence acceptance + keygen unlock remain and
+    payment is not blocking. Used by desktop/Flutter first-run sequencing tests
+    and documentation of upgrade rollover.
+    """
+    _ = previous_app_version, current_app_version  # version delta is not a gate
+    if not keygen_unlock_is_version_agnostic():
+        return True
+    if not licence_accepted:
+        return True
+    st = (payment_status or "").strip().lower()
+    if st in (STATUS_FAILED, STATUS_REVOKED, STATUS_UNPAID):
+        return False  # renew surface, not keygen
+    # Durable RPT-KEY on file rolls over across monopin upgrades.
+    if has_keygen:
+        return False
+    return True
+
+
 def import_keygen_and_verify(
     keygen: str,
     *,

@@ -5401,6 +5401,92 @@ def find_paid_purchase_by_id(purchase_id: str) -> dict[str, Any] | None:
         conn.close()
 
 
+def mint_subscriber_upgrade_download(
+    *,
+    platform: str,
+    keygen: str = "",
+    session_id: str = "",
+    now: float | None = None,
+    base_url: str | None = None,
+    ttl_sec: int = TOKEN_TTL_SEC,
+) -> dict[str, Any]:
+    """Mint a time-limited monopin installer grant for an **active** subscriber.
+
+    Used by the in-app "Get update" CTA so an entitled customer downloads the
+    current catalog package for their device **without** going through Stripe
+    Checkout again. Requires an active connect entitlement (keygen and/or
+    session_id). Returns absolute ``download_url`` to ``/download?token=…`` so
+    the browser/OS starts retrieving the installer immediately.
+
+    Raises ``ValueError`` for unknown platform, missing credentials, or
+    inactive/expired entitlement.
+    """
+    plat = (platform or "").strip().lower()
+    fname = platform_filename(plat)
+    if not fname:
+        raise ValueError(f"unknown platform: {platform!r}")
+    kg = normalize_keygen(keygen) if keygen else ""
+    sid = (session_id or "").strip()
+    ent: dict[str, Any] | None = None
+    if kg:
+        ent = get_connect_entitlement_by_keygen(kg, now=now)
+    elif sid:
+        ent = get_connect_entitlement(sid, now=now)
+    else:
+        raise ValueError("missing_keygen_or_session_id")
+    if not ent or not ent.get("connect_allowed"):
+        raise ValueError("entitlement_not_active")
+    # Prefer bound session from entitlement for grant lineage
+    bound_sid = str(ent.get("session_id") or sid or f"upgrade_{secrets.token_hex(8)}")
+    # Prefer purchase lineage when present on prior grants for this session
+    purchase_id = ""
+    try:
+        init_db()
+        conn = _connect()
+        try:
+            row = conn.execute(
+                """
+                SELECT purchase_id FROM grants
+                WHERE session_id = ? AND purchase_id IS NOT NULL AND purchase_id != ''
+                ORDER BY created_at DESC LIMIT 1
+                """,
+                (bound_sid,),
+            ).fetchone()
+            if row is not None:
+                purchase_id = normalize_purchase_id(str(row["purchase_id"] or "")) or ""
+        finally:
+            conn.close()
+    except Exception:  # noqa: BLE001
+        purchase_id = ""
+    token = mint_download_token(
+        filename=fname,
+        platform=plat,
+        session_id=bound_sid,
+        amount_pence=PRICE_PENCE,
+        currency=PRICE_CURRENCY,
+        ttl_sec=ttl_sec,
+        now=now,
+        purchase_id=purchase_id or None,
+    )
+    path = f"/download?token={token}"
+    base = (base_url if base_url is not None else public_base_url()).rstrip("/")
+    url = f"{base}{path}"
+    if "github.com" in url.lower() and "releases/download" in url.lower():
+        raise RuntimeError("refusing free GitHub release URL from subscriber upgrade mint")
+    return {
+        "ok": True,
+        "token": token,
+        "download_path": path,
+        "download_url": url,
+        "platform": plat,
+        "filename": fname,
+        "session_id": bound_sid,
+        "keygen": str(ent.get("keygen") or kg or ""),
+        "subscriber_upgrade": True,
+        "catalog_version": fname.split("-")[3] if fname.count("-") >= 3 else "",
+    }
+
+
 def admin_mint_download_for_platform(
     platform: str,
     *,

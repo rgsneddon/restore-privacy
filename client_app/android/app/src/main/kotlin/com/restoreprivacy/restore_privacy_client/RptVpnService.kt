@@ -42,6 +42,11 @@ class RptVpnService : VpnService() {
                 val port = intent.getIntExtra(EXTRA_PORT, 44044)
                 val fullTunnel = intent.getBooleanExtra(EXTRA_FULL_TUNNEL, true)
                 val session = intent.getStringExtra(EXTRA_SESSION) ?: "Privacy Restored"
+                // Privacy-scale lean defaults OFF unless Flutter Connect extras enable them.
+                val shape = intent.getBooleanExtra(EXTRA_TRAFFIC_SHAPE, false)
+                val obfs = intent.getBooleanExtra(EXTRA_OUTER_OBFS, false)
+                RptTrafficShape.applyPrivacyScale(shape)
+                RptObfuscation.applyPrivacyScale(obfs)
                 val recv = extractReceiver(intent)
                 // Already handshaking or up: reply to *this* receiver only — do not
                 // steal the active connect's ResultReceiver / reported flag (that hung
@@ -437,14 +442,20 @@ class RptVpnService : VpnService() {
                         }
                     }
                 }
+                // Cover only when privacy-scale traffic shaping is ON (lean default OFF).
                 val coverThread = thread(name = "rpt-cover", isDaemon = true) {
+                    val interval = RptTrafficShape.PRODUCT_COVER_INTERVAL_MS.coerceAtLeast(200L)
                     while (running.get()) {
                         try {
-                            Thread.sleep(200)
+                            if (!RptTrafficShape.productCover) {
+                                // Lean residual: sleep long; no cover AEAD/UDP.
+                                Thread.sleep(interval)
+                                continue
+                            }
+                            Thread.sleep(interval)
+                            if (!running.get() || !RptTrafficShape.productCover) continue
                             val now = System.currentTimeMillis()
-                            if (RptTrafficShape.PRODUCT_COVER &&
-                                now - lastCoverMs.get() >= RptTrafficShape.PRODUCT_COVER_INTERVAL_MS
-                            ) {
+                            if (now - lastCoverMs.get() >= interval) {
                                 val wire = engine.sealAndWrapCover()
                                 dataSock.send(DatagramPacket(wire, wire.size))
                                 lastCoverMs.set(now)
@@ -650,6 +661,10 @@ class RptVpnService : VpnService() {
         const val EXTRA_PORT = "port"
         const val EXTRA_FULL_TUNNEL = "fullTunnel"
         const val EXTRA_SESSION = "session"
+        /** Privacy-scale: traffic shaping (pad/cover/jitter); default lean OFF. */
+        const val EXTRA_TRAFFIC_SHAPE = "trafficShape"
+        /** Privacy-scale: outer QUIC-mimic wrap; default lean OFF. */
+        const val EXTRA_OUTER_OBFS = "outerObfuscation"
         const val EXTRA_RECEIVER = "receiver"
         const val EXTRA_MESSAGE = "message"
         const val EXTRA_VPN_IP = "vpnIp"

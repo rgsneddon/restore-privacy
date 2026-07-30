@@ -25,6 +25,8 @@ public final class RptClientEngine {
     private let nodeElgamalPubRaw: Data
     private var sessionId: Data?
     private var sessionKey: Data?
+    /// Reused for DATA seal/open (avoid per-packet SymmetricKey construction).
+    private var sessionCrypto: RptSessionCrypto?
     private var counterOut: UInt64 = 0
     /// Ephemeral X25519 private key for the in-flight HELLO (PFS).
     private var pendingClientEph: Curve25519.KeyAgreement.PrivateKey?
@@ -55,6 +57,7 @@ public final class RptClientEngine {
     public func applySession(_ session: Session) {
         self.sessionId = session.sessionId
         self.sessionKey = session.sessionKey
+        self.sessionCrypto = RptSessionCrypto(keyBytes: session.sessionKey)
         self.counterOut = 0
         self.lastVpnIp = session.vpnIp
     }
@@ -191,7 +194,7 @@ public final class RptClientEngine {
     // Product residual: pad (RPTP) / cover (RPTC) inside AEAD; outer wrap on UDP.
 
     public func sealPacket(_ ipPacket: Data) throws -> Data {
-        guard let sid = sessionId, let keyBytes = sessionKey else {
+        guard let sid = sessionId, let crypto = dataPlaneCrypto() else {
             throw RptProtocol.ProtocolError("no session")
         }
         counterOut += 1
@@ -199,14 +202,13 @@ public final class RptClientEngine {
         var c = counterOut.bigEndian
         aad.append(Data(bytes: &c, count: 8))
         let body = try RptTrafficShape.prepareOutbound(ipPacket)
-        let crypto = RptSessionCrypto(keyBytes: keyBytes)
         let (nonce, sealed) = try crypto.seal(plaintext: body, aad: aad)
         return RptProtocol.packData(sessionId: sid, counter: counterOut, nonce: nonce, sealed: sealed)
     }
 
     /// Open DATA after outer unwrap; returns nil if cover (RPTC).
     public func openPacketAllowCover(_ frame: Data) throws -> Data? {
-        guard let keyBytes = sessionKey else {
+        guard let crypto = dataPlaneCrypto() else {
             throw RptProtocol.ProtocolError("no session")
         }
         let (sid, counter, nonce, sealed) = try RptProtocol.parseData(frame)
@@ -216,7 +218,6 @@ public final class RptClientEngine {
         var aad = sid
         var c = counter.bigEndian
         aad.append(Data(bytes: &c, count: 8))
-        let crypto = RptSessionCrypto(keyBytes: keyBytes)
         let raw = try crypto.open(nonce: nonce, ciphertext: sealed, aad: aad)
         let (plain, isCover) = try RptTrafficShape.interpretInbound(raw)
         if isCover { return nil }
@@ -231,7 +232,7 @@ public final class RptClientEngine {
     }
 
     public func sealCoverFrame(size: Int = RptTrafficShape.productCoverSize) throws -> Data {
-        guard let sid = sessionId, let keyBytes = sessionKey else {
+        guard let sid = sessionId, let crypto = dataPlaneCrypto() else {
             throw RptProtocol.ProtocolError("no session")
         }
         counterOut += 1
@@ -239,9 +240,17 @@ public final class RptClientEngine {
         var c = counterOut.bigEndian
         aad.append(Data(bytes: &c, count: 8))
         let body = RptTrafficShape.makeCoverPayload(size: size)
-        let crypto = RptSessionCrypto(keyBytes: keyBytes)
         let (nonce, sealed) = try crypto.seal(plaintext: body, aad: aad)
         return RptProtocol.packData(sessionId: sid, counter: counterOut, nonce: nonce, sealed: sealed)
+    }
+
+    /// Cached session AEAD for DATA path (created once per session key).
+    private func dataPlaneCrypto() -> RptSessionCrypto? {
+        if let c = sessionCrypto { return c }
+        guard let keyBytes = sessionKey else { return nil }
+        let c = RptSessionCrypto(keyBytes: keyBytes)
+        sessionCrypto = c
+        return c
     }
 
     public func packKeepalive() throws -> Data {

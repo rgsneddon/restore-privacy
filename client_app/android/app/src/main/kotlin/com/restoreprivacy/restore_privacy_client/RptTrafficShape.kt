@@ -10,7 +10,9 @@ import java.security.SecureRandom
  *   Real padded: RPTP || u16_be(len) || plain || random_pad
  *   Cover dummy: RPTC || random_bytes
  *
- * Product residual defaults: padding on (bucket 128), cover available.
+ * Runtime flags (privacy scale): default **lean residual** (pad/cover/jitter OFF)
+ * until Settings / Connect extras enable traffic shaping — parity with
+ * `client.product_policy` and Apple `RptResidualPrivacyPolicy`.
  */
 object RptTrafficShape {
     val PAD_MAGIC: ByteArray = byteArrayOf(0x52, 0x50, 0x54, 0x50) // RPTP
@@ -18,16 +20,36 @@ object RptTrafficShape {
     const val PRODUCT_PAD_BUCKET: Int = 128
     const val PRODUCT_COVER_SIZE: Int = 128
     const val PRODUCT_COVER_INTERVAL_MS: Long = 2000L
-    /** Bounded send-side delay (ms); matches Python product policy (jitter_ms_max=40). */
-    const val PRODUCT_JITTER_MS_MAX: Int = 40
-    const val PRODUCT_PADDING: Boolean = true
-    const val PRODUCT_COVER: Boolean = true
+    /** Bounded send-side delay (ms) when shaping is on. */
+    const val PRODUCT_JITTER_MS_MAX_WHEN_ON: Int = 40
+
+    /** Runtime: pad real DATA (default OFF — lean residual). */
+    @Volatile
+    var productPadding: Boolean = false
+
+    /** Runtime: send cover frames (default OFF). */
+    @Volatile
+    var productCover: Boolean = false
+
+    /** Runtime: max send jitter ms (0 when lean). */
+    @Volatile
+    var productJitterMsMax: Int = 0
 
     private val rnd = SecureRandom()
 
-    /** Product residual send jitter (0…PRODUCT_JITTER_MS_MAX). DATA path only. */
+    /**
+     * Apply privacy-scale Settings (Flutter) to residual DATA flags.
+     * When [trafficShape] is false: pad, cover, and jitter are all off.
+     */
+    fun applyPrivacyScale(trafficShape: Boolean) {
+        productPadding = trafficShape
+        productCover = trafficShape
+        productJitterMsMax = if (trafficShape) PRODUCT_JITTER_MS_MAX_WHEN_ON else 0
+    }
+
+    /** Product residual send jitter (0…productJitterMsMax). DATA path only. */
     fun applySendJitter() {
-        val maxMs = PRODUCT_JITTER_MS_MAX
+        val maxMs = productJitterMsMax
         if (maxMs <= 0) return
         val ms = rnd.nextInt(maxMs + 1)
         if (ms > 0) {
@@ -70,7 +92,7 @@ object RptTrafficShape {
         return rest.copyOfRange(2, 2 + n) to false
     }
 
-    fun prepareOutbound(ipPacket: ByteArray, padding: Boolean = PRODUCT_PADDING): ByteArray {
+    fun prepareOutbound(ipPacket: ByteArray, padding: Boolean = productPadding): ByteArray {
         return if (padding) padPayload(ipPacket) else ipPacket
     }
 

@@ -118,14 +118,18 @@ class RptDataPlane:
         sock = self.sock
         last_keepalive = 0.0
         last_cover = 0.0
+        last_activity = time.time()
         keepalive_every = 30.0  # keep node session alive (routing / idle prune)
+        # Adaptive select timeout: busy 50ms, idle backoff up to 400ms (P1 drain).
+        idle_select_s = 0.05
+        idle_select_max_s = 0.40
         while not self._stop.is_set():
             try:
                 rlist = [sock]
                 fd = tun.fileno()
                 if fd >= 0:
                     rlist.append(fd)
-                readable, _, _ = select.select(rlist, [], [], 0.05)
+                readable, _, _ = select.select(rlist, [], [], idle_select_s)
             except (ValueError, OSError):
                 readable = []
                 fd = -1
@@ -134,6 +138,8 @@ class RptDataPlane:
             # (nonblocking only — never steal frames via keepalive recv)
             try:
                 data, _addr = sock.recvfrom(65535)
+                last_activity = time.time()
+                idle_select_s = 0.05
                 try:
                     try:
                         from client.product_policy import (
@@ -177,6 +183,8 @@ class RptDataPlane:
             try:
                 pkt = tun.read_packet()
                 if pkt:
+                    last_activity = time.time()
+                    idle_select_s = 0.05
                     if self.traffic_shape.jitter_ms_max > 0:
                         apply_send_jitter(self.traffic_shape.jitter_ms_max)
                     frame = self.client.seal_packet(pkt)
@@ -198,6 +206,7 @@ class RptDataPlane:
                 except Exception:
                     self.stats.errors += 1
                 last_cover = now
+                last_activity = now
 
             # Periodic KEEPALIVE so idle tunnels are not pruned on the node
             if (now - last_keepalive) >= keepalive_every:
@@ -207,8 +216,15 @@ class RptDataPlane:
                     self.stats.errors += 1
                 last_keepalive = now
 
+            # Idle backoff: when no TUN/UDP activity, lengthen select wait (battery).
+            quiet_s = now - last_activity
+            if quiet_s >= 0.5:
+                idle_select_s = min(
+                    idle_select_max_s,
+                    0.05 + min(quiet_s, 2.0) * 0.15,
+                )
             if fd < 0:
-                time.sleep(0.01)
+                time.sleep(min(0.05, idle_select_s))
 
     def seal_from_tun_once(self, tun: TunIO) -> bytes:
         """Read one TUN packet and seal it via RptClient.seal_packet (tests + manual pump)."""

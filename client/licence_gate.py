@@ -234,6 +234,11 @@ def needs_keygen_unlock(path: Optional[Path] = None) -> bool:
     Returns **False** when payment is blocking (failed/revoked/unpaid) so the
     UI shows the renew-licence surface instead of the keygen modal.
 
+    **Upgrade rollover:** package version / ``client/VERSION`` is never read
+    here. Durable ``licence_acceptance.json`` + ``payment_entitlement.json``
+    under the product data dir survive install-over-install; an active keygen
+    on file continues to unlock without re-accept or re-paste after upgrade.
+
     ``path`` is the **licence** acceptance path only (same as
     :func:`has_accepted_licence`). Payment entitlement is always read from the
     product entitlement path — do not pass the licence file into
@@ -245,6 +250,8 @@ def needs_keygen_unlock(path: Optional[Path] = None) -> bool:
         return False
     from client.payment_entitlement import payment_allows_connect
 
+    # Durable product-data entitlement path (not install tree) — version bump
+    # does not clear keygen; payment_allows_connect reads that store only.
     return not payment_allows_connect()
 
 
