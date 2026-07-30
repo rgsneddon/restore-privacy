@@ -335,7 +335,7 @@ def render_audit_uk_ping_section(
         )
         if any_exit_live:
             lines.append(
-                f"  and **exit** `{PRODUCT_EXIT_HOST}:{PRODUCT_EXIT_PORT}` (Romania)."
+                f"  and **exit** `{PRODUCT_EXIT_HOST}:{PRODUCT_EXIT_PORT}` (Germany)."
             )
         else:
             lines.append(
@@ -370,7 +370,7 @@ def render_audit_uk_ping_section(
             [
                 "- **Approximate** RTT bands for a **typical UK** (London metro) user to",
                 f"  product **entry** `{PRODUCT_NODE_HOST}:{PRODUCT_NODE_PORT}` (Iceland) and",
-                f"  **exit** `{PRODUCT_EXIT_HOST}:{PRODUCT_EXIT_PORT}` (Romania).",
+                f"  **exit** `{PRODUCT_EXIT_HOST}:{PRODUCT_EXIT_PORT}` (Germany).",
                 "- Live probe from this host **failed or unavailable** — using estimate bands only.",
             ]
         )

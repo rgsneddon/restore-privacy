@@ -120,6 +120,37 @@ class TestRoDeprecationCatalog(unittest.TestCase):
         self.assertEqual(set(CATALOG_FLAG_CODES), {"IS", "DE", "US"})
         self.assertNotIn("RO", CATALOG_FLAG_CODES)
 
+    def test_private_capacity_no_live_ro(self):
+        from node.private_capacity import (
+            PRODUCT_SESSION_SOFT_MAX,
+            PRODUCT_UNLIMITED_BANDWIDTH_CODES,
+            PRODUCT_UNLIMITED_BANDWIDTH_HOSTS,
+            resolve_peer_identity,
+        )
+
+        self.assertNotIn("RO", PRODUCT_UNLIMITED_BANDWIDTH_CODES)
+        self.assertNotIn("185.146.232.107", PRODUCT_UNLIMITED_BANDWIDTH_HOSTS)
+        self.assertNotIn("RO", PRODUCT_SESSION_SOFT_MAX)
+        self.assertNotIn("185.146.232.107", PRODUCT_SESSION_SOFT_MAX)
+        code, host = resolve_peer_identity(code="RO", host="")
+        self.assertEqual(code, "DE")
+        code2, host2 = resolve_peer_identity(code="", host="185.146.232.107")
+        self.assertEqual(code2, "DE")
+        self.assertEqual(host2, "178.105.187.178")
+
+    def test_audit_md_monopin_0_5_8(self):
+        from pathlib import Path
+
+        root = Path(__file__).resolve().parents[1]
+        for rel in ("AUDIT.md", "status_page/public/AUDIT.md"):
+            text = (root / rel).read_text(encoding="utf-8")
+            self.assertIn("**0.5.8**", text)
+            self.assertIn("restore-privacy-client-0.5.8-", text)
+            # Current-catalog pin must not still claim 0.5.7
+            self.assertNotIn("**Public catalog version** | **0.5.7**", text)
+            self.assertNotIn("catalog v0.5.7", text)
+            self.assertNotIn("Code baseline | Catalog **0.5.7**", text)
+
 
 if __name__ == "__main__":
     unittest.main()

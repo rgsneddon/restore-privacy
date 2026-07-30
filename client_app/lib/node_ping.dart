@@ -1,9 +1,10 @@
 /// Best-effort device→node RTT probes for Settings ping statistics (Dart).
 ///
 /// Mirrors `client/node_ping.py` intent: measure approximate latency to product
-/// **entry** (Iceland) and **exit** (Romania). Uses TCP connect RTT to the node
-/// status port (8080) as a portable probe — residual HELLO is crypto-gated and
-/// not used here. Results are **probe RTT**, not a browser SLA.
+/// **entry** (IS / DE / US; default Germany) and multi-hop **exit** (Germany).
+/// Uses TCP connect RTT to the node status port (8080) as a portable probe —
+/// residual HELLO is crypto-gated and not used here. Results are **probe RTT**,
+/// not a browser SLA.
 library;
 
 import 'dart:async';

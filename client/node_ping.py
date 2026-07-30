@@ -197,9 +197,9 @@ class SettingsPingSnapshot:
     exit: Optional[PingResult]
     multihop_enabled: bool
     measured_at: float
-    entry_country: str = "US"
-    entry_name: str = "Iceland"
-    exit_name: str = "Romania"
+    entry_country: str = "DE"
+    entry_name: str = "Germany"
+    exit_name: str = "Germany"
 
     def entry_display(self) -> str:
         return self.entry.display()
@@ -232,7 +232,7 @@ def measure_settings_pings(
     entry_node = country_node_for_code(code)
     entry = probe_entry_rtt_ms(timeout_s=timeout_s, entry_country=code)
     exit_r: Optional[PingResult] = None
-    exit_name = "Romania"
+    exit_name = "Germany"
     if multihop_enabled:
         exit_r = probe_exit_rtt_ms(
             timeout_s=timeout_s,
@@ -240,10 +240,11 @@ def measure_settings_pings(
             multihop_enabled=True,
         )
         if exit_r is not None and exit_r.host:
-            # Label exit by catalog name when known
+            # Label exit by live catalog name (IS / DE / US only)
             for n in (
                 country_node_for_code("IS"),
-                country_node_for_code("RO"),
+                country_node_for_code("DE"),
+                country_node_for_code("US"),
             ):
                 if (n.host or "").strip() == (exit_r.host or "").strip():
                     exit_name = n.name

@@ -2843,8 +2843,8 @@ class TunnelClientApp:
             tk.Label(
                 entry_col,
                 text=(
-                    "Choose residual entry: Iceland, Romania, or United States. "
-                    "With multi-hop on, exit is another catalog country."
+                    "Choose residual entry: Iceland, Germany, or United States. "
+                    "With multi-hop on, exit is Germany (DE)."
                 ),
                 bg=PANEL_BG,
                 fg=TEXT_MUTED,
@@ -2876,7 +2876,7 @@ class TunnelClientApp:
             # Friendly labels under the code menu
             tk.Label(
                 entry_col,
-                text="IS = Iceland · RO = Romania · US = United States",
+                text="IS = Iceland · DE = Germany (default) · US = United States",
                 bg=PANEL_BG,
                 fg=TEXT_MUTED,
                 font=("Segoe UI", 7),

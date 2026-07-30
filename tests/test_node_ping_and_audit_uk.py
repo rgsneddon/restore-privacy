@@ -42,7 +42,7 @@ class TestNodePingHelper(unittest.TestCase):
             host="82.221.101.241", port=44044, ok=True, rtt_ms=42.0, method="tcp"
         )
         fake_exit = PingResult(
-            host="185.146.232.107", port=44044, ok=True, rtt_ms=50.0, method="tcp"
+            host="178.105.187.178", port=44044, ok=True, rtt_ms=50.0, method="tcp"
         )
         with mock.patch(
             "client.node_ping.probe_entry_rtt_ms", return_value=fake_entry
@@ -63,8 +63,11 @@ class TestNodePingHelper(unittest.TestCase):
         src = (ROOT / "client" / "windows" / "app.py").read_text(encoding="utf-8")
         self.assertIn("measure_settings_pings", src)
         self.assertIn("Ping statistics", src)
-        self.assertIn("Entry (Iceland)", src)
-        self.assertIn("Exit (Romania)", src)
+        # Live residual catalog only: IS / DE / US (RO retired)
+        self.assertIn("Iceland, Germany, or United States", src)
+        self.assertIn("DE = Germany (default)", src)
+        self.assertNotIn("Exit (Romania)", src)
+        self.assertNotIn("RO = Romania", src)
         self.assertIn("Measure ping now", src)
 
 
@@ -86,7 +89,9 @@ class TestAuditUkPingSection(unittest.TestCase):
         self.assertIn("Method (honesty)", text)
         self.assertIn("Approximate", text)
         self.assertIn("82.221.101.241", text)
-        self.assertIn("185.146.232.107", text)
+        self.assertIn("178.105.187.178", text)
+        self.assertIn("Germany", text)
+        self.assertNotIn("Romania", text)
         self.assertIn("multi-hop", text.lower())
         rows = uk_ping_matrix_rows(live=LiveRttBase(entry_ms=None, exit_ms=None))
         self.assertEqual(len(rows), 8)
@@ -210,7 +215,7 @@ class TestAuditUkPingSection(unittest.TestCase):
             host="82.221.101.241", port=44044, ok=True, rtt_ms=33.0, method="tcp"
         )
         fake_exit = PingResult(
-            host="185.146.232.107", port=44044, ok=True, rtt_ms=44.0, method="udp"
+            host="178.105.187.178", port=44044, ok=True, rtt_ms=44.0, method="udp"
         )
         text2 = render_audit_uk_ping_section(
             measure=True,
@@ -233,7 +238,7 @@ class TestAuditUkPingSection(unittest.TestCase):
             error="timeout",
         )
         fail_x = PingResult(
-            host="185.146.232.107",
+            host="178.105.187.178",
             port=44044,
             ok=False,
             rtt_ms=None,
@@ -271,9 +276,9 @@ class TestAuditUkPingSection(unittest.TestCase):
         )
 
     def test_audit_package_table_and_monopin_match_catalog(self) -> None:
-        """Shipped AUDIT must name live monopin; package RAG may lag with honesty note."""
+        """Shipped AUDIT must name live monopin; package RAG uses catalog basenames."""
         ver = (ROOT / "client" / "VERSION").read_text(encoding="utf-8").strip()
-        self.assertEqual(ver, "0.4.8")
+        self.assertEqual(ver, "0.5.8")
         paths = [
             ROOT / "AUDIT.md",
             ROOT / "status_page" / "AUDIT.md",
@@ -286,25 +291,22 @@ class TestAuditUkPingSection(unittest.TestCase):
                 text,
                 f"{path} missing live monopin {ver}",
             )
-            # Package table names current or documented lag snapshot filenames
-            self.assertTrue(
-                f"restore-privacy-client-{ver}-windows-x64-setup.exe" in text
-                or "restore-privacy-client-0.4.0-windows-x64-setup.exe" in text
-                or "restore-privacy-client-0.4.1-windows-x64-setup.exe" in text
-                or "restore-privacy-client-0.4.8-windows-x64-setup.exe" in text,
-                f"{path} missing package RAG windows row",
+            self.assertIn(
+                f"restore-privacy-client-{ver}-windows-x64-setup.exe",
+                text,
+                f"{path} missing package RAG windows row for {ver}",
             )
-            self.assertNotIn("restore-privacy-client-0.3.7-", text)
-            self.assertNotIn("restore-privacy-client-0.3.6-", text)
-            self.assertNotIn("monopin **0.3.7**", text)
-            self.assertNotIn("assets/0.3.7/", text)
-            self.assertNotIn("Windows **0.3.6**", text)
+            self.assertIn(f"restore-privacy-client-{ver}-macos.zip", text)
+            # Stale current-catalog pin must not remain
+            self.assertNotIn("**Public catalog version** | **0.5.7**", text)
+            self.assertNotIn("catalog v0.5.7", text)
+            self.assertNotIn("restore-privacy-client-0.5.7-", text)
 
 
 class TestVersionMonopin(unittest.TestCase):
     def test_version_pin_matches_catalog(self) -> None:
         ver = (ROOT / "client" / "VERSION").read_text(encoding="utf-8").strip()
-        self.assertEqual(ver, "0.4.8")
+        self.assertEqual(ver, "0.5.8")
         from status_page import downloads as dl
 
         self.assertEqual(dl.RELEASE_VERSION, ver)

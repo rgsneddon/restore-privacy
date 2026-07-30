@@ -39,26 +39,25 @@ ENV_MAX_SESSIONS = "RPT_NODE_MAX_SESSIONS"
 ENV_PEER_CODE = "RPT_NODE_PEER_CODE"  # IS | DE | US
 ENV_NODE_HOST = "RPT_NODE_HOST"
 
-# Mbps product allowances (operator budget). IS/DE/RO omitted = unlimited-class.
+# Mbps product allowances (operator budget). IS/DE omitted = unlimited-class.
 _MBPS = 1_000_000
 PRODUCT_BANDWIDTH_CAP_BPS: dict[str, int] = {
     "US": 200 * _MBPS,
     "5.161.242.85": 200 * _MBPS,
 }
 
-# Peers with extendable bandwidth at cost — no fixed product Mbps budget.
-PRODUCT_UNLIMITED_BANDWIDTH_CODES = frozenset({"IS", "DE", "RO"})
+# Live peers with extendable bandwidth at cost — no fixed product Mbps budget.
+# Romania (RO) is deprecated and is not a live residual peer.
+PRODUCT_UNLIMITED_BANDWIDTH_CODES = frozenset({"IS", "DE"})
 PRODUCT_UNLIMITED_BANDWIDTH_HOSTS = frozenset(
-    {"82.221.101.241", "178.105.187.178", "185.146.232.107"}
+    {"82.221.101.241", "178.105.187.178"}
 )
 
-# Session soft max: DE dedicated > IS/US; RO base (legacy)
+# Session soft max: DE dedicated > IS/US (live catalog only)
 PRODUCT_SESSION_SOFT_MAX: dict[str, int] = {
-    "RO": DEFAULT_MAX_SESSIONS,
     "IS": DEFAULT_MAX_SESSIONS_IS,
     "US": DEFAULT_MAX_SESSIONS_US,
     "DE": DEFAULT_MAX_SESSIONS_DE,
-    "185.146.232.107": DEFAULT_MAX_SESSIONS,
     "82.221.101.241": DEFAULT_MAX_SESSIONS_IS,
     "5.161.242.85": DEFAULT_MAX_SESSIONS_US,
     "178.105.187.178": DEFAULT_MAX_SESSIONS_DE,
@@ -92,7 +91,7 @@ def product_bandwidth_unlimited(
     code: str = "",
     host: str = "",
 ) -> bool:
-    """True when product treats peer bandwidth as unlimited-class (IS/DE/RO)."""
+    """True when product treats peer bandwidth as unlimited-class (IS/DE)."""
     c = (code or "").strip().upper()
     h = (host or "").strip()
     if c in PRODUCT_UNLIMITED_BANDWIDTH_CODES:
@@ -109,8 +108,8 @@ def product_bandwidth_cap_bps(
 ) -> int | None:
     """Product bandwidth allowance (bits/s), or None if unlimited-class / unknown.
 
-    IS/DE/RO return None (extendable bandwidth at cost — no fixed product budget).
-    US returns 200 Mbps.
+    IS/DE return None (extendable bandwidth at cost — no fixed product budget).
+    US returns 200 Mbps. Stale RO host is not a live unlimited peer.
     """
     if product_bandwidth_unlimited(code=code, host=host):
         return None
@@ -127,12 +126,17 @@ def resolve_peer_identity(
     e = env if env is not None else os.environ
     c = (code or str(e.get(ENV_PEER_CODE, "") or e.get("RPT_PEER_CODE", "") or "")).strip().upper()
     h = (host or str(e.get(ENV_NODE_HOST, "") or e.get("RPT_RESIDUAL_HOST", "") or "")).strip()
+    # Stale RO code / former RO host → treat as DE (retired peer, not live RO)
+    if c == "RO":
+        c = "DE"
+    if h == "185.146.232.107":
+        h = "178.105.187.178"
+        c = c or "DE"
     if not c and h:
-        # Infer code from known catalog hosts
+        # Infer code from live catalog hosts only
         for k, v in (
             ("82.221.101.241", "IS"),
             ("178.105.187.178", "DE"),
-            ("185.146.232.107", "RO"),
             ("5.161.242.85", "US"),
         ):
             if h == k:
