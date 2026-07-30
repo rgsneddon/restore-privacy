@@ -1,11 +1,11 @@
 {
-  "generated_at": "2026-07-30T00:00:28Z",
-  "node_host": "VPN node",
+  "generated_at": "2026-07-30T00:12:27Z",
+  "node_host": "Germany (DE)",
   "catalog_version": "0.5.7",
   "unit_suite": {
     "ran": true,
-    "ok": false,
-    "returncode": 1,
+    "ok": true,
+    "returncode": 0,
     "modules": [
       "tests.test_legal_links",
       "tests.test_legal_docs",
@@ -21,20 +21,22 @@
     ]
   },
   "tcp_status": {
-    "host": "VPN node",
+    "host": "Germany (DE)",
     "port": 8080,
-    "ok": false,
-    "error": "timed out"
+    "ok": true,
+    "error": null
   },
   "http_status": {
-    "url": "http://VPN node/status",
-    "ok": false,
-    "status_code": null,
-    "body": null,
-    "error": "<urlopen error timed out>"
+    "url": "http://Germany (DE)/status",
+    "ok": true,
+    "status_code": 200,
+    "body": {
+      "title": "RESTORE PRIVACY"
+    },
+    "error": null
   },
   "udp": {
-    "host": "VPN node",
+    "host": "Germany (DE)",
     "port": 44044,
     "sent": true,
     "error": null
@@ -218,13 +220,14 @@
         "parked": true
       },
       "title_only_status": {
-        "ok": false,
+        "ok": true,
         "warn": false,
         "skipped": false,
         "reasons": [
-          "http probe not ok: <urlopen error timed out>"
+          "title_only=True",
+          "body={'title': 'RESTORE PRIVACY'}"
         ],
-        "title_only": false
+        "title_only": true
       },
       "host_privacy_drift": {
         "ok": true,
@@ -284,19 +287,20 @@
   "multihop_structure": {
     "probes": {
       "multihop_module_flags": {
-        "ok": false,
+        "ok": true,
         "warn": false,
         "skipped": false,
         "reasons": [
           "MULTI_HOP_ROUTING_IMPLEMENTED=True (residual-via-exit)",
           "Iceland peer Iceland (IS) (IS monopin)",
-          "exit host 'Germany (DE)' != product Romania pin VPN node",
+          "Germany peer Germany (DE) (DE monopin / RO replacement)",
           "United States peer United States (US) (US monopin)",
-          "DEFAULT_ENTRY_COUNTRY='DE' expected 'US'"
+          "DEFAULT_ENTRY_COUNTRY=DE (product default residual entry = Germany)"
         ],
         "entry_host": "Iceland (IS)",
         "exit_host": "Germany (DE)",
         "us_host": "United States (US)",
+        "de_host": "Germany (DE)",
         "entry_port": 44044,
         "exit_port": 44044,
         "us_port": 44044,
@@ -308,22 +312,22 @@
         "skipped": false,
         "reasons": [
           "IS pub present (/Users/russellsneddon/restore-privacy/product/node_elgamal.pub) sha=1b126abfae737c66\u2026",
-          "RO pub present (/Users/russellsneddon/restore-privacy/product/exit_node_elgamal.pub) sha=ea0c7fa338612386\u2026",
+          "exit/DE pub present (/Users/russellsneddon/restore-privacy/product/exit_node_elgamal.pub) sha=ea0c7fa338612386\u2026",
           "US pub present (/Users/russellsneddon/restore-privacy/product/us_node_elgamal.pub) sha=9864211dc29e8b21\u2026",
-          "IS/RO/US pubs present and pairwise distinct"
+          "IS/exit-DE/US pubs present and pairwise distinct"
         ],
         "entry_pub": "/Users/russellsneddon/restore-privacy/product/node_elgamal.pub",
         "exit_pub": "/Users/russellsneddon/restore-privacy/product/exit_node_elgamal.pub",
         "us_pub": "/Users/russellsneddon/restore-privacy/product/us_node_elgamal.pub"
       },
       "multihop_residual_via_exit": {
-        "ok": false,
+        "ok": true,
         "warn": false,
         "skipped": false,
         "reasons": [
-          "is_multihop_active=True for US\u2192RO entry\u2192exit path",
+          "is_multihop_active=True for US\u2192DE entry\u2192exit path",
           "residual_endpoint dials exit Germany (DE) (residual-via-exit)",
-          "default single-hop residual 'Germany (DE)' != US United States (US)",
+          "multi-hop disabled residual stays entry Germany (DE) (default single-hop DE)",
           "status text: multi-hop active (2 hops): United States (US) \u2192 Germany (DE) (residual via Germany (DE))"
         ],
         "status_text": "multi-hop active (2 hops): United States (US) \u2192 Germany (DE) (residual via Germany (DE))"
@@ -339,9 +343,9 @@
         ]
       }
     },
-    "ok": false,
+    "ok": true,
     "section": "multihop_node_structure",
-    "honesty": "residual-via-exit when multi-hop enabled; not full intermediate onion encapsulation; default single-hop United States entry"
+    "honesty": "residual-via-exit when multi-hop enabled; not full intermediate onion encapsulation; default single-hop Germany (DE) entry (RO replaced)"
   },
   "audit_privacy": {
     "localhost_required": false,
@@ -352,7 +356,7 @@
     "multihop_structure": true,
     "firewall_probe_excluded": true
   },
-  "overall_ok": false,
+  "overall_ok": true,
   "privacy": {
     "redacted": true,
     "no_suite_tails": true,

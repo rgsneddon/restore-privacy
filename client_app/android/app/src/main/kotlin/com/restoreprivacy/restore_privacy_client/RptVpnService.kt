@@ -286,6 +286,7 @@ class RptVpnService : VpnService() {
                 // Residual IPv6 ON installs ULA + ::/0 (ISP IPv6 blackhole / leak mitigation).
                 val residualIpv4 = StartupPrefs.residualIpv4Enabled(this) // always true
                 val residualIpv6 = StartupPrefs.residualIpv6Enabled(this)
+                // Kill switch removed — product residual does not call setBlocking(true).
                 val builder = Builder()
                     .setSession(sessionName)
                     .setMtu(1280)

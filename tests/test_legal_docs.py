@@ -68,7 +68,12 @@ class TestPrivacyPolicy(unittest.TestCase):
         self.assertIn("private", text.lower())
         self.assertIn("£2.45", text)
         # Paid-only distribution — no free permanent public installer CDN claim
-        self.assertIn("one-time", text.lower())
+        # Fulfilment is time-limited download (1 hour), not a permanent free CDN
+        low = text.lower()
+        self.assertTrue(
+            "one-time" in low or "1-hour" in low or "time-limited" in low,
+            "policy must describe paid time-limited fulfilment",
+        )
         self.assertNotIn(
             "download links to public GitHub release packages",
             text,

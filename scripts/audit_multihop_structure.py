@@ -3,12 +3,13 @@
 Structural / product-layout checks only. Does **not** claim live dual-relay residual
 IP proof or full intermediate onion encapsulation.
 
-Honesty baseline (0.4.10+ catalog):
-  - Default residual entry: United States ``PRODUCT_US_HOST`` + ``product/us_node_elgamal.pub``
+Honesty baseline (0.5.7+ catalog — RO retired):
+  - Default residual entry: Germany ``PRODUCT_DE_HOST`` / ``PRODUCT_EXIT_HOST``
+    + ``product/de_node_elgamal.pub`` (exit pub may still be ``exit_node_elgamal.pub``)
   - Iceland ``PRODUCT_NODE_HOST`` + ``product/node_elgamal.pub``
-  - Romania ``PRODUCT_EXIT_HOST`` + ``product/exit_node_elgamal.pub`` (distinct)
+  - United States ``PRODUCT_US_HOST`` + ``product/us_node_elgamal.pub``
   - ``MULTI_HOP_ROUTING_IMPLEMENTED`` residual-via-exit when multi-hop is active
-  - Default remains single-hop entry when multi-hop is not enabled
+  - Default remains single-hop **DE** entry when multi-hop is not enabled
 """
 
 from __future__ import annotations
@@ -24,9 +25,12 @@ DEFAULT_INSTALL_ROOT = Path(os.environ.get("RPT_INSTALL_ROOT", "/opt/restore-pri
 # Product monopin facts (must match client/multihop.py + client/endpoint.py)
 EXPECTED_ICELAND_HOST = "82.221.101.241"
 EXPECTED_ENTRY_HOST = EXPECTED_ICELAND_HOST  # historical alias: Iceland monopin
-EXPECTED_EXIT_HOST = "185.146.232.107"
+# Germany replaces Romania as exit + default residual entry monopin
+EXPECTED_EXIT_HOST = "178.105.187.178"
+EXPECTED_DE_HOST = EXPECTED_EXIT_HOST
 EXPECTED_US_HOST = "5.161.242.85"
 EXPECTED_PORT = 44044
+EXPECTED_DEFAULT_ENTRY_COUNTRY = "DE"
 
 
 def _status(
@@ -138,11 +142,12 @@ def probe_multihop_module_flags(
     else:
         reasons.append("MULTI_HOP_ROUTING_IMPLEMENTED=True (residual-via-exit)")
 
-    # Catalog peers (IS / RO / US) — not "product default entry" alone
+    # Catalog peers (IS / DE / US) — DE is RO replacement + default entry
     iceland_host = getattr(mh, "PRODUCT_NODE_HOST", None) or getattr(
         ep, "PRODUCT_NODE_HOST", None
     )
     exit_host = getattr(mh, "PRODUCT_EXIT_HOST", None)
+    de_host = getattr(mh, "PRODUCT_DE_HOST", None) or exit_host
     us_host = getattr(mh, "PRODUCT_US_HOST", None)
     entry_port = int(getattr(ep, "PRODUCT_NODE_PORT", EXPECTED_PORT) or EXPECTED_PORT)
     exit_port = int(getattr(mh, "PRODUCT_EXIT_PORT", entry_port) or entry_port)
@@ -160,10 +165,16 @@ def probe_multihop_module_flags(
     if exit_host != EXPECTED_EXIT_HOST:
         ok = False
         reasons.append(
-            f"exit host {exit_host!r} != product Romania pin {EXPECTED_EXIT_HOST}"
+            f"exit host {exit_host!r} != product Germany pin {EXPECTED_EXIT_HOST}"
         )
     else:
-        reasons.append(f"Romania peer {exit_host}:{exit_port} (RO monopin)")
+        reasons.append(f"Germany peer {exit_host}:{exit_port} (DE monopin / RO replacement)")
+
+    if de_host and de_host != EXPECTED_DE_HOST:
+        ok = False
+        reasons.append(
+            f"DE host {de_host!r} != product Germany pin {EXPECTED_DE_HOST}"
+        )
 
     if us_host != EXPECTED_US_HOST:
         ok = False
@@ -173,15 +184,21 @@ def probe_multihop_module_flags(
     else:
         reasons.append(f"United States peer {us_host}:{us_port} (US monopin)")
 
-    if default_country != "US":
+    if default_country != EXPECTED_DEFAULT_ENTRY_COUNTRY:
         ok = False
-        reasons.append(f"DEFAULT_ENTRY_COUNTRY={default_country!r} expected 'US'")
+        reasons.append(
+            f"DEFAULT_ENTRY_COUNTRY={default_country!r} expected "
+            f"{EXPECTED_DEFAULT_ENTRY_COUNTRY!r}"
+        )
     else:
-        reasons.append("DEFAULT_ENTRY_COUNTRY=US (product default residual entry)")
+        reasons.append(
+            f"DEFAULT_ENTRY_COUNTRY={EXPECTED_DEFAULT_ENTRY_COUNTRY} "
+            "(product default residual entry = Germany)"
+        )
 
     if iceland_host == exit_host:
         ok = False
-        reasons.append("Iceland and Romania hosts must differ")
+        reasons.append("Iceland and Germany hosts must differ")
 
     return _status(
         ok=ok,
@@ -190,6 +207,7 @@ def probe_multihop_module_flags(
         entry_host=iceland_host,
         exit_host=exit_host,
         us_host=us_host,
+        de_host=de_host,
         entry_port=entry_port,
         exit_port=exit_port,
         us_port=us_port,
@@ -219,7 +237,9 @@ def probe_multihop_product_pubs(
         ok = False
         reasons.append("product/exit_node_elgamal.pub missing or too small")
     else:
-        reasons.append(f"RO pub present ({exit_p}) sha={_sha256_file(exit_p)[:16]}…")
+        reasons.append(
+            f"exit/DE pub present ({exit_p}) sha={_sha256_file(exit_p)[:16]}…"
+        )
     if us_p is None:
         ok = False
         reasons.append("product/us_node_elgamal.pub missing or too small")
@@ -228,7 +248,7 @@ def probe_multihop_product_pubs(
     if entry is not None and exit_p is not None:
         if entry.read_bytes() == exit_p.read_bytes():
             ok = False
-            reasons.append("IS and RO pubs must be distinct key material")
+            reasons.append("IS and exit/DE pubs must be distinct key material")
     if us_p is not None and entry is not None:
         if us_p.read_bytes() == entry.read_bytes():
             ok = False
@@ -236,9 +256,9 @@ def probe_multihop_product_pubs(
     if us_p is not None and exit_p is not None:
         if us_p.read_bytes() == exit_p.read_bytes():
             ok = False
-            reasons.append("US and RO pubs must be distinct key material")
+            reasons.append("US and exit/DE pubs must be distinct key material")
     if entry is not None and exit_p is not None and us_p is not None:
-        reasons.append("IS/RO/US pubs present and pairwise distinct")
+        reasons.append("IS/exit-DE/US pubs present and pairwise distinct")
     return _status(
         ok=ok,
         skipped=False if (entry or exit_p or us_p) else True,
@@ -265,9 +285,10 @@ def probe_multihop_residual_via_exit(
     except ImportError as exc:
         return _status(ok=False, skipped=True, reasons=[str(exc)])
 
-    # Prefer product default entry (US) → RO exit for residual-via-exit check
+    # Prefer non-DE entry (US) → DE exit for residual-via-exit check
     us_host = getattr(mh, "PRODUCT_US_HOST", None) or EXPECTED_US_HOST
     us_port = int(getattr(mh, "PRODUCT_US_PORT", EXPECTED_PORT) or EXPECTED_PORT)
+    de_host = getattr(mh, "PRODUCT_EXIT_HOST", None) or EXPECTED_EXIT_HOST
     hops = [
         mh.Hop(us_host, us_port, role="entry"),
         mh.Hop(mh.PRODUCT_EXIT_HOST, mh.PRODUCT_EXIT_PORT, role="exit"),
@@ -278,7 +299,7 @@ def probe_multihop_residual_via_exit(
         ok = False
         reasons.append("is_multihop_active(enabled, 2 hops) is False")
     else:
-        reasons.append("is_multihop_active=True for US→RO entry→exit path")
+        reasons.append("is_multihop_active=True for US→DE entry→exit path")
 
     residual = mh.residual_endpoint(cfg)
     if residual.host != mh.PRODUCT_EXIT_HOST:
@@ -292,17 +313,18 @@ def probe_multihop_residual_via_exit(
             "(residual-via-exit)"
         )
 
-    # Default single-hop honesty: product default country → US monopin
+    # Default single-hop honesty: product default country → DE monopin
     cfg_def = mh.multihop_config_for_entry_country(None, multihop_enabled=False)
     single = mh.residual_endpoint(cfg_def)
-    if single.host != us_host:
+    if single.host != de_host:
         ok = False
         reasons.append(
-            f"default single-hop residual {single.host!r} != US {us_host}"
+            f"default single-hop residual {single.host!r} != DE {de_host}"
         )
     else:
         reasons.append(
-            f"multi-hop disabled residual stays entry {single.host} (default single-hop)"
+            f"multi-hop disabled residual stays entry {single.host} "
+            "(default single-hop DE)"
         )
 
     status = mh.multihop_status_text(cfg)
@@ -405,7 +427,7 @@ def run_all_multihop_structure_probes(
         "honesty": (
             "residual-via-exit when multi-hop enabled; "
             "not full intermediate onion encapsulation; "
-            "default single-hop United States entry"
+            "default single-hop Germany (DE) entry (RO replaced)"
         ),
     }
 
@@ -451,8 +473,8 @@ Honesty: **{honesty}**.
 
 | Role | Host | Public key |
 |------|------|------------|
-| **Default entry** (United States) | `United States (US)` | `product/us_node_elgamal.pub` |
+| **Default entry / exit** (Germany) | `Germany (DE)` | `product/de_node_elgamal.pub` (exit alias: `exit_node_elgamal.pub`) |
 | **Catalog peer** (Iceland) | `Iceland (IS)` | `product/node_elgamal.pub` |
-| **Catalog peer / exit** (Romania) | `Romania (RO)` | `product/exit_node_elgamal.pub` |
+| **Catalog peer** (United States) | `United States (US)` | `product/us_node_elgamal.pub` |
 
 """

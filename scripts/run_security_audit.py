@@ -14,7 +14,7 @@ Usage:
   python3 scripts/run_security_audit.py --write --out AUDIT.md
 
 Environment:
-  RPT_NODE_HOST     default 185.146.232.107 Romania residual (timer forces 127.0.0.1 on node)
+  RPT_NODE_HOST     default 178.105.187.178 Germany residual (timer forces 127.0.0.1 on node)
   RPT_STATUS_PORT   default 8080
   RPT_UDP_PORT      default 44044
   RPT_AUDIT_PATH    override output path
@@ -41,8 +41,8 @@ from typing import Any
 
 ROOT = Path(__file__).resolve().parents[1]
 # Default live probe peer when not on the node timer (localhost-only there).
-# Audit timer home is Romania residual monopin (lowest-spec fleet peer).
-DEFAULT_HOST = os.environ.get("RPT_NODE_HOST", "185.146.232.107")
+# Product residual default + RO replacement is Germany monopin (DE).
+DEFAULT_HOST = os.environ.get("RPT_NODE_HOST", "178.105.187.178")
 STATUS_PORT = int(os.environ.get("RPT_STATUS_PORT", "8080"))
 UDP_PORT = int(os.environ.get("RPT_UDP_PORT", "44044"))
 
@@ -150,7 +150,8 @@ def redact_audit_text(text: str) -> str:
     except Exception:  # noqa: BLE001
         for host, label in (
             ("82.221.101.241", "Iceland (IS)"),
-            ("185.146.232.107", "Romania (RO)"),
+            ("178.105.187.178", "Germany (DE)"),
+            ("185.146.232.107", "Romania (RO, retired)"),
             ("5.161.242.85", "United States (US)"),
             ("167.233.224.5", "VPN node"),
         ):

@@ -120,9 +120,15 @@ class TestLiveHelloWithProductKey(unittest.TestCase):
             node_pub = ElGamalPublicKey.import_bytes(product.read_bytes())
             frame, nonce, cpub, _eph = build_authorized_client_hello(priv, node_pub)
             self.assertEqual(frame[:5], b"RPT2\x01")
-            # Product wire (Rust node + device releases) uses outer QUIC-mimic obfs.
+            # Lean residual product default is outer obfs **off** (bare RPT2).
+            # Live nodes accept bare HELLO; optional wrap when RPT_OBFS=1 / Settings.
             wire = maybe_wrap(frame)
-            self.assertNotEqual(wire[:4], b"RPT2", "product HELLO must be obfuscated")
+            self.assertEqual(wire[:5], b"RPT2\x01", "default product HELLO is bare RPT2")
+            # When explicitly enabled, wrap must hide magic
+            wrapped = maybe_wrap(frame, enabled=True)
+            self.assertNotEqual(
+                wrapped[:4], b"RPT2", "RPT_OBFS wrap must hide RPT2 magic"
+            )
             sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
             sock.settimeout(12.0)
             try:

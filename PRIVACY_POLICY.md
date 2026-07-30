@@ -95,12 +95,12 @@ Runs **only on the device** — no phone-home wipe notification.
 
 ## 4. Limits of this privacy promise
 
-1. **Hosting and networks.** (VPS provider / CDN logging may sit outside this application's no-log defaults.) Catalog peers: FlokiNET (IS/RO) and the US residual host. Host public “no invasive logs” stance is not a third-party forensic audit. CDN/status/DNS operators and other networks may log under their policies. Node OS compromise can still expose live memory.
+1. **Hosting and networks.** (VPS provider / CDN logging may sit outside this application's no-log defaults.) Catalog peers: Iceland (FlokiNET), Germany (default entry / exit), and the US residual host. Host public “no invasive logs” stance is not a third-party forensic audit. CDN/status/DNS operators and other networks may log under their policies. Node OS compromise can still expose live memory.
 2. **Destination sites** have their own policies.
 3. **Device and OS** (VPN dialogs, crash reporters, network stacks) process data outside this app.
 4. **Misconfiguration** (verbose logs, reverse-proxy access logs) can create logs this policy assumes are off.
 5. **Device keys** identify an install, not a named human account — still treat them as secrets.
-6. **Traffic analysis mitigations are incomplete.** Pad/cover/obfs (**QUIC-mimic** when on) reduce coarse fingerprints; they do not guarantee undetectability. Multi-hop residual is opt-in (`RPT_MULTIHOP_ENABLED=1`); default is single-hop on the chosen entry (United States default).
+6. **Traffic analysis mitigations are incomplete.** Pad/cover/obfs (**QUIC-mimic** when on) reduce coarse fingerprints; they do not guarantee undetectability. Multi-hop residual is opt-in (`RPT_MULTIHOP_ENABLED=1`); default is single-hop on the chosen entry (Germany default).
 7. **Self-hosters** must protect long-term keys and remember provider-level IP logs. PQ hybrid is staged readiness only (`docs/PQ_MIGRATION.md`).
 8. **LUKS / zram volumes** protect locked disks/RAM only — not live secrecy against root on an unlocked host.
 
