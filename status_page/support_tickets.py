@@ -367,7 +367,6 @@ def render_support_page_html(
             public_brand_header_html,
             public_head_open,
             public_page_close,
-            public_site_css,
         )
     except ImportError:  # pragma: no cover
         from status_page.public_chrome import (  # type: ignore
@@ -375,7 +374,6 @@ def render_support_page_html(
             public_brand_header_html,
             public_head_open,
             public_page_close,
-            public_site_css,
         )
     pre = prefill or {}
     err_html = (
@@ -401,36 +399,17 @@ def render_support_page_html(
         "app_version": html.escape(pre.get("app_version") or ""),
         "keygen": html.escape(pre.get("keygen") or ""),
     }
-    css = public_site_css() + """
-.support-wrap{max-width:36rem;margin:0 auto;padding:1rem 1.1rem 2.5rem}
-.support-wrap h2{margin:0 0 0.5rem;font-size:1.25rem}
-.support-lead{color:var(--rb-muted);margin:0 0 1.1rem;line-height:1.45;font-size:0.95rem}
-.support-form label{display:block;margin:0.75rem 0 0.25rem;font-weight:600;font-size:0.88rem}
-.support-form input,.support-form select,.support-form textarea{
-  width:100%;box-sizing:border-box;padding:0.65rem 0.75rem;border-radius:10px;
-  border:1px solid var(--rb-card-border);background:var(--rb-panel);color:var(--rb-text);
-  font:inherit}
-.support-form textarea{min-height:9rem;resize:vertical}
-.support-form .hint{font-size:0.8rem;color:var(--rb-muted);font-weight:400;margin-top:0.15rem}
-.support-form button{
-  margin-top:1.1rem;appearance:none;border:0;border-radius:10px;
-  padding:0.7rem 1.25rem;background:var(--rb-primary);color:#fff;font-weight:700;cursor:pointer}
-.support-form button:hover{filter:brightness(1.05)}
-.support-err{color:#fca5a5;background:#3f1d1d;border:1px solid #7f1d1d;
-  padding:0.7rem 0.9rem;border-radius:10px;margin:0 0 1rem}
-.support-ok{background:#052e1a;border:1px solid #166534;border-radius:12px;
-  padding:0.9rem 1rem;margin:0 0 1.1rem;color:#bbf7d0}
-.support-ok code{font-size:0.95rem}
-"""
+    # Support form chrome lives in public_site_css (theme-aware inputs / CTAs).
     head = public_head_open(
         title=f"Support — {PUBLIC_BRAND_TITLE}",
-        extra_css=css,
+        extra_css="",
     )
     header = public_brand_header_html(active="support")
     close = public_page_close()
     return f"""{head}
+  <div class="page-shell" id="support-page-shell" data-page="support">
 {header}
-<main class="support-wrap panel-card" id="support-main">
+<main class="support-wrap panel-card" id="support-main" data-chrome="pro">
   <h2>Customer support</h2>
   <p class="support-lead">
     Tell us what went wrong. We open a ticket and email
@@ -474,5 +453,6 @@ def render_support_page_html(
     <button type="submit" id="support-submit">Send support ticket</button>
   </form>
 </main>
+  </div>
 {close}
 """

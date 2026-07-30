@@ -396,9 +396,16 @@ WINDOWS_ZIP_FILENAME = WINDOWS_EXE_FILENAME
 def download_css() -> str:
     """CSS for catalog pay section (RB-donate inspired navy/blue palette)."""
     return """
-    .downloads { width: 100%; text-align: center; box-sizing: border-box; }
-    .downloads h2 { font-size: 1.05rem; letter-spacing: 0.1em; font-weight: 700;
-                    margin: 0 0 0.5rem; color: var(--rb-cream); text-transform: uppercase; }
+    /* Download shop — aligns with site-chrome-pro / data-path shell */
+    .downloads {
+      width: 100%; text-align: center; box-sizing: border-box;
+      position: relative;
+    }
+    .downloads h2 {
+      font-size: 0.82rem; letter-spacing: 0.12em; font-weight: 700;
+      margin: 0 0 0.65rem; color: var(--rb-muted, var(--rb-cream));
+      text-transform: uppercase;
+    }
     /* Single large price callout — no second £ amount banner below it */
     .dl-only-price {
       margin: 0.25rem auto 0.55rem;
@@ -492,13 +499,22 @@ def download_css() -> str:
     }
     /* Homepage embedded buy form (platform + plan + Buy now) */
     .dl-buy-form {
-      width: min(28rem, 100%);
+      width: min(30rem, 100%);
       margin: 0 auto;
-      padding: 1rem 1.1rem 1.15rem;
+      padding: 1.1rem 1.15rem 1.2rem;
       box-sizing: border-box;
-      border-radius: 14px;
-      border: 1px solid rgba(174, 208, 234, 0.28);
-      background: rgba(8, 18, 32, 0.5);
+      border-radius: var(--rb-radius, 14px);
+      border: 1px solid transparent;
+      background:
+        linear-gradient(
+          165deg,
+          color-mix(in srgb, var(--rb-card, #132a4a) 90%, transparent) 0%,
+          color-mix(in srgb, var(--rb-code-bg, rgba(8, 18, 32, 0.55)) 95%, transparent) 100%
+        ) padding-box,
+        var(--rb-neon-border, linear-gradient(135deg, #00e5ff, #2694e8, #39ff6a)) border-box;
+      background-origin: border-box;
+      background-clip: padding-box, border-box;
+      box-shadow: var(--rb-panel-shadow-soft, 0 4px 16px rgba(2, 8, 20, 0.28));
       text-align: left;
     }
     .dl-buy-field { margin: 0 0 0.85rem; }
@@ -507,9 +523,16 @@ def download_css() -> str:
       text-transform: uppercase; color: var(--rb-muted, #aed0ea); margin-bottom: 0.35rem;
     }
     .dl-buy-field select {
-      width: 100%; box-sizing: border-box; padding: 0.65rem 0.75rem;
-      border-radius: 10px; border: 1px solid rgba(174, 208, 234, 0.35);
-      background: rgba(8, 18, 32, 0.75); color: #e8f1ff; font: inherit; font-weight: 600;
+      width: 100%; box-sizing: border-box; padding: 0.7rem 0.85rem;
+      border-radius: var(--rb-radius-sm, 10px);
+      border: 1px solid var(--rb-input-border, rgba(174, 208, 234, 0.35));
+      background: var(--rb-input-bg, rgba(8, 18, 32, 0.75));
+      color: var(--rb-field-fg, #e8f1ff); font: inherit; font-weight: 600;
+    }
+    .dl-buy-field select:focus {
+      outline: none;
+      border-color: color-mix(in srgb, var(--rb-neon-cyan, #00e5ff) 55%, transparent);
+      box-shadow: 0 0 0 3px color-mix(in srgb, var(--rb-neon-cyan, #00e5ff) 18%, transparent);
     }
     .dl-plan-options { display: flex; flex-direction: column; gap: 0.5rem; }
     .dl-plan-option {

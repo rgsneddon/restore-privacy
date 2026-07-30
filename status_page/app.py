@@ -140,6 +140,9 @@ STATIC_ROUTES: dict[str, str] = {
     "/static/admin_fleet_usage.js": "admin_fleet_usage.js",
     "/static/admin_link_generation.js": "admin_link_generation.js",
     "/static/tester_page_gate.js": "tester_page_gate.js",
+    # Public redesign: logo-aligned circuit / data-path motif
+    "/static/data_path_motif.svg": "data_path_motif.svg",
+    "/data_path_motif.svg": "data_path_motif.svg",
 }
 
 # Customer device-licence renew host (Stripe Checkout custom domain).
@@ -539,12 +542,12 @@ def render_html(
         product_active="vpn",
     )
     body = f"""{public_head_open(title=str(title), extra_css=page_css)}
-  <div class="page-shell" id="page-shell">
+  <div class="page-shell" id="page-shell" data-page="home" data-chrome="pro">
 {header}
 {render_settings_explainer_banner_html()}
 {downloads_html}
 {node_wipe_html}
-    <section class="panel-card" id="audit-panel" aria-label="Security audit countdown">
+    <section class="panel-card" id="audit-panel" aria-label="Security audit countdown" data-chrome="pro">
 {countdown_html}
     </section>
 {bmc_tip_html}

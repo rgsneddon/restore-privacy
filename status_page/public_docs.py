@@ -899,14 +899,14 @@ def render_document_html(
         logo_size=112,
     )
     page = f"""{public_head_open(title=title, extra_css=extra)}
-  <div class="page-shell" id="doc-page-shell">
+  <div class="page-shell" id="doc-page-shell" data-page="doc" data-chrome="pro">
 {header}
-    <section class="panel-card doc-body-panel" id="doc-content-panel" aria-label="Document">
+    <section class="panel-card doc-body-panel" id="doc-content-panel" aria-label="Document" data-chrome="pro">
       <article class="doc-body" id="doc-body">
 {body_inner}
       </article>
     </section>
-    <footer class="panel-card doc-foot" id="doc-foot">
+    <footer class="panel-card doc-foot" id="doc-foot" data-chrome="pro">
       <p class="muted">Restore Privacy public documents on this status host
       (source repository is private). Paid installers:
       <a href="/#downloads">downloads</a>.</p>
@@ -916,6 +916,7 @@ def render_document_html(
         <a href="{AUDIT_PATH}">Audit</a>
         <a href="{CREDITS_PATH}">Credits</a>
         <a href="{README_PATH}">README</a>
+        <a href="/support">Support</a>
       </p>
     </footer>
   </div>
