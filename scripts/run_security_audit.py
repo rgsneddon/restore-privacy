@@ -464,7 +464,7 @@ def load_catalog_version() -> str:
 
 
 def product_exit_pub_pin() -> str:
-    """SHA-256 of product/exit_node_elgamal.pub (Romania exit) when tracked."""
+    """SHA-256 of product/exit_node_elgamal.pub (Germany DE exit pin) when tracked."""
     import hashlib
 
     pub = ROOT / "product" / "exit_node_elgamal.pub"
@@ -798,7 +798,7 @@ def probe_helsinki_paid_package(
     """Return remote package metadata when present on Helsinki paid store.
 
     Uses authenticated Range GET (``X-RPT-Asset-Token``) and closes after the
-    first byte so low-spec audit hosts (Romania timer) never pull full installers.
+    first byte so low-spec audit hosts (node timer) never pull full installers.
     """
     if not package_store_probe_allowed():
         return None
@@ -1043,7 +1043,7 @@ def _windows_multihop_markers(path: Path) -> dict[str, bool]:
     return {
         "multihop": b"multihop" in raw or b"MULTI_HOP" in raw,
         "exit_pub_name": b"exit_node_elgamal" in raw,
-        "exit_host": b"185.146.232.107" in raw,
+        "exit_host": b"178.105.187.178" in raw or b"185.146.232.107" in raw,
     }
 
 
@@ -1170,7 +1170,7 @@ def evaluate_package_audit_state(
                     "(rebuild via scripts/build_windows_multihop.py)"
                 )
             if _package_contains_raw_pub(path, exit_pub):
-                reasons.append("exit_node_elgamal.pub raw bytes present (Romania exit pin)")
+                reasons.append("exit_node_elgamal.pub raw bytes present (Germany DE exit pin)")
         else:
             soft.append("PE magic not checked")
     elif platform == "android":
@@ -1393,7 +1393,7 @@ def build_markdown(results: dict) -> str:
 | **Product** | Restore Privacy Tunnel (RPT / RPT2) |
 | **Repository** | restore-privacy (**private** source; installers only via paid status host) |
 | **Public catalog version** | **{catalog}** |
-| **Default residual entry** | **United States (US)** (product default on all clients) |
+| **Default residual entry** | **Germany (DE)** (product default on all clients; RO monopin retired) |
 | **Live probe peer** | **{host}:{UDP_PORT}** (UDP); status UI TCP **{STATUS_PORT}** |
 | **Audit generated** | **{human_date()}** (`{now}`) |
 | **Cadence** | Automated security pass (~**every 1 day** + **jitter** on privacy-hardened node timer) |
@@ -1425,7 +1425,7 @@ Latest automated security audit for production node **{host}** and the in-repo p
 | Live node healthy (TCP+HTTP) | {"YES" if node_ok else "NO"} |
 | Catalog installers AUDIT STATE | {package_state_cell_markup(pkg_overall if pkg_overall in VALID_PACKAGE_STATES else "Red")} (see top package table) |
 
-**Overall posture:** **Strong** for residual honesty (`residual_ip_capture`), no public live count, no-phones-home Connect, packaging strip of `*.priv`, tunnel DNS + DoT, Settings transparency. Multi-hop residual is **opt-in** (`RPT_MULTIHOP_ENABLED=1`): residual-via-exit among non-entry catalog peers; default single-hop **United States (US)** entry — not full intermediate encapsulation. Catalog monopin **0.4.10**. Product kill-switch is **off by default** (opt-in ``RPT_KILL_SWITCH=1`` only). Installer package confidence is the RAG table at the top of this audit.
+**Overall posture:** **Strong** for residual honesty (`residual_ip_capture`), no public live count, no-phones-home Connect, packaging strip of `*.priv`, tunnel DNS + DoT, Settings transparency. Multi-hop residual is **opt-in** (`RPT_MULTIHOP_ENABLED=1`): residual-via-exit among non-entry catalog peers (exit **Germany (DE)**); default single-hop **Germany (DE)** entry — not full intermediate encapsulation. Catalog monopin **{catalog}**. Product kill-switch is **off by default** (opt-in ``RPT_KILL_SWITCH=1`` only). Installer package confidence is the RAG table at the top of this audit.
 
 **Primary residual risks (open by design / environment):**
 
@@ -1444,7 +1444,7 @@ Latest automated security audit for production node **{host}** and the in-repo p
 | Area | Paths |
 |------|--------|
 | Shared client | `client/connect.py`, `client/endpoint.py`, `client/full_tunnel.py`, `client/multihop.py`, `client/secrets_loader.py`, `client/legal_links.py`, residual honesty / `residual_ip_capture` |
-| Multi-hop residual | Opt-in residual-via-exit (`RPT_MULTIHOP_ENABLED=1`); catalog pubs IS/RO/US under `product/` (default entry US) |
+| Multi-hop residual | Opt-in residual-via-exit (`RPT_MULTIHOP_ENABLED=1`); catalog pubs IS/DE/US under `product/` (default entry **DE**; RO retired) |
 | Windows / Linux | `client/windows/*` (multihop PE via `scripts/build_windows_multihop.py`), `client/linux/*` |
 | Mobile / Apple | `client_app/` Flutter + NativePrep residual engines (exit pub inject) |
 | Node | `node/*` (handshake, pfs, traffic_shape, crypto_session, nolog); node-only zram+LUKS2 |
@@ -1455,7 +1455,7 @@ Latest automated security audit for production node **{host}** and the in-repo p
 ### 2.2 Method notes
 
 - Public audit is served on the **status host** as **`/AUDIT.md`** and **`/audit.md`** (source repo is private).  
-- Product default residual entry **United States (US)** (catalog monopin; live probe host may be another peer).  
+- Product default residual entry **Germany (DE)** (catalog monopin; live probe host may be another peer). Romania monopin retired.  
 - Live probe host **{host}**.  
 - Product node ElGamal pub pin: `product/NODE_ELGAMAL_PUB.sha256` (SHA-256 `1b126abf…`).  
 - **Did not** paste secret material into this document.
@@ -1500,7 +1500,7 @@ An **ISP** performing **traffic analysis** may still observe connection timing a
 | **High** | Public client count on status | {"Closed (title-only)" if title_only or not http.get("ok") else "REVIEW"} |
 | **Medium** | Shared client priv in packages | {"Closed (no .priv hits)" if priv.get("ok") else "OPEN — see hits"} |
 | **Low** | Unit suite failure | {"N/A" if suite.get("ok") or not suite.get("ran") else "OPEN — see suite log"} |
-| **Info** | Multi-hop residual | Opt-in residual-via-exit (Romania); Windows PE multihop rebuild shipped in catalog when package present |
+| **Info** | Multi-hop residual | Opt-in residual-via-exit (Germany DE); Windows PE multihop rebuild shipped in catalog when package present |
 
 ---
 
@@ -1560,7 +1560,7 @@ Re-run: `python3 scripts/run_security_audit.py --write`
 |-----|--------|
 | Public audit on private GitHub blob | **Fixed** — clients use status-origin `/AUDIT.md` |
 | Periodic node audit | **In tree** — 1d systemd timer |
-| Multi-hop residual | **In tree** — opt-in residual-via-exit (Romania); Windows multihop PE via `build_windows_multihop.py`; Linux/Android/Apple ship exit pub |
+| Multi-hop residual | **In tree** — opt-in residual-via-exit (Germany DE); Windows multihop PE via `build_windows_multihop.py`; Linux/Android/Apple ship exit/DE pub |
 | Kill-switch + DoT + outer obfs | In tree |
 | Ephemeral node rebuild | In tree (dry-run default) |
 

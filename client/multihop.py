@@ -809,7 +809,7 @@ def entry_hop() -> Hop:
 
 
 def product_exit_hop() -> Hop:
-    """Product exit hop (Romania / FlokiNET) for multi-hop residual."""
+    """Product exit hop (Germany DE) for multi-hop residual."""
     return Hop(PRODUCT_EXIT_HOST, PRODUCT_EXIT_PORT, role="exit")
 
 
@@ -834,7 +834,7 @@ def build_entry_exit_path(
 
 
 def product_multihop_path() -> list[Hop]:
-    """Shipped entry (Iceland) → exit (Romania) path."""
+    """Shipped entry (Iceland) → exit (Germany DE) path."""
     return build_entry_exit_path(PRODUCT_EXIT_HOST, exit_port=PRODUCT_EXIT_PORT)
 
 
