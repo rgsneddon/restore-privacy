@@ -2,7 +2,7 @@
 
 Emoji regional-indicator flags often fail to paint in Tk OptionMenu menus on
 Windows. Shipped PNG flags under ``client/windows/native/flags/`` are the
-reliable presentation for IS / RO / US.
+reliable presentation for IS / DE / US (live residual catalog).
 """
 
 from __future__ import annotations
@@ -11,11 +11,12 @@ from pathlib import Path
 from typing import Optional
 
 # Codes that ship explicit flag bitmaps (product residual catalog).
-CATALOG_FLAG_CODES: tuple[str, ...] = ("IS", "RO", "US")
+# Live peers only: IS, DE, US. Romania is deprecated (stale prefs map to DE).
+CATALOG_FLAG_CODES: tuple[str, ...] = ("IS", "DE", "US")
 
 
 def flag_images_dir() -> Path:
-    """Directory containing ``is.png`` / ``ro.png`` / ``us.png``."""
+    """Directory containing catalog flag PNGs (``is.png``, ``de.png``, ``us.png``)."""
     # client/flag_images.py → client/windows/native/flags
     return Path(__file__).resolve().parent / "windows" / "native" / "flags"
 
@@ -32,7 +33,7 @@ def flag_image_path(code: str | None) -> Optional[Path]:
 
 
 def catalog_flag_image_paths() -> dict[str, Path]:
-    """Map catalog code → existing flag PNG path (IS / RO / US when present)."""
+    """Map catalog code → existing flag PNG path (IS / DE / US when present)."""
     out: dict[str, Path] = {}
     for code in CATALOG_FLAG_CODES:
         p = flag_image_path(code)
@@ -42,7 +43,7 @@ def catalog_flag_image_paths() -> dict[str, Path]:
 
 
 def assert_catalog_flag_images_present() -> list[str]:
-    """Return list of missing catalog codes (empty when all three PNGs exist)."""
+    """Return list of missing live-catalog flag codes (empty when all exist)."""
     missing: list[str] = []
     for code in CATALOG_FLAG_CODES:
         if flag_image_path(code) is None:

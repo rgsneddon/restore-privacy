@@ -64,7 +64,7 @@ def settings_parts_catalog() -> list[dict[str, str]]:
         )
         multi = (
             "Multi-hop residual routes via an exit hop so egress IP is the exit. "
-            "OFF (default) = single hop to Iceland entry (lower lag). ON = exit path."
+            "OFF (default) = single hop to entry (default Germany). ON = exit path."
         )
         core = (
             "Always on: licence + keygen entitlement, cryptographic HELLO/session, "
@@ -136,7 +136,7 @@ def settings_parts_catalog() -> list[dict[str, str]]:
             "body": (
                 "Settings shows best-effort RTT from your device to the product "
                 "entry node (Iceland) and, when multi-hop is ON, to the exit node "
-                "(Romania). Uses a short UDP/TCP probe — not a browser speedbench "
+                "(Germany exit when multi-hop is on). Uses a short UDP/TCP probe — not a browser speedbench "
                 "SLA. Tap Measure ping now to refresh; values may show n/a if the "
                 "host is unreachable from your network."
             ),

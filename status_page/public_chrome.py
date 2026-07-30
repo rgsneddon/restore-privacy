@@ -20,6 +20,7 @@ LICENCE_LINK_ID = "licence-link"
 PRIVACY_LINK_ID = "privacy-link"
 AUDIT_LINK_ID = "audit-link"
 README_LINK_ID = "readme-link"
+SUPPORT_LINK_ID = "support-link"
 SETTINGS_GUIDE_LINK_ID = "settings-guide-link"
 
 # Public website brand / page identity (top H1 + default document title)
@@ -40,6 +41,7 @@ LICENSE_PATH = "/LICENSE"
 PRIVACY_PATH = "/PRIVACY_POLICY.md"
 AUDIT_PATH = "/AUDIT.md"
 README_PATH = "/README.md"
+SUPPORT_PATH = "/support"
 SETTINGS_GUIDE_PATH = "/settings-explainer"
 
 # Product family landings (paths; optional Host aliases for browser./vault.)
@@ -587,9 +589,9 @@ def public_product_tabs_html(*, active: str = PRODUCT_VPN_KEY) -> str:
 
 
 def public_nav_links_html(*, active: str | None = None) -> str:
-    """Button-style nav: Home, Licence, Privacy Policy, Security Audit, README.
+    """Button-style nav: Home, Licence, Privacy, Audit, Support, README.
 
-    *active* is one of: home, licence, privacy, audit, readme (or None).
+    *active* is one of: home, licence, privacy, audit, support, readme (or None).
     Settings guide is **not** in the top brand nav (homepage banner may still
     link to the explainer page).
     """
@@ -598,6 +600,7 @@ def public_nav_links_html(*, active: str | None = None) -> str:
         ("LICENCE", LICENSE_PATH, LICENCE_LINK_ID, "licence"),
         ("PRIVACY POLICY", PRIVACY_PATH, PRIVACY_LINK_ID, "privacy"),
         ("SECURITY AUDIT", AUDIT_PATH, AUDIT_LINK_ID, "audit"),
+        ("SUPPORT", SUPPORT_PATH, SUPPORT_LINK_ID, "support"),
         ("README", README_PATH, README_LINK_ID, "readme"),
     )
     parts: list[str] = []

@@ -7,15 +7,15 @@ Product soft budgets (operator allowance — not auto NIC line-rate):
 
 | Peer | Bandwidth budget | Session soft max |
 |------|------------------|------------------|
-| RO Romania (legacy) | **unlimited-class** (extendable at cost) | 256 (base) |
+| DE Germany (default entry) | **unlimited-class** (30 TB class entitlement) | 1024 |
 | IS Iceland | **unlimited-class** (extendable at cost) | 512 |
-| DE Germany (dedicated) | **unlimited-class** (30 TB class entitlement) | 1024 |
 | US | 200 Mbps fixed product budget | 512 |
 
 Session numbers are a **soft** utilization hint for residual routing, not a hard
-public admission lock. IS/DE/RO bandwidth is essentially unlimited in product terms
+public admission lock. IS/DE bandwidth is essentially unlimited in product terms
 because extended bandwidth is available at extra cost — not a fixed 100 Mbps
-product budget. US keeps a fixed 200 Mbps operator allowance.
+product budget. US keeps a fixed 200 Mbps operator allowance. Romania (RO) is
+deprecated and is not a live residual peer.
 
 DE session soft max (1024) is sized for the dedicated residual host
 (8 vCPU / 32 GB RAM / 30 TB traffic class): above IS/US 512, soft utilization
@@ -29,14 +29,14 @@ import os
 from typing import Any, Mapping, Optional
 
 # Soft cap for utilization math (not a hard admission gate).
-# RO base; IS/US 512; DE dedicated (8 vCPU / 32 GB) → 1024.
-DEFAULT_MAX_SESSIONS = 256  # RO base (legacy peer)
+# IS/US 512; DE dedicated (8 vCPU / 32 GB) → 1024.
+DEFAULT_MAX_SESSIONS = 256  # generic fallback only (not a live peer code)
 DEFAULT_MAX_SESSIONS_IS = 512  # Iceland
 DEFAULT_MAX_SESSIONS_US = 512
 DEFAULT_MAX_SESSIONS_DE = 1024  # dedicated DE residual host
 ENV_CAPACITY_TOKEN = "RPT_CAPACITY_TOKEN"
 ENV_MAX_SESSIONS = "RPT_NODE_MAX_SESSIONS"
-ENV_PEER_CODE = "RPT_NODE_PEER_CODE"  # IS | DE | US | RO
+ENV_PEER_CODE = "RPT_NODE_PEER_CODE"  # IS | DE | US
 ENV_NODE_HOST = "RPT_NODE_HOST"
 
 # Mbps product allowances (operator budget). IS/DE/RO omitted = unlimited-class.

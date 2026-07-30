@@ -49,8 +49,8 @@ const String kExplainerOuterObfuscation =
 
 /// Mirrors EXPLAINER_MULTIHOP.
 const String kExplainerMultihop =
-    'Multi-hop residual routes via an exit hop (e.g. entry → Romania exit) so '
-    'egress IP is the exit, not only the Iceland entry. '
+    'Multi-hop residual routes via an exit hop (entry → Germany exit) so '
+    'egress IP is the exit, not only the selected entry (default Germany). '
     'OFF (product default) = single hop to the entry node — lower lag/ping. '
     'ON = extra hop path when configured — more privacy of path, higher latency. '
     'Requires residual multi-hop routing; does not replace licence/keygen unlock. '

@@ -705,6 +705,19 @@ class Handler(BaseHTTPRequestHandler):
         if path in ("/vault", "/vault/"):
             self._send(200, "text/html; charset=utf-8", render_vault_page_html())
             return
+        if path in ("/support", "/support/"):
+            try:
+                from support_tickets import render_support_page_html
+            except ImportError:  # pragma: no cover
+                from status_page.support_tickets import (  # type: ignore
+                    render_support_page_html,
+                )
+            self._send(
+                200,
+                "text/html; charset=utf-8",
+                render_support_page_html().encode("utf-8"),
+            )
+            return
         if path in ("/", "/index.html"):
             try:
                 from local_currency import (
@@ -1821,6 +1834,47 @@ class Handler(BaseHTTPRequestHandler):
     def do_POST(self):  # noqa: N802
         path, _query = _parse_query(self.path)
         body = self._read_body()
+
+        # Public customer support form → ticket + email to rus@
+        if path in ("/support", "/support/"):
+            try:
+                from support_tickets import create_support_ticket, render_support_page_html
+            except ImportError:  # pragma: no cover
+                from status_page.support_tickets import (  # type: ignore
+                    create_support_ticket,
+                    render_support_page_html,
+                )
+            form = urllib.parse.parse_qs(body.decode("utf-8", errors="replace"))
+            def _first(key: str) -> str:
+                vals = form.get(key) or []
+                return str(vals[0] if vals else "").strip()
+
+            result = create_support_ticket(
+                email=_first("email"),
+                subject=_first("subject"),
+                message=_first("message"),
+                platform=_first("platform"),
+                app_version=_first("app_version"),
+                keygen=_first("keygen"),
+            )
+            if result.get("ok") and result.get("ticket_id"):
+                page = render_support_page_html(
+                    success_ticket_id=str(result["ticket_id"])
+                )
+            else:
+                page = render_support_page_html(
+                    error=str(result.get("error") or "Could not create ticket."),
+                    prefill={
+                        "email": _first("email"),
+                        "subject": _first("subject"),
+                        "message": _first("message"),
+                        "platform": _first("platform"),
+                        "app_version": _first("app_version"),
+                        "keygen": _first("keygen"),
+                    },
+                )
+            self._send(200, "text/html; charset=utf-8", page.encode("utf-8"))
+            return
 
         # App testers mint (direct URL only)
         try:

@@ -500,7 +500,7 @@ def load_node_elgamal_public(
     """Load node ElGamal public key for HELLO.
 
     *pub_name* defaults to ``node_elgamal.pub`` (entry). For multi-hop residual
-    to the Romania exit hop, pass ``exit_node_elgamal.pub`` (or use
+    to the multi-hop exit (Germany), pass ``exit_node_elgamal.pub`` (or use
     :func:`load_node_elgamal_public_for_endpoint`).
     """
     name = (pub_name or NODE_PUB_NAME).strip() or NODE_PUB_NAME

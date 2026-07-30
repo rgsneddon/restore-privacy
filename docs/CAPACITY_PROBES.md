@@ -26,7 +26,7 @@ ufw allow 22/tcp
 ufw allow 44044/udp
 ```
 
-Shared secret (same value on United States, Iceland, Romania, and any future peers):
+Shared secret (same value on Iceland, Germany, United States, and any future peers):
 
 ```bash
 # On each residual node (root)
@@ -70,18 +70,14 @@ Catalog product budgets (operator reference):
 
 | Peer | Host | Bandwidth budget | Session soft max |
 |------|------|------------------|------------------|
-| RO Romania | `185.146.232.107` | **unlimited-class** (extendable at cost) | **256** |
-| IS Iceland | `82.221.101.241` | **unlimited-class** (extendable at cost) | **512** (IS > RO) |
+| DE Germany (default entry) | `178.105.187.178` | **unlimited-class** (extendable at cost) | **1024** |
+| IS Iceland | `82.221.101.241` | **unlimited-class** (extendable at cost) | **512** |
 | US United States | `5.161.242.85` | 200 Mbps (`200000000`) | **512** |
 
-**Why limits differ:** IS/RO bandwidth is essentially unlimited in product terms
+**Why limits differ:** IS/DE bandwidth is essentially unlimited in product terms
 because the host can extend bandwidth at extra cost — not a fixed 100 Mbps product
 budget. Session soft max is a utilization / residual-routing hint only — **not** a
-hard public admission lock. Iceland is larger than Romania on session soft max.
-
-**RO still needs operator finalize from a host with SSH** (Mac): copy-paste
-install + verify steps in **[RO_CAPACITY_MAC_FINALIZE.md](RO_CAPACITY_MAC_FINALIZE.md)**.
-IS/US token env were applied separately; RO was blocked from Windows keys.
+hard public admission lock. Romania (RO) is **deprecated** and is not a live peer.
 
 ## Enable on status host (admin fleet panel)
 

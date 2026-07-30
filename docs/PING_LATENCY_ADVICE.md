@@ -13,7 +13,7 @@ order on the AUDIT UK ping matrix does not change latency.
 |-------|--------|------------------------|---------|
 | **Traffic shaping OFF** | Settings → privacy-scale; `PrivacyScalePrefs.traffic_shape`; env `RPT_TRAFFIC_SHAPE` unset/off | Less pad / jitter / cover → snappier feel | Default is **off** (`client/product_policy.py`). ON enables pad_bucket 128, jitter ≤40 ms, cover ~2 s (`PRODUCT_ENABLED_TRAFFIC_SHAPE` / `node/traffic_shape.py`). |
 | **Outer obfuscation OFF** | Settings; env `RPT_OBFS` | Slightly less header/CPU overhead | Default **off**. ~0 ms pure RTT delta in AUDIT estimates; still real CPU/path cost when ON (QUIC-mimic wrap). |
-| **Multi-hop OFF** | Settings multi-hop; env `RPT_MULTIHOP_ENABLED` | Single-hop to **entry** only — usually lower lag | Default **off**. ON = residual-via-exit (e.g. Romania) → higher latency for path privacy (`EXPLAINER_MULTIHOP`). |
+| **Multi-hop OFF** | Settings multi-hop; env `RPT_MULTIHOP_ENABLED` | Single-hop to **entry** only — usually lower lag | Default **off**. ON = residual-via-exit (Germany) → higher latency for path privacy (`EXPLAINER_MULTIHOP`). |
 | **Entry country closer to user** | Product country catalog / entry selection | Shorter Internet path → lower probe RTT | Catalog peers IS / RO / US; pick entry by geography when residual policy allows. |
 | **Measure from the user device** | Settings “Ping statistics” / `client/node_ping.py` | Live device→entry (and exit if multi-hop) | AUDIT live probes are from **audit host**, not the customer’s phone. |
 

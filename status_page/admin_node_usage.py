@@ -82,11 +82,9 @@ def _product_maps():
                 "5.161.242.85": 200 * _MBPS,
             }
             PRODUCT_SESSION_SOFT_MAX = {
-                "RO": 256,
                 "IS": 512,
                 "US": 512,
                 "DE": 1024,
-                "185.146.232.107": 256,
                 "82.221.101.241": 512,
                 "5.161.242.85": 512,
                 "178.105.187.178": 1024,
@@ -95,10 +93,9 @@ def _product_maps():
             def product_bandwidth_unlimited(*, code: str = "", host: str = ""):
                 c = (code or "").strip().upper()
                 h = (host or "").strip()
-                return c in {"IS", "DE", "RO"} or h in {
+                return c in {"IS", "DE"} or h in {
                     "82.221.101.241",
                     "178.105.187.178",
-                    "185.146.232.107",
                 }
 
             def product_bandwidth_cap_bps(*, code: str = "", host: str = ""):

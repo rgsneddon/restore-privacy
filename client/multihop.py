@@ -62,7 +62,7 @@ PRODUCT_DE_LEGACY_HOST = "167.233.224.5"  # former retired DE monopin
 class CountryNode:
     """One residual-capable product node identified by country code."""
 
-    code: str  # ISO-ish short code (IS, RO, US, …)
+    code: str  # ISO-ish short code (IS, DE, US, …)
     name: str  # User-facing country name
     host: str
     port: int = PRODUCT_NODE_PORT
@@ -258,7 +258,7 @@ class MultiHopConfig:
         """Configured hop path (entry first; exit only when multi-hop enabled).
 
         When disabled, returns **only the configured entry hop** (first hop),
-        so user entry-country selection (e.g. Romania) is honoured for
+        so user entry-country selection (e.g. Germany) is honoured for
         single-hop residual — not hard-locked to the historical Iceland monopin.
         """
         path = build_hop_path(self.hops)
@@ -471,8 +471,8 @@ def alternate_peer_endpoint(config: MultiHopConfig | None = None) -> Endpoint:
     """Failover residual peer — **never** the same host as preferred entry.
 
     - Multi-hop path configured: last hop when it differs from entry.
-    - Else first catalog peer whose host ≠ entry (IS↔RO when two peers).
-    - Never falls back to PRODUCT_EXIT_HOST when entry is already Romania.
+    - Else first catalog peer whose host ≠ entry (e.g. IS↔DE when two peers).
+    - Never falls back to PRODUCT_EXIT_HOST when entry is already the exit peer.
     """
     cfg = config or MultiHopConfig()
     entry_ep = entry_endpoint(cfg)
@@ -497,7 +497,7 @@ def exit_endpoint(config: MultiHopConfig | None = None) -> Endpoint:
 
     When multi-hop is configured (≥2 hops), returns the last hop (residual-via-exit).
     When single-hop, returns :func:`alternate_peer_endpoint` so a preferred entry
-    of Romania does **not** failover to Romania again.
+    of the exit peer does **not** failover to the same exit again.
     """
     cfg = config or MultiHopConfig()
     if hop_path_configured(cfg):
@@ -847,7 +847,7 @@ def multihop_config_from_env(
       (when this env key is set it wins over Settings)
     - When env key is unset, product Settings ``privacy_multihop`` is used
       (default **off** / single-hop residual baseline)
-    - ``RPT_ENTRY_COUNTRY`` / Settings ``entry_country`` — IS, RO, or US (default US)
+    - ``RPT_ENTRY_COUNTRY`` / Settings ``entry_country`` — IS, DE, or US (default DE)
     - ``RPT_MULTIHOP_HOPS`` — CSV ``host[:port],host2[:port]`` (operator override)
     - ``RPT_EXIT_HOST`` / ``RPT_EXIT_PORT`` — second hop override (legacy)
     """

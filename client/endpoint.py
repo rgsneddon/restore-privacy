@@ -22,7 +22,7 @@ def product_node_elgamal_pub_path() -> Path:
 
 
 def product_exit_node_elgamal_pub_path() -> Path:
-    """Tracked exit-hop public key (Romania multi-hop residual; public only)."""
+    """Tracked exit-hop public key (Germany multi-hop residual; public only)."""
     return Path(__file__).resolve().parents[1] / "product" / "exit_node_elgamal.pub"
 
 
