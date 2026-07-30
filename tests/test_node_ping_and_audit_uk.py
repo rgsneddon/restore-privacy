@@ -198,17 +198,21 @@ class TestAuditUkPingSection(unittest.TestCase):
                     self.assertEqual(r.exit_ms_low, 50)
             else:
                 self.assertIn("multi-hop off", r.exit_range().lower())
-            # full live → green RAG
-            if r.multihop:
-                self.assertEqual(r.rag, "green")
-            else:
-                self.assertEqual(r.rag, "green")
+            # RAG from AVG thresholds (not live-vs-approx)
+            self.assertIn(r.rag, ("green", "amber", "red"))
+            # 42 ms single-hop → amber (40–70); multi-hop mean (42+50)/2=46 → amber
+            self.assertEqual(r.rag, "amber", msg=f"avg={r.avg_ms} rag={r.rag}")
+            self.assertGreater(r.avg_ms, 0)
 
         text = render_audit_uk_ping_section(live=live, measure=False)
         self.assertIn("42 ms", text)
         self.assertIn("50 ms", text)
         self.assertIn("Live", text)
         self.assertIn("(live)", text)
+        self.assertIn("| AVG |", text)
+        self.assertIn("AVG", text)
+        self.assertIn("40", text)  # threshold prose
+        self.assertIn("70", text)
         self.assertNotIn("Approximate** RTT bands", text)
         # injectable probe_entry path also works
         fake_entry = PingResult(
@@ -270,10 +274,76 @@ class TestAuditUkPingSection(unittest.TestCase):
         )
         self.assertIn(pin, audit)
         self.assertIn("n/a (multi-hop off)", audit)
+        # AVG column + threshold RAG (not live-vs-approx colouring)
+        self.assertIn("| AVG |", audit)
+        self.assertIn("from AVG only", audit)
+        self.assertTrue(
+            "40 ms" in audit or "&lt; 40" in audit or "< 40" in audit,
+            "green threshold prose missing",
+        )
+        self.assertIn("70 ms", audit)
         # method honesty (live and/or approximate)
         self.assertTrue(
             "Approximate" in audit or "Live" in audit or "live probe" in audit.lower()
         )
+
+    def test_rag_from_avg_ms_thresholds(self) -> None:
+        """Shipped classifier: green &lt;40, amber 40–70, red &gt;70."""
+        from client.uk_ping_estimates import rag_from_avg_ms
+
+        self.assertEqual(rag_from_avg_ms(0), "green")
+        self.assertEqual(rag_from_avg_ms(39.9), "green")
+        self.assertEqual(rag_from_avg_ms(40), "amber")
+        self.assertEqual(rag_from_avg_ms(55), "amber")
+        self.assertEqual(rag_from_avg_ms(70), "amber")
+        self.assertEqual(rag_from_avg_ms(70.1), "red")
+        self.assertEqual(rag_from_avg_ms(120), "red")
+
+    def test_avg_column_and_rag_from_injected_rtt(self) -> None:
+        """Matrix AVG + RAG follow live RTTs via shipped row builders."""
+        from client.uk_ping_estimates import (
+            LiveRttBase,
+            render_audit_uk_ping_section,
+            uk_ping_matrix_rows,
+        )
+
+        # Fast path: 25 ms entry / 30 ms exit → green AVG
+        live_fast = LiveRttBase(entry_ms=25.0, exit_ms=30.0)
+        rows_fast = uk_ping_matrix_rows(live=live_fast)
+        for r in rows_fast:
+            if not r.traffic_shape and not r.multihop:
+                self.assertEqual(r.avg_ms, 25.0)
+                self.assertEqual(r.rag, "green")
+            if not r.traffic_shape and r.multihop:
+                self.assertEqual(r.avg_ms, (25.0 + 30.0) / 2.0)
+                self.assertEqual(r.rag, "green")
+        text_fast = render_audit_uk_ping_section(live=live_fast, measure=False)
+        self.assertIn("| AVG |", text_fast)
+        self.assertIn("🟩", text_fast)
+        self.assertIn("from AVG only", text_fast)
+        self.assertIn("40 ms", text_fast)
+        self.assertIn("70 ms", text_fast)
+
+        # Slow path: 90 ms → red
+        live_slow = LiveRttBase(entry_ms=90.0, exit_ms=95.0)
+        rows_slow = uk_ping_matrix_rows(live=live_slow)
+        for r in rows_slow:
+            if not r.traffic_shape:
+                self.assertEqual(r.rag, "red")
+                self.assertGreater(r.avg_ms, 70)
+        text_slow = render_audit_uk_ping_section(live=live_slow, measure=False)
+        self.assertIn("🟥", text_slow)
+
+        # Mid path: 50 ms → amber
+        live_mid = LiveRttBase(entry_ms=50.0, exit_ms=None)
+        rows_mid = uk_ping_matrix_rows(live=live_mid)
+        for r in rows_mid:
+            if not r.multihop and not r.traffic_shape:
+                self.assertEqual(r.avg_ms, 50.0)
+                self.assertEqual(r.rag, "amber")
+        text_mid = render_audit_uk_ping_section(live=live_mid, measure=False)
+        self.assertIn("🟧", text_mid)
+        self.assertIn("| AVG | RAG |", text_mid)
 
     def test_audit_package_table_and_monopin_match_catalog(self) -> None:
         """Shipped AUDIT must name live monopin; package RAG uses catalog basenames."""

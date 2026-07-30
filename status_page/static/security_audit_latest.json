@@ -1,24 +1,11 @@
 {
-  "generated_at": "2026-07-30T00:18:24Z",
+  "generated_at": "2026-07-30T22:38:09Z",
   "node_host": "Germany (DE)",
-  "catalog_version": "0.5.7",
+  "catalog_version": "0.5.8",
   "unit_suite": {
-    "ran": true,
+    "ran": false,
     "ok": true,
-    "returncode": 0,
-    "modules": [
-      "tests.test_legal_links",
-      "tests.test_legal_docs",
-      "tests.test_no_public_client_count",
-      "tests.test_connect_no_phones_home",
-      "tests.test_obfuscation",
-      "tests.test_kill_switch_leaks",
-      "tests.test_product_node_key",
-      "tests.test_pfs_product_require",
-      "tests.test_downloads",
-      "tests.test_multihop",
-      "tests.test_audit_package_rag"
-    ]
+    "reason": "skipped"
   },
   "tcp_status": {
     "host": "Germany (DE)",
@@ -53,118 +40,118 @@
     ]
   },
   "package_rag": {
-    "catalog_version": "0.5.7",
+    "catalog_version": "0.5.8",
     "pin": "1b126abfae737c66ce99670b730e123f2831ce5beb2868d7865324f391280bbe",
     "exit_pin": "ea0c7fa338612386cbe666a0ca64a6a69e3471b03db1848e7df4be2ed6823b18",
     "packages": [
       {
         "platform": "windows",
         "label": "Windows",
-        "filename": "restore-privacy-client-0.5.7-windows-x64-setup.exe",
+        "filename": "restore-privacy-client-0.5.8-windows-x64-setup.exe",
         "state": "Green",
         "reasons": [
-          "present on Helsinki paid_assets store (https://135.181.152.10.sslip.io/paid-assets/0.5.7/restore-privacy-client-0.5.7-windows-x64-setup.exe; 38606582 bytes)",
+          "present on Helsinki paid_assets store (https://135.181.152.10.sslip.io/paid-assets/0.5.8/restore-privacy-client-0.5.8-windows-x64-setup.exe; 38631642 bytes)",
           "structural pin/PE gates not re-scanned over HTTP (inventory presence from fulfilment host)"
         ],
-        "path": "https://135.181.152.10.sslip.io/paid-assets/0.5.7/restore-privacy-client-0.5.7-windows-x64-setup.exe",
-        "bytes": 38606582,
+        "path": "https://135.181.152.10.sslip.io/paid-assets/0.5.8/restore-privacy-client-0.5.8-windows-x64-setup.exe",
+        "bytes": 38631642,
         "remote_store": "helsinki",
         "search_roots": [
-          "status_page/assets/0.5.7/",
-          "releases/0.5.7/",
-          "/opt/restore-privacy/paid_assets/0.5.7/",
-          "dist/0.5.7/",
+          "status_page/assets/0.5.8/",
+          "releases/0.5.8/",
+          "/opt/restore-privacy/paid_assets/0.5.8/",
+          "dist/0.5.8/",
           "status_page/assets/",
-          "https://135.181.152.10.sslip.io/paid-assets/0.5.7/"
+          "https://135.181.152.10.sslip.io/paid-assets/0.5.8/"
         ],
-        "relative_path": "0.5.7/restore-privacy-client-0.5.7-windows-x64-setup.exe"
+        "relative_path": "0.5.8/restore-privacy-client-0.5.8-windows-x64-setup.exe"
       },
       {
         "platform": "android",
         "label": "Android",
-        "filename": "restore-privacy-client-0.5.7-android.apk",
+        "filename": "restore-privacy-client-0.5.8-android.apk",
         "state": "Green",
         "reasons": [
           "node_elgamal.pub pin matches product monopin",
           "Android residual wire (PFS + outer obfs) present",
           "exit_node_elgamal.pub present (multihop exit pin)"
         ],
-        "path": "/Users/russellsneddon/restore-privacy/status_page/assets/0.5.7/restore-privacy-client-0.5.7-android.apk",
+        "path": "/Users/russellsneddon/restore-privacy/status_page/assets/0.5.8/restore-privacy-client-0.5.8-android.apk",
         "bytes": 52455169,
-        "relative_path": "0.5.7/restore-privacy-client-0.5.7-android.apk",
+        "relative_path": "0.5.8/restore-privacy-client-0.5.8-android.apk",
         "search_roots": [
-          "status_page/assets/0.5.7/",
-          "releases/0.5.7/",
-          "/opt/restore-privacy/paid_assets/0.5.7/",
-          "dist/0.5.7/",
+          "status_page/assets/0.5.8/",
+          "releases/0.5.8/",
+          "/opt/restore-privacy/paid_assets/0.5.8/",
+          "dist/0.5.8/",
           "status_page/assets/",
-          "https://135.181.152.10.sslip.io/paid-assets/0.5.7/"
+          "https://135.181.152.10.sslip.io/paid-assets/0.5.8/"
         ]
       },
       {
         "platform": "macos",
         "label": "macOS",
-        "filename": "restore-privacy-client-0.5.7-macos.zip",
+        "filename": "restore-privacy-client-0.5.8-macos.zip",
         "state": "Green",
         "reasons": [
           "node_elgamal.pub pin matches product monopin",
           "archive present (structural residual gates N/A in this pass)",
           "exit_node_elgamal.pub present (multihop exit pin)"
         ],
-        "path": "/Users/russellsneddon/restore-privacy/status_page/assets/0.5.7/restore-privacy-client-0.5.7-macos.zip",
-        "bytes": 20982976,
-        "relative_path": "0.5.7/restore-privacy-client-0.5.7-macos.zip",
+        "path": "/Users/russellsneddon/restore-privacy/status_page/assets/0.5.8/restore-privacy-client-0.5.8-macos.zip",
+        "bytes": 21024463,
+        "relative_path": "0.5.8/restore-privacy-client-0.5.8-macos.zip",
         "search_roots": [
-          "status_page/assets/0.5.7/",
-          "releases/0.5.7/",
-          "/opt/restore-privacy/paid_assets/0.5.7/",
-          "dist/0.5.7/",
+          "status_page/assets/0.5.8/",
+          "releases/0.5.8/",
+          "/opt/restore-privacy/paid_assets/0.5.8/",
+          "dist/0.5.8/",
           "status_page/assets/",
-          "https://135.181.152.10.sslip.io/paid-assets/0.5.7/"
+          "https://135.181.152.10.sslip.io/paid-assets/0.5.8/"
         ]
       },
       {
         "platform": "ios",
         "label": "iOS",
-        "filename": "restore-privacy-client-0.5.7-ios.zip",
+        "filename": "restore-privacy-client-0.5.8-ios.zip",
         "state": "Green",
         "reasons": [
           "node_elgamal.pub pin matches product monopin",
           "archive present (structural residual gates N/A in this pass)",
           "exit_node_elgamal.pub present (multihop exit pin)"
         ],
-        "path": "/Users/russellsneddon/restore-privacy/status_page/assets/0.5.7/restore-privacy-client-0.5.7-ios.zip",
-        "bytes": 9350747,
-        "relative_path": "0.5.7/restore-privacy-client-0.5.7-ios.zip",
+        "path": "/Users/russellsneddon/restore-privacy/status_page/assets/0.5.8/restore-privacy-client-0.5.8-ios.zip",
+        "bytes": 9369901,
+        "relative_path": "0.5.8/restore-privacy-client-0.5.8-ios.zip",
         "search_roots": [
-          "status_page/assets/0.5.7/",
-          "releases/0.5.7/",
-          "/opt/restore-privacy/paid_assets/0.5.7/",
-          "dist/0.5.7/",
+          "status_page/assets/0.5.8/",
+          "releases/0.5.8/",
+          "/opt/restore-privacy/paid_assets/0.5.8/",
+          "dist/0.5.8/",
           "status_page/assets/",
-          "https://135.181.152.10.sslip.io/paid-assets/0.5.7/"
+          "https://135.181.152.10.sslip.io/paid-assets/0.5.8/"
         ]
       },
       {
         "platform": "linux",
         "label": "Linux",
-        "filename": "restore-privacy-client-0.5.7-linux-x64.tar.gz",
+        "filename": "restore-privacy-client-0.5.8-linux-x64.tar.gz",
         "state": "Green",
         "reasons": [
           "node_elgamal.pub pin matches product monopin",
           "archive present (structural residual gates N/A in this pass)",
           "exit_node_elgamal.pub present (multihop exit pin)"
         ],
-        "path": "/Users/russellsneddon/restore-privacy/status_page/assets/0.5.7/restore-privacy-client-0.5.7-linux-x64.tar.gz",
-        "bytes": 14410224,
-        "relative_path": "0.5.7/restore-privacy-client-0.5.7-linux-x64.tar.gz",
+        "path": "/Users/russellsneddon/restore-privacy/status_page/assets/0.5.8/restore-privacy-client-0.5.8-linux-x64.tar.gz",
+        "bytes": 14635866,
+        "relative_path": "0.5.8/restore-privacy-client-0.5.8-linux-x64.tar.gz",
         "search_roots": [
-          "status_page/assets/0.5.7/",
-          "releases/0.5.7/",
-          "/opt/restore-privacy/paid_assets/0.5.7/",
-          "dist/0.5.7/",
+          "status_page/assets/0.5.8/",
+          "releases/0.5.8/",
+          "/opt/restore-privacy/paid_assets/0.5.8/",
+          "dist/0.5.8/",
           "status_page/assets/",
-          "https://135.181.152.10.sslip.io/paid-assets/0.5.7/"
+          "https://135.181.152.10.sslip.io/paid-assets/0.5.8/"
         ]
       }
     ],

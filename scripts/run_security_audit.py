@@ -1354,6 +1354,20 @@ def build_markdown(results: dict) -> str:
     multihop_md = render_multihop_structure_markdown(
         results.get("multihop_structure")
     )
+    # Privacy-scale UK ping + AVG-threshold RAG (live probes when reachable)
+    try:
+        from client.uk_ping_estimates import render_audit_uk_ping_section
+    except ImportError:
+        sys.path.insert(0, str(ROOT))
+        from client.uk_ping_estimates import render_audit_uk_ping_section  # type: ignore
+
+    try:
+        uk_ping_md = render_audit_uk_ping_section(measure=True) + "\n"
+    except Exception as exc:  # noqa: BLE001
+        uk_ping_md = (
+            "## Privacy-scale settings — UK ping + RAG\n\n"
+            f"_UK ping section unavailable this pass: {type(exc).__name__}_\n\n"
+        )
     suite_line = (
         f"**PASS** ({len(suite.get('modules') or [])} modules)"
         if suite.get("ok")
@@ -1405,6 +1419,7 @@ def build_markdown(results: dict) -> str:
 {package_section}
 {section_b_md}
 {multihop_md}
+{uk_ping_md}
 ## 1. Executive summary
 
 Latest automated security audit for production node **{host}** and the in-repo privacy/security gates.

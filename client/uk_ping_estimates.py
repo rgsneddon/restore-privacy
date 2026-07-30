@@ -5,6 +5,11 @@ When live probes succeed (device/host → product entry/exit via
 the section fails soft to documented approximate bands — never invents a live
 ms figure.
 
+**RAG** is driven by each row's numeric **AVG** ms (not live-vs-approx):
+  - 🟩 green when AVG &lt; 40
+  - 🟧 amber when 40 ≤ AVG ≤ 70
+  - 🟥 red when AVG &gt; 70
+
 Method honesty always states whether figures are live (this probe host) or
 approximate UK estimates. Not a contractual SLA.
 """
@@ -30,8 +35,51 @@ SHAPE_OVERHEAD_MS = 5
 # Multi-hop residual-via-exit: residual path is exit; entry ping still listed.
 MULTIHOP_NOTE = "residual dials exit when multi-hop on"
 
+# Latency RAG thresholds (ms) — AVG column drives the colour.
+RAG_GREEN_MAX_MS = 40.0  # green when avg < this
+RAG_AMBER_MAX_MS = 70.0  # amber when RAG_GREEN_MAX_MS <= avg <= this; else red
+
 # Injectable probe callables: () -> PingResult-like with .ok and .rtt_ms
 ProbeFn = Callable[[], object]
+
+
+def rag_from_avg_ms(avg_ms: float) -> str:
+    """Map numeric AVG RTT (ms) → ``green`` | ``amber`` | ``red``.
+
+    Thresholds (inclusive amber band):
+      - green: avg < 40
+      - amber: 40 ≤ avg ≤ 70
+      - red: avg > 70
+    """
+    try:
+        a = float(avg_ms)
+    except (TypeError, ValueError):
+        return "amber"
+    if a < RAG_GREEN_MAX_MS:
+        return "green"
+    if a <= RAG_AMBER_MAX_MS:
+        return "amber"
+    return "red"
+
+
+def row_avg_ms(
+    *,
+    entry_ms_low: int,
+    entry_ms_high: int,
+    exit_ms_low: int | None,
+    exit_ms_high: int | None,
+    multihop: bool,
+) -> float:
+    """Numeric AVG ms for a privacy-scale row.
+
+    Single-hop: midpoint of the entry lo–hi band (equals live base when lo==hi).
+    Multi-hop: mean of entry midpoint and exit midpoint (both legs listed).
+    """
+    entry_avg = (float(entry_ms_low) + float(entry_ms_high)) / 2.0
+    if multihop and exit_ms_low is not None and exit_ms_high is not None:
+        exit_avg = (float(exit_ms_low) + float(exit_ms_high)) / 2.0
+        return (entry_avg + exit_avg) / 2.0
+    return entry_avg
 
 
 @dataclass(frozen=True)
@@ -65,10 +113,11 @@ class UkPingRow:
     entry_ms_high: int
     exit_ms_low: int | None
     exit_ms_high: int | None
-    rag: str  # "green" | "amber"
+    rag: str  # "green" | "amber" | "red" — from AVG thresholds
     notes: str
     entry_live: bool = False
     exit_live: bool = False
+    avg_ms: float = 0.0  # numeric AVG used for RAG (ms)
 
     @property
     def shape_label(self) -> str:
@@ -104,6 +153,13 @@ class UkPingRow:
                 f"(live base + shape feel)"
             )
         return f"{self.exit_ms_low}–{self.exit_ms_high} ms"
+
+    def avg_display(self) -> str:
+        """Formatted AVG cell (one decimal when needed)."""
+        a = float(self.avg_ms)
+        if abs(a - round(a)) < 1e-9:
+            return f"{int(round(a))} ms"
+        return f"{a:.1f} ms"
 
     def rag_cell(self) -> str:
         if self.rag == "green":
@@ -234,13 +290,16 @@ def _estimate_row(
         else:
             notes += "; exit RTT approximate UK band"
 
-    # Green when entry (and exit if multihop) is live; else amber approx
-    if entry_live and (not prefs.multihop or exit_live):
-        rag = "green"
-    elif entry_live:
-        rag = "amber"  # partial live (entry only, exit approx)
-    else:
-        rag = "amber"
+    avg = row_avg_ms(
+        entry_ms_low=entry_lo,
+        entry_ms_high=entry_hi,
+        exit_ms_low=exit_lo,
+        exit_ms_high=exit_hi,
+        multihop=prefs.multihop,
+    )
+    # RAG from AVG only (not live-vs-approx)
+    rag = rag_from_avg_ms(avg)
+    notes += f"; AVG {avg:.1f} ms → {rag}"
 
     return UkPingRow(
         traffic_shape=prefs.traffic_shape,
@@ -254,6 +313,7 @@ def _estimate_row(
         notes=notes,
         entry_live=entry_live,
         exit_live=exit_live,
+        avg_ms=avg,
     )
 
 
@@ -361,8 +421,10 @@ def render_audit_uk_ping_section(
                 f"  (+0–{SHAPE_OVERHEAD_MS} ms labeled); outer obfs ~0 ms RTT.",
                 "- **Not** a contractual SLA. Failed probes fall back to approximate UK bands",
                 "  (never invent live ms).",
-                "- **RAG:** 🟩 Green = live base RTT available for the row; "
-                "🟧 Amber = approximate / partial.",
+                "- **AVG** is the numeric mean used for RAG: single-hop = entry band midpoint;",
+                "  multi-hop = mean of entry and exit midpoints.",
+                "- **RAG (from AVG only):** 🟩 Green = AVG **&lt; 40 ms**; "
+                "🟧 Amber = **40–70 ms**; 🟥 Red = AVG **&gt; 70 ms**.",
             ]
         )
     else:
@@ -383,7 +445,10 @@ def render_audit_uk_ping_section(
                 "- **Not** a contractual SLA.",
                 "- Traffic shaping adds a small **feel** overhead (bounded jitter/cover);",
                 "  outer obfuscation is ~0 ms RTT; multi-hop residual dials **exit**.",
-                "- **RAG:** 🟧 Amber = approximate RTT estimate; monopin hosts are product pins.",
+                "- **AVG** is still computed from band midpoints so RAG is latency-threshold",
+                "  driven (not permanently amber just because estimates were used).",
+                "- **RAG (from AVG only):** 🟩 Green = AVG **&lt; 40 ms**; "
+                "🟧 Amber = **40–70 ms**; 🟥 Red = AVG **&gt; 70 ms**.",
                 "- Client Settings shows **live probe** ms (device→entry / exit) when measured.",
             ]
         )
@@ -399,14 +464,15 @@ def render_audit_uk_ping_section(
     lines.extend(
         [
             "",
-            f"| Shape | Outer obfs | Multi-hop | {entry_hdr} | {exit_hdr} | RAG | Notes |",
-            "|-------|------------|-----------|-------------------|------------------|-----|-------|",
+            f"| Shape | Outer obfs | Multi-hop | {entry_hdr} | {exit_hdr} | AVG | RAG | Notes |",
+            "|-------|------------|-----------|-------------------|------------------|-----|-----|-------|",
         ]
     )
     for r in rows:
         lines.append(
             f"| {r.shape_label} | {r.obfs_label} | {r.multihop_label} | "
-            f"{r.entry_range()} | {r.exit_range()} | {r.rag_cell()} | {r.notes} |"
+            f"{r.entry_range()} | {r.exit_range()} | {r.avg_display()} | "
+            f"{r.rag_cell()} | {r.notes} |"
         )
     lines.extend(
         [
