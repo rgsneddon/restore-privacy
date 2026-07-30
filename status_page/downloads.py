@@ -426,7 +426,7 @@ def download_css() -> str:
       box-sizing: border-box;
       background: var(--rb-price-panel-bg, linear-gradient(165deg, #1a4a7a 0%, #0a1628 70%));
       border: 1px solid rgba(174, 208, 234, 0.35);
-      border-radius: 14px;
+      border-radius: var(--rb-radius, 0px);
       box-shadow: 0 8px 24px rgba(4, 12, 28, 0.35);
     }
     /* One local-currency line (accept notice included; no duplicate italic line) */
@@ -449,7 +449,7 @@ def download_css() -> str:
       padding: 0.7rem 1rem;
       box-sizing: border-box;
       border: 1px solid rgba(174, 208, 234, 0.35);
-      border-radius: 12px;
+      border-radius: var(--rb-radius-sm, 0px);
       background: var(--rb-price-panel-bg, linear-gradient(165deg, #1a4a7a 0%, #0a1628 70%));
       box-shadow: 0 6px 20px rgba(4, 12, 28, 0.28), inset 0 1px 0 rgba(255, 255, 255, 0.06);
     }
@@ -475,7 +475,7 @@ def download_css() -> str:
       padding: 0.65rem 0.9rem;
       box-sizing: border-box;
       border: 1px solid var(--rb-card-border);
-      border-radius: 12px;
+      border-radius: var(--rb-radius-sm, 0px);
       background: rgba(10, 22, 40, 0.45);
       box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05);
     }
@@ -492,7 +492,7 @@ def download_css() -> str:
       max-width: 36rem; margin: 1.15rem auto 0.35rem; padding: 0.65rem 0.85rem;
       font-size: 0.82rem; line-height: 1.45; font-weight: 600;
       color: #fecaca; background: rgba(127, 29, 29, 0.35);
-      border: 1px solid #b91c1c; border-radius: 12px; text-align: left;
+      border: 1px solid #b91c1c; border-radius: var(--rb-radius-sm, 0px); text-align: left;
     }
     .dl-buttons {
       display: flex; flex-direction: column; gap: 1rem; align-items: stretch; width: 100%;
@@ -536,7 +536,7 @@ def download_css() -> str:
     }
     .dl-plan-options { display: flex; flex-direction: column; gap: 0.5rem; }
     .dl-plan-option {
-      display: block; cursor: pointer; border-radius: 12px;
+      display: block; cursor: pointer; border-radius: var(--rb-radius-sm, 0px);
       border: 1px solid rgba(174, 208, 234, 0.25); padding: 0.7rem 0.85rem;
       background: rgba(10, 22, 40, 0.55);
     }
@@ -550,12 +550,12 @@ def download_css() -> str:
     .dl-plan-price { font-weight: 700; color: var(--rb-soft, #deedf7); margin-top: 0.15rem; font-size: 0.9rem; }
     .dl-plan-save {
       display: inline-block; margin-left: 0.35rem; padding: 0.1rem 0.4rem;
-      border-radius: 999px; font-size: 0.7rem; font-weight: 800;
+      border-radius: var(--rb-radius-control, 0px); font-size: 0.7rem; font-weight: 800;
       background: rgba(57, 255, 106, 0.18); color: #39ff6a;
     }
     .dl-buy-now {
       width: 100%; margin-top: 0.35rem; padding: 0.85rem 1rem; border: 0;
-      border-radius: 12px; font-weight: 800; font-size: 1.05rem; cursor: pointer;
+      border-radius: var(--rb-radius-sm, 0px); font-weight: 800; font-size: 1.05rem; cursor: pointer;
       font-family: inherit; color: #fff;
       background: linear-gradient(180deg, var(--rb-btn, #2694e8) 0%, var(--rb-btn-deep, #1a6fad) 100%);
       box-shadow: 0 4px 14px rgba(7, 30, 60, 0.4);
@@ -577,7 +577,7 @@ def download_css() -> str:
     }
     .dl-pay-error {
       color: #fecaca; background: rgba(127, 29, 29, 0.35); border: 1px solid #b91c1c;
-      border-radius: 10px; padding: 0.65rem 0.85rem; margin: 0 auto 0.85rem;
+      border-radius: var(--rb-radius-sm, 0px); padding: 0.65rem 0.85rem; margin: 0 auto 0.85rem;
       max-width: 28rem; text-align: left; font-weight: 600; font-size: 0.88rem;
     }
     .dl-row {
@@ -589,7 +589,7 @@ def download_css() -> str:
       display: flex; flex-direction: column; align-items: stretch; gap: 0.45rem;
       min-width: 9.5rem; width: clamp(9.5rem, 18vw, 11rem);
       padding: 0.65rem 0.55rem 0.7rem;
-      border-radius: 14px;
+      border-radius: var(--rb-radius, 0px);
       background: rgba(8, 18, 32, 0.45);
       border: 1px solid rgba(174, 208, 234, 0.18);
       box-sizing: border-box;
@@ -610,7 +610,7 @@ def download_css() -> str:
       min-height: 2.65rem; height: auto;
       padding: 0.55rem 0.6rem;
       background: linear-gradient(180deg, var(--rb-btn) 0%, var(--rb-btn-deep) 100%);
-      color: #fff; text-decoration: none; border-radius: 10px;
+      color: #fff; text-decoration: none; border-radius: var(--rb-radius-sm, 0px);
       font-weight: 800; font-size: 0.86rem; box-sizing: border-box;
       border: 1px solid rgba(255,255,255,0.22); cursor: pointer;
       font-family: inherit; text-align: center; line-height: 1.2;

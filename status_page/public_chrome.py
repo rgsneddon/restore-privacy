@@ -128,7 +128,7 @@ def public_data_path_layer_html() -> str:
     """Decorative ambient data-path layer (aria-hidden; pure presentational)."""
     src = public_data_path_motif_src()
     return f"""
-<div class="{DATA_PATH_LAYER_CLASS}" id="data-path-layer" data-path="1" aria-hidden="true">
+<div class="{DATA_PATH_LAYER_CLASS} data-path-prominent" id="data-path-layer" data-path="1" data-path-prominent="1" aria-hidden="true">
   <div class="data-path-grid"></div>
   <div class="data-path-glow data-path-glow-a"></div>
   <div class="data-path-glow data-path-glow-b"></div>
@@ -170,8 +170,10 @@ def public_site_css() -> str:
   --rb-soft: #deedf7;
   --rb-accent-sky: #5eb0e8;
   --rb-accent: #5eb0e8;
-  --rb-radius: 14px;
-  --rb-radius-sm: 10px;
+  /* Sleek business geometry: sharp edges (no toy soft pills on panels) */
+  --rb-radius: 0px;
+  --rb-radius-sm: 0px;
+  --rb-radius-control: 0px;
   --rb-max: 64rem;
   --rb-body-fg: var(--rb-cream);
   --rb-body-bg1: #16325a;
@@ -336,7 +338,7 @@ body, body.{SITE_CHROME_PRO_CLASS}, body.site-public {{
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }}
-/* Ambient logo-aligned data-path layers */
+/* Ambient logo-aligned data-path layers (prominent, still non-interactive) */
 .{DATA_PATH_LAYER_CLASS}, .data-path-layer {{
   position: fixed;
   inset: 0;
@@ -344,57 +346,62 @@ body, body.{SITE_CHROME_PRO_CLASS}, body.site-public {{
   pointer-events: none;
   overflow: hidden;
 }}
+/* data-path-prominent: higher grid + motif contrast than soft ambient */
 .data-path-grid {{
   position: absolute;
   inset: 0;
-  opacity: 0.22;
+  opacity: 0.42;
   background-image:
-    linear-gradient(color-mix(in srgb, var(--rb-neon-cyan) 18%, transparent) 1px, transparent 1px),
-    linear-gradient(90deg, color-mix(in srgb, var(--rb-neon-blue) 14%, transparent) 1px, transparent 1px);
-  background-size: 48px 48px;
-  mask-image: radial-gradient(ellipse 75% 60% at 50% 20%, #000 20%, transparent 75%);
-  -webkit-mask-image: radial-gradient(ellipse 75% 60% at 50% 20%, #000 20%, transparent 75%);
+    linear-gradient(color-mix(in srgb, var(--rb-neon-cyan) 28%, transparent) 1px, transparent 1px),
+    linear-gradient(90deg, color-mix(in srgb, var(--rb-neon-blue) 22%, transparent) 1px, transparent 1px);
+  background-size: 40px 40px;
+  mask-image: radial-gradient(ellipse 90% 75% at 50% 30%, #000 35%, transparent 88%);
+  -webkit-mask-image: radial-gradient(ellipse 90% 75% at 50% 30%, #000 35%, transparent 88%);
 }}
-[data-theme="light"] .data-path-grid {{ opacity: 0.14; }}
+[data-theme="light"] .data-path-grid {{ opacity: 0.28; }}
 .data-path-glow {{
   position: absolute;
   border-radius: 50%;
-  filter: blur(48px);
+  filter: blur(56px);
 }}
 .data-path-glow-a {{
-  width: min(42vw, 28rem);
-  height: min(42vw, 28rem);
-  top: -8%;
-  left: 8%;
+  width: min(52vw, 34rem);
+  height: min(52vw, 34rem);
+  top: -10%;
+  left: 4%;
   background: var(--rb-neon-glow-cyan);
+  opacity: 1.15;
 }}
 .data-path-glow-b {{
-  width: min(36vw, 24rem);
-  height: min(36vw, 24rem);
-  bottom: 4%;
-  right: 6%;
+  width: min(44vw, 30rem);
+  height: min(44vw, 30rem);
+  bottom: 2%;
+  right: 2%;
   background: var(--rb-neon-glow-green);
+  opacity: 1.1;
 }}
 .data-path-motif {{
   position: absolute;
   left: 0;
   width: 100%;
   height: auto;
-  max-height: 14vh;
+  max-height: 22vh;
   object-fit: cover;
-  opacity: 0.38;
+  opacity: 0.58;
   mix-blend-mode: screen;
 }}
 [data-theme="light"] .data-path-motif {{
-  opacity: 0.28;
+  opacity: 0.4;
   mix-blend-mode: multiply;
 }}
-.data-path-motif-top {{ top: 0; transform: scaleY(0.85); }}
+.data-path-motif-top {{ top: 0; transform: scaleY(1); }}
 .data-path-motif-bottom {{
   bottom: 0;
-  transform: scaleY(-0.75);
-  opacity: 0.22;
+  transform: scaleY(-0.95);
+  opacity: 0.42;
+  max-height: 18vh;
 }}
+[data-theme="light"] .data-path-motif-bottom {{ opacity: 0.3; }}
 .page-shell, #{PAGE_SHELL_ID}, #doc-page-shell, #support-page-shell {{
   width: min(100% - 1.75rem, var(--rb-max));
   display: flex;
@@ -623,7 +630,7 @@ a.product-tab.is-active, .product-tab.is-active {{
   color: var(--rb-btn-text) !important;
   background: linear-gradient(180deg, var(--rb-btn) 0%, var(--rb-btn-deep) 100%);
   border: 1px solid color-mix(in srgb, var(--rb-link) 42%, transparent);
-  border-radius: 999px;
+  border-radius: var(--rb-radius-control, 0px);
   padding: 0.48rem 0.95rem;
   box-shadow: 0 3px 10px rgba(10, 22, 40, 0.18);
   transition: filter 0.14s ease, transform 0.14s ease, box-shadow 0.14s ease;
@@ -669,7 +676,7 @@ a.product-tab.is-active, .product-tab.is-active {{
   margin: 0;
   padding: 0.18rem;
   border: 1px solid var(--rb-card-border);
-  border-radius: 999px;
+  border-radius: var(--rb-radius-control, 0px);
   display: flex;
   flex-wrap: wrap;
   gap: 0.15rem;
@@ -692,7 +699,7 @@ a.product-tab.is-active, .product-tab.is-active {{
   text-transform: uppercase;
   color: var(--rb-muted);
   padding: 0.32rem 0.62rem;
-  border-radius: 999px;
+  border-radius: var(--rb-radius-control, 0px);
   cursor: pointer;
   transition: background 0.12s ease, color 0.12s ease;
 }}
@@ -746,7 +753,7 @@ a.product-tab.is-active, .product-tab.is-active {{
   background: linear-gradient(180deg, var(--rb-btn) 0%, var(--rb-btn-deep) 100%);
   text-decoration: none;
   padding: 0.58rem 1.2rem;
-  border-radius: 999px;
+  border-radius: var(--rb-radius-control, 0px);
   border: 1px solid color-mix(in srgb, var(--rb-link) 40%, transparent);
   box-shadow: 0 6px 18px rgba(10, 22, 40, 0.2);
   transition: filter 0.14s ease, transform 0.14s ease;

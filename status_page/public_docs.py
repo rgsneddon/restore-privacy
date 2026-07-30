@@ -471,6 +471,7 @@ def markdownish_to_html(text: str) -> str:
             if not in_table:
                 # Installer package table: Platform | Package | STATE | Notes
                 # Section B privacy probes: Probe | State | Notes
+                # UK ping + RAG: Shape | … | AVG | RAG | Notes
                 header_join = " ".join(cells).lower()
                 table_is_pkg_rag = (
                     "package" in header_join
@@ -482,10 +483,31 @@ def markdownish_to_html(text: str) -> str:
                     and "probe" in header_join
                     and "state" in header_join
                 )
+                table_is_uk_ping = (
+                    not table_is_pkg_rag
+                    and not table_is_section_b
+                    and "notes" in header_join
+                    and (
+                        "avg" in header_join
+                        or ("shape" in header_join and "multi" in header_join)
+                    )
+                )
+                # Any other Notes-last audit matrix (balanced cols + scroll Notes)
+                table_is_notes_matrix = (
+                    not table_is_pkg_rag
+                    and not table_is_section_b
+                    and not table_is_uk_ping
+                    and "notes" in header_join
+                    and len(cells) >= 3
+                )
                 if table_is_pkg_rag:
                     tclass = "doc-table pkg-rag"
                 elif table_is_section_b:
                     tclass = "doc-table section-b-probes"
+                elif table_is_uk_ping:
+                    tclass = "doc-table uk-ping-rag"
+                elif table_is_notes_matrix:
+                    tclass = "doc-table notes-matrix"
                 else:
                     tclass = "doc-table"
                 out.append(f'<table class="{tclass}"><tbody>')
@@ -506,22 +528,41 @@ def markdownish_to_html(text: str) -> str:
                 tag = "td"
             # Package AUDIT STATE: scroll lengthy Package (col 2) / Notes (col 4) in-cell
             # Section B: scroll lengthy Notes (col 3) only — Probe col stays identity
+            # UK ping / notes matrix: last Notes column scrolls (vertical + horizontal)
             scroll_cols: set[int] = set()
+            notes_scroll_cols: set[int] = set()
             if table_is_pkg_rag:
                 scroll_cols = {1, 3}
+                notes_scroll_cols = {3}
             elif table_is_section_b:
                 scroll_cols = {2}  # Notes only; not Probe (0) or State (1)
+                notes_scroll_cols = {2}
+            elif table_is_uk_ping or table_is_notes_matrix:
+                # Notes is last column
+                notes_i = len(cells) - 1
+                if tag == "th":
+                    for hi, hc in enumerate(cells):
+                        if "note" in hc.lower():
+                            notes_i = hi
+                            break
+                scroll_cols = {notes_i}
+                notes_scroll_cols = {notes_i}
             cell_parts: list[str] = []
             for col_i, c in enumerate(cells):
                 inner = _format_table_cell(c, header=(tag == "th"))
                 if col_i in scroll_cols and tag == "td":
+                    scroll_cls = (
+                        "cell-scroll cell-scroll-notes"
+                        if col_i in notes_scroll_cols
+                        else "cell-scroll"
+                    )
                     cell_parts.append(
-                        f'<{tag} class="pkg-cell-scroll">'
-                        f'<div class="cell-scroll">{inner}</div></{tag}>'
+                        f'<{tag} class="pkg-cell-scroll notes-cell">'
+                        f'<div class="{scroll_cls}">{inner}</div></{tag}>'
                     )
                 elif col_i in scroll_cols and tag == "th":
                     cell_parts.append(
-                        f'<{tag} class="pkg-cell-scroll">{inner}</{tag}>'
+                        f'<{tag} class="pkg-cell-scroll notes-cell">{inner}</{tag}>'
                     )
                 else:
                     cell_parts.append(f"<{tag}>{inner}</{tag}>")
@@ -599,26 +640,47 @@ DOC_SHELL_CSS = """
 .doc-body hr { border: 0; border-top: 1px solid var(--rb-card-border); margin: 1.5rem 0; }
 .doc-body code {
   font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-  font-size: 0.9em; background: var(--rb-code-bg); padding: 0.12rem 0.35rem; border-radius: 4px;
+  font-size: 0.9em; background: var(--rb-code-bg); padding: 0.12rem 0.35rem; border-radius: 0;
 }
 pre.doc-code, pre.doc-plain {
-  background: var(--rb-pre-bg); border: 1px solid var(--rb-pre-border); border-radius: 10px;
+  background: var(--rb-pre-bg); border: 1px solid var(--rb-pre-border); border-radius: 0;
   padding: 0.9rem 1rem; overflow-x: auto; font-size: 0.88rem; line-height: 1.45;
   color: var(--rb-doc-fg);
 }
 pre.doc-code code { background: transparent; padding: 0; }
 table.doc-table {
   width: 100%; border-collapse: collapse; margin: 0.85rem 0 1.1rem;
-  font-size: 0.95rem; display: block; overflow-x: auto;
+  font-size: 0.88rem; display: block; overflow-x: auto;
+  border-radius: 0;
 }
 table.doc-table th, table.doc-table td {
-  border: 1px solid var(--rb-card-border); padding: 0.45rem 0.6rem; text-align: left; vertical-align: top;
+  border: 1px solid var(--rb-card-border); padding: 0.4rem 0.5rem; text-align: left; vertical-align: top;
 }
 table.doc-table th {
-  background: var(--rb-code-bg); color: var(--rb-accent-sky, var(--rb-link)); font-weight: 600;
+  background: var(--rb-code-bg); color: var(--rb-accent-sky, var(--rb-link)); font-weight: 650;
+  font-size: 0.78rem; letter-spacing: 0.03em; text-transform: uppercase;
 }
 table.doc-table tr:nth-child(even) td {
   background: color-mix(in srgb, var(--rb-code-bg) 55%, transparent);
+}
+/* Shared Notes-cell scroll (vertical wrap + thin scrollbar) */
+table.doc-table .cell-scroll-notes {
+  max-width: 100%;
+  max-height: 5.25rem;
+  overflow-x: auto;
+  overflow-y: auto;
+  white-space: normal;
+  word-break: break-word;
+  line-height: 1.35;
+  font-size: 0.8rem;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: thin;
+}
+table.doc-table td.notes-cell,
+table.doc-table th.notes-cell {
+  max-width: 0;
+  overflow: hidden;
+  vertical-align: top;
 }
 /*
  * Package AUDIT STATE (pkg-rag): fit content column; lengthy Package/Notes
@@ -671,6 +733,12 @@ table.doc-table.pkg-rag .cell-scroll {
   white-space: nowrap;
   -webkit-overflow-scrolling: touch;
   scrollbar-width: thin;
+}
+table.doc-table.pkg-rag .cell-scroll-notes {
+  white-space: normal;
+  overflow-y: auto;
+  max-height: 5.25rem;
+  word-break: break-word;
 }
 table.doc-table.pkg-rag td.pkg-cell-scroll .cell-scroll code,
 table.doc-table.pkg-rag .cell-scroll code {
@@ -726,6 +794,11 @@ table.doc-table.section-b-probes .cell-scroll {
   -webkit-overflow-scrolling: touch;
   scrollbar-width: thin;
 }
+table.doc-table.section-b-probes .cell-scroll-notes {
+  white-space: normal;
+  overflow-y: auto;
+  max-height: 5.25rem;
+}
 table.doc-table.section-b-probes td.pkg-cell-scroll .cell-scroll code,
 table.doc-table.section-b-probes .cell-scroll code {
   white-space: nowrap;
@@ -734,10 +807,68 @@ table.doc-table.section-b-probes .cell-scroll code {
   display: inline-block;
   font-size: 0.82rem;
 }
+/*
+ * Privacy-scale UK ping + RAG:
+ * compact control columns; entry/exit readable; Notes scrolls in-cell.
+ * Shape | Outer obfs | Multi-hop | Entry | Exit | AVG | RAG | Notes
+ */
+table.doc-table.uk-ping-rag {
+  display: table;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  table-layout: fixed;
+  overflow: visible;
+  font-size: 0.82rem;
+}
+table.doc-table.uk-ping-rag th:nth-child(1),
+table.doc-table.uk-ping-rag td:nth-child(1) { width: 6.5%; text-align: center; white-space: nowrap; }
+table.doc-table.uk-ping-rag th:nth-child(2),
+table.doc-table.uk-ping-rag td:nth-child(2) { width: 8%; text-align: center; white-space: nowrap; }
+table.doc-table.uk-ping-rag th:nth-child(3),
+table.doc-table.uk-ping-rag td:nth-child(3) { width: 8%; text-align: center; white-space: nowrap; }
+table.doc-table.uk-ping-rag th:nth-child(4),
+table.doc-table.uk-ping-rag td:nth-child(4) { width: 14%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+table.doc-table.uk-ping-rag th:nth-child(5),
+table.doc-table.uk-ping-rag td:nth-child(5) { width: 14%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+table.doc-table.uk-ping-rag th:nth-child(6),
+table.doc-table.uk-ping-rag td:nth-child(6) { width: 7.5%; text-align: center; white-space: nowrap; font-variant-numeric: tabular-nums; font-weight: 700; }
+table.doc-table.uk-ping-rag th:nth-child(7),
+table.doc-table.uk-ping-rag td:nth-child(7) { width: 6%; text-align: center; white-space: nowrap; vertical-align: middle; }
+table.doc-table.uk-ping-rag th:nth-child(8),
+table.doc-table.uk-ping-rag td:nth-child(8),
+table.doc-table.uk-ping-rag th.notes-cell,
+table.doc-table.uk-ping-rag td.notes-cell {
+  width: 36%;
+  max-width: 0;
+  overflow: hidden;
+  vertical-align: top;
+}
+table.doc-table.uk-ping-rag .cell-scroll-notes {
+  max-height: 4.75rem;
+  font-size: 0.76rem;
+  color: var(--rb-doc-muted, var(--rb-muted));
+}
+/* Generic Notes-last matrices (multihop etc.) */
+table.doc-table.notes-matrix {
+  display: table;
+  width: 100%;
+  max-width: 100%;
+  table-layout: fixed;
+  overflow: visible;
+}
+table.doc-table.notes-matrix th:last-child,
+table.doc-table.notes-matrix td:last-child,
+table.doc-table.notes-matrix th.notes-cell,
+table.doc-table.notes-matrix td.notes-cell {
+  width: 42%;
+  max-width: 0;
+  overflow: hidden;
+}
 /* Package AUDIT STATE + section B State solid colour cells */
 .rag-cell { display: flex; align-items: center; justify-content: center; min-height: 1.5rem; min-width: 2.5rem; }
 .rag-swatch {
-  display: inline-block; width: 1.35rem; height: 1.35rem; border-radius: 4px;
+  display: inline-block; width: 1.25rem; height: 1.25rem; border-radius: 0;
   border: 1px solid rgba(255,255,255,0.12); vertical-align: middle;
 }
 .rag-swatch.rag-green { background: #22c55e; }
@@ -746,7 +877,7 @@ table.doc-table.section-b-probes .cell-scroll code {
 /* Audit page: countdown under H1 + current-run RAG colour */
 .audit-page-ticker {
   margin: 0.85rem 0 1.35rem; padding: 0.85rem 1rem;
-  background: var(--rb-code-bg); border: 1px solid var(--rb-card-border); border-radius: 10px;
+  background: var(--rb-code-bg); border: 1px solid var(--rb-card-border); border-radius: 0;
   max-width: 36rem;
 }
 .audit-page-countdown-row {
@@ -880,13 +1011,14 @@ def render_document_html(
     extra = DOC_SHELL_CSS + """
 .doc-body-panel h1:first-child { margin-top: 0; }
 .rag-swatch {
-  display: inline-block; width: 1.1rem; height: 1.1rem; border-radius: 4px;
+  display: inline-block; width: 1.1rem; height: 1.1rem; border-radius: 0;
   vertical-align: middle;
 }
 .rag-green { background: #22c55e; }
 .rag-amber { background: #f59e0b; }
 .rag-red { background: #ef4444; }
 .pkg-cell-scroll .cell-scroll { max-height: 6.5rem; overflow: auto; }
+.pkg-cell-scroll .cell-scroll-notes { max-height: 5.25rem; overflow: auto; white-space: normal; }
 """
     try:
         from public_chrome import PUBLIC_BRAND_TITLE
