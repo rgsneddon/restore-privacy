@@ -100,56 +100,28 @@ class TestSettingsExplainerPage(unittest.TestCase):
         self.assertIn("Browse Settings guide", b)
 
 
-class TestHomepageBannerPlacement(unittest.TestCase):
-    def test_render_html_brand_then_banner_then_downloads(self) -> None:
+class TestHomepageSettingsGuideNav(unittest.TestCase):
+    def test_homepage_settings_guide_in_nav_not_banner(self) -> None:
+        """Settings Guide is main-nav only — dedicated homepage banner removed."""
         from app import render_html
-        from settings_explainer import (
-            HOMEPAGE_SETTINGS_BANNER_ID,
-            SETTINGS_EXPLAINER_PATH,
-        )
+        from settings_explainer import SETTINGS_EXPLAINER_PATH
 
         html = render_html({"title": "RESTORE PRIVACY"}).decode("utf-8")
-        # Brand panel
         self.assertIn('id="brand-panel"', html)
-        # Banner between brand and downloads
-        self.assertIn(HOMEPAGE_SETTINGS_BANNER_ID, html)
-        self.assertIn(SETTINGS_EXPLAINER_PATH, html)
-        self.assertIn("settings-explainer-banner-link", html)
-        # Downloads section marker from downloads.py
-        i_brand = html.index('id="brand-panel"')
-        i_banner = html.index(HOMEPAGE_SETTINGS_BANNER_ID)
-        # download section usually has download or platform buttons
-        m = re.search(
-            r'id="(downloads|download-section|catalog|paid-downloads)[^"]*"',
-            html,
-            re.I,
-        )
-        if m:
-            i_dl = m.start()
-        else:
-            # fallback: first occurrence of pay/download section language
-            for needle in (
-                "Download client",
-                "ONLY £2.45",
-                "platform-card",
-                "download-section",
-                "paid-download",
-            ):
-                if needle in html:
-                    i_dl = html.index(needle)
-                    break
-            else:
-                self.fail("downloads section marker not found in homepage HTML")
-        self.assertLess(i_brand, i_banner, "banner must follow brand panel")
-        self.assertLess(i_banner, i_dl, "banner must precede downloads section")
-        # Banner CSS present
-        self.assertIn("settings-banner", html)
+        self.assertIn('id="settings-guide-link"', html)
+        self.assertIn(f'href="{SETTINGS_EXPLAINER_PATH}"', html)
+        self.assertIn("SETTINGS GUIDE", html)
+        # Dedicated homepage banner box must not appear
+        self.assertNotIn("settings-explainer-banner", html)
+        self.assertNotIn("settings-explainer-banner-link", html)
+        self.assertNotIn('class="panel-card settings-banner"', html)
 
     def test_route_paths_include_settings_explainer(self) -> None:
         src = (ROOT / "status_page" / "app.py").read_text(encoding="utf-8")
         self.assertIn("settings_explainer_paths", src)
         self.assertIn("render_settings_explainer_page_html", src)
-        self.assertIn("render_settings_explainer_banner_html", src)
+        # Banner helper may still exist for legacy callers; homepage must not inject it
+        self.assertNotIn("render_settings_explainer_banner_html()", src)
         from settings_explainer import settings_explainer_paths
 
         paths = settings_explainer_paths()

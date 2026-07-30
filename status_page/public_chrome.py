@@ -147,7 +147,7 @@ def public_site_css() -> str:
   --rb-navy-mid: #0f2340;
   --rb-card: #132a4a;
   /* Soft fill edge under neon dual-tone border (logo circuit + key palette) */
-  --rb-card-border: rgba(0, 229, 255, 0.28);
+  --rb-card-border: rgba(0, 229, 255, 0.18);
   /* Logo data-artifact neon: cyan/blue circuit + green key */
   --rb-neon-cyan: #00e5ff;
   --rb-neon-blue: #2694e8;
@@ -438,7 +438,7 @@ a.product-tab, .product-tab {{
   line-height: 1.3;
   padding: 0.78rem 0.45rem;
   border-radius: var(--rb-radius);
-  border: 1.5px solid transparent;
+  border: 1px solid transparent;
   box-sizing: border-box;
   background:
     linear-gradient(
@@ -450,7 +450,8 @@ a.product-tab, .product-tab {{
   background-origin: border-box;
   background-clip: padding-box, border-box;
   box-shadow:
-    0 0 0 1px color-mix(in srgb, var(--rb-neon-cyan) 12%, transparent),
+    0 0 0 1px color-mix(in srgb, var(--rb-neon-cyan) 8%, transparent),
+    0 0 12px var(--rb-neon-glow-cyan),
     var(--rb-panel-shadow-soft);
   transition: transform 0.15s ease, box-shadow 0.15s ease, filter 0.15s ease;
 }}
@@ -458,15 +459,15 @@ a.product-tab:hover, .product-tab:hover {{
   transform: translateY(-1px);
   color: var(--rb-cream);
   box-shadow:
-    0 0 0 1px color-mix(in srgb, var(--rb-neon-cyan) 28%, transparent),
-    0 0 18px var(--rb-neon-glow-cyan),
+    0 0 0 1px color-mix(in srgb, var(--rb-neon-cyan) 20%, transparent),
+    0 0 16px var(--rb-neon-glow-cyan),
     var(--rb-panel-shadow-soft);
 }}
 a.product-tab.is-active, .product-tab.is-active {{
   box-shadow:
-    0 0 0 2px color-mix(in srgb, var(--rb-neon-green) 48%, transparent),
-    0 0 16px var(--rb-neon-glow-cyan),
-    0 0 22px var(--rb-neon-glow-green),
+    0 0 0 1px color-mix(in srgb, var(--rb-neon-green) 40%, transparent),
+    0 0 14px var(--rb-neon-glow-cyan),
+    0 0 18px var(--rb-neon-glow-green),
     var(--rb-panel-shadow-soft);
   outline: none;
 }}
@@ -498,10 +499,10 @@ a.product-tab.is-active, .product-tab.is-active {{
   color: var(--rb-muted);
   font-weight: 500;
 }}
-/* Logo data-artifact borders: neon cyan/blue → green gradient + refined glow */
+/* Logo data-artifact borders: thin neon edge + retained dual glow (softer prominence) */
 .panel-card {{
   position: relative;
-  border: 1.5px solid transparent;
+  border: 1px solid transparent;
   border-radius: var(--rb-radius);
   padding: clamp(1.05rem, 2.6vw, 1.55rem);
   background:
@@ -514,9 +515,9 @@ a.product-tab.is-active, .product-tab.is-active {{
   background-origin: border-box;
   background-clip: padding-box, border-box;
   box-shadow:
-    0 0 0 1px color-mix(in srgb, var(--rb-neon-cyan) 14%, transparent),
-    0 0 18px var(--rb-neon-glow-cyan),
-    0 0 28px var(--rb-neon-glow-green),
+    0 0 0 1px color-mix(in srgb, var(--rb-neon-cyan) 10%, transparent),
+    0 0 14px var(--rb-neon-glow-cyan),
+    0 0 22px var(--rb-neon-glow-green),
     var(--rb-panel-shadow);
   overflow: hidden;
 }}
@@ -526,22 +527,22 @@ a.product-tab.is-active, .product-tab.is-active {{
   left: 0;
   right: 0;
   top: 0;
-  height: 2px;
+  height: 1px;
   background: var(--rb-neon-border);
-  opacity: 0.85;
+  opacity: 0.55;
   pointer-events: none;
 }}
 .panel-card::after {{
   content: "";
   position: absolute;
-  width: 7px;
-  height: 7px;
+  width: 5px;
+  height: 5px;
   border-radius: 50%;
   top: 10px;
   right: 12px;
   background: var(--rb-neon-green);
-  box-shadow: 0 0 10px var(--rb-neon-glow-green);
-  opacity: 0.7;
+  box-shadow: 0 0 8px var(--rb-neon-glow-green);
+  opacity: 0.5;
   pointer-events: none;
 }}
 .panel-title {{
@@ -1087,11 +1088,10 @@ def public_product_tabs_html(*, active: str = PRODUCT_VPN_KEY) -> str:
 
 
 def public_nav_links_html(*, active: str | None = None) -> str:
-    """Button-style nav: Home, Licence, Privacy, Audit, Support, README.
+    """Button-style nav: Home, Licence, Privacy, Audit, Support, Settings, README.
 
-    *active* is one of: home, licence, privacy, audit, support, readme (or None).
-    Settings guide is **not** in the top brand nav (homepage banner may still
-    link to the explainer page).
+    *active* is one of: home, licence, privacy, audit, support, settings,
+    readme (or None). Settings Guide is a main-menu item (no homepage banner).
     """
     items = (
         ("HOME", HOME_PATH, HOME_LINK_ID, "home"),
@@ -1099,6 +1099,7 @@ def public_nav_links_html(*, active: str | None = None) -> str:
         ("PRIVACY POLICY", PRIVACY_PATH, PRIVACY_LINK_ID, "privacy"),
         ("SECURITY AUDIT", AUDIT_PATH, AUDIT_LINK_ID, "audit"),
         ("SUPPORT", SUPPORT_PATH, SUPPORT_LINK_ID, "support"),
+        ("SETTINGS GUIDE", SETTINGS_GUIDE_PATH, SETTINGS_GUIDE_LINK_ID, "settings"),
         ("README", README_PATH, README_LINK_ID, "readme"),
     )
     parts: list[str] = []

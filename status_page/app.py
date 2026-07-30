@@ -68,8 +68,6 @@ def upgrade_download_form_html(platform: str) -> str:
         "</body></html>"
     )
 from settings_explainer import (
-    homepage_settings_banner_css,
-    render_settings_explainer_banner_html,
     render_settings_explainer_page_html,
     settings_explainer_paths,
 )
@@ -469,9 +467,9 @@ def render_html(
     node_wipe_html = render_node_wipe_countdown_html()
     bmc_tip_html = render_bmc_tip_html()
     # public_head_open already injects public_site_css — only page-specific extras here
+    # Settings Guide is main-nav only (no dedicated homepage banner box).
     page_css = (
         dl_css
-        + homepage_settings_banner_css()
         + """
     .audit-countdown { text-align: center; letter-spacing: 0.02em; width: 100%; }
     .audit-countdown-row {
@@ -544,7 +542,6 @@ def render_html(
     body = f"""{public_head_open(title=str(title), extra_css=page_css)}
   <div class="page-shell" id="page-shell" data-page="home" data-chrome="pro">
 {header}
-{render_settings_explainer_banner_html()}
 {downloads_html}
 {node_wipe_html}
     <section class="panel-card" id="audit-panel" aria-label="Security audit countdown" data-chrome="pro">

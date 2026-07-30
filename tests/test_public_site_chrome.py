@@ -21,9 +21,10 @@ class TestPublicChromeModule(unittest.TestCase):
         self.assertIn('id="privacy-link"', html)
         self.assertIn('id="audit-link"', html)
         self.assertIn('id="readme-link"', html)
-        # Top brand nav no longer includes Settings Guide
-        self.assertNotIn('id="settings-guide-link"', html)
-        self.assertNotIn("SETTINGS GUIDE", html)
+        # Settings Guide is a main-menu nav item
+        self.assertIn('id="settings-guide-link"', html)
+        self.assertIn("SETTINGS GUIDE", html)
+        self.assertIn('href="/settings-explainer"', html)
         self.assertIn('id="doc-links"', html)
         self.assertIn("nav-btn", html)
         i_home = html.index('id="home-link"')
@@ -38,12 +39,14 @@ class TestPublicChromeModule(unittest.TestCase):
 
         from public_chrome import public_nav_links_html
 
-        keys = ("home", "licence", "privacy", "audit", "readme")
+        keys = ("home", "licence", "privacy", "audit", "support", "settings", "readme")
         expected = {
             "home": "home-link",
             "licence": "licence-link",
             "privacy": "privacy-link",
             "audit": "audit-link",
+            "support": "support-link",
+            "settings": "settings-guide-link",
             "readme": "readme-link",
         }
         for key in keys:
@@ -59,13 +62,13 @@ class TestPublicChromeModule(unittest.TestCase):
                 msg=f"active={key!r} should mark exactly one control: {active_anchors}",
             )
             self.assertEqual(active_anchors[0][1], expected[key])
-            self.assertNotIn("settings-guide-link", html)
+            self.assertIn("settings-guide-link", html)
         bare = public_nav_links_html(active=None)
         self.assertEqual(
             len(re.findall(r'<a class="[^"]*is-active', bare)),
             0,
         )
-        self.assertNotIn("settings-guide-link", bare)
+        self.assertIn("settings-guide-link", bare)
 
     def test_brand_header_has_theme_and_nav(self) -> None:
         from public_chrome import (
@@ -142,6 +145,11 @@ class TestPublicChromeModule(unittest.TestCase):
         # Dual-tone border technique: padding-box fill + border-box gradient
         self.assertIn("padding-box", css)
         self.assertIn("border-box", css)
+        # Neon panel edges thinner than legacy 1.5px; glow retained
+        self.assertIn("border: 1px solid transparent", css)
+        self.assertNotIn("border: 1.5px solid transparent", css)
+        self.assertIn("var(--rb-neon-glow-cyan)", css)
+        self.assertIn("var(--rb-neon-glow-green)", css)
         # Brand logo: larger clamp, no border/frame, transparent plate
         self.assertIn(".brand-mark", css)
         self.assertIn("flex-direction: row", css)
@@ -252,8 +260,12 @@ class TestHomepageChrome(unittest.TestCase):
         self.assertIn('id="theme-mode-control"', html)
         self.assertIn("public-theme-script", html)
         self.assertIn("nav-btn", html)
-        self.assertIn("settings-banner", html)
-        self.assertIn("settings-explainer-banner-link", html)
+        # Settings Guide is main nav only — no dedicated homepage banner box
+        self.assertIn('id="settings-guide-link"', html)
+        self.assertIn('href="/settings-explainer"', html)
+        self.assertNotIn('id="settings-explainer-banner"', html)
+        self.assertNotIn("settings-explainer-banner-link", html)
+        self.assertNotIn('class="panel-card settings-banner"', html)
         # Top brand box has no lightweight-vpn (or any) tagline line
         brand_start = html.index('id="brand-panel"')
         brand_end = html.index("</header>", brand_start)
@@ -284,7 +296,7 @@ class TestDocsShareChrome(unittest.TestCase):
             self.assertIn("page-shell", html, path)
             self.assertIn("panel-card", html, path)
             self.assertIn("nav-btn", html, path)
-            self.assertNotIn("settings-guide-link", html, path)
+            self.assertIn("settings-guide-link", html, path)
             brand_start = html.index('id="brand-panel"')
             brand_end = html.index("</header>", brand_start)
             brand_box = html[brand_start:brand_end]
@@ -362,7 +374,9 @@ class TestDocsShareChrome(unittest.TestCase):
                 self.assertIsNotNone(m, path)
                 assert m is not None
                 self.assertNotIn("is-active", m.group(1), msg=path)
-            self.assertNotIn("settings-guide-link", html)
+            # Settings Guide remains in nav on every public doc
+            self.assertIn('id="settings-guide-link"', html)
+            self.assertIn('href="/settings-explainer"', html)
 
 
 if __name__ == "__main__":
