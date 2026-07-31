@@ -633,8 +633,8 @@ def render_html(
     body = f"""{public_head_open(title=str(title), extra_css=page_css)}
   <div class="page-shell" id="page-shell" data-page="home" data-product="suite" data-suite-version="1.0.0" data-chrome="pro">
 {header}
-{shop_row_html}
 {suite_intro_html}
+{shop_row_html}
 {node_wipe_html}
     <section class="panel-card" id="audit-panel" aria-label="Security audit countdown" data-chrome="pro">
 {countdown_html}

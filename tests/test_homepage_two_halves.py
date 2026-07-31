@@ -20,6 +20,23 @@ def _main_html(page: str) -> str:
 
 
 class TestHomepageTwoHalves(unittest.TestCase):
+    def test_intro_above_shop_row(self) -> None:
+        from app import render_html
+
+        page = render_html({"title": "RESTORE PRIVACY"}).decode("utf-8")
+        main = _main_html(page)
+        self.assertIn("Privacy you can actually use", main)
+        self.assertIn("suite-home-intro", main)
+        i_header = main.index('id="brand-panel"')
+        i_intro = main.index("suite-home-intro")
+        i_row = main.index('id="home-shop-row"')
+        i_suite = main.index('id="suite-storefront"')
+        i_dl = main.index('id="downloads"')
+        self.assertLess(i_header, i_intro)
+        self.assertLess(i_intro, i_row)
+        self.assertLess(i_row, i_suite)
+        self.assertLess(i_suite, i_dl)
+
     def test_shop_row_side_by_side_css_and_structure(self) -> None:
         from app import render_html
 
@@ -62,8 +79,9 @@ class TestHomepageTwoHalves(unittest.TestCase):
         self.assertLess(i_row, i_audit)
         i_intro = main.find("suite-home-intro")
         if i_intro > 0:
-            # Dual shop is first content after header (intro after shop)
-            self.assertLess(i_row, i_intro)
+            # Intro (“Privacy you can actually use”) sits above dual shop row
+            self.assertLess(i_header, i_intro)
+            self.assertLess(i_intro, i_row)
         i_nw = main.find("node-wipe")
         if i_nw > 0:
             self.assertLess(i_row, i_nw)
