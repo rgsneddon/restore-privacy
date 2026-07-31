@@ -618,40 +618,154 @@ def close_support_ticket(
     }
 
 
+def support_smtp_env_keys() -> list[str]:
+    """Same env keys as fulfilment — support reuses Render SMTP settings."""
+    try:
+        from payments import fulfilment_smtp_env_keys
+
+        return list(fulfilment_smtp_env_keys())
+    except Exception:  # noqa: BLE001
+        return [
+            "RPT_FULFILMENT_SMTP_HOST",
+            "RPT_FULFILMENT_SMTP_PORT",
+            "RPT_FULFILMENT_SMTP_USER",
+            "RPT_FULFILMENT_SMTP_PASSWORD",
+            "RPT_FULFILMENT_FROM_EMAIL",
+            "RPT_FULFILMENT_SMTP_TLS",
+        ]
+
+
+def support_smtp_config() -> dict[str, Any]:
+    """Read SMTP for support tickets — identical source as fulfilment.
+
+    Render ``RPT_FULFILMENT_SMTP_*`` (+ admin processor_env) drives both
+    keygen fulfilment mail and support ticket notify/close mail.
+    """
+    try:
+        from payments import fulfilment_smtp_config
+
+        cfg = dict(fulfilment_smtp_config())
+        cfg["purpose"] = "support_tickets"
+        cfg["env_keys"] = support_smtp_env_keys()
+        return cfg
+    except Exception as exc:  # noqa: BLE001
+        return {
+            "host": "",
+            "port": 587,
+            "user": "",
+            "password": "",
+            "from_addr": DEFAULT_FROM_FALLBACK,
+            "use_tls": True,
+            "configured": False,
+            "purpose": "support_tickets",
+            "env_keys": support_smtp_env_keys(),
+            "error": str(exc)[:200],
+        }
+
+
+def assess_support_smtp_readiness(
+    cfg: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    """Non-secret readiness for support outbound mail (reuses fulfilment assess)."""
+    try:
+        from payments import assess_fulfilment_smtp_readiness, fulfilment_smtp_config
+
+        c = cfg if isinstance(cfg, dict) else fulfilment_smtp_config()
+        out = dict(assess_fulfilment_smtp_readiness(c))
+        out["purpose"] = "support_tickets"
+        out["uses_fulfilment_smtp"] = True
+        out["env_keys"] = support_smtp_env_keys()
+        # Clarify detail for support operators
+        if out.get("email_flow_enabled"):
+            out["support_detail"] = (
+                "Support ticket notify/close will attempt SMTP via the same "
+                "RPT_FULFILMENT_SMTP_* settings as keygen fulfilment."
+            )
+        else:
+            out["support_detail"] = (
+                "Support mail cannot send until fulfilment SMTP is fully set "
+                f"({out.get('status') or 'not ready'})."
+            )
+        return out
+    except Exception as exc:  # noqa: BLE001
+        return {
+            "status": "error",
+            "email_flow_enabled": False,
+            "purpose": "support_tickets",
+            "uses_fulfilment_smtp": True,
+            "env_keys": support_smtp_env_keys(),
+            "detail": str(exc)[:200],
+            "support_detail": str(exc)[:200],
+        }
+
+
 def send_support_ticket_email(
     mail: dict[str, str],
     *,
     transport: Callable[[dict[str, Any]], dict[str, Any]] | None = None,
+    smtp_config: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
-    """Send support notification using fulfilment SMTP config.
+    """Send support notification using fulfilment SMTP config (Render settings).
 
     *transport* injects a fake sender for tests: (payload) -> {ok, error?}.
     Used for both new-ticket staff notify and requester close notify.
+
+    *smtp_config* injects a config dict (tests); default is
+    :func:`support_smtp_config` / :func:`payments.fulfilment_smtp_config`.
     """
+    to_addr = (mail.get("to") or SUPPORT_INBOX).strip()
     payload = {
-        "to": mail.get("to") or SUPPORT_INBOX,
+        "to": to_addr,
         "subject": mail.get("subject") or "",
         "body_text": mail.get("body") or mail.get("body_text") or "",
-        "reply_to": mail.get("reply_to") or "",
+        "reply_to": (mail.get("reply_to") or "").strip(),
         "ticket_id": mail.get("ticket_id") or "",
+        "from_purpose": "support_tickets",
     }
+    if not to_addr or "@" not in to_addr:
+        return {"ok": False, "error": "missing_to_email", "sent": False}
     if transport is not None:
-        return transport(payload)
-    try:
-        from payments import fulfilment_smtp_config
-    except Exception as exc:  # noqa: BLE001
-        return {"ok": False, "error": f"smtp_config:{exc}"}
-    cfg = fulfilment_smtp_config()
+        try:
+            result = transport(payload)
+            if isinstance(result, dict):
+                # Normalize transport shape
+                if "sent" not in result and result.get("ok"):
+                    result = {**result, "sent": True}
+                return result
+            return {"ok": True, "error": None, "sent": True}
+        except Exception as exc:  # noqa: BLE001
+            return {
+                "ok": False,
+                "error": f"{type(exc).__name__}:{str(exc)[:200]}",
+                "sent": False,
+            }
+
+    cfg = dict(smtp_config) if isinstance(smtp_config, dict) else support_smtp_config()
     host = str(cfg.get("host") or "").strip()
     if not host:
-        return {"ok": False, "error": "smtp_not_configured"}
+        return {
+            "ok": False,
+            "error": "smtp_not_configured",
+            "sent": False,
+            "skipped": True,
+            "env_keys": support_smtp_env_keys(),
+        }
     try:
         import smtplib
         from email.message import EmailMessage
 
+        # Match fulfilment From header formatting when available
+        from_raw = str(cfg.get("from_addr") or DEFAULT_FROM_FALLBACK).strip()
+        try:
+            from payments import _fulfilment_from_header
+
+            from_header = _fulfilment_from_header(from_raw)
+        except Exception:  # noqa: BLE001
+            from_header = from_raw or DEFAULT_FROM_FALLBACK
+
         msg = EmailMessage()
         msg["Subject"] = payload["subject"]
-        msg["From"] = str(cfg.get("from_addr") or DEFAULT_FROM_FALLBACK)
+        msg["From"] = from_header
         msg["To"] = payload["to"]
         if payload["reply_to"]:
             msg["Reply-To"] = payload["reply_to"]
@@ -659,6 +773,7 @@ def send_support_ticket_email(
         port = int(cfg.get("port") or 587)
         user = str(cfg.get("user") or "")
         password = str(cfg.get("password") or "")
+        # Same path as probe_fulfilment_smtp_login + send_fulfilment_email
         with smtplib.SMTP(host, port, timeout=30) as smtp:
             smtp.ehlo()
             if cfg.get("use_tls"):
@@ -667,9 +782,20 @@ def send_support_ticket_email(
             if user:
                 smtp.login(user, password)
             smtp.send_message(msg)
-        return {"ok": True, "error": None}
+        return {
+            "ok": True,
+            "error": None,
+            "sent": True,
+            "skipped": False,
+            "uses_fulfilment_smtp": True,
+        }
     except Exception as exc:  # noqa: BLE001
-        return {"ok": False, "error": f"{type(exc).__name__}:{str(exc)[:200]}"}
+        return {
+            "ok": False,
+            "error": f"{type(exc).__name__}:{str(exc)[:200]}",
+            "sent": False,
+            "uses_fulfilment_smtp": True,
+        }
 
 
 def create_support_ticket(
@@ -711,23 +837,25 @@ def create_support_ticket(
         keygen="",
         created_at=t,
     )
-    mail_result: dict[str, Any] = {"ok": True, "error": None, "skipped": True}
+    mail_result: dict[str, Any] = {"ok": True, "error": None, "skipped": True, "sent": False}
     if send_mail:
         mail_result = send_support_ticket_email(mail, transport=transport)
         st = "sent" if mail_result.get("ok") else "failed"
+        detail = str(mail_result.get("error") or ("ok" if mail_result.get("ok") else "send_failed"))[:500]
         update_ticket_mail_status(
             tid,
             mail_status=st,
-            mail_detail=str(mail_result.get("error") or "ok")[:500],
+            mail_detail=detail,
             path=path,
         )
         row["mail_status"] = st
-        row["mail_detail"] = str(mail_result.get("error") or "")[:500]
+        row["mail_detail"] = detail
     return {
         "ok": True,
         "ticket_id": tid,
         "error": "",
         "mail": mail_result,
+        "mail_sent": bool(mail_result.get("ok") and send_mail),
         "email_payload": mail,
         "record": row,
     }
@@ -737,6 +865,7 @@ def render_support_page_html(
     *,
     error: str = "",
     success_ticket_id: str = "",
+    mail_sent: bool | None = None,
     prefill: dict[str, str] | None = None,
 ) -> str:
     """Full HTML page for /support (public chrome + form)."""
@@ -763,12 +892,23 @@ def render_support_page_html(
     ok_html = ""
     if success_ticket_id:
         tid = html.escape(success_ticket_id)
+        # Honest mail line: ticket is always stored; SMTP may still fail
+        if mail_sent is False:
+            mail_line = (
+                f"<p>Your ticket is saved. We could not send email right now "
+                f"(site SMTP). Quote <code>{tid}</code> if you write again to "
+                f"{html.escape(SUPPORT_INBOX)}.</p>"
+            )
+        else:
+            mail_line = (
+                f"<p>We notified the team at {html.escape(SUPPORT_INBOX)} "
+                f"via site SMTP. Keep this reference if you write again.</p>"
+            )
         ok_html = (
-            f'<div class="support-ok" role="status">'
+            f'<div class="support-ok" role="status" id="support-success">'
             f"<p><strong>Ticket received.</strong> Your reference is "
             f"<code id=\"support-ticket-id\">{tid}</code>.</p>"
-            f"<p>We emailed the team at {html.escape(SUPPORT_INBOX)}. "
-            f"Keep this reference if you write again.</p></div>"
+            f"{mail_line}</div>"
         )
     fields = {
         "email": html.escape(pre.get("email") or ""),
@@ -790,9 +930,11 @@ def render_support_page_html(
 <main class="support-wrap panel-card" id="support-main" data-chrome="pro">
   <h2>Customer support</h2>
   <p class="support-lead">
-    Tell us what went wrong. We open a ticket and email
-    <strong>{html.escape(SUPPORT_INBOX)}</strong>. You get a short reference
-    (e.g. <code>RPS-001</code>) to quote later.
+    Tell us what went wrong. We open a ticket and notify
+    <strong>{html.escape(SUPPORT_INBOX)}</strong> using the same site SMTP
+    as fulfilment (Render <code>RPT_FULFILMENT_SMTP_*</code>). You get a short
+    reference (e.g. <code>RPS-001</code>) to quote later — the ticket is kept
+    even if mail briefly fails.
   </p>
   {ok_html}
   {err_html}

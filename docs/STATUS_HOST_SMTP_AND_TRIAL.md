@@ -10,6 +10,19 @@
 
 ## SMTP env keys (shipped reader)
 
+**One config drives two product mail paths:**
+
+| Path | Module | Behaviour |
+|------|--------|-----------|
+| Keygen / fulfilment after Stripe | `payments.send_fulfilment_email` | Customer download + KEYGEN email |
+| Support tickets (open + close) | `support_tickets.send_support_ticket_email` | Staff notify (`rus@`) + close notify to customer |
+
+Both call `fulfilment_smtp_config()` / `RPT_FULFILMENT_SMTP_*` (and admin
+`processor_env.json` when set). There is **no** separate support SMTP secret.
+
+Readiness: `GET /health/fulfilment` and `?smtp_probe=1` report `smtp_status` /
+`smtp_probe` **and** `support_ticket_email_enabled` / `support_ticket_smtp`.
+
 From `status_page/payments.py` → `fulfilment_smtp_env_keys()` /
 `fulfilment_smtp_config()`:
 

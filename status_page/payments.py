@@ -3802,6 +3802,7 @@ def activate_connect_entitlement(
                     keep_keygen,
                     email,
                     iv or BILLING_INTERVAL_MONTH,
+                    keep_pl,
                 ),
             )
         if pi:
@@ -3926,7 +3927,7 @@ def get_connect_entitlement(
             """
             SELECT session_id, status, platform, reason, created_at, updated_at,
                    payment_intent_id, subscription_id, valid_until, keygen,
-                   customer_email, billing_interval
+                   customer_email, billing_interval, product_line
             FROM connect_entitlements WHERE session_id = ?
             """,
             (sid,),
@@ -3968,6 +3969,10 @@ def get_connect_entitlement(
             bill_iv = str(row["billing_interval"] or "").strip() or BILLING_INTERVAL_MONTH
         except (KeyError, IndexError, TypeError):
             bill_iv = BILLING_INTERVAL_MONTH
+        try:
+            pl = normalize_product_line(str(row["product_line"] or "") or PRODUCT_LINE_VPN)
+        except (KeyError, IndexError, TypeError):
+            pl = PRODUCT_LINE_VPN
         connect_ok = (
             _entitlement_connect_allowed(status, vu_f, now=t)
             if status == ENTITLEMENT_ACTIVE
@@ -3986,6 +3991,7 @@ def get_connect_entitlement(
             "keygen": kg,
             "customer_email": email,
             "billing_interval": bill_iv,
+            "product_line": pl,
             "connect_allowed": connect_ok,
         }
         out["licence_status"] = licence_status_from_entitlement(out, now=t)
@@ -4332,10 +4338,15 @@ def find_session_id_by_payment_intent(payment_intent_id: str) -> str:
 
 
 def client_entitlement_file_payload(session_id: str) -> dict[str, Any] | None:
-    """JSON body for payment_entitlement.json download (client product data)."""
+    """JSON body for payment_entitlement.json download (client product data).
+
+    Suite and VPN share the same status / keygen / period fields so residual
+    clients and Flutter licence gate inherit one entitlement model.
+    """
     ent = get_connect_entitlement(session_id)
     if not ent:
         return None
+    pl = normalize_product_line(str(ent.get("product_line") or PRODUCT_LINE_VPN))
     return {
         "session_id": ent["session_id"],
         "status": ent["status"],
@@ -4345,6 +4356,8 @@ def client_entitlement_file_payload(session_id: str) -> dict[str, Any] | None:
         "valid_until": ent.get("valid_until"),
         "connect_allowed": bool(ent.get("connect_allowed")),
         "keygen": ent.get("keygen") or "",
+        "product_line": pl,
+        "product": pl,
     }
 
 
@@ -6136,9 +6149,15 @@ def check_fulfilment_ready(
         "smtp_status": smtp_ready.get("status"),
         "smtp_detail": smtp_ready.get("detail"),
         "smtp_missing": list(smtp_ready.get("missing_or_empty") or []),
+        # Support tickets use the same RPT_FULFILMENT_SMTP_* keys
+        "support_ticket_email_enabled": bool(smtp_ready.get("email_flow_enabled")),
+        "support_ticket_smtp": "same_as_fulfilment",
+        "support_ticket_smtp_keys": list(FULFILMENT_SMTP_ENV_KEYS),
     }
     if smtp_probe:
         meta["smtp_probe"] = probe_fulfilment_smtp_login()
+        # Same probe covers support ticket notify/close (shared SMTP config)
+        meta["support_smtp_probe"] = meta["smtp_probe"]
     elif smtp_ready.get("email_flow_enabled"):
         # Config looks complete; only ?smtp_probe=1 proves provider login
         meta["smtp_login_unverified"] = True
@@ -6328,7 +6347,7 @@ def list_licences_for_admin(*, limit: int | None = None) -> list[dict[str, Any]]
         sql = """
             SELECT e.session_id, e.status, e.platform, e.keygen, e.customer_email,
                    e.billing_interval, e.valid_until, e.updated_at, e.created_at,
-                   e.keygen_activated_at,
+                   e.keygen_activated_at, e.product_line,
                    (SELECT g.purchase_id FROM grants g
                     WHERE g.session_id = e.session_id
                     ORDER BY g.created_at DESC LIMIT 1) AS purchase_id
@@ -6359,6 +6378,12 @@ def list_licences_for_admin(*, limit: int | None = None) -> list[dict[str, Any]]
             status = str(r["status"] or "")
             connect_ok = _entitlement_connect_allowed(status, vu_f, now=t)
             kg = normalize_keygen(str(r["keygen"] or ""))
+            try:
+                pl = normalize_product_line(
+                    str(r["product_line"] or "") or PRODUCT_LINE_VPN
+                )
+            except (KeyError, IndexError, TypeError):
+                pl = PRODUCT_LINE_VPN
             pid = ""
             if r["purchase_id"]:
                 raw_pid = str(r["purchase_id"])
@@ -6374,6 +6399,7 @@ def list_licences_for_admin(*, limit: int | None = None) -> list[dict[str, Any]]
                 "connect_allowed": connect_ok,
                 "valid_until": vu_f,
                 "keygen": kg,
+                "product_line": pl,
             }
             raw_ls = licence_status_from_entitlement(ent, now=t)
             display = admin_licence_display_status(
@@ -6388,6 +6414,7 @@ def list_licences_for_admin(*, limit: int | None = None) -> list[dict[str, Any]]
                     "licence_status": display,
                     "licence_status_raw": raw_ls,
                     "platform": str(r["platform"] or ""),
+                    "product_line": pl,
                     "billing_interval": str(r["billing_interval"] or "")
                     or BILLING_INTERVAL_MONTH,
                     "session_id": sid,
@@ -7395,6 +7422,7 @@ def process_checkout_completed_event(
     # Successful paid/trial session → Connect entitlement active + unique keygen
     keygen = ""
     cust_email = customer_email_from_checkout_object(obj)
+    product_line = product_line_from_checkout_object(obj)
     if session_id:
         keygen = activate_connect_entitlement(
             session_id,
@@ -7404,6 +7432,7 @@ def process_checkout_completed_event(
             valid_until=valid_until,
             customer_email=cust_email,
             billing_interval=billing_interval,
+            product_line=product_line,
             now=t_now,
         ) or ""
     # Apply purchase-flow auto-renew choice on the Subscription (cancel_at_period_end)

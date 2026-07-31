@@ -2067,7 +2067,8 @@ class Handler(BaseHTTPRequestHandler):
             )
             if result.get("ok") and result.get("ticket_id"):
                 page = render_support_page_html(
-                    success_ticket_id=str(result["ticket_id"])
+                    success_ticket_id=str(result["ticket_id"]),
+                    mail_sent=bool(result.get("mail_sent")),
                 )
             else:
                 page = render_support_page_html(

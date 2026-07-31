@@ -12,6 +12,135 @@ sys.path.insert(0, str(ROOT))
 sys.path.insert(0, str(ROOT / "status_page"))
 
 
+class TestSupportSmtpPath(unittest.TestCase):
+    """Support mail reuses fulfilment SMTP config (Render RPT_FULFILMENT_SMTP_*)."""
+
+    def test_send_path_payload_and_config_keys(self) -> None:
+        from payments import FULFILMENT_SMTP_ENV_KEYS, fulfilment_smtp_env_keys
+        from support_tickets import (
+            SUPPORT_INBOX,
+            assess_support_smtp_readiness,
+            build_support_email,
+            build_ticket_closed_email,
+            create_support_ticket,
+            send_support_ticket_email,
+            support_smtp_config,
+            support_smtp_env_keys,
+        )
+
+        # Same env keys as fulfilment (no second secret store)
+        self.assertEqual(support_smtp_env_keys(), fulfilment_smtp_env_keys())
+        self.assertEqual(set(support_smtp_env_keys()), set(FULFILMENT_SMTP_ENV_KEYS))
+
+        cfg = support_smtp_config()
+        self.assertIn("host", cfg)
+        self.assertIn("env_keys", cfg)
+        self.assertEqual(cfg.get("purpose"), "support_tickets")
+        for k in FULFILMENT_SMTP_ENV_KEYS:
+            self.assertIn(k, cfg["env_keys"])
+
+        ready = assess_support_smtp_readiness()
+        self.assertTrue(ready.get("uses_fulfilment_smtp"))
+        self.assertIn("status", ready)
+        self.assertIn("email_flow_enabled", ready)
+
+        open_mail = build_support_email(
+            ticket_id="RPS-001",
+            email="user@example.com",
+            subject="Cannot connect",
+            message="Tunnel stays Connecting after keygen unlock path.",
+            platform="macos",
+            app_version="1.0.0",
+        )
+        self.assertEqual(open_mail["to"], SUPPORT_INBOX)
+        self.assertEqual(open_mail["reply_to"], "user@example.com")
+        self.assertIn("RPS-001", open_mail["subject"])
+
+        captured: list[dict] = []
+
+        def transport(payload: dict) -> dict:
+            captured.append(dict(payload))
+            return {"ok": True, "error": None}
+
+        sent = send_support_ticket_email(open_mail, transport=transport)
+        self.assertTrue(sent["ok"])
+        self.assertEqual(captured[0]["to"], SUPPORT_INBOX)
+        self.assertEqual(captured[0]["reply_to"], "user@example.com")
+        self.assertIn("RPS-001", captured[0]["subject"])
+
+        close_mail = build_ticket_closed_email(
+            ticket_id="RPS-001",
+            email="user@example.com",
+            subject="Cannot connect",
+        )
+        self.assertEqual(close_mail["to"], "user@example.com")
+        self.assertEqual(close_mail["reply_to"], SUPPORT_INBOX)
+        closed_send = send_support_ticket_email(close_mail, transport=transport)
+        self.assertTrue(closed_send["ok"])
+        self.assertEqual(captured[1]["to"], "user@example.com")
+
+        # Real config reader path when host empty → smtp_not_configured
+        empty = send_support_ticket_email(
+            open_mail,
+            smtp_config={
+                "host": "",
+                "port": 587,
+                "user": "",
+                "password": "",
+                "from_addr": "noreply@restoreprivacy.online",
+                "use_tls": True,
+            },
+        )
+        self.assertFalse(empty["ok"])
+        self.assertEqual(empty.get("error"), "smtp_not_configured")
+
+    def test_ticket_persists_when_smtp_fails(self) -> None:
+        from support_tickets import create_support_ticket, get_support_ticket
+
+        def boom(_payload: dict) -> dict:
+            return {"ok": False, "error": "SMTPAuthenticationError:test"}
+
+        with tempfile.TemporaryDirectory() as td:
+            db = Path(td) / "support_tickets.sqlite"
+            result = create_support_ticket(
+                email="user@example.com",
+                subject="Cannot connect after unlock",
+                message="Tunnel stays Connecting after unlock on macOS.",
+                path=db,
+                transport=boom,
+                send_mail=True,
+            )
+            self.assertTrue(result["ok"], result)
+            tid = result["ticket_id"]
+            self.assertTrue(tid.startswith("RPS-"))
+            self.assertFalse(result.get("mail_sent"))
+            rec = get_support_ticket(tid, path=db)
+            assert rec is not None
+            self.assertEqual(rec["mail_status"], "failed")
+            self.assertIn("SMTPAuthenticationError", rec["mail_detail"])
+            # Ticket fields intact
+            self.assertEqual(rec["email"], "user@example.com")
+            self.assertIn("Connecting", rec["message"])
+
+    def test_ticket_mail_sent_status_when_transport_ok(self) -> None:
+        from support_tickets import create_support_ticket, get_support_ticket
+
+        with tempfile.TemporaryDirectory() as td:
+            db = Path(td) / "support_tickets.sqlite"
+            result = create_support_ticket(
+                email="ok@example.com",
+                subject="Works when mail works",
+                message="Just confirming support path sends when SMTP is ok.",
+                path=db,
+                transport=lambda p: {"ok": True, "error": None},
+            )
+            self.assertTrue(result["ok"])
+            self.assertTrue(result.get("mail_sent"))
+            rec = get_support_ticket(result["ticket_id"], path=db)
+            assert rec is not None
+            self.assertEqual(rec["mail_status"], "sent")
+
+
 class TestSupportTicketPure(unittest.TestCase):
     def test_validate_and_build_email_to_rus(self):
         from support_tickets import (
