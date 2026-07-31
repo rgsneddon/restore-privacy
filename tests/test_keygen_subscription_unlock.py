@@ -69,8 +69,9 @@ class TestHomepageTrialSentence(unittest.TestCase):
             or "Monthly or Annual" in snippet
             or "Monthly or Yearly" in snippet
         )
-        self.assertIn("subscription starts when you pay", snippet)
-        self.assertNotIn("7 day trial", snippet.lower())
+        self.assertIn("3-day free trial", snippet.lower())
+        self.assertIn("no money is taken until after the trial ends", snippet.lower())
+        self.assertNotIn("7 day trial", snippet.lower())  # legacy length banned
         self.assertNotIn("7-day trial", snippet.lower())
         self.assertTrue(
             "Stripe" in snippet or "Buy now" in snippet or "secure" in snippet.lower()

@@ -278,8 +278,9 @@ def render_install_howto_box_html() -> str:
       <ol class="howto-steps" id="install-howto-steps">
         <li><strong>Pay on the status page.</strong> Open
           <a href="/" style="color:var(--rb-link);font-weight:700;">restoreprivacy.online</a>,
-          choose your platform and plan (Monthly £3.00 or Yearly £30.00), and
-          complete Stripe Checkout.</li>
+          choose your platform and plan (Monthly £3.00 or Yearly £30.00 — both
+          include a 3-day free trial; no money is taken until after the trial ends),
+          and complete Stripe Checkout.</li>
         <li><strong>Download after payment.</strong> Use the 1-hour download link on the success page
           (retry if the connection drops; email also has download + keygen).
           These are not free permanent GitHub installs.</li>

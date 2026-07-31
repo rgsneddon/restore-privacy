@@ -51,8 +51,8 @@ Source of truth in code: `status_page/payments.py` → `STRIPE_WEBHOOK_EVENTS` a
    **revoked** (client gate + bound device removed; node HELLO refuses that device).
 
 Catalog Checkout is **subscription** mode. **Monthly** is £3.00/month; **yearly**
-is £30.00/year (fixed). Subscription starts when the customer pays (no free
-trial). Refunds/disputes still revoke Connect immediately
+is £30.00/year (fixed). Catalog subscriptions include a **3-day free trial**
+(no money taken until after the trial ends). Refunds/disputes still revoke Connect immediately
 (`licence_status` **EXPIRED** on clients).
 
 ## Node residual HELLO

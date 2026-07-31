@@ -56,7 +56,7 @@ class TestFulfilmentSmtpEnvKeys(unittest.TestCase):
 
 
 class TestPaymentLinkTrialHelpers(unittest.TestCase):
-    def test_desired_fields_300_monthly_no_trial(self):
+    def test_desired_fields_300_monthly_with_3day_trial(self):
         from payments import (
             DEFAULT_STRIPE_PAYMENT_LINK_ID,
             DEFAULT_STRIPE_PAYMENT_PAGE_URL_YEARLY,
@@ -70,35 +70,39 @@ class TestPaymentLinkTrialHelpers(unittest.TestCase):
         self.assertEqual(d["unit_amount_pence"], 300)
         self.assertEqual(d["currency"], "gbp")
         self.assertEqual(d["recurring_interval"], "month")
-        self.assertEqual(d["trial_period_days"], 0)
+        self.assertEqual(d["trial_period_days"], 3)
+        self.assertNotEqual(d["trial_period_days"], 0)
         self.assertNotEqual(d["trial_period_days"], 7)
         self.assertEqual(d["mode"], "subscription")
         self.assertEqual(d["payment_link_id"], DEFAULT_STRIPE_PAYMENT_LINK_ID)
         self.assertEqual(d["unit_amount_yearly_pence"], 3000)
         self.assertIn("/pay", d["payment_page_url"])
+        self.assertIn("3-day free trial", d["homepage_trial_sentence"].lower())
+        self.assertIn("no money is taken until after the trial ends", d["homepage_trial_sentence"].lower())
         self.assertNotIn("7 day trial", d["homepage_trial_sentence"].lower())
-        self.assertNotIn("7-day trial", d["homepage_trial_sentence"].lower())
+        self.assertNotIn("subscription starts when you pay", d["homepage_trial_sentence"].lower())
 
-        # No trial: absent or 0 both match
-        ok_absent = payment_link_matches_trial_subscription(
+        # Trial=3 on payment_link_trial_period_days matches
+        ok_three = payment_link_matches_trial_subscription(
             {
                 "id": "price_test",
                 "currency": "gbp",
                 "unit_amount": 300,
                 "type": "recurring",
                 "recurring": {"interval": "month"},
+                "payment_link_trial_period_days": 3,
             }
         )
-        self.assertTrue(ok_absent["ok"], ok_absent)
-        ok_zero = payment_link_matches_trial_subscription(
+        self.assertTrue(ok_three["ok"], ok_three)
+        # Missing trial mismatches when want=3
+        missing = payment_link_matches_trial_subscription(
             {
                 "currency": "gbp",
                 "unit_amount": 300,
                 "recurring": {"interval": "month"},
-                "payment_link_trial_period_days": 0,
             }
         )
-        self.assertTrue(ok_zero["ok"], ok_zero)
+        self.assertFalse(missing["ok"])
         # 7-day trial is explicitly rejected
         bad = payment_link_matches_trial_subscription(
             {
@@ -119,7 +123,8 @@ class TestPaymentLinkTrialHelpers(unittest.TestCase):
         self.assertIn("trial_period_days", src)
         self.assertIn("PRICE_PENCE", src)
         self.assertIn("unit_amount_pence", src)
-        self.assertIn("no trial", src.lower())
+        self.assertIn("3-day trial", src.lower())
+        self.assertIn("trial_period_days", src)
         self.assertIn("year", src.lower())
         smtp_script = ROOT / "scripts" / "set_render_fulfilment_smtp.ps1"
         self.assertTrue(smtp_script.is_file())
@@ -142,6 +147,8 @@ class TestDeployDocs(unittest.TestCase):
         self.assertIn("set_render_fulfilment_smtp.ps1", text)
         self.assertNotIn("£29.40", text)
         self.assertNotIn("unit_amount: 2940", text)
+        self.assertIn("3-day free trial", text.lower())
+        self.assertIn("trial_period_days", text)
 
 
 if __name__ == "__main__":

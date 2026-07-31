@@ -174,12 +174,13 @@ except Exception:  # noqa: BLE001
 # Large white bold callout under "Download client v…" on the public homepage.
 ONLY_PRICE_BANNER = (
     f"ONLY {PRICE_LABEL} per month — or annual {PRICE_YEARLY_LABEL} "
-    f"(save ~{_YEARLY_SAVE_PCT}% vs 12 × monthly)"
+    f"(save ~{_YEARLY_SAVE_PCT}% vs 12 × monthly) — includes a 3-day free trial"
 )
 # Short single-line note under the price box (no re-listing of £ amounts).
 YEARLY_PLAN_NOTE = (
     "Select your device and plan below, then Buy now. "
     f"Annual is {PRICE_YEARLY_LABEL} (save ~{_YEARLY_SAVE_PCT}% vs 12 × monthly). "
+    "Every plan includes a 3-day free trial — no money is taken until after the trial ends. "
     "Local currency display uses the GBP anchors above "
     "(we accept your local currency when Stripe allows; otherwise USD)."
 )
@@ -190,15 +191,15 @@ PLATFORM_SELECT_NOTE = (
 )
 # Homepage download price block (single shipped contract for public #downloads).
 PACKAGE_IDENTITY = "one device licence"
-# Legacy constant name kept for import stability (no trial product / no trial copy).
+# Catalog trial copy (kept name for import stability).
 TRIAL_SUBSCRIPTION_SENTENCE = (
     f"Select your device and plan — Monthly {PRICE_LABEL} or Annual {PRICE_YEARLY_LABEL} — "
-    "subscription starts when you pay"
+    "3-day free trial — no money is taken until after the trial ends"
 )
-# Preferred alias (same text; avoid “trial” in new call sites).
 CATALOG_SUBSCRIPTION_SENTENCE = TRIAL_SUBSCRIPTION_SENTENCE
 PAY_AND_KEYGEN_CLAUSE = (
-    "Buy now opens secure Stripe checkout, then download starts automatically "
+    "Buy now opens secure Stripe checkout (card on file; first charge after the 3-day trial), "
+    "then download starts automatically "
     "(licence key and download links are emailed to you separately)"
 )
 # Buy now label on the homepage form.
@@ -856,6 +857,8 @@ def render_homepage_buy_form_html(
                    aria-label="Monthly VPN plan"/>
             <span class="dl-plan-title">Monthly VPN plan</span>
             <div class="dl-plan-price">{_esc_html(month_label)} / month</div>
+            <div class="dl-plan-price" style="font-weight:600;font-size:0.82rem;opacity:0.9">
+              3-day free trial · no charge until trial ends</div>
           </label>
           <label class="dl-plan-option" id="dl-plan-year" data-interval="year">
             <input type="radio" name="interval" value="year"{year_checked}
@@ -863,6 +866,8 @@ def render_homepage_buy_form_html(
             <span class="dl-plan-title">Yearly VPN plan
               <span class="dl-plan-save">SAVE ~{_YEARLY_SAVE_PCT}%</span></span>
             <div class="dl-plan-price">{_esc_html(year_label)} / year</div>
+            <div class="dl-plan-price" style="font-weight:600;font-size:0.82rem;opacity:0.9">
+              3-day free trial · no charge until trial ends</div>
           </label>
         </div>
       </div>

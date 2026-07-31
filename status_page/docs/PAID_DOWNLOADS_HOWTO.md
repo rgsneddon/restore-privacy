@@ -3,7 +3,7 @@
 This status site sells **Restore Privacy** as a **Stripe subscription**. Catalog
 tiles open the site **Select your plan** page (`/pay`) for **Monthly VPN plan
 (£3.00/month GBP)** or **Yearly VPN plan (£30.00/year)**.
-Checkout is a Stripe **subscription** Checkout Session (subscription starts when you pay). Funds
+Checkout is a Stripe **subscription** Checkout Session (**3-day free trial**; no money taken until after the trial ends). Funds
 settle in **your Stripe account** when you use **live** API keys.
 
 [Buy Me a Coffee](https://buymeacoffee.com/rgsneddon) is linked as **tip / support only**.
@@ -28,13 +28,13 @@ See **[`docs/STRIPE_CUSTOM_DOMAINS_AND_BRANDING.md`](../../docs/STRIPE_CUSTOM_DO
   the platform account — use the Dashboard.
 - Programmatic guide: `payments.stripe_checkout_branding_guide()`.
 
-## Deploy: fulfilment SMTP + Stripe subscription (no trial)
+## Deploy: fulfilment SMTP + Stripe subscription (3-day free trial)
 
 Operator deploy for production email + Stripe product prices is documented in
 [`docs/STATUS_HOST_SMTP_AND_TRIAL.md`](../../docs/STATUS_HOST_SMTP_AND_TRIAL.md):
 
 - Render env: `RPT_FULFILMENT_SMTP_*` (blueprint `render.yaml`; script `scripts/set_render_fulfilment_smtp.ps1`)
-- Stripe products: **Monthly VPN plan** £3.00/month and **Yearly VPN plan** **£30.00/year** (3000 pence), **subscription starts when you pay** (script `scripts/configure_stripe_payment_link_trial.py` when `STRIPE_SECRET_KEY` is set)
+- Stripe products: **Monthly VPN plan** £3.00/month and **Yearly VPN plan** **£30.00/year** (3000 pence), **3-day free trial** (script `scripts/configure_stripe_payment_link_trial.py` when `STRIPE_SECRET_KEY` is set)
 - Price ids: `STRIPE_PRICE_ID_MONTHLY` / `STRIPE_PRICE_ID_YEARLY` (defaults in `payments.py`)
 - **Local currency display:** catalog converts £3.00 / £30.00 into the visitor’s currency (`status_page/local_currency.py`) and shows **we accept *CURRENCY***
 - **Checkout presentment:** plan page → `POST /pay/checkout` creates a **subscription** Checkout Session; USD presentment uses relative cents from GBP anchors when needed (`STRIPE_SECRET_KEY` required)
@@ -112,7 +112,7 @@ Flow:
 1. Catalog tile → site **`/pay?platform=…`** (Select your plan: **Monthly** or **Annual**).
 2. Form **`POST /pay/checkout`** creates a Stripe **subscription** Checkout Session for
    **Monthly VPN plan** (£3.00/month) or **Yearly VPN plan** (£30.00/year).
-3. Customer pays on Stripe Checkout (**subscription starts when you pay**). Email is collected by Checkout.
+3. Customer completes Stripe Checkout (**3-day free trial**; card on file, first charge after trial). Email is collected by Checkout.
 
 Dashboard products/prices:
 
@@ -123,7 +123,7 @@ Dashboard products/prices:
 
 Override with `STRIPE_PRICE_ID_MONTHLY` / `STRIPE_PRICE_ID_YEARLY` if you rotate prices.
 Use `scripts/configure_stripe_payment_link_trial.py` (when `STRIPE_SECRET_KEY` is set)
-to create/reuse prices and assert **trial_period_days = 0**.
+to create/reuse prices; catalog Checkout asserts **trial_period_days = 3**.
 
 Also confirm **Settings → Customer emails** / Checkout branding still send receipts if you want them.
 

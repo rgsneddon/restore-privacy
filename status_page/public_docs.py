@@ -1132,6 +1132,8 @@ ol{{padding-left:1.25rem;color:var(--rb-muted)}}
 <p class="muted">Paid subscription only: <strong>Monthly VPN plan</strong>
 ({_escape(PRICE_LABEL)} / month GBP) or <strong>Yearly VPN plan</strong>
 ({_escape(PRICE_YEARLY_LABEL)} / year — save vs 12 × monthly).
+Every plan includes a <strong>3-day free trial</strong> —
+<strong>no money is taken until after the trial ends</strong>.
 There are no free permanent installer buttons on this shop.</p>
 
 <div class="card" id="how-to-buy-steps">
@@ -1142,10 +1144,11 @@ There are no free permanent installer buttons on this shop.</p>
       (Monthly VPN plan or Yearly VPN plan). You can also open the plan page at
       <code>{_escape(SITE_PAY_PLAN_PATH)}</code> (<code>/pay</code>).</li>
   <li>Continue to Stripe Checkout
-      ({_escape(PRICE_LABEL)}/month or {_escape(PRICE_YEARLY_LABEL)}/year):
+      ({_escape(PRICE_LABEL)}/month or {_escape(PRICE_YEARLY_LABEL)}/year —
+      3-day free trial; card on file, first charge after trial):
       <a id="how-to-buy-payment-page" href="{_escape(pay)}"
       rel="noopener noreferrer">{_escape(pay)}</a></li>
-  <li>After payment, use the download on the success page
+  <li>After checkout (trial start or paid), use the download on the success page
       (<code>{_escape(claim)}?session_id=…</code>). The link is valid for
       <strong>1 hour</strong> and can be used again if the connection drops
       mid-download (not single-use). Your keygen arrives in email
@@ -1153,8 +1156,8 @@ There are no free permanent installer buttons on this shop.</p>
 </ol>
 <p class="muted">Fulfilment listens for Stripe
 <code>checkout.session.completed</code> on
-<code>{_escape(webhook)}</code>. Connect stays active through the paid
-period; refunds and subscription end revoke access.</p>
+<code>{_escape(webhook)}</code>. Connect stays active through the trial and
+paid period; refunds and subscription end revoke access.</p>
 </div>
 
 <div class="card" id="how-to-buy-public-docs">

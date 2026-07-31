@@ -43,6 +43,13 @@ PRICE_YEARLY_FULL_LABEL = (
 YEARLY_DISCOUNT_PERCENT = int(
     round(100 * (1 - PRICE_YEARLY_PENCE / max(1, PRICE_YEARLY_FULL_PENCE)))
 )
+# Free trial on **all** catalog subscription options (monthly + yearly).
+# Applied on Checkout Session subscription_data (and desired catalog shape).
+CATALOG_TRIAL_PERIOD_DAYS = 3
+# Customer-facing trial copy (homepage, /pay, desired fields).
+CATALOG_TRIAL_COPY = (
+    f"{CATALOG_TRIAL_PERIOD_DAYS}-day free trial — no money is taken until after the trial ends"
+)
 # Operator: enable Stripe Dashboard Adaptive Pricing when presentment allows;
 # unsupported currencies → USD (see local_currency.stripe_presentment_or_usd).
 
@@ -4605,8 +4612,9 @@ def desired_payment_link_trial_fields() -> dict[str, Any]:
     (no network). Configure script can sync Dashboard prices when
     ``STRIPE_SECRET_KEY`` is set.
 
-    ``trial_period_days`` is **0** (Stripe field; not a product trial).
-    Catalog amounts: monthly **£3.00** (300 pence), yearly **£30.00** (3000 pence).
+    ``trial_period_days`` is **:data:`CATALOG_TRIAL_PERIOD_DAYS`** (3) for both
+    monthly and yearly. Catalog amounts: monthly **£3.00** (300 pence), yearly
+    **£30.00** (3000 pence).
     """
     return {
         "payment_link_id": DEFAULT_STRIPE_PAYMENT_LINK_ID,
@@ -4625,13 +4633,12 @@ def desired_payment_link_trial_fields() -> dict[str, Any]:
         "yearly_discount_percent": YEARLY_DISCOUNT_PERCENT,
         "recurring_interval": "month",
         "recurring_interval_yearly": "year",
-        "trial_period_days": 0,
+        "trial_period_days": int(CATALOG_TRIAL_PERIOD_DAYS),
         "mode": CATALOG_STRIPE_PAYMENT_MODE,
         "catalog_entry": SITE_PAY_PLAN_PATH,
-        # Legacy key name kept for tests/config (no trial product / no trial copy).
         "homepage_trial_sentence": (
-            "Select your plan — Monthly £3.00 or Annual £30.00 — "
-            "subscription starts when you pay"
+            f"Select your plan — Monthly {PRICE_LABEL} or Annual {PRICE_YEARLY_LABEL} — "
+            f"{CATALOG_TRIAL_COPY}"
         ),
     }
 
@@ -4797,9 +4804,11 @@ def render_pay_plan_page_html(
       <p class="pay-plan-lead" id="pay-plan-lead">
         One device licence. Choose <strong>Monthly</strong> ({_esc(monthly_label)} for one month) or
         <strong>Annual</strong> ({_esc(yearly_label)} for one year — save about {save_pct}% vs
-        12 × monthly). Subscription starts when you pay. Without renewal after the paid period,
-        Connect expires and the client becomes unusable until you renew.
-        You will complete card payment securely on Stripe.
+        12 × monthly). Every plan includes a <strong>{CATALOG_TRIAL_PERIOD_DAYS}-day free trial</strong>
+        — <strong>no money is taken until after the trial ends</strong>
+        (you add a card at checkout; the first charge is after the trial).
+        Without renewal after the paid period, Connect expires and the client becomes
+        unusable until you renew. You complete checkout securely on Stripe.
       </p>
       {err_html}
       <form id="pay-plan-form" class="pay-plan-form" method="post" action="/pay/checkout">
@@ -4818,7 +4827,7 @@ def render_pay_plan_page_html(
                      aria-label="Monthly VPN plan"/>
               <span class="pay-plan-title">{_esc(product_m)}</span>
               <div class="pay-plan-price">{_esc(monthly_label)} / month</div>
-              <div class="pay-plan-note">Billed monthly · cancel anytime in Stripe</div>
+              <div class="pay-plan-note">{CATALOG_TRIAL_PERIOD_DAYS}-day free trial · no charge until trial ends · then billed monthly</div>
             </label>
             <label class="pay-plan-option" id="pay-option-year" data-interval="year">
               <input type="radio" name="interval" value="year"{year_checked}
@@ -4828,7 +4837,7 @@ def render_pay_plan_page_html(
               <div class="pay-plan-price">
                 <span class="pay-was">{_esc(full_yearly)}</span>{_esc(yearly_label)} / year
               </div>
-              <div class="pay-plan-note">vs 12 × monthly ({_esc(monthly_label)} × 12 = {_esc(full_yearly)})</div>
+              <div class="pay-plan-note">{CATALOG_TRIAL_PERIOD_DAYS}-day free trial · no charge until trial ends · then {_esc(yearly_label)}/year (vs 12 × {_esc(monthly_label)} = {_esc(full_yearly)})</div>
             </label>
           </div>
         </div>
@@ -4868,13 +4877,14 @@ def _normalize_trial_days(value: Any) -> int | None:
 
 
 def payment_link_matches_trial_subscription(price_obj: dict[str, Any]) -> dict[str, Any]:
-    """Check a Stripe Price object against desired £3.00/mo + **no trial** fields.
+    """Check a Stripe Price object against desired £3.00/mo + **3-day trial**.
 
     *price_obj* is a Stripe API Price dict (or redacted summary). Returns
     ``{ok, mismatches[], observed}`` without inventing success.
 
-    Desired ``trial_period_days`` is 0: observed trial may be ``None`` (absent)
-    or ``0``; any positive trial (e.g. 7) is a mismatch.
+    Desired ``trial_period_days`` is :data:`CATALOG_TRIAL_PERIOD_DAYS` (3).
+    Price objects alone may not carry trial; pass
+    ``payment_link_trial_period_days`` when the trial is on the link/session.
     """
     want = desired_payment_link_trial_fields()
     mismatches: list[str] = []
@@ -6575,7 +6585,9 @@ def build_subscription_checkout_form_body(
 ) -> bytes:
     """Stripe Checkout Session body for **subscription** Monthly/Yearly VPN plan.
 
-    Uses Dashboard Price ids for Monthly VPN plan / Yearly VPN plan. No trial.
+    Uses Dashboard Price ids for Monthly VPN plan / Yearly VPN plan. Applies
+    catalog free trial (:data:`CATALOG_TRIAL_PERIOD_DAYS`) via
+    ``subscription_data[trial_period_days]`` for both intervals.
     *currency* may be ``usd`` for presentment conversion via price_data fallback
     when a dedicated USD price is not configured (inline recurring price_data).
 
@@ -6594,6 +6606,7 @@ def build_subscription_checkout_form_body(
     ref = encode_client_reference_id(plat, interval=iv)
     ccy = (currency or PRICE_CURRENCY).strip().lower() or PRICE_CURRENCY
     renew = bool(auto_renew)
+    trial_days = int(CATALOG_TRIAL_PERIOD_DAYS)
     fields: list[tuple[str, str]] = [
         ("mode", "subscription"),
         ("success_url", success_url),
@@ -6606,9 +6619,11 @@ def build_subscription_checkout_form_body(
         ("metadata[currency]", ccy if ccy == "usd" else PRICE_CURRENCY),
         ("metadata[product_name]", product_name),
         ("metadata[auto_renew]", "1" if renew else "0"),
+        ("metadata[trial_period_days]", str(trial_days)),
         ("subscription_data[metadata][platform]", plat),
         ("subscription_data[metadata][billing_interval]", iv),
         ("subscription_data[metadata][auto_renew]", "1" if renew else "0"),
+        ("subscription_data[trial_period_days]", str(trial_days)),
     ]
     # Prefer create-time cancel_at_period_end when the Stripe API version accepts
     # it; some accounts return parameter_unknown — then fulfilment applies

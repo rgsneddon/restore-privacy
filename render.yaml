@@ -47,16 +47,16 @@ services:
         sync: false
       - key: RPT_ADMIN_SESSION_SECRET
         sync: false
-      # Stripe paid downloads (£2.45) — paste secrets in Render dashboard (sync: false).
-      # Never commit real sk_… / whsec_… values.
+      # Stripe paid downloads (£3.00/mo or £30.00/yr + 3-day free trial) — secrets in Dashboard.
+      # Never commit real sk_… / whsec_… values. Checkout sets trial_period_days=3 in code.
       - key: STRIPE_SECRET_KEY
         sync: false
       - key: STRIPE_WEBHOOK_SECRET
         sync: false
-      # Optional one-time price_… ; leave unset for unit_amount=245 (£2.45) Checkout
+      # Optional one-time price_… ; catalog default is subscription Checkout (+ trial)
       - key: STRIPE_CHECKOUT_PRICE_ID
         sync: false
-      # Customer fulfilment email after pay (keygen + PPI + download link).
+      # Customer fulfilment email after pay/trial start (keygen + PPI + download link).
       # Secrets stay in Dashboard (sync: false). Non-secret defaults are safe to ship.
       - key: RPT_FULFILMENT_SMTP_HOST
         sync: false

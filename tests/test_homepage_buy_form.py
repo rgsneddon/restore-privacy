@@ -65,7 +65,7 @@ class TestHomepageBuyFormInDownloadsBox(unittest.TestCase):
 
 
 class TestCheckoutIntervalDistinct(unittest.TestCase):
-    def test_month_year_distinct_price_ids_no_trial(self):
+    def test_month_year_distinct_price_ids_with_3day_trial(self):
         from urllib.parse import parse_qs
 
         from payments import (
@@ -105,8 +105,11 @@ class TestCheckoutIntervalDistinct(unittest.TestCase):
         py = parse_qs(by)
         self.assertEqual(pm["line_items[0][price]"], [mid])
         self.assertEqual(py["line_items[0][price]"], [yid])
-        self.assertNotIn("trial_period_days", bm)
-        self.assertNotIn("trial_period_days", by)
+        self.assertIn("trial_period_days", bm)
+        self.assertIn("trial_period_days", by)
+        from urllib.parse import parse_qs as _pqs
+        self.assertEqual(_pqs(bm)["subscription_data[trial_period_days]"], ["3"])
+        self.assertEqual(_pqs(by)["subscription_data[trial_period_days]"], ["3"])
 
 
 if __name__ == "__main__":

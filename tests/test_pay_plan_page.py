@@ -126,8 +126,8 @@ class TestSubscriptionCheckoutBody(unittest.TestCase):
         self.assertEqual(py["line_items[0][price]"], [yid])
         self.assertNotIn("line_items[0][price_data][unit_amount]", pm)
         self.assertNotIn("line_items[0][price_data][unit_amount]", py)
-        self.assertNotIn("trial_period_days", bm)
-        self.assertNotIn("trial_period_days", by)
+        self.assertIn("subscription_data%5Btrial_period_days%5D=3", bm)
+        self.assertIn("subscription_data%5Btrial_period_days%5D=3", by)
         self.assertIn(STRIPE_PRODUCT_NAME_MONTHLY.replace(" ", "+"), bm)
         self.assertIn(STRIPE_PRODUCT_NAME_YEARLY.replace(" ", "+"), by)
 
@@ -218,7 +218,7 @@ class TestCatalogRoutesToSitePayPlan(unittest.TestCase):
 
 
 class TestDesiredCatalogShape(unittest.TestCase):
-    def test_desired_products_and_no_trial(self):
+    def test_desired_products_and_3day_trial(self):
         from payments import (
             PRICE_PENCE,
             STRIPE_PRODUCT_NAME_MONTHLY,
@@ -227,7 +227,7 @@ class TestDesiredCatalogShape(unittest.TestCase):
         )
 
         d = desired_payment_link_trial_fields()
-        self.assertEqual(d["trial_period_days"], 0)
+        self.assertEqual(d["trial_period_days"], 3)
         self.assertEqual(d["unit_amount_pence"], PRICE_PENCE)
         self.assertEqual(d["unit_amount_pence"], 300)
         self.assertEqual(d["unit_amount_yearly_pence"], 3000)

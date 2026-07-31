@@ -6,7 +6,7 @@
    (SMTP env vars on Render).
 2. Catalog routes to the site **Select your plan** page (`/pay`) for
    **Monthly VPN plan (£3.00/month)** or **Yearly VPN plan (£30.00/year)**
-   with **subscription starts when you pay**, then Stripe **subscription** Checkout Session.
+   with a **3-day free trial** (no money taken until after the trial ends), then Stripe **subscription** Checkout Session.
 
 ## SMTP env keys (shipped reader)
 
@@ -112,7 +112,7 @@ rows) in
 [STRIPE_CUSTOM_DOMAINS_AND_BRANDING.md](STRIPE_CUSTOM_DOMAINS_AND_BRANDING.md) §0.
 Verify with `python scripts/verify_stripe_email_domain_dns.py`.
 
-## Stripe products — Monthly / Yearly VPN plan (no trial)
+## Stripe products — Monthly / Yearly VPN plan (3-day free trial)
 
 Catalog **primary path** is site-hosted `/pay` → Checkout Session (not dual
 `buy.stripe.com` Payment Links).
@@ -129,7 +129,7 @@ Old product **download a vpn** is archived. Override price ids with
 
 1. [Stripe Dashboard → Products](https://dashboard.stripe.com/products) — create
    **Monthly VPN plan** and **Yearly VPN plan** (or open the shipped products).
-2. Recurring prices: **£3.00 GBP / month** and **£30.00 GBP / year** (no trial).
+2. Recurring prices: **£3.00 GBP / month** and **£30.00 GBP / year**. Catalog Checkout applies a **3-day free trial**.
 3. Ensure status host has `STRIPE_SECRET_KEY` + webhook so `/pay/checkout` can
    create subscription Checkout Sessions.
 4. Confirm catalog tiles open `/pay?platform=…` and the plan page shows
@@ -145,7 +145,7 @@ python scripts/configure_stripe_payment_link_trial.py --dry-run
 ```
 
 The script reuses or creates monthly £3.00 and yearly **£30.00** (3000 pence)
-prices and asserts **subscription starts when you pay**. Prefer Checkout Session price ids over
+prices and asserts catalog **trial_period_days = 3** on Checkout. Prefer Checkout Session price ids over
 legacy Payment Links for catalog.
 
 ## Verification checklist
@@ -156,7 +156,7 @@ legacy Payment Links for catalog.
 | App reads same keys | `python -c "from payments import fulfilment_smtp_env_keys; print(fulfilment_smtp_env_keys())"` from `status_page/` |
 | Host healthy | `GET https://restoreprivacy.online/health` → `{"ok":true}` (twice) |
 | Fulfilment probe | `GET https://restoreprivacy.online/health/fulfilment` → `ok: true` |
-| No trial + monthly/yearly | Desired fields: `trial_period_days` 0; monthly `300`; yearly **`3000`**; products Monthly/Yearly VPN plan |
+| 3-day trial + monthly/yearly | Desired fields: `trial_period_days` **3**; monthly `300`; yearly **`3000`**; products Monthly/Yearly VPN plan |
 | Catalog entry | Homepage tiles → `/pay?platform=…` (site plan page) |
 
 ## Code map

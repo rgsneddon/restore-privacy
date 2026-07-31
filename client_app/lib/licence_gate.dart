@@ -156,7 +156,8 @@ const String kShortLicenceSummary =
     'By accepting, you agree to those terms. Acceptance is stored only on this device. '
     'After you accept, enter the keygen from your fulfilment email '
     '($kKeygenUnlockInstruction) to unlock Connect. '
-    'Your subscription (£3.00 per month or £30.00 per year) starts when you pay. '
+    'Your subscription (£3.00 per month or £30.00 per year) includes a 3-day free trial — '
+    'no money is taken until after the trial ends. '
     '$kPaymentConnectDisclaimerPlain';
 
 class LicenceAcceptance {

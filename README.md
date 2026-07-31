@@ -4,7 +4,7 @@
 
 | | |
 |--|--|
-| **Get the app** | [Paid downloads](https://restoreprivacy.online/) — catalog **v0.5.8** (£3.00/month or £30.00/year per platform) |
+| **Get the app** | [Paid downloads](https://restoreprivacy.online/) — catalog **v0.5.8** (£3.00/month or £30.00/year per platform; **3-day free trial**) |
 | **Privacy** | [PRIVACY_POLICY.md](PRIVACY_POLICY.md) |
 | **Licence** | [LICENSE](LICENSE) (proprietary full copyright) |
 | **Credits** | [CREDITS.md](CREDITS.md) |
@@ -41,7 +41,7 @@
 
 Installers are **paid only** on [restoreprivacy.online](https://restoreprivacy.online/) (Stripe). There are no free permanent GitHub release downloads; the source repo is **private**.
 
-**Current catalog (v0.5.8):** the homepage **Download client** box has device/platform and plan selection — **Monthly VPN plan** £3.00 / **Yearly VPN plan** £30.00  — plus **Buy now**, which opens Stripe Checkout. You can also open the plan page at **`/pay`**. Card payment uses Stripe’s hosted checkout (Dashboard branding only — not this site’s full CSS). Email delivers **keygen + PPI + download link** (**USE THIS KEYGEN TO UNLOCK RESTORE PRIVACY**).
+**Current catalog (v0.5.8):** the homepage **Download client** box has device/platform and plan selection — **Monthly VPN plan** £3.00 / **Yearly VPN plan** £30.00 — both include a **3-day free trial** (no money is taken until after the trial ends) — plus **Buy now**, which opens Stripe Checkout. You can also open the plan page at **`/pay`**. Card payment uses Stripe’s hosted checkout (Dashboard branding only — not this site’s full CSS). Email delivers **keygen + PPI + download link** (**USE THIS KEYGEN TO UNLOCK RESTORE PRIVACY**).
 
 1. Pick your **device** and **plan**, then **Buy now** (or open `/pay`).
 2. Complete Stripe Checkout. You get a download link valid for **1 hour** (retry if the connection drops) plus email with **keygen** (`RPT-KEY-…`) and **PPI**.

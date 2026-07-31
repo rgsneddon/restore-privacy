@@ -281,7 +281,7 @@ python -c "import sys; sys.path.insert(0,'status_page'); from payments import st
 ### What Buy now still does
 
 Homepage form → `POST /pay/checkout` → Stripe **subscription** Checkout Session
-(Monthly / Yearly VPN plan, subscription starts when you pay). Branding and custom domains do
+(Monthly / Yearly VPN plan, 3-day free trial). Branding and custom domains do
 **not** change fulfilment webhooks or amounts.
 
 ---

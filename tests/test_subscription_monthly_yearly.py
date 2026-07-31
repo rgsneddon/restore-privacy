@@ -95,6 +95,8 @@ class TestBillingIntervals(unittest.TestCase):
         self.assertNotIn("buy.stripe.com", html)
         self.assertNotIn("7 day trial", html.lower())
         self.assertNotIn("begins after your 7 day trial", html.lower())
+        self.assertIn("3-day free trial", html.lower())
+        self.assertIn("no money is taken until after the trial ends", html.lower())
 
         html_usd = render_download_section_html(
             coming_soon=False, currency="USD", country="US"

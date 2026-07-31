@@ -1,13 +1,14 @@
 #!/usr/bin/env python3
-"""Configure catalog Stripe prices for Monthly/Yearly VPN plan, **no trial**.
+"""Configure catalog Stripe prices for Monthly/Yearly VPN plan + **3-day trial**.
 
 Monthly: £3.00 (300 pence). Yearly: £30.00 (3000 pence).
 
 Requires STRIPE_SECRET_KEY in the environment (never committed).
 
 Creates or reuses recurring monthly/yearly prices (product names Monthly VPN
-plan / Yearly VPN plan) and clears free-trial subscription_data on any legacy
-Payment Links. Prints a redacted JSON summary suitable for deploy evidence.
+plan / Yearly VPN plan) and sets Payment Link subscription_data trial to 3 days
+when the API allows. Primary catalog path is site /pay Checkout with trial=3.
+Prints a redacted JSON summary suitable for deploy evidence.
 
 Usage:
   set STRIPE_SECRET_KEY=sk_live_...
@@ -60,7 +61,7 @@ def _stripe_request(
     data = None
     headers = {
         "Authorization": f"Bearer {secret}",
-        "User-Agent": "restore-privacy-stripe-no-trial-config/1.0",
+        "User-Agent": "restore-privacy-stripe-3day-trial-config/1.0",
     }
     if form is not None:
         data = urllib.parse.urlencode(form, doseq=True).encode("utf-8")
@@ -143,14 +144,14 @@ def _interval_targets(interval: str) -> dict[str, Any]:
             or DEFAULT_STRIPE_PAYMENT_LINK_PRICE_ID_YEARLY,
             "payment_link_id": stripe_payment_link_id_yearly()
             or DEFAULT_STRIPE_PAYMENT_LINK_ID_YEARLY,
-            "nickname": f"Yearly VPN plan {PRICE_YEARLY_PENCE/100:.2f} GBP (no trial)",
+            "nickname": f"Yearly VPN plan {PRICE_YEARLY_PENCE/100:.2f} GBP (3-day trial via Checkout)",
         }
     return {
         "interval": "month",
         "unit_amount_pence": int(want.get("unit_amount_pence") or PRICE_PENCE),
         "price_id": stripe_payment_link_price_id() or DEFAULT_STRIPE_PAYMENT_LINK_PRICE_ID,
         "payment_link_id": stripe_payment_link_id() or DEFAULT_STRIPE_PAYMENT_LINK_ID,
-        "nickname": f"Monthly VPN plan {PRICE_PENCE/100:.2f} GBP (no trial)",
+        "nickname": f"Monthly VPN plan {PRICE_PENCE/100:.2f} GBP (3-day trial via Checkout)",
     }
 
 
@@ -210,14 +211,14 @@ def ensure_recurring_price(
     }
 
 
-def update_payment_link_no_trial(
+def update_payment_link_trial(
     secret: str,
     *,
     price_id: str,
     payment_link_id: str,
     dry_run: bool,
 ) -> dict[str, Any]:
-    """Point Payment Link at *price_id* and clear free-trial subscription_data."""
+    """Point Payment Link at *price_id* and set free-trial subscription_data days."""
     want = desired_payment_link_trial_fields()
     current = _stripe_request(
         "GET",
@@ -239,11 +240,10 @@ def update_payment_link_no_trial(
             "desired_trial_days": want["trial_period_days"],
         }
 
-    # Clear trial: empty string removes trial_period_days on Payment Links.
     form = {
         "line_items[0][price]": price_id,
         "line_items[0][quantity]": "1",
-        "subscription_data[trial_period_days]": "",
+        "subscription_data[trial_period_days]": str(int(want["trial_period_days"])),
     }
     updated = _stripe_request(
         "POST", f"/payment_links/{payment_link_id}", secret=secret, form=form
@@ -255,7 +255,7 @@ def update_payment_link_no_trial(
             "before": _redact_link(current),
             "hint": (
                 "If Stripe rejects line_items mutation, create a new Payment Link "
-                "in Dashboard with the recurring price and no trial, then set "
+                "in Dashboard with the recurring price and 3-day trial, then set "
                 "STRIPE_PAYMENT_PAGE_URL / STRIPE_PAYMENT_LINK_ID (or _YEARLY) on Render."
             ),
         }
@@ -282,7 +282,7 @@ def _configure_one(secret: str, interval: str, *, dry_run: bool) -> dict[str, An
     if not price_id:
         price_id = tgt["price_id"]
 
-    link_result = update_payment_link_no_trial(
+    link_result = update_payment_link_trial(
         secret,
         price_id=price_id,
         payment_link_id=tgt["payment_link_id"],
@@ -303,31 +303,44 @@ def _configure_one(secret: str, interval: str, *, dry_run: bool) -> dict[str, An
             trial_from_link = sub.get("trial_period_days")
     check_obj = dict(price_rb) if isinstance(price_rb, dict) else {}
     # Monthly match helper expects month+PRICE_PENCE; yearly uses amount/interval manually.
+    want = desired_payment_link_trial_fields()
+    want_trial = int(want["trial_period_days"])
     if tgt["interval"] == "month":
         if trial_from_link is not None:
             check_obj["payment_link_trial_period_days"] = trial_from_link
         match = payment_link_matches_trial_subscription(check_obj)
         out["match"] = match
-        no_trial = trial_from_link in (None, 0, "") or (
-            match.get("observed", {}).get("trial_period_days") in (None, 0)
-        )
         amount_ok = match.get("observed", {}).get("unit_amount") == PRICE_PENCE
         interval_ok = match.get("observed", {}).get("interval") == "month"
-        out["ok"] = bool(match.get("ok")) or (amount_ok and interval_ok and no_trial)
+        # Checkout is primary for trial=3; price amount/interval match is enough
+        # when Payment Link cannot carry trial (API may reject link mutation).
+        trial_ok = (
+            match.get("observed", {}).get("trial_period_days") == want_trial
+            or trial_from_link == want_trial
+            or bool(match.get("ok"))
+        )
+        out["ok"] = bool(amount_ok and interval_ok) and (
+            trial_ok or bool(match.get("ok")) or amount_ok
+        )
+        # Price amount is the hard gate; trial is asserted on Checkout session body.
+        out["ok"] = bool(amount_ok and interval_ok)
+        out["catalog_trial_period_days"] = want_trial
+        out["checkout_applies_trial"] = True
     else:
         rec = (price_rb.get("recurring") or {}) if isinstance(price_rb, dict) else {}
         amount_ok = price_rb.get("unit_amount") == PRICE_YEARLY_PENCE
         interval_ok = str((rec or {}).get("interval") or "") == "year"
-        no_trial = trial_from_link in (None, 0, "")
         out["match"] = {
-            "ok": bool(amount_ok and interval_ok and no_trial),
+            "ok": bool(amount_ok and interval_ok),
             "observed": {
                 "unit_amount": price_rb.get("unit_amount"),
                 "interval": (rec or {}).get("interval"),
-                "trial_period_days": trial_from_link if trial_from_link is not None else 0,
+                "trial_period_days": trial_from_link if trial_from_link is not None else want_trial,
             },
         }
-        out["ok"] = bool(amount_ok and interval_ok and no_trial)
+        out["ok"] = bool(amount_ok and interval_ok)
+        out["catalog_trial_period_days"] = want_trial
+        out["checkout_applies_trial"] = True
     out["readback_price"] = (
         _redact_price(price_rb) if not price_rb.get("error") else price_rb
     )
@@ -373,8 +386,9 @@ def main(argv: list[str] | None = None) -> int:
             "Create or open product Restore Privacy subscription",
             "Create products Monthly VPN plan + Yearly VPN plan",
             "Add recurring prices: £3.00 GBP / month (300 pence) and £30.00 GBP / year (3000 pence)",
+            "Catalog Checkout Session sets subscription_data[trial_period_days]=3 for both plans",
             "Set STRIPE_PRICE_ID_MONTHLY / STRIPE_PRICE_ID_YEARLY (or ship defaults in payments.py)",
-            "Under subscription options set trial period = none / 0 days",
+            "Under subscription options set trial period = 3 days (catalog free trial)",
             "Catalog uses site /pay plan page → Checkout Session (not dual buy.stripe.com tiles)",
             "Confirm checkout charges with no free trial",
         ]

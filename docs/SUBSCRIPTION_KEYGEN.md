@@ -4,7 +4,7 @@
 
 1. Pay on [restoreprivacy.online](https://restoreprivacy.online/). Homepage /
    `/pay` offer **Monthly VPN plan (£3.00)** (licence for **one month**) and
-   **Yearly VPN plan (£30.00)** (licence for **one year**). Customers can
+   **Yearly VPN plan (£30.00)** (licence for **one year**). Both include a **3-day free trial** (no money taken until after the trial ends). Customers can
    **enable or disable auto-renew** before checkout (default: on).
 2. Status host on `checkout.session.completed`:
    - mints a **1-hour** download token (reusable until expiry)

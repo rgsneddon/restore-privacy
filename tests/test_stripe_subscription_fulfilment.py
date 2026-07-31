@@ -28,7 +28,7 @@ class TestCatalogSubscriptionPaymentLink(unittest.TestCase):
         ):
             os.environ.pop(k, None)
 
-    def test_desired_fields_are_subscription_300_monthly_no_trial(self):
+    def test_desired_fields_are_subscription_300_monthly_with_3day_trial(self):
         from payments import (
             CATALOG_STRIPE_PAYMENT_MODE,
             PRICE_PENCE,
@@ -51,7 +51,8 @@ class TestCatalogSubscriptionPaymentLink(unittest.TestCase):
         self.assertEqual(d["currency"], "gbp")
         self.assertEqual(d["recurring_interval"], "month")
         self.assertEqual(d["recurring_interval_yearly"], "year")
-        self.assertEqual(d["trial_period_days"], 0)
+        self.assertEqual(d["trial_period_days"], 3)
+        self.assertNotEqual(d["trial_period_days"], 0)
         self.assertNotEqual(d["trial_period_days"], 7)
         self.assertEqual(d["catalog_entry"], SITE_PAY_PLAN_PATH)
         self.assertIn("/pay", d["payment_page_url"])
@@ -65,7 +66,9 @@ class TestCatalogSubscriptionPaymentLink(unittest.TestCase):
         # Must not pin pre-£3 catalog Price ids
         self.assertNotEqual(mid, "price_1TwjilJDavQ2TJW6fyxzCIkA")
         self.assertNotEqual(yid, "price_1TwjimJDavQ2TJW6wEKr4upj")
+        self.assertIn("3-day free trial", d["homepage_trial_sentence"].lower())
         self.assertNotIn("7 day trial", d["homepage_trial_sentence"].lower())
+        self.assertNotIn("subscription starts when you pay", d["homepage_trial_sentence"].lower())
         self.assertIn("£3.00", d["homepage_trial_sentence"])
         self.assertIn("£30.00", d["homepage_trial_sentence"])
 
