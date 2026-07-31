@@ -290,7 +290,13 @@ def main() -> int:
         "# Restore Privacy Suite — public site\n\n"
         "Static GitHub Pages export for **Restore Privacy Suite v1.0.0**.\n\n"
         "Free installers; KEYGEN licence from £3/month on restoreprivacy.online.\n\n"
-        "This tree is **public only**. It does **not** include `/admin` or operator tools.\n",
+        "This tree is **public only**. It does **not** include `/admin` or operator tools.\n\n"
+        "## Live public open site\n\n"
+        "| | |\n|--|--|\n"
+        "| **GitHub Pages** | https://rgsneddon.github.io/restore-privacy-suite/ |\n"
+        "| **Public source repo** | https://github.com/rgsneddon/restore-privacy-suite |\n\n"
+        "Publish by pushing this export to the public `restore-privacy-suite` repo "
+        "(keep the product monorepo private).\n",
         encoding="utf-8",
     )
 
