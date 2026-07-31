@@ -48,7 +48,9 @@ String downloadUrlForMonopin(String monopin) {
   return 'https://restoreprivacy.online/?monopin=$pin';
 }
 
-/// Apply pending update from a vault manifest when CHECK BREADCRUMBS is on.
+/// Apply pending update from a vault manifest when Suite self-update is on.
+///
+/// Same Settings gate as residual push-update receive ([checkBreadcrumbsEnabled]).
 Future<Map<String, dynamic>> applyBreadcrumbsUpdate({
   required ProductSettings settings,
   required String productVersion,
@@ -60,9 +62,10 @@ Future<Map<String, dynamic>> applyBreadcrumbsUpdate({
     return {
       'ok': true,
       'skipped': true,
-      'reason': 'CHECK BREADCRUMBS off',
+      'reason': 'Suite self-update off',
       'store': null,
       'label': kBreadcrumbsCheckLabel,
+      'may_unpack': false,
     };
   }
   final pin = monopinFromManifest(manifest);

@@ -4,6 +4,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import 'connection_log.dart';
+import 'easter_egg_server.dart';
 import 'free_tier.dart';
 import 'keygen_field.dart';
 import 'leak_test.dart';
@@ -14,6 +15,7 @@ import 'registration_copy.dart';
 import 'rpt_config.dart';
 import 'breadcrumbs_check.dart';
 import 'settings_store.dart';
+import 'suite_update.dart';
 import 'theme.dart';
 import 'transparency_copy.dart';
 
@@ -294,16 +296,17 @@ class _SettingsScreenState extends State<SettingsScreen> {
         );
         if (crumbsR['skipped'] == true) {
           _note =
-              '$kCheckBreadcrumbsLabel on — ${crumbsR['reason'] ?? 'ok'}.';
+              '$kSuiteUpdateSettingsTitle on — ${crumbsR['reason'] ?? 'ok'}.';
         } else if (crumbsR['ok'] == true && crumbsR['store'] != null) {
           final store = crumbsR['store'] as Map?;
           final ver = store?['pending_update_version'] ?? crumbsR['monopin'];
           _note =
-              '$kCheckBreadcrumbsLabel on — pending update v$ver '
-              '(${store?['pending_update_url'] ?? ''}).';
+              '$kSuiteUpdateSettingsTitle on — pending update v$ver '
+              '(${store?['pending_update_url'] ?? ''}). '
+              'Use “$kSuiteUpdateUnpackButtonLabel” on the VPN screen.';
         } else {
           _note =
-              '$kCheckBreadcrumbsLabel on — fetch/apply: '
+              '$kSuiteUpdateSettingsTitle on — fetch/apply: '
               '${crumbsR['error'] ?? 'check failed'}';
         }
         // Best-effort native notify (platforms may no-op).
@@ -315,10 +318,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
           // Dart path above is authoritative when native is absent.
         } catch (_) {}
       } catch (e) {
-        _note = '$kCheckBreadcrumbsLabel on — saved; check path error: $e';
+        _note = '$kSuiteUpdateSettingsTitle on — saved; check path error: $e';
       }
     } else {
-      _note = '$kCheckBreadcrumbsLabel off — no auto self-update.';
+      _note =
+          '$kSuiteUpdateSettingsTitle off — no push-update receive or unpack.';
     }
     widget.onChanged?.call(_settings);
     if (mounted) setState(() => _busy = false);
@@ -574,14 +578,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 ),
                 const Divider(height: 1),
                 SwitchListTile(
+                  key: const Key(kSuiteUpdateSettingsSwitchMarker),
                   title: const Text(
-                    kCheckBreadcrumbsLabel,
+                    kSuiteUpdateSettingsTitle,
                     style: TextStyle(fontWeight: FontWeight.w600),
                   ),
-                  subtitle: const Text(
-                    'When on, allow this device to fetch Helsinki breadcrumbs '
-                    'and apply monopin update directives (self-update when you choose)',
-                  ),
+                  subtitle: const Text(kSuiteUpdateSettingsSubtitle),
                   value: _settings.checkBreadcrumbs,
                   activeThumbColor: kWhite,
                   activeTrackColor: kPrimary,
@@ -592,10 +594,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
           ),
           const SizedBox(height: 16),
           Text(
-            'Both options default to off. Seamless power-up needs both on '
+            'Startup and autoconnect default off. Seamless power-up needs both on '
             '(startup launches the app; autoconnect starts the VPN). '
             'OS VPN permission / Administrator may still be required. '
-            '${kCheckBreadcrumbsLabel} defaults off — no auto self-update until you allow it.',
+            '$kSuiteUpdateSettingsTitle defaults off — no push-update receive or '
+            'unpack until you allow it. Unpacking still requires your click on the '
+            'VPN main screen ($kSuiteUpdateUnpackButtonLabel).',
             style: TextStyle(color: kTextMuted, fontSize: 12),
           ),
           if (!freeTierSettingsLocked) ...[
@@ -975,6 +979,24 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     onTap: () => _openLegalDoc(kLegalDocLinks[i]),
                   ),
                 ],
+                const Divider(height: 1),
+                ListTile(
+                  key: const Key('easter_egg_loft_link'),
+                  title: const Text(
+                    kEasterEggSettingsLabel,
+                    style: TextStyle(
+                      fontWeight: FontWeight.w500,
+                      color: kTextMuted,
+                      fontSize: 13,
+                    ),
+                  ),
+                  subtitle: const Text(
+                    'http://127.0.0.1:18765  ·  while the app is open',
+                    style: TextStyle(fontSize: 11, color: kTextMuted),
+                  ),
+                  trailing: const Icon(Icons.open_in_new, size: 16, color: kTextMuted),
+                  onTap: _openEasterEggLoft,
+                ),
               ],
             ),
           ),
@@ -985,5 +1007,29 @@ class _SettingsScreenState extends State<SettingsScreen> {
         ],
       ),
     );
+  }
+
+  Future<void> _openEasterEggLoft() async {
+    // Ensure the loft is up (no-op if already listening).
+    final listening = await easterEggServer.start();
+    if (!listening && mounted) {
+      setState(() {
+        _note =
+            'Local loft could not bind :$kEasterEggPort (port busy?). '
+            'Try $kEasterEggUrlLoopback while the Suite app is open and nothing else owns that port.';
+      });
+      return;
+    }
+    final uri = Uri.parse(kEasterEggUrlLoopback);
+    try {
+      final ok = await launchUrl(uri, mode: LaunchMode.externalApplication);
+      if (!ok && mounted) {
+        setState(() => _note = 'Open $kEasterEggUrlLoopback in a browser (app must stay running).');
+      }
+    } catch (_) {
+      if (mounted) {
+        setState(() => _note = 'Open $kEasterEggUrlLoopback in a browser (app must stay running).');
+      }
+    }
   }
 }

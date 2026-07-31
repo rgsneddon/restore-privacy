@@ -20,10 +20,14 @@ const String kKeyResidualIpv4 = 'residual_ipv4';
 /// Residual IPv6 ISP-leak protection while residual is up. Default ON when unset.
 const String kKeyResidualIpv6 = 'residual_ipv6';
 const String kKeyEntryCountry = 'entry_country';
-/// Opt-in: user allows CHECK BREADCRUMBS self-update path (Helsinki vault).
+/// Opt-in: Suite self-update / push-receive / CHECK BREADCRUMBS (unified gate).
+///
+/// Default **off**. When on, residual "Push update to clients" and Helsinki
+/// breadcrumbs may store a pending Suite package; the user still clicks
+/// unpack-and-relaunch on the VPN main screen.
 const String kKeyCheckBreadcrumbs = 'check_breadcrumbs';
 
-/// Exact Settings label for breadcrumbs self-update opt-in.
+/// Legacy / operator label (still grepped); Settings UI uses human Suite title.
 const String kCheckBreadcrumbsLabel = 'CHECK BREADCRUMBS';
 
 /// Product policy: residual IPv4 capture is never user-off.

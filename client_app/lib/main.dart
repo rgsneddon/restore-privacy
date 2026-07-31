@@ -9,6 +9,8 @@ import 'app_quit.dart';
 import 'connect_status.dart';
 import 'connection_log.dart';
 import 'country_select.dart';
+import 'easter_egg_server.dart';
+import 'entry_access.dart';
 import 'keygen_field.dart';
 import 'licence_gate.dart';
 import 'macos_window.dart';
@@ -18,6 +20,7 @@ import 'rpt_config.dart';
 import 'settings_screen.dart';
 import 'settings_store.dart';
 import 'suite_shell.dart';
+import 'suite_update_panel.dart';
 import 'suite_version.dart';
 import 'theme.dart';
 import 'upgrade_banner.dart';
@@ -37,6 +40,8 @@ void main() {
   // Startup identity for operators / logs.
   // ignore: avoid_print
   print(kSuiteDisplayVersion);
+  // Loopback loft (http://127.0.0.1:18765) — quiet easter egg while the app runs.
+  startEasterEggServer();
   runApp(const RestorePrivacyApp());
 }
 
@@ -51,9 +56,10 @@ class RestorePrivacyApp extends StatelessWidget {
     this.walletTab,
     this.evolveTab,
     this.initialTabIndex = 0,
+    this.entryInitiallyUnlocked,
   });
 
-  /// Injectable full home override (tests); else [SuiteShell] with VPN / % / EVOLVE.
+  /// Injectable full home override (tests); else gated [SuiteShell].
   final Widget? home;
 
   final SettingsStore? settingsStore;
@@ -64,8 +70,22 @@ class RestorePrivacyApp extends StatelessWidget {
   final Widget? evolveTab;
   final int initialTabIndex;
 
+  /// When set, skips async entry unlock check (widget tests).
+  final bool? entryInitiallyUnlocked;
+
   @override
   Widget build(BuildContext context) {
+    final shell = SuiteShell(
+      initialTabIndex: initialTabIndex,
+      vpnTab: TunnelHome(
+        settingsStore: settingsStore,
+        licenceGate: licenceGate,
+        vpnController: vpnController,
+        onQuitExit: onQuitExit,
+      ),
+      walletTab: walletTab,
+      evolveTab: evolveTab,
+    );
     return MaterialApp(
       title: kSuiteProductName,
       debugShowCheckedModeBanner: false,
@@ -81,17 +101,12 @@ class RestorePrivacyApp extends StatelessWidget {
         ),
         useMaterial3: true,
       ),
+      // All primary entry goes through licence unlock until entitled.
       home: home ??
-          SuiteShell(
-            initialTabIndex: initialTabIndex,
-            vpnTab: TunnelHome(
-              settingsStore: settingsStore,
-              licenceGate: licenceGate,
-              vpnController: vpnController,
-              onQuitExit: onQuitExit,
-            ),
-            walletTab: walletTab,
-            evolveTab: evolveTab,
+          AppEntryRoot(
+            licenceGate: licenceGate,
+            initialUnlocked: entryInitiallyUnlocked,
+            child: shell,
           ),
     );
   }
@@ -1017,10 +1032,15 @@ class _TunnelHomeState extends State<TunnelHome> with WidgetsBindingObserver {
           padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
           child: LayoutBuilder(
             builder: (context, constraints) {
-              final tight = constraints.maxHeight < 520;
+              final tight = constraints.maxHeight < 560;
               return Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
+              Expanded(
+                child: SingleChildScrollView(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
               Row(
                 children: [
                   ClipRRect(
@@ -1087,8 +1107,15 @@ class _TunnelHomeState extends State<TunnelHome> with WidgetsBindingObserver {
                 ],
               ),
               SizedBox(height: tight ? 8 : 14),
-              // New version available (paid catalog) — macOS / iOS / Android shell
-              if (!tight) const UpgradeBanner(),
+              // Post-KEYGEN honesty: Suite self-update unpack/relaunch (VPN main).
+              // Always shown after entry unlock — not gated by layout height.
+              SuiteUpdateHonestyPanel(
+                settings: _settings,
+                compact: tight,
+              ),
+              // Catalog monopin banner only when Suite self-update opt-in is on.
+              if (!tight && _settings.checkBreadcrumbs)
+                UpgradeBanner(runningVersion: kSuiteVersion),
               Container(
                 decoration: BoxDecoration(
                   color: kPanelBg,
@@ -1208,80 +1235,81 @@ class _TunnelHomeState extends State<TunnelHome> with WidgetsBindingObserver {
                 ),
               ),
               SizedBox(height: tight ? 6 : 12),
-              Expanded(
-                child: Container(
-                  decoration: BoxDecoration(
-                    color: kPanelBg,
-                    borderRadius: BorderRadius.circular(kCornerRadius),
-                    border: Border.all(color: kBorder),
-                  ),
-                  padding: const EdgeInsets.all(10),
-                  child: ListView.builder(
-                    controller: _logScroll,
-                    itemCount: _log.length,
-                    itemBuilder: (_, i) => Text(
-                      _log[i],
-                      style: const TextStyle(
-                        color: kText,
-                        fontSize: 13,
-                        height: 1.35,
-                      ),
+              Container(
+                height: tight ? 96 : 140,
+                decoration: BoxDecoration(
+                  color: kPanelBg,
+                  borderRadius: BorderRadius.circular(kCornerRadius),
+                  border: Border.all(color: kBorder),
+                ),
+                padding: const EdgeInsets.all(10),
+                child: ListView.builder(
+                  controller: _logScroll,
+                  itemCount: _log.length,
+                  itemBuilder: (_, i) => Text(
+                    _log[i],
+                    style: const TextStyle(
+                      color: kText,
+                      fontSize: 13,
+                      height: 1.35,
                     ),
                   ),
                 ),
               ),
               SizedBox(height: tight ? 8 : 14),
               // Entry country (flags) — main shell above Connect, not Settings-only
-              if (!tight) ...[
-                const Text(
-                  'Entry country',
-                  style: TextStyle(
-                    color: kTextMuted,
-                    fontSize: 11,
-                    fontWeight: FontWeight.w600,
-                  ),
+              const Text(
+                'Entry country',
+                style: TextStyle(
+                  color: kTextMuted,
+                  fontSize: 11,
+                  fontWeight: FontWeight.w600,
                 ),
-                const SizedBox(height: 4),
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12),
-                  decoration: BoxDecoration(
-                    color: kPanelBg,
-                    borderRadius: BorderRadius.circular(kCornerRadius),
-                    border: Border.all(color: kBorder),
-                  ),
-                  child: DropdownButtonHideUnderline(
-                    child: DropdownButton<String>(
-                      isExpanded: true,
-                      value: normalizeEntryCountry(_settings.entryCountry),
-                      items: [
-                        for (final o in kProductCountryCatalog)
-                          DropdownMenuItem<String>(
-                            value: o.code,
-                            child: Text(
-                              o.label,
-                              style: const TextStyle(fontSize: 15),
-                            ),
+              ),
+              const SizedBox(height: 4),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12),
+                decoration: BoxDecoration(
+                  color: kPanelBg,
+                  borderRadius: BorderRadius.circular(kCornerRadius),
+                  border: Border.all(color: kBorder),
+                ),
+                child: DropdownButtonHideUnderline(
+                  child: DropdownButton<String>(
+                    isExpanded: true,
+                    value: normalizeEntryCountry(_settings.entryCountry),
+                    items: [
+                      for (final o in kProductCountryCatalog)
+                        DropdownMenuItem<String>(
+                          value: o.code,
+                          child: Text(
+                            o.label,
+                            style: const TextStyle(fontSize: 15),
                           ),
-                      ],
-                      onChanged: _busy
-                          ? null
-                          : (code) async {
-                              if (code == null) return;
-                              final next = normalizeEntryCountry(code);
-                              final updated =
-                                  _settings.copyWith(entryCountry: next);
-                              setState(() => _settings = updated);
-                              RptConfig.setRuntimeEntryCountry(next);
-                              await _store?.save(updated);
-                              _append(
-                                'Entry country: ${countryOptionForCode(next)?.label ?? next} (next Connect)',
-                              );
-                            },
-                    ),
+                        ),
+                    ],
+                    onChanged: _busy
+                        ? null
+                        : (code) async {
+                            if (code == null) return;
+                            final next = normalizeEntryCountry(code);
+                            final updated =
+                                _settings.copyWith(entryCountry: next);
+                            setState(() => _settings = updated);
+                            RptConfig.setRuntimeEntryCountry(next);
+                            await _store?.save(updated);
+                            _append(
+                              'Entry country: ${countryOptionForCode(next)?.label ?? next} (next Connect)',
+                            );
+                          },
                   ),
                 ),
-                const SizedBox(height: 10),
-              ],
+              ),
+              const SizedBox(height: 10),
+                    ],
+                  ),
+                ),
+              ),
               SizedBox(
                 height: tight ? 44 : 52,
                 child: ElevatedButton(
