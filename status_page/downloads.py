@@ -1318,6 +1318,5 @@ def render_download_section_html(
     <div class="dl-platform-note-box" id="dl-platform-note-box">
       <p class="dl-platform-note" id="dl-platform-note">{PLATFORM_SELECT_NOTE}</p>
     </div>
-{render_node_preference_html()}
   </section>
 """

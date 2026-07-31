@@ -89,8 +89,10 @@ class TestDownloadBoxNodeLinks(unittest.TestCase):
         suite = render_suite_storefront_html()
         self.assertIn(NODE_OPERATOR_DOCS_HREF, suite)
         self.assertNotIn('href="/README.md"', frag)
+        # Node preference only on Suite (left) box — not the client downloads card
         dl = render_download_section_html()
-        self.assertIn(NODE_OPERATOR_DOCS_HREF, dl)
+        self.assertNotIn("download-node-preference", dl)
+        self.assertNotIn(NODE_OPERATOR_DOCS_HREF, dl)
 
     def test_suite_client_downloads_still_present(self) -> None:
         from downloads import (
