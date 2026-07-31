@@ -39,7 +39,7 @@ class TestHomepageTrialSentence(unittest.TestCase):
         self.assertIn('id="dl-only-price"', html)
         self.assertIn('class="dl-only-price"', html)
         self.assertIn(ONLY_PRICE_BANNER, html)
-        self.assertIn("ONLY £2.45 per month", ONLY_PRICE_BANNER)
+        self.assertIn("ONLY £3.00 per month", ONLY_PRICE_BANNER)
         self.assertTrue(
             "yearly" in ONLY_PRICE_BANNER.lower()
             or "annual" in ONLY_PRICE_BANNER.lower()
@@ -64,7 +64,10 @@ class TestHomepageTrialSentence(unittest.TestCase):
         self.assertIn("one device licence", snippet)
         self.assertIn(sub_sentence, snippet)
         self.assertTrue(
-            "Monthly or Annual" in snippet or "Monthly or Yearly" in snippet
+            ("Monthly" in snippet and "Annual" in snippet)
+            or ("Monthly" in snippet and "Yearly" in snippet)
+            or "Monthly or Annual" in snippet
+            or "Monthly or Yearly" in snippet
         )
         self.assertIn("subscription starts when you pay", snippet)
         self.assertNotIn("7 day trial", snippet.lower())
@@ -81,11 +84,11 @@ class TestHomepageTrialSentence(unittest.TestCase):
         self.assertNotIn("keygen is emailed to you directly", snippet)
         self.assertNotIn("keygen is emailed to you directly", html)
         self.assertNotIn(
-            "Your monthly subscription (£2.45 per month) begins after your 7 day trial",
+            "Your monthly subscription (£3.00 per month) begins after your 7 day trial",
             snippet,
         )
         self.assertNotIn(
-            "Your monthly subscription (£2.45 per month) begins after your 7 day trial",
+            "Your monthly subscription (£3.00 per month) begins after your 7 day trial",
             html,
         )
         self.assertNotIn(
@@ -124,7 +127,7 @@ class TestHomepageTrialSentence(unittest.TestCase):
             css,
             r"@media \(max-width:\s*640px\)[\s\S]*?\.dl-price-box[\s\S]*?width:\s*100%",
         )
-        # ONLY £2.45 banner: large, white, same sans-serif stack as page/dl-price
+        # ONLY £3.00 banner: large, white, same sans-serif stack as page/dl-price
         self.assertIn(".dl-only-price", css)
         self.assertIn("#ffffff", css)
         self.assertIn("font-size:", css)
@@ -185,13 +188,13 @@ class TestKeygenMintAndEmail(unittest.TestCase):
                 "object": {
                     "id": "cs_test_keygen_1",
                     "payment_status": "paid",
-                    "amount_total": 245,
+                    "amount_total": 300,
                     "currency": "gbp",
                     "client_reference_id": "windows",
                     "customer_email": "buyer@example.com",
                     "metadata": {
                         "platform": "windows",
-                        "amount_pence": "245",
+                        "amount_pence": "300",
                         "currency": "gbp",
                     },
                 }

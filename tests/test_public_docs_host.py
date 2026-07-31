@@ -122,7 +122,7 @@ class TestHowToBuyAndHttp(unittest.TestCase):
         self.assertIn("Select your plan", html)
         self.assertIn("Monthly VPN plan", html)
         self.assertIn("Yearly VPN plan", html)
-        self.assertIn("£27.93", html)
+        self.assertIn("£30.00", html)
         self.assertNotIn("buy.stripe.com", html)
         self.assertNotIn("£29.40", html)
         self.assertIn("how-to-buy-payment-page", html)
@@ -133,12 +133,12 @@ class TestHowToBuyAndHttp(unittest.TestCase):
         self.assertIn("checkout.session.completed", html)
 
     def test_public_readme_catalog_copy_matches_site_pay_plan(self):
-        """Shipped /README.md (status_page/public) must advertise /pay + £27.93."""
+        """Shipped /README.md (status_page/public) must advertise /pay + £30.00."""
         readme = (ROOT / "status_page" / "public" / "README.md").read_text(
             encoding="utf-8"
         )
         self.assertIn("/pay", readme)
-        self.assertIn("£27.93", readme)
+        self.assertIn("£30.00", readme)
         self.assertIn("Monthly VPN plan", readme)
         self.assertIn("Yearly VPN plan", readme)
         self.assertNotIn("£29.40", readme)

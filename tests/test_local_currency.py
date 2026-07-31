@@ -19,14 +19,13 @@ class TestGbpAnchorsAndConvert(unittest.TestCase):
             PRICE_YEARLY_PENCE,
         )
 
-        self.assertEqual(PRICE_MONTHLY_GBP, 2.45)
-        self.assertEqual(PRICE_YEARLY_GBP, 27.93)
-        self.assertEqual(PRICE_MONTHLY_PENCE, 245)
-        self.assertEqual(PRICE_YEARLY_PENCE, 2793)
-        # 5% off 12 × monthly
-        self.assertAlmostEqual(
-            PRICE_YEARLY_GBP, 12 * PRICE_MONTHLY_GBP * 0.95, places=2
-        )
+        self.assertEqual(PRICE_MONTHLY_GBP, 3.00)
+        self.assertEqual(PRICE_YEARLY_GBP, 30.00)
+        self.assertEqual(PRICE_MONTHLY_PENCE, 300)
+        self.assertEqual(PRICE_YEARLY_PENCE, 3000)
+        # Fixed yearly catalog (£30), not 5% of 12× monthly
+        self.assertEqual(PRICE_YEARLY_GBP, 30.00)
+        self.assertLess(PRICE_YEARLY_GBP, 12 * PRICE_MONTHLY_GBP)
 
     def test_convert_eur_and_jpy(self):
         from local_currency import (
@@ -36,14 +35,14 @@ class TestGbpAnchorsAndConvert(unittest.TestCase):
         )
 
         # Fixed table: EUR 1.17 per GBP
-        eur_m = convert_gbp_to_currency(2.45, "EUR")
-        self.assertAlmostEqual(eur_m, 2.45 * 1.17, places=4)
-        eur_y = convert_gbp_to_currency(27.93, "EUR")
-        self.assertAlmostEqual(eur_y, 27.93 * 1.17, places=4)
+        eur_m = convert_gbp_to_currency(3.00, "EUR")
+        self.assertAlmostEqual(eur_m, 3.00 * 1.17, places=4)
+        eur_y = convert_gbp_to_currency(30.00, "EUR")
+        self.assertAlmostEqual(eur_y, 30.00 * 1.17, places=4)
         self.assertIn("EUR", format_money(eur_m, "EUR"))
 
-        jpy = convert_gbp_to_currency(2.45, "JPY")
-        self.assertAlmostEqual(jpy, 2.45 * 190.0, places=2)
+        jpy = convert_gbp_to_currency(3.00, "JPY")
+        self.assertAlmostEqual(jpy, 3.00 * 190.0, places=2)
         # Zero-decimal display
         self.assertRegex(format_money(jpy, "JPY"), r"^JPY \d")
 
@@ -114,8 +113,8 @@ class TestCatalogHtmlLocalCurrency(unittest.TestCase):
         self.assertIn('id="dl-local-price"', html)
         self.assertIn('id="dl-accept-currency"', html)
         self.assertIn("EUR", html)
-        self.assertIn("£2.45", html)
-        self.assertIn("£27.93", html)
+        self.assertIn("£3.00", html)
+        self.assertIn("£30.00", html)
         self.assertIn("data-display-currency=\"EUR\"", html)
         # Catalog embeds buy form (local amounts on plan radio labels)
         self.assertIn("/pay/checkout", html)
@@ -203,12 +202,12 @@ class TestCatalogHtmlLocalCurrency(unittest.TestCase):
                 success_url="https://example.com/ok",
                 cancel_url="https://example.com/cancel",
             ),
-            amount_gbp=2.45,
+            amount_gbp=3.00,
             interval="month",
         ).decode("utf-8")
         decoded = urllib.parse.unquote(body)
         self.assertIn("currency]=usd", decoded)  # price_data[currency]=usd
-        self.assertIn("unit_amount]=311", decoded)  # 2.45 * 1.27 * 100
+        self.assertIn("unit_amount]=381", decoded)  # 3.00 * 1.27 * 100
         self.assertIn("presentment]=usd", decoded)
         self.assertNotIn("currency]=gbp", decoded)
 

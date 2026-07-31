@@ -2,7 +2,7 @@
 
 This status site sells **Restore Privacy** as a **Stripe subscription**. Catalog
 tiles open the site **Select your plan** page (`/pay`) for **Monthly VPN plan
-(£2.45/month GBP)** or **Yearly VPN plan (£27.93/year = 5% off 12× monthly)**.
+(£3.00/month GBP)** or **Yearly VPN plan (£30.00/year)**.
 Checkout is a Stripe **subscription** Checkout Session (subscription starts when you pay). Funds
 settle in **your Stripe account** when you use **live** API keys.
 
@@ -34,9 +34,9 @@ Operator deploy for production email + Stripe product prices is documented in
 [`docs/STATUS_HOST_SMTP_AND_TRIAL.md`](../../docs/STATUS_HOST_SMTP_AND_TRIAL.md):
 
 - Render env: `RPT_FULFILMENT_SMTP_*` (blueprint `render.yaml`; script `scripts/set_render_fulfilment_smtp.ps1`)
-- Stripe products: **Monthly VPN plan** £2.45/month and **Yearly VPN plan** **£27.93/year** (2793 pence), **subscription starts when you pay** (script `scripts/configure_stripe_payment_link_trial.py` when `STRIPE_SECRET_KEY` is set)
+- Stripe products: **Monthly VPN plan** £3.00/month and **Yearly VPN plan** **£30.00/year** (3000 pence), **subscription starts when you pay** (script `scripts/configure_stripe_payment_link_trial.py` when `STRIPE_SECRET_KEY` is set)
 - Price ids: `STRIPE_PRICE_ID_MONTHLY` / `STRIPE_PRICE_ID_YEARLY` (defaults in `payments.py`)
-- **Local currency display:** catalog converts £2.45 / £27.93 into the visitor’s currency (`status_page/local_currency.py`) and shows **we accept *CURRENCY***
+- **Local currency display:** catalog converts £3.00 / £30.00 into the visitor’s currency (`status_page/local_currency.py`) and shows **we accept *CURRENCY***
 - **Checkout presentment:** plan page → `POST /pay/checkout` creates a **subscription** Checkout Session; USD presentment uses relative cents from GBP anchors when needed (`STRIPE_SECRET_KEY` required)
 
 ## Customer journey (subscription keygen unlock)
@@ -88,16 +88,16 @@ online re-check on Connect (`client/payment_entitlement.py` and
 3. Optional: Publishable key is not required for this Checkout redirect flow.
 4. **Never commit** secret keys to git. Set them only on the host (Render env, etc.).
 
-### 1.3 Product price (£2.45)
+### 1.3 Product price (£3.00)
 
 **Option A (simplest / default):** leave checkout price env empty.  
-The app creates Checkout line items with `mode=payment`, `unit_amount=245`, `currency=gbp`.
+The app creates Checkout line items with `mode=payment`, `unit_amount=300`, `currency=gbp`.
 Server Checkout always sets `customer_creation=always` so **email is required**.
 
 **Option B (Dashboard one-time price only):**
 
 1. Product catalog → **Add product** → name e.g. `Restore Privacy download`.
-2. Price: **£2.45**, currency **GBP**, **one-time** (not recurring / subscription).
+2. Price: **£3.00**, currency **GBP**, **one-time** (not recurring / subscription).
 3. Copy the **Price id** (`price_…`) into **`STRIPE_CHECKOUT_PRICE_ID`** (not the Payment Link price).
 
 **Do not** put a Payment Link **recurring** price in `STRIPE_PRICE_ID` for downloads.
@@ -111,15 +111,15 @@ Flow:
 
 1. Catalog tile → site **`/pay?platform=…`** (Select your plan: **Monthly** or **Annual**).
 2. Form **`POST /pay/checkout`** creates a Stripe **subscription** Checkout Session for
-   **Monthly VPN plan** (£2.45/month) or **Yearly VPN plan** (£27.93/year = 5% off).
+   **Monthly VPN plan** (£3.00/month) or **Yearly VPN plan** (£30.00/year).
 3. Customer pays on Stripe Checkout (**subscription starts when you pay**). Email is collected by Checkout.
 
 Dashboard products/prices:
 
 | Plan | Name | Amount | Price id (default) |
 |------|------|--------|--------------------|
-| Monthly | Monthly VPN plan | 245 pence GBP / month | `price_1TwjilJDavQ2TJW6fyxzCIkA` |
-| Yearly | Yearly VPN plan | **2793** pence GBP / year | `price_1TwjimJDavQ2TJW6wEKr4upj` |
+| Monthly | Monthly VPN plan | 300 pence GBP / month | `price_1Tz8mgJDavQ2TJW6M6mB9c7x` |
+| Yearly | Yearly VPN plan | **3000** pence GBP / year | `price_1Tz8miJDavQ2TJW6T0G7B1iD` |
 
 Override with `STRIPE_PRICE_ID_MONTHLY` / `STRIPE_PRICE_ID_YEARLY` if you rotate prices.
 Use `scripts/configure_stripe_payment_link_trial.py` (when `STRIPE_SECRET_KEY` is set)
@@ -163,7 +163,7 @@ stripe trigger checkout.session.completed
 | `STRIPE_SECRET_KEY` | `sk_test_…` or `sk_live_…` (Dashboard → Developers → API keys) — **required** for `/pay/checkout` Sessions |
 | `STRIPE_WEBHOOK_SECRET` | `whsec_…` from the webhook endpoint (Dashboard → Webhooks → Signing secret) |
 | `STRIPE_PRICE_ID_MONTHLY` | Recurring Monthly VPN plan price id (default shipped in `payments.py`) |
-| `STRIPE_PRICE_ID_YEARLY` | Recurring Yearly VPN plan price id (default shipped; **2793** pence) |
+| `STRIPE_PRICE_ID_YEARLY` | Recurring Yearly VPN plan price id (default empty; Checkout uses unit_amount **3000** pence when unset) |
 | `STRIPE_PAYMENT_PAGE_URL` | Legacy monthly Payment Link URL (inactive; not catalog primary) |
 | `STRIPE_PAYMENT_PAGE_URL_YEARLY` | Legacy yearly Payment Link URL (inactive; not catalog primary) |
 | `STRIPE_CHECKOUT_PRICE_ID` | Optional **one-time** `price_…` only if forcing `RPT_CHECKOUT_ONE_TIME=1`; catalog default is subscription |
@@ -186,7 +186,7 @@ stripe trigger checkout.session.completed
 
 1. Use **test** keys + test card `4242 4242 4242 4242` until the flow works.
 2. Switch webhook to the live endpoint, set **live** secret key + live webhook secret.
-3. Confirm a real £2.45 payment appears in the Stripe Dashboard **Payments** list and payouts schedule.
+3. Confirm a real £3.00 payment appears in the Stripe Dashboard **Payments** list and payouts schedule.
 
 ### 1.7 Success / cancel URLs
 

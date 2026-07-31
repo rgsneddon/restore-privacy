@@ -410,7 +410,7 @@ def render_html(
     """HTML: shared brand header + downloads + audit countdown (no client count).
 
     *accept_language* / *country* / *currency* drive local-currency price display
-    (GBP anchors £2.45 / £27.93 → visitor currency; Stripe-unsupported → USD).
+    (GBP anchors £3.00 / £30.00 → visitor currency; Stripe-unsupported → USD).
     """
     _ = poll_ms  # retained for call-site compat; public page does not poll a count
     try:

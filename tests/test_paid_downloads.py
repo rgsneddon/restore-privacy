@@ -31,49 +31,49 @@ from downloads import (  # noqa: E402
 
 class TestPaidDownloadUI(unittest.TestCase):
     def test_buttons_are_paid_not_free_github_href(self):
-        # Default catalog: live Stripe Payment Link Pay buttons
+        # Default catalog: homepage Buy now → site /pay/checkout subscription.
         # BMC tip lives in page footer (coffee_link), not inside download buttons.
+        from downloads import RELEASE_VERSION
+
         html = render_download_section_html()
-        self.assertIn("£2.45", html)
+        self.assertIn("£3.00", html)
+        self.assertIn("£30.00", html)
         self.assertIn("GBP", html)
         self.assertIn(PRICE_LABEL, html)
-        self.assertIn("data-price-pence=\"245\"", html)
-        self.assertIn("Download client v0.4.0", html)
-        self.assertIn("Windows | Linux | macOS | iOS | Android", html)
+        self.assertIn(f"Download client v{RELEASE_VERSION}", html)
+        self.assertNotIn("£2.45", html)
+        self.assertNotIn("£27.93", html)
         self.assertNotIn('href="#"', html)
         self.assertNotIn("catalog-version", html)
-        self.assertIn('data-buy-mode="stripe-live"', html)
-        self.assertIn('data-pay-via="stripe-payment-page"', html)
-        self.assertIn("BUY - 0.4.0", html)
-        pay_base = payments.stripe_payment_page_url()
-        self.assertEqual(
-            pay_base, payments.desired_payment_link_trial_fields()["payment_page_url"]
-        )
-        self.assertEqual(
-            pay_base, "https://buy.stripe.com/cNi7sM4uOeWQ9TBe0q7kc00"
-        )
+        self.assertIn('data-buy-mode="homepage-buy-form"', html)
+        self.assertIn('action="/pay/checkout"', html)
+        self.assertIn("Buy now", html)
+        self.assertNotIn("buy.stripe.com", html)
+        self.assertNotIn("releases/download", html)
         self.assertEqual(
             payments.desired_payment_link_trial_fields()["mode"], "subscription"
         )
+        self.assertEqual(
+            payments.desired_payment_link_trial_fields()["unit_amount_pence"], 300
+        )
+        self.assertEqual(
+            payments.desired_payment_link_trial_fields()["unit_amount_yearly_pence"],
+            3000,
+        )
         self.assertNotIn("donate.stripe.com", html)
-        self.assertIn("buy.stripe.com", html)
         self.assertIn('id="dl-platform-note"', html)
         self.assertIn(
             "please select your device platform carefully",
             html.lower(),
         )
         for a in available_downloads():
-            href = payments.stripe_payment_page_href_for_platform(a.platform)
-            self.assertIn(f'href="{href}"', html)
-            self.assertIn(f"client_reference_id={a.platform}", href)
-            self.assertIn("buy.stripe.com", href)
-            self.assertNotIn("donate.stripe.com", href)
+            # Platform is selected in the buy form (not dual buy.stripe.com tiles)
+            self.assertIn(f'value="{a.platform}"', html)
             self.assertNotIn(f'href="{a.url}"', html)  # never free GitHub release href
-            self.assertNotIn(f'href="/pay?platform={a.platform}"', html)
 
     def test_status_page_html_paid_flow(self):
         page = status_app.render_html({"title": "RESTORE PRIVACY"}).decode("utf-8")
-        self.assertIn("£2.45", page)
+        self.assertIn("£3.00", page)
         # Public footer is Raskul copyright (not Buy Me a Coffee)
         self.assertIn("Raskul", page)
         self.assertIn("all rights reserved", page)
@@ -93,11 +93,11 @@ class TestPaidDownloadUI(unittest.TestCase):
 class TestCheckoutAmount(unittest.TestCase):
     def test_pricing_constants(self):
         fields = payments.checkout_amount_fields_for_tests()
-        self.assertEqual(fields["amount_pence"], 245)
+        self.assertEqual(fields["amount_pence"], 300)
         self.assertEqual(fields["currency"], "gbp")
-        self.assertEqual(fields["label"], "£2.45")
+        self.assertEqual(fields["label"], "£3.00")
 
-    def test_checkout_form_body_includes_245_gbp_and_platform(self):
+    def test_checkout_form_body_includes_300_gbp_and_platform(self):
         creq = payments.CheckoutRequest(
             platform="windows",
             filename="restore-privacy-client-0.4.0-windows-x64-setup.exe",
@@ -109,14 +109,14 @@ class TestCheckoutAmount(unittest.TestCase):
         parsed = urllib.parse.parse_qs(body)
         self.assertEqual(parsed["mode"], ["payment"])
         self.assertEqual(parsed["customer_creation"], ["always"])
-        self.assertEqual(parsed["line_items[0][price_data][unit_amount]"], ["245"])
+        self.assertEqual(parsed["line_items[0][price_data][unit_amount]"], ["300"])
         self.assertEqual(parsed["line_items[0][price_data][currency]"], ["gbp"])
         self.assertEqual(parsed["metadata[platform]"], ["windows"])
         self.assertEqual(
             parsed["metadata[filename]"],
             ["restore-privacy-client-0.4.0-windows-x64-setup.exe"],
         )
-        self.assertEqual(parsed["metadata[amount_pence]"], ["245"])
+        self.assertEqual(parsed["metadata[amount_pence]"], ["300"])
 
     def test_legacy_stripe_price_id_ignored_avoids_recurring_payment_mode_error(self):
         """STRIPE_PRICE_ID often holds a Payment Link recurring price — must not be used."""
@@ -142,7 +142,7 @@ class TestCheckoutAmount(unittest.TestCase):
         parsed = urllib.parse.parse_qs(body)
         self.assertEqual(parsed["mode"], ["payment"])
         self.assertNotIn("line_items[0][price]", parsed)
-        self.assertEqual(parsed["line_items[0][price_data][unit_amount]"], ["245"])
+        self.assertEqual(parsed["line_items[0][price_data][unit_amount]"], ["300"])
         self.assertNotIn(recurring, body)
 
     def test_explicit_one_time_checkout_price_id_used(self):
@@ -191,7 +191,7 @@ class TestCheckoutAmount(unittest.TestCase):
             out = payments.create_checkout_session(
                 "android", http_post=fake_post
             )
-        self.assertEqual(out["amount_pence"], 245)
+        self.assertEqual(out["amount_pence"], 300)
         self.assertEqual(out["currency"], "gbp")
         self.assertEqual(out["platform"], "android")
         self.assertTrue(out["filename"].endswith("android.apk"))
@@ -200,8 +200,14 @@ class TestCheckoutAmount(unittest.TestCase):
         self.assertIn("Bearer sk_test_unit", captured["headers"]["Authorization"])
         body = captured["body"].decode("utf-8")
         parsed = urllib.parse.parse_qs(body)
-        self.assertEqual(parsed["line_items[0][price_data][unit_amount]"], ["245"])
-        self.assertEqual(parsed["line_items[0][price_data][currency]"], ["gbp"])
+        # Catalog default is subscription Checkout with Dashboard Price ids
+        self.assertEqual(parsed["mode"], ["subscription"])
+        self.assertEqual(
+            parsed["line_items[0][price]"],
+            [payments.DEFAULT_STRIPE_PRICE_ID_MONTHLY],
+        )
+        self.assertEqual(parsed["metadata[amount_pence]"], ["300"])
+        self.assertEqual(out["mode"], "subscription")
 
 
 class TestWebhookAndTokens(unittest.TestCase):
@@ -227,7 +233,7 @@ class TestWebhookAndTokens(unittest.TestCase):
                         "metadata": {
                             "platform": "linux",
                             "filename": "restore-privacy-client-0.4.0-linux-x64.tar.gz",
-                            "amount_pence": "245",
+                            "amount_pence": "300",
                             "currency": "gbp",
                         },
                     }
@@ -255,7 +261,7 @@ class TestWebhookAndTokens(unittest.TestCase):
                         "metadata": {
                             "platform": "windows",
                             "filename": "restore-privacy-client-0.4.0-windows-x64-setup.exe",
-                            "amount_pence": "245",
+                            "amount_pence": "300",
                             "currency": "gbp",
                         },
                     }
@@ -278,7 +284,7 @@ class TestWebhookAndTokens(unittest.TestCase):
             first["url"].endswith("windows-x64-setup.exe"),
             first["url"],
         )
-        self.assertEqual(first["amount_pence"], 245)
+        self.assertEqual(first["amount_pence"], 300)
 
         # Reusable within TTL (not single-use)
         second = payments.redeem_download_token(token)
@@ -306,12 +312,12 @@ class TestWebhookAndTokens(unittest.TestCase):
                         "id": "cs_stale_meta_1",
                         "payment_status": "paid",
                         "currency": "gbp",
-                        "amount_total": 245,
+                        "amount_total": 300,
                         "metadata": {
                             "platform": "windows",
                             # Stale prior catalog name — must not be granted as-is
                             "filename": "restore-privacy-client-0.2.9-windows-x64-setup.exe",
-                            "amount_pence": "245",
+                            "amount_pence": "300",
                             "currency": "gbp",
                         },
                     }
@@ -382,7 +388,7 @@ class TestWebhookAndTokens(unittest.TestCase):
                         "id": "cs_plink_windows_1",
                         "payment_status": "paid",
                         "currency": "gbp",
-                        "amount_total": 245,
+                        "amount_total": 300,
                         "client_reference_id": "windows",
                         "metadata": {},
                     }
@@ -408,7 +414,7 @@ class TestWebhookAndTokens(unittest.TestCase):
     def test_payment_link_zero_amount_or_missing_status_refuses_grant(self):
         """Only if paid at full price — zero amount / blank status must not mint."""
         secret = "whsec_zero"
-        # amount_total=0 must not be rewritten to 245
+        # amount_total=0 must not be rewritten to 300
         payload_zero = json.dumps(
             {
                 "type": "checkout.session.completed",
@@ -440,7 +446,7 @@ class TestWebhookAndTokens(unittest.TestCase):
                     "object": {
                         "id": "cs_no_status",
                         "currency": "gbp",
-                        "amount_total": 245,
+                        "amount_total": 300,
                         "client_reference_id": "linux",
                         "metadata": {},
                     }
@@ -454,7 +460,7 @@ class TestWebhookAndTokens(unittest.TestCase):
         self.assertFalse(r1["granted"])
 
     def test_payment_link_underpay_amount_total_refuses_grant(self):
-        """amount_total must equal product PRICE_PENCE (245), not a lower paid amount."""
+        """amount_total must equal product PRICE_PENCE (300), not a lower paid amount."""
         secret = "whsec_under"
         payload = json.dumps(
             {
@@ -519,7 +525,7 @@ class TestAdminAuth(unittest.TestCase):
         html = admin_panel.render_admin_html(page="licences").decode("utf-8")
         self.assertIn("admin-grants-table", html)
         self.assertIn("macos", html)
-        self.assertIn("245", html)
+        self.assertIn("300", html)
 
 
 class TestAdminHttpUnauthenticated(unittest.TestCase):
@@ -558,8 +564,8 @@ class TestHowtoDoc(unittest.TestCase):
         text = doc.read_text(encoding="utf-8")
         self.assertIn("Stripe", text)
         self.assertIn("webhook", text.lower())
-        self.assertIn("2.45", text)
-        self.assertIn("245", text)
+        self.assertIn("3.00", text)
+        self.assertIn("300", text)
         self.assertIn("STRIPE_SECRET_KEY", text)
         self.assertIn("STRIPE_WEBHOOK_SECRET", text)
         self.assertIn("RPT_ADMIN_PASSWORD", text)
@@ -594,7 +600,7 @@ class TestBuyerSuccessFulfilment(unittest.TestCase):
                         "metadata": {
                             "platform": "linux",
                             "filename": "restore-privacy-client-0.4.0-linux-x64.tar.gz",
-                            "amount_pence": "245",
+                            "amount_pence": "300",
                             "currency": "gbp",
                         },
                     }
@@ -630,7 +636,7 @@ class TestBuyerSuccessFulfilment(unittest.TestCase):
                         "metadata": {
                             "platform": "windows",
                             "filename": "restore-privacy-client-0.4.0-windows-x64-setup.exe",
-                            "amount_pence": "245",
+                            "amount_pence": "300",
                             "currency": "gbp",
                         },
                     }
@@ -816,7 +822,7 @@ class TestAdminHtmlArchitecture(unittest.TestCase):
         self.assertIn("admin-grants-table", grants)
         self.assertIn("Active Licences", grants)
         self.assertIn("android", grants)
-        self.assertIn("245", grants)
+        self.assertIn("300", grants)
         # Guide may show prefix+ellipsis; ban real-looking secret values only
         for html in (proc, grants):
             self.assertNotRegex(html, r"sk_(?:live|test)_[A-Za-z0-9]{10,}")
@@ -1593,7 +1599,7 @@ class TestAdminFullGrantsListNoDropOff(unittest.TestCase):
                         "metadata": {
                             "platform": "linux",
                             "filename": "restore-privacy-client-0.4.0-linux-x64.tar.gz",
-                            "amount_pence": "245",
+                            "amount_pence": "300",
                             "currency": "gbp",
                         },
                     }

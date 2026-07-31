@@ -174,7 +174,7 @@ def _stripe_readiness() -> dict[str, Any]:
         "payment_page_url": pay_page,
         "payment_link_id": plink,
         "payment_link_ready": bool(plink.startswith("plink_")),
-        # Catalog product is subscription (£2.45/mo or yearly)
+        # Catalog product is subscription (£3.00/mo or £30.00/year)
         "catalog_payment_mode": CATALOG_STRIPE_PAYMENT_MODE,
         "desired_subscription": {
             "mode": desired.get("mode"),
@@ -260,9 +260,9 @@ STRIPE_PLUGIN = ProcessorPlugin(
     display_name="Stripe",
     role="paid_downloads",
     description=(
-        "Paid package downloads via Stripe **subscription** Payment Link "
-        "(£2.45/month GBP subscription). Catalog BUY tiles open the public link "
-        "with client_reference_id; fulfilment needs secret key + webhook — never commit them."
+        "Paid package downloads via Stripe **subscription** Checkout "
+        "(£3.00/month or £30.00/year GBP). Catalog BUY tiles open the public plan "
+        "page; fulfilment needs secret key + webhook — never commit them."
     ),
     variables=(
         ProcessorVariable(
@@ -286,7 +286,7 @@ STRIPE_PLUGIN = ProcessorPlugin(
         ProcessorVariable(
             key="STRIPE_CHECKOUT_PRICE_ID",
             label="Optional one-time Checkout price id",
-            purpose="Server /api/checkout only (mode=payment). Catalog uses subscription Payment Link price. Leave empty for unit_amount=245.",
+            purpose="Server /api/checkout only (mode=payment). Catalog uses subscription Checkout. Leave empty for unit_amount=300 (£3.00).",
             required=False,
             secret=False,
             input_type="text",

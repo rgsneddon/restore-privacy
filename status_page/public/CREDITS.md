@@ -38,7 +38,7 @@ The dark retro chrome is a visual nod to classic Windows 3.x UI — no Microsoft
 | **7-Zip / LZMA SDK** | Windows self-extracting setup packaging | https://www.7-zip.org/ |
 | **paramiko** | Optional deploy SSH helper | LGPL-2.1 — https://www.paramiko.org/ |
 | **GitHub** | Private operator source hosting (not a free public installer CDN) | GitHub terms |
-| **Stripe** | Catalog checkout (monthly £2.45 / yearly £27.93 GBP) | https://stripe.com/ |
+| **Stripe** | Catalog checkout (monthly £3.00 / yearly £30.00 GBP) | https://stripe.com/ |
 | **Render** | Public status host + paid download fulfilment | https://render.com/ |
 | **FlokiNET** | Residual peer IS (`82.221.101.241`); former RO host retired | https://flokinet.is/privacy/ · https://flokinet.is/vps/ |
 | **Hetzner** | Residual peer US (`5.161.242.85`, default entry) | https://www.hetzner.com/ |

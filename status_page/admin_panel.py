@@ -1423,7 +1423,7 @@ def render_processor_settings_html(
     <div><dt>Secret key</dt><dd id="stripe-secret-status">{_status_badge(bool(v.get("stripe_configured")))}</dd></div>
     <div><dt>Key mode</dt><dd id="stripe-key-mode">{_escape(stripe_mode)}</dd></div>
     <div><dt>Webhook signing secret</dt><dd id="stripe-webhook-status">{_status_badge(bool(v.get("stripe_webhook_configured")))}</dd></div>
-    <div><dt>Price id (optional)</dt><dd id="stripe-price-status">{_status_badge(bool(v.get("stripe_price_id_set")), "set", "empty · unit_amount 245")}</dd></div>
+    <div><dt>Price id (optional)</dt><dd id="stripe-price-status">{_status_badge(bool(v.get("stripe_price_id_set")), "set", "empty · unit_amount 300")}</dd></div>
     <div><dt>Checkout ready</dt><dd id="stripe-checkout-ready">{_status_badge(bool(v.get("stripe_checkout_ready")))}</dd></div>
     <div><dt>Fulfilment ready (key + webhook)</dt><dd id="stripe-fulfilment-ready">{_status_badge(bool(v.get("stripe_fulfilment_ready")))}</dd></div>
     <div><dt>Public base URL</dt><dd id="stripe-public-base"><code>{_escape(base)}</code></dd></div>

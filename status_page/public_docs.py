@@ -1131,7 +1131,7 @@ ol{{padding-left:1.25rem;color:var(--rb-muted)}}
 <h1 id="how-to-buy-heading">How to buy Restore Privacy</h1>
 <p class="muted">Paid subscription only: <strong>Monthly VPN plan</strong>
 ({_escape(PRICE_LABEL)} / month GBP) or <strong>Yearly VPN plan</strong>
-({_escape(PRICE_YEARLY_LABEL)} / year — 5% off vs paying monthly).
+({_escape(PRICE_YEARLY_LABEL)} / year — save vs 12 × monthly).
 There are no free permanent installer buttons on this shop.</p>
 
 <div class="card" id="how-to-buy-steps">

@@ -50,9 +50,13 @@ class TestBillingIntervals(unittest.TestCase):
 
     def test_month_year_checkout_use_distinct_price_ids(self):
         """Subscription Checkout binds month vs year to distinct Stripe Price ids."""
+        from urllib.parse import parse_qs
+
         from payments import (
             DEFAULT_STRIPE_PRICE_ID_MONTHLY,
             DEFAULT_STRIPE_PRICE_ID_YEARLY,
+            PRICE_PENCE,
+            PRICE_YEARLY_PENCE,
             build_subscription_checkout_form_body,
             stripe_subscription_price_id_for_interval,
         )
@@ -62,6 +66,8 @@ class TestBillingIntervals(unittest.TestCase):
         self.assertEqual(mid, DEFAULT_STRIPE_PRICE_ID_MONTHLY)
         self.assertEqual(yid, DEFAULT_STRIPE_PRICE_ID_YEARLY)
         self.assertNotEqual(mid, yid)
+        self.assertEqual(PRICE_PENCE, 300)
+        self.assertEqual(PRICE_YEARLY_PENCE, 3000)
         bm = build_subscription_checkout_form_body(
             "windows", "f.exe", interval="month",
             success_url="https://x/s", cancel_url="https://x/c",
@@ -70,9 +76,10 @@ class TestBillingIntervals(unittest.TestCase):
             "windows", "f.exe", interval="year",
             success_url="https://x/s", cancel_url="https://x/c",
         ).decode()
-        self.assertIn(mid, bm)
-        self.assertIn(yid, by)
-        self.assertNotIn(yid, bm)
+        pm = parse_qs(bm)
+        py = parse_qs(by)
+        self.assertEqual(pm["line_items[0][price]"], [mid])
+        self.assertEqual(py["line_items[0][price]"], [yid])
 
     def test_catalog_html_routes_to_site_pay_plan(self):
         from downloads import render_download_section_html
@@ -84,7 +91,7 @@ class TestBillingIntervals(unittest.TestCase):
         self.assertIn('data-buy-mode="homepage-buy-form"', html)
         self.assertIn("billing-intervals", html)
         self.assertIn("Buy now", html)
-        self.assertIn("£27.93", html)
+        self.assertIn("£30.00", html)
         self.assertNotIn("buy.stripe.com", html)
         self.assertNotIn("7 day trial", html.lower())
         self.assertNotIn("begins after your 7 day trial", html.lower())

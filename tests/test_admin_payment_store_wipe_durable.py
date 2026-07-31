@@ -105,7 +105,7 @@ class TestPaymentStoreWipeProtection(unittest.TestCase):
                             "restore-privacy-client-0.4.8-windows-x64-setup.exe",
                             "windows",
                             "cs_wipe_test_1",
-                            245,
+                            300,
                             "gbp",
                             1_700_000_000.0,
                             1_800_000_000.0,
@@ -335,7 +335,7 @@ class TestLegacyMigrateToDurable(unittest.TestCase):
                         "restore-privacy-client-0.4.8-windows-x64-setup.exe",
                         "windows",
                         "cs_migrate_1",
-                        245,
+                        300,
                         "gbp",
                         1_700_000_000.0,
                         1_800_000_000.0,
@@ -503,8 +503,8 @@ class TestAdminArchitectureCopy(unittest.TestCase):
 
 
 # Avoid importing PRICE constants at module load if payments side-effects
-PRICE_SNIPPET_MONTH = "£2.45"
-PRICE_SNIPPET_YEAR = "£27.93"
+PRICE_SNIPPET_MONTH = "£3.00"
+PRICE_SNIPPET_YEAR = "£30.00"
 
 
 if __name__ == "__main__":

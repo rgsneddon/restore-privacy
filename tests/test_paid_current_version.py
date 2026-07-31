@@ -67,13 +67,13 @@ class TestGrantBindsCurrentCatalogVersion(unittest.TestCase):
                     "object": {
                         "id": "cs_ver_stale_meta",
                         "payment_status": "paid",
-                        "amount_total": 245,
+                        "amount_total": 300,
                         "currency": "gbp",
                         "client_reference_id": "linux",
                         "metadata": {
                             "platform": "linux",
                             "filename": stale,
-                            "amount_pence": "245",
+                            "amount_pence": "300",
                             "currency": "gbp",
                         },
                     }
@@ -104,7 +104,7 @@ class TestGrantBindsCurrentCatalogVersion(unittest.TestCase):
                             "object": {
                                 "id": f"cs_ver_{a.platform}",
                                 "payment_status": "paid",
-                                "amount_total": 245,
+                                "amount_total": 300,
                                 "currency": "gbp",
                                 "client_reference_id": a.platform,
                                 "metadata": {},

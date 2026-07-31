@@ -3,8 +3,8 @@
 ## Customer flow
 
 1. Pay on [restoreprivacy.online](https://restoreprivacy.online/). Homepage /
-   `/pay` offer **Monthly VPN plan (£2.45)** (licence for **one month**) and
-   **Yearly VPN plan (£27.93, 5% off)** (licence for **one year**). Customers can
+   `/pay` offer **Monthly VPN plan (£3.00)** (licence for **one month**) and
+   **Yearly VPN plan (£30.00)** (licence for **one year**). Customers can
    **enable or disable auto-renew** before checkout (default: on).
 2. Status host on `checkout.session.completed`:
    - mints a **1-hour** download token (reusable until expiry)

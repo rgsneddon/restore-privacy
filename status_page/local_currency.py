@@ -1,8 +1,8 @@
 """Local-currency display for catalog prices (GBP anchors → visitor currency).
 
 Anchors (single source of truth):
-  - Monthly: **£2.45** GBP
-  - Yearly:  **£27.93** GBP (5% off 12 × £2.45)
+  - Monthly: **£3.00** GBP
+  - Yearly:  **£30.00** GBP (fixed catalog yearly)
 
 Conversion uses a fixed, testable FX table (units of currency per 1 GBP).
 When the visitor currency is **not** in Stripe's presentment set for this
@@ -19,10 +19,11 @@ from dataclasses import dataclass
 from typing import Iterable
 
 # --- GBP anchors (pence for integer math where useful) ---
-PRICE_MONTHLY_GBP = 2.45
-PRICE_YEARLY_GBP = 27.93  # 5% off 12 × 2.45
-PRICE_MONTHLY_PENCE = 245
-PRICE_YEARLY_PENCE = 2793
+# Keep aligned with status_page/payments.py PRICE_PENCE / PRICE_YEARLY_PENCE.
+PRICE_MONTHLY_GBP = 3.00
+PRICE_YEARLY_GBP = 30.00
+PRICE_MONTHLY_PENCE = 300
+PRICE_YEARLY_PENCE = 3000
 
 FALLBACK_CURRENCY = "USD"
 BASE_CURRENCY = "GBP"

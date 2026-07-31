@@ -1,6 +1,6 @@
 """Release download catalog + paid download UI (version 0.5.8).
 
-Primary path: pay **£2.45** (GBP) via Stripe Checkout per package, then a
+Primary path: pay **£3.00** (GBP) via Stripe Checkout per package, then a
 time-limited download token (default **1 hour**, reusable until expiry).
 Free permanent GitHub ``href`` is not used on the public buttons. After payment
 the status host **proxies** the installer (authenticated GitHub API / local
@@ -156,14 +156,30 @@ MACOS_ZIP_FILENAME = f"restore-privacy-client-{RELEASE_VERSION}-macos.zip"
 IOS_ZIP_FILENAME = f"restore-privacy-client-{RELEASE_VERSION}-ios.zip"
 LINUX_TGZ_FILENAME = f"restore-privacy-client-{RELEASE_VERSION}-linux-x64.tar.gz"
 
-PRICE_LABEL = "£2.45"
-PRICE_YEARLY_LABEL = "£27.93"  # 5% off 12 × £2.45 GBP anchor
+# Prefer payments module anchors when available (single source of truth).
+try:
+    from payments import (  # type: ignore
+        PRICE_LABEL as _PAY_PRICE_LABEL,
+        PRICE_YEARLY_LABEL as _PAY_PRICE_YEARLY_LABEL,
+        YEARLY_DISCOUNT_PERCENT as _PAY_YEARLY_DISCOUNT_PERCENT,
+    )
+
+    PRICE_LABEL = _PAY_PRICE_LABEL
+    PRICE_YEARLY_LABEL = _PAY_PRICE_YEARLY_LABEL
+    _YEARLY_SAVE_PCT = int(_PAY_YEARLY_DISCOUNT_PERCENT)
+except Exception:  # noqa: BLE001
+    PRICE_LABEL = "£3.00"
+    PRICE_YEARLY_LABEL = "£30.00"
+    _YEARLY_SAVE_PCT = 17
 # Large white bold callout under "Download client v…" on the public homepage.
-ONLY_PRICE_BANNER = "ONLY £2.45 per month — or annual £27.93 (save 5%)"
+ONLY_PRICE_BANNER = (
+    f"ONLY {PRICE_LABEL} per month — or annual {PRICE_YEARLY_LABEL} "
+    f"(save ~{_YEARLY_SAVE_PCT}% vs 12 × monthly)"
+)
 # Short single-line note under the price box (no re-listing of £ amounts).
 YEARLY_PLAN_NOTE = (
     "Select your device and plan below, then Buy now. "
-    "Annual saves 5% vs paying monthly. "
+    f"Annual is {PRICE_YEARLY_LABEL} (save ~{_YEARLY_SAVE_PCT}% vs 12 × monthly). "
     "Local currency display uses the GBP anchors above "
     "(we accept your local currency when Stripe allows; otherwise USD)."
 )
@@ -176,7 +192,7 @@ PLATFORM_SELECT_NOTE = (
 PACKAGE_IDENTITY = "one device licence"
 # Legacy constant name kept for import stability (no trial product / no trial copy).
 TRIAL_SUBSCRIPTION_SENTENCE = (
-    "Select your device and plan — Monthly or Annual (5% off yearly) — "
+    f"Select your device and plan — Monthly {PRICE_LABEL} or Annual {PRICE_YEARLY_LABEL} — "
     "subscription starts when you pay"
 )
 # Preferred alias (same text; avoid “trial” in new call sites).
@@ -382,7 +398,7 @@ def available_downloads(
 # Pre-RUST product line: restore-privacy Python RPT catalog (not RUST-IN-PRIVACY).
 PRODUCT_CATALOG_URL = "https://restoreprivacy.online/#downloads"
 PRODUCT_CATALOG_LABEL = (
-    f"Catalog v{RELEASE_VERSION} — installers after £2.45 payment only (signed packages)"
+    f"Catalog v{RELEASE_VERSION} — installers after {PRICE_LABEL} payment only (signed packages)"
 )
 # Back-compat aliases (historical RUST_REPO_* names; values are pre-RUST catalog).
 RUST_REPO_URL = PRODUCT_CATALOG_URL
@@ -845,7 +861,7 @@ def render_homepage_buy_form_html(
             <input type="radio" name="interval" value="year"{year_checked}
                    aria-label="Yearly VPN plan"/>
             <span class="dl-plan-title">Yearly VPN plan
-              <span class="dl-plan-save">SAVE 5%</span></span>
+              <span class="dl-plan-save">SAVE ~{_YEARLY_SAVE_PCT}%</span></span>
             <div class="dl-plan-price">{_esc_html(year_label)} / year</div>
           </label>
         </div>
@@ -880,7 +896,7 @@ def render_download_section_html(
     Live mode posts to ``/pay/checkout`` (subscription Checkout Session).
     *coming_soon* defaults to :func:`catalog_buy_buttons_coming_soon`.
 
-    Local-currency display uses GBP anchors £2.45 / £27.93 (5% annual off) with
+    Local-currency display uses GBP anchors £3.00 / £30.00 with
     :mod:`local_currency` (Stripe-unsupported currencies → USD).
     """
     items = list(assets) if assets is not None else available_downloads()
@@ -922,7 +938,7 @@ def render_download_section_html(
         local_line = (
             f"Local: <strong>{local.monthly_label}</strong> / mo · "
             f"<strong>{local.yearly_label}</strong> / yr "
-            f"(from £2.45 / £27.93 GBP) · {accept}"
+            f"(from {PRICE_LABEL} / {PRICE_YEARLY_LABEL} GBP) · {accept}"
         )
     if coming_soon:
         price_line = (

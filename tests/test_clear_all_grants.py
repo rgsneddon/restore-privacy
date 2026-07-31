@@ -44,14 +44,14 @@ class TestClearAllGrantsForAdmin(unittest.TestCase):
             filename="restore-privacy-client-0.5.2-windows-x64-setup.exe",
             platform="windows",
             session_id="cs_test_clear_grants_1",
-            amount_pence=245,
+            amount_pence=300,
             currency="gbp",
         )
         p.mint_download_token(
             filename="restore-privacy-client-0.5.2-android.apk",
             platform="android",
             session_id="cs_test_clear_grants_2",
-            amount_pence=245,
+            amount_pence=300,
             currency="gbp",
         )
         before = p.list_all_grants()

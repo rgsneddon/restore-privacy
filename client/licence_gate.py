@@ -275,7 +275,7 @@ def short_licence_summary() -> str:
         "By accepting, you agree to those terms. Acceptance is stored only on this device. "
         "After you accept, enter the keygen from your fulfilment email "
         "(USE THIS KEYGEN TO UNLOCK RESTORE PRIVACY) to unlock Connect. "
-        "Your subscription (£2.45 per month or £27.93 per year, save 5% annually) starts when you pay. "
+        "Your subscription (£3.00 per month or £30.00 per year) starts when you pay. "
         + PAYMENT_CONNECT_DISCLAIMER_PLAIN
     )
 

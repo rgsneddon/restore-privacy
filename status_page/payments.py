@@ -1,8 +1,8 @@
-"""Paid download fulfilment: Stripe **subscription** (£2.45/month GBP) + tokens.
+"""Paid download fulfilment: Stripe **subscription** (£3/month GBP) + tokens.
 
 Catalog BUY buttons open the **site-hosted plan page** (``/pay``) where the
-visitor selects Monthly or Annual (5% off yearly = £27.93). Checkout continues
-to a Stripe **subscription** Checkout Session for the chosen plan only (products
+visitor selects Monthly (£3.00) or Annual (£30.00). Checkout continues to a
+Stripe **subscription** Checkout Session for the chosen plan only (products
 **Monthly VPN plan** / **Yearly VPN plan**). Webhook/recovery mints a time-limited
 download token and Connect entitlement. See docs/PAID_DOWNLOADS_HOWTO.md.
 """
@@ -28,11 +28,21 @@ from typing import Any, Callable
 
 from downloads import RELEASE_ASSETS, available_downloads
 
-# £2.45 monthly; annual = 5% off 12 × monthly → £27.93 (2793 pence)
-PRICE_PENCE = 245
-YEARLY_DISCOUNT_PERCENT = 5
+# Catalog GBP anchors: £3.00 / month, £30.00 / year (fixed yearly, not 5% formula)
+PRICE_PENCE = 300
 PRICE_CURRENCY = "gbp"
-PRICE_LABEL = "£2.45"
+PRICE_LABEL = "£3.00"
+# Fixed yearly catalog price (3000 pence). 12 × monthly would be £36.00.
+PRICE_YEARLY_PENCE = 3000
+PRICE_YEARLY_LABEL = "£30.00"
+PRICE_YEARLY_FULL_PENCE = PRICE_PENCE * 12  # 3600 — “was” 12 × monthly
+PRICE_YEARLY_FULL_LABEL = (
+    f"£{PRICE_YEARLY_FULL_PENCE // 100}.{PRICE_YEARLY_FULL_PENCE % 100:02d}"
+)
+# Savings vs 12 × monthly (3000/3600 → ~17%)
+YEARLY_DISCOUNT_PERCENT = int(
+    round(100 * (1 - PRICE_YEARLY_PENCE / max(1, PRICE_YEARLY_FULL_PENCE)))
+)
 # Operator: enable Stripe Dashboard Adaptive Pricing when presentment allows;
 # unsupported currencies → USD (see local_currency.stripe_presentment_or_usd).
 
@@ -40,21 +50,20 @@ PRICE_LABEL = "£2.45"
 def yearly_amount_pence(
     monthly_pence: int = PRICE_PENCE,
     *,
-    discount_percent: int = YEARLY_DISCOUNT_PERCENT,
+    discount_percent: int | None = None,
 ) -> int:
-    """Annual unit amount in pence: 12 × monthly with *discount_percent* off."""
+    """Annual unit amount in pence.
+
+    Catalog yearly is the fixed :data:`PRICE_YEARLY_PENCE` when called with
+    defaults. Passing *discount_percent* keeps the old 12×monthly-discount helper
+    for tests that still exercise that math.
+    """
     m = int(monthly_pence)
-    d = max(0, min(100, int(discount_percent)))
+    if discount_percent is None and m == PRICE_PENCE:
+        return int(PRICE_YEARLY_PENCE)
+    d = YEARLY_DISCOUNT_PERCENT if discount_percent is None else int(discount_percent)
+    d = max(0, min(100, d))
     return int(round(m * 12 * (100 - d) / 100.0))
-
-
-PRICE_YEARLY_PENCE = yearly_amount_pence()  # 2793
-PRICE_YEARLY_LABEL = f"£{PRICE_YEARLY_PENCE // 100}.{PRICE_YEARLY_PENCE % 100:02d}"
-# Pre-discount 12× monthly (for “was / save 5%” display only)
-PRICE_YEARLY_FULL_PENCE = PRICE_PENCE * 12  # 2940
-PRICE_YEARLY_FULL_LABEL = (
-    f"£{PRICE_YEARLY_FULL_PENCE // 100}.{PRICE_YEARLY_FULL_PENCE % 100:02d}"
-)
 
 DEFAULT_SUCCESS_PATH = "/download/success"
 DEFAULT_CANCEL_PATH = "/download/cancel"
@@ -1244,8 +1253,12 @@ def update_stripe_account_public_profile(
 # Names: Monthly VPN plan / Yearly VPN plan. Old “download a vpn” product archived.
 DEFAULT_STRIPE_PRODUCT_ID_MONTHLY = "prod_UwcybkCi0spmDk"
 DEFAULT_STRIPE_PRODUCT_ID_YEARLY = "prod_Uwcy4ghppuxS2C"
-DEFAULT_STRIPE_PRICE_ID_MONTHLY = "price_1TwjilJDavQ2TJW6fyxzCIkA"
-DEFAULT_STRIPE_PRICE_ID_YEARLY = "price_1TwjimJDavQ2TJW6wEKr4upj"
+# Dashboard recurring Prices for catalog GBP anchors (£3 / month, £30 / year).
+# Created 2026-07 via scripts/configure_stripe_payment_link_trial.py (old 245/2793
+# Price ids must not remain as defaults). Override with STRIPE_PRICE_ID_MONTHLY /
+# YEARLY env or processor store. Empty → Checkout falls back to price_data unit_amount.
+DEFAULT_STRIPE_PRICE_ID_MONTHLY = "price_1Tz8mgJDavQ2TJW6M6mB9c7x"
+DEFAULT_STRIPE_PRICE_ID_YEARLY = "price_1Tz8miJDavQ2TJW6T0G7B1iD"
 STRIPE_PRODUCT_NAME_MONTHLY = "Monthly VPN plan"
 STRIPE_PRODUCT_NAME_YEARLY = "Yearly VPN plan"
 
@@ -1809,7 +1822,7 @@ def stripe_price_id() -> str:
     mode=payment. Set ``STRIPE_ALLOW_LEGACY_PRICE_ID=1`` to use ``STRIPE_PRICE_ID``
     only when that price is known one-time.
 
-    Empty is OK: Checkout uses ``unit_amount`` = £2.45 when no one-time price id.
+    Empty is OK: Checkout uses ``unit_amount`` = £3.00 when no one-time price id.
     """
     for key in ("STRIPE_CHECKOUT_PRICE_ID", "STRIPE_ONE_TIME_PRICE_ID"):
         raw = _env_or_processor_store(key)
@@ -4368,7 +4381,7 @@ def build_fulfilment_email_payload(
         "",
         "Install flow: Install → accept licence terms and conditions → enter keygen → unlock.",
         "Your subscription is active once payment succeeds "
-        "(£2.45/month or £27.93/year — Annual saves 5%).",
+        f"({PRICE_LABEL}/month or {PRICE_YEARLY_LABEL}/year).",
         "The keygen only unlocks Connect while your subscription/payment is active.",
         "If payment fails later (failed charge, refund, dispute, or subscription ends),",
         "this keygen becomes useless and the app locks until payment is active again.",
@@ -4592,7 +4605,8 @@ def desired_payment_link_trial_fields() -> dict[str, Any]:
     (no network). Configure script can sync Dashboard prices when
     ``STRIPE_SECRET_KEY`` is set.
 
-    ``trial_period_days`` is **0** (Stripe field; not a product trial). Annual is 5% off 12× monthly.
+    ``trial_period_days`` is **0** (Stripe field; not a product trial).
+    Catalog amounts: monthly **£3.00** (300 pence), yearly **£30.00** (3000 pence).
     """
     return {
         "payment_link_id": DEFAULT_STRIPE_PAYMENT_LINK_ID,
@@ -4616,7 +4630,7 @@ def desired_payment_link_trial_fields() -> dict[str, Any]:
         "catalog_entry": SITE_PAY_PLAN_PATH,
         # Legacy key name kept for tests/config (no trial product / no trial copy).
         "homepage_trial_sentence": (
-            "Select your plan — Monthly or Annual (5% off yearly) — "
+            "Select your plan — Monthly £3.00 or Annual £30.00 — "
             "subscription starts when you pay"
         ),
     }
@@ -4781,9 +4795,9 @@ def render_pay_plan_page_html(
     <section class="pay-plan-card panel-card" id="pay-plan-card" aria-labelledby="pay-plan-heading">
       <h2 id="pay-plan-heading">Select your plan</h2>
       <p class="pay-plan-lead" id="pay-plan-lead">
-        One device licence. Choose <strong>Monthly</strong> (access for one month) or
-        <strong>Annual</strong> (access for one year, save {save_pct}% vs paying monthly).
-        Subscription starts when you pay. Without renewal after the paid period,
+        One device licence. Choose <strong>Monthly</strong> ({_esc(monthly_label)} for one month) or
+        <strong>Annual</strong> ({_esc(yearly_label)} for one year — save about {save_pct}% vs
+        12 × monthly). Subscription starts when you pay. Without renewal after the paid period,
         Connect expires and the client becomes unusable until you renew.
         You will complete card payment securely on Stripe.
       </p>
@@ -4814,7 +4828,7 @@ def render_pay_plan_page_html(
               <div class="pay-plan-price">
                 <span class="pay-was">{_esc(full_yearly)}</span>{_esc(yearly_label)} / year
               </div>
-              <div class="pay-plan-note">5% off vs 12 × monthly ({_esc(monthly_label)} × 12)</div>
+              <div class="pay-plan-note">vs 12 × monthly ({_esc(monthly_label)} × 12 = {_esc(full_yearly)})</div>
             </label>
           </div>
         </div>
@@ -4854,7 +4868,7 @@ def _normalize_trial_days(value: Any) -> int | None:
 
 
 def payment_link_matches_trial_subscription(price_obj: dict[str, Any]) -> dict[str, Any]:
-    """Check a Stripe Price object against desired £2.45/mo + **no trial** fields.
+    """Check a Stripe Price object against desired £3.00/mo + **no trial** fields.
 
     *price_obj* is a Stripe API Price dict (or redacted summary). Returns
     ``{ok, mismatches[], observed}`` without inventing success.
@@ -6807,7 +6821,7 @@ def build_checkout_form_body(req: CheckoutRequest) -> bytes:
         fields.append(("line_items[0][price]", price_id))
         fields.append(("line_items[0][quantity]", "1"))
     else:
-        # Inline one-time price_data — correct for payment mode (245 pence GBP).
+        # Inline one-time price_data — correct for payment mode (PRICE_PENCE GBP).
         fields.extend(
             [
                 ("line_items[0][price_data][currency]", PRICE_CURRENCY),
@@ -7081,14 +7095,14 @@ def process_checkout_completed_event(
 ) -> str | None:
     """On checkout.session.completed, mint a download token. Returns token or None.
 
-    Supports **subscription** Payment Link checkouts (catalog: £2.45/month or
-    £27.93/year) and legacy full-price paid sessions.
+    Supports **subscription** Payment Link checkouts (catalog: £3.00/month or
+    £30.00/year) and legacy full-price paid sessions.
 
     Platform comes from ``client_reference_id`` (BUY tile) or ``metadata.platform``.
 
     **Only if paid / subscription:** ``payment_status`` must be ``paid`` or
     ``no_payment_required``.
-    **Full product price:** amount must equal ``PRICE_PENCE`` (245), **or** a
+    **Full product price:** amount must equal ``PRICE_PENCE`` (300), **or** a
     subscription session with a ``subscription`` id (including legacy zero-amount
     trial checkouts that still carry a subscription id). Underpay without a
     subscription never mints a grant.
@@ -7138,7 +7152,7 @@ def process_checkout_completed_event(
         subscription_id = str(sub_raw.get("id") or "")
     else:
         subscription_id = str(sub_raw or "").strip()
-    # Full price (245 GBP pence) always OK. Yearly catalog amount (2940) with
+    # Full price (PRICE_PENCE GBP) always OK. Yearly catalog amount with
     # subscription id is OK. Paid monthly/yearly subscriptions mint without a
     # free-trial window. Legacy £0 / no_payment_required still allowed only with
     # a subscription id so underpay one-time never mints.

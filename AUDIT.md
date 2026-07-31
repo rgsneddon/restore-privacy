@@ -234,7 +234,7 @@ An **ISP** performing **traffic analysis** may still observe connection timing a
 | Expectation | Notes |
 |-------------|--------|
 | Product host | **Germany (DE)** |
-| Public catalog | **0.5.8** paid installers on [status host](https://restoreprivacy.online/) (£2.45; no free GitHub release downloads) |
+| Public catalog | **0.5.8** paid installers on [status host](https://restoreprivacy.online/) (£3.00; no free GitHub release downloads) |
 | Node pub pin | `1b126abf…` |
 | No `.priv` in public package trees | OK |
 

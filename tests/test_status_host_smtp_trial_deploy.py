@@ -56,7 +56,7 @@ class TestFulfilmentSmtpEnvKeys(unittest.TestCase):
 
 
 class TestPaymentLinkTrialHelpers(unittest.TestCase):
-    def test_desired_fields_245_monthly_no_trial(self):
+    def test_desired_fields_300_monthly_no_trial(self):
         from payments import (
             DEFAULT_STRIPE_PAYMENT_LINK_ID,
             DEFAULT_STRIPE_PAYMENT_PAGE_URL_YEARLY,
@@ -67,14 +67,14 @@ class TestPaymentLinkTrialHelpers(unittest.TestCase):
 
         d = desired_payment_link_trial_fields()
         self.assertEqual(d["unit_amount_pence"], PRICE_PENCE)
-        self.assertEqual(d["unit_amount_pence"], 245)
+        self.assertEqual(d["unit_amount_pence"], 300)
         self.assertEqual(d["currency"], "gbp")
         self.assertEqual(d["recurring_interval"], "month")
         self.assertEqual(d["trial_period_days"], 0)
         self.assertNotEqual(d["trial_period_days"], 7)
         self.assertEqual(d["mode"], "subscription")
         self.assertEqual(d["payment_link_id"], DEFAULT_STRIPE_PAYMENT_LINK_ID)
-        self.assertEqual(d["unit_amount_yearly_pence"], 2793)
+        self.assertEqual(d["unit_amount_yearly_pence"], 3000)
         self.assertIn("/pay", d["payment_page_url"])
         self.assertNotIn("7 day trial", d["homepage_trial_sentence"].lower())
         self.assertNotIn("7-day trial", d["homepage_trial_sentence"].lower())
@@ -84,7 +84,7 @@ class TestPaymentLinkTrialHelpers(unittest.TestCase):
             {
                 "id": "price_test",
                 "currency": "gbp",
-                "unit_amount": 245,
+                "unit_amount": 300,
                 "type": "recurring",
                 "recurring": {"interval": "month"},
             }
@@ -93,7 +93,7 @@ class TestPaymentLinkTrialHelpers(unittest.TestCase):
         ok_zero = payment_link_matches_trial_subscription(
             {
                 "currency": "gbp",
-                "unit_amount": 245,
+                "unit_amount": 300,
                 "recurring": {"interval": "month"},
                 "payment_link_trial_period_days": 0,
             }
@@ -103,7 +103,7 @@ class TestPaymentLinkTrialHelpers(unittest.TestCase):
         bad = payment_link_matches_trial_subscription(
             {
                 "currency": "gbp",
-                "unit_amount": 245,
+                "unit_amount": 300,
                 "recurring": {"interval": "month"},
                 "payment_link_trial_period_days": 7,
             }
@@ -136,8 +136,8 @@ class TestDeployDocs(unittest.TestCase):
         self.assertIn("RPT_FULFILMENT_SMTP_HOST", text)
         self.assertIn("Monthly VPN plan", text)
         self.assertIn("Yearly VPN plan", text)
-        self.assertIn("2793", text)
-        self.assertIn("£27.93", text)
+        self.assertIn("3000", text)
+        self.assertIn("£30.00", text)
         self.assertIn("/pay", text)
         self.assertIn("set_render_fulfilment_smtp.ps1", text)
         self.assertNotIn("£29.40", text)

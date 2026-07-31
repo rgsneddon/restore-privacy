@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Configure catalog Stripe prices for Monthly/Yearly VPN plan, **no trial**.
 
-Monthly: £2.45 (245 pence). Yearly: £27.93 (2793 pence = 5% off 12× monthly).
+Monthly: £3.00 (300 pence). Yearly: £30.00 (3000 pence).
 
 Requires STRIPE_SECRET_KEY in the environment (never committed).
 
@@ -143,14 +143,14 @@ def _interval_targets(interval: str) -> dict[str, Any]:
             or DEFAULT_STRIPE_PAYMENT_LINK_PRICE_ID_YEARLY,
             "payment_link_id": stripe_payment_link_id_yearly()
             or DEFAULT_STRIPE_PAYMENT_LINK_ID_YEARLY,
-            "nickname": "Yearly VPN plan £27.93 (5% off, no trial)",
+            "nickname": f"Yearly VPN plan {PRICE_YEARLY_PENCE/100:.2f} GBP (no trial)",
         }
     return {
         "interval": "month",
         "unit_amount_pence": int(want.get("unit_amount_pence") or PRICE_PENCE),
         "price_id": stripe_payment_link_price_id() or DEFAULT_STRIPE_PAYMENT_LINK_PRICE_ID,
         "payment_link_id": stripe_payment_link_id() or DEFAULT_STRIPE_PAYMENT_LINK_ID,
-        "nickname": "Monthly VPN plan £2.45 (no trial)",
+        "nickname": f"Monthly VPN plan {PRICE_PENCE/100:.2f} GBP (no trial)",
     }
 
 
@@ -302,7 +302,7 @@ def _configure_one(secret: str, interval: str, *, dry_run: bool) -> dict[str, An
         if isinstance(sub, dict):
             trial_from_link = sub.get("trial_period_days")
     check_obj = dict(price_rb) if isinstance(price_rb, dict) else {}
-    # Monthly match helper expects month+245; yearly uses amount/interval manually.
+    # Monthly match helper expects month+PRICE_PENCE; yearly uses amount/interval manually.
     if tgt["interval"] == "month":
         if trial_from_link is not None:
             check_obj["payment_link_trial_period_days"] = trial_from_link
@@ -372,7 +372,7 @@ def main(argv: list[str] | None = None) -> int:
             "Open https://dashboard.stripe.com/products",
             "Create or open product Restore Privacy subscription",
             "Create products Monthly VPN plan + Yearly VPN plan",
-            "Add recurring prices: £2.45 GBP / month and £27.93 GBP / year (2793 pence, 5% off)",
+            "Add recurring prices: £3.00 GBP / month (300 pence) and £30.00 GBP / year (3000 pence)",
             "Set STRIPE_PRICE_ID_MONTHLY / STRIPE_PRICE_ID_YEARLY (or ship defaults in payments.py)",
             "Under subscription options set trial period = none / 0 days",
             "Catalog uses site /pay plan page → Checkout Session (not dual buy.stripe.com tiles)",

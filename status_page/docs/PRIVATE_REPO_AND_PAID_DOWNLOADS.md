@@ -29,7 +29,7 @@ If fulfilment returns **503**, paying customers cannot download until you stage 
    `client_reference_id` and is filled on the success page)
 4. Webhook `POST https://restoreprivacy.online/webhook/stripe`  
    event **`checkout.session.completed`** → mints 1-hour reusable token for that platform  
-   (requires `payment_status` paid + **245** pence GBP + platform from `client_reference_id` / metadata)
+   (requires `payment_status` paid + **300** pence GBP (monthly) or **3000** (yearly) + platform from `client_reference_id` / metadata)
 5. Success page shows **Download \<platform\> package** → `/download?token=…`  
    streams installer via **proxy** (local staged file or GitHub API token)
 
@@ -118,10 +118,10 @@ Fallbacks (optional): local `status_page/assets/{version}/`, or `RPT_GITHUB_TOKE
 
 ## Payment Link amount (critical for seamless grants)
 
-Webhook grants only when paid amount is **245 pence (GBP)** and currency is **gbp**.
+Webhook grants when paid amount matches catalog (**300** pence monthly or **3000** yearly GBP) and currency is **gbp**.
 
-- Prefer **subscription** Payment Links: **monthly £2.45/month GBP** + **7-day trial**, plus optional **yearly** link via `STRIPE_PAYMENT_PAGE_URL_YEARLY` (not a free-amount tip or one-time donate).
-- Variable / tip-only amounts that are not exactly 245p and lack a trial subscription id will **not** mint installers — the buyer pays but the success page stays on “Confirming with Stripe…”.
+- Prefer **subscription** Checkout: **monthly £3.00/month GBP** or **yearly £30.00/year** via site `/pay` (not a free-amount tip or one-time donate).
+- Variable / tip-only amounts that are not catalog 300/3000 pence will **not** mint installers — the buyer pays but the success page stays on “Confirming with Stripe…”.
 
 ## Client in-app update
 
@@ -141,6 +141,6 @@ curl -s https://restoreprivacy.online/ | findstr /i "buy.stripe client_reference
 curl -s https://restoreprivacy.online/health/fulfilment
   → {"ok": true, "source": "local"|"github_api"|...}
 
-# After a £2.45 test payment for one platform:
+# After a £3.00 test payment for one platform:
 # success page → Download <platform> package → installer streams once
 ```

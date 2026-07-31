@@ -105,14 +105,14 @@ class TestDownloadCatalog(unittest.TestCase):
         self.assertIn(IOS_ZIP_FILENAME, html)
         self.assertIn(ANDROID_APK_FILENAME, html)
         self.assertIn('value="android"', html)
-        self.assertIn("£2.45", html)
+        self.assertIn("£3.00", html)
         # BMC tip URL is on homepage shell bottom, not inside downloads section
         self.assertNotIn(BMC_TIP_URL, html)
         # Live default: embedded platform + plan form + Buy now in downloads box
         self.assertIn("Buy now", html)
         self.assertIn("we accept *", html)
-        self.assertIn("£2.45", html)
-        self.assertIn("£27.93", html)
+        self.assertIn("£3.00", html)
+        self.assertIn("£30.00", html)
         self.assertIn('id="dl-buy-form"', html)
         self.assertIn('id="dl-platform"', html)
         self.assertIn('id="dl-buy-now"', html)
@@ -131,7 +131,7 @@ class TestDownloadCatalog(unittest.TestCase):
         # FULL CATALOGUE / catalog footer link must not be visible on public downloads.
         self.assertNotIn('id="rust-repo-link"', html)
         self.assertNotIn("rust-repo-footer", html)
-        self.assertNotIn("installers after £2.45 payment only", html)
+        self.assertNotIn("installers after £3.00 payment only", html)
         self.assertNotIn("FULL CATALOGUE", html.upper())
         self.assertNotIn("how-to-buy-footer-link", html)
         self.assertNotIn('href="/how-to-buy"', html)
@@ -286,8 +286,8 @@ class TestDownloadCatalog(unittest.TestCase):
         self.assertIn("homepage-buy-form", page)
         self.assertNotIn("buy.stripe.com", page)
         self.assertNotIn("Coming soon", page)
-        self.assertIn("£2.45", page)
-        self.assertIn("£27.93", page)
+        self.assertIn("£3.00", page)
+        self.assertIn("£30.00", page)
         self.assertIn(WINDOWS_ZIP_FILENAME, page)  # data-filename
         self.assertIn(ANDROID_APK_FILENAME, page)
         self.assertIn("Raskul", page)

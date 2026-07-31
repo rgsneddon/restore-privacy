@@ -50,11 +50,9 @@ Source of truth in code: `status_page/payments.py` → `STRIPE_WEBHOOK_EVENTS` a
 4. When the period ends, Stripe sends `customer.subscription.deleted` → Connect is
    **revoked** (client gate + bound device removed; node HELLO refuses that device).
 
-Catalog Payment Links are **subscription** mode. **Monthly** is £2.45/month +
-7-day trial; **yearly** uses a separate Payment Link when
-`STRIPE_PAYMENT_PAGE_URL_YEARLY` is set (amount from Stripe Dashboard). Trial
-starts with `no_payment_required` / £0 + subscription id; after trial, invoices
-renew `valid_until`. Refunds/disputes still revoke Connect immediately
+Catalog Checkout is **subscription** mode. **Monthly** is £3.00/month; **yearly**
+is £30.00/year (fixed). Subscription starts when the customer pays (no free
+trial). Refunds/disputes still revoke Connect immediately
 (`licence_status` **EXPIRED** on clients).
 
 ## Node residual HELLO
@@ -113,6 +111,6 @@ only**, no amend/edit/revoke controls on that table.
 
 See [`docs/STATUS_HOST_SMTP_AND_TRIAL.md`](../../docs/STATUS_HOST_SMTP_AND_TRIAL.md)
 for Render `RPT_FULFILMENT_SMTP_*` env keys and configuring the catalog monthly
-Payment Link for **£2.45/month**
+subscription prices for **£3.00/month** and **£30.00/year**
 (`scripts/configure_stripe_payment_link_trial.py`).
 

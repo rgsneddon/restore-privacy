@@ -5,7 +5,7 @@
 1. Production status host can send **keygen + PPI + download** fulfilment email
    (SMTP env vars on Render).
 2. Catalog routes to the site **Select your plan** page (`/pay`) for
-   **Monthly VPN plan (£2.45/month)** or **Yearly VPN plan (£27.93/year, 5% off)**
+   **Monthly VPN plan (£3.00/month)** or **Yearly VPN plan (£30.00/year)**
    with **subscription starts when you pay**, then Stripe **subscription** Checkout Session.
 
 ## SMTP env keys (shipped reader)
@@ -119,8 +119,8 @@ Catalog **primary path** is site-hosted `/pay` → Checkout Session (not dual
 
 | Plan | Product name | Unit amount | Interval | Default price id |
 |------|--------------|-------------|----------|------------------|
-| Monthly | Monthly VPN plan | **245** pence (£2.45) | month | `price_1TwjilJDavQ2TJW6fyxzCIkA` |
-| Yearly | Yearly VPN plan | **2793** pence (£27.93 = 5% off 12×£2.45) | year | `price_1TwjimJDavQ2TJW6wEKr4upj` |
+| Monthly | Monthly VPN plan | **300** pence (£3.00) | month | `price_1Tz8mgJDavQ2TJW6M6mB9c7x` |
+| Yearly | Yearly VPN plan | **3000** pence (£30.00 fixed yearly) | year | `price_1Tz8miJDavQ2TJW6T0G7B1iD` |
 
 Old product **download a vpn** is archived. Override price ids with
 `STRIPE_PRICE_ID_MONTHLY` / `STRIPE_PRICE_ID_YEARLY` if you rotate Dashboard prices.
@@ -129,11 +129,11 @@ Old product **download a vpn** is archived. Override price ids with
 
 1. [Stripe Dashboard → Products](https://dashboard.stripe.com/products) — create
    **Monthly VPN plan** and **Yearly VPN plan** (or open the shipped products).
-2. Recurring prices: **£2.45 GBP / month** and **£27.93 GBP / year** (no trial).
+2. Recurring prices: **£3.00 GBP / month** and **£30.00 GBP / year** (no trial).
 3. Ensure status host has `STRIPE_SECRET_KEY` + webhook so `/pay/checkout` can
    create subscription Checkout Sessions.
 4. Confirm catalog tiles open `/pay?platform=…` and the plan page shows
-   Select your plan Monthly | Annual with **SAVE 5%** on annual.
+   Select your plan Monthly | Annual with **SAVE ~17%** on annual (vs 12 × monthly).
 
 ### API script (when `STRIPE_SECRET_KEY` is available)
 
@@ -144,7 +144,7 @@ python scripts/configure_stripe_payment_link_trial.py --out stripe_payment_link_
 python scripts/configure_stripe_payment_link_trial.py --dry-run
 ```
 
-The script reuses or creates monthly £2.45 and yearly **£27.93** (2793 pence)
+The script reuses or creates monthly £3.00 and yearly **£30.00** (3000 pence)
 prices and asserts **subscription starts when you pay**. Prefer Checkout Session price ids over
 legacy Payment Links for catalog.
 
@@ -156,7 +156,7 @@ legacy Payment Links for catalog.
 | App reads same keys | `python -c "from payments import fulfilment_smtp_env_keys; print(fulfilment_smtp_env_keys())"` from `status_page/` |
 | Host healthy | `GET https://restoreprivacy.online/health` → `{"ok":true}` (twice) |
 | Fulfilment probe | `GET https://restoreprivacy.online/health/fulfilment` → `ok: true` |
-| No trial + monthly/yearly | Desired fields: `trial_period_days` 0; monthly `245`; yearly **`2793`**; products Monthly/Yearly VPN plan |
+| No trial + monthly/yearly | Desired fields: `trial_period_days` 0; monthly `300`; yearly **`3000`**; products Monthly/Yearly VPN plan |
 | Catalog entry | Homepage tiles → `/pay?platform=…` (site plan page) |
 
 ## Code map

@@ -93,7 +93,7 @@ class TestPurchaseIdStoreAndReissue(unittest.TestCase):
                 "object": {
                     "id": "cs_live_purchase_id_test",
                     "payment_status": "paid",
-                    "amount_total": 245,
+                    "amount_total": 300,
                     "currency": "gbp",
                     "client_reference_id": "windows",
                     "metadata": {},

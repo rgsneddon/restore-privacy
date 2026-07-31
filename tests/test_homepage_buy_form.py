@@ -39,7 +39,7 @@ class TestHomepageBuyFormInDownloadsBox(unittest.TestCase):
         self.assertIn(BUY_NOW_LABEL, html)
         self.assertIn("Monthly VPN plan", html)
         self.assertIn("Yearly VPN plan", html)
-        self.assertIn("SAVE 5%", html)
+        self.assertIn("SAVE ~17%", html)
         self.assertIn(STRIPE_CHECKOUT_BRANDING_NOTE, html)
         # Branding honesty: no claim Stripe-hosted page uses full site CSS
         low = STRIPE_CHECKOUT_BRANDING_NOTE.lower()
@@ -66,7 +66,11 @@ class TestHomepageBuyFormInDownloadsBox(unittest.TestCase):
 
 class TestCheckoutIntervalDistinct(unittest.TestCase):
     def test_month_year_distinct_price_ids_no_trial(self):
+        from urllib.parse import parse_qs
+
         from payments import (
+            DEFAULT_STRIPE_PRICE_ID_MONTHLY,
+            DEFAULT_STRIPE_PRICE_ID_YEARLY,
             PRICE_PENCE,
             PRICE_YEARLY_PENCE,
             build_subscription_checkout_form_body,
@@ -75,9 +79,12 @@ class TestCheckoutIntervalDistinct(unittest.TestCase):
         )
 
         self.assertEqual(PRICE_YEARLY_PENCE, yearly_amount_pence())
-        self.assertEqual(PRICE_YEARLY_PENCE, 2793)
+        self.assertEqual(PRICE_YEARLY_PENCE, 3000)
+        self.assertEqual(PRICE_PENCE, 300)
         mid = stripe_subscription_price_id_for_interval("month")
         yid = stripe_subscription_price_id_for_interval("year")
+        self.assertEqual(mid, DEFAULT_STRIPE_PRICE_ID_MONTHLY)
+        self.assertEqual(yid, DEFAULT_STRIPE_PRICE_ID_YEARLY)
         self.assertNotEqual(mid, yid)
         bm = build_subscription_checkout_form_body(
             "windows",
@@ -94,12 +101,12 @@ class TestCheckoutIntervalDistinct(unittest.TestCase):
             cancel_url="https://x/c",
         ).decode()
         self.assertIn("mode=subscription", bm)
-        self.assertIn(mid, unquote(bm))
-        self.assertIn(yid, unquote(by))
-        self.assertNotIn(yid, unquote(bm))
+        pm = parse_qs(bm)
+        py = parse_qs(by)
+        self.assertEqual(pm["line_items[0][price]"], [mid])
+        self.assertEqual(py["line_items[0][price]"], [yid])
         self.assertNotIn("trial_period_days", bm)
         self.assertNotIn("trial_period_days", by)
-        self.assertEqual(PRICE_PENCE, 245)
 
 
 if __name__ == "__main__":

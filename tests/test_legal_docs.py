@@ -66,7 +66,7 @@ class TestPrivacyPolicy(unittest.TestCase):
         self.assertIn("Developer ID", text)
         self.assertIn("Team-signed", text)
         self.assertIn("private", text.lower())
-        self.assertIn("£2.45", text)
+        self.assertIn("£3.00", text)
         # Paid-only distribution — no free permanent public installer CDN claim
         # Fulfilment is time-limited download (1 hour), not a permanent free CDN
         low = text.lower()
@@ -172,7 +172,7 @@ class TestReadmeHowto(unittest.TestCase):
         self.assertIn("Developer ID", text)
         self.assertIn("Team-signed", text)
         self.assertIn("private", lower)
-        self.assertIn("£2.45", text)
+        self.assertIn("£3.00", text)
         self.assertNotIn("prep stubs", lower)
         self.assertNotIn("prep packages only", lower)
         # Buyer path is paid status host — not free GH releases/download

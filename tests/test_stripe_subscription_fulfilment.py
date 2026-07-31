@@ -28,7 +28,7 @@ class TestCatalogSubscriptionPaymentLink(unittest.TestCase):
         ):
             os.environ.pop(k, None)
 
-    def test_desired_fields_are_subscription_245_monthly_no_trial(self):
+    def test_desired_fields_are_subscription_300_monthly_no_trial(self):
         from payments import (
             CATALOG_STRIPE_PAYMENT_MODE,
             PRICE_PENCE,
@@ -44,10 +44,10 @@ class TestCatalogSubscriptionPaymentLink(unittest.TestCase):
         self.assertEqual(d["mode"], "subscription")
         self.assertEqual(d["mode"], CATALOG_STRIPE_PAYMENT_MODE)
         self.assertEqual(d["unit_amount_pence"], PRICE_PENCE)
-        self.assertEqual(d["unit_amount_pence"], 245)
+        self.assertEqual(d["unit_amount_pence"], 300)
         self.assertEqual(d["unit_amount_yearly_pence"], PRICE_YEARLY_PENCE)
-        self.assertEqual(d["unit_amount_yearly_pence"], 2793)
-        self.assertEqual(d["yearly_discount_percent"], 5)
+        self.assertEqual(d["unit_amount_yearly_pence"], 3000)
+        self.assertEqual(d["yearly_discount_percent"], 17)
         self.assertEqual(d["currency"], "gbp")
         self.assertEqual(d["recurring_interval"], "month")
         self.assertEqual(d["recurring_interval_yearly"], "year")
@@ -57,11 +57,17 @@ class TestCatalogSubscriptionPaymentLink(unittest.TestCase):
         self.assertIn("/pay", d["payment_page_url"])
         self.assertEqual(d["product_name_monthly"], STRIPE_PRODUCT_NAME_MONTHLY)
         self.assertEqual(d["product_name_yearly"], STRIPE_PRODUCT_NAME_YEARLY)
-        self.assertNotEqual(
-            stripe_subscription_price_id_for_interval("month"),
-            stripe_subscription_price_id_for_interval("year"),
-        )
+        mid = stripe_subscription_price_id_for_interval("month")
+        yid = stripe_subscription_price_id_for_interval("year")
+        self.assertTrue(mid.startswith("price_"))
+        self.assertTrue(yid.startswith("price_"))
+        self.assertNotEqual(mid, yid)
+        # Must not pin pre-£3 catalog Price ids
+        self.assertNotEqual(mid, "price_1TwjilJDavQ2TJW6fyxzCIkA")
+        self.assertNotEqual(yid, "price_1TwjimJDavQ2TJW6wEKr4upj")
         self.assertNotIn("7 day trial", d["homepage_trial_sentence"].lower())
+        self.assertIn("£3.00", d["homepage_trial_sentence"])
+        self.assertIn("£30.00", d["homepage_trial_sentence"])
 
     def test_platform_buy_hrefs_go_to_site_pay_plan(self):
         from downloads import available_downloads
@@ -187,7 +193,7 @@ class TestSubscriptionCheckoutCompleted(unittest.TestCase):
         self.assertEqual(ent.get("platform"), "linux")
 
     def test_paid_yearly_subscription_mints_without_trial(self):
-        """Catalog yearly Payment Link charge (£29.40) mints entitlement."""
+        """Catalog yearly subscription charge (£30.00) mints entitlement."""
         pay = self.pay
         event = {
             "type": "checkout.session.completed",
