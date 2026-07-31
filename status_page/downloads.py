@@ -900,6 +900,34 @@ SUITE_KEYGEN_HINT = (
 SUITE_FREE_DOWNLOAD_PATH = "/suite/download"
 DOWNLOADS_SECTION_ID = "downloads"
 
+# Suite product ecosystem sub-menu (Perc explorer + Evolve + Perccent wallet docs).
+# Only real public destinations (verified live); align explorer base with admin_perc.
+try:
+    from admin_perc import DEFAULT_PERC_PUBLIC_BASE as _PERC_EXPLORER_BASE
+except ImportError:  # pragma: no cover
+    try:
+        from status_page.admin_perc import (  # type: ignore
+            DEFAULT_PERC_PUBLIC_BASE as _PERC_EXPLORER_BASE,
+        )
+    except ImportError:  # pragma: no cover
+        _PERC_EXPLORER_BASE = "https://135.181.152.10.sslip.io/perc"
+
+SUITE_SUBMENU_ID = "suite-product-submenu"
+SUITE_PERC_EXPLORER_HREF = str(_PERC_EXPLORER_BASE).rstrip("/") + "/"
+SUITE_PERC_EXPLORER_LABEL = "Perc blockchain explorer"
+SUITE_EVOLVE_PAGES_HREF = "https://rgsneddon.github.io/evolve/"
+SUITE_EVOLVE_PAGES_LABEL = "Evolve docs (GitHub Pages)"
+SUITE_EVOLVE_WHITEPAPER_HREF = "https://rgsneddon.github.io/evolve/fcg_white_paper.html"
+SUITE_EVOLVE_WHITEPAPER_LABEL = "Evolve FCG white paper"
+SUITE_EVOLVE_SOURCE_HREF = "https://github.com/rgsneddon/evolve"
+SUITE_EVOLVE_SOURCE_LABEL = "Evolve source (GitHub)"
+SUITE_PERCCENT_WALLET_HREF = "https://github.com/rgsneddon/perccent-wallet"
+SUITE_PERCCENT_WALLET_LABEL = "Perccent wallet (GitHub)"
+SUITE_PERCCENT_WALLET_README_HREF = (
+    "https://github.com/rgsneddon/perccent-wallet/blob/main/README.md"
+)
+SUITE_PERCCENT_WALLET_README_LABEL = "Perccent wallet README"
+
 # Prefer-to-host residual node (operator path) — separate from Suite client installers.
 # Primary doc is status-host /NODE_OPERATOR.md (public pack), not Suite README.
 NODE_PREFERENCE_SECTION_ID = "download-node-preference"
@@ -928,6 +956,44 @@ def suite_free_download_href(platform: str) -> str:
     if not plat:
         return SUITE_FREE_DOWNLOAD_PATH
     return f"{SUITE_FREE_DOWNLOAD_PATH}?platform={plat}"
+
+
+def suite_product_submenu_links() -> list[tuple[str, str, str]]:
+    """(href, label, data-key) for Suite box sub-menu — public docs only."""
+    return [
+        (SUITE_PERC_EXPLORER_HREF, SUITE_PERC_EXPLORER_LABEL, "perc-explorer"),
+        (SUITE_EVOLVE_PAGES_HREF, SUITE_EVOLVE_PAGES_LABEL, "evolve-docs"),
+        (SUITE_EVOLVE_WHITEPAPER_HREF, SUITE_EVOLVE_WHITEPAPER_LABEL, "evolve-whitepaper"),
+        (SUITE_EVOLVE_SOURCE_HREF, SUITE_EVOLVE_SOURCE_LABEL, "evolve-source"),
+        (SUITE_PERCCENT_WALLET_HREF, SUITE_PERCCENT_WALLET_LABEL, "perccent-wallet"),
+        (
+            SUITE_PERCCENT_WALLET_README_HREF,
+            SUITE_PERCCENT_WALLET_README_LABEL,
+            "perccent-readme",
+        ),
+    ]
+
+
+def render_suite_product_submenu_html() -> str:
+    """Sub-menu: Perc explorer + Evolve + Perccent wallet public docs."""
+    items: list[str] = []
+    for href, label, key in suite_product_submenu_links():
+        items.append(
+            f'<a class="suite-sub-link" id="suite-sub-{_esc_html(key)}" '
+            f'href="{_esc_html(href)}" data-suite-sub="{_esc_html(key)}" '
+            f'target="_blank" rel="noopener noreferrer">'
+            f"{_esc_html(label)}</a>"
+        )
+    return f"""
+    <nav class="suite-product-submenu" id="{SUITE_SUBMENU_ID}"
+         data-suite-product-submenu="1"
+         aria-label="Suite product docs — Perc explorer, Evolve, Perccent wallet">
+      <p class="suite-product-submenu-label" id="suite-product-submenu-label">
+        Suite ecosystem
+      </p>
+      {" ".join(items)}
+    </nav>
+"""
 
 
 def suite_storefront_css() -> str:
@@ -961,6 +1027,25 @@ def suite_storefront_css() -> str:
     .suite-storefront .suite-keygen-line {
       margin: 0 auto 1rem; max-width: 34rem;
       font-size: 0.92rem; line-height: 1.45; color: #fecaca; font-weight: 700;
+    }
+    .suite-product-submenu {
+      display: flex; flex-wrap: wrap; gap: 0.4rem; justify-content: center;
+      margin: 0.35rem auto 0.85rem; max-width: 36rem; padding: 0;
+      list-style: none;
+    }
+    .suite-product-submenu a {
+      display: inline-block; padding: 0.32rem 0.65rem; border-radius: 999px;
+      font-size: 0.72rem; font-weight: 700; text-decoration: none;
+      color: #e8f2ff; background: rgba(15, 40, 70, 0.65);
+      border: 1px solid rgba(174, 208, 234, 0.4);
+      letter-spacing: 0.02em;
+    }
+    .suite-product-submenu a:hover {
+      background: rgba(30, 90, 150, 0.75); border-color: #aed0ea;
+    }
+    .suite-product-submenu-label {
+      width: 100%; margin: 0 0 0.35rem; font-size: 0.72rem; font-weight: 700;
+      letter-spacing: 0.06em; text-transform: uppercase; color: rgba(174,208,234,0.9);
     }
     .suite-free-grid {
       display: flex; flex-wrap: wrap; gap: 0.65rem; justify-content: center;
@@ -1122,6 +1207,7 @@ def render_suite_storefront_html(
     <h2 id="suite-storefront-title">{SUITE_PRODUCT_TITLE}</h2>
     <span class="suite-version-badge" id="suite-version-badge">{SUITE_VERSION_LABEL}</span>
     <p class="suite-blurb" id="suite-blurb">{SUITE_PRODUCT_SUBTITLE}</p>
+{render_suite_product_submenu_html()}
     <p class="suite-keygen-line" id="suite-keygen-line">{SUITE_KEYGEN_HINT}</p>
     <div class="suite-free-grid" id="suite-free-grid" data-free-download="1">
       {free_grid}
