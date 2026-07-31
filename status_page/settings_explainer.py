@@ -1,8 +1,8 @@
-"""Public Settings explainer page — homepage-style shell + install how-to.
+"""Public Settings / Suite guide — human how-to for every Suite part.
 
-Pure HTML builders (no live server required for unit tests). Content tracks
-shipped Windows Settings surfaces and ``client.product_policy`` EXPLAINER_*
-copy so the page stays aligned with the product client.
+Pure HTML builders (no live server required for unit tests). Framed for
+**Restore Privacy Suite**: free install, KEYGEN unlock, VPN / % / EVOLVE tabs,
+and VPN Settings controls in plain language.
 """
 
 from __future__ import annotations
@@ -22,6 +22,26 @@ SETTINGS_EXPLAINER_ALIASES = (
 HOMEPAGE_SETTINGS_BANNER_ID = "settings-explainer-banner"
 HOMEPAGE_SETTINGS_BANNER_HREF = SETTINGS_EXPLAINER_PATH
 
+# Page structure markers (tests + progressive hooks)
+SUITE_GUIDE_INTRO_ID = "suite-guide-intro"
+SUITE_HOWTO_PARTS_ID = "suite-howto-parts"
+SUITE_HOWTO_PARTS_LIST_ID = "suite-howto-parts-list"
+SETTINGS_EXPLAINERS_BOX_ID = "settings-explainers-box"
+INSTALL_HOWTO_BOX_ID = "install-run-howto-box"
+
+SUITE_GUIDE_INTRO_HEADING = "How to use Restore Privacy Suite"
+SUITE_GUIDE_INTRO_BODY = (
+    "This guide walks you through the whole app in everyday language. "
+    "Download the Suite for free, unlock residual Connect with a KEYGEN when "
+    "you are ready, then use the three tabs — VPN, %, and EVOLVE — and the "
+    "Settings that sit behind the gear on the VPN tab."
+)
+SUITE_GUIDE_INTRO_FOOT = (
+    "Nothing here is an operator console. Installers are free; residual Connect "
+    "needs an active KEYGEN (monthly licence from £3). The unlock screen is only "
+    "your licence key — enter it when you are ready to Connect."
+)
+
 
 def _esc(s: str) -> str:
     return (
@@ -33,8 +53,92 @@ def _esc(s: str) -> str:
     )
 
 
+def suite_howto_parts_catalog() -> list[dict[str, str]]:
+    """How to utilise each major Suite surface (human cadence).
+
+    Keys: id, title, what, how, default.
+    """
+    return [
+        {
+            "id": "suite-unlock",
+            "title": "Free install and KEYGEN unlock",
+            "what": (
+                "You install Restore Privacy Suite without paying for the package. "
+                "Residual Connect (the VPN path that changes your public IP) waits "
+                "until you enter a KEYGEN from your fulfilment email."
+            ),
+            "how": (
+                "Download your platform build from the homepage free installer grid "
+                "(or /suite/download). Open the app, accept the end-user licence, "
+                "then enter the KEYGEN (RPT-KEY-…) on the unlock screen or under "
+                "Settings → Payment entitlement. A monthly licence starts at £3; "
+                "yearly residual plans remain on /pay if you prefer that option."
+            ),
+            "default": "Download free; Connect needs KEYGEN",
+        },
+        {
+            "id": "suite-vpn",
+            "title": "VPN tab — residual Connect",
+            "what": (
+                "The VPN tab is where you start and stop residual protection. "
+                "It shows connection status, a short local log, entry country, "
+                "and the honesty note about Suite self-update."
+            ),
+            "how": (
+                "Choose an entry country if you like (Germany is the product default), "
+                "then press Connect and approve any system VPN prompt. Wait until "
+                "status is honestly connected before you rely on residual IP. "
+                "Press Disconnect when you are done — minimize does not stop the tunnel."
+            ),
+            "default": "Manual Connect; entry Germany (DE)",
+        },
+        {
+            "id": "suite-wallet",
+            "title": "% tab — private wallet",
+            "what": (
+                "The % tab is Perccent wallet inside the Suite shell. It is a separate "
+                "surface for wallet work — not a second residual tunnel."
+            ),
+            "how": (
+                "Open the % tab from the bottom navigation. Use the wallet UI there for "
+                "local wallet actions. Residual Connect still lives only on the VPN tab; "
+                "your KEYGEN story is shared across the Suite."
+            ),
+            "default": "Available after unlock; not residual Connect",
+        },
+        {
+            "id": "suite-evolve",
+            "title": "EVOLVE tab — analysis",
+            "what": (
+                "EVOLVE is the analysis surface in the same Suite app. It sits beside "
+                "VPN and % so you do not juggle three installers."
+            ),
+            "how": (
+                "Select EVOLVE from the bottom navigation and use the tools shown there. "
+                "It does not replace Connect; for residual public IP, return to VPN and "
+                "Connect while your KEYGEN is active."
+            ),
+            "default": "Available after unlock; analysis only",
+        },
+        {
+            "id": "suite-settings-gear",
+            "title": "VPN Settings (gear on the VPN tab)",
+            "what": (
+                "Settings under the VPN gear cover power-up, residual privacy scale, "
+                "KEYGEN fallback, local log, leak test, legal links, and Suite self-update."
+            ),
+            "how": (
+                "Tap the gear on the VPN tab. Defaults are lean: startup and autoconnect "
+                "off, traffic shaping / outer obfuscation / multi-hop off, self-update off. "
+                "Turn on only what you understand. Each control is listed below."
+            ),
+            "default": "Lean off until you opt in",
+        },
+    ]
+
+
 def settings_parts_catalog() -> list[dict[str, str]]:
-    """Each separate part of the product client Settings tab (Windows primary).
+    """Each separate part of the product client Settings tab (VPN gear).
 
     Keys: id, title, default, body. Sourced from shipped Settings UI + product_policy.
     """
@@ -67,8 +171,8 @@ def settings_parts_catalog() -> list[dict[str, str]]:
             "OFF (default) = single hop to entry (default Germany). ON = exit path."
         )
         core = (
-            "Always on: licence + keygen entitlement, cryptographic HELLO/session, "
-            "and system residual tunnel. Those cannot be turned off in Settings."
+            "Always on once you Connect with a valid KEYGEN: cryptographic HELLO/session "
+            "and the system residual tunnel. Those cannot be turned off in Settings."
         )
 
     return [
@@ -77,7 +181,7 @@ def settings_parts_catalog() -> list[dict[str, str]]:
             "title": "Run at device startup",
             "default": "Off",
             "body": (
-                "When ON, the app opens at Windows sign-in (Startup-folder shortcut). "
+                "When ON, the app can open at sign-in (platform startup hooks). "
                 "Default OFF — it only runs when you launch it. This does not Connect "
                 "the VPN by itself."
             ),
@@ -88,7 +192,19 @@ def settings_parts_catalog() -> list[dict[str, str]]:
             "default": "Off",
             "body": (
                 "When ON, opening the app starts Connect automatically after licence "
-                "and keygen unlock. Default OFF — Connect is manual. Unlock is never skipped."
+                "and KEYGEN unlock. Default OFF — Connect is manual. Unlock is never skipped."
+            ),
+        },
+        {
+            "id": "suite-self-update",
+            "title": "Allow Suite self-update",
+            "default": "Off",
+            "body": (
+                "When ON, this device may receive a pushed Suite package (operator "
+                "“Push update to clients” or breadcrumbs) and store it as pending. "
+                "You still must click “Unpack update and relaunch” on the VPN main "
+                "screen. That path is the one privacy breach in the Suite — leave OFF "
+                "if you prefer no self-update. Silent unpack never runs."
             ),
         },
         {
@@ -106,9 +222,9 @@ def settings_parts_catalog() -> list[dict[str, str]]:
                 "cannot be turned off in Settings. IPv6 residual ISP-leak protection "
                 "defaults ON and remains optional — turning IPv6 residual OFF means "
                 "IPv6 may use the ISP and Connected status will not claim IPv6 is "
-                "protected. USING IPV4 ONLY MAY CAUSE DATA LEAKS on dual-stack networks. "
+                "protected. Using IPv4 only may cause data leaks on dual-stack networks. "
                 "Changing IPv6 Settings while residual is connected disconnects first, "
-                "then saves for the next Connect (no mid-session hot-apply)."
+                "then saves for the next Connect."
             ),
         },
         {
@@ -134,11 +250,10 @@ def settings_parts_catalog() -> list[dict[str, str]]:
             "title": "Ping statistics (device → node)",
             "default": "Measure on demand",
             "body": (
-                "Settings shows best-effort RTT from your device to the product "
-                "entry node (Iceland) and, when multi-hop is ON, to the exit node "
-                "(Germany exit when multi-hop is on). Uses a short UDP/TCP probe — not a browser speedbench "
-                "SLA. Tap Measure ping now to refresh; values may show n/a if the "
-                "host is unreachable from your network."
+                "Settings can show best-effort RTT from your device toward product "
+                "entry (and exit when multi-hop is ON). Tap Measure ping when you want "
+                "a rough sense of path health — not a speedbench SLA. Values may show "
+                "n/a if the host is unreachable from your network."
             ),
         },
         {
@@ -148,20 +263,21 @@ def settings_parts_catalog() -> list[dict[str, str]]:
             "body": (
                 "Connect stays blocked until you accept the end-user licence on "
                 "this device. Acceptance is stored only locally (not uploaded to "
-                "the node). After accept, enter the fulfilment keygen to unlock "
+                "the node). After accept, enter the fulfilment KEYGEN to unlock "
                 "residual VPN."
             ),
         },
         {
             "id": "keygen",
-            "title": "Payment entitlement / keygen unlock",
+            "title": "Payment entitlement / KEYGEN unlock",
             "default": "Required for Connect",
             "body": (
-                "After you pay on restoreprivacy.online, email delivers a keygen "
-                "(RPT-KEY-…). Enter it in the forced unlock dialog (Settings → "
-                "Payment entitlement is a fallback). Download alone does not unlock "
-                "residual HELLO. Connect only works while the subscription is active; "
-                "refunds or failed charges cancel Connect until you renew."
+                "Installers are free. Residual Connect needs a KEYGEN after you take "
+                "a monthly licence (from £3) on restoreprivacy.online — email delivers "
+                "RPT-KEY-…. Enter it on the unlock screen or Settings → Payment "
+                "entitlement. Download alone does not unlock residual HELLO. Connect "
+                "only works while the subscription is active; refunds or failed charges "
+                "stop Connect until you renew."
             ),
         },
         {
@@ -170,7 +286,8 @@ def settings_parts_catalog() -> list[dict[str, str]]:
             "default": "On-device only",
             "body": (
                 "Settings can show and export a local connection log. Events stay on "
-                "your device — they are not uploaded to the node."
+                "your device — they are not uploaded to the node. Export only if you "
+                "choose to email support yourself."
             ),
         },
         {
@@ -195,14 +312,14 @@ def settings_parts_catalog() -> list[dict[str, str]]:
 
 
 def render_settings_explainer_banner_html() -> str:
-    """Homepage banner between brand panel and downloads section."""
+    """Optional banner (homepage no longer injects it; kept for legacy callers)."""
     href = _esc(HOMEPAGE_SETTINGS_BANNER_HREF)
-    return f"""    <aside class="panel-card settings-banner" id="{HOMEPAGE_SETTINGS_BANNER_ID}" aria-label="Client Settings guide">
-      <p class="settings-banner-kicker">New to the app?</p>
-      <p class="settings-banner-title">Client Settings explained</p>
+    return f"""    <aside class="panel-card settings-banner" id="{HOMEPAGE_SETTINGS_BANNER_ID}" aria-label="Suite Settings guide">
+      <p class="settings-banner-kicker">New to the Suite?</p>
+      <p class="settings-banner-title">How to use every part</p>
       <p class="settings-banner-blurb">
-        Learn every Settings control — privacy scale, keygen unlock, ping stats, and more —
-        plus a full install &amp; run guide.
+        Free install, KEYGEN unlock, VPN / % / EVOLVE, and every Settings control —
+        plain language, step by step.
       </p>
       <p class="settings-banner-actions">
         <a class="settings-banner-link" id="settings-explainer-banner-link" href="{href}">Browse Settings guide →</a>
@@ -219,6 +336,35 @@ def homepage_settings_banner_css() -> str:
 def _shared_shell_css() -> str:
     """Page-specific explainer CSS (shared shell CSS comes from public_head_open)."""
     return """
+.suite-guide-intro { text-align: center; }
+.suite-guide-intro .suite-guide-lead {
+  margin: 0 auto 0.75rem; max-width: 40rem; line-height: 1.55;
+  font-size: clamp(0.95rem, 2.2vw, 1.08rem); color: var(--rb-soft, #aed0ea);
+  font-weight: 500;
+}
+.suite-guide-intro .suite-guide-foot {
+  margin: 0 auto; max-width: 36rem; font-size: 0.9rem;
+  color: var(--rb-muted); line-height: 1.45;
+}
+.suite-howto-list { margin: 0; padding: 0; list-style: none; }
+.suite-howto-item {
+  border-top: 1px solid var(--rb-card-border);
+  padding: 0.95rem 0.15rem;
+  text-align: left;
+}
+.suite-howto-item:first-child { border-top: none; padding-top: 0.15rem; }
+.suite-howto-item h3 {
+  margin: 0 0 0.35rem; font-size: 1.05rem; color: var(--rb-cream);
+  letter-spacing: 0.02em;
+}
+.suite-howto-item .howto-label {
+  margin: 0.35rem 0 0.15rem; font-size: 0.72rem; font-weight: 800;
+  letter-spacing: 0.07em; text-transform: uppercase;
+  color: var(--rb-accent-sky, var(--rb-link));
+}
+.suite-howto-item p {
+  margin: 0 0 0.35rem; font-size: 0.92rem; line-height: 1.5; color: var(--rb-muted);
+}
 .explainer-list { margin: 0; padding: 0; list-style: none; }
 .explainer-item {
   border-top: 1px solid var(--rb-card-border);
@@ -249,8 +395,47 @@ def _shared_shell_css() -> str:
 """
 
 
+def render_suite_guide_intro_html() -> str:
+    """Lead block: human Suite narrative (not residual inventory)."""
+    return f"""    <section class="panel-card suite-guide-intro" id="{SUITE_GUIDE_INTRO_ID}"
+             aria-labelledby="suite-guide-intro-heading" data-product="suite">
+      <h1 class="panel-title" id="suite-guide-intro-heading">{_esc(SUITE_GUIDE_INTRO_HEADING)}</h1>
+      <p class="suite-guide-lead" id="suite-guide-lead">{_esc(SUITE_GUIDE_INTRO_BODY)}</p>
+      <p class="suite-guide-foot" id="suite-guide-foot">{_esc(SUITE_GUIDE_INTRO_FOOT)}</p>
+    </section>
+"""
+
+
+def render_suite_howto_parts_html(
+    parts: list[dict[str, str]] | None = None,
+) -> str:
+    """How-to blocks for free install, VPN, %, EVOLVE, Settings gear."""
+    items = parts if parts is not None else suite_howto_parts_catalog()
+    rows: list[str] = []
+    for p in items:
+        rows.append(
+            f"""      <li class="suite-howto-item" id="howto-{_esc(p['id'])}">
+        <h3>{_esc(p['title'])}</h3>
+        <p class="explainer-default">Default: {_esc(p['default'])}</p>
+        <p class="howto-label">What it is</p>
+        <p>{_esc(p['what'])}</p>
+        <p class="howto-label">How to use it</p>
+        <p>{_esc(p['how'])}</p>
+      </li>"""
+        )
+    inner = "\n".join(rows)
+    return f"""    <section class="panel-card" id="{SUITE_HOWTO_PARTS_ID}"
+             aria-labelledby="suite-howto-parts-heading" data-product="suite">
+      <h2 class="panel-title" id="suite-howto-parts-heading">Each part of the Suite</h2>
+      <ul class="suite-howto-list" id="{SUITE_HOWTO_PARTS_LIST_ID}">
+{inner}
+      </ul>
+    </section>
+"""
+
+
 def render_explainers_box_html(parts: list[dict[str, str]] | None = None) -> str:
-    """First box: full Settings tab part explainers."""
+    """VPN Settings controls — every control under the gear."""
     items = parts if parts is not None else settings_parts_catalog()
     rows: list[str] = []
     for p in items:
@@ -262,8 +447,8 @@ def render_explainers_box_html(parts: list[dict[str, str]] | None = None) -> str
       </li>"""
         )
     inner = "\n".join(rows)
-    return f"""    <section class="panel-card" id="settings-explainers-box" aria-labelledby="settings-explainers-heading">
-      <h2 class="panel-title" id="settings-explainers-heading">Client Settings — every control</h2>
+    return f"""    <section class="panel-card" id="{SETTINGS_EXPLAINERS_BOX_ID}" aria-labelledby="settings-explainers-heading">
+      <h2 class="panel-title" id="settings-explainers-heading">VPN Settings — every control</h2>
       <ul class="explainer-list" id="settings-explainer-list">
 {inner}
       </ul>
@@ -272,18 +457,14 @@ def render_explainers_box_html(parts: list[dict[str, str]] | None = None) -> str
 
 
 def render_install_howto_box_html() -> str:
-    """Second box: how to install and run (below explainers)."""
-    return """    <section class="panel-card" id="install-run-howto-box" aria-labelledby="install-howto-heading">
+    """How to install and run: free Suite download + KEYGEN + Connect."""
+    return f"""    <section class="panel-card" id="{INSTALL_HOWTO_BOX_ID}" aria-labelledby="install-howto-heading">
       <h2 class="panel-title" id="install-howto-heading">How to install and run</h2>
       <ol class="howto-steps" id="install-howto-steps">
-        <li><strong>Pay on the status page.</strong> Open
-          <a href="/" style="color:var(--rb-link);font-weight:700;">restoreprivacy.online</a>,
-          choose your platform and plan (Monthly £3.00 or Yearly £30.00 — both
-          include a 3-day free trial; no money is taken until after the trial ends),
-          and complete Stripe Checkout.</li>
-        <li><strong>Download after payment.</strong> Use the 12-hour download link on the success page
-          (retry if the connection drops; email also has download + keygen).
-          These are not free permanent GitHub installs.</li>
+        <li><strong>Download the Suite for free.</strong> Open
+          <a href="/" style="color:var(--rb-link);font-weight:700;">restoreprivacy.online</a>
+          and pick your platform from the free installer grid (or use
+          <code>/suite/download</code>). You do not pay for the package itself.</li>
         <li><strong>Install for your OS.</strong>
           Windows: run the setup exe (Admin may be needed later for residual).
           Android: allow the APK source, then install.
@@ -291,29 +472,34 @@ def render_install_howto_box_html() -> str:
           macOS / iOS: follow the package notes (signed / sideload).</li>
         <li><strong>Accept the end-user licence</strong> on first use. Acceptance is local only —
           Connect stays blocked until you accept.</li>
-        <li><strong>Enter the keygen</strong> from email (RPT-KEY-…).
-          Use the forced unlock dialog — download alone does not unlock residual VPN.</li>
-        <li><strong>Press Connect.</strong> Approve elevation when asked so residual public IP
-          uses the VPN node. Wait until residual capture is active before relying on it.</li>
+        <li><strong>Get a KEYGEN when you want residual Connect.</strong>
+          Take a monthly licence from £3 on the site (or a yearly residual plan on
+          <code>/pay</code>). Email delivers KEYGEN (<code>RPT-KEY-…</code>) after checkout.</li>
+        <li><strong>Enter the KEYGEN</strong> on the unlock screen (or Settings → Payment entitlement).
+          Download alone does not unlock residual VPN.</li>
+        <li><strong>Press Connect</strong> on the VPN tab. Approve elevation / VPN permission when asked
+          so residual public IP uses the product path. Wait until status is honestly connected.</li>
         <li><strong>Optional Settings.</strong> Traffic shaping / outer obfuscation OFF feels
           snappier (weaker traffic-analysis resistance). Multi-hop ON uses the exit path
-          (higher latency). Measure ping shows device→entry (and exit when multi-hop is on) —
-          not a speed SLA.</li>
+          (higher latency). Leave <strong>Allow Suite self-update</strong> OFF unless you want
+          pushed packages — you still click unpack and relaunch yourself.</li>
+        <li><strong>Use % and EVOLVE</strong> from the bottom tabs when you need wallet or analysis.
+          They share the same unlock story; residual traffic still starts on VPN → Connect.</li>
         <li><strong>Disconnect</strong> when finished. Residual routing stops on Disconnect
-          (or Quit, depending on platform).</li>
+          (or Quit, depending on platform). Minimize keeps the tunnel until you Disconnect.</li>
       </ol>
       <p class="howto-note" id="install-howto-note">
-        If Connect fails after payment: re-enter the keygen, confirm the subscription is
+        If Connect fails after KEYGEN: re-enter the key, confirm the subscription is
         still active, check firewall / UDP path, and open the
         <a href="/AUDIT.md" style="color:var(--rb-link);">security audit</a>.
-        Privacy policy and licence are linked from the homepage.
+        Privacy policy and licence are linked from the homepage and Settings.
       </p>
     </section>
 """
 
 
 def render_settings_explainer_page_html(*, title: str | None = None) -> bytes:
-    """Full settings explainer page: shared brand header (no BUY NOW), explainers + how-to."""
+    """Full Suite settings guide: intro, how-to parts, Settings controls, install steps."""
     try:
         from public_chrome import (
             PUBLIC_BRAND_TITLE,
@@ -332,22 +518,25 @@ def render_settings_explainer_page_html(*, title: str | None = None) -> bytes:
         )
 
     brand = public_display_title(title if title is not None else PUBLIC_BRAND_TITLE)
-    parts = settings_parts_catalog()
-    explainers = render_explainers_box_html(parts)
+    intro = render_suite_guide_intro_html()
+    howto_parts = render_suite_howto_parts_html()
+    explainers = render_explainers_box_html(settings_parts_catalog())
     howto = render_install_howto_box_html()
     css = _shared_shell_css()
     header = public_brand_header_html(
         title=brand,
         active="settings",
-        logo_size=112,
     )
-    body = f"""{public_head_open(title=f"Client Settings guide — {brand}", extra_css=css)}
-  <div class="page-shell" id="settings-explainer-page">
+    page_title = f"Settings guide — {brand}"
+    body = f"""{public_head_open(title=page_title, extra_css=css)}
+  <div class="page-shell" id="settings-explainer-page" data-product="suite">
 {header}
+{intro}
+{howto_parts}
 {explainers}
 {howto}
     <section class="panel-card footer-nav" id="settings-explainer-footer">
-      <p style="margin:0;">Use <strong>Home</strong> in the header to return to downloads and pay.</p>
+      <p style="margin:0;">Use <strong>Home</strong> in the header for free Suite downloads and KEYGEN checkout.</p>
     </section>
   </div>
 {public_page_close()}
@@ -362,3 +551,22 @@ def settings_explainer_paths() -> frozenset[str]:
 
 def catalog_ids() -> list[str]:
     return [p["id"] for p in settings_parts_catalog()]
+
+
+def suite_howto_ids() -> list[str]:
+    return [p["id"] for p in suite_howto_parts_catalog()]
+
+
+def suite_guide_copy_is_valid(html_or_text: str = "") -> bool:
+    """Structural honesty for tests: Suite story present; forbidden wording banned."""
+    blob = (html_or_text or "").lower()
+    if "paywall" in blob:
+        return False
+    # Prefer full page; also allow checking intro constants alone.
+    sample = blob if blob.strip() else (
+        f"{SUITE_GUIDE_INTRO_BODY} {SUITE_GUIDE_INTRO_FOOT}".lower()
+    )
+    if "paywall" in sample:
+        return False
+    need = ("keygen", "free", "vpn", "evolve")
+    return all(n in sample for n in need)

@@ -42,12 +42,17 @@ class TestSettingsExplainerPage(unittest.TestCase):
         exp_end = html.index("</section>", exp_start)
         explainers_box = html[exp_start:exp_end]
         self.assertNotIn('class="tagline"', explainers_box)
+        # Suite intro + how-to parts before Settings catalog
+        self.assertIn('id="suite-guide-intro"', html)
+        self.assertIn("How to use Restore Privacy Suite", html)
+        self.assertIn('id="suite-howto-parts"', html)
         # Explainers box + required Settings parts
         self.assertIn('id="settings-explainers-box"', html)
         ids = catalog_ids()
         for need in (
             "run-at-startup",
             "autoconnect-on-launch",
+            "suite-self-update",
             "traffic-shaping",
             "outer-obfuscation",
             "multihop",
@@ -71,7 +76,9 @@ class TestSettingsExplainerPage(unittest.TestCase):
         self.assertIn("ping statistics", low)
         self.assertIn("keygen", low)
         self.assertIn("licence", low)
-        # Second box: install how-to after explainers
+        self.assertIn("allow suite self-update", low)
+        self.assertNotIn("paywall", low)
+        # Install how-to after explainers (free Suite + KEYGEN)
         self.assertIn('id="install-run-howto-box"', html)
         i_exp = html.index('id="settings-explainers-box"')
         i_how = html.index('id="install-run-howto-box"')
@@ -81,6 +88,7 @@ class TestSettingsExplainerPage(unittest.TestCase):
         self.assertIn("Accept the end-user licence", html)
         self.assertIn("keygen", html.lower())
         self.assertIn("Press Connect", html)
+        self.assertIn("free", low)
         # Product-policy explainers wired (or fallback) — privacy scale honesty
         parts = settings_parts_catalog()
         shape = next(p for p in parts if p["id"] == "traffic-shaping")
