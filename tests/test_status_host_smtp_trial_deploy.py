@@ -126,6 +126,17 @@ class TestPaymentLinkTrialHelpers(unittest.TestCase):
         self.assertIn("3-day trial", src.lower())
         self.assertIn("trial_period_days", src)
         self.assertIn("year", src.lower())
+        # Live catalog policy is trial=3 — must not ship dual "no trial" operator steps
+        self.assertNotIn("charges with no free trial", src.lower())
+        self.assertNotIn("confirm checkout charges with no free trial", src.lower())
+        # Nicknames / dashboard_steps may mention "3-day trial via Checkout"; ban bare no-trial policy
+        for banned in (
+            "no free trial",
+            "set trial period = none",
+            "trial period = none / 0 days",
+            "clears free-trial",
+        ):
+            self.assertNotIn(banned, src.lower(), msg=f"configure script still has {banned!r}")
         smtp_script = ROOT / "scripts" / "set_render_fulfilment_smtp.ps1"
         self.assertTrue(smtp_script.is_file())
         ps = smtp_script.read_text(encoding="utf-8")

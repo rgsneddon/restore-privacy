@@ -390,7 +390,7 @@ def main(argv: list[str] | None = None) -> int:
             "Set STRIPE_PRICE_ID_MONTHLY / STRIPE_PRICE_ID_YEARLY (or ship defaults in payments.py)",
             "Under subscription options set trial period = 3 days (catalog free trial)",
             "Catalog uses site /pay plan page → Checkout Session (not dual buy.stripe.com tiles)",
-            "Confirm checkout charges with no free trial",
+            "Confirm Checkout applies 3-day free trial (no money taken until after trial ends)",
         ]
         text = json.dumps(summary, indent=2) + "\n"
         if args.out:
