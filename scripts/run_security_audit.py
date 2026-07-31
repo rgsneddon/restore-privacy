@@ -1459,7 +1459,7 @@ Latest automated security audit for production node **{host}** and the in-repo p
 | Area | Paths |
 |------|--------|
 | Shared client | `client/connect.py`, `client/endpoint.py`, `client/full_tunnel.py`, `client/multihop.py`, `client/secrets_loader.py`, `client/legal_links.py`, residual honesty / `residual_ip_capture` |
-| Multi-hop residual | Opt-in residual-via-exit (`RPT_MULTIHOP_ENABLED=1`); catalog pubs IS/DE/US under `product/` (default entry **DE**; RO retired) |
+| Multi-hop residual | Opt-in residual-via-exit (`RPT_MULTIHOP_ENABLED=1`); catalog pubs IS/DE under `product/` (default entry **DE**; US and RO residual peers retired) |
 | Windows / Linux | `client/windows/*` (multihop PE via `scripts/build_windows_multihop.py`), `client/linux/*` |
 | Mobile / Apple | `client_app/` Flutter + NativePrep residual engines (exit pub inject) |
 | Node | `node/*` (handshake, pfs, traffic_shape, crypto_session, nolog); node-only zram+LUKS2 |

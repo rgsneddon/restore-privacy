@@ -140,11 +140,11 @@ class TestNodeWipeHtml(unittest.TestCase):
         self.assertIn("one at a time", low)
         self.assertNotIn("simultaneous all-node wipe", low)
         self.assertNotIn("provider backups and netflow are not erased", low)
-        self.assertTrue(
-            "is" in low and "de" in low and "us" in low,
-            "blurb should name monopin fleet peers IS/DE/US",
-        )
+        # Live fleet is IS+DE only (US residual peer retired)
+        self.assertIn("is then de", low)
+        self.assertNotIn("is then de then us", low)
         self.assertNotIn("is then ro then us", low)
+        self.assertNotIn("then us", low)
         self.assertIn("manual reconnection", low)
         self.assertIn("weekly", low)
         self.assertIn("disconnect", low)

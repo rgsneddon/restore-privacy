@@ -186,7 +186,7 @@ Short user-education summary. Full policy language: **[PRIVACY_POLICY.md — Thr
 
 - **Endpoint correlation** — sites still know you via logins, cookies, and browser fingerprints; many users share one node egress IP.
 - **Behavioral analysis** — observers can still study when you connect and rough usage patterns.
-- **VPS / provider IP metadata** — catalog peers include **Iceland**, **Germany** (default entry), and the **US** residual host; host public **no invasive logs** stance is not a forensic audit. Other providers (CDN/status, home ISP, destinations) may still log. Node OS compromise remains a residual risk.
+- **VPS / provider IP metadata** — live catalog peers are **Iceland** and **Germany** (default entry) only (United States residual peer is **retired**); host public **no invasive logs** stance is not a forensic audit. Other providers (CDN/status, home ISP, destinations) may still log. Node OS compromise remains a residual risk.
 - **Traffic analysis by ISP** beyond mitigations — you still appear to use a VPN; opt-in multi-hop residual dials Germany (DE) exit when enabled.
 - **Client device seizure** — local keys, apps, and browser history on an unlocked device are out of scope for the node’s no-log promise.
 - Malware, compromised OS, or destination-site tracking.

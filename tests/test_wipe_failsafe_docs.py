@@ -39,8 +39,10 @@ class TestWipeFailsafeShippedDocs(unittest.TestCase):
         # Still honest: best-effort hop + not zero packet-loss
         self.assertIn("best-effort", low)
         self.assertIn("zero packet-loss", low)
-        # Sequential fleet remains
-        self.assertIn("is → de → us", low)
+        # Sequential fleet remains (IS → DE only; US residual peer retired)
+        self.assertIn("is → de", low)
+        self.assertNotIn("is → de → us", low)
+        self.assertNotIn("then us", low)
 
     def test_node_wipe_reinstall_failsafe(self):
         text = (ROOT / "docs" / "NODE_WIPE_REINSTALL.md").read_text(encoding="utf-8")
@@ -50,8 +52,10 @@ class TestWipeFailsafeShippedDocs(unittest.TestCase):
         self.assertIn(WEEKLY_WIPE, low)
         self.assertIn("best-effort", low)
         self.assertIn("not zero packet-loss", low)
-        # Monopin order (not RO as live wipe target)
-        self.assertIn("is → de → us", low)
+        # Live monopin fleet order (IS → DE only; US residual peer retired)
+        self.assertIn("is → de", low)
+        self.assertNotIn("is → de → us", low)
+        self.assertNotIn("then us", low)
 
     def test_countdown_honesty_blurb_failsafe(self):
         sys.path.insert(0, str(ROOT / "status_page"))
@@ -64,6 +68,9 @@ class TestWipeFailsafeShippedDocs(unittest.TestCase):
         self.assertIn("disconnect", low)
         self.assertIn("restart", low)
         self.assertIn("best-effort", low)
+        self.assertIn("is then de", low)
+        self.assertNotIn("is then de then us", low)
+        self.assertNotIn("then us", low)
         # Rendered public HTML carries the same blurb (not seamless-hop-only)
         html = render_node_wipe_countdown_html()
         self.assertIn(HONESTY_BLURB, html)

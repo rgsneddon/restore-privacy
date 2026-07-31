@@ -115,15 +115,72 @@ class TestLiveCatalogIsDeOnly(unittest.TestCase):
             self.assertNotIn("return usNodePubName", text, msg=rel)
 
     def test_current_docs_do_not_list_us_as_live_catalog_peer(self):
+        """Exhaustive scanner: current product surfaces must not present US as live."""
+        # Fixed allowlist of *current* surfaces only (not RELEASE_NOTES / old handoffs).
+        allowlist = [
+            ROOT / "README.md",
+            ROOT / "status_page" / "public" / "README.md",
+            ROOT / "PRIVACY_POLICY.md",
+            ROOT / "status_page" / "public" / "PRIVACY_POLICY.md",
+            ROOT / "docs" / "NODE_WIPE_REINSTALL.md",
+            ROOT / "CREDITS.md",
+            ROOT / "status_page" / "public" / "CREDITS.md",
+            ROOT / "status_page" / "node_wipe_countdown.py",
+            ROOT / "status_page" / "admin_panel.py",
+            ROOT / "scripts" / "run_security_audit.py",
+            ROOT / "AUDIT.md",
+            ROOT / "status_page" / "AUDIT.md",
+            ROOT / "status_page" / "public" / "AUDIT.md",
+        ]
+        # Live-presentation patterns (not every English “US” or heal-constant host IP).
+        forbidden = [
+            "is then de then us",
+            "is → de → us",
+            "is → de → us",
+            "IS then DE then US",
+            "IS → DE → US",
+            "IS/DE/US",
+            "IS / DE / US",
+            "**IS** / **DE** (default) / **US**",
+            "and the **US** residual host",
+            "and the US residual host",
+            "catalog pubs IS/DE/US",
+            "catalog peers include **Iceland**, **Germany** (default entry), and the **US**",
+            "then **US**",
+            "then US)",
+            "then US).",
+            "monopin fleet peers IS/DE/US",
+        ]
+        offenders: list[str] = []
+        for path in allowlist:
+            self.assertTrue(path.is_file(), f"missing current surface {path}")
+            text = path.read_text(encoding="utf-8")
+            low = text.lower()
+            for pat in forbidden:
+                if pat.lower() in low:
+                    offenders.append(f"{path.relative_to(ROOT)}: contains {pat!r}")
+            # HONESTY_BLURB / fleet sentence must not advertise US without retired
+            if path.name == "node_wipe_countdown.py":
+                # Import shipped blurb
+                sys.path.insert(0, str(ROOT / "status_page"))
+                from node_wipe_countdown import HONESTY_BLURB  # noqa: E402
+
+                bl = HONESTY_BLURB.lower()
+                self.assertIn("is then de", bl)
+                self.assertNotIn("is then de then us", bl)
+                self.assertNotIn("then us", bl)
+
+        self.assertEqual(
+            offenders,
+            [],
+            msg="current surfaces still present US as live catalog/fleet peer:\n"
+            + "\n".join(offenders),
+        )
+        # Positive IS+DE catalog wording still present on primary README
         readme = (ROOT / "README.md").read_text(encoding="utf-8")
         self.assertIn("Catalog peers: **IS** / **DE** (default) only", readme)
-        self.assertNotIn("**IS** / **DE** (default) / **US**", readme)
         privacy = (ROOT / "PRIVACY_POLICY.md").read_text(encoding="utf-8")
-        self.assertNotIn("and the US residual host", privacy)
         self.assertIn("retired", privacy.lower())
-        wipe = (ROOT / "docs" / "NODE_WIPE_REINSTALL.md").read_text(encoding="utf-8")
-        self.assertNotIn("then **US**", wipe)
-        self.assertIn("**IS first**, then **DE**", wipe)
 
 
 if __name__ == "__main__":

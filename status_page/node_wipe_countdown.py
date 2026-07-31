@@ -4,7 +4,7 @@ Display for https://restoreprivacy.online/ homepage. Period matches the product
 **weekly sequential fleet wipe** service (``OnUnitActiveSec=604800`` / ``7d``).
 
 Honesty:
-- Label covers **all catalog residual peers** (IS → RO → US) over the cycle.
+- Label covers **all live catalog residual peers** (IS → DE) over the cycle.
 - Wipe is **one peer at a time** (never concurrent multi-node wipe).
 - Live completion advances the clear clock when recorded; dry-run does not.
 - Without a last-clear anchor the UI uses a fixed ~7d epoch grid.
@@ -40,9 +40,24 @@ ENTRY_LAST_CLEAR_REL = "var/rpt-node-a-last-clear.json"
 
 NODE_WIPE_HEADING = "Node data clear timer"
 
+def _fleet_order_phrase() -> str:
+    """Human fleet order for honesty blurb (live catalog only — IS then DE)."""
+    try:
+        from node.fleet_wipe import PREFERRED_FLEET_ORDER
+
+        codes = [str(c).strip().upper() for c in PREFERRED_FLEET_ORDER if str(c).strip()]
+        if codes:
+            if len(codes) == 1:
+                return codes[0]
+            return " then ".join(codes)
+    except Exception:  # noqa: BLE001
+        pass
+    return "IS then DE"
+
+
 HONESTY_BLURB = (
     "About every week we wipe and rebuild residual nodes one at a time "
-    "(IS then DE then US). Hop to another peer while one drains is best-effort "
+    f"({_fleet_order_phrase()}). Hop to another peer while one drains is best-effort "
     "(not guaranteed). If hop does not succeed, the client may disconnect or "
     "restart and will require manual reconnection whilst privacy-preserving "
     "weekly node wipedown occurs. This clock is that cycle."
