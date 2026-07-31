@@ -12,6 +12,12 @@ Never copies admin panel HTML, admin_*.js, payment secrets, or operator runbooks
 Usage::
 
   python3 scripts/build_public_pages.py
+
+Publish the open public site (separate public repo, not this monorepo)::
+
+  # after build, push public_site/ contents to:
+  #   https://github.com/rgsneddon/restore-privacy-suite
+  # Live Pages: https://rgsneddon.github.io/restore-privacy-suite/
 """
 
 from __future__ import annotations

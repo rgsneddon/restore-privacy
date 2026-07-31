@@ -11,10 +11,16 @@ Live free route on the status host: `/suite/download?platform=…`
 Public Pages point those buttons at restoreprivacy.online so binaries stay
 on the fulfilment host.
 
+Open public website (no admin):
+
+- https://rgsneddon.github.io/restore-privacy-suite/
+- Source: https://github.com/rgsneddon/restore-privacy-suite
+
 Operators building packages:
 
 ```bash
 python3 scripts/build_suite_1.0.0.py
 python3 scripts/host_paid_assets_vps.py --stage --upload --version 1.0.0 --force
 python3 scripts/build_public_pages.py
+# push public_site/ contents to rgsneddon/restore-privacy-suite (public Pages)
 ```

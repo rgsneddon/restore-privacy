@@ -12,7 +12,7 @@ with regular automated security audits.
 | **Licence** | [LICENSE](LICENSE) (proprietary full copyright) |
 | **Credits** | [CREDITS.md](CREDITS.md) |
 | **Security audit** | [AUDIT.md](AUDIT.md) |
-| **Public pages** | [`public_site/`](public_site/) (GitHub Pages — no admin) |
+| **Public pages** | https://rgsneddon.github.io/restore-privacy-suite/ · open source: [rgsneddon/restore-privacy-suite](https://github.com/rgsneddon/restore-privacy-suite) · monorepo export [`public_site/`](public_site/) |
 
 ---
 
@@ -272,7 +272,8 @@ Live requires `RPT_EPHEMERAL_CONFIRM=yes`.
 
 ```bash
 python3 scripts/build_public_pages.py
-# enable GitHub Pages from public_site/ (or copy to docs/)
+# push public_site/ to github.com/rgsneddon/restore-privacy-suite (public open Pages)
+# live: https://rgsneddon.github.io/restore-privacy-suite/
 ```
 
 **Release scripts:**
