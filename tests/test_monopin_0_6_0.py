@@ -1,4 +1,10 @@
-"""Monopin 0.6.0 pins + node→client update-push for 0.6.0 on shipped paths."""
+"""Historical monopin 0.6.0 handoff notes + update-push mechanics.
+
+Current Suite catalog monopin is **1.0.0** (see ``tests/test_suite_monopin_1_0_0.py``
+and ``client/VERSION``). This module only covers archival 0.6.0 packaging notes
+and that residual UPDATE_PUSH still delivers an arbitrary target version string
+(including historical 0.6.0) — it must **not** re-pin the live catalog to 0.6.0.
+"""
 
 from __future__ import annotations
 
@@ -15,23 +21,15 @@ PLATFORMS = ("windows", "android", "macos", "ios", "linux")
 
 
 class TestMonopin060Pins(unittest.TestCase):
-    def test_client_and_catalog_pins_are_0_6_0(self) -> None:
+    def test_live_catalog_is_not_0_6_0_anymore(self) -> None:
+        """Archive 0.6.0 packaging must not redefine the live Suite catalog pin."""
         ver = (ROOT / "client" / "VERSION").read_text(encoding="utf-8").strip()
-        self.assertEqual(ver, "0.6.0")
-        pub = (ROOT / "client_app" / "pubspec.yaml").read_text(encoding="utf-8")
-        self.assertRegex(pub, r"(?m)^version:\s*0\.6\.0\+")
-        dart = (ROOT / "client_app" / "lib" / "rpt_config.dart").read_text(
-            encoding="utf-8"
-        )
-        self.assertIn("productVersion = '0.6.0'", dart)
-        inst = (ROOT / "client" / "windows" / "installer.py").read_text(
-            encoding="utf-8"
-        )
-        self.assertIn('PRODUCT_VERSION_EMBEDDED = "0.6.0"', inst)
-        from downloads import RELEASE_TAG, RELEASE_VERSION
+        self.assertNotEqual(ver, "0.6.0")
+        self.assertEqual(ver, "1.0.0")
+        from downloads import RELEASE_VERSION
 
-        self.assertEqual(RELEASE_VERSION, "0.6.0")
-        self.assertEqual(RELEASE_TAG, "0.6.0")
+        self.assertEqual(RELEASE_VERSION, "1.0.0")
+        self.assertNotEqual(RELEASE_VERSION, "0.6.0")
 
     def test_release_notes_and_build_script_list_all_platforms(self) -> None:
         notes = (ROOT / "scripts" / "RELEASE_NOTES_0.6.0.md").read_text(

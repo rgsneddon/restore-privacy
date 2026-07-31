@@ -10,6 +10,7 @@ Stable same-origin paths (no GitHub dependency for public readers):
 | ``/PRIVACY_POLICY.md`` | Privacy policy |
 | ``/AUDIT.md`` | Security audit |
 | ``/CREDITS.md`` | Credits / third-party components |
+| ``/NODE_OPERATOR.md`` | Residual node / operator path (not Suite client) |
 """
 
 from __future__ import annotations
@@ -32,6 +33,7 @@ LICENSE_PATH = "/LICENSE"
 PRIVACY_PATH = "/PRIVACY_POLICY.md"
 AUDIT_PATH = "/AUDIT.md"
 CREDITS_PATH = "/CREDITS.md"
+NODE_OPERATOR_PATH = "/NODE_OPERATOR.md"
 
 
 @dataclass(frozen=True)
@@ -84,6 +86,18 @@ PUBLIC_DOCS: tuple[PublicDoc, ...] = (
         title="Credits — Restore Privacy",
         filename="CREDITS.md",
         aliases=("/credits", "/docs/CREDITS.md"),
+    ),
+    PublicDoc(
+        id="node-operator",
+        path=NODE_OPERATOR_PATH,
+        title="Residual node / operator path — Restore Privacy",
+        filename="NODE_OPERATOR.md",
+        aliases=(
+            "/node-operator",
+            "/node_operator.md",
+            "/docs/NODE_OPERATOR.md",
+            "/docs/node-operator",
+        ),
     ),
 )
 

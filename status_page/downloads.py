@@ -900,6 +900,27 @@ SUITE_KEYGEN_HINT = (
 SUITE_FREE_DOWNLOAD_PATH = "/suite/download"
 DOWNLOADS_SECTION_ID = "downloads"
 
+# Prefer-to-host residual node (operator path) — separate from Suite client installers.
+# Primary doc is status-host /NODE_OPERATOR.md (public pack), not Suite README.
+NODE_PREFERENCE_SECTION_ID = "download-node-preference"
+NODE_OPERATOR_DOCS_HREF = "/NODE_OPERATOR.md"
+NODE_OPERATOR_DOCS_LABEL = "Residual node / operator path"
+NODE_OPERATOR_DOCS_ALIAS_HREF = "/node-operator"
+# Public open Suite Pages (client storefront docs only — no /admin).
+NODE_PUBLIC_SUITE_PAGES_HREF = "https://rgsneddon.github.io/restore-privacy-suite/"
+NODE_PUBLIC_SUITE_PAGES_LABEL = "Public Suite Pages (client docs)"
+NODE_PUBLIC_SUITE_SOURCE_HREF = "https://github.com/rgsneddon/restore-privacy-suite"
+NODE_PUBLIC_SUITE_SOURCE_LABEL = "Public Suite source (GitHub)"
+NODE_PREFERENCE_HEADING = "Prefer to run a residual node?"
+NODE_PREFERENCE_BLURB = (
+    "The free Suite installers and KEYGEN above are for residual <strong>Connect</strong> "
+    "on your own device. We also keep a dedicated <strong>node / operator path</strong> "
+    "for people who prefer to <strong>host</strong> a residual VPN node "
+    "(self-host, Node Operator lab GUI, operator tooling) instead of only installing the "
+    "client. That is a different role: not a fifth Suite client platform, and not unlocked "
+    "by the monthly KEYGEN checkout."
+)
+
 
 def suite_free_download_href(platform: str) -> str:
     """Relative free-download URL for a Suite platform installer."""
@@ -962,6 +983,69 @@ def suite_storefront_css() -> str:
       margin: 0.75rem auto 0; max-width: 34rem;
       font-size: 0.82rem; color: rgba(174, 208, 234, 0.95); line-height: 1.4;
     }
+    /* Node / operator preference (additive; not a Suite client platform) */
+    .download-node-preference {
+      margin: 1rem auto 0; max-width: 36rem; padding: 0.85rem 1rem;
+      text-align: center; box-sizing: border-box;
+      border: 1px dashed rgba(174, 208, 234, 0.4);
+      border-radius: 12px;
+      background: rgba(8, 18, 32, 0.45);
+    }
+    .download-node-preference h3 {
+      margin: 0 0 0.45rem; font-size: 0.92rem; font-weight: 800;
+      letter-spacing: 0.04em; color: #e8eef5; text-transform: none;
+    }
+    .download-node-preference .node-pref-blurb {
+      margin: 0 auto 0.65rem; max-width: 34rem;
+      font-size: 0.82rem; line-height: 1.45; color: rgba(174, 208, 234, 0.95);
+      font-weight: 500;
+    }
+    .download-node-preference .node-pref-links {
+      display: flex; flex-wrap: wrap; gap: 0.45rem; justify-content: center;
+      margin: 0;
+    }
+    .download-node-preference a.node-pref-link {
+      display: inline-block; padding: 0.4rem 0.7rem; border-radius: 999px;
+      font-size: 0.78rem; font-weight: 700; text-decoration: none;
+      color: #0a1628; background: #aed0ea;
+      border: 1px solid rgba(255,255,255,0.2);
+    }
+    .download-node-preference a.node-pref-link:hover { background: #c5e0f4; }
+    .downloads .download-node-preference {
+      margin-top: 1.1rem;
+    }
+"""
+
+
+def render_node_preference_html() -> str:
+    """Additive node/operator preference block for public download boxes.
+
+    Explains Suite client vs residual-node host preference and links only to
+    real public destinations (status-host README; public Suite Pages/source).
+    """
+    links = [
+        (NODE_OPERATOR_DOCS_HREF, NODE_OPERATOR_DOCS_LABEL, "node-docs"),
+        (NODE_OPERATOR_DOCS_ALIAS_HREF, "Node operator (short path)", "node-docs-alias"),
+        (NODE_PUBLIC_SUITE_PAGES_HREF, NODE_PUBLIC_SUITE_PAGES_LABEL, "suite-pages"),
+        (NODE_PUBLIC_SUITE_SOURCE_HREF, NODE_PUBLIC_SUITE_SOURCE_LABEL, "suite-source"),
+    ]
+    anchors: list[str] = []
+    for href, label, key in links:
+        anchors.append(
+            f'<a class="node-pref-link" id="node-pref-link-{_esc_html(key)}" '
+            f'href="{_esc_html(href)}" data-node-pref-link="{_esc_html(key)}" '
+            f'rel="noopener noreferrer">'
+            f"{_esc_html(label)}</a>"
+        )
+    return f"""
+    <aside class="download-node-preference" id="{NODE_PREFERENCE_SECTION_ID}"
+           data-node-preference="1" aria-label="Residual node operator preference">
+      <h3 id="node-pref-heading">{_esc_html(NODE_PREFERENCE_HEADING)}</h3>
+      <p class="node-pref-blurb" id="node-pref-blurb">{NODE_PREFERENCE_BLURB}</p>
+      <div class="node-pref-links" id="node-pref-links" data-node-pref-links="1">
+        {" ".join(anchors)}
+      </div>
+    </aside>
 """
 
 
@@ -1050,6 +1134,7 @@ def render_suite_storefront_html(
       Download first, then enter the KEYGEN from your fulfilment email after checkout.
       Yearly VPN plans remain available in the client download box below.
     </p>
+{render_node_preference_html()}
   </section>
 """
 
@@ -1147,5 +1232,6 @@ def render_download_section_html(
     <div class="dl-platform-note-box" id="dl-platform-note-box">
       <p class="dl-platform-note" id="dl-platform-note">{PLATFORM_SELECT_NOTE}</p>
     </div>
+{render_node_preference_html()}
   </section>
 """

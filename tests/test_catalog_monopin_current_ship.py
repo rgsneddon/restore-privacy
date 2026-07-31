@@ -71,25 +71,30 @@ class TestCatalogMonopinCurrentShip(unittest.TestCase):
         Drives the real public-document loader used by the status app (not a
         parallel re-implementation of the serve path).
         """
-        public_audit = ROOT / "status_page" / "public" / "AUDIT.md"
-        self.assertTrue(public_audit.is_file(), "missing status_page/public/AUDIT.md")
-        text = public_audit.read_text(encoding="utf-8")
-        self.assertIn(
-            f"| **Public catalog version** | **{self.pin}** |",
-            text,
-        )
-        # Current package table basenames only
-        for p in self.d.list_catalog_platform_packages(version=self.pin):
-            self.assertIn(p["filename"], text)
-        found = re.findall(
-            r"restore-privacy-client-([0-9.]+)-[A-Za-z0-9._-]+", text
-        )
-        for ver in found:
-            self.assertEqual(
-                ver,
-                self.pin,
-                f"public AUDIT cites non-current monopin package {ver}; pin={self.pin}",
+        for rel in (
+            "status_page/public/AUDIT.md",
+            "status_page/AUDIT.md",
+            "AUDIT.md",
+        ):
+            public_audit = ROOT / rel
+            self.assertTrue(public_audit.is_file(), f"missing {rel}")
+            text = public_audit.read_text(encoding="utf-8")
+            self.assertIn(
+                f"| **Public catalog version** | **{self.pin}** |",
+                text,
+                rel,
             )
+            for p in self.d.list_catalog_platform_packages(version=self.pin):
+                self.assertIn(p["filename"], text, rel)
+            found = re.findall(
+                r"restore-privacy-client-([0-9.]+)-[A-Za-z0-9._-]+", text
+            )
+            for ver in found:
+                self.assertEqual(
+                    ver,
+                    self.pin,
+                    f"{rel} cites non-current monopin package {ver}; pin={self.pin}",
+                )
         # Shipped loader the status host uses for /AUDIT.md
         try:
             from public_docs import load_public_document_bytes
@@ -102,6 +107,7 @@ class TestCatalogMonopinCurrentShip(unittest.TestCase):
         self.assertIsInstance(raw, (bytes, bytearray))
         self.assertIn(f"| **Public catalog version** | **{self.pin}** |".encode(), raw)
         self.assertNotIn(b"restore-privacy-client-0.6.0-", raw)
+        self.assertNotIn(b"restore-privacy-client-0.5.9-", raw)
 
 
 if __name__ == "__main__":

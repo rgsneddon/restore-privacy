@@ -522,6 +522,31 @@ def render_html(
     page_css = (
         dl_css
         + """
+    /* Suite + client download boxes: equal halves side-by-side at top of home */
+    .home-shop-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: clamp(0.75rem, 2vw, 1.15rem);
+      width: 100%;
+      align-items: stretch;
+      box-sizing: border-box;
+      margin: 0 0 clamp(0.95rem, 2.2vw, 1.35rem);
+    }
+    .home-shop-row > .suite-storefront,
+    .home-shop-row > .downloads,
+    .home-shop-row > section {
+      width: 100%;
+      max-width: 100%;
+      min-width: 0;
+      margin: 0;
+      box-sizing: border-box;
+      height: 100%;
+    }
+    @media (max-width: 820px) {
+      .home-shop-row {
+        grid-template-columns: 1fr;
+      }
+    }
     .audit-countdown { text-align: center; letter-spacing: 0.02em; width: 100%; }
     .audit-countdown-row {
       font-size: 0.95rem; color: var(--rb-soft, var(--rb-muted));
@@ -589,13 +614,19 @@ def render_html(
         active="home",
         product_active="vpn",
     )
-    # Suite intro + free storefront above residual client downloads.
+    # Shop dual-row first (Suite + client downloads as halves), then intro / timers.
+    shop_row_html = f"""
+    <div class="home-shop-row" id="home-shop-row" data-home-shop-row="1"
+         data-layout="two-halves" aria-label="Suite and client downloads">
+{suite_html}
+{downloads_html}
+    </div>
+"""
     body = f"""{public_head_open(title=str(title), extra_css=page_css)}
   <div class="page-shell" id="page-shell" data-page="home" data-product="suite" data-suite-version="1.0.0" data-chrome="pro">
 {header}
+{shop_row_html}
 {suite_intro_html}
-{suite_html}
-{downloads_html}
 {node_wipe_html}
     <section class="panel-card" id="audit-panel" aria-label="Security audit countdown" data-chrome="pro">
 {countdown_html}

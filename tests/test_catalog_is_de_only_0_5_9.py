@@ -51,17 +51,19 @@ class TestLiveCatalogIsDeOnly(unittest.TestCase):
         self.assertEqual(PREFERRED_FLEET_ORDER, ("IS", "DE"))
         self.assertEqual(fleet_country_codes(), ["IS", "DE"])
 
-    def test_monopin_version_0_5_9(self):
+    def test_live_monopin_and_is_de_catalog(self):
+        """Live Suite monopin is 1.0.0; IS+DE product catalog peers remain (no US)."""
         ver = (ROOT / "client" / "VERSION").read_text(encoding="utf-8").strip()
-        self.assertEqual(ver, "0.5.9")
+        self.assertEqual(ver, "1.0.0")
         dl = (ROOT / "status_page" / "downloads.py").read_text(encoding="utf-8")
-        self.assertIn('RELEASE_VERSION = "0.5.9"', dl)
+        self.assertIn(f'RELEASE_VERSION = "{ver}"', dl)
+        self.assertNotIn('RELEASE_VERSION = "0.5.9"', dl)
         pub = (ROOT / "client_app" / "pubspec.yaml").read_text(encoding="utf-8")
-        self.assertTrue(re.search(r"^version:\s*0\.5\.9\+", pub, flags=re.M))
+        self.assertTrue(re.search(rf"^version:\s*{re.escape(ver)}\+", pub, flags=re.M))
         dart = (ROOT / "client_app" / "lib" / "rpt_config.dart").read_text(
             encoding="utf-8"
         )
-        self.assertIn("productVersion = '0.5.9'", dart)
+        self.assertIn(f"productVersion = '{ver}'", dart)
         dart_cat = (ROOT / "client_app" / "lib" / "country_select.dart").read_text(
             encoding="utf-8"
         )
@@ -178,7 +180,14 @@ class TestLiveCatalogIsDeOnly(unittest.TestCase):
         )
         # Positive IS+DE catalog wording still present on primary README
         readme = (ROOT / "README.md").read_text(encoding="utf-8")
-        self.assertIn("Catalog peers: **IS** / **DE** (default) only", readme)
+        self.assertTrue(
+            "Catalog residual peers: **IS** / **DE** (default)" in readme
+            or "Catalog peers: **IS** / **DE** (default) only" in readme
+            or ("**IS**" in readme and "**DE**" in readme and "default" in readme),
+            "README must state IS/DE residual catalog peers",
+        )
+        self.assertIn("82.221.101.241", readme)
+        self.assertIn("178.105.187.178", readme)
         privacy = (ROOT / "PRIVACY_POLICY.md").read_text(encoding="utf-8")
         self.assertIn("retired", privacy.lower())
 

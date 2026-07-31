@@ -54,6 +54,19 @@ body {
 }
 .free-grid a.dl:hover, a.btn:hover { background: #c5e0f4; }
 .keygen-note { margin: 0.75rem auto; max-width: 32rem; color: #fecaca; font-weight: 600; }
+.download-node-preference {
+  margin: 1rem auto 0; max-width: 36rem; padding: 0.85rem 1rem;
+  border: 1px dashed var(--border); border-radius: 12px;
+  background: rgba(8, 18, 32, 0.45); text-align: center;
+}
+.download-node-preference h3 { margin: 0 0 0.45rem; font-size: 0.95rem; }
+.download-node-preference .node-pref-blurb {
+  margin: 0 auto 0.65rem; max-width: 34rem; font-size: 0.85rem;
+  line-height: 1.45; color: #cfe6f7;
+}
+.download-node-preference .node-pref-links {
+  display: flex; flex-wrap: wrap; gap: 0.45rem; justify-content: center;
+}
 .steps { text-align: left; max-width: 28rem; margin: 0.5rem auto; line-height: 1.55; color: #cfe6f7; }
 .site-foot { text-align: center; margin-top: 1.5rem; font-size: 0.85rem; color: var(--muted); }
 .doc-body { text-align: left; max-width: 38rem; margin: 0 auto; line-height: 1.55; color: #cfe6f7; }

@@ -1,8 +1,8 @@
-"""restore-privacy 0.3.4 is the signed, published current public catalog.
+"""Suite live public catalog monopin is 1.0.0; 0.3.4 remains archival handoff only.
 
-README, PRIVACY_POLICY, and status_page/downloads must present 0.3.4 as current
-(not RUST-IN-PRIVACY v1.0.0 as the sole public package story). Optional local
-zip codesign when releases/0.3.4 Apple packages are on disk.
+README, PRIVACY_POLICY, and status_page/downloads must present the live monopin
+from client/VERSION (Suite **1.0.0**). Optional local zip codesign when
+releases/0.3.4 Apple packages are on disk is archival-only.
 """
 from __future__ import annotations
 
@@ -16,40 +16,50 @@ import zipfile
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-VERSION = "0.3.4"
-RELEASE_DIR = ROOT / "releases" / VERSION
-MACOS_ZIP = RELEASE_DIR / f"restore-privacy-client-{VERSION}-macos.zip"
-IOS_ZIP = RELEASE_DIR / f"restore-privacy-client-{VERSION}-ios.zip"
+# Archival ship folder (not the live catalog pin).
+ARCHIVE_VERSION = "0.3.4"
+RELEASE_DIR = ROOT / "releases" / ARCHIVE_VERSION
+MACOS_ZIP = RELEASE_DIR / f"restore-privacy-client-{ARCHIVE_VERSION}-macos.zip"
+IOS_ZIP = RELEASE_DIR / f"restore-privacy-client-{ARCHIVE_VERSION}-ios.zip"
 
 sys.path.insert(0, str(ROOT / "status_page"))
 
 
 class Test029PublicCatalogCurrent(unittest.TestCase):
-    def test_readme_current_public_is_0_2_9_signed(self):
+    def test_readme_current_public_is_live_suite_monopin(self):
+        pin = (ROOT / "client" / "VERSION").read_text(encoding="utf-8").strip()
+        self.assertEqual(pin, "1.0.0")
         readme = (ROOT / "README.md").read_text(encoding="utf-8")
         lower = readme.lower()
-        self.assertIn("0.3.4", readme)
+        self.assertIn(pin, readme)
         self.assertIn("restoreprivacy.online", readme)
-        self.assertIn("restore-privacy-client-0.3.4-macos.zip", readme)
-        self.assertIn("restore-privacy-client-0.3.4-ios.zip", readme)
-        self.assertIn("Developer ID", readme)
-        self.assertIn("notariz", lower)
-        self.assertIn("team-signed", lower)
+        self.assertIn(f"restore-privacy-client-{pin}-macos.zip", readme)
+        self.assertIn(f"restore-privacy-client-{pin}-ios.zip", readme)
+        self.assertIn(f"catalog **v{pin}**", readme)
+        self.assertIn("Suite", readme)
         self.assertIn("private", lower)
         self.assertNotIn("prep packages only", lower)
-        # Must not present RUST v1.0.0 as the primary Get the app / package table
+        # Signing language may live in PRIVACY / handoff; package table is monopin
+        privacy = (ROOT / "PRIVACY_POLICY.md").read_text(encoding="utf-8")
+        self.assertIn("Developer ID", privacy)
+        self.assertIn("Team-signed", privacy)
+        # Must not present RUST v1.0.0 or historical 0.3.4 as the package table
         self.assertNotIn("Public v1.0.0 (RUST-IN-PRIVACY)", readme)
         self.assertNotIn("restore-privacy-rust-1.0.0-macos.zip", readme)
-        # Primary path is paid VPN APP Shop, not free permanent GH release links
-        self.assertIn("paid", lower)
+        self.assertNotIn("restore-privacy-client-0.3.4-macos.zip", readme)
+        # Primary path is VPN APP Shop / KEYGEN, not free permanent GH release links
+        self.assertIn("keygen", lower)
         self.assertNotIn(
             "[Download v0.3.4](https://github.com/rgsneddon/restore-privacy/releases/tag/0.3.4)",
             readme,
         )
 
-    def test_privacy_current_public_is_0_2_9_signed(self):
+    def test_privacy_current_public_is_live_suite_monopin(self):
+        pin = (ROOT / "client" / "VERSION").read_text(encoding="utf-8").strip()
+        self.assertEqual(pin, "1.0.0")
         privacy = (ROOT / "PRIVACY_POLICY.md").read_text(encoding="utf-8")
-        self.assertIn("0.3.4", privacy)
+        self.assertIn(pin, privacy)
+        self.assertIn("catalog v1.0.0", privacy.lower().replace("**", ""))
         self.assertIn("restoreprivacy.online", privacy)
         self.assertIn("Developer ID", privacy)
         self.assertIn("Team-signed", privacy)
@@ -58,24 +68,35 @@ class Test029PublicCatalogCurrent(unittest.TestCase):
             "Current public packages:** [RUST-IN-PRIVACY v1.0.0]",
             privacy,
         )
+        self.assertNotIn("catalog v0.3.4", privacy.lower())
 
-    def test_status_catalog_is_0_2_9_restore_privacy(self):
+    def test_status_catalog_is_live_suite_monopin_not_0_3_4(self):
+        """Live catalog is Suite monopin from VERSION — not historical 0.3.4."""
         from downloads import (  # noqa: E402
             GITHUB_REPO,
             MACOS_ZIP_FILENAME,
             RELEASE_TAG,
             RELEASE_VERSION,
             available_downloads,
+            current_catalog_version,
         )
 
-        self.assertEqual(RELEASE_VERSION, "0.3.4")
-        self.assertEqual(RELEASE_TAG, "0.3.4")
+        pin = (ROOT / "client" / "VERSION").read_text(encoding="utf-8").strip()
+        self.assertEqual(pin, "1.0.0")
+        self.assertEqual(RELEASE_VERSION, pin)
+        self.assertEqual(RELEASE_TAG, pin)
+        self.assertEqual(current_catalog_version(), pin)
+        self.assertNotEqual(RELEASE_VERSION, "0.3.4")
         self.assertEqual(GITHUB_REPO, "restore-privacy")
-        self.assertEqual(MACOS_ZIP_FILENAME, "restore-privacy-client-0.3.4-macos.zip")
+        self.assertEqual(
+            MACOS_ZIP_FILENAME, f"restore-privacy-client-{pin}-macos.zip"
+        )
         names = {a.filename for a in available_downloads()}
-        self.assertIn("restore-privacy-client-0.3.4-windows-x64-setup.exe", names)
-        self.assertIn("restore-privacy-client-0.3.4-macos.zip", names)
-        self.assertIn("restore-privacy-client-0.3.4-ios.zip", names)
+        self.assertIn(f"restore-privacy-client-{pin}-windows-x64-setup.exe", names)
+        self.assertIn(f"restore-privacy-client-{pin}-macos.zip", names)
+        self.assertIn(f"restore-privacy-client-{pin}-ios.zip", names)
+        # Historical 0.3.4 basenames must not be the live catalog list
+        self.assertNotIn("restore-privacy-client-0.3.4-windows-x64-setup.exe", names)
 
     def test_handoff_and_release_notes_signed_not_prep_only(self):
         handoff = ROOT / "client_app" / "APPLE_HANDOFF_0.3.4.md"
@@ -109,15 +130,15 @@ class TestLocal029PackagesIfPresent(unittest.TestCase):
         exp = hashlib.sha256(product.read_bytes()).hexdigest()
         self.assertEqual(exp, PRODUCT_NODE_ELGAMAL_PUB_SHA256)
         names = [
-            f"restore-privacy-client-{VERSION}-windows-x64-setup.exe",
-            f"restore-privacy-client-{VERSION}-android.apk",
-            f"restore-privacy-client-{VERSION}-macos.zip",
-            f"restore-privacy-client-{VERSION}-ios.zip",
-            f"restore-privacy-client-{VERSION}-linux-x64.tar.gz",
+            f"restore-privacy-client-{ARCHIVE_VERSION}-windows-x64-setup.exe",
+            f"restore-privacy-client-{ARCHIVE_VERSION}-android.apk",
+            f"restore-privacy-client-{ARCHIVE_VERSION}-macos.zip",
+            f"restore-privacy-client-{ARCHIVE_VERSION}-ios.zip",
+            f"restore-privacy-client-{ARCHIVE_VERSION}-linux-x64.tar.gz",
         ]
         present = [RELEASE_DIR / n for n in names if (RELEASE_DIR / n).is_file()]
         if len(present) < 5:
-            self.skipTest(f"need all five packages under releases/{VERSION}/")
+            self.skipTest(f"need all five packages under releases/{ARCHIVE_VERSION}/")
 
         import tarfile
 

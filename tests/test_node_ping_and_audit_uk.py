@@ -348,7 +348,8 @@ class TestAuditUkPingSection(unittest.TestCase):
     def test_audit_package_table_and_monopin_match_catalog(self) -> None:
         """Shipped AUDIT must name live monopin; package RAG uses catalog basenames."""
         ver = (ROOT / "client" / "VERSION").read_text(encoding="utf-8").strip()
-        self.assertEqual(ver, "0.5.9")
+        # Live Suite catalog monopin (not a frozen historical pin).
+        self.assertEqual(ver, "1.0.0")
         paths = [
             ROOT / "AUDIT.md",
             ROOT / "status_page" / "AUDIT.md",
@@ -357,7 +358,7 @@ class TestAuditUkPingSection(unittest.TestCase):
         for path in paths:
             text = path.read_text(encoding="utf-8")
             self.assertIn(
-                f"**{ver}**",
+                f"| **Public catalog version** | **{ver}** |",
                 text,
                 f"{path} missing live monopin {ver}",
             )
@@ -367,25 +368,31 @@ class TestAuditUkPingSection(unittest.TestCase):
                 f"{path} missing package RAG windows row for {ver}",
             )
             self.assertIn(f"restore-privacy-client-{ver}-macos.zip", text)
-            # Stale current-catalog pin must not remain
-            self.assertNotIn("**Public catalog version** | **0.5.7**", text)
-            self.assertNotIn("catalog v0.5.7", text)
-            self.assertNotIn("restore-privacy-client-0.5.7-", text)
+            # Stale current-catalog pins must not remain
+            for stale in ("0.5.7", "0.5.9", "0.6.0", "0.3.4"):
+                if stale == ver:
+                    continue
+                self.assertNotIn(
+                    f"**Public catalog version** | **{stale}**",
+                    text,
+                )
+                self.assertNotIn(f"restore-privacy-client-{stale}-", text)
 
 
 class TestVersionMonopin(unittest.TestCase):
     def test_version_pin_matches_catalog(self) -> None:
         ver = (ROOT / "client" / "VERSION").read_text(encoding="utf-8").strip()
-        self.assertEqual(ver, "0.5.9")
+        self.assertEqual(ver, "1.0.0")
         from status_page import downloads as dl
 
         self.assertEqual(dl.RELEASE_VERSION, ver)
+        self.assertEqual(dl.current_catalog_version(), ver)
         pub = (ROOT / "client_app" / "pubspec.yaml").read_text(encoding="utf-8")
         self.assertIn(f"version: {ver}+", pub)
         cfg = (ROOT / "client_app" / "lib" / "rpt_config.dart").read_text(
             encoding="utf-8"
         )
-        self.assertIn(ver, cfg)
+        self.assertIn(f"productVersion = '{ver}'", cfg)
 
 
 if __name__ == "__main__":

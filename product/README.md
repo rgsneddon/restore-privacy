@@ -20,7 +20,7 @@ client at first run (not shipped shared).
 ## `de_node_elgamal.pub`
 
 Public ElGamal key for the **Germany** residual peer (`178.105.187.178:44044`) —
-**default residual entry** for monopin 0.5.8+.
+**default residual entry** for monopin **1.0.0** (and prior 0.5.8+ clients).
 
 ## `exit_node_elgamal.pub`
 

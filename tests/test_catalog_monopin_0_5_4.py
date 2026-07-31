@@ -1,4 +1,8 @@
-"""Catalog monopin 0.5.4 surfaces used by shop + Windows ship path."""
+"""Historical monopin 0.5.4 ship notes + live catalog must stay at Suite 1.0.0.
+
+Live pin assertions follow ``client/VERSION`` / downloads.RELEASE_VERSION.
+Do not re-pin the current catalog to 0.5.4.
+"""
 
 from __future__ import annotations
 
@@ -9,9 +13,10 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 class TestCatalogMonopin054(unittest.TestCase):
-    def test_client_version_pin(self) -> None:
+    def test_live_catalog_is_not_0_5_4(self) -> None:
         pin = (ROOT / "client" / "VERSION").read_text(encoding="utf-8").strip()
-        self.assertEqual(pin, "0.5.4")
+        self.assertEqual(pin, "1.0.0")
+        self.assertNotEqual(pin, "0.5.4")
 
     def test_downloads_release_version_and_windows_basename(self) -> None:
         import sys
@@ -21,34 +26,37 @@ class TestCatalogMonopin054(unittest.TestCase):
             sys.path.insert(0, sp)
         import downloads
 
-        self.assertEqual(downloads.RELEASE_VERSION, "0.5.4")
-        self.assertEqual(downloads.RELEASE_TAG, "0.5.4")
+        pin = (ROOT / "client" / "VERSION").read_text(encoding="utf-8").strip()
+        self.assertEqual(downloads.RELEASE_VERSION, pin)
+        self.assertEqual(downloads.RELEASE_TAG, pin)
         self.assertEqual(
             downloads.WINDOWS_EXE_FILENAME,
-            "restore-privacy-client-0.5.4-windows-x64-setup.exe",
+            f"restore-privacy-client-{pin}-windows-x64-setup.exe",
         )
-        self.assertIn("0.5.4", downloads.WINDOWS_EXE_FILENAME)
+        self.assertIn(pin, downloads.WINDOWS_EXE_FILENAME)
+        self.assertNotIn("0.5.4", downloads.WINDOWS_EXE_FILENAME)
         self.assertNotIn("0.5.3", downloads.WINDOWS_EXE_FILENAME)
-        # Real catalog helper — all five shop basenames are 0.5.4
         pkgs = downloads.list_catalog_platform_packages()
         self.assertEqual(len(pkgs), 5)
         for p in pkgs:
-            self.assertEqual(p["version"], "0.5.4")
-            self.assertIn("0.5.4", p["filename"])
-            self.assertNotIn("0.5.3", p["filename"])
+            self.assertEqual(p["version"], pin)
+            self.assertIn(pin, p["filename"])
+            self.assertNotIn("0.5.4", p["filename"])
         names = {p["platform"]: p["filename"] for p in pkgs}
         self.assertEqual(
             names["windows"],
-            "restore-privacy-client-0.5.4-windows-x64-setup.exe",
+            f"restore-privacy-client-{pin}-windows-x64-setup.exe",
         )
         self.assertTrue(names["macos"].endswith("-macos.zip"))
         self.assertTrue(names["ios"].endswith("-ios.zip"))
 
     def test_installer_embedded_pin(self) -> None:
+        pin = (ROOT / "client" / "VERSION").read_text(encoding="utf-8").strip()
         src = (ROOT / "client" / "windows" / "installer.py").read_text(
             encoding="utf-8"
         )
-        self.assertIn('PRODUCT_VERSION_EMBEDDED = "0.5.4"', src)
+        self.assertIn(f'PRODUCT_VERSION_EMBEDDED = "{pin}"', src)
+        self.assertNotIn('PRODUCT_VERSION_EMBEDDED = "0.5.4"', src)
 
     def test_window_foreground_present_for_freeze(self) -> None:
         path = ROOT / "client" / "windows" / "window_foreground.py"
