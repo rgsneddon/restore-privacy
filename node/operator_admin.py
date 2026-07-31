@@ -476,3 +476,162 @@ class NodeOperatorController:
             except Exception:  # noqa: BLE001
                 pass
         return {"ok": True, "connected": False}
+
+    # --- catalog package stage + Helsinki upload (manual GUI) ------------
+
+    def _load_host_paid_assets(self):
+        """Import shipped ``scripts/host_paid_assets_vps`` helpers."""
+        import importlib.util
+
+        path = self.repo_root / "scripts" / "host_paid_assets_vps.py"
+        if not path.is_file():
+            raise FileNotFoundError(f"missing {path}")
+        spec = importlib.util.spec_from_file_location("host_paid_assets_vps", path)
+        if spec is None or spec.loader is None:
+            raise ImportError("cannot load host_paid_assets_vps")
+        mod = importlib.util.module_from_spec(spec)
+        # Ensure status_page is importable (script expects it on path)
+        sp = str(self.repo_root / "status_page")
+        if sp not in sys.path:
+            sys.path.insert(0, sp)
+        if str(self.repo_root) not in sys.path:
+            sys.path.insert(0, str(self.repo_root))
+        spec.loader.exec_module(mod)
+        return mod
+
+    def catalog_version_default(self) -> str:
+        """Current shipped catalog monopin (downloads.RELEASE_VERSION)."""
+        try:
+            sys.path.insert(0, str(self.repo_root / "status_page"))
+            from downloads import RELEASE_VERSION
+
+            return str(RELEASE_VERSION).strip() or "0.6.0"
+        except Exception:  # noqa: BLE001
+            ver = (self.repo_root / "client" / "VERSION").read_text(encoding="utf-8")
+            return ver.strip() or "0.6.0"
+
+    def list_local_packages(self, *, version: str | None = None) -> dict[str, Any]:
+        """Inventory catalog packages under releases/ and status_page/assets/."""
+        ver = (version or "").strip() or self.catalog_version_default()
+        try:
+            mod = self._load_host_paid_assets()
+            pkgs = mod.list_packages(ver)
+        except Exception as exc:  # noqa: BLE001
+            return {
+                "ok": False,
+                "error": str(exc)[:240],
+                "version": ver,
+                "packages": [],
+            }
+        rows: list[dict[str, Any]] = []
+        for p in pkgs:
+            fname = p["filename"]
+            found = None
+            size = 0
+            for cand in mod._candidate_sources(ver, fname):  # noqa: SLF001
+                if cand.is_file() and cand.stat().st_size > 0:
+                    found = cand
+                    size = int(cand.stat().st_size)
+                    break
+            staged = self.repo_root / "status_page" / "assets" / ver / fname
+            rows.append(
+                {
+                    "platform": p["platform"],
+                    "filename": fname,
+                    "present": found is not None,
+                    "path": str(found) if found else "",
+                    "size": size,
+                    "staged": staged.is_file() and staged.stat().st_size > 0,
+                    "staged_path": str(staged),
+                }
+            )
+        return {
+            "ok": True,
+            "version": ver,
+            "packages": rows,
+            "present_count": sum(1 for r in rows if r["present"]),
+            "staged_count": sum(1 for r in rows if r["staged"]),
+            "total": len(rows),
+        }
+
+    def upload_catalog_packages(
+        self,
+        *,
+        version: str | None = None,
+        stage: bool = True,
+        upload: bool = True,
+        dry_run: bool = False,
+        force: bool = False,
+        allow_missing: bool = True,
+        install_serve: bool = False,
+    ) -> dict[str, Any]:
+        """Manual deploy: stage local monopin packages and/or upload to Helsinki.
+
+        Wraps shipped ``scripts/host_paid_assets_vps.stage_packages`` and
+        ``upload_packages``. Default *allow_missing* is True so partial builds
+        (e.g. Mac without Windows PE yet) can still upload what exists.
+        """
+        ver = (version or "").strip() or self.catalog_version_default()
+        out: dict[str, Any] = {
+            "ok": False,
+            "version": ver,
+            "stage": bool(stage),
+            "upload": bool(upload),
+            "dry_run": bool(dry_run),
+            "force": bool(force),
+            "allow_missing": bool(allow_missing),
+            "install_serve": bool(install_serve),
+            "staged": [],
+            "upload_code": None,
+            "error": "",
+            "inventory": {},
+        }
+        try:
+            mod = self._load_host_paid_assets()
+        except Exception as exc:  # noqa: BLE001
+            out["error"] = f"host script unavailable: {exc}"[:240]
+            return out
+
+        inv_before = self.list_local_packages(version=ver)
+        out["inventory"] = inv_before
+
+        if not stage and not upload:
+            out["ok"] = True
+            out["error"] = "nothing to do (stage and upload both off)"
+            return out
+
+        if stage:
+            try:
+                staged_paths = mod.stage_packages(
+                    version=ver, allow_missing=bool(allow_missing)
+                )
+                out["staged"] = [str(p) for p in staged_paths]
+            except FileNotFoundError as exc:
+                out["error"] = f"stage failed: {exc}"[:300]
+                return out
+            except Exception as exc:  # noqa: BLE001
+                out["error"] = f"stage failed: {exc}"[:300]
+                return out
+
+        if upload:
+            try:
+                code = int(
+                    mod.upload_packages(
+                        version=ver,
+                        dry_run=bool(dry_run),
+                        install_serve=bool(install_serve),
+                        force=bool(force),
+                        allow_missing=bool(allow_missing),
+                    )
+                )
+            except Exception as exc:  # noqa: BLE001
+                out["error"] = f"upload failed: {exc}"[:300]
+                return out
+            out["upload_code"] = code
+            if code != 0:
+                out["error"] = f"upload_packages returned {code}"
+                return out
+
+        out["ok"] = True
+        out["inventory_after"] = self.list_local_packages(version=ver)
+        return out

@@ -2454,6 +2454,9 @@ class TunnelClientApp:
         self._settings = cur
         run_var = tk.BooleanVar(value=cur.run_at_startup)
         auto_var = tk.BooleanVar(value=cur.autoconnect_on_launch)
+        crumbs_var = tk.BooleanVar(
+            value=bool(getattr(cur, "check_breadcrumbs", False))
+        )
         shape_var = tk.BooleanVar(value=cur.privacy_traffic_shape)
         obfs_var = tk.BooleanVar(value=cur.privacy_outer_obfuscation)
         multihop_var = tk.BooleanVar(value=cur.privacy_multihop)
@@ -2553,6 +2556,7 @@ class TunnelClientApp:
                 ),
                 first_run_settings_completed=prev_done,
                 ui_mode=mode,
+                check_breadcrumbs=bool(crumbs_var.get()),
             )
 
         def _save_run() -> None:
@@ -2671,6 +2675,61 @@ class TunnelClientApp:
             "When the app opens, start Connect automatically",
             auto_var,
             _save_auto,
+        )
+        tk.Frame(card, bg=BORDER, height=1).pack(fill=tk.X, pady=4)
+
+        def _save_crumbs() -> None:
+            s = _current_settings()
+            save_settings(s)
+            self._settings = s
+            if s.check_breadcrumbs:
+                # Live path: gate was just enabled — fetch Helsinki breadcrumbs
+                # and apply pending monopin via client.breadcrumbs_check.
+                try:
+                    from client.breadcrumbs_check import (
+                        on_check_breadcrumbs_setting_changed,
+                    )
+
+                    crumbs_r = on_check_breadcrumbs_setting_changed(
+                        True,
+                        settings=s,
+                        platform="windows",
+                    )
+                    if crumbs_r.get("skipped"):
+                        note_var.set(
+                            "CHECK BREADCRUMBS ON — "
+                            f"{crumbs_r.get('reason') or 'no update needed'}."
+                        )
+                    elif crumbs_r.get("ok") and crumbs_r.get("store"):
+                        store = crumbs_r.get("store") or {}
+                        note_var.set(
+                            "CHECK BREADCRUMBS ON — pending update "
+                            f"v{store.get('pending_update_version') or crumbs_r.get('monopin')} "
+                            f"({store.get('pending_update_url') or ''})."
+                        )
+                    else:
+                        err = crumbs_r.get("error") or "check failed"
+                        note_var.set(
+                            f"CHECK BREADCRUMBS ON — fetch/apply: {err}"
+                        )
+                    self._log(f"Settings: check_breadcrumbs apply → {crumbs_r}")
+                except Exception as crumbs_exc:  # noqa: BLE001
+                    note_var.set(
+                        "CHECK BREADCRUMBS ON — saved; check path error: "
+                        f"{crumbs_exc}"
+                    )
+                    self._log(f"Settings: check_breadcrumbs error: {crumbs_exc}")
+            else:
+                note_var.set("CHECK BREADCRUMBS OFF — no auto self-update.")
+            self._log(f"Settings: check_breadcrumbs={s.check_breadcrumbs}")
+
+        _row(
+            card,
+            "CHECK BREADCRUMBS",
+            "When on, allow this device to fetch Helsinki breadcrumbs "
+            "and apply monopin update directives (self-update when you choose)",
+            crumbs_var,
+            _save_crumbs,
         )
 
         def _save_residual_stack() -> None:

@@ -1650,6 +1650,7 @@ def _admin_sidebar_html(*, active: str = "home") -> str:
     lic_open = " open" if active == "licences" else ""
     proc_cls = "sb-btn active" if active == "processors" else "sb-btn"
     fleet_cls = "sb-btn active" if active == "fleet" else "sb-btn"
+    node_op_cls = "sb-btn active" if active == "node-operator" else "sb-btn"
     acct_cls = "sb-btn active" if active == "accounting" else "sb-btn"
     support_cls = "sb-btn active" if active == "support-tickets" else "sb-btn"
     seed = ""
@@ -1688,6 +1689,8 @@ def _admin_sidebar_html(*, active: str = "home") -> str:
   </details>
   <a class="{fleet_cls}" id="admin-nav-fleet" href="/admin/fleet"><span class="sb-ico">&#9678;</span>
     <span class="sb-label">Fleet usage</span></a>
+  <a class="{node_op_cls}" id="admin-nav-node-operator" href="/admin/node-operator"><span class="sb-ico">&#128225;</span>
+    <span class="sb-label">Node Operator</span></a>
   <a class="{support_cls}" id="admin-nav-support-tickets" href="/admin/support-tickets"><span class="sb-ico">&#9993;</span>
     <span class="sb-label">Support tickets</span></a>
   <a class="{acct_cls}" id="admin-nav-accounting" href="/admin/accounting"><span class="sb-ico">&#163;</span>

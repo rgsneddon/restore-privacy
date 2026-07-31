@@ -8,6 +8,9 @@ const String kAppTitle = 'Restore Privacy';
 const String kBannerTitle = 'Restore Privacy — Virtual Private Network';
 const String kTrayProductName = 'Privacy Restored';
 
+// Suite branding aliases (see suite_version.dart for monopin source of truth).
+const String kSuiteAppTitle = 'Restore Privacy Suite';
+
 // Cupertino / Windows product shell
 const Color kChromeBg = Color(0xFFF2F5F7);
 const Color kPanelBg = Color(0xFFFFFFFF);

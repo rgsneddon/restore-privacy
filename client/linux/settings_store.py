@@ -24,6 +24,9 @@ KEY_PRIVACY_MULTIHOP = "privacy_multihop"
 KEY_RESIDUAL_IPV4 = "residual_ipv4"
 KEY_RESIDUAL_IPV6 = "residual_ipv6"
 KEY_ENTRY_COUNTRY = "entry_country"
+# Opt-in: CHECK BREADCRUMBS self-update path (Helsinki vault). Default off.
+KEY_CHECK_BREADCRUMBS = "check_breadcrumbs"
+CHECK_BREADCRUMBS_LABEL = "CHECK BREADCRUMBS"
 AUTOSTART_DESKTOP_NAME = "restore-privacy.desktop"
 
 
@@ -48,6 +51,8 @@ class ProductSettings:
     # Residual entry country: DE (Germany, product default) or IS (Iceland).
     # Stale US|RO prefs normalize to DE.
     entry_country: str = "DE"
+    # Opt-in Helsinki breadcrumbs → monopin self-update (Settings CHECK BREADCRUMBS).
+    check_breadcrumbs: bool = False
 
 
 def settings_dir() -> Path:
@@ -73,6 +78,7 @@ def default_settings() -> ProductSettings:
         residual_ipv4=True,
         residual_ipv6=True,
         entry_country=DEFAULT_ENTRY_COUNTRY,
+        check_breadcrumbs=False,
     )
 
 
@@ -101,6 +107,7 @@ def load_settings(path: Optional[Path] = None) -> ProductSettings:
             residual_ipv6=ipv6,
             # Missing key → empty → DE; explicit saved IS kept
             entry_country=normalize_entry_country(data.get(KEY_ENTRY_COUNTRY)),
+            check_breadcrumbs=bool(data.get(KEY_CHECK_BREADCRUMBS, False)),
         )
     except (OSError, json.JSONDecodeError, TypeError, ValueError):
         return default_settings()
@@ -122,6 +129,9 @@ def save_settings(settings: ProductSettings, path: Optional[Path] = None) -> Pat
         KEY_RESIDUAL_IPV6: bool(getattr(settings, "residual_ipv6", True)),
         KEY_ENTRY_COUNTRY: normalize_entry_country(
             getattr(settings, "entry_country", DEFAULT_ENTRY_COUNTRY)
+        ),
+        KEY_CHECK_BREADCRUMBS: bool(
+            getattr(settings, "check_breadcrumbs", False)
         ),
     }
     p.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")

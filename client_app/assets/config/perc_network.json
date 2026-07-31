@@ -1,0 +1,11 @@
+{
+  "rendezvousUrl": "https://135.181.152.10.sslip.io/perc",
+  "seedUsername": "evolve_seed_node",
+  "networkGenesisRevision": 2,
+  "publicIpLookupUrls": [
+    "https://api.ipify.org",
+    "https://ifconfig.me/ip"
+  ],
+  "publicEndpointOverride": "",
+  "_comment_paused_render": "evolve-perc-internet (Render) is paused to save money; Helsinki perc_chain (nginx /perc) is the default suite rendezvous. Do not re-enable the paid Render service by default."
+}

@@ -20,6 +20,11 @@ const String kKeyResidualIpv4 = 'residual_ipv4';
 /// Residual IPv6 ISP-leak protection while residual is up. Default ON when unset.
 const String kKeyResidualIpv6 = 'residual_ipv6';
 const String kKeyEntryCountry = 'entry_country';
+/// Opt-in: user allows CHECK BREADCRUMBS self-update path (Helsinki vault).
+const String kKeyCheckBreadcrumbs = 'check_breadcrumbs';
+
+/// Exact Settings label for breadcrumbs self-update opt-in.
+const String kCheckBreadcrumbsLabel = 'CHECK BREADCRUMBS';
 
 /// Product policy: residual IPv4 capture is never user-off.
 const bool kResidualIpv4AlwaysOn = true;
@@ -36,6 +41,8 @@ class ProductSettings {
   final bool residualIpv6;
   /// Catalog entry country code (DE / IS); default Germany/DE.
   final String entryCountry;
+  /// When true, client may fetch Helsinki breadcrumbs and apply pending monopin update.
+  final bool checkBreadcrumbs;
 
   const ProductSettings({
     this.runAtStartup = false,
@@ -47,6 +54,7 @@ class ProductSettings {
     bool residualIpv4 = true,
     this.residualIpv6 = true,
     this.entryCountry = kDefaultEntryCountry,
+    this.checkBreadcrumbs = false,
   }) : residualIpv4 = kResidualIpv4AlwaysOn;
 
   static const ProductSettings defaults = ProductSettings();
@@ -60,6 +68,7 @@ class ProductSettings {
     bool? residualIpv4,
     bool? residualIpv6,
     String? entryCountry,
+    bool? checkBreadcrumbs,
   }) {
     return ProductSettings(
       runAtStartup: runAtStartup ?? this.runAtStartup,
@@ -74,6 +83,7 @@ class ProductSettings {
       entryCountry: entryCountry != null
           ? normalizeEntryCountry(entryCountry)
           : this.entryCountry,
+      checkBreadcrumbs: checkBreadcrumbs ?? this.checkBreadcrumbs,
     );
   }
 
@@ -86,6 +96,7 @@ class ProductSettings {
         kKeyResidualIpv4: kResidualIpv4AlwaysOn,
         kKeyResidualIpv6: residualIpv6,
         kKeyEntryCountry: normalizeEntryCountry(entryCountry),
+        kKeyCheckBreadcrumbs: checkBreadcrumbs,
       };
 
   factory ProductSettings.fromJson(Map<String, dynamic>? data) {
@@ -104,6 +115,7 @@ class ProductSettings {
       entryCountry: normalizeEntryCountry(
         data[kKeyEntryCountry]?.toString(),
       ),
+      checkBreadcrumbs: data[kKeyCheckBreadcrumbs] == true,
     );
   }
 }
@@ -161,6 +173,7 @@ class SettingsStore {
     final mh = await backend.getBool(kKeyPrivacyMultihop);
     final ipv6 = await backend.getBool(kKeyResidualIpv6);
     final entry = await backend.getString(kKeyEntryCountry);
+    final crumbs = await backend.getBool(kKeyCheckBreadcrumbs);
     return ProductSettings(
       runAtStartup: run == true,
       autoconnectOnLaunch: auto == true,
@@ -171,6 +184,7 @@ class SettingsStore {
       residualIpv4: kResidualIpv4AlwaysOn,
       residualIpv6: ipv6 != false,
       entryCountry: normalizeEntryCountry(entry),
+      checkBreadcrumbs: crumbs == true,
     );
   }
 
@@ -190,6 +204,7 @@ class SettingsStore {
       kKeyEntryCountry,
       normalizeEntryCountry(settings.entryCountry),
     );
+    await backend.setBool(kKeyCheckBreadcrumbs, settings.checkBreadcrumbs);
   }
 
   bool shouldAutoconnectOnLaunch(ProductSettings s) => s.autoconnectOnLaunch;

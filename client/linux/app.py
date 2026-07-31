@@ -915,6 +915,9 @@ class TunnelClientApp:
         cur = load_settings()
         run_var = tk.BooleanVar(value=cur.run_at_startup)
         auto_var = tk.BooleanVar(value=cur.autoconnect_on_launch)
+        crumbs_var = tk.BooleanVar(
+            value=bool(getattr(cur, "check_breadcrumbs", False))
+        )
         # Residual IPv4 always ON (no switch). IPv6 remains adjustable.
         ipv6_var = tk.BooleanVar(value=bool(getattr(cur, "residual_ipv6", True)))
         note_var = tk.StringVar(value="")
@@ -948,18 +951,47 @@ class TunnelClientApp:
                 ),
                 privacy_multihop=bool(getattr(cur, "privacy_multihop", False)),
                 entry_country=getattr(cur, "entry_country", "DE"),
+                check_breadcrumbs=bool(crumbs_var.get()),
             )
             save_settings(s)
             st = apply_run_at_startup(s.run_at_startup)
+            crumbs_note = "off"
+            if s.check_breadcrumbs:
+                # Live path: enabled → fetch Helsinki breadcrumbs + apply update.
+                try:
+                    from client.breadcrumbs_check import (
+                        on_check_breadcrumbs_setting_changed,
+                    )
+
+                    crumbs_r = on_check_breadcrumbs_setting_changed(
+                        True,
+                        settings=s,
+                        platform="linux",
+                    )
+                    if crumbs_r.get("skipped"):
+                        crumbs_note = f"on ({crumbs_r.get('reason') or 'ok'})"
+                    elif crumbs_r.get("ok") and crumbs_r.get("store"):
+                        store = crumbs_r.get("store") or {}
+                        crumbs_note = (
+                            f"on → pending v{store.get('pending_update_version')}"
+                        )
+                    else:
+                        crumbs_note = f"on (err: {crumbs_r.get('error') or 'fail'})"
+                    self._log(f"Settings: check_breadcrumbs apply → {crumbs_r}")
+                except Exception as crumbs_exc:  # noqa: BLE001
+                    crumbs_note = f"on (check err: {crumbs_exc})"
+                    self._log(f"Settings: check_breadcrumbs error: {crumbs_exc}")
             note_var.set(
                 f"Saved. Run at startup: {st}. "
                 f"Autoconnect: {'on' if s.autoconnect_on_launch else 'off'}. "
+                f"CHECK BREADCRUMBS: {crumbs_note}. "
                 f"IPv4 residual: always on. "
                 f"IPv6 residual: {'on' if s.residual_ipv6 else 'off'}."
             )
             self._log(
                 f"Settings: run_at_startup={s.run_at_startup} ({st}); "
                 f"autoconnect={s.autoconnect_on_launch}; "
+                f"check_breadcrumbs={s.check_breadcrumbs}; "
                 f"residual_ipv4=always_on; residual_ipv6={s.residual_ipv6}"
             )
 
@@ -979,6 +1011,18 @@ class TunnelClientApp:
             frm,
             text="Autoconnect on launch (same Connect gates)",
             variable=auto_var,
+            command=_save_prefs,
+            bg=WHITE,
+            fg=TEXT,
+            activebackground=WHITE,
+            selectcolor=WHITE,
+            font=("DejaVu Sans", 9),
+            anchor="w",
+        ).pack(fill=tk.X, pady=(0, 4))
+        tk.Checkbutton(
+            frm,
+            text="CHECK BREADCRUMBS (Helsinki monopin self-update)",
+            variable=crumbs_var,
             command=_save_prefs,
             bg=WHITE,
             fg=TEXT,

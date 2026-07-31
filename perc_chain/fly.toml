@@ -1,0 +1,34 @@
+# Fly.io — cheaper always-on option (~$0–3/mo within free allowance, no sleep on min_machines_running=1)
+# Setup: fly launch --no-deploy && fly volumes create perc_data --size 1 --region lhr && fly deploy
+app = "evolve-perc-internet"
+primary_region = "lhr"
+
+[build]
+  dockerfile = "Dockerfile"
+
+[env]
+  PERC_SEED_USERNAME = "evolve_seed_node"
+  PERC_DATA_DIR = "/var/data"
+  PERC_BIND_HOST = "0.0.0.0"
+
+[http_service]
+  internal_port = 9478
+  force_https = true
+  auto_stop_machines = false
+  auto_start_machines = true
+  min_machines_running = 1
+
+  [[http_service.checks]]
+    grace_period = "20s"
+    interval = "30s"
+    method = "GET"
+    path = "/health"
+    timeout = "5s"
+
+[[mounts]]
+  source = "perc_data"
+  destination = "/var/data"
+
+[[vm]]
+  size = "shared-cpu-1x"
+  memory = "256mb"

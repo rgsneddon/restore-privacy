@@ -107,18 +107,41 @@ def try_tk_gui(ctrl: NodeOperatorController) -> bool:
         refresh()
 
     def on_push() -> None:
+        ver = ctrl.catalog_version_default()
         r = ctrl.push_update(
-            version="0.5.9",
+            version=ver,
             url="https://restoreprivacy.online/",
             message="Operator update push",
         )
         messagebox.showinfo(APP_TITLE, f"Push: {r}")
         refresh()
 
+    def on_upload() -> None:
+        ver = ctrl.catalog_version_default()
+        inv = ctrl.list_local_packages(version=ver)
+        if not messagebox.askyesno(
+            APP_TITLE,
+            f"Upload catalog {ver} to Helsinki?\n"
+            f"Local present {inv.get('present_count')}/{inv.get('total')}.\n"
+            "Uses host_paid_assets_vps (SSH). Prefer dry-run from the HTTP GUI for plan-only.",
+        ):
+            return
+        r = ctrl.upload_catalog_packages(
+            version=ver,
+            stage=True,
+            upload=True,
+            dry_run=False,
+            allow_missing=True,
+            force=False,
+        )
+        messagebox.showinfo(APP_TITLE, f"Upload: {r}")
+        refresh()
+
     ttk.Button(bf, text="Start lab node", command=on_start_lab).pack(side=tk.LEFT, padx=2)
     ttk.Button(bf, text="Stop", command=on_stop).pack(side=tk.LEFT, padx=2)
     ttk.Button(bf, text="Add lab session", command=on_lab_sess).pack(side=tk.LEFT, padx=2)
     ttk.Button(bf, text="Prioritise clients", command=on_priority).pack(side=tk.LEFT, padx=2)
+    ttk.Button(bf, text="Upload packages", command=on_upload).pack(side=tk.LEFT, padx=2)
     ttk.Button(bf, text="Push update", command=on_push).pack(side=tk.LEFT, padx=2)
 
     refresh()

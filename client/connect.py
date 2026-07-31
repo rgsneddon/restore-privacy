@@ -825,13 +825,18 @@ class RptClient:
                             f"Primary residual failed — trying failover {peer}"
                         )
                         self.last_selection_reason = "hello_failover"
-                    return self._hello_to_endpoint(
+                    result = self._hello_to_endpoint(
                         ep,
                         timeout=timeout,
                         sdir=sdir,
                         client_priv=client_priv,
                         mh_note=mh_note,
                     )
+                    if result.ok:
+                        # CHECK BREADCRUMBS opt-in: after residual HELLO success,
+                        # fetch Helsinki vault and store pending monopin update.
+                        self._maybe_check_breadcrumbs_after_connect()
+                    return result
                 except Exception as exc:
                     last_exc = exc
                     continue
@@ -847,6 +852,31 @@ class RptClient:
             )
             self._status(f"Connect failed: {msg}")
             return ConnectResult(ok=False, state=self.state, message=msg)
+
+    def _maybe_check_breadcrumbs_after_connect(self) -> None:
+        """If Settings CHECK BREADCRUMBS is on, run shipped breadcrumbs→update path."""
+        try:
+            from client.breadcrumbs_check import run_check_breadcrumbs_for_product
+
+            r = run_check_breadcrumbs_for_product()
+            if r.get("skipped"):
+                return
+            if r.get("ok") and r.get("store"):
+                store = r.get("store") or {}
+                ver = store.get("pending_update_version") or r.get("monopin") or ""
+                self._status(
+                    f"CHECK BREADCRUMBS: pending update v{ver}"
+                    if ver
+                    else "CHECK BREADCRUMBS: update directive applied"
+                )
+            elif not r.get("ok") and r.get("error"):
+                # Honest degradation (no token / network) — do not fail Connect.
+                self._status(
+                    f"CHECK BREADCRUMBS: {str(r.get('error'))[:120]}"
+                )
+        except Exception:  # noqa: BLE001
+            # Never break residual Connect for breadcrumbs failures.
+            pass
 
     def auto_connect_on_launch(self, timeout: float = 20.0) -> ConnectResult:
         """Legacy helper — same as connect(); product UI no longer auto-invokes this."""

@@ -1,0 +1,22 @@
+[Unit]
+Description=Restore Privacy Suite perc_chain internet node (Helsinki)
+After=network-online.target
+Wants=network-online.target
+# evolve-perc-internet (Render) is paused to save money; this unit is the default.
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/opt/restore-privacy/perc_chain
+EnvironmentFile=-/opt/restore-privacy/perc_chain/helsinki.env
+Environment=PORT=9478
+Environment=PERC_DATA_DIR=/opt/restore-privacy/perc_chain/data
+Environment=PERC_PUBLIC_ENDPOINT=https://135.181.152.10.sslip.io/perc
+Environment=PERC_BIND_HOST=127.0.0.1
+ExecStart=/usr/bin/node src/internet_node.js
+Restart=on-failure
+RestartSec=5
+LimitNOFILE=65535
+
+[Install]
+WantedBy=multi-user.target

@@ -76,6 +76,15 @@ DEFAULT_SUCCESS_PATH = "/download/success"
 DEFAULT_CANCEL_PATH = "/download/cancel"
 # Site-hosted plan selection (main-site style) before Stripe Checkout
 SITE_PAY_PLAN_PATH = "/pay"
+
+# Product line discriminator (Suite vs plain VPN catalog) — same entitlement shape.
+PRODUCT_LINE_VPN = "vpn"
+PRODUCT_LINE_SUITE = "suite"
+PRODUCT_LINE_DEFAULT = PRODUCT_LINE_VPN
+# Suite display names (metadata / Checkout product_data); prices reuse VPN Price ids.
+STRIPE_PRODUCT_NAME_SUITE_MONTHLY = "Restore Privacy Suite monthly plan"
+STRIPE_PRODUCT_NAME_SUITE_YEARLY = "Restore Privacy Suite yearly plan"
+SUITE_PRODUCT_DISPLAY_NAME = "Restore Privacy Suite"
 # Default paid fulfilment link window: 12 hours (reusable until expiry).
 _DEFAULT_DOWNLOAD_TOKEN_TTL_SEC = 12 * 3600  # 43200
 TOKEN_TTL_SEC = int(
@@ -2114,6 +2123,7 @@ def site_pay_plan_path(
     platform: str = "",
     *,
     interval: str = "",
+    product_line: str = PRODUCT_LINE_DEFAULT,
 ) -> str:
     """Relative path to the site-hosted Select your plan page."""
     plat = (platform or "").strip().lower()
@@ -2125,6 +2135,9 @@ def site_pay_plan_path(
         params["interval"] = BILLING_INTERVAL_YEAR
     elif iv in ("month", "monthly"):
         params["interval"] = BILLING_INTERVAL_MONTH
+    pl = normalize_product_line(product_line)
+    if pl == PRODUCT_LINE_SUITE:
+        params["product"] = PRODUCT_LINE_SUITE
     if not params:
         return SITE_PAY_PLAN_PATH
     return f"{SITE_PAY_PLAN_PATH}?{urllib.parse.urlencode(params)}"
@@ -2135,9 +2148,12 @@ def site_pay_plan_href(
     *,
     interval: str = "",
     base_url: str | None = None,
+    product_line: str = PRODUCT_LINE_DEFAULT,
 ) -> str:
     """Absolute or relative URL for the site plan page (primary catalog pay entry)."""
-    path = site_pay_plan_path(platform, interval=interval)
+    path = site_pay_plan_path(
+        platform, interval=interval, product_line=product_line
+    )
     base = (base_url if base_url is not None else public_base_url() or "").rstrip("/")
     if base:
         return f"{base}{path}"
@@ -2282,37 +2298,124 @@ def usd_pay_start_path(
     return f"/pay/start?{q}"
 
 
-def encode_client_reference_id(
-    platform: str, *, interval: str = BILLING_INTERVAL_MONTH
+def normalize_product_line(product: str | None) -> str:
+    """Return ``vpn`` or ``suite`` (default vpn). Accepts product / product_line keys."""
+    s = (product or "").strip().lower().replace(" ", "_")
+    if s in (
+        PRODUCT_LINE_SUITE,
+        "restore_privacy_suite",
+        "restore-privacy-suite",
+        "rps",
+        "suite_v1",
+        "suite-1.0.0",
+    ):
+        return PRODUCT_LINE_SUITE
+    return PRODUCT_LINE_VPN
+
+
+def is_suite_product_line(product: str | None) -> bool:
+    return normalize_product_line(product) == PRODUCT_LINE_SUITE
+
+
+def stripe_product_name_for_product_line(
+    interval: str = BILLING_INTERVAL_MONTH,
+    *,
+    product_line: str = PRODUCT_LINE_DEFAULT,
 ) -> str:
-    """Encode platform + billing interval for Stripe ``client_reference_id``."""
+    """Checkout product_name for VPN or Suite (same Price ids, distinct labels)."""
+    iv = normalize_billing_interval(interval)
+    if is_suite_product_line(product_line):
+        if iv == BILLING_INTERVAL_YEAR:
+            return STRIPE_PRODUCT_NAME_SUITE_YEARLY
+        return STRIPE_PRODUCT_NAME_SUITE_MONTHLY
+    return stripe_product_name_for_interval(iv)
+
+
+def encode_client_reference_id(
+    platform: str,
+    *,
+    interval: str = BILLING_INTERVAL_MONTH,
+    product_line: str = PRODUCT_LINE_DEFAULT,
+) -> str:
+    """Encode platform + billing interval (+ optional suite) for Stripe ``client_reference_id``.
+
+    Forms:
+      - ``platform|month`` / ``platform|year`` — VPN catalog (default)
+      - ``platform|month|suite`` / ``platform|year|suite`` — Restore Privacy Suite
+    """
     plat = (platform or "").strip().lower()
     iv = (interval or BILLING_INTERVAL_MONTH).strip().lower()
     if iv in ("year", "yearly", "annual", "annually"):
         iv = BILLING_INTERVAL_YEAR
     else:
         iv = BILLING_INTERVAL_MONTH
+    pl = normalize_product_line(product_line)
     if not plat:
-        return iv
-    return f"{plat}|{iv}"
+        base = iv
+    else:
+        base = f"{plat}|{iv}"
+    if pl == PRODUCT_LINE_SUITE:
+        return f"{base}|{PRODUCT_LINE_SUITE}"
+    return base
 
 
 def parse_client_reference_id(ref: str) -> tuple[str, str]:
-    """Return ``(platform, interval)`` from Stripe client_reference_id."""
+    """Return ``(platform, interval)`` from Stripe client_reference_id.
+
+    Suite suffix (``|suite``) is stripped for interval resolution; use
+    :func:`parse_product_line_from_client_reference` for the product line.
+    """
     s = (ref or "").strip().lower()
     if not s:
         return "", BILLING_INTERVAL_MONTH
-    if "|" in s:
-        plat, _, rest = s.partition("|")
-        iv = rest.strip()
-        if iv in ("year", "yearly", "annual", "annually"):
-            return plat.strip(), BILLING_INTERVAL_YEAR
-        return plat.strip(), BILLING_INTERVAL_MONTH
-    if s.endswith("-year") or s.endswith("_year"):
-        for sep in ("-year", "_year"):
-            if s.endswith(sep):
-                return s[: -len(sep)], BILLING_INTERVAL_YEAR
-    return s, BILLING_INTERVAL_MONTH
+    # Drop product-line suffix when present
+    parts = [p.strip() for p in s.split("|") if p.strip()]
+    if parts and parts[-1] in (PRODUCT_LINE_SUITE, PRODUCT_LINE_VPN):
+        parts = parts[:-1]
+    if not parts:
+        return "", BILLING_INTERVAL_MONTH
+    if len(parts) == 1:
+        only = parts[0]
+        if only in ("year", "yearly", "annual", "annually"):
+            return "", BILLING_INTERVAL_YEAR
+        if only in ("month", "monthly"):
+            return "", BILLING_INTERVAL_MONTH
+        if only.endswith("-year") or only.endswith("_year"):
+            for sep in ("-year", "_year"):
+                if only.endswith(sep):
+                    return only[: -len(sep)], BILLING_INTERVAL_YEAR
+        return only, BILLING_INTERVAL_MONTH
+    plat = parts[0]
+    iv = parts[1] if len(parts) > 1 else BILLING_INTERVAL_MONTH
+    if iv in ("year", "yearly", "annual", "annually"):
+        return plat, BILLING_INTERVAL_YEAR
+    return plat, BILLING_INTERVAL_MONTH
+
+
+def parse_product_line_from_client_reference(ref: str) -> str:
+    """Return product line from client_reference_id (default vpn)."""
+    s = (ref or "").strip().lower()
+    if not s:
+        return PRODUCT_LINE_DEFAULT
+    parts = [p.strip() for p in s.split("|") if p.strip()]
+    if parts and parts[-1] == PRODUCT_LINE_SUITE:
+        return PRODUCT_LINE_SUITE
+    if parts and parts[-1] == PRODUCT_LINE_VPN:
+        return PRODUCT_LINE_VPN
+    return PRODUCT_LINE_DEFAULT
+
+
+def product_line_from_checkout_object(obj: dict[str, Any] | None) -> str:
+    """Resolve product_line from Checkout Session metadata / client_reference_id."""
+    if not isinstance(obj, dict):
+        return PRODUCT_LINE_DEFAULT
+    meta = obj.get("metadata") if isinstance(obj.get("metadata"), dict) else {}
+    for key in ("product_line", "product", "family"):
+        raw = str(meta.get(key) or "").strip()
+        if raw:
+            return normalize_product_line(raw)
+    ref = str(obj.get("client_reference_id") or "").strip()
+    return parse_product_line_from_client_reference(ref)
 
 
 def stripe_payment_page_href_for_platform(
@@ -3379,8 +3482,24 @@ def init_db() -> None:
         _migrate_grants_purchase_id(conn)
         _ensure_keygen_column(conn)
         _ensure_keygen_activated_at_column(conn)
+        _ensure_product_line_column(conn)
     finally:
         conn.close()
+
+
+def _ensure_product_line_column(conn: sqlite3.Connection) -> None:
+    """Optional product_line on connect_entitlements (vpn default / suite).
+
+    Suite subscriptions reuse the same entitlement status semantics as VPN;
+    the column only labels the grant source for operators and clients.
+    """
+    ent_cols = {
+        str(r[1]) for r in conn.execute("PRAGMA table_info(connect_entitlements)")
+    }
+    if "product_line" not in ent_cols:
+        conn.execute(
+            "ALTER TABLE connect_entitlements ADD COLUMN product_line TEXT"
+        )
 
 
 def _ensure_keygen_column(conn: sqlite3.Connection) -> None:
@@ -3564,6 +3683,7 @@ def activate_connect_entitlement(
     keygen: str | None = None,
     customer_email: str = "",
     billing_interval: str = "",
+    product_line: str = "",
     now: float | None = None,
 ) -> str:
     """Mark Checkout session as paid/active for Connect entitlement.
@@ -3572,6 +3692,9 @@ def activate_connect_entitlement(
     (subscription period end). ``None`` means no time limit — used only for
     **admin failsafe** / legacy paths; paid monthly/yearly catalog grants always
     pass a finite period from :func:`process_checkout_completed_event`.
+
+    *product_line* labels Suite vs VPN grant source; status/period/keygen
+    semantics are shared (Suite inherits the VPN entitlement structure).
 
     Returns the bound **keygen** (minted once per session if not already set).
     """
@@ -3589,11 +3712,12 @@ def activate_connect_entitlement(
         iv = BILLING_INTERVAL_YEAR
     elif iv:
         iv = BILLING_INTERVAL_MONTH
+    pl = normalize_product_line(product_line) if (product_line or "").strip() else ""
     conn = _connect()
     try:
         cur = conn.execute(
             "SELECT platform, payment_intent_id, subscription_id, valid_until, keygen, "
-            "customer_email, billing_interval "
+            "customer_email, billing_interval, product_line "
             "FROM connect_entitlements WHERE session_id = ?",
             (sid,),
         )
@@ -3625,12 +3749,18 @@ def activate_connect_entitlement(
                 keep_iv = iv or str(row["billing_interval"] or "") or BILLING_INTERVAL_MONTH
             except (KeyError, IndexError, TypeError):
                 keep_iv = iv or BILLING_INTERVAL_MONTH
+            try:
+                keep_pl = pl or str(row["product_line"] or "") or PRODUCT_LINE_VPN
+            except (KeyError, IndexError, TypeError):
+                keep_pl = pl or PRODUCT_LINE_VPN
+            keep_pl = normalize_product_line(keep_pl)
             conn.execute(
                 """
                 UPDATE connect_entitlements
                 SET status = ?, platform = ?, reason = ?, updated_at = ?,
                     payment_intent_id = ?, subscription_id = ?, valid_until = ?,
-                    keygen = ?, customer_email = ?, billing_interval = ?
+                    keygen = ?, customer_email = ?, billing_interval = ?,
+                    product_line = ?
                 WHERE session_id = ?
                 """,
                 (
@@ -3644,18 +3774,20 @@ def activate_connect_entitlement(
                     keep_keygen,
                     keep_email,
                     keep_iv,
+                    keep_pl,
                     sid,
                 ),
             )
         else:
             keep_keygen = normalize_keygen(keygen) if keygen else _mint_unique_keygen(conn)
+            keep_pl = normalize_product_line(pl or PRODUCT_LINE_VPN)
             conn.execute(
                 """
                 INSERT INTO connect_entitlements(
                     session_id, status, platform, reason, created_at, updated_at,
                     payment_intent_id, subscription_id, valid_until, keygen,
-                    customer_email, billing_interval
-                ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)
+                    customer_email, billing_interval, product_line
+                ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)
                 """,
                 (
                     sid,
@@ -6586,11 +6718,15 @@ def build_subscription_checkout_form_body(
     cancel_url: str,
     currency: str = PRICE_CURRENCY,
     auto_renew: bool = True,
+    product_line: str = PRODUCT_LINE_DEFAULT,
 ) -> bytes:
-    """Stripe Checkout Session body for **subscription** Monthly/Yearly VPN plan.
+    """Stripe Checkout Session body for **subscription** Monthly/Yearly plan.
 
-    Uses Dashboard Price ids for Monthly VPN plan / Yearly VPN plan. Applies
-    catalog free trial (:data:`CATALOG_TRIAL_PERIOD_DAYS`) via
+    Uses Dashboard Price ids for Monthly/Yearly VPN plan (shared by Suite).
+    *product_line* ``suite`` marks Restore Privacy Suite in metadata and
+    client_reference_id; grant shape remains the shared Connect entitlement.
+
+    Applies catalog free trial (:data:`CATALOG_TRIAL_PERIOD_DAYS`) via
     ``subscription_data[trial_period_days]`` for both intervals.
     *currency* may be ``usd`` for presentment conversion via price_data fallback
     when a dedicated USD price is not configured (inline recurring price_data).
@@ -6601,13 +6737,13 @@ def build_subscription_checkout_form_body(
     """
     plat = (platform or "").strip().lower()
     iv = normalize_billing_interval(interval)
+    pl = normalize_product_line(product_line)
     if iv == BILLING_INTERVAL_YEAR:
         amount = PRICE_YEARLY_PENCE
-        product_name = STRIPE_PRODUCT_NAME_YEARLY
     else:
         amount = PRICE_PENCE
-        product_name = STRIPE_PRODUCT_NAME_MONTHLY
-    ref = encode_client_reference_id(plat, interval=iv)
+    product_name = stripe_product_name_for_product_line(iv, product_line=pl)
+    ref = encode_client_reference_id(plat, interval=iv, product_line=pl)
     ccy = (currency or PRICE_CURRENCY).strip().lower() or PRICE_CURRENCY
     renew = bool(auto_renew)
     trial_days = int(CATALOG_TRIAL_PERIOD_DAYS)
@@ -6622,10 +6758,13 @@ def build_subscription_checkout_form_body(
         ("metadata[amount_pence]", str(amount)),
         ("metadata[currency]", ccy if ccy == "usd" else PRICE_CURRENCY),
         ("metadata[product_name]", product_name),
+        ("metadata[product_line]", pl),
+        ("metadata[product]", pl),
         ("metadata[auto_renew]", "1" if renew else "0"),
         ("metadata[trial_period_days]", str(trial_days)),
         ("subscription_data[metadata][platform]", plat),
         ("subscription_data[metadata][billing_interval]", iv),
+        ("subscription_data[metadata][product_line]", pl),
         ("subscription_data[metadata][auto_renew]", "1" if renew else "0"),
         ("subscription_data[trial_period_days]", str(trial_days)),
     ]
@@ -6698,11 +6837,15 @@ def create_subscription_checkout_session(
     http_post: HttpPostFn | None = None,
     currency: str = "",
     auto_renew: bool = True,
+    product_line: str = PRODUCT_LINE_DEFAULT,
 ) -> dict[str, Any]:
-    """Create a Stripe **subscription** Checkout Session for Monthly or Yearly VPN plan.
+    """Create a Stripe **subscription** Checkout Session for Monthly or Yearly plan.
+
+    *product_line* ``suite`` tags Restore Privacy Suite (metadata +
+    client_reference_id); entitlement minting reuses the VPN grant structure.
 
     Returns dict with id, url, platform, filename, amount_pence, currency,
-    billing_interval, price_id, product_name, auto_renew.
+    billing_interval, price_id, product_name, product_line, auto_renew.
     """
     filename = platform_filename(platform)
     if not filename:
@@ -6713,6 +6856,7 @@ def create_subscription_checkout_session(
 
     plat = (platform or "").strip().lower()
     iv = normalize_billing_interval(interval)
+    pl = normalize_product_line(product_line)
     if iv == BILLING_INTERVAL_YEAR:
         amount = PRICE_YEARLY_PENCE
     else:
@@ -6723,10 +6867,13 @@ def create_subscription_checkout_session(
     success = (
         f"{base}{DEFAULT_SUCCESS_PATH}"
         f"?session_id={{CHECKOUT_SESSION_ID}}&platform={urllib.parse.quote(plat)}"
+        f"&product={urllib.parse.quote(pl)}"
     )
-    # Return to homepage Download client box (primary selection UX)
+    # Suite cancels back to suite storefront; VPN to Download client box
+    frag = "suite-storefront" if pl == PRODUCT_LINE_SUITE else "downloads"
     cancel = (
-        f"{base}/?platform={urllib.parse.quote(plat)}&interval={iv}#downloads"
+        f"{base}/?platform={urllib.parse.quote(plat)}&interval={iv}"
+        f"&product={urllib.parse.quote(pl)}#{frag}"
     )
 
     presentment_ccy = PRICE_CURRENCY
@@ -6749,6 +6896,7 @@ def create_subscription_checkout_session(
         cancel_url=cancel,
         currency=presentment_ccy,
         auto_renew=renew,
+        product_line=pl,
     )
     post = http_post or _default_http_post
     headers = {
@@ -6772,6 +6920,7 @@ def create_subscription_checkout_session(
             cancel_url=cancel,
             currency=presentment_ccy,
             auto_renew=True,  # omit create-time cancel flag
+            product_line=pl,
         )
         # Force metadata auto_renew=0 on the retry body
         retry_fields = urllib.parse.parse_qsl(body_retry.decode("utf-8"))
@@ -6807,7 +6956,8 @@ def create_subscription_checkout_session(
         "currency": charge_ccy,
         "billing_interval": iv,
         "price_id": stripe_subscription_price_id_for_interval(iv),
-        "product_name": stripe_product_name_for_interval(iv),
+        "product_name": stripe_product_name_for_product_line(iv, product_line=pl),
+        "product_line": pl,
         "mode": "subscription",
         "auto_renew": renew,
     }
@@ -6919,12 +7069,15 @@ def create_checkout_session(
     currency: str = "",
     interval: str = BILLING_INTERVAL_MONTH,
     auto_renew: bool = True,
+    product_line: str = PRODUCT_LINE_DEFAULT,
 ) -> dict[str, Any]:
     """Create a Stripe Checkout Session for one package.
 
-    Catalog default: **subscription** Checkout for Monthly or Yearly VPN plan
+    Catalog default: **subscription** Checkout for Monthly or Yearly plan
     (see :func:`create_subscription_checkout_session`). Pass
     ``RPT_CHECKOUT_ONE_TIME=1`` to force legacy one-time payment mode.
+
+    *product_line* ``suite`` tags Restore Privacy Suite (same prices/entitlement).
 
     When *currency* resolves to **USD** presentment, subscription session uses
     USD recurring price_data relative to GBP anchors.
@@ -6940,6 +7093,7 @@ def create_checkout_session(
             interval=interval,
             base_url=base_url,
             http_post=http_post,
+            product_line=product_line,
             currency=currency,
             auto_renew=auto_renew,
         )

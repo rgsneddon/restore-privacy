@@ -27,7 +27,18 @@ python3 -m node_operator --no-browser --port 18765
 - **Start / stop** residual node stack (lab or full)
 - **Connected clients** table (admin only; public `/status` stays title-only)
 - **Prioritise clients** — higher integer preferred under contention (IP pool reclaim)
+- **Upload packages to host** — manual **stage + upload** of catalog installers to the
+  Helsinki paid store (`scripts/host_paid_assets_vps.py`), with dry-run / force /
+  allow-missing / install-serve options. Primary path after you build monopin packages.
 - **Push update** — version/url/message directive to connected clients (`UPDATE_PUSH` wire type + client receive path)
+
+### Upload packages (GUI)
+
+1. Build or place installers under `releases/{version}/` (or stage tree).
+2. Open the operator GUI → **Upload packages to host**.
+3. Set monopin version (default catalog pin), choose Stage and/or Upload.
+4. Prefer **Allow missing** for partial ships; use **Dry-run** to print the plan.
+5. **Upload packages to Helsinki** runs the shipped host script (SSH key required for real upload).
 
 ## Related code
 

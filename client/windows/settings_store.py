@@ -32,6 +32,9 @@ KEY_ENTRY_COUNTRY = "entry_country"
 KEY_FIRST_RUN_SETTINGS_COMPLETED = "first_run_settings_completed"
 # Chrome appearance: "light" (default) or "dark"
 KEY_UI_MODE = "ui_mode"
+# Opt-in: CHECK BREADCRUMBS self-update path (Helsinki vault). Default off.
+KEY_CHECK_BREADCRUMBS = "check_breadcrumbs"
+CHECK_BREADCRUMBS_LABEL = "CHECK BREADCRUMBS"
 
 
 def normalize_entry_country(code: str | None) -> str:
@@ -68,6 +71,8 @@ class ProductSettings:
     first_run_settings_completed: bool = False
     # Main-window chrome: light (default) or dark
     ui_mode: str = "light"
+    # Opt-in Helsinki breadcrumbs → monopin self-update (Settings CHECK BREADCRUMBS).
+    check_breadcrumbs: bool = False
 
 
 def settings_dir() -> Path:
@@ -94,6 +99,7 @@ def default_settings() -> ProductSettings:
         entry_country=DEFAULT_ENTRY_COUNTRY,
         first_run_settings_completed=False,
         ui_mode="light",
+        check_breadcrumbs=False,
     )
 
 
@@ -130,6 +136,7 @@ def load_settings(path: Optional[Path] = None) -> ProductSettings:
                 data.get(KEY_FIRST_RUN_SETTINGS_COMPLETED, False)
             ),
             ui_mode=normalize_ui_mode(data.get(KEY_UI_MODE, "light")),
+            check_breadcrumbs=bool(data.get(KEY_CHECK_BREADCRUMBS, False)),
         )
     except (OSError, json.JSONDecodeError, TypeError, ValueError):
         return default_settings()
@@ -157,6 +164,9 @@ def save_settings(settings: ProductSettings, path: Optional[Path] = None) -> Pat
             settings.first_run_settings_completed
         ),
         KEY_UI_MODE: normalize_ui_mode(getattr(settings, "ui_mode", "light")),
+        KEY_CHECK_BREADCRUMBS: bool(
+            getattr(settings, "check_breadcrumbs", False)
+        ),
     }
     p.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
     return p

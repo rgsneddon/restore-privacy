@@ -12,6 +12,7 @@ import 'licence_gate.dart';
 import 'node_ping.dart';
 import 'registration_copy.dart';
 import 'rpt_config.dart';
+import 'breadcrumbs_check.dart';
 import 'settings_store.dart';
 import 'theme.dart';
 import 'transparency_copy.dart';
@@ -277,6 +278,52 @@ class _SettingsScreenState extends State<SettingsScreen> {
     if (mounted) setState(() => _busy = false);
   }
 
+  Future<void> _setCheckBreadcrumbs(bool value) async {
+    setState(() {
+      _busy = true;
+      _settings = _settings.copyWith(checkBreadcrumbs: value);
+    });
+    await widget.store.save(_settings);
+    if (value) {
+      // Live path: enabled → fetch Helsinki breadcrumbs + apply pending update.
+      try {
+        final crumbsR = await onCheckBreadcrumbsSettingChanged(
+          enabled: true,
+          settings: _settings,
+          productVersion: RptConfig.productVersion,
+        );
+        if (crumbsR['skipped'] == true) {
+          _note =
+              '$kCheckBreadcrumbsLabel on — ${crumbsR['reason'] ?? 'ok'}.';
+        } else if (crumbsR['ok'] == true && crumbsR['store'] != null) {
+          final store = crumbsR['store'] as Map?;
+          final ver = store?['pending_update_version'] ?? crumbsR['monopin'];
+          _note =
+              '$kCheckBreadcrumbsLabel on — pending update v$ver '
+              '(${store?['pending_update_url'] ?? ''}).';
+        } else {
+          _note =
+              '$kCheckBreadcrumbsLabel on — fetch/apply: '
+              '${crumbsR['error'] ?? 'check failed'}';
+        }
+        // Best-effort native notify (platforms may no-op).
+        try {
+          await _channel.invokeMethod<dynamic>('checkBreadcrumbs', {
+            'enabled': true,
+          });
+        } on MissingPluginException {
+          // Dart path above is authoritative when native is absent.
+        } catch (_) {}
+      } catch (e) {
+        _note = '$kCheckBreadcrumbsLabel on — saved; check path error: $e';
+      }
+    } else {
+      _note = '$kCheckBreadcrumbsLabel off — no auto self-update.';
+    }
+    widget.onChanged?.call(_settings);
+    if (mounted) setState(() => _busy = false);
+  }
+
   /// Residual IPv6 only (IPv4 residual is product always-on, not adjustable).
   Future<void> _setResidualStack({bool? ipv6}) async {
     setState(() {
@@ -525,6 +572,21 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   activeTrackColor: kPrimary,
                   onChanged: _busy ? null : _setAutoconnect,
                 ),
+                const Divider(height: 1),
+                SwitchListTile(
+                  title: const Text(
+                    kCheckBreadcrumbsLabel,
+                    style: TextStyle(fontWeight: FontWeight.w600),
+                  ),
+                  subtitle: const Text(
+                    'When on, allow this device to fetch Helsinki breadcrumbs '
+                    'and apply monopin update directives (self-update when you choose)',
+                  ),
+                  value: _settings.checkBreadcrumbs,
+                  activeThumbColor: kWhite,
+                  activeTrackColor: kPrimary,
+                  onChanged: _busy ? null : _setCheckBreadcrumbs,
+                ),
               ],
             ),
           ),
@@ -532,7 +594,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
           Text(
             'Both options default to off. Seamless power-up needs both on '
             '(startup launches the app; autoconnect starts the VPN). '
-            'OS VPN permission / Administrator may still be required.',
+            'OS VPN permission / Administrator may still be required. '
+            '${kCheckBreadcrumbsLabel} defaults off — no auto self-update until you allow it.',
             style: TextStyle(color: kTextMuted, fontSize: 12),
           ),
           if (!freeTierSettingsLocked) ...[

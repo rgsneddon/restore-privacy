@@ -15,9 +15,10 @@ import 'macos_window.dart';
 import 'prefs_backend.dart';
 import 'registration_copy.dart';
 import 'rpt_config.dart';
-import 'free_tier.dart';
 import 'settings_screen.dart';
 import 'settings_store.dart';
+import 'suite_shell.dart';
+import 'suite_version.dart';
 import 'theme.dart';
 import 'upgrade_banner.dart';
 import 'vpn_controller.dart';
@@ -33,16 +34,40 @@ void main() {
       systemNavigationBarIconBrightness: Brightness.dark,
     ),
   );
+  // Startup identity for operators / logs.
+  // ignore: avoid_print
+  print(kSuiteDisplayVersion);
   runApp(const RestorePrivacyApp());
 }
 
 class RestorePrivacyApp extends StatelessWidget {
-  const RestorePrivacyApp({super.key});
+  const RestorePrivacyApp({
+    super.key,
+    this.home,
+    this.settingsStore,
+    this.licenceGate,
+    this.vpnController,
+    this.onQuitExit,
+    this.walletTab,
+    this.evolveTab,
+    this.initialTabIndex = 0,
+  });
+
+  /// Injectable full home override (tests); else [SuiteShell] with VPN / % / EVOLVE.
+  final Widget? home;
+
+  final SettingsStore? settingsStore;
+  final LicenceGate? licenceGate;
+  final VpnController? vpnController;
+  final void Function()? onQuitExit;
+  final Widget? walletTab;
+  final Widget? evolveTab;
+  final int initialTabIndex;
 
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: kAppTitle,
+      title: kSuiteProductName,
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
         brightness: Brightness.light,
@@ -56,7 +81,18 @@ class RestorePrivacyApp extends StatelessWidget {
         ),
         useMaterial3: true,
       ),
-      home: const TunnelHome(),
+      home: home ??
+          SuiteShell(
+            initialTabIndex: initialTabIndex,
+            vpnTab: TunnelHome(
+              settingsStore: settingsStore,
+              licenceGate: licenceGate,
+              vpnController: vpnController,
+              onQuitExit: onQuitExit,
+            ),
+            walletTab: walletTab,
+            evolveTab: evolveTab,
+          ),
     );
   }
 }
@@ -130,6 +166,7 @@ class _TunnelHomeState extends State<TunnelHome> with WidgetsBindingObserver {
     WidgetsBinding.instance.addPostFrameCallback((_) async {
       await _initSettings();
       if (!mounted) return;
+      _append(kSuiteDisplayVersion);
       _append(kAppTitle);
       _append(kPrivacyMessageText);
       _append(kSeamlessHint);
@@ -452,7 +489,9 @@ class _TunnelHomeState extends State<TunnelHome> with WidgetsBindingObserver {
   /// nested navigator leaves the keygen window stuck open.
   Future<void> _showKeygenSheet() async {
     // EXPIRED installs must renew — never show keygen in place of renew.
-    if (await (_licence?.needsLicenceRenewal() ?? false)) {
+    final bool needsRenew = _licence != null &&
+        await _licence!.needsLicenceRenewal();
+    if (needsRenew) {
       await _showRenewLicenceSheet();
       return;
     }
@@ -967,14 +1006,19 @@ class _TunnelHomeState extends State<TunnelHome> with WidgetsBindingObserver {
       residual: true,
     );
 
+    // Nested under SuiteShell chrome + bottom nav: avoid SafeArea double-padding
+    // and allow the body to shrink/scroll when height is tight.
     return Scaffold(
       backgroundColor: kChromeBg,
       body: SafeArea(
-        top: true,
-        bottom: true,
+        top: false,
+        bottom: false,
         child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Column(
+          padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              final tight = constraints.maxHeight < 520;
+              return Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               Row(
@@ -983,8 +1027,8 @@ class _TunnelHomeState extends State<TunnelHome> with WidgetsBindingObserver {
                     borderRadius: BorderRadius.circular(12),
                     child: Image.asset(
                       kLogoAsset,
-                      width: 48,
-                      height: 48,
+                      width: tight ? 36 : 48,
+                      height: tight ? 36 : 48,
                       errorBuilder: (context, error, stackTrace) => Container(
                         width: 48,
                         height: 48,
@@ -1042,9 +1086,9 @@ class _TunnelHomeState extends State<TunnelHome> with WidgetsBindingObserver {
                   ),
                 ],
               ),
-              const SizedBox(height: 14),
+              SizedBox(height: tight ? 8 : 14),
               // New version available (paid catalog) — macOS / iOS / Android shell
-              const UpgradeBanner(),
+              if (!tight) const UpgradeBanner(),
               Container(
                 decoration: BoxDecoration(
                   color: kPanelBg,
@@ -1163,7 +1207,7 @@ class _TunnelHomeState extends State<TunnelHome> with WidgetsBindingObserver {
                   ],
                 ),
               ),
-              const SizedBox(height: 12),
+              SizedBox(height: tight ? 6 : 12),
               Expanded(
                 child: Container(
                   decoration: BoxDecoration(
@@ -1186,58 +1230,60 @@ class _TunnelHomeState extends State<TunnelHome> with WidgetsBindingObserver {
                   ),
                 ),
               ),
-              const SizedBox(height: 14),
+              SizedBox(height: tight ? 8 : 14),
               // Entry country (flags) — main shell above Connect, not Settings-only
-              Text(
-                'Entry country',
-                style: TextStyle(
-                  color: kTextMuted,
-                  fontSize: 11,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-              const SizedBox(height: 4),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12),
-                decoration: BoxDecoration(
-                  color: kPanelBg,
-                  borderRadius: BorderRadius.circular(kCornerRadius),
-                  border: Border.all(color: kBorder),
-                ),
-                child: DropdownButtonHideUnderline(
-                  child: DropdownButton<String>(
-                    isExpanded: true,
-                    value: normalizeEntryCountry(_settings.entryCountry),
-                    items: [
-                      for (final o in kProductCountryCatalog)
-                        DropdownMenuItem<String>(
-                          value: o.code,
-                          child: Text(
-                            o.label,
-                            style: const TextStyle(fontSize: 15),
-                          ),
-                        ),
-                    ],
-                    onChanged: _busy
-                        ? null
-                        : (code) async {
-                            if (code == null) return;
-                            final next = normalizeEntryCountry(code);
-                            final updated =
-                                _settings.copyWith(entryCountry: next);
-                            setState(() => _settings = updated);
-                            RptConfig.setRuntimeEntryCountry(next);
-                            await _store?.save(updated);
-                            _append(
-                              'Entry country: ${countryOptionForCode(next)?.label ?? next} (next Connect)',
-                            );
-                          },
+              if (!tight) ...[
+                const Text(
+                  'Entry country',
+                  style: TextStyle(
+                    color: kTextMuted,
+                    fontSize: 11,
+                    fontWeight: FontWeight.w600,
                   ),
                 ),
-              ),
-              const SizedBox(height: 10),
+                const SizedBox(height: 4),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12),
+                  decoration: BoxDecoration(
+                    color: kPanelBg,
+                    borderRadius: BorderRadius.circular(kCornerRadius),
+                    border: Border.all(color: kBorder),
+                  ),
+                  child: DropdownButtonHideUnderline(
+                    child: DropdownButton<String>(
+                      isExpanded: true,
+                      value: normalizeEntryCountry(_settings.entryCountry),
+                      items: [
+                        for (final o in kProductCountryCatalog)
+                          DropdownMenuItem<String>(
+                            value: o.code,
+                            child: Text(
+                              o.label,
+                              style: const TextStyle(fontSize: 15),
+                            ),
+                          ),
+                      ],
+                      onChanged: _busy
+                          ? null
+                          : (code) async {
+                              if (code == null) return;
+                              final next = normalizeEntryCountry(code);
+                              final updated =
+                                  _settings.copyWith(entryCountry: next);
+                              setState(() => _settings = updated);
+                              RptConfig.setRuntimeEntryCountry(next);
+                              await _store?.save(updated);
+                              _append(
+                                'Entry country: ${countryOptionForCode(next)?.label ?? next} (next Connect)',
+                              );
+                            },
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 10),
+              ],
               SizedBox(
-                height: 52,
+                height: tight ? 44 : 52,
                 child: ElevatedButton(
                   onPressed: _busy ? null : _onToggle,
                   style: ElevatedButton.styleFrom(
@@ -1295,6 +1341,8 @@ class _TunnelHomeState extends State<TunnelHome> with WidgetsBindingObserver {
                 ),
               ],
             ],
+              );
+            },
           ),
         ),
       ),

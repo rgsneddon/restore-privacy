@@ -133,7 +133,7 @@ class TestNodeOperatorAppEntry(unittest.TestCase):
     def test_app_smoke_and_gui_shell(self) -> None:
         from node_operator import APP_TITLE
         from node_operator.app import get_controller, main as app_main
-        from node_operator.gui_html import render_operator_page
+        from node_operator.gui_html import handle_operator_post, render_operator_page
 
         self.assertIn("Node Operator", APP_TITLE)
         self.assertEqual(app_main(["--smoke"]), 0)
@@ -150,6 +150,62 @@ class TestNodeOperatorAppEntry(unittest.TestCase):
         self.assertIn('id="op-priority-btn"', html)
         self.assertIn('id="op-push-btn"', html)
         self.assertIn('id="op-sessions-table"', html)
+        # Upload packages card (manual Helsinki deploy)
+        self.assertIn('id="op-deploy-packages"', html)
+        self.assertIn("Upload packages to host", html)
+        self.assertIn('id="op-upload-packages-form"', html)
+        self.assertIn('id="op-upload-packages-btn"', html)
+        self.assertIn("Upload packages to Helsinki", html)
+        self.assertIn('id="op-packages-table"', html)
+        self.assertIn("/op/upload-packages", html)
+        self.assertIn('id="op-update-push"', html)
+
+    def test_upload_catalog_packages_inventory_and_gui_post(self) -> None:
+        from node.operator_admin import NodeOperatorController
+        from node_operator.gui_html import handle_operator_post
+
+        ctrl = NodeOperatorController(repo_root=ROOT)
+        ver = ctrl.catalog_version_default()
+        self.assertTrue(ver, "catalog version must be non-empty")
+        inv = ctrl.list_local_packages(version=ver)
+        self.assertTrue(inv.get("ok"), inv)
+        self.assertEqual(inv.get("version"), ver)
+        self.assertEqual(inv.get("total"), 5)
+        platforms = {p["platform"] for p in inv.get("packages") or []}
+        self.assertEqual(
+            platforms, {"windows", "android", "macos", "ios", "linux"}
+        )
+
+        # Drive shipped host script via controller (dry-run; no SSH write).
+        # Without local staged packages, result may be not-ok — still real path.
+        r = ctrl.upload_catalog_packages(
+            version=ver,
+            stage=False,
+            upload=True,
+            dry_run=True,
+            allow_missing=True,
+        )
+        self.assertEqual(r["version"], ver)
+        self.assertTrue(r.get("dry_run"))
+        self.assertTrue(r.get("upload"))
+        self.assertFalse(r.get("stage"))
+
+        # GUI POST: list inventory
+        code, flash = handle_operator_post(
+            ctrl, "/op/list-packages", f"version={ver}".encode()
+        )
+        self.assertEqual(code, 200)
+        self.assertIn("Inventory", flash)
+        self.assertIn(ver, flash)
+
+        # GUI POST: dry-run upload (honest success or missing-package error)
+        body = f"version={ver}&upload=1&dry_run=1&allow_missing=1".encode()
+        code2, flash2 = handle_operator_post(ctrl, "/op/upload-packages", body)
+        self.assertIn(code2, (200, 400))
+        self.assertTrue(flash2)
+        if code2 == 200:
+            self.assertIn("Deploy", flash2)
+            self.assertIn(ver, flash2)
 
     def test_client_update_receive_module(self) -> None:
         from client.update_receive import (

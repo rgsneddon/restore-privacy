@@ -4,7 +4,7 @@
 
 | | |
 |--|--|
-| **Get the app** | [Paid downloads](https://restoreprivacy.online/) — catalog **v0.6.0** (£3.00/month or £30.00/year per platform; **3-day free trial**) |
+| **Get the app** | [Paid downloads](https://restoreprivacy.online/) — catalog **v1.0.0** (£3.00/month or £30.00/year per platform; **3-day free trial**) |
 | **Privacy** | [PRIVACY_POLICY.md](PRIVACY_POLICY.md) |
 | **Licence** | [LICENSE](LICENSE) (proprietary full copyright) |
 | **Credits** | [CREDITS.md](CREDITS.md) |
@@ -23,7 +23,7 @@
 - Windows product firewall rules are **scoped allows** only (node UDP + program). Kill-switch is **off** unless you set `RPT_KILL_SWITCH=1`.
 - **Restore Internet** failsafe in every installer completely removes the product (see warning below).
 - Admission is cryptographic (device Ed25519 + node keys) — no third-party geo lookup on Connect.
-- Connect uses the standard **HELLO** residual path (**flyclient** fast-path removed in catalog **v0.6.0**).
+- Connect uses the standard **HELLO** residual path (**flyclient** fast-path removed in catalog **v1.0.0**).
 - **Node-only** optional **zram + LUKS2** encrypted RAM volume (`node/install_zram_luks.sh`) and optional **LUKS2 disk** at-rest (`node/install_disk_encryption.sh`) — not client encryption; residual Connect unchanged.
 - Session **PFS** (ephemeral X25519) on residual HELLO for all product clients (Python Windows/Linux, Android, iOS/macOS Packet Tunnel).
 - **Outer obfuscation** (QUIC-mimic wrap) and **traffic shaping** (pad / jitter / cover) are **off** by default (lean residual). Turn them on in Settings (`RPT_OBFS=1` / `RPT_TRAFFIC_SHAPE=1` also force on for Python) — mitigations, not “undetectable DPI”. When on: pad bucket 128, cover ~2s, jitter ≤40ms.
@@ -41,7 +41,7 @@
 
 Installers are **paid only** on [restoreprivacy.online](https://restoreprivacy.online/) (Stripe). There are no free permanent GitHub release downloads; the source repo is **private**.
 
-**Current catalog (v0.6.0):** the homepage **Download client** box has device/platform and plan selection — **Monthly VPN plan** £3.00 / **Yearly VPN plan** £30.00 — both include a **3-day free trial** (no money is taken until after the trial ends) — plus **Buy now**, which opens Stripe Checkout. You can also open the plan page at **`/pay`**. Card payment uses Stripe’s hosted checkout (Dashboard branding only — not this site’s full CSS). Email delivers **keygen + PPI + download link** (**USE THIS KEYGEN TO UNLOCK RESTORE PRIVACY**).
+**Current catalog (v1.0.0):** the homepage **Download client** box has device/platform and plan selection — **Monthly VPN plan** £3.00 / **Yearly VPN plan** £30.00 — both include a **3-day free trial** (no money is taken until after the trial ends) — plus **Buy now**, which opens Stripe Checkout. You can also open the plan page at **`/pay`**. Card payment uses Stripe’s hosted checkout (Dashboard branding only — not this site’s full CSS). Email delivers **keygen + PPI + download link** (**USE THIS KEYGEN TO UNLOCK RESTORE PRIVACY**).
 
 1. Pick your **device** and **plan**, then **Buy now** (or open `/pay`).
 2. Complete Stripe Checkout. You get a download link valid for **12 hours** (retry if the connection drops) plus email with **keygen** (`RPT-KEY-…`) and **PPI**.
@@ -56,11 +56,11 @@ The app re-checks the status host (`/api/connect-entitlement`) on each Connect s
 
 | Platform | Package |
 |----------|---------|
-| Windows | `restore-privacy-client-0.6.0-windows-x64-setup.exe` *(PE from Windows host — see WINDOWS_HANDOFF_0.6.0 / Helsinki breadcrumbs)* |
-| Android | `restore-privacy-client-0.6.0-android.apk` *(**native** monopin 0.6.0; DE pin + IPv4 always-on)* |
-| macOS | `restore-privacy-client-0.6.0-macos.zip` *(**native** DevID + notarized; see APPLE_HANDOFF_0.6.0)* |
-| iOS | `restore-privacy-client-0.6.0-ios.zip` *(**native** Team-signed sideload; see APPLE_HANDOFF_0.6.0)* |
-| Ubuntu / Arch / CachyOS (Linux x64) | `restore-privacy-client-0.6.0-linux-x64.tar.gz` *(**native** rebuild; pacman or apt via `install.sh`)* |
+| Windows | `restore-privacy-client-1.0.0-windows-x64-setup.exe` *(PE from Windows host — see client_app/SUITE.md / Helsinki breadcrumbs)* |
+| Android | `restore-privacy-client-1.0.0-android.apk` *(**native** monopin 1.0.0; DE pin + IPv4 always-on)* |
+| macOS | `restore-privacy-client-1.0.0-macos.zip` *(**native** DevID + notarized; see client_app/SUITE.md)* |
+| iOS | `restore-privacy-client-1.0.0-ios.zip` *(**native** Team-signed sideload; see client_app/SUITE.md)* |
+| Ubuntu / Arch / CachyOS (Linux x64) | `restore-privacy-client-1.0.0-linux-x64.tar.gz` *(**native** rebuild; pacman or apt via `install.sh`)* |
 | Browser (Chromium MV3) | browser proxy only, not OS residual TUN |
 
 ### Browser extension (Chromium MV3)
@@ -72,7 +72,7 @@ The app re-checks the status host (`/api/connect-entitlement`) on each Connect s
 
 ### Windows
 
-1. On the [status downloads page](https://restoreprivacy.online/), choose **Monthly £3.00** or **Yearly** for **Windows** and download **`restore-privacy-client-0.6.0-windows-x64-setup.exe`** (12-hour download link after payment; retry if connection drops).
+1. On the [status downloads page](https://restoreprivacy.online/), choose **Monthly £3.00** or **Yearly** for **Windows** and download **`restore-privacy-client-1.0.0-windows-x64-setup.exe`** (12-hour download link after payment; retry if connection drops).
 2. Run the installer (PE self-extracting package: frozen runtime + Wintun — no separate Python install). Default install is **Program Files\\Restore Privacy** (elevation when required); per-user fallback if Program Files is unwritable.
 3. **Accept the end-user licence**, then enter the **keygen** from your fulfilment email (forced unlock dialog). Settings → Payment entitlement is a fallback only. Connect is allowed only when status is **OK** (active subscription **and** keygen activated).
 4. Press **Connect** and approve **UAC** when prompted so residual public IP uses the VPN node. Scoped **Windows Defender Firewall** allows (node UDP + program) may be applied for residual Connect.
@@ -81,7 +81,7 @@ The app re-checks the status host (`/api/connect-entitlement`) on each Connect s
 
 ### Android
 
-1. On the [status downloads page](https://restoreprivacy.online/), choose **Monthly £3.00** or **Yearly** for **Android** and download **`restore-privacy-client-0.6.0-android.apk`** (12-hour download link after payment; retry if connection drops).
+1. On the [status downloads page](https://restoreprivacy.online/), choose **Monthly £3.00** or **Yearly** for **Android** and download **`restore-privacy-client-1.0.0-android.apk`** (12-hour download link after payment; retry if connection drops).
 2. Install the APK (allow install from unknown sources if your device asks). Catalog APK includes residual wire (**PFS + outer obfs**).
 3. **Accept the licence**, then enter the **keygen** from email (forced unlock sheet). Connect requires **OK** (active subscription + keygen).
 4. Press **Connect**, and grant **VPN** permission when prompted.
@@ -92,11 +92,11 @@ The app re-checks the status host (`/api/connect-entitlement`) on each Connect s
 
 Supported floor: **Ubuntu 20.04 LTS** and later (including 22.04 / 24.04 LTS).
 
-1. On the [status downloads page](https://restoreprivacy.online/), choose **Monthly £3.00** or **Yearly** for **Linux** and download **`restore-privacy-client-0.6.0-linux-x64.tar.gz`** (12-hour download link after payment; retry if connection drops).
+1. On the [status downloads page](https://restoreprivacy.online/), choose **Monthly £3.00** or **Yearly** for **Linux** and download **`restore-privacy-client-1.0.0-linux-x64.tar.gz`** (12-hour download link after payment; retry if connection drops).
 2. Unpack and run the bundled installer:
 
    ```bash
-   tar xzf restore-privacy-client-0.6.0-linux-x64.tar.gz
+   tar xzf restore-privacy-client-1.0.0-linux-x64.tar.gz
    cd restore-privacy-*-linux   # package folder name from the archive
    bash install.sh
    ```
@@ -106,23 +106,23 @@ Supported floor: **Ubuntu 20.04 LTS** and later (including 22.04 / 24.04 LTS).
 
 ### macOS
 
-**Monopin 0.6.0 macOS** is on the Helsinki paid store (Developer ID + notarized). See `client_app/APPLE_HANDOFF_0.6.0.md`.
+**Monopin 1.0.0 macOS** is on the Helsinki paid store (Developer ID + notarized). See `client_app/SUITE.md`.
 
 When the Mac zip is published:
 
-1. On the [status downloads page](https://restoreprivacy.online/), choose **Monthly £3.00** or **Yearly** for **macOS** and download **`restore-privacy-client-0.6.0-macos.zip`** (12-hour download link after payment; retry if connection drops).
+1. On the [status downloads page](https://restoreprivacy.online/), choose **Monthly £3.00** or **Yearly** for **macOS** and download **`restore-privacy-client-1.0.0-macos.zip`** (12-hour download link after payment; retry if connection drops).
 2. Unzip and open **`restore_privacy_client.app`**.
 3. **Accept the licence** and **enter keygen**, then press **Connect** and approve the **VPN configuration** prompt.
-4. Residual public IP only changes when the Packet Tunnel is **active**. Host-only HELLO is **diagnostic** only. **Disconnect** / **Quit** stops the system VPN. See `client_app/APPLE_HANDOFF_0.6.0.md`.
+4. Residual public IP only changes when the Packet Tunnel is **active**. Host-only HELLO is **diagnostic** only. **Disconnect** / **Quit** stops the system VPN. See `client_app/SUITE.md`.
 5. Failsafe: run **`Restore Internet.command`** in the package (or follow VPN Settings cleanup) — see warning below.
 
 ### iOS
 
-**Monopin 0.6.0 iOS** is on the Helsinki paid store (Team-signed sideload). See `client_app/APPLE_HANDOFF_0.6.0.md`.
+**Monopin 1.0.0 iOS** is on the Helsinki paid store (Team-signed sideload). See `client_app/SUITE.md`.
 
 When the iOS zip is published:
 
-1. On the [status downloads page](https://restoreprivacy.online/), choose **Monthly £3.00** or **Yearly** for **iOS** and download **`restore-privacy-client-0.6.0-ios.zip`** (12-hour download link after payment; retry if connection drops).
+1. On the [status downloads page](https://restoreprivacy.online/), choose **Monthly £3.00** or **Yearly** for **iOS** and download **`restore-privacy-client-1.0.0-ios.zip`** (12-hour download link after payment; retry if connection drops).
 2. Install **`Runner.app`** with device tooling; **accept licence**, **enter keygen**, then press **Connect** and grant **VPN** permission.
 3. Residual public IP only changes when the Packet Tunnel is **active**.
 4. Complete removal: follow **`Restore Internet.txt`** (Settings → VPN / Delete App) — see warning below.
@@ -131,7 +131,7 @@ When the iOS zip is published:
 
 https://restoreprivacy.online/
 
-- **Monthly £3.00** and **Yearly** pay controls per platform (Windows, Android, macOS, iOS, Linux) — catalog **v0.6.0**
+- **Monthly £3.00** and **Yearly** pay controls per platform (Windows, Android, macOS, iOS, Linux) — catalog **v1.0.0**
 - Installers are delivered **after payment** (link valid for 12 hours, reusable until expiry); the product repo is private
 - Connect requires **keygen activation** on an **active** subscription (**OK**); **EXPIRED** shows **renew your licence *here*** with a platform payment portal link
 - **No** public live session / connected-client counter
@@ -209,7 +209,7 @@ Node deploy, ports, secrets, from-source builds, and tests: **[sundries.txt](sun
 
 **Post-quantum readiness:** staged hybrid Kyber/ML-KEM hook in `node/pq_hybrid.py` + plan [`docs/PQ_MIGRATION.md`](docs/PQ_MIGRATION.md) (not residual PQ on the wire until dual-wire + real ML-KEM).
 
-**Product ship (v0.6.0):** Paid installers on **[status downloads](https://restoreprivacy.online/)**. **macOS** native monopin **0.6.0** DevID+notarized (Team **SFCBP95595**); **iOS** Team-signed sideload — see `APPLE_HANDOFF_0.6.0.md`. **Android** and **Linux** native on this pin; **Windows** PE from Windows host (`WINDOWS_HANDOFF_0.6.0.md` + Helsinki breadcrumbs). Catalog residual peers: **IS** / **DE** (default) — US and Romania **retired** (not dialable).
+**Product ship (v1.0.0):** Paid installers on **[status downloads](https://restoreprivacy.online/)**. **macOS** native monopin **1.0.0** DevID+notarized (Team **SFCBP95595**); **iOS** Team-signed sideload — see `SUITE.md`. **Android** and **Linux** native on this pin; **Windows** PE from Windows host (`SUITE.md` + Helsinki breadcrumbs). Catalog residual peers: **IS** / **DE** (default) — US and Romania **retired** (not dialable).
 
 **Self-host (one shot):** `sudo bash scripts/selfhost_node.sh` — node install + tunnel DNS + host privacy. Deploy remote: `python scripts/deploy_rpt_node.py` (`RPT_SSH_HOST`, `RPT_SSH_USER`, key). Details: [sundries.txt](sundries.txt).
 
@@ -223,7 +223,7 @@ Node deploy, ports, secrets, from-source builds, and tests: **[sundries.txt](sun
 
 **Private capacity probes (near-capacity residual migration):** [docs/CAPACITY_PROBES.md](docs/CAPACITY_PROBES.md). Residual nodes: `sudo bash scripts/install_capacity_token_env.sh` (sets durable `RPT_CAPACITY_TOKEN` for token-gated `/api/private/capacity`). Operator clients: `export RPT_CAPACITY_TOKEN='…'` (same secret). Optional: `RPT_CAPACITY_PROBE_URLS`, `RPT_CAPACITY_PROBE_TIMEOUT`, `RPT_NODE_MAX_SESSIONS`. Template: [scripts/hop_env.example](scripts/hop_env.example). **No public client counts** — public status remains title-only; missing token leaves probes off.
 
-**Release scripts:** `scripts/build_release_0.6.0.py`. **Windows multihop PE** (x64 only): `scripts/build_windows_multihop.py` / `scriptsuild_windows_multihop.bat` — handoff [`client/windows/WINDOWS_HANDOFF_0.6.0.md`](client/windows/WINDOWS_HANDOFF_0.6.0.md). Release notes: [`scripts/RELEASE_NOTES_0.6.0.md`](scripts/RELEASE_NOTES_0.6.0.md). Catalog **0.6.0** Apple/Android/Linux hosted; Windows PE from Windows host; multihop residual-via-exit remains opt-in (`RPT_MULTIHOP_ENABLED=1` / Settings multi-hop).
+**Release scripts:** `scripts/package_restore_privacy_suite.py`. **Windows multihop PE** (x64 only): `scripts/build_windows_multihop.py` / `scriptsuild_windows_multihop.bat` — handoff [`client/windows/SUITE.md`](client/windows/SUITE.md). Release notes: [`scripts/package_restore_privacy_suite.py (suite pin)`](scripts/package_restore_privacy_suite.py (suite pin)). Catalog **1.0.0** Apple/Android/Linux hosted; Windows PE from Windows host; multihop residual-via-exit remains opt-in (`RPT_MULTIHOP_ENABLED=1` / Settings multi-hop).
 
 ```bash
 # Windows GUI (requires system Python)
@@ -239,7 +239,7 @@ sudo PYTHONPATH=. python3 -m client.linux
 python scripts/package_linux.py  # manylinux wheels for CPython 3.8—3.12; re-run each release
 
 # Release packages (current tag)
-python scripts/build_release_0.6.0.py
+python scripts/package_restore_privacy_suite.py
 ```
 
 **Node wipe reinstall (sequential fleet):** [docs/NODE_WIPE_REINSTALL.md](docs/NODE_WIPE_REINSTALL.md) — weekly wipe is **one peer at a time** (IS → DE) with mandatory full selfhost reinstall; never concurrent multi-node wipe.

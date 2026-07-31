@@ -12,11 +12,30 @@ if TYPE_CHECKING:
 
 
 def render_operator_page(ctrl: "NodeOperatorController", *, flash: str = "") -> str:
+    from node_operator.client_visuals import render_connected_clients_visual_html
+    from node_operator.update_delivery import (
+        build_update_delivery_matrix,
+        render_update_delivery_matrix_html,
+    )
+
     st = ctrl.get_state()
     sessions = ctrl.list_sessions_admin()
     prio_map = ctrl.priority.as_dict()
+    catalog_ver = ctrl.catalog_version_default()
+    inv = ctrl.list_local_packages(version=catalog_ver)
     flash_html = (
         f'<p class="flash" id="op-flash">{html.escape(flash)}</p>' if flash else ""
+    )
+    clients_visual = render_connected_clients_visual_html(
+        sessions, id_prefix="op-client"
+    )
+    matrix = build_update_delivery_matrix(
+        sessions=sessions,
+        packages=inv.get("packages") or [],
+        catalog_version=catalog_ver,
+    )
+    delivery_html = render_update_delivery_matrix_html(
+        matrix, id_prefix="op-delivery"
     )
     sess_rows = []
     for s in sessions:
@@ -33,6 +52,26 @@ def render_operator_page(ctrl: "NodeOperatorController", *, flash: str = "") -> 
         "\n".join(sess_rows)
         if sess_rows
         else '<tr id="op-sessions-empty"><td colspan="4">No connected clients</td></tr>'
+    )
+    pkg_rows = []
+    for p in inv.get("packages") or []:
+        present = "yes" if p.get("present") else "no"
+        staged = "yes" if p.get("staged") else "no"
+        size = int(p.get("size") or 0)
+        size_s = f"{size // 1_000_000} MB" if size >= 1_000_000 else (f"{size} B" if size else "—")
+        pkg_rows.append(
+            "<tr>"
+            f"<td>{html.escape(str(p.get('platform') or ''))}</td>"
+            f"<td><code>{html.escape(str(p.get('filename') or ''))}</code></td>"
+            f"<td data-present=\"{present}\">{present}</td>"
+            f"<td data-staged=\"{staged}\">{staged}</td>"
+            f"<td>{html.escape(size_s)}</td>"
+            "</tr>"
+        )
+    pkg_table = (
+        "\n".join(pkg_rows)
+        if pkg_rows
+        else '<tr id="op-packages-empty"><td colspan="5">No catalog packages listed</td></tr>'
     )
     return f"""<!DOCTYPE html>
 <html lang="en"><head>
@@ -115,13 +154,17 @@ code{{font-size:0.8rem}}
 
 <section class="card" id="op-sessions">
   <h2>Connected clients (admin)</h2>
-  <p class="muted">Ordered by priority (higher first). Not published on public /status.</p>
+  <p class="muted">Graphic tiles ordered by priority (higher first). Not on public /status.</p>
+  {clients_visual}
+  <details id="op-sessions-table-details" class="muted">
+    <summary>Table detail</summary>
   <table id="op-sessions-table">
     <thead><tr><th>Client id</th><th>VPN IP</th><th>Addr</th><th>Priority</th></tr></thead>
     <tbody>
 {table}
     </tbody>
   </table>
+  </details>
   <form method="post" action="/op/lab-session" id="op-lab-session-form">
     <p class="muted">Lab: inject a synthetic session for admin testing</p>
     <button type="submit" class="secondary" id="op-lab-session-btn">Add lab session</button>
@@ -140,22 +183,76 @@ code{{font-size:0.8rem}}
   <p class="muted">Stored priorities: <code id="op-priority-map">{html.escape(json.dumps(prio_map))}</code></p>
 </section>
 
-<section class="card" id="op-update-push">
+<section class="card" id="op-deploy-packages" data-deploy-packages="1" data-helsinki-upload="1">
+  <h2>Upload packages to host</h2>
+  <p class="muted" id="op-deploy-blurb">
+    After you build monopin installers, <strong>stage and upload</strong> them to the Helsinki
+    paid store host from this GUI — no terminal required. Uses
+    <code>scripts/host_paid_assets_vps.py</code> (SSH key needed for a real upload).
+    Prefer <strong>Dry-run</strong> first; use <strong>Allow missing platforms</strong> for partial ships.
+  </p>
+  <p id="op-deploy-inventory">
+    <strong>Catalog:</strong> <code id="op-catalog-version">{html.escape(catalog_ver)}</code>
+    · present {int(inv.get('present_count') or 0)}/{int(inv.get('total') or 0)}
+    · staged {int(inv.get('staged_count') or 0)}/{int(inv.get('total') or 0)}
+  </p>
+  <table id="op-packages-table">
+    <thead><tr><th>Platform</th><th>Filename</th><th>Local</th><th>Staged</th><th>Size</th></tr></thead>
+    <tbody>
+{pkg_table}
+    </tbody>
+  </table>
+  <form method="post" action="/op/upload-packages" id="op-upload-packages-form"
+        data-helsinki-upload="1">
+    <label for="deploy_version">Monopin version</label>
+    <input id="deploy_version" name="version" required value="{html.escape(catalog_ver)}"
+           placeholder="{html.escape(catalog_ver)}"/>
+    <label><input type="checkbox" name="stage" value="1" checked id="op-deploy-stage"/> Stage local assets</label>
+    <label><input type="checkbox" name="upload" value="1" checked id="op-deploy-upload"/> Upload to Helsinki paid_assets</label>
+    <label><input type="checkbox" name="allow_missing" value="1" checked id="op-deploy-allow-missing"/> Allow missing platforms</label>
+    <label><input type="checkbox" name="force" value="1" id="op-deploy-force"/> Force re-upload</label>
+    <label><input type="checkbox" name="dry_run" value="1" id="op-deploy-dry-run"/> Dry-run (no SSH write)</label>
+    <label><input type="checkbox" name="install_serve" value="1" id="op-deploy-install-serve"/> Restart store serve</label>
+    <button type="submit" id="op-upload-packages-btn" class="primary-upload">
+      Upload packages to Helsinki
+    </button>
+  </form>
+  <form method="post" action="/op/list-packages" id="op-list-packages-form" style="margin-top:0.4rem">
+    <input type="hidden" name="version" value="{html.escape(catalog_ver)}"/>
+    <button type="submit" class="secondary" id="op-list-packages-btn">Refresh package inventory</button>
+  </form>
+</section>
+
+<section class="card" id="op-update-push" data-push-update="1">
   <h2>Push update to clients</h2>
+  <p class="muted" id="op-push-blurb">
+    Residual <strong>UPDATE_PUSH</strong> directive (version/url/message) to connected clients.
+    Upload packages above first so the download URL resolves. Clients apply when Settings
+    <strong>CHECK BREADCRUMBS</strong> is on.
+  </p>
   <form method="post" action="/op/push-update" id="op-push-form">
-    <label for="version">Version</label>
-    <input id="version" name="version" required placeholder="0.5.9"/>
+    <label for="version">Update directive version</label>
+    <input id="version" name="version" required placeholder="{html.escape(catalog_ver)}" value="{html.escape(catalog_ver)}"/>
     <label for="url">Download / notes URL (optional)</label>
     <input id="url" name="url" placeholder="https://restoreprivacy.online/"/>
     <label for="message">Message (optional)</label>
     <input id="message" name="message" placeholder="Please upgrade"/>
     <label for="target_client_id">Target client id (empty = all connected)</label>
     <input id="target_client_id" name="target_client_id" placeholder=""/>
-    <button type="submit" id="op-push-btn">Push update</button>
+    <button type="submit" id="op-push-btn">Push update to clients</button>
   </form>
+</section>
+
+<section class="card" id="op-delivery-section">
+  {delivery_html}
 </section>
 </main>
 </body></html>
+<style>
+button.primary-upload,#op-upload-packages-btn{{
+  background:#0d9488!important;font-size:1rem;padding:0.65rem 1.1rem!important;
+  margin-top:0.5rem}}
+</style>
 """
 
 
@@ -214,4 +311,45 @@ def handle_operator_post(
     if path in ("/op/disconnect-residual", "/op/disconnect-residual/"):
         ctrl.disconnect_residual()
         return 200, "Residual disconnected"
+    if path in ("/op/list-packages", "/op/list-packages/"):
+        ver = (form.get("version") or "").strip() or ctrl.catalog_version_default()
+        inv = ctrl.list_local_packages(version=ver)
+        if not inv.get("ok"):
+            return 400, str(inv.get("error") or "inventory failed")
+        return (
+            200,
+            f"Inventory {inv.get('version')}: "
+            f"present {inv.get('present_count')}/{inv.get('total')}, "
+            f"staged {inv.get('staged_count')}/{inv.get('total')}",
+        )
+    if path in ("/op/upload-packages", "/op/upload-packages/"):
+        ver = (form.get("version") or "").strip() or ctrl.catalog_version_default()
+        stage = form.get("stage") == "1"
+        upload = form.get("upload") == "1"
+        dry_run = form.get("dry_run") == "1"
+        force = form.get("force") == "1"
+        allow_missing = form.get("allow_missing") == "1"
+        install_serve = form.get("install_serve") == "1"
+        r = ctrl.upload_catalog_packages(
+            version=ver,
+            stage=stage,
+            upload=upload,
+            dry_run=dry_run,
+            force=force,
+            allow_missing=allow_missing,
+            install_serve=install_serve,
+        )
+        if not r.get("ok"):
+            return 400, str(r.get("error") or "deploy failed")
+        parts = [
+            f"Deploy {r.get('version')}",
+            f"stage={'yes' if stage else 'no'}",
+            f"upload={'yes' if upload else 'no'}",
+            f"dry_run={'yes' if dry_run else 'no'}",
+        ]
+        if r.get("staged"):
+            parts.append(f"staged={len(r['staged'])}")
+        if r.get("upload_code") is not None:
+            parts.append(f"upload_code={r['upload_code']}")
+        return 200, " · ".join(parts)
     return 404, "unknown action"

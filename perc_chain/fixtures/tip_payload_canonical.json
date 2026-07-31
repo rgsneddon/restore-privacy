@@ -1,0 +1,73 @@
+{
+  "defaults_only": {
+    "block": {
+      "index": 0,
+      "timestamp": "2026-07-06T10:00:00.000Z",
+      "treasuryEmitted": {
+        "microUnits": 0
+      },
+      "transactions": [
+        {
+          "id": "tx-1",
+          "kind": "transfer",
+          "amount": {
+            "microUnits": 5
+          },
+          "timestamp": "2026-07-06T10:00:00.000Z"
+        }
+      ]
+    },
+    "canonicalJson": "{\"index\":0,\"timestamp\":\"2026-07-06T10:00:00.000Z\",\"treasuryEmitted\":{\"microUnits\":0},\"transactions\":[{\"id\":\"tx-1\",\"kind\":\"transfer\",\"amount\":{\"microUnits\":5},\"timestamp\":\"2026-07-06T10:00:00.000Z\"}]}",
+    "tipHash": "147b51860a8f6b42c8c2b10a4b4ba7268781497d72b924125317df4d3925e8d5"
+  },
+  "treasury_cycle_two": {
+    "block": {
+      "index": 1,
+      "timestamp": "2026-07-06T10:00:00.000Z",
+      "treasuryEmitted": {
+        "microUnits": 0
+      },
+      "treasuryCycle": 2,
+      "transactions": []
+    },
+    "canonicalJson": "{\"index\":1,\"timestamp\":\"2026-07-06T10:00:00.000Z\",\"treasuryEmitted\":{\"microUnits\":0},\"treasuryCycle\":2,\"transactions\":[]}",
+    "tipHash": "24081f9af774483d98af01a960f59d417070fea3f8557676d0ea0515ead7e8d0"
+  },
+  "all_optionals": {
+    "block": {
+      "index": 2,
+      "timestamp": "2026-07-06T10:00:00.000Z",
+      "treasuryEmitted": {
+        "microUnits": 100
+      },
+      "treasuryCycle": 2,
+      "isGenesisRenewal": true,
+      "confirmations": 2,
+      "microblockSeal": true,
+      "chronofluxFingerprint": "cfp-block",
+      "microblocksSealed": 5,
+      "transactions": [
+        {
+          "id": "tx-9",
+          "kind": "stakingReward",
+          "amount": {
+            "microUnits": 3
+          },
+          "timestamp": "2026-07-06T10:00:00.000Z",
+          "percentChance": 42.5,
+          "blockIndex": 2,
+          "confirmations": 1,
+          "continuumScs": 1.1,
+          "vortexScs": 2.2,
+          "shearScs": 3.3,
+          "resistanceScs": 4.4,
+          "flowScs": 5.5,
+          "microblockIndex": 7,
+          "chronofluxFingerprint": "cfp-tx"
+        }
+      ]
+    },
+    "canonicalJson": "{\"index\":2,\"timestamp\":\"2026-07-06T10:00:00.000Z\",\"treasuryEmitted\":{\"microUnits\":100},\"treasuryCycle\":2,\"isGenesisRenewal\":true,\"confirmations\":2,\"microblockSeal\":true,\"chronofluxFingerprint\":\"cfp-block\",\"microblocksSealed\":5,\"transactions\":[{\"id\":\"tx-9\",\"kind\":\"stakingReward\",\"amount\":{\"microUnits\":3},\"timestamp\":\"2026-07-06T10:00:00.000Z\",\"percentChance\":42.5,\"blockIndex\":2,\"confirmations\":1,\"continuumScs\":1.1,\"vortexScs\":2.2,\"shearScs\":3.3,\"resistanceScs\":4.4,\"flowScs\":5.5,\"microblockIndex\":7,\"chronofluxFingerprint\":\"cfp-tx\"}]}",
+    "tipHash": "b6b2f9cd210e435f1eadd7b627e2e9226afdecfbbcd7a8e34423b17dffaa4a9d"
+  }
+}

@@ -1,0 +1,536 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Perccent Network Explorer</title>
+  <style>
+    :root {
+      --bg: #0b0d14;
+      --panel: #141824;
+      --border: #252b3d;
+      --text: #e8ecf4;
+      --muted: #9aa3b8;
+      --accent: #6c63ff;
+      --online: #00d4aa;
+      --offline: #f59e0b;
+      --danger: #ef4444;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: "Segoe UI", system-ui, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      line-height: 1.5;
+    }
+    .wrap { max-width: 1100px; margin: 0 auto; padding: 32px 20px 64px; }
+    .page-top {
+      display: flex;
+      justify-content: flex-end;
+      align-items: center;
+      margin-bottom: 6px;
+    }
+    .fcg-link {
+      font-size: 0.78rem;
+      color: var(--muted);
+      text-decoration: none;
+      letter-spacing: 0.02em;
+      opacity: 0.82;
+    }
+    .fcg-link:hover { color: var(--accent); opacity: 1; }
+    header { margin-bottom: 28px; }
+    h1 { font-size: 1.75rem; margin-bottom: 6px; }
+    .sub { color: var(--muted); font-size: 0.95rem; }
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 14px;
+      margin-bottom: 24px;
+    }
+    .card {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 16px 18px;
+    }
+    .card .label { color: var(--muted); font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.06em; }
+    .card .value { font-size: 1.5rem; font-weight: 700; margin-top: 4px; }
+    .status-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 6px 12px;
+      border-radius: 999px;
+      font-size: 0.85rem;
+      font-weight: 600;
+    }
+    .status-pill.online { background: rgba(0,212,170,0.15); color: var(--online); border: 1px solid rgba(0,212,170,0.35); }
+    .status-pill.offline { background: rgba(245,158,11,0.12); color: var(--offline); border: 1px solid rgba(245,158,11,0.3); }
+    .dot { width: 8px; height: 8px; border-radius: 50%; background: currentColor; }
+    section { margin-bottom: 28px; }
+    h2 { font-size: 1.1rem; margin-bottom: 12px; }
+    table { width: 100%; border-collapse: collapse; font-size: 0.9rem; }
+    th, td { text-align: left; padding: 10px 12px; border-bottom: 1px solid var(--border); }
+    th { color: var(--muted); font-weight: 600; font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.04em; }
+    tr:hover td { background: rgba(108,99,255,0.06); }
+    .mono { font-family: ui-monospace, Consolas, monospace; font-size: 0.82rem; word-break: break-all; }
+    .muted { color: var(--muted); }
+    .btn {
+      background: var(--accent);
+      color: white;
+      border: none;
+      border-radius: 8px;
+      padding: 8px 14px;
+      cursor: pointer;
+      font-size: 0.85rem;
+    }
+    .btn.secondary { background: transparent; border: 1px solid var(--border); color: var(--text); }
+    .toolbar { display: flex; gap: 10px; align-items: center; margin-bottom: 12px; flex-wrap: wrap; }
+    #block-detail { display: none; }
+    #block-detail.open { display: block; }
+    .error { color: var(--danger); padding: 12px; background: rgba(239,68,68,0.1); border-radius: 8px; margin-bottom: 16px; }
+    footer { color: var(--muted); font-size: 0.8rem; margin-top: 32px; }
+    a { color: var(--accent); }
+    .hint { color: var(--muted); font-size: 0.85rem; margin-top: 8px; }
+    .chart-layout {
+      display: grid;
+      grid-template-columns: minmax(260px, 340px) 1fr;
+      gap: 20px;
+      align-items: start;
+    }
+    @media (max-width: 760px) {
+      .chart-layout { grid-template-columns: 1fr; }
+    }
+    #wallet-pentagon-chart {
+      width: 100%;
+      max-width: 340px;
+      height: auto;
+      display: block;
+    }
+    .wallet-legend {
+      display: grid;
+      gap: 8px;
+      max-height: 360px;
+      overflow-y: auto;
+    }
+    .wallet-legend-item {
+      display: grid;
+      grid-template-columns: 12px 1fr auto;
+      gap: 10px;
+      align-items: center;
+      padding: 8px 10px;
+      border-radius: 10px;
+      border: 1px solid var(--border);
+      background: rgba(20,24,36,0.6);
+      font-size: 0.85rem;
+    }
+    .wallet-swatch {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+    }
+    .wallet-legend-meta {
+      color: var(--muted);
+      font-size: 0.78rem;
+      margin-top: 2px;
+    }
+    .wallet-legend-block {
+      font-weight: 700;
+      font-size: 1rem;
+      color: var(--accent);
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="page-top">
+      <a class="fcg-link" href="https://rgsneddon.github.io/evolve/fcg_white_paper.html" target="_blank" rel="noopener noreferrer">FCG white paper</a>
+    </div>
+    <header>
+      <h1>Perccent Network Explorer</h1>
+      <p class="sub">Evolve Chronoflux seed node &middot; rendezvous &middot; peer status</p>
+      <p class="sub" style="margin-top:8px" id="endpoint-line"></p>
+    </header>
+
+    <div id="error" class="error" style="display:none"></div>
+
+    <div class="grid" id="stats"></div>
+
+    <section id="treasury-emission-public" style="display:none">
+      <h2>Treasury emission</h2>
+      <div class="grid" id="treasury-emission-stats"></div>
+      <p class="hint">Treasury emission is dynamic — it scales with average block time and wallet load on a faucet-aligned baseline (up to 1 PERC per 7-minute window at 1.0×). Manual sends from evolve_treasury are disabled after launch; emission, regeneration, and faucet payouts continue.</p>
+    </section>
+
+    <section>
+      <h2>Network nodes</h2>
+      <p class="hint" style="margin-bottom:12px" id="network-nodes-hint">
+        Chronoflux five-point pentagon — every registered wallet by current block height
+        (highest of scenario, chain, or relay). Five rings mark 0%–100% of network max.
+        Wallets appear for 7 minutes after their last heartbeat, then drop off.
+      </p>
+      <div class="card chart-layout">
+        <svg id="wallet-pentagon-chart" viewBox="0 0 320 320" role="img" aria-label="Network nodes block pentagon chart"></svg>
+        <div class="wallet-legend" id="wallet-block-legend"></div>
+      </div>
+    </section>
+
+    <section>
+      <div class="toolbar">
+        <h2 style="margin:0">Block explorer</h2>
+        <button class="btn secondary" id="refresh-btn">Refresh</button>
+        <span class="muted" id="refresh-countdown">Refreshing in 30s</span>
+      </div>
+      <div class="card" style="padding:0; overflow:hidden">
+        <table>
+          <thead>
+            <tr>
+              <th>Block</th>
+              <th>Time</th>
+              <th>Txs</th>
+              <th>Treasury</th>
+              <th>Label</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody id="blocks"></tbody>
+        </table>
+      </div>
+      <p class="muted" style="margin-top:10px" id="blocks-meta"></p>
+    </section>
+
+    <section id="block-detail" class="card">
+      <h2 id="detail-title">Block detail</h2>
+      <pre class="mono" id="detail-body" style="white-space:pre-wrap;margin-top:12px"></pre>
+    </section>
+
+    <footer>
+      API: <a href="/api/network">/api/network</a> &middot;
+      <a href="/api/blocks">/api/blocks</a> &middot;
+      <a href="/health">/health</a> &middot;
+      Auto-refresh in <span id="refresh-countdown-footer">30</span>s
+    </footer>
+  </div>
+
+  <script>
+    const $ = (id) => document.getElementById(id);
+
+    function pill(online) {
+      const cls = online ? 'online' : 'offline';
+      const label = online ? 'Online' : 'Offline';
+      return `<span class="status-pill ${cls}"><span class="dot"></span>${label}</span>`;
+    }
+
+    function fmtTime(iso) {
+      if (!iso) return '—';
+      try { return new Date(iso).toLocaleString(); } catch { return iso; }
+    }
+
+    const IPV4_RE = /\b(?:(?:25[0-5]|2[0-4]\d|[01]?\d?\d)\.){3}(?:25[0-5]|2[0-4]\d|[01]?\d?\d)\b/g;
+
+    function maskIpAddresses(text) {
+      if (text == null || typeof text !== 'string') return text ?? '';
+      return text.replace(IPV4_RE, '[hidden]');
+    }
+
+    function endpointHost(endpoint) {
+      if (!endpoint) return '';
+      try { return new URL(endpoint).hostname; } catch {
+        const m = endpoint.match(/^https?:\/\/([^/:]+)/i);
+        return m ? m[1] : '';
+      }
+    }
+
+    function renderEndpoint(endpoint) {
+      if (!endpoint) return '—';
+      const host = endpointHost(endpoint);
+      if (host && IPV4_RE.test(host)) {
+        return '<span class="muted">Private node</span>';
+      }
+      if (endpoint === 'Private node') {
+        return '<span class="muted">Private node</span>';
+      }
+      const safe = maskIpAddresses(endpoint);
+      if (safe.includes('[hidden]')) {
+        return `<span class="mono muted">${safe}</span>`;
+      }
+      return `<a href="${safe}/perc/status" target="_blank" rel="noopener">${safe}</a>`;
+    }
+
+    function sanitizeExplorerJson(value) {
+      if (value == null) return value;
+      if (typeof value === 'string') return maskIpAddresses(value);
+      if (Array.isArray(value)) return value.map(sanitizeExplorerJson);
+      if (typeof value === 'object') {
+        const out = {};
+        for (const [k, v] of Object.entries(value)) {
+          out[k] = k === 'endpoint' && typeof v === 'string'
+            ? (IPV4_RE.test(endpointHost(v)) ? 'Private node' : maskIpAddresses(v))
+            : sanitizeExplorerJson(v);
+        }
+        return out;
+      }
+      return value;
+    }
+
+    function showError(msg) {
+      const el = $('error');
+      if (!msg) { el.style.display = 'none'; return; }
+      el.textContent = msg;
+      el.style.display = 'block';
+    }
+
+    function emissionRateLabel(emission) {
+      if (!emission) return '—';
+      const rate = emission.emissionPerMinute ?? emission.emissionPerSecond ?? '1';
+      const unit = emission.emissionPerMinute != null ? 'PERC/min' : 'PERC/s';
+      return `${rate} ${unit}`;
+    }
+
+    function renderTreasuryEmissionPublic(net) {
+      const section = $('treasury-emission-public');
+      const emission = net.treasuryEmission;
+      if (!net.blockchainLaunched || !emission) {
+        section.style.display = 'none';
+        return;
+      }
+      section.style.display = 'block';
+      $('treasury-emission-stats').innerHTML = `
+        <div class="card"><div class="label">Emission rate</div><div class="value">${emissionRateLabel(emission)}</div></div>
+        <div class="card"><div class="label">Treasury balance</div><div class="value">${emission.balance} PERC</div></div>
+        <div class="card"><div class="label">Cumulative minted</div><div class="value">${emission.cumulativeMinted} PERC</div></div>
+        <div class="card"><div class="label">Treasury cycle</div><div class="value">${emission.treasuryCycle}</div></div>
+      `;
+    }
+
+    const WALLET_CHART_COLORS = [
+      '#00D9C0', '#6C63FF', '#F59E0B', '#38BDF8', '#F472B6',
+      '#A3E635', '#FB7185', '#C084FC', '#2DD4BF', '#FACC15',
+    ];
+
+    function pentagonAngles() {
+      return Array.from({ length: 5 }, (_, i) => -Math.PI / 2 + i * 2 * Math.PI / 5);
+    }
+
+    function pentagonPoint(cx, cy, radius, angle) {
+      return { x: cx + radius * Math.cos(angle), y: cy + radius * Math.sin(angle) };
+    }
+
+    function publicAlias(row) {
+      return row?.publicAlias ?? row?.username ?? '-----';
+    }
+
+    function renderWalletBlockChart(chart, peerList = []) {
+      const svg = $('wallet-pentagon-chart');
+      const legend = $('wallet-block-legend');
+      const peerByName = new Map((peerList ?? []).map((p) => [publicAlias(p), p]));
+
+      if (!chart || !chart.users) {
+        svg.innerHTML = '';
+        legend.innerHTML = '<p class="muted">No wallets registered yet.</p>';
+        return;
+      }
+
+      const users = chart.users.map((u) => {
+        const label = publicAlias(u);
+        const p = peerByName.get(label);
+        return {
+          ...u,
+          publicAlias: label,
+          online: u.online ?? p?.online ?? false,
+          endpoint: u.endpoint ?? p?.endpoint ?? null,
+          lastSeen: u.lastSeen ?? p?.lastSeen ?? null,
+          chainBlockHeight: u.chainBlockHeight ?? p?.blockHeight ?? 0,
+          relayHeight: Math.max(u.relayHeight ?? 0, p?.relayHeight ?? 0),
+        };
+      });
+      const maxBlock = Math.max(0, chart.maxBlock ?? 0);
+      const cx = 160;
+      const cy = 160;
+      const radius = 118;
+      const angles = pentagonAngles();
+      const scale = chart.pentagonScale ?? [0, 0.25, 0.5, 0.75, 1].map((t) => Math.round(maxBlock * t));
+
+      let svgParts = '';
+
+      for (let ring = 1; ring <= 4; ring++) {
+        const r = radius * ring / 4;
+        const pts = angles.map((a) => pentagonPoint(cx, cy, r, a));
+        svgParts += `<polygon points="${pts.map((p) => `${p.x},${p.y}`).join(' ')}" fill="none" stroke="#2A3142" stroke-width="1"/>`;
+      }
+
+      for (const a of angles) {
+        const outer = pentagonPoint(cx, cy, radius, a);
+        svgParts += `<line x1="${cx}" y1="${cy}" x2="${outer.x}" y2="${outer.y}" stroke="#2A3142" stroke-width="1"/>`;
+      }
+
+      for (let i = 0; i < 5; i++) {
+        const labelR = radius + 16;
+        const lp = pentagonPoint(cx, cy, labelR, angles[i]);
+        const blockLabel = scale[i] ?? 0;
+        svgParts += `<text x="${lp.x}" y="${lp.y}" text-anchor="middle" dominant-baseline="middle" fill="#9BA3B8" font-size="9" font-family="Segoe UI, system-ui, sans-serif">B${blockLabel}</text>`;
+      }
+
+      svgParts += `<text x="${cx}" y="${18}" text-anchor="middle" fill="#9BA3B8" font-size="10" font-family="Segoe UI, system-ui, sans-serif">Seed anchor ${chart.seedAnchorBlock ?? 1} · max ${maxBlock}</text>`;
+
+      users.forEach((user, index) => {
+        const frac = (user.displayBlock ?? 0) / maxBlock;
+        const angle = -Math.PI / 2 + index * 2 * Math.PI / Math.max(users.length, 1);
+        const r = radius * Math.max(0.04, Math.min(1, frac));
+        const p = pentagonPoint(cx, cy, r, angle);
+        const color = WALLET_CHART_COLORS[index % WALLET_CHART_COLORS.length];
+        svgParts += `<circle cx="${p.x}" cy="${p.y}" r="5.5" fill="${color}" stroke="#0b0d14" stroke-width="1.5"><title>${publicAlias(user)}: block ${user.displayBlock}</title></circle>`;
+        if (users.length <= 8) {
+          const lx = p.x + 8 * Math.cos(angle);
+          const ly = p.y + 8 * Math.sin(angle);
+          svgParts += `<text x="${lx}" y="${ly}" fill="${color}" font-size="8" font-family="Segoe UI, system-ui, sans-serif">${publicAlias(user)}</text>`;
+        }
+      });
+
+      svg.innerHTML = svgParts;
+
+      legend.innerHTML = users.length
+        ? users.map((user, index) => {
+            const color = WALLET_CHART_COLORS[index % WALLET_CHART_COLORS.length];
+            const chain = user.chainBlockHeight ?? 0;
+            const relay = user.relayHeight ?? 0;
+            const nodeLine = user.endpoint
+              ? renderEndpoint(user.endpoint)
+              : '<span class="muted">—</span>';
+            const seen = user.lastSeen ? fmtTime(user.lastSeen) : '—';
+            return `<div class="wallet-legend-item">
+              <span class="wallet-swatch" style="background:${color}"></span>
+              <div>
+                <strong>${publicAlias(user)}</strong> ${pill(user.online)}
+                <div class="wallet-legend-meta">
+                  Block ${user.displayBlock ?? 0}
+                  · scenario ${user.scenarioBlockHeight ?? 0}
+                  · chain ${chain}${relay > chain ? ` · relay ${relay}` : ''}
+                </div>
+                <div class="wallet-legend-meta mono">${nodeLine}</div>
+                <div class="wallet-legend-meta">Last seen ${seen}</div>
+              </div>
+              <span class="wallet-legend-block">${user.displayBlock ?? 0}</span>
+            </div>`;
+          }).join('')
+        : '<p class="muted">No wallets registered yet. Open Evolve and log in.</p>';
+    }
+
+    function renderStats(net) {
+      $('endpoint-line').textContent = maskIpAddresses(net.endpoint || '');
+      renderTreasuryEmissionPublic(net);
+      renderWalletBlockChart(net.walletBlockChart, net.peerList);
+      const timeoutSec = net.peerOnlineTimeoutSeconds ?? net.walletBlockChart?.visibleTimeoutSeconds ?? 420;
+      const timeoutMin = Math.max(1, Math.round(timeoutSec / 60));
+      const hint = $('network-nodes-hint');
+      if (hint) {
+        hint.textContent =
+          `Chronoflux five-point pentagon — wallets by current block height (scenario, chain, or relay). ` +
+          `Five rings mark 0%–100% of network max. Wallets show for ${timeoutMin} minutes after last heartbeat, then drop off.`;
+      }
+      $('stats').innerHTML = `
+        <div class="card"><div class="label">Node</div><div class="value">${pill(net.nodeStatus === 'online')}</div></div>
+        <div class="card"><div class="label">Seed height</div><div class="value">${net.blockHeight}</div></div>
+        <div class="card"><div class="label">Network height</div><div class="value">${net.networkHeight}</div></div>
+        <div class="card"><div class="label">Peers online</div><div class="value">${net.peers.online} / ${net.peers.total}</div></div>
+        <div class="card"><div class="label">Ledger</div><div class="value">${net.ledgerReady ? 'Synced' : 'Pending'}</div></div>
+        <div class="card"><div class="label">Chain</div><div class="value mono" style="font-size:0.75rem">${net.chainId}</div></div>
+      `;
+    }
+
+    function renderBlocks(data) {
+      const rows = data.blocks || [];
+      $('blocks').innerHTML = rows.length
+        ? rows.map((b) => `
+          <tr>
+            <td><strong>#${b.index}</strong></td>
+            <td class="muted">${fmtTime(b.timestamp)}</td>
+            <td>${b.txCount}</td>
+            <td>${b.treasuryEmitted} PERC</td>
+            <td>${b.displayLabel || '—'}</td>
+            <td><button class="btn secondary" data-block="${b.index}">View</button></td>
+          </tr>`).join('')
+        : '<tr><td colspan="6" class="muted">No blocks yet — the Perccent chain will appear here as scenarios advance.</td></tr>';
+      $('blocks-meta').textContent = data.total
+        ? `Showing ${rows.length} of ${data.total} blocks (newest first)`
+        : '';
+      document.querySelectorAll('[data-block]').forEach((btn) => {
+        btn.addEventListener('click', () => loadBlock(btn.dataset.block));
+      });
+    }
+
+    async function loadBlock(index) {
+      const res = await fetch(`/api/blocks/${index}`);
+      if (!res.ok) { showError(`Block ${index} not found`); return; }
+      const block = await res.json();
+      $('block-detail').classList.add('open');
+      $('detail-title').textContent = `Block #${block.index}`;
+      $('detail-body').textContent = JSON.stringify(sanitizeExplorerJson(block), null, 2);
+    }
+
+    const REFRESH_INTERVAL_SEC = 30;
+    let countdownSec = REFRESH_INTERVAL_SEC;
+    let countdownTimer = null;
+    let refreshInFlight = false;
+
+    function updateCountdownDisplay() {
+      const label = refreshInFlight
+        ? 'Refreshing…'
+        : `Refreshing in ${countdownSec}s`;
+      const toolbar = $('refresh-countdown');
+      const footer = $('refresh-countdown-footer');
+      if (toolbar) toolbar.textContent = label;
+      if (footer) footer.textContent = refreshInFlight ? '…' : String(countdownSec);
+    }
+
+    function resetCountdown() {
+      countdownSec = REFRESH_INTERVAL_SEC;
+      updateCountdownDisplay();
+    }
+
+    function startCountdown() {
+      if (countdownTimer) clearInterval(countdownTimer);
+      countdownTimer = setInterval(() => {
+        if (refreshInFlight) return;
+        countdownSec -= 1;
+        if (countdownSec <= 0) {
+          refresh();
+          return;
+        }
+        updateCountdownDisplay();
+      }, 1000);
+    }
+
+    async function refresh() {
+      if (refreshInFlight) return;
+      refreshInFlight = true;
+      updateCountdownDisplay();
+      showError('');
+      try {
+        const [netRes, blocksRes] = await Promise.all([
+          fetch('/api/network'),
+          fetch('/api/blocks?limit=40'),
+        ]);
+        if (!netRes.ok) throw new Error('Network API unavailable');
+        renderStats(await netRes.json());
+        if (blocksRes.ok) {
+          renderBlocks(await blocksRes.json());
+        } else {
+          renderBlocks({ total: 0, blocks: [] });
+        }
+      } catch (e) {
+        showError(e.message || 'Failed to load explorer data');
+      } finally {
+        refreshInFlight = false;
+        resetCountdown();
+      }
+    }
+
+    $('refresh-btn').addEventListener('click', refresh);
+    resetCountdown();
+    refresh();
+    startCountdown();
+  </script>
+</body>
+</html>

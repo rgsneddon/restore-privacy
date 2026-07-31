@@ -1,0 +1,19 @@
+{
+  "name": "perc-chain",
+  "version": "0.1.0",
+  "description": "Perccent (PERC) internet node — rendezvous, seed sync, and chain API for Evolve",
+  "type": "module",
+  "scripts": {
+    "start": "node src/internet_node.js",
+    "start:internet": "node src/internet_node.js",
+    "start:rendezvous": "node src/rendezvous.js",
+    "start:chain": "node src/server.js",
+    "dev": "node --watch src/internet_node.js",
+    "health": "node -e \"fetch('http://127.0.0.1:'+(process.env.PORT||process.env.PERC_RENDEZVOUS_PORT||9478)+'/health').then(r=>r.json()).then(j=>{console.log(j);if(!j.ok)process.exit(1)}).catch(e=>{console.error(e);process.exit(1)})\"",
+    "test": "node --test src/*.test.js",
+    "test:seed-compat": "node --test src/seed_wallet_compat.test.js"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}
