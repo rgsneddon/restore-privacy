@@ -158,7 +158,7 @@ def probe_entry_rtt_ms(
     timeout_s: float = DEFAULT_PROBE_TIMEOUT_S,
     entry_country: str | None = None,
 ) -> PingResult:
-    """Device → selected residual entry node (default United States monopin)."""
+    """Device → selected residual entry node (default Germany monopin)."""
     node = country_node_for_code(entry_country)
     return probe_node_rtt_ms(
         node.host or PRODUCT_NODE_HOST,
@@ -240,7 +240,7 @@ def measure_settings_pings(
             multihop_enabled=True,
         )
         if exit_r is not None and exit_r.host:
-            # Label exit by live catalog name (IS / DE / US only)
+            # Label exit by live catalog name (IS / DE only)
             for n in (
                 country_node_for_code("IS"),
                 country_node_for_code("DE"),

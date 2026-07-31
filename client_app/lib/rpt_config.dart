@@ -21,7 +21,7 @@ class RptConfig {
   /// Product exit hop (Germany DE) for multi-hop residual when enabled.
   static const String exitHost = '178.105.187.178';
 
-  /// United States residual peer.
+  /// Retired United States residual peer (not dialable; normalize maps to DE).
   static const String usHost = '5.161.242.85';
 
   static const int port = 44044;
@@ -30,7 +30,7 @@ class RptConfig {
 
   /// Paid catalog pin — must match monorepo ``client/VERSION`` and pubspec.
   /// Free builds report [kFreeTierVersion] via [displayProductVersion].
-  static const String productVersion = '0.5.8';
+  static const String productVersion = '0.5.9';
 
   /// UI / about version (free tier always ``3.3.3``).
   static String get displayProductVersion =>

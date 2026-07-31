@@ -7,7 +7,7 @@ public enum RptEndpoint {
     public static let host: String = "178.105.187.178"
     /// Iceland residual peer.
     public static let icelandHost: String = "82.221.101.241"
-    /// United States residual peer.
+    /// Retired United States residual peer (not dialable).
     public static let usHost: String = "5.161.242.85"
     /// Germany residual peer (default entry / multi-hop exit).
     public static let deHost: String = "178.105.187.178"
@@ -19,11 +19,10 @@ public enum RptEndpoint {
 
     public static var hostPortDescription: String { "\(host):\(port)" }
 
-    /// Live residual catalog hosts (IS, DE, US) for wipe-drain failover.
+    /// Live residual catalog hosts (IS, DE only) for wipe-drain failover.
     public static let catalogHosts: [String] = [
         icelandHost,
         deHost,
-        usHost,
     ]
 
     /// Alternates for wipe-drain / preferred-down failover (never includes preferred).

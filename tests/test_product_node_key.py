@@ -219,8 +219,8 @@ class TestAndroidNodePubRefreshOnUpgrade(unittest.TestCase):
         self.assertIn("residualNodePubNameForHost", load)
         # Catalog residual pubs must still exist on the service (name map + assets)
         self.assertIn("exit_node_elgamal.pub", svc)
-        # US residual pub name is us_node_elgamal.pub (not usa_*)
-        self.assertIn("us_node_elgamal.pub", svc)
+        # Live DE residual pub; US monopin retired (us_node may remain as archival file only)
+        self.assertIn("de_node_elgamal.pub", svc)
 
     def test_refresh_node_elgamal_pub_file_overwrites_stale(self):
         """Shipped Python mirror of Android helper: stale filesDir bytes replaced."""

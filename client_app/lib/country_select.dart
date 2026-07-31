@@ -1,14 +1,14 @@
 /// Entry-country selector helpers (flags, Germany/DE default, Connect gate).
 ///
-/// Catalog mirrors [client/multihop.py] PRODUCT_COUNTRY_CATALOG (IS/DE/US).
+/// Catalog mirrors [client/multihop.py] PRODUCT_COUNTRY_CATALOG (IS/DE only).
 library;
 
 /// Product default residual entry (empty prefs / fresh install).
 const String kDefaultEntryCountry = 'DE';
 const String kCountryIceland = 'IS';
 const String kCountryGermany = 'DE';
-const String kCountryUnitedStates = 'US';
-/// Retired residual peer code — [normalizeEntryCountry] maps RO → default DE.
+const String kCountryUnitedStates = 'US'; // retired — normalize maps US → DE
+/// Retired residual peer codes — [normalizeEntryCountry] maps RO/US → default DE.
 const String kCountryRomania = 'RO';
 
 /// Product residual entry peers (code, name, flag emoji, monopin host).
@@ -46,12 +46,6 @@ const List<CountryOption> kProductCountryCatalog = [
     flag: '🇩🇪',
     host: '178.105.187.178',
   ),
-  CountryOption(
-    code: kCountryUnitedStates,
-    name: 'United States',
-    flag: '🇺🇸',
-    host: '5.161.242.85',
-  ),
 ];
 
 String defaultEntryCountry() => kDefaultEntryCountry;
@@ -60,10 +54,15 @@ String defaultEntryCountry() => kDefaultEntryCountry;
 String? parseCatalogCountryCode(String? raw) {
   final upper = (raw ?? '').trim().toUpperCase();
   if (upper.isEmpty) return null;
-  // Stale RO prefs are not a catalog member
+  // Stale RO/US prefs are not catalog members (normalize maps to DE)
   if (upper == 'RO' ||
       upper == 'ROMANIA' ||
-      upper == 'ROU') {
+      upper == 'ROU' ||
+      upper == 'US' ||
+      upper == 'USA' ||
+      upper == 'UNITED STATES' ||
+      upper == 'UNITED STATES OF AMERICA' ||
+      upper == 'AMERICA') {
     return null;
   }
   const aliases = {
@@ -73,11 +72,6 @@ String? parseCatalogCountryCode(String? raw) {
     'DE': kCountryGermany,
     'DEU': kCountryGermany,
     'DEUTSCHLAND': kCountryGermany,
-    'UNITED STATES': kCountryUnitedStates,
-    'UNITED STATES OF AMERICA': kCountryUnitedStates,
-    'USA': kCountryUnitedStates,
-    'US': kCountryUnitedStates,
-    'AMERICA': kCountryUnitedStates,
   };
   final want = aliases[upper] ?? upper;
   for (final o in kProductCountryCatalog) {
@@ -86,7 +80,7 @@ String? parseCatalogCountryCode(String? raw) {
   return null;
 }
 
-/// Normalize: empty/unknown/stale RO → Germany/DE (durable prefs default).
+/// Normalize: empty/unknown/stale RO/US → Germany/DE (durable prefs default).
 String normalizeEntryCountry(String? raw) {
   final c = parseCatalogCountryCode(raw);
   return c ?? kDefaultEntryCountry;
@@ -113,19 +107,22 @@ String normalizeEntryCountry(String? raw) {
     // Stale RO / unknown: when allowDefault, map to product default DE
     if (allowDefault) {
       final upper = trimmed.toUpperCase();
-      if (upper == 'RO' ||
-          upper == 'ROMANIA' ||
-          upper == 'ROU' ||
-          upper == 'US' ||
-          upper == 'USA' ||
-          upper == 'UNITED STATES') {
-        // RO stale → DE; bare unknown falls through
-      }
       if (upper == 'RO' || upper == 'ROMANIA' || upper == 'ROU') {
         return (
           ok: true,
           code: kDefaultEntryCountry,
           reason: 'stale_ro_to_default_germany',
+        );
+      }
+      if (upper == 'US' ||
+          upper == 'USA' ||
+          upper == 'UNITED STATES' ||
+          upper == 'UNITED STATES OF AMERICA' ||
+          upper == 'AMERICA') {
+        return (
+          ok: true,
+          code: kDefaultEntryCountry,
+          reason: 'stale_us_to_default_germany',
         );
       }
       // Other unknown → product default
@@ -193,15 +190,14 @@ String residualNodePubNameForHost(String host) {
           return 'node_elgamal.pub';
         case kCountryGermany:
           return 'de_node_elgamal.pub';
-        case kCountryUnitedStates:
-          return 'us_node_elgamal.pub';
       }
     }
   }
   if (h == kProductExitHost || h == '178.105.187.178') {
     return 'de_node_elgamal.pub';
   }
-  if (h == '5.161.242.85') return 'us_node_elgamal.pub';
+  // Retired US monopin host — heal to DE pin
+  if (h == '5.161.242.85') return 'de_node_elgamal.pub';
   if (h == '82.221.101.241') return 'node_elgamal.pub';
   // Stale RO host still maps to exit pin file (now DE content) for heal path only.
   if (h == '185.146.232.107') return 'exit_node_elgamal.pub';

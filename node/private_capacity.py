@@ -9,16 +9,14 @@ Product soft budgets (operator allowance — not auto NIC line-rate):
 |------|------------------|------------------|
 | DE Germany (default entry) | **unlimited-class** (30 TB class entitlement) | 1024 |
 | IS Iceland | **unlimited-class** (extendable at cost) | 512 |
-| US | 200 Mbps fixed product budget | 512 |
 
 Session numbers are a **soft** utilization hint for residual routing, not a hard
 public admission lock. IS/DE bandwidth is essentially unlimited in product terms
-because extended bandwidth is available at extra cost — not a fixed 100 Mbps
-product budget. US keeps a fixed 200 Mbps operator allowance. Romania (RO) is
-deprecated and is not a live residual peer.
+because extended bandwidth is available at extra cost. United States (US) and
+Romania (RO) residual peers are **retired** and are not live catalog peers.
 
 DE session soft max (1024) is sized for the dedicated residual host
-(8 vCPU / 32 GB RAM / 30 TB traffic class): above IS/US 512, soft utilization
+(8 vCPU / 32 GB RAM / 30 TB traffic class): above IS 512, soft utilization
 only — not a hard admission lock.
 """
 
@@ -29,14 +27,14 @@ import os
 from typing import Any, Mapping, Optional
 
 # Soft cap for utilization math (not a hard admission gate).
-# IS/US 512; DE dedicated (8 vCPU / 32 GB) → 1024.
+# IS 512; DE dedicated (8 vCPU / 32 GB) → 1024.
 DEFAULT_MAX_SESSIONS = 256  # generic fallback only (not a live peer code)
 DEFAULT_MAX_SESSIONS_IS = 512  # Iceland
 DEFAULT_MAX_SESSIONS_US = 512
 DEFAULT_MAX_SESSIONS_DE = 1024  # dedicated DE residual host
 ENV_CAPACITY_TOKEN = "RPT_CAPACITY_TOKEN"
 ENV_MAX_SESSIONS = "RPT_NODE_MAX_SESSIONS"
-ENV_PEER_CODE = "RPT_NODE_PEER_CODE"  # IS | DE | US
+ENV_PEER_CODE = "RPT_NODE_PEER_CODE"  # IS | DE (live)
 ENV_NODE_HOST = "RPT_NODE_HOST"
 
 # Mbps product allowances (operator budget). IS/DE omitted = unlimited-class.
@@ -53,14 +51,15 @@ PRODUCT_UNLIMITED_BANDWIDTH_HOSTS = frozenset(
     {"82.221.101.241", "178.105.187.178"}
 )
 
-# Session soft max: DE dedicated > IS/US (live catalog only)
+# Session soft max: DE dedicated > IS (live catalog only)
 PRODUCT_SESSION_SOFT_MAX: dict[str, int] = {
     "IS": DEFAULT_MAX_SESSIONS_IS,
-    "US": DEFAULT_MAX_SESSIONS_US,
     "DE": DEFAULT_MAX_SESSIONS_DE,
     "82.221.101.241": DEFAULT_MAX_SESSIONS_IS,
-    "5.161.242.85": DEFAULT_MAX_SESSIONS_US,
     "178.105.187.178": DEFAULT_MAX_SESSIONS_DE,
+    # Retired US monopin (not live catalog) — env-only leftover hosts
+    "US": DEFAULT_MAX_SESSIONS_US,
+    "5.161.242.85": DEFAULT_MAX_SESSIONS_US,
 }
 
 

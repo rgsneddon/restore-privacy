@@ -661,7 +661,7 @@ class _TunnelHomeState extends State<TunnelHome> with WidgetsBindingObserver {
   Future<void> _onToggleConnectOnly() async {
     // Connect path only (used by autoconnect)
     if (_busy || _connected) return;
-    // Gate: valid catalog entry country (empty → United States default).
+    // Gate: valid catalog entry country (empty → Germany/DE default).
     final resolved = resolveEntryCountrySelection(
       _settings.entryCountry,
       allowDefault: true,
@@ -669,7 +669,7 @@ class _TunnelHomeState extends State<TunnelHome> with WidgetsBindingObserver {
     if (!resolved.ok ||
         !entryCountryAllowsConnect(resolved.code, allowDefault: false)) {
       final msg =
-          'Choose a valid entry country above Connect (United States is the default).';
+          'Choose a valid entry country above Connect (Germany is the default).';
       _append(msg);
       setState(() {
         _status = msg;

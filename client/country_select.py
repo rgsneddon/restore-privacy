@@ -25,7 +25,7 @@ from .multihop import (
     product_country_catalog,
 )
 
-# Regional-indicator flag sequences (IS / DE / US). Safe as unicode text.
+# Regional-indicator flag sequences (IS / DE live; US retired). Safe as unicode text.
 _FLAG_BY_CODE: dict[str, str] = {
     COUNTRY_IS: "\U0001f1ee\U0001f1f8",  # 🇮🇸
     COUNTRY_DE: "\U0001f1e9\U0001f1ea",  # 🇩🇪
@@ -107,12 +107,12 @@ def parse_catalog_country_code(
         "DE": COUNTRY_DE,
         "DEU": COUNTRY_DE,
         "DEUTSCHLAND": COUNTRY_DE,
+        # Stale US/RO are not catalog members (normalize maps → DE)
         "UNITED STATES": COUNTRY_US,
         "UNITED STATES OF AMERICA": COUNTRY_US,
         "USA": COUNTRY_US,
         "US": COUNTRY_US,
         "AMERICA": COUNTRY_US,
-        # Stale RO is not a catalog member (normalize maps RO → DE)
         "ROMANIA": COUNTRY_RO,
         "RO": COUNTRY_RO,
         "ROU": COUNTRY_RO,

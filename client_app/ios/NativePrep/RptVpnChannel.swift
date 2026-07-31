@@ -434,22 +434,30 @@ enum RptVpnChannel {
   }
 
   /// Apply product Packet Tunnel protocol identity (shared by prepare + Connect).
+  /// Seamless upgrade: reuse existing product Packet Tunnel protocol when present.
   private static func applyProductPacketTunnelProtocol(
     to manager: NETunnelProviderManager,
     host: String,
     port: UInt16
   ) {
-    let proto = NETunnelProviderProtocol()
+    let proto: NETunnelProviderProtocol
+    if let existing = manager.protocolConfiguration as? NETunnelProviderProtocol,
+       (existing.providerBundleIdentifier ?? "").isEmpty
+         || existing.providerBundleIdentifier == providerBundleId {
+      proto = existing
+    } else {
+      proto = NETunnelProviderProtocol()
+    }
     proto.providerBundleIdentifier = providerBundleId
     proto.serverAddress = "\(host):\(port)"
     proto.disconnectOnSleep = false
-    proto.providerConfiguration = [
-      "host": host,
-      "port": Int(port),
-      "fullTunnel": true,
-      "sessionName": productLocalizedDescription,
-      "tunnelType": productTunnelType,
-    ]
+    var cfg = (proto.providerConfiguration as? [String: Any]) ?? [:]
+    cfg["host"] = host
+    cfg["port"] = Int(port)
+    cfg["fullTunnel"] = true
+    cfg["sessionName"] = productLocalizedDescription
+    cfg["tunnelType"] = productTunnelType
+    proto.providerConfiguration = cfg
     manager.protocolConfiguration = proto
     manager.localizedDescription = productLocalizedDescription
   }

@@ -64,7 +64,7 @@ class TestNodePingHelper(unittest.TestCase):
         self.assertIn("measure_settings_pings", src)
         self.assertIn("Ping statistics", src)
         # Live residual catalog only: IS / DE / US (RO retired)
-        self.assertIn("Iceland, Germany, or United States", src)
+        self.assertIn("Iceland or Germany", src)
         self.assertIn("DE = Germany (default)", src)
         self.assertNotIn("Exit (Romania)", src)
         self.assertNotIn("RO = Romania", src)
@@ -348,7 +348,7 @@ class TestAuditUkPingSection(unittest.TestCase):
     def test_audit_package_table_and_monopin_match_catalog(self) -> None:
         """Shipped AUDIT must name live monopin; package RAG uses catalog basenames."""
         ver = (ROOT / "client" / "VERSION").read_text(encoding="utf-8").strip()
-        self.assertEqual(ver, "0.5.8")
+        self.assertEqual(ver, "0.5.9")
         paths = [
             ROOT / "AUDIT.md",
             ROOT / "status_page" / "AUDIT.md",
@@ -376,7 +376,7 @@ class TestAuditUkPingSection(unittest.TestCase):
 class TestVersionMonopin(unittest.TestCase):
     def test_version_pin_matches_catalog(self) -> None:
         ver = (ROOT / "client" / "VERSION").read_text(encoding="utf-8").strip()
-        self.assertEqual(ver, "0.5.8")
+        self.assertEqual(ver, "0.5.9")
         from status_page import downloads as dl
 
         self.assertEqual(dl.RELEASE_VERSION, ver)

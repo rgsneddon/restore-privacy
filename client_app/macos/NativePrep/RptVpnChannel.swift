@@ -822,25 +822,37 @@ enum RptVpnChannel {
   }
 
   /// Apply product Packet Tunnel protocol identity (shared by prepare + Connect).
+  ///
+  /// **Seamless upgrade:** reuse an existing product ``NETunnelProviderProtocol``
+  /// when present (same provider bundle id). Replacing the protocol object on
+  /// every prepare/Connect after an app upgrade can leave System VPN prefs
+  /// unable to reconfigure the tunnel (reported 0.5.7→0.5.8 macOS failure).
   private static func applyProductPacketTunnelProtocol(
     to manager: NETunnelProviderManager,
     host: String,
     port: UInt16
   ) {
-    let proto = NETunnelProviderProtocol()
+    let proto: NETunnelProviderProtocol
+    if let existing = manager.protocolConfiguration as? NETunnelProviderProtocol,
+       (existing.providerBundleIdentifier ?? "").isEmpty
+         || existing.providerBundleIdentifier == providerBundleId {
+      proto = existing
+    } else {
+      proto = NETunnelProviderProtocol()
+    }
     proto.providerBundleIdentifier = providerBundleId
     proto.serverAddress = "\(host):\(port)"
     // DisconnectOnSleep false so residual session survives lid close while allowed by OS.
     proto.disconnectOnSleep = false
-    proto.providerConfiguration = [
-      "host": host,
-      "port": Int(port),
-      "fullTunnel": true,
-      "sessionName": productLocalizedDescription,
-      "tunnelType": productTunnelType,
-      // Catalog peers for Packet Tunnel wipe-drain HELLO failover
-      "alternateHosts": RptEndpoint.alternateHosts(excluding: host),
-    ]
+    var cfg = (proto.providerConfiguration as? [String: Any]) ?? [:]
+    cfg["host"] = host
+    cfg["port"] = Int(port)
+    cfg["fullTunnel"] = true
+    cfg["sessionName"] = productLocalizedDescription
+    cfg["tunnelType"] = productTunnelType
+    // Catalog peers for Packet Tunnel wipe-drain HELLO failover (IS/DE only)
+    cfg["alternateHosts"] = RptEndpoint.alternateHosts(excluding: host)
+    proto.providerConfiguration = cfg
     manager.protocolConfiguration = proto
     manager.localizedDescription = productLocalizedDescription
   }

@@ -2,7 +2,7 @@
 
 Mirrors Android ``always open secrets/$pubName from package`` and the Apple
 ``ensureResidualPubInWritableDir`` path: when the residual dial host needs
-the RO/US pin, copy that basename from package/candidate dirs into the writable
+the DE pin (RO/US monopin retired), copy that basename from package/candidate dirs into the writable
 secrets directory before load. Never fall back to Iceland ``node_elgamal.pub``
 for a non-IS monopin.
 
@@ -26,8 +26,9 @@ def residual_node_pub_name_for_host(host: str) -> str:
     h = (host or "").strip()
     if h == "178.105.187.178" or h.endswith("178.105.187.178"):
         return "de_node_elgamal.pub"
+    # Retired US monopin — heal to DE pin (entry prefs normalize US → DE)
     if h == "5.161.242.85" or h.endswith("5.161.242.85"):
-        return "us_node_elgamal.pub"
+        return "de_node_elgamal.pub"
     # Stale RO host: exit pin file now holds DE public material
     if h == "185.146.232.107" or h.endswith("185.146.232.107"):
         return "exit_node_elgamal.pub"
@@ -51,7 +52,7 @@ def ensure_residual_pub_in_writable_dir(
     Always refreshes from the first candidate that has the basename when found
     (heals stale keys). If no package candidate has the pin:
     - IS (node_elgamal.pub): keep existing writable file if valid
-    - RO/US: raise :class:`ResidualPubError` (never substitute Iceland pin)
+    - Non-IS without package pin: raise :class:`ResidualPubError` (never substitute Iceland pin for DE)
 
     Returns path to the pin under *writable_dir*.
     """
@@ -115,13 +116,12 @@ def load_residual_node_pub(
     return data
 
 
-# Catalog public pin basenames (IS / DE / US) — never private keys.
+# Catalog public pin basenames (IS / DE) — never private keys.
 # exit_node_elgamal.pub mirrors DE pin for multi-hop residual-via-exit.
 CATALOG_PUBLIC_PUBS: tuple[str, ...] = (
     "node_elgamal.pub",
     "de_node_elgamal.pub",
     "exit_node_elgamal.pub",
-    "us_node_elgamal.pub",
 )
 
 

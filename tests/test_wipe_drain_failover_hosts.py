@@ -42,7 +42,7 @@ class TestDartAlternateResidualHosts(unittest.TestCase):
         hosts = re.findall(r"host: '([0-9.]+)'", src)
         self.assertEqual(
             hosts,
-            ["82.221.101.241", "178.105.187.178", "5.161.242.85"],
+            ["82.221.101.241", "178.105.187.178"],
         )
         self.assertNotIn("185.146.232.107", hosts)
 
@@ -62,7 +62,18 @@ class TestSwiftWipeDrainFailover(unittest.TestCase):
         self.assertIn("isResidualUnreachableFailure", src)
         self.assertIn("82.221.101.241", src)
         self.assertIn("178.105.187.178", src)
-        self.assertIn("5.161.242.85", src)
+        # usHost constant may remain for retirement notes; must not be in live array
+        m = re.search(
+            r"catalogHosts:\s*\[String\]\s*=\s*\[(.*?)\]",
+            src,
+            re.S,
+        )
+        self.assertIsNotNone(m, "catalogHosts array missing")
+        body = m.group(1)
+        self.assertNotIn("usHost", body)
+        self.assertNotIn("5.161.242.85", body)
+        self.assertIn("icelandHost", body)
+        self.assertIn("deHost", body)
         self.assertIn("udp receive timeout", src)
 
     def test_vpn_channel_attempts_failover_sequence(self):
@@ -120,13 +131,12 @@ class TestPythonSelectStillDrainsDe(unittest.TestCase):
             peer_health={
                 PRODUCT_NODE_HOST: True,
                 PRODUCT_DE_HOST: True,
-                PRODUCT_US_HOST: True,
+                # US host retired — not required for live failover set
             },
             rng=random.Random(1),
         )
         self.assertEqual(sel.reason, REASON_WIPE_DRAIN_FAILOVER)
-        self.assertIn(sel.endpoint.host, {PRODUCT_NODE_HOST, PRODUCT_US_HOST})
-        self.assertNotEqual(sel.endpoint.host, PRODUCT_DE_HOST)
+        self.assertEqual(sel.endpoint.host, PRODUCT_NODE_HOST)  # only IS alternate left
 
 
 if __name__ == "__main__":

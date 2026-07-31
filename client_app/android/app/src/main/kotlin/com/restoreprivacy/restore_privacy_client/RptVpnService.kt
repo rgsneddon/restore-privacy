@@ -619,7 +619,7 @@ class RptVpnService : VpnService() {
 
         /**
          * ElGamal public pin basename for residual HELLO from dial host.
-         * IS → node_elgamal.pub; DE → de_node_elgamal.pub; US → us_node_elgamal.pub.
+         * IS → node_elgamal.pub; DE → de_node_elgamal.pub; retired US → de_node_elgamal.pub.
          */
         @JvmStatic
         fun residualNodePubNameForHost(host: String): String {
@@ -629,8 +629,9 @@ class RptVpnService : VpnService() {
             ) {
                 return "de_node_elgamal.pub"
             }
+            // Retired US monopin — heal to DE pin
             if (h == PRODUCT_US_HOST || h.endsWith(PRODUCT_US_HOST)) {
-                return "us_node_elgamal.pub"
+                return "de_node_elgamal.pub"
             }
             if (h == PRODUCT_ICELAND_HOST || h.endsWith(PRODUCT_ICELAND_HOST)) {
                 return "node_elgamal.pub"

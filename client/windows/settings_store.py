@@ -60,7 +60,7 @@ class ProductSettings:
     residual_ipv4: bool = True
     # Residual IPv6 ISP leak block (user-adjustable; default ON).
     residual_ipv6: bool = True
-    # Residual entry country: US (United States, product default), IS, or RO.
+    # Residual entry country: DE (Germany, product default) or IS (Iceland).
     # Multihop exit = other catalog country (random among non-entry when >2).
     # Empty/missing key → normalize to US; stale "DE" normalizes to default US.
     entry_country: str = "US"

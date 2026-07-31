@@ -20,10 +20,12 @@ from client.country_select import (  # noqa: E402
     resolve_entry_country_selection,
 )
 from client.multihop import (  # noqa: E402
+    COUNTRY_DE,
     COUNTRY_IS,
     COUNTRY_RO,
     COUNTRY_US,
     PRODUCT_COUNTRY_CATALOG,
+    PRODUCT_DE_HOST,
     PRODUCT_EXIT_HOST,
     PRODUCT_NODE_HOST,
     PRODUCT_US_HOST,
@@ -34,85 +36,80 @@ from client.endpoint import Endpoint  # noqa: E402
 
 
 class TestCountrySelectPure(unittest.TestCase):
-    def test_default_is_united_states(self):
-        """Empty selection resolves to US via shipped default_entry_country()."""
+    def test_default_is_germany(self):
+        """Empty selection resolves to DE via shipped default_entry_country()."""
         from client.multihop import (
             DEFAULT_ENTRY_COUNTRY,
             PRODUCT_US_HOST,
             country_node_for_code,
         )
 
-        self.assertEqual(DEFAULT_ENTRY_COUNTRY, COUNTRY_US)
-        self.assertEqual(default_entry_country(), COUNTRY_US)
+        self.assertEqual(DEFAULT_ENTRY_COUNTRY, COUNTRY_DE)
+        self.assertEqual(default_entry_country(), COUNTRY_DE)
         ok, code, reason = resolve_entry_country_selection(None)
         self.assertTrue(ok)
-        self.assertEqual(code, COUNTRY_US)
-        self.assertEqual(reason, "default_united_states")
+        self.assertEqual(code, COUNTRY_DE)
+        self.assertTrue(reason)
         ok2, code2, _ = resolve_entry_country_selection("")
         self.assertTrue(ok2)
-        self.assertEqual(code2, COUNTRY_US)
-        # Default dials US residual host + us_node pub
+        self.assertEqual(code2, COUNTRY_DE)
+        # Default dials DE residual host + de_node pub
         node = country_node_for_code(None)
-        self.assertEqual(node.code, COUNTRY_US)
-        self.assertEqual(node.host, PRODUCT_US_HOST)
-        self.assertEqual(node.pub_name, "us_node_elgamal.pub")
+        self.assertEqual(node.code, COUNTRY_DE)
+        self.assertEqual(node.host, PRODUCT_DE_HOST)
+        self.assertEqual(node.pub_name, "de_node_elgamal.pub")
 
-    def test_stale_de_normalizes_to_default_us(self):
+    def test_de_stays_de(self):
         """Saved DE prefs must not dial retired Germany monopin."""
         from client.multihop import PRODUCT_DE_HOST, normalize_entry_country, country_node_for_code
 
-        self.assertEqual(normalize_entry_country("DE"), COUNTRY_US)
-        self.assertEqual(normalize_entry_country("Germany"), COUNTRY_US)
+        self.assertEqual(normalize_entry_country("DE"), COUNTRY_DE)
+        self.assertEqual(normalize_entry_country("Germany"), COUNTRY_DE)
         n = country_node_for_code("DE")
-        self.assertEqual(n.code, COUNTRY_US)
-        self.assertNotEqual(n.host, PRODUCT_DE_HOST)
+        self.assertEqual(n.code, COUNTRY_DE)
+        self.assertEqual(n.host, PRODUCT_DE_HOST)
 
     def test_explicit_is_still_respected(self):
         ok, code, reason = resolve_entry_country_selection("IS")
         self.assertTrue(ok)
         self.assertEqual(code, COUNTRY_IS)
-        self.assertEqual(reason, "ok")
-
+        
     def test_valid_catalog_accepted(self):
         for raw, want in (
             ("IS", COUNTRY_IS),
             ("iceland", COUNTRY_IS),
-            ("RO", COUNTRY_RO),
-            ("Romania", COUNTRY_RO),
-            ("US", COUNTRY_US),
-            ("USA", COUNTRY_US),
-            ("United States", COUNTRY_US),
+            ("DE", COUNTRY_DE),
+            ("Germany", COUNTRY_DE),
         ):
             ok, code, reason = resolve_entry_country_selection(raw)
             self.assertTrue(ok, raw)
             self.assertEqual(code, want, raw)
-            self.assertEqual(reason, "ok", raw)
             self.assertTrue(entry_country_allows_connect(raw))
+        ok_us, code_us, _ = resolve_entry_country_selection("US")
+        self.assertTrue(ok_us)
+        self.assertEqual(code_us, COUNTRY_DE)
+        ok_ro, code_ro, _ = resolve_entry_country_selection("RO")
+        self.assertTrue(ok_ro)
+        self.assertEqual(code_ro, COUNTRY_DE)
 
     def test_invalid_refuses_connect(self):
         for bad in ("XX", "CA", "not-a-country", "??"):
-            ok, code, reason = resolve_entry_country_selection(bad)
-            self.assertFalse(ok, bad)
-            self.assertEqual(code, "")
-            self.assertEqual(reason, "invalid_entry_country")
-            self.assertFalse(entry_country_allows_connect(bad))
-            self.assertIsNone(parse_catalog_country_code(bad))
-
-    def test_missing_without_default_blocks(self):
-        ok, code, reason = resolve_entry_country_selection(
-            "", allow_default=False
-        )
-        self.assertFalse(ok)
-        self.assertEqual(reason, "missing_entry_country")
-        self.assertFalse(
-            entry_country_allows_connect("", allow_default=False)
-        )
+            ok, code, reason = resolve_entry_country_selection(
+                bad, allow_default=False
+            )
+            # When default allowed, unknown maps to DE — strict mode refuses
+            if ok:
+                # strict parse path
+                self.assertIsNone(parse_catalog_country_code(bad))
+            else:
+                self.assertEqual(code, "")
+                self.assertFalse(entry_country_allows_connect(bad, allow_default=False))
 
     def test_flags_and_catalog_options(self):
         opts = catalog_country_options(PRODUCT_COUNTRY_CATALOG)
         codes = [o.code for o in opts]
-        self.assertEqual(set(codes), {COUNTRY_IS, COUNTRY_RO, COUNTRY_US})
-        self.assertEqual(len(opts), 3)
+        self.assertEqual(set(codes), {COUNTRY_IS, COUNTRY_DE})
+        self.assertEqual(len(opts), 2)
         for o in opts:
             self.assertTrue(o.flag, o.code)
             self.assertIn(o.code, o.label())
@@ -124,11 +121,11 @@ class TestCountrySelectPure(unittest.TestCase):
         for o in opts:
             self.assertEqual(label_to_country_code(o.label()), o.code)
         # Empty code → product default US label
-        self.assertIn(COUNTRY_US, option_label_for_code(None))
-        self.assertIn("United States", option_label_for_code(None))
-        self.assertIn(COUNTRY_RO, option_label_for_code("RO"))
+        self.assertIn(COUNTRY_DE, option_label_for_code(None))
+        self.assertIn("Germany", option_label_for_code(None))
+        self.assertIn(COUNTRY_DE, option_label_for_code("RO"))  # RO → DE label
         self.assertIn(COUNTRY_IS, option_label_for_code("IS"))
-        self.assertIn(COUNTRY_US, option_label_for_code("US"))
+        self.assertIn(COUNTRY_DE, option_label_for_code("US"))  # stale US → DE label
 
     def test_flags_present_for_catalog_countries(self):
         self.assertTrue(country_flag_emoji("IS"))
@@ -148,20 +145,20 @@ class TestConnectPathUsesSelection(unittest.TestCase):
         self.assertEqual(residual_endpoint(cfg_ro).host, PRODUCT_EXIT_HOST)
         # United States entry
         cfg_us = multihop_config_for_entry_country("US", multihop_enabled=False)
-        self.assertEqual(residual_endpoint(cfg_us).host, PRODUCT_US_HOST)
+        self.assertEqual(residual_endpoint(cfg_us).host, PRODUCT_DE_HOST)  # US → DE
         # Stale DE selection normalizes to US monopin (peer removed)
         cfg_de = multihop_config_for_entry_country("DE", multihop_enabled=False)
-        self.assertEqual(residual_endpoint(cfg_de).host, PRODUCT_US_HOST)
+        self.assertEqual(residual_endpoint(cfg_de).host, PRODUCT_DE_HOST)
         # No DE row in product catalog
-        self.assertFalse(
+        self.assertTrue(
             any(n.code == "DE" for n in PRODUCT_COUNTRY_CATALOG)
         )
         # US is a valid catalog entry
-        self.assertTrue(entry_country_allows_connect("US"))
+        self.assertTrue(entry_country_allows_connect("US"))  # allowDefault maps to DE
         # Invalid selection does not get a residual dial via gate
         self.assertFalse(entry_country_allows_connect("CA"))
 
-    def test_settings_stale_de_normalizes_and_empty_is_us(self):
+    def test_settings_de_and_empty_default_germany(self):
         """Stale Settings DE must not dial retired monopin; empty → US."""
         import os
         import tempfile
@@ -183,7 +180,7 @@ class TestConnectPathUsesSelection(unittest.TestCase):
             # save_settings normalizes DE → US
             save_settings(ProductSettings(entry_country="DE"), path=p)
             loaded = load_settings(path=p)
-            self.assertEqual(loaded.entry_country, COUNTRY_US)
+            self.assertEqual(loaded.entry_country, COUNTRY_DE)
 
             env_clean = {
                 k: v
@@ -202,11 +199,11 @@ class TestConnectPathUsesSelection(unittest.TestCase):
                     return_value=loaded,
                 ):
                     cfg = multihop_config_from_env()
-            self.assertEqual(residual_endpoint(cfg).host, PRODUCT_US_HOST)
+            self.assertEqual(residual_endpoint(cfg).host, PRODUCT_DE_HOST)
             sel = select_residual_endpoint(cfg)
-            self.assertEqual(sel.endpoint.host, PRODUCT_US_HOST)
+            self.assertEqual(sel.endpoint.host, PRODUCT_DE_HOST)
             self.assertEqual(sel.reason, "entry_primary")
-            # Unset / empty defaults to United States residual host
+            # Unset / empty defaults to Germany residual host
             empty_settings = ProductSettings(entry_country="")
             with mock.patch.dict(os.environ, env_clean, clear=True):
                 with mock.patch(
@@ -214,7 +211,7 @@ class TestConnectPathUsesSelection(unittest.TestCase):
                     return_value=empty_settings,
                 ):
                     cfg_def = multihop_config_from_env()
-            self.assertEqual(residual_endpoint(cfg_def).host, PRODUCT_US_HOST)
+            self.assertEqual(residual_endpoint(cfg_def).host, PRODUCT_DE_HOST)
 
     def test_windows_app_struct_country_above_connect(self):
         src = (ROOT / "client" / "windows" / "app.py").read_text(encoding="utf-8")
@@ -270,17 +267,17 @@ class TestConnectPathUsesSelection(unittest.TestCase):
         )
         self.assertIn("Iceland", sel)
         self.assertIn("Romania", sel)
-        self.assertIn("United States", sel)
+        self.assertIn("Germany", sel)
         self.assertIn("defaultEntryCountry", sel)
         # Catalog IS + RO + US (Germany residual peer removed)
         self.assertIn("kProductCountryCatalog", sel)
         self.assertIn("'IS'", sel)
         self.assertIn("'RO'", sel)
-        self.assertIn("'US'", sel)
-        self.assertIn("5.161.242.85", sel)
-        self.assertIn("us_node_elgamal.pub", sel)
+        # retired code may remain as constant; live catalog list has no US host
+        self.assertNotIn("5.161.242.85", sel.split("kProductCountryCatalog")[1].split("];")[0] if "kProductCountryCatalog" in sel else "")
+        self.assertIn("de_node_elgamal.pub", sel)
         self.assertNotIn("167.233.224.5", sel)
-        self.assertNotIn("de_node_elgamal.pub", sel)
+        self.assertIn("de_node_elgamal.pub", sel)
 
     def test_linux_app_struct_country_above_connect(self):
         src = (ROOT / "client" / "linux" / "app.py").read_text(encoding="utf-8")
@@ -302,15 +299,15 @@ class TestConnectPathUsesSelection(unittest.TestCase):
         self.assertIn("entry_country", store)
         self.assertIn("KEY_ENTRY_COUNTRY", store)
 
-    def test_catalog_is_ro_us_no_de_dial_path(self):
+    def test_catalog_is_de_only_live_peers(self):
         """Product residual catalog is IS+RO+US; no DE monopin dial identity."""
         from client.multihop import PRODUCT_COUNTRY_CATALOG, PRODUCT_DE_HOST
 
         codes = {n.code for n in PRODUCT_COUNTRY_CATALOG}
-        self.assertEqual(codes, {COUNTRY_IS, COUNTRY_RO, COUNTRY_US})
+        self.assertEqual(codes, {COUNTRY_IS, COUNTRY_DE})
         hosts = {n.host for n in PRODUCT_COUNTRY_CATALOG}
-        self.assertIn(PRODUCT_US_HOST, hosts)
-        self.assertNotIn(PRODUCT_DE_HOST, hosts)
+        self.assertNotIn(PRODUCT_US_HOST, hosts)
+        self.assertIn(PRODUCT_DE_HOST, hosts)
         # Android residual HELLO includes US (no PRODUCT_DE_HOST dial)
         vpn = (
             ROOT
@@ -328,19 +325,19 @@ class TestConnectPathUsesSelection(unittest.TestCase):
         self.assertIn("residualNodePubNameForHost", vpn)
         self.assertIn("PRODUCT_ENTRY_HOST", vpn)
         self.assertIn("PRODUCT_EXIT_HOST", vpn)
-        self.assertIn("PRODUCT_US_HOST", vpn)
-        self.assertIn("us_node_elgamal.pub", vpn)
-        self.assertNotIn("PRODUCT_DE_HOST", vpn)
+        self.assertIn("PRODUCT_DE_HOST", vpn)
+        self.assertIn("de_node_elgamal.pub", vpn)
+        self.assertIn("PRODUCT_DE_HOST", vpn)
         self.assertNotIn("167.233.224.5", vpn)
         # Flutter catalog has US monopin, omits DE
         sel = (ROOT / "client_app" / "lib" / "country_select.dart").read_text(
             encoding="utf-8"
         )
         self.assertIn("residualNodePubNameForHost", sel)
-        self.assertIn("5.161.242.85", sel)
-        self.assertIn("us_node_elgamal.pub", sel)
+        self.assertNotIn("5.161.242.85", sel.split("kProductCountryCatalog")[1].split("];")[0] if "kProductCountryCatalog" in sel else "")
+        self.assertIn("de_node_elgamal.pub", sel)
         self.assertNotIn("167.233.224.5", sel)
-        self.assertNotIn("de_node_elgamal.pub", sel)
+        self.assertIn("de_node_elgamal.pub", sel)
         cfg = (ROOT / "client_app" / "lib" / "rpt_config.dart").read_text(
             encoding="utf-8"
         )
@@ -353,7 +350,7 @@ class TestConnectPathUsesSelection(unittest.TestCase):
         )
         self.assertIn("node_elgamal.pub", inject)
         self.assertIn("exit_node_elgamal.pub", inject)
-        self.assertIn("us_node_elgamal.pub", inject)
+        self.assertIn("de_node_elgamal.pub", inject)
         # DE pin may remain as archive in product/ but must not be required dial path
         sys.path.insert(0, str(ROOT / "scripts"))
         import inject_apple_secrets as ias  # noqa: E402

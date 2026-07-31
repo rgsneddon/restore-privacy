@@ -1,6 +1,6 @@
 """Multi-hop path configuration and residual routing selection.
 
-Product default is **single hop** to the **United States (US)** residual entry.
+Product default is **single hop** to the **Germany (DE)** residual entry.
 When multi-hop is **enabled** with ≥2 hops and routing is implemented, residual
 Connect dials the **exit** (last) hop so egress residual is the exit VPS; the
 hop list still names entry → exit for path honesty.
@@ -8,8 +8,8 @@ hop list still names entry → exit for path honesty.
 **Preferred-entry downtime failover** (fleet wipe/rebuild): pure selection prefers
 the user's **selected entry** when healthy; automatically residual-fails over to
 the **other catalog peer** when preferred entry is draining/down; re-prefers
-entry when healthy again. Fail closed if neither path is usable. Iceland is not
-a fixed sole entry role for all users — peers are residual-capable.
+entry when healthy again. Fail closed if neither path is usable. Live catalog
+peers are **Iceland (IS)** and **Germany (DE)** only.
 
 Node-only zram + LUKS2 applies on multi-hop hosts; clients never run LUKS/zram.
 
@@ -36,7 +36,7 @@ MULTI_HOP_ROUTING_IMPLEMENTED = True
 PRODUCT_EXIT_HOST = "178.105.187.178"
 PRODUCT_EXIT_PORT = PRODUCT_NODE_PORT
 
-# USA residual peer (Hetzner Ashburn).
+# Retired USA residual peer (Hetzner Ashburn) — redaction only; not dialable.
 PRODUCT_US_HOST = "5.161.242.85"
 PRODUCT_US_PORT = PRODUCT_NODE_PORT
 
@@ -46,7 +46,7 @@ PRODUCT_DE_PORT = PRODUCT_NODE_PORT
 
 # --- Country → node catalog (extensible as more VPS countries ship) ---
 COUNTRY_IS = "IS"
-COUNTRY_US = "US"
+COUNTRY_US = "US"  # retired code — normalize maps US → DE
 COUNTRY_DE = "DE"
 # Historical Romania monopin (removed) — normalize maps RO → product default DE.
 COUNTRY_RO = "RO"
@@ -56,6 +56,7 @@ DEFAULT_ENTRY_COUNTRY = COUNTRY_DE
 # Retired monopin hosts (redaction only — not dialable catalog peers).
 PRODUCT_RO_HOST = "185.146.232.107"  # former Romania FlokiNET
 PRODUCT_DE_LEGACY_HOST = "167.233.224.5"  # former retired DE monopin
+# PRODUCT_US_HOST above is also retired (not in live catalog).
 
 
 @dataclass(frozen=True)
@@ -75,7 +76,7 @@ class CountryNode:
         return Endpoint(host=self.host, port=int(self.port))
 
 
-# Shipped residual catalog: Iceland + Germany + USA (Romania peer removed).
+# Shipped residual catalog: Iceland + Germany only (US and RO peers retired).
 PRODUCT_COUNTRY_CATALOG: tuple[CountryNode, ...] = (
     CountryNode(
         code=COUNTRY_IS,
@@ -91,13 +92,6 @@ PRODUCT_COUNTRY_CATALOG: tuple[CountryNode, ...] = (
         port=PRODUCT_DE_PORT,
         pub_name="de_node_elgamal.pub",
     ),
-    CountryNode(
-        code=COUNTRY_US,
-        name="United States",
-        host=PRODUCT_US_HOST,
-        port=PRODUCT_US_PORT,
-        pub_name="us_node_elgamal.pub",
-    ),
 )
 
 
@@ -107,11 +101,11 @@ def product_country_catalog() -> tuple[CountryNode, ...]:
 
 
 def normalize_entry_country(code: str | None) -> str:
-    """Return a valid catalog country code; unknown/empty/stale RO → DE default."""
+    """Return a valid catalog country code; unknown/empty/stale RO/US → DE default."""
     raw = (code or "").strip().upper()
     if not raw:
         return DEFAULT_ENTRY_COUNTRY
-    # Accept full names; retired RO/Romania map to default DE.
+    # Accept full names; retired RO/US map to product default DE.
     aliases = {
         "ICELAND": COUNTRY_IS,
         "IS": COUNTRY_IS,
@@ -119,11 +113,12 @@ def normalize_entry_country(code: str | None) -> str:
         "DE": COUNTRY_DE,
         "DEU": COUNTRY_DE,
         "DEUTSCHLAND": COUNTRY_DE,
-        "UNITED STATES": COUNTRY_US,
-        "UNITED STATES OF AMERICA": COUNTRY_US,
-        "USA": COUNTRY_US,
-        "US": COUNTRY_US,
-        "AMERICA": COUNTRY_US,
+        # Stale prefs after US peer removal → product default DE
+        "UNITED STATES": DEFAULT_ENTRY_COUNTRY,
+        "UNITED STATES OF AMERICA": DEFAULT_ENTRY_COUNTRY,
+        "USA": DEFAULT_ENTRY_COUNTRY,
+        "US": DEFAULT_ENTRY_COUNTRY,
+        "AMERICA": DEFAULT_ENTRY_COUNTRY,
         # Stale prefs after RO peer removal → product default DE
         "ROMANIA": DEFAULT_ENTRY_COUNTRY,
         "RO": DEFAULT_ENTRY_COUNTRY,
@@ -847,7 +842,7 @@ def multihop_config_from_env(
       (when this env key is set it wins over Settings)
     - When env key is unset, product Settings ``privacy_multihop`` is used
       (default **off** / single-hop residual baseline)
-    - ``RPT_ENTRY_COUNTRY`` / Settings ``entry_country`` — IS, DE, or US (default DE)
+    - ``RPT_ENTRY_COUNTRY`` / Settings ``entry_country`` — IS or DE (default DE)
     - ``RPT_MULTIHOP_HOPS`` — CSV ``host[:port],host2[:port]`` (operator override)
     - ``RPT_EXIT_HOST`` / ``RPT_EXIT_PORT`` — second hop override (legacy)
     """
@@ -872,7 +867,7 @@ def multihop_config_from_env(
         except Exception:  # noqa: BLE001
             enabled = False
 
-    # Entry country: env wins, else product Settings (default United States)
+    # Entry country: env wins, else product Settings (default Germany/DE)
     entry_country = str(e.get("RPT_ENTRY_COUNTRY", "") or "").strip()
     if not entry_country and env is None:
         try:
@@ -931,8 +926,9 @@ def node_pub_name_for_endpoint(endpoint: Endpoint) -> str:
             return n.pub_name
     if host == PRODUCT_DE_HOST or host == PRODUCT_EXIT_HOST:
         return "de_node_elgamal.pub"
+    # Retired US monopin: heal to DE pin (stale prefs normalize entry to DE first)
     if host == PRODUCT_US_HOST:
-        return "us_node_elgamal.pub"
+        return "de_node_elgamal.pub"
     if host == PRODUCT_RO_HOST:
         return "exit_node_elgamal.pub"  # stale RO → exit pin (now DE material)
     return "node_elgamal.pub"

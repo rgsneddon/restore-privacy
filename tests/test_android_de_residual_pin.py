@@ -42,7 +42,7 @@ def residual_node_pub_name_for_host_from_source(src: str, host: str) -> str:
     """Execute the shipped residualNodePubNameForHost policy from RptVpnService.kt.
 
     Reads PRODUCT_* constants and applies the same branch order as the Kotlin
-    function body (DE/exit → de_node; US → us_node; IS → node; RO legacy → exit).
+    function body (DE/exit → de_node; retired US → de_node; IS → node; RO legacy → exit).
     """
     c = _parse_constants(src)
     de = c["PRODUCT_DE_HOST"]
@@ -72,7 +72,7 @@ def residual_node_pub_name_for_host_from_source(src: str, host: str) -> str:
     if h == de or h.endswith(de) or h == exit_h or h.endswith(exit_h):
         return "de_node_elgamal.pub"
     if h == us or h.endswith(us):
-        return "us_node_elgamal.pub"
+        return "de_node_elgamal.pub"  # retired US monopin heals to DE
     if h == iceland or h.endswith(iceland):
         return "node_elgamal.pub"
     if ro_legacy and (h == ro_legacy or h.endswith(ro_legacy)):
@@ -95,7 +95,7 @@ def test_android_residual_node_pub_name_maps_de_host():
     )
 
     assert residual_node_pub_name_for_host_from_source(src, DE_HOST) == "de_node_elgamal.pub"
-    assert residual_node_pub_name_for_host_from_source(src, "5.161.242.85") == "us_node_elgamal.pub"
+    assert residual_node_pub_name_for_host_from_source(src, "5.161.242.85") == "de_node_elgamal.pub"
     assert residual_node_pub_name_for_host_from_source(src, "82.221.101.241") == "node_elgamal.pub"
     assert residual_node_pub_name_for_host_from_source(src, DE_HOST) != "node_elgamal.pub"
 
@@ -112,7 +112,7 @@ def test_copy_rpt_secrets_packages_de_node_pin():
     names_block = m.group(1)
     assert "de_node_elgamal.pub" in names_block
     assert "node_elgamal.pub" in names_block
-    assert "us_node_elgamal.pub" in names_block
+    assert "de_node_elgamal.pub" in names_block  # live DE pin; US pub not required
     assert "exit_node_elgamal.pub" in names_block
 
 

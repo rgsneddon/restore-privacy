@@ -34,7 +34,7 @@ class ProductSettings {
   final bool residualIpv4;
   /// Residual IPv6 ISP path block while residual is up. Product default ON.
   final bool residualIpv6;
-  /// Catalog entry country code (DE / IS / US); default Germany/DE.
+  /// Catalog entry country code (DE / IS); default Germany/DE.
   final String entryCountry;
 
   const ProductSettings({

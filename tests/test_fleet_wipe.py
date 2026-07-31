@@ -1,4 +1,4 @@
-"""Sequential fleet wipe (IS → DE → US) + peer preflight (shipped helpers)."""
+"""Sequential fleet wipe (IS → DE) + peer preflight (shipped helpers)."""
 
 from __future__ import annotations
 
@@ -37,22 +37,23 @@ from node.wipe_preflight import evaluate_catalog_peer_prewipe  # noqa: E402
 
 class TestFleetWipeOrder(unittest.TestCase):
     def test_monopin_order_is_de_us(self):
-        self.assertEqual(PREFERRED_FLEET_ORDER, ("IS", "DE", "US"))
+        self.assertEqual(PREFERRED_FLEET_ORDER, ("IS", "DE"))
         codes = fleet_country_codes(PRODUCT_COUNTRY_CATALOG)
-        self.assertEqual(codes, ["IS", "DE", "US"])
+        self.assertEqual(codes, ["IS", "DE"])
         nodes = fleet_wipe_order(PRODUCT_COUNTRY_CATALOG)
-        self.assertEqual([n.code for n in nodes], ["IS", "DE", "US"])
+        self.assertEqual([n.code for n in nodes], ["IS", "DE"])
         self.assertEqual(nodes[0].host, PRODUCT_NODE_HOST)
         self.assertEqual(nodes[1].host, PRODUCT_DE_HOST)
-        self.assertEqual(nodes[2].host, PRODUCT_US_HOST)
+        self.assertEqual(len(nodes), 2)
         self.assertNotIn("RO", codes)
+        self.assertNotIn("US", codes)
 
     def test_third_country_appends_after_preferred(self):
         extra = CountryNode(
             code="XX", name="Extra", host="198.51.100.20", port=44044
         )
         cat = list(PRODUCT_COUNTRY_CATALOG) + [extra]
-        self.assertEqual(fleet_country_codes(cat), ["IS", "DE", "US", "XX"])
+        self.assertEqual(fleet_country_codes(cat), ["IS", "DE", "XX"])
 
     def test_next_target_and_refuse_concurrent(self):
         self.assertEqual(
@@ -78,19 +79,16 @@ class TestFleetWipeOrder(unittest.TestCase):
         d4 = assert_sequential_fleet_start("DE", completed=done, in_progress=None)
         self.assertTrue(d4.allow)
         done2, nxt2 = mark_wipe_complete("DE", completed=done)
-        self.assertEqual(nxt2, "US")
-        done3, nxt3 = mark_wipe_complete("US", completed=done2)
-        self.assertTrue(is_fleet_cycle_complete(done3))
-        self.assertIsNone(nxt3)
+        self.assertIsNone(nxt2)
+        self.assertTrue(is_fleet_cycle_complete(done2))
 
-    def test_appended_country_after_is_de_us(self):
+    def test_appended_country_after_is_de(self):
         extra = CountryNode(
             code="XX", name="Extra", host="198.51.100.20", port=44044
         )
         cat = list(PRODUCT_COUNTRY_CATALOG) + [extra]
         done, nxt = mark_wipe_complete("IS", completed=[], catalog=cat)
         done, nxt = mark_wipe_complete("DE", completed=done, catalog=cat)
-        done, nxt = mark_wipe_complete("US", completed=done, catalog=cat)
         self.assertEqual(nxt, "XX")
         d = assert_sequential_fleet_start(
             "XX", completed=done, in_progress=None, catalog=cat
@@ -131,7 +129,7 @@ class TestPeerPrewipe(unittest.TestCase):
 class TestCatalogAlignment(unittest.TestCase):
     def test_client_residual_and_fleet_share_codes(self):
         fleet = set(fleet_country_codes(PRODUCT_COUNTRY_CATALOG))
-        self.assertEqual(fleet, {COUNTRY_IS, COUNTRY_DE, COUNTRY_US})
+        self.assertEqual(fleet, {COUNTRY_IS, COUNTRY_DE})
         # DE entry preference (default monopin) resolves
         e, x = resolve_entry_exit(COUNTRY_DE, multihop_enabled=False)
         self.assertEqual(e.host, PRODUCT_DE_HOST)
@@ -147,7 +145,7 @@ class TestCatalogAlignment(unittest.TestCase):
         from node.ephemeral_node import build_fleet_sequential_plan_summary
 
         s = build_fleet_sequential_plan_summary(completed=[], in_progress=None)
-        self.assertEqual(s["fleet_order"], ["IS", "DE", "US"])
+        self.assertEqual(s["fleet_order"], ["IS", "DE"])
         self.assertEqual(s["next_target"], "IS")
         self.assertFalse(s["decisions"]["DE"]["allow"])
         self.assertTrue(s["decisions"]["IS"]["allow"])

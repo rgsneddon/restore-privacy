@@ -1732,7 +1732,7 @@ class TunnelClientApp:
             except Exception:
                 entry_code = ""
             self._refresh_multihop_from_settings()
-        # Entry country must be a live catalog monopin (default United States/US).
+        # Entry country must be a live catalog monopin (default Germany/DE).
         try:
             cur_entry = getattr(load_settings(), "entry_country", "") or entry_code
         except Exception:
@@ -2843,7 +2843,7 @@ class TunnelClientApp:
             tk.Label(
                 entry_col,
                 text=(
-                    "Choose residual entry: Iceland, Germany, or United States. "
+                    "Choose residual entry: Iceland or Germany. "
                     "With multi-hop on, exit is Germany (DE)."
                 ),
                 bg=PANEL_BG,
@@ -2876,7 +2876,7 @@ class TunnelClientApp:
             # Friendly labels under the code menu
             tk.Label(
                 entry_col,
-                text="IS = Iceland · DE = Germany (default) · US = United States",
+                text="IS = Iceland · DE = Germany (default)",
                 bg=PANEL_BG,
                 fg=TEXT_MUTED,
                 font=("Segoe UI", 7),
