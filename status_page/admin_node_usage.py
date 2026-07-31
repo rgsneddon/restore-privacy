@@ -1,6 +1,6 @@
 """Admin fleet node usage: bandwidth used vs capability (authenticated only).
 
-Public status stays title-only. This module builds operator rows for IS/DE/US
+Public status stays title-only. This module builds operator rows for IS/DE
 from the product country catalog and optional private capacity probes.
 
 Limits are **per-peer**:
@@ -186,7 +186,6 @@ def product_catalog_peers() -> list[dict[str, Any]]:
         return [
             {"code": "IS", "name": "Iceland", "host": "82.221.101.241", "port": 44044},
             {"code": "DE", "name": "Germany", "host": "178.105.187.178", "port": 44044},
-            {"code": "US", "name": "United States", "host": "5.161.242.85", "port": 44044},
         ]
     out: list[dict[str, Any]] = []
     for n in cat:

@@ -15,23 +15,29 @@ public enum RptSecrets {
     public static let nodePubName = "node_elgamal.pub"
     public static let exitNodePubName = "exit_node_elgamal.pub"
     public static let usNodePubName = "us_node_elgamal.pub"
-    /// Product default residual entry (United States monopin).
-    public static let productEntryHost = "5.161.242.85"
+    /// Product default residual entry (Germany monopin).
+    public static let productEntryHost = "178.105.187.178"
     public static let productIcelandHost = "82.221.101.241"
-    public static let productExitHost = "185.146.232.107"
-    public static let productUsHost = "5.161.242.85"
+    public static let productExitHost = "178.105.187.178"
+    public static let productUsHost = "5.161.242.85" // retired monopin
+    public static let productDeHost = "178.105.187.178"
     /// Must never be loaded by product clients.
     public static let nodePrivName = "node_elgamal.priv"
 
     /// Public key basename for residual HELLO from dial host monopin.
-    /// IS → node; RO → exit; US → us (never invent pin from entry code alone).
+    /// IS → node; DE → de; retired US → de (never invent pin from entry code alone).
     public static func residualNodePubName(forHost host: String) -> String {
         let h = host.trimmingCharacters(in: .whitespacesAndNewlines)
-        if h == productExitHost || h.hasSuffix(productExitHost) {
-            return exitNodePubName
+        if h == productDeHost || h.hasSuffix(productDeHost)
+            || h == productExitHost || h.hasSuffix(productExitHost) {
+            return deNodePubName
         }
+        // Retired US monopin — heal to DE pin
         if h == productUsHost || h.hasSuffix(productUsHost) {
-            return usNodePubName
+            return deNodePubName
+        }
+        if h == productIcelandHost || h.hasSuffix(productIcelandHost) {
+            return nodePubName
         }
         return nodePubName
     }

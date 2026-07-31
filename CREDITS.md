@@ -41,7 +41,7 @@ The dark retro chrome is a visual nod to classic Windows 3.x UI — no Microsoft
 | **Stripe** | Catalog checkout (monthly £3.00 / yearly £30.00 GBP) | https://stripe.com/ |
 | **Render** | Public status host + paid download fulfilment | https://render.com/ |
 | **FlokiNET** | Residual peer IS (`82.221.101.241`); former RO host retired | https://flokinet.is/privacy/ · https://flokinet.is/vps/ |
-| **Hetzner** | Residual peer US (`5.161.242.85`, default entry) | https://www.hetzner.com/ |
+| **Hetzner** | Residual peer DE (`178.105.187.178`, default entry); US monopin retired | https://www.hetzner.com/ |
 
 ## Standards (non-code)
 

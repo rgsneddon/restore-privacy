@@ -477,10 +477,16 @@ class TestAdminArchitectureCopy(unittest.TestCase):
             PRICE_SNIPPET_YEAR,
         ):
             self.assertIn(marker, html, f"missing marker {marker!r}")
-        # RO may appear only as deprecated; live catalog is DE not RO
-        self.assertIn("deprecated", html.lower())
-        self.assertIn("Romania (RO) residual peer is deprecated", html)
+        # US/RO may appear only as retired; live catalog is IS+DE
+        self.assertTrue(
+            "retired" in html.lower() or "deprecated" in html.lower(),
+            "expected retired/deprecated language for US/RO",
+        )
+        self.assertIn("retired", html.lower())
         self.assertNotIn("167.233.224.5", html)
+        # Live catalog is two peers (not three with United States selectable)
+        self.assertIn("two peers", html.lower())
+        self.assertNotIn("three peers", html.lower())
         # Mint tools live on Link Generation, not home monostack
         self.assertNotIn('id="admin-tester-month"', html)
         self.assertNotIn('id="admin-grants-table"', html)

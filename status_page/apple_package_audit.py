@@ -105,6 +105,37 @@ def require_macos_zip_matches_monopin(path: Path | str, monopin: str) -> str:
     return found
 
 
+def ios_zip_cfbundle_short_version(path: Path | str) -> str | None:
+    """Host app ``CFBundleShortVersionString`` from an iOS catalog zip (or None)."""
+    info = inspect_apple_zip(Path(path), platform="ios")
+    ver = info.get("primary_version")
+    return str(ver).strip() if ver else None
+
+
+def require_ios_zip_matches_monopin(path: Path | str, monopin: str) -> str:
+    """Fail closed when paid iOS zip CFBundle lags (or leads) the catalog monopin.
+
+    Prevents secret-inject / Team-sign of a stale 0.5.x Runner.app into a
+    monopin-named zip (same class of bug as macOS carry-forward rename).
+    """
+    pin = (monopin or "").strip()
+    p = Path(path)
+    if not pin:
+        raise ValueError("monopin required")
+    if not p.is_file():
+        raise FileNotFoundError(f"iOS catalog zip missing: {p}")
+    found = ios_zip_cfbundle_short_version(p)
+    if found != pin:
+        raise RuntimeError(
+            f"iOS CFBundleShortVersionString {found!r} != monopin {pin!r} "
+            f"in {p}; refuse catalog publish — rebuild Flutter iOS release "
+            f"so FLUTTER_BUILD_NAME/pubspec product version is {pin} "
+            f"(flutter build ios --release --no-codesign, then "
+            f"scripts/build_release_{pin}.py --apple-only on Darwin)."
+        )
+    return found
+
+
 def audit_catalog_apple_packages(
     *,
     version: str,

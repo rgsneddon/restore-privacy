@@ -45,8 +45,9 @@ class ProductSettings:
     residual_ipv4: bool = True
     # Residual IPv6 ISP leak block (user-adjustable; default ON).
     residual_ipv6: bool = True
-    # Residual entry country: IS (product default) or RO.
-    entry_country: str = "US"
+    # Residual entry country: DE (Germany, product default) or IS (Iceland).
+    # Stale US|RO prefs normalize to DE.
+    entry_country: str = "DE"
 
 
 def settings_dir() -> Path:

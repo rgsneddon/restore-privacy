@@ -43,7 +43,7 @@ Node process stdout/stderr is configured for no journal session streams in the s
 ### 3.1 VPN node
 
 - **Optional at-rest encryption (operator):** LUKS2 data volumes (`node/install_disk_encryption.sh`) and optional zram+LUKS2 RAM volume (`node/install_zram_luks.sh`) are **node-only**. They protect locked volumes. They are **not** live secrecy against root on an unlocked host, **not** residual tunnel crypto, and they do not erase VPS provider snapshots/netflow.
-- **Endpoints (catalog peers):** Iceland **82.221.101.241:44044**, Germany **178.105.187.178:44044** (default residual entry), United States **5.161.242.85:44044** — user-selectable entry; multi-hop exit is Germany. Romania (RO) is deprecated.
+- **Endpoints (catalog peers):** Iceland **82.221.101.241:44044**, Germany **178.105.187.178:44044** (default residual entry) — user-selectable entry; multi-hop exit is Germany. United States (US) and Romania (RO) residual peers are **retired**.
 - **Location / host:** IS on **FlokiNET** (https://flokinet.is/); DE is a separate residual peer (US residual peer retired). FlokiNET public materials state **no invasive logs**, root-only customer access, monitoring limited to resource usage, and no third-party sharing of tenant traffic patterns (https://flokinet.is/privacy/, https://flokinet.is/vps/). That is **host-published posture**, not a Restore Privacy forensic audit. Product no-log defaults (below) are separate.
 - Listens for handshakes and encrypted data frames; **admits** only peers that complete the product handshake with an authorized client key (**Ed25519 allow-list** + **ElGamal / Pedersen** handshake materials).
 - Assigns a temporary tunnel IP and relays traffic while the session is active; holds **in-memory** session state only.

@@ -61,9 +61,9 @@ class ProductSettings:
     # Residual IPv6 ISP leak block (user-adjustable; default ON).
     residual_ipv6: bool = True
     # Residual entry country: DE (Germany, product default) or IS (Iceland).
-    # Multihop exit = other catalog country (random among non-entry when >2).
-    # Empty/missing key → normalize to US; stale "DE" normalizes to default US.
-    entry_country: str = "US"
+    # Multihop exit = other catalog country when multi-hop is on.
+    # Empty/missing/stale US|RO → normalize to DE (DEFAULT_ENTRY_COUNTRY).
+    entry_country: str = "DE"
     # False until user binds first-run Settings with OK (post-keygen onboarding).
     first_run_settings_completed: bool = False
     # Main-window chrome: light (default) or dark

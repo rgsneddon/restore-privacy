@@ -2,7 +2,7 @@
 
 ## Sequential fleet wipe (~7d) — **one peer at a time**
 
-Planner: `node/fleet_wipe.py` (`PREFERRED_FLEET_ORDER = IS → DE → US`).  
+Planner: `node/fleet_wipe.py` (`PREFERRED_FLEET_ORDER = IS → DE`).  
 Orchestrator entrypoint: `scripts/weekly_entry_rebuild.py` (still hosts the timer; fleet order is multi-peer).
 
 | Rule | Detail |

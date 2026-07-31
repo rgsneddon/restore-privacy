@@ -167,7 +167,6 @@ def _redact_public_doc_text(text: str) -> str:
         for host, label in (
             ("82.221.101.241", "Iceland (IS)"),
             ("185.146.232.107", "Romania (RO)"),
-            ("5.161.242.85", "United States (US)"),
             ("167.233.224.5", "VPN node"),
         ):
             text = text.replace(host, label)

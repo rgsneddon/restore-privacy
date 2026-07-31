@@ -8,16 +8,17 @@ void main() {
     RptConfig.setRuntimeEntryCountry(kDefaultEntryCountry);
   });
 
-  test('pub name follows residual dial host (IS/DE/US)', () {
+  test('pub name follows residual dial host (IS/DE; retired US→de)', () {
     expect(residualNodePubNameForHost('82.221.101.241'), 'node_elgamal.pub');
     expect(residualNodePubNameForHost('178.105.187.178'), 'de_node_elgamal.pub');
-    expect(residualNodePubNameForHost('5.161.242.85'), 'us_node_elgamal.pub');
+    expect(residualNodePubNameForHost('5.161.242.85'), 'de_node_elgamal.pub');
   });
 
-  test('catalog has IS DE US and no RO monopin', () {
+  test('catalog has IS DE only and no RO/US monopin hosts', () {
     final codes = kProductCountryCatalog.map((o) => o.code).toSet();
-    expect(codes, {'IS', 'DE', 'US'});
+    expect(codes, {'IS', 'DE'});
     expect(kProductCountryCatalog.any((o) => o.host == '185.146.232.107'), isFalse);
+    expect(kProductCountryCatalog.any((o) => o.host == '5.161.242.85'), isFalse);
     expect(
       kProductCountryCatalog.any((o) => o.host == '178.105.187.178'),
       isTrue,
@@ -42,11 +43,12 @@ void main() {
     expect(RptConfig.residualNodePubName, 'de_node_elgamal.pub');
   });
 
-  test('US single-hop uses us pub', () {
+  test('stale US single-hop normalizes to DE with de pub', () {
     RptConfig.setRuntimeMultiHop(false);
     RptConfig.setRuntimeEntryCountry('US');
-    expect(RptConfig.host, '5.161.242.85');
-    expect(RptConfig.residualNodePubName, 'us_node_elgamal.pub');
+    expect(normalizeEntryCountry('US'), 'DE');
+    expect(RptConfig.host, '178.105.187.178');
+    expect(RptConfig.residualNodePubName, 'de_node_elgamal.pub');
   });
 
   test('default Germany host and de_node pub', () {

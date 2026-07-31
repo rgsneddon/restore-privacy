@@ -37,26 +37,30 @@ public enum RptSecrets {
     public static let nodePrivName = "node_elgamal.priv"
 
     /// Public key basename for residual HELLO from dial host monopin.
-    /// IS → node; DE → de; US → us (never invent pin from entry code alone).
+    /// IS → node; DE → de; retired US → de (never invent pin from entry code alone).
     public static func residualNodePubName(forHost host: String) -> String {
         let h = host.trimmingCharacters(in: .whitespacesAndNewlines)
         if h == productDeHost || h.hasSuffix(productDeHost)
             || h == productExitHost || h.hasSuffix(productExitHost) {
             return deNodePubName
         }
+        // Retired US monopin — heal to DE pin
         if h == productUsHost || h.hasSuffix(productUsHost) {
-            return usNodePubName
+            return deNodePubName
+        }
+        if h == productIcelandHost || h.hasSuffix(productIcelandHost) {
+            return nodePubName
         }
         return nodePubName
     }
 
     /// All catalog residual public pin basenames (never private keys).
     public static let catalogPublicPubNames: [String] = [
-        nodePubName, exitNodePubName, usNodePubName,
+        nodePubName, deNodePubName, exitNodePubName,
     ]
 
     /// Copy every catalog public pin found in *candidates* into *dest*.
-    /// Host uses this so Packet Tunnel App Group / home secrets can HELLO to RO/US
+    /// Host uses this so Packet Tunnel App Group / home secrets can HELLO to DE
     /// even when the appex bundle only ever saw Iceland ``node_elgamal.pub``.
     public static func seedCatalogPublicKeys(
         into dest: URL,

@@ -947,7 +947,7 @@ class TunnelClientApp:
                     getattr(cur, "privacy_outer_obfuscation", False)
                 ),
                 privacy_multihop=bool(getattr(cur, "privacy_multihop", False)),
-                entry_country=getattr(cur, "entry_country", "US"),
+                entry_country=getattr(cur, "entry_country", "DE"),
             )
             save_settings(s)
             st = apply_run_at_startup(s.run_at_startup)

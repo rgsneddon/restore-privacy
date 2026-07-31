@@ -25,13 +25,15 @@ from node.handshake import (
 CLIENT_PRIV_NAME = "client_ed25519.priv"
 CLIENT_PUB_NAME = "client_ed25519.pub"
 NODE_PUB_NAME = "node_elgamal.pub"
-# Catalog residual public pins (IS entry + RO exit + US default entry). Never priv.
+# Live catalog residual public pins (IS + DE; exit pin mirrors DE). Never priv.
+# us_node_elgamal.pub is retired (heal path only — not a live catalog seed).
 EXIT_NODE_PUB_NAME = "exit_node_elgamal.pub"
-US_NODE_PUB_NAME = "us_node_elgamal.pub"
+DE_NODE_PUB_NAME = "de_node_elgamal.pub"
+US_NODE_PUB_NAME = "us_node_elgamal.pub"  # retired monopin file (optional heal only)
 CATALOG_NODE_PUB_NAMES: tuple[str, ...] = (
     NODE_PUB_NAME,
+    DE_NODE_PUB_NAME,
     EXIT_NODE_PUB_NAME,
-    US_NODE_PUB_NAME,
 )
 # Never load or expect node private key on the client
 NODE_PRIV_NAME = "node_elgamal.priv"
@@ -245,15 +247,25 @@ def _product_pub_path_for_name(name: str) -> Path | None:
         from .endpoint import (
             product_exit_node_elgamal_pub_path,
             product_node_elgamal_pub_path,
-            product_us_node_elgamal_pub_path,
         )
+        try:
+            from .endpoint import product_de_node_elgamal_pub_path
+        except Exception:
+            product_de_node_elgamal_pub_path = None  # type: ignore
     except Exception:
         return None
     mapping = {
         NODE_PUB_NAME: product_node_elgamal_pub_path,
         EXIT_NODE_PUB_NAME: product_exit_node_elgamal_pub_path,
-        US_NODE_PUB_NAME: product_us_node_elgamal_pub_path,
     }
+    if product_de_node_elgamal_pub_path is not None:
+        mapping[DE_NODE_PUB_NAME] = product_de_node_elgamal_pub_path
+    else:
+        # de_node is often product/de_node_elgamal.pub next to node_elgamal.pub
+        def _de_path():
+            from pathlib import Path as _P
+            return _P(__file__).resolve().parents[1] / "product" / "de_node_elgamal.pub"
+        mapping[DE_NODE_PUB_NAME] = _de_path
     fn = mapping.get(name)
     if fn is None:
         return None
@@ -272,9 +284,9 @@ def sync_product_node_pub_into(dest_dir: Path) -> bool:
 
 
 def sync_catalog_public_pubs_into(dest_dir: Path) -> list[str]:
-    """Refresh all catalog residual public pins (IS/RO/US) into *dest_dir*.
+    """Refresh all live catalog residual public pins (IS/DE) into *dest_dir*.
 
-    Default Windows entry is United States — without ``us_node_elgamal.pub``
+    Default Windows entry is Germany (DE) — without ``de_node_elgamal.pub``
     HELLO to the primary residual fails closed and Connect falls over to
     Iceland. Heal install trees that only shipped the Iceland entry pub.
     Returns basenames successfully written/refreshed.

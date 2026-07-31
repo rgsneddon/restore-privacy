@@ -638,20 +638,35 @@ def stage_macos_zip() -> Path:
     return _require_macos_cfbundle_matches_monopin(path)
 
 
+def _require_ios_cfbundle_matches_monopin(path: Path) -> Path:
+    """Refuse catalog iOS zip when host CFBundleShortVersionString ≠ monopin."""
+    try:
+        sys.path.insert(0, str(ROOT / "status_page"))
+        from apple_package_audit import require_ios_zip_matches_monopin
+    except ImportError:  # pragma: no cover
+        from status_page.apple_package_audit import (  # type: ignore
+            require_ios_zip_matches_monopin,
+        )
+    ver = require_ios_zip_matches_monopin(path, VERSION)
+    print(f"ios CFBundleShortVersionString={ver} matches monopin {VERSION}")
+    return path
+
+
 def stage_ios_zip() -> Path:
-    """iOS zip: Flutter+Team-sign when Mac+secrets; else honest carry-forward rename."""
+    """iOS zip: Flutter+Team-sign when Mac+secrets; CFBundle must equal monopin.
+
+    Carry-forward rename of a prior zip is refused when CFBundle ≠ monopin so a
+    stale Runner.app (e.g. 0.5.8) cannot be published as the current pin.
+    """
     dest = OUT / IOS_ZIP_NAME
     try:
-        return package_ios_zip()
+        path = package_ios_zip()
     except Exception as exc:  # noqa: BLE001
-        print(
-            f"ios native package unavailable ({exc}); "
-            f"carry-forward prior zip → {dest.name} (Mac must rebuild/sign for real {VERSION})",
-            file=sys.stderr,
-        )
-        return _stage_from_prior(
-            f"restore-privacy-client-{PRIOR_TAG}-ios.zip", dest
-        )
+        raise RuntimeError(
+            f"ios native package required for monopin {VERSION} "
+            f"(refuse carry-forward rename with possible stale CFBundle): {exc}"
+        ) from exc
+    return _require_ios_cfbundle_matches_monopin(path)
 
 
 def main(argv: list[str] | None = None) -> int:

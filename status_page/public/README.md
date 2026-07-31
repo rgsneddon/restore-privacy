@@ -209,7 +209,7 @@ Node deploy, ports, secrets, from-source builds, and tests: **[sundries.txt](sun
 
 **Post-quantum readiness:** staged hybrid Kyber/ML-KEM hook in `node/pq_hybrid.py` + plan [`docs/PQ_MIGRATION.md`](docs/PQ_MIGRATION.md) (not residual PQ on the wire until dual-wire + real ML-KEM).
 
-**Product ship (v0.5.9):** Paid installers on **[status downloads](https://restoreprivacy.online/)**. **macOS** native monopin **0.5.9** DevID+notarized (Team **SFCBP95595**); **iOS** Team-signed sideload — see `APPLE_HANDOFF_0.5.9.md`. **Android** and **Linux** native on this pin; **Windows** PE from Windows host (`WINDOWS_HANDOFF_0.5.9.md` + Helsinki breadcrumbs). Catalog residual peers: **IS** / **DE** (default) — US and Romania retired.
+**Product ship (v0.5.9):** Paid installers on **[status downloads](https://restoreprivacy.online/)**. **macOS** native monopin **0.5.9** DevID+notarized (Team **SFCBP95595**); **iOS** Team-signed sideload — see `APPLE_HANDOFF_0.5.9.md`. **Android** and **Linux** native on this pin; **Windows** PE from Windows host (`WINDOWS_HANDOFF_0.5.9.md` + Helsinki breadcrumbs). Catalog residual peers: **IS** / **DE** (default) — US and Romania **retired** (not dialable).
 
 **Self-host (one shot):** `sudo bash scripts/selfhost_node.sh` — node install + tunnel DNS + host privacy. Deploy remote: `python scripts/deploy_rpt_node.py` (`RPT_SSH_HOST`, `RPT_SSH_USER`, key). Details: [sundries.txt](sundries.txt).
 
