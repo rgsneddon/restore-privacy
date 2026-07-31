@@ -94,6 +94,37 @@ class TestLiveCatalogIsDeOnly(unittest.TestCase):
         # Must not always allocate a brand-new protocol without reuse path
         self.assertIn("proto = existing", swift)
 
+    def test_rpt_secrets_declare_de_node_pub_name(self):
+        """Every Apple RptSecrets enum must declare deNodePubName (US heal returns it)."""
+        rels = [
+            "client_app/macos/NativePrep/RptSecrets.swift",
+            "client_app/macos/NativePrep/Rpt2/RptSecrets.swift",
+            "client_app/ios/NativePrep/RptSecrets.swift",
+            "client_app/ios/NativePrep/Rpt2/RptSecrets.swift",
+            "client_app/apple_shared/Rpt2/Sources/Rpt2/RptSecrets.swift",
+        ]
+        for rel in rels:
+            text = (ROOT / rel).read_text(encoding="utf-8")
+            self.assertIn(
+                'public static let deNodePubName = "de_node_elgamal.pub"',
+                text,
+                msg=rel,
+            )
+            self.assertIn("return deNodePubName", text, msg=rel)
+            # US host branch must not still return usNodePubName
+            self.assertNotIn("return usNodePubName", text, msg=rel)
+
+    def test_current_docs_do_not_list_us_as_live_catalog_peer(self):
+        readme = (ROOT / "README.md").read_text(encoding="utf-8")
+        self.assertIn("Catalog peers: **IS** / **DE** (default) only", readme)
+        self.assertNotIn("**IS** / **DE** (default) / **US**", readme)
+        privacy = (ROOT / "PRIVACY_POLICY.md").read_text(encoding="utf-8")
+        self.assertNotIn("and the US residual host", privacy)
+        self.assertIn("retired", privacy.lower())
+        wipe = (ROOT / "docs" / "NODE_WIPE_REINSTALL.md").read_text(encoding="utf-8")
+        self.assertNotIn("then **US**", wipe)
+        self.assertIn("**IS first**, then **DE**", wipe)
+
 
 if __name__ == "__main__":
     unittest.main()

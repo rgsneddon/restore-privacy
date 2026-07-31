@@ -22,7 +22,9 @@ public enum RptSecrets {
     public static let clientPrivName = "client_ed25519.priv"
     public static let nodePubName = "node_elgamal.pub"
     public static let exitNodePubName = "exit_node_elgamal.pub"
-    public static let usNodePubName = "us_node_elgamal.pub"
+    public static let usNodePubName = "us_node_elgamal.pub" // retired monopin file
+    /// Germany residual hop public key (HELLO when residual host is DE monopin).
+    public static let deNodePubName = "de_node_elgamal.pub"
     /// Product default residual entry (Germany monopin).
     public static let productEntryHost = "178.105.187.178"
     public static let productIcelandHost = "82.221.101.241"

@@ -95,7 +95,7 @@ Runs **only on the device** — no phone-home wipe notification.
 
 ## 4. Limits of this privacy promise
 
-1. **Hosting and networks.** (VPS provider / CDN logging may sit outside this application's no-log defaults.) Catalog peers: Iceland (FlokiNET), Germany (default entry / exit), and the US residual host. Host public “no invasive logs” stance is not a third-party forensic audit. CDN/status/DNS operators and other networks may log under their policies. Node OS compromise can still expose live memory.
+1. **Hosting and networks.** (VPS provider / CDN logging may sit outside this application's no-log defaults.) Live catalog peers: Iceland (FlokiNET) and Germany (default entry / exit). The United States residual host is **retired** (not dialable). Host public “no invasive logs” stance is not a third-party forensic audit. CDN/status/DNS operators and other networks may log under their policies. Node OS compromise can still expose live memory.
 2. **Destination sites** have their own policies.
 3. **Device and OS** (VPN dialogs, crash reporters, network stacks) process data outside this app.
 4. **Misconfiguration** (verbose logs, reverse-proxy access logs) can create logs this policy assumes are off.

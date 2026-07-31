@@ -7,7 +7,7 @@ Orchestrator entrypoint: `scripts/weekly_entry_rebuild.py` (still hosts the time
 
 | Rule | Detail |
 |------|--------|
-| Order | **IS first**, then **DE**, then **US** (and any later catalog peers) — finish prior peer before starting next |
+| Order | **IS first**, then **DE** (live catalog only; US retired) — finish prior peer before starting next |
 | Concurrency | Exclusive lock — **never** concurrent multi-node wipe |
 | Continuity | **Best-effort** hop to a healthy alternate while a peer drains (not zero packet-loss; hop is not guaranteed) |
 | Failsafe | If hop does not succeed, the client may disconnect or restart and will require **manual reconnection** whilst privacy-preserving weekly node wipedown occurs |
