@@ -31,7 +31,7 @@ class TestTitleLegalLinks(unittest.TestCase):
         )
         self.assertNotIn('id="beta-note"', html)
         self.assertNotIn('class="tagline"', html)
-        # Shared public nav (Home before Licence; button-style links)
+        # Shared public nav (button-style): Home → Settings Guide → Licence → …
         self.assertIn("LICENCE", html)
         self.assertIn("PRIVACY POLICY", html)
         self.assertIn("SECURITY AUDIT", html)
@@ -51,8 +51,18 @@ class TestTitleLegalLinks(unittest.TestCase):
         self.assertIn('id="privacy-link"', html)
         self.assertIn('id="audit-link"', html)
         self.assertIn("nav-btn", html)
-        # Order: Home before Licence; h1 then doc-links
-        self.assertLess(html.find('id="home-link"'), html.find('id="licence-link"'))
+        # Order: Home → Settings Guide → Licence → Audit → Privacy → Support
+        order_ids = (
+            "home-link",
+            "settings-guide-link",
+            "licence-link",
+            "audit-link",
+            "privacy-link",
+            "support-link",
+        )
+        positions = [html.find(f'id="{eid}"') for eid in order_ids]
+        for i in range(len(positions) - 1):
+            self.assertLess(positions[i], positions[i + 1], order_ids[i : i + 2])
         h1_pos = html.find("<h1>")
         if h1_pos < 0:
             h1_pos = html.find("<h1 ")

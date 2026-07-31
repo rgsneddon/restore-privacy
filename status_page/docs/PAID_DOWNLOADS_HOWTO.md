@@ -11,7 +11,7 @@ It does **not** unlock the paid download (BMC is not the fulfilment API).
 
 The product GitHub repository is **private**. This site does **not** offer free
 permanent installer buttons. Payment grants a **time-limited** download token
-(default **1 hour**, `RPT_DOWNLOAD_TOKEN_TTL_SEC`); the same link may be
+(default **12 hours**, `RPT_DOWNLOAD_TOKEN_TTL_SEC`); the same link may be
 **re-used** until it expires (retries if the connection drops). `/download`
 **proxies** the installer via a server-side GitHub token
 (`RPT_GITHUB_TOKEN` / `GITHUB_TOKEN`) or locally staged assets (`RPT_ASSET_DIR`).
@@ -44,11 +44,11 @@ Operator deploy for production email + Stripe product prices is documented in
 1. Homepage **Download client** box: select **device/platform** and **plan**
    (Monthly or Annual), then **Buy now** → Stripe subscription Checkout.
 2. After successful Stripe pay, the status host:
-   - mints a **1-hour** download token (reusable until expiry)
+   - mints a **12-hour** download token (reusable until expiry)
    - activates Connect entitlement for the Checkout session
    - mints a unique **keygen** (`RPT-KEY-…`) bound to that entitlement
    - emails the customer (**status-host fulfilment SMTP**, not the Stripe receipt PDF):
-     **keygen + PPI + absolute download link** + **1-hour / retry-if-drop** advice,
+     **keygen + PPI + absolute download link** + **12-hour / retry-if-drop** advice,
      support line **Questions? Contact us at rus@restoreprivacy.online**, signed **RASKUL**,
      with **USE THIS KEYGEN TO UNLOCK RESTORE PRIVACY**
    - Stripe’s own receipt/invoice email remains PDF-only (no download token). Brand it
@@ -170,7 +170,7 @@ stripe trigger checkout.session.completed
 | `RPT_PUBLIC_BASE_URL` | Public site origin, e.g. `https://restoreprivacy.online` (no trailing slash). Used for success/cancel URLs. |
 | `RPT_ASSET_FETCH_TOKEN` | Shared secret (you choose) for status host → Iceland VPS paid installer fetch; same value on VPS unit |
 | `RPT_PAYMENT_DATA_DIR` | Optional directory for SQLite grant DB (default: `status_page/data/`) |
-| `RPT_DOWNLOAD_TOKEN_TTL_SEC` | Optional download-token lifetime in seconds (default `3600` = **1 hour**). Tokens are reusable until this window ends. |
+| `RPT_DOWNLOAD_TOKEN_TTL_SEC` | Optional download-token lifetime in seconds (default `43200` = **12 hours**). Tokens are reusable until this window ends. |
 | `RPT_FULFILMENT_SMTP_HOST` | Optional SMTP host for customer fulfilment email (keygen + PPI + download) |
 | `RPT_FULFILMENT_SMTP_PORT` | SMTP port (default `587`) |
 | `RPT_FULFILMENT_SMTP_USER` / `RPT_FULFILMENT_SMTP_PASSWORD` | SMTP auth |
@@ -198,7 +198,7 @@ Checkout success URL pattern (set automatically from `RPT_PUBLIC_BASE_URL`):
 After payment, Stripe redirects to the success page with **`session_id`**. That page:
 
 1. Looks up the webhook-minted grant by Checkout session id (polls a few seconds if the webhook is slightly late).
-2. Shows a **1-hour reusable** link: `/download?token=…` (`#success-download-link`)
+2. Shows a **12-hour reusable** link: `/download?token=…` (`#success-download-link`)
    — same link can be retried if the connection drops until the window expires.
 
 You may also surface the token from admin grants if a buyer contacts support.
@@ -252,7 +252,7 @@ Architecture (modules):
 | `/pay/checkout` | POST form/JSON `{platform, interval}` → subscription Checkout Session redirect |
 | `/api/checkout` | JSON POST `{ "platform": "android", "interval": "year" }` → `{ url, amount_pence, … }` |
 | `/webhook/stripe` | Stripe webhook (signature required) |
-| `/download?token=` | **1-hour reusable proxy** download of the paid package (retry if connection drops; not a free GitHub redirect) |
+| `/download?token=` | **12-hour reusable proxy** download of the paid package (retry if connection drops; not a free GitHub redirect) |
 | `/download/success?session_id=` | After Checkout redirect — **Download \<platform\> package** button |
 | `/admin` | **Private** operator page: processor settings + grants (login required) |
 | `/admin/login` | Login form / POST credentials |
@@ -275,11 +275,11 @@ Session so the thank-you URL becomes
 
 - Never commit `sk_live_`, `whsec_`, or admin passwords.
 - Webhook **must** verify `Stripe-Signature` (implemented in `payments.py`).
-- Tokens are **time-limited** (default 1 hour) and **reusable** within that window;
+- Tokens are **time-limited** (default 12 hours) and **reusable** within that window;
   invalid/expired tokens do not download. Usage count does not burn the link.
 - Public status HTML must not expose free permanent `releases/download` installer buttons.
 - With a **private** repo, unpaid browsers cannot fetch installers; paid buyers get them only via token + server proxy.
 
 ## Success page UX
 
-After payment redirect, `/download/success` shows **Thank you**, names the **platform package you paid for**, auto-starts the `/download?token=…` installer (proxy stream), and instructs **run as administrator**. Copy explains the link is valid for **1 hour** and can be retried if the connection drops. A fallback **Download \<platform\> package** button remains if the browser blocks auto-download.
+After payment redirect, `/download/success` shows **Thank you**, names the **platform package you paid for**, auto-starts the `/download?token=…` installer (proxy stream), and instructs **run as administrator**. Copy explains the link is valid for **12 hours** and can be retried if the connection drops. A fallback **Download \<platform\> package** button remains if the browser blocks auto-download.

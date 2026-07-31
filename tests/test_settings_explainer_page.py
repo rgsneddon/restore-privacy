@@ -111,6 +111,12 @@ class TestHomepageSettingsGuideNav(unittest.TestCase):
         self.assertIn('id="settings-guide-link"', html)
         self.assertIn(f'href="{SETTINGS_EXPLAINER_PATH}"', html)
         self.assertIn("SETTINGS GUIDE", html)
+        # Settings Guide sits immediately after Home in main nav
+        i_home = html.index('id="home-link"')
+        i_sg = html.index('id="settings-guide-link"')
+        i_lic = html.index('id="licence-link"')
+        self.assertLess(i_home, i_sg)
+        self.assertLess(i_sg, i_lic)
         # Dedicated homepage banner box must not appear
         self.assertNotIn("settings-explainer-banner", html)
         self.assertNotIn("settings-explainer-banner-link", html)

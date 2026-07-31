@@ -1,14 +1,15 @@
 """Admin fleet node usage: bandwidth used vs capability (authenticated only).
 
-Public status stays title-only. This module builds operator rows for IS/DE
-from the product country catalog and optional private capacity probes.
+Public status stays title-only. This module builds operator rows for **IS/DE**
+(live residual catalog only) from the product country catalog and optional
+private capacity probes. United States (US) and Romania (RO) are **retired**
+and must not appear as live fleet peers.
 
-Limits are **per-peer**:
+Limits are **per-peer** (from ``node.private_capacity``):
   - **Bandwidth** — IS/DE product **unlimited-class** (extendable at cost; DE has
-    30 TB class entitlement); US fixed 200 Mbps product budget. Not auto-detected
-    NIC line-rate.
-  - **Session soft max** — utilization / residual routing hint (IS/US 512;
-    DE dedicated 8 vCPU / 32 GB → 1024). Not a hard public admission lock.
+    30 TB class entitlement). Not auto-detected NIC line-rate.
+  - **Session soft max** — utilization / residual routing hint (IS **512**;
+    DE dedicated 8 vCPU / 32 GB → **1024**). Not a hard public admission lock.
 """
 
 from __future__ import annotations
@@ -279,7 +280,7 @@ def resolve_session_soft_max(
     env: Mapping[str, str] | None = None,
     caps: Mapping[str, int] | None = None,
 ) -> int:
-    """Resolve session soft max for a peer (DE 1024; IS/US 512; RO 256).
+    """Resolve session soft max for a peer (DE 1024; IS 512; live catalog).
 
     Priority: ``RPT_SESSION_SOFT_MAX_MAP`` → product map → base 256.
     """
@@ -466,7 +467,7 @@ def row_from_probe_payload(
     maps = _product_maps()
     unlimited = maps["product_bandwidth_unlimited"](code=code, host=host)
     cap = bandwidth_cap_bps
-    # Product unlimited-class (IS/RO): do not re-pin a legacy node-reported Mbps budget
+    # Product unlimited-class (IS/DE): do not re-pin a legacy node-reported Mbps budget
     if unlimited:
         cap = None
     elif cap is None and payload.get("bandwidth_cap_bps") is not None:
@@ -486,7 +487,7 @@ def row_from_probe_payload(
         node_cap = None
         if payload.get("capacity") is not None:
             node_cap = max(1, int(payload["capacity"]))
-        # Prefer product soft max so US is 2× IS/RO even when a node still has
+        # Prefer product soft max (IS 512, DE 1024) even when a node still has
         # a flat env of 256; note node-reported capacity when it differs.
         if node_cap is not None and product_sess is not None and node_cap != product_sess:
             note = f"node reports capacity={node_cap}"
@@ -1128,7 +1129,10 @@ def render_admin_node_usage_section_html(
          data-fleet-usage-api="{FLEET_USAGE_API_PATH}">
   <h2 id="admin-node-usage-heading">Fleet node usage (bandwidth)</h2>
   <p class="muted" id="admin-node-usage-probe-note">
-  Residual peers (IS / RO / US). Avg used rate from private probes; table refreshes
+  Live residual peers <strong>IS</strong> (Iceland) and <strong>DE</strong> (Germany) only —
+  US and RO are retired. Bandwidth capability is product
+  <strong>unlimited-class</strong> for both (extendable at cost); session soft max
+  IS&nbsp;512 / DE&nbsp;1024. Avg used rate from private probes; table refreshes
   about every {refresh_ms // 1000}s
   (<span id="admin-node-usage-refreshed">—</span>). Not on the public shop.
   </p>

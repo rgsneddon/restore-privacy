@@ -91,7 +91,7 @@ ADMIN_ARCHITECTURE_FULL = (
     "pay on Stripe (monthly or yearly), then unlock Connect with the keygen from "
     "their fulfilment email. Installers are never free permanent GitHub downloads — "
     "each package is handed out through a time-limited paid link on the status host "
-    "(default 1 hour, reusable until it expires).\n\n"
+    "(default 12 hours, reusable until it expires).\n\n"
     "Where residual traffic lands: the live catalog has two peers — Germany "
     "(default entry) and Iceland. Users choose their entry country in the app. "
     "Multi-hop is optional: when turned on, exit is the other catalog peer, not a "
@@ -755,7 +755,7 @@ def render_purchase_reissue_section_html(
     <p><strong>Secondary download link minted</strong> for purchase
     <code id="reissue-result-purchase-id">{pid}</code> {copy_pid}
     ({plat} — <code>{fname}</code>).</p>
-    <p>Pass this <strong>1-hour reusable</strong> link to the buyer (not a free GitHub URL):</p>
+    <p>Pass this <strong>12-hour reusable</strong> link to the buyer (not a free GitHub URL):</p>
     <p><a id="reissue-download-link" href="{url}" rel="noopener noreferrer">{url}</a>
       {copy_url}</p>
     <p class="muted">Path only: <code id="reissue-download-path">{path}</code></p>
@@ -769,12 +769,12 @@ def render_purchase_reissue_section_html(
     they should quote the <strong>product purchase identifier</strong> from the thank-you
     page (format <code>RPT-XXXX-XXXX-XXXX</code>). Enter it below to mint a
     <strong>secondary time-limited download link</strong> for the same package they paid for.
-    Tell the buyer: open the link on a trusted device within 1 hour (re-download if
+    Tell the buyer: open the link on a trusted device within 12 hours (re-download if
     interrupted), save the installer, and keep their RPT-… ID for any future recovery.
     This is the preferred recovery path when the customer still has their purchase identifier.
   </p>
   <p class="muted" id="admin-reissue-elaborate">
-    Steps for the buyer after you send the link: (1) open the 1-hour download URL
+    Steps for the buyer after you send the link: (1) open the 12-hour download URL
     (retry if the connection drops — same link works until it expires),
     (2) download starts or use the on-page button, (3) run/install the package,
     (4) for Connect, use payment entitlement as on the original thank-you page if needed.
@@ -829,11 +829,11 @@ def render_admin_ondemand_mint_section_html(
   <div class="ok-msg" id="ondemand-result" role="status" data-admin-focus-result="1" tabindex="-1">
     <p><strong>Admin failsafe link minted</strong> for <strong id="ondemand-result-platform">{plat}</strong>
       (<code id="ondemand-result-filename">{fname}</code>).</p>
-    <p>1-hour reusable paid download (not free GitHub; retry if connection drops):</p>
+    <p>12-hour reusable paid download (not free GitHub; retry if connection drops):</p>
     <p><a id="ondemand-download-link" href="{url}" rel="noopener noreferrer">{url}</a>
       {copy_url}</p>
     <p class="muted">Path: <code id="ondemand-download-path">{path}</code>
-      — valid for 1 hour; not written as a customer RPT-PPI recovery event.</p>
+      — valid for 12 hours; not written as a customer RPT-PPI recovery event.</p>
   </div>"""
     plat_sel = (platform or "windows").strip().lower()
     options = []
@@ -996,7 +996,7 @@ def render_admin_tester_month_section_html(
       — expires after one month (valid_until
       <code id="tester-month-valid-until">{vu_s}</code>).</p>
     <p>Keygen: <code id="tester-month-keygen">{kg}</code> {copy_kg}</p>
-    <p>Download (1-hour status-host token, reusable until expiry; not free GitHub):</p>
+    <p>Download (12-hour status-host token, reusable until expiry; not free GitHub):</p>
     <p><a id="tester-month-download-link" href="{url}" rel="noopener noreferrer">{url}</a>
       {copy_url}</p>
     <p class="muted">Path: <code id="tester-month-download-path">{path}</code>
@@ -1052,7 +1052,7 @@ def render_seed_test_purchase_section_html(
     """Dev/staging-only card: seed a paid test grant (RPT-… + platform).
 
     Hidden unless :func:`seed_test_purchase_enabled` (``RPT_ADMIN_SEED_PURCHASE=1``).
-    Still creates a full-price paid grant + 1-hour download token — never a free public unlock.
+    Still creates a full-price paid grant + 12-hour download token — never a free public unlock.
     """
     if not seed_test_purchase_enabled():
         return ""
@@ -1080,11 +1080,11 @@ def render_seed_test_purchase_section_html(
       <code id="seed-purchase-id">{pid}</code> {copy_pid}</p>
     <p>Platform: <strong id="seed-purchase-platform">{plat}</strong>
       — <code id="seed-purchase-filename">{fname}</code></p>
-    <p>1-hour reusable paid download (not free GitHub):
+    <p>12-hour reusable paid download (not free GitHub):
       <a id="seed-download-link" href="{url}" rel="noopener noreferrer">{url}</a>
       {copy_url}</p>
     <p class="muted">Path: <code id="seed-download-path">{path}</code>
-      — valid for 1 hour (audit stamp does not burn the link). Use the purchase ID
+      — valid for 12 hours (audit stamp does not burn the link). Use the purchase ID
       above in the re-issue form after the window expires or if a new token is needed.</p>
   </div>"""
     plat_sel = (platform or "windows").strip().lower()
@@ -2396,22 +2396,27 @@ def render_admin_support_tickets_page_html(
 
     try:
         from support_tickets import (
+            ADMIN_SUPPORT_CLEAR_PATH,
             ADMIN_SUPPORT_CLOSE_PATH,
             ADMIN_SUPPORT_TICKETS_PATH,
+            CLEAR_ALL_SUPPORT_TICKETS_CONFIRM,
             TICKET_STATUS_CLOSED,
             TICKET_STATUS_OPEN,
             list_support_tickets,
         )
     except ImportError:  # pragma: no cover
         from status_page.support_tickets import (  # type: ignore
+            ADMIN_SUPPORT_CLEAR_PATH,
             ADMIN_SUPPORT_CLOSE_PATH,
             ADMIN_SUPPORT_TICKETS_PATH,
+            CLEAR_ALL_SUPPORT_TICKETS_CONFIRM,
             TICKET_STATUS_CLOSED,
             TICKET_STATUS_OPEN,
             list_support_tickets,
         )
 
     rows = tickets if tickets is not None else list_support_tickets()
+    confirm_token = _escape(str(CLEAR_ALL_SUPPORT_TICKETS_CONFIRM))
     flash = ""
     if (message or "").strip():
         flash += (
@@ -2433,6 +2438,34 @@ def render_admin_support_tickets_page_html(
             return "—"
         return _time.strftime("%Y-%m-%d %H:%M:%S UTC", _time.gmtime(t))
 
+    def _mail_cell(
+        status_raw: Any,
+        detail_raw: Any,
+        *,
+        field: str,
+    ) -> str:
+        """Staff / close mail cell: store status + optional detail (not chrome text)."""
+        st = str(status_raw or "").strip()
+        detail = str(detail_raw or "").strip()
+        if not st:
+            st_disp = "—"
+            st_cls = "mail-status mail-status-empty"
+        else:
+            st_disp = st
+            st_safe = re.sub(r"[^a-z0-9_-]+", "", st.lower()) or "other"
+            st_cls = f"mail-status mail-status-{st_safe}"
+        detail_html = ""
+        if detail:
+            detail_html = (
+                f'<div class="mail-detail" data-field="{_escape(field)}-detail">'
+                f"{_escape(detail[:240])}</div>"
+            )
+        return (
+            f'<td data-field="{_escape(field)}">'
+            f'<span class="{st_cls}" data-mail-status="{_escape(st_disp)}">'
+            f"{_escape(st_disp)}</span>{detail_html}</td>"
+        )
+
     body_rows: list[str] = []
     for t in rows:
         tid = str(t.get("ticket_id") or "")
@@ -2451,40 +2484,45 @@ def render_admin_support_tickets_page_html(
                 f'<span class="ticket-toggle-knob"></span></span></span>'
             )
         else:
-            # Green open switch (knob left); flip submits close (one-way)
+            # Green open switch: native submit button (CSP-safe; no inline handlers).
+            # External script also wires change/click for progressive UX parity.
             control = (
                 f'<form class="admin-support-close-form" method="post" '
                 f'action="{ADMIN_SUPPORT_CLOSE_PATH}" '
-                f'id="close-form-{_escape(tid)}">'
+                f'id="close-form-{_escape(tid)}" data-ticket-close="1">'
                 f'<input type="hidden" name="ticket_id" value="{_escape(tid)}"/>'
-                f'<label class="ticket-toggle ticket-toggle-open" '
+                f'<button type="submit" name="close" value="1" '
+                f'class="ticket-toggle ticket-toggle-open ticket-toggle-submit" '
+                f'id="ticket-toggle-{_escape(tid)}" '
                 f'title="Close ticket (cannot reopen)" '
                 f'aria-label="Open — switch to close">'
-                f'<input type="checkbox" name="close" value="1" '
-                f'class="ticket-toggle-input" '
-                f'id="ticket-toggle-{_escape(tid)}" '
-                f'onchange="this.form.submit()"/>'
                 f'<span class="ticket-toggle-track" aria-hidden="true">'
                 f'<span class="ticket-toggle-knob"></span></span>'
-                f"</label></form>"
+                f"</button></form>"
             )
+        email = str(t.get("email") or "")
+        subject = str(t.get("subject") or "")
+        message = str(t.get("message") or "")
+        platform = str(t.get("platform") or "") or "—"
+        app_ver = str(t.get("app_version") or "") or "—"
         body_rows.append(
             "<tr "
             f'id="ticket-row-{_escape(tid)}" data-ticket-id="{_escape(tid)}" '
             f'data-status="{_escape(status_label)}">'
-            f"<td><code>{_escape(tid)}</code></td>"
-            f"<td>{_escape(_fmt_ts(t.get('created_at')))}</td>"
-            f"<td>{_escape(str(t.get('email') or ''))}</td>"
-            f"<td>{_escape(str(t.get('subject') or ''))}</td>"
-            f'<td class="ticket-msg-cell"><div class="ticket-msg-scroll">'
-            f"{_escape(str(t.get('message') or ''))}</div></td>"
-            f"<td>{_escape(str(t.get('platform') or '—') or '—')}</td>"
-            f"<td>{_escape(str(t.get('app_version') or '—') or '—')}</td>"
-            f"<td>{_escape(str(t.get('mail_status') or '—'))}</td>"
-            f'<td><span class="{status_cls}">{_escape(status_label)}</span></td>'
-            f"<td>{_escape(_fmt_ts(t.get('closed_at')))}</td>"
-            f"<td>{_escape(str(t.get('close_mail_status') or '—') or '—')}</td>"
-            f"<td class=\"ticket-toggle-cell\">{control}</td>"
+            f'<td data-field="ticket_id"><code>{_escape(tid)}</code></td>'
+            f'<td data-field="created_at">{_escape(_fmt_ts(t.get("created_at")))}</td>'
+            f'<td data-field="email">{_escape(email)}</td>'
+            f'<td data-field="subject">{_escape(subject)}</td>'
+            f'<td class="ticket-msg-cell" data-field="message">'
+            f'<div class="ticket-msg-scroll">{_escape(message)}</div></td>'
+            f'<td data-field="platform">{_escape(platform)}</td>'
+            f'<td data-field="app_version">{_escape(app_ver)}</td>'
+            f"{_mail_cell(t.get('mail_status'), t.get('mail_detail'), field='mail_status')}"
+            f'<td data-field="status"><span class="{status_cls}">'
+            f"{_escape(status_label)}</span></td>"
+            f'<td data-field="closed_at">{_escape(_fmt_ts(t.get("closed_at")))}</td>'
+            f"{_mail_cell(t.get('close_mail_status'), t.get('close_mail_detail'), field='close_mail_status')}"
+            f'<td class="ticket-toggle-cell" data-field="open_closed">{control}</td>'
             "</tr>"
         )
     table_body = (
@@ -2505,18 +2543,18 @@ def render_admin_support_tickets_page_html(
   <table class="admin-table" id="admin-support-table">
     <thead>
       <tr>
-        <th>Ticket ID</th>
-        <th>Created (UTC)</th>
-        <th>Email</th>
-        <th>Subject</th>
-        <th>Message</th>
-        <th>Platform</th>
-        <th>App version</th>
-        <th>Staff mail</th>
-        <th>Status</th>
-        <th>Closed (UTC)</th>
-        <th>Close mail</th>
-        <th>Open / closed</th>
+        <th data-col="ticket_id">Ticket ID</th>
+        <th data-col="created_at">Created (UTC)</th>
+        <th data-col="email">Email</th>
+        <th data-col="subject">Subject</th>
+        <th data-col="message">Message</th>
+        <th data-col="platform">Platform</th>
+        <th data-col="app_version">App version</th>
+        <th data-col="mail_status">Staff mail</th>
+        <th data-col="status">Status</th>
+        <th data-col="closed_at">Closed (UTC)</th>
+        <th data-col="close_mail_status">Close mail</th>
+        <th data-col="open_closed">Open / closed</th>
       </tr>
     </thead>
     <tbody>
@@ -2524,6 +2562,25 @@ def render_admin_support_tickets_page_html(
     </tbody>
   </table>
   </div>
+  <form method="post" action="{ADMIN_SUPPORT_CLEAR_PATH}"
+        id="admin-clear-support-tickets-form"
+        data-admin-clear-support-tickets="1">
+    <p class="muted" id="admin-clear-support-tickets-blurb">
+      <strong>Clear all support tickets</strong>: permanently deletes every ticket
+      row so this table is empty. Ticket IDs restart at <code>RPS-001</code> on the
+      next create. Type
+      <code id="admin-clear-support-tickets-token">{confirm_token}</code> to confirm.
+    </p>
+    <label class="field" for="clear_support_tickets_confirm">
+      <span class="field-label">Confirm phrase</span>
+      <input id="clear_support_tickets_confirm" name="confirm" type="text"
+             autocomplete="off" maxlength="64" required
+             placeholder="{confirm_token}">
+    </label>
+    <button type="submit" id="admin-clear-support-tickets-submit">
+      Clear all support tickets
+    </button>
+  </form>
 </section>
 <style>
 .admin-table-scroll{{overflow-x:auto;max-width:100%}}
@@ -2535,13 +2592,20 @@ def render_admin_support_tickets_page_html(
 .ticket-msg-scroll{{max-height:5.5rem;overflow:auto;white-space:pre-wrap;word-break:break-word}}
 .badge-open{{color:#065f46;font-weight:700}}
 .badge-closed{{color:#7f1d1d;font-weight:700}}
-/* Textless green/red toggle (not a bare checkbox) */
+.mail-status{{font-weight:600;font-variant-numeric:tabular-nums}}
+.mail-status-failed,.mail-status-error{{color:#b91c1c}}
+.mail-status-sent,.mail-status-ok{{color:#065f46}}
+.mail-status-pending{{color:#92400e}}
+.mail-detail{{margin-top:0.2rem;font-size:0.75rem;opacity:0.85;max-width:12rem;
+  word-break:break-word;white-space:pre-wrap}}
+/* Textless green/red toggle — submit button (CSP-safe, no inline handlers) */
 .ticket-toggle-cell{{vertical-align:middle;min-width:3.2rem}}
 .ticket-toggle{{
   display:inline-block;position:relative;cursor:pointer;user-select:none;
   vertical-align:middle;line-height:0}}
-.ticket-toggle-input{{
-  position:absolute;opacity:0;width:0;height:0;margin:0;pointer-events:none}}
+button.ticket-toggle-submit{{
+  border:0;background:transparent;padding:0;margin:0;font:inherit;color:inherit;
+  appearance:none;-webkit-appearance:none}}
 .ticket-toggle-track{{
   display:inline-block;width:2.75rem;height:1.45rem;border-radius:999px;
   position:relative;transition:background 0.15s ease;
@@ -2560,6 +2624,7 @@ def render_admin_support_tickets_page_html(
   padding:0.5rem 0.75rem;border-radius:8px}}
 .err-msg{{color:#fecaca;background:rgba(127,29,29,0.35);padding:0.5rem 0.75rem;border-radius:8px}}
 </style>
+<script id="admin-support-tickets-script" src="/static/admin_support_tickets.js"></script>
 """
     _ = ADMIN_SUPPORT_TICKETS_PATH  # path used by sidebar href
     return _admin_page_shell(

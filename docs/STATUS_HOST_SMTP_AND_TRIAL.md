@@ -78,12 +78,12 @@ Product fulfilment (keygen + PPI + download after Stripe pay) uses **outbound SM
 | Channel | What the customer gets | Download token? |
 |---------|------------------------|-----------------|
 | **Stripe receipt / invoice** | Payment PDF, amount, “Questions? Contact us…” | **No** — Stripe cannot host `/download?token=…` |
-| **Status-host fulfilment SMTP** | Keygen + PPI + **absolute download link** + **1-hour** retry advice | **Yes** — only place the installer link is emailed |
+| **Status-host fulfilment SMTP** | Keygen + PPI + **absolute download link** + **12-hour** retry advice | **Yes** — only place the installer link is emailed |
 
 After `checkout.session.completed`, the status host builds and sends the fulfilment
 email (`build_fulfilment_email_payload` / `send_fulfilment_email`) when SMTP is
 configured and Checkout has a customer email. Body includes
-`DOWNLOAD_LINK_VALIDITY_ADVICE` (1 hour, re-download if interrupted) and
+`DOWNLOAD_LINK_VALIDITY_ADVICE` (12 hours, re-download if interrupted) and
 `Questions? Contact us at rus@restoreprivacy.online`. From display name **RASKUL**,
 Reply-To **rus@restoreprivacy.online**.
 

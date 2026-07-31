@@ -12,7 +12,8 @@ sys.path.insert(0, str(ROOT / "status_page"))
 
 
 class TestPublicChromeModule(unittest.TestCase):
-    def test_nav_home_before_licence_and_button_classes(self) -> None:
+    def test_nav_main_menu_order_and_button_classes(self) -> None:
+        """Main nav order: Home → Settings Guide → Licence → Audit → Privacy → Support."""
         from public_chrome import public_nav_links_html
 
         html = public_nav_links_html(active="home")
@@ -20,6 +21,7 @@ class TestPublicChromeModule(unittest.TestCase):
         self.assertIn('id="licence-link"', html)
         self.assertIn('id="privacy-link"', html)
         self.assertIn('id="audit-link"', html)
+        self.assertIn('id="support-link"', html)
         # README is not a main-menu control
         self.assertNotIn('id="readme-link"', html)
         self.assertNotIn(">README<", html)
@@ -29,11 +31,27 @@ class TestPublicChromeModule(unittest.TestCase):
         self.assertIn('href="/settings-explainer"', html)
         self.assertIn('id="doc-links"', html)
         self.assertIn("nav-btn", html)
-        i_home = html.index('id="home-link"')
-        i_lic = html.index('id="licence-link"')
-        self.assertLess(i_home, i_lic, "Home must appear before Licence")
+        # Exact sequential order of the six main controls
+        order_ids = (
+            "home-link",
+            "settings-guide-link",
+            "licence-link",
+            "audit-link",
+            "privacy-link",
+            "support-link",
+        )
+        positions = [html.index(f'id="{eid}"') for eid in order_ids]
+        for i in range(len(positions) - 1):
+            self.assertLess(
+                positions[i],
+                positions[i + 1],
+                f"{order_ids[i]} must appear before {order_ids[i + 1]}",
+            )
         self.assertIn('href="/"', html)
         self.assertIn('href="/LICENSE"', html)
+        self.assertIn('href="/AUDIT.md"', html)
+        self.assertIn('href="/PRIVACY_POLICY.md"', html)
+        self.assertIn('href="/support"', html)
         self.assertIn("is-active", html)
 
     def test_nav_active_exactly_one_per_key(self) -> None:
@@ -255,9 +273,22 @@ class TestHomepageChrome(unittest.TestCase):
         self.assertIn(f"<title>{PUBLIC_BRAND_TITLE}</title>", html)
         self.assertIn('id="home-link" href="/"', html)
         self.assertIn('id="licence-link" href="/LICENSE"', html)
-        i_home = html.index('id="home-link"')
-        i_lic = html.index('id="licence-link"')
-        self.assertLess(i_home, i_lic)
+        # Shared main-nav order on homepage
+        order_ids = (
+            "home-link",
+            "settings-guide-link",
+            "licence-link",
+            "audit-link",
+            "privacy-link",
+            "support-link",
+        )
+        positions = [html.index(f'id="{eid}"') for eid in order_ids]
+        for i in range(len(positions) - 1):
+            self.assertLess(
+                positions[i],
+                positions[i + 1],
+                f"homepage: {order_ids[i]} before {order_ids[i + 1]}",
+            )
         self.assertIn('id="theme-mode-control"', html)
         self.assertIn("public-theme-script", html)
         self.assertIn("nav-btn", html)
@@ -304,9 +335,21 @@ class TestDocsShareChrome(unittest.TestCase):
             self.assertNotIn("brand-tagline", brand_box, path)
             self.assertNotIn('class="tagline"', brand_box, path)
             self.assertNotIn("lightweight vpn to restore", brand_box.lower(), path)
-            i_home = html.index('id="home-link"')
-            i_lic = html.index('id="licence-link"')
-            self.assertLess(i_home, i_lic, path)
+            order_ids = (
+                "home-link",
+                "settings-guide-link",
+                "licence-link",
+                "audit-link",
+                "privacy-link",
+                "support-link",
+            )
+            positions = [html.index(f'id="{eid}"') for eid in order_ids]
+            for i in range(len(positions) - 1):
+                self.assertLess(
+                    positions[i],
+                    positions[i + 1],
+                    f"{path}: {order_ids[i]} before {order_ids[i + 1]}",
+                )
         # Licence keeps typeform / plain body
         lic = public_docs.document_bytes_for_path("/LICENSE")
         assert lic is not None

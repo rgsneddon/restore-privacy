@@ -26,7 +26,7 @@ reads it from the Checkout Session and fills the browser URL.
 
 | Event | Purpose |
 |-------|---------|
-| `checkout.session.completed` | Paid checkout → mint **1-hour reusable** download token + **activate Connect entitlement** + **unique keygen** + fulfilment email (keygen + PPI + download) |
+| `checkout.session.completed` | Paid checkout → mint **12-hour reusable** download token + **activate Connect entitlement** + **unique keygen** + fulfilment email (keygen + PPI + download) |
 | `checkout.session.async_payment_failed` | Async pay fail → **revoke Connect** |
 | `checkout.session.expired` | Expired unpaid checkout → revoke if any |
 | `payment_intent.payment_failed` | Card/charge fail → **revoke Connect** |
@@ -75,7 +75,7 @@ stripe trigger checkout.session.completed
 On `checkout.session.completed` the status host mints a unique **keygen**
 (`RPT-KEY-…`) bound to the connect entitlement and includes it in the customer
 fulfilment email with **USE THIS KEYGEN TO UNLOCK RESTORE PRIVACY**,
-the **PPI**, and the time-limited (1 hour) download link.
+the **PPI**, and the time-limited (12 hours) download link.
 
 **Connect allowed = active subscription + keygen activated** (after licence
 accept). Download alone does not unlock residual VPN.

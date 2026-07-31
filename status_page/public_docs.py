@@ -1149,7 +1149,7 @@ There are no free permanent installer buttons on this shop.</p>
       rel="noopener noreferrer">{_escape(pay)}</a></li>
   <li>After checkout (trial start or paid), use the download on the success page
       (<code>{_escape(claim)}?session_id=…</code>). The link is valid for
-      <strong>1 hour</strong> and can be used again if the connection drops
+      <strong>12 hours</strong> and can be used again if the connection drops
       mid-download (not single-use). Your keygen arrives in email
       separately (USE THIS KEYGEN TO UNLOCK RESTORE PRIVACY).</li>
 </ol>
@@ -1182,7 +1182,7 @@ paid period; refunds and subscription end revoke access.</p>
 
 
 def render_public_nav_links_html(*, active: str | None = None) -> str:
-    """Shared public nav: Home before Licence, button-style (logo palette).
+    """Shared public nav: Home → Settings Guide → Licence → … (logo palette).
 
     Delegates to :mod:`public_chrome` so homepage and docs cannot drift.
     """

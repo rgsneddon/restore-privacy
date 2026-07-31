@@ -271,7 +271,7 @@ By accepting below you confirm that:
 3. Tester builds may be pre-release or catalog monopin builds; residual VPN
    behaviour, nodes, and host privacy posture are as described in product docs
    (no absolute anonymity or logging-free guarantee beyond published statements).
-4. Download links are time-limited (1 hour) status-host fulfilment tokens — not permanent
+4. Download links are time-limited (12 hours) status-host fulfilment tokens — not permanent
    public installer mirrors. KEYGEN unlocks Connect for the tester period only.
 5. After the tester period ends, Connect is refused until a paid subscription
    or new authorised entitlement is obtained.
@@ -564,7 +564,7 @@ def render_success_html(mint: dict[str, Any]) -> bytes:
     <p style="margin:0 0 0.35rem;color:#86efac;font-weight:600">KEYGEN</p>
     <p class="keygen" id="product-keygen">{kg}</p>
     <p class="dl" style="margin:0 0 0.75rem">
-      <a href="{url}">Download installer (1-hour link)</a>
+      <a href="{url}">Download installer (12-hour link)</a>
     </p>
     <p style="margin:0;font-size:0.9rem;color:#bbf7d0">{unlock}</p>
   </div>

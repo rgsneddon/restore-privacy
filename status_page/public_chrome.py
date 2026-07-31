@@ -1088,7 +1088,8 @@ def public_product_tabs_html(*, active: str = PRODUCT_VPN_KEY) -> str:
 
 
 def public_nav_links_html(*, active: str | None = None) -> str:
-    """Button-style nav: Home, Licence, Privacy, Audit, Support, Settings Guide.
+    """Button-style nav: Home → Settings Guide → Licence → Security Audit →
+    Privacy Policy → Support.
 
     *active* is one of: home, licence, privacy, audit, support, settings
     (or None). README is not a main-menu control (``/README.md`` may still be
@@ -1096,11 +1097,11 @@ def public_nav_links_html(*, active: str | None = None) -> str:
     """
     items = (
         ("HOME", HOME_PATH, HOME_LINK_ID, "home"),
-        ("LICENCE", LICENSE_PATH, LICENCE_LINK_ID, "licence"),
-        ("PRIVACY POLICY", PRIVACY_PATH, PRIVACY_LINK_ID, "privacy"),
-        ("SECURITY AUDIT", AUDIT_PATH, AUDIT_LINK_ID, "audit"),
-        ("SUPPORT", SUPPORT_PATH, SUPPORT_LINK_ID, "support"),
         ("SETTINGS GUIDE", SETTINGS_GUIDE_PATH, SETTINGS_GUIDE_LINK_ID, "settings"),
+        ("LICENCE", LICENSE_PATH, LICENCE_LINK_ID, "licence"),
+        ("SECURITY AUDIT", AUDIT_PATH, AUDIT_LINK_ID, "audit"),
+        ("PRIVACY POLICY", PRIVACY_PATH, PRIVACY_LINK_ID, "privacy"),
+        ("SUPPORT", SUPPORT_PATH, SUPPORT_LINK_ID, "support"),
     )
     parts: list[str] = []
     for label, path, el_id, key in items:
@@ -1147,7 +1148,7 @@ def public_brand_header_html(
     Logo has no outer plate/frame. Under-title tagline is omitted by default.
     Pass a non-empty *tagline* only if a page truly needs a header subtitle.
     Brand H1 defaults to :data:`PUBLIC_BRAND_TITLE` (**RESTORE PRIVACY VPN**).
-    *include_site_nav* controls Home/Licence/Privacy/Audit/Support/Settings Guide
+    *include_site_nav* controls Home/Settings Guide/Licence/Audit/Privacy/Support
     menu buttons (VPN homepage keeps them; Browser/Vault landings may omit them).
     """
     # Product landings pass full product titles; VPN home normalizes short titles.

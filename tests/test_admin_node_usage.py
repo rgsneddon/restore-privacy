@@ -104,6 +104,7 @@ class TestProductPerPeerCaps(unittest.TestCase):
         from admin_node_usage import build_fleet_usage_rows, product_catalog_peers
 
         peers = product_catalog_peers()
+        self.assertEqual({p["code"] for p in peers}, {"IS", "DE"})
         probes = {
             "82.221.101.241": {
                 "live": 10,
@@ -119,33 +120,30 @@ class TestProductPerPeerCaps(unittest.TestCase):
                 "bandwidth_cap_bps": 100_000_000,
                 "private": True,
             },
-            "5.161.242.85": {
-                "live": 20,
-                "capacity": 512,
-                "private": True,
-            },
         }
         rows = build_fleet_usage_rows(probes_by_host=probes, peers=peers, env={})
         by = {r.code: r for r in rows}
+        self.assertEqual(set(by), {"IS", "DE"})
         self.assertEqual(by["DE"].sessions_cap, 1024)
         self.assertEqual(by["IS"].sessions_cap, 512)
-        self.assertEqual(by["US"].sessions_cap, 512)
         self.assertGreater(by["DE"].sessions_cap, by["IS"].sessions_cap)
         # IS/DE product unlimited — no fixed Mbps budget even if node reported one
         self.assertIsNone(by["IS"].bandwidth_cap_bps)
         self.assertIsNone(by["DE"].bandwidth_cap_bps)
         self.assertIsNone(by["IS"].bandwidth_util)
-        self.assertEqual(by["US"].bandwidth_cap_bps, 200_000_000)
+        # Node reported capacity=256 while product soft max is 512 → detail note
+        self.assertIn("capacity=256", by["IS"].detail)
 
 
 class TestFleetRows(unittest.TestCase):
-    def test_rows_cover_catalog_is_de_us(self):
+    def test_rows_cover_catalog_is_de_only(self):
         from admin_node_usage import build_fleet_usage_rows, product_catalog_peers
 
         peers = product_catalog_peers()
         codes = {p["code"] for p in peers}
-        self.assertEqual(codes, {"IS", "DE", "US"})
+        self.assertEqual(codes, {"IS", "DE"})
         self.assertNotIn("RO", codes)
+        self.assertNotIn("US", codes)
         probes = {
             "82.221.101.241": {
                 "live": 10,
@@ -153,6 +151,8 @@ class TestFleetRows(unittest.TestCase):
                 "total_bytes_relayed": 8_000_000,
                 "process_uptime_sec": 100,
                 "private": True,
+                # Legacy fixed Mbps pin on node — must not override unlimited-class
+                "bandwidth_cap_bps": 100_000_000,
             }
         }
         rows = build_fleet_usage_rows(
@@ -161,67 +161,53 @@ class TestFleetRows(unittest.TestCase):
             env={},
         )
         by_code = {r.code: r for r in rows}
+        self.assertEqual(set(by_code), {"IS", "DE"})
         self.assertEqual(by_code["IS"].status, "ok")
         self.assertIsNotNone(by_code["IS"].bandwidth_used_bps)
         self.assertIsNone(by_code["IS"].bandwidth_cap_bps)  # unlimited-class
+        self.assertEqual(by_code["IS"].sessions_cap, 512)
         self.assertIn(by_code["DE"].status, ("unknown", "error"))
-        self.assertEqual(by_code["US"].sessions_cap, 512)
         self.assertEqual(by_code["DE"].sessions_cap, 1024)
+        self.assertIsNone(by_code["DE"].bandwidth_cap_bps)
 
 
 class TestAdminHtmlSection(unittest.TestCase):
-    def test_admin_html_no_node_column_blurb(self):
+    def test_admin_html_is_de_unlimited_and_catalog_honesty(self):
         import admin_panel
-        from admin_node_usage import NodeUsageRow
+        from admin_node_usage import (
+            NodeUsageRow,
+            build_fleet_usage_rows,
+            format_bandwidth_cap,
+            product_catalog_peers,
+            render_admin_node_usage_section_html,
+            resolve_session_soft_max,
+        )
 
-        rows = [
-            NodeUsageRow(
-                code="IS",
-                name="Iceland",
-                host="82.221.101.241",
-                port=44044,
-                bandwidth_used_bps=1_000_000.0,
-                bandwidth_cap_bps=None,
-                bandwidth_util=None,
-                bytes_relayed=5_000_000,
-                uptime_sec=40,
-                sessions_live=2,
-                sessions_cap=512,
-                session_util=2 / 512,
-                status="ok",
-            ),
-            NodeUsageRow(
-                code="DE",
-                name="Germany",
-                host="178.105.187.178",
-                port=44044,
-                bandwidth_used_bps=None,
-                bandwidth_cap_bps=None,
-                bandwidth_util=None,
-                bytes_relayed=None,
-                uptime_sec=None,
-                sessions_live=None,
-                sessions_cap=1024,
-                session_util=None,
-                status="unknown",
-                detail="not probed",
-            ),
-            NodeUsageRow(
-                code="US",
-                name="United States",
-                host="5.161.242.85",
-                port=44044,
-                bandwidth_used_bps=2_000_000.0,
-                bandwidth_cap_bps=200_000_000,
-                bandwidth_util=0.01,
-                bytes_relayed=9_000_000,
-                uptime_sec=40,
-                sessions_live=4,
-                sessions_cap=512,
-                session_util=4 / 512,
-                status="ok",
-            ),
-        ]
+        # Real catalog path → only IS+DE rows from builder
+        peers = product_catalog_peers()
+        probes = {
+            "82.221.101.241": {
+                "live": 2,
+                "capacity": 512,
+                "total_bytes_relayed": 5_000_000,
+                "process_uptime_sec": 40,
+                "bandwidth_cap_bps": 100_000_000,  # ignored for unlimited-class
+                "private": True,
+            },
+        }
+        rows = build_fleet_usage_rows(probes_by_host=probes, peers=peers, env={})
+        by = {r.code: r for r in rows}
+        self.assertEqual(set(by), {"IS", "DE"})
+        self.assertIsNone(by["IS"].bandwidth_cap_bps)
+        self.assertEqual(by["IS"].sessions_cap, 512)
+        self.assertEqual(
+            format_bandwidth_cap(by["IS"].bandwidth_cap_bps, code="IS", host=by["IS"].host),
+            "unlimited",
+        )
+        self.assertEqual(
+            resolve_session_soft_max(code="IS", host=by["IS"].host, env={}), 512
+        )
+
         with tempfile.TemporaryDirectory() as td:
             prev = os.environ.get("RPT_PAYMENT_DATA_DIR")
             os.environ["RPT_PAYMENT_DATA_DIR"] = td
@@ -245,12 +231,25 @@ class TestAdminHtmlSection(unittest.TestCase):
         self.assertNotIn("admin-node-limit-bandwidth", html)
         self.assertNotIn("Bandwidth budget — operator", html)
         self.assertNotIn("Session soft max — soft", html)
-        # Short node labels remain
+        # Short node labels remain — live catalog only
         self.assertIn("Iceland", html)
         self.assertIn("Germany", html)
         self.assertNotIn("Romania", html)
+        self.assertNotIn("United States", html)
         self.assertIn("unlimited", html)  # IS/DE capacity display
-        self.assertIn("200.00 Mbps", html)  # US
+        self.assertIn('id="admin-node-bw-cap-IS">unlimited<', html)
+        self.assertIn('id="admin-node-sess-IS">', html)
+        self.assertIn("2/512", html)
+        # Probe note: IS+DE honesty, not RO/US as live residual peers
+        self.assertIn("admin-node-usage-probe-note", html)
+        note = html[html.index("admin-node-usage-probe-note") : html.index("admin-node-usage-probe-note") + 800]
+        self.assertIn("IS", note)
+        self.assertIn("DE", note)
+        self.assertIn("unlimited-class", note)
+        self.assertIn("512", note)
+        self.assertIn("1024", note)
+        self.assertNotIn("IS / RO / US", note)
+        self.assertIn("retired", note.lower())
         # Live refresh still present (script externalized for CSP)
         self.assertIn("data-fleet-refresh-ms", html)
         self.assertIn("/admin/api/fleet-usage", html)
@@ -260,6 +259,12 @@ class TestAdminHtmlSection(unittest.TestCase):
         )
         self.assertIn("setInterval", js)
 
+        # Section-only render (same blurb / IS row)
+        section = render_admin_node_usage_section_html(rows, live=False)
+        self.assertIn('id="admin-node-bw-cap-IS">unlimited<', section)
+        self.assertNotIn("IS / RO / US", section)
+        self.assertNotIn("United States", section)
+
     def test_section_html_short_labels_only(self):
         from admin_node_usage import (
             NodeUsageRow,
@@ -268,12 +273,12 @@ class TestAdminHtmlSection(unittest.TestCase):
 
         rows = [
             NodeUsageRow(
-                code="US",
-                name="United States",
-                host="5.161.242.85",
+                code="IS",
+                name="Iceland",
+                host="82.221.101.241",
                 port=44044,
                 bandwidth_used_bps=None,
-                bandwidth_cap_bps=200_000_000,
+                bandwidth_cap_bps=None,
                 bandwidth_util=None,
                 bytes_relayed=None,
                 uptime_sec=None,
@@ -286,7 +291,8 @@ class TestAdminHtmlSection(unittest.TestCase):
         html = render_admin_node_usage_section_html(rows, live=False)
         self.assertNotIn("admin-node-why", html)
         self.assertNotIn("operator product allowance", html.lower())
-        self.assertIn("United States", html)
+        self.assertIn("Iceland", html)
+        self.assertIn("unlimited", html)
         self.assertIn("/static/admin_fleet_usage.js", html)
         js = (ROOT / "status_page" / "static" / "admin_fleet_usage.js").read_text(
             encoding="utf-8"
@@ -322,18 +328,18 @@ class TestLiveRefreshContract(unittest.TestCase):
                 status="ok",
             ),
             NodeUsageRow(
-                code="US",
-                name="United States",
-                host="5.161.242.85",
+                code="DE",
+                name="Germany",
+                host="178.105.187.178",
                 port=44044,
                 bandwidth_used_bps=2_000_000.0,
-                bandwidth_cap_bps=200_000_000,
-                bandwidth_util=0.01,
+                bandwidth_cap_bps=None,
+                bandwidth_util=None,
                 bytes_relayed=2000,
                 uptime_sec=10,
                 sessions_live=6,
-                sessions_cap=512,
-                session_util=6 / 512,
+                sessions_cap=1024,
+                session_util=6 / 1024,
                 status="ok",
             ),
         ]
@@ -344,7 +350,9 @@ class TestLiveRefreshContract(unittest.TestCase):
         self.assertEqual(by["IS"]["sessions_cap"], 512)
         self.assertIsNone(by["IS"]["bandwidth_cap_bps"])
         self.assertEqual(by["IS"]["bandwidth_cap_display"], "unlimited")
-        self.assertEqual(by["US"]["bandwidth_cap_bps"], 200_000_000)
+        self.assertEqual(by["DE"]["sessions_cap"], 1024)
+        self.assertIsNone(by["DE"]["bandwidth_cap_bps"])
+        self.assertEqual(by["DE"]["bandwidth_cap_display"], "unlimited")
 
     def test_admin_api_route_requires_auth(self):
         src = (ROOT / "status_page" / "app.py").read_text(encoding="utf-8")

@@ -113,6 +113,22 @@ class SessionRegistry:
         with self._lock:
             return list(self._by_id.keys())
 
+    def admin_list_sessions(self) -> list[dict]:
+        """Operator-only session rows (identity hex + vpn_ip + addr). Not public."""
+        with self._lock:
+            out: list[dict] = []
+            for sid, s in self._by_id.items():
+                out.append(
+                    {
+                        "client_id": sid.hex(),
+                        "session_id_hex": sid.hex(),
+                        "vpn_ip": s.vpn_ip,
+                        "client_addr": f"{s.client_addr[0]}:{s.client_addr[1]}",
+                        "last_seen": float(s.last_seen),
+                    }
+                )
+            return out
+
     def status_payload(self) -> dict:
         """Public status: product title only — no live client count field.
 

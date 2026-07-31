@@ -23,7 +23,7 @@ replace root SPF when adding Stripe email CNAMEs.
 |---------|-------|--------|
 | Public business name | **RASKUL** (not a personal legal name) | [Public details](https://dashboard.stripe.com/settings/public) |
 | Support / “Questions? Contact us at…” | **rus@restoreprivacy.online** | Public details / Customer emails |
-| Paid installer download link | **Not in Stripe receipts** | Status-host fulfilment email only (1-hour token) |
+| Paid installer download link | **Not in Stripe receipts** | Status-host fulfilment email only (12-hour token) |
 
 API helper: `payments.update_stripe_account_public_profile` /
 `scripts/configure_stripe_public_profile.py`. Guide: `payments.stripe_public_business_guide()`.

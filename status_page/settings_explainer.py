@@ -281,7 +281,7 @@ def render_install_howto_box_html() -> str:
           choose your platform and plan (Monthly £3.00 or Yearly £30.00 — both
           include a 3-day free trial; no money is taken until after the trial ends),
           and complete Stripe Checkout.</li>
-        <li><strong>Download after payment.</strong> Use the 1-hour download link on the success page
+        <li><strong>Download after payment.</strong> Use the 12-hour download link on the success page
           (retry if the connection drops; email also has download + keygen).
           These are not free permanent GitHub installs.</li>
         <li><strong>Install for your OS.</strong>

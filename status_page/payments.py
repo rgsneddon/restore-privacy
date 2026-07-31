@@ -76,8 +76,12 @@ DEFAULT_SUCCESS_PATH = "/download/success"
 DEFAULT_CANCEL_PATH = "/download/cancel"
 # Site-hosted plan selection (main-site style) before Stripe Checkout
 SITE_PAY_PLAN_PATH = "/pay"
-TOKEN_TTL_SEC = int(os.environ.get("RPT_DOWNLOAD_TOKEN_TTL_SEC", "3600"))
-# Buyer-facing window for the paid fulfilment link (default 1 hour).
+# Default paid fulfilment link window: 12 hours (reusable until expiry).
+_DEFAULT_DOWNLOAD_TOKEN_TTL_SEC = 12 * 3600  # 43200
+TOKEN_TTL_SEC = int(
+    os.environ.get("RPT_DOWNLOAD_TOKEN_TTL_SEC", str(_DEFAULT_DOWNLOAD_TOKEN_TTL_SEC))
+)
+# Buyer-facing window for the paid fulfilment link (default 12 hours).
 DOWNLOAD_LINK_TTL_HOURS = max(1, int(round(TOKEN_TTL_SEC / 3600.0)) or 1)
 DOWNLOAD_LINK_VALIDITY_ADVICE = (
     f"Your download link is valid for {DOWNLOAD_LINK_TTL_HOURS} hour"
@@ -1101,7 +1105,7 @@ def stripe_checkout_branding_guide() -> dict[str, Any]:
         "customer_emails_vs_fulfilment": (
             "Stripe receipt/invoice emails are payment records (PDF). The paid "
             f"installer download token is only in the status-host fulfilment SMTP "
-            f"email (keygen + PPI + 1-hour download link). Set public name to "
+            f"email (keygen + PPI + 12-hour download link). Set public name to "
             f"{PUBLIC_BUSINESS_NAME} and support to {SUPPORT_EMAIL} in Stripe "
             "so receipt footers match the product brand."
         ),
@@ -3077,7 +3081,7 @@ def render_post_payment_thankyou_html(
     script click / meta-refresh) and uses the **same** href as the iframe.
 
     Grant validity (see app ``/download`` + :func:`lookup_download_token`):
-      * Time-window only (default **1 hour** via ``RPT_DOWNLOAD_TOKEN_TTL_SEC``).
+      * Time-window only (default **12 hours** via ``RPT_DOWNLOAD_TOKEN_TTL_SEC``).
       * Same token may be fetched **multiple times** while unexpired (retry if
         the connection drops mid-download).
       * ``used_at`` is audit bookkeeping only and does **not** invalidate the link.
@@ -4326,7 +4330,7 @@ def build_fulfilment_email_payload(
     Pure helper — no I/O. Used by tests and :func:`send_fulfilment_email`.
     Body always includes :data:`KEYGEN_UNLOCK_INSTRUCTION`, the customer
     **KEYGEN** (``RPT-KEY-…``), the absolute download URL (when provided),
-    :data:`DOWNLOAD_LINK_VALIDITY_ADVICE` (1-hour reusable), and support
+    :data:`DOWNLOAD_LINK_VALIDITY_ADVICE` (12-hour reusable), and support
     contact :data:`SUPPORT_EMAIL` (``rus@…``).
 
     **Not** Stripe's receipt/invoice PDF — those cannot carry KEYGEN or the
@@ -5305,7 +5309,7 @@ def mint_download_token(
 ) -> str:
     """Create a time-limited download token bound to a **current catalog** asset.
 
-    Valid for *ttl_sec* (default :data:`TOKEN_TTL_SEC` = 1 hour). The same token
+    Valid for *ttl_sec* (default :data:`TOKEN_TTL_SEC` = 12 hours). The same token
     may be used for multiple downloads until ``expires_at``; usage does not burn it.
 
     Re-resolves the platform to the live catalog filename so callers cannot mint
@@ -5847,7 +5851,7 @@ def lookup_download_token(
 ) -> dict[str, Any] | None:
     """Return grant if valid and non-expired — **does not** mark used.
 
-    Time-window only (default 1 hour from mint). Prior downloads (``used_at``)
+    Time-window only (default 12 hours from mint). Prior downloads (``used_at``)
     do **not** invalidate the token while ``expires_at`` is still in the future.
     Revoked/unknown/expired tokens return ``None``.
 
@@ -7261,7 +7265,7 @@ def process_checkout_completed_event(
                 f"err={exc!r}",
                 flush=True,
             )
-    # Customer fulfilment email: KEYGEN + PPI + 1-hour download URL
+    # Customer fulfilment email: KEYGEN + PPI + 12-hour download URL
     try:
         if token and cust_email:
             # Ensure keygen exists before email even if activate returned empty

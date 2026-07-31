@@ -1,10 +1,12 @@
 """Public customer support tickets — form, durable store, email to rus@.
 
 Minimal ticket architecture:
-  - Ticket id: RPT-SUP-… (public reference)
-  - Fields: contact email, subject, message; optional platform, app version, keygen
+  - Ticket id: short sequential ``RPS-###`` (public reference)
+  - Fields: contact email, subject, message; optional platform, app version
+  - Keygen is **not** collected on the public form
   - Persist under status data dir (SQLite)
   - Notify SUPPORT_EMAIL via fulfilment SMTP path
+  - Admin: one-way close + confirm-gated clear-all
 """
 
 from __future__ import annotations
@@ -27,7 +29,11 @@ SUPPORT_LINK_ID = "support-link"
 # Admin management surface (authenticated).
 ADMIN_SUPPORT_TICKETS_PATH = "/admin/support-tickets"
 ADMIN_SUPPORT_CLOSE_PATH = "/admin/support-tickets/close"
+ADMIN_SUPPORT_CLEAR_PATH = "/admin/support-tickets/clear"
 ADMIN_NAV_SUPPORT_TICKETS_ID = "admin-nav-support-tickets"
+
+# Explicit confirm token for clear_all_support_tickets (no silent wipe).
+CLEAR_ALL_SUPPORT_TICKETS_CONFIRM = "CLEAR_ALL_SUPPORT_TICKETS"
 
 # Ticket lifecycle (one-way: open → closed only).
 TICKET_STATUS_OPEN = "open"
@@ -321,6 +327,55 @@ def list_support_tickets(
         return [_row_to_ticket(r) for r in cur.fetchall()]
     finally:
         conn.close()
+
+
+def count_support_tickets(*, path: Path | None = None) -> int:
+    """Return number of rows in the support ticket store."""
+    p = init_support_db(path)
+    conn = sqlite3.connect(str(p))
+    try:
+        return int(conn.execute("SELECT COUNT(*) FROM support_tickets").fetchone()[0])
+    finally:
+        conn.close()
+
+
+def clear_all_support_tickets(
+    *,
+    confirm: str,
+    path: Path | None = None,
+    now: float | None = None,
+) -> dict[str, Any]:
+    """Delete every support ticket so the admin table is empty.
+
+    Requires ``confirm == CLEAR_ALL_SUPPORT_TICKETS_CONFIRM`` — refuses otherwise
+    (no silent wipe). After a successful clear, the next create starts at
+    ``RPS-001`` again (sequence from empty store).
+    """
+    if (confirm or "").strip() != CLEAR_ALL_SUPPORT_TICKETS_CONFIRM:
+        raise ValueError(
+            "clear_all_support_tickets refused: confirm must be "
+            f"{CLEAR_ALL_SUPPORT_TICKETS_CONFIRM!r} (got {confirm!r})"
+        )
+    p = init_support_db(path)
+    t = float(now if now is not None else time.time())
+    conn = sqlite3.connect(str(p))
+    try:
+        n = int(conn.execute("SELECT COUNT(*) FROM support_tickets").fetchone()[0])
+        conn.execute("DELETE FROM support_tickets")
+        conn.commit()
+        remaining = int(
+            conn.execute("SELECT COUNT(*) FROM support_tickets").fetchone()[0]
+        )
+    finally:
+        conn.close()
+    return {
+        "ok": True,
+        "confirm": CLEAR_ALL_SUPPORT_TICKETS_CONFIRM,
+        "db_path": str(p),
+        "deleted": n,
+        "remaining": remaining,
+        "cleared_at": t,
+    }
 
 
 def get_support_ticket(

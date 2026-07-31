@@ -17,6 +17,8 @@ class MsgType(IntEnum):
     KEEPALIVE = 0x04
     # Node → client residual control (drain before wipe / ready after rebuild)
     NODE_STATUS = 0x05
+    # Node → client operator update directive (version / url payload)
+    UPDATE_PUSH = 0x06
 
 
 class ProtocolError(ValueError):
@@ -151,6 +153,37 @@ def parse_node_status(data: bytes) -> tuple[bytes, int, str, str]:
         raise ProtocolError("bad NODE_STATUS role")
     role = rest[1 : 1 + role_len].decode("utf-8", errors="replace")
     return sid, int(flags), host, role
+
+
+def pack_update_push(session_id: bytes, payload_json: bytes) -> bytes:
+    """Node → client update directive frame (JSON payload, u16 length)."""
+    sid = session_id if len(session_id) == 8 else (session_id + b"\x00" * 8)[:8]
+    body = payload_json if isinstance(payload_json, (bytes, bytearray)) else bytes(payload_json)
+    if len(body) > 65000:
+        raise ProtocolError("update push payload too large")
+    return (
+        MAGIC
+        + bytes([MsgType.UPDATE_PUSH])
+        + sid
+        + struct.pack("!H", len(body))
+        + body
+    )
+
+
+def parse_update_push(data: bytes) -> tuple[bytes, bytes]:
+    """Return (session_id, payload_json_bytes)."""
+    if (
+        len(data) < HEADER_LEN + 8 + 2
+        or data[:4] != MAGIC
+        or data[4] != MsgType.UPDATE_PUSH
+    ):
+        raise ProtocolError("bad UPDATE_PUSH")
+    body = data[HEADER_LEN:]
+    sid = body[:8]
+    (plen,) = struct.unpack("!H", body[8:10])
+    if len(body) < 10 + plen:
+        raise ProtocolError("bad UPDATE_PUSH length")
+    return sid, bytes(body[10 : 10 + plen])
 
 
 def peek_type(data: bytes) -> Optional[MsgType]:

@@ -1109,7 +1109,7 @@ class TestPrivateRepoProxyFulfilment(unittest.TestCase):
                 disp = resp.headers.get("Content-Disposition", "")
             self.assertEqual(body, payload)
             self.assertIn(fname, disp)
-            # Same token still works within the 1-hour window
+            # Same token still works within the 12-hour window
             with urllib.request.urlopen(
                 f"http://127.0.0.1:{port}/download?token={token}", timeout=5
             ) as resp2:
@@ -1371,7 +1371,8 @@ class TestPostPayAutoStartSingleConsume(unittest.TestCase):
         )
         self.assertIsNotNone(payments.lookup_download_token(tok))
         self.assertNotIn(".click()", success_html)
-        self.assertIn("1 hour", success_html)
+        self.assertIn("12 hour", success_html)
+        self.assertNotIn("1 hour", success_html)
 
         def _open(name, **kwargs):
             return {

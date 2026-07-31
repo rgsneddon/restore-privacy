@@ -90,6 +90,18 @@ class TestPublicChromeRedesign(unittest.TestCase):
         self.assertNotIn("readme-link", nav)
         self.assertIn('href="/support"', nav)
         self.assertIn("is-active", nav)
+        # Order: Home → Settings Guide → Licence → Audit → Privacy → Support
+        order_ids = (
+            "home-link",
+            "settings-guide-link",
+            "licence-link",
+            "audit-link",
+            "privacy-link",
+            "support-link",
+        )
+        positions = [nav.index(f'id="{eid}"') for eid in order_ids]
+        for i in range(len(positions) - 1):
+            self.assertLess(positions[i], positions[i + 1], order_ids[i : i + 2])
         header = public_brand_header_html(active="home")
         self.assertIn('id="brand-panel"', header)
         self.assertIn('id="brand-mark"', header)
@@ -126,6 +138,21 @@ class TestPublicPagesShareRedesign(unittest.TestCase):
         self.assertIn('id="support-submit"', html)
         self.assertIn('id="support-link"', html)
         self.assertIn("is-active", html)
+        order_ids = (
+            "home-link",
+            "settings-guide-link",
+            "licence-link",
+            "audit-link",
+            "privacy-link",
+            "support-link",
+        )
+        positions = [html.index(f'id="{eid}"') for eid in order_ids]
+        for i in range(len(positions) - 1):
+            self.assertLess(
+                positions[i],
+                positions[i + 1],
+                f"support page: {order_ids[i]} before {order_ids[i + 1]}",
+            )
         # Theme-aware field tokens (not broken --rb-panel / --rb-primary)
         self.assertNotIn("var(--rb-panel)", html)
         self.assertNotIn("var(--rb-primary)", html)

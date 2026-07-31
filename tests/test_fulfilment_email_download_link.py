@@ -1,4 +1,4 @@
-"""Fulfilment email: absolute download link + 1-hour advice + RASKUL/rus@ support.
+"""Fulfilment email: absolute download link + 12-hour advice + RASKUL/rus@ support.
 
 Drives shipped payments builders and webhook post-pay send branch.
 """
@@ -38,7 +38,8 @@ class TestFulfilmentEmailDownloadLink(unittest.TestCase):
         self.assertIn("RPT-KEY-AAAA-BBBB-CCCC", body)
         self.assertIn("Keygen: RPT-KEY-AAAA-BBBB-CCCC", body)
         self.assertIn(pay.DOWNLOAD_LINK_VALIDITY_ADVICE, body)
-        self.assertIn("1 hour", body)
+        self.assertIn("12 hour", body)
+        self.assertNotIn("1 hour", body)
         self.assertIn("connection drops", body.lower())
         self.assertIn(pay.FULFILMENT_SUPPORT_FOOTER, body)
         self.assertIn(pay.SUPPORT_EMAIL, body)
@@ -174,7 +175,8 @@ class TestFulfilmentEmailDownloadLink(unittest.TestCase):
             self.assertIn(tok, body)
             self.assertIn("/download?token=", body)
             self.assertIn(pay.DOWNLOAD_LINK_VALIDITY_ADVICE, body)
-            self.assertIn("1 hour", body)
+            self.assertIn("12 hour", body)
+            self.assertNotIn("1 hour", body)
             self.assertIn(pay.SUPPORT_EMAIL, body)
             self.assertTrue(captured[0].get("has_keygen"))
             self.assertTrue(captured[0].get("has_download_url"))

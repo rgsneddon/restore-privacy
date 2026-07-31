@@ -198,6 +198,26 @@ class RPTNode:
                 ip = int_to_ipv4(n)
                 if self.registry.get_by_ip(ip) is None:
                     return ip
+            # Contention: drop lowest-priority live session to free a tunnel IP
+            # (operator priority store — higher priority clients are retained).
+            try:
+                from node.client_priority import global_priority_store, honour_priority_order
+
+                rows = self.registry.admin_list_sessions()
+                if rows:
+                    order = honour_priority_order(
+                        [r["client_id"] for r in rows],
+                        store=global_priority_store(),
+                    )
+                    # order is high→low; reclaim from the end (lowest priority)
+                    victim = order[-1]
+                    for r in rows:
+                        if r["client_id"] == victim:
+                            sid = bytes.fromhex(r["session_id_hex"])
+                            self.registry.remove(sid)
+                            return r["vpn_ip"]
+            except Exception:
+                pass
             raise RuntimeError("IP pool exhausted")
         ip = int_to_ipv4(self._next_ip)
         self._next_ip += 1

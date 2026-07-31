@@ -137,6 +137,7 @@ STATIC_ROUTES: dict[str, str] = {
     "/static/thankyou_entitlement.js": "thankyou_entitlement.js",
     "/static/admin_fleet_usage.js": "admin_fleet_usage.js",
     "/static/admin_link_generation.js": "admin_link_generation.js",
+    "/static/admin_support_tickets.js": "admin_support_tickets.js",
     "/static/tester_page_gate.js": "tester_page_gate.js",
     # Public redesign: logo-aligned circuit / data-path motif
     "/static/data_path_motif.svg": "data_path_motif.svg",
@@ -1228,7 +1229,7 @@ class Handler(BaseHTTPRequestHandler):
             # multi-MB installers are not double-proxied through Render.
             # Probe Helsinki first; on failure fall through to open_release_asset.
             #
-            # Grant is **time-limited (default 1 hour)**, not single-use. Audit
+            # Grant is **time-limited (default 12 hours)**, not single-use. Audit
             # stamp via consume after a full proxy stream; host 302 does not
             # stamp. Re-hits of ``/download?token=`` work until expires_at.
             try:
@@ -2325,6 +2326,55 @@ class Handler(BaseHTTPRequestHandler):
                     "text/html; charset=utf-8",
                     render_admin_support_tickets_page_html(error=err),
                 )
+            return
+
+        if path in ("/admin/support-tickets/clear", "/admin/support-tickets/clear/"):
+            # Operator cleanup: empty support ticket store (typed confirm required)
+            if not admin_enabled():
+                self._send(503, "text/plain; charset=utf-8", b"admin disabled")
+                return
+            if not is_authenticated(self.headers):
+                self._send(200, "text/html; charset=utf-8", render_login_html())
+                return
+            try:
+                from support_tickets import clear_all_support_tickets
+            except ImportError:
+                from status_page.support_tickets import (  # type: ignore
+                    clear_all_support_tickets,
+                )
+            from admin_panel import render_admin_support_tickets_page_html
+
+            form = dict(urllib.parse.parse_qsl(body.decode("utf-8", "replace")))
+            confirm = (form.get("confirm") or "").strip()
+            try:
+                cleared = clear_all_support_tickets(confirm=confirm)
+            except ValueError as exc:
+                self._send(
+                    400,
+                    "text/html; charset=utf-8",
+                    render_admin_support_tickets_page_html(error=str(exc)),
+                )
+                return
+            except Exception as exc:  # noqa: BLE001
+                self._send(
+                    500,
+                    "text/html; charset=utf-8",
+                    render_admin_support_tickets_page_html(
+                        error=f"clear failed: {exc}"[:240]
+                    ),
+                )
+                return
+            n = int(cleared.get("deleted") or 0)
+            self._send(
+                200,
+                "text/html; charset=utf-8",
+                render_admin_support_tickets_page_html(
+                    message=(
+                        f"Cleared support tickets: deleted {n} row(s). "
+                        "Next ticket id will be RPS-001."
+                    ),
+                ),
+            )
             return
 
         if path == "/admin/processors/apply":
