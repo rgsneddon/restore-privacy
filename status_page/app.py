@@ -13,11 +13,19 @@ import json
 import mimetypes
 import os
 import shutil
+import sys
 import urllib.error
 import urllib.parse
 import urllib.request
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
+
+# Render rootDir is status_page — put monorepo root on path for node/node_operator.
+_REPO_ROOT = Path(__file__).resolve().parent.parent
+if (_REPO_ROOT / "node" / "operator_admin.py").is_file():
+    _rs = str(_REPO_ROOT)
+    if _rs not in sys.path:
+        sys.path.insert(0, _rs)
 
 from admin_panel import (
     SESSION_COOKIE,

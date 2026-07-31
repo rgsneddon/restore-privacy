@@ -39,6 +39,47 @@ class TestOperableNodes(unittest.TestCase):
         self.assertEqual(default["id"], "IS")
 
 
+class TestMonorepoPathBootstrap(unittest.TestCase):
+    """Render rootDir is status_page — monorepo must still resolve ``import node``."""
+
+    def test_ensure_monorepo_on_path_from_status_page_cwd(self) -> None:
+        import os
+
+        from admin_node_operator import (
+            ensure_monorepo_on_path,
+            monorepo_root,
+            render_admin_node_operator_page_html,
+            reset_operator_controller_for_tests,
+        )
+
+        root = monorepo_root()
+        self.assertTrue((root / "node" / "operator_admin.py").is_file())
+        prev = os.getcwd()
+        try:
+            os.chdir(ROOT / "status_page")
+            reset_operator_controller_for_tests()
+            # Drop monorepo from path to simulate fresh Render worker
+            while str(root) in sys.path:
+                sys.path.remove(str(root))
+            # Must re-insert monorepo even when cwd is status_page only
+            found = ensure_monorepo_on_path()
+            self.assertEqual(found, root)
+            self.assertIn(str(root), sys.path)
+            import node.operator_admin  # noqa: F401
+
+            page = render_admin_node_operator_page_html(selected_node="IS").decode(
+                "utf-8"
+            )
+            self.assertIn('id="admin-node-operator"', page)
+            self.assertIn("Node Operator", page)
+            self.assertNotIn("ModuleNotFoundError", page)
+            self.assertIn("admin-node-op-tabs", page)
+        finally:
+            os.chdir(prev)
+            ensure_monorepo_on_path()
+            reset_operator_controller_for_tests()
+
+
 class TestAdminNodeOperatorPage(unittest.TestCase):
     def test_sidebar_nav_and_page_render(self) -> None:
         from admin_node_operator import (

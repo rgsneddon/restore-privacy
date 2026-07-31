@@ -9,6 +9,8 @@ from __future__ import annotations
 
 import html
 import json
+import sys
+from pathlib import Path
 from typing import Any
 
 # Stable admin paths / nav ids (tests + sidebar).
@@ -17,6 +19,34 @@ ADMIN_NODE_OPERATOR_POST_PATH = "/admin/node-operator/action"
 ADMIN_NAV_NODE_OPERATOR_ID = "admin-nav-node-operator"
 # Live page reload interval (seconds) for sessions / residual status.
 ADMIN_NODE_OPERATOR_AUTO_REFRESH_SEC = 5
+
+
+def monorepo_root() -> Path:
+    """Repo root that contains ``node/``, ``client/``, ``node_operator/``.
+
+    On Render, ``rootDir`` is ``status_page`` so process cwd is not the monorepo
+    root — resolve from this file's parent instead of relying on PYTHONPATH.
+    """
+    here = Path(__file__).resolve().parent
+    # status_page/admin_node_operator.py → parents[0]=status_page, [1]=repo root
+    candidate = here.parent
+    if (candidate / "node" / "operator_admin.py").is_file():
+        return candidate
+    # Fallback: cwd walk (local monorepo runs)
+    cwd = Path.cwd().resolve()
+    for p in (cwd, *cwd.parents):
+        if (p / "node" / "operator_admin.py").is_file():
+            return p
+    return candidate
+
+
+def ensure_monorepo_on_path() -> Path:
+    """Insert monorepo root at front of ``sys.path`` so ``import node`` works."""
+    root = monorepo_root()
+    s = str(root)
+    if s not in sys.path:
+        sys.path.insert(0, s)
+    return root
 
 
 def node_operator_auto_refresh_meta(node_id: str = "") -> str:
@@ -154,12 +184,11 @@ _OPERATOR_CTRL = None
 def get_operator_controller():
     """Process-wide controller so admin pages share lab sessions / inventory."""
     global _OPERATOR_CTRL
-    from pathlib import Path
 
+    root = ensure_monorepo_on_path()
     from node.operator_admin import NodeOperatorController
 
     if _OPERATOR_CTRL is None:
-        root = Path(__file__).resolve().parents[1]
         _OPERATOR_CTRL = NodeOperatorController(repo_root=root)
     return _OPERATOR_CTRL
 
@@ -195,15 +224,31 @@ def render_admin_node_operator_page_html(
             admin_section_top_link_html,
         )
 
-    ctrl = get_operator_controller()
+    ensure_monorepo_on_path()
     node = resolve_operable_node(selected_node)
     nodes = list_operable_nodes()
-    catalog_ver = ctrl.catalog_version_default()
-    inv = ctrl.list_local_packages(version=catalog_ver)
-    st = ctrl.get_state()
-    residual = ctrl.residual_connect_status()
-    sessions = ctrl.list_sessions_admin()
-    prio_map = ctrl.priority.as_dict()
+    load_err = ""
+    try:
+        ctrl = get_operator_controller()
+        catalog_ver = ctrl.catalog_version_default()
+        inv = ctrl.list_local_packages(version=catalog_ver)
+        st = ctrl.get_state()
+        residual = ctrl.residual_connect_status()
+        sessions = ctrl.list_sessions_admin()
+        prio_map = ctrl.priority.as_dict()
+    except Exception as exc:  # noqa: BLE001
+        # Fail-soft: still show operable shell so admin is not a bare 500.
+        load_err = f"Node Operator backend failed to load: {type(exc).__name__}: {exc}"
+        catalog_ver = "1.0.0"
+        inv = {"packages": [], "version": catalog_ver}
+        st = {"error": load_err}
+        residual = {"connected": False, "error": load_err}
+        sessions = []
+        prio_map = {}
+        if (error or "").strip():
+            error = f"{error.strip()} | {load_err}"
+        else:
+            error = load_err
 
     flash = ""
     if (message or "").strip():
@@ -261,41 +306,36 @@ def render_admin_node_operator_page_html(
         else '<tr id="admin-node-op-packages-empty"><td colspan="5">No packages listed</td></tr>'
     )
 
+    ensure_monorepo_on_path()
     try:
         from node_operator.client_visuals import render_connected_clients_visual_html
-    except ImportError:  # pragma: no cover
-        import sys
-        from pathlib import Path
 
-        root = Path(__file__).resolve().parents[1]
-        if str(root) not in sys.path:
-            sys.path.insert(0, str(root))
-        from node_operator.client_visuals import render_connected_clients_visual_html
-
-    clients_visual = render_connected_clients_visual_html(
-        sessions,
-        id_prefix="admin-node-op-client",
-        update_push={
-            "form_action": ADMIN_NODE_OPERATOR_POST_PATH,
-            "version": catalog_ver,
-            "url": "https://restoreprivacy.online/",
-            "message": "",
-            "hidden_fields": {
-                "node": node["id"],
-                "action": "push_update",
+        clients_visual = render_connected_clients_visual_html(
+            sessions,
+            id_prefix="admin-node-op-client",
+            update_push={
+                "form_action": ADMIN_NODE_OPERATOR_POST_PATH,
+                "version": catalog_ver,
+                "url": "https://restoreprivacy.online/",
+                "message": "",
+                "hidden_fields": {
+                    "node": node["id"],
+                    "action": "push_update",
+                },
             },
-        },
-    )
+        )
+    except Exception as exc:  # noqa: BLE001
+        clients_visual = (
+            f'<p class="muted" id="admin-node-op-clients-fallback">'
+            f"Connected clients visual unavailable: {_esc(type(exc).__name__)}: {_esc(exc)}</p>"
+        )
     try:
         from node_operator.update_delivery import (
             build_update_delivery_matrix,
             render_update_delivery_matrix_html,
         )
     except ImportError:  # pragma: no cover
-        import sys
-        from pathlib import Path
-
-        root = Path(__file__).resolve().parents[1]
+        root = monorepo_root()
         if str(root) not in sys.path:
             sys.path.insert(0, str(root))
         from node_operator.update_delivery import (
@@ -558,10 +598,18 @@ def handle_admin_node_operator_action(
     form: dict[str, str],
 ) -> tuple[bool, str, str]:
     """Process POST action. Returns (ok, message_or_error, selected_node_id)."""
-    ctrl = get_operator_controller()
+    ensure_monorepo_on_path()
     node_id = (form.get("node") or "").strip() or "IS"
     action = (form.get("action") or "").strip()
     node = resolve_operable_node(node_id)
+    try:
+        ctrl = get_operator_controller()
+    except Exception as exc:  # noqa: BLE001
+        return (
+            False,
+            f"Node Operator backend unavailable: {type(exc).__name__}: {exc}",
+            node["id"],
+        )
 
     if action == "start_lab":
         st = ctrl.start(mode="lab")
