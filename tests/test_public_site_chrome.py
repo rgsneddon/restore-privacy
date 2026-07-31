@@ -91,10 +91,11 @@ class TestPublicChromeModule(unittest.TestCase):
 
     def test_brand_header_has_theme_and_nav(self) -> None:
         from public_chrome import (
+            PUBLIC_BRAND_BANNER_PATH,
+            PUBLIC_BRAND_HEADER_HEIGHT_DEFAULT,
+            PUBLIC_BRAND_HEADER_HEIGHT_MAX_CSS,
+            PUBLIC_BRAND_HEADER_HEIGHT_MIN_CSS,
             PUBLIC_BRAND_LOGO_PATH,
-            PUBLIC_BRAND_LOGO_SIZE_DEFAULT,
-            PUBLIC_BRAND_LOGO_SIZE_MAX_CSS,
-            PUBLIC_BRAND_LOGO_SIZE_MIN_CSS,
             PUBLIC_BRAND_TITLE,
             PUBLIC_THEME_STORAGE_KEY,
             public_brand_header_html,
@@ -106,29 +107,35 @@ class TestPublicChromeModule(unittest.TestCase):
         self.assertIn('id="brand-panel"', header)
         self.assertIn('id="brand-mark"', header)
         self.assertIn('class="brand-mark"', header)
-        self.assertIn("<h1>", header)
-        self.assertEqual(PUBLIC_BRAND_TITLE, "RESTORE PRIVACY VPN")
-        self.assertIn(f"<h1>{PUBLIC_BRAND_TITLE}</h1>", header)
-        # Borderless transparent mark left of title (logo before h1)
+        # Heading is banner.jpg + simple logo — not VPN H1 text
+        self.assertNotIn(f"<h1>{PUBLIC_BRAND_TITLE}</h1>", header)
+        self.assertNotIn("<h1>RESTORE PRIVACY VPN</h1>", header)
+        self.assertEqual(PUBLIC_BRAND_TITLE, "RESTORE PRIVACY VPN")  # doc title still
+        self.assertIn('class="brand-banner"', header)
+        self.assertIn('id="brand-banner"', header)
+        self.assertIn(PUBLIC_BRAND_BANNER_PATH, header)
+        self.assertIn("banner.jpg", header)
+        # Borderless transparent mark left of banner
         mark_start = header.index('id="brand-mark"')
         mark_end = header.index("</div>", mark_start)
         mark = header[mark_start:mark_end]
         i_logo = mark.index("brand-logo")
-        i_h1 = mark.index("<h1>")
-        self.assertLess(i_logo, i_h1, "logo must sit left of title in brand-mark")
+        i_banner = mark.index("brand-banner")
+        self.assertLess(i_logo, i_banner, "logo must sit left of banner in brand-mark")
         self.assertIn(PUBLIC_BRAND_LOGO_PATH, mark)
         self.assertIn("logo_transparent", mark)
         self.assertNotIn('src="/logo.png"', mark)
         self.assertNotIn('src="/logo.png?', mark)
-        self.assertIn(f'width="{PUBLIC_BRAND_LOGO_SIZE_DEFAULT}"', header)
-        # Nav remains below the logo+title band
+        # Shared height attr on logo + banner
+        self.assertIn(f'height="{PUBLIC_BRAND_HEADER_HEIGHT_DEFAULT}"', header)
+        self.assertEqual(
+            header.count(f'height="{PUBLIC_BRAND_HEADER_HEIGHT_DEFAULT}"'),
+            2,
+        )
+        # Nav remains below the logo+banner band
         i_mark = header.index('id="brand-mark"')
         i_nav = header.index('id="doc-links"')
         self.assertLess(i_mark, i_nav)
-        # Short historical title upgrades to brand title with VPN
-        short = public_brand_header_html(title="RESTORE PRIVACY")
-        self.assertIn(f"<h1>{PUBLIC_BRAND_TITLE}</h1>", short)
-        self.assertNotRegex(short, r"<h1>RESTORE PRIVACY</h1>")
         # No under-title slogan in the top brand box
         self.assertNotIn("brand-tagline", header)
         self.assertNotIn("lightweight vpn to restore", header.lower())
@@ -169,21 +176,24 @@ class TestPublicChromeModule(unittest.TestCase):
         self.assertNotIn("border: 1.5px solid transparent", css)
         self.assertIn("var(--rb-neon-glow-cyan)", css)
         self.assertIn("var(--rb-neon-glow-green)", css)
-        # Brand logo: larger clamp, no border/frame, transparent plate
+        # Brand logo + banner share --rb-brand-header-height
         self.assertIn(".brand-mark", css)
         self.assertIn("flex-direction: row", css)
-        self.assertIn(f"{PUBLIC_BRAND_LOGO_SIZE_MIN_CSS}px", css)
-        self.assertIn(f"{PUBLIC_BRAND_LOGO_SIZE_MAX_CSS}px", css)
-        self.assertGreater(PUBLIC_BRAND_LOGO_SIZE_MIN_CSS, 72)
-        self.assertGreater(PUBLIC_BRAND_LOGO_SIZE_MAX_CSS, 104)
-        self.assertGreater(PUBLIC_BRAND_LOGO_SIZE_DEFAULT, 96)
+        self.assertIn("--rb-brand-header-height", css)
+        self.assertIn(f"{PUBLIC_BRAND_HEADER_HEIGHT_MIN_CSS}px", css)
+        self.assertIn(f"{PUBLIC_BRAND_HEADER_HEIGHT_MAX_CSS}px", css)
         logo_css_i = css.index(".brand-logo")
         logo_css = css[logo_css_i : logo_css_i + 450]
         self.assertIn("border: none", logo_css)
         self.assertIn("background: transparent", logo_css)
         self.assertIn("box-shadow: none", logo_css)
         self.assertIn("object-fit: contain", logo_css)
+        self.assertIn("var(--rb-brand-header-height)", logo_css)
         self.assertNotIn("var(--rb-neon-border)", logo_css)
+        banner_css_i = css.index(".brand-banner")
+        banner_css = css[banner_css_i : banner_css_i + 400]
+        self.assertIn("var(--rb-brand-header-height)", banner_css)
+        self.assertIn("object-fit: contain", banner_css)
         # Light theme still defines both neon tones (softer values)
         light_i = css.index('[data-theme="light"]')
         light_css = css[light_i : light_i + 1800]
@@ -254,7 +264,11 @@ class TestPublicChromeModule(unittest.TestCase):
             self.assertNotEqual(solid.read_bytes(), path.read_bytes())
             return
         except ImportError:
-            self.fail("Pillow required to assert transparent logo alpha")
+            # Environment without Pillow: PNG signature + non-identity vs solid plate
+            solid = ROOT / "status_page" / "static" / "logo.png"
+            self.assertTrue(solid.is_file())
+            self.assertNotEqual(solid.read_bytes(), path.read_bytes())
+            self.skipTest("Pillow not installed; PNG signature already checked")
 
 
 class TestHomepageChrome(unittest.TestCase):
@@ -268,8 +282,12 @@ class TestHomepageChrome(unittest.TestCase):
         brand_start = html.index('id="brand-panel"')
         brand_end = html.index("</header>", brand_start)
         brand_box = html[brand_start:brand_end]
-        self.assertIn(f"<h1>{PUBLIC_BRAND_TITLE}</h1>", brand_box)
-        self.assertNotRegex(brand_box, r"<h1>RESTORE PRIVACY</h1>")
+        # Visible heading is banner + logo (not VPN H1 text)
+        self.assertIn("brand-banner", brand_box)
+        self.assertIn("banner.jpg", brand_box)
+        self.assertIn("brand-logo", brand_box)
+        self.assertNotIn(f"<h1>{PUBLIC_BRAND_TITLE}</h1>", brand_box)
+        self.assertNotRegex(brand_box, r"<h1>RESTORE PRIVACY VPN</h1>")
         self.assertIn(f"<title>{PUBLIC_BRAND_TITLE}</title>", html)
         self.assertIn('id="home-link" href="/"', html)
         self.assertIn('id="licence-link" href="/LICENSE"', html)

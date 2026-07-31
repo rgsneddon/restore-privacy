@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
-"""Restore Privacy VPN APP Shop for Render.
+"""Restore Privacy Suite status host (public shop + private admin).
 
-Public surface: product title, beta note, and client download links only.
+Public surface: Suite brand, free installers, KEYGEN checkout, docs.
 Does **not** expose a connected-client count or poll a live session metric.
+Admin (/admin) is auth-only and never part of the public Pages export.
 """
 
 from __future__ import annotations
@@ -11,6 +12,7 @@ import html
 import json
 import mimetypes
 import os
+import shutil
 import urllib.error
 import urllib.parse
 import urllib.request
@@ -42,7 +44,14 @@ from admin_2fa import (
     verify_pending_token,
     verify_totp,
 )
-from downloads import download_css, render_bmc_tip_html, render_download_section_html
+from downloads import (
+    download_css,
+    render_bmc_tip_html,
+    render_download_section_html,
+    render_suite_storefront_html,
+    suite_storefront_css,
+    SUITE_FREE_DOWNLOAD_PATH,
+)
 
 
 def upgrade_download_form_html(platform: str) -> str:
@@ -103,8 +112,10 @@ FAVICON_PATH = "/favicon.ico"
 FAVICON_PNG_PATH = "/favicon.png"
 APPLE_TOUCH_PATH = "/apple-touch-icon.png"
 LOGO_PATH = "/logo.png"
-# Transparent-background site header logo (left of RESTORE PRIVACY VPN)
+# Transparent-background site header logo (left of banner mark)
 LOGO_TRANSPARENT_PATH = "/logo_transparent.png"
+# Public heading banner (logo + banner row; no VPN H1 text)
+BANNER_PATH = "/banner.jpg"
 
 # Map URL path → filename under static/
 STATIC_ROUTES: dict[str, str] = {
@@ -114,10 +125,12 @@ STATIC_ROUTES: dict[str, str] = {
     APPLE_TOUCH_PATH: "apple-touch-icon.png",
     LOGO_PATH: "logo.png",
     LOGO_TRANSPARENT_PATH: "logo_transparent.png",
+    BANNER_PATH: "banner.jpg",
     "/static/favicon.ico": "favicon.ico",
     "/static/favicon.png": "favicon.png",
     "/static/logo.png": "logo.png",
     "/static/logo_transparent.png": "logo_transparent.png",
+    "/static/banner.jpg": "banner.jpg",
     "/static/apple-touch-icon.png": "apple-touch-icon.png",
     # Stripe Dashboard Branding exports (PNG ≥128px, <512KB)
     "/stripe_brand_icon.png": "stripe_brand_icon.png",
@@ -172,6 +185,18 @@ def static_file_path(url_path: str) -> Path | None:
     except ValueError:
         return None
     return path if path.is_file() else None
+
+
+def is_admin_static_path(url_path: str) -> bool:
+    """True for operator-only static assets (must not ship on public Pages)."""
+    p = (url_path or "").strip().lower()
+    name = STATIC_ROUTES.get(url_path) or STATIC_ROUTES.get(p) or ""
+    base = (name or p.rsplit("/", 1)[-1]).lower()
+    if base.startswith("admin_") or "/admin_" in p:
+        return True
+    if "admin_" in base:
+        return True
+    return False
 
 
 def read_static_bytes(url_path: str) -> tuple[bytes, str] | None:
@@ -416,25 +441,41 @@ def render_html(
     _ = poll_ms  # retained for call-site compat; public page does not poll a count
     try:
         from public_chrome import (
+            PUBLIC_BRAND_DISPLAY,
             PUBLIC_BRAND_TITLE,
             public_brand_header_html,
             public_display_title,
             public_head_open,
             public_page_close,
+            render_suite_home_intro_html,
+            suite_home_intro_css,
         )
     except ImportError:  # pragma: no cover
         from status_page.public_chrome import (  # type: ignore
+            PUBLIC_BRAND_DISPLAY,
             PUBLIC_BRAND_TITLE,
             public_brand_header_html,
             public_display_title,
             public_head_open,
             public_page_close,
+            render_suite_home_intro_html,
+            suite_home_intro_css,
         )
 
     title = public_display_title(
         str(status.get("title", PUBLIC_BRAND_TITLE) or PUBLIC_BRAND_TITLE)
     )
+    if "Suite" not in title and "1.0.0" not in title:
+        title = PUBLIC_BRAND_DISPLAY
 
+    suite_intro_html = render_suite_home_intro_html()
+    suite_html = render_suite_storefront_html(
+        accept_language=accept_language,
+        country=country,
+        currency=currency,
+        default_platform=default_platform,
+        default_interval=default_interval,
+    )
     downloads_html = render_download_section_html(
         accept_language=accept_language,
         country=country,
@@ -448,12 +489,21 @@ def render_html(
             .replace("<", "&lt;")
             .replace(">", "&gt;")
         )
-        downloads_html = downloads_html.replace(
-            '<div class="dl-buttons"',
-            f'<p class="dl-pay-error" id="dl-pay-error" role="alert">{err}</p>\n    <div class="dl-buttons"',
+        # Surface pay errors on both Suite and VPN shop forms
+        err_block = (
+            f'<p class="dl-pay-error" id="dl-pay-error" role="alert">{err}</p>\n    '
+        )
+        suite_html = suite_html.replace(
+            '<div class="dl-buttons" id="suite-dl-buttons"',
+            f"{err_block}<div class=\"dl-buttons\" id=\"suite-dl-buttons\"",
             1,
         )
-    dl_css = download_css()
+        downloads_html = downloads_html.replace(
+            '<div class="dl-buttons"',
+            f"{err_block}<div class=\"dl-buttons\"",
+            1,
+        )
+    dl_css = download_css() + suite_storefront_css() + suite_home_intro_css()
     try:
         from audit_countdown import render_audit_countdown_html
     except ImportError:  # package-style import when status_page is on path
@@ -537,12 +587,14 @@ def render_html(
     header = public_brand_header_html(
         title=str(title),
         active="home",
-        logo_size=112,
         product_active="vpn",
     )
+    # Suite intro + free storefront above residual client downloads.
     body = f"""{public_head_open(title=str(title), extra_css=page_css)}
-  <div class="page-shell" id="page-shell" data-page="home" data-chrome="pro">
+  <div class="page-shell" id="page-shell" data-page="home" data-product="suite" data-suite-version="1.0.0" data-chrome="pro">
 {header}
+{suite_intro_html}
+{suite_html}
 {downloads_html}
 {node_wipe_html}
     <section class="panel-card" id="audit-panel" aria-label="Security audit countdown" data-chrome="pro">
@@ -719,6 +771,93 @@ class Handler(BaseHTTPRequestHandler):
                 render_support_page_html().encode("utf-8"),
             )
             return
+        # Suite free installer download (no pay token). App still needs KEYGEN.
+        if path in (SUITE_FREE_DOWNLOAD_PATH, f"{SUITE_FREE_DOWNLOAD_PATH}/"):
+            plat = (query.get("platform") or "").strip().lower()
+            fname = platform_filename(plat) if plat else None
+            if not plat or not fname:
+                self._send(
+                    400,
+                    "text/html; charset=utf-8",
+                    _html_page(
+                        "Suite download",
+                        '<p class="msg">Choose a platform from the Suite free download links.</p>'
+                        '<p><a href="/#suite-storefront">Back to Suite</a></p>',
+                    ),
+                )
+                return
+            # Prefer Helsinki host delivery (signed short-lived URL) without payment.
+            try:
+                from host_delivery import (  # type: ignore
+                    host_delivery_plan,
+                    is_browser_safe_https_url,
+                )
+            except Exception:  # noqa: BLE001
+                try:
+                    from status_page.host_delivery import (  # type: ignore
+                        host_delivery_plan,
+                        is_browser_safe_https_url,
+                    )
+                except Exception:  # noqa: BLE001
+                    host_delivery_plan = None  # type: ignore
+                    is_browser_safe_https_url = None  # type: ignore
+            if host_delivery_plan is not None:
+                plan = host_delivery_plan(str(fname), probe=True)
+                loc = str((plan or {}).get("url") or "").strip()
+                safe_https = (
+                    is_browser_safe_https_url(loc)
+                    if callable(is_browser_safe_https_url)
+                    else loc.lower().startswith("https://")
+                )
+                if plan and loc and safe_https:
+                    self.send_response(302)
+                    self.send_header("Location", loc)
+                    self.send_header("Cache-Control", "no-store")
+                    self.send_header("X-RPT-Fulfilment", "suite-free-helsinki")
+                    self.send_header("Content-Length", "0")
+                    self._security_headers()
+                    self.end_headers()
+                    return
+            asset = open_release_asset(str(fname))
+            if asset is None:
+                self._send(
+                    502,
+                    "text/html; charset=utf-8",
+                    _html_page(
+                        "Suite download unavailable",
+                        f'<p class="msg">Installer for <strong>{_escape_html(plat)}</strong> '
+                        "is not on the store yet. Try again after the next publish, "
+                        "or use the KEYGEN path after it lands.</p>"
+                        '<p><a href="/#suite-storefront">Back to Suite</a></p>',
+                    ),
+                )
+                return
+            body_src = asset["body"]
+            ctype = str(asset.get("content_type") or "application/octet-stream")
+            length = asset.get("content_length")
+            disp = f'attachment; filename="{fname}"'
+            try:
+                self.send_response(200)
+                self.send_header("Content-Type", ctype)
+                self.send_header("Content-Disposition", disp)
+                self.send_header("Cache-Control", "no-store")
+                self.send_header("X-RPT-Fulfilment", "suite-free")
+                if length is not None:
+                    self.send_header("Content-Length", str(length))
+                self._security_headers()
+                self.end_headers()
+                if hasattr(body_src, "read"):
+                    shutil.copyfileobj(body_src, self.wfile)  # type: ignore[arg-type]
+                else:
+                    self.wfile.write(body_src)  # type: ignore[arg-type]
+            finally:
+                try:
+                    if hasattr(body_src, "close"):
+                        body_src.close()
+                except Exception:  # noqa: BLE001
+                    pass
+            return
+
         if path in ("/", "/index.html"):
             try:
                 from local_currency import (
@@ -890,13 +1029,26 @@ class Handler(BaseHTTPRequestHandler):
             self.end_headers()
             self.wfile.write(data)
             return
+        # Operator console scripts are never anonymous-public.
+        # Use module-level is_authenticated only — a local import here would
+        # shadow the name for the whole do_GET and crash later admin routes.
+        if is_admin_static_path(path):
+            if not is_authenticated(self.headers):
+                self._send(401, "text/plain; charset=utf-8", b"unauthorized")
+                return
         static = read_static_bytes(path)
         if static is not None:
             data, ctype = static
             self.send_response(200)
             self.send_header("Content-Type", ctype)
             self.send_header("Content-Length", str(len(data)))
-            self.send_header("Cache-Control", "public, max-age=3600")
+            # Admin static: no long public cache; public assets may cache.
+            cache = (
+                "no-store"
+                if is_admin_static_path(path)
+                else "public, max-age=3600"
+            )
+            self.send_header("Cache-Control", cache)
             self._security_headers()
             self.end_headers()
             self.wfile.write(data)
@@ -1999,11 +2151,12 @@ class Handler(BaseHTTPRequestHandler):
             return
 
         if path == "/pay/checkout":
-            # Site plan form: platform + interval + auto_renew → subscription Checkout
+            # Site plan form: platform + interval + auto_renew + product → subscription Checkout
             ctype = (self.headers.get("Content-Type") or "").lower()
             platform = ""
             interval = "month"
             auto_renew = True
+            product_line = "vpn"
             if "application/json" in ctype:
                 try:
                     data = json.loads(body.decode("utf-8") or "{}")
@@ -2012,6 +2165,11 @@ class Handler(BaseHTTPRequestHandler):
                 if isinstance(data, dict):
                     platform = str(data.get("platform") or "").strip()
                     interval = str(data.get("interval") or "month").strip()
+                    product_line = str(
+                        data.get("product")
+                        or data.get("product_line")
+                        or "vpn"
+                    ).strip()
                     if "auto_renew" in data:
                         from payments import parse_auto_renew_choice
 
@@ -2020,44 +2178,57 @@ class Handler(BaseHTTPRequestHandler):
                 form = urllib.parse.parse_qs(body.decode("utf-8", errors="replace"))
                 platform = (form.get("platform") or [""])[0].strip()
                 interval = (form.get("interval") or ["month"])[0].strip()
+                product_line = (
+                    (form.get("product") or form.get("product_line") or ["vpn"])[0]
+                ).strip()
                 from payments import parse_auto_renew_form_values
 
                 auto_renew = parse_auto_renew_form_values(form.get("auto_renew"))
+            from payments import normalize_product_line, PRODUCT_LINE_SUITE
+
+            product_line = normalize_product_line(product_line)
+            frag = "suite-storefront" if product_line == PRODUCT_LINE_SUITE else "downloads"
             if not platform or not platform_filename(platform):
                 q = urllib.parse.urlencode(
                     {
                         "pay_error": "Please select your device platform.",
                         "interval": interval or "month",
+                        "product": product_line,
                     }
                 )
-                self._redirect(f"/?{q}#downloads")
+                self._redirect(f"/?{q}#{frag}")
                 return
             if not stripe_configured():
                 q = urllib.parse.urlencode(
                     {
                         "platform": platform,
                         "interval": interval or "month",
+                        "product": product_line,
                         "pay_error": (
                             "Checkout is temporarily unavailable "
                             "(payments not configured)."
                         ),
                     }
                 )
-                self._redirect(f"/?{q}#downloads")
+                self._redirect(f"/?{q}#{frag}")
                 return
             try:
                 session = create_subscription_checkout_session(
-                    platform, interval=interval, auto_renew=auto_renew
+                    platform,
+                    interval=interval,
+                    auto_renew=auto_renew,
+                    product_line=product_line,
                 )
             except ValueError as e:
                 q = urllib.parse.urlencode(
                     {
                         "platform": platform,
                         "interval": interval or "month",
+                        "product": product_line,
                         "pay_error": f"Could not start checkout: {e}",
                     }
                 )
-                self._redirect(f"/?{q}#downloads")
+                self._redirect(f"/?{q}#{frag}")
                 return
             self._redirect(str(session["url"]))
             return
@@ -2070,11 +2241,15 @@ class Handler(BaseHTTPRequestHandler):
                 return
             platform = str(data.get("platform") or "").strip()
             interval = str(data.get("interval") or "month").strip()
-            from payments import parse_auto_renew_choice
+            product_line = str(
+                data.get("product") or data.get("product_line") or "vpn"
+            ).strip()
+            from payments import parse_auto_renew_choice, normalize_product_line
 
             auto_renew = parse_auto_renew_choice(
                 data.get("auto_renew") if isinstance(data, dict) else True
             )
+            product_line = normalize_product_line(product_line)
             if not stripe_configured():
                 self._send(
                     503,
@@ -2090,7 +2265,10 @@ class Handler(BaseHTTPRequestHandler):
                 return
             try:
                 session = create_checkout_session(
-                    platform, interval=interval, auto_renew=auto_renew
+                    platform,
+                    interval=interval,
+                    auto_renew=auto_renew,
+                    product_line=product_line,
                 )
             except ValueError as e:
                 self._send(
@@ -2462,6 +2640,96 @@ class Handler(BaseHTTPRequestHandler):
                     400,
                     "text/html; charset=utf-8",
                     render_admin_html(error=err),
+                )
+            return
+
+        if path in (
+            "/admin/processors/upload-path",
+            "/admin/processors/upload-path/",
+        ):
+            if not admin_enabled():
+                self._send(503, "text/plain; charset=utf-8", b"admin disabled")
+                return
+            if not is_authenticated(self.headers):
+                self._send(200, "text/html; charset=utf-8", render_login_html())
+                return
+            form = dict(urllib.parse.parse_qsl(body.decode("utf-8", "replace")))
+            from admin_node_operator import get_operator_controller
+            from admin_panel import render_admin_processors_page_html
+
+            ctrl = get_operator_controller()
+            r = ctrl.upload_package_by_path(
+                (form.get("path") or "").strip(),
+                stage=form.get("stage") == "1",
+                upload=form.get("upload") == "1",
+                dry_run=form.get("dry_run") == "1",
+                force=form.get("force") == "1",
+                install_serve=form.get("install_serve") == "1",
+            )
+            if r.get("ok"):
+                msg = (
+                    f"Path upload {r.get('filename')} v{r.get('version')} "
+                    f"platform={r.get('platform')} "
+                    f"staged={r.get('staged_to') or '—'} "
+                    f"dry_run={r.get('dry_run')} "
+                    f"upload_code={r.get('upload_code')}"
+                )
+                self._send(
+                    200,
+                    "text/html; charset=utf-8",
+                    render_admin_processors_page_html(message=msg),
+                )
+            else:
+                err = str(r.get("error") or "path upload failed")
+                self._send(
+                    400,
+                    "text/html; charset=utf-8",
+                    render_admin_processors_page_html(error=err),
+                )
+            return
+
+        if path in (
+            "/admin/processors/push-suite",
+            "/admin/processors/push-suite/",
+        ):
+            if not admin_enabled():
+                self._send(503, "text/plain; charset=utf-8", b"admin disabled")
+                return
+            if not is_authenticated(self.headers):
+                self._send(200, "text/html; charset=utf-8", render_login_html())
+                return
+            form = dict(urllib.parse.parse_qsl(body.decode("utf-8", "replace")))
+            from admin_node_operator import get_operator_controller
+            from admin_panel import render_admin_processors_page_html
+
+            ctrl = get_operator_controller()
+            ver = (form.get("version") or "").strip() or ctrl.catalog_version_default()
+            r = ctrl.push_suite_packages(
+                version=ver,
+                stage=form.get("stage") == "1",
+                upload=form.get("upload") == "1",
+                dry_run=form.get("dry_run") == "1",
+                force=form.get("force") == "1",
+                allow_missing=form.get("allow_missing") == "1",
+                install_serve=form.get("install_serve") == "1",
+            )
+            if r.get("ok"):
+                msg = (
+                    f"Pushed {r.get('suite')} present={r.get('present_count')}/"
+                    f"{r.get('total')} dry_run={r.get('dry_run')} "
+                    f"upload_code={r.get('upload_code')}"
+                )
+                self._send(
+                    200,
+                    "text/html; charset=utf-8",
+                    render_admin_processors_page_html(message=msg),
+                )
+            else:
+                err = str(r.get("error") or "suite push failed")
+                self._send(
+                    400,
+                    "text/html; charset=utf-8",
+                    render_admin_processors_page_html(error=err),
                 )
             return
 

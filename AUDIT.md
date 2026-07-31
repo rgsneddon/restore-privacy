@@ -233,7 +233,7 @@ An **ISP** performing **traffic analysis** may still observe connection timing a
 | Expectation | Notes |
 |-------------|--------|
 | Product host | **Germany (DE)** |
-| Public catalog | **1.0.0** paid installers on [status host](https://restoreprivacy.online/) (£3.00; no free GitHub release downloads) |
+| Public catalog | **1.0.0** Suite free installers on [status host](https://restoreprivacy.online/); KEYGEN from £3.00/month (VPN APP Shop) |
 | Node pub pin | `1b126abf…` |
 | No `.priv` in public package trees | OK |
 

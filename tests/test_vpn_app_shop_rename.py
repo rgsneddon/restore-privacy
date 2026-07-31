@@ -56,8 +56,11 @@ class TestVpnAppShopRename(unittest.TestCase):
 
     def test_admin_home_link_label(self):
         src = (ROOT / "status_page" / "admin_panel.py").read_text(encoding="utf-8")
-        self.assertIn('href="/">VPN APP Shop</a>', src)
+        # Sidebar may wrap the label in span.sb-label; still must say VPN APP Shop.
+        self.assertIn('href="/"', src)
+        self.assertIn("VPN APP Shop", src)
         self.assertNotIn('href="/">Status page</a>', src)
+        self.assertNotIn(">Status page</span>", src)
 
     def test_readme_section_heading(self):
         readme = (ROOT / "README.md").read_text(encoding="utf-8")

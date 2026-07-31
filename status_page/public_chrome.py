@@ -26,17 +26,27 @@ README_LINK_ID = "readme-link"
 SUPPORT_LINK_ID = "support-link"
 SETTINGS_GUIDE_LINK_ID = "settings-guide-link"
 
-# Public website brand / page identity (top H1 + default document title)
-PUBLIC_BRAND_TITLE = "RESTORE PRIVACY VPN"
+# Public website brand / page identity (document <title> + default page title).
+# Visible header no longer shows this as an H1 — banner.jpg is the heading mark.
+PUBLIC_BRAND_TITLE = "Restore Privacy Suite"
+PUBLIC_BRAND_VERSION = "1.0.0"
+PUBLIC_BRAND_DISPLAY = "Restore Privacy Suite v1.0.0"
 
 # Borderless mark: shield + protruding green key only (transparent outside).
 # Opaque logo.png remains for favicon/legacy plate uses; Stripe uses stripe_brand_*.
 PUBLIC_BRAND_LOGO_PATH = "/logo_transparent.png"
 PUBLIC_BRAND_LOGO_STATIC_NAME = "logo_transparent.png"
-# Default img width/height (CSS clamp is slightly larger than prior 96px).
-PUBLIC_BRAND_LOGO_SIZE_DEFAULT = 112
-PUBLIC_BRAND_LOGO_SIZE_MIN_CSS = 88  # clamp min — was 72
-PUBLIC_BRAND_LOGO_SIZE_MAX_CSS = 120  # clamp max — was 104
+# Public heading banner (wide wordmark / art from operator Downloads → static).
+PUBLIC_BRAND_BANNER_PATH = "/banner.jpg"
+PUBLIC_BRAND_BANNER_STATIC_NAME = "banner.jpg"
+# Shared display height for logo + banner in the brand header row (px).
+PUBLIC_BRAND_HEADER_HEIGHT_DEFAULT = 72
+PUBLIC_BRAND_HEADER_HEIGHT_MIN_CSS = 56
+PUBLIC_BRAND_HEADER_HEIGHT_MAX_CSS = 96
+# Legacy size aliases (tests / callers) — height-matched to banner row.
+PUBLIC_BRAND_LOGO_SIZE_DEFAULT = PUBLIC_BRAND_HEADER_HEIGHT_DEFAULT
+PUBLIC_BRAND_LOGO_SIZE_MIN_CSS = PUBLIC_BRAND_HEADER_HEIGHT_MIN_CSS
+PUBLIC_BRAND_LOGO_SIZE_MAX_CSS = PUBLIC_BRAND_HEADER_HEIGHT_MAX_CSS
 
 # Redesign shell markers (tests + progressive CSS hooks)
 SITE_CHROME_PRO_CLASS = "site-chrome-pro"
@@ -59,10 +69,11 @@ PRODUCT_VAULT_PATH = "/vault"
 PRODUCT_VPN_KEY = "vpn"
 PRODUCT_BROWSER_KEY = "browser"
 PRODUCT_VAULT_KEY = "vault"
-PRODUCT_VPN_LABEL = "Restore Privacy VPN"
+# Suite is the public product; VPN remains the residual Connect tab inside the app.
+PRODUCT_VPN_LABEL = "Restore Privacy Suite"
 PRODUCT_BROWSER_LABEL = "Restore Privacy Browser"
 PRODUCT_VAULT_LABEL = "Restore Privacy Vault"
-PRODUCT_VPN_TITLE = "RESTORE PRIVACY VPN"
+PRODUCT_VPN_TITLE = "RESTORE PRIVACY SUITE"
 PRODUCT_BROWSER_TITLE = "RESTORE PRIVACY BROWSER"
 PRODUCT_VAULT_TITLE = "RESTORE PRIVACY VAULT"
 PRODUCT_TABS_ID = "product-tabs"
@@ -86,6 +97,7 @@ def public_brand_asset_version() -> str:
     h = hashlib.sha256()
     for name in (
         PUBLIC_BRAND_LOGO_STATIC_NAME,
+        PUBLIC_BRAND_BANNER_STATIC_NAME,
         "favicon.ico",
         "favicon.png",
         "apple-touch-icon.png",
@@ -101,6 +113,11 @@ def public_brand_asset_version() -> str:
 def public_brand_logo_src() -> str:
     """Borderless logo path with cache-bust query for public header ``<img>``."""
     return f"{PUBLIC_BRAND_LOGO_PATH}?v={public_brand_asset_version()}"
+
+
+def public_brand_banner_src() -> str:
+    """Heading banner path with cache-bust query for public header ``<img>``."""
+    return f"{PUBLIC_BRAND_BANNER_PATH}?v={public_brand_asset_version()}"
 
 
 def public_favicon_href(path: str) -> str:
@@ -560,8 +577,14 @@ a.product-tab.is-active, .product-tab.is-active {{
   align-items: center;
   text-align: center;
   gap: 0.85rem;
+  /* Shared logo + banner display height (matched pair) */
+  --rb-brand-header-height: clamp(
+    {PUBLIC_BRAND_HEADER_HEIGHT_MIN_CSS}px,
+    12vw,
+    {PUBLIC_BRAND_HEADER_HEIGHT_MAX_CSS}px
+  );
 }}
-/* Logo + title row: centered above the menu */
+/* Logo + banner heading row: centered above the menu (no VPN H1 text) */
 .brand-mark {{
   display: flex;
   flex-direction: row;
@@ -573,8 +596,9 @@ a.product-tab.is-active, .product-tab.is-active {{
   max-width: 100%;
 }}
 .brand-logo {{
-  width: clamp(88px, 16vw, 120px);
-  height: clamp(88px, 16vw, 120px);
+  height: var(--rb-brand-header-height);
+  width: auto;
+  max-width: var(--rb-brand-header-height);
   border: none;
   border-radius: 0;
   object-fit: contain;
@@ -583,6 +607,19 @@ a.product-tab.is-active, .product-tab.is-active {{
   flex-shrink: 0;
   filter: drop-shadow(0 4px 14px rgba(0, 229, 255, 0.18));
 }}
+.brand-banner {{
+  height: var(--rb-brand-header-height);
+  width: auto;
+  max-width: min(100%, 36rem);
+  border: none;
+  border-radius: 0;
+  object-fit: contain;
+  background: transparent;
+  box-shadow: none;
+  flex: 1 1 auto;
+  filter: drop-shadow(0 4px 14px rgba(0, 229, 255, 0.12));
+}}
+/* H1 kept for rare product-page overrides; default header has no title text */
 #{SITE_BRAND_HEADER_ID} h1, .brand-panel h1, #site-brand-header h1,
 .brand-mark h1 {{
   letter-spacing: var(--rb-tracking-display);
@@ -1120,13 +1157,69 @@ def public_nav_links_html(*, active: str | None = None) -> str:
 def public_display_title(raw: str | None = None) -> str:
     """Normalize product title for public brand chrome and page titles.
 
-    Short historical **RESTORE PRIVACY** (node/status payload) becomes
-    **RESTORE PRIVACY VPN**. Empty / missing → :data:`PUBLIC_BRAND_TITLE`.
+    Historical short titles and sole “VPN” branding map to Suite.
+    Empty / missing → :data:`PUBLIC_BRAND_TITLE`.
     """
     t = (raw or "").strip()
-    if not t or t == "RESTORE PRIVACY":
+    if not t or t in (
+        "RESTORE PRIVACY",
+        "RESTORE PRIVACY VPN",
+        "Restore Privacy VPN",
+        "Restore Privacy",
+    ):
         return PUBLIC_BRAND_TITLE
     return t
+
+
+# Homepage lead copy (human cadence — not a residual inventory list).
+SUITE_HOME_INTRO_ID = "suite-home-intro"
+SUITE_HOME_INTRO_HEADING = "Privacy you can actually use"
+SUITE_HOME_INTRO_BODY = (
+    "Restore Privacy Suite brings together residual protection, a private wallet, "
+    "and Evolve analysis in one place. Download the installer for free, then unlock "
+    "with a KEYGEN when you are ready — a monthly licence starts at £3."
+)
+SUITE_HOME_INTRO_FOOT = (
+    "Install first. Use only after KEYGEN unlock. Your device stays yours."
+)
+
+
+def render_suite_home_intro_html() -> str:
+    """Short Suite welcome block for the public homepage (above free downloads)."""
+    return f"""  <section class="panel-card suite-home-intro" id="{SUITE_HOME_INTRO_ID}"
+           aria-labelledby="suite-home-intro-title" data-product="suite"
+           data-suite-version="{PUBLIC_BRAND_VERSION}">
+    <h2 id="suite-home-intro-title">{SUITE_HOME_INTRO_HEADING}</h2>
+    <p class="suite-home-lead" id="suite-home-lead">{SUITE_HOME_INTRO_BODY}</p>
+    <p class="suite-home-foot" id="suite-home-foot">{SUITE_HOME_INTRO_FOOT}</p>
+    <p class="suite-home-version" id="suite-home-version">{PUBLIC_BRAND_DISPLAY}</p>
+  </section>
+"""
+
+
+def suite_home_intro_css() -> str:
+    return """
+    .suite-home-intro {
+      text-align: center; margin: 0 0 1.15rem; padding: 1.25rem 1.15rem 1.15rem;
+    }
+    .suite-home-intro h2 {
+      margin: 0 0 0.65rem; font-size: clamp(1.25rem, 3.2vw, 1.65rem);
+      letter-spacing: 0.04em; color: var(--rb-cream, #fff); font-weight: 800;
+    }
+    .suite-home-lead {
+      margin: 0 auto 0.75rem; max-width: 38rem; line-height: 1.55;
+      font-size: clamp(0.95rem, 2.2vw, 1.08rem); color: var(--rb-soft, #aed0ea);
+      font-weight: 500;
+    }
+    .suite-home-foot {
+      margin: 0 auto 0.55rem; max-width: 32rem; font-size: 0.9rem;
+      color: var(--rb-muted, #8eb4d0); line-height: 1.45;
+    }
+    .suite-home-version {
+      margin: 0; font-size: 0.78rem; letter-spacing: 0.06em; font-weight: 700;
+      color: var(--rb-accent-sky, #7dd3fc); text-transform: uppercase;
+    }
+"""
 
 
 def public_brand_header_html(
@@ -1136,37 +1229,40 @@ def public_brand_header_html(
     active: str | None = None,
     logo_size: int = PUBLIC_BRAND_LOGO_SIZE_DEFAULT,
     logo_src: str = PUBLIC_BRAND_LOGO_PATH,
+    banner_src: str = PUBLIC_BRAND_BANNER_PATH,
     product_active: str = PRODUCT_VPN_KEY,
     include_product_tabs: bool = False,
     include_site_nav: bool = True,
+    show_title_text: bool = False,
 ) -> str:
     """Static top brand panel used across all public pages.
 
-    Layout: **borderless shield+key mark** to the **left** of the brand H1, as a
-    centered row **above** the site nav (when included). Product-family top tabs
-    (VPN / Browser / Vault) are **off by default** and not shown on public pages.
-    Logo has no outer plate/frame. Under-title tagline is omitted by default.
-    Pass a non-empty *tagline* only if a page truly needs a header subtitle.
-    Brand H1 defaults to :data:`PUBLIC_BRAND_TITLE` (**RESTORE PRIVACY VPN**).
-    *include_site_nav* controls Home/Settings Guide/Licence/Audit/Privacy/Support
-    menu buttons (VPN homepage keeps them; Browser/Vault landings may omit them).
+    Layout: **borderless shield+key logo** to the **left** of the **banner.jpg**
+    heading image, same display height, centered row **above** the site nav
+    (when included). The VPN H1 text (**RESTORE PRIVACY VPN**) is **not** shown
+    in the header by default — the banner is the heading mark. Product-family
+    top tabs are **off by default**. Logo has no outer plate/frame. Under-title
+    tagline is omitted by default. *title* still normalizes document/page titles
+    for callers; pass *show_title_text=True* only for rare product overrides.
     """
-    # Product landings pass full product titles; VPN home normalizes short titles.
-    raw_title = (title or "").strip()
-    if raw_title in (PRODUCT_BROWSER_TITLE, PRODUCT_VAULT_TITLE):
-        title_safe = _esc(raw_title)
-    else:
-        title_safe = _esc(public_display_title(title))
+    _ = title  # retained for API compat (page titles use public_display_title)
     raw_src = (logo_src or PUBLIC_BRAND_LOGO_PATH).strip() or PUBLIC_BRAND_LOGO_PATH
-    # Default solid logo gets cache-bust; explicit override paths are left as-is
-    # unless they are the standard solid path without a query.
     if raw_src == PUBLIC_BRAND_LOGO_PATH or raw_src.startswith(f"{PUBLIC_BRAND_LOGO_PATH}?"):
         src = public_brand_logo_src()
     else:
         src = raw_src
-    sz = int(logo_size) if logo_size else PUBLIC_BRAND_LOGO_SIZE_DEFAULT
-    if sz < 64:
-        sz = PUBLIC_BRAND_LOGO_SIZE_DEFAULT
+    raw_banner = (banner_src or PUBLIC_BRAND_BANNER_PATH).strip() or PUBLIC_BRAND_BANNER_PATH
+    if raw_banner == PUBLIC_BRAND_BANNER_PATH or raw_banner.startswith(
+        f"{PUBLIC_BRAND_BANNER_PATH}?"
+    ):
+        bsrc = public_brand_banner_src()
+    else:
+        bsrc = raw_banner
+    # Shared height with banner (height attrs; CSS clamps via --rb-brand-header-height)
+    sz = int(logo_size) if logo_size else PUBLIC_BRAND_HEADER_HEIGHT_DEFAULT
+    if sz < 48:
+        sz = PUBLIC_BRAND_HEADER_HEIGHT_DEFAULT
+    h_attr = sz
     tag = (tagline or "").strip()
     tagline_html = (
         f'      <p class="brand-tagline">{_esc(tag)}</p>\n' if tag else ""
@@ -1175,10 +1271,19 @@ def public_brand_header_html(
         public_product_tabs_html(active=product_active) if include_product_tabs else ""
     )
     nav_html = public_nav_links_html(active=active) if include_site_nav else ""
-    return f"""{tabs}    <header class="brand-panel panel-card" id="{SITE_BRAND_HEADER_ID}" data-site-header="1" data-header-alias="site-brand-header" data-chrome="pro">
+    # Optional H1 only when explicitly requested (not default VPN heading text).
+    title_html = ""
+    if show_title_text:
+        raw_title = (title or "").strip()
+        if raw_title in (PRODUCT_BROWSER_TITLE, PRODUCT_VAULT_TITLE):
+            title_safe = _esc(raw_title)
+        else:
+            title_safe = _esc(public_display_title(title))
+        title_html = f"\n        <h1>{title_safe}</h1>"
+    return f"""{tabs}    <header class="brand-panel panel-card" id="{SITE_BRAND_HEADER_ID}" data-site-header="1" data-header-alias="site-brand-header" data-chrome="pro" data-brand-banner="1">
       <div class="brand-mark" id="brand-mark" data-brand-mark="1">
-        <img class="brand-logo" src="{_esc(src)}" width="{sz}" height="{sz}" alt="Restore Privacy logo"/>
-        <h1>{title_safe}</h1>
+        <img class="brand-logo" src="{_esc(src)}" height="{h_attr}" alt="Restore Privacy logo"/>
+        <img class="brand-banner" id="brand-banner" src="{_esc(bsrc)}" height="{h_attr}" alt="Restore Privacy"/>{title_html}
       </div>
       <hr class="brand-header-rule" aria-hidden="true"/>
 {tagline_html}{nav_html}

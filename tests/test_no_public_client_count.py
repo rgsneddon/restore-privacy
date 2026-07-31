@@ -101,12 +101,28 @@ class TestNodePublicStatusNoCount(unittest.TestCase):
                 data = json.loads(resp.read().decode("utf-8"))
             # Node UI public API still title-only (short product name from node)
             self.assertEqual(data, {"title": "RESTORE PRIVACY"})
-            with urllib.request.urlopen(
-                f"http://127.0.0.1:{port}/", timeout=5
-            ) as resp:
-                html = resp.read().decode("utf-8")
+            # Browser observe path redirects to app-testers (do not follow)
+            class _NoRedirect(urllib.request.HTTPRedirectHandler):
+                def redirect_request(self, req, fp, code, msg, headers, newurl):
+                    return None
+
+            req = urllib.request.Request(f"http://127.0.0.1:{port}/", method="GET")
+            try:
+                with urllib.request.build_opener(_NoRedirect).open(
+                    req, timeout=5
+                ) as resp:
+                    status = resp.status
+                    loc = resp.headers.get("Location") or ""
+                    html = resp.read().decode("utf-8")
+            except urllib.error.HTTPError as e:
+                status = e.code
+                loc = e.headers.get("Location") or ""
+                html = e.read().decode("utf-8")
+            self.assertIn(status, (301, 302, 303, 307, 308))
+            self.assertIn("restoreprivacy.online/app-testers", loc)
             self.assertNotIn("Clients connected", html)
             self.assertNotIn('id="n"', html)
+            self.assertNotIn("Node online. No public live session counter.", html)
         finally:
             httpd.shutdown()
             httpd.server_close()

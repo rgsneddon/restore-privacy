@@ -1,0 +1,59 @@
+
+:root {
+  color-scheme: dark;
+  --bg: #0a1628;
+  --card: #132a4a;
+  --text: #e8eef5;
+  --muted: #8eb4d0;
+  --accent: #7dd3fc;
+  --btn: #2694e8;
+  --border: rgba(174, 208, 234, 0.35);
+  --font: "Segoe UI", system-ui, -apple-system, sans-serif;
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0; min-height: 100vh;
+  font-family: var(--font); color: var(--text);
+  background: radial-gradient(ellipse at 50% 0%, #1a4a7a 0%, var(--bg) 55%);
+}
+.page-shell { max-width: 44rem; margin: 0 auto; padding: 1.25rem 1rem 2.5rem; }
+.brand-panel {
+  background: color-mix(in srgb, var(--card) 88%, transparent);
+  border: 1px solid var(--border); border-radius: 14px;
+  padding: 1rem 1.1rem; margin-bottom: 1.1rem;
+}
+.brand-mark { display: flex; align-items: center; gap: 0.85rem; justify-content: center; }
+.brand-logo { height: 64px; width: auto; }
+.brand-name { margin: 0; font-weight: 800; letter-spacing: 0.04em; font-size: 1.15rem; }
+.brand-ver { margin: 0.2rem 0 0; font-size: 0.8rem; color: var(--accent); font-weight: 700; }
+.site-nav {
+  display: flex; flex-wrap: wrap; gap: 0.55rem; justify-content: center;
+  margin-top: 0.9rem;
+}
+.site-nav a {
+  color: var(--text); text-decoration: none; font-size: 0.82rem; font-weight: 700;
+  padding: 0.4rem 0.7rem; border-radius: 999px; border: 1px solid var(--border);
+  background: rgba(0,0,0,0.18);
+}
+.site-nav a:hover { border-color: var(--accent); }
+.panel {
+  background: color-mix(in srgb, var(--card) 90%, transparent);
+  border: 1px solid var(--border); border-radius: 14px;
+  padding: 1.2rem 1.15rem; margin: 0 0 1rem; text-align: center;
+}
+.panel h1, .panel h2 { margin: 0 0 0.7rem; letter-spacing: 0.03em; }
+.lead { margin: 0 auto 0.75rem; max-width: 36rem; line-height: 1.55; color: #cfe6f7; }
+.foot, .muted { color: var(--muted); line-height: 1.45; }
+.free-grid {
+  display: flex; flex-wrap: wrap; gap: 0.55rem; justify-content: center; margin: 0.85rem 0;
+}
+.free-grid a.dl, a.btn {
+  display: inline-block; min-width: 8rem; padding: 0.65rem 0.9rem;
+  border-radius: 12px; font-weight: 700; text-decoration: none;
+  color: #0a1628; background: #aed0ea;
+}
+.free-grid a.dl:hover, a.btn:hover { background: #c5e0f4; }
+.keygen-note { margin: 0.75rem auto; max-width: 32rem; color: #fecaca; font-weight: 600; }
+.steps { text-align: left; max-width: 28rem; margin: 0.5rem auto; line-height: 1.55; color: #cfe6f7; }
+.site-foot { text-align: center; margin-top: 1.5rem; font-size: 0.85rem; color: var(--muted); }
+.doc-body { text-align: left; max-width: 38rem; margin: 0 auto; line-height: 1.55; color: #cfe6f7; }

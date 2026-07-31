@@ -1,12 +1,12 @@
-# Privacy Policy — Restore Privacy
+# Privacy Policy — Restore Privacy Suite
 
-**Last updated:** 29 July 2026  
-**Product:** Restore Privacy Tunnel (RPT / RPT2) — VPN node, client apps, and public status shop  
-**Current packages (catalog v1.0.0):** paid installers on [restoreprivacy.online](https://restoreprivacy.online/) — Monthly **£3.00 GBP** or Yearly **£30.00**  per platform when published. **Linux**, **Android**, **macOS**, and **iOS** monopin **1.0.0** packages are fulfilled from the Helsinki paid store; **Windows** PE for **0.5.9** is uploaded from the Windows build host when ready. **macOS** is **Developer ID** + notarized (Team **SFCBP95595**); **iOS** is **Apple Distribution** Team-signed sideload (same Team). Source repository is **private**; free permanent GitHub installer URLs are not offered. After payment you get a **12-hour** download link (retry if the connection drops) and email with **keygen** + **PPI**. Pre-adjustment Settings defaults (lean residual): run at startup **off**, autoconnect **off**, residual VPN core **always on**, residual **IPv4 always on**, residual **IPv6** toggleable, traffic shaping / outer obfuscation / multi-hop **off**. Optional browser extension (Chromium MV3) is browser-scoped only — not OS residual TUN.
+**Last updated:** 31 July 2026  
+**Product:** Restore Privacy Suite v1.0.0 — residual Connect, wallet, Evolve, and the public **VPN APP Shop**  
+**Current packages (catalog v1.0.0):** free Suite installers on [restoreprivacy.online](https://restoreprivacy.online/) (VPN APP Shop). Residual Connect needs a **KEYGEN** — monthly licence from **£3.00 GBP**; yearly residual plan **£30.00** remains on `/pay`. **Linux**, **Android**, **macOS**, **iOS**, and **Windows** monopin **1.0.0** packages are fulfilled from the product host. **macOS** is **Developer ID** + notarized (Team **SFCBP95595**); **iOS** is **Apple Distribution** Team-signed sideload (same Team). Public GitHub Pages (`public_site/`) ship docs only — not operator admin. After KEYGEN checkout, email delivers **keygen** + **PPI**. Settings defaults (lean residual): run at startup **off**, autoconnect **off**, residual VPN core **always on**, residual **IPv4 always on**, residual **IPv6** toggleable, traffic shaping / outer obfuscation / multi-hop **off**. Optional browser extension (Chromium MV3) is browser-scoped only — not OS residual TUN.
 
 **Payment and Connect:** residual Connect needs a **successful payment** and **keygen unlock** while the subscription is **OK**. If payment fails, is refunded/disputed, or the paid period ends, status is **EXPIRED**: the app **hard-locks** with **renew your licence *here*** and a **platform payment portal** link until you renew and re-enter a valid keygen. Stripe session id / keygen are entitlement keys, not a username/password account. The status host also binds Stripe **`payment_intent`** so refunds without session metadata still revoke Connect.
 
-**Related:** [AUDIT.md](AUDIT.md) · Operator: **Raskul** · Docs and downloads: [status host](https://restoreprivacy.online/)
+**Related:** [AUDIT.md](AUDIT.md) · Operator: **Raskul** · Docs and downloads: [VPN APP Shop](https://restoreprivacy.online/)
 
 This policy describes how the software is **designed** to handle data. It is not legal advice and not a jurisdiction-specific compliance certificate.
 
@@ -19,7 +19,7 @@ Restore Privacy is a **custom encrypted tunnel**. Product goals:
 | Commitment | Meaning |
 |------------|---------|
 | **No user-info logs** | Node and status software are configured **not** to write connection, session, access, traffic, **accounting**, or peer-activity logs to disk. |
-| **No client PII on the public shop** | Public status shows **title and paid-download entry** — not a live client count, identities, IPs, or per-client lists. |
+| **No client PII on the public shop** | Public VPN APP Shop shows **title, free Suite download entry, and KEYGEN checkout** — not a live client count, identities, IPs, or per-client lists. |
 | **Tunnel as a relay** | After admission, the node forwards encrypted-session traffic; it is not an analytics or advertising platform. |
 
 ---

@@ -886,6 +886,174 @@ def render_homepage_buy_form_html(
 """
 
 
+# Suite storefront (homepage section above VPN #downloads)
+SUITE_SECTION_ID = "suite-storefront"
+SUITE_PRODUCT_TITLE = "Restore Privacy Suite"
+SUITE_PRODUCT_SUBTITLE = (
+    "VPN, Perccent wallet (%), and Evolve in one app — free to install"
+)
+SUITE_VERSION_LABEL = f"v {RELEASE_VERSION}"
+SUITE_KEYGEN_HINT = (
+    f"Connect needs a KEYGEN. Licence is {PRICE_LABEL}/month "
+    "(same residual entitlement path as the VPN client)."
+)
+SUITE_FREE_DOWNLOAD_PATH = "/suite/download"
+DOWNLOADS_SECTION_ID = "downloads"
+
+
+def suite_free_download_href(platform: str) -> str:
+    """Relative free-download URL for a Suite platform installer."""
+    plat = (platform or "").strip().lower()
+    if not plat:
+        return SUITE_FREE_DOWNLOAD_PATH
+    return f"{SUITE_FREE_DOWNLOAD_PATH}?platform={plat}"
+
+
+def suite_storefront_css() -> str:
+    """CSS for the Suite storefront card (above VPN downloads)."""
+    return """
+    .suite-storefront {
+      width: 100%; text-align: center; box-sizing: border-box;
+      margin: 0 0 1.25rem;
+      border: 1px solid rgba(174, 208, 234, 0.45);
+      background:
+        linear-gradient(165deg, rgba(30, 80, 140, 0.55) 0%, rgba(10, 22, 40, 0.92) 70%);
+      box-shadow: 0 10px 28px rgba(4, 12, 28, 0.4), inset 0 1px 0 rgba(255,255,255,0.08);
+    }
+    .suite-storefront h2 {
+      font-size: clamp(1.05rem, 2.8vw, 1.35rem);
+      letter-spacing: 0.06em; font-weight: 800;
+      margin: 0 0 0.35rem; color: #ffffff;
+      text-transform: uppercase;
+    }
+    .suite-storefront .suite-version-badge {
+      display: inline-block; margin: 0 0 0.65rem;
+      padding: 0.2rem 0.65rem; border-radius: 999px;
+      font-size: 0.78rem; font-weight: 700; letter-spacing: 0.04em;
+      color: #0a1628; background: #aed0ea;
+    }
+    .suite-storefront .suite-blurb {
+      margin: 0 auto 0.85rem; max-width: 36rem;
+      font-size: clamp(0.88rem, 2.1vw, 1rem);
+      line-height: 1.45; color: #dbeafe; font-weight: 600;
+    }
+    .suite-storefront .suite-keygen-line {
+      margin: 0 auto 1rem; max-width: 34rem;
+      font-size: 0.92rem; line-height: 1.45; color: #fecaca; font-weight: 700;
+    }
+    .suite-free-grid {
+      display: flex; flex-wrap: wrap; gap: 0.65rem; justify-content: center;
+      margin: 0.5rem auto 1rem; max-width: 40rem;
+    }
+    .suite-free-grid a.suite-dl {
+      display: inline-block; min-width: 8.5rem; padding: 0.65rem 0.9rem;
+      border-radius: 12px; font-weight: 700; font-size: 0.92rem;
+      text-decoration: none; color: #0a1628; background: #aed0ea;
+      border: 1px solid rgba(255,255,255,0.25);
+    }
+    .suite-free-grid a.suite-dl:hover { background: #c5e0f4; }
+    .suite-keygen-cta {
+      margin: 0.35rem auto 0.25rem; max-width: 28rem;
+    }
+    .suite-keygen-cta .dl-buy-now {
+      width: 100%; max-width: 22rem;
+    }
+    .suite-storefront .suite-pay-hint {
+      margin: 0.75rem auto 0; max-width: 34rem;
+      font-size: 0.82rem; color: rgba(174, 208, 234, 0.95); line-height: 1.4;
+    }
+"""
+
+
+def render_suite_storefront_html(
+    assets: Iterable[DownloadAsset] | None = None,
+    *,
+    coming_soon: bool | None = None,
+    accept_language: str = "",
+    country: str = "",
+    currency: str = "",
+    default_platform: str = "",
+    default_interval: str = "month",
+) -> str:
+    """Homepage **Restore Privacy Suite** block (above VPN downloads).
+
+    Installers are **free**. Residual Connect still needs a KEYGEN from the
+    monthly (£3) subscription — same entitlement model as the VPN client.
+    """
+    _ = (coming_soon, accept_language, country, currency, default_interval)
+    items = list(assets) if assets is not None else available_downloads()
+    if not items:
+        return ""
+
+    def_plat = (default_platform or "").strip().lower()
+    free_links: list[str] = []
+    for a in items:
+        title = platform_face_title(a.platform)
+        href = suite_free_download_href(a.platform)
+        free_links.append(
+            f'<a class="suite-dl" id="suite-dl-{_esc_html(a.platform)}" '
+            f'href="{_esc_html(href)}" data-platform="{_esc_html(a.platform)}" '
+            f'data-free-download="1" data-product="suite">'
+            f"Download {_esc_html(title)}</a>"
+        )
+    free_grid = "\n      ".join(free_links)
+
+    # KEYGEN licence: monthly only (£3), product=suite
+    plat_opts: list[str] = []
+    for a in items:
+        sel = " selected" if a.platform == def_plat else ""
+        title = platform_face_title(a.platform)
+        plat_opts.append(
+            f'<option value="{_esc_html(a.platform)}"{sel}>'
+            f"{_esc_html(title)}</option>"
+        )
+    platform_options = "\n            ".join(plat_opts)
+
+    keygen_form = f"""
+    <form class="dl-buy-form suite-keygen-cta" id="suite-keygen-form" method="post"
+          action="/pay/checkout" data-pay-via="suite-keygen" data-product="suite"
+          data-billing-intervals="month">
+      <input type="hidden" name="product" value="suite" id="suite-product-field"/>
+      <input type="hidden" name="interval" value="month" id="suite-interval-field"/>
+      <input type="hidden" name="auto_renew" value="1" id="suite-auto-renew-field"/>
+      <div class="dl-buy-field" id="suite-keygen-platform-field">
+        <label class="dl-buy-label" for="suite-keygen-platform">Device for KEYGEN licence</label>
+        <select name="platform" id="suite-keygen-platform" required
+                aria-label="Platform for Suite KEYGEN">
+          <option value="" disabled{" selected" if not def_plat else ""}>Choose device…</option>
+            {platform_options}
+        </select>
+      </div>
+      <button type="submit" class="dl-buy-now" id="suite-keygen-buy"
+              data-product="suite">Get KEYGEN — {PRICE_LABEL}/month</button>
+      <p class="dl-stripe-branding" id="suite-stripe-branding">{STRIPE_CHECKOUT_BRANDING_NOTE}</p>
+    </form>
+"""
+
+    return f"""
+  <section class="suite-storefront panel-card" id="{SUITE_SECTION_ID}"
+           aria-label="Download Restore Privacy Suite"
+           data-product="suite" data-storefront="suite" data-free-download="1"
+           data-suite-version="{_esc_html(RELEASE_VERSION)}">
+    <h2 id="suite-storefront-title">{SUITE_PRODUCT_TITLE}</h2>
+    <span class="suite-version-badge" id="suite-version-badge">{SUITE_VERSION_LABEL}</span>
+    <p class="suite-blurb" id="suite-blurb">{SUITE_PRODUCT_SUBTITLE}</p>
+    <p class="suite-keygen-line" id="suite-keygen-line">{SUITE_KEYGEN_HINT}</p>
+    <div class="suite-free-grid" id="suite-free-grid" data-free-download="1">
+      {free_grid}
+    </div>
+    <div class="dl-buttons" id="suite-dl-buttons" data-buy-mode="suite-keygen"
+         data-product="suite">
+{keygen_form}
+    </div>
+    <p class="suite-pay-hint" id="suite-pay-hint">
+      Download first, then enter the KEYGEN from your fulfilment email after checkout.
+      Yearly VPN plans remain available in the client download box below.
+    </p>
+  </section>
+"""
+
+
 def render_download_section_html(
     assets: Iterable[DownloadAsset] | None = None,
     *,

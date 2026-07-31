@@ -1027,7 +1027,6 @@ def render_document_html(
     header = public_brand_header_html(
         title=PUBLIC_BRAND_TITLE,
         active=active,
-        logo_size=112,
     )
     page = f"""{public_head_open(title=title, extra_css=extra)}
   <div class="page-shell" id="doc-page-shell" data-page="doc" data-chrome="pro">
@@ -1038,9 +1037,9 @@ def render_document_html(
       </article>
     </section>
     <footer class="panel-card doc-foot" id="doc-foot" data-chrome="pro">
-      <p class="muted">Restore Privacy public documents on this status host
-      (source repository is private). Paid installers:
-      <a href="/#downloads">downloads</a>.</p>
+      <p class="muted">Restore Privacy Suite public documents on the VPN APP Shop.
+      Free installers and KEYGEN checkout:
+      <a href="/#suite-storefront">Suite storefront</a>.</p>
       <p>
         <a href="{PRIVACY_PATH}">Privacy</a>
         <a href="{LICENSE_PATH}">Licence</a>
@@ -1118,9 +1117,8 @@ def render_how_to_buy_html() -> bytes:
     header = public_brand_header_html(
         title=PUBLIC_BRAND_TITLE,
         active="home",
-        logo_size=112,
     )
-    body = f"""{public_head_open(title="How to buy — Restore Privacy", extra_css='''
+    body = f"""{public_head_open(title="How to buy — Restore Privacy Suite", extra_css='''
 .card{{background:var(--rb-card);border-radius:12px;padding:1rem 1.15rem;margin:1rem 0;border:1px solid var(--rb-card-border)}}
 ol{{padding-left:1.25rem;color:var(--rb-muted)}}
 ''')}
@@ -1128,35 +1126,35 @@ ol{{padding-left:1.25rem;color:var(--rb-muted)}}
 {header}
 <section class="panel-card doc-body-panel" id="how-to-buy-panel">
 <h1 id="how-to-buy-heading">How to buy Restore Privacy</h1>
-<p class="muted">Paid subscription only: <strong>Monthly VPN plan</strong>
-({_escape(PRICE_LABEL)} / month GBP) or <strong>Yearly VPN plan</strong>
-({_escape(PRICE_YEARLY_LABEL)} / year — save vs 12 × monthly).
-Every plan includes a <strong>3-day free trial</strong> —
-<strong>no money is taken until after the trial ends</strong>.
-There are no free permanent installer buttons on this shop.</p>
+<p class="muted">The Suite installers are <strong>free</strong> on the VPN APP Shop.
+Residual Connect needs a <strong>KEYGEN</strong> licence: start with the monthly
+path (from {_escape(PRICE_LABEL)}), or choose a residual client plan —
+<strong>Monthly VPN plan</strong> ({_escape(PRICE_LABEL)} / month GBP) or
+<strong>Yearly VPN plan</strong> ({_escape(PRICE_YEARLY_LABEL)} / year).
+Where a plan includes a <strong>3-day free trial</strong>,
+<strong>no money is taken until after the trial ends</strong>.</p>
 
 <div class="card" id="how-to-buy-steps">
 <h2>Select your plan</h2>
 <ol>
-  <li>Open the shop: <a href="{_escape(home)}">{_escape(home)}</a></li>
-  <li>Under <strong>Download client</strong>, choose your device and plan
-      (Monthly VPN plan or Yearly VPN plan). You can also open the plan page at
-      <code>{_escape(SITE_PAY_PLAN_PATH)}</code> (<code>/pay</code>).</li>
+  <li>Open the VPN APP Shop: <a href="{_escape(home)}">{_escape(home)}</a></li>
+  <li>Download the free Suite installer for your device, then under residual
+      plans pick Monthly VPN plan or Yearly VPN plan. You can also open the plan
+      page at <code>{_escape(SITE_PAY_PLAN_PATH)}</code> (<code>/pay</code>).</li>
   <li>Continue to Stripe Checkout
-      ({_escape(PRICE_LABEL)}/month or {_escape(PRICE_YEARLY_LABEL)}/year —
-      3-day free trial; card on file, first charge after trial):
+      ({_escape(PRICE_LABEL)}/month or {_escape(PRICE_YEARLY_LABEL)}/year):
       <a id="how-to-buy-payment-page" href="{_escape(pay)}"
       rel="noopener noreferrer">{_escape(pay)}</a></li>
-  <li>After checkout (trial start or paid), use the download on the success page
-      (<code>{_escape(claim)}?session_id=…</code>). The link is valid for
-      <strong>12 hours</strong> and can be used again if the connection drops
-      mid-download (not single-use). Your keygen arrives in email
-      separately (USE THIS KEYGEN TO UNLOCK RESTORE PRIVACY).</li>
+  <li>After checkout, your KEYGEN arrives in email
+      (USE THIS KEYGEN TO UNLOCK RESTORE PRIVACY). Paste it in the app, then
+      Connect. Older paid-download success links
+      (<code>{_escape(claim)}?session_id=…</code>) remain valid for
+      <strong>12 hours</strong> when fulfilment still issues a package URL.</li>
 </ol>
 <p class="muted">Fulfilment listens for Stripe
 <code>checkout.session.completed</code> on
-<code>{_escape(webhook)}</code>. Connect stays active through the trial and
-paid period; refunds and subscription end revoke access.</p>
+<code>{_escape(webhook)}</code>. Connect stays active through the paid period
+(and trial when offered); refunds and subscription end revoke access.</p>
 </div>
 
 <div class="card" id="how-to-buy-public-docs">
