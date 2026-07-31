@@ -766,6 +766,35 @@ def platform_face_title(platform: str) -> str:
     return names.get(key, key.title() if key else "Device")
 
 
+def detect_platform_from_user_agent(user_agent: str = "") -> str:
+    """Map browser User-Agent to a catalog free-download platform key.
+
+    Returns one of: windows, android, macos, ios, linux — empty if unknown.
+    Order matters (iPhone/iPad before Mac; Android before Linux).
+    """
+    ua = (user_agent or "").strip()
+    if not ua:
+        return ""
+    low = ua.lower()
+    # Mobile first
+    if "iphone" in low or "ipad" in low or "ipod" in low:
+        return "ios"
+    if "android" in low:
+        return "android"
+    # Desktop OS brands
+    if "windows" in low or "win64" in low or "win32" in low:
+        return "windows"
+    # macOS: "Macintosh" / "Mac OS X" / "Mac OS"
+    if "macintosh" in low or "mac os" in low or "mac_powerpc" in low:
+        return "macos"
+    if "cros" in low:
+        # ChromeOS — closest free package is Linux
+        return "linux"
+    if "linux" in low or "x11" in low or "ubuntu" in low or "fedora" in low:
+        return "linux"
+    return ""
+
+
 def download_menu_rows(
     assets: Iterable[DownloadAsset] | None = None,
 ) -> tuple[list[DownloadAsset], list[DownloadAsset]]:
@@ -1047,6 +1076,21 @@ def suite_storefront_css() -> str:
       width: 100%; margin: 0 0 0.35rem; font-size: 0.72rem; font-weight: 700;
       letter-spacing: 0.06em; text-transform: uppercase; color: rgba(174,208,234,0.9);
     }
+    .suite-free-primary {
+      margin: 0.35rem auto 0.65rem; max-width: 28rem; text-align: center;
+    }
+    .suite-free-primary a.suite-dl-primary {
+      display: inline-block; width: 100%; max-width: 22rem; box-sizing: border-box;
+      padding: 0.85rem 1.1rem; border-radius: 12px; font-weight: 800; font-size: 1.02rem;
+      text-decoration: none; color: #0a1628; background: #7dd3fc;
+      border: 2px solid rgba(255,255,255,0.45);
+      box-shadow: 0 6px 18px rgba(0, 120, 200, 0.35);
+    }
+    .suite-free-primary a.suite-dl-primary:hover { background: #bae6fd; }
+    .suite-detect-hint {
+      margin: 0.45rem auto 0; max-width: 28rem; font-size: 0.78rem;
+      color: rgba(174, 208, 234, 0.95); line-height: 1.35;
+    }
     .suite-free-grid {
       display: flex; flex-wrap: wrap; gap: 0.65rem; justify-content: center;
       margin: 0.5rem auto 1rem; max-width: 40rem;
@@ -1058,6 +1102,10 @@ def suite_storefront_css() -> str:
       border: 1px solid rgba(255,255,255,0.25);
     }
     .suite-free-grid a.suite-dl:hover { background: #c5e0f4; }
+    .suite-free-grid a.suite-dl.is-detected {
+      outline: 2px solid #7dd3fc; outline-offset: 2px;
+      background: #bae6fd;
+    }
     .suite-keygen-cta {
       margin: 0.35rem auto 0.25rem; max-width: 28rem;
     }
@@ -1155,14 +1203,40 @@ def render_suite_storefront_html(
         return ""
 
     def_plat = (default_platform or "").strip().lower()
+    # Only accept catalog platforms
+    known = {a.platform for a in items}
+    if def_plat and def_plat not in known:
+        def_plat = ""
     free_links: list[str] = []
-    for a in items:
+    # Detected platform first + highlighted for free download
+    ordered = list(items)
+    if def_plat:
+        ordered = sorted(
+            items,
+            key=lambda a: (0 if a.platform == def_plat else 1, a.platform),
+        )
+    primary_free = ""
+    if def_plat:
+        title = platform_face_title(def_plat)
+        href = suite_free_download_href(def_plat)
+        primary_free = (
+            f'<a class="suite-dl suite-dl-primary" id="suite-dl-primary" '
+            f'href="{_esc_html(href)}" data-platform="{_esc_html(def_plat)}" '
+            f'data-free-download="1" data-product="suite" data-detected-platform="1">'
+            f"Free download for {_esc_html(title)}</a>"
+            f'<p class="suite-detect-hint" id="suite-detect-hint" data-detected-platform="{_esc_html(def_plat)}">'
+            f"Detected your device as <strong>{_esc_html(title)}</strong> — "
+            f"or pick another platform below.</p>"
+        )
+    for a in ordered:
         title = platform_face_title(a.platform)
         href = suite_free_download_href(a.platform)
+        is_det = " is-detected" if def_plat and a.platform == def_plat else ""
+        det_attr = ' data-detected-platform="1"' if is_det else ""
         free_links.append(
-            f'<a class="suite-dl" id="suite-dl-{_esc_html(a.platform)}" '
+            f'<a class="suite-dl{_esc_html(is_det)}" id="suite-dl-{_esc_html(a.platform)}" '
             f'href="{_esc_html(href)}" data-platform="{_esc_html(a.platform)}" '
-            f'data-free-download="1" data-product="suite">'
+            f'data-free-download="1" data-product="suite"{det_attr}>'
             f"Download {_esc_html(title)}</a>"
         )
     free_grid = "\n      ".join(free_links)
@@ -1198,17 +1272,23 @@ def render_suite_storefront_html(
       <p class="dl-stripe-branding" id="suite-stripe-branding">{STRIPE_CHECKOUT_BRANDING_NOTE}</p>
     </form>
 """
+    detect_attr = (
+        f' data-detected-platform="{_esc_html(def_plat)}"' if def_plat else ""
+    )
 
     return f"""
   <section class="suite-storefront panel-card" id="{SUITE_SECTION_ID}"
            aria-label="Download Restore Privacy Suite"
            data-product="suite" data-storefront="suite" data-free-download="1"
-           data-suite-version="{_esc_html(RELEASE_VERSION)}">
+           data-suite-version="{_esc_html(RELEASE_VERSION)}"{detect_attr}>
     <h2 id="suite-storefront-title">{SUITE_PRODUCT_TITLE}</h2>
     <span class="suite-version-badge" id="suite-version-badge">{SUITE_VERSION_LABEL}</span>
     <p class="suite-blurb" id="suite-blurb">{SUITE_PRODUCT_SUBTITLE}</p>
 {render_suite_product_submenu_html()}
     <p class="suite-keygen-line" id="suite-keygen-line">{SUITE_KEYGEN_HINT}</p>
+    <div class="suite-free-primary" id="suite-free-primary" data-free-download="1">
+      {primary_free}
+    </div>
     <div class="suite-free-grid" id="suite-free-grid" data-free-download="1">
       {free_grid}
     </div>

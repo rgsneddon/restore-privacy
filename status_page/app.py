@@ -915,6 +915,20 @@ class Handler(BaseHTTPRequestHandler):
             q_plat = (query.get("platform") or "").strip()
             q_iv = (query.get("interval") or "month").strip()
             q_err = (query.get("pay_error") or query.get("error") or "").strip()
+            # Free-download + KEYGEN platform default: query pin, else User-Agent OS brand
+            if not q_plat:
+                try:
+                    from downloads import detect_platform_from_user_agent
+                except ImportError:  # pragma: no cover
+                    from status_page.downloads import (  # type: ignore
+                        detect_platform_from_user_agent,
+                    )
+                ua = ""
+                for k, v in hdrs.items():
+                    if str(k).lower() == "user-agent":
+                        ua = str(v or "")
+                        break
+                q_plat = detect_platform_from_user_agent(ua)
             self._send(
                 200,
                 "text/html; charset=utf-8",
