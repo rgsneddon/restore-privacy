@@ -2440,23 +2440,31 @@ def render_admin_support_tickets_page_html(
         status_label = "closed" if is_closed else "open"
         status_cls = "badge-closed" if is_closed else "badge-open"
         if is_closed:
+            # Red locked switch (knob right) — no text, cannot reopen
             control = (
-                f'<span class="ticket-status-locked" id="ticket-status-{_escape(tid)}">'
-                f"Closed</span>"
+                f'<span class="ticket-toggle ticket-toggle-closed" '
+                f'id="ticket-toggle-{_escape(tid)}" role="img" '
+                f'aria-label="Closed" title="Closed (cannot reopen)" '
+                f'data-status="closed">'
+                f'<span class="ticket-toggle-track" aria-hidden="true">'
+                f'<span class="ticket-toggle-knob"></span></span></span>'
             )
         else:
+            # Green open switch (knob left); flip submits close (one-way)
             control = (
                 f'<form class="admin-support-close-form" method="post" '
                 f'action="{ADMIN_SUPPORT_CLOSE_PATH}" '
                 f'id="close-form-{_escape(tid)}">'
                 f'<input type="hidden" name="ticket_id" value="{_escape(tid)}"/>'
-                f'<label class="ticket-close-switch" title="Close ticket (cannot reopen)">'
+                f'<label class="ticket-toggle ticket-toggle-open" '
+                f'title="Close ticket (cannot reopen)" '
+                f'aria-label="Open — switch to close">'
                 f'<input type="checkbox" name="close" value="1" '
-                f'class="ticket-close-checkbox" '
-                f'id="ticket-close-{_escape(tid)}" '
+                f'class="ticket-toggle-input" '
+                f'id="ticket-toggle-{_escape(tid)}" '
                 f'onchange="this.form.submit()"/>'
-                f'<span class="ticket-close-track" aria-hidden="true"></span>'
-                f'<span class="ticket-close-label">Open → Closed</span>'
+                f'<span class="ticket-toggle-track" aria-hidden="true">'
+                f'<span class="ticket-toggle-knob"></span></span>'
                 f"</label></form>"
             )
         body_rows.append(
@@ -2471,25 +2479,24 @@ def render_admin_support_tickets_page_html(
             f"{_escape(str(t.get('message') or ''))}</div></td>"
             f"<td>{_escape(str(t.get('platform') or '—') or '—')}</td>"
             f"<td>{_escape(str(t.get('app_version') or '—') or '—')}</td>"
-            f"<td><code>{_escape(str(t.get('keygen') or '—') or '—')}</code></td>"
             f"<td>{_escape(str(t.get('mail_status') or '—'))}</td>"
             f'<td><span class="{status_cls}">{_escape(status_label)}</span></td>'
             f"<td>{_escape(_fmt_ts(t.get('closed_at')))}</td>"
             f"<td>{_escape(str(t.get('close_mail_status') or '—') or '—')}</td>"
-            f"<td>{control}</td>"
+            f"<td class=\"ticket-toggle-cell\">{control}</td>"
             "</tr>"
         )
     table_body = (
         "\n".join(body_rows)
         if body_rows
-        else '<tr id="admin-support-empty"><td colspan="13">No support tickets yet.</td></tr>'
+        else '<tr id="admin-support-empty"><td colspan="12">No support tickets yet.</td></tr>'
     )
     main = f"""
 <section class="card" id="admin-support-tickets" data-admin-support="1">
   <h2 id="admin-support-heading">Support tickets database</h2>
   <p class="muted" id="admin-support-blurb">
-    Public form tickets (<code>/support</code>). Closing a ticket is permanent
-    (cannot reopen) and emails the requester a closed notice with thanks.
+    Public form tickets (<code>/support</code>). Green switch = open; flip to close
+    (red, permanent). Closing emails the requester a closed notice with thanks.
   </p>
   {flash}
   <p class="muted" id="admin-support-count">{len(rows)} ticket(s)</p>
@@ -2504,12 +2511,11 @@ def render_admin_support_tickets_page_html(
         <th>Message</th>
         <th>Platform</th>
         <th>App version</th>
-        <th>Keygen</th>
         <th>Staff mail</th>
         <th>Status</th>
         <th>Closed (UTC)</th>
         <th>Close mail</th>
-        <th>Close</th>
+        <th>Open / closed</th>
       </tr>
     </thead>
     <tbody>
@@ -2528,9 +2534,27 @@ def render_admin_support_tickets_page_html(
 .ticket-msg-scroll{{max-height:5.5rem;overflow:auto;white-space:pre-wrap;word-break:break-word}}
 .badge-open{{color:#065f46;font-weight:700}}
 .badge-closed{{color:#7f1d1d;font-weight:700}}
-.ticket-close-switch{{display:inline-flex;align-items:center;gap:0.4rem;cursor:pointer;font-size:0.78rem}}
-.ticket-close-checkbox{{accent-color:#1a6fad}}
-.ticket-status-locked{{font-weight:700;color:#7f1d1d}}
+/* Textless green/red toggle (not a bare checkbox) */
+.ticket-toggle-cell{{vertical-align:middle;min-width:3.2rem}}
+.ticket-toggle{{
+  display:inline-block;position:relative;cursor:pointer;user-select:none;
+  vertical-align:middle;line-height:0}}
+.ticket-toggle-input{{
+  position:absolute;opacity:0;width:0;height:0;margin:0;pointer-events:none}}
+.ticket-toggle-track{{
+  display:inline-block;width:2.75rem;height:1.45rem;border-radius:999px;
+  position:relative;transition:background 0.15s ease;
+  box-shadow:inset 0 1px 2px rgba(0,0,0,0.18)}}
+.ticket-toggle-knob{{
+  position:absolute;top:2px;left:2px;width:1.2rem;height:1.2rem;border-radius:50%;
+  background:#fff;box-shadow:0 1px 3px rgba(0,0,0,0.28);
+  transition:left 0.15s ease}}
+.ticket-toggle-open .ticket-toggle-track{{background:#22c55e}}
+.ticket-toggle-open .ticket-toggle-knob{{left:2px}}
+.ticket-toggle-open:hover .ticket-toggle-track{{filter:brightness(1.05)}}
+.ticket-toggle-closed{{cursor:default}}
+.ticket-toggle-closed .ticket-toggle-track{{background:#ef4444}}
+.ticket-toggle-closed .ticket-toggle-knob{{left:1.4rem}}
 .ok-msg{{color:var(--badge-ok-fg,#065f46);background:var(--badge-ok-bg,#ecfdf5);
   padding:0.5rem 0.75rem;border-radius:8px}}
 .err-msg{{color:#fecaca;background:rgba(127,29,29,0.35);padding:0.5rem 0.75rem;border-radius:8px}}

@@ -33,6 +33,10 @@ ADMIN_NAV_SUPPORT_TICKETS_ID = "admin-nav-support-tickets"
 TICKET_STATUS_OPEN = "open"
 TICKET_STATUS_CLOSED = "closed"
 
+# Short public ticket references: RPS-001, RPS-002, …
+TICKET_ID_PREFIX = "RPS"
+TICKET_ID_RE = re.compile(r"^RPS-(\d+)$", re.IGNORECASE)
+
 # Optional public reply address on the ticket email (same as fulfilment from).
 DEFAULT_FROM_FALLBACK = "noreply@restoreprivacy.online"
 
@@ -61,10 +65,56 @@ def support_db_path() -> Path:
     return support_data_dir() / "support_tickets.sqlite"
 
 
-def new_ticket_id(*, now: float | None = None) -> str:
-    """Public ticket reference: RPT-SUP-<hex> (unique, not sequential)."""
-    t = int(now if now is not None else time.time())
-    return f"RPT-SUP-{t:x}-{secrets.token_hex(4)}".upper()
+def format_ticket_id(n: int) -> str:
+    """Format sequence number as ``RPS-001`` (at least 3 digits)."""
+    n = max(1, int(n))
+    return f"{TICKET_ID_PREFIX}-{n:03d}"
+
+
+def parse_ticket_seq(ticket_id: str) -> int | None:
+    """Return sequence int from ``RPS-###``, or None if not that shape."""
+    m = TICKET_ID_RE.match((ticket_id or "").strip())
+    if not m:
+        return None
+    try:
+        return int(m.group(1))
+    except ValueError:
+        return None
+
+
+def next_ticket_seq(*, path: Path | None = None) -> int:
+    """Next free sequence for ``RPS-###`` from the ticket store (max+1)."""
+    p = init_support_db(path)
+    conn = sqlite3.connect(str(p))
+    try:
+        cur = conn.execute(
+            "SELECT ticket_id FROM support_tickets WHERE ticket_id LIKE 'RPS-%'"
+        )
+        max_n = 0
+        for (tid,) in cur.fetchall():
+            n = parse_ticket_seq(str(tid or ""))
+            if n is not None and n > max_n:
+                max_n = n
+        return max_n + 1
+    finally:
+        conn.close()
+
+
+def new_ticket_id(
+    *,
+    now: float | None = None,
+    path: Path | None = None,
+    seq: int | None = None,
+) -> str:
+    """Public ticket reference: short sequential ``RPS-001``, ``RPS-002``, …
+
+    *seq* forces a number (tests). Otherwise allocates from the store max+1.
+    *now* is ignored (kept for call-site compat).
+    """
+    _ = now
+    if seq is not None:
+        return format_ticket_id(seq)
+    return format_ticket_id(next_ticket_seq(path=path))
 
 
 def validate_support_form(
@@ -74,15 +124,15 @@ def validate_support_form(
     message: str,
     platform: str = "",
     app_version: str = "",
-    keygen: str = "",
+    keygen: str = "",  # accepted but ignored (field removed from public form)
 ) -> tuple[bool, str, dict[str, str]]:
-    """Return (ok, error, cleaned_fields). Pure — no I/O."""
+    """Return (ok, error, cleaned_fields). Pure — no I/O. Keygen is not collected."""
+    _ = keygen
     em = (email or "").strip()
     sub = (subject or "").strip()
     msg = (message or "").strip()
     plat = (platform or "").strip()[:40]
     ver = (app_version or "").strip()[:32]
-    kg = (keygen or "").strip().upper()[:80]
     if not em or not _EMAIL_RE.match(em):
         return False, "Please enter a valid email address.", {}
     if len(sub) < 3:
@@ -99,7 +149,7 @@ def validate_support_form(
         "message": msg,
         "platform": plat,
         "app_version": ver,
-        "keygen": kg,
+        "keygen": "",  # no longer collected on the public form
     }
 
 
@@ -115,6 +165,7 @@ def build_support_email(
     created_at: float | None = None,
 ) -> dict[str, str]:
     """Build outbound mail fields for rus@ (pure; no SMTP)."""
+    _ = keygen  # not presented for new tickets
     tid = (ticket_id or "").strip()
     ts = time.strftime(
         "%Y-%m-%d %H:%M:%S UTC",
@@ -132,7 +183,6 @@ def build_support_email(
         "--- Optional context ---",
         f"Platform: {platform or '(not given)'}",
         f"App version: {app_version or '(not given)'}",
-        f"Keygen: {keygen or '(not given)'}",
         "",
         "— Restore Privacy support form",
         "https://restoreprivacy.online/support",
@@ -592,7 +642,7 @@ def create_support_ticket(
     if not ok:
         return {"ok": False, "error": err, "ticket_id": ""}
     t = float(now if now is not None else time.time())
-    tid = new_ticket_id(now=t)
+    tid = new_ticket_id(now=t, path=path)
     row = persist_support_ticket(
         fields, ticket_id=tid, now=t, path=path, mail_status="pending"
     )
@@ -603,7 +653,7 @@ def create_support_ticket(
         message=fields["message"],
         platform=fields["platform"],
         app_version=fields["app_version"],
-        keygen=fields["keygen"],
+        keygen="",
         created_at=t,
     )
     mail_result: dict[str, Any] = {"ok": True, "error": None, "skipped": True}
@@ -671,7 +721,6 @@ def render_support_page_html(
         "message": html.escape(pre.get("message") or ""),
         "platform": html.escape(pre.get("platform") or ""),
         "app_version": html.escape(pre.get("app_version") or ""),
-        "keygen": html.escape(pre.get("keygen") or ""),
     }
     # Support form chrome lives in public_site_css (theme-aware inputs / CTAs).
     head = public_head_open(
@@ -687,7 +736,8 @@ def render_support_page_html(
   <h2>Customer support</h2>
   <p class="support-lead">
     Tell us what went wrong. We open a ticket and email
-    <strong>{html.escape(SUPPORT_INBOX)}</strong>. You get a reference number to quote later.
+    <strong>{html.escape(SUPPORT_INBOX)}</strong>. You get a short reference
+    (e.g. <code>RPS-001</code>) to quote later.
   </p>
   {ok_html}
   {err_html}
@@ -719,10 +769,7 @@ def render_support_page_html(
     <input id="support-version" name="app_version" type="text" maxlength="32"
       value="{fields['app_version']}" placeholder="0.5.8"/>
 
-    <label for="support-keygen">Keygen <span class="hint">(optional — only if relevant)</span></label>
-    <input id="support-keygen" name="keygen" type="text" maxlength="80"
-      value="{fields['keygen']}" placeholder="RPT-KEY-…"/>
-    <p class="hint">We never ask for passwords. Do not paste card details.</p>
+    <p class="hint">We never ask for passwords or card details. Do not paste secrets.</p>
 
     <button type="submit" id="support-submit">Send support ticket</button>
   </form>

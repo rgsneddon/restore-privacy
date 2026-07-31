@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 import sys
 import tempfile
 import unittest
@@ -53,19 +54,21 @@ class TestAdminSupportTableAndClose(unittest.TestCase):
 
             created = create_support_ticket(
                 email="user@example.com",
-                subject="Cannot connect after keygen",
+                subject="Cannot connect after unlock",
                 message="Tunnel stays Connecting after unlock on macOS.",
                 platform="macos",
                 app_version="0.5.8",
-                keygen="RPT-KEY-TEST",
                 path=db,
                 send_mail=False,
             )
             self.assertTrue(created["ok"])
             tid = created["ticket_id"]
+            self.assertEqual(tid, "RPS-001")
+            self.assertRegex(tid, r"^RPS-\d{3}$")
             rec = get_support_ticket(tid, path=db)
             assert rec is not None
             self.assertEqual(rec["status"], TICKET_STATUS_OPEN)
+            self.assertEqual(rec.get("keygen") or "", "")
 
             listed = list_support_tickets(path=db)
             self.assertEqual(len(listed), 1)
@@ -77,21 +80,30 @@ class TestAdminSupportTableAndClose(unittest.TestCase):
             self.assertIn("admin-support-table", page)
             self.assertIn(tid, page)
             self.assertIn("user@example.com", page)
-            self.assertIn("Cannot connect after keygen", page)
+            self.assertIn("Cannot connect after unlock", page)
             self.assertIn("Tunnel stays Connecting", page)
             self.assertIn("macos", page)
             self.assertIn("0.5.8", page)
-            self.assertIn("RPT-KEY-TEST", page)
+            # Keygen column removed from admin presentation
+            self.assertNotIn(">Keygen<", page)
+            self.assertNotIn("RPT-KEY-TEST", page)
             self.assertIn("admin-nav-support-tickets", page)
             self.assertIn("/admin/support-tickets/close", page)
-            self.assertIn(f'ticket-close-{tid}', page)
+            # Textless green open switch (not checkbox-only / not Open→Closed label)
+            self.assertIn("ticket-toggle-open", page)
+            self.assertIn(f'id="ticket-toggle-{tid}"', page)
+            self.assertIn("ticket-toggle-track", page)
+            self.assertIn("ticket-toggle-knob", page)
+            self.assertNotIn("Open → Closed", page)
+            self.assertNotIn("ticket-close-label", page)
+            self.assertNotIn("ticket-close-checkbox", page)
             self.assertIn("open", page.lower())
 
             # Pure close-email builder
             mail = build_ticket_closed_email(
                 ticket_id=tid,
                 email="user@example.com",
-                subject="Cannot connect after keygen",
+                subject="Cannot connect after unlock",
                 closed_at=1_700_000_000,
             )
             self.assertEqual(mail["to"], "user@example.com")
@@ -131,8 +143,16 @@ class TestAdminSupportTableAndClose(unittest.TestCase):
                 tickets=list_support_tickets(path=db)
             ).decode("utf-8")
             self.assertIn("closed", page2.lower())
-            self.assertIn("ticket-status-locked", page2)
-            self.assertNotIn(f'ticket-close-{tid}"', page2)
+            self.assertIn("ticket-toggle-closed", page2)
+            self.assertIn("#ef4444", page2)  # red closed switch
+            self.assertIn("#22c55e", page)  # green open switch styles
+            # No interactive close input for closed ticket
+            self.assertIsNone(
+                re.search(
+                    rf'id="ticket-toggle-{re.escape(tid)}"[^>]*onchange=',
+                    page2,
+                )
+            )
 
     def test_app_routes_mention_support_tickets(self) -> None:
         src = (ROOT / "status_page" / "app.py").read_text(encoding="utf-8")

@@ -38,8 +38,9 @@ class TestSupportTicketPure(unittest.TestCase):
         )
         self.assertFalse(bad)
 
-        tid = new_ticket_id(now=1_700_000_000)
-        self.assertTrue(tid.startswith("RPT-SUP-"))
+        tid = new_ticket_id(seq=1)
+        self.assertEqual(tid, "RPS-001")
+        self.assertRegex(tid, r"^RPS-\d{3}$")
         mail = build_support_email(
             ticket_id=tid,
             email=fields["email"],
@@ -53,7 +54,9 @@ class TestSupportTicketPure(unittest.TestCase):
         self.assertIn(tid, mail["subject"])
         self.assertIn("Cannot connect", mail["subject"])
         self.assertIn(fields["message"], mail["body"])
+        self.assertNotIn("Keygen:", mail["body"])
         self.assertEqual(mail["reply_to"], "user@example.com")
+        self.assertEqual(fields.get("keygen"), "")
 
         sent = []
 
@@ -66,18 +69,26 @@ class TestSupportTicketPure(unittest.TestCase):
             result = create_support_ticket(
                 email="user@example.com",
                 subject="Cannot connect",
-                message="Tunnel stays Connecting after keygen.",
+                message="Tunnel stays Connecting after unlock.",
                 platform="macos",
                 app_version="0.5.8",
                 path=db,
                 transport=transport,
                 send_mail=True,
             )
-        self.assertTrue(result["ok"])
-        self.assertTrue(result["ticket_id"].startswith("RPT-SUP-"))
+            self.assertTrue(result["ok"])
+            self.assertEqual(result["ticket_id"], "RPS-001")
+            second = create_support_ticket(
+                email="two@example.com",
+                subject="Second issue here",
+                message="Need help with a second distinct issue.",
+                path=db,
+                send_mail=False,
+            )
+            self.assertEqual(second["ticket_id"], "RPS-002")
         self.assertEqual(len(sent), 1)
         self.assertEqual(sent[0]["to"], "rus@restoreprivacy.online")
-        self.assertIn(result["ticket_id"], sent[0]["subject"])
+        self.assertIn("RPS-001", sent[0]["subject"])
 
     def test_render_page_has_form_and_action(self):
         from support_tickets import SUPPORT_PATH, render_support_page_html
@@ -87,6 +98,10 @@ class TestSupportTicketPure(unittest.TestCase):
         self.assertIn('id="support-form"', page)
         self.assertIn("support-email", page)
         self.assertIn(SUPPORT_PATH, page)
+        # Keygen field removed from public form
+        self.assertNotIn('name="keygen"', page)
+        self.assertNotIn("support-keygen", page)
+        self.assertIn("RPS-001", page)
 
     def test_nav_includes_support(self):
         from public_chrome import public_nav_links_html
