@@ -206,15 +206,67 @@
     </section>
 
     <footer>
-      API: <a href="/api/network">/api/network</a> &middot;
-      <a href="/api/blocks">/api/blocks</a> &middot;
-      <a href="/health">/health</a> &middot;
+      API: <a id="link-api-network" href="api/network">api/network</a> &middot;
+      <a id="link-api-blocks" href="api/blocks">api/blocks</a> &middot;
+      <a id="link-health" href="health">health</a> &middot;
       Auto-refresh in <span id="refresh-countdown-footer">30</span>s
     </footer>
   </div>
 
   <script>
     const $ = (id) => document.getElementById(id);
+
+    /**
+     * Resolve explorer API base when the UI is path-mounted (e.g. /perc/) or at site root.
+     * Pure — unit tests import via Node by extracting this function from the shipped HTML.
+     *
+     * @param {string} pathname location.pathname (e.g. "/perc/" or "/perc/index.html" or "/")
+     * @returns {string} absolute path prefix with no trailing slash, e.g. "/perc" or ""
+     */
+    function explorerApiBase(pathname) {
+      const p = String(pathname || '/');
+      // Prefer explicit /perc/ mount (Helsinki nginx reverse-proxy)
+      if (p === '/perc' || p.startsWith('/perc/')) {
+        return '/perc';
+      }
+      // Directory of current page when not at domain root (e.g. /apps/explorer/)
+      const lastSlash = p.lastIndexOf('/');
+      if (lastSlash > 0) {
+        const dir = p.slice(0, lastSlash);
+        // Ignore file-like last segment: /foo/index.html → /foo
+        if (dir && dir !== '/') return dir.replace(/\/$/, '') || '';
+      }
+      return '';
+    }
+
+    function explorerApiUrl(path, pathname) {
+      const base = explorerApiBase(pathname != null ? pathname : (typeof location !== 'undefined' ? location.pathname : '/'));
+      const rel = String(path || '').replace(/^\//, '');
+      if (!base) return '/' + rel;
+      return base + '/' + rel;
+    }
+
+    // Expose for tests / console diagnostics
+    window.explorerApiBase = explorerApiBase;
+    window.explorerApiUrl = explorerApiUrl;
+
+    function wireFooterApiLinks() {
+      const net = $('link-api-network');
+      const blocks = $('link-api-blocks');
+      const health = $('link-health');
+      if (net) {
+        net.href = explorerApiUrl('api/network');
+        net.textContent = explorerApiUrl('api/network');
+      }
+      if (blocks) {
+        blocks.href = explorerApiUrl('api/blocks');
+        blocks.textContent = explorerApiUrl('api/blocks');
+      }
+      if (health) {
+        health.href = explorerApiUrl('health');
+        health.textContent = explorerApiUrl('health');
+      }
+    }
 
     function pill(online) {
       const cls = online ? 'online' : 'offline';
@@ -461,7 +513,7 @@
     }
 
     async function loadBlock(index) {
-      const res = await fetch(`/api/blocks/${index}`);
+      const res = await fetch(explorerApiUrl(`api/blocks/${index}`));
       if (!res.ok) { showError(`Block ${index} not found`); return; }
       const block = await res.json();
       $('block-detail').classList.add('open');
@@ -509,8 +561,8 @@
       showError('');
       try {
         const [netRes, blocksRes] = await Promise.all([
-          fetch('/api/network'),
-          fetch('/api/blocks?limit=40'),
+          fetch(explorerApiUrl('api/network')),
+          fetch(explorerApiUrl('api/blocks?limit=40')),
         ]);
         if (!netRes.ok) throw new Error('Network API unavailable');
         renderStats(await netRes.json());
@@ -527,6 +579,7 @@
       }
     }
 
+    wireFooterApiLinks();
     $('refresh-btn').addEventListener('click', refresh);
     resetCountdown();
     refresh();

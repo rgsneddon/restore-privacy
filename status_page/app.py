@@ -1901,6 +1901,25 @@ class Handler(BaseHTTPRequestHandler):
                 render_admin_node_operator_page_html(selected_node=node or None),
             )
             return
+        if path in ("/admin/perc", "/admin/perc/"):
+            if not admin_enabled():
+                self._send(503, "text/plain; charset=utf-8", b"admin disabled")
+                return
+            if not is_authenticated(self.headers):
+                self._send(200, "text/html; charset=utf-8", render_login_html())
+                return
+            try:
+                from admin_perc import render_admin_perc_page_html
+            except ImportError:
+                from status_page.admin_perc import (  # type: ignore
+                    render_admin_perc_page_html,
+                )
+            self._send(
+                200,
+                "text/html; charset=utf-8",
+                render_admin_perc_page_html(),
+            )
+            return
         if path in ("/admin/api/fleet-usage", "/admin/api/fleet-usage/"):
             # Authenticated JSON for live fleet usage table refresh (admin only).
             if not admin_enabled():
