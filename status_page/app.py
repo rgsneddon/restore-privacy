@@ -1712,6 +1712,21 @@ class Handler(BaseHTTPRequestHandler):
 
             self._send(200, "text/html; charset=utf-8", render_admin_fleet_page_html())
             return
+        if path in ("/admin/support-tickets", "/admin/support-tickets/"):
+            if not admin_enabled():
+                self._send(503, "text/plain; charset=utf-8", b"admin disabled")
+                return
+            if not is_authenticated(self.headers):
+                self._send(200, "text/html; charset=utf-8", render_login_html())
+                return
+            from admin_panel import render_admin_support_tickets_page_html
+
+            self._send(
+                200,
+                "text/html; charset=utf-8",
+                render_admin_support_tickets_page_html(),
+            )
+            return
         if path in ("/admin/api/fleet-usage", "/admin/api/fleet-usage/"):
             # Authenticated JSON for live fleet usage table refresh (admin only).
             if not admin_enabled():
@@ -2272,6 +2287,44 @@ class Handler(BaseHTTPRequestHandler):
             self.send_header("Cache-Control", "no-store")
             self._security_headers()
             self.end_headers()
+            return
+
+        if path in ("/admin/support-tickets/close", "/admin/support-tickets/close/"):
+            if not admin_enabled():
+                self._send(503, "text/plain; charset=utf-8", b"admin disabled")
+                return
+            if not is_authenticated(self.headers):
+                self._send(200, "text/html; charset=utf-8", render_login_html())
+                return
+            form = dict(urllib.parse.parse_qsl(body.decode("utf-8", "replace")))
+            tid = (form.get("ticket_id") or "").strip()
+            try:
+                from support_tickets import close_support_ticket
+            except ImportError:
+                from status_page.support_tickets import close_support_ticket  # type: ignore
+            from admin_panel import render_admin_support_tickets_page_html
+
+            result = close_support_ticket(tid, send_mail=True)
+            if result.get("ok"):
+                msg = (
+                    f"Ticket {tid} closed. Requester notified by email when SMTP is configured."
+                )
+                self._send(
+                    200,
+                    "text/html; charset=utf-8",
+                    render_admin_support_tickets_page_html(message=msg),
+                )
+            else:
+                err = str(result.get("error") or "close_failed")
+                if err == "already_closed":
+                    err = f"Ticket {tid} is already closed and cannot be reopened."
+                elif err == "not_found":
+                    err = f"Ticket {tid} was not found."
+                self._send(
+                    400,
+                    "text/html; charset=utf-8",
+                    render_admin_support_tickets_page_html(error=err),
+                )
             return
 
         if path == "/admin/processors/apply":

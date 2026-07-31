@@ -24,6 +24,15 @@ SUPPORT_INBOX = "rus@restoreprivacy.online"
 SUPPORT_PATH = "/support"
 SUPPORT_LINK_ID = "support-link"
 
+# Admin management surface (authenticated).
+ADMIN_SUPPORT_TICKETS_PATH = "/admin/support-tickets"
+ADMIN_SUPPORT_CLOSE_PATH = "/admin/support-tickets/close"
+ADMIN_NAV_SUPPORT_TICKETS_ID = "admin-nav-support-tickets"
+
+# Ticket lifecycle (one-way: open → closed only).
+TICKET_STATUS_OPEN = "open"
+TICKET_STATUS_CLOSED = "closed"
+
 # Optional public reply address on the ticket email (same as fulfilment from).
 DEFAULT_FROM_FALLBACK = "noreply@restoreprivacy.online"
 
@@ -139,6 +148,27 @@ def build_support_email(
     }
 
 
+def _migrate_support_schema(conn: sqlite3.Connection) -> None:
+    """Add open/closed lifecycle columns when missing (ALTER-safe)."""
+    cols = {str(r[1]) for r in conn.execute("PRAGMA table_info(support_tickets)")}
+    if "status" not in cols:
+        conn.execute(
+            "ALTER TABLE support_tickets ADD COLUMN status TEXT NOT NULL DEFAULT 'open'"
+        )
+    if "closed_at" not in cols:
+        conn.execute("ALTER TABLE support_tickets ADD COLUMN closed_at REAL")
+    if "close_mail_status" not in cols:
+        conn.execute(
+            "ALTER TABLE support_tickets ADD COLUMN close_mail_status "
+            "TEXT NOT NULL DEFAULT ''"
+        )
+    if "close_mail_detail" not in cols:
+        conn.execute(
+            "ALTER TABLE support_tickets ADD COLUMN close_mail_detail "
+            "TEXT NOT NULL DEFAULT ''"
+        )
+
+
 def init_support_db(path: Path | None = None) -> Path:
     p = path or support_db_path()
     p.parent.mkdir(parents=True, exist_ok=True)
@@ -156,14 +186,119 @@ def init_support_db(path: Path | None = None) -> Path:
                 app_version TEXT NOT NULL DEFAULT '',
                 keygen TEXT NOT NULL DEFAULT '',
                 mail_status TEXT NOT NULL DEFAULT 'pending',
-                mail_detail TEXT NOT NULL DEFAULT ''
+                mail_detail TEXT NOT NULL DEFAULT '',
+                status TEXT NOT NULL DEFAULT 'open',
+                closed_at REAL,
+                close_mail_status TEXT NOT NULL DEFAULT '',
+                close_mail_detail TEXT NOT NULL DEFAULT ''
             )
             """
         )
+        _migrate_support_schema(conn)
         conn.commit()
     finally:
         conn.close()
     return p
+
+
+def _row_to_ticket(row: sqlite3.Row | tuple) -> dict[str, Any]:
+    """Normalize a DB row to a ticket dict (handles optional lifecycle cols)."""
+    if isinstance(row, sqlite3.Row):
+        d = {k: row[k] for k in row.keys()}
+    else:
+        # Fallback positional (should not hit with row_factory)
+        keys = (
+            "ticket_id",
+            "created_at",
+            "email",
+            "subject",
+            "message",
+            "platform",
+            "app_version",
+            "keygen",
+            "mail_status",
+            "mail_detail",
+            "status",
+            "closed_at",
+            "close_mail_status",
+            "close_mail_detail",
+        )
+        d = {keys[i]: row[i] if i < len(row) else None for i in range(len(keys))}
+    status = str(d.get("status") or TICKET_STATUS_OPEN).strip().lower()
+    if status not in (TICKET_STATUS_OPEN, TICKET_STATUS_CLOSED):
+        status = TICKET_STATUS_OPEN
+    return {
+        "ticket_id": str(d.get("ticket_id") or ""),
+        "created_at": float(d.get("created_at") or 0),
+        "email": str(d.get("email") or ""),
+        "subject": str(d.get("subject") or ""),
+        "message": str(d.get("message") or ""),
+        "platform": str(d.get("platform") or ""),
+        "app_version": str(d.get("app_version") or ""),
+        "keygen": str(d.get("keygen") or ""),
+        "mail_status": str(d.get("mail_status") or ""),
+        "mail_detail": str(d.get("mail_detail") or ""),
+        "status": status,
+        "closed_at": d.get("closed_at"),
+        "close_mail_status": str(d.get("close_mail_status") or ""),
+        "close_mail_detail": str(d.get("close_mail_detail") or ""),
+    }
+
+
+def list_support_tickets(
+    *,
+    path: Path | None = None,
+    limit: int = 500,
+) -> list[dict[str, Any]]:
+    """Return tickets newest-first (open first within same second is not guaranteed)."""
+    p = init_support_db(path)
+    conn = sqlite3.connect(str(p))
+    conn.row_factory = sqlite3.Row
+    try:
+        cur = conn.execute(
+            """
+            SELECT ticket_id, created_at, email, subject, message,
+                   platform, app_version, keygen, mail_status, mail_detail,
+                   status, closed_at, close_mail_status, close_mail_detail
+            FROM support_tickets
+            ORDER BY
+              CASE WHEN lower(COALESCE(status,'')) = 'closed' THEN 1 ELSE 0 END,
+              created_at DESC
+            LIMIT ?
+            """,
+            (max(1, int(limit)),),
+        )
+        return [_row_to_ticket(r) for r in cur.fetchall()]
+    finally:
+        conn.close()
+
+
+def get_support_ticket(
+    ticket_id: str,
+    *,
+    path: Path | None = None,
+) -> dict[str, Any] | None:
+    """Fetch one ticket by id, or None."""
+    tid = (ticket_id or "").strip()
+    if not tid:
+        return None
+    p = init_support_db(path)
+    conn = sqlite3.connect(str(p))
+    conn.row_factory = sqlite3.Row
+    try:
+        cur = conn.execute(
+            """
+            SELECT ticket_id, created_at, email, subject, message,
+                   platform, app_version, keygen, mail_status, mail_detail,
+                   status, closed_at, close_mail_status, close_mail_detail
+            FROM support_tickets WHERE ticket_id=?
+            """,
+            (tid,),
+        )
+        r = cur.fetchone()
+        return _row_to_ticket(r) if r else None
+    finally:
+        conn.close()
 
 
 def persist_support_ticket(
@@ -190,6 +325,10 @@ def persist_support_ticket(
         "keygen": fields.get("keygen") or "",
         "mail_status": mail_status,
         "mail_detail": mail_detail[:500],
+        "status": TICKET_STATUS_OPEN,
+        "closed_at": None,
+        "close_mail_status": "",
+        "close_mail_detail": "",
     }
     conn = sqlite3.connect(str(p))
     try:
@@ -197,8 +336,9 @@ def persist_support_ticket(
             """
             INSERT INTO support_tickets(
                 ticket_id, created_at, email, subject, message,
-                platform, app_version, keygen, mail_status, mail_detail
-            ) VALUES (?,?,?,?,?,?,?,?,?,?)
+                platform, app_version, keygen, mail_status, mail_detail,
+                status, closed_at, close_mail_status, close_mail_detail
+            ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)
             """,
             (
                 row["ticket_id"],
@@ -211,6 +351,10 @@ def persist_support_ticket(
                 row["keygen"],
                 row["mail_status"],
                 row["mail_detail"],
+                row["status"],
+                row["closed_at"],
+                row["close_mail_status"],
+                row["close_mail_detail"],
             ),
         )
         conn.commit()
@@ -240,6 +384,135 @@ def update_ticket_mail_status(
         conn.close()
 
 
+def build_ticket_closed_email(
+    *,
+    ticket_id: str,
+    email: str,
+    subject: str = "",
+    closed_at: float | None = None,
+) -> dict[str, str]:
+    """Build close-notification mail **to the requester** (pure; no SMTP).
+
+    Body states the ticket is closed and thanks them for getting in touch.
+    """
+    tid = (ticket_id or "").strip()
+    to = (email or "").strip()
+    sub = (subject or "").strip()
+    ts = time.strftime(
+        "%Y-%m-%d %H:%M:%S UTC",
+        time.gmtime(closed_at if closed_at is not None else time.time()),
+    )
+    lines = [
+        f"Your Restore Privacy support ticket {tid} is now closed.",
+        "",
+        f"Original subject: {sub or '(none)'}",
+        f"Closed (UTC): {ts}",
+        "",
+        "Thank you for getting in touch. We appreciate you contacting us,",
+        "and we hope the issue is resolved. If you need further help, please",
+        "open a new support ticket at:",
+        "https://restoreprivacy.online/support",
+        "",
+        "— Restore Privacy Support",
+        "https://restoreprivacy.online/",
+    ]
+    return {
+        "to": to,
+        "subject": f"[RPT Support {tid}] Ticket closed — thank you"[:200],
+        "body": "\n".join(lines),
+        "reply_to": SUPPORT_INBOX,
+        "ticket_id": tid,
+    }
+
+
+def close_support_ticket(
+    ticket_id: str,
+    *,
+    path: Path | None = None,
+    now: float | None = None,
+    transport: Callable[[dict[str, Any]], dict[str, Any]] | None = None,
+    send_mail: bool = True,
+) -> dict[str, Any]:
+    """One-way close: open → closed only. Sends close email to requester.
+
+    Refuses reopen and double-close (status stays closed; returns ok=False).
+    """
+    tid = (ticket_id or "").strip()
+    if not tid:
+        return {"ok": False, "error": "missing_ticket_id", "ticket": None}
+    ticket = get_support_ticket(tid, path=path)
+    if not ticket:
+        return {"ok": False, "error": "not_found", "ticket": None}
+    if ticket.get("status") == TICKET_STATUS_CLOSED:
+        return {
+            "ok": False,
+            "error": "already_closed",
+            "ticket": ticket,
+        }
+    t = float(now if now is not None else time.time())
+    p = init_support_db(path)
+    conn = sqlite3.connect(str(p))
+    try:
+        cur = conn.execute(
+            """
+            UPDATE support_tickets
+            SET status=?, closed_at=?
+            WHERE ticket_id=? AND lower(COALESCE(status,'open')) != 'closed'
+            """,
+            (TICKET_STATUS_CLOSED, t, tid),
+        )
+        if cur.rowcount < 1:
+            conn.commit()
+            again = get_support_ticket(tid, path=path)
+            return {
+                "ok": False,
+                "error": "already_closed" if again and again.get("status") == TICKET_STATUS_CLOSED else "update_failed",
+                "ticket": again,
+            }
+        conn.commit()
+    finally:
+        conn.close()
+
+    closed = get_support_ticket(tid, path=path) or ticket
+    closed["status"] = TICKET_STATUS_CLOSED
+    closed["closed_at"] = t
+
+    mail = build_ticket_closed_email(
+        ticket_id=tid,
+        email=str(closed.get("email") or ""),
+        subject=str(closed.get("subject") or ""),
+        closed_at=t,
+    )
+    mail_result: dict[str, Any] = {"ok": True, "error": None, "skipped": True}
+    if send_mail:
+        mail_result = send_support_ticket_email(mail, transport=transport)
+        st = "sent" if mail_result.get("ok") else "failed"
+        detail = str(mail_result.get("error") or "ok")[:500]
+        conn = sqlite3.connect(str(p))
+        try:
+            conn.execute(
+                """
+                UPDATE support_tickets
+                SET close_mail_status=?, close_mail_detail=?
+                WHERE ticket_id=?
+                """,
+                (st, detail, tid),
+            )
+            conn.commit()
+        finally:
+            conn.close()
+        closed["close_mail_status"] = st
+        closed["close_mail_detail"] = detail
+
+    return {
+        "ok": True,
+        "error": "",
+        "ticket": closed,
+        "mail": mail_result,
+        "email_payload": mail,
+    }
+
+
 def send_support_ticket_email(
     mail: dict[str, str],
     *,
@@ -248,11 +521,12 @@ def send_support_ticket_email(
     """Send support notification using fulfilment SMTP config.
 
     *transport* injects a fake sender for tests: (payload) -> {ok, error?}.
+    Used for both new-ticket staff notify and requester close notify.
     """
     payload = {
         "to": mail.get("to") or SUPPORT_INBOX,
         "subject": mail.get("subject") or "",
-        "body_text": mail.get("body") or "",
+        "body_text": mail.get("body") or mail.get("body_text") or "",
         "reply_to": mail.get("reply_to") or "",
         "ticket_id": mail.get("ticket_id") or "",
     }

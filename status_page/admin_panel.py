@@ -1650,6 +1650,7 @@ def _admin_sidebar_html(*, active: str = "home") -> str:
     proc_cls = "sb-btn active" if active == "processors" else "sb-btn"
     fleet_cls = "sb-btn active" if active == "fleet" else "sb-btn"
     acct_cls = "sb-btn active" if active == "accounting" else "sb-btn"
+    support_cls = "sb-btn active" if active == "support-tickets" else "sb-btn"
     seed = ""
     if seed_test_purchase_enabled():
         seed = (
@@ -1686,6 +1687,8 @@ def _admin_sidebar_html(*, active: str = "home") -> str:
   </details>
   <a class="{fleet_cls}" id="admin-nav-fleet" href="/admin/fleet"><span class="sb-ico">&#9678;</span>
     <span class="sb-label">Fleet usage</span></a>
+  <a class="{support_cls}" id="admin-nav-support-tickets" href="/admin/support-tickets"><span class="sb-ico">&#9993;</span>
+    <span class="sb-label">Support tickets</span></a>
   <a class="{acct_cls}" id="admin-nav-accounting" href="/admin/accounting"><span class="sb-ico">&#163;</span>
     <span class="sb-label">RASKUL LTD accounts</span></a>
   <a class="{proc_cls}" id="admin-nav-processors" href="/admin/processors"><span class="sb-ico">&#9881;</span>
@@ -2380,6 +2383,165 @@ def render_admin_fleet_page_html(
         main_html=node_usage_html,
     )
 
+
+def render_admin_support_tickets_page_html(
+    *,
+    message: str = "",
+    error: str = "",
+    tickets: list[dict[str, Any]] | None = None,
+) -> bytes:
+    """Admin table of public support tickets with one-way open→closed control."""
+    import time as _time
+
+    try:
+        from support_tickets import (
+            ADMIN_SUPPORT_CLOSE_PATH,
+            ADMIN_SUPPORT_TICKETS_PATH,
+            TICKET_STATUS_CLOSED,
+            TICKET_STATUS_OPEN,
+            list_support_tickets,
+        )
+    except ImportError:  # pragma: no cover
+        from status_page.support_tickets import (  # type: ignore
+            ADMIN_SUPPORT_CLOSE_PATH,
+            ADMIN_SUPPORT_TICKETS_PATH,
+            TICKET_STATUS_CLOSED,
+            TICKET_STATUS_OPEN,
+            list_support_tickets,
+        )
+
+    rows = tickets if tickets is not None else list_support_tickets()
+    flash = ""
+    if (message or "").strip():
+        flash += (
+            f'<p class="ok-msg" id="admin-support-flash-ok" role="status">'
+            f"{_escape(message.strip())}</p>"
+        )
+    if (error or "").strip():
+        flash += (
+            f'<p class="err-msg" id="admin-support-flash-err" role="alert">'
+            f"{_escape(error.strip())}</p>"
+        )
+
+    def _fmt_ts(ts: Any) -> str:
+        try:
+            t = float(ts)
+        except (TypeError, ValueError):
+            return "—"
+        if t <= 0:
+            return "—"
+        return _time.strftime("%Y-%m-%d %H:%M:%S UTC", _time.gmtime(t))
+
+    body_rows: list[str] = []
+    for t in rows:
+        tid = str(t.get("ticket_id") or "")
+        status = str(t.get("status") or TICKET_STATUS_OPEN).lower()
+        is_closed = status == TICKET_STATUS_CLOSED
+        status_label = "closed" if is_closed else "open"
+        status_cls = "badge-closed" if is_closed else "badge-open"
+        if is_closed:
+            control = (
+                f'<span class="ticket-status-locked" id="ticket-status-{_escape(tid)}">'
+                f"Closed</span>"
+            )
+        else:
+            control = (
+                f'<form class="admin-support-close-form" method="post" '
+                f'action="{ADMIN_SUPPORT_CLOSE_PATH}" '
+                f'id="close-form-{_escape(tid)}">'
+                f'<input type="hidden" name="ticket_id" value="{_escape(tid)}"/>'
+                f'<label class="ticket-close-switch" title="Close ticket (cannot reopen)">'
+                f'<input type="checkbox" name="close" value="1" '
+                f'class="ticket-close-checkbox" '
+                f'id="ticket-close-{_escape(tid)}" '
+                f'onchange="this.form.submit()"/>'
+                f'<span class="ticket-close-track" aria-hidden="true"></span>'
+                f'<span class="ticket-close-label">Open → Closed</span>'
+                f"</label></form>"
+            )
+        body_rows.append(
+            "<tr "
+            f'id="ticket-row-{_escape(tid)}" data-ticket-id="{_escape(tid)}" '
+            f'data-status="{_escape(status_label)}">'
+            f"<td><code>{_escape(tid)}</code></td>"
+            f"<td>{_escape(_fmt_ts(t.get('created_at')))}</td>"
+            f"<td>{_escape(str(t.get('email') or ''))}</td>"
+            f"<td>{_escape(str(t.get('subject') or ''))}</td>"
+            f'<td class="ticket-msg-cell"><div class="ticket-msg-scroll">'
+            f"{_escape(str(t.get('message') or ''))}</div></td>"
+            f"<td>{_escape(str(t.get('platform') or '—') or '—')}</td>"
+            f"<td>{_escape(str(t.get('app_version') or '—') or '—')}</td>"
+            f"<td><code>{_escape(str(t.get('keygen') or '—') or '—')}</code></td>"
+            f"<td>{_escape(str(t.get('mail_status') or '—'))}</td>"
+            f'<td><span class="{status_cls}">{_escape(status_label)}</span></td>'
+            f"<td>{_escape(_fmt_ts(t.get('closed_at')))}</td>"
+            f"<td>{_escape(str(t.get('close_mail_status') or '—') or '—')}</td>"
+            f"<td>{control}</td>"
+            "</tr>"
+        )
+    table_body = (
+        "\n".join(body_rows)
+        if body_rows
+        else '<tr id="admin-support-empty"><td colspan="13">No support tickets yet.</td></tr>'
+    )
+    main = f"""
+<section class="card" id="admin-support-tickets" data-admin-support="1">
+  <h2 id="admin-support-heading">Support tickets database</h2>
+  <p class="muted" id="admin-support-blurb">
+    Public form tickets (<code>/support</code>). Closing a ticket is permanent
+    (cannot reopen) and emails the requester a closed notice with thanks.
+  </p>
+  {flash}
+  <p class="muted" id="admin-support-count">{len(rows)} ticket(s)</p>
+  <div class="admin-table-scroll" id="admin-support-table-wrap">
+  <table class="admin-table" id="admin-support-table">
+    <thead>
+      <tr>
+        <th>Ticket ID</th>
+        <th>Created (UTC)</th>
+        <th>Email</th>
+        <th>Subject</th>
+        <th>Message</th>
+        <th>Platform</th>
+        <th>App version</th>
+        <th>Keygen</th>
+        <th>Staff mail</th>
+        <th>Status</th>
+        <th>Closed (UTC)</th>
+        <th>Close mail</th>
+        <th>Close</th>
+      </tr>
+    </thead>
+    <tbody>
+{table_body}
+    </tbody>
+  </table>
+  </div>
+</section>
+<style>
+.admin-table-scroll{{overflow-x:auto;max-width:100%}}
+#admin-support-table{{width:100%;border-collapse:collapse;font-size:0.82rem}}
+#admin-support-table th,#admin-support-table td{{
+  border:1px solid var(--border,#3333);padding:0.4rem 0.45rem;vertical-align:top;text-align:left}}
+#admin-support-table th{{background:var(--bg-elevated);position:sticky;top:0}}
+.ticket-msg-cell{{min-width:12rem;max-width:18rem}}
+.ticket-msg-scroll{{max-height:5.5rem;overflow:auto;white-space:pre-wrap;word-break:break-word}}
+.badge-open{{color:#065f46;font-weight:700}}
+.badge-closed{{color:#7f1d1d;font-weight:700}}
+.ticket-close-switch{{display:inline-flex;align-items:center;gap:0.4rem;cursor:pointer;font-size:0.78rem}}
+.ticket-close-checkbox{{accent-color:#1a6fad}}
+.ticket-status-locked{{font-weight:700;color:#7f1d1d}}
+.ok-msg{{color:var(--badge-ok-fg,#065f46);background:var(--badge-ok-bg,#ecfdf5);
+  padding:0.5rem 0.75rem;border-radius:8px}}
+.err-msg{{color:#fecaca;background:rgba(127,29,29,0.35);padding:0.5rem 0.75rem;border-radius:8px}}
+</style>
+"""
+    _ = ADMIN_SUPPORT_TICKETS_PATH  # path used by sidebar href
+    return _admin_page_shell(
+        title="Support tickets",
+        active="support-tickets",
+        main_html=main,
+    )
 
 
 def _escape(s: str) -> str:
