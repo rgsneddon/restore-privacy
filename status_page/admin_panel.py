@@ -614,6 +614,7 @@ def render_admin_licences_section_html(
     for row in rows_src:
         st = str(row.get("licence_status") or "ENDED")
         badge = "ok" if st == "OK" else "bad"
+        pl = str(row.get("product_line") or "vpn").strip() or "vpn"
         body_rows.append(
             "<tr>"
             f"<td>{_escape(str(row.get('email') or ''))}</td>"
@@ -623,6 +624,7 @@ def render_admin_licences_section_html(
             f'id="licence-status-{_escape(str(row.get("session_id") or "")[:12])}">'
             f"{_escape(st)}</span></td>"
             f"<td>{_escape(str(row.get('platform') or ''))}</td>"
+            f"<td class=\"licence-product\">{_escape(pl)}</td>"
             f"<td class=\"licence-initiated\">{_escape(str(row.get('initiated_date') or ''))}</td>"
             f"<td class=\"licence-expiry\">{_escape(str(row.get('expiry_date') or ''))}</td>"
             "</tr>"
@@ -630,7 +632,7 @@ def render_admin_licences_section_html(
     table = (
         "\n".join(body_rows)
         if body_rows
-        else '<tr><td colspan="7">No licences yet</td></tr>'
+        else '<tr><td colspan="8">No licences yet</td></tr>'
     )
     msg_html = (
         f'<p class="ok-msg" id="admin-licences-clear-ok">{_escape(clear_message)}</p>'
@@ -658,7 +660,7 @@ def render_admin_licences_section_html(
   <table id="admin-licences-table">
     <thead><tr>
       <th>Email</th><th>KEYGEN</th><th>PPI</th><th>Status</th><th>Platform</th>
-      <th>Initiated</th><th>Expiry</th>
+      <th>Product</th><th>Initiated</th><th>Expiry</th>
     </tr></thead>
     <tbody>
 {table}
@@ -1524,6 +1526,7 @@ def render_processor_settings_html(
   <nav class="plugin-nav" id="processor-plugin-nav" aria-label="Processor plugins">{option_links}</nav>
   {msg_html}{err_html}
 {plugins_html}
+{render_admin_path_upload_html()}
 {admin_section_top_link_html()}</section>
 """
     # Block only real-looking secret values, not doc prefixes (sk_test_… / whsec_…).
@@ -1534,6 +1537,138 @@ def render_processor_settings_html(
             f"{admin_section_top_link_html()}</section>"
         )
     return frag
+
+
+def render_admin_suite_push_upload_html() -> str:
+    """Best-in-class admin card: push-upload Restore Privacy Suite packages.
+
+    Primary control targets the catalog suite pin (default **1.0.0**) via the
+    shipped Helsinki paid_assets path. Includes inventory + one-click push +
+    optional single-path upload.
+    """
+    try:
+        from admin_node_operator import get_operator_controller
+    except ImportError:  # pragma: no cover
+        from status_page.admin_node_operator import (  # type: ignore
+            get_operator_controller,
+        )
+    try:
+        ctrl = get_operator_controller()
+        catalog_ver = ctrl.catalog_version_default()
+        suite_label = ctrl.suite_product_label(catalog_ver)
+        inv = ctrl.list_local_packages(version=catalog_ver)
+    except Exception:  # noqa: BLE001
+        catalog_ver = "1.0.0"
+        suite_label = f"Restore Privacy Suite v{catalog_ver}"
+        inv = {
+            "ok": False,
+            "packages": [],
+            "present_count": 0,
+            "staged_count": 0,
+            "total": 0,
+        }
+    pkg_rows: list[str] = []
+    for p in inv.get("packages") or []:
+        present = "yes" if p.get("present") else "no"
+        staged = "yes" if p.get("staged") else "no"
+        size = int(p.get("size") or 0)
+        size_s = (
+            f"{size // 1_000_000} MB"
+            if size >= 1_000_000
+            else (f"{size} B" if size else "—")
+        )
+        pkg_rows.append(
+            "<tr>"
+            f"<td>{_escape(p.get('platform'))}</td>"
+            f"<td><code>{_escape(p.get('filename'))}</code></td>"
+            f"<td data-present=\"{present}\">{present}</td>"
+            f"<td data-staged=\"{staged}\">{staged}</td>"
+            f"<td>{_escape(size_s)}</td>"
+            "</tr>"
+        )
+    pkg_table = (
+        "\n".join(pkg_rows)
+        if pkg_rows
+        else '<tr id="admin-suite-packages-empty"><td colspan="5">No catalog packages</td></tr>'
+    )
+    present_n = int(inv.get("present_count") or 0)
+    staged_n = int(inv.get("staged_count") or 0)
+    total_n = int(inv.get("total") or 0)
+    return f"""
+<section class="card nested" id="admin-suite-push-upload"
+         data-suite-push-upload="1" data-suite-version="{_escape(catalog_ver)}">
+  <h3 id="admin-suite-push-heading">Push Suite packages</h3>
+  <p class="muted" id="admin-suite-push-blurb">
+    Stage and upload <strong>{_escape(suite_label)}</strong> installers to the Helsinki
+    paid store. Drives <code>scripts/host_paid_assets_vps.py</code> — not a public shop
+    control. Prefer <strong>Dry-run</strong> first; use <strong>Allow missing</strong>
+    for partial ships.
+  </p>
+  <p id="admin-suite-push-inventory" data-suite-inventory="1">
+    <span class="suite-badge" id="admin-suite-version-badge">{_escape(suite_label)}</span>
+    · catalog <code id="admin-suite-catalog-version">{_escape(catalog_ver)}</code>
+    · present <span id="admin-suite-present-count">{present_n}</span>/{total_n}
+    · staged <span id="admin-suite-staged-count">{staged_n}</span>/{total_n}
+  </p>
+  <table id="admin-suite-packages-table" data-suite-packages="1">
+    <thead><tr><th>Platform</th><th>Filename</th><th>Local</th><th>Staged</th><th>Size</th></tr></thead>
+    <tbody>
+{pkg_table}
+    </tbody>
+  </table>
+  <form method="post" action="/admin/processors/push-suite"
+        id="admin-suite-push-form" data-suite-push-form="1">
+    <input type="hidden" name="version" value="{_escape(catalog_ver)}" id="admin-suite-push-version"/>
+    <label><input type="checkbox" name="stage" value="1" checked id="admin-suite-push-stage"/> Stage local assets</label>
+    <label><input type="checkbox" name="upload" value="1" checked id="admin-suite-push-upload"/> Upload to Helsinki paid_assets</label>
+    <label><input type="checkbox" name="allow_missing" value="1" checked id="admin-suite-push-allow-missing"/> Allow missing platforms</label>
+    <label><input type="checkbox" name="force" value="1" id="admin-suite-push-force"/> Force re-upload</label>
+    <label><input type="checkbox" name="dry_run" value="1" id="admin-suite-push-dry-run"/> Dry-run (plan only, no SSH write)</label>
+    <label><input type="checkbox" name="install_serve" value="1" id="admin-suite-push-install-serve"/> Restart store serve</label>
+    <button type="submit" id="admin-suite-push-btn" class="primary-upload">
+      Push Suite packages to Helsinki
+    </button>
+  </form>
+  <hr style="border:0;border-top:1px solid var(--border,#333);margin:1rem 0"/>
+  <h4 id="admin-path-upload-heading">Upload one package by file path</h4>
+  <p class="muted" id="admin-path-upload-blurb">
+    Single installer path under <code>releases/{_escape(catalog_ver)}/</code>
+    (catalog basename <code>restore-privacy-client-{_escape(catalog_ver)}-…</code>).
+  </p>
+  <form method="post" action="/admin/processors/upload-path"
+        id="admin-path-upload-form" data-path-upload-form="1" data-path-upload="1">
+    <label class="field" for="admin-path-upload-input">
+      <span class="field-label">Local package path</span>
+      <input type="text" id="admin-path-upload-input" name="path" required
+             placeholder="/path/to/restore-privacy-client-{_escape(catalog_ver)}-macos.zip"
+             autocomplete="off"/>
+    </label>
+    <label><input type="checkbox" name="stage" value="1" checked id="admin-path-upload-stage"/> Stage</label>
+    <label><input type="checkbox" name="upload" value="1" checked id="admin-path-upload-upload"/> Upload to Helsinki</label>
+    <label><input type="checkbox" name="dry_run" value="1" id="admin-path-upload-dry-run"/> Dry-run</label>
+    <label><input type="checkbox" name="force" value="1" id="admin-path-upload-force"/> Force</label>
+    <button type="submit" id="admin-path-upload-btn">
+      Browse files and Upload
+    </button>
+  </form>
+</section>
+<style>
+#admin-suite-push-upload .suite-badge{{
+  display:inline-block;padding:0.2rem 0.55rem;border-radius:999px;
+  background:rgba(13,148,136,0.18);border:1px solid #0d9488;font-weight:700;font-size:0.85rem}}
+#admin-suite-push-btn.primary-upload,#admin-path-upload-btn{{
+  margin-top:0.5rem;padding:0.65rem 1.1rem;border:0;border-radius:8px;
+  background:#0d9488;color:#fff;font-weight:700;cursor:pointer}}
+#admin-suite-packages-table{{width:100%;border-collapse:collapse;font-size:0.82rem;margin:0.5rem 0}}
+#admin-suite-packages-table th,#admin-suite-packages-table td{{
+  border:1px solid var(--border,#333);padding:0.35rem 0.45rem;text-align:left}}
+</style>
+"""
+
+
+def render_admin_path_upload_html() -> str:
+    """Backward-compatible alias: suite push-upload card (includes path form)."""
+    return render_admin_suite_push_upload_html()
 
 
 def _render_node_usage_section(
@@ -1711,8 +1846,15 @@ def _admin_page_shell(
     title: str,
     active: str,
     main_html: str,
+    extra_head: str = "",
 ) -> bytes:
-    """Full HTML document with left sidebar + main pane."""
+    """Full HTML document with left sidebar + main pane.
+
+    *extra_head* is optional markup inserted before ``</head>`` (e.g. meta refresh
+    for Node Operator live view). Callers that omit it stay unchanged.
+    """
+    head_extra = (extra_head or "").strip()
+    head_extra_block = f"\n{head_extra}" if head_extra else ""
     body = f"""<!DOCTYPE html>
 <html lang="en"><head>
 <meta charset="utf-8"/><meta name="viewport" content="width=device-width, initial-scale=1"/>
@@ -1721,7 +1863,7 @@ def _admin_page_shell(
 <style>
 {_admin_shared_css()}
 </style>
-{admin_theme_boot_script()}
+{admin_theme_boot_script()}{head_extra_block}
 </head><body>
 {admin_theme_picker_html()}
 <div class="admin-shell" id="admin-shell">

@@ -15,6 +15,33 @@ from typing import Any
 ADMIN_NODE_OPERATOR_PATH = "/admin/node-operator"
 ADMIN_NODE_OPERATOR_POST_PATH = "/admin/node-operator/action"
 ADMIN_NAV_NODE_OPERATOR_ID = "admin-nav-node-operator"
+# Live page reload interval (seconds) for sessions / residual status.
+ADMIN_NODE_OPERATOR_AUTO_REFRESH_SEC = 5
+
+
+def node_operator_auto_refresh_meta(node_id: str = "") -> str:
+    """CSP-safe meta refresh for Node Operator (no inline script).
+
+    *node_id* is preserved in the refresh URL query so the selected operable
+    node tab survives the reload.
+    """
+    sec = int(ADMIN_NODE_OPERATOR_AUTO_REFRESH_SEC)
+    if sec < 1:
+        sec = 5
+    # Allow only simple operable-node id characters (lab, IS, DE, helsinki-store).
+    nid = "".join(
+        c for c in (node_id or "").strip() if c.isalnum() or c in "-_"
+    )
+    if nid:
+        content = f"{sec};url={ADMIN_NODE_OPERATOR_PATH}?node={nid}"
+    else:
+        content = str(sec)
+    return (
+        f'<meta http-equiv="refresh" content="{content}" '
+        f'id="admin-node-op-auto-refresh" '
+        f'data-auto-refresh-sec="{sec}" '
+        f'data-auto-refresh-node="{nid}"/>'
+    )
 
 
 def _esc(s: Any) -> str:
@@ -246,7 +273,18 @@ def render_admin_node_operator_page_html(
         from node_operator.client_visuals import render_connected_clients_visual_html
 
     clients_visual = render_connected_clients_visual_html(
-        sessions, id_prefix="admin-node-op-client"
+        sessions,
+        id_prefix="admin-node-op-client",
+        update_push={
+            "form_action": ADMIN_NODE_OPERATOR_POST_PATH,
+            "version": catalog_ver,
+            "url": "https://restoreprivacy.online/",
+            "message": "",
+            "hidden_fields": {
+                "node": node["id"],
+                "action": "push_update",
+            },
+        },
     )
     try:
         from node_operator.update_delivery import (
@@ -274,9 +312,15 @@ def render_admin_node_operator_page_html(
     )
     sess_rows: list[str] = []
     for s in sessions:
+        ver_raw = str(s.get("product_version") or "").strip()
+        ver_disp = ver_raw if ver_raw else "unknown"
+        ver_attr = _escape(ver_raw)
+        unknown_attr = ' data-client-version-unknown="1"' if not ver_raw else ""
         sess_rows.append(
             "<tr>"
             f"<td><code>{_escape(s.get('client_id'))}</code></td>"
+            f"<td data-client-version=\"{ver_attr}\"{unknown_attr}>"
+            f"<code>{_escape(ver_disp)}</code></td>"
             f"<td>{_escape(s.get('vpn_ip'))}</td>"
             f"<td>{_escape(s.get('client_addr'))}</td>"
             f"<td>{int(s.get('priority') or 0)}</td>"
@@ -285,7 +329,7 @@ def render_admin_node_operator_page_html(
     sess_table = (
         "\n".join(sess_rows)
         if sess_rows
-        else '<tr id="admin-node-op-sessions-empty"><td colspan="4">No lab sessions</td></tr>'
+        else '<tr id="admin-node-op-sessions-empty"><td colspan="5">No lab sessions</td></tr>'
     )
 
     residual_peer_default = (
@@ -369,12 +413,14 @@ def render_admin_node_operator_page_html(
 
   <section class="card nested" id="admin-node-op-sessions">
     <h3>Connected clients (graphic)</h3>
-    <p class="muted">Tiles from the real lab session list (priority order). Not public.</p>
+    <p class="muted">Chronoflux-style pyramid of animated blob tiles from the real lab
+      session list (apex = higher priority). Each blob shows product version (or unknown)
+      and can push residual UPDATE_PUSH to that client only. Not public.</p>
     {clients_visual}
     <details id="admin-node-op-sessions-table-details" class="muted">
       <summary>Table detail</summary>
     <table id="admin-node-op-sessions-table">
-      <thead><tr><th>Client id</th><th>VPN IP</th><th>Addr</th><th>Priority</th></tr></thead>
+      <thead><tr><th>Client id</th><th>Version</th><th>VPN IP</th><th>Addr</th><th>Priority</th></tr></thead>
       <tbody>{sess_table}</tbody>
     </table>
     </details>
@@ -394,27 +440,31 @@ def render_admin_node_operator_page_html(
     <p class="muted">Stored: <code id="admin-node-op-priority-map">{_escape(json.dumps(prio_map))}</code></p>
   </section>
 
-  <section class="card nested" id="admin-node-op-deploy-packages" data-deploy-packages="1" data-helsinki-upload="1">
-    <h3>Upload packages to host</h3>
+  <section class="card nested" id="admin-node-op-deploy-packages"
+           data-deploy-packages="1" data-helsinki-upload="1" data-suite-push-upload="1"
+           data-suite-version="{_escape(catalog_ver)}">
+    <h3 id="admin-node-op-suite-push-heading">Push Suite packages</h3>
     <p class="muted" id="admin-node-op-deploy-blurb">
-      Manual <strong>stage + upload</strong> of monopin installers to the Helsinki paid store
-      after you build packages. No terminal required — drives
+      Stage + upload <strong>Restore Privacy Suite v{_escape(catalog_ver)}</strong>
+      installers to the Helsinki paid store. Drives
       <code>scripts/host_paid_assets_vps.py</code> (SSH key for real upload).
       Store host: <code>{_escape(next((n['host'] for n in nodes if n['id']=='helsinki-store'), '135.181.152.10'))}</code>.
     </p>
     <p id="admin-node-op-deploy-inventory">
-      Catalog <code id="admin-node-op-catalog-version">{_escape(catalog_ver)}</code>
+      <span class="suite-badge" id="admin-node-op-suite-badge">Restore Privacy Suite v{_escape(catalog_ver)}</span>
+      · catalog <code id="admin-node-op-catalog-version">{_escape(catalog_ver)}</code>
       · present {int(inv.get('present_count') or 0)}/{int(inv.get('total') or 0)}
       · staged {int(inv.get('staged_count') or 0)}/{int(inv.get('total') or 0)}
     </p>
-    <table id="admin-node-op-packages-table">
+    <table id="admin-node-op-packages-table" data-suite-packages="1">
       <thead><tr><th>Platform</th><th>Filename</th><th>Local</th><th>Staged</th><th>Size</th></tr></thead>
       <tbody>{pkg_table}</tbody>
     </table>
-    <form method="post" action="{action}" id="admin-node-op-upload-form" data-helsinki-upload="1">
+    <form method="post" action="{action}" id="admin-node-op-upload-form"
+          data-helsinki-upload="1" data-suite-push-form="1">
       <input type="hidden" name="node" value="{node_q}"/>
-      <input type="hidden" name="action" value="upload_packages"/>
-      <label for="admin-node-op-deploy-version">Monopin version</label>
+      <input type="hidden" name="action" value="push_suite_packages"/>
+      <label for="admin-node-op-deploy-version">Suite catalog version</label>
       <input id="admin-node-op-deploy-version" name="version" required value="{_escape(catalog_ver)}"/>
       <label><input type="checkbox" name="stage" value="1" checked id="admin-node-op-deploy-stage"/> Stage</label>
       <label><input type="checkbox" name="upload" value="1" checked id="admin-node-op-deploy-upload"/> Upload to Helsinki</label>
@@ -422,7 +472,24 @@ def render_admin_node_operator_page_html(
       <label><input type="checkbox" name="force" value="1" id="admin-node-op-deploy-force"/> Force</label>
       <label><input type="checkbox" name="dry_run" value="1" id="admin-node-op-deploy-dry-run"/> Dry-run</label>
       <label><input type="checkbox" name="install_serve" value="1" id="admin-node-op-deploy-install-serve"/> Install serve</label>
-      <button type="submit" id="admin-node-op-upload-btn" class="primary-upload">Upload packages to Helsinki</button>
+      <button type="submit" id="admin-node-op-upload-btn" class="primary-upload">Push Suite packages to Helsinki</button>
+    </form>
+    <hr style="border:0;border-top:1px solid var(--border,#333);margin:1rem 0"/>
+    <h4 id="admin-node-op-path-upload-heading">Upload by file path</h4>
+    <p class="muted" id="admin-node-op-path-upload-blurb">
+      Stage + upload one local monopin installer by absolute/relative filesystem path.
+    </p>
+    <form method="post" action="{action}" id="admin-node-op-path-upload-form" data-path-upload="1">
+      <input type="hidden" name="node" value="{node_q}"/>
+      <input type="hidden" name="action" value="upload_by_path"/>
+      <label for="admin-node-op-path-input">Local package path</label>
+      <input id="admin-node-op-path-input" name="path" required
+             placeholder="/path/to/restore-privacy-client-{_escape(catalog_ver)}-linux-x64.tar.gz"/>
+      <label><input type="checkbox" name="stage" value="1" checked id="admin-node-op-path-stage"/> Stage</label>
+      <label><input type="checkbox" name="upload" value="1" checked id="admin-node-op-path-upload"/> Upload to Helsinki</label>
+      <label><input type="checkbox" name="dry_run" value="1" id="admin-node-op-path-dry-run"/> Dry-run</label>
+      <label><input type="checkbox" name="force" value="1" id="admin-node-op-path-force"/> Force</label>
+      <button type="submit" id="admin-node-op-path-upload-btn">Browse files and Upload</button>
     </form>
   </section>
 
@@ -483,6 +550,7 @@ def render_admin_node_operator_page_html(
         title="Node Operator",
         active="node-operator",
         main_html=main,
+        extra_head=node_operator_auto_refresh_meta(node["id"]),
     )
 
 
@@ -547,8 +615,31 @@ def handle_admin_node_operator_action(
         if not r.get("ok"):
             return False, str(r.get("error") or "push failed"), node["id"]
         return True, f"Pushed to {r.get('count')} target(s)", node["id"]
-    if action == "upload_packages":
+    if action in ("upload_packages", "push_suite_packages"):
         ver = (form.get("version") or "").strip() or ctrl.catalog_version_default()
+        if action == "push_suite_packages":
+            r = ctrl.push_suite_packages(
+                version=ver,
+                stage=form.get("stage") == "1",
+                upload=form.get("upload") == "1",
+                dry_run=form.get("dry_run") == "1",
+                force=form.get("force") == "1",
+                allow_missing=form.get("allow_missing") == "1",
+                install_serve=form.get("install_serve") == "1",
+            )
+            if not r.get("ok"):
+                return (
+                    False,
+                    str(r.get("error") or "suite push failed"),
+                    node["id"],
+                )
+            return (
+                True,
+                f"Pushed {r.get('suite')} present={r.get('present_count')}/"
+                f"{r.get('total')} dry_run={r.get('dry_run')} "
+                f"upload_code={r.get('upload_code')}",
+                node["id"],
+            )
         r = ctrl.upload_catalog_packages(
             version=ver,
             stage=form.get("stage") == "1",
@@ -564,6 +655,25 @@ def handle_admin_node_operator_action(
             True,
             f"Deploy {r.get('version')} dry_run={r.get('dry_run')} "
             f"upload_code={r.get('upload_code')}",
+            node["id"],
+        )
+    if action == "upload_by_path":
+        path = (form.get("path") or "").strip()
+        r = ctrl.upload_package_by_path(
+            path,
+            stage=form.get("stage") == "1",
+            upload=form.get("upload") == "1",
+            dry_run=form.get("dry_run") == "1",
+            force=form.get("force") == "1",
+            install_serve=form.get("install_serve") == "1",
+        )
+        if not r.get("ok"):
+            return False, str(r.get("error") or "path upload failed"), node["id"]
+        return (
+            True,
+            f"Path upload {r.get('filename')} v{r.get('version')} "
+            f"platform={r.get('platform')} staged={r.get('staged_to') or '—'} "
+            f"dry_run={r.get('dry_run')} upload_code={r.get('upload_code')}",
             node["id"],
         )
     return False, f"unknown action {action!r}", node["id"]

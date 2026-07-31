@@ -27,7 +27,15 @@ def render_operator_page(ctrl: "NodeOperatorController", *, flash: str = "") -> 
         f'<p class="flash" id="op-flash">{html.escape(flash)}</p>' if flash else ""
     )
     clients_visual = render_connected_clients_visual_html(
-        sessions, id_prefix="op-client"
+        sessions,
+        id_prefix="op-client",
+        update_push={
+            "form_action": "/op/push-update",
+            "version": catalog_ver,
+            "url": "https://restoreprivacy.online/",
+            "message": "",
+            "hidden_fields": {},
+        },
     )
     matrix = build_update_delivery_matrix(
         sessions=sessions,
@@ -40,9 +48,15 @@ def render_operator_page(ctrl: "NodeOperatorController", *, flash: str = "") -> 
     sess_rows = []
     for s in sessions:
         cid = html.escape(s["client_id"])
+        ver_raw = str(s.get("product_version") or "").strip()
+        ver_disp = ver_raw if ver_raw else "unknown"
+        ver_attr = html.escape(ver_raw)
+        unknown_attr = ' data-client-version-unknown="1"' if not ver_raw else ""
         sess_rows.append(
             "<tr>"
             f"<td><code>{cid}</code></td>"
+            f'<td data-client-version="{ver_attr}"{unknown_attr}>'
+            f"<code>{html.escape(ver_disp)}</code></td>"
             f"<td>{html.escape(str(s.get('vpn_ip') or ''))}</td>"
             f"<td>{html.escape(str(s.get('client_addr') or ''))}</td>"
             f"<td>{int(s.get('priority') or 0)}</td>"
@@ -51,7 +65,7 @@ def render_operator_page(ctrl: "NodeOperatorController", *, flash: str = "") -> 
     table = (
         "\n".join(sess_rows)
         if sess_rows
-        else '<tr id="op-sessions-empty"><td colspan="4">No connected clients</td></tr>'
+        else '<tr id="op-sessions-empty"><td colspan="5">No connected clients</td></tr>'
     )
     pkg_rows = []
     for p in inv.get("packages") or []:
@@ -159,7 +173,7 @@ code{{font-size:0.8rem}}
   <details id="op-sessions-table-details" class="muted">
     <summary>Table detail</summary>
   <table id="op-sessions-table">
-    <thead><tr><th>Client id</th><th>VPN IP</th><th>Addr</th><th>Priority</th></tr></thead>
+    <thead><tr><th>Client id</th><th>Version</th><th>VPN IP</th><th>Addr</th><th>Priority</th></tr></thead>
     <tbody>
 {table}
     </tbody>

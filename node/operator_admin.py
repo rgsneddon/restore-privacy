@@ -255,6 +255,8 @@ class NodeOperatorController:
                     "client_addr": f"{s.client_addr[0]}:{s.client_addr[1]}",
                     "last_seen": float(s.last_seen),
                     "priority": self.priority.get_priority(cid),
+                    # Honest empty when session never reported a product monopin.
+                    "product_version": (getattr(s, "product_version", None) or "").strip(),
                 }
             )
         # Honour priority ordering for admin table
@@ -270,8 +272,13 @@ class NodeOperatorController:
         session_id: bytes | None = None,
         client_addr: tuple[str, int] | None = None,
         vpn_ip: str = "",
+        product_version: str = "",
     ) -> dict[str, Any]:
-        """Test/lab helper: add a synthetic live session."""
+        """Test/lab helper: add a synthetic live session.
+
+        *product_version* is optional; omit or empty for honest unknown (do not
+        invent a monopin for lab sessions that never reported one).
+        """
         import os as _os
 
         from node.sessions import Session
@@ -294,17 +301,20 @@ class NodeOperatorController:
         # Unique UDP endpoint per lab session (registry collapses same client_addr)
         addr = client_addr if client_addr is not None else ("127.0.0.1", 50000 + int(n))
         ip = (vpn_ip or "").strip() or f"10.88.0.{2 + int(n)}"
+        ver = (product_version or "").strip()
         sess = Session(
             session_id=sid,
             crypto=object(),
             client_addr=addr,
             vpn_ip=ip,
+            product_version=ver,
         )
         reg.add(sess)
         return {
             "client_id": sid.hex(),
             "session_id_hex": sid.hex(),
             "vpn_ip": ip,
+            "product_version": ver,
         }
 
     def public_status_title_only(self) -> dict[str, Any]:
@@ -505,10 +515,70 @@ class NodeOperatorController:
             sys.path.insert(0, str(self.repo_root / "status_page"))
             from downloads import RELEASE_VERSION
 
-            return str(RELEASE_VERSION).strip() or "0.6.0"
+            return str(RELEASE_VERSION).strip() or "1.0.0"
         except Exception:  # noqa: BLE001
             ver = (self.repo_root / "client" / "VERSION").read_text(encoding="utf-8")
-            return ver.strip() or "0.6.0"
+            return ver.strip() or "1.0.0"
+
+    def suite_product_label(self, version: str | None = None) -> str:
+        """Human suite label for admin flash / UI (e.g. Restore Privacy Suite v1.0.0)."""
+        ver = (version or "").strip() or self.catalog_version_default()
+        try:
+            sys.path.insert(0, str(self.repo_root / "status_page"))
+            from downloads import SUITE_PRODUCT_TITLE
+
+            title = str(SUITE_PRODUCT_TITLE).strip() or "Restore Privacy Suite"
+        except Exception:  # noqa: BLE001
+            title = "Restore Privacy Suite"
+        return f"{title} v{ver}"
+
+    def push_suite_packages(
+        self,
+        *,
+        version: str | None = None,
+        stage: bool = True,
+        upload: bool = True,
+        dry_run: bool = False,
+        force: bool = False,
+        allow_missing: bool = True,
+        install_serve: bool = False,
+    ) -> dict[str, Any]:
+        """Admin primary path: stage + upload Suite catalog packages (default pin).
+
+        Explicit Suite push-upload entry used by website admin forms. Always
+        resolves the product catalog monopin (Suite **1.0.0** when that is the
+        shipped pin) and drives :meth:`upload_catalog_packages`.
+        """
+        ver = (version or "").strip() or self.catalog_version_default()
+        inv = self.list_local_packages(version=ver)
+        deploy = self.upload_catalog_packages(
+            version=ver,
+            stage=bool(stage),
+            upload=bool(upload),
+            dry_run=bool(dry_run),
+            force=bool(force),
+            allow_missing=bool(allow_missing),
+            install_serve=bool(install_serve),
+        )
+        return {
+            "ok": bool(deploy.get("ok")),
+            "suite": self.suite_product_label(ver),
+            "version": ver,
+            "stage": bool(stage),
+            "upload": bool(upload),
+            "dry_run": bool(dry_run),
+            "force": bool(force),
+            "allow_missing": bool(allow_missing),
+            "install_serve": bool(install_serve),
+            "inventory": inv,
+            "inventory_after": deploy.get("inventory_after") or {},
+            "staged": deploy.get("staged") or [],
+            "upload_code": deploy.get("upload_code"),
+            "error": deploy.get("error") or "",
+            "present_count": int(inv.get("present_count") or 0),
+            "total": int(inv.get("total") or 0),
+            "packages": inv.get("packages") or [],
+        }
 
     def list_local_packages(self, *, version: str | None = None) -> dict[str, Any]:
         """Inventory catalog packages under releases/ and status_page/assets/."""
@@ -634,4 +704,193 @@ class NodeOperatorController:
 
         out["ok"] = True
         out["inventory_after"] = self.list_local_packages(version=ver)
+        return out
+
+    def validate_package_file_path(self, path: str | Path) -> dict[str, Any]:
+        """Validate a local filesystem path for monopin package stage/upload.
+
+        Pure-ish: no SSH. Returns resolved path, filename, version, platform
+        when the basename matches a catalog installer; otherwise an honest error.
+        """
+        raw = str(path or "").strip()
+        out: dict[str, Any] = {
+            "ok": False,
+            "path": raw,
+            "resolved": "",
+            "filename": "",
+            "version": "",
+            "platform": "",
+            "size": 0,
+            "error": "",
+        }
+        if not raw:
+            out["error"] = "path is required"
+            return out
+        # Reject null bytes / empty after expand
+        if "\x00" in raw:
+            out["error"] = "invalid path"
+            return out
+        try:
+            p = Path(raw).expanduser()
+            # Resolve carefully: missing path still resolves parents; use absolute
+            p = p if p.is_absolute() else (Path.cwd() / p)
+            p = p.resolve(strict=False)
+        except (OSError, RuntimeError, ValueError) as exc:
+            out["error"] = f"invalid path: {exc}"[:200]
+            return out
+        out["resolved"] = str(p)
+        out["filename"] = p.name
+        if not p.exists():
+            out["error"] = f"path does not exist: {p}"
+            return out
+        if not p.is_file():
+            out["error"] = f"path is not a file: {p}"
+            return out
+        try:
+            size = int(p.stat().st_size)
+        except OSError as exc:
+            out["error"] = f"cannot stat path: {exc}"[:200]
+            return out
+        if size <= 0:
+            out["error"] = f"file is empty: {p}"
+            return out
+        out["size"] = size
+        # Match catalog monopin basename for current pin (or parse version from name)
+        try:
+            mod = self._load_host_paid_assets()
+            ver = self.catalog_version_default()
+            pkgs = mod.list_packages(ver)
+        except Exception as exc:  # noqa: BLE001
+            out["error"] = f"catalog unavailable: {exc}"[:200]
+            return out
+        matched = None
+        for pkg in pkgs:
+            if pkg.get("filename") == p.name:
+                matched = pkg
+                break
+        if matched is None:
+            # Allow versioned catalog basenames for non-default pins
+            import re
+
+            m = re.match(
+                r"^restore-privacy-client-([0-9]+(?:\.[0-9]+)*)-(.+)$",
+                p.name,
+            )
+            if not m:
+                out["error"] = (
+                    f"filename is not a catalog monopin installer: {p.name}"
+                )
+                return out
+            alt_ver = m.group(1)
+            try:
+                pkgs_alt = mod.list_packages(alt_ver)
+            except Exception:  # noqa: BLE001
+                pkgs_alt = []
+            for pkg in pkgs_alt:
+                if pkg.get("filename") == p.name:
+                    matched = pkg
+                    break
+            if matched is None:
+                out["error"] = (
+                    f"filename not in catalog for version {alt_ver}: {p.name}"
+                )
+                return out
+        out["ok"] = True
+        out["version"] = str(matched.get("version") or "")
+        out["platform"] = str(matched.get("platform") or "")
+        out["error"] = ""
+        return out
+
+    def upload_package_by_path(
+        self,
+        path: str | Path,
+        *,
+        stage: bool = True,
+        upload: bool = True,
+        dry_run: bool = False,
+        force: bool = False,
+        install_serve: bool = False,
+    ) -> dict[str, Any]:
+        """Stage (and optionally upload) one local package file by filesystem path.
+
+        Admin path-upload entry: validates *path*, copies into
+        ``status_page/assets/{version}/`` under the catalog basename, then
+        drives :meth:`upload_catalog_packages` (allow_missing) so Helsinki upload
+        uses the existing host_paid_assets path.
+        """
+        import shutil
+
+        v = self.validate_package_file_path(path)
+        out: dict[str, Any] = {
+            "ok": False,
+            "path": str(path or "").strip(),
+            "resolved": v.get("resolved") or "",
+            "filename": v.get("filename") or "",
+            "version": v.get("version") or "",
+            "platform": v.get("platform") or "",
+            "size": int(v.get("size") or 0),
+            "stage": bool(stage),
+            "upload": bool(upload),
+            "dry_run": bool(dry_run),
+            "staged_to": "",
+            "upload_code": None,
+            "error": "",
+            "deploy": {},
+        }
+        if not v.get("ok"):
+            out["error"] = str(v.get("error") or "invalid path")
+            return out
+
+        ver = str(v["version"])
+        fname = str(v["filename"])
+        src = Path(str(v["resolved"]))
+        stage_dir = self.repo_root / "status_page" / "assets" / ver
+        dest = stage_dir / fname
+
+        if dry_run and not stage and not upload:
+            out["ok"] = True
+            out["error"] = "dry-run: nothing to do (stage and upload both off)"
+            return out
+
+        if stage:
+            try:
+                stage_dir.mkdir(parents=True, exist_ok=True)
+                if dry_run:
+                    out["staged_to"] = str(dest)
+                    out["error"] = ""
+                else:
+                    if src.resolve() != dest.resolve():
+                        shutil.copy2(src, dest)
+                    out["staged_to"] = str(dest)
+                    if not dest.is_file() or dest.stat().st_size <= 0:
+                        out["error"] = f"stage failed: dest missing or empty ({dest})"
+                        return out
+            except OSError as exc:
+                out["error"] = f"stage failed: {exc}"[:300]
+                return out
+
+        if upload:
+            # Reuse shipped catalog upload (allow_missing so single-file ships)
+            dep = self.upload_catalog_packages(
+                version=ver,
+                stage=False,  # already staged this file
+                upload=True,
+                dry_run=bool(dry_run),
+                force=bool(force),
+                allow_missing=True,
+                install_serve=bool(install_serve),
+            )
+            out["deploy"] = dep
+            out["upload_code"] = dep.get("upload_code")
+            if not dep.get("ok"):
+                out["error"] = str(dep.get("error") or "upload failed")[:300]
+                # Stage may still have succeeded
+                if stage and out.get("staged_to") and not dry_run:
+                    out["error"] = (
+                        f"staged ok but upload failed: {out['error']}"
+                    )[:300]
+                return out
+
+        out["ok"] = True
+        out["error"] = ""
         return out

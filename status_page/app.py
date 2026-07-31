@@ -112,7 +112,7 @@ FAVICON_PATH = "/favicon.ico"
 FAVICON_PNG_PATH = "/favicon.png"
 APPLE_TOUCH_PATH = "/apple-touch-icon.png"
 LOGO_PATH = "/logo.png"
-# Transparent-background site header logo (left of banner mark)
+# Transparent-background site header logo (right of banner mark)
 LOGO_TRANSPARENT_PATH = "/logo_transparent.png"
 # Public heading banner (logo + banner row; no VPN H1 text)
 BANNER_PATH = "/banner.jpg"

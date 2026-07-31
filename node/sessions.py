@@ -19,6 +19,8 @@ class Session:
     vpn_ip: str
     counter_out: int = 0
     last_seen: float = field(default_factory=time.time)
+    # Client product/catalog monopin when known (handshake/report). Empty = unknown.
+    product_version: str = ""
 
 
 class SessionRegistry:
@@ -114,7 +116,7 @@ class SessionRegistry:
             return list(self._by_id.keys())
 
     def admin_list_sessions(self) -> list[dict]:
-        """Operator-only session rows (identity hex + vpn_ip + addr). Not public."""
+        """Operator-only session rows (identity hex + vpn_ip + addr + version). Not public."""
         with self._lock:
             out: list[dict] = []
             for sid, s in self._by_id.items():
@@ -125,6 +127,7 @@ class SessionRegistry:
                         "vpn_ip": s.vpn_ip,
                         "client_addr": f"{s.client_addr[0]}:{s.client_addr[1]}",
                         "last_seen": float(s.last_seen),
+                        "product_version": (getattr(s, "product_version", None) or "").strip(),
                     }
                 )
             return out

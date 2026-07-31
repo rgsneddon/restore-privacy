@@ -40,9 +40,11 @@ PUBLIC_BRAND_LOGO_STATIC_NAME = "logo_transparent.png"
 PUBLIC_BRAND_BANNER_PATH = "/banner.jpg"
 PUBLIC_BRAND_BANNER_STATIC_NAME = "banner.jpg"
 # Shared display height for logo + banner in the brand header row (px).
-PUBLIC_BRAND_HEADER_HEIGHT_DEFAULT = 72
-PUBLIC_BRAND_HEADER_HEIGHT_MIN_CSS = 56
-PUBLIC_BRAND_HEADER_HEIGHT_MAX_CSS = 96
+# Taller clamp keeps the wide banner.jpg sharp at full content-shell width
+# (native banner ~1760×576; logo is square transparent mark).
+PUBLIC_BRAND_HEADER_HEIGHT_DEFAULT = 128
+PUBLIC_BRAND_HEADER_HEIGHT_MIN_CSS = 80
+PUBLIC_BRAND_HEADER_HEIGHT_MAX_CSS = 200
 # Legacy size aliases (tests / callers) — height-matched to banner row.
 PUBLIC_BRAND_LOGO_SIZE_DEFAULT = PUBLIC_BRAND_HEADER_HEIGHT_DEFAULT
 PUBLIC_BRAND_LOGO_SIZE_MIN_CSS = PUBLIC_BRAND_HEADER_HEIGHT_MIN_CSS
@@ -577,47 +579,76 @@ a.product-tab.is-active, .product-tab.is-active {{
   align-items: center;
   text-align: center;
   gap: 0.85rem;
-  /* Shared logo + banner display height (matched pair) */
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
+  /* Shared logo + banner display height (matched pair); scales with shell width */
   --rb-brand-header-height: clamp(
     {PUBLIC_BRAND_HEADER_HEIGHT_MIN_CSS}px,
-    12vw,
+    18vw,
     {PUBLIC_BRAND_HEADER_HEIGHT_MAX_CSS}px
   );
 }}
-/* Logo + banner heading row: centered above the menu (no VPN H1 text) */
+/* Logo + banner heading row: full usable content width above the menu (no VPN H1) */
 .brand-mark {{
   display: flex;
   flex-direction: row;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
   align-items: center;
-  justify-content: center;
-  gap: clamp(0.55rem, 2vw, 1rem);
+  justify-content: stretch;
+  gap: clamp(0.55rem, 2vw, 1.1rem);
   width: 100%;
   max-width: 100%;
+  box-sizing: border-box;
 }}
 .brand-logo {{
   height: var(--rb-brand-header-height);
   width: auto;
   max-width: var(--rb-brand-header-height);
+  max-height: var(--rb-brand-header-height);
   border: none;
   border-radius: 0;
   object-fit: contain;
+  object-position: center;
   background: transparent;
   box-shadow: none;
-  flex-shrink: 0;
+  flex: 0 0 auto;
+  image-rendering: -webkit-optimize-contrast;
+  image-rendering: high-quality;
+  -ms-interpolation-mode: bicubic;
   filter: drop-shadow(0 4px 14px rgba(0, 229, 255, 0.18));
 }}
 .brand-banner {{
+  /* Full remaining width of brand-mark / content shell (no narrow max-width strip) */
   height: var(--rb-brand-header-height);
-  width: auto;
-  max-width: min(100%, 36rem);
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
   border: none;
   border-radius: 0;
   object-fit: contain;
+  object-position: center right;
   background: transparent;
   box-shadow: none;
   flex: 1 1 auto;
+  image-rendering: -webkit-optimize-contrast;
+  image-rendering: high-quality;
+  -ms-interpolation-mode: bicubic;
   filter: drop-shadow(0 4px 14px rgba(0, 229, 255, 0.12));
+}}
+@media (max-width: 520px) {{
+  .brand-mark {{
+    flex-wrap: wrap;
+    justify-content: center;
+  }}
+  .brand-logo {{
+    max-width: min(var(--rb-brand-header-height), 28vw);
+  }}
+  .brand-banner {{
+    width: 100%;
+    max-width: 100%;
+    object-position: center;
+  }}
 }}
 /* H1 kept for rare product-page overrides; default header has no title text */
 #{SITE_BRAND_HEADER_ID} h1, .brand-panel h1, #site-brand-header h1,
@@ -639,7 +670,8 @@ a.product-tab.is-active, .product-tab.is-active {{
   font-weight: 500;
 }}
 .brand-header-rule {{
-  width: min(100%, 22rem);
+  width: 100%;
+  max-width: 100%;
   height: 1px;
   margin: 0.15rem auto 0;
   border: 0;
@@ -1048,7 +1080,7 @@ a.product-tab.is-active, .product-tab.is-active {{
   }}
   /* Override row for logo+title on very small if tests allow — keep row for tests via min-width */
 }}
-/* Keep brand-mark row orientation for structure (logo left of title) at ≥360px */
+/* Keep brand-mark row orientation (banner left, logo right) at ≥360px */
 @media (min-width: 360px) {{
   .brand-mark {{
     flex-direction: row;
@@ -1237,8 +1269,8 @@ def public_brand_header_html(
 ) -> str:
     """Static top brand panel used across all public pages.
 
-    Layout: **borderless shield+key logo** to the **left** of the **banner.jpg**
-    heading image, same display height, centered row **above** the site nav
+    Layout: **banner.jpg** heading image with the **borderless shield+key logo**
+    on the **right**, same display height, full-width row **above** the site nav
     (when included). The VPN H1 text (**RESTORE PRIVACY VPN**) is **not** shown
     in the header by default — the banner is the heading mark. Product-family
     top tabs are **off by default**. Logo has no outer plate/frame. Under-title
@@ -1282,8 +1314,8 @@ def public_brand_header_html(
         title_html = f"\n        <h1>{title_safe}</h1>"
     return f"""{tabs}    <header class="brand-panel panel-card" id="{SITE_BRAND_HEADER_ID}" data-site-header="1" data-header-alias="site-brand-header" data-chrome="pro" data-brand-banner="1">
       <div class="brand-mark" id="brand-mark" data-brand-mark="1">
-        <img class="brand-logo" src="{_esc(src)}" height="{h_attr}" alt="Restore Privacy logo"/>
-        <img class="brand-banner" id="brand-banner" src="{_esc(bsrc)}" height="{h_attr}" alt="Restore Privacy"/>{title_html}
+        <img class="brand-banner" id="brand-banner" src="{_esc(bsrc)}" height="{h_attr}" alt="Restore Privacy"/>
+        <img class="brand-logo" src="{_esc(src)}" height="{h_attr}" alt="Restore Privacy logo"/>{title_html}
       </div>
       <hr class="brand-header-rule" aria-hidden="true"/>
 {tagline_html}{nav_html}

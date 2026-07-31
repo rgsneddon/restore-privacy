@@ -110,18 +110,19 @@ class TestPublicChromeModule(unittest.TestCase):
         # Heading is banner.jpg + simple logo — not VPN H1 text
         self.assertNotIn(f"<h1>{PUBLIC_BRAND_TITLE}</h1>", header)
         self.assertNotIn("<h1>RESTORE PRIVACY VPN</h1>", header)
-        self.assertEqual(PUBLIC_BRAND_TITLE, "RESTORE PRIVACY VPN")  # doc title still
+        # Document/page brand title is Suite identity (not a visible VPN H1)
+        self.assertIn("Restore Privacy", PUBLIC_BRAND_TITLE)
         self.assertIn('class="brand-banner"', header)
         self.assertIn('id="brand-banner"', header)
         self.assertIn(PUBLIC_BRAND_BANNER_PATH, header)
         self.assertIn("banner.jpg", header)
-        # Borderless transparent mark left of banner
+        # Borderless transparent mark to the right of banner
         mark_start = header.index('id="brand-mark"')
         mark_end = header.index("</div>", mark_start)
         mark = header[mark_start:mark_end]
         i_logo = mark.index("brand-logo")
         i_banner = mark.index("brand-banner")
-        self.assertLess(i_logo, i_banner, "logo must sit left of banner in brand-mark")
+        self.assertLess(i_banner, i_logo, "logo must sit right of banner in brand-mark")
         self.assertIn(PUBLIC_BRAND_LOGO_PATH, mark)
         self.assertIn("logo_transparent", mark)
         self.assertNotIn('src="/logo.png"', mark)
