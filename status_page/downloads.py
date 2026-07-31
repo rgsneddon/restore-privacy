@@ -928,6 +928,12 @@ SUITE_KEYGEN_HINT = (
 )
 SUITE_FREE_DOWNLOAD_PATH = "/suite/download"
 DOWNLOADS_SECTION_ID = "downloads"
+# Full-width free-download v1.0.0 face (operator asset freebie.jpg) → packages page
+FREE_PACKAGES_PATH = "/free-packages"
+FREEBIE_IMG_PATH = "/static/freebie.jpg"
+FREEBIE_IMG_ALT = "Free download v1.0.0"
+FREE_DOWNLOAD_CTA_ID = "free-download-v1-cta"
+FREE_PACKAGES_PAGE_ID = "free-packages-page"
 
 # Suite product ecosystem sub-menu (Perc explorer + Evolve + Perccent wallet docs).
 # Only real public destinations (verified live); align explorer base with admin_perc.
@@ -985,6 +991,198 @@ def suite_free_download_href(platform: str) -> str:
     if not plat:
         return SUITE_FREE_DOWNLOAD_PATH
     return f"{SUITE_FREE_DOWNLOAD_PATH}?platform={plat}"
+
+
+def freebie_img_src() -> str:
+    """Cache-busted freebie button image (static freebie.jpg)."""
+    try:
+        from public_chrome import public_brand_asset_version
+    except ImportError:  # pragma: no cover
+        try:
+            from status_page.public_chrome import (  # type: ignore
+                public_brand_asset_version,
+            )
+        except ImportError:  # pragma: no cover
+            return FREEBIE_IMG_PATH
+    return f"{FREEBIE_IMG_PATH}?v={public_brand_asset_version()}"
+
+
+def free_download_cta_css() -> str:
+    """Full-width free-download image button (push-in active/selected)."""
+    return f"""
+    .free-download-cta-wrap {{
+      width: 100%; max-width: 100%; box-sizing: border-box;
+      margin: 0 0 clamp(0.85rem, 2vw, 1.2rem);
+    }}
+    a.free-download-cta, a#{FREE_DOWNLOAD_CTA_ID} {{
+      display: block; width: 100%; max-width: 100%; box-sizing: border-box;
+      margin: 0; padding: 0; border: 0; border-radius: 14px;
+      overflow: hidden; cursor: pointer; text-decoration: none;
+      line-height: 0; position: relative;
+      box-shadow: 0 10px 28px rgba(4, 12, 28, 0.45),
+                  0 2px 0 rgba(255,255,255,0.08) inset;
+      transition: transform 0.08s ease, box-shadow 0.08s ease, filter 0.12s ease;
+      background: #0a1628;
+    }}
+    a.free-download-cta img {{
+      display: block; width: 100%; height: auto; max-height: 9.5rem;
+      object-fit: cover; object-position: center;
+      pointer-events: none; user-select: none;
+    }}
+    a.free-download-cta .free-download-cta-label {{
+      position: absolute; left: 0; right: 0; bottom: 0;
+      padding: 0.55rem 0.85rem;
+      font: 800 clamp(0.95rem, 2.6vw, 1.2rem)/1.2 system-ui,sans-serif;
+      letter-spacing: 0.06em; text-transform: uppercase; text-align: center;
+      color: #fff; text-shadow: 0 2px 10px rgba(0,0,0,0.65);
+      background: linear-gradient(180deg, transparent, rgba(8,16,32,0.88));
+      pointer-events: none;
+    }}
+    /* Pressed / selected: push in */
+    a.free-download-cta:active,
+    a.free-download-cta.is-pressed,
+    a.free-download-cta:focus-visible {{
+      transform: scale(0.985) translateY(2px);
+      box-shadow: 0 2px 8px rgba(0,0,0,0.45) inset, 0 1px 4px rgba(0,0,0,0.35);
+      filter: brightness(0.94);
+    }}
+    a.free-download-cta:hover {{
+      filter: brightness(1.05);
+    }}
+"""
+
+
+def render_free_download_cta_html(*, version: str = "") -> str:
+    """Full-width free download v1.0.0 image button above Stripe selector."""
+    ver = (version or RELEASE_VERSION).strip() or RELEASE_VERSION
+    src = freebie_img_src()
+    label = f"Free download v{ver}"
+    return f"""
+    <div class="free-download-cta-wrap" id="free-download-cta-wrap"
+         data-free-download-cta="1">
+      <a class="free-download-cta" id="{FREE_DOWNLOAD_CTA_ID}"
+         href="{FREE_PACKAGES_PATH}" data-free-download-v1="1"
+         data-version="{_esc_html(ver)}"
+         aria-label="{_esc_html(label)}">
+        <img src="{_esc_html(src)}" alt="{_esc_html(FREEBIE_IMG_ALT)}"
+             width="1024" height="256" decoding="async"/>
+        <span class="free-download-cta-label">{_esc_html(label)}</span>
+      </a>
+    </div>
+"""
+
+
+def free_packages_page_css() -> str:
+    """Data-path free packages page: centered bold orange package links."""
+    return """
+    .free-packages-page {
+      min-height: 70vh; display: flex; flex-direction: column;
+      align-items: center; justify-content: center;
+      text-align: center; position: relative; width: 100%;
+      box-sizing: border-box; padding: 2rem 1rem 3rem;
+    }
+    .free-packages-page .free-packages-center {
+      position: sticky; top: 35vh; transform: translateY(-50%);
+      width: min(100%, 28rem); margin: 0 auto; z-index: 2;
+      padding: 1.25rem 1rem;
+    }
+    .free-packages-page h1 {
+      margin: 0 0 0.75rem; font-size: clamp(1.15rem, 3.5vw, 1.55rem);
+      letter-spacing: 0.06em; color: #e8f2ff; font-weight: 800;
+    }
+    .free-packages-page .free-packages-blurb {
+      margin: 0 0 1.25rem; font-size: 0.92rem; line-height: 1.45;
+      color: #aed0ea; font-weight: 600;
+    }
+    .free-packages-page .free-packages-list {
+      list-style: none; margin: 0; padding: 0;
+      display: flex; flex-direction: column; gap: 0.85rem;
+      align-items: center;
+    }
+    .free-packages-page a.free-package-link {
+      display: inline-block; font-size: clamp(1.05rem, 3vw, 1.35rem);
+      font-weight: 800; text-decoration: none;
+      color: #ff7a18; /* bold orange */
+      text-shadow: 0 0 12px rgba(255, 122, 24, 0.35);
+      padding: 0.35rem 0.5rem;
+      border-bottom: 2px solid rgba(255, 122, 24, 0.55);
+    }
+    .free-packages-page a.free-package-link:hover {
+      color: #ff9a4a; border-bottom-color: #ff9a4a;
+    }
+    .free-packages-page .free-packages-back {
+      margin-top: 1.75rem; font-size: 0.85rem;
+    }
+    .free-packages-page .free-packages-back a {
+      color: #93c5fd; font-weight: 700; text-decoration: none;
+    }
+"""
+
+
+def render_free_packages_page_html(*, version: str = "") -> bytes:
+    """Simple free packages page: data-path background + centered orange links."""
+    ver = (version or RELEASE_VERSION).strip() or RELEASE_VERSION
+    items = list_catalog_platform_packages(version=ver)
+    if not items:
+        items = list_catalog_platform_packages()
+    links: list[str] = []
+    for p in items:
+        plat = str(p.get("platform") or "")
+        title = platform_face_title(plat)
+        href = suite_free_download_href(plat)
+        fname = str(p.get("filename") or "")
+        links.append(
+            f'<li><a class="free-package-link" id="free-pkg-{_esc_html(plat)}" '
+            f'href="{_esc_html(href)}" data-platform="{_esc_html(plat)}" '
+            f'data-filename="{_esc_html(fname)}" data-free-package="1">'
+            f"{_esc_html(title)} — {_esc_html(fname)}</a></li>"
+        )
+    list_html = "\n        ".join(links) if links else (
+        "<li><p class=\"free-packages-blurb\">No packages listed for this pin.</p></li>"
+    )
+    try:
+        from public_chrome import (
+            public_brand_header_html,
+            public_data_path_layer_html,
+            public_head_open,
+            public_page_close,
+            public_site_css,
+        )
+    except ImportError:  # pragma: no cover
+        from status_page.public_chrome import (  # type: ignore
+            public_brand_header_html,
+            public_data_path_layer_html,
+            public_head_open,
+            public_page_close,
+            public_site_css,
+        )
+
+    extra_css = public_site_css() + free_packages_page_css()
+    header = public_brand_header_html(active="home", product_active="vpn")
+    motif = public_data_path_layer_html()
+    body = f"""{public_head_open(title=f"Free download v{ver}", extra_css=extra_css)}
+{motif}
+  <div class="page-shell" id="page-shell" data-page="free-packages"
+       data-product="suite" data-suite-version="{_esc_html(ver)}" data-chrome="pro">
+{header}
+    <main class="free-packages-page panel-card" id="{FREE_PACKAGES_PAGE_ID}"
+          data-free-packages-page="1" data-version="{_esc_html(ver)}"
+          aria-label="Free Suite packages">
+      <div class="free-packages-center" id="free-packages-center">
+        <h1 id="free-packages-heading">Free download v{_esc_html(ver)}</h1>
+        <p class="free-packages-blurb" id="free-packages-blurb">
+          Direct Suite installers. Residual Connect still needs a KEYGEN after install.
+        </p>
+        <ul class="free-packages-list" id="free-packages-list" data-free-packages="1">
+        {list_html}
+        </ul>
+        <p class="free-packages-back"><a href="/#free-download-cta-wrap">Back to home</a></p>
+      </div>
+    </main>
+  </div>
+{public_page_close()}
+"""
+    return body.encode("utf-8")
 
 
 def suite_product_submenu_links() -> list[tuple[str, str, str]]:

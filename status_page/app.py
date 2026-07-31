@@ -53,9 +53,13 @@ from admin_2fa import (
     verify_totp,
 )
 from downloads import (
+    FREE_PACKAGES_PATH,
     download_css,
+    free_download_cta_css,
     render_bmc_tip_html,
     render_download_section_html,
+    render_free_download_cta_html,
+    render_free_packages_page_html,
     render_suite_storefront_html,
     suite_storefront_css,
     SUITE_FREE_DOWNLOAD_PATH,
@@ -134,11 +138,13 @@ STATIC_ROUTES: dict[str, str] = {
     LOGO_PATH: "logo.png",
     LOGO_TRANSPARENT_PATH: "logo_transparent.png",
     BANNER_PATH: "banner.jpg",
+    "/freebie.jpg": "freebie.jpg",
     "/static/favicon.ico": "favicon.ico",
     "/static/favicon.png": "favicon.png",
     "/static/logo.png": "logo.png",
     "/static/logo_transparent.png": "logo_transparent.png",
     "/static/banner.jpg": "banner.jpg",
+    "/static/freebie.jpg": "freebie.jpg",
     "/static/apple-touch-icon.png": "apple-touch-icon.png",
     # Stripe Dashboard Branding exports (PNG ≥128px, <512KB)
     "/stripe_brand_icon.png": "stripe_brand_icon.png",
@@ -511,7 +517,13 @@ def render_html(
             f"{err_block}<div class=\"dl-buttons\"",
             1,
         )
-    dl_css = download_css() + suite_storefront_css() + suite_home_intro_css()
+    dl_css = (
+        download_css()
+        + suite_storefront_css()
+        + suite_home_intro_css()
+        + free_download_cta_css()
+    )
+    free_cta_html = render_free_download_cta_html()
     try:
         from audit_countdown import render_audit_countdown_html
     except ImportError:  # package-style import when status_page is on path
@@ -634,6 +646,7 @@ def render_html(
   <div class="page-shell" id="page-shell" data-page="home" data-product="suite" data-suite-version="1.0.0" data-chrome="pro">
 {header}
 {suite_intro_html}
+{free_cta_html}
 {shop_row_html}
 {node_wipe_html}
     <section class="panel-card" id="audit-panel" aria-label="Security audit countdown" data-chrome="pro">
@@ -808,6 +821,14 @@ class Handler(BaseHTTPRequestHandler):
                 200,
                 "text/html; charset=utf-8",
                 render_support_page_html().encode("utf-8"),
+            )
+            return
+        # Free packages hub (centered orange direct-download links)
+        if path in (FREE_PACKAGES_PATH, f"{FREE_PACKAGES_PATH}/"):
+            self._send(
+                200,
+                "text/html; charset=utf-8",
+                render_free_packages_page_html(),
             )
             return
         # Suite free installer download (no pay token). App still needs KEYGEN.
