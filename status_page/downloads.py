@@ -950,12 +950,18 @@ except ImportError:  # pragma: no cover
 SUITE_SUBMENU_ID = "suite-product-submenu"
 SUITE_PERC_EXPLORER_HREF = str(_PERC_EXPLORER_BASE).rstrip("/") + "/"
 SUITE_PERC_EXPLORER_LABEL = "Perc blockchain explorer"
-SUITE_EVOLVE_PAGES_HREF = "https://rgsneddon.github.io/evolve/"
-SUITE_EVOLVE_PAGES_LABEL = "Evolve docs (GitHub Pages)"
+# Evolve docs: same-origin page (README mirror); white paper + source stay external.
+SUITE_EVOLVE_DOCS_HREF = "/EVOLVE.md"
+SUITE_EVOLVE_DOCS_LABEL = "Evolve docs"
+SUITE_EVOLVE_PAGES_HREF = SUITE_EVOLVE_DOCS_HREF  # back-compat alias for tests/callers
+SUITE_EVOLVE_PAGES_LABEL = SUITE_EVOLVE_DOCS_LABEL
 SUITE_EVOLVE_WHITEPAPER_HREF = "https://rgsneddon.github.io/evolve/fcg_white_paper.html"
 SUITE_EVOLVE_WHITEPAPER_LABEL = "Evolve FCG white paper"
 SUITE_EVOLVE_SOURCE_HREF = "https://github.com/rgsneddon/evolve"
 SUITE_EVOLVE_SOURCE_LABEL = "Evolve source (GitHub)"
+SUITE_EVOLVE_README_GITHUB_HREF = (
+    "https://github.com/rgsneddon/evolve/blob/main/README.md"
+)
 SUITE_PERCCENT_WALLET_HREF = "https://github.com/rgsneddon/perccent-wallet"
 SUITE_PERCCENT_WALLET_LABEL = "Perccent wallet (GitHub)"
 SUITE_PERCCENT_WALLET_README_HREF = (
@@ -1189,7 +1195,7 @@ def suite_product_submenu_links() -> list[tuple[str, str, str]]:
     """(href, label, data-key) for Suite box sub-menu — public docs only."""
     return [
         (SUITE_PERC_EXPLORER_HREF, SUITE_PERC_EXPLORER_LABEL, "perc-explorer"),
-        (SUITE_EVOLVE_PAGES_HREF, SUITE_EVOLVE_PAGES_LABEL, "evolve-docs"),
+        (SUITE_EVOLVE_DOCS_HREF, SUITE_EVOLVE_DOCS_LABEL, "evolve-docs"),
         (SUITE_EVOLVE_WHITEPAPER_HREF, SUITE_EVOLVE_WHITEPAPER_LABEL, "evolve-whitepaper"),
         (SUITE_EVOLVE_SOURCE_HREF, SUITE_EVOLVE_SOURCE_LABEL, "evolve-source"),
         (SUITE_PERCCENT_WALLET_HREF, SUITE_PERCCENT_WALLET_LABEL, "perccent-wallet"),

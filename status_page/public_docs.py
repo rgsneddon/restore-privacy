@@ -11,6 +11,7 @@ Stable same-origin paths (no GitHub dependency for public readers):
 | ``/AUDIT.md`` | Security audit |
 | ``/CREDITS.md`` | Credits / third-party components |
 | ``/NODE_OPERATOR.md`` | Residual node / operator path (not Suite client) |
+| ``/EVOLVE.md`` | Evolve docs (mirror of evolve repo README) |
 """
 
 from __future__ import annotations
@@ -34,6 +35,13 @@ PRIVACY_PATH = "/PRIVACY_POLICY.md"
 AUDIT_PATH = "/AUDIT.md"
 CREDITS_PATH = "/CREDITS.md"
 NODE_OPERATOR_PATH = "/NODE_OPERATOR.md"
+EVOLVE_DOCS_PATH = "/EVOLVE.md"
+EVOLVE_README_GITHUB_URL = (
+    "https://github.com/rgsneddon/evolve/blob/main/README.md"
+)
+EVOLVE_README_RAW_URL = (
+    "https://raw.githubusercontent.com/rgsneddon/evolve/main/README.md"
+)
 
 
 @dataclass(frozen=True)
@@ -97,6 +105,18 @@ PUBLIC_DOCS: tuple[PublicDoc, ...] = (
             "/node_operator.md",
             "/docs/NODE_OPERATOR.md",
             "/docs/node-operator",
+        ),
+    ),
+    PublicDoc(
+        id="evolve-docs",
+        path=EVOLVE_DOCS_PATH,
+        title="Evolve docs — Chronoflux framework",
+        filename="EVOLVE.md",
+        aliases=(
+            "/evolve",
+            "/evolve-docs",
+            "/docs/EVOLVE.md",
+            "/docs/evolve",
         ),
     ),
 )
