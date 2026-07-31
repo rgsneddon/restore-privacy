@@ -83,10 +83,11 @@ class TestPublicChromeRedesign(unittest.TestCase):
             "privacy-link",
             "audit-link",
             "support-link",
-            "readme-link",
+            "settings-guide-link",
             "doc-links",
         ):
             self.assertIn(f'id="{el}"', nav)
+        self.assertNotIn("readme-link", nav)
         self.assertIn('href="/support"', nav)
         self.assertIn("is-active", nav)
         header = public_brand_header_html(active="home")

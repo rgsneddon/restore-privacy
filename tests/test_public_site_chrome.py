@@ -20,7 +20,9 @@ class TestPublicChromeModule(unittest.TestCase):
         self.assertIn('id="licence-link"', html)
         self.assertIn('id="privacy-link"', html)
         self.assertIn('id="audit-link"', html)
-        self.assertIn('id="readme-link"', html)
+        # README is not a main-menu control
+        self.assertNotIn('id="readme-link"', html)
+        self.assertNotIn(">README<", html)
         # Settings Guide is a main-menu nav item
         self.assertIn('id="settings-guide-link"', html)
         self.assertIn("SETTINGS GUIDE", html)
@@ -39,7 +41,7 @@ class TestPublicChromeModule(unittest.TestCase):
 
         from public_chrome import public_nav_links_html
 
-        keys = ("home", "licence", "privacy", "audit", "support", "settings", "readme")
+        keys = ("home", "licence", "privacy", "audit", "support", "settings")
         expected = {
             "home": "home-link",
             "licence": "licence-link",
@@ -47,7 +49,6 @@ class TestPublicChromeModule(unittest.TestCase):
             "audit": "audit-link",
             "support": "support-link",
             "settings": "settings-guide-link",
-            "readme": "readme-link",
         }
         for key in keys:
             html = public_nav_links_html(active=key)
@@ -338,7 +339,6 @@ class TestDocsShareChrome(unittest.TestCase):
 
         for path, link_id, not_id in (
             ("/AUDIT.md", "audit-link", "privacy-link"),
-            ("/README.md", "readme-link", "privacy-link"),
             ("/PRIVACY_POLICY.md", "privacy-link", "audit-link"),
             ("/LICENSE", "licence-link", "privacy-link"),
         ):
@@ -348,7 +348,7 @@ class TestDocsShareChrome(unittest.TestCase):
             html = got[0].decode("utf-8")
             import re
 
-            # Active class on site nav only (product-family tabs also use is-active)
+            # Active class on site nav only
             active_anchors = re.findall(
                 r'<a class="([^"]*nav-btn[^"]*is-active[^"]*)" id="([^"]+)"',
                 html,
@@ -363,9 +363,11 @@ class TestDocsShareChrome(unittest.TestCase):
                 link_id,
                 msg=f"{path} should activate {link_id}",
             )
-            # Product tabs present on public docs
-            self.assertIn("product-tabs", html)
-            self.assertIn("product-tab-vpn", html)
+            # Product family top tabs removed from public chrome
+            self.assertNotIn('id="product-tabs"', html)
+            self.assertNotIn('id="product-tab-vpn"', html)
+            self.assertNotIn('data-product-tabs="1"', html)
+            self.assertNotIn('id="readme-link"', html)
             if link_id != "privacy-link":
                 m = re.search(
                     r'<a class="([^"]*)" id="privacy-link"',
@@ -377,6 +379,16 @@ class TestDocsShareChrome(unittest.TestCase):
             # Settings Guide remains in nav on every public doc
             self.assertIn('id="settings-guide-link"', html)
             self.assertIn('href="/settings-explainer"', html)
+
+        # README document still served, but no README main-nav button / no tabs
+        readme = public_docs.document_bytes_for_path("/README.md")
+        self.assertIsNotNone(readme)
+        assert readme is not None
+        rhtml = readme[0].decode("utf-8")
+        self.assertNotIn('id="readme-link"', rhtml)
+        self.assertNotIn('id="product-tabs"', rhtml)
+        self.assertNotIn('data-product-tabs="1"', rhtml)
+        self.assertIn('id="settings-guide-link"', rhtml)
 
 
 if __name__ == "__main__":

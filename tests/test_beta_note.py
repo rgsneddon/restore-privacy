@@ -40,7 +40,9 @@ class TestTitleLegalLinks(unittest.TestCase):
         self.assertIn('id="licence-link" href="/LICENSE"', html)
         self.assertIn('id="privacy-link" href="/PRIVACY_POLICY.md"', html)
         self.assertIn('id="audit-link" href="/AUDIT.md"', html)
-        self.assertIn('id="readme-link" href="/README.md"', html)
+        # README is not a main-menu control
+        self.assertNotIn('id="readme-link"', html)
+        self.assertIn('id="settings-guide-link" href="/settings-explainer"', html)
         self.assertNotIn("how-to-buy-link", html)
         self.assertNotIn('href="/how-to-buy"', html)
         self.assertIn(status_app.SECURITY_AUDIT_LOCAL_PATH, html)

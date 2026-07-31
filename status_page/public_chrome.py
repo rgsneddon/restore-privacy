@@ -1088,10 +1088,11 @@ def public_product_tabs_html(*, active: str = PRODUCT_VPN_KEY) -> str:
 
 
 def public_nav_links_html(*, active: str | None = None) -> str:
-    """Button-style nav: Home, Licence, Privacy, Audit, Support, Settings, README.
+    """Button-style nav: Home, Licence, Privacy, Audit, Support, Settings Guide.
 
-    *active* is one of: home, licence, privacy, audit, support, settings,
-    readme (or None). Settings Guide is a main-menu item (no homepage banner).
+    *active* is one of: home, licence, privacy, audit, support, settings
+    (or None). README is not a main-menu control (``/README.md`` may still be
+    served as a document). Settings Guide remains in the top brand nav.
     """
     items = (
         ("HOME", HOME_PATH, HOME_LINK_ID, "home"),
@@ -1100,7 +1101,6 @@ def public_nav_links_html(*, active: str | None = None) -> str:
         ("SECURITY AUDIT", AUDIT_PATH, AUDIT_LINK_ID, "audit"),
         ("SUPPORT", SUPPORT_PATH, SUPPORT_LINK_ID, "support"),
         ("SETTINGS GUIDE", SETTINGS_GUIDE_PATH, SETTINGS_GUIDE_LINK_ID, "settings"),
-        ("README", README_PATH, README_LINK_ID, "readme"),
     )
     parts: list[str] = []
     for label, path, el_id, key in items:
@@ -1136,21 +1136,19 @@ def public_brand_header_html(
     logo_size: int = PUBLIC_BRAND_LOGO_SIZE_DEFAULT,
     logo_src: str = PUBLIC_BRAND_LOGO_PATH,
     product_active: str = PRODUCT_VPN_KEY,
-    include_product_tabs: bool = True,
+    include_product_tabs: bool = False,
     include_site_nav: bool = True,
 ) -> str:
     """Static top brand panel used across all public pages.
 
-    Layout: **product tabs** (VPN / Browser / Vault) at the very top, then
-    **borderless shield+key mark** to the **left** of the brand H1, as a centered
-    row **above** the site nav (when included). Logo has no outer plate/frame.
-    Under-title tagline is omitted by default (no lightweight-vpn slogan).
-    Pass a non-empty *tagline* only if a page truly needs a header subtitle;
-    public catalog/docs call sites leave it empty for a clean top box.
+    Layout: **borderless shield+key mark** to the **left** of the brand H1, as a
+    centered row **above** the site nav (when included). Product-family top tabs
+    (VPN / Browser / Vault) are **off by default** and not shown on public pages.
+    Logo has no outer plate/frame. Under-title tagline is omitted by default.
+    Pass a non-empty *tagline* only if a page truly needs a header subtitle.
     Brand H1 defaults to :data:`PUBLIC_BRAND_TITLE` (**RESTORE PRIVACY VPN**).
-    *product_active* is vpn | browser | vault for the top product tabs.
-    *include_site_nav* controls Home/Licence/Privacy/Audit/README menu buttons
-    (VPN homepage keeps them; Browser/Vault omit them).
+    *include_site_nav* controls Home/Licence/Privacy/Audit/Support/Settings Guide
+    menu buttons (VPN homepage keeps them; Browser/Vault landings may omit them).
     """
     # Product landings pass full product titles; VPN home normalizes short titles.
     raw_title = (title or "").strip()

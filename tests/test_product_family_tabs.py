@@ -50,11 +50,17 @@ class TestProductTabsChrome(unittest.TestCase):
         self.assertIn("width: 100%", css)
         # Must not re-introduce a short cluster cap on tabs
         self.assertNotIn("max-width: 15rem", css)
-        # Injected at top of brand header chrome
-        header = public_brand_header_html(product_active="browser")
-        self.assertLess(header.index("product-tabs"), header.index("brand-panel"))
-        self.assertIn('id="product-tab-browser"', header)
-        self.assertIn("is-active", header)
+        # Product tabs helper still works when requested explicitly
+        header_with = public_brand_header_html(
+            product_active="browser", include_product_tabs=True
+        )
+        self.assertLess(header_with.index("product-tabs"), header_with.index("brand-panel"))
+        self.assertIn('id="product-tab-browser"', header_with)
+        # Default brand chrome: no top product family tabs
+        header_default = public_brand_header_html(product_active="browser")
+        self.assertNotIn('id="product-tabs"', header_default)
+        self.assertNotIn('id="product-tab-vpn"', header_default)
+        self.assertNotIn('data-product-tabs="1"', header_default)
 
 
 class TestBrowserVaultBodies(unittest.TestCase):
@@ -71,7 +77,10 @@ class TestBrowserVaultBodies(unittest.TestCase):
         self.assertIn(BROWSER_LINE_2, html)
         self.assertIn(BROWSER_LINE_3, html)
         self.assertIn("Q3 2026", html)
-        self.assertIn("product-tabs", html)
+        # Top product tabs removed from public chrome (CSS may still define helpers)
+        self.assertNotIn('id="product-tabs"', html)
+        self.assertNotIn('id="product-tab-vpn"', html)
+        self.assertNotIn('data-product-tabs="1"', html)
         self.assertIn('data-product="browser"', html)
         # No VPN homepage structure
         self.assertNotIn("dl-buy-form", html)
@@ -100,7 +109,9 @@ class TestBrowserVaultBodies(unittest.TestCase):
         self.assertIn(VAULT_LINE_2, html)
         self.assertIn(VAULT_LINE_3, html)
         self.assertIn("Q3 2027", html)
-        self.assertIn("product-tabs", html)
+        self.assertNotIn('id="product-tabs"', html)
+        self.assertNotIn('id="product-tab-vpn"', html)
+        self.assertNotIn('data-product-tabs="1"', html)
         self.assertNotIn("dl-buy-form", html)
         self.assertNotIn("audit-countdown", html)
         self.assertNotIn("node-wipe-countdown", html)
@@ -113,24 +124,29 @@ class TestBrowserVaultBodies(unittest.TestCase):
 
 
 class TestHomepageStillVpn(unittest.TestCase):
-    def test_render_html_is_vpn_with_tabs(self) -> None:
+    def test_render_html_is_vpn_without_tabs(self) -> None:
         from app import render_html
         from public_chrome import PUBLIC_BRAND_TITLE
 
         html = render_html({"title": "RESTORE PRIVACY"}).decode("utf-8")
         self.assertIn(PUBLIC_BRAND_TITLE, html)
         self.assertIn("RESTORE PRIVACY VPN", html)
-        self.assertIn("product-tabs", html)
-        self.assertIn('id="product-tab-vpn"', html)
+        # Product family top tabs removed
+        self.assertNotIn('id="product-tabs"', html)
+        self.assertNotIn('data-product-tabs="1"', html)
+        self.assertNotIn('id="product-tab-vpn"', html)
+        self.assertNotIn('id="product-tab-browser"', html)
+        self.assertNotIn('id="product-tab-vault"', html)
         self.assertIn("dl-buy-form", html)  # VPN shop still present
         self.assertIn("audit-countdown", html)
-        # VPN retains site menu buttons
+        # VPN retains site menu buttons (no README nav button)
         self.assertIn('id="doc-links"', html)
         self.assertIn('id="home-link"', html)
         self.assertIn('id="licence-link"', html)
         self.assertIn('id="privacy-link"', html)
         self.assertIn('id="audit-link"', html)
-        self.assertIn('id="readme-link"', html)
+        self.assertIn('id="settings-guide-link"', html)
+        self.assertNotIn('id="readme-link"', html)
 
 
 class TestAppEntryRoutes(unittest.TestCase):
@@ -187,13 +203,13 @@ class TestAppEntryRoutes(unittest.TestCase):
         home = render_html({"title": "RESTORE PRIVACY"}).decode()
         browser = render_browser_page_html().decode()
         vault = render_vault_page_html().decode()
-        for page, active in (
-            (home, "vpn"),
-            (browser, "browser"),
-            (vault, "vault"),
-        ):
-            self.assertIn("product-tabs", page)
-            self.assertIn(f'data-product="{active}"', page)
+        # Product family top tabs removed from public chrome
+        for page in (home, browser, vault):
+            self.assertNotIn('id="product-tabs"', page)
+            self.assertNotIn('data-product-tabs="1"', page)
+        self.assertIn('data-page="home"', home)
+        self.assertIn('data-product="browser"', browser)
+        self.assertIn('data-product="vault"', vault)
         self.assertIn("RESTORE PRIVACY VPN", home)
         self.assertIn("dl-buy-form", home)
         self.assertNotIn("dl-buy-form", browser)
