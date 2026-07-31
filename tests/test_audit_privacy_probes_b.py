@@ -138,6 +138,63 @@ class TestSectionBProbes(unittest.TestCase):
             joined = " ".join(r.get("reasons") or [])
             self.assertIn("drop-in", joined.lower())
 
+    def test_host_privacy_recipe_present_in_tree(self):
+        """Shipped monorepo recipe must exist and probe must report present-in-tree."""
+        recipe = ROOT / "node" / "install_host_privacy.sh"
+        self.assertTrue(recipe.is_file(), f"missing recipe: {recipe}")
+        self.assertGreater(recipe.stat().st_size, 0)
+        body = recipe.read_text(encoding="utf-8")
+        self.assertTrue(body.startswith("#!/"), "shell shebang required")
+        # Real recipe markers (host-privacy install surface)
+        self.assertIn("rpt-host-privacy", body)
+        self.assertIn("99-rpt-privacy", body)
+        self.assertIn("journald", body.lower())
+
+        with tempfile.TemporaryDirectory() as td:
+            tdp = Path(td)
+            r = probe_host_privacy_drift(
+                install_root=tdp,
+                unit_path=tdp / "missing.service",
+                journald_dropin=tdp / "missing.conf",
+                log_dirs=[tdp / "no-log-a"],
+                recipe_paths=[recipe],
+            )
+            reasons = list(r.get("reasons") or [])
+            joined = " ".join(reasons)
+            self.assertIn(
+                "install_host_privacy.sh recipe present in tree",
+                reasons,
+                msg=r,
+            )
+            self.assertNotIn(
+                "install_host_privacy.sh recipe missing from tree",
+                joined,
+            )
+            # Developer host: SKIP is honest even when recipe is present
+            self.assertTrue(r.get("skipped"), msg=r)
+
+    def test_host_privacy_recipe_missing_from_tree(self):
+        """When no recipe candidate exists, probe reasons must say missing."""
+        with tempfile.TemporaryDirectory() as td:
+            tdp = Path(td)
+            r = probe_host_privacy_drift(
+                install_root=tdp,
+                unit_path=tdp / "missing.service",
+                journald_dropin=tdp / "missing.conf",
+                log_dirs=[tdp / "no-log-a"],
+                recipe_paths=[tdp / "no-such-install_host_privacy.sh"],
+            )
+            reasons = list(r.get("reasons") or [])
+            self.assertIn(
+                "install_host_privacy.sh recipe missing from tree",
+                reasons,
+                msg=r,
+            )
+            self.assertNotIn(
+                "install_host_privacy.sh recipe present in tree",
+                reasons,
+            )
+
     def test_host_privacy_no_host_artifacts_skips(self):
         """No unit/drop-in/log dirs ⇒ honest SKIP even if recipe exists in monorepo."""
         with tempfile.TemporaryDirectory() as td:
@@ -152,7 +209,14 @@ class TestSectionBProbes(unittest.TestCase):
             self.assertTrue(r.get("skipped"), msg=r)
             self.assertTrue(r.get("ok"), msg=r)
             self.assertFalse(r.get("warn"), msg=r)
-            self.assertIn("non-node host", " ".join(r.get("reasons") or []))
+            reasons = list(r.get("reasons") or [])
+            joined = " ".join(reasons)
+            self.assertIn("non-node host", joined)
+            self.assertIn(
+                "install_host_privacy.sh recipe present in tree",
+                reasons,
+                msg=r,
+            )
 
     def test_host_privacy_dropin_and_unit_pass(self):
         with tempfile.TemporaryDirectory() as td:
@@ -179,6 +243,11 @@ class TestSectionBProbes(unittest.TestCase):
             self.assertFalse(r.get("warn"), msg=r)
             self.assertTrue(r.get("dropin_present"))
             self.assertTrue(r.get("unit_present"))
+            self.assertIn(
+                "install_host_privacy.sh recipe present in tree",
+                list(r.get("reasons") or []),
+                msg=r,
+            )
 
     def test_disk_and_ephemeral(self):
         disk = probe_disk_wipe_readiness(repo_root=ROOT, install_root=ROOT)
