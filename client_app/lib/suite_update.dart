@@ -480,3 +480,73 @@ Map<String, dynamic> parseSuiteUpdatePushJson(String raw) {
   }
   return Map<String, dynamic>.from(blob);
 }
+
+// ---------------------------------------------------------------------------
+// Production residual receive path (host MethodChannel + poll)
+// ---------------------------------------------------------------------------
+
+/// Native → Flutter method name for residual operator push (host invokes).
+const String kUpdatePushHostMethod = 'updatePush';
+
+/// Flutter → native poll for a queued UPDATE_PUSH payload (best-effort).
+const String kPollUpdatePushMethod = 'pollUpdatePush';
+
+/// Normalize host/native arguments into a directive map (or null).
+Map<String, dynamic>? coerceUpdatePushPayload(dynamic raw) {
+  if (raw == null) return null;
+  if (raw is String) {
+    final s = raw.trim();
+    if (s.isEmpty) return null;
+    try {
+      return parseSuiteUpdatePushJson(s);
+    } catch (_) {
+      return null;
+    }
+  }
+  if (raw is Map) {
+    final m = Map<String, dynamic>.from(raw);
+    // Nested under common host keys
+    if (m['directive'] is Map) {
+      return Map<String, dynamic>.from(m['directive'] as Map);
+    }
+    if (m['update'] is Map) {
+      return Map<String, dynamic>.from(m['update'] as Map);
+    }
+    if (m['payload'] is Map) {
+      return Map<String, dynamic>.from(m['payload'] as Map);
+    }
+    if (m['payload'] is String) {
+      return coerceUpdatePushPayload(m['payload']);
+    }
+    return m;
+  }
+  return null;
+}
+
+/// Production entry: residual UPDATE_PUSH (or operator poll result) → pending store.
+///
+/// Called from [VpnController] MethodChannel handler and post-Connect poll.
+/// When Settings opt-in is off, does not write pending (may_unpack false).
+Future<Map<String, dynamic>> handleProductionUpdatePush({
+  required ProductSettings settings,
+  dynamic rawPayload,
+  SharedPreferences? prefs,
+  Map<String, String>? memory,
+}) async {
+  final payload = coerceUpdatePushPayload(rawPayload);
+  if (payload == null) {
+    return {
+      'ok': false,
+      'skipped': false,
+      'error': 'empty or invalid update push payload',
+      'store': null,
+      'may_unpack': false,
+    };
+  }
+  return receiveAndStoreSuiteUpdate(
+    settings: settings,
+    payload: payload,
+    prefs: prefs,
+    memory: memory,
+  );
+}

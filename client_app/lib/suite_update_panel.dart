@@ -19,6 +19,7 @@ class SuiteUpdateHonestyPanel extends StatefulWidget {
     this.memoryPending,
     this.onAfterUnpack,
     this.compact = false,
+    this.reloadToken = 0,
   });
 
   final ProductSettings settings;
@@ -33,6 +34,9 @@ class SuiteUpdateHonestyPanel extends StatefulWidget {
 
   /// Shorter body for nested Suite chrome with limited height.
   final bool compact;
+
+  /// Bump when residual push stores a new pending package (forces reload).
+  final int reloadToken;
 
   @override
   State<SuiteUpdateHonestyPanel> createState() =>
@@ -55,7 +59,8 @@ class _SuiteUpdateHonestyPanelState extends State<SuiteUpdateHonestyPanel> {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.settings.checkBreadcrumbs !=
             widget.settings.checkBreadcrumbs ||
-        oldWidget.memoryPending != widget.memoryPending) {
+        oldWidget.memoryPending != widget.memoryPending ||
+        oldWidget.reloadToken != widget.reloadToken) {
       _reloadPending();
     }
   }

@@ -4,6 +4,8 @@ import 'package:flutter/services.dart';
 
 import 'connect_status.dart';
 import 'rpt_config.dart';
+import 'settings_store.dart';
+import 'suite_update.dart';
 import 'theme.dart';
 
 /// Platform channel to Android VpnService / Windows plugin hooks.
@@ -15,7 +17,74 @@ class VpnController {
 
   final void Function(String) onStatus;
 
+  /// Residual operator "Push update to clients" → Flutter (after opt-in gate).
+  ///
+  /// Payload is the raw host map/JSON; [handleProductionUpdatePush] applies Settings.
+  void Function(dynamic rawPayload)? onUpdatePush;
+
+  /// Current product settings for gated receive (set by TunnelHome).
+  ProductSettings settingsForUpdatePush = ProductSettings.defaults;
+
   VpnController({required this.onStatus});
+
+  /// Install host→Flutter handler for residual [kUpdatePushHostMethod].
+  ///
+  /// Production path: node operator push → native residual frame → this method
+  /// → [handleProductionUpdatePush] → pending Suite package for unpack UI.
+  void installUpdatePushHandler() {
+    _channel.setMethodCallHandler((call) async {
+      if (call.method == kUpdatePushHostMethod) {
+        final raw = call.arguments;
+        onUpdatePush?.call(raw);
+        // Always run gated receive even if UI callback unset (durable store).
+        return handleProductionUpdatePush(
+          settings: settingsForUpdatePush,
+          rawPayload: raw,
+        );
+      }
+      return null;
+    });
+  }
+
+  /// Poll native for a queued UPDATE_PUSH (MissingPlugin → no-op).
+  Future<Map<String, dynamic>> pollAndApplyUpdatePush({
+    ProductSettings? settings,
+  }) async {
+    final s = settings ?? settingsForUpdatePush;
+    try {
+      final result = await _channel.invokeMethod<dynamic>(kPollUpdatePushMethod);
+      if (result == null) {
+        return {
+          'ok': true,
+          'skipped': true,
+          'reason': 'no pending native update',
+          'store': null,
+        };
+      }
+      final applied = await handleProductionUpdatePush(
+        settings: s,
+        rawPayload: result,
+      );
+      if (applied['store'] != null) {
+        onUpdatePush?.call(result);
+      }
+      return applied;
+    } on MissingPluginException {
+      return {
+        'ok': true,
+        'skipped': true,
+        'reason': 'pollUpdatePush not bound on this build',
+        'store': null,
+      };
+    } on PlatformException catch (e) {
+      return {
+        'ok': false,
+        'skipped': false,
+        'error': e.message ?? e.code,
+        'store': null,
+      };
+    }
+  }
 
   /// Compile-time default is off; runtime Settings may enable autoconnect.
   static bool get autoConnectOnLaunchEnabled => RptConfig.autoConnectOnLaunch;

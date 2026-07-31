@@ -1,7 +1,10 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
+import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:restore_privacy_client/entry_access.dart';
 import 'package:restore_privacy_client/licence_gate.dart';
@@ -10,6 +13,7 @@ import 'package:restore_privacy_client/prefs_backend.dart';
 import 'package:restore_privacy_client/settings_store.dart';
 import 'package:restore_privacy_client/suite_update.dart';
 import 'package:restore_privacy_client/suite_update_panel.dart';
+import 'package:restore_privacy_client/vpn_controller.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 void main() {
@@ -161,6 +165,93 @@ void main() {
       final r = receiveSuiteUpdateDirective(settings: on, payload: blob);
       expect(r['ok'], isTrue);
       expect((r['store'] as Map)['pending_update_version'], '1.0.1');
+    });
+
+    test('production handleProductionUpdatePush stores pending when opt-in on',
+        () async {
+      const on = ProductSettings(checkBreadcrumbs: true);
+      final mem = <String, String>{};
+      final r = await handleProductionUpdatePush(
+        settings: on,
+        rawPayload: {
+          'version': '1.0.2',
+          'url': 'https://example.test/suite-1.0.2.pkg',
+          'message': 'Push update to clients',
+          'kind': 'rpt_suite_update',
+        },
+        memory: mem,
+      );
+      expect(r['ok'], isTrue);
+      expect(mem[kPendingUpdateVersionKey], '1.0.2');
+      expect(mayUnpackSuiteUpdate(
+        settings: on,
+        pending: await loadPendingSuiteUpdate(memory: mem),
+      ), isTrue);
+    });
+
+    test('VpnController MethodChannel updatePush → production receive', () async {
+      SharedPreferences.setMockInitialValues({});
+      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+          .setMockMethodCallHandler(
+        const MethodChannel('restore_privacy/vpn'),
+        (call) async {
+          // Dart→native polls not used in this test; host→Flutter is handler side.
+          return null;
+        },
+      );
+      final mem = <String, String>{};
+      // Drive shipped handleProductionUpdatePush as installUpdatePushHandler does.
+      const on = ProductSettings(checkBreadcrumbs: true);
+      final vpn = VpnController(onStatus: (_) {});
+      vpn.settingsForUpdatePush = on;
+      dynamic captured;
+      vpn.onUpdatePush = (raw) => captured = raw;
+      vpn.installUpdatePushHandler();
+
+      // Simulate host invoke of updatePush (same channel MethodCall path).
+      final messenger =
+          TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger;
+      final codec = const StandardMethodCodec();
+      final call = const MethodCall(kUpdatePushHostMethod, {
+        'version': '1.0.3',
+        'url': 'https://example.test/s-1.0.3.pkg',
+        'message': 'operator push',
+      });
+      final data = codec.encodeMethodCall(call);
+      // Channel handler is on Flutter side; use handlePlatformMessage.
+      final completer = Completer<ByteData?>();
+      messenger.handlePlatformMessage(
+        'restore_privacy/vpn',
+        data,
+        (ByteData? reply) {
+          completer.complete(reply);
+        },
+      );
+      final reply = await completer.future;
+      expect(reply, isNotNull);
+      // Handler returns handleProductionUpdatePush result via encodeSuccessEnvelope
+      final decoded = codec.decodeEnvelope(reply!);
+      expect(decoded, isA<Map>());
+      final map = Map<String, dynamic>.from(decoded as Map);
+      // Persist via production path with memory for assertion
+      final stored = await handleProductionUpdatePush(
+        settings: on,
+        rawPayload: {
+          'version': '1.0.3',
+          'url': 'https://example.test/s-1.0.3.pkg',
+        },
+        memory: mem,
+      );
+      expect(stored['ok'], isTrue);
+      expect(mem[kPendingUpdateVersionKey], '1.0.3');
+      expect(map['ok'], isTrue);
+      expect(captured, isNotNull);
+
+      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+          .setMockMethodCallHandler(
+        const MethodChannel('restore_privacy/vpn'),
+        null,
+      );
     });
   });
 

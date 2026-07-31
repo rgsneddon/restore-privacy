@@ -20,6 +20,7 @@ import 'rpt_config.dart';
 import 'settings_screen.dart';
 import 'settings_store.dart';
 import 'suite_shell.dart';
+import 'suite_update.dart';
 import 'suite_update_panel.dart';
 import 'suite_version.dart';
 import 'theme.dart';
@@ -161,11 +162,17 @@ class _TunnelHomeState extends State<TunnelHome> with WidgetsBindingObserver {
   /// Guards double presentation of the keygen sheet (licence Accept + launch race).
   bool _keygenSheetOpen = false;
 
+  /// Bumps [SuiteUpdateHonestyPanel] when residual push stores a pending package.
+  int _suiteUpdateReloadToken = 0;
+
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     _vpn = widget.vpnController ?? VpnController(onStatus: _onStatus);
+    // Residual "Push update to clients" → Suite pending package (Settings-gated).
+    _vpn.onUpdatePush = _onResidualUpdatePush;
+    _vpn.installUpdatePushHandler();
     // macOS menu bar tray → Flutter Disconnect / Show
     _macWindow.setHandlers(
       onTrayDisconnect: () {
@@ -297,6 +304,7 @@ class _TunnelHomeState extends State<TunnelHome> with WidgetsBindingObserver {
       );
     }
     final loaded = await _store!.load();
+    _vpn.settingsForUpdatePush = loaded;
     RptConfig.setRuntimeMultiHop(loaded.privacyMultihop);
     RptConfig.setRuntimeEntryCountry(loaded.entryCountry);
     // Push Flutter Settings into native App Group so Packet Tunnel / Connect
@@ -742,6 +750,7 @@ class _TunnelHomeState extends State<TunnelHome> with WidgetsBindingObserver {
         'Connect — entry ${countryOptionForCode(resolved.code)?.label ?? resolved.code}…',
       );
       await _connLog(kLogKindConnect, 'Connect started (RPT full tunnel)');
+      _vpn.settingsForUpdatePush = _settings;
       final ok = await _vpn.connect(
         residualIpv4: kResidualIpv4AlwaysOn,
         residualIpv6: _settings.residualIpv6,
@@ -749,6 +758,11 @@ class _TunnelHomeState extends State<TunnelHome> with WidgetsBindingObserver {
         privacyOuterObfuscation: _settings.privacyOuterObfuscation,
         privacyMultihop: _settings.privacyMultihop,
       );
+      if (!mounted) return;
+      if (ok) {
+        // Residual push may have delivered a Suite package while HELLO ran.
+        await _pollSuiteUpdatePush();
+      }
       if (!mounted) return;
       setState(() {
         _connected = ok;
@@ -849,6 +863,10 @@ class _TunnelHomeState extends State<TunnelHome> with WidgetsBindingObserver {
     if (snap.connected && from == 'resume') {
       _append('Resumed — VPN still active (minimize did not disconnect).');
     }
+    if (snap.connected) {
+      // Pull any residual operator push that arrived while backgrounded.
+      unawaited(_pollSuiteUpdatePush());
+    }
   }
 
   void _onStatus(String msg) {
@@ -867,6 +885,47 @@ class _TunnelHomeState extends State<TunnelHome> with WidgetsBindingObserver {
       }
     });
     _scrollLogToEnd();
+  }
+
+  /// Residual UPDATE_PUSH / operator poll result → gated Suite pending store.
+  Future<void> _onResidualUpdatePush(dynamic raw) async {
+    final r = await handleProductionUpdatePush(
+      settings: _settings,
+      rawPayload: raw,
+    );
+    if (!mounted) return;
+    if (r['store'] is Map) {
+      final store = Map<String, dynamic>.from(r['store'] as Map);
+      final ver = store[kPendingUpdateVersionKey] ?? store['version'] ?? '';
+      _append(
+        'Suite update pending v$ver — click “$kSuiteUpdateUnpackButtonLabel” '
+        'when you are ready (Settings self-update is on).',
+      );
+      setState(() => _suiteUpdateReloadToken++);
+    } else if (r['skipped'] == true) {
+      _append(
+        'Update push ignored — ${r['reason'] ?? 'Suite self-update off'}. '
+        'Enable “$kSuiteUpdateSettingsTitle” in Settings to receive packages.',
+      );
+    } else if (r['ok'] != true) {
+      _append('Update push not applied: ${r['error'] ?? 'unknown'}');
+    }
+  }
+
+  /// After Connect / rehydrate: poll native queue for Suite package directive.
+  Future<void> _pollSuiteUpdatePush() async {
+    _vpn.settingsForUpdatePush = _settings;
+    final r = await _vpn.pollAndApplyUpdatePush(settings: _settings);
+    if (!mounted) return;
+    if (r['store'] is Map) {
+      final store = Map<String, dynamic>.from(r['store'] as Map);
+      final ver = store[kPendingUpdateVersionKey] ?? '';
+      _append(
+        'Received Suite update v$ver from residual push — '
+        'use “$kSuiteUpdateUnpackButtonLabel”.',
+      );
+      setState(() => _suiteUpdateReloadToken++);
+    }
   }
 
   void _append(String msg) {
@@ -972,6 +1031,7 @@ class _TunnelHomeState extends State<TunnelHome> with WidgetsBindingObserver {
           },
           onChanged: (s) {
             RptConfig.setRuntimeMultiHop(s.privacyMultihop);
+            _vpn.settingsForUpdatePush = s;
             if (mounted) setState(() => _settings = s);
             // Keep native App Group aligned when Settings change outside Connect.
             unawaited(
@@ -1112,6 +1172,7 @@ class _TunnelHomeState extends State<TunnelHome> with WidgetsBindingObserver {
               SuiteUpdateHonestyPanel(
                 settings: _settings,
                 compact: tight,
+                reloadToken: _suiteUpdateReloadToken,
               ),
               // Catalog monopin banner only when Suite self-update opt-in is on.
               if (!tight && _settings.checkBreadcrumbs)
