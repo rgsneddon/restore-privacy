@@ -393,40 +393,147 @@ SSH_KEY_CANDIDATE_NAMES: tuple[str, ...] = (
     "id_ed25519_restore_privacy_eu",  # Helsinki store (current Macs)
     "id_ed25519_20260725",  # Helsinki store (legacy filename)
     "id_ed25519_restore_privacy_vps",  # Iceland residual node
+    "id_ed25519_restore_privacy_hop",  # hop peer key (optional)
     "id_ed25519",
     "id_rsa",
 )
+
+# Durable dirs probed when status_page runs on Render (HOME often empty).
+SSH_KEY_EXTRA_DIR_ENV = "RPT_SSH_KEY_DIR"
+SSH_KEY_MATERIAL_ENVS: tuple[str, ...] = (
+    "RPT_SSH_PRIVATE_KEY",
+    "RPT_SSH_KEY_BODY",
+)
+
+
+def _ssh_search_dirs(
+    *,
+    env: dict[str, str],
+    home: Path | None = None,
+) -> list[Path]:
+    """Ordered directories that may hold package-host private keys."""
+    dirs: list[Path] = []
+    key_dir = (env.get(SSH_KEY_EXTRA_DIR_ENV) or "").strip()
+    if key_dir:
+        dirs.append(Path(key_dir).expanduser())
+    # Render payment disk sibling (optional operator-mounted key store).
+    pay = (env.get("RPT_PAYMENT_DATA_DIR") or "").strip()
+    if pay:
+        try:
+            dirs.append(Path(pay).expanduser().resolve().parent / "rpt-ssh")
+        except OSError:
+            pass
+    for fixed in ("/var/data/rpt-ssh", "/var/data/ssh"):
+        dirs.append(Path(fixed))
+    try:
+        base_home = home if home is not None else Path.home()
+        dirs.append(base_home / ".ssh")
+    except (RuntimeError, OSError):
+        pass
+    # de-dupe while preserving order
+    out: list[Path] = []
+    seen: set[str] = set()
+    for d in dirs:
+        key = str(d)
+        if key in seen:
+            continue
+        seen.add(key)
+        out.append(d)
+    return out
+
+
+def materialize_ssh_key_from_env(
+    *,
+    env: dict[str, str] | None = None,
+    home: Path | None = None,
+) -> Path | None:
+    """If RPT_SSH_PRIVATE_KEY (PEM) is set, write it to a key file and return path.
+
+    Lets the Render status host provision Helsinki package-upload keys via a
+    secret without baking the private key into the image. File mode 0o600.
+    """
+    e = env if env is not None else dict(os.environ)
+    material = ""
+    for name in SSH_KEY_MATERIAL_ENVS:
+        material = (e.get(name) or "").strip()
+        if material:
+            break
+    if not material:
+        return None
+    # OpenSSH PEMs sometimes arrive with literal \n from dashboard paste.
+    if "\\n" in material and "\n" not in material:
+        material = material.replace("\\n", "\n")
+    if not material.endswith("\n"):
+        material += "\n"
+    dest_s = (e.get("RPT_SSH_KEY") or "").strip()
+    if not dest_s:
+        dirs = _ssh_search_dirs(env=e, home=home)
+        # Prefer writable durable dir
+        base = None
+        for d in dirs:
+            try:
+                d.mkdir(parents=True, exist_ok=True)
+                base = d
+                break
+            except OSError:
+                continue
+        if base is None:
+            try:
+                base = (home if home is not None else Path.home()) / ".ssh"
+                base.mkdir(parents=True, exist_ok=True)
+            except (RuntimeError, OSError):
+                return None
+        dest_s = str(base / "id_ed25519_restore_privacy_eu")
+    dest = Path(dest_s).expanduser()
+    try:
+        dest.parent.mkdir(parents=True, exist_ok=True)
+        if not dest.is_file() or dest.read_text(encoding="utf-8") != material:
+            dest.write_text(material, encoding="utf-8")
+        try:
+            os.chmod(dest, 0o600)
+        except OSError:
+            pass
+        if dest.is_file() and dest.stat().st_size > 0:
+            return dest
+    except OSError:
+        return None
+    return None
 
 
 def resolve_ssh_access_key_path(
     *,
     key_env: str = "",
     home: Path | None = None,
+    env: dict[str, str] | None = None,
 ) -> Path | None:
     """Return a usable SSH private key path on this host, or None.
 
-    Pure filesystem probe: *key_env* (``RPT_SSH_KEY`` value) first, then known
-    candidate basenames under ``home/.ssh`` (default ``Path.home()``).
+    Probe order:
+    1. Materialize from ``RPT_SSH_PRIVATE_KEY`` secret when set
+    2. Explicit *key_env* / ``RPT_SSH_KEY`` file path
+    3. Candidate basenames under ``RPT_SSH_KEY_DIR``, ``/var/data/rpt-ssh``,
+       payment-disk sibling, and ``home/.ssh``
     """
-    key = (key_env or "").strip()
+    e = env if env is not None else dict(os.environ)
+    materialized = materialize_ssh_key_from_env(env=e, home=home)
+    if materialized is not None:
+        return materialized
+    key = (key_env or e.get("RPT_SSH_KEY") or "").strip()
     if key:
         p = Path(key).expanduser()
         try:
-            if p.is_file():
+            if p.is_file() and p.stat().st_size > 0:
                 return p
         except OSError:
             pass
-    try:
-        base = (home if home is not None else Path.home()) / ".ssh"
-    except (RuntimeError, OSError):
-        return None
-    for name in SSH_KEY_CANDIDATE_NAMES:
-        p = base / name
-        try:
-            if p.is_file():
-                return p
-        except OSError:
-            continue
+    for base in _ssh_search_dirs(env=e, home=home):
+        for name in SSH_KEY_CANDIDATE_NAMES:
+            p = base / name
+            try:
+                if p.is_file() and p.stat().st_size > 0:
+                    return p
+            except OSError:
+                continue
     return None
 
 
@@ -438,14 +545,15 @@ def host_ssh_access_keys_present(
     """True when this host has package-upload SSH credentials.
 
     Accepts either a non-empty ``RPT_SSH_PASSWORD`` or a resolvable private key
-    file (``RPT_SSH_KEY`` or a candidate under ``~/.ssh``).
+    file (``RPT_SSH_KEY``, secret material, or a candidate under known dirs).
     """
-    e = env if env is not None else os.environ
+    e = env if env is not None else dict(os.environ)
     if (e.get("RPT_SSH_PASSWORD") or "").strip():
         return True
     key_path = resolve_ssh_access_key_path(
         key_env=(e.get("RPT_SSH_KEY") or "").strip(),
         home=home,
+        env=e,
     )
     return key_path is not None and key_path.is_file()
 
@@ -471,11 +579,12 @@ def ssh_upload_preflight(
             "error": "",
             "key_path": "",
         }
-    e = env if env is not None else os.environ
-    if host_ssh_access_keys_present(env=dict(e), home=home):
+    e = dict(env) if env is not None else dict(os.environ)
+    if host_ssh_access_keys_present(env=e, home=home):
         key_path = resolve_ssh_access_key_path(
             key_env=(e.get("RPT_SSH_KEY") or "").strip(),
             home=home,
+            env=e,
         )
         return {
             "ok": True,
@@ -489,8 +598,12 @@ def ssh_upload_preflight(
         "missing_ssh_keys": True,
         "redirect": APP_TESTERS_FORCE_URL,
         "error": (
-            "Package host SSH access keys were not found on this machine. "
-            f"Open {APP_TESTERS_FORCE_URL} to continue."
+            "Package host SSH access keys were not found on this machine "
+            "(status host process). Live Helsinki upload needs RPT_SSH_KEY "
+            "(path), RPT_SSH_PRIVATE_KEY (PEM secret), RPT_SSH_PASSWORD, or a "
+            "key under ~/.ssh / RPT_SSH_KEY_DIR / /var/data/rpt-ssh. "
+            "Use Dry-run for a key-free plan, or open "
+            f"{APP_TESTERS_FORCE_URL} for client installs."
         ),
         "key_path": "",
     }
@@ -502,11 +615,12 @@ def _ssh_target() -> tuple[str, str, str | None, Path | None]:
     user = os.environ.get("RPT_SSH_USER", "root").strip() or "root"
     password = os.environ.get("RPT_SSH_PASSWORD")
     key = os.environ.get("RPT_SSH_KEY", "").strip()
-    key_path = resolve_ssh_access_key_path(key_env=key)
+    key_path = resolve_ssh_access_key_path(key_env=key, env=dict(os.environ))
     if not password and (key_path is None or not key_path.is_file()):
         raise SystemExit(
-            "Need RPT_SSH_PASSWORD or SSH key (RPT_SSH_KEY / "
-            "~/.ssh/id_ed25519_restore_privacy_eu or id_ed25519_20260725). "
+            "Need RPT_SSH_PASSWORD, RPT_SSH_PRIVATE_KEY, or SSH key path "
+            "(RPT_SSH_KEY / ~/.ssh/id_ed25519_restore_privacy_eu / "
+            "RPT_SSH_KEY_DIR / /var/data/rpt-ssh). "
             f"If keys are missing, open {APP_TESTERS_FORCE_URL}"
         )
     return host, user, password, key_path

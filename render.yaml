@@ -78,6 +78,19 @@ services:
       # Iceland VPS paid installer store (status host fetches with token after pay)
       - key: RPT_VPS_ASSET_BASE
         value: http://82.221.101.241:8081/paid-assets
+      # Optional: admin "Push Suite packages to Helsinki" live SSH upload.
+      # Without these, live upload fails closed (use Dry-run or push from a laptop with keys).
+      # Prefer RPT_SSH_PRIVATE_KEY (PEM secret) or mount a key under /var/data/rpt-ssh/.
+      - key: RPT_SSH_KEY
+        sync: false
+      - key: RPT_SSH_PRIVATE_KEY
+        sync: false
+      - key: RPT_SSH_KEY_DIR
+        sync: false
+      - key: RPT_SSH_HOST
+        value: "135.181.152.10"
+      - key: RPT_SSH_USER
+        value: root
       - key: RPT_ASSET_FETCH_TOKEN
         sync: false
       # Admin fleet usage panel: private capacity probes (same token as residual nodes).

@@ -152,7 +152,12 @@ def start_push_job(
     allow_missing: bool = True,
     install_serve: bool = False,
 ) -> dict[str, Any]:
-    """Create job, start background brand push, return job id + initial snapshot."""
+    """Create job, start background brand push, return job id + initial snapshot.
+
+    Live upload (upload and not dry_run) runs SSH preflight **before** starting
+    the worker so missing keys return ``missing_ssh_keys`` + ``redirect``
+    immediately — not a confusing 0/20 failed job after the fact.
+    """
     inv = controller.list_local_packages(version=version, brand_wide=True)
     if not inv.get("ok") and not inv.get("packages"):
         return {"ok": False, "error": inv.get("error") or "inventory failed"}
@@ -165,6 +170,48 @@ def start_push_job(
         "allow_missing": allow_missing,
         "install_serve": install_serve,
     }
+
+    # Early gate: real SSH upload needs host keys on the status process.
+    if upload and not dry_run:
+        try:
+            pre = controller.ssh_upload_access_preflight(upload=True)
+        except Exception as exc:  # noqa: BLE001
+            pre = {
+                "ok": False,
+                "missing_ssh_keys": True,
+                "redirect": "https://restoreprivacy.online/app-testers",
+                "error": f"SSH preflight failed: {exc}"[:240],
+                "key_path": "",
+            }
+        if not pre.get("ok") or pre.get("missing_ssh_keys"):
+            job_id = create_job_from_inventory(inv, options=opts)
+            err = str(
+                pre.get("error")
+                or "Package host SSH access keys were not found on this machine."
+            )
+            redir = str(pre.get("redirect") or "")
+            _finish_job(
+                job_id,
+                ok=False,
+                error=err,
+                message="missing_ssh_keys",
+            )
+            with _LOCK:
+                job = _JOBS.get(job_id)
+                if job is not None:
+                    job["redirect"] = redir
+                    job["missing_ssh_keys"] = True
+            snap = job_snapshot(job_id) or {}
+            return {
+                "ok": False,
+                "job_id": job_id,
+                "job": snap,
+                "missing_ssh_keys": True,
+                "redirect": redir,
+                "error": err,
+                "key_path": str(pre.get("key_path") or ""),
+            }
+
     job_id = create_job_from_inventory(inv, options=opts)
 
     def worker() -> None:
@@ -184,12 +231,18 @@ def start_push_job(
                 brand_wide=True,
             )
             if result.get("missing_ssh_keys"):
+                redir = str(result.get("redirect") or "")
                 _finish_job(
                     job_id,
                     ok=False,
                     error=str(result.get("error") or "SSH keys missing"),
                     message="missing_ssh_keys",
                 )
+                with _LOCK:
+                    job = _JOBS.get(job_id)
+                    if job is not None:
+                        job["redirect"] = redir
+                        job["missing_ssh_keys"] = True
                 return
             _finish_job(
                 job_id,

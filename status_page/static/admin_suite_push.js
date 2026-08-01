@@ -110,11 +110,31 @@
         return resp.json();
       })
       .then(function (data) {
-        if (!data || !data.ok) {
-          if (data && data.error) setStatus(String(data.error));
+        if (!data) return;
+        var job = data.job || data;
+        if (job && (job.missing_ssh_keys || job.message === "missing_ssh_keys")) {
+          stopPoll();
+          if (btn) btn.disabled = false;
+          if (job.redirect) {
+            setStatus(String(job.error || "SSH keys missing") + " — redirecting…");
+            window.location.href = job.redirect;
+            return;
+          }
+          setStatus(
+            String(
+              job.error ||
+                data.error ||
+                "SSH keys missing on status host — set RPT_SSH_KEY / RPT_SSH_PRIVATE_KEY or use Dry-run"
+            )
+          );
+          applyJob(job);
           return;
         }
-        applyJob(data.job || data);
+        if (!data.ok && !job) {
+          if (data.error) setStatus(String(data.error));
+          return;
+        }
+        applyJob(job);
       })
       .catch(function () {
         setStatus("status poll failed (will retry)");
@@ -153,8 +173,23 @@
         })
         .then(function (res) {
           var data = res.data || {};
-          if (data.redirect) {
-            window.location.href = data.redirect;
+          if (data.missing_ssh_keys || data.redirect) {
+            if (data.redirect) {
+              setStatus(
+                String(data.error || "SSH keys missing on status host") +
+                  " — redirecting…"
+              );
+              window.location.href = data.redirect;
+              return;
+            }
+            setStatus(
+              String(
+                data.error ||
+                  "SSH keys missing — set RPT_SSH_KEY / RPT_SSH_PRIVATE_KEY on the status host, or enable Dry-run"
+              )
+            );
+            if (data.job) applyJob(data.job);
+            if (btn) btn.disabled = false;
             return;
           }
           if (!data.ok || !data.job_id) {
