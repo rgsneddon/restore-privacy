@@ -767,13 +767,19 @@ class NodeOperatorController:
             out["missing_ssh_keys"] = False
             out["ssh_key_path"] = str(pre.get("key_path") or "")
 
+        # Progress UI: report one file at a time. When both stage and upload run,
+        # only the upload phase drives progress_cb so rows do not flash
+        # done-then-reupload or get auto-skipped at finish while still pending.
+        stage_cb = progress_cb if (progress_cb and stage and not upload) else None
+        upload_cb = progress_cb if (progress_cb and upload) else None
+
         if stage:
             try:
                 if brand_wide and hasattr(mod, "stage_brand_packages"):
                     staged_paths = mod.stage_brand_packages(
                         version=ver,
                         allow_missing=bool(allow_missing),
-                        progress_cb=progress_cb,
+                        progress_cb=stage_cb,
                     )
                 else:
                     staged_paths = mod.stage_packages(
@@ -797,7 +803,7 @@ class NodeOperatorController:
                             install_serve=bool(install_serve),
                             force=bool(force),
                             allow_missing=bool(allow_missing),
-                            progress_cb=progress_cb,
+                            progress_cb=upload_cb,
                         )
                     )
                 else:

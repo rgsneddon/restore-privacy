@@ -166,10 +166,13 @@ _BRAND_COMPANION_PREFIXES: tuple[str, ...] = (
     "pens-",
     "tables-",
     "slides-",
+    "rpmail-",
+    "rpoffice-",
     "restore-privacy-node-installer-",
     "restore-privacy-node-operator-",
     "restore-privacy-browser-extension-",
     "restore-privacy-rx-browser-",
+    "restore-privacy-suite-",
     "rpt-perc-chain-",
 )
 

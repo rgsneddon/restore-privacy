@@ -153,7 +153,12 @@ def upload_brand_packages(
     allow_missing: bool = False,
     progress_cb: Any | None = None,
 ) -> int:
-    """Upload staged brand packages (any size > min_bytes for kind)."""
+    """Upload staged brand packages one file at a time (any size > min_bytes).
+
+    Walks the full brand inventory in order. Each row gets progress_cb
+    (uploading → done|error|skipped) so admin UI never leaves rows pending
+    then auto-skipped at job end.
+    """
     scripts = ROOT / "scripts"
     if str(scripts) not in sys.path:
         sys.path.insert(0, str(scripts))
@@ -168,34 +173,55 @@ def upload_brand_packages(
     remote_ver = f"{remote_root.rstrip('/')}/{suite_ver}"
     host_default = DEFAULT_VPS_ASSET_HOST
 
-    present: list[dict[str, Any]] = []
+    # Resolve local path for every inventory row (order preserved).
+    work: list[dict[str, Any]] = []
     for row in inv["packages"]:
         fname = row["filename"]
         f = local_dir / fname
         min_b = int(row.get("min_bytes") or 1)
         if f.is_file() and f.stat().st_size >= min_b:
-            present.append({**row, "local_path": str(f)})
-        elif allow_missing:
-            print(f"skip_missing upload kind={row.get('kind')} file={fname}")
-            if progress_cb:
-                progress_cb(fname, "skipped", 0)
+            work.append({**row, "local_path": str(f), "ready": True})
         else:
-            print(f"missing or too-small local stage: {f}", file=sys.stderr)
-            return 1
+            work.append({**row, "local_path": str(f), "ready": False})
 
-    if not present:
+    ready = [p for p in work if p.get("ready")]
+    if not ready and not allow_missing:
         print("ERROR: no staged brand packages to upload", file=sys.stderr)
+        for p in work:
+            if progress_cb:
+                progress_cb(p["filename"], "error", 0)
+        return 1
+    if not ready and allow_missing:
+        print("ERROR: no staged brand packages to upload", file=sys.stderr)
+        for p in work:
+            if progress_cb:
+                progress_cb(p["filename"], "skipped", 0)
         return 1
 
-    print(f"brand upload plan: {len(present)}/{inv['total']} files -> {host_default}:{remote_ver}/")
-    for p in present:
-        print(f"  {p.get('kind')}/{p.get('platform')}: {p['filename']}")
+    print(
+        f"brand upload plan: {len(ready)}/{inv['total']} files "
+        f"-> {host_default}:{remote_ver}/ (force={bool(force)} "
+        f"allow_missing={bool(allow_missing)})"
+    )
+    for p in work:
+        flag = "ready" if p.get("ready") else "missing"
+        print(f"  {flag} {p.get('kind')}/{p.get('platform')}: {p['filename']}")
 
     if dry_run:
-        for p in present:
+        for p in work:
+            fname = p["filename"]
+            if not p.get("ready"):
+                if allow_missing:
+                    if progress_cb:
+                        progress_cb(fname, "skipped", 0)
+                    continue
+                if progress_cb:
+                    progress_cb(fname, "error", 0)
+                print(f"missing or too-small local stage: {p.get('local_path')}", file=sys.stderr)
+                return 1
             if progress_cb:
-                progress_cb(p["filename"], "uploading", 50)
-                progress_cb(p["filename"], "done", 100)
+                progress_cb(fname, "uploading", 50)
+                progress_cb(fname, "done", 100)
         print("dry-run: no SSH")
         return 0
 
@@ -216,13 +242,25 @@ def upload_brand_packages(
     if code != 0:
         print("ERROR: could not prepare remote paid_assets dir", file=sys.stderr)
         return 1
-    for p in present:
+    for p in work:
+        fname = p["filename"]
+        if not p.get("ready"):
+            if allow_missing:
+                print(f"skip_missing upload kind={p.get('kind')} file={fname}")
+                if progress_cb:
+                    progress_cb(fname, "skipped", 0)
+                continue
+            print(f"missing or too-small local stage: {p.get('local_path')}", file=sys.stderr)
+            if progress_cb:
+                progress_cb(fname, "error", 0)
+            return 1
         local = Path(p["local_path"])
-        remote = f"{remote_ver}/{p['filename']}"
+        remote = f"{remote_ver}/{fname}"
         if progress_cb:
-            progress_cb(p["filename"], "uploading", 10)
-        print(f"upload kind={p.get('kind')} file={p['filename']} ({local.stat().st_size} bytes)")
+            progress_cb(fname, "uploading", 10)
+        print(f"upload kind={p.get('kind')} file={fname} ({local.stat().st_size} bytes)")
         try:
+            # force=True → never skip_if_present; always re-upload this file.
             _upload_one_installer_openssh(
                 local,
                 remote,
@@ -232,15 +270,21 @@ def upload_brand_packages(
                 skip_if_present=not force,
             )
             if progress_cb:
-                progress_cb(p["filename"], "done", 100)
+                progress_cb(fname, "done", 100)
         except Exception as e:  # noqa: BLE001
-            print(f"ERROR file={p['filename']}: {e}", file=sys.stderr)
+            print(f"ERROR file={fname}: {e}", file=sys.stderr)
             if progress_cb:
-                progress_cb(p["filename"], "error", 0)
+                progress_cb(fname, "error", 0)
             return 1
     if install_serve:
         # Reuse catalog install-serve when requested
-        return upload_packages(version=suite_ver, dry_run=False, install_serve=True, force=force, allow_missing=True)
+        return upload_packages(
+            version=suite_ver,
+            dry_run=False,
+            install_serve=True,
+            force=force,
+            allow_missing=True,
+        )
     print(f"brand upload complete host={host_default} version={suite_ver}")
     return 0
 

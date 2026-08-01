@@ -129,16 +129,27 @@ def _finish_job(job_id: str, *, ok: bool, error: str = "", message: str = "") ->
         job["message"] = message
         job["state"] = "complete" if ok else "failed"
         job["updated_unix"] = int(time.time())
-        # Mark remaining pending as skipped on success dry-run end
-        if ok:
-            pkgs = []
-            for p in job.get("packages") or []:
-                if p.get("status") == STATUS_PENDING:
-                    pkgs.append(progress_transition(p, status=STATUS_SKIPPED, progress=0))
-                else:
-                    pkgs.append(p)
-            job["packages"] = pkgs
-            job["done_count"] = sum(1 for p in pkgs if p.get("done"))
+        # Never auto-mark rows as "skipped". Admin Push Suite must either
+        # finish each inventory row via progress_cb (done / error / explicit
+        # skipped only when allow_missing opts in) or leave a visible error.
+        # Auto-skip hid unprocessed packages after ok=True and made the UI lie.
+        pkgs: list[dict[str, Any]] = []
+        for p in job.get("packages") or []:
+            st = str(p.get("status") or STATUS_PENDING).strip().lower()
+            if st in (STATUS_PENDING, STATUS_UPLOADING):
+                pkgs.append(
+                    progress_transition(
+                        p,
+                        status=STATUS_ERROR,
+                        progress=int(p.get("progress") or 0),
+                    )
+                )
+            else:
+                pkgs.append(p)
+        job["packages"] = pkgs
+        job["done_count"] = sum(
+            1 for p in pkgs if p.get("status") in (STATUS_DONE, STATUS_SKIPPED)
+        )
 
 
 def start_push_job(
