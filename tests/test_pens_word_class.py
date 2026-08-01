@@ -121,6 +121,64 @@ class TestPensEditOps(unittest.TestCase):
         self.assertNotIn("tail", ed.document.plain_text())
         self.assertTrue(ed.undo())  # undo delete
 
+    def test_undo_mutates_shared_document_instance(self) -> None:
+        """Caller-held Document must reflect undo (no rebind to new object)."""
+        from rpoffice.word import DocumentEditor, create_document
+
+        doc = create_document("Shared", "before")
+        ed = DocumentEditor(doc)
+        self.assertIs(ed.document, doc)
+        ed.add_paragraph("after-edit")
+        self.assertIn("after-edit", doc.plain_text())
+        self.assertIs(ed.document, doc)
+        self.assertTrue(ed.undo())
+        self.assertIs(ed.document, doc)
+        self.assertNotIn("after-edit", doc.plain_text())
+        self.assertNotIn("after-edit", ed.document.plain_text())
+        # save on original ref matches editor view
+        with tempfile.TemporaryDirectory() as td:
+            path = Path(td) / "shared.pens.json"
+            doc.save(path)
+            text = path.read_text(encoding="utf-8")
+            self.assertNotIn("after-edit", text)
+        self.assertTrue(ed.redo())
+        self.assertIs(ed.document, doc)
+        self.assertIn("after-edit", doc.plain_text())
+
+    def test_replace_preserves_multi_run_formatting(self) -> None:
+        """replace_all must not collapse runs or drop bold/italic on neighbors."""
+        from rpoffice.word import (
+            Block,
+            CharFormat,
+            DocumentEditor,
+            Paragraph,
+            Run,
+            create_document,
+        )
+
+        doc = create_document("Fmt")
+        para = Paragraph(
+            runs=[
+                Run("Hello ", format=CharFormat(bold=True)),
+                Run("world", format=CharFormat(italic=True)),
+                Run(" end", format=CharFormat(underline=True)),
+            ]
+        )
+        doc.blocks = [Block.paragraph_block(para)]
+        ed = DocumentEditor(doc)
+        n = ed.replace_all("world", "Earth")
+        self.assertEqual(n, 1)
+        runs = ed.document.paragraphs[0].runs
+        self.assertEqual(len(runs), 3)
+        self.assertEqual(runs[0].text, "Hello ")
+        self.assertTrue(runs[0].format.bold)
+        self.assertFalse(runs[0].format.italic)
+        self.assertEqual(runs[1].text, "Earth")
+        self.assertTrue(runs[1].format.italic)
+        self.assertFalse(runs[1].format.bold)
+        self.assertEqual(runs[2].text, " end")
+        self.assertTrue(runs[2].format.underline)
+
 
 class TestPensEntry(unittest.TestCase):
     def test_smoke_and_cli(self) -> None:

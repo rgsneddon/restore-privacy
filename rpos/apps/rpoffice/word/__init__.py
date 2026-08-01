@@ -122,8 +122,39 @@ class Paragraph:
 
     @text.setter
     def text(self, value: str) -> None:
+        """Replace entire paragraph plain text (collapses runs — prefer replace_in_runs)."""
         fmt = self.runs[0].format if self.runs else CharFormat()
         self.runs = [Run(text=str(value), format=copy.deepcopy(fmt))]
+
+    def replace_in_runs(
+        self,
+        needle: str,
+        replacement: str,
+        *,
+        case_sensitive: bool = True,
+    ) -> int:
+        """Replace *needle* inside each run, preserving that run's CharFormat.
+
+        Does not merge/split across run boundaries (keeps per-run bold/italic).
+        Returns number of replacements.
+        """
+        if not needle:
+            return 0
+        count = 0
+        if case_sensitive:
+            for r in self.runs:
+                n = r.text.count(needle)
+                if n:
+                    r.text = r.text.replace(needle, replacement)
+                    count += n
+        else:
+            pattern = re.compile(re.escape(needle), re.IGNORECASE)
+            for r in self.runs:
+                new, n = pattern.subn(replacement, r.text)
+                if n:
+                    r.text = new
+                    count += n
+        return count
 
     @classmethod
     def from_text(
@@ -523,37 +554,39 @@ class Document:
         *,
         case_sensitive: bool = True,
     ) -> int:
-        """Replace all occurrences in paragraphs and table cells. Returns count."""
+        """Replace all occurrences in paragraphs and table cells. Returns count.
+
+        Uses per-run replacement so bold/italic/underline on other runs survive.
+        """
         if not needle:
             return 0
         count = 0
-        if case_sensitive:
-            def repl_text(t: str) -> tuple[str, int]:
-                n = t.count(needle)
-                return t.replace(needle, replacement), n
-        else:
-            pattern = re.compile(re.escape(needle), re.IGNORECASE)
-
-            def repl_text(t: str) -> tuple[str, int]:
-                new, n = pattern.subn(replacement, t)
-                return new, n
-
         for b in self.blocks:
             if b.kind == "paragraph" and b.paragraph is not None:
-                old = b.paragraph.text
-                new, n = repl_text(old)
-                if n:
-                    b.paragraph.text = new
-                    count += n
+                count += b.paragraph.replace_in_runs(
+                    needle, replacement, case_sensitive=case_sensitive
+                )
             elif b.kind == "table" and b.table is not None:
                 for row in b.table.rows:
                     for cell in row:
-                        old = cell.text
-                        new, n = repl_text(old)
-                        if n:
-                            cell.set_text(new)
-                            count += n
+                        for p in cell.paragraphs:
+                            count += p.replace_in_runs(
+                                needle, replacement, case_sensitive=case_sensitive
+                            )
         return count
+
+    def restore_snapshot(self, raw: str) -> None:
+        """Reload document state *in place* from dumps() JSON (shared identity).
+
+        Callers holding a reference to this Document see undo/redo results
+        without rebinding to a new instance.
+        """
+        other = Document.loads(raw)
+        self.title = other.title
+        self.blocks = other.blocks
+        self.styles = other.styles
+        self.doc_id = other.doc_id
+        self.schema_version = other.schema_version
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -637,7 +670,8 @@ class DocumentEditor:
             return False
         self._redo.append(self.document.dumps())
         raw = self._undo.pop()
-        self.document = Document.loads(raw)
+        # Mutate the same Document instance so caller-held refs stay in sync.
+        self.document.restore_snapshot(raw)
         return True
 
     def redo(self) -> bool:
@@ -645,7 +679,7 @@ class DocumentEditor:
             return False
         self._undo.append(self.document.dumps())
         raw = self._redo.pop()
-        self.document = Document.loads(raw)
+        self.document.restore_snapshot(raw)
         return True
 
     def add_paragraph(self, text: str, **kwargs: Any) -> Paragraph:
