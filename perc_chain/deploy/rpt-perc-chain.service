@@ -1,8 +1,10 @@
 [Unit]
 Description=Restore Privacy Suite perc_chain internet node (Helsinki)
+Documentation=file:///opt/restore-privacy/perc_chain/DEPLOY_HELSINKI.md
 After=network-online.target
 Wants=network-online.target
 # evolve-perc-internet (Render) is paused to save money; this unit is the default.
+# Starts on multi-user boot and reloads durable PERC_DATA_DIR (not a fresh genesis).
 
 [Service]
 Type=simple
@@ -13,9 +15,13 @@ Environment=PORT=9478
 Environment=PERC_DATA_DIR=/opt/restore-privacy/perc_chain/data
 Environment=PERC_PUBLIC_ENDPOINT=https://135.181.152.10.sslip.io/perc
 Environment=PERC_BIND_HOST=127.0.0.1
+# Durable ledger dir — seed_ledger.json resumes tip/height after reboot.
+ExecStartPre=/bin/mkdir -p /opt/restore-privacy/perc_chain/data
 ExecStart=/usr/bin/node src/internet_node.js
-Restart=on-failure
+# always: recover after crash *and* clean exit so chain comes back after host reboot paths.
+Restart=always
 RestartSec=5
+StartLimitIntervalSec=0
 LimitNOFILE=65535
 
 [Install]

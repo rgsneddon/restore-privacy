@@ -222,21 +222,38 @@ def upload_and_install(tarball: Path, install_service: bool) -> None:
     scp.extend([str(tarball), f"{user}@{host}:{remote_tar}"])
     print("scp:", " ".join(scp))
     subprocess.check_call(scp)
+    # Extract package sources without wiping durable ledger under data/.
+    # Tarball has no data/ entries; never rm -rf data or the chain restarts from genesis.
     remote_cmds = [
         f"mkdir -p {DEFAULT_REMOTE_ROOT}",
+        f"mkdir -p {DEFAULT_REMOTE_ROOT}/data",
+        # Snapshot ledger path before extract (safety if a future package ships data/)
+        f"if [ -f {DEFAULT_REMOTE_ROOT}/data/seed_ledger.json ]; then "
+        f"cp -a {DEFAULT_REMOTE_ROOT}/data/seed_ledger.json "
+        f"{DEFAULT_REMOTE_ROOT}/data/seed_ledger.json.pre_deploy; fi",
         f"tar -xzf {remote_tar} -C /opt/restore-privacy --strip-components=0",
-        # tarball arcname is perc_chain/ → lands at /opt/restore-privacy/perc_chain
+        # Restore durable ledger if extract ever clobbered it
+        f"if [ ! -s {DEFAULT_REMOTE_ROOT}/data/seed_ledger.json ] && "
+        f"[ -s {DEFAULT_REMOTE_ROOT}/data/seed_ledger.json.pre_deploy ]; then "
+        f"mv -f {DEFAULT_REMOTE_ROOT}/data/seed_ledger.json.pre_deploy "
+        f"{DEFAULT_REMOTE_ROOT}/data/seed_ledger.json; fi",
         f"mkdir -p {DEFAULT_REMOTE_ROOT}/data",
         f"cd {DEFAULT_REMOTE_ROOT} && (test -f package-lock.json && npm ci --omit=dev || npm install --omit=dev)",
-        f"cp -f {DEFAULT_REMOTE_ROOT}/helsinki.env {DEFAULT_REMOTE_ROOT}/helsinki.env 2>/dev/null || true",
+        f"test -f {DEFAULT_REMOTE_ROOT}/helsinki.env || true",
     ]
     if install_service:
         remote_cmds.extend(
             [
                 f"cp -f {DEFAULT_REMOTE_ROOT}/deploy/rpt-perc-chain.service /etc/systemd/system/{UNIT_NAME}",
                 "systemctl daemon-reload",
-                f"systemctl enable --now {UNIT_NAME}",
+                f"systemctl enable {UNIT_NAME}",
+                # Ensure suite store + reverse proxy also boot with the host.
+                "systemctl enable nginx.service 2>/dev/null || true",
+                "systemctl enable rpt-paid-assets.service 2>/dev/null || true",
+                f"systemctl restart {UNIT_NAME}",
                 f"systemctl --no-pager --full status {UNIT_NAME} || true",
+                f"systemctl is-enabled {UNIT_NAME}",
+                f"systemctl is-active {UNIT_NAME}",
                 f"curl -fsS {DEFAULT_PUBLIC_ENDPOINT}/health || curl -fsS http://127.0.0.1:{DEFAULT_PORT}/health || true",
             ]
         )
