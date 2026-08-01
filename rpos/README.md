@@ -5,17 +5,15 @@ Commercial privacy-focused OS product (**£3000** deposit path via Restore Priva
 ## Positioning
 
 rpOS is a **privacy-first operating system** SDK surface for commercial deployment.
-Bundled app surfaces (built per customer requirements):
+**Free bundled apps** (Desktop launchers after install):
 
-- Database creator
-- Word Processor
-- Spreadsheet
-- Email client (SMTP / IMAP / POP3 import; company emails by **moderator only**)
-- Private Browser (**Rx**) with free basic **IPv4-only** VPN extension posture
-- VPN
-- **Evolve** game with rewards tokens
+| Brand | Role | Package |
+|-------|------|---------|
+| **Pens** | Documents | `pens-*-installer.zip` |
+| **Tables** | Spreadsheets | `tables-*-installer.zip` |
+| **Slides** | Presentations | `slides-*-installer.zip` |
 
-Moderator / governance surface: **MISHI** (GUI whitewash for every function as SDK).
+Also: Database creator · Email (**rpMail**) · Private Browser (**Rx**) · VPN · **Evolve** · **MISHI** moderator GUI.
 
 ## Installable platforms (desktop only)
 
@@ -29,53 +27,37 @@ Moderator / governance surface: **MISHI** (GUI whitewash for every function as S
 ```bash
 # From restore-privacy monorepo
 python3 scripts/package_rpos.py
+python3 scripts/package_pts_apps.py   # Pens / Tables / Slides free installers
 ```
 
 **Not installable:** iOS, Android.
 
 ## Install story (honest)
 
-### Single-click RESTORE (IMPERATIVE product path)
+### Single-click RESTORE
 
-Primary control after extraction: **`RESTORE_rpOS`** (Unix) or **`RESTORE_rpOS.cmd`**
-(Windows). Flow:
+Primary control: **`RESTORE_rpOS`** (Unix) or **`RESTORE_rpOS.cmd`** (Windows).
 
 1. **Advisories** — BE CAREFUL · IRREVERSIBLE · DATA LOSS  
-2. **Gate** — type exact `RESTORE` or abort (no wipe, no install)  
-3. **Wipe intent** — absolute format/remove-all intent; default adapter is **dry-run**  
-4. **Install** — rpOS foundation from scratch  
-5. **Ned** — guides timezone → language → email bound to **rpMail**
+2. **Gate** — type exact `RESTORE` or abort  
+3. **Wipe intent** — absolute format intent; default **dry-run**  
+4. **Install** — foundation + free **Pens · Tables · Slides** → **user Desktop** launchers  
+5. **Ned OOBE** — timezone → language → email → **rpMail**  
+6. **Ned locked guide** — **Pens → Tables → Slides** before full OS unlock  
+
+Full utilisation stays **locked** until Ned finishes showing all three Desktop apps.
 
 ```bash
 python3 -m rpos.installer smoke   # safe dry-run of full path
+python3 -m rpos.installer apps-tour --prefix ~/.rpos/install --auto
 ```
-
-Silent wipe without advisories is **not** shipped.
 
 ## Repositories
 
-- Private GitHub: `rgsneddon/rpOS` (this product line)
-- Suite monorepo companion: `restore-privacy` (catalog, admin deploy how-to)
-
-## Docs
-
-| File | Role |
-|------|------|
-| [LICENSE](LICENSE) | MIT |
-| [PRIVACY_POLICY.md](PRIVACY_POLICY.md) | Privacy policy |
-| [security/AUDIT.md](security/AUDIT.md) | Security audit (also Rx browser homepage content) |
-| [docs/DEPLOY.md](docs/DEPLOY.md) | Deploy how-to (mirror of admin-only status host page) |
-| [sdk/](sdk/) | MISHI + app SDK whitewash scaffolds |
+- Private GitHub: `rgsneddon/rpOS`
+- Suite monorepo: `restore-privacy`
+- Office apps: `rgsneddon/rpOffice` (**Pens · Tables · Slides**)
 
 ## Licence
 
 MIT — see [LICENSE](LICENSE).
-
-## Companion private app repos
-
-| Product | Repo |
-|---------|------|
-| rpMail | https://github.com/rgsneddon/rpMail |
-| rpOffice | https://github.com/rgsneddon/rpOffice |
-| MISHI GUI | https://github.com/rgsneddon/mishi |
-

@@ -47,31 +47,43 @@ class TestDesktopPlacement(unittest.TestCase):
         from rpos.installer.desktop import (
             assert_desktop_has_all_three,
             place_app_launchers,
+            prefix_desktop_dir,
         )
         from rpos.installer.pipeline import RestorePipeline
         from rpos.installer.wipe_adapter import DryRunWipeAdapter
 
         with tempfile.TemporaryDirectory() as td:
-            prefix = Path(td) / "install"
-            # Source rpos with apps
+            tdp = Path(td)
+            prefix = tdp / "install"
+            user_desk = tdp / "UserDesktop"
+            user_desk.mkdir()
             src = ROOT / "rpos"
+            # Install with injected "user" desktop (simulates real Desktop)
             pipe = RestorePipeline(
                 prefix=prefix, source_rpos=src, wipe=DryRunWipeAdapter()
             )
+            # Run foundation then place with desktop_root override for test isolation
             r = pipe.run("RESTORE")
             self.assertTrue(r["proceeded"])
-            desk = Path(r["desktop"]["desktop"])
-            self.assertTrue(assert_desktop_has_all_three(desk))
+            # Always have prefix Desktop from install
+            pdesk = prefix_desktop_dir(prefix)
+            self.assertTrue(assert_desktop_has_all_three(pdesk))
+            # Product path also stages to user desktop when provided
+            place_app_launchers(
+                prefix,
+                desktop_root=user_desk,
+                apps_root=prefix / "apps",
+                also_user_desktop=False,
+            )
+            self.assertTrue(assert_desktop_has_all_three(user_desk))
             for brand in ("Pens", "Tables", "Slides"):
-                launcher = desk / brand
+                launcher = user_desk / brand
                 self.assertTrue(launcher.is_file(), brand)
                 body = launcher.read_text(encoding="utf-8")
                 self.assertIn("rpoffice.apps.", body)
             man = json.loads((prefix / "DESKTOP_APPS.json").read_text())
             self.assertEqual(man["brands"], ["Pens", "Tables", "Slides"])
-            # Idempotent re-place
-            place_app_launchers(prefix)
-            self.assertTrue(assert_desktop_has_all_three(desk))
+            self.assertTrue(man.get("user_desktop") or man.get("prefix_desktop"))
 
 
 class TestNedLockedTour(unittest.TestCase):

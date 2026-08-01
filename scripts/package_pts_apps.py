@@ -83,17 +83,32 @@ def _stage_one(app: dict[str, str], stage: Path) -> None:
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")" && pwd)"
 PREFIX="${{RPOS_PREFIX:-$HOME/.rpos/install}}"
-DESKTOP="${{RPOS_DESKTOP:-$PREFIX/Desktop}}"
-mkdir -p "$PREFIX/apps" "$DESKTOP"
+# Real user Desktop by default (immediate discovery); also stage under prefix/Desktop
+if [[ -n "${{RPOS_DESKTOP:-}}" ]]; then
+  DESKTOP="$RPOS_DESKTOP"
+elif [[ -n "${{XDG_DESKTOP_DIR:-}}" ]]; then
+  DESKTOP="$XDG_DESKTOP_DIR"
+elif [[ -d "$HOME/Desktop" ]]; then
+  DESKTOP="$HOME/Desktop"
+else
+  DESKTOP="$HOME/Desktop"
+fi
+PREFIX_DESKTOP="$PREFIX/Desktop"
+mkdir -p "$PREFIX/apps" "$DESKTOP" "$PREFIX_DESKTOP"
 cp -a "$ROOT/apps/." "$PREFIX/apps/"
 export PYTHONPATH="$PREFIX/apps${{PYTHONPATH:+:$PYTHONPATH}}"
-cat > "$DESKTOP/{app["brand"]}" <<LAUNCH
+_write_launcher() {{
+  local dest="$1"
+  cat > "$dest" <<LAUNCH
 #!/usr/bin/env bash
 export PYTHONPATH="$PREFIX/apps${{PYTHONPATH:+:$PYTHONPATH}}"
 exec python3 -m {app["module"]} "$@"
 LAUNCH
-chmod +x "$DESKTOP/{app["brand"]}"
-echo "[install] {app["brand"]} launcher → $DESKTOP/{app["brand"]}"
+  chmod +x "$dest"
+}}
+_write_launcher "$DESKTOP/{app["brand"]}"
+_write_launcher "$PREFIX_DESKTOP/{app["brand"]}"
+echo "[install] {app["brand"]} → $DESKTOP/{app["brand"]} (and $PREFIX_DESKTOP/)"
 python3 -m {app["module"]} --version || true
 ''',
         encoding="utf-8",
@@ -103,17 +118,23 @@ python3 -m {app["module"]} --version || true
         f'''$ErrorActionPreference = "Stop"
 $Root = Split-Path -Parent $MyInvocation.MyCommand.Path
 $Prefix = if ($env:RPOS_PREFIX) {{ $env:RPOS_PREFIX }} else {{ Join-Path $env:USERPROFILE ".rpos\\install" }}
-$Desktop = if ($env:RPOS_DESKTOP) {{ $env:RPOS_DESKTOP }} else {{ Join-Path $Prefix "Desktop" }}
+# Real user Desktop by default
+if ($env:RPOS_DESKTOP) {{ $Desktop = $env:RPOS_DESKTOP }}
+elseif (Test-Path (Join-Path $env:USERPROFILE "Desktop")) {{ $Desktop = Join-Path $env:USERPROFILE "Desktop" }}
+else {{ $Desktop = Join-Path $env:USERPROFILE "Desktop" }}
+$PrefixDesktop = Join-Path $Prefix "Desktop"
 New-Item -ItemType Directory -Force -Path (Join-Path $Prefix "apps") | Out-Null
 New-Item -ItemType Directory -Force -Path $Desktop | Out-Null
+New-Item -ItemType Directory -Force -Path $PrefixDesktop | Out-Null
 Copy-Item -Recurse -Force (Join-Path $Root "apps\\*") (Join-Path $Prefix "apps")
-$Launcher = Join-Path $Desktop "{app["brand"]}.cmd"
-@"
+$Body = @"
 @echo off
 set PYTHONPATH=$Prefix\\apps;%PYTHONPATH%
 python -m {app["module"]} %*
-"@ | Set-Content -Path $Launcher -Encoding ASCII
-Write-Host "[install] {app["brand"]} launcher → $Launcher"
+"@
+$Body | Set-Content -Path (Join-Path $Desktop "{app["brand"]}.cmd") -Encoding ASCII
+$Body | Set-Content -Path (Join-Path $PrefixDesktop "{app["brand"]}.cmd") -Encoding ASCII
+Write-Host "[install] {app["brand"]} → $Desktop\\{app["brand"]}.cmd"
 ''',
         encoding="utf-8",
     )
