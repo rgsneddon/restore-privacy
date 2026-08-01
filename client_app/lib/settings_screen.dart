@@ -16,7 +16,10 @@ import 'registration_copy.dart';
 import 'rpt_config.dart';
 import 'breadcrumbs_check.dart';
 import 'settings_store.dart';
+import 'suite_parts.dart';
+import 'suite_parts_store.dart';
 import 'suite_update.dart';
+import 'suite_usage.dart';
 import 'theme.dart';
 import 'transparency_copy.dart';
 
@@ -52,6 +55,11 @@ class SettingsScreen extends StatefulWidget {
     this.residualCaptureActive = false,
     this.ipv6Protected = false,
     this.residualConnected = false,
+    this.partsStore,
+    this.initialParts,
+    this.onPartsChanged,
+    this.usageReporter,
+    this.initialUsage,
   });
 
   final SettingsStore store;
@@ -69,6 +77,17 @@ class SettingsScreen extends StatefulWidget {
 
   /// True when residual tunnel is active (for multihop reconnect messaging).
   final bool residualConnected;
+
+  /// Optional Suite parts install store (remove/retain % · EVOLVE · rpAI).
+  final SuitePartsStore? partsStore;
+  final SuitePartsState? initialParts;
+  final ValueChanged<SuitePartsState>? onPartsChanged;
+
+  /// Disk + process usage probes (injectable for tests).
+  final SuiteUsageReporter? usageReporter;
+
+  /// Optional initial usage snapshot (tests / prefetched).
+  final SuiteUsageSnapshot? initialUsage;
 
   @override
   State<SettingsScreen> createState() => _SettingsScreenState();
@@ -89,18 +108,84 @@ class _SettingsScreenState extends State<SettingsScreen> {
   String _entryPing = '…';
   String _exitPing = '…';
   bool _pingBusy = false;
+  SuitePartsState _parts = SuitePartsState.allInstalled;
+  SuitePartsStore? _partsStore;
+  String _diskUsageText = '…';
+  String _processUsageText = '…';
+  bool _usageBusy = false;
 
   @override
   void initState() {
     super.initState();
     _settings = widget.initial;
     _log = widget.connectionLog;
+    _parts = widget.initialParts ?? SuitePartsState.allInstalled;
+    _partsStore = widget.partsStore;
+    final seed = widget.initialUsage;
+    if (seed != null) {
+      _diskUsageText = formatSuiteDiskUsage(seed.diskBytes);
+      _processUsageText = formatSuiteProcessPercent(seed.processPercent);
+    }
     RptConfig.setRuntimeMultiHop(_settings.privacyMultihop);
     WidgetsBinding.instance.addPostFrameCallback((_) async {
       await _ensureLog();
       await _refreshLicenceAndPayment();
       await _refreshPings();
+      await _loadParts();
+      await _refreshUsage();
     });
+  }
+
+  Future<void> _loadParts() async {
+    final store = _partsStore;
+    if (store == null) return;
+    final loaded = await store.load();
+    if (!mounted) return;
+    setState(() => _parts = loaded);
+  }
+
+  Future<void> _setPartInstalled(SuitePartId id, bool installed) async {
+    if (!suitePartIsRemovable(id)) return;
+    setState(() => _busy = true);
+    final store = _partsStore;
+    SuitePartsState next;
+    if (store != null) {
+      next = await store.setInstalled(id, installed);
+    } else {
+      next = applySuitePartInstall(_parts, id: id, installed: installed);
+    }
+    if (!mounted) return;
+    setState(() {
+      _parts = next;
+      _busy = false;
+      _note = installed
+          ? '${suitePartLabel(id)} kept installed.'
+          : '${suitePartLabel(id)} removed from this install.';
+    });
+    widget.onPartsChanged?.call(next);
+  }
+
+  Future<void> _refreshUsage() async {
+    if (_usageBusy) return;
+    setState(() => _usageBusy = true);
+    try {
+      final reporter = widget.usageReporter ?? SuiteUsageReporter();
+      final snap = await reporter.measure();
+      if (!mounted) return;
+      setState(() {
+        _diskUsageText = formatSuiteDiskUsage(snap.diskBytes);
+        _processUsageText = formatSuiteProcessPercent(snap.processPercent);
+      });
+    } catch (_) {
+      if (mounted) {
+        setState(() {
+          _diskUsageText = 'n/a';
+          _processUsageText = 'n/a';
+        });
+      }
+    } finally {
+      if (mounted) setState(() => _usageBusy = false);
+    }
   }
 
   @override
@@ -492,6 +577,41 @@ class _SettingsScreenState extends State<SettingsScreen> {
     );
   }
 
+  Widget _buildPartTile(SuitePartSpec part) {
+    final installed = _parts.isInstalled(part.id);
+    final keyBase = 'suite_part_${part.id.name}';
+    if (!part.removable) {
+      return ListTile(
+        key: Key(keyBase),
+        title: Text(
+          part.label,
+          style: const TextStyle(fontWeight: FontWeight.w600),
+        ),
+        subtitle: const Text(kSuitePartVpnRequiredLabel),
+        trailing: const Text(
+          kSuitePartInstalledLabel,
+          style: TextStyle(fontWeight: FontWeight.w700, color: kPrimary),
+        ),
+      );
+    }
+    return SwitchListTile(
+      key: Key(keyBase),
+      title: Text(
+        part.label,
+        style: const TextStyle(fontWeight: FontWeight.w600),
+      ),
+      subtitle: Text(
+        installed ? kSuitePartInstalledLabel : kSuitePartRemovedLabel,
+      ),
+      value: installed,
+      activeThumbColor: kWhite,
+      activeTrackColor: kPrimary,
+      onChanged: _busy
+          ? null
+          : (v) => _setPartInstalled(part.id, v),
+    );
+  }
+
   Future<void> runLeakTest() async {
     // Prefer live residual flags from parent; fall back to native status.
     var residual = widget.residualCaptureActive;
@@ -602,6 +722,98 @@ class _SettingsScreenState extends State<SettingsScreen> {
             'unpack until you allow it. Unpacking still requires your click on the '
             'VPN main screen ($kSuiteUpdateUnpackButtonLabel).',
             style: TextStyle(color: kTextMuted, fontSize: 12),
+          ),
+          const SizedBox(height: 20),
+          Text(
+            kSuitePartsSettingsTitle,
+            key: const Key('suite_parts_section_title'),
+            style: TextStyle(
+              color: kPrimaryDark,
+              fontSize: 14,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            kSuitePartsSettingsSubtitle,
+            style: TextStyle(color: kTextMuted, fontSize: 12),
+          ),
+          const SizedBox(height: 10),
+          Material(
+            key: const Key('suite_parts_panel'),
+            color: kPanelBg,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(kCornerRadius),
+              side: const BorderSide(color: kBorder),
+            ),
+            clipBehavior: Clip.antiAlias,
+            child: Column(
+              children: [
+                for (var i = 0; i < kSuitePartCatalog.length; i++) ...[
+                  if (i > 0) const Divider(height: 1),
+                  _buildPartTile(kSuitePartCatalog[i]),
+                ],
+              ],
+            ),
+          ),
+          const SizedBox(height: 20),
+          Text(
+            kSuiteUsageNotifierTitle,
+            key: const Key('suite_usage_section_title'),
+            style: TextStyle(
+              color: kPrimaryDark,
+              fontSize: 14,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+          const SizedBox(height: 6),
+          Material(
+            key: const Key('suite_usage_panel'),
+            color: kPanelBg,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(kCornerRadius),
+              side: const BorderSide(color: kBorder),
+            ),
+            clipBehavior: Clip.antiAlias,
+            child: Column(
+              children: [
+                ListTile(
+                  key: const Key(kSuiteUsageDiskKey),
+                  title: const Text(
+                    kSuiteUsageDiskLabel,
+                    style: TextStyle(fontWeight: FontWeight.w600),
+                  ),
+                  subtitle: Text(
+                    _diskUsageText,
+                    style: const TextStyle(fontSize: 13),
+                  ),
+                  trailing: _usageBusy
+                      ? const SizedBox(
+                          width: 18,
+                          height: 18,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : IconButton(
+                          key: const Key('suite_usage_refresh'),
+                          tooltip: 'Refresh usage',
+                          onPressed: _busy ? null : _refreshUsage,
+                          icon: const Icon(Icons.refresh),
+                        ),
+                ),
+                const Divider(height: 1),
+                ListTile(
+                  key: const Key(kSuiteUsageProcessKey),
+                  title: const Text(
+                    kSuiteUsageProcessLabel,
+                    style: TextStyle(fontWeight: FontWeight.w600),
+                  ),
+                  subtitle: Text(
+                    '$_processUsageText of process capacity',
+                    style: const TextStyle(fontSize: 13),
+                  ),
+                ),
+              ],
+            ),
           ),
           const SizedBox(height: 20),
           // Website-equivalent fleet wipe clock (read-only Settings window).

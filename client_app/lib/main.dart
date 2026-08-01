@@ -21,6 +21,8 @@ import 'settings_screen.dart';
 import 'settings_store.dart';
 import 'suite_account.dart';
 import 'suite_account_prompt.dart';
+import 'suite_parts.dart';
+import 'suite_parts_store.dart';
 import 'suite_shell.dart';
 import 'suite_update.dart';
 import 'suite_update_panel.dart';
@@ -48,7 +50,7 @@ void main() {
   runApp(const RestorePrivacyApp());
 }
 
-class RestorePrivacyApp extends StatelessWidget {
+class RestorePrivacyApp extends StatefulWidget {
   const RestorePrivacyApp({
     super.key,
     this.home,
@@ -58,8 +60,11 @@ class RestorePrivacyApp extends StatelessWidget {
     this.onQuitExit,
     this.walletTab,
     this.evolveTab,
+    this.rpaiTab,
     this.initialTabIndex = 0,
     this.entryInitiallyUnlocked,
+    this.partsStore,
+    this.initialParts,
   });
 
   /// Injectable full home override (tests); else gated [SuiteShell].
@@ -71,23 +76,54 @@ class RestorePrivacyApp extends StatelessWidget {
   final void Function()? onQuitExit;
   final Widget? walletTab;
   final Widget? evolveTab;
+  final Widget? rpaiTab;
   final int initialTabIndex;
 
   /// When set, skips async entry unlock check (widget tests).
   final bool? entryInitiallyUnlocked;
 
+  final SuitePartsStore? partsStore;
+  final SuitePartsState? initialParts;
+
+  @override
+  State<RestorePrivacyApp> createState() => _RestorePrivacyAppState();
+}
+
+class _RestorePrivacyAppState extends State<RestorePrivacyApp> {
+  final GlobalKey<SuiteShellState> _shellKey = GlobalKey<SuiteShellState>();
+  late SuitePartsState _parts;
+
+  @override
+  void initState() {
+    super.initState();
+    _parts = widget.initialParts ?? SuitePartsState.allInstalled;
+  }
+
+  void _onPartsChanged(SuitePartsState next) {
+    setState(() => _parts = next);
+    _shellKey.currentState?.applyParts(next);
+  }
+
   @override
   Widget build(BuildContext context) {
     final shell = SuiteShell(
-      initialTabIndex: initialTabIndex,
+      key: _shellKey,
+      initialTabIndex: widget.initialTabIndex,
+      initialParts: _parts,
+      partsStore: widget.partsStore,
+      onPartsChanged: _onPartsChanged,
       vpnTab: TunnelHome(
-        settingsStore: settingsStore,
-        licenceGate: licenceGate,
-        vpnController: vpnController,
-        onQuitExit: onQuitExit,
+        settingsStore: widget.settingsStore,
+        licenceGate: widget.licenceGate,
+        vpnController: widget.vpnController,
+        onQuitExit: widget.onQuitExit,
+        partsStore: widget.partsStore,
+        initialParts: _parts,
+        onPartsChanged: _onPartsChanged,
       ),
-      walletTab: walletTab,
-      evolveTab: evolveTab,
+      walletTab: widget.walletTab,
+      evolveTab: widget.evolveTab,
+      rpaiTab: widget.rpaiTab,
     );
     return MaterialApp(
       title: kSuiteProductName,
@@ -105,10 +141,10 @@ class RestorePrivacyApp extends StatelessWidget {
         useMaterial3: true,
       ),
       // All primary entry goes through licence unlock until entitled.
-      home: home ??
+      home: widget.home ??
           AppEntryRoot(
-            licenceGate: licenceGate,
-            initialUnlocked: entryInitiallyUnlocked,
+            licenceGate: widget.licenceGate,
+            initialUnlocked: widget.entryInitiallyUnlocked,
             child: shell,
           ),
     );
@@ -127,6 +163,9 @@ class TunnelHome extends StatefulWidget {
     this.licenceGate,
     this.vpnController,
     this.onQuitExit,
+    this.partsStore,
+    this.initialParts,
+    this.onPartsChanged,
   });
 
   /// Injectable store for tests; production loads SharedPreferences.
@@ -139,6 +178,10 @@ class TunnelHome extends StatefulWidget {
   /// Injectable process exit after tunnel stop (tests); production uses
   /// [exitAppProcess].
   final void Function()? onQuitExit;
+
+  final SuitePartsStore? partsStore;
+  final SuitePartsState? initialParts;
+  final ValueChanged<SuitePartsState>? onPartsChanged;
 
   @override
   State<TunnelHome> createState() => _TunnelHomeState();
@@ -1067,6 +1110,15 @@ class _TunnelHomeState extends State<TunnelHome> with WidgetsBindingObserver {
   Future<void> _openSettings() async {
     final store = _store;
     if (store == null) return;
+    SuitePartsStore? partsStore = widget.partsStore;
+    if (partsStore == null) {
+      try {
+        final prefs = await SharedPreferences.getInstance();
+        partsStore = SuitePartsStore(SharedPreferencesBackend(prefs));
+      } catch (_) {
+        partsStore = SuitePartsStore(MemorySettingsBackend());
+      }
+    }
     final updated = await Navigator.of(context).push<ProductSettings>(
       MaterialPageRoute(
         builder: (_) => SettingsScreen(
@@ -1080,6 +1132,9 @@ class _TunnelHomeState extends State<TunnelHome> with WidgetsBindingObserver {
               (_status.toLowerCase().contains('ipv6 isp path blocked') ||
                   (_settings.residualIpv6 &&
                       !_status.toLowerCase().contains('ipv6 not protected'))),
+          partsStore: partsStore,
+          initialParts: widget.initialParts,
+          onPartsChanged: widget.onPartsChanged,
           onLicenceChanged: (accepted) {
             if (mounted) setState(() => _licenceAccepted = accepted);
           },
