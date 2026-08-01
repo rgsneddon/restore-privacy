@@ -1,10 +1,8 @@
 #!/usr/bin/env bash
-# Single-click RESTORE entry (Unix) — advisories then confirm then dry-run wipe + install.
+# Single-click RESTORE entry (Unix) — advisories, confirm, dry-run wipe, install, Ned interactive OOBE.
 set -euo pipefail
-ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
-# When shipped inside package: stage_top/RESTORE_click.sh or bin/
 PKG="$(cd "$(dirname "$0")" && pwd)"
-# Prefer package root (parent of bin/ or installer/)
+# Package root may be this dir (RESTORE_click at root) or installer/ subdir
 if [[ -d "$PKG/rpos/installer" ]]; then
   BASE="$PKG"
 elif [[ -d "$PKG/../rpos/installer" ]]; then
@@ -12,16 +10,16 @@ elif [[ -d "$PKG/../rpos/installer" ]]; then
 elif [[ -d "$PKG/../../rpos/installer" ]]; then
   BASE="$(cd "$PKG/../.." && pwd)"
 else
-  BASE="$ROOT"
+  BASE="$PKG"
 fi
 export PYTHONPATH="${BASE}${PYTHONPATH:+:$PYTHONPATH}"
 cd "$BASE"
-echo "Launching Ned-aware RESTORE path..."
+PREFIX="${RPOS_PREFIX:-$HOME/.rpos/install}"
+echo "Launching Ned-aware RESTORE path (prefix=$PREFIX)..."
 python3 -m rpos.installer advisories
 echo ""
-echo "Type RESTORE to confirm absolute wipe intent + install (or Ctrl-C):"
-read -r CONFIRM
-python3 -m rpos.installer restore --yes-advisories --confirm "$CONFIRM"
+read -r -p "Type RESTORE to confirm absolute wipe intent: " CONFIRM
+python3 -m rpos.installer restore --yes-advisories --confirm "$CONFIRM" --prefix "$PREFIX"
 echo ""
-echo "Ned will guide first setup (timezone, language, rpMail email)."
-python3 -m rpos.installer oobe --smoke
+echo "Ned will guide first setup — timezone, language, then your rpMail email."
+python3 -m rpos.installer oobe --prefix "$PREFIX"

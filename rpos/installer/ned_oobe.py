@@ -126,12 +126,100 @@ class NedOobe:
         return cls(st)
 
 
+def oobe_state_path(prefix: Path) -> Path:
+    """Canonical OOBE/rpMail prefs path under an install prefix."""
+    return Path(prefix) / "oobe_state.json"
+
+
+def install_marker_path(prefix: Path) -> Path:
+    return Path(prefix) / "RPOS_INSTALLED.json"
+
+
+def mark_oobe_complete_on_prefix(prefix: Path, oobe_payload: dict[str, Any]) -> dict[str, Any]:
+    """Persist OOBE under *prefix* and clear oobe_pending on RPOS_INSTALLED.json."""
+    prefix = Path(prefix)
+    prefix.mkdir(parents=True, exist_ok=True)
+    state_path = oobe_state_path(prefix)
+    state_path.write_text(
+        json.dumps(oobe_payload, indent=2) + "\n", encoding="utf-8"
+    )
+    marker = install_marker_path(prefix)
+    if marker.is_file():
+        try:
+            data = json.loads(marker.read_text(encoding="utf-8"))
+        except json.JSONDecodeError:
+            data = {"product": "rpOS"}
+    else:
+        data = {
+            "product": "rpOS",
+            "installed_unix": int(time.time()),
+            "from_scratch": True,
+        }
+    data["oobe_pending"] = False
+    data["oobe_completed_unix"] = int(time.time())
+    data["timezone"] = oobe_payload.get("timezone") or ""
+    data["language"] = oobe_payload.get("language") or ""
+    data["rpmail"] = oobe_payload.get("rpmail")
+    data["oobe_state"] = str(state_path)
+    marker.write_text(json.dumps(data, indent=2) + "\n", encoding="utf-8")
+    return data
+
+
+def _finish_oobe(
+    oobe: NedOobe,
+    steps_out: list[dict[str, Any]],
+    *,
+    persist_path: Path | None = None,
+    prefix: Path | None = None,
+) -> dict[str, Any]:
+    assert oobe.state.completed
+    rpmail = oobe.bind_rpmail()
+    payload = {
+        "ok": True,
+        "mode": "interactive" if any(
+            s.get("interactive") for s in steps_out
+        ) else "scripted",
+        "ned": NED_LINES["complete"],
+        "timezone": oobe.state.timezone,
+        "language": oobe.state.language,
+        "email": oobe.state.email,
+        "rpmail": rpmail,
+        "ned_log": list(oobe.state.ned_log),
+        "steps": steps_out,
+        "persisted": None,
+        "prefix": str(prefix) if prefix else None,
+        "oobe_pending": True,
+    }
+    # Prefer install prefix binding when provided
+    if prefix is not None:
+        # Also write full payload for reload
+        full = {
+            "oobe": oobe.state.to_dict(),
+            "rpmail": rpmail,
+            "timezone": oobe.state.timezone,
+            "language": oobe.state.language,
+            "email": oobe.state.email,
+            "ned_log": list(oobe.state.ned_log),
+            "saved_unix": int(time.time()),
+        }
+        mark_oobe_complete_on_prefix(prefix, full)
+        payload["persisted"] = str(oobe_state_path(prefix))
+        payload["oobe_pending"] = False
+        payload["install_marker"] = str(install_marker_path(prefix))
+    elif persist_path is not None:
+        oobe.persist(persist_path)
+        payload["persisted"] = str(persist_path)
+        payload["oobe_pending"] = False
+    return payload
+
+
 def run_oobe_scripted(
     timezone: str,
     language: str,
     email: str,
     *,
     persist_path: Path | None = None,
+    prefix: Path | None = None,
 ) -> dict[str, Any]:
     """Non-interactive OOBE for smoke/tests — still drives real step machine."""
     oobe = NedOobe()
@@ -146,20 +234,63 @@ def run_oobe_scripted(
                 "ned": ned_before,
                 "value": value,
                 "next": oobe.state.step,
+                "interactive": False,
             }
         )
-    assert oobe.state.completed
-    rpmail = oobe.bind_rpmail()
-    if persist_path:
-        oobe.persist(persist_path)
-    return {
-        "ok": True,
-        "ned": NED_LINES["complete"],
-        "timezone": oobe.state.timezone,
-        "language": oobe.state.language,
-        "email": oobe.state.email,
-        "rpmail": rpmail,
-        "ned_log": list(oobe.state.ned_log),
-        "steps": steps_out,
-        "persisted": str(persist_path) if persist_path else None,
+    return _finish_oobe(oobe, steps_out, persist_path=persist_path, prefix=prefix)
+
+
+def run_oobe_interactive(
+    *,
+    persist_path: Path | None = None,
+    prefix: Path | None = None,
+    input_fn=None,
+    print_fn=None,
+) -> dict[str, Any]:
+    """Product OOBE: Ned prints each line; user supplies timezone, language, email.
+
+    *input_fn* / *print_fn* default to builtins so tests can inject fakes.
+    """
+    read = input_fn or input
+    write = print_fn or print
+    oobe = NedOobe()
+    steps_out: list[dict[str, Any]] = []
+    prompts = {
+        "timezone": "Timezone (e.g. Europe/London, America/New_York, UTC): ",
+        "language": "Language (e.g. en-GB, en-US, fr, de): ",
+        "email_rpmail": "Email for rpMail (you@example.com): ",
     }
+    while not oobe.state.completed:
+        step = oobe.state.step
+        ned = oobe.state.current_ned_line()
+        write("")
+        write(f"Ned: {ned}")
+        prompt = prompts.get(step, f"{step}: ")
+        while True:
+            try:
+                value = read(prompt)
+            except EOFError as exc:
+                raise ValueError(f"{step} required") from exc
+            try:
+                oobe.advance(str(value or ""))
+                break
+            except ValueError as exc:
+                write(f"  ({exc}) Please try again.")
+        steps_out.append(
+            {
+                "step": step,
+                "ned": ned,
+                "value": (
+                    oobe.state.timezone
+                    if step == "timezone"
+                    else oobe.state.language
+                    if step == "language"
+                    else oobe.state.email
+                ),
+                "next": oobe.state.step,
+                "interactive": True,
+            }
+        )
+    write("")
+    write(f"Ned: {NED_LINES['complete']}")
+    return _finish_oobe(oobe, steps_out, persist_path=persist_path, prefix=prefix)

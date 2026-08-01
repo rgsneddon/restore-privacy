@@ -226,17 +226,19 @@ def _write_single_click(stage: Path, slot: dict[str, Any]) -> None:
             )
         # Primary one-click name
         (stage / "RESTORE_rpOS.cmd").write_text(
-            f"""@echo off
+            """@echo off
 setlocal
 set ROOT=%~dp0
 set PYTHONPATH=%ROOT%;%PYTHONPATH%
 cd /d "%ROOT%"
+if "%RPOS_PREFIX%"=="" set RPOS_PREFIX=%USERPROFILE%\\.rpos\\install
 echo === RESTORE rpOS single-click (advisories required) ===
 python -m rpos.installer advisories
 set /p CONFIRM=Type RESTORE to confirm absolute wipe intent: 
-python -m rpos.installer restore --yes-advisories --confirm %CONFIRM%
+python -m rpos.installer restore --yes-advisories --confirm %CONFIRM% --prefix "%RPOS_PREFIX%"
 if errorlevel 1 exit /b 1
-python -m rpos.installer oobe --smoke
+echo Ned will guide timezone, language, and rpMail email.
+python -m rpos.installer oobe --prefix "%RPOS_PREFIX%"
 """,
             encoding="utf-8",
         )
@@ -254,12 +256,15 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "$0")" && pwd)"
 export PYTHONPATH="${ROOT}${PYTHONPATH:+:$PYTHONPATH}"
 cd "$ROOT"
+PREFIX="${RPOS_PREFIX:-$HOME/.rpos/install}"
 echo "=== RESTORE rpOS single-click (advisories required) ==="
 python3 -m rpos.installer advisories
 echo ""
 read -r -p "Type RESTORE to confirm absolute wipe intent: " CONFIRM
-python3 -m rpos.installer restore --yes-advisories --confirm "$CONFIRM"
-python3 -m rpos.installer oobe --smoke
+python3 -m rpos.installer restore --yes-advisories --confirm "$CONFIRM" --prefix "$PREFIX"
+echo ""
+echo "Ned will guide timezone, language, and rpMail email."
+python3 -m rpos.installer oobe --prefix "$PREFIX"
 """,
             encoding="utf-8",
         )

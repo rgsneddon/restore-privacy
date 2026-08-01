@@ -1,4 +1,4 @@
-# Single-click RESTORE entry (Windows)
+# Single-click RESTORE entry (Windows) — advisories, confirm, dry-run wipe, install, Ned interactive OOBE.
 $ErrorActionPreference = "Stop"
 $Here = Split-Path -Parent $MyInvocation.MyCommand.Path
 $Base = if (Test-Path (Join-Path $Here "rpos\installer")) { $Here }
@@ -6,11 +6,13 @@ $Base = if (Test-Path (Join-Path $Here "rpos\installer")) { $Here }
   else { (Resolve-Path (Join-Path $Here "..\..")).Path }
 $env:PYTHONPATH = $Base
 Set-Location $Base
-Write-Host "Launching Ned-aware RESTORE path..."
+$Prefix = if ($env:RPOS_PREFIX) { $env:RPOS_PREFIX } else { Join-Path $env:USERPROFILE ".rpos\install" }
+Write-Host "Launching Ned-aware RESTORE path (prefix=$Prefix)..."
 python -m rpos.installer advisories
 Write-Host ""
-$Confirm = Read-Host "Type RESTORE to confirm absolute wipe intent + install"
-python -m rpos.installer restore --yes-advisories --confirm $Confirm
+$Confirm = Read-Host "Type RESTORE to confirm absolute wipe intent"
+python -m rpos.installer restore --yes-advisories --confirm $Confirm --prefix $Prefix
+if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 Write-Host ""
-Write-Host "Ned will guide first setup (timezone, language, rpMail email)."
-python -m rpos.installer oobe --smoke
+Write-Host "Ned will guide first setup — timezone, language, then your rpMail email."
+python -m rpos.installer oobe --prefix $Prefix
