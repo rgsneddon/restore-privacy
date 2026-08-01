@@ -1,4 +1,2 @@
-usd_unit 381 expect 381 meta_amount_pence ['300']
-fulfilment_email_not_sent session='cs_usd' skipped=True error='smtp_not_configured' has_keygen=True has_download=True smtp='disabled'
-usd_unlock True connect True grant_pence 300
-spoof token None connect True ent {'session_id': 'cs_spoof', 'status': 'active', 'platform': 'windows', 'reason': 'payment_succeeded', 'created_at': 1785573751.733771, 'updated_at': 1785573751.733771, 'payment_intent_id': '', 'subscription_id': 'sub_spoof', 'valid_until': 1788252151.733771, 'keygen': 'RPT-KEY-DB9B-6DEE-21C4', 'customer_email': 's@example.com', 'billing_interval': 'month', 'product_line': 'vpn', 'connect_allowed': True, 'licence_status': 'OK'}
+data_dir /var/folders/qb/tz4y4zts04z4846pbq95l6kw0000gp/T/grok-goal-3eb85b74914d/implementer/paydb.OO1UB0
+db /var/folders/qb/tz4y4zts04z4846pbq95l6kw0000gp/T/grok-goal-3eb85b74914d/implementer/paydb.OO1UB0/paid_downloads.sqlite3

@@ -1,9 +1,9 @@
 # Stripe audit findings (amount_total fix)
 
-## Bugs fixed this pass
-1. **USD presentment never unlocked:** completion preferred `metadata.amount_pence=300` over `amount_total≈381` USD cents, so `amount_ok`/`usd_ok` both failed. Now **amount_total** is cash truth; USD monthly/yearly map to GBP catalog grant anchors.
-2. **Underpay spoof:** `amount_total=1` + `metadata.amount_pence=300` previously unlocked. amount_total wins → rejected.
+## Bugs fixed
+1. **USD presentment never unlocked:** completion preferred metadata.amount_pence=300 over amount_total≈381 USD cents. Now amount_total is cash truth; USD maps to GBP catalog grant (300/3000).
+2. **Underpay spoof:** amount_total=1 + metadata amount_pence=300 no longer unlocks.
 
-## Tests
-- `test_usd_builder_shaped_paid_monthly_unlocks` (drives real builder fields + completion)
-- `test_amount_total_1_with_metadata_300_does_not_unlock`
+## Proof
+- Unit: TestAmountTotalOverMetadata (builder-shaped USD + spoof)
+- SCRATCH stripe_audit_checkout.txt (fresh RPT_PAYMENT_DATA_DIR) → AMOUNT_TOTAL_GATE_OK

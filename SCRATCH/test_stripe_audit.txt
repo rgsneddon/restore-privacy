@@ -46,6 +46,6 @@ test_month_and_year_use_distinct_catalog_price_ids (tests.test_pay_plan_page.Tes
 test_yearly_pence_is_fixed_catalog_amount (tests.test_pay_plan_page.TestYearlyCatalogPrice.test_yearly_pence_is_fixed_catalog_amount) ... ok
 
 ----------------------------------------------------------------------
-Ran 31 tests in 0.213s
+Ran 31 tests in 0.221s
 
 OK
