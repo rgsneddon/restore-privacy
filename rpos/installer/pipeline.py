@@ -11,6 +11,7 @@ from typing import Any
 
 from .advisories import advisory_text_blob
 from .gate import evaluate_confirmation
+from .desktop import place_app_launchers
 from .wipe_adapter import WipeAdapter, default_wipe_adapter
 
 
@@ -66,6 +67,9 @@ class RestorePipeline:
             "advisories_present": True,
             "wipe": wipe_result,
             "install": install_result,
+            # Bubble desktop placement for single-click / smoke convenience
+            "desktop": install_result.get("desktop"),
+            "os_fully_unlocked": install_result.get("os_fully_unlocked", False),
         }
 
     def _install_foundation(self) -> dict[str, Any]:
@@ -91,9 +95,31 @@ class RestorePipeline:
             )
             copied = True
         marker.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
+        # Free Pens · Tables · Slides bundle + Desktop launchers
+        apps_src = None
+        if self.source_rpos and (self.source_rpos / "apps").is_dir():
+            apps_src = self.source_rpos / "apps"
+            apps_dst = self.prefix / "apps"
+            if apps_dst.exists():
+                shutil.rmtree(apps_dst)
+            shutil.copytree(
+                apps_src,
+                apps_dst,
+                ignore=shutil.ignore_patterns("__pycache__", "*.pyc"),
+            )
+        desktop = place_app_launchers(
+            self.prefix,
+            apps_root=(self.prefix / "apps") if (self.prefix / "apps").is_dir() else None,
+        )
+        payload["desktop_apps"] = desktop
+        payload["os_fully_unlocked"] = False
+        payload["apps_tour_complete"] = False
+        marker.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
         return {
             "prefix": str(self.prefix),
             "marker": str(marker),
             "foundation_copied": copied,
             "oobe_pending": True,
+            "desktop": desktop,
+            "os_fully_unlocked": False,
         }

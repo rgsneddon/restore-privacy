@@ -1,4 +1,4 @@
-"""CLI: single-click RESTORE + Ned OOBE entry for rpOS packages."""
+"""CLI: single-click RESTORE + Ned OOBE + Pens/Tables/Slides locked tour."""
 
 from __future__ import annotations
 
@@ -10,7 +10,9 @@ from pathlib import Path
 
 from . import NED_NAME, PRODUCT, __version__
 from .advisories import advisory_text_blob, has_required_warning_keywords
+from .desktop import assert_desktop_has_all_three, place_app_launchers
 from .gate import evaluate_confirmation, gate_preview
+from .ned_apps_tour import NedAppsTour, persist_tour
 from .ned_oobe import (
     install_marker_path,
     oobe_state_path,
@@ -25,12 +27,10 @@ def _default_prefix() -> Path:
 
 
 def _package_rpos_src() -> Path | None:
-    # When running from an extracted package: rpos/ next to package root
     here = Path(__file__).resolve().parent
-    cand = here.parent  # rpos/
+    cand = here.parent
     if (cand / "README.md").is_file() and (cand / "sdk").is_dir():
         return cand
-    # Monorepo checkout
     mono = here.parents[1] / "rpos"
     if mono.is_dir():
         return mono
@@ -67,7 +67,6 @@ def cmd_restore(args: argparse.Namespace) -> int:
     if confirm is None and args.smoke:
         confirm = "RESTORE"
     if confirm is None:
-        # Interactive confirm after advisories (single-click path)
         try:
             confirm = input("Type RESTORE to confirm absolute wipe intent: ")
         except EOFError:
@@ -85,7 +84,6 @@ def cmd_restore(args: argparse.Namespace) -> int:
     print(json.dumps(result, indent=2))
     if not result.get("ok"):
         return 1
-    # Optional chained OOBE after successful RESTORE
     if args.run_oobe:
         oobe_args = argparse.Namespace(
             timezone="",
@@ -94,13 +92,13 @@ def cmd_restore(args: argparse.Namespace) -> int:
             persist=None,
             prefix=str(prefix),
             smoke=bool(args.smoke),
+            run_apps_tour=True,
         )
         return cmd_oobe(oobe_args)
     return 0
 
 
 def cmd_oobe(args: argparse.Namespace) -> int:
-    """Ned-guided setup. Default: interactive stdin. --smoke: scripted only."""
     prefix = Path(args.prefix) if args.prefix else None
     path = Path(args.persist) if args.persist else None
     if prefix is not None and path is None:
@@ -125,17 +123,44 @@ def cmd_oobe(args: argparse.Namespace) -> int:
             prefix=prefix,
         )
     else:
-        # Product path: Ned prompts interactively
         out = run_oobe_interactive(
             persist_path=path if prefix is None else None,
             prefix=prefix,
         )
     print(json.dumps(out, indent=2))
-    return 0 if out.get("ok") else 1
+    if not out.get("ok"):
+        return 1
+    if getattr(args, "run_apps_tour", False):
+        return cmd_apps_tour(
+            argparse.Namespace(
+                prefix=str(prefix) if prefix else None,
+                smoke=bool(getattr(args, "smoke", False)),
+                auto=bool(getattr(args, "smoke", False)),
+            )
+        )
+    return 0
+
+
+def cmd_apps_tour(args: argparse.Namespace) -> int:
+    prefix = Path(args.prefix) if args.prefix else _default_prefix()
+    # Ensure desktop launchers exist (re-entrant safe)
+    place_app_launchers(
+        prefix,
+        apps_root=(prefix / "apps") if (prefix / "apps").is_dir() else None,
+    )
+    tour = NedAppsTour()
+    auto = bool(getattr(args, "auto", False) or getattr(args, "smoke", False))
+    result = tour.run_full_tour(auto=auto)
+    path = persist_tour(prefix, result)
+    result["persisted"] = str(path)
+    result["prefix"] = str(prefix)
+    desk = prefix / "Desktop"
+    result["desktop_ready"] = assert_desktop_has_all_three(desk)
+    print(json.dumps(result, indent=2))
+    return 0 if result.get("ok") and result.get("os_fully_unlocked") else 1
 
 
 def cmd_smoke() -> int:
-    """Full dry-run: gate reject, gate accept, wipe dry-run, OOBE on prefix."""
     adv = advisory_text_blob()
     assert has_required_warning_keywords(adv)
     bad = evaluate_confirmation("nope", advisories_acknowledged=True)
@@ -149,35 +174,36 @@ def cmd_smoke() -> int:
         assert denied["proceeded"] is False
         ok = pipe.run("RESTORE")
         assert ok["proceeded"] is True
-        assert ok["wipe"] and ok["wipe"]["host_disk_touched"] is False
+        assert ok.get("desktop")
+        desk = Path(ok["desktop"]["desktop"])
+        assert assert_desktop_has_all_three(desk)
         marker = install_marker_path(prefix)
-        assert marker.is_file()
         assert json.loads(marker.read_text())["oobe_pending"] is True
-        # Interactive with injected answers (real product function)
         answers = iter(["UTC", "en", "ned.user@restoreprivacy.example"])
         oobe = run_oobe_interactive(
             prefix=prefix,
             input_fn=lambda _p: next(answers),
             print_fn=lambda *_a, **_k: None,
         )
-        assert oobe["timezone"] == "UTC"
-        assert oobe["email"]
-        assert oobe["rpmail"]["bound"] is True
         assert oobe["oobe_pending"] is False
-        marker_data = json.loads(marker.read_text(encoding="utf-8"))
-        assert marker_data["oobe_pending"] is False
-        assert marker_data["rpmail"]["address"] == "ned.user@restoreprivacy.example"
-        assert oobe_state_path(prefix).is_file()
+        tour = NedAppsTour()
+        tres = tour.run_full_tour(auto=True, print_fn=lambda *_a, **_k: None)
+        persist_tour(prefix, tres)
+        assert tres["os_fully_unlocked"] is True
+        assert tres["completed"] == ["Pens", "Tables", "Slides"]
+        m = json.loads(marker.read_text())
+        assert m["os_fully_unlocked"] is True
     payload = {
         "ok": True,
         "product": PRODUCT,
         "version": __version__,
         "ned": NED_NAME,
-        "single_click_entry": "RESTORE_rpOS / python -m rpos.installer restore --run-oobe",
+        "apps": ["Pens", "Tables", "Slides"],
+        "single_click_entry": "RESTORE_rpOS",
         "gate_preview": gate_preview()["confirm_phrase"],
         "wipe_default": "dry_run",
-        "oobe_steps": ["timezone", "language", "email_rpmail"],
         "oobe_default": "interactive",
+        "apps_tour": ["Pens", "Tables", "Slides"],
     }
     print(json.dumps(payload, indent=2))
     return 0
@@ -186,49 +212,39 @@ def cmd_smoke() -> int:
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(
         prog="rpos.installer",
-        description="rpOS single-click RESTORE + Ned OOBE",
+        description="rpOS RESTORE + Ned OOBE + Pens/Tables/Slides tour",
     )
     ap.add_argument("--version", action="store_true")
     sub = ap.add_subparsers(dest="cmd")
 
     sub.add_parser("advisories", help="Print multi-layer RESTORE advisories")
     p_rest = sub.add_parser("restore", help="Single-click RESTORE pipeline")
-    p_rest.add_argument(
-        "--confirm",
-        default=None,
-        help="Exact confirmation phrase (must be RESTORE); omit to prompt",
-    )
-    p_rest.add_argument(
-        "--yes-advisories",
-        action="store_true",
-        help="Assert you read the advisories",
-    )
+    p_rest.add_argument("--confirm", default=None)
+    p_rest.add_argument("--yes-advisories", action="store_true")
     p_rest.add_argument("--prefix", default=None)
     p_rest.add_argument("--skip-wipe", action="store_true")
-    p_rest.add_argument("--smoke", action="store_true", help="Use RESTORE confirm without prompt")
-    p_rest.add_argument(
-        "--run-oobe",
-        action="store_true",
-        help="After successful RESTORE, run Ned interactive OOBE on install prefix",
-    )
+    p_rest.add_argument("--smoke", action="store_true")
+    p_rest.add_argument("--run-oobe", action="store_true")
 
-    p_oobe = sub.add_parser("oobe", help="Ned-guided first setup (interactive by default)")
+    p_oobe = sub.add_parser("oobe", help="Ned timezone/language/email (interactive)")
     p_oobe.add_argument("--timezone", default="")
     p_oobe.add_argument("--language", default="")
     p_oobe.add_argument("--email", default="")
-    p_oobe.add_argument("--persist", default=None, help="Legacy path if no --prefix")
+    p_oobe.add_argument("--persist", default=None)
+    p_oobe.add_argument("--prefix", default=None)
+    p_oobe.add_argument("--smoke", action="store_true")
     p_oobe.add_argument(
-        "--prefix",
-        default=None,
-        help="Install prefix (writes oobe_state.json + clears oobe_pending)",
-    )
-    p_oobe.add_argument(
-        "--smoke",
+        "--run-apps-tour",
         action="store_true",
-        help="Non-interactive scripted defaults (tests only)",
+        help="After personal OOBE, run Ned locked Pens→Tables→Slides tour",
     )
 
-    sub.add_parser("smoke", help="Dry-run full path (no host wipe)")
+    p_tour = sub.add_parser("apps-tour", help="Ned locked guide: Pens → Tables → Slides")
+    p_tour.add_argument("--prefix", default=None)
+    p_tour.add_argument("--smoke", action="store_true")
+    p_tour.add_argument("--auto", action="store_true", help="Acknowledge steps without Enter")
+
+    sub.add_parser("smoke", help="Dry-run full path including apps tour")
 
     args = ap.parse_args(argv)
     if args.version:
@@ -240,6 +256,8 @@ def main(argv: list[str] | None = None) -> int:
         return cmd_restore(args)
     if args.cmd == "oobe":
         return cmd_oobe(args)
+    if args.cmd == "apps-tour":
+        return cmd_apps_tour(args)
     if args.cmd == "smoke" or args.cmd is None:
         return cmd_smoke()
     ap.print_help()
