@@ -1,0 +1,25 @@
+test_mirror_plan_lists_every_brand_inventory_filename (tests.test_windows_brand_mirror.TestBrandInventoryCoverage.test_mirror_plan_lists_every_brand_inventory_filename) ... ok
+test_plan_reports_missing_vs_present_without_windows_host (tests.test_windows_brand_mirror.TestBrandInventoryCoverage.test_plan_reports_missing_vs_present_without_windows_host) ... ok
+test_apply_without_dest_fails_closed (tests.test_windows_brand_mirror.TestChecklistAndCliSurface.test_apply_without_dest_fails_closed) ... ok
+test_render_checklist_mentions_pe_and_all_kinds (tests.test_windows_brand_mirror.TestChecklistAndCliSurface.test_render_checklist_mentions_pe_and_all_kinds) ... ok
+test_apply_copies_present_packages_to_temp_drive (tests.test_windows_brand_mirror.TestMirrorApplyTempDrive.test_apply_copies_present_packages_to_temp_drive)
+Drive real apply_mirror_plan against a tiny fake monorepo (not multi-GB releases). ... ok
+test_serve_allows_windows_vault_files (tests.test_windows_brand_mirror.TestVaultStagesWindowsBrandFiles.test_serve_allows_windows_vault_files) ... ok
+test_stage_writes_windows_brand_mirror_and_checklist (tests.test_windows_brand_mirror.TestVaultStagesWindowsBrandFiles.test_stage_writes_windows_brand_mirror_and_checklist) ... ok
+test_only_vault_files_allowed (tests.test_breadcrumbs_vault.TestBreadcrumbsServeGate.test_only_vault_files_allowed) ... ok
+test_operator_docs_point_at_vault (tests.test_breadcrumbs_vault.TestGithubDeprecatedDocs.test_operator_docs_point_at_vault) ... ok
+test_check_local_stage_runs (tests.test_breadcrumbs_vault.TestMacCheckOutcomes.test_check_local_stage_runs) ... ok
+test_evaluate_needs_work_flags (tests.test_breadcrumbs_vault.TestMacCheckOutcomes.test_evaluate_needs_work_flags) ... ok
+test_evaluate_up_to_date_when_no_work (tests.test_breadcrumbs_vault.TestMacCheckOutcomes.test_evaluate_up_to_date_when_no_work) ... ok
+test_stage_writes_well_formed_vault (tests.test_breadcrumbs_vault.TestVaultLayout.test_stage_writes_well_formed_vault) ... ok
+
+----------------------------------------------------------------------
+Ran 13 tests in 0.061s
+
+OK
+staged_vault monopin=1.0.2 dir=/var/folders/qb/tz4y4zts04z4846pbq95l6kw0000gp/T/tmp5_c2mg5y/1.0.2
+needs_any_apple_work=False
+actions=['none_apple_up_to_date']
+staged_vault monopin=1.0.2 dir=/var/folders/qb/tz4y4zts04z4846pbq95l6kw0000gp/T/tmp_3sl0ek0/1.0.2
+needs_any_apple_work=False
+actions=['none_apple_up_to_date']

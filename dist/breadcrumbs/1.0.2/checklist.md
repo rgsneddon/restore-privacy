@@ -1,6 +1,6 @@
 # Apple breadcrumbs checklist — monopin 1.0.2
 
-Generated: 2026-08-01T06:41:27Z
+Generated: 2026-08-01T07:50:36Z
 Source of truth: **helsinki_breadcrumbs_vault** (GitHub breadcrumb pull: **deprecated**)
 
 ## Operator mandate (monopin 1.0.2)
@@ -25,5 +25,6 @@ Source of truth: **helsinki_breadcrumbs_vault** (GitHub breadcrumb pull: **depre
 - 3. If ios needs_work: flutter build ios + Team-sign per APPLE_HANDOFF
 - 4. Stage/upload paid assets for 1.0.2 (Helsinki), then re-publish breadcrumbs
 - 5. Re-run check until needs_any_apple_work is false
+- 6. Windows machine: set RPT_WINDOWS_DRIVE to the large drive; python scripts/windows_brand_mirror.py apply — monorepo + all brand installer slots (35 packages); then native PE seal + upload
 
 Fetch: `python3 scripts/breadcrumbs_vault.py check --fetch` with `RPT_ASSET_FETCH_TOKEN` set.

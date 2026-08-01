@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
-"""Helsinki breadcrumbs vault — Apple (macOS/iOS) update task source of truth.
+"""Helsinki breadcrumbs vault — Apple + Windows brand-mirror task source of truth.
 
 Replaces the **GitHub handoff pull** as the MacBook's primary “what needs
 updating?” queue. Source code may still live in the private repo; **task
-breadcrumbs** (monopin, honesty flags, checklist, APPLE_HANDOFF copy) live on
-the Helsinki store host.
+breadcrumbs** (monopin, honesty flags, checklist, APPLE_HANDOFF + Windows
+brand-wide large-drive mirror) live on the Helsinki store host.
 
 Layout on Helsinki::
 
@@ -14,6 +14,9 @@ Layout on Helsinki::
       honesty.json
       checklist.md
       APPLE_HANDOFF.md
+      WINDOWS_HANDOFF.md
+      WINDOWS_BRAND_CHECKLIST.md
+      windows_brand_mirror.json
     {VERSION}/               # pinned copy of the same snapshot
 
 Fetch (token-gated, same secret class as paid-assets)::
@@ -147,6 +150,41 @@ def inspect_platform_honesty(platform: str, monopin: str) -> dict[str, Any]:
     return out
 
 
+def _windows_brand_mirror_snapshot(*, monopin: str) -> dict[str, Any]:
+    """Brand-wide Windows large-drive mirror fields for the vault manifest."""
+    try:
+        from windows_brand_mirror import build_windows_mirror_plan
+
+        plan = build_windows_mirror_plan(monopin=monopin)
+        return {
+            "schema": plan.get("schema"),
+            "brand_slot_count": plan.get("brand_slot_count"),
+            "brand_kinds": plan.get("brand_kinds"),
+            "present_source_count": plan.get("present_source_count"),
+            "missing_source_count": plan.get("missing_source_count"),
+            "dest_root": plan.get("dest_root"),
+            "dest_configured": plan.get("dest_configured"),
+            "repo_dest": plan.get("repo_dest"),
+            "native_pe_build": plan.get("native_pe_build"),
+            "brand_filenames": [
+                str(r.get("filename") or "")
+                for r in (plan.get("brand_packages") or [])
+                if r.get("filename")
+            ],
+            "operator_cli": (
+                "python scripts/windows_brand_mirror.py plan|apply "
+                "--dest $RPT_WINDOWS_DRIVE"
+            ),
+        }
+    except Exception as exc:  # noqa: BLE001
+        return {
+            "schema": "rpt.windows_brand_mirror.v1",
+            "error": str(exc)[:200],
+            "brand_slot_count": 0,
+            "brand_filenames": [],
+        }
+
+
 def build_vault_manifest(*, monopin: str | None = None) -> dict[str, Any]:
     """Assemble the live breadcrumbs vault snapshot (pure-ish JSON)."""
     pin = (monopin or current_monopin()).strip()
@@ -162,6 +200,12 @@ def build_vault_manifest(*, monopin: str | None = None) -> dict[str, Any]:
 
     handoff_rel = f"client_app/APPLE_HANDOFF_{pin}.md"
     handoff_path = ROOT / handoff_rel
+    windows_mirror = _windows_brand_mirror_snapshot(monopin=pin)
+    win_actions: list[str] = [
+        "mirror_monorepo_and_brand_assets_to_large_drive",
+        "rebuild_windows_native_pe_seal",
+        f"upload_paid_assets_{pin}",
+    ]
 
     return {
         "schema": "rpt.breadcrumbs.v1",
@@ -181,6 +225,8 @@ def build_vault_manifest(*, monopin: str | None = None) -> dict[str, Any]:
         or DEFAULT_BREADCRUMBS_BASE,
         "platforms": {"macos": macos, "ios": ios},
         "macbook_actions": actions,
+        "windows_actions": win_actions,
+        "windows_brand_mirror": windows_mirror,
         "needs_any_apple_work": bool(macos.get("needs_work") or ios.get("needs_work")),
         "handoff_file": handoff_rel if handoff_path.is_file() else None,
         "checklist": [
@@ -200,6 +246,10 @@ def build_vault_manifest(*, monopin: str | None = None) -> dict[str, Any]:
             "3. If ios needs_work: flutter build ios + Team-sign per APPLE_HANDOFF",
             f"4. Stage/upload paid assets for {pin} (Helsinki), then re-publish breadcrumbs",
             "5. Re-run check until needs_any_apple_work is false",
+            "6. Windows machine: set RPT_WINDOWS_DRIVE to the large drive; "
+            "python scripts/windows_brand_mirror.py apply — monorepo + all brand "
+            f"installer slots ({windows_mirror.get('brand_slot_count') or 'N'} packages); "
+            "then native PE seal + upload",
         ],
     }
 
@@ -304,6 +354,36 @@ def stage_vault(*, monopin: str | None = None, out_root: Path | None = None) -> 
     if "Breadcrumbs vault (Helsinki)" not in win_text:
         win_text = win_text.rstrip() + banner
 
+    # Brand-wide large-drive mirror plan + checklist (all installer slots)
+    try:
+        from windows_brand_mirror import (
+            build_windows_mirror_plan,
+            render_windows_brand_checklist,
+            render_windows_handoff_brand_section,
+            write_releases_breadcrumbs,
+        )
+
+        win_plan = build_windows_mirror_plan(monopin=pin)
+        win_brand_checklist = render_windows_brand_checklist(win_plan)
+        brand_section = render_windows_handoff_brand_section(win_plan)
+        if "Brand-wide large-drive mirror" not in win_text:
+            win_text = win_text.rstrip() + brand_section
+        try:
+            write_releases_breadcrumbs(monopin=pin)
+        except OSError:
+            pass
+    except Exception as exc:  # noqa: BLE001
+        win_plan = {
+            "schema": "rpt.windows_brand_mirror.v1",
+            "monopin": pin,
+            "error": str(exc)[:200],
+            "brand_packages": [],
+        }
+        win_brand_checklist = (
+            f"# Windows brand checklist — monopin {pin}\n\n"
+            f"Error building brand mirror plan: {exc}\n"
+        )
+
     for dest in (ver_dir, cur_dir):
         (dest / "manifest.json").write_text(
             json.dumps(manifest, indent=2) + "\n", encoding="utf-8"
@@ -314,6 +394,12 @@ def stage_vault(*, monopin: str | None = None, out_root: Path | None = None) -> 
         (dest / "checklist.md").write_text(checklist, encoding="utf-8")
         (dest / "APPLE_HANDOFF.md").write_text(handoff_text, encoding="utf-8")
         (dest / "WINDOWS_HANDOFF.md").write_text(win_text, encoding="utf-8")
+        (dest / "WINDOWS_BRAND_CHECKLIST.md").write_text(
+            win_brand_checklist, encoding="utf-8"
+        )
+        (dest / "windows_brand_mirror.json").write_text(
+            json.dumps(win_plan, indent=2) + "\n", encoding="utf-8"
+        )
 
     # Tidy: remove other monopin dirs under dist/breadcrumbs except current
     for child in list(base.iterdir()):
@@ -458,6 +544,8 @@ def publish_vault(*, monopin: str | None = None, dry_run: bool = False) -> int:
         "checklist.md",
         "APPLE_HANDOFF.md",
         "WINDOWS_HANDOFF.md",
+        "WINDOWS_BRAND_CHECKLIST.md",
+        "windows_brand_mirror.json",
     ):
         local_f = local / name
         if not local_f.is_file():

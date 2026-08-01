@@ -1,0 +1,109 @@
+=== monopin ===
+1.0.2
+=== brand inventory count ===
+slots 35
+kinds ['browser', 'node_installer', 'node_operator', 'rpmail', 'rpoffice', 'rpos', 'rpos_app', 'suite_client']
+  suite_client     windows          restore-privacy-client-1.0.2-windows-x64-setup.exe
+  suite_client     android          restore-privacy-client-1.0.2-android.apk
+  suite_client     macos            restore-privacy-client-1.0.2-macos.zip
+  suite_client     ios              restore-privacy-client-1.0.2-ios.zip
+  suite_client     linux            restore-privacy-client-1.0.2-linux-x64.tar.gz
+  browser          chromium         restore-privacy-browser-extension-1.0.2.zip
+  browser          default          restore-privacy-rx-browser-1.0.2.zip
+  browser          macos            restore-privacy-rx-browser-1.0.2-macos.zip
+  browser          windows          restore-privacy-rx-browser-1.0.2-windows.zip
+  browser          linux-x86_64     restore-privacy-rx-browser-1.0.2-linux-x86_64.tar.gz
+  browser          linux-aarch64    restore-privacy-rx-browser-1.0.2-linux-aarch64.tar.gz
+  browser          linux-x86_64-zip restore-privacy-rx-browser-1.0.2-linux-x86_64.zip
+  browser          ios              restore-privacy-rx-browser-1.0.2-ios.zip
+  browser          android          restore-privacy-rx-browser-1.0.2-android.zip
+  rpos             windows          rpos-0.2.0-windows-x64.zip
+  rpos             macos            rpos-0.2.0-macos.zip
+  rpos             linux-x86_64     rpos-0.2.0-linux-x86_64.tar.gz
+  rpos             linux-aarch64    rpos-0.2.0-linux-aarch64.tar.gz
+  rpos_app         pens             pens-0.1.0-installer.zip
+  rpos_app         tables           tables-0.1.0-installer.zip
+  rpos_app         slides           slides-0.1.0-installer.zip
+  node_installer   linux            restore-privacy-node-installer-1.0.0-linux-x64.tar.gz
+  node_installer   macos            restore-privacy-node-installer-1.0.0-macos.zip
+  node_installer   windows          restore-privacy-node-installer-1.0.0-windows-x64.zip
+  node_installer   android          restore-privacy-node-installer-1.0.0-android.zip
+  node_installer   ios              restore-privacy-node-installer-1.0.0-ios.zip
+  node_operator    linux            restore-privacy-node-operator-1.0.0-linux-x64.tar.gz
+  rpmail           windows          rpmail-0.1.0-windows.zip
+  rpmail           macos            rpmail-0.1.0-macos.zip
+  rpmail           linux-x86_64     rpmail-0.1.0-linux-x86_64.tar.gz
+  rpmail           linux-aarch64    rpmail-0.1.0-linux-aarch64.tar.gz
+  rpoffice         windows          rpoffice-0.1.0-windows.zip
+  rpoffice         macos            rpoffice-0.1.0-macos.zip
+  rpoffice         linux-x86_64     rpoffice-0.1.0-linux-x86_64.tar.gz
+  rpoffice         linux-aarch64    rpoffice-0.1.0-linux-aarch64.tar.gz
+present 35 / 35
+=== windows_brand_mirror plan (summary) ===
+schema rpt.windows_brand_mirror.v1
+monopin 1.0.2
+dest_root {RPT_WINDOWS_DRIVE}
+dest_configured False
+brand_slot_count 35
+brand_kinds ['browser', 'node_installer', 'node_operator', 'rpmail', 'rpoffice', 'rpos', 'rpos_app', 'suite_client']
+present_source 35
+missing_source 0
+native_pe {'required': True, 'script': 'scripts/build_windows_multihop.py', 'output': 'releases/1.0.2/restore-privacy-client-1.0.2-windows-x64-setup.exe', 'upload': 'paid_assets/1.0.2/'}
+filenames 35
+  suite_client restore-privacy-client-1.0.2-windows-x64-setup.exe src=True
+  suite_client restore-privacy-client-1.0.2-android.apk src=True
+  suite_client restore-privacy-client-1.0.2-macos.zip src=True
+  suite_client restore-privacy-client-1.0.2-ios.zip src=True
+  suite_client restore-privacy-client-1.0.2-linux-x64.tar.gz src=True
+  browser restore-privacy-browser-extension-1.0.2.zip src=True
+  browser restore-privacy-rx-browser-1.0.2.zip src=True
+  browser restore-privacy-rx-browser-1.0.2-macos.zip src=True
+  browser restore-privacy-rx-browser-1.0.2-windows.zip src=True
+  browser restore-privacy-rx-browser-1.0.2-linux-x86_64.tar.gz src=True
+  browser restore-privacy-rx-browser-1.0.2-linux-aarch64.tar.gz src=True
+  browser restore-privacy-rx-browser-1.0.2-linux-x86_64.zip src=True
+  browser restore-privacy-rx-browser-1.0.2-ios.zip src=True
+  browser restore-privacy-rx-browser-1.0.2-android.zip src=True
+  rpos rpos-0.2.0-windows-x64.zip src=True
+  rpos rpos-0.2.0-macos.zip src=True
+  rpos rpos-0.2.0-linux-x86_64.tar.gz src=True
+  rpos rpos-0.2.0-linux-aarch64.tar.gz src=True
+  rpos_app pens-0.1.0-installer.zip src=True
+  rpos_app tables-0.1.0-installer.zip src=True
+  rpos_app slides-0.1.0-installer.zip src=True
+  node_installer restore-privacy-node-installer-1.0.0-linux-x64.tar.gz src=True
+  node_installer restore-privacy-node-installer-1.0.0-macos.zip src=True
+  node_installer restore-privacy-node-installer-1.0.0-windows-x64.zip src=True
+  node_installer restore-privacy-node-installer-1.0.0-android.zip src=True
+  node_installer restore-privacy-node-installer-1.0.0-ios.zip src=True
+  node_operator restore-privacy-node-operator-1.0.0-linux-x64.tar.gz src=True
+  rpmail rpmail-0.1.0-windows.zip src=True
+  rpmail rpmail-0.1.0-macos.zip src=True
+  rpmail rpmail-0.1.0-linux-x86_64.tar.gz src=True
+  rpmail rpmail-0.1.0-linux-aarch64.tar.gz src=True
+  rpoffice rpoffice-0.1.0-windows.zip src=True
+  rpoffice rpoffice-0.1.0-macos.zip src=True
+  rpoffice rpoffice-0.1.0-linux-x86_64.tar.gz src=True
+  rpoffice rpoffice-0.1.0-linux-aarch64.tar.gz src=True
+=== stage vault ===
+staged_vault monopin=1.0.2 dir=/Users/russellsneddon/restore-privacy/dist/breadcrumbs/1.0.2
+needs_any_apple_work=False
+actions=['none_apple_up_to_date']
+=== vault files ===
+total 168
+drwxr-xr-x  9 russellsneddon  staff    288  1 Aug 08:50 .
+drwxr-xr-x  4 russellsneddon  staff    128  1 Aug 07:38 ..
+-rw-r--r--  1 russellsneddon  staff    393  1 Aug 08:50 APPLE_HANDOFF.md
+-rw-r--r--  1 russellsneddon  staff   2437  1 Aug 08:50 checklist.md
+-rw-r--r--  1 russellsneddon  staff   1114  1 Aug 08:50 honesty.json
+-rw-r--r--  1 russellsneddon  staff   5567  1 Aug 08:50 manifest.json
+-rw-r--r--  1 russellsneddon  staff   5786  1 Aug 08:50 WINDOWS_BRAND_CHECKLIST.md
+-rw-r--r--  1 russellsneddon  staff  45553  1 Aug 08:50 windows_brand_mirror.json
+-rw-r--r--  1 russellsneddon  staff   6309  1 Aug 08:50 WINDOWS_HANDOFF.md
+=== manifest windows_brand_mirror keys ===
+windows_actions ['mirror_monorepo_and_brand_assets_to_large_drive', 'rebuild_windows_native_pe_seal', 'upload_paid_assets_1.0.2']
+slot_count 35
+kinds ['browser', 'node_installer', 'node_operator', 'rpmail', 'rpoffice', 'rpos', 'rpos_app', 'suite_client']
+cli python scripts/windows_brand_mirror.py plan|apply --dest $RPT_WINDOWS_DRIVE
+filenames_count 35
+pe {'required': True, 'script': 'scripts/build_windows_multihop.py', 'output': 'releases/1.0.2/restore-privacy-client-1.0.2-windows-x64-setup.exe', 'upload': 'paid_assets/1.0.2/'}

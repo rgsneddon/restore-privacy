@@ -92,6 +92,25 @@ python scripts\brand_package_inventory.py
 python -c "import sys; sys.path.insert(0,'scripts'); from brand_package_inventory import list_brand_installer_packages; print(len(list_brand_installer_packages()))"
 ```
 
+## Large-drive mirror (all brand assets + monorepo)
+
+The Windows **larger drive** must hold a working monorepo copy **and every** brand
+installer slot (Suite clients, Rx/browser, rpOS, Pens/Tables/Slides, node
+installer/operator, rpMail, rpOffice) — not only the Suite setup.exe.
+
+```powershell
+# Prefer the large secondary drive, e.g. D:\
+$env:RPT_WINDOWS_DRIVE = "D:\RestorePrivacyMirror"
+python scripts\windows_brand_mirror.py plan
+python scripts\windows_brand_mirror.py apply --dest $env:RPT_WINDOWS_DRIVE --execute
+```
+
+Vault files after `python scripts\breadcrumbs_vault.py stage`:
+
+- `dist/breadcrumbs/current/WINDOWS_BRAND_CHECKLIST.md`
+- `dist/breadcrumbs/current/windows_brand_mirror.json`
+- `releases/1.0.2/WINDOWS_BREADCRUMBS.md`
+
 ## Breadcrumbs vault
 
 ```text
@@ -121,3 +140,32 @@ https://restoreprivacy.online/ · Admin mint: https://restoreprivacy.online/admi
 
 > **Breadcrumbs vault (Helsinki)** is the source of truth for “what to update” on this monopin. Do **not** treat a private GitHub pull of this file as the primary task queue.
 > Fetch: `https://135.181.152.10.sslip.io/breadcrumbs/current/manifest.json` with `X-RPT-Asset-Token`.
+
+---
+
+## Brand-wide large-drive mirror (all installer slots)
+
+The Windows **larger drive** must hold a working monorepo copy **and** every brand
+asset from the inventory — not only the Suite Windows setup.exe.
+
+| | |
+|--|--|
+| **Env** | `RPT_WINDOWS_DRIVE` (or `--dest`) = large-drive root |
+| **Monorepo dest** | `{RPT_WINDOWS_DRIVE}/restore-privacy` |
+| **Brand slots** | **35** (browser, node_installer, node_operator, rpmail, rpoffice, rpos, rpos_app, suite_client) |
+| **Monopin** | **1.0.2** |
+
+```powershell
+$env:RPT_WINDOWS_DRIVE = "D:\RestorePrivacyMirror"   # larger drive
+python scripts\windows_brand_mirror.py plan
+python scripts\windows_brand_mirror.py apply --dest $env:RPT_WINDOWS_DRIVE
+```
+
+Inventory kinds covered: suite_client, browser/Rx, rpos, rpos_app (Pens/Tables/Slides),
+node_installer, node_operator, rpmail, rpoffice.
+
+Full checklist: vault `WINDOWS_BRAND_CHECKLIST.md` / `windows_brand_mirror.json`
+(after `python scripts\breadcrumbs_vault.py stage`).
+
+Native PE remains required: `scripts\build_windows_multihop.py` →
+`releases\1.0.2\restore-privacy-client-1.0.2-windows-x64-setup.exe`.

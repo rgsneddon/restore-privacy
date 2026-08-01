@@ -1,0 +1,7 @@
+RPT_WINDOWS_DRIVE=<unset>
+RPT_WINDOWS_LARGE_DRIVE=<unset>
+Volumes:
+Macintosh HD
+DRIVE_REACHABLE=0
+Windows large drive is not mounted/configured on this Mac host.
+Honest fallback: unit tests + plan/manifest cover criteria 1-2; live apply deferred to operator machine with RPT_WINDOWS_DRIVE set.

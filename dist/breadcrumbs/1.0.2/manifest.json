@@ -1,7 +1,7 @@
 {
   "schema": "rpt.breadcrumbs.v1",
   "monopin": "1.0.2",
-  "generated_at": "2026-08-01T06:41:27Z",
+  "generated_at": "2026-08-01T07:50:36Z",
   "source_of_truth": "helsinki_breadcrumbs_vault",
   "github_breadcrumb_flow": "deprecated",
   "github_note": "Do not use private GitHub APPLE_HANDOFF pull as the primary Mac task queue. Fetch this vault instead. Source code may still live in the private repo.",
@@ -40,6 +40,74 @@
   "macbook_actions": [
     "none_apple_up_to_date"
   ],
+  "windows_actions": [
+    "mirror_monorepo_and_brand_assets_to_large_drive",
+    "rebuild_windows_native_pe_seal",
+    "upload_paid_assets_1.0.2"
+  ],
+  "windows_brand_mirror": {
+    "schema": "rpt.windows_brand_mirror.v1",
+    "brand_slot_count": 35,
+    "brand_kinds": [
+      "browser",
+      "node_installer",
+      "node_operator",
+      "rpmail",
+      "rpoffice",
+      "rpos",
+      "rpos_app",
+      "suite_client"
+    ],
+    "present_source_count": 35,
+    "missing_source_count": 0,
+    "dest_root": "{RPT_WINDOWS_DRIVE}",
+    "dest_configured": false,
+    "repo_dest": "{RPT_WINDOWS_DRIVE}/restore-privacy",
+    "native_pe_build": {
+      "required": true,
+      "script": "scripts/build_windows_multihop.py",
+      "output": "releases/1.0.2/restore-privacy-client-1.0.2-windows-x64-setup.exe",
+      "upload": "paid_assets/1.0.2/"
+    },
+    "brand_filenames": [
+      "restore-privacy-client-1.0.2-windows-x64-setup.exe",
+      "restore-privacy-client-1.0.2-android.apk",
+      "restore-privacy-client-1.0.2-macos.zip",
+      "restore-privacy-client-1.0.2-ios.zip",
+      "restore-privacy-client-1.0.2-linux-x64.tar.gz",
+      "restore-privacy-browser-extension-1.0.2.zip",
+      "restore-privacy-rx-browser-1.0.2.zip",
+      "restore-privacy-rx-browser-1.0.2-macos.zip",
+      "restore-privacy-rx-browser-1.0.2-windows.zip",
+      "restore-privacy-rx-browser-1.0.2-linux-x86_64.tar.gz",
+      "restore-privacy-rx-browser-1.0.2-linux-aarch64.tar.gz",
+      "restore-privacy-rx-browser-1.0.2-linux-x86_64.zip",
+      "restore-privacy-rx-browser-1.0.2-ios.zip",
+      "restore-privacy-rx-browser-1.0.2-android.zip",
+      "rpos-0.2.0-windows-x64.zip",
+      "rpos-0.2.0-macos.zip",
+      "rpos-0.2.0-linux-x86_64.tar.gz",
+      "rpos-0.2.0-linux-aarch64.tar.gz",
+      "pens-0.1.0-installer.zip",
+      "tables-0.1.0-installer.zip",
+      "slides-0.1.0-installer.zip",
+      "restore-privacy-node-installer-1.0.0-linux-x64.tar.gz",
+      "restore-privacy-node-installer-1.0.0-macos.zip",
+      "restore-privacy-node-installer-1.0.0-windows-x64.zip",
+      "restore-privacy-node-installer-1.0.0-android.zip",
+      "restore-privacy-node-installer-1.0.0-ios.zip",
+      "restore-privacy-node-operator-1.0.0-linux-x64.tar.gz",
+      "rpmail-0.1.0-windows.zip",
+      "rpmail-0.1.0-macos.zip",
+      "rpmail-0.1.0-linux-x86_64.tar.gz",
+      "rpmail-0.1.0-linux-aarch64.tar.gz",
+      "rpoffice-0.1.0-windows.zip",
+      "rpoffice-0.1.0-macos.zip",
+      "rpoffice-0.1.0-linux-x86_64.tar.gz",
+      "rpoffice-0.1.0-linux-aarch64.tar.gz"
+    ],
+    "operator_cli": "python scripts/windows_brand_mirror.py plan|apply --dest $RPT_WINDOWS_DRIVE"
+  },
   "needs_any_apple_work": false,
   "handoff_file": null,
   "checklist": [
@@ -50,6 +118,7 @@
     "2. If macos needs_work: flutter build macos + notarize per APPLE_HANDOFF",
     "3. If ios needs_work: flutter build ios + Team-sign per APPLE_HANDOFF",
     "4. Stage/upload paid assets for 1.0.2 (Helsinki), then re-publish breadcrumbs",
-    "5. Re-run check until needs_any_apple_work is false"
+    "5. Re-run check until needs_any_apple_work is false",
+    "6. Windows machine: set RPT_WINDOWS_DRIVE to the large drive; python scripts/windows_brand_mirror.py apply \u2014 monorepo + all brand installer slots (35 packages); then native PE seal + upload"
   ]
 }

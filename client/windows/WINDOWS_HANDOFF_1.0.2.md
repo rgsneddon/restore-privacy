@@ -92,6 +92,25 @@ python scripts\brand_package_inventory.py
 python -c "import sys; sys.path.insert(0,'scripts'); from brand_package_inventory import list_brand_installer_packages; print(len(list_brand_installer_packages()))"
 ```
 
+## Large-drive mirror (all brand assets + monorepo)
+
+The Windows **larger drive** must hold a working monorepo copy **and every** brand
+installer slot (Suite clients, Rx/browser, rpOS, Pens/Tables/Slides, node
+installer/operator, rpMail, rpOffice) — not only the Suite setup.exe.
+
+```powershell
+# Prefer the large secondary drive, e.g. D:\
+$env:RPT_WINDOWS_DRIVE = "D:\RestorePrivacyMirror"
+python scripts\windows_brand_mirror.py plan
+python scripts\windows_brand_mirror.py apply --dest $env:RPT_WINDOWS_DRIVE --execute
+```
+
+Vault files after `python scripts\breadcrumbs_vault.py stage`:
+
+- `dist/breadcrumbs/current/WINDOWS_BRAND_CHECKLIST.md`
+- `dist/breadcrumbs/current/windows_brand_mirror.json`
+- `releases/1.0.2/WINDOWS_BREADCRUMBS.md`
+
 ## Breadcrumbs vault
 
 ```text

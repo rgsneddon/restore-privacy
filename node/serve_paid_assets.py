@@ -49,6 +49,9 @@ BREADCRUMB_FILES = frozenset(
         "honesty.json",
         "checklist.md",
         "APPLE_HANDOFF.md",
+        "WINDOWS_HANDOFF.md",
+        "WINDOWS_BRAND_CHECKLIST.md",
+        "windows_brand_mirror.json",
     }
 )
 

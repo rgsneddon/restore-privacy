@@ -66,11 +66,23 @@ Native Windows PE seal is built on a Windows machine. Full steps:
 - `client/windows/WINDOWS_HANDOFF_1.0.2.md`
 - `releases/1.0.2/WINDOWS_BREADCRUMBS.md`
 - Vault: `dist/breadcrumbs/current/WINDOWS_HANDOFF.md`
+- Brand-wide large-drive mirror: `scripts/windows_brand_mirror.py`
+  (`RPT_WINDOWS_DRIVE` or `--dest`; vault `WINDOWS_BRAND_CHECKLIST.md` +
+  `windows_brand_mirror.json` after `breadcrumbs_vault.py stage`)
 
 Target PE:
 
 ```text
 restore-privacy-client-1.0.2-windows-x64-setup.exe
+```
+
+Mirror monorepo + **all brand installers** onto the Windows larger drive before
+the PE rebuild:
+
+```powershell
+$env:RPT_WINDOWS_DRIVE = "D:\RestorePrivacyMirror"
+python scripts\windows_brand_mirror.py plan
+python scripts\windows_brand_mirror.py apply --dest $env:RPT_WINDOWS_DRIVE --execute
 ```
 
 ## Honesty
