@@ -82,6 +82,10 @@
       if (btn) btn.disabled = false;
       if (state === "complete") {
         setStatus(msg + " · green done rows are finished");
+      } else if (state === "failed" && job.error) {
+        // Job-level failure (stage/SSH/etc.) — rows may stay pending; do not
+        // treat every pending package as a per-file error.
+        setStatus(msg + " · unstarted packages stay pending (see job error)");
       }
     }
   }

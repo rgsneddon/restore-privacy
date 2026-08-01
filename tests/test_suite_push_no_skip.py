@@ -25,17 +25,19 @@ for p in (str(STATUS), str(ROOT / "node"), str(ROOT / "scripts")):
         sys.path.insert(0, p)
 
 
-class TestFinishJobNoAutoSkip(unittest.TestCase):
-    def test_finish_job_success_marks_pending_as_error_not_skipped(self) -> None:
+class TestFinishJobNoBulkRewrite(unittest.TestCase):
+    def test_finish_job_success_leaves_unprocessed_pending_not_skipped_or_error(
+        self,
+    ) -> None:
         from suite_push_progress import (
             STATUS_DONE,
             STATUS_ERROR,
             STATUS_PENDING,
             STATUS_SKIPPED,
             _finish_job,
+            _update_file,
             create_job_from_inventory,
             job_snapshot,
-            progress_transition,
         )
 
         inv = {
@@ -45,23 +47,19 @@ class TestFinishJobNoAutoSkip(unittest.TestCase):
             ]
         }
         jid = create_job_from_inventory(inv)
-        # Simulate only first file processed
-        from suite_push_progress import _update_file
-
         _update_file(jid, "a.zip", STATUS_DONE, 100)
         _finish_job(jid, ok=True, message="partial")
         snap = job_snapshot(jid)
         assert snap is not None
         by_name = {p["filename"]: p for p in snap["packages"]}
         self.assertEqual(by_name["a.zip"]["status"], STATUS_DONE)
+        # Unprocessed row stays pending — never auto-skip or bulk-error
+        self.assertEqual(by_name["b.zip"]["status"], STATUS_PENDING)
         self.assertNotEqual(by_name["b.zip"]["status"], STATUS_SKIPPED)
-        self.assertEqual(by_name["b.zip"]["status"], STATUS_ERROR)
-        self.assertFalse(
-            any(p.get("status") == STATUS_SKIPPED for p in snap["packages"]),
-            snap["packages"],
-        )
+        self.assertNotEqual(by_name["b.zip"]["status"], STATUS_ERROR)
 
-    def test_finish_job_failure_marks_pending_as_error_not_skipped(self) -> None:
+    def test_finish_job_failure_keeps_pending_not_bulk_error(self) -> None:
+        """Stage/SSH failure before per-file progress must not paint all rows error."""
         from suite_push_progress import (
             STATUS_ERROR,
             STATUS_PENDING,
@@ -74,14 +72,51 @@ class TestFinishJobNoAutoSkip(unittest.TestCase):
         inv = {
             "packages": [
                 {"filename": "x.zip", "kind": "suite_client", "present": True},
+                {"filename": "y.zip", "kind": "rpos", "present": True},
             ]
         }
         jid = create_job_from_inventory(inv)
-        _finish_job(jid, ok=False, error="boom")
+        _finish_job(jid, ok=False, error="stage failed: missing brand package")
         snap = job_snapshot(jid)
         assert snap is not None
-        self.assertEqual(snap["packages"][0]["status"], STATUS_ERROR)
-        self.assertNotEqual(snap["packages"][0]["status"], STATUS_SKIPPED)
+        self.assertEqual(snap.get("state"), "failed")
+        self.assertFalse(snap.get("ok"))
+        self.assertIn("stage failed", snap.get("error") or "")
+        statuses = [p.get("status") for p in snap["packages"]]
+        self.assertEqual(statuses, [STATUS_PENDING, STATUS_PENDING], snap["packages"])
+        self.assertFalse(any(s == STATUS_ERROR for s in statuses))
+        self.assertFalse(any(s == STATUS_SKIPPED for s in statuses))
+
+    def test_finish_job_failure_preserves_done_interrupts_only_uploading(self) -> None:
+        from suite_push_progress import (
+            STATUS_DONE,
+            STATUS_ERROR,
+            STATUS_PENDING,
+            STATUS_UPLOADING,
+            _finish_job,
+            _update_file,
+            create_job_from_inventory,
+            job_snapshot,
+        )
+
+        inv = {
+            "packages": [
+                {"filename": "a.zip", "kind": "suite_client", "present": True},
+                {"filename": "b.zip", "kind": "rpos", "present": True},
+                {"filename": "c.zip", "kind": "rpos_app", "present": True},
+            ]
+        }
+        jid = create_job_from_inventory(inv)
+        _update_file(jid, "a.zip", STATUS_DONE, 100)
+        _update_file(jid, "b.zip", STATUS_UPLOADING, 40)
+        # c stays pending
+        _finish_job(jid, ok=False, error="upload failed: scp b.zip")
+        snap = job_snapshot(jid)
+        assert snap is not None
+        by_name = {p["filename"]: p for p in snap["packages"]}
+        self.assertEqual(by_name["a.zip"]["status"], STATUS_DONE)
+        self.assertEqual(by_name["b.zip"]["status"], STATUS_ERROR)
+        self.assertEqual(by_name["c.zip"]["status"], STATUS_PENDING)
 
 
 class TestAdminPushDefaults(unittest.TestCase):
@@ -139,8 +174,16 @@ class TestAdminPushDefaults(unittest.TestCase):
 class _FakeController:
     """Mock NodeOperatorController for admin push job tests (no real SSH)."""
 
-    def __init__(self, packages: list[dict[str, Any]]) -> None:
+    def __init__(
+        self,
+        packages: list[dict[str, Any]],
+        *,
+        mode: str = "success",
+        fail_at_index: int | None = None,
+    ) -> None:
         self._packages = packages
+        self._mode = mode  # success | stage_fail | zero_progress_fail
+        self._fail_at_index = fail_at_index
         self.last_kwargs: dict[str, Any] = {}
         self.cb_events: list[tuple[str, str, int]] = []
 
@@ -165,9 +208,39 @@ class _FakeController:
     def push_suite_packages(self, **kwargs: Any) -> dict[str, Any]:
         self.last_kwargs = dict(kwargs)
         cb = kwargs.get("progress_cb")
-        # Simulate one-at-a-time upload for every inventory filename
-        for p in self._packages:
+        if self._mode == "stage_fail":
+            # Fail before any progress_cb — reproduces admin "all error" bug
+            return {
+                "ok": False,
+                "suite": "Restore Privacy Suite v9.9.9",
+                "error": "stage failed: missing brand package: a.zip",
+                "force": kwargs.get("force"),
+                "allow_missing": kwargs.get("allow_missing"),
+            }
+        if self._mode == "zero_progress_fail":
+            return {
+                "ok": False,
+                "suite": "",
+                "error": "upload_packages returned 1",
+                "force": kwargs.get("force"),
+                "allow_missing": kwargs.get("allow_missing"),
+            }
+        # success or fail mid-file
+        for i, p in enumerate(self._packages):
             fname = p["filename"]
+            if self._fail_at_index is not None and i == self._fail_at_index:
+                if cb:
+                    cb(fname, "uploading", 10)
+                    self.cb_events.append((fname, "uploading", 10))
+                    cb(fname, "error", 0)
+                    self.cb_events.append((fname, "error", 0))
+                return {
+                    "ok": False,
+                    "suite": "Restore Privacy Suite v9.9.9",
+                    "error": f"upload failed: {fname}",
+                    "force": kwargs.get("force"),
+                    "allow_missing": kwargs.get("allow_missing"),
+                }
             if cb:
                 cb(fname, "uploading", 10)
                 self.cb_events.append((fname, "uploading", 10))
@@ -180,6 +253,88 @@ class _FakeController:
             "force": kwargs.get("force"),
             "allow_missing": kwargs.get("allow_missing"),
         }
+
+
+class TestStartPushJobNoBulkError(unittest.TestCase):
+    def _wait_job(self, jid: str, timeout: float = 10.0) -> dict[str, Any]:
+        from suite_push_progress import job_snapshot
+
+        deadline = time.time() + timeout
+        snap = None
+        while time.time() < deadline:
+            snap = job_snapshot(jid)
+            if snap and snap.get("state") in ("complete", "failed"):
+                return snap
+            time.sleep(0.02)
+        self.fail(f"job {jid} did not finish: {snap}")
+
+    def test_stage_fail_before_progress_leaves_rows_pending_with_job_error(
+        self,
+    ) -> None:
+        """Reproduce: job fails early → must NOT mark every package error."""
+        from suite_push_progress import job_snapshot, start_push_job
+
+        pkgs = [
+            {"filename": f"pkg-{i}.zip", "kind": "suite_client", "present": True}
+            for i in range(4)
+        ]
+        ctrl = _FakeController(pkgs, mode="stage_fail")
+        started = start_push_job(
+            ctrl,
+            stage=True,
+            upload=True,
+            dry_run=False,
+            force=True,
+            allow_missing=False,
+        )
+        self.assertTrue(started.get("ok"), started)  # job started async
+        snap = self._wait_job(started["job_id"])
+        self.assertEqual(snap.get("state"), "failed", snap)
+        self.assertFalse(snap.get("ok"))
+        self.assertIn("stage failed", snap.get("error") or "")
+        statuses = [p.get("status") for p in snap.get("packages") or []]
+        self.assertEqual(statuses, ["pending"] * 4, snap.get("packages"))
+        self.assertFalse(
+            any(s == "error" for s in statuses),
+            f"early failure must not paint all rows error: {statuses}",
+        )
+        self.assertFalse(any(s == "skipped" for s in statuses), statuses)
+
+    def test_zero_progress_fail_leaves_pending_not_all_error(self) -> None:
+        from suite_push_progress import start_push_job
+
+        pkgs = [
+            {"filename": "only.zip", "kind": "suite_client", "present": True},
+            {"filename": "two.zip", "kind": "rpos", "present": True},
+        ]
+        ctrl = _FakeController(pkgs, mode="zero_progress_fail")
+        started = start_push_job(
+            ctrl, force=True, allow_missing=False, stage=True, upload=True
+        )
+        snap = self._wait_job(started["job_id"])
+        self.assertEqual(snap.get("state"), "failed")
+        self.assertTrue(snap.get("error"))
+        statuses = [p.get("status") for p in snap.get("packages") or []]
+        self.assertEqual(statuses, ["pending", "pending"])
+
+    def test_mid_file_fail_keeps_prior_done_and_later_pending(self) -> None:
+        from suite_push_progress import start_push_job
+
+        pkgs = [
+            {"filename": "a.zip", "kind": "suite_client", "present": True},
+            {"filename": "b.zip", "kind": "rpos", "present": True},
+            {"filename": "c.zip", "kind": "rpos_app", "present": True},
+        ]
+        ctrl = _FakeController(pkgs, fail_at_index=1)
+        started = start_push_job(
+            ctrl, force=True, allow_missing=False, stage=True, upload=True
+        )
+        snap = self._wait_job(started["job_id"])
+        self.assertEqual(snap.get("state"), "failed")
+        by_name = {p["filename"]: p["status"] for p in snap["packages"]}
+        self.assertEqual(by_name["a.zip"], "done")
+        self.assertEqual(by_name["b.zip"], "error")
+        self.assertEqual(by_name["c.zip"], "pending")
 
 
 class TestStartPushJobNoSkipped(unittest.TestCase):

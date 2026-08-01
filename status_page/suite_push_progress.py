@@ -120,6 +120,15 @@ def _update_file(job_id: str, filename: str, status: str, progress: int) -> None
 
 
 def _finish_job(job_id: str, *, ok: bool, error: str = "", message: str = "") -> None:
+    """Close a push job without bulk-rewriting inventory row statuses.
+
+    Per-file truth comes only from ``progress_cb`` / ``_update_file``:
+    - ``done`` / ``skipped`` / explicit ``error`` rows are left alone
+    - unprocessed ``pending`` rows stay ``pending`` (job-level ``error`` explains why)
+    - a mid-flight ``uploading`` row becomes ``error`` only when the job fails
+      (interrupted file); already-``done`` rows are never rewritten to ``error``
+    - never auto-mark remaining rows as ``skipped`` (that lied after green jobs)
+    """
     with _LOCK:
         job = _JOBS.get(job_id)
         if not job:
@@ -129,14 +138,12 @@ def _finish_job(job_id: str, *, ok: bool, error: str = "", message: str = "") ->
         job["message"] = message
         job["state"] = "complete" if ok else "failed"
         job["updated_unix"] = int(time.time())
-        # Never auto-mark rows as "skipped". Admin Push Suite must either
-        # finish each inventory row via progress_cb (done / error / explicit
-        # skipped only when allow_missing opts in) or leave a visible error.
-        # Auto-skip hid unprocessed packages after ok=True and made the UI lie.
         pkgs: list[dict[str, Any]] = []
         for p in job.get("packages") or []:
             st = str(p.get("status") or STATUS_PENDING).strip().lower()
-            if st in (STATUS_PENDING, STATUS_UPLOADING):
+            # Only interrupt mid-upload on failure — do not paint every pending
+            # row error (that made admin show "all error" on stage/SSH failures).
+            if not ok and st == STATUS_UPLOADING:
                 pkgs.append(
                     progress_transition(
                         p,
