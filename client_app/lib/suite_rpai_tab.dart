@@ -442,7 +442,7 @@ class SuiteRpaiTabState extends State<SuiteRpaiTab> {
     final status = nedFaceStatusLabel(stimulus);
     switch (stimulus) {
       case NedIconStimulus.idle:
-        return 'STATUS: $status · calm';
+        return 'STATUS: $status · at ease';
       case NedIconStimulus.asking:
         return 'STATUS: $status · your call';
       case NedIconStimulus.processing:

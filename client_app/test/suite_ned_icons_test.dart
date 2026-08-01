@@ -18,14 +18,15 @@ void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
   group('face asset tree (shipped paths)', () {
-    test('all five Imagine faces exist on disk + in path constants', () {
+    test('resting base + four task faces exist on disk + in path constants', () {
       final root = _clientAppRoot();
       for (final rel in kNedFaceAssetPaths) {
         final f = File('${root.path}/$rel');
         expect(f.existsSync(), isTrue, reason: 'missing $rel under ${root.path}');
         expect(f.lengthSync(), greaterThan(1000), reason: '$rel too small');
       }
-      expect(kNedFaceAssetPaths, contains(kNedFaceAssetDefault));
+      expect(kNedFaceAssetPaths, contains(kNedFaceAssetResting));
+      expect(kNedFaceAssetDefault, kNedFaceAssetResting);
       expect(kNedFaceAssetPaths, contains(kNedFaceAssetError));
       expect(kNedFaceAssetPaths, contains(kNedFaceAssetExcited));
       expect(kNedFaceAssetPaths, contains(kNedFaceAssetConfused));
@@ -33,6 +34,9 @@ void main() {
       // Distinct assets — no accidental alias of all faces to one file.
       final basenames = kNedFaceAssetPaths.map((p) => p.split('/').last).toSet();
       expect(basenames.length, 5);
+      expect(basenames, contains('ned_face_resting.png'));
+      // Prior gallery "default smile" is not the idle base path.
+      expect(kNedFaceAssetResting, isNot(contains('ned_face_default.png')));
       // Primary chrome list is the face set.
       expect(kNedIconAssetPaths, kNedFaceAssetPaths);
     });
@@ -43,18 +47,19 @@ void main() {
       for (final rel in kNedFaceAssetPaths) {
         expect(pubspec, contains(rel), reason: 'pubspec must declare $rel');
       }
+      expect(pubspec, contains('ned_face_resting.png'));
     });
   });
 
   group('nedIconStimulusFor (pure, real phases → faces)', () {
-    test('menu → idle default; done → ready excited', () {
+    test('menu → idle resting base; done → ready excited', () {
       expect(
         nedIconStimulusFor(phase: NedGuidePhase.menu),
         NedIconStimulus.idle,
       );
       expect(
         nedIconAssetForStimulus(NedIconStimulus.idle),
-        kNedFaceAssetDefault,
+        kNedFaceAssetResting,
       );
       expect(
         nedIconStimulusFor(phase: NedGuidePhase.done),
@@ -64,8 +69,13 @@ void main() {
         nedIconAssetForStimulus(NedIconStimulus.ready),
         kNedFaceAssetExcited,
       );
-      expect(nedFaceStatusLabel(NedIconStimulus.idle), 'DEFAULT');
+      expect(nedFaceStatusLabel(NedIconStimulus.idle), 'RESTING');
       expect(nedFaceStatusLabel(NedIconStimulus.ready), 'EXCITED');
+      // Resting asset is distinct from task faces.
+      expect(kNedFaceAssetResting, isNot(kNedFaceAssetConfused));
+      expect(kNedFaceAssetResting, isNot(kNedFaceAssetExcited));
+      expect(kNedFaceAssetResting, isNot(kNedFaceAssetSleep));
+      expect(kNedFaceAssetResting, isNot(kNedFaceAssetError));
     });
 
     test('ask* phases → confused face', () {
@@ -135,12 +145,13 @@ void main() {
       var s = nedGuideInitial(registered: false, deferred: true);
       expect(s.phase, NedGuidePhase.menu);
       expect(nedIconStimulusForState(s), NedIconStimulus.idle);
-      expect(nedIconAssetForState(s), kNedFaceAssetDefault);
+      expect(nedIconAssetForState(s), kNedFaceAssetResting);
 
       s = nedGuideStartContinueSetup(s);
       expect(s.phase, NedGuidePhase.askContinueSetup);
       expect(nedIconStimulusForState(s), NedIconStimulus.asking);
       expect(nedIconAssetForState(s), kNedFaceAssetConfused);
+      expect(nedIconAssetForState(s), isNot(kNedFaceAssetResting));
 
       s = nedGuideBeginRegistering(s);
       expect(s.phase, NedGuidePhase.registering);
@@ -180,7 +191,7 @@ void main() {
   });
 
   group('SuiteRpaiTab face chrome', () {
-    testWidgets('avatar + default face on deferred menu', (tester) async {
+    testWidgets('avatar + resting face on deferred menu (no task)', (tester) async {
       await _prepSurface(tester);
       final store = SuiteAccountStore(MemorySettingsBackend());
       await store.markDeferred();
@@ -200,11 +211,11 @@ void main() {
       expect(find.byKey(const Key('ned_icon_stimulus_idle')), findsOneWidget);
       expect(find.byKey(const Key('ned_icon_stimulus_label')), findsOneWidget);
       expect(find.byKey(const Key('ned_icon_asset_idle')), findsOneWidget);
-      expect(find.textContaining('DEFAULT'), findsWidgets);
+      expect(find.textContaining('RESTING'), findsWidgets);
       expect(find.byKey(const Key('ned_resume_setup')), findsOneWidget);
     });
 
-    testWidgets('resume → confused face stimulus', (tester) async {
+    testWidgets('resume leaves resting base → confused face', (tester) async {
       await _prepSurface(tester);
       final store = SuiteAccountStore(MemorySettingsBackend());
       await store.markDeferred();
@@ -220,8 +231,10 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.byKey(const Key('ned_icon_stimulus_idle')), findsOneWidget);
+      expect(find.textContaining('RESTING'), findsWidgets);
       await _tapKey(tester, 'ned_resume_setup');
       expect(find.byKey(const Key('ned_icon_stimulus_asking')), findsOneWidget);
+      expect(find.byKey(const Key('ned_icon_stimulus_idle')), findsNothing);
       expect(find.textContaining('CONFUSED'), findsWidgets);
       expect(find.byKey(const Key('ned_setup_yes')), findsOneWidget);
       expect(find.byKey(const Key('ned_setup_no')), findsOneWidget);
@@ -294,7 +307,8 @@ void main() {
           .readAsStringSync();
       expect(mapper.contains('NedGuidePhase'), isTrue);
       expect(mapper.contains('nedIconStimulusFor'), isTrue);
-      expect(mapper.contains('kNedFaceAssetDefault'), isTrue);
+      expect(mapper.contains('kNedFaceAssetResting'), isTrue);
+      expect(mapper.contains('ned_face_resting.png'), isTrue);
       expect(mapper.contains('kNedFaceAssetConfused'), isTrue);
       expect(mapper.contains('kNedFaceAssetSleep'), isTrue);
       expect(mapper.contains('kNedFaceAssetExcited'), isTrue);

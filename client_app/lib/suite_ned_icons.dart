@@ -1,18 +1,18 @@
-/// Ned (rpAI) face icon set + phase→stimulus mapping from the Imagine
-/// "NED Core Package" Preview Gallery (default / ERROR / EXCITED / CONFUSED / SLEEP).
+/// Ned (rpAI) face icon set + phase→stimulus mapping.
+///
+/// **Base / resting** face (Imagine resting post) is the idle menu state when
+/// Ned is not enacting tasks. Task faces come from the Preview Gallery
+/// (ERROR / EXCITED / CONFUSED / SLEEP).
 ///
 /// Pure helpers — unit-tested without widgets. Faces decorate the guide only;
 /// they never gate Connect or replace [suite_ned_guide] transitions.
-///
-/// Prior non-face motifs (package / chip / satellite / gear) may remain on disk
-/// as secondary assets; **faces are the primary rpAI avatar chrome**.
 library;
 
 import 'suite_ned_guide.dart';
 
 /// Named visual stimulus for Ned chrome (maps 1:1 to a discrete face asset).
 enum NedIconStimulus {
-  /// Menu / idle — calm default NED face.
+  /// Menu / idle base — resting face (not enacting tasks).
   idle,
 
   /// Ned is asking a yes/no or primary choice — CONFUSED face.
@@ -31,16 +31,20 @@ enum NedIconStimulus {
   error,
 }
 
-/// Primary face asset paths under [assets/ned/] (see pubspec).
-const String kNedFaceAssetDefault = 'assets/ned/ned_face_default.png';
+/// Resting / at-ease base face (Imagine post 03888eba…) — idle menu avatar.
+const String kNedFaceAssetResting = 'assets/ned/ned_face_resting.png';
+
+/// Alias: default base path is the resting face (supersedes prior gallery smile).
+const String kNedFaceAssetDefault = kNedFaceAssetResting;
+
 const String kNedFaceAssetError = 'assets/ned/ned_face_error.png';
 const String kNedFaceAssetExcited = 'assets/ned/ned_face_excited.png';
 const String kNedFaceAssetConfused = 'assets/ned/ned_face_confused.png';
 const String kNedFaceAssetSleep = 'assets/ned/ned_face_sleep.png';
 
-/// All shippable face motifs (order: default, error, excited, confused, sleep).
+/// All shippable face motifs (resting base + task gallery).
 const List<String> kNedFaceAssetPaths = [
-  kNedFaceAssetDefault,
+  kNedFaceAssetResting,
   kNedFaceAssetError,
   kNedFaceAssetExcited,
   kNedFaceAssetConfused,
@@ -51,7 +55,7 @@ const List<String> kNedFaceAssetPaths = [
 const List<String> kNedIconAssetPaths = kNedFaceAssetPaths;
 
 // Backward-compatible constants (older tests / secondary chrome).
-const String kNedIconAssetPackage = kNedFaceAssetDefault;
+const String kNedIconAssetPackage = kNedFaceAssetResting;
 const String kNedIconAssetChip = kNedFaceAssetSleep;
 const String kNedIconAssetSatellite = kNedFaceAssetConfused;
 const String kNedIconAssetGear = kNedFaceAssetExcited;
@@ -60,7 +64,7 @@ const String kNedIconAssetGear = kNedFaceAssetExcited;
 String nedIconAssetForStimulus(NedIconStimulus stimulus) {
   switch (stimulus) {
     case NedIconStimulus.idle:
-      return kNedFaceAssetDefault;
+      return kNedFaceAssetResting;
     case NedIconStimulus.asking:
       return kNedFaceAssetConfused;
     case NedIconStimulus.processing:
@@ -75,8 +79,8 @@ String nedIconAssetForStimulus(NedIconStimulus stimulus) {
 
 /// Pure phase (+ busy / error) → face stimulus.
 ///
-/// Busy/registering → SLEEP. Ask* → CONFUSED. Explaining/done → EXCITED.
-/// Menu → calm default. ERROR only when [error] is true (real failure).
+/// Menu (not busy) → resting base. Busy/registering → SLEEP. Ask* → CONFUSED.
+/// Explaining/done → EXCITED. ERROR only when [error] is true (real failure).
 NedIconStimulus nedIconStimulusFor({
   required NedGuidePhase phase,
   bool busy = false,
@@ -129,7 +133,7 @@ String nedIconAssetForState(
 String nedIconSemanticsLabel(NedIconStimulus stimulus) {
   switch (stimulus) {
     case NedIconStimulus.idle:
-      return 'Ned idle — calm face';
+      return 'Ned idle — resting face';
     case NedIconStimulus.asking:
       return 'Ned asking — confused face';
     case NedIconStimulus.processing:
@@ -143,11 +147,11 @@ String nedIconSemanticsLabel(NedIconStimulus stimulus) {
   }
 }
 
-/// Face status label matching the Imagine Preview Gallery (for captions).
+/// Face status label for captions (resting base + Preview Gallery statuses).
 String nedFaceStatusLabel(NedIconStimulus stimulus) {
   switch (stimulus) {
     case NedIconStimulus.idle:
-      return 'DEFAULT';
+      return 'RESTING';
     case NedIconStimulus.asking:
       return 'CONFUSED';
     case NedIconStimulus.processing:
