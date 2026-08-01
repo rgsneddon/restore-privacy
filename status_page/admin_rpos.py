@@ -58,7 +58,8 @@ def render_admin_rpos_deploy_howto_html() -> str:
     <li><code>rpos-0.1.0-linux-aarch64.tar.gz</code></li>
   </ul>
   <p><strong>iOS / Android are not installable slots</strong> for rpOS packages.</p>
-  <p>Primary single-click control: <code>RESTORE_rpOS</code> /
+  <p>Primary single-click control for <strong>RESTORE rpOS</strong>:
+  <code>RESTORE_rpOS</code> /
   <code>RESTORE_rpOS.cmd</code>. Flow: multi-layer advisories (careful /
   irreversible / data loss) → exact phrase <code>RESTORE</code> → absolute wipe
   <em>intent</em> (default dry-run adapter; never silent) → foundation install →

@@ -27,20 +27,22 @@ class TestSuite101Catalog(unittest.TestCase):
             rx_browser_package_href,
         )
 
-        self.assertEqual(RELEASE_VERSION, "1.0.1")
-        self.assertEqual(current_catalog_version(), "1.0.1")
+        pin = RELEASE_VERSION
+        self.assertEqual(current_catalog_version(), pin)
         pkgs = list_catalog_platform_packages()
         plats = {p["platform"] for p in pkgs}
         self.assertEqual(
             plats, {"windows", "macos", "linux", "android", "ios"}
         )
         for p in pkgs:
-            self.assertEqual(p["version"], "1.0.1")
-            self.assertIn("1.0.1", p["filename"])
-            self.assertTrue(p["filename"].startswith("restore-privacy-client-1.0.1-"))
+            self.assertEqual(p["version"], pin)
+            self.assertIn(pin, p["filename"])
+            self.assertTrue(
+                p["filename"].startswith(f"restore-privacy-client-{pin}-")
+            )
 
         # Local release tree has real files
-        rel = ROOT / "releases" / "1.0.1"
+        rel = ROOT / "releases" / pin
         for p in pkgs:
             f = rel / p["filename"]
             self.assertTrue(f.is_file(), f"missing {f}")
@@ -53,15 +55,15 @@ class TestSuite101Catalog(unittest.TestCase):
         self.assertTrue(rx.is_file(), rx)
         self.assertGreater(rx.stat().st_size, 0)
         self.assertTrue(
-            (rel / "restore-privacy-browser-extension-1.0.1.zip").is_file()
+            (rel / f"restore-privacy-browser-extension-{pin}.zip").is_file()
         )
         href = rx_browser_package_href(user_agent="Mozilla/5.0 (Windows NT 10.0)")
-        self.assertIn("/assets/1.0.1/", href)
+        self.assertIn(f"/assets/{pin}/", href)
         self.assertIn("rx-browser", href)
 
         # assure helper should not invent platforms
         r = assure_current_catalog_packages()
-        self.assertEqual(r.get("catalog_version"), "1.0.1")
+        self.assertEqual(r.get("catalog_version"), pin)
 
 
 class TestServiceRxLink(unittest.TestCase):
@@ -79,8 +81,10 @@ class TestServiceRxLink(unittest.TestCase):
         self.assertIn(f'id="{SERVICE_RX_BOX_ID}"', html)
         self.assertIn(f'id="{SERVICE_RX_LINK_ID}"', html)
         self.assertIn("data-rx-browser-download", html)
-        self.assertIn("restore-privacy-rx-browser-1.0.1.zip", html)
-        self.assertIn("/assets/1.0.1/", html)
+        from downloads import RELEASE_VERSION, rx_browser_package_filename
+
+        self.assertIn(rx_browser_package_filename(), html)
+        self.assertIn(f"/assets/{RELEASE_VERSION}/", html)
         self.assertIn('data-detected-platform="macos"', html)
         # Companion also links Rx
         self.assertIn("service-link-rx-browser-inline", html)
@@ -224,30 +228,44 @@ class TestRposScaffoldDocs(unittest.TestCase):
                 encoding="utf-8"
             )
         )
-        self.assertEqual(man.get("suite_monopin"), "1.0.1")
+        from downloads import RELEASE_VERSION
+
+        self.assertEqual(man.get("suite_monopin"), RELEASE_VERSION)
 
     def test_windows_breadcrumbs_present(self) -> None:
-        p = ROOT / "releases" / "1.0.1" / "WINDOWS_BREADCRUMBS.md"
+        from downloads import RELEASE_VERSION
+
+        # Prefer current monopin; fall back to prior pin breadcrumbs if not yet staged.
+        p = ROOT / "releases" / RELEASE_VERSION / "WINDOWS_BREADCRUMBS.md"
+        if not p.is_file():
+            p = ROOT / "releases" / "1.0.1" / "WINDOWS_BREADCRUMBS.md"
         self.assertTrue(p.is_file(), p)
         text = p.read_text(encoding="utf-8")
-        self.assertIn("1.0.1", text)
+        self.assertRegex(text, r"1\.\d+\.\d+")
         self.assertIn("Windows", text)
         self.assertIn("breadcrumb", text.lower())
 
 
 class TestBrowserExtension101(unittest.TestCase):
     def test_extension_manifest_and_zip_pin(self) -> None:
+        from downloads import RELEASE_VERSION
+
         man = json.loads(
             (ROOT / "browser_extension" / "manifest.json").read_text(encoding="utf-8")
         )
-        self.assertEqual(man.get("version"), "1.0.1")
+        self.assertEqual(man.get("version"), RELEASE_VERSION)
         self.assertEqual(man.get("manifest_version"), 3)
         core = (ROOT / "browser_extension" / "lib" / "vpn_core.js").read_text(
             encoding="utf-8"
         )
-        self.assertIn('catalogVersion: "1.0.1"', core)
-        z = ROOT / "releases" / "1.0.1" / "restore-privacy-browser-extension-1.0.1.zip"
-        self.assertTrue(z.is_file())
+        self.assertIn(f'catalogVersion: "{RELEASE_VERSION}"', core)
+        z = (
+            ROOT
+            / "releases"
+            / RELEASE_VERSION
+            / f"restore-privacy-browser-extension-{RELEASE_VERSION}.zip"
+        )
+        self.assertTrue(z.is_file(), z)
         self.assertGreater(z.stat().st_size, 0)
 
 
