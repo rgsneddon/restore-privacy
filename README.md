@@ -22,9 +22,10 @@ Install the Suite for free. When you want residual Connect, take a monthly
 licence, paste the KEYGEN from your fulfilment email, and connect. Download
 alone does not unlock residual traffic.
 
-Inside the app: **VPN**, **%** (wallet), and **EVOLVE**. One KEYGEN story across
-those surfaces. Browser and Vault landings stay on the same public chrome for
-what comes next.
+Inside the app: **VPN**, **%** (wallet), **EVOLVE**, and **rpAI** (Ned helper).
+One KEYGEN story unlocks residual Connect. Wallet and Evolve share an **optional**
+unified Suite account (deferrable). Browser and Vault landings stay on the same
+public chrome for what comes next.
 
 ---
 
@@ -35,7 +36,12 @@ what comes next.
 3. Buy a KEYGEN (from **£3.00/month**) on the site — or open **`/pay`** for
    **Monthly VPN plan** / **Yearly VPN plan** (£30.00) residual client options —
    then enter the KEYGEN in the app.
-4. Connect while the licence is **OK**.
+4. Connect while the licence is **OK**. Residual Connect is unlocked by KEYGEN
+   only — **not** by wallet or Evolve registration.
+5. **Optional** after KEYGEN: **Register for % wallet & Evolve?** — one Suite
+   account for Perccent (**%**) and Evolve (**EVOLVE**). Choose **Not now — use
+   VPN only** to defer; Connect keeps working. Resume the same setup later from
+   the **rpAI** (Ned) tab via **Continue wallet & analyser setup**.
 
 Card payment uses Stripe’s hosted checkout. Email delivers **KEYGEN** (`RPT-KEY-…`)
 and fulfilment details (**USE THIS KEYGEN TO UNLOCK RESTORE PRIVACY**). Failed
@@ -47,12 +53,22 @@ Settings → Payment entitlement is a fallback unlock path.
 
 > **Payment for Connect, not for the installer:** residual Connect needs an active
 > KEYGEN while the subscription is valid. The free download is only the package.
+> Suite wallet/Evolve sign-up is optional and never gates Connect.
+
+Operator / implementer detail:
+[docs/SUITE_ACCOUNT_AND_RPAI.md](docs/SUITE_ACCOUNT_AND_RPAI.md) ·
+[client_app/SUITE.md](client_app/SUITE.md).
 
 ---
 
 ## At a glance
 
-- **VPN**, **%**, and **EVOLVE** tabs in one Suite shell (monopin **1.0.1**).
+- **VPN**, **%**, **EVOLVE**, and **rpAI** (Ned) tabs in one Suite shell
+  (catalog monopin matches `client/VERSION` — currently **1.0.2** on storefront).
+- **Optional Suite account** after KEYGEN: one sign-up/sign-in for **%** and
+  **EVOLVE**; **Not now — use VPN only** defers without blocking Connect.
+- **rpAI / Ned:** resume deferred wallet & analyser setup; registered users get
+  **Offer how-to** with stepped **Continue…** explainers, then optional VPN tour.
 - Residual peers: Iceland `82.221.101.241:44044`, Germany `178.105.187.178:44044`
   (**default residual entry**). Multi-hop exit is Germany. United States (US) and
   Romania (RO) residual peers are **retired**.

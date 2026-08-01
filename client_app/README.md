@@ -1,6 +1,11 @@
 # Restore Privacy Client (Flutter)
 
-Cross-platform UI for the **RPT2** tunnel (custom protocol — not WireGuard/OpenVPN).
+Cross-platform UI for the **Restore Privacy Suite**: residual **RPT2** tunnel
+(custom protocol — not WireGuard/OpenVPN), optional Perccent wallet (**%**),
+Evolve (**EVOLVE**), and **rpAI** (Ned).
+
+Product onboarding (KEYGEN, optional Suite account, Ned):
+**[SUITE.md](SUITE.md)** · **[docs/SUITE_ACCOUNT_AND_RPAI.md](../docs/SUITE_ACCOUNT_AND_RPAI.md)**.
 
 | Platform | Status |
 |----------|--------|
@@ -13,6 +18,16 @@ Cross-platform UI for the **RPT2** tunnel (custom protocol — not WireGuard/Ope
 - Endpoint / full tunnel / auto-connect: `lib/rpt_config.dart`  
 - Method channel: `restore_privacy/vpn` (`lib/vpn_controller.dart`)  
 - Theme / privacy message string: `lib/theme.dart`  
+- Optional Suite account (post-KEYGEN, deferrable): `lib/suite_account.dart`,
+  `lib/suite_account_prompt.dart`, `lib/suite_account_apply.dart`  
+- rpAI / Ned scripted guide: `lib/suite_ned_guide.dart`, `lib/suite_rpai_tab.dart`  
+
+**Connect never consults Suite account flags** — only licence + KEYGEN
+(`LicenceGate.mayConnect`). One Suite identity covers **%** and **EVOLVE**;
+**Not now — use VPN only** defers registration. Deferred users resume from
+rpAI (**Continue wallet & analyser setup**); registered users get **Offer how-to**
+with **Continue…** parts and an optional VPN tour.  
+
 
 ## Apple (MacBook)
 

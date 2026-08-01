@@ -10,6 +10,12 @@ export). Unauthenticated `/suite/download` and `/assets/…` requests **redirect
 to `/pay`**. After checkout, use `session_id` / download token / KEYGEN, paste
 the KEYGEN from your fulfilment email, then Connect.
 
+After KEYGEN unlock in the app, Suite may offer an **optional** unified
+sign-up/sign-in for Perccent wallet (**%**) and Evolve (**EVOLVE**). Choosing
+**Not now — use VPN only** defers that account; **Connect is not gated** on
+Suite registration. Resume setup or run how-tos from the **rpAI** (Ned) tab —
+see [SUITE_ACCOUNT_AND_RPAI.md](SUITE_ACCOUNT_AND_RPAI.md).
+
 Live gated route on the status host: `/suite/download?platform=…`  
 (requires `session_id`, `keygen`, or `token` query proof)
 
