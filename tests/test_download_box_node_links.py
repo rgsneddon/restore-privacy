@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import re
 import sys
 import unittest
 from pathlib import Path
@@ -113,14 +112,45 @@ class TestDownloadBoxNodeLinks(unittest.TestCase):
         self.assertIn(f'href="{NODE_PUBLIC_SUITE_PAGES_HREF}"', frag)
         self.assertIn(f'href="{NODE_PUBLIC_SUITE_SOURCE_HREF}"', frag)
 
+        # Business package is standalone on home (above node wipe) — not nested in Suite.
         suite = render_suite_storefront_html()
-        self.assertIn(NODE_PREFERENCE_SECTION_ID, suite)
-        self.assertIn("Full business package?", suite)
-        self.assertIn(COMMERCIAL_SUITE_CHECKOUT_PATH, suite)
-        self.assertNotIn("Prefer to run a residual node?", suite)
-        # Node preference only on Suite (left) box — not the client downloads card
+        self.assertNotIn(NODE_PREFERENCE_SECTION_ID, suite)
+        self.assertNotIn("Full business package?", suite)
+        self.assertNotIn("download-node-preference", suite)
+        self.assertNotIn('data-business-package="1"', suite)
+        # Client downloads card also does not host it
         dl = render_download_section_html()
         self.assertNotIn("download-node-preference", dl)
+
+        # Standalone fragment marks home-business-package (dotted transparent box).
+        stand = render_node_preference_html(standalone=True)
+        self.assertIn("home-business-package", stand)
+        self.assertIn('data-home-business-package="1"', stand)
+        self.assertIn("Full business package?", stand)
+        self.assertIn("deposit", stand.lower())
+        self.assertIn("3000", stand)
+
+        # Home page: shop row → business package → node wipe timer.
+        from app import render_html
+        from downloads import suite_storefront_css
+
+        page = render_html({"title": "RESTORE PRIVACY"}).decode("utf-8")
+        main_i = page.find('id="page-shell"')
+        main = page[main_i:] if main_i >= 0 else page
+        i_row = main.index('id="home-shop-row"')
+        i_biz = main.index(f'id="{NODE_PREFERENCE_SECTION_ID}"')
+        i_nw = main.index("node-wipe")
+        self.assertLess(i_row, i_biz, "business package must follow shop row")
+        self.assertLess(i_biz, i_nw, "business package must sit above node wipe")
+        self.assertIn('data-home-business-package="1"', main)
+        self.assertIn("home-business-package", main)
+        # Dotted transparent style lives in suite_storefront_css (injected on home).
+        css = suite_storefront_css()
+        self.assertIn("border: 1px dashed", css)
+        self.assertIn("rgba(8, 18, 32, 0.18)", css)
+        self.assertIn(".download-node-preference.home-business-package", css)
+        self.assertIn("border: 1px dashed", page)
+        self.assertIn("rgba(8, 18, 32, 0.18)", page)
 
     def test_suite_client_downloads_still_present(self) -> None:
         from downloads import (
@@ -139,27 +169,21 @@ class TestDownloadBoxNodeLinks(unittest.TestCase):
             self.assertIn(f'data-platform="{plat}"', suite)
         self.assertIn("KEYGEN", suite)
         self.assertIn("/pay/checkout", suite)
+        # Business package must NOT nest inside Suite storefront anymore.
+        self.assertNotIn("download-node-preference", suite)
+        self.assertNotIn("Full business package?", suite)
         dl = render_download_section_html()
         self.assertIn('id="downloads"', dl)
         self.assertIn(f"Download Suite client v{RELEASE_VERSION}", dl)
         self.assertIn("dl-buy-now", dl)
-        pref = re.search(
-            r'id="download-node-preference".*?</aside>',
-            suite,
-            re.DOTALL,
-        )
-        self.assertIsNotNone(pref)
-        assert pref is not None
-        block = pref.group(0).lower()
-        self.assertIn("deposit", block)
-        self.assertIn("3000", block)
-        self.assertIn("business package", block)
 
-    def test_public_site_mirror_suite_downloads_1_0_0(self) -> None:
-        """Static public_site export: Suite brand + live host 1.0.0 free downloads."""
+    def test_public_site_mirror_suite_downloads_current(self) -> None:
+        """Static public_site export: Suite brand + live host free downloads."""
+        from downloads import RELEASE_VERSION
+
         html = (ROOT / "public_site" / "index.html").read_text(encoding="utf-8")
         self.assertIn("Restore Privacy Suite", html)
-        self.assertIn("1.0.0", html)
+        self.assertIn(RELEASE_VERSION, html)
         self.assertNotIn("Restore Privacy VPN", html)
         self.assertNotIn("RESTORE PRIVACY VPN", html)
         for plat in ("windows", "android", "macos", "ios", "linux"):

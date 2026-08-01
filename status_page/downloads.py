@@ -1668,13 +1668,22 @@ def suite_storefront_css() -> str:
       border-radius: 1px; flex: 0 0 auto;
       display: block; opacity: 0.9;
     }
-    /* Full business package / commercial deposit (Suite box) */
+    /* Full business package / commercial deposit (standalone home box) */
     .download-node-preference {
-      margin: 1rem auto 0; max-width: 36rem; padding: 0.85rem 1rem;
+      margin: 0 auto clamp(0.95rem, 2.2vw, 1.35rem);
+      max-width: min(42rem, 100%);
+      width: 100%;
+      padding: 0.85rem 1rem;
       text-align: center; box-sizing: border-box;
       border: 1px dashed rgba(174, 208, 234, 0.4);
       border-radius: 12px;
-      background: rgba(8, 18, 32, 0.45);
+      /* Transparent fill so page background / motif shows through */
+      background: rgba(8, 18, 32, 0.18);
+    }
+    .download-node-preference.home-business-package {
+      display: block;
+      margin-left: auto;
+      margin-right: auto;
     }
     .download-node-preference h3 {
       margin: 0 0 0.45rem; font-size: 0.92rem; font-weight: 800;
@@ -1724,11 +1733,14 @@ def suite_storefront_css() -> str:
 """
 
 
-def render_node_preference_html() -> str:
+def render_node_preference_html(*, standalone: bool = True) -> str:
     """Full business package block: residual node / Raskul host + £3000 deposit.
 
     Primary copy is commercial deposit framing (not KEYGEN client preference).
     £3000 control posts into the same commercial Stripe checkout as /service.
+
+    When *standalone* is True (homepage placement above the Node data clear
+    timer), adds ``home-business-package`` for full-width layout styling.
     """
     links = [
         (NODE_OPERATOR_DOCS_HREF, NODE_OPERATOR_DOCS_LABEL, "node-docs"),
@@ -1749,10 +1761,12 @@ def render_node_preference_html() -> str:
             f'rel="noopener noreferrer">'
             f"{_esc_html(label)}</a>"
         )
+    stand_cls = " home-business-package" if standalone else ""
+    stand_attr = ' data-home-business-package="1"' if standalone else ""
     return f"""
-    <aside class="download-node-preference" id="{NODE_PREFERENCE_SECTION_ID}"
+    <aside class="download-node-preference{stand_cls}" id="{NODE_PREFERENCE_SECTION_ID}"
            data-node-preference="1" data-business-package="1"
-           data-commercial-deposit="1"
+           data-commercial-deposit="1"{stand_attr}
            data-price-pence="{NODE_PREFERENCE_DEPOSIT_PENCE}"
            aria-label="Full business package — residual node and deposit">
       <h3 id="node-pref-heading">{_esc_html(NODE_PREFERENCE_HEADING)}</h3>
@@ -1955,7 +1969,6 @@ def render_suite_storefront_html(
       Download first, then enter the KEYGEN from your fulfilment email after checkout.
       Yearly VPN plans remain available in the client download box below.
     </p>
-{render_node_preference_html()}
 {render_suite_world_flags_html()}
   </section>
 """

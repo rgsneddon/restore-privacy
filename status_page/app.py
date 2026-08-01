@@ -61,6 +61,7 @@ from downloads import (
     render_download_section_html,
     render_free_download_cta_html,
     render_free_packages_page_html,
+    render_node_preference_html,
     render_suite_storefront_html,
     suite_storefront_css,
     SUITE_FREE_DOWNLOAD_PATH,
@@ -653,7 +654,8 @@ def render_html(
         active="home",
         product_active="vpn",
     )
-    # Shop dual-row first (Suite + client downloads as halves), then intro / timers.
+    # Shop dual-row first (Suite + client downloads as halves), then full-width
+    # business package dotted box, then Node data clear timer.
     shop_row_html = f"""
     <div class="home-shop-row" id="home-shop-row" data-home-shop-row="1"
          data-layout="two-halves" aria-label="Suite and client downloads">
@@ -661,12 +663,14 @@ def render_html(
 {downloads_html}
     </div>
 """
+    business_package_html = render_node_preference_html(standalone=True)
     body = f"""{public_head_open(title=str(title), extra_css=page_css)}
   <div class="page-shell" id="page-shell" data-page="home" data-product="suite" data-suite-version="{RELEASE_VERSION}" data-chrome="pro">
 {header}
 {suite_intro_html}
 {free_cta_html}
 {shop_row_html}
+{business_package_html}
 {node_wipe_html}
     <section class="panel-card" id="audit-panel" aria-label="Security audit countdown" data-chrome="pro">
 {countdown_html}

@@ -85,6 +85,14 @@ class TestHomepageTwoHalves(unittest.TestCase):
         i_nw = main.find("node-wipe")
         if i_nw > 0:
             self.assertLess(i_row, i_nw)
+        # Full business package dotted box sits between shop row and node wipe.
+        i_biz = main.find("download-node-preference")
+        if i_biz > 0:
+            self.assertLess(i_row, i_biz)
+            if i_nw > 0:
+                self.assertLess(i_biz, i_nw)
+            self.assertIn("home-business-package", main)
+            self.assertIn("Full business package?", main)
 
 
 if __name__ == "__main__":
