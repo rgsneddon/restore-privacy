@@ -232,7 +232,7 @@ def main(argv: list[str] | None = None) -> int:
         last = 0
         for cmd in args.command:
             if args.json:
-                # Parse optional :lang prefix
+                # Parse optional :lang prefix — unknown tags fail closed (no auto-detect).
                 language = default_lang
                 code = cmd
                 s = cmd.strip()
@@ -244,7 +244,16 @@ def main(argv: list[str] | None = None) -> int:
                         language = None
                         code = rest
                     else:
-                        language = resolve_language(tag) or language
+                        resolved = resolve_language(tag)
+                        if resolved is None:
+                            result = run_snippet(
+                                rest or "",
+                                language=tag,  # forces unsupported-language path
+                            )
+                            print(json.dumps(result.to_dict(), indent=2))
+                            last = int(result.exit_code)
+                            continue
+                        language = resolved
                         code = rest
                 result = run_snippet(code, language=language)
                 print(json.dumps(result.to_dict(), indent=2))

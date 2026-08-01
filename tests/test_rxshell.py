@@ -143,6 +143,52 @@ class TestRxShellCLI(unittest.TestCase):
         self.assertEqual(rc2, 0)
         self.assertIn("81", out2.getvalue())
 
+    def test_json_c_unknown_lang_tag_fail_closed(self) -> None:
+        """--json -c ':cobol …' must not auto-detect as python (exit 127, ok=false)."""
+        from rpos.rxshell.repl import main as rxshell_main
+        from io import StringIO
+        from unittest import mock
+        import json as json_mod
+
+        buf = StringIO()
+        err = StringIO()
+        with mock.patch("sys.stdout", buf), mock.patch("sys.stderr", err):
+            rc = rxshell_main(["--json", "-c", ":cobol print(1)"])
+        self.assertEqual(rc, 127, msg=(buf.getvalue(), err.getvalue()))
+        data = json_mod.loads(buf.getvalue())
+        self.assertFalse(data.get("ok"))
+        self.assertEqual(int(data.get("exit_code")), 127)
+        err_s = (data.get("error") or "").lower()
+        self.assertTrue(
+            "unsupported" in err_s or "unknown" in err_s,
+            msg=data,
+        )
+        # Must not have silently executed as python
+        self.assertNotEqual(data.get("language"), "python")
+        self.assertNotIn("1\n", data.get("stdout") or "")
+
+        # Same path via real module entry (subprocess)
+        env = {**dict(**__import__("os").environ), "PYTHONPATH": str(ROOT)}
+        p = subprocess.run(
+            [
+                sys.executable,
+                "-m",
+                "rpos.rxshell",
+                "--json",
+                "-c",
+                ":cobol print(1)",
+            ],
+            cwd=str(ROOT),
+            capture_output=True,
+            text=True,
+            env=env,
+            check=False,
+        )
+        self.assertEqual(p.returncode, 127, p.stdout + p.stderr)
+        data2 = json_mod.loads(p.stdout)
+        self.assertFalse(data2.get("ok"))
+        self.assertIn("unsupported", (data2.get("error") or "").lower())
+
 
 class TestRposVersionPackage(unittest.TestCase):
     def test_version_constants_0_2_0(self) -> None:
