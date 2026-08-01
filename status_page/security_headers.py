@@ -23,11 +23,9 @@ FORM_ACTION_DIRECTIVE = (
     "https://buy.stripe.com"
 )
 
-# Suite left-box embeds the live Perccent block explorer (wallet area iframe).
-# Without frame-src, default-src 'self' blocks the external explorer document.
-FRAME_SRC_DIRECTIVE = (
-    "frame-src 'self' https://evolve-perc-internet.onrender.com"
-)
+# Same-origin framing only (e.g. thank-you download iframe). The Suite page no
+# longer embeds the external Perccent block explorer.
+FRAME_SRC_DIRECTIVE = "frame-src 'self'"
 
 CONTENT_SECURITY_POLICY = (
     "default-src 'self'; "

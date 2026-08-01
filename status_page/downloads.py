@@ -1154,13 +1154,6 @@ SUITE_ECOSYSTEM_VPN_HREF = "#suite-vpn"
 SUITE_ECOSYSTEM_VPN_LABEL = "VPN"
 SUITE_ECOSYSTEM_VPN_KEY = "suite-vpn"
 
-# Live Perccent block explorer (iframe inside Suite box perc-wallet area).
-# User-facing Render host for the full community explorer UI.
-SUITE_PERC_WALLET_EXPLORER_IFRAME_SRC = "https://evolve-perc-internet.onrender.com"
-SUITE_PERC_WALLET_EXPLORER_ID = "suite-perc-wallet-explorer"
-SUITE_PERC_WALLET_EXPLORER_IFRAME_ID = "suite-perc-wallet-explorer-frame"
-SUITE_PERC_WALLET_EXPLORER_LABEL = "Perc wallet · block explorer"
-
 # Full business package / residual node host (commercial deposit path via Service).
 # Primary doc is status-host /NODE_OPERATOR.md (public pack), not Suite README.
 NODE_PREFERENCE_SECTION_ID = "download-node-preference"
@@ -1756,45 +1749,13 @@ def render_suite_product_submenu_html() -> str:
 
 
 def render_suite_perc_wallet_explorer_iframe_html() -> str:
-    """Iframe the live Perccent block explorer into the Suite perc-wallet area.
+    """No longer embeds the Perccent block explorer on the Suite storefront.
 
-    Embeds :data:`SUITE_PERC_WALLET_EXPLORER_IFRAME_SRC`
-    (``https://evolve-perc-internet.onrender.com``) so visitors see the full
-    community explorer inside the Suite storefront wallet section.
+    Kept as a no-op helper so older call sites stay import-safe. The explorer
+    remains available via the ecosystem submenu external link
+    (:data:`SUITE_PERC_EXPLORER_HREF`) opened in a normal browser tab.
     """
-    src = SUITE_PERC_WALLET_EXPLORER_IFRAME_SRC.rstrip("/")
-    # Prefer trailing slash for directory-style explorer hosts
-    src_href = src + "/"
-    return f"""
-    <div class="suite-perc-wallet-explorer" id="{SUITE_PERC_WALLET_EXPLORER_ID}"
-         data-suite-perc-wallet-explorer="1" data-product="perccent-wallet"
-         data-explorer-host="evolve-perc-internet.onrender.com">
-      <p class="suite-perc-wallet-explorer-label"
-         id="suite-perc-wallet-explorer-label">
-        {_esc_html(SUITE_PERC_WALLET_EXPLORER_LABEL)}
-      </p>
-      <div class="suite-perc-wallet-explorer-frame-wrap"
-           id="suite-perc-wallet-explorer-frame-wrap">
-        <iframe class="suite-perc-wallet-explorer-frame"
-                id="{SUITE_PERC_WALLET_EXPLORER_IFRAME_ID}"
-                src="{_esc_html(src_href)}"
-                title="Perccent Network Explorer — Evolve Chronoflux"
-                loading="lazy"
-                referrerpolicy="no-referrer-when-downgrade"
-                allow="fullscreen"
-                sandbox="allow-scripts allow-same-origin allow-popups allow-forms allow-popups-to-escape-sandbox"
-                data-explorer-iframe="1"
-                data-src-host="evolve-perc-internet.onrender.com"></iframe>
-      </div>
-      <p class="suite-perc-wallet-explorer-open">
-        <a class="suite-sub-link" id="suite-perc-wallet-explorer-open"
-           href="{_esc_html(src_href)}" target="_blank" rel="noopener noreferrer"
-           data-suite-sub="perc-wallet-explorer-open">
-          Open block explorer full page
-        </a>
-      </p>
-    </div>
-"""
+    return ""
 
 
 def suite_storefront_css() -> str:
@@ -1833,36 +1794,6 @@ def suite_storefront_css() -> str:
       display: flex; flex-wrap: wrap; gap: 0.4rem; justify-content: center;
       margin: 0.35rem auto 0.85rem; max-width: 36rem; padding: 0;
       list-style: none;
-    }
-    /* Perc wallet area: live block explorer iframe (evolve-perc-internet) */
-    .suite-perc-wallet-explorer {
-      margin: 0.35rem auto 1rem; max-width: 100%; width: 100%;
-      box-sizing: border-box; text-align: center;
-      padding: 0.55rem 0.35rem 0.35rem;
-      border: 1px solid rgba(174, 208, 234, 0.35);
-      border-radius: 12px;
-      background: rgba(8, 16, 32, 0.55);
-    }
-    .suite-perc-wallet-explorer-label {
-      margin: 0 0 0.45rem; font-size: 0.78rem; font-weight: 800;
-      letter-spacing: 0.06em; text-transform: uppercase;
-      color: #aed0ea;
-    }
-    .suite-perc-wallet-explorer-frame-wrap {
-      position: relative; width: 100%;
-      min-height: 16rem; max-height: 22rem;
-      border-radius: 10px; overflow: hidden;
-      background: #0b0d14;
-      border: 1px solid rgba(108, 99, 255, 0.35);
-      box-shadow: inset 0 0 0 1px rgba(0,0,0,0.35);
-    }
-    .suite-perc-wallet-explorer-frame,
-    iframe#suite-perc-wallet-explorer-frame {
-      display: block; width: 100%; height: 20rem; min-height: 16rem;
-      max-height: 22rem; border: 0; background: #0b0d14;
-    }
-    .suite-perc-wallet-explorer-open {
-      margin: 0.45rem 0 0; font-size: 0.82rem;
     }
     /* Neon-gradient underline menu (not filled pill/box chips) */
     .suite-product-submenu a,
@@ -2240,7 +2171,6 @@ def render_suite_storefront_html(
     <span class="suite-version-badge" id="suite-version-badge">{SUITE_VERSION_LABEL}</span>
     <p class="suite-blurb" id="suite-blurb">{SUITE_PRODUCT_SUBTITLE}</p>
 {render_suite_product_submenu_html()}
-{render_suite_perc_wallet_explorer_iframe_html()}
     <p class="suite-keygen-line" id="suite-keygen-line">{SUITE_KEYGEN_HINT}</p>
     <div class="suite-free-primary" id="suite-free-primary" data-free-download="1">
       {primary_free}
