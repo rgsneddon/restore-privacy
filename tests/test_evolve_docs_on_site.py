@@ -45,6 +45,10 @@ class TestEvolveDocsOnSite(unittest.TestCase):
         pack_text = pack.read_text(encoding="utf-8")
         self.assertIn("Chronoflux", pack_text)
         self.assertIn("Social Science", pack_text)
+        # No HTML source-marker comment on the public pack (visible attribution remains).
+        self.assertNotIn("<!-- Source", pack_text)
+        self.assertNotIn("<!-- Source", text)
+        self.assertIn("On this site:", pack_text)
 
     def test_suite_evolve_docs_link_is_same_origin(self) -> None:
         from downloads import (

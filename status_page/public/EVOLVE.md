@@ -1,5 +1,3 @@
-<!-- Source: https://github.com/rgsneddon/evolve/blob/main/README.md -->
-
 > **On this site:** Evolve documentation mirrored from the public [Evolve README](https://github.com/rgsneddon/evolve/blob/main/README.md). That GitHub file remains the source of truth.
 
 # Evolve — Social Science Chronoflux Framework
