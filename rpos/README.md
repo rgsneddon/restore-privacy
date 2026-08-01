@@ -17,15 +17,28 @@ Bundled app surfaces (built per customer requirements):
 
 Moderator / governance surface: **MISHI** (GUI whitewash for every function as SDK).
 
+## Installable platforms (desktop only)
+
+| OS | Arch | How to get |
+|----|------|------------|
+| **Windows** | x86_64 | `releases/rpos/0.1.0/rpos-0.1.0-windows-x64.zip` |
+| **macOS** | universal | `releases/rpos/0.1.0/rpos-0.1.0-macos.zip` |
+| **Linux** | x86_64 | `releases/rpos/0.1.0/rpos-0.1.0-linux-x86_64.tar.gz` |
+| **Linux** | aarch64 | `releases/rpos/0.1.0/rpos-0.1.0-linux-aarch64.tar.gz` |
+
+```bash
+# From restore-privacy monorepo
+python3 scripts/package_rpos.py
+```
+
+**Not installable:** iOS, Android.
+
 ## Install story (honest)
 
-The installer executable **warns** that **RESTORE rpOS** will wipe the device.
-Instant wipe is the product *intent* on desktop Windows / macOS / Linux relatives
-where full-disk format is operable with user consent.
-
-**iOS / Android** cannot freely reformat like desktop OSes — those platforms use
-sideload / managed enrolment scaffolds. This repository does **not** ship fake
-instant-wipe binaries for every device family.
+Each package includes `install.*` (stages foundation under `/opt/rpos` or
+`%ProgramData%\rpos`) and `RESTORE_rpos.*` which **warns** and requires typing
+`RESTORE` before continuing. Full-disk imaging remains operator-controlled —
+packages do not silent-wipe disks.
 
 ## Repositories
 

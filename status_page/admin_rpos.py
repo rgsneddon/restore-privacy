@@ -46,17 +46,21 @@ def render_admin_rpos_deploy_howto_html() -> str:
         privacy policy, security audit).</li>
   </ol>
 
-  <h3>2. Installer story (honest)</h3>
-  <p>The customer-facing installer is framed as a simple executable that
-  <strong>warns the user they are about to wipe the device</strong> before
-  <strong>RESTORE rpOS</strong>. Instant wipe is the <em>product intent</em>
-  for platforms where a full disk format is technically and legally operable
-  (desktop Windows / macOS / Linux relatives with operator consent).</p>
-  <p><strong>iOS / Android cannot freely reformat internal storage like desktop
-  OSes.</strong> On those platforms, deploy uses sideload / managed-device
-  enrolment scaffolds — never a fake “instant wipe binary” claim.</p>
-  <p>Do <strong>not</strong> ship a silent wipe. The RESTORE control must show a
-  clear destructive warning first.</p>
+  <h3>2. Installer story (honest) — desktop packages only</h3>
+  <p>rpOS is <strong>installable only on Windows, macOS, and Linux</strong>
+  (x86_64 + aarch64). Build with
+  <code>python3 scripts/package_rpos.py</code> →
+  <code>releases/rpos/0.1.0/</code>:</p>
+  <ul id="admin-rpos-packages">
+    <li><code>rpos-0.1.0-windows-x64.zip</code> — <code>install.ps1</code> / <code>RESTORE_rpos.ps1</code></li>
+    <li><code>rpos-0.1.0-macos.zip</code> — <code>install.sh</code> / <code>RESTORE_rpos.sh</code></li>
+    <li><code>rpos-0.1.0-linux-x86_64.tar.gz</code></li>
+    <li><code>rpos-0.1.0-linux-aarch64.tar.gz</code></li>
+  </ul>
+  <p><strong>iOS / Android are not installable slots</strong> for rpOS packages.</p>
+  <p>The RESTORE entry <strong>warns</strong> and requires typing <code>RESTORE</code>
+  before foundation install continues. Packages stage the commercial foundation
+  tree — they do <strong>not</strong> ship a silent full-disk reformat binary.</p>
 
   <h3>3. SDK whitewash (built per requirements)</h3>
   <p>Moderator surface: <strong>{RPOS_MODERATOR_SURFACE}</strong> (sexy GUI;
