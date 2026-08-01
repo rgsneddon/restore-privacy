@@ -1895,10 +1895,14 @@ def suite_storefront_css() -> str:
       /* Transparent fill so page background / motif shows through */
       background: rgba(8, 18, 32, 0.18);
     }
+    /* Homepage placement: span full content column (not the narrow 42rem card). */
     .download-node-preference.home-business-package {
       display: block;
-      margin-left: auto;
-      margin-right: auto;
+      width: 100%;
+      max-width: 100%;
+      margin-left: 0;
+      margin-right: 0;
+      box-sizing: border-box;
     }
     .download-node-preference h3 {
       margin: 0 0 0.45rem; font-size: 0.92rem; font-weight: 800;

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 import sys
 import unittest
 from pathlib import Path
@@ -72,7 +73,9 @@ class TestDownloadBoxNodeLinks(unittest.TestCase):
         )
 
         self.assertEqual(NODE_OPERATOR_DOCS_HREF, "/NODE_OPERATOR.md")
-        self.assertEqual(NODE_PREFERENCE_HEADING, "Full business package?")
+        # Heading always carries Full business package + £3000 deposit framing.
+        self.assertIn("Full business package?", NODE_PREFERENCE_HEADING)
+        self.assertIn("3000", NODE_PREFERENCE_HEADING.replace("£", ""))
         self.assertNotEqual(NODE_PREFERENCE_HEADING, "Prefer to run a residual node?")
         self.assertEqual(NODE_PREFERENCE_DEPOSIT_LABEL, COMMERCIAL_SUITE_NODE_PRICE_LABEL)
         self.assertEqual(NODE_PREFERENCE_COMMERCIAL_CHECKOUT, COMMERCIAL_SUITE_CHECKOUT_PATH)
@@ -82,6 +85,7 @@ class TestDownloadBoxNodeLinks(unittest.TestCase):
         self.assertIn('data-node-preference="1"', frag)
         self.assertIn('data-business-package="1"', frag)
         self.assertIn('data-commercial-deposit="1"', frag)
+        self.assertIn(NODE_PREFERENCE_HEADING, frag)
         self.assertIn("Full business package?", frag)
         self.assertNotIn("Prefer to run a residual node?", frag)
         # Old KEYGEN-not-unlock framing must not be primary blurb
@@ -151,6 +155,28 @@ class TestDownloadBoxNodeLinks(unittest.TestCase):
         self.assertIn(".download-node-preference.home-business-package", css)
         self.assertIn("border: 1px dashed", page)
         self.assertIn("rgba(8, 18, 32, 0.18)", page)
+
+        # Homepage/standalone box spans full content width (not narrow 42rem-only card).
+        self.assertRegex(
+            css,
+            r"\.download-node-preference\.home-business-package\s*\{[^}]*width:\s*100%",
+        )
+        self.assertRegex(
+            css,
+            r"\.download-node-preference\.home-business-package\s*\{[^}]*max-width:\s*100%",
+        )
+        # Base card may still use min(42rem, 100%); home override must not re-apply that cap.
+        home_rule = re.search(
+            r"\.download-node-preference\.home-business-package\s*\{([^}]*)\}",
+            css,
+            re.S,
+        )
+        self.assertIsNotNone(home_rule, "home-business-package CSS rule required")
+        assert home_rule is not None
+        home_body = home_rule.group(1)
+        self.assertNotIn("42rem", home_body)
+        self.assertIn("width: 100%", home_body.replace(" ", ""))
+        self.assertIn("max-width:100%", home_body.replace(" ", ""))
 
     def test_suite_client_downloads_still_present(self) -> None:
         from downloads import (
