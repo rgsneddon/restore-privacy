@@ -174,9 +174,10 @@ class TestDownloadBoxNodeLinks(unittest.TestCase):
         self.assertIsNotNone(home_rule, "home-business-package CSS rule required")
         assert home_rule is not None
         home_body = home_rule.group(1)
+        home_compact = re.sub(r"\s+", "", home_body)
         self.assertNotIn("42rem", home_body)
-        self.assertIn("width: 100%", home_body.replace(" ", ""))
-        self.assertIn("max-width:100%", home_body.replace(" ", ""))
+        self.assertIn("width:100%", home_compact)
+        self.assertIn("max-width:100%", home_compact)
 
     def test_suite_client_downloads_still_present(self) -> None:
         from downloads import (
