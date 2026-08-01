@@ -71,6 +71,34 @@ describe('genericBlockLabel', () => {
     );
   });
 
+  it('labels admin seal with confirmed transfer txs as Admin (not Manual tx)', () => {
+    // Admin seals include pending/relayed transfers in the same block — must stay Admin.
+    assert.equal(
+      genericBlockLabel({
+        adminAction: true,
+        adminActionKind: 'push_suite_packages',
+        scenarioLabel: 'Admin: Push Suite Packages',
+        transactions: [
+          { kind: 'adminAction', scenarioLabel: 'Admin: Push Suite Packages' },
+          { kind: 'transfer', id: 'xfer-1', confirmedBy: 'adminAction' },
+          { kind: 'transfer', id: 'xfer-2' },
+        ],
+      }),
+      'Admin: Push Suite Packages',
+    );
+    assert.notEqual(
+      genericBlockLabel({
+        adminAction: true,
+        adminActionKind: 'mint_keygen',
+        transactions: [
+          { kind: 'transfer', id: 'a' },
+          { kind: 'adminAction' },
+        ],
+      }),
+      'Manual tx',
+    );
+  });
+
   it('maps microblock seal', () => {
     const label = genericBlockLabel({
       microblockSeal: true,

@@ -3042,6 +3042,12 @@ class Handler(BaseHTTPRequestHandler):
             plugin_id = (form.get("plugin_id") or "").strip()
             result = apply_processor_entry(plugin_id, form, persist=True)
             if result.get("ok"):
+                self._admin_chronoflux_ok(
+                    "processors_apply",
+                    label="Admin: Processors Apply",
+                    memo=f"plugin_id={plugin_id}",
+                    path="/admin/processors/apply",
+                )
                 keys = ", ".join(result.get("applied_keys") or []) or "(no new values)"
                 msg = f"Saved {plugin_id} connection variables: {keys}."
                 self._send(
@@ -3087,6 +3093,12 @@ class Handler(BaseHTTPRequestHandler):
                 self._redirect(str(r["redirect"]))
                 return
             if r.get("ok"):
+                self._admin_chronoflux_ok(
+                    "upload_package_path",
+                    label="Admin: Upload Package Path",
+                    memo=f"filename={r.get('filename')} platform={r.get('platform')}",
+                    path="/admin/uploads/upload-path",
+                )
                 msg = (
                     f"Path upload {r.get('filename')} v{r.get('version')} "
                     f"platform={r.get('platform')} "
@@ -3249,6 +3261,12 @@ class Handler(BaseHTTPRequestHandler):
                         ),
                     )
                     return
+                self._admin_chronoflux_ok(
+                    "reissue_download",
+                    label="Admin: Reissue Download",
+                    memo=f"purchase_id={issued.get('purchase_id') or pid_in}",
+                    path="/admin/reissue-download",
+                )
                 self._send(
                     200,
                     "text/html; charset=utf-8",
@@ -3345,6 +3363,13 @@ class Handler(BaseHTTPRequestHandler):
                 platform=plat,
             )
             code = 200 if result.get("sent") else 400
+            if result.get("sent"):
+                self._admin_chronoflux_ok(
+                    "resend_fulfilment_email",
+                    label="Admin: Resend Fulfilment Email",
+                    memo=f"platform={plat} purchase_id={pid}",
+                    path="/admin/resend-fulfilment-email",
+                )
             self._send(
                 code,
                 "application/json",
@@ -3611,6 +3636,12 @@ class Handler(BaseHTTPRequestHandler):
                     ),
                 )
                 return
+            self._admin_chronoflux_ok(
+                "seed_test_purchase",
+                label="Admin: Seed Test Purchase",
+                memo=f"platform={plat}",
+                path="/admin/seed-test-purchase",
+            )
             # Pre-fill reissue form with the new purchase id for convenience
             self._send(
                 200,

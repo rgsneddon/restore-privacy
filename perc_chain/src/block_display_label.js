@@ -38,9 +38,7 @@ export function genericBlockLabel(block) {
   const kinds = new Set(txs.map((tx) => tx.kind).filter(Boolean));
   const text = collectScenarioText(block);
 
-  if (kinds.has('transfer')) return 'Manual tx';
-
-  // Admin ChronoFlux progression (status-host mutators → confirmed seal)
+  // Admin ChronoFlux seals may also include confirmed transfer txs — label as Admin first.
   if (
     block.adminAction === true ||
     kinds.has('adminAction') ||
@@ -60,6 +58,8 @@ export function genericBlockLabel(block) {
     }
     return 'Admin action';
   }
+
+  if (kinds.has('transfer')) return 'Manual tx';
 
   if (kinds.has('scenarioReward') || kinds.has('scenarioFaucet')) {
     if (isScsInput(text)) return 'SCS input';

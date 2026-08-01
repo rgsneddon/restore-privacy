@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import io
 import json
 import sys
 import tempfile
@@ -43,11 +44,11 @@ class TestAdminChronofluxMint(unittest.TestCase):
 
     def test_pending_relays_confirmed_on_seal(self) -> None:
         from admin_chronoflux import (
+            empty_ledger,
+            load_ledger,
             mint_admin_action_block,
             queue_pending_relayed_transfer,
-            load_ledger,
             save_ledger,
-            empty_ledger,
         )
 
         with tempfile.TemporaryDirectory() as td:
@@ -96,35 +97,150 @@ class TestAdminChronofluxMint(unittest.TestCase):
         self.assertIn("relay-aa", r["confirmedRelayTxIds"])
 
 
-class TestAdminChronofluxNegative(unittest.TestCase):
-    def test_failed_action_does_not_call_progress_on_unauth(self) -> None:
-        """Unauthenticated admin POST must not mint (structural: after_admin_success not invoked)."""
-        # Drive after_admin_success only on success; failed path uses no hook.
-        # Pure unit: mint only when after_admin_success is called.
-        from admin_chronoflux import after_admin_success, list_admin_chronoflux_blocks
+class _FakeHandler:
+    """Minimal stand-in that uses real Handler methods with controlled I/O."""
+
+    def __init__(self, path: str, body: bytes = b"", headers: dict | None = None):
+        import app as status_app
+
+        self.path = path
+        self.headers = headers or {}
+        self._body = body
+        self.rfile = io.BytesIO(body)
+        self.wfile = io.BytesIO()
+        self._code = None
+        self._sent: list[tuple[str, str]] = []
+        # Bind real methods
+        self._read_body = status_app.Handler._read_body.__get__(self, status_app.Handler)
+        self._admin_chronoflux_ok = status_app.Handler._admin_chronoflux_ok.__get__(
+            self, status_app.Handler
+        )
+        self.do_POST = status_app.Handler.do_POST.__get__(self, status_app.Handler)
+        self.do_GET = status_app.Handler.do_GET.__get__(self, status_app.Handler)
+        self._security_headers = lambda **kw: None
+
+    def send_response(self, code: int) -> None:
+        self._code = code
+
+    def send_header(self, k: str, v: str) -> None:
+        self._sent.append((k, v))
+
+    def end_headers(self) -> None:
+        pass
+
+    def _send(
+        self,
+        code: int,
+        content_type: str,
+        data: bytes,
+        *,
+        extra_headers: list | None = None,
+        allow_framing: bool = False,
+    ) -> None:
+        self._code = code
+        self._body_out = data
+        self._content_type = content_type
+
+
+class TestAdminChronofluxHandlerNegative(unittest.TestCase):
+    """Drive real Handler do_POST/do_GET — failed/unauth must not mint."""
+
+    def test_unauth_mint_keygen_post_does_not_mint(self) -> None:
+        from admin_chronoflux import list_admin_chronoflux_blocks
 
         with tempfile.TemporaryDirectory() as td:
             lp = Path(td) / "ledger.json"
-            # Simulate failure: we never call after_admin_success
-            self.assertEqual(list_admin_chronoflux_blocks(ledger_path=lp), [])
-            # Success path would call:
             with mock.patch(
                 "admin_chronoflux.admin_chronoflux_ledger_path", return_value=lp
+            ), mock.patch(
+                "status_page.admin_chronoflux.admin_chronoflux_ledger_path",
+                return_value=lp,
+            ), mock.patch(
+                "admin_panel.admin_enabled", return_value=True
+            ), mock.patch(
+                "admin_panel.is_authenticated", return_value=False
             ):
-                r = after_admin_success("mint_download", path="/admin/mint-download")
-            self.assertTrue(r.get("ok"))
-            self.assertEqual(len(list_admin_chronoflux_blocks(ledger_path=lp)), 1)
+                # Import after patches so app uses same modules
+                import app as status_app
 
-    def test_read_only_get_does_not_mint(self) -> None:
-        from admin_chronoflux import list_admin_chronoflux_blocks, load_ledger, empty_ledger, save_ledger
+                with mock.patch.object(
+                    status_app, "admin_enabled", return_value=True
+                ), mock.patch.object(
+                    status_app, "is_authenticated", return_value=False
+                ), mock.patch.object(
+                    status_app, "render_login_html", return_value=b"login"
+                ):
+                    h = _FakeHandler(
+                        "/admin/mint-keygen",
+                        body=b"platform=windows&note=test",
+                        headers={"Content-Length": "24"},
+                    )
+                    # Content-Length must match body for _read_body
+                    h.headers = {
+                        "Content-Length": str(len(h._body)),
+                    }
+                    h.do_POST()
+            blocks = list_admin_chronoflux_blocks(ledger_path=lp)
+            self.assertEqual(
+                blocks, [], "unauthenticated mint-keygen must not mint a block"
+            )
+            self.assertEqual(h._code, 200)  # login page
+
+    def test_bad_form_clear_licences_does_not_mint(self) -> None:
+        from admin_chronoflux import list_admin_chronoflux_blocks
 
         with tempfile.TemporaryDirectory() as td:
             lp = Path(td) / "ledger.json"
-            save_ledger(empty_ledger(), lp)
-            # No progress_admin_action → still empty
+            import app as status_app
+
+            with mock.patch.object(
+                status_app, "admin_enabled", return_value=True
+            ), mock.patch.object(
+                status_app, "is_authenticated", return_value=True
+            ), mock.patch(
+                "payments.clear_all_licences_for_admin",
+                side_effect=ValueError("confirm token mismatch"),
+            ), mock.patch(
+                "admin_panel.render_admin_licences_page_html",
+                return_value=b"err",
+            ), mock.patch(
+                "admin_chronoflux.admin_chronoflux_ledger_path", return_value=lp
+            ):
+                body = b"confirm=WRONG"
+                h = _FakeHandler(
+                    "/admin/clear-licences",
+                    body=body,
+                    headers={"Content-Length": str(len(body))},
+                )
+                h.headers = {"Content-Length": str(len(body))}
+                h.do_POST()
             self.assertEqual(list_admin_chronoflux_blocks(ledger_path=lp), [])
-            data = load_ledger(lp)
-            self.assertEqual(data.get("blocks"), [])
+            self.assertEqual(h._code, 400)
+
+    def test_admin_get_does_not_mint(self) -> None:
+        from admin_chronoflux import list_admin_chronoflux_blocks
+
+        with tempfile.TemporaryDirectory() as td:
+            lp = Path(td) / "ledger.json"
+            import app as status_app
+
+            with mock.patch.object(
+                status_app, "admin_enabled", return_value=True
+            ), mock.patch.object(
+                status_app, "is_authenticated", return_value=True
+            ), mock.patch.object(
+                status_app, "render_admin_html", return_value=b"admin-home"
+            ), mock.patch(
+                "admin_chronoflux.admin_chronoflux_ledger_path", return_value=lp
+            ):
+                h = _FakeHandler("/admin", body=b"", headers={})
+                h.headers = {"Content-Length": "0"}
+                h.do_GET()
+            self.assertEqual(
+                list_admin_chronoflux_blocks(ledger_path=lp),
+                [],
+                "admin GET must not mint ChronoFlux blocks",
+            )
 
 
 class TestAdminHandlerHookExists(unittest.TestCase):
@@ -132,7 +248,6 @@ class TestAdminHandlerHookExists(unittest.TestCase):
         import app as status_app
 
         self.assertTrue(hasattr(status_app.Handler, "_admin_chronoflux_ok"))
-        # Source wiring for representative mutators
         src = Path(status_app.__file__).read_text(encoding="utf-8")
         for needle in (
             '"mint_keygen"',
@@ -140,10 +255,16 @@ class TestAdminHandlerHookExists(unittest.TestCase):
             '"clear_licences"',
             '"push_suite_packages"',
             '"support_ticket_close"',
+            '"reissue_download"',
+            '"resend_fulfilment_email"',
+            '"seed_test_purchase"',
+            '"processors_apply"',
+            '"upload_package_path"',
             "_admin_chronoflux_ok",
         ):
             self.assertIn(needle, src, msg=f"missing hook for {needle!r}")
-        self.assertGreaterEqual(src.count("_admin_chronoflux_ok"), 8)
+        self.assertGreaterEqual(src.count("_admin_chronoflux_ok"), 12)
+
 
 if __name__ == "__main__":
     unittest.main()
