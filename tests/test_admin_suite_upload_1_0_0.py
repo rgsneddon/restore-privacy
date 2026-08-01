@@ -13,10 +13,11 @@ sys.path.insert(0, str(ROOT / "status_page"))
 
 
 class TestAdminSuiteUploadUI(unittest.TestCase):
-    def test_processor_suite_push_card_targets_1_0_0(self) -> None:
+    def test_uploads_page_hosts_suite_push_card(self) -> None:
         from admin_panel import (
             render_admin_processors_page_html,
             render_admin_suite_push_upload_html,
+            render_admin_uploads_page_html,
         )
         from downloads import RELEASE_VERSION
 
@@ -26,7 +27,7 @@ class TestAdminSuiteUploadUI(unittest.TestCase):
         self.assertIn('id="admin-suite-push-upload"', frag)
         self.assertIn('id="admin-suite-push-btn"', frag)
         self.assertIn('id="admin-suite-push-form"', frag)
-        self.assertIn("/admin/processors/push-suite", frag)
+        self.assertIn("/admin/uploads/push-suite", frag)
         self.assertIn("Push Suite packages", frag)
         self.assertIn(RELEASE_VERSION, frag)
         self.assertIn("Restore Privacy Suite", frag)
@@ -49,9 +50,18 @@ class TestAdminSuiteUploadUI(unittest.TestCase):
         self.assertIn("Progress", frag)
         self.assertIn("/static/admin_suite_push.js", frag)
 
-        page = render_admin_processors_page_html().decode("utf-8")
+        # Primary home is UPLOADS (not Processors).
+        page = render_admin_uploads_page_html().decode("utf-8")
+        self.assertIn('id="admin-uploads"', page)
+        self.assertIn("UPLOADS", page)
         self.assertIn('id="admin-suite-push-upload"', page)
         self.assertIn("admin-suite-push-btn", page)
+        self.assertIn('id="admin-nav-uploads"', page)
+        self.assertIn('href="/admin/uploads"', page)
+        # Processors no longer embeds the push card.
+        proc = render_admin_processors_page_html().decode("utf-8")
+        self.assertNotIn('id="admin-suite-push-upload"', proc)
+        self.assertIn("/admin/uploads", proc)
 
     def test_node_operator_suite_push_control(self) -> None:
         from admin_node_operator import render_admin_node_operator_page_html
@@ -157,10 +167,14 @@ class TestAdminSuiteUploadPost(unittest.TestCase):
 
     def test_app_routes_push_suite(self) -> None:
         app_src = (ROOT / "status_page" / "app.py").read_text(encoding="utf-8")
+        self.assertIn("/admin/uploads", app_src)
+        self.assertIn("/admin/uploads/push-suite", app_src)
+        self.assertIn("/admin/uploads/push-suite/status", app_src)
+        # Legacy processors paths kept as aliases
         self.assertIn("/admin/processors/push-suite", app_src)
         self.assertIn("push_suite_packages", app_src)
         self.assertIn("start_push_job", app_src)
-        self.assertIn("/admin/processors/push-suite/status", app_src)
+        self.assertIn("render_admin_uploads_page_html", app_src)
 
 
 if __name__ == "__main__":

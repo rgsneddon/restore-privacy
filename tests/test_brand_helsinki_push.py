@@ -259,7 +259,7 @@ class TestAdminSuitePushMarkup(unittest.TestCase):
         self.assertIn("suite-pkg-progress-bar", frag)
         self.assertIn("suite-pkg-done", frag)
         self.assertIn("/static/admin_suite_push.js", frag)
-        self.assertIn("/admin/processors/push-suite/status", frag)
+        self.assertIn("/admin/uploads/push-suite/status", frag)
         self.assertIn("<th>Kind</th>", frag)
         self.assertIn("<th>Status</th>", frag)
         self.assertIn("<th>Progress</th>", frag)
@@ -282,7 +282,8 @@ class TestAdminSuitePushMarkup(unittest.TestCase):
         self.assertIn("data-status", js)
         self.assertIn("setInterval", js)  # continual refresh
         app_src = (ROOT / "status_page" / "app.py").read_text(encoding="utf-8")
-        self.assertIn("/admin/processors/push-suite/status", app_src)
+        self.assertIn("/admin/uploads/push-suite/status", app_src)
+        self.assertIn("/admin/uploads", app_src)
         self.assertIn("start_push_job", app_src)
         self.assertIn("admin_suite_push.js", app_src)
         # CSS green-done for finished rows

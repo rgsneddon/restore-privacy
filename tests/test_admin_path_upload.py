@@ -17,10 +17,11 @@ sys.path.insert(0, str(ROOT / "status_page"))
 
 
 class TestAdminPathUploadUI(unittest.TestCase):
-    def test_processor_settings_has_path_upload_control(self) -> None:
+    def test_uploads_page_has_path_upload_control(self) -> None:
         from admin_panel import (
             render_admin_path_upload_html,
             render_admin_processors_page_html,
+            render_admin_uploads_page_html,
             render_processor_settings_html,
         )
 
@@ -30,19 +31,25 @@ class TestAdminPathUploadUI(unittest.TestCase):
         self.assertIn('id="admin-path-upload-form"', frag)
         self.assertIn('id="admin-path-upload-input"', frag)
         self.assertIn('id="admin-path-upload-btn"', frag)
-        self.assertIn("/admin/processors/upload-path", frag)
-        self.assertIn("/admin/processors/push-suite", frag)
+        self.assertIn("/admin/uploads/upload-path", frag)
+        self.assertIn("/admin/uploads/push-suite", frag)
         self.assertIn("Browse files and Upload", frag)
         self.assertNotIn(">Upload by path<", frag)
         self.assertIn("Push Suite packages", frag)
 
-        settings = render_processor_settings_html()
-        self.assertIn('id="admin-suite-push-upload"', settings)
-        self.assertIn("admin-path-upload-input", settings)
-
-        page = render_admin_processors_page_html().decode("utf-8")
+        # UPLOADS hosts the card; Processors does not.
+        page = render_admin_uploads_page_html().decode("utf-8")
         self.assertIn('id="admin-suite-push-upload"', page)
-        self.assertIn('id="admin-processor-settings"', page)
+        self.assertIn("admin-path-upload-input", page)
+        self.assertIn('id="admin-uploads"', page)
+
+        settings = render_processor_settings_html()
+        self.assertNotIn('id="admin-suite-push-upload"', settings)
+        self.assertIn("/admin/uploads", settings)
+
+        proc = render_admin_processors_page_html().decode("utf-8")
+        self.assertNotIn('id="admin-suite-push-upload"', proc)
+        self.assertIn('id="admin-processor-settings"', proc)
 
     def test_node_operator_has_path_upload_control(self) -> None:
         from admin_node_operator import render_admin_node_operator_page_html

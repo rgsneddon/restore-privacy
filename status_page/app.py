@@ -1986,7 +1986,22 @@ class Handler(BaseHTTPRequestHandler):
                 200, "text/html; charset=utf-8", render_admin_processors_page_html()
             )
             return
+        if path in ("/admin/uploads", "/admin/uploads/"):
+            if not admin_enabled():
+                self._send(503, "text/plain; charset=utf-8", b"admin disabled")
+                return
+            if not is_authenticated(self.headers):
+                self._send(200, "text/html; charset=utf-8", render_login_html())
+                return
+            from admin_panel import render_admin_uploads_page_html
+
+            self._send(
+                200, "text/html; charset=utf-8", render_admin_uploads_page_html()
+            )
+            return
         if path in (
+            "/admin/uploads/push-suite/status",
+            "/admin/uploads/push-suite/status/",
             "/admin/processors/push-suite/status",
             "/admin/processors/push-suite/status/",
         ):
@@ -2977,6 +2992,8 @@ class Handler(BaseHTTPRequestHandler):
             return
 
         if path in (
+            "/admin/uploads/upload-path",
+            "/admin/uploads/upload-path/",
             "/admin/processors/upload-path",
             "/admin/processors/upload-path/",
         ):
@@ -2988,7 +3005,7 @@ class Handler(BaseHTTPRequestHandler):
                 return
             form = dict(urllib.parse.parse_qsl(body.decode("utf-8", "replace")))
             from admin_node_operator import get_operator_controller
-            from admin_panel import render_admin_processors_page_html
+            from admin_panel import render_admin_uploads_page_html
 
             ctrl = get_operator_controller()
             r = ctrl.upload_package_by_path(
@@ -3013,18 +3030,20 @@ class Handler(BaseHTTPRequestHandler):
                 self._send(
                     200,
                     "text/html; charset=utf-8",
-                    render_admin_processors_page_html(message=msg),
+                    render_admin_uploads_page_html(message=msg),
                 )
             else:
                 err = str(r.get("error") or "path upload failed")
                 self._send(
                     400,
                     "text/html; charset=utf-8",
-                    render_admin_processors_page_html(error=err),
+                    render_admin_uploads_page_html(error=err),
                 )
             return
 
         if path in (
+            "/admin/uploads/push-suite",
+            "/admin/uploads/push-suite/",
             "/admin/processors/push-suite",
             "/admin/processors/push-suite/",
         ):
@@ -3062,7 +3081,7 @@ class Handler(BaseHTTPRequestHandler):
                 return
             form = dict(urllib.parse.parse_qsl(body.decode("utf-8", "replace")))
             from admin_node_operator import get_operator_controller
-            from admin_panel import render_admin_processors_page_html
+            from admin_panel import render_admin_uploads_page_html
 
             ctrl = get_operator_controller()
             ver = (form.get("version") or "").strip() or ctrl.catalog_version_default()
@@ -3121,14 +3140,14 @@ class Handler(BaseHTTPRequestHandler):
                 self._send(
                     200,
                     "text/html; charset=utf-8",
-                    render_admin_processors_page_html(message=msg),
+                    render_admin_uploads_page_html(message=msg),
                 )
             else:
                 err = str(r.get("error") or "suite push failed")
                 self._send(
                     400,
                     "text/html; charset=utf-8",
-                    render_admin_processors_page_html(error=err),
+                    render_admin_uploads_page_html(error=err),
                 )
             return
 

@@ -1519,7 +1519,11 @@ def render_processor_settings_html(
   <nav class="plugin-nav" id="processor-plugin-nav" aria-label="Processor plugins">{option_links}</nav>
   {msg_html}{err_html}
 {plugins_html}
-{render_admin_path_upload_html()}
+  <p class="muted" id="admin-processors-uploads-hint" data-uploads-hint="1">
+    Brand package stage/upload moved to
+    <a href="/admin/uploads" id="admin-processors-uploads-link"><strong>UPLOADS</strong></a>
+    (full-brand Helsinki push).
+  </p>
 {admin_section_top_link_html()}</section>
 """
     # Block only real-looking secret values, not doc prefixes (sk_test_… / whsec_…).
@@ -1614,8 +1618,8 @@ def render_admin_suite_push_upload_html() -> str:
     return f"""
 <section class="card nested" id="admin-suite-push-upload"
          data-suite-push-upload="1" data-suite-version="{_escape(catalog_ver)}"
-         data-brand-wide="1" data-push-status-api="/admin/processors/push-suite/status"
-         data-push-job-api="/admin/processors/push-suite">
+         data-brand-wide="1" data-push-status-api="/admin/uploads/push-suite/status"
+         data-push-job-api="/admin/uploads/push-suite">
   <h3 id="admin-suite-push-heading">Push Suite packages</h3>
   <p class="muted" id="admin-suite-push-blurb">
     Stage and upload <strong>full brand</strong> installers (Suite clients, browser/Rx,
@@ -1645,7 +1649,7 @@ def render_admin_suite_push_upload_html() -> str:
 {pkg_table}
     </tbody>
   </table>
-  <form method="post" action="/admin/processors/push-suite"
+  <form method="post" action="/admin/uploads/push-suite"
         id="admin-suite-push-form" data-suite-push-form="1" data-async-push="1">
     <input type="hidden" name="version" value="{_escape(catalog_ver)}" id="admin-suite-push-version"/>
     <input type="hidden" name="async" value="1" id="admin-suite-push-async"/>
@@ -1665,7 +1669,7 @@ def render_admin_suite_push_upload_html() -> str:
     Single installer path under <code>releases/{_escape(catalog_ver)}/</code>
     (catalog basename <code>restore-privacy-client-{_escape(catalog_ver)}-…</code>).
   </p>
-  <form method="post" action="/admin/processors/upload-path"
+  <form method="post" action="/admin/uploads/upload-path"
         id="admin-path-upload-form" data-path-upload-form="1" data-path-upload="1">
     <label class="field" for="admin-path-upload-input">
       <span class="field-label">Local package path</span>
@@ -1717,6 +1721,43 @@ def render_admin_suite_push_upload_html() -> str:
 def render_admin_path_upload_html() -> str:
     """Backward-compatible alias: suite push-upload card (includes path form)."""
     return render_admin_suite_push_upload_html()
+
+
+def render_admin_uploads_page_html(*, message: str = "", error: str = "") -> bytes:
+    """Dedicated admin UPLOADS page: full-brand Helsinki package push.
+
+    Inventory is live brand_wide (Suite + rpOS + apps + extras from releases/).
+    """
+    flash = ""
+    if (message or "").strip():
+        flash += (
+            f'<p class="ok-msg" id="admin-uploads-flash-ok" role="status">'
+            f"{_escape(message.strip())}</p>"
+        )
+    if (error or "").strip():
+        flash += (
+            f'<p class="err" id="admin-uploads-flash-err" role="alert">'
+            f"{_escape(error.strip())}</p>"
+        )
+    main = f"""
+<section class="card" id="admin-uploads" data-admin-uploads="1">
+  <h2 id="admin-uploads-heading">UPLOADS</h2>
+  <p class="muted" id="admin-uploads-blurb">
+    Stage and push <strong>full brand</strong> installers from the monorepo
+    <code>releases/</code> tree (Suite clients, browser/Rx, rpOS, Pens · Tables · Slides,
+    node-installer, node-operator — every present package for the current catalog pin).
+    Inventory is read live on each page load (not a frozen snapshot).
+  </p>
+  {flash}
+  {render_admin_suite_push_upload_html()}
+  {admin_section_top_link_html()}
+</section>
+"""
+    return _admin_page_shell(
+        title="UPLOADS",
+        active="uploads",
+        main_html=main,
+    )
 
 
 def _render_node_usage_section(
@@ -1832,6 +1873,7 @@ def _admin_sidebar_html(*, active: str = "home") -> str:
     link_open = " open" if active == "link-generation" else ""
     lic_open = " open" if active == "licences" else ""
     proc_cls = "sb-btn active" if active == "processors" else "sb-btn"
+    uploads_cls = "sb-btn active" if active == "uploads" else "sb-btn"
     fleet_cls = "sb-btn active" if active == "fleet" else "sb-btn"
     node_op_cls = "sb-btn active" if active == "node-operator" else "sb-btn"
     perc_cls = "sb-btn active" if active == "perc" else "sb-btn"
@@ -1887,6 +1929,8 @@ def _admin_sidebar_html(*, active: str = "home") -> str:
     <span class="sb-label">Support tickets</span></a>
   <a class="{acct_cls}" id="admin-nav-accounting" href="/admin/accounting"><span class="sb-ico">&#163;</span>
     <span class="sb-label">RASKUL LTD accounts</span></a>
+  <a class="{uploads_cls}" id="admin-nav-uploads" href="/admin/uploads"><span class="sb-ico">&#11014;</span>
+    <span class="sb-label">UPLOADS</span></a>
   <a class="{proc_cls}" id="admin-nav-processors" href="/admin/processors"><span class="sb-ico">&#9881;</span>
     <span class="sb-label">Processor settings</span></a>
   <a class="sb-btn" href="/admin/logout" id="admin-logout"><span class="sb-ico">&#9099;</span>
@@ -2278,6 +2322,10 @@ def render_admin_processors_page_html(*, message: str = "", error: str = "") -> 
         active="processors",
         main_html=settings_html,
     )
+
+
+# Stable path constant for tests + nav.
+ADMIN_UPLOADS_PATH = "/admin/uploads"
 
 
 def render_admin_accounting_page_html(
