@@ -1,4 +1,4 @@
-# perc_chain on Helsinki — Restore Privacy Suite v1.0.1
+# perc_chain on Helsinki — Restore Privacy Suite v1.0.4
 
 ## Why Helsinki
 
@@ -40,11 +40,11 @@ Docker (when available):
 
 ```bash
 cd perc_chain
-docker build -t rpt-perc-chain:1.0.1 .
+docker build -t rpt-perc-chain:1.0.4 .
 docker run -d --name rpt-perc-chain -p 9478:9478 \
   -e PERC_PUBLIC_ENDPOINT=http://135.181.152.10:9478 \
   -v /opt/restore-privacy/perc_chain/data:/var/data \
-  rpt-perc-chain:1.0.1
+  rpt-perc-chain:1.0.4
 ```
 
 ## Operator note

@@ -344,6 +344,9 @@ def build_simple_doc(title: str, body_html: str) -> str:
 
 
 def main() -> int:
+    sys.path.insert(0, str(STATUS))
+    from downloads import RELEASE_VERSION  # noqa: E402
+
     if OUT.exists():
         shutil.rmtree(OUT)
     assets = OUT / "assets"
@@ -379,7 +382,7 @@ def main() -> int:
     (OUT / ".nojekyll").write_text("", encoding="utf-8")
     (OUT / "README.md").write_text(
         "# Restore Privacy Suite — public site\n\n"
-        "Static GitHub Pages export for **Restore Privacy Suite v1.0.2**.\n\n"
+        f"Static GitHub Pages export for **Restore Privacy Suite v{RELEASE_VERSION}**.\n\n"
         "Free installers + **Downloads Map** of every product/platform package; "
         "KEYGEN licence from £3/month on restoreprivacy.online.\n\n"
         "This tree is **public only**. It does **not** include `/admin` or operator tools.\n\n"

@@ -53,9 +53,9 @@ def suite_version() -> str:
         sys.path.insert(0, str(ROOT / "status_page"))
         from downloads import RELEASE_VERSION
 
-        return str(RELEASE_VERSION).strip() or "1.0.2"
+        return str(RELEASE_VERSION).strip() or "1.0.4"
     except Exception:
-        return "1.0.2"
+        return "1.0.4"
 
 
 def sha256_file(path: Path) -> str:

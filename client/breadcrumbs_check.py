@@ -252,10 +252,10 @@ def default_product_version() -> str:
         root = _P(__file__).resolve().parents[1]
         ver_path = root / "client" / "VERSION"
         if ver_path.is_file():
-            return ver_path.read_text(encoding="utf-8").strip() or "1.0.1"
+            return ver_path.read_text(encoding="utf-8").strip() or "1.0.4"
     except Exception:  # noqa: BLE001
         pass
-    return "1.0.1"
+    return "1.0.4"
 
 
 def run_check_breadcrumbs_for_product(
