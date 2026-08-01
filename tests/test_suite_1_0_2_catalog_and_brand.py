@@ -42,6 +42,11 @@ class TestSuite102Catalog(unittest.TestCase):
         self.assertTrue(all(p["version"] == "1.0.2" for p in pkgs))
         html = render_download_section_html()
         self.assertIn("1.0.2", html)
+        from public_chrome import PUBLIC_BRAND_VERSION, PUBLIC_BRAND_DISPLAY
+        self.assertEqual(PUBLIC_BRAND_VERSION, "1.0.2")
+        self.assertIn("1.0.2", PUBLIC_BRAND_DISPLAY)
+        app_src = (ROOT / "status_page" / "app.py").read_text(encoding="utf-8")
+        self.assertIn('data-suite-version="{RELEASE_VERSION}"', app_src)
 
     def test_release_files_present(self) -> None:
         d = ROOT / "releases" / "1.0.2"

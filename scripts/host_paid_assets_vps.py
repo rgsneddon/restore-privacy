@@ -1016,6 +1016,34 @@ def install_serve_only(
     )
     token = os.environ.get("RPT_ASSET_FETCH_TOKEN", "").strip()
     if not token:
+        # Prefer monorepo secrets (same value Render already holds) over a new random.
+        for cand in (
+            ROOT / "secrets" / "rpt_asset_fetch_token",
+            ROOT / "secrets" / "RPT_ASSET_FETCH_TOKEN",
+        ):
+            try:
+                if cand.is_file():
+                    token = cand.read_text(encoding="utf-8").strip()
+                    if token:
+                        print(f"using asset token from {cand.relative_to(ROOT)}")
+                        break
+            except OSError:
+                continue
+    if not token and key_path is not None:
+        # Preserve token already installed on the unit (avoid breaking Render).
+        code, out = _ssh_run_openssh(
+            "grep -E '^Environment=RPT_ASSET_FETCH_TOKEN=' "
+            "/etc/systemd/system/rpt-paid-assets.service 2>/dev/null "
+            "| head -1 | sed 's/^[^=]*=[^=]*=//'",
+            host=host,
+            user=user,
+            key_path=key_path,
+            sudo=False,
+        )
+        if code == 0 and (out or "").strip():
+            token = out.strip().splitlines()[0].strip()
+            print("preserving existing host RPT_ASSET_FETCH_TOKEN")
+    if not token:
         token = secrets.token_urlsafe(32)
         print(
             f"generated RPT_ASSET_FETCH_TOKEN (set on Render too): {token}",
