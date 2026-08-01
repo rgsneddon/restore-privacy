@@ -166,6 +166,7 @@ STATIC_ROUTES: dict[str, str] = {
     "/static/admin_fleet_usage.js": "admin_fleet_usage.js",
     "/static/admin_link_generation.js": "admin_link_generation.js",
     "/static/admin_support_tickets.js": "admin_support_tickets.js",
+    "/static/admin_suite_push.js": "admin_suite_push.js",
     "/static/tester_page_gate.js": "tester_page_gate.js",
     # Public redesign: logo-aligned circuit / data-path motif
     "/static/data_path_motif.svg": "data_path_motif.svg",
@@ -1985,6 +1986,58 @@ class Handler(BaseHTTPRequestHandler):
                 200, "text/html; charset=utf-8", render_admin_processors_page_html()
             )
             return
+        if path in (
+            "/admin/processors/push-suite/status",
+            "/admin/processors/push-suite/status/",
+        ):
+            # Authenticated JSON for suite push progress table refresh.
+            if not admin_enabled():
+                self._send(
+                    503,
+                    "application/json; charset=utf-8",
+                    b'{"ok":false,"error":"admin disabled"}',
+                )
+                return
+            if not is_authenticated(self.headers):
+                self._send(
+                    401,
+                    "application/json; charset=utf-8",
+                    b'{"ok":false,"error":"unauthorized"}',
+                )
+                return
+            job_id = str(query.get("job_id") or "").strip()
+            try:
+                from suite_push_progress import job_snapshot
+            except ImportError:
+                from status_page.suite_push_progress import (  # type: ignore
+                    job_snapshot,
+                )
+            if not job_id:
+                self._send(
+                    400,
+                    "application/json; charset=utf-8",
+                    b'{"ok":false,"error":"job_id required"}',
+                )
+                return
+            snap = job_snapshot(job_id)
+            if not snap:
+                self._send(
+                    404,
+                    "application/json; charset=utf-8",
+                    b'{"ok":false,"error":"job not found"}',
+                )
+                return
+            payload = json.dumps(
+                {"ok": True, "job": snap, "job_id": job_id},
+                separators=(",", ":"),
+            ).encode("utf-8")
+            self._send(
+                200,
+                "application/json; charset=utf-8",
+                payload,
+                extra_headers=[("Cache-Control", "no-store")],
+            )
+            return
         if path in ("/admin/rpos", "/admin/rpos/"):
             if not admin_enabled():
                 self._send(503, "text/plain; charset=utf-8", b"admin disabled")
@@ -2976,10 +3029,36 @@ class Handler(BaseHTTPRequestHandler):
             "/admin/processors/push-suite/",
         ):
             if not admin_enabled():
-                self._send(503, "text/plain; charset=utf-8", b"admin disabled")
+                want_json = (
+                    "application/json"
+                    in (self.headers.get("Accept") or "").lower()
+                    or (self.headers.get("X-Requested-With") or "")
+                    == "XMLHttpRequest"
+                )
+                if want_json:
+                    self._send(
+                        503,
+                        "application/json; charset=utf-8",
+                        b'{"ok":false,"error":"admin disabled"}',
+                    )
+                else:
+                    self._send(503, "text/plain; charset=utf-8", b"admin disabled")
                 return
             if not is_authenticated(self.headers):
-                self._send(200, "text/html; charset=utf-8", render_login_html())
+                want_json = (
+                    "application/json"
+                    in (self.headers.get("Accept") or "").lower()
+                    or (self.headers.get("X-Requested-With") or "")
+                    == "XMLHttpRequest"
+                )
+                if want_json:
+                    self._send(
+                        401,
+                        "application/json; charset=utf-8",
+                        b'{"ok":false,"error":"unauthorized"}',
+                    )
+                else:
+                    self._send(200, "text/html; charset=utf-8", render_login_html())
                 return
             form = dict(urllib.parse.parse_qsl(body.decode("utf-8", "replace")))
             from admin_node_operator import get_operator_controller
@@ -2987,6 +3066,39 @@ class Handler(BaseHTTPRequestHandler):
 
             ctrl = get_operator_controller()
             ver = (form.get("version") or "").strip() or ctrl.catalog_version_default()
+            want_async = (
+                form.get("async") == "1"
+                or "application/json"
+                in (self.headers.get("Accept") or "").lower()
+                or (self.headers.get("X-Requested-With") or "")
+                == "XMLHttpRequest"
+            )
+            if want_async:
+                try:
+                    from suite_push_progress import start_push_job
+                except ImportError:
+                    from status_page.suite_push_progress import (  # type: ignore
+                        start_push_job,
+                    )
+                started = start_push_job(
+                    ctrl,
+                    version=ver,
+                    stage=form.get("stage") == "1",
+                    upload=form.get("upload") == "1",
+                    dry_run=form.get("dry_run") == "1",
+                    force=form.get("force") == "1",
+                    allow_missing=form.get("allow_missing") == "1",
+                    install_serve=form.get("install_serve") == "1",
+                )
+                payload = json.dumps(started, separators=(",", ":")).encode("utf-8")
+                code = 200 if started.get("ok") else 400
+                self._send(
+                    code,
+                    "application/json; charset=utf-8",
+                    payload,
+                    extra_headers=[("Cache-Control", "no-store")],
+                )
+                return
             r = ctrl.push_suite_packages(
                 version=ver,
                 stage=form.get("stage") == "1",
@@ -2995,15 +3107,16 @@ class Handler(BaseHTTPRequestHandler):
                 force=form.get("force") == "1",
                 allow_missing=form.get("allow_missing") == "1",
                 install_serve=form.get("install_serve") == "1",
+                brand_wide=True,
             )
             if r.get("missing_ssh_keys") and r.get("redirect"):
                 self._redirect(str(r["redirect"]))
                 return
             if r.get("ok"):
                 msg = (
-                    f"Pushed {r.get('suite')} present={r.get('present_count')}/"
+                    f"Pushed {r.get('suite')} brand present={r.get('present_count')}/"
                     f"{r.get('total')} dry_run={r.get('dry_run')} "
-                    f"upload_code={r.get('upload_code')}"
+                    f"upload_code={r.get('upload_code')} kinds={r.get('kinds')}"
                 )
                 self._send(
                     200,

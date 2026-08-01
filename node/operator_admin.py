@@ -578,15 +578,16 @@ class NodeOperatorController:
         force: bool = False,
         allow_missing: bool = True,
         install_serve: bool = False,
+        progress_cb: Any | None = None,
+        brand_wide: bool = True,
     ) -> dict[str, Any]:
-        """Admin primary path: stage + upload Suite catalog packages (default pin).
+        """Admin primary path: stage + upload brand installers to Helsinki.
 
-        Explicit Suite push-upload entry used by website admin forms. Always
-        resolves the product catalog monopin (Suite **1.0.0** when that is the
-        shipped pin) and drives :meth:`upload_catalog_packages`.
+        Default *brand_wide* includes Suite clients, rpOS, Pens/Tables/Slides,
+        browser/Rx, node-installer, and node-operator packages.
         """
         ver = (version or "").strip() or self.catalog_version_default()
-        inv = self.list_local_packages(version=ver)
+        inv = self.list_local_packages(version=ver, brand_wide=bool(brand_wide))
         deploy = self.upload_catalog_packages(
             version=ver,
             stage=bool(stage),
@@ -595,6 +596,8 @@ class NodeOperatorController:
             force=bool(force),
             allow_missing=bool(allow_missing),
             install_serve=bool(install_serve),
+            progress_cb=progress_cb,
+            brand_wide=bool(brand_wide),
         )
         return {
             "ok": bool(deploy.get("ok")),
@@ -606,6 +609,7 @@ class NodeOperatorController:
             "force": bool(force),
             "allow_missing": bool(allow_missing),
             "install_serve": bool(install_serve),
+            "brand_wide": bool(brand_wide),
             "inventory": inv,
             "inventory_after": deploy.get("inventory_after") or {},
             "staged": deploy.get("staged") or [],
@@ -614,14 +618,44 @@ class NodeOperatorController:
             "present_count": int(inv.get("present_count") or 0),
             "total": int(inv.get("total") or 0),
             "packages": inv.get("packages") or [],
+            "kinds": inv.get("kinds") or [],
             "missing_ssh_keys": bool(deploy.get("missing_ssh_keys")),
             "redirect": str(deploy.get("redirect") or ""),
             "ssh_key_path": str(deploy.get("ssh_key_path") or ""),
         }
 
-    def list_local_packages(self, *, version: str | None = None) -> dict[str, Any]:
-        """Inventory catalog packages under releases/ and status_page/assets/."""
+    def list_local_packages(
+        self, *, version: str | None = None, brand_wide: bool = True
+    ) -> dict[str, Any]:
+        """Inventory packages under releases/ and status_page/assets/.
+
+        When *brand_wide* is True (default for admin push), includes full brand
+        set (Suite + rpOS + Pens/Tables/Slides + extras).
+        """
         ver = (version or "").strip() or self.catalog_version_default()
+        if brand_wide:
+            try:
+                scripts = str(self.repo_root / "scripts")
+                if scripts not in sys.path:
+                    sys.path.insert(0, scripts)
+                from brand_package_inventory import inventory_with_presence
+
+                inv = inventory_with_presence(
+                    suite_version=ver, repo_root=self.repo_root
+                )
+                inv["version"] = ver
+                return inv
+            except Exception as exc:  # noqa: BLE001
+                return {
+                    "ok": False,
+                    "error": str(exc)[:240],
+                    "version": ver,
+                    "packages": [],
+                    "present_count": 0,
+                    "staged_count": 0,
+                    "total": 0,
+                    "kinds": [],
+                }
         try:
             mod = self._load_host_paid_assets()
             pkgs = mod.list_packages(ver)
@@ -645,6 +679,8 @@ class NodeOperatorController:
             staged = self.repo_root / "status_page" / "assets" / ver / fname
             rows.append(
                 {
+                    "kind": "suite_client",
+                    "product": "Restore Privacy Suite",
                     "platform": p["platform"],
                     "filename": fname,
                     "present": found is not None,
@@ -652,6 +688,8 @@ class NodeOperatorController:
                     "size": size,
                     "staged": staged.is_file() and staged.stat().st_size > 0,
                     "staged_path": str(staged),
+                    "status": "pending",
+                    "progress": 0,
                 }
             )
         return {
@@ -661,6 +699,7 @@ class NodeOperatorController:
             "present_count": sum(1 for r in rows if r["present"]),
             "staged_count": sum(1 for r in rows if r["staged"]),
             "total": len(rows),
+            "kinds": ["suite_client"],
         }
 
     def upload_catalog_packages(
@@ -673,12 +712,13 @@ class NodeOperatorController:
         force: bool = False,
         allow_missing: bool = True,
         install_serve: bool = False,
+        progress_cb: Any | None = None,
+        brand_wide: bool = True,
     ) -> dict[str, Any]:
-        """Manual deploy: stage local monopin packages and/or upload to Helsinki.
+        """Manual deploy: stage local packages and/or upload to Helsinki.
 
-        Wraps shipped ``scripts/host_paid_assets_vps.stage_packages`` and
-        ``upload_packages``. Default *allow_missing* is True so partial builds
-        (e.g. Mac without Windows PE yet) can still upload what exists.
+        When *brand_wide* is True, stages/uploads the full brand inventory
+        (Suite + rpOS + Pens/Tables/Slides + extras).
         """
         ver = (version or "").strip() or self.catalog_version_default()
         out: dict[str, Any] = {
@@ -690,6 +730,7 @@ class NodeOperatorController:
             "force": bool(force),
             "allow_missing": bool(allow_missing),
             "install_serve": bool(install_serve),
+            "brand_wide": bool(brand_wide),
             "staged": [],
             "upload_code": None,
             "error": "",
@@ -701,7 +742,7 @@ class NodeOperatorController:
             out["error"] = f"host script unavailable: {exc}"[:240]
             return out
 
-        inv_before = self.list_local_packages(version=ver)
+        inv_before = self.list_local_packages(version=ver, brand_wide=bool(brand_wide))
         out["inventory"] = inv_before
 
         if not stage and not upload:
@@ -710,7 +751,6 @@ class NodeOperatorController:
             return out
 
         # Real SSH upload (not dry-run) requires host access keys.
-        # Missing keys → block SSH and force browser to app-testers.
         if upload and not dry_run:
             pre = self.ssh_upload_access_preflight(upload=True)
             if not pre.get("ok"):
@@ -723,9 +763,16 @@ class NodeOperatorController:
 
         if stage:
             try:
-                staged_paths = mod.stage_packages(
-                    version=ver, allow_missing=bool(allow_missing)
-                )
+                if brand_wide and hasattr(mod, "stage_brand_packages"):
+                    staged_paths = mod.stage_brand_packages(
+                        version=ver,
+                        allow_missing=bool(allow_missing),
+                        progress_cb=progress_cb,
+                    )
+                else:
+                    staged_paths = mod.stage_packages(
+                        version=ver, allow_missing=bool(allow_missing)
+                    )
                 out["staged"] = [str(p) for p in staged_paths]
             except FileNotFoundError as exc:
                 out["error"] = f"stage failed: {exc}"[:300]
@@ -736,15 +783,27 @@ class NodeOperatorController:
 
         if upload:
             try:
-                code = int(
-                    mod.upload_packages(
-                        version=ver,
-                        dry_run=bool(dry_run),
-                        install_serve=bool(install_serve),
-                        force=bool(force),
-                        allow_missing=bool(allow_missing),
+                if brand_wide and hasattr(mod, "upload_brand_packages"):
+                    code = int(
+                        mod.upload_brand_packages(
+                            version=ver,
+                            dry_run=bool(dry_run),
+                            install_serve=bool(install_serve),
+                            force=bool(force),
+                            allow_missing=bool(allow_missing),
+                            progress_cb=progress_cb,
+                        )
                     )
-                )
+                else:
+                    code = int(
+                        mod.upload_packages(
+                            version=ver,
+                            dry_run=bool(dry_run),
+                            install_serve=bool(install_serve),
+                            force=bool(force),
+                            allow_missing=bool(allow_missing),
+                        )
+                    )
             except Exception as exc:  # noqa: BLE001
                 out["error"] = f"upload failed: {exc}"[:300]
                 return out
@@ -754,7 +813,9 @@ class NodeOperatorController:
                 return out
 
         out["ok"] = True
-        out["inventory_after"] = self.list_local_packages(version=ver)
+        out["inventory_after"] = self.list_local_packages(
+            version=ver, brand_wide=bool(brand_wide)
+        )
         return out
 
     def validate_package_file_path(self, path: str | Path) -> dict[str, Any]:

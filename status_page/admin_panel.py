@@ -1533,11 +1533,11 @@ def render_processor_settings_html(
 
 
 def render_admin_suite_push_upload_html() -> str:
-    """Best-in-class admin card: push-upload Restore Privacy Suite packages.
+    """Admin card: push full-brand installers to Helsinki with live progress.
 
-    Primary control targets the catalog suite pin (default **1.0.0**) via the
-    shipped Helsinki paid_assets path. Includes inventory + one-click push +
-    optional single-path upload.
+    Inventory is brand-wide (Suite clients, browser/Rx, rpOS, Pens/Tables/Slides,
+    node-installer, node-operator). Table shows kind/status/progress bars and is
+    refreshed by ``/static/admin_suite_push.js`` while a push job runs.
     """
     try:
         from admin_node_operator import get_operator_controller
@@ -1549,9 +1549,9 @@ def render_admin_suite_push_upload_html() -> str:
         ctrl = get_operator_controller()
         catalog_ver = ctrl.catalog_version_default()
         suite_label = ctrl.suite_product_label(catalog_ver)
-        inv = ctrl.list_local_packages(version=catalog_ver)
+        inv = ctrl.list_local_packages(version=catalog_ver, brand_wide=True)
     except Exception:  # noqa: BLE001
-        catalog_ver = "1.0.0"
+        catalog_ver = "1.0.1"
         suite_label = f"Restore Privacy Suite v{catalog_ver}"
         inv = {
             "ok": False,
@@ -1559,6 +1559,7 @@ def render_admin_suite_push_upload_html() -> str:
             "present_count": 0,
             "staged_count": 0,
             "total": 0,
+            "kinds": [],
         }
     pkg_rows: list[str] = []
     for p in inv.get("packages") or []:
@@ -1570,48 +1571,84 @@ def render_admin_suite_push_upload_html() -> str:
             if size >= 1_000_000
             else (f"{size} B" if size else "—")
         )
+        status = str(p.get("status") or "pending")
+        progress = int(p.get("progress") or 0)
+        kind = str(p.get("kind") or "")
+        product = str(p.get("product") or "")
+        fname = str(p.get("filename") or "")
+        done_cls = " suite-pkg-done" if status == "done" else ""
         pkg_rows.append(
-            "<tr>"
-            f"<td>{_escape(p.get('platform'))}</td>"
-            f"<td><code>{_escape(p.get('filename'))}</code></td>"
-            f"<td data-present=\"{present}\">{present}</td>"
-            f"<td data-staged=\"{staged}\">{staged}</td>"
-            f"<td>{_escape(size_s)}</td>"
+            f'<tr class="suite-pkg-row{done_cls}" data-filename="{_escape(fname)}" '
+            f'data-status="{_escape(status)}" data-progress="{progress}" '
+            f'data-kind="{_escape(kind)}">'
+            f'<td class="suite-pkg-kind">{_escape(kind)}</td>'
+            f'<td class="suite-pkg-product">{_escape(product)}</td>'
+            f'<td class="suite-pkg-platform">{_escape(p.get("platform"))}</td>'
+            f'<td class="suite-pkg-file"><code>{_escape(fname)}</code></td>'
+            f'<td data-present="{present}" class="suite-pkg-local">{present}</td>'
+            f'<td data-staged="{staged}" class="suite-pkg-staged">{staged}</td>'
+            f'<td class="suite-pkg-size">{_escape(size_s)}</td>'
+            f'<td class="suite-pkg-status" data-status="{_escape(status)}">'
+            f"{_escape(status)}</td>"
+            f'<td class="suite-pkg-progress-cell">'
+            f'<div class="suite-pkg-progress-wrap" role="progressbar" '
+            f'aria-valuemin="0" aria-valuemax="100" aria-valuenow="{progress}">'
+            f'<div class="suite-pkg-progress-bar" style="width:{progress}%"></div>'
+            f"</div>"
+            f'<span class="suite-pkg-progress-pct">{progress}%</span></td>'
             "</tr>"
         )
     pkg_table = (
         "\n".join(pkg_rows)
         if pkg_rows
-        else '<tr id="admin-suite-packages-empty"><td colspan="5">No catalog packages</td></tr>'
+        else (
+            '<tr id="admin-suite-packages-empty">'
+            '<td colspan="9">No brand packages in inventory</td></tr>'
+        )
     )
     present_n = int(inv.get("present_count") or 0)
     staged_n = int(inv.get("staged_count") or 0)
     total_n = int(inv.get("total") or 0)
+    kinds = inv.get("kinds") or []
+    kinds_s = ", ".join(str(k) for k in kinds) if kinds else "—"
     return f"""
 <section class="card nested" id="admin-suite-push-upload"
-         data-suite-push-upload="1" data-suite-version="{_escape(catalog_ver)}">
+         data-suite-push-upload="1" data-suite-version="{_escape(catalog_ver)}"
+         data-brand-wide="1" data-push-status-api="/admin/processors/push-suite/status"
+         data-push-job-api="/admin/processors/push-suite">
   <h3 id="admin-suite-push-heading">Push Suite packages</h3>
   <p class="muted" id="admin-suite-push-blurb">
-    Stage and upload <strong>{_escape(suite_label)}</strong> installers to the Helsinki
-    paid store. Drives <code>scripts/host_paid_assets_vps.py</code> — not a public shop
-    control. Prefer <strong>Dry-run</strong> first; use <strong>Allow missing</strong>
-    for partial ships.
+    Stage and upload <strong>full brand</strong> installers (Suite clients, browser/Rx,
+    rpOS, Pens · Tables · Slides, node-installer, node-operator) for
+    <strong>{_escape(suite_label)}</strong> to the Helsinki paid store.
+    Drives <code>scripts/host_paid_assets_vps.py</code> brand inventory.
+    Prefer <strong>Dry-run</strong> first; use <strong>Allow missing</strong>
+    for partial ships. Table refreshes live during push.
   </p>
   <p id="admin-suite-push-inventory" data-suite-inventory="1">
     <span class="suite-badge" id="admin-suite-version-badge">{_escape(suite_label)}</span>
     · catalog <code id="admin-suite-catalog-version">{_escape(catalog_ver)}</code>
     · present <span id="admin-suite-present-count">{present_n}</span>/{total_n}
     · staged <span id="admin-suite-staged-count">{staged_n}</span>/{total_n}
+    · kinds <span id="admin-suite-kinds">{_escape(kinds_s)}</span>
   </p>
-  <table id="admin-suite-packages-table" data-suite-packages="1">
-    <thead><tr><th>Platform</th><th>Filename</th><th>Local</th><th>Staged</th><th>Size</th></tr></thead>
-    <tbody>
+  <p id="admin-suite-push-job-status" class="muted" data-suite-job-status="1"
+     aria-live="polite"></p>
+  <table id="admin-suite-packages-table" data-suite-packages="1"
+         data-suite-packages-progress="1">
+    <thead><tr>
+      <th>Kind</th><th>Product</th><th>Platform</th><th>Filename</th>
+      <th>Local</th><th>Staged</th><th>Size</th>
+      <th>Status</th><th>Progress</th>
+    </tr></thead>
+    <tbody id="admin-suite-packages-tbody">
 {pkg_table}
     </tbody>
   </table>
   <form method="post" action="/admin/processors/push-suite"
-        id="admin-suite-push-form" data-suite-push-form="1">
+        id="admin-suite-push-form" data-suite-push-form="1" data-async-push="1">
     <input type="hidden" name="version" value="{_escape(catalog_ver)}" id="admin-suite-push-version"/>
+    <input type="hidden" name="async" value="1" id="admin-suite-push-async"/>
     <label><input type="checkbox" name="stage" value="1" checked id="admin-suite-push-stage"/> Stage local assets</label>
     <label><input type="checkbox" name="upload" value="1" checked id="admin-suite-push-upload"/> Upload to Helsinki paid_assets</label>
     <label><input type="checkbox" name="allow_missing" value="1" checked id="admin-suite-push-allow-missing"/> Allow missing platforms</label>
@@ -1652,10 +1689,28 @@ def render_admin_suite_push_upload_html() -> str:
 #admin-suite-push-btn.primary-upload,#admin-path-upload-btn{{
   margin-top:0.5rem;padding:0.65rem 1.1rem;border:0;border-radius:8px;
   background:#0d9488;color:#fff;font-weight:700;cursor:pointer}}
-#admin-suite-packages-table{{width:100%;border-collapse:collapse;font-size:0.82rem;margin:0.5rem 0}}
+#admin-suite-packages-table{{width:100%;border-collapse:collapse;font-size:0.78rem;margin:0.5rem 0}}
 #admin-suite-packages-table th,#admin-suite-packages-table td{{
-  border:1px solid var(--border,#333);padding:0.35rem 0.45rem;text-align:left}}
+  border:1px solid var(--border,#333);padding:0.3rem 0.4rem;text-align:left;vertical-align:middle}}
+.suite-pkg-progress-wrap{{
+  display:inline-block;width:6.5rem;height:0.65rem;background:rgba(148,163,184,0.25);
+  border-radius:999px;overflow:hidden;vertical-align:middle;margin-right:0.35rem}}
+.suite-pkg-progress-bar{{
+  height:100%;width:0;background:#0d9488;transition:width 0.25s ease}}
+.suite-pkg-row[data-status="uploading"] .suite-pkg-progress-bar{{background:#38bdf8}}
+.suite-pkg-row[data-status="done"],.suite-pkg-row.suite-pkg-done{{
+  background:rgba(34,197,94,0.12)}}
+.suite-pkg-row[data-status="done"] .suite-pkg-status,
+.suite-pkg-row.suite-pkg-done .suite-pkg-status{{
+  color:#16a34a;font-weight:700}}
+.suite-pkg-row[data-status="done"] .suite-pkg-progress-bar,
+.suite-pkg-row.suite-pkg-done .suite-pkg-progress-bar{{
+  background:#16a34a}}
+.suite-pkg-row[data-status="error"] .suite-pkg-status{{color:#dc2626;font-weight:700}}
+.suite-pkg-row[data-status="skipped"] .suite-pkg-status{{color:#94a3b8}}
+.suite-pkg-progress-pct{{font-size:0.72rem;opacity:0.9}}
 </style>
+<script id="admin-suite-push-script" src="/static/admin_suite_push.js"></script>
 """
 
 

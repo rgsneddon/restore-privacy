@@ -52,6 +52,7 @@ import secrets
 import shutil
 import sys
 from pathlib import Path
+from typing import Any
 
 ROOT = Path(__file__).resolve().parents[1]
 STATUS = ROOT / "status_page"
@@ -81,6 +82,168 @@ DEFAULT_BREADCRUMBS_REMOTE_ROOT = "/opt/restore-privacy/breadcrumbs"
 def list_packages(version: str | None = None) -> list[dict[str, str]]:
     """Shipped helper: current catalog version + five platform packages."""
     return list_catalog_platform_packages(version=version)
+
+
+def list_brand_packages(version: str | None = None) -> list[dict[str, Any]]:
+    """Full brand installer inventory for Helsinki push (Suite + rpOS + apps + extras)."""
+    scripts = ROOT / "scripts"
+    if str(scripts) not in sys.path:
+        sys.path.insert(0, str(scripts))
+    from brand_package_inventory import list_brand_installer_packages
+
+    return list_brand_installer_packages(suite_version=version, repo_root=ROOT)
+
+
+def stage_brand_packages(
+    *,
+    version: str | None = None,
+    allow_missing: bool = False,
+    progress_cb: Any | None = None,
+) -> list[Path]:
+    """Stage all brand packages into status_page/assets/{suite_version}/.
+
+    Flat layout under the Suite catalog pin so Helsinki serve path stays simple.
+    *progress_cb(filename, status, progress)* optional.
+    """
+    scripts = ROOT / "scripts"
+    if str(scripts) not in sys.path:
+        sys.path.insert(0, str(scripts))
+    from brand_package_inventory import (
+        inventory_with_presence,
+        resolve_local_path,
+        list_brand_installer_packages,
+    )
+
+    inv = inventory_with_presence(suite_version=version, repo_root=ROOT)
+    suite_ver = inv["suite_version"]
+    dst_dir = STATUS / "assets" / suite_ver
+    dst_dir.mkdir(parents=True, exist_ok=True)
+    staged: list[Path] = []
+    for row in inv["packages"]:
+        fname = row["filename"]
+        if progress_cb:
+            progress_cb(fname, "uploading", 5)
+        src = resolve_local_path(row, repo_root=ROOT)
+        if src is None:
+            msg = f"missing brand package: {fname} ({row.get('relative_path')})"
+            if allow_missing:
+                print(f"skip_missing {msg}")
+                if progress_cb:
+                    progress_cb(fname, "skipped", 0)
+                continue
+            if progress_cb:
+                progress_cb(fname, "error", 0)
+            raise FileNotFoundError(msg)
+        # Suite clients: keep CFBundle check via stage_packages path for macos
+        dst = dst_dir / fname
+        shutil.copy2(src, dst)
+        staged.append(dst)
+        print(f"staged kind={row.get('kind')} platform={row.get('platform')} {dst} ({dst.stat().st_size} bytes)")
+        if progress_cb:
+            progress_cb(fname, "done", 100)
+    return staged
+
+
+def upload_brand_packages(
+    *,
+    version: str | None = None,
+    dry_run: bool = False,
+    install_serve: bool = False,
+    force: bool = False,
+    allow_missing: bool = False,
+    progress_cb: Any | None = None,
+) -> int:
+    """Upload staged brand packages (any size > min_bytes for kind)."""
+    scripts = ROOT / "scripts"
+    if str(scripts) not in sys.path:
+        sys.path.insert(0, str(scripts))
+    from brand_package_inventory import inventory_with_presence
+
+    inv = inventory_with_presence(suite_version=version, repo_root=ROOT)
+    suite_ver = inv["suite_version"]
+    local_dir = STATUS / "assets" / suite_ver
+    remote_root = os.environ.get(
+        "RPT_VPS_ASSET_REMOTE_ROOT", DEFAULT_VPS_ASSET_REMOTE_ROOT
+    ).strip() or DEFAULT_VPS_ASSET_REMOTE_ROOT
+    remote_ver = f"{remote_root.rstrip('/')}/{suite_ver}"
+    host_default = DEFAULT_VPS_ASSET_HOST
+
+    present: list[dict[str, Any]] = []
+    for row in inv["packages"]:
+        fname = row["filename"]
+        f = local_dir / fname
+        min_b = int(row.get("min_bytes") or 1)
+        if f.is_file() and f.stat().st_size >= min_b:
+            present.append({**row, "local_path": str(f)})
+        elif allow_missing:
+            print(f"skip_missing upload kind={row.get('kind')} file={fname}")
+            if progress_cb:
+                progress_cb(fname, "skipped", 0)
+        else:
+            print(f"missing or too-small local stage: {f}", file=sys.stderr)
+            return 1
+
+    if not present:
+        print("ERROR: no staged brand packages to upload", file=sys.stderr)
+        return 1
+
+    print(f"brand upload plan: {len(present)}/{inv['total']} files -> {host_default}:{remote_ver}/")
+    for p in present:
+        print(f"  {p.get('kind')}/{p.get('platform')}: {p['filename']}")
+
+    if dry_run:
+        for p in present:
+            if progress_cb:
+                progress_cb(p["filename"], "uploading", 50)
+                progress_cb(p["filename"], "done", 100)
+        print("dry-run: no SSH")
+        return 0
+
+    # Reuse SSH path from upload_packages for each file
+    host, user, password, key_path = _ssh_target()
+    use_openssh = password is None and key_path is not None and _openssh_available()
+    if not use_openssh:
+        print("ERROR: brand upload requires OpenSSH key transport", file=sys.stderr)
+        return 1
+    assert key_path is not None
+    code, _ = _ssh_run_openssh(
+        f"mkdir -p {remote_ver} && chown -R {user}:{user} {remote_root}",
+        host=host,
+        user=user,
+        key_path=key_path,
+        sudo=True,
+    )
+    if code != 0:
+        print("ERROR: could not prepare remote paid_assets dir", file=sys.stderr)
+        return 1
+    for p in present:
+        local = Path(p["local_path"])
+        remote = f"{remote_ver}/{p['filename']}"
+        if progress_cb:
+            progress_cb(p["filename"], "uploading", 10)
+        print(f"upload kind={p.get('kind')} file={p['filename']} ({local.stat().st_size} bytes)")
+        try:
+            _upload_one_installer_openssh(
+                local,
+                remote,
+                host=host,
+                user=user,
+                key_path=key_path,
+                skip_if_present=not force,
+            )
+            if progress_cb:
+                progress_cb(p["filename"], "done", 100)
+        except Exception as e:  # noqa: BLE001
+            print(f"ERROR file={p['filename']}: {e}", file=sys.stderr)
+            if progress_cb:
+                progress_cb(p["filename"], "error", 0)
+            return 1
+    if install_serve:
+        # Reuse catalog install-serve when requested
+        return upload_packages(version=suite_ver, dry_run=False, install_serve=True, force=force, allow_missing=True)
+    print(f"brand upload complete host={host_default} version={suite_ver}")
+    return 0
+
 
 
 def print_catalog(version: str | None = None) -> None:

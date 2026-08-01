@@ -20,19 +20,20 @@ class TestAdminSuiteUploadUI(unittest.TestCase):
         )
         from downloads import RELEASE_VERSION
 
-        self.assertEqual(RELEASE_VERSION, "1.0.0")
+        # Catalog monopin (currently Suite 1.0.1; test follows shipped pin).
+        self.assertTrue(RELEASE_VERSION)
         frag = render_admin_suite_push_upload_html()
         self.assertIn('id="admin-suite-push-upload"', frag)
         self.assertIn('id="admin-suite-push-btn"', frag)
         self.assertIn('id="admin-suite-push-form"', frag)
         self.assertIn("/admin/processors/push-suite", frag)
         self.assertIn("Push Suite packages", frag)
-        self.assertIn("1.0.0", frag)
+        self.assertIn(RELEASE_VERSION, frag)
         self.assertIn("Restore Privacy Suite", frag)
-        self.assertIn('data-suite-version="1.0.0"', frag)
+        self.assertIn(f'data-suite-version="{RELEASE_VERSION}"', frag)
         # Path upload nested under suite card
         self.assertIn('id="admin-path-upload-form"', frag)
-        # Five platform basenames for 1.0.0
+        # Five Suite platform basenames for catalog pin
         for plat_suffix in (
             "windows-x64-setup.exe",
             "android.apk",
@@ -40,7 +41,13 @@ class TestAdminSuiteUploadUI(unittest.TestCase):
             "ios.zip",
             "linux-x64.tar.gz",
         ):
-            self.assertIn(f"restore-privacy-client-1.0.0-{plat_suffix}", frag)
+            self.assertIn(
+                f"restore-privacy-client-{RELEASE_VERSION}-{plat_suffix}", frag
+            )
+        # Brand-wide inventory columns + free apps / rpOS
+        self.assertIn("Kind", frag)
+        self.assertIn("Progress", frag)
+        self.assertIn("/static/admin_suite_push.js", frag)
 
         page = render_admin_processors_page_html().decode("utf-8")
         self.assertIn('id="admin-suite-push-upload"', page)
@@ -52,30 +59,36 @@ class TestAdminSuiteUploadUI(unittest.TestCase):
         page = render_admin_node_operator_page_html(selected_node="lab").decode(
             "utf-8"
         )
+        from downloads import RELEASE_VERSION
+
         self.assertIn('data-suite-push-upload="1"', page)
         self.assertIn("push_suite_packages", page)
         self.assertIn("Push Suite packages to Helsinki", page)
-        self.assertIn("1.0.0", page)
-        self.assertIn("Restore Privacy Suite v1.0.0", page)
+        self.assertIn(RELEASE_VERSION, page)
+        self.assertIn(f"Restore Privacy Suite v{RELEASE_VERSION}", page)
 
 
 class TestPushSuitePackagesHelper(unittest.TestCase):
     def test_push_suite_dry_run_1_0_0(self) -> None:
         from node.operator_admin import NodeOperatorController
 
+        from downloads import RELEASE_VERSION
+
         ctrl = NodeOperatorController(repo_root=ROOT)
-        self.assertEqual(ctrl.catalog_version_default(), "1.0.0")
-        self.assertIn("1.0.0", ctrl.suite_product_label())
+        self.assertEqual(ctrl.catalog_version_default(), RELEASE_VERSION)
+        self.assertIn(RELEASE_VERSION, ctrl.suite_product_label())
         r = ctrl.push_suite_packages(
-            version="1.0.0",
-            stage=False,
+            version=RELEASE_VERSION,
+            stage=True,
             upload=True,
             dry_run=True,
             allow_missing=True,
+            brand_wide=True,
         )
-        self.assertEqual(r.get("version"), "1.0.0")
+        self.assertEqual(r.get("version"), RELEASE_VERSION)
         self.assertTrue(r.get("dry_run"))
         self.assertIn("Restore Privacy Suite", r.get("suite") or "")
+        self.assertTrue(r.get("brand_wide"))
         # With present packages, dry-run should succeed; if not, honest error
         if int(r.get("present_count") or 0) > 0 or int(r.get("total") or 0) == 0:
             if r.get("ok"):
@@ -87,25 +100,28 @@ class TestPushSuitePackagesHelper(unittest.TestCase):
         from node.operator_admin import NodeOperatorController
 
         ctrl = NodeOperatorController(repo_root=ROOT)
+        from downloads import RELEASE_VERSION
+
         r = ctrl.upload_package_by_path(
-            "/no/such/restore-privacy-client-1.0.0-linux-x64.tar.gz",
+            f"/no/such/restore-privacy-client-{RELEASE_VERSION}-linux-x64.tar.gz",
             dry_run=True,
         )
         self.assertFalse(r.get("ok"))
         self.assertTrue(r.get("error"))
 
-    def test_path_upload_accepts_1_0_0_basename(self) -> None:
+    def test_path_upload_accepts_catalog_basename(self) -> None:
+        from downloads import RELEASE_VERSION
         from node.operator_admin import NodeOperatorController
 
         ctrl = NodeOperatorController(repo_root=ROOT)
-        fname = "restore-privacy-client-1.0.0-linux-x64.tar.gz"
+        fname = f"restore-privacy-client-{RELEASE_VERSION}-linux-x64.tar.gz"
         with tempfile.TemporaryDirectory() as td:
             src = Path(td) / fname
             src.write_bytes(b"RPT" + b"\0" * 1_000_000)
             r = ctrl.upload_package_by_path(
                 str(src), stage=True, upload=True, dry_run=True
             )
-            self.assertEqual(r.get("version"), "1.0.0")
+            self.assertEqual(r.get("version"), RELEASE_VERSION)
             self.assertEqual(r.get("filename"), fname)
             self.assertTrue(r.get("ok"), r)
             staged = Path(str(r.get("staged_to") or ""))
@@ -121,19 +137,21 @@ class TestAdminSuiteUploadPost(unittest.TestCase):
     def test_node_operator_push_suite_action(self) -> None:
         from admin_node_operator import handle_admin_node_operator_action
 
+        from downloads import RELEASE_VERSION
+
         ok, msg, node = handle_admin_node_operator_action(
             {
                 "node": "lab",
                 "action": "push_suite_packages",
-                "version": "1.0.0",
-                "stage": "0",
+                "version": RELEASE_VERSION,
+                "stage": "1",
                 "upload": "1",
                 "dry_run": "1",
                 "allow_missing": "1",
             }
         )
         self.assertTrue(ok, msg)
-        self.assertIn("1.0.0", msg)
+        self.assertIn(RELEASE_VERSION, msg)
         self.assertIn("Pushed", msg)
         self.assertEqual(node, "lab")
 
@@ -141,6 +159,8 @@ class TestAdminSuiteUploadPost(unittest.TestCase):
         app_src = (ROOT / "status_page" / "app.py").read_text(encoding="utf-8")
         self.assertIn("/admin/processors/push-suite", app_src)
         self.assertIn("push_suite_packages", app_src)
+        self.assertIn("start_push_job", app_src)
+        self.assertIn("/admin/processors/push-suite/status", app_src)
 
 
 if __name__ == "__main__":
