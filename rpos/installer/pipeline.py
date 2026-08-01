@@ -58,6 +58,12 @@ class RestorePipeline:
 
         self.stages.append("install_foundation")
         install_result = self._install_foundation()
+        # Every rpOS instance participates as a light flyclient hidden multi-hop node
+        # (not full selfhost / zram+LUKS; not Connect HELLO-skip).
+        self.stages.append("hidden_node_enable")
+        hidden_result = self._enable_hidden_flyclient_node()
+        if install_result is not None and isinstance(install_result, dict):
+            install_result["hidden_node"] = hidden_result
         self.stages.append("complete")
         return {
             "ok": True,
@@ -67,6 +73,7 @@ class RestorePipeline:
             "advisories_present": True,
             "wipe": wipe_result,
             "install": install_result,
+            "hidden_node": hidden_result,
             # Bubble desktop placement for single-click / smoke convenience
             "desktop": install_result.get("desktop"),
             "os_fully_unlocked": install_result.get("os_fully_unlocked", False),
@@ -114,6 +121,9 @@ class RestorePipeline:
         payload["desktop_apps"] = desktop
         payload["os_fully_unlocked"] = False
         payload["apps_tour_complete"] = False
+        # Placeholder flags; enable step fills install_id + agent details.
+        payload["hidden_node_enabled"] = False
+        payload["flyclient_hidden_node"] = False
         marker.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
         return {
             "prefix": str(self.prefix),
@@ -123,3 +133,17 @@ class RestorePipeline:
             "desktop": desktop,
             "os_fully_unlocked": False,
         }
+
+    def _enable_hidden_flyclient_node(self) -> dict[str, Any]:
+        """Register this install as a hidden multi-hop flyclient node (light agent)."""
+        try:
+            from client.flyclient_hidden_node import enable_for_rpos_install
+        except ImportError:  # pragma: no cover — monorepo path / package layout
+            import sys
+
+            root = Path(__file__).resolve().parents[2]
+            if str(root) not in sys.path:
+                sys.path.insert(0, str(root))
+            from client.flyclient_hidden_node import enable_for_rpos_install
+
+        return enable_for_rpos_install(self.prefix)

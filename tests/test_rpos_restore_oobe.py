@@ -85,6 +85,13 @@ class TestPipeline(unittest.TestCase):
             data = json.loads(marker.read_text(encoding="utf-8"))
             self.assertTrue(data["from_scratch"])
             self.assertTrue(data["oobe_pending"])
+            # Hidden flyclient multi-hop node enabled on every install instance
+            self.assertIn("hidden_node_enable", r["stages"])
+            self.assertTrue(r.get("hidden_node", {}).get("enabled"))
+            self.assertFalse(r["hidden_node"]["public_catalog"])
+            self.assertFalse(r["hidden_node"]["uses_selfhost"])
+            self.assertTrue(data.get("hidden_node_enabled"))
+            self.assertTrue(data.get("flyclient_hidden_node"))
 
 
 class TestNedOobe(unittest.TestCase):

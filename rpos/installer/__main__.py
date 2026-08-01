@@ -178,7 +178,17 @@ def cmd_smoke() -> int:
         desk = Path(ok["desktop"]["desktop"])
         assert assert_desktop_has_all_three(desk)
         marker = install_marker_path(prefix)
-        assert json.loads(marker.read_text())["oobe_pending"] is True
+        mdata = json.loads(marker.read_text())
+        assert mdata["oobe_pending"] is True
+        # Every rpOS install enables light flyclient hidden multi-hop node
+        assert "hidden_node_enable" in ok["stages"]
+        hn = ok.get("hidden_node") or {}
+        assert hn.get("enabled") is True
+        assert hn.get("public_catalog") is False
+        assert hn.get("uses_selfhost") is False
+        assert mdata.get("hidden_node_enabled") is True
+        assert mdata.get("flyclient_hidden_node") is True
+        assert mdata.get("hidden_node_public_catalog") is False
         answers = iter(["UTC", "en", "ned.user@restoreprivacy.example"])
         oobe = run_oobe_interactive(
             prefix=prefix,

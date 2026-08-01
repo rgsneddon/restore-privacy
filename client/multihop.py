@@ -212,19 +212,39 @@ def multihop_config_for_entry_country(
     )
 
 
+# Hop roles: public catalog residual uses entry/exit only. rpOS flyclient
+# participation uses role=hidden (never listed as public dial targets).
+ROLE_ENTRY = "entry"
+ROLE_EXIT = "exit"
+ROLE_HIDDEN = "hidden"
+
+
 @dataclass(frozen=True)
 class Hop:
-    """One operator relay hop (config entry)."""
+    """One operator relay hop (config entry).
+
+    *role*: ``entry`` | ``exit`` | ``hidden`` | ``""``.
+    Hidden hops are flyclient light nodes (rpOS) — intermediate only, never
+    public catalog residual dial peers.
+    """
 
     host: str
     port: int = PRODUCT_NODE_PORT
-    role: str = ""  # "entry" | "exit" | ""
+    role: str = ""  # "entry" | "exit" | "hidden" | ""
 
     def as_endpoint(self) -> Endpoint:
         return Endpoint(host=self.host, port=int(self.port))
 
+    def is_hidden(self) -> bool:
+        return (self.role or "").strip().lower() == ROLE_HIDDEN
+
     def label(self) -> str:
-        """User-facing hop label — country name for monopin peers, never raw IP."""
+        """User-facing hop label — country name for monopin peers, never raw IP.
+
+        Hidden flyclient hops are labelled generically (no user-device IP leak).
+        """
+        if self.is_hidden():
+            return "hidden hop"
         try:
             from client.residual_public import (
                 is_residual_monopin_host,
@@ -263,7 +283,11 @@ class MultiHopConfig:
 
 
 def build_hop_path(hops: Sequence[Hop] | Iterable[Hop] | None) -> list[Hop]:
-    """Normalize hop list; default to product single hop when empty."""
+    """Normalize hop list; default to product single hop when empty.
+
+    Preserves explicit ``hidden`` roles (rpOS flyclient intermediate hops).
+    Does not promote hidden hops to entry/exit when auto-tagging ends.
+    """
     items = list(hops or [])
     cleaned: list[Hop] = []
     for h in items:
@@ -273,17 +297,139 @@ def build_hop_path(hops: Sequence[Hop] | Iterable[Hop] | None) -> list[Hop]:
         port = int(h.port) if h.port else PRODUCT_NODE_PORT
         if port <= 0 or port > 65535:
             port = PRODUCT_NODE_PORT
-        role = (getattr(h, "role", None) or "").strip()
+        role = (getattr(h, "role", None) or "").strip().lower()
+        if role not in ("", ROLE_ENTRY, ROLE_EXIT, ROLE_HIDDEN):
+            role = ""
         cleaned.append(Hop(host=host, port=port, role=role))
     if not cleaned:
-        return [Hop(PRODUCT_NODE_HOST, PRODUCT_NODE_PORT, role="entry")]
-    # Tag entry/exit when ≥2 hops and roles empty
+        return [Hop(PRODUCT_NODE_HOST, PRODUCT_NODE_PORT, role=ROLE_ENTRY)]
+    # Tag entry/exit when ≥2 hops and roles empty — never overwrite hidden.
     if len(cleaned) >= 2:
         if not cleaned[0].role:
-            cleaned[0] = Hop(cleaned[0].host, cleaned[0].port, role="entry")
+            cleaned[0] = Hop(cleaned[0].host, cleaned[0].port, role=ROLE_ENTRY)
         if not cleaned[-1].role:
-            cleaned[-1] = Hop(cleaned[-1].host, cleaned[-1].port, role="exit")
+            cleaned[-1] = Hop(cleaned[-1].host, cleaned[-1].port, role=ROLE_EXIT)
+        # If last hop was wrongly empty but middle is hidden, exit stays last.
     return cleaned
+
+
+def is_hidden_hop(hop: Hop | None) -> bool:
+    """True when *hop* is a flyclient hidden intermediate (not public catalog)."""
+    if hop is None:
+        return False
+    return bool(hop.is_hidden())
+
+
+def public_catalog_hosts(
+    catalog: Sequence[CountryNode] | None = None,
+) -> frozenset[str]:
+    """Hosts that are legitimate public residual dial targets (IS/DE catalog)."""
+    cat = tuple(catalog) if catalog is not None else PRODUCT_COUNTRY_CATALOG
+    return frozenset(n.host.strip() for n in cat if (n.host or "").strip())
+
+
+def public_dialable_peers(
+    catalog: Sequence[CountryNode] | None = None,
+    *,
+    hidden_hosts: Sequence[str] | None = None,
+) -> tuple[CountryNode, ...]:
+    """Public catalog peers only — hidden flyclient hosts are never dialable here.
+
+    *hidden_hosts* is an extra denylist (e.g. from a local registry). Catalog
+    entries that match a hidden host are excluded (defence in depth).
+    """
+    cat = tuple(catalog) if catalog is not None else PRODUCT_COUNTRY_CATALOG
+    deny = {(h or "").strip() for h in (hidden_hosts or ()) if (h or "").strip()}
+    out: list[CountryNode] = []
+    for n in cat:
+        h = (n.host or "").strip()
+        if not h or h in deny:
+            continue
+        out.append(n)
+    return tuple(out)
+
+
+def build_multihop_path_with_hidden(
+    entry: Hop | CountryNode,
+    exit_hop: Hop | CountryNode,
+    hidden: Sequence[Hop] | None = None,
+    *,
+    enabled: bool = True,
+) -> MultiHopConfig:
+    """Build entry → [hidden flyclient hops…] → exit multi-hop path.
+
+    Residual dial remains the **exit** (last hop) when multi-hop is active —
+    same honesty as two-hop residual-via-exit. Hidden hops are intermediate
+    only and must not be public catalog hosts.
+
+    When *enabled* is False or no exit distinct from entry, returns single-hop
+    entry config (fail closed to single-hop; does not invent multi-hop).
+    """
+    def _as_hop(node: Hop | CountryNode, role: str) -> Hop:
+        if isinstance(node, CountryNode):
+            return node.as_hop(role=role)
+        host = (node.host or "").strip()
+        port = int(node.port) if node.port else PRODUCT_NODE_PORT
+        return Hop(host=host, port=port, role=role)
+
+    entry_h = _as_hop(entry, ROLE_ENTRY)
+    exit_h = _as_hop(exit_hop, ROLE_EXIT)
+    if not entry_h.host or not exit_h.host:
+        return MultiHopConfig(hops=[entry_h] if entry_h.host else [], enabled=False)
+    if not enabled:
+        return MultiHopConfig(hops=[entry_h], enabled=False)
+    if (
+        entry_h.host.strip() == exit_h.host.strip()
+        and int(entry_h.port) == int(exit_h.port)
+    ):
+        # No distinct exit — stay single-hop honest
+        return MultiHopConfig(hops=[entry_h], enabled=False)
+
+    pub = public_catalog_hosts()
+    mid: list[Hop] = []
+    for h in hidden or ():
+        host = (h.host or "").strip()
+        if not host:
+            continue
+        # Never place a public monopin as a "hidden" hop
+        if host in pub:
+            continue
+        port = int(h.port) if h.port else PRODUCT_NODE_PORT
+        mid.append(Hop(host=host, port=port, role=ROLE_HIDDEN))
+
+    path = build_hop_path([entry_h, *mid, exit_h])
+    return MultiHopConfig(hops=path, enabled=True)
+
+
+def multihop_config_with_hidden_registry(
+    entry_country: str | None = None,
+    *,
+    multihop_enabled: bool = False,
+    catalog: Sequence[CountryNode] | None = None,
+    hidden_hops: Sequence[Hop] | None = None,
+    rng: random.Random | None = None,
+) -> MultiHopConfig:
+    """Like :func:`multihop_config_for_entry_country` plus optional hidden middles.
+
+    When multi-hop is off or no exit peer exists, hidden hops are ignored
+    (fail closed / single-hop residual). Residual remains via exit when active.
+    """
+    base = multihop_config_for_entry_country(
+        entry_country,
+        multihop_enabled=multihop_enabled,
+        catalog=catalog,
+        rng=rng,
+    )
+    if not multihop_enabled or not base.enabled or len(base.hops) < 2:
+        return base
+    entry_h = base.hops[0]
+    exit_h = base.hops[-1]
+    return build_multihop_path_with_hidden(
+        entry_h,
+        exit_h,
+        hidden_hops,
+        enabled=True,
+    )
 
 
 def first_hop_endpoint(config: MultiHopConfig | None = None) -> Endpoint:
@@ -739,7 +885,11 @@ def hop_path_configured(config: MultiHopConfig | None = None) -> bool:
 
 
 def multihop_status_text(config: MultiHopConfig | None = None) -> str:
-    """Honest UI/status for multi-hop."""
+    """Honest UI/status for multi-hop.
+
+    Never claims full intermediate onion encapsulation. Hidden flyclient hops
+    appear as ``hidden hop`` labels only; residual remains via exit peer.
+    """
     cfg = config or MultiHopConfig()
     if not cfg.enabled:
         return "single-hop (multi-hop inactive)"
@@ -747,6 +897,7 @@ def multihop_status_text(config: MultiHopConfig | None = None) -> str:
     if len(hops) < 2:
         return "single-hop (multi-hop needs ≥2 configured hops)"
     labels = " → ".join(h.label() for h in hops)
+    n_hidden = sum(1 for h in hops if h.is_hidden())
     if not MULTI_HOP_ROUTING_IMPLEMENTED:
         return f"multi-hop path configured (not routed; entry-only): {labels}"
     if is_multihop_active(cfg):
@@ -757,9 +908,16 @@ def multihop_status_text(config: MultiHopConfig | None = None) -> str:
             via = public_label_for_host(residual.host)
         except Exception:  # noqa: BLE001
             via = "VPN node"
+        # Residual-via-exit honesty (not full onion claim)
+        extra = ""
+        if n_hidden:
+            extra = (
+                f"; {n_hidden} hidden flyclient hop(s) — light intermediate "
+                "participation, not full onion encapsulation"
+            )
         return (
             f"multi-hop active ({len(hops)} hops): {labels} "
-            f"(residual via {via})"
+            f"(residual via {via}){extra}"
         )
     return f"multi-hop path configured (not active): {labels}"
 
