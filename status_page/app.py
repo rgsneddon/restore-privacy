@@ -54,6 +54,7 @@ from admin_2fa import (
 )
 from downloads import (
     FREE_PACKAGES_PATH,
+    RELEASE_VERSION,
     download_css,
     free_download_cta_css,
     render_bmc_tip_html,
@@ -661,7 +662,7 @@ def render_html(
     </div>
 """
     body = f"""{public_head_open(title=str(title), extra_css=page_css)}
-  <div class="page-shell" id="page-shell" data-page="home" data-product="suite" data-suite-version="1.0.1" data-chrome="pro">
+  <div class="page-shell" id="page-shell" data-page="home" data-product="suite" data-suite-version="{RELEASE_VERSION}" data-chrome="pro">
 {header}
 {suite_intro_html}
 {free_cta_html}

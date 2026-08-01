@@ -31,8 +31,16 @@ SERVICE_LINK_ID = "service-link"
 # Visible header no longer shows this as an H1 — banner.jpg is the heading mark.
 # Browser-tab title: all-caps Suite brand (never "RESTORE PRIVACY VPN").
 PUBLIC_BRAND_TITLE = "RESTORE PRIVACY SUITE"
-PUBLIC_BRAND_VERSION = "1.0.1"
-PUBLIC_BRAND_DISPLAY = "Restore Privacy Suite v1.0.1"
+# Keep in lockstep with downloads.RELEASE_VERSION (Suite catalog monopin).
+try:
+    from downloads import RELEASE_VERSION as _CATALOG_PIN
+except Exception:  # pragma: no cover
+    try:
+        from status_page.downloads import RELEASE_VERSION as _CATALOG_PIN  # type: ignore
+    except Exception:  # pragma: no cover
+        _CATALOG_PIN = "1.0.2"
+PUBLIC_BRAND_VERSION = str(_CATALOG_PIN).strip() or "1.0.2"
+PUBLIC_BRAND_DISPLAY = f"Restore Privacy Suite v{PUBLIC_BRAND_VERSION}"
 
 # Borderless mark: shield + protruding green key only (transparent outside).
 # Opaque logo.png remains for favicon/legacy plate uses; Stripe uses stripe_brand_*.
