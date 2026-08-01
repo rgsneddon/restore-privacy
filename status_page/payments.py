@@ -2893,6 +2893,29 @@ def catalog_filenames() -> frozenset[str]:
     )
 
 
+def free_open_filenames() -> frozenset[str]:
+    """Filenames openable without a paid grant (platform catalog + Suite free extras).
+
+    Includes client installers (Suite free download path) and companion packages
+    such as Rx Privacy Browser / browser_extension zip from
+    :func:`downloads.list_suite_extra_packages`.
+    """
+    names: set[str] = set(catalog_filenames())
+    try:
+        from downloads import list_suite_extra_packages
+
+        for pkg in list_suite_extra_packages():
+            fn = str(pkg.get("filename") or "").strip()
+            if fn:
+                names.add(fn)
+            alias = str(pkg.get("alias_filename") or "").strip()
+            if alias:
+                names.add(alias)
+    except Exception:
+        pass
+    return frozenset(names)
+
+
 def asset_search_dirs() -> list[Path]:
     """Directories that may hold release installers for local proxy fulfilment.
 
@@ -2936,9 +2959,11 @@ def content_type_for_filename(filename: str) -> str:
 
 
 def _safe_catalog_filename(filename: str) -> str | None:
-    """Return basename only when it is a current catalog package; else None.
+    """Return basename only when it is a free-open / catalog package; else None.
 
-    Blocks path traversal and non-catalog names before any disk/HTTP open.
+    Blocks path traversal and non-allowlisted names before any disk/HTTP open.
+    Allowlist is :func:`free_open_filenames` (current catalog + Suite free extras
+    such as Rx browser zip).
     """
     raw = (filename or "").strip()
     if not raw or raw in (".", ".."):
@@ -2949,7 +2974,7 @@ def _safe_catalog_filename(filename: str) -> str | None:
     name = Path(raw).name
     if name != raw or name in (".", ".."):
         return None
-    if name not in catalog_filenames():
+    if name not in free_open_filenames():
         return None
     return name
 

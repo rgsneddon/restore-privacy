@@ -972,7 +972,57 @@ class Handler(BaseHTTPRequestHandler):
                     pass
             return
 
+        # Free-open staged packages (Rx browser etc.) under /assets/{version}/{file}
+        if path.startswith("/assets/"):
+            parts = [x for x in path.split("/") if x]
+            # ["assets", version, filename]
+            if len(parts) != 3 or parts[0] != "assets":
+                self._send(404, "text/plain; charset=utf-8", b"not found")
+                return
+            ver, fname = parts[1], parts[2]
+            try:
+                from downloads import RELEASE_VERSION, free_open_asset_versions
+            except ImportError:
+                from status_page.downloads import (  # type: ignore
+                    RELEASE_VERSION,
+                    free_open_asset_versions,
+                )
+            allowed_vers = free_open_asset_versions()
+            if ver not in allowed_vers and ver != RELEASE_VERSION:
+                self._send(404, "text/plain; charset=utf-8", b"not found")
+                return
+            asset = open_release_asset(str(fname))
+            if asset is None:
+                self._send(404, "text/plain; charset=utf-8", b"not found")
+                return
+            body_src = asset["body"]
+            ctype = str(asset.get("content_type") or "application/octet-stream")
+            length = asset.get("content_length")
+            disp = f'attachment; filename="{fname}"'
+            try:
+                self.send_response(200)
+                self.send_header("Content-Type", ctype)
+                self.send_header("Content-Disposition", disp)
+                self.send_header("Cache-Control", "no-store")
+                self.send_header("X-RPT-Fulfilment", "suite-free-asset")
+                if length is not None:
+                    self.send_header("Content-Length", str(length))
+                self._security_headers()
+                self.end_headers()
+                if hasattr(body_src, "read"):
+                    shutil.copyfileobj(body_src, self.wfile)  # type: ignore[arg-type]
+                else:
+                    self.wfile.write(body_src)  # type: ignore[arg-type]
+            finally:
+                try:
+                    if hasattr(body_src, "close"):
+                        body_src.close()
+                except Exception:  # noqa: BLE001
+                    pass
+            return
+
         if path in ("/", "/index.html"):
+
             try:
                 from local_currency import (
                     accept_language_from_request,

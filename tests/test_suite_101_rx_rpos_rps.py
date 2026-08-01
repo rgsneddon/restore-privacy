@@ -87,6 +87,71 @@ class TestServiceRxLink(unittest.TestCase):
         # Main nav Service still present via brand header
         self.assertIn('data-page="service"', html)
 
+    def test_open_release_asset_serves_rx_zip(self) -> None:
+        """Fulfilment helper must open Rx package (free-open allowlist), not None."""
+        from downloads import rx_browser_package_filename
+        from payments import free_open_filenames, open_release_asset
+
+        fname = rx_browser_package_filename()
+        self.assertIn(fname, free_open_filenames())
+        asset = open_release_asset(fname)
+        self.assertIsNotNone(asset, f"open_release_asset({fname!r}) returned None")
+        assert asset is not None
+        self.assertEqual(asset.get("content_type"), "application/zip")
+        length = asset.get("content_length")
+        self.assertIsNotNone(length)
+        self.assertGreater(int(length or 0), 0)
+        body = asset["body"]
+        try:
+            chunk = body.read(4) if hasattr(body, "read") else body[:4]
+            # ZIP local file header magic
+            self.assertEqual(chunk[:2], b"PK")
+        finally:
+            if hasattr(body, "close"):
+                body.close()
+
+    def test_http_get_service_rx_href_returns_zip(self) -> None:
+        """Live Handler: GET Service Rx href → 200 + application/zip + non-empty body."""
+        import threading
+        import urllib.error
+        import urllib.request
+        from http.server import ThreadingHTTPServer
+
+        import app as status_app
+        from downloads import rx_browser_package_href
+        from service_commercial import render_service_page_html
+
+        href = rx_browser_package_href(
+            user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64)"
+        )
+        self.assertTrue(href.startswith("/assets/"), href)
+        # Service HTML embeds the same href
+        html = render_service_page_html(
+            user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64)"
+        ).decode("utf-8")
+        self.assertIn(href, html)
+
+        httpd = ThreadingHTTPServer(("127.0.0.1", 0), status_app.Handler)
+        port = httpd.server_address[1]
+        thread = threading.Thread(target=httpd.serve_forever, daemon=True)
+        thread.start()
+        try:
+            url = f"http://127.0.0.1:{port}{href}"
+            req = urllib.request.Request(url, method="GET")
+            with urllib.request.urlopen(req, timeout=15) as res:
+                status = res.status
+                ctype = (res.headers.get("Content-Type") or "").lower()
+                data = res.read()
+            self.assertEqual(status, 200, f"expected 200 for {url}")
+            self.assertIn("zip", ctype)
+            self.assertGreater(len(data), 100)
+            self.assertEqual(data[:2], b"PK")
+        except urllib.error.HTTPError as exc:
+            self.fail(f"GET {href} failed HTTP {exc.code}: {exc.read()[:200]!r}")
+        finally:
+            httpd.shutdown()
+            httpd.server_close()
+
 
 class TestAdminRposRps(unittest.TestCase):
     def test_rpos_howto_admin_only_content(self) -> None:

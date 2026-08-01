@@ -817,6 +817,11 @@ def browser_extension_package_filename(version: str | None = None) -> str:
     return f"restore-privacy-browser-extension-{ver}.zip"
 
 
+def free_open_asset_versions() -> frozenset[str]:
+    """Version path segments allowed under /assets/{version}/..."""
+    return frozenset({RELEASE_VERSION})
+
+
 def rx_browser_package_href(
     *,
     version: str | None = None,
