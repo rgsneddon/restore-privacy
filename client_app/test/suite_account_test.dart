@@ -3,8 +3,22 @@ library;
 
 import 'dart:io';
 
+import 'package:evolve/perc/providers/perc_wallet_provider.dart' as evolve_wallet;
+import 'package:evolve/perc/services/perc_ledger.dart' as evolve_ledger;
+import 'package:evolve/perc/services/perc_ledger_hub.dart' as evolve_hub;
+import 'package:evolve/perc/services/perc_network_coordinator.dart'
+    as evolve_coord;
+import 'package:evolve/perc/services/perc_wallet_store.dart' as evolve_store;
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:perccent_wallet/perc/providers/perc_wallet_provider.dart'
+    as perc_wallet;
+import 'package:perccent_wallet/perc/services/perc_ledger.dart' as perc_ledger;
+import 'package:perccent_wallet/perc/services/perc_ledger_hub.dart' as perc_hub;
+import 'package:perccent_wallet/perc/services/perc_network_coordinator.dart'
+    as perc_coord;
+import 'package:perccent_wallet/perc/services/perc_wallet_store.dart'
+    as perc_store;
 import 'package:restore_privacy_client/licence_gate.dart';
 import 'package:restore_privacy_client/settings_store.dart';
 import 'package:restore_privacy_client/suite_account.dart';
@@ -127,44 +141,101 @@ void main() {
     });
   });
 
-  group('applySuiteAccountToWalletAndEvolve (injected runner)', () {
-    test('one apply notifies bus and records both-surface intent once', () async {
-      final calls = <String>[];
-      var busHits = 0;
-      void onBus() => busHits++;
-      SuiteAccountBus.instance.addListener(onBus);
-      addTearDown(() {
-        SuiteAccountBus.instance.removeListener(onBus);
-      });
+  group('applySuiteAccountToWalletAndEvolve (real dual providers)', () {
+    late _SharedJsonLedger shared;
 
-      await applySuiteAccountToWalletAndEvolve(
-        username: 'carol',
-        password: 'password1',
-        register: true,
-        runner: ({
-          required String username,
-          required String password,
-          required bool register,
-        }) async {
-          calls.add('${register ? 'reg' : 'login'}:$username');
-        },
-      );
+    setUp(() {
+      shared = _SharedJsonLedger();
+      perc_hub.PercLedgerHub.resetForTest();
+      evolve_hub.PercLedgerHub.resetForTest();
+      perc_coord.PercNetworkCoordinator.disableLiveNodesForTests = true;
+      evolve_coord.PercNetworkCoordinator.disableLiveNodesForTests = true;
+      perc_wallet.PercWalletProvider.sessionTimeoutEnabled = false;
+      evolve_wallet.PercWalletProvider.sessionTimeoutEnabled = false;
+    });
 
-      expect(calls, ['reg:carol']);
-      expect(busHits, 1);
-      expect(SuiteAccountBus.instance.lastUsername, 'carol');
+    tearDown(() {
+      perc_wallet.PercWalletProvider.sessionTimeoutEnabled = true;
+      evolve_wallet.PercWalletProvider.sessionTimeoutEnabled = true;
+      perc_hub.PercLedgerHub.resetForTest();
+      evolve_hub.PercLedgerHub.resetForTest();
+    });
 
-      // Second surface consumers only need the bus/store — no second register.
-      final account = SuiteAccountStore(MemorySettingsBackend());
-      await account.markRegistered('carol');
+    test(
+      'one register leaves Perccent and Evolve isLoggedIn as same user',
+      () async {
+        late perc_wallet.PercWalletProvider perc;
+        late evolve_wallet.PercWalletProvider evolve;
+        var busHits = 0;
+        void onBus() => busHits++;
+        SuiteAccountBus.instance.addListener(onBus);
+        addTearDown(() => SuiteAccountBus.instance.removeListener(onBus));
+
+        final surfaces = SuiteAccountPackageSurfaces(
+          createPercProvider: () {
+            perc = perc_wallet.PercWalletProvider(
+              store: _PercSharedStore(shared),
+            );
+            return perc;
+          },
+          createEvolveProvider: () {
+            evolve = evolve_wallet.PercWalletProvider(
+              store: _EvolveSharedStore(shared),
+            );
+            return evolve;
+          },
+          reloadEvolveHub: () =>
+              evolve_hub.PercLedgerHub.instance.reloadFromStore(),
+          persistPercHub: () => perc_hub.PercLedgerHub.instance.persistLocal(),
+        );
+
+        await applySuiteAccountToWalletAndEvolve(
+          username: 'carol',
+          password: 'password12345',
+          register: true,
+          surfaces: surfaces,
+        );
+
+        // Real dual-surface assertion — not a no-op runner.
+        expect(perc.isLoggedIn, isTrue, reason: 'Perccent must be signed in');
+        expect(perc.loggedInUsername, 'carol');
+        expect(perc.hasAppAccess, isTrue);
+        expect(evolve.isLoggedIn, isTrue, reason: 'Evolve must be signed in');
+        expect(evolve.loggedInUsername, 'carol');
+        expect(evolve.hasAppAccess, isTrue);
+        expect(busHits, 1);
+        expect(SuiteAccountBus.instance.lastUsername, 'carol');
+
+        final account = SuiteAccountStore(MemorySettingsBackend());
+        await account.markRegistered('carol');
+        expect(
+          shouldOfferSuiteAccountPrompt(
+            vpnUnlocked: true,
+            deferred: await account.isDeferred(),
+            registered: await account.isRegistered(),
+          ),
+          isFalse,
+        );
+      },
+    );
+
+    test('failed auth does not claim logged-in (requireWalletSurfaceLoggedIn)',
+        () {
       expect(
-        shouldOfferSuiteAccountPrompt(
-          vpnUnlocked: true,
-          deferred: await account.isDeferred(),
-          registered: await account.isRegistered(),
+        () => requireWalletSurfaceLoggedIn(
+          surfaceLabel: 'Perccent wallet',
+          isLoggedIn: false,
+          loggedInUsername: null,
+          username: 'x',
+          lastError: 'bad_password',
         ),
-        isFalse,
-        reason: 'registered suite account must not re-prompt dual register',
+        throwsA(
+          isA<StateError>().having(
+            (e) => e.message,
+            'message',
+            contains('Perccent wallet did not sign in'),
+          ),
+        ),
       );
     });
   });
@@ -312,10 +383,48 @@ String _readSuiteSource(String relative) {
     final f = File('$base$relative');
     if (f.existsSync()) return f.readAsStringSync();
   }
-  // Relative to this test file: client_app/test/ → client_app/lib/
   final fromTest = File(
     '${Directory.current.path}${Platform.pathSeparator}$relative',
   );
   if (fromTest.existsSync()) return fromTest.readAsStringSync();
   throw StateError('cannot read $relative (cwd=${Directory.current.path})');
+}
+
+/// Shared on-disk ledger simulation for Perccent + Evolve package hubs in tests.
+class _SharedJsonLedger {
+  Map<String, dynamic>? json;
+}
+
+class _PercSharedStore implements perc_store.PercWalletStore {
+  _PercSharedStore(this.shared);
+  final _SharedJsonLedger shared;
+
+  @override
+  Future<perc_ledger.PercLedger?> load() async {
+    final j = shared.json;
+    if (j == null) return null;
+    return perc_ledger.PercLedger.fromJson(j);
+  }
+
+  @override
+  Future<void> save(perc_ledger.PercLedger ledger) async {
+    shared.json = ledger.toJson();
+  }
+}
+
+class _EvolveSharedStore implements evolve_store.PercWalletStore {
+  _EvolveSharedStore(this.shared);
+  final _SharedJsonLedger shared;
+
+  @override
+  Future<evolve_ledger.PercLedger?> load() async {
+    final j = shared.json;
+    if (j == null) return null;
+    return evolve_ledger.PercLedger.fromJson(j);
+  }
+
+  @override
+  Future<void> save(evolve_ledger.PercLedger ledger) async {
+    shared.json = ledger.toJson();
+  }
 }
