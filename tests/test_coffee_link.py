@@ -33,22 +33,25 @@ class TestCoffeeLinkBuilder(unittest.TestCase):
         self.assertIn("buymeacoffee.com", coffee_tip_url())
 
     def test_public_footer_is_raskul_copyright(self):
-        self.assertEqual(SITE_COPYRIGHT_TEXT, "(c) Raskul - all rights reserved")
+        self.assertEqual(SITE_COPYRIGHT_TEXT, "© Raskul - all rights reserved")
         html = render_site_copyright_footer_html()
         self.assertIn("Raskul", html)
         self.assertIn("all rights reserved", html)
-        self.assertIn("(c)", html)
+        self.assertIn("©", html)
+        self.assertNotIn("(c)", html)
         self.assertIn('id="site-footer"', html)
+        self.assertIn("Downloadables Mapped Here", html)
+        self.assertIn("/downloads-map", html)
         self.assertNotIn("buymeacoffee.com", html)
         self.assertNotIn("bmc-tip-link", html)
-        # render_coffee_link_html is back-compat alias → copyright
+        # render_coffee_link_html is back-compat alias → copyright + map
         alias = render_coffee_link_html()
         self.assertIn("Raskul", alias)
         self.assertNotIn("buymeacoffee.com", alias)
         css = coffee_link_css()
-        self.assertIn("text-align: center", css)
         self.assertIn("site-footer", css)
         self.assertIn("margin-top: auto", css)
+        self.assertIn("space-between", css)
 
     def test_public_page_footer_copyright_no_bmc(self):
         page = status_app.render_html(
@@ -60,10 +63,11 @@ class TestCoffeeLinkBuilder(unittest.TestCase):
         self.assertIn("Raskul", page)
         self.assertIn("all rights reserved", page)
         self.assertIn('id="site-footer"', page)
+        self.assertIn("Downloadables Mapped Here", page)
         self.assertNotIn("fetch('/api/status'", page)
         self.assertNotIn("clients_connected", page)
         self.assertIn("RESTORE PRIVACY", page)
-        self.assertIn("Download client", page)
+        self.assertIn("Download", page)
 
 
 class TestCoffeeLinkHttp(unittest.TestCase):
@@ -91,7 +95,8 @@ class TestCoffeeLinkHttp(unittest.TestCase):
                 self.assertNotIn("buy rus a coffee", html)
                 self.assertNotIn("buymeacoffee.com", html)
                 self.assertIn("Raskul", html)
-                self.assertIn("Download client", html)
+                self.assertIn("Download", html)
+                self.assertIn("Downloadables Mapped Here", html)
 
 
 if __name__ == "__main__":

@@ -115,6 +115,7 @@ def public_brand_asset_version() -> str:
         "favicon.png",
         "apple-touch-icon.png",
         "data_path_motif.svg",
+        "freebie.jpg",  # FREE DOWNLOAD CTA face — cache-bust when art changes
     ):
         p = _STATIC_DIR / name
         if p.is_file():

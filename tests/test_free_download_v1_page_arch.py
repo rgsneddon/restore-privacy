@@ -22,23 +22,22 @@ class TestFreeDownloadV1CtaAndPage(unittest.TestCase):
     def test_homepage_full_width_cta_above_stripe_selector(self) -> None:
         from app import render_html
         from downloads import (
+            DOWNLOADS_MAP_PATH,
             FREE_DOWNLOAD_CTA_ID,
             FREE_DOWNLOAD_FACE_VERSION,
-            FREE_PACKAGES_PATH,
             FREEBIE_IMG_PATH,
         )
 
-        # No default platform → packages chooser; OS detect is covered in
+        # No default platform → Downloads Map; OS detect is covered in
         # test_free_download_platform_detect when default_platform is set.
         page = render_html({"title": "RESTORE PRIVACY"}).decode("utf-8")
         main = page[page.index('id="page-shell"') :]
         self.assertIn(f'id="{FREE_DOWNLOAD_CTA_ID}"', main)
         self.assertIn("freebie", main.lower())
         self.assertIn(FREEBIE_IMG_PATH, main)
-        # CTA face version (1.0.1) — may diverge from catalog monopin
-        self.assertIn(f"Free download version {FREE_DOWNLOAD_FACE_VERSION}", main)
+        self.assertIn("FREE DOWNLOAD", main)
         self.assertIn(f'data-face-version="{FREE_DOWNLOAD_FACE_VERSION}"', main)
-        self.assertIn(f'href="{FREE_PACKAGES_PATH}"', main)
+        self.assertIn(f'href="{DOWNLOADS_MAP_PATH}"', main)
         # Full-width CTA styles — full freebie art (contain, not cover crop)
         from downloads import free_download_cta_css
 
@@ -76,7 +75,8 @@ class TestFreeDownloadV1CtaAndPage(unittest.TestCase):
         self.assertIn("data-path", html.lower())
         self.assertIn("data_path_motif", html)
         self.assertIn("#ff7a18", html)  # bold orange
-        self.assertIn(f"Free download v{RELEASE_VERSION}", html)
+        self.assertIn("Downloads Map", html)
+        self.assertIn(RELEASE_VERSION, html)
         pkgs = list_catalog_platform_packages(version=RELEASE_VERSION)
         self.assertEqual(len(pkgs), 5)
         for p in pkgs:

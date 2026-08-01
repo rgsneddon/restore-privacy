@@ -2894,15 +2894,16 @@ def catalog_filenames() -> frozenset[str]:
 
 
 def free_open_filenames() -> frozenset[str]:
-    """Filenames openable without a paid grant (platform catalog + Suite free extras).
+    """Filenames openable without a paid grant (catalog + brand inventory free slots).
 
-    Includes client installers (Suite free download path) and companion packages
-    such as Rx Privacy Browser / browser_extension zip from
-    :func:`downloads.list_suite_extra_packages`.
+    Includes client installers (Suite free download path), Suite free extras
+    (Rx browser), and full brand inventory basenames (rpOS, Pens/Tables/Slides,
+    node installer/operator, rpMail, rpOffice, …) so the Downloads Map can
+    serve every shipped free installer via ``/assets/{version}/{file}``.
     """
     names: set[str] = set(catalog_filenames())
     try:
-        from downloads import list_suite_extra_packages
+        from downloads import RELEASE_VERSION, list_suite_extra_packages
 
         for pkg in list_suite_extra_packages():
             fn = str(pkg.get("filename") or "").strip()
@@ -2911,6 +2912,25 @@ def free_open_filenames() -> frozenset[str]:
             alias = str(pkg.get("alias_filename") or "").strip()
             if alias:
                 names.add(alias)
+        # Suite storefront aliases
+        ver = RELEASE_VERSION
+        for suffix in (
+            "windows-x64-setup.exe",
+            "android.apk",
+            "macos.zip",
+            "ios.zip",
+            "linux-x64.tar.gz",
+        ):
+            names.add(f"restore-privacy-suite-{ver}-{suffix}")
+    except Exception:
+        pass
+    try:
+        from downloads import list_downloads_map_rows
+
+        for row in list_downloads_map_rows():
+            fn = str(row.get("filename") or "").strip()
+            if fn:
+                names.add(fn)
     except Exception:
         pass
     return frozenset(names)
@@ -2921,9 +2941,8 @@ def asset_search_dirs() -> list[Path]:
 
     Prefer ``status_page/assets/{VERSION}/`` first — that path is what Render can
     ship when ``rootDir`` is ``status_page`` (repo ``releases/`` is not deployed).
-    Also includes the dedicated store on-disk layout when status runs co-located
-    with the Helsinki paid-asset host
-    (``/opt/restore-privacy/paid_assets/{VERSION}``).
+    Also includes monorepo ``releases/`` brand subtrees and the Helsinki
+    paid-asset host layout when co-located.
     """
     out: list[Path] = []
     raw = os.environ.get("RPT_ASSET_DIR", "").strip()
@@ -2932,17 +2951,39 @@ def asset_search_dirs() -> list[Path]:
     from downloads import RELEASE_VERSION  # local import avoids cycles at module load
 
     status = Path(__file__).resolve().parent
+    root = status.parent
     # Deploy root-friendly (Render rootDir=status_page)
     out.append(status / "assets" / RELEASE_VERSION)
     # Monorepo checkout: releases/{VERSION} (gitignored; local/dev only)
-    out.append(status.parent / "releases" / RELEASE_VERSION)
+    out.append(root / "releases" / RELEASE_VERSION)
+    # Brand companion trees (rpOS, apps, node, mail, office, …)
+    for sub in (
+        f"rpos/0.2.0",
+        f"rpos/0.1.0",
+        f"rpos-apps/0.1.0",
+        f"node-installer/1.0.0",
+        f"node-operator/1.0.0",
+        f"rpmail/0.1.0",
+        f"rpoffice/0.1.0",
+        f"free",
+    ):
+        out.append(root / "releases" / sub)
     # Helsinki store layout (when fulfilment is co-located with the asset host)
     remote_root = os.environ.get(
         "RPT_VPS_ASSET_REMOTE_ROOT", DEFAULT_VPS_ASSET_REMOTE_ROOT
     ).strip()
     if remote_root:
         out.append(Path(remote_root) / RELEASE_VERSION)
-    return out
+        out.append(Path(remote_root))
+    # de-dupe while preserving order
+    seen: set[str] = set()
+    uniq: list[Path] = []
+    for p in out:
+        key = str(p)
+        if key not in seen:
+            seen.add(key)
+            uniq.append(p)
+    return uniq
 
 
 def content_type_for_filename(filename: str) -> str:

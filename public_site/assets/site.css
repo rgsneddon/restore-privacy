@@ -55,5 +55,25 @@ body {
 .free-grid a.dl:hover, a.btn:hover { background: #c5e0f4; }
 .keygen-note { margin: 0.75rem auto; max-width: 32rem; color: #fecaca; font-weight: 600; }
 .steps { text-align: left; max-width: 28rem; margin: 0.5rem auto; line-height: 1.55; color: #cfe6f7; }
-.site-foot { text-align: center; margin-top: 1.5rem; font-size: 0.85rem; color: var(--muted); }
+.site-foot {
+  display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between;
+  gap: 0.65rem 1.25rem; margin-top: 1.5rem; font-size: 0.85rem; color: var(--muted);
+}
+.site-foot .copy { margin: 0; text-align: left; flex: 1 1 auto; }
+.site-foot .map-link {
+  margin: 0; text-align: right; flex: 0 0 auto; color: #7aa0c0; text-decoration: none;
+  font-size: 0.78rem; letter-spacing: 0.03em;
+}
+.site-foot .map-link:hover { color: #aed0ea; text-decoration: underline; }
+.free-cta { display: block; max-width: 22rem; margin: 0.75rem auto 1rem; }
+.free-cta img { width: 100%; height: auto; border-radius: 14px; display: block; }
+.map-section { text-align: left; margin: 0.75rem 0 1rem; }
+.map-section h3 { margin: 0.85rem 0 0.35rem; font-size: 1rem; color: #e8f2ff; }
+.map-section ul { list-style: none; margin: 0; padding: 0; }
+.map-section a {
+  display: block; color: #ff9a4a; font-weight: 700; text-decoration: none;
+  padding: 0.25rem 0; border-bottom: 1px solid rgba(255,122,24,0.35);
+  word-break: break-word; font-size: 0.92rem;
+}
+.map-section a:hover { color: #ffb347; }
 .doc-body { text-align: left; max-width: 38rem; margin: 0 auto; line-height: 1.55; color: #cfe6f7; }

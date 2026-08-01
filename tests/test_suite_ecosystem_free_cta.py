@@ -131,16 +131,19 @@ class TestSuiteEcosystemNeonUnderline(unittest.TestCase):
 
 
 class TestFreeDownloadFace101Platform(unittest.TestCase):
-    """Free-download bar: full art, version 1.0.1, platform detect face."""
+    """Free-download bar: full art, FREE DOWNLOAD face, platform detect hrefs."""
 
     def test_cta_face_version_1_0_1_and_full_image_css(self) -> None:
         from downloads import (
+            DOWNLOADS_MAP_PATH,
             FREE_DOWNLOAD_FACE_VERSION,
+            RELEASE_VERSION,
             free_download_cta_css,
             render_free_download_cta_html,
         )
 
-        self.assertEqual(FREE_DOWNLOAD_FACE_VERSION, "1.0.1")
+        # Face art no longer bakes a version; monopin tracks RELEASE_VERSION.
+        self.assertEqual(FREE_DOWNLOAD_FACE_VERSION, RELEASE_VERSION)
         css = free_download_cta_css()
         self.assertIn("object-fit: contain", css)
         self.assertNotIn("object-fit: cover", css)
@@ -149,16 +152,17 @@ class TestFreeDownloadFace101Platform(unittest.TestCase):
         self.assertIn("height: auto", css)
 
         cta = render_free_download_cta_html()
-        self.assertIn("1.0.1", cta)
-        self.assertIn('data-face-version="1.0.1"', cta)
-        self.assertIn('data-version="1.0.1"', cta)
-        self.assertIn("Free download version 1.0.1", cta)
+        self.assertIn(RELEASE_VERSION, cta)
+        self.assertIn(f'data-face-version="{RELEASE_VERSION}"', cta)
+        self.assertIn("FREE DOWNLOAD", cta)
+        self.assertIn(DOWNLOADS_MAP_PATH, cta)
+        self.assertNotIn("v1.0.0", cta)
         self.assertIn('width="1024"', cta)
         self.assertIn('height="1024"', cta)
 
     def test_cta_platform_detect_names_brand_and_href(self) -> None:
         from downloads import (
-            FREE_PACKAGES_PATH,
+            DOWNLOADS_MAP_PATH,
             render_free_download_cta_html,
             suite_free_download_href,
         )
@@ -172,19 +176,19 @@ class TestFreeDownloadFace101Platform(unittest.TestCase):
         ):
             cta = render_free_download_cta_html(default_platform=plat)
             self.assertIn(suite_free_download_href(plat), cta, msg=plat)
-            self.assertIn(f"Free download for {face}", cta, msg=plat)
-            self.assertIn("version 1.0.1", cta, msg=plat)
+            self.assertIn("FREE DOWNLOAD", cta, msg=plat)
+            self.assertIn(face, cta, msg=plat)
             self.assertIn(f'data-detected-platform="{plat}"', cta, msg=plat)
-            self.assertNotIn(f'href="{FREE_PACKAGES_PATH}"', cta, msg=plat)
+            self.assertNotIn(f'href="{DOWNLOADS_MAP_PATH}"', cta, msg=plat)
 
-        # Unknown / empty → free-packages chooser
+        # Unknown / empty → Downloads Map
         chooser = render_free_download_cta_html(default_platform="")
-        self.assertIn(f'href="{FREE_PACKAGES_PATH}"', chooser)
-        self.assertIn("Free download version 1.0.1", chooser)
+        self.assertIn(f'href="{DOWNLOADS_MAP_PATH}"', chooser)
+        self.assertIn("FREE DOWNLOAD", chooser)
         self.assertNotIn("data-detected-platform", chooser)
 
         unknown = render_free_download_cta_html(default_platform="not-a-platform")
-        self.assertIn(f'href="{FREE_PACKAGES_PATH}"', unknown)
+        self.assertIn(f'href="{DOWNLOADS_MAP_PATH}"', unknown)
         self.assertNotIn("data-detected-platform", unknown)
 
 

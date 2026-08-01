@@ -53,12 +53,14 @@ from admin_2fa import (
     verify_totp,
 )
 from downloads import (
+    DOWNLOADS_MAP_PATH,
     FREE_PACKAGES_PATH,
     RELEASE_VERSION,
     download_css,
     free_download_cta_css,
     render_bmc_tip_html,
     render_download_section_html,
+    render_downloads_map_page_html,
     render_free_download_cta_html,
     render_free_packages_page_html,
     render_node_preference_html,
@@ -869,8 +871,13 @@ class Handler(BaseHTTPRequestHandler):
                 ),
             )
             return
-        # Free packages hub (centered orange direct-download links)
-        if path in (FREE_PACKAGES_PATH, f"{FREE_PACKAGES_PATH}/"):
+        # Downloads Map (all brand installers) + legacy /free-packages alias
+        if path in (
+            DOWNLOADS_MAP_PATH,
+            f"{DOWNLOADS_MAP_PATH}/",
+            FREE_PACKAGES_PATH,
+            f"{FREE_PACKAGES_PATH}/",
+        ):
             q_plat = (query.get("platform") or "").strip()
             if not q_plat:
                 try:
@@ -888,7 +895,7 @@ class Handler(BaseHTTPRequestHandler):
             self._send(
                 200,
                 "text/html; charset=utf-8",
-                render_free_packages_page_html(default_platform=q_plat),
+                render_downloads_map_page_html(default_platform=q_plat),
             )
             return
         # Suite free installer download (no pay token). App still needs KEYGEN.

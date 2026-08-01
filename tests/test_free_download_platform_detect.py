@@ -94,8 +94,8 @@ class TestDetectPlatformFromUserAgent(unittest.TestCase):
     def test_free_download_cta_links_to_detected_os(self) -> None:
         from app import render_html
         from downloads import (
+            DOWNLOADS_MAP_PATH,
             FREE_DOWNLOAD_CTA_ID,
-            FREE_PACKAGES_PATH,
             render_free_download_cta_html,
             suite_free_download_href,
         )
@@ -103,14 +103,15 @@ class TestDetectPlatformFromUserAgent(unittest.TestCase):
         # Direct CTA helper
         cta = render_free_download_cta_html(default_platform="macos")
         self.assertIn(suite_free_download_href("macos"), cta)
-        self.assertIn("Free download for macOS", cta)
+        self.assertIn("FREE DOWNLOAD", cta)
+        self.assertIn("macOS", cta)  # aria-label names platform
         self.assertIn('data-detected-platform="macos"', cta)
         self.assertIn(f'id="{FREE_DOWNLOAD_CTA_ID}"', cta)
-        self.assertNotIn(f'href="{FREE_PACKAGES_PATH}"', cta)
+        self.assertNotIn(f'href="{DOWNLOADS_MAP_PATH}"', cta)
 
-        # Unknown → packages chooser
+        # Unknown → Downloads Map
         chooser = render_free_download_cta_html(default_platform="")
-        self.assertIn(f'href="{FREE_PACKAGES_PATH}"', chooser)
+        self.assertIn(f'href="{DOWNLOADS_MAP_PATH}"', chooser)
         self.assertNotIn("data-detected-platform", chooser)
 
         # Homepage wires UA default into the image CTA
@@ -118,9 +119,9 @@ class TestDetectPlatformFromUserAgent(unittest.TestCase):
             {"title": "RESTORE PRIVACY"}, default_platform="android"
         ).decode("utf-8")
         i_cta = page.index(f'id="{FREE_DOWNLOAD_CTA_ID}"')
-        cta_snip = page[i_cta : i_cta + 600]
+        cta_snip = page[i_cta : i_cta + 800]
         self.assertIn(suite_free_download_href("android"), cta_snip)
-        self.assertIn("Free download for Android", cta_snip)
+        self.assertIn("Android", cta_snip)
         self.assertIn('data-detected-platform="android"', cta_snip)
 
     def test_free_packages_page_highlights_detected_os(self) -> None:
@@ -131,10 +132,9 @@ class TestDetectPlatformFromUserAgent(unittest.TestCase):
         self.assertIn("Detected your device as <strong>iOS</strong>", html)
         self.assertIn("is-detected", html)
         self.assertIn(suite_free_download_href("ios"), html)
-        # Detected platform appears first in the list
-        i_ios = html.index('id="free-pkg-ios"')
-        i_win = html.index('id="free-pkg-windows"')
-        self.assertLess(i_ios, i_win)
+        # Detected Suite iOS installer is marked on the Downloads Map
+        self.assertIn('data-platform="ios"', html)
+        self.assertIn('data-kind="suite_client"', html)
 
 
 if __name__ == "__main__":

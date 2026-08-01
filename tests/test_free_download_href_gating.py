@@ -42,8 +42,11 @@ class TestFreeDownloadHrefGating(unittest.TestCase):
         from downloads import SUITE_FREE_DOWNLOAD_PATH, suite_free_download_href
         from payments import platform_filename
 
+        from downloads import DOWNLOADS_MAP_PATH
+
         self.assertEqual(SUITE_FREE_DOWNLOAD_PATH, "/suite/download")
-        self.assertEqual(suite_free_download_href(""), SUITE_FREE_DOWNLOAD_PATH)
+        # Empty platform → Downloads Map (no dead /suite/download without ?platform=)
+        self.assertEqual(suite_free_download_href(""), DOWNLOADS_MAP_PATH)
         for plat in PLATFORMS:
             href = suite_free_download_href(plat)
             self.assertEqual(href, f"/suite/download?platform={plat}")
@@ -103,9 +106,12 @@ class TestFreeDownloadHrefGating(unittest.TestCase):
         for plat in PLATFORMS:
             self.assertIn(suite_free_download_href(plat), home)
 
-        # Default CTA → packages chooser (no guessed platform without UA).
+        # Default CTA → Downloads Map (no guessed platform without UA).
+        from downloads import DOWNLOADS_MAP_PATH
+
         cta = render_free_download_cta_html()
-        self.assertIn(f'href="{FREE_PACKAGES_PATH}"', cta)
+        self.assertIn(f'href="{DOWNLOADS_MAP_PATH}"', cta)
+
         # Detected platform CTA → that free installer only.
         for plat in PLATFORMS:
             cta_p = render_free_download_cta_html(default_platform=plat)

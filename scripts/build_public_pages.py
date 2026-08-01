@@ -41,6 +41,7 @@ PUBLIC_STATIC = (
     "apple-touch-icon.png",
     "data_path_motif.svg",
     "public_theme.js",
+    "freebie.jpg",
 )
 
 FORBIDDEN_NAME_FRAGMENTS = (
@@ -122,7 +123,27 @@ body {
 .free-grid a.dl:hover, a.btn:hover { background: #c5e0f4; }
 .keygen-note { margin: 0.75rem auto; max-width: 32rem; color: #fecaca; font-weight: 600; }
 .steps { text-align: left; max-width: 28rem; margin: 0.5rem auto; line-height: 1.55; color: #cfe6f7; }
-.site-foot { text-align: center; margin-top: 1.5rem; font-size: 0.85rem; color: var(--muted); }
+.site-foot {
+  display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between;
+  gap: 0.65rem 1.25rem; margin-top: 1.5rem; font-size: 0.85rem; color: var(--muted);
+}
+.site-foot .copy { margin: 0; text-align: left; flex: 1 1 auto; }
+.site-foot .map-link {
+  margin: 0; text-align: right; flex: 0 0 auto; color: #7aa0c0; text-decoration: none;
+  font-size: 0.78rem; letter-spacing: 0.03em;
+}
+.site-foot .map-link:hover { color: #aed0ea; text-decoration: underline; }
+.free-cta { display: block; max-width: 22rem; margin: 0.75rem auto 1rem; }
+.free-cta img { width: 100%; height: auto; border-radius: 14px; display: block; }
+.map-section { text-align: left; margin: 0.75rem 0 1rem; }
+.map-section h3 { margin: 0.85rem 0 0.35rem; font-size: 1rem; color: #e8f2ff; }
+.map-section ul { list-style: none; margin: 0; padding: 0; }
+.map-section a {
+  display: block; color: #ff9a4a; font-weight: 700; text-decoration: none;
+  padding: 0.25rem 0; border-bottom: 1px solid rgba(255,122,24,0.35);
+  word-break: break-word; font-size: 0.92rem;
+}
+.map-section a:hover { color: #ffb347; }
 .doc-body { text-align: left; max-width: 38rem; margin: 0 auto; line-height: 1.55; color: #cfe6f7; }
 """
 
@@ -156,6 +177,13 @@ def build_index() -> str:
             f'<a class="dl" href="{_esc(href)}">Download {_esc(label)}</a>'
         )
     free_grid = "\n      ".join(links)
+    # Large FREE DOWNLOAD CTA → live host map (platform detect is status-host only)
+    free_cta = (
+        f'<a class="free-cta" id="free-download-v1-cta" '
+        f'href="{origin}/downloads-map" data-free-download-v1="1">'
+        f'<img src="assets/freebie.jpg" width="1024" height="1024" '
+        f'alt="FREE DOWNLOAD — Restore Privacy Suite"/></a>'
+    )
 
     return f"""<!DOCTYPE html>
 <html lang="en">
@@ -180,6 +208,7 @@ def build_index() -> str:
       </div>
       <nav class="site-nav" aria-label="Site">
         <a href="index.html">Home</a>
+        <a href="downloads-map.html">Downloads Map</a>
         <a href="privacy.html">Privacy</a>
         <a href="licence.html">Licence</a>
         <a href="https://restoreprivacy.online/AUDIT.md">Audit</a>
@@ -194,8 +223,10 @@ def build_index() -> str:
     </section>
 
     <section class="panel" id="suite-storefront" data-free-download="1">
-      <h2>Free installers</h2>
-      <p class="muted">Pick your device. Residual Connect waits for a KEYGEN after checkout.</p>
+      <h2>FREE DOWNLOAD</h2>
+      {free_cta}
+      <p class="muted">Or pick a Suite platform below. Full map of every product:
+        <a href="downloads-map.html">Downloadables Mapped Here</a>.</p>
       <div class="free-grid" id="suite-free-grid">
       {free_grid}
       </div>
@@ -218,8 +249,67 @@ def build_index() -> str:
     </section>
 
     <footer class="site-foot">
-      <p>{_esc(PUBLIC_BRAND_DISPLAY)} · public pages only · no operator console</p>
-      <p class="muted">Checkout and fulfilment live on restoreprivacy.online</p>
+      <p class="copy">© Raskul - all rights reserved · {_esc(PUBLIC_BRAND_DISPLAY)}</p>
+      <a class="map-link" href="downloads-map.html">Downloadables Mapped Here</a>
+    </footer>
+  </div>
+</body>
+</html>
+"""
+
+
+def build_downloads_map() -> str:
+    """Static Downloads Map export — installer links point at live status host."""
+    sys.path.insert(0, str(STATUS))
+    from downloads import (  # noqa: E402
+        RELEASE_VERSION,
+        downloads_map_products,
+        list_downloads_map_rows,
+    )
+
+    origin = "https://restoreprivacy.online"
+    sections: list[str] = []
+    for product, rows in downloads_map_products(list_downloads_map_rows()):
+        links = []
+        for r in rows:
+            href = str(r.get("href") or "")
+            if href.startswith("/"):
+                href = origin + href
+            label = str(r.get("label") or r.get("filename") or "")
+            links.append(f'<li><a href="{_esc(href)}">{_esc(label)}</a></li>')
+        body = "\n        ".join(links)
+        sections.append(
+            f'<div class="map-section" data-map-product="{_esc(product)}">'
+            f"<h3>{_esc(product)}</h3><ul>\n        {body}\n      </ul></div>"
+        )
+    sections_html = "\n      ".join(sections)
+    return f"""<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>Downloads Map · Restore Privacy Suite v{RELEASE_VERSION}</title>
+<link rel="icon" href="assets/favicon.ico"/>
+<link rel="stylesheet" href="assets/site.css"/>
+</head>
+<body class="site-public" data-theme="dark" data-product="suite">
+  <div class="page-shell">
+    <header class="brand-panel">
+      <p class="brand-name">Downloads Map</p>
+      <nav class="site-nav">
+        <a href="index.html">Home</a>
+        <a href="downloads-map.html">Downloads Map</a>
+      </nav>
+    </header>
+    <section class="panel" id="downloads-map-page" data-downloads-map-page="1">
+      <h1>Downloads Map</h1>
+      <p class="muted">Every Restore Privacy installer we ship (Suite monopin {RELEASE_VERSION}
+        and companions). Links open on restoreprivacy.online fulfilment host.</p>
+      {sections_html}
+    </section>
+    <footer class="site-foot">
+      <p class="copy">© Raskul - all rights reserved</p>
+      <a class="map-link" href="index.html">Home</a>
     </footer>
   </div>
 </body>
@@ -266,6 +356,7 @@ def main() -> int:
             shutil.copy2(src, assets / name)
 
     (OUT / "index.html").write_text(build_index(), encoding="utf-8")
+    (OUT / "downloads-map.html").write_text(build_downloads_map(), encoding="utf-8")
     (OUT / "privacy.html").write_text(
         build_simple_doc(
             "Privacy",
@@ -288,13 +379,17 @@ def main() -> int:
     (OUT / ".nojekyll").write_text("", encoding="utf-8")
     (OUT / "README.md").write_text(
         "# Restore Privacy Suite — public site\n\n"
-        "Static GitHub Pages export for **Restore Privacy Suite v1.0.0**.\n\n"
-        "Free installers; KEYGEN licence from £3/month on restoreprivacy.online.\n\n"
+        "Static GitHub Pages export for **Restore Privacy Suite v1.0.2**.\n\n"
+        "Free installers + **Downloads Map** of every product/platform package; "
+        "KEYGEN licence from £3/month on restoreprivacy.online.\n\n"
         "This tree is **public only**. It does **not** include `/admin` or operator tools.\n\n"
         "## Live public open site\n\n"
         "| | |\n|--|--|\n"
         "| **GitHub Pages** | https://rgsneddon.github.io/restore-privacy-suite/ |\n"
-        "| **Public source repo** | https://github.com/rgsneddon/restore-privacy-suite |\n\n"
+        "| **Public source repo** | https://github.com/rgsneddon/restore-privacy-suite |\n"
+        "| **Downloads Map** | downloads-map.html (and live /downloads-map) |\n\n"
+        "Installer bytes are fulfilled on restoreprivacy.online / Helsinki; this "
+        "export links to those routes (large binaries are not committed to Pages).\n\n"
         "Publish by pushing this export to the public `restore-privacy-suite` repo "
         "(keep the product monorepo private).\n",
         encoding="utf-8",

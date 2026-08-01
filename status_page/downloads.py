@@ -1093,14 +1093,17 @@ SUITE_KEYGEN_HINT = (
 )
 SUITE_FREE_DOWNLOAD_PATH = "/suite/download"
 DOWNLOADS_SECTION_ID = "downloads"
-# Full-width free-download face (operator asset freebie.jpg) → packages / platform
+# Full-width free-download face (operator asset freebie.jpg) → monopin platform or map
 FREE_PACKAGES_PATH = "/free-packages"
+DOWNLOADS_MAP_PATH = "/downloads-map"
+DOWNLOADS_MAP_LABEL = "Downloadables Mapped Here"
 FREEBIE_IMG_PATH = "/static/freebie.jpg"
-# CTA face version (OBJECTIVE 1.0.2); may diverge from catalog monopin until pin bump
-FREE_DOWNLOAD_FACE_VERSION = "1.0.2"
-FREEBIE_IMG_ALT = f"Free download version {FREE_DOWNLOAD_FACE_VERSION}"
+# Catalog monopin for links (face art no longer bakes a version string)
+FREE_DOWNLOAD_FACE_VERSION = RELEASE_VERSION
+FREEBIE_IMG_ALT = "FREE DOWNLOAD — Restore Privacy Suite"
 FREE_DOWNLOAD_CTA_ID = "free-download-v1-cta"
 FREE_PACKAGES_PAGE_ID = "free-packages-page"
+DOWNLOADS_MAP_PAGE_ID = "downloads-map-page"
 
 # Suite product ecosystem sub-menu (Perc explorer + Evolve + Perccent wallet docs).
 # Only real public destinations (verified live); align explorer base with admin_perc.
@@ -1224,8 +1227,17 @@ def suite_free_download_href(platform: str) -> str:
     """Relative free-download URL for a Suite platform installer."""
     plat = (platform or "").strip().lower()
     if not plat:
-        return SUITE_FREE_DOWNLOAD_PATH
+        return DOWNLOADS_MAP_PATH
     return f"{SUITE_FREE_DOWNLOAD_PATH}?platform={plat}"
+
+
+def free_asset_href(filename: str, *, version: str | None = None) -> str:
+    """Relative free-open path for a staged brand/catalog basename."""
+    ver = (version or RELEASE_VERSION).strip() or RELEASE_VERSION
+    fname = (filename or "").strip()
+    if not fname:
+        return DOWNLOADS_MAP_PATH
+    return f"/assets/{ver}/{fname}"
 
 
 def freebie_img_src() -> str:
@@ -1243,7 +1255,7 @@ def freebie_img_src() -> str:
 
 
 def free_download_cta_css() -> str:
-    """Full-width free-download image button — full freebie art visible (no crop)."""
+    """Full-width free-download image button — face art already has FREE DOWNLOAD."""
     return f"""
     .free-download-cta-wrap {{
       width: 100%; max-width: 100%; box-sizing: border-box;
@@ -1266,14 +1278,10 @@ def free_download_cta_css() -> str:
       pointer-events: none; user-select: none;
       aspect-ratio: 1 / 1;
     }}
+    /* Screen-reader / a11y only — face text lives in freebie.jpg (FREE DOWNLOAD) */
     a.free-download-cta .free-download-cta-label {{
-      position: absolute; left: 0; right: 0; bottom: 0;
-      padding: 0.65rem 0.85rem 0.75rem;
-      font: 800 clamp(0.95rem, 2.6vw, 1.2rem)/1.25 system-ui,sans-serif;
-      letter-spacing: 0.05em; text-transform: uppercase; text-align: center;
-      color: #fff; text-shadow: 0 2px 10px rgba(0,0,0,0.65);
-      background: linear-gradient(180deg, transparent, rgba(8,16,32,0.9));
-      pointer-events: none;
+      position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
+      overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0;
     }}
     a.free-download-cta:active,
     a.free-download-cta.is-pressed,
@@ -1288,16 +1296,24 @@ def free_download_cta_css() -> str:
 """
 
 
+def free_download_cta_href(*, default_platform: str = "") -> str:
+    """CTA target: monopin Suite free installer for known platform, else Downloads Map."""
+    def_plat = (default_platform or "").strip().lower()
+    known = {a.platform for a in available_downloads()}
+    if def_plat and def_plat in known:
+        return suite_free_download_href(def_plat)
+    return DOWNLOADS_MAP_PATH
+
+
 def render_free_download_cta_html(
     *,
     version: str = "",
     default_platform: str = "",
 ) -> str:
-    """Full-width free download image button (face version 1.0.2 by default).
+    """Full-width free download image button (FREE DOWNLOAD face, no version text).
 
-    When *default_platform* is a known catalog OS brand (from User-Agent on the
-    homepage), the button links straight to that Suite free installer and names
-    the brand in the label. Unknown/empty falls back to the packages chooser.
+    When *default_platform* is a known catalog OS (from User-Agent), the button
+    links to that Suite monopin free installer. Unknown/empty → Downloads Map.
     """
     ver = (version or FREE_DOWNLOAD_FACE_VERSION).strip() or FREE_DOWNLOAD_FACE_VERSION
     src = freebie_img_src()
@@ -1305,25 +1321,29 @@ def render_free_download_cta_html(
     known = {a.platform for a in available_downloads()}
     if def_plat and def_plat not in known:
         def_plat = ""
+    href = free_download_cta_href(default_platform=def_plat)
     if def_plat:
         title = platform_face_title(def_plat)
-        href = suite_free_download_href(def_plat)
-        label = f"Free download for {title} · version {ver}"
+        aria = f"FREE DOWNLOAD for {title}"
         detect_attrs = (
             f' data-platform="{_esc_html(def_plat)}"'
             f' data-detected-platform="{_esc_html(def_plat)}"'
         )
     else:
-        href = FREE_PACKAGES_PATH
-        label = f"Free download version {ver}"
-        detect_attrs = ""
+        aria = "FREE DOWNLOAD — open Downloads Map"
+        detect_attrs = ' data-fallback-map="1"'
+    # Visible face copy is the bitmap only; label is for a11y / tests.
+    label = "FREE DOWNLOAD"
+    href_kind = "platform" if def_plat else "map"
     return f"""
     <div class="free-download-cta-wrap" id="free-download-cta-wrap"
-         data-free-download-cta="1" data-face-version="{_esc_html(ver)}"{detect_attrs}>
+         data-free-download-cta="1" data-face-version="{_esc_html(ver)}"
+         data-catalog-version="{_esc_html(RELEASE_VERSION)}"{detect_attrs}>
       <a class="free-download-cta" id="{FREE_DOWNLOAD_CTA_ID}"
          href="{_esc_html(href)}" data-free-download-v1="1"
-         data-version="{_esc_html(ver)}"{detect_attrs}
-         aria-label="{_esc_html(label)}">
+         data-version="{_esc_html(ver)}" data-href-kind="{href_kind}"
+         {detect_attrs}
+         aria-label="{_esc_html(aria)}">
         <img src="{_esc_html(src)}" alt="{_esc_html(FREEBIE_IMG_ALT)}"
              width="1024" height="1024" decoding="async"/>
         <span class="free-download-cta-label">{_esc_html(label)}</span>
@@ -1333,59 +1353,200 @@ def render_free_download_cta_html(
 
 
 def free_packages_page_css() -> str:
-    """Data-path free packages page: centered bold orange package links."""
+    """Legacy alias — Downloads Map styles."""
+    return downloads_map_page_css()
+
+
+def downloads_map_page_css() -> str:
+    """Downloads Map: grouped product → platform installer links."""
     return """
-    .free-packages-page {
+    .downloads-map-page, .free-packages-page {
       min-height: 70vh; display: flex; flex-direction: column;
-      align-items: center; justify-content: center;
-      text-align: center; position: relative; width: 100%;
-      box-sizing: border-box; padding: 2rem 1rem 3rem;
+      align-items: stretch; justify-content: flex-start;
+      text-align: left; position: relative; width: 100%;
+      box-sizing: border-box; padding: 1.5rem 1rem 3rem;
     }
+    .downloads-map-page .downloads-map-center,
     .free-packages-page .free-packages-center {
-      position: sticky; top: 35vh; transform: translateY(-50%);
-      width: min(100%, 28rem); margin: 0 auto; z-index: 2;
-      padding: 1.25rem 1rem;
+      width: min(100%, 42rem); margin: 0 auto; z-index: 2;
+      padding: 1rem 0.5rem 2rem;
     }
-    .free-packages-page h1 {
-      margin: 0 0 0.75rem; font-size: clamp(1.15rem, 3.5vw, 1.55rem);
-      letter-spacing: 0.06em; color: #e8f2ff; font-weight: 800;
+    .downloads-map-page h1, .free-packages-page h1 {
+      margin: 0 0 0.5rem; font-size: clamp(1.2rem, 3.5vw, 1.65rem);
+      letter-spacing: 0.04em; color: #e8f2ff; font-weight: 800;
+      text-align: center;
     }
+    .downloads-map-page .downloads-map-blurb,
     .free-packages-page .free-packages-blurb {
       margin: 0 0 1.25rem; font-size: 0.92rem; line-height: 1.45;
-      color: #aed0ea; font-weight: 600;
+      color: #aed0ea; font-weight: 600; text-align: center;
     }
+    .downloads-map-section {
+      margin: 0 0 1.35rem; padding: 0.85rem 0.9rem 1rem;
+      border: 1px solid rgba(174, 208, 234, 0.28);
+      border-radius: 12px; background: rgba(10, 22, 40, 0.55);
+    }
+    .downloads-map-section h2 {
+      margin: 0 0 0.55rem; font-size: 1.02rem; font-weight: 800;
+      color: #dbeafe; letter-spacing: 0.03em;
+    }
+    .downloads-map-section .downloads-map-list,
     .free-packages-page .free-packages-list {
       list-style: none; margin: 0; padding: 0;
-      display: flex; flex-direction: column; gap: 0.85rem;
-      align-items: center;
+      display: flex; flex-direction: column; gap: 0.55rem;
+      align-items: stretch;
     }
+    .downloads-map-page a.downloads-map-link,
     .free-packages-page a.free-package-link {
-      display: inline-block; font-size: clamp(1.05rem, 3vw, 1.35rem);
-      font-weight: 800; text-decoration: none;
-      color: #ff7a18; /* bold orange */
-      text-shadow: 0 0 12px rgba(255, 122, 24, 0.35);
-      padding: 0.35rem 0.5rem;
-      border-bottom: 2px solid rgba(255, 122, 24, 0.55);
+      display: block; font-size: clamp(0.92rem, 2.4vw, 1.08rem);
+      font-weight: 700; text-decoration: none;
+      color: #ff7a18;
+      text-shadow: 0 0 10px rgba(255, 122, 24, 0.28);
+      padding: 0.3rem 0.15rem;
+      border-bottom: 1px solid rgba(255, 122, 24, 0.35);
+      word-break: break-word;
     }
+    .downloads-map-page a.downloads-map-link:hover,
     .free-packages-page a.free-package-link:hover {
       color: #ff9a4a; border-bottom-color: #ff9a4a;
     }
+    .downloads-map-page a.downloads-map-link.is-detected,
     .free-packages-page a.free-package-link.is-detected {
-      color: #ffb347;
-      border-bottom-color: #ffb347;
-      font-size: clamp(1.15rem, 3.2vw, 1.5rem);
+      color: #ffb347; border-bottom-color: #ffb347;
     }
+    .downloads-map-page .downloads-map-detect-hint,
     .free-packages-page .free-packages-detect-hint {
       margin: 0 0 1rem; font-size: 0.9rem; line-height: 1.4;
-      color: #c8e0f5; font-weight: 600;
+      color: #c8e0f5; font-weight: 600; text-align: center;
     }
+    .downloads-map-page .downloads-map-back,
     .free-packages-page .free-packages-back {
-      margin-top: 1.75rem; font-size: 0.85rem;
+      margin-top: 1.5rem; font-size: 0.85rem; text-align: center;
     }
+    .downloads-map-page .downloads-map-back a,
     .free-packages-page .free-packages-back a {
       color: #93c5fd; font-weight: 700; text-decoration: none;
     }
 """
+
+
+def list_downloads_map_rows(
+    *, version: str | None = None
+) -> list[dict[str, str]]:
+    """Pure inventory rows for the Downloads Map (product × platform installers).
+
+    Sourced from brand package inventory + Suite catalog monopin. Each row has
+    product, kind, platform, filename, href, version — href targets Suite free
+    download or free-open ``/assets/{ver}/{file}``.
+    """
+    ver = (version or RELEASE_VERSION).strip() or RELEASE_VERSION
+    rows: list[dict[str, str]] = []
+    # --- Suite client platforms (primary residual / Suite free storefront) ---
+    for p in list_catalog_platform_packages(version=ver):
+        plat = str(p.get("platform") or "")
+        fname = str(p.get("filename") or "")
+        rows.append(
+            {
+                "product": "Restore Privacy Suite",
+                "kind": "suite_client",
+                "platform": plat,
+                "filename": fname,
+                "href": suite_free_download_href(plat),
+                "version": ver,
+                "label": f"{platform_face_title(plat)} — {fname}",
+            }
+        )
+    # --- Full brand inventory companions ---
+    try:
+        import sys
+        from pathlib import Path
+
+        root = Path(__file__).resolve().parents[1]
+        scripts = root / "scripts"
+        if str(scripts) not in sys.path:
+            sys.path.insert(0, str(scripts))
+        from brand_package_inventory import list_brand_installer_packages
+
+        for r in list_brand_installer_packages(suite_version=ver, repo_root=root):
+            kind = str(r.get("kind") or "")
+            if kind == "suite_client":
+                continue  # already listed via suite free path
+            product = str(r.get("product") or kind or "Package")
+            plat = str(r.get("platform") or "")
+            fname = str(r.get("filename") or "")
+            if not fname:
+                continue
+            # Prefer suite monopin free-open path so status host can serve
+            href = free_asset_href(fname, version=ver)
+            face = platform_face_title(plat) if plat in {
+                "windows", "android", "macos", "ios", "linux",
+            } else (plat or "package")
+            rows.append(
+                {
+                    "product": product,
+                    "kind": kind,
+                    "platform": plat,
+                    "filename": fname,
+                    "href": href,
+                    "version": str(r.get("version") or ver),
+                    "label": f"{face} — {fname}",
+                }
+            )
+    except Exception:
+        # Fallback: at least Rx extras
+        for pkg in list_suite_extra_packages(version=ver):
+            fname = str(pkg.get("filename") or "")
+            if not fname:
+                continue
+            rows.append(
+                {
+                    "product": str(pkg.get("product") or "Rx Privacy Browser"),
+                    "kind": str(pkg.get("kind") or "browser"),
+                    "platform": str(pkg.get("platform") or ""),
+                    "filename": fname,
+                    "href": free_asset_href(fname, version=ver),
+                    "version": ver,
+                    "label": f"{pkg.get('platform') or 'package'} — {fname}",
+                }
+            )
+    # --- Beam privacy dapp (source pack when present; no binary installer) ---
+    try:
+        from pathlib import Path
+
+        beam_readme = (
+            Path(__file__).resolve().parents[1] / "beam_privacy_dapp" / "README.md"
+        )
+        if beam_readme.is_file():
+            rows.append(
+                {
+                    "product": "Beam Privacy dApp",
+                    "kind": "beam_dapp",
+                    "platform": "source",
+                    "filename": "beam_privacy_dapp/README.md",
+                    "href": "https://github.com/rgsneddon/restore-privacy/tree/main/beam_privacy_dapp",
+                    "version": ver,
+                    "label": "Source / integration docs (Beam dApp)",
+                }
+            )
+    except Exception:
+        pass
+    return rows
+
+
+def downloads_map_products(
+    rows: list[dict[str, str]] | None = None,
+) -> list[tuple[str, list[dict[str, str]]]]:
+    """Group map rows by product (stable order)."""
+    items = rows if rows is not None else list_downloads_map_rows()
+    order: list[str] = []
+    groups: dict[str, list[dict[str, str]]] = {}
+    for r in items:
+        prod = str(r.get("product") or "Other")
+        if prod not in groups:
+            groups[prod] = []
+            order.append(prod)
+        groups[prod].append(r)
+    return [(p, groups[p]) for p in order]
 
 
 def render_free_packages_page_html(
@@ -1393,52 +1554,76 @@ def render_free_packages_page_html(
     version: str = "",
     default_platform: str = "",
 ) -> bytes:
-    """Simple free packages page: data-path background + centered orange links.
+    """Back-compat alias: free-packages hub is the Downloads Map."""
+    return render_downloads_map_page_html(
+        version=version, default_platform=default_platform
+    )
 
-    *default_platform* (User-Agent OS brand) sorts that package first and marks
-    it detected so viewers land on their device without hunting the list.
+
+def render_downloads_map_page_html(
+    *,
+    version: str = "",
+    default_platform: str = "",
+) -> bytes:
+    """Downloads Map: every brand inventory installer, per platform.
+
+    *default_platform* (User-Agent OS) highlights matching Suite client links.
     """
     ver = (version or RELEASE_VERSION).strip() or RELEASE_VERSION
-    items = list_catalog_platform_packages(version=ver)
-    if not items:
-        items = list_catalog_platform_packages()
     def_plat = (default_platform or "").strip().lower()
-    known = {str(p.get("platform") or "") for p in items}
+    known = {a.platform for a in available_downloads()}
     if def_plat and def_plat not in known:
         def_plat = ""
-    if def_plat:
-        items = sorted(
-            items,
-            key=lambda p: (
-                0 if str(p.get("platform") or "") == def_plat else 1,
-                str(p.get("platform") or ""),
-            ),
+    sections_html: list[str] = []
+    for product, rows in downloads_map_products():
+        links: list[str] = []
+        for r in rows:
+            plat = str(r.get("platform") or "")
+            href = str(r.get("href") or "")
+            label = str(r.get("label") or r.get("filename") or plat)
+            fname = str(r.get("filename") or "")
+            kind = str(r.get("kind") or "")
+            is_det = (
+                " is-detected"
+                if def_plat
+                and kind == "suite_client"
+                and plat == def_plat
+                else ""
+            )
+            det_attr = ' data-detected-platform="1"' if is_det else ""
+            pid = f"map-{kind}-{plat}-{fname}"[:80]
+            links.append(
+                f'<li><a class="downloads-map-link free-package-link{_esc_html(is_det)}" '
+                f'id="{_esc_html(pid)}" '
+                f'href="{_esc_html(href)}" data-platform="{_esc_html(plat)}" '
+                f'data-filename="{_esc_html(fname)}" data-product="{_esc_html(product)}" '
+                f'data-kind="{_esc_html(kind)}" data-map-package="1"{det_attr}>'
+                f"{_esc_html(label)}</a></li>"
+            )
+        list_body = "\n          ".join(links) if links else (
+            "<li><p class=\"downloads-map-blurb\">No packages in this group.</p></li>"
         )
-    links: list[str] = []
-    for p in items:
-        plat = str(p.get("platform") or "")
-        title = platform_face_title(plat)
-        href = suite_free_download_href(plat)
-        fname = str(p.get("filename") or "")
-        is_det = " is-detected" if def_plat and plat == def_plat else ""
-        det_attr = ' data-detected-platform="1"' if is_det else ""
-        links.append(
-            f'<li><a class="free-package-link{_esc_html(is_det)}" '
-            f'id="free-pkg-{_esc_html(plat)}" '
-            f'href="{_esc_html(href)}" data-platform="{_esc_html(plat)}" '
-            f'data-filename="{_esc_html(fname)}" data-free-package="1"{det_attr}>'
-            f"{_esc_html(title)} — {_esc_html(fname)}</a></li>"
+        sec_id = "map-sec-" + "".join(
+            ch if ch.isalnum() else "-" for ch in product.lower()
+        )[:48]
+        sections_html.append(
+            f'<section class="downloads-map-section" id="{_esc_html(sec_id)}" '
+            f'data-map-product="{_esc_html(product)}">'
+            f"<h2>{_esc_html(product)}</h2>"
+            f'<ul class="downloads-map-list free-packages-list" data-free-packages="1">'
+            f"\n          {list_body}\n        </ul></section>"
         )
-    list_html = "\n        ".join(links) if links else (
-        "<li><p class=\"free-packages-blurb\">No packages listed for this pin.</p></li>"
+    sections = "\n      ".join(sections_html) if sections_html else (
+        '<p class="downloads-map-blurb">No packages listed for this pin.</p>'
     )
     if def_plat:
         face = platform_face_title(def_plat)
         detect_hint = (
-            f'<p class="free-packages-detect-hint" id="free-packages-detect-hint" '
+            f'<p class="downloads-map-detect-hint free-packages-detect-hint" '
+            f'id="downloads-map-detect-hint" '
             f'data-detected-platform="{_esc_html(def_plat)}">'
             f"Detected your device as <strong>{_esc_html(face)}</strong> — "
-            f"or pick another platform below.</p>"
+            f"Suite installer highlighted; every product/platform is below.</p>"
         )
         detect_main_attr = f' data-detected-platform="{_esc_html(def_plat)}"'
     else:
@@ -1461,27 +1646,30 @@ def render_free_packages_page_html(
             public_site_css,
         )
 
-    extra_css = public_site_css() + free_packages_page_css()
+    extra_css = public_site_css() + downloads_map_page_css()
     header = public_brand_header_html(active="home", product_active="vpn")
     motif = public_data_path_layer_html()
-    body = f"""{public_head_open(title=f"Free download v{ver}", extra_css=extra_css)}
+    body = f"""{public_head_open(title=f"Downloads Map · Suite {ver}", extra_css=extra_css)}
 {motif}
-  <div class="page-shell" id="page-shell" data-page="free-packages"
+  <div class="page-shell" id="page-shell" data-page="downloads-map"
        data-product="suite" data-suite-version="{_esc_html(ver)}" data-chrome="pro">
 {header}
-    <main class="free-packages-page panel-card" id="{FREE_PACKAGES_PAGE_ID}"
+    <main class="downloads-map-page free-packages-page panel-card"
+          id="{DOWNLOADS_MAP_PAGE_ID}" data-downloads-map-page="1"
           data-free-packages-page="1" data-version="{_esc_html(ver)}"
-          aria-label="Free Suite packages"{detect_main_attr}>
-      <div class="free-packages-center" id="free-packages-center">
-        <h1 id="free-packages-heading">Free download v{_esc_html(ver)}</h1>
-        <p class="free-packages-blurb" id="free-packages-blurb">
-          Direct Suite installers. Residual Connect still needs a KEYGEN after install.
+          aria-label="Downloads Map — all Restore Privacy installers"{detect_main_attr}>
+      <div class="downloads-map-center free-packages-center" id="downloads-map-center">
+        <h1 id="downloads-map-heading">Downloads Map</h1>
+        <p class="downloads-map-blurb free-packages-blurb" id="downloads-map-blurb">
+          Every Restore Privacy installer we ship — Suite, residual VPN client,
+          rpOS, Rx browser, Pens · Tables · Slides, node tools, rpMail, rpOffice,
+          and more. Residual Connect still needs a KEYGEN after Suite install.
         </p>
         {detect_hint}
-        <ul class="free-packages-list" id="free-packages-list" data-free-packages="1">
-        {list_html}
-        </ul>
-        <p class="free-packages-back"><a href="/#free-download-cta-wrap">Back to home</a></p>
+        {sections}
+        <p class="downloads-map-back free-packages-back">
+          <a href="/#free-download-cta-wrap">Back to home</a>
+        </p>
       </div>
     </main>
   </div>
