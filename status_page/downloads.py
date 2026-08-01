@@ -1,4 +1,4 @@
-"""Release download catalog + paid download UI (Restore Privacy Suite v1.0.1).
+"""Release download catalog + paid download UI (Restore Privacy Suite v1.0.2).
 
 Primary path: pay **£3.00** (GBP) via Stripe Checkout per package, then a
 time-limited download token (default **12 hours**, reusable until expiry).
@@ -7,7 +7,7 @@ the status host **proxies** the installer (authenticated GitHub API / local
 assets) so fulfilment works when the restore-privacy repo is **private**.
 Buy Me a Coffee is tip/support only.
 
-Current catalog packages: Restore Privacy Suite **1.0.1**
+Current catalog packages: Restore Privacy Suite **1.0.2**
 (Windows setup needs no separate Python install; macOS Developer ID notarized;
 iOS Team-signed sideload).
 """
@@ -32,10 +32,10 @@ except ImportError:  # package import path (status_page as package)
         site_copyright_text,
     )
 
-RELEASE_VERSION = "1.0.1"
+RELEASE_VERSION = "1.0.2"
 GITHUB_OWNER = "rgsneddon"
 GITHUB_REPO = "restore-privacy"
-RELEASE_TAG = "1.0.1"
+RELEASE_TAG = "1.0.2"
 RELEASE_PAGE_URL = (
     f"https://github.com/{GITHUB_OWNER}/{GITHUB_REPO}/releases/tag/{RELEASE_TAG}"
 )
@@ -1007,8 +1007,8 @@ DOWNLOADS_SECTION_ID = "downloads"
 # Full-width free-download face (operator asset freebie.jpg) → packages / platform
 FREE_PACKAGES_PATH = "/free-packages"
 FREEBIE_IMG_PATH = "/static/freebie.jpg"
-# CTA face version (OBJECTIVE 1.0.1); may diverge from catalog monopin until pin bump
-FREE_DOWNLOAD_FACE_VERSION = "1.0.1"
+# CTA face version (OBJECTIVE 1.0.2); may diverge from catalog monopin until pin bump
+FREE_DOWNLOAD_FACE_VERSION = "1.0.2"
 FREEBIE_IMG_ALT = f"Free download version {FREE_DOWNLOAD_FACE_VERSION}"
 FREE_DOWNLOAD_CTA_ID = "free-download-v1-cta"
 FREE_PACKAGES_PAGE_ID = "free-packages-page"
@@ -1204,7 +1204,7 @@ def render_free_download_cta_html(
     version: str = "",
     default_platform: str = "",
 ) -> str:
-    """Full-width free download image button (face version 1.0.1 by default).
+    """Full-width free download image button (face version 1.0.2 by default).
 
     When *default_platform* is a known catalog OS brand (from User-Agent on the
     homepage), the button links straight to that Suite free installer and names

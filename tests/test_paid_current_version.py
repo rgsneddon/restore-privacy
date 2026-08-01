@@ -307,6 +307,29 @@ class TestServePathCatalogPin(unittest.TestCase):
                 catalog_version=pin,
             )
         )
+        # Brand companions omit suite monopin but live under the pin directory.
+        self.assertTrue(
+            mod.path_allowed_for_catalog(
+                pin, "rpos-0.1.0-macos.zip", catalog_version=pin
+            )
+        )
+        self.assertTrue(
+            mod.path_allowed_for_catalog(
+                pin,
+                "restore-privacy-node-installer-1.0.0-linux-x64.tar.gz",
+                catalog_version=pin,
+            )
+        )
+        self.assertTrue(
+            mod.path_allowed_for_catalog(
+                pin, "pens-0.1.0-installer.zip", catalog_version=pin
+            )
+        )
+        self.assertFalse(
+            mod.path_allowed_for_catalog(
+                "0.2.9", "rpos-0.1.0-macos.zip", catalog_version=pin
+            )
+        )
 
 
 class TestStoreTidyCurrentOnly(unittest.TestCase):

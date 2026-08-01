@@ -511,8 +511,8 @@ def render_admin_node_operator_page_html(
       <input id="admin-node-op-deploy-version" name="version" required value="{_escape(catalog_ver)}"/>
       <label><input type="checkbox" name="stage" value="1" checked id="admin-node-op-deploy-stage"/> Stage</label>
       <label><input type="checkbox" name="upload" value="1" checked id="admin-node-op-deploy-upload"/> Upload to Helsinki</label>
-      <label><input type="checkbox" name="allow_missing" value="1" checked id="admin-node-op-deploy-allow-missing"/> Allow missing</label>
-      <label><input type="checkbox" name="force" value="1" id="admin-node-op-deploy-force"/> Force</label>
+      <label><input type="checkbox" name="allow_missing" value="1" id="admin-node-op-deploy-allow-missing"/> Allow missing (skip incomplete)</label>
+      <label><input type="checkbox" name="force" value="1" checked id="admin-node-op-deploy-force"/> Force re-upload (no skip)</label>
       <label><input type="checkbox" name="dry_run" value="1" id="admin-node-op-deploy-dry-run"/> Dry-run</label>
       <label><input type="checkbox" name="install_serve" value="1" id="admin-node-op-deploy-install-serve"/> Install serve</label>
       <button type="submit" id="admin-node-op-upload-btn" class="primary-upload">Push Suite packages to Helsinki</button>

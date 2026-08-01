@@ -575,8 +575,8 @@ class NodeOperatorController:
         stage: bool = True,
         upload: bool = True,
         dry_run: bool = False,
-        force: bool = False,
-        allow_missing: bool = True,
+        force: bool = True,
+        allow_missing: bool = False,
         install_serve: bool = False,
         progress_cb: Any | None = None,
         brand_wide: bool = True,
@@ -585,6 +585,9 @@ class NodeOperatorController:
 
         Default *brand_wide* includes Suite clients, rpOS, Pens/Tables/Slides,
         browser/Rx, node-installer, and node-operator packages.
+
+        Defaults: *force* True (re-upload all — never skip present remotes);
+        *allow_missing* False (incomplete local inventory fails closed).
         """
         ver = (version or "").strip() or self.catalog_version_default()
         inv = self.list_local_packages(version=ver, brand_wide=bool(brand_wide))
@@ -709,8 +712,8 @@ class NodeOperatorController:
         stage: bool = True,
         upload: bool = True,
         dry_run: bool = False,
-        force: bool = False,
-        allow_missing: bool = True,
+        force: bool = True,
+        allow_missing: bool = False,
         install_serve: bool = False,
         progress_cb: Any | None = None,
         brand_wide: bool = True,
@@ -719,6 +722,9 @@ class NodeOperatorController:
 
         When *brand_wide* is True, stages/uploads the full brand inventory
         (Suite + rpOS + Pens/Tables/Slides + extras).
+
+        Defaults: *force* re-uploads every package (no skip-if-present);
+        *allow_missing* is off so incomplete inventory fails instead of skipping.
         """
         ver = (version or "").strip() or self.catalog_version_default()
         out: dict[str, Any] = {

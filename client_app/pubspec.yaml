@@ -4,8 +4,8 @@ description: "Restore Privacy Suite — residual VPN, Perccent wallet (%), and E
 # pub.dev using `flutter pub publish`. This is preferred for private packages.
 publish_to: 'none' # Remove this line if you wish to publish to pub.dev
 
-# Restore Privacy Suite v 1.0.1 monopin.
-version: 1.0.1+1
+# Restore Privacy Suite v 1.0.2 monopin.
+version: 1.0.2+1
 
 environment:
   sdk: '>=3.2.0 <4.0.0'

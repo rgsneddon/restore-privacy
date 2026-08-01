@@ -1655,8 +1655,8 @@ def render_admin_suite_push_upload_html() -> str:
     <input type="hidden" name="async" value="1" id="admin-suite-push-async"/>
     <label><input type="checkbox" name="stage" value="1" checked id="admin-suite-push-stage"/> Stage local assets</label>
     <label><input type="checkbox" name="upload" value="1" checked id="admin-suite-push-upload"/> Upload to Helsinki paid_assets</label>
-    <label><input type="checkbox" name="allow_missing" value="1" checked id="admin-suite-push-allow-missing"/> Allow missing platforms</label>
-    <label><input type="checkbox" name="force" value="1" id="admin-suite-push-force"/> Force re-upload</label>
+    <label><input type="checkbox" name="allow_missing" value="1" id="admin-suite-push-allow-missing"/> Allow missing platforms (skip incomplete)</label>
+    <label><input type="checkbox" name="force" value="1" checked id="admin-suite-push-force"/> Force re-upload (no skip if already on server)</label>
     <label><input type="checkbox" name="dry_run" value="1" id="admin-suite-push-dry-run"/> Dry-run (plan only, no SSH write)</label>
     <label><input type="checkbox" name="install_serve" value="1" id="admin-suite-push-install-serve"/> Restart store serve</label>
     <button type="submit" id="admin-suite-push-btn" class="primary-upload">

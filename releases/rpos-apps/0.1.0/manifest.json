@@ -9,7 +9,7 @@
       "archive": "/Users/russellsneddon/restore-privacy/releases/rpos-apps/0.1.0/pens-0.1.0-installer.zip",
       "archive_name": "pens-0.1.0-installer.zip",
       "bytes": 12529,
-      "sha256": "e909967fd8055d2f613c8f70add133d94a54deafc28fa741fd7ad015c49a6922"
+      "sha256": "c53a24dea7234f4b304c4c8efdf2f3762d81ec7605c6930866951b93f3bea1dc"
     },
     {
       "ok": true,
@@ -17,7 +17,7 @@
       "archive": "/Users/russellsneddon/restore-privacy/releases/rpos-apps/0.1.0/tables-0.1.0-installer.zip",
       "archive_name": "tables-0.1.0-installer.zip",
       "bytes": 12621,
-      "sha256": "3133c4f701b5c68d9d2b68e73be810339c29627345e1cc5c77d02e6461aecfe4"
+      "sha256": "45d7f2a787746b129b57e58f8c4d75fe4a2d24f93ab58d2b73ed50aea7e481b3"
     },
     {
       "ok": true,
@@ -25,7 +25,7 @@
       "archive": "/Users/russellsneddon/restore-privacy/releases/rpos-apps/0.1.0/slides-0.1.0-installer.zip",
       "archive_name": "slides-0.1.0-installer.zip",
       "bytes": 12620,
-      "sha256": "1805ef10f6bee51791290ae7e676bbbbc8c2bfade8ea86760dc120c38e082855"
+      "sha256": "4518e02f5555c788bbe3c7be4823720985a6adea385dabaae0a6d85f4e027e52"
     }
   ],
   "inventory": [

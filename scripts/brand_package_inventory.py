@@ -25,7 +25,7 @@ def _suite_version() -> str:
 
         return str(RELEASE_VERSION).strip() or "1.0.1"
     except Exception:
-        return "1.0.1"
+        return "1.0.2"
 
 
 def list_brand_installer_packages(
@@ -181,6 +181,28 @@ def list_brand_installer_packages(
             "required": False,
         }
     )
+
+    # --- rpMail + rpOffice desktop installers ---
+    mail_ver = "0.1.0"
+    for key, product in (("rpmail", "rpMail"), ("rpoffice", "rpOffice")):
+        for plat, fname in (
+            ("windows", f"{key}-{mail_ver}-windows.zip"),
+            ("macos", f"{key}-{mail_ver}-macos.zip"),
+            ("linux-x86_64", f"{key}-{mail_ver}-linux-x86_64.tar.gz"),
+            ("linux-aarch64", f"{key}-{mail_ver}-linux-aarch64.tar.gz"),
+        ):
+            rows.append(
+                {
+                    "kind": key,
+                    "product": product,
+                    "platform": plat,
+                    "filename": fname,
+                    "relative_path": f"{key}/{mail_ver}/{fname}",
+                    "version": mail_ver,
+                    "min_bytes": 500,
+                    "required": False,
+                }
+            )
 
     return rows
 

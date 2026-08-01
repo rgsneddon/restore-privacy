@@ -158,10 +158,38 @@ def request_authorized(
     )
 
 
+# Brand companions live under the suite monopin directory but use their own
+# product versions (e.g. rpos-0.1.0-*, node-installer-1.0.0-*). Allow those
+# basenames; still refuse stale suite-client files that omit the monopin.
+_BRAND_COMPANION_PREFIXES: tuple[str, ...] = (
+    "rpos-",
+    "pens-",
+    "tables-",
+    "slides-",
+    "restore-privacy-node-installer-",
+    "restore-privacy-node-operator-",
+    "restore-privacy-browser-extension-",
+    "restore-privacy-rx-browser-",
+    "rpt-perc-chain-",
+)
+
+
+def _is_brand_companion_filename(name: str) -> bool:
+    n = (name or "").strip()
+    if not n or n != Path(n).name:
+        return False
+    return any(n.startswith(p) for p in _BRAND_COMPANION_PREFIXES)
+
+
 def path_allowed_for_catalog(
     version: str, filename: str, *, catalog_version: str = ""
 ) -> bool:
-    """Pure: refuse stale version dirs and filenames that omit the pin."""
+    """Pure: refuse stale version dirs; require monopin in suite-client names.
+
+    Brand companions (rpOS, node installer/operator, Pens/Tables/Slides, browser)
+    may omit the suite monopin in the basename — they are still only served from
+    the pinned version directory.
+    """
     ver = (version or "").strip()
     name = (filename or "").strip()
     if not ver or not name or name != Path(name).name:
@@ -170,7 +198,10 @@ def path_allowed_for_catalog(
     if pin:
         if ver != pin:
             return False
-        if pin not in name:
+        if pin not in name and not _is_brand_companion_filename(name):
+            return False
+        # Stale suite-client under current pin dir (e.g. client-0.2.9 under 1.0.1)
+        if name.startswith("restore-privacy-client-") and pin not in name:
             return False
     return True
 

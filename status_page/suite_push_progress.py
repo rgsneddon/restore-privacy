@@ -148,8 +148,8 @@ def start_push_job(
     stage: bool = True,
     upload: bool = True,
     dry_run: bool = False,
-    force: bool = False,
-    allow_missing: bool = True,
+    force: bool = True,
+    allow_missing: bool = False,
     install_serve: bool = False,
 ) -> dict[str, Any]:
     """Create job, start background brand push, return job id + initial snapshot.
