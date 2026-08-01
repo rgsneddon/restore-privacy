@@ -1,9 +1,12 @@
-"""Pens / Word-class document model (handmade Raskul — not Microsoft Word).
+"""Pens / structure-first document model (handmade Raskul).
 
-Core: paragraphs with character runs, styles, alignment, lists, tables,
-image placeholders, find/replace, undo/redo, JSON round-trip.
+Corel-historical design ethos: total control over document structure (Reveal Codes
+spirit), not an opaque Microsoft Word workalike. Core: paragraphs with character
+runs, styles, alignment, lists, tables, image placeholders, structure/reveal view,
+find/replace, undo/redo, JSON round-trip.
 
-Honesty: Word-class *core* outcomes — not full OOXML/VBA/collaboration parity.
+Honesty: structure-first document core — not full WordPerfect Reveal Codes UI,
+PerfectScript, OOXML/VBA, or Microsoft Word parity.
 """
 
 from __future__ import annotations
@@ -382,7 +385,7 @@ class Block:
 
 @dataclass
 class Document:
-    """Pens document — Word-class core model (Raskul handmade)."""
+    """Pens document — structure-first core model (Raskul handmade)."""
 
     title: str
     blocks: list[Block] = field(default_factory=list)
@@ -392,6 +395,7 @@ class Document:
             "font": "system",
             "product": "Pens",
             "maker": "Raskul",
+            "design": "structure-first",
         }
     )
     doc_id: str = field(default_factory=lambda: uuid.uuid4().hex[:12])
@@ -509,6 +513,107 @@ class Document:
             elif b.kind == "image" and b.image is not None:
                 parts.append(f"[{b.image.name}]")
         return "\n".join(parts)
+
+    def structure_tokens(self) -> list[dict[str, Any]]:
+        """Structure/reveal view: ordered structural codes for live document state.
+
+        Reveal Codes ethos (Corel-historical structure control): explicit tokens
+        for title, styles, lists, tables, images — not full historical WordPerfect
+        Reveal Codes UI parity.
+        """
+        tokens: list[dict[str, Any]] = [
+            {
+                "code": "Doc",
+                "title": self.title,
+                "doc_id": self.doc_id,
+                "blocks": len(self.blocks),
+            }
+        ]
+        for i, b in enumerate(self.blocks):
+            if b.kind == "paragraph" and b.paragraph is not None:
+                p = b.paragraph
+                codes: list[str] = [f"Style:{p.style}"]
+                if p.list_type:
+                    codes.append(f"List:{p.list_type}")
+                    if p.list_level:
+                        codes.append(f"Level:{p.list_level}")
+                if p.align and p.align != ALIGN_LEFT:
+                    codes.append(f"Align:{p.align}")
+                # character format from first run if any
+                if p.runs:
+                    r0 = p.runs[0]
+                    fmt = r0.format if hasattr(r0, "format") else None
+                    if fmt is not None:
+                        if getattr(fmt, "bold", False):
+                            codes.append("Bold")
+                        if getattr(fmt, "italic", False):
+                            codes.append("Italic")
+                        if getattr(fmt, "underline", False):
+                            codes.append("Underline")
+                tokens.append(
+                    {
+                        "index": i,
+                        "kind": "paragraph",
+                        "codes": codes,
+                        "text": p.text,
+                        "style": p.style,
+                        "list_type": p.list_type,
+                    }
+                )
+            elif b.kind == "table" and b.table is not None:
+                t = b.table
+                nrows = len(t.rows)
+                ncols = len(t.rows[0]) if t.rows else 0
+                tokens.append(
+                    {
+                        "index": i,
+                        "kind": "table",
+                        "codes": [f"Table:{nrows}x{ncols}"],
+                        "nrows": nrows,
+                        "ncols": ncols,
+                        "preview": t.rows[0][0].text if nrows and ncols else "",
+                    }
+                )
+            elif b.kind == "image" and b.image is not None:
+                tokens.append(
+                    {
+                        "index": i,
+                        "kind": "image",
+                        "codes": [f"Image:{b.image.name}"],
+                        "name": b.image.name,
+                        "alt": b.image.alt,
+                    }
+                )
+            else:
+                tokens.append(
+                    {
+                        "index": i,
+                        "kind": b.kind,
+                        "codes": [f"Block:{b.kind}"],
+                    }
+                )
+        return tokens
+
+    def reveal_structure(self) -> str:
+        """Human-readable structure codes stream (Reveal Codes ethos)."""
+        lines: list[str] = []
+        for tok in self.structure_tokens():
+            if tok.get("code") == "Doc":
+                lines.append(f"[Doc title={tok.get('title')!s} blocks={tok.get('blocks')}]")
+                continue
+            codes = tok.get("codes") or []
+            code_s = " ".join(f"[{c}]" for c in codes)
+            kind = tok.get("kind")
+            if kind == "paragraph":
+                text = str(tok.get("text") or "")
+                lines.append(f"{code_s} {text}".rstrip())
+            elif kind == "table":
+                lines.append(f"{code_s}")
+            elif kind == "image":
+                lines.append(f"{code_s}")
+            else:
+                lines.append(f"{code_s}")
+        return "\n".join(lines)
 
     def find_all(self, needle: str, *, case_sensitive: bool = True) -> list[dict[str, Any]]:
         """Locate needle occurrences; returns list of {block_index, kind, start, end, snippet}."""
@@ -727,6 +832,13 @@ class DocumentEditor:
             return
         self._push()
         b.paragraph.apply_char_format(**kwargs)
+
+    def structure_tokens(self) -> list[dict[str, Any]]:
+        """Reveal view on the live document (same path as Document.structure_tokens)."""
+        return self.document.structure_tokens()
+
+    def reveal_structure(self) -> str:
+        return self.document.reveal_structure()
 
     def set_paragraph_align(self, index: int, align: str) -> None:
         if not (0 <= index < len(self.document.blocks)):

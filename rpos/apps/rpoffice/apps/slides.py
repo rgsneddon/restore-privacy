@@ -1,6 +1,7 @@
-"""Slides — Raskul PowerPoint-class presentation program (standalone).
+"""Slides — Raskul independent presentation program (standalone).
 
-Not Microsoft PowerPoint. Core: multi-slide deck, title/body/bullets/notes,
+Corel-historical independent suite design (not Microsoft PowerPoint; not Corel
+Presentations trademark). Core: multi-slide deck, title/body/bullets/notes,
 add/delete/duplicate/reorder, undo/redo, durable JSON round-trip.
 """
 
@@ -12,12 +13,12 @@ from pathlib import Path
 from typing import Any
 
 from .. import __version__
-from ..brand import PRODUCT_FAMILY, SLIDES
+from ..brand import DESIGN_LINEAGE, MAKER, PRODUCT_FAMILY, SLIDES
 from ..deck import Presentation, PresentationEditor, create_presentation
 
 
 def smoke() -> dict[str, Any]:
-    """Ship-path smoke: PowerPoint-class core + round-trip + edit ops."""
+    """Ship-path smoke: independent presentation core + round-trip + edit ops."""
     p = create_presentation(f"{SLIDES} intro")
     ed = PresentationEditor(p)
     # create_presentation seeds one title slide; enrich it
@@ -40,14 +41,14 @@ def smoke() -> dict[str, Any]:
     # round-trip
     raw = p.dumps()
     again = Presentation.loads(raw)
-    # redo path after undo of delete: redo deletes again — skip; re-set content check
     return {
         "ok": True,
         "product": SLIDES,
         "family": PRODUCT_FAMILY,
         "version": __version__,
         "kind": "presentation",
-        "maker": "Raskul",
+        "maker": MAKER,
+        "design_lineage": DESIGN_LINEAGE,
         "title": again.title,
         "slide_count": len(again.slides),
         "titles": [s.title for s in again.slides],
@@ -62,8 +63,9 @@ def smoke() -> dict[str, Any]:
         ),
         "structure_ops_titles": titles_before_undo_delete,
         "honesty": (
-            "PowerPoint-class core (multi-slide, bullets, notes, structure, undo); "
-            "not full Microsoft PowerPoint parity"
+            "Slides independent presentation core (multi-slide, bullets, notes, "
+            "structure, undo); Corel-historical suite design; "
+            "not full Microsoft PowerPoint parity; not Corel Presentations trademark"
         ),
     }
 
@@ -76,7 +78,11 @@ def cmd_demo(out: Path | None) -> dict[str, Any]:
     ed.set_body(0, "Restore Privacy Suite")
     ed.set_bullets(0, ["Pens", "Tables", "Slides"])
     ed.set_notes(0, "Presenter: introduce the three pillars.")
-    ed.add_slide("Agenda", "What we ship", bullets=["Word-class Pens", "Excel-class Tables", "PPT-class Slides"])
+    ed.add_slide(
+        "Agenda",
+        "What we ship",
+        bullets=["Structure-first Pens", "Independent Tables", "Independent Slides"],
+    )
     path = str(out) if out else ""
     if out:
         p.save(out)
@@ -93,7 +99,10 @@ def cmd_demo(out: Path | None) -> dict[str, Any]:
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(
         prog="slides",
-        description=f"{SLIDES} — Raskul PowerPoint-class presentations (not Microsoft PowerPoint)",
+        description=(
+            f"{SLIDES} — Raskul independent presentations "
+            f"({DESIGN_LINEAGE}; not Microsoft PowerPoint)"
+        ),
     )
     ap.add_argument("--version", action="store_true")
     ap.add_argument("--smoke", action="store_true")
@@ -101,7 +110,7 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("-o", "--output", default="")
     args = ap.parse_args(argv)
     if args.version:
-        print(f"{SLIDES} {__version__} (Raskul)")
+        print(f"{SLIDES} {__version__} ({MAKER})")
         return 0
     out = Path(args.output) if args.output else None
     if args.demo:

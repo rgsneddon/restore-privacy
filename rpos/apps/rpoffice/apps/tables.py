@@ -1,6 +1,7 @@
-"""Tables — Raskul Excel-class spreadsheet program (standalone).
+"""Tables — Raskul independent spreadsheet program (standalone).
 
-Not Microsoft Excel. Core: grid, formulas (refs, SUM, IF), multi-sheet workbook,
+Corel-historical independent suite design (not Microsoft Excel; not Quattro Pro
+trademark). Core: grid, formulas (refs, SUM, IF), multi-sheet workbook,
 insert/delete rows/cols, undo/redo, durable JSON round-trip.
 """
 
@@ -12,7 +13,7 @@ from pathlib import Path
 from typing import Any
 
 from .. import __version__
-from ..brand import PRODUCT_FAMILY, TABLES
+from ..brand import DESIGN_LINEAGE, MAKER, PRODUCT_FAMILY, TABLES
 from ..sheet import (
     FormulaError,
     Workbook,
@@ -23,7 +24,7 @@ from ..sheet import (
 
 
 def smoke() -> dict[str, Any]:
-    """Ship-path smoke: Excel-class core + round-trip + edit ops."""
+    """Ship-path smoke: independent spreadsheet core + round-trip + edit ops."""
     wb = create_workbook(f"{TABLES} budget", "Main")
     ed = WorkbookEditor(wb)
     ed.set_ref("A1", 10)
@@ -62,7 +63,8 @@ def smoke() -> dict[str, Any]:
         "family": PRODUCT_FAMILY,
         "version": __version__,
         "kind": "spreadsheet",
-        "maker": "Raskul",
+        "maker": MAKER,
+        "design_lineage": DESIGN_LINEAGE,
         "title": again.title,
         "sheets": again.list_sheets(),
         "formula_A1_plus_B1": total,
@@ -74,8 +76,9 @@ def smoke() -> dict[str, Any]:
         "schema_version": again.schema_version,
         "round_trip": again.active.get_ref("B1") == 5,
         "honesty": (
-            "Excel-class core (grid, formulas, multi-sheet, structure, undo); "
-            "not full Microsoft Excel parity"
+            "Tables independent spreadsheet core (grid, formulas, multi-sheet, "
+            "structure, undo); Corel-historical suite design; "
+            "not full Microsoft Excel parity; not Corel Quattro Pro trademark"
         ),
     }
 
@@ -100,7 +103,10 @@ def cmd_demo(out: Path | None) -> dict[str, Any]:
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(
         prog="tables",
-        description=f"{TABLES} — Raskul Excel-class spreadsheets (not Microsoft Excel)",
+        description=(
+            f"{TABLES} — Raskul independent spreadsheets "
+            f"({DESIGN_LINEAGE}; not Microsoft Excel)"
+        ),
     )
     ap.add_argument("--version", action="store_true")
     ap.add_argument("--smoke", action="store_true")
@@ -108,7 +114,7 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("-o", "--output", default="")
     args = ap.parse_args(argv)
     if args.version:
-        print(f"{TABLES} {__version__} (Raskul)")
+        print(f"{TABLES} {__version__} ({MAKER})")
         return 0
     out = Path(args.output) if args.output else None
     if args.demo:

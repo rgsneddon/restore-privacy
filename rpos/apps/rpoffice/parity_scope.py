@@ -1,51 +1,76 @@
-"""Office full-parity scope — Restore Privacy brands: Pens · Tables · Slides."""
+"""Office full-parity scope — Restore Privacy brands: Pens · Tables · Slides.
+
+Design lineage: Corel-historical independent suite (Raskul) — not Microsoft
+Office workalike, not Corel/WordPerfect trademark use.
+"""
 
 from __future__ import annotations
 
 from typing import Any
 
-from .brand import OFFICE_PILLARS_BRANDED, PENS, SLIDES, TABLES
+from .brand import (
+    DESIGN_ETHOS,
+    DESIGN_LINEAGE,
+    DESIGN_NOTE,
+    MAKER,
+    OFFICE_PILLARS_BRANDED,
+    PENS,
+    SLIDES,
+    TABLES,
+)
 
 # Primary pillars are Restore Privacy brand names
 OFFICE_PILLARS: tuple[str, ...] = OFFICE_PILLARS_BRANDED
 
-# Honest matrix: Pens Word-class *core* is implemented; full MS Word is not.
+# Honest matrix: structure-first independent suite cores; full WP/MS clones out of scope.
 OFFICE_PARITY_MATRIX: list[dict[str, str]] = [
     {
         "pillar": PENS,
         "feature": "Document body + character/paragraph format + serialize round-trip",
         "status": "implemented",
-        "analogue": "Word-class core",
+        "analogue": "Pens structure-first core",
     },
     {
         "pillar": PENS,
         "feature": "Headings (H1–H3) + body styles",
         "status": "implemented",
-        "analogue": "Word-class core",
+        "analogue": "Pens structure-first core",
     },
     {
         "pillar": PENS,
         "feature": "Bulleted and numbered lists",
         "status": "implemented",
-        "analogue": "Word-class core",
+        "analogue": "Pens structure-first core",
     },
     {
         "pillar": PENS,
         "feature": "Tables (cells, edit text, round-trip)",
         "status": "implemented",
-        "analogue": "Word-class core",
+        "analogue": "Pens structure-first core",
     },
     {
         "pillar": PENS,
         "feature": "Find/replace + undo/redo",
         "status": "implemented",
-        "analogue": "Word-class core",
+        "analogue": "Pens structure-first core",
+    },
+    {
+        "pillar": PENS,
+        "feature": "Structure/reveal view (ordered structural codes)",
+        "status": "implemented",
+        "analogue": "Pens structure-first core (Reveal Codes ethos)",
     },
     {
         "pillar": PENS,
         "feature": "Image placeholder / attachment hook",
         "status": "implemented",
-        "analogue": "Word-class core",
+        "analogue": "Pens structure-first core",
+    },
+    {
+        "pillar": PENS,
+        "feature": "Full WordPerfect Reveal Codes UI, PerfectScript, legal line-numbering",
+        "status": "out_of_scope",
+        "analogue": "Corel WordPerfect (not claimed)",
     },
     {
         "pillar": PENS,
@@ -57,25 +82,25 @@ OFFICE_PARITY_MATRIX: list[dict[str, str]] = [
         "pillar": TABLES,
         "feature": "2D grid + numbers/text/blank + serialize round-trip",
         "status": "implemented",
-        "analogue": "Excel-class core",
+        "analogue": "Tables independent spreadsheet core",
     },
     {
         "pillar": TABLES,
         "feature": "Formulas with cell refs, arithmetic, SUM, IF + recalculation",
         "status": "implemented",
-        "analogue": "Excel-class core",
+        "analogue": "Tables independent spreadsheet core",
     },
     {
         "pillar": TABLES,
         "feature": "Named worksheets in workbook (add/select/list; sheet isolation)",
         "status": "implemented",
-        "analogue": "Excel-class core",
+        "analogue": "Tables independent spreadsheet core",
     },
     {
         "pillar": TABLES,
         "feature": "Insert/delete rows and columns + undo/redo",
         "status": "implemented",
-        "analogue": "Excel-class core",
+        "analogue": "Tables independent spreadsheet core",
     },
     {
         "pillar": TABLES,
@@ -84,28 +109,40 @@ OFFICE_PARITY_MATRIX: list[dict[str, str]] = [
         "analogue": "Microsoft Excel (not claimed)",
     },
     {
+        "pillar": TABLES,
+        "feature": "Full Quattro Pro feature set / Corel trademark",
+        "status": "out_of_scope",
+        "analogue": "Corel Quattro Pro (not claimed)",
+    },
+    {
         "pillar": SLIDES,
         "feature": "Multi-slide deck + title/body/bullets/notes + serialize round-trip",
         "status": "implemented",
-        "analogue": "PowerPoint-class core",
+        "analogue": "Slides independent presentation core",
     },
     {
         "pillar": SLIDES,
         "feature": "Add/delete/duplicate/reorder slides",
         "status": "implemented",
-        "analogue": "PowerPoint-class core",
+        "analogue": "Slides independent presentation core",
     },
     {
         "pillar": SLIDES,
         "feature": "Undo/redo of edit actions on shared presentation",
         "status": "implemented",
-        "analogue": "PowerPoint-class core",
+        "analogue": "Slides independent presentation core",
     },
     {
         "pillar": SLIDES,
         "feature": "Animations, transitions, slide masters, full PPTX/VBA, collaboration",
         "status": "out_of_scope",
         "analogue": "Microsoft PowerPoint (not claimed)",
+    },
+    {
+        "pillar": SLIDES,
+        "feature": "Full Corel Presentations feature set / Corel trademark",
+        "status": "out_of_scope",
+        "analogue": "Corel Presentations (not claimed)",
     },
 ]
 
@@ -126,7 +163,7 @@ def implemented_pillars() -> list[str]:
 
 
 def pens_word_class_core_rows() -> list[dict[str, str]]:
-    """Pens rows that constitute gating Word-class core (for honesty reports)."""
+    """Pens rows that constitute gating document core (legacy helper name)."""
     return [
         r
         for r in OFFICE_PARITY_MATRIX
@@ -134,8 +171,13 @@ def pens_word_class_core_rows() -> list[dict[str, str]]:
     ]
 
 
+def pens_structure_first_core_rows() -> list[dict[str, str]]:
+    """Pens structure-first core rows (Corel-historical design framing)."""
+    return pens_word_class_core_rows()
+
+
 def tables_excel_class_core_rows() -> list[dict[str, str]]:
-    """Tables rows that constitute gating Excel-class core."""
+    """Tables rows that constitute gating spreadsheet core."""
     return [
         r
         for r in OFFICE_PARITY_MATRIX
@@ -144,7 +186,7 @@ def tables_excel_class_core_rows() -> list[dict[str, str]]:
 
 
 def slides_powerpoint_class_core_rows() -> list[dict[str, str]]:
-    """Slides rows that constitute gating PowerPoint-class core."""
+    """Slides rows that constitute gating presentation core."""
     return [
         r
         for r in OFFICE_PARITY_MATRIX
@@ -155,17 +197,26 @@ def slides_powerpoint_class_core_rows() -> list[dict[str, str]]:
 def matrix_as_dict() -> dict[str, Any]:
     return {
         "product": "rpOffice",
-        "variant": "from-scratch Restore Privacy suite (Raskul)",
+        "variant": "Corel-historical independent suite (Raskul / Restore Privacy)",
+        "maker": MAKER,
+        "design_lineage": DESIGN_LINEAGE,
+        "design_ethos": DESIGN_ETHOS,
         "brands": list(OFFICE_PILLARS),
         "required_pillars": list(OFFICE_PILLARS),
         "matrix": list(OFFICE_PARITY_MATRIX),
         "implemented_pillars": implemented_pillars(),
         "pens_word_class_core": pens_word_class_core_rows(),
+        "pens_structure_first_core": pens_structure_first_core_rows(),
         "tables_excel_class_core": tables_excel_class_core_rows(),
         "slides_powerpoint_class_core": slides_powerpoint_class_core_rows(),
+        "microsoft_workalike": False,
+        "corel_trademark_claimed": False,
         "note": (
-            "Primary names are Pens, Tables, Slides — not Microsoft brand labels. "
-            "Pens Word-class, Tables Excel-class, and Slides PowerPoint-class cores "
-            "are implemented; full Microsoft Office parity is not claimed."
+            "Primary names are Pens, Tables, Slides — independent suite brands, "
+            "not Microsoft or Corel product labels. Design lineage is "
+            f"{DESIGN_LINEAGE}: {DESIGN_ETHOS}. {DESIGN_NOTE} "
+            "Document/spreadsheet/presentation cores are implemented; full "
+            "WordPerfect/Quattro/Presentations and full Microsoft Office parity "
+            "are not claimed."
         ),
     }
