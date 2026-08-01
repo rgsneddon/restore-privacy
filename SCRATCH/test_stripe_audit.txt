@@ -3,6 +3,11 @@ Underpay cash (total=1) must not unlock even if metadata claims 300. ... ok
 test_usd_builder_shaped_paid_monthly_unlocks (tests.test_stripe_keygen_accounting_chain.TestAmountTotalOverMetadata.test_usd_builder_shaped_paid_monthly_unlocks)
 USD subscription body uses metadata amount_pence=300 + currency=usd; ... fulfilment_email_not_sent session='cs_usd_mo_real' skipped=True error='smtp_not_configured' has_keygen=True has_download=True smtp='disabled'
 ok
+test_amount_total_1_with_metadata_300_does_not_unlock (tests.test_stripe_keygen_accounting_chain.TestAmountTotalOverMetadata.test_amount_total_1_with_metadata_300_does_not_unlock)
+Underpay cash (total=1) must not unlock even if metadata claims 300. ... ok
+test_usd_builder_shaped_paid_monthly_unlocks (tests.test_stripe_keygen_accounting_chain.TestAmountTotalOverMetadata.test_usd_builder_shaped_paid_monthly_unlocks)
+USD subscription body uses metadata amount_pence=300 + currency=usd; ... fulfilment_email_not_sent session='cs_usd_mo_real' skipped=True error='smtp_not_configured' has_keygen=True has_download=True smtp='disabled'
+ok
 test_invoice_paid_after_trial_books_catalog_sale (tests.test_stripe_keygen_accounting_chain.TestCheckoutCompletedKeygenChain.test_invoice_paid_after_trial_books_catalog_sale) ... fulfilment_email_not_sent session='cs_trial_then_pay' skipped=True error='smtp_not_configured' has_keygen=True has_download=True smtp='disabled'
 ok
 test_invoice_paid_non_catalog_does_not_renew_connect (tests.test_stripe_keygen_accounting_chain.TestCheckoutCompletedKeygenChain.test_invoice_paid_non_catalog_does_not_renew_connect)
@@ -36,16 +41,8 @@ test_cancel_at_period_end_keeps_usable_until_period_end (tests.test_stripe_subsc
 test_refund_revokes_after_subscription_checkout (tests.test_stripe_subscription_fulfilment.TestSubscriptionLifecycle.test_refund_revokes_after_subscription_checkout) ... fulfilment_email_skipped_no_customer_email session='cs_life_refund' keygen_minted=True customer_field=NoneType
 ok
 test_subscription_deleted_revokes (tests.test_stripe_subscription_fulfilment.TestSubscriptionLifecycle.test_subscription_deleted_revokes) ... ok
-test_catalog_homepage_buy_form (tests.test_pay_plan_page.TestCatalogRoutesToSitePayPlan.test_catalog_homepage_buy_form) ... ok
-test_desired_products_and_3day_trial (tests.test_pay_plan_page.TestDesiredCatalogShape.test_desired_products_and_3day_trial) ... ok
-test_annual_preselect (tests.test_pay_plan_page.TestPayPlanPageHtml.test_annual_preselect) ... ok
-test_select_your_plan_monthly_and_annual (tests.test_pay_plan_page.TestPayPlanPageHtml.test_select_your_plan_monthly_and_annual) ... ok
-test_create_session_posts_subscription_and_returns_url (tests.test_pay_plan_page.TestSubscriptionCheckoutBody.test_create_session_posts_subscription_and_returns_url) ... ok
-test_empty_price_id_falls_back_to_unit_amount (tests.test_pay_plan_page.TestSubscriptionCheckoutBody.test_empty_price_id_falls_back_to_unit_amount) ... ok
-test_month_and_year_use_distinct_catalog_price_ids (tests.test_pay_plan_page.TestSubscriptionCheckoutBody.test_month_and_year_use_distinct_catalog_price_ids) ... ok
-test_yearly_pence_is_fixed_catalog_amount (tests.test_pay_plan_page.TestYearlyCatalogPrice.test_yearly_pence_is_fixed_catalog_amount) ... ok
 
 ----------------------------------------------------------------------
-Ran 31 tests in 0.221s
+Ran 25 tests in 0.224s
 
 OK

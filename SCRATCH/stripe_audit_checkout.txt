@@ -1,2 +1,4 @@
-data_dir /var/folders/qb/tz4y4zts04z4846pbq95l6kw0000gp/T/grok-goal-3eb85b74914d/implementer/paydb.OO1UB0
-db /var/folders/qb/tz4y4zts04z4846pbq95l6kw0000gp/T/grok-goal-3eb85b74914d/implementer/paydb.OO1UB0/paid_downloads.sqlite3
+usd_unit 381 expect 381 meta ['300']
+fulfilment_email_not_sent session='cs_usd' skipped=True error='smtp_not_configured' has_keygen=True has_download=True smtp='disabled'
+usd_unlock True connect True grant 300
+spoof_token None connect True
