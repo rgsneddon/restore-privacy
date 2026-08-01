@@ -243,6 +243,157 @@ class TestAdminChronofluxHandlerNegative(unittest.TestCase):
             )
 
 
+class TestAsyncSuitePushChronoflux(unittest.TestCase):
+    """Primary async push UI: seal only after worker success, not on start."""
+
+    def test_async_push_worker_success_mints_admin_block(self) -> None:
+        import time
+
+        from admin_chronoflux import list_admin_chronoflux_blocks
+        from suite_push_progress import job_snapshot, start_push_job
+
+        with tempfile.TemporaryDirectory() as td:
+            lp = Path(td) / "ledger.json"
+            ctrl = mock.MagicMock()
+            ctrl.catalog_version_default.return_value = "1.0.2"
+            ctrl.list_local_packages.return_value = {
+                "ok": True,
+                "packages": [
+                    {"filename": "restore-privacy-client-1.0.2-macos.zip"},
+                ],
+            }
+            ctrl.ssh_upload_access_preflight.return_value = {
+                "ok": True,
+                "key_path": "/tmp/fake",
+            }
+            ctrl.push_suite_packages.return_value = {
+                "ok": True,
+                "suite": "1.0.2",
+                "present_count": 5,
+                "total": 5,
+            }
+            import admin_chronoflux as ac
+
+            # Worker passes remote=True; force local ledger for the unit test.
+            _orig_progress = ac.progress_admin_action
+
+            def _seal(**kwargs):
+                kw = dict(kwargs)
+                kw["ledger_path"] = lp
+                kw["remote"] = False
+                return _orig_progress(**kw)
+
+            with mock.patch.object(ac, "progress_admin_action", side_effect=_seal):
+                started = start_push_job(
+                    ctrl,
+                    version="1.0.2",
+                    stage=True,
+                    upload=True,
+                    dry_run=False,
+                    force=True,
+                    allow_missing=False,
+                    install_serve=False,
+                )
+                self.assertTrue(started.get("ok"), started)
+                jid = str(started.get("job_id") or "")
+                self.assertTrue(jid)
+                deadline = time.time() + 5.0
+                snap = job_snapshot(jid) or {}
+                while time.time() < deadline and snap.get("state") not in (
+                    "complete",
+                    "failed",
+                    "done",
+                    "error",
+                ):
+                    time.sleep(0.05)
+                    snap = job_snapshot(jid) or {}
+                self.assertIn(snap.get("state"), ("complete", "done"), snap)
+                self.assertTrue(snap.get("ok"), snap)
+                # Give worker chronoflux store a tick if finish raced with seal
+                for _ in range(20):
+                    blocks = list_admin_chronoflux_blocks(ledger_path=lp)
+                    if blocks:
+                        break
+                    time.sleep(0.05)
+                self.assertEqual(len(blocks), 1, blocks)
+                self.assertTrue(blocks[0].get("adminAction"))
+                self.assertEqual(blocks[0].get("adminActionKind"), "push_suite_packages")
+                self.assertIn("Push Suite", str(blocks[0].get("scenarioLabel") or ""))
+                # Job snapshot should also record the seal (re-fetch after worker seal).
+                snap = job_snapshot(jid) or {}
+                cf = snap.get("chronoflux") or {}
+                self.assertTrue(cf.get("ok"), snap)
+                self.assertIsNotNone(cf.get("height"), snap)
+
+    def test_async_push_worker_failure_does_not_mint(self) -> None:
+        import time
+
+        from admin_chronoflux import list_admin_chronoflux_blocks
+        from suite_push_progress import job_snapshot, start_push_job
+
+        with tempfile.TemporaryDirectory() as td:
+            lp = Path(td) / "ledger.json"
+            ctrl = mock.MagicMock()
+            ctrl.catalog_version_default.return_value = "1.0.2"
+            ctrl.list_local_packages.return_value = {
+                "ok": True,
+                "packages": [{"filename": "x.zip"}],
+            }
+            ctrl.ssh_upload_access_preflight.return_value = {
+                "ok": True,
+                "key_path": "/tmp/fake",
+            }
+            ctrl.push_suite_packages.return_value = {
+                "ok": False,
+                "error": "upload failed",
+            }
+            import admin_chronoflux as ac
+
+            _orig_progress = ac.progress_admin_action
+
+            def _seal(**kwargs):
+                kw = dict(kwargs)
+                kw["ledger_path"] = lp
+                kw["remote"] = False
+                return _orig_progress(**kw)
+
+            with mock.patch.object(ac, "progress_admin_action", side_effect=_seal):
+                started = start_push_job(
+                    ctrl,
+                    version="1.0.2",
+                    stage=True,
+                    upload=True,
+                    dry_run=False,
+                    force=True,
+                )
+                jid = str(started.get("job_id") or "")
+                deadline = time.time() + 5.0
+                snap = job_snapshot(jid) or {}
+                while time.time() < deadline and snap.get("state") not in (
+                    "complete",
+                    "failed",
+                    "done",
+                    "error",
+                ):
+                    time.sleep(0.05)
+                    snap = job_snapshot(jid) or {}
+                self.assertIn(
+                    snap.get("state"), ("complete", "failed", "done", "error"), snap
+                )
+                self.assertFalse(bool(snap.get("ok")))
+                self.assertEqual(list_admin_chronoflux_blocks(ledger_path=lp), [])
+                self.assertFalse(bool((snap.get("chronoflux") or {}).get("ok")))
+
+    def test_suite_push_progress_source_seals_on_worker_success(self) -> None:
+        src = Path(ROOT / "status_page" / "suite_push_progress.py").read_text(
+            encoding="utf-8"
+        )
+        self.assertIn("progress_admin_action", src)
+        self.assertIn("push_suite_packages", src)
+        self.assertIn("if job_ok:", src)
+        self.assertIn("chronoflux", src)
+
+
 class TestAdminHandlerHookExists(unittest.TestCase):
     def test_handler_has_chronoflux_ok_method(self) -> None:
         import app as status_app
@@ -264,6 +415,11 @@ class TestAdminHandlerHookExists(unittest.TestCase):
         ):
             self.assertIn(needle, src, msg=f"missing hook for {needle!r}")
         self.assertGreaterEqual(src.count("_admin_chronoflux_ok"), 12)
+        # Async path seals in suite_push_progress worker (not only sync Handler)
+        spp = Path(ROOT / "status_page" / "suite_push_progress.py").read_text(
+            encoding="utf-8"
+        )
+        self.assertIn("progress_admin_action", spp)
 
 
 if __name__ == "__main__":

@@ -255,12 +255,45 @@ def start_push_job(
                         job["redirect"] = redir
                         job["missing_ssh_keys"] = True
                 return
+            job_ok = bool(result.get("ok"))
             _finish_job(
                 job_id,
-                ok=bool(result.get("ok")),
+                ok=job_ok,
                 error=str(result.get("error") or ""),
                 message=str(result.get("suite") or ""),
             )
+            # ChronoFlux seal only when the async push actually succeeds (not on start).
+            if job_ok:
+                try:
+                    from admin_chronoflux import progress_admin_action
+                except ImportError:  # pragma: no cover
+                    try:
+                        from status_page.admin_chronoflux import (  # type: ignore
+                            progress_admin_action,
+                        )
+                    except ImportError:
+                        progress_admin_action = None  # type: ignore
+                if progress_admin_action is not None:
+                    seal = progress_admin_action(
+                        action_kind="push_suite_packages",
+                        label="Admin: Push Suite Packages",
+                        memo=(
+                            f"async job_id={job_id} "
+                            f"present={result.get('present_count')}/"
+                            f"{result.get('total')} "
+                            f"version={opts.get('version') or ''}"
+                        )[:200],
+                        path="/admin/uploads/push-suite",
+                        remote=True,
+                    )
+                    with _LOCK:
+                        job = _JOBS.get(job_id)
+                        if job is not None:
+                            job["chronoflux"] = {
+                                "ok": bool(seal.get("ok")),
+                                "height": seal.get("height"),
+                                "label": seal.get("label"),
+                            }
         except Exception as exc:  # noqa: BLE001
             _finish_job(job_id, ok=False, error=str(exc)[:300])
 
