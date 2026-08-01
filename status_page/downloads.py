@@ -1123,6 +1123,11 @@ except ImportError:  # pragma: no cover
 SUITE_SUBMENU_ID = "suite-product-submenu"
 SUITE_PERC_EXPLORER_HREF = str(_PERC_EXPLORER_BASE).rstrip("/") + "/"
 SUITE_PERC_EXPLORER_LABEL = "Perc blockchain explorer"
+# Homepage iframe embed (must end with / so framed location.pathname is /perc/).
+SUITE_PERC_WALLET_EXPLORER_IFRAME_SRC = SUITE_PERC_EXPLORER_HREF
+SUITE_PERC_WALLET_EXPLORER_ID = "suite-perc-wallet-explorer"
+SUITE_PERC_WALLET_EXPLORER_IFRAME_ID = "suite-perc-wallet-explorer-frame"
+SUITE_PERC_WALLET_EXPLORER_LABEL = "Perccent blockchain explorer"
 # Evolve docs: same-origin page (README mirror); white paper + source stay external.
 SUITE_EVOLVE_DOCS_HREF = "/EVOLVE.md"
 SUITE_EVOLVE_DOCS_LABEL = "Evolve docs"
@@ -1751,13 +1756,55 @@ def render_suite_product_submenu_html() -> str:
 
 
 def render_suite_perc_wallet_explorer_iframe_html() -> str:
-    """No longer embeds the Perccent block explorer on the Suite storefront.
+    """Iframe the live Perccent block explorer into the Suite storefront.
 
-    Kept as a no-op helper so older call sites stay import-safe. The explorer
-    remains available via the ecosystem submenu external link
-    (:data:`SUITE_PERC_EXPLORER_HREF`) opened in a normal browser tab.
+    Uses :data:`SUITE_PERC_EXPLORER_HREF` (Helsinki public ``/perc/`` base) so
+    the framed document's ``location.pathname`` is under ``/perc/`` and the
+    explorer's :func:`explorerApiBase` prefixes API calls to ``/perc/api/…``.
+    Trailing slash is required. Load is eager so first homepage visit connects
+    without requiring a top-level open of the external explorer link.
     """
-    return ""
+    src_href = SUITE_PERC_WALLET_EXPLORER_IFRAME_SRC
+    if not src_href.endswith("/"):
+        src_href = src_href.rstrip("/") + "/"
+    # Host for CSP / data markers (no path).
+    try:
+        from urllib.parse import urlparse
+
+        host = urlparse(src_href).netloc or "135.181.152.10.sslip.io"
+    except Exception:  # noqa: BLE001
+        host = "135.181.152.10.sslip.io"
+    return f"""
+    <div class="suite-perc-wallet-explorer" id="{SUITE_PERC_WALLET_EXPLORER_ID}"
+         data-suite-perc-wallet-explorer="1" data-product="perccent-wallet"
+         data-explorer-host="{_esc_html(host)}" data-explorer-iframe-wrap="1">
+      <p class="suite-perc-wallet-explorer-label"
+         id="suite-perc-wallet-explorer-label">
+        {_esc_html(SUITE_PERC_WALLET_EXPLORER_LABEL)}
+      </p>
+      <div class="suite-perc-wallet-explorer-frame-wrap"
+           id="suite-perc-wallet-explorer-frame-wrap">
+        <iframe class="suite-perc-wallet-explorer-frame"
+                id="{SUITE_PERC_WALLET_EXPLORER_IFRAME_ID}"
+                src="{_esc_html(src_href)}"
+                title="Perccent Network Explorer — Chronoflux Principia chain"
+                loading="eager"
+                referrerpolicy="no-referrer-when-downgrade"
+                allow="fullscreen"
+                sandbox="allow-scripts allow-same-origin allow-popups allow-forms allow-popups-to-escape-sandbox"
+                data-explorer-iframe="1"
+                data-src-host="{_esc_html(host)}"
+                data-src-path="/perc/"></iframe>
+      </div>
+      <p class="suite-perc-wallet-explorer-open">
+        <a class="suite-sub-link" id="suite-perc-wallet-explorer-open"
+           href="{_esc_html(src_href)}" target="_blank" rel="noopener noreferrer"
+           data-suite-sub="perc-wallet-explorer-open">
+          Open block explorer full page
+        </a>
+      </p>
+    </div>
+"""
 
 
 def suite_storefront_css() -> str:
@@ -1828,6 +1875,28 @@ def suite_storefront_css() -> str:
     .suite-product-submenu-label {
       width: 100%; margin: 0 0 0.35rem; font-size: 0.72rem; font-weight: 700;
       letter-spacing: 0.06em; text-transform: uppercase; color: rgba(174,208,234,0.9);
+    }
+    /* Perccent explorer embed — forces connect on first homepage visit */
+    .suite-perc-wallet-explorer {
+      width: 100%; max-width: 100%; box-sizing: border-box;
+      margin: 0.75rem 0 1rem; text-align: left;
+    }
+    .suite-perc-wallet-explorer-label {
+      margin: 0 0 0.4rem; font-size: 0.82rem; font-weight: 700;
+      color: #dbeafe; letter-spacing: 0.03em;
+    }
+    .suite-perc-wallet-explorer-frame-wrap {
+      width: 100%; box-sizing: border-box; border-radius: 12px; overflow: hidden;
+      border: 1px solid rgba(174, 208, 234, 0.4);
+      background: rgba(4, 12, 28, 0.55); min-height: 22rem;
+    }
+    .suite-perc-wallet-explorer-frame,
+    iframe#suite-perc-wallet-explorer-frame {
+      display: block; width: 100%; height: min(70vh, 36rem);
+      min-height: 22rem; border: 0; background: #0a1628;
+    }
+    .suite-perc-wallet-explorer-open {
+      margin: 0.45rem 0 0; text-align: center; font-size: 0.8rem;
     }
     .suite-free-primary {
       margin: 0.35rem auto 0.65rem; max-width: 28rem; text-align: center;
@@ -2177,6 +2246,7 @@ def render_suite_storefront_html(
     <span class="suite-version-badge" id="suite-version-badge">{SUITE_VERSION_LABEL}</span>
     <p class="suite-blurb" id="suite-blurb">{SUITE_PRODUCT_SUBTITLE}</p>
 {render_suite_product_submenu_html()}
+{render_suite_perc_wallet_explorer_iframe_html()}
     <p class="suite-keygen-line" id="suite-keygen-line">{SUITE_KEYGEN_HINT}</p>
     <div class="suite-free-primary" id="suite-free-primary" data-free-download="1">
       {primary_free}

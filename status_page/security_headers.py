@@ -23,9 +23,14 @@ FORM_ACTION_DIRECTIVE = (
     "https://buy.stripe.com"
 )
 
-# Same-origin framing only (e.g. thank-you download iframe). The Suite page no
-# longer embeds the external Perccent block explorer.
-FRAME_SRC_DIRECTIVE = "frame-src 'self'"
+# Allow homepage Perccent explorer iframe (Helsinki /perc public base) plus
+# same-origin framing (thank-you download iframe). Host list must match
+# SUITE_PERC_EXPLORER_HREF / DEFAULT_PERC_PUBLIC_BASE origins.
+FRAME_SRC_DIRECTIVE = (
+    "frame-src 'self' "
+    "https://135.181.152.10.sslip.io "
+    "https://evolve-perc-internet.onrender.com"
+)
 
 CONTENT_SECURITY_POLICY = (
     "default-src 'self'; "
