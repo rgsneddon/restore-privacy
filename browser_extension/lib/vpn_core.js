@@ -40,7 +40,54 @@
       browserScopeOnly: true,
       productTitle: "RESTORE PRIVACY SUITE",
       catalogVersion: "1.0.2",
+      /** One-time KEYGEN unlock for this extension product on this device. */
+      keygenUnlocked: false,
+      keygenStored: "",
     };
+  }
+
+  /**
+   * True when a valid KEYGEN has been entered once for this app product.
+   * @param {object} state
+   * @returns {boolean}
+   */
+  function isKeygenUnlocked(state) {
+    if (!state || typeof state !== "object") return false;
+    return state.keygenUnlocked === true && String(state.keygenStored || "").trim().length > 0;
+  }
+
+  /**
+   * Accept a fulfilment KEYGEN once for this extension (does not re-verify host).
+   * Minimal shape: non-empty RPT-KEY-… or long token (same family as Suite KEYGEN).
+   * @param {object} [prev]
+   * @param {string} keygen
+   * @returns {object} next state
+   */
+  function unlockWithKeygen(prev, keygen) {
+    var base = prev && typeof prev === "object" ? prev : defaultState();
+    var k = String(keygen || "").trim();
+    if (!k) {
+      return Object.assign({}, base, {
+        error: "Enter the KEYGEN from your fulfilment email to unlock this app.",
+        keygenUnlocked: false,
+        keygenStored: "",
+      });
+    }
+    var ok =
+      /^RPT-KEY-/i.test(k) ||
+      (k.length >= 12 && /[A-Za-z0-9-]{12,}/.test(k));
+    if (!ok) {
+      return Object.assign({}, base, {
+        error: "Invalid KEYGEN — paste the keygen from your fulfilment email.",
+        keygenUnlocked: !!base.keygenUnlocked,
+        keygenStored: base.keygenStored || "",
+      });
+    }
+    return Object.assign({}, base, {
+      keygenUnlocked: true,
+      keygenStored: k,
+      error: null,
+    });
   }
 
   /**
@@ -78,6 +125,20 @@
    */
   function enableVpn(prev, opts) {
     var base = prev && typeof prev === "object" ? prev : defaultState();
+    if (!isKeygenUnlocked(base)) {
+      return {
+        status: STATUS.ERROR,
+        proxyConfig: null,
+        error:
+          "KEYGEN required: unlock this app once with the keygen from your " +
+          "fulfilment email before Connect.",
+        browserScopeOnly: true,
+        productTitle: base.productTitle || "RESTORE PRIVACY SUITE",
+        catalogVersion: base.catalogVersion || "1.0.2",
+        keygenUnlocked: false,
+        keygenStored: "",
+      };
+    }
     try {
       var cfg = buildProxyConfig(opts);
       return {
@@ -86,7 +147,9 @@
         error: null,
         browserScopeOnly: true,
         productTitle: base.productTitle || "RESTORE PRIVACY SUITE",
-        catalogVersion: base.catalogVersion || "0.4.2",
+        catalogVersion: base.catalogVersion || "1.0.2",
+        keygenUnlocked: true,
+        keygenStored: base.keygenStored || "",
         enabledAt: Date.now(),
       };
     } catch (err) {
@@ -96,7 +159,9 @@
         error: String(err && err.message ? err.message : err),
         browserScopeOnly: true,
         productTitle: base.productTitle || "RESTORE PRIVACY SUITE",
-        catalogVersion: base.catalogVersion || "0.4.2",
+        catalogVersion: base.catalogVersion || "1.0.2",
+        keygenUnlocked: !!base.keygenUnlocked,
+        keygenStored: base.keygenStored || "",
       };
     }
   }
@@ -114,7 +179,9 @@
       error: null,
       browserScopeOnly: true,
       productTitle: base.productTitle || "RESTORE PRIVACY SUITE",
-      catalogVersion: base.catalogVersion || "0.4.2",
+      catalogVersion: base.catalogVersion || "1.0.2",
+      keygenUnlocked: !!base.keygenUnlocked,
+      keygenStored: base.keygenStored || "",
       disabledAt: Date.now(),
     };
   }
@@ -155,6 +222,8 @@
     disableVpn: disableVpn,
     getStatus: getStatus,
     isConnected: isConnected,
+    isKeygenUnlocked: isKeygenUnlocked,
+    unlockWithKeygen: unlockWithKeygen,
     browserScopeDisclaimer: browserScopeDisclaimer,
   };
 });

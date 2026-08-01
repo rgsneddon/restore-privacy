@@ -27,8 +27,21 @@ test("default state is disconnected without proxy", function () {
   assert.strictEqual(core.isConnected(s), false);
 });
 
-test("enableVpn sets connected + fixed_servers proxy config", function () {
+test("Connect blocked without KEYGEN unlock", function () {
   var s = core.enableVpn(core.defaultState(), {
+    host: "127.0.0.1",
+    port: 1080,
+  });
+  assert.strictEqual(s.status, "error");
+  assert.strictEqual(s.proxyConfig, null);
+  assert.ok(String(s.error).toLowerCase().indexOf("keygen") >= 0);
+  assert.strictEqual(core.isKeygenUnlocked(core.defaultState()), false);
+});
+
+test("unlockWithKeygen then enableVpn connects once unlocked", function () {
+  var unlocked = core.unlockWithKeygen(core.defaultState(), "RPT-KEY-TEST-TEST-TEST");
+  assert.strictEqual(core.isKeygenUnlocked(unlocked), true);
+  var s = core.enableVpn(unlocked, {
     host: "127.0.0.1",
     port: 1080,
     scheme: "socks5",
@@ -41,19 +54,26 @@ test("enableVpn sets connected + fixed_servers proxy config", function () {
   assert.strictEqual(s.proxyConfig.rules.singleProxy.scheme, "socks5");
   assert.strictEqual(core.isConnected(s), true);
   assert.strictEqual(core.getStatus(s), "connected");
+  // KEYGEN remains after connect
+  assert.strictEqual(core.isKeygenUnlocked(s), true);
 });
 
-test("disableVpn clears proxy config and disconnects", function () {
-  var on = core.enableVpn(null, { host: "10.0.0.1", port: 9050 });
+test("disableVpn clears proxy but keeps KEYGEN unlock", function () {
+  var unlocked = core.unlockWithKeygen(null, "RPT-KEY-TEST-TEST-TEST");
+  var on = core.enableVpn(unlocked, { host: "10.0.0.1", port: 9050 });
   assert.strictEqual(core.isConnected(on), true);
   var off = core.disableVpn(on);
   assert.strictEqual(off.status, "disconnected");
   assert.strictEqual(off.proxyConfig, null);
   assert.strictEqual(core.isConnected(off), false);
+  assert.strictEqual(core.isKeygenUnlocked(off), true);
 });
 
-test("invalid port yields error status without proxy", function () {
-  var s = core.enableVpn(null, { host: "127.0.0.1", port: 0 });
+test("invalid KEYGEN rejected; invalid port after unlock still errors", function () {
+  var bad = core.unlockWithKeygen(null, "x");
+  assert.strictEqual(core.isKeygenUnlocked(bad), false);
+  var unlocked = core.unlockWithKeygen(null, "RPT-KEY-TEST-TEST-TEST");
+  var s = core.enableVpn(unlocked, { host: "127.0.0.1", port: 0 });
   assert.strictEqual(s.status, "error");
   assert.strictEqual(s.proxyConfig, null);
   assert.ok(s.error);
@@ -92,7 +112,8 @@ test("proxy adapter apply + clear with mock chrome", function () {
     },
   };
   var ad = adapterFactory.createProxyAdapter(mock);
-  var state = core.enableVpn(null, { host: "127.0.0.1", port: 1080 });
+  var unlocked = core.unlockWithKeygen(null, "RPT-KEY-TEST-TEST-TEST");
+  var state = core.enableVpn(unlocked, { host: "127.0.0.1", port: 1080 });
   return ad.applyProxyConfig(state.proxyConfig).then(function () {
     assert.ok(applied);
     assert.strictEqual(applied.mode, "fixed_servers");
@@ -133,7 +154,8 @@ Promise.resolve()
       },
     };
     var ad = adapterFactory.createProxyAdapter(mock);
-    var state = core.enableVpn(null, { host: "127.0.0.1", port: 1080 });
+    var unlocked = core.unlockWithKeygen(null, "RPT-KEY-TEST-TEST-TEST");
+    var state = core.enableVpn(unlocked, { host: "127.0.0.1", port: 1080 });
     return ad.applyProxyConfig(state.proxyConfig).then(function () {
       assert.strictEqual(applied.mode, "fixed_servers");
       return ad.clearProxyConfig().then(function () {

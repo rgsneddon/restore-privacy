@@ -171,8 +171,14 @@ def public_data_path_layer_html() -> str:
 
 def public_site_css() -> str:
     """Site-wide CSS variables, shell, brand header, nav buttons, light/dark themes."""
+    try:
+        from coffee_link import coffee_link_css
+    except ImportError:  # pragma: no cover
+        from status_page.coffee_link import coffee_link_css  # type: ignore
+    footer_css = coffee_link_css()
     return f"""
 /* === Public site chrome (shared) — site-chrome-pro / data-path === */
+{footer_css}
 :root, [data-theme="dark"] {{
   --rb-navy: #0a1628;
   --rb-navy-mid: #0f2340;
@@ -1420,6 +1426,19 @@ def public_head_open(
 
 
 def public_page_close() -> str:
-    return """</body>
+    """Close every public HTML shell with the shared copyright + map footer.
+
+    Copyright left, downloads map link right — same line on all public pages
+    that use this closer (home, downloads-map, docs, support, settings guide,
+    product family landings, …). Admin routes do not use this helper.
+    """
+    try:
+        from coffee_link import render_site_copyright_footer_html
+    except ImportError:  # pragma: no cover
+        from status_page.coffee_link import (  # type: ignore
+            render_site_copyright_footer_html,
+        )
+    return f"""{render_site_copyright_footer_html()}
+</body>
 </html>
 """

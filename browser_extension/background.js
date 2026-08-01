@@ -138,6 +138,19 @@ chrome.runtime.onMessage.addListener(function (msg, _sender, sendResponse) {
     });
     return true;
   }
+  if (msg.type === "unlock_keygen") {
+    loadState().then(async function (prev) {
+      var next = core.unlockWithKeygen(prev, msg.keygen || "");
+      await saveState(next);
+      setBadge(next);
+      sendResponse({
+        ok: core.isKeygenUnlocked(next),
+        state: next,
+        error: next.error || null,
+      });
+    });
+    return true;
+  }
   sendResponse({ ok: false, error: "unknown type" });
   return false;
 });

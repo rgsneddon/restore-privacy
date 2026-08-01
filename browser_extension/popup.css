@@ -121,3 +121,31 @@ body {
 .is-connected #status-text {
   color: var(--green);
 }
+
+.keygen-gate {
+  margin: 0.65rem 0 0.85rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+.keygen-label {
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: #aed0ea;
+  letter-spacing: 0.02em;
+}
+.keygen-input {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 0.45rem 0.55rem;
+  border-radius: 8px;
+  border: 1px solid rgba(174, 208, 234, 0.4);
+  background: #0a1628;
+  color: #e8eef5;
+  font-size: 0.82rem;
+}
+.btn-unlock {
+  background: #f59e0b;
+  color: #041018;
+  font-weight: 800;
+}

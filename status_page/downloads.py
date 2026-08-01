@@ -731,12 +731,12 @@ def payment_connect_disclaimer_html() -> str:
 
 
 def render_bmc_tip_html() -> str:
-    """Public page bottom bar: ``(c) Raskul - all rights reserved``.
+    """Deprecated: footer is injected by :func:`public_page_close` for all pages.
 
-    Historical name retained for imports; no longer renders Buy Me a Coffee.
-    Stable anchors: ``#site-footer`` / ``#site-footer-copyright``.
+    Historical name retained for imports. Returns empty so shells that still
+    call this helper do not double-render the copyright + map line.
     """
-    return render_site_copyright_footer_html()
+    return ""
 
 
 def render_catalog_footer_html() -> str:
