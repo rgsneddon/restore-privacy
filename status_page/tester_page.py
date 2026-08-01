@@ -1,10 +1,12 @@
-"""Unlinked app-tester page: licence accept → one-package one-month mint.
+"""Unlinked app-tester page: licence accept → full Suite one-month mint.
 
 Direct URL only (``/app-testers``). Not linked from homepage, downloads, footer,
 or public chrome. After the tester checks that they have read the full licence
-and disclaimer, they may mint **one** catalog platform via the existing
-one-month tester mint path (download token + KEYGEN). A durable claim keyed by
-HTTP-only cookie refuses a second package.
+and disclaimer, they mint a **one-month** KEYGEN and downloadables for the
+**full brand Suite product set** (residual client platforms + companions from
+the downloads-map inventory). They pick one residual client platform for the
+primary Connect entitlement; success still lists every inventory installer.
+A durable claim keyed by HTTP-only cookie refuses a second KEYGEN mint.
 """
 
 from __future__ import annotations
@@ -16,7 +18,7 @@ import sqlite3
 import time
 from pathlib import Path
 from typing import Any
-from urllib.parse import parse_qs
+from urllib.parse import parse_qs, urlencode
 
 # Public paths (direct URL only — do not add to public nav/footer)
 TESTER_PAGE_PATH = "/app-testers"
@@ -45,6 +47,11 @@ CATALOG_PLATFORMS: tuple[tuple[str, str], ...] = (
     ("linux", "Linux"),
     ("ios", "iOS"),
 )
+
+# Kinds from downloads-map inventory that are real installer packages (not docs).
+_SKIP_DOWNLOADABLE_KINDS = frozenset({"beam_dapp", "docs", "source", "scaffold"})
+# Basename patterns that are not streamable installers
+_SKIP_FILENAME_SUFFIXES = (".md", ".txt", ".html")
 
 
 def tester_page_paths() -> frozenset[str]:
@@ -265,14 +272,19 @@ By accepting below you confirm that:
 
 1. You are an invited or intentional app tester of **Restore Privacy Suite**, not a
    substitute for a paid subscription for production use.
-2. You receive a **one-month** tester grant and KEYGEN for **one** device package
-   platform only (Suite catalog monopin). A second package selection for the same
-   tester identity is refused.
+2. You receive a **one-month** tester KEYGEN and downloadables for the **full brand
+   Suite product set** (residual client installers for all device platforms plus
+   companions such as Rx browser / browser extension, rpOS, node installer &
+   operator, rpMail, rpOffice, Pens/Tables/Slides — matching the current catalog
+   downloads map). You select one residual client platform for the primary Connect
+   entitlement. A second KEYGEN mint for the same tester identity is refused.
 3. Tester builds may be pre-release or catalog monopin builds; residual Connect
    behaviour, nodes, and host privacy posture are as described in product docs
    (no absolute anonymity or logging-free guarantee beyond published statements).
-4. Download links are time-limited (12 hours) status-host fulfilment tokens — not permanent
-   public installer mirrors. KEYGEN unlocks Connect for the tester period only.
+4. Suite residual client download links are time-limited (12 hours) status-host
+   fulfilment tokens. Companion brand packages use KEYGEN-gated ``/assets/…``
+   links — not permanent public installer mirrors. KEYGEN unlocks Connect for the
+   tester period only.
 5. After the tester period ends, Connect is refused until a paid subscription
    or new authorised entitlement is obtained.
 6. You have read the full licence agreement above and this disclaimer in full
@@ -280,6 +292,187 @@ By accepting below you confirm that:
 
 """
     return body.rstrip() + "\n" + disclaimer
+
+
+def list_tester_full_suite_downloadables(
+    *,
+    version: str | None = None,
+    require_resolvable: bool = False,
+) -> list[dict[str, str]]:
+    """Installer rows for app-tester full Suite grant (inventory-driven).
+
+    Sourced from shipped :func:`downloads.list_downloads_map_rows`. Excludes
+    pure docs/scaffold rows (e.g. Beam dApp README). Each row keeps product,
+    kind, platform, filename, version, label.
+
+    When *require_resolvable* is True, only basenames that
+    :func:`payments.open_release_asset` can open are returned (omit phantoms).
+    """
+    try:
+        from downloads import RELEASE_VERSION, list_downloads_map_rows
+    except ImportError:  # pragma: no cover
+        from status_page.downloads import (  # type: ignore
+            RELEASE_VERSION,
+            list_downloads_map_rows,
+        )
+
+    ver = (version or RELEASE_VERSION).strip() or RELEASE_VERSION
+    rows: list[dict[str, str]] = []
+    open_asset = None
+    if require_resolvable:
+        try:
+            from payments import open_release_asset as open_asset
+        except ImportError:  # pragma: no cover
+            try:
+                from status_page.payments import (  # type: ignore
+                    open_release_asset as open_asset,
+                )
+            except ImportError:
+                open_asset = None
+
+    for raw in list_downloads_map_rows(version=ver):
+        kind = str(raw.get("kind") or "").strip().lower()
+        fname = str(raw.get("filename") or "").strip()
+        if not fname:
+            continue
+        if kind in _SKIP_DOWNLOADABLE_KINDS:
+            continue
+        if "/" in fname or "\\" in fname:
+            continue
+        if any(fname.lower().endswith(s) for s in _SKIP_FILENAME_SUFFIXES):
+            continue
+        if open_asset is not None:
+            try:
+                asset = open_asset(fname)
+            except Exception:  # noqa: BLE001
+                asset = None
+            if asset is None:
+                continue
+            try:
+                body = asset.get("body")
+                if body is not None and hasattr(body, "close"):
+                    body.close()
+            except Exception:  # noqa: BLE001
+                pass
+        rows.append(
+            {
+                "product": str(raw.get("product") or kind or "Package"),
+                "kind": kind or "package",
+                "platform": str(raw.get("platform") or ""),
+                "filename": fname,
+                "version": str(raw.get("version") or ver),
+                "label": str(raw.get("label") or fname),
+            }
+        )
+    return rows
+
+
+def build_tester_full_suite_download_links(
+    *,
+    session_id: str,
+    keygen: str,
+    primary_platform: str,
+    base_url: str | None = None,
+    now: float | None = None,
+    ttl_sec: int | None = None,
+) -> list[dict[str, str]]:
+    """Mint/link every full-suite installer for a successful tester claim.
+
+    - **suite_client** platforms: time-limited ``/download?token=`` grants
+      (primary residual path + other device platforms).
+    - **companions**: KEYGEN/session-gated ``/assets/{ver}/{file}`` hrefs so
+      brand packages ride the same one-month entitlement without inventing a
+      second paid product line.
+
+    Returns only rows that produced a usable download URL. Does not list
+    phantom basenames when the asset cannot be resolved for suite tokens.
+    """
+    try:
+        from downloads import RELEASE_VERSION, free_asset_href
+        from payments import (
+            TOKEN_TTL_SEC,
+            TESTER_MONTH_PPI,
+            mint_download_token,
+            public_base_url,
+        )
+    except ImportError:  # pragma: no cover
+        from status_page.downloads import (  # type: ignore
+            RELEASE_VERSION,
+            free_asset_href,
+        )
+        from status_page.payments import (  # type: ignore
+            TOKEN_TTL_SEC,
+            TESTER_MONTH_PPI,
+            mint_download_token,
+            public_base_url,
+        )
+
+    t = float(now if now is not None else time.time())
+    ttl = int(ttl_sec if ttl_sec is not None else TOKEN_TTL_SEC)
+    base = (base_url if base_url is not None else public_base_url()).rstrip("/")
+    sid = (session_id or "").strip()
+    kg = (keygen or "").strip()
+    primary = (primary_platform or "").strip().lower()
+    inventory = list_tester_full_suite_downloadables(
+        version=RELEASE_VERSION, require_resolvable=False
+    )
+    out: list[dict[str, str]] = []
+    seen: set[str] = set()
+
+    for row in inventory:
+        fname = row["filename"]
+        if fname in seen:
+            continue
+        kind = row["kind"]
+        plat = (row.get("platform") or "").strip().lower()
+        url = ""
+        path = ""
+        if kind == "suite_client" and plat in {p for p, _ in CATALOG_PLATFORMS}:
+            try:
+                token = mint_download_token(
+                    filename=fname,
+                    platform=plat,
+                    session_id=sid,
+                    amount_pence=0,
+                    ttl_sec=ttl,
+                    now=t,
+                    purchase_id=TESTER_MONTH_PPI,
+                )
+            except Exception:  # noqa: BLE001
+                continue
+            path = f"/download?token={token}"
+            url = f"{base}{path}"
+        else:
+            # Companion brand packages — KEYGEN-gated free-open asset path.
+            # Always stage under the suite monopin free-open version (Render
+            # allowlist is free_open_asset_versions() → current RELEASE_VERSION),
+            # even when the product basename embeds its own line pin (rpos 0.2.0).
+            rel = free_asset_href(fname, version=RELEASE_VERSION)
+            q: dict[str, str] = {}
+            if kg:
+                q["keygen"] = kg
+            if sid:
+                q["session_id"] = sid
+            if q:
+                rel = f"{rel}?{urlencode(q)}"
+            path = rel
+            url = f"{base}{rel}" if rel.startswith("/") else rel
+        if not url:
+            continue
+        seen.add(fname)
+        out.append(
+            {
+                "product": row["product"],
+                "kind": kind,
+                "platform": plat or row.get("platform") or "",
+                "filename": fname,
+                "label": row.get("label") or fname,
+                "download_path": path,
+                "download_url": url,
+                "primary": "1" if (kind == "suite_client" and plat == primary) else "0",
+            }
+        )
+    return out
 
 
 def _truthy_form_field(form: dict[str, list[str]] | None, *names: str) -> bool:
@@ -464,6 +657,36 @@ def mint_for_tester(
     out["ok"] = True
     out["claim_id"] = cid
     out["public_tester"] = True
+    # Full brand Suite downloadables (residual clients + companions)
+    try:
+        suite_links = build_tester_full_suite_download_links(
+            session_id=str(minted.get("session_id") or ""),
+            keygen=str(minted.get("keygen") or ""),
+            primary_platform=plat,
+            base_url=base_url,
+            now=now,
+        )
+    except Exception:  # noqa: BLE001
+        suite_links = []
+    if not suite_links:
+        # Fail soft: at least keep the primary residual client download.
+        suite_links = [
+            {
+                "product": "Restore Privacy Suite",
+                "kind": "suite_client",
+                "platform": plat,
+                "filename": str(minted.get("filename") or ""),
+                "label": str(minted.get("filename") or plat),
+                "download_path": str(minted.get("download_path") or ""),
+                "download_url": str(minted.get("download_url") or ""),
+                "primary": "1",
+            }
+        ]
+    out["downloads"] = suite_links
+    out["full_suite"] = True
+    out["download_count"] = len(suite_links)
+    kinds = {str(d.get("kind") or "") for d in suite_links}
+    out["product_kinds"] = sorted(k for k in kinds if k)
     return out
 
 
@@ -504,6 +727,12 @@ border-radius:10px;margin:0 0 1rem}
 .keygen{font-family:ui-monospace,Consolas,monospace;font-size:1.05rem;font-weight:700;
 word-break:break-all;color:#fff;margin:0.5rem 0 1rem}
 .dl a{color:#7dd3fc;font-weight:600}
+.suite-dl{margin:1rem 0 0;padding:0;list-style:none}
+.suite-dl li{margin:0.35rem 0;padding:0.35rem 0;border-top:1px solid rgba(22,101,52,.45);
+font-size:0.9rem}
+.suite-dl li:first-child{border-top:0}
+.suite-dl .prod{color:#86efac;font-size:0.78rem;font-weight:700;display:block}
+.suite-dl a{color:#7dd3fc;font-weight:600;word-break:break-all}
 .foot{margin-top:1.5rem;font-size:0.8rem;color:var(--muted)}
 .refuse{font-size:1.05rem;font-weight:600;line-height:1.55;color:#fef3c7}
 """
@@ -536,7 +765,7 @@ def render_already_used_html() -> bytes:
 
 
 def render_success_html(mint: dict[str, Any]) -> bytes:
-    """HTTP body after a successful one-package mint (bytes for Handler._send)."""
+    """HTTP body after a successful full-suite tester mint (bytes for Handler._send)."""
     kg = html.escape(str(mint.get("keygen") or ""))
     url = html.escape(str(mint.get("download_url") or mint.get("download_path") or ""))
     plat = html.escape(str(mint.get("platform") or ""))
@@ -547,29 +776,75 @@ def render_success_html(mint: dict[str, Any]) -> bytes:
             or "Enter the KEYGEN in the client to unlock Connect."
         )
     )
+    downloads = mint.get("downloads") if isinstance(mint.get("downloads"), list) else []
+    if not downloads and (mint.get("download_url") or mint.get("filename")):
+        downloads = [
+            {
+                "product": "Restore Privacy Suite",
+                "kind": "suite_client",
+                "platform": str(mint.get("platform") or ""),
+                "filename": str(mint.get("filename") or ""),
+                "label": str(mint.get("filename") or ""),
+                "download_url": str(mint.get("download_url") or mint.get("download_path") or ""),
+                "primary": "1",
+            }
+        ]
+    items_html: list[str] = []
+    for d in downloads:
+        if not isinstance(d, dict):
+            continue
+        d_url = html.escape(str(d.get("download_url") or d.get("download_path") or ""))
+        d_name = html.escape(str(d.get("filename") or d.get("label") or "package"))
+        d_prod = html.escape(str(d.get("product") or d.get("kind") or "Package"))
+        if not d_url:
+            continue
+        items_html.append(
+            f'<li data-kind="{html.escape(str(d.get("kind") or ""))}" '
+            f'data-filename="{d_name}">'
+            f'<span class="prod">{d_prod}</span>'
+            f'<a href="{d_url}">{d_name}</a></li>'
+        )
+    if not items_html and url:
+        items_html.append(
+            f'<li data-kind="suite_client" data-filename="{fname}">'
+            f'<span class="prod">Restore Privacy Suite</span>'
+            f'<a href="{url}">{fname or "Download installer"}</a></li>'
+        )
+    suite_list = "\n".join(items_html)
+    n = len(items_html)
     body = f"""<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="utf-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1"/>
 <meta name="robots" content="noindex,nofollow"/>
-<title>App tester — your link and KEYGEN</title>
+<title>App tester — full Suite downloadables &amp; KEYGEN</title>
 <style>{_css()}</style>
 </head>
 <body>
 <main class="wrap">
-  <h1>Your one-month tester grant</h1>
-  <p class="lead">Platform: <strong>{plat}</strong> · Package: {fname}</p>
-  <div class="okbox card">
+  <h1>Your one-month full Suite tester grant</h1>
+  <p class="lead">Primary residual platform: <strong>{plat}</strong>
+  · Primary package: {fname}
+  · <strong data-full-suite-count="{n}">{n}</strong> Suite brand downloadables</p>
+  <div class="okbox card" data-full-suite="1">
     <p style="margin:0 0 0.35rem;color:#86efac;font-weight:600">KEYGEN</p>
     <p class="keygen" id="product-keygen">{kg}</p>
-    <p class="dl" style="margin:0 0 0.75rem">
-      <a href="{url}">Download installer (12-hour link)</a>
+    <p style="margin:0 0 0.75rem;font-size:0.9rem;color:#bbf7d0">{unlock}</p>
+    <p style="margin:0 0 0.35rem;color:#86efac;font-weight:600">
+      Full Suite downloadables
     </p>
-    <p style="margin:0;font-size:0.9rem;color:#bbf7d0">{unlock}</p>
+    <p style="margin:0 0 0.5rem;font-size:0.85rem;color:#bbf7d0">
+      Residual clients use 12-hour download tokens; companions use KEYGEN-gated
+      asset links. Save this KEYGEN — it unlocks Connect and brand packages.
+    </p>
+    <ul class="suite-dl" id="full-suite-downloads">
+      {suite_list}
+    </ul>
   </div>
-  <p class="foot">Save this KEYGEN. A second package cannot be generated for this tester identity.
-  If you clear cookies you may appear as a new tester — that is not a multi-device entitlement.</p>
+  <p class="foot">Save this KEYGEN. A second KEYGEN mint cannot be generated for this
+  tester identity. If you clear cookies you may appear as a new tester — that is not
+  a multi-identity entitlement.</p>
 </main>
 </body>
 </html>
@@ -617,8 +892,10 @@ def render_tester_page_html(
   <h1>Restore Privacy — app testers</h1>
   <p class="do-not-share" id="do-not-share" role="status">{notice}</p>
   <p class="lead">Scroll the full licence and tester disclaimer to the bottom, then
-  confirm both checkboxes. Only then can you select <strong>one</strong> package for a
-  <strong>one-month</strong> tester download link and KEYGEN.</p>
+  confirm both checkboxes. Only then can you select your <strong>primary residual
+  client platform</strong> and generate a <strong>one-month</strong> KEYGEN plus
+  <strong>full Suite</strong> brand downloadables (residual clients, Rx browser,
+  rpOS, node tools, rpMail, rpOffice, and more).</p>
   {err}
   <div class="card">
     <h2 style="font-size:1.05rem;margin:0 0 0.65rem">Licence agreement &amp; disclaimer</h2>
@@ -636,17 +913,21 @@ def render_tester_page_html(
         <span>I agree to send app reports to <strong>{reports_email}</strong>
         for this tester period.</span>
       </label>
-      <div class="gen" id="generator" data-package-gate="1">
-        <p style="margin:0 0 0.4rem;font-weight:600">Select one package</p>
+      <div class="gen" id="generator" data-package-gate="1" data-full-suite-grant="1">
+        <p style="margin:0 0 0.4rem;font-weight:600">Primary residual client platform</p>
+        <p style="margin:0 0 0.55rem;font-size:0.85rem;color:var(--muted)">
+          Your KEYGEN unlocks Connect on this residual client. After mint you also
+          receive download links for the <strong>full Suite brand package set</strong>
+          (all five residual clients plus companions).</p>
         <div class="plats">
           {platforms}
         </div>
-        <button type="submit" id="mint-btn" disabled>Generate download link &amp; KEYGEN</button>
+        <button type="submit" id="mint-btn" disabled>Generate full Suite downloads &amp; KEYGEN</button>
       </div>
     </form>
   </div>
   <p class="foot">This page is not linked from the public site. Direct URL only.
-  Not a paid checkout — free one-month tester programme.</p>
+  Not a paid checkout — free one-month full Suite tester programme.</p>
 </main>
 <!-- External gate script (CSP script-src 'self' blocks inline scripts). -->
 <script src="{TESTER_GATE_SCRIPT_PATH}" defer></script>
