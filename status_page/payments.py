@@ -7783,13 +7783,20 @@ def process_checkout_completed_event(
         return None
     if filename not in catalog_filenames():
         return None
-    # Resolve paid amount in pence; never invent PRICE_PENCE when zero/missing.
+    # Cash amount: Stripe ``amount_total`` is source of truth (what was charged).
+    # ``metadata.amount_pence`` is the GBP catalog pin from our builders (often 300
+    # even for USD presentment) — never prefer it over amount_total for unlock
+    # gates (breaks USD checkout; spoofs underpay when total=1 and meta=300).
     amount: int | None = None
     try:
-        if meta.get("amount_pence") is not None and str(meta.get("amount_pence")).strip() != "":
-            amount = int(meta.get("amount_pence"))
-        elif obj.get("amount_total") is not None and str(obj.get("amount_total")).strip() != "":
+        if obj.get("amount_total") is not None and str(obj.get("amount_total")).strip() != "":
             amount = int(obj.get("amount_total"))
+        elif (
+            meta.get("amount_pence") is not None
+            and str(meta.get("amount_pence")).strip() != ""
+        ):
+            # Rare fallback when amount_total omitted (prefer fail-closed elsewhere)
+            amount = int(meta.get("amount_pence"))
     except (TypeError, ValueError):
         return None
     session_id = str(obj.get("id") or "")
@@ -7799,13 +7806,20 @@ def process_checkout_completed_event(
         subscription_id = str(sub_raw.get("id") or "")
     else:
         subscription_id = str(sub_raw or "").strip()
+    # Currency: prefer Stripe session currency over builder metadata.
+    currency = str(
+        obj.get("currency") or meta.get("currency") or PRICE_CURRENCY
+    ).strip().lower()
     # Full price (PRICE_PENCE GBP) always OK. Yearly catalog amount with
     # subscription id is OK. Paid monthly/yearly subscriptions mint without a
     # free-trial window. Legacy £0 / no_payment_required still allowed only with
     # a subscription id so underpay one-time never mints.
-    # USD one-time: relative cents from GBP anchors (local_currency FX table).
-    currency = str(meta.get("currency") or obj.get("currency") or PRICE_CURRENCY).strip().lower()
-    amount_ok = amount is not None and amount == PRICE_PENCE and currency in ("", PRICE_CURRENCY, "gbp")
+    # USD presentment: amount_total is relative cents from GBP catalog anchors.
+    amount_ok = amount is not None and amount == PRICE_PENCE and currency in (
+        "",
+        PRICE_CURRENCY,
+        "gbp",
+    )
     yearly_amount_ok = (
         amount is not None
         and amount == PRICE_YEARLY_PENCE
@@ -7813,6 +7827,7 @@ def process_checkout_completed_event(
         and bool(subscription_id)
     )
     usd_ok = False
+    usd_yearly = False
     if currency == "usd" and amount is not None and amount > 0:
         try:
             from local_currency import (
@@ -7829,7 +7844,12 @@ def process_checkout_completed_event(
         expect_m = int(round(convert_gbp_to_currency(PRICE_MONTHLY_GBP, "USD") * 100))
         expect_y = int(round(convert_gbp_to_currency(PRICE_YEARLY_GBP, "USD") * 100))
         # Allow small rounding slack (±2 cents)
-        usd_ok = abs(int(amount) - expect_m) <= 2 or abs(int(amount) - expect_y) <= 2
+        if abs(int(amount) - expect_m) <= 2:
+            usd_ok = True
+            usd_yearly = False
+        elif abs(int(amount) - expect_y) <= 2:
+            usd_ok = True
+            usd_yearly = True
     # Paid yearly must hit yearly_amount_ok (exactly PRICE_YEARLY_PENCE) — do not
     # unlock on arbitrary amount>=0 with a yearly interval (underpay loophole).
     # Trial: only Stripe free-trial completion (no_payment_required + £0/absent).
@@ -7849,15 +7869,13 @@ def process_checkout_completed_event(
     # Catalog KEYGEN cash amounts for Raskul books: £3 (300p) or £30 (3000p).
     # Pure trial start (no money taken) stores 0 so accounting excludes the row
     # until invoice.paid / paid checkout records a real catalog amount.
-    if yearly_amount_ok:
+    # USD presentment maps to the same GBP catalog anchors for the ledger.
+    if yearly_amount_ok or (usd_ok and usd_yearly):
         grant_pence = PRICE_YEARLY_PENCE
-    elif amount_ok:
+    elif amount_ok or (usd_ok and not usd_yearly):
         grant_pence = PRICE_PENCE
     elif trial_ok:
         grant_pence = 0
-    elif usd_ok and amount is not None and int(amount) > 0:
-        # USD presentment: store charged cents (catalog-relative via usd_ok gate).
-        grant_pence = int(amount)
     else:
         # Gate said allow but no grantable amount path — fail closed.
         return None

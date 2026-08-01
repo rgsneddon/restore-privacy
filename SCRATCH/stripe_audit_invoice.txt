@@ -1,8 +1,3 @@
-=== Stripe audit: invoice.paid ===
 fulfilment_email_not_sent session='cs_t' skipped=True error='smtp_not_configured' has_keygen=True has_download=True smtp='disabled'
-invoice_300 renewed True
-fulfilment_email_not_sent session='cs_t2' skipped=True error='smtp_not_configured' has_keygen=True has_download=True smtp='disabled'
-invoice_1 rejected_non_catalog_amount False
-invoice_999 rejected_non_catalog_amount False
-invoice_0 invoice_zero_no_extend
-INVOICE_AUDIT_OK
+{'action': 'rejected_non_catalog_amount', 'session_id': 'cs_t', 'amount_paid': 1, 'event_type': 'invoice.paid', 'catalog_sale': None}
+INVOICE_OK

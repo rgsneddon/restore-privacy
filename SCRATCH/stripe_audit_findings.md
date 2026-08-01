@@ -1,16 +1,9 @@
-# Stripe audit findings
+# Stripe audit findings (amount_total fix)
 
-## Bugs found this pass
-1. **`trial_ok` loophole (fixed):** `payment_status=paid` with `amount_total=0` unlocked KEYGEN via `amount == 0` branch. Now trial requires `payment_status == "no_payment_required"` and amount 0/absent only.
-2. **Grant amount fallback (hardened):** Removed open `amount > 0` grant_pence path; non-matching gated sessions fail closed with `return None`.
+## Bugs fixed this pass
+1. **USD presentment never unlocked:** completion preferred `metadata.amount_pence=300` over `amount_total≈381` USD cents, so `amount_ok`/`usd_ok` both failed. Now **amount_total** is cash truth; USD monthly/yearly map to GBP catalog grant anchors.
+2. **Underpay spoof:** `amount_total=1` + `metadata.amount_pence=300` previously unlocked. amount_total wins → rejected.
 
-## Already closed (prior commits, re-verified)
-- Yearly underpay (1p/999p) with subscription does not unlock
-- Monthly underpay (1p/150p/999p) with subscription does not unlock
-- invoice.paid non-catalog (1/999) does not renew Connect
-- Commercial £3000 one-time does not unlock KEYGEN catalog path
-- Catalog builders: subscription mode, 300/3000 pence, trial_period_days=3
-
-## Residual notes (not bugs)
-- Paid session with amount 3000 and monthly interval still unlocks as yearly catalog amount (honest £30 cash) — acceptable.
-- USD presentment uses relative cents (±2) via existing usd_ok path.
+## Tests
+- `test_usd_builder_shaped_paid_monthly_unlocks` (drives real builder fields + completion)
+- `test_amount_total_1_with_metadata_300_does_not_unlock`

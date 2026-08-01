@@ -537,6 +537,112 @@ class TestCheckoutCompletedKeygenChain(unittest.TestCase):
         )
 
 
+class TestAmountTotalOverMetadata(unittest.TestCase):
+    """Stripe amount_total is cash truth — metadata.amount_pence must not override."""
+
+    def setUp(self) -> None:
+        self._td = tempfile.TemporaryDirectory()
+        self.env = mock.patch.dict(
+            os.environ, {"RPT_PAYMENT_DATA_DIR": self._td.name}, clear=False
+        )
+        self.env.start()
+        import payments as pay
+
+        pay.init_db()
+        self.pay = pay
+
+    def tearDown(self) -> None:
+        self.env.stop()
+        self._td.cleanup()
+
+    def test_usd_builder_shaped_paid_monthly_unlocks(self) -> None:
+        """USD subscription body uses metadata amount_pence=300 + currency=usd;
+        amount_total is relative cents (~381) — must unlock KEYGEN."""
+        pay = self.pay
+        from local_currency import PRICE_MONTHLY_GBP, convert_gbp_to_currency
+        from payments import build_subscription_checkout_form_body
+        from urllib.parse import parse_qs
+
+        raw = build_subscription_checkout_form_body(
+            "windows",
+            pay.platform_filename("windows") or "restore-privacy-client-windows.exe",
+            interval="month",
+            success_url="https://example.com/ok",
+            cancel_url="https://example.com/cancel",
+            currency="usd",
+        )
+        fields = parse_qs(raw.decode("utf-8"))
+        self.assertEqual(fields.get("mode"), ["subscription"])
+        self.assertEqual(fields.get("metadata[currency]"), ["usd"])
+        self.assertEqual(fields.get("metadata[amount_pence]"), ["300"])
+        unit = int(fields["line_items[0][price_data][unit_amount]"][0])
+        expect = int(round(convert_gbp_to_currency(PRICE_MONTHLY_GBP, "USD") * 100))
+        self.assertEqual(unit, expect)
+
+        ts = datetime(2026, 8, 15, 12, 0, tzinfo=timezone.utc).timestamp()
+        token = pay.process_checkout_completed_event(
+            {
+                "type": "checkout.session.completed",
+                "data": {
+                    "object": {
+                        "id": "cs_usd_mo_real",
+                        "mode": "subscription",
+                        "payment_status": "paid",
+                        "amount_total": unit,
+                        "currency": "usd",
+                        "client_reference_id": "windows|month",
+                        "subscription": "sub_usd_mo",
+                        "customer_email": "usd@example.com",
+                        "metadata": {
+                            "platform": "windows",
+                            "amount_pence": "300",
+                            "currency": "usd",
+                            "billing_interval": "month",
+                        },
+                    }
+                },
+            },
+            now=ts,
+        )
+        self.assertTrue(token, "USD catalog presentment must unlock KEYGEN")
+        self.assertTrue(pay.connect_entitlement_allows("cs_usd_mo_real"))
+        grant = pay.lookup_download_token(token)
+        self.assertIsNotNone(grant)
+        assert grant is not None
+        # Raskul books GBP catalog anchor, not raw USD cents
+        self.assertEqual(grant["amount_pence"], pay.PRICE_PENCE)
+
+    def test_amount_total_1_with_metadata_300_does_not_unlock(self) -> None:
+        """Underpay cash (total=1) must not unlock even if metadata claims 300."""
+        pay = self.pay
+        token = pay.process_checkout_completed_event(
+            {
+                "type": "checkout.session.completed",
+                "data": {
+                    "object": {
+                        "id": "cs_spoof_meta_300",
+                        "mode": "subscription",
+                        "payment_status": "paid",
+                        "amount_total": 1,
+                        "currency": "gbp",
+                        "client_reference_id": "windows|month",
+                        "subscription": "sub_spoof_meta",
+                        "customer_email": "spoof@example.com",
+                        "metadata": {
+                            "platform": "windows",
+                            "amount_pence": "300",
+                            "currency": "gbp",
+                            "billing_interval": "month",
+                        },
+                    }
+                },
+            }
+        )
+        self.assertIsNone(token)
+        self.assertIsNone(pay.get_connect_entitlement("cs_spoof_meta_300"))
+        self.assertFalse(pay.connect_entitlement_allows("cs_spoof_meta_300"))
+
+
 class TestFindPaidPurchaseYearly(unittest.TestCase):
     def setUp(self) -> None:
         self._td = tempfile.TemporaryDirectory()

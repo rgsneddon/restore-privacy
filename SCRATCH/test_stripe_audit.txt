@@ -1,3 +1,8 @@
+test_amount_total_1_with_metadata_300_does_not_unlock (tests.test_stripe_keygen_accounting_chain.TestAmountTotalOverMetadata.test_amount_total_1_with_metadata_300_does_not_unlock)
+Underpay cash (total=1) must not unlock even if metadata claims 300. ... ok
+test_usd_builder_shaped_paid_monthly_unlocks (tests.test_stripe_keygen_accounting_chain.TestAmountTotalOverMetadata.test_usd_builder_shaped_paid_monthly_unlocks)
+USD subscription body uses metadata amount_pence=300 + currency=usd; ... fulfilment_email_not_sent session='cs_usd_mo_real' skipped=True error='smtp_not_configured' has_keygen=True has_download=True smtp='disabled'
+ok
 test_invoice_paid_after_trial_books_catalog_sale (tests.test_stripe_keygen_accounting_chain.TestCheckoutCompletedKeygenChain.test_invoice_paid_after_trial_books_catalog_sale) ... fulfilment_email_not_sent session='cs_trial_then_pay' skipped=True error='smtp_not_configured' has_keygen=True has_download=True smtp='disabled'
 ok
 test_invoice_paid_non_catalog_does_not_renew_connect (tests.test_stripe_keygen_accounting_chain.TestCheckoutCompletedKeygenChain.test_invoice_paid_non_catalog_does_not_renew_connect)
@@ -39,18 +44,8 @@ test_create_session_posts_subscription_and_returns_url (tests.test_pay_plan_page
 test_empty_price_id_falls_back_to_unit_amount (tests.test_pay_plan_page.TestSubscriptionCheckoutBody.test_empty_price_id_falls_back_to_unit_amount) ... ok
 test_month_and_year_use_distinct_catalog_price_ids (tests.test_pay_plan_page.TestSubscriptionCheckoutBody.test_month_and_year_use_distinct_catalog_price_ids) ... ok
 test_yearly_pence_is_fixed_catalog_amount (tests.test_pay_plan_page.TestYearlyCatalogPrice.test_yearly_pence_is_fixed_catalog_amount) ... ok
-test_allow_with_session_or_keygen_or_token_flags (tests.test_compulsory_pay_gates.TestBrandPackageKeygenGate.test_allow_with_session_or_keygen_or_token_flags) ... ok
-test_evaluate_uses_real_lookup_download_token (tests.test_compulsory_pay_gates.TestBrandPackageKeygenGate.test_evaluate_uses_real_lookup_download_token) ... ok
-test_is_brand_asset_delivery_path (tests.test_compulsory_pay_gates.TestBrandPackageKeygenGate.test_is_brand_asset_delivery_path) ... ok
-test_pure_deny_without_proof_redirects_to_pay (tests.test_compulsory_pay_gates.TestBrandPackageKeygenGate.test_pure_deny_without_proof_redirects_to_pay) ... ok
-test_build_commercial_checkout_body_pins_300000 (tests.test_compulsory_pay_gates.TestBusinessDepositGate.test_build_commercial_checkout_body_pins_300000) ... ok
-test_exactly_3000_gbp_required (tests.test_compulsory_pay_gates.TestBusinessDepositGate.test_exactly_3000_gbp_required) ... ok
-test_short_licence_summary_mentions_trial_and_deposit (tests.test_compulsory_pay_gates.TestClientLicenceMentionsCompulsory.test_short_licence_summary_mentions_trial_and_deposit) ... ok
-test_handler_wires_brand_package_gate (tests.test_compulsory_pay_gates.TestStorefrontCopyCompulsory.test_handler_wires_brand_package_gate)
-Structural: suite download + assets + commercial use brand_asset_gate. ... ok
-test_suite_and_service_copy_require_trial_and_deposit (tests.test_compulsory_pay_gates.TestStorefrontCopyCompulsory.test_suite_and_service_copy_require_trial_and_deposit) ... ok
 
 ----------------------------------------------------------------------
-Ran 38 tests in 0.216s
+Ran 31 tests in 0.213s
 
 OK
