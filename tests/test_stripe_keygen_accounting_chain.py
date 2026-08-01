@@ -294,7 +294,7 @@ class TestCheckoutCompletedKeygenChain(unittest.TestCase):
 
     def test_underpay_and_commercial_amount_do_not_unlock_keygen_path(self) -> None:
         pay = self.pay
-        # Underpay
+        # Underpay without subscription
         self.assertIsNone(
             pay.process_checkout_completed_event(
                 {
@@ -311,6 +311,62 @@ class TestCheckoutCompletedKeygenChain(unittest.TestCase):
                 }
             )
         )
+        # Yearly subscription underpay (1p) — must not unlock (closed yearly_sub_ok loophole)
+        self.assertIsNone(
+            pay.process_checkout_completed_event(
+                {
+                    "type": "checkout.session.completed",
+                    "data": {
+                        "object": {
+                            "id": "cs_year_under_1p",
+                            "mode": "subscription",
+                            "payment_status": "paid",
+                            "amount_total": 1,
+                            "currency": "gbp",
+                            "client_reference_id": "windows|year",
+                            "subscription": "sub_year_under_1",
+                            "customer_email": "u1@example.com",
+                            "metadata": {
+                                "platform": "windows",
+                                "amount_pence": "1",
+                                "billing_interval": "year",
+                            },
+                        }
+                    },
+                }
+            )
+        )
+        self.assertIsNone(pay.get_connect_entitlement("cs_year_under_1p"))
+        self.assertFalse(pay.connect_entitlement_allows("cs_year_under_1p"))
+
+        # Yearly subscription underpay (999p) — not catalog 3000
+        self.assertIsNone(
+            pay.process_checkout_completed_event(
+                {
+                    "type": "checkout.session.completed",
+                    "data": {
+                        "object": {
+                            "id": "cs_year_under_999",
+                            "mode": "subscription",
+                            "payment_status": "paid",
+                            "amount_total": 999,
+                            "currency": "gbp",
+                            "client_reference_id": "linux|year",
+                            "subscription": "sub_year_under_999",
+                            "customer_email": "u9@example.com",
+                            "metadata": {
+                                "platform": "linux",
+                                "amount_pence": "999",
+                                "billing_interval": "year",
+                            },
+                        }
+                    },
+                }
+            )
+        )
+        self.assertIsNone(pay.get_connect_entitlement("cs_year_under_999"))
+        self.assertFalse(pay.connect_entitlement_allows("cs_year_under_999"))
+
         # Commercial deposit amount must not unlock residual KEYGEN as catalog sub
         # without subscription id + wrong product path
         self.assertIsNone(
@@ -332,6 +388,102 @@ class TestCheckoutCompletedKeygenChain(unittest.TestCase):
                     },
                 }
             )
+        )
+
+    def test_invoice_paid_non_catalog_does_not_renew_connect(self) -> None:
+        """After trial, invoice.paid with amount_paid=1 must not extend KEYGEN."""
+        pay = self.pay
+        now = 1_700_000_000.0
+        # Trial unlock with finite period
+        pay.process_checkout_completed_event(
+            {
+                "type": "checkout.session.completed",
+                "data": {
+                    "object": {
+                        "id": "cs_trial_bad_inv",
+                        "mode": "subscription",
+                        "payment_status": "no_payment_required",
+                        "amount_total": 0,
+                        "client_reference_id": "android",
+                        "subscription": "sub_bad_inv",
+                        "customer_email": "badinv@example.com",
+                        "metadata": {"platform": "android"},
+                    }
+                },
+            },
+            now=now,
+        )
+        ent_before = pay.get_connect_entitlement("cs_trial_bad_inv", now=now)
+        self.assertIsNotNone(ent_before)
+        assert ent_before is not None
+        self.assertTrue(ent_before.get("connect_allowed"))
+        vu_before = ent_before.get("valid_until")
+
+        # Non-catalog invoice after trial — must not renew / extend
+        res = pay.process_subscription_lifecycle_event(
+            {
+                "type": "invoice.paid",
+                "data": {
+                    "object": {
+                        "id": "in_underpay_1",
+                        "subscription": "sub_bad_inv",
+                        "amount_paid": 1,
+                        "currency": "gbp",
+                        "period_end": int(now) + 365 * 86400,
+                        "lines": {
+                            "data": [
+                                {
+                                    "period": {"end": int(now) + 365 * 86400},
+                                    "metadata": {"platform": "android"},
+                                }
+                            ]
+                        },
+                    }
+                },
+            },
+            now=now + 4 * 86400,
+        )
+        self.assertIsNotNone(res)
+        assert res is not None
+        self.assertEqual(res.get("action"), "rejected_non_catalog_amount")
+        self.assertIsNone(res.get("catalog_sale"))
+        ent_after = pay.get_connect_entitlement("cs_trial_bad_inv", now=now + 4 * 86400)
+        self.assertIsNotNone(ent_after)
+        assert ent_after is not None
+        # valid_until must not jump to the year-long invoice period_end
+        if vu_before is not None and ent_after.get("valid_until") is not None:
+            self.assertLessEqual(
+                float(ent_after["valid_until"]),
+                float(vu_before) + 1.0,
+            )
+        # Far future (past original trial) must not still be allowed solely due to bad invoice
+        far = now + 200 * 86400
+        # Only fail if trial period would have ended — set a short trial valid_until
+        pay.set_entitlement_valid_until(
+            "cs_trial_bad_inv", now + 3 * 86400, reason="test_trial_window", now=now
+        )
+        self.assertFalse(
+            pay.connect_entitlement_allows("cs_trial_bad_inv", now=now + 10 * 86400)
+        )
+        # Re-fire bad invoice while expired — still no renew
+        res2 = pay.process_subscription_lifecycle_event(
+            {
+                "type": "invoice.paid",
+                "data": {
+                    "object": {
+                        "id": "in_underpay_1b",
+                        "subscription": "sub_bad_inv",
+                        "amount_paid": 999,
+                        "currency": "gbp",
+                        "period_end": int(far),
+                    }
+                },
+            },
+            now=now + 10 * 86400,
+        )
+        self.assertEqual(res2 and res2.get("action"), "rejected_non_catalog_amount")
+        self.assertFalse(
+            pay.connect_entitlement_allows("cs_trial_bad_inv", now=now + 10 * 86400)
         )
 
 

@@ -5698,6 +5698,32 @@ def process_subscription_lifecycle_event(
             sid = _session_id_from_stripe_object(obj)
         if not sid:
             return None
+        try:
+            amount_paid = int(
+                obj.get("amount_paid")
+                if obj.get("amount_paid") is not None
+                else -1
+            )
+        except (TypeError, ValueError):
+            amount_paid = -1
+        # $0 trial invoices: do not extend period (checkout already set trial window).
+        if amount_paid == 0:
+            return {
+                "action": "invoice_zero_no_extend",
+                "session_id": sid,
+                "amount_paid": 0,
+                "event_type": etype,
+                "catalog_sale": None,
+            }
+        # Non-catalog cash (underpay / wrong product) must not keep KEYGEN access.
+        if not is_catalog_keygen_amount_pence(amount_paid):
+            return {
+                "action": "rejected_non_catalog_amount",
+                "session_id": sid,
+                "amount_paid": amount_paid,
+                "event_type": etype,
+                "catalog_sale": None,
+            }
         # Prefer lines period end
         pe = None
         lines = (obj.get("lines") or {}).get("data") or []
@@ -7804,17 +7830,15 @@ def process_checkout_completed_event(
         expect_y = int(round(convert_gbp_to_currency(PRICE_YEARLY_GBP, "USD") * 100))
         # Allow small rounding slack (±2 cents)
         usd_ok = abs(int(amount) - expect_m) <= 2 or abs(int(amount) - expect_y) <= 2
-    yearly_sub_ok = bool(subscription_id) and billing_interval == BILLING_INTERVAL_YEAR and (
-        amount is None or amount >= 0
-    )
-    # Legacy name: subscription session with zero/no_payment_required still mints
-    # (no free-trial product path required; paid monthly/yearly use amount_ok paths).
+    # Paid yearly must hit yearly_amount_ok (exactly PRICE_YEARLY_PENCE) — do not
+    # unlock on arbitrary amount>=0 with a yearly interval (underpay loophole).
+    # Trial: subscription + no cash taken yet (0 / no_payment_required).
     trial_ok = bool(subscription_id) and (
         payment_status == "no_payment_required"
         or amount == 0
-        or amount is None
+        or (amount is None and payment_status == "no_payment_required")
     )
-    if not amount_ok and not yearly_amount_ok and not trial_ok and not yearly_sub_ok and not usd_ok:
+    if not amount_ok and not yearly_amount_ok and not trial_ok and not usd_ok:
         return None
     # Paid catalog: always set a finite period end (month or year).
     stripe_pe = stripe_period_end_from_checkout_object(obj)

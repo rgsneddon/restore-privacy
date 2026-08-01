@@ -1,9 +1,9 @@
-=== checkout completed KEYGEN ===
-fulfilment_email_not_sent session='cs_m' skipped=True error='smtp_not_configured' has_keygen=True has_download=True smtp='disabled'
-monthly token True ent True grant_amt 300
-fulfilment_email_not_sent session='cs_y' skipped=True error='smtp_not_configured' has_keygen=True has_download=True smtp='disabled'
-yearly token True grant_amt 3000
-underpay None
-fulfilment_email_not_sent session='cs_t' skipped=True error='smtp_not_configured' has_keygen=True has_download=True smtp='disabled'
-trial unlock True amt 0 connect True
-OK
+=== skeptic fixes: yearly underpay + invoice non-catalog ===
+yearly_1p None False
+yearly_999p None False
+fulfilment_email_skipped_no_customer_email session='cs_t' keygen_minted=True customer_field=NoneType
+invoice_1p {'action': 'rejected_non_catalog_amount', 'session_id': 'cs_t', 'amount_paid': 1, 'event_type': 'invoice.paid', 'catalog_sale': None}
+connect_after_bad_inv False
+fulfilment_email_not_sent session='cs_yok' skipped=True error='smtp_not_configured' has_keygen=True has_download=True smtp='disabled'
+yearly_3000 True True
+SKEPTIC_GAPS_CLOSED

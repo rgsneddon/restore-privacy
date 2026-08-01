@@ -1,5 +1,8 @@
 test_invoice_paid_after_trial_books_catalog_sale (tests.test_stripe_keygen_accounting_chain.TestCheckoutCompletedKeygenChain.test_invoice_paid_after_trial_books_catalog_sale) ... fulfilment_email_not_sent session='cs_trial_then_pay' skipped=True error='smtp_not_configured' has_keygen=True has_download=True smtp='disabled'
 ok
+test_invoice_paid_non_catalog_does_not_renew_connect (tests.test_stripe_keygen_accounting_chain.TestCheckoutCompletedKeygenChain.test_invoice_paid_non_catalog_does_not_renew_connect)
+After trial, invoice.paid with amount_paid=1 must not extend KEYGEN. ... fulfilment_email_not_sent session='cs_trial_bad_inv' skipped=True error='smtp_not_configured' has_keygen=True has_download=True smtp='disabled'
+ok
 test_monthly_paid_unlocks_and_books_sale (tests.test_stripe_keygen_accounting_chain.TestCheckoutCompletedKeygenChain.test_monthly_paid_unlocks_and_books_sale) ... fulfilment_email_not_sent session='cs_keygen_paid_mo' skipped=True error='smtp_not_configured' has_keygen=True has_download=True smtp='disabled'
 ok
 test_trial_unlocks_but_not_accounting_sale (tests.test_stripe_keygen_accounting_chain.TestCheckoutCompletedKeygenChain.test_trial_unlocks_but_not_accounting_sale) ... fulfilment_email_not_sent session='cs_keygen_trial_only' skipped=True error='smtp_not_configured' has_keygen=True has_download=True smtp='disabled'
@@ -30,6 +33,6 @@ ok
 test_subscription_deleted_revokes (tests.test_stripe_subscription_fulfilment.TestSubscriptionLifecycle.test_subscription_deleted_revokes) ... ok
 
 ----------------------------------------------------------------------
-Ran 20 tests in 0.176s
+Ran 21 tests in 0.195s
 
 OK
