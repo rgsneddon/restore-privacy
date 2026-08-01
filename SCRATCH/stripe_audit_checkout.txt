@@ -1,4 +1,5 @@
 usd_unit 381 expect 381 meta ['300']
-fulfilment_email_not_sent session='cs_usd' skipped=True error='smtp_not_configured' has_keygen=True has_download=True smtp='disabled'
-usd_unlock True connect True grant 300
-spoof_token None connect True
+fulfilment_email_not_sent session='cs_usd_4a8d5a63' skipped=True error='smtp_not_configured' has_keygen=True has_download=True smtp='disabled'
+usd_unlock True connect True grant_pence 300
+spoof_token None connect False ent None
+AMOUNT_TOTAL_GATE_OK

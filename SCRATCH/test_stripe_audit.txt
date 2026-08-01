@@ -46,3 +46,13 @@ test_subscription_deleted_revokes (tests.test_stripe_subscription_fulfilment.Tes
 Ran 25 tests in 0.224s
 
 OK
+test_amount_total_1_with_metadata_300_does_not_unlock (tests.test_stripe_keygen_accounting_chain.TestAmountTotalOverMetadata.test_amount_total_1_with_metadata_300_does_not_unlock)
+Underpay cash (total=1) must not unlock even if metadata claims 300. ... ok
+test_usd_builder_shaped_paid_monthly_unlocks (tests.test_stripe_keygen_accounting_chain.TestAmountTotalOverMetadata.test_usd_builder_shaped_paid_monthly_unlocks)
+USD subscription body uses metadata amount_pence=300 + currency=usd; ... fulfilment_email_not_sent session='cs_usd_mo_real' skipped=True error='smtp_not_configured' has_keygen=True has_download=True smtp='disabled'
+ok
+
+----------------------------------------------------------------------
+Ran 2 tests in 0.038s
+
+OK
