@@ -902,23 +902,27 @@ class Handler(BaseHTTPRequestHandler):
                     ),
                 )
                 return
-            # Prefer Helsinki host delivery (signed short-lived URL) without payment.
+            # Prefer Helsinki host delivery (signed short-lived URL) — free download.
+            # Soft-redirect: do not 502 when probe is flaky if a signed HTTPS URL
+            # can still be minted (browser→Helsinki often works when Render→store probe fails).
             try:
                 from host_delivery import (  # type: ignore
-                    host_delivery_plan,
                     is_browser_safe_https_url,
+                    suite_free_delivery_plan,
                 )
             except Exception:  # noqa: BLE001
                 try:
                     from status_page.host_delivery import (  # type: ignore
-                        host_delivery_plan,
                         is_browser_safe_https_url,
+                        suite_free_delivery_plan,
                     )
                 except Exception:  # noqa: BLE001
-                    host_delivery_plan = None  # type: ignore
+                    suite_free_delivery_plan = None  # type: ignore
                     is_browser_safe_https_url = None  # type: ignore
-            if host_delivery_plan is not None:
-                plan = host_delivery_plan(str(fname), probe=True)
+            if suite_free_delivery_plan is not None:
+                plan = suite_free_delivery_plan(
+                    str(fname), probe=True, soft_redirect=True
+                )
                 loc = str((plan or {}).get("url") or "").strip()
                 safe_https = (
                     is_browser_safe_https_url(loc)
@@ -936,14 +940,21 @@ class Handler(BaseHTTPRequestHandler):
                     return
             asset = open_release_asset(str(fname))
             if asset is None:
+                try:
+                    from downloads import RELEASE_VERSION as _suite_pin
+                except Exception:  # noqa: BLE001
+                    _suite_pin = RELEASE_VERSION
                 self._send(
                     502,
                     "text/html; charset=utf-8",
                     _html_page(
                         "Suite download unavailable",
                         f'<p class="msg">Installer for <strong>{_escape_html(plat)}</strong> '
-                        "is not on the store yet. Try again after the next publish, "
-                        "or use the KEYGEN path after it lands.</p>"
+                        f"(catalog <code>{_escape_html(str(_suite_pin))}</code> / "
+                        f"<code>{_escape_html(str(fname))}</code>) could not be fetched "
+                        "from the package store. Free Suite installers are published under "
+                        "Helsinki paid-assets for this pin — try again shortly, or use the "
+                        "KEYGEN path after it lands.</p>"
                         '<p><a href="/#suite-storefront">Back to Suite</a></p>',
                     ),
                 )

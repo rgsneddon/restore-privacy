@@ -368,7 +368,10 @@ def probe_host_asset_reachable(
     try:
         req = urllib.request.Request(
             target,
-            headers={"User-Agent": "restore-privacy-host-delivery-probe"},
+            headers={
+                "User-Agent": "restore-privacy-host-delivery-probe",
+                "Range": "bytes=0-0",
+            },
             method="GET",
         )
         with open_url(req, timeout=float(timeout)) as resp:
@@ -379,6 +382,117 @@ def probe_host_asset_reachable(
             return bool(chunk)
     except Exception:  # noqa: BLE001
         return False
+
+
+def probe_vps_catalog_asset(
+    filename: str,
+    *,
+    version: str | None = None,
+    urlopen: Any | None = None,
+    timeout: float = 12.0,
+) -> bool:
+    """True when Helsinki serves *filename* for the catalog pin (token header).
+
+    Server-side probe used by free Suite download so a flaky signed-URL probe
+    does not claim "not on the store" when the file is present and the shared
+    fetch token matches.
+    """
+    import urllib.request
+
+    name = (filename or "").strip()
+    if not name or ".." in name or "/" in name or "\\" in name:
+        return False
+    try:
+        from payments import vps_asset_fetch_token, vps_asset_url  # type: ignore
+    except Exception:  # noqa: BLE001
+        try:
+            from status_page.payments import (  # type: ignore
+                vps_asset_fetch_token,
+                vps_asset_url,
+            )
+        except Exception:  # noqa: BLE001
+            return False
+    token = (vps_asset_fetch_token() or "").strip()
+    if not token:
+        return False
+    try:
+        target = vps_asset_url(name, version=version)
+    except Exception:  # noqa: BLE001
+        return False
+    open_url = urlopen or urllib.request.urlopen
+    try:
+        req = urllib.request.Request(
+            target,
+            headers={
+                "User-Agent": "restore-privacy-suite-free-probe",
+                "X-RPT-Asset-Token": token,
+                "Range": "bytes=0-0",
+            },
+            method="GET",
+        )
+        with open_url(req, timeout=float(timeout)) as resp:
+            code = int(getattr(resp, "status", None) or resp.getcode() or 0)
+            if code not in (200, 206):
+                return False
+            return bool(resp.read(1))
+    except Exception:  # noqa: BLE001
+        return False
+
+
+def suite_free_delivery_plan(
+    filename: str,
+    *,
+    probe: bool = True,
+    soft_redirect: bool = True,
+    urlopen: Any | None = None,
+    probe_timeout: float = 12.0,
+) -> dict[str, Any] | None:
+    """Plan free Suite installer delivery (no paid grant).
+
+    Prefers a short-lived **HTTPS** Helsinki signed URL so the browser pulls the
+    multi-MB package directly. When *probe* is True, prefer a token probe of the
+    catalog object; if that fails but *soft_redirect* is True and a signed URL
+    can still be minted, return the redirect anyway (browser→Helsinki often
+    works when Render→Helsinki probe is flaky). Returns None when no delivery
+    plan is possible (caller should try ``open_release_asset`` then 502).
+    """
+    name = (filename or "").strip()
+    if not name:
+        return None
+    if not host_delivery_enabled() and not (
+        host_delivery_secret() and browser_host_base_url()
+    ):
+        # Still allow mint when secret+base present even if flag off via default
+        if not (host_delivery_secret() and browser_host_base_url()):
+            return None
+    url = build_host_delivery_url(name, require_https=True)
+    if not url or not is_browser_safe_https_url(url):
+        return None
+    pair = safe_catalog_version_and_filename(name)
+    if not pair:
+        return None
+    ver, safe_name = pair
+    store_ok = False
+    if probe:
+        store_ok = probe_vps_catalog_asset(
+            safe_name,
+            version=ver,
+            urlopen=urlopen,
+            timeout=probe_timeout,
+        )
+        if not store_ok:
+            store_ok = probe_host_asset_reachable(
+                url, urlopen=urlopen, timeout=min(probe_timeout, 10.0)
+            )
+    if store_ok or soft_redirect or not probe:
+        return {
+            "url": url,
+            "version": ver,
+            "filename": safe_name,
+            "source": "helsinki_host",
+            "store_probed": bool(store_ok),
+        }
+    return None
 
 
 def is_signed_helsinki_delivery_url(url: str) -> bool:
