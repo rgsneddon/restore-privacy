@@ -1,4 +1,4 @@
-"""Public product brand is Suite; all catalog download links pin 1.0.0."""
+"""Public product brand is Suite; all catalog download links pin RELEASE_VERSION."""
 
 from __future__ import annotations
 
@@ -11,7 +11,7 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 sys.path.insert(0, str(ROOT / "status_page"))
 
-SUITE_PIN = "1.0.0"
+from downloads import RELEASE_VERSION as SUITE_PIN  # noqa: E402
 
 
 class TestSuiteBrandSurfaces(unittest.TestCase):
@@ -91,8 +91,8 @@ class TestSuiteBrandSurfaces(unittest.TestCase):
         self.assertIn('"name": "Restore Privacy Suite"', manifest)
 
 
-class TestSuiteDownloadsMonopin100(unittest.TestCase):
-    def test_catalog_and_free_package_links_are_1_0_0(self) -> None:
+class TestSuiteDownloadsMonopinCurrent(unittest.TestCase):
+    def test_catalog_and_free_package_links_match_release(self) -> None:
         from downloads import (
             RELEASE_VERSION,
             available_downloads,
@@ -133,7 +133,7 @@ class TestSuiteDownloadsMonopin100(unittest.TestCase):
         self.assertNotIn("0.5.", free)
         self.assertNotIn("0.4.", free)
 
-    def test_homepage_download_section_pins_1_0_0(self) -> None:
+    def test_homepage_download_section_pins_release(self) -> None:
         from app import render_html
         from downloads import RELEASE_VERSION
 
