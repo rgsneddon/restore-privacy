@@ -332,6 +332,24 @@ class RPTNode:
         self.tun_fd, _ = open_tun(iface)
         self.apply_routing(iface)
 
+        # Co-join VPN + rpAI + Perccent on this host (one deploy unit).
+        try:
+            from node.cojoined_roles import get_cojoined_registry
+
+            reg = get_cojoined_registry()
+            reg.configure_contact(
+                host=str(
+                    self.config.get("public_host")
+                    or os.environ.get("RPT_PUBLIC_NODE_HOST")
+                    or ""
+                ),
+                port=int(self.config.get("listen_port") or 44044),
+                ui_port=int(self.config.get("ui_port") or 8080),
+            )
+            reg.start_background_roles()
+        except Exception:  # noqa: BLE001 — residual must still run if co-join fails
+            pass
+
         start_ui_server(
             self.config["ui_host"],
             int(self.config["ui_port"]),

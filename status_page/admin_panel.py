@@ -1567,7 +1567,7 @@ def render_admin_suite_push_upload_html() -> str:
         suite_label = ctrl.suite_product_label(catalog_ver)
         inv = ctrl.list_local_packages(version=catalog_ver, brand_wide=True)
     except Exception:  # noqa: BLE001
-        catalog_ver = "1.0.3"
+        catalog_ver = "1.0.4"
         suite_label = f"Restore Privacy Suite v{catalog_ver}"
         inv = {
             "ok": False,

@@ -1,41 +1,54 @@
 # Residual node / operator path
 
 **Not** the Suite client installers. This page is for people who prefer to
-**host** a residual VPN **node** (operator tooling / self-host) rather than only
+**host** a residual node (operator tooling / self-host) rather than only
 install Restore Privacy Suite for residual **Connect** on a phone or PC.
 
 | Role | What you get |
 |------|----------------|
 | **Suite client** | Free installers + KEYGEN on the VPN APP Shop — residual Connect on *your* device |
-| **Node / operator** | Run residual node software and operator tooling on a **host** you control |
+| **Node / operator** | Run the co-joined residual stack on a **host** you control |
 
 The monthly KEYGEN checkout unlocks **client** Connect. It does **not** replace
 node hosting and does **not** turn a client download into a residual node package.
 
 ---
 
-## Product node stack (operator monorepo)
+## Co-joined node (three parts, one host)
 
-In the product tree, residual node work lives under:
+Each residual **node server** runs **three co-located roles** as one deploy unit
+— not three unrelated machines:
+
+| Part | What it does |
+|------|----------------|
+| **VPN residual** | HELLO / sessions / TUN path — residual privacy tunnel (public status stays **title-only**) |
+| **rpAI · Ned** | Co-located Ned helper loop — learns oracle/housework counters for admin rpS (not a full LLM fleet claim) |
+| **Perccent blockchain** | Co-located chain seed heartbeat — same host as residual, private hooks on the node UI port |
+
+They start together with `python3 -m node` / `rpt-node.service` and
+`scripts/deploy_rpt_node.py`. Clients keep a **single residual contact**
+(`host:44044` for Connect); Ned and Perccent use private UI hooks on that same
+host (default UI port **8080**), not a second peer list.
+
+Optional **Helsinki oracle** (master) collates satellite heartbeats for admin
+**rpS** (`/admin/rps`) — readiness, compute score, Ned findings/housework.
+
+---
+
+## Product node stack (operator monorepo)
 
 | Path | Purpose |
 |------|---------|
-| `node/` | Residual VPN node (HELLO, sessions, TUN on Linux, nolog, multi-hop structure) |
-| `node_operator/` | **Node Operator** desktop/lab GUI — sessions, priority, package upload, UPDATE_PUSH |
-| `scripts/selfhost_node.sh` | One-shot self-host install (node + tunnel DNS + host privacy) |
-| `scripts/deploy_rpt_node.py` | Remote deploy helper |
+| `node/` | Residual co-joined stack (VPN + `cojoined_roles` + optional oracle collate) |
+| `node/cojoined_roles.py` | Role registry: vpn · rpai · perccent |
+| `node/oracle_master.py` | Helsinki oracle aggregation helpers |
+| `node_operator/` | Node Operator lab GUI |
+| `scripts/selfhost_node.sh` | One-shot self-host install |
+| `scripts/deploy_rpt_node.py` | Remote deploy (copies co-joined modules) |
+| `scripts/deploy_perc_chain_helsinki.py` | Helsinki Perccent public rendezvous (when used) |
 
-**Node Operator** (`python3 -m node_operator`) is **admin / lab** tooling for
-running this host as a residual node lab: start/stop lab stack, connected
-clients (admin only), prioritise clients, upload monopin packages to the paid
-store host, push residual update directives. Public node `/status` stays
+**Node Operator** is **admin / lab** tooling. Public node `/status` stays
 **title-only** (no live client count).
-
-This is **not**:
-
-- a Suite client platform button (Windows / Android / macOS / iOS / Linux)
-- unlocked by KEYGEN subscription checkout alone
-- the public status shop admin console (that is operator-auth on the status host)
 
 ---
 
@@ -48,10 +61,9 @@ sudo bash scripts/selfhost_node.sh
 # Deploy remote: python scripts/deploy_rpt_node.py
 ```
 
-See the product README **Operators / developers** section for ports (UDP 44044
-tunnel, TCP 8080 title-only status UI), secrets discipline, and weekly fleet
-wipe notes. Source monorepo for full node code is **private**; public shop docs
-and this page orient the preference without publishing private operator secrets.
+Ports (typical): **UDP 44044** residual tunnel, **TCP 8080** title-only status UI
++ private co-join/capacity hooks (token-gated). Weekly fleet wipe notes live in
+operator README material.
 
 ---
 
@@ -62,8 +74,7 @@ When packaged, the Linux operator GUI artifact is named like:
 `restore-privacy-node-operator-<version>-linux-x64.tar.gz`
 
 under `releases/node-operator/`. That artifact is **operator tooling**, not a
-Suite free-download client. Prefer building from the monorepo (`python3 -m
-node_operator`) when you already have a checkout.
+Suite free-download client.
 
 ---
 
@@ -75,8 +86,6 @@ node_operator`) when you already have a checkout.
 | Privacy policy | [/PRIVACY_POLICY.md](/PRIVACY_POLICY.md) |
 | Security audit | [/AUDIT.md](/AUDIT.md) |
 | Public Suite Pages (client) | https://rgsneddon.github.io/restore-privacy-suite/ |
+| Admin rpS (operator auth) | `/admin/rps` |
 
 ---
-
-*Restore Privacy — residual node / operator orientation (public). Suite KEYGEN
-installers remain on the homepage download boxes.*

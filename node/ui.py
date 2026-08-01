@@ -145,6 +145,48 @@ def make_handler(
                 self.end_headers()
                 self.wfile.write(data)
                 return
+            if path in (
+                "/api/private/cojoined",
+                "/private/cojoined",
+                "/api/private/rpai",
+                "/private/rpai",
+                "/api/private/perc",
+                "/private/perc",
+            ):
+                # Co-joined role snapshot (VPN + rpAI + Perccent) — private only.
+                from node.private_capacity import authorize_capacity_request
+
+                qs = parse_qs(parsed.query or "")
+                q_token = ""
+                if "token" in qs and qs["token"]:
+                    q_token = str(qs["token"][0] or "")
+                ok, _reason = authorize_capacity_request(
+                    authorization_header=self.headers.get("Authorization", "") or "",
+                    x_token_header=self.headers.get("X-RPT-Capacity-Token", "") or "",
+                    query_token=q_token,
+                )
+                if not ok:
+                    self.send_response(401)
+                    self.send_header("Content-Type", "application/json")
+                    body = b'{"error":"unauthorized"}'
+                    self.send_header("Content-Length", str(len(body)))
+                    self.end_headers()
+                    self.wfile.write(body)
+                    return
+                try:
+                    from node.cojoined_roles import cojoined_private_payload
+
+                    payload = cojoined_private_payload()
+                except Exception:  # noqa: BLE001
+                    payload = {"cojoined": False, "error": "unavailable"}
+                data = json.dumps(payload).encode("utf-8")
+                self.send_response(200)
+                self.send_header("Content-Type", "application/json")
+                self.send_header("Content-Length", str(len(data)))
+                self.send_header("Cache-Control", "no-store")
+                self.end_headers()
+                self.wfile.write(data)
+                return
             self.send_response(404)
             self.end_headers()
 

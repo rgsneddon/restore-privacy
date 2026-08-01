@@ -38,8 +38,8 @@ except Exception:  # pragma: no cover
     try:
         from status_page.downloads import RELEASE_VERSION as _CATALOG_PIN  # type: ignore
     except Exception:  # pragma: no cover
-        _CATALOG_PIN = "1.0.3"
-PUBLIC_BRAND_VERSION = str(_CATALOG_PIN).strip() or "1.0.3"
+        _CATALOG_PIN = "1.0.4"
+PUBLIC_BRAND_VERSION = str(_CATALOG_PIN).strip() or "1.0.4"
 PUBLIC_BRAND_DISPLAY = f"Restore Privacy Suite v{PUBLIC_BRAND_VERSION}"
 
 # Borderless mark: shield + protruding green key only (transparent outside).

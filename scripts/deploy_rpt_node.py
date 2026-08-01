@@ -64,6 +64,9 @@ NODE_PRIVACY_PY = (
     "config.py",
     "key_backend.py",
     "key_rotation.py",
+    # Co-joined stack: VPN residual + rpAI (Ned) + Perccent on one host unit
+    "cojoined_roles.py",
+    "oracle_master.py",
 )
 
 DEFAULT_HOST = "82.221.101.241"
@@ -270,12 +273,17 @@ def main() -> int:
         f"test -f {INSTALL_ROOT}/node/rpt_shutdown_wipe.sh && echo wipe_script=ok",
         f"test -f {INSTALL_ROOT}/node/obfuscation.py && test -f {INSTALL_ROOT}/node/traffic_shape.py && echo wire_privacy_py=ok",
         f"test -f {INSTALL_ROOT}/node/pfs.py && echo pfs_py=ok",
+        f"test -f {INSTALL_ROOT}/node/cojoined_roles.py && echo cojoined_roles=ok",
+        f"test -f {INSTALL_ROOT}/node/oracle_master.py && echo oracle_master=ok",
         "grep -E 'StandardOutput=null|LogLevelMax=emerg' /etc/systemd/system/rpt-node.service && echo nolog_unit=ok || true",
         "grep -E 'ExecStop=.*rpt_shutdown_wipe|rpt_shutdown_wipe' /etc/systemd/system/rpt-node.service && echo wipe_execstop=ok || true",
         "systemctl is-enabled rpt-node-shutdown-wipe.service 2>/dev/null || true",
         # title-only status (no clients_connected)
         "curl -s http://127.0.0.1:8080/api/status | tee /tmp/rpt-status.json; "
         "grep -q '\"title\"' /tmp/rpt-status.json && ! grep -q clients_connected /tmp/rpt-status.json && echo status_title_only=ok || true",
+        # co-joined roles ship with residual unit (VPN + rpAI + Perccent)
+        "python3 -c \"from node.cojoined_roles import COJOINED_ROLES; assert set(COJOINED_ROLES)=={'vpn','rpai','perccent'}; print('cojoin_roles_ok')\" "
+        f"|| (cd {INSTALL_ROOT} && PYTHONPATH={INSTALL_ROOT} python3 -c \"from node.cojoined_roles import COJOINED_ROLES; print('cojoin', COJOINED_ROLES)\") || true",
     ]:
         run(c, as_root=True)
 
