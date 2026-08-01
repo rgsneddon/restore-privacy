@@ -66,14 +66,16 @@ class TestCtaLinkFallback(unittest.TestCase):
         self.assertEqual(href_unk, DOWNLOADS_MAP_PATH)
 
         html_mac = render_free_download_cta_html(default_platform="macos")
-        self.assertIn("FREE DOWNLOAD", html_mac)
+        self.assertIn("KEYGEN", html_mac)
+        self.assertIn("DOWNLOAD", html_mac)
         self.assertIn("platform=macos", html_mac)
         self.assertNotIn("v1.0.0", html_mac)
         self.assertNotIn("version 1.0.0", html_mac.lower())
 
         html_map = render_free_download_cta_html(default_platform="")
         self.assertIn(DOWNLOADS_MAP_PATH, html_map)
-        self.assertIn("FREE DOWNLOAD", html_map)
+        self.assertIn("KEYGEN", html_map)
+        self.assertIn("DOWNLOAD", html_map)
         self.assertIn('data-href-kind="map"', html_map)
 
 

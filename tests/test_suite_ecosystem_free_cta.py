@@ -154,7 +154,8 @@ class TestFreeDownloadFace101Platform(unittest.TestCase):
         cta = render_free_download_cta_html()
         self.assertIn(RELEASE_VERSION, cta)
         self.assertIn(f'data-face-version="{RELEASE_VERSION}"', cta)
-        self.assertIn("FREE DOWNLOAD", cta)
+        self.assertIn("KEYGEN", cta)
+        self.assertIn("DOWNLOAD", cta)
         self.assertIn(DOWNLOADS_MAP_PATH, cta)
         self.assertNotIn("v1.0.0", cta)
         self.assertIn('width="1024"', cta)
@@ -176,7 +177,8 @@ class TestFreeDownloadFace101Platform(unittest.TestCase):
         ):
             cta = render_free_download_cta_html(default_platform=plat)
             self.assertIn(suite_free_download_href(plat), cta, msg=plat)
-            self.assertIn("FREE DOWNLOAD", cta, msg=plat)
+            self.assertIn("KEYGEN", cta, msg=plat)
+            self.assertIn("DOWNLOAD", cta, msg=plat)
             self.assertIn(face, cta, msg=plat)
             self.assertIn(f'data-detected-platform="{plat}"', cta, msg=plat)
             self.assertNotIn(f'href="{DOWNLOADS_MAP_PATH}"', cta, msg=plat)
@@ -184,7 +186,8 @@ class TestFreeDownloadFace101Platform(unittest.TestCase):
         # Unknown / empty → Downloads Map
         chooser = render_free_download_cta_html(default_platform="")
         self.assertIn(f'href="{DOWNLOADS_MAP_PATH}"', chooser)
-        self.assertIn("FREE DOWNLOAD", chooser)
+        self.assertIn("KEYGEN", chooser)
+        self.assertIn("DOWNLOAD", chooser)
         self.assertNotIn("data-detected-platform", chooser)
 
         unknown = render_free_download_cta_html(default_platform="not-a-platform")

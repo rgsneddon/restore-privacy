@@ -1084,12 +1084,13 @@ def render_homepage_buy_form_html(
 SUITE_SECTION_ID = "suite-storefront"
 SUITE_PRODUCT_TITLE = "Restore Privacy Suite"
 SUITE_PRODUCT_SUBTITLE = (
-    "VPN, Perccent wallet (%), and Evolve in one app — free to install"
+    "VPN, Perccent wallet (%), and Evolve in one app — start the KEYGEN free trial to download"
 )
 SUITE_VERSION_LABEL = f"v {RELEASE_VERSION}"
 SUITE_KEYGEN_HINT = (
-    f"Connect needs a KEYGEN. Licence is {PRICE_LABEL}/month "
-    "(same residual entitlement path as the VPN client)."
+    f"Brand installers require a KEYGEN licence first: start the 3-day free trial "
+    f"({PRICE_LABEL}/month or yearly) — no money is taken until after the trial ends. "
+    "Enter the KEYGEN from your fulfilment email to unlock residual Connect and downloads."
 )
 SUITE_FREE_DOWNLOAD_PATH = "/suite/download"
 DOWNLOADS_SECTION_ID = "downloads"
@@ -1100,7 +1101,9 @@ DOWNLOADS_MAP_LABEL = "Downloadables Mapped Here"
 FREEBIE_IMG_PATH = "/static/freebie.jpg"
 # Catalog monopin for links (face art no longer bakes a version string)
 FREE_DOWNLOAD_FACE_VERSION = RELEASE_VERSION
-FREEBIE_IMG_ALT = "FREE DOWNLOAD — Restore Privacy Suite"
+FREEBIE_IMG_ALT = (
+    "Download Restore Privacy Suite — start the KEYGEN 3-day free trial first"
+)
 FREE_DOWNLOAD_CTA_ID = "free-download-v1-cta"
 FREE_PACKAGES_PAGE_ID = "free-packages-page"
 DOWNLOADS_MAP_PAGE_ID = "downloads-map-page"
@@ -1201,7 +1204,7 @@ NODE_PREFERENCE_DEPOSIT_PENCE = int(_COMMERCIAL_PENCE)
 NODE_PREFERENCE_PRODUCT_KEY = _COMMERCIAL_KEY
 NODE_PREFERENCE_PRODUCT_LINE = _COMMERCIAL_LINE
 
-NODE_PREFERENCE_HEADING = "Full business package?"
+NODE_PREFERENCE_HEADING = "Full business package? (£3000 deposit required)"
 # HTML blurb — human cadence; £3000 is a deposit to start the work (not final total).
 NODE_PREFERENCE_BLURB = (
     "Run a residual node on your own server, or arrange a dedicated host through "
@@ -1324,16 +1327,18 @@ def render_free_download_cta_html(
     href = free_download_cta_href(default_platform=def_plat)
     if def_plat:
         title = platform_face_title(def_plat)
-        aria = f"FREE DOWNLOAD for {title}"
+        aria = (
+            f"Download for {title} — KEYGEN free trial required before installer"
+        )
         detect_attrs = (
             f' data-platform="{_esc_html(def_plat)}"'
             f' data-detected-platform="{_esc_html(def_plat)}"'
         )
     else:
-        aria = "FREE DOWNLOAD — open Downloads Map"
+        aria = "Downloads Map — KEYGEN free trial required before installers"
         detect_attrs = ' data-fallback-map="1"'
     # Visible face copy is the bitmap only; label is for a11y / tests.
-    label = "FREE DOWNLOAD"
+    label = "DOWNLOAD (KEYGEN TRIAL)"
     href_kind = "platform" if def_plat else "map"
     return f"""
     <div class="free-download-cta-wrap" id="free-download-cta-wrap"
@@ -1663,7 +1668,9 @@ def render_downloads_map_page_html(
         <p class="downloads-map-blurb free-packages-blurb" id="downloads-map-blurb">
           Every Restore Privacy installer we ship — Suite, residual VPN client,
           rpOS, Rx browser, Pens · Tables · Slides, node tools, rpMail, rpOffice,
-          and more. Residual Connect still needs a KEYGEN after Suite install.
+          and more. <strong>Download links require a KEYGEN licence first</strong>
+          (start the 3-day free trial on <a href="/pay?product=suite">/pay</a>).
+          Residual Connect also needs that KEYGEN after install.
         </p>
         {detect_hint}
         {sections}
@@ -2139,7 +2146,8 @@ def render_suite_storefront_html(
 ) -> str:
     """Homepage **Restore Privacy Suite** block (above VPN downloads).
 
-    Installers are **free**. Residual Connect still needs a KEYGEN from the
+    Installers unlock after you start the **3-day KEYGEN free trial** (or hold an
+    active licence). Residual Connect still needs the KEYGEN from the
     monthly (£3) subscription — same entitlement model as the VPN client.
     """
     _ = (coming_soon, accept_language, country, currency, default_interval)
@@ -2167,11 +2175,12 @@ def render_suite_storefront_html(
         primary_free = (
             f'<a class="suite-dl suite-dl-primary" id="suite-dl-primary" '
             f'href="{_esc_html(href)}" data-platform="{_esc_html(def_plat)}" '
-            f'data-free-download="1" data-product="suite" data-detected-platform="1">'
-            f"Free download for {_esc_html(title)}</a>"
+            f'data-free-download="1" data-keygen-gated="1" data-product="suite" '
+            f'data-detected-platform="1">'
+            f"Download for {_esc_html(title)} (after KEYGEN trial)</a>"
             f'<p class="suite-detect-hint" id="suite-detect-hint" data-detected-platform="{_esc_html(def_plat)}">'
             f"Detected your device as <strong>{_esc_html(title)}</strong> — "
-            f"or pick another platform below.</p>"
+            f"start the free trial if you have not yet, or pick another platform below.</p>"
         )
     for a in ordered:
         title = platform_face_title(a.platform)
@@ -2181,8 +2190,8 @@ def render_suite_storefront_html(
         free_links.append(
             f'<a class="suite-dl{_esc_html(is_det)}" id="suite-dl-{_esc_html(a.platform)}" '
             f'href="{_esc_html(href)}" data-platform="{_esc_html(a.platform)}" '
-            f'data-free-download="1" data-product="suite"{det_attr}>'
-            f"Download {_esc_html(title)}</a>"
+            f'data-free-download="1" data-keygen-gated="1" data-product="suite"{det_attr}>'
+            f"Download {_esc_html(title)} (KEYGEN trial)</a>"
         )
     free_grid = "\n      ".join(free_links)
 
@@ -2225,6 +2234,7 @@ def render_suite_storefront_html(
   <section class="suite-storefront panel-card" id="{SUITE_SECTION_ID}"
            aria-label="Download Restore Privacy Suite"
            data-product="suite" data-storefront="suite" data-free-download="1"
+           data-keygen-gated="1"
            data-suite-version="{_esc_html(RELEASE_VERSION)}"{detect_attr}>
     <h2 id="suite-storefront-title">{SUITE_PRODUCT_TITLE}</h2>
     <span class="suite-version-badge" id="suite-version-badge">{SUITE_VERSION_LABEL}</span>
@@ -2243,8 +2253,11 @@ def render_suite_storefront_html(
 {keygen_form}
     </div>
     <p class="suite-pay-hint" id="suite-pay-hint">
-      Download first, then enter the KEYGEN from your fulfilment email after checkout.
-      Yearly VPN plans remain available in the client download box below.
+      <strong>Start the 3-day free trial first</strong> (Get KEYGEN above) — installers
+      refuse anonymous download. After checkout, use your fulfilment KEYGEN and the
+      download links (session_id / token from thank-you). Yearly plans are in the
+      client box below. Business-Class requires a separate <strong>£3000 deposit</strong>
+      on Service.
     </p>
 {render_suite_world_flags_html()}
   </section>

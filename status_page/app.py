@@ -1,7 +1,9 @@
 #!/usr/bin/env python3
 """Restore Privacy Suite status host (public shop + private admin).
 
-Public surface: Suite brand, free installers, KEYGEN checkout, docs.
+Public surface: Suite brand, KEYGEN trial-gated installers, commercial deposit, docs.
+Brand packages require catalog KEYGEN path (3-day free trial / active entitlement)
+before download. Business-Class requires the compulsory £3000 commercial deposit.
 Does **not** expose a connected-client count or poll a live session metric.
 Admin (/admin) is auth-only and never part of the public Pages export.
 """
@@ -780,6 +782,28 @@ class Handler(BaseHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(data)
 
+    def _brand_package_gate(
+        self,
+        query: dict[str, str],
+        *,
+        next_path: str,
+        platform: str = "",
+    ) -> dict:
+        """Compulsory KEYGEN trial/entitlement before brand installer delivery."""
+        try:
+            from brand_asset_gate import evaluate_brand_package_request
+        except ImportError:  # pragma: no cover
+            from status_page.brand_asset_gate import (  # type: ignore
+                evaluate_brand_package_request,
+            )
+        return evaluate_brand_package_request(
+            session_id=(query.get("session_id") or query.get("sid") or "").strip(),
+            keygen=(query.get("keygen") or query.get("licence") or "").strip(),
+            token=(query.get("token") or query.get("download_token") or "").strip(),
+            next_path=next_path,
+            platform=platform,
+        )
+
     def _redirect(self, location: str, code: int = 302) -> None:
         self.send_response(code)
         self.send_header("Location", location)
@@ -923,7 +947,7 @@ class Handler(BaseHTTPRequestHandler):
                 render_downloads_map_page_html(default_platform=q_plat),
             )
             return
-        # Suite free installer download (no pay token). App still needs KEYGEN.
+        # Suite installer download — KEYGEN trial / active entitlement required.
         if path in (SUITE_FREE_DOWNLOAD_PATH, f"{SUITE_FREE_DOWNLOAD_PATH}/"):
             plat = (query.get("platform") or "").strip().lower()
             fname = platform_filename(plat) if plat else None
@@ -933,12 +957,30 @@ class Handler(BaseHTTPRequestHandler):
                     "text/html; charset=utf-8",
                     _html_page(
                         "Suite download",
-                        '<p class="msg">Choose a platform from the Suite free download links.</p>'
-                        '<p><a href="/#suite-storefront">Back to Suite</a></p>',
+                        '<p class="msg">Choose a platform from the Suite download links, '
+                        "then start the KEYGEN free trial to unlock installers.</p>"
+                        '<p><a href="/pay?product=suite">Start 3-day free trial (KEYGEN)</a>'
+                        " · <a href=\"/#suite-storefront\">Back to Suite</a></p>",
                     ),
                 )
                 return
-            # Prefer Helsinki host delivery (signed short-lived URL) — free download.
+            next_q = urllib.parse.urlencode({"platform": plat})
+            gate = self._brand_package_gate(
+                query,
+                next_path=f"{SUITE_FREE_DOWNLOAD_PATH}?{next_q}",
+                platform=plat,
+            )
+            if not gate.get("allow"):
+                loc = str(gate.get("redirect") or "/pay?product=suite")
+                self.send_response(int(gate.get("http_status") or 302))
+                self.send_header("Location", loc)
+                self.send_header("Cache-Control", "no-store")
+                self.send_header("X-RPT-Brand-Gate", str(gate.get("reason") or "deny"))
+                self.send_header("Content-Length", "0")
+                self._security_headers()
+                self.end_headers()
+                return
+            # Prefer Helsinki host delivery (signed short-lived URL) after gate.
             # Soft-redirect: do not 502 when probe is flaky if a signed HTTPS URL
             # can still be minted (browser→Helsinki often works when Render→store probe fails).
             try:
@@ -969,7 +1011,10 @@ class Handler(BaseHTTPRequestHandler):
                     self.send_response(302)
                     self.send_header("Location", loc)
                     self.send_header("Cache-Control", "no-store")
-                    self.send_header("X-RPT-Fulfilment", "suite-free-helsinki")
+                    self.send_header("X-RPT-Fulfilment", "suite-keygen-helsinki")
+                    self.send_header(
+                        "X-RPT-Brand-Gate", str(gate.get("reason") or "allow")
+                    )
                     self.send_header("Content-Length", "0")
                     self._security_headers()
                     self.end_headers()
@@ -988,10 +1033,11 @@ class Handler(BaseHTTPRequestHandler):
                         f'<p class="msg">Installer for <strong>{_escape_html(plat)}</strong> '
                         f"(catalog <code>{_escape_html(str(_suite_pin))}</code> / "
                         f"<code>{_escape_html(str(fname))}</code>) could not be fetched "
-                        "from the package store. Free Suite installers are published under "
-                        "Helsinki paid-assets for this pin — try again shortly, or use the "
-                        "KEYGEN path after it lands.</p>"
-                        '<p><a href="/#suite-storefront">Back to Suite</a></p>',
+                        "from the package store. KEYGEN-gated Suite installers are published "
+                        "under Helsinki paid-assets for this pin — try again shortly after "
+                        "starting your free trial.</p>"
+                        '<p><a href="/pay?product=suite">KEYGEN free trial</a> · '
+                        '<a href="/#suite-storefront">Back to Suite</a></p>',
                     ),
                 )
                 return
@@ -1004,7 +1050,10 @@ class Handler(BaseHTTPRequestHandler):
                 self.send_header("Content-Type", ctype)
                 self.send_header("Content-Disposition", disp)
                 self.send_header("Cache-Control", "no-store")
-                self.send_header("X-RPT-Fulfilment", "suite-free")
+                self.send_header("X-RPT-Fulfilment", "suite-keygen-gated")
+                self.send_header(
+                    "X-RPT-Brand-Gate", str(gate.get("reason") or "allow")
+                )
                 if length is not None:
                     self.send_header("Content-Length", str(length))
                 self._security_headers()
@@ -1021,7 +1070,7 @@ class Handler(BaseHTTPRequestHandler):
                     pass
             return
 
-        # Free-open staged packages (Rx browser etc.) under /assets/{version}/{file}
+        # Brand packages (Rx browser etc.) under /assets/{version}/{file} — KEYGEN-gated.
         if path.startswith("/assets/"):
             parts = [x for x in path.split("/") if x]
             # ["assets", version, filename]
@@ -1029,6 +1078,21 @@ class Handler(BaseHTTPRequestHandler):
                 self._send(404, "text/plain; charset=utf-8", b"not found")
                 return
             ver, fname = parts[1], parts[2]
+            gate = self._brand_package_gate(
+                query,
+                next_path=f"/assets/{ver}/{fname}",
+                platform="",
+            )
+            if not gate.get("allow"):
+                loc = str(gate.get("redirect") or "/pay?product=suite")
+                self.send_response(int(gate.get("http_status") or 302))
+                self.send_header("Location", loc)
+                self.send_header("Cache-Control", "no-store")
+                self.send_header("X-RPT-Brand-Gate", str(gate.get("reason") or "deny"))
+                self.send_header("Content-Length", "0")
+                self._security_headers()
+                self.end_headers()
+                return
             try:
                 from downloads import RELEASE_VERSION, free_open_asset_versions
             except ImportError:
@@ -1053,7 +1117,10 @@ class Handler(BaseHTTPRequestHandler):
                 self.send_header("Content-Type", ctype)
                 self.send_header("Content-Disposition", disp)
                 self.send_header("Cache-Control", "no-store")
-                self.send_header("X-RPT-Fulfilment", "suite-free-asset")
+                self.send_header("X-RPT-Fulfilment", "suite-keygen-asset")
+                self.send_header(
+                    "X-RPT-Brand-Gate", str(gate.get("reason") or "allow")
+                )
                 if length is not None:
                     self.send_header("Content-Length", str(length))
                 self._security_headers()
@@ -2515,6 +2582,53 @@ class Handler(BaseHTTPRequestHandler):
                 )
                 self._redirect(f"/service?{q}#service-commercial-box")
                 return
+            # Compulsory deposit: reject non-£3000 / wrong product form values early.
+            try:
+                from brand_asset_gate import (
+                    commercial_checkout_session_allowed,
+                    commercial_deposit_gate,
+                )
+            except ImportError:  # pragma: no cover
+                from status_page.brand_asset_gate import (  # type: ignore
+                    commercial_checkout_session_allowed,
+                    commercial_deposit_gate,
+                )
+            form_product = "commercial_suite_node"
+            form_amount: str | int = COMMERCIAL_SUITE_NODE_PRICE_PENCE
+            if body:
+                try:
+                    form = urllib.parse.parse_qs(
+                        body.decode("utf-8", errors="replace")
+                    )
+                    if form.get("amount_pence"):
+                        form_amount = form.get("amount_pence", [str(form_amount)])[0]
+                    if form.get("product"):
+                        form_product = str(form.get("product", [form_product])[0] or form_product)
+                except Exception:  # noqa: BLE001
+                    pass
+            # Query-string override (rare)
+            if _query.get("amount_pence"):
+                form_amount = _query.get("amount_pence") or form_amount
+            if _query.get("product"):
+                form_product = str(_query.get("product") or form_product)
+            pre = commercial_deposit_gate(
+                amount_pence=form_amount,
+                product=form_product,
+                product_line="commercial_suite",
+                mode="payment",
+                billing="one_time",
+            )
+            if not pre.get("allow"):
+                q = urllib.parse.urlencode(
+                    {
+                        "pay_error": (
+                            "Business-Class requires the compulsory £3000 deposit "
+                            f"({pre.get('reason')})."
+                        ),
+                    }
+                )
+                self._redirect(f"/service?{q}#service-commercial-box")
+                return
             try:
                 session = create_commercial_suite_checkout_session()
             except ValueError as e:
@@ -2523,7 +2637,19 @@ class Handler(BaseHTTPRequestHandler):
                 )
                 self._redirect(f"/service?{q}#service-commercial-box")
                 return
-            # Guard: session must be one-time £3000 payment (not KEYGEN sub)
+            # Guard: session must be one-time £3000 commercial deposit (not KEYGEN sub)
+            post_gate = commercial_checkout_session_allowed(session)
+            if not post_gate.get("allow"):
+                q = urllib.parse.urlencode(
+                    {
+                        "pay_error": (
+                            "Commercial checkout rejected: compulsory £3000 deposit "
+                            f"required ({post_gate.get('reason')})."
+                        ),
+                    }
+                )
+                self._redirect(f"/service?{q}#service-commercial-box")
+                return
             if int(session.get("amount_pence") or 0) != int(
                 COMMERCIAL_SUITE_NODE_PRICE_PENCE
             ):

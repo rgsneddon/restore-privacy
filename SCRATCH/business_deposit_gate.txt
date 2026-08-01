@@ -1,0 +1,10 @@
+=== commercial deposit gate ===
+required_pence 300000 300000
+ok {'allow': True, 'reason': 'commercial_deposit_ok', 'required_pence': 300000, 'required_label': '£3000', 'amount_ok': True, 'product_ok': True, 'mode_ok': True}
+bad_amt {'allow': False, 'reason': 'deposit_amount_required_3000_gbp', 'required_pence': 300000, 'required_label': '£3000', 'amount_ok': False, 'product_ok': True, 'mode_ok': True}
+bad_prod {'allow': False, 'reason': 'commercial_product_required', 'required_pence': 300000, 'required_label': '£3000', 'amount_ok': True, 'product_ok': False, 'mode_ok': True}
+sub {'allow': False, 'reason': 'one_time_payment_required', 'required_pence': 300000, 'required_label': '£3000', 'amount_ok': True, 'product_ok': True, 'mode_ok': False}
+body_unit_amount ['300000']
+body_mode ['payment']
+sess_ok {'allow': True, 'reason': 'commercial_deposit_ok', 'required_pence': 300000, 'required_label': '£3000', 'amount_ok': True, 'product_ok': True, 'mode_ok': True}
+sess_bad {'allow': False, 'reason': 'deposit_amount_required_3000_gbp', 'required_pence': 300000, 'required_label': '£3000', 'amount_ok': False, 'product_ok': False, 'mode_ok': False}

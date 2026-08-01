@@ -1,0 +1,15 @@
+test_allow_with_session_or_keygen_or_token_flags (tests.test_compulsory_pay_gates.TestBrandPackageKeygenGate.test_allow_with_session_or_keygen_or_token_flags) ... ok
+test_evaluate_uses_real_lookup_download_token (tests.test_compulsory_pay_gates.TestBrandPackageKeygenGate.test_evaluate_uses_real_lookup_download_token) ... ok
+test_is_brand_asset_delivery_path (tests.test_compulsory_pay_gates.TestBrandPackageKeygenGate.test_is_brand_asset_delivery_path) ... ok
+test_pure_deny_without_proof_redirects_to_pay (tests.test_compulsory_pay_gates.TestBrandPackageKeygenGate.test_pure_deny_without_proof_redirects_to_pay) ... ok
+test_build_commercial_checkout_body_pins_300000 (tests.test_compulsory_pay_gates.TestBusinessDepositGate.test_build_commercial_checkout_body_pins_300000) ... ok
+test_exactly_3000_gbp_required (tests.test_compulsory_pay_gates.TestBusinessDepositGate.test_exactly_3000_gbp_required) ... ok
+test_short_licence_summary_mentions_trial_and_deposit (tests.test_compulsory_pay_gates.TestClientLicenceMentionsCompulsory.test_short_licence_summary_mentions_trial_and_deposit) ... ok
+test_handler_wires_brand_package_gate (tests.test_compulsory_pay_gates.TestStorefrontCopyCompulsory.test_handler_wires_brand_package_gate)
+Structural: suite download + assets + commercial use brand_asset_gate. ... ok
+test_suite_and_service_copy_require_trial_and_deposit (tests.test_compulsory_pay_gates.TestStorefrontCopyCompulsory.test_suite_and_service_copy_require_trial_and_deposit) ... ok
+
+----------------------------------------------------------------------
+Ran 9 tests in 0.041s
+
+OK

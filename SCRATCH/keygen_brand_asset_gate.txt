@@ -1,0 +1,10 @@
+=== pure brand_package_access_decision ===
+deny {'allow': False, 'reason': 'keygen_trial_required', 'redirect': '/pay?next=%2Fsuite%2Fdownload%3Fplatform%3Dmacos&platform=macos&product=suite', 'http_status': 302}
+token {'allow': True, 'reason': 'download_token', 'redirect': None, 'http_status': 200}
+sess {'allow': True, 'reason': 'session_entitlement', 'redirect': None, 'http_status': 200}
+kg {'allow': True, 'reason': 'keygen_entitlement', 'redirect': None, 'http_status': 200}
+eval_deny {'allow': False, 'reason': 'keygen_trial_required', 'redirect': '/pay?next=%2Fsuite%2Fdownload%3Fplatform%3Dlinux&platform=linux&product=suite', 'http_status': 302, 'session_id': '', 'has_token': False, 'keygen_provided': False}
+=== paths ===
+/suite/download True
+/assets/x True
+/pay False

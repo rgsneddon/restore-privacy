@@ -1,15 +1,21 @@
-# Suite free download
+# Suite download (KEYGEN free trial required)
 
-Restore Privacy Suite **v1.0.2** installers are free. Residual Connect still
-needs a KEYGEN — monthly licence from **£3.00** on the live site.
+Restore Privacy Suite **v1.0.2** installers are **not** anonymous freebies.
+You must start the catalog **KEYGEN** path first — monthly **£3.00** or yearly
+**£30.00** with the **3-day free trial** (no money taken until after the trial
+ends). Residual Connect also needs that KEYGEN after install.
 
 Download links sit on the public homepage (and on the open `public_site/` Pages
-export). After checkout, paste the KEYGEN from your fulfilment email, then
-Connect.
+export). Unauthenticated `/suite/download` and `/assets/…` requests **redirect
+to `/pay`**. After checkout, use `session_id` / download token / KEYGEN, paste
+the KEYGEN from your fulfilment email, then Connect.
 
-Live free route on the status host: `/suite/download?platform=…`  
-Public Pages point those buttons at restoreprivacy.online so binaries stay
-on the fulfilment host.
+Live gated route on the status host: `/suite/download?platform=…`  
+(requires `session_id`, `keygen`, or `token` query proof)
+
+**Business-Class / full business package** requires a separate compulsory
+**£3000 deposit** via `/pay/commercial-suite` (Service page) — not the KEYGEN
+subscription.
 
 **Catalog monopin:** `1.0.2` (`status_page/downloads.py` `RELEASE_VERSION`,
 `client/VERSION`).
@@ -87,7 +93,9 @@ python scripts\windows_brand_mirror.py apply --dest $env:RPT_WINDOWS_DRIVE --exe
 
 ## Honesty
 
-- Free download is the **package only**; Connect requires a valid KEYGEN.
+- Brand package delivery requires KEYGEN trial start / active entitlement first.
+- Connect requires a valid KEYGEN on the device after install.
+- Business-Class work starts only after the **£3000** commercial deposit.
 - macOS CFBundle / Windows embedded product version must match monopin **1.0.2**
   for an honest catalog seal (host scripts refuse mismatched macOS zips).
 - Carry-forward basenames may be used temporarily; replace with native rebuilds

@@ -7127,6 +7127,7 @@ def create_commercial_suite_checkout_session(
     """Create a one-time Stripe Checkout Session for £3000 commercial Suite node.
 
     Returns dict with id, url, amount_pence, currency, mode, product.
+    Always pins unit_amount to :data:`COMMERCIAL_SUITE_NODE_PRICE_PENCE` (300_000).
     """
     key = stripe_secret_key()
     if not key:
@@ -7139,6 +7140,15 @@ def create_commercial_suite_checkout_session(
         cancel_url=cancel,
         quantity=quantity,
     )
+    # Fail closed before Stripe if body amount is not the compulsory deposit.
+    try:
+        from brand_asset_gate import commercial_deposit_amount_ok
+    except ImportError:  # pragma: no cover
+        from status_page.brand_asset_gate import (  # type: ignore
+            commercial_deposit_amount_ok,
+        )
+    if not commercial_deposit_amount_ok(COMMERCIAL_SUITE_NODE_PRICE_PENCE):
+        raise ValueError("commercial deposit constant invalid")
     post = http_post or _default_http_post
     headers = {
         "Authorization": f"Bearer {key}",
@@ -7158,7 +7168,7 @@ def create_commercial_suite_checkout_session(
     sid = data.get("id")
     if not url or not sid:
         raise ValueError("stripe response missing url/id")
-    return {
+    result = {
         "id": sid,
         "url": url,
         "amount_pence": int(COMMERCIAL_SUITE_NODE_PRICE_PENCE),
@@ -7170,6 +7180,18 @@ def create_commercial_suite_checkout_session(
         "quantity": max(1, int(quantity or 1)),
         "billing": "one_time",
     }
+    try:
+        from brand_asset_gate import commercial_checkout_session_allowed
+    except ImportError:  # pragma: no cover
+        from status_page.brand_asset_gate import (  # type: ignore
+            commercial_checkout_session_allowed,
+        )
+    gate = commercial_checkout_session_allowed(result)
+    if not gate.get("allow"):
+        raise ValueError(
+            f"commercial checkout failed deposit gate: {gate.get('reason')}"
+        )
+    return result
 
 
 def build_checkout_form_body(req: CheckoutRequest) -> bytes:

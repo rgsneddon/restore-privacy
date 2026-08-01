@@ -30,7 +30,7 @@ SERVICE_INTRO_ID = "service-home-intro"
 
 SERVICE_INTRO_HEADING = "Privacy you can actually use"
 
-SERVICE_COMMERCIAL_TITLE = "Full business package — commercial node"
+SERVICE_COMMERCIAL_TITLE = "Full business package — commercial node (£3000 deposit required)"
 SERVICE_COMMERCIAL_SUBTITLE = (
     f"{COMMERCIAL_SUITE_NODE_PRICE_LABEL} deposit to begin the work · one-time"
 )

@@ -153,7 +153,8 @@ class TestSuiteFreeDeliveryPlan(unittest.TestCase):
         self.assertIn("Suite download unavailable", app_src)
         self.assertIn("could not be fetched", app_src)
         # Free path should not require only hard probe failure → 502 without soft redirect
-        self.assertIn("suite-free-helsinki", app_src)
+        self.assertIn("suite-keygen-helsinki", app_src)
+        self.assertIn("_brand_package_gate", app_src)
 
 
 if __name__ == "__main__":

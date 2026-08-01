@@ -273,10 +273,11 @@ def short_licence_summary() -> str:
         "Copy or transmission of the product architecture is not permitted. "
         "Third-party components keep their own licences (see LICENSE / CREDITS). "
         "By accepting, you agree to those terms. Acceptance is stored only on this device. "
-        "After you accept, enter the keygen from your fulfilment email "
-        "(USE THIS KEYGEN TO UNLOCK RESTORE PRIVACY) to unlock Connect. "
-        "Your subscription (£3.00 per month or £30.00 per year) includes a 3-day free trial — "
-        "no money is taken until after the trial ends. "
+        "Brand installers and residual Connect require a KEYGEN: start the 3-day free trial "
+        "(£3.00 per month or £30.00 per year — no money is taken until after the trial ends), "
+        "then enter the keygen from your fulfilment email "
+        "(USE THIS KEYGEN TO UNLOCK RESTORE PRIVACY). "
+        "Business-Class options require a separate £3000 deposit — they are not free. "
         + PAYMENT_CONNECT_DISCLAIMER_PLAIN
     )
 
