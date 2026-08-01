@@ -1,4 +1,15 @@
-# MISHI — moderator GUI (SDK whitewash)
+# MISHI — moderator GUI (SDK)
 
-Sexy operator GUI for commercial rpOS deployments. Every moderator function is
-an SDK surface built **per requirements**. Company emails: **moderator only**.
+Private repo: **https://github.com/rgsneddon/mishi** (private)
+
+Restore Privacy Suite–branded moderator portal (sexy GUI) coexists with the
+original FCG ward CLI.
+
+```bash
+git clone https://github.com/rgsneddon/mishi.git
+cd mishi
+python3 -m rps_gui --smoke
+python3 -m rps_gui --serve --port 18770
+```
+
+Company email creation: moderator-only (see **rpMail**).

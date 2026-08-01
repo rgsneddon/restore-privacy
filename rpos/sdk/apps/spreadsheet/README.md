@@ -1,4 +1,3 @@
-# SDK surface: spreadsheet
+# Spreadsheet module
 
-Whitewash scaffold for commercial per-requirements builds under rpOS.
-
+Part of **rpOffice**: https://github.com/rgsneddon/rpOffice (`rpoffice.sheet`).

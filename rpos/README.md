@@ -45,3 +45,12 @@ instant-wipe binaries for every device family.
 ## Licence
 
 MIT — see [LICENSE](LICENSE).
+
+## Companion private app repos
+
+| Product | Repo |
+|---------|------|
+| rpMail | https://github.com/rgsneddon/rpMail |
+| rpOffice | https://github.com/rgsneddon/rpOffice |
+| MISHI GUI | https://github.com/rgsneddon/mishi |
+
