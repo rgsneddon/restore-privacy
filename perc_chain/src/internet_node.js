@@ -31,6 +31,13 @@ import {
   fetchInboundRelayHints,
 } from './rendezvous_inbound_hints.js';
 import { mergeUpstreamPeers } from './upstream_rendezvous.js';
+import {
+  isRemoteLedgerCandidate,
+  normalizeEndpoint,
+  pickBestLedger,
+  resolveNetworkSyncBase,
+  selectTallerLedger,
+} from './dual_seed_sync.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PUBLIC_DIR = path.join(__dirname, '..', 'public');
@@ -98,13 +105,9 @@ function upstreamRendezvousUrl() {
 }
 
 function networkSyncBase() {
-  const local = publicEndpoint();
-  const isLocal =
-    !local ||
-    local.includes('127.0.0.1') ||
-    local.includes('localhost') ||
-    local.startsWith('http://[::1]');
-  return isLocal ? upstreamRendezvousUrl() : local;
+  // Dual-seed: prefer upstream (Render) for peer/ledger pull so a public
+  // Helsinki endpoint does not only re-query itself (height 0 forever).
+  return resolveNetworkSyncBase(upstreamRendezvousUrl(), publicEndpoint());
 }
 
 function json(res, code, body) {
@@ -223,58 +226,88 @@ async function syncUpstreamPeers() {
 }
 
 async function syncFromNetwork() {
+  const upstream = upstreamRendezvousUrl();
   const base = networkSyncBase();
-  if (!base) return;
+  const localEp = normalizeEndpoint(publicEndpoint());
+  const candidates = [];
 
-  let peerList = [];
-  try {
-    peerList = await fetchJson(
-      `${base}/perc/rendezvous/peers?chainId=${encodeURIComponent(CHAIN_ID)}`,
-    );
-  } catch {
-    return;
-  }
-  if (!Array.isArray(peerList)) return;
-  mergeUpstreamPeers(peers, peerList, CHAIN_ID);
-
-  let best = null;
-  let bestUsername = null;
-
-  for (const peer of peerList) {
-    const username = peer.sessionUsername;
-    const endpoint = peer.endpoint;
-    const height = peer.blockHeight ?? 0;
-    if (!username || username === SEED_USERNAME || isHiddenPeer(username)) continue;
-    if (height < blockHeight(best)) continue;
-
-    let candidate = null;
-    if (endpoint && !endpoint.includes('127.0.0.1') && !endpoint.includes('localhost')) {
-      try {
-        candidate = await fetchJson(`${endpoint.replace(/\/$/, '')}/perc/ledger`);
-      } catch {
-        candidate = null;
+  // 1) Direct upstream seed ledger (Render dual bias) — same username as us is OK.
+  if (upstream) {
+    try {
+      const remote = await fetchJson(`${upstream}/perc/ledger`);
+      if (remote) {
+        candidates.push({ ledger: remote, source: `upstream:${upstream}` });
       }
-    }
-    if (!candidate || blockHeight(candidate) < height) {
-      try {
-        const relay = await fetchJson(
-          `${base}/perc/rendezvous/ledger?username=${encodeURIComponent(username)}`,
-        );
-        candidate = relay?.ledger ?? null;
-      } catch {
-        candidate = null;
-      }
-    }
-    if (candidate && blockHeight(candidate) >= blockHeight(best)) {
-      best = candidate;
-      bestUsername = username;
+    } catch (err) {
+      console.warn('Upstream ledger pull failed:', err?.message ?? err);
     }
   }
 
-  if (best && store.importLedger(best)) {
-    console.log(
-      `Seed synced to height ${blockHeight(best)} from ${bestUsername ?? 'network'}`,
-    );
+  // 2) Peer list from sync base (upstream when configured)
+  if (base) {
+    let peerList = [];
+    try {
+      peerList = await fetchJson(
+        `${base}/perc/rendezvous/peers?chainId=${encodeURIComponent(CHAIN_ID)}`,
+      );
+    } catch {
+      peerList = [];
+    }
+    if (Array.isArray(peerList)) {
+      mergeUpstreamPeers(peers, peerList, CHAIN_ID);
+      for (const peer of peerList) {
+        if (isHiddenPeer(peer.sessionUsername)) continue;
+        if (
+          !isRemoteLedgerCandidate(peer, {
+            seedUsername: SEED_USERNAME,
+            localEndpoint: localEp,
+          })
+        ) {
+          continue;
+        }
+        const username = peer.sessionUsername;
+        const endpoint = normalizeEndpoint(peer.endpoint);
+        const height = peer.blockHeight ?? 0;
+        let candidate = null;
+        if (
+          endpoint &&
+          !endpoint.includes('127.0.0.1') &&
+          !endpoint.includes('localhost')
+        ) {
+          try {
+            candidate = await fetchJson(`${endpoint}/perc/ledger`);
+          } catch {
+            candidate = null;
+          }
+        }
+        if ((!candidate || blockHeight(candidate) < height) && username) {
+          try {
+            const relay = await fetchJson(
+              `${base}/perc/rendezvous/ledger?username=${encodeURIComponent(username)}`,
+            );
+            candidate = relay?.ledger ?? null;
+          } catch {
+            candidate = null;
+          }
+        }
+        if (candidate) {
+          candidates.push({
+            ledger: candidate,
+            source: username || endpoint || 'peer',
+          });
+        }
+      }
+    }
+  }
+
+  const bestLedger = pickBestLedger(candidates.map((c) => c.ledger));
+  if (!bestLedger) return;
+  const adopt = selectTallerLedger(store.ledger, bestLedger);
+  if (!adopt) return;
+  if (store.importLedger(adopt)) {
+    const src =
+      candidates.find((c) => c.ledger === bestLedger)?.source ?? 'network';
+    console.log(`Seed synced to height ${blockHeight(adopt)} from ${src}`);
     await registerSeed();
   }
 }

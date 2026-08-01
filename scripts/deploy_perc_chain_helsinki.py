@@ -77,6 +77,7 @@ def _stage_dir(out: Path) -> Path:
                 "PERC_BIND_HOST=127.0.0.1",
                 f"PERC_DATA_DIR={DEFAULT_REMOTE_ROOT}/data",
                 f"PERC_PUBLIC_ENDPOINT={DEFAULT_PUBLIC_ENDPOINT}",
+                "PERC_UPSTREAM_RENDEZVOUS_URL=https://evolve-perc-internet.onrender.com",
                 "PERC_SEED_USERNAME=evolve_seed_node",
                 "PERC_CHAIN_GENESIS_REVISION=2",
                 "NODE_ENV=production",

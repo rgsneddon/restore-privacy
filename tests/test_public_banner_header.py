@@ -102,6 +102,11 @@ class TestPublicBannerHeader(unittest.TestCase):
         self.assertNotIn("36rem", ban_css)
         self.assertNotIn("max-width: min(100%, 36rem)", ban_css)
         self.assertNotIn("max-width: 36rem", ban_css)
+        # Phone: banner hidden, logo only (see test_mobile_brand_logo)
+        self.assertIn("@media (max-width: 520px)", css)
+        phone = css[css.index("@media (max-width: 520px)") :]
+        self.assertIn(".brand-banner", phone)
+        self.assertIn("display: none", phone)
 
         # Height clamp allows a taller, sharper full-width banner
         self.assertIn(f"{PUBLIC_BRAND_HEADER_HEIGHT_MIN_CSS}px", css)

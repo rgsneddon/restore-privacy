@@ -616,13 +616,14 @@ a.product-tab.is-active, .product-tab.is-active {{
   background: transparent;
   box-shadow: none;
   flex: 0 0 auto;
+  display: block;
   image-rendering: -webkit-optimize-contrast;
   image-rendering: high-quality;
   -ms-interpolation-mode: bicubic;
   filter: drop-shadow(0 4px 14px rgba(0, 229, 255, 0.18));
 }}
 .brand-banner {{
-  /* Full remaining width of brand-mark / content shell (no narrow max-width strip) */
+  /* Full remaining width of brand-mark / content shell */
   height: var(--rb-brand-header-height);
   width: 100%;
   max-width: 100%;
@@ -634,22 +635,55 @@ a.product-tab.is-active, .product-tab.is-active {{
   background: transparent;
   box-shadow: none;
   flex: 1 1 auto;
+  display: block;
   image-rendering: -webkit-optimize-contrast;
   image-rendering: high-quality;
   -ms-interpolation-mode: bicubic;
   filter: drop-shadow(0 4px 14px rgba(0, 229, 255, 0.12));
 }}
+/* Phone / Android: logo only at top — hide wide banner (markup kept for desktop) */
 @media (max-width: 520px) {{
   .brand-mark {{
-    flex-wrap: wrap;
+    flex-direction: row;
+    flex-wrap: nowrap;
     justify-content: center;
+    align-items: center;
+    gap: 0;
   }}
-  .brand-logo {{
-    max-width: min(var(--rb-brand-header-height), 28vw);
+  .brand-banner,
+  .brand-mark .brand-banner,
+  img.brand-banner {{
+    display: none !important;
+    visibility: hidden !important;
+    width: 0 !important;
+    height: 0 !important;
+    min-width: 0 !important;
+    min-height: 0 !important;
+    max-width: 0 !important;
+    max-height: 0 !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    border: 0 !important;
+    flex: 0 0 0 !important;
+    overflow: hidden !important;
+    position: absolute !important;
+    clip: rect(0, 0, 0, 0) !important;
   }}
-  .brand-banner {{
-    width: 100%;
-    max-width: 100%;
+  .brand-logo,
+  .brand-mark .brand-logo,
+  img.brand-logo {{
+    display: block !important;
+    visibility: visible !important;
+    opacity: 1 !important;
+    width: clamp(72px, 28vw, 112px) !important;
+    height: clamp(72px, 28vw, 112px) !important;
+    min-width: 72px !important;
+    min-height: 72px !important;
+    max-width: 112px !important;
+    max-height: 112px !important;
+    margin: 0 auto !important;
+    flex: 0 0 auto !important;
+    object-fit: contain;
     object-position: center;
   }}
 }}
@@ -1094,15 +1128,20 @@ a.product-tab.is-active, .product-tab.is-active {{
     text-align: center;
     font-size: clamp(1.1rem, 5.5vw, 1.45rem);
   }}
-  .brand-mark {{
-    flex-direction: column;
-  }}
-  /* Override row for logo+title on very small if tests allow — keep row for tests via min-width */
+  /* brand-mark phone: logo-only — see max-width 520px brand-banner hide rules above */
 }}
-/* Keep brand-mark row orientation (banner left, logo right) at ≥360px */
-@media (min-width: 360px) {{
+/* Desktop/tablet: banner + logo row (banner not hidden) */
+@media (min-width: 521px) {{
   .brand-mark {{
     flex-direction: row;
+  }}
+  .brand-banner {{
+    display: block;
+    visibility: visible;
+  }}
+  .brand-logo {{
+    display: block;
+    visibility: visible;
   }}
   #{SITE_BRAND_HEADER_ID} h1, .brand-panel h1, .brand-mark h1 {{
     text-align: left;
