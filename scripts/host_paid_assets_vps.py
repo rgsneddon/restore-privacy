@@ -1225,6 +1225,30 @@ def upload_packages(
             )
             token = os.environ.get("RPT_ASSET_FETCH_TOKEN", "").strip()
             if not token:
+                for cand in (
+                    ROOT / "secrets" / "rpt_asset_fetch_token",
+                    ROOT / "secrets" / "RPT_ASSET_FETCH_TOKEN",
+                ):
+                    try:
+                        if cand.is_file():
+                            token = cand.read_text(encoding="utf-8").strip()
+                            if token:
+                                break
+                    except OSError:
+                        continue
+            if not token:
+                code_t, out_t = _ssh_run_openssh(
+                    "grep -E '^Environment=RPT_ASSET_FETCH_TOKEN=' "
+                    "/etc/systemd/system/rpt-paid-assets.service 2>/dev/null "
+                    "| head -1 | sed 's/^[^=]*=[^=]*=//'",
+                    host=host,
+                    user=user,
+                    key_path=key_path,
+                    sudo=False,
+                )
+                if code_t == 0 and (out_t or "").strip():
+                    token = out_t.strip().splitlines()[0].strip()
+            if not token:
                 token = secrets.token_urlsafe(32)
                 print(
                     f"generated RPT_ASSET_FETCH_TOKEN (set on Render too): {token}",
