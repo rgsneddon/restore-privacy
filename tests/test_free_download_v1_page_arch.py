@@ -23,21 +23,30 @@ class TestFreeDownloadV1CtaAndPage(unittest.TestCase):
         from app import render_html
         from downloads import (
             FREE_DOWNLOAD_CTA_ID,
+            FREE_DOWNLOAD_FACE_VERSION,
             FREE_PACKAGES_PATH,
             FREEBIE_IMG_PATH,
-            RELEASE_VERSION,
         )
 
+        # No default platform → packages chooser; OS detect is covered in
+        # test_free_download_platform_detect when default_platform is set.
         page = render_html({"title": "RESTORE PRIVACY"}).decode("utf-8")
         main = page[page.index('id="page-shell"') :]
         self.assertIn(f'id="{FREE_DOWNLOAD_CTA_ID}"', main)
         self.assertIn("freebie", main.lower())
         self.assertIn(FREEBIE_IMG_PATH, main)
-        self.assertIn(f"Free download v{RELEASE_VERSION}", main)
+        # CTA face version (1.0.1) — may diverge from catalog monopin
+        self.assertIn(f"Free download version {FREE_DOWNLOAD_FACE_VERSION}", main)
+        self.assertIn(f'data-face-version="{FREE_DOWNLOAD_FACE_VERSION}"', main)
         self.assertIn(f'href="{FREE_PACKAGES_PATH}"', main)
-        # Full-width CTA styles
+        # Full-width CTA styles — full freebie art (contain, not cover crop)
+        from downloads import free_download_cta_css
+
         self.assertIn(".free-download-cta-wrap", page)
         self.assertIn("width: 100%", page)
+        cta_css = free_download_cta_css()
+        self.assertIn("object-fit: contain", cta_css)
+        self.assertNotIn("object-fit: cover", cta_css)
         self.assertIn("a.free-download-cta:active", page)
         self.assertIn("scale(0.985)", page)
         # Order: intro → free CTA → shop (stripe selector in downloads)

@@ -11,6 +11,7 @@ import 'leak_test.dart';
 import 'legal_links.dart';
 import 'licence_gate.dart';
 import 'node_ping.dart';
+import 'node_wipe_timer_panel.dart';
 import 'registration_copy.dart';
 import 'rpt_config.dart';
 import 'breadcrumbs_check.dart';
@@ -602,6 +603,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
             'VPN main screen ($kSuiteUpdateUnpackButtonLabel).',
             style: TextStyle(color: kTextMuted, fontSize: 12),
           ),
+          const SizedBox(height: 20),
+          // Website-equivalent fleet wipe clock (read-only Settings window).
+          const NodeWipeTimerPanel(),
           if (!freeTierSettingsLocked) ...[
             const SizedBox(height: 20),
             Text(

@@ -160,7 +160,10 @@ void main() {
       'licence_accepted_at': '1',
     });
 
-    await tester.pumpWidget(const RestorePrivacyApp());
+    // Entry access gate must not block the VPN home keygen sheet under test.
+    await tester.pumpWidget(
+      const RestorePrivacyApp(entryInitiallyUnlocked: true),
+    );
     await tester.pump();
     // post-frame callback opens keygen sheet
     await tester.pump(const Duration(milliseconds: 200));

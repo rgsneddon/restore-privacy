@@ -34,9 +34,10 @@ class TestProductTabsChrome(unittest.TestCase):
         self.assertIn(f'href="{PRODUCT_VPN_PATH}"', html)
         self.assertIn(f'href="{PRODUCT_BROWSER_PATH}"', html)
         self.assertIn(f'href="{PRODUCT_VAULT_PATH}"', html)
-        self.assertIn("Restore Privacy VPN", html)
+        self.assertIn("Restore Privacy Suite", html)
         self.assertIn("Restore Privacy Browser", html)
         self.assertIn("Restore Privacy Vault", html)
+        self.assertNotIn("Restore Privacy VPN", html)
         # VPN active
         self.assertIn('id="product-tab-vpn"', html)
         self.assertIn("product-tab is-active", html)
@@ -130,7 +131,8 @@ class TestHomepageStillVpn(unittest.TestCase):
 
         html = render_html({"title": "RESTORE PRIVACY"}).decode("utf-8")
         self.assertIn(PUBLIC_BRAND_TITLE, html)
-        self.assertIn("RESTORE PRIVACY VPN", html)
+        self.assertIn("RESTORE PRIVACY SUITE", html)
+        self.assertNotIn("<title>RESTORE PRIVACY VPN</title>", html)
         # Product family top tabs removed
         self.assertNotIn('id="product-tabs"', html)
         self.assertNotIn('data-product-tabs="1"', html)
@@ -210,7 +212,8 @@ class TestAppEntryRoutes(unittest.TestCase):
         self.assertIn('data-page="home"', home)
         self.assertIn('data-product="browser"', browser)
         self.assertIn('data-product="vault"', vault)
-        self.assertIn("RESTORE PRIVACY VPN", home)
+        self.assertIn("RESTORE PRIVACY SUITE", home)
+        self.assertNotIn("<title>RESTORE PRIVACY VPN</title>", home)
         self.assertIn("dl-buy-form", home)
         self.assertNotIn("dl-buy-form", browser)
         self.assertNotIn("dl-buy-form", vault)

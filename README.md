@@ -1,12 +1,12 @@
 # Restore Privacy Suite
 
-**Restore Privacy Suite v1.0.0** is the full app: residual protection, a private
+**Restore Privacy Suite v1.0.1** is the full app: residual protection, a private
 wallet, and Evolve analysis together. Maintained under **Raskul**’s direction,
 with regular automated security audits.
 
 | | |
 |--|--|
-| **Download** | Free installers on [restoreprivacy.online](https://restoreprivacy.online/) — catalog **v1.0.0** |
+| **Download** | Free installers on [restoreprivacy.online](https://restoreprivacy.online/) — catalog **v1.0.1** |
 | **Use residual Connect** | KEYGEN licence from **£3.00/month** (Stripe); yearly residual plan **£30.00** still on **`/pay`** |
 | **Privacy** | [PRIVACY_POLICY.md](PRIVACY_POLICY.md) |
 | **Licence** | [LICENSE](LICENSE) (proprietary full copyright) |
@@ -52,7 +52,7 @@ Settings → Payment entitlement is a fallback unlock path.
 
 ## At a glance
 
-- **VPN**, **%**, and **EVOLVE** tabs in one Suite shell (monopin **1.0.0**).
+- **VPN**, **%**, and **EVOLVE** tabs in one Suite shell (monopin **1.0.1**).
 - Residual peers: Iceland `82.221.101.241:44044`, Germany `178.105.187.178:44044`
   (**default residual entry**). Multi-hop exit is Germany. United States (US) and
   Romania (RO) residual peers are **retired**.
@@ -96,11 +96,11 @@ Settings → Payment entitlement is a fallback unlock path.
 
 | Platform | Package |
 |----------|---------|
-| Windows | `restore-privacy-client-1.0.0-windows-x64-setup.exe` |
-| Android | `restore-privacy-client-1.0.0-android.apk` |
-| macOS | `restore-privacy-client-1.0.0-macos.zip` |
-| iOS | `restore-privacy-client-1.0.0-ios.zip` |
-| Linux x64 | `restore-privacy-client-1.0.0-linux-x64.tar.gz` |
+| Windows | `restore-privacy-client-1.0.1-windows-x64-setup.exe` |
+| Android | `restore-privacy-client-1.0.1-android.apk` |
+| macOS | `restore-privacy-client-1.0.1-macos.zip` |
+| iOS | `restore-privacy-client-1.0.1-ios.zip` |
+| Linux x64 | `restore-privacy-client-1.0.1-linux-x64.tar.gz` |
 | Browser (Chromium MV3) | browser proxy only, not OS residual TUN |
 
 ### Windows
@@ -127,7 +127,7 @@ Supported floor: **Ubuntu 20.04 LTS** and later.
 2. Unpack and run:
 
    ```bash
-   tar xzf restore-privacy-client-1.0.0-linux-x64.tar.gz
+   tar xzf restore-privacy-client-1.0.1-linux-x64.tar.gz
    cd restore-privacy-*-linux
    bash install.sh
    ```
@@ -161,7 +161,7 @@ https://restoreprivacy.online/
 
 - **Suite free installers** first, then **KEYGEN** from **£3.00/month**
 - **Monthly VPN plan** and **Yearly VPN plan** (£30.00) residual options on **`/pay`**
-- Catalog **v1.0.0** — Connect needs KEYGEN on an **active** subscription (**OK**)
+- Catalog **v1.0.1** — Connect needs KEYGEN on an **active** subscription (**OK**)
 - **No** public live session / connected-client counter
 - Public GitHub Pages tree (`public_site/`) has **no** `/admin` and no operator console
 

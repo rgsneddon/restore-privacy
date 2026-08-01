@@ -1,11 +1,11 @@
 {
   "manifest_version": 3,
-  "name": "Restore Privacy VPN",
-  "short_name": "RPT VPN",
+  "name": "Restore Privacy Suite",
+  "short_name": "RP Suite",
   "version": "0.4.8",
-  "description": "Browser-scoped Restore Privacy VPN (Connect/Disconnect). Not OS residual TUN \u2014 use paid native clients for system residual.",
+  "description": "Browser-scoped Restore Privacy Suite Connect/Disconnect. Not OS residual TUN \u2014 use Suite native clients (1.0.0) for system residual.",
   "action": {
-    "default_title": "Restore Privacy VPN",
+    "default_title": "Restore Privacy Suite",
     "default_popup": "popup.html",
     "default_icon": {
       "16": "icons/icon-16.png",

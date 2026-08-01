@@ -7,106 +7,108 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
-		61E4B8768F3C2CD1D67F4176 /* RptFullTunnelResult.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6B6E833E61E4B8768F3C2CD1 /* RptFullTunnelResult.swift */; };
-		2E434A68870DAC1E5110D9FA /* RptFullTunnelResult.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6B6E833E61E4B8768F3C2CD1 /* RptFullTunnelResult.swift */; };
-		B6F167DE1D36BE52956936ED /* RptEndpoint.swift in Sources */ = {isa = PBXBuildFile; fileRef = 60DF89726CB0112FB8408B6D /* RptEndpoint.swift */; };
-		23E0DDE47637E5D10988B9CA /* RptEndpoint.swift in Sources */ = {isa = PBXBuildFile; fileRef = 60DF89726CB0112FB8408B6D /* RptEndpoint.swift */; };
-		A3E798CC69E28AD862366BD4 /* Network.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = BA98F8222A4AF392A7A4A84A /* Network.framework */; };
-		27C73F1169CD485F9D3DEEB6 /* Network.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = BA98F8222A4AF392A7A4A84A /* Network.framework */; };
-		0AD856FDC79F35AB84D2CB0D /* RptClientEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1E8ECFC3BC60269BEBC2CA40 /* RptClientEngine.swift */; };
-		A11B2C3D4E5F607182930012 /* RptResidualPrivacyPolicy.swift in Sources */ = {isa = PBXBuildFile; fileRef = A11B2C3D4E5F607182930011 /* RptResidualPrivacyPolicy.swift */; };
-		A11B2C3D4E5F607182930013 /* RptResidualPrivacyPolicy.swift in Sources */ = {isa = PBXBuildFile; fileRef = A11B2C3D4E5F607182930011 /* RptResidualPrivacyPolicy.swift */; };
-		178DFBBF8229AB5933CD28FC /* RptConnectOrchestrator.swift in Sources */ = {isa = PBXBuildFile; fileRef = B008E63BE1A87521A006D658 /* RptConnectOrchestrator.swift */; };
-		8DA5D118F1FB617796DF7BDE /* RptElgamal.swift in Sources */ = {isa = PBXBuildFile; fileRef = B7A984DE1FCFFC0139C1D464 /* RptElgamal.swift */; };
-		3C286BCE142676397F3A447C /* RptPedersen.swift in Sources */ = {isa = PBXBuildFile; fileRef = A8340F72CA3D6450BE844011 /* RptPedersen.swift */; };
-		D037DE89F6B615111C2C497C /* RptProtocol.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC2B56A3A7EB3E5A89358950 /* RptProtocol.swift */; };
-		C1EC9DB0E9CF2DC565637E8E /* RptSessionCrypto.swift in Sources */ = {isa = PBXBuildFile; fileRef = E1A10CCAC1B8762250473E09 /* RptSessionCrypto.swift */; };
-		AE626A7B048C9E0A4653D56C /* RptUkIpGate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 07466FFA1B9B1F0989D529CC /* RptUkIpGate.swift */; };
-		861B9F3BF57A20AAB3C54190 /* Addition.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A3AD1EC56D0D7306F8F0784 /* Addition.swift */; };
-		F8A590AEEC96F1DEB0C48717 /* BigInt.swift in Sources */ = {isa = PBXBuildFile; fileRef = C8F54AAE93B9555BD821F02F /* BigInt.swift */; };
-		0C222EC070FA06D972EEFF3A /* BigUInt.swift in Sources */ = {isa = PBXBuildFile; fileRef = BBC7801B3EC2A4F5A0883A60 /* BigUInt.swift */; };
-		B63C155EF025480B034DB3E2 /* Bitwise Ops.swift in Sources */ = {isa = PBXBuildFile; fileRef = A4CB073058F916596F00374A /* Bitwise Ops.swift */; };
-		8A274D974EEA9F7D2ACB1C2A /* Codable.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3695A4FD390A5BEFAEFE42E6 /* Codable.swift */; };
-		65036CBA48E79B899427511B /* Comparable.swift in Sources */ = {isa = PBXBuildFile; fileRef = C87A22772F7F3DE189B25004 /* Comparable.swift */; };
-		0BF67D552B6856A329725E5A /* Data Conversion.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3876BD7C82AFBA742ADDDD6F /* Data Conversion.swift */; };
-		25D2EA708AE8DE21E03CE77E /* Division.swift in Sources */ = {isa = PBXBuildFile; fileRef = 61CD85EACACCFB0367104278 /* Division.swift */; };
-		CFFD43C6E95D2C0664B63EC2 /* Exponentiation.swift in Sources */ = {isa = PBXBuildFile; fileRef = 16EFBF9DC4D79F6716517E2B /* Exponentiation.swift */; };
-		06F3C9B8143833F985B1485D /* Floating Point Conversion.swift in Sources */ = {isa = PBXBuildFile; fileRef = DAB1FBCABC908C11641B5957 /* Floating Point Conversion.swift */; };
-		0B2B777E394D72E1A87DF6F0 /* GCD.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5DE10DDAD215BE62535CC795 /* GCD.swift */; };
-		4C4B1D5F2EFB0E14E17A1079 /* Hashable.swift in Sources */ = {isa = PBXBuildFile; fileRef = F5ED0B330722633E3313724D /* Hashable.swift */; };
-		12A95C4A5FEE86D19189AC4B /* Integer Conversion.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9A59535CB8BA0F5270C416EF /* Integer Conversion.swift */; };
-		0E311443B35FD4E8BEEE7F92 /* Multiplication.swift in Sources */ = {isa = PBXBuildFile; fileRef = 172511E0BE6C3FBC77B1FC48 /* Multiplication.swift */; };
-		D366A0827887B9B34934E118 /* Prime Test.swift in Sources */ = {isa = PBXBuildFile; fileRef = 39366F83943C97D21FC8E092 /* Prime Test.swift */; };
-		496EA035B19C4DB68EC48E9F /* Random.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9D3C63F5FCA205C44CD5A510 /* Random.swift */; };
-		84763B1CC6C77D73BAD10F4F /* Shifts.swift in Sources */ = {isa = PBXBuildFile; fileRef = 91ED3F6AE50DBEA8037BBB8E /* Shifts.swift */; };
-		0C8EA59822296FA8F206361E /* Square Root.swift in Sources */ = {isa = PBXBuildFile; fileRef = 851CCB86B7410AD563B070DD /* Square Root.swift */; };
-		3E091507D1DB11BA372699E2 /* Strideable.swift in Sources */ = {isa = PBXBuildFile; fileRef = 63E78E1658B10B5279B43F7E /* Strideable.swift */; };
-		5A08ABF1894D541E8F9DC65A /* String Conversion.swift in Sources */ = {isa = PBXBuildFile; fileRef = C49848DCC33EEF9958B3F0ED /* String Conversion.swift */; };
-		BB9173F72E9988CC51F5F00C /* Subtraction.swift in Sources */ = {isa = PBXBuildFile; fileRef = C73344ABBC4538E95B02E231 /* Subtraction.swift */; };
-		F05F977A2567499A580612E7 /* Words and Bits.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7736C2F78A994C26DF5492F9 /* Words and Bits.swift */; };
-		BBF09D864AB695EE761D3456 /* RptVpnChannel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9CB45736AA3B2370E6610B82 /* RptVpnChannel.swift */; };
-		B37B9E88976111C4D96EF808 /* RptSecrets.swift in Sources */ = {isa = PBXBuildFile; fileRef = 62511016D6DF79B2234B83B0 /* RptSecrets.swift */; };
-		575107590C8330125CDF9BD8 /* RptClientEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1E8ECFC3BC60269BEBC2CA40 /* RptClientEngine.swift */; };
-		6D0E04054998188A656BE38F /* RptConnectOrchestrator.swift in Sources */ = {isa = PBXBuildFile; fileRef = B008E63BE1A87521A006D658 /* RptConnectOrchestrator.swift */; };
-		B55667EB4080B9E1877B920F /* RptElgamal.swift in Sources */ = {isa = PBXBuildFile; fileRef = B7A984DE1FCFFC0139C1D464 /* RptElgamal.swift */; };
-		7FB1864B91278AE9C58463DB /* RptPedersen.swift in Sources */ = {isa = PBXBuildFile; fileRef = A8340F72CA3D6450BE844011 /* RptPedersen.swift */; };
-		AA3450CB9AC946ADFD53CF6B /* RptProtocol.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC2B56A3A7EB3E5A89358950 /* RptProtocol.swift */; };
-		77943E3BD49C420AF0D56022 /* RptSessionCrypto.swift in Sources */ = {isa = PBXBuildFile; fileRef = E1A10CCAC1B8762250473E09 /* RptSessionCrypto.swift */; };
-		20B2D4A3CB19BBDC5EFD89C2 /* RptUkIpGate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 07466FFA1B9B1F0989D529CC /* RptUkIpGate.swift */; };
-		4A54C0FBE676707BEACF054F /* Addition.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A3AD1EC56D0D7306F8F0784 /* Addition.swift */; };
-		F17ED68FCE78DD9CDEF67E07 /* BigInt.swift in Sources */ = {isa = PBXBuildFile; fileRef = C8F54AAE93B9555BD821F02F /* BigInt.swift */; };
-		57A4983673F1A2796AEDF81C /* BigUInt.swift in Sources */ = {isa = PBXBuildFile; fileRef = BBC7801B3EC2A4F5A0883A60 /* BigUInt.swift */; };
-		F2F49871C9EE7FEDA1E3E006 /* Bitwise Ops.swift in Sources */ = {isa = PBXBuildFile; fileRef = A4CB073058F916596F00374A /* Bitwise Ops.swift */; };
-		CB48BBC59565E00F43AAE803 /* Codable.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3695A4FD390A5BEFAEFE42E6 /* Codable.swift */; };
-		EF84B4FB16BABE9F523286DE /* Comparable.swift in Sources */ = {isa = PBXBuildFile; fileRef = C87A22772F7F3DE189B25004 /* Comparable.swift */; };
-		F43F2E041E472412E513AAF2 /* Data Conversion.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3876BD7C82AFBA742ADDDD6F /* Data Conversion.swift */; };
-		71212C4FEC3058D3CEDED653 /* Division.swift in Sources */ = {isa = PBXBuildFile; fileRef = 61CD85EACACCFB0367104278 /* Division.swift */; };
-		89315929921CDBD4022C3894 /* Exponentiation.swift in Sources */ = {isa = PBXBuildFile; fileRef = 16EFBF9DC4D79F6716517E2B /* Exponentiation.swift */; };
-		ECD513B67BF501F8A0C23E9D /* Floating Point Conversion.swift in Sources */ = {isa = PBXBuildFile; fileRef = DAB1FBCABC908C11641B5957 /* Floating Point Conversion.swift */; };
-		0D5E19BB9CFBC380DD5C53F8 /* GCD.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5DE10DDAD215BE62535CC795 /* GCD.swift */; };
-		FD6E8C1D45826F5996430BF8 /* Hashable.swift in Sources */ = {isa = PBXBuildFile; fileRef = F5ED0B330722633E3313724D /* Hashable.swift */; };
-		4BF4B309B949785333D39124 /* Integer Conversion.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9A59535CB8BA0F5270C416EF /* Integer Conversion.swift */; };
-		70CC13D0EACC80D57F0C0E54 /* Multiplication.swift in Sources */ = {isa = PBXBuildFile; fileRef = 172511E0BE6C3FBC77B1FC48 /* Multiplication.swift */; };
-		B704A5D336E2AAF79DE3A9C5 /* Prime Test.swift in Sources */ = {isa = PBXBuildFile; fileRef = 39366F83943C97D21FC8E092 /* Prime Test.swift */; };
-		5BCB45B3998ADFA83CB75F82 /* Random.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9D3C63F5FCA205C44CD5A510 /* Random.swift */; };
-		67751C9AB8988BF85E2DF79D /* Shifts.swift in Sources */ = {isa = PBXBuildFile; fileRef = 91ED3F6AE50DBEA8037BBB8E /* Shifts.swift */; };
-		55A7DE917BD997A64C7DD24C /* Square Root.swift in Sources */ = {isa = PBXBuildFile; fileRef = 851CCB86B7410AD563B070DD /* Square Root.swift */; };
-		D0E362626CF8176EFE1332EC /* Strideable.swift in Sources */ = {isa = PBXBuildFile; fileRef = 63E78E1658B10B5279B43F7E /* Strideable.swift */; };
-		1C64DE0ACBF9DCF238B6463B /* String Conversion.swift in Sources */ = {isa = PBXBuildFile; fileRef = C49848DCC33EEF9958B3F0ED /* String Conversion.swift */; };
-		AF29B7D7B6E3CE80439D6F7A /* Subtraction.swift in Sources */ = {isa = PBXBuildFile; fileRef = C73344ABBC4538E95B02E231 /* Subtraction.swift */; };
-		B47A1E38FA31BCCEDE6E1FC2 /* Words and Bits.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7736C2F78A994C26DF5492F9 /* Words and Bits.swift */; };
-		78444A07E9D0DD88C5378485 /* PacketTunnelProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = 61BF160C0289711F5F69C626 /* PacketTunnelProvider.swift */; };
-		94B1014585FB705E966C1B62 /* RptSecrets.swift in Sources */ = {isa = PBXBuildFile; fileRef = 62511016D6DF79B2234B83B0 /* RptSecrets.swift */; };
 		01370DF98A3E3BF229AAA093 /* NetworkExtension.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 9A683FBC827C89BF0ACFD770 /* NetworkExtension.framework */; };
-		EC5645BA2A17534F3C0700C2 /* NetworkExtension.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 9A683FBC827C89BF0ACFD770 /* NetworkExtension.framework */; };
-		BDC04FCD1A748D2F392DFFB7 /* Security.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 682B337331B91E8907D41E21 /* Security.framework */; };
-		657D522E338C1D809D9CEC2D /* Security.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 682B337331B91E8907D41E21 /* Security.framework */; };
-		37B58A4DDD7D9C2C465C4BCF /* PacketTunnel.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = EA93ACD7AF6899D15FEDF353 /* PacketTunnel.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+		06F3C9B8143833F985B1485D /* Floating Point Conversion.swift in Sources */ = {isa = PBXBuildFile; fileRef = DAB1FBCABC908C11641B5957 /* Floating Point Conversion.swift */; };
+		0AD856FDC79F35AB84D2CB0D /* RptClientEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1E8ECFC3BC60269BEBC2CA40 /* RptClientEngine.swift */; };
+		0B2B777E394D72E1A87DF6F0 /* GCD.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5DE10DDAD215BE62535CC795 /* GCD.swift */; };
+		0BF67D552B6856A329725E5A /* Data Conversion.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3876BD7C82AFBA742ADDDD6F /* Data Conversion.swift */; };
+		0C222EC070FA06D972EEFF3A /* BigUInt.swift in Sources */ = {isa = PBXBuildFile; fileRef = BBC7801B3EC2A4F5A0883A60 /* BigUInt.swift */; };
+		0C8EA59822296FA8F206361E /* Square Root.swift in Sources */ = {isa = PBXBuildFile; fileRef = 851CCB86B7410AD563B070DD /* Square Root.swift */; };
+		0D5E19BB9CFBC380DD5C53F8 /* GCD.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5DE10DDAD215BE62535CC795 /* GCD.swift */; };
+		0E311443B35FD4E8BEEE7F92 /* Multiplication.swift in Sources */ = {isa = PBXBuildFile; fileRef = 172511E0BE6C3FBC77B1FC48 /* Multiplication.swift */; };
+		12A95C4A5FEE86D19189AC4B /* Integer Conversion.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9A59535CB8BA0F5270C416EF /* Integer Conversion.swift */; };
 		1498D2341E8E89220040F4C2 /* GeneratedPluginRegistrant.m in Sources */ = {isa = PBXBuildFile; fileRef = 1498D2331E8E89220040F4C2 /* GeneratedPluginRegistrant.m */; };
+		178DFBBF8229AB5933CD28FC /* RptConnectOrchestrator.swift in Sources */ = {isa = PBXBuildFile; fileRef = B008E63BE1A87521A006D658 /* RptConnectOrchestrator.swift */; };
+		1C64DE0ACBF9DCF238B6463B /* String Conversion.swift in Sources */ = {isa = PBXBuildFile; fileRef = C49848DCC33EEF9958B3F0ED /* String Conversion.swift */; };
+		20B2D4A3CB19BBDC5EFD89C2 /* RptUkIpGate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 07466FFA1B9B1F0989D529CC /* RptUkIpGate.swift */; };
+		23E0DDE47637E5D10988B9CA /* RptEndpoint.swift in Sources */ = {isa = PBXBuildFile; fileRef = 60DF89726CB0112FB8408B6D /* RptEndpoint.swift */; };
+		25D2EA708AE8DE21E03CE77E /* Division.swift in Sources */ = {isa = PBXBuildFile; fileRef = 61CD85EACACCFB0367104278 /* Division.swift */; };
+		27C73F1169CD485F9D3DEEB6 /* Network.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = BA98F8222A4AF392A7A4A84A /* Network.framework */; };
+		2E434A68870DAC1E5110D9FA /* RptFullTunnelResult.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6B6E833E61E4B8768F3C2CD1 /* RptFullTunnelResult.swift */; };
 		331C808B294A63AB00263BE5 /* RunnerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 331C807B294A618700263BE5 /* RunnerTests.swift */; };
+		37B58A4DDD7D9C2C465C4BCF /* PacketTunnel.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = EA93ACD7AF6899D15FEDF353 /* PacketTunnel.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 		3B3967161E833CAA004F5970 /* AppFrameworkInfo.plist in Resources */ = {isa = PBXBuildFile; fileRef = 3B3967151E833CAA004F5970 /* AppFrameworkInfo.plist */; };
+		3C286BCE142676397F3A447C /* RptPedersen.swift in Sources */ = {isa = PBXBuildFile; fileRef = A8340F72CA3D6450BE844011 /* RptPedersen.swift */; };
+		3E091507D1DB11BA372699E2 /* Strideable.swift in Sources */ = {isa = PBXBuildFile; fileRef = 63E78E1658B10B5279B43F7E /* Strideable.swift */; };
+		496EA035B19C4DB68EC48E9F /* Random.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9D3C63F5FCA205C44CD5A510 /* Random.swift */; };
+		4A54C0FBE676707BEACF054F /* Addition.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A3AD1EC56D0D7306F8F0784 /* Addition.swift */; };
+		4BF4B309B949785333D39124 /* Integer Conversion.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9A59535CB8BA0F5270C416EF /* Integer Conversion.swift */; };
+		4C4B1D5F2EFB0E14E17A1079 /* Hashable.swift in Sources */ = {isa = PBXBuildFile; fileRef = F5ED0B330722633E3313724D /* Hashable.swift */; };
+		55A7DE917BD997A64C7DD24C /* Square Root.swift in Sources */ = {isa = PBXBuildFile; fileRef = 851CCB86B7410AD563B070DD /* Square Root.swift */; };
+		575107590C8330125CDF9BD8 /* RptClientEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1E8ECFC3BC60269BEBC2CA40 /* RptClientEngine.swift */; };
+		57A4983673F1A2796AEDF81C /* BigUInt.swift in Sources */ = {isa = PBXBuildFile; fileRef = BBC7801B3EC2A4F5A0883A60 /* BigUInt.swift */; };
+		5A08ABF1894D541E8F9DC65A /* String Conversion.swift in Sources */ = {isa = PBXBuildFile; fileRef = C49848DCC33EEF9958B3F0ED /* String Conversion.swift */; };
+		5BCB45B3998ADFA83CB75F82 /* Random.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9D3C63F5FCA205C44CD5A510 /* Random.swift */; };
+		61E4B8768F3C2CD1D67F4176 /* RptFullTunnelResult.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6B6E833E61E4B8768F3C2CD1 /* RptFullTunnelResult.swift */; };
+		65036CBA48E79B899427511B /* Comparable.swift in Sources */ = {isa = PBXBuildFile; fileRef = C87A22772F7F3DE189B25004 /* Comparable.swift */; };
+		657D522E338C1D809D9CEC2D /* Security.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 682B337331B91E8907D41E21 /* Security.framework */; };
+		67751C9AB8988BF85E2DF79D /* Shifts.swift in Sources */ = {isa = PBXBuildFile; fileRef = 91ED3F6AE50DBEA8037BBB8E /* Shifts.swift */; };
+		6D0E04054998188A656BE38F /* RptConnectOrchestrator.swift in Sources */ = {isa = PBXBuildFile; fileRef = B008E63BE1A87521A006D658 /* RptConnectOrchestrator.swift */; };
+		70CC13D0EACC80D57F0C0E54 /* Multiplication.swift in Sources */ = {isa = PBXBuildFile; fileRef = 172511E0BE6C3FBC77B1FC48 /* Multiplication.swift */; };
+		71212C4FEC3058D3CEDED653 /* Division.swift in Sources */ = {isa = PBXBuildFile; fileRef = 61CD85EACACCFB0367104278 /* Division.swift */; };
 		74858FAF1ED2DC5600515810 /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 74858FAE1ED2DC5600515810 /* AppDelegate.swift */; };
+		77943E3BD49C420AF0D56022 /* RptSessionCrypto.swift in Sources */ = {isa = PBXBuildFile; fileRef = E1A10CCAC1B8762250473E09 /* RptSessionCrypto.swift */; };
+		78444A07E9D0DD88C5378485 /* PacketTunnelProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = 61BF160C0289711F5F69C626 /* PacketTunnelProvider.swift */; };
 		7884E8682EC3CC0700C636F2 /* SceneDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7884E8672EC3CC0400C636F2 /* SceneDelegate.swift */; };
 		78A318202AECB46A00862997 /* FlutterGeneratedPluginSwiftPackage in Frameworks */ = {isa = PBXBuildFile; productRef = 78A3181F2AECB46A00862997 /* FlutterGeneratedPluginSwiftPackage */; };
+		7FB1864B91278AE9C58463DB /* RptPedersen.swift in Sources */ = {isa = PBXBuildFile; fileRef = A8340F72CA3D6450BE844011 /* RptPedersen.swift */; };
+		83B384CB8E2D7C034C9B9F75 /* Pods_Runner.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 44301E29A90B14EAF7DF73EE /* Pods_Runner.framework */; };
+		84763B1CC6C77D73BAD10F4F /* Shifts.swift in Sources */ = {isa = PBXBuildFile; fileRef = 91ED3F6AE50DBEA8037BBB8E /* Shifts.swift */; };
+		861B9F3BF57A20AAB3C54190 /* Addition.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A3AD1EC56D0D7306F8F0784 /* Addition.swift */; };
+		89315929921CDBD4022C3894 /* Exponentiation.swift in Sources */ = {isa = PBXBuildFile; fileRef = 16EFBF9DC4D79F6716517E2B /* Exponentiation.swift */; };
+		8A274D974EEA9F7D2ACB1C2A /* Codable.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3695A4FD390A5BEFAEFE42E6 /* Codable.swift */; };
+		8DA5D118F1FB617796DF7BDE /* RptElgamal.swift in Sources */ = {isa = PBXBuildFile; fileRef = B7A984DE1FCFFC0139C1D464 /* RptElgamal.swift */; };
+		94B1014585FB705E966C1B62 /* RptSecrets.swift in Sources */ = {isa = PBXBuildFile; fileRef = 62511016D6DF79B2234B83B0 /* RptSecrets.swift */; };
 		97C146FC1CF9000F007C117D /* Main.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = 97C146FA1CF9000F007C117D /* Main.storyboard */; };
 		97C146FE1CF9000F007C117D /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 97C146FD1CF9000F007C117D /* Assets.xcassets */; };
 		97C147011CF9000F007C117D /* LaunchScreen.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = 97C146FF1CF9000F007C117D /* LaunchScreen.storyboard */; };
+		9AB68E96719268222D5B4E0E /* Pods_RunnerTests.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 88C1E65207B20639F3791CCF /* Pods_RunnerTests.framework */; };
+		A11B2C3D4E5F607182930012 /* RptResidualPrivacyPolicy.swift in Sources */ = {isa = PBXBuildFile; fileRef = A11B2C3D4E5F607182930011 /* RptResidualPrivacyPolicy.swift */; };
+		A11B2C3D4E5F607182930013 /* RptResidualPrivacyPolicy.swift in Sources */ = {isa = PBXBuildFile; fileRef = A11B2C3D4E5F607182930011 /* RptResidualPrivacyPolicy.swift */; };
+		A3E798CC69E28AD862366BD4 /* Network.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = BA98F8222A4AF392A7A4A84A /* Network.framework */; };
+		AA3450CB9AC946ADFD53CF6B /* RptProtocol.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC2B56A3A7EB3E5A89358950 /* RptProtocol.swift */; };
+		AE626A7B048C9E0A4653D56C /* RptUkIpGate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 07466FFA1B9B1F0989D529CC /* RptUkIpGate.swift */; };
+		AF29B7D7B6E3CE80439D6F7A /* Subtraction.swift in Sources */ = {isa = PBXBuildFile; fileRef = C73344ABBC4538E95B02E231 /* Subtraction.swift */; };
+		B37B9E88976111C4D96EF808 /* RptSecrets.swift in Sources */ = {isa = PBXBuildFile; fileRef = 62511016D6DF79B2234B83B0 /* RptSecrets.swift */; };
+		B47A1E38FA31BCCEDE6E1FC2 /* Words and Bits.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7736C2F78A994C26DF5492F9 /* Words and Bits.swift */; };
+		B55667EB4080B9E1877B920F /* RptElgamal.swift in Sources */ = {isa = PBXBuildFile; fileRef = B7A984DE1FCFFC0139C1D464 /* RptElgamal.swift */; };
+		B63C155EF025480B034DB3E2 /* Bitwise Ops.swift in Sources */ = {isa = PBXBuildFile; fileRef = A4CB073058F916596F00374A /* Bitwise Ops.swift */; };
+		B6F167DE1D36BE52956936ED /* RptEndpoint.swift in Sources */ = {isa = PBXBuildFile; fileRef = 60DF89726CB0112FB8408B6D /* RptEndpoint.swift */; };
+		B704A5D336E2AAF79DE3A9C5 /* Prime Test.swift in Sources */ = {isa = PBXBuildFile; fileRef = 39366F83943C97D21FC8E092 /* Prime Test.swift */; };
+		BB9173F72E9988CC51F5F00C /* Subtraction.swift in Sources */ = {isa = PBXBuildFile; fileRef = C73344ABBC4538E95B02E231 /* Subtraction.swift */; };
+		BBF09D864AB695EE761D3456 /* RptVpnChannel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9CB45736AA3B2370E6610B82 /* RptVpnChannel.swift */; };
+		BDC04FCD1A748D2F392DFFB7 /* Security.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 682B337331B91E8907D41E21 /* Security.framework */; };
+		C1EC9DB0E9CF2DC565637E8E /* RptSessionCrypto.swift in Sources */ = {isa = PBXBuildFile; fileRef = E1A10CCAC1B8762250473E09 /* RptSessionCrypto.swift */; };
+		CB48BBC59565E00F43AAE803 /* Codable.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3695A4FD390A5BEFAEFE42E6 /* Codable.swift */; };
+		CFFD43C6E95D2C0664B63EC2 /* Exponentiation.swift in Sources */ = {isa = PBXBuildFile; fileRef = 16EFBF9DC4D79F6716517E2B /* Exponentiation.swift */; };
+		D037DE89F6B615111C2C497C /* RptProtocol.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC2B56A3A7EB3E5A89358950 /* RptProtocol.swift */; };
+		D0E362626CF8176EFE1332EC /* Strideable.swift in Sources */ = {isa = PBXBuildFile; fileRef = 63E78E1658B10B5279B43F7E /* Strideable.swift */; };
+		D366A0827887B9B34934E118 /* Prime Test.swift in Sources */ = {isa = PBXBuildFile; fileRef = 39366F83943C97D21FC8E092 /* Prime Test.swift */; };
+		EC5645BA2A17534F3C0700C2 /* NetworkExtension.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 9A683FBC827C89BF0ACFD770 /* NetworkExtension.framework */; };
+		ECD513B67BF501F8A0C23E9D /* Floating Point Conversion.swift in Sources */ = {isa = PBXBuildFile; fileRef = DAB1FBCABC908C11641B5957 /* Floating Point Conversion.swift */; };
+		EF84B4FB16BABE9F523286DE /* Comparable.swift in Sources */ = {isa = PBXBuildFile; fileRef = C87A22772F7F3DE189B25004 /* Comparable.swift */; };
+		F05F977A2567499A580612E7 /* Words and Bits.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7736C2F78A994C26DF5492F9 /* Words and Bits.swift */; };
+		F17ED68FCE78DD9CDEF67E07 /* BigInt.swift in Sources */ = {isa = PBXBuildFile; fileRef = C8F54AAE93B9555BD821F02F /* BigInt.swift */; };
+		F2F49871C9EE7FEDA1E3E006 /* Bitwise Ops.swift in Sources */ = {isa = PBXBuildFile; fileRef = A4CB073058F916596F00374A /* Bitwise Ops.swift */; };
+		F43F2E041E472412E513AAF2 /* Data Conversion.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3876BD7C82AFBA742ADDDD6F /* Data Conversion.swift */; };
+		F8A590AEEC96F1DEB0C48717 /* BigInt.swift in Sources */ = {isa = PBXBuildFile; fileRef = C8F54AAE93B9555BD821F02F /* BigInt.swift */; };
+		FD6E8C1D45826F5996430BF8 /* Hashable.swift in Sources */ = {isa = PBXBuildFile; fileRef = F5ED0B330722633E3313724D /* Hashable.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
-		F72B63F62BAD96EAED1A7356 /* PBXContainerItemProxy */ = {
-			isa = PBXContainerItemProxy;
-			containerPortal = 97C146E61CF9000F007C117D /* Project object */;
-			proxyType = 1;
-			remoteGlobalIDString = 1146A010C7AD86E59C5B2EA6;
-			remoteInfo = PacketTunnel;
-		};
 		331C8085294A63A400263BE5 /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
 			containerPortal = 97C146E61CF9000F007C117D /* Project object */;
 			proxyType = 1;
 			remoteGlobalIDString = 97C146ED1CF9000F007C117D;
 			remoteInfo = Runner;
+		};
+		F72B63F62BAD96EAED1A7356 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 97C146E61CF9000F007C117D /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 1146A010C7AD86E59C5B2EA6;
+			remoteInfo = PacketTunnel;
 		};
 /* End PBXContainerItemProxy section */
 
@@ -121,61 +123,55 @@
 			name = "Embed Frameworks";
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		9E6E52BB466F74436E749753 /* Embed Foundation Extensions */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 13;
+			files = (
+				37B58A4DDD7D9C2C465C4BCF /* PacketTunnel.appex in Embed Foundation Extensions */,
+			);
+			name = "Embed Foundation Extensions";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
-		CD7D96CE01B2E4DC8C7918DF /* Runner.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = Runner.entitlements; sourceTree = "<group>"; };
-		6B6E833E61E4B8768F3C2CD1 /* RptFullTunnelResult.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = "RptFullTunnelResult.swift"; path = "NativePrep/Rpt2/RptFullTunnelResult.swift"; sourceTree = "<group>"; };
-		61BF160C0289711F5F69C626 /* PacketTunnelProvider.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = "PacketTunnelProvider.swift"; path = "NativePrep/PacketTunnelProvider.swift"; sourceTree = "<group>"; };
-		1E8ECFC3BC60269BEBC2CA40 /* RptClientEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = "RptClientEngine.swift"; path = "NativePrep/Rpt2/RptClientEngine.swift"; sourceTree = "<group>"; };
-		A11B2C3D4E5F607182930011 /* RptResidualPrivacyPolicy.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = "RptResidualPrivacyPolicy.swift"; path = "NativePrep/Rpt2/RptResidualPrivacyPolicy.swift"; sourceTree = "<group>"; };
-		B008E63BE1A87521A006D658 /* RptConnectOrchestrator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = "RptConnectOrchestrator.swift"; path = "NativePrep/Rpt2/RptConnectOrchestrator.swift"; sourceTree = "<group>"; };
-		B7A984DE1FCFFC0139C1D464 /* RptElgamal.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = "RptElgamal.swift"; path = "NativePrep/Rpt2/RptElgamal.swift"; sourceTree = "<group>"; };
-		A8340F72CA3D6450BE844011 /* RptPedersen.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = "RptPedersen.swift"; path = "NativePrep/Rpt2/RptPedersen.swift"; sourceTree = "<group>"; };
-		BC2B56A3A7EB3E5A89358950 /* RptProtocol.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = "RptProtocol.swift"; path = "NativePrep/Rpt2/RptProtocol.swift"; sourceTree = "<group>"; };
-		60DF89726CB0112FB8408B6D /* RptEndpoint.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = "RptEndpoint.swift"; path = "NativePrep/Rpt2/RptEndpoint.swift"; sourceTree = "<group>"; };
-		E1A10CCAC1B8762250473E09 /* RptSessionCrypto.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = "RptSessionCrypto.swift"; path = "NativePrep/Rpt2/RptSessionCrypto.swift"; sourceTree = "<group>"; };
-		07466FFA1B9B1F0989D529CC /* RptUkIpGate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = "RptUkIpGate.swift"; path = "NativePrep/Rpt2/RptUkIpGate.swift"; sourceTree = "<group>"; };
-		1A3AD1EC56D0D7306F8F0784 /* Addition.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = "Addition.swift"; path = "NativePrep/Rpt2/VendorBigInt/Addition.swift"; sourceTree = "<group>"; };
-		C8F54AAE93B9555BD821F02F /* BigInt.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = "BigInt.swift"; path = "NativePrep/Rpt2/VendorBigInt/BigInt.swift"; sourceTree = "<group>"; };
-		BBC7801B3EC2A4F5A0883A60 /* BigUInt.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = "BigUInt.swift"; path = "NativePrep/Rpt2/VendorBigInt/BigUInt.swift"; sourceTree = "<group>"; };
-		A4CB073058F916596F00374A /* Bitwise Ops.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = "Bitwise Ops.swift"; path = "NativePrep/Rpt2/VendorBigInt/Bitwise Ops.swift"; sourceTree = "<group>"; };
-		3695A4FD390A5BEFAEFE42E6 /* Codable.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = "Codable.swift"; path = "NativePrep/Rpt2/VendorBigInt/Codable.swift"; sourceTree = "<group>"; };
-		C87A22772F7F3DE189B25004 /* Comparable.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = "Comparable.swift"; path = "NativePrep/Rpt2/VendorBigInt/Comparable.swift"; sourceTree = "<group>"; };
-		3876BD7C82AFBA742ADDDD6F /* Data Conversion.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = "Data Conversion.swift"; path = "NativePrep/Rpt2/VendorBigInt/Data Conversion.swift"; sourceTree = "<group>"; };
-		61CD85EACACCFB0367104278 /* Division.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = "Division.swift"; path = "NativePrep/Rpt2/VendorBigInt/Division.swift"; sourceTree = "<group>"; };
-		16EFBF9DC4D79F6716517E2B /* Exponentiation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = "Exponentiation.swift"; path = "NativePrep/Rpt2/VendorBigInt/Exponentiation.swift"; sourceTree = "<group>"; };
-		DAB1FBCABC908C11641B5957 /* Floating Point Conversion.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = "Floating Point Conversion.swift"; path = "NativePrep/Rpt2/VendorBigInt/Floating Point Conversion.swift"; sourceTree = "<group>"; };
-		5DE10DDAD215BE62535CC795 /* GCD.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = "GCD.swift"; path = "NativePrep/Rpt2/VendorBigInt/GCD.swift"; sourceTree = "<group>"; };
-		F5ED0B330722633E3313724D /* Hashable.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = "Hashable.swift"; path = "NativePrep/Rpt2/VendorBigInt/Hashable.swift"; sourceTree = "<group>"; };
-		9A59535CB8BA0F5270C416EF /* Integer Conversion.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = "Integer Conversion.swift"; path = "NativePrep/Rpt2/VendorBigInt/Integer Conversion.swift"; sourceTree = "<group>"; };
-		172511E0BE6C3FBC77B1FC48 /* Multiplication.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = "Multiplication.swift"; path = "NativePrep/Rpt2/VendorBigInt/Multiplication.swift"; sourceTree = "<group>"; };
-		39366F83943C97D21FC8E092 /* Prime Test.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = "Prime Test.swift"; path = "NativePrep/Rpt2/VendorBigInt/Prime Test.swift"; sourceTree = "<group>"; };
-		9D3C63F5FCA205C44CD5A510 /* Random.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = "Random.swift"; path = "NativePrep/Rpt2/VendorBigInt/Random.swift"; sourceTree = "<group>"; };
-		91ED3F6AE50DBEA8037BBB8E /* Shifts.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = "Shifts.swift"; path = "NativePrep/Rpt2/VendorBigInt/Shifts.swift"; sourceTree = "<group>"; };
-		851CCB86B7410AD563B070DD /* Square Root.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = "Square Root.swift"; path = "NativePrep/Rpt2/VendorBigInt/Square Root.swift"; sourceTree = "<group>"; };
-		63E78E1658B10B5279B43F7E /* Strideable.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = "Strideable.swift"; path = "NativePrep/Rpt2/VendorBigInt/Strideable.swift"; sourceTree = "<group>"; };
-		C49848DCC33EEF9958B3F0ED /* String Conversion.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = "String Conversion.swift"; path = "NativePrep/Rpt2/VendorBigInt/String Conversion.swift"; sourceTree = "<group>"; };
-		C73344ABBC4538E95B02E231 /* Subtraction.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = "Subtraction.swift"; path = "NativePrep/Rpt2/VendorBigInt/Subtraction.swift"; sourceTree = "<group>"; };
-		7736C2F78A994C26DF5492F9 /* Words and Bits.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = "Words and Bits.swift"; path = "NativePrep/Rpt2/VendorBigInt/Words and Bits.swift"; sourceTree = "<group>"; };
-		62511016D6DF79B2234B83B0 /* RptSecrets.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = "RptSecrets.swift"; path = "NativePrep/RptSecrets.swift"; sourceTree = "<group>"; };
-		9CB45736AA3B2370E6610B82 /* RptVpnChannel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = "RptVpnChannel.swift"; path = "NativePrep/RptVpnChannel.swift"; sourceTree = "<group>"; };
-		9A683FBC827C89BF0ACFD770 /* NetworkExtension.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = NetworkExtension.framework; path = System/Library/Frameworks/NetworkExtension.framework; sourceTree = SDKROOT; };
-		BA98F8222A4AF392A7A4A84A /* Network.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Network.framework; path = System/Library/Frameworks/Network.framework; sourceTree = SDKROOT; };
-		682B337331B91E8907D41E21 /* Security.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Security.framework; path = System/Library/Frameworks/Security.framework; sourceTree = SDKROOT; };
-		EA93ACD7AF6899D15FEDF353 /* PacketTunnel.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = PacketTunnel.appex; sourceTree = BUILT_PRODUCTS_DIR; };
-		8CA2FAD23EC9B7A3F02E36B7 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = "PacketTunnel/Info.plist"; sourceTree = "<group>"; };
-		B6A626E5EEE26136E1AEC2EC /* PacketTunnel.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = "PacketTunnel/PacketTunnel.entitlements"; sourceTree = "<group>"; };
+		02D4437F61C429D846B1C15A /* Pods-Runner.debug.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-Runner.debug.xcconfig"; path = "Target Support Files/Pods-Runner/Pods-Runner.debug.xcconfig"; sourceTree = "<group>"; };
+		07466FFA1B9B1F0989D529CC /* RptUkIpGate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = RptUkIpGate.swift; path = NativePrep/Rpt2/RptUkIpGate.swift; sourceTree = "<group>"; };
 		1498D2321E8E86230040F4C2 /* GeneratedPluginRegistrant.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = GeneratedPluginRegistrant.h; sourceTree = "<group>"; };
 		1498D2331E8E89220040F4C2 /* GeneratedPluginRegistrant.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = GeneratedPluginRegistrant.m; sourceTree = "<group>"; };
+		16EFBF9DC4D79F6716517E2B /* Exponentiation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = Exponentiation.swift; path = NativePrep/Rpt2/VendorBigInt/Exponentiation.swift; sourceTree = "<group>"; };
+		172511E0BE6C3FBC77B1FC48 /* Multiplication.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = Multiplication.swift; path = NativePrep/Rpt2/VendorBigInt/Multiplication.swift; sourceTree = "<group>"; };
+		1A3AD1EC56D0D7306F8F0784 /* Addition.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = Addition.swift; path = NativePrep/Rpt2/VendorBigInt/Addition.swift; sourceTree = "<group>"; };
+		1E8ECFC3BC60269BEBC2CA40 /* RptClientEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = RptClientEngine.swift; path = NativePrep/Rpt2/RptClientEngine.swift; sourceTree = "<group>"; };
 		331C807B294A618700263BE5 /* RunnerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RunnerTests.swift; sourceTree = "<group>"; };
 		331C8081294A63A400263BE5 /* RunnerTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = RunnerTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		3695A4FD390A5BEFAEFE42E6 /* Codable.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = Codable.swift; path = NativePrep/Rpt2/VendorBigInt/Codable.swift; sourceTree = "<group>"; };
+		3876BD7C82AFBA742ADDDD6F /* Data Conversion.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = "Data Conversion.swift"; path = "NativePrep/Rpt2/VendorBigInt/Data Conversion.swift"; sourceTree = "<group>"; };
+		39366F83943C97D21FC8E092 /* Prime Test.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = "Prime Test.swift"; path = "NativePrep/Rpt2/VendorBigInt/Prime Test.swift"; sourceTree = "<group>"; };
 		3B3967151E833CAA004F5970 /* AppFrameworkInfo.plist */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.plist.xml; name = AppFrameworkInfo.plist; path = Flutter/AppFrameworkInfo.plist; sourceTree = "<group>"; };
+		44301E29A90B14EAF7DF73EE /* Pods_Runner.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; includeInIndex = 0; path = Pods_Runner.framework; sourceTree = BUILT_PRODUCTS_DIR; };
+		5DE10DDAD215BE62535CC795 /* GCD.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = GCD.swift; path = NativePrep/Rpt2/VendorBigInt/GCD.swift; sourceTree = "<group>"; };
+		60DF89726CB0112FB8408B6D /* RptEndpoint.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = RptEndpoint.swift; path = NativePrep/Rpt2/RptEndpoint.swift; sourceTree = "<group>"; };
+		61BF160C0289711F5F69C626 /* PacketTunnelProvider.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = PacketTunnelProvider.swift; path = NativePrep/PacketTunnelProvider.swift; sourceTree = "<group>"; };
+		61CD85EACACCFB0367104278 /* Division.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = Division.swift; path = NativePrep/Rpt2/VendorBigInt/Division.swift; sourceTree = "<group>"; };
+		62511016D6DF79B2234B83B0 /* RptSecrets.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = RptSecrets.swift; path = NativePrep/RptSecrets.swift; sourceTree = "<group>"; };
+		63E78E1658B10B5279B43F7E /* Strideable.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = Strideable.swift; path = NativePrep/Rpt2/VendorBigInt/Strideable.swift; sourceTree = "<group>"; };
+		64C6A7A5C2BC6146816AF637 /* Pods-Runner.release.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-Runner.release.xcconfig"; path = "Target Support Files/Pods-Runner/Pods-Runner.release.xcconfig"; sourceTree = "<group>"; };
+		682B337331B91E8907D41E21 /* Security.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Security.framework; path = System/Library/Frameworks/Security.framework; sourceTree = SDKROOT; };
+		6B6E833E61E4B8768F3C2CD1 /* RptFullTunnelResult.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = RptFullTunnelResult.swift; path = NativePrep/Rpt2/RptFullTunnelResult.swift; sourceTree = "<group>"; };
 		74858FAD1ED2DC5600515810 /* Runner-Bridging-Header.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = "Runner-Bridging-Header.h"; sourceTree = "<group>"; };
 		74858FAE1ED2DC5600515810 /* AppDelegate.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = AppDelegate.swift; sourceTree = "<group>"; };
+		7736C2F78A994C26DF5492F9 /* Words and Bits.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = "Words and Bits.swift"; path = "NativePrep/Rpt2/VendorBigInt/Words and Bits.swift"; sourceTree = "<group>"; };
+		77A5AFC49608DC9159F75886 /* Pods-RunnerTests.debug.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-RunnerTests.debug.xcconfig"; path = "Target Support Files/Pods-RunnerTests/Pods-RunnerTests.debug.xcconfig"; sourceTree = "<group>"; };
 		7884E8672EC3CC0400C636F2 /* SceneDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SceneDelegate.swift; sourceTree = "<group>"; };
 		78E0A7A72DC9AD7400C4905E /* FlutterGeneratedPluginSwiftPackage */ = {isa = PBXFileReference; lastKnownFileType = wrapper; name = FlutterGeneratedPluginSwiftPackage; path = Flutter/ephemeral/Packages/FlutterGeneratedPluginSwiftPackage; sourceTree = "<group>"; };
 		7AFA3C8E1D35360C0083082E /* Release.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; name = Release.xcconfig; path = Flutter/Release.xcconfig; sourceTree = "<group>"; };
+		851CCB86B7410AD563B070DD /* Square Root.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = "Square Root.swift"; path = "NativePrep/Rpt2/VendorBigInt/Square Root.swift"; sourceTree = "<group>"; };
+		88C1E65207B20639F3791CCF /* Pods_RunnerTests.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; includeInIndex = 0; path = Pods_RunnerTests.framework; sourceTree = BUILT_PRODUCTS_DIR; };
+		8CA2FAD23EC9B7A3F02E36B7 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = PacketTunnel/Info.plist; sourceTree = "<group>"; };
+		91ED3F6AE50DBEA8037BBB8E /* Shifts.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = Shifts.swift; path = NativePrep/Rpt2/VendorBigInt/Shifts.swift; sourceTree = "<group>"; };
 		9740EEB21CF90195004384FC /* Debug.xcconfig */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.xcconfig; name = Debug.xcconfig; path = Flutter/Debug.xcconfig; sourceTree = "<group>"; };
 		9740EEB31CF90195004384FC /* Generated.xcconfig */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.xcconfig; name = Generated.xcconfig; path = Flutter/Generated.xcconfig; sourceTree = "<group>"; };
 		97C146EE1CF9000F007C117D /* Runner.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Runner.app; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -183,22 +179,34 @@
 		97C146FD1CF9000F007C117D /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		97C147001CF9000F007C117D /* Base */ = {isa = PBXFileReference; lastKnownFileType = file.storyboard; name = Base; path = Base.lproj/LaunchScreen.storyboard; sourceTree = "<group>"; };
 		97C147021CF9000F007C117D /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
+		9A59535CB8BA0F5270C416EF /* Integer Conversion.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = "Integer Conversion.swift"; path = "NativePrep/Rpt2/VendorBigInt/Integer Conversion.swift"; sourceTree = "<group>"; };
+		9A683FBC827C89BF0ACFD770 /* NetworkExtension.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = NetworkExtension.framework; path = System/Library/Frameworks/NetworkExtension.framework; sourceTree = SDKROOT; };
+		9CB45736AA3B2370E6610B82 /* RptVpnChannel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = RptVpnChannel.swift; path = NativePrep/RptVpnChannel.swift; sourceTree = "<group>"; };
+		9D3C63F5FCA205C44CD5A510 /* Random.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = Random.swift; path = NativePrep/Rpt2/VendorBigInt/Random.swift; sourceTree = "<group>"; };
+		A11B2C3D4E5F607182930011 /* RptResidualPrivacyPolicy.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = RptResidualPrivacyPolicy.swift; path = NativePrep/Rpt2/RptResidualPrivacyPolicy.swift; sourceTree = "<group>"; };
+		A4CB073058F916596F00374A /* Bitwise Ops.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = "Bitwise Ops.swift"; path = "NativePrep/Rpt2/VendorBigInt/Bitwise Ops.swift"; sourceTree = "<group>"; };
+		A8340F72CA3D6450BE844011 /* RptPedersen.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = RptPedersen.swift; path = NativePrep/Rpt2/RptPedersen.swift; sourceTree = "<group>"; };
+		AB30E055DFB57676A82D5C24 /* Pods-RunnerTests.profile.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-RunnerTests.profile.xcconfig"; path = "Target Support Files/Pods-RunnerTests/Pods-RunnerTests.profile.xcconfig"; sourceTree = "<group>"; };
+		B008E63BE1A87521A006D658 /* RptConnectOrchestrator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = RptConnectOrchestrator.swift; path = NativePrep/Rpt2/RptConnectOrchestrator.swift; sourceTree = "<group>"; };
+		B6A626E5EEE26136E1AEC2EC /* PacketTunnel.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = PacketTunnel/PacketTunnel.entitlements; sourceTree = "<group>"; };
+		B7A984DE1FCFFC0139C1D464 /* RptElgamal.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = RptElgamal.swift; path = NativePrep/Rpt2/RptElgamal.swift; sourceTree = "<group>"; };
+		BA98F8222A4AF392A7A4A84A /* Network.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Network.framework; path = System/Library/Frameworks/Network.framework; sourceTree = SDKROOT; };
+		BBC7801B3EC2A4F5A0883A60 /* BigUInt.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = BigUInt.swift; path = NativePrep/Rpt2/VendorBigInt/BigUInt.swift; sourceTree = "<group>"; };
+		BC2B56A3A7EB3E5A89358950 /* RptProtocol.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = RptProtocol.swift; path = NativePrep/Rpt2/RptProtocol.swift; sourceTree = "<group>"; };
+		C0B540F5CE82BD1A70C79C04 /* Pods-RunnerTests.release.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-RunnerTests.release.xcconfig"; path = "Target Support Files/Pods-RunnerTests/Pods-RunnerTests.release.xcconfig"; sourceTree = "<group>"; };
+		C49848DCC33EEF9958B3F0ED /* String Conversion.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = "String Conversion.swift"; path = "NativePrep/Rpt2/VendorBigInt/String Conversion.swift"; sourceTree = "<group>"; };
+		C73344ABBC4538E95B02E231 /* Subtraction.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = Subtraction.swift; path = NativePrep/Rpt2/VendorBigInt/Subtraction.swift; sourceTree = "<group>"; };
+		C87A22772F7F3DE189B25004 /* Comparable.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = Comparable.swift; path = NativePrep/Rpt2/VendorBigInt/Comparable.swift; sourceTree = "<group>"; };
+		C8F54AAE93B9555BD821F02F /* BigInt.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = BigInt.swift; path = NativePrep/Rpt2/VendorBigInt/BigInt.swift; sourceTree = "<group>"; };
+		CD7D96CE01B2E4DC8C7918DF /* Runner.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = Runner.entitlements; sourceTree = "<group>"; };
+		DAB1FBCABC908C11641B5957 /* Floating Point Conversion.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = "Floating Point Conversion.swift"; path = "NativePrep/Rpt2/VendorBigInt/Floating Point Conversion.swift"; sourceTree = "<group>"; };
+		E1A10CCAC1B8762250473E09 /* RptSessionCrypto.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = RptSessionCrypto.swift; path = NativePrep/Rpt2/RptSessionCrypto.swift; sourceTree = "<group>"; };
+		EA93ACD7AF6899D15FEDF353 /* PacketTunnel.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = PacketTunnel.appex; sourceTree = BUILT_PRODUCTS_DIR; };
+		F5ED0B330722633E3313724D /* Hashable.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = Hashable.swift; path = NativePrep/Rpt2/VendorBigInt/Hashable.swift; sourceTree = "<group>"; };
+		FBF23B835D0C133D97789FE6 /* Pods-Runner.profile.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-Runner.profile.xcconfig"; path = "Target Support Files/Pods-Runner/Pods-Runner.profile.xcconfig"; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
-		97C146EB1CF9000F007C117D /* Frameworks */ = {
-			isa = PBXFrameworksBuildPhase;
-			buildActionMask = 2147483647;
-			files = (
-				01370DF98A3E3BF229AAA093 /* NetworkExtension.framework in Frameworks */,
-				A3E798CC69E28AD862366BD4 /* Network.framework in Frameworks */,
-				BDC04FCD1A748D2F392DFFB7 /* Security.framework in Frameworks */,
-
-				78A318202AECB46A00862997 /* FlutterGeneratedPluginSwiftPackage in Frameworks */,
-			);
-			runOnlyForDeploymentPostprocessing = 0;
-		};
-
 		88B65EA859E5C9102B07A76B /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
@@ -209,10 +217,29 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		97C146EB1CF9000F007C117D /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				01370DF98A3E3BF229AAA093 /* NetworkExtension.framework in Frameworks */,
+				A3E798CC69E28AD862366BD4 /* Network.framework in Frameworks */,
+				BDC04FCD1A748D2F392DFFB7 /* Security.framework in Frameworks */,
+				78A318202AECB46A00862997 /* FlutterGeneratedPluginSwiftPackage in Frameworks */,
+				83B384CB8E2D7C034C9B9F75 /* Pods_Runner.framework in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		B42CC2F0FC985ACD734F6D7C /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				9AB68E96719268222D5B4E0E /* Pods_RunnerTests.framework in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
-
 		0F29D609169D04A5997EAE72 /* VendorBigInt */ = {
 			isa = PBXGroup;
 			children = (
@@ -242,6 +269,28 @@
 			name = VendorBigInt;
 			sourceTree = "<group>";
 		};
+		1DBE0C805521B1588DED79DF /* Pods */ = {
+			isa = PBXGroup;
+			children = (
+				02D4437F61C429D846B1C15A /* Pods-Runner.debug.xcconfig */,
+				64C6A7A5C2BC6146816AF637 /* Pods-Runner.release.xcconfig */,
+				FBF23B835D0C133D97789FE6 /* Pods-Runner.profile.xcconfig */,
+				77A5AFC49608DC9159F75886 /* Pods-RunnerTests.debug.xcconfig */,
+				C0B540F5CE82BD1A70C79C04 /* Pods-RunnerTests.release.xcconfig */,
+				AB30E055DFB57676A82D5C24 /* Pods-RunnerTests.profile.xcconfig */,
+			);
+			name = Pods;
+			path = Pods;
+			sourceTree = "<group>";
+		};
+		331C8082294A63A400263BE5 /* RunnerTests */ = {
+			isa = PBXGroup;
+			children = (
+				331C807B294A618700263BE5 /* RunnerTests.swift */,
+			);
+			path = RunnerTests;
+			sourceTree = "<group>";
+		};
 		52217DA2235CE4EC6A80CFE3 /* Rpt2 */ = {
 			isa = PBXGroup;
 			children = (
@@ -252,7 +301,7 @@
 				A8340F72CA3D6450BE844011 /* RptPedersen.swift */,
 				BC2B56A3A7EB3E5A89358950 /* RptProtocol.swift */,
 				60DF89726CB0112FB8408B6D /* RptEndpoint.swift */,
-			6B6E833E61E4B8768F3C2CD1 /* RptFullTunnelResult.swift */,
+				6B6E833E61E4B8768F3C2CD1 /* RptFullTunnelResult.swift */,
 				E1A10CCAC1B8762250473E09 /* RptSessionCrypto.swift */,
 				07466FFA1B9B1F0989D529CC /* RptUkIpGate.swift */,
 				0F29D609169D04A5997EAE72 /* VendorBigInt */,
@@ -269,23 +318,6 @@
 				52217DA2235CE4EC6A80CFE3 /* Rpt2 */,
 			);
 			name = NativePrep;
-			sourceTree = "<group>";
-		};
-		DF50F53142DFAE48E47D6E6C /* PacketTunnel */ = {
-			isa = PBXGroup;
-			children = (
-				8CA2FAD23EC9B7A3F02E36B7 /* Info.plist */,
-				B6A626E5EEE26136E1AEC2EC /* PacketTunnel.entitlements */,
-			);
-			name = PacketTunnel;
-			sourceTree = "<group>";
-		};
-		331C8082294A63A400263BE5 /* RunnerTests */ = {
-			isa = PBXGroup;
-			children = (
-				331C807B294A618700263BE5 /* RunnerTests.swift */,
-			);
-			path = RunnerTests;
 			sourceTree = "<group>";
 		};
 		9740EEB11CF90186004384FC /* Flutter */ = {
@@ -309,14 +341,16 @@
 				DF50F53142DFAE48E47D6E6C /* PacketTunnel */,
 				97C146EF1CF9000F007C117D /* Products */,
 				331C8082294A63A400263BE5 /* RunnerTests */,
+				1DBE0C805521B1588DED79DF /* Pods */,
+				C1A1BF3DCA677EBA3E5D5E81 /* Frameworks */,
 			);
 			sourceTree = "<group>";
 		};
 		97C146EF1CF9000F007C117D /* Products */ = {
 			isa = PBXGroup;
 			children = (
-				
-				EA93ACD7AF6899D15FEDF353 /* PacketTunnel.appex */,97C146EE1CF9000F007C117D /* Runner.app */,
+				EA93ACD7AF6899D15FEDF353 /* PacketTunnel.appex */,
+				97C146EE1CF9000F007C117D /* Runner.app */,
 				331C8081294A63A400263BE5 /* RunnerTests.xctest */,
 			);
 			name = Products;
@@ -329,7 +363,7 @@
 				97C146FD1CF9000F007C117D /* Assets.xcassets */,
 				97C146FF1CF9000F007C117D /* LaunchScreen.storyboard */,
 				97C147021CF9000F007C117D /* Info.plist */,
-			CD7D96CE01B2E4DC8C7918DF /* Runner.entitlements */,
+				CD7D96CE01B2E4DC8C7918DF /* Runner.entitlements */,
 				1498D2321E8E86230040F4C2 /* GeneratedPluginRegistrant.h */,
 				1498D2331E8E89220040F4C2 /* GeneratedPluginRegistrant.m */,
 				74858FAE1ED2DC5600515810 /* AppDelegate.swift */,
@@ -339,52 +373,27 @@
 			path = Runner;
 			sourceTree = "<group>";
 		};
+		C1A1BF3DCA677EBA3E5D5E81 /* Frameworks */ = {
+			isa = PBXGroup;
+			children = (
+				44301E29A90B14EAF7DF73EE /* Pods_Runner.framework */,
+				88C1E65207B20639F3791CCF /* Pods_RunnerTests.framework */,
+			);
+			name = Frameworks;
+			sourceTree = "<group>";
+		};
+		DF50F53142DFAE48E47D6E6C /* PacketTunnel */ = {
+			isa = PBXGroup;
+			children = (
+				8CA2FAD23EC9B7A3F02E36B7 /* Info.plist */,
+				B6A626E5EEE26136E1AEC2EC /* PacketTunnel.entitlements */,
+			);
+			name = PacketTunnel;
+			sourceTree = "<group>";
+		};
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
-		331C8080294A63A400263BE5 /* RunnerTests */ = {
-			isa = PBXNativeTarget;
-			buildConfigurationList = 331C8087294A63A400263BE5 /* Build configuration list for PBXNativeTarget "RunnerTests" */;
-			buildPhases = (
-				331C807D294A63A400263BE5 /* Sources */,
-				331C807F294A63A400263BE5 /* Resources */,
-			);
-			buildRules = (
-			);
-			dependencies = (
-				331C8086294A63A400263BE5 /* PBXTargetDependency */,
-			);
-			name = RunnerTests;
-			productName = RunnerTests;
-			productReference = 331C8081294A63A400263BE5 /* RunnerTests.xctest */;
-			productType = "com.apple.product-type.bundle.unit-test";
-		};
-		97C146ED1CF9000F007C117D /* Runner */ = {
-			isa = PBXNativeTarget;
-			buildConfigurationList = 97C147051CF9000F007C117D /* Build configuration list for PBXNativeTarget "Runner" */;
-			buildPhases = (
-				9E6E52BB466F74436E749753 /* Embed Foundation Extensions */,
-				9740EEB61CF901F6004384FC /* Run Script */,
-				97C146EA1CF9000F007C117D /* Sources */,
-				97C146EB1CF9000F007C117D /* Frameworks */,
-				97C146EC1CF9000F007C117D /* Resources */,
-				9705A1C41CF9048500538489 /* Embed Frameworks */,
-				3B06AD1E1E4923F5004D2608 /* Thin Binary */,
-			);
-			buildRules = (
-			);
-			dependencies = (
-				93737992C4DF9097468F92A3 /* PBXTargetDependency */,
-			);
-			name = Runner;
-			packageProductDependencies = (
-				78A3181F2AECB46A00862997 /* FlutterGeneratedPluginSwiftPackage */,
-			);
-			productName = Runner;
-			productReference = 97C146EE1CF9000F007C117D /* Runner.app */;
-			productType = "com.apple.product-type.application";
-		};
-
 		1146A010C7AD86E59C5B2EA6 /* PacketTunnel */ = {
 			isa = PBXNativeTarget;
 			buildConfigurationList = 08A6F30785722DFD48D9D65E /* Build configuration list for PBXNativeTarget "PacketTunnel" */;
@@ -402,6 +411,52 @@
 			productName = PacketTunnel;
 			productReference = EA93ACD7AF6899D15FEDF353 /* PacketTunnel.appex */;
 			productType = "com.apple.product-type.app-extension";
+		};
+		331C8080294A63A400263BE5 /* RunnerTests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 331C8087294A63A400263BE5 /* Build configuration list for PBXNativeTarget "RunnerTests" */;
+			buildPhases = (
+				DC2DBE29B078227452C9F726 /* [CP] Check Pods Manifest.lock */,
+				331C807D294A63A400263BE5 /* Sources */,
+				331C807F294A63A400263BE5 /* Resources */,
+				B42CC2F0FC985ACD734F6D7C /* Frameworks */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				331C8086294A63A400263BE5 /* PBXTargetDependency */,
+			);
+			name = RunnerTests;
+			productName = RunnerTests;
+			productReference = 331C8081294A63A400263BE5 /* RunnerTests.xctest */;
+			productType = "com.apple.product-type.bundle.unit-test";
+		};
+		97C146ED1CF9000F007C117D /* Runner */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 97C147051CF9000F007C117D /* Build configuration list for PBXNativeTarget "Runner" */;
+			buildPhases = (
+				E31D8D2DA25DB1307C63D240 /* [CP] Check Pods Manifest.lock */,
+				9E6E52BB466F74436E749753 /* Embed Foundation Extensions */,
+				9740EEB61CF901F6004384FC /* Run Script */,
+				97C146EA1CF9000F007C117D /* Sources */,
+				97C146EB1CF9000F007C117D /* Frameworks */,
+				97C146EC1CF9000F007C117D /* Resources */,
+				9705A1C41CF9048500538489 /* Embed Frameworks */,
+				3B06AD1E1E4923F5004D2608 /* Thin Binary */,
+				2D9F5EFA1A23A2221BF1942C /* [CP] Embed Pods Frameworks */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				93737992C4DF9097468F92A3 /* PBXTargetDependency */,
+			);
+			name = Runner;
+			packageProductDependencies = (
+				78A3181F2AECB46A00862997 /* FlutterGeneratedPluginSwiftPackage */,
+			);
+			productName = Runner;
+			productReference = 97C146EE1CF9000F007C117D /* Runner.app */;
+			productType = "com.apple.product-type.application";
 		};
 /* End PBXNativeTarget section */
 
@@ -437,7 +492,7 @@
 			);
 			mainGroup = 97C146E51CF9000F007C117D;
 			packageReferences = (
-				781AD8BC2B33823900A9FFBB /* XCLocalSwiftPackageReference "Flutter/ephemeral/Packages/FlutterGeneratedPluginSwiftPackage" */,
+				781AD8BC2B33823900A9FFBB /* XCLocalSwiftPackageReference "FlutterGeneratedPluginSwiftPackage" */,
 			);
 			productRefGroup = 97C146EF1CF9000F007C117D /* Products */;
 			projectDirPath = "";
@@ -451,6 +506,13 @@
 /* End PBXProject section */
 
 /* Begin PBXResourcesBuildPhase section */
+		0F6CB8CA600FFA682DCE86FE /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		331C807F294A63A400263BE5 /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
@@ -469,50 +531,25 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
-
-		0F6CB8CA600FFA682DCE86FE /* Resources */ = {
-			isa = PBXResourcesBuildPhase;
-			buildActionMask = 2147483647;
-			files = (
-			);
-			runOnlyForDeploymentPostprocessing = 0;
-		};
 /* End PBXResourcesBuildPhase section */
 
 /* Begin PBXShellScriptBuildPhase section */
-
-		AA8CACB6B720076AFDD39194 /* Ad-hoc sign PacketTunnel */ = {
+		2D9F5EFA1A23A2221BF1942C /* [CP] Embed Pods Frameworks */ = {
 			isa = PBXShellScriptBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
 			);
 			inputFileListPaths = (
+				"${PODS_ROOT}/Target Support Files/Pods-Runner/Pods-Runner-frameworks-${CONFIGURATION}-input-files.xcfilelist",
 			);
-			inputPaths = (
-			);
-			name = "Ad-hoc sign PacketTunnel";
+			name = "[CP] Embed Pods Frameworks";
 			outputFileListPaths = (
-			);
-			outputPaths = (
+				"${PODS_ROOT}/Target Support Files/Pods-Runner/Pods-Runner-frameworks-${CONFIGURATION}-output-files.xcfilelist",
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
-			shellScript = "# Team-signed Packet Tunnel: do nothing (Xcode already signed with NE entitlements).
-# Ad-hoc only when CODE_SIGNING_ALLOWED=NO (unsigned CI / no NE profile).
-set -e
-APPX=\"${TARGET_BUILD_DIR}/${FULL_PRODUCT_NAME}\"
-if [ ! -d \"$APPX\" ]; then
-  exit 0
-fi
-if [ \"${CODE_SIGNING_ALLOWED}\" = \"NO\" ] || [ \"${CODE_SIGNING_ALLOWED}\" = \"no\" ]; then
-  echo \"Ad-hoc signing PacketTunnel (CODE_SIGNING_ALLOWED=NO): $APPX\"
-  /usr/bin/codesign --force --sign - --timestamp=none \"$APPX\"
-  /usr/bin/codesign --verify --verbose \"$APPX\" || true
-else
-  echo \"PacketTunnel Team-signed (CODE_SIGNING_ALLOWED=${CODE_SIGNING_ALLOWED}); skip ad-hoc re-sign: $APPX\"
-  /usr/bin/codesign --verify --verbose \"$APPX\" || true
-fi
-";
+			shellScript = "\"${PODS_ROOT}/Target Support Files/Pods-Runner/Pods-Runner-frameworks.sh\"\n";
+			showEnvVarsInLog = 0;
 		};
 		3B06AD1E1E4923F5004D2608 /* Thin Binary */ = {
 			isa = PBXShellScriptBuildPhase;
@@ -545,22 +582,69 @@ fi
 			shellPath = /bin/sh;
 			shellScript = "/bin/sh \"$FLUTTER_ROOT/packages/flutter_tools/bin/xcode_backend.sh\" build";
 		};
-/* End PBXShellScriptBuildPhase section */
-
-/* Begin PBXCopyFilesBuildPhase section */
-
-		9E6E52BB466F74436E749753 /* Embed Foundation Extensions */ = {
-			isa = PBXCopyFilesBuildPhase;
+		AA8CACB6B720076AFDD39194 /* Ad-hoc sign PacketTunnel */ = {
+			isa = PBXShellScriptBuildPhase;
 			buildActionMask = 2147483647;
-			dstPath = "";
-			dstSubfolderSpec = 13;
 			files = (
-				37B58A4DDD7D9C2C465C4BCF /* PacketTunnel.appex in Embed Foundation Extensions */,
 			);
-			name = "Embed Foundation Extensions";
+			inputFileListPaths = (
+			);
+			inputPaths = (
+			);
+			name = "Ad-hoc sign PacketTunnel";
+			outputFileListPaths = (
+			);
+			outputPaths = (
+			);
 			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "# Team-signed Packet Tunnel: do nothing (Xcode already signed with NE entitlements).\n# Ad-hoc only when CODE_SIGNING_ALLOWED=NO (unsigned CI / no NE profile).\nset -e\nAPPX=\"${TARGET_BUILD_DIR}/${FULL_PRODUCT_NAME}\"\nif [ ! -d \"$APPX\" ]; then\n  exit 0\nfi\nif [ \"${CODE_SIGNING_ALLOWED}\" = \"NO\" ] || [ \"${CODE_SIGNING_ALLOWED}\" = \"no\" ]; then\n  echo \"Ad-hoc signing PacketTunnel (CODE_SIGNING_ALLOWED=NO): $APPX\"\n  /usr/bin/codesign --force --sign - --timestamp=none \"$APPX\"\n  /usr/bin/codesign --verify --verbose \"$APPX\" || true\nelse\n  echo \"PacketTunnel Team-signed (CODE_SIGNING_ALLOWED=${CODE_SIGNING_ALLOWED}); skip ad-hoc re-sign: $APPX\"\n  /usr/bin/codesign --verify --verbose \"$APPX\" || true\nfi\n";
 		};
-/* End PBXCopyFilesBuildPhase section */
+		DC2DBE29B078227452C9F726 /* [CP] Check Pods Manifest.lock */ = {
+			isa = PBXShellScriptBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputFileListPaths = (
+			);
+			inputPaths = (
+				"${PODS_PODFILE_DIR_PATH}/Podfile.lock",
+				"${PODS_ROOT}/Manifest.lock",
+			);
+			name = "[CP] Check Pods Manifest.lock";
+			outputFileListPaths = (
+			);
+			outputPaths = (
+				"$(DERIVED_FILE_DIR)/Pods-RunnerTests-checkManifestLockResult.txt",
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "diff \"${PODS_PODFILE_DIR_PATH}/Podfile.lock\" \"${PODS_ROOT}/Manifest.lock\" > /dev/null\nif [ $? != 0 ] ; then\n    # print error to STDERR\n    echo \"error: The sandbox is not in sync with the Podfile.lock. Run 'pod install' or update your CocoaPods installation.\" >&2\n    exit 1\nfi\n# This output is used by Xcode 'outputs' to avoid re-running this script phase.\necho \"SUCCESS\" > \"${SCRIPT_OUTPUT_FILE_0}\"\n";
+			showEnvVarsInLog = 0;
+		};
+		E31D8D2DA25DB1307C63D240 /* [CP] Check Pods Manifest.lock */ = {
+			isa = PBXShellScriptBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputFileListPaths = (
+			);
+			inputPaths = (
+				"${PODS_PODFILE_DIR_PATH}/Podfile.lock",
+				"${PODS_ROOT}/Manifest.lock",
+			);
+			name = "[CP] Check Pods Manifest.lock";
+			outputFileListPaths = (
+			);
+			outputPaths = (
+				"$(DERIVED_FILE_DIR)/Pods-Runner-checkManifestLockResult.txt",
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "diff \"${PODS_PODFILE_DIR_PATH}/Podfile.lock\" \"${PODS_ROOT}/Manifest.lock\" > /dev/null\nif [ $? != 0 ] ; then\n    # print error to STDERR\n    echo \"error: The sandbox is not in sync with the Podfile.lock. Run 'pod install' or update your CocoaPods installation.\" >&2\n    exit 1\nfi\n# This output is used by Xcode 'outputs' to avoid re-running this script phase.\necho \"SUCCESS\" > \"${SCRIPT_OUTPUT_FILE_0}\"\n";
+			showEnvVarsInLog = 0;
+		};
+/* End PBXShellScriptBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
 		331C807D294A63A400263BE5 /* Sources */ = {
@@ -571,52 +655,6 @@ fi
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
-		97C146EA1CF9000F007C117D /* Sources */ = {
-			isa = PBXSourcesBuildPhase;
-			buildActionMask = 2147483647;
-			files = (
-				0AD856FDC79F35AB84D2CB0D /* RptClientEngine.swift in Sources */,
-				A11B2C3D4E5F607182930012 /* RptResidualPrivacyPolicy.swift in Sources */,
-				178DFBBF8229AB5933CD28FC /* RptConnectOrchestrator.swift in Sources */,
-				8DA5D118F1FB617796DF7BDE /* RptElgamal.swift in Sources */,
-				3C286BCE142676397F3A447C /* RptPedersen.swift in Sources */,
-				D037DE89F6B615111C2C497C /* RptProtocol.swift in Sources */,
-				B6F167DE1D36BE52956936ED /* RptEndpoint.swift in Sources */,
-				61E4B8768F3C2CD1D67F4176 /* RptFullTunnelResult.swift in Sources */,
-				C1EC9DB0E9CF2DC565637E8E /* RptSessionCrypto.swift in Sources */,
-				AE626A7B048C9E0A4653D56C /* RptUkIpGate.swift in Sources */,
-				861B9F3BF57A20AAB3C54190 /* Addition.swift in Sources */,
-				F8A590AEEC96F1DEB0C48717 /* BigInt.swift in Sources */,
-				0C222EC070FA06D972EEFF3A /* BigUInt.swift in Sources */,
-				B63C155EF025480B034DB3E2 /* Bitwise Ops.swift in Sources */,
-				8A274D974EEA9F7D2ACB1C2A /* Codable.swift in Sources */,
-				65036CBA48E79B899427511B /* Comparable.swift in Sources */,
-				0BF67D552B6856A329725E5A /* Data Conversion.swift in Sources */,
-				25D2EA708AE8DE21E03CE77E /* Division.swift in Sources */,
-				CFFD43C6E95D2C0664B63EC2 /* Exponentiation.swift in Sources */,
-				06F3C9B8143833F985B1485D /* Floating Point Conversion.swift in Sources */,
-				0B2B777E394D72E1A87DF6F0 /* GCD.swift in Sources */,
-				4C4B1D5F2EFB0E14E17A1079 /* Hashable.swift in Sources */,
-				12A95C4A5FEE86D19189AC4B /* Integer Conversion.swift in Sources */,
-				0E311443B35FD4E8BEEE7F92 /* Multiplication.swift in Sources */,
-				D366A0827887B9B34934E118 /* Prime Test.swift in Sources */,
-				496EA035B19C4DB68EC48E9F /* Random.swift in Sources */,
-				84763B1CC6C77D73BAD10F4F /* Shifts.swift in Sources */,
-				0C8EA59822296FA8F206361E /* Square Root.swift in Sources */,
-				3E091507D1DB11BA372699E2 /* Strideable.swift in Sources */,
-				5A08ABF1894D541E8F9DC65A /* String Conversion.swift in Sources */,
-				BB9173F72E9988CC51F5F00C /* Subtraction.swift in Sources */,
-				F05F977A2567499A580612E7 /* Words and Bits.swift in Sources */,
-				BBF09D864AB695EE761D3456 /* RptVpnChannel.swift in Sources */,
-				B37B9E88976111C4D96EF808 /* RptSecrets.swift in Sources */,
-
-				74858FAF1ED2DC5600515810 /* AppDelegate.swift in Sources */,
-				1498D2341E8E89220040F4C2 /* GeneratedPluginRegistrant.m in Sources */,
-				7884E8682EC3CC0700C636F2 /* SceneDelegate.swift in Sources */,
-			);
-			runOnlyForDeploymentPostprocessing = 0;
-		};
-
 		8A5D0516ACB0747CF5A41AF3 /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
@@ -658,18 +696,62 @@ fi
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		97C146EA1CF9000F007C117D /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				0AD856FDC79F35AB84D2CB0D /* RptClientEngine.swift in Sources */,
+				A11B2C3D4E5F607182930012 /* RptResidualPrivacyPolicy.swift in Sources */,
+				178DFBBF8229AB5933CD28FC /* RptConnectOrchestrator.swift in Sources */,
+				8DA5D118F1FB617796DF7BDE /* RptElgamal.swift in Sources */,
+				3C286BCE142676397F3A447C /* RptPedersen.swift in Sources */,
+				D037DE89F6B615111C2C497C /* RptProtocol.swift in Sources */,
+				B6F167DE1D36BE52956936ED /* RptEndpoint.swift in Sources */,
+				61E4B8768F3C2CD1D67F4176 /* RptFullTunnelResult.swift in Sources */,
+				C1EC9DB0E9CF2DC565637E8E /* RptSessionCrypto.swift in Sources */,
+				AE626A7B048C9E0A4653D56C /* RptUkIpGate.swift in Sources */,
+				861B9F3BF57A20AAB3C54190 /* Addition.swift in Sources */,
+				F8A590AEEC96F1DEB0C48717 /* BigInt.swift in Sources */,
+				0C222EC070FA06D972EEFF3A /* BigUInt.swift in Sources */,
+				B63C155EF025480B034DB3E2 /* Bitwise Ops.swift in Sources */,
+				8A274D974EEA9F7D2ACB1C2A /* Codable.swift in Sources */,
+				65036CBA48E79B899427511B /* Comparable.swift in Sources */,
+				0BF67D552B6856A329725E5A /* Data Conversion.swift in Sources */,
+				25D2EA708AE8DE21E03CE77E /* Division.swift in Sources */,
+				CFFD43C6E95D2C0664B63EC2 /* Exponentiation.swift in Sources */,
+				06F3C9B8143833F985B1485D /* Floating Point Conversion.swift in Sources */,
+				0B2B777E394D72E1A87DF6F0 /* GCD.swift in Sources */,
+				4C4B1D5F2EFB0E14E17A1079 /* Hashable.swift in Sources */,
+				12A95C4A5FEE86D19189AC4B /* Integer Conversion.swift in Sources */,
+				0E311443B35FD4E8BEEE7F92 /* Multiplication.swift in Sources */,
+				D366A0827887B9B34934E118 /* Prime Test.swift in Sources */,
+				496EA035B19C4DB68EC48E9F /* Random.swift in Sources */,
+				84763B1CC6C77D73BAD10F4F /* Shifts.swift in Sources */,
+				0C8EA59822296FA8F206361E /* Square Root.swift in Sources */,
+				3E091507D1DB11BA372699E2 /* Strideable.swift in Sources */,
+				5A08ABF1894D541E8F9DC65A /* String Conversion.swift in Sources */,
+				BB9173F72E9988CC51F5F00C /* Subtraction.swift in Sources */,
+				F05F977A2567499A580612E7 /* Words and Bits.swift in Sources */,
+				BBF09D864AB695EE761D3456 /* RptVpnChannel.swift in Sources */,
+				B37B9E88976111C4D96EF808 /* RptSecrets.swift in Sources */,
+				74858FAF1ED2DC5600515810 /* AppDelegate.swift in Sources */,
+				1498D2341E8E89220040F4C2 /* GeneratedPluginRegistrant.m in Sources */,
+				7884E8682EC3CC0700C636F2 /* SceneDelegate.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXSourcesBuildPhase section */
 
 /* Begin PBXTargetDependency section */
-		93737992C4DF9097468F92A3 /* PBXTargetDependency */ = {
-			isa = PBXTargetDependency;
-			target = 1146A010C7AD86E59C5B2EA6 /* PacketTunnel */;
-			targetProxy = F72B63F62BAD96EAED1A7356 /* PBXContainerItemProxy */;
-		};
 		331C8086294A63A400263BE5 /* PBXTargetDependency */ = {
 			isa = PBXTargetDependency;
 			target = 97C146ED1CF9000F007C117D /* Runner */;
 			targetProxy = 331C8085294A63A400263BE5 /* PBXContainerItemProxy */;
+		};
+		93737992C4DF9097468F92A3 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 1146A010C7AD86E59C5B2EA6 /* PacketTunnel */;
+			targetProxy = F72B63F62BAD96EAED1A7356 /* PBXContainerItemProxy */;
 		};
 /* End PBXTargetDependency section */
 
@@ -749,13 +831,13 @@ fi
 			isa = XCBuildConfiguration;
 			baseConfigurationReference = 7AFA3C8E1D35360C0083082E /* Release.xcconfig */;
 			buildSettings = {
-				CODE_SIGN_ENTITLEMENTS = Runner/Runner.entitlements;
-				DEVELOPMENT_TEAM = SFCBP95595;
-				CODE_SIGN_IDENTITY = "Apple Development";
-				CODE_SIGN_STYLE = Automatic;
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CLANG_ENABLE_MODULES = YES;
+				CODE_SIGN_ENTITLEMENTS = Runner/Runner.entitlements;
+				CODE_SIGN_IDENTITY = "Apple Development";
+				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = "$(FLUTTER_BUILD_NUMBER)";
+				DEVELOPMENT_TEAM = SFCBP95595;
 				ENABLE_BITCODE = NO;
 				INFOPLIST_FILE = Runner/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -772,6 +854,7 @@ fi
 		};
 		331C8088294A63A400263BE5 /* Debug */ = {
 			isa = XCBuildConfiguration;
+			baseConfigurationReference = 77A5AFC49608DC9159F75886 /* Pods-RunnerTests.debug.xcconfig */;
 			buildSettings = {
 				BUNDLE_LOADER = "$(TEST_HOST)";
 				CODE_SIGN_STYLE = Automatic;
@@ -789,6 +872,7 @@ fi
 		};
 		331C8089294A63A400263BE5 /* Release */ = {
 			isa = XCBuildConfiguration;
+			baseConfigurationReference = C0B540F5CE82BD1A70C79C04 /* Pods-RunnerTests.release.xcconfig */;
 			buildSettings = {
 				BUNDLE_LOADER = "$(TEST_HOST)";
 				CODE_SIGN_STYLE = Automatic;
@@ -804,6 +888,7 @@ fi
 		};
 		331C808A294A63A400263BE5 /* Profile */ = {
 			isa = XCBuildConfiguration;
+			baseConfigurationReference = AB30E055DFB57676A82D5C24 /* Pods-RunnerTests.profile.xcconfig */;
 			buildSettings = {
 				BUNDLE_LOADER = "$(TEST_HOST)";
 				CODE_SIGN_STYLE = Automatic;
@@ -816,6 +901,62 @@ fi
 				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Runner.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/Runner";
 			};
 			name = Profile;
+		};
+		3A02EB5406B6490D32489D7C /* Profile */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGNING_ALLOWED = YES;
+				CODE_SIGNING_REQUIRED = YES;
+				CODE_SIGN_ENTITLEMENTS = PacketTunnel/PacketTunnel.entitlements;
+				CODE_SIGN_IDENTITY = "Apple Development";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = SFCBP95595;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = PacketTunnel/Info.plist;
+				IPHONEOS_DEPLOYMENT_TARGET = 14.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.restoreprivacy.restorePrivacyClient.PacketTunnel;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SKIP_INSTALL = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Profile;
+		};
+		4F62EB7C9CB0208E5D1E212A /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGNING_ALLOWED = YES;
+				CODE_SIGNING_REQUIRED = YES;
+				CODE_SIGN_ENTITLEMENTS = PacketTunnel/PacketTunnel.entitlements;
+				CODE_SIGN_IDENTITY = "Apple Development";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = SFCBP95595;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = PacketTunnel/Info.plist;
+				IPHONEOS_DEPLOYMENT_TARGET = 14.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.restoreprivacy.restorePrivacyClient.PacketTunnel;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SKIP_INSTALL = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Release;
 		};
 		97C147031CF9000F007C117D /* Debug */ = {
 			isa = XCBuildConfiguration;
@@ -932,13 +1073,13 @@ fi
 			isa = XCBuildConfiguration;
 			baseConfigurationReference = 9740EEB21CF90195004384FC /* Debug.xcconfig */;
 			buildSettings = {
-				CODE_SIGN_ENTITLEMENTS = Runner/Runner.entitlements;
-				DEVELOPMENT_TEAM = SFCBP95595;
-				CODE_SIGN_IDENTITY = "Apple Development";
-				CODE_SIGN_STYLE = Automatic;
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CLANG_ENABLE_MODULES = YES;
+				CODE_SIGN_ENTITLEMENTS = Runner/Runner.entitlements;
+				CODE_SIGN_IDENTITY = "Apple Development";
+				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = "$(FLUTTER_BUILD_NUMBER)";
+				DEVELOPMENT_TEAM = SFCBP95595;
 				ENABLE_BITCODE = NO;
 				INFOPLIST_FILE = Runner/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -958,13 +1099,13 @@ fi
 			isa = XCBuildConfiguration;
 			baseConfigurationReference = 7AFA3C8E1D35360C0083082E /* Release.xcconfig */;
 			buildSettings = {
-				CODE_SIGN_ENTITLEMENTS = Runner/Runner.entitlements;
-				DEVELOPMENT_TEAM = SFCBP95595;
-				CODE_SIGN_IDENTITY = "Apple Development";
-				CODE_SIGN_STYLE = Automatic;
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CLANG_ENABLE_MODULES = YES;
+				CODE_SIGN_ENTITLEMENTS = Runner/Runner.entitlements;
+				CODE_SIGN_IDENTITY = "Apple Development";
+				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = "$(FLUTTER_BUILD_NUMBER)";
+				DEVELOPMENT_TEAM = SFCBP95595;
 				ENABLE_BITCODE = NO;
 				INFOPLIST_FILE = Runner/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -979,99 +1120,47 @@ fi
 			};
 			name = Release;
 		};
-
 		B30B56FC775F3CB16F423B3D /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
-								CODE_SIGN_STYLE = Automatic;
+				CODE_SIGNING_ALLOWED = YES;
+				CODE_SIGNING_REQUIRED = YES;
+				CODE_SIGN_ENTITLEMENTS = PacketTunnel/PacketTunnel.entitlements;
+				CODE_SIGN_IDENTITY = "Apple Development";
+				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = SFCBP95595;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = PacketTunnel/Info.plist;
+				IPHONEOS_DEPLOYMENT_TARGET = 14.0;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
 					"@executable_path/../../Frameworks",
 				);
 				MARKETING_VERSION = 1.0;
-				CODE_SIGN_ENTITLEMENTS = PacketTunnel/PacketTunnel.entitlements;
-				CODE_SIGN_IDENTITY = "Apple Development";
-				CODE_SIGN_STYLE = Automatic;
-				CODE_SIGNING_ALLOWED = YES;
-				CODE_SIGNING_REQUIRED = YES;
-				DEVELOPMENT_TEAM = SFCBP95595;
 				PRODUCT_BUNDLE_IDENTIFIER = com.restoreprivacy.restorePrivacyClient.PacketTunnel;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = iphoneos;
 				SKIP_INSTALL = YES;
 				SWIFT_VERSION = 5.0;
-				IPHONEOS_DEPLOYMENT_TARGET = 14.0;
 				TARGETED_DEVICE_FAMILY = "1,2";
 			};
 			name = Debug;
 		};
-
-		4F62EB7C9CB0208E5D1E212A /* Release */ = {
-			isa = XCBuildConfiguration;
-			buildSettings = {
-								CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 1;
-				GENERATE_INFOPLIST_FILE = NO;
-				INFOPLIST_FILE = PacketTunnel/Info.plist;
-				LD_RUNPATH_SEARCH_PATHS = (
-					"$(inherited)",
-					"@executable_path/Frameworks",
-					"@executable_path/../../Frameworks",
-				);
-				MARKETING_VERSION = 1.0;
-				CODE_SIGN_ENTITLEMENTS = PacketTunnel/PacketTunnel.entitlements;
-				CODE_SIGN_IDENTITY = "Apple Development";
-				CODE_SIGN_STYLE = Automatic;
-				CODE_SIGNING_ALLOWED = YES;
-				CODE_SIGNING_REQUIRED = YES;
-				DEVELOPMENT_TEAM = SFCBP95595;
-				PRODUCT_BUNDLE_IDENTIFIER = com.restoreprivacy.restorePrivacyClient.PacketTunnel;
-				PRODUCT_NAME = "$(TARGET_NAME)";
-				SDKROOT = iphoneos;
-				SKIP_INSTALL = YES;
-				SWIFT_VERSION = 5.0;
-				IPHONEOS_DEPLOYMENT_TARGET = 14.0;
-				TARGETED_DEVICE_FAMILY = "1,2";
-			};
-			name = Release;
-		};
-
-		3A02EB5406B6490D32489D7C /* Profile */ = {
-			isa = XCBuildConfiguration;
-			buildSettings = {
-								CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 1;
-				GENERATE_INFOPLIST_FILE = NO;
-				INFOPLIST_FILE = PacketTunnel/Info.plist;
-				LD_RUNPATH_SEARCH_PATHS = (
-					"$(inherited)",
-					"@executable_path/Frameworks",
-					"@executable_path/../../Frameworks",
-				);
-				MARKETING_VERSION = 1.0;
-				CODE_SIGN_ENTITLEMENTS = PacketTunnel/PacketTunnel.entitlements;
-				CODE_SIGN_IDENTITY = "Apple Development";
-				CODE_SIGN_STYLE = Automatic;
-				CODE_SIGNING_ALLOWED = YES;
-				CODE_SIGNING_REQUIRED = YES;
-				DEVELOPMENT_TEAM = SFCBP95595;
-				PRODUCT_BUNDLE_IDENTIFIER = com.restoreprivacy.restorePrivacyClient.PacketTunnel;
-				PRODUCT_NAME = "$(TARGET_NAME)";
-				SDKROOT = iphoneos;
-				SKIP_INSTALL = YES;
-				SWIFT_VERSION = 5.0;
-				IPHONEOS_DEPLOYMENT_TARGET = 14.0;
-				TARGETED_DEVICE_FAMILY = "1,2";
-			};
-			name = Profile;
-		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
+		08A6F30785722DFD48D9D65E /* Build configuration list for PBXNativeTarget "PacketTunnel" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				B30B56FC775F3CB16F423B3D /* Debug */,
+				4F62EB7C9CB0208E5D1E212A /* Release */,
+				3A02EB5406B6490D32489D7C /* Profile */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
 		331C8087294A63A400263BE5 /* Build configuration list for PBXNativeTarget "RunnerTests" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
@@ -1102,21 +1191,10 @@ fi
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
 		};
-
-		08A6F30785722DFD48D9D65E /* Build configuration list for PBXNativeTarget "PacketTunnel" */ = {
-			isa = XCConfigurationList;
-			buildConfigurations = (
-				B30B56FC775F3CB16F423B3D /* Debug */,
-				4F62EB7C9CB0208E5D1E212A /* Release */,
-				3A02EB5406B6490D32489D7C /* Profile */,
-			);
-			defaultConfigurationIsVisible = 0;
-			defaultConfigurationName = Release;
-		};
 /* End XCConfigurationList section */
 
 /* Begin XCLocalSwiftPackageReference section */
-		781AD8BC2B33823900A9FFBB /* XCLocalSwiftPackageReference "Flutter/ephemeral/Packages/FlutterGeneratedPluginSwiftPackage" */ = {
+		781AD8BC2B33823900A9FFBB /* XCLocalSwiftPackageReference "FlutterGeneratedPluginSwiftPackage" */ = {
 			isa = XCLocalSwiftPackageReference;
 			relativePath = Flutter/ephemeral/Packages/FlutterGeneratedPluginSwiftPackage;
 		};

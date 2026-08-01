@@ -155,6 +155,7 @@ STATIC_ROUTES: dict[str, str] = {
     "/static/public_theme.js": "public_theme.js",
     "/static/admin_theme.js": "admin_theme.js",
     "/static/admin_sidebar.js": "admin_sidebar.js",
+    "/static/audit_last_run_helpers.js": "audit_last_run_helpers.js",
     "/static/audit_countdown.js": "audit_countdown.js",
     "/static/audit_page_ticker.js": "audit_page_ticker.js",
     # Written by scripts/run_security_audit.py --write; public Audit page + countdown
@@ -192,7 +193,16 @@ def static_file_path(url_path: str) -> Path | None:
     """Resolve a public static URL to a file under status_page/static/."""
     name = STATIC_ROUTES.get(url_path)
     if not name:
-        return None
+        # Allow tiny world-flag pack: /static/flags/w20/{cc}.png
+        p = (url_path or "").strip()
+        if p.startswith("/static/flags/w20/") and p.lower().endswith(".png"):
+            base = p.rsplit("/", 1)[-1].lower()
+            if len(base) == 6 and base[:2].isalpha() and base.endswith(".png"):
+                name = f"flags/w20/{base}"
+            else:
+                return None
+        else:
+            return None
     path = (STATIC_DIR / name).resolve()
     try:
         path.relative_to(STATIC_DIR.resolve())
@@ -479,8 +489,13 @@ def render_html(
     title = public_display_title(
         str(status.get("title", PUBLIC_BRAND_TITLE) or PUBLIC_BRAND_TITLE)
     )
-    if "Suite" not in title and "1.0.0" not in title:
-        title = PUBLIC_BRAND_DISPLAY
+    # Document <title> stays Suite-branded (all-caps PUBLIC_BRAND_TITLE). Never
+    # fall back to a VPN product name; only upgrade empty/legacy leftovers.
+    low = title.casefold()
+    if "suite" not in low and "1.0.0" not in title and "vpn" in low:
+        title = PUBLIC_BRAND_TITLE
+    elif not title.strip():
+        title = PUBLIC_BRAND_TITLE
 
     suite_intro_html = render_suite_home_intro_html()
     suite_html = render_suite_storefront_html(
@@ -523,7 +538,9 @@ def render_html(
         + suite_home_intro_css()
         + free_download_cta_css()
     )
-    free_cta_html = render_free_download_cta_html()
+    free_cta_html = render_free_download_cta_html(
+        default_platform=default_platform,
+    )
     try:
         from audit_countdown import render_audit_countdown_html
     except ImportError:  # package-style import when status_page is on path
@@ -643,7 +660,7 @@ def render_html(
     </div>
 """
     body = f"""{public_head_open(title=str(title), extra_css=page_css)}
-  <div class="page-shell" id="page-shell" data-page="home" data-product="suite" data-suite-version="1.0.0" data-chrome="pro">
+  <div class="page-shell" id="page-shell" data-page="home" data-product="suite" data-suite-version="1.0.1" data-chrome="pro">
 {header}
 {suite_intro_html}
 {free_cta_html}
@@ -823,12 +840,46 @@ class Handler(BaseHTTPRequestHandler):
                 render_support_page_html().encode("utf-8"),
             )
             return
-        # Free packages hub (centered orange direct-download links)
-        if path in (FREE_PACKAGES_PATH, f"{FREE_PACKAGES_PATH}/"):
+        # Commercial Suite service page (main-nav Service → £3000/node)
+        if path in ("/service", "/service/"):
+            try:
+                from service_commercial import render_service_page_html
+            except ImportError:  # pragma: no cover
+                from status_page.service_commercial import (  # type: ignore
+                    render_service_page_html,
+                )
+            pay_err = (query.get("pay_error") or query.get("error") or "").strip()
+            paid_flag = (query.get("paid") or "").strip().lower() in (
+                "1",
+                "true",
+                "yes",
+            )
             self._send(
                 200,
                 "text/html; charset=utf-8",
-                render_free_packages_page_html(),
+                render_service_page_html(pay_error=pay_err, paid=paid_flag),
+            )
+            return
+        # Free packages hub (centered orange direct-download links)
+        if path in (FREE_PACKAGES_PATH, f"{FREE_PACKAGES_PATH}/"):
+            q_plat = (query.get("platform") or "").strip()
+            if not q_plat:
+                try:
+                    from downloads import detect_platform_from_user_agent
+                except ImportError:  # pragma: no cover
+                    from status_page.downloads import (  # type: ignore
+                        detect_platform_from_user_agent,
+                    )
+                ua = ""
+                for k, v in self.headers.items():
+                    if str(k).lower() == "user-agent":
+                        ua = str(v or "")
+                        break
+                q_plat = detect_platform_from_user_agent(ua)
+            self._send(
+                200,
+                "text/html; charset=utf-8",
+                render_free_packages_page_html(default_platform=q_plat),
             )
             return
         # Suite free installer download (no pay token). App still needs KEYGEN.
@@ -2244,6 +2295,57 @@ class Handler(BaseHTTPRequestHandler):
             )
             return
 
+        if path in ("/pay/commercial-suite", "/pay/commercial-suite/"):
+            # One-time £3000 commercial Suite node licence (Service page left box)
+            try:
+                from payments import (
+                    COMMERCIAL_SUITE_NODE_PRICE_PENCE,
+                    create_commercial_suite_checkout_session,
+                    stripe_configured,
+                )
+            except ImportError:  # pragma: no cover
+                from status_page.payments import (  # type: ignore
+                    COMMERCIAL_SUITE_NODE_PRICE_PENCE,
+                    create_commercial_suite_checkout_session,
+                    stripe_configured,
+                )
+            if not stripe_configured():
+                q = urllib.parse.urlencode(
+                    {
+                        "pay_error": (
+                            "Checkout is temporarily unavailable "
+                            "(payments not configured)."
+                        ),
+                    }
+                )
+                self._redirect(f"/service?{q}#service-commercial-box")
+                return
+            try:
+                session = create_commercial_suite_checkout_session()
+            except ValueError as e:
+                q = urllib.parse.urlencode(
+                    {"pay_error": f"Could not start commercial checkout: {e}"}
+                )
+                self._redirect(f"/service?{q}#service-commercial-box")
+                return
+            # Guard: session must be one-time £3000 payment (not KEYGEN sub)
+            if int(session.get("amount_pence") or 0) != int(
+                COMMERCIAL_SUITE_NODE_PRICE_PENCE
+            ):
+                q = urllib.parse.urlencode(
+                    {"pay_error": "Commercial checkout amount mismatch."}
+                )
+                self._redirect(f"/service?{q}#service-commercial-box")
+                return
+            if str(session.get("mode") or "") != "payment":
+                q = urllib.parse.urlencode(
+                    {"pay_error": "Commercial checkout must be one-time payment."}
+                )
+                self._redirect(f"/service?{q}#service-commercial-box")
+                return
+            self._redirect(str(session["url"]))
+            return
+
         if path == "/pay/checkout":
             # Site plan form: platform + interval + auto_renew + product → subscription Checkout
             ctype = (self.headers.get("Content-Type") or "").lower()
@@ -2691,7 +2793,12 @@ class Handler(BaseHTTPRequestHandler):
                     render_admin_node_operator_page_html,
                 )
             form = dict(urllib.parse.parse_qsl(body.decode("utf-8", "replace")))
-            ok, msg, node_id = handle_admin_node_operator_action(form)
+            result = handle_admin_node_operator_action(form)
+            ok, msg, node_id = result[0], result[1], result[2]
+            # Missing package-host SSH keys → force browser to app-testers
+            if len(result) > 3 and result[3]:
+                self._redirect(str(result[3]))
+                return
             if ok:
                 self._send(
                     200,
@@ -2760,6 +2867,9 @@ class Handler(BaseHTTPRequestHandler):
                 force=form.get("force") == "1",
                 install_serve=form.get("install_serve") == "1",
             )
+            if r.get("missing_ssh_keys") and r.get("redirect"):
+                self._redirect(str(r["redirect"]))
+                return
             if r.get("ok"):
                 msg = (
                     f"Path upload {r.get('filename')} v{r.get('version')} "
@@ -2807,6 +2917,9 @@ class Handler(BaseHTTPRequestHandler):
                 allow_missing=form.get("allow_missing") == "1",
                 install_serve=form.get("install_serve") == "1",
             )
+            if r.get("missing_ssh_keys") and r.get("redirect"):
+                self._redirect(str(r["redirect"]))
+                return
             if r.get("ok"):
                 msg = (
                     f"Pushed {r.get('suite')} present={r.get('present_count')}/"

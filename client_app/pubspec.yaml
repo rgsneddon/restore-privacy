@@ -5,7 +5,7 @@ description: "Restore Privacy Suite — residual VPN, Perccent wallet (%), and E
 publish_to: 'none' # Remove this line if you wish to publish to pub.dev
 
 # Restore Privacy Suite v 1.0.0 monopin.
-version: 1.0.0+1
+version: 1.0.1+1
 
 environment:
   sdk: '>=3.2.0 <4.0.0'
@@ -20,6 +20,8 @@ dependencies:
   shared_preferences: ^2.5.3
   url_launcher: ^6.3.1
   provider: ^6.1.2
+  # Embed live Perccent block explorer in the Suite % wallet tab.
+  webview_flutter: ^4.10.0
 
   # Perccent wallet (%) and Evolve Chronoflux (EVOLVE) — path deps, one source.
   perccent_wallet:

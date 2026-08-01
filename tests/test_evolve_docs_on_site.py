@@ -57,7 +57,9 @@ class TestEvolveDocsOnSite(unittest.TestCase):
         self.assertEqual(SUITE_EVOLVE_DOCS_HREF, "/EVOLVE.md")
         self.assertEqual(SUITE_EVOLVE_PAGES_HREF, "/EVOLVE.md")
         # Primary evolve-docs entry is not only external GH Pages
-        hrefs = {h for h, _, k in suite_product_submenu_links() if k == "evolve-docs"}
+        hrefs = {
+            h for h, _, k, *_rest in suite_product_submenu_links() if k == "evolve-docs"
+        }
         self.assertEqual(hrefs, {"/EVOLVE.md"})
         suite = render_suite_storefront_html()
         self.assertIn('data-suite-sub="evolve-docs"', suite)
@@ -70,6 +72,33 @@ class TestEvolveDocsOnSite(unittest.TestCase):
         # White paper / source can remain external
         self.assertIn("fcg_white_paper.html", suite)
         self.assertIn("github.com/rgsneddon/evolve", suite)
+
+    def test_evolve_docs_rendered_as_public_site_page(self) -> None:
+        """Drive the shipped public-doc path loader — full site HTML page, not raw dump only."""
+        from public_docs import EVOLVE_DOCS_PATH, document_bytes_for_path
+
+        result = document_bytes_for_path(EVOLVE_DOCS_PATH)
+        self.assertIsNotNone(result)
+        assert result is not None
+        raw, content_type, title = result
+        self.assertIsInstance(raw, (bytes, bytearray))
+        self.assertIn("html", content_type.lower())
+        html = raw.decode("utf-8")
+        # Site chrome + README substance (github.com/rgsneddon/evolve README)
+        self.assertIn("Chronoflux", html)
+        self.assertIn("Evolve", html)
+        self.assertIn("Social Science", html)
+        self.assertTrue(
+            'id="page-shell"' in html
+            or 'data-page=' in html
+            or "brand-panel" in html
+            or "doc-body" in html
+            or "site-nav" in html
+            or "doc-links" in html,
+            msg="expected public site chrome around Evolve docs",
+        )
+        self.assertGreater(len(html), 2000)
+        self.assertIn("Evolve", title)
 
 
 if __name__ == "__main__":

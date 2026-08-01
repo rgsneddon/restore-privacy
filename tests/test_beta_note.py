@@ -72,7 +72,7 @@ class TestTitleLegalLinks(unittest.TestCase):
         # Downloads remain; live client count removed
         self.assertNotIn("clients-connected", html)
         self.assertNotIn("fetch('/api/status'", html)
-        self.assertIn("Download client", html)
+        self.assertIn("Download Suite client", html)
 
     def test_legal_url_constants_point_at_shipped_docs(self):
         self.assertTrue(

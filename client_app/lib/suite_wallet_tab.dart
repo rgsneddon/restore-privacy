@@ -11,17 +11,21 @@ import 'package:perccent_wallet/screens/wallet_bootstrap_screen.dart';
 import 'package:perccent_wallet/theme/app_theme.dart';
 import 'package:perccent_wallet/wallet_core/models/locale_config_ui.dart';
 
+import 'suite_perc_explorer_panel.dart';
 import 'theme.dart';
 
 /// **%** tab — full Perccent / MY PERC wallet (bootstrap → shell).
 ///
-/// Embeds the shipped wallet package surfaces; not a stub.
+/// Embeds the shipped wallet package surfaces; not a stub. The live Perccent
+/// block explorer (``https://evolve-perc-internet.onrender.com``) is iframed
+/// via [SuitePercExplorerPanel] above the wallet bootstrap shell.
 class SuiteWalletTab extends StatefulWidget {
   const SuiteWalletTab({
     super.key,
     this.walletProvider,
     this.localeProvider,
     this.child,
+    this.showExplorer = true,
   });
 
   /// Injectable for tests; production creates [PercWalletProvider].
@@ -32,6 +36,9 @@ class SuiteWalletTab extends StatefulWidget {
 
   /// When set, replaces bootstrap (tests inject a ready surface).
   final Widget? child;
+
+  /// When true (default), show the live block-explorer embed above the wallet.
+  final bool showExplorer;
 
   @override
   State<SuiteWalletTab> createState() => _SuiteWalletTabState();
@@ -110,8 +117,21 @@ class _SuiteWalletTabState extends State<SuiteWalletTab> {
       );
     }
 
-    final body = widget.child ??
+    final walletBody = widget.child ??
         WalletBootstrapScreen(walletProvider: _wallet!);
+
+    final body = widget.showExplorer
+        ? Column(
+            key: const Key('suite_wallet_with_explorer'),
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              const SuitePercExplorerPanel(
+                key: Key('suite_wallet_perc_explorer'),
+              ),
+              Expanded(child: walletBody),
+            ],
+          )
+        : walletBody;
 
     return MultiProvider(
       providers: [

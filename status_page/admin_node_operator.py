@@ -17,8 +17,9 @@ from typing import Any
 ADMIN_NODE_OPERATOR_PATH = "/admin/node-operator"
 ADMIN_NODE_OPERATOR_POST_PATH = "/admin/node-operator/action"
 ADMIN_NAV_NODE_OPERATOR_ID = "admin-nav-node-operator"
-# Live page reload interval (seconds) for sessions / residual status.
-ADMIN_NODE_OPERATOR_AUTO_REFRESH_SEC = 5
+# Full-page auto-reload for Node Operator is off (operators refresh manually).
+# Kept as a named constant so tests/callers can assert the feature is disabled.
+ADMIN_NODE_OPERATOR_AUTO_REFRESH_SEC = 0
 
 
 def monorepo_root() -> Path:
@@ -50,15 +51,17 @@ def ensure_monorepo_on_path() -> Path:
 
 
 def node_operator_auto_refresh_meta(node_id: str = "") -> str:
-    """CSP-safe meta refresh for Node Operator (no inline script).
+    """Optional CSP-safe meta refresh for Node Operator (no inline script).
 
-    *node_id* is preserved in the refresh URL query so the selected operable
-    node tab survives the reload.
+    Auto-refresh is **disabled** (``ADMIN_NODE_OPERATOR_AUTO_REFRESH_SEC`` ≤ 0).
+    Returns an empty string so the admin page does not full-reload on a timer.
+    *node_id* is accepted for API compat (selected node survives manual GET).
     """
+    _ = node_id  # retained for call-site API compatibility
     sec = int(ADMIN_NODE_OPERATOR_AUTO_REFRESH_SEC)
     if sec < 1:
-        sec = 5
-    # Allow only simple operable-node id characters (lab, IS, DE, helsinki-store).
+        return ""
+    # Defensive: only emit meta if a positive interval is re-enabled later.
     nid = "".join(
         c for c in (node_id or "").strip() if c.isalnum() or c in "-_"
     )
@@ -594,10 +597,20 @@ def render_admin_node_operator_page_html(
     )
 
 
+# Forced browser destination when package-host SSH keys are missing on this machine.
+ADMIN_UPLOAD_MISSING_SSH_KEYS_URL = "https://restoreprivacy.online/app-testers"
+
+
 def handle_admin_node_operator_action(
     form: dict[str, str],
-) -> tuple[bool, str, str]:
-    """Process POST action. Returns (ok, message_or_error, selected_node_id)."""
+) -> tuple[bool, str, str] | tuple[bool, str, str, str]:
+    """Process POST action.
+
+    Returns ``(ok, message_or_error, selected_node_id)`` normally.
+    When package SSH upload is blocked for missing host access keys, returns a
+    fourth element: absolute redirect URL (``https://restoreprivacy.online/app-testers``)
+    so the status host can force browser navigation.
+    """
     ensure_monorepo_on_path()
     node_id = (form.get("node") or "").strip() or "IS"
     action = (form.get("action") or "").strip()
@@ -675,6 +688,13 @@ def handle_admin_node_operator_action(
                 allow_missing=form.get("allow_missing") == "1",
                 install_serve=form.get("install_serve") == "1",
             )
+            if r.get("missing_ssh_keys") and r.get("redirect"):
+                return (
+                    False,
+                    str(r.get("error") or "SSH access keys missing"),
+                    node["id"],
+                    str(r.get("redirect") or ADMIN_UPLOAD_MISSING_SSH_KEYS_URL),
+                )
             if not r.get("ok"):
                 return (
                     False,
@@ -697,6 +717,13 @@ def handle_admin_node_operator_action(
             allow_missing=form.get("allow_missing") == "1",
             install_serve=form.get("install_serve") == "1",
         )
+        if r.get("missing_ssh_keys") and r.get("redirect"):
+            return (
+                False,
+                str(r.get("error") or "SSH access keys missing"),
+                node["id"],
+                str(r.get("redirect") or ADMIN_UPLOAD_MISSING_SSH_KEYS_URL),
+            )
         if not r.get("ok"):
             return False, str(r.get("error") or "deploy failed"), node["id"]
         return (
@@ -715,6 +742,13 @@ def handle_admin_node_operator_action(
             force=form.get("force") == "1",
             install_serve=form.get("install_serve") == "1",
         )
+        if r.get("missing_ssh_keys") and r.get("redirect"):
+            return (
+                False,
+                str(r.get("error") or "SSH access keys missing"),
+                node["id"],
+                str(r.get("redirect") or ADMIN_UPLOAD_MISSING_SSH_KEYS_URL),
+            )
         if not r.get("ok"):
             return False, str(r.get("error") or "path upload failed"), node["id"]
         return (

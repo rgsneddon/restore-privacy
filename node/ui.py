@@ -1,18 +1,35 @@
-"""Minimal node status UI: product title only (no public client count).
+"""Minimal node status UI: human observe → app-testers; public JSON title-only.
 
-Optional **private** capacity endpoint (token-gated) for residual load probes —
-never mixed into public HTML/JSON status.
+When a browser opens the residual node status surface (``/`` / ``/index.html``),
+viewers are sent to the product app-testers page on the public status host.
+Machine-facing ``/api/status`` and ``/status`` stay **title-only** JSON (no live
+session counters). Optional **private** capacity endpoint remains token-gated.
 """
 
 from __future__ import annotations
 
 import json
+import os
 import threading
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from typing import Callable, Optional
 from urllib.parse import parse_qs, urlparse
 
 from node.aggregate_metrics import filter_public_status
+
+# Default human observe destination (status host app-testers gate).
+DEFAULT_OBSERVE_REDIRECT_URL = "https://restoreprivacy.online/app-testers"
+# Env override for lab / alternate status origins (must still land on /app-testers
+# when using the public product host).
+_ENV_OBSERVE_URL = "RPT_NODE_OBSERVE_URL"
+
+
+def observe_redirect_url() -> str:
+    """Absolute URL browsers hit when opening the node status UI."""
+    raw = (os.environ.get(_ENV_OBSERVE_URL) or "").strip()
+    if raw:
+        return raw.rstrip("/") or DEFAULT_OBSERVE_REDIRECT_URL
+    return DEFAULT_OBSERVE_REDIRECT_URL
 
 
 def public_status_from_payload(payload: dict) -> dict:
@@ -24,7 +41,10 @@ def make_handler(
     get_status: Callable[[], dict],
     *,
     get_private_capacity: Optional[Callable[[], dict]] = None,
+    observe_url: Optional[str] = None,
 ):
+    dest = (observe_url or "").strip() or observe_redirect_url()
+
     class Handler(BaseHTTPRequestHandler):
         def log_message(self, format, *args):  # noqa: A003
             # No access logs of any means
@@ -34,35 +54,25 @@ def make_handler(
             parsed = urlparse(self.path)
             path = parsed.path or self.path
 
-            if path in ("/", "/index.html"):
-                status = public_status_from_payload(get_status())
-                title = status.get("title", "RESTORE PRIVACY")
-                body = f"""<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="utf-8"/>
-  <title>{title}</title>
-  <style>
-    body {{ margin:0; min-height:100vh; display:flex; flex-direction:column;
-           align-items:center; justify-content:center; background:#0b0f14; color:#e8eef5;
-           font-family: system-ui, sans-serif; }}
-    h1 {{ letter-spacing:0.12em; font-weight:600; font-size:2.2rem; margin:0 0 1.5rem; }}
-    .tag {{ font-size:1rem; opacity:0.75; max-width:22rem; text-align:center; }}
-  </style>
-</head>
-<body>
-  <h1>{title}</h1>
-  <div class="tag">Node online. No public live session counter.</div>
-</body>
-</html>
-"""
-                data = body.encode("utf-8")
-                self.send_response(200)
-                self.send_header("Content-Type", "text/html; charset=utf-8")
-                self.send_header("Content-Length", str(data.__len__()))
+            if path in ("/", "/index.html", "/observe", "/observe/"):
+                # Human browser observe → product app-testers (not local title HTML).
+                self.send_response(302)
+                self.send_header("Location", dest)
                 self.send_header("Cache-Control", "no-store")
+                # Small HTML fallback if a client ignores Location
+                body = (
+                    "<!DOCTYPE html><html lang=\"en\"><head>"
+                    f'<meta charset="utf-8"/>'
+                    f'<meta http-equiv="refresh" content="0;url={dest}"/>'
+                    f'<script>location.replace({json.dumps(dest)});</script>'
+                    f"<title>Redirect</title></head><body>"
+                    f'<p><a href="{dest}">Continue to app testers</a></p>'
+                    "</body></html>"
+                ).encode("utf-8")
+                self.send_header("Content-Type", "text/html; charset=utf-8")
+                self.send_header("Content-Length", str(len(body)))
                 self.end_headers()
-                self.wfile.write(data)
+                self.wfile.write(body)
                 return
             if path in ("/api/status", "/status"):
                 safe = public_status_from_payload(get_status())

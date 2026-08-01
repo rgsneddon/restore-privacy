@@ -34,8 +34,8 @@ class TestHomepageTrialSentence(unittest.TestCase):
         html = render_download_section_html(coming_soon=False)
         # Nested box inside #downloads
         self.assertIn('id="downloads"', html)
-        # Large white bold monthly callout under Download client heading
-        self.assertIn("Download client v", html)
+        # Large white bold monthly callout under Download Suite client heading
+        self.assertIn("Download Suite client v", html)
         self.assertIn('id="dl-only-price"', html)
         self.assertIn('class="dl-only-price"', html)
         self.assertIn(ONLY_PRICE_BANNER, html)
@@ -44,7 +44,7 @@ class TestHomepageTrialSentence(unittest.TestCase):
             "yearly" in ONLY_PRICE_BANNER.lower()
             or "annual" in ONLY_PRICE_BANNER.lower()
         )
-        heading_i = html.find("Download client v")
+        heading_i = html.find("Download Suite client v")
         banner_i = html.find('id="dl-only-price"')
         box_start = html.find('id="dl-price-box"')
         self.assertGreater(banner_i, heading_i)

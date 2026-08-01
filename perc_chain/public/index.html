@@ -3,7 +3,9 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Perccent Network Explorer</title>
+  <title>Restore Privacy Suite · Perccent Network Explorer</title>
+  <link rel="icon" href="public/favicon.png" type="image/png" sizes="32x32"/>
+  <meta name="description" content="Restore Privacy Suite — Perccent Network Explorer (Evolve Chronoflux)"/>
   <style>
     :root {
       --bg: #0b0d14;
@@ -15,6 +17,7 @@
       --online: #00d4aa;
       --offline: #f59e0b;
       --danger: #ef4444;
+      --rb-cyan: #00e5ff;
     }
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body {
@@ -27,9 +30,44 @@
     .wrap { max-width: 1100px; margin: 0 auto; padding: 32px 20px 64px; }
     .page-top {
       display: flex;
-      justify-content: flex-end;
+      justify-content: space-between;
       align-items: center;
-      margin-bottom: 6px;
+      gap: 12px;
+      margin-bottom: 10px;
+      flex-wrap: wrap;
+    }
+    .brand-lockup {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      text-decoration: none;
+      color: inherit;
+    }
+    .brand-lockup img.rpt-logo {
+      width: 52px;
+      height: 52px;
+      object-fit: contain;
+      display: block;
+      filter: drop-shadow(0 0 10px rgba(0, 229, 255, 0.35));
+    }
+    .brand-lockup .brand-text {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+      line-height: 1.15;
+    }
+    .brand-lockup .brand-name {
+      font-size: 0.95rem;
+      font-weight: 800;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      color: #f2f5f7;
+    }
+    .brand-lockup .brand-tag {
+      font-size: 0.72rem;
+      font-weight: 600;
+      letter-spacing: 0.04em;
+      color: var(--rb-cyan);
     }
     .fcg-link {
       font-size: 0.78rem;
@@ -40,6 +78,13 @@
     }
     .fcg-link:hover { color: var(--accent); opacity: 1; }
     header { margin-bottom: 28px; }
+    header.explorer-header {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: flex-start;
+      gap: 16px 20px;
+    }
+    header.explorer-header .header-copy { flex: 1 1 16rem; min-width: 0; }
     h1 { font-size: 1.75rem; margin-bottom: 6px; }
     .sub { color: var(--muted); font-size: 0.95rem; }
     .grid {
@@ -145,12 +190,26 @@
 <body>
   <div class="wrap">
     <div class="page-top">
+      <a class="brand-lockup" id="rpt-brand-lockup" href="https://restoreprivacy.online/"
+         data-rpt-brand="1" aria-label="Restore Privacy Suite">
+        <img class="rpt-logo" id="rpt-logo"
+             src="public/restore-privacy-logo.png"
+             width="52" height="52"
+             alt="Restore Privacy logo"
+             data-rpt-logo="1"/>
+        <span class="brand-text">
+          <span class="brand-name">Restore Privacy Suite</span>
+          <span class="brand-tag">Perc · Evolve Chronoflux</span>
+        </span>
+      </a>
       <a class="fcg-link" href="https://rgsneddon.github.io/evolve/fcg_white_paper.html" target="_blank" rel="noopener noreferrer">FCG white paper</a>
     </div>
-    <header>
-      <h1>Perccent Network Explorer</h1>
-      <p class="sub">Evolve Chronoflux seed node &middot; rendezvous &middot; peer status</p>
-      <p class="sub" style="margin-top:8px" id="endpoint-line"></p>
+    <header class="explorer-header" data-rpt-branded-header="1">
+      <div class="header-copy">
+        <h1>Perccent Network Explorer</h1>
+        <p class="sub">Restore Privacy Suite · Evolve Chronoflux seed node · rendezvous · peer status</p>
+        <p class="sub" style="margin-top:8px" id="endpoint-line"></p>
+      </div>
     </header>
 
     <div id="error" class="error" style="display:none"></div>

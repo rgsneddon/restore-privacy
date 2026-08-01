@@ -44,21 +44,6 @@ body {
 .panel h1, .panel h2 { margin: 0 0 0.7rem; letter-spacing: 0.03em; }
 .lead { margin: 0 auto 0.75rem; max-width: 36rem; line-height: 1.55; color: #cfe6f7; }
 .foot, .muted { color: var(--muted); line-height: 1.45; }
-.suite-product-submenu {
-  display: flex; flex-wrap: wrap; gap: 0.4rem; justify-content: center;
-  margin: 0.5rem auto 0.85rem; max-width: 36rem;
-}
-.suite-product-submenu-label {
-  width: 100%; margin: 0 0 0.35rem; font-size: 0.72rem; font-weight: 700;
-  letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted);
-}
-.suite-product-submenu a {
-  display: inline-block; padding: 0.32rem 0.65rem; border-radius: 999px;
-  font-size: 0.72rem; font-weight: 700; text-decoration: none;
-  color: #e8f2ff; background: rgba(15, 40, 70, 0.65);
-  border: 1px solid var(--border);
-}
-.suite-product-submenu a:hover { border-color: var(--accent); }
 .free-grid {
   display: flex; flex-wrap: wrap; gap: 0.55rem; justify-content: center; margin: 0.85rem 0;
 }
@@ -69,19 +54,6 @@ body {
 }
 .free-grid a.dl:hover, a.btn:hover { background: #c5e0f4; }
 .keygen-note { margin: 0.75rem auto; max-width: 32rem; color: #fecaca; font-weight: 600; }
-.download-node-preference {
-  margin: 1rem auto 0; max-width: 36rem; padding: 0.85rem 1rem;
-  border: 1px dashed var(--border); border-radius: 12px;
-  background: rgba(8, 18, 32, 0.45); text-align: center;
-}
-.download-node-preference h3 { margin: 0 0 0.45rem; font-size: 0.95rem; }
-.download-node-preference .node-pref-blurb {
-  margin: 0 auto 0.65rem; max-width: 34rem; font-size: 0.85rem;
-  line-height: 1.45; color: #cfe6f7;
-}
-.download-node-preference .node-pref-links {
-  display: flex; flex-wrap: wrap; gap: 0.45rem; justify-content: center;
-}
 .steps { text-align: left; max-width: 28rem; margin: 0.5rem auto; line-height: 1.55; color: #cfe6f7; }
 .site-foot { text-align: center; margin-top: 1.5rem; font-size: 0.85rem; color: var(--muted); }
 .doc-body { text-align: left; max-width: 38rem; margin: 0 auto; line-height: 1.55; color: #cfe6f7; }

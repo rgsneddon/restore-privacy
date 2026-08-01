@@ -55,11 +55,36 @@ const String kKeyPaymentKeygen = 'payment_entitlement_keygen';
 const String kKeyPaymentPlatform = 'payment_entitlement_platform';
 const String kKeyPaymentValidUntil = 'payment_entitlement_valid_until';
 const String kKeyPaymentRenewUrl = 'payment_entitlement_renew_url';
+/// Suite vs VPN product line (shared entitlement structure).
+const String kKeyPaymentProductLine = 'payment_entitlement_product_line';
+const String kProductLineVpn = 'vpn';
+const String kProductLineSuite = 'suite';
 const String kPaymentStatusActive = 'active';
 const String kPaymentStatusFailed = 'failed';
 const String kPaymentStatusRevoked = 'revoked';
 const String kPaymentStatusUnpaid = 'unpaid';
 const String kPaymentStatusUnknown = 'unknown';
+
+/// Normalize product_line from host payload (Suite inherits VPN status semantics).
+String normalizeProductLine(String? raw) {
+  final s = (raw ?? '').trim().toLowerCase().replaceAll(' ', '_');
+  if (s == kProductLineSuite ||
+      s == 'restore_privacy_suite' ||
+      s == 'restore-privacy-suite') {
+    return kProductLineSuite;
+  }
+  return kProductLineVpn;
+}
+
+/// Active subscription unlocks Connect for both Suite and VPN grants.
+bool entitlementConnectAllowed({
+  required String status,
+  String productLine = kProductLineVpn,
+}) {
+  // productLine is informational; Suite reuses VPN active/failed/period model.
+  final _ = productLine;
+  return status.trim().toLowerCase() == kPaymentStatusActive;
+}
 
 /// Customer-facing licence status (host + clients).
 const String kLicenceStatusOk = 'OK';
@@ -149,8 +174,8 @@ const String kPaymentConnectDisclaimerPlain =
     'cancelled for that purchase/install until a successful payment is completed.';
 
 const String kShortLicenceSummary =
-    'Restore Privacy is proprietary full copyright: client packages may be used '
-    'only to run a device on the Restore Privacy VPN, with no warranty (AS IS). '
+    'Restore Privacy Suite is proprietary full copyright: client packages may be used '
+    'only to run a device with residual Connect, with no warranty (AS IS). '
     'Copy or transmission of the product architecture is not permitted. '
     'Third-party components keep their own licences (see LICENSE / CREDITS). '
     'By accepting, you agree to those terms. Acceptance is stored only on this device. '
@@ -254,6 +279,7 @@ class LicenceGate {
     String platform = '',
     double? validUntil,
     String renewUrl = '',
+    String productLine = '',
   }) async {
     if (sessionId.trim().isNotEmpty) {
       await backend.setString(kKeyPaymentSessionId, sessionId.trim());
@@ -273,7 +299,18 @@ class LicenceGate {
     if (renewUrl.trim().isNotEmpty) {
       await backend.setString(kKeyPaymentRenewUrl, renewUrl.trim());
     }
+    if (productLine.trim().isNotEmpty) {
+      await backend.setString(
+        kKeyPaymentProductLine,
+        normalizeProductLine(productLine),
+      );
+    }
     await backend.setString(kKeyPaymentStatus, kPaymentStatusActive);
+  }
+
+  Future<String> paymentProductLine() async {
+    final s = await backend.getString(kKeyPaymentProductLine);
+    return normalizeProductLine(s);
   }
 
   Future<void> recordPaymentFailure({
@@ -449,12 +486,16 @@ class LicenceGate {
         );
         return kPaymentStatusRevoked;
       }
+      final remotePl = normalizeProductLine(
+        remote['product_line']?.toString() ?? remote['product']?.toString(),
+      );
       await recordPaymentSuccess(
         remoteSid,
         keygen: remoteKg,
         platform: remotePlat,
         validUntil: remoteVu,
         renewUrl: remoteRenew,
+        productLine: remotePl,
       );
       if (bindDevice && remoteSid.trim().isNotEmpty) {
         try {

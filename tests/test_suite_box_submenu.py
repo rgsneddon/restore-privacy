@@ -28,7 +28,8 @@ class TestSuiteBoxSubmenu(unittest.TestCase):
         )
 
         links = suite_product_submenu_links()
-        hrefs = {h for h, _, _ in links}
+        # (href, label, key, title) — title optional expanded meaning
+        hrefs = {row[0] for row in links}
         self.assertIn(SUITE_PERC_EXPLORER_HREF, hrefs)
         self.assertTrue(
             SUITE_PERC_EXPLORER_HREF.startswith("https://135.181.152.10.sslip.io/perc")

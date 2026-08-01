@@ -23,6 +23,12 @@ FORM_ACTION_DIRECTIVE = (
     "https://buy.stripe.com"
 )
 
+# Suite left-box embeds the live Perccent block explorer (wallet area iframe).
+# Without frame-src, default-src 'self' blocks the external explorer document.
+FRAME_SRC_DIRECTIVE = (
+    "frame-src 'self' https://evolve-perc-internet.onrender.com"
+)
+
 CONTENT_SECURITY_POLICY = (
     "default-src 'self'; "
     "script-src 'self'; "
@@ -33,6 +39,7 @@ CONTENT_SECURITY_POLICY = (
     "object-src 'none'; "
     "base-uri 'self'; "
     "frame-ancestors 'none'; "
+    f"{FRAME_SRC_DIRECTIVE}; "
     f"{FORM_ACTION_DIRECTIVE}; "
     "upgrade-insecure-requests"
 )
@@ -47,6 +54,7 @@ CONTENT_SECURITY_POLICY_FRAMEABLE = (
     "object-src 'none'; "
     "base-uri 'self'; "
     "frame-ancestors 'self'; "
+    f"{FRAME_SRC_DIRECTIVE}; "
     f"{FORM_ACTION_DIRECTIVE}; "
     "upgrade-insecure-requests"
 )

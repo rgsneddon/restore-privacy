@@ -809,16 +809,68 @@ def package_host_row_from_metrics(
     )
 
 
-def package_host_base_url(env: Mapping[str, str] | None = None) -> str:
-    """Public base for the package store (no path suffix required)."""
-    e = env if env is not None else os.environ
-    raw = str(e.get(ENV_VPS_ASSET_BASE, "") or "").strip()
+def _resolve_package_host_token(env: Mapping[str, str] | None = None) -> str:
+    """Asset token from *env*, process env, or admin processor store (same as payments)."""
+    if env is not None:
+        for key in (ENV_ASSET_TOKEN, "RPT_VPS_ASSET_TOKEN"):
+            val = str(env.get(key, "") or "").strip()
+            if val:
+                return val
+    for key in (ENV_ASSET_TOKEN, "RPT_VPS_ASSET_TOKEN"):
+        val = (os.environ.get(key) or "").strip()
+        if val:
+            return val
+    try:
+        from payments import vps_asset_fetch_token
+    except ImportError:  # pragma: no cover
+        try:
+            from status_page.payments import vps_asset_fetch_token  # type: ignore
+        except ImportError:
+            return ""
+    try:
+        return (vps_asset_fetch_token() or "").strip()
+    except Exception:  # noqa: BLE001
+        return ""
+
+
+def _resolve_package_host_asset_base(env: Mapping[str, str] | None = None) -> str:
+    """``RPT_VPS_ASSET_BASE`` from *env*, process env, or processor store."""
+    e = env if env is not None else {}
+    raw = str(e.get(ENV_VPS_ASSET_BASE, "") or "").strip().rstrip("/")
     if raw:
-        # Strip /paid-assets suffix if present so we can join metrics path
+        return raw
+    try:
+        from payments import vps_asset_base_url
+    except ImportError:  # pragma: no cover
+        try:
+            from status_page.payments import vps_asset_base_url  # type: ignore
+        except ImportError:
+            vps_asset_base_url = None  # type: ignore
+    if vps_asset_base_url is not None:
+        try:
+            raw = (vps_asset_base_url() or "").strip().rstrip("/")
+            if raw:
+                return raw
+        except Exception:  # noqa: BLE001
+            pass
+    raw = (os.environ.get(ENV_VPS_ASSET_BASE) or "").strip().rstrip("/")
+    return raw
+
+
+def package_host_base_url(env: Mapping[str, str] | None = None) -> str:
+    """Origin for the package store (no ``/paid-assets`` path suffix).
+
+    Metrics live at ``{origin}/api/private/host-metrics`` on the store host
+    (not under ``/paid-assets/…``). Accepts bases with or without that prefix.
+    """
+    raw = _resolve_package_host_asset_base(env)
+    if raw:
         base = raw.rstrip("/")
-        if base.endswith("/paid-assets"):
-            base = base[: -len("/paid-assets")]
-        return base.rstrip("/")
+        # Strip one or more trailing /paid-assets segments
+        while base.endswith("/paid-assets"):
+            base = base[: -len("/paid-assets")].rstrip("/")
+        if base:
+            return base
     return DEFAULT_PACKAGE_HOST_BASE
 
 
@@ -832,20 +884,32 @@ def probe_package_host_metrics(
     transport: TransportFn | None = None,
     timeout_s: float | None = None,
 ) -> tuple[dict[str, Any] | None, str]:
-    """Token-gated GET host-metrics on package store; (payload, error)."""
+    """Token-gated GET host-metrics on package store; (payload, error).
+
+    Token and base URL resolve the same way as paid delivery: process env,
+    then admin processor store (``vps_asset_fetch_token`` / ``vps_asset_base_url``).
+    """
     e = env if env is not None else os.environ
-    tok = str(e.get(ENV_ASSET_TOKEN, "") or "").strip()
+    tok = _resolve_package_host_token(env)
     if not tok:
-        return None, "RPT_ASSET_FETCH_TOKEN not set"
+        return (
+            None,
+            "Package store token not configured "
+            "(set RPT_ASSET_FETCH_TOKEN in admin Processors or host env)",
+        )
     try:
         t = (
             float(timeout_s)
             if timeout_s is not None
-            else float(e.get(ENV_PROBE_TIMEOUT, "") or DEFAULT_PROBE_TIMEOUT)
+            else float(
+                (e.get(ENV_PROBE_TIMEOUT) if hasattr(e, "get") else None)
+                or os.environ.get(ENV_PROBE_TIMEOUT, "")
+                or DEFAULT_PROBE_TIMEOUT
+            )
         )
     except ValueError:
         t = DEFAULT_PROBE_TIMEOUT
-    url = package_host_metrics_url(e)
+    url = package_host_metrics_url(env)
     headers = {
         "X-RPT-Asset-Token": tok,
         "Accept": "application/json",
@@ -859,6 +923,10 @@ def probe_package_host_metrics(
             return None, "invalid host-metrics JSON"
         return data, ""
     except urllib.error.HTTPError as exc:
+        if int(getattr(exc, "code", 0) or 0) == 401:
+            return None, "package store rejected asset token (HTTP 401)"
+        if int(getattr(exc, "code", 0) or 0) == 404:
+            return None, "host-metrics path not found on package store (HTTP 404)"
         return None, f"HTTP {exc.code}"
     except urllib.error.URLError as exc:
         return None, f"unreachable ({exc.reason})"

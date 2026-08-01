@@ -35,6 +35,10 @@ KEY_REASON = "reason"
 KEY_UPDATED_AT = "updated_at"
 KEY_VALID_UNTIL = "valid_until"
 KEY_KEYGEN = "keygen"
+# Suite vs VPN product line (shared entitlement structure; optional label).
+KEY_PRODUCT_LINE = "product_line"
+PRODUCT_LINE_VPN = "vpn"
+PRODUCT_LINE_SUITE = "suite"
 
 STATUS_ACTIVE = "active"
 STATUS_FAILED = "failed"
@@ -115,6 +119,14 @@ PAYMENT_CONNECT_DISCLAIMER_PLAIN = (
 )
 
 
+def normalize_product_line(product: str | None) -> str:
+    """VPN structure first: suite and vpn share active/failed/period semantics."""
+    s = (product or "").strip().lower().replace(" ", "_")
+    if s in (PRODUCT_LINE_SUITE, "restore_privacy_suite", "restore-privacy-suite"):
+        return PRODUCT_LINE_SUITE
+    return PRODUCT_LINE_VPN
+
+
 @dataclass(frozen=True)
 class PaymentEntitlement:
     session_id: str = ""
@@ -125,6 +137,7 @@ class PaymentEntitlement:
     valid_until: float | None = None
     keygen: str = ""
     renew_url: str = ""
+    product_line: str = PRODUCT_LINE_VPN
 
     def to_dict(self) -> dict[str, Any]:
         d: dict[str, Any] = {
@@ -134,6 +147,7 @@ class PaymentEntitlement:
             KEY_REASON: str(self.reason or ""),
             KEY_UPDATED_AT: float(self.updated_at or 0.0),
             KEY_KEYGEN: str(self.keygen or ""),
+            KEY_PRODUCT_LINE: normalize_product_line(self.product_line),
         }
         if self.valid_until is not None:
             d[KEY_VALID_UNTIL] = float(self.valid_until)
@@ -148,6 +162,7 @@ class PaymentEntitlement:
             vu = float(vu_raw) if vu_raw is not None and str(vu_raw).strip() != "" else None
         except (TypeError, ValueError):
             vu = None
+        pl_raw = data.get(KEY_PRODUCT_LINE) or data.get("product") or PRODUCT_LINE_VPN
         return cls(
             session_id=str(data.get(KEY_SESSION_ID) or ""),
             status=str(data.get(KEY_STATUS) or STATUS_UNKNOWN).strip().lower(),
@@ -157,6 +172,7 @@ class PaymentEntitlement:
             valid_until=vu,
             keygen=str(data.get(KEY_KEYGEN) or "").strip().upper(),
             renew_url=str(data.get(KEY_RENEW_URL) or "").strip(),
+            product_line=normalize_product_line(str(pl_raw or "")),
         )
 
 

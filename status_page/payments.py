@@ -85,6 +85,26 @@ PRODUCT_LINE_DEFAULT = PRODUCT_LINE_VPN
 STRIPE_PRODUCT_NAME_SUITE_MONTHLY = "Restore Privacy Suite monthly plan"
 STRIPE_PRODUCT_NAME_SUITE_YEARLY = "Restore Privacy Suite yearly plan"
 SUITE_PRODUCT_DISPLAY_NAME = "Restore Privacy Suite"
+
+# Commercial own-company branded Suite (Service page) — one-time £3000 per node.
+# Distinct from residual KEYGEN £3/month subscription (PRICE_PENCE).
+COMMERCIAL_SUITE_NODE_PRICE_PENCE = 300_000  # £3000.00 GBP
+COMMERCIAL_SUITE_NODE_PRICE_LABEL = "£3000"
+COMMERCIAL_SUITE_NODE_PRICE_GBP = 3000
+COMMERCIAL_SUITE_PRODUCT_KEY = "commercial_suite_node"
+COMMERCIAL_SUITE_PRODUCT_LINE = "commercial_suite"
+COMMERCIAL_SUITE_PRODUCT_NAME = (
+    "Restore Privacy Suite — £3000 deposit (commercial node work)"
+)
+COMMERCIAL_SUITE_PRODUCT_DESCRIPTION = (
+    "£3000 is a deposit to begin commercial Restore Privacy Suite node work "
+    "(not a fixed final all-in price). Covers starting dedicated residual node / "
+    "rpOS mainframe deployment and business package setup. Further costs may "
+    "apply and are agreed before additional work is billed. One-time payment."
+)
+COMMERCIAL_SUITE_CHECKOUT_PATH = "/pay/commercial-suite"
+COMMERCIAL_SUITE_SUCCESS_PATH = "/service?paid=1"
+COMMERCIAL_SUITE_CANCEL_PATH = "/service?pay_error=cancelled"
 # Default paid fulfilment link window: 12 hours (reusable until expiry).
 _DEFAULT_DOWNLOAD_TOKEN_TTL_SEC = 12 * 3600  # 43200
 TOKEN_TTL_SEC = int(
@@ -6987,6 +7007,102 @@ def create_subscription_checkout_session(
         "product_line": pl,
         "mode": "subscription",
         "auto_renew": renew,
+    }
+
+
+def build_commercial_suite_checkout_form_body(
+    *,
+    success_url: str,
+    cancel_url: str,
+    quantity: int = 1,
+) -> bytes:
+    """Stripe Checkout Session body for commercial Suite node licence.
+
+    **Always** ``mode=payment`` (one-time) with unit_amount
+    :data:`COMMERCIAL_SUITE_NODE_PRICE_PENCE` (£3000 GBP). Never attaches the
+    monthly KEYGEN subscription Price ids.
+    """
+    qty = max(1, int(quantity or 1))
+    amount = int(COMMERCIAL_SUITE_NODE_PRICE_PENCE)
+    fields: list[tuple[str, str]] = [
+        ("mode", "payment"),
+        ("success_url", success_url),
+        ("cancel_url", cancel_url),
+        ("client_reference_id", COMMERCIAL_SUITE_PRODUCT_KEY),
+        ("metadata[product]", COMMERCIAL_SUITE_PRODUCT_KEY),
+        ("metadata[product_line]", COMMERCIAL_SUITE_PRODUCT_LINE),
+        ("metadata[amount_pence]", str(amount)),
+        ("metadata[currency]", PRICE_CURRENCY),
+        ("metadata[billing]", "one_time"),
+        ("metadata[per_node]", "1"),
+        ("metadata[quantity]", str(qty)),
+        ("customer_creation", "always"),
+        ("line_items[0][price_data][currency]", PRICE_CURRENCY),
+        ("line_items[0][price_data][unit_amount]", str(amount)),
+        (
+            "line_items[0][price_data][product_data][name]",
+            COMMERCIAL_SUITE_PRODUCT_NAME,
+        ),
+        (
+            "line_items[0][price_data][product_data][description]",
+            COMMERCIAL_SUITE_PRODUCT_DESCRIPTION,
+        ),
+        ("line_items[0][quantity]", str(qty)),
+    ]
+    return urllib.parse.urlencode(fields).encode("utf-8")
+
+
+def create_commercial_suite_checkout_session(
+    *,
+    base_url: str | None = None,
+    http_post: HttpPostFn | None = None,
+    quantity: int = 1,
+) -> dict[str, Any]:
+    """Create a one-time Stripe Checkout Session for £3000 commercial Suite node.
+
+    Returns dict with id, url, amount_pence, currency, mode, product.
+    """
+    key = stripe_secret_key()
+    if not key:
+        raise ValueError("STRIPE_SECRET_KEY not configured")
+    base = (base_url or public_base_url()).rstrip("/")
+    success = f"{base}/service?paid=1&session_id={{CHECKOUT_SESSION_ID}}"
+    cancel = f"{base}/service?pay_error=cancelled"
+    body = build_commercial_suite_checkout_form_body(
+        success_url=success,
+        cancel_url=cancel,
+        quantity=quantity,
+    )
+    post = http_post or _default_http_post
+    headers = {
+        "Authorization": f"Bearer {key}",
+        "Content-Type": "application/x-www-form-urlencoded",
+    }
+    status, raw = post(
+        "https://api.stripe.com/v1/checkout/sessions",
+        headers,
+        body,
+    )
+    if status >= 400:
+        raise ValueError(
+            f"stripe commercial checkout create failed HTTP {status}: {raw[:300]!r}"
+        )
+    data = json.loads(raw.decode("utf-8"))
+    url = data.get("url")
+    sid = data.get("id")
+    if not url or not sid:
+        raise ValueError("stripe response missing url/id")
+    return {
+        "id": sid,
+        "url": url,
+        "amount_pence": int(COMMERCIAL_SUITE_NODE_PRICE_PENCE),
+        "currency": PRICE_CURRENCY,
+        "mode": "payment",
+        "product": COMMERCIAL_SUITE_PRODUCT_KEY,
+        "product_line": COMMERCIAL_SUITE_PRODUCT_LINE,
+        "product_name": COMMERCIAL_SUITE_PRODUCT_NAME,
+        "quantity": max(1, int(quantity or 1)),
+        "billing": "one_time",
     }
 
 

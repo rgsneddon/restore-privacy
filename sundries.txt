@@ -7,7 +7,7 @@ Contents moved from the public-facing README (ports, VPN APP Shop hosting,
 node deploy, developer client-app notes, local tests, secrets).
 
 Source client version: 1.0.0 (product host residual peers; see README).
-Public download catalog: 1.0.0 (status_page/downloads.py RELEASE_VERSION).
+Public download catalog: 1.0.1 (status_page/downloads.py RELEASE_VERSION).
 (see status_page/downloads.py RELEASE_VERSION / client/VERSION monopin).
 
 

@@ -1,11 +1,13 @@
-# Restore Privacy VPN — browser extension (catalog 0.4.4)
+# Restore Privacy Suite — browser extension
 
 Chromium **Manifest V3** extension for **browser-scoped** Connect / Disconnect.
+It sits beside **Restore Privacy Suite 1.0.0** native installers; it is not a
+replacement for residual TUN.
 
 ## Honesty
 
 - **Browser only:** routes this browser’s traffic via the configured **local proxy** path (`chrome.proxy`).
-- **Not OS residual:** does **not** create Wintun / Packet Tunnel / system residual TUN. Paid native clients (Windows · Android · macOS · iOS · Linux) remain the residual product path.
+- **Not OS residual:** does **not** create Wintun / Packet Tunnel / system residual TUN. Suite native clients (Windows · Android · macOS · iOS · Linux, catalog **1.0.0**) remain the residual product path.
 - Default proxy target is `socks5://127.0.0.1:1080` (local companion / future bridge). Override via Connect options if your browser stack exposes a different local path.
 
 ## Load unpacked (developer)

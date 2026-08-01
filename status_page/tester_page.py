@@ -27,8 +27,8 @@ CLAIM_COOKIE_MAX_AGE = 86400 * 400  # ~13 months (covers one-month test + return
 
 # User-facing refusal (objective typo "trsters" → "testers")
 ALREADY_USED_MESSAGE = (
-    "You have already generated a testers link and keygen, "
-    "please use that to test the Restore Privacy VPN."
+    "You have already generated a testers link and keygen — "
+    "please use that to test Restore Privacy Suite."
 )
 
 ACCEPT_FIELD = "read_licence_fully"
@@ -263,12 +263,12 @@ APP TESTER DISCLAIMER (one-month free tester programme)
 
 By accepting below you confirm that:
 
-1. You are an invited or intentional app tester of Restore Privacy VPN, not a
+1. You are an invited or intentional app tester of **Restore Privacy Suite**, not a
    substitute for a paid subscription for production use.
 2. You receive a **one-month** tester grant and KEYGEN for **one** device package
-   platform only. A second package selection for the same tester identity is
-   refused.
-3. Tester builds may be pre-release or catalog monopin builds; residual VPN
+   platform only (Suite catalog monopin). A second package selection for the same
+   tester identity is refused.
+3. Tester builds may be pre-release or catalog monopin builds; residual Connect
    behaviour, nodes, and host privacy posture are as described in product docs
    (no absolute anonymity or logging-free guarantee beyond published statements).
 4. Download links are time-limited (12 hours) status-host fulfilment tokens — not permanent

@@ -51,7 +51,7 @@ class TestDownloadsNoMojibake(unittest.TestCase):
     def test_render_html_clean(self):
         html = render_download_section_html()
         _assert_clean(html, "download html")
-        self.assertIn(f"Download client v{RELEASE_VERSION}", html)
+        self.assertIn(f"Download Suite client v{RELEASE_VERSION}", html)
         self.assertIn("Windows | Linux | macOS | iOS | Android", html)
         # Trailing “catalog v… on restoreprivacy.online (paid download only)” removed
         self.assertNotIn("paid download only", html)

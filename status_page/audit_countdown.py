@@ -326,7 +326,7 @@ def render_audit_countdown_html(
     last_disp = html.escape(format_last_audit_run_display(last_raw if isinstance(last_raw, str) else None))
     available = "1" if state["available"] else "0"
     # data-next-audit is ISO Z used by client JS; empty when unavailable
-    return f"""  <div class="audit-countdown" id="audit-countdown" data-available="{available}" data-next-audit="{next_iso}" data-period-seconds="{state['period_seconds']}">
+    return f"""  <div class="audit-countdown" id="audit-countdown" data-available="{available}" data-next-audit="{next_iso}" data-period-seconds="{state['period_seconds']}" data-last-audit="{html.escape(str(last_raw or ''))}">
     <div class="audit-countdown-row">
       <span class="audit-countdown-label">{label}</span>
       <span class="audit-countdown-value" id="audit-countdown-value" aria-live="polite">{display}</span>
@@ -334,6 +334,7 @@ def render_audit_countdown_html(
     <p class="audit-countdown-blurb" id="audit-countdown-blurb">{blurb}</p>
     <p class="audit-last-run" id="audit-last-run">last audit run: <time id="audit-last-run-time" datetime="{html.escape(str(last_raw or ''))}">{last_disp}</time></p>
   </div>
+  <script id="audit-last-run-helpers-script" src="/static/audit_last_run_helpers.js"></script>
   <script id="audit-countdown-script" src="/static/audit_countdown.js"></script>
 """
 
@@ -406,9 +407,10 @@ def render_audit_page_ticker_html(
       ~every 1 day automated security pass (node probes, package confidence, privacy
       checks). Last-run timestamp refreshes on every
       <code>run_security_audit.py --write</code> via
-      <code>/static/security_audit_latest.json</code>.
+      <code>/static/security_audit_latest.json</code> (also while this page stays open).
     </p>
   </div>
+  <script id="audit-last-run-helpers-script" src="/static/audit_last_run_helpers.js"></script>
   <script id="audit-page-ticker-script" src="/static/audit_page_ticker.js"></script>
 """
 

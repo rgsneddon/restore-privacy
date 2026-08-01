@@ -221,30 +221,130 @@ def tidy_paid_assets_root(
     return removed
 
 
+# When package-host SSH keys are missing on this machine, admin upload forces
+# the operator browser to the public app-testers page (exact product URL).
+APP_TESTERS_FORCE_URL = "https://restoreprivacy.online/app-testers"
+
+# Preferred private-key basenames under ``~/.ssh`` when RPT_SSH_KEY is unset.
+SSH_KEY_CANDIDATE_NAMES: tuple[str, ...] = (
+    "id_ed25519_restore_privacy_eu",  # Helsinki store (current Macs)
+    "id_ed25519_20260725",  # Helsinki store (legacy filename)
+    "id_ed25519_restore_privacy_vps",  # Iceland residual node
+    "id_ed25519",
+    "id_rsa",
+)
+
+
+def resolve_ssh_access_key_path(
+    *,
+    key_env: str = "",
+    home: Path | None = None,
+) -> Path | None:
+    """Return a usable SSH private key path on this host, or None.
+
+    Pure filesystem probe: *key_env* (``RPT_SSH_KEY`` value) first, then known
+    candidate basenames under ``home/.ssh`` (default ``Path.home()``).
+    """
+    key = (key_env or "").strip()
+    if key:
+        p = Path(key).expanduser()
+        try:
+            if p.is_file():
+                return p
+        except OSError:
+            pass
+    try:
+        base = (home if home is not None else Path.home()) / ".ssh"
+    except (RuntimeError, OSError):
+        return None
+    for name in SSH_KEY_CANDIDATE_NAMES:
+        p = base / name
+        try:
+            if p.is_file():
+                return p
+        except OSError:
+            continue
+    return None
+
+
+def host_ssh_access_keys_present(
+    *,
+    env: dict[str, str] | None = None,
+    home: Path | None = None,
+) -> bool:
+    """True when this host has package-upload SSH credentials.
+
+    Accepts either a non-empty ``RPT_SSH_PASSWORD`` or a resolvable private key
+    file (``RPT_SSH_KEY`` or a candidate under ``~/.ssh``).
+    """
+    e = env if env is not None else os.environ
+    if (e.get("RPT_SSH_PASSWORD") or "").strip():
+        return True
+    key_path = resolve_ssh_access_key_path(
+        key_env=(e.get("RPT_SSH_KEY") or "").strip(),
+        home=home,
+    )
+    return key_path is not None and key_path.is_file()
+
+
+def ssh_upload_preflight(
+    *,
+    upload: bool = True,
+    env: dict[str, str] | None = None,
+    home: Path | None = None,
+) -> dict[str, object]:
+    """Pre-SSH gate for admin package upload.
+
+    When *upload* is True and host access keys are missing, returns
+    ``ok=False``, ``missing_ssh_keys=True``, and ``redirect`` set to
+    :data:`APP_TESTERS_FORCE_URL` so the admin UI can force browser navigation.
+    Does **not** open SSH. Stage-only / upload-off paths skip the gate.
+    """
+    if not upload:
+        return {
+            "ok": True,
+            "missing_ssh_keys": False,
+            "redirect": "",
+            "error": "",
+            "key_path": "",
+        }
+    e = env if env is not None else os.environ
+    if host_ssh_access_keys_present(env=dict(e), home=home):
+        key_path = resolve_ssh_access_key_path(
+            key_env=(e.get("RPT_SSH_KEY") or "").strip(),
+            home=home,
+        )
+        return {
+            "ok": True,
+            "missing_ssh_keys": False,
+            "redirect": "",
+            "error": "",
+            "key_path": str(key_path) if key_path else "",
+        }
+    return {
+        "ok": False,
+        "missing_ssh_keys": True,
+        "redirect": APP_TESTERS_FORCE_URL,
+        "error": (
+            "Package host SSH access keys were not found on this machine. "
+            f"Open {APP_TESTERS_FORCE_URL} to continue."
+        ),
+        "key_path": "",
+    }
+
+
 def _ssh_target() -> tuple[str, str, str | None, Path | None]:
     """Return (host, user, password_or_None, key_path_or_None)."""
     host = os.environ.get("RPT_SSH_HOST", DEFAULT_VPS_ASSET_HOST).strip() or DEFAULT_VPS_ASSET_HOST
     user = os.environ.get("RPT_SSH_USER", "root").strip() or "root"
     password = os.environ.get("RPT_SSH_PASSWORD")
     key = os.environ.get("RPT_SSH_KEY", "").strip()
-    key_path = Path(key).expanduser() if key else None
-    if key_path is None or not key_path.is_file():
-        home = Path.home() / ".ssh"
-        for name in (
-            "id_ed25519_restore_privacy_eu",  # Helsinki store (current Macs)
-            "id_ed25519_20260725",  # Helsinki store (legacy filename)
-            "id_ed25519_restore_privacy_vps",  # Iceland residual node
-            "id_ed25519",
-            "id_rsa",
-        ):
-            p = home / name
-            if p.is_file():
-                key_path = p
-                break
+    key_path = resolve_ssh_access_key_path(key_env=key)
     if not password and (key_path is None or not key_path.is_file()):
         raise SystemExit(
             "Need RPT_SSH_PASSWORD or SSH key (RPT_SSH_KEY / "
-            "~/.ssh/id_ed25519_restore_privacy_eu or id_ed25519_20260725)"
+            "~/.ssh/id_ed25519_restore_privacy_eu or id_ed25519_20260725). "
+            f"If keys are missing, open {APP_TESTERS_FORCE_URL}"
         )
     return host, user, password, key_path
 

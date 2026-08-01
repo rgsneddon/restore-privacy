@@ -1,4 +1,4 @@
-"""Suite monopin 1.0.0 is the project-wide current catalog pin."""
+"""Suite monopin 1.0.1 is the project-wide current catalog pin."""
 
 from __future__ import annotations
 
@@ -11,7 +11,7 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 sys.path.insert(0, str(ROOT / "status_page"))
 
-SUITE_PIN = "1.0.0"
+SUITE_PIN = "1.0.1"
 
 
 class TestSuiteMonopin100(unittest.TestCase):
@@ -111,7 +111,7 @@ class TestSuiteMonopin100(unittest.TestCase):
                 )
 
         sundries = (ROOT / "sundries.txt").read_text(encoding="utf-8")
-        self.assertIn("Public download catalog: 1.0.0", sundries)
+        self.assertIn("Public download catalog: 1.0.1", sundries)
         self.assertNotIn("Public download catalog: 0.2.1", sundries)
         self.assertNotIn("Public download catalog: 0.5.9", sundries)
 

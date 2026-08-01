@@ -98,6 +98,120 @@ class TestPackageHostRowBuilder(unittest.TestCase):
         self.assertIn("package_hosts", payload)
         self.assertEqual(payload["package_hosts"][0]["status"], "error")
 
+    def test_probe_uses_processor_store_token_and_maps_ok_metrics(self) -> None:
+        """Token saved only in admin processor store must still probe successfully."""
+        import json
+        from unittest import mock
+
+        from admin_node_usage import (
+            collect_package_host_rows,
+            package_host_metrics_url,
+            probe_package_host_metrics,
+        )
+
+        healthy = {
+            "ok": True,
+            "role": "package_store",
+            "load_1": 0.25,
+            "load_5": 0.20,
+            "load_15": 0.15,
+            "disk_total_bytes": 50_000_000_000,
+            "disk_used_bytes": 5_000_000_000,
+            "disk_avail_bytes": 45_000_000_000,
+            "disk_util": 0.1,
+            "uptime_sec": 86400,
+        }
+        captured: dict = {}
+
+        def transport(url: str, headers: dict, timeout: float) -> str:
+            captured["url"] = url
+            captured["headers"] = headers
+            captured["timeout"] = timeout
+            return json.dumps(healthy)
+
+        with tempfile.TemporaryDirectory() as td:
+            store = Path(td) / "processor_env.json"
+            store.write_text(
+                json.dumps(
+                    {
+                        "RPT_ASSET_FETCH_TOKEN": "store-only-secret",
+                        "RPT_VPS_ASSET_BASE": "https://135.181.152.10.sslip.io/paid-assets",
+                    }
+                ),
+                encoding="utf-8",
+            )
+            with mock.patch(
+                "processor_plugins.processor_env_store_path",
+                return_value=store,
+            ):
+                # Clear process env so only the processor store supplies credentials
+                env_clear = {
+                    k: v
+                    for k, v in __import__("os").environ.items()
+                    if k
+                    not in (
+                        "RPT_ASSET_FETCH_TOKEN",
+                        "RPT_VPS_ASSET_TOKEN",
+                        "RPT_VPS_ASSET_BASE",
+                    )
+                }
+                with mock.patch.dict("os.environ", env_clear, clear=True):
+                    # Empty explicit env → must fall back to processor store
+                    payload, err = probe_package_host_metrics(
+                        env={},
+                        transport=transport,
+                    )
+                    self.assertEqual(err, "", msg=err)
+                    self.assertIsNotNone(payload)
+                    assert payload is not None
+                    self.assertTrue(payload.get("ok"))
+                    self.assertEqual(
+                        captured["headers"].get("X-RPT-Asset-Token"),
+                        "store-only-secret",
+                    )
+                    # Metrics path is origin + /api/private/host-metrics (not under /paid-assets)
+                    self.assertEqual(
+                        captured["url"],
+                        "https://135.181.152.10.sslip.io/api/private/host-metrics",
+                    )
+                    self.assertNotIn("/paid-assets/", captured["url"])
+                    rows = collect_package_host_rows(
+                        env={},
+                        transport=transport,
+                    )
+        self.assertEqual(len(rows), 1)
+        d = rows[0].to_dict()
+        self.assertEqual(d["status"], "ok")
+        self.assertIn("0.25", d["load_display"])
+        self.assertNotEqual(d["disk_used_display"], "—")
+        self.assertNotEqual(d["disk_total_display"], "—")
+        self.assertEqual(d["disk_util_display"], "10.0%")
+        blob = json.dumps(d)
+        self.assertNotIn("paid_assets", blob)
+        self.assertNotIn("restore-privacy-client", blob)
+        self.assertNotIn("/opt/", blob)
+
+    def test_probe_missing_token_honest_error_no_fake_metrics(self) -> None:
+        from unittest import mock
+
+        from admin_node_usage import collect_package_host_rows, probe_package_host_metrics
+
+        with mock.patch(
+            "admin_node_usage._resolve_package_host_token",
+            return_value="",
+        ):
+            payload, err = probe_package_host_metrics(env={})
+            self.assertIsNone(payload)
+            self.assertIn("token", err.lower())
+            rows = collect_package_host_rows(
+                env={"RPT_VPS_ASSET_BASE": "https://store.example"},
+                error=err,
+            )
+        self.assertEqual(rows[0].status, "error")
+        self.assertIsNone(rows[0].load_1)
+        self.assertIsNone(rows[0].disk_total_bytes)
+        self.assertEqual(rows[0].to_dict()["load_display"], "—")
+
     def test_fleet_json_includes_package_hosts_from_injected_metrics(self) -> None:
         from admin_node_usage import (
             fleet_usage_json_payload,

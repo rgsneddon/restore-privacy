@@ -13,11 +13,12 @@ sys.path.insert(0, str(ROOT / "status_page"))
 
 class TestPublicChromeModule(unittest.TestCase):
     def test_nav_main_menu_order_and_button_classes(self) -> None:
-        """Main nav order: Home → Settings Guide → Licence → Audit → Privacy → Support."""
+        """Main nav: Home → Settings Guide → Service → Licence → Audit → Privacy → Support."""
         from public_chrome import public_nav_links_html
 
         html = public_nav_links_html(active="home")
         self.assertIn('id="home-link"', html)
+        self.assertIn('id="service-link"', html)
         self.assertIn('id="licence-link"', html)
         self.assertIn('id="privacy-link"', html)
         self.assertIn('id="audit-link"', html)
@@ -29,12 +30,15 @@ class TestPublicChromeModule(unittest.TestCase):
         self.assertIn('id="settings-guide-link"', html)
         self.assertIn("SETTINGS GUIDE", html)
         self.assertIn('href="/settings-explainer"', html)
+        self.assertIn("SERVICE", html)
+        self.assertIn('href="/service"', html)
         self.assertIn('id="doc-links"', html)
         self.assertIn("nav-btn", html)
-        # Exact sequential order of the six main controls
+        # Exact sequential order of the seven main controls
         order_ids = (
             "home-link",
             "settings-guide-link",
+            "service-link",
             "licence-link",
             "audit-link",
             "privacy-link",
@@ -59,7 +63,15 @@ class TestPublicChromeModule(unittest.TestCase):
 
         from public_chrome import public_nav_links_html
 
-        keys = ("home", "licence", "privacy", "audit", "support", "settings")
+        keys = (
+            "home",
+            "licence",
+            "privacy",
+            "audit",
+            "support",
+            "settings",
+            "service",
+        )
         expected = {
             "home": "home-link",
             "licence": "licence-link",
@@ -67,6 +79,7 @@ class TestPublicChromeModule(unittest.TestCase):
             "audit": "audit-link",
             "support": "support-link",
             "settings": "settings-guide-link",
+            "service": "service-link",
         }
         for key in keys:
             html = public_nav_links_html(active=key)
@@ -111,7 +124,9 @@ class TestPublicChromeModule(unittest.TestCase):
         self.assertNotIn(f"<h1>{PUBLIC_BRAND_TITLE}</h1>", header)
         self.assertNotIn("<h1>RESTORE PRIVACY VPN</h1>", header)
         # Document/page brand title is Suite identity (not a visible VPN H1)
-        self.assertIn("Restore Privacy", PUBLIC_BRAND_TITLE)
+        self.assertIn("RESTORE PRIVACY", PUBLIC_BRAND_TITLE)
+        self.assertIn("SUITE", PUBLIC_BRAND_TITLE)
+        self.assertNotIn("VPN", PUBLIC_BRAND_TITLE)
         self.assertIn('class="brand-banner"', header)
         self.assertIn('id="brand-banner"', header)
         self.assertIn(PUBLIC_BRAND_BANNER_PATH, header)

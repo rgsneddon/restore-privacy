@@ -25,12 +25,14 @@ AUDIT_LINK_ID = "audit-link"
 README_LINK_ID = "readme-link"
 SUPPORT_LINK_ID = "support-link"
 SETTINGS_GUIDE_LINK_ID = "settings-guide-link"
+SERVICE_LINK_ID = "service-link"
 
 # Public website brand / page identity (document <title> + default page title).
 # Visible header no longer shows this as an H1 — banner.jpg is the heading mark.
-PUBLIC_BRAND_TITLE = "Restore Privacy Suite"
-PUBLIC_BRAND_VERSION = "1.0.0"
-PUBLIC_BRAND_DISPLAY = "Restore Privacy Suite v1.0.0"
+# Browser-tab title: all-caps Suite brand (never "RESTORE PRIVACY VPN").
+PUBLIC_BRAND_TITLE = "RESTORE PRIVACY SUITE"
+PUBLIC_BRAND_VERSION = "1.0.1"
+PUBLIC_BRAND_DISPLAY = "Restore Privacy Suite v1.0.1"
 
 # Borderless mark: shield + protruding green key only (transparent outside).
 # Opaque logo.png remains for favicon/legacy plate uses; Stripe uses stripe_brand_*.
@@ -63,6 +65,7 @@ AUDIT_PATH = "/AUDIT.md"
 README_PATH = "/README.md"
 SUPPORT_PATH = "/support"
 SETTINGS_GUIDE_PATH = "/settings-explainer"
+SERVICE_PATH = "/service"
 
 # Product family landings (paths; optional Host aliases for browser./vault.)
 PRODUCT_VPN_PATH = "/"
@@ -697,26 +700,42 @@ a.product-tab.is-active, .product-tab.is-active {{
   font-size: clamp(0.7rem, 1.9vw, 0.8rem);
   text-transform: uppercase;
   text-decoration: none;
-  color: var(--rb-btn-text) !important;
-  background: linear-gradient(180deg, var(--rb-btn) 0%, var(--rb-btn-deep) 100%);
-  border: 1px solid color-mix(in srgb, var(--rb-link) 42%, transparent);
-  border-radius: var(--rb-radius-control, 0px);
-  padding: 0.48rem 0.95rem;
-  box-shadow: 0 3px 10px rgba(10, 22, 40, 0.18);
-  transition: filter 0.14s ease, transform 0.14s ease, box-shadow 0.14s ease;
+  color: var(--rb-cream, #e8f2ff) !important;
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+  padding: 0.42rem 0.55rem 0.5rem;
+  box-shadow: none;
+  border-bottom: 2px solid transparent;
+  transition: color 0.14s ease, filter 0.14s ease, border-color 0.14s ease;
 }}
 .nav-btn:hover, a.nav-btn:hover, a.doc-link:hover {{
-  filter: brightness(1.07);
-  transform: translateY(-1px);
-  color: var(--rb-btn-text) !important;
-  background: linear-gradient(180deg, var(--rb-accent-sky) 0%, var(--rb-btn) 100%);
-  box-shadow: 0 5px 14px rgba(10, 22, 40, 0.22);
+  filter: brightness(1.08);
+  transform: none;
+  color: #ffffff !important;
+  background: transparent;
+  box-shadow: none;
+  border-bottom: 2px solid transparent;
+  border-image: linear-gradient(
+    90deg,
+    var(--rb-neon-cyan, #00e5ff) 0%,
+    var(--rb-neon-blue, #2694e8) 42%,
+    var(--rb-neon-green, #39ff6a) 100%
+  ) 1;
 }}
+/* Current page: neon-gradient underline (not filled box / pill outline) */
 .nav-btn.is-active, a.nav-btn.is-active {{
-  outline: 2px solid color-mix(in srgb, var(--rb-neon-cyan) 65%, var(--rb-soft));
-  outline-offset: 2px;
-  box-shadow: 0 0 0 1px color-mix(in srgb, var(--rb-neon-green) 35%, transparent),
-    0 4px 14px rgba(10, 22, 40, 0.2);
+  outline: none;
+  box-shadow: none;
+  color: #ffffff !important;
+  background: transparent;
+  border-bottom: 2px solid transparent;
+  border-image: linear-gradient(
+    90deg,
+    var(--rb-neon-cyan, #00e5ff) 0%,
+    var(--rb-neon-blue, #2694e8) 42%,
+    var(--rb-neon-green, #39ff6a) 100%
+  ) 1;
 }}
 .nav-btn:focus-visible, a.nav-btn:focus-visible, a.doc-link:focus-visible,
 .product-tab:focus-visible {{
@@ -1157,16 +1176,17 @@ def public_product_tabs_html(*, active: str = PRODUCT_VPN_KEY) -> str:
 
 
 def public_nav_links_html(*, active: str | None = None) -> str:
-    """Button-style nav: Home → Settings Guide → Licence → Security Audit →
-    Privacy Policy → Support.
+    """Button-style nav: Home → Settings Guide → Service → Licence →
+    Security Audit → Privacy Policy → Support.
 
-    *active* is one of: home, licence, privacy, audit, support, settings
-    (or None). README is not a main-menu control (``/README.md`` may still be
-    served as a document). Settings Guide remains in the top brand nav.
+    *active* is one of: home, licence, privacy, audit, support, settings,
+    service (or None). README is not a main-menu control (``/README.md`` may
+    still be served as a document). Settings Guide remains in the top brand nav.
     """
     items = (
         ("HOME", HOME_PATH, HOME_LINK_ID, "home"),
         ("SETTINGS GUIDE", SETTINGS_GUIDE_PATH, SETTINGS_GUIDE_LINK_ID, "settings"),
+        ("SERVICE", SERVICE_PATH, SERVICE_LINK_ID, "service"),
         ("LICENCE", LICENSE_PATH, LICENCE_LINK_ID, "licence"),
         ("SECURITY AUDIT", AUDIT_PATH, AUDIT_LINK_ID, "audit"),
         ("PRIVACY POLICY", PRIVACY_PATH, PRIVACY_LINK_ID, "privacy"),
@@ -1187,18 +1207,36 @@ def public_nav_links_html(*, active: str | None = None) -> str:
 
 
 def public_display_title(raw: str | None = None) -> str:
-    """Normalize product title for public brand chrome and page titles.
+    """Normalize product title for public brand chrome and document ``<title>``.
 
-    Historical short titles and sole “VPN” branding map to Suite.
-    Empty / missing → :data:`PUBLIC_BRAND_TITLE`.
+    Historical short titles and sole “VPN” branding map to
+    :data:`PUBLIC_BRAND_TITLE` (**RESTORE PRIVACY SUITE**). Empty / missing →
+    Suite brand. A VPN-branded upstream cannot reintroduce **RESTORE PRIVACY
+    VPN** into browser tabs.
     """
     t = (raw or "").strip()
-    if not t or t in (
+    if not t:
+        return PUBLIC_BRAND_TITLE
+    # Exact legacy VPN / short brand strings
+    if t in (
         "RESTORE PRIVACY",
         "RESTORE PRIVACY VPN",
         "Restore Privacy VPN",
         "Restore Privacy",
+        "Restore Privacy Suite",  # title-case → all-caps tab title
+        PUBLIC_BRAND_TITLE,
     ):
+        return PUBLIC_BRAND_TITLE
+    # Case-insensitive / suffix-tolerant: any “…PRIVACY VPN” product brand
+    compact = " ".join(t.upper().split())
+    if compact in (
+        "RESTORE PRIVACY",
+        "RESTORE PRIVACY VPN",
+        "RESTORE PRIVACY SUITE",
+    ) or compact.startswith("RESTORE PRIVACY VPN"):
+        return PUBLIC_BRAND_TITLE
+    # If the only product brand word is VPN (legacy tab), force Suite
+    if "VPN" in compact and "SUITE" not in compact and "RESTORE PRIVACY" in compact:
         return PUBLIC_BRAND_TITLE
     return t
 
@@ -1271,8 +1309,8 @@ def public_brand_header_html(
 
     Layout: **banner.jpg** heading image with the **borderless shield+key logo**
     on the **right**, same display height, full-width row **above** the site nav
-    (when included). The VPN H1 text (**RESTORE PRIVACY VPN**) is **not** shown
-    in the header by default — the banner is the heading mark. Product-family
+    (when included). Legacy VPN product H1 text is **not** shown in the header
+    by default — the banner is the heading mark (Suite brand). Product-family
     top tabs are **off by default**. Logo has no outer plate/frame. Under-title
     tagline is omitted by default. *title* still normalizes document/page titles
     for callers; pass *show_title_text=True* only for rare product overrides.

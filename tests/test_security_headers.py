@@ -56,6 +56,14 @@ class TestSecurityHeaderConstants(unittest.TestCase):
         self.assertIn(sh.FORM_ACTION_DIRECTIVE, csp)
         self.assertIn(sh.FORM_ACTION_DIRECTIVE, frameable)
 
+    def test_frame_src_allows_perc_block_explorer_iframe(self):
+        """Suite perc-wallet iframe needs frame-src for evolve-perc-internet."""
+        csp = sh.CONTENT_SECURITY_POLICY
+        self.assertIn("frame-src", csp)
+        self.assertIn("https://evolve-perc-internet.onrender.com", csp)
+        self.assertIn(sh.FRAME_SRC_DIRECTIVE, csp)
+        self.assertIn(sh.FRAME_SRC_DIRECTIVE, sh.CONTENT_SECURITY_POLICY_FRAMEABLE)
+
     def test_frameable_omits_xfo_deny_uses_self_ancestors(self):
         pairs = dict(sh.security_headers(allow_framing=True))
         self.assertNotIn("X-Frame-Options", pairs)

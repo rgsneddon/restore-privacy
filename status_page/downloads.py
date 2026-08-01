@@ -1,4 +1,4 @@
-"""Release download catalog + paid download UI (Restore Privacy Suite v1.0.0).
+"""Release download catalog + paid download UI (Restore Privacy Suite v1.0.1).
 
 Primary path: pay **£3.00** (GBP) via Stripe Checkout per package, then a
 time-limited download token (default **12 hours**, reusable until expiry).
@@ -7,7 +7,7 @@ the status host **proxies** the installer (authenticated GitHub API / local
 assets) so fulfilment works when the restore-privacy repo is **private**.
 Buy Me a Coffee is tip/support only.
 
-Current catalog packages: Restore Privacy Suite **1.0.0**
+Current catalog packages: Restore Privacy Suite **1.0.1**
 (Windows setup needs no separate Python install; macOS Developer ID notarized;
 iOS Team-signed sideload).
 """
@@ -32,10 +32,10 @@ except ImportError:  # package import path (status_page as package)
         site_copyright_text,
     )
 
-RELEASE_VERSION = "1.0.0"
+RELEASE_VERSION = "1.0.1"
 GITHUB_OWNER = "rgsneddon"
 GITHUB_REPO = "restore-privacy"
-RELEASE_TAG = "1.0.0"
+RELEASE_TAG = "1.0.1"
 RELEASE_PAGE_URL = (
     f"https://github.com/{GITHUB_OWNER}/{GITHUB_REPO}/releases/tag/{RELEASE_TAG}"
 )
@@ -928,10 +928,12 @@ SUITE_KEYGEN_HINT = (
 )
 SUITE_FREE_DOWNLOAD_PATH = "/suite/download"
 DOWNLOADS_SECTION_ID = "downloads"
-# Full-width free-download v1.0.0 face (operator asset freebie.jpg) → packages page
+# Full-width free-download face (operator asset freebie.jpg) → packages / platform
 FREE_PACKAGES_PATH = "/free-packages"
 FREEBIE_IMG_PATH = "/static/freebie.jpg"
-FREEBIE_IMG_ALT = "Free download v1.0.0"
+# CTA face version (OBJECTIVE 1.0.1); may diverge from catalog monopin until pin bump
+FREE_DOWNLOAD_FACE_VERSION = "1.0.1"
+FREEBIE_IMG_ALT = f"Free download version {FREE_DOWNLOAD_FACE_VERSION}"
 FREE_DOWNLOAD_CTA_ID = "free-download-v1-cta"
 FREE_PACKAGES_PAGE_ID = "free-packages-page"
 
@@ -969,7 +971,26 @@ SUITE_PERCCENT_WALLET_README_HREF = (
 )
 SUITE_PERCCENT_WALLET_README_LABEL = "Perccent wallet README"
 
-# Prefer-to-host residual node (operator path) — separate from Suite client installers.
+# Suite ecosystem product family (placeholder hrefs until product URLs ship)
+SUITE_RPOS_HREF = "#suite-rpos"
+SUITE_RPOS_LABEL = "rpOS"
+SUITE_RPOS_TITLE = "Restore Privacy Operating System"
+SUITE_RPOS_KEY = "rpos"
+SUITE_RX_BROWSER_HREF = "#suite-rx-privacy-browser"
+SUITE_RX_BROWSER_LABEL = "Rx Privacy Browser"
+SUITE_RX_BROWSER_KEY = "rx-privacy-browser"
+SUITE_ECOSYSTEM_VPN_HREF = "#suite-vpn"
+SUITE_ECOSYSTEM_VPN_LABEL = "VPN"
+SUITE_ECOSYSTEM_VPN_KEY = "suite-vpn"
+
+# Live Perccent block explorer (iframe inside Suite box perc-wallet area).
+# User-facing Render host for the full community explorer UI.
+SUITE_PERC_WALLET_EXPLORER_IFRAME_SRC = "https://evolve-perc-internet.onrender.com"
+SUITE_PERC_WALLET_EXPLORER_ID = "suite-perc-wallet-explorer"
+SUITE_PERC_WALLET_EXPLORER_IFRAME_ID = "suite-perc-wallet-explorer-frame"
+SUITE_PERC_WALLET_EXPLORER_LABEL = "Perc wallet · block explorer"
+
+# Full business package / residual node host (commercial deposit path via Service).
 # Primary doc is status-host /NODE_OPERATOR.md (public pack), not Suite README.
 NODE_PREFERENCE_SECTION_ID = "download-node-preference"
 NODE_OPERATOR_DOCS_HREF = "/NODE_OPERATOR.md"
@@ -980,14 +1001,57 @@ NODE_PUBLIC_SUITE_PAGES_HREF = "https://rgsneddon.github.io/restore-privacy-suit
 NODE_PUBLIC_SUITE_PAGES_LABEL = "Public Suite Pages (client docs)"
 NODE_PUBLIC_SUITE_SOURCE_HREF = "https://github.com/rgsneddon/restore-privacy-suite"
 NODE_PUBLIC_SUITE_SOURCE_LABEL = "Public Suite source (GitHub)"
-NODE_PREFERENCE_HEADING = "Prefer to run a residual node?"
+# Commercial deposit cart (same one-time £3000 Stripe path as /service).
+try:
+    from payments import (
+        COMMERCIAL_SUITE_CHECKOUT_PATH as _COMMERCIAL_CHECKOUT,
+        COMMERCIAL_SUITE_NODE_PRICE_LABEL as _COMMERCIAL_PRICE,
+        COMMERCIAL_SUITE_NODE_PRICE_PENCE as _COMMERCIAL_PENCE,
+        COMMERCIAL_SUITE_PRODUCT_KEY as _COMMERCIAL_KEY,
+        COMMERCIAL_SUITE_PRODUCT_LINE as _COMMERCIAL_LINE,
+    )
+except ImportError:  # pragma: no cover
+    try:
+        from status_page.payments import (  # type: ignore
+            COMMERCIAL_SUITE_CHECKOUT_PATH as _COMMERCIAL_CHECKOUT,
+            COMMERCIAL_SUITE_NODE_PRICE_LABEL as _COMMERCIAL_PRICE,
+            COMMERCIAL_SUITE_NODE_PRICE_PENCE as _COMMERCIAL_PENCE,
+            COMMERCIAL_SUITE_PRODUCT_KEY as _COMMERCIAL_KEY,
+            COMMERCIAL_SUITE_PRODUCT_LINE as _COMMERCIAL_LINE,
+        )
+    except ImportError:  # pragma: no cover
+        _COMMERCIAL_CHECKOUT = "/pay/commercial-suite"
+        _COMMERCIAL_PRICE = "£3000"
+        _COMMERCIAL_PENCE = 300_000
+        _COMMERCIAL_KEY = "commercial_suite_node"
+        _COMMERCIAL_LINE = "commercial_suite"
+
+NODE_PREFERENCE_COMMERCIAL_HREF = "/service"
+NODE_PREFERENCE_COMMERCIAL_CHECKOUT = _COMMERCIAL_CHECKOUT
+NODE_PREFERENCE_DEPOSIT_LABEL = _COMMERCIAL_PRICE
+NODE_PREFERENCE_DEPOSIT_PENCE = int(_COMMERCIAL_PENCE)
+NODE_PREFERENCE_PRODUCT_KEY = _COMMERCIAL_KEY
+NODE_PREFERENCE_PRODUCT_LINE = _COMMERCIAL_LINE
+
+NODE_PREFERENCE_HEADING = "Full business package?"
+# HTML blurb — human cadence; £3000 is a deposit to start the work (not final total).
 NODE_PREFERENCE_BLURB = (
-    "The free Suite installers and KEYGEN above are for residual <strong>Connect</strong> "
-    "on your own device. We also keep a dedicated <strong>node / operator path</strong> "
-    "for people who prefer to <strong>host</strong> a residual VPN node "
-    "(self-host, Node Operator lab GUI, operator tooling) instead of only installing the "
-    "client. That is a different role: not a fifth Suite client platform, and not unlocked "
-    "by the monthly KEYGEN checkout."
+    "Run a residual node on your own server, or arrange a dedicated host through "
+    "<strong>Raskul</strong>. This is the full business package: on-site network "
+    "tasks, mainframe establishment, and deploy of <strong>Restore Privacy "
+    "Operating System</strong> (rpOS) and the matching Suite parts — with a "
+    "user-friendly interface and everyday business apps. "
+    f"Prices start with a <strong>{NODE_PREFERENCE_DEPOSIT_LABEL} deposit</strong> "
+    "to do the work (that payment is a deposit, not the finished all-in price). "
+    "<em>Costs may be higher</em> once scope, on-site work, and hardware are "
+    "agreed — we confirm anything beyond the deposit before further work."
+)
+NODE_PREFERENCE_DEPOSIT_CTA = (
+    f"Pay {NODE_PREFERENCE_DEPOSIT_LABEL} deposit — begin the work (one-time)"
+)
+NODE_PREFERENCE_DEPOSIT_NOTE = (
+    f"The {NODE_PREFERENCE_DEPOSIT_LABEL} is a <strong>deposit to do the work</strong>, "
+    "not a fixed final quote. Further costs are agreed before they are billed."
 )
 
 
@@ -1014,7 +1078,7 @@ def freebie_img_src() -> str:
 
 
 def free_download_cta_css() -> str:
-    """Full-width free-download image button (push-in active/selected)."""
+    """Full-width free-download image button — full freebie art visible (no crop)."""
     return f"""
     .free-download-cta-wrap {{
       width: 100%; max-width: 100%; box-sizing: border-box;
@@ -1031,20 +1095,21 @@ def free_download_cta_css() -> str:
       background: #0a1628;
     }}
     a.free-download-cta img {{
-      display: block; width: 100%; height: auto; max-height: 9.5rem;
-      object-fit: cover; object-position: center;
+      /* Full square freebie art: width 100%, natural height, no cover crop */
+      display: block; width: 100%; height: auto; max-height: none;
+      object-fit: contain; object-position: center;
       pointer-events: none; user-select: none;
+      aspect-ratio: 1 / 1;
     }}
     a.free-download-cta .free-download-cta-label {{
       position: absolute; left: 0; right: 0; bottom: 0;
-      padding: 0.55rem 0.85rem;
-      font: 800 clamp(0.95rem, 2.6vw, 1.2rem)/1.2 system-ui,sans-serif;
-      letter-spacing: 0.06em; text-transform: uppercase; text-align: center;
+      padding: 0.65rem 0.85rem 0.75rem;
+      font: 800 clamp(0.95rem, 2.6vw, 1.2rem)/1.25 system-ui,sans-serif;
+      letter-spacing: 0.05em; text-transform: uppercase; text-align: center;
       color: #fff; text-shadow: 0 2px 10px rgba(0,0,0,0.65);
-      background: linear-gradient(180deg, transparent, rgba(8,16,32,0.88));
+      background: linear-gradient(180deg, transparent, rgba(8,16,32,0.9));
       pointer-events: none;
     }}
-    /* Pressed / selected: push in */
     a.free-download-cta:active,
     a.free-download-cta.is-pressed,
     a.free-download-cta:focus-visible {{
@@ -1058,20 +1123,44 @@ def free_download_cta_css() -> str:
 """
 
 
-def render_free_download_cta_html(*, version: str = "") -> str:
-    """Full-width free download v1.0.0 image button above Stripe selector."""
-    ver = (version or RELEASE_VERSION).strip() or RELEASE_VERSION
+def render_free_download_cta_html(
+    *,
+    version: str = "",
+    default_platform: str = "",
+) -> str:
+    """Full-width free download image button (face version 1.0.1 by default).
+
+    When *default_platform* is a known catalog OS brand (from User-Agent on the
+    homepage), the button links straight to that Suite free installer and names
+    the brand in the label. Unknown/empty falls back to the packages chooser.
+    """
+    ver = (version or FREE_DOWNLOAD_FACE_VERSION).strip() or FREE_DOWNLOAD_FACE_VERSION
     src = freebie_img_src()
-    label = f"Free download v{ver}"
+    def_plat = (default_platform or "").strip().lower()
+    known = {a.platform for a in available_downloads()}
+    if def_plat and def_plat not in known:
+        def_plat = ""
+    if def_plat:
+        title = platform_face_title(def_plat)
+        href = suite_free_download_href(def_plat)
+        label = f"Free download for {title} · version {ver}"
+        detect_attrs = (
+            f' data-platform="{_esc_html(def_plat)}"'
+            f' data-detected-platform="{_esc_html(def_plat)}"'
+        )
+    else:
+        href = FREE_PACKAGES_PATH
+        label = f"Free download version {ver}"
+        detect_attrs = ""
     return f"""
     <div class="free-download-cta-wrap" id="free-download-cta-wrap"
-         data-free-download-cta="1">
+         data-free-download-cta="1" data-face-version="{_esc_html(ver)}"{detect_attrs}>
       <a class="free-download-cta" id="{FREE_DOWNLOAD_CTA_ID}"
-         href="{FREE_PACKAGES_PATH}" data-free-download-v1="1"
-         data-version="{_esc_html(ver)}"
+         href="{_esc_html(href)}" data-free-download-v1="1"
+         data-version="{_esc_html(ver)}"{detect_attrs}
          aria-label="{_esc_html(label)}">
         <img src="{_esc_html(src)}" alt="{_esc_html(FREEBIE_IMG_ALT)}"
-             width="1024" height="256" decoding="async"/>
+             width="1024" height="1024" decoding="async"/>
         <span class="free-download-cta-label">{_esc_html(label)}</span>
       </a>
     </div>
@@ -1116,6 +1205,15 @@ def free_packages_page_css() -> str:
     .free-packages-page a.free-package-link:hover {
       color: #ff9a4a; border-bottom-color: #ff9a4a;
     }
+    .free-packages-page a.free-package-link.is-detected {
+      color: #ffb347;
+      border-bottom-color: #ffb347;
+      font-size: clamp(1.15rem, 3.2vw, 1.5rem);
+    }
+    .free-packages-page .free-packages-detect-hint {
+      margin: 0 0 1rem; font-size: 0.9rem; line-height: 1.4;
+      color: #c8e0f5; font-weight: 600;
+    }
     .free-packages-page .free-packages-back {
       margin-top: 1.75rem; font-size: 0.85rem;
     }
@@ -1125,27 +1223,62 @@ def free_packages_page_css() -> str:
 """
 
 
-def render_free_packages_page_html(*, version: str = "") -> bytes:
-    """Simple free packages page: data-path background + centered orange links."""
+def render_free_packages_page_html(
+    *,
+    version: str = "",
+    default_platform: str = "",
+) -> bytes:
+    """Simple free packages page: data-path background + centered orange links.
+
+    *default_platform* (User-Agent OS brand) sorts that package first and marks
+    it detected so viewers land on their device without hunting the list.
+    """
     ver = (version or RELEASE_VERSION).strip() or RELEASE_VERSION
     items = list_catalog_platform_packages(version=ver)
     if not items:
         items = list_catalog_platform_packages()
+    def_plat = (default_platform or "").strip().lower()
+    known = {str(p.get("platform") or "") for p in items}
+    if def_plat and def_plat not in known:
+        def_plat = ""
+    if def_plat:
+        items = sorted(
+            items,
+            key=lambda p: (
+                0 if str(p.get("platform") or "") == def_plat else 1,
+                str(p.get("platform") or ""),
+            ),
+        )
     links: list[str] = []
     for p in items:
         plat = str(p.get("platform") or "")
         title = platform_face_title(plat)
         href = suite_free_download_href(plat)
         fname = str(p.get("filename") or "")
+        is_det = " is-detected" if def_plat and plat == def_plat else ""
+        det_attr = ' data-detected-platform="1"' if is_det else ""
         links.append(
-            f'<li><a class="free-package-link" id="free-pkg-{_esc_html(plat)}" '
+            f'<li><a class="free-package-link{_esc_html(is_det)}" '
+            f'id="free-pkg-{_esc_html(plat)}" '
             f'href="{_esc_html(href)}" data-platform="{_esc_html(plat)}" '
-            f'data-filename="{_esc_html(fname)}" data-free-package="1">'
+            f'data-filename="{_esc_html(fname)}" data-free-package="1"{det_attr}>'
             f"{_esc_html(title)} — {_esc_html(fname)}</a></li>"
         )
     list_html = "\n        ".join(links) if links else (
         "<li><p class=\"free-packages-blurb\">No packages listed for this pin.</p></li>"
     )
+    if def_plat:
+        face = platform_face_title(def_plat)
+        detect_hint = (
+            f'<p class="free-packages-detect-hint" id="free-packages-detect-hint" '
+            f'data-detected-platform="{_esc_html(def_plat)}">'
+            f"Detected your device as <strong>{_esc_html(face)}</strong> — "
+            f"or pick another platform below.</p>"
+        )
+        detect_main_attr = f' data-detected-platform="{_esc_html(def_plat)}"'
+    else:
+        detect_hint = ""
+        detect_main_attr = ""
     try:
         from public_chrome import (
             public_brand_header_html,
@@ -1173,12 +1306,13 @@ def render_free_packages_page_html(*, version: str = "") -> bytes:
 {header}
     <main class="free-packages-page panel-card" id="{FREE_PACKAGES_PAGE_ID}"
           data-free-packages-page="1" data-version="{_esc_html(ver)}"
-          aria-label="Free Suite packages">
+          aria-label="Free Suite packages"{detect_main_attr}>
       <div class="free-packages-center" id="free-packages-center">
         <h1 id="free-packages-heading">Free download v{_esc_html(ver)}</h1>
         <p class="free-packages-blurb" id="free-packages-blurb">
           Direct Suite installers. Residual Connect still needs a KEYGEN after install.
         </p>
+        {detect_hint}
         <ul class="free-packages-list" id="free-packages-list" data-free-packages="1">
         {list_html}
         </ul>
@@ -1191,41 +1325,115 @@ def render_free_packages_page_html(*, version: str = "") -> bytes:
     return body.encode("utf-8")
 
 
-def suite_product_submenu_links() -> list[tuple[str, str, str]]:
-    """(href, label, data-key) for Suite box sub-menu — public docs only."""
+def suite_product_submenu_links() -> list[tuple[str, str, str, str]]:
+    """(href, label, data-key, title) for Suite ecosystem submenu.
+
+    *title* is optional expanded meaning (e.g. rpOS → Restore Privacy Operating
+    System) for ``title`` / ``aria-label``; empty string when label is enough.
+    """
     return [
-        (SUITE_PERC_EXPLORER_HREF, SUITE_PERC_EXPLORER_LABEL, "perc-explorer"),
-        (SUITE_EVOLVE_DOCS_HREF, SUITE_EVOLVE_DOCS_LABEL, "evolve-docs"),
-        (SUITE_EVOLVE_WHITEPAPER_HREF, SUITE_EVOLVE_WHITEPAPER_LABEL, "evolve-whitepaper"),
-        (SUITE_EVOLVE_SOURCE_HREF, SUITE_EVOLVE_SOURCE_LABEL, "evolve-source"),
-        (SUITE_PERCCENT_WALLET_HREF, SUITE_PERCCENT_WALLET_LABEL, "perccent-wallet"),
+        (SUITE_RPOS_HREF, SUITE_RPOS_LABEL, SUITE_RPOS_KEY, SUITE_RPOS_TITLE),
+        (
+            SUITE_RX_BROWSER_HREF,
+            SUITE_RX_BROWSER_LABEL,
+            SUITE_RX_BROWSER_KEY,
+            SUITE_RX_BROWSER_LABEL,
+        ),
+        (
+            SUITE_ECOSYSTEM_VPN_HREF,
+            SUITE_ECOSYSTEM_VPN_LABEL,
+            SUITE_ECOSYSTEM_VPN_KEY,
+            "Restore Privacy residual VPN / Connect",
+        ),
+        (SUITE_PERC_EXPLORER_HREF, SUITE_PERC_EXPLORER_LABEL, "perc-explorer", ""),
+        (SUITE_EVOLVE_DOCS_HREF, SUITE_EVOLVE_DOCS_LABEL, "evolve-docs", ""),
+        (
+            SUITE_EVOLVE_WHITEPAPER_HREF,
+            SUITE_EVOLVE_WHITEPAPER_LABEL,
+            "evolve-whitepaper",
+            "",
+        ),
+        (SUITE_EVOLVE_SOURCE_HREF, SUITE_EVOLVE_SOURCE_LABEL, "evolve-source", ""),
+        (SUITE_PERCCENT_WALLET_HREF, SUITE_PERCCENT_WALLET_LABEL, "perccent-wallet", ""),
         (
             SUITE_PERCCENT_WALLET_README_HREF,
             SUITE_PERCCENT_WALLET_README_LABEL,
             "perccent-readme",
+            "",
         ),
     ]
 
 
 def render_suite_product_submenu_html() -> str:
-    """Sub-menu: Perc explorer + Evolve + Perccent wallet public docs."""
+    """Sub-menu: product family (rpOS / browser / VPN) + Perc / Evolve / wallet."""
     items: list[str] = []
-    for href, label, key in suite_product_submenu_links():
+    for href, label, key, title in suite_product_submenu_links():
+        external = href.startswith("http://") or href.startswith("https://")
+        target_rel = (
+            ' target="_blank" rel="noopener noreferrer"' if external else ""
+        )
+        title_attr = ""
+        aria = _esc_html(label)
+        if title and title != label:
+            title_attr = f' title="{_esc_html(title)}"'
+            aria = _esc_html(title)
         items.append(
             f'<a class="suite-sub-link" id="suite-sub-{_esc_html(key)}" '
             f'href="{_esc_html(href)}" data-suite-sub="{_esc_html(key)}" '
-            f'target="_blank" rel="noopener noreferrer">'
+            f'aria-label="{aria}"{title_attr}{target_rel}>'
             f"{_esc_html(label)}</a>"
         )
     return f"""
     <nav class="suite-product-submenu" id="{SUITE_SUBMENU_ID}"
          data-suite-product-submenu="1"
-         aria-label="Suite product docs — Perc explorer, Evolve, Perccent wallet">
+         aria-label="Suite ecosystem — rpOS, Rx Privacy Browser, VPN, Perc, Evolve">
       <p class="suite-product-submenu-label" id="suite-product-submenu-label">
         Suite ecosystem
       </p>
       {" ".join(items)}
     </nav>
+"""
+
+
+def render_suite_perc_wallet_explorer_iframe_html() -> str:
+    """Iframe the live Perccent block explorer into the Suite perc-wallet area.
+
+    Embeds :data:`SUITE_PERC_WALLET_EXPLORER_IFRAME_SRC`
+    (``https://evolve-perc-internet.onrender.com``) so visitors see the full
+    community explorer inside the Suite storefront wallet section.
+    """
+    src = SUITE_PERC_WALLET_EXPLORER_IFRAME_SRC.rstrip("/")
+    # Prefer trailing slash for directory-style explorer hosts
+    src_href = src + "/"
+    return f"""
+    <div class="suite-perc-wallet-explorer" id="{SUITE_PERC_WALLET_EXPLORER_ID}"
+         data-suite-perc-wallet-explorer="1" data-product="perccent-wallet"
+         data-explorer-host="evolve-perc-internet.onrender.com">
+      <p class="suite-perc-wallet-explorer-label"
+         id="suite-perc-wallet-explorer-label">
+        {_esc_html(SUITE_PERC_WALLET_EXPLORER_LABEL)}
+      </p>
+      <div class="suite-perc-wallet-explorer-frame-wrap"
+           id="suite-perc-wallet-explorer-frame-wrap">
+        <iframe class="suite-perc-wallet-explorer-frame"
+                id="{SUITE_PERC_WALLET_EXPLORER_IFRAME_ID}"
+                src="{_esc_html(src_href)}"
+                title="Perccent Network Explorer — Evolve Chronoflux"
+                loading="lazy"
+                referrerpolicy="no-referrer-when-downgrade"
+                allow="fullscreen"
+                sandbox="allow-scripts allow-same-origin allow-popups allow-forms allow-popups-to-escape-sandbox"
+                data-explorer-iframe="1"
+                data-src-host="evolve-perc-internet.onrender.com"></iframe>
+      </div>
+      <p class="suite-perc-wallet-explorer-open">
+        <a class="suite-sub-link" id="suite-perc-wallet-explorer-open"
+           href="{_esc_html(src_href)}" target="_blank" rel="noopener noreferrer"
+           data-suite-sub="perc-wallet-explorer-open">
+          Open block explorer full page
+        </a>
+      </p>
+    </div>
 """
 
 
@@ -1266,15 +1474,63 @@ def suite_storefront_css() -> str:
       margin: 0.35rem auto 0.85rem; max-width: 36rem; padding: 0;
       list-style: none;
     }
-    .suite-product-submenu a {
-      display: inline-block; padding: 0.32rem 0.65rem; border-radius: 999px;
-      font-size: 0.72rem; font-weight: 700; text-decoration: none;
-      color: #e8f2ff; background: rgba(15, 40, 70, 0.65);
-      border: 1px solid rgba(174, 208, 234, 0.4);
-      letter-spacing: 0.02em;
+    /* Perc wallet area: live block explorer iframe (evolve-perc-internet) */
+    .suite-perc-wallet-explorer {
+      margin: 0.35rem auto 1rem; max-width: 100%; width: 100%;
+      box-sizing: border-box; text-align: center;
+      padding: 0.55rem 0.35rem 0.35rem;
+      border: 1px solid rgba(174, 208, 234, 0.35);
+      border-radius: 12px;
+      background: rgba(8, 16, 32, 0.55);
     }
-    .suite-product-submenu a:hover {
-      background: rgba(30, 90, 150, 0.75); border-color: #aed0ea;
+    .suite-perc-wallet-explorer-label {
+      margin: 0 0 0.45rem; font-size: 0.78rem; font-weight: 800;
+      letter-spacing: 0.06em; text-transform: uppercase;
+      color: #aed0ea;
+    }
+    .suite-perc-wallet-explorer-frame-wrap {
+      position: relative; width: 100%;
+      min-height: 16rem; max-height: 22rem;
+      border-radius: 10px; overflow: hidden;
+      background: #0b0d14;
+      border: 1px solid rgba(108, 99, 255, 0.35);
+      box-shadow: inset 0 0 0 1px rgba(0,0,0,0.35);
+    }
+    .suite-perc-wallet-explorer-frame,
+    iframe#suite-perc-wallet-explorer-frame {
+      display: block; width: 100%; height: 20rem; min-height: 16rem;
+      max-height: 22rem; border: 0; background: #0b0d14;
+    }
+    .suite-perc-wallet-explorer-open {
+      margin: 0.45rem 0 0; font-size: 0.82rem;
+    }
+    /* Neon-gradient underline menu (not filled pill/box chips) */
+    .suite-product-submenu a,
+    .suite-product-submenu a.suite-sub-link {
+      display: inline-block; padding: 0.28rem 0.35rem 0.4rem;
+      margin: 0 0.15rem 0.2rem; border-radius: 0;
+      font-size: 0.78rem; font-weight: 700; text-decoration: none;
+      color: #e8f2ff; background: transparent; border: 0;
+      letter-spacing: 0.03em;
+      border-bottom: 2px solid transparent;
+      background-image: none;
+      transition: color 0.12s ease, border-color 0.12s ease, filter 0.12s ease;
+    }
+    .suite-product-submenu a:hover,
+    .suite-product-submenu a:focus-visible,
+    .suite-product-submenu a.is-active {
+      color: #ffffff;
+      /* Brand neon underline: cyan → blue → green (matches site chrome) */
+      border-bottom: 2px solid transparent;
+      border-image: linear-gradient(
+        90deg,
+        #00e5ff 0%,
+        #2694e8 42%,
+        #39ff6a 100%
+      ) 1;
+      filter: brightness(1.06);
+      background: transparent;
+      outline: none;
     }
     .suite-product-submenu-label {
       width: 100%; margin: 0 0 0.35rem; font-size: 0.72rem; font-weight: 700;
@@ -1320,7 +1576,23 @@ def suite_storefront_css() -> str:
       margin: 0.75rem auto 0; max-width: 34rem;
       font-size: 0.82rem; color: rgba(174, 208, 234, 0.95); line-height: 1.4;
     }
-    /* Node / operator preference (additive; not a Suite client platform) */
+    /* World flags strip — fill leftover bottom of Suite box, tiny assets */
+    .suite-world-flags {
+      display: flex; flex-wrap: wrap; gap: 1px; justify-content: center;
+      align-content: flex-start;
+      margin: 0.55rem 0 0; padding: 0.3rem 0.1rem 0.1rem;
+      /* Compact density so ISO set fits the leftover bottom without huge card growth */
+      max-height: 6.5rem; overflow-y: auto; overflow-x: hidden;
+      border-top: 1px solid rgba(174, 208, 234, 0.25);
+      width: 100%; box-sizing: border-box;
+      scrollbar-width: thin;
+    }
+    .suite-world-flags img.suite-world-flag {
+      width: 12px; height: 9px; object-fit: cover;
+      border-radius: 1px; flex: 0 0 auto;
+      display: block; opacity: 0.9;
+    }
+    /* Full business package / commercial deposit (Suite box) */
     .download-node-preference {
       margin: 1rem auto 0; max-width: 36rem; padding: 0.85rem 1rem;
       text-align: center; box-sizing: border-box;
@@ -1336,6 +1608,28 @@ def suite_storefront_css() -> str:
       margin: 0 auto 0.65rem; max-width: 34rem;
       font-size: 0.82rem; line-height: 1.45; color: rgba(174, 208, 234, 0.95);
       font-weight: 500;
+    }
+    .download-node-preference .node-pref-deposit-note {
+      margin: 0 auto 0.65rem; max-width: 32rem;
+      font-size: 0.78rem; line-height: 1.4; color: #fde68a; font-weight: 600;
+    }
+    .download-node-preference .node-pref-deposit-form {
+      margin: 0.35rem auto 0.75rem; max-width: 22rem;
+      display: flex; flex-direction: column; gap: 0.4rem; align-items: stretch;
+    }
+    .download-node-preference button.node-pref-deposit-btn,
+    .download-node-preference a.node-pref-deposit-link {
+      display: inline-block; width: 100%; max-width: 100%; box-sizing: border-box;
+      margin: 0; padding: 0.7rem 0.9rem; border: 0; border-radius: 12px;
+      cursor: pointer; font: 800 0.88rem/1.25 system-ui, sans-serif;
+      letter-spacing: 0.03em; text-decoration: none; text-align: center;
+      color: #041018;
+      background: linear-gradient(180deg, #fde68a, #f59e0b 55%, #d97706);
+      box-shadow: 0 6px 16px rgba(217, 119, 6, 0.35);
+    }
+    .download-node-preference button.node-pref-deposit-btn:hover,
+    .download-node-preference a.node-pref-deposit-link:hover {
+      filter: brightness(1.05);
     }
     .download-node-preference .node-pref-links {
       display: flex; flex-wrap: wrap; gap: 0.45rem; justify-content: center;
@@ -1355,16 +1649,21 @@ def suite_storefront_css() -> str:
 
 
 def render_node_preference_html() -> str:
-    """Additive node/operator preference block for public download boxes.
+    """Full business package block: residual node / Raskul host + £3000 deposit.
 
-    Explains Suite client vs residual-node host preference and links only to
-    real public destinations (status-host README; public Suite Pages/source).
+    Primary copy is commercial deposit framing (not KEYGEN client preference).
+    £3000 control posts into the same commercial Stripe checkout as /service.
     """
     links = [
         (NODE_OPERATOR_DOCS_HREF, NODE_OPERATOR_DOCS_LABEL, "node-docs"),
         (NODE_OPERATOR_DOCS_ALIAS_HREF, "Node operator (short path)", "node-docs-alias"),
         (NODE_PUBLIC_SUITE_PAGES_HREF, NODE_PUBLIC_SUITE_PAGES_LABEL, "suite-pages"),
         (NODE_PUBLIC_SUITE_SOURCE_HREF, NODE_PUBLIC_SUITE_SOURCE_LABEL, "suite-source"),
+        (
+            NODE_PREFERENCE_COMMERCIAL_HREF,
+            "Commercial Service page",
+            "commercial-service",
+        ),
     ]
     anchors: list[str] = []
     for href, label, key in links:
@@ -1376,13 +1675,88 @@ def render_node_preference_html() -> str:
         )
     return f"""
     <aside class="download-node-preference" id="{NODE_PREFERENCE_SECTION_ID}"
-           data-node-preference="1" aria-label="Residual node operator preference">
+           data-node-preference="1" data-business-package="1"
+           data-commercial-deposit="1"
+           data-price-pence="{NODE_PREFERENCE_DEPOSIT_PENCE}"
+           aria-label="Full business package — residual node and deposit">
       <h3 id="node-pref-heading">{_esc_html(NODE_PREFERENCE_HEADING)}</h3>
       <p class="node-pref-blurb" id="node-pref-blurb">{NODE_PREFERENCE_BLURB}</p>
+      <p class="node-pref-deposit-note" id="node-pref-deposit-note"
+         data-deposit="1">
+        {NODE_PREFERENCE_DEPOSIT_NOTE}
+      </p>
+      <form class="node-pref-deposit-form" id="node-pref-deposit-form"
+            method="post" action="{_esc_html(NODE_PREFERENCE_COMMERCIAL_CHECKOUT)}"
+            data-pay-via="commercial-suite" data-billing="one_time"
+            data-product="{_esc_html(NODE_PREFERENCE_PRODUCT_KEY)}"
+            data-price-pence="{NODE_PREFERENCE_DEPOSIT_PENCE}"
+            data-commercial-deposit-form="1">
+        <input type="hidden" name="product"
+               value="{_esc_html(NODE_PREFERENCE_PRODUCT_KEY)}"/>
+        <input type="hidden" name="product_line"
+               value="{_esc_html(NODE_PREFERENCE_PRODUCT_LINE)}"/>
+        <input type="hidden" name="billing" value="one_time"/>
+        <input type="hidden" name="amount_pence"
+               value="{NODE_PREFERENCE_DEPOSIT_PENCE}"/>
+        <button type="submit" class="node-pref-deposit-btn"
+                id="node-pref-deposit-btn"
+                data-commercial-deposit="1"
+                data-price-pence="{NODE_PREFERENCE_DEPOSIT_PENCE}">
+          {_esc_html(NODE_PREFERENCE_DEPOSIT_CTA)}
+        </button>
+      </form>
+      <p class="node-pref-deposit-note" id="node-pref-deposit-service-link">
+        <a class="node-pref-deposit-link" id="node-pref-deposit-service"
+           href="{_esc_html(NODE_PREFERENCE_COMMERCIAL_HREF)}"
+           data-commercial-deposit-link="1"
+           data-price-label="{_esc_html(NODE_PREFERENCE_DEPOSIT_LABEL)}">
+          {_esc_html(NODE_PREFERENCE_DEPOSIT_LABEL)} deposit details on Service →
+        </a>
+      </p>
       <div class="node-pref-links" id="node-pref-links" data-node-pref-links="1">
         {" ".join(anchors)}
       </div>
     </aside>
+"""
+
+
+def world_flag_codes() -> tuple[str, ...]:
+    """ISO alpha-2 codes with shipped tiny flag PNGs."""
+    try:
+        from world_flag_codes import WORLD_FLAG_CODES
+    except ImportError:  # pragma: no cover
+        try:
+            from status_page.world_flag_codes import WORLD_FLAG_CODES  # type: ignore
+        except ImportError:  # pragma: no cover
+            return ()
+    return tuple(WORLD_FLAG_CODES)
+
+
+def world_flag_static_url(code: str) -> str:
+    """Public static path for a tiny w20 flag PNG."""
+    cc = (code or "").strip().lower()
+    return f"/static/flags/w20/{cc}.png"
+
+
+def render_suite_world_flags_html() -> str:
+    """Dense strip of all world country flags at the bottom of the Suite box."""
+    codes = world_flag_codes()
+    if not codes:
+        return ""
+    imgs: list[str] = []
+    for cc in codes:
+        src = world_flag_static_url(cc)
+        imgs.append(
+            f'<img class="suite-world-flag" src="{_esc_html(src)}" '
+            f'width="20" height="15" alt="" loading="lazy" decoding="async" '
+            f'data-flag-cc="{_esc_html(cc)}" title="{_esc_html(cc.upper())}"/>'
+        )
+    return f"""
+    <div class="suite-world-flags" id="suite-world-flags"
+         data-suite-world-flags="1" data-flag-count="{len(codes)}"
+         aria-label="Flags of the world" role="img">
+      {"".join(imgs)}
+    </div>
 """
 
 
@@ -1489,6 +1863,7 @@ def render_suite_storefront_html(
     <span class="suite-version-badge" id="suite-version-badge">{SUITE_VERSION_LABEL}</span>
     <p class="suite-blurb" id="suite-blurb">{SUITE_PRODUCT_SUBTITLE}</p>
 {render_suite_product_submenu_html()}
+{render_suite_perc_wallet_explorer_iframe_html()}
     <p class="suite-keygen-line" id="suite-keygen-line">{SUITE_KEYGEN_HINT}</p>
     <div class="suite-free-primary" id="suite-free-primary" data-free-download="1">
       {primary_free}
@@ -1505,6 +1880,7 @@ def render_suite_storefront_html(
       Yearly VPN plans remain available in the client download box below.
     </p>
 {render_node_preference_html()}
+{render_suite_world_flags_html()}
   </section>
 """
 
@@ -1586,9 +1962,11 @@ def render_download_section_html(
         )
     # Order: title → price banner → local line → price box → buy form → note.
     return f"""
-  <section class="downloads panel-card" id="downloads" aria-label="Download Restore Privacy client"
+  <section class="downloads panel-card" id="downloads"
+    aria-label="Download Restore Privacy Suite client"
+    data-product="suite" data-catalog-version="{RELEASE_VERSION}"
     data-price-currency="{local.currency}" data-accept-currency="{local.currency}">
-    <h2>Download client v{RELEASE_VERSION}</h2>
+    <h2>Download Suite client v{RELEASE_VERSION}</h2>
     <p class="dl-only-price" id="dl-only-price">{ONLY_PRICE_BANNER}</p>
     <p class="dl-local-price" id="dl-local-price">{local_line}</p>
     <p class="dl-accept-currency" id="dl-accept-currency" hidden>{accept}</p>

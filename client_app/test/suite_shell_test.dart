@@ -171,6 +171,7 @@ void main() {
       (tester) async {
     await tester.pumpWidget(
       RestorePrivacyApp(
+        entryInitiallyUnlocked: true,
         walletTab: const _WalletSurface(),
         evolveTab: const _EvolveSurface(),
       ),

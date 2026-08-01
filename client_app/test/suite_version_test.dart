@@ -45,6 +45,15 @@ void main() {
     expect(evolve.contains('package:evolve/'), isTrue);
     expect(wallet.toLowerCase().contains('coming soon'), isFalse);
     expect(evolve.toLowerCase().contains('coming soon'), isFalse);
+    // Live block explorer iframed into the % wallet tab
+    expect(wallet.contains('SuitePercExplorerPanel'), isTrue);
+    expect(wallet.contains('suite_wallet_perc_explorer'), isTrue);
+    final explorer = File('lib/suite_perc_explorer_panel.dart').readAsStringSync();
+    expect(
+      explorer.contains('https://evolve-perc-internet.onrender.com'),
+      isTrue,
+    );
+    expect(explorer.contains('WebView'), isTrue);
   });
 
   test('suite network config source rejects Render as required default', () {
@@ -55,7 +64,11 @@ void main() {
     final asset = File('assets/config/perc_network.json').readAsStringSync();
     expect(asset.contains('135.181.152.10'), isTrue);
     expect(asset.contains('/perc'), isTrue);
+    // Rendezvous asset still must not require the paid Render host.
     expect(asset.contains('evolve-perc-internet.onrender.com'), isFalse);
     expect(asset.toLowerCase(), contains('paused'));
+    // Explorer iframe is a separate surface (wallet tab), not the API default.
+    final explorer = File('lib/suite_perc_explorer_panel.dart').readAsStringSync();
+    expect(explorer.contains('evolve-perc-internet.onrender.com'), isTrue);
   });
 }

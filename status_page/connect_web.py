@@ -1,8 +1,8 @@
-"""Connect-via-web panel for the public VPN APP Shop.
+"""Connect-via-web panel for the public Restore Privacy Suite storefront.
 
-A normal browser tab cannot create a full OS TUN / system-wide VPN. This module
-ships the maximum honest path: a clear Connect via web control that explains
-that limit and routes the user to real native clients (release downloads).
+A normal browser tab cannot create a full OS TUN / system-wide residual path.
+This module ships the maximum honest path: a clear Connect via web control that
+explains that limit and routes the user to real native Suite clients (1.0.0).
 """
 
 from __future__ import annotations
@@ -12,17 +12,18 @@ from downloads import RELEASE_VERSION, available_downloads
 
 CONNECT_HEADING = "Connect via web"
 HONESTY_LINE = (
-    "A normal web page cannot install a full system-wide VPN on your device "
-    "(browsers do not allow creating an OS tunnel from a tab alone)."
+    "A normal web page cannot install a full system-wide residual tunnel on your "
+    "device (browsers do not allow creating an OS tunnel from a tab alone)."
 )
 ACTION_LINE = (
-    "To connect with full Restore Privacy VPN, start the native client for your platform below. "
-    "That is the real connect path — the same apps from release v{version}."
-).format(version=RELEASE_VERSION)
+    "For full Restore Privacy Suite residual Connect, start the native Suite "
+    "installer for your platform below. Those are the real apps — catalog "
+    f"v{RELEASE_VERSION}."
+)
 
 
 def recommended_download_actions() -> list[dict[str, str]]:
-    """Primary actions: paid VPN APP Shop paths (not free public GitHub hrefs)."""
+    """Primary actions: Suite storefront package paths (catalog monopin)."""
     actions: list[dict[str, str]] = []
     for asset in available_downloads():
         actions.append(
@@ -43,12 +44,14 @@ def render_connect_via_web_html() -> str:
     for a in actions:
         buttons.append(
             f'      <a class="connect-btn" id="connect-web-{a["platform"]}" '
-            f'href="{a["href"]}">{a["label"]}</a>'
+            f'href="{a["href"]}" data-catalog-version="{RELEASE_VERSION}" '
+            f'data-filename="{a["filename"]}">{a["label"]}</a>'
         )
     buttons_html = "\n".join(buttons)
-    # Limited in-page demo: only checks live status API — clearly not full VPN
+    # Limited in-page demo: only checks live status API — clearly not full residual
     return f"""
-  <section class="connect-web" id="connect-via-web" aria-label="Connect via web">
+  <section class="connect-web" id="connect-via-web" aria-label="Connect via web"
+           data-product="suite" data-catalog-version="{RELEASE_VERSION}">
     <h2>{CONNECT_HEADING}</h2>
     <p class="connect-honest">{HONESTY_LINE}</p>
     <p class="connect-action">{ACTION_LINE}</p>
@@ -56,10 +59,11 @@ def render_connect_via_web_html() -> str:
 {buttons_html}
     </div>
     <details class="connect-limited">
-      <summary>Limited web check (not a full-device VPN)</summary>
+      <summary>Limited web check (not full-device residual Connect)</summary>
       <p class="connect-limited-note">
-        This only contacts this VPN APP Shop&rsquo;s live API to show the current session count.
-        It does <strong>not</strong> route your device traffic or replace the Windows/Android client.
+        This only contacts the Suite shop&rsquo;s live status API. It does
+        <strong>not</strong> route your device traffic or replace the native
+        Suite client for Windows, Android, macOS, iOS, or Linux.
       </p>
       <button type="button" class="connect-probe" id="connect-web-probe">Run web status check</button>
       <p class="connect-probe-out" id="connect-web-probe-out" aria-live="polite"></p>

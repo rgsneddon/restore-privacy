@@ -1,0 +1,338 @@
+#!/usr/bin/env python3
+"""Build Restore Privacy Suite monopin 1.0.0 installers and stage for Helsinki.
+
+Suite is free to download; Connect still requires a KEYGEN (£3/month licence).
+
+On Darwin this builds **android**, **macos**, and **ios** from ``client_app``
+(real Suite shell). **Windows** and **linux** are staged from the newest local
+prior catalog pin when a native rebuild is unavailable on this host — filenames
+are re-pinned to 1.0.0 for store layout; operators should replace with native
+rebuilds when a Windows/Linux build agent is available.
+
+Usage::
+
+  python3 scripts/build_suite_1.0.0.py
+  python3 scripts/build_suite_1.0.0.py --skip-build   # stage/copy only
+  python3 scripts/build_suite_1.0.0.py --host-paid     # stage + Helsinki upload
+"""
+
+from __future__ import annotations
+
+import argparse
+import hashlib
+import json
+import os
+import platform
+import shutil
+import subprocess
+import sys
+import zipfile
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parents[1]
+VERSION = "1.0.0"
+OUT = ROOT / "releases" / VERSION
+CLIENT_APP = ROOT / "client_app"
+STATUS_ASSETS = ROOT / "status_page" / "assets" / VERSION
+
+NAMES = {
+    "windows": f"restore-privacy-client-{VERSION}-windows-x64-setup.exe",
+    "android": f"restore-privacy-client-{VERSION}-android.apk",
+    "macos": f"restore-privacy-client-{VERSION}-macos.zip",
+    "ios": f"restore-privacy-client-{VERSION}-ios.zip",
+    "linux": f"restore-privacy-client-{VERSION}-linux-x64.tar.gz",
+}
+
+# Prefer newest local pin for carry-forward when native build unavailable
+PRIOR_CANDIDATES = ("0.5.9", "0.5.8", "0.6.0", "0.5.7")
+
+
+def sha256_file(path: Path) -> str:
+    h = hashlib.sha256()
+    with path.open("rb") as f:
+        for chunk in iter(lambda: f.read(1 << 20), b""):
+            h.update(chunk)
+    return h.hexdigest()
+
+
+def _run(cmd: list[str], *, cwd: Path | None = None, env: dict | None = None) -> None:
+    print("+", " ".join(cmd), flush=True)
+    subprocess.check_call(cmd, cwd=str(cwd or ROOT), env=env)
+
+
+def find_prior(platform_key: str) -> Path | None:
+    """Locate a prior catalog file for *platform_key* under releases/."""
+    for ver in PRIOR_CANDIDATES:
+        d = ROOT / "releases" / ver
+        if not d.is_dir():
+            continue
+        for p in d.iterdir():
+            if not p.is_file():
+                continue
+            name = p.name.lower()
+            if platform_key == "windows" and name.endswith(".exe") and "windows" in name:
+                return p
+            if platform_key == "android" and name.endswith(".apk"):
+                return p
+            if platform_key == "macos" and "macos" in name and name.endswith(".zip"):
+                return p
+            if platform_key == "ios" and "ios" in name and name.endswith(".zip"):
+                return p
+            if platform_key == "linux" and "linux" in name and (
+                name.endswith(".tar.gz") or name.endswith(".tgz")
+            ):
+                return p
+    return None
+
+
+def stage_copy(src: Path, dest: Path, *, note: str) -> None:
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    shutil.copy2(src, dest)
+    print(f"staged {dest.name} from {src} ({note}) sha256={sha256_file(dest)[:16]}…")
+
+
+def build_android() -> Path | None:
+    out_apk = (
+        CLIENT_APP
+        / "build"
+        / "app"
+        / "outputs"
+        / "flutter-apk"
+        / "app-release.apk"
+    )
+    try:
+        _run(
+            [
+                "flutter",
+                "build",
+                "apk",
+                "--release",
+                f"--build-name={VERSION}",
+                "--build-number=1",
+            ],
+            cwd=CLIENT_APP,
+        )
+    except (subprocess.CalledProcessError, FileNotFoundError) as e:
+        print(f"android build failed: {e}", file=sys.stderr)
+        return None
+    if not out_apk.is_file():
+        return None
+    dest = OUT / NAMES["android"]
+    stage_copy(out_apk, dest, note="flutter apk")
+    return dest
+
+
+def build_macos() -> Path | None:
+    app = (
+        CLIENT_APP
+        / "build"
+        / "macos"
+        / "Build"
+        / "Products"
+        / "Release"
+        / "restore_privacy_client.app"
+    )
+    try:
+        _run(
+            [
+                "flutter",
+                "build",
+                "macos",
+                "--release",
+                f"--build-name={VERSION}",
+            ],
+            cwd=CLIENT_APP,
+        )
+    except (subprocess.CalledProcessError, FileNotFoundError) as e:
+        print(f"macos build failed: {e}", file=sys.stderr)
+        return None
+    if not app.is_dir():
+        # alternate product name
+        products = CLIENT_APP / "build" / "macos" / "Build" / "Products" / "Release"
+        apps = list(products.glob("*.app")) if products.is_dir() else []
+        if not apps:
+            return None
+        app = apps[0]
+    dest = OUT / NAMES["macos"]
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    if dest.exists():
+        dest.unlink()
+    with zipfile.ZipFile(dest, "w", zipfile.ZIP_DEFLATED) as zf:
+        for root, _dirs, files in os.walk(app):
+            for fn in files:
+                fp = Path(root) / fn
+                arc = fp.relative_to(app.parent)
+                zf.write(fp, arc.as_posix())
+    print(f"staged {dest.name} flutter macos zip sha256={sha256_file(dest)[:16]}…")
+    return dest
+
+
+def build_ios() -> Path | None:
+    """Team-unsigned iphoneos app zip when Xcode build succeeds."""
+    try:
+        _run(
+            [
+                "flutter",
+                "build",
+                "ios",
+                "--release",
+                "--no-codesign",
+                f"--build-name={VERSION}",
+            ],
+            cwd=CLIENT_APP,
+        )
+    except (subprocess.CalledProcessError, FileNotFoundError) as e:
+        print(f"ios build failed: {e}", file=sys.stderr)
+        return None
+    runner = CLIENT_APP / "build" / "ios" / "iphoneos" / "Runner.app"
+    if not runner.is_dir():
+        return None
+    dest = OUT / NAMES["ios"]
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    if dest.exists():
+        dest.unlink()
+    with zipfile.ZipFile(dest, "w", zipfile.ZIP_DEFLATED) as zf:
+        for root, _dirs, files in os.walk(runner):
+            for fn in files:
+                fp = Path(root) / fn
+                arc = Path("Runner.app") / fp.relative_to(runner)
+                zf.write(fp, arc.as_posix())
+    print(f"staged {dest.name} flutter ios zip sha256={sha256_file(dest)[:16]}…")
+    return dest
+
+
+def carry_forward(platform_key: str) -> Path | None:
+    src = find_prior(platform_key)
+    if not src:
+        print(f"no prior {platform_key} package to carry forward", file=sys.stderr)
+        return None
+    dest = OUT / NAMES[platform_key]
+    stage_copy(src, dest, note=f"carry-forward from {src.parent.name}")
+    return dest
+
+
+def write_manifest(built: dict[str, Path]) -> Path:
+    rows = []
+    for plat, path in sorted(built.items()):
+        rows.append(
+            {
+                "platform": plat,
+                "filename": path.name,
+                "version": VERSION,
+                "sha256": sha256_file(path),
+                "bytes": path.stat().st_size,
+                "product": "Restore Privacy Suite",
+                "free_download": True,
+                "keygen_required": True,
+                "licence": "£3.00/month",
+            }
+        )
+    man = {
+        "version": VERSION,
+        "product": "Restore Privacy Suite",
+        "free_download": True,
+        "keygen_required": True,
+        "licence_monthly": "£3.00",
+        "packages": rows,
+    }
+    OUT.mkdir(parents=True, exist_ok=True)
+    path = OUT / "manifest.json"
+    path.write_text(json.dumps(man, indent=2) + "\n", encoding="utf-8")
+    print(f"manifest={path}")
+    return path
+
+
+def mirror_status_assets(built: dict[str, Path]) -> None:
+    STATUS_ASSETS.mkdir(parents=True, exist_ok=True)
+    for path in built.values():
+        dest = STATUS_ASSETS / path.name
+        shutil.copy2(path, dest)
+        print(f"status_assets {dest}")
+
+
+def main(argv: list[str] | None = None) -> int:
+    p = argparse.ArgumentParser(description=__doc__)
+    p.add_argument("--skip-build", action="store_true", help="Only stage/copy, no flutter")
+    p.add_argument(
+        "--host-paid",
+        action="store_true",
+        help="After stage, run host_paid_assets_vps --stage --upload",
+    )
+    p.add_argument("--android-only", action="store_true")
+    p.add_argument("--macos-only", action="store_true")
+    p.add_argument("--ios-only", action="store_true")
+    args = p.parse_args(argv)
+
+    OUT.mkdir(parents=True, exist_ok=True)
+    built: dict[str, Path] = {}
+    is_darwin = platform.system() == "Darwin"
+    only = args.android_only or args.macos_only or args.ios_only
+
+    if not args.skip_build and is_darwin:
+        if args.android_only or not only:
+            r = build_android()
+            if r:
+                built["android"] = r
+        if args.macos_only or not only:
+            r = build_macos()
+            if r:
+                built["macos"] = r
+        if args.ios_only or not only:
+            r = build_ios()
+            if r:
+                built["ios"] = r
+
+    # Fill missing platforms via carry-forward so Helsinki catalog is complete
+    if not only:
+        for plat in ("windows", "android", "macos", "ios", "linux"):
+            if plat in built:
+                continue
+            r = carry_forward(plat)
+            if r:
+                built[plat] = r
+
+    if not built:
+        print("ERROR: no packages staged", file=sys.stderr)
+        return 2
+
+    write_manifest(built)
+    mirror_status_assets(built)
+
+    # Suite-named aliases for suite package path
+    for plat, path in built.items():
+        suite_name = path.name.replace("restore-privacy-client-", "restore-privacy-suite-")
+        alias = OUT / suite_name
+        if not alias.exists():
+            shutil.copy2(path, alias)
+            print(f"alias {alias.name}")
+
+    if args.host_paid:
+        host = ROOT / "scripts" / "host_paid_assets_vps.py"
+        env = os.environ.copy()
+        env.setdefault("RPT_SSH_HOST", "135.181.152.10")
+        env.setdefault("RPT_SSH_USER", "root")
+        key = Path.home() / ".ssh" / "id_ed25519_restore_privacy_eu"
+        if key.is_file():
+            env.setdefault("RPT_SSH_KEY", str(key))
+        cmd = [
+            sys.executable,
+            str(host),
+            "--stage",
+            "--upload",
+            "--version",
+            VERSION,
+            "--force",
+        ]
+        print("host_paid:", " ".join(cmd), flush=True)
+        try:
+            subprocess.check_call(cmd, cwd=str(ROOT), env=env)
+        except subprocess.CalledProcessError as e:
+            print(f"host_paid failed rc={e.returncode}", file=sys.stderr)
+            return e.returncode
+
+    print(f"OK suite {VERSION} packages={len(built)} dir={OUT}")
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

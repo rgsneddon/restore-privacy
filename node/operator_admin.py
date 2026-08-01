@@ -509,6 +509,42 @@ class NodeOperatorController:
         spec.loader.exec_module(mod)
         return mod
 
+    def ssh_upload_access_preflight(
+        self,
+        *,
+        upload: bool = True,
+        env: dict[str, str] | None = None,
+        home: Path | None = None,
+    ) -> dict[str, Any]:
+        """Check host SSH access keys before package upload (no network).
+
+        Delegates to shipped ``host_paid_assets_vps.ssh_upload_preflight``. When
+        keys are missing and *upload* is True, returns ``redirect`` to the public
+        app-testers URL so the admin browser can be forced there.
+        """
+        try:
+            mod = self._load_host_paid_assets()
+        except Exception as exc:  # noqa: BLE001
+            return {
+                "ok": False,
+                "missing_ssh_keys": True,
+                "redirect": "https://restoreprivacy.online/app-testers",
+                "error": f"host script unavailable: {exc}"[:240],
+                "key_path": "",
+            }
+        preflight = getattr(mod, "ssh_upload_preflight", None)
+        if not callable(preflight):
+            return {
+                "ok": False,
+                "missing_ssh_keys": True,
+                "redirect": "https://restoreprivacy.online/app-testers",
+                "error": "ssh_upload_preflight helper missing",
+                "key_path": "",
+            }
+        return dict(
+            preflight(upload=bool(upload), env=env, home=home)  # type: ignore[misc]
+        )
+
     def catalog_version_default(self) -> str:
         """Current shipped catalog monopin (downloads.RELEASE_VERSION)."""
         try:
@@ -578,6 +614,9 @@ class NodeOperatorController:
             "present_count": int(inv.get("present_count") or 0),
             "total": int(inv.get("total") or 0),
             "packages": inv.get("packages") or [],
+            "missing_ssh_keys": bool(deploy.get("missing_ssh_keys")),
+            "redirect": str(deploy.get("redirect") or ""),
+            "ssh_key_path": str(deploy.get("ssh_key_path") or ""),
         }
 
     def list_local_packages(self, *, version: str | None = None) -> dict[str, Any]:
@@ -669,6 +708,18 @@ class NodeOperatorController:
             out["ok"] = True
             out["error"] = "nothing to do (stage and upload both off)"
             return out
+
+        # Real SSH upload (not dry-run) requires host access keys.
+        # Missing keys → block SSH and force browser to app-testers.
+        if upload and not dry_run:
+            pre = self.ssh_upload_access_preflight(upload=True)
+            if not pre.get("ok"):
+                out["error"] = str(pre.get("error") or "SSH access keys missing")
+                out["missing_ssh_keys"] = True
+                out["redirect"] = str(pre.get("redirect") or "")
+                return out
+            out["missing_ssh_keys"] = False
+            out["ssh_key_path"] = str(pre.get("key_path") or "")
 
         if stage:
             try:
@@ -884,12 +935,17 @@ class NodeOperatorController:
             out["upload_code"] = dep.get("upload_code")
             if not dep.get("ok"):
                 out["error"] = str(dep.get("error") or "upload failed")[:300]
+                out["missing_ssh_keys"] = bool(dep.get("missing_ssh_keys"))
+                out["redirect"] = str(dep.get("redirect") or "")
                 # Stage may still have succeeded
                 if stage and out.get("staged_to") and not dry_run:
-                    out["error"] = (
-                        f"staged ok but upload failed: {out['error']}"
-                    )[:300]
+                    if not out.get("missing_ssh_keys"):
+                        out["error"] = (
+                            f"staged ok but upload failed: {out['error']}"
+                        )[:300]
                 return out
+            out["missing_ssh_keys"] = False
+            out["ssh_key_path"] = str(dep.get("ssh_key_path") or "")
 
         out["ok"] = True
         out["error"] = ""

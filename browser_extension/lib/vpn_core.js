@@ -38,7 +38,7 @@
       proxyConfig: null,
       error: null,
       browserScopeOnly: true,
-      productTitle: "RESTORE PRIVACY VPN",
+      productTitle: "RESTORE PRIVACY SUITE",
       catalogVersion: "0.4.2",
     };
   }
@@ -85,7 +85,7 @@
         proxyConfig: cfg,
         error: null,
         browserScopeOnly: true,
-        productTitle: base.productTitle || "RESTORE PRIVACY VPN",
+        productTitle: base.productTitle || "RESTORE PRIVACY SUITE",
         catalogVersion: base.catalogVersion || "0.4.2",
         enabledAt: Date.now(),
       };
@@ -95,7 +95,7 @@
         proxyConfig: null,
         error: String(err && err.message ? err.message : err),
         browserScopeOnly: true,
-        productTitle: base.productTitle || "RESTORE PRIVACY VPN",
+        productTitle: base.productTitle || "RESTORE PRIVACY SUITE",
         catalogVersion: base.catalogVersion || "0.4.2",
       };
     }
@@ -113,7 +113,7 @@
       proxyConfig: null,
       error: null,
       browserScopeOnly: true,
-      productTitle: base.productTitle || "RESTORE PRIVACY VPN",
+      productTitle: base.productTitle || "RESTORE PRIVACY SUITE",
       catalogVersion: base.catalogVersion || "0.4.2",
       disabledAt: Date.now(),
     };

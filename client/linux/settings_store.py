@@ -197,7 +197,7 @@ def apply_run_at_startup(enabled: bool) -> str:
             "Type=Application\n"
             "Version=1.0\n"
             "Name=Privacy Restored\n"
-            "Comment=Restore Privacy VPN client\n"
+            "Comment=Restore Privacy Suite client\n"
             f"Exec={exec_line}\n"
             f"Path={root}\n"
             "Terminal=false\n"
