@@ -134,6 +134,7 @@ void main() {
         MaterialApp(
           home: SuiteShell(
             initialParts: parts,
+            preferInitialParts: true,
             partsStore: SuitePartsStore(MemorySettingsBackend()),
             vpnTab: const Scaffold(
               body: Text('VPN_ONLY_SURFACE'),
@@ -156,6 +157,48 @@ void main() {
       await tester.pumpAndSettle();
       expect(find.text('EVOLVE_HERE'), findsOneWidget);
       expect(find.text('WALLET_GONE'), findsNothing);
+    });
+
+    testWidgets(
+        'cold start loads persisted removed parts from SuitePartsStore (no forced allInstalled)',
+        (tester) async {
+      final backend = MemorySettingsBackend();
+      final store = SuitePartsStore(backend);
+      // Simulate prior session: user removed wallet + rpAI.
+      await store.save(
+        const SuitePartsState(
+          walletInstalled: false,
+          evolveInstalled: true,
+          rpaiInstalled: false,
+        ),
+      );
+
+      // Fresh shell — no preferInitialParts / no initialParts (production path).
+      await tester.pumpWidget(
+        MaterialApp(
+          home: SuiteShell(
+            partsStore: store,
+            vpnTab: const Scaffold(body: Text('VPN_COLD')),
+            walletTab: const Scaffold(body: Text('WALLET_COLD')),
+            evolveTab: const Scaffold(body: Text('EVOLVE_COLD')),
+            rpaiTab: const Scaffold(body: Text('RPAI_COLD')),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      final state = tester.state<SuiteShellState>(find.byType(SuiteShell));
+      expect(state.partsState.walletInstalled, isFalse);
+      expect(state.partsState.evolveInstalled, isTrue);
+      expect(state.partsState.rpaiInstalled, isFalse);
+      expect(state.partsState.vpnInstalled, isTrue);
+
+      expect(find.text(kSuiteTabVpn), findsWidgets);
+      expect(find.text(kSuiteTabEvolve), findsWidgets);
+      expect(find.text(kSuiteTabWallet), findsNothing);
+      expect(find.text(kSuiteTabRpai), findsNothing);
+      expect(find.text('VPN_COLD'), findsOneWidget);
+      expect(find.text('WALLET_COLD'), findsNothing);
     });
   });
 

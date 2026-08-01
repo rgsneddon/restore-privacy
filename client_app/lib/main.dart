@@ -92,24 +92,39 @@ class RestorePrivacyApp extends StatefulWidget {
 class _RestorePrivacyAppState extends State<RestorePrivacyApp> {
   final GlobalKey<SuiteShellState> _shellKey = GlobalKey<SuiteShellState>();
   late SuitePartsState _parts;
+  /// True after durable prefs (or forced test snapshot) have been applied.
+  var _partsReady = false;
 
   @override
   void initState() {
     super.initState();
+    // Bootstrap only; cold start loads SuitePartsStore inside SuiteShell unless
+    // the test injects [initialParts] with preferInitialParts.
     _parts = widget.initialParts ?? SuitePartsState.allInstalled;
+    _partsReady = widget.initialParts != null;
   }
 
   void _onPartsChanged(SuitePartsState next) {
-    setState(() => _parts = next);
-    _shellKey.currentState?.applyParts(next);
+    if (!mounted) return;
+    // Shell already applied the state; only sync parent fields (no re-entrant applyParts).
+    if (_partsReady && _parts == next) return;
+    setState(() {
+      _parts = next;
+      _partsReady = true;
+    });
   }
 
   @override
   Widget build(BuildContext context) {
+    final forceSnapshot = widget.initialParts != null;
     final shell = SuiteShell(
       key: _shellKey,
       initialTabIndex: widget.initialTabIndex,
-      initialParts: _parts,
+      // Do not force allInstalled after boot — null lets shell load prefs.
+      initialParts: forceSnapshot
+          ? widget.initialParts
+          : (_partsReady ? _parts : null),
+      preferInitialParts: forceSnapshot,
       partsStore: widget.partsStore,
       onPartsChanged: _onPartsChanged,
       vpnTab: TunnelHome(
@@ -118,7 +133,7 @@ class _RestorePrivacyAppState extends State<RestorePrivacyApp> {
         vpnController: widget.vpnController,
         onQuitExit: widget.onQuitExit,
         partsStore: widget.partsStore,
-        initialParts: _parts,
+        initialParts: _partsReady ? _parts : widget.initialParts,
         onPartsChanged: _onPartsChanged,
       ),
       walletTab: widget.walletTab,

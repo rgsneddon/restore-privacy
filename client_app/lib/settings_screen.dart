@@ -142,6 +142,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
     final loaded = await store.load();
     if (!mounted) return;
     setState(() => _parts = loaded);
+    // Keep shell nav in sync after cold start / reopen Settings.
+    widget.onPartsChanged?.call(loaded);
   }
 
   Future<void> _setPartInstalled(SuitePartId id, bool installed) async {

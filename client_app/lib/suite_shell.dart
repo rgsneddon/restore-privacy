@@ -25,6 +25,7 @@ class SuiteShell extends StatefulWidget {
     this.rpaiTab,
     this.partsStore,
     this.initialParts,
+    this.preferInitialParts = false,
     this.onPartsChanged,
   });
 
@@ -46,8 +47,13 @@ class SuiteShell extends StatefulWidget {
   /// Durable optional-part install flags.
   final SuitePartsStore? partsStore;
 
-  /// Injectable parts state (tests / sync after Settings).
+  /// Bootstrap / parent-synced parts snapshot. Durable prefs still load on
+  /// boot unless [preferInitialParts] is true (tests that force a snapshot).
   final SuitePartsState? initialParts;
+
+  /// When true, skip durable [partsStore] load and keep [initialParts].
+  /// Production leaves this false so cold start applies SharedPreferences.
+  final bool preferInitialParts;
 
   /// Notified when Settings (or shell) changes optional part install flags.
   final ValueChanged<SuitePartsState>? onPartsChanged;
@@ -77,14 +83,20 @@ class SuiteShellState extends State<SuiteShell> {
   }
 
   /// Apply new parts (e.g. after Settings) and clamp tab index.
-  void applyParts(SuitePartsState next) {
+  ///
+  /// Does not re-notify [onPartsChanged] (caller / Settings already owns notify).
+  void applyParts(SuitePartsState next, {bool notifyParent = false}) {
     if (!mounted) return;
+    if (_parts == next && !_loadingParts) {
+      if (notifyParent) widget.onPartsChanged?.call(next);
+      return;
+    }
     setState(() {
       _parts = next;
       _index = clampSuiteTabIndex(_index, _parts);
       _loadingParts = false;
     });
-    widget.onPartsChanged?.call(next);
+    if (notifyParent) widget.onPartsChanged?.call(next);
   }
 
   Future<void> setPartInstalled(SuitePartId id, bool installed) async {
@@ -95,7 +107,7 @@ class SuiteShellState extends State<SuiteShell> {
     } else {
       next = applySuitePartInstall(_parts, id: id, installed: installed);
     }
-    applyParts(next);
+    applyParts(next, notifyParent: true);
   }
 
   @override
@@ -109,8 +121,15 @@ class SuiteShellState extends State<SuiteShell> {
   @override
   void didUpdateWidget(covariant SuiteShell oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (widget.initialParts != null &&
+    if (widget.preferInitialParts &&
+        widget.initialParts != null &&
         widget.initialParts != oldWidget.initialParts) {
+      applyParts(widget.initialParts!);
+    } else if (!widget.preferInitialParts &&
+        widget.initialParts != null &&
+        widget.initialParts != _parts &&
+        widget.initialParts != oldWidget.initialParts) {
+      // Parent synced from Settings — apply without re-notifying parent.
       applyParts(widget.initialParts!);
     }
   }
@@ -118,8 +137,8 @@ class SuiteShellState extends State<SuiteShell> {
   Future<void> _bootParts() async {
     final store = widget.partsStore ?? await _defaultPartsStore();
     if (!mounted) return;
-    // Explicit initialParts wins over store load (tests + post-Settings sync).
-    if (widget.initialParts != null) {
+    // Tests may force a snapshot; production always loads durable prefs.
+    if (widget.preferInitialParts && widget.initialParts != null) {
       setState(() {
         _store = store;
         _parts = widget.initialParts!;
@@ -136,6 +155,8 @@ class SuiteShellState extends State<SuiteShell> {
       _index = clampSuiteTabIndex(_index, _parts);
       _loadingParts = false;
     });
+    // Sync parent (RestorePrivacyApp / TunnelHome) so Settings matches nav.
+    widget.onPartsChanged?.call(loaded);
   }
 
   Future<SuitePartsStore> _defaultPartsStore() async {
