@@ -56,13 +56,14 @@ class TestSecurityHeaderConstants(unittest.TestCase):
         self.assertIn(sh.FORM_ACTION_DIRECTIVE, csp)
         self.assertIn(sh.FORM_ACTION_DIRECTIVE, frameable)
 
-    def test_frame_src_is_same_origin_only_no_explorer_embed(self):
-        """Suite no longer embeds external Perc explorer; frame-src stays 'self'."""
+    def test_frame_src_allows_perc_explorer_embed_origin(self):
+        """Homepage embeds Perc explorer; frame-src allows public /perc host."""
         csp = sh.CONTENT_SECURITY_POLICY
         self.assertIn("frame-src", csp)
         self.assertIn(sh.FRAME_SRC_DIRECTIVE, csp)
-        self.assertEqual(sh.FRAME_SRC_DIRECTIVE, "frame-src 'self'")
-        self.assertNotIn("evolve-perc-internet.onrender.com", csp)
+        self.assertIn("'self'", sh.FRAME_SRC_DIRECTIVE)
+        self.assertIn("135.181.152.10.sslip.io", sh.FRAME_SRC_DIRECTIVE)
+        self.assertIn("135.181.152.10.sslip.io", csp)
         self.assertIn(sh.FRAME_SRC_DIRECTIVE, sh.CONTENT_SECURITY_POLICY_FRAMEABLE)
 
     def test_frameable_omits_xfo_deny_uses_self_ancestors(self):
