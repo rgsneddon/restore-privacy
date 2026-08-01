@@ -143,6 +143,39 @@ class TestPerAppPackages(unittest.TestCase):
                     names = "\n".join(zf.namelist())
                     self.assertIn("install.sh", names)
                     self.assertIn("apps/rpoffice/", names)
+                    install_name = next(n for n in zf.namelist() if n.endswith("install.sh"))
+                    install_sh = zf.read(install_name).decode("utf-8")
+                    # Real user Desktop default (not only prefix Desktop)
+                    self.assertTrue(
+                        "HOME/Desktop" in install_sh or "XDG_DESKTOP" in install_sh,
+                        msg=f"{p['brand']} install.sh must default to user Desktop",
+                    )
+                    # Must not be PREFIX/Desktop-only default
+                    self.assertNotIn(
+                        'DESKTOP="${RPOS_DESKTOP:-$PREFIX/Desktop}"',
+                        install_sh,
+                    )
+                    self.assertIn("PREFIX_DESKTOP", install_sh)
+
+    def test_shipped_releases_rpos_apps_install_sh_user_desktop(self) -> None:
+        """Shipped artifacts under releases/rpos-apps must match generator Desktop path."""
+        rel = ROOT / "releases" / "rpos-apps" / "0.1.0"
+        if not rel.is_dir():
+            self.skipTest("releases/rpos-apps/0.1.0 not present")
+        zips = sorted(rel.glob("*-0.1.0-installer.zip"))
+        self.assertEqual(len(zips), 3, f"expected 3 installers in {rel}")
+        for zpath in zips:
+            with zipfile.ZipFile(zpath) as zf:
+                install_name = next(n for n in zf.namelist() if n.endswith("install.sh"))
+                text = zf.read(install_name).decode("utf-8")
+                self.assertTrue(
+                    "HOME/Desktop" in text or "XDG_DESKTOP" in text,
+                    msg=f"{zpath.name} install.sh missing user Desktop default",
+                )
+                self.assertNotIn(
+                    'DESKTOP="${RPOS_DESKTOP:-$PREFIX/Desktop}"',
+                    text,
+                )
 
 
 class TestInstallerSmoke(unittest.TestCase):

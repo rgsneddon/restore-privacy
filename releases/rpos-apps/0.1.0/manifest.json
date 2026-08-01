@@ -1,0 +1,55 @@
+{
+  "ok": true,
+  "version": "0.1.0",
+  "out_dir": "/Users/russellsneddon/restore-privacy/releases/rpos-apps/0.1.0",
+  "packages": [
+    {
+      "ok": true,
+      "brand": "Pens",
+      "archive": "/Users/russellsneddon/restore-privacy/releases/rpos-apps/0.1.0/pens-0.1.0-installer.zip",
+      "archive_name": "pens-0.1.0-installer.zip",
+      "bytes": 12529,
+      "sha256": "e909967fd8055d2f613c8f70add133d94a54deafc28fa741fd7ad015c49a6922"
+    },
+    {
+      "ok": true,
+      "brand": "Tables",
+      "archive": "/Users/russellsneddon/restore-privacy/releases/rpos-apps/0.1.0/tables-0.1.0-installer.zip",
+      "archive_name": "tables-0.1.0-installer.zip",
+      "bytes": 12621,
+      "sha256": "3133c4f701b5c68d9d2b68e73be810339c29627345e1cc5c77d02e6461aecfe4"
+    },
+    {
+      "ok": true,
+      "brand": "Slides",
+      "archive": "/Users/russellsneddon/restore-privacy/releases/rpos-apps/0.1.0/slides-0.1.0-installer.zip",
+      "archive_name": "slides-0.1.0-installer.zip",
+      "bytes": 12620,
+      "sha256": "1805ef10f6bee51791290ae7e676bbbbc8c2bfade8ea86760dc120c38e082855"
+    }
+  ],
+  "inventory": [
+    {
+      "brand": "Pens",
+      "key": "pens",
+      "archive_name": "pens-0.1.0-installer.zip",
+      "module": "rpoffice.apps.pens",
+      "free_with_rpos": "true"
+    },
+    {
+      "brand": "Tables",
+      "key": "tables",
+      "archive_name": "tables-0.1.0-installer.zip",
+      "module": "rpoffice.apps.tables",
+      "free_with_rpos": "true"
+    },
+    {
+      "brand": "Slides",
+      "key": "slides",
+      "archive_name": "slides-0.1.0-installer.zip",
+      "module": "rpoffice.apps.slides",
+      "free_with_rpos": "true"
+    }
+  ],
+  "free_with_rpos": true
+}
