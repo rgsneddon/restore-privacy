@@ -1,0 +1,31 @@
+=== monopin zip verify ===
+-rw-r--r--  1 russellsneddon  staff  27207358  1 Aug 12:49 releases/1.0.2/restore-privacy-client-1.0.2-macos.zip
+-rw-r--r--  1 russellsneddon  staff  27207358  1 Aug 12:50 status_page/assets/1.0.2/restore-privacy-client-1.0.2-macos.zip
+8a7d55c1803f15ce86c03214871928f2a169e54883326cadba314eeca3a59453  releases/1.0.2/restore-privacy-client-1.0.2-macos.zip
+APP=/var/folders/qb/tz4y4zts04z4846pbq95l6kw0000gp/T/grok-goal-ec22957d0ec5/implementer/verifyxZdr/restore_privacy_client.app
+Identifier=com.restoreprivacy.restorePrivacyClient
+Authority=Developer ID Application: Russell Sneddon (SFCBP95595)
+Authority=Developer ID Certification Authority
+Authority=Apple Root CA
+Notarization Ticket=stapled
+TeamIdentifier=SFCBP95595
+Runtime Version=26.5.0
+--validated:/private/var/folders/qb/tz4y4zts04z4846pbq95l6kw0000gp/T/grok-goal-ec22957d0ec5/implementer/verifyxZdr/restore_privacy_client.app/Contents/Frameworks/flutter_secure_storage_macos.framework/Versions/Current/.
+--prepared:/private/var/folders/qb/tz4y4zts04z4846pbq95l6kw0000gp/T/grok-goal-ec22957d0ec5/implementer/verifyxZdr/restore_privacy_client.app/Contents/Frameworks/App.framework/Versions/Current/.
+--validated:/private/var/folders/qb/tz4y4zts04z4846pbq95l6kw0000gp/T/grok-goal-ec22957d0ec5/implementer/verifyxZdr/restore_privacy_client.app/Contents/Frameworks/App.framework/Versions/Current/.
+/var/folders/qb/tz4y4zts04z4846pbq95l6kw0000gp/T/grok-goal-ec22957d0ec5/implementer/verifyxZdr/restore_privacy_client.app: valid on disk
+/var/folders/qb/tz4y4zts04z4846pbq95l6kw0000gp/T/grok-goal-ec22957d0ec5/implementer/verifyxZdr/restore_privacy_client.app: satisfies its Designated Requirement
+/var/folders/qb/tz4y4zts04z4846pbq95l6kw0000gp/T/grok-goal-ec22957d0ec5/implementer/verifyxZdr/restore_privacy_client.app: accepted
+source=Notarized Developer ID
+origin=Developer ID Application: Russell Sneddon (SFCBP95595)
+Processing: /var/folders/qb/tz4y4zts04z4846pbq95l6kw0000gp/T/grok-goal-ec22957d0ec5/implementer/verifyxZdr/restore_privacy_client.app
+The validate action worked!
+1.0.2
+{'path': 'releases/1.0.2/restore-privacy-client-1.0.2-macos.zip', 'platform': 'macos', 'exists': True, 'size': 27207358, 'bundle_versions': [{'plist': 'restore_privacy_client.app/Contents/Info.plist', 'version': '1.0.2'}], 'primary_version': '1.0.2', 'plist_paths': ['restore_privacy_client.app/Contents/Info.plist']}
+require 1.0.2
+monopin 1.0.2
+{'ok': True, 'reason': 'developer_id_application', 'leaf_authority': 'Developer ID Application: Russell Sneddon (SFCBP95595)', 'ticket_stapled': True, 'spctl_notarized_developer_id': True, 'spctl_exit': 0}
+spctl_text /var/folders/qb/tz4y4zts04z4846pbq95l6kw0000gp/T/tmpk508b712/restore_privacy_client.app: accepted
+source=Notarized Developer ID
+origin=Developer ID Application: Russell Sneddon (SFCBP95595)
+ASSESS_OK

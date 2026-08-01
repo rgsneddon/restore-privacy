@@ -1,0 +1,23 @@
+test_adhoc_fails_closed (tests.test_apple_distribution_seal.TestCodesignDvParser.test_adhoc_fails_closed) ... ok
+test_apple_development_fails_closed (tests.test_apple_distribution_seal.TestCodesignDvParser.test_apple_development_fails_closed) ... ok
+test_developer_id_leaf_ok (tests.test_apple_distribution_seal.TestCodesignDvParser.test_developer_id_leaf_ok) ... ok
+test_monopin_macos_zip_is_developer_id_when_present (tests.test_apple_distribution_seal.TestLiveMonopinZipDistribution.test_monopin_macos_zip_is_developer_id_when_present) ... ok
+test_sign_script_requires_developer_id_not_development (tests.test_apple_distribution_seal.TestSignScriptFailClosed.test_sign_script_requires_developer_id_not_development) ... ok
+test_audit_detects_catalog_match_after_mac_rebuild (tests.test_apple_package_audit.TestApplePackageAudit.test_audit_detects_catalog_match_after_mac_rebuild)
+Drive real audit helper against catalog monopin. ... ok
+test_handoff_documents_mac_rebuild_ship (tests.test_apple_package_audit.TestApplePackageAudit.test_handoff_documents_mac_rebuild_ship) ... ok
+test_macos_build_doc_mentions_notarization (tests.test_apple_signing_pipeline.TestGatekeeperDocsMentionNotarize.test_macos_build_doc_mentions_notarization) ... ok
+test_inject_roundtrip_into_temp_app_layout (tests.test_apple_signing_pipeline.TestInjectAppleSecretsScript.test_inject_roundtrip_into_temp_app_layout)
+Drive the real inject script on a fake .app tree (node pub only). ... ok
+test_inject_script_only_copies_product_keys (tests.test_apple_signing_pipeline.TestInjectAppleSecretsScript.test_inject_script_only_copies_product_keys) ... ok
+test_release_package_script_calls_sign_and_notarize (tests.test_apple_signing_pipeline.TestMacosSignNotarizeScript.test_release_package_script_calls_sign_and_notarize) ... ok
+test_script_exists_and_invokes_real_apple_tools (tests.test_apple_signing_pipeline.TestMacosSignNotarizeScript.test_script_exists_and_invokes_real_apple_tools) ... ok
+test_build_release_wires_residual_team_resign (tests.test_apple_ship_gates.TestAppleShipGates.test_build_release_wires_residual_team_resign) ... ok
+test_docs_name_dual_path_ship_checklist (tests.test_apple_ship_gates.TestAppleShipGates.test_docs_name_dual_path_ship_checklist) ... ok
+test_residual_team_app_path_is_sibling_copy (tests.test_apple_ship_gates.TestAppleShipGates.test_residual_team_app_path_is_sibling_copy) ... ok
+test_ship_scripts_present (tests.test_apple_ship_gates.TestAppleShipGates.test_ship_scripts_present) ... ok
+
+----------------------------------------------------------------------
+Ran 16 tests in 0.634s
+
+OK

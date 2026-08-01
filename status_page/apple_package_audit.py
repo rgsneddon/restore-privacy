@@ -3,11 +3,17 @@
 Windows hosts cannot notarize; operators often stage placeholder zips under
 ``status_page/assets/{VERSION}/``. This helper reads CFBundleShortVersionString
 from the real zip contents so CI / ops can detect mislabeled packages.
+
+Also provides pure codesign-output parsers and optional live Gatekeeper checks
+so **Apple Development** (or unsigned) zips cannot be treated as a catalog seal.
 """
 
 from __future__ import annotations
 
 import plistlib
+import re
+import subprocess
+import tempfile
 import zipfile
 from pathlib import Path
 from typing import Any
@@ -80,6 +86,163 @@ def macos_zip_cfbundle_short_version(path: Path | str) -> str | None:
     info = inspect_apple_zip(Path(path), platform="macos")
     ver = info.get("primary_version")
     return str(ver).strip() if ver else None
+
+
+def parse_codesign_dv_output(text: str) -> dict[str, Any]:
+    """Pure parse of ``codesign -dv --verbose=2`` stderr/stdout text."""
+    lines = (text or "").splitlines()
+    authorities: list[str] = []
+    team = ""
+    runtime = ""
+    notarization = ""
+    identifier = ""
+    for line in lines:
+        s = line.strip()
+        if s.startswith("Authority="):
+            authorities.append(s.split("=", 1)[1].strip())
+        elif s.startswith("TeamIdentifier="):
+            team = s.split("=", 1)[1].strip()
+        elif s.startswith("Runtime Version="):
+            runtime = s.split("=", 1)[1].strip()
+        elif s.startswith("Notarization Ticket="):
+            notarization = s.split("=", 1)[1].strip()
+        elif s.startswith("Identifier="):
+            identifier = s.split("=", 1)[1].strip()
+    leaf = authorities[0] if authorities else ""
+    is_dev_id = "Developer ID Application" in leaf
+    is_apple_development = leaf.startswith("Apple Development:")
+    is_adhoc = "Signature=adhoc" in text or leaf == ""
+    return {
+        "authorities": authorities,
+        "leaf_authority": leaf,
+        "team_identifier": team,
+        "runtime_version": runtime,
+        "notarization_ticket": notarization,
+        "identifier": identifier,
+        "is_developer_id_application": is_dev_id,
+        "is_apple_development": is_apple_development,
+        "is_adhoc": is_adhoc,
+        "ticket_stapled": notarization.lower() == "stapled",
+    }
+
+
+def distribution_seal_ok_from_codesign(text: str) -> dict[str, Any]:
+    """Pure: catalog distribution seal requires Developer ID Application leaf.
+
+    Apple Development / ad-hoc fail closed — they produce Gatekeeper
+    \"Apple could not verify… / Not Opened\" for downloaded apps.
+    """
+    parsed = parse_codesign_dv_output(text)
+    ok = bool(parsed["is_developer_id_application"]) and not parsed["is_apple_development"]
+    reason = "developer_id_application"
+    if parsed["is_apple_development"]:
+        reason = "apple_development_not_distribution"
+    elif parsed["is_adhoc"] or not parsed["leaf_authority"]:
+        reason = "unsigned_or_adhoc"
+    elif not parsed["is_developer_id_application"]:
+        reason = "not_developer_id_application"
+    return {
+        "ok": ok,
+        "reason": reason,
+        **parsed,
+    }
+
+
+def assess_macos_catalog_zip_codesign(path: Path | str) -> dict[str, Any]:
+    """Extract catalog zip and run real ``codesign -dv`` (Darwin only).
+
+    Returns distribution_seal_ok fields; on non-Darwin or missing zip, reports
+    error without claiming a notarized seal.
+    """
+    p = Path(path)
+    out: dict[str, Any] = {
+        "path": str(p),
+        "exists": p.is_file(),
+        "ok": False,
+        "reason": "unknown",
+    }
+    if not p.is_file():
+        out["reason"] = "missing_zip"
+        return out
+    import sys
+
+    if sys.platform != "darwin":
+        out["reason"] = "not_darwin"
+        out["note"] = "codesign assessment requires macOS"
+        return out
+    try:
+        with tempfile.TemporaryDirectory() as td:
+            # ditto preserves code signature / staple; Python zipfile does not
+            # (spctl then reports "no usable signature" on extracted apps).
+            dig = subprocess.run(
+                ["ditto", "-x", "-k", str(p), td],
+                capture_output=True,
+                text=True,
+            )
+            if dig.returncode != 0:
+                # Fallback: system unzip
+                dig2 = subprocess.run(
+                    ["unzip", "-q", str(p), "-d", td],
+                    capture_output=True,
+                    text=True,
+                )
+                if dig2.returncode != 0:
+                    out["reason"] = "extract_failed"
+                    out["error"] = ((dig.stderr or "") + (dig2.stderr or ""))[:200]
+                    return out
+            apps = list(Path(td).rglob("restore_privacy_client.app"))
+            if not apps:
+                apps = list(Path(td).rglob("*.app"))
+            if not apps:
+                out["reason"] = "no_app_in_zip"
+                return out
+            app = apps[0]
+            proc = subprocess.run(
+                ["codesign", "-dv", "--verbose=2", str(app)],
+                capture_output=True,
+                text=True,
+            )
+            # codesign -dv writes to stderr
+            text = (proc.stderr or "") + (proc.stdout or "")
+            seal = distribution_seal_ok_from_codesign(text)
+            out.update(seal)
+            out["codesign_exit"] = proc.returncode
+            out["app_path"] = str(app)
+            # Live Gatekeeper assess when seal claims DevID
+            if seal.get("ok"):
+                sp = subprocess.run(
+                    ["spctl", "--assess", "--type", "execute", "-vv", str(app)],
+                    capture_output=True,
+                    text=True,
+                )
+                sp_text = (sp.stderr or "") + (sp.stdout or "")
+                out["spctl_exit"] = sp.returncode
+                out["spctl_text"] = sp_text.strip()[:400]
+                out["spctl_notarized_developer_id"] = (
+                    "Notarized Developer ID" in sp_text
+                    or "source=Notarized Developer ID" in sp_text
+                )
+                if sp.returncode != 0 or not out["spctl_notarized_developer_id"]:
+                    out["ok"] = False
+                    out["reason"] = "spctl_not_notarized_developer_id"
+            return out
+    except Exception as exc:  # noqa: BLE001
+        out["reason"] = "assess_error"
+        out["error"] = str(exc)[:200]
+        return out
+
+
+def require_macos_zip_developer_id_distribution(path: Path | str) -> dict[str, Any]:
+    """Fail closed when catalog zip is not Developer ID (and ideally notarized)."""
+    report = assess_macos_catalog_zip_codesign(path)
+    if not report.get("ok"):
+        raise RuntimeError(
+            f"macOS catalog zip is not a Developer ID distribution seal: "
+            f"reason={report.get('reason')!r} leaf={report.get('leaf_authority')!r} "
+            f"path={path}. Rebuild with scripts/sign_and_notarize_macos.py "
+            f"(RP_CODESIGN_IDENTITY=Developer ID Application… + notarytool)."
+        )
+    return report
 
 
 def require_macos_zip_matches_monopin(path: Path | str, monopin: str) -> str:

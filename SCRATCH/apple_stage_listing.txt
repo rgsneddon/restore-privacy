@@ -1,0 +1,24 @@
+=== Apple stage listing monopin 1.0.2 ===
+-rw-r--r--  1 russellsneddon  staff  12558929  1 Aug 07:37 releases/1.0.2/restore-privacy-client-1.0.2-ios.zip
+-rw-r--r--  1 russellsneddon  staff  27207358  1 Aug 12:49 releases/1.0.2/restore-privacy-client-1.0.2-macos.zip
+-rw-r--r--  1 russellsneddon  staff     35363  1 Aug 07:35 releases/1.0.2/restore-privacy-rx-browser-1.0.2-ios.zip
+-rw-r--r--  1 russellsneddon  staff     35705  1 Aug 07:35 releases/1.0.2/restore-privacy-rx-browser-1.0.2-macos.zip
+-rw-r--r--  1 russellsneddon  staff  12558929  1 Aug 07:37 releases/1.0.2/restore-privacy-suite-1.0.2-ios.zip
+-rw-r--r--  1 russellsneddon  staff  27207358  1 Aug 12:50 releases/1.0.2/restore-privacy-suite-1.0.2-macos.zip
+-rw-r--r--  1 russellsneddon  staff  12558929  1 Aug 07:37 status_page/assets/1.0.2/restore-privacy-client-1.0.2-ios.zip
+-rw-r--r--  1 russellsneddon  staff  27207358  1 Aug 12:50 status_page/assets/1.0.2/restore-privacy-client-1.0.2-macos.zip
+-rw-r--r--  1 russellsneddon  staff    115603  1 Aug 07:35 status_page/assets/1.0.2/restore-privacy-node-installer-1.0.0-ios.zip
+-rw-r--r--  1 russellsneddon  staff    135672  1 Aug 07:35 status_page/assets/1.0.2/restore-privacy-node-installer-1.0.0-macos.zip
+-rw-r--r--  1 russellsneddon  staff     35363  1 Aug 07:35 status_page/assets/1.0.2/restore-privacy-rx-browser-1.0.2-ios.zip
+-rw-r--r--  1 russellsneddon  staff     35705  1 Aug 07:35 status_page/assets/1.0.2/restore-privacy-rx-browser-1.0.2-macos.zip
+-rw-r--r--  1 russellsneddon  staff  12558929  1 Aug 07:37 status_page/assets/1.0.2/restore-privacy-suite-1.0.2-ios.zip
+-rw-r--r--  1 russellsneddon  staff  27207358  1 Aug 12:50 status_page/assets/1.0.2/restore-privacy-suite-1.0.2-macos.zip
+-rw-r--r--  1 russellsneddon  staff     14194  1 Aug 07:35 status_page/assets/1.0.2/rpmail-0.1.0-macos.zip
+-rw-r--r--  1 russellsneddon  staff     13760  1 Aug 07:35 status_page/assets/1.0.2/rpoffice-0.1.0-macos.zip
+-rw-r--r--  1 russellsneddon  staff     41772  1 Aug 04:48 status_page/assets/1.0.2/rpos-0.1.0-macos.zip
+-rw-r--r--  1 russellsneddon  staff     68140  1 Aug 07:35 status_page/assets/1.0.2/rpos-0.2.0-macos.zip
+RELEASE_VERSION 1.0.2
+{'version': '1.0.2', 'platform': 'macos', 'filename': 'restore-privacy-client-1.0.2-macos.zip', 'relative_path': '1.0.2/restore-privacy-client-1.0.2-macos.zip'}
+{'version': '1.0.2', 'platform': 'ios', 'filename': 'restore-privacy-client-1.0.2-ios.zip', 'relative_path': '1.0.2/restore-privacy-client-1.0.2-ios.zip'}
+platform_filename macos restore-privacy-client-1.0.2-macos.zip
+platform_filename ios restore-privacy-client-1.0.2-ios.zip

@@ -348,8 +348,19 @@ def main(argv: list[str] | None = None) -> int:
 
     cs = run_capture(["codesign", "-dv", "--verbose=2", str(app)])
     print(cs)
-    if "Developer ID Application" not in cs and "Signature=adhoc" in cs:
+    if "Signature=adhoc" in cs or "Signature=adhoc" in cs.replace(" ", ""):
         print("ERROR: still ad-hoc after sign", file=sys.stderr)
+        return 2
+    # Fail closed: catalog distribution must be Developer ID, not Apple Development
+    # (Development-signed apps trigger Gatekeeper "Apple could not verify… / Not Opened").
+    if "Developer ID Application" not in cs:
+        print(
+            "ERROR: signature is not Developer ID Application after sign. "
+            f"Got codesign -dv:\n{cs}\n"
+            "Set RP_CODESIGN_IDENTITY to a Developer ID Application identity "
+            "(not Apple Development / Apple Distribution).",
+            file=sys.stderr,
+        )
         return 2
 
     try:
@@ -365,6 +376,14 @@ def main(argv: list[str] | None = None) -> int:
 
     sp = assess(app)
     print(sp)
+    if not args.skip_notarize and "accepted" not in sp.lower() and "source=Notarized Developer ID" not in sp:
+        # spctl may still print "accepted\nsource=Notarized Developer ID" on success
+        if "source=Notarized Developer ID" not in sp and "Notarized Developer ID" not in sp:
+            print(
+                "WARNING: spctl did not report Notarized Developer ID — "
+                "Gatekeeper may still block downloads.",
+                file=sys.stderr,
+            )
 
     if args.zip:
         package_zip(app, args.zip.resolve())
