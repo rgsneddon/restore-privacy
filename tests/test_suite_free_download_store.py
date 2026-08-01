@@ -150,7 +150,8 @@ class TestSuiteFreeDeliveryPlan(unittest.TestCase):
         app_src = (ROOT / "status_page" / "app.py").read_text(encoding="utf-8")
         self.assertIn("suite_free_delivery_plan", app_src)
         self.assertIn("soft_redirect=True", app_src)
-        self.assertIn("is not on the store yet", app_src)  # still present as last resort
+        self.assertIn("Suite download unavailable", app_src)
+        self.assertIn("could not be fetched", app_src)
         # Free path should not require only hard probe failure → 502 without soft redirect
         self.assertIn("suite-free-helsinki", app_src)
 
