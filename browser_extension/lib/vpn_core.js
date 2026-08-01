@@ -46,6 +46,66 @@
     };
   }
 
+  /** Product mint format: RPT-KEY-XXXX-XXXX-XXXX (12 hex after prefix). */
+  var KEYGEN_PREFIX = "RPT-KEY-";
+  var PRODUCT_KEYGEN_RE = /^RPT-KEY-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}$/;
+  /** Status host used to confirm subscription before unlock (same as Suite). */
+  var CONNECT_ENTITLEMENT_URL =
+    "https://restoreprivacy.online/api/connect-entitlement";
+
+  /**
+   * Normalize customer-entered KEYGEN (uppercase, strip spaces; accept compacted forms).
+   * Mirrors status_page payments.normalize_keygen product shape.
+   * @param {string} [keygen]
+   * @returns {string}
+   */
+  function normalizeKeygen(keygen) {
+    var s = String(keygen || "")
+      .trim()
+      .toUpperCase()
+      .replace(/ /g, "");
+    if (!s) return "";
+    // RPTKEY + 12 hex (no separators) → RPT-KEY-XXXX-XXXX-XXXX
+    if (s.indexOf("RPTKEY") === 0 && s.indexOf("-") < 0 && s.length === 18) {
+      var body0 = s.slice(6);
+      s =
+        KEYGEN_PREFIX +
+        body0.slice(0, 4) +
+        "-" +
+        body0.slice(4, 8) +
+        "-" +
+        body0.slice(8, 12);
+    } else if (
+      s.indexOf("RPT-KEY") === 0 &&
+      s.split("-").length === 2 &&
+      s.length === 19
+    ) {
+      // RPT-KEY + 12 hex, no inner dashes
+      var body1 = s.replace("RPT-KEY", "").replace(/-/g, "");
+      if (body1.length === 12) {
+        s =
+          KEYGEN_PREFIX +
+          body1.slice(0, 4) +
+          "-" +
+          body1.slice(4, 8) +
+          "-" +
+          body1.slice(8, 12);
+      }
+    }
+    return s;
+  }
+
+  /**
+   * True when raw matches product KEYGEN shape RPT-KEY-XXXX-XXXX-XXXX (12 hex).
+   * Shape only — host entitlement verify is separate (background unlock path).
+   * @param {string} raw
+   * @returns {boolean}
+   */
+  function looksLikeProductKeygen(raw) {
+    var kg = normalizeKeygen(raw);
+    return PRODUCT_KEYGEN_RE.test(kg);
+  }
+
   /**
    * True when a valid KEYGEN has been entered once for this app product.
    * @param {object} state
@@ -53,19 +113,30 @@
    */
   function isKeygenUnlocked(state) {
     if (!state || typeof state !== "object") return false;
-    return state.keygenUnlocked === true && String(state.keygenStored || "").trim().length > 0;
+    return (
+      state.keygenUnlocked === true &&
+      looksLikeProductKeygen(state.keygenStored || "")
+    );
   }
 
   /**
-   * Accept a fulfilment KEYGEN once for this extension (does not re-verify host).
-   * Minimal shape: non-empty RPT-KEY-… or long token (same family as Suite KEYGEN).
+   * Accept a fulfilment KEYGEN once for this extension.
+   *
+   * Requires product shape RPT-KEY-XXXX-XXXX-XXXX. Production unlock path
+   * (background.js) must pass hostResult from /api/connect-entitlement with
+   * connect_allowed true — shape alone is not enough for a real unlock.
+   *
+   * Unit tests may pass { connect_allowed: true } to exercise the state machine
+   * without a network hop.
+   *
    * @param {object} [prev]
    * @param {string} keygen
+   * @param {object} [hostResult] entitlement payload ({ connect_allowed, status, … })
    * @returns {object} next state
    */
-  function unlockWithKeygen(prev, keygen) {
+  function unlockWithKeygen(prev, keygen, hostResult) {
     var base = prev && typeof prev === "object" ? prev : defaultState();
-    var k = String(keygen || "").trim();
+    var k = normalizeKeygen(keygen);
     if (!k) {
       return Object.assign({}, base, {
         error: "Enter the KEYGEN from your fulfilment email to unlock this app.",
@@ -73,12 +144,35 @@
         keygenStored: "",
       });
     }
-    var ok =
-      /^RPT-KEY-/i.test(k) ||
-      (k.length >= 12 && /[A-Za-z0-9-]{12,}/.test(k));
-    if (!ok) {
+    if (!looksLikeProductKeygen(k)) {
       return Object.assign({}, base, {
-        error: "Invalid KEYGEN — paste the keygen from your fulfilment email.",
+        error:
+          "Invalid KEYGEN — use format RPT-KEY-XXXX-XXXX-XXXX from your fulfilment email.",
+        keygenUnlocked: !!base.keygenUnlocked,
+        keygenStored: base.keygenStored || "",
+      });
+    }
+    // Require host entitlement confirmation (connect_allowed) before unlock.
+    var host = hostResult && typeof hostResult === "object" ? hostResult : null;
+    if (!host) {
+      return Object.assign({}, base, {
+        error:
+          "KEYGEN must be verified against the status host before unlock.",
+        keygenUnlocked: !!base.keygenUnlocked,
+        keygenStored: base.keygenStored || "",
+      });
+    }
+    if (host.connect_allowed !== true) {
+      var reason =
+        host.reason ||
+        host.error ||
+        host.status ||
+        "entitlement not active";
+      return Object.assign({}, base, {
+        error:
+          "KEYGEN not active on status host (" +
+          String(reason) +
+          "). Renew or re-check fulfilment email.",
         keygenUnlocked: !!base.keygenUnlocked,
         keygenStored: base.keygenStored || "",
       });
@@ -216,6 +310,8 @@
   return {
     STATUS: STATUS,
     PRODUCT_BROWSER_PROXY: PRODUCT_BROWSER_PROXY,
+    KEYGEN_PREFIX: KEYGEN_PREFIX,
+    CONNECT_ENTITLEMENT_URL: CONNECT_ENTITLEMENT_URL,
     defaultState: defaultState,
     buildProxyConfig: buildProxyConfig,
     enableVpn: enableVpn,
@@ -223,6 +319,8 @@
     getStatus: getStatus,
     isConnected: isConnected,
     isKeygenUnlocked: isKeygenUnlocked,
+    normalizeKeygen: normalizeKeygen,
+    looksLikeProductKeygen: looksLikeProductKeygen,
     unlockWithKeygen: unlockWithKeygen,
     browserScopeDisclaimer: browserScopeDisclaimer,
   };

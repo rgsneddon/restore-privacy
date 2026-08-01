@@ -77,18 +77,23 @@ class TestFooterCopyright(unittest.TestCase):
     def test_footer_helper_and_homepage_placement(self):
         from app import render_html
         from coffee_link import SITE_COPYRIGHT_TEXT, render_site_copyright_footer_html
-        from downloads import render_bmc_tip_html
+        from public_chrome import public_page_close
 
+        # Site footer is copyright left + downloads-map link right (not BMC tip).
         frag = render_site_copyright_footer_html()
-        self.assertEqual(frag, render_bmc_tip_html())
         self.assertIn(SITE_COPYRIGHT_TEXT, frag)
         self.assertIn('id="site-footer"', frag)
-        self.assertNotIn("href=", frag)  # plain text copyright, no tip link
+        self.assertIn("Downloadables Mapped Here", frag)
+        self.assertIn("site-footer-downloads-map", frag)
+        self.assertIn("site-footer", public_page_close())
+        self.assertNotIn("buymeacoffee.com", frag)
 
         page = render_html({"title": "RESTORE PRIVACY"}).decode("utf-8")
         foot_at = page.find('id="site-footer"')
         self.assertGreater(foot_at, 0)
         self.assertGreater(foot_at, page.find('id="downloads"'))
+        self.assertIn(SITE_COPYRIGHT_TEXT, page)
+        self.assertIn("Downloadables Mapped Here", page)
 
 
 if __name__ == "__main__":

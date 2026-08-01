@@ -1,0 +1,23 @@
+site_footer_all_pages + KEYGEN once-per-app (skeptic remediation)
+date: 2026-08-01
+
+f1 Rx KEYGEN:
+- looksLikeProductKeygen / normalizeKeygen: RPT-KEY-XXXX-XXXX-XXXX (12 hex)
+- unlockWithKeygen requires hostResult.connect_allowed from
+  https://restoreprivacy.online/api/connect-entitlement
+- background.js unlock_keygen fetches status host before unlock
+
+f2 proxy fail preserves KEYGEN:
+- background.js connect catch keeps keygenUnlocked + keygenStored
+
+f3 footer tests:
+- render_bmc_tip_html() is empty; footer via public_page_close /
+  render_site_copyright_footer_html
+- tests/test_downloads.py + test_no_trial_footer_copyright.py updated
+
+verification:
+  node browser_extension/test/vpn_core.test.js → ALL PASS
+  PYTHONPATH=status_page python3 -m unittest \
+    tests.test_no_trial_footer_copyright.TestFooterCopyright \
+    tests.test_site_footer_all_pages tests.test_coffee_link \
+    tests.test_downloads.TestDownloadCatalog.test_homepage_copyright_footer_is_last_content_block → OK

@@ -41,6 +41,45 @@ function setBadge(state) {
   });
 }
 
+/**
+ * Verify product KEYGEN against status host /api/connect-entitlement.
+ * @param {string} keygen normalized product keygen
+ * @returns {Promise<object>} entitlement JSON (connect_allowed, status, …)
+ */
+function verifyKeygenWithStatusHost(keygen) {
+  var url =
+    core.CONNECT_ENTITLEMENT_URL +
+    "?keygen=" +
+    encodeURIComponent(keygen);
+  return fetch(url, {
+    method: "GET",
+    credentials: "omit",
+    cache: "no-store",
+  }).then(function (resp) {
+    if (!resp || !resp.ok) {
+      return {
+        connect_allowed: false,
+        status: "unknown",
+        error: "status_host_http_" + (resp && resp.status),
+      };
+    }
+    return resp.json().then(
+      function (body) {
+        return body && typeof body === "object"
+          ? body
+          : { connect_allowed: false, status: "unknown", error: "bad_json" };
+      },
+      function () {
+        return {
+          connect_allowed: false,
+          status: "unknown",
+          error: "bad_json",
+        };
+      }
+    );
+  });
+}
+
 async function connect(opts) {
   var prev = await loadState();
   var next = core.enableVpn(prev, opts || {});
@@ -53,6 +92,7 @@ async function connect(opts) {
     try {
       await adapter.applyProxyConfig(next.proxyConfig);
     } catch (err) {
+      // Proxy apply failure must not wipe one-time KEYGEN unlock.
       next = {
         status: core.STATUS.ERROR,
         proxyConfig: null,
@@ -60,6 +100,8 @@ async function connect(opts) {
         browserScopeOnly: true,
         productTitle: next.productTitle,
         catalogVersion: next.catalogVersion,
+        keygenUnlocked: !!next.keygenUnlocked,
+        keygenStored: next.keygenStored || "",
       };
       await saveState(next);
       setBadge(next);
@@ -140,7 +182,31 @@ chrome.runtime.onMessage.addListener(function (msg, _sender, sendResponse) {
   }
   if (msg.type === "unlock_keygen") {
     loadState().then(async function (prev) {
-      var next = core.unlockWithKeygen(prev, msg.keygen || "");
+      var raw = msg.keygen || "";
+      var shapeOnly = core.unlockWithKeygen(prev, raw, null);
+      // Fail closed on empty/invalid shape without hitting the host.
+      if (!core.looksLikeProductKeygen(raw)) {
+        await saveState(shapeOnly);
+        setBadge(shapeOnly);
+        sendResponse({
+          ok: false,
+          state: shapeOnly,
+          error: shapeOnly.error || null,
+        });
+        return;
+      }
+      var kg = core.normalizeKeygen(raw);
+      var hostResult;
+      try {
+        hostResult = await verifyKeygenWithStatusHost(kg);
+      } catch (err) {
+        hostResult = {
+          connect_allowed: false,
+          status: "unknown",
+          error: String(err && err.message ? err.message : err),
+        };
+      }
+      var next = core.unlockWithKeygen(prev, kg, hostResult);
       await saveState(next);
       setBadge(next);
       sendResponse({

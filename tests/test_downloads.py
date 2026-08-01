@@ -241,8 +241,8 @@ class TestDownloadCatalog(unittest.TestCase):
 
     def test_homepage_copyright_footer_is_last_content_block(self):
         """Homepage: Raskul copyright after downloads / node-wipe / audit."""
-        from coffee_link import SITE_COPYRIGHT_TEXT
-        from downloads import render_bmc_tip_html
+        from coffee_link import SITE_COPYRIGHT_TEXT, render_site_copyright_footer_html
+        from public_chrome import public_page_close
 
         import app as status_app
 
@@ -269,9 +269,11 @@ class TestDownloadCatalog(unittest.TestCase):
         self.assertNotIn('id="downloads"', after[20:])
         self.assertNotIn('id="audit-panel"', after[20:])
         self.assertNotIn('id="brand-panel"', after[20:])
-        frag = render_bmc_tip_html()
+        # Footer lives in public_page_close / copyright helper (bmc tip is empty).
+        frag = render_site_copyright_footer_html()
         self.assertIn('id="site-footer"', frag)
         self.assertIn(SITE_COPYRIGHT_TEXT, frag)
+        self.assertIn("site-footer", public_page_close())
 
     def test_status_page_html_includes_paid_downloads(self):
         page = status_app.render_html({"title": "RESTORE PRIVACY"}).decode("utf-8")
