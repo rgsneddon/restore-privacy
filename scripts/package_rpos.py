@@ -62,6 +62,7 @@ def platform_package_matrix(version: str = RPOS_VERSION) -> list[dict[str, Any]]
             "format": "zip",
             "install_entry": "install.ps1",
             "restore_entry": "RESTORE_rpos.ps1",
+            "restore_click": "RESTORE_click.ps1",
             "installable": True,
             "mobile": False,
             "honesty": (
@@ -80,6 +81,7 @@ def platform_package_matrix(version: str = RPOS_VERSION) -> list[dict[str, Any]]
             "format": "zip",
             "install_entry": "install.sh",
             "restore_entry": "RESTORE_rpos.sh",
+            "restore_click": "RESTORE_click.sh",
             "installable": True,
             "mobile": False,
             "honesty": (
@@ -98,11 +100,12 @@ def platform_package_matrix(version: str = RPOS_VERSION) -> list[dict[str, Any]]
             "format": "tar.gz",
             "install_entry": "install.sh",
             "restore_entry": "RESTORE_rpos.sh",
+            "restore_click": "RESTORE_click.sh",
             "installable": True,
             "mobile": False,
             "honesty": (
                 "Linux x86_64 / amd64 relatives (Ubuntu, Debian, Fedora, Arch, …). "
-                "install.sh stages under /opt/rpos by default; RESTORE path is warned."
+                "install.sh stages under /opt/rpos; RESTORE_click.sh is the single-click path (advisories + gate + dry-run wipe intent + Ned OOBE)."
             ),
         },
         {
@@ -115,11 +118,12 @@ def platform_package_matrix(version: str = RPOS_VERSION) -> list[dict[str, Any]]
             "format": "tar.gz",
             "install_entry": "install.sh",
             "restore_entry": "RESTORE_rpos.sh",
+            "restore_click": "RESTORE_click.sh",
             "installable": True,
             "mobile": False,
             "honesty": (
                 "Linux aarch64 / arm64 relatives (Raspberry Pi OS 64-bit, ARM servers, …). "
-                "Same foundation tree; arch tag for operator targeting."
+                "Same single-click RESTORE_click path as x86_64; arch tag for operator targeting."
             ),
         },
     ]
@@ -203,6 +207,63 @@ def _write_capability(stage: Path, slot: dict[str, Any]) -> None:
 def _write_version(stage: Path, version: str) -> None:
     (stage / "VERSION").write_text(version + "\n", encoding="utf-8")
     (stage / "RPOS_VERSION").write_text(version + "\n", encoding="utf-8")
+
+
+
+def _write_single_click(stage: Path, slot: dict[str, Any]) -> None:
+    """Primary single-click RESTORE executable entry (post-advisory gate)."""
+    installer_dir = stage / "rpos" / "installer"
+    if slot["os"] == "windows":
+        src = installer_dir / "RESTORE_click.ps1"
+        dest = stage / "RESTORE_click.ps1"
+        if src.is_file():
+            shutil.copy2(src, dest)
+        else:
+            dest.write_text(
+                "# fallback invokes python module\n"
+                "python -m rpos.installer restore --yes-advisories --confirm RESTORE\n",
+                encoding="utf-8",
+            )
+        # Primary one-click name
+        (stage / "RESTORE_rpOS.cmd").write_text(
+            f"""@echo off
+setlocal
+set ROOT=%~dp0
+set PYTHONPATH=%ROOT%;%PYTHONPATH%
+cd /d "%ROOT%"
+echo === RESTORE rpOS single-click (advisories required) ===
+python -m rpos.installer advisories
+set /p CONFIRM=Type RESTORE to confirm absolute wipe intent: 
+python -m rpos.installer restore --yes-advisories --confirm %CONFIRM%
+if errorlevel 1 exit /b 1
+python -m rpos.installer oobe --smoke
+""",
+            encoding="utf-8",
+        )
+    else:
+        src = installer_dir / "RESTORE_click.sh"
+        dest = stage / "RESTORE_click.sh"
+        if src.is_file():
+            shutil.copy2(src, dest)
+            dest.chmod(dest.stat().st_mode | 0o111)
+        # Primary one-click name
+        click = stage / "RESTORE_rpOS"
+        click.write_text(
+            """#!/usr/bin/env bash
+set -euo pipefail
+ROOT="$(cd "$(dirname "$0")" && pwd)"
+export PYTHONPATH="${ROOT}${PYTHONPATH:+:$PYTHONPATH}"
+cd "$ROOT"
+echo "=== RESTORE rpOS single-click (advisories required) ==="
+python3 -m rpos.installer advisories
+echo ""
+read -r -p "Type RESTORE to confirm absolute wipe intent: " CONFIRM
+python3 -m rpos.installer restore --yes-advisories --confirm "$CONFIRM"
+python3 -m rpos.installer oobe --smoke
+""",
+            encoding="utf-8",
+        )
+        click.chmod(click.stat().st_mode | 0o111)
 
 
 def _write_unix_install(stage: Path, slot: dict[str, Any]) -> None:
@@ -348,6 +409,7 @@ def _stage_platform(slot: dict[str, Any], stage: Path) -> None:
         _write_windows_install(stage, slot)
     else:
         _write_unix_install(stage, slot)
+    _write_single_click(stage, slot)
     for p in stage.rglob("*.priv"):
         raise RuntimeError(f"refusing private key: {p}")
 

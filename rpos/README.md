@@ -35,10 +35,22 @@ python3 scripts/package_rpos.py
 
 ## Install story (honest)
 
-Each package includes `install.*` (stages foundation under `/opt/rpos` or
-`%ProgramData%\rpos`) and `RESTORE_rpos.*` which **warns** and requires typing
-`RESTORE` before continuing. Full-disk imaging remains operator-controlled —
-packages do not silent-wipe disks.
+### Single-click RESTORE (IMPERATIVE product path)
+
+Primary control after extraction: **`RESTORE_rpOS`** (Unix) or **`RESTORE_rpOS.cmd`**
+(Windows). Flow:
+
+1. **Advisories** — BE CAREFUL · IRREVERSIBLE · DATA LOSS  
+2. **Gate** — type exact `RESTORE` or abort (no wipe, no install)  
+3. **Wipe intent** — absolute format/remove-all intent; default adapter is **dry-run**  
+4. **Install** — rpOS foundation from scratch  
+5. **Ned** — guides timezone → language → email bound to **rpMail**
+
+```bash
+python3 -m rpos.installer smoke   # safe dry-run of full path
+```
+
+Silent wipe without advisories is **not** shipped.
 
 ## Repositories
 

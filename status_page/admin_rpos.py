@@ -58,9 +58,12 @@ def render_admin_rpos_deploy_howto_html() -> str:
     <li><code>rpos-0.1.0-linux-aarch64.tar.gz</code></li>
   </ul>
   <p><strong>iOS / Android are not installable slots</strong> for rpOS packages.</p>
-  <p>The RESTORE entry <strong>warns</strong> and requires typing <code>RESTORE</code>
-  before foundation install continues. Packages stage the commercial foundation
-  tree — they do <strong>not</strong> ship a silent full-disk reformat binary.</p>
+  <p>Primary single-click control: <code>RESTORE_rpOS</code> /
+  <code>RESTORE_rpOS.cmd</code>. Flow: multi-layer advisories (careful /
+  irreversible / data loss) → exact phrase <code>RESTORE</code> → absolute wipe
+  <em>intent</em> (default dry-run adapter; never silent) → foundation install →
+  <strong>Ned</strong> OOBE (timezone → language → email into rpMail). Packages do
+  <strong>not</strong> silent-format disks without confirmation.</p>
 
   <h3>3. SDK whitewash (built per requirements)</h3>
   <p>Moderator surface: <strong>{RPOS_MODERATOR_SURFACE}</strong> (sexy GUI;

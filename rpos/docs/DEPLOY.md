@@ -20,9 +20,23 @@ python3 scripts/package_rpos.py
 python3 scripts/package_rpos.py --inventory
 ```
 
-Each archive includes `install.*` (foundation stage under `/opt/rpos` or
-`%ProgramData%\rpos`) and a **warned** `RESTORE_rpos.*` entry (type `RESTORE`
-to continue — no silent disk wipe binary).
+Each archive includes:
+
+- `install.*` — foundation stage under `/opt/rpos` or `%ProgramData%\rpos`
+- **`RESTORE_rpOS` / `RESTORE_rpOS.cmd`** — **single-click** primary control:
+  1. Multi-layer advisories (careful / irreversible / data loss)
+  2. Exact confirmation phrase `RESTORE` (anything else aborts)
+  3. Absolute wipe **intent** via dry-run adapter by default (no silent format)
+  4. Foundation install from scratch
+  5. **Ned** OOBE: timezone → language → email into **rpMail**
+
+```bash
+# From extracted package root (or monorepo with PYTHONPATH=.)
+python3 -m rpos.installer advisories
+python3 -m rpos.installer restore --yes-advisories --confirm RESTORE
+python3 -m rpos.installer oobe --timezone UTC --language en --email you@example.com
+python3 -m rpos.installer smoke
+```
 
 ## Operator steps
 
