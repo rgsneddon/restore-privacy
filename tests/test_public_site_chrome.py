@@ -131,22 +131,27 @@ class TestPublicChromeModule(unittest.TestCase):
         self.assertIn('id="brand-banner"', header)
         self.assertIn(PUBLIC_BRAND_BANNER_PATH, header)
         self.assertIn("banner.jpg", header)
-        # Borderless transparent mark to the right of banner
+        # Desktop dual-logo: logo — banner — logo (same asset both sides)
         mark_start = header.index('id="brand-mark"')
         mark_end = header.index("</div>", mark_start)
         mark = header[mark_start:mark_end]
-        i_logo = mark.index("brand-logo")
+        self.assertIn("brand-logo-left", mark)
+        self.assertIn("brand-logo-right", mark)
+        self.assertIn('data-dual-logo="1"', header)
+        i_left = mark.index("brand-logo-left")
         i_banner = mark.index("brand-banner")
-        self.assertLess(i_banner, i_logo, "logo must sit right of banner in brand-mark")
+        i_right = mark.index("brand-logo-right")
+        self.assertLess(i_left, i_banner, "left logo must precede banner")
+        self.assertLess(i_banner, i_right, "right logo must follow banner")
         self.assertIn(PUBLIC_BRAND_LOGO_PATH, mark)
         self.assertIn("logo_transparent", mark)
         self.assertNotIn('src="/logo.png"', mark)
         self.assertNotIn('src="/logo.png?', mark)
-        # Shared height attr on logo + banner
+        # Shared height attr on both logos + banner (3 nodes)
         self.assertIn(f'height="{PUBLIC_BRAND_HEADER_HEIGHT_DEFAULT}"', header)
         self.assertEqual(
             header.count(f'height="{PUBLIC_BRAND_HEADER_HEIGHT_DEFAULT}"'),
-            2,
+            3,
         )
         # Nav remains below the logo+banner band
         i_mark = header.index('id="brand-mark"')
