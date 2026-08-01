@@ -225,18 +225,23 @@ class TestStatusPageFavicon(unittest.TestCase):
         self.assertIn("/favicon.ico", html)
         self.assertIn("/favicon.png", html)
         self.assertIn("/apple-touch-icon.png", html)
-        # Header uses borderless transparent mark (shield + key), not opaque plate
-        self.assertIn(PUBLIC_BRAND_LOGO_PATH, html)
-        self.assertIn("/logo_transparent.png", html)
-        self.assertIn('class="brand-logo"', html)
+        # Header brand mark is banner-only (logos not in top box)
         self.assertIn('class="brand-mark"', html)
+        self.assertIn('class="brand-banner"', html)
+        self.assertIn("banner.jpg", html)
         self.assertIn(PUBLIC_BRAND_TITLE, html)
         brand_start = html.index('id="brand-panel"')
         brand_end = html.index("</header>", brand_start)
         brand = html[brand_start:brand_end]
-        self.assertIn("/logo_transparent.png", brand)
+        self.assertIn("brand-banner", brand)
+        self.assertNotIn('class="brand-logo"', brand)
+        self.assertNotIn("brand-logo-left", brand)
+        self.assertNotIn("brand-logo-right", brand)
+        self.assertNotIn("/logo_transparent.png", brand)
         self.assertNotIn('src="/logo.png"', brand)
         self.assertNotIn('src="/logo.png?', brand)
+        # Logo static files still resolve for favicon/media-kit (not header)
+        _ = PUBLIC_BRAND_LOGO_PATH
 
     def test_static_resolution_and_bytes(self):
         for path in (

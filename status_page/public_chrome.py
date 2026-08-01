@@ -601,43 +601,28 @@ a.product-tab.is-active, .product-tab.is-active {{
     {PUBLIC_BRAND_HEADER_HEIGHT_MAX_CSS}px
   );
 }}
-/* Logo + banner + logo row (desktop): equal logo size, equal gap to banner */
+/* Banner-only brand mark (no flanking logos) */
 .brand-mark {{
   display: flex;
   flex-direction: row;
   flex-wrap: nowrap;
   align-items: center;
-  justify-content: stretch;
-  /* Symmetric proximity: same gap left-of-banner and right-of-banner */
-  gap: clamp(0.55rem, 2vw, 1.1rem);
-  column-gap: clamp(0.55rem, 2vw, 1.1rem);
+  justify-content: center;
+  gap: 0;
+  column-gap: 0;
   width: 100%;
   max-width: 100%;
   box-sizing: border-box;
 }}
+/* Legacy logo classes kept inert if old HTML is cached — not emitted by header */
 .brand-logo,
 .brand-logo-left,
 .brand-logo-right,
 .brand-mark .brand-logo {{
-  height: var(--rb-brand-header-height);
-  width: auto;
-  max-width: var(--rb-brand-header-height);
-  max-height: var(--rb-brand-header-height);
-  border: none;
-  border-radius: 0;
-  object-fit: contain;
-  object-position: center;
-  background: transparent;
-  box-shadow: none;
-  flex: 0 0 auto;
-  display: block;
-  image-rendering: -webkit-optimize-contrast;
-  image-rendering: high-quality;
-  -ms-interpolation-mode: bicubic;
-  filter: drop-shadow(0 4px 14px rgba(0, 229, 255, 0.18));
+  display: none !important;
 }}
 .brand-banner {{
-  /* Center strip between equal flanking logos */
+  /* Sole heading mark in the top brand box */
   height: var(--rb-brand-header-height);
   width: 100%;
   max-width: 100%;
@@ -650,12 +635,13 @@ a.product-tab.is-active, .product-tab.is-active {{
   box-shadow: none;
   flex: 1 1 auto;
   display: block;
+  visibility: visible;
   image-rendering: -webkit-optimize-contrast;
   image-rendering: high-quality;
   -ms-interpolation-mode: bicubic;
   filter: drop-shadow(0 4px 14px rgba(0, 229, 255, 0.12));
 }}
-/* Phone / Android: single logo only — hide banner + left twin (no dual beside hidden banner) */
+/* Phone / small screens: still banner-only (no logo fallback) */
 @media (max-width: 520px) {{
   .brand-mark {{
     flex-direction: row;
@@ -667,44 +653,23 @@ a.product-tab.is-active, .product-tab.is-active {{
   }}
   .brand-banner,
   .brand-mark .brand-banner,
-  img.brand-banner,
-  .brand-logo-left,
-  .brand-mark .brand-logo-left,
-  img.brand-logo-left {{
-    display: none !important;
-    visibility: hidden !important;
-    width: 0 !important;
-    height: 0 !important;
-    min-width: 0 !important;
-    min-height: 0 !important;
-    max-width: 0 !important;
-    max-height: 0 !important;
-    margin: 0 !important;
-    padding: 0 !important;
-    border: 0 !important;
-    flex: 0 0 0 !important;
-    overflow: hidden !important;
-    position: absolute !important;
-    clip: rect(0, 0, 0, 0) !important;
-  }}
-  .brand-logo-right,
-  .brand-mark .brand-logo-right,
-  img.brand-logo-right,
-  .brand-logo:not(.brand-logo-left),
-  .brand-mark .brand-logo:not(.brand-logo-left) {{
+  img.brand-banner {{
     display: block !important;
     visibility: visible !important;
-    opacity: 1 !important;
-    width: clamp(72px, 28vw, 112px) !important;
-    height: clamp(72px, 28vw, 112px) !important;
-    min-width: 72px !important;
-    min-height: 72px !important;
-    max-width: 112px !important;
-    max-height: 112px !important;
+    width: 100% !important;
+    height: auto !important;
+    max-height: var(--rb-brand-header-height) !important;
+    min-width: 0 !important;
     margin: 0 auto !important;
-    flex: 0 0 auto !important;
+    flex: 1 1 auto !important;
     object-fit: contain;
     object-position: center;
+  }}
+  .brand-logo,
+  .brand-logo-left,
+  .brand-logo-right,
+  .brand-mark .brand-logo {{
+    display: none !important;
   }}
 }}
 /* H1 kept for rare product-page overrides; default header has no title text */
@@ -1148,32 +1113,28 @@ a.product-tab.is-active, .product-tab.is-active {{
     text-align: center;
     font-size: clamp(1.1rem, 5.5vw, 1.45rem);
   }}
-  /* brand-mark phone: logo-only — see max-width 520px brand-banner hide rules above */
+  /* brand-mark phone: banner-only (no logo fallback) */
 }}
-/* Desktop/tablet: logo — banner — logo (equal size, equal gap; banner visible) */
+/* Desktop/tablet: banner-only mark, full width of brand box */
 @media (min-width: 521px) {{
   .brand-mark {{
     flex-direction: row;
     flex-wrap: nowrap;
     align-items: center;
-    /* Same gap on both sides of the banner */
-    gap: clamp(0.55rem, 2vw, 1.1rem);
-    column-gap: clamp(0.55rem, 2vw, 1.1rem);
+    justify-content: center;
+    gap: 0;
+    column-gap: 0;
   }}
   .brand-banner {{
     display: block;
     visibility: visible;
     object-position: center;
+    width: 100%;
   }}
   .brand-logo,
   .brand-logo-left,
   .brand-logo-right {{
-    display: block;
-    visibility: visible;
-    height: var(--rb-brand-header-height);
-    max-width: var(--rb-brand-header-height);
-    max-height: var(--rb-brand-header-height);
-    flex: 0 0 auto;
+    display: none !important;
   }}
   #{SITE_BRAND_HEADER_ID} h1, .brand-panel h1, .brand-mark h1 {{
     text-align: left;
@@ -1378,18 +1339,12 @@ def public_brand_header_html(
 ) -> str:
     """Static top brand panel used across all public pages.
 
-    Desktop (≥521px): **logo — banner — logo** in one row. Both logos use the
-    same borderless shield+key asset, same height as the banner row, and equal
-    flex gap so left/right proximity to the banner matches. Phone (≤520px):
-    banner and left logo hidden; single right logo centered. Product H1 text is
-    off by default. *title* still normalizes page titles for callers.
+    Brand mark is **banner only** (no flanking logos). Product H1 text is off
+    by default. *title* still normalizes page titles for callers.
+    *logo_size* / *logo_src* retained for API compat but are not rendered.
     """
     _ = title  # retained for API compat (page titles use public_display_title)
-    raw_src = (logo_src or PUBLIC_BRAND_LOGO_PATH).strip() or PUBLIC_BRAND_LOGO_PATH
-    if raw_src == PUBLIC_BRAND_LOGO_PATH or raw_src.startswith(f"{PUBLIC_BRAND_LOGO_PATH}?"):
-        src = public_brand_logo_src()
-    else:
-        src = raw_src
+    _ = logo_src  # logos no longer rendered in the public brand mark
     raw_banner = (banner_src or PUBLIC_BRAND_BANNER_PATH).strip() or PUBLIC_BRAND_BANNER_PATH
     if raw_banner == PUBLIC_BRAND_BANNER_PATH or raw_banner.startswith(
         f"{PUBLIC_BRAND_BANNER_PATH}?"
@@ -1397,7 +1352,7 @@ def public_brand_header_html(
         bsrc = public_brand_banner_src()
     else:
         bsrc = raw_banner
-    # Shared height with banner (height attrs; CSS clamps via --rb-brand-header-height)
+    # Banner height (height attr; CSS clamps via --rb-brand-header-height)
     sz = int(logo_size) if logo_size else PUBLIC_BRAND_HEADER_HEIGHT_DEFAULT
     if sz < 48:
         sz = PUBLIC_BRAND_HEADER_HEIGHT_DEFAULT
@@ -1419,22 +1374,9 @@ def public_brand_header_html(
         else:
             title_safe = _esc(public_display_title(title))
         title_html = f"\n        <h1>{title_safe}</h1>"
-    # Dual logo: left + right share src/height (symmetric beside banner)
-    logo_left = (
-        f'<img class="brand-logo brand-logo-left" id="brand-logo-left" '
-        f'src="{_esc(src)}" height="{h_attr}" width="{h_attr}" '
-        f'alt="Restore Privacy logo" data-brand-logo="left"/>'
-    )
-    logo_right = (
-        f'<img class="brand-logo brand-logo-right" id="brand-logo-right" '
-        f'src="{_esc(src)}" height="{h_attr}" width="{h_attr}" '
-        f'alt="Restore Privacy logo" data-brand-logo="right"/>'
-    )
-    return f"""{tabs}    <header class="brand-panel panel-card" id="{SITE_BRAND_HEADER_ID}" data-site-header="1" data-header-alias="site-brand-header" data-chrome="pro" data-brand-banner="1" data-dual-logo="1">
-      <div class="brand-mark" id="brand-mark" data-brand-mark="1" data-dual-logo="1">
-        {logo_left}
-        <img class="brand-banner" id="brand-banner" src="{_esc(bsrc)}" height="{h_attr}" alt="Restore Privacy"/>
-        {logo_right}{title_html}
+    return f"""{tabs}    <header class="brand-panel panel-card" id="{SITE_BRAND_HEADER_ID}" data-site-header="1" data-header-alias="site-brand-header" data-chrome="pro" data-brand-banner="1" data-banner-only="1">
+      <div class="brand-mark" id="brand-mark" data-brand-mark="1" data-banner-only="1">
+        <img class="brand-banner" id="brand-banner" src="{_esc(bsrc)}" height="{h_attr}" alt="Restore Privacy"/>{title_html}
       </div>
       <hr class="brand-header-rule" aria-hidden="true"/>
 {tagline_html}{nav_html}

@@ -120,7 +120,7 @@ class TestPublicChromeModule(unittest.TestCase):
         self.assertIn('id="brand-panel"', header)
         self.assertIn('id="brand-mark"', header)
         self.assertIn('class="brand-mark"', header)
-        # Heading is banner.jpg + simple logo — not VPN H1 text
+        # Heading is banner.jpg only — not VPN H1 text, no flanking logos
         self.assertNotIn(f"<h1>{PUBLIC_BRAND_TITLE}</h1>", header)
         self.assertNotIn("<h1>RESTORE PRIVACY VPN</h1>", header)
         # Document/page brand title is Suite identity (not a visible VPN H1)
@@ -131,29 +131,28 @@ class TestPublicChromeModule(unittest.TestCase):
         self.assertIn('id="brand-banner"', header)
         self.assertIn(PUBLIC_BRAND_BANNER_PATH, header)
         self.assertIn("banner.jpg", header)
-        # Desktop dual-logo: logo — banner — logo (same asset both sides)
+        # Banner-only mark: no left/right brand-logo images
         mark_start = header.index('id="brand-mark"')
         mark_end = header.index("</div>", mark_start)
         mark = header[mark_start:mark_end]
-        self.assertIn("brand-logo-left", mark)
-        self.assertIn("brand-logo-right", mark)
-        self.assertIn('data-dual-logo="1"', header)
-        i_left = mark.index("brand-logo-left")
-        i_banner = mark.index("brand-banner")
-        i_right = mark.index("brand-logo-right")
-        self.assertLess(i_left, i_banner, "left logo must precede banner")
-        self.assertLess(i_banner, i_right, "right logo must follow banner")
-        self.assertIn(PUBLIC_BRAND_LOGO_PATH, mark)
-        self.assertIn("logo_transparent", mark)
+        self.assertIn("brand-banner", mark)
+        self.assertNotIn("brand-logo-left", mark)
+        self.assertNotIn("brand-logo-right", mark)
+        self.assertNotIn('class="brand-logo"', mark)
+        self.assertNotIn("data-brand-logo", mark)
+        self.assertNotIn('data-dual-logo="1"', header)
+        self.assertIn('data-banner-only="1"', header)
+        self.assertNotIn(PUBLIC_BRAND_LOGO_PATH, mark)
+        self.assertNotIn("logo_transparent", mark)
         self.assertNotIn('src="/logo.png"', mark)
         self.assertNotIn('src="/logo.png?', mark)
-        # Shared height attr on both logos + banner (3 nodes)
+        # Banner height attr only (1 node)
         self.assertIn(f'height="{PUBLIC_BRAND_HEADER_HEIGHT_DEFAULT}"', header)
         self.assertEqual(
             header.count(f'height="{PUBLIC_BRAND_HEADER_HEIGHT_DEFAULT}"'),
-            3,
+            1,
         )
-        # Nav remains below the logo+banner band
+        # Nav remains below the banner band
         i_mark = header.index('id="brand-mark"')
         i_nav = header.index('id="doc-links"')
         self.assertLess(i_mark, i_nav)
@@ -197,24 +196,20 @@ class TestPublicChromeModule(unittest.TestCase):
         self.assertNotIn("border: 1.5px solid transparent", css)
         self.assertIn("var(--rb-neon-glow-cyan)", css)
         self.assertIn("var(--rb-neon-glow-green)", css)
-        # Brand logo + banner share --rb-brand-header-height
+        # Banner-only mark uses --rb-brand-header-height; logos hidden if present
         self.assertIn(".brand-mark", css)
         self.assertIn("flex-direction: row", css)
         self.assertIn("--rb-brand-header-height", css)
         self.assertIn(f"{PUBLIC_BRAND_HEADER_HEIGHT_MIN_CSS}px", css)
         self.assertIn(f"{PUBLIC_BRAND_HEADER_HEIGHT_MAX_CSS}px", css)
         logo_css_i = css.index(".brand-logo")
-        logo_css = css[logo_css_i : logo_css_i + 450]
-        self.assertIn("border: none", logo_css)
-        self.assertIn("background: transparent", logo_css)
-        self.assertIn("box-shadow: none", logo_css)
-        self.assertIn("object-fit: contain", logo_css)
-        self.assertIn("var(--rb-brand-header-height)", logo_css)
-        self.assertNotIn("var(--rb-neon-border)", logo_css)
+        logo_css = css[logo_css_i : logo_css_i + 200]
+        self.assertIn("display: none", logo_css)
         banner_css_i = css.index(".brand-banner")
-        banner_css = css[banner_css_i : banner_css_i + 400]
+        banner_css = css[banner_css_i : banner_css_i + 500]
         self.assertIn("var(--rb-brand-header-height)", banner_css)
         self.assertIn("object-fit: contain", banner_css)
+        self.assertIn("display: block", banner_css)
         # Light theme still defines both neon tones (softer values)
         light_i = css.index('[data-theme="light"]')
         light_css = css[light_i : light_i + 1800]
@@ -303,10 +298,13 @@ class TestHomepageChrome(unittest.TestCase):
         brand_start = html.index('id="brand-panel"')
         brand_end = html.index("</header>", brand_start)
         brand_box = html[brand_start:brand_end]
-        # Visible heading is banner + logo (not VPN H1 text)
+        # Visible heading is banner only (not VPN H1 text, no flanking logos)
         self.assertIn("brand-banner", brand_box)
         self.assertIn("banner.jpg", brand_box)
-        self.assertIn("brand-logo", brand_box)
+        self.assertNotIn("brand-logo-left", brand_box)
+        self.assertNotIn("brand-logo-right", brand_box)
+        self.assertNotIn('class="brand-logo"', brand_box)
+        self.assertIn("data-banner-only", brand_box)
         self.assertNotIn(f"<h1>{PUBLIC_BRAND_TITLE}</h1>", brand_box)
         self.assertNotRegex(brand_box, r"<h1>RESTORE PRIVACY VPN</h1>")
         self.assertIn(f"<title>{PUBLIC_BRAND_TITLE}</title>", html)
