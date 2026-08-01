@@ -8,24 +8,24 @@
       "brand": "Pens",
       "archive": "/Users/russellsneddon/restore-privacy/releases/rpos-apps/0.1.0/pens-0.1.0-installer.zip",
       "archive_name": "pens-0.1.0-installer.zip",
-      "bytes": 12529,
-      "sha256": "c53a24dea7234f4b304c4c8efdf2f3762d81ec7605c6930866951b93f3bea1dc"
+      "bytes": 29965,
+      "sha256": "156e9438d025cbd6c58b8a0d52a3cf84da29d408e84fdc6c1d0908b1a0d1e202"
     },
     {
       "ok": true,
       "brand": "Tables",
       "archive": "/Users/russellsneddon/restore-privacy/releases/rpos-apps/0.1.0/tables-0.1.0-installer.zip",
       "archive_name": "tables-0.1.0-installer.zip",
-      "bytes": 12621,
-      "sha256": "45d7f2a787746b129b57e58f8c4d75fe4a2d24f93ab58d2b73ed50aea7e481b3"
+      "bytes": 30057,
+      "sha256": "2e1c6972474f3c19147cc8a9dab50be2fbb7b2893703ad80d507d79f592e4ab7"
     },
     {
       "ok": true,
       "brand": "Slides",
       "archive": "/Users/russellsneddon/restore-privacy/releases/rpos-apps/0.1.0/slides-0.1.0-installer.zip",
       "archive_name": "slides-0.1.0-installer.zip",
-      "bytes": 12620,
-      "sha256": "4518e02f5555c788bbe3c7be4823720985a6adea385dabaae0a6d85f4e027e52"
+      "bytes": 30056,
+      "sha256": "5823dc2ea7b28cafcee6f7d8aeebcc473f3e937c156500994d27de91d63167fe"
     }
   ],
   "inventory": [
