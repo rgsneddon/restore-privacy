@@ -88,23 +88,52 @@ def list_brand_installer_packages(
                 }
             )
 
-    # --- Browser / Rx (Suite companion under same monopin dir) ---
-    for plat, fname in (
-        ("browser", f"restore-privacy-browser-extension-{ver}.zip"),
-        ("rx-browser", f"restore-privacy-rx-browser-{ver}.zip"),
-    ):
-        rows.append(
-            {
-                "kind": "browser",
-                "product": "Rx Privacy Browser",
-                "platform": plat,
-                "filename": fname,
-                "relative_path": f"{ver}/{fname}",
-                "version": ver,
-                "min_bytes": 1_000,
-                "required": False,
-            }
-        )
+    # --- Browser / Rx multi-platform (Suite monopin; valid expandable archives) ---
+    try:
+        import sys as _sys
+
+        _sp = str(root / "scripts")
+        if _sp not in _sys.path:
+            _sys.path.insert(0, _sp)
+        from package_browser_rx import platform_package_matrix as _rx_matrix
+
+        for slot in _rx_matrix(ver):
+            rows.append(
+                {
+                    "kind": "browser",
+                    "product": str(slot.get("product") or "Rx Privacy Browser"),
+                    "platform": str(slot.get("platform") or "browser"),
+                    "filename": str(slot["filename"]),
+                    "relative_path": str(slot["relative_path"]),
+                    "version": ver,
+                    "min_bytes": 1_000,
+                    "required": bool(slot.get("default_download")),
+                    "format": str(slot.get("format") or "zip"),
+                }
+            )
+    except Exception:
+        for plat, fname in (
+            ("chromium", f"restore-privacy-browser-extension-{ver}.zip"),
+            ("default", f"restore-privacy-rx-browser-{ver}.zip"),
+            ("macos", f"restore-privacy-rx-browser-{ver}-macos.zip"),
+            ("windows", f"restore-privacy-rx-browser-{ver}-windows.zip"),
+            ("linux-x86_64", f"restore-privacy-rx-browser-{ver}-linux-x86_64.tar.gz"),
+            ("linux-aarch64", f"restore-privacy-rx-browser-{ver}-linux-aarch64.tar.gz"),
+            ("ios", f"restore-privacy-rx-browser-{ver}-ios.zip"),
+            ("android", f"restore-privacy-rx-browser-{ver}-android.zip"),
+        ):
+            rows.append(
+                {
+                    "kind": "browser",
+                    "product": "Rx Privacy Browser",
+                    "platform": plat,
+                    "filename": fname,
+                    "relative_path": f"{ver}/{fname}",
+                    "version": ver,
+                    "min_bytes": 1_000,
+                    "required": plat == "default",
+                }
+            )
 
     # --- rpOS desktop packages (current monopin includes RxShell CLI) ---
     try:
