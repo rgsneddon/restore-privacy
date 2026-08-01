@@ -106,8 +106,18 @@ def list_brand_installer_packages(
             }
         )
 
-    # --- rpOS desktop packages ---
-    rpos_ver = "0.1.0"
+    # --- rpOS desktop packages (current monopin includes RxShell CLI) ---
+    try:
+        import sys as _sys
+
+        _scripts = str(root / "scripts")
+        if _scripts not in _sys.path:
+            _sys.path.insert(0, _scripts)
+        from package_rpos import RPOS_VERSION as _rpos_ver_src
+
+        rpos_ver = str(_rpos_ver_src).strip() or "0.2.0"
+    except Exception:
+        rpos_ver = "0.2.0"
     for plat, fname in (
         ("windows", f"rpos-{rpos_ver}-windows-x64.zip"),
         ("macos", f"rpos-{rpos_ver}-macos.zip"),
@@ -124,6 +134,7 @@ def list_brand_installer_packages(
                 "version": rpos_ver,
                 "min_bytes": 1_000,
                 "required": False,
+                "features": ["RxShell"],
             }
         )
 

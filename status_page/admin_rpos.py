@@ -50,13 +50,15 @@ def render_admin_rpos_deploy_howto_html() -> str:
   <p>rpOS is <strong>installable only on Windows, macOS, and Linux</strong>
   (x86_64 + aarch64). Build with
   <code>python3 scripts/package_rpos.py</code> →
-  <code>releases/rpos/0.1.0/</code>:</p>
+  <code>releases/rpos/0.2.0/</code> (includes <strong>RxShell</strong>):</p>
   <ul id="admin-rpos-packages">
-    <li><code>rpos-0.1.0-windows-x64.zip</code> — <code>install.ps1</code> / <code>RESTORE_rpos.ps1</code></li>
-    <li><code>rpos-0.1.0-macos.zip</code> — <code>install.sh</code> / <code>RESTORE_rpos.sh</code></li>
-    <li><code>rpos-0.1.0-linux-x86_64.tar.gz</code></li>
-    <li><code>rpos-0.1.0-linux-aarch64.tar.gz</code></li>
+    <li><code>rpos-0.2.0-windows-x64.zip</code> — <code>install.ps1</code> / <code>RESTORE_rpos.ps1</code> / <code>RxShell.cmd</code></li>
+    <li><code>rpos-0.2.0-macos.zip</code> — <code>install.sh</code> / <code>RESTORE_rpos.sh</code> / <code>RxShell</code></li>
+    <li><code>rpos-0.2.0-linux-x86_64.tar.gz</code></li>
+    <li><code>rpos-0.2.0-linux-aarch64.tar.gz</code></li>
   </ul>
+  <p>RxShell: <code>python3 -m rpos.rxshell</code> or package launcher <code>./RxShell</code>
+  (multi-language shell/Python/JS/PowerShell-style; not full MS PowerShell).</p>
   <p><strong>iOS / Android are not installable slots</strong> for rpOS packages.</p>
   <p>Primary single-click control for <strong>RESTORE rpOS</strong>:
   <code>RESTORE_rpOS</code> /

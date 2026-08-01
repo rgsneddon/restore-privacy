@@ -115,6 +115,9 @@ def planned_programs(*, repo_root: Path | None = None) -> list[dict[str, Any]]:
                 "rpos",
                 "rpos/installer",
                 "rpos/installer/pipeline.py",
+                "rpos/rxshell",
+                "rpos/rxshell/__main__.py",
+                "rpos/rxshell/runner.py",
                 "client/flyclient_hidden_node.py",
             ],
             "package_kind": "rpos",
@@ -125,8 +128,30 @@ def planned_programs(*, repo_root: Path | None = None) -> list[dict[str, Any]]:
             "public_residual_dial": False,
             "proprietary_suite": False,
             "notes": (
-                "Desktop-only RESTORE path; free apps bundle; flyclient hidden "
-                "multi-hop hook (not public dial, not full selfhost)"
+                "Desktop-only RESTORE path (monopin 0.2.0+); RxShell multi-language "
+                "CLI; free apps bundle; flyclient hidden multi-hop hook "
+                "(not public dial, not full selfhost)"
+            ),
+        },
+        {
+            "id": "rxshell",
+            "product": "RxShell",
+            "trees": [
+                "rpos/rxshell",
+                "rpos/rxshell/__main__.py",
+                "rpos/rxshell/runner.py",
+                "rpos/rxshell/repl.py",
+            ],
+            "package_kind": "rpos",
+            "package_entry": PACKAGE_ENTRY_SCRIPTS["rpos"],
+            "required_platforms": [],
+            "desktop_only": True,
+            "mobile_installable": False,
+            "public_residual_dial": False,
+            "proprietary_suite": False,
+            "notes": (
+                "PowerShell-type multi-language CLI of rpOS; shell/Python/JS/"
+                "PowerShell-style via host runtimes; not full MS PowerShell parity"
             ),
         },
         {

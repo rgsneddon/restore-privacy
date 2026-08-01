@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
 """Package **rpOS** installers for desktop platforms only.
 
-Monopin **0.1.0** under ``releases/rpos/0.1.0/``.
+Monopin **0.2.0** under ``releases/rpos/0.2.0/`` (includes **RxShell** CLI).
 
 Installable matrix (desktop only)::
 
-  windows  — zip + install.ps1 / RESTORE warning entry
-  macos    — zip + install.sh / RESTORE warning entry
+  windows  — zip + install.ps1 / RESTORE warning entry + RxShell
+  macos    — zip + install.sh / RESTORE warning entry + RxShell
   linux    — tar.gz for **x86_64** and **aarch64** (any Linux relatives)
 
 **Not installable for this product surface:** iOS, Android (no packages).
@@ -35,9 +35,10 @@ from pathlib import Path
 from typing import Any
 
 ROOT = Path(__file__).resolve().parents[1]
-RPOS_VERSION = "0.1.0"
+RPOS_VERSION = "0.2.0"
 OUT_DIR = ROOT / "releases" / "rpos" / RPOS_VERSION
 RPOS_SRC = ROOT / "rpos"
+RXSHELL_PRODUCT = "RxShell"
 
 # Desktop-only product slots — never iOS/Android for rpOS installers.
 INSTALLABLE_PLATFORMS: tuple[str, ...] = (
@@ -174,12 +175,20 @@ def _write_capability(stage: Path, slot: dict[str, Any]) -> None:
         f"- **installable:** yes (desktop)\n"
         f"- **install_entry:** {slot['install_entry']}\n"
         f"- **restore_entry:** {slot['restore_entry']}\n"
+        f"- **RxShell:** `{RXSHELL_PRODUCT}` multi-language CLI "
+        f"(`python -m rpos.rxshell` / `./RxShell`)\n"
         f"- **mobile (iOS/Android):** not supported for this installer surface\n\n"
         f"## Honesty\n\n{slot['honesty']}\n\n"
+        "## RxShell\n\n"
+        f"{RXSHELL_PRODUCT} is the PowerShell-type CLI of rpOS. It accepts "
+        "shell / Python / JavaScript / PowerShell-style snippets via host "
+        "interpreters. It is **not** full Microsoft PowerShell parity and does "
+        "not embed every language runtime — missing runtimes fail closed.\n\n"
         "## RESTORE wipe intent\n\n"
         "The RESTORE entry **warns** the operator/user before any destructive path. "
         "This package is an **installable commercial foundation** (docs, SDK scaffolds, "
-        "launchers). It does **not** ship a silent instant full-disk reformat binary.\n"
+        "launchers). It does **not** ship a silent instant full-disk reformat binary. "
+        f"{RXSHELL_PRODUCT} launches without RESTORE wipe.\n"
     )
     (stage / "CAPABILITY.md").write_text(body, encoding="utf-8")
     (stage / "CAPABILITY.json").write_text(
@@ -194,12 +203,61 @@ def _write_capability(stage: Path, slot: dict[str, Any]) -> None:
                 "mobile": False,
                 "install_entry": slot["install_entry"],
                 "restore_entry": slot["restore_entry"],
+                "rxshell": RXSHELL_PRODUCT,
+                "rxshell_entry": "python -m rpos.rxshell",
+                "rxshell_launcher": "RxShell" if slot["os"] != "windows" else "RxShell.cmd",
                 "excluded_mobile": excluded_mobile_platforms(),
                 "honesty": slot["honesty"],
             },
             indent=2,
         )
         + "\n",
+        encoding="utf-8",
+    )
+
+
+def _write_rxshell_launchers(stage: Path, slot: dict[str, Any]) -> None:
+    """Ship RxShell launch scripts at package root (no RESTORE required)."""
+    if slot["os"] == "windows":
+        (stage / "RxShell.cmd").write_text(
+            """@echo off
+setlocal
+set ROOT=%~dp0
+set PYTHONPATH=%ROOT%;%PYTHONPATH%
+cd /d "%ROOT%"
+python -m rpos.rxshell %*
+""",
+            encoding="utf-8",
+        )
+    else:
+        sh = stage / "RxShell"
+        sh.write_text(
+            """#!/usr/bin/env bash
+set -euo pipefail
+ROOT="$(cd "$(dirname "$0")" && pwd)"
+export PYTHONPATH="${ROOT}${PYTHONPATH:+:$PYTHONPATH}"
+cd "$ROOT"
+exec python3 -m rpos.rxshell "$@"
+""",
+            encoding="utf-8",
+        )
+        sh.chmod(sh.stat().st_mode | 0o111)
+    # Short docs
+    (stage / "RXSHELL.md").write_text(
+        f"# {RXSHELL_PRODUCT} (rpOS {slot['version']})\n\n"
+        "PowerShell-type multi-language CLI for rpOS.\n\n"
+        "## Launch\n\n"
+        "```bash\n"
+        "./RxShell                 # interactive (Unix)\n"
+        "RxShell.cmd               # interactive (Windows)\n"
+        "python3 -m rpos.rxshell\n"
+        "python3 -m rpos.rxshell -c ':python print(2+2)'\n"
+        "python3 -m rpos.rxshell --list-languages\n"
+        "```\n\n"
+        "## Languages\n\n"
+        "shell · python · javascript · powershell (host interpreters).\n"
+        "Unknown languages and missing runtimes **fail closed** — no fake success.\n"
+        "Not full Microsoft PowerShell feature parity.\n",
         encoding="utf-8",
     )
 
@@ -420,6 +478,7 @@ def _stage_platform(slot: dict[str, Any], stage: Path) -> None:
     else:
         _write_unix_install(stage, slot)
     _write_single_click(stage, slot)
+    _write_rxshell_launchers(stage, slot)
     for p in stage.rglob("*.priv"):
         raise RuntimeError(f"refusing private key: {p}")
 

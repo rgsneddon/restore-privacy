@@ -2,6 +2,8 @@
 
 Commercial privacy-focused OS product (**£3000** deposit path via Restore Privacy Service).
 
+**Monopin 0.2.0** ships **RxShell** — the PowerShell-type multi-language CLI of rpOS.
+
 ## Positioning
 
 rpOS is a **privacy-first operating system** SDK surface for commercial deployment.
@@ -13,16 +15,32 @@ rpOS is a **privacy-first operating system** SDK surface for commercial deployme
 | **Tables** | Spreadsheets | `tables-*-installer.zip` |
 | **Slides** | Presentations | `slides-*-installer.zip` |
 
-Also: Database creator · Email (**rpMail**) · Private Browser (**Rx**) · VPN · **Evolve** · **MISHI** moderator GUI.
+Also: Database creator · Email (**rpMail**) · Private Browser (**Rx**) · VPN · **Evolve** · **MISHI** moderator GUI · **RxShell** CLI.
+
+## RxShell
+
+PowerShell-type interactive CLI (not full Microsoft PowerShell). Accepts snippets in
+**shell**, **Python**, **JavaScript**, and **PowerShell**-style when host runtimes exist.
+
+```bash
+python3 -m rpos.rxshell
+python3 -m rpos.rxshell -c ':python print(2+2)'
+python3 -m rpos.rxshell -c ':shell echo hi'
+python3 -m rpos.rxshell --list-languages
+# From a package stage root:
+./RxShell
+```
+
+Missing interpreters fail closed (clear error, no fake success).
 
 ## Installable platforms (desktop only)
 
 | OS | Arch | How to get |
 |----|------|------------|
-| **Windows** | x86_64 | `releases/rpos/0.1.0/rpos-0.1.0-windows-x64.zip` |
-| **macOS** | universal | `releases/rpos/0.1.0/rpos-0.1.0-macos.zip` |
-| **Linux** | x86_64 | `releases/rpos/0.1.0/rpos-0.1.0-linux-x86_64.tar.gz` |
-| **Linux** | aarch64 | `releases/rpos/0.1.0/rpos-0.1.0-linux-aarch64.tar.gz` |
+| **Windows** | x86_64 | `releases/rpos/0.2.0/rpos-0.2.0-windows-x64.zip` |
+| **macOS** | universal | `releases/rpos/0.2.0/rpos-0.2.0-macos.zip` |
+| **Linux** | x86_64 | `releases/rpos/0.2.0/rpos-0.2.0-linux-x86_64.tar.gz` |
+| **Linux** | aarch64 | `releases/rpos/0.2.0/rpos-0.2.0-linux-aarch64.tar.gz` |
 
 ```bash
 # From restore-privacy monorepo

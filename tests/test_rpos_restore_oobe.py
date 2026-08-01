@@ -216,7 +216,7 @@ class TestPackageHasSingleClick(unittest.TestCase):
         importlib.reload(pr)
         with tempfile.TemporaryDirectory() as td:
             out = Path(td) / "out"
-            r = pr.package_all(version="0.1.0", out_dir=out)
+            r = pr.package_all(version=pr.RPOS_VERSION, out_dir=out)
             self.assertTrue(r["ok"], r)
             by = {p["platform"]: p for p in r["packages"]}
             with zipfile.ZipFile(by["windows"]["archive"]) as zf:

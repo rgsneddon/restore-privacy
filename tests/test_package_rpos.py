@@ -25,7 +25,7 @@ class TestRposMatrix(unittest.TestCase):
             platform_package_matrix,
         )
 
-        self.assertEqual(RPOS_VERSION, "0.1.0")
+        self.assertEqual(RPOS_VERSION, "0.2.0")
         plats = catalog_platforms()
         self.assertEqual(
             plats, ["windows", "macos", "linux-x86_64", "linux-aarch64"]
@@ -38,20 +38,22 @@ class TestRposMatrix(unittest.TestCase):
             self.assertTrue(s["installable"])
             self.assertFalse(s["mobile"])
             self.assertIn(s["os"], ("windows", "macos", "linux"))
+            self.assertEqual(s["version"], RPOS_VERSION)
 
 
 class TestRposPackage(unittest.TestCase):
     def test_package_all_archives(self) -> None:
-        from package_rpos import package_all
+        from package_rpos import RPOS_VERSION, package_all
 
         with tempfile.TemporaryDirectory() as td:
-            out = Path(td) / "rpos" / "0.1.0"
-            r = package_all(version="0.1.0", out_dir=out)
+            out = Path(td) / "rpos" / RPOS_VERSION
+            r = package_all(version=RPOS_VERSION, out_dir=out)
             self.assertTrue(r.get("ok"), r)
             self.assertEqual(r["package_count"], 4)
             self.assertEqual(r["excluded_mobile"], ["ios", "android"])
             man = json.loads((out / "manifest.json").read_text(encoding="utf-8"))
             self.assertTrue(man["ok"])
+            self.assertEqual(man["version"], RPOS_VERSION)
             sums = json.loads((out / "SHA256SUMS.json").read_text(encoding="utf-8"))
             self.assertEqual(len(sums), 4)
             for pkg in man["packages"]:
@@ -61,12 +63,12 @@ class TestRposPackage(unittest.TestCase):
                 self.assertEqual(len(pkg["sha256"]), 64)
 
     def test_linux_archive_has_install_and_rpos_tree(self) -> None:
-        from package_rpos import package_all
+        from package_rpos import RPOS_VERSION, package_all
 
         with tempfile.TemporaryDirectory() as td:
             out = Path(td) / "out"
             r = package_all(
-                version="0.1.0", out_dir=out, platforms=["linux-x86_64"]
+                version=RPOS_VERSION, out_dir=out, platforms=["linux-x86_64"]
             )
             self.assertTrue(r.get("ok"), r)
             with tarfile.open(r["packages"][0]["archive"], "r:gz") as tf:
@@ -76,6 +78,9 @@ class TestRposPackage(unittest.TestCase):
                 self.assertIn("CAPABILITY.json", names)
                 self.assertIn("rpos/README.md", names)
                 self.assertIn("rpos/sdk/", names)
+                self.assertIn("rpos/rxshell/", names)
+                self.assertIn("RxShell", names)
+                self.assertIn("RXSHELL.md", names)
                 self.assertIn("bin/rpos-install", names)
                 cap = next(n for n in tf.getnames() if n.endswith("CAPABILITY.json"))
                 raw = tf.extractfile(cap)
@@ -84,14 +89,15 @@ class TestRposPackage(unittest.TestCase):
                 self.assertTrue(data["installable"])
                 self.assertFalse(data["mobile"])
                 self.assertIn("ios", data["excluded_mobile"])
+                self.assertEqual(data.get("rxshell"), "RxShell")
 
     def test_windows_and_macos_zips(self) -> None:
-        from package_rpos import package_all
+        from package_rpos import RPOS_VERSION, package_all
 
         with tempfile.TemporaryDirectory() as td:
             out = Path(td) / "out"
             r = package_all(
-                version="0.1.0",
+                version=RPOS_VERSION,
                 out_dir=out,
                 platforms=["windows", "macos"],
             )
@@ -101,11 +107,15 @@ class TestRposPackage(unittest.TestCase):
                 joined = "\n".join(zf.namelist())
                 self.assertIn("install.ps1", joined)
                 self.assertIn("RESTORE_rpos.ps1", joined)
+                self.assertIn("RxShell.cmd", joined)
                 self.assertIn("rpos/", joined)
+                self.assertIn("rpos/rxshell/", joined)
             with zipfile.ZipFile(by["macos"]["archive"]) as zf:
                 joined = "\n".join(zf.namelist())
                 self.assertIn("install.sh", joined)
                 self.assertIn("RESTORE_rpos.sh", joined)
+                self.assertIn("RxShell", joined)
+                self.assertIn("RXSHELL.md", joined)
 
     def test_cli_inventory(self) -> None:
         from package_rpos import main
