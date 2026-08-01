@@ -77,13 +77,13 @@ class TestPushSuitePackagesHelper(unittest.TestCase):
         ctrl = NodeOperatorController(repo_root=ROOT)
         self.assertEqual(ctrl.catalog_version_default(), RELEASE_VERSION)
         self.assertIn(RELEASE_VERSION, ctrl.suite_product_label())
+        # Default brand_wide=True — omit the flag on the primary push path.
         r = ctrl.push_suite_packages(
             version=RELEASE_VERSION,
             stage=True,
             upload=True,
             dry_run=True,
             allow_missing=True,
-            brand_wide=True,
         )
         self.assertEqual(r.get("version"), RELEASE_VERSION)
         self.assertTrue(r.get("dry_run"))

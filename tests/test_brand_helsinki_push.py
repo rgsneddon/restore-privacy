@@ -13,6 +13,99 @@ sys.path.insert(0, str(ROOT / "status_page"))
 sys.path.insert(0, str(ROOT / "scripts"))
 
 
+class TestBrandWideDefault(unittest.TestCase):
+    """Default list/push APIs must be brand_wide=true when flag is omitted."""
+
+    def test_list_local_packages_default_is_brand_wide(self) -> None:
+        import inspect
+
+        from node.operator_admin import NodeOperatorController
+
+        ctrl = NodeOperatorController(repo_root=ROOT)
+        sig = inspect.signature(ctrl.list_local_packages)
+        self.assertIs(sig.parameters["brand_wide"].default, True)
+
+        # No brand_wide kwarg → full brand inventory (not suite-only five).
+        inv = ctrl.list_local_packages(version=ctrl.catalog_version_default())
+        self.assertTrue(inv.get("ok"), inv)
+        self.assertGreaterEqual(int(inv.get("total") or 0), 5)
+        kinds = set(inv.get("kinds") or [])
+        self.assertIn("suite_client", kinds)
+        non_suite = kinds - {"suite_client"}
+        self.assertTrue(
+            non_suite & {"rpos", "rpos_app", "browser", "node_installer", "node_operator"},
+            kinds,
+        )
+        pkgs = inv.get("packages") or []
+        self.assertTrue(any(p.get("kind") == "suite_client" for p in pkgs))
+        self.assertTrue(
+            any(p.get("kind") in ("rpos", "rpos_app") for p in pkgs),
+            "default inventory must include rpOS and/or free apps",
+        )
+
+        suite_only = ctrl.list_local_packages(
+            version=ctrl.catalog_version_default(), brand_wide=False
+        )
+        self.assertEqual(int(suite_only.get("total") or 0), 5)
+        suite_kinds = set(suite_only.get("kinds") or [])
+        self.assertEqual(suite_kinds, {"suite_client"})
+
+    def test_push_suite_packages_default_is_brand_wide(self) -> None:
+        import inspect
+
+        from node.operator_admin import NodeOperatorController
+
+        ctrl = NodeOperatorController(repo_root=ROOT)
+        for name in ("push_suite_packages", "upload_catalog_packages"):
+            sig = inspect.signature(getattr(ctrl, name))
+            self.assertIs(
+                sig.parameters["brand_wide"].default,
+                True,
+                f"{name} brand_wide default",
+            )
+
+        # Omit brand_wide entirely — must still be full brand push.
+        r = ctrl.push_suite_packages(
+            stage=True,
+            upload=True,
+            dry_run=True,
+            allow_missing=True,
+        )
+        self.assertTrue(r.get("brand_wide"), r)
+        self.assertGreaterEqual(int(r.get("total") or 0), 5)
+        kinds = set(r.get("kinds") or [])
+        if not kinds:
+            kinds = {p.get("kind") for p in (r.get("packages") or [])}
+        self.assertIn("suite_client", kinds)
+        self.assertTrue(
+            kinds & {"rpos", "rpos_app", "browser", "node_installer", "node_operator"},
+            kinds,
+        )
+        if int(r.get("present_count") or 0) > 0:
+            self.assertTrue(r.get("ok"), r.get("error"))
+            self.assertEqual(r.get("upload_code"), 0)
+
+    def test_primary_admin_paths_do_not_force_suite_only(self) -> None:
+        """Helsinki push entry points must not pass brand_wide=False."""
+        files = [
+            ROOT / "status_page" / "admin_panel.py",
+            ROOT / "status_page" / "suite_push_progress.py",
+            ROOT / "status_page" / "admin_node_operator.py",
+            ROOT / "status_page" / "app.py",
+            ROOT / "node_operator" / "gui_html.py",
+            ROOT / "node_operator" / "app.py",
+        ]
+        for path in files:
+            src = path.read_text(encoding="utf-8")
+            # No silent suite-only on shared list/push call sites.
+            self.assertNotIn(
+                "brand_wide=False",
+                src,
+                f"{path.name} must not force suite-only for primary paths",
+            )
+            self.assertNotIn("brand_wide=false", src.lower().replace(" ", ""))
+
+
 class TestBrandPackageInventory(unittest.TestCase):
     def test_inventory_includes_suite_rpos_and_apps(self) -> None:
         from brand_package_inventory import inventory_with_presence, list_brand_installer_packages
@@ -37,11 +130,11 @@ class TestBrandPackageInventory(unittest.TestCase):
         self.assertTrue(inv.get("ok"))
         self.assertGreaterEqual(int(inv["total"]), 5)
         self.assertGreaterEqual(int(inv["present_count"]), 1)
-        # Operator path must use same helper
+        # Default path (no brand_wide kwarg) matches brand inventory.
         from node.operator_admin import NodeOperatorController
 
         ctrl = NodeOperatorController(repo_root=ROOT)
-        op = ctrl.list_local_packages(brand_wide=True)
+        op = ctrl.list_local_packages()
         self.assertGreaterEqual(int(op.get("total") or 0), int(inv["total"]))
         op_kinds = set(op.get("kinds") or [])
         self.assertIn("suite_client", op_kinds)
@@ -54,12 +147,12 @@ class TestBrandPushPlan(unittest.TestCase):
         from node.operator_admin import NodeOperatorController
 
         ctrl = NodeOperatorController(repo_root=ROOT)
+        # Default brand_wide — do not pass the flag.
         r = ctrl.push_suite_packages(
             stage=True,
             upload=True,
             dry_run=True,
             allow_missing=True,
-            brand_wide=True,
         )
         self.assertTrue(r.get("brand_wide"), r)
         inv = r.get("inventory") or {}
