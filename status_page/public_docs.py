@@ -13,6 +13,7 @@ Stable same-origin paths (no GitHub dependency for public readers):
 | ``/NODE_OPERATOR.md`` | Residual node / operator path (not Suite client) |
 | ``/EVOLVE.md`` | Evolve docs (mirror of evolve repo README) |
 | ``/RPOS.md`` | rpOS docs (mirror of rgsneddon/rpOS README) |
+| ``/RX.md`` | Rx Privacy Browser docs (mirror of Rx-Privacy-Browser README) |
 """
 
 from __future__ import annotations
@@ -49,6 +50,14 @@ RPOS_README_GITHUB_URL = (
 )
 RPOS_README_RAW_URL = (
     "https://raw.githubusercontent.com/rgsneddon/rpOS/main/README.md"
+)
+RX_DOCS_PATH = "/RX.md"
+RX_README_GITHUB_URL = (
+    "https://github.com/rgsneddon/Rx-Privacy-Browser/blob/master/README.md"
+)
+RX_README_RAW_URL = (
+    "https://raw.githubusercontent.com/rgsneddon/Rx-Privacy-Browser/"
+    "master/README.md"
 )
 
 
@@ -137,6 +146,19 @@ PUBLIC_DOCS: tuple[PublicDoc, ...] = (
             "/rpos-docs",
             "/docs/RPOS.md",
             "/docs/rpos",
+        ),
+    ),
+    PublicDoc(
+        id="rx-docs",
+        path=RX_DOCS_PATH,
+        title="Rx Privacy Browser",
+        filename="RX.md",
+        aliases=(
+            "/rx",
+            "/rx-browser",
+            "/rx-privacy-browser",
+            "/docs/RX.md",
+            "/docs/rx",
         ),
     ),
 )
