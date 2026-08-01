@@ -308,6 +308,10 @@ void main() {
       // Single unified Suite prompt reuse — not a second parallel register wall.
       expect(src.contains('showSuiteAccountPrompt'), isTrue);
       expect(src.contains('applySuiteAccountToWalletAndEvolve'), isFalse);
+      // Imagine Ned icon chrome tracks guide phase (decorator only).
+      expect(src.contains('ned_icon_avatar'), isTrue);
+      expect(src.contains('nedIconStimulusFor'), isTrue);
+      expect(src.contains('suite_ned_icons.dart'), isTrue);
     });
   });
 }

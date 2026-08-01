@@ -7,6 +7,7 @@ import 'suite_account.dart';
 import 'suite_account_apply.dart';
 import 'suite_account_prompt.dart';
 import 'suite_ned_guide.dart';
+import 'suite_ned_icons.dart';
 import 'theme.dart';
 
 /// Ned — Restore Privacy Helper (rpAI) tab surface.
@@ -197,28 +198,13 @@ class SuiteRpaiTabState extends State<SuiteRpaiTab> {
           children: [
             Row(
               children: [
-                Container(
-                  width: 56,
-                  height: 56,
-                  decoration: BoxDecoration(
-                    color: kPrimaryDark,
-                    borderRadius: BorderRadius.circular(16),
-                    boxShadow: [
-                      BoxShadow(
-                        color: kPrimary.withValues(alpha: 0.35),
-                        blurRadius: 12,
-                        offset: const Offset(0, 4),
-                      ),
-                    ],
-                  ),
-                  alignment: Alignment.center,
-                  child: const Text(
-                    'N',
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 28,
-                      fontWeight: FontWeight.w800,
-                    ),
+                // Imagine-derived Ned chrome: package / chip / satellite / gear
+                // tracks real [NedGuidePhase] (+ busy) via [nedIconStimulusFor].
+                _NedIconAvatar(
+                  key: const Key('ned_icon_avatar'),
+                  stimulus: nedIconStimulusFor(
+                    phase: _guide.phase,
+                    busy: _busy || _loading,
                   ),
                 ),
                 const SizedBox(width: 14),
@@ -241,6 +227,21 @@ class SuiteRpaiTabState extends State<SuiteRpaiTab> {
                           fontSize: 13,
                           fontWeight: FontWeight.w600,
                           color: kTextMuted,
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        _stimulusCaption(
+                          nedIconStimulusFor(
+                            phase: _guide.phase,
+                            busy: _busy || _loading,
+                          ),
+                        ),
+                        key: const Key('ned_icon_stimulus_label'),
+                        style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w600,
+                          color: kPrimaryDark,
                         ),
                       ),
                     ],
@@ -431,6 +432,71 @@ class SuiteRpaiTabState extends State<SuiteRpaiTab> {
               ],
             ],
           ],
+        ),
+      ),
+    );
+  }
+
+  /// Short chrome caption under the title (tracks stimulus, not a second script).
+  static String _stimulusCaption(NedIconStimulus stimulus) {
+    switch (stimulus) {
+      case NedIconStimulus.idle:
+        return 'NED Core Package · ready';
+      case NedIconStimulus.asking:
+        return 'Listening · your call';
+      case NedIconStimulus.processing:
+        return 'Deploying account…';
+      case NedIconStimulus.explaining:
+        return 'Walking you through…';
+      case NedIconStimulus.ready:
+        return 'READY TO DEPLOY · done';
+    }
+  }
+}
+
+/// Rounded Ned avatar that swaps Imagine icons with guide phase.
+class _NedIconAvatar extends StatelessWidget {
+  const _NedIconAvatar({
+    super.key,
+    required this.stimulus,
+  });
+
+  final NedIconStimulus stimulus;
+
+  @override
+  Widget build(BuildContext context) {
+    final asset = nedIconAssetForStimulus(stimulus);
+    return Container(
+      key: Key('ned_icon_stimulus_${stimulus.name}'),
+      width: 64,
+      height: 64,
+      decoration: BoxDecoration(
+        color: const Color(0xFF0A1628),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: kPrimary.withValues(alpha: 0.55), width: 1.5),
+        boxShadow: [
+          BoxShadow(
+            color: kPrimary.withValues(alpha: 0.4),
+            blurRadius: 14,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: Image.asset(
+        asset,
+        key: Key('ned_icon_asset_${stimulus.name}'),
+        fit: BoxFit.cover,
+        semanticLabel: nedIconSemanticsLabel(stimulus),
+        errorBuilder: (_, __, ___) => Center(
+          child: Text(
+            'N',
+            style: TextStyle(
+              color: Colors.white.withValues(alpha: 0.9),
+              fontSize: 28,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
         ),
       ),
     );

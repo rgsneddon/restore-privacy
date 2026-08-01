@@ -56,6 +56,11 @@ flutter:
     - assets/flags/us.png
     - assets/flags/eu.png
     - assets/branding/my_perc_logo.png
+    # Ned / rpAI Imagine icon set (NED Core Package + chip / satellite / AI gear)
+    - assets/ned/ned_icon_package.png
+    - assets/ned/ned_icon_chip.png
+    - assets/ned/ned_icon_satellite.png
+    - assets/ned/ned_icon_gear.png
 
 
   # An image asset can refer to one or more resolution-specific "variants", see
