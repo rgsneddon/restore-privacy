@@ -174,7 +174,8 @@ class TestSubscriptionCheckoutCompleted(unittest.TestCase):
         assert grant is not None
         self.assertEqual(grant["platform"], "windows")
         self.assertEqual(grant["session_id"], "cs_test_sub_trial_1")
-        self.assertEqual(grant["amount_pence"], pay.PRICE_PENCE)
+        # Trial: no cash yet — grant amount 0 so Raskul books exclude until invoice.paid
+        self.assertEqual(grant["amount_pence"], 0)
 
         ent = pay.get_connect_entitlement("cs_test_sub_trial_1")
         self.assertIsNotNone(ent)

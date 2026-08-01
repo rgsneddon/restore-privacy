@@ -1,0 +1,46 @@
+=== Raskul accounting sales ===
+fulfilment_email_not_sent session='cs_acc_m' skipped=True error='smtp_not_configured' has_keygen=True has_download=True smtp='disabled'
+fulfilment_email_not_sent session='cs_acc_y' skipped=True error='smtp_not_configured' has_keygen=True has_download=True smtp='disabled'
+fulfilment_email_not_sent session='cs_acc_t' skipped=True error='smtp_not_configured' has_keygen=True has_download=True smtp='disabled'
+sales_count 20
+ sale 245 Paid sale (android) — Stripe fee (estimate 1.5% + £0.20) cs_thank_tok
+ sale 245 Paid sale (windows) — Stripe fee (estimate 1.5% + £0.20) cs_doublehit
+ sale 245 Paid sale (windows) — Stripe fee (estimate 1.5% + £0.20) cs_sess_ok
+ sale 245 Paid sale (linux) RPT-E707-AA3D-1C73 — Stripe fee (estimate 1.5% + £0.20) cs_test_recovery_mint_b531e0529ba7
+ sale 245 Paid sale (android) RPT-FDF9-6408-CDFE — Stripe fee (estimate 1.5% + £0.20) cs_test_recovery_hint_296427259158
+ sale 245 Paid sale (linux) RPT-6D10-89B6-6A29 — Stripe fee (estimate 1.5% + £0.20) cs_test_recovery_mint_9407f32b2729
+ sale 245 Paid sale (android) RPT-0E07-95DC-2BCA — Stripe fee (estimate 1.5% + £0.20) cs_test_recovery_hint_3fad7bdd7640
+ sale 245 Paid sale (linux) RPT-6BC0-57AF-05CF — Stripe fee (estimate 1.5% + £0.20) cs_test_recovery_mint_f4cf25447b36
+ sale 245 Paid sale (android) RPT-5600-1888-C042 — Stripe fee (estimate 1.5% + £0.20) cs_test_recovery_hint_f0bbbd08e99e
+ sale 245 Paid sale (linux) RPT-9AA8-8E9F-72EE — Stripe fee (estimate 1.5% + £0.20) cs_test_recovery_mint_efc89fa0b669
+ sale 245 Paid sale (android) RPT-333A-1047-7940 — Stripe fee (estimate 1.5% + £0.20) cs_test_recovery_hint_a86739577a36
+ sale 245 Paid sale (windows) RPT-C8D2-C8D1-BA88 — Stripe fee (estimate 1.5% + £0.20) test_sess_windows
+ sale 245 Paid sale (android) RPT-DB7E-C061-C5C9 — Stripe fee (estimate 1.5% + £0.20) test_sess_android
+ sale 245 Paid sale (macos) RPT-C60D-8776-08CD — Stripe fee (estimate 1.5% + £0.20) test_sess_macos
+ sale 245 Paid sale (ios) RPT-C650-C712-0DE7 — Stripe fee (estimate 1.5% + £0.20) test_sess_ios
+ sale 245 Paid sale (linux) RPT-E71F-F028-CC55 — Stripe fee (estimate 1.5% + £0.20) test_sess_linux
+ sale 245 Paid sale (windows) RPT-D209-F20A-A696 — Stripe fee (estimate 1.5% + £0.20) cs_skeptic_spot_1
+ sale 300 Paid sale (windows) RPT-D7CB-769D-E4A6 — Stripe fee (estimate 1.5% + £0.20) cs_acc_m
+ sale 3000 Paid sale (linux) RPT-76B1-59F3-DDEF — Stripe fee (estimate 1.5% + £0.20) cs_acc_y
+ sale 300 Paid sale (macos) RPT-INAC-C100-0000 — Stripe fee (estimate 1.5% + £0.20) cs_acc_t
+ ledger_sale 245 Paid sale (android) — Stripe fee (estimate 1.5% + £0.20) 221
+ ledger_sale 245 Paid sale (windows) — Stripe fee (estimate 1.5% + £0.20) 221
+ ledger_sale 245 Paid sale (windows) — Stripe fee (estimate 1.5% + £0.20) 221
+ ledger_sale 245 Paid sale (linux) RPT-E707-AA3D-1C73 — Stripe fee (estimate 1.5% + £0.20) 221
+ ledger_sale 245 Paid sale (android) RPT-FDF9-6408-CDFE — Stripe fee (estimate 1.5% + £0.20) 221
+ ledger_sale 245 Paid sale (linux) RPT-6D10-89B6-6A29 — Stripe fee (estimate 1.5% + £0.20) 221
+ ledger_sale 245 Paid sale (android) RPT-0E07-95DC-2BCA — Stripe fee (estimate 1.5% + £0.20) 221
+ ledger_sale 245 Paid sale (linux) RPT-6BC0-57AF-05CF — Stripe fee (estimate 1.5% + £0.20) 221
+ ledger_sale 245 Paid sale (android) RPT-5600-1888-C042 — Stripe fee (estimate 1.5% + £0.20) 221
+ ledger_sale 245 Paid sale (linux) RPT-9AA8-8E9F-72EE — Stripe fee (estimate 1.5% + £0.20) 221
+ ledger_sale 245 Paid sale (android) RPT-333A-1047-7940 — Stripe fee (estimate 1.5% + £0.20) 221
+ ledger_sale 245 Paid sale (windows) RPT-C8D2-C8D1-BA88 — Stripe fee (estimate 1.5% + £0.20) 221
+ ledger_sale 245 Paid sale (android) RPT-DB7E-C061-C5C9 — Stripe fee (estimate 1.5% + £0.20) 221
+ ledger_sale 245 Paid sale (macos) RPT-C60D-8776-08CD — Stripe fee (estimate 1.5% + £0.20) 221
+ ledger_sale 245 Paid sale (ios) RPT-C650-C712-0DE7 — Stripe fee (estimate 1.5% + £0.20) 221
+ ledger_sale 245 Paid sale (linux) RPT-E71F-F028-CC55 — Stripe fee (estimate 1.5% + £0.20) 221
+ ledger_sale 245 Paid sale (windows) RPT-D209-F20A-A696 — Stripe fee (estimate 1.5% + £0.20) 221
+ ledger_sale 300 Paid sale (windows) RPT-D7CB-769D-E4A6 — Stripe fee (estimate 1.5% + £0.20) 275
+ ledger_sale 3000 Paid sale (linux) RPT-76B1-59F3-DDEF — Stripe fee (estimate 1.5% + £0.20) 2935
+ ledger_sale 300 Paid sale (macos) RPT-INAC-C100-0000 — Stripe fee (estimate 1.5% + £0.20) 275
+ACCOUNTING_OK

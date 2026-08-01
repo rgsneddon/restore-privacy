@@ -5392,6 +5392,217 @@ def process_payment_failure_event(event: dict[str, Any]) -> str | None:
     return session_id
 
 
+def is_catalog_keygen_amount_pence(amount_pence: Any) -> bool:
+    """True when amount is catalog KEYGEN £3.00 (300p) or £30.00 (3000p)."""
+    try:
+        a = int(amount_pence)
+    except (TypeError, ValueError):
+        return False
+    return a in (int(PRICE_PENCE), int(PRICE_YEARLY_PENCE))
+
+
+def catalog_keygen_subscription_body_fields(
+    platform: str,
+    *,
+    interval: str = BILLING_INTERVAL_MONTH,
+    product_line: str = PRODUCT_LINE_DEFAULT,
+) -> dict[str, Any]:
+    """Parse real :func:`build_subscription_checkout_form_body` into a check dict.
+
+    Used by inventory tests and operator audits — does not call Stripe.
+    """
+    fname = platform_filename(platform) or f"restore-privacy-client-{platform}.bin"
+    raw = build_subscription_checkout_form_body(
+        platform,
+        fname,
+        interval=interval,
+        success_url="https://restoreprivacy.online/success",
+        cancel_url="https://restoreprivacy.online/pay",
+        product_line=product_line,
+    )
+    fields = urllib.parse.parse_qs(raw.decode("utf-8"))
+
+    def _one(key: str) -> str:
+        vals = fields.get(key) or []
+        return str(vals[0]) if vals else ""
+
+    iv = normalize_billing_interval(interval)
+    expect_amt = PRICE_YEARLY_PENCE if iv == BILLING_INTERVAL_YEAR else PRICE_PENCE
+    return {
+        "mode": _one("mode"),
+        "amount_pence": int(_one("metadata[amount_pence]") or "0"),
+        "expected_amount_pence": int(expect_amt),
+        "trial_period_days": int(_one("subscription_data[trial_period_days]") or "0"),
+        "billing_interval": _one("metadata[billing_interval]") or iv,
+        "product_line": _one("metadata[product_line]") or normalize_product_line(product_line),
+        "platform": _one("metadata[platform]") or (platform or "").strip().lower(),
+        "ok": (
+            _one("mode") == "subscription"
+            and int(_one("metadata[amount_pence]") or "0") == int(expect_amt)
+            and int(_one("subscription_data[trial_period_days]") or "0")
+            == int(CATALOG_TRIAL_PERIOD_DAYS)
+        ),
+    }
+
+
+def inventory_catalog_keygen_pay_entry_points() -> list[dict[str, Any]]:
+    """Every shipped public KEYGEN pay entry (forms/hrefs) with expected checkout shape.
+
+    Commercial £3000 deposit is listed separately and must not use KEYGEN amounts.
+    """
+    entries: list[dict[str, Any]] = [
+        {
+            "id": "site_pay_plan",
+            "path": SITE_PAY_PLAN_PATH,
+            "form_action": "/pay/checkout",
+            "kind": "subscription_keygen",
+            "intervals": [BILLING_INTERVAL_MONTH, BILLING_INTERVAL_YEAR],
+            "amounts_pence": [PRICE_PENCE, PRICE_YEARLY_PENCE],
+            "trial_days": CATALOG_TRIAL_PERIOD_DAYS,
+        },
+        {
+            "id": "homepage_buy_form",
+            "path": "/",
+            "form_action": "/pay/checkout",
+            "kind": "subscription_keygen",
+            "product_line": PRODUCT_LINE_DEFAULT,
+            "intervals": [BILLING_INTERVAL_MONTH, BILLING_INTERVAL_YEAR],
+            "amounts_pence": [PRICE_PENCE, PRICE_YEARLY_PENCE],
+            "trial_days": CATALOG_TRIAL_PERIOD_DAYS,
+        },
+        {
+            "id": "suite_keygen_form",
+            "path": "/#suite-storefront",
+            "form_action": "/pay/checkout",
+            "kind": "subscription_keygen",
+            "product_line": PRODUCT_LINE_SUITE,
+            "intervals": [BILLING_INTERVAL_MONTH],
+            "amounts_pence": [PRICE_PENCE],
+            "trial_days": CATALOG_TRIAL_PERIOD_DAYS,
+        },
+        {
+            "id": "api_checkout",
+            "path": "/api/checkout",
+            "kind": "subscription_keygen",
+            "builder": "create_checkout_session→create_subscription_checkout_session",
+            "intervals": [BILLING_INTERVAL_MONTH, BILLING_INTERVAL_YEAR],
+            "amounts_pence": [PRICE_PENCE, PRICE_YEARLY_PENCE],
+            "trial_days": CATALOG_TRIAL_PERIOD_DAYS,
+        },
+        {
+            "id": "commercial_suite_deposit",
+            "path": COMMERCIAL_SUITE_CHECKOUT_PATH,
+            "kind": "commercial_deposit",
+            "amounts_pence": [COMMERCIAL_SUITE_NODE_PRICE_PENCE],
+            "trial_days": 0,
+            "not_keygen": True,
+        },
+    ]
+    return entries
+
+
+def record_catalog_keygen_sale_from_invoice(
+    invoice: dict[str, Any],
+    *,
+    session_id: str = "",
+    now: float | None = None,
+) -> dict[str, Any] | None:
+    """Mint a catalog KEYGEN grant at £3/£30 when an invoice is actually paid.
+
+    Pure trial invoices (amount_paid 0) return None — no Raskul sales line.
+    Dedupes on purchase_id derived from invoice id so webhook retries are safe.
+    """
+    if not isinstance(invoice, dict):
+        return None
+    try:
+        amount_paid = int(invoice.get("amount_paid") if invoice.get("amount_paid") is not None else -1)
+    except (TypeError, ValueError):
+        return None
+    if not is_catalog_keygen_amount_pence(amount_paid):
+        return None
+    sid = (session_id or "").strip()
+    if not sid:
+        sub_raw = invoice.get("subscription")
+        sub_id = (
+            str(sub_raw.get("id") or "")
+            if isinstance(sub_raw, dict)
+            else str(sub_raw or "").strip()
+        )
+        if sub_id:
+            sid = find_session_id_by_subscription(sub_id) or ""
+    if not sid:
+        return None
+    # If checkout.session.completed already booked this catalog amount for the
+    # session (paid-at-start, no free trial), do not double-count on first invoice.
+    try:
+        for g in list_all_grants() or []:
+            if not isinstance(g, dict):
+                continue
+            if str(g.get("session_id") or "") != sid:
+                continue
+            if int(g.get("amount_pence") or 0) == int(amount_paid):
+                return {
+                    "ok": True,
+                    "deduped": True,
+                    "reason": "session_already_has_catalog_sale",
+                    "amount_pence": amount_paid,
+                    "session_id": sid,
+                    "purchase_id": str(g.get("purchase_id") or ""),
+                }
+    except Exception:  # noqa: BLE001
+        pass
+    inv_id = str(invoice.get("id") or "").strip()
+    # Stable purchase id from invoice (RPT- + 12 hex-ish from invoice suffix)
+    if inv_id:
+        body = "".join(c for c in inv_id.upper() if c.isalnum())[-12:].ljust(12, "0")
+        pid = f"RPT-{body[0:4]}-{body[4:8]}-{body[8:12]}"
+        existing = find_paid_purchase_by_id(pid)
+        if existing is not None:
+            return {
+                "ok": True,
+                "deduped": True,
+                "purchase_id": pid,
+                "amount_pence": amount_paid,
+                "session_id": sid,
+            }
+    else:
+        pid = generate_purchase_id()
+    ent = get_connect_entitlement(sid, now=now)
+    plat = str((ent or {}).get("platform") or "").strip().lower()
+    if not plat or not platform_filename(plat):
+        # Infer from invoice lines metadata if present
+        lines = (invoice.get("lines") or {}).get("data") or []
+        if isinstance(lines, list) and lines:
+            meta = lines[0].get("metadata") if isinstance(lines[0], dict) else {}
+            if isinstance(meta, dict):
+                plat = str(meta.get("platform") or plat).strip().lower()
+    if not plat or not platform_filename(plat):
+        plat = "windows"
+    fname = platform_filename(plat) or ""
+    if not fname:
+        return None
+    t = now if now is not None else time.time()
+    token = mint_download_token(
+        filename=fname,
+        platform=plat,
+        session_id=sid,
+        amount_pence=int(amount_paid),
+        currency=PRICE_CURRENCY,
+        purchase_id=pid,
+        now=t,
+    )
+    return {
+        "ok": True,
+        "deduped": False,
+        "token": token,
+        "purchase_id": pid,
+        "amount_pence": int(amount_paid),
+        "session_id": sid,
+        "platform": plat,
+        "filename": fname,
+    }
+
+
 def process_subscription_lifecycle_event(
     event: dict[str, Any], *, now: float | None = None
 ) -> dict[str, Any] | None:
@@ -5480,6 +5691,8 @@ def process_subscription_lifecycle_event(
 
     if etype == "invoice.paid":
         sub_id = str(obj.get("subscription") or "")
+        if isinstance(obj.get("subscription"), dict):
+            sub_id = str((obj.get("subscription") or {}).get("id") or "")
         sid = find_session_id_by_subscription(sub_id) if sub_id else ""
         if not sid:
             sid = _session_id_from_stripe_object(obj)
@@ -5518,11 +5731,14 @@ def process_subscription_lifecycle_event(
         set_entitlement_valid_until(
             sid, pe, reason="invoice_paid_period", now=t
         )
+        # Confirmed KEYGEN cash after trial / renewals → Raskul accounting sale
+        sale = record_catalog_keygen_sale_from_invoice(obj, session_id=sid, now=t)
         return {
             "action": "renewed",
             "session_id": sid,
             "valid_until": pe,
             "event_type": etype,
+            "catalog_sale": sale,
         }
     return None
 
@@ -5637,8 +5853,9 @@ def find_paid_purchase_by_id(purchase_id: str) -> dict[str, Any] | None:
         ).fetchone()
         if row is None:
             return None
-        # Only full-price paid catalogue grants may reissue
-        if int(row["amount_pence"] or 0) != PRICE_PENCE:
+        # Only full catalog KEYGEN paid amounts may reissue (£3/mo or £30/yr)
+        amt = int(row["amount_pence"] or 0)
+        if amt not in (PRICE_PENCE, PRICE_YEARLY_PENCE):
             return None
         st = str(row["status"] or "").strip().lower()
         # Rows are created as status=granted; used downloads keep status with used_at set
@@ -7606,16 +7823,21 @@ def process_checkout_completed_event(
         now=t_now,
         stripe_period_end=stripe_pe,
     )
+    # Catalog KEYGEN cash amounts for Raskul books: £3 (300p) or £30 (3000p).
+    # Pure trial start (no money taken) stores 0 so accounting excludes the row
+    # until invoice.paid / paid checkout records a real catalog amount.
     if yearly_amount_ok:
         grant_pence = PRICE_YEARLY_PENCE
-    elif amount_ok or trial_ok:
+    elif amount_ok:
         grant_pence = PRICE_PENCE
+    elif trial_ok and not amount_ok and not yearly_amount_ok:
+        grant_pence = 0
     elif usd_ok and amount is not None:
         grant_pence = int(amount)
     elif amount is not None and amount > 0:
         grant_pence = int(amount)
     else:
-        grant_pence = PRICE_PENCE
+        grant_pence = 0 if trial_ok else PRICE_PENCE
     token = mint_download_token(
         filename=filename,
         platform=platform,

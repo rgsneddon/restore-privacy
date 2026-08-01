@@ -1,0 +1,9 @@
+=== checkout completed KEYGEN ===
+fulfilment_email_not_sent session='cs_m' skipped=True error='smtp_not_configured' has_keygen=True has_download=True smtp='disabled'
+monthly token True ent True grant_amt 300
+fulfilment_email_not_sent session='cs_y' skipped=True error='smtp_not_configured' has_keygen=True has_download=True smtp='disabled'
+yearly token True grant_amt 3000
+underpay None
+fulfilment_email_not_sent session='cs_t' skipped=True error='smtp_not_configured' has_keygen=True has_download=True smtp='disabled'
+trial unlock True amt 0 connect True
+OK

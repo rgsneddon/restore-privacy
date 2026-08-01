@@ -1,0 +1,35 @@
+test_invoice_paid_after_trial_books_catalog_sale (tests.test_stripe_keygen_accounting_chain.TestCheckoutCompletedKeygenChain.test_invoice_paid_after_trial_books_catalog_sale) ... fulfilment_email_not_sent session='cs_trial_then_pay' skipped=True error='smtp_not_configured' has_keygen=True has_download=True smtp='disabled'
+ok
+test_monthly_paid_unlocks_and_books_sale (tests.test_stripe_keygen_accounting_chain.TestCheckoutCompletedKeygenChain.test_monthly_paid_unlocks_and_books_sale) ... fulfilment_email_not_sent session='cs_keygen_paid_mo' skipped=True error='smtp_not_configured' has_keygen=True has_download=True smtp='disabled'
+ok
+test_trial_unlocks_but_not_accounting_sale (tests.test_stripe_keygen_accounting_chain.TestCheckoutCompletedKeygenChain.test_trial_unlocks_but_not_accounting_sale) ... fulfilment_email_not_sent session='cs_keygen_trial_only' skipped=True error='smtp_not_configured' has_keygen=True has_download=True smtp='disabled'
+ok
+test_underpay_and_commercial_amount_do_not_unlock_keygen_path (tests.test_stripe_keygen_accounting_chain.TestCheckoutCompletedKeygenChain.test_underpay_and_commercial_amount_do_not_unlock_keygen_path) ... ok
+test_yearly_paid_unlocks_and_books_3000 (tests.test_stripe_keygen_accounting_chain.TestCheckoutCompletedKeygenChain.test_yearly_paid_unlocks_and_books_3000) ... fulfilment_email_not_sent session='cs_keygen_paid_yr' skipped=True error='smtp_not_configured' has_keygen=True has_download=True smtp='disabled'
+ok
+test_yearly_purchase_reissue_lookup (tests.test_stripe_keygen_accounting_chain.TestFindPaidPurchaseYearly.test_yearly_purchase_reissue_lookup) ... ok
+test_html_forms_post_to_pay_checkout (tests.test_stripe_keygen_accounting_chain.TestKeygenPayLinkInventory.test_html_forms_post_to_pay_checkout) ... ok
+test_inventory_and_subscription_bodies_are_catalog_keygen (tests.test_stripe_keygen_accounting_chain.TestKeygenPayLinkInventory.test_inventory_and_subscription_bodies_are_catalog_keygen) ... ok
+test_catalog_html_uses_site_pay_plan (tests.test_stripe_subscription_fulfilment.TestCatalogSubscriptionPaymentLink.test_catalog_html_uses_site_pay_plan) ... ok
+test_desired_fields_are_subscription_300_monthly_with_3day_trial (tests.test_stripe_subscription_fulfilment.TestCatalogSubscriptionPaymentLink.test_desired_fields_are_subscription_300_monthly_with_3day_trial) ... ok
+test_platform_buy_hrefs_go_to_site_pay_plan (tests.test_stripe_subscription_fulfilment.TestCatalogSubscriptionPaymentLink.test_platform_buy_hrefs_go_to_site_pay_plan) ... ok
+test_paid_subscription_session_mints_and_binds_subscription (tests.test_stripe_subscription_fulfilment.TestSubscriptionCheckoutCompleted.test_paid_subscription_session_mints_and_binds_subscription) ... fulfilment_email_not_sent session='cs_test_sub_paid_1' skipped=True error='smtp_not_configured' has_keygen=True has_download=True smtp='disabled'
+ok
+test_paid_yearly_subscription_mints_without_trial (tests.test_stripe_subscription_fulfilment.TestSubscriptionCheckoutCompleted.test_paid_yearly_subscription_mints_without_trial)
+Catalog yearly subscription charge (£30.00) mints entitlement. ... fulfilment_email_not_sent session='cs_test_sub_yearly_1' skipped=True error='smtp_not_configured' has_keygen=True has_download=True smtp='disabled'
+ok
+test_trial_subscription_mints_grant_and_stores_subscription_id (tests.test_stripe_subscription_fulfilment.TestSubscriptionCheckoutCompleted.test_trial_subscription_mints_grant_and_stores_subscription_id) ... fulfilment_email_not_sent session='cs_test_sub_trial_1' skipped=True error='smtp_not_configured' has_keygen=True has_download=True smtp='disabled'
+ok
+test_underpay_without_subscription_does_not_mint (tests.test_stripe_subscription_fulfilment.TestSubscriptionCheckoutCompleted.test_underpay_without_subscription_does_not_mint) ... ok
+test_webhook_handler_grants_on_trial_subscription (tests.test_stripe_subscription_fulfilment.TestSubscriptionCheckoutCompleted.test_webhook_handler_grants_on_trial_subscription) ... fulfilment_email_not_sent session='cs_wh_trial' skipped=True error='smtp_not_configured' has_keygen=True has_download=True smtp='disabled'
+ok
+test_zero_without_subscription_does_not_mint (tests.test_stripe_subscription_fulfilment.TestSubscriptionCheckoutCompleted.test_zero_without_subscription_does_not_mint) ... ok
+test_cancel_at_period_end_keeps_usable_until_period_end (tests.test_stripe_subscription_fulfilment.TestSubscriptionLifecycle.test_cancel_at_period_end_keeps_usable_until_period_end) ... ok
+test_refund_revokes_after_subscription_checkout (tests.test_stripe_subscription_fulfilment.TestSubscriptionLifecycle.test_refund_revokes_after_subscription_checkout) ... fulfilment_email_skipped_no_customer_email session='cs_life_refund' keygen_minted=True customer_field=NoneType
+ok
+test_subscription_deleted_revokes (tests.test_stripe_subscription_fulfilment.TestSubscriptionLifecycle.test_subscription_deleted_revokes) ... ok
+
+----------------------------------------------------------------------
+Ran 20 tests in 0.176s
+
+OK
