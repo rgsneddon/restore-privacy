@@ -2194,6 +2194,37 @@ class Handler(BaseHTTPRequestHandler):
                 from status_page.admin_rps import render_admin_rps_page_html  # type: ignore
             self._send(200, "text/html; charset=utf-8", render_admin_rps_page_html())
             return
+        if path in ("/admin/rps/stats.json", "/admin/rps/stats.json/"):
+            if not admin_enabled():
+                self._send(503, "text/plain; charset=utf-8", b"admin disabled")
+                return
+            if not is_authenticated(self.headers):
+                self._send(401, "application/json", b'{"ok":false,"error":"auth"}')
+                return
+            try:
+                from admin_rps import load_rps_stats, ned_growth_public_snapshot
+            except ImportError:
+                from status_page.admin_rps import (  # type: ignore
+                    load_rps_stats,
+                    ned_growth_public_snapshot,
+                )
+            snap = ned_growth_public_snapshot(load_rps_stats())
+            body = json.dumps({"ok": True, "ned": snap}, indent=2).encode("utf-8")
+            self._send(200, "application/json; charset=utf-8", body)
+            return
+        # Public Ned growth counters (honest stats only — no fingerprints / paths).
+        if path in ("/api/ned-growth", "/api/ned-growth/"):
+            try:
+                from admin_rps import load_rps_stats, ned_growth_public_snapshot
+            except ImportError:
+                from status_page.admin_rps import (  # type: ignore
+                    load_rps_stats,
+                    ned_growth_public_snapshot,
+                )
+            snap = ned_growth_public_snapshot(load_rps_stats())
+            body = json.dumps({"ok": True, "ned": snap}, indent=2).encode("utf-8")
+            self._send(200, "application/json; charset=utf-8", body)
+            return
         if path in ("/admin/accounting", "/admin/accounting/"):
             if not admin_enabled():
                 self._send(503, "text/plain; charset=utf-8", b"admin disabled")

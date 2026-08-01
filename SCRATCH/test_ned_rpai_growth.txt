@@ -1,0 +1,13 @@
+test_apply_confirmed_block_increases_growth_pure (tests.test_ned_rpai_growth.TestChronoFluxBlockGrowth.test_apply_confirmed_block_increases_growth_pure) ... ok
+test_progress_admin_action_records_ned_growth (tests.test_ned_rpai_growth.TestChronoFluxBlockGrowth.test_progress_admin_action_records_ned_growth)
+Real ChronoFlux seal path must raise Ned growth score. ... ok
+test_public_snapshot_and_api_wiring (tests.test_ned_rpai_growth.TestGrowthSurfaces.test_public_snapshot_and_api_wiring) ... ok
+test_heartbeat_increases_growth (tests.test_ned_rpai_growth.TestSecondaryGrowthSignals.test_heartbeat_increases_growth) ... ok
+test_narrative_session_increases_growth (tests.test_ned_rpai_growth.TestSecondaryGrowthSignals.test_narrative_session_increases_growth) ... ok
+test_oobe_complete_hooks_narrative_growth (tests.test_ned_rpai_growth.TestSecondaryGrowthSignals.test_oobe_complete_hooks_narrative_growth)
+Shipped mark_oobe_complete_on_prefix calls narrative growth when available. ... ok
+
+----------------------------------------------------------------------
+Ran 6 tests in 0.019s
+
+OK

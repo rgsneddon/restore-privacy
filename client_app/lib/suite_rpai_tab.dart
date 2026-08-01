@@ -6,12 +6,16 @@ import 'theme.dart';
 ///
 /// Adaptive learning begins *for the good of all humanity*. Narrative install
 /// helper for rpOS (Clippy-class companion, affectionately **Ned**). Core design
-/// load-balances across available **rpS** project servers and grows as nodes join.
+/// load-balances across available **rpS** project servers and grows as nodes join
+/// **and** as confirmed ChronoFlux blocks are sealed (honest counters / tiers).
 class SuiteRpaiTab extends StatelessWidget {
-  const SuiteRpaiTab({super.key, this.narrative});
+  const SuiteRpaiTab({super.key, this.narrative, this.growthStats});
 
   /// Optional override narrative (tests).
   final String? narrative;
+
+  /// Optional growth snapshot from `/api/ned-growth` or admin stats (tests + live).
+  final Map<String, dynamic>? growthStats;
 
   static const String kNedName = 'Ned';
   static const String kRpaiLabel = 'rpAI';
@@ -24,11 +28,30 @@ class SuiteRpaiTab extends StatelessWidget {
       'I guide Suite installs and the rpOS story with a calm narrative, '
       'like a privacy-first Clippy. My core runs across rpS '
       '(Restore Privacy Server computational power) and grows as project '
-      'nodes come online. Let\'s keep residual privacy human and kind.';
+      'nodes come online and as ChronoFlux blocks are confirmed. '
+      'Let\'s keep residual privacy human and kind.';
+
+  /// Pure formatter for growth counters (unit-testable; no network).
+  static String formatGrowthSummary(Map<String, dynamic>? stats) {
+    if (stats == null || stats.isEmpty) {
+      return 'Growth: waiting for ChronoFlux seals, node heartbeats, or Ned OOBE.';
+    }
+    final score = stats['growth_score'] ?? stats['growthScore'] ?? 0;
+    final blocks =
+        stats['chronoflux_blocks_grown'] ?? stats['chronofluxBlocksGrown'] ?? 0;
+    final epochs = stats['learning_epochs'] ?? stats['learningEpochs'] ?? 0;
+    final tier = stats['capability_tier'] ?? stats['capabilityTier'] ?? 0;
+    final nodes = stats['nodes_online'] ?? stats['nodesOnline'] ?? 0;
+    final narrative =
+        stats['narrative_sessions'] ?? stats['narrativeSessions'] ?? 0;
+    return 'Growth score $score · tier $tier · ChronoFlux blocks $blocks · '
+        'epochs $epochs · nodes online $nodes · narrative sessions $narrative';
+  }
 
   @override
   Widget build(BuildContext context) {
     final text = narrative ?? kDefaultNarrative;
+    final growthLine = formatGrowthSummary(growthStats);
     return ColoredBox(
       color: kChromeBg,
       child: SafeArea(
@@ -76,7 +99,7 @@ class SuiteRpaiTab extends StatelessWidget {
                       ),
                       const SizedBox(height: 2),
                       Text(
-                        'rpAI · begins adaptive learning',
+                        'rpAI · grows on ChronoFlux + nodes',
                         style: TextStyle(
                           fontSize: 13,
                           fontWeight: FontWeight.w600,
@@ -117,8 +140,20 @@ class SuiteRpaiTab extends StatelessWidget {
             ),
             const SizedBox(height: 8),
             Text(
+              growthLine,
+              key: const Key('ned_growth_summary'),
+              style: TextStyle(
+                fontSize: 12,
+                height: 1.4,
+                fontWeight: FontWeight.w600,
+                color: kText,
+              ),
+            ),
+            const SizedBox(height: 6),
+            Text(
               'Load balance: available rpS servers · expands as residual/project '
-              'nodes are added. Admin rpS page shows growth statistics.',
+              'nodes heartbeat. Confirmed ChronoFlux admin seals also raise '
+              'growth score. Admin rpS page shows the same durable statistics.',
               style: TextStyle(fontSize: 12, height: 1.4, color: kTextMuted),
             ),
           ],

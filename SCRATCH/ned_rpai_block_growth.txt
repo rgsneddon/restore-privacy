@@ -1,0 +1,8 @@
+=== ChronoFlux block → Ned growth (shipped progress_admin_action) ===
+before {'growth_score': 0, 'chronoflux_blocks_grown': 0, 'learning_epochs': 0}
+seal ok True height 0
+nedGrowth {'ok': True, 'grew': True, 'growth_reason': 'chronoflux_block', 'growth_points_applied': 3, 'stats': {'product': 'Ned · rpAI · Restore Privacy Helper', 'mission': 'adaptive learning for the good of all humanity', 'rps_label': 'rpS — Restore Privacy Server computational power', 'nodes_online': 0, 'nodes_total_seen': 0, 'learning_epochs': 1, 'narrative_sessions': 0, 'chronoflux_blocks_grown': 1, 'last_chronoflux_height': 0, 'last_chronoflux_fingerprint': '4b1327cd7bb3e8ef91799f06fd3e1806', 'last_chronoflux_label': 'Admin: Mint Keygen', 'growth_score': 3, 'capability_tier': 0, 'grown_fingerprints': ['4b1327cd7bb3e8ef91799f06fd3e1806'], 'load_balance': 'round-robin across available project servers; expands as nodes join; grows on each confirmed ChronoFlux admin seal + node heartbeat + Ned OOBE', 'updated_unix': 1785572287}, 'chronoflux_blocks_grown': 1, 'growth_score': 3, 'capability_tier': 0, 'learning_epochs': 1, 'last_chronoflux_height': 0}
+after {'growth_score': 3, 'chronoflux_blocks_grown': 1, 'learning_epochs': 1, 'capability_tier': 0, 'last_chronoflux_height': 0}
+after2 blocks 2 score 6
+HTML snippet: True
+BLOCK_GROWTH_OK

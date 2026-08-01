@@ -162,6 +162,24 @@ def mark_oobe_complete_on_prefix(prefix: Path, oobe_payload: dict[str, Any]) -> 
     data["rpmail"] = oobe_payload.get("rpmail")
     data["oobe_state"] = str(state_path)
     marker.write_text(json.dumps(data, indent=2) + "\n", encoding="utf-8")
+    # Secondary Ned growth signal: completed narrative / OOBE session.
+    try:
+        import sys
+        from pathlib import Path as _P
+
+        _sp = _P(__file__).resolve().parents[2] / "status_page"
+        if _sp.is_dir() and str(_sp) not in sys.path:
+            sys.path.insert(0, str(_sp))
+        from admin_rps import record_narrative_session
+
+        growth = record_narrative_session()
+        data["ned_growth"] = {
+            "narrative_sessions": growth.get("narrative_sessions"),
+            "growth_score": growth.get("growth_score"),
+            "learning_epochs": growth.get("learning_epochs"),
+        }
+    except Exception:  # noqa: BLE001
+        data["ned_growth"] = None
     return data
 
 

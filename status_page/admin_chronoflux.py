@@ -230,6 +230,33 @@ def progress_admin_action(
     result["ledgerPath"] = str(lp)
     result["blockCount"] = len(ledger.get("blocks") or [])
 
+    # Ned · rpAI grows on each confirmed ChronoFlux seal (same block just minted).
+    try:
+        from admin_rps import record_chronoflux_block_growth
+    except ImportError:  # pragma: no cover
+        try:
+            from status_page.admin_rps import (  # type: ignore
+                record_chronoflux_block_growth,
+            )
+        except ImportError:
+            record_chronoflux_block_growth = None  # type: ignore
+    if record_chronoflux_block_growth is not None:
+        try:
+            block = result.get("block") if isinstance(result.get("block"), dict) else {}
+            result["nedGrowth"] = record_chronoflux_block_growth(
+                height=result.get("height", block.get("index")),
+                fingerprint=str(
+                    block.get("chronofluxFingerprint")
+                    or block.get("fingerprint")
+                    or ""
+                ),
+                action_kind=action_kind,
+                label=str(result.get("label") or label or ""),
+                block=block,
+            )
+        except Exception as exc:  # noqa: BLE001
+            result["nedGrowth"] = {"ok": False, "error": str(exc)[:160]}
+
     if remote:
         remote_url = os.environ.get("RPT_CHRONOFLUX_ADMIN_MINT_URL", "").strip()
         if remote_url:

@@ -1,0 +1,6 @@
+=== Secondary growth: heartbeat + narrative ===
+heartbeat 4 1 1
+narrative 1 3
+snapshot methods ['chronoflux_confirmed_block', 'node_heartbeat', 'narrative_session']
+snapshot score 3
+SECONDARY_OK
