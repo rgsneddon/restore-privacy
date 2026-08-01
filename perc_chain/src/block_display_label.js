@@ -40,6 +40,27 @@ export function genericBlockLabel(block) {
 
   if (kinds.has('transfer')) return 'Manual tx';
 
+  // Admin ChronoFlux progression (status-host mutators → confirmed seal)
+  if (
+    block.adminAction === true ||
+    kinds.has('adminAction') ||
+    text.includes('admin:') ||
+    text.startsWith('admin ')
+  ) {
+    const kind = (block.adminActionKind || '').toString().trim();
+    if (kind) {
+      const pretty = kind
+        .replace(/[_-]+/g, ' ')
+        .replace(/\b\w/g, (c) => c.toUpperCase());
+      return `Admin: ${pretty}`;
+    }
+    if (text.includes('admin:')) {
+      const raw = (block?.scenarioLabel || '').toString().trim();
+      if (raw) return raw.length > 48 ? `${raw.slice(0, 45)}…` : raw;
+    }
+    return 'Admin action';
+  }
+
   if (kinds.has('scenarioReward') || kinds.has('scenarioFaucet')) {
     if (isScsInput(text)) return 'SCS input';
     if (isPercentChanceInput(text)) return '% chance input';

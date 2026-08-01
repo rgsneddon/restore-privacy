@@ -797,6 +797,31 @@ class Handler(BaseHTTPRequestHandler):
             return b""
         return self.rfile.read(n)
 
+    def _admin_chronoflux_ok(
+        self,
+        action_kind: str,
+        *,
+        label: str = "",
+        memo: str = "",
+        path: str = "",
+    ) -> None:
+        """After a successful admin mutator: mint ChronoFlux block + confirm pending relays."""
+        try:
+            from admin_chronoflux import after_admin_success
+        except ImportError:  # pragma: no cover
+            try:
+                from status_page.admin_chronoflux import (  # type: ignore
+                    after_admin_success,
+                )
+            except ImportError:
+                return
+        after_admin_success(
+            action_kind,
+            label=label,
+            memo=memo,
+            path=path or (getattr(self, "path", "") or "").split("?", 1)[0],
+        )
+
     def do_GET(self):  # noqa: N802
         path, query = _parse_query(self.path)
         # Product family: paths /browser /vault; optional Host browser.* / vault.*
@@ -2872,6 +2897,12 @@ class Handler(BaseHTTPRequestHandler):
 
             result = close_support_ticket(tid, send_mail=True)
             if result.get("ok"):
+                self._admin_chronoflux_ok(
+                    "support_ticket_close",
+                    label="Admin: Close Support Ticket",
+                    memo=f"ticket_id={tid}",
+                    path="/admin/support-tickets/close",
+                )
                 msg = (
                     f"Ticket {tid} closed. Requester notified by email when SMTP is configured."
                 )
@@ -2930,6 +2961,12 @@ class Handler(BaseHTTPRequestHandler):
                 )
                 return
             n = int(cleared.get("deleted") or 0)
+            self._admin_chronoflux_ok(
+                "support_tickets_clear",
+                label="Admin: Clear Support Tickets",
+                memo=f"deleted={n}",
+                path="/admin/support-tickets/clear",
+            )
             self._send(
                 200,
                 "text/html; charset=utf-8",
@@ -2970,6 +3007,13 @@ class Handler(BaseHTTPRequestHandler):
                 self._redirect(str(result[3]))
                 return
             if ok:
+                action_name = str(form.get("action") or "node_operator").strip()
+                self._admin_chronoflux_ok(
+                    f"node_operator_{action_name}"[:64],
+                    label=f"Admin: Node Operator ({action_name})",
+                    memo=str(msg or "")[:160],
+                    path="/admin/node-operator/action",
+                )
                 self._send(
                     200,
                     "text/html; charset=utf-8",
@@ -3155,6 +3199,12 @@ class Handler(BaseHTTPRequestHandler):
                 self._redirect(str(r["redirect"]))
                 return
             if r.get("ok"):
+                self._admin_chronoflux_ok(
+                    "push_suite_packages",
+                    label="Admin: Push Suite Packages",
+                    memo=f"present={r.get('present_count')}/{r.get('total')}",
+                    path="/admin/uploads",
+                )
                 msg = (
                     f"Pushed {r.get('suite')} brand present={r.get('present_count')}/"
                     f"{r.get('total')} dry_run={r.get('dry_run')} "
@@ -3256,6 +3306,12 @@ class Handler(BaseHTTPRequestHandler):
                     ),
                 )
                 return
+            self._admin_chronoflux_ok(
+                "mint_download",
+                label="Admin: Mint Download",
+                memo=f"platform={plat}",
+                path="/admin/mint-download",
+            )
             # No durable customer-recovery log for this failsafe path
             self._send(
                 200,
@@ -3333,6 +3389,12 @@ class Handler(BaseHTTPRequestHandler):
                     ),
                 )
                 return
+            self._admin_chronoflux_ok(
+                "mint_keygen",
+                label="Admin: Mint Keygen",
+                memo=f"platform={plat}",
+                path="/admin/mint-keygen",
+            )
             self._send(
                 200,
                 "text/html; charset=utf-8",
@@ -3377,6 +3439,12 @@ class Handler(BaseHTTPRequestHandler):
                 return
             n = int(cleared.get("deleted_connect_entitlements") or 0)
             nd = int(cleared.get("deleted_device_entitlements") or 0)
+            self._admin_chronoflux_ok(
+                "clear_licences",
+                label="Admin: Clear Licences",
+                memo=f"deleted_connect={n} deleted_device={nd}",
+                path="/admin/clear-licences",
+            )
             self._send(
                 200,
                 "text/html; charset=utf-8",
@@ -3421,6 +3489,12 @@ class Handler(BaseHTTPRequestHandler):
                 )
                 return
             n = int(cleared.get("deleted_grants") or 0)
+            self._admin_chronoflux_ok(
+                "clear_grants",
+                label="Admin: Clear Grants",
+                memo=f"deleted_grants={n}",
+                path="/admin/clear-grants",
+            )
             self._send(
                 200,
                 "text/html; charset=utf-8",
@@ -3478,6 +3552,12 @@ class Handler(BaseHTTPRequestHandler):
                     ),
                 )
                 return
+            self._admin_chronoflux_ok(
+                "mint_tester_month",
+                label="Admin: Mint Tester Month",
+                memo=f"platform={plat}",
+                path="/admin/mint-tester-month",
+            )
             self._send(
                 200,
                 "text/html; charset=utf-8",
@@ -3594,6 +3674,12 @@ class Handler(BaseHTTPRequestHandler):
                     ),
                 )
                 return
+            self._admin_chronoflux_ok(
+                "accounting_manual_entry",
+                label="Admin: Accounting Manual Entry",
+                memo=str(added.get("id") or ""),
+                path="/admin/accounting",
+            )
             self._send(
                 200,
                 "text/html; charset=utf-8",
@@ -3638,6 +3724,12 @@ class Handler(BaseHTTPRequestHandler):
                 )
                 return
             action = str(result.get("action") or "removed")
+            self._admin_chronoflux_ok(
+                "accounting_delete",
+                label="Admin: Accounting Delete",
+                memo=f"row_id={row_id} action={action}",
+                path="/admin/accounting/delete",
+            )
             self._send(
                 200,
                 "text/html; charset=utf-8",

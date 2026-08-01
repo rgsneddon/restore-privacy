@@ -356,6 +356,55 @@ const server = http.createServer(async (req, res) => {
     return json(res, 200, sanitizeForPublicExplorer(listBlocks(store.ledger, { offset, limit })));
   }
 
+  // Status-host admin mutators → ChronoFlux seal (admin action + pending relays)
+  if (req.method === 'POST' && url.pathname === '/api/admin-action') {
+    const data = await readBody(req);
+    if (!store.hasLedger()) {
+      return json(res, 503, { error: 'ledger not ready' });
+    }
+    try {
+      const { mintAdminActionBlock } = await import('./admin_action_progression.js');
+      const actionKind = String(data.actionKind || data.action_kind || 'admin_action');
+      const relayLedgers = [];
+      for (const [, entry] of ledgers) {
+        if (entry?.ledger) relayLedgers.push(entry.ledger);
+      }
+      const result = mintAdminActionBlock(
+        store.ledger,
+        {
+          actionKind,
+          label: data.label,
+          memo: data.memo,
+          path: data.path,
+          actor: data.actor || 'admin',
+        },
+        { relayLedgers },
+      );
+      if (result.ok) {
+        store.revision = (store.revision || 0) + 1;
+        store.save();
+      }
+      return json(res, result.ok ? 200 : 400, {
+        ok: result.ok,
+        height: result.height,
+        label: result.label,
+        confirmedRelayTxIds: result.confirmedRelayTxIds,
+        pendingIncluded: result.pendingIncluded,
+        block: result.block
+          ? {
+              index: result.block.index,
+              scenarioLabel: result.block.scenarioLabel,
+              adminAction: true,
+              adminActionKind: result.block.adminActionKind,
+              txCount: (result.block.transactions || []).length,
+            }
+          : null,
+      });
+    } catch (e) {
+      return json(res, 500, { error: String(e?.message || e).slice(0, 200) });
+    }
+  }
+
   if (req.method === 'GET' && (url.pathname === '/' || url.pathname === '/explorer')) {
     if (servePublic('index.html', res)) return;
     return json(res, 503, { error: 'explorer UI missing' });

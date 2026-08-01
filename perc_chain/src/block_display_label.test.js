@@ -52,6 +52,25 @@ describe('genericBlockLabel', () => {
     assert.equal(label, 'Treasury regeneration');
   });
 
+  it('maps admin action seals', () => {
+    assert.equal(
+      genericBlockLabel({
+        adminAction: true,
+        adminActionKind: 'mint_keygen',
+        scenarioLabel: 'Admin: Mint Keygen',
+        transactions: [{ kind: 'adminAction', scenarioLabel: 'Admin: Mint Keygen' }],
+      }),
+      'Admin: Mint Keygen',
+    );
+    assert.equal(
+      genericBlockLabel({
+        transactions: [{ kind: 'adminAction' }],
+        scenarioLabel: 'Admin: Push Suite Packages',
+      }),
+      'Admin: Push Suite Packages',
+    );
+  });
+
   it('maps microblock seal', () => {
     const label = genericBlockLabel({
       microblockSeal: true,
