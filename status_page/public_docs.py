@@ -32,6 +32,10 @@ DEFAULT_STATUS_ORIGIN = "https://restoreprivacy.online"
 
 HOW_TO_BUY_PATH = "/how-to-buy"
 README_PATH = "/README.md"
+# Monorepo product README source (GitHub); on-site body is status_page/public/README.md.
+README_GITHUB_URL = (
+    "https://github.com/rgsneddon/restore-privacy/blob/main/README.md"
+)
 LICENSE_PATH = "/LICENSE"
 PRIVACY_PATH = "/PRIVACY_POLICY.md"
 AUDIT_PATH = "/AUDIT.md"

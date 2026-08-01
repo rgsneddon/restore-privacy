@@ -1151,7 +1151,8 @@ SUITE_RPOS_KEY = "rpos"
 SUITE_RX_BROWSER_HREF = "/RX.md"
 SUITE_RX_BROWSER_LABEL = "Rx Privacy Browser"
 SUITE_RX_BROWSER_KEY = "rx-privacy-browser"
-SUITE_ECOSYSTEM_VPN_HREF = "#suite-vpn"
+# Same-origin monorepo / product README (residual Suite + Connect docs).
+SUITE_ECOSYSTEM_VPN_HREF = "/README.md"
 SUITE_ECOSYSTEM_VPN_LABEL = "VPN"
 SUITE_ECOSYSTEM_VPN_KEY = "suite-vpn"
 
