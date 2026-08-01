@@ -19,6 +19,8 @@ import 'registration_copy.dart';
 import 'rpt_config.dart';
 import 'settings_screen.dart';
 import 'settings_store.dart';
+import 'suite_account.dart';
+import 'suite_account_prompt.dart';
 import 'suite_shell.dart';
 import 'suite_update.dart';
 import 'suite_update_panel.dart';
@@ -679,6 +681,58 @@ class _TunnelHomeState extends State<TunnelHome> with WidgetsBindingObserver {
       _append('Keygen unlocked.');
       // Sheet is fully closed — safe to register Packet Tunnel / open Settings.
       await _prepareMacosPacketTunnelBeforeConnect();
+      // Optional: one Suite account for % wallet + Evolve (VPN already unlocked).
+      await _maybeShowSuiteAccountPrompt();
+    }
+  }
+
+  /// Post-KEYGEN optional register/login for Perccent + Evolve (single prompt).
+  ///
+  /// Dismissible; never required for [LicenceGate.mayConnect] / residual VPN.
+  Future<void> _maybeShowSuiteAccountPrompt() async {
+    final store = _store;
+    final gate = _licence;
+    if (store == null || gate == null || !mounted) return;
+    final may = await gate.mayConnect();
+    final account = SuiteAccountStore(store.backend);
+    final deferred = await account.isDeferred();
+    final registered = await account.isRegistered();
+    if (!shouldOfferSuiteAccountPrompt(
+      vpnUnlocked: may,
+      deferred: deferred,
+      registered: registered,
+    )) {
+      return;
+    }
+    if (!mounted) return;
+    final outcome = await showSuiteAccountPrompt(
+      context,
+      store: account,
+    );
+    if (!mounted) return;
+    switch (outcome) {
+      case SuiteAccountPromptOutcome.deferred:
+        _append('Suite account deferred — VPN remains available.');
+        setState(() {
+          _status =
+              'Keygen verified. Press Connect anytime. Register for % / Evolve later from those tabs.';
+        });
+      case SuiteAccountPromptOutcome.registered:
+        _append('Suite account created for % wallet and Evolve.');
+        setState(() {
+          _status =
+              'Keygen verified and Suite account ready for % and Evolve. Press Connect for residual VPN.';
+        });
+      case SuiteAccountPromptOutcome.signedIn:
+        _append('Suite account signed in for % wallet and Evolve.');
+        setState(() {
+          _status =
+              'Keygen verified and Suite account signed in. Press Connect for residual VPN.';
+        });
+      case SuiteAccountPromptOutcome.dismissed:
+        // Treated like defer so we do not re-prompt every Connect.
+        await account.markDeferred();
+        _append('Suite account prompt dismissed — VPN remains available.');
     }
   }
 

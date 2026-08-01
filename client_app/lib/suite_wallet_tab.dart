@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:provider/provider.dart';
@@ -7,16 +9,19 @@ import 'package:perccent_wallet/perc/providers/perc_wallet_provider.dart';
 import 'package:perccent_wallet/perc/services/perc_network_config.dart';
 import 'package:perccent_wallet/perc/services/perc_network_coordinator.dart';
 import 'package:perccent_wallet/providers/locale_provider.dart';
+import 'package:perccent_wallet/perc/services/perc_ledger_hub.dart';
 import 'package:perccent_wallet/screens/wallet_bootstrap_screen.dart';
 import 'package:perccent_wallet/theme/app_theme.dart';
 import 'package:perccent_wallet/wallet_core/models/locale_config_ui.dart';
 
+import 'suite_account.dart';
 import 'theme.dart';
 
 /// **%** tab — full Perccent / MY PERC wallet (bootstrap → shell).
 ///
-/// Embeds the shipped wallet package surfaces; not a stub. The community
-/// block explorer is **not** embedded here — open it in a browser if needed.
+/// Embeds the shipped wallet package surfaces; not a stub. Suite account
+/// registration is optional (shared with Evolve via [SuiteAccountBus]); VPN
+/// never depends on it.
 class SuiteWalletTab extends StatefulWidget {
   const SuiteWalletTab({
     super.key,
@@ -47,6 +52,7 @@ class _SuiteWalletTabState extends State<SuiteWalletTab> {
   @override
   void initState() {
     super.initState();
+    SuiteAccountBus.instance.addListener(_onSuiteAccountChanged);
     if (widget.child != null &&
         widget.walletProvider != null &&
         widget.localeProvider != null) {
@@ -56,6 +62,23 @@ class _SuiteWalletTabState extends State<SuiteWalletTab> {
       return;
     }
     _boot();
+  }
+
+  @override
+  void dispose() {
+    SuiteAccountBus.instance.removeListener(_onSuiteAccountChanged);
+    super.dispose();
+  }
+
+  void _onSuiteAccountChanged() {
+    unawaited(_reloadSharedLedgerSession());
+  }
+
+  Future<void> _reloadSharedLedgerSession() async {
+    if (_wallet == null) return;
+    try {
+      await PercLedgerHub.instance.reloadFromStore();
+    } catch (_) {}
   }
 
   Future<void> _boot() async {
@@ -72,6 +95,11 @@ class _SuiteWalletTabState extends State<SuiteWalletTab> {
 
       final wallet = widget.walletProvider ?? PercWalletProvider();
       // Bootstrap screen initializes wallet; do not double-init here.
+      // After Suite-wide register, ledger session is on disk — reload so this
+      // tab does not force a second independent register wall.
+      try {
+        await PercLedgerHub.instance.reloadFromStore();
+      } catch (_) {}
 
       if (!mounted) return;
       setState(() {

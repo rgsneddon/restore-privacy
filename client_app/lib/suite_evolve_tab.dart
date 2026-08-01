@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:provider/provider.dart';
@@ -11,6 +13,7 @@ import 'package:evolve/models/locale_config.dart';
 import 'package:evolve/models/locale_config_ui.dart';
 import 'package:evolve/models/scenario_input.dart';
 import 'package:evolve/perc/providers/perc_wallet_provider.dart' as evolve_wallet;
+import 'package:evolve/perc/services/perc_ledger_hub.dart' as evolve_hub;
 import 'package:evolve/perc/services/perc_network_config.dart' as evolve_net;
 import 'package:evolve/perc/services/perc_network_coordinator.dart'
     as evolve_coord;
@@ -19,11 +22,13 @@ import 'package:evolve/providers/locale_provider.dart' as evolve_locale;
 import 'package:evolve/screens/app_bootstrap_screen.dart';
 import 'package:evolve/theme/app_theme.dart';
 
+import 'suite_account.dart';
 import 'theme.dart';
 
 /// **EVOLVE** tab — full Evolve Chronoflux app (bootstrap → analysis shell).
 ///
-/// Embeds the shipped evolve package surfaces; not a stub.
+/// Embeds the shipped evolve package surfaces; not a stub. Suite account is
+/// optional and shared with Perccent (% tab) via [SuiteAccountBus].
 class SuiteEvolveTab extends StatefulWidget {
   const SuiteEvolveTab({
     super.key,
@@ -57,6 +62,7 @@ class _SuiteEvolveTabState extends State<SuiteEvolveTab> {
   @override
   void initState() {
     super.initState();
+    SuiteAccountBus.instance.addListener(_onSuiteAccountChanged);
     if (widget.child != null &&
         widget.evolveProvider != null &&
         widget.walletProvider != null &&
@@ -69,6 +75,23 @@ class _SuiteEvolveTabState extends State<SuiteEvolveTab> {
       return;
     }
     _boot();
+  }
+
+  @override
+  void dispose() {
+    SuiteAccountBus.instance.removeListener(_onSuiteAccountChanged);
+    super.dispose();
+  }
+
+  void _onSuiteAccountChanged() {
+    unawaited(_reloadSharedLedgerSession());
+  }
+
+  Future<void> _reloadSharedLedgerSession() async {
+    if (_wallet == null) return;
+    try {
+      await evolve_hub.PercLedgerHub.instance.reloadFromStore();
+    } catch (_) {}
   }
 
   Future<void> _boot() async {
@@ -101,6 +124,11 @@ class _SuiteEvolveTabState extends State<SuiteEvolveTab> {
       if (widget.fcgProvider == null) {
         await fcg.initialize();
       }
+      // Shared Suite account session may already be on disk from % tab or
+      // the post-KEYGEN prompt — reload so Evolve does not force a second wall.
+      try {
+        await evolve_hub.PercLedgerHub.instance.reloadFromStore();
+      } catch (_) {}
 
       evolve.setLocale(locale.config);
       evolve.analysisRewardHandler = ({
