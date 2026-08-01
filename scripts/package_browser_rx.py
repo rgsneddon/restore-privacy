@@ -258,13 +258,27 @@ def write_compatible_zip(
     validate_archive(dest)
 
 
-def write_tar_gz(dest: Path, files: list[tuple[Path | bytes, str]], top: str) -> None:
+def write_tar_gz(
+    dest: Path,
+    files: list[tuple[Path | bytes, str]],
+    top: str = "",
+) -> None:
+    """Write tar.gz. *arcname* paths are used as-is (already include top folder).
+
+    *top* is optional and only applied when arcnames are not already prefixed
+    (avoids double-nest ``top/top/...`` when callers pass top-prefixed paths).
+    """
     dest.parent.mkdir(parents=True, exist_ok=True)
     if dest.exists():
         dest.unlink()
+    top_s = (top or "").strip().strip("/")
     with tarfile.open(dest, "w:gz") as tf:
         for src, arcname in files:
-            name = f"{top}/{arcname}".replace("//", "/")
+            arc = str(arcname).replace("\\", "/").lstrip("/")
+            if top_s and not (arc == top_s or arc.startswith(top_s + "/")):
+                name = f"{top_s}/{arc}"
+            else:
+                name = arc
             if isinstance(src, (bytes, bytearray)):
                 data = bytes(src)
                 ti = tarfile.TarInfo(name=name)
@@ -272,11 +286,20 @@ def write_tar_gz(dest: Path, files: list[tuple[Path | bytes, str]], top: str) ->
                 tf.addfile(ti, io.BytesIO(data))
             else:
                 tf.add(str(src), arcname=name)
-    # basic integrity: reopen
+    # basic integrity: reopen + single primary top folder for extension tree
     with tarfile.open(dest, "r:gz") as tf:
-        _ = tf.getnames()
+        names = tf.getnames()
+    if not names:
+        raise RuntimeError(f"empty tar.gz: {dest}")
     if dest.stat().st_size < 100:
         raise RuntimeError(f"tar.gz too small: {dest}")
+    # Fail closed on double-nest: .../linux-x86_64/linux-x86_64/manifest.json
+    for n in names:
+        parts = n.split("/")
+        if len(parts) >= 3 and parts[0] == parts[1] and parts[0].startswith(
+            "restore-privacy-rx-browser-"
+        ):
+            raise RuntimeError(f"double-nested tar path {n!r} in {dest}")
 
 
 def validate_archive(path: Path) -> None:
@@ -364,8 +387,8 @@ def package_one(
     files = _payload_files(install_plat, ver)
     fmt = str(slot.get("format") or "zip")
     if fmt == "tar.gz":
-        top = f"restore-privacy-rx-browser-{ver}-{install_plat}"
-        write_tar_gz(dest, files, top=top)
+        # arcnames from _payload_files already include the single top folder
+        write_tar_gz(dest, files, top="")
     else:
         write_compatible_zip(dest, files)
     print(

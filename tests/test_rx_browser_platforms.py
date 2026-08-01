@@ -68,6 +68,58 @@ class TestRxPlatformMatrix(unittest.TestCase):
                         self.assertNotEqual(zf.read(names[0])[:9], b"not found")
 
 
+class TestRxTarSingleTop(unittest.TestCase):
+    def test_linux_tar_gz_single_top_folder(self) -> None:
+        """tar.gz must not double-nest top/top/manifest.json."""
+        import tarfile
+        from package_browser_rx import package_one, platform_package_matrix
+
+        slot = next(
+            s
+            for s in platform_package_matrix("1.0.2")
+            if s["platform"] == "linux-x86_64" and s["format"] == "tar.gz"
+        )
+        with tempfile.TemporaryDirectory() as td:
+            path = package_one(slot, out_dir=Path(td))
+            with tarfile.open(path, "r:gz") as tf:
+                names = tf.getnames()
+            self.assertTrue(names)
+            top = f"restore-privacy-rx-browser-1.0.2-linux-x86_64"
+            # Manifest lives at exactly one top level
+            self.assertIn(f"{top}/manifest.json", names)
+            double = f"{top}/{top}/manifest.json"
+            self.assertNotIn(double, names)
+            for n in names:
+                parts = n.split("/")
+                if len(parts) >= 3 and parts[0] == parts[1]:
+                    self.fail(f"double-nested path: {n}")
+
+
+class TestServiceRxAttrsMatchHref(unittest.TestCase):
+    def test_download_attr_matches_platform_href(self) -> None:
+        from service_commercial import render_service_page_html
+
+        mac_ua = "Mozilla/5.0 (Macintosh; Intel Mac OS X 14_0)"
+        html = render_service_page_html(user_agent=mac_ua).decode("utf-8")
+        self.assertIn(
+            'href="/assets/1.0.2/restore-privacy-rx-browser-1.0.2-macos.zip"',
+            html,
+        )
+        self.assertIn(
+            'download="restore-privacy-rx-browser-1.0.2-macos.zip"',
+            html,
+        )
+        self.assertIn(
+            'data-package="restore-privacy-rx-browser-1.0.2-macos.zip"',
+            html,
+        )
+        # Must not advertise generic zip while linking macos
+        self.assertNotIn(
+            'download="restore-privacy-rx-browser-1.0.2.zip"',
+            html,
+        )
+
+
 class TestRxDownloadHrefs(unittest.TestCase):
     def test_device_aware_hrefs_and_free_open(self) -> None:
         from downloads import (

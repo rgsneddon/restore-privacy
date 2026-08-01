@@ -285,7 +285,10 @@ def render_service_rx_browser_box_html(*, user_agent: str = "") -> str:
     href = rx_browser_package_href(user_agent=user_agent)
     label = rx_browser_download_label(user_agent)
     plat = detect_platform_from_user_agent(user_agent) or "unknown"
-    fname = rx_browser_package_filename()
+    # Keep download= / data-package in lockstep with UA-aware href (not generic zip).
+    fname = rx_browser_package_filename(
+        platform=plat if plat != "unknown" else None
+    )
     return f"""
   <section class="panel-card service-rx-browser-box" id="{SERVICE_RX_BOX_ID}"
            data-service-rx="1" data-product="rx-browser"
