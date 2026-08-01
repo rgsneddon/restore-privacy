@@ -56,7 +56,13 @@ flutter:
     - assets/flags/us.png
     - assets/flags/eu.png
     - assets/branding/my_perc_logo.png
-    # Ned / rpAI Imagine icon set (NED Core Package + chip / satellite / AI gear)
+    # Ned / rpAI Imagine face set (default + ERROR / EXCITED / CONFUSED / SLEEP)
+    - assets/ned/ned_face_default.png
+    - assets/ned/ned_face_error.png
+    - assets/ned/ned_face_excited.png
+    - assets/ned/ned_face_confused.png
+    - assets/ned/ned_face_sleep.png
+    # Prior motif set (secondary; faces are primary avatar chrome)
     - assets/ned/ned_icon_package.png
     - assets/ned/ned_icon_chip.png
     - assets/ned/ned_icon_satellite.png

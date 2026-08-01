@@ -198,8 +198,8 @@ class SuiteRpaiTabState extends State<SuiteRpaiTab> {
           children: [
             Row(
               children: [
-                // Imagine-derived Ned chrome: package / chip / satellite / gear
-                // tracks real [NedGuidePhase] (+ busy) via [nedIconStimulusFor].
+                // Imagine-derived Ned face chrome (default / CONFUSED / SLEEP /
+                // EXCITED / ERROR) tracks real [NedGuidePhase] (+ busy).
                 _NedIconAvatar(
                   key: const Key('ned_icon_avatar'),
                   stimulus: nedIconStimulusFor(
@@ -437,19 +437,22 @@ class SuiteRpaiTabState extends State<SuiteRpaiTab> {
     );
   }
 
-  /// Short chrome caption under the title (tracks stimulus, not a second script).
+  /// Short chrome caption under the title (tracks face stimulus, not a second script).
   static String _stimulusCaption(NedIconStimulus stimulus) {
+    final status = nedFaceStatusLabel(stimulus);
     switch (stimulus) {
       case NedIconStimulus.idle:
-        return 'NED Core Package · ready';
+        return 'STATUS: $status · calm';
       case NedIconStimulus.asking:
-        return 'Listening · your call';
+        return 'STATUS: $status · your call';
       case NedIconStimulus.processing:
-        return 'Deploying account…';
+        return 'STATUS: $status · working…';
       case NedIconStimulus.explaining:
-        return 'Walking you through…';
+        return 'STATUS: $status · walking through…';
       case NedIconStimulus.ready:
-        return 'READY TO DEPLOY · done';
+        return 'STATUS: $status · done';
+      case NedIconStimulus.error:
+        return 'STATUS: $status';
     }
   }
 }
