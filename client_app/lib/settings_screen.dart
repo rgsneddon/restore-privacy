@@ -146,25 +146,131 @@ class _SettingsScreenState extends State<SettingsScreen> {
     widget.onPartsChanged?.call(loaded);
   }
 
-  Future<void> _setPartInstalled(SuitePartId id, bool installed) async {
+  Future<void> _setPartInstalled(
+    SuitePartId id,
+    bool installed, {
+    String? confirmPhrase,
+  }) async {
     if (!suitePartIsRemovable(id)) return;
+    if (!installed) {
+      final gate = evaluateSuitePartUninstallConfirmation(
+        id: id,
+        userInput: confirmPhrase,
+      );
+      if (!gate.allowed) {
+        if (mounted) {
+          setState(() {
+            _note =
+                'Uninstall aborted (${gate.reason}). Type the exact part name '
+                '“${suitePartConfirmPhrase(id)}” to confirm.';
+          });
+        }
+        return;
+      }
+    }
     setState(() => _busy = true);
     final store = _partsStore;
     SuitePartsState next;
     if (store != null) {
-      next = await store.setInstalled(id, installed);
+      next = await store.setInstalled(
+        id,
+        installed,
+        confirmPhrase: confirmPhrase,
+      );
     } else {
-      next = applySuitePartInstall(_parts, id: id, installed: installed);
+      next = applySuitePartInstall(
+        _parts,
+        id: id,
+        installed: installed,
+        confirmPhrase: confirmPhrase,
+      );
     }
     if (!mounted) return;
     setState(() {
       _parts = next;
       _busy = false;
       _note = installed
-          ? '${suitePartLabel(id)} kept installed.'
-          : '${suitePartLabel(id)} removed from this install.';
+          ? '${suitePartLabel(id)} reinstalled. Licence and Suite account stay as before.'
+          : '${suitePartLabel(id)} uninstalled — tab kept with reinstall link.';
     });
     widget.onPartsChanged?.call(next);
+  }
+
+  /// rpOS-style typed gate: user must enter the exact part label.
+  Future<void> _confirmUninstallPart(SuitePartId id) async {
+    if (!suitePartIsRemovable(id)) return;
+    final phrase = suitePartConfirmPhrase(id);
+    final ctrl = TextEditingController();
+    final confirmed = await showDialog<bool>(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) {
+        return AlertDialog(
+          key: Key('suite_part_uninstall_dialog_${id.name}'),
+          title: const Text(kSuitePartConfirmDialogTitle),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Text(
+                '$kSuitePartConfirmHintPrefix $phrase',
+                key: Key('suite_part_confirm_hint_${id.name}'),
+              ),
+              const SizedBox(height: 8),
+              const Text(
+                kSuitePartConfirmAbortNote,
+                style: TextStyle(fontSize: 12),
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                key: Key('suite_part_confirm_field_${id.name}'),
+                controller: ctrl,
+                autofocus: true,
+                decoration: InputDecoration(
+                  labelText: 'Part name',
+                  hintText: phrase,
+                  border: const OutlineInputBorder(),
+                ),
+                onSubmitted: (_) {
+                  final ok = suitePartUninstallConfirmationAccepted(
+                    id: id,
+                    userInput: ctrl.text,
+                  );
+                  Navigator.of(ctx).pop(ok);
+                },
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              key: const Key('suite_part_confirm_cancel'),
+              onPressed: () => Navigator.of(ctx).pop(false),
+              child: const Text(kSuitePartConfirmCancelLabel),
+            ),
+            FilledButton(
+              key: Key('suite_part_confirm_proceed_${id.name}'),
+              onPressed: () {
+                final ok = suitePartUninstallConfirmationAccepted(
+                  id: id,
+                  userInput: ctrl.text,
+                );
+                Navigator.of(ctx).pop(ok);
+              },
+              child: const Text(kSuitePartConfirmProceedLabel),
+            ),
+          ],
+        );
+      },
+    );
+    ctrl.dispose();
+    if (confirmed == true) {
+      await _setPartInstalled(id, false, confirmPhrase: phrase);
+    } else if (mounted && confirmed == false) {
+      setState(() {
+        _note =
+            'Uninstall cancelled or confirmation did not match “$phrase”.';
+      });
+    }
   }
 
   Future<void> _refreshUsage() async {
@@ -596,7 +702,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
         ),
       );
     }
-    return SwitchListTile(
+    return ListTile(
       key: Key(keyBase),
       title: Text(
         part.label,
@@ -605,12 +711,19 @@ class _SettingsScreenState extends State<SettingsScreen> {
       subtitle: Text(
         installed ? kSuitePartInstalledLabel : kSuitePartRemovedLabel,
       ),
-      value: installed,
-      activeThumbColor: kWhite,
-      activeTrackColor: kPrimary,
-      onChanged: _busy
-          ? null
-          : (v) => _setPartInstalled(part.id, v),
+      trailing: installed
+          ? TextButton(
+              key: Key('suite_part_uninstall_btn_${part.id.name}'),
+              onPressed: _busy ? null : () => _confirmUninstallPart(part.id),
+              child: const Text(kSuitePartUninstallLabel),
+            )
+          : TextButton(
+              key: Key('suite_part_reinstall_settings_${part.id.name}'),
+              onPressed: _busy
+                  ? null
+                  : () => _setPartInstalled(part.id, true),
+              child: const Text(kSuitePartReinstallLabel),
+            ),
     );
   }
 

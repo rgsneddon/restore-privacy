@@ -149,22 +149,107 @@ const String kKeySuitePartRpai = 'suite_part_rpai_installed';
 
 const String kSuitePartsSettingsTitle = 'Suite parts';
 const String kSuitePartsSettingsSubtitle =
-    'Remove surfaces you do not use. Residual VPN always stays installed.';
+    'Uninstall optional surfaces you do not use — tabs stay with a reinstall '
+    'link. Residual VPN always stays installed. Type the part name to confirm.';
 const String kSuitePartVpnRequiredLabel = 'Required — always installed';
 const String kSuitePartInstalledLabel = 'Installed';
-const String kSuitePartRemovedLabel = 'Removed';
-const String kSuitePartUninstallLabel = 'Remove';
+const String kSuitePartRemovedLabel = 'Uninstalled — tab shows reinstall';
+const String kSuitePartUninstallLabel = 'Uninstall…';
 const String kSuitePartRetainLabel = 'Keep installed';
-const String kSuitePartReinstallLabel = 'Reinstall';
+const String kSuitePartReinstallLabel = 'Reinstall this section';
+const String kSuitePartReinstallTitle = 'Section uninstalled';
+const String kSuitePartReinstallBody =
+    'This Suite section is uninstalled on this device. Your residual VPN licence '
+    '(KEYGEN) and any Suite account registration stay on device — reinstalling '
+    'does not require a second KEYGEN unlock or a second full register solely '
+    'because this section was removed.';
+const String kSuitePartConfirmDialogTitle = 'Confirm uninstall';
+const String kSuitePartConfirmHintPrefix =
+    'Type the exact part name to confirm deletion:';
+const String kSuitePartConfirmAbortNote =
+    'Wrong or empty confirmation aborts — nothing is uninstalled.';
+const String kSuitePartConfirmCancelLabel = 'Cancel';
+const String kSuitePartConfirmProceedLabel = 'Uninstall';
+
+/// Exact confirmation phrase for a part (rpOS RESTORE-style gate).
+///
+/// User must type this string exactly (after trim). VPN has no phrase.
+String suitePartConfirmPhrase(SuitePartId id) => suitePartLabel(id);
+
+/// Pure gate: uninstall may proceed only when typed phrase matches part name.
+bool suitePartUninstallConfirmationAccepted({
+  required SuitePartId id,
+  required String? userInput,
+}) {
+  if (!suitePartIsRemovable(id)) return false;
+  final expected = suitePartConfirmPhrase(id);
+  final phrase = (userInput ?? '').trim();
+  if (phrase.isEmpty) return false;
+  return phrase == expected;
+}
+
+/// Result of evaluating uninstall confirmation (mirrors rpOS gate shape).
+class SuitePartUninstallGateResult {
+  const SuitePartUninstallGateResult({
+    required this.allowed,
+    required this.reason,
+  });
+
+  final bool allowed;
+  final String reason;
+
+  static const rejectedNotRemovable = SuitePartUninstallGateResult(
+    allowed: false,
+    reason: 'part_not_removable',
+  );
+  static const rejectedEmpty = SuitePartUninstallGateResult(
+    allowed: false,
+    reason: 'confirmation_empty',
+  );
+  static const rejectedMismatch = SuitePartUninstallGateResult(
+    allowed: false,
+    reason: 'confirmation_rejected',
+  );
+  static const accepted = SuitePartUninstallGateResult(
+    allowed: true,
+    reason: 'confirmation_accepted',
+  );
+}
+
+SuitePartUninstallGateResult evaluateSuitePartUninstallConfirmation({
+  required SuitePartId id,
+  required String? userInput,
+}) {
+  if (!suitePartIsRemovable(id)) {
+    return SuitePartUninstallGateResult.rejectedNotRemovable;
+  }
+  final phrase = (userInput ?? '').trim();
+  if (phrase.isEmpty) return SuitePartUninstallGateResult.rejectedEmpty;
+  if (phrase != suitePartConfirmPhrase(id)) {
+    return SuitePartUninstallGateResult.rejectedMismatch;
+  }
+  return SuitePartUninstallGateResult.accepted;
+}
 
 /// Apply remove/retain. VPN requests are ignored (always installed).
+///
+/// Uninstall (`installed: false`) requires [confirmPhrase] to pass the typed
+/// part-name gate; mismatch leaves state unchanged.
 SuitePartsState applySuitePartInstall(
   SuitePartsState current, {
   required SuitePartId id,
   required bool installed,
+  String? confirmPhrase,
 }) {
   if (id == SuitePartId.vpn || !suitePartIsRemovable(id)) {
     return current;
+  }
+  if (!installed) {
+    final gate = evaluateSuitePartUninstallConfirmation(
+      id: id,
+      userInput: confirmPhrase,
+    );
+    if (!gate.allowed) return current;
   }
   switch (id) {
     case SuitePartId.vpn:
@@ -178,13 +263,23 @@ SuitePartsState applySuitePartInstall(
   }
 }
 
-/// Ordered list of parts that should appear in the shell navigation.
+/// Shell always retains every Suite tab (including uninstalled optionals).
+///
+/// Uninstalled optionals show a reinstall placeholder body — not a missing tab.
 List<SuitePartId> visibleSuitePartIds(SuitePartsState state) {
-  final out = <SuitePartId>[SuitePartId.vpn];
-  if (state.walletInstalled) out.add(SuitePartId.wallet);
-  if (state.evolveInstalled) out.add(SuitePartId.evolve);
-  if (state.rpaiInstalled) out.add(SuitePartId.rpai);
-  return out;
+  // state is unused: tabs always retained. Signature kept for call-site stability.
+  assert(state.vpnInstalled);
+  return const [
+    SuitePartId.vpn,
+    SuitePartId.wallet,
+    SuitePartId.evolve,
+    SuitePartId.rpai,
+  ];
+}
+
+/// True when the shell should mount the full feature surface (not placeholder).
+bool suitePartShowsFullSurface(SuitePartsState state, SuitePartId id) {
+  return state.isInstalled(id);
 }
 
 String suitePartLabel(SuitePartId id) {
@@ -194,7 +289,7 @@ String suitePartLabel(SuitePartId id) {
   return id.name;
 }
 
-/// Clamp tab index into the visible destinations list.
+/// Clamp tab index into the (always full) destinations list.
 int clampSuiteTabIndex(int index, SuitePartsState state) {
   final n = visibleSuitePartIds(state).length;
   if (n <= 0) return 0;

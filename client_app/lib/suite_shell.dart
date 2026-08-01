@@ -4,6 +4,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'prefs_backend.dart';
 import 'settings_store.dart';
 import 'suite_evolve_tab.dart';
+import 'suite_part_placeholder.dart';
 import 'suite_parts.dart';
 import 'suite_parts_store.dart';
 import 'suite_rpai_tab.dart';
@@ -11,10 +12,10 @@ import 'suite_version.dart';
 import 'suite_wallet_tab.dart';
 import 'theme.dart';
 
-/// Unified Restore Privacy Suite shell: **VPN** · optional **%** · **EVOLVE** · **rpAI**.
+/// Unified Restore Privacy Suite shell: **VPN** · **%** · **EVOLVE** · **rpAI**.
 ///
-/// Tab switch keeps the process alive (IndexedStack). VPN is always present;
-/// optional parts follow [SuitePartsState] (Settings remove/retain).
+/// Tab switch keeps the process alive (IndexedStack). All four tabs stay in the
+/// nav; uninstalled optional parts show a reinstall placeholder body.
 class SuiteShell extends StatefulWidget {
   const SuiteShell({
     super.key,
@@ -99,15 +100,32 @@ class SuiteShellState extends State<SuiteShell> {
     if (notifyParent) widget.onPartsChanged?.call(next);
   }
 
-  Future<void> setPartInstalled(SuitePartId id, bool installed) async {
+  Future<void> setPartInstalled(
+    SuitePartId id,
+    bool installed, {
+    String? confirmPhrase,
+  }) async {
     final store = _store;
     SuitePartsState next;
     if (store != null) {
-      next = await store.setInstalled(id, installed);
+      next = await store.setInstalled(
+        id,
+        installed,
+        confirmPhrase: confirmPhrase,
+      );
     } else {
-      next = applySuitePartInstall(_parts, id: id, installed: installed);
+      next = applySuitePartInstall(
+        _parts,
+        id: id,
+        installed: installed,
+        confirmPhrase: confirmPhrase,
+      );
     }
     applyParts(next, notifyParent: true);
+  }
+
+  Future<void> reinstallPart(SuitePartId id) async {
+    await setPartInstalled(id, true);
   }
 
   @override
@@ -168,61 +186,50 @@ class SuiteShellState extends State<SuiteShell> {
     }
   }
 
+  Widget _bodyForPart(SuitePartId id) {
+    final full = suitePartShowsFullSurface(_parts, id);
+    switch (id) {
+      case SuitePartId.vpn:
+        return widget.vpnTab;
+      case SuitePartId.wallet:
+        if (full) return widget.walletTab ?? const SuiteWalletTab();
+        return SuitePartReinstallPlaceholder(
+          key: const Key('suite_part_placeholder_wallet'),
+          partId: id,
+          onReinstall: () => reinstallPart(id),
+        );
+      case SuitePartId.evolve:
+        if (full) return widget.evolveTab ?? const SuiteEvolveTab();
+        return SuitePartReinstallPlaceholder(
+          key: const Key('suite_part_placeholder_evolve'),
+          partId: id,
+          onReinstall: () => reinstallPart(id),
+        );
+      case SuitePartId.rpai:
+        if (full) return widget.rpaiTab ?? const SuiteRpaiTab();
+        return SuitePartReinstallPlaceholder(
+          key: const Key('suite_part_placeholder_rpai'),
+          partId: id,
+          onReinstall: () => reinstallPart(id),
+        );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
-    final wallet = widget.walletTab ?? const SuiteWalletTab();
-    final evolve = widget.evolveTab ?? const SuiteEvolveTab();
-    final rpai = widget.rpaiTab ?? const SuiteRpaiTab();
-
     final visible = visibleSuitePartIds(_parts);
-    final children = <Widget>[];
-    final destinations = <NavigationDestination>[];
-
-    for (final id in visible) {
-      switch (id) {
-        case SuitePartId.vpn:
-          children.add(widget.vpnTab);
-          destinations.add(const NavigationDestination(
-            icon: Icon(Icons.shield_outlined),
-            selectedIcon: Icon(Icons.shield),
-            label: kSuiteTabVpn,
-          ));
-        case SuitePartId.wallet:
-          children.add(wallet);
-          destinations.add(const NavigationDestination(
-            icon: Icon(Icons.account_balance_wallet_outlined),
-            selectedIcon: Icon(Icons.account_balance_wallet),
-            label: kSuiteTabWallet,
-          ));
-        case SuitePartId.evolve:
-          children.add(evolve);
-          destinations.add(const NavigationDestination(
-            icon: Icon(Icons.auto_graph_outlined),
-            selectedIcon: Icon(Icons.auto_graph),
-            label: kSuiteTabEvolve,
-          ));
-        case SuitePartId.rpai:
-          children.add(rpai);
-          destinations.add(const NavigationDestination(
-            icon: Icon(Icons.smart_toy_outlined),
-            selectedIcon: Icon(Icons.smart_toy),
-            label: kSuiteTabRpai,
-          ));
-      }
-    }
-
-    // Safety: VPN must always be present even if state is corrupt.
-    if (children.isEmpty) {
-      children.add(widget.vpnTab);
-      destinations.add(const NavigationDestination(
-        icon: Icon(Icons.shield_outlined),
-        selectedIcon: Icon(Icons.shield),
-        label: kSuiteTabVpn,
-      ));
-    }
+    final children = visible.map(_bodyForPart).toList(growable: false);
+    final destinations = <NavigationDestination>[
+      for (final id in visible)
+        NavigationDestination(
+          icon: Icon(_iconFor(id, selected: false)),
+          selectedIcon: Icon(_iconFor(id, selected: true)),
+          label: suitePartLabel(id),
+        ),
+    ];
 
     final tabIndex = clampSuiteTabIndex(_index, _parts);
-    final chromeLabel = suitePartLabel(visibleSuitePartIds(_parts)[tabIndex]);
+    final chromeLabel = suitePartLabel(visible[tabIndex]);
 
     return Scaffold(
       backgroundColor: kChromeBg,
@@ -251,6 +258,21 @@ class SuiteShellState extends State<SuiteShell> {
         destinations: destinations,
       ),
     );
+  }
+
+  static IconData _iconFor(SuitePartId id, {required bool selected}) {
+    switch (id) {
+      case SuitePartId.vpn:
+        return selected ? Icons.shield : Icons.shield_outlined;
+      case SuitePartId.wallet:
+        return selected
+            ? Icons.account_balance_wallet
+            : Icons.account_balance_wallet_outlined;
+      case SuitePartId.evolve:
+        return selected ? Icons.auto_graph : Icons.auto_graph_outlined;
+      case SuitePartId.rpai:
+        return selected ? Icons.smart_toy : Icons.smart_toy_outlined;
+    }
   }
 }
 

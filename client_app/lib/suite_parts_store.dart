@@ -29,9 +29,21 @@ class SuitePartsStore {
   }
 
   /// Set one optional part; VPN is a no-op. Returns the new state.
-  Future<SuitePartsState> setInstalled(SuitePartId id, bool installed) async {
+  ///
+  /// Uninstall requires [confirmPhrase] matching the part label exactly.
+  /// Reinstall does not require confirmation or a new KEYGEN/register wall.
+  Future<SuitePartsState> setInstalled(
+    SuitePartId id,
+    bool installed, {
+    String? confirmPhrase,
+  }) async {
     final cur = await load();
-    final next = applySuitePartInstall(cur, id: id, installed: installed);
+    final next = applySuitePartInstall(
+      cur,
+      id: id,
+      installed: installed,
+      confirmPhrase: confirmPhrase,
+    );
     if (next != cur) {
       await save(next);
     }
