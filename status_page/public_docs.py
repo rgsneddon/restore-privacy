@@ -12,6 +12,7 @@ Stable same-origin paths (no GitHub dependency for public readers):
 | ``/CREDITS.md`` | Credits / third-party components |
 | ``/NODE_OPERATOR.md`` | Residual node / operator path (not Suite client) |
 | ``/EVOLVE.md`` | Evolve docs (mirror of evolve repo README) |
+| ``/RPOS.md`` | rpOS docs (mirror of rgsneddon/rpOS README) |
 """
 
 from __future__ import annotations
@@ -41,6 +42,13 @@ EVOLVE_README_GITHUB_URL = (
 )
 EVOLVE_README_RAW_URL = (
     "https://raw.githubusercontent.com/rgsneddon/evolve/main/README.md"
+)
+RPOS_DOCS_PATH = "/RPOS.md"
+RPOS_README_GITHUB_URL = (
+    "https://github.com/rgsneddon/rpOS/blob/main/README.md"
+)
+RPOS_README_RAW_URL = (
+    "https://raw.githubusercontent.com/rgsneddon/rpOS/main/README.md"
 )
 
 
@@ -117,6 +125,18 @@ PUBLIC_DOCS: tuple[PublicDoc, ...] = (
             "/evolve-docs",
             "/docs/EVOLVE.md",
             "/docs/evolve",
+        ),
+    ),
+    PublicDoc(
+        id="rpos-docs",
+        path=RPOS_DOCS_PATH,
+        title="rpOS — Restore Privacy Operating System",
+        filename="RPOS.md",
+        aliases=(
+            "/rpos",
+            "/rpos-docs",
+            "/docs/RPOS.md",
+            "/docs/rpos",
         ),
     ),
 )

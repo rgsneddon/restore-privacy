@@ -1142,8 +1142,8 @@ SUITE_PERCCENT_WALLET_README_HREF = (
 )
 SUITE_PERCCENT_WALLET_README_LABEL = "Perccent wallet README"
 
-# Suite ecosystem product family (placeholder hrefs until product URLs ship)
-SUITE_RPOS_HREF = "#suite-rpos"
+# Suite ecosystem product family — rpOS opens on-site README (same-origin)
+SUITE_RPOS_HREF = "/RPOS.md"
 SUITE_RPOS_LABEL = "rpOS"
 SUITE_RPOS_TITLE = "Restore Privacy Operating System"
 SUITE_RPOS_KEY = "rpos"
