@@ -85,15 +85,27 @@ OFFICE_PARITY_MATRIX: list[dict[str, str]] = [
     },
     {
         "pillar": SLIDES,
-        "feature": "Multi-slide create/reorder/serialize",
+        "feature": "Multi-slide deck + title/body/bullets/notes + serialize round-trip",
         "status": "implemented",
-        "analogue": "PowerPoint-class",
+        "analogue": "PowerPoint-class core",
     },
     {
         "pillar": SLIDES,
-        "feature": "Animations / masters",
-        "status": "planned",
-        "analogue": "PowerPoint-class",
+        "feature": "Add/delete/duplicate/reorder slides",
+        "status": "implemented",
+        "analogue": "PowerPoint-class core",
+    },
+    {
+        "pillar": SLIDES,
+        "feature": "Undo/redo of edit actions on shared presentation",
+        "status": "implemented",
+        "analogue": "PowerPoint-class core",
+    },
+    {
+        "pillar": SLIDES,
+        "feature": "Animations, transitions, slide masters, full PPTX/VBA, collaboration",
+        "status": "out_of_scope",
+        "analogue": "Microsoft PowerPoint (not claimed)",
     },
 ]
 
@@ -131,6 +143,15 @@ def tables_excel_class_core_rows() -> list[dict[str, str]]:
     ]
 
 
+def slides_powerpoint_class_core_rows() -> list[dict[str, str]]:
+    """Slides rows that constitute gating PowerPoint-class core."""
+    return [
+        r
+        for r in OFFICE_PARITY_MATRIX
+        if r["pillar"] == SLIDES and r["status"] == "implemented"
+    ]
+
+
 def matrix_as_dict() -> dict[str, Any]:
     return {
         "product": "rpOffice",
@@ -141,9 +162,10 @@ def matrix_as_dict() -> dict[str, Any]:
         "implemented_pillars": implemented_pillars(),
         "pens_word_class_core": pens_word_class_core_rows(),
         "tables_excel_class_core": tables_excel_class_core_rows(),
+        "slides_powerpoint_class_core": slides_powerpoint_class_core_rows(),
         "note": (
             "Primary names are Pens, Tables, Slides — not Microsoft brand labels. "
-            "Pens Word-class and Tables Excel-class cores are implemented; "
-            "full Microsoft Office parity is not claimed."
+            "Pens Word-class, Tables Excel-class, and Slides PowerPoint-class cores "
+            "are implemented; full Microsoft Office parity is not claimed."
         ),
     }
