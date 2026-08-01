@@ -991,6 +991,23 @@ def product_multihop_path() -> list[Hop]:
     return build_entry_exit_path(PRODUCT_EXIT_HOST, exit_port=PRODUCT_EXIT_PORT)
 
 
+def _load_product_hidden_hops(
+    env: dict[str, str] | None,
+) -> list[Hop]:
+    """Discover flyclient hidden hops for product multi-hop path building.
+
+    Uses live process agents + on-disk registries under
+    ``RPT_HIDDEN_NODE_PREFIX`` / ``RPT_HIDDEN_NODE_PREFIXES`` / default
+    ``~/.rpos/install``. Never promotes hidden hosts into the public catalog.
+    """
+    try:
+        from client.flyclient_hidden_node import discover_enabled_hidden_hops
+
+        return list(discover_enabled_hidden_hops(env=env, include_live=True))
+    except Exception:  # noqa: BLE001
+        return []
+
+
 def multihop_config_from_env(
     env: dict[str, str] | None = None,
 ) -> MultiHopConfig:
@@ -1003,6 +1020,9 @@ def multihop_config_from_env(
     - ``RPT_ENTRY_COUNTRY`` / Settings ``entry_country`` — IS or DE (default DE)
     - ``RPT_MULTIHOP_HOPS`` — CSV ``host[:port],host2[:port]`` (operator override)
     - ``RPT_EXIT_HOST`` / ``RPT_EXIT_PORT`` — second hop override (legacy)
+    - When multi-hop is enabled, **flyclient hidden** hops from the local
+      registry / live agents are inserted between entry and exit (not when
+      multi-hop is off — fail closed to single-hop residual).
     """
     import os
 
@@ -1044,10 +1064,26 @@ def multihop_config_from_env(
     if not entry_country:
         entry_country = DEFAULT_ENTRY_COUNTRY
 
+    # Optional: skip flyclient injection (operator pure path)
+    inject_hidden = str(e.get("RPT_HIDDEN_HOPS", "1")).strip().lower() not in (
+        "0",
+        "false",
+        "no",
+        "off",
+    )
+
     csv = str(e.get("RPT_MULTIHOP_HOPS", "") or "").strip()
     if csv:
         hops = parse_hops_csv(csv)
-        return MultiHopConfig(hops=hops, enabled=enabled)
+        cfg = MultiHopConfig(hops=hops, enabled=enabled)
+        if enabled and inject_hidden and len(build_hop_path(hops)) >= 2:
+            hidden = _load_product_hidden_hops(e)
+            if hidden:
+                path = build_hop_path(hops)
+                return build_multihop_path_with_hidden(
+                    path[0], path[-1], hidden, enabled=True
+                )
+        return cfg
 
     # Legacy RPT_EXIT_HOST with fixed Iceland entry only when env forces exit host
     # without country selection (operator override).
@@ -1058,13 +1094,29 @@ def multihop_config_from_env(
         except ValueError:
             exit_port = PRODUCT_EXIT_PORT
         hops = build_entry_exit_path(exit_host_env, exit_port=exit_port)
+        if enabled and inject_hidden:
+            hidden = _load_product_hidden_hops(e)
+            if hidden:
+                return build_multihop_path_with_hidden(
+                    hops[0], hops[-1], hidden, enabled=True
+                )
         return MultiHopConfig(hops=hops, enabled=enabled)
 
     # User path: entry country + multihop → complement/random non-entry exit
-    return multihop_config_for_entry_country(
+    base = multihop_config_for_entry_country(
         entry_country,
         multihop_enabled=enabled,
     )
+    if enabled and base.enabled and inject_hidden and len(base.hops) >= 2:
+        hidden = _load_product_hidden_hops(e)
+        if hidden:
+            return build_multihop_path_with_hidden(
+                base.hops[0],
+                base.hops[-1],
+                hidden,
+                enabled=True,
+            )
+    return base
 
 
 def exit_hop_label(config: MultiHopConfig | None = None) -> str | None:

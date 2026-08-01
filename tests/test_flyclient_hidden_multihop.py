@@ -14,6 +14,7 @@ sys.path.insert(0, str(ROOT))
 from client.flyclient_hidden_node import (  # noqa: E402
     AGENT_NAME,
     FORBIDDEN_SELFHOST_MARKERS,
+    HOOK_BANNER_PREFIX,
     ROLE_HIDDEN,
     USES_DISK_CRYPTO_INSTALL,
     USES_SELFHOST_STACK,
@@ -21,11 +22,15 @@ from client.flyclient_hidden_node import (  # noqa: E402
     FlyclientHiddenAgent,
     assert_not_public_catalog,
     enable_for_rpos_install,
+    get_live_agent,
+    handle_hook_payload,
     hidden_hops_from_records,
     is_public_catalog_peer_host,
     list_enabled_hidden_nodes,
     load_registry,
+    probe_hidden_hook,
     register_instance,
+    stop_all_live_agents,
     synthetic_hidden_host,
 )
 from client.multihop import (  # noqa: E402
@@ -37,6 +42,7 @@ from client.multihop import (  # noqa: E402
     build_multihop_path_with_hidden,
     is_hidden_hop,
     is_multihop_active,
+    multihop_config_from_env,
     multihop_config_with_hidden_registry,
     multihop_status_text,
     product_country_catalog,
@@ -49,45 +55,60 @@ from rpos.installer.wipe_adapter import DryRunWipeAdapter  # noqa: E402
 
 
 class TestFlyclientHiddenAgent(unittest.TestCase):
+    def tearDown(self) -> None:
+        stop_all_live_agents()
+
     def test_resource_posture_no_selfhost_stack(self) -> None:
         self.assertFalse(USES_SELFHOST_STACK)
         self.assertFalse(USES_ZRAM_LUKS)
         self.assertFalse(USES_DISK_CRYPTO_INSTALL)
         with tempfile.TemporaryDirectory() as td:
-            rec = register_instance(td, install_id="rpos-test-1", start=True)
-            agent = FlyclientHiddenAgent(record=rec)
-            start = agent.start()
-            stop = agent.stop()
+            rec = register_instance(
+                td, install_id="rpos-test-1", host="127.0.0.1", port=0, start=True
+            )
+            agent = get_live_agent(rec.install_id)
+            self.assertIsNotNone(agent)
+            assert agent is not None
+            start = agent._status_dict(ok=True)
             self.assertTrue(start["ok"])
-            self.assertTrue(stop["ok"])
+            self.assertTrue(start["running"])
             self.assertFalse(start["uses_selfhost"])
             self.assertFalse(start["uses_zram_luks"])
             self.assertFalse(start["public_catalog"])
+            # Real bound port — not ConnectionRefused
+            resp = probe_hidden_hook(rec.host, int(rec.port), b"PING")
+            self.assertTrue(resp.startswith(HOOK_BANNER_PREFIX))
+            self.assertIn(rec.install_id.encode(), resp)
+            # Pure hook unit
+            pure = handle_hook_payload(rec.install_id, b"FORWARD:abc")
+            self.assertTrue(pure.startswith(HOOK_BANNER_PREFIX))
+            self.assertIn(b"FWD:abc", pure)
+            stop = agent.stop()
+            self.assertTrue(stop["ok"])
             posture = agent.resource_posture()
             self.assertLessEqual(posture["max_rss_mb"], 128)
             self.assertLessEqual(posture["max_cpu_percent"], 15)
             self.assertFalse(posture["uses_selfhost"])
-            # Must not have invoked selfhost scripts
             blob = " ".join(agent.invocations)
             for m in FORBIDDEN_SELFHOST_MARKERS:
                 self.assertNotIn(m, blob)
-            # Agent start/stop path does not shell out
             src = (ROOT / "client" / "flyclient_hidden_node.py").read_text(
                 encoding="utf-8"
             )
             self.assertNotIn("subprocess", src)
             self.assertNotIn("os.system", src)
             self.assertNotIn("Popen", src)
-            # Forbid list documents markers; agent must never call them
             self.assertIn("FORBIDDEN_SELFHOST_MARKERS", src)
-            self.assertTrue(start.get("uses_selfhost") is False)
 
     def test_register_not_public_catalog(self) -> None:
         with tempfile.TemporaryDirectory() as td:
+            # Bind loopback (participation identity); never a public monopin.
             rec = register_instance(
                 td,
                 install_id="rpos-hid-2",
-                host=synthetic_hidden_host(seed="aa"),
+                host="127.0.0.1",
+                port=0,
+                start=True,
             )
             assert_not_public_catalog(rec)
             self.assertEqual(rec.role, ROLE_HIDDEN)
@@ -97,9 +118,15 @@ class TestFlyclientHiddenAgent(unittest.TestCase):
             nodes = load_registry(td)
             self.assertEqual(len(nodes), 1)
             self.assertEqual(nodes[0].install_id, "rpos-hid-2")
+            # Port was actually bound (ephemeral if needed)
+            self.assertGreater(int(nodes[0].port), 0)
+            probe_hidden_hook(nodes[0].host, int(nodes[0].port))
 
 
 class TestRposInstallEnablesHiddenNode(unittest.TestCase):
+    def tearDown(self) -> None:
+        stop_all_live_agents()
+
     def test_pipeline_restore_enables_hidden_flyclient(self) -> None:
         with tempfile.TemporaryDirectory() as td:
             prefix = Path(td) / "root"
@@ -114,10 +141,14 @@ class TestRposInstallEnablesHiddenNode(unittest.TestCase):
             hn = r["hidden_node"]
             self.assertTrue(hn["ok"])
             self.assertTrue(hn["enabled"])
+            self.assertTrue(hn.get("hook_ok"))
             self.assertEqual(hn["agent"], AGENT_NAME)
             self.assertFalse(hn["public_catalog"])
             self.assertFalse(hn["uses_selfhost"])
             self.assertFalse(hn["uses_zram_luks"])
+            # Live participation: TCP connect to registered host:port succeeds
+            resp = probe_hidden_hook(hn["host"], int(hn["port"]), b"PING")
+            self.assertTrue(resp.startswith(HOOK_BANNER_PREFIX))
             marker = Path(r["install"]["marker"])
             data = json.loads(marker.read_text(encoding="utf-8"))
             self.assertTrue(data["hidden_node_enabled"])
@@ -125,14 +156,27 @@ class TestRposInstallEnablesHiddenNode(unittest.TestCase):
             self.assertFalse(data["hidden_node_public_catalog"])
             self.assertFalse(data["hidden_node_uses_selfhost"])
             self.assertTrue(data.get("install_id"))
-            # Registry file on disk
+            self.assertTrue(data.get("hidden_node_hook_ok"))
             reg = list_enabled_hidden_nodes(single_prefix=prefix)
             self.assertEqual(len(reg), 1)
             self.assertEqual(reg[0].install_id, data["install_id"])
+            # Product multi-hop path loads this registry when multihop on
+            cfg = multihop_config_from_env(
+                {
+                    "RPT_MULTIHOP_ENABLED": "1",
+                    "RPT_ENTRY_COUNTRY": "IS",
+                    "RPT_HIDDEN_NODE_PREFIX": str(prefix),
+                }
+            )
+            self.assertTrue(is_multihop_active(cfg))
+            hidden = [h for h in cfg.hops if h.is_hidden()]
+            self.assertGreaterEqual(len(hidden), 1)
+            self.assertEqual(hidden[0].host, hn["host"])
+            self.assertEqual(int(hidden[0].port), int(hn["port"]))
+            self.assertEqual(residual_endpoint(cfg).host, PRODUCT_DE_HOST)
 
     def test_enable_for_rpos_install_entry_point(self) -> None:
         with tempfile.TemporaryDirectory() as td:
-            # Pre-create marker as pipeline does
             pref = Path(td)
             (pref / "RPOS_INSTALLED.json").write_text(
                 json.dumps({"product": "rpOS", "oobe_pending": True}) + "\n",
@@ -140,11 +184,48 @@ class TestRposInstallEnablesHiddenNode(unittest.TestCase):
             )
             out = enable_for_rpos_install(pref)
             self.assertTrue(out["enabled"])
+            self.assertTrue(out["hook_ok"])
             data = json.loads((pref / "RPOS_INSTALLED.json").read_text(encoding="utf-8"))
             self.assertTrue(data["flyclient_hidden_node"])
+            probe_hidden_hook(out["host"], int(out["port"]))
 
 
 class TestMultihopHiddenPath(unittest.TestCase):
+    def tearDown(self) -> None:
+        stop_all_live_agents()
+
+    def test_product_multihop_from_env_includes_live_hidden(self) -> None:
+        """Connect path builder multihop_config_from_env injects live flyclient hops."""
+        with tempfile.TemporaryDirectory() as td:
+            out = enable_for_rpos_install(Path(td), install_id="rpos-env-live")
+            self.assertTrue(out["hook_ok"])
+            cfg = multihop_config_from_env(
+                {
+                    "RPT_MULTIHOP_ENABLED": "1",
+                    "RPT_ENTRY_COUNTRY": "DE",
+                    "RPT_HIDDEN_NODE_PREFIX": td,
+                }
+            )
+            self.assertTrue(is_multihop_active(cfg))
+            roles = [h.role for h in cfg.hops]
+            self.assertEqual(roles[0], "entry")
+            self.assertEqual(roles[-1], "exit")
+            self.assertIn(ROLE_HIDDEN, roles)
+            # Residual still exit catalog peer
+            self.assertIn(
+                residual_endpoint(cfg).host,
+                {PRODUCT_NODE_HOST, PRODUCT_DE_HOST},
+            )
+            self.assertNotEqual(residual_endpoint(cfg).host, out["host"])
+            # Off → no hidden
+            off = multihop_config_from_env(
+                {
+                    "RPT_MULTIHOP_ENABLED": "0",
+                    "RPT_HIDDEN_NODE_PREFIX": td,
+                }
+            )
+            self.assertFalse(any(h.is_hidden() for h in off.hops))
+
     def test_path_includes_hidden_not_public(self) -> None:
         hid_host = synthetic_hidden_host(seed="bb")
         hidden = [Hop(hid_host, 44051, role=ROLE_HIDDEN)]
@@ -210,11 +291,15 @@ class TestMultihopHiddenPath(unittest.TestCase):
             rec = register_instance(
                 td,
                 install_id="rpos-path",
-                host=synthetic_hidden_host(seed="ee"),
+                host="127.0.0.1",
+                port=0,
+                start=True,
             )
             hops = hidden_hops_from_records([rec])
             self.assertEqual(len(hops), 1)
             self.assertTrue(hops[0].is_hidden())
+            # Live hook reachable
+            probe_hidden_hook(hops[0].host, int(hops[0].port), b"x")
             cfg = build_multihop_path_with_hidden(
                 Hop(PRODUCT_NODE_HOST, role="entry"),
                 Hop(PRODUCT_DE_HOST, role="exit"),

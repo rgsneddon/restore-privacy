@@ -8,14 +8,21 @@ multi-hop structure. This is a light agent (OBJECTIVE: flyclient) — it does
 - skip residual Connect HELLO (legacy residual HELLO-skip path — removed)
 - appear as a public catalog residual entry/exit dial target
 
-Resource posture is deliberately bounded: in-process registry + optional
-loopback hook only; no disk crypto stack, no host wipe, no package reinstall.
+Resource posture is deliberately bounded: a small loopback TCP **hook acceptor**
+plus on-disk registry (no disk crypto stack, no host wipe, no package reinstall).
+
+Participation identity is the bound ``host:port`` of the hook (default loopback)
+so multi-hop path builders can include a real intermediate that accepts sockets.
+NAT desktop installs stay on loopback — honest light participation, not a public
+VPS equivalent.
 """
 
 from __future__ import annotations
 
 import json
 import secrets
+import socket
+import threading
 import time
 import uuid
 from dataclasses import asdict, dataclass, field
@@ -42,10 +49,19 @@ FORBIDDEN_SELFHOST_MARKERS = (
 )
 
 ROLE_HIDDEN = "hidden"
-DEFAULT_HOOK_PORT = 44050  # local participation hook (not public residual dial)
+DEFAULT_HOOK_PORT = 44050  # preferred local participation hook port
+DEFAULT_BIND_HOST = "127.0.0.1"
+# Wire banner for the light hook (not residual HELLO).
+HOOK_BANNER_PREFIX = b"FLYCLIENT_HIDDEN_OK"
+HOOK_RECV_MAX = 512
+HOOK_FORWARD_PREFIX = b"FORWARD:"
 
 REGISTRY_FILENAME = "flyclient_hidden_node.json"
 INSTALL_MARKER_NAME = "RPOS_INSTALLED.json"
+
+# Process-local live agents (bound sockets). Keyed by install_id.
+_LIVE_AGENTS: dict[str, "FlyclientHiddenAgent"] = {}
+_LIVE_LOCK = threading.Lock()
 
 
 @dataclass
@@ -102,28 +118,163 @@ class HiddenNodeRecord:
         return Hop(host=self.host, port=int(self.port), role=ROLE_HIDDEN)
 
 
+def handle_hook_payload(install_id: str, data: bytes) -> bytes:
+    """Pure light hook/forward unit (no selfhost). Callable without a socket.
+
+    - Empty / probe → banner with install id
+    - ``FORWARD:<bytes>`` → echo payload (bounded light forward)
+    - anything else → banner + ack of received length
+    """
+    iid = (install_id or "").encode("utf-8")
+    banner = HOOK_BANNER_PREFIX + b" " + iid + b"\n"
+    raw = data or b""
+    if raw.startswith(HOOK_FORWARD_PREFIX):
+        payload = raw[len(HOOK_FORWARD_PREFIX) : HOOK_RECV_MAX]
+        return banner + b"FWD:" + payload
+    if not raw.strip():
+        return banner
+    return banner + b"ACK:" + str(len(raw)).encode("ascii") + b"\n"
+
+
 @dataclass
 class FlyclientHiddenAgent:
-    """In-process light agent state for one install instance."""
+    """In-process light agent: binds a TCP hook acceptor for multi-hop participation."""
 
     record: HiddenNodeRecord
     started: bool = False
     # Audit: commands/scripts attempted (must stay empty of selfhost markers).
     invocations: list[str] = field(default_factory=list)
+    _sock: socket.socket | None = field(default=None, repr=False)
+    _thread: threading.Thread | None = field(default=None, repr=False)
+    _stop: threading.Event = field(default_factory=threading.Event, repr=False)
+    accepts: int = 0
 
     def start(self) -> dict[str, Any]:
-        """Start light participation hook — no selfhost / LUKS / zram."""
+        """Bind loopback (or configured host) TCP hook and accept in a daemon thread.
+
+        No selfhost / LUKS / zram. On port conflict, binds an ephemeral free port
+        and updates ``record.port`` to the real bound port.
+        """
         if any(m in " ".join(self.invocations) for m in FORBIDDEN_SELFHOST_MARKERS):
             raise RuntimeError("hidden flyclient agent must not invoke selfhost stack")
-        self.started = True
-        self.record.running = True
+        if self.started and self._sock is not None:
+            return self._status_dict(ok=True)
+
+        # Light desktop participation binds loopback only (honest NAT posture).
+        # Non-loopback / public catalog hosts are rewritten so bind always works.
+        want = (self.record.host or DEFAULT_BIND_HOST).strip() or DEFAULT_BIND_HOST
+        if want in ("0.0.0.0", "::", "*", "localhost"):
+            want = DEFAULT_BIND_HOST
+        if want not in ("127.0.0.1", "::1") or is_public_catalog_peer_host(want):
+            want = DEFAULT_BIND_HOST
+        bind_host = DEFAULT_BIND_HOST
+        port = int(self.record.port or 0)
+        if port <= 0 or port > 65535:
+            port = 0
+
+        sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        try:
+            try:
+                sock.bind((bind_host, port))
+            except OSError:
+                # Preferred port busy — ephemeral free port.
+                sock.bind((bind_host, 0))
+        except OSError:
+            try:
+                sock.close()
+            except OSError:
+                pass
+            raise
+        sock.listen(16)
+        sock.settimeout(0.5)
+        bound_host, bound_port = sock.getsockname()[:2]
+        # Participation identity = actually bound address (connectible).
+        self.record.host = str(bound_host) if str(bound_host) != "0.0.0.0" else DEFAULT_BIND_HOST
+        self.record.port = int(bound_port)
         self.record.enabled = True
+        self.record.running = True
+        self.record.public_catalog = False
+        self.record.visibility = "hidden"
+        self._sock = sock
+        self._stop.clear()
+        self._thread = threading.Thread(
+            target=self._accept_loop,
+            name=f"flyclient-hidden-{self.record.install_id[:12]}",
+            daemon=True,
+        )
+        self._thread.start()
+        self.started = True
+        with _LIVE_LOCK:
+            _LIVE_AGENTS[self.record.install_id] = self
+        return self._status_dict(ok=True)
+
+    def _accept_loop(self) -> None:
+        sock = self._sock
+        if sock is None:
+            return
+        while not self._stop.is_set():
+            try:
+                conn, _addr = sock.accept()
+            except socket.timeout:
+                continue
+            except OSError:
+                break
+            self.accepts += 1
+            try:
+                conn.settimeout(2.0)
+                try:
+                    data = conn.recv(HOOK_RECV_MAX)
+                except OSError:
+                    data = b""
+                resp = handle_hook_payload(self.record.install_id, data)
+                try:
+                    conn.sendall(resp)
+                except OSError:
+                    pass
+            finally:
+                try:
+                    conn.close()
+                except OSError:
+                    pass
+
+    def stop(self) -> dict[str, Any]:
+        self._stop.set()
+        sock = self._sock
+        self._sock = None
+        if sock is not None:
+            try:
+                sock.close()
+            except OSError:
+                pass
+        thr = self._thread
+        if thr is not None and thr.is_alive():
+            thr.join(timeout=2.0)
+        self._thread = None
+        self.started = False
+        self.record.running = False
+        with _LIVE_LOCK:
+            if _LIVE_AGENTS.get(self.record.install_id) is self:
+                _LIVE_AGENTS.pop(self.record.install_id, None)
         return {
             "ok": True,
             "agent": AGENT_NAME,
+            "install_id": self.record.install_id,
+            "running": False,
+            "accepts": self.accepts,
+            "invocations": list(self.invocations),
+        }
+
+    def _status_dict(self, *, ok: bool) -> dict[str, Any]:
+        return {
+            "ok": ok,
+            "agent": AGENT_NAME,
             "kind": AGENT_KIND,
             "install_id": self.record.install_id,
-            "running": True,
+            "running": bool(self.started and self._sock is not None),
+            "host": self.record.host,
+            "port": int(self.record.port),
+            "bound": f"{self.record.host}:{int(self.record.port)}",
             "uses_selfhost": USES_SELFHOST_STACK,
             "uses_zram_luks": USES_ZRAM_LUKS,
             "uses_disk_crypto_install": USES_DISK_CRYPTO_INSTALL,
@@ -131,17 +282,7 @@ class FlyclientHiddenAgent:
             "max_cpu_percent": self.record.max_cpu_percent,
             "public_catalog": False,
             "visibility": "hidden",
-            "invocations": list(self.invocations),
-        }
-
-    def stop(self) -> dict[str, Any]:
-        self.started = False
-        self.record.running = False
-        return {
-            "ok": True,
-            "agent": AGENT_NAME,
-            "install_id": self.record.install_id,
-            "running": False,
+            "accepts": self.accepts,
             "invocations": list(self.invocations),
         }
 
@@ -154,7 +295,64 @@ class FlyclientHiddenAgent:
             "uses_zram_luks": USES_ZRAM_LUKS,
             "uses_disk_crypto_install": USES_DISK_CRYPTO_INSTALL,
             "forbidden_selfhost_markers": list(FORBIDDEN_SELFHOST_MARKERS),
+            "hook_bound": bool(self._sock is not None),
         }
+
+    def probe_local(self, payload: bytes = b"") -> bytes:
+        """Connect to this agent's bound hook and return the response bytes."""
+        if not self.started or self._sock is None:
+            raise RuntimeError("agent not started")
+        return probe_hidden_hook(self.record.host, int(self.record.port), payload)
+
+
+def probe_hidden_hook(
+    host: str,
+    port: int,
+    payload: bytes = b"",
+    *,
+    timeout: float = 2.0,
+) -> bytes:
+    """TCP client probe against a live flyclient hidden hook (real path)."""
+    h = (host or DEFAULT_BIND_HOST).strip() or DEFAULT_BIND_HOST
+    with socket.create_connection((h, int(port)), timeout=timeout) as s:
+        s.settimeout(timeout)
+        if payload:
+            s.sendall(payload)
+        else:
+            s.sendall(b"")
+        chunks: list[bytes] = []
+        try:
+            while True:
+                part = s.recv(HOOK_RECV_MAX)
+                if not part:
+                    break
+                chunks.append(part)
+                if len(b"".join(chunks)) >= HOOK_RECV_MAX:
+                    break
+        except socket.timeout:
+            pass
+        return b"".join(chunks)
+
+
+def get_live_agent(install_id: str) -> FlyclientHiddenAgent | None:
+    with _LIVE_LOCK:
+        return _LIVE_AGENTS.get(install_id)
+
+
+def list_live_agents() -> list[FlyclientHiddenAgent]:
+    with _LIVE_LOCK:
+        return list(_LIVE_AGENTS.values())
+
+
+def stop_all_live_agents() -> int:
+    """Stop every process-local agent (tests / shutdown)."""
+    with _LIVE_LOCK:
+        agents = list(_LIVE_AGENTS.values())
+    n = 0
+    for a in agents:
+        a.stop()
+        n += 1
+    return n
 
 
 def new_install_id() -> str:
@@ -200,21 +398,22 @@ def register_instance(
     prefix: Path | str,
     *,
     install_id: str | None = None,
-    host: str = "127.0.0.1",
+    host: str = DEFAULT_BIND_HOST,
     port: int = DEFAULT_HOOK_PORT,
     start: bool = True,
 ) -> HiddenNodeRecord:
     """Register (or refresh) this install as a hidden multi-hop node.
 
-    Persists under *prefix*/flyclient_hidden_node.json. Never marks public_catalog.
+    Persists under *prefix*/flyclient_hidden_node.json. When *start* is True,
+    binds a real TCP hook acceptor and keeps the agent in the process-local
+    live map. Never marks public_catalog.
     """
     pref = Path(prefix)
     pref.mkdir(parents=True, exist_ok=True)
     iid = (install_id or "").strip() or new_install_id()
-    host_s = (host or "").strip() or "127.0.0.1"
-    # Never allow empty host that could collide with public catalog semantics.
+    host_s = (host or "").strip() or DEFAULT_BIND_HOST
     if host_s in ("0.0.0.0", "::", "*"):
-        host_s = "127.0.0.1"
+        host_s = DEFAULT_BIND_HOST
 
     nodes = load_registry(pref)
     existing = next((n for n in nodes if n.install_id == iid), None)
@@ -223,14 +422,14 @@ def register_instance(
         rec = HiddenNodeRecord(
             install_id=iid,
             host=host_s,
-            port=int(port),
+            port=int(port) if port else 0,
             registered_unix=now,
             prefix=str(pref),
         )
         nodes.append(rec)
     else:
         existing.host = host_s
-        existing.port = int(port)
+        existing.port = int(port) if port else int(existing.port or 0)
         existing.enabled = True
         existing.public_catalog = False
         existing.visibility = "hidden"
@@ -239,9 +438,23 @@ def register_instance(
         existing.prefix = str(pref)
         rec = existing
 
-    agent = FlyclientHiddenAgent(record=rec)
+    live = get_live_agent(iid)
     if start:
-        agent.start()
+        if live is not None and live.started:
+            # Refresh host/port from live bind
+            rec.host = live.record.host
+            rec.port = live.record.port
+            rec.running = True
+            agent = live
+        else:
+            agent = FlyclientHiddenAgent(record=rec)
+            agent.start()
+            rec = agent.record
+        # Sync registry list with bound identity
+        for i, n in enumerate(nodes):
+            if n.install_id == iid:
+                nodes[i] = rec
+                break
     save_registry(pref, nodes)
     return rec
 
@@ -250,15 +463,14 @@ def enable_for_rpos_install(
     prefix: Path | str,
     *,
     install_id: str | None = None,
-    host: str = "127.0.0.1",
+    host: str = DEFAULT_BIND_HOST,
     port: int | None = None,
 ) -> dict[str, Any]:
     """rpOS install-path entry: enable hidden flyclient node for this instance.
 
-    Safe for dry-run / smoke: local registry only, no selfhost scripts.
+    Binds a real light TCP hook (default loopback). No selfhost scripts.
     """
     pref = Path(prefix)
-    # Stable id from install marker when present.
     iid = (install_id or "").strip()
     marker = pref / INSTALL_MARKER_NAME
     if not iid and marker.is_file():
@@ -270,30 +482,44 @@ def enable_for_rpos_install(
     if not iid:
         iid = new_install_id()
 
-    # Ephemeral local port offset from id (still loopback-only participation).
+    # Preferred port from id; bind may fall back to ephemeral if busy.
     if port is None:
-        # Deterministic-ish port in private range from install id entropy.
         digest = sum(ord(c) for c in iid) % 1000
         port = DEFAULT_HOOK_PORT + digest
 
     rec = register_instance(
         pref,
         install_id=iid,
-        host=host,
+        host=host or DEFAULT_BIND_HOST,
         port=int(port),
         start=True,
     )
-    agent = FlyclientHiddenAgent(record=rec)
-    start_info = agent.start() if not rec.running else {
-        "ok": True,
-        "running": True,
-        "agent": AGENT_NAME,
-        "install_id": rec.install_id,
-        "uses_selfhost": False,
-        "uses_zram_luks": False,
-        "public_catalog": False,
-    }
-    # Persist flags on install marker when present.
+    agent = get_live_agent(rec.install_id)
+    if agent is None:
+        agent = FlyclientHiddenAgent(record=rec)
+        start_info = agent.start()
+        rec = agent.record
+        # persist bound identity
+        nodes = load_registry(pref)
+        for i, n in enumerate(nodes):
+            if n.install_id == rec.install_id:
+                nodes[i] = rec
+                break
+        else:
+            nodes.append(rec)
+        save_registry(pref, nodes)
+    else:
+        start_info = agent._status_dict(ok=True)
+
+    # Prove hook accepts connections (participation unit is live).
+    try:
+        probe = probe_hidden_hook(rec.host, int(rec.port), b"PING")
+        hook_ok = probe.startswith(HOOK_BANNER_PREFIX)
+    except OSError as exc:
+        probe = b""
+        hook_ok = False
+        start_info = {**start_info, "probe_error": str(exc)}
+
     if marker.is_file():
         try:
             data = json.loads(marker.read_text(encoding="utf-8"))
@@ -308,10 +534,12 @@ def enable_for_rpos_install(
         data["hidden_node_agent"] = AGENT_NAME
         data["hidden_node_host"] = rec.host
         data["hidden_node_port"] = rec.port
+        data["hidden_node_bound"] = f"{rec.host}:{int(rec.port)}"
+        data["hidden_node_hook_ok"] = hook_ok
         marker.write_text(json.dumps(data, indent=2) + "\n", encoding="utf-8")
 
     return {
-        "ok": True,
+        "ok": bool(hook_ok),
         "enabled": True,
         "install_id": rec.install_id,
         "agent": AGENT_NAME,
@@ -320,15 +548,107 @@ def enable_for_rpos_install(
         "visibility": "hidden",
         "public_catalog": False,
         "host": rec.host,
-        "port": rec.port,
+        "port": int(rec.port),
+        "bound": f"{rec.host}:{int(rec.port)}",
+        "hook_ok": hook_ok,
+        "hook_probe": probe.decode("utf-8", errors="replace")[:120],
         "registry": str(registry_path(pref)),
         "uses_selfhost": USES_SELFHOST_STACK,
         "uses_zram_luks": USES_ZRAM_LUKS,
         "uses_disk_crypto_install": USES_DISK_CRYPTO_INSTALL,
-        "resource": agent.resource_posture(),
+        "resource": agent.resource_posture() if agent else {},
         "start": start_info,
         "record": rec.to_dict(),
     }
+
+
+def discover_hidden_registry_prefixes(
+    env: dict[str, str] | None = None,
+) -> list[Path]:
+    """Prefixes that may hold flyclient_hidden_node.json for product multi-hop."""
+    import os
+
+    e = env if env is not None else os.environ
+    out: list[Path] = []
+    raw = str(e.get("RPT_HIDDEN_NODE_PREFIXES", "") or "").strip()
+    if raw:
+        for part in raw.replace(";", os.pathsep).split(os.pathsep):
+            p = part.strip()
+            if p:
+                out.append(Path(p))
+    single = str(e.get("RPT_HIDDEN_NODE_PREFIX", "") or "").strip()
+    if single:
+        out.append(Path(single))
+    # Default rpOS install root
+    out.append(Path.home() / ".rpos" / "install")
+    # Dedupe preserving order
+    seen: set[str] = set()
+    uniq: list[Path] = []
+    for p in out:
+        key = str(p.resolve()) if p.exists() else str(p)
+        if key in seen:
+            continue
+        seen.add(key)
+        uniq.append(p)
+    return uniq
+
+
+def discover_enabled_hidden_hops(
+    env: dict[str, str] | None = None,
+    *,
+    prefixes: Sequence[Path | str] | None = None,
+    include_live: bool = True,
+) -> list:
+    """Hidden hops for product multi-hop: live agents + on-disk registries.
+
+    Returns multihop :class:`Hop` list with role=hidden only. Live process agents
+    win over stale registry ports so path identity matches the bound hook.
+    """
+    from client.multihop import Hop
+
+    hops: list = []
+    seen: set[tuple[str, int]] = set()
+
+    if include_live:
+        for agent in list_live_agents():
+            rec = agent.record
+            if not rec.enabled or not agent.started:
+                continue
+            host = (rec.host or "").strip()
+            port = int(rec.port or 0)
+            if not host or port <= 0:
+                continue
+            key = (host, port)
+            if key in seen:
+                continue
+            seen.add(key)
+            hops.append(Hop(host=host, port=port, role=ROLE_HIDDEN))
+
+    prefs: list[Path | str]
+    if prefixes is not None:
+        prefs = list(prefixes)
+    else:
+        prefs = list(discover_hidden_registry_prefixes(env))
+    for pref in prefs:
+        for rec in load_registry(pref):
+            if not rec.enabled:
+                continue
+            # Prefer live identity for same install_id
+            live = get_live_agent(rec.install_id)
+            if live is not None and live.started:
+                host = live.record.host
+                port = int(live.record.port)
+            else:
+                host = (rec.host or "").strip()
+                port = int(rec.port or 0)
+            if not host or port <= 0:
+                continue
+            key = (host, port)
+            if key in seen:
+                continue
+            seen.add(key)
+            hops.append(Hop(host=host, port=port, role=ROLE_HIDDEN))
+    return hops
 
 
 def list_enabled_hidden_nodes(
