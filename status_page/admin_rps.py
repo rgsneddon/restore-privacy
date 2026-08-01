@@ -442,69 +442,210 @@ def record_oracle_collation(
     return save_rps_stats(learned, stats_path=stats_path)
 
 
-def ensure_admin_rps_ready_surface(*, stats_path: Path | None = None) -> dict[str, Any]:
-    """Ensure readiness parameters can report true for co-joined stack.
+def _capacity_token() -> str:
+    import os
 
-    Collates live fleet peers when available; otherwise marks lab-ready co-join
-    so admin /admin/rps is not permanently false when architecture is present.
+    return (os.environ.get("RPT_CAPACITY_TOKEN") or "").strip()
+
+
+def probe_peer_cojoined_snapshot(
+    host: str,
+    *,
+    ui_port: int = 8080,
+    token: str | None = None,
+    timeout_s: float = 4.0,
+    transport: Any | None = None,
+) -> dict[str, Any] | None:
+    """GET residual private co-joined snapshot. None if 404/unauthorized/error.
+
+    Real path — does **not** invent readiness. Fail closed when co-join unavailable.
     """
-    sats: list[dict[str, Any]] = []
+    h = (host or "").strip()
+    if not h:
+        return None
+    tok = (token if token is not None else _capacity_token()).strip()
+    url = f"http://{h}:{int(ui_port)}/api/private/cojoined"
+    if tok:
+        url = f"{url}?token={tok}"
+    headers = {"Accept": "application/json"}
+    if tok:
+        headers["X-RPT-Capacity-Token"] = tok
+        headers["Authorization"] = f"Bearer {tok}"
     try:
-        from admin_node_usage import collect_live_fleet_usage_rows
+        if transport is not None:
+            raw = transport(url, headers, timeout_s)
+        else:
+            import urllib.request
 
-        rows = collect_live_fleet_usage_rows()
-        for r in rows or []:
-            d = r.to_dict() if hasattr(r, "to_dict") else dict(r)
-            host = str(d.get("host") or d.get("code") or "")
-            # When fleet probe is ok, treat as co-join ready for that peer.
-            ok = str(d.get("status") or "") == "ok"
-            live = d.get("sessions_live")
-            cap = d.get("sessions_cap")
-            cj = {
-                "cojoined": True,
-                "all_ready": ok,
-                "readiness": {
-                    "vpn": ok,
-                    "rpai": ok,
-                    "perccent": ok,
-                },
-                "roles": {
-                    "vpn": {"ready": ok, "stats": {}},
-                    "rpai": {
-                        "ready": ok,
-                        "stats": {"learning_epochs_local": 1 if ok else 0},
-                    },
-                    "perccent": {
-                        "ready": ok,
-                        "stats": {"seed_ticks": 1 if ok else 0},
-                    },
-                },
-            }
-            sats.append(
-                {
-                    "host": host,
-                    "cojoined": cj,
-                    "capacity": {
-                        "live": int(live or 0) if live is not None else 0,
-                        "capacity": int(cap or 0) if cap is not None else 0,
-                    },
-                }
-            )
+            req = urllib.request.Request(url, headers=headers, method="GET")
+            with urllib.request.urlopen(req, timeout=timeout_s) as resp:  # noqa: S310
+                if getattr(resp, "status", 200) >= 400:
+                    return None
+                raw = resp.read().decode("utf-8", errors="replace")
+        data = json.loads(raw)
+        if not isinstance(data, dict) or data.get("error"):
+            return None
+        # Must look like co-joined registry snapshot
+        if not data.get("cojoined") and "readiness" not in data and "roles" not in data:
+            return None
+        return data
     except Exception:  # noqa: BLE001
-        sats = []
-    # Prefer live fleet sats when every peer reports ok; otherwise lab-ready
-    # synthetic co-join so /admin/rps is not permanently false when architecture
-    # is present but probes are empty/erroring.
-    use_lab = True
-    if sats:
-        use_lab = not any(
-            bool((s.get("cojoined") or {}).get("all_ready")) for s in sats
+        return None
+
+
+def probe_peer_capacity_payload(
+    host: str,
+    *,
+    ui_port: int = 8080,
+    token: str | None = None,
+    timeout_s: float = 4.0,
+) -> dict[str, Any] | None:
+    """Optional capacity probe for session/compute counters (honest fail → {})."""
+    h = (host or "").strip()
+    if not h:
+        return None
+    tok = (token if token is not None else _capacity_token()).strip()
+    url = f"http://{h}:{int(ui_port)}/api/private/capacity"
+    if tok:
+        url = f"{url}?token={tok}"
+    headers = {"Accept": "application/json"}
+    if tok:
+        headers["X-RPT-Capacity-Token"] = tok
+        headers["Authorization"] = f"Bearer {tok}"
+    try:
+        import urllib.request
+
+        req = urllib.request.Request(url, headers=headers, method="GET")
+        with urllib.request.urlopen(req, timeout=timeout_s) as resp:  # noqa: S310
+            raw = resp.read().decode("utf-8", errors="replace")
+        data = json.loads(raw)
+        return data if isinstance(data, dict) and not data.get("error") else None
+    except Exception:  # noqa: BLE001
+        return None
+
+
+def collect_real_cojoined_satellites(
+    *,
+    peers: list[dict[str, Any]] | None = None,
+    token: str | None = None,
+    ui_port: int = 8080,
+    transport: Any | None = None,
+) -> list[dict[str, Any]]:
+    """Probe catalog residual peers for real /api/private/cojoined snapshots."""
+    if peers is None:
+        try:
+            from admin_node_usage import product_catalog_peers
+
+            peers = list(product_catalog_peers())
+        except Exception:  # noqa: BLE001
+            peers = [
+                {"code": "IS", "host": "82.221.101.241", "port": 44044},
+                {"code": "DE", "host": "178.105.187.178", "port": 44044},
+            ]
+    sats: list[dict[str, Any]] = []
+    for p in peers or []:
+        host = str(p.get("host") or "").strip()
+        if not host:
+            continue
+        cj = probe_peer_cojoined_snapshot(
+            host, ui_port=ui_port, token=token, transport=transport
         )
-    return record_oracle_collation(
-        None if use_lab else sats,
-        stats_path=stats_path,
-        lab_ready=use_lab,
+        if not cj:
+            # Honest: skip unavailable peers (do not invent readiness)
+            continue
+        cap = probe_peer_capacity_payload(host, ui_port=ui_port, token=token) or {}
+        sats.append({"host": host, "cojoined": cj, "capacity": cap})
+    return sats
+
+
+def load_stored_satellite_heartbeats(
+    *, stats_path: Path | None = None
+) -> list[dict[str, Any]]:
+    """Satellites last pushed via /api/node-cojoin-heartbeat (durable)."""
+    s = load_rps_stats(stats_path=stats_path)
+    raw = s.get("satellite_heartbeats")
+    if not isinstance(raw, list):
+        return []
+    out: list[dict[str, Any]] = []
+    for item in raw:
+        if isinstance(item, dict) and item.get("host") and item.get("cojoined"):
+            out.append(item)
+    return out
+
+
+def record_satellite_cojoin_heartbeat(
+    *,
+    host: str,
+    cojoined: dict[str, Any],
+    capacity: dict[str, Any] | None = None,
+    stats_path: Path | None = None,
+) -> dict[str, Any]:
+    """Persist one residual co-join heartbeat and re-collate oracle readiness."""
+    h = (host or "").strip()
+    if not h or not isinstance(cojoined, dict):
+        raise ValueError("host and cojoined required")
+    current = load_rps_stats(stats_path=stats_path)
+    beats: list[dict[str, Any]] = []
+    for item in current.get("satellite_heartbeats") or []:
+        if isinstance(item, dict) and str(item.get("host") or "") != h:
+            beats.append(item)
+    beats.append(
+        {
+            "host": h,
+            "cojoined": cojoined,
+            "capacity": capacity if isinstance(capacity, dict) else {},
+            "received_unix": int(time.time()),
+        }
     )
+    # Keep latest per host, cap 16
+    by_host: dict[str, dict[str, Any]] = {}
+    for b in beats:
+        by_host[str(b.get("host"))] = b
+    current["satellite_heartbeats"] = list(by_host.values())[-16:]
+    save_rps_stats(current, stats_path=stats_path)
+    return record_oracle_collation(
+        list(by_host.values()), stats_path=stats_path, lab_ready=False
+    )
+
+
+def ensure_admin_rps_ready_surface(
+    *,
+    stats_path: Path | None = None,
+    allow_lab_fallback: bool = False,
+    satellites: list[dict[str, Any]] | None = None,
+    token: str | None = None,
+) -> dict[str, Any]:
+    """Collate **real** co-joined satellite snapshots into durable rpS stats.
+
+    Order: injected *satellites* → live probe of residual ``/api/private/cojoined``
+    → durable heartbeats from residual POST → honest false (unless lab fallback).
+    Does **not** invent readiness from capacity-only probes.
+    """
+    sats = list(satellites) if satellites is not None else []
+    if satellites is None:
+        sats = collect_real_cojoined_satellites(token=token)
+        if not sats:
+            sats = load_stored_satellite_heartbeats(stats_path=stats_path)
+
+    if not sats and allow_lab_fallback:
+        return record_oracle_collation(None, stats_path=stats_path, lab_ready=True)
+
+    if not sats:
+        # Fail closed: architecture missing/unreachable → not all true
+        current = load_rps_stats(stats_path=stats_path)
+        current = apply_cojoined_readiness(
+            current, vpn=False, rpai=False, perccent=False, oracle=False
+        )
+        current["oracle_findings"] = list(current.get("oracle_findings") or [])
+        current["oracle_findings"].append(
+            "no residual /api/private/cojoined responses — deploy cojoined_roles"
+        )
+        current["oracle_findings"] = current["oracle_findings"][-16:]
+        current["oracle_satellites_seen"] = 0
+        current["oracle_satellites_ready"] = 0
+        return save_rps_stats(current, stats_path=stats_path)
+
+    return record_oracle_collation(sats, stats_path=stats_path, lab_ready=False)
 
 
 def render_admin_rps_stats_html(stats: dict[str, Any] | None = None) -> str:
@@ -615,14 +756,16 @@ def render_admin_rps_page_html() -> bytes:
             admin_section_top_link_html,
         )
     try:
-        stats = ensure_admin_rps_ready_surface()
+        # Probe residual private co-joined APIs (real path; no lab invent on prod)
+        stats = ensure_admin_rps_ready_surface(allow_lab_fallback=False)
     except Exception:  # noqa: BLE001
         stats = load_rps_stats()
     body = f"""
 <div id="{ADMIN_RPS_PAGE_ID}" data-admin-page="rps" class="admin-main-inner"
      data-cojoined-stack="1">
   <p class="admin-lead">Restore Privacy Server computational power · co-joined
-  residual (VPN + rpAI + Perccent) · admin only.</p>
+  residual (VPN + rpAI + Perccent) · admin only. Readiness is collated from live
+  residual <code>/api/private/cojoined</code> heartbeats (Helsinki oracle path).</p>
   {render_admin_rps_stats_html(stats)}
   {admin_section_top_link_html()}
 </div>

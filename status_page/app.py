@@ -2226,13 +2226,23 @@ class Handler(BaseHTTPRequestHandler):
         # Public Ned growth counters (honest stats only — no fingerprints / paths).
         if path in ("/api/ned-growth", "/api/ned-growth/"):
             try:
-                from admin_rps import load_rps_stats, ned_growth_public_snapshot
-            except ImportError:
-                from status_page.admin_rps import (  # type: ignore
+                from admin_rps import (
+                    ensure_admin_rps_ready_surface,
                     load_rps_stats,
                     ned_growth_public_snapshot,
                 )
-            snap = ned_growth_public_snapshot(load_rps_stats())
+            except ImportError:
+                from status_page.admin_rps import (  # type: ignore
+                    ensure_admin_rps_ready_surface,
+                    load_rps_stats,
+                    ned_growth_public_snapshot,
+                )
+            # Refresh from stored residual heartbeats + live co-join probes
+            try:
+                stats = ensure_admin_rps_ready_surface(allow_lab_fallback=False)
+            except Exception:  # noqa: BLE001
+                stats = load_rps_stats()
+            snap = ned_growth_public_snapshot(stats)
             body = json.dumps({"ok": True, "ned": snap}, indent=2).encode("utf-8")
             self._send(200, "application/json; charset=utf-8", body)
             return
@@ -2800,6 +2810,62 @@ class Handler(BaseHTTPRequestHandler):
                 )
                 return
             self._redirect(url)
+            return
+
+        if path in (
+            "/api/node-cojoin-heartbeat",
+            "/api/node-cojoin-heartbeat/",
+            "/node-cojoin-heartbeat",
+        ):
+            # Residual monopin posts co-joined readiness (capacity token auth).
+            try:
+                data = json.loads(body.decode("utf-8") or "{}")
+            except json.JSONDecodeError:
+                self._send(400, "application/json", b'{"ok":false,"error":"bad_json"}')
+                return
+            token = ""
+            auth = self.headers.get("Authorization") or ""
+            if auth.lower().startswith("bearer "):
+                token = auth[7:].strip()
+            token = token or (self.headers.get("X-RPT-Capacity-Token") or "").strip()
+            if not token and isinstance(data, dict):
+                token = str(data.get("token") or "").strip()
+            expected = (os.environ.get("RPT_CAPACITY_TOKEN") or "").strip()
+            if not expected or token != expected:
+                self._send(
+                    401, "application/json", b'{"ok":false,"error":"unauthorized"}'
+                )
+                return
+            host = str((data or {}).get("host") or "").strip()
+            cojoined = (data or {}).get("cojoined")
+            capacity = (data or {}).get("capacity")
+            if not host or not isinstance(cojoined, dict):
+                self._send(
+                    400,
+                    "application/json",
+                    b'{"ok":false,"error":"host_and_cojoined_required"}',
+                )
+                return
+            try:
+                from admin_rps import (
+                    ned_growth_public_snapshot,
+                    record_satellite_cojoin_heartbeat,
+                )
+            except ImportError:
+                from status_page.admin_rps import (  # type: ignore
+                    ned_growth_public_snapshot,
+                    record_satellite_cojoin_heartbeat,
+                )
+            saved = record_satellite_cojoin_heartbeat(
+                host=host,
+                cojoined=cojoined,
+                capacity=capacity if isinstance(capacity, dict) else None,
+            )
+            body_out = json.dumps(
+                {"ok": True, "ned": ned_growth_public_snapshot(saved)},
+                indent=2,
+            ).encode("utf-8")
+            self._send(200, "application/json; charset=utf-8", body_out)
             return
 
         if path == "/api/checkout":

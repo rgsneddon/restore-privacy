@@ -49,3 +49,31 @@ class Endpoint:
 
 
 DEFAULT_ENDPOINT = Endpoint()
+
+
+def cojoined_primary_contact() -> dict:
+    """Single residual contact for co-joined VPN + rpAI + Perccent stack.
+
+    Used by Connect path so clients do not maintain three host lists.
+    """
+    try:
+        from client.cojoined_contact import cojoined_single_contact
+
+        return cojoined_single_contact(
+            host=PRODUCT_NODE_HOST, port=PRODUCT_NODE_PORT
+        )
+    except Exception:  # noqa: BLE001
+        try:
+            from cojoined_contact import cojoined_single_contact  # type: ignore
+
+            return cojoined_single_contact(
+                host=PRODUCT_NODE_HOST, port=PRODUCT_NODE_PORT
+            )
+        except Exception:  # noqa: BLE001
+            return {
+                "host": PRODUCT_NODE_HOST,
+                "port": PRODUCT_NODE_PORT,
+                "contact": f"{PRODUCT_NODE_HOST}:{PRODUCT_NODE_PORT}",
+                "cojoined": True,
+                "roles": ("vpn", "rpai", "perccent"),
+            }

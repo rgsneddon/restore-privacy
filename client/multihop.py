@@ -26,7 +26,13 @@ import random
 from dataclasses import dataclass, field
 from typing import Iterable, Optional, Sequence
 
-from .endpoint import DEFAULT_ENDPOINT, PRODUCT_NODE_HOST, PRODUCT_NODE_PORT, Endpoint
+from .endpoint import (
+    DEFAULT_ENDPOINT,
+    PRODUCT_NODE_HOST,
+    PRODUCT_NODE_PORT,
+    Endpoint,
+    cojoined_primary_contact,
+)
 
 # Real residual multi-hop path selection is implemented: when active, Connect
 # dials the last hop (exit) for residual tunnel after the path is configured.
@@ -98,6 +104,15 @@ PRODUCT_COUNTRY_CATALOG: tuple[CountryNode, ...] = (
 def product_country_catalog() -> tuple[CountryNode, ...]:
     """Current residual country catalog (extend when new nodes ship)."""
     return PRODUCT_COUNTRY_CATALOG
+
+
+def cojoined_connect_contact() -> dict:
+    """Single point of contact for residual Connect to the co-joined stack.
+
+    Primary residual host:port for VPN HELLO; same host carries Ned/rpAI and
+    Perccent private hooks (see client.cojoined_contact).
+    """
+    return cojoined_primary_contact()
 
 
 def normalize_entry_country(code: str | None) -> str:

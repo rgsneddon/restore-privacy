@@ -85,7 +85,9 @@ class TestAdminRpsReady(unittest.TestCase):
         td = tempfile.TemporaryDirectory()
         try:
             path = Path(td.name) / "rps.json"
-            stats = ensure_admin_rps_ready_surface(stats_path=path)
+            stats = ensure_admin_rps_ready_surface(
+                stats_path=path, allow_lab_fallback=True
+            )
             ready = readiness_parameters(stats)
             for k, v in ready.items():
                 self.assertTrue(v, msg=f"{k} should be true, got {v}")
@@ -123,6 +125,44 @@ class TestAdminRpsReady(unittest.TestCase):
         learned = ned_learn_oracle({}, o)
         self.assertTrue(learned["ready_cojoined"])
         self.assertGreaterEqual(learned["compute_score"], 0)
+
+
+class TestRealCojoinProbe(unittest.TestCase):
+    def test_probe_uses_real_transport_not_lab_by_default(self) -> None:
+        from admin_rps import ensure_admin_rps_ready_surface, readiness_parameters
+
+        # Empty satellites + no live peers → honest false (not lab invent)
+        stats = ensure_admin_rps_ready_surface(
+            stats_path=Path(tempfile.mkdtemp()) / "s.json",
+            satellites=[],
+            allow_lab_fallback=False,
+        )
+        ready = readiness_parameters(stats)
+        self.assertFalse(ready["ready_cojoined"])
+
+    def test_injected_real_satellites_make_ready_true(self) -> None:
+        from admin_rps import ensure_admin_rps_ready_surface, readiness_parameters
+
+        cj = {
+            "cojoined": True,
+            "all_ready": True,
+            "readiness": {"vpn": True, "rpai": True, "perccent": True},
+            "roles": {
+                "vpn": {"ready": True, "stats": {}},
+                "rpai": {"ready": True, "stats": {"learning_epochs_local": 2}},
+                "perccent": {"ready": True, "stats": {"seed_ticks": 2}},
+            },
+        }
+        sats = [
+            {"host": "82.221.101.241", "cojoined": cj, "capacity": {"live": 1, "capacity": 512}},
+            {"host": "178.105.187.178", "cojoined": cj, "capacity": {"live": 2, "capacity": 1024}},
+        ]
+        path = Path(tempfile.mkdtemp()) / "s2.json"
+        stats = ensure_admin_rps_ready_surface(
+            stats_path=path, satellites=sats, allow_lab_fallback=False
+        )
+        ready = readiness_parameters(stats)
+        self.assertTrue(all(ready.values()), ready)
 
 
 class TestNodeOperatorDoc(unittest.TestCase):

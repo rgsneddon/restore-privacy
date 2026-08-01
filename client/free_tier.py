@@ -18,8 +18,24 @@ from dataclasses import dataclass
 FREE_TIER_VERSION = "3.3.3"
 
 # Iceland product entry (same as client.endpoint.PRODUCT_NODE_HOST).
-FREE_TIER_ENTRY_HOST = "82.221.101.241"
-FREE_TIER_ENTRY_PORT = 44044
+# Prefer cojoined single-contact when available.
+def _cojoined_entry() -> tuple[str, int]:
+    try:
+        from client.cojoined_contact import primary_residual_endpoint
+
+        return primary_residual_endpoint()
+    except Exception:  # noqa: BLE001
+        try:
+            from cojoined_contact import primary_residual_endpoint  # type: ignore
+
+            return primary_residual_endpoint()
+        except Exception:  # noqa: BLE001
+            return "82.221.101.241", 44044
+
+
+_cj_host, _cj_port = _cojoined_entry()
+FREE_TIER_ENTRY_HOST = _cj_host
+FREE_TIER_ENTRY_PORT = int(_cj_port)
 
 
 def free_tier_enabled() -> bool:
@@ -41,14 +57,17 @@ class FreeTierConnectivityPolicy:
     outer_obfuscation: bool = False
     # Core residual VPN still on (HELLO/session/tunnel).
     residual_vpn_core: bool = True
+    cojoined: bool = True
 
     def residual_host(self) -> str:
+        """Single residual contact host (co-joined VPN + rpAI + Perccent)."""
         return self.entry_host
 
 
 def free_tier_policy() -> FreeTierConnectivityPolicy:
     """Resolved free-tier policy (same defaults whether flag on/off for testing)."""
-    return FreeTierConnectivityPolicy()
+    h, p = _cojoined_entry()
+    return FreeTierConnectivityPolicy(entry_host=h, entry_port=int(p), cojoined=True)
 
 
 def free_tier_product_version() -> str:
