@@ -34,6 +34,14 @@ class _EvolveSurface extends StatelessWidget {
       );
 }
 
+class _RpaiSurface extends StatelessWidget {
+  const _RpaiSurface();
+  @override
+  Widget build(BuildContext context) => const Scaffold(
+        body: Center(child: Text('RPAI_SURFACE_NED')),
+      );
+}
+
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
@@ -67,14 +75,15 @@ void main() {
         .setMockMethodCallHandler(channel, null);
   });
 
-  test('suite version monopin is 1.0.0 Restore Privacy Suite', () {
-    expect(kSuiteVersion, '1.0.0');
+  test('suite version monopin is 1.0.1 Restore Privacy Suite', () {
+    expect(kSuiteVersion, '1.0.1');
     expect(kSuiteProductName, 'Restore Privacy Suite');
-    expect(kSuiteDisplayVersion, 'Restore Privacy Suite v 1.0.0');
-    expect(kSuiteTabLabels, ['VPN', '%', 'EVOLVE']);
+    expect(kSuiteDisplayVersion, 'Restore Privacy Suite v 1.0.1');
+    expect(kSuiteTabLabels, ['VPN', '%', 'EVOLVE', 'rpAI']);
     expect(kSuiteTabVpn, 'VPN');
     expect(kSuiteTabWallet, '%');
     expect(kSuiteTabEvolve, 'EVOLVE');
+    expect(kSuiteTabRpai, 'rpAI');
   });
 
   test('suite network defaults to Helsinki, not paused Render', () {
@@ -98,7 +107,7 @@ void main() {
     expect(u, 'http://example.test:9');
   });
 
-  testWidgets('shell declares VPN, %, EVOLVE tabs and switches surfaces',
+  testWidgets('shell declares VPN, %, EVOLVE, rpAI tabs and switches surfaces',
       (tester) async {
     await tester.pumpWidget(
       MaterialApp(
@@ -106,6 +115,7 @@ void main() {
           vpnTab: const _VpnSurface(),
           walletTab: const _WalletSurface(),
           evolveTab: const _EvolveSurface(),
+          rpaiTab: const _RpaiSurface(),
         ),
       ),
     );
@@ -119,11 +129,13 @@ void main() {
     expect(find.text('VPN'), findsWidgets);
     expect(find.text('%'), findsWidgets);
     expect(find.text('EVOLVE'), findsWidgets);
+    expect(find.text('rpAI'), findsWidgets);
 
     // Default tab = VPN primary surface.
     expect(find.text('VPN_SURFACE_CONNECT'), findsOneWidget);
     expect(find.text('WALLET_SURFACE_BOOTSTRAP'), findsNothing);
     expect(find.text('EVOLVE_SURFACE_HOME'), findsNothing);
+    expect(find.text('RPAI_SURFACE_NED'), findsNothing);
 
     // Select % tab.
     final shell = tester.state<SuiteShellState>(find.byType(SuiteShell));
@@ -140,6 +152,13 @@ void main() {
     expect(find.text('EVOLVE_SURFACE_HOME'), findsOneWidget);
     expect(find.text('WALLET_SURFACE_BOOTSTRAP'), findsNothing);
 
+    // Select rpAI (Ned) tab.
+    shell.selectTab(3);
+    await tester.pump();
+    expect(shell.currentTabIndex, 3);
+    expect(find.text('RPAI_SURFACE_NED'), findsOneWidget);
+    expect(find.text('EVOLVE_SURFACE_HOME'), findsNothing);
+
     // Back to VPN without process restart.
     shell.selectTab(0);
     await tester.pump();
@@ -153,6 +172,7 @@ void main() {
           vpnTab: const _VpnSurface(),
           walletTab: const _WalletSurface(),
           evolveTab: const _EvolveSurface(),
+          rpaiTab: const _RpaiSurface(),
         ),
       ),
     );
@@ -165,6 +185,10 @@ void main() {
     await tester.tap(find.text('EVOLVE').last);
     await tester.pump();
     expect(find.text('EVOLVE_SURFACE_HOME'), findsOneWidget);
+
+    await tester.tap(find.text('rpAI').last);
+    await tester.pump();
+    expect(find.text('RPAI_SURFACE_NED'), findsOneWidget);
   });
 
   testWidgets('RestorePrivacyApp hosts suite shell with real VPN home',

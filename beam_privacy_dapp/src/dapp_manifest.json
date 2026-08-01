@@ -1,0 +1,14 @@
+{
+  "name": "Restore Privacy Beam Dapp",
+  "version": "0.1.0",
+  "suite_monopin": "1.0.1",
+  "target": "Beam Privacy Suite",
+  "visibility": "private",
+  "products": [
+    "Restore Privacy Suite",
+    "Rx Privacy Browser",
+    "rpOS commercial foundations",
+    "Ned rpAI helper"
+  ],
+  "deploy": "scaffold — private repo; not mainnet"
+}

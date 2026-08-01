@@ -795,6 +795,77 @@ def detect_platform_from_user_agent(user_agent: str = "") -> str:
     return ""
 
 
+
+# --- Rx Privacy Browser (MV3 companion under Suite monopin) ---
+RX_BROWSER_PACKAGE_BASENAME = (
+    f"restore-privacy-rx-browser-{RELEASE_VERSION}.zip"
+)
+BROWSER_EXTENSION_PACKAGE_BASENAME = (
+    f"restore-privacy-browser-extension-{RELEASE_VERSION}.zip"
+)
+
+
+def rx_browser_package_filename(version: str | None = None) -> str:
+    """Catalog basename for the Rx / browser-extension package (Suite monopin)."""
+    ver = (version or RELEASE_VERSION).strip() or RELEASE_VERSION
+    return f"restore-privacy-rx-browser-{ver}.zip"
+
+
+def browser_extension_package_filename(version: str | None = None) -> str:
+    """Canonical browser_extension zip basename for the Suite monopin."""
+    ver = (version or RELEASE_VERSION).strip() or RELEASE_VERSION
+    return f"restore-privacy-browser-extension-{ver}.zip"
+
+
+def rx_browser_package_href(
+    *,
+    version: str | None = None,
+    user_agent: str = "",
+) -> str:
+    """Relative free/store path for the Rx browser package.
+
+    MV3 zip is platform-agnostic (Chromium desktop). *user_agent* is retained for
+    device-aware presentation (mobile UA gets the same package + honesty note).
+    """
+    _ = detect_platform_from_user_agent(user_agent)  # device-aware path hook
+    fname = rx_browser_package_filename(version)
+    ver = (version or RELEASE_VERSION).strip() or RELEASE_VERSION
+    return f"/assets/{ver}/{fname}"
+
+
+def rx_browser_download_label(user_agent: str = "") -> str:
+    """Human label for the Rx download control (device-aware wording)."""
+    plat = detect_platform_from_user_agent(user_agent)
+    base = f"Rx Privacy Browser · Suite {RELEASE_VERSION}"
+    if plat in ("android", "ios"):
+        return f"{base} (desktop Chromium MV3 — load on a computer)"
+    if plat == "windows":
+        return f"{base} (Windows / Chromium Edge · Chrome)"
+    if plat == "macos":
+        return f"{base} (macOS / Chromium)"
+    if plat == "linux":
+        return f"{base} (Linux / Chromium)"
+    return f"{base} (Chromium MV3 extension)"
+
+
+def list_suite_extra_packages(
+    *, version: str | None = None
+) -> list[dict[str, str]]:
+    """Non-platform Suite companion packages (Rx browser extension, etc.)."""
+    ver = (version or RELEASE_VERSION).strip() or RELEASE_VERSION
+    return [
+        {
+            "version": ver,
+            "kind": "rx_browser",
+            "platform": "browser",
+            "filename": rx_browser_package_filename(ver),
+            "relative_path": f"{ver}/{rx_browser_package_filename(ver)}",
+            "alias_filename": browser_extension_package_filename(ver),
+            "product": "Rx Privacy Browser",
+        }
+    ]
+
+
 def download_menu_rows(
     assets: Iterable[DownloadAsset] | None = None,
 ) -> tuple[list[DownloadAsset], list[DownloadAsset]]:

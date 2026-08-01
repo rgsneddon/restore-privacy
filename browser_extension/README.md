@@ -1,13 +1,13 @@
 # Restore Privacy Suite — browser extension
 
-Chromium **Manifest V3** extension for **browser-scoped** Connect / Disconnect.
-It sits beside **Restore Privacy Suite 1.0.0** native installers; it is not a
-replacement for residual TUN.
+Chromium **Manifest V3** extension — **Rx Privacy Browser** companion for
+**browser-scoped** Connect / Disconnect. Ships with **Restore Privacy Suite
+1.0.1** native installers; it is not a replacement for residual TUN.
 
 ## Honesty
 
-- **Browser only:** routes this browser’s traffic via the configured **local proxy** path (`chrome.proxy`).
-- **Not OS residual:** does **not** create Wintun / Packet Tunnel / system residual TUN. Suite native clients (Windows · Android · macOS · iOS · Linux, catalog **1.0.0**) remain the residual product path.
+- **Browser only:** routes this browser’s traffic via the configured **local proxy** path (`chrome.proxy`). IPv4-focused free basic path; no OS residual settings surface.
+- **Not OS residual:** does **not** create Wintun / Packet Tunnel / system residual TUN. Suite native clients (Windows · Android · macOS · iOS · Linux, catalog **1.0.1**) remain the residual product path.
 - Default proxy target is `socks5://127.0.0.1:1080` (local companion / future bridge). Override via Connect options if your browser stack exposes a different local path.
 
 ## Load unpacked (developer)
@@ -32,8 +32,11 @@ Any custom browser that loads Chromium MV3 extensions can use the same package.
 
 ```bash
 cd browser_extension
-zip -r ../releases/0.4.4/restore-privacy-browser-extension-0.4.4.zip . \
-  -x '*.DS_Store' -x '*__pycache__*'
+zip -r ../releases/1.0.1/restore-privacy-browser-extension-1.0.1.zip . \
+  -x '*.DS_Store' -x '*__pycache__*' -x 'test/*'
+# Rx-branded alias (Service page / store):
+cp ../releases/1.0.1/restore-privacy-browser-extension-1.0.1.zip \
+   ../releases/1.0.1/restore-privacy-rx-browser-1.0.1.zip
 ```
 
 ## Pay / native residual

@@ -260,8 +260,61 @@ def render_service_commercial_box_html(*, pay_error: str = "") -> str:
 """
 
 
-def render_service_companion_box_html() -> str:
-    """Right half layout companion — free Suite / KEYGEN path pointer."""
+SERVICE_RX_BOX_ID = "service-rx-browser-box"
+SERVICE_RX_LINK_ID = "service-link-rx-browser"
+
+
+def render_service_rx_browser_box_html(*, user_agent: str = "") -> str:
+    """Rx Privacy Browser package link — device/UA-aware when UA is known."""
+    try:
+        from downloads import (
+            RELEASE_VERSION,
+            detect_platform_from_user_agent,
+            rx_browser_download_label,
+            rx_browser_package_filename,
+            rx_browser_package_href,
+        )
+    except ImportError:  # pragma: no cover
+        from status_page.downloads import (  # type: ignore
+            RELEASE_VERSION,
+            detect_platform_from_user_agent,
+            rx_browser_download_label,
+            rx_browser_package_filename,
+            rx_browser_package_href,
+        )
+    href = rx_browser_package_href(user_agent=user_agent)
+    label = rx_browser_download_label(user_agent)
+    plat = detect_platform_from_user_agent(user_agent) or "unknown"
+    fname = rx_browser_package_filename()
+    return f"""
+  <section class="panel-card service-rx-browser-box" id="{SERVICE_RX_BOX_ID}"
+           data-service-rx="1" data-product="rx-browser"
+           data-detected-platform="{_esc(plat)}"
+           aria-label="Rx Privacy Browser">
+    <h2 id="service-rx-title">Rx Privacy Browser</h2>
+    <p class="service-companion-body" id="service-rx-body">
+      Suite <strong>{_esc(RELEASE_VERSION)}</strong> includes the <strong>Rx</strong>
+      Chromium MV3 companion — browser-scoped Connect/Disconnect (IPv4 basic path).
+      Not OS residual TUN. Load unpacked or install the zip in Chromium-class browsers.
+    </p>
+    <div class="service-companion-links" id="service-rx-links">
+      <a href="{_esc(href)}" id="{SERVICE_RX_LINK_ID}"
+         data-rx-browser-download="1"
+         data-package="{_esc(fname)}"
+         data-detected-platform="{_esc(plat)}"
+         download="{_esc(fname)}">{_esc(label)}</a>
+    </div>
+  </section>
+"""
+
+
+def render_service_companion_box_html(*, user_agent: str = "") -> str:
+    """Right half layout companion — free Suite / KEYGEN / Rx path pointer."""
+    try:
+        from downloads import rx_browser_package_href
+    except ImportError:  # pragma: no cover
+        from status_page.downloads import rx_browser_package_href  # type: ignore
+    rx_href = rx_browser_package_href(user_agent=user_agent)
     return f"""
   <section class="panel-card service-companion-box" id="{SERVICE_COMPANION_BOX_ID}"
            data-service-companion="1" aria-label="Individual Suite path">
@@ -272,16 +325,20 @@ def render_service_companion_box_html() -> str:
     <div class="service-companion-links" id="service-companion-links">
       <a href="/#suite-storefront" id="service-link-free-suite">Free Suite download</a>
       <a href="/#suite-keygen-form" id="service-link-keygen">Monthly KEYGEN</a>
+      <a href="{_esc(rx_href)}" id="service-link-rx-browser-inline"
+         data-rx-browser-download="1">Rx Privacy Browser package</a>
       <a href="/NODE_OPERATOR.md" id="service-link-node-op">Node operator docs</a>
     </div>
   </section>
 """
 
 
-def render_service_shop_row_html(*, pay_error: str = "") -> str:
+def render_service_shop_row_html(
+    *, pay_error: str = "", user_agent: str = ""
+) -> str:
     """Dual half-width row matching homepage home-shop-row structure."""
     left = render_service_commercial_box_html(pay_error=pay_error)
-    right = render_service_companion_box_html()
+    right = render_service_companion_box_html(user_agent=user_agent)
     return f"""
     <div class="service-shop-row home-shop-row" id="{SERVICE_SHOP_ROW_ID}"
          data-home-shop-row="1" data-service-shop-row="1"
@@ -296,6 +353,7 @@ def render_service_page_html(
     *,
     pay_error: str = "",
     paid: bool = False,
+    user_agent: str = "",
 ) -> bytes:
     """Full public Service page HTML (status host)."""
     try:
@@ -330,7 +388,8 @@ def render_service_page_html(
     extra = service_page_css()
     header = public_brand_header_html(active="service", product_active="vpn")
     intro = render_service_intro_html()
-    shop = render_service_shop_row_html(pay_error=pay_error)
+    shop = render_service_shop_row_html(pay_error=pay_error, user_agent=user_agent)
+    rx_box = render_service_rx_browser_box_html(user_agent=user_agent)
     # Inject success banner into left box top when paid
     if ok_html:
         shop = shop.replace(
@@ -353,6 +412,7 @@ def render_service_page_html(
           aria-label="Commercial Suite service">
 {intro}
 {shop}
+{rx_box}
     </main>
 {render_bmc_tip_html()}
   </div>

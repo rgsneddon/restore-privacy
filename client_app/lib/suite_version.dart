@@ -17,10 +17,12 @@ const String kSuiteDisplayVersion = 'Restore Privacy Suite v 1.0.1';
 const String kSuiteTabVpn = 'VPN';
 const String kSuiteTabWallet = '%';
 const String kSuiteTabEvolve = 'EVOLVE';
+const String kSuiteTabRpai = 'rpAI';
 
 /// Ordered tab labels for NavigationBar / tests.
 const List<String> kSuiteTabLabels = [
   kSuiteTabVpn,
   kSuiteTabWallet,
   kSuiteTabEvolve,
+  kSuiteTabRpai,
 ];

@@ -1,14 +1,16 @@
 import 'package:flutter/material.dart';
 
 import 'suite_evolve_tab.dart';
+import 'suite_rpai_tab.dart';
 import 'suite_version.dart';
 import 'suite_wallet_tab.dart';
 import 'theme.dart';
 
-/// Unified Restore Privacy Suite shell: **VPN** · **%** · **EVOLVE**.
+/// Unified Restore Privacy Suite shell: **VPN** · **%** · **EVOLVE** · **rpAI**.
 ///
 /// Tab switch keeps the process alive (IndexedStack). VPN is the residual
-/// tunnel home; % embeds Perccent wallet; EVOLVE embeds the full Evolve app.
+/// tunnel home; % embeds Perccent wallet; EVOLVE embeds the full Evolve app;
+/// rpAI is Ned, the Restore Privacy Helper.
 class SuiteShell extends StatefulWidget {
   const SuiteShell({
     super.key,
@@ -16,12 +18,13 @@ class SuiteShell extends StatefulWidget {
     this.initialTabIndex = 0,
     this.walletTab,
     this.evolveTab,
+    this.rpaiTab,
   });
 
   /// Residual VPN home (Connect / licence / settings) — required shipped surface.
   final Widget vpnTab;
 
-  /// 0 = VPN, 1 = %, 2 = EVOLVE.
+  /// 0 = VPN, 1 = %, 2 = EVOLVE, 3 = rpAI (Ned).
   final int initialTabIndex;
 
   /// Injectable wallet tab body (tests); production uses [SuiteWalletTab].
@@ -29,6 +32,9 @@ class SuiteShell extends StatefulWidget {
 
   /// Injectable evolve tab body (tests); production uses [SuiteEvolveTab].
   final Widget? evolveTab;
+
+  /// Injectable Ned / rpAI tab (tests); production uses [SuiteRpaiTab].
+  final Widget? rpaiTab;
 
   @override
   State<SuiteShell> createState() => SuiteShellState();
@@ -57,6 +63,7 @@ class SuiteShellState extends State<SuiteShell> {
   Widget build(BuildContext context) {
     final wallet = widget.walletTab ?? const SuiteWalletTab();
     final evolve = widget.evolveTab ?? const SuiteEvolveTab();
+    final rpai = widget.rpaiTab ?? const SuiteRpaiTab();
 
     return Scaffold(
       backgroundColor: kChromeBg,
@@ -71,6 +78,7 @@ class SuiteShellState extends State<SuiteShell> {
                 widget.vpnTab,
                 wallet,
                 evolve,
+                rpai,
               ],
             ),
           ),
@@ -97,6 +105,11 @@ class SuiteShellState extends State<SuiteShell> {
             icon: Icon(Icons.auto_graph_outlined),
             selectedIcon: Icon(Icons.auto_graph),
             label: kSuiteTabEvolve,
+          ),
+          NavigationDestination(
+            icon: Icon(Icons.smart_toy_outlined),
+            selectedIcon: Icon(Icons.smart_toy),
+            label: kSuiteTabRpai,
           ),
         ],
       ),

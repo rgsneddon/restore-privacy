@@ -1782,6 +1782,8 @@ def _admin_sidebar_html(*, active: str = "home") -> str:
     perc_cls = "sb-btn active" if active == "perc" else "sb-btn"
     acct_cls = "sb-btn active" if active == "accounting" else "sb-btn"
     support_cls = "sb-btn active" if active == "support-tickets" else "sb-btn"
+    rpos_cls = "sb-btn active" if active == "rpos" else "sb-btn"
+    rps_cls = "sb-btn active" if active == "rps" else "sb-btn"
     seed = ""
     if seed_test_purchase_enabled():
         seed = (
@@ -1820,6 +1822,10 @@ def _admin_sidebar_html(*, active: str = "home") -> str:
     <span class="sb-label">Fleet usage</span></a>
   <a class="{node_op_cls}" id="admin-nav-node-operator" href="/admin/node-operator"><span class="sb-ico">&#128225;</span>
     <span class="sb-label">Node Operator</span></a>
+  <a class="{rpos_cls}" id="admin-nav-rpos" href="/admin/rpos"><span class="sb-ico">&#128187;</span>
+    <span class="sb-label">rpOS deploy</span></a>
+  <a class="{rps_cls}" id="admin-nav-rps" href="/admin/rps"><span class="sb-ico">&#129302;</span>
+    <span class="sb-label">rpS · Ned</span></a>
   <a class="{perc_cls}" id="admin-nav-perc" href="/admin/perc"><span class="sb-ico">&#9673;</span>
     <span class="sb-label">Perc network</span></a>
   <a class="{support_cls}" id="admin-nav-support-tickets" href="/admin/support-tickets"><span class="sb-ico">&#9993;</span>

@@ -39,7 +39,7 @@
       error: null,
       browserScopeOnly: true,
       productTitle: "RESTORE PRIVACY SUITE",
-      catalogVersion: "0.4.2",
+      catalogVersion: "1.0.1",
     };
   }
 

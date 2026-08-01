@@ -5,34 +5,37 @@ import 'package:restore_privacy_client/rpt_config.dart';
 import 'package:restore_privacy_client/suite_version.dart';
 
 void main() {
-  test('RptConfig product monopin matches suite 1.0.0', () {
+  test('RptConfig product monopin matches suite 1.0.1', () {
     expect(RptConfig.productVersion, kSuiteVersion);
-    expect(RptConfig.displayProductVersion, '1.0.0');
+    expect(RptConfig.displayProductVersion, '1.0.1');
     expect(kSuiteDisplayVersion.contains(kSuiteVersion), isTrue);
     expect(kSuiteDisplayVersion.startsWith('Restore Privacy Suite'), isTrue);
   });
 
-  test('pubspec and client/VERSION pin suite 1.0.0', () {
+  test('pubspec and client/VERSION pin suite 1.0.1', () {
     final pubspec = File('pubspec.yaml').readAsStringSync();
-    expect(pubspec.contains('version: 1.0.0'), isTrue);
+    expect(pubspec.contains('version: 1.0.1'), isTrue);
     expect(pubspec.contains('Restore Privacy Suite'), isTrue);
 
     final versionFile = File('../client/VERSION').readAsStringSync().trim();
-    expect(versionFile, '1.0.0');
+    expect(versionFile, '1.0.1');
   });
 
-  test('source declares three suite tab labels exactly', () {
+  test('source declares four suite tab labels exactly including rpAI', () {
     final shell = File('lib/suite_shell.dart').readAsStringSync();
     final version = File('lib/suite_version.dart').readAsStringSync();
     expect(version.contains("kSuiteTabVpn = 'VPN'"), isTrue);
     expect(version.contains("kSuiteTabWallet = '%'"), isTrue);
     expect(version.contains("kSuiteTabEvolve = 'EVOLVE'"), isTrue);
+    expect(version.contains("kSuiteTabRpai = 'rpAI'"), isTrue);
     expect(shell.contains('kSuiteTabVpn'), isTrue);
     expect(shell.contains('kSuiteTabWallet'), isTrue);
     expect(shell.contains('kSuiteTabEvolve'), isTrue);
+    expect(shell.contains('kSuiteTabRpai'), isTrue);
     // Real tab bodies — not stub-only placeholders.
     expect(shell.contains('SuiteWalletTab'), isTrue);
     expect(shell.contains('SuiteEvolveTab'), isTrue);
+    expect(shell.contains('SuiteRpaiTab'), isTrue);
     expect(shell.contains('vpnTab'), isTrue);
   });
 

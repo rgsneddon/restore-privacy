@@ -854,10 +854,13 @@ class Handler(BaseHTTPRequestHandler):
                 "true",
                 "yes",
             )
+            ua = (self.headers.get("User-Agent") or "").strip()
             self._send(
                 200,
                 "text/html; charset=utf-8",
-                render_service_page_html(pay_error=pay_err, paid=paid_flag),
+                render_service_page_html(
+                    pay_error=pay_err, paid=paid_flag, user_agent=ua
+                ),
             )
             return
         # Free packages hub (centered orange direct-download links)
@@ -1931,6 +1934,32 @@ class Handler(BaseHTTPRequestHandler):
             self._send(
                 200, "text/html; charset=utf-8", render_admin_processors_page_html()
             )
+            return
+        if path in ("/admin/rpos", "/admin/rpos/"):
+            if not admin_enabled():
+                self._send(503, "text/plain; charset=utf-8", b"admin disabled")
+                return
+            if not is_authenticated(self.headers):
+                self._send(200, "text/html; charset=utf-8", render_login_html())
+                return
+            try:
+                from admin_rpos import render_admin_rpos_page_html
+            except ImportError:
+                from status_page.admin_rpos import render_admin_rpos_page_html  # type: ignore
+            self._send(200, "text/html; charset=utf-8", render_admin_rpos_page_html())
+            return
+        if path in ("/admin/rps", "/admin/rps/"):
+            if not admin_enabled():
+                self._send(503, "text/plain; charset=utf-8", b"admin disabled")
+                return
+            if not is_authenticated(self.headers):
+                self._send(200, "text/html; charset=utf-8", render_login_html())
+                return
+            try:
+                from admin_rps import render_admin_rps_page_html
+            except ImportError:
+                from status_page.admin_rps import render_admin_rps_page_html  # type: ignore
+            self._send(200, "text/html; charset=utf-8", render_admin_rps_page_html())
             return
         if path in ("/admin/accounting", "/admin/accounting/"):
             if not admin_enabled():
