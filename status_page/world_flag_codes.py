@@ -1,6 +1,16 @@
-"""ISO 3166-1 alpha-2 codes for Suite world-flags strip (static/flags/w20)."""
+"""Flag codes for the homepage world-flags strip (static/flags/w20).
 
-WORLD_FLAG_COUNT = 252
+Most entries are ISO 3166-1 alpha-2. UK home nations use dedicated non-ISO
+codes so they are not confused with Seychelles (sc) / Nicaragua (ni):
+
+  sct — Scotland
+  eng — England
+  nir — Northern Ireland
+  wls — Wales
+"""
+
+# ISO pack + four UK home-nation extras (see UK_HOME_NATION_FLAGS).
+WORLD_FLAG_COUNT = 256
 WORLD_FLAG_CODES: tuple[str, ...] = (
     "ad",
     "ae",
@@ -254,5 +264,20 @@ WORLD_FLAG_CODES: tuple[str, ...] = (
     "za",
     "zm",
     "zw",
+    # UK home nations (OBJECTIVE: Scotland / England / Northern Ireland / Wales)
+    "sct",
+    "eng",
+    "nir",
+    "wls",
 )
 WORLD_FLAG_STATIC_PREFIX = "/static/flags/w20"
+
+# Distinct home-nation codes (not ISO alpha-2; assets under static/flags/w20).
+UK_HOME_NATION_FLAGS: tuple[tuple[str, str], ...] = (
+    ("sct", "Scotland"),
+    ("eng", "England"),
+    ("nir", "Northern Ireland"),
+    ("wls", "Wales"),
+)
+UK_HOME_NATION_CODES: tuple[str, ...] = tuple(c for c, _ in UK_HOME_NATION_FLAGS)
+UK_HOME_NATION_TITLES: dict[str, str] = {c: t for c, t in UK_HOME_NATION_FLAGS}

@@ -152,15 +152,63 @@
     pollTimer = setInterval(pollOnce, pollMs);
   }
 
+  function setAllPackageChecks(mode) {
+    // mode: "all" | "none" | "present"
+    var boxes = document.querySelectorAll(
+      'input.suite-pkg-checkbox[data-package-select="1"]'
+    );
+    boxes.forEach(function (box) {
+      if (mode === "all") {
+        box.checked = true;
+      } else if (mode === "none") {
+        box.checked = false;
+      } else if (mode === "present") {
+        var tr = box.closest("tr");
+        var present =
+          tr &&
+          (tr.getAttribute("data-present") === "yes" ||
+            (tr.querySelector(".suite-pkg-local") &&
+              tr.querySelector(".suite-pkg-local").getAttribute("data-present") ===
+                "yes"));
+        box.checked = !!present;
+      }
+    });
+  }
+  var selPresent = document.getElementById("admin-suite-select-present");
+  var selNone = document.getElementById("admin-suite-select-none");
+  var selAll = document.getElementById("admin-suite-select-all");
+  if (selPresent) selPresent.addEventListener("click", function () { setAllPackageChecks("present"); });
+  if (selNone) selNone.addEventListener("click", function () { setAllPackageChecks("none"); });
+  if (selAll) selAll.addEventListener("click", function () { setAllPackageChecks("all"); });
+
   if (form) {
     form.addEventListener("submit", function (ev) {
       if (!form.getAttribute("data-async-push")) return;
       ev.preventDefault();
+      var selected = form.querySelectorAll(
+        'input.suite-pkg-checkbox[data-package-select="1"]:checked'
+      );
+      // Also count checkboxes linked via form= attribute outside the form.
+      if (!selected.length) {
+        selected = document.querySelectorAll(
+          'input.suite-pkg-checkbox[form="admin-suite-push-form"]:checked'
+        );
+      }
+      if (!selected.length) {
+        setStatus("Select at least one package checkbox before pushing.");
+        return;
+      }
       if (btn) btn.disabled = true;
-      setStatus("Starting brand push…");
+      setStatus("Starting brand push for " + selected.length + " package(s)…");
       if (table) table.setAttribute("data-push-running", "1");
       var fd = new FormData(form);
       fd.set("async", "1");
+      // Ensure package= values from table (form= attribute) are included
+      selected.forEach(function (box) {
+        if (box.name && box.value) {
+          fd.append(box.name, box.value);
+        }
+      });
       fetch(jobApi, {
         method: "POST",
         credentials: "same-origin",

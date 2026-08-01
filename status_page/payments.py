@@ -4883,11 +4883,14 @@ def render_pay_plan_page_html(
     *,
     interval: str = BILLING_INTERVAL_MONTH,
     error: str = "",
+    product: str = PRODUCT_LINE_DEFAULT,
 ) -> bytes:
-    """Site-styled **Select your plan** page (Monthly | Annual) for one platform.
+    """Site-styled **cart / Select your plan** page for KEYGEN licence purchase.
 
-    Pure HTML builder (no network). Continue submits to ``POST /pay/checkout``
+    Pure HTML builder (no network). Shows platform, Monthly/Annual, and an
+    explicit auto-renew on/off control. Continue submits to ``POST /pay/checkout``
     which creates a Stripe subscription Checkout Session for the chosen plan.
+    *product* is ``suite`` (Suite KEYGEN cart) or ``vpn`` (VPN box cart).
     """
     try:
         from public_chrome import (
@@ -4919,6 +4922,7 @@ def render_pay_plan_page_html(
         iv = BILLING_INTERVAL_YEAR
     else:
         iv = BILLING_INTERVAL_MONTH
+    pl = normalize_product_line(product)
 
     platforms = [a.platform for a in available_downloads()]
     if plat and plat not in platforms:
@@ -5031,22 +5035,33 @@ def render_pay_plan_page_html(
             AUTO_RENEW_HELP,
             AUTO_RENEW_LABEL,
         )
+    product_label = (
+        "Restore Privacy Suite KEYGEN"
+        if pl == PRODUCT_LINE_SUITE
+        else "device KEYGEN licence"
+    )
     body = f"""
-  <div class="page-shell pay-plan-shell" id="pay-plan-shell">
-{public_brand_header_html(title=PUBLIC_BRAND_TITLE, active=None)}
-    <section class="pay-plan-card panel-card" id="pay-plan-card" aria-labelledby="pay-plan-heading">
+  <div class="page-shell pay-plan-shell" id="pay-plan-shell"
+       data-cart="1" data-product="{_esc(pl)}">
+{public_brand_header_html(title=PUBLIC_BRAND_TITLE, active=None, mark="logo")}
+    <section class="pay-plan-card panel-card" id="pay-plan-card" aria-labelledby="pay-plan-heading"
+             data-cart-step="plan" data-product="{_esc(pl)}">
       <h2 id="pay-plan-heading">Select your plan</h2>
       <p class="pay-plan-lead" id="pay-plan-lead">
-        One device licence. Choose <strong>Monthly</strong> ({_esc(monthly_label)} for one month) or
+        Cart for a <strong>{_esc(product_label)}</strong> (one device).
+        Choose <strong>Monthly</strong> ({_esc(monthly_label)} for one month) or
         <strong>Annual</strong> ({_esc(yearly_label)} for one year — save about {save_pct}% vs
         12 × monthly). Every plan includes a <strong>{CATALOG_TRIAL_PERIOD_DAYS}-day free trial</strong>
         — <strong>no money is taken until after the trial ends</strong>
         (you add a card at checkout; the first charge is after the trial).
+        Use the auto-renew control below to keep or stop billing after this period.
         Without renewal after the paid period, Connect expires and the client becomes
         unusable until you renew. You complete checkout securely on Stripe.
       </p>
       {err_html}
-      <form id="pay-plan-form" class="pay-plan-form" method="post" action="/pay/checkout">
+      <form id="pay-plan-form" class="pay-plan-form" method="post" action="/pay/checkout"
+            data-cart-checkout="1" data-product="{_esc(pl)}">
+        <input type="hidden" name="product" value="{_esc(pl)}" id="pay-product-field"/>
         <div class="pay-field" id="pay-platform-field">
           <label class="pay-label" for="pay-platform">Platform</label>
           <select name="platform" id="pay-platform" required aria-required="true">

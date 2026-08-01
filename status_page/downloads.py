@@ -1,4 +1,4 @@
-"""Release download catalog + paid download UI (Restore Privacy Suite v1.0.2).
+"""Release download catalog + paid download UI (Restore Privacy Suite v1.0.3).
 
 Primary path: pay **£3.00** (GBP) via Stripe Checkout per package, then a
 time-limited download token (default **12 hours**, reusable until expiry).
@@ -7,7 +7,7 @@ the status host **proxies** the installer (authenticated GitHub API / local
 assets) so fulfilment works when the restore-privacy repo is **private**.
 Buy Me a Coffee is tip/support only.
 
-Current catalog packages: Restore Privacy Suite **1.0.2**
+Current catalog packages: Restore Privacy Suite **1.0.3**
 (Windows setup needs no separate Python install; macOS Developer ID notarized;
 iOS Team-signed sideload).
 """
@@ -32,10 +32,10 @@ except ImportError:  # package import path (status_page as package)
         site_copyright_text,
     )
 
-RELEASE_VERSION = "1.0.2"
+RELEASE_VERSION = "1.0.3"
 GITHUB_OWNER = "rgsneddon"
 GITHUB_REPO = "restore-privacy"
-RELEASE_TAG = "1.0.2"
+RELEASE_TAG = "1.0.3"
 RELEASE_PAGE_URL = (
     f"https://github.com/{GITHUB_OWNER}/{GITHUB_REPO}/releases/tag/{RELEASE_TAG}"
 )
@@ -1938,17 +1938,19 @@ def suite_storefront_css() -> str:
       margin: 0.75rem auto 0; max-width: 34rem;
       font-size: 0.82rem; color: rgba(174, 208, 234, 0.95); line-height: 1.4;
     }
-    /* World flags strip — fill leftover bottom of Suite box, tiny assets */
+    /* World flags strip — bottom of right-hand downloads (#downloads) box */
+    .downloads .suite-world-flags,
     .suite-world-flags {
       display: flex; flex-wrap: wrap; gap: 1px; justify-content: center;
       align-content: flex-start;
       margin: 0.55rem 0 0; padding: 0.3rem 0.1rem 0.1rem;
-      /* Compact density so ISO set fits the leftover bottom without huge card growth */
+      /* Compact density so full pack fits the leftover bottom without huge card growth */
       max-height: 6.5rem; overflow-y: auto; overflow-x: hidden;
       border-top: 1px solid rgba(174, 208, 234, 0.25);
       width: 100%; box-sizing: border-box;
       scrollbar-width: thin;
     }
+    .downloads .suite-world-flags img.suite-world-flag,
     .suite-world-flags img.suite-world-flag {
       width: 12px; height: 9px; object-fit: cover;
       border-radius: 1px; flex: 0 0 auto;
@@ -2101,7 +2103,7 @@ def render_node_preference_html(*, standalone: bool = True) -> str:
 
 
 def world_flag_codes() -> tuple[str, ...]:
-    """ISO alpha-2 codes with shipped tiny flag PNGs."""
+    """Shipped flag codes (ISO alpha-2 + UK home-nation extras)."""
     try:
         from world_flag_codes import WORLD_FLAG_CODES
     except ImportError:  # pragma: no cover
@@ -2112,6 +2114,21 @@ def world_flag_codes() -> tuple[str, ...]:
     return tuple(WORLD_FLAG_CODES)
 
 
+def world_flag_title(code: str) -> str:
+    """Human title for a flag code (home nations get full names)."""
+    cc = (code or "").strip().lower()
+    try:
+        from world_flag_codes import UK_HOME_NATION_TITLES
+    except ImportError:  # pragma: no cover
+        try:
+            from status_page.world_flag_codes import UK_HOME_NATION_TITLES  # type: ignore
+        except ImportError:  # pragma: no cover
+            UK_HOME_NATION_TITLES = {}  # type: ignore[misc, assignment]
+    if cc in UK_HOME_NATION_TITLES:
+        return str(UK_HOME_NATION_TITLES[cc])
+    return cc.upper()
+
+
 def world_flag_static_url(code: str) -> str:
     """Public static path for a tiny w20 flag PNG."""
     cc = (code or "").strip().lower()
@@ -2119,21 +2136,33 @@ def world_flag_static_url(code: str) -> str:
 
 
 def render_suite_world_flags_html() -> str:
-    """Dense strip of all world country flags at the bottom of the Suite box."""
+    """Dense strip of world (+ UK home-nation) flags for the downloads box bottom.
+
+    Historical name kept; call site is the right-hand ``#downloads`` panel.
+    """
     codes = world_flag_codes()
     if not codes:
         return ""
     imgs: list[str] = []
     for cc in codes:
         src = world_flag_static_url(cc)
+        title = world_flag_title(cc)
+        is_home = cc in ("sct", "eng", "nir", "wls")
+        home_attr = (
+            f' data-flag-home-nation="1" data-flag-nation="{_esc_html(title)}"'
+            if is_home
+            else ""
+        )
         imgs.append(
             f'<img class="suite-world-flag" src="{_esc_html(src)}" '
-            f'width="20" height="15" alt="" loading="lazy" decoding="async" '
-            f'data-flag-cc="{_esc_html(cc)}" title="{_esc_html(cc.upper())}"/>'
+            f'width="20" height="15" alt="{_esc_html(title)}" loading="lazy" '
+            f'decoding="async" data-flag-cc="{_esc_html(cc)}" '
+            f'title="{_esc_html(title)}"{home_attr}/>'
         )
     return f"""
     <div class="suite-world-flags" id="suite-world-flags"
-         data-suite-world-flags="1" data-flag-count="{len(codes)}"
+         data-suite-world-flags="1" data-downloads-world-flags="1"
+         data-flag-count="{len(codes)}"
          aria-label="Flags of the world" role="img">
       {"".join(imgs)}
     </div>
@@ -2212,13 +2241,14 @@ def render_suite_storefront_html(
         )
     platform_options = "\n            ".join(plat_opts)
 
+    # Cart entry: GET /pay (platform + monthly Suite KEYGEN). Auto-renew is
+    # chosen on the plan cart page — never a silent hidden force-on here.
     keygen_form = f"""
-    <form class="dl-buy-form suite-keygen-cta" id="suite-keygen-form" method="post"
-          action="/pay/checkout" data-pay-via="suite-keygen" data-product="suite"
-          data-billing-intervals="month">
+    <form class="dl-buy-form suite-keygen-cta" id="suite-keygen-form" method="get"
+          action="/pay" data-pay-via="suite-keygen-cart" data-product="suite"
+          data-billing-intervals="month" data-cart-step="1">
       <input type="hidden" name="product" value="suite" id="suite-product-field"/>
       <input type="hidden" name="interval" value="month" id="suite-interval-field"/>
-      <input type="hidden" name="auto_renew" value="1" id="suite-auto-renew-field"/>
       <div class="dl-buy-field" id="suite-keygen-platform-field">
         <label class="dl-buy-label" for="suite-keygen-platform">Device for KEYGEN licence</label>
         <select name="platform" id="suite-keygen-platform" required
@@ -2228,7 +2258,12 @@ def render_suite_storefront_html(
         </select>
       </div>
       <button type="submit" class="dl-buy-now" id="suite-keygen-buy"
-              data-product="suite">Get KEYGEN — {PRICE_LABEL}/month</button>
+              data-product="suite" data-cart-cta="1">
+        Get KEYGEN — {PRICE_LABEL}/month</button>
+      <p class="suite-cart-hint" id="suite-cart-hint">
+        Continues to a short cart: confirm device, one-month KEYGEN licence, and
+        choose whether to auto-renew — then secure Stripe checkout.
+      </p>
       <p class="dl-stripe-branding" id="suite-stripe-branding">{STRIPE_CHECKOUT_BRANDING_NOTE}</p>
     </form>
 """
@@ -2265,7 +2300,6 @@ def render_suite_storefront_html(
       client box below. Business-Class requires a separate <strong>£3000 deposit</strong>
       on Service.
     </p>
-{render_suite_world_flags_html()}
   </section>
 """
 
@@ -2345,7 +2379,7 @@ def render_download_section_html(
             f' data-display-currency="{local.currency}"'
             f' data-stripe-presentment="{local.stripe_presentment_currency}"'
         )
-    # Order: title → price banner → local line → price box → buy form → note.
+    # Order: title → price → form → note → world flags (bottom of right box).
     return f"""
   <section class="downloads panel-card" id="downloads"
     aria-label="Download Restore Privacy Suite client"
@@ -2365,5 +2399,6 @@ def render_download_section_html(
     <div class="dl-platform-note-box" id="dl-platform-note-box">
       <p class="dl-platform-note" id="dl-platform-note">{PLATFORM_SELECT_NOTE}</p>
     </div>
+{render_suite_world_flags_html()}
   </section>
 """

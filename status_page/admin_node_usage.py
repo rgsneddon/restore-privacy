@@ -482,11 +482,24 @@ def row_from_probe_payload(
     sess_util = None
     extra_detail = detail
     try:
-        if payload.get("live") is not None:
-            sess_live = max(0, int(payload["live"]))
+        # Capacity payload uses ``live``; accept common aliases so fleet UI
+        # never stays blank when nodes/labs report sessions under other keys.
+        live_raw = payload.get("live")
+        if live_raw is None:
+            live_raw = payload.get("sessions_live")
+        if live_raw is None:
+            live_raw = payload.get("active_sessions")
+        if live_raw is None:
+            live_raw = payload.get("sessions")
+        if live_raw is None:
+            live_raw = payload.get("session_count")
+        if live_raw is not None:
+            sess_live = max(0, int(live_raw))
         node_cap = None
         if payload.get("capacity") is not None:
             node_cap = max(1, int(payload["capacity"]))
+        elif payload.get("sessions_cap") is not None:
+            node_cap = max(1, int(payload["sessions_cap"]))
         # Prefer product soft max (IS 512, DE 1024) even when a node still has
         # a flat env of 256; note node-reported capacity when it differs.
         if node_cap is not None and product_sess is not None and node_cap != product_sess:

@@ -70,6 +70,55 @@ class TestPayPlanPageHtml(unittest.TestCase):
         self.assertIn("brand-panel", html)
         self.assertIn("RESTORE PRIVACY", html.upper())
 
+    def test_pay_plan_header_is_one_logo_no_banner(self):
+        """GET /pay shell: one logo mark at top; never banner.jpg (all platforms)."""
+        from public_chrome import (
+            PUBLIC_BRAND_BANNER_PATH,
+            PUBLIC_BRAND_LOGO_PATH,
+            public_brand_header_html,
+        )
+        from payments import render_pay_plan_page_html
+
+        platforms = ("macos", "windows", "linux", "android", "ios", "")
+        for plat in platforms:
+            with self.subTest(platform=plat or "(empty)"):
+                html = render_pay_plan_page_html(plat, interval="month").decode()
+                # Isolate top brand header region
+                h0 = html.find('id="brand-panel"')
+                if h0 < 0:
+                    h0 = html.find('id="site-brand-header"')
+                self.assertGreater(h0, -1, msg="pay plan missing brand header")
+                h1 = html.find("</header>", h0)
+                self.assertGreater(h1, h0)
+                header = html[h0:h1]
+                # Exactly one logo image class; no banner mark
+                self.assertEqual(header.count('class="brand-logo"'), 1)
+                self.assertEqual(header.count('id="brand-logo"'), 1)
+                self.assertNotIn("brand-banner", header)
+                self.assertNotIn("banner.jpg", header)
+                self.assertNotIn('data-banner-only="1"', header)
+                self.assertIn('data-logo-only="1"', header)
+                self.assertIn(PUBLIC_BRAND_LOGO_PATH, header)
+                self.assertNotIn(PUBLIC_BRAND_BANNER_PATH, header)
+                # Dual logos must not reappear
+                self.assertNotIn("brand-logo-left", header)
+                self.assertNotIn("brand-logo-right", header)
+
+        # Error re-render still logo-only
+        err_page = render_pay_plan_page_html(
+            "macos", interval="month", error="Pick a platform"
+        ).decode()
+        self.assertIn('data-logo-only="1"', err_page)
+        self.assertNotIn('class="brand-banner"', err_page)
+
+        # Explicit helper opt-in vs default site banner-only
+        logo_h = public_brand_header_html(mark="logo")
+        ban_h = public_brand_header_html()
+        self.assertIn('class="brand-logo"', logo_h)
+        self.assertNotIn('class="brand-banner"', logo_h)
+        self.assertIn('class="brand-banner"', ban_h)
+        self.assertNotIn('class="brand-logo"', ban_h)
+
     def test_annual_preselect(self):
         from payments import render_pay_plan_page_html
 

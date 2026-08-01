@@ -201,10 +201,17 @@ def static_file_path(url_path: str) -> Path | None:
     name = STATIC_ROUTES.get(url_path)
     if not name:
         # Allow tiny world-flag pack: /static/flags/w20/{cc}.png
+        # cc is ISO alpha-2 (2) or UK home-nation codes (3: sct/eng/nir/wls).
         p = (url_path or "").strip()
         if p.startswith("/static/flags/w20/") and p.lower().endswith(".png"):
             base = p.rsplit("/", 1)[-1].lower()
-            if len(base) == 6 and base[:2].isalpha() and base.endswith(".png"):
+            stem = base[: -len(".png")] if base.endswith(".png") else ""
+            if (
+                stem
+                and 2 <= len(stem) <= 3
+                and stem.isalpha()
+                and base.endswith(".png")
+            ):
                 name = f"flags/w20/{base}"
             else:
                 return None
@@ -1617,11 +1624,14 @@ class Handler(BaseHTTPRequestHandler):
             self.wfile.write(body)
             return
 
-        # --- Paid download flow: site-hosted Select your plan page ---
+        # --- Paid download flow: site-hosted cart / Select your plan page ---
         if path == "/pay":
             platform = (query.get("platform") or "").strip().lower()
             interval = (query.get("interval") or "month").strip().lower()
-            err = (query.get("error") or "").strip()
+            err = (query.get("error") or query.get("pay_error") or "").strip()
+            product = (
+                query.get("product") or query.get("product_line") or "vpn"
+            ).strip()
             # Allow empty platform (picker on page); invalid platform still shows page
             if platform and not platform_filename(platform):
                 self._send(
@@ -1631,6 +1641,7 @@ class Handler(BaseHTTPRequestHandler):
                         "",
                         interval=interval,
                         error="Unknown package — choose a platform below.",
+                        product=product,
                     ),
                 )
                 return
@@ -1638,7 +1649,7 @@ class Handler(BaseHTTPRequestHandler):
                 200,
                 "text/html; charset=utf-8",
                 render_pay_plan_page_html(
-                    platform, interval=interval, error=err
+                    platform, interval=interval, error=err, product=product
                 ),
             )
             return
@@ -2699,7 +2710,9 @@ class Handler(BaseHTTPRequestHandler):
             return
 
         if path == "/pay/checkout":
-            # Site plan form: platform + interval + auto_renew + product → subscription Checkout
+            # Cart checkout: platform + interval + auto_renew + product → subscription
+            # Always fail closed with redirect + error on the cart page — never a bare
+            # reverse-proxy 502 from an uncaught Stripe / network crash.
             ctype = (self.headers.get("Content-Type") or "").lower()
             platform = ""
             interval = "month"
@@ -2732,53 +2745,61 @@ class Handler(BaseHTTPRequestHandler):
                 from payments import parse_auto_renew_form_values
 
                 auto_renew = parse_auto_renew_form_values(form.get("auto_renew"))
-            from payments import normalize_product_line, PRODUCT_LINE_SUITE
+            from payments import (
+                create_subscription_checkout_session as _create_sub_checkout,
+                normalize_product_line,
+                stripe_configured as _stripe_ok,
+            )
 
             product_line = normalize_product_line(product_line)
-            frag = "suite-storefront" if product_line == PRODUCT_LINE_SUITE else "downloads"
+            iv_norm = (interval or "month").strip().lower() or "month"
+
+            def _pay_cart_error(msg: str, *, plat: str = "") -> None:
+                """Recoverable cart redirect (not gateway 502 HTML)."""
+                q = urllib.parse.urlencode(
+                    {
+                        "platform": (plat or platform or "").strip(),
+                        "interval": iv_norm,
+                        "product": product_line,
+                        "error": msg,
+                    }
+                )
+                self._redirect(f"/pay?{q}")
+
             if not platform or not platform_filename(platform):
-                q = urllib.parse.urlencode(
-                    {
-                        "pay_error": "Please select your device platform.",
-                        "interval": interval or "month",
-                        "product": product_line,
-                    }
-                )
-                self._redirect(f"/?{q}#{frag}")
+                _pay_cart_error("Please select your device platform.")
                 return
-            if not stripe_configured():
-                q = urllib.parse.urlencode(
-                    {
-                        "platform": platform,
-                        "interval": interval or "month",
-                        "product": product_line,
-                        "pay_error": (
-                            "Checkout is temporarily unavailable "
-                            "(payments not configured)."
-                        ),
-                    }
+            if not _stripe_ok():
+                _pay_cart_error(
+                    "Checkout is temporarily unavailable "
+                    "(payments not configured). Try again shortly."
                 )
-                self._redirect(f"/?{q}#{frag}")
                 return
             try:
-                session = create_subscription_checkout_session(
+                session = _create_sub_checkout(
                     platform,
                     interval=interval,
                     auto_renew=auto_renew,
                     product_line=product_line,
                 )
             except ValueError as e:
-                q = urllib.parse.urlencode(
-                    {
-                        "platform": platform,
-                        "interval": interval or "month",
-                        "product": product_line,
-                        "pay_error": f"Could not start checkout: {e}",
-                    }
-                )
-                self._redirect(f"/?{q}#{frag}")
+                _pay_cart_error(f"Could not start checkout: {e}")
                 return
-            self._redirect(str(session["url"]))
+            except Exception as e:  # noqa: BLE001 — never surface as bare 502
+                _pay_cart_error(
+                    "Could not start checkout (temporary error). "
+                    f"Please try again. ({type(e).__name__})"
+                )
+                return
+            url = ""
+            if isinstance(session, dict):
+                url = str(session.get("url") or "").strip()
+            if not url:
+                _pay_cart_error(
+                    "Could not start checkout (no session URL). Please try again."
+                )
+                return
+            self._redirect(url)
             return
 
         if path == "/api/checkout":
@@ -3335,6 +3356,24 @@ class Handler(BaseHTTPRequestHandler):
                     from status_page.suite_push_progress import (  # type: ignore
                         start_push_job,
                     )
+                # Per-package selection (checkboxes name=package / package[]).
+                raw_pkgs = form.get("package")
+                if raw_pkgs is None:
+                    # parse_qsl only keeps last value — re-parse multi package=
+                    multi = urllib.parse.parse_qs(
+                        body.decode("utf-8", "replace")
+                    )
+                    pkg_list = multi.get("package") or multi.get("package[]") or []
+                elif isinstance(raw_pkgs, list):
+                    pkg_list = raw_pkgs
+                else:
+                    multi = urllib.parse.parse_qs(
+                        body.decode("utf-8", "replace")
+                    )
+                    pkg_list = multi.get("package") or multi.get("package[]") or [
+                        str(raw_pkgs)
+                    ]
+                only = [str(x).strip() for x in pkg_list if str(x).strip()]
                 started = start_push_job(
                     ctrl,
                     version=ver,
@@ -3344,6 +3383,7 @@ class Handler(BaseHTTPRequestHandler):
                     force=form.get("force") == "1",
                     allow_missing=form.get("allow_missing") == "1",
                     install_serve=form.get("install_serve") == "1",
+                    only_filenames=only if only else [],
                 )
                 payload = json.dumps(started, separators=(",", ":")).encode("utf-8")
                 code = 200 if started.get("ok") else 400
@@ -3354,6 +3394,12 @@ class Handler(BaseHTTPRequestHandler):
                     extra_headers=[("Cache-Control", "no-store")],
                 )
                 return
+            multi = urllib.parse.parse_qs(body.decode("utf-8", "replace"))
+            only = [
+                str(x).strip()
+                for x in (multi.get("package") or multi.get("package[]") or [])
+                if str(x).strip()
+            ]
             r = ctrl.push_suite_packages(
                 version=ver,
                 stage=form.get("stage") == "1",
@@ -3363,6 +3409,7 @@ class Handler(BaseHTTPRequestHandler):
                 allow_missing=form.get("allow_missing") == "1",
                 install_serve=form.get("install_serve") == "1",
                 brand_wide=True,
+                only_filenames=only if only else None,
             )
             if r.get("missing_ssh_keys") and r.get("redirect"):
                 self._redirect(str(r["redirect"]))

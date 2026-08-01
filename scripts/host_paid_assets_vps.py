@@ -99,11 +99,14 @@ def stage_brand_packages(
     version: str | None = None,
     allow_missing: bool = False,
     progress_cb: Any | None = None,
+    only_filenames: list[str] | set[str] | tuple[str, ...] | None = None,
 ) -> list[Path]:
-    """Stage all brand packages into status_page/assets/{suite_version}/.
+    """Stage brand packages into status_page/assets/{suite_version}/.
 
     Flat layout under the Suite catalog pin so Helsinki serve path stays simple.
     *progress_cb(filename, status, progress)* optional.
+    *only_filenames*: when set, stage **only** those basenames (admin selective
+    upload). Unselected packages are skipped without failing the job.
     """
     scripts = ROOT / "scripts"
     if str(scripts) not in sys.path:
@@ -118,14 +121,31 @@ def stage_brand_packages(
     suite_ver = inv["suite_version"]
     dst_dir = STATUS / "assets" / suite_ver
     dst_dir.mkdir(parents=True, exist_ok=True)
+    selected: set[str] | None = None
+    if only_filenames is not None:
+        selected = {str(x).strip() for x in only_filenames if str(x).strip()}
+        if not selected:
+            raise FileNotFoundError(
+                "no packages selected — check at least one package to stage/upload"
+            )
     staged: list[Path] = []
     for row in inv["packages"]:
         fname = row["filename"]
+        if selected is not None and fname not in selected:
+            if progress_cb:
+                progress_cb(fname, "skipped", 0)
+            continue
         if progress_cb:
             progress_cb(fname, "uploading", 5)
         src = resolve_local_path(row, repo_root=ROOT)
         if src is None:
             msg = f"missing brand package: {fname} ({row.get('relative_path')})"
+            if allow_missing or (selected is not None and fname not in selected):
+                print(f"skip_missing {msg}")
+                if progress_cb:
+                    progress_cb(fname, "skipped", 0)
+                continue
+            # Selected but missing always fails closed (unless allow_missing)
             if allow_missing:
                 print(f"skip_missing {msg}")
                 if progress_cb:
@@ -152,12 +172,13 @@ def upload_brand_packages(
     force: bool = False,
     allow_missing: bool = False,
     progress_cb: Any | None = None,
+    only_filenames: list[str] | set[str] | tuple[str, ...] | None = None,
 ) -> int:
     """Upload staged brand packages one file at a time (any size > min_bytes).
 
-    Walks the full brand inventory in order. Each row gets progress_cb
-    (uploading → done|error|skipped) so admin UI never leaves rows pending
-    then auto-skipped at job end.
+    Walks the brand inventory in order. *only_filenames* limits work to the
+    admin-selected subset (unselected rows are skipped, not job-failing).
+    Each row gets progress_cb (uploading → done|error|skipped).
     """
     scripts = ROOT / "scripts"
     if str(scripts) not in sys.path:
@@ -173,21 +194,44 @@ def upload_brand_packages(
     remote_ver = f"{remote_root.rstrip('/')}/{suite_ver}"
     host_default = DEFAULT_VPS_ASSET_HOST
 
+    selected: set[str] | None = None
+    if only_filenames is not None:
+        selected = {str(x).strip() for x in only_filenames if str(x).strip()}
+        if not selected:
+            print("ERROR: no packages selected for upload", file=sys.stderr)
+            return 1
+
     # Resolve local path for every inventory row (order preserved).
     work: list[dict[str, Any]] = []
     for row in inv["packages"]:
         fname = row["filename"]
+        if selected is not None and fname not in selected:
+            work.append(
+                {
+                    **row,
+                    "local_path": str(local_dir / fname),
+                    "ready": False,
+                    "unselected": True,
+                }
+            )
+            continue
         f = local_dir / fname
         min_b = int(row.get("min_bytes") or 1)
         if f.is_file() and f.stat().st_size >= min_b:
-            work.append({**row, "local_path": str(f), "ready": True})
+            work.append({**row, "local_path": str(f), "ready": True, "unselected": False})
         else:
-            work.append({**row, "local_path": str(f), "ready": False})
+            work.append(
+                {**row, "local_path": str(f), "ready": False, "unselected": False}
+            )
 
     ready = [p for p in work if p.get("ready")]
     if not ready and not allow_missing:
         print("ERROR: no staged brand packages to upload", file=sys.stderr)
         for p in work:
+            if p.get("unselected"):
+                if progress_cb:
+                    progress_cb(p["filename"], "skipped", 0)
+                continue
             if progress_cb:
                 progress_cb(p["filename"], "error", 0)
         return 1
@@ -199,17 +243,24 @@ def upload_brand_packages(
         return 1
 
     print(
-        f"brand upload plan: {len(ready)}/{inv['total']} files "
+        f"brand upload plan: {len(ready)} selected-ready / {inv['total']} inventory "
         f"-> {host_default}:{remote_ver}/ (force={bool(force)} "
-        f"allow_missing={bool(allow_missing)})"
+        f"allow_missing={bool(allow_missing)} selection={bool(selected)})"
     )
     for p in work:
-        flag = "ready" if p.get("ready") else "missing"
+        if p.get("unselected"):
+            flag = "unselected"
+        else:
+            flag = "ready" if p.get("ready") else "missing"
         print(f"  {flag} {p.get('kind')}/{p.get('platform')}: {p['filename']}")
 
     if dry_run:
         for p in work:
             fname = p["filename"]
+            if p.get("unselected"):
+                if progress_cb:
+                    progress_cb(fname, "skipped", 0)
+                continue
             if not p.get("ready"):
                 if allow_missing:
                     if progress_cb:
@@ -244,6 +295,10 @@ def upload_brand_packages(
         return 1
     for p in work:
         fname = p["filename"]
+        if p.get("unselected"):
+            if progress_cb:
+                progress_cb(fname, "skipped", 0)
+            continue
         if not p.get("ready"):
             if allow_missing:
                 print(f"skip_missing upload kind={p.get('kind')} file={fname}")

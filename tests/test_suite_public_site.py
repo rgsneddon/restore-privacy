@@ -30,11 +30,13 @@ class TestSuitePublicBrand(unittest.TestCase):
 
         html = render_html({"title": PUBLIC_BRAND_TITLE}).decode("utf-8")
         self.assertIn("Restore Privacy Suite", html)
-        self.assertIn("1.0.0", html)
         self.assertIn(PUBLIC_BRAND_VERSION, html)
         self.assertIn(PUBLIC_BRAND_DISPLAY.split()[0], html)  # Restore
         self.assertIn("suite-home-intro", html)
         self.assertIn(SUITE_HOME_INTRO_BODY[:40], html)
+        self.assertIn("residual VPN protection", html)
+        self.assertIn("a monthly licence starts at £3", html)
+        self.assertNotIn("mothly sunscription", html)
         self.assertIn("suite-storefront", html)
         self.assertIn("data-free-download", html)
         self.assertIn("KEYGEN", html)
@@ -67,6 +69,22 @@ class TestPublicSiteCopyHuman(unittest.TestCase):
         self.assertIn(SUITE_HOME_INTRO_HEADING, body)
         self.assertIn(SUITE_HOME_INTRO_BODY, body)
         self.assertIn(SUITE_HOME_INTRO_FOOT, body)
+        # Grammatical intro: residual VPN + monthly licence (no typo theater)
+        open_clause = (
+            "Restore Privacy Suite brings together residual VPN protection, a private"
+        )
+        self.assertTrue(
+            SUITE_HOME_INTRO_BODY.startswith(open_clause),
+            msg=f"intro open clause missing residual VPN: {SUITE_HOME_INTRO_BODY!r}",
+        )
+        self.assertIn("a monthly licence starts at £3", SUITE_HOME_INTRO_BODY)
+        self.assertIn(open_clause, body)
+        self.assertNotIn("mothly sunscription", SUITE_HOME_INTRO_BODY)
+        self.assertNotIn("mothly sunscription", body)
+        self.assertNotIn(
+            "brings together residual protection, a private",
+            SUITE_HOME_INTRO_BODY,
+        )
         # Anti-patterns: dense residual laundry as lead voice
         for bad in (
             "178.105.187.178",
@@ -102,7 +120,9 @@ class TestAdminNotOnPublicPages(unittest.TestCase):
         self.assertTrue((out / "index.html").is_file())
         idx = (out / "index.html").read_text(encoding="utf-8")
         self.assertIn("Restore Privacy Suite", idx)
-        self.assertIn("1.0.0", idx)
+        from public_chrome import PUBLIC_BRAND_VERSION
+
+        self.assertIn(PUBLIC_BRAND_VERSION, idx)
         self.assertIn("KEYGEN", idx)
         self.assertIn("£3", idx)
         # No admin console artifacts

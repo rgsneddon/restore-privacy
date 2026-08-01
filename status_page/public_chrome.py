@@ -38,8 +38,8 @@ except Exception:  # pragma: no cover
     try:
         from status_page.downloads import RELEASE_VERSION as _CATALOG_PIN  # type: ignore
     except Exception:  # pragma: no cover
-        _CATALOG_PIN = "1.0.2"
-PUBLIC_BRAND_VERSION = str(_CATALOG_PIN).strip() or "1.0.2"
+        _CATALOG_PIN = "1.0.3"
+PUBLIC_BRAND_VERSION = str(_CATALOG_PIN).strip() or "1.0.3"
 PUBLIC_BRAND_DISPLAY = f"Restore Privacy Suite v{PUBLIC_BRAND_VERSION}"
 
 # Borderless mark: shield + protruding green key only (transparent outside).
@@ -620,7 +620,7 @@ a.product-tab.is-active, .product-tab.is-active {{
   max-width: 100%;
   box-sizing: border-box;
 }}
-/* Legacy logo classes kept inert if old HTML is cached — not emitted by header */
+/* Default public shells: logos inert (banner-only mark). Logo-only shells opt in. */
 .brand-logo,
 .brand-logo-left,
 .brand-logo-right,
@@ -628,7 +628,7 @@ a.product-tab.is-active, .product-tab.is-active {{
   display: none !important;
 }}
 .brand-banner {{
-  /* Sole heading mark in the top brand box */
+  /* Sole heading mark in the top brand box (default banner-only mode) */
   height: var(--rb-brand-header-height);
   width: 100%;
   max-width: 100%;
@@ -647,7 +647,37 @@ a.product-tab.is-active, .product-tab.is-active {{
   -ms-interpolation-mode: bicubic;
   filter: drop-shadow(0 4px 14px rgba(0, 229, 255, 0.12));
 }}
-/* Phone / small screens: still banner-only (no logo fallback) */
+/* Opt-in single logo (pay-plan flow): one logo, no banner */
+.brand-panel[data-logo-only="1"] .brand-banner,
+.brand-mark[data-logo-only="1"] .brand-banner,
+.brand-panel[data-logo-only="1"] img.brand-banner {{
+  display: none !important;
+  visibility: hidden !important;
+}}
+.brand-panel[data-logo-only="1"] .brand-logo,
+.brand-mark[data-logo-only="1"] .brand-logo,
+.brand-panel[data-logo-only="1"] .brand-mark .brand-logo,
+.brand-panel[data-logo-only="1"] img.brand-logo {{
+  display: block !important;
+  visibility: visible !important;
+  height: var(--rb-brand-header-height);
+  width: auto;
+  max-width: min(100%, 12rem);
+  min-width: 0;
+  margin: 0 auto;
+  border: none;
+  border-radius: 0;
+  object-fit: contain;
+  object-position: center;
+  background: transparent;
+  box-shadow: none;
+  flex: 0 0 auto;
+  image-rendering: -webkit-optimize-contrast;
+  image-rendering: high-quality;
+  -ms-interpolation-mode: bicubic;
+  filter: drop-shadow(0 4px 14px rgba(0, 229, 255, 0.12));
+}}
+/* Phone / small screens: default banner-only; logo-only shells keep logo */
 @media (max-width: 520px) {{
   .brand-mark {{
     flex-direction: row;
@@ -676,6 +706,24 @@ a.product-tab.is-active, .product-tab.is-active {{
   .brand-logo-right,
   .brand-mark .brand-logo {{
     display: none !important;
+  }}
+  .brand-panel[data-logo-only="1"] .brand-banner,
+  .brand-mark[data-logo-only="1"] .brand-banner,
+  .brand-panel[data-logo-only="1"] img.brand-banner {{
+    display: none !important;
+    visibility: hidden !important;
+  }}
+  .brand-panel[data-logo-only="1"] .brand-logo,
+  .brand-mark[data-logo-only="1"] .brand-logo,
+  .brand-panel[data-logo-only="1"] img.brand-logo {{
+    display: block !important;
+    visibility: visible !important;
+    height: auto !important;
+    max-height: var(--rb-brand-header-height) !important;
+    width: auto !important;
+    max-width: min(100%, 10rem) !important;
+    margin: 0 auto !important;
+    flex: 0 0 auto !important;
   }}
 }}
 /* H1 kept for rare product-page overrides; default header has no title text */
@@ -1121,7 +1169,7 @@ a.product-tab.is-active, .product-tab.is-active {{
   }}
   /* brand-mark phone: banner-only (no logo fallback) */
 }}
-/* Desktop/tablet: banner-only mark, full width of brand box */
+/* Desktop/tablet: default banner-only mark; logo-only shells keep logo */
 @media (min-width: 521px) {{
   .brand-mark {{
     flex-direction: row;
@@ -1141,6 +1189,13 @@ a.product-tab.is-active, .product-tab.is-active {{
   .brand-logo-left,
   .brand-logo-right {{
     display: none !important;
+  }}
+  .brand-panel[data-logo-only="1"] .brand-banner {{
+    display: none !important;
+  }}
+  .brand-panel[data-logo-only="1"] .brand-logo,
+  .brand-panel[data-logo-only="1"] .brand-mark .brand-logo {{
+    display: block !important;
   }}
   #{SITE_BRAND_HEADER_ID} h1, .brand-panel h1, .brand-mark h1 {{
     text-align: left;
@@ -1283,7 +1338,7 @@ def public_display_title(raw: str | None = None) -> str:
 SUITE_HOME_INTRO_ID = "suite-home-intro"
 SUITE_HOME_INTRO_HEADING = "Privacy you can actually use"
 SUITE_HOME_INTRO_BODY = (
-    "Restore Privacy Suite brings together residual protection, a private wallet, "
+    "Restore Privacy Suite brings together residual VPN protection, a private wallet, "
     "and Evolve analysis in one place. Download the installer for free, then unlock "
     "with a KEYGEN when you are ready — a monthly licence starts at £3."
 )
@@ -1342,23 +1397,20 @@ def public_brand_header_html(
     include_product_tabs: bool = False,
     include_site_nav: bool = True,
     show_title_text: bool = False,
+    mark: str = "banner",
 ) -> str:
-    """Static top brand panel used across all public pages.
+    """Static top brand panel used across public pages.
 
-    Brand mark is **banner only** (no flanking logos). Product H1 text is off
-    by default. *title* still normalizes page titles for callers.
-    *logo_size* / *logo_src* retained for API compat but are not rendered.
+    Default *mark* is **banner** (full-width banner.jpg, no logos) for homepage
+    and most public shells. Pass ``mark="logo"`` for pay-flow and other shells
+    that want **exactly one** logo and no banner image.
+    *title* still normalizes page titles for callers.
     """
     _ = title  # retained for API compat (page titles use public_display_title)
-    _ = logo_src  # logos no longer rendered in the public brand mark
-    raw_banner = (banner_src or PUBLIC_BRAND_BANNER_PATH).strip() or PUBLIC_BRAND_BANNER_PATH
-    if raw_banner == PUBLIC_BRAND_BANNER_PATH or raw_banner.startswith(
-        f"{PUBLIC_BRAND_BANNER_PATH}?"
-    ):
-        bsrc = public_brand_banner_src()
-    else:
-        bsrc = raw_banner
-    # Banner height (height attr; CSS clamps via --rb-brand-header-height)
+    mode = (mark or "banner").strip().lower()
+    if mode not in ("banner", "logo"):
+        mode = "banner"
+    # Display height (height attr; CSS clamps via --rb-brand-header-height)
     sz = int(logo_size) if logo_size else PUBLIC_BRAND_HEADER_HEIGHT_DEFAULT
     if sz < 48:
         sz = PUBLIC_BRAND_HEADER_HEIGHT_DEFAULT
@@ -1380,10 +1432,41 @@ def public_brand_header_html(
         else:
             title_safe = _esc(public_display_title(title))
         title_html = f"\n        <h1>{title_safe}</h1>"
-    return f"""{tabs}    <header class="brand-panel panel-card" id="{SITE_BRAND_HEADER_ID}" data-site-header="1" data-header-alias="site-brand-header" data-chrome="pro" data-brand-banner="1" data-banner-only="1">
-      <div class="brand-mark" id="brand-mark" data-brand-mark="1" data-banner-only="1">
+
+    if mode == "logo":
+        raw_logo = (logo_src or PUBLIC_BRAND_LOGO_PATH).strip() or PUBLIC_BRAND_LOGO_PATH
+        if raw_logo == PUBLIC_BRAND_LOGO_PATH or raw_logo.startswith(
+            f"{PUBLIC_BRAND_LOGO_PATH}?"
+        ):
+            lsrc = public_brand_logo_src()
+        else:
+            lsrc = raw_logo
+        mark_html = f"""      <div class="brand-mark" id="brand-mark" data-brand-mark="1" data-logo-only="1">
+        <img class="brand-logo" id="brand-logo" src="{_esc(lsrc)}" height="{h_attr}" alt="Restore Privacy"/>{title_html}
+      </div>"""
+        header_data = (
+            f'data-site-header="1" data-header-alias="site-brand-header" '
+            f'data-chrome="pro" data-brand-logo="1" data-logo-only="1"'
+        )
+    else:
+        raw_banner = (
+            (banner_src or PUBLIC_BRAND_BANNER_PATH).strip() or PUBLIC_BRAND_BANNER_PATH
+        )
+        if raw_banner == PUBLIC_BRAND_BANNER_PATH or raw_banner.startswith(
+            f"{PUBLIC_BRAND_BANNER_PATH}?"
+        ):
+            bsrc = public_brand_banner_src()
+        else:
+            bsrc = raw_banner
+        mark_html = f"""      <div class="brand-mark" id="brand-mark" data-brand-mark="1" data-banner-only="1">
         <img class="brand-banner" id="brand-banner" src="{_esc(bsrc)}" height="{h_attr}" alt="Restore Privacy"/>{title_html}
-      </div>
+      </div>"""
+        header_data = (
+            f'data-site-header="1" data-header-alias="site-brand-header" '
+            f'data-chrome="pro" data-brand-banner="1" data-banner-only="1"'
+        )
+    return f"""{tabs}    <header class="brand-panel panel-card" id="{SITE_BRAND_HEADER_ID}" {header_data}>
+{mark_html}
       <hr class="brand-header-rule" aria-hidden="true"/>
 {tagline_html}{nav_html}
 {public_theme_picker_html()}

@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "Restore Privacy Suite",
   "short_name": "RP Suite",
-  "version": "1.0.2",
+  "version": "1.0.3",
   "description": "Rx Privacy Browser companion (MV3) for Restore Privacy Suite 1.0.1. Browser-scoped Connect/Disconnect only — not OS residual TUN. Use Suite native clients for system residual.",
   "action": {
     "default_title": "Restore Privacy Suite",

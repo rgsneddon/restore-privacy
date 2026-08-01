@@ -580,14 +580,16 @@ class NodeOperatorController:
         install_serve: bool = False,
         progress_cb: Any | None = None,
         brand_wide: bool = True,
+        only_filenames: list[str] | set[str] | tuple[str, ...] | None = None,
     ) -> dict[str, Any]:
         """Admin primary path: stage + upload brand installers to Helsinki.
 
         Default *brand_wide* includes Suite clients, rpOS, Pens/Tables/Slides,
         browser/Rx, node-installer, and node-operator packages.
 
-        Defaults: *force* True (re-upload all — never skip present remotes);
-        *allow_missing* False (incomplete local inventory fails closed).
+        *only_filenames*: admin-selected basenames only (cross-OS packages not
+        selected never fail the job). Defaults: *force* True; *allow_missing*
+        False for selected rows.
         """
         ver = (version or "").strip() or self.catalog_version_default()
         inv = self.list_local_packages(version=ver, brand_wide=bool(brand_wide))
@@ -601,7 +603,9 @@ class NodeOperatorController:
             install_serve=bool(install_serve),
             progress_cb=progress_cb,
             brand_wide=bool(brand_wide),
+            only_filenames=only_filenames,
         )
+        sel = deploy.get("only_filenames") or []
         return {
             "ok": bool(deploy.get("ok")),
             "suite": self.suite_product_label(ver),
@@ -613,6 +617,7 @@ class NodeOperatorController:
             "allow_missing": bool(allow_missing),
             "install_serve": bool(install_serve),
             "brand_wide": bool(brand_wide),
+            "only_filenames": list(sel) if sel else [],
             "inventory": inv,
             "inventory_after": deploy.get("inventory_after") or {},
             "staged": deploy.get("staged") or [],
@@ -717,16 +722,21 @@ class NodeOperatorController:
         install_serve: bool = False,
         progress_cb: Any | None = None,
         brand_wide: bool = True,
+        only_filenames: list[str] | set[str] | tuple[str, ...] | None = None,
     ) -> dict[str, Any]:
         """Manual deploy: stage local packages and/or upload to Helsinki.
 
-        When *brand_wide* is True, stages/uploads the full brand inventory
-        (Suite + rpOS + Pens/Tables/Slides + extras).
+        When *brand_wide* is True, stages/uploads the brand inventory
+        (Suite + rpOS + Pens/Tables/Slides + extras), optionally limited by
+        *only_filenames* (admin package checkboxes).
 
-        Defaults: *force* re-uploads every package (no skip-if-present);
-        *allow_missing* is off so incomplete inventory fails instead of skipping.
+        Defaults: *force* re-uploads selected packages (no skip-if-present);
+        *allow_missing* is off so **selected** incomplete files fail closed.
         """
         ver = (version or "").strip() or self.catalog_version_default()
+        sel_list: list[str] | None = None
+        if only_filenames is not None:
+            sel_list = [str(x).strip() for x in only_filenames if str(x).strip()]
         out: dict[str, Any] = {
             "ok": False,
             "version": ver,
@@ -737,6 +747,7 @@ class NodeOperatorController:
             "allow_missing": bool(allow_missing),
             "install_serve": bool(install_serve),
             "brand_wide": bool(brand_wide),
+            "only_filenames": list(sel_list) if sel_list is not None else [],
             "staged": [],
             "upload_code": None,
             "error": "",
@@ -780,6 +791,7 @@ class NodeOperatorController:
                         version=ver,
                         allow_missing=bool(allow_missing),
                         progress_cb=stage_cb,
+                        only_filenames=sel_list,
                     )
                 else:
                     staged_paths = mod.stage_packages(
@@ -804,6 +816,7 @@ class NodeOperatorController:
                             force=bool(force),
                             allow_missing=bool(allow_missing),
                             progress_cb=upload_cb,
+                            only_filenames=sel_list,
                         )
                     )
                 else:

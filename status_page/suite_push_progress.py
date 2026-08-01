@@ -169,16 +169,38 @@ def start_push_job(
     force: bool = True,
     allow_missing: bool = False,
     install_serve: bool = False,
+    only_filenames: list[str] | None = None,
 ) -> dict[str, Any]:
     """Create job, start background brand push, return job id + initial snapshot.
 
     Live upload (upload and not dry_run) runs SSH preflight **before** starting
     the worker so missing keys return ``missing_ssh_keys`` + ``redirect``
     immediately — not a confusing 0/20 failed job after the fact.
+
+    *only_filenames*: when provided, only those packages are staged/uploaded
+    (admin per-package checkboxes). Unselected missing packages never fail.
     """
     inv = controller.list_local_packages(version=version, brand_wide=True)
     if not inv.get("ok") and not inv.get("packages"):
         return {"ok": False, "error": inv.get("error") or "inventory failed"}
+    sel = [str(x).strip() for x in (only_filenames or []) if str(x).strip()]
+    # When form sent no package checkboxes at all, default to **present** locals
+    # only so Mac operators are not forced to have Windows installers.
+    if only_filenames is not None and not sel:
+        return {
+            "ok": False,
+            "error": "Select at least one package checkbox to stage/upload.",
+        }
+    if only_filenames is None:
+        # API callers without selection: keep historical full-inventory behaviour
+        # but prefer present-only to avoid cross-OS false fails on stage.
+        sel = [
+            str(p.get("filename") or "")
+            for p in (inv.get("packages") or [])
+            if p.get("present") and p.get("filename")
+        ]
+        if not sel:
+            sel = None  # type: ignore[assignment]
     opts = {
         "version": version or controller.catalog_version_default(),
         "stage": stage,
@@ -187,6 +209,7 @@ def start_push_job(
         "force": force,
         "allow_missing": allow_missing,
         "install_serve": install_serve,
+        "only_filenames": list(sel) if sel else [],
     }
 
     # Early gate: real SSH upload needs host keys on the status process.
@@ -247,6 +270,7 @@ def start_push_job(
                 install_serve=install_serve,
                 progress_cb=cb,
                 brand_wide=True,
+                only_filenames=opts.get("only_filenames") or None,
             )
             if result.get("missing_ssh_keys"):
                 redir = str(result.get("redirect") or "")

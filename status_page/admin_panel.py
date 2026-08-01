@@ -1567,7 +1567,7 @@ def render_admin_suite_push_upload_html() -> str:
         suite_label = ctrl.suite_product_label(catalog_ver)
         inv = ctrl.list_local_packages(version=catalog_ver, brand_wide=True)
     except Exception:  # noqa: BLE001
-        catalog_ver = "1.0.1"
+        catalog_ver = "1.0.3"
         suite_label = f"Restore Privacy Suite v{catalog_ver}"
         inv = {
             "ok": False,
@@ -1593,10 +1593,18 @@ def render_admin_suite_push_upload_html() -> str:
         product = str(p.get("product") or "")
         fname = str(p.get("filename") or "")
         done_cls = " suite-pkg-done" if status == "done" else ""
+        # Default-check packages that are present locally (Mac can omit Windows, etc.)
+        checked = " checked" if p.get("present") else ""
         pkg_rows.append(
             f'<tr class="suite-pkg-row{done_cls}" data-filename="{_escape(fname)}" '
             f'data-status="{_escape(status)}" data-progress="{progress}" '
-            f'data-kind="{_escape(kind)}">'
+            f'data-kind="{_escape(kind)}" data-present="{present}">'
+            f'<td class="suite-pkg-select">'
+            f'<input type="checkbox" name="package" value="{_escape(fname)}" '
+            f'id="admin-suite-pkg-sel-{_escape(fname)}" '
+            f'class="suite-pkg-checkbox" data-package-select="1"{checked} '
+            f'form="admin-suite-push-form" aria-label="Select {_escape(fname)}"/>'
+            f"</td>"
             f'<td class="suite-pkg-kind">{_escape(kind)}</td>'
             f'<td class="suite-pkg-product">{_escape(product)}</td>'
             f'<td class="suite-pkg-platform">{_escape(p.get("platform"))}</td>'
@@ -1619,7 +1627,7 @@ def render_admin_suite_push_upload_html() -> str:
         if pkg_rows
         else (
             '<tr id="admin-suite-packages-empty">'
-            '<td colspan="9">No brand packages in inventory</td></tr>'
+            '<td colspan="10">No brand packages in inventory</td></tr>'
         )
     )
     present_n = int(inv.get("present_count") or 0)
@@ -1634,12 +1642,10 @@ def render_admin_suite_push_upload_html() -> str:
          data-push-job-api="/admin/uploads/push-suite">
   <h3 id="admin-suite-push-heading">Push Suite packages</h3>
   <p class="muted" id="admin-suite-push-blurb">
-    Stage and upload <strong>full brand</strong> installers (Suite clients, browser/Rx,
-    rpOS, Pens · Tables · Slides, node-installer, node-operator) for
-    <strong>{_escape(suite_label)}</strong> to the Helsinki paid store.
-    Drives <code>scripts/host_paid_assets_vps.py</code> brand inventory.
-    Prefer <strong>Dry-run</strong> first; use <strong>Allow missing</strong>
-    for partial ships. Table refreshes live during push.
+    Stage and upload brand installers for <strong>{_escape(suite_label)}</strong>
+    to the Helsinki paid store. <strong>Tick only the packages this machine has</strong>
+    (Mac can omit Windows setup.exe; Windows can upload Windows-only). Unchecked
+    packages are skipped and never fail the job. Prefer <strong>Dry-run</strong> first.
   </p>
   <p id="admin-suite-push-inventory" data-suite-inventory="1">
     <span class="suite-badge" id="admin-suite-version-badge">{_escape(suite_label)}</span>
@@ -1650,9 +1656,15 @@ def render_admin_suite_push_upload_html() -> str:
   </p>
   <p id="admin-suite-push-job-status" class="muted" data-suite-job-status="1"
      aria-live="polite"></p>
+  <p class="muted" id="admin-suite-select-hint">
+    <button type="button" id="admin-suite-select-present" class="linkish">Select present</button>
+    · <button type="button" id="admin-suite-select-none" class="linkish">Select none</button>
+    · <button type="button" id="admin-suite-select-all" class="linkish">Select all</button>
+  </p>
   <table id="admin-suite-packages-table" data-suite-packages="1"
-         data-suite-packages-progress="1">
+         data-suite-packages-progress="1" data-package-select="1">
     <thead><tr>
+      <th>Upload</th>
       <th>Kind</th><th>Product</th><th>Platform</th><th>Filename</th>
       <th>Local</th><th>Staged</th><th>Size</th>
       <th>Status</th><th>Progress</th>
@@ -1662,17 +1674,18 @@ def render_admin_suite_push_upload_html() -> str:
     </tbody>
   </table>
   <form method="post" action="/admin/uploads/push-suite"
-        id="admin-suite-push-form" data-suite-push-form="1" data-async-push="1">
+        id="admin-suite-push-form" data-suite-push-form="1" data-async-push="1"
+        data-selective-packages="1">
     <input type="hidden" name="version" value="{_escape(catalog_ver)}" id="admin-suite-push-version"/>
     <input type="hidden" name="async" value="1" id="admin-suite-push-async"/>
     <label><input type="checkbox" name="stage" value="1" checked id="admin-suite-push-stage"/> Stage local assets</label>
     <label><input type="checkbox" name="upload" value="1" checked id="admin-suite-push-upload"/> Upload to Helsinki paid_assets</label>
-    <label><input type="checkbox" name="allow_missing" value="1" id="admin-suite-push-allow-missing"/> Allow missing platforms (skip incomplete)</label>
+    <label><input type="checkbox" name="allow_missing" value="1" id="admin-suite-push-allow-missing"/> Allow missing among selected (skip incomplete selected)</label>
     <label><input type="checkbox" name="force" value="1" checked id="admin-suite-push-force"/> Force re-upload (no skip if already on server)</label>
     <label><input type="checkbox" name="dry_run" value="1" id="admin-suite-push-dry-run"/> Dry-run (plan only, no SSH write)</label>
     <label><input type="checkbox" name="install_serve" value="1" id="admin-suite-push-install-serve"/> Restart store serve</label>
     <button type="submit" id="admin-suite-push-btn" class="primary-upload">
-      Push Suite packages to Helsinki
+      Push selected packages to Helsinki
     </button>
   </form>
   <hr style="border:0;border-top:1px solid var(--border,#333);margin:1rem 0"/>

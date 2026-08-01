@@ -9,6 +9,7 @@ import time
 import unittest
 import urllib.parse
 from pathlib import Path
+from typing import Any
 from unittest import mock
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -38,7 +39,16 @@ class TestSuiteStorefrontOrder(unittest.TestCase):
         self.assertIn("Get KEYGEN", html)
         self.assertIn('name="product" value="suite"', html)
         self.assertIn('name="interval" value="month"', html)
-        self.assertIn("/pay/checkout", html)
+        # Cart entry: GET /pay (not direct POST checkout with silent auto_renew)
+        self.assertIn('id="suite-keygen-form"', html)
+        self.assertIn('action="/pay"', html)
+        self.assertIn('method="get"', html.lower())
+        self.assertIn('data-cart-step="1"', html)
+        self.assertNotIn(
+            'id="suite-auto-renew-field"',
+            html,
+            msg="homepage suite CTA must not force auto_renew via hidden field",
+        )
         # VPN shop section id/role preserved
         self.assertIn('id="downloads"', html)
         self.assertIn("Download Suite client", html)
@@ -60,9 +70,230 @@ class TestSuiteStorefrontOrder(unittest.TestCase):
         self.assertIn("KEYGEN", block)
         self.assertIn("Evolve", block)
         self.assertNotIn("coming soon", block.lower())
-        # Monthly licence only on Suite KEYGEN CTA
+        # Monthly licence cart entry (GET /pay) — not direct checkout post
         self.assertIn('value="month"', block)
+        self.assertIn('action="/pay"', block)
+        self.assertIn('method="get"', block.lower())
         self.assertNotIn("suite-plan-year", block)
+        self.assertNotIn(
+            'name="auto_renew" value="1" id="suite-auto-renew-field"',
+            block,
+        )
+
+
+class TestSuiteKeygenCartMarkup(unittest.TestCase):
+    """Homepage Get KEYGEN → cart step with visible auto-renew (not 502 post)."""
+
+    def test_suite_keygen_cta_is_get_pay_cart_not_hidden_autorenew_checkout(self):
+        from downloads import AUTO_RENEW_LABEL, render_suite_storefront_html
+        from payments import render_pay_plan_page_html
+
+        suite = render_suite_storefront_html(default_platform="macos")
+        # Cart entry markup
+        self.assertIn('id="suite-keygen-form"', suite)
+        self.assertIn('action="/pay"', suite)
+        self.assertRegex(suite, r'method\s*=\s*["\']get["\']', msg=suite[:400])
+        self.assertIn('name="product" value="suite"', suite)
+        self.assertIn('name="interval" value="month"', suite)
+        self.assertIn("Device for KEYGEN licence", suite)
+        self.assertIn("Get KEYGEN", suite)
+        # No silent force auto-renew on homepage CTA
+        self.assertNotIn('id="suite-auto-renew-field"', suite)
+        self.assertNotIn('action="/pay/checkout"', suite)
+
+        # Cart page: monthly default + explicit auto-renew control + product=suite
+        cart = render_pay_plan_page_html(
+            "macos", interval="month", product="suite"
+        ).decode("utf-8")
+        self.assertIn('data-cart="1"', cart)
+        self.assertIn('data-product="suite"', cart)
+        self.assertIn('name="product" value="suite"', cart)
+        self.assertIn('id="pay-auto-renew"', cart)
+        self.assertIn(AUTO_RENEW_LABEL, cart)
+        self.assertIn('name="auto_renew"', cart)
+        self.assertIn('value="month"', cart)
+        self.assertIn('action="/pay/checkout"', cart)
+        self.assertIn("Continue to secure checkout", cart)
+        # Visible on/off: hidden 0 + checkbox 1 pattern (same as VPN buy form)
+        self.assertIn('id="pay-auto-renew-off"', cart)
+        self.assertIn('value="0"', cart)
+
+
+class TestSuitePayCheckoutHandler(unittest.TestCase):
+    """POST /pay/checkout via Handler: mock Stripe success/fail → redirect, not crash."""
+
+    def _post_checkout(
+        self,
+        form: dict[str, str],
+        *,
+        env: dict[str, str] | None = None,
+        session_fn=None,
+    ) -> tuple[int, str, bytes]:
+        import os
+        from http.server import ThreadingHTTPServer
+        from threading import Thread
+        from urllib import error, request
+
+        from app import Handler
+
+        prev = {
+            k: os.environ.get(k) for k in ("STRIPE_SECRET_KEY", "RPT_PUBLIC_BASE_URL")
+        }
+        patches: list[Any] = []
+        try:
+            if env is not None:
+                for k, v in env.items():
+                    if v is None or v == "":
+                        os.environ.pop(k, None)
+                    else:
+                        os.environ[k] = v
+            else:
+                os.environ["STRIPE_SECRET_KEY"] = "sk_test_cart_unit"
+                os.environ.setdefault(
+                    "RPT_PUBLIC_BASE_URL", "https://restoreprivacy.online"
+                )
+
+            if session_fn is not None:
+                # Handler imports create_subscription_checkout_session locally
+                # from payments at call time.
+                p = mock.patch(
+                    "payments.create_subscription_checkout_session", session_fn
+                )
+                p.start()
+                patches.append(p)
+
+            httpd = ThreadingHTTPServer(("127.0.0.1", 0), Handler)
+            port = httpd.server_address[1]
+            t = Thread(target=httpd.serve_forever, daemon=True)
+            t.start()
+            try:
+                body = urllib.parse.urlencode(form).encode("utf-8")
+                req = request.Request(
+                    f"http://127.0.0.1:{port}/pay/checkout",
+                    data=body,
+                    method="POST",
+                    headers={"Content-Type": "application/x-www-form-urlencoded"},
+                )
+
+                class _NoRedirect(request.HTTPRedirectHandler):
+                    def redirect_request(self, req, fp, code, msg, headers, newurl):  # noqa: ANN001, N802
+                        return None
+
+                opener = request.build_opener(_NoRedirect)
+                try:
+                    with opener.open(req, timeout=8) as resp:
+                        return (
+                            resp.getcode(),
+                            resp.headers.get("Location") or "",
+                            resp.read(),
+                        )
+                except error.HTTPError as e:
+                    loc = e.headers.get("Location") if e.headers else ""
+                    return e.code, loc or "", e.read()
+            finally:
+                httpd.shutdown()
+        finally:
+            for p in patches:
+                p.stop()
+            for k, v in prev.items():
+                if v is None:
+                    os.environ.pop(k, None)
+                else:
+                    os.environ[k] = v
+
+    def test_checkout_success_redirects_to_mock_stripe_url_auto_renew_both(self):
+        from payments import create_subscription_checkout_session
+
+        captured: list[bytes] = []
+
+        def fake_post(url, headers, body):  # noqa: ARG001
+            captured.append(body)
+            return (
+                200,
+                b'{"id":"cs_test_cart","url":"https://checkout.stripe.com/c/pay/cs_test_cart"}',
+            )
+
+        def session_fn(platform, **kwargs):  # noqa: ANN001
+            kwargs = dict(kwargs)
+            kwargs["http_post"] = fake_post
+            kwargs["base_url"] = "https://restoreprivacy.online"
+            return create_subscription_checkout_session(platform, **kwargs)
+
+        for renew in ("1", "0"):
+            with self.subTest(auto_renew=renew):
+                captured.clear()
+                code, loc, _ = self._post_checkout(
+                    {
+                        "platform": "macos",
+                        "interval": "month",
+                        "product": "suite",
+                        "auto_renew": renew,
+                    },
+                    session_fn=session_fn,
+                )
+                self.assertIn(code, (302, 303))
+                self.assertIn("checkout.stripe.com", loc)
+                self.assertTrue(captured)
+                fields = urllib.parse.parse_qs(captured[-1].decode("utf-8"))
+                self.assertEqual(fields.get("metadata[product_line]"), ["suite"])
+                self.assertEqual(fields.get("metadata[auto_renew]"), [renew])
+
+    def test_checkout_stripe_failure_redirects_to_pay_with_error(self):
+        def boom(**_kwargs):  # noqa: ANN001
+            raise ValueError("stripe checkout create failed HTTP 500: boom")
+
+        code, loc, body = self._post_checkout(
+            {
+                "platform": "windows",
+                "interval": "month",
+                "product": "suite",
+                "auto_renew": "1",
+            },
+            session_fn=boom,
+        )
+        self.assertIn(code, (302, 303))
+        self.assertIn("/pay?", loc)
+        q = urllib.parse.parse_qs(urllib.parse.urlparse(loc).query)
+        self.assertEqual(q.get("product"), ["suite"])
+        self.assertEqual(q.get("platform"), ["windows"])
+        err = (q.get("error") or [""])[0]
+        self.assertTrue(err, msg=f"expected error on cart redirect: {loc}")
+        self.assertNotIn(b"502 Bad Gateway", body[:400] if body else b"")
+
+    def test_checkout_uncaught_style_exception_still_redirects(self):
+        def raise_net(**_kwargs):  # noqa: ANN001
+            raise OSError("simulated stripe network down")
+
+        code, loc, _ = self._post_checkout(
+            {
+                "platform": "linux",
+                "interval": "month",
+                "product": "suite",
+                "auto_renew": "0",
+            },
+            session_fn=raise_net,
+        )
+        self.assertIn(code, (302, 303))
+        self.assertIn("/pay?", loc)
+        q = urllib.parse.parse_qs(urllib.parse.urlparse(loc).query)
+        self.assertIn("error", q)
+        self.assertEqual(q.get("product"), ["suite"])
+
+    def test_checkout_unconfigured_stripe_redirects_to_pay(self):
+        code, loc, _ = self._post_checkout(
+            {
+                "platform": "macos",
+                "interval": "month",
+                "product": "suite",
+                "auto_renew": "1",
+            },
+            env={"STRIPE_SECRET_KEY": ""},
+        )
+        self.assertIn(code, (302, 303))
+        self.assertIn("/pay?", loc)
+        q = urllib.parse.parse_qs(urllib.parse.urlparse(loc).query)
+        self.assertIn("error", q)
+        self.assertIn("unavailable", q["error"][0].lower())
 
 
 class TestSuiteStripeCheckout(unittest.TestCase):
