@@ -311,6 +311,56 @@ class TestCheckoutCompletedKeygenChain(unittest.TestCase):
                 }
             )
         )
+        # Monthly subscription underpay (1p / 150p) with subscription id — fail closed
+        for amt, sid in ((1, "cs_mo_under_1"), (150, "cs_mo_under_150"), (999, "cs_mo_under_999")):
+            self.assertIsNone(
+                pay.process_checkout_completed_event(
+                    {
+                        "type": "checkout.session.completed",
+                        "data": {
+                            "object": {
+                                "id": sid,
+                                "mode": "subscription",
+                                "payment_status": "paid",
+                                "amount_total": amt,
+                                "currency": "gbp",
+                                "client_reference_id": "windows|month",
+                                "subscription": f"sub_{sid}",
+                                "metadata": {
+                                    "platform": "windows",
+                                    "amount_pence": str(amt),
+                                    "billing_interval": "month",
+                                },
+                            }
+                        },
+                    }
+                ),
+                msg=f"monthly underpay {amt}p",
+            )
+            self.assertFalse(pay.connect_entitlement_allows(sid), msg=sid)
+
+        # payment_status=paid with amount 0 is NOT a free trial — must not unlock
+        self.assertIsNone(
+            pay.process_checkout_completed_event(
+                {
+                    "type": "checkout.session.completed",
+                    "data": {
+                        "object": {
+                            "id": "cs_paid_zero_not_trial",
+                            "mode": "subscription",
+                            "payment_status": "paid",
+                            "amount_total": 0,
+                            "currency": "gbp",
+                            "client_reference_id": "linux",
+                            "subscription": "sub_paid_zero",
+                            "customer_email": "pz@example.com",
+                            "metadata": {"amount_pence": "0", "platform": "linux"},
+                        }
+                    },
+                }
+            )
+        )
+        self.assertFalse(pay.connect_entitlement_allows("cs_paid_zero_not_trial"))
         # Yearly subscription underpay (1p) — must not unlock (closed yearly_sub_ok loophole)
         self.assertIsNone(
             pay.process_checkout_completed_event(

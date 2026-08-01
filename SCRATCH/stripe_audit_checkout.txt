@@ -1,0 +1,14 @@
+=== Stripe audit: checkout completed ===
+fulfilment_email_not_sent session='cs_m' skipped=True error='smtp_not_configured' has_keygen=True has_download=True smtp='disabled'
+fulfilment_email_not_sent session='cs_y' skipped=True error='smtp_not_configured' has_keygen=True has_download=True smtp='disabled'
+fulfilment_email_not_sent session='cs_t' skipped=True error='smtp_not_configured' has_keygen=True has_download=True smtp='disabled'
+PASS mo_300 True
+PASS yr_3000 True
+PASS trial True
+PASS mo_1p_sub True
+PASS mo_999_sub True
+PASS yr_1p True
+PASS yr_999 True
+PASS paid_zero True
+PASS commercial True
+CHECKOUT_AUDIT_OK

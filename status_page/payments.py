@@ -7832,11 +7832,10 @@ def process_checkout_completed_event(
         usd_ok = abs(int(amount) - expect_m) <= 2 or abs(int(amount) - expect_y) <= 2
     # Paid yearly must hit yearly_amount_ok (exactly PRICE_YEARLY_PENCE) — do not
     # unlock on arbitrary amount>=0 with a yearly interval (underpay loophole).
-    # Trial: subscription + no cash taken yet (0 / no_payment_required).
-    trial_ok = bool(subscription_id) and (
-        payment_status == "no_payment_required"
-        or amount == 0
-        or (amount is None and payment_status == "no_payment_required")
+    # Trial: only Stripe free-trial completion (no_payment_required + £0/absent).
+    # payment_status=paid with amount 0 is NOT a catalog trial — fail closed.
+    trial_ok = bool(subscription_id) and payment_status == "no_payment_required" and (
+        amount is None or amount == 0
     )
     if not amount_ok and not yearly_amount_ok and not trial_ok and not usd_ok:
         return None
@@ -7854,14 +7853,14 @@ def process_checkout_completed_event(
         grant_pence = PRICE_YEARLY_PENCE
     elif amount_ok:
         grant_pence = PRICE_PENCE
-    elif trial_ok and not amount_ok and not yearly_amount_ok:
+    elif trial_ok:
         grant_pence = 0
-    elif usd_ok and amount is not None:
-        grant_pence = int(amount)
-    elif amount is not None and amount > 0:
+    elif usd_ok and amount is not None and int(amount) > 0:
+        # USD presentment: store charged cents (catalog-relative via usd_ok gate).
         grant_pence = int(amount)
     else:
-        grant_pence = 0 if trial_ok else PRICE_PENCE
+        # Gate said allow but no grantable amount path — fail closed.
+        return None
     token = mint_download_token(
         filename=filename,
         platform=platform,

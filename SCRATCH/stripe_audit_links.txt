@@ -1,0 +1,13 @@
+=== Stripe audit: links + builders ===
+catalog 300 3000 trial 3
+commercial 300000
+{"id": "site_pay_plan", "path": "/pay", "form_action": "/pay/checkout", "kind": "subscription_keygen", "intervals": ["month", "year"], "amounts_pence": [300, 3000], "trial_days": 3}
+{"id": "homepage_buy_form", "path": "/", "form_action": "/pay/checkout", "kind": "subscription_keygen", "product_line": "vpn", "intervals": ["month", "year"], "amounts_pence": [300, 3000], "trial_days": 3}
+{"id": "suite_keygen_form", "path": "/#suite-storefront", "form_action": "/pay/checkout", "kind": "subscription_keygen", "product_line": "suite", "intervals": ["month"], "amounts_pence": [300], "trial_days": 3}
+{"id": "api_checkout", "path": "/api/checkout", "kind": "subscription_keygen", "builder": "create_checkout_session\u2192create_subscription_checkout_session", "intervals": ["month", "year"], "amounts_pence": [300, 3000], "trial_days": 3}
+{"id": "commercial_suite_deposit", "path": "/pay/commercial-suite", "kind": "commercial_deposit", "amounts_pence": [300000], "trial_days": 0, "not_keygen": true}
+body month {'mode': 'subscription', 'amount_pence': 300, 'expected_amount_pence': 300, 'trial_period_days': 3, 'billing_interval': 'month', 'product_line': 'vpn', 'platform': 'windows', 'ok': True}
+body year {'mode': 'subscription', 'amount_pence': 3000, 'expected_amount_pence': 3000, 'trial_period_days': 3, 'billing_interval': 'year', 'product_line': 'vpn', 'platform': 'windows', 'ok': True}
+commercial mode ['payment'] amount ['300000']
+yearly_sub_ok_absent True
+trial_requires_no_payment_required True
