@@ -239,6 +239,8 @@ python -m rpos.installer restore --yes-advisories --confirm %CONFIRM% --prefix "
 if errorlevel 1 exit /b 1
 echo Ned will guide timezone, language, and rpMail email.
 python -m rpos.installer oobe --prefix "%RPOS_PREFIX%"
+echo Ned: locked guide — Pens, Tables, then Slides.
+python -m rpos.installer apps-tour --prefix "%RPOS_PREFIX%"
 """,
             encoding="utf-8",
         )
@@ -265,6 +267,9 @@ python3 -m rpos.installer restore --yes-advisories --confirm "$CONFIRM" --prefix
 echo ""
 echo "Ned will guide timezone, language, and rpMail email."
 python3 -m rpos.installer oobe --prefix "$PREFIX"
+echo ""
+echo "Ned: locked guide — Pens, then Tables, then Slides."
+python3 -m rpos.installer apps-tour --prefix "$PREFIX"
 """,
             encoding="utf-8",
         )
