@@ -55,27 +55,39 @@ OFFICE_PARITY_MATRIX: list[dict[str, str]] = [
     },
     {
         "pillar": TABLES,
-        "feature": "Grid cells + simple formula evaluation",
+        "feature": "2D grid + numbers/text/blank + serialize round-trip",
         "status": "implemented",
-        "analogue": "Excel-class",
+        "analogue": "Excel-class core",
+    },
+    {
+        "pillar": TABLES,
+        "feature": "Formulas with cell refs, arithmetic, SUM, IF + recalculation",
+        "status": "implemented",
+        "analogue": "Excel-class core",
+    },
+    {
+        "pillar": TABLES,
+        "feature": "Named worksheets in workbook (add/select/list; sheet isolation)",
+        "status": "implemented",
+        "analogue": "Excel-class core",
+    },
+    {
+        "pillar": TABLES,
+        "feature": "Insert/delete rows and columns + undo/redo",
+        "status": "implemented",
+        "analogue": "Excel-class core",
+    },
+    {
+        "pillar": TABLES,
+        "feature": "Charts, pivot tables, XLSX/VBA, Power Query, collaboration",
+        "status": "out_of_scope",
+        "analogue": "Microsoft Excel (not claimed)",
     },
     {
         "pillar": SLIDES,
         "feature": "Multi-slide create/reorder/serialize",
         "status": "implemented",
         "analogue": "PowerPoint-class",
-    },
-    {
-        "pillar": TABLES,
-        "feature": "Named worksheets in workbook",
-        "status": "partial",
-        "analogue": "Excel-class",
-    },
-    {
-        "pillar": TABLES,
-        "feature": "Charts / pivot tables",
-        "status": "planned",
-        "analogue": "Excel-class",
     },
     {
         "pillar": SLIDES,
@@ -110,6 +122,15 @@ def pens_word_class_core_rows() -> list[dict[str, str]]:
     ]
 
 
+def tables_excel_class_core_rows() -> list[dict[str, str]]:
+    """Tables rows that constitute gating Excel-class core."""
+    return [
+        r
+        for r in OFFICE_PARITY_MATRIX
+        if r["pillar"] == TABLES and r["status"] == "implemented"
+    ]
+
+
 def matrix_as_dict() -> dict[str, Any]:
     return {
         "product": "rpOffice",
@@ -119,8 +140,10 @@ def matrix_as_dict() -> dict[str, Any]:
         "matrix": list(OFFICE_PARITY_MATRIX),
         "implemented_pillars": implemented_pillars(),
         "pens_word_class_core": pens_word_class_core_rows(),
+        "tables_excel_class_core": tables_excel_class_core_rows(),
         "note": (
             "Primary names are Pens, Tables, Slides — not Microsoft brand labels. "
-            "Pens Word-class core is implemented; full Microsoft Word parity is not claimed."
+            "Pens Word-class and Tables Excel-class cores are implemented; "
+            "full Microsoft Office parity is not claimed."
         ),
     }
