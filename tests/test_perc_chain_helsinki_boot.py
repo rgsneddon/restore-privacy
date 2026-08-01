@@ -30,10 +30,13 @@ class TestPercChainHelsinkiBoot(unittest.TestCase):
         self.assertIn("seed_ledger.json.pre_deploy", src)
         self.assertIn("systemctl enable", src)
         self.assertIn("PERC_DATA_DIR", src)
-        # Must not wipe durable data dir on install
-        for line in src.splitlines():
-            if "rm -rf" in line and "data" in line:
-                self.fail(f"deploy must not wipe data dir: {line}")
+        # Must not wipe durable data dir on install (ignore comment-only lines).
+        for raw in src.splitlines():
+            code = raw.split("#", 1)[0].strip()
+            if not code:
+                continue
+            if "rm -rf" in code and "data" in code:
+                self.fail(f"deploy must not wipe data dir: {raw}")
 
     def test_package_and_dry_run_shipped_entry(self) -> None:
         import deploy_perc_chain_helsinki as d
