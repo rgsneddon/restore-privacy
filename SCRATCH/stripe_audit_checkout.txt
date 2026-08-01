@@ -1,5 +1,10 @@
-usd_unit 381 expect 381 meta ['300']
-fulfilment_email_not_sent session='cs_usd_4a8d5a63' skipped=True error='smtp_not_configured' has_keygen=True has_download=True smtp='disabled'
-usd_unlock True connect True grant_pence 300
-spoof_token None connect False ent None
-AMOUNT_TOTAL_GATE_OK
+builder_usd_unit 381 expect 381 meta ['300']
+fulfilment_email_not_sent session='cs_usd_9d7c408d' skipped=True error='smtp_not_configured' has_keygen=True has_download=True smtp='disabled'
+USD_UNLOCK True True 300
+SPOOF_total1_meta300 token None connect False ent None
+PAID_NO_AMOUNT_TOTAL None False
+fulfilment_email_not_sent session='cs_mo_9d7c408d' skipped=True error='smtp_not_configured' has_keygen=True has_download=True smtp='disabled'
+GBP_300 True True
+fulfilment_email_not_sent session='cs_yr_9d7c408d' skipped=True error='smtp_not_configured' has_keygen=True has_download=True smtp='disabled'
+GBP_3000 True True
+CHECKOUT_AUDIT_OK spoof_never_grants_connect_allowed

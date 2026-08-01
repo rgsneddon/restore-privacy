@@ -642,6 +642,34 @@ class TestAmountTotalOverMetadata(unittest.TestCase):
         self.assertIsNone(pay.get_connect_entitlement("cs_spoof_meta_300"))
         self.assertFalse(pay.connect_entitlement_allows("cs_spoof_meta_300"))
 
+    def test_paid_missing_amount_total_ignores_metadata_300(self) -> None:
+        """Paid with no amount_total must fail closed even if metadata says 300."""
+        pay = self.pay
+        token = pay.process_checkout_completed_event(
+            {
+                "type": "checkout.session.completed",
+                "data": {
+                    "object": {
+                        "id": "cs_no_total_meta_300",
+                        "mode": "subscription",
+                        "payment_status": "paid",
+                        # amount_total omitted — sole cash truth absent
+                        "currency": "gbp",
+                        "client_reference_id": "windows|month",
+                        "subscription": "sub_no_total",
+                        "customer_email": "nototal@example.com",
+                        "metadata": {
+                            "platform": "windows",
+                            "amount_pence": "300",
+                            "currency": "gbp",
+                        },
+                    }
+                },
+            }
+        )
+        self.assertIsNone(token)
+        self.assertFalse(pay.connect_entitlement_allows("cs_no_total_meta_300"))
+
 
 class TestFindPaidPurchaseYearly(unittest.TestCase):
     def setUp(self) -> None:

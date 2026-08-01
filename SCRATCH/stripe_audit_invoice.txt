@@ -1,3 +1,5 @@
-fulfilment_email_not_sent session='cs_t' skipped=True error='smtp_not_configured' has_keygen=True has_download=True smtp='disabled'
-{'action': 'rejected_non_catalog_amount', 'session_id': 'cs_t', 'amount_paid': 1, 'event_type': 'invoice.paid', 'catalog_sale': None}
-INVOICE_OK
+fulfilment_email_not_sent session='cs_t_ac95d2fb' skipped=True error='smtp_not_configured' has_keygen=True has_download=True smtp='disabled'
+invoice_1 rejected_non_catalog_amount connect False
+invoice_999 rejected_non_catalog_amount connect False
+invoice_300 renewed True
+INVOICE_AUDIT_OK

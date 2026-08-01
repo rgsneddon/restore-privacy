@@ -7783,21 +7783,20 @@ def process_checkout_completed_event(
         return None
     if filename not in catalog_filenames():
         return None
-    # Cash amount: Stripe ``amount_total`` is source of truth (what was charged).
-    # ``metadata.amount_pence`` is the GBP catalog pin from our builders (often 300
-    # even for USD presentment) — never prefer it over amount_total for unlock
-    # gates (breaks USD checkout; spoofs underpay when total=1 and meta=300).
+    # Cash amount: Stripe ``amount_total`` is the **sole** unlock truth (what was
+    # charged). Ignore spoofable ``metadata.amount_pence`` entirely for gates —
+    # builders pin GBP 300 there even for USD presentment (amount_total≈381¢),
+    # and underpay can set total=1 while metadata still says 300.
     amount: int | None = None
     try:
-        if obj.get("amount_total") is not None and str(obj.get("amount_total")).strip() != "":
-            amount = int(obj.get("amount_total"))
-        elif (
-            meta.get("amount_pence") is not None
-            and str(meta.get("amount_pence")).strip() != ""
-        ):
-            # Rare fallback when amount_total omitted (prefer fail-closed elsewhere)
-            amount = int(meta.get("amount_pence"))
+        raw_total = obj.get("amount_total")
+        if raw_total is not None and str(raw_total).strip() != "":
+            amount = int(raw_total)
     except (TypeError, ValueError):
+        return None
+    # Paid sessions without amount_total cannot prove catalog cash — fail closed.
+    # (Trial uses payment_status=no_payment_required with amount_total 0 or absent.)
+    if payment_status == "paid" and amount is None:
         return None
     session_id = str(obj.get("id") or "")
     payment_intent_id = _payment_intent_id_from_stripe_object(obj)
