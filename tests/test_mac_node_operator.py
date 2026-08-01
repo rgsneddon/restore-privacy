@@ -167,7 +167,8 @@ class TestNodeOperatorAppEntry(unittest.TestCase):
         ctrl = NodeOperatorController(repo_root=ROOT)
         ver = ctrl.catalog_version_default()
         self.assertTrue(ver, "catalog version must be non-empty")
-        inv = ctrl.list_local_packages(version=ver)
+        # Suite-only catalog inventory (explicit brand_wide=False).
+        inv = ctrl.list_local_packages(version=ver, brand_wide=False)
         self.assertTrue(inv.get("ok"), inv)
         self.assertEqual(inv.get("version"), ver)
         self.assertEqual(inv.get("total"), 5)
@@ -175,6 +176,13 @@ class TestNodeOperatorAppEntry(unittest.TestCase):
         self.assertEqual(
             platforms, {"windows", "android", "macos", "ios", "linux"}
         )
+        # Default brand-wide inventory used by Helsinki push (≥ Suite five).
+        brand = ctrl.list_local_packages(version=ver, brand_wide=True)
+        self.assertTrue(brand.get("ok"), brand)
+        self.assertGreaterEqual(int(brand.get("total") or 0), 5)
+        brand_kinds = set(brand.get("kinds") or [])
+        self.assertIn("suite_client", brand_kinds)
+        self.assertIn("rpos", brand_kinds)
 
         # Drive shipped host script via controller (dry-run; no SSH write).
         # Without local staged packages, result may be not-ok — still real path.
@@ -184,6 +192,7 @@ class TestNodeOperatorAppEntry(unittest.TestCase):
             upload=True,
             dry_run=True,
             allow_missing=True,
+            brand_wide=False,
         )
         self.assertEqual(r["version"], ver)
         self.assertTrue(r.get("dry_run"))
