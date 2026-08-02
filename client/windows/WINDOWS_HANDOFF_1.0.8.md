@@ -25,10 +25,10 @@ releases/1.0.8/restore-privacy-client-1.0.8-windows-x64-setup.exe
 
 ## Operator note (Stripe Dashboard)
 
-Code no longer sends `subscription_data[trial_period_days]` when catalog wants 0.
-If live Dashboard prices still show a Stripe trial, reconfigure prices / stop
-attaching trial on Checkout so live matches code. Residual free trial remains
-host `device_trial` only.
+- Code: `CATALOG_TRIAL_PERIOD_DAYS = 0`; Checkout omits `subscription_data[trial_period_days]`.
+- `scripts/configure_stripe_payment_link_trial.py`: trial=0; `checkout_applies_trial` is False.
+- If live Dashboard still has a Stripe trial, clear it so live matches code.
+- Residual free trial remains host `device_trial` only (in-app).
 
 ## Related commits (this goal series)
 

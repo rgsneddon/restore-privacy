@@ -132,14 +132,21 @@ class TestPaymentLinkTrialHelpers(unittest.TestCase):
         self.assertIn("PRICE_PENCE", src)
         self.assertIn("unit_amount_pence", src)
         self.assertIn("year", src.lower())
-        # Nicknames / dashboard_steps may mention "3-day trial via Checkout"; ban bare no-trial policy
-        for banned in (
-            "no free trial",
-            "set trial period = none",
-            "trial period = none / 0 days",
-            "clears free-trial",
-        ):
-            self.assertNotIn(banned, src.lower(), msg=f"configure script still has {banned!r}")
+        # Configure path must ship trial_period_days=0 (no Stripe free trial)
+        self.assertIn("trial_period_days = 0", src.lower() or "trial_period_days=0" in src.lower())
+        self.assertTrue(
+            "no stripe free trial" in src.lower()
+            or "trial_period_days = 0" in src.lower()
+            or "trial period = none" in src.lower()
+            or "no stripe trial" in src.lower(),
+            "configure script must document no Stripe Checkout trial",
+        )
+        self.assertNotIn("trial_period_days]=3", src)
+        self.assertNotIn("trial_period_days]=3", src.replace(" ", ""))
+        self.assertNotIn("set trial period = 3 days", src.lower())
+        self.assertNotIn("3-day trial via checkout", src.lower())
+        self.assertIn("checkout_applies_trial", src)
+        self.assertIn("want_trial > 0", src)
         smtp_script = ROOT / "scripts" / "set_render_fulfilment_smtp.ps1"
         self.assertTrue(smtp_script.is_file())
         ps = smtp_script.read_text(encoding="utf-8")

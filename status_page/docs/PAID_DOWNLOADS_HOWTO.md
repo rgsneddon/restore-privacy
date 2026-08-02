@@ -127,7 +127,8 @@ Dashboard products/prices:
 
 Override with `STRIPE_PRICE_ID_MONTHLY` / `STRIPE_PRICE_ID_YEARLY` if you rotate prices.
 Use `scripts/configure_stripe_payment_link_trial.py` (when `STRIPE_SECRET_KEY` is set)
-to create/reuse prices; catalog Checkout asserts **trial_period_days = 3**.
+to create/reuse prices; catalog Checkout uses **trial_period_days = 0**
+(no Stripe free trial — residual free trial is in-app only).
 
 Also confirm **Settings → Customer emails** / Checkout branding still send receipts if you want them.
 
