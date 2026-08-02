@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Package free Pens · Tables · Slides installers (bundled with rpOS).
 
-Outputs under ``releases/rpos-apps/0.1.0/``:
+Outputs under ``releases/rpos-apps/0.1.1/``:
 
   pens-0.1.0-installer.zip
   tables-0.1.0-installer.zip
@@ -23,7 +23,7 @@ from pathlib import Path
 from typing import Any
 
 ROOT = Path(__file__).resolve().parents[1]
-VERSION = "0.1.0"
+VERSION = "0.1.1"
 OUT = ROOT / "releases" / "rpos-apps" / VERSION
 APPS_SRC = ROOT / "rpos" / "apps"
 

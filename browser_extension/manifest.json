@@ -2,8 +2,8 @@
   "manifest_version": 3,
   "name": "Restore Privacy Suite",
   "short_name": "RP Suite",
-  "version": "1.0.4",
-  "description": "Rx Privacy Browser companion (MV3) for Restore Privacy Suite 1.0.4. Browser-scoped Connect/Disconnect only — not OS residual TUN. Use Suite native clients for system residual.",
+  "version": "1.0.5",
+  "description": "Rx Privacy Browser companion (MV3) for Restore Privacy Suite 1.0.5. Browser-scoped Connect/Disconnect only \u2014 not OS residual TUN. Use Suite native clients for system residual.",
   "action": {
     "default_title": "Restore Privacy Suite",
     "default_popup": "popup.html",

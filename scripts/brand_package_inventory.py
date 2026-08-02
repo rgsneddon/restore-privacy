@@ -23,9 +23,9 @@ def _suite_version() -> str:
             sys.path.insert(0, str(sys_path_status))
         from downloads import RELEASE_VERSION
 
-        return str(RELEASE_VERSION).strip() or "1.0.4"
+        return str(RELEASE_VERSION).strip() or "1.0.5"
     except Exception:
-        return "1.0.4"
+        return "1.0.5"
 
 
 def list_brand_installer_packages(
@@ -144,9 +144,9 @@ def list_brand_installer_packages(
             _sys.path.insert(0, _scripts)
         from package_rpos import RPOS_VERSION as _rpos_ver_src
 
-        rpos_ver = str(_rpos_ver_src).strip() or "0.2.0"
+        rpos_ver = str(_rpos_ver_src).strip() or "0.2.1"
     except Exception:
-        rpos_ver = "0.2.0"
+        rpos_ver = "0.2.1"
     for plat, fname in (
         ("windows", f"rpos-{rpos_ver}-windows-x64.zip"),
         ("macos", f"rpos-{rpos_ver}-macos.zip"),
@@ -168,7 +168,7 @@ def list_brand_installer_packages(
         )
 
     # --- Free bundled Pens · Tables · Slides ---
-    apps_ver = "0.1.0"
+    apps_ver = "0.1.1"
     for brand, key in (("Pens", "pens"), ("Tables", "tables"), ("Slides", "slides")):
         fname = f"{key}-{apps_ver}-installer.zip"
         rows.append(
@@ -185,7 +185,7 @@ def list_brand_installer_packages(
         )
 
     # --- Node installer multi-platform ---
-    node_ver = "1.0.0"
+    node_ver = "1.0.1"
     for plat, fname in (
         ("linux", f"restore-privacy-node-installer-{node_ver}-linux-x64.tar.gz"),
         ("macos", f"restore-privacy-node-installer-{node_ver}-macos.zip"),
@@ -207,7 +207,7 @@ def list_brand_installer_packages(
         )
 
     # --- Node Operator Linux ---
-    op_ver = "1.0.0"
+    op_ver = "1.0.1"
     op_name = f"restore-privacy-node-operator-{op_ver}-linux-x64.tar.gz"
     rows.append(
         {
@@ -223,7 +223,7 @@ def list_brand_installer_packages(
     )
 
     # --- rpMail + rpOffice desktop installers ---
-    mail_ver = "0.1.0"
+    mail_ver = "0.1.1"
     for key, product in (("rpmail", "rpMail"), ("rpoffice", "rpOffice")):
         for plat, fname in (
             ("windows", f"{key}-{mail_ver}-windows.zip"),

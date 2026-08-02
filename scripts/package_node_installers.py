@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Package residual **node installer** materials for every product platform.
 
-Monopin **1.0.0** under ``releases/node-installer/1.0.0/``.
+Monopin **1.0.1** under ``releases/node-installer/1.0.1/``.
 
 Platform matrix (honest residual capability)::
 
@@ -36,7 +36,7 @@ from pathlib import Path
 from typing import Any
 
 ROOT = Path(__file__).resolve().parents[1]
-NODE_INSTALLER_VERSION = "1.0.0"
+NODE_INSTALLER_VERSION = "1.0.1"
 OUT_DIR = ROOT / "releases" / "node-installer" / NODE_INSTALLER_VERSION
 
 # Residual node host install scripts that ship in every package tree.

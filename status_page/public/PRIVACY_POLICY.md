@@ -1,8 +1,8 @@
 # Privacy Policy — Restore Privacy Suite
 
 **Last updated:** 31 July 2026  
-**Product:** Restore Privacy Suite v1.0.4 — residual Connect, wallet, Evolve, and the public **VPN APP Shop**  
-**Current packages (catalog v1.0.4):** free Suite installers on [restoreprivacy.online](https://restoreprivacy.online/) (VPN APP Shop). Residual Connect needs a **KEYGEN** — monthly licence from **£3.00 GBP**; yearly residual plan **£30.00** remains on `/pay`. **Linux**, **Android**, **macOS**, **iOS**, and **Windows** monopin **1.0.4** packages are fulfilled from the product host. **macOS** is **Developer ID** + notarized (Team **SFCBP95595**); **iOS** is **Apple Distribution** Team-signed sideload (same Team). Public GitHub Pages (`public_site/`) ship docs only — not operator admin. After KEYGEN checkout, email delivers **keygen** + **PPI**. Settings defaults (lean residual): run at startup **off**, autoconnect **off**, residual VPN core **always on**, residual **IPv4 always on**, residual **IPv6** toggleable, traffic shaping / outer obfuscation / multi-hop **off**. Optional browser extension (Chromium MV3) is browser-scoped only — not OS residual TUN.
+**Product:** Restore Privacy Suite v1.0.5 — residual Connect, wallet, Evolve, and the public **VPN APP Shop**  
+**Current packages (catalog v1.0.5):** free Suite installers on [restoreprivacy.online](https://restoreprivacy.online/) (VPN APP Shop). Residual Connect needs a **KEYGEN** — monthly licence from **£3.00 GBP**; yearly residual plan **£30.00** remains on `/pay`. **Linux**, **Android**, **macOS**, **iOS**, and **Windows** monopin **1.0.5** packages are fulfilled from the product host. **macOS** is **Developer ID** + notarized (Team **SFCBP95595**); **iOS** is **Apple Distribution** Team-signed sideload (same Team). Public GitHub Pages (`public_site/`) ship docs only — not operator admin. After KEYGEN checkout, email delivers **keygen** + **PPI**. Settings defaults (lean residual): run at startup **off**, autoconnect **off**, residual VPN core **always on**, residual **IPv4 always on**, residual **IPv6** toggleable, traffic shaping / outer obfuscation / multi-hop **off**. Optional browser extension (Chromium MV3) is browser-scoped only — not OS residual TUN.
 
 **Payment and Connect:** residual Connect needs a **successful payment** and **keygen unlock** while the subscription is **OK**. If payment fails, is refunded/disputed, or the paid period ends, status is **EXPIRED**: the app **hard-locks** with **renew your licence *here*** and a **platform payment portal** link until you renew and re-enter a valid keygen. Stripe session id / keygen are entitlement keys, not a username/password account. The status host also binds Stripe **`payment_intent`** so refunds without session metadata still revoke Connect.
 
@@ -71,7 +71,7 @@ Node process stdout/stderr is configured for no journal session streams in the s
 - Shows product title and paid download entry. Platform line is names only — not a live metric.
 - After paid Checkout: active Connect entitlement (binds Stripe **`payment_intent`** so refunds without session metadata still revoke), **keygen** mint, email with keygen + PPI + download. Licence accept + keygen required for Connect (**OK**). Failures/refunds/disputes/period end → **EXPIRED**: apps hard-lock with **renew your licence *here*** and a platform payment portal link. Clients re-check `/api/connect-entitlement` on Connect.
 - Optional `/api/status` JSON is **title-only** (no `clients_connected`).
-- Does not publish free permanent GitHub installer buttons. Catalog v1.0.4 is fulfilled after payment via a time-limited (12 hours) download proxy.
+- Does not publish free permanent GitHub installer buttons. Catalog v1.0.5 is fulfilled after payment via a time-limited (12 hours) download proxy.
 - Serves same-origin legal docs (`/PRIVACY_POLICY.md`, `/LICENSE`, `/README.md`, `/CREDITS.md`, `/AUDIT.md`).
 
 ### 3.4 Operator secrets

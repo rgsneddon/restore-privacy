@@ -1,12 +1,12 @@
 # Restore Privacy Suite
 
-**Restore Privacy Suite v1.0.4** is the full app: residual protection, a private
+**Restore Privacy Suite v1.0.5** is the full app: residual protection, a private
 wallet, and Evolve analysis together. Maintained under **Raskul**’s direction,
 with regular automated security audits.
 
 | | |
 |--|--|
-| **Download** | Free installers on [restoreprivacy.online](https://restoreprivacy.online/) — catalog **v1.0.4** |
+| **Download** | Free installers on [restoreprivacy.online](https://restoreprivacy.online/) — catalog **v1.0.5** |
 | **Use residual Connect** | KEYGEN licence from **£3.00/month** (Stripe); yearly residual plan **£30.00** still on **`/pay`** |
 | **Privacy** | [PRIVACY_POLICY.md](PRIVACY_POLICY.md) |
 | **Licence** | [LICENSE](LICENSE) (proprietary full copyright) |
@@ -64,7 +64,7 @@ Operator / implementer detail:
 ## At a glance
 
 - **VPN**, **%**, **EVOLVE**, and **rpAI** (Ned) tabs in one Suite shell
-  (catalog monopin matches `client/VERSION` — currently **1.0.4** on storefront).
+  (catalog monopin matches `client/VERSION` — currently **1.0.5** on storefront).
 - **Optional Suite account** after KEYGEN: one sign-up/sign-in for **%** and
   **EVOLVE**; **Not now — use VPN only** defers without blocking Connect.
 - **rpAI / Ned:** resume deferred wallet & analyser setup; registered users get
@@ -112,11 +112,11 @@ Operator / implementer detail:
 
 | Platform | Package |
 |----------|---------|
-| Windows | `restore-privacy-client-1.0.4-windows-x64-setup.exe` |
-| Android | `restore-privacy-client-1.0.4-android.apk` |
-| macOS | `restore-privacy-client-1.0.4-macos.zip` |
-| iOS | `restore-privacy-client-1.0.4-ios.zip` |
-| Linux x64 | `restore-privacy-client-1.0.4-linux-x64.tar.gz` |
+| Windows | `restore-privacy-client-1.0.5-windows-x64-setup.exe` |
+| Android | `restore-privacy-client-1.0.5-android.apk` |
+| macOS | `restore-privacy-client-1.0.5-macos.zip` |
+| iOS | `restore-privacy-client-1.0.5-ios.zip` |
+| Linux x64 | `restore-privacy-client-1.0.5-linux-x64.tar.gz` |
 | Browser (Chromium MV3) | browser proxy only, not OS residual TUN |
 
 ### Windows
@@ -143,7 +143,7 @@ Supported floor: **Ubuntu 20.04 LTS** and later.
 2. Unpack and run:
 
    ```bash
-   tar xzf restore-privacy-client-1.0.4-linux-x64.tar.gz
+   tar xzf restore-privacy-client-1.0.5-linux-x64.tar.gz
    cd restore-privacy-*-linux
    bash install.sh
    ```
@@ -177,7 +177,7 @@ https://restoreprivacy.online/
 
 - **Suite free installers** first, then **KEYGEN** from **£3.00/month**
 - **Monthly VPN plan** and **Yearly VPN plan** (£30.00) residual options on **`/pay`**
-- Catalog **v1.0.4** — Connect needs KEYGEN on an **active** subscription (**OK**)
+- Catalog **v1.0.5** — Connect needs KEYGEN on an **active** subscription (**OK**)
 - **No** public live session / connected-client counter
 - Public GitHub Pages tree (`public_site/`) has **no** `/admin` and no operator console
 

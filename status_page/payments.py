@@ -2958,13 +2958,13 @@ def asset_search_dirs() -> list[Path]:
     out.append(root / "releases" / RELEASE_VERSION)
     # Brand companion trees (rpOS, apps, node, mail, office, …)
     for sub in (
-        f"rpos/0.2.0",
-        f"rpos/0.1.0",
-        f"rpos-apps/0.1.0",
-        f"node-installer/1.0.0",
-        f"node-operator/1.0.0",
-        f"rpmail/0.1.0",
-        f"rpoffice/0.1.0",
+        f"rpos/0.2.1",
+        f"rpos/0.2.1",
+        f"rpos-apps/0.1.1",
+        f"node-installer/1.0.1",
+        f"node-operator/1.0.1",
+        f"rpmail/0.1.1",
+        f"rpoffice/0.1.1",
         f"free",
     ):
         out.append(root / "releases" / sub)

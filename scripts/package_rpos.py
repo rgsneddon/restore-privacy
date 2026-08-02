@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Package **rpOS** installers for desktop platforms only.
 
-Monopin **0.2.0** under ``releases/rpos/0.2.0/`` (includes **RxShell** CLI).
+Monopin **0.2.1** under ``releases/rpos/0.2.1/`` (includes **RxShell** CLI).
 
 Installable matrix (desktop only)::
 
@@ -35,7 +35,7 @@ from pathlib import Path
 from typing import Any
 
 ROOT = Path(__file__).resolve().parents[1]
-RPOS_VERSION = "0.2.0"
+RPOS_VERSION = "0.2.1"
 OUT_DIR = ROOT / "releases" / "rpos" / RPOS_VERSION
 RPOS_SRC = ROOT / "rpos"
 RXSHELL_PRODUCT = "RxShell"

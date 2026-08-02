@@ -1,7 +1,7 @@
-"""Suite monopin 1.0.4 alignment + companion/dapp version retention.
+"""Suite monopin 1.0.5 alignment + companion/dapp version retention.
 
 Drives shipped pin sources and catalog helpers (not re-implementations).
-Fails if public/current surfaces still claim a pre-1.0.4 suite pin as current,
+Fails if public/current surfaces still claim a pre-1.0.5 suite pin as current,
 or if companion/dapp product versions were collapsed onto the suite monopin.
 """
 
@@ -15,15 +15,15 @@ import unittest
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-EXPECTED_SUITE = "1.0.4"
+EXPECTED_SUITE = "1.0.5"
 
 # Companion / dapp product lines keep their own pins (not suite monopin).
 RETAINED = {
-    "rpos": "0.2.0",
-    "node_installer": "1.0.0",
-    "node_operator": "1.0.0",
-    "rpmail_rpoffice": "0.1.0",
-    "pts_apps": "0.1.0",
+    "rpos": "0.2.1",
+    "node_installer": "1.0.1",
+    "node_operator": "1.0.1",
+    "rpmail_rpoffice": "0.1.1",
+    "pts_apps": "0.1.1",
     "perc_chain": "0.1.0",
     "beam_dapp": "0.1.0",
 }

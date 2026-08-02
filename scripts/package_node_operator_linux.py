@@ -1,16 +1,16 @@
 #!/usr/bin/env python3
-"""Package **Node Operator GUI** for Linux as monopin **1.0.0**.
+"""Package **Node Operator GUI** for Linux as monopin **1.0.1**.
 
 Distinct from the end-user client monopin (0.6.0): this archive is the residual
 node operator shell (``python -m node_operator``) only.
 
 Produces::
 
-  releases/node-operator/1.0.0/restore-privacy-node-operator-1.0.0-linux-x64.tar.gz
+  releases/node-operator/1.0.1/restore-privacy-node-operator-1.0.1-linux-x64.tar.gz
 
 Layout inside the archive::
 
-  restore-privacy-node-operator-1.0.0-linux/
+  restore-privacy-node-operator-1.0.1-linux/
     node_operator/ node/ client/ scripts/ status_page/ product/ secrets/
     requirements.txt VERSION NODE_OPERATOR_VERSION
     wheels/          # full manylinux × CPython matrix (same as package_linux)
@@ -35,7 +35,7 @@ from pathlib import Path
 from typing import Any
 
 ROOT = Path(__file__).resolve().parents[1]
-NODE_OPERATOR_VERSION = "1.0.0"
+NODE_OPERATOR_VERSION = "1.0.1"
 OUT_DIR = ROOT / "releases" / "node-operator" / NODE_OPERATOR_VERSION
 ARCHIVE_NAME = (
     f"restore-privacy-node-operator-{NODE_OPERATOR_VERSION}-linux-x64.tar.gz"
