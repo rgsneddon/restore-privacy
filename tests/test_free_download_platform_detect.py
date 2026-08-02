@@ -61,7 +61,9 @@ class TestDetectPlatformFromUserAgent(unittest.TestCase):
 
         html = render_suite_storefront_html(default_platform="macos")
         self.assertIn('id="suite-dl-primary"', html)
-        self.assertIn("Free download for macOS", html)
+        # Shipped storefront primary label (KEYGEN-gated wording)
+        self.assertIn("Download for macOS", html)
+        self.assertIn("KEYGEN", html)
         self.assertIn(suite_free_download_href("macos"), html)
         self.assertIn('data-detected-platform="macos"', html)
         self.assertIn('id="suite-dl-macos"', html)
@@ -86,10 +88,18 @@ class TestDetectPlatformFromUserAgent(unittest.TestCase):
         page = render_html({"title": "RESTORE PRIVACY"}, default_platform=plat).decode(
             "utf-8"
         )
-        self.assertIn("Free download for Windows", page)
+        # Homepage free CTA (rectangular typewriter) + storefront primary for detected OS
+        self.assertIn("FREE DOWNLOAD", page)
+        self.assertIn("Download for Windows", page)
         self.assertIn('data-detected-platform="windows"', page)
         self.assertIn('id="suite-dl-primary"', page)
+        self.assertIn('id="free-download-v1-cta"', page)
         self.assertIn("/suite/download?platform=windows", page)
+        # CTA is text rectangle, not freebie image face
+        self.assertIn('data-cta-shape="rectangle"', page)
+        cta_i = page.index('id="free-download-v1-cta"')
+        cta_snip = page[cta_i : cta_i + 700]
+        self.assertNotIn("<img", cta_snip)
 
     def test_free_download_cta_links_to_detected_os(self) -> None:
         from app import render_html
@@ -114,7 +124,7 @@ class TestDetectPlatformFromUserAgent(unittest.TestCase):
         self.assertIn(f'href="{DOWNLOADS_MAP_PATH}"', chooser)
         self.assertNotIn("data-detected-platform", chooser)
 
-        # Homepage wires UA default into the image CTA
+        # Homepage wires UA default into the rectangular text CTA
         page = render_html(
             {"title": "RESTORE PRIVACY"}, default_platform="android"
         ).decode("utf-8")
@@ -123,6 +133,9 @@ class TestDetectPlatformFromUserAgent(unittest.TestCase):
         self.assertIn(suite_free_download_href("android"), cta_snip)
         self.assertIn("Android", cta_snip)
         self.assertIn('data-detected-platform="android"', cta_snip)
+        self.assertIn("FREE DOWNLOAD", cta_snip)
+        self.assertIn('data-cta-shape="rectangle"', cta_snip)
+        self.assertNotIn("<img", cta_snip)
 
     def test_free_packages_page_highlights_detected_os(self) -> None:
         from downloads import render_free_packages_page_html, suite_free_download_href
