@@ -52,9 +52,9 @@ PUBLIC_BRAND_BANNER_STATIC_NAME = "banner.jpg"
 # Shared display height for logo + banner in the brand header row (px).
 # Taller clamp keeps the wide banner.jpg sharp at full content-shell width
 # (native banner ~1760×576; logo is square transparent mark).
-PUBLIC_BRAND_HEADER_HEIGHT_DEFAULT = 128
-PUBLIC_BRAND_HEADER_HEIGHT_MIN_CSS = 80
-PUBLIC_BRAND_HEADER_HEIGHT_MAX_CSS = 200
+PUBLIC_BRAND_HEADER_HEIGHT_DEFAULT = 160
+PUBLIC_BRAND_HEADER_HEIGHT_MIN_CSS = 96
+PUBLIC_BRAND_HEADER_HEIGHT_MAX_CSS = 260
 # Legacy size aliases (tests / callers) — height-matched to banner row.
 PUBLIC_BRAND_LOGO_SIZE_DEFAULT = PUBLIC_BRAND_HEADER_HEIGHT_DEFAULT
 PUBLIC_BRAND_LOGO_SIZE_MIN_CSS = PUBLIC_BRAND_HEADER_HEIGHT_MIN_CSS
@@ -582,6 +582,21 @@ a.product-tab.is-active, .product-tab.is-active {{
   opacity: 0.5;
   pointer-events: none;
 }}
+/* Brand header box only: no top-right corner dot */
+#{SITE_BRAND_HEADER_ID}.panel-card::after,
+.brand-panel.panel-card::after,
+#site-brand-header.panel-card::after,
+#{SITE_BRAND_HEADER_ID}::after,
+.brand-panel::after,
+#site-brand-header::after {{
+  content: none !important;
+  display: none !important;
+  width: 0 !important;
+  height: 0 !important;
+  opacity: 0 !important;
+  box-shadow: none !important;
+  background: none !important;
+}}
 .panel-title {{
   margin: 0 0 0.9rem;
   font-size: 0.78rem;
@@ -594,30 +609,59 @@ a.product-tab.is-active, .product-tab.is-active {{
 #{SITE_BRAND_HEADER_ID}, .brand-panel, #site-brand-header {{
   display: flex;
   flex-direction: column;
-  align-items: center;
+  align-items: stretch;
   text-align: center;
-  gap: 0.85rem;
+  gap: 0.75rem;
   width: 100%;
   max-width: 100%;
   box-sizing: border-box;
-  /* Shared logo + banner display height (matched pair); scales with shell width */
+  /* Full-bleed banner edge-to-edge inside the brand box; pad only below for nav */
+  padding-top: 0 !important;
+  padding-left: 0 !important;
+  padding-right: 0 !important;
+  padding-bottom: clamp(0.95rem, 2.4vw, 1.35rem) !important;
+  /* Shared logo + banner display height; taller so wordmark/logo fill the strip */
   --rb-brand-header-height: clamp(
     {PUBLIC_BRAND_HEADER_HEIGHT_MIN_CSS}px,
-    18vw,
+    22vw,
     {PUBLIC_BRAND_HEADER_HEIGHT_MAX_CSS}px
   );
 }}
-/* Banner-only brand mark (no flanking logos) */
+/* Keep nav / rule / theme chrome inset when brand panel padding is zeroed */
+#{SITE_BRAND_HEADER_ID} .site-nav,
+.brand-panel .site-nav,
+#site-brand-header .site-nav,
+#{SITE_BRAND_HEADER_ID} .brand-header-rule,
+.brand-panel .brand-header-rule,
+#site-brand-header .brand-header-rule,
+#{SITE_BRAND_HEADER_ID} .brand-tagline,
+.brand-panel .brand-tagline,
+#site-brand-header .brand-tagline,
+#{SITE_BRAND_HEADER_ID} .theme-picker,
+.brand-panel .theme-picker,
+#site-brand-header .theme-picker,
+#{SITE_BRAND_HEADER_ID} .public-theme-picker,
+.brand-panel .public-theme-picker,
+#site-brand-header .public-theme-picker {{
+  margin-left: clamp(1.05rem, 2.6vw, 1.55rem);
+  margin-right: clamp(1.05rem, 2.6vw, 1.55rem);
+  width: auto;
+  max-width: calc(100% - 2 * clamp(1.05rem, 2.6vw, 1.55rem));
+  box-sizing: border-box;
+}}
+/* Banner-only brand mark (no flanking logos) — full width of brand box */
 .brand-mark {{
   display: flex;
   flex-direction: row;
   flex-wrap: nowrap;
-  align-items: center;
-  justify-content: center;
+  align-items: stretch;
+  justify-content: stretch;
   gap: 0;
   column-gap: 0;
   width: 100%;
   max-width: 100%;
+  margin: 0;
+  padding: 0;
   box-sizing: border-box;
 }}
 /* Default public shells: logos inert (banner-only mark). Logo-only shells opt in. */
@@ -628,20 +672,23 @@ a.product-tab.is-active, .product-tab.is-active {{
   display: none !important;
 }}
 .brand-banner {{
-  /* Sole heading mark in the top brand box (default banner-only mode) */
-  height: var(--rb-brand-header-height);
-  width: 100%;
-  max-width: 100%;
-  min-width: 0;
-  border: none;
-  border-radius: 0;
-  object-fit: contain;
-  object-position: center;
-  background: transparent;
-  box-shadow: none;
-  flex: 1 1 auto;
+  /* Full-width fill of the brand box: logo + wordmark occupy the banner area */
   display: block;
   visibility: visible;
+  width: 100%;
+  max-width: 100%;
+  min-width: 100%;
+  height: var(--rb-brand-header-height);
+  min-height: var(--rb-brand-header-height);
+  margin: 0;
+  padding: 0;
+  border: none;
+  border-radius: 0;
+  object-fit: cover;
+  object-position: center center;
+  background: transparent;
+  box-shadow: none;
+  flex: 1 1 100%;
   image-rendering: -webkit-optimize-contrast;
   image-rendering: high-quality;
   -ms-interpolation-mode: bicubic;
@@ -693,13 +740,14 @@ a.product-tab.is-active, .product-tab.is-active {{
     display: block !important;
     visibility: visible !important;
     width: 100% !important;
-    height: auto !important;
-    max-height: var(--rb-brand-header-height) !important;
-    min-width: 0 !important;
-    margin: 0 auto !important;
-    flex: 1 1 auto !important;
-    object-fit: contain;
-    object-position: center;
+    min-width: 100% !important;
+    height: var(--rb-brand-header-height) !important;
+    min-height: var(--rb-brand-header-height) !important;
+    max-height: none !important;
+    margin: 0 !important;
+    flex: 1 1 100% !important;
+    object-fit: cover !important;
+    object-position: center center !important;
   }}
   .brand-logo,
   .brand-logo-left,
@@ -1182,8 +1230,11 @@ a.product-tab.is-active, .product-tab.is-active {{
   .brand-banner {{
     display: block;
     visibility: visible;
-    object-position: center;
+    object-fit: cover;
+    object-position: center center;
     width: 100%;
+    min-width: 100%;
+    height: var(--rb-brand-header-height);
   }}
   .brand-logo,
   .brand-logo-left,

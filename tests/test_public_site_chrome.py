@@ -206,10 +206,22 @@ class TestPublicChromeModule(unittest.TestCase):
         logo_css = css[logo_css_i : logo_css_i + 200]
         self.assertIn("display: none", logo_css)
         banner_css_i = css.index(".brand-banner")
-        banner_css = css[banner_css_i : banner_css_i + 500]
+        banner_css = css[banner_css_i : banner_css_i + 700]
         self.assertIn("var(--rb-brand-header-height)", banner_css)
-        self.assertIn("object-fit: contain", banner_css)
+        # Full-bleed fill of brand box (logo + wordmark occupy the banner area)
+        self.assertIn("object-fit: cover", banner_css)
+        self.assertIn("width: 100%", banner_css)
+        self.assertIn("min-width: 100%", banner_css)
         self.assertIn("display: block", banner_css)
+        # Brand box only: corner accent dot suppressed
+        self.assertIn(".brand-panel.panel-card::after", css)
+        brand_after_i = css.index(".brand-panel.panel-card::after")
+        brand_after = css[brand_after_i : brand_after_i + 280]
+        self.assertIn("display: none", brand_after)
+        # Full-bleed brand panel (no side padding on the box itself)
+        self.assertIn("padding-left: 0 !important", css)
+        self.assertIn("padding-right: 0 !important", css)
+        self.assertIn("padding-top: 0 !important", css)
         # Light theme still defines both neon tones (softer values)
         light_i = css.index('[data-theme="light"]')
         light_css = css[light_i : light_i + 1800]
