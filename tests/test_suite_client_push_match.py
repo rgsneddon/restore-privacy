@@ -218,6 +218,143 @@ class TestSuiteClientPushMatch(unittest.TestCase):
             'data-can-push="1"' in page or 'data-can-push="0"' in page,
             page[page.find("admin-client-push-section") :][:400],
         )
+        # Critical: checkboxes must associate with client-push form for native POST
+        self.assertIn('form="admin-client-push-form"', page)
+        self.assertIn('id="admin-client-push-form"', page)
+        # Every client-push checkbox must carry form= or sit inside the form
+        import re
+
+        boxes = re.findall(
+            r'<input[^>]*class="client-push-pkg-checkbox"[^>]*>',
+            page,
+        )
+        self.assertEqual(len(boxes), 5, boxes)
+        for box in boxes:
+            self.assertIn(
+                'form="admin-client-push-form"',
+                box,
+                f"checkbox missing form association: {box[:120]}",
+            )
+            self.assertIn('name="package"', box)
+
+    def test_matching_subset_enables_partial_push(self) -> None:
+        """Per-package match: partial Helsinki match enables those rows only."""
+        from suite_client_push import (
+            matching_suite_filenames,
+            summarize_helsinki_suite_inventory,
+            summarize_local_suite_inventory,
+        )
+
+        host = summarize_local_suite_inventory(
+            [
+                {
+                    "platform": "android",
+                    "filename": "a-android.apk",
+                    "present": True,
+                    "size": 1000,
+                },
+                {
+                    "platform": "windows",
+                    "filename": "b-windows.exe",
+                    "present": True,
+                    "size": 2000,
+                },
+                {
+                    "platform": "linux",
+                    "filename": "c-linux-x64.tar.gz",
+                    "present": True,
+                    "size": 3000,
+                },
+            ],
+            version="1.0.8",
+        )
+        # Only android + linux match Helsinki; windows size differs
+        hel = summarize_helsinki_suite_inventory(
+            "1.0.8",
+            [
+                {"filename": "a-android.apk", "bytes": 1000, "present": True},
+                {"filename": "b-windows.exe", "bytes": 9999, "present": True},
+                {"filename": "c-linux-x64.tar.gz", "bytes": 3000, "present": True},
+            ],
+        )
+        matched = matching_suite_filenames(host, hel)
+        self.assertEqual(
+            set(matched),
+            {"a-android.apk", "c-linux-x64.tar.gz"},
+        )
+        self.assertNotIn("b-windows.exe", matched)
+
+    def test_post_body_package_multi_reaches_handler_logic(self) -> None:
+        """Simulate form POST: parse package= multi-values and push selected only."""
+        import urllib.parse
+
+        from node.operator_admin import NodeOperatorController
+        from node.update_push import UpdatePushQueue
+        from suite_client_push import summarize_helsinki_suite_inventory
+
+        ctrl = NodeOperatorController(repo_root=ROOT)
+        ctrl.updates = UpdatePushQueue()
+        ver = ctrl.catalog_version_default()
+        host = ctrl.suite_host_inventory(version=ver)
+        present = list(host.get("present_filenames") or [])
+        if len(present) < 2:
+            self.skipTest("need ≥2 local Suite packages")
+        # Build matching Helsinki for two packages
+        sel = present[:2]
+        hel = summarize_helsinki_suite_inventory(
+            ver,
+            [
+                {
+                    "filename": fn,
+                    "bytes": host["present_sizes"][fn],
+                    "present": True,
+                }
+                for fn in sel
+            ],
+        )
+        # Emulate browser POST with form-associated package checkboxes
+        body = urllib.parse.urlencode(
+            [
+                ("version", ver),
+                ("url", "https://restoreprivacy.online/#downloads"),
+                ("message", ""),
+                ("target_client_id", ""),
+                ("package", sel[0]),
+                ("package", sel[1]),
+            ]
+        )
+        multi = urllib.parse.parse_qs(body)
+        only = [
+            str(x).strip()
+            for x in (multi.get("package") or multi.get("package[]") or [])
+            if str(x).strip()
+        ]
+        self.assertEqual(only, sel)
+        # Same path as app.py push-clients handler
+        r = ctrl.push_selected_suite_updates_to_clients(
+            version=(multi.get("version") or [ver])[0],
+            only_filenames=only,
+            url=(multi.get("url") or [""])[0],
+            message=(multi.get("message") or [""])[0],
+            target_client_id=(multi.get("target_client_id") or [""])[0],
+            require_host_helsinki_match=True,
+            host=host,
+            helsinki=hel,
+        )
+        self.assertTrue(r.get("ok"), r)
+        self.assertEqual(r.get("only_filenames"), sel)
+
+        # Empty package= must not push (handler 400 path)
+        body_empty = urllib.parse.urlencode(
+            [("version", ver), ("url", "https://restoreprivacy.online/#downloads")]
+        )
+        multi_empty = urllib.parse.parse_qs(body_empty)
+        only_empty = [
+            str(x).strip()
+            for x in (multi_empty.get("package") or [])
+            if str(x).strip()
+        ]
+        self.assertEqual(only_empty, [])
 
 
 if __name__ == "__main__":

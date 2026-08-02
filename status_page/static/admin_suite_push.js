@@ -268,7 +268,8 @@
     });
   }
 
-  // Client-push section: its own package checkboxes + select helpers.
+  // Client-push: checkboxes use form="admin-client-push-form" so native POST
+  // includes package= multi-values. Select helpers only enable matching rows.
   function clientPushBoxes() {
     return document.querySelectorAll(
       'input.client-push-pkg-checkbox[data-client-package-select="1"]'
@@ -276,16 +277,18 @@
   }
   function setClientPushChecks(mode) {
     clientPushBoxes().forEach(function (box) {
-      if (box.disabled && mode !== "none") return;
-      if (mode === "all") {
-        if (!box.disabled) box.checked = true;
-      } else if (mode === "none") {
+      if (mode === "none") {
         box.checked = false;
-      } else if (mode === "present") {
-        var tr = box.closest("tr");
-        var present =
-          tr && tr.getAttribute("data-present") === "yes";
-        box.checked = !!present && !box.disabled;
+        return;
+      }
+      // present / all → only matching (enabled) packages
+      if (box.disabled) return;
+      var match =
+        box.getAttribute("data-package-match") === "yes" ||
+        (box.closest("tr") &&
+          box.closest("tr").getAttribute("data-match") === "yes");
+      if (mode === "all" || mode === "present") {
+        box.checked = !!match;
       }
     });
   }
@@ -302,20 +305,44 @@
       if (section && section.getAttribute("data-can-push") === "0") {
         ev.preventDefault();
         setStatus(
-          "Client push cannot be completed — build host and Helsinki Suite " +
-            "packages do not match (or Helsinki is unknown)."
+          "Client push cannot be completed — no Suite packages match between " +
+            "build host and Helsinki (or Helsinki is unknown)."
         );
         return;
       }
+      // Collect selected matching packages (form= associates them with this form;
+      // also inject hidden package= so submit works if form= is stripped).
       var selected = [];
       clientPushBoxes().forEach(function (box) {
         if (box.checked && box.value && !box.disabled) selected.push(box);
       });
       if (!selected.length) {
         ev.preventDefault();
-        setStatus("Select at least one Suite package for client push.");
+        setStatus("Select at least one matching Suite package for client push.");
         return;
       }
+      // Drop prior injected hiddens, then ensure package= values are on the form.
+      var old = clientForm.querySelectorAll(
+        'input[data-client-push-package-inject="1"]'
+      );
+      old.forEach(function (el) {
+        if (el.parentNode) el.parentNode.removeChild(el);
+      });
+      selected.forEach(function (box) {
+        // If checkbox already has form= association, native submit includes it.
+        // Injecting duplicates can double-send — only inject when not form-linked
+        // to this form id.
+        var formAttr = box.getAttribute("form");
+        if (formAttr === "admin-client-push-form" || clientForm.contains(box)) {
+          return;
+        }
+        var hid = document.createElement("input");
+        hid.type = "hidden";
+        hid.name = "package";
+        hid.value = box.value;
+        hid.setAttribute("data-client-push-package-inject", "1");
+        clientForm.appendChild(hid);
+      });
     });
   }
 })();

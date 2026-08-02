@@ -1555,16 +1555,25 @@ def _render_client_push_section_html(
     suite_label: str,
     inv: dict[str, Any],
 ) -> str:
-    """Client-push card: prefilled host/Helsinki monopin, match gate, package boxes."""
+    """Client-push card: prefilled host/Helsinki monopin, match gate, package boxes.
+
+    Checkboxes are associated with ``#admin-client-push-form`` via the HTML
+    ``form=`` attribute so native POST includes ``package=`` multi-values even
+    though the table sits above the URL fields (same pattern as Helsinki form).
+    Push is allowed for any **per-package** host/Helsinki size match — not only
+    when every present host file matches.
+    """
     try:
         from suite_client_push import (
             default_client_update_url,
+            matching_suite_filenames,
             suite_platform_display_label,
             validate_linux_suite_package,
         )
     except ImportError:  # pragma: no cover
         from status_page.suite_client_push import (  # type: ignore
             default_client_update_url,
+            matching_suite_filenames,
             suite_platform_display_label,
             validate_linux_suite_package,
         )
@@ -1575,38 +1584,67 @@ def _render_client_push_section_html(
     hel_present = 0
     can_push = False
     reason = "Match status not evaluated."
-    gate: dict[str, Any] = {}
     host_inv: dict[str, Any] = {}
     hel_inv: dict[str, Any] = {}
+    matching: list[str] = []
     if ctrl is not None:
         try:
             host_inv = ctrl.suite_host_inventory(version=catalog_ver)
             host_ver = str(host_inv.get("version") or catalog_ver)
             host_present = int(host_inv.get("present_count") or 0)
             hel_inv = ctrl.suite_helsinki_inventory(version=catalog_ver)
-            hel_ver = str(hel_inv.get("version") or catalog_ver) if hel_inv.get("known") else "unknown"
-            hel_present = int(hel_inv.get("present_count") or 0)
-            # Gate on all present-on-host files for default page load
-            gate = ctrl.suite_client_push_match_gate(
-                version=catalog_ver,
-                only_filenames=list(host_inv.get("present_filenames") or []),
-                host=host_inv,
-                helsinki=hel_inv,
+            hel_ver = (
+                str(hel_inv.get("version") or catalog_ver)
+                if hel_inv.get("known")
+                else "unknown"
             )
-            can_push = bool(gate.get("can_push"))
-            reason = str(gate.get("reason") or reason)
+            hel_present = int(hel_inv.get("present_count") or 0)
+            matching = matching_suite_filenames(host_inv, hel_inv)
+            if not hel_inv.get("known"):
+                can_push = False
+                reason = (
+                    "Helsinki Suite inventory unknown or unreachable — push "
+                    "cannot be completed until paid_assets presence is confirmed."
+                )
+            elif not matching:
+                can_push = False
+                reason = (
+                    "No Suite packages match between build host and Helsinki "
+                    "(size/presence) — push cannot be completed. Upload matching "
+                    "packages to Helsinki first, or select none until they match."
+                )
+            else:
+                can_push = True
+                host_all = list(host_inv.get("present_filenames") or [])
+                mismatched = [f for f in host_all if f not in matching]
+                reason = (
+                    f"{len(matching)} package(s) match build host + Helsinki for "
+                    f"Suite v{host_ver} — select those to push "
+                    f"(CHECK BREADCRUMBS opt-in only)."
+                )
+                if mismatched:
+                    short = ", ".join(
+                        (m.rsplit("/", 1)[-1] if "/" in m else m)
+                        for m in mismatched[:4]
+                    )
+                    reason += (
+                        f" Mismatched/unavailable on Helsinki (not selectable): {short}."
+                    )
         except Exception as exc:  # noqa: BLE001
             can_push = False
+            matching = []
             reason = f"Could not evaluate host/Helsinki match: {exc}"[:200]
 
     match_cls = "ok-msg" if can_push else "err"
     match_state = "match" if can_push else "mismatch"
-    disabled = "" if can_push else " disabled"
-    disabled_attr = disabled
+    disabled_attr = "" if can_push else " disabled"
     prefill_url = default_client_update_url(host_ver)
     prefill_msg = f"Suite {host_ver} ready"
+    matching_set = set(matching)
+    host_sizes = dict(host_inv.get("present_sizes") or {})
+    hel_sizes = dict(hel_inv.get("present_sizes") or {})
 
-    # Package rows owned by client-push form (independent of Helsinki form)
+    # Package rows: form= associates checkboxes with admin-client-push-form
     c_rows: list[str] = []
     for p in inv.get("packages") or []:
         fname = str(p.get("filename") or "")
@@ -1618,7 +1656,7 @@ def _render_client_push_section_html(
         )
         present = bool(p.get("present"))
         try:
-            size = int(p.get("size") or 0)
+            size = int(p.get("size") or host_sizes.get(fname) or 0)
         except (TypeError, ValueError):
             size = 0
         size_s = (
@@ -1626,12 +1664,11 @@ def _render_client_push_section_html(
             if size >= 1_000_000
             else (f"{size} B" if size else "—")
         )
-        checked = " checked" if present else ""
-        # Disable checkbox when gate fails (still show list)
-        cb_dis = "" if can_push and present else (" disabled" if not can_push else "")
-        if not present:
-            cb_dis = " disabled"
-        hel_sz = (hel_inv.get("present_sizes") or {}).get(fname)
+        pkg_matches = fname in matching_set
+        # Only matching host+Helsinki packages are selectable; default-check them
+        checked = " checked" if pkg_matches else ""
+        cb_dis = "" if pkg_matches else " disabled"
+        hel_sz = hel_sizes.get(fname)
         hel_s = (
             f"{int(hel_sz) // 1_000_000} MB"
             if hel_sz and int(hel_sz) >= 1_000_000
@@ -1640,7 +1677,6 @@ def _render_client_push_section_html(
         arch_note = ""
         if plat.lower() == "linux":
             arch_note = " · covers Arch Linux x86_64"
-            # Structural validity when local path present
             path = str(p.get("path") or "")
             if path:
                 val = validate_linux_suite_package(path)
@@ -1649,21 +1685,25 @@ def _render_client_push_section_html(
                 elif present:
                     arch_note += f" · validity: {val.get('error') or 'fail'}"
         host_mark = "yes" if present else "no"
-        hel_mark = "yes" if hel_sz else "no"
+        hel_mark = "yes" if hel_sz and int(hel_sz) >= 1000 else "no"
+        match_mark = "yes" if pkg_matches else "no"
         c_rows.append(
             f'<tr class="client-push-pkg-row" data-filename="{_escape(fname)}" '
-            f'data-platform="{_escape(plat)}" data-present="{host_mark}">'
+            f'data-platform="{_escape(plat)}" data-present="{host_mark}" '
+            f'data-match="{match_mark}">'
             f'<td class="client-push-select">'
             f'<input type="checkbox" name="package" value="{_escape(fname)}" '
             f'id="admin-client-pkg-sel-{_escape(fname)}" '
-            f'class="client-push-pkg-checkbox" data-client-package-select="1"'
+            f'class="client-push-pkg-checkbox" data-client-package-select="1" '
+            f'form="admin-client-push-form" data-package-match="{match_mark}"'
             f"{checked}{cb_dis} aria-label=\"Select {_escape(fname)} for client push\"/>"
             f"</td>"
             f'<td class="client-push-platform">{_escape(plat_lab)}'
             f'<span class="muted">{_escape(arch_note)}</span></td>'
             f'<td class="client-push-file"><code>{_escape(fname)}</code></td>'
             f'<td data-host-present="{host_mark}">{host_mark} ({_escape(size_s)})</td>'
-            f'<td data-helsinki-present="{hel_mark}">{hel_mark} ({_escape(str(hel_s))})</td>'
+            f'<td data-helsinki-present="{hel_mark}" data-match="{match_mark}">'
+            f"{hel_mark} ({_escape(str(hel_s))})</td>"
             f"</tr>"
         )
     c_table = (
@@ -1677,13 +1717,15 @@ def _render_client_push_section_html(
 
     return f"""
   <div id="admin-client-push-section" data-client-push-section="1"
-       data-match-state="{_escape(match_state)}" data-can-push="{'1' if can_push else '0'}">
+       data-match-state="{_escape(match_state)}" data-can-push="{'1' if can_push else '0'}"
+       data-matching-count="{len(matching)}">
   <h4 id="admin-client-push-heading">Push selected updates to clients</h4>
   <p class="muted" id="admin-client-push-blurb" data-client-push-blurb="1">
     Enqueue a residual <strong>UPDATE_PUSH</strong> for Suite packages that match
     on the <strong>build host</strong> and <strong>Helsinki</strong> paid store.
     Clients apply only when Settings has <strong>CHECK BREADCRUMBS</strong> on —
-    never force-install on opt-out devices. Select one, many, or all packages below.
+    never force-install on opt-out devices. Tick one, many, or all <em>matching</em>
+    packages below (mismatched rows are disabled).
   </p>
   <p id="admin-client-push-versions" data-client-push-versions="1">
     <span class="suite-badge" id="admin-client-host-version-badge">
@@ -1692,15 +1734,19 @@ def _render_client_push_section_html(
     · <span class="suite-badge" id="admin-client-helsinki-version-badge">
       Helsinki: {_escape(hel_ver if hel_ver != 'unknown' else 'unknown')}</span>
     · present <span id="admin-client-helsinki-present">{hel_present}</span>
+    · matching <span id="admin-client-matching-count">{len(matching)}</span>
   </p>
   <p id="admin-client-push-match" class="{match_cls}" data-client-push-match="1"
      data-match="{_escape(match_state)}" role="status">
     {_escape(reason)}
   </p>
+  <form method="post" action="/admin/uploads/push-clients"
+        id="admin-client-push-form" data-client-push-form="1" data-push-update="1"
+        data-require-match="1">
   <p class="muted" id="admin-client-push-select-hint">
-    <button type="button" id="admin-client-select-present" class="linkish">Select present</button>
+    <button type="button" id="admin-client-select-present" class="linkish">Select matching</button>
     · <button type="button" id="admin-client-select-none" class="linkish">Select none</button>
-    · <button type="button" id="admin-client-select-all" class="linkish">Select all</button>
+    · <button type="button" id="admin-client-select-all" class="linkish">Select all matching</button>
   </p>
   <table id="admin-client-packages-table" data-client-packages="1" data-package-select="1">
     <thead><tr>
@@ -1711,9 +1757,6 @@ def _render_client_push_section_html(
 {c_table}
     </tbody>
   </table>
-  <form method="post" action="/admin/uploads/push-clients"
-        id="admin-client-push-form" data-client-push-form="1" data-push-update="1"
-        data-require-match="1">
     <input type="hidden" name="version" value="{_escape(host_ver)}" id="admin-client-push-version"/>
     <label class="field" for="admin-client-push-url">
       <span class="field-label">Update URL</span>

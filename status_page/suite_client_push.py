@@ -230,6 +230,27 @@ def summarize_helsinki_suite_inventory(
     }
 
 
+def matching_suite_filenames(
+    host: Mapping[str, Any],
+    helsinki: Mapping[str, Any],
+) -> list[str]:
+    """Filenames present on host and Helsinki with equal size (pushable subset)."""
+    if not helsinki.get("known"):
+        return []
+    host_sizes = dict(host.get("present_sizes") or {})
+    hel_sizes = dict(helsinki.get("present_sizes") or {})
+    out: list[str] = []
+    for fname, hsz in host_sizes.items():
+        try:
+            h = int(hsz)
+            r = int(hel_sizes.get(fname) or 0)
+        except (TypeError, ValueError):
+            continue
+        if h >= 1000 and r >= 1000 and h == r:
+            out.append(str(fname))
+    return out
+
+
 def match_host_helsinki_suite(
     host: Mapping[str, Any],
     helsinki: Mapping[str, Any],
