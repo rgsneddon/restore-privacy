@@ -397,6 +397,7 @@
 				33CC110E2044A8840003C045 /* Bundle Framework */,
 				3399D490228B24CF009A79C7 /* ShellScript */,
 				28A406FF786A2E7D8357B37C /* [CP] Embed Pods Frameworks */,
+				A9F3E201DE1100B001C0FFEE /* Inject residual public pins */,
 			);
 			buildRules = (
 			);
@@ -631,6 +632,31 @@
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
 			shellScript = "diff \"${PODS_PODFILE_DIR_PATH}/Podfile.lock\" \"${PODS_ROOT}/Manifest.lock\" > /dev/null\nif [ $? != 0 ] ; then\n    # print error to STDERR\n    echo \"error: The sandbox is not in sync with the Podfile.lock. Run 'pod install' or update your CocoaPods installation.\" >&2\n    exit 1\nfi\n# This output is used by Xcode 'outputs' to avoid re-running this script phase.\necho \"SUCCESS\" > \"${SCRIPT_OUTPUT_FILE_0}\"\n";
+			showEnvVarsInLog = 0;
+		};
+		A9F3E201DE1100B001C0FFEE /* Inject residual public pins */ = {
+			isa = PBXShellScriptBuildPhase;
+			alwaysOutOfDate = 1;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputFileListPaths = (
+			);
+			inputPaths = (
+				"${SRCROOT}/scripts/inject_residual_pubs.sh",
+				"${SRCROOT}/Runner/secrets/de_node_elgamal.pub",
+				"${SRCROOT}/Runner/secrets/node_elgamal.pub",
+			);
+			name = "Inject residual public pins";
+			outputFileListPaths = (
+			);
+			outputPaths = (
+				"${TARGET_BUILD_DIR}/${FULL_PRODUCT_NAME}/Contents/Resources/secrets/de_node_elgamal.pub",
+				"${TARGET_BUILD_DIR}/${FULL_PRODUCT_NAME}/Contents/Resources/secrets/node_elgamal.pub",
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "\"${SRCROOT}/scripts/inject_residual_pubs.sh\"\n";
 			showEnvVarsInLog = 0;
 		};
 /* End PBXShellScriptBuildPhase section */

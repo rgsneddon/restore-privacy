@@ -124,3 +124,11 @@ class TestInjectAppleSecretsScript(unittest.TestCase):
             self.assertTrue((dest / "node_elgamal.pub").is_file())
             self.assertEqual((dest / "node_elgamal.pub").stat().st_size, 256)
             self.assertFalse((dest / "node_elgamal.priv").exists())
+            # Default residual host (DE) pin required for Connect admission
+            self.assertTrue(
+                (dest / "de_node_elgamal.pub").is_file(),
+                "inject must place de_node_elgamal.pub for host 178.105.187.178",
+            )
+            self.assertGreaterEqual(
+                (dest / "de_node_elgamal.pub").stat().st_size, 32
+            )
