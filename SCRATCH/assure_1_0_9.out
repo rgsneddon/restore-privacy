@@ -1,0 +1,9 @@
+catalog_version=1.0.9
+product_pin=1.0.9
+platforms=5
+  platform=windows  file=restore-privacy-client-1.0.9-windows-x64-setup.exe rel=1.0.9/restore-privacy-client-1.0.9-windows-x64-setup.exe
+  platform=android  file=restore-privacy-client-1.0.9-android.apk rel=1.0.9/restore-privacy-client-1.0.9-android.apk
+  platform=macos    file=restore-privacy-client-1.0.9-macos.zip rel=1.0.9/restore-privacy-client-1.0.9-macos.zip
+  platform=ios      file=restore-privacy-client-1.0.9-ios.zip rel=1.0.9/restore-privacy-client-1.0.9-ios.zip
+  platform=linux    file=restore-privacy-client-1.0.9-linux-x64.tar.gz rel=1.0.9/restore-privacy-client-1.0.9-linux-x64.tar.gz
+ASSURE_OK: current per-device packages are consistent

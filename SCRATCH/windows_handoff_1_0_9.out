@@ -1,0 +1,23 @@
+test_brand_companions_and_end_to_end_map (tests.test_windows_handoff_1_0_8_architecture.TestWindowsHandoffArchitecture.test_brand_companions_and_end_to_end_map) ... ok
+test_breadcrumbs_vault_stages_windows_handoff (tests.test_windows_handoff_1_0_8_architecture.TestWindowsHandoffArchitecture.test_breadcrumbs_vault_stages_windows_handoff)
+Vault stage path references WINDOWS_HANDOFF_{pin}.md (shipped script). ... ok
+test_first_run_account_seed_licence_before_vpn (tests.test_windows_handoff_1_0_8_architecture.TestWindowsHandoffArchitecture.test_first_run_account_seed_licence_before_vpn) ... ok
+test_full_admin_sidebar_map (tests.test_windows_handoff_1_0_8_architecture.TestWindowsHandoffArchitecture.test_full_admin_sidebar_map)
+Every major status-host admin surface is named with path. ... ok
+test_monopin_and_pe_basename (tests.test_windows_handoff_1_0_8_architecture.TestWindowsHandoffArchitecture.test_monopin_and_pe_basename) ... ok
+test_ned_oracle_cojoin_and_admin_rps (tests.test_windows_handoff_1_0_8_architecture.TestWindowsHandoffArchitecture.test_ned_oracle_cojoin_and_admin_rps)
+Ned/rpAI, oracle absorb, co-join roles, and admin rpS are documented. ... ok
+test_residual_peers_is_de_us_retired (tests.test_windows_handoff_1_0_8_architecture.TestWindowsHandoffArchitecture.test_residual_peers_is_de_us_retired) ... ok
+test_suite_parts_vpn_percent_evolve_backup_rpai (tests.test_windows_handoff_1_0_8_architecture.TestWindowsHandoffArchitecture.test_suite_parts_vpn_percent_evolve_backup_rpai) ... ok
+test_trial_72h_keygen_free_stripe_zero (tests.test_windows_handoff_1_0_8_architecture.TestWindowsHandoffArchitecture.test_trial_72h_keygen_free_stripe_zero) ... ok
+test_windows_build_steps_present (tests.test_windows_handoff_1_0_8_architecture.TestWindowsHandoffArchitecture.test_windows_build_steps_present) ... ok
+test_downloads_catalog_pin (tests.test_suite_monopin_1_0_9.TestSuiteMonopin109.test_downloads_catalog_pin) ... ok
+test_pubspec_pin (tests.test_suite_monopin_1_0_9.TestSuiteMonopin109.test_pubspec_pin) ... ok
+test_suite_version_dart_pin (tests.test_suite_monopin_1_0_9.TestSuiteMonopin109.test_suite_version_dart_pin) ... ok
+test_version_file_is_1_0_9 (tests.test_suite_monopin_1_0_9.TestSuiteMonopin109.test_version_file_is_1_0_9) ... ok
+test_windows_handoff_1_0_9_exists (tests.test_suite_monopin_1_0_9.TestSuiteMonopin109.test_windows_handoff_1_0_9_exists) ... ok
+
+----------------------------------------------------------------------
+Ran 15 tests in 0.040s
+
+OK

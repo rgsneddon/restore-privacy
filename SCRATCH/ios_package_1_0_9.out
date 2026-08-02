@@ -1,0 +1,17 @@
+exists True bytes 13218209
+path=releases/1.0.9/restore-privacy-client-1.0.9-ios.zip
+platform=ios
+exists=True
+size=13218209
+bundle_versions=[{'plist': 'Runner.app/Info.plist', 'version': '1.0.9'}]
+primary_version=1.0.9
+plist_paths=['Runner.app/Info.plist']
+pub_count 6
+  Runner.app/PlugIns/PacketTunnel.appex/secrets/de_node_elgamal.pub
+  Runner.app/PlugIns/PacketTunnel.appex/secrets/exit_node_elgamal.pub
+  Runner.app/PlugIns/PacketTunnel.appex/secrets/node_elgamal.pub
+  Runner.app/secrets/de_node_elgamal.pub
+  Runner.app/secrets/exit_node_elgamal.pub
+  Runner.app/secrets/node_elgamal.pub
+us_retired_absent True []
+IOS_OK

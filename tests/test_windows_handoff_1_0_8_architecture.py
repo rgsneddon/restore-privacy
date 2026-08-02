@@ -30,14 +30,13 @@ class TestWindowsHandoffArchitecture(unittest.TestCase):
         cls.low = cls.text.lower()
 
     def test_monopin_and_pe_basename(self) -> None:
-        self.assertIn("1.0.8", self.text)
-        self.assertIn(
-            "restore-privacy-client-1.0.8-windows-x64-setup.exe",
-            self.text,
-        )
-        # Live monopin in tree should match handoff series when VERSION is 1.0.8
-        if VERSION == "1.0.8":
-            self.assertEqual(self.path.name, "WINDOWS_HANDOFF_1.0.8.md")
+        # Live monopin from client/VERSION drives expected PE basename + handoff name.
+        self.assertIn(VERSION, self.text)
+        pe = f"restore-privacy-client-{VERSION}-windows-x64-setup.exe"
+        self.assertIn(pe, self.text)
+        expected_name = f"WINDOWS_HANDOFF_{VERSION}.md"
+        if HANDOFF.is_file():
+            self.assertEqual(self.path.name, expected_name)
 
     def test_first_run_account_seed_licence_before_vpn(self) -> None:
         # Order: account → seed → licence before residual VPN permissions

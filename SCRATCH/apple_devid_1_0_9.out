@@ -1,0 +1,26 @@
+=== codesign -dv ===
+Executable=/Users/russellsneddon/restore-privacy/client_app/build/macos/Build/Products/Release/restore_privacy_client.app/Contents/MacOS/restore_privacy_client
+Identifier=com.restoreprivacy.restorePrivacyClient
+Format=app bundle with Mach-O universal (x86_64 arm64)
+CodeDirectory v=20500 size=5907 flags=0x10000(runtime) hashes=173+7 location=embedded
+Signature size=8979
+Authority=Developer ID Application: Russell Sneddon (SFCBP95595)
+Authority=Developer ID Certification Authority
+Authority=Apple Root CA
+Timestamp=2 Aug 2026 at 22:13:27
+Notarization Ticket=stapled
+Info.plist entries=24
+TeamIdentifier=SFCBP95595
+Runtime Version=26.5.0
+Sealed Resources version=2 rules=13 files=25
+Internal requirements count=1 size=200
+=== spctl ===
+client_app/build/macos/Build/Products/Release/restore_privacy_client.app: accepted
+source=Notarized Developer ID
+origin=Developer ID Application: Russell Sneddon (SFCBP95595)
+=== stapler ===
+Processing: /Users/russellsneddon/restore-privacy/client_app/build/macos/Build/Products/Release/restore_privacy_client.app
+The validate action worked!
+=== zip size ===
+-rw-r--r--  1 russellsneddon  staff  27801379  2 Aug 22:14 releases/1.0.9/restore-privacy-client-1.0.9-macos.zip
+OK apple ship scripts present
