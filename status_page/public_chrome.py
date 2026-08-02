@@ -1388,7 +1388,7 @@ def public_display_title(raw: str | None = None) -> str:
 # Homepage lead copy (human cadence — not a residual inventory list).
 SUITE_HOME_INTRO_ID = "suite-home-intro"
 # Neon typewriter lines (one-shot keystroke animation on page load)
-SUITE_HOME_WELCOME_TYPE = "WELCOME, ANON..."
+SUITE_HOME_WELCOME_TYPE = ".:WELCOME, ANON:."
 SUITE_HOME_CLOSING_TYPE = "YOUR PRIVACY, RESTORED"
 # Normal CSS heading (not neon typewriter)
 SUITE_HOME_INTRO_HEADING = "...privacy you can actually use..."

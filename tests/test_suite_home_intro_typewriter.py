@@ -99,10 +99,13 @@ class TestSuiteIntroRenderer(unittest.TestCase):
 
     def test_homepage_path_includes_intro_and_script(self) -> None:
         from app import render_html
+        from public_chrome import SUITE_HOME_WELCOME_TYPE
 
         page = render_html({"title": "RESTORE PRIVACY"}).decode("utf-8")
         self.assertIn("suite-home-intro", page)
-        self.assertIn("WELCOME, ANON...", page)
+        self.assertEqual(SUITE_HOME_WELCOME_TYPE, ".:WELCOME, ANON:.")
+        self.assertIn(".:WELCOME, ANON:.", page)
+        self.assertNotIn("WELCOME, ANON...", page)
         self.assertIn("...privacy you can actually use...", page)
         self.assertIn("YOUR PRIVACY, RESTORED", page)
         self.assertIn("£3 per month", page)
@@ -125,6 +128,39 @@ class TestSuiteIntroRenderer(unittest.TestCase):
         self.assertIn("data-typewriter-complete", src)
         self.assertIn("suite-home-intro", src)
         self.assertIn("data-typewriter", src)
+
+    def test_welcome_copy_and_slower_delay(self) -> None:
+        """Welcome is .:WELCOME, ANON:. and types slower than prior 55ms baseline."""
+        import re
+
+        from public_chrome import (
+            SUITE_HOME_WELCOME_TYPE,
+            render_suite_home_intro_html,
+        )
+
+        self.assertEqual(SUITE_HOME_WELCOME_TYPE, ".:WELCOME, ANON:.")
+        html = render_suite_home_intro_html()
+        self.assertIn('data-typewriter-text=".:WELCOME, ANON:."', html)
+        self.assertIn('data-typewriter-role="welcome"', html)
+        self.assertIn('id="suite-welcome-type"', html)
+        self.assertNotIn("WELCOME, ANON...", html)
+
+        js_path = ROOT / "status_page" / "static" / "suite_home_typewriter.js"
+        src = js_path.read_text(encoding="utf-8")
+        # Shipped timing constants (real JS source — not reimplemented)
+        m_def = re.search(r"var\s+DEFAULT_MS\s*=\s*(\d+)", src)
+        m_wel = re.search(r"var\s+WELCOME_MS\s*=\s*(\d+)", src)
+        self.assertIsNotNone(m_def, "DEFAULT_MS must be declared in suite_home_typewriter.js")
+        self.assertIsNotNone(m_wel, "WELCOME_MS must be declared in suite_home_typewriter.js")
+        assert m_def is not None and m_wel is not None
+        default_ms = int(m_def.group(1))
+        welcome_ms = int(m_wel.group(1))
+        self.assertEqual(default_ms, 55)
+        self.assertGreater(welcome_ms, 55, msg="welcome typing must be slower than prior baseline")
+        self.assertGreater(welcome_ms, default_ms)
+        self.assertIn("delayMsFor", src)
+        self.assertIn('role === "welcome"', src)
+        self.assertIn("WELCOME_MS", src)
 
 
 if __name__ == "__main__":

@@ -5,12 +5,30 @@
 (function () {
   "use strict";
 
+  // Baseline closing/default cadence; welcome is slower so it draws attention.
   var DEFAULT_MS = 55;
+  var WELCOME_MS = 120;
   var DONE_CLASS = "is-done";
   var TYPING_CLASS = "is-typing";
 
   function fullText(el) {
     return (el.getAttribute("data-typewriter-text") || el.getAttribute("aria-label") || "").trim();
+  }
+
+  /**
+   * Per-role typing delay (ms). Welcome is intentionally slower than DEFAULT_MS.
+   * @param {Element} el
+   * @returns {number}
+   */
+  function delayMsFor(el) {
+    var role = (el && el.getAttribute("data-typewriter-role")) || "";
+    if (role === "welcome") return WELCOME_MS;
+    var attr = el && el.getAttribute("data-typewriter-ms");
+    if (attr != null && attr !== "") {
+      var n = parseInt(attr, 10);
+      if (!isNaN(n) && n > 0) return n;
+    }
+    return DEFAULT_MS;
   }
 
   /**
@@ -32,7 +50,7 @@
   function typeElement(el, opts) {
     opts = opts || {};
     var full = fullText(el);
-    var ms = opts.ms != null ? opts.ms : DEFAULT_MS;
+    var ms = opts.ms != null ? opts.ms : delayMsFor(el);
     var step = 0;
     var finished = false;
 
@@ -79,7 +97,7 @@
       if (i >= nodes.length) return;
       var el = nodes[i++];
       typeElement(el, {
-        ms: DEFAULT_MS,
+        ms: delayMsFor(el),
         onDone: function () {
           // brief pause before next typewriter line
           window.setTimeout(next, 280);
@@ -108,11 +126,14 @@
     runChain(nodes);
   }
 
-  // Expose pure helpers for optional unit hooks
+  // Expose pure helpers / timing constants for optional unit hooks
   window.SuiteHomeTypewriter = {
     typewriterPrefix: typewriterPrefix,
     typewriterDone: typewriterDone,
     typeElement: typeElement,
+    delayMsFor: delayMsFor,
+    DEFAULT_MS: DEFAULT_MS,
+    WELCOME_MS: WELCOME_MS,
   };
 
   if (document.readyState === "loading") {

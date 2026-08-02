@@ -26,7 +26,7 @@ class TestHomepageTwoHalves(unittest.TestCase):
         page = render_html({"title": "RESTORE PRIVACY"}).decode("utf-8")
         main = _main_html(page)
         self.assertIn("...privacy you can actually use...", main)
-        self.assertIn("WELCOME, ANON...", main)
+        self.assertIn(".:WELCOME, ANON:.", main)
         self.assertIn("suite-home-intro", main)
         i_header = main.index('id="brand-panel"')
         i_intro = main.index("suite-home-intro")

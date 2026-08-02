@@ -40,7 +40,7 @@ class TestSuitePublicBrand(unittest.TestCase):
         self.assertIn("RPSuite extras", html)
         self.assertIn("£3 per month", html)
         self.assertIn("£30 annually", html)
-        self.assertIn("WELCOME, ANON...", html)
+        self.assertIn(".:WELCOME, ANON:.", html)
         self.assertIn("YOUR PRIVACY, RESTORED", html)
         self.assertNotIn("mothly sunscription", html)
         self.assertIn("suite-storefront", html)
