@@ -2248,84 +2248,30 @@ def render_suite_storefront_html(
     active licence). Residual Connect still needs the KEYGEN from the
     monthly (£3) subscription — same entitlement model as the VPN client.
     """
-    _ = (coming_soon, accept_language, country, currency, default_interval)
+    _ = (coming_soon, accept_language, country, currency, default_interval, assets)
     items = list(assets) if assets is not None else available_downloads()
     if not items:
         return ""
 
     def_plat = (default_platform or "").strip().lower()
-    # Only accept catalog platforms
     known = {a.platform for a in items}
     if def_plat and def_plat not in known:
         def_plat = ""
-    free_links: list[str] = []
-    # Detected platform first + highlighted for free download
-    ordered = list(items)
-    if def_plat:
-        ordered = sorted(
-            items,
-            key=lambda a: (0 if a.platform == def_plat else 1, a.platform),
-        )
-    primary_free = ""
-    if def_plat:
-        title = platform_face_title(def_plat)
-        href = suite_pay_href(def_plat)
-        primary_free = (
-            f'<a class="suite-dl suite-dl-primary" id="suite-dl-primary" '
-            f'href="{_esc_html(href)}" data-platform="{_esc_html(def_plat)}" '
-            f'data-pay="1" data-product="suite" data-suite-latest="1" '
-            f'data-detected-platform="1">'
-            f"Get Suite for {_esc_html(title)} — KEYGEN /pay</a>"
-            f'<p class="suite-detect-hint" id="suite-detect-hint" data-detected-platform="{_esc_html(def_plat)}">'
-            f"Detected your device as <strong>{_esc_html(title)}</strong> — "
-            f"choose another platform below if needed, then continue on /pay.</p>"
-        )
-    for a in ordered:
-        title = platform_face_title(a.platform)
-        href = suite_pay_href(a.platform)
-        is_det = " is-detected" if def_plat and a.platform == def_plat else ""
-        det_attr = ' data-detected-platform="1"' if is_det else ""
-        free_links.append(
-            f'<a class="suite-dl{_esc_html(is_det)}" id="suite-dl-{_esc_html(a.platform)}" '
-            f'href="{_esc_html(href)}" data-platform="{_esc_html(a.platform)}" '
-            f'data-pay="1" data-product="suite" data-suite-latest="1"{det_attr}>'
-            f"Get Suite {_esc_html(title)} — /pay</a>"
-        )
-    free_grid = "\n      ".join(free_links)
 
-    # KEYGEN licence: monthly only (£3), product=suite
-    plat_opts: list[str] = []
-    for a in items:
-        sel = " selected" if a.platform == def_plat else ""
-        title = platform_face_title(a.platform)
-        plat_opts.append(
-            f'<option value="{_esc_html(a.platform)}"{sel}>'
-            f"{_esc_html(title)}</option>"
-        )
-    platform_options = "\n            ".join(plat_opts)
-
-    # Cart entry: GET /pay (platform + monthly Suite KEYGEN). Auto-renew is
-    # chosen on the plan cart page — never a silent hidden force-on here.
+    # Cart entry: GET /pay (monthly Suite KEYGEN). Device is chosen on the /pay
+    # cart page — no homepage Device-for-KEYGEN select and no platform button grid.
     keygen_form = f"""
     <form class="dl-buy-form suite-keygen-cta" id="suite-keygen-form" method="get"
           action="/pay" data-pay-via="suite-keygen-cart" data-product="suite"
           data-billing-intervals="month" data-cart-step="1">
       <input type="hidden" name="product" value="suite" id="suite-product-field"/>
       <input type="hidden" name="interval" value="month" id="suite-interval-field"/>
-      <div class="dl-buy-field" id="suite-keygen-platform-field">
-        <label class="dl-buy-label" for="suite-keygen-platform">Device for KEYGEN licence</label>
-        <select name="platform" id="suite-keygen-platform" required
-                aria-label="Platform for Suite KEYGEN">
-          <option value="" disabled{" selected" if not def_plat else ""}>Choose device…</option>
-            {platform_options}
-        </select>
-      </div>
       <button type="submit" class="dl-buy-now" id="suite-keygen-buy"
               data-product="suite" data-cart-cta="1">
         Get KEYGEN — {PRICE_LABEL}/month</button>
       <p class="suite-cart-hint" id="suite-cart-hint">
-        Continues to a short cart: confirm device, one-month KEYGEN licence, and
-        choose whether to auto-renew — then secure Stripe checkout.
+        Continues to a short cart: one-month KEYGEN licence, choose device, and
+        whether to auto-renew — then secure Stripe checkout.
       </p>
       <p class="dl-stripe-branding" id="suite-stripe-branding">{STRIPE_CHECKOUT_BRANDING_NOTE}</p>
     </form>
@@ -2337,19 +2283,13 @@ def render_suite_storefront_html(
     return f"""
   <section class="suite-storefront panel-card" id="{SUITE_SECTION_ID}"
            aria-label="Download Restore Privacy Suite"
-           data-product="suite" data-storefront="suite" data-pay-packages="1"
+           data-product="suite" data-storefront="suite"
            data-suite-version="{_esc_html(RELEASE_VERSION)}"{detect_attr}>
     <h2 id="suite-storefront-title">{SUITE_PRODUCT_TITLE}</h2>
     <span class="suite-version-badge" id="suite-version-badge">{SUITE_VERSION_LABEL}</span>
     <p class="suite-blurb" id="suite-blurb">{SUITE_PRODUCT_SUBTITLE}</p>
 {render_suite_product_submenu_html()}
     <p class="suite-keygen-line" id="suite-keygen-line">{SUITE_KEYGEN_HINT}</p>
-    <div class="suite-free-primary" id="suite-free-primary" data-pay-packages="1">
-      {primary_free}
-    </div>
-    <div class="suite-free-grid" id="suite-free-grid" data-pay-packages="1">
-      {free_grid}
-    </div>
     <div class="dl-buttons" id="suite-dl-buttons" data-buy-mode="suite-keygen"
          data-product="suite">
 {keygen_form}

@@ -189,12 +189,12 @@ class TestDownloadBoxNodeLinks(unittest.TestCase):
 
         suite = render_suite_storefront_html()
         self.assertIn('id="suite-storefront"', suite)
-        self.assertIn("suite-free-grid", suite)
-        for plat in ("windows", "android", "macos", "ios", "linux"):
-            self.assertIn(suite_pay_href(plat).replace("&", "&amp;"), suite)
-            self.assertIn(f'data-platform="{plat}"', suite)
+        self.assertNotIn('id="suite-free-grid"', suite)
+        self.assertNotIn("Device for KEYGEN", suite)
+        self.assertNotIn("Get Suite", suite)
         self.assertIn("KEYGEN", suite)
         self.assertIn("/pay", suite)
+        self.assertIn("suite-keygen-buy", suite)
         self.assertNotIn("download-node-preference", suite)
         self.assertNotIn("Full business package?", suite)
         dl = render_download_section_html()

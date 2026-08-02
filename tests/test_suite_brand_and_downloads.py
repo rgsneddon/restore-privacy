@@ -124,8 +124,10 @@ class TestSuiteDownloadsMonopinCurrent(unittest.TestCase):
             self.assertTrue(href.startswith("/pay?"))
 
         suite = render_suite_storefront_html()
-        for plat in ("windows", "android", "macos", "ios", "linux"):
-            self.assertIn(suite_pay_href(plat).replace("&", "&amp;"), suite)
+        self.assertIn('id="suite-storefront"', suite)
+        self.assertIn("suite-keygen-buy", suite)
+        self.assertNotIn('id="suite-free-grid"', suite)
+        self.assertNotIn("Device for KEYGEN", suite)
         # Downloads map / free-packages: Suite latest → /pay only
         free = render_free_packages_page_html(version=SUITE_PIN).decode("utf-8")
         for p in pkgs:
@@ -138,16 +140,19 @@ class TestSuiteDownloadsMonopinCurrent(unittest.TestCase):
         from app import render_html
         from downloads import RELEASE_VERSION
 
-        # With detected platform: free CTA free_direct + storefront /pay
+        # With detected platform: free CTA free_direct + Suite KEYGEN cart
         html = render_html(
             {"title": "RESTORE PRIVACY"}, default_platform="macos"
         ).decode("utf-8")
         self.assertEqual(RELEASE_VERSION, SUITE_PIN)
         self.assertIn(f"Download Suite client v{SUITE_PIN}", html)
         self.assertIn(f'data-catalog-version="{SUITE_PIN}"', html)
-        # Free CTA direct path + paid /pay package paths present
-        self.assertIn("/pay?product=suite", html)
+        # Free CTA direct path + KEYGEN cart entry to /pay
+        self.assertIn('action="/pay"', html)
+        self.assertIn('name="product" value="suite"', html)
         self.assertIn("free_direct=1", html)
+        self.assertNotIn('id="suite-free-grid"', html)
+        self.assertNotIn("Device for KEYGEN", html)
         self.assertIsNone(re.search(r"restore-privacy-client-0\.\d+\.\d+-", html))
 
 

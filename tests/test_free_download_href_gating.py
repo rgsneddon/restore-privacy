@@ -48,27 +48,19 @@ class TestFreeDownloadHrefGating(unittest.TestCase):
             assert fname is not None
             self.assertTrue(fname.startswith("restore-privacy-client-"))
 
-    def test_render_suite_storefront_five_platform_buttons(self) -> None:
-        from downloads import render_suite_storefront_html, suite_pay_href
-        from payments import platform_filename
+    def test_render_suite_storefront_no_platform_grid_or_device_box(self) -> None:
+        from downloads import render_suite_storefront_html
 
         suite = render_suite_storefront_html()
-        self.assertIn("data-pay-packages", suite)
-        for plat in PLATFORMS:
-            href = suite_pay_href(plat)
-            href_html = href.replace("&", "&amp;")
-            self.assertIn(href_html, suite)
-            self.assertIn(f'data-platform="{plat}"', suite)
-            m = re.search(
-                rf'href="{re.escape(href_html)}"[^>]*>\s*([^<]+)',
-                suite,
-            )
-            self.assertIsNotNone(m, msg=plat)
-            assert m is not None
-            self.assertIn(PLATFORM_LABEL[plat], m.group(1), msg=f"{plat}: {m.group(1)!r}")
-            fname = platform_filename(plat)
-            assert fname is not None
-        # Storefront package grid is /pay only (not free suite/download)
+        self.assertIn('id="suite-storefront"', suite)
+        self.assertIn("suite-keygen-buy", suite)
+        self.assertIn('action="/pay"', suite)
+        # Removed: Device for KEYGEN + Get Suite platform button links
+        self.assertNotIn("Device for KEYGEN", suite)
+        self.assertNotIn('id="suite-keygen-platform"', suite)
+        self.assertNotIn('id="suite-free-grid"', suite)
+        self.assertNotIn('id="suite-free-primary"', suite)
+        self.assertNotIn("Get Suite", suite)
         self.assertNotIn("/suite/download?platform=", suite)
 
     def test_home_and_free_packages_and_public_site(self) -> None:
@@ -77,13 +69,17 @@ class TestFreeDownloadHrefGating(unittest.TestCase):
             DOWNLOADS_MAP_PATH,
             render_free_download_cta_html,
             render_free_packages_page_html,
-            suite_free_direct_download_href,
             suite_pay_href,
         )
 
         home = render_html({"title": "RESTORE PRIVACY"}).decode("utf-8")
-        for plat in PLATFORMS:
-            self.assertIn(suite_pay_href(plat).replace("&", "&amp;"), home)
+        # Suite storefront no longer lists per-platform /pay package buttons
+        self.assertNotIn('id="suite-free-grid"', home)
+        self.assertNotIn('id="suite-free-primary"', home)
+        self.assertNotIn("Device for KEYGEN", home)
+        self.assertNotIn('id="suite-keygen-platform"', home)
+        self.assertIn("suite-keygen-buy", home)
+        self.assertIn('action="/pay"', home)
 
         cta = render_free_download_cta_html()
         self.assertIn(f'href="{DOWNLOADS_MAP_PATH}"', cta)
@@ -95,6 +91,7 @@ class TestFreeDownloadHrefGating(unittest.TestCase):
             self.assertIn(f'data-platform="{plat}"', cta_p)
             self.assertNotIn('href="/pay', cta_p)
 
+        # Downloads map still carries Suite latest /pay platform rows
         pkgs = render_free_packages_page_html().decode("utf-8")
         for plat in PLATFORMS:
             href_html = suite_pay_href(plat).replace("&", "&amp;")

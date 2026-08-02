@@ -53,28 +53,21 @@ class TestDetectPlatformFromUserAgent(unittest.TestCase):
                 msg=f"ua={ua!r}",
             )
 
-    def test_suite_storefront_primary_free_download_for_detected(self) -> None:
-        from downloads import (
-            render_suite_storefront_html,
-            suite_free_download_href,
-        )
-
-        from downloads import suite_pay_href
+    def test_suite_storefront_keygen_without_device_grid(self) -> None:
+        from downloads import render_suite_storefront_html, suite_free_download_href
 
         html = render_suite_storefront_html(default_platform="macos")
-        self.assertIn('id="suite-dl-primary"', html)
-        # Storefront package links go to /pay (not ungated suite/download)
-        self.assertIn(suite_pay_href("macos").replace("&", "&amp;"), html)
-        self.assertIn("KEYGEN", html)
-        self.assertIn("/pay", html)
-        self.assertNotIn(suite_free_download_href("macos"), html)
+        # Detected platform still marked on section; no package grid / device box
         self.assertIn('data-detected-platform="macos"', html)
-        self.assertIn('id="suite-dl-macos"', html)
-        self.assertIn("is-detected", html)
-        for plat in ("windows", "android", "macos", "ios", "linux"):
-            self.assertIn(f'data-platform="{plat}"', html)
-            self.assertIn(suite_pay_href(plat).replace("&", "&amp;"), html)
-        self.assertIn('value="macos" selected', html)
+        self.assertIn("KEYGEN", html)
+        self.assertIn('action="/pay"', html)
+        self.assertIn("suite-keygen-buy", html)
+        self.assertNotIn('id="suite-dl-primary"', html)
+        self.assertNotIn('id="suite-free-grid"', html)
+        self.assertNotIn("Device for KEYGEN", html)
+        self.assertNotIn('id="suite-keygen-platform"', html)
+        self.assertNotIn(suite_free_download_href("macos"), html)
+        self.assertNotIn("Get Suite", html)
 
     def test_homepage_uses_user_agent_when_no_query_platform(self) -> None:
         from app import render_html
@@ -90,16 +83,17 @@ class TestDetectPlatformFromUserAgent(unittest.TestCase):
         page = render_html({"title": "RESTORE PRIVACY"}, default_platform=plat).decode(
             "utf-8"
         )
-        # Homepage free CTA = direct Suite free_direct; storefront = /pay
+        # Homepage free CTA = direct Suite free_direct; storefront KEYGEN cart only
         self.assertIn("FREE DOWNLOAD", page)
         self.assertIn("free_direct=1", page)
         self.assertIn("platform=windows", page)
         self.assertIn("/suite/download?platform=windows", page)
-        self.assertIn(
-            "/pay?product=suite&amp;platform=windows", page
-        )  # HTML-escaped href
         self.assertIn('data-detected-platform="windows"', page)
-        self.assertIn('id="suite-dl-primary"', page)
+        self.assertNotIn('id="suite-dl-primary"', page)
+        self.assertNotIn('id="suite-free-grid"', page)
+        self.assertNotIn("Device for KEYGEN", page)
+        self.assertNotIn('id="suite-keygen-platform"', page)
+        self.assertIn("suite-keygen-buy", page)
         self.assertIn('id="free-download-v1-cta"', page)
         self.assertIn('data-cta-shape="rectangle"', page)
         cta_i = page.index('id="free-download-v1-cta"')

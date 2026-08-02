@@ -34,7 +34,7 @@ class TestSuitePercWalletExplorerNotOnHomepage(unittest.TestCase):
         suite = render_suite_storefront_html()
         self.assertIn('id="suite-storefront"', suite)
         self.assertIn("KEYGEN", suite)
-        self.assertIn("data-pay-packages", suite)
+        self.assertIn("suite-keygen-buy", suite)
         self.assertNotIn("<iframe", suite)
         self.assertNotIn("data-explorer-iframe", suite)
         self.assertNotIn("suite-perc-wallet-explorer", suite)
@@ -72,7 +72,9 @@ class TestSuitePercWalletExplorerNotOnHomepage(unittest.TestCase):
         self.assertNotIn(f'src="{SUITE_PERC_EXPLORER_HREF}"', storefront)
         # Storefront essentials still present
         self.assertIn("KEYGEN", storefront)
-        self.assertIn("suite-free-grid", storefront)
+        self.assertIn("suite-keygen-buy", storefront)
+        self.assertNotIn('id="suite-free-grid"', storefront)
+        self.assertNotIn("Device for KEYGEN", storefront)
 
 
 class TestExplorerApiBaseForFramedPerc(unittest.TestCase):

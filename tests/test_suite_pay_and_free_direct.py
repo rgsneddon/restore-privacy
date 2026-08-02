@@ -81,13 +81,17 @@ class TestHomeAndMapRender(unittest.TestCase):
             self.assertIn("free_direct=1", page)
 
             suite = render_suite_storefront_html(default_platform="macos")
-            # HTML attributes escape & → &amp;
-            self.assertIn(suite_pay_href("macos").replace("&", "&amp;"), suite)
-            self.assertIn(suite_pay_href("windows").replace("&", "&amp;"), suite)
-            # Platform grid must not advertise ungated free suite/download
+            # No Device-for-KEYGEN box or platform pay button grid on storefront
+            self.assertNotIn("Device for KEYGEN", suite)
+            self.assertNotIn('id="suite-keygen-platform"', suite)
+            self.assertNotIn('id="suite-free-grid"', suite)
+            self.assertNotIn('id="suite-free-primary"', suite)
+            self.assertNotIn("Get Suite", suite)
             self.assertNotIn("/suite/download?platform=", suite)
-            self.assertIn("/pay?product=suite", suite)
-            self.assertIn("platform=linux", suite)
+            # Single KEYGEN cart entry remains (device chosen on /pay cart)
+            self.assertIn('action="/pay"', suite)
+            self.assertIn("suite-keygen-buy", suite)
+            self.assertIn("KEYGEN", suite)
 
             map_html = render_downloads_map_page_html().decode("utf-8")
             self.assertIn("Restore Privacy Suite", map_html)

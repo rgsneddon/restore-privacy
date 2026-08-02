@@ -24,7 +24,6 @@ class TestSuiteStorefrontOrder(unittest.TestCase):
             DOWNLOADS_SECTION_ID,
             SUITE_SECTION_ID,
             SUITE_PRODUCT_TITLE,
-            suite_pay_href,
         )
 
         html = render_html({"title": "RESTORE PRIVACY VPN"}).decode("utf-8")
@@ -34,10 +33,12 @@ class TestSuiteStorefrontOrder(unittest.TestCase):
         self.assertGreaterEqual(vpn_at, 0, "downloads section missing")
         self.assertLess(suite_at, vpn_at, "Suite must appear above VPN downloads")
         self.assertIn(SUITE_PRODUCT_TITLE, html)
-        # Storefront package links are /pay (not ungated free suite/download)
-        self.assertIn('data-pay-packages="1"', html)
-        self.assertIn("/pay?product=suite", html)
-        self.assertIn(suite_pay_href("windows").replace("&", "&amp;"), html)
+        # No Device-for-KEYGEN box or Get Suite platform button grid
+        self.assertNotIn("Device for KEYGEN", html)
+        self.assertNotIn('id="suite-keygen-platform"', html)
+        self.assertNotIn('id="suite-free-grid"', html)
+        self.assertNotIn('id="suite-free-primary"', html)
+        self.assertNotIn("Get Suite", html)
         self.assertIn("Get KEYGEN", html)
         self.assertIn('name="product" value="suite"', html)
         self.assertIn('name="interval" value="month"', html)
@@ -55,21 +56,22 @@ class TestSuiteStorefrontOrder(unittest.TestCase):
         self.assertIn('id="downloads"', html)
         self.assertIn("Download Suite client", html)
 
-    def test_suite_storefront_helper_emits_pay_packages_and_keygen(self):
+    def test_suite_storefront_helper_emits_keygen_cart_without_device_box(self):
         from downloads import (
             PRICE_LABEL,
             render_suite_storefront_html,
             SUITE_PRODUCT_TITLE,
-            suite_pay_href,
         )
 
         block = render_suite_storefront_html(default_platform="windows")
         self.assertIn(SUITE_PRODUCT_TITLE, block)
         self.assertIn(PRICE_LABEL, block)
         self.assertIn('data-product="suite"', block)
-        self.assertIn('data-pay-packages="1"', block)
-        self.assertIn(suite_pay_href("windows").replace("&", "&amp;"), block)
-        self.assertIn('data-pay="1"', block)
+        self.assertNotIn("Device for KEYGEN", block)
+        self.assertNotIn('id="suite-keygen-platform"', block)
+        self.assertNotIn('id="suite-free-grid"', block)
+        self.assertNotIn('id="suite-free-primary"', block)
+        self.assertNotIn("Get Suite", block)
         self.assertNotIn("/suite/download?platform=", block)
         self.assertIn("KEYGEN", block)
         self.assertIn("Evolve", block)
@@ -99,7 +101,8 @@ class TestSuiteKeygenCartMarkup(unittest.TestCase):
         self.assertRegex(suite, r'method\s*=\s*["\']get["\']', msg=suite[:400])
         self.assertIn('name="product" value="suite"', suite)
         self.assertIn('name="interval" value="month"', suite)
-        self.assertIn("Device for KEYGEN licence", suite)
+        self.assertNotIn("Device for KEYGEN", suite)
+        self.assertNotIn('id="suite-keygen-platform"', suite)
         self.assertIn("Get KEYGEN", suite)
         # No silent force auto-renew on homepage CTA
         self.assertNotIn('id="suite-auto-renew-field"', suite)

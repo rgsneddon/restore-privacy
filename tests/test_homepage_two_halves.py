@@ -62,10 +62,11 @@ class TestHomepageTwoHalves(unittest.TestCase):
             j = main.find(marker)
             if j >= 0:
                 self.assertLess(i_dl, j, f"{marker} must follow downloads in main")
-        # Affordances: package grid → /pay; free CTA is separate (free_direct when platform set)
-        self.assertIn("suite-free-grid", main)
-        self.assertIn("/pay?product=suite", main)
-        self.assertIn("platform=windows", main)  # storefront pay link or option
+        # Affordances: KEYGEN cart entry + free CTA (no Device-for-KEYGEN / package grid)
+        self.assertNotIn('id="suite-free-grid"', main)
+        self.assertNotIn("Device for KEYGEN", main)
+        self.assertIn("suite-keygen-buy", main)
+        self.assertIn('action="/pay"', main)
         self.assertIn("dl-buy-now", main)
         self.assertIn("KEYGEN", main)
         # With detected platform, free CTA is direct Suite download (not /pay)
@@ -75,8 +76,8 @@ class TestHomepageTwoHalves(unittest.TestCase):
         main_win = _main_html(page_win)
         self.assertIn("free_direct=1", main_win)
         self.assertIn("/suite/download?platform=windows", main_win)
-        # Package grid still /pay (HTML-escaped &)
-        self.assertIn("/pay?product=suite&amp;platform=windows", main_win)
+        self.assertNotIn('id="suite-free-grid"', main_win)
+        self.assertNotIn("Device for KEYGEN", main_win)
         i_cta = main_win.index('id="free-download-v1-cta"')
         cta_snip = main_win[i_cta : i_cta + 700]
         self.assertIn("free_direct=1", cta_snip)
