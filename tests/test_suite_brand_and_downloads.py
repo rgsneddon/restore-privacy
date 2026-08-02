@@ -161,6 +161,35 @@ class TestSuiteDownloadsMonopinCurrent(unittest.TestCase):
         self.assertNotIn("Device for KEYGEN", html)
         self.assertIsNone(re.search(r"restore-privacy-client-0\.\d+\.\d+-", html))
 
+    def test_suite_keygen_cart_button_and_hint_centered(self) -> None:
+        """Get KEYGEN + under-button cart text are centred (not left-flush)."""
+        from downloads import render_suite_storefront_html, suite_storefront_css
+
+        css = suite_storefront_css()
+        # Scoped centre override on suite KEYGEN cart form (not global .dl-buy-form)
+        self.assertIn(".suite-keygen-cta", css)
+        self.assertIn("text-align: center", css)
+        # Button and under-button copy get explicit centre rules
+        self.assertIn("#suite-keygen-buy", css)
+        self.assertIn("margin-left: auto", css)
+        self.assertIn("margin-right: auto", css)
+        self.assertIn("#suite-cart-hint", css)
+        self.assertIn("#suite-stripe-branding", css)
+        # Right-box buy form must keep left field alignment in downloads CSS
+        from downloads import download_css
+
+        dl_css = download_css()
+        self.assertIn(".dl-buy-form", dl_css)
+        self.assertIn("text-align: left", dl_css)
+
+        suite = render_suite_storefront_html()
+        self.assertIn('id="suite-keygen-buy"', suite)
+        self.assertIn('id="suite-cart-hint"', suite)
+        self.assertIn('id="suite-stripe-branding"', suite)
+        self.assertIn("suite-keygen-cta", suite)
+        self.assertIn("Get KEYGEN", suite)
+        self.assertIn("Continues to a short cart", suite)
+
 
 if __name__ == "__main__":
     unittest.main()

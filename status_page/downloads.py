@@ -2010,15 +2010,29 @@ def suite_storefront_css() -> str:
       outline: 2px solid #7dd3fc; outline-offset: 2px;
       background: #bae6fd;
     }
-    .suite-keygen-cta {
+    /* Suite KEYGEN cart: centre button + under-button copy (override .dl-buy-form left). */
+    .suite-keygen-cta,
+    form.suite-keygen-cta#suite-keygen-form {
       margin: 0.35rem auto 0.25rem; max-width: 28rem;
+      text-align: center;
     }
-    .suite-keygen-cta .dl-buy-now {
+    .suite-keygen-cta .dl-buy-now,
+    .suite-keygen-cta #suite-keygen-buy {
+      display: block;
       width: 100%; max-width: 22rem;
+      margin-left: auto; margin-right: auto;
+    }
+    .suite-keygen-cta .suite-cart-hint,
+    .suite-keygen-cta #suite-cart-hint,
+    .suite-keygen-cta .dl-stripe-branding,
+    .suite-keygen-cta #suite-stripe-branding {
+      text-align: center;
+      margin-left: auto; margin-right: auto;
     }
     .suite-storefront .suite-pay-hint {
       margin: 0.75rem auto 0; max-width: 34rem;
       font-size: 0.82rem; color: rgba(174, 208, 234, 0.95); line-height: 1.4;
+      text-align: center;
     }
     /* World flags strip — bottom of right-hand downloads (#downloads) box */
     .downloads .suite-world-flags,
