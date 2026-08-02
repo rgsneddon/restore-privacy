@@ -76,13 +76,13 @@
 		900FBE1927916EF03A6F42BF /* Addition.swift in Sources */ = {isa = PBXBuildFile; fileRef = E16A499C273A9871B4C18E26 /* Addition.swift */; };
 		92A92D4A05C8E430980D9446 /* RptSessionCrypto.swift in Sources */ = {isa = PBXBuildFile; fileRef = E2076CDD9CED44AA459FBEA9 /* RptSessionCrypto.swift */; };
 		970A610C0BA5DE735495946C /* RptClientEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = ED9129F30F6C17D1AF81D2BC /* RptClientEngine.swift */; };
-		B22C3D4E5F6071829300A1B2 /* RptAppGroupAccessExplainer.swift in Sources */ = {isa = PBXBuildFile; fileRef = A11B2C3D4E5F6071829300A1 /* RptAppGroupAccessExplainer.swift */; };
 		A0CCEFE479826FBA1091286A /* RptVpnChannel.swift in Sources */ = {isa = PBXBuildFile; fileRef = F66C2ECCCA169DB6C485B5A9 /* RptVpnChannel.swift */; };
 		A11B2C3D4E5F607182930002 /* RptResidualPrivacyPolicy.swift in Sources */ = {isa = PBXBuildFile; fileRef = A11B2C3D4E5F607182930001 /* RptResidualPrivacyPolicy.swift */; };
 		A11B2C3D4E5F607182930003 /* RptResidualPrivacyPolicy.swift in Sources */ = {isa = PBXBuildFile; fileRef = A11B2C3D4E5F607182930001 /* RptResidualPrivacyPolicy.swift */; };
 		A42AB0C37358264806286F3E /* Multiplication.swift in Sources */ = {isa = PBXBuildFile; fileRef = F5BAD9B9C6AC449B9C94DC39 /* Multiplication.swift */; };
 		A78DD36D023D41E89CA378CA /* Shifts.swift in Sources */ = {isa = PBXBuildFile; fileRef = 385CACA210AE9365F0A0EE85 /* Shifts.swift */; };
 		A7B1C2D3E4F5061728394A5B /* RptTrayController.swift in Sources */ = {isa = PBXBuildFile; fileRef = A7B1C2D3E4F5061728394A5A /* RptTrayController.swift */; };
+		B22C3D4E5F6071829300A1B2 /* RptAppGroupAccessExplainer.swift in Sources */ = {isa = PBXBuildFile; fileRef = A11B2C3D4E5F6071829300A1 /* RptAppGroupAccessExplainer.swift */; };
 		B4A18A4212E3CAE5F0ED0A71 /* RptElgamal.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0E891EED73A07511A7B5A11 /* RptElgamal.swift */; };
 		B8B35428AB412E659898FCB6 /* RptClientEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = ED9129F30F6C17D1AF81D2BC /* RptClientEngine.swift */; };
 		C050651D9C31389C601D2E73 /* RptElgamal.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0E891EED73A07511A7B5A11 /* RptElgamal.swift */; };
@@ -207,6 +207,7 @@
 		95B08728A284CB056E9DED0A /* RptConnectOrchestrator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = RptConnectOrchestrator.swift; path = NativePrep/Rpt2/RptConnectOrchestrator.swift; sourceTree = "<group>"; };
 		9740EEB21CF90195004384FC /* Debug.xcconfig */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.xcconfig; path = Debug.xcconfig; sourceTree = "<group>"; };
 		A11B2C3D4E5F607182930001 /* RptResidualPrivacyPolicy.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = RptResidualPrivacyPolicy.swift; path = NativePrep/Rpt2/RptResidualPrivacyPolicy.swift; sourceTree = "<group>"; };
+		A11B2C3D4E5F6071829300A1 /* RptAppGroupAccessExplainer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = RptAppGroupAccessExplainer.swift; path = NativePrep/RptAppGroupAccessExplainer.swift; sourceTree = "<group>"; };
 		A7B1C2D3E4F5061728394A5A /* RptTrayController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RptTrayController.swift; sourceTree = "<group>"; };
 		B7FD0844874A9EF9602CB015 /* Pods_Runner.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; includeInIndex = 0; path = Pods_Runner.framework; sourceTree = BUILT_PRODUCTS_DIR; };
 		BA59528E4CF6C43E6F767344 /* Pods-RunnerTests.profile.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-RunnerTests.profile.xcconfig"; path = "Target Support Files/Pods-RunnerTests/Pods-RunnerTests.profile.xcconfig"; sourceTree = "<group>"; };
@@ -224,7 +225,6 @@
 		ECECDB7E1FD55ACF992D61FC /* PacketTunnel.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = PacketTunnel.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 		ED9129F30F6C17D1AF81D2BC /* RptClientEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = RptClientEngine.swift; path = NativePrep/Rpt2/RptClientEngine.swift; sourceTree = "<group>"; };
 		F5BAD9B9C6AC449B9C94DC39 /* Multiplication.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = Multiplication.swift; path = NativePrep/Rpt2/VendorBigInt/Multiplication.swift; sourceTree = "<group>"; };
-		A11B2C3D4E5F6071829300A1 /* RptAppGroupAccessExplainer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = RptAppGroupAccessExplainer.swift; path = NativePrep/RptAppGroupAccessExplainer.swift; sourceTree = "<group>"; };
 		F66C2ECCCA169DB6C485B5A9 /* RptVpnChannel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = RptVpnChannel.swift; path = NativePrep/RptVpnChannel.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
@@ -1062,12 +1062,20 @@
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = PacketTunnel/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
-					"$(inherited)",
-					"@executable_path/Frameworks",
-					"@executable_path/../../Frameworks",
+					"@executable_path/../Frameworks",
+					"@loader_path/../Frameworks",
 				);
 				MACOSX_DEPLOYMENT_TARGET = 11.0;
 				MARKETING_VERSION = 1.0;
+				OTHER_LDFLAGS = (
+					"-framework",
+					NetworkExtension,
+					"-framework",
+					Security,
+					"-framework",
+					Network,
+				);
+				OTHER_SWIFT_FLAGS = "";
 				PRODUCT_BUNDLE_IDENTIFIER = com.restoreprivacy.restorePrivacyClient.PacketTunnel;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = macosx;
@@ -1089,12 +1097,20 @@
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = PacketTunnel/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
-					"$(inherited)",
-					"@executable_path/Frameworks",
-					"@executable_path/../../Frameworks",
+					"@executable_path/../Frameworks",
+					"@loader_path/../Frameworks",
 				);
 				MACOSX_DEPLOYMENT_TARGET = 11.0;
 				MARKETING_VERSION = 1.0;
+				OTHER_LDFLAGS = (
+					"-framework",
+					NetworkExtension,
+					"-framework",
+					Security,
+					"-framework",
+					Network,
+				);
+				OTHER_SWIFT_FLAGS = "";
 				PRODUCT_BUNDLE_IDENTIFIER = com.restoreprivacy.restorePrivacyClient.PacketTunnel;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = macosx;
@@ -1116,12 +1132,20 @@
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = PacketTunnel/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
-					"$(inherited)",
-					"@executable_path/Frameworks",
-					"@executable_path/../../Frameworks",
+					"@executable_path/../Frameworks",
+					"@loader_path/../Frameworks",
 				);
 				MACOSX_DEPLOYMENT_TARGET = 11.0;
 				MARKETING_VERSION = 1.0;
+				OTHER_LDFLAGS = (
+					"-framework",
+					NetworkExtension,
+					"-framework",
+					Security,
+					"-framework",
+					Network,
+				);
+				OTHER_SWIFT_FLAGS = "";
 				PRODUCT_BUNDLE_IDENTIFIER = com.restoreprivacy.restorePrivacyClient.PacketTunnel;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = macosx;
