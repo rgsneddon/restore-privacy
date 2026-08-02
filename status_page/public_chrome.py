@@ -1395,12 +1395,12 @@ SUITE_HOME_INTRO_HEADING = "...privacy you can actually use..."
 # Legacy alias for callers/tests that still import the short human title idea
 SUITE_HOME_INTRO_HEADING_LEGACY = "Privacy you can actually use"
 SUITE_HOME_INTRO_BODY = (
-    "The Restore Privacy Suite brings together a residual VPN protection, a private "
-    "wallet and the Evolve analysis engine for your personal use, all in one place. "
-    "Download the installer for free using the button below, try it for three days "
-    "and when you are ready, buy a licence key — a licence for personal use of the "
-    "RPSuite costs only £3 per month or £30 annually. This gives you full access to "
-    "the VPN and RPSuite."
+    "The Restore Privacy Suite brings together residual VPN protection, the Evolve "
+    "analysis engine and a fun rewards token wallet, for your personal use, all in "
+    "one conveient app.  Download the installer for free using the button below, try "
+    "it for three days and when you are ready, buy a licence key — a licence for "
+    "personal use of The Restore Privacy Suite costs only £3 per month or £30 "
+    "annually. This gives you full access to the VPN and RPSuite extras."
 )
 # Foot retired: closing typewriter is the end line
 SUITE_HOME_INTRO_FOOT = ""

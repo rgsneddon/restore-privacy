@@ -35,6 +35,9 @@ class TestSuitePublicBrand(unittest.TestCase):
         self.assertIn("suite-home-intro", html)
         self.assertIn(SUITE_HOME_INTRO_BODY[:40], html)
         self.assertIn("residual VPN protection", html)
+        self.assertIn("fun rewards token wallet", html)
+        self.assertIn("Evolve analysis engine", html)
+        self.assertIn("RPSuite extras", html)
         self.assertIn("£3 per month", html)
         self.assertIn("£30 annually", html)
         self.assertIn("WELCOME, ANON...", html)
@@ -74,21 +77,26 @@ class TestPublicSiteCopyHuman(unittest.TestCase):
         # Foot retired in favour of closing typewriter line
         self.assertEqual(SUITE_HOME_INTRO_FOOT, "")
         self.assertIn("YOUR PRIVACY, RESTORED", body)
-        # Grammatical intro: residual VPN + monthly/annual licence
+        # Grammatical intro: residual VPN + Evolve + rewards wallet + licence
         open_clause = (
-            "The Restore Privacy Suite brings together a residual VPN protection, a private"
+            "The Restore Privacy Suite brings together residual VPN protection, the Evolve"
         )
         self.assertTrue(
             SUITE_HOME_INTRO_BODY.startswith(open_clause),
             msg=f"intro open clause missing residual VPN: {SUITE_HOME_INTRO_BODY!r}",
         )
+        self.assertIn("fun rewards token wallet", SUITE_HOME_INTRO_BODY)
+        self.assertIn("conveient app", SUITE_HOME_INTRO_BODY)
         self.assertIn("£3 per month", SUITE_HOME_INTRO_BODY)
         self.assertIn("£30 annually", SUITE_HOME_INTRO_BODY)
+        self.assertIn("The Restore Privacy Suite", SUITE_HOME_INTRO_BODY)
+        self.assertIn("RPSuite extras", SUITE_HOME_INTRO_BODY)
         self.assertIn(open_clause, body)
         self.assertNotIn("mothly sunscription", SUITE_HOME_INTRO_BODY)
         self.assertNotIn("mothly sunscription", body)
+        # Retired prior open clause
         self.assertNotIn(
-            "brings together residual protection, a private",
+            "a residual VPN protection, a private wallet and the Evolve analysis engine",
             SUITE_HOME_INTRO_BODY,
         )
         # Anti-patterns: dense residual laundry as lead voice
