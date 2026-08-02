@@ -86,27 +86,39 @@ function publicEndpoint() {
   return `http://127.0.0.1:${PORT}`;
 }
 
+function isDisabledUpstream(value) {
+  const v = String(value ?? '')
+    .trim()
+    .toLowerCase();
+  return !v || v === 'none' || v === 'off' || v === 'disabled' || v === '0' || v === 'false';
+}
+
 function readDefaultUpstreamRendezvousUrl() {
+  // Optional local config — never hard-default to paid Render (Helsinki is solo seed).
   const configPath = path.join(__dirname, '..', '..', 'assets', 'config', 'perc_network.json');
   try {
     const raw = JSON.parse(fs.readFileSync(configPath, 'utf8'));
     const url = (raw.rendezvousUrl ?? '').trim();
-    if (url) return url.replace(/\/$/, '');
+    if (url && !/onrender\.com/i.test(url)) return url.replace(/\/$/, '');
   } catch {
     // optional — env override still works
   }
-  return 'https://evolve-perc-internet.onrender.com';
+  return '';
 }
 
 function upstreamRendezvousUrl() {
-  const explicit = (process.env.PERC_UPSTREAM_RENDEZVOUS_URL ?? '').trim();
-  if (explicit) return explicit.replace(/\/$/, '');
+  // Explicit env wins: empty / none / off / disabled = no dual-seed pull.
+  if (Object.prototype.hasOwnProperty.call(process.env, 'PERC_UPSTREAM_RENDEZVOUS_URL')) {
+    const explicit = (process.env.PERC_UPSTREAM_RENDEZVOUS_URL ?? '').trim();
+    if (isDisabledUpstream(explicit)) return '';
+    return explicit.replace(/\/$/, '');
+  }
   return readDefaultUpstreamRendezvousUrl();
 }
 
 function networkSyncBase() {
-  // Dual-seed: prefer upstream (Render) for peer/ledger pull so a public
-  // Helsinki endpoint does not only re-query itself (height 0 forever).
+  // Dual-seed: when upstream is set, prefer it for peer/ledger pull.
+  // Solo Helsinki: empty upstream → public endpoint only (durable local ledger).
   return resolveNetworkSyncBase(upstreamRendezvousUrl(), publicEndpoint());
 }
 

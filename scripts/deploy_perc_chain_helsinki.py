@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Package and (re)deploy perc_chain internet node for Helsinki / any host.
 
-Restore Privacy Suite v1.0.5 — evolve-perc-internet (Render) is **paused to
+Restore Privacy Suite v1.0.6 — evolve-perc-internet (Render) is **paused to
 save money**. Default public endpoint is Helsinki ``135.181.152.10:9478``.
 
 Dry-run and local package production work without SSH. Live upload is optional
@@ -35,7 +35,7 @@ DEFAULT_HOST = "135.181.152.10"
 DEFAULT_PORT = 9478
 DEFAULT_REMOTE_ROOT = "/opt/restore-privacy/perc_chain"
 UNIT_NAME = "rpt-perc-chain.service"
-SUITE_VERSION = "1.0.5"
+SUITE_VERSION = "1.0.6"
 PAUSED_RENDER = "evolve-perc-internet.onrender.com"
 
 # evolve-perc-internet (Render) is paused to save money — never default to it.
@@ -77,7 +77,8 @@ def _stage_dir(out: Path) -> Path:
                 "PERC_BIND_HOST=127.0.0.1",
                 f"PERC_DATA_DIR={DEFAULT_REMOTE_ROOT}/data",
                 f"PERC_PUBLIC_ENDPOINT={DEFAULT_PUBLIC_ENDPOINT}",
-                "PERC_UPSTREAM_RENDEZVOUS_URL=https://evolve-perc-internet.onrender.com",
+                # none = solo Helsinki seed (do not re-attach paid Render dual-seed)
+                "PERC_UPSTREAM_RENDEZVOUS_URL=none",
                 "PERC_SEED_USERNAME=evolve_seed_node",
                 "PERC_CHAIN_GENESIS_REVISION=2",
                 "NODE_ENV=production",

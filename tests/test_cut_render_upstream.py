@@ -66,9 +66,18 @@ class TestCutRenderUpstream(unittest.TestCase):
         )
         self.assertIn("systemctl restart rpt-perc-chain", md)
         self.assertIn("nginx -t", md)
-        # Script must strip UPSTREAM lines (shipped entry logic)
-        self.assertIn("PERC_UPSTREAM_RENDEZVOUS_URL=", sh)
+        # Script must force explicit disable (none), not merely drop the key
+        self.assertIn("PERC_UPSTREAM_RENDEZVOUS_URL=none", sh)
         self.assertIn("grep -vE", sh)
+        # Node must not hard-default to paid Render
+        node = (ROOT / "perc_chain" / "src" / "internet_node.js").read_text(
+            encoding="utf-8"
+        )
+        self.assertIn("isDisabledUpstream", node)
+        self.assertNotIn(
+            "return 'https://evolve-perc-internet.onrender.com'",
+            node,
+        )
 
     def test_script_cuts_upstream_on_live_shaped_env(self) -> None:
         """Run the real shipped script against temp files (no host systemctl)."""
@@ -110,17 +119,15 @@ class TestCutRenderUpstream(unittest.TestCase):
             )
             self.assertIn("CUT_RENDER_UPSTREAM_DONE", proc.stdout)
             after = env_path.read_text(encoding="utf-8")
-            # No assignment line / live URL (comment header may name the key)
+            self.assertIn("PERC_UPSTREAM_RENDEZVOUS_URL=none", after)
+            self.assertNotRegex(after, r"https?://\S*onrender\.com")
             for line in after.splitlines():
                 stripped = line.strip()
                 if stripped.startswith("#"):
                     continue
-                self.assertFalse(
-                    stripped.startswith("PERC_UPSTREAM_RENDEZVOUS_URL="),
-                    msg=line,
-                )
                 self.assertNotIn("onrender.com", stripped, msg=line)
-            self.assertNotRegex(after, r"https?://\S*onrender\.com")
+                if stripped.startswith("PERC_UPSTREAM_RENDEZVOUS_URL="):
+                    self.assertEqual(stripped, "PERC_UPSTREAM_RENDEZVOUS_URL=none")
             # Required keys preserved
             self.assertIn("PORT=9478", after)
             self.assertIn(

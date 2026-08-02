@@ -2,7 +2,11 @@
 
 **Scope:** Remove dual-seed pull from `evolve-perc-internet.onrender.com` on the
 Helsinki store host only. Clients already use Helsinki as rendezvous; this cut
-only stops the node from merging/pulling upstream from Render.
+stops the node from merging/pulling upstream from Render.
+
+**Important:** Older `internet_node.js` hard-defaulted upstream to Render when
+`PERC_UPSTREAM_RENDEZVOUS_URL` was unset. Deploy a build with `isDisabledUpstream`
+and set `PERC_UPSTREAM_RENDEZVOUS_URL=none` (the cut script does both checks).
 
 **Not in scope:** `restore-privacy-status` Render shop/admin, GitHub
 `rgsneddon/evolve`, Flutter client config, or pausing/deleting the Render service.
@@ -148,17 +152,11 @@ Then re-run the public `curl` verify from section 3 on your laptop.
 
 ---
 
-## Re-deploy risk (follow-up)
+## Re-deploy
 
-`scripts/deploy_perc_chain_helsinki.py` currently **rewrites** `helsinki.env` with:
-
-`PERC_UPSTREAM_RENDEZVOUS_URL=https://evolve-perc-internet.onrender.com`
-
-A later `python3 scripts/deploy_perc_chain_helsinki.py --package --upload --install-service`
-will **re-attach** the umbilical unless that line is removed from the packager.
-After a re-deploy, re-run section 1 (or the all-in-one) again.
-
-Repo example still documents dual-seed: `perc_chain/deploy/helsinki.env.example`.
+`scripts/deploy_perc_chain_helsinki.py` now stages
+`PERC_UPSTREAM_RENDEZVOUS_URL=none` (solo Helsinki). Re-deploy no longer re-attaches
+Render. To deliberately dual-seed again, set a real upstream URL in `helsinki.env`.
 
 ## Shipped script
 
