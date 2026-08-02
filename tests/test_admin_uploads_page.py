@@ -38,6 +38,11 @@ class TestAdminUploadsPage(unittest.TestCase):
         self.assertIn("/admin/uploads/push-clients", page)
         self.assertIn("Push selected updates to clients", page)
         self.assertIn("CHECK BREADCRUMBS", page)
+        self.assertIn('id="admin-client-push-section"', page)
+        self.assertIn("client-push-pkg-checkbox", page)
+        self.assertIn("Build host:", page)
+        self.assertIn("Helsinki:", page)
+        self.assertIn("Linux / Arch Linux", page)
         # Path browse retained
         self.assertIn('data-path-upload="1"', page)
         self.assertIn("/admin/uploads/upload-path", page)
@@ -165,26 +170,41 @@ class TestAdminUploadsPage(unittest.TestCase):
     def test_client_push_opt_in_only(self) -> None:
         from node.operator_admin import NodeOperatorController
         from node.update_push import (
+            UpdatePushQueue,
             apply_client_update_directive,
             reset_global_update_queue_for_tests,
         )
+        from suite_client_push import summarize_helsinki_suite_inventory
 
         reset_global_update_queue_for_tests()
         ctrl = NodeOperatorController(repo_root=ROOT)
-        # Isolate queue on this controller
-        from node.update_push import UpdatePushQueue
-
         ctrl.updates = UpdatePushQueue()
         ver = ctrl.catalog_version_default()
-        inv = ctrl.list_local_packages(version=ver, brand_wide=False)
-        fnames = [p["filename"] for p in inv["packages"] if p.get("filename")]
-        selected = fnames[:2]
-
+        host = ctrl.suite_host_inventory(version=ver)
+        present = list(host.get("present_filenames") or [])
+        if not present:
+            self.skipTest("no local Suite packages")
+        selected = present[:2]
+        # Matching Helsinki sizes so gate allows push
+        hel = summarize_helsinki_suite_inventory(
+            ver,
+            [
+                {
+                    "filename": fn,
+                    "bytes": host["present_sizes"][fn],
+                    "present": True,
+                }
+                for fn in selected
+            ],
+        )
         r = ctrl.push_selected_suite_updates_to_clients(
             version=ver,
             only_filenames=selected,
             url="https://restoreprivacy.online/#downloads",
             message="",
+            require_host_helsinki_match=True,
+            host=host,
+            helsinki=hel,
         )
         self.assertTrue(r.get("ok"), r)
         self.assertTrue(r.get("opt_in_only"))
@@ -197,7 +217,6 @@ class TestAdminUploadsPage(unittest.TestCase):
         self.assertIn("CHECK BREADCRUMBS", r.get("message") or "")
         self.assertNotIn("force-install", (r.get("message") or "").lower())
 
-        # Client receive path
         pulled = ctrl.client_pull_updates("test-client-1")
         self.assertGreaterEqual(len(pulled), 1)
         applied = apply_client_update_directive(pulled[0])
@@ -206,7 +225,6 @@ class TestAdminUploadsPage(unittest.TestCase):
         self.assertEqual(store.get("pending_update_version"), ver)
         self.assertIn("restoreprivacy.online", store.get("pending_update_url") or "")
 
-        # Breadcrumbs gate honesty: off does not apply
         from client.breadcrumbs_check import (
             KEY_CHECK_BREADCRUMBS,
             apply_breadcrumbs_update,

@@ -268,25 +268,54 @@
     });
   }
 
-  // Client UPDATE_PUSH form: inject selected package basenames (checkboxes belong
-  // to the Helsinki form via form=) so the server sees package= multi values.
+  // Client-push section: its own package checkboxes + select helpers.
+  function clientPushBoxes() {
+    return document.querySelectorAll(
+      'input.client-push-pkg-checkbox[data-client-package-select="1"]'
+    );
+  }
+  function setClientPushChecks(mode) {
+    clientPushBoxes().forEach(function (box) {
+      if (box.disabled && mode !== "none") return;
+      if (mode === "all") {
+        if (!box.disabled) box.checked = true;
+      } else if (mode === "none") {
+        box.checked = false;
+      } else if (mode === "present") {
+        var tr = box.closest("tr");
+        var present =
+          tr && tr.getAttribute("data-present") === "yes";
+        box.checked = !!present && !box.disabled;
+      }
+    });
+  }
+  var cPresent = document.getElementById("admin-client-select-present");
+  var cNone = document.getElementById("admin-client-select-none");
+  var cAll = document.getElementById("admin-client-select-all");
+  if (cPresent) cPresent.addEventListener("click", function () { setClientPushChecks("present"); });
+  if (cNone) cNone.addEventListener("click", function () { setClientPushChecks("none"); });
+  if (cAll) cAll.addEventListener("click", function () { setClientPushChecks("all"); });
+
   if (clientForm) {
-    clientForm.addEventListener("submit", function () {
-      var old = clientForm.querySelectorAll(
-        'input[data-client-push-package="1"]'
-      );
-      old.forEach(function (el) {
-        if (el.parentNode) el.parentNode.removeChild(el);
+    clientForm.addEventListener("submit", function (ev) {
+      var section = document.getElementById("admin-client-push-section");
+      if (section && section.getAttribute("data-can-push") === "0") {
+        ev.preventDefault();
+        setStatus(
+          "Client push cannot be completed — build host and Helsinki Suite " +
+            "packages do not match (or Helsinki is unknown)."
+        );
+        return;
+      }
+      var selected = [];
+      clientPushBoxes().forEach(function (box) {
+        if (box.checked && box.value && !box.disabled) selected.push(box);
       });
-      selectedPackageBoxes().forEach(function (box) {
-        if (!box.value) return;
-        var hid = document.createElement("input");
-        hid.type = "hidden";
-        hid.name = "package";
-        hid.value = box.value;
-        hid.setAttribute("data-client-push-package", "1");
-        clientForm.appendChild(hid);
-      });
+      if (!selected.length) {
+        ev.preventDefault();
+        setStatus("Select at least one Suite package for client push.");
+        return;
+      }
     });
   }
 })();

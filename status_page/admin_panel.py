@@ -1548,6 +1548,200 @@ def render_processor_settings_html(
     return frag
 
 
+def _render_client_push_section_html(
+    *,
+    ctrl: Any,
+    catalog_ver: str,
+    suite_label: str,
+    inv: dict[str, Any],
+) -> str:
+    """Client-push card: prefilled host/Helsinki monopin, match gate, package boxes."""
+    try:
+        from suite_client_push import (
+            default_client_update_url,
+            suite_platform_display_label,
+            validate_linux_suite_package,
+        )
+    except ImportError:  # pragma: no cover
+        from status_page.suite_client_push import (  # type: ignore
+            default_client_update_url,
+            suite_platform_display_label,
+            validate_linux_suite_package,
+        )
+
+    host_ver = catalog_ver
+    hel_ver = "—"
+    host_present = 0
+    hel_present = 0
+    can_push = False
+    reason = "Match status not evaluated."
+    gate: dict[str, Any] = {}
+    host_inv: dict[str, Any] = {}
+    hel_inv: dict[str, Any] = {}
+    if ctrl is not None:
+        try:
+            host_inv = ctrl.suite_host_inventory(version=catalog_ver)
+            host_ver = str(host_inv.get("version") or catalog_ver)
+            host_present = int(host_inv.get("present_count") or 0)
+            hel_inv = ctrl.suite_helsinki_inventory(version=catalog_ver)
+            hel_ver = str(hel_inv.get("version") or catalog_ver) if hel_inv.get("known") else "unknown"
+            hel_present = int(hel_inv.get("present_count") or 0)
+            # Gate on all present-on-host files for default page load
+            gate = ctrl.suite_client_push_match_gate(
+                version=catalog_ver,
+                only_filenames=list(host_inv.get("present_filenames") or []),
+                host=host_inv,
+                helsinki=hel_inv,
+            )
+            can_push = bool(gate.get("can_push"))
+            reason = str(gate.get("reason") or reason)
+        except Exception as exc:  # noqa: BLE001
+            can_push = False
+            reason = f"Could not evaluate host/Helsinki match: {exc}"[:200]
+
+    match_cls = "ok-msg" if can_push else "err"
+    match_state = "match" if can_push else "mismatch"
+    disabled = "" if can_push else " disabled"
+    disabled_attr = disabled
+    prefill_url = default_client_update_url(host_ver)
+    prefill_msg = f"Suite {host_ver} ready"
+
+    # Package rows owned by client-push form (independent of Helsinki form)
+    c_rows: list[str] = []
+    for p in inv.get("packages") or []:
+        fname = str(p.get("filename") or "")
+        if not fname:
+            continue
+        plat = str(p.get("platform") or "")
+        plat_lab = str(
+            p.get("platform_label") or suite_platform_display_label(plat)
+        )
+        present = bool(p.get("present"))
+        try:
+            size = int(p.get("size") or 0)
+        except (TypeError, ValueError):
+            size = 0
+        size_s = (
+            f"{size // 1_000_000} MB"
+            if size >= 1_000_000
+            else (f"{size} B" if size else "—")
+        )
+        checked = " checked" if present else ""
+        # Disable checkbox when gate fails (still show list)
+        cb_dis = "" if can_push and present else (" disabled" if not can_push else "")
+        if not present:
+            cb_dis = " disabled"
+        hel_sz = (hel_inv.get("present_sizes") or {}).get(fname)
+        hel_s = (
+            f"{int(hel_sz) // 1_000_000} MB"
+            if hel_sz and int(hel_sz) >= 1_000_000
+            else (f"{hel_sz} B" if hel_sz else "—")
+        )
+        arch_note = ""
+        if plat.lower() == "linux":
+            arch_note = " · covers Arch Linux x86_64"
+            # Structural validity when local path present
+            path = str(p.get("path") or "")
+            if path:
+                val = validate_linux_suite_package(path)
+                if val.get("ok"):
+                    arch_note += " · valid tarball"
+                elif present:
+                    arch_note += f" · validity: {val.get('error') or 'fail'}"
+        host_mark = "yes" if present else "no"
+        hel_mark = "yes" if hel_sz else "no"
+        c_rows.append(
+            f'<tr class="client-push-pkg-row" data-filename="{_escape(fname)}" '
+            f'data-platform="{_escape(plat)}" data-present="{host_mark}">'
+            f'<td class="client-push-select">'
+            f'<input type="checkbox" name="package" value="{_escape(fname)}" '
+            f'id="admin-client-pkg-sel-{_escape(fname)}" '
+            f'class="client-push-pkg-checkbox" data-client-package-select="1"'
+            f"{checked}{cb_dis} aria-label=\"Select {_escape(fname)} for client push\"/>"
+            f"</td>"
+            f'<td class="client-push-platform">{_escape(plat_lab)}'
+            f'<span class="muted">{_escape(arch_note)}</span></td>'
+            f'<td class="client-push-file"><code>{_escape(fname)}</code></td>'
+            f'<td data-host-present="{host_mark}">{host_mark} ({_escape(size_s)})</td>'
+            f'<td data-helsinki-present="{hel_mark}">{hel_mark} ({_escape(str(hel_s))})</td>'
+            f"</tr>"
+        )
+    c_table = (
+        "\n".join(c_rows)
+        if c_rows
+        else (
+            '<tr id="admin-client-packages-empty">'
+            '<td colspan="5">No Suite packages listed for this monopin</td></tr>'
+        )
+    )
+
+    return f"""
+  <div id="admin-client-push-section" data-client-push-section="1"
+       data-match-state="{_escape(match_state)}" data-can-push="{'1' if can_push else '0'}">
+  <h4 id="admin-client-push-heading">Push selected updates to clients</h4>
+  <p class="muted" id="admin-client-push-blurb" data-client-push-blurb="1">
+    Enqueue a residual <strong>UPDATE_PUSH</strong> for Suite packages that match
+    on the <strong>build host</strong> and <strong>Helsinki</strong> paid store.
+    Clients apply only when Settings has <strong>CHECK BREADCRUMBS</strong> on —
+    never force-install on opt-out devices. Select one, many, or all packages below.
+  </p>
+  <p id="admin-client-push-versions" data-client-push-versions="1">
+    <span class="suite-badge" id="admin-client-host-version-badge">
+      Build host: Suite v{_escape(host_ver)}</span>
+    · present <span id="admin-client-host-present">{host_present}</span>
+    · <span class="suite-badge" id="admin-client-helsinki-version-badge">
+      Helsinki: {_escape(hel_ver if hel_ver != 'unknown' else 'unknown')}</span>
+    · present <span id="admin-client-helsinki-present">{hel_present}</span>
+  </p>
+  <p id="admin-client-push-match" class="{match_cls}" data-client-push-match="1"
+     data-match="{_escape(match_state)}" role="status">
+    {_escape(reason)}
+  </p>
+  <p class="muted" id="admin-client-push-select-hint">
+    <button type="button" id="admin-client-select-present" class="linkish">Select present</button>
+    · <button type="button" id="admin-client-select-none" class="linkish">Select none</button>
+    · <button type="button" id="admin-client-select-all" class="linkish">Select all</button>
+  </p>
+  <table id="admin-client-packages-table" data-client-packages="1" data-package-select="1">
+    <thead><tr>
+      <th>Push</th><th>Platform</th><th>Filename</th>
+      <th>Build host</th><th>Helsinki</th>
+    </tr></thead>
+    <tbody id="admin-client-packages-tbody">
+{c_table}
+    </tbody>
+  </table>
+  <form method="post" action="/admin/uploads/push-clients"
+        id="admin-client-push-form" data-client-push-form="1" data-push-update="1"
+        data-require-match="1">
+    <input type="hidden" name="version" value="{_escape(host_ver)}" id="admin-client-push-version"/>
+    <label class="field" for="admin-client-push-url">
+      <span class="field-label">Update URL</span>
+      <input type="text" id="admin-client-push-url" name="url"
+             value="{_escape(prefill_url)}"
+             placeholder="{_escape(prefill_url)}"
+             autocomplete="off"/>
+    </label>
+    <label class="field" for="admin-client-push-message">
+      <span class="field-label">Message (optional)</span>
+      <input type="text" id="admin-client-push-message" name="message"
+             value=""
+             placeholder="{_escape(prefill_msg)}"
+             autocomplete="off"/>
+    </label>
+    <label class="field" for="admin-client-push-target">
+      <span class="field-label">Target client id (empty = broadcast / connected)</span>
+      <input type="text" id="admin-client-push-target" name="target_client_id"
+             autocomplete="off"/>
+    </label>
+    <button type="submit" id="admin-client-push-btn" class="primary-upload"{disabled_attr}>
+      Push selected updates to clients
+    </button>
+  </form>
+  </div>
+"""
+
+
 def render_admin_suite_push_upload_html() -> str:
     """Admin UPLOADS card: Suite-only latest catalog packages + Helsinki + clients.
 
@@ -1562,6 +1756,7 @@ def render_admin_suite_push_upload_html() -> str:
         from status_page.admin_node_operator import (  # type: ignore
             get_operator_controller,
         )
+    ctrl = None
     try:
         ctrl = get_operator_controller()
         catalog_ver = ctrl.catalog_version_default()
@@ -1609,7 +1804,8 @@ def render_admin_suite_push_upload_html() -> str:
             f"</td>"
             f'<td class="suite-pkg-kind">{_escape(kind)}</td>'
             f'<td class="suite-pkg-product">{_escape(product)}</td>'
-            f'<td class="suite-pkg-platform">{_escape(p.get("platform"))}</td>'
+            f'<td class="suite-pkg-platform">'
+            f'{_escape(str(p.get("platform_label") or p.get("platform") or ""))}</td>'
             f'<td class="suite-pkg-file"><code>{_escape(fname)}</code></td>'
             f'<td data-present="{present}" class="suite-pkg-local">{present}</td>'
             f'<td data-staged="{staged}" class="suite-pkg-staged">{staged}</td>'
@@ -1637,6 +1833,12 @@ def render_admin_suite_push_upload_html() -> str:
     total_n = int(inv.get("total") or 0)
     kinds = inv.get("kinds") or []
     kinds_s = ", ".join(str(k) for k in kinds) if kinds else "suite_client"
+    client_push_html = _render_client_push_section_html(
+        ctrl=ctrl,
+        catalog_ver=catalog_ver,
+        suite_label=suite_label,
+        inv=inv,
+    )
     return f"""
 <section class="card nested" id="admin-suite-push-upload"
          data-suite-push-upload="1" data-suite-version="{_escape(catalog_ver)}"
@@ -1646,11 +1848,11 @@ def render_admin_suite_push_upload_html() -> str:
   <h3 id="admin-suite-push-heading">Push Suite packages</h3>
   <p class="muted" id="admin-suite-push-blurb">
     Latest <strong>{_escape(suite_label)}</strong> client installers only
-    (windows · android · macos · ios · linux). Stage/upload selected packages to
-    the Helsinki paid store, and/or push an update directive to residual clients
-    that have <strong>CHECK BREADCRUMBS</strong> enabled. Unchecked packages are
-    skipped and never fail the Helsinki job. Prefer <strong>Dry-run</strong> first
-    for Helsinki.
+    (windows · android · macos · ios · linux / Arch Linux). Stage/upload selected
+    packages to the Helsinki paid store, and/or push an update directive to residual
+    clients that have <strong>CHECK BREADCRUMBS</strong> enabled. Unchecked packages
+    are skipped and never fail the Helsinki job. Prefer <strong>Dry-run</strong>
+    first for Helsinki.
   </p>
   <p id="admin-suite-push-inventory" data-suite-inventory="1">
     <span class="suite-badge" id="admin-suite-version-badge">{_escape(suite_label)}</span>
@@ -1694,41 +1896,7 @@ def render_admin_suite_push_upload_html() -> str:
     </button>
   </form>
   <hr style="border:0;border-top:1px solid var(--border,#333);margin:1rem 0"/>
-  <h4 id="admin-client-push-heading">Push selected updates to clients</h4>
-  <p class="muted" id="admin-client-push-blurb" data-client-push-blurb="1">
-    Enqueue a residual <strong>UPDATE_PUSH</strong> directive for monopin
-    <code>{_escape(catalog_ver)}</code> (selected platforms noted in the message).
-    Clients apply only when Settings has <strong>CHECK BREADCRUMBS</strong> on —
-    this never force-installs on opt-out devices.
-  </p>
-  <form method="post" action="/admin/uploads/push-clients"
-        id="admin-client-push-form" data-client-push-form="1" data-push-update="1">
-    <input type="hidden" name="version" value="{_escape(catalog_ver)}" id="admin-client-push-version"/>
-    <label class="field" for="admin-client-push-url">
-      <span class="field-label">Update URL</span>
-      <input type="text" id="admin-client-push-url" name="url"
-             value="https://restoreprivacy.online/#downloads"
-             placeholder="https://restoreprivacy.online/#downloads"
-             autocomplete="off"/>
-    </label>
-    <label class="field" for="admin-client-push-message">
-      <span class="field-label">Message (optional)</span>
-      <input type="text" id="admin-client-push-message" name="message"
-             placeholder="Suite {_escape(catalog_ver)} ready"
-             autocomplete="off"/>
-    </label>
-    <label class="field" for="admin-client-push-target">
-      <span class="field-label">Target client id (empty = broadcast / connected)</span>
-      <input type="text" id="admin-client-push-target" name="target_client_id"
-             autocomplete="off"/>
-    </label>
-    <p class="muted" id="admin-client-push-select-hint">
-      Uses the same package checkboxes above (Select present / none / all).
-    </p>
-    <button type="submit" id="admin-client-push-btn" class="primary-upload">
-      Push selected updates to clients
-    </button>
-  </form>
+{client_push_html}
   <hr style="border:0;border-top:1px solid var(--border,#333);margin:1rem 0"/>
   <h4 id="admin-path-upload-heading">Upload one package by file path</h4>
   <p class="muted" id="admin-path-upload-blurb">
@@ -1760,10 +1928,13 @@ def render_admin_suite_push_upload_html() -> str:
   margin-top:0.5rem;padding:0.65rem 1.1rem;border:0;border-radius:8px;
   background:#0d9488;color:#fff;font-weight:700;cursor:pointer}}
 #admin-client-push-btn{{background:#1d6fd8}}
+#admin-client-push-btn:disabled{{opacity:0.55;cursor:not-allowed}}
 #admin-client-push-form .field{{display:block;margin:0.4rem 0}}
 #admin-client-push-form input[type=text]{{
   width:100%;max-width:28rem;box-sizing:border-box;padding:0.35rem 0.45rem}}
-#admin-suite-packages-table{{width:100%;border-collapse:collapse;font-size:0.78rem;margin:0.5rem 0}}
+#admin-client-packages-table,#admin-suite-packages-table{{
+  width:100%;border-collapse:collapse;font-size:0.78rem;margin:0.5rem 0}}
+#admin-client-packages-table th,#admin-client-packages-table td,
 #admin-suite-packages-table th,#admin-suite-packages-table td{{
   border:1px solid var(--border,#333);padding:0.3rem 0.4rem;text-align:left;vertical-align:middle}}
 .suite-pkg-progress-wrap{{

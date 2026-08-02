@@ -13,7 +13,7 @@ import threading
 import time
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Callable, Optional, Sequence
+from typing import Any, Callable, Mapping, Optional, Sequence
 
 from node.client_priority import (
     ClientPriorityStore,
@@ -370,6 +370,97 @@ class NodeOperatorController:
     def client_pull_updates(self, client_id: str) -> list[dict[str, Any]]:
         return client_receive_update_directives(client_id, queue=self.updates)
 
+    def suite_host_inventory(self, *, version: str | None = None) -> dict[str, Any]:
+        """Build-host Suite monopin inventory (for client-push prefill + match)."""
+        try:
+            from suite_client_push import summarize_local_suite_inventory
+        except ImportError:  # pragma: no cover
+            from status_page.suite_client_push import (  # type: ignore
+                summarize_local_suite_inventory,
+            )
+        ver = (version or "").strip() or self.catalog_version_default()
+        inv = self.list_local_packages(version=ver, brand_wide=False)
+        # Enrich sizes/paths already present; linux label for Arch coverage
+        pkgs = list(inv.get("packages") or [])
+        for p in pkgs:
+            if str(p.get("platform") or "").lower() == "linux":
+                p["platform_label"] = "Linux / Arch Linux (x86_64)"
+                p["covers_archlinux"] = True
+            path = str(p.get("path") or "")
+            if p.get("present") and path:
+                try:
+                    p["size"] = int(Path(path).stat().st_size)
+                except OSError:
+                    pass
+        return summarize_local_suite_inventory(pkgs, version=ver)
+
+    def suite_helsinki_inventory(
+        self,
+        *,
+        version: str | None = None,
+        filenames: list[str] | None = None,
+        probe_one: Any | None = None,
+        remote_rows: list[dict[str, Any]] | None = None,
+    ) -> dict[str, Any]:
+        """Helsinki paid_assets Suite inventory (injectable for tests)."""
+        try:
+            from suite_client_push import (
+                probe_helsinki_suite_packages,
+                summarize_helsinki_suite_inventory,
+            )
+        except ImportError:  # pragma: no cover
+            from status_page.suite_client_push import (  # type: ignore
+                probe_helsinki_suite_packages,
+                summarize_helsinki_suite_inventory,
+            )
+        ver = (version or "").strip() or self.catalog_version_default()
+        if remote_rows is not None:
+            return summarize_helsinki_suite_inventory(
+                ver, remote_rows, expected_filenames=filenames
+            )
+        names = filenames
+        if not names:
+            host = self.suite_host_inventory(version=ver)
+            names = [
+                str(p.get("filename") or "")
+                for p in (host.get("packages") or [])
+                if p.get("filename")
+            ]
+        return probe_helsinki_suite_packages(
+            ver, names or [], probe_one=probe_one
+        )
+
+    def suite_client_push_match_gate(
+        self,
+        *,
+        version: str | None = None,
+        only_filenames: list[str] | set[str] | tuple[str, ...] | None = None,
+        helsinki: Mapping[str, Any] | None = None,
+        host: Mapping[str, Any] | None = None,
+    ) -> dict[str, Any]:
+        """Gate: host and Helsinki Suite package sets must match to push clients."""
+        try:
+            from suite_client_push import match_host_helsinki_suite
+        except ImportError:  # pragma: no cover
+            from status_page.suite_client_push import (  # type: ignore
+                match_host_helsinki_suite,
+            )
+        ver = (version or "").strip() or self.catalog_version_default()
+        host_inv = host if host is not None else self.suite_host_inventory(version=ver)
+        hel_inv = (
+            helsinki
+            if helsinki is not None
+            else self.suite_helsinki_inventory(version=ver)
+        )
+        sel = None
+        if only_filenames is not None:
+            sel = [str(x).strip() for x in only_filenames if str(x).strip()]
+        gate = match_host_helsinki_suite(host_inv, hel_inv, only_filenames=sel)
+        gate["host"] = host_inv
+        gate["helsinki"] = hel_inv
+        gate["suite"] = self.suite_product_label(ver)
+        return gate
+
     def push_selected_suite_updates_to_clients(
         self,
         *,
@@ -378,6 +469,9 @@ class NodeOperatorController:
         url: str = "",
         message: str = "",
         target_client_id: str = "",
+        require_host_helsinki_match: bool = True,
+        helsinki: Mapping[str, Any] | None = None,
+        host: Mapping[str, Any] | None = None,
     ) -> dict[str, Any]:
         """UPLOADS path: push Suite monopin update directive to residual clients.
 
@@ -385,8 +479,12 @@ class NodeOperatorController:
         when Settings **CHECK BREADCRUMBS** (push-update) is enabled — this never
         claims force-install for opt-out clients.
 
-        *only_filenames*: selected Suite catalog basenames (informational platforms
-        in the message). Empty selection still pushes the monopin version directive.
+        When *require_host_helsinki_match* is True (default), build-host and
+        Helsinki Suite package sizes for the selected basenames must match or
+        the push is rejected with a clear cannot-complete reason.
+
+        *only_filenames*: selected Suite catalog basenames (required when gate
+        is on — empty selection blocks push).
         """
         ver = (version or "").strip() or self.catalog_version_default()
         inv = self.list_local_packages(version=ver, brand_wide=False)
@@ -400,6 +498,35 @@ class NodeOperatorController:
             for x in (only_filenames or [])
             if str(x).strip()
         ]
+        gate: dict[str, Any] | None = None
+        if require_host_helsinki_match:
+            gate = self.suite_client_push_match_gate(
+                version=ver,
+                only_filenames=sel if sel else [],
+                helsinki=helsinki,
+                host=host,
+            )
+            if not gate.get("can_push"):
+                return {
+                    "ok": False,
+                    "error": str(
+                        gate.get("reason")
+                        or "Host and Helsinki Suite packages do not match — "
+                        "push cannot be completed."
+                    ),
+                    "delivered_to": [],
+                    "suite": self.suite_product_label(ver),
+                    "version": ver,
+                    "only_filenames": list(sel),
+                    "platforms": [],
+                    "unknown_filenames": [f for f in sel if f not in known],
+                    "opt_in_only": True,
+                    "client_gate": "CHECK BREADCRUMBS",
+                    "force_install": False,
+                    "can_push": False,
+                    "match": False,
+                    "match_gate": gate,
+                }
         unknown = [f for f in sel if f not in known]
         platforms = [
             str(known[f].get("platform") or "")
@@ -407,9 +534,27 @@ class NodeOperatorController:
             if f in known
         ]
         platforms = [p for p in platforms if p]
-        u = (url or "").strip() or "https://restoreprivacy.online/#downloads"
+        # Expand linux → Linux / Arch Linux in message
+        plat_labels: list[str] = []
+        try:
+            from suite_client_push import suite_platform_display_label
+        except ImportError:  # pragma: no cover
+            from status_page.suite_client_push import (  # type: ignore
+                suite_platform_display_label,
+            )
+        for p in platforms:
+            lab = suite_platform_display_label(p)
+            if lab not in plat_labels:
+                plat_labels.append(lab)
+        try:
+            from suite_client_push import default_client_update_url
+        except ImportError:  # pragma: no cover
+            from status_page.suite_client_push import (  # type: ignore
+                default_client_update_url,
+            )
+        u = (url or "").strip() or default_client_update_url(ver)
         if not message.strip():
-            plat_s = ", ".join(platforms) if platforms else "all Suite platforms"
+            plat_s = ", ".join(plat_labels) if plat_labels else "all Suite platforms"
             msg = (
                 f"Restore Privacy Suite v{ver} update available ({plat_s}). "
                 "Clients apply only when CHECK BREADCRUMBS is enabled."
@@ -428,12 +573,16 @@ class NodeOperatorController:
             "version": ver,
             "only_filenames": list(sel),
             "platforms": platforms,
+            "platform_labels": plat_labels,
             "unknown_filenames": unknown,
             "opt_in_only": True,
             "client_gate": "CHECK BREADCRUMBS",
             "force_install": False,
             "url": u,
             "message": msg,
+            "can_push": True,
+            "match": True if gate is None else bool(gate.get("match")),
+            "match_gate": gate,
         }
 
     # --- residual HELLO to catalog peers (test path) ---------------------
@@ -751,11 +900,19 @@ class NodeOperatorController:
                     size = int(cand.stat().st_size)
                     break
             staged = self.repo_root / "status_page" / "assets" / ver / fname
+            plat = str(p.get("platform") or "")
+            plat_label = plat
+            covers_arch = False
+            if plat.lower() == "linux":
+                plat_label = "Linux / Arch Linux (x86_64)"
+                covers_arch = True
             rows.append(
                 {
                     "kind": "suite_client",
                     "product": "Restore Privacy Suite",
-                    "platform": p["platform"],
+                    "platform": plat,
+                    "platform_label": plat_label,
+                    "covers_archlinux": covers_arch,
                     "filename": fname,
                     "present": found is not None,
                     "path": str(found) if found else "",

@@ -3644,12 +3644,25 @@ class Handler(BaseHTTPRequestHandler):
                 for x in (multi.get("package") or multi.get("package[]") or [])
                 if str(x).strip()
             ]
+            if not only:
+                self._send(
+                    400,
+                    "text/html; charset=utf-8",
+                    render_admin_uploads_page_html(
+                        error=(
+                            "Select at least one Suite package checkbox for "
+                            "client push."
+                        )
+                    ),
+                )
+                return
             r = ctrl.push_selected_suite_updates_to_clients(
                 version=ver,
-                only_filenames=only if only else None,
+                only_filenames=only,
                 url=(form.get("url") or "").strip(),
                 message=(form.get("message") or "").strip(),
                 target_client_id=(form.get("target_client_id") or "").strip(),
+                require_host_helsinki_match=True,
             )
             if r.get("ok"):
                 self._admin_chronoflux_ok(
@@ -3663,9 +3676,11 @@ class Handler(BaseHTTPRequestHandler):
                 )
                 msg = (
                     f"Client update directive enqueued for {r.get('suite')} "
-                    f"v{r.get('version')} platforms={r.get('platforms') or 'all'} "
+                    f"v{r.get('version')} platforms="
+                    f"{r.get('platform_labels') or r.get('platforms') or 'all'} "
                     f"delivered_to={r.get('delivered_to')} "
-                    f"(opt-in only: {r.get('client_gate')}; force_install=False)"
+                    f"(opt-in only: {r.get('client_gate')}; force_install=False; "
+                    f"host/Helsinki match=True)"
                 )
                 self._send(
                     200,
@@ -3673,7 +3688,11 @@ class Handler(BaseHTTPRequestHandler):
                     render_admin_uploads_page_html(message=msg),
                 )
             else:
-                err = str(r.get("error") or "client push failed")
+                err = str(
+                    r.get("error")
+                    or "Client push cannot be completed (host/Helsinki mismatch "
+                    "or invalid selection)."
+                )
                 self._send(
                     400,
                     "text/html; charset=utf-8",
