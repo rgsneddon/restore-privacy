@@ -1257,44 +1257,118 @@ def freebie_img_src() -> str:
     return f"{FREEBIE_IMG_PATH}?v={public_brand_asset_version()}"
 
 
+# Visible FREE DOWNLOAD label (typewriter face — matches Suite intro neon mono)
+FREE_DOWNLOAD_CTA_LABEL = "FREE DOWNLOAD"
+
+
 def free_download_cta_css() -> str:
-    """Full-width free-download image button — face art already has FREE DOWNLOAD."""
+    """Full-width rectangular free-download button — data-path chrome + typewriter label."""
     return f"""
     .free-download-cta-wrap {{
       width: 100%; max-width: 100%; box-sizing: border-box;
       margin: 0 0 clamp(0.85rem, 2vw, 1.2rem);
     }}
     a.free-download-cta, a#{FREE_DOWNLOAD_CTA_ID} {{
-      display: block; width: 100%; max-width: 100%; box-sizing: border-box;
-      margin: 0; padding: 0; border: 0; border-radius: 14px;
-      overflow: hidden; cursor: pointer; text-decoration: none;
-      line-height: 0; position: relative;
-      box-shadow: 0 10px 28px rgba(4, 12, 28, 0.45),
-                  0 2px 0 rgba(255,255,255,0.08) inset;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 100%;
+      max-width: 100%;
+      min-height: clamp(3.4rem, 9vw, 4.6rem);
+      box-sizing: border-box;
+      margin: 0;
+      padding: clamp(0.95rem, 2.8vw, 1.35rem) clamp(1rem, 3vw, 1.5rem);
+      border: 1px solid transparent;
+      border-radius: 12px;
+      overflow: hidden;
+      cursor: pointer;
+      text-decoration: none;
+      line-height: 1.2;
+      position: relative;
+      text-align: center;
+      /* Data-path panel language: neon dual-tone border + navy fill */
+      background:
+        linear-gradient(
+          165deg,
+          color-mix(in srgb, var(--rb-card, #132a4a) 88%, #0a1628) 0%,
+          #0a1628 55%,
+          color-mix(in srgb, #0f2340 80%, #0a1628) 100%
+        ) padding-box,
+        linear-gradient(
+          135deg,
+          var(--rb-neon-cyan, #00e5ff) 0%,
+          var(--rb-neon-blue, #2694e8) 42%,
+          var(--rb-neon-green, #39ff6a) 100%
+        ) border-box;
+      background-origin: border-box;
+      background-clip: padding-box, border-box;
+      box-shadow:
+        0 0 0 1px color-mix(in srgb, var(--rb-neon-cyan, #00e5ff) 12%, transparent),
+        0 0 18px var(--rb-neon-glow-cyan, rgba(0, 229, 255, 0.22)),
+        0 0 28px var(--rb-neon-glow-green, rgba(57, 255, 106, 0.14)),
+        0 10px 28px rgba(4, 12, 28, 0.45),
+        inset 0 1px 0 rgba(255, 255, 255, 0.06);
       transition: transform 0.08s ease, box-shadow 0.08s ease, filter 0.12s ease;
-      background: #0a1628;
     }}
+    /* Circuit motif wash (same public data-path graphic language) */
+    a.free-download-cta::before {{
+      content: "";
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+      opacity: 0.22;
+      background-image: url("/static/data_path_motif.svg");
+      background-repeat: no-repeat;
+      background-position: center right;
+      background-size: min(52%, 18rem) auto;
+      z-index: 0;
+    }}
+    a.free-download-cta::after {{
+      content: none !important;
+      display: none !important;
+    }}
+    /* No logo / freebie image face */
     a.free-download-cta img {{
-      /* Full square freebie art: width 100%, natural height, no cover crop */
-      display: block; width: 100%; height: auto; max-height: none;
-      object-fit: contain; object-position: center;
-      pointer-events: none; user-select: none;
-      aspect-ratio: 1 / 1;
+      display: none !important;
     }}
-    /* Screen-reader / a11y only — face text lives in freebie.jpg (FREE DOWNLOAD) */
     a.free-download-cta .free-download-cta-label {{
-      position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
-      overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0;
+      position: relative;
+      z-index: 1;
+      display: block;
+      width: 100%;
+      margin: 0;
+      padding: 0;
+      /* Same typewriter family as Suite intro neon lines */
+      font-family: "Courier New", Courier, ui-monospace, monospace;
+      font-size: clamp(1.25rem, 3.8vw, 1.85rem);
+      font-weight: 700;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+      color: #7dffe8;
+      text-shadow:
+        0 0 6px rgba(0, 229, 255, 0.85),
+        0 0 14px rgba(57, 255, 136, 0.55),
+        0 0 28px rgba(0, 229, 255, 0.35);
+      white-space: normal;
+      word-break: break-word;
     }}
     a.free-download-cta:active,
     a.free-download-cta.is-pressed,
     a.free-download-cta:focus-visible {{
       transform: scale(0.985) translateY(2px);
-      box-shadow: 0 2px 8px rgba(0,0,0,0.45) inset, 0 1px 4px rgba(0,0,0,0.35);
-      filter: brightness(0.94);
+      box-shadow:
+        0 2px 8px rgba(0,0,0,0.45) inset,
+        0 0 16px var(--rb-neon-glow-cyan, rgba(0, 229, 255, 0.28));
+      filter: brightness(0.96);
+      outline: none;
     }}
     a.free-download-cta:hover {{
-      filter: brightness(1.05);
+      filter: brightness(1.06);
+      box-shadow:
+        0 0 0 1px color-mix(in srgb, var(--rb-neon-green, #39ff6a) 22%, transparent),
+        0 0 22px var(--rb-neon-glow-cyan, rgba(0, 229, 255, 0.28)),
+        0 0 32px var(--rb-neon-glow-green, rgba(57, 255, 106, 0.18)),
+        0 12px 30px rgba(4, 12, 28, 0.5);
     }}
 """
 
@@ -1313,13 +1387,12 @@ def render_free_download_cta_html(
     version: str = "",
     default_platform: str = "",
 ) -> str:
-    """Full-width free download image button (FREE DOWNLOAD face, no version text).
+    """Full-width rectangular FREE DOWNLOAD button (text + data-path chrome, no logo face).
 
     When *default_platform* is a known catalog OS (from User-Agent), the button
     links to that Suite monopin free installer. Unknown/empty → Downloads Map.
     """
     ver = (version or FREE_DOWNLOAD_FACE_VERSION).strip() or FREE_DOWNLOAD_FACE_VERSION
-    src = freebie_img_src()
     def_plat = (default_platform or "").strip().lower()
     known = {a.platform for a in available_downloads()}
     if def_plat and def_plat not in known:
@@ -1328,29 +1401,28 @@ def render_free_download_cta_html(
     if def_plat:
         title = platform_face_title(def_plat)
         aria = (
-            f"Download for {title} — KEYGEN free trial required before installer"
+            f"FREE DOWNLOAD for {title} — KEYGEN free trial required before installer"
         )
         detect_attrs = (
             f' data-platform="{_esc_html(def_plat)}"'
             f' data-detected-platform="{_esc_html(def_plat)}"'
         )
     else:
-        aria = "Downloads Map — KEYGEN free trial required before installers"
+        aria = "FREE DOWNLOAD — Downloads Map; KEYGEN free trial required before installers"
         detect_attrs = ' data-fallback-map="1"'
-    # Visible face copy is the bitmap only; label is for a11y / tests.
-    label = "DOWNLOAD (KEYGEN TRIAL)"
+    label = FREE_DOWNLOAD_CTA_LABEL
     href_kind = "platform" if def_plat else "map"
     return f"""
     <div class="free-download-cta-wrap" id="free-download-cta-wrap"
          data-free-download-cta="1" data-face-version="{_esc_html(ver)}"
-         data-catalog-version="{_esc_html(RELEASE_VERSION)}"{detect_attrs}>
-      <a class="free-download-cta" id="{FREE_DOWNLOAD_CTA_ID}"
+         data-catalog-version="{_esc_html(RELEASE_VERSION)}"
+         data-cta-shape="rectangle" data-cta-face="typewriter"{detect_attrs}>
+      <a class="free-download-cta free-download-cta-rect neon-type" id="{FREE_DOWNLOAD_CTA_ID}"
          href="{_esc_html(href)}" data-free-download-v1="1"
          data-version="{_esc_html(ver)}" data-href-kind="{href_kind}"
+         data-cta-shape="rectangle" data-cta-face="typewriter"
          {detect_attrs}
          aria-label="{_esc_html(aria)}">
-        <img src="{_esc_html(src)}" alt="{_esc_html(FREEBIE_IMG_ALT)}"
-             width="1024" height="1024" decoding="async"/>
         <span class="free-download-cta-label">{_esc_html(label)}</span>
       </a>
     </div>

@@ -142,24 +142,25 @@ class TestFreeDownloadFace101Platform(unittest.TestCase):
             render_free_download_cta_html,
         )
 
-        # Face art no longer bakes a version; monopin tracks RELEASE_VERSION.
+        # Catalog version tracks RELEASE_VERSION; CTA is rectangular typewriter text.
         self.assertEqual(FREE_DOWNLOAD_FACE_VERSION, RELEASE_VERSION)
         css = free_download_cta_css()
-        self.assertIn("object-fit: contain", css)
-        self.assertNotIn("object-fit: cover", css)
-        self.assertIn("max-height: none", css)
-        self.assertIn("aspect-ratio: 1 / 1", css)
-        self.assertIn("height: auto", css)
+        self.assertIn("width: 100%", css)
+        self.assertIn("Courier New", css)
+        self.assertIn("data_path_motif", css)
+        self.assertIn("display: none", css)
+        self.assertNotIn("aspect-ratio: 1 / 1", css)
 
         cta = render_free_download_cta_html()
         self.assertIn(RELEASE_VERSION, cta)
         self.assertIn(f'data-face-version="{RELEASE_VERSION}"', cta)
         self.assertIn("KEYGEN", cta)
-        self.assertIn("DOWNLOAD", cta)
+        self.assertIn("FREE DOWNLOAD", cta)
         self.assertIn(DOWNLOADS_MAP_PATH, cta)
         self.assertNotIn("v1.0.0", cta)
-        self.assertIn('width="1024"', cta)
-        self.assertIn('height="1024"', cta)
+        self.assertNotIn("<img", cta)
+        self.assertIn('data-cta-shape="rectangle"', cta)
+        self.assertIn("free-download-cta-label", cta)
 
     def test_cta_platform_detect_names_brand_and_href(self) -> None:
         from downloads import (

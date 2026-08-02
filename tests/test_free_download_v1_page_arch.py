@@ -33,20 +33,23 @@ class TestFreeDownloadV1CtaAndPage(unittest.TestCase):
         page = render_html({"title": "RESTORE PRIVACY"}).decode("utf-8")
         main = page[page.index('id="page-shell"') :]
         self.assertIn(f'id="{FREE_DOWNLOAD_CTA_ID}"', main)
-        self.assertIn("freebie", main.lower())
-        self.assertIn(FREEBIE_IMG_PATH, main)
+        # Rectangular text CTA — no freebie/logo image face
+        self.assertNotIn(FREEBIE_IMG_PATH, main)
+        self.assertNotIn("<img", main[main.index(f'id="{FREE_DOWNLOAD_CTA_ID}"') : main.index(f'id="{FREE_DOWNLOAD_CTA_ID}"') + 600])
         self.assertIn("KEYGEN", main)
-        self.assertIn("DOWNLOAD", main)
+        self.assertIn("FREE DOWNLOAD", main)
         self.assertIn(f'data-face-version="{FREE_DOWNLOAD_FACE_VERSION}"', main)
         self.assertIn(f'href="{DOWNLOADS_MAP_PATH}"', main)
-        # Full-width CTA styles — full freebie art (contain, not cover crop)
+        self.assertIn('data-cta-shape="rectangle"', main)
         from downloads import free_download_cta_css
 
         self.assertIn(".free-download-cta-wrap", page)
         self.assertIn("width: 100%", page)
         cta_css = free_download_cta_css()
-        self.assertIn("object-fit: contain", cta_css)
-        self.assertNotIn("object-fit: cover", cta_css)
+        self.assertIn("width: 100%", cta_css)
+        self.assertIn("Courier New", cta_css)
+        self.assertIn("data_path_motif", cta_css)
+        self.assertIn("display: none", cta_css)  # hide any img face
         self.assertIn("a.free-download-cta:active", page)
         self.assertIn("scale(0.985)", page)
         # Order: intro → free CTA → shop (stripe selector in downloads)
