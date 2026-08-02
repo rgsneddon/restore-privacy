@@ -1603,67 +1603,52 @@ class Handler(BaseHTTPRequestHandler):
             self._send(code, "application/json", json.dumps(payload).encode("utf-8"))
             return
 
-        if path in (
-            "/api/device-trial/claim",
-            "/device-trial/claim",
-            "/api/device-trial/status",
-            "/device-trial/status",
-        ):
-            # KEYGEN-free 72h residual trial bound to device Ed25519 pub (no email/card).
-            from device_trial import claim_device_trial, get_device_trial_row
+        if path in ("/api/device-trial/status", "/device-trial/status"):
+            # KEYGEN-free trial status (GET only — claim is POST).
+            from device_trial import get_device_trial_row
 
-            is_claim = path.rstrip("/").endswith("claim")
             device_pub = (
                 query.get("device_pub") or query.get("device_pub_hex") or ""
             ).strip()
-            if self.command == "POST" and is_claim:
-                try:
-                    length = int(self.headers.get("Content-Length") or "0")
-                except ValueError:
-                    length = 0
-                raw = self.rfile.read(length) if length > 0 else b"{}"
-                try:
-                    body = json.loads(raw.decode("utf-8") or "{}")
-                except (UnicodeDecodeError, json.JSONDecodeError):
-                    body = {}
-                if isinstance(body, dict):
-                    device_pub = str(
-                        body.get("device_pub")
-                        or body.get("device_pub_hex")
-                        or device_pub
-                        or ""
-                    ).strip()
-                payload = claim_device_trial(device_pub)
+            row = get_device_trial_row(device_pub)
+            if not row:
+                payload = {
+                    "ok": False,
+                    "device_pub_hex": device_pub,
+                    "connect_allowed": False,
+                    "status": "unknown",
+                    "error": "no_trial",
+                    "kind": "device_trial",
+                    "requires_keygen": True,
+                    "shop_pay_path": "/pay",
+                }
             else:
-                row = get_device_trial_row(device_pub)
-                if not row:
-                    payload = {
-                        "ok": False,
-                        "device_pub_hex": device_pub,
-                        "connect_allowed": False,
-                        "status": "unknown",
-                        "error": "no_trial",
-                        "kind": "device_trial",
-                        "requires_keygen": True,
-                        "shop_pay_path": "/pay",
-                    }
-                else:
-                    payload = {
-                        "ok": bool(row.get("connect_allowed")),
-                        **row,
-                        "requires_keygen": not bool(row.get("connect_allowed")),
-                        "shop_pay_path": "/pay",
-                        "licence_status": (
-                            "TRIAL" if row.get("connect_allowed") else "EXPIRED"
-                        ),
-                    }
-            code = 200 if not payload.get("error") or payload.get("error") in (
-                "trial_exhausted",
-                "no_trial",
-            ) else 400
-            if payload.get("error") == "bad_device_pub":
-                code = 400
+                payload = {
+                    "ok": bool(row.get("connect_allowed")),
+                    **row,
+                    "requires_keygen": not bool(row.get("connect_allowed")),
+                    "shop_pay_path": "/pay",
+                    "licence_status": (
+                        "TRIAL" if row.get("connect_allowed") else "EXPIRED"
+                    ),
+                }
+            code = 400 if payload.get("error") == "bad_device_pub" else 200
             self._send(code, "application/json", json.dumps(payload).encode("utf-8"))
+            return
+
+        if path in ("/api/device-trial/claim", "/device-trial/claim"):
+            # Claim is POST only (Flutter claimDeviceTrial). Guide clients.
+            self._send(
+                405,
+                "application/json",
+                json.dumps(
+                    {
+                        "ok": False,
+                        "error": "method_not_allowed",
+                        "hint": "POST JSON {device_pub} to /api/device-trial/claim",
+                    }
+                ).encode("utf-8"),
+            )
             return
 
         if path in (
@@ -3036,6 +3021,35 @@ class Handler(BaseHTTPRequestHandler):
                 str(data.get("device_pub") or data.get("device_pub_hex") or ""),
             )
             code = 200 if result.get("ok") else 403
+            self._send(code, "application/json", json.dumps(result).encode("utf-8"))
+            return
+
+        if path in ("/api/device-trial/claim", "/device-trial/claim"):
+            # Flutter claimDeviceTrial POSTs JSON {device_pub} — KEYGEN-free 72h trial.
+            from device_trial import claim_device_trial
+
+            try:
+                data = json.loads(body.decode("utf-8") or "{}")
+            except json.JSONDecodeError:
+                self._send(
+                    400,
+                    "application/json",
+                    json.dumps({"ok": False, "error": "bad_json"}).encode("utf-8"),
+                )
+                return
+            if not isinstance(data, dict):
+                data = {}
+            device_pub = str(
+                data.get("device_pub") or data.get("device_pub_hex") or ""
+            ).strip()
+            result = claim_device_trial(device_pub)
+            # 200 for ok claim, exhausted trial, and structured denials (client UX);
+            # 400 only for malformed device_pub / bad request shape.
+            err = result.get("error")
+            if err == "bad_device_pub":
+                code = 400
+            else:
+                code = 200
             self._send(code, "application/json", json.dumps(result).encode("utf-8"))
             return
 

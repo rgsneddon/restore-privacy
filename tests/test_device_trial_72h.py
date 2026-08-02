@@ -174,6 +174,153 @@ class TestTrialPrivacySurface(unittest.TestCase):
         app = (ROOT / "status_page" / "app.py").read_text(encoding="utf-8")
         self.assertIn("/api/device-trial/claim", app)
         self.assertIn("device-trial", app)
+        # Claim must live on do_POST (Flutter POSTs); status on do_GET.
+        post_idx = app.find("def do_POST")
+        get_idx = app.find("def do_GET")
+        claim_in_post = app.find("/api/device-trial/claim", post_idx)
+        self.assertGreater(post_idx, 0)
+        self.assertGreater(claim_in_post, post_idx)
+        # Status path remains on GET before do_POST
+        status_in_get = app.find("/api/device-trial/status", get_idx)
+        self.assertGreater(status_in_get, get_idx)
+        self.assertLess(status_in_get, post_idx)
+
+
+class TestTrialHttpHandler(unittest.TestCase):
+    """Drive real status_page.Handler POST claim + GET status (Flutter path)."""
+
+    def setUp(self) -> None:
+        import json
+        import threading
+        import urllib.error
+        import urllib.request
+        from http.server import ThreadingHTTPServer
+
+        self.json = json
+        self.urllib_request = urllib.request
+        self.urllib_error = urllib.error
+        self._td = tempfile.TemporaryDirectory()
+        self._prev = os.environ.get("RPT_PAYMENT_DATA_DIR")
+        os.environ["RPT_PAYMENT_DATA_DIR"] = self._td.name
+        import payments
+
+        payments.init_db()
+        import app as status_app
+
+        self._httpd = ThreadingHTTPServer(("127.0.0.1", 0), status_app.Handler)
+        self._port = self._httpd.server_address[1]
+        self._thread = threading.Thread(target=self._httpd.serve_forever, daemon=True)
+        self._thread.start()
+        self._base = f"http://127.0.0.1:{self._port}"
+
+    def tearDown(self) -> None:
+        try:
+            self._httpd.shutdown()
+            self._httpd.server_close()
+        except Exception:
+            pass
+        if self._prev is None:
+            os.environ.pop("RPT_PAYMENT_DATA_DIR", None)
+        else:
+            os.environ["RPT_PAYMENT_DATA_DIR"] = self._prev
+        self._td.cleanup()
+
+    def _post_json(self, path: str, payload: dict) -> tuple[int, dict]:
+        data = self.json.dumps(payload).encode("utf-8")
+        req = self.urllib_request.Request(
+            f"{self._base}{path}",
+            data=data,
+            method="POST",
+            headers={
+                "Content-Type": "application/json",
+                "Accept": "application/json",
+            },
+        )
+        try:
+            with self.urllib_request.urlopen(req, timeout=5) as resp:
+                body = resp.read().decode("utf-8")
+                return resp.status, self.json.loads(body)
+        except self.urllib_error.HTTPError as exc:
+            body = exc.read().decode("utf-8", errors="replace")
+            try:
+                parsed = self.json.loads(body) if body else {}
+            except self.json.JSONDecodeError:
+                parsed = {"raw": body}
+            return int(exc.code), parsed
+
+    def _get_json(self, path: str) -> tuple[int, dict]:
+        req = self.urllib_request.Request(
+            f"{self._base}{path}",
+            method="GET",
+            headers={"Accept": "application/json"},
+        )
+        try:
+            with self.urllib_request.urlopen(req, timeout=5) as resp:
+                body = resp.read().decode("utf-8")
+                return resp.status, self.json.loads(body)
+        except self.urllib_error.HTTPError as exc:
+            body = exc.read().decode("utf-8", errors="replace")
+            try:
+                parsed = self.json.loads(body) if body else {}
+            except self.json.JSONDecodeError:
+                parsed = {"raw": body}
+            return int(exc.code), parsed
+
+    def test_post_claim_then_get_status_and_device_entitlement(self) -> None:
+        pub = _fake_pub(11)
+        code, claim = self._post_json(
+            "/api/device-trial/claim", {"device_pub": pub}
+        )
+        self.assertEqual(code, 200, claim)
+        self.assertTrue(claim.get("connect_allowed"), claim)
+        self.assertTrue(claim.get("ok"), claim)
+        self.assertEqual(claim.get("kind"), "device_trial")
+        self.assertEqual(claim.get("keygen") or "", "")
+        self.assertNotIn("customer_email", claim)
+
+        # Same pub GET status
+        code2, st = self._get_json(f"/api/device-trial/status?device_pub={pub}")
+        self.assertEqual(code2, 200, st)
+        self.assertTrue(st.get("connect_allowed"), st)
+
+        # Node residual path uses device-entitlement
+        code3, ent = self._get_json(f"/api/device-entitlement?device_pub={pub}")
+        self.assertEqual(code3, 200, ent)
+        self.assertTrue(ent.get("connect_allowed"), ent)
+        self.assertEqual(ent.get("kind"), "device_trial")
+
+        # Anti-reinstall after forced expiry: reuse host clock via claim with now
+        from device_trial import claim_device_trial
+
+        ends = float(claim["ends_at"])
+        denied = claim_device_trial(pub, now=ends + 10)
+        self.assertFalse(denied.get("connect_allowed"), denied)
+        self.assertEqual(denied.get("error"), "trial_exhausted")
+
+        # POST claim again after expiry still exhausted (HTTP path)
+        code4, claim2 = self._post_json(
+            "/api/device-trial/claim", {"device_pub": pub}
+        )
+        self.assertEqual(code4, 200, claim2)
+        self.assertFalse(claim2.get("connect_allowed"), claim2)
+        self.assertEqual(claim2.get("error"), "trial_exhausted")
+
+        # After expiry, residual HELLO must deny without KEYGEN
+        code5, ent2 = self._get_json(f"/api/device-entitlement?device_pub={pub}")
+        self.assertEqual(code5, 200, ent2)
+        self.assertFalse(ent2.get("connect_allowed"), ent2)
+
+    def test_get_claim_returns_405(self) -> None:
+        code, body = self._get_json("/api/device-trial/claim")
+        self.assertEqual(code, 405, body)
+        self.assertEqual(body.get("error"), "method_not_allowed")
+
+    def test_post_claim_bad_pub_400(self) -> None:
+        code, body = self._post_json(
+            "/api/device-trial/claim", {"device_pub": "not-a-key"}
+        )
+        self.assertEqual(code, 400, body)
+        self.assertEqual(body.get("error"), "bad_device_pub")
 
 
 if __name__ == "__main__":
