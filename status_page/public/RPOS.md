@@ -6,7 +6,7 @@
 
 Commercial privacy-focused OS product (**£3000** deposit path via Restore Privacy Service).
 
-**Monopin 0.2.0** ships **RxShell** — the PowerShell-type multi-language CLI of rpOS.
+**Monopin 0.2.1** ships **RxShell** — the PowerShell-type multi-language CLI of rpOS.
 
 ## Positioning
 
@@ -41,10 +41,10 @@ Missing interpreters fail closed (clear error, no fake success).
 
 | OS | Arch | How to get |
 |----|------|------------|
-| **Windows** | x86_64 | `releases/rpos/0.2.0/rpos-0.2.0-windows-x64.zip` |
-| **macOS** | universal | `releases/rpos/0.2.0/rpos-0.2.0-macos.zip` |
-| **Linux** | x86_64 | `releases/rpos/0.2.0/rpos-0.2.0-linux-x86_64.tar.gz` |
-| **Linux** | aarch64 | `releases/rpos/0.2.0/rpos-0.2.0-linux-aarch64.tar.gz` |
+| **Windows** | x86_64 | `releases/rpos/0.2.1/rpos-0.2.1-windows-x64.zip` |
+| **macOS** | universal | `releases/rpos/0.2.1/rpos-0.2.1-macos.zip` |
+| **Linux** | x86_64 | `releases/rpos/0.2.1/rpos-0.2.1-linux-x86_64.tar.gz` |
+| **Linux** | aarch64 | `releases/rpos/0.2.1/rpos-0.2.1-linux-aarch64.tar.gz` |
 
 ```bash
 # From restore-privacy monorepo

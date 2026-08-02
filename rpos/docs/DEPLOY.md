@@ -4,12 +4,12 @@ See also admin-only page on the status host: `/admin/rpos` (requires admin login
 
 ## Installable platforms (desktop only)
 
-| OS | Arch | Package (monopin 0.2.0 + RxShell) |
+| OS | Arch | Package (monopin 0.2.1 + RxShell) |
 |----|------|-----------------------------------|
-| Windows | x86_64 | `releases/rpos/0.2.0/rpos-0.2.0-windows-x64.zip` |
-| macOS | universal | `releases/rpos/0.2.0/rpos-0.2.0-macos.zip` |
-| Linux | x86_64 | `releases/rpos/0.2.0/rpos-0.2.0-linux-x86_64.tar.gz` |
-| Linux | aarch64 | `releases/rpos/0.2.0/rpos-0.2.0-linux-aarch64.tar.gz` |
+| Windows | x86_64 | `releases/rpos/0.2.1/rpos-0.2.1-windows-x64.zip` |
+| macOS | universal | `releases/rpos/0.2.1/rpos-0.2.1-macos.zip` |
+| Linux | x86_64 | `releases/rpos/0.2.1/rpos-0.2.1-linux-x86_64.tar.gz` |
+| Linux | aarch64 | `releases/rpos/0.2.1/rpos-0.2.1-linux-aarch64.tar.gz` |
 
 **Not installable:** iOS, Android.
 
@@ -42,7 +42,7 @@ python3 -m rpos.installer smoke
 
 1. Commercial deposit / Service path (£3000 deposit framing).
 2. Stage Suite + Rx packages on paid host.
-3. Build/ship rpOS desktop packages (`package_rpos.py` → `releases/rpos/0.2.0/`, includes RxShell).
+3. Build/ship rpOS desktop packages (`package_rpos.py` → `releases/rpos/0.2.1/`, includes RxShell).
 4. Customer install via platform entry; RESTORE path only after wipe warning.
 5. Configure custom network via separate company SDK admin installer.
 6. Enable Ned (rpAI) narrative helper for install storytelling.

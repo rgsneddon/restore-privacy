@@ -51,6 +51,35 @@ class TestRposDocsOnSite(unittest.TestCase):
         self.assertIn("RxShell", pack_text)
         self.assertIn(monorepo.strip().splitlines()[0], pack_text)
 
+        # Current monopin from shipped package script — docs must not lag.
+        import importlib.util
+
+        spec = importlib.util.spec_from_file_location(
+            "package_rpos", ROOT / "scripts" / "package_rpos.py"
+        )
+        assert spec and spec.loader
+        mod = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(mod)
+        pin = str(mod.RPOS_VERSION).strip()
+        self.assertTrue(pin)
+        self.assertIn(f"Monopin {pin}", pack_text)
+        self.assertIn(f"Monopin {pin}", monorepo)
+        self.assertIn(f"releases/rpos/{pin}/", pack_text)
+        self.assertIn(f"rpos-{pin}-windows-x64.zip", pack_text)
+        self.assertNotIn("Monopin 0.2.0", pack_text)
+        self.assertNotIn("rpos-0.2.0-", pack_text)
+        self.assertNotIn("Monopin 0.2.0", monorepo)
+        self.assertNotIn("rpos-0.2.0-", monorepo)
+
+        # Admin how-to install story follows the same pin.
+        import admin_rpos
+
+        howto = admin_rpos.render_admin_rpos_deploy_howto_html()
+        self.assertEqual(admin_rpos.current_rpos_monopin(), pin)
+        self.assertIn(f"releases/rpos/{pin}/", howto)
+        self.assertIn(f"rpos-{pin}-windows-x64.zip", howto)
+        self.assertNotIn("rpos-0.2.0-", howto)
+
     def test_suite_rpos_homepage_href_is_same_origin(self) -> None:
         from downloads import (
             SUITE_RPOS_HREF,

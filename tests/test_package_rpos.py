@@ -25,7 +25,9 @@ class TestRposMatrix(unittest.TestCase):
             platform_package_matrix,
         )
 
-        self.assertEqual(RPOS_VERSION, "0.2.0")
+        # Product pin is owned by package_rpos.RPOS_VERSION (currently 0.2.1+).
+        self.assertRegex(RPOS_VERSION, r"^\d+\.\d+\.\d+$")
+        self.assertNotEqual(RPOS_VERSION, "0.2.0")
         plats = catalog_platforms()
         self.assertEqual(
             plats, ["windows", "macos", "linux-x86_64", "linux-aarch64"]

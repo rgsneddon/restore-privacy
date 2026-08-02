@@ -28,9 +28,30 @@ RPOS_SDK_APPS: tuple[str, ...] = (
 RPOS_MODERATOR_SURFACE = "MISHI"
 
 
+def current_rpos_monopin() -> str:
+    """Shipped rpOS product pin from ``scripts/package_rpos.RPOS_VERSION``."""
+    try:
+        import importlib.util
+        from pathlib import Path
+
+        path = Path(__file__).resolve().parents[1] / "scripts" / "package_rpos.py"
+        spec = importlib.util.spec_from_file_location("package_rpos_pin", path)
+        if spec is None or spec.loader is None:
+            raise ImportError("package_rpos")
+        mod = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(mod)
+        ver = str(getattr(mod, "RPOS_VERSION", "") or "").strip()
+        if ver:
+            return ver
+    except Exception:  # noqa: BLE001
+        pass
+    return "0.2.1"
+
+
 def render_admin_rpos_deploy_howto_html() -> str:
     """Inner deploy how-to body (admin-gated page only)."""
     apps = "".join(f"<li>{a}</li>" for a in RPOS_SDK_APPS)
+    rpos_ver = current_rpos_monopin()
     return f"""
 <section class="admin-card" id="{ADMIN_RPOS_HOWTO_ID}" data-admin-rpos-howto="1">
   <h2>How to deploy {RPOS_PRODUCT_NAME}</h2>
@@ -50,12 +71,12 @@ def render_admin_rpos_deploy_howto_html() -> str:
   <p>rpOS is <strong>installable only on Windows, macOS, and Linux</strong>
   (x86_64 + aarch64). Build with
   <code>python3 scripts/package_rpos.py</code> →
-  <code>releases/rpos/0.2.0/</code> (includes <strong>RxShell</strong>):</p>
+  <code>releases/rpos/{rpos_ver}/</code> (includes <strong>RxShell</strong>):</p>
   <ul id="admin-rpos-packages">
-    <li><code>rpos-0.2.0-windows-x64.zip</code> — <code>install.ps1</code> / <code>RESTORE_rpos.ps1</code> / <code>RxShell.cmd</code></li>
-    <li><code>rpos-0.2.0-macos.zip</code> — <code>install.sh</code> / <code>RESTORE_rpos.sh</code> / <code>RxShell</code></li>
-    <li><code>rpos-0.2.0-linux-x86_64.tar.gz</code></li>
-    <li><code>rpos-0.2.0-linux-aarch64.tar.gz</code></li>
+    <li><code>rpos-{rpos_ver}-windows-x64.zip</code> — <code>install.ps1</code> / <code>RESTORE_rpos.ps1</code> / <code>RxShell.cmd</code></li>
+    <li><code>rpos-{rpos_ver}-macos.zip</code> — <code>install.sh</code> / <code>RESTORE_rpos.sh</code> / <code>RxShell</code></li>
+    <li><code>rpos-{rpos_ver}-linux-x86_64.tar.gz</code></li>
+    <li><code>rpos-{rpos_ver}-linux-aarch64.tar.gz</code></li>
   </ul>
   <p>RxShell: <code>python3 -m rpos.rxshell</code> or package launcher <code>./RxShell</code>
   (multi-language shell/Python/JS/PowerShell-style; not full MS PowerShell).</p>
