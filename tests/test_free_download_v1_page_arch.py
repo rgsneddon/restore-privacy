@@ -33,9 +33,25 @@ class TestFreeDownloadV1CtaAndPage(unittest.TestCase):
         page = render_html({"title": "RESTORE PRIVACY"}).decode("utf-8")
         main = page[page.index('id="page-shell"') :]
         self.assertIn(f'id="{FREE_DOWNLOAD_CTA_ID}"', main)
-        # Rectangular text CTA — no freebie/logo image face
+        # Rectangular CTA: transparent logo flanks + FREE DOWNLOAD label (not freebie face)
         self.assertNotIn(FREEBIE_IMG_PATH, main)
-        self.assertNotIn("<img", main[main.index(f'id="{FREE_DOWNLOAD_CTA_ID}"') : main.index(f'id="{FREE_DOWNLOAD_CTA_ID}"') + 600])
+        cta_snip = main[
+            main.index(f'id="{FREE_DOWNLOAD_CTA_ID}"') : main.index(
+                f'id="{FREE_DOWNLOAD_CTA_ID}"'
+            )
+            + 900
+        ]
+        self.assertEqual(cta_snip.count("logo_transparent.png"), 2)
+        self.assertEqual(cta_snip.count('data-free-download-logo="left"'), 1)
+        self.assertEqual(cta_snip.count('data-free-download-logo="right"'), 1)
+        self.assertIn("free-download-cta-logo-left", cta_snip)
+        self.assertIn("free-download-cta-logo-right", cta_snip)
+        self.assertIn("free-download-cta-label", cta_snip)
+        i_left = cta_snip.index('data-free-download-logo="left"')
+        i_label = cta_snip.index("free-download-cta-label")
+        i_right = cta_snip.index('data-free-download-logo="right"')
+        self.assertLess(i_left, i_label)
+        self.assertLess(i_label, i_right)
         self.assertIn("KEYGEN", main)
         self.assertIn("FREE DOWNLOAD", main)
         self.assertIn(f'data-face-version="{FREE_DOWNLOAD_FACE_VERSION}"', main)
@@ -50,7 +66,11 @@ class TestFreeDownloadV1CtaAndPage(unittest.TestCase):
         self.assertIn("width: 100%", cta_css)
         self.assertIn("Courier New", cta_css)
         self.assertIn("data_path_motif", cta_css)
-        self.assertIn("display: none", cta_css)  # hide any img face
+        # Hide non-logo faces; show flank logos
+        self.assertIn("img:not(.free-download-cta-logo)", cta_css)
+        self.assertIn("display: none", cta_css)
+        self.assertIn("display: block !important", cta_css)
+        self.assertIn("free-download-cta-logo", cta_css)
         self.assertIn("a.free-download-cta:active", page)
         self.assertIn("scale(0.985)", page)
         # Blink/flash on FREE DOWNLOAD label (shipped CSS injected into homepage)

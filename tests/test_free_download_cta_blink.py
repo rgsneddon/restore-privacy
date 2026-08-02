@@ -37,6 +37,18 @@ class TestFreeDownloadCtaBlink(unittest.TestCase):
         self.assertIn(f'id="{FREE_DOWNLOAD_CTA_ID}"', cta)
         self.assertIn("free-download-cta-label", cta)
         self.assertIn("FREE DOWNLOAD", cta)
+        # Transparent logo flanks left + right of the blinking label
+        self.assertEqual(cta.count("logo_transparent.png"), 2)
+        self.assertIn('data-free-download-logo="left"', cta)
+        self.assertIn('data-free-download-logo="right"', cta)
+        self.assertLess(
+            cta.index('data-free-download-logo="left"'),
+            cta.index("free-download-cta-label"),
+        )
+        self.assertLess(
+            cta.index("free-download-cta-label"),
+            cta.index('data-free-download-logo="right"'),
+        )
 
     def test_homepage_emits_blink_css_with_label(self) -> None:
         from app import render_html

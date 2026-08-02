@@ -97,8 +97,11 @@ class TestDetectPlatformFromUserAgent(unittest.TestCase):
         self.assertIn('id="free-download-v1-cta"', page)
         self.assertIn('data-cta-shape="rectangle"', page)
         cta_i = page.index('id="free-download-v1-cta"')
-        cta_snip = page[cta_i : cta_i + 900]
-        self.assertNotIn("<img", cta_snip)
+        cta_snip = page[cta_i : cta_i + 1200]
+        self.assertEqual(cta_snip.count("logo_transparent.png"), 2)
+        self.assertIn("free-download-cta-logo-left", cta_snip)
+        self.assertIn("free-download-cta-logo-right", cta_snip)
+        self.assertNotIn("freebie.jpg", cta_snip)
         self.assertIn("free_direct=1", cta_snip)
         self.assertNotIn("/pay", cta_snip)
 
@@ -142,7 +145,9 @@ class TestDetectPlatformFromUserAgent(unittest.TestCase):
         self.assertIn('data-detected-platform="android"', cta_snip)
         self.assertIn("FREE DOWNLOAD", cta_snip)
         self.assertIn('data-cta-shape="rectangle"', cta_snip)
-        self.assertNotIn("<img", cta_snip)
+        self.assertEqual(cta_snip.count("logo_transparent.png"), 2)
+        self.assertIn("free-download-cta-logo", cta_snip)
+        self.assertNotIn("freebie.jpg", cta_snip)
         self.assertNotIn('href="/pay', cta_snip)
 
     def test_free_packages_page_highlights_detected_os(self) -> None:

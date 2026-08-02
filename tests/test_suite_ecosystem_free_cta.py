@@ -152,7 +152,9 @@ class TestFreeDownloadFace101Platform(unittest.TestCase):
         self.assertIn("width: 100%", css)
         self.assertIn("Courier New", css)
         self.assertIn("data_path_motif", css)
-        self.assertIn("display: none", css)
+        self.assertIn("display: none", css)  # non-logo faces hidden
+        self.assertIn("free-download-cta-logo", css)
+        self.assertIn("display: block !important", css)  # logo flanks shown
         self.assertNotIn("aspect-ratio: 1 / 1", css)
         # FREE DOWNLOAD label continuously flashes for attention
         self.assertIn("@keyframes free-download-label-blink", css)
@@ -170,7 +172,10 @@ class TestFreeDownloadFace101Platform(unittest.TestCase):
         self.assertIn('data-pay="0"', cta)
         self.assertNotIn('href="/pay', cta)
         self.assertNotIn("v1.0.0", cta)
-        self.assertNotIn("<img", cta)
+        self.assertEqual(cta.count("logo_transparent.png"), 2)
+        self.assertIn("free-download-cta-logo-left", cta)
+        self.assertIn("free-download-cta-logo-right", cta)
+        self.assertNotIn("freebie.jpg", cta)
         self.assertIn('data-cta-shape="rectangle"', cta)
         self.assertIn("free-download-cta-label", cta)
 

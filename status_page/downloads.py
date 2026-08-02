@@ -1398,6 +1398,9 @@ def freebie_img_src() -> str:
 
 # Visible FREE DOWNLOAD label (typewriter face — matches Suite intro neon mono)
 FREE_DOWNLOAD_CTA_LABEL = "FREE DOWNLOAD"
+# Transparent brand mark (dark fill) flanking FREE DOWNLOAD left + right
+FREE_DOWNLOAD_CTA_LOGO_SRC = "/logo_transparent.png"
+FREE_DOWNLOAD_CTA_LOGO_CLASS = "free-download-cta-logo"
 
 
 def free_download_cta_css() -> str:
@@ -1409,14 +1412,16 @@ def free_download_cta_css() -> str:
     }}
     a.free-download-cta, a#{FREE_DOWNLOAD_CTA_ID} {{
       display: flex;
+      flex-direction: row;
       align-items: center;
-      justify-content: center;
+      justify-content: space-between;
+      gap: clamp(0.45rem, 2vw, 1rem);
       width: 100%;
       max-width: 100%;
       min-height: clamp(3.4rem, 9vw, 4.6rem);
       box-sizing: border-box;
       margin: 0;
-      padding: clamp(0.95rem, 2.8vw, 1.35rem) clamp(1rem, 3vw, 1.5rem);
+      padding: clamp(0.7rem, 2.2vw, 1.1rem) clamp(0.75rem, 2.5vw, 1.25rem);
       border: 1px solid transparent;
       border-radius: 12px;
       overflow: hidden;
@@ -1466,20 +1471,43 @@ def free_download_cta_css() -> str:
       content: none !important;
       display: none !important;
     }}
-    /* No logo / freebie image face */
-    a.free-download-cta img {{
+    /* Transparent logo flanks (far left + far right); hide freebie/other faces */
+    a.free-download-cta img:not(.{FREE_DOWNLOAD_CTA_LOGO_CLASS}) {{
       display: none !important;
+    }}
+    a.free-download-cta img.{FREE_DOWNLOAD_CTA_LOGO_CLASS},
+    a.free-download-cta .{FREE_DOWNLOAD_CTA_LOGO_CLASS} {{
+      display: block !important;
+      position: relative;
+      z-index: 1;
+      flex: 0 0 auto;
+      height: clamp(1.85rem, 5.5vw, 2.65rem);
+      width: auto;
+      max-width: clamp(2.2rem, 8vw, 3.2rem);
+      object-fit: contain;
+      object-position: center;
+      pointer-events: none;
+      user-select: none;
+    }}
+    a.free-download-cta .free-download-cta-logo-left {{
+      margin-right: 0;
+    }}
+    a.free-download-cta .free-download-cta-logo-right {{
+      margin-left: 0;
     }}
     a.free-download-cta .free-download-cta-label {{
       position: relative;
       z-index: 1;
       display: block;
-      width: 100%;
+      flex: 1 1 auto;
+      width: auto;
+      min-width: 0;
       margin: 0;
-      padding: 0;
+      padding: 0 0.25rem;
+      text-align: center;
       /* Same typewriter family as Suite intro neon lines */
       font-family: "Courier New", Courier, ui-monospace, monospace;
-      font-size: clamp(1.25rem, 3.8vw, 1.85rem);
+      font-size: clamp(1.15rem, 3.6vw, 1.85rem);
       font-weight: 700;
       letter-spacing: 0.14em;
       text-transform: uppercase;
@@ -1553,11 +1581,12 @@ def render_free_download_cta_html(
     version: str = "",
     default_platform: str = "",
 ) -> str:
-    """Full-width rectangular FREE DOWNLOAD button (text + data-path chrome, no logo face).
+    """Full-width rectangular FREE DOWNLOAD button with transparent logo flanks.
 
     When *default_platform* is a known catalog OS (from User-Agent), the button
     starts an **immediate** latest Suite download for that device (no /pay).
-    Unknown/empty → Downloads Map (Suite latest via /pay only).
+    Unknown/empty → Downloads Map (Suite latest free_direct rows).
+    Layout: logo left | FREE DOWNLOAD label | logo right.
     """
     ver = (version or FREE_DOWNLOAD_FACE_VERSION).strip() or FREE_DOWNLOAD_FACE_VERSION
     def_plat = (default_platform or "").strip().lower()
@@ -1586,20 +1615,28 @@ def render_free_download_cta_html(
         href_kind = "map"
         pay_attr = ' data-pay="0"'
     label = FREE_DOWNLOAD_CTA_LABEL
+    logo_src = _esc_html(FREE_DOWNLOAD_CTA_LOGO_SRC)
+    logo_cls = FREE_DOWNLOAD_CTA_LOGO_CLASS
     return f"""
     <div class="free-download-cta-wrap" id="free-download-cta-wrap"
          data-free-download-cta="1" data-face-version="{_esc_html(ver)}"
          data-catalog-version="{_esc_html(RELEASE_VERSION)}"
-         data-cta-shape="rectangle" data-cta-face="typewriter"
+         data-cta-shape="rectangle" data-cta-face="typewriter-logo-flanks"
          data-suite-latest="1"{detect_attrs}>
       <a class="free-download-cta free-download-cta-rect neon-type" id="{FREE_DOWNLOAD_CTA_ID}"
          href="{_esc_html(href)}" data-free-download-v1="1"
          data-version="{_esc_html(ver)}" data-href-kind="{href_kind}"
-         data-cta-shape="rectangle" data-cta-face="typewriter"
+         data-cta-shape="rectangle" data-cta-face="typewriter-logo-flanks"
          data-suite-latest="1"{pay_attr}
          {detect_attrs}
          aria-label="{_esc_html(aria)}">
+        <img class="{logo_cls} free-download-cta-logo-left" src="{logo_src}"
+             alt="" width="64" height="64" decoding="async"
+             data-free-download-logo="left" aria-hidden="true"/>
         <span class="free-download-cta-label">{_esc_html(label)}</span>
+        <img class="{logo_cls} free-download-cta-logo-right" src="{logo_src}"
+             alt="" width="64" height="64" decoding="async"
+             data-free-download-logo="right" aria-hidden="true"/>
       </a>
     </div>
 """
