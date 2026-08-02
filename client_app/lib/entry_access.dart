@@ -49,8 +49,8 @@ const String kEntryAccessShopHint =
     'Need a KEYGEN? Get one at restoreprivacy.online/pay (monthly licence).';
 
 const String kEntryAccessTrialHint =
-    'Or try residual Connect free for 3 days on this device (no card, no KEYGEN). '
-    'When the trial ends you will need a KEYGEN to continue.';
+    'Free residual trial: 3 days (72 hours) on this device — no card. '
+    'After it ends, a paid KEYGEN / active subscription is required to continue.';
 
 /// Finder key for the Get keygen control (opens public /pay).
 const Key kEntryAccessGetKeygenButtonKey = Key('entry_access_get_keygen_button');

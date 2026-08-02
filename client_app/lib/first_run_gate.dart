@@ -23,8 +23,9 @@ const String kFirstRunSeedBody =
 const String kFirstRunSeedConfirmLabel = 'I wrote the words down — continue';
 const String kFirstRunLicenceStepTitle = 'Accept end-user licence';
 const String kFirstRunCompleteHint =
-    'You can use the Suite. Residual Connect includes a free 3-day trial on '
-    'this device; after that a KEYGEN is required.';
+    'You can use the Suite. Residual Connect: free 3-day (72-hour) trial on '
+    'this device (no card). After the trial ends, a paid KEYGEN / active '
+    'subscription is required.';
 
 enum FirstRunStep {
   account,

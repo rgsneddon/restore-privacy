@@ -3037,7 +3037,7 @@ class Handler(BaseHTTPRequestHandler):
             return
 
         if path in ("/api/device-trial/claim", "/device-trial/claim"):
-            # Flutter claimDeviceTrial POSTs JSON {device_pub} — KEYGEN-free 72h trial.
+            # Flutter claimDeviceTrial POSTs JSON {device_pub, install_id?} — 72h trial.
             from device_trial import claim_device_trial
 
             try:
@@ -3054,7 +3054,10 @@ class Handler(BaseHTTPRequestHandler):
             device_pub = str(
                 data.get("device_pub") or data.get("device_pub_hex") or ""
             ).strip()
-            result = claim_device_trial(device_pub)
+            install_id = str(
+                data.get("install_id") or data.get("installId") or ""
+            ).strip()
+            result = claim_device_trial(device_pub, install_id=install_id or None)
             # 200 for ok claim, exhausted trial, and structured denials (client UX);
             # 400 only for malformed device_pub / bad request shape.
             err = result.get("error")

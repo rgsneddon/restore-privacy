@@ -71,6 +71,13 @@ class TestTrialPureRules(unittest.TestCase):
         self.assertFalse(d["connect_allowed"])
         self.assertEqual(d["error"], "trial_exhausted")
 
+    def test_decide_claim_install_exhausted_blocks_new_pub(self) -> None:
+        t0 = 3_000_000.0
+        d = decide_trial_claim(None, now=t0, install_exhausted=True)
+        self.assertEqual(d["action"], "deny")
+        self.assertFalse(d["connect_allowed"])
+        self.assertEqual(d["error"], "trial_exhausted")
+
     def test_paid_or_trial_decision(self) -> None:
         self.assertTrue(
             connect_allowed_trial_or_paid(
@@ -130,6 +137,25 @@ class TestTrialHostRegistry(unittest.TestCase):
         self.assertIsNotNone(row)
         assert row is not None
         self.assertFalse(row["connect_allowed"])
+
+    def test_install_id_blocks_second_trial_after_new_device_pub(self) -> None:
+        """Best-effort: same install_id + new device_pub after expiry → deny."""
+        pub1 = _fake_pub(21)
+        pub2 = _fake_pub(22)
+        iid = "a1b2c3d4e5f60718293a4b5c6d7e8f90"
+        t0 = time.time()
+        a = claim_device_trial(pub1, now=t0, install_id=iid)
+        self.assertTrue(a["connect_allowed"], a)
+        ends = float(a["ends_at"])
+        denied_same = claim_device_trial(pub1, now=ends + 5, install_id=iid)
+        self.assertFalse(denied_same["connect_allowed"])
+        # Wipe keystore (new pub) but keep install marker
+        denied_new = claim_device_trial(pub2, now=ends + 10, install_id=iid)
+        self.assertFalse(denied_new["connect_allowed"], denied_new)
+        self.assertEqual(denied_new.get("error"), "trial_exhausted")
+        # Different install gets a fresh trial
+        ok = claim_device_trial(pub2, now=ends + 15, install_id="f0e1d2c3b4a5968778695a4b3c2d1e0f")
+        self.assertTrue(ok["connect_allowed"], ok)
 
     def test_get_device_entitlement_trial_and_paid_isolation(self) -> None:
         import payments

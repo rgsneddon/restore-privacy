@@ -259,29 +259,35 @@ class TestStorefrontCopyCompulsory(unittest.TestCase):
         self.assertIn("KEYGEN", suite)
         self.assertIn("trial", suite.lower())
         self.assertIn("suite-keygen-buy", suite)
-        self.assertIn("free trial", suite.lower())
+        self.assertTrue(
+            "free residual trial" in suite.lower() or "free 3-day trial" in suite.lower(),
+            suite[:400],
+        )
         self.assertIn('id="suite-storefront"', suite)
         # Retired KEYGEN licence/trial hint line removed from left box
         self.assertNotIn("Brand installers require a KEYGEN licence first", suite)
         self.assertNotIn('id="suite-keygen-line"', suite)
         self.assertNotIn("suite-keygen-line", suite)
-        # Left-box pay-hint: new trial/checkout copy (no Business-Class £3000 line)
+        # Left-box pay-hint: trial first (72h), pay after — no card-before-trial
         i_hint = suite.index('id="suite-pay-hint"')
-        hint = suite[i_hint : i_hint + 700]
-        self.assertIn("To start your 3-day free trial", hint)
-        self.assertIn("payment details and email address", hint)
-        self.assertIn("no money is deducted from your card", hint)
-        self.assertIn("download links which you receive via email", hint)
+        hint = suite[i_hint : i_hint + 900]
+        self.assertIn("3 days", hint.lower())
+        self.assertIn("72", hint)
+        self.assertIn("no card", hint.lower())
+        self.assertIn("paid keygen", hint.lower())
         self.assertIn("Yearly plans available (17% discount)", hint)
+        self.assertNotIn("payment details and email address", hint.lower())
+        self.assertNotIn("To start your 3-day free trial", hint)
+        self.assertNotIn("no money is deducted from your card", hint.lower())
         self.assertNotIn("installers refuse anonymous download", hint)
         self.assertNotIn("session_id / token from thank-you", hint)
         self.assertNotIn("client box below", hint)
         self.assertNotIn("£3000", hint)
         self.assertNotIn("Business-Class", hint)
         self.assertNotIn("3000", suite)  # deposit no longer in storefront hint
-        # Distinctive retired mid-phrase must not appear in storefront either
+        # Card-before-trial copy must not appear in storefront
         self.assertNotIn(
-            "no money is taken until after the trial ends", suite.lower()
+            "enter your payment details", suite.lower()
         )
         # Pure helper still builds commercial deposit markup (not on homepage)
         home_biz = render_node_preference_html()

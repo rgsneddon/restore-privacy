@@ -1182,17 +1182,18 @@ def render_homepage_buy_form_html(
 SUITE_SECTION_ID = "suite-storefront"
 SUITE_PRODUCT_TITLE = "Restore Privacy Suite"
 SUITE_PRODUCT_SUBTITLE = (
-    "VPN, Perccent wallet (%), and Evolve in one app — start the KEYGEN free trial to download"
+    "VPN, Perccent wallet (%), and Evolve in one app — free 3-day trial, then KEYGEN"
 )
 SUITE_VERSION_LABEL = f"v {RELEASE_VERSION}"
 # Retired left-box KEYGEN licence/trial line (no longer shown on storefront).
 SUITE_KEYGEN_HINT = ""
-# Left-box pay-hint under Get KEYGEN (customer-facing trial/checkout guidance)
+# Left-box pay-hint: residual trial first (no card); pay after 72h for KEYGEN/subscription.
 SUITE_PAY_HINT_HTML = (
-    "<strong>To start your 3-day free trial</strong> (Get KEYGEN above) — please enter "
-    "your payment details and email address - no money is deducted from your card until "
-    "the end of the trial period. After checkout, use your fulfilment KEYGEN and the "
-    "download links which you receive via email. Yearly plans available (17% discount)."
+    "<strong>Free residual trial — 3 days (72 hours)</strong> on this device after "
+    "install (no card, no KEYGEN). When the trial ends, residual Connect needs a "
+    "<strong>paid KEYGEN / active subscription</strong> from Get KEYGEN above "
+    "(£3.00/month or yearly). Download the Suite freely; pay only when you want to "
+    "continue past the trial. Yearly plans available (17% discount)."
 )
 SUITE_FREE_DOWNLOAD_PATH = "/suite/download"
 # Anonymous free-CTA delivery (no KEYGEN / no /pay) — detected platform only
@@ -1208,7 +1209,7 @@ FREEBIE_IMG_PATH = "/static/freebie.jpg"
 # Catalog monopin for links (face art no longer bakes a version string)
 FREE_DOWNLOAD_FACE_VERSION = RELEASE_VERSION
 FREEBIE_IMG_ALT = (
-    "Download Restore Privacy Suite — start the KEYGEN 3-day free trial first"
+    "Download Restore Privacy Suite — free 3-day residual trial, then KEYGEN"
 )
 FREE_DOWNLOAD_CTA_ID = "free-download-v1-cta"
 FREE_PACKAGES_PAGE_ID = "free-packages-page"
@@ -2523,9 +2524,8 @@ def render_suite_storefront_html(
 ) -> str:
     """Homepage **Restore Privacy Suite** block (above VPN downloads).
 
-    Installers unlock after you start the **3-day KEYGEN free trial** (or hold an
-    active licence). Residual Connect still needs the KEYGEN from the
-    monthly (£3) subscription — same entitlement model as the VPN client.
+    Suite downloads freely. Residual Connect: free **3-day (72h)** device trial
+    (no card), then paid KEYGEN / active subscription to continue.
     """
     _ = (coming_soon, accept_language, country, currency, default_interval, assets)
     items = list(assets) if assets is not None else available_downloads()

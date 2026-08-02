@@ -273,10 +273,9 @@ def short_licence_summary() -> str:
         "Copy or transmission of the product architecture is not permitted. "
         "Third-party components keep their own licences (see LICENSE / CREDITS). "
         "By accepting, you agree to those terms. Acceptance is stored only on this device. "
-        "Brand installers and residual Connect require a KEYGEN: start the 3-day free trial "
-        "(£3.00 per month or £30.00 per year — no money is taken until after the trial ends), "
-        "then enter the keygen from your fulfilment email "
-        "(USE THIS KEYGEN TO UNLOCK RESTORE PRIVACY). "
+        "Residual Connect includes a free 3-day (72-hour) trial on this device "
+        "(no card required). After the trial ends, enter a KEYGEN from /pay "
+        "(£3.00 per month or £30.00 per year — USE THIS KEYGEN TO UNLOCK RESTORE PRIVACY). "
         "Business-Class options require a separate £3000 deposit — they are not free. "
         + PAYMENT_CONNECT_DISCLAIMER_PLAIN
     )

@@ -5,6 +5,7 @@ library;
 
 import 'dart:convert';
 import 'dart:io';
+import 'dart:math';
 
 import 'package:flutter/services.dart';
 
@@ -113,14 +114,24 @@ const String kGetKeygenButtonLabel = 'Get keygen';
 const String kKeyDeviceTrialEndsAt = 'device_trial_ends_at';
 const String kKeyDeviceTrialStartedAt = 'device_trial_started_at';
 const String kKeyDeviceTrialStatus = 'device_trial_status';
+/// Durable install marker (survives reinstall when prefs/keychain keep it).
+const String kKeyDeviceTrialInstallId = 'device_trial_install_id';
+/// Local flag: this install already exhausted a residual trial (best-effort).
+const String kKeyDeviceTrialExhausted = 'device_trial_exhausted';
 const double kDeviceTrialSeconds = 72 * 3600;
 const String kDeviceTrialStatusActive = 'active';
 const String kDeviceTrialStatusExpired = 'expired';
 const String kPaymentStatusTrial = 'trial';
 const String kStartFreeTrialButtonLabel = 'Start free 3-day trial';
 const String kTrialExpiredUnlockMsg =
-    'Your free 3-day trial has ended. Purchase a KEYGEN at restoreprivacy.online/pay '
-    'to keep using residual Connect.';
+    'Your free 3-day (72-hour) trial has ended. An active paid KEYGEN subscription '
+    'is required to keep using residual Connect — get one at restoreprivacy.online/pay.';
+
+/// User-facing residual trial copy (trial first; pay after 72h).
+const String kResidualTrialThenPayCopy =
+    'Residual Connect includes a free 3-day (72-hour) trial on this device. '
+    'No card is required for the trial. When it ends, a paid KEYGEN / active '
+    'subscription is required to continue.';
 
 /// Pure local cache check (host is authority; this only gates offline UX hints).
 bool deviceTrialCacheAllowsConnect({
@@ -142,6 +153,16 @@ bool connectAllowedTrialOrPaid({
   required bool trialOk,
 }) =>
     keygenOk || trialOk;
+
+/// Whether the client should offer a free-trial claim (not after local exhausted).
+bool mayOfferDeviceTrialClaim({
+  required bool localExhausted,
+  required bool keygenOk,
+}) {
+  if (keygenOk) return false;
+  if (localExhausted) return false;
+  return true;
+}
 
 /// Default monthly Stripe Payment Link (aligned with status_page.payments).
 const String kDefaultStripePaymentPageUrl =
@@ -215,11 +236,11 @@ const String kLicencePromptTitle = 'End-user licence';
 const String kLicenceAcceptButton = 'Accept licence';
 
 const String kPaymentConnectDisclaimerPlain =
-    'STRONG DISCLAIMER — PAYMENT REQUIRED FOR CONNECT: Access to Connect and '
-    'residual VPN use requires successful payment. If payment fails at any '
-    'time (failed checkout, failed charge, refund, dispute, or revoked '
-    'entitlement), the ability to Connect with the Restore Privacy app is '
-    'cancelled for that purchase/install until a successful payment is completed.';
+    'STRONG DISCLAIMER — PAYMENT REQUIRED AFTER TRIAL: Residual Connect includes a '
+    'free 3-day (72-hour) trial on this device. After the trial ends, Connect needs a '
+    'paid KEYGEN / active subscription. If payment fails (failed checkout, failed '
+    'charge, refund, dispute, or revoked entitlement), Connect is cancelled for that '
+    'purchase/install until a successful payment is completed.';
 
 const String kShortLicenceSummary =
     'Restore Privacy Suite is proprietary full copyright: client packages may be used '
@@ -227,10 +248,9 @@ const String kShortLicenceSummary =
     'Copy or transmission of the product architecture is not permitted. '
     'Third-party components keep their own licences (see LICENSE / CREDITS). '
     'By accepting, you agree to those terms. Acceptance is stored only on this device. '
-    'After you accept, enter the keygen from your fulfilment email '
-    '($kKeygenUnlockInstruction) to unlock Connect. '
-    'Your subscription (£3.00 per month or £30.00 per year) includes a 3-day free trial — '
-    'no money is taken until after the trial ends. '
+    'Residual Connect: free 3-day (72-hour) trial on this device — no card required. '
+    'After the trial ends, enter a KEYGEN from restoreprivacy.online/pay '
+    '($kKeygenUnlockInstruction) to continue (£3.00/month or £30.00/year). '
     '$kPaymentConnectDisclaimerPlain';
 
 class LicenceAcceptance {
@@ -724,13 +744,35 @@ class LicenceGate {
     }
   }
 
+  /// Durable install marker for best-effort reinstall trial mitigation.
+  Future<String> ensureDeviceTrialInstallId() async {
+    final existing =
+        (await backend.getString(kKeyDeviceTrialInstallId) ?? '').trim();
+    if (existing.length >= 8) return existing.toLowerCase();
+    // 32 hex chars — no package UUID dependency.
+    final rnd = Random.secure();
+    final id = List.generate(32, (_) => rnd.nextInt(16).toRadixString(16)).join();
+    await backend.setString(kKeyDeviceTrialInstallId, id);
+    return id;
+  }
+
+  Future<bool> isLocalTrialExhausted() async {
+    return (await backend.getBool(kKeyDeviceTrialExhausted)) == true;
+  }
+
+  Future<void> markLocalTrialExhausted() async {
+    await backend.setBool(kKeyDeviceTrialExhausted, true);
+    await backend.setString(kKeyDeviceTrialStatus, kDeviceTrialStatusExpired);
+  }
+
   /// Claim or refresh KEYGEN-free 72h trial on the status host (device pub bind).
   ///
   /// Does not mint a KEYGEN. Host refuses a second full window for the same
-  /// device_pub after expiry (anti-reinstall for keystore-stable identities).
+  /// device_pub (and install_id when provided) after expiry.
   Future<Map<String, dynamic>> claimDeviceTrial({
     String? baseUrl,
     String? devicePubHex,
+    String? installId,
     Future<Map<String, dynamic>> Function(Uri uri, List<int> body)? post,
   }) async {
     final base = (baseUrl ??
@@ -749,8 +791,21 @@ class LicenceGate {
         'error': 'missing_device_pub',
       };
     }
+    // Local exhausted marker: skip network when this install already finished trial.
+    if (await isLocalTrialExhausted()) {
+      return {
+        'ok': false,
+        'connect_allowed': false,
+        'error': 'trial_exhausted',
+        'requires_keygen': true,
+        'status': kDeviceTrialStatusExpired,
+      };
+    }
+    final iid = (installId ?? await ensureDeviceTrialInstallId()).trim();
     final uri = Uri.parse('$base/api/device-trial/claim');
-    final body = utf8.encode(jsonEncode({'device_pub': pub}));
+    final payload = <String, dynamic>{'device_pub': pub};
+    if (iid.isNotEmpty) payload['install_id'] = iid;
+    final body = utf8.encode(jsonEncode(payload));
     try {
       final Map<String, dynamic> remote;
       if (post != null) {
@@ -765,12 +820,15 @@ class LicenceGate {
       final started = (remote['started_at'] is num)
           ? (remote['started_at'] as num).toDouble()
           : double.tryParse('${remote['started_at'] ?? ''}');
+      final err = '${remote['error'] ?? ''}';
       final st =
           allowed ? kDeviceTrialStatusActive : kDeviceTrialStatusExpired;
       await _cacheDeviceTrial(status: st, startedAt: started, endsAt: ends);
       if (allowed) {
         // Local UX status only — not a paid KEYGEN unlock.
         await backend.setString(kKeyPaymentStatus, kPaymentStatusTrial);
+      } else if (err == 'trial_exhausted' || st == kDeviceTrialStatusExpired) {
+        await markLocalTrialExhausted();
       }
       return remote;
     } catch (e) {
@@ -784,13 +842,24 @@ class LicenceGate {
 
   /// Local + optional remote trial: true while host trial window is open.
   Future<bool> deviceTrialAllowsConnect({bool refreshRemote = false}) async {
+    if (await isLocalTrialExhausted()) {
+      return false;
+    }
     if (refreshRemote) {
       await claimDeviceTrial(); // reuse path on host when still active
     }
     final st = await deviceTrialStatus();
     final ends = await deviceTrialEndsAt() ?? 0.0;
     final now = DateTime.now().millisecondsSinceEpoch / 1000.0;
-    return deviceTrialCacheAllowsConnect(status: st, endsAt: ends, nowSec: now);
+    final ok = deviceTrialCacheAllowsConnect(
+      status: st,
+      endsAt: ends,
+      nowSec: now,
+    );
+    if (!ok && ends > 0 && now >= ends) {
+      await markLocalTrialExhausted();
+    }
+    return ok;
   }
 
   /// Failed / revoked / unpaid always block. Missing entitlement blocks when
