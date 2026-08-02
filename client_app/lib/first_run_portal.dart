@@ -17,6 +17,7 @@ import 'theme.dart';
 /// Finder keys for tests / automation.
 const Key kFirstRunPortalKey = Key('first_run_portal');
 const Key kFirstRunAccountContinueKey = Key('first_run_account_continue');
+const Key kFirstRunSeedGenerateKey = Key('first_run_seed_generate');
 const Key kFirstRunSeedConfirmKey = Key('first_run_seed_confirm');
 const Key kFirstRunLicenceAcceptKey = Key('first_run_licence_accept');
 
@@ -31,6 +32,11 @@ class FirstRunPortal extends StatefulWidget {
     this.applyCredentials,
     this.seedOffer,
     this.initialState,
+    this.generateSeedWords,
+    this.attachAndPublishSeed,
+    this.surfaces,
+    this.suitePrefsBackend,
+    this.licenceBackend,
   });
 
   final VoidCallback onComplete;
@@ -42,6 +48,17 @@ class FirstRunPortal extends StatefulWidget {
 
   /// When set, skips async load (widget tests).
   final FirstRunState? initialState;
+
+  /// Override real BIP39 generate (tests inject [generateSuiteSeedWords] path).
+  final Future<List<String>> Function()? generateSeedWords;
+
+  /// Override attach+publish after write-down confirm.
+  final Future<void> Function(List<String> words)? attachAndPublishSeed;
+
+  /// Wallet surfaces for production attach (or injectable test stores).
+  final SuiteAccountPackageSurfaces? surfaces;
+  final SettingsBackend? suitePrefsBackend;
+  final SettingsBackend? licenceBackend;
 
   @override
   State<FirstRunPortal> createState() => _FirstRunPortalState();
@@ -56,6 +73,9 @@ class _FirstRunPortalState extends State<FirstRunPortal> {
   var _busy = false;
   final _user = TextEditingController();
   final _pass = TextEditingController();
+  /// Credentials retained for post-account seed attach (not uploaded).
+  String _pendingUsername = '';
+  String _pendingPassword = '';
   List<String>? _seedWords;
   var _status = '';
 
@@ -166,6 +186,10 @@ class _FirstRunPortalState extends State<FirstRunPortal> {
       setState(() => _status = 'Enter username and password.');
       return;
     }
+    if (p.length < 8) {
+      setState(() => _status = 'Password must be at least 8 characters.');
+      return;
+    }
     setState(() {
       _busy = true;
       _status = register ? 'Creating account…' : 'Signing in…';
@@ -181,8 +205,11 @@ class _FirstRunPortalState extends State<FirstRunPortal> {
               username: username,
               password: password,
               register: register,
-              // First-run portal owns the seed step after account.
+              // Portal owns seed write-down after account; attach on confirm.
               skipSeedOffer: true,
+              surfaces: widget.surfaces,
+              suitePrefsBackend: widget.suitePrefsBackend,
+              licenceBackend: widget.licenceBackend,
             );
     try {
       await apply(
@@ -194,6 +221,8 @@ class _FirstRunPortalState extends State<FirstRunPortal> {
       SuiteAccountBus.instance.notifyRegistered(u);
       if (!mounted) return;
       setState(() {
+        _pendingUsername = u;
+        _pendingPassword = p;
         _busy = false;
         _status = '';
       });
@@ -214,25 +243,24 @@ class _FirstRunPortalState extends State<FirstRunPortal> {
       _status = 'Generating seed…';
     });
     try {
-      // Prefer product seed generator when available via suite_account_seed.
-      final words = await generateSuiteSeedWords();
+      final gen = widget.generateSeedWords ?? generateSuiteSeedWords;
+      final words = await gen();
+      if (isStubSuiteSeedWords(words)) {
+        throw StateError('stub seed words rejected');
+      }
       if (!mounted) return;
       setState(() {
         _seedWords = words;
         _busy = false;
-        _status = '';
+        _status = 'Write these words offline, then continue.';
       });
     } catch (e) {
-      // Deterministic offline fallback for tests / missing package surfaces.
-      final words = List<String>.generate(
-        12,
-        (i) => 'word${(i + 1).toString().padLeft(2, '0')}',
-      );
+      // Fail closed — never substitute fake word01..word12.
       if (!mounted) return;
       setState(() {
-        _seedWords = words;
+        _seedWords = null;
         _busy = false;
-        _status = 'Generated backup phrase (write these down offline).';
+        _status = 'Could not generate recovery seed: $e';
       });
     }
   }
@@ -243,15 +271,49 @@ class _FirstRunPortalState extends State<FirstRunPortal> {
       setState(() => _status = 'Generate the 12-word phrase first.');
       return;
     }
-    setState(() => _busy = true);
-    await _firstRun?.markSeedDone();
-    // Best-effort export to local backup when apply helpers are present.
+    if (isStubSuiteSeedWords(_seedWords!)) {
+      setState(() => _status = 'Invalid seed — generate again.');
+      return;
+    }
+    setState(() {
+      _busy = true;
+      _status = 'Saving recovery envelope…';
+    });
     try {
-      await exportSuiteSeedIfPossible(_seedWords!);
-    } catch (_) {}
-    if (!mounted) return;
-    setState(() => _busy = false);
-    await _reload();
+      final attach = widget.attachAndPublishSeed;
+      if (attach != null) {
+        await attach(_seedWords!);
+      } else {
+        final u = _pendingUsername.trim().isNotEmpty
+            ? _pendingUsername.trim()
+            : _user.text.trim();
+        final p = _pendingPassword.isNotEmpty ? _pendingPassword : _pass.text;
+        if (u.isEmpty || p.isEmpty) {
+          throw StateError('Account credentials required to save seed');
+        }
+        await attachAndPublishSuiteSeedForUser(
+          words: _seedWords!,
+          username: u,
+          password: p,
+          surfaces: widget.surfaces,
+          suitePrefsBackend: widget.suitePrefsBackend,
+          licenceBackend: widget.licenceBackend,
+        );
+      }
+      await _firstRun?.markSeedDone();
+      if (!mounted) return;
+      setState(() {
+        _busy = false;
+        _status = '';
+      });
+      await _reload();
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _busy = false;
+        _status = 'Seed save failed: $e';
+      });
+    }
   }
 
   Future<void> _acceptLicence() async {
@@ -444,6 +506,7 @@ class _FirstRunPortalState extends State<FirstRunPortal> {
         const SizedBox(height: 16),
         if (_seedWords == null)
           FilledButton(
+            key: kFirstRunSeedGenerateKey,
             onPressed: _busy ? null : _generateSeed,
             child: Text(_busy ? 'Please wait…' : kSuiteSeedGenerateLabel),
           )
@@ -523,26 +586,4 @@ class _FirstRunPortalState extends State<FirstRunPortal> {
       ),
     );
   }
-}
-
-/// Best-effort seed word generation via Evolve recovery when available.
-Future<List<String>> generateSuiteSeedWords() async {
-  // Product path uses evolve perc_seed_recovery; import may fail in unit tests.
-  try {
-    // ignore: depend_on_referenced_packages
-    final mod = await _tryGenerateFromEvolve();
-    if (mod != null && mod.length == 12) return mod;
-  } catch (_) {}
-  throw StateError('seed_generate_unavailable');
-}
-
-Future<List<String>?> _tryGenerateFromEvolve() async {
-  // Deferred: suite_account_seed / evolve packages supply real BIP39 in app.
-  // Portal catches and uses offline fallback when packages are not linked in test.
-  return null;
-}
-
-Future<void> exportSuiteSeedIfPossible(List<String> words) async {
-  // Best-effort; full envelope export is handled when wallet packages load.
-  assert(words.length == 12);
 }

@@ -500,3 +500,110 @@ String? suiteSeedEnvelopeB64FromPerc(perc_wallet.PercWalletProvider wallet) {
   final acc = perc_hub.PercLedgerHub.instance.ledger.account(u);
   return acc?.seedRecoveryEnvelope;
 }
+
+/// Real BIP39 recovery words for Suite first-run / seed export (product path).
+///
+/// Always uses [PercSeedRecovery.generateMnemonic] — never a fake wordNN list.
+Future<List<String>> generateSuiteSeedWords() async {
+  final words = PercSeedRecovery.generateMnemonic();
+  PercSeedRecovery.validateMnemonic(words);
+  if (words.length != PercSeedRecovery.wordCount) {
+    throw StateError('seed_generate_invalid_length');
+  }
+  // Fail closed if a stub ever leaks into the product path.
+  if (_looksLikeStubSeedWords(words)) {
+    throw StateError('seed_generate_stub_rejected');
+  }
+  return List<String>.from(words);
+}
+
+/// True for the historical first-run fallback `word01`…`word12` (never ship).
+bool _looksLikeStubSeedWords(List<String> words) {
+  if (words.length != 12) return false;
+  for (var i = 0; i < 12; i++) {
+    final expected = 'word${(i + 1).toString().padLeft(2, '0')}';
+    if (words[i] != expected) return false;
+  }
+  return true;
+}
+
+/// Whether [words] are the forbidden wordNN stub (tests + fail-closed UI).
+bool isStubSuiteSeedWords(List<String> words) => _looksLikeStubSeedWords(words);
+
+/// Attach recovery envelope to a registered Suite identity and publish restore.
+///
+/// Call after first-run account register (which uses [skipSeedOffer]) so the
+/// portal seed step owns write-down UI while still producing a real envelope
+/// the user can restore from.
+Future<void> attachAndPublishSuiteSeedForUser({
+  required List<String> words,
+  required String username,
+  required String password,
+  SuiteAccountPackageSurfaces? surfaces,
+  SettingsBackend? suitePrefsBackend,
+  SettingsBackend? licenceBackend,
+}) async {
+  final u = username.trim();
+  if (u.isEmpty) throw StateError('Username is required for seed attach');
+  if (_looksLikeStubSeedWords(words)) {
+    throw StateError('stub seed words cannot be attached');
+  }
+  PercSeedRecovery.validateMnemonic(words);
+
+  final s = surfaces ?? productionSuiteAccountSurfaces();
+  final prevPerc = perc_coord.PercNetworkCoordinator.disableLiveNodesForTests;
+  final prevEvolve = evolve_coord.PercNetworkCoordinator.disableLiveNodesForTests;
+  perc_coord.PercNetworkCoordinator.disableLiveNodesForTests = true;
+  evolve_coord.PercNetworkCoordinator.disableLiveNodesForTests = true;
+  try {
+    final perc = s.createPercProvider();
+    await perc.initialize();
+    if (perc.needsTreasuryPassword) {
+      await perc.setupTreasuryPassword(password);
+      await perc.logout();
+    }
+    if (!perc.isLoggedIn || (perc.loggedInUsername ?? '').trim() != u) {
+      await perc.login(u, password);
+    }
+    if (!perc.isLoggedIn || (perc.loggedInUsername ?? '').trim() != u) {
+      throw StateError(
+        perc.errorMessage?.trim().isNotEmpty == true
+            ? perc.errorMessage!
+            : 'Perccent login required before seed attach',
+      );
+    }
+    await perc.refreshSeedRecoveryEnvelope(words);
+    await s.persistPercHub();
+
+    final evolve = s.createEvolveProvider();
+    await evolve.initialize();
+    await s.reloadEvolveHub();
+    if (!evolve.isLoggedIn || (evolve.loggedInUsername ?? '').trim() != u) {
+      await evolve.login(u, password);
+    }
+    if (evolve.isLoggedIn && (evolve.loggedInUsername ?? '').trim() == u) {
+      await evolve.refreshSeedRecoveryEnvelope(words);
+      await evolve_hub.PercLedgerHub.instance.persistLocal();
+    }
+
+    final env = suiteSeedEnvelopeB64FromPerc(perc) ??
+        suiteSeedEnvelopeB64FromWallet(evolve);
+    if (env == null || env.isEmpty) {
+      throw StateError('seed envelope missing after attach');
+    }
+
+    // Restore live flags before publish so rendezvous is not no-op'd.
+    perc_coord.PercNetworkCoordinator.disableLiveNodesForTests = prevPerc;
+    evolve_coord.PercNetworkCoordinator.disableLiveNodesForTests = prevEvolve;
+    await publishSuiteSeedAfterExport(
+      words: words,
+      username: u,
+      envelopeB64: env,
+      suitePrefsBackend: suitePrefsBackend,
+      licenceBackend: licenceBackend,
+    );
+  } finally {
+    perc_coord.PercNetworkCoordinator.disableLiveNodesForTests = prevPerc;
+    evolve_coord.PercNetworkCoordinator.disableLiveNodesForTests = prevEvolve;
+  }
+}
