@@ -1320,17 +1320,19 @@ def public_product_tabs_html(*, active: str = PRODUCT_VPN_KEY) -> str:
 
 
 def public_nav_links_html(*, active: str | None = None) -> str:
-    """Button-style nav: Home → Settings Guide → Service → Licence →
+    """Button-style nav: Home → Settings Guide → Licence →
     Security Audit → Privacy Policy → Support.
 
-    *active* is one of: home, licence, privacy, audit, support, settings,
-    service (or None). README is not a main-menu control (``/README.md`` may
-    still be served as a document). Settings Guide remains in the top brand nav.
+    *active* is one of: home, licence, privacy, audit, support, settings
+    (or None). README is not a main-menu control (``/README.md`` may still be
+    served as a document). Settings Guide remains in the top brand nav.
+
+    Service (``SERVICE_PATH`` / ``/service``) is intentionally **not** in the
+    public main menu — the page module and route are retained for private use.
     """
     items = (
         ("HOME", HOME_PATH, HOME_LINK_ID, "home"),
         ("SETTINGS GUIDE", SETTINGS_GUIDE_PATH, SETTINGS_GUIDE_LINK_ID, "settings"),
-        ("SERVICE", SERVICE_PATH, SERVICE_LINK_ID, "service"),
         ("LICENCE", LICENSE_PATH, LICENCE_LINK_ID, "licence"),
         ("SECURITY AUDIT", AUDIT_PATH, AUDIT_LINK_ID, "audit"),
         ("PRIVACY POLICY", PRIVACY_PATH, PRIVACY_LINK_ID, "privacy"),

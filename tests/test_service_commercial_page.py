@@ -15,29 +15,41 @@ sys.path.insert(0, str(ROOT / "status_page"))
 
 
 class TestServiceNav(unittest.TestCase):
-    def test_main_nav_includes_service_control(self) -> None:
+    def test_main_nav_omits_service_control(self) -> None:
+        """Service page retained privately — not advertised in public main nav."""
         from public_chrome import (
             SERVICE_LINK_ID,
             SERVICE_PATH,
             public_brand_header_html,
             public_nav_links_html,
         )
+        from service_commercial import render_service_page_html
 
         nav = public_nav_links_html()
         self.assertIn('data-site-nav="1"', nav)
-        self.assertIn(f'id="{SERVICE_LINK_ID}"', nav)
-        self.assertIn(f'href="{SERVICE_PATH}"', nav)
-        self.assertIn("SERVICE", nav)
-        # Active marker when on service page header
+        self.assertNotIn(f'id="{SERVICE_LINK_ID}"', nav)
+        self.assertNotIn(f'href="{SERVICE_PATH}"', nav)
+        self.assertNotIn('href="/service/"', nav)
+        self.assertNotIn(">SERVICE<", nav)
+        # Path constant kept for private page / checkout redirects
+        self.assertEqual(SERVICE_PATH, "/service")
         header = public_brand_header_html(active="service")
-        self.assertIn(f'id="{SERVICE_LINK_ID}"', header)
-        self.assertIn("is-active", header)
-        # Relative order: Home then Settings then Service
-        i_home = nav.index("home-link")
-        i_settings = nav.index("settings-guide-link")
-        i_service = nav.index(SERVICE_LINK_ID)
-        self.assertLess(i_home, i_settings)
-        self.assertLess(i_settings, i_service)
+        self.assertNotIn(f'id="{SERVICE_LINK_ID}"', header)
+        self.assertNotIn(">SERVICE<", header)
+        # Remaining main-nav peers still present
+        for peer_id in (
+            "home-link",
+            "settings-guide-link",
+            "licence-link",
+            "audit-link",
+            "privacy-link",
+            "support-link",
+        ):
+            self.assertIn(peer_id, nav)
+        # Private page still renders (route body retained)
+        page = render_service_page_html().decode("utf-8")
+        self.assertIn('data-page="service"', page)
+        self.assertIn('id="service-page"', page)
 
 
 class TestServicePageLayoutAndCopy(unittest.TestCase):
@@ -116,11 +128,12 @@ class TestServicePageLayoutAndCopy(unittest.TestCase):
         # Service path constant
         self.assertEqual(SERVICE_PATH, "/service")
 
-    def test_service_path_constant_matches_nav(self) -> None:
-        from public_chrome import SERVICE_PATH as NAV_PATH
+    def test_service_path_constant_retained(self) -> None:
+        """Path constant remains aligned for private page + checkout redirects."""
+        from public_chrome import SERVICE_PATH as CHROME_PATH
         from service_commercial import SERVICE_PATH as PAGE_PATH
 
-        self.assertEqual(NAV_PATH, PAGE_PATH)
+        self.assertEqual(CHROME_PATH, PAGE_PATH)
         self.assertEqual(PAGE_PATH, "/service")
 
 

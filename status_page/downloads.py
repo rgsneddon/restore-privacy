@@ -1192,7 +1192,7 @@ NODE_PUBLIC_SUITE_PAGES_HREF = "https://rgsneddon.github.io/restore-privacy-suit
 NODE_PUBLIC_SUITE_PAGES_LABEL = "Public Suite Pages (client docs)"
 NODE_PUBLIC_SUITE_SOURCE_HREF = "https://github.com/rgsneddon/restore-privacy-suite"
 NODE_PUBLIC_SUITE_SOURCE_LABEL = "Public Suite source (GitHub)"
-# Commercial deposit cart (same one-time £3000 Stripe path as /service).
+# Commercial deposit cart (same one-time £3000 Stripe path as private /service).
 try:
     from payments import (
         COMMERCIAL_SUITE_CHECKOUT_PATH as _COMMERCIAL_CHECKOUT,
@@ -1217,6 +1217,7 @@ except ImportError:  # pragma: no cover
         _COMMERCIAL_KEY = "commercial_suite_node"
         _COMMERCIAL_LINE = "commercial_suite"
 
+# Private retained Service page path — not advertised from public customer HTML.
 NODE_PREFERENCE_COMMERCIAL_HREF = "/service"
 NODE_PREFERENCE_COMMERCIAL_CHECKOUT = _COMMERCIAL_CHECKOUT
 NODE_PREFERENCE_DEPOSIT_LABEL = _COMMERCIAL_PRICE
@@ -2123,11 +2124,7 @@ def render_node_preference_html(*, standalone: bool = True) -> str:
         (NODE_OPERATOR_DOCS_ALIAS_HREF, "Node operator (short path)", "node-docs-alias"),
         (NODE_PUBLIC_SUITE_PAGES_HREF, NODE_PUBLIC_SUITE_PAGES_LABEL, "suite-pages"),
         (NODE_PUBLIC_SUITE_SOURCE_HREF, NODE_PUBLIC_SUITE_SOURCE_LABEL, "suite-source"),
-        (
-            NODE_PREFERENCE_COMMERCIAL_HREF,
-            "Commercial Service page",
-            "commercial-service",
-        ),
+        # Commercial Service page (/service) is retained privately — not linked here.
     ]
     anchors: list[str] = []
     for href, label, key in links:
@@ -2171,20 +2168,11 @@ def render_node_preference_html(*, standalone: bool = True) -> str:
           {_esc_html(NODE_PREFERENCE_DEPOSIT_CTA)}
         </button>
       </form>
-      <p class="node-pref-deposit-note" id="node-pref-deposit-service-link">
-        <a class="node-pref-deposit-link" id="node-pref-deposit-service"
-           href="{_esc_html(NODE_PREFERENCE_COMMERCIAL_HREF)}"
-           data-commercial-deposit-link="1"
-           data-price-label="{_esc_html(NODE_PREFERENCE_DEPOSIT_LABEL)}">
-          {_esc_html(NODE_PREFERENCE_DEPOSIT_LABEL)} deposit details on Service →
-        </a>
-      </p>
       <div class="node-pref-links" id="node-pref-links" data-node-pref-links="1">
         {" ".join(anchors)}
       </div>
     </aside>
 """
-
 
 def world_flag_codes() -> tuple[str, ...]:
     """Shipped flag codes (ISO alpha-2 + UK home-nation extras)."""

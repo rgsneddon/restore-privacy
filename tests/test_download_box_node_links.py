@@ -110,12 +110,16 @@ class TestDownloadBoxNodeLinks(unittest.TestCase):
         self.assertIn(f'value="{COMMERCIAL_SUITE_NODE_PRICE_PENCE}"', frag)
         self.assertIn('id="node-pref-deposit-btn"', frag)
         self.assertIn("deposit", frag.lower())
-        self.assertIn(f'href="{NODE_PREFERENCE_COMMERCIAL_HREF}"', frag)
+        # Private /service page is not linked from this customer-facing block
+        self.assertNotIn(f'href="{NODE_PREFERENCE_COMMERCIAL_HREF}"', frag)
+        self.assertNotIn('href="/service"', frag)
+        self.assertNotIn("Commercial Service page", frag)
+        self.assertNotIn("deposit details on Service", frag)
+        self.assertNotIn("node-pref-deposit-service", frag)
         self.assertIn(f'href="{NODE_OPERATOR_DOCS_HREF}"', frag)
         self.assertIn(f'href="{NODE_OPERATOR_DOCS_ALIAS_HREF}"', frag)
         self.assertIn(f'href="{NODE_PUBLIC_SUITE_PAGES_HREF}"', frag)
         self.assertIn(f'href="{NODE_PUBLIC_SUITE_SOURCE_HREF}"', frag)
-
         # Business package is standalone on home (above node wipe) — not nested in Suite.
         suite = render_suite_storefront_html()
         self.assertNotIn(NODE_PREFERENCE_SECTION_ID, suite)
