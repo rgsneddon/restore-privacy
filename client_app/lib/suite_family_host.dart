@@ -1,7 +1,7 @@
 /// Single shared % / Evolve provider boot for all promoted family destinations.
 ///
-/// Wraps the Suite [PageView] so Analysis / Wallet / Security / Voting / Credit
-/// share one bootstrap and one provider tree — not one [SuiteEvolveTab] per tab.
+/// Wraps the Suite [PageView] with providers only (no [Theme]) so VPN / rpAI
+/// keep suite chrome. [SuiteFamilyBody] applies Evolve/wallet theme locally.
 library;
 
 import 'dart:async';
@@ -23,6 +23,8 @@ import 'package:evolve/perc/services/perc_ledger_hub.dart' as evolve_hub;
 import 'package:evolve/perc/services/perc_network_config.dart' as evolve_net;
 import 'package:evolve/perc/services/perc_network_coordinator.dart'
     as evolve_coord;
+import 'package:evolve/perc/widgets/registration_seed_setup_dialog.dart'
+    as evolve_reg;
 import 'package:evolve/providers/evolve_provider.dart';
 import 'package:evolve/providers/locale_provider.dart' as evolve_locale;
 import 'package:evolve/screens/evolve_shell_screen.dart';
@@ -36,6 +38,8 @@ import 'package:perccent_wallet/perc/services/perc_network_config.dart'
     as wallet_net;
 import 'package:perccent_wallet/perc/services/perc_network_coordinator.dart'
     as wallet_coord;
+import 'package:perccent_wallet/perc/widgets/registration_seed_setup_dialog.dart'
+    as wallet_reg;
 import 'package:perccent_wallet/providers/locale_provider.dart' as wallet_locale;
 import 'package:perccent_wallet/screens/wallet_shell_screen.dart';
 import 'package:perccent_wallet/theme/app_theme.dart' as wallet_theme;
@@ -46,7 +50,7 @@ import 'suite_nav.dart';
 import 'suite_parts.dart';
 import 'theme.dart';
 
-/// Boots family providers once and exposes them to [SuiteFamilyBody] children.
+/// Boots family providers once; exposes them via [MultiProvider] without Theme.
 class SuiteFamilyHost extends StatefulWidget {
   const SuiteFamilyHost({
     super.key,
@@ -66,13 +70,11 @@ class SuiteFamilyHost extends StatefulWidget {
 }
 
 class SuiteFamilyHostState extends State<SuiteFamilyHost> {
-  // Evolve package providers (preferred when evolve part installed).
   EvolveProvider? _evolve;
   evolve_wallet.PercWalletProvider? _evolveWallet;
   FcgVotingProvider? _fcg;
   evolve_locale.LocaleProvider? _evolveLocale;
 
-  // Perccent wallet-only providers (when wallet installed and evolve is not).
   wallet_p.PercWalletProvider? _walletOnly;
   wallet_locale.LocaleProvider? _walletLocale;
 
@@ -178,6 +180,9 @@ class SuiteFamilyHostState extends State<SuiteFamilyHost> {
     final evolve = EvolveProvider();
     final wallet = evolve_wallet.PercWalletProvider();
     final fcg = FcgVotingProvider();
+
+    // Match prior AppBootstrap path: wallet session must initialize before shell.
+    await wallet.initialize();
     await evolve.initialize();
     await fcg.initialize();
     try {
@@ -264,13 +269,16 @@ class SuiteFamilyHostState extends State<SuiteFamilyHost> {
 
   @override
   Widget build(BuildContext context) {
-    // Always keep [child] (Suite PageView) mounted so VPN / rpAI paint while
-    // family providers boot — do not replace the whole tree with a spinner.
+    // Providers only — never Theme/Localizations around the Suite PageView
+    // (VPN/rpAI must keep suite chrome).
     Widget body = _FamilyHostScope(
       ready: _ready,
       error: _error,
       hasAppAccess: _hasAppAccess,
       onRetry: _boot,
+      useEvolve: useEvolvePackage,
+      evolveLocale: _evolveLocale,
+      walletLocale: _walletLocale,
       child: widget.child,
     );
 
@@ -291,23 +299,7 @@ class SuiteFamilyHostState extends State<SuiteFamilyHost> {
           ),
           ChangeNotifierProvider<FcgVotingProvider>.value(value: _fcg!),
         ],
-        child: Theme(
-          data: evolve_theme.AppTheme.dark(),
-          child: Localizations(
-            locale: _evolveLocale!.config.materialLocale,
-            delegates: const [
-              GlobalMaterialLocalizations.delegate,
-              GlobalWidgetsLocalizations.delegate,
-              GlobalCupertinoLocalizations.delegate,
-            ],
-            child: Builder(
-              builder: (context) {
-                evolve_l10n.AppLocalizations.of(_evolveLocale!.config);
-                return body;
-              },
-            ),
-          ),
-        ),
+        child: body,
       );
     } else if (_ready &&
         useWalletOnlyPackage &&
@@ -322,23 +314,7 @@ class SuiteFamilyHostState extends State<SuiteFamilyHost> {
             value: _walletOnly!,
           ),
         ],
-        child: Theme(
-          data: wallet_theme.AppTheme.dark(),
-          child: Localizations(
-            locale: _walletLocale!.config.materialLocale,
-            delegates: const [
-              GlobalMaterialLocalizations.delegate,
-              GlobalWidgetsLocalizations.delegate,
-              GlobalCupertinoLocalizations.delegate,
-            ],
-            child: Builder(
-              builder: (context) {
-                walletLocalizationsOf(_walletLocale!.config);
-                return body;
-              },
-            ),
-          ),
-        ),
+        child: body,
       );
     }
 
@@ -346,13 +322,16 @@ class SuiteFamilyHostState extends State<SuiteFamilyHost> {
   }
 }
 
-/// Loading / error scope for [SuiteFamilyBody] (VPN pages ignore this).
+/// Loading / error / package mode for [SuiteFamilyBody] (VPN pages ignore).
 class _FamilyHostScope extends InheritedWidget {
   const _FamilyHostScope({
     required this.ready,
     required this.error,
     required this.hasAppAccess,
     required this.onRetry,
+    required this.useEvolve,
+    required this.evolveLocale,
+    required this.walletLocale,
     required super.child,
   });
 
@@ -360,6 +339,9 @@ class _FamilyHostScope extends InheritedWidget {
   final Object? error;
   final bool hasAppAccess;
   final VoidCallback onRetry;
+  final bool useEvolve;
+  final evolve_locale.LocaleProvider? evolveLocale;
+  final wallet_locale.LocaleProvider? walletLocale;
 
   static _FamilyHostScope? maybeOf(BuildContext context) =>
       context.dependOnInheritedWidgetOfExactType<_FamilyHostScope>();
@@ -368,10 +350,11 @@ class _FamilyHostScope extends InheritedWidget {
   bool updateShouldNotify(covariant _FamilyHostScope oldWidget) =>
       ready != oldWidget.ready ||
       error != oldWidget.error ||
-      hasAppAccess != oldWidget.hasAppAccess;
+      hasAppAccess != oldWidget.hasAppAccess ||
+      useEvolve != oldWidget.useEvolve;
 }
 
-/// Body for one family destination — no nested bottom bar, no re-bootstrap.
+/// Body for one family destination — themed locally; no nested bottom bar.
 class SuiteFamilyBody extends StatelessWidget {
   const SuiteFamilyBody({
     super.key,
@@ -413,6 +396,7 @@ class SuiteFamilyBody extends StatelessWidget {
 
     final access = scope?.hasAppAccess ?? hasAppAccess;
     final useEvolve = suitePartShowsFullSurface(parts, SuitePartId.evolve);
+
     if (useEvolve) {
       final idx = suiteNavEvolveShellTabIndex(
         dest,
@@ -421,21 +405,74 @@ class SuiteFamilyBody extends StatelessWidget {
       if (idx == null) {
         return const Center(child: Text('Unavailable'));
       }
-      return EvolveShellScreen(
+      final locale = scope?.evolveLocale;
+      Widget shell = EvolveShellScreen(
         key: ValueKey('suite_family_evolve_$idx'),
         showBottomBar: false,
         tabIndex: idx,
       );
+      // Registration / seed host (same gate as AppBootstrap path).
+      shell = evolve_reg.RegistrationSeedSetupDialogHost(child: shell);
+      // Theme only around family body — not Suite VPN/rpAI pages.
+      if (locale != null) {
+        return Theme(
+          data: evolve_theme.AppTheme.dark(),
+          child: Localizations(
+            locale: locale.config.materialLocale,
+            delegates: const [
+              GlobalMaterialLocalizations.delegate,
+              GlobalWidgetsLocalizations.delegate,
+              GlobalCupertinoLocalizations.delegate,
+            ],
+            child: Builder(
+              builder: (context) {
+                evolve_l10n.AppLocalizations.of(locale.config);
+                return shell;
+              },
+            ),
+          ),
+        );
+      }
+      return Theme(
+        data: evolve_theme.AppTheme.dark(),
+        child: shell,
+      );
     }
+
     if (suitePartShowsFullSurface(parts, SuitePartId.wallet)) {
       final idx = suiteNavWalletShellTabIndex(dest);
       if (idx == null) {
         return const Center(child: Text('Unavailable'));
       }
-      return WalletShellScreen(
+      final locale = scope?.walletLocale;
+      Widget shell = WalletShellScreen(
         key: ValueKey('suite_family_wallet_$idx'),
         showBottomBar: false,
         tabIndex: idx,
+      );
+      shell = wallet_reg.RegistrationSeedSetupDialogHost(child: shell);
+      if (locale != null) {
+        return Theme(
+          data: wallet_theme.AppTheme.dark(),
+          child: Localizations(
+            locale: locale.config.materialLocale,
+            delegates: const [
+              GlobalMaterialLocalizations.delegate,
+              GlobalWidgetsLocalizations.delegate,
+              GlobalCupertinoLocalizations.delegate,
+            ],
+            child: Builder(
+              builder: (context) {
+                walletLocalizationsOf(locale.config);
+                return shell;
+              },
+            ),
+          ),
+        );
+      }
+      return Theme(
+        data: wallet_theme.AppTheme.dark(),
+        child: shell,
       );
     }
     return const SizedBox.shrink();
