@@ -5,6 +5,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:restore_privacy_client/main.dart';
 import 'package:restore_privacy_client/suite_network_config.dart';
+import 'package:restore_privacy_client/suite_parts.dart';
 import 'package:restore_privacy_client/suite_shell.dart';
 import 'package:restore_privacy_client/suite_version.dart';
 import 'package:restore_privacy_client/theme.dart';
@@ -109,11 +110,13 @@ void main() {
     expect(u, 'http://example.test:9');
   });
 
-  testWidgets('shell declares VPN, %, EVOLVE, rpAI tabs and switches surfaces',
+  testWidgets('shell main bar promotes %/Evolve family tabs and switches',
       (tester) async {
     await tester.pumpWidget(
       MaterialApp(
         home: SuiteShell(
+          preferInitialParts: true,
+          initialParts: SuitePartsState.allInstalled,
           vpnTab: const _VpnSurface(),
           walletTab: const _WalletSurface(),
           evolveTab: const _EvolveSurface(),
@@ -127,50 +130,56 @@ void main() {
     expect(find.text(kSuiteProductName), findsOneWidget);
     expect(find.text(kSuiteDisplayVersion), findsOneWidget);
 
-    // Navigation destinations with exact labels.
+    // Main bar: VPN, promoted family, rpAI — no dual EVOLVE product slot.
     expect(find.text('VPN'), findsWidgets);
-    expect(find.text('%'), findsWidgets);
-    expect(find.text('EVOLVE'), findsWidgets);
+    expect(find.text('Wallet'), findsWidgets);
+    expect(find.text('Analysis'), findsWidgets);
+    expect(find.text('Security'), findsWidgets);
+    expect(find.text('Voting'), findsWidgets);
+    expect(find.text('Credit'), findsWidgets);
     expect(find.text('rpAI'), findsWidgets);
+    expect(find.text('EVOLVE'), findsNothing);
 
     // Default tab = VPN primary surface.
     expect(find.text('VPN_SURFACE_CONNECT'), findsOneWidget);
-    expect(find.text('WALLET_SURFACE_BOOTSTRAP'), findsNothing);
-    expect(find.text('EVOLVE_SURFACE_HOME'), findsNothing);
-    expect(find.text('RPAI_SURFACE_NED'), findsNothing);
 
-    // Select % tab.
     final shell = tester.state<SuiteShellState>(find.byType(SuiteShell));
-    shell.selectTab(1);
+    final dests = shell.destinations;
+    expect(dests.first.name, 'vpn');
+
+    // Select Wallet (shared % surface).
+    final walletIdx = dests.indexWhere((d) => d.name == 'wallet');
+    shell.selectTab(walletIdx);
     await tester.pump();
-    expect(shell.currentTabIndex, 1);
     expect(find.text('WALLET_SURFACE_BOOTSTRAP'), findsOneWidget);
-    expect(find.text('VPN_SURFACE_CONNECT'), findsNothing);
 
-    // Select EVOLVE tab.
-    shell.selectTab(2);
+    // Select Analysis (Evolve-only surface).
+    final analysisIdx = dests.indexWhere((d) => d.name == 'analysis');
+    shell.selectTab(analysisIdx);
     await tester.pump();
-    expect(shell.currentTabIndex, 2);
     expect(find.text('EVOLVE_SURFACE_HOME'), findsOneWidget);
-    expect(find.text('WALLET_SURFACE_BOOTSTRAP'), findsNothing);
 
-    // Select rpAI (Ned) tab.
-    shell.selectTab(3);
+    // Select rpAI.
+    final rpaiIdx = dests.indexWhere((d) => d.name == 'rpai');
+    shell.selectTab(rpaiIdx);
     await tester.pump();
-    expect(shell.currentTabIndex, 3);
     expect(find.text('RPAI_SURFACE_NED'), findsOneWidget);
-    expect(find.text('EVOLVE_SURFACE_HOME'), findsNothing);
 
     // Back to VPN without process restart.
     shell.selectTab(0);
     await tester.pump();
     expect(find.text('VPN_SURFACE_CONNECT'), findsOneWidget);
+
+    // Only the Suite main NavigationBar.
+    expect(find.byType(NavigationBar), findsOneWidget);
   });
 
-  testWidgets('NavigationBar taps switch tabs', (tester) async {
+  testWidgets('NavigationBar taps switch flat destinations', (tester) async {
     await tester.pumpWidget(
       MaterialApp(
         home: SuiteShell(
+          preferInitialParts: true,
+          initialParts: SuitePartsState.allInstalled,
           vpnTab: const _VpnSurface(),
           walletTab: const _WalletSurface(),
           evolveTab: const _EvolveSurface(),
@@ -180,11 +189,11 @@ void main() {
     );
     await tester.pump();
 
-    await tester.tap(find.text('%').last);
+    await tester.tap(find.text('Wallet').last);
     await tester.pump();
     expect(find.text('WALLET_SURFACE_BOOTSTRAP'), findsOneWidget);
 
-    await tester.tap(find.text('EVOLVE').last);
+    await tester.tap(find.text('Analysis').last);
     await tester.pump();
     expect(find.text('EVOLVE_SURFACE_HOME'), findsOneWidget);
 

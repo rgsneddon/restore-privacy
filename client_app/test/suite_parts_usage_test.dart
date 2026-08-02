@@ -181,9 +181,9 @@ void main() {
     });
   });
 
-  group('SuiteShell tab retain + reinstall', () {
+  group('SuiteShell flat family + reinstall', () {
     testWidgets(
-        'uninstalled optional part keeps tab and shows reinstall placeholder',
+        'wallet off + evolve on: family still on main bar via Evolve surfaces',
         (tester) async {
       final parts = SuitePartsState(
         walletInstalled: false,
@@ -205,31 +205,27 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      // All four tab labels remain.
+      // Flat main bar: no dual EVOLVE product slot; family destinations present.
       expect(find.text(kSuiteTabVpn), findsWidgets);
-      expect(find.text(kSuiteTabWallet), findsWidgets);
-      expect(find.text(kSuiteTabEvolve), findsWidgets);
+      expect(find.text('Wallet'), findsWidgets);
+      expect(find.text('Analysis'), findsWidgets);
       expect(find.text(kSuiteTabRpai), findsWidgets);
+      expect(find.text(kSuiteTabEvolve), findsNothing);
 
-      // Wallet tab: placeholder, not full surface.
-      await tester.tap(find.text(kSuiteTabWallet));
+      // Wallet destination served by Evolve inject when wallet part is off.
+      await tester.tap(find.text('Wallet').last);
       await tester.pumpAndSettle();
-      expect(find.byKey(const Key('suite_part_placeholder_wallet')), findsOneWidget);
-      expect(find.text(kSuitePartReinstallLabel), findsOneWidget);
+      expect(find.text('EVOLVE_FULL'), findsOneWidget);
       expect(find.text('WALLET_FULL'), findsNothing);
-      expect(find.textContaining(kSuitePartReinstallBody.substring(0, 40)),
-          findsOneWidget);
 
-      // Evolve still full.
-      await tester.tap(find.text(kSuiteTabEvolve));
+      await tester.tap(find.text('Analysis').last);
       await tester.pumpAndSettle();
       expect(find.text('EVOLVE_FULL'), findsOneWidget);
     });
 
-    testWidgets('reinstall restores full surface without second KEYGEN wall',
+    testWidgets('reinstall wallet part restores wallet inject path',
         (tester) async {
       final backend = MemorySettingsBackend();
-      // Prior licence / suite account still on device (not cleared by reinstall).
       backend.data['licence_accepted'] = true;
       backend.data['suite_account_registered'] = true;
       backend.data['suite_account_username'] = 'alice';
@@ -238,7 +234,7 @@ void main() {
       await store.save(
         const SuitePartsState(
           walletInstalled: false,
-          evolveInstalled: true,
+          evolveInstalled: false,
           rpaiInstalled: true,
         ),
       );
@@ -256,27 +252,28 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      await tester.tap(find.text(kSuiteTabWallet));
-      await tester.pumpAndSettle();
-      expect(find.byKey(const Key('suite_part_reinstall_btn_wallet')), findsOneWidget);
-      await tester.tap(find.byKey(const Key('suite_part_reinstall_btn_wallet')));
+      // Family destinations omitted when both wallet and evolve are off.
+      expect(find.text('Wallet'), findsNothing);
+      expect(find.text(kSuiteTabRpai), findsWidgets);
+
+      // Reinstall wallet via shell API (Settings path).
+      final shell = tester.state<SuiteShellState>(find.byType(SuiteShell));
+      await shell.setPartInstalled(SuitePartId.wallet, true);
       await tester.pumpAndSettle();
 
+      expect(find.text('Wallet'), findsWidgets);
+      await tester.tap(find.text('Wallet').last);
+      await tester.pumpAndSettle();
       expect(find.text('WALLET_FULL'), findsOneWidget);
-      expect(find.byKey(const Key('suite_part_placeholder_wallet')), findsNothing);
 
       final loaded = await store.load();
       expect(loaded.walletInstalled, isTrue);
-      // Entitlement / registration keys untouched by reinstall.
       expect(backend.data['licence_accepted'], isTrue);
       expect(backend.data['suite_account_registered'], isTrue);
       expect(backend.data['suite_account_username'], 'alice');
-      // No second-register wall invented by reinstall path.
-      expect(find.textContaining('Register for % wallet'), findsNothing);
-      expect(find.textContaining('KEYGEN'), findsNothing);
     });
 
-    testWidgets('cold start loads uninstalled flags; tabs still present',
+    testWidgets('cold start: uninstalled rpAI omitted from main bar',
         (tester) async {
       final backend = MemorySettingsBackend();
       final store = SuitePartsStore(backend);
@@ -304,12 +301,8 @@ void main() {
       final state = tester.state<SuiteShellState>(find.byType(SuiteShell));
       expect(state.partsState.walletInstalled, isFalse);
       expect(state.partsState.rpaiInstalled, isFalse);
-      expect(find.text(kSuiteTabWallet), findsWidgets);
-      expect(find.text(kSuiteTabRpai), findsWidgets);
-
-      await tester.tap(find.text(kSuiteTabRpai));
-      await tester.pumpAndSettle();
-      expect(find.byKey(const Key('suite_part_placeholder_rpai')), findsOneWidget);
+      expect(find.text('Analysis'), findsWidgets);
+      expect(find.text(kSuiteTabRpai), findsNothing);
       expect(find.text('RPAI_COLD'), findsNothing);
     });
   });

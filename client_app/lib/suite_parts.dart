@@ -320,8 +320,9 @@ int suiteSwipePrevIndex(int current, int destinationCount) {
 
 /// Map a completed horizontal swipe to the next index.
 ///
-/// Product copy: **left-to-right** finger motion advances VPN→%→Evolve→rpAI;
-/// **right-to-left** walks back. Positive [dx] = left-to-right.
+/// Product (reversed from prior reverse:true pager): **right-to-left** finger
+/// motion (negative [dx], standard [PageView]) advances toward higher indices;
+/// **left-to-right** (positive [dx]) walks back. End blocks at first/last.
 int suiteIndexAfterHorizontalSwipe({
   required int current,
   required int destinationCount,
@@ -336,6 +337,7 @@ int suiteIndexAfterHorizontalSwipe({
           ? 0
           : (current >= n ? n - 1 : current));
   if (dx.abs() < threshold) return clamped;
-  if (dx > 0) return suiteSwipeNextIndex(clamped, n);
+  // Reversed vs prior product: positive dx retreats, negative advances.
+  if (dx < 0) return suiteSwipeNextIndex(clamped, n);
   return suiteSwipePrevIndex(clamped, n);
 }

@@ -28,6 +28,8 @@ class SuiteWalletTab extends StatefulWidget {
     this.walletProvider,
     this.localeProvider,
     this.child,
+    this.showShellBottomBar = false,
+    this.shellTabIndex,
   });
 
   /// Injectable for tests; production creates [PercWalletProvider].
@@ -38,6 +40,12 @@ class SuiteWalletTab extends StatefulWidget {
 
   /// When set, replaces bootstrap (tests inject a ready surface).
   final Widget? child;
+
+  /// Suite path: nested shell bottom bar off (main bar owns destinations).
+  final bool showShellBottomBar;
+
+  /// Suite path: which wallet shell tab body to show (0–2).
+  final int? shellTabIndex;
 
   @override
   State<SuiteWalletTab> createState() => _SuiteWalletTabState();
@@ -140,7 +148,11 @@ class _SuiteWalletTabState extends State<SuiteWalletTab> {
     }
 
     final body = widget.child ??
-        WalletBootstrapScreen(walletProvider: _wallet!);
+        WalletBootstrapScreen(
+          walletProvider: _wallet!,
+          showShellBottomBar: widget.showShellBottomBar,
+          shellTabIndex: widget.shellTabIndex,
+        );
 
     return MultiProvider(
       providers: [

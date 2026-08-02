@@ -37,6 +37,8 @@ class SuiteEvolveTab extends StatefulWidget {
     this.fcgProvider,
     this.localeProvider,
     this.child,
+    this.showShellBottomBar = false,
+    this.shellTabIndex,
   });
 
   final EvolveProvider? evolveProvider;
@@ -46,6 +48,12 @@ class SuiteEvolveTab extends StatefulWidget {
 
   /// When set, replaces bootstrap (tests inject a ready surface).
   final Widget? child;
+
+  /// Suite path: nested shell bottom bar off (main bar owns destinations).
+  final bool showShellBottomBar;
+
+  /// Suite path: which evolve shell tab body to show.
+  final int? shellTabIndex;
 
   @override
   State<SuiteEvolveTab> createState() => _SuiteEvolveTabState();
@@ -236,7 +244,11 @@ class _SuiteEvolveTabState extends State<SuiteEvolveTab> {
     }
 
     final body = widget.child ??
-        AppBootstrapScreen(walletProvider: _wallet!);
+        AppBootstrapScreen(
+          walletProvider: _wallet!,
+          showShellBottomBar: widget.showShellBottomBar,
+          shellTabIndex: widget.shellTabIndex,
+        );
 
     return MultiProvider(
       providers: [

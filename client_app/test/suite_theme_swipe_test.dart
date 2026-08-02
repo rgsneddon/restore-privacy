@@ -309,28 +309,29 @@ void main() {
       expect(suiteSwipePrevIndex(-5, n), 0);
     });
 
-    test('horizontal swipe dx: positive advances, negative retreats', () {
+    test('horizontal swipe dx: negative advances, positive retreats (reversed)',
+        () {
       const n = 4;
-      // Left-to-right finger (dx > 0) → next
+      // Right-to-left finger (dx < 0) → next (natural PageView / reversed product)
       expect(
-        suiteIndexAfterHorizontalSwipe(current: 0, destinationCount: n, dx: 40),
+        suiteIndexAfterHorizontalSwipe(current: 0, destinationCount: n, dx: -40),
         1,
       );
       expect(
-        suiteIndexAfterHorizontalSwipe(current: 2, destinationCount: n, dx: 12),
+        suiteIndexAfterHorizontalSwipe(current: 2, destinationCount: n, dx: -12),
         3,
       );
       expect(
-        suiteIndexAfterHorizontalSwipe(current: 3, destinationCount: n, dx: 50),
+        suiteIndexAfterHorizontalSwipe(current: 3, destinationCount: n, dx: -50),
         3,
       );
-      // Right-to-left finger (dx < 0) → prev
+      // Left-to-right finger (dx > 0) → prev
       expect(
-        suiteIndexAfterHorizontalSwipe(current: 3, destinationCount: n, dx: -40),
+        suiteIndexAfterHorizontalSwipe(current: 3, destinationCount: n, dx: 40),
         2,
       );
       expect(
-        suiteIndexAfterHorizontalSwipe(current: 0, destinationCount: n, dx: -40),
+        suiteIndexAfterHorizontalSwipe(current: 0, destinationCount: n, dx: 40),
         0,
       );
     });
