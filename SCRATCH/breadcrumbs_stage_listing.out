@@ -1,0 +1,23 @@
+dist/breadcrumbs/1.0.9/:
+total 160
+drwxr-xr-x  9 russellsneddon  staff    288  2 Aug 22:18 .
+drwxr-xr-x  4 russellsneddon  staff    128  2 Aug 22:18 ..
+-rw-r--r--  1 russellsneddon  staff    393  2 Aug 23:12 APPLE_HANDOFF.md
+-rw-r--r--  1 russellsneddon  staff   2886  2 Aug 23:12 checklist.md
+-rw-r--r--  1 russellsneddon  staff   1114  2 Aug 23:12 honesty.json
+-rw-r--r--  1 russellsneddon  staff   6266  2 Aug 23:12 manifest.json
+-rw-r--r--  1 russellsneddon  staff   5906  2 Aug 23:12 WINDOWS_BRAND_CHECKLIST.md
+-rw-r--r--  1 russellsneddon  staff  29558  2 Aug 23:12 windows_brand_mirror.json
+-rw-r--r--  1 russellsneddon  staff  20475  2 Aug 23:12 WINDOWS_HANDOFF.md
+
+dist/breadcrumbs/current/:
+total 160
+drwxr-xr-x  9 russellsneddon  staff    288  1 Aug 08:50 .
+drwxr-xr-x  4 russellsneddon  staff    128  2 Aug 22:18 ..
+-rw-r--r--  1 russellsneddon  staff    393  2 Aug 23:12 APPLE_HANDOFF.md
+-rw-r--r--  1 russellsneddon  staff   2886  2 Aug 23:12 checklist.md
+-rw-r--r--  1 russellsneddon  staff   1114  2 Aug 23:12 honesty.json
+-rw-r--r--  1 russellsneddon  staff   6266  2 Aug 23:12 manifest.json
+-rw-r--r--  1 russellsneddon  staff   5906  2 Aug 23:12 WINDOWS_BRAND_CHECKLIST.md
+-rw-r--r--  1 russellsneddon  staff  29558  2 Aug 23:12 windows_brand_mirror.json
+-rw-r--r--  1 russellsneddon  staff  20475  2 Aug 23:12 WINDOWS_HANDOFF.md

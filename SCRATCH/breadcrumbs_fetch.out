@@ -1,0 +1,13 @@
+{
+  "monopin": "1.0.9",
+  "macos_needs_work": false,
+  "ios_needs_work": false,
+  "needs_any_apple_work": false,
+  "macbook_actions": [
+    "none_apple_up_to_date"
+  ],
+  "up_to_date": true,
+  "source_of_truth": "helsinki_breadcrumbs_vault",
+  "github_breadcrumb_flow": "deprecated"
+}
+STATUS: Apple packages up to date for monopin

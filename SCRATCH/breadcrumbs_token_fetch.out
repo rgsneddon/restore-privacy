@@ -1,0 +1,93 @@
+=== GET breadcrumbs/current/manifest.json ===
+{
+  "schema": "rpt.breadcrumbs.v1",
+  "monopin": "1.0.9",
+  "generated_at": "2026-08-02T22:12:42Z",
+  "source_of_truth": "helsinki_breadcrumbs_vault",
+  "github_breadcrumb_flow": "deprecated",
+  "github_note": "Do not use private GitHub APPLE_HANDOFF pull as the primary Mac task queue. Fetch this vault instead. Source code may still live in the private repo.",
+  "helsinki_host": "135.181.152.10",
+  "breadcrumbs_base": "https://135.181.152.10.sslip.io/breadcrumbs",
+  "platforms": {
+    "macos": {
+      "platform": "macos",
+      "monopin": "1.0.9",
+      "package_present": true,
+      "bundle_version": "1.0.9",
+      "status": "native_monopin",
+      "needs_work": false,
+      "notes": "CFBundle/marketing version 1.0.9 matches monopin 1.0.9.",
+      "path": "/Users/russellsneddon/restore-privacy/status_page/assets/1.0.9/restore-privacy-client-1.0.9-macos.zip",
+      "size": 27801379,
+      "plist_paths": [
+        "restore_privacy_client.app/Contents/Info.plist"
+      ]
+    },
+    "ios": {
+      "platform": "ios",
+      "monopin": "1.0.9",
+      "package_present": true,
+      "bundle_version": "1.0.9",
+      "status": "native_monopin",
+      "needs_work": false,
+      "notes": "CFBundle/marketing version 1.0.9 matches monopin 1.0.9.",
+      "path": "/Users/russellsneddon/restore-privacy/status_page/assets/1.0.9/restore-privacy-client-1.0.9-ios.zip",
+      "size": 13218209,
+      "plist_paths": [
+        "Runner.app/Info.plist"
+      ]
+    }
+  },
+  "macbook_actions": [
+    "none_apple_up_to_date"
+  ],
+  "windows_actions": [
+    "mirror_monorepo_and_brand_assets_to_large_drive",
+    "rebuild_windows_native_pe_seal",
+    "upload_paid_assets_1.0.9",
+    "observe_first_run_account_seed_licence_before_vpn",
+    "observe_72h_keygen_free_trial_then_pay",
+    "observe_suite_shell_vpn_percent_evolve_backup_rpai",
+    "observe_ned_oracle_admin_rps_and_full_admin_map"
+  ],
+  "windows_brand_mirror": {
+    "schema": "rpt.windows_brand_mirror.v1",
+    "brand_slot_count": 35,
+    "b
+=== HEAD WINDOWS_HANDOFF.md ===
+HTTP/2 200 
+server: nginx/1.18.0 (Ubuntu)
+date: Sun, 02 Aug 2026 22:13:10 GMT
+content-type: text/markdown
+content-length: 20475
+cache-control: no-store
+strict-transport-security: max-age=31536000; includeSubDomains
+
+=== HEAD versioned WINDOWS_HANDOFF ===
+HTTP/2 200 
+server: nginx/1.18.0 (Ubuntu)
+date: Sun, 02 Aug 2026 22:13:11 GMT
+content-type: text/markdown
+content-length: 20475
+cache-control: no-store
+strict-transport-security: max-age=31536000; includeSubDomains
+
+# Windows brand breadcrumbs — monopin 1.0.9
+
+**Audience:** Windows build machine operator. This is the **full product map**
+for Suite **1.0.9**: client architecture, residual fleet, **Ned / rpAI / oracle**,
+**every status-host admin surface**, fulfilment, brand companions, and PE rebuild.
+Fetch via Helsinki breadcrumbs vault when published
+(`scripts/breadcrumbs_vault.py check --fetch`).
+
+**Catalog monopin:** `1.0.9` (`client/VERSION` must match).
+
+**Target Suite PE (must match basename):**
+
+```text
+releases/1.0.9/restore-privacy-client-1.0.9-windows-x64-setup.exe
+```
+
+Honesty: Mac may stage a **carry-forward** PE under that filename until this
+machine rebuilds and Authenticode-seals a native **1.0.9** installer. Do not
+claim native Windows seal complete until you have built and signed he

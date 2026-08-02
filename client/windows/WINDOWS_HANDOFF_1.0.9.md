@@ -29,6 +29,7 @@ Architecture below is product truth regardless of PE carry-forward.
 | Evolve inherit | Suite step-1 account session rehydrates on family host; no redundant create-account wall when `hasAppAccess` |
 | macOS VPN prep | Sequenced prepare → await → open System Settings if needed → Connect (no simultaneous popup burst) |
 | Residual peers | IS+DE only (US retired) — unchanged |
+| Family auto-login | After Suite step-1 register, family wallet rehydrates `hasAppAccess` so Analysis/Voting icons stay; missing session stamps no longer force logout on boot (evolve + Suite rehydrate) |
 | Free Suite download | Five catalog basenames under Helsinki `paid_assets/1.0.9/` |
 
 
