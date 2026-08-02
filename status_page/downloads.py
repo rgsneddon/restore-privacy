@@ -1088,11 +1088,8 @@ SUITE_PRODUCT_SUBTITLE = (
     "VPN, Perccent wallet (%), and Evolve in one app — start the KEYGEN free trial to download"
 )
 SUITE_VERSION_LABEL = f"v {RELEASE_VERSION}"
-SUITE_KEYGEN_HINT = (
-    f"Brand installers require a KEYGEN licence first: start the 3-day free trial "
-    f"({PRICE_LABEL}/month or yearly) — no money is taken until after the trial ends. "
-    "Enter the KEYGEN from your fulfilment email to unlock residual Connect and downloads."
-)
+# Retired left-box KEYGEN licence/trial line (no longer shown on storefront).
+SUITE_KEYGEN_HINT = ""
 # Left-box pay-hint under Get KEYGEN (customer-facing trial/checkout guidance)
 SUITE_PAY_HINT_HTML = (
     "<strong>To start your 3-day free trial</strong> (Get KEYGEN above) — please enter "
@@ -2298,7 +2295,6 @@ def render_suite_storefront_html(
     <span class="suite-version-badge" id="suite-version-badge">{SUITE_VERSION_LABEL}</span>
     <p class="suite-blurb" id="suite-blurb">{SUITE_PRODUCT_SUBTITLE}</p>
 {render_suite_product_submenu_html()}
-    <p class="suite-keygen-line" id="suite-keygen-line">{SUITE_KEYGEN_HINT}</p>
     <div class="dl-buttons" id="suite-dl-buttons" data-buy-mode="suite-keygen"
          data-product="suite">
 {keygen_form}

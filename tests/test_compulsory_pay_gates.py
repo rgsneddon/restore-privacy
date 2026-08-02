@@ -248,9 +248,10 @@ class TestStorefrontCopyCompulsory(unittest.TestCase):
         )
         from service_commercial import render_service_page_html
 
-        self.assertIn("KEYGEN", SUITE_KEYGEN_HINT)
-        self.assertIn("3-day", SUITE_KEYGEN_HINT.lower() or SUITE_KEYGEN_HINT)
+        # Retired suite-keygen-line copy is empty / not rendered
+        self.assertEqual(SUITE_KEYGEN_HINT, "")
         self.assertIn("trial", SUITE_PRODUCT_SUBTITLE.lower())
+        self.assertIn("KEYGEN", SUITE_PRODUCT_SUBTITLE)
         self.assertIn("3000", NODE_PREFERENCE_DEPOSIT_LABEL)
         self.assertIn("deposit", NODE_PREFERENCE_HEADING.lower())
 
@@ -259,6 +260,11 @@ class TestStorefrontCopyCompulsory(unittest.TestCase):
         self.assertIn("trial", suite.lower())
         self.assertIn("suite-keygen-buy", suite)
         self.assertIn("free trial", suite.lower())
+        self.assertIn('id="suite-storefront"', suite)
+        # Retired KEYGEN licence/trial hint line removed from left box
+        self.assertNotIn("Brand installers require a KEYGEN licence first", suite)
+        self.assertNotIn('id="suite-keygen-line"', suite)
+        self.assertNotIn("suite-keygen-line", suite)
         # Left-box pay-hint: new trial/checkout copy (no Business-Class £3000 line)
         i_hint = suite.index('id="suite-pay-hint"')
         hint = suite[i_hint : i_hint + 700]
@@ -273,7 +279,10 @@ class TestStorefrontCopyCompulsory(unittest.TestCase):
         self.assertNotIn("£3000", hint)
         self.assertNotIn("Business-Class", hint)
         self.assertNotIn("3000", suite)  # deposit no longer in storefront hint
-
+        # Distinctive retired mid-phrase must not appear in storefront either
+        self.assertNotIn(
+            "no money is taken until after the trial ends", suite.lower()
+        )
         # Pure helper still builds commercial deposit markup (not on homepage)
         home_biz = render_node_preference_html()
         self.assertIn("£3000", home_biz)
