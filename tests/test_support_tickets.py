@@ -413,18 +413,32 @@ class TestSupportTicketPure(unittest.TestCase):
             customer_mail_sent=True,
         )
         self.assertIn("RPS-042", ok_page)
-        self.assertIn("confirmation", ok_page.lower())
+        self.assertIn('id="support-ticket-id"', ok_page)
+        ok_i = ok_page.index('id="support-success"')
+        ok_block = ok_page[ok_i : ok_i + 700]
+        self.assertIn("Your message was sent", ok_block)
+        self.assertIn("notified the team at", ok_block)
+        self.assertIn("rus@restoreprivacy.online", ok_block)
+        self.assertIn("emailing you a confirmation", ok_block)
+        self.assertIn("copy of your support ticket", ok_block)
+        self.assertIn("further support in this specific detail", ok_block)
+        self.assertIn("48 hours", ok_block)
+        self.assertNotIn("via site SMTP and emailed you a confirmation", ok_block)
+        self.assertNotIn("Keep this reference if you write again", ok_block)
+        self.assertNotIn("Ticket received.", ok_block)
         fail_page = render_support_page_html(
             success_ticket_id="RPS-043",
             mail_sent=False,
         )
         self.assertIn("could not send email", fail_page.lower())
+        self.assertIn("RPS-043", fail_page)
         partial = render_support_page_html(
             success_ticket_id="RPS-044",
             mail_sent=True,
             customer_mail_sent=False,
         )
         self.assertIn("confirmation copy", partial.lower())
+        self.assertIn("RPS-044", partial)
 
     def test_nav_includes_support(self):
         from public_chrome import public_nav_links_html

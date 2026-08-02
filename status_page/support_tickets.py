@@ -1011,29 +1011,33 @@ def render_support_page_html(
         tid = html.escape(success_ticket_id)
         # Honest mail lines: ticket always stored; staff + customer SMTP may differ
         if mail_sent is False:
-            mail_line = (
+            ok_html = (
+                f'<div class="support-ok" role="status" id="support-success">'
                 f"<p>Your ticket is saved. We could not send email right now "
-                f"(site SMTP). Quote <code>{tid}</code> if you write again to "
-                f"{html.escape(SUPPORT_INBOX)}.</p>"
+                f"(site SMTP). Quote "
+                f"<code id=\"support-ticket-id\">{tid}</code> if you write again to "
+                f"{html.escape(SUPPORT_INBOX)}.</p></div>"
             )
         elif customer_mail_sent is False:
-            mail_line = (
-                f"<p>We notified the team at {html.escape(SUPPORT_INBOX)} via site SMTP. "
+            ok_html = (
+                f'<div class="support-ok" role="status" id="support-success">'
+                f"<p>We notified the team at {html.escape(SUPPORT_INBOX)}. "
                 f"We could not email you a confirmation copy right now. "
-                f"Keep reference <code>{tid}</code>.</p>"
+                f"Keep reference "
+                f"<code id=\"support-ticket-id\">{tid}</code>.</p></div>"
             )
         else:
-            mail_line = (
-                f"<p>We notified the team at {html.escape(SUPPORT_INBOX)} via site SMTP "
-                f"and emailed you a confirmation with a copy of your ticket. "
-                f"Keep this reference if you write again.</p>"
+            # Full success — OBJECTIVE customer-facing confirmation
+            ok_html = (
+                f'<div class="support-ok" role="status" id="support-success">'
+                f"<p>Your message was sent and we have notified the team at "
+                f"<strong>{html.escape(SUPPORT_INBOX)}</strong> — emailing you a "
+                f"confirmation, with a copy of your support ticket. Keep this "
+                f"reference "
+                f"<code id=\"support-ticket-id\">{tid}</code> if you need to write "
+                f"for further support in this specific detail. Please allow up to "
+                f"48 hours for a response to your ticket.</p></div>"
             )
-        ok_html = (
-            f'<div class="support-ok" role="status" id="support-success">'
-            f"<p><strong>Ticket received.</strong> Your reference is "
-            f"<code id=\"support-ticket-id\">{tid}</code>.</p>"
-            f"{mail_line}</div>"
-        )
     fields = {
         "email": html.escape(pre.get("email") or ""),
         "subject": html.escape(pre.get("subject") or ""),
