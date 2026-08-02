@@ -129,7 +129,8 @@ class TestCheckoutFlowStillSubscription(unittest.TestCase):
         ).decode()
         self.assertIn("mode=subscription", body)
         self.assertIn(yid, unquote(body))
-        self.assertIn("subscription_data%5Btrial_period_days%5D=3", body)
+        self.assertNotIn("subscription_data%5Btrial_period_days%5D=", body)
+        self.assertIn("metadata%5Btrial_period_days%5D=0", body)
 
 
 if __name__ == "__main__":

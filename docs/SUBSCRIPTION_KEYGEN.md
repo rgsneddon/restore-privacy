@@ -7,9 +7,9 @@
    Connect needs a **paid KEYGEN / active subscription**.
 2. Buy a KEYGEN on [restoreprivacy.online](https://restoreprivacy.online/) when
    ready: Homepage / `/pay` offer **Monthly VPN plan (£3.00)** (one month) and
-   **Yearly VPN plan (£30.00)** (one year). Customers can **enable or disable
-   auto-renew** before checkout (default: on). You do **not** need payment
-   details to start the free residual trial.
+   **Yearly VPN plan (£30.00)** (one year). Checkout bills the subscription
+   **immediately** (no Stripe free trial — residual free trial is in-app only).
+   Customers can **enable or disable auto-renew** before checkout (default: on).
 3. Status host on `checkout.session.completed`:
    - mints a **12-hour** download token (reusable until expiry)
    - activates Connect entitlement with **`valid_until`** = Stripe period end

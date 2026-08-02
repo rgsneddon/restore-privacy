@@ -4,11 +4,11 @@
 
 1. Production status host can send **keygen + PPI + download** fulfilment email
    (SMTP env vars on Render).
-2. Residual Connect: free **3-day (72-hour) device trial** (**no card**); after
-   expiry a paid KEYGEN is required. Catalog routes to **Select your plan**
-   (`/pay`) for **Monthly VPN plan (£3.00/month)** or **Yearly VPN plan
-   (£30.00/year)** when buying that KEYGEN — Stripe **subscription** Checkout
-   (not “card before residual trial”).
+2. Residual Connect: free **3-day (72-hour) device trial** in the app (**no
+   card**); after expiry a paid KEYGEN is required. Catalog routes to **Select
+   your plan** (`/pay`) for **Monthly VPN plan (£3.00/month)** or **Yearly VPN
+   plan (£30.00/year)** — Stripe **subscription** Checkout with
+   **trial_period_days = 0** (bill immediately).
 
 ## SMTP env keys (shipped reader)
 
@@ -164,7 +164,8 @@ python scripts/configure_stripe_payment_link_trial.py --dry-run
 ```
 
 The script reuses or creates monthly £3.00 and yearly **£30.00** (3000 pence)
-prices and asserts catalog **trial_period_days = 3** on Checkout. Prefer Checkout Session price ids over
+prices. Catalog Checkout uses **trial_period_days = 0** (no Stripe free trial;
+residual free trial is in-app only). Prefer Checkout Session price ids over
 legacy Payment Links for catalog.
 
 ## Verification checklist
@@ -175,7 +176,7 @@ legacy Payment Links for catalog.
 | App reads same keys | `python -c "from payments import fulfilment_smtp_env_keys; print(fulfilment_smtp_env_keys())"` from `status_page/` |
 | Host healthy | `GET https://restoreprivacy.online/health` → `{"ok":true}` (twice) |
 | Fulfilment probe | `GET https://restoreprivacy.online/health/fulfilment` → `ok: true` |
-| 3-day trial + monthly/yearly | Desired fields: `trial_period_days` **3**; monthly `300`; yearly **`3000`**; products Monthly/Yearly VPN plan |
+| Stripe KEYGEN + residual trial | Desired fields: `trial_period_days` **0**; monthly `300`; yearly **`3000`**; residual in-app 72h |
 | Catalog entry | Homepage tiles → `/pay?platform=…` (site plan page) |
 
 ## Code map

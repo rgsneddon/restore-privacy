@@ -12,10 +12,9 @@ email, then Connect.
 You do **not** need to enter payment details before trying residual Connect for
 three days. Pay only when you want to continue after the trial.
 
-After first-run (Suite account, seed, licence) the app may auto-claim the device
-trial. Reinstall that keeps the same device key (or durable install marker) does
-**not** grant a second full trial window — best-effort host enforcement; a full
-wipe that mints a new device key can still claim once (honest limit without PII).
+After first-run (Suite account, seed, licence) the app may auto-claim the free
+device trial. When the trial ends, the app asks for a KEYGEN; residual Connect
+stays blocked until you subscribe.
 
 **Business-Class / full business package** requires a separate compulsory
 **£3000 deposit** via `/pay/commercial-suite` (Service page) — not the KEYGEN

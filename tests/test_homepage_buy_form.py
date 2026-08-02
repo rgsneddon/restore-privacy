@@ -105,11 +105,12 @@ class TestCheckoutIntervalDistinct(unittest.TestCase):
         py = parse_qs(by)
         self.assertEqual(pm["line_items[0][price]"], [mid])
         self.assertEqual(py["line_items[0][price]"], [yid])
-        self.assertIn("trial_period_days", bm)
-        self.assertIn("trial_period_days", by)
+        # Stripe Checkout has no subscription trial (residual trial is in-app)
         from urllib.parse import parse_qs as _pqs
-        self.assertEqual(_pqs(bm)["subscription_data[trial_period_days]"], ["3"])
-        self.assertEqual(_pqs(by)["subscription_data[trial_period_days]"], ["3"])
+        self.assertNotIn("subscription_data[trial_period_days]", _pqs(bm))
+        self.assertNotIn("subscription_data[trial_period_days]", _pqs(by))
+        self.assertEqual(_pqs(bm).get("metadata[trial_period_days]"), ["0"])
+        self.assertEqual(_pqs(by).get("metadata[trial_period_days]"), ["0"])
 
 
 if __name__ == "__main__":

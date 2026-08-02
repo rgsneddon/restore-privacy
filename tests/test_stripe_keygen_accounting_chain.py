@@ -35,7 +35,8 @@ class TestKeygenPayLinkInventory(unittest.TestCase):
 
         self.assertEqual(PRICE_PENCE, 300)
         self.assertEqual(PRICE_YEARLY_PENCE, 3000)
-        self.assertEqual(CATALOG_TRIAL_PERIOD_DAYS, 3)
+        # Stripe KEYGEN checkout has no trial; residual free trial is in-app only.
+        self.assertEqual(CATALOG_TRIAL_PERIOD_DAYS, 0)
         self.assertTrue(is_catalog_keygen_amount_pence(300))
         self.assertTrue(is_catalog_keygen_amount_pence(3000))
         self.assertFalse(is_catalog_keygen_amount_pence(0))
@@ -53,7 +54,7 @@ class TestKeygenPayLinkInventory(unittest.TestCase):
             if e.get("not_keygen"):
                 self.assertEqual(e["amounts_pence"], [COMMERCIAL_SUITE_NODE_PRICE_PENCE])
                 continue
-            self.assertEqual(e["trial_days"], 3)
+            self.assertEqual(e["trial_days"], 0)
             for a in e["amounts_pence"]:
                 self.assertTrue(is_catalog_keygen_amount_pence(a), msg=a)
 
@@ -61,12 +62,12 @@ class TestKeygenPayLinkInventory(unittest.TestCase):
         self.assertTrue(m["ok"], m)
         self.assertEqual(m["mode"], "subscription")
         self.assertEqual(m["amount_pence"], 300)
-        self.assertEqual(m["trial_period_days"], 3)
+        self.assertEqual(m["trial_period_days"], 0)
 
         y = catalog_keygen_subscription_body_fields("linux", interval="year")
         self.assertTrue(y["ok"], y)
         self.assertEqual(y["amount_pence"], 3000)
-        self.assertEqual(y["trial_period_days"], 3)
+        self.assertEqual(y["trial_period_days"], 0)
 
         # Suite product line same prices
         s = catalog_keygen_subscription_body_fields(
@@ -84,13 +85,26 @@ class TestKeygenPayLinkInventory(unittest.TestCase):
         self.assertIn('action="/pay/checkout"', plan)
         self.assertIn("£3.00", plan)
         self.assertIn("£30.00", plan)
-        self.assertIn("3-day free trial", plan.lower() or plan)
+        # Residual trial is in-app; pay page must not market Stripe free trial
+        low = plan.lower()
+        self.assertTrue(
+            "72" in low or "residual" in low or "3-day" in low,
+            plan[:300],
+        )
+        self.assertNotIn("no charge until trial ends", low)
+        self.assertTrue(
+            "no stripe trial" in low
+            or "bills immediately" in low
+            or "72-hour" in low,
+            plan[:400],
+        )
 
         home = render_download_section_html(coming_soon=False)
         self.assertIn('action="/pay/checkout"', home)
 
         suite = render_suite_storefront_html(default_platform="android")
-        self.assertIn('action="/pay/checkout"', suite)
+        # Suite KEYGEN CTA goes to site /pay cart (not direct checkout body)
+        self.assertIn('action="/pay"', suite)
         self.assertIn('name="product" value="suite"', suite)
         self.assertIn('name="interval" value="month"', suite)
 

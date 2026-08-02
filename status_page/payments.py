@@ -43,14 +43,16 @@ PRICE_YEARLY_FULL_LABEL = (
 YEARLY_DISCOUNT_PERCENT = int(
     round(100 * (1 - PRICE_YEARLY_PENCE / max(1, PRICE_YEARLY_FULL_PENCE)))
 )
-# Free residual trial window (days) for product messaging; KEYGEN path is paid after.
-# Stripe Checkout may still attach trial_period_days on catalog prices where configured;
-# customer copy must not require card details before residual trial.
-CATALOG_TRIAL_PERIOD_DAYS = 3
-# Customer-facing trial copy (homepage, /pay, desired fields) — residual first.
+# In-app residual free trial (host device_pub / install_id) — NOT Stripe Checkout.
+RESIDUAL_TRIAL_DAYS = 3
+RESIDUAL_TRIAL_HOURS = 72
+# Stripe KEYGEN subscription Checkout: **no** free trial period (bill immediately).
+CATALOG_TRIAL_PERIOD_DAYS = 0
+# Customer-facing copy: residual trial is in the app; pay KEYGEN after it ends.
 CATALOG_TRIAL_COPY = (
-    f"Free {CATALOG_TRIAL_PERIOD_DAYS}-day (72-hour) residual trial without card; "
-    "after that a paid KEYGEN / active subscription is required"
+    f"Free {RESIDUAL_TRIAL_DAYS}-day ({RESIDUAL_TRIAL_HOURS}-hour) residual trial "
+    "in the app without card; after it ends a paid KEYGEN / active subscription "
+    "is required (subscription bills at checkout — no Stripe trial)"
 )
 # Operator: enable Stripe Dashboard Adaptive Pricing when presentment allows;
 # unsupported currencies → USD (see local_currency.stripe_presentment_or_usd).
@@ -4911,9 +4913,9 @@ def desired_payment_link_trial_fields() -> dict[str, Any]:
     (no network). Configure script can sync Dashboard prices when
     ``STRIPE_SECRET_KEY`` is set.
 
-    ``trial_period_days`` is **:data:`CATALOG_TRIAL_PERIOD_DAYS`** (3) for both
-    monthly and yearly. Catalog amounts: monthly **£3.00** (300 pence), yearly
-    **£30.00** (3000 pence).
+    ``trial_period_days`` is **0** (no Stripe free trial). Residual free trial
+    is in-app only (:data:`RESIDUAL_TRIAL_DAYS`). Catalog amounts: monthly
+    **£3.00** (300 pence), yearly **£30.00** (3000 pence).
     """
     return {
         "payment_link_id": DEFAULT_STRIPE_PAYMENT_LINK_ID,
@@ -5114,12 +5116,14 @@ def render_pay_plan_page_html(
       <p class="pay-plan-lead" id="pay-plan-lead">
         Cart for a <strong>{_esc(product_label)}</strong> (one device) —
         buy a KEYGEN when you want residual Connect past the free trial.
-        Residual Connect includes a free <strong>{CATALOG_TRIAL_PERIOD_DAYS}-day
-        (72-hour) trial</strong> on this device (<strong>no card</strong>). After
-        that trial ends, a <strong>paid KEYGEN / active subscription</strong> is
-        required. Choose <strong>Monthly</strong> ({_esc(monthly_label)} for one
-        month) or <strong>Annual</strong> ({_esc(yearly_label)} for one year —
-        save about {save_pct}% vs 12 × monthly).
+        Residual Connect includes a free <strong>{RESIDUAL_TRIAL_DAYS}-day
+        ({RESIDUAL_TRIAL_HOURS}-hour) trial</strong> in the app
+        (<strong>no card</strong>). After that trial ends, a
+        <strong>paid KEYGEN / active subscription</strong> is required — checkout
+        bills immediately (no Stripe trial period). Choose
+        <strong>Monthly</strong> ({_esc(monthly_label)} for one month) or
+        <strong>Annual</strong> ({_esc(yearly_label)} for one year — save about
+        {save_pct}% vs 12 × monthly).
         Use the auto-renew control below to keep or stop billing after this period.
         Without renewal after the paid period, Connect expires and the client becomes
         unusable until you renew. You complete checkout securely on Stripe.
@@ -5193,14 +5197,14 @@ def _normalize_trial_days(value: Any) -> int | None:
 
 
 def payment_link_matches_trial_subscription(price_obj: dict[str, Any]) -> dict[str, Any]:
-    """Check a Stripe Price object against desired £3.00/mo + **3-day trial**.
+    """Check a Stripe Price object against desired £3.00/mo + **no Stripe trial**.
 
     *price_obj* is a Stripe API Price dict (or redacted summary). Returns
     ``{ok, mismatches[], observed}`` without inventing success.
 
-    Desired ``trial_period_days`` is :data:`CATALOG_TRIAL_PERIOD_DAYS` (3).
-    Price objects alone may not carry trial; pass
-    ``payment_link_trial_period_days`` when the trial is on the link/session.
+    Desired ``trial_period_days`` is **0** (:data:`CATALOG_TRIAL_PERIOD_DAYS`).
+    Residual free trial is in-app only. Price objects alone may not carry trial;
+    pass ``payment_link_trial_period_days`` when the trial is on the link/session.
     """
     want = desired_payment_link_trial_fields()
     mismatches: list[str] = []
@@ -7201,8 +7205,9 @@ def build_subscription_checkout_form_body(
     *product_line* ``suite`` marks Restore Privacy Suite in metadata and
     client_reference_id; grant shape remains the shared Connect entitlement.
 
-    Applies catalog free trial (:data:`CATALOG_TRIAL_PERIOD_DAYS`) via
-    ``subscription_data[trial_period_days]`` for both intervals.
+    Residual free trial is in-app only. Stripe KEYGEN Checkout has
+    **no** ``subscription_data[trial_period_days]`` when
+    :data:`CATALOG_TRIAL_PERIOD_DAYS` is 0 (immediate bill).
     *currency* may be ``usd`` for presentment conversion via price_data fallback
     when a dedicated USD price is not configured (inline recurring price_data).
 
@@ -7241,8 +7246,10 @@ def build_subscription_checkout_form_body(
         ("subscription_data[metadata][billing_interval]", iv),
         ("subscription_data[metadata][product_line]", pl),
         ("subscription_data[metadata][auto_renew]", "1" if renew else "0"),
-        ("subscription_data[trial_period_days]", str(trial_days)),
     ]
+    # Only attach Stripe trial when catalog still requests one (must be 0 now).
+    if trial_days > 0:
+        fields.append(("subscription_data[trial_period_days]", str(trial_days)))
     # Prefer create-time cancel_at_period_end when the Stripe API version accepts
     # it; some accounts return parameter_unknown — then fulfilment applies
     # cancel_at_period_end on the Subscription after checkout.session.completed

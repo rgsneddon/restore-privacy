@@ -70,8 +70,9 @@ class TestPaymentLinkTrialHelpers(unittest.TestCase):
         self.assertEqual(d["unit_amount_pence"], 300)
         self.assertEqual(d["currency"], "gbp")
         self.assertEqual(d["recurring_interval"], "month")
-        self.assertEqual(d["trial_period_days"], 3)
-        self.assertNotEqual(d["trial_period_days"], 0)
+        # Stripe KEYGEN path: no Checkout trial period
+        self.assertEqual(d["trial_period_days"], 0)
+        self.assertNotEqual(d["trial_period_days"], 3)
         self.assertNotEqual(d["trial_period_days"], 7)
         self.assertEqual(d["mode"], "subscription")
         self.assertEqual(d["payment_link_id"], DEFAULT_STRIPE_PAYMENT_LINK_ID)
@@ -90,19 +91,18 @@ class TestPaymentLinkTrialHelpers(unittest.TestCase):
         self.assertNotIn("7 day trial", sent)
         self.assertNotIn("subscription starts when you pay", sent)
 
-        # Trial=3 on payment_link_trial_period_days matches
-        ok_three = payment_link_matches_trial_subscription(
+        # No Stripe trial: absent or 0 both match desired trial_period_days=0
+        ok_zero = payment_link_matches_trial_subscription(
             {
                 "id": "price_test",
                 "currency": "gbp",
                 "unit_amount": 300,
                 "type": "recurring",
                 "recurring": {"interval": "month"},
-                "payment_link_trial_period_days": 3,
+                "payment_link_trial_period_days": 0,
             }
         )
-        self.assertTrue(ok_three["ok"], ok_three)
-        # Missing trial mismatches when want=3
+        self.assertTrue(ok_zero["ok"], ok_zero)
         missing = payment_link_matches_trial_subscription(
             {
                 "currency": "gbp",
@@ -110,8 +110,8 @@ class TestPaymentLinkTrialHelpers(unittest.TestCase):
                 "recurring": {"interval": "month"},
             }
         )
-        self.assertFalse(missing["ok"])
-        # 7-day trial is explicitly rejected
+        self.assertTrue(missing["ok"], missing)
+        # Positive Stripe trial days are rejected when catalog wants 0
         bad = payment_link_matches_trial_subscription(
             {
                 "currency": "gbp",
@@ -131,12 +131,7 @@ class TestPaymentLinkTrialHelpers(unittest.TestCase):
         self.assertIn("trial_period_days", src)
         self.assertIn("PRICE_PENCE", src)
         self.assertIn("unit_amount_pence", src)
-        self.assertIn("3-day trial", src.lower())
-        self.assertIn("trial_period_days", src)
         self.assertIn("year", src.lower())
-        # Live catalog policy is trial=3 — must not ship dual "no trial" operator steps
-        self.assertNotIn("charges with no free trial", src.lower())
-        self.assertNotIn("confirm checkout charges with no free trial", src.lower())
         # Nicknames / dashboard_steps may mention "3-day trial via Checkout"; ban bare no-trial policy
         for banned in (
             "no free trial",
@@ -166,7 +161,16 @@ class TestDeployDocs(unittest.TestCase):
         self.assertIn("set_render_fulfilment_smtp.ps1", text)
         self.assertNotIn("£29.40", text)
         self.assertNotIn("unit_amount: 2940", text)
-        self.assertIn("3-day free trial", text.lower())
+        low = text.lower()
+        self.assertTrue(
+            "72" in low or "3-day" in low or "device trial" in low,
+            text[:400],
+        )
+        self.assertTrue(
+            "trial_period_days = 0" in low or "trial_period_days** = 0" in low
+            or "trial_period_days = **0**" in low,
+            "operator doc must state Stripe trial_period_days = 0",
+        )
         self.assertIn("trial_period_days", text)
 
 
