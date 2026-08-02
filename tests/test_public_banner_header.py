@@ -91,24 +91,39 @@ class TestPublicBannerHeader(unittest.TestCase):
         ban_css = css[ban_i : ban_i + 900]
         self.assertIn("width: 100%", ban_css)
         self.assertIn("max-width: 100%", ban_css)
-        self.assertIn("object-fit: contain", ban_css)
+        self.assertIn("min-width: 100%", ban_css)
+        # Full-bleed fill of the brand box (logo + wordmark occupy the strip)
+        self.assertIn("object-fit: cover", ban_css)
+        self.assertNotIn("object-fit: contain", ban_css)
         self.assertIn("var(--rb-brand-header-height)", ban_css)
         self.assertIn("image-rendering", ban_css)
         # Must not reintroduce the narrow banner strip cap
         self.assertNotIn("36rem", ban_css)
         self.assertNotIn("max-width: min(100%, 36rem)", ban_css)
         self.assertNotIn("max-width: 36rem", ban_css)
+        # Brand box only: no top-right corner accent
+        self.assertIn(".brand-panel.panel-card::after", css)
+        after_i = css.index(".brand-panel.panel-card::after")
+        after_css = css[after_i : after_i + 280]
+        self.assertIn("display: none", after_css)
+        # Full-bleed brand panel (no side padding on the box)
+        self.assertIn("padding-left: 0 !important", css)
+        self.assertIn("padding-right: 0 !important", css)
         # Phone: banner still visible (no logo-only fallback)
         self.assertIn("@media (max-width: 520px)", css)
         phone = css[css.index("@media (max-width: 520px)") :]
         self.assertIn(".brand-banner", phone)
         self.assertIn("display: block", phone)
+        self.assertIn("object-fit: cover", phone)
 
         # Height clamp allows a taller, sharper full-width banner
         self.assertIn(f"{PUBLIC_BRAND_HEADER_HEIGHT_MIN_CSS}px", css)
         self.assertIn(f"{PUBLIC_BRAND_HEADER_HEIGHT_MAX_CSS}px", css)
         self.assertGreaterEqual(PUBLIC_BRAND_HEADER_HEIGHT_MAX_CSS, 160)
         self.assertGreaterEqual(PUBLIC_BRAND_HEADER_HEIGHT_DEFAULT, 100)
+        # Shipped taller defaults for fill (post full-bleed banner work)
+        self.assertGreaterEqual(PUBLIC_BRAND_HEADER_HEIGHT_DEFAULT, 128)
+        self.assertGreaterEqual(PUBLIC_BRAND_HEADER_HEIGHT_MAX_CSS, 200)
         self.assertLessEqual(
             PUBLIC_BRAND_HEADER_HEIGHT_MIN_CSS, PUBLIC_BRAND_HEADER_HEIGHT_DEFAULT
         )
