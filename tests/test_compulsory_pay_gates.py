@@ -257,9 +257,22 @@ class TestStorefrontCopyCompulsory(unittest.TestCase):
         suite = render_suite_storefront_html()
         self.assertIn("KEYGEN", suite)
         self.assertIn("trial", suite.lower())
-        self.assertIn("3000", suite)  # business deposit mention in pay-hint
         self.assertIn("suite-keygen-buy", suite)
         self.assertIn("free trial", suite.lower())
+        # Left-box pay-hint: new trial/checkout copy (no Business-Class £3000 line)
+        i_hint = suite.index('id="suite-pay-hint"')
+        hint = suite[i_hint : i_hint + 700]
+        self.assertIn("To start your 3-day free trial", hint)
+        self.assertIn("payment details and email address", hint)
+        self.assertIn("no money is deducted from your card", hint)
+        self.assertIn("download links which you receive via email", hint)
+        self.assertIn("Yearly plans available (17% discount)", hint)
+        self.assertNotIn("installers refuse anonymous download", hint)
+        self.assertNotIn("session_id / token from thank-you", hint)
+        self.assertNotIn("client box below", hint)
+        self.assertNotIn("£3000", hint)
+        self.assertNotIn("Business-Class", hint)
+        self.assertNotIn("3000", suite)  # deposit no longer in storefront hint
 
         # Pure helper still builds commercial deposit markup (not on homepage)
         home_biz = render_node_preference_html()
@@ -272,7 +285,6 @@ class TestStorefrontCopyCompulsory(unittest.TestCase):
         self.assertIn("deposit", svc.lower())
         self.assertIn("300000", svc)  # pence in form
         self.assertIn("required", svc.lower())
-
     def test_handler_wires_brand_package_gate(self) -> None:
         """Structural: suite download + assets + commercial use brand_asset_gate."""
         app_src = (ROOT / "status_page" / "app.py").read_text(encoding="utf-8")

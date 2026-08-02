@@ -1093,6 +1093,13 @@ SUITE_KEYGEN_HINT = (
     f"({PRICE_LABEL}/month or yearly) — no money is taken until after the trial ends. "
     "Enter the KEYGEN from your fulfilment email to unlock residual Connect and downloads."
 )
+# Left-box pay-hint under Get KEYGEN (customer-facing trial/checkout guidance)
+SUITE_PAY_HINT_HTML = (
+    "<strong>To start your 3-day free trial</strong> (Get KEYGEN above) — please enter "
+    "your payment details and email address - no money is deducted from your card until "
+    "the end of the trial period. After checkout, use your fulfilment KEYGEN and the "
+    "download links which you receive via email. Yearly plans available (17% discount)."
+)
 SUITE_FREE_DOWNLOAD_PATH = "/suite/download"
 # Anonymous free-CTA delivery (no KEYGEN / no /pay) — detected platform only
 SUITE_FREE_DIRECT_QUERY = "free_direct"
@@ -2309,11 +2316,7 @@ def render_suite_storefront_html(
 {keygen_form}
     </div>
     <p class="suite-pay-hint" id="suite-pay-hint">
-      <strong>Start the 3-day free trial first</strong> (Get KEYGEN above) — installers
-      refuse anonymous download. After checkout, use your fulfilment KEYGEN and the
-      download links (session_id / token from thank-you). Yearly plans are in the
-      client box below. Business-Class requires a separate <strong>£3000 deposit</strong>
-      on Service.
+      {SUITE_PAY_HINT_HTML}
     </p>
   </section>
 """
