@@ -43,8 +43,16 @@ const String kEntryAccessRenewLabel = 'Renew licence';
 const String kEntryAccessShopHint =
     'Need a KEYGEN? Get one at restoreprivacy.online/pay (monthly licence).';
 
+const String kEntryAccessTrialHint =
+    'Or try residual Connect free for 3 days on this device (no card, no KEYGEN). '
+    'When the trial ends you will need a KEYGEN to continue.';
+
 /// Finder key for the Get keygen control (opens public /pay).
 const Key kEntryAccessGetKeygenButtonKey = Key('entry_access_get_keygen_button');
+
+/// Finder key for KEYGEN-free 3-day trial start.
+const Key kEntryAccessStartTrialButtonKey =
+    Key('entry_access_start_trial_button');
 
 /// True when [copy] includes the shipped guidance phrases and omits forbidden wording.
 bool entryAccessCopyIsValid(String copy) {
@@ -333,6 +341,48 @@ class _EntryAccessScreenState extends State<EntryAccessScreen> {
     } catch (_) {}
   }
 
+  Future<void> _startFreeTrial() async {
+    if (_busy) return;
+    final gate = widget.licenceGate;
+    if (gate == null) {
+      setState(() => _statusLine = 'Trial is unavailable on this build.');
+      return;
+    }
+    if (!_licenceAccepted) {
+      setState(() => _statusLine = 'Accept the end-user licence first.');
+      return;
+    }
+    if (_needsRenew) {
+      setState(
+        () => _statusLine =
+            'Licence expired — renew first, then enter your new keygen.',
+      );
+      return;
+    }
+    setState(() {
+      _busy = true;
+      _statusLine = 'Starting free 3-day trial…';
+    });
+    final remote = await gate.claimDeviceTrial();
+    final ok = remote['connect_allowed'] == true || remote['ok'] == true;
+    if (!mounted) return;
+    if (!ok) {
+      final err = remote['error']?.toString() ?? 'trial_denied';
+      setState(() {
+        _busy = false;
+        _statusLine = err == 'trial_exhausted'
+            ? kTrialExpiredUnlockMsg
+            : 'Trial not available ($err). Get a KEYGEN at restoreprivacy.online/pay.';
+      });
+      return;
+    }
+    setState(() {
+      _busy = false;
+      _statusLine = 'Free trial active. Opening the app…';
+    });
+    await widget.onUnlocked?.call();
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -464,6 +514,28 @@ class _EntryAccessScreenState extends State<EntryAccessScreen> {
                     ),
                     child: Text(
                       _busy ? 'Please wait…' : kEntryAccessUnlockLabel,
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  OutlinedButton(
+                    key: kEntryAccessStartTrialButtonKey,
+                    onPressed: (_busy || !_licenceAccepted || _needsRenew)
+                        ? null
+                        : _startFreeTrial,
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: kWhite,
+                      side: BorderSide(color: kWhite.withValues(alpha: 0.55)),
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                    ),
+                    child: const Text(kStartFreeTrialButtonLabel),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    kEntryAccessTrialHint,
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      color: kWhite.withValues(alpha: 0.75),
+                      fontSize: 12,
                     ),
                   ),
                   const SizedBox(height: 12),

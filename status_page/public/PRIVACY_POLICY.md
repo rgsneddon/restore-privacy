@@ -44,6 +44,7 @@ Before residual Connect unlocks, you **accept the end-user licence** on this dev
 ### Payment / shop host
 
 - Checkout and KEYGEN fulfilment go through the public shop (`restoreprivacy.online`, including `/pay`). Payment processors process card data under their terms; we receive entitlement status and fulfilment codes needed to unlock Connect.
+- **KEYGEN-free device trial (optional):** on first use you may start a **72-hour residual trial** without email or card. The status host records only your device’s existing Ed25519 **public** admission key and trial timestamps (no connection logs). After expiry, residual Connect requires a paid KEYGEN. Reinstall that keeps the same device key does **not** grant a second full trial window.
 
 ### What we do **not** do
 

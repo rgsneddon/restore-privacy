@@ -1594,12 +1594,75 @@ class Handler(BaseHTTPRequestHandler):
             return
 
         if path in ("/api/device-entitlement", "/device-entitlement"):
-            # Node residual HELLO gate — device Ed25519 pub must be bound to paid session
+            # Node residual HELLO gate — paid KEYGEN bind **or** active KEYGEN-free trial
             from payments import get_device_entitlement
 
             device_pub = (query.get("device_pub") or query.get("device_pub_hex") or "").strip()
             payload = get_device_entitlement(device_pub)
             code = 200 if not payload.get("error") else 400
+            self._send(code, "application/json", json.dumps(payload).encode("utf-8"))
+            return
+
+        if path in (
+            "/api/device-trial/claim",
+            "/device-trial/claim",
+            "/api/device-trial/status",
+            "/device-trial/status",
+        ):
+            # KEYGEN-free 72h residual trial bound to device Ed25519 pub (no email/card).
+            from device_trial import claim_device_trial, get_device_trial_row
+
+            is_claim = path.rstrip("/").endswith("claim")
+            device_pub = (
+                query.get("device_pub") or query.get("device_pub_hex") or ""
+            ).strip()
+            if self.command == "POST" and is_claim:
+                try:
+                    length = int(self.headers.get("Content-Length") or "0")
+                except ValueError:
+                    length = 0
+                raw = self.rfile.read(length) if length > 0 else b"{}"
+                try:
+                    body = json.loads(raw.decode("utf-8") or "{}")
+                except (UnicodeDecodeError, json.JSONDecodeError):
+                    body = {}
+                if isinstance(body, dict):
+                    device_pub = str(
+                        body.get("device_pub")
+                        or body.get("device_pub_hex")
+                        or device_pub
+                        or ""
+                    ).strip()
+                payload = claim_device_trial(device_pub)
+            else:
+                row = get_device_trial_row(device_pub)
+                if not row:
+                    payload = {
+                        "ok": False,
+                        "device_pub_hex": device_pub,
+                        "connect_allowed": False,
+                        "status": "unknown",
+                        "error": "no_trial",
+                        "kind": "device_trial",
+                        "requires_keygen": True,
+                        "shop_pay_path": "/pay",
+                    }
+                else:
+                    payload = {
+                        "ok": bool(row.get("connect_allowed")),
+                        **row,
+                        "requires_keygen": not bool(row.get("connect_allowed")),
+                        "shop_pay_path": "/pay",
+                        "licence_status": (
+                            "TRIAL" if row.get("connect_allowed") else "EXPIRED"
+                        ),
+                    }
+            code = 200 if not payload.get("error") or payload.get("error") in (
+                "trial_exhausted",
+                "no_trial",
+            ) else 400
+            if payload.get("error") == "bad_device_pub":
+                code = 400
             self._send(code, "application/json", json.dumps(payload).encode("utf-8"))
             return
 

@@ -1,8 +1,9 @@
 """Node residual HELLO payment entitlement gate.
 
 When enabled, CLIENT_HELLO is admitted only if the device Ed25519 public key
-is bound to an active paid Connect entitlement on the status host
-(``GET /api/device-entitlement?device_pub=…``).
+is bound to an active **paid** Connect entitlement **or** an active KEYGEN-free
+**device trial** on the status host
+(``GET /api/device-entitlement?device_pub=…`` — paid bind first, then 72h trial).
 
 Operators set::
 

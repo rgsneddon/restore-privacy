@@ -4222,7 +4222,12 @@ def bind_device_entitlement(
 def get_device_entitlement(
     device_pub_hex: str, *, now: float | None = None
 ) -> dict[str, Any]:
-    """Lookup Connect allowance for a device public key (node residual gate)."""
+    """Lookup Connect allowance for a device public key (node residual gate).
+
+    Order: paid KEYGEN bind first; then active KEYGEN-free **device trial** (72h).
+    Trial never mints a KEYGEN and never overrides failed/revoked paid status
+    when a paid bind exists and is explicitly not allowed.
+    """
     pub = normalize_device_pub_hex(device_pub_hex)
     if not pub:
         return {
@@ -4242,30 +4247,82 @@ def get_device_entitlement(
         row = cur.fetchone()
     finally:
         conn.close()
-    if not row:
-        return {
-            "device_pub_hex": pub,
-            "connect_allowed": False,
-            "status": "unknown",
-            "reason": "device_not_bound",
-        }
-    sid = str(row["session_id"])
-    ent = get_connect_entitlement(sid, now=t)
-    if not ent:
+    if row:
+        sid = str(row["session_id"])
+        ent = get_connect_entitlement(sid, now=t)
+        if ent and bool(ent.get("connect_allowed")):
+            return {
+                "device_pub_hex": pub,
+                "session_id": sid,
+                "status": ent["status"],
+                "valid_until": ent.get("valid_until"),
+                "connect_allowed": True,
+                "reason": ent.get("reason") or "",
+                "kind": "paid",
+            }
+        # Paid bind present but not active — do not fall through to a free trial
+        # for the same device (preserves paid-path security).
+        if ent and not bool(ent.get("connect_allowed")):
+            return {
+                "device_pub_hex": pub,
+                "session_id": sid,
+                "status": ent.get("status") or "unknown",
+                "valid_until": ent.get("valid_until"),
+                "connect_allowed": False,
+                "reason": ent.get("reason") or "entitlement_not_active",
+                "kind": "paid",
+            }
         return {
             "device_pub_hex": pub,
             "session_id": sid,
             "connect_allowed": False,
             "status": "unknown",
             "reason": "session_missing",
+            "kind": "paid",
+        }
+
+    # No paid bind — KEYGEN-free device trial (if any).
+    try:
+        from device_trial import get_device_trial_row
+
+        trial = get_device_trial_row(pub, now=t)
+    except Exception:  # noqa: BLE001
+        trial = None
+    if trial and trial.get("connect_allowed"):
+        return {
+            "device_pub_hex": pub,
+            "session_id": "",
+            "status": "trial",
+            "licence_status": "TRIAL",
+            "valid_until": trial.get("ends_at"),
+            "trial_ends_at": trial.get("ends_at"),
+            "trial_started_at": trial.get("started_at"),
+            "remaining_sec": trial.get("remaining_sec"),
+            "connect_allowed": True,
+            "reason": "device_trial_active",
+            "kind": "device_trial",
+            "keygen": "",
+        }
+    if trial and not trial.get("connect_allowed"):
+        return {
+            "device_pub_hex": pub,
+            "session_id": "",
+            "status": str(trial.get("status") or "expired"),
+            "licence_status": "EXPIRED",
+            "valid_until": trial.get("ends_at"),
+            "trial_ends_at": trial.get("ends_at"),
+            "connect_allowed": False,
+            "reason": "trial_exhausted",
+            "kind": "device_trial",
+            "requires_keygen": True,
+            "shop_pay_path": "/pay",
         }
     return {
         "device_pub_hex": pub,
-        "session_id": sid,
-        "status": ent["status"],
-        "valid_until": ent.get("valid_until"),
-        "connect_allowed": bool(ent.get("connect_allowed")),
-        "reason": ent.get("reason") or "",
+        "connect_allowed": False,
+        "status": "unknown",
+        "reason": "device_not_bound",
+        "kind": "none",
     }
 
 

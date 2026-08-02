@@ -109,6 +109,40 @@ String shopPayUrl({String? baseUrl}) {
 /// User-facing label for the Get keygen action on unlock / entry surfaces.
 const String kGetKeygenButtonLabel = 'Get keygen';
 
+/// KEYGEN-free residual trial (host-authoritative 72h / 3 days).
+const String kKeyDeviceTrialEndsAt = 'device_trial_ends_at';
+const String kKeyDeviceTrialStartedAt = 'device_trial_started_at';
+const String kKeyDeviceTrialStatus = 'device_trial_status';
+const double kDeviceTrialSeconds = 72 * 3600;
+const String kDeviceTrialStatusActive = 'active';
+const String kDeviceTrialStatusExpired = 'expired';
+const String kPaymentStatusTrial = 'trial';
+const String kStartFreeTrialButtonLabel = 'Start free 3-day trial';
+const String kTrialExpiredUnlockMsg =
+    'Your free 3-day trial has ended. Purchase a KEYGEN at restoreprivacy.online/pay '
+    'to keep using residual Connect.';
+
+/// Pure local cache check (host is authority; this only gates offline UX hints).
+bool deviceTrialCacheAllowsConnect({
+  required String status,
+  required double endsAt,
+  required double nowSec,
+}) {
+  if (status.trim().toLowerCase() != kDeviceTrialStatusActive &&
+      status.trim().toLowerCase() != kPaymentStatusTrial) {
+    return false;
+  }
+  if (endsAt <= 0) return false;
+  return nowSec < endsAt;
+}
+
+/// Connect decision: paid KEYGEN active **or** host trial active.
+bool connectAllowedTrialOrPaid({
+  required bool keygenOk,
+  required bool trialOk,
+}) =>
+    keygenOk || trialOk;
+
 /// Default monthly Stripe Payment Link (aligned with status_page.payments).
 const String kDefaultStripePaymentPageUrl =
     'https://buy.stripe.com/cNi7sM4uOeWQ9TBe0q7kc00';
@@ -667,9 +701,101 @@ class LicenceGate {
     }
   }
 
+  Future<double?> deviceTrialEndsAt() async {
+    final raw = await backend.getString(kKeyDeviceTrialEndsAt);
+    return double.tryParse(raw ?? '');
+  }
+
+  Future<String> deviceTrialStatus() async {
+    return (await backend.getString(kKeyDeviceTrialStatus) ?? '').trim().toLowerCase();
+  }
+
+  Future<void> _cacheDeviceTrial({
+    required String status,
+    double? startedAt,
+    double? endsAt,
+  }) async {
+    await backend.setString(kKeyDeviceTrialStatus, status);
+    if (startedAt != null) {
+      await backend.setString(kKeyDeviceTrialStartedAt, startedAt.toString());
+    }
+    if (endsAt != null) {
+      await backend.setString(kKeyDeviceTrialEndsAt, endsAt.toString());
+    }
+  }
+
+  /// Claim or refresh KEYGEN-free 72h trial on the status host (device pub bind).
+  ///
+  /// Does not mint a KEYGEN. Host refuses a second full window for the same
+  /// device_pub after expiry (anti-reinstall for keystore-stable identities).
+  Future<Map<String, dynamic>> claimDeviceTrial({
+    String? baseUrl,
+    String? devicePubHex,
+    Future<Map<String, dynamic>> Function(Uri uri, List<int> body)? post,
+  }) async {
+    final base = (baseUrl ??
+            Platform.environment['RPT_PUBLIC_BASE_URL'] ??
+            kDefaultPaymentStatusBaseUrl)
+        .trim()
+        .replaceAll(RegExp(r'/+$'), '');
+    var pub = (devicePubHex ?? '').trim().toLowerCase();
+    if (pub.isEmpty) {
+      pub = (await resolveDevicePubHex()).trim().toLowerCase();
+    }
+    if (pub.length != 64) {
+      return {
+        'ok': false,
+        'connect_allowed': false,
+        'error': 'missing_device_pub',
+      };
+    }
+    final uri = Uri.parse('$base/api/device-trial/claim');
+    final body = utf8.encode(jsonEncode({'device_pub': pub}));
+    try {
+      final Map<String, dynamic> remote;
+      if (post != null) {
+        remote = await post(uri, body);
+      } else {
+        remote = await postBindDeviceEntitlement(uri, body);
+      }
+      final allowed = remote['connect_allowed'] == true || remote['ok'] == true;
+      final ends = (remote['ends_at'] is num)
+          ? (remote['ends_at'] as num).toDouble()
+          : double.tryParse('${remote['ends_at'] ?? ''}');
+      final started = (remote['started_at'] is num)
+          ? (remote['started_at'] as num).toDouble()
+          : double.tryParse('${remote['started_at'] ?? ''}');
+      final st =
+          allowed ? kDeviceTrialStatusActive : kDeviceTrialStatusExpired;
+      await _cacheDeviceTrial(status: st, startedAt: started, endsAt: ends);
+      if (allowed) {
+        // Local UX status only — not a paid KEYGEN unlock.
+        await backend.setString(kKeyPaymentStatus, kPaymentStatusTrial);
+      }
+      return remote;
+    } catch (e) {
+      return {
+        'ok': false,
+        'connect_allowed': false,
+        'error': e.toString(),
+      };
+    }
+  }
+
+  /// Local + optional remote trial: true while host trial window is open.
+  Future<bool> deviceTrialAllowsConnect({bool refreshRemote = false}) async {
+    if (refreshRemote) {
+      await claimDeviceTrial(); // reuse path on host when still active
+    }
+    final st = await deviceTrialStatus();
+    final ends = await deviceTrialEndsAt() ?? 0.0;
+    final now = DateTime.now().millisecondsSinceEpoch / 1000.0;
+    return deviceTrialCacheAllowsConnect(status: st, endsAt: ends, nowSec: now);
+  }
+
   /// Failed / revoked / unpaid always block. Missing entitlement blocks when
-  /// product requires payment (default). Active allows only with keygen unlock
-  /// (parity with desktop ``payment_allows_connect``).
+  /// product requires payment (default). Active KEYGEN **or** active 72h trial
+  /// allows Connect (parity with host ``get_device_entitlement``).
   Future<bool> paymentAllowsConnect({bool require = true}) async {
     final st = await paymentStatus();
     if (isPaymentBlockingStatus(st)) {
@@ -687,6 +813,10 @@ class LicenceGate {
           return false;
         }
       }
+      return true;
+    }
+    // KEYGEN-free device trial (host-bound 72h)
+    if (await deviceTrialAllowsConnect()) {
       return true;
     }
     if (!require) return true;
@@ -770,6 +900,9 @@ class LicenceGate {
       final kg = await paymentKeygen();
       if (sid.isNotEmpty || kg.isNotEmpty) {
         await refreshEntitlementFromRemote(baseUrl: baseUrl, fetch: fetch);
+      } else if (await deviceTrialStatus() == kDeviceTrialStatusActive) {
+        // Re-check host trial window (clock authority).
+        await claimDeviceTrial(baseUrl: baseUrl);
       }
     }
     if (!await paymentAllowsConnect(require: requirePayment)) {
@@ -777,6 +910,13 @@ class LicenceGate {
       if (isPaymentBlockingStatus(st) || await needsLicenceRenewal()) {
         // EXPIRED lock — renew your licence *here* + platform portal
         return (ok: false, message: await renewMessageForInstall());
+      }
+      final trialSt = await deviceTrialStatus();
+      final ends = await deviceTrialEndsAt() ?? 0.0;
+      final now = DateTime.now().millisecondsSinceEpoch / 1000.0;
+      if (trialSt == kDeviceTrialStatusExpired ||
+          (ends > 0 && now >= ends && trialSt.isNotEmpty)) {
+        return (ok: false, message: kTrialExpiredUnlockMsg);
       }
       final sid = await paymentSessionId();
       final kg = await paymentKeygen();
