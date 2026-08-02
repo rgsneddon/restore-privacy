@@ -1509,7 +1509,15 @@ def suite_home_intro_css() -> str:
       word-break: break-word;
     }
     .suite-typewriter-welcome { margin-top: 0.15rem; margin-bottom: 0.35rem; }
-    .suite-typewriter-close { margin-top: 0.85rem; margin-bottom: 0.25rem; }
+    /* Closing line: slightly smaller so full "YOUR PRIVACY, RESTORED" fits on
+       phones/tablets (shared typewriter clamp is larger for welcome). */
+    .suite-typewriter-close {
+      margin-top: 0.85rem;
+      margin-bottom: 0.25rem;
+      font-size: clamp(1.05rem, 3.2vw, 1.55rem);
+      letter-spacing: 0.08em;
+      max-width: min(44rem, 96vw);
+    }
     .suite-typewriter.is-typing::after {
       content: "▌";
       display: inline-block;

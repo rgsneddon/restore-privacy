@@ -97,6 +97,92 @@ class TestSuiteIntroRenderer(unittest.TestCase):
         tag = suite_home_intro_script_tag()
         self.assertIn("/static/suite_home_typewriter.js", tag)
 
+    def test_closing_typewriter_smaller_font_for_narrow_screens(self) -> None:
+        """YOUR PRIVACY, RESTORED uses a smaller clamp than shared typewriter size."""
+        import re
+
+        from public_chrome import (
+            SUITE_HOME_CLOSING_TYPE,
+            render_suite_home_intro_html,
+            suite_home_intro_css,
+        )
+        from app import render_html
+
+        self.assertEqual(SUITE_HOME_CLOSING_TYPE, "YOUR PRIVACY, RESTORED")
+        html = render_suite_home_intro_html()
+        self.assertIn("YOUR PRIVACY, RESTORED", html)
+        self.assertIn('data-typewriter-role="closing"', html)
+        self.assertIn("suite-typewriter-close", html)
+        self.assertIn('id="suite-closing-type"', html)
+        # Full phrase still bound for typewriter (not truncated)
+        self.assertIn(
+            f'data-typewriter-text="{SUITE_HOME_CLOSING_TYPE}"',
+            html,
+        )
+
+        css = suite_home_intro_css()
+        # Shared baseline for welcome/neon typewriters
+        shared = re.search(
+            r"\.suite-typewriter,\s*\n\s*\.neon-type\s*\{[^}]*font-size:\s*"
+            r"clamp\(([^)]+)\)",
+            css,
+            re.S,
+        )
+        self.assertIsNotNone(shared, "shared .suite-typewriter font-size clamp required")
+        assert shared is not None
+        shared_parts = [p.strip() for p in shared.group(1).split(",")]
+        self.assertEqual(len(shared_parts), 3)
+        # Closing-only override — smaller than shared baseline
+        close = re.search(
+            r"\.suite-typewriter-close\s*\{([^}]+)\}",
+            css,
+            re.S,
+        )
+        self.assertIsNotNone(close, ".suite-typewriter-close rule required")
+        assert close is not None
+        close_body = close.group(1)
+        m_fs = re.search(r"font-size:\s*clamp\(([^)]+)\)", close_body)
+        self.assertIsNotNone(m_fs, "closing font-size clamp override required")
+        assert m_fs is not None
+        close_parts = [p.strip() for p in m_fs.group(1).split(",")]
+        self.assertEqual(len(close_parts), 3)
+
+        def rem_val(s: str) -> float:
+            m = re.search(r"([\d.]+)rem", s)
+            self.assertIsNotNone(m, f"expected rem in {s!r}")
+            assert m is not None
+            return float(m.group(1))
+
+        def vw_val(s: str) -> float:
+            m = re.search(r"([\d.]+)vw", s)
+            self.assertIsNotNone(m, f"expected vw in {s!r}")
+            assert m is not None
+            return float(m.group(1))
+
+        # Min, preferred (vw), max all strictly smaller than shared typewriter
+        self.assertLess(rem_val(close_parts[0]), rem_val(shared_parts[0]))
+        self.assertLess(vw_val(close_parts[1]), vw_val(shared_parts[1]))
+        self.assertLess(rem_val(close_parts[2]), rem_val(shared_parts[2]))
+        # Closing max below prior shared max (~2.15rem)
+        self.assertLess(rem_val(close_parts[2]), 2.15)
+        # Welcome still uses shared baseline (no smaller override on welcome)
+        wel = re.search(
+            r"\.suite-typewriter-welcome\s*\{([^}]+)\}",
+            css,
+            re.S,
+        )
+        self.assertIsNotNone(wel)
+        assert wel is not None
+        self.assertNotIn("font-size", wel.group(1))
+
+        page = render_html({"title": "RESTORE PRIVACY"}).decode("utf-8")
+        self.assertIn("YOUR PRIVACY, RESTORED", page)
+        self.assertIn("suite-typewriter-close", page)
+        # Homepage injects the same shipped intro CSS (closing clamp present)
+        close_clamp = f"clamp({m_fs.group(1)})"
+        self.assertIn(close_clamp, page)
+        self.assertIn(close_clamp, css)
+
     def test_homepage_path_includes_intro_and_script(self) -> None:
         from app import render_html
         from public_chrome import SUITE_HOME_WELCOME_TYPE
