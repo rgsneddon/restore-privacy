@@ -48,6 +48,7 @@ import 'package:perccent_wallet/wallet_core/models/locale_config_ui.dart';
 import 'suite_account.dart';
 import 'suite_nav.dart';
 import 'suite_parts.dart';
+import 'suite_session_rehydrate.dart';
 import 'theme.dart';
 
 /// Cap for live package I/O so Suite never spins forever without Retry.
@@ -219,21 +220,11 @@ class SuiteFamilyHostState extends State<SuiteFamilyHost> {
   Future<void> _reloadLedgers() async {
     try {
       if (_evolveWallet != null) {
-        // Always re-read disk: first-run may have written session after this
-        // wallet was already isReady with an empty in-memory session.
-        await evolve_hub.PercLedgerHub.instance.reloadFromStore();
         if (!_evolveWallet!.isReady) {
           await _evolveWallet!.initialize();
         }
-        // Hub reload notifies the wallet listener; re-publish hasAppAccess.
+        await rehydrateSuiteFamilyWalletSession(wallet: _evolveWallet!);
         _onEvolveWalletChanged();
-        // If still cold but Suite registered + accounts exist, force another
-        // hub load so a just-persisted sessionUsername is not missed.
-        if (!_evolveWallet!.hasAppAccess &&
-            SuiteAccountBus.instance.hasRegisteredSession) {
-          await evolve_hub.PercLedgerHub.instance.reloadFromStore();
-          _onEvolveWalletChanged();
-        }
       }
       if (_walletOnly != null) {
         await wallet_hub.PercLedgerHub.instance.reloadFromStore();
@@ -247,17 +238,18 @@ class SuiteFamilyHostState extends State<SuiteFamilyHost> {
 
   /// After first-run / Suite register: ensure live wallet reflects disk session.
   ///
-  /// Safe to call when the wallet is already [isReady] — still reloads the hub.
+  /// Safe to call when the wallet is already [isReady] — still reloads the hub
+  /// and restores session for the Suite-registered username when needed.
   Future<bool> rehydrateEvolveSessionFromStore() async {
     final wallet = _evolveWallet;
     if (wallet == null) return false;
     try {
-      await evolve_hub.PercLedgerHub.instance.reloadFromStore();
       if (!wallet.isReady) {
         await wallet.initialize();
       }
+      final ok = await rehydrateSuiteFamilyWalletSession(wallet: wallet);
       _onEvolveWalletChanged();
-      return wallet.hasAppAccess;
+      return ok;
     } catch (_) {
       return false;
     }
@@ -326,6 +318,7 @@ class SuiteFamilyHostState extends State<SuiteFamilyHost> {
       ready.evolveWallet!.addListener(_onEvolveWalletChanged);
     }
 
+    final access = ready.hasAppAccess;
     setState(() {
       _evolve = ready.evolve;
       _evolveWallet = ready.evolveWallet;
@@ -333,11 +326,25 @@ class SuiteFamilyHostState extends State<SuiteFamilyHost> {
       _evolveLocale = ready.evolveLocale;
       _walletOnly = ready.walletOnly;
       _walletLocale = ready.walletLocale;
-      _hasAppAccess = ready.hasAppAccess;
+      _hasAppAccess = access;
       _ready = true;
       _error = null;
     });
     widget.onHasAppAccessChanged?.call(_hasAppAccess);
+
+    // If boot still cold but Suite just registered, rehydrate before leaving
+    // nav in a collapsed (no Analysis/Voting) state.
+    if (!access &&
+        ready.evolveWallet != null &&
+        SuiteAccountBus.instance.hasRegisteredSession) {
+      unawaited(() async {
+        final ok = await rehydrateSuiteFamilyWalletSession(
+          wallet: ready.evolveWallet!,
+        );
+        if (!mounted) return;
+        if (ok) _onEvolveWalletChanged();
+      }());
+    }
   }
 
   Future<SuiteFamilyBootReady> _bootEvolve() async {
@@ -362,22 +369,18 @@ class SuiteFamilyHostState extends State<SuiteFamilyHost> {
     // Order: wallet.initialize loads store, then explicit reload so a Suite
     // first-run session written moments earlier is always applied to hasAppAccess.
     await _step('wallet_initialize', wallet.initialize());
-    try {
-      await _step(
-        'ledger_reload',
-        evolve_hub.PercLedgerHub.instance.reloadFromStore(),
-      );
-    } catch (_) {}
+    // Rehydrate Suite first-run session before publishing hasAppAccess to nav.
+    await _step(
+      'suite_session_rehydrate',
+      rehydrateSuiteFamilyWalletSession(wallet: wallet),
+    );
     await _step('evolve_initialize', evolve.initialize());
     await _step('fcg_initialize', fcg.initialize());
-    // Second reload after full boot — covers race where first-run persist
-    // finished while initialize was in flight.
-    try {
-      await _step(
-        'ledger_reload_post',
-        evolve_hub.PercLedgerHub.instance.reloadFromStore(),
-      );
-    } catch (_) {}
+    // Final rehydrate after package inits (covers late first-run persist).
+    await _step(
+      'suite_session_rehydrate_post',
+      rehydrateSuiteFamilyWalletSession(wallet: wallet),
+    );
 
     evolve.setLocale(locale.config);
     evolve.analysisRewardHandler = ({

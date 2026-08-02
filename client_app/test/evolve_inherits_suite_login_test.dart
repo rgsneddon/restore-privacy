@@ -371,9 +371,8 @@ void main() {
   test('SuiteFamilyHost rehydrate path reloads hub when isReady (structural)', () {
     final src = File('lib/suite_family_host.dart').readAsStringSync();
     expect(src.contains('rehydrateEvolveSessionFromStore'), isTrue);
-    expect(src.contains('Always re-read disk'), isTrue);
-    // Must not only re-init when !isReady — also reloads after isReady.
-    expect(src.contains('reloadFromStore()'), isTrue);
+    expect(src.contains('rehydrateSuiteFamilyWalletSession'), isTrue);
+    expect(src.contains('suite_session_rehydrate'), isTrue);
     expect(src.contains('hasRegisteredSession'), isTrue);
   });
 

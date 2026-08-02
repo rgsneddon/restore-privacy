@@ -221,6 +221,10 @@ class SuiteShellState extends State<SuiteShell> {
 
   void _onHasAppAccessChanged(bool next) {
     if (!mounted || next == _hasAppAccess) return;
+    // When access becomes true after rehydrate, expand Analysis/Voting.
+    // When false after a true flash, still apply (honest cold install) — family
+    // host is responsible for rehydrating Suite-registered sessions first so
+    // this false path is not a false negative right after account create.
     final nextIndex = clampSuiteNavIndex(
       _index,
       _parts,
