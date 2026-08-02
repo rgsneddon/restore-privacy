@@ -1,13 +1,14 @@
 # Windows brand breadcrumbs — monopin 1.0.8
 
-**Audience:** Windows build machine operator. This handoff is the architecture
-map for Suite **1.0.8** — first-run, residual trial, shell parts, residual peers,
-and the PE rebuild path. Fetch via Helsinki breadcrumbs vault when published
+**Audience:** Windows build machine operator. This is the **full product map**
+for Suite **1.0.8**: client architecture, residual fleet, **Ned / rpAI / oracle**,
+**every status-host admin surface**, fulfilment, brand companions, and PE rebuild.
+Fetch via Helsinki breadcrumbs vault when published
 (`scripts/breadcrumbs_vault.py check --fetch`).
 
 **Catalog monopin:** `1.0.8` (`client/VERSION` must match).
 
-**Target PE (must match basename):**
+**Target Suite PE (must match basename):**
 
 ```text
 releases/1.0.8/restore-privacy-client-1.0.8-windows-x64-setup.exe
@@ -16,6 +17,36 @@ releases/1.0.8/restore-privacy-client-1.0.8-windows-x64-setup.exe
 Honesty: Mac may stage a **carry-forward** PE under that filename until this
 machine rebuilds and Authenticode-seals a native **1.0.8** installer. Do not
 claim native Windows seal complete until you have built and signed here.
+Architecture below is product truth regardless of PE carry-forward.
+
+---
+
+## 0. End-to-end product map (one page)
+
+```text
+Public shop (restoreprivacy.online)
+  ├── Free Suite installer download (all 5 platforms) — no residual until KEYGEN/trial
+  ├── /pay Stripe Checkout KEYGEN (monthly/yearly GBP) — trial_period_days = 0
+  └── Public status title-only (no client counts)
+
+Client Suite (this PE / Flutter / native)
+  ├── First-run: account → 12-word seed → licence  BEFORE  residual VPN permissions
+  ├── Residual Connect: 72h KEYGEN-free trial (device_pub + install_id) then paid KEYGEN
+  ├── Shell: VPN · Wallet (%) · Backup · Evolve Analysis/Voting · Credit · rpAI·Ned
+  └── Settings: CHECK BREADCRUMBS (opt-in push updates) — never force-install
+
+Residual fleet (IS + DE only; US/RO retired)
+  ├── Default entry DE; catalog peer IS; multihop residual-via-exit (optional)
+  ├── Co-joined node roles: VPN + rpAI + Perccent
+  └── Weekly sequential wipe IS → DE (never both at once)
+
+Helsinki paid store
+  └── paid_assets/{monopin}/ — authenticated downloads; not public GitHub
+
+Status-host admin (/admin) — full map in §8
+  Link Generation · Licences · Fleet · Node Operator · rpOS · rpS (Ned)
+  Perc · Support · Accounting · UPLOADS · Processors · 2FA login
+```
 
 ---
 
@@ -73,7 +104,7 @@ reinstall-for-trial attack-surface wording on public pages.
 
 ---
 
-## 3. Suite shell architecture (all major parts)
+## 3. Suite shell architecture (all major client parts)
 
 Restore Privacy Suite is **one shell** with residual VPN plus free product
 surfaces. Main destinations (`SuiteNavDest` / product map):
@@ -86,24 +117,20 @@ surfaces. Main destinations (`SuiteNavDest` / product map):
 | **Analysis** | Analysis | **Evolve** analyser (when Evolve installed + app access) |
 | **Voting** | Voting | **Evolve** FCG voting (when Evolve installed + app access) |
 | **Credit** | Credit | Credit surface in % / Evolve family |
-| **rpAI · Ned** | rpAI | Ned guide / rpAI co-join surface |
+| **rpAI · Ned** | rpAI | **Ned** guide / rpAI surface (when rpAI installed) |
 
 Family rule: **% and Evolve** share one product family — Wallet, Backup, Credit,
 Analysis, and Voting promote onto the main bar when the corresponding Suite
 parts are installed (`suite_parts` + `suite_nav.dart`). VPN is always on the bar;
-rpAI appears when installed.
-
-**Co-joined residual node roles (fleet honesty, not client PE):** residual hosts
-may run **VPN + rpAI + Perccent** co-joined roles for operator/Helsinki oracle
-collation — clients still contact monopin residual entry.
+rpAI/Ned appears when installed.
 
 **Windows observe checklist**
 
 1. After first-run, main bar shows **VPN**.  
 2. With wallet/Evolve installed: **Wallet**, **Backup**, **Credit**, and when
    Evolve access is on: **Analysis**, **Voting**.  
-3. With rpAI installed: **rpAI** tab.  
-4. Settings self-update / CHECK BREADCRUMBS remains opt-in for push updates.  
+3. With rpAI installed: **rpAI** tab (Ned guide content).  
+4. Settings self-update / **CHECK BREADCRUMBS** remains opt-in for push updates.  
 5. Residual **IS + DE** peers only in product catalog (see §4).
 
 ---
@@ -120,78 +147,236 @@ Live residual catalog peers:
 **United States residual is retired** — do **not** inject `us_node_elgamal.pub`
 as a live dial peer. Dials normalize retired US → DE. Never ship `*.priv`.
 
-Windows package path should embed entry + DE/exit pubs via the existing Windows
-installer secrets inject (same honesty as Apple `inject_apple_secrets`: live
-IS+DE+exit only).
+Windows package path must embed entry + DE/exit pubs (same honesty as Apple
+`inject_apple_secrets`: live IS+DE+exit only). Multihop when enabled:
+residual-via-exit; not full intermediate onion.
 
-Multihop (when enabled): residual-via-exit; not full intermediate onion.
+**Fleet wipe cadence:** sequential peers under exclusive lock — **IS then DE**
+(never concurrent). Clients hop to a healthy peer while one rebuilds.
 
 ---
 
-## 5. On the Windows build machine (ordered)
+## 5. Ned · rpAI · oracle · co-join (fleet + client)
 
-1. Sync monorepo to the ship commit; confirm `client/VERSION` reads **`1.0.8`**.  
-2. Optional large-drive mirror:  
-   `set RPT_WINDOWS_DRIVE=…` then  
-   `python scripts/windows_brand_mirror.py apply`  
-3. Build native PE with the existing Windows freeze/package path (MSVC / Inno /
-   brand assets — see prior multihop handoffs if using `build_windows_multihop`).  
-4. Output **must** be named:  
-   `restore-privacy-client-1.0.8-windows-x64-setup.exe`  
-5. Authenticode-sign the PE.  
-6. Stage: copy to `status_page/assets/1.0.8/` and `releases/1.0.8/`.  
-7. Helsinki upload: paid_assets monopin path (admin UPLOADS or  
-   `scripts/host_paid_assets_vps.py` — selective Windows file is fine).  
-8. Refresh breadcrumbs vault:  
-   `python3 scripts/breadcrumbs_vault.py stage --version 1.0.8`  
-   then `publish` when SSH vault path is available.  
-9. Re-check: host PE size/sha matches Helsinki before admin **client-push** of
-   Windows package (host vs Helsinki match gate).
+### 5.1 Client: rpAI · Ned
+
+- Suite tab **rpAI** hosts the **Ned** product guide / rpAI surface.  
+- Install optional via Suite parts (`rpaiInstalled`).  
+- Ned does **not** receive user secrets (seed, password, connection logs, KEYGEN
+  strings, cards). Privacy strip is absolute on oracle/Ned durable paths.
+
+### 5.2 Residual node co-join
+
+On residual hosts, **three co-joined roles** share one contact surface:
+
+| Role | Purpose |
+|------|---------|
+| **VPN** | Residual HELLO / session / tunnel |
+| **rpAI** | Local Ned-related learning epochs / oracle sync hooks |
+| **Perccent** | % chain health / seed ticks (co-located heartbeat) |
+
+Code: `node/cojoined_roles.py`. Clients dial monopin residual host:port once.
+
+### 5.3 Helsinki oracle + Ned absorb (admin rpS)
+
+| Piece | Path / role |
+|-------|-------------|
+| Oracle collate | `node/oracle_master.py` — pure collate of satellite heartbeats |
+| Live residual peers in collate | **IS + DE only** (US/RO retired if reported) |
+| Suite surfaces in collate | vpn, wallet, backup, analysis, voting, credit, rpai |
+| Ned absorb | `ned_learn_oracle` — growth counters, learned surfaces, housework tags |
+| Ops counters only | trial_claims / keygen_entitled **ints** — never KEYGEN strings or cards |
+| Admin rpS UI | status host **`/admin/rps`** — readiness + Ned growth public snapshot |
+| Persistence | `admin_rps` stats path — stripped of forbidden user keys |
+
+**Windows machine must understand:** rebuilding the PE does not train Ned. Ned
+growth comes from **Helsinki oracle collate + admin rpS absorb** of fleet
+heartbeats. Client rpAI tab is the user-facing Ned guide, not the training loop.
+
+---
+
+## 6. Status-host admin — complete map
+
+**Base:** public shop / status process (e.g. Render / restoreprivacy.online).
+Login: `/admin` with `RPT_ADMIN_USER` / `RPT_ADMIN_PASSWORD` (+ optional 2FA).
+Session: `RPT_ADMIN_SESSION_SECRET`. Durable licences/grants on **payment disk**,
+not residual scratch.
+
+### 6.1 Sidebar (every surface)
+
+| Nav | Path | What it is |
+|-----|------|------------|
+| **Home** | `/admin` | Architecture blurb + payment readiness summary |
+| **Link Generation** | `/admin/link-generation` | Failsafe links & KEYGENs (see §6.2) |
+| **Active Licences** | `/admin/licences` | Licence DB + paid download grants |
+| **Fleet** | `/admin/fleet` | Fleet bandwidth / node usage probes |
+| **Node Operator** | `/admin/node-operator` | Residual node control (IS/DE tabs): co-join, capacity, package deploy, **UPDATE_PUSH** to clients |
+| **rpOS** | `/admin/rpos` | Desktop RESTORE OS brand admin surface |
+| **rpS** | `/admin/rps` | **Ned / admin rpS** readiness + growth (oracle absorb) |
+| **Perc** | `/admin/perc` | Perccent chain / % admin surface |
+| **Support tickets** | `/admin/support-tickets` | Operator support inbox |
+| **Accounting** | `/admin/accounting` | RASKUL LTD accounting |
+| **UPLOADS** | `/admin/uploads` | Suite monopin packages → Helsinki + client-push (see §6.3) |
+| **Processors** | `/admin/processors` | Processor plugins / connection variables |
+| **Logout** | `/admin/logout` | End admin session |
+
+### 6.2 Link Generation (detail)
+
+| Tool | Purpose |
+|------|---------|
+| Re-issue by purchase ID | Fresh paid download URL for an existing Stripe purchase |
+| Generate download (failsafe) | On-demand catalog package mint (platform dropdown) |
+| Generate KEYGEN (failsafe) | Mint KEYGEN without full Checkout path (operator) |
+| One-month tester | Tester entitlement window |
+| Seed test purchase | Only if `RPT_ADMIN_SEED_PURCHASE=1` (lab) |
+
+Also: clear-licences / clear-grants forms where exposed — durable disk ops.
+
+### 6.3 UPLOADS (Suite push — critical for this machine)
+
+Path: **`/admin/uploads`**. Inventory = **Suite client only** at current monopin
+(windows / android / macos / ios / linux) — not full brand by default.
+
+| Action | Behaviour |
+|--------|-----------|
+| **Push selected packages to Helsinki** | Stage + upload checked files to `paid_assets/{monopin}/` (async progress). Dry-run available. |
+| **Push selected updates to clients** | Residual **UPDATE_PUSH** for monopin; packages that **size-match** build host and Helsinki are selectable; mismatch rows disabled; POST requires `package=` checkboxes. Clients apply only if Settings **CHECK BREADCRUMBS** is on. |
+| **Browse / path upload** | Single local installer path → stage/upload Helsinki |
+
+After you seal a native Windows PE: upload Windows file, confirm host sha/size
+equals Helsinki, then client-push can include Windows.
+
+### 6.4 Node Operator (residual control)
+
+Path: **`/admin/node-operator`**.
+
+- Node selector tabs (IS / DE / lab).  
+- Co-join readiness (vpn / rpai / perccent).  
+- Capacity live/capacity.  
+- Package inventory + Helsinki deploy (can still be brand-aware on that page).  
+- **Push update to clients** (version + URL + message + optional target client).  
+- SSH key missing for package host → forced browser redirect to app-testers (product rule).
+
+### 6.5 Fleet · Perc · rpOS · Support · Accounting · Processors
+
+| Surface | Operator purpose |
+|---------|------------------|
+| **Fleet** | Package-host / residual bandwidth used vs capability (token probes) |
+| **Perc** | Perccent / % chain ops on Helsinki explorer path |
+| **rpOS** | Desktop RESTORE OS brand (not mobile residual) |
+| **Support** | Tickets inbox, close/clear |
+| **Accounting** | RASKUL LTD books surface |
+| **Processors** | Plugin connection variables (apply form) |
+
+### 6.6 Security / privacy admin rules
+
+- Public status: **title-only** (no live client counts).  
+- No `.priv` in installers or paid assets.  
+- Oracle/Ned never durable-store seed, password, connection_log, KEYGEN string,
+  card numbers, reinstall-trial attack prose.  
+- 2FA setup/verify paths under `/admin/2fa/*` when enabled.
+
+---
+
+## 7. Public shop + payments (customer path)
+
+| Item | Truth |
+|------|--------|
+| Free Suite download | Shop catalog five platforms; download ≠ residual unlock |
+| KEYGEN unlock | After Stripe; monthly / yearly GBP prices in `payments.py` |
+| Webhook | Stripe → status host fulfilment email + grant + KEYGEN |
+| Custom domain | pay.restoreprivacy.online (Checkout branding limits apply) |
+| Trial | **In-app only**; Stripe `CATALOG_TRIAL_PERIOD_DAYS = 0` |
+
+---
+
+## 8. Brand companions (beyond Suite PE)
+
+Not all required for residual smoke, but Windows brand mirror may stage them:
+
+| Brand | Notes |
+|-------|--------|
+| **Suite client** | This monopin PE + other OS packages |
+| **Rx browser** | `restore-privacy-rx-browser-1.0.8-windows.zip` (optional) |
+| **rpOS** | Desktop Windows/macOS/Linux; free Pens · Tables · Slides after install |
+| **rpMail / rpOffice** | Brand desktop package slots |
+| **Node installer / node-operator** | Operator-facing residual host packages |
+| **Browser extension** | Separate browser slot in brand inventory |
+
+Large-drive mirror: `RPT_WINDOWS_DRIVE` + `python scripts/windows_brand_mirror.py apply`.
+
+---
+
+## 9. On the Windows build machine (ordered)
+
+1. Sync monorepo; confirm `client/VERSION` = **`1.0.8`**.  
+2. Read **this entire handoff** (client + admin + Ned + fleet).  
+3. Optional: `set RPT_WINDOWS_DRIVE=…` → `python scripts/windows_brand_mirror.py apply`.  
+4. Build native PE (MSVC / Inno / multihop recipe as used on this host).  
+5. Output name: `restore-privacy-client-1.0.8-windows-x64-setup.exe`.  
+6. Authenticode-sign.  
+7. Stage → `status_page/assets/1.0.8/` and `releases/1.0.8/`.  
+8. Helsinki: admin **UPLOADS** or `host_paid_assets_vps` (Windows file).  
+9. Confirm host size == Helsinki size for Windows (client-push gate).  
+10. Breadcrumbs: `python3 scripts/breadcrumbs_vault.py stage --version 1.0.8` (+ publish).  
+11. Smoke client: first-run → trial → Suite bar (VPN · % · Evolve · Backup · Credit · rpAI/Ned).  
+12. Smoke residual: IS/DE only; no US live peer.  
+13. Optionally open status **admin** (credentials from ops vault) and verify UPLOADS /
+    Node Operator / **rpS (Ned)** pages load — do not treat admin as part of the PE.
 
 ### Smoke after PE install (architecture observation)
 
-- First-run order: account → seed → licence → shell (no VPN permission first).  
+- First-run: account → seed → licence → shell (no VPN permission first).  
 - Trial: 72h KEYGEN-free residual; then KEYGEN /pay.  
-- Suite bar: VPN, %, Evolve surfaces (Analysis/Voting when installed), Backup,
-  Credit, rpAI when installed.  
-- Residual catalog: IS + DE only; no US peer in Settings as live entry.  
-- Stripe: no Checkout trial days.
+- Suite bar: VPN, %, Evolve (Analysis/Voting), Backup, Credit, rpAI/Ned when installed.  
+- Residual catalog: IS + DE only.  
+- Stripe: no Checkout trial days.  
+- CHECK BREADCRUMBS off by default for push updates.
 
 ---
 
-## 6. Operator notes (Stripe + fulfilment)
+## 10. Operator notes (Stripe + fulfilment)
 
 - Code: `CATALOG_TRIAL_PERIOD_DAYS = 0`; Checkout omits subscription trial days.  
 - Residual free trial remains host **device_trial** only (in-app).  
-- Paid installers live under Helsinki `paid_assets/1.0.8/` (not public GitHub).  
-- Admin UPLOADS (status host): Suite-only monopin inventory; client-push only when
-  selected package **sizes match** build host and Helsinki.
+- Paid installers: Helsinki `paid_assets/1.0.8/` (token-gated).  
+- Admin UPLOADS: Suite-only inventory; client-push only for packages that
+  **size-match** build host and Helsinki.  
+- Licence/grant DB: durable payment disk — survives residual wipe / redeploy.
 
 ---
 
-## 7. Related monorepo truth (read-only pointers)
+## 11. Monorepo truth table (read-only pointers)
 
 | Topic | Location |
 |-------|----------|
 | First-run gate | `client_app/lib/first_run_gate.dart`, `first_run_portal.dart` |
 | Suite nav / parts | `client_app/lib/suite_nav.dart`, `suite_parts.dart` |
-| Trial / Stripe | `status_page/payments.py` (`RESIDUAL_TRIAL_HOURS`, `CATALOG_TRIAL_PERIOD_DAYS`) |
-| Residual peers | `client/multihop.py` (IS+DE live; US/RO retired) |
-| Apple inject (parity) | `scripts/inject_apple_secrets.py` — Windows PE should match live-pub set |
-| Breadcrumbs vault | `scripts/breadcrumbs_vault.py` stages this file as `WINDOWS_HANDOFF.md` |
+| Trial / Stripe | `status_page/payments.py` |
+| Residual peers | `client/multihop.py` |
+| Co-join roles | `node/cojoined_roles.py` |
+| Oracle + Ned absorb | `node/oracle_master.py`, `status_page/admin_rps.py` |
+| UPDATE_PUSH | `node/update_push.py`, admin Node Operator + UPLOADS client-push |
+| Client-push match gate | `status_page/suite_client_push.py` |
+| Admin shell | `status_page/admin_panel.py` (sidebar + all pages) |
+| Node Operator UI | `status_page/admin_node_operator.py` |
+| Apple inject (parity) | `scripts/inject_apple_secrets.py` |
+| Breadcrumbs vault | `scripts/breadcrumbs_vault.py` (stages this file as `WINDOWS_HANDOFF.md`) |
+| Brand mirror | `scripts/windows_brand_mirror.py` |
+| Paid assets host | `scripts/host_paid_assets_vps.py` |
 
 ---
 
 ## Companions (optional same monopin)
 
 - `restore-privacy-rx-browser-1.0.8-windows.zip` if Rx browser ships with this monopin.  
-- Brand-wide slots (rpOS, Pens, …) are **not** required for Suite residual observe;
-  Suite client PE is the primary residual + shell artifact.
+- Brand-wide slots (rpOS, Pens, node-installer, …) via brand mirror — see §8.
 
 ## Honest status
 
 - Catalog can serve monopin **1.0.8** with a re-pinned carry-forward PE until
   this machine seals a native Authenticode build.  
-- Architecture (first-run, trial, Suite parts, IS+DE) is product truth regardless
-  of PE carry-forward — validate UI/behaviour on a current client build when
-  the PE is still carry-forward.
+- **Everything above** (first-run, trial, Suite shell, Ned/oracle, full admin map,
+  fleet, fulfilment) is required operator knowledge even while the PE is still
+  carry-forward — validate client UI on a current build and admin on the live
+  status host.

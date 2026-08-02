@@ -209,6 +209,7 @@ def build_vault_manifest(*, monopin: str | None = None) -> dict[str, Any]:
         "observe_first_run_account_seed_licence_before_vpn",
         "observe_72h_keygen_free_trial_then_pay",
         "observe_suite_shell_vpn_percent_evolve_backup_rpai",
+        "observe_ned_oracle_admin_rps_and_full_admin_map",
     ]
 
     return {
@@ -255,10 +256,12 @@ def build_vault_manifest(*, monopin: str | None = None) -> dict[str, Any]:
             f"installer slots ({windows_mirror.get('brand_slot_count') or 'N'} packages); "
             "then native PE seal + upload",
             f"7. Windows machine: open client/windows/WINDOWS_HANDOFF_{pin}.md — "
-            "observe full Suite architecture: first-run account→seed→licence before "
-            "VPN permissions; 72h KEYGEN-free residual trial then KEYGEN "
-            "(Stripe trial_period_days=0); Suite shell VPN · % · Evolve · Backup · "
-            "Credit · rpAI; residual peers IS+DE only (US retired)",
+            "full product map: first-run account→seed→licence before VPN; "
+            "72h KEYGEN-free trial then KEYGEN (Stripe trial_period_days=0); "
+            "Suite VPN · % · Evolve · Backup · Credit · rpAI/Ned; residual IS+DE; "
+            "Ned/oracle/co-join; every /admin surface (UPLOADS, Node Operator, "
+            "rpS, Link Generation, Licences, Fleet, Perc, Support, Accounting, "
+            "Processors); brand companions rpOS/browser",
         ],
     }
 
