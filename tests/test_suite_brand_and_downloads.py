@@ -187,6 +187,7 @@ class TestSuiteDownloadsMonopinCurrent(unittest.TestCase):
         from downloads import (
             download_css,
             downloads_map_page_css,
+            render_download_section_html,
             render_downloads_map_page_html,
             render_suite_storefront_html,
             suite_storefront_css,
@@ -209,11 +210,54 @@ class TestSuiteDownloadsMonopinCurrent(unittest.TestCase):
         self.assertIn('[data-theme="light"] .dl-local-price', dc)
         self.assertIn('[data-theme="light"] .dl-interval-note', dc)
         self.assertIn('[data-theme="light"] .downloads h2', dc)
+        # Platform note: light panel + dark text (not white on translucent navy)
+        self.assertIn('[data-theme="light"] .dl-platform-note', dc)
+        self.assertIn('[data-theme="light"] .dl-platform-note-box', dc)
+        pn_i = dc.index('[data-theme="light"] .dl-platform-note-box')
+        pn_block = dc[pn_i : pn_i + 350]
+        self.assertIn("background: #e8f1f8", pn_block)
+        pn_text_i = dc.index('[data-theme="light"] .dl-platform-note,')
+        pn_text = dc[pn_text_i : pn_text_i + 220]
+        self.assertIn("color: #0a2348", pn_text)
+        self.assertIn("text-shadow: none", pn_text)
+        # Dark default white platform note retained (class rule, not -box)
+        dark_pn_i = dc.index(".dl-platform-note {\n")
+        dark_pn = dc[dark_pn_i : dark_pn_i + 220]
+        self.assertIn("color: #ffffff", dark_pn)
+        # Plan title/price: light tiles + dark text (not pale soft / #fff on translucent)
+        self.assertIn('[data-theme="light"] .dl-plan-option', dc)
+        self.assertIn('[data-theme="light"] .dl-plan-title', dc)
+        self.assertIn('[data-theme="light"] .dl-plan-price', dc)
+        plan_i = dc.index('[data-theme="light"] .dl-plan-title')
+        plan_block = dc[plan_i : plan_i + 280]
+        self.assertIn("color: #0a2348", plan_block)
+        price_i = dc.index('[data-theme="light"] .dl-plan-price')
+        self.assertIn("color: #0f2340", dc[price_i : price_i + 120])
+        # Dark defaults for plan title/price still present
+        self.assertIn(".dl-plan-title { font-weight: 800; color: #fff", dc)
+        self.assertIn("var(--rb-soft, #deedf7)", dc)
 
         mc = downloads_map_page_css()
         self.assertIn('[data-theme="light"] .downloads-map-page h1', mc)
         self.assertIn('[data-theme="light"] .downloads-map-section h2', mc)
         self.assertIn("color: #e8f2ff", mc)  # dark default map title
+        # Map/free-packages back links darkened under light (not #93c5fd on white)
+        self.assertIn(
+            '[data-theme="light"] .downloads-map-page .downloads-map-back a',
+            mc,
+        )
+        self.assertIn(
+            '[data-theme="light"] .free-packages-page .free-packages-back a',
+            mc,
+        )
+        back_i = mc.index(
+            '[data-theme="light"] .downloads-map-page .downloads-map-back a'
+        )
+        back_block = mc[back_i : back_i + 280]
+        self.assertIn("color: #0a2a6e", back_block)
+        self.assertNotIn("color: #93c5fd", back_block)
+        # Dark default pale back link retained
+        self.assertIn("color: #93c5fd", mc)
 
         se = _shared_shell_css()
         self.assertIn('[data-theme="light"] .suite-guide-intro .suite-guide-lead', se)
@@ -227,10 +271,17 @@ class TestSuiteDownloadsMonopinCurrent(unittest.TestCase):
         self.assertIn('id="suite-storefront"', suite)
         self.assertIn('id="suite-blurb"', suite)
         self.assertIn('id="suite-product-submenu"', suite)
+        # Live homepage downloads emit platform-note + plan title/price markup
+        dl_html = render_download_section_html()
+        self.assertIn('id="dl-platform-note"', dl_html)
+        self.assertIn("dl-platform-note-box", dl_html)
+        self.assertIn("dl-plan-title", dl_html)
+        self.assertIn("dl-plan-price", dl_html)
         mmap = render_downloads_map_page_html().decode("utf-8")
         self.assertIn("downloads-map-page", mmap)
         self.assertIn("Downloads Map", mmap)
-
+        self.assertIn("downloads-map-back", mmap)
+        self.assertIn("Back to home", mmap)
     def test_suite_keygen_cart_button_and_hint_centered(self) -> None:
         """Get KEYGEN + under-button cart text are centred (not left-flush)."""
         from downloads import render_suite_storefront_html, suite_storefront_css

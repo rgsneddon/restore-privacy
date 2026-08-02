@@ -625,6 +625,34 @@ def download_css() -> str:
     [data-theme="light"] .download-node-preference .node-pref-deposit-note {
       color: #0f2340;
     }
+    /* Light: opaque light platform-note panel + dark text (was white on 45% navy) */
+    [data-theme="light"] .dl-platform-note-box,
+    [data-theme="light"] #dl-platform-note-box {
+      background: #e8f1f8;
+      border-color: rgba(0, 180, 220, 0.38);
+      box-shadow: none;
+    }
+    [data-theme="light"] .dl-platform-note,
+    [data-theme="light"] #dl-platform-note {
+      color: #0a2348;
+      text-shadow: none;
+    }
+    /* Light: plan tiles on light form — light fill + dark title/price (not pale soft/white) */
+    [data-theme="light"] .dl-plan-option {
+      background: #e8f1f8;
+      border-color: rgba(0, 180, 220, 0.35);
+    }
+    [data-theme="light"] .dl-plan-option:has(input:checked) {
+      background: #d7ebf9;
+      border-color: rgba(26, 143, 212, 0.65);
+      box-shadow: 0 0 0 1px rgba(26, 143, 212, 0.25);
+    }
+    [data-theme="light"] .dl-plan-title {
+      color: #0a2348;
+    }
+    [data-theme="light"] .dl-plan-price {
+      color: #0f2340;
+    }
     @media (prefers-color-scheme: light) {
       :root:not([data-theme="dark"]):not([data-theme="light"]) .dl-auto-renew-help,
       :root:not([data-theme="dark"]):not([data-theme="light"]) #dl-auto-renew-help {
@@ -643,6 +671,23 @@ def download_css() -> str:
       :root:not([data-theme="dark"]):not([data-theme="light"]) .dl-interval-note,
       :root:not([data-theme="dark"]):not([data-theme="light"]) .dl-buy-field label.dl-buy-label {
         color: #0a2348;
+      }
+      :root:not([data-theme="dark"]):not([data-theme="light"]) .dl-platform-note-box {
+        background: #e8f1f8;
+        box-shadow: none;
+      }
+      :root:not([data-theme="dark"]):not([data-theme="light"]) .dl-platform-note {
+        color: #0a2348;
+        text-shadow: none;
+      }
+      :root:not([data-theme="dark"]):not([data-theme="light"]) .dl-plan-option {
+        background: #e8f1f8;
+      }
+      :root:not([data-theme="dark"]):not([data-theme="light"]) .dl-plan-title {
+        color: #0a2348;
+      }
+      :root:not([data-theme="dark"]):not([data-theme="light"]) .dl-plan-price {
+        color: #0f2340;
       }
     }
     .dl-pay-error {
@@ -1667,6 +1712,22 @@ def downloads_map_page_css() -> str:
     .downloads-map-page .downloads-map-back a,
     .free-packages-page .free-packages-back a {
       color: #93c5fd; font-weight: 700; text-decoration: none;
+    }
+    /* Light mode: back link was pale sky (#93c5fd) on white shell */
+    [data-theme="light"] .downloads-map-page .downloads-map-back a,
+    [data-theme="light"] .free-packages-page .free-packages-back a {
+      color: #0a2a6e;
+    }
+    [data-theme="light"] .downloads-map-page .downloads-map-back a:hover,
+    [data-theme="light"] .free-packages-page .free-packages-back a:hover {
+      color: #0a1628;
+      text-decoration: underline;
+    }
+    @media (prefers-color-scheme: light) {
+      :root:not([data-theme="dark"]):not([data-theme="light"]) .downloads-map-page .downloads-map-back a,
+      :root:not([data-theme="dark"]):not([data-theme="light"]) .free-packages-page .free-packages-back a {
+        color: #0a2a6e;
+      }
     }
 """
 
