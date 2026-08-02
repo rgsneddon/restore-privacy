@@ -25,6 +25,8 @@ import 'package:evolve/theme/app_theme.dart';
 import 'suite_account.dart';
 import 'theme.dart';
 
+// suiteEvolveInheritsSuiteLogin / suiteEvolveShowsLoginWall live in suite_account.dart
+
 /// **EVOLVE** tab — full Evolve Chronoflux app (bootstrap → analysis shell).
 ///
 /// Embeds the shipped evolve package surfaces; not a stub. Suite account is
@@ -39,6 +41,7 @@ class SuiteEvolveTab extends StatefulWidget {
     this.child,
     this.showShellBottomBar = false,
     this.shellTabIndex,
+    this.accountStore,
   });
 
   final EvolveProvider? evolveProvider;
@@ -55,6 +58,9 @@ class SuiteEvolveTab extends StatefulWidget {
   /// Suite path: which evolve shell tab body to show.
   final int? shellTabIndex;
 
+  /// Optional Suite account store — used to inherit first-run registration.
+  final SuiteAccountStore? accountStore;
+
   @override
   State<SuiteEvolveTab> createState() => _SuiteEvolveTabState();
 }
@@ -66,6 +72,8 @@ class _SuiteEvolveTabState extends State<SuiteEvolveTab> {
   evolve_locale.LocaleProvider? _locale;
   bool _ready = false;
   Object? _error;
+  bool _suiteRegistered = false;
+  String? _suiteUsername;
 
   @override
   void initState() {
@@ -80,6 +88,7 @@ class _SuiteEvolveTabState extends State<SuiteEvolveTab> {
       _fcg = widget.fcgProvider;
       _locale = widget.localeProvider;
       _ready = true;
+      unawaited(_refreshSuiteRegisteredFlag());
       return;
     }
     _boot();
@@ -95,11 +104,41 @@ class _SuiteEvolveTabState extends State<SuiteEvolveTab> {
     unawaited(_reloadSharedLedgerSession());
   }
 
+  Future<void> _refreshSuiteRegisteredFlag() async {
+    final busUser = (SuiteAccountBus.instance.lastUsername ?? '').trim();
+    var registered = busUser.isNotEmpty;
+    String? user = busUser.isNotEmpty ? busUser : null;
+    final store = widget.accountStore;
+    if (store != null) {
+      try {
+        registered = await store.isRegistered() || registered;
+        user ??= await store.username();
+      } catch (_) {}
+    }
+    if (!mounted) return;
+    setState(() {
+      _suiteRegistered = registered;
+      _suiteUsername = user;
+    });
+  }
+
   Future<void> _reloadSharedLedgerSession() async {
-    if (_wallet == null) return;
+    await _refreshSuiteRegisteredFlag();
+    final wallet = _wallet;
+    if (wallet == null) return;
     try {
       await evolve_hub.PercLedgerHub.instance.reloadFromStore();
+      // Re-init if session appeared on disk after first-run (shared ledger).
+      if (!wallet.isReady) {
+        await wallet.initialize();
+      } else if (!wallet.hasAppAccess) {
+        // Hub may have sessionUsername after first-run persist — re-read store.
+        try {
+          await evolve_hub.PercLedgerHub.instance.reloadFromStore();
+        } catch (_) {}
+      }
     } catch (_) {}
+    if (mounted) setState(() {});
   }
 
   Future<void> _boot() async {
@@ -132,11 +171,18 @@ class _SuiteEvolveTabState extends State<SuiteEvolveTab> {
       if (widget.fcgProvider == null) {
         await fcg.initialize();
       }
-      // Shared Suite account session may already be on disk from % tab or
-      // the post-KEYGEN prompt — reload so Evolve does not force a second wall.
+      // Shared Suite account session may already be on disk from first-run,
+      // % tab, or the post-KEYGEN prompt — load wallet + hub before bootstrap
+      // so Evolve can inherit login (no redundant create-account wall).
       try {
         await evolve_hub.PercLedgerHub.instance.reloadFromStore();
       } catch (_) {}
+      if (widget.walletProvider == null) {
+        try {
+          await wallet.initialize();
+        } catch (_) {}
+      }
+      await _refreshSuiteRegisteredFlag();
 
       evolve.setLocale(locale.config);
       evolve.analysisRewardHandler = ({
@@ -243,9 +289,15 @@ class _SuiteEvolveTabState extends State<SuiteEvolveTab> {
       );
     }
 
+    final wallet = _wallet!;
+    final inherits = suiteEvolveInheritsSuiteLogin(
+      suiteAccountRegistered: _suiteRegistered ||
+          (SuiteAccountBus.instance.lastUsername ?? '').trim().isNotEmpty,
+      walletHasAppAccess: wallet.hasAppAccess,
+    );
     final body = widget.child ??
         AppBootstrapScreen(
-          walletProvider: _wallet!,
+          walletProvider: wallet,
           showShellBottomBar: widget.showShellBottomBar,
           shellTabIndex: widget.shellTabIndex,
         );
@@ -257,7 +309,7 @@ class _SuiteEvolveTabState extends State<SuiteEvolveTab> {
         ),
         ChangeNotifierProvider<EvolveProvider>.value(value: _evolve!),
         ChangeNotifierProvider<evolve_wallet.PercWalletProvider>.value(
-          value: _wallet!,
+          value: wallet,
         ),
         ChangeNotifierProvider<FcgVotingProvider>.value(value: _fcg!),
       ],
@@ -273,6 +325,63 @@ class _SuiteEvolveTabState extends State<SuiteEvolveTab> {
           child: Builder(
             builder: (context) {
               AppLocalizations.of(_locale!.config);
+              // Banner when Suite first-run registered the same identity.
+              if (inherits) {
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Material(
+                      color: const Color(0xFF1A3A5C),
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 8,
+                        ),
+                        child: Text(
+                          'Suite account'
+                          '${(_suiteUsername ?? SuiteAccountBus.instance.lastUsername ?? '').trim().isEmpty ? '' : ' (${_suiteUsername ?? SuiteAccountBus.instance.lastUsername})'}'
+                          ' — Evolve uses the same login from setup.',
+                          textAlign: TextAlign.center,
+                          style: const TextStyle(
+                            color: Color(0xFFFF9800),
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
+                    ),
+                    Expanded(child: body),
+                  ],
+                );
+              }
+              if (_suiteRegistered && !wallet.hasAppAccess) {
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Material(
+                      color: const Color(0xFF3A2A10),
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 8,
+                        ),
+                        child: Text(
+                          'Sign in with your Suite username'
+                          '${(_suiteUsername ?? '').isEmpty ? '' : ' (${_suiteUsername!})'}'
+                          ' — account already created in setup (not a new register).',
+                          textAlign: TextAlign.center,
+                          style: const TextStyle(
+                            color: Color(0xFFFF9800),
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
+                    ),
+                    Expanded(child: body),
+                  ],
+                );
+              }
               return body;
             },
           ),

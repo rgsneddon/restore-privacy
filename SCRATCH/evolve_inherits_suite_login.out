@@ -1,0 +1,6 @@
+00:00 +0: loading /Users/russellsneddon/restore-privacy/client_app/test/evolve_inherits_suite_login_test.dart
+00:00 +0: suiteEvolveInheritsSuiteLogin when registered + wallet session live
+00:00 +1: suiteEvolveShowsLoginWall when no Suite account yet
+00:00 +2: Suite registered without live session still needs password (not create)
+00:00 +3: SuiteAccountBus notify + store markRegistered share identity
+00:00 +4: All tests passed!

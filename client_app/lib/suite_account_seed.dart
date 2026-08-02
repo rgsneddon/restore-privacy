@@ -7,6 +7,7 @@
 /// sealed alongside the envelope when present (never invented from the seed).
 library;
 
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:evolve/perc/perc_chain_constants.dart' as evolve_chain;
@@ -530,18 +531,74 @@ bool _looksLikeStubSeedWords(List<String> words) {
 /// Whether [words] are the forbidden wordNN stub (tests + fail-closed UI).
 bool isStubSuiteSeedWords(List<String> words) => _looksLikeStubSeedWords(words);
 
+/// Default wall-clock budget for first-run seed confirm (local attach + publish).
+///
+/// Network rendezvous must not hang the portal multi-minute; local envelope is
+/// required, remote publish is best-effort within this budget.
+const Duration kSuiteSeedConfirmTimeout = Duration(seconds: 45);
+
+/// Sub-budget for remote seed envelope publish only (after local attach).
+const Duration kSuiteSeedPublishTimeout = Duration(seconds: 20);
+
+/// Outcome of first-run seed attach/publish (portal advances on local success).
+class SuiteSeedAttachResult {
+  const SuiteSeedAttachResult({
+    required this.localOk,
+    required this.published,
+    this.publishError,
+  });
+
+  final bool localOk;
+  final bool published;
+  final Object? publishError;
+
+  bool get ok => localOk;
+}
+
 /// Attach recovery envelope to a registered Suite identity and publish restore.
 ///
 /// Call after first-run account register (which uses [skipSeedOffer]) so the
 /// portal seed step owns write-down UI while still producing a real envelope
 /// the user can restore from.
-Future<void> attachAndPublishSuiteSeedForUser({
+///
+/// Local attach is required. Network publish is best-effort and time-bounded so
+/// “I’ve written them down” never hangs unbounded on rendezvous.
+Future<SuiteSeedAttachResult> attachAndPublishSuiteSeedForUser({
   required List<String> words,
   required String username,
   required String password,
   SuiteAccountPackageSurfaces? surfaces,
   SettingsBackend? suitePrefsBackend,
   SettingsBackend? licenceBackend,
+  Duration? overallTimeout,
+  Duration? publishTimeout,
+}) async {
+  final budget = overallTimeout ?? kSuiteSeedConfirmTimeout;
+  return _attachAndPublishSuiteSeedForUserBody(
+    words: words,
+    username: username,
+    password: password,
+    surfaces: surfaces,
+    suitePrefsBackend: suitePrefsBackend,
+    licenceBackend: licenceBackend,
+    publishTimeout: publishTimeout ?? kSuiteSeedPublishTimeout,
+  ).timeout(
+    budget,
+    onTimeout: () => throw TimeoutException(
+      'Seed save timed out after ${budget.inSeconds}s',
+      budget,
+    ),
+  );
+}
+
+Future<SuiteSeedAttachResult> _attachAndPublishSuiteSeedForUserBody({
+  required List<String> words,
+  required String username,
+  required String password,
+  SuiteAccountPackageSurfaces? surfaces,
+  SettingsBackend? suitePrefsBackend,
+  SettingsBackend? licenceBackend,
+  required Duration publishTimeout,
 }) async {
   final u = username.trim();
   if (u.isEmpty) throw StateError('Username is required for seed attach');
@@ -595,12 +652,72 @@ Future<void> attachAndPublishSuiteSeedForUser({
     // Restore live flags before publish so rendezvous is not no-op'd.
     perc_coord.PercNetworkCoordinator.disableLiveNodesForTests = prevPerc;
     evolve_coord.PercNetworkCoordinator.disableLiveNodesForTests = prevEvolve;
-    await publishSuiteSeedAfterExport(
-      words: words,
-      username: u,
-      envelopeB64: env,
-      suitePrefsBackend: suitePrefsBackend,
-      licenceBackend: licenceBackend,
+
+    // Local prefs + memory publish first (always). Network is time-bounded.
+    Object? publishErr;
+    var published = false;
+    try {
+      await publishSuiteSeedAfterExport(
+        words: words,
+        username: u,
+        envelopeB64: env,
+        suitePrefsBackend: suitePrefsBackend,
+        licenceBackend: licenceBackend,
+      ).timeout(publishTimeout);
+      published = true;
+    } on TimeoutException catch (e) {
+      publishErr = e;
+      // Local envelope already in SuiteSeedEnvelopeStore.memory + prefs (if set).
+      // Persist local artifacts even when network hangs.
+      if (suitePrefsBackend != null) {
+        try {
+          await persistSuiteSeedBackupArtifacts(
+            backend: suitePrefsBackend,
+            words: words,
+            username: u,
+            envelopeB64: env,
+            licenceBackend: licenceBackend,
+          );
+        } catch (_) {}
+      }
+      final fp = PercSeedRecovery.fingerprint(words);
+      final meta = await buildSuiteSeedMetaBlob(
+        words: words,
+        username: u,
+        licenceBackend: licenceBackend,
+      );
+      SuiteSeedEnvelopeStore.memory[fp] = SuiteSeedPublishedRecovery(
+        envelopeB64: env,
+        metaBlobB64: meta,
+      );
+    } catch (e) {
+      publishErr = e;
+      if (suitePrefsBackend != null) {
+        try {
+          await persistSuiteSeedBackupArtifacts(
+            backend: suitePrefsBackend,
+            words: words,
+            username: u,
+            envelopeB64: env,
+            licenceBackend: licenceBackend,
+          );
+        } catch (_) {}
+      }
+      final fp = PercSeedRecovery.fingerprint(words);
+      final meta = await buildSuiteSeedMetaBlob(
+        words: words,
+        username: u,
+        licenceBackend: licenceBackend,
+      );
+      SuiteSeedEnvelopeStore.memory[fp] = SuiteSeedPublishedRecovery(
+        envelopeB64: env,
+        metaBlobB64: meta,
+      );
+    }
+    return SuiteSeedAttachResult(
+      localOk: true,
+      published: published,
+      publishError: publishErr,
     );
   } finally {
     perc_coord.PercNetworkCoordinator.disableLiveNodesForTests = prevPerc;

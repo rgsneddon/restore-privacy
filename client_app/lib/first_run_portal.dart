@@ -1,10 +1,14 @@
 /// Full-screen first-run portal: account → seed → licence (before shell/VPN).
 library;
 
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import 'first_run_gate.dart';
+import 'legal_links.dart';
 import 'licence_gate.dart';
 import 'prefs_backend.dart';
 import 'settings_store.dart';
@@ -20,6 +24,15 @@ const Key kFirstRunAccountContinueKey = Key('first_run_account_continue');
 const Key kFirstRunSeedGenerateKey = Key('first_run_seed_generate');
 const Key kFirstRunSeedConfirmKey = Key('first_run_seed_confirm');
 const Key kFirstRunLicenceAcceptKey = Key('first_run_licence_accept');
+const Key kFirstRunLicenceScrollKey = Key('first_run_licence_scroll');
+const Key kFirstRunLicenceLinkKey = Key('first_run_licence_link');
+
+/// Public licence page opened from first-run (status-host LICENSE).
+final Uri kFirstRunPublicLicenceUri = Uri.parse(
+  kLegalDocLinks
+      .firstWhere((l) => l.statusPath == '/LICENSE')
+      .url,
+);
 
 /// Ordered first-run surface. Calls [onComplete] when account+seed+licence done.
 class FirstRunPortal extends StatefulWidget {
@@ -34,9 +47,11 @@ class FirstRunPortal extends StatefulWidget {
     this.initialState,
     this.generateSeedWords,
     this.attachAndPublishSeed,
+    this.seedConfirmTimeout = kSuiteSeedConfirmTimeout,
     this.surfaces,
     this.suitePrefsBackend,
     this.licenceBackend,
+    this.openLicenceUrl,
   });
 
   final VoidCallback onComplete;
@@ -55,10 +70,16 @@ class FirstRunPortal extends StatefulWidget {
   /// Override attach+publish after write-down confirm.
   final Future<void> Function(List<String> words)? attachAndPublishSeed;
 
+  /// Wall-clock budget for seed confirm (tests inject short timeouts).
+  final Duration seedConfirmTimeout;
+
   /// Wallet surfaces for production attach (or injectable test stores).
   final SuiteAccountPackageSurfaces? surfaces;
   final SettingsBackend? suitePrefsBackend;
   final SettingsBackend? licenceBackend;
+
+  /// Open public licence URL (tests inject).
+  final Future<bool> Function(Uri url)? openLicenceUrl;
 
   @override
   State<FirstRunPortal> createState() => _FirstRunPortalState();
@@ -78,10 +99,14 @@ class _FirstRunPortalState extends State<FirstRunPortal> {
   String _pendingPassword = '';
   List<String>? _seedWords;
   var _status = '';
+  /// Licence step: accept enabled only after scroll-to-bottom.
+  var _licenceScrolledToBottom = false;
+  final ScrollController _licenceScroll = ScrollController();
 
   @override
   void initState() {
     super.initState();
+    _licenceScroll.addListener(_onLicenceScroll);
     if (widget.initialState != null) {
       _state = widget.initialState;
       _gate = widget.licenceGate;
@@ -102,8 +127,10 @@ class _FirstRunPortalState extends State<FirstRunPortal> {
 
   @override
   void dispose() {
+    _licenceScroll.removeListener(_onLicenceScroll);
     _user.dispose();
     _pass.dispose();
+    _licenceScroll.dispose();
     super.dispose();
   }
 
@@ -279,10 +306,17 @@ class _FirstRunPortalState extends State<FirstRunPortal> {
       _busy = true;
       _status = 'Saving recovery envelope…';
     });
+    final budget = widget.seedConfirmTimeout;
     try {
       final attach = widget.attachAndPublishSeed;
       if (attach != null) {
-        await attach(_seedWords!);
+        await attach(_seedWords!).timeout(
+          budget,
+          onTimeout: () => throw TimeoutException(
+            'Seed save timed out after ${budget.inSeconds}s',
+            budget,
+          ),
+        );
       } else {
         final u = _pendingUsername.trim().isNotEmpty
             ? _pendingUsername.trim()
@@ -291,22 +325,46 @@ class _FirstRunPortalState extends State<FirstRunPortal> {
         if (u.isEmpty || p.isEmpty) {
           throw StateError('Account credentials required to save seed');
         }
-        await attachAndPublishSuiteSeedForUser(
+        final result = await attachAndPublishSuiteSeedForUser(
           words: _seedWords!,
           username: u,
           password: p,
           surfaces: widget.surfaces,
           suitePrefsBackend: widget.suitePrefsBackend,
           licenceBackend: widget.licenceBackend,
+          overallTimeout: budget,
         );
+        if (!result.localOk) {
+          throw StateError('Seed local attach failed');
+        }
+        if (!result.published && mounted) {
+          // Advance anyway — user wrote the words; network backup is optional.
+          setState(() {
+            _status = result.publishError is TimeoutException
+                ? 'Seed saved on this device (network backup timed out).'
+                : 'Seed saved on this device (network backup skipped).';
+          });
+        }
       }
       await _firstRun?.markSeedDone();
       if (!mounted) return;
       setState(() {
         _busy = false;
-        _status = '';
+        if (_status.startsWith('Seed saved')) {
+          // keep soft publish note briefly into licence step via reload
+        } else {
+          _status = '';
+        }
       });
       await _reload();
+    } on TimeoutException catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _busy = false;
+        _status =
+            'Seed save timed out (${e.duration?.inSeconds ?? budget.inSeconds}s). '
+            'Check network and tap continue again — or note your written words.';
+      });
     } catch (e) {
       if (!mounted) return;
       setState(() {
@@ -318,6 +376,10 @@ class _FirstRunPortalState extends State<FirstRunPortal> {
 
   Future<void> _acceptLicence() async {
     if (_busy) return;
+    if (!_licenceScrolledToBottom) {
+      setState(() => _status = 'Scroll to the bottom of the licence to accept.');
+      return;
+    }
     final gate = _gate;
     if (gate == null) return;
     setState(() => _busy = true);
@@ -325,6 +387,45 @@ class _FirstRunPortalState extends State<FirstRunPortal> {
     if (!mounted) return;
     setState(() => _busy = false);
     await _reload();
+  }
+
+  void _onLicenceScroll() {
+    if (!_licenceScroll.hasClients) return;
+    final pos = _licenceScroll.position;
+    // No overflow → entire licence already visible → treat as bottom reached.
+    final atBottom = pos.maxScrollExtent <= 0 ||
+        pos.pixels >= (pos.maxScrollExtent - 12);
+    if (atBottom && !_licenceScrolledToBottom) {
+      setState(() => _licenceScrolledToBottom = true);
+    }
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // After first frame of licence step, re-check short content.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      final st = _state;
+      if (st != null && nextFirstRunStep(st) == FirstRunStep.licence) {
+        _onLicenceScroll();
+      }
+    });
+  }
+
+  Future<void> _openPublicLicence() async {
+    final opener = widget.openLicenceUrl;
+    final uri = kFirstRunPublicLicenceUri;
+    if (opener != null) {
+      await opener(uri);
+      return;
+    }
+    try {
+      await launchUrl(uri, mode: LaunchMode.externalApplication);
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _status = 'Could not open licence page: $e');
+    }
   }
 
   @override
@@ -343,6 +444,74 @@ class _FirstRunPortalState extends State<FirstRunPortal> {
       );
     }
     final step = nextFirstRunStep(st);
+    final header = <Widget>[
+      Text(
+        kSuiteProductName,
+        textAlign: TextAlign.center,
+        style: const TextStyle(
+          color: Colors.white,
+          fontSize: 20,
+          fontWeight: FontWeight.w800,
+        ),
+      ),
+      const SizedBox(height: 6),
+      Text(
+        kSuiteDisplayVersion,
+        textAlign: TextAlign.center,
+        style: TextStyle(
+          color: Colors.white.withValues(alpha: 0.75),
+          fontSize: 12,
+        ),
+      ),
+      const SizedBox(height: 8),
+      Text(
+        'Step ${_stepIndex(step)} of 3',
+        textAlign: TextAlign.center,
+        style: TextStyle(
+          color: Colors.white.withValues(alpha: 0.6),
+          fontSize: 12,
+        ),
+      ),
+      const SizedBox(height: 24),
+    ];
+    final status = _status.isNotEmpty
+        ? <Widget>[
+            const SizedBox(height: 12),
+            Text(
+              _status,
+              textAlign: TextAlign.center,
+              style: const TextStyle(color: Color(0xFFFF9800), fontSize: 13),
+            ),
+          ]
+        : const <Widget>[];
+
+    // Licence uses Expanded scroll pane (not nested outer SingleChildScrollView)
+    // so scroll-to-bottom gating receives real scroll metrics within app bounds.
+    if (step == FirstRunStep.licence) {
+      return Scaffold(
+        key: kFirstRunPortalKey,
+        backgroundColor: const Color(0xFF0A1628),
+        body: SafeArea(
+          child: Center(
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 440),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    ...header,
+                    Expanded(child: _buildLicenceStep(context)),
+                    ...status,
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+    }
+
     return Scaffold(
       key: kFirstRunPortalKey,
       backgroundColor: const Color(0xFF0A1628),
@@ -355,45 +524,10 @@ class _FirstRunPortalState extends State<FirstRunPortal> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  Text(
-                    kSuiteProductName,
-                    textAlign: TextAlign.center,
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 20,
-                      fontWeight: FontWeight.w800,
-                    ),
-                  ),
-                  const SizedBox(height: 6),
-                  Text(
-                    kSuiteDisplayVersion,
-                    textAlign: TextAlign.center,
-                    style: TextStyle(
-                      color: Colors.white.withValues(alpha: 0.75),
-                      fontSize: 12,
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    'Step ${_stepIndex(step)} of 3',
-                    textAlign: TextAlign.center,
-                    style: TextStyle(
-                      color: Colors.white.withValues(alpha: 0.6),
-                      fontSize: 12,
-                    ),
-                  ),
-                  const SizedBox(height: 24),
+                  ...header,
                   if (step == FirstRunStep.account) _buildAccountStep(context),
                   if (step == FirstRunStep.seed) _buildSeedStep(context),
-                  if (step == FirstRunStep.licence) _buildLicenceStep(context),
-                  if (_status.isNotEmpty) ...[
-                    const SizedBox(height: 12),
-                    Text(
-                      _status,
-                      textAlign: TextAlign.center,
-                      style: const TextStyle(color: Color(0xFFFF9800), fontSize: 13),
-                    ),
-                  ],
+                  ...status,
                 ],
               ),
             ),
@@ -523,6 +657,11 @@ class _FirstRunPortalState extends State<FirstRunPortal> {
   }
 
   Widget _buildLicenceStep(BuildContext context) {
+    // Bounded licence pane inside Expanded parent so macOS windows stay
+    // within app dimensions; accept unlocks only after scroll-to-bottom.
+    const licenceBody = '$kShortLicenceSummary\n\n'
+        '$kPaymentConnectDisclaimerPlain\n\n'
+        '$kFirstRunCompleteHint';
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -537,27 +676,75 @@ class _FirstRunPortalState extends State<FirstRunPortal> {
         ),
         const SizedBox(height: 12),
         Text(
-          kPaymentConnectDisclaimerPlain,
-          style: const TextStyle(
-            color: Color(0xFFFF9800),
-            fontSize: 13,
-            height: 1.4,
-          ),
-        ),
-        const SizedBox(height: 12),
-        Text(
-          kFirstRunCompleteHint,
+          'Scroll through the full licence below. Accept unlocks only after '
+          'you reach the end.',
+          textAlign: TextAlign.center,
           style: TextStyle(
-            color: Colors.white.withValues(alpha: 0.8),
-            fontSize: 13,
+            color: Colors.white.withValues(alpha: 0.75),
+            fontSize: 12,
             height: 1.35,
           ),
         ),
-        const SizedBox(height: 20),
+        const SizedBox(height: 12),
+        Expanded(
+          child: DecoratedBox(
+            decoration: BoxDecoration(
+              color: const Color(0xFF132A4A),
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(color: Colors.white24),
+            ),
+            child: NotificationListener<ScrollNotification>(
+              onNotification: (n) {
+                if (n is ScrollUpdateNotification ||
+                    n is ScrollEndNotification ||
+                    n is ScrollMetricsNotification) {
+                  _onLicenceScroll();
+                }
+                return false;
+              },
+              child: Scrollbar(
+                controller: _licenceScroll,
+                thumbVisibility: true,
+                child: SingleChildScrollView(
+                  key: kFirstRunLicenceScrollKey,
+                  controller: _licenceScroll,
+                  padding: const EdgeInsets.all(14),
+                  child: const Text(
+                    licenceBody,
+                    style: TextStyle(
+                      color: Color(0xFFFF9800),
+                      fontSize: 13,
+                      height: 1.45,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+        const SizedBox(height: 10),
+        TextButton(
+          key: kFirstRunLicenceLinkKey,
+          onPressed: _busy ? null : _openPublicLicence,
+          child: Text(
+            kEndUserLicenceLabel,
+            style: TextStyle(
+              color: Colors.lightBlueAccent.withValues(alpha: 0.95),
+              decoration: TextDecoration.underline,
+            ),
+          ),
+        ),
+        const SizedBox(height: 8),
         FilledButton(
           key: kFirstRunLicenceAcceptKey,
-          onPressed: _busy ? null : _acceptLicence,
-          child: Text(_busy ? 'Please wait…' : kLicenceAcceptButton),
+          onPressed: (_busy || !_licenceScrolledToBottom) ? null : _acceptLicence,
+          child: Text(
+            _busy
+                ? 'Please wait…'
+                : (_licenceScrolledToBottom
+                    ? kLicenceAcceptButton
+                    : 'Scroll to bottom to accept'),
+          ),
         ),
       ],
     );

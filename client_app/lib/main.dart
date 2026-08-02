@@ -304,15 +304,18 @@ class _TunnelHomeState extends State<TunnelHome> with WidgetsBindingObserver {
   }
 
   /// First-run / post-install style prep: save product Packet Tunnel to OS prefs.
+  ///
+  /// Uses the sequenced prepare path so System Settings is not opened in the
+  /// same tick as the NE Allow dialog (missed VPN allow popup fix).
   Future<void> _prepareMacosPacketTunnelBeforeConnect() async {
     if (!MacWindowController.isSupported) return;
     if (!mounted) return;
     _append(
       'Preparing system VPN profile (Restore Privacy Packet Tunnel)…',
     );
-    final ok = await _vpn.preparePacketTunnelConfiguration();
+    final outcome = await _vpn.preparePacketTunnelSequenced();
     if (!mounted) return;
-    if (ok) {
+    if (outcome.prepared) {
       _append(
         'Packet Tunnel configuration ready — Allow if macOS asks, then Connect. '
         'Do not add L2TP, Cisco IPsec, or IKEv2.',
@@ -326,7 +329,9 @@ class _TunnelHomeState extends State<TunnelHome> with WidgetsBindingObserver {
           _status = kPacketTunnelPreparedMessage;
         });
       }
-    } else if (isNeVpnPermissionFailureMessage(_status) ||
+    } else if (outcome.needsVpnSystemSettingsApproval ||
+        outcome.openedSettings ||
+        isNeVpnPermissionFailureMessage(_status) ||
         shouldPromptOpenVpnSystemSettings({
           'ok': false,
           'message': _status,

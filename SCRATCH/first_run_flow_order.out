@@ -1,0 +1,9 @@
+00:00 +0: loading /Users/russellsneddon/restore-privacy/client_app/test/first_run_gate_test.dart
+00:00 +0: first-run order is account → seed → licence → complete
+00:00 +1: out-of-order flags still advance through account then seed then licence
+00:00 +2: residual permission/tunnel helpers stay false until first-run complete
+00:00 +3: residual Connect needs first-run and trial/keygen
+00:00 +4: FirstRunStore marks seed and loads complete
+00:00 +5: seed write-down copy is strong offline advice
+00:00 +6: trial and keygen still compose Connect after first-run
+00:00 +7: All tests passed!

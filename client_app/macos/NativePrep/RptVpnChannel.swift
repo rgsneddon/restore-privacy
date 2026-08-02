@@ -59,9 +59,16 @@ enum RptVpnChannel {
         queryProductSessionStatus { map in result(map) }
       case "prepareVpn", "preparePacketTunnel", "registerVpnConfiguration":
         // Pre-Connect: save Packet Tunnel NE profile into OS VPN prefs (not L2TP/IKEv2).
+        // openSettingsOnDenial default false — Flutter sequences System Settings
+        // after prepare returns so Allow dialogs are not lost in a simultaneous burst.
         let args = call.arguments as? [String: Any] ?? [:]
         let ep = RptEndpoint.resolve(from: args)
-        preparePacketTunnelConfiguration(host: ep.host, port: ep.port) { map in
+        let openOnDenial = (args["openSettingsOnDenial"] as? Bool) ?? false
+        preparePacketTunnelConfiguration(
+          host: ep.host,
+          port: ep.port,
+          openSettingsOnDenial: openOnDenial
+        ) { map in
           result(map)
         }
       case "openVpnSettings", "openVpnSystemSettings":
@@ -251,6 +258,7 @@ enum RptVpnChannel {
   private static func preparePacketTunnelConfiguration(
     host: String,
     port: UInt16,
+    openSettingsOnDenial: Bool = false,
     completion: @escaping ([String: Any]) -> Void
   ) {
     if !hostHasPacketTunnelNetworkExtensionEntitlement() {
@@ -309,9 +317,11 @@ enum RptVpnChannel {
       // Failure: do NOT set lastSuccessfulPrepareAt — next prepare must re-attempt.
       let detail = neError ?? "NE preferences unavailable"
       let permissionClass = isNePermissionFailureDetail(detail)
-      // Auto-open Settings only on real permission denial.
-      if permissionClass {
-        _ = openVpnSystemSettings(force: false)
+      // Sequence: only open Settings when Flutter/native opt-in — never by default
+      // during prepare so the NE Allow dialog is not missed among simultaneous panes.
+      var opened = false
+      if permissionClass && openSettingsOnDenial {
+        opened = openVpnSystemSettings(force: false)
       }
       var map: [String: Any] = [
         "ok": false,
@@ -320,7 +330,7 @@ enum RptVpnChannel {
         "providerBundleId": providerBundleId,
         "localizedDescription": productLocalizedDescription,
         "needsVpnSystemSettingsApproval": permissionClass,
-        "openedVpnSettings": permissionClass,
+        "openedVpnSettings": opened,
         "message":
           "Could not pre-register Packet Tunnel VPN configuration: \(detail). "
           + (permissionClass

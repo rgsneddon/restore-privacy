@@ -1,0 +1,5 @@
+00:00 +0: loading /Users/russellsneddon/restore-privacy/client_app/test/first_run_seed_confirm_hang_test.dart
+00:00 +0: slow attach surfaces timeout error and leaves seed step (no infinite busy)
+00:00 +1: successful attach advances to licence step
+00:00 +2: kSuiteSeedConfirmTimeout is finite and positive
+00:00 +3: All tests passed!

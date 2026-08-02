@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/services.dart';
 
 import 'connect_status.dart';
+import 'macos_vpn_permission_sequence.dart';
 import 'rpt_config.dart';
 import 'settings_store.dart';
 import 'suite_update.dart';
@@ -106,13 +107,22 @@ class VpnController {
   ///
   /// Returns true when native reports prepared/ok. Permission failures still return
   /// false but set [onStatus] with Allow guidance.
-  Future<bool> preparePacketTunnelConfiguration() async {
+  ///
+  /// By default does **not** auto-open System Settings in the same tick as prepare
+  /// (see [macos_vpn_permission_sequence]) so the Allow dialog is not missed.
+  /// Use [preparePacketTunnelSequenced] for the full ordered path.
+  Future<bool> preparePacketTunnelConfiguration({
+    bool openSettingsOnDenial = false,
+  }) async {
     try {
       final result = await _channel.invokeMethod<dynamic>('prepareVpn', {
         'host': RptConfig.host,
         'port': RptConfig.port,
         'fullTunnel': true,
         'sessionName': RptConfig.sessionName,
+        // Native must not race System Settings open during prepare.
+        'openSettingsOnDenial': openSettingsOnDenial &&
+            !macosShouldDeferOpenSettingsUntilAfterPrepare(),
       });
       final msg = mapPrepareVpnStatusMessage(result);
       // Only treat dual ok+prepared as success (failed NE save is never prepared).
@@ -121,8 +131,10 @@ class VpnController {
         return isProductPacketTunnelPrepareResult(result);
       }
       onStatus(msg);
-      // Auto-open Settings only on real permission denial — not every prepare fail.
-      if (shouldAutoOpenVpnSystemSettings(result)) {
+      // Optional legacy path only when caller opts in AND sequence allows.
+      if (openSettingsOnDenial &&
+          !macosShouldDeferOpenSettingsUntilAfterPrepare() &&
+          shouldAutoOpenVpnSystemSettings(result)) {
         await openVpnSystemSettings(reportStatus: false);
       }
       return false;
@@ -136,6 +148,71 @@ class VpnController {
       );
       return false;
     }
+  }
+
+  /// Ordered macOS VPN readiness: prepare → await → open Settings if needed.
+  ///
+  /// Does **not** call Connect — that remains a separate user action so system
+  /// popups never fire as a simultaneous burst.
+  Future<MacosVpnPrepOutcome> preparePacketTunnelSequenced() async {
+    // Step 1–2: prepare only (no Settings open in-band).
+    Map<String, dynamic>? raw;
+    try {
+      final result = await _channel.invokeMethod<dynamic>('prepareVpn', {
+        'host': RptConfig.host,
+        'port': RptConfig.port,
+        'fullTunnel': true,
+        'sessionName': RptConfig.sessionName,
+        'openSettingsOnDenial': false,
+      });
+      if (result is Map) {
+        raw = Map<String, dynamic>.from(
+          result.map((k, v) => MapEntry(k.toString(), v)),
+        );
+      }
+    } on MissingPluginException {
+      return const MacosVpnPrepOutcome(
+        prepared: false,
+        openedSettings: false,
+        action: MacosVpnAfterPrepareAction.retryPrepare,
+        message: 'VPN prepare not bound on this build',
+      );
+    } on PlatformException catch (e) {
+      return MacosVpnPrepOutcome(
+        prepared: false,
+        openedSettings: false,
+        action: MacosVpnAfterPrepareAction.retryPrepare,
+        message: e.message ?? e.code,
+      );
+    }
+
+    final prepared = isPrepareVpnSuccess(raw);
+    final needsAllow = shouldAutoOpenVpnSystemSettings(raw) ||
+        (raw?['needsVpnSystemSettingsApproval'] == true);
+    final needsSign = raw?['needsTeamResidualSign'] == true;
+    final hasNe = raw?['hostHasPacketTunnelEntitlement'] != false;
+    final action = macosVpnActionAfterPrepare(
+      prepared: prepared,
+      ok: prepared,
+      needsVpnSystemSettingsApproval: needsAllow,
+      needsTeamResidualSign: needsSign,
+      hostHasPacketTunnelEntitlement: hasNe,
+    );
+    final msg = mapPrepareVpnStatusMessage(raw);
+    onStatus(msg);
+
+    var opened = false;
+    if (action == MacosVpnAfterPrepareAction.openSystemSettingsThenConnect) {
+      // Step 3: open Settings only after prepare completed.
+      opened = await openVpnSystemSettings(reportStatus: false);
+    }
+    return MacosVpnPrepOutcome(
+      prepared: prepared,
+      openedSettings: opened,
+      action: action,
+      message: msg,
+      needsVpnSystemSettingsApproval: needsAllow,
+    );
   }
 
   /// Product Connect: keep **Connecting** status until native full-tunnel result.

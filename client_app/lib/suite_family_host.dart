@@ -220,11 +220,20 @@ class SuiteFamilyHostState extends State<SuiteFamilyHost> {
     try {
       if (_evolveWallet != null) {
         await evolve_hub.PercLedgerHub.instance.reloadFromStore();
+        // Re-sync provider after first-run Suite account wrote the shared ledger.
+        if (!_evolveWallet!.isReady) {
+          await _evolveWallet!.initialize();
+        }
+        _onEvolveWalletChanged();
       }
       if (_walletOnly != null) {
         await wallet_hub.PercLedgerHub.instance.reloadFromStore();
+        if (!_walletOnly!.isReady) {
+          await _walletOnly!.initialize();
+        }
       }
     } catch (_) {}
+    if (mounted) setState(() {});
   }
 
   /// Timeout that is cancelled on [dispose] (no pending-timer test flakes).
@@ -323,6 +332,14 @@ class SuiteFamilyHostState extends State<SuiteFamilyHost> {
     final fcg = FcgVotingProvider();
 
     // Match prior AppBootstrap path: wallet session must initialize before shell.
+    // Order: hub reload (first-run may have just persisted Suite session) then
+    // wallet.initialize so hasAppAccess inherits step-1 registration.
+    try {
+      await _step(
+        'ledger_reload_pre',
+        evolve_hub.PercLedgerHub.instance.reloadFromStore(),
+      );
+    } catch (_) {}
     await _step('wallet_initialize', wallet.initialize());
     await _step('evolve_initialize', evolve.initialize());
     await _step('fcg_initialize', fcg.initialize());
@@ -555,6 +572,44 @@ class SuiteFamilyBody extends StatelessWidget {
       );
       // Registration / seed host (same gate as AppBootstrap path).
       shell = evolve_reg.RegistrationSeedSetupDialogHost(child: shell);
+      // Suite first-run identity banner (inherit step-1 account).
+      final suiteUser = (SuiteAccountBus.instance.lastUsername ?? '').trim();
+      final inherits = suiteEvolveInheritsSuiteLogin(
+        suiteAccountRegistered:
+            SuiteAccountBus.instance.hasRegisteredSession || suiteUser.isNotEmpty,
+        walletHasAppAccess: access,
+      );
+      if (inherits || SuiteAccountBus.instance.hasRegisteredSession) {
+        final label = inherits
+            ? 'Suite account${suiteUser.isEmpty ? '' : ' ($suiteUser)'} — '
+                'same login from setup (no new register).'
+            : 'Sign in with your Suite username'
+                '${suiteUser.isEmpty ? '' : ' ($suiteUser)'} — '
+                'account already created in setup.';
+        shell = Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Material(
+              color: inherits
+                  ? const Color(0xFF1A3A5C)
+                  : const Color(0xFF3A2A10),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                child: Text(
+                  label,
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(
+                    color: Color(0xFFFF9800),
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+            ),
+            Expanded(child: shell),
+          ],
+        );
+      }
       // Theme only around family body — not Suite VPN/rpAI pages.
       if (locale != null) {
         return Theme(

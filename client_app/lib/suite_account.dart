@@ -107,6 +107,29 @@ class SuiteAccountBus {
       l();
     }
   }
+
+  /// True when first-run / apply already established a Suite identity this process.
+  bool get hasRegisteredSession {
+    final u = (lastUsername ?? '').trim();
+    return u.isNotEmpty;
+  }
+}
+
+/// Pure: Evolve/% must not force a full create-account wall when Suite already
+/// registered **and** the shared wallet session is live on this install.
+bool suiteEvolveInheritsSuiteLogin({
+  required bool suiteAccountRegistered,
+  required bool walletHasAppAccess,
+}) =>
+    suiteAccountRegistered && walletHasAppAccess;
+
+/// Pure: whether Evolve should still show an auth surface.
+bool suiteEvolveShowsLoginWall({
+  required bool suiteAccountRegistered,
+  required bool walletHasAppAccess,
+}) {
+  if (walletHasAppAccess) return false;
+  return true;
 }
 
 /// Result of the optional post-keygen Suite account sheet.

@@ -1,0 +1,7 @@
+00:00 +0: loading /Users/russellsneddon/restore-privacy/client_app/test/macos_vpn_permission_sequence_test.dart
+00:00 +0: permission sequence order is prepare → await → settings → connect
+00:00 +1: prepare must not auto-open System Settings in the same tick
+00:00 +2: after prepare: ready / settings / retry / missing NE actions
+00:00 +3: connect may open Settings only after prepare sequence completed
+00:00 +4: native RptVpnChannel prepare gates openSettingsOnDenial
+00:00 +5: All tests passed!
