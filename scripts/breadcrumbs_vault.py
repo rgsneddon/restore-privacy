@@ -205,6 +205,10 @@ def build_vault_manifest(*, monopin: str | None = None) -> dict[str, Any]:
         "mirror_monorepo_and_brand_assets_to_large_drive",
         "rebuild_windows_native_pe_seal",
         f"upload_paid_assets_{pin}",
+        # Architecture observe (first-run, trial, Suite shell) — see WINDOWS_HANDOFF
+        "observe_first_run_account_seed_licence_before_vpn",
+        "observe_72h_keygen_free_trial_then_pay",
+        "observe_suite_shell_vpn_percent_evolve_backup_rpai",
     ]
 
     return {
@@ -250,6 +254,11 @@ def build_vault_manifest(*, monopin: str | None = None) -> dict[str, Any]:
             "python scripts/windows_brand_mirror.py apply — monorepo + all brand "
             f"installer slots ({windows_mirror.get('brand_slot_count') or 'N'} packages); "
             "then native PE seal + upload",
+            f"7. Windows machine: open client/windows/WINDOWS_HANDOFF_{pin}.md — "
+            "observe full Suite architecture: first-run account→seed→licence before "
+            "VPN permissions; 72h KEYGEN-free residual trial then KEYGEN "
+            "(Stripe trial_period_days=0); Suite shell VPN · % · Evolve · Backup · "
+            "Credit · rpAI; residual peers IS+DE only (US retired)",
         ],
     }
 
