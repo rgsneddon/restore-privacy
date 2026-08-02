@@ -15,7 +15,9 @@ import 'package:perccent_wallet/perc/services/perc_ledger_hub.dart' as perc_hub;
 import 'package:perccent_wallet/perc/services/perc_network_coordinator.dart'
     as perc_coord;
 
+import 'settings_store.dart';
 import 'suite_account.dart';
+import 'suite_account_seed.dart';
 
 /// Optional full-path override (legacy/tests that fully replace the apply body).
 typedef SuiteAccountAuthRunner = Future<void> Function({
@@ -53,12 +55,19 @@ SuiteAccountPackageSurfaces productionSuiteAccountSurfaces() {
 ///
 /// Throws [StateError] if either package is not logged in with [username]
 /// after apply — callers must not mark the Suite account registered on failure.
+///
+/// On first [register], [seedOffer] (when provided) presents the recovery seed
+/// export opportunity before registration is finalized. Skip remains allowed.
 Future<void> applySuiteAccountToWalletAndEvolve({
   required String username,
   required String password,
   required bool register,
   SuiteAccountAuthRunner? runner,
   SuiteAccountPackageSurfaces? surfaces,
+  SuiteSeedOfferFn? seedOffer,
+  bool skipSeedOffer = false,
+  SettingsBackend? suitePrefsBackend,
+  SettingsBackend? licenceBackend,
 }) async {
   final u = username.trim();
   final p = password;
@@ -78,20 +87,37 @@ Future<void> applySuiteAccountToWalletAndEvolve({
   final prevPercLive = perc_coord.PercNetworkCoordinator.disableLiveNodesForTests;
   final prevEvolveLive =
       evolve_coord.PercNetworkCoordinator.disableLiveNodesForTests;
+  // Force offline-honest registration during Suite apply so a transient seed
+  // network blip cannot leave a half-account that rejects later logins.
+  // Live nodes remain disabled only for this apply window.
+  perc_coord.PercNetworkCoordinator.disableLiveNodesForTests = true;
+  evolve_coord.PercNetworkCoordinator.disableLiveNodesForTests = true;
+  List<String>? enabledSeedWords;
   try {
     final perc = s.createPercProvider();
     await perc.initialize();
+    // Ensure local treasury exists so register can mint a password-verifiable account.
+    if (perc.needsTreasuryPassword) {
+      await perc.setupTreasuryPassword(p);
+      await perc.logout();
+    }
     await authWalletSurface(
       login: perc.login,
       register: perc.register,
       completeSeed: perc.completeRegistrationSeedSetup,
+      generateSeed: perc.generateRegistrationSeed,
+      isPendingSeed: () => perc.pendingSeedSetup,
       isLoggedIn: () => perc.isLoggedIn,
       loggedInUsername: () => perc.loggedInUsername,
       lastError: () => perc.errorMessage,
+      attachSeed: perc.refreshSeedRecoveryEnvelope,
       username: u,
       password: p,
       preferRegister: register,
       surfaceLabel: 'Perccent wallet',
+      seedOffer: seedOffer,
+      skipSeedOffer: skipSeedOffer,
+      onSeedEnabled: (words) => enabledSeedWords = words,
     );
     await s.persistPercHub();
 
@@ -104,6 +130,8 @@ Future<void> applySuiteAccountToWalletAndEvolve({
         login: evolve.login,
         register: evolve.register,
         completeSeed: evolve.completeRegistrationSeedSetup,
+        generateSeed: evolve.generateRegistrationSeed,
+        isPendingSeed: () => evolve.pendingSeedSetup,
         isLoggedIn: () => evolve.isLoggedIn,
         loggedInUsername: () => evolve.loggedInUsername,
         lastError: () => evolve.errorMessage,
@@ -112,8 +140,10 @@ Future<void> applySuiteAccountToWalletAndEvolve({
         // Account should already exist on the shared ledger after Perccent apply.
         preferRegister: false,
         surfaceLabel: 'Evolve analyser',
+        skipSeedOffer: true,
       );
     }
+    await evolve_hub.PercLedgerHub.instance.persistLocal();
     requireWalletSurfaceLoggedIn(
       surfaceLabel: 'Perccent wallet',
       isLoggedIn: perc.isLoggedIn,
@@ -128,6 +158,24 @@ Future<void> applySuiteAccountToWalletAndEvolve({
       username: u,
       lastError: evolve.errorMessage,
     );
+
+    // Seal seed backup artifacts for clean-install import when seed was enabled.
+    final words = enabledSeedWords;
+    final prefs = suitePrefsBackend;
+    if (words != null && words.isNotEmpty && prefs != null) {
+      final env = suiteSeedEnvelopeB64FromPerc(perc) ??
+          suiteSeedEnvelopeB64FromWallet(evolve);
+      if (env != null && env.isNotEmpty) {
+        await persistSuiteSeedBackupArtifacts(
+          backend: prefs,
+          words: words,
+          username: u,
+          envelopeB64: env,
+          licenceBackend: licenceBackend,
+        );
+      }
+    }
+
     SuiteAccountBus.instance.notifyRegistered(u);
   } finally {
     perc_coord.PercNetworkCoordinator.disableLiveNodesForTests = prevPercLive;
@@ -151,6 +199,13 @@ Future<void> authWalletSurface({
   required String password,
   required bool preferRegister,
   required String surfaceLabel,
+  Future<List<String>> Function()? generateSeed,
+  bool Function()? isPendingSeed,
+  /// Attach recovery envelope after a durable offline register (no network).
+  Future<void> Function(List<String> words)? attachSeed,
+  SuiteSeedOfferFn? seedOffer,
+  bool skipSeedOffer = false,
+  void Function(List<String> words)? onSeedEnabled,
 }) async {
   if (isLoggedIn()) {
     final cur = (loggedInUsername() ?? '').trim();
@@ -158,12 +213,36 @@ Future<void> authWalletSurface({
   }
   if (preferRegister) {
     await register(username, password);
-    // Completes deferred seed setup when register left pending (default
-    // sessionTimeoutEnabled=true). No-op if register already completed.
-    await completeSeed(enableSeed: false);
+    final pending = isPendingSeed?.call() ?? false;
+    List<String>? seedWords;
+    if (pending) {
+      if (!skipSeedOffer && seedOffer != null && generateSeed != null) {
+        final offer = await seedOffer(generateSeed);
+        if (offer.enableSeed) {
+          final words = offer.words;
+          if (words == null || words.isEmpty) {
+            throw StateError('Seed export requires generated words');
+          }
+          seedWords = List<String>.from(words);
+          onSeedEnabled?.call(seedWords);
+        }
+      }
+      // Always finalize offline first (enableSeed:true path can hang on seed
+      // network publish). Attach the recovery envelope after login succeeds.
+      await completeSeed(enableSeed: false);
+    } else {
+      // sessionTimeoutEnabled=false path auto-completed with enableSeed:false.
+      await completeSeed(enableSeed: false);
+    }
     if (!isLoggedIn() || (loggedInUsername() ?? '').trim() != username) {
       // Username may already exist (swallowed "already taken") — try login.
       await login(username, password);
+    }
+    if (seedWords != null &&
+        seedWords.isNotEmpty &&
+        isLoggedIn() &&
+        attachSeed != null) {
+      await attachSeed(seedWords);
     }
   } else {
     await login(username, password);
