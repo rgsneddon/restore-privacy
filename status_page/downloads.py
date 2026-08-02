@@ -1380,6 +1380,29 @@ def free_download_cta_css() -> str:
         0 0 28px rgba(0, 229, 255, 0.35);
       white-space: normal;
       word-break: break-word;
+      /* Continuous flash to draw attention to FREE DOWNLOAD */
+      animation: free-download-label-blink 1.15s ease-in-out infinite;
+    }}
+    @keyframes free-download-label-blink {{
+      0%, 100% {{
+        opacity: 1;
+        text-shadow:
+          0 0 6px rgba(0, 229, 255, 0.85),
+          0 0 14px rgba(57, 255, 136, 0.55),
+          0 0 28px rgba(0, 229, 255, 0.35);
+      }}
+      50% {{
+        opacity: 0.22;
+        text-shadow:
+          0 0 2px rgba(0, 229, 255, 0.25),
+          0 0 6px rgba(57, 255, 136, 0.15);
+      }}
+    }}
+    @media (prefers-reduced-motion: reduce) {{
+      a.free-download-cta .free-download-cta-label {{
+        animation: none;
+        opacity: 1;
+      }}
     }}
     a.free-download-cta:active,
     a.free-download-cta.is-pressed,

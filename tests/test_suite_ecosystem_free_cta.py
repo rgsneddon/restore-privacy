@@ -150,6 +150,12 @@ class TestFreeDownloadFace101Platform(unittest.TestCase):
         self.assertIn("data_path_motif", css)
         self.assertIn("display: none", css)
         self.assertNotIn("aspect-ratio: 1 / 1", css)
+        # FREE DOWNLOAD label continuously flashes for attention
+        self.assertIn("@keyframes free-download-label-blink", css)
+        self.assertIn("free-download-label-blink", css)
+        self.assertIn("animation:", css)
+        self.assertIn("infinite", css)
+        self.assertIn("prefers-reduced-motion", css)
 
         cta = render_free_download_cta_html()
         self.assertIn(RELEASE_VERSION, cta)
