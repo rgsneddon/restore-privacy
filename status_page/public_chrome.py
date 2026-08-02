@@ -1387,28 +1387,80 @@ def public_display_title(raw: str | None = None) -> str:
 
 # Homepage lead copy (human cadence — not a residual inventory list).
 SUITE_HOME_INTRO_ID = "suite-home-intro"
-SUITE_HOME_INTRO_HEADING = "Privacy you can actually use"
+# Neon typewriter lines (one-shot keystroke animation on page load)
+SUITE_HOME_WELCOME_TYPE = "WELCOME, ANON..."
+SUITE_HOME_CLOSING_TYPE = "YOUR PRIVACY, RESTORED"
+# Normal CSS heading (not neon typewriter)
+SUITE_HOME_INTRO_HEADING = "...privacy you can actually use..."
+# Legacy alias for callers/tests that still import the short human title idea
+SUITE_HOME_INTRO_HEADING_LEGACY = "Privacy you can actually use"
 SUITE_HOME_INTRO_BODY = (
-    "Restore Privacy Suite brings together residual VPN protection, a private wallet, "
-    "and Evolve analysis in one place. Download the installer for free, then unlock "
-    "with a KEYGEN when you are ready — a monthly licence starts at £3."
+    "The Restore Privacy Suite brings together a residual VPN protection, a private "
+    "wallet and the Evolve analysis engine for your personal use, all in one place. "
+    "Download the installer for free using the button below, try it for three days "
+    "and when you are ready, buy a licence key — a licence for personal use of the "
+    "RPSuite costs only £3 per month or £30 annually. This gives you full access to "
+    "the VPN and RPSuite."
 )
-SUITE_HOME_INTRO_FOOT = (
-    "Install first. Use only after KEYGEN unlock. Your device stays yours."
-)
+# Foot retired: closing typewriter is the end line
+SUITE_HOME_INTRO_FOOT = ""
+
+
+def typewriter_prefix(full: str, step: int) -> str:
+    """Return progressive typewriter text for *step* (0 = empty, len = complete)."""
+    text = full or ""
+    n = max(0, min(int(step), len(text)))
+    return text[:n]
+
+
+def typewriter_done(full: str, step: int) -> bool:
+    """True when typewriter has finished the full string (and stays done)."""
+    return int(step) >= len(full or "")
+
+
+def typewriter_sequence(full: str) -> list[str]:
+    """All progressive prefixes including empty start and final full string."""
+    text = full or ""
+    return [typewriter_prefix(text, i) for i in range(len(text) + 1)]
 
 
 def render_suite_home_intro_html() -> str:
-    """Short Suite welcome block for the public homepage (above free downloads)."""
+    """Suite welcome block: neon typewriters + tagline + body (above free downloads)."""
+    welcome = _esc(SUITE_HOME_WELCOME_TYPE)
+    closing = _esc(SUITE_HOME_CLOSING_TYPE)
+    heading = _esc(SUITE_HOME_INTRO_HEADING)
+    body = _esc(SUITE_HOME_INTRO_BODY)
     return f"""  <section class="panel-card suite-home-intro" id="{SUITE_HOME_INTRO_ID}"
            aria-labelledby="suite-home-intro-title" data-product="suite"
-           data-suite-version="{PUBLIC_BRAND_VERSION}">
-    <h2 id="suite-home-intro-title">{SUITE_HOME_INTRO_HEADING}</h2>
-    <p class="suite-home-lead" id="suite-home-lead">{SUITE_HOME_INTRO_BODY}</p>
-    <p class="suite-home-foot" id="suite-home-foot">{SUITE_HOME_INTRO_FOOT}</p>
+           data-suite-version="{PUBLIC_BRAND_VERSION}" data-suite-intro="1">
+    <p class="suite-typewriter suite-typewriter-welcome neon-type"
+       id="suite-welcome-type"
+       data-typewriter="1"
+       data-typewriter-role="welcome"
+       data-typewriter-text="{welcome}"
+       data-typewriter-once="1"
+       aria-label="{welcome}"></p>
+    <h2 class="suite-home-tagline" id="suite-home-intro-title">{heading}</h2>
+    <p class="suite-home-lead" id="suite-home-lead">{body}</p>
+    <p class="suite-typewriter suite-typewriter-close neon-type"
+       id="suite-closing-type"
+       data-typewriter="1"
+       data-typewriter-role="closing"
+       data-typewriter-text="{closing}"
+       data-typewriter-once="1"
+       data-typewriter-after="suite-welcome-type"
+       aria-label="{closing}"></p>
     <p class="suite-home-version" id="suite-home-version">{PUBLIC_BRAND_DISPLAY}</p>
   </section>
 """
+
+
+def suite_home_intro_script_tag() -> str:
+    """Same-origin one-shot typewriter script for the Suite intro panel."""
+    return (
+        '<script id="suite-home-typewriter-script" '
+        'src="/static/suite_home_typewriter.js" defer></script>\n'
+    )
 
 
 def suite_home_intro_css() -> str:
@@ -1416,12 +1468,15 @@ def suite_home_intro_css() -> str:
     .suite-home-intro {
       text-align: center; margin: 0 0 1.15rem; padding: 1.25rem 1.15rem 1.15rem;
     }
+    .suite-home-tagline,
     .suite-home-intro h2 {
-      margin: 0 0 0.65rem; font-size: clamp(1.25rem, 3.2vw, 1.65rem);
-      letter-spacing: 0.04em; color: var(--rb-cream, #fff); font-weight: 800;
+      margin: 0.55rem auto 0.75rem; max-width: 40rem;
+      font-size: clamp(1.15rem, 3vw, 1.5rem);
+      letter-spacing: 0.03em; color: var(--rb-cream, #fff); font-weight: 700;
+      font-family: inherit; line-height: 1.3;
     }
     .suite-home-lead {
-      margin: 0 auto 0.75rem; max-width: 38rem; line-height: 1.55;
+      margin: 0 auto 0.95rem; max-width: 42rem; line-height: 1.58;
       font-size: clamp(0.95rem, 2.2vw, 1.08rem); color: var(--rb-soft, #aed0ea);
       font-weight: 500;
     }
@@ -1430,8 +1485,42 @@ def suite_home_intro_css() -> str:
       color: var(--rb-muted, #8eb4d0); line-height: 1.45;
     }
     .suite-home-version {
-      margin: 0; font-size: 0.78rem; letter-spacing: 0.06em; font-weight: 700;
+      margin: 0.65rem 0 0; font-size: 0.78rem; letter-spacing: 0.06em; font-weight: 700;
       color: var(--rb-accent-sky, #7dd3fc); text-transform: uppercase;
+    }
+    /* Neon typewriter (welcome + closing) — large mono, blue/green glow */
+    .suite-typewriter,
+    .neon-type {
+      margin: 0 auto;
+      min-height: 1.35em;
+      max-width: 44rem;
+      font-family: "Courier New", Courier, ui-monospace, monospace;
+      font-size: clamp(1.45rem, 4.2vw, 2.15rem);
+      font-weight: 700;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      line-height: 1.35;
+      color: #7dffe8;
+      text-shadow:
+        0 0 6px rgba(0, 229, 255, 0.85),
+        0 0 14px rgba(57, 255, 136, 0.55),
+        0 0 28px rgba(0, 229, 255, 0.35);
+      white-space: pre-wrap;
+      word-break: break-word;
+    }
+    .suite-typewriter-welcome { margin-top: 0.15rem; margin-bottom: 0.35rem; }
+    .suite-typewriter-close { margin-top: 0.85rem; margin-bottom: 0.25rem; }
+    .suite-typewriter.is-typing::after {
+      content: "▌";
+      display: inline-block;
+      margin-left: 0.08em;
+      color: #39ff88;
+      text-shadow: 0 0 8px rgba(57, 255, 136, 0.9);
+      animation: suite-type-caret 0.85s step-end infinite;
+    }
+    .suite-typewriter.is-done::after { content: none; }
+    @keyframes suite-type-caret {
+      50% { opacity: 0; }
     }
 """
 

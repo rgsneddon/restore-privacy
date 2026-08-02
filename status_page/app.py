@@ -159,6 +159,7 @@ STATIC_ROUTES: dict[str, str] = {
     "/static/stripe_brand_logo.png": "stripe_brand_logo.png",
     # Same-origin JS for CSP script-src 'self' (no inline scripts)
     "/static/public_theme.js": "public_theme.js",
+    "/static/suite_home_typewriter.js": "suite_home_typewriter.js",
     "/static/admin_theme.js": "admin_theme.js",
     "/static/admin_sidebar.js": "admin_sidebar.js",
     "/static/audit_last_run_helpers.js": "audit_last_run_helpers.js",
@@ -487,6 +488,7 @@ def render_html(
             public_page_close,
             render_suite_home_intro_html,
             suite_home_intro_css,
+            suite_home_intro_script_tag,
         )
     except ImportError:  # pragma: no cover
         from status_page.public_chrome import (  # type: ignore
@@ -498,6 +500,7 @@ def render_html(
             public_page_close,
             render_suite_home_intro_html,
             suite_home_intro_css,
+            suite_home_intro_script_tag,
         )
 
     title = public_display_title(
@@ -675,7 +678,14 @@ def render_html(
     </div>
 """
     business_package_html = render_node_preference_html(standalone=True)
-    body = f"""{public_head_open(title=str(title), extra_css=page_css)}
+    head_html = public_head_open(title=str(title), extra_css=page_css)
+    # One-shot neon typewriter for Suite intro (welcome + closing lines)
+    head_html = head_html.replace(
+        "</head>",
+        suite_home_intro_script_tag() + "</head>",
+        1,
+    )
+    body = f"""{head_html}
   <div class="page-shell" id="page-shell" data-page="home" data-product="suite" data-suite-version="{RELEASE_VERSION}" data-chrome="pro">
 {header}
 {suite_intro_html}

@@ -35,7 +35,10 @@ class TestSuitePublicBrand(unittest.TestCase):
         self.assertIn("suite-home-intro", html)
         self.assertIn(SUITE_HOME_INTRO_BODY[:40], html)
         self.assertIn("residual VPN protection", html)
-        self.assertIn("a monthly licence starts at £3", html)
+        self.assertIn("£3 per month", html)
+        self.assertIn("£30 annually", html)
+        self.assertIn("WELCOME, ANON...", html)
+        self.assertIn("YOUR PRIVACY, RESTORED", html)
         self.assertNotIn("mothly sunscription", html)
         self.assertIn("suite-storefront", html)
         self.assertIn("data-free-download", html)
@@ -68,16 +71,19 @@ class TestPublicSiteCopyHuman(unittest.TestCase):
         body = render_suite_home_intro_html()
         self.assertIn(SUITE_HOME_INTRO_HEADING, body)
         self.assertIn(SUITE_HOME_INTRO_BODY, body)
-        self.assertIn(SUITE_HOME_INTRO_FOOT, body)
-        # Grammatical intro: residual VPN + monthly licence (no typo theater)
+        # Foot retired in favour of closing typewriter line
+        self.assertEqual(SUITE_HOME_INTRO_FOOT, "")
+        self.assertIn("YOUR PRIVACY, RESTORED", body)
+        # Grammatical intro: residual VPN + monthly/annual licence
         open_clause = (
-            "Restore Privacy Suite brings together residual VPN protection, a private"
+            "The Restore Privacy Suite brings together a residual VPN protection, a private"
         )
         self.assertTrue(
             SUITE_HOME_INTRO_BODY.startswith(open_clause),
             msg=f"intro open clause missing residual VPN: {SUITE_HOME_INTRO_BODY!r}",
         )
-        self.assertIn("a monthly licence starts at £3", SUITE_HOME_INTRO_BODY)
+        self.assertIn("£3 per month", SUITE_HOME_INTRO_BODY)
+        self.assertIn("£30 annually", SUITE_HOME_INTRO_BODY)
         self.assertIn(open_clause, body)
         self.assertNotIn("mothly sunscription", SUITE_HOME_INTRO_BODY)
         self.assertNotIn("mothly sunscription", body)
@@ -97,7 +103,7 @@ class TestPublicSiteCopyHuman(unittest.TestCase):
             self.assertNotIn(bad, SUITE_HOME_INTRO_HEADING)
         self.assertGreater(len(SUITE_HOME_INTRO_BODY), 40)
         self.assertIn("£3", SUITE_HOME_INTRO_BODY)
-        self.assertIn("KEYGEN", SUITE_HOME_INTRO_BODY.upper().replace("Keygen", "KEYGEN") or SUITE_HOME_INTRO_BODY)
+        self.assertIn("licence", SUITE_HOME_INTRO_BODY.lower())
         # free + licence facts
         self.assertTrue(
             "free" in SUITE_HOME_INTRO_BODY.lower()

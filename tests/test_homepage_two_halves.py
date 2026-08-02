@@ -25,7 +25,8 @@ class TestHomepageTwoHalves(unittest.TestCase):
 
         page = render_html({"title": "RESTORE PRIVACY"}).decode("utf-8")
         main = _main_html(page)
-        self.assertIn("Privacy you can actually use", main)
+        self.assertIn("...privacy you can actually use...", main)
+        self.assertIn("WELCOME, ANON...", main)
         self.assertIn("suite-home-intro", main)
         i_header = main.index('id="brand-panel"')
         i_intro = main.index("suite-home-intro")
@@ -79,7 +80,7 @@ class TestHomepageTwoHalves(unittest.TestCase):
         self.assertLess(i_row, i_audit)
         i_intro = main.find("suite-home-intro")
         if i_intro > 0:
-            # Intro (“Privacy you can actually use”) sits above dual shop row
+            # Intro (welcome typewriter + tagline) sits above dual shop row
             self.assertLess(i_header, i_intro)
             self.assertLess(i_intro, i_row)
         i_nw = main.find("node-wipe")
