@@ -263,7 +263,7 @@ long-term material + `product/node_elgamal.pub` pin.
 **Post-quantum readiness:** staged hybrid hook in `node/pq_hybrid.py` +
 [`docs/PQ_MIGRATION.md`](docs/PQ_MIGRATION.md).
 
-**Product ship (v1.0.0):** Free Suite installers on the VPN APP Shop; KEYGEN from
+**Product ship (catalog monopin):** Free Suite installers on the VPN APP Shop; KEYGEN from
 £3.00/month. Catalog residual peers: **IS** / **DE** (default) — US and Romania
 **retired**.
 

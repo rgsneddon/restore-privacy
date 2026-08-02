@@ -2,12 +2,12 @@
 
 Chromium **Manifest V3** extension — **Rx Privacy Browser** companion for
 **browser-scoped** Connect / Disconnect. Ships with **Restore Privacy Suite
-1.0.1** native installers; it is not a replacement for residual TUN.
+1.0.7** native installers; it is not a replacement for residual TUN.
 
 ## Honesty
 
 - **Browser only:** routes this browser’s traffic via the configured **local proxy** path (`chrome.proxy`). IPv4-focused free basic path; no OS residual settings surface.
-- **Not OS residual:** does **not** create Wintun / Packet Tunnel / system residual TUN. Suite native clients (Windows · Android · macOS · iOS · Linux, catalog **1.0.1**) remain the residual product path.
+- **Not OS residual:** does **not** create Wintun / Packet Tunnel / system residual TUN. Suite native clients (Windows · Android · macOS · iOS · Linux, catalog **1.0.7**) remain the residual product path.
 - Default proxy target is `socks5://127.0.0.1:1080` (local companion / future bridge). Override via Connect options if your browser stack exposes a different local path.
 
 ## Load unpacked (developer)

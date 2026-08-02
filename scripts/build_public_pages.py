@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Build the public GitHub Pages tree for Restore Privacy Suite v1.0.0.
+"""Build the public GitHub Pages tree for Restore Privacy Suite (catalog monopin).
 
 Writes a whitelist-only static site under ``public_site/``:
 
@@ -167,29 +167,11 @@ def build_index() -> str:
     )
 
     origin = "https://restoreprivacy.online"
-    labels = {
-        "windows": "Windows",
-        "android": "Android",
-        "macos": "macOS",
-        "ios": "iOS",
-        "linux": "Linux",
-    }
-    # Non-free package grid → live /pay with platform (shipped suite_pay_href)
-    links = []
-    for a in available_downloads():
-        href = origin + suite_pay_href(a.platform)
-        label = labels.get(a.platform, a.platform)
-        links.append(
-            f'<a class="dl" href="{_esc(href)}" data-pay="1" data-platform="{_esc(a.platform)}">'
-            f"Get Suite {_esc(label)} — /pay</a>"
-        )
-    free_grid = "\n      ".join(links)
-    # FREE DOWNLOAD: only direct Suite path. Static pages detect UA in JS
-    # (mirrors status_page detect_platform_from_user_agent) and set free_direct.
-    # Fallback when unknown: Downloads Map (Suite /pay rows only).
+    # FREE DOWNLOAD: UA-detect → free_direct Suite path (matches live status host).
+    # No platform "Get Suite — /pay" grid on static home (removed on live host).
     free_cta = (
         f'<a class="free-cta" id="free-download-v1-cta" '
-        f'href="{origin}/downloads-map" data-free-download-v1="1" data-pay="0" '
+        f'href="{origin}/" data-free-download-v1="1" data-pay="0" '
         f'data-suite-latest="1" data-href-kind="map">'
         f'<img src="assets/freebie.jpg" width="1024" height="1024" '
         f'alt="FREE DOWNLOAD — Restore Privacy Suite"/></a>'
@@ -219,13 +201,15 @@ def build_index() -> str:
     )
     # Sanity: free_direct builder path matches script template
     _ = suite_free_direct_download_href("macos")
+    _ = available_downloads()
+    _ = suite_pay_href  # keep import used for map builder elsewhere
 
     return f"""<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="utf-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1"/>
-<meta name="description" content="Restore Privacy Suite v{RELEASE_VERSION} — free download; KEYGEN licence from {PRICE_LABEL}/month"/>
+<meta name="description" content="Restore Privacy Suite v{RELEASE_VERSION} — free download; KEYGEN licence from {PRICE_LABEL}/month or yearly"/>
 <title>{_esc(PUBLIC_BRAND_DISPLAY)}</title>
 <link rel="icon" href="assets/favicon.ico"/>
 <link rel="stylesheet" href="assets/site.css"/>
@@ -261,14 +245,12 @@ def build_index() -> str:
       <h2>FREE DOWNLOAD</h2>
       {free_cta}
       <p class="muted">FREE DOWNLOAD detects your device and starts the latest Suite
-        installer (no /pay). Platform links below open the /pay cart so you can choose device:
-        <a href="downloads-map.html">Downloadables Mapped Here</a>.</p>
-      <div class="free-grid" id="suite-free-grid" data-pay-packages="1">
-      {free_grid}
-      </div>
+        installer (no /pay). Platform package paths and KEYGEN cart are on the live host
+        and the <a href="downloads-map.html">Downloads Map</a>.</p>
       <p class="keygen-note">
-        Licence starts at <strong>{_esc(PRICE_LABEL)} per month</strong>.
-        After you pay, enter the KEYGEN from your email in the app — then Connect.
+        KEYGEN licence from <strong>{_esc(PRICE_LABEL)} per month</strong>
+        (yearly available on /pay). After you pay, enter the KEYGEN from your email
+        in the app — then Connect.
       </p>
       <p class="cta-row">
         <a class="btn" href="https://restoreprivacy.online/pay?product=suite">Get a KEYGEN — /pay</a>
