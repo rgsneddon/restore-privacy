@@ -17,6 +17,8 @@ import 'package:evolve/perc/services/perc_network_coordinator.dart'
 import 'package:evolve/perc/services/perc_network_rendezvous.dart'
     as evolve_rendezvous;
 import 'package:evolve/perc/services/perc_seed_recovery.dart';
+import 'package:evolve/perc/services/perc_seed_recovery_transport.dart'
+    as seed_transport;
 import 'package:perccent_wallet/perc/providers/perc_wallet_provider.dart'
     as perc_wallet;
 import 'package:perccent_wallet/perc/services/perc_ledger_hub.dart' as perc_hub;
@@ -77,53 +79,41 @@ class SuiteSeedPublishedRecovery {
 }
 
 /// Kind marker for composite transport (ledger envelope + sealed Suite meta).
-const String kSuiteSeedTransportKind = 'suite_seed_transport';
+const String kSuiteSeedTransportKind = seed_transport.kSuiteSeedTransportKind;
 
 /// Encode ledger envelope + optional sealed meta into one rendezvous string.
 ///
-/// Production Perc rendezvous only stores a single `envelope` field. When meta
-/// is present we wrap both so clean-install KEYGEN/licence rehydrate survives
-/// process death (no SharedPreferences, no process-local memory).
+/// Canonical implementation lives in evolve [perc_seed_recovery_transport]
+/// so hub re-publish uses the same builder and cannot clobber meta.
 String encodeSuiteSeedTransport({
   required String ledgerEnvelopeB64,
   String? metaBlobB64,
-}) {
-  if (metaBlobB64 == null || metaBlobB64.isEmpty) {
-    return ledgerEnvelopeB64;
-  }
-  final payload = <String, dynamic>{
-    'v': 1,
-    'kind': kSuiteSeedTransportKind,
-    'ledger': ledgerEnvelopeB64,
-    'meta': metaBlobB64,
-  };
-  return base64Encode(utf8.encode(jsonEncode(payload)));
-}
+}) =>
+    seed_transport.encodeSeedRecoveryTransport(
+      ledgerEnvelopeB64: ledgerEnvelopeB64,
+      metaBlobB64: metaBlobB64,
+    );
 
 /// Decode composite transport or legacy raw ledger envelope.
 SuiteSeedPublishedRecovery decodeSuiteSeedTransport(String raw) {
-  if (raw.isEmpty) {
-    return const SuiteSeedPublishedRecovery(envelopeB64: '');
-  }
-  try {
-    final decoded = utf8.decode(base64Decode(raw));
-    final map = jsonDecode(decoded);
-    if (map is Map && map['kind'] == kSuiteSeedTransportKind) {
-      final ledger = (map['ledger'] as String? ?? '').trim();
-      if (ledger.isEmpty) {
-        throw FormatException('suite_seed_transport missing ledger');
-      }
-      final meta = map['meta'] as String?;
-      return SuiteSeedPublishedRecovery(
-        envelopeB64: ledger,
-        metaBlobB64: (meta != null && meta.isNotEmpty) ? meta : null,
-      );
-    }
-  } catch (_) {
-    // Not composite — treat as legacy ledger-only envelope.
-  }
-  return SuiteSeedPublishedRecovery(envelopeB64: raw);
+  final decoded = seed_transport.decodeSeedRecoveryTransport(raw);
+  return SuiteSeedPublishedRecovery(
+    envelopeB64: decoded.ledger,
+    metaBlobB64: decoded.meta,
+  );
 }
+
+/// Pure: build network payload preserving meta on overwrite (all writers).
+String buildSeedRecoveryNetworkPayload({
+  required String ledgerEnvelopeB64,
+  String? metaBlobB64,
+  String? existingRemoteB64,
+}) =>
+    seed_transport.buildSeedRecoveryNetworkPayload(
+      ledgerEnvelopeB64: ledgerEnvelopeB64,
+      metaBlobB64: metaBlobB64,
+      existingRemoteB64: existingRemoteB64,
+    );
 
 /// Publish/fetch seed envelopes so clean-install words-only restore works.
 ///
@@ -171,24 +161,21 @@ class SuiteSeedEnvelopeStore {
       await handler(fingerprint, recovery);
       return;
     }
-    try {
-      await evolve_hub.PercLedgerHub.instance.network
-          .publishSeedRecoveryEnvelopes();
-    } catch (_) {}
-    try {
-      await perc_hub.PercLedgerHub.instance.network
-          .publishSeedRecoveryEnvelopes();
-    } catch (_) {}
-    // Production transport: composite ledger+meta as single rendezvous envelope.
-    final transport = encodeSuiteSeedTransport(
+    // Single write: composite payload only (do NOT pre-call hub publish which
+    // used to PUT ledger-only and clobber meta before this write).
+    final existing =
+        evolve_rendezvous.PercNetworkRendezvous.testSeedRecoveries[fingerprint];
+    final transport = buildSeedRecoveryNetworkPayload(
       ledgerEnvelopeB64: envelopeB64,
       metaBlobB64: metaBlobB64,
+      existingRemoteB64: existing,
     );
     try {
       await const evolve_rendezvous.PercNetworkRendezvous()
           .publishSeedRecoveryEnvelope(
         fingerprint: fingerprint,
         envelopeB64: transport,
+        metaBlobB64: metaBlobB64,
       );
     } catch (_) {}
   }

@@ -163,10 +163,10 @@ void main() {
 
         final fp = PercSeedRecovery.fingerprint(offeredWords);
         // Production adapter must have staged composite transport on rendezvous.
-        final staged =
+        var staged =
             evolve_rendezvous.PercNetworkRendezvous.testSeedRecoveries[fp];
         expect(staged, isNotNull, reason: 'default publish must hit rendezvous');
-        final decoded = decodeSuiteSeedTransport(staged!);
+        var decoded = decodeSuiteSeedTransport(staged!);
         expect(decoded.envelopeB64, isNotEmpty);
         expect(
           decoded.metaBlobB64,
@@ -174,16 +174,50 @@ void main() {
           reason: 'composite transport must carry sealed meta',
         );
 
+        // Critical: post-export hub re-publish (normal persistLocal/commit path)
+        // must NOT clobber sealed meta. Coordinator now always merge-stages even
+        // when live nodes are disabled (HTTP still gated); call the real method.
+        await evolve_hub.PercLedgerHub.instance.network
+            .publishSeedRecoveryEnvelopes();
+        await perc_hub.PercLedgerHub.instance.network
+            .publishSeedRecoveryEnvelopes();
+        staged =
+            evolve_rendezvous.PercNetworkRendezvous.testSeedRecoveries[fp];
+        expect(staged, isNotNull);
+        decoded = decodeSuiteSeedTransport(staged!);
+        expect(
+          decoded.metaBlobB64,
+          isNotNull,
+          reason: 'hub re-publish must preserve suite_seed_transport meta',
+        );
+        expect(
+          decoded.metaBlobB64,
+          isNotEmpty,
+          reason: 'meta must remain non-empty after hub re-publish',
+        );
+        // Pure builder fixed-point: ledger-only account envelope + existing composite.
+        final ledgerOnly = decoded.envelopeB64;
+        final afterClobberAttempt = buildSeedRecoveryNetworkPayload(
+          ledgerEnvelopeB64: ledgerOnly,
+          existingRemoteB64: staged,
+        );
+        expect(
+          decodeSuiteSeedTransport(afterClobberAttempt).metaBlobB64,
+          isNotNull,
+          reason: 'pure builder must keep meta when hub supplies ledger-only',
+        );
+
         // New process / clean install: wipe local Suite memory + ledger hubs +
         // prefs. Hub resetForTest also clears rendezvous test maps — re-stage
-        // the published composite afterward (network survives app reinstall).
+        // the network value after wipe (network survives app reinstall).
+        final networkHeld = staged;
         SuiteSeedEnvelopeStore.clearMemoryForTest();
         expect(SuiteSeedEnvelopeStore.memory, isEmpty);
         perc_hub.PercLedgerHub.resetForTest();
         evolve_hub.PercLedgerHub.resetForTest();
         sharedJson.clear();
         evolve_rendezvous.PercNetworkRendezvous.testSeedRecoveries[fp] =
-            staged;
+            networkHeld;
 
         final cleanAccount = SuiteAccountStore(MemorySettingsBackend());
         final cleanPrefs = MemorySettingsBackend();
@@ -239,6 +273,37 @@ void main() {
       final legacy = decodeSuiteSeedTransport(ledger);
       expect(legacy.envelopeB64, ledger);
       expect(legacy.metaBlobB64, isNull);
+    });
+
+    test('hub ledger-only re-publish preserves meta via pure builder', () {
+      // Fixed-point: every writer must use buildSeedRecoveryNetworkPayload so a
+      // hub persist that only knows the account ledger envelope cannot wipe KEYGEN.
+      final ledger = base64Encode(utf8.encode('account-seedRecoveryEnvelope-raw'));
+      final meta = sealSuiteSeedMeta(
+        words: PercSeedRecovery.generateMnemonic(),
+        username: 'seed_user',
+        paymentKeygen: 'RPT-KEY-SEED-TEST-AAAA-BBBB',
+        licenceAccepted: true,
+        paymentStatus: kPaymentStatusActive,
+      );
+      final suitePublished = encodeSuiteSeedTransport(
+        ledgerEnvelopeB64: ledger,
+        metaBlobB64: meta,
+      );
+      // Hub re-publish supplies ledger-only (account field) + existing remote.
+      final afterHub = buildSeedRecoveryNetworkPayload(
+        ledgerEnvelopeB64: ledger,
+        existingRemoteB64: suitePublished,
+      );
+      final decoded = decodeSuiteSeedTransport(afterHub);
+      expect(decoded.envelopeB64, ledger);
+      expect(decoded.metaBlobB64, meta);
+      // Second hub re-publish still keeps meta.
+      final afterSecond = buildSeedRecoveryNetworkPayload(
+        ledgerEnvelopeB64: ledger,
+        existingRemoteB64: afterHub,
+      );
+      expect(decodeSuiteSeedTransport(afterSecond).metaBlobB64, meta);
     });
 
     test('parseSuiteSeedPhrase validates 12 words', () {
