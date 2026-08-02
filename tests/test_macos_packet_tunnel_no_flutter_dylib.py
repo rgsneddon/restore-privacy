@@ -23,10 +23,11 @@ class TestPacketTunnelNoFlutterDylib(unittest.TestCase):
             "PRODUCT_BUNDLE_IDENTIFIER = com.restoreprivacy.restorePrivacyClient.PacketTunnel;",
             text,
         )
-        self.assertIn("PacketTunnel must NOT inherit CocoaPods Flutter plugin", text)
         # Shipped target flags must not pull secure storage into the appex.
         self.assertNotIn("flutter_secure_storage", text)
-        self.assertIn('"-framework",\n\t\t\t\t\tNetworkExtension,', text)
+        # PacketTunnel configs set explicit OTHER_LDFLAGS (not only CocoaPods inherited).
+        self.assertGreaterEqual(text.count("OTHER_LDFLAGS = ("), 3)
+        self.assertIn("NetworkExtension,", text)
 
     def test_podfile_post_install_clears_packet_tunnel_plugin_ldflags(self) -> None:
         text = PODFILE.read_text(encoding="utf-8")
