@@ -1,7 +1,7 @@
 {
-  "generated_at": "2026-08-02T13:59:54Z",
+  "generated_at": "2026-08-02T14:27:37Z",
   "node_host": "Germany (DE)",
-  "catalog_version": "1.0.6",
+  "catalog_version": "1.0.7",
   "unit_suite": {
     "ran": true,
     "ok": false,
@@ -55,14 +55,14 @@
     ]
   },
   "package_rag": {
-    "catalog_version": "1.0.6",
+    "catalog_version": "1.0.7",
     "pin": "1b126abfae737c66ce99670b730e123f2831ce5beb2868d7865324f391280bbe",
     "exit_pin": "ea0c7fa338612386cbe666a0ca64a6a69e3471b03db1848e7df4be2ed6823b18",
     "packages": [
       {
         "platform": "windows",
         "label": "Windows",
-        "filename": "restore-privacy-client-1.0.6-windows-x64-setup.exe",
+        "filename": "restore-privacy-client-1.0.7-windows-x64-setup.exe",
         "state": "Green",
         "reasons": [
           "node_elgamal.pub embedded (raw product pin match)",
@@ -70,103 +70,103 @@
           "multihop residual prep markers present (exit_node_elgamal; residual-via-exit when RPT_MULTIHOP_ENABLED=1)",
           "exit_node_elgamal.pub raw bytes present (Germany DE exit pin)"
         ],
-        "path": "/Users/russellsneddon/restore-privacy/status_page/assets/1.0.6/restore-privacy-client-1.0.6-windows-x64-setup.exe",
+        "path": "/Users/russellsneddon/restore-privacy/status_page/assets/1.0.7/restore-privacy-client-1.0.7-windows-x64-setup.exe",
         "bytes": 38631642,
-        "relative_path": "1.0.6/restore-privacy-client-1.0.6-windows-x64-setup.exe",
+        "relative_path": "1.0.7/restore-privacy-client-1.0.7-windows-x64-setup.exe",
         "search_roots": [
-          "status_page/assets/1.0.6/",
-          "releases/1.0.6/",
-          "/opt/restore-privacy/paid_assets/1.0.6/",
-          "dist/1.0.6/",
+          "status_page/assets/1.0.7/",
+          "releases/1.0.7/",
+          "/opt/restore-privacy/paid_assets/1.0.7/",
+          "dist/1.0.7/",
           "status_page/assets/",
-          "https://135.181.152.10.sslip.io/paid-assets/1.0.6/"
+          "https://135.181.152.10.sslip.io/paid-assets/1.0.7/"
         ]
       },
       {
         "platform": "android",
         "label": "Android",
-        "filename": "restore-privacy-client-1.0.6-android.apk",
+        "filename": "restore-privacy-client-1.0.7-android.apk",
         "state": "Green",
         "reasons": [
           "node_elgamal.pub pin matches product monopin",
           "Android residual wire (PFS + outer obfs) present",
           "exit_node_elgamal.pub present (multihop exit pin)"
         ],
-        "path": "/Users/russellsneddon/restore-privacy/status_page/assets/1.0.6/restore-privacy-client-1.0.6-android.apk",
-        "bytes": 84688794,
-        "relative_path": "1.0.6/restore-privacy-client-1.0.6-android.apk",
+        "path": "/Users/russellsneddon/restore-privacy/status_page/assets/1.0.7/restore-privacy-client-1.0.7-android.apk",
+        "bytes": 85154250,
+        "relative_path": "1.0.7/restore-privacy-client-1.0.7-android.apk",
         "search_roots": [
-          "status_page/assets/1.0.6/",
-          "releases/1.0.6/",
-          "/opt/restore-privacy/paid_assets/1.0.6/",
-          "dist/1.0.6/",
+          "status_page/assets/1.0.7/",
+          "releases/1.0.7/",
+          "/opt/restore-privacy/paid_assets/1.0.7/",
+          "dist/1.0.7/",
           "status_page/assets/",
-          "https://135.181.152.10.sslip.io/paid-assets/1.0.6/"
+          "https://135.181.152.10.sslip.io/paid-assets/1.0.7/"
         ]
       },
       {
         "platform": "macos",
         "label": "macOS",
-        "filename": "restore-privacy-client-1.0.6-macos.zip",
+        "filename": "restore-privacy-client-1.0.7-macos.zip",
         "state": "Green",
         "reasons": [
           "node_elgamal.pub pin matches product monopin",
           "archive present (structural residual gates N/A in this pass)",
           "exit_node_elgamal.pub present (multihop exit pin)"
         ],
-        "path": "/Users/russellsneddon/restore-privacy/status_page/assets/1.0.6/restore-privacy-client-1.0.6-macos.zip",
-        "bytes": 27751412,
-        "relative_path": "1.0.6/restore-privacy-client-1.0.6-macos.zip",
+        "path": "/Users/russellsneddon/restore-privacy/status_page/assets/1.0.7/restore-privacy-client-1.0.7-macos.zip",
+        "bytes": 27750600,
+        "relative_path": "1.0.7/restore-privacy-client-1.0.7-macos.zip",
         "search_roots": [
-          "status_page/assets/1.0.6/",
-          "releases/1.0.6/",
-          "/opt/restore-privacy/paid_assets/1.0.6/",
-          "dist/1.0.6/",
+          "status_page/assets/1.0.7/",
+          "releases/1.0.7/",
+          "/opt/restore-privacy/paid_assets/1.0.7/",
+          "dist/1.0.7/",
           "status_page/assets/",
-          "https://135.181.152.10.sslip.io/paid-assets/1.0.6/"
+          "https://135.181.152.10.sslip.io/paid-assets/1.0.7/"
         ]
       },
       {
         "platform": "ios",
         "label": "iOS",
-        "filename": "restore-privacy-client-1.0.6-ios.zip",
+        "filename": "restore-privacy-client-1.0.7-ios.zip",
         "state": "Amber",
         "reasons": [
           "archive present (structural residual gates N/A in this pass)",
           "node_elgamal.pub not found inside package (pin not verified)"
         ],
-        "path": "/Users/russellsneddon/restore-privacy/status_page/assets/1.0.6/restore-privacy-client-1.0.6-ios.zip",
-        "bytes": 12558929,
-        "relative_path": "1.0.6/restore-privacy-client-1.0.6-ios.zip",
+        "path": "/Users/russellsneddon/restore-privacy/status_page/assets/1.0.7/restore-privacy-client-1.0.7-ios.zip",
+        "bytes": 13116178,
+        "relative_path": "1.0.7/restore-privacy-client-1.0.7-ios.zip",
         "search_roots": [
-          "status_page/assets/1.0.6/",
-          "releases/1.0.6/",
-          "/opt/restore-privacy/paid_assets/1.0.6/",
-          "dist/1.0.6/",
+          "status_page/assets/1.0.7/",
+          "releases/1.0.7/",
+          "/opt/restore-privacy/paid_assets/1.0.7/",
+          "dist/1.0.7/",
           "status_page/assets/",
-          "https://135.181.152.10.sslip.io/paid-assets/1.0.6/"
+          "https://135.181.152.10.sslip.io/paid-assets/1.0.7/"
         ]
       },
       {
         "platform": "linux",
         "label": "Linux",
-        "filename": "restore-privacy-client-1.0.6-linux-x64.tar.gz",
+        "filename": "restore-privacy-client-1.0.7-linux-x64.tar.gz",
         "state": "Green",
         "reasons": [
           "node_elgamal.pub pin matches product monopin",
           "archive present (structural residual gates N/A in this pass)",
           "exit_node_elgamal.pub present (multihop exit pin)"
         ],
-        "path": "/Users/russellsneddon/restore-privacy/status_page/assets/1.0.6/restore-privacy-client-1.0.6-linux-x64.tar.gz",
+        "path": "/Users/russellsneddon/restore-privacy/status_page/assets/1.0.7/restore-privacy-client-1.0.7-linux-x64.tar.gz",
         "bytes": 14636754,
-        "relative_path": "1.0.6/restore-privacy-client-1.0.6-linux-x64.tar.gz",
+        "relative_path": "1.0.7/restore-privacy-client-1.0.7-linux-x64.tar.gz",
         "search_roots": [
-          "status_page/assets/1.0.6/",
-          "releases/1.0.6/",
-          "/opt/restore-privacy/paid_assets/1.0.6/",
-          "dist/1.0.6/",
+          "status_page/assets/1.0.7/",
+          "releases/1.0.7/",
+          "/opt/restore-privacy/paid_assets/1.0.7/",
+          "dist/1.0.7/",
           "status_page/assets/",
-          "https://135.181.152.10.sslip.io/paid-assets/1.0.6/"
+          "https://135.181.152.10.sslip.io/paid-assets/1.0.7/"
         ]
       }
     ],
