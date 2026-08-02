@@ -260,7 +260,7 @@ void main() {
       await tester.pumpWidget(
         MaterialApp(
           home: SuiteFamilyHost(
-            parts: const SuitePartsState(),
+            parts: SuitePartsState.allInstalled,
             boot: () async => SuiteFamilyBootReady.evolve(
               evolve: evolve,
               evolveWallet: familyWallet,
@@ -333,7 +333,7 @@ void main() {
       await tester.pumpWidget(
         MaterialApp(
           home: SuiteFamilyHost(
-            parts: const SuitePartsState(),
+            parts: SuitePartsState.allInstalled,
             boot: () async => SuiteFamilyBootReady.evolve(
               evolve: evolve,
               evolveWallet: coldWallet,

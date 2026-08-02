@@ -113,7 +113,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   String _entryPing = '…';
   String _exitPing = '…';
   bool _pingBusy = false;
-  SuitePartsState _parts = SuitePartsState.allInstalled;
+  SuitePartsState _parts = SuitePartsState.vpnOnly;
   SuitePartsStore? _partsStore;
   String _diskUsageText = '…';
   String _processUsageText = '…';
@@ -124,7 +124,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     super.initState();
     _settings = widget.initial;
     _log = widget.connectionLog;
-    _parts = widget.initialParts ?? SuitePartsState.allInstalled;
+    _parts = widget.initialParts ?? SuitePartsState.vpnOnly;
     _partsStore = widget.partsStore;
     final seed = widget.initialUsage;
     if (seed != null) {
@@ -195,8 +195,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
       _parts = next;
       _busy = false;
       _note = installed
-          ? '${suitePartLabel(id)} reinstalled. Licence and Suite account stay as before.'
-          : '${suitePartLabel(id)} uninstalled — tab kept with reinstall link.';
+          ? '${suitePartLabel(id)} installed. It appears on the main bar; licence and Suite account stay as before.'
+          : '${suitePartLabel(id)} uninstalled — removed from the main bar. Install again anytime without a new KEYGEN.';
     });
     widget.onPartsChanged?.call(next);
   }
@@ -741,7 +741,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
               onPressed: _busy
                   ? null
                   : () => _setPartInstalled(part.id, true),
-              child: const Text(kSuitePartReinstallLabel),
+              child: const Text(kSuitePartInstallLabel),
             ),
     );
   }

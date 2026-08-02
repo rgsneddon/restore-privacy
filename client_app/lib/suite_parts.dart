@@ -73,18 +73,29 @@ bool suitePartIsRemovable(SuitePartId id) {
 }
 
 /// Durable install flags for optional parts. VPN is always installed.
+///
+/// Fresh / missing prefs: optional parts are **not** installed (VPN-only main
+/// bar). Only an explicit stored `true` marks an optional part installed.
 class SuitePartsState {
   const SuitePartsState({
-    this.walletInstalled = true,
-    this.evolveInstalled = true,
-    this.rpaiInstalled = true,
+    this.walletInstalled = false,
+    this.evolveInstalled = false,
+    this.rpaiInstalled = false,
   });
 
   final bool walletInstalled;
   final bool evolveInstalled;
   final bool rpaiInstalled;
 
-  static const SuitePartsState allInstalled = SuitePartsState();
+  /// Explicit full-Suite snapshot (tests / “install all” paths).
+  static const SuitePartsState allInstalled = SuitePartsState(
+    walletInstalled: true,
+    evolveInstalled: true,
+    rpaiInstalled: true,
+  );
+
+  /// Fresh install default: residual VPN only; optionals off until user installs.
+  static const SuitePartsState vpnOnly = SuitePartsState();
 
   /// VPN is always true — never stored as removable.
   bool get vpnInstalled => true;
@@ -120,10 +131,10 @@ class SuitePartsState {
         kKeySuitePartRpai: rpaiInstalled,
       };
 
+  /// Parse durable map. Null / missing / non-true → not installed (fresh default).
   factory SuitePartsState.fromJson(Map<String, dynamic>? data) {
-    if (data == null) return allInstalled;
-    // Missing key → installed (upgrade path keeps prior full Suite).
-    bool on(Object? v) => v != false;
+    if (data == null) return vpnOnly;
+    bool on(Object? v) => v == true;
     return SuitePartsState(
       walletInstalled: on(data[kKeySuitePartWallet]),
       evolveInstalled: on(data[kKeySuitePartEvolve]),
@@ -149,20 +160,22 @@ const String kKeySuitePartRpai = 'suite_part_rpai_installed';
 
 const String kSuitePartsSettingsTitle = 'Suite parts';
 const String kSuitePartsSettingsSubtitle =
-    'Uninstall optional surfaces you do not use — tabs stay with a reinstall '
-    'link. Residual VPN always stays installed. Type the part name to confirm.';
+    'Optional surfaces (% wallet, EVOLVE, rpAI) start uninstalled. Install the '
+    'ones you want — they appear on the main bar only after install. Residual '
+    'VPN always stays installed. Type the part name to confirm uninstall.';
 const String kSuitePartVpnRequiredLabel = 'Required — always installed';
 const String kSuitePartInstalledLabel = 'Installed';
-const String kSuitePartRemovedLabel = 'Uninstalled — tab shows reinstall';
+const String kSuitePartRemovedLabel = 'Not installed — use Install to add to the main bar';
 const String kSuitePartUninstallLabel = 'Uninstall…';
 const String kSuitePartRetainLabel = 'Keep installed';
-const String kSuitePartReinstallLabel = 'Reinstall this section';
-const String kSuitePartReinstallTitle = 'Section uninstalled';
+const String kSuitePartInstallLabel = 'Install';
+const String kSuitePartReinstallLabel = 'Install this section';
+const String kSuitePartReinstallTitle = 'Section not installed';
 const String kSuitePartReinstallBody =
-    'This Suite section is uninstalled on this device. Your residual VPN licence '
-    '(KEYGEN) and any Suite account registration stay on device — reinstalling '
-    'does not require a second KEYGEN unlock or a second full register solely '
-    'because this section was removed.';
+    'This Suite section is not installed on this device. Your residual VPN '
+    'licence (KEYGEN) and any Suite account registration stay on device — '
+    'installing does not require a second KEYGEN unlock or a second full '
+    'register solely because this section was not installed yet.';
 const String kSuitePartConfirmDialogTitle = 'Confirm uninstall';
 const String kSuitePartConfirmHintPrefix =
     'Type the exact part name to confirm deletion:';
@@ -263,18 +276,17 @@ SuitePartsState applySuitePartInstall(
   }
 }
 
-/// Shell always retains every Suite tab (including uninstalled optionals).
+/// Product-part ids that are installed (VPN always; optionals only when on).
 ///
-/// Uninstalled optionals show a reinstall placeholder body — not a missing tab.
+/// Main-bar chrome uses [suiteNavDestinations] (flat family promotion). This
+/// list is the coarse install set for Settings / placeholder paths.
 List<SuitePartId> visibleSuitePartIds(SuitePartsState state) {
-  // state is unused: tabs always retained. Signature kept for call-site stability.
   assert(state.vpnInstalled);
-  return const [
-    SuitePartId.vpn,
-    SuitePartId.wallet,
-    SuitePartId.evolve,
-    SuitePartId.rpai,
-  ];
+  final out = <SuitePartId>[SuitePartId.vpn];
+  if (state.walletInstalled) out.add(SuitePartId.wallet);
+  if (state.evolveInstalled) out.add(SuitePartId.evolve);
+  if (state.rpaiInstalled) out.add(SuitePartId.rpai);
+  return List<SuitePartId>.unmodifiable(out);
 }
 
 /// True when the shell should mount the full feature surface (not placeholder).

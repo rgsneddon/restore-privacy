@@ -1,4 +1,4 @@
-/// Suite parts: tab-retain uninstall, typed confirm, reinstall, usage notifier.
+/// Suite parts: optional default-off, install expands bar, typed uninstall, VPN fixed.
 library;
 
 import 'dart:io';
@@ -7,6 +7,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:restore_privacy_client/settings_screen.dart';
 import 'package:restore_privacy_client/settings_store.dart';
+import 'package:restore_privacy_client/suite_nav.dart';
 import 'package:restore_privacy_client/suite_parts.dart';
 import 'package:restore_privacy_client/suite_parts_store.dart';
 import 'package:restore_privacy_client/suite_shell.dart';
@@ -32,11 +33,15 @@ void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
   group('suite parts pure policy', () {
-    test('fresh default has all optional parts installed; VPN always-in', () {
+    test('fresh default: optionals off; VPN always-in and non-removable', () {
+      expect(SuitePartsState.vpnOnly.walletInstalled, isFalse);
+      expect(SuitePartsState.vpnOnly.evolveInstalled, isFalse);
+      expect(SuitePartsState.vpnOnly.rpaiInstalled, isFalse);
+      expect(SuitePartsState.vpnOnly.vpnInstalled, isTrue);
+      expect(const SuitePartsState().walletInstalled, isFalse);
       expect(SuitePartsState.allInstalled.walletInstalled, isTrue);
       expect(SuitePartsState.allInstalled.evolveInstalled, isTrue);
       expect(SuitePartsState.allInstalled.rpaiInstalled, isTrue);
-      expect(SuitePartsState.allInstalled.vpnInstalled, isTrue);
       expect(suitePartIsRemovable(SuitePartId.vpn), isFalse);
       expect(
         applySuitePartInstall(
@@ -47,25 +52,83 @@ void main() {
         ).vpnInstalled,
         isTrue,
       );
+      // VPN uninstall attempt leaves state unchanged and still installed.
+      final afterVpnOff = applySuitePartInstall(
+        SuitePartsState.vpnOnly,
+        id: SuitePartId.vpn,
+        installed: false,
+        confirmPhrase: 'VPN',
+      );
+      expect(afterVpnOff.vpnInstalled, isTrue);
+      expect(afterVpnOff, SuitePartsState.vpnOnly);
     });
 
-    test('tabs always retained even when optional parts uninstalled', () {
-      final s = SuitePartsState(
-        walletInstalled: false,
-        evolveInstalled: false,
-        rpaiInstalled: false,
-      );
+    test('fresh main-bar destinations are VPN-only', () {
+      final d = suiteNavDestinations(SuitePartsState.vpnOnly);
+      expect(d, [SuiteNavDest.vpn]);
+      final labels = d.map(suiteNavLabel).toList();
+      expect(labels, ['VPN']);
+      expect(labels, isNot(contains('Wallet')));
+      expect(labels, isNot(contains('Analysis')));
+      expect(labels, isNot(contains('Backup')));
+      expect(labels, isNot(contains('Voting')));
+      expect(labels, isNot(contains('Credit')));
+      expect(labels, isNot(contains(kSuiteTabRpai)));
+      expect(visibleSuitePartIds(SuitePartsState.vpnOnly), [SuitePartId.vpn]);
+      expect(suitePartShowsFullSurface(SuitePartsState.vpnOnly, SuitePartId.vpn),
+          isTrue);
       expect(
-        visibleSuitePartIds(s),
-        [
-          SuitePartId.vpn,
-          SuitePartId.wallet,
-          SuitePartId.evolve,
-          SuitePartId.rpai,
-        ],
+        suitePartShowsFullSurface(SuitePartsState.vpnOnly, SuitePartId.wallet),
+        isFalse,
       );
-      expect(suitePartShowsFullSurface(s, SuitePartId.vpn), isTrue);
-      expect(suitePartShowsFullSurface(s, SuitePartId.wallet), isFalse);
+    });
+
+    test('install optional part expands main-bar destinations', () {
+      var s = SuitePartsState.vpnOnly;
+      expect(suiteNavDestinations(s), [SuiteNavDest.vpn]);
+      s = applySuitePartInstall(
+        s,
+        id: SuitePartId.wallet,
+        installed: true,
+      );
+      expect(s.walletInstalled, isTrue);
+      expect(
+        suiteNavDestinations(s).map(suiteNavLabel).toList(),
+        ['VPN', 'Wallet', 'Backup', 'Credit'],
+      );
+      s = applySuitePartInstall(
+        s,
+        id: SuitePartId.rpai,
+        installed: true,
+      );
+      expect(s.rpaiInstalled, isTrue);
+      expect(
+        suiteNavDestinations(s).map(suiteNavLabel).toList(),
+        ['VPN', 'Wallet', 'Backup', 'Credit', kSuiteTabRpai],
+      );
+      s = applySuitePartInstall(
+        s,
+        id: SuitePartId.evolve,
+        installed: true,
+      );
+      final labels = suiteNavDestinations(s).map(suiteNavLabel).toList();
+      expect(labels.first, 'VPN');
+      expect(labels, containsAll(['Analysis', 'Wallet', 'Backup', 'Voting', 'Credit', kSuiteTabRpai]));
+    });
+
+    test('fromJson and store load: missing keys mean not installed', () async {
+      expect(SuitePartsState.fromJson(null), SuitePartsState.vpnOnly);
+      expect(SuitePartsState.fromJson({}), SuitePartsState.vpnOnly);
+      expect(
+        SuitePartsState.fromJson({kKeySuitePartWallet: true}),
+        const SuitePartsState(walletInstalled: true),
+      );
+      final backend = MemorySettingsBackend();
+      final store = SuitePartsStore(backend);
+      final fresh = await store.load();
+      expect(fresh, SuitePartsState.vpnOnly);
+      expect(fresh.vpnInstalled, isTrue);
+      expect(fresh.walletInstalled, isFalse);
     });
 
     test('uninstall confirm gate requires exact part name (rpOS-style)', () {
@@ -145,6 +208,7 @@ void main() {
     test('store persists uninstall only with valid confirm phrase', () async {
       final backend = MemorySettingsBackend();
       final store = SuitePartsStore(backend);
+      await store.save(SuitePartsState.allInstalled);
       final rejected = await store.setInstalled(SuitePartId.evolve, false);
       expect(rejected.evolveInstalled, isTrue);
       final accepted = await store.setInstalled(
@@ -157,6 +221,21 @@ void main() {
       expect(loaded.evolveInstalled, isFalse);
       final re = await store.setInstalled(SuitePartId.evolve, true);
       expect(re.evolveInstalled, isTrue);
+    });
+
+    test('store setInstalled from fresh installs optional without KEYGEN wall',
+        () async {
+      final backend = MemorySettingsBackend();
+      backend.data['licence_accepted'] = true;
+      final store = SuitePartsStore(backend);
+      expect((await store.load()).walletInstalled, isFalse);
+      final next = await store.setInstalled(SuitePartId.wallet, true);
+      expect(next.walletInstalled, isTrue);
+      expect(backend.data['licence_accepted'], isTrue);
+      expect(
+        suiteNavDestinations(next).map(suiteNavLabel).toList(),
+        ['VPN', 'Wallet', 'Backup', 'Credit'],
+      );
     });
   });
 
@@ -221,6 +300,54 @@ void main() {
       await tester.tap(find.text('Analysis').last);
       await tester.pumpAndSettle();
       expect(find.text('EVOLVE_FULL'), findsOneWidget);
+    });
+
+    testWidgets('fresh shell: VPN-only bar until install expands destinations',
+        (tester) async {
+      final backend = MemorySettingsBackend();
+      backend.data['licence_accepted'] = true;
+      backend.data['suite_account_registered'] = true;
+      backend.data['suite_account_username'] = 'alice';
+      final store = SuitePartsStore(backend);
+      // No part keys saved → vpnOnly after load.
+      expect((await store.load()), SuitePartsState.vpnOnly);
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: SuiteShell(
+            partsStore: store,
+            vpnTab: const Scaffold(body: Text('VPN_SURFACE')),
+            walletTab: const Scaffold(body: Text('WALLET_FULL')),
+            evolveTab: const Scaffold(body: Text('EVOLVE_FULL')),
+            rpaiTab: const Scaffold(body: Text('RPAI_FULL')),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      final shell = tester.state<SuiteShellState>(find.byType(SuiteShell));
+      expect(shell.partsState, SuitePartsState.vpnOnly);
+      expect(shell.destinations, [SuiteNavDest.vpn]);
+      expect(find.text('Wallet'), findsNothing);
+      expect(find.text('Analysis'), findsNothing);
+      expect(find.text(kSuiteTabRpai), findsNothing);
+      expect(find.text('VPN_SURFACE'), findsOneWidget);
+
+      // Install wallet via shell API (Settings install path).
+      await shell.setPartInstalled(SuitePartId.wallet, true);
+      await tester.pumpAndSettle();
+
+      expect(find.text('Wallet'), findsWidgets);
+      await tester.tap(find.text('Wallet').last);
+      await tester.pumpAndSettle();
+      expect(find.text('WALLET_FULL'), findsOneWidget);
+
+      final loaded = await store.load();
+      expect(loaded.walletInstalled, isTrue);
+      expect(loaded.evolveInstalled, isFalse);
+      expect(backend.data['licence_accepted'], isTrue);
+      expect(backend.data['suite_account_registered'], isTrue);
+      expect(backend.data['suite_account_username'], 'alice');
     });
 
     testWidgets('reinstall wallet part restores wallet inject path',
@@ -378,10 +505,59 @@ void main() {
       );
       expect(ok.walletInstalled, isFalse);
     });
+
+    testWidgets('Settings shows Install for fresh optional parts', (tester) async {
+      final previousOnError = FlutterError.onError;
+      FlutterError.onError = (details) {
+        if (details.exceptionAsString().contains('ListTile background color')) {
+          return;
+        }
+        previousOnError?.call(details);
+      };
+      addTearDown(() => FlutterError.onError = previousOnError);
+
+      final backend = MemorySettingsBackend();
+      final settingsStore = SettingsStore(backend);
+      final partsStore = SuitePartsStore(backend);
+
+      final view = tester.view;
+      view.physicalSize = const Size(900, 2400);
+      view.devicePixelRatio = 1.0;
+      addTearDown(view.resetPhysicalSize);
+      addTearDown(view.resetDevicePixelRatio);
+
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: ThemeData(scaffoldBackgroundColor: kChromeBg),
+          home: SettingsScreen(
+            store: settingsStore,
+            initial: ProductSettings.defaults,
+            partsStore: partsStore,
+            initialParts: SuitePartsState.vpnOnly,
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.byKey(const Key('suite_parts_panel')), findsOneWidget);
+      expect(find.byKey(const Key('suite_part_reinstall_settings_wallet')),
+          findsOneWidget);
+      expect(find.byKey(const Key('suite_part_reinstall_settings_evolve')),
+          findsOneWidget);
+      expect(find.byKey(const Key('suite_part_reinstall_settings_rpai')),
+          findsOneWidget);
+      expect(find.text(kSuitePartInstallLabel), findsWidgets);
+      expect(find.byKey(const Key('suite_part_uninstall_btn_wallet')), findsNothing);
+
+      await tester.tap(find.byKey(const Key('suite_part_reinstall_settings_wallet')));
+      await tester.pumpAndSettle();
+      final loaded = await partsStore.load();
+      expect(loaded.walletInstalled, isTrue);
+    });
   });
 
   group('structural', () {
-    test('settings + shell + parts source mount confirm and reinstall path', () {
+    test('settings + shell + parts source mount confirm and install path', () {
       String read(String rel) {
         for (final base in ['', 'client_app/']) {
           final f = File('$base$rel');
@@ -393,18 +569,25 @@ void main() {
       final settingsSrc = read('lib/settings_screen.dart');
       final partsSrc = read('lib/suite_parts.dart');
       final shellSrc = read('lib/suite_shell.dart');
+      final storeSrc = read('lib/suite_parts_store.dart');
       final phSrc = read('lib/suite_part_placeholder.dart');
 
       expect(settingsSrc.contains('suite_part_confirm_field_'), isTrue);
       expect(settingsSrc.contains('evaluateSuitePartUninstallConfirmation'),
           isTrue);
       expect(settingsSrc.contains('_confirmUninstallPart'), isTrue);
+      expect(settingsSrc.contains('kSuitePartInstallLabel'), isTrue);
       expect(partsSrc.contains('suitePartUninstallConfirmationAccepted'), isTrue);
       expect(partsSrc.contains('visibleSuitePartIds'), isTrue);
+      expect(partsSrc.contains('vpnOnly'), isTrue);
+      expect(partsSrc.contains('walletInstalled = false'), isTrue);
+      expect(storeSrc.contains('w == true'), isTrue);
       expect(shellSrc.contains('SuitePartReinstallPlaceholder'), isTrue);
+      expect(shellSrc.contains('SuitePartsState.vpnOnly'), isTrue);
       expect(phSrc.contains('kSuitePartReinstallLabel'), isTrue);
       expect(partsSrc.contains('KEYGEN'), isTrue);
       expect(partsSrc.contains('removable: false'), isTrue);
+      expect(partsSrc.contains('start uninstalled'), isTrue);
     });
   });
 }

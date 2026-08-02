@@ -102,7 +102,7 @@ class _RestorePrivacyAppState extends State<RestorePrivacyApp> {
     super.initState();
     // Bootstrap only; cold start loads SuitePartsStore inside SuiteShell unless
     // the test injects [initialParts] with preferInitialParts.
-    _parts = widget.initialParts ?? SuitePartsState.allInstalled;
+    _parts = widget.initialParts ?? SuitePartsState.vpnOnly;
     _partsReady = widget.initialParts != null;
     _bootAppearance();
   }
