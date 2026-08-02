@@ -27,6 +27,9 @@ enum RptVpnChannel {
   private static let prepareDebounce: TimeInterval = 8
 
   static func register(with messenger: FlutterBinaryMessenger) {
+    // Product explainer (once) before App Group seed may surface macOS
+    // “access data from other apps” — Apple owns that dialog; we cannot rewrite it.
+    RptAppGroupAccessExplainer.presentIfNeeded()
     // Seed Application Support + App Group + ~/.restore-privacy so Packet Tunnel
     // can load keys (Team residual host profile may omit application-groups;
     // sandboxed appex still reads home via temporary-exception).

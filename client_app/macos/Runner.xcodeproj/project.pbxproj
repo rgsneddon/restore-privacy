@@ -76,6 +76,7 @@
 		900FBE1927916EF03A6F42BF /* Addition.swift in Sources */ = {isa = PBXBuildFile; fileRef = E16A499C273A9871B4C18E26 /* Addition.swift */; };
 		92A92D4A05C8E430980D9446 /* RptSessionCrypto.swift in Sources */ = {isa = PBXBuildFile; fileRef = E2076CDD9CED44AA459FBEA9 /* RptSessionCrypto.swift */; };
 		970A610C0BA5DE735495946C /* RptClientEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = ED9129F30F6C17D1AF81D2BC /* RptClientEngine.swift */; };
+		B22C3D4E5F6071829300A1B2 /* RptAppGroupAccessExplainer.swift in Sources */ = {isa = PBXBuildFile; fileRef = A11B2C3D4E5F6071829300A1 /* RptAppGroupAccessExplainer.swift */; };
 		A0CCEFE479826FBA1091286A /* RptVpnChannel.swift in Sources */ = {isa = PBXBuildFile; fileRef = F66C2ECCCA169DB6C485B5A9 /* RptVpnChannel.swift */; };
 		A11B2C3D4E5F607182930002 /* RptResidualPrivacyPolicy.swift in Sources */ = {isa = PBXBuildFile; fileRef = A11B2C3D4E5F607182930001 /* RptResidualPrivacyPolicy.swift */; };
 		A11B2C3D4E5F607182930003 /* RptResidualPrivacyPolicy.swift in Sources */ = {isa = PBXBuildFile; fileRef = A11B2C3D4E5F607182930001 /* RptResidualPrivacyPolicy.swift */; };
@@ -223,6 +224,7 @@
 		ECECDB7E1FD55ACF992D61FC /* PacketTunnel.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = PacketTunnel.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 		ED9129F30F6C17D1AF81D2BC /* RptClientEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = RptClientEngine.swift; path = NativePrep/Rpt2/RptClientEngine.swift; sourceTree = "<group>"; };
 		F5BAD9B9C6AC449B9C94DC39 /* Multiplication.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = Multiplication.swift; path = NativePrep/Rpt2/VendorBigInt/Multiplication.swift; sourceTree = "<group>"; };
+		A11B2C3D4E5F6071829300A1 /* RptAppGroupAccessExplainer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = RptAppGroupAccessExplainer.swift; path = NativePrep/RptAppGroupAccessExplainer.swift; sourceTree = "<group>"; };
 		F66C2ECCCA169DB6C485B5A9 /* RptVpnChannel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = RptVpnChannel.swift; path = NativePrep/RptVpnChannel.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
@@ -678,6 +680,7 @@
 				7F51CD412B50C7843984F1AA /* String Conversion.swift in Sources */,
 				09C052CBE47707797A6B0635 /* Subtraction.swift in Sources */,
 				CABAC855FCDD9F75CDA2ABE4 /* Words and Bits.swift in Sources */,
+				B22C3D4E5F6071829300A1B2 /* RptAppGroupAccessExplainer.swift in Sources */,
 				A0CCEFE479826FBA1091286A /* RptVpnChannel.swift in Sources */,
 				17C1C22384D11B060F6B37F0 /* RptSecrets.swift in Sources */,
 				33CC11132044BFA00003C045 /* MainFlutterWindow.swift in Sources */,

@@ -4,6 +4,11 @@
 **Dialog (OS-owned, Sequoia+ wording):**  
 `“restore_privacy_client” would like to access data from other apps.`
 
+**Product cannot change Apple’s system dialog text.** On first Mac channel
+register, the Suite shows its own sheet (`RptAppGroupAccessExplainer`) **before**
+App Group seed, with a one-line reason to Allow (Packet Tunnel ↔ residual nodes).
+That sheet is show-once (`rpt_app_group_access_explainer_seen`).
+
 This note answers three product questions from in-repo sources (entitlements + native Swift), not generic TCC lore alone.
 
 ---
