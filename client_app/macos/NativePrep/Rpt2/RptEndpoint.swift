@@ -86,6 +86,12 @@ public enum RptEndpoint {
             || d.contains("failed to connect")
             || d.contains("nwerror")
             || d.contains("socket")
+            // Host-side poll after startTunnel: extension HELLO timeout surfaces only as
+            // "Packet Tunnel did not become Connected" — still try catalog alternates.
+            || d.contains("did not become connected")
+            || d.contains("still connecting/failed")
+            || d.contains("status disconnected")
+            || d.contains("status invalid")
     }
 
     /// Parse MethodChannel args (`host` / `port`) with NSNumber-safe port casting.

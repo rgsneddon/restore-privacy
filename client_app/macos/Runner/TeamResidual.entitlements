@@ -14,5 +14,10 @@
 	<array>
 		<string>packet-tunnel-provider</string>
 	</array>
+	<!-- Host must share secrets/prefs with PacketTunnel.appex for residual HELLO. -->
+	<key>com.apple.security.application-groups</key>
+	<array>
+		<string>group.com.restoreprivacy.shared</string>
+	</array>
 </dict>
 </plist>

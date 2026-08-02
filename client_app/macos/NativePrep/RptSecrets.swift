@@ -270,7 +270,10 @@ public enum RptSecrets {
     public static func dirHasClientSecrets(_ dir: URL, fileManager: FileManager = .default) -> Bool {
         let c = dir.appendingPathComponent(clientPrivName)
         let n = dir.appendingPathComponent(nodePubName)
-        return fileManager.fileExists(atPath: c.path) && fileManager.fileExists(atPath: n.path)
+        // Exist alone is not enough: sandboxed/App Group paths can appear on disk
+        // but fail Data(contentsOf:) with permission denied — skip those dirs.
+        return fileManager.isReadableFile(atPath: c.path)
+            && fileManager.isReadableFile(atPath: n.path)
     }
 
     public static func dirHasNodePub(_ dir: URL, fileManager: FileManager = .default) -> Bool {
@@ -429,6 +432,9 @@ public enum RptSecrets {
     /// Load product admission material (device client priv + node pub). Never loads node private key.
     /// Ensures RO/DE residual pins are refreshed from package candidates into the writable dir
     /// (App Support may only have been seeded with Iceland ``node_elgamal.pub``).
+    ///
+    /// Tries each trusted secrets directory in order and **skips** unreadable dirs
+    /// (permission / TCC) so Connect does not die on the first blocked path.
     public static func loadAdmissionMaterial(
         fileManager: FileManager = .default,
         bundle: Bundle = .main,
@@ -437,34 +443,48 @@ public enum RptSecrets {
         let candidates = Array(
             candidateSecretsDirectories(fileManager: fileManager, bundle: bundle)
         )
+        var lastError: Error?
 
-        if let dir = resolveSecretsDirectory(fileManager: fileManager, bundle: bundle) {
-            try ensureResidualPubInWritableDir(
-                writableDir: dir,
-                residualHost: residualHost,
-                candidates: candidates,
-                fileManager: fileManager
-            )
-            return try loadFromDirectory(dir, residualHost: residualHost)
+        // Prefer dirs that already look complete and readable.
+        for dir in candidates {
+            if isPackageReadonlySecretsDir(dir, bundle: bundle, fileManager: fileManager) {
+                continue
+            }
+            guard dirHasClientSecrets(dir, fileManager: fileManager) else { continue }
+            do {
+                try ensureResidualPubInWritableDir(
+                    writableDir: dir,
+                    residualHost: residualHost,
+                    candidates: candidates,
+                    fileManager: fileManager
+                )
+                return try loadFromDirectory(dir, residualHost: residualHost)
+            } catch {
+                lastError = error
+                continue
+            }
         }
 
-        if let dir = try? seedApplicationSupportFromBundleIfNeeded(fileManager: fileManager, bundle: bundle) {
-            try ensureResidualPubInWritableDir(
-                writableDir: dir,
-                residualHost: residualHost,
-                candidates: candidates,
-                fileManager: fileManager
-            )
-            return try loadFromDirectory(dir, residualHost: residualHost)
-        }
-        if let dir = try? seedAppGroupFromKnownSourcesIfNeeded(fileManager: fileManager, bundle: bundle) {
-            try ensureResidualPubInWritableDir(
-                writableDir: dir,
-                residualHost: residualHost,
-                candidates: candidates,
-                fileManager: fileManager
-            )
-            return try loadFromDirectory(dir, residualHost: residualHost)
+        // Seed App Support / App Group / home then retry readable load.
+        let seedAttempts: [() throws -> URL?] = [
+            { try seedApplicationSupportFromBundleIfNeeded(fileManager: fileManager, bundle: bundle) },
+            { try seedAppGroupFromKnownSourcesIfNeeded(fileManager: fileManager, bundle: bundle) },
+            { try seedHomeRestorePrivacyFromKnownSourcesIfNeeded(fileManager: fileManager, bundle: bundle) },
+        ]
+        for seed in seedAttempts {
+            guard let dir = try? seed() else { continue }
+            do {
+                try ensureResidualPubInWritableDir(
+                    writableDir: dir,
+                    residualHost: residualHost,
+                    candidates: candidates,
+                    fileManager: fileManager
+                )
+                return try loadFromDirectory(dir, residualHost: residualHost)
+            } catch {
+                lastError = error
+                continue
+            }
         }
 
         if let dest = secretsDirectory(fileManager: fileManager) {
@@ -474,7 +494,7 @@ public enum RptSecrets {
             for d in candidates {
                 for name in names {
                     let n = d.appendingPathComponent(name)
-                    if fileManager.fileExists(atPath: n.path) {
+                    if fileManager.isReadableFile(atPath: n.path) {
                         nodeSrc = n
                         break
                     }
@@ -482,18 +502,28 @@ public enum RptSecrets {
                 if nodeSrc != nil { break }
             }
             if let nodeSrc {
-                _ = try ensureDeviceAdmissionKey(in: dest, nodePubSource: nodeSrc, fileManager: fileManager)
-                try ensureResidualPubInWritableDir(
-                    writableDir: dest,
-                    residualHost: residualHost,
-                    candidates: candidates,
-                    fileManager: fileManager
-                )
-                return try loadFromDirectory(dest, residualHost: residualHost)
+                do {
+                    _ = try ensureDeviceAdmissionKey(in: dest, nodePubSource: nodeSrc, fileManager: fileManager)
+                    try ensureResidualPubInWritableDir(
+                        writableDir: dest,
+                        residualHost: residualHost,
+                        candidates: candidates,
+                        fileManager: fileManager
+                    )
+                    return try loadFromDirectory(dest, residualHost: residualHost)
+                } catch {
+                    lastError = error
+                }
             }
         }
 
         let paths = searchedPathsDescription(fileManager: fileManager, bundle: bundle)
+        if let lastError {
+            throw RptProtocol.ProtocolError(
+                "\(lastError.localizedDescription) — also missing readable residual pin for host "
+                    + "\(residualHost.isEmpty ? "default" : residualHost). Searched: \(paths)"
+            )
+        }
         throw RptProtocol.ProtocolError(
             "Missing residual public pin for host \(residualHost.isEmpty ? "default" : residualHost) — "
                 + "packages ship node/exit pubs; device Ed25519 is generated on first run. "
@@ -521,8 +551,16 @@ public enum RptSecrets {
             }
             throw RptProtocol.ProtocolError("Missing \(pubName) in \(dir.path)")
         }
-        let clientPriv = try Data(contentsOf: cURL)
-        let nodePub = try Data(contentsOf: nURL)
+        let clientPriv: Data
+        let nodePub: Data
+        do {
+            clientPriv = try Data(contentsOf: cURL)
+            nodePub = try Data(contentsOf: nURL)
+        } catch {
+            throw RptProtocol.ProtocolError(
+                "Cannot read secrets in \(dir.path): \(error.localizedDescription)"
+            )
+        }
         guard clientPriv.count == 32 else {
             throw RptProtocol.ProtocolError("client_ed25519.priv must be 32 raw bytes")
         }
