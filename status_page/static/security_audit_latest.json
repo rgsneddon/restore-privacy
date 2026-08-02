@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-08-02T14:30:45Z",
+  "generated_at": "2026-08-02T14:47:31Z",
   "node_host": "Germany (DE)",
   "catalog_version": "1.0.7",
   "unit_suite": {
@@ -115,7 +115,7 @@
           "exit_node_elgamal.pub present (multihop exit pin)"
         ],
         "path": "/Users/russellsneddon/restore-privacy/status_page/assets/1.0.7/restore-privacy-client-1.0.7-macos.zip",
-        "bytes": 27750600,
+        "bytes": 27750617,
         "relative_path": "1.0.7/restore-privacy-client-1.0.7-macos.zip",
         "search_roots": [
           "status_page/assets/1.0.7/",
@@ -136,7 +136,7 @@
           "node_elgamal.pub not found inside package (pin not verified)"
         ],
         "path": "/Users/russellsneddon/restore-privacy/status_page/assets/1.0.7/restore-privacy-client-1.0.7-ios.zip",
-        "bytes": 13116178,
+        "bytes": 13190699,
         "relative_path": "1.0.7/restore-privacy-client-1.0.7-ios.zip",
         "search_roots": [
           "status_page/assets/1.0.7/",

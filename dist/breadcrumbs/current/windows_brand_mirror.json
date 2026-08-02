@@ -1,7 +1,7 @@
 {
   "schema": "rpt.windows_brand_mirror.v1",
   "monopin": "1.0.7",
-  "generated_at": "2026-08-02T14:38:21Z",
+  "generated_at": "2026-08-02T14:47:35Z",
   "dest_root": "{RPT_WINDOWS_DRIVE}",
   "dest_configured": false,
   "dest_reachable": false,

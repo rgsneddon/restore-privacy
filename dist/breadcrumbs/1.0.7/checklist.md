@@ -1,6 +1,6 @@
 # Apple breadcrumbs checklist — monopin 1.0.7
 
-Generated: 2026-08-02T14:38:21Z
+Generated: 2026-08-02T14:47:35Z
 Source of truth: **helsinki_breadcrumbs_vault** (GitHub breadcrumb pull: **deprecated**)
 
 ## Operator mandate (monopin 1.0.7)

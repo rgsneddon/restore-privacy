@@ -1,7 +1,7 @@
 {
   "schema": "rpt.breadcrumbs.v1",
   "monopin": "1.0.7",
-  "generated_at": "2026-08-02T14:38:21Z",
+  "generated_at": "2026-08-02T14:47:35Z",
   "source_of_truth": "helsinki_breadcrumbs_vault",
   "github_breadcrumb_flow": "deprecated",
   "github_note": "Do not use private GitHub APPLE_HANDOFF pull as the primary Mac task queue. Fetch this vault instead. Source code may still live in the private repo.",
@@ -17,7 +17,7 @@
       "needs_work": false,
       "notes": "CFBundle/marketing version 1.0.7 matches monopin 1.0.7.",
       "path": "/Users/russellsneddon/restore-privacy/status_page/assets/1.0.7/restore-privacy-client-1.0.7-macos.zip",
-      "size": 27750600,
+      "size": 27750617,
       "plist_paths": [
         "restore_privacy_client.app/Contents/Info.plist"
       ]
@@ -31,7 +31,7 @@
       "needs_work": false,
       "notes": "CFBundle/marketing version 1.0.7 matches monopin 1.0.7.",
       "path": "/Users/russellsneddon/restore-privacy/status_page/assets/1.0.7/restore-privacy-client-1.0.7-ios.zip",
-      "size": 13116178,
+      "size": 13190699,
       "plist_paths": [
         "Runner.app/Info.plist"
       ]
