@@ -1219,10 +1219,14 @@ class _TunnelHomeState extends State<TunnelHome> with WidgetsBindingObserver {
   @override
   Widget build(BuildContext context) {
     final btnLabel = connectButtonLabel(_connected);
-    final btnColor = _connected ? kButtonDisconnectBg : kButtonConnectBg;
-    final statusColor = _connected
-        ? kStatusOk
-        : (_busy ? kPrimary : kText);
+    final btnColor = _connected
+        ? suiteSecondaryOf(context)
+        : suitePrimaryOf(context);
+    final statusColor = vpnStatusTitleColor(
+      context,
+      connected: _connected,
+      busyConnecting: _busy && !_connected,
+    );
     final cardTitle = statusCardTitle(
       connected: _connected,
       busyConnecting: _busy && !_connected,
@@ -1364,7 +1368,7 @@ class _TunnelHomeState extends State<TunnelHome> with WidgetsBindingObserver {
                                 : 'Licence required',
                             style: TextStyle(
                               color: _licenceAccepted
-                                  ? kPrimaryDark
+                                  ? suitePrimaryOf(context)
                                   : kStatusError,
                               fontSize: 11,
                               fontWeight: FontWeight.w700,
@@ -1376,6 +1380,7 @@ class _TunnelHomeState extends State<TunnelHome> with WidgetsBindingObserver {
                     const SizedBox(height: 8),
                     Text(
                       cardTitle,
+                      key: const Key('vpn_status_card_title'),
                       style: TextStyle(
                         color: statusColor,
                         fontWeight: FontWeight.w700,

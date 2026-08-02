@@ -261,6 +261,20 @@ Color suiteAccentFillOf(BuildContext context) => suiteThemeIsDark(context)
     ? kLightAccent
     : kEvolveLightPrimary.withValues(alpha: 0.12);
 
+/// VPN status card title color (TunnelHome).
+///
+/// Idle disconnected uses [suiteTextOf] so light Evolve panels stay readable;
+/// never hard-code dark-only [kText] for this surface.
+Color vpnStatusTitleColor(
+  BuildContext context, {
+  required bool connected,
+  required bool busyConnecting,
+}) {
+  if (connected) return suiteSecondaryOf(context);
+  if (busyConnecting) return suitePrimaryOf(context);
+  return suiteTextOf(context);
+}
+
 /// Single control label for the Connect / Disconnect button.
 String connectButtonLabel(bool connected) =>
     connected ? 'Disconnect' : 'Connect';

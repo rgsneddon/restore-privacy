@@ -200,6 +200,87 @@ void main() {
         );
       },
     );
+
+    testWidgets(
+      'idle VPN status title uses suiteTextOf (readable on light panels)',
+      (tester) async {
+        // Drive shipped [vpnStatusTitleColor] (TunnelHome entry) under light theme.
+        await tester.pumpWidget(
+          MaterialApp(
+            theme: buildSuiteThemeLight(),
+            darkTheme: buildSuiteThemeDark(),
+            themeMode: ThemeMode.light,
+            home: Builder(
+              builder: (context) {
+                final statusColor = vpnStatusTitleColor(
+                  context,
+                  connected: false,
+                  busyConnecting: false,
+                );
+                return Scaffold(
+                  backgroundColor: suiteChromeBgOf(context),
+                  body: Container(
+                    color: suitePanelBgOf(context),
+                    padding: const EdgeInsets.all(16),
+                    child: Text(
+                      'Disconnected',
+                      key: const Key('vpn_status_card_title'),
+                      style: TextStyle(
+                        color: statusColor,
+                        fontWeight: FontWeight.w700,
+                        fontSize: 17,
+                      ),
+                    ),
+                  ),
+                );
+              },
+            ),
+          ),
+        );
+        await tester.pump();
+        final title = tester.widget<Text>(
+          find.byKey(const Key('vpn_status_card_title')),
+        );
+        final color = title.style?.color;
+        expect(color, isNotNull);
+        // Light onSurface — not dark-only kText / kEvolveText.
+        expect(color, kEvolveLightText);
+        expect(color, isNot(kText));
+        expect(color, isNot(kEvolveText));
+        // Contrast against light panel: relative luminance gap must be clear.
+        final textLum = color!.computeLuminance();
+        final panelLum = kEvolveLightCard.computeLuminance();
+        final contrast = (panelLum + 0.05) / (textLum + 0.05);
+        expect(contrast, greaterThan(4.5), reason: 'WCAG AA-ish body contrast');
+
+        // Busy / connected branches of the same shipped helper.
+        late Color busyColor;
+        late Color connectedColor;
+        await tester.pumpWidget(
+          MaterialApp(
+            theme: buildSuiteThemeLight(),
+            home: Builder(
+              builder: (context) {
+                busyColor = vpnStatusTitleColor(
+                  context,
+                  connected: false,
+                  busyConnecting: true,
+                );
+                connectedColor = vpnStatusTitleColor(
+                  context,
+                  connected: true,
+                  busyConnecting: false,
+                );
+                return const SizedBox.shrink();
+              },
+            ),
+          ),
+        );
+        await tester.pump();
+        expect(busyColor, kEvolveLightPrimary);
+        expect(connectedColor, kEvolveLightSecondary);
+      },
+    );
   });
 
   group('suite swipe order VPN → % → Evolve → rpAI', () {
