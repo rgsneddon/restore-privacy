@@ -26,6 +26,8 @@ const String kKeyEntryCountry = 'entry_country';
 /// breadcrumbs may store a pending Suite package; the user still clicks
 /// unpack-and-relaunch on the VPN main screen.
 const String kKeyCheckBreadcrumbs = 'check_breadcrumbs';
+/// Suite appearance: `dark` (default, Evolve look) or `light` — Settings only.
+const String kKeySuiteAppearance = 'suite_appearance';
 
 /// Legacy / operator label (still grepped); Settings UI uses human Suite title.
 const String kCheckBreadcrumbsLabel = 'CHECK BREADCRUMBS';
@@ -47,6 +49,8 @@ class ProductSettings {
   final String entryCountry;
   /// When true, client may fetch Helsinki breadcrumbs and apply pending monopin update.
   final bool checkBreadcrumbs;
+  /// `dark` (default Evolve chrome) or `light` — set only from Settings.
+  final String appearance;
 
   const ProductSettings({
     this.runAtStartup = false,
@@ -59,9 +63,14 @@ class ProductSettings {
     this.residualIpv6 = true,
     this.entryCountry = kDefaultEntryCountry,
     this.checkBreadcrumbs = false,
+    this.appearance = 'dark',
   }) : residualIpv4 = kResidualIpv4AlwaysOn;
 
   static const ProductSettings defaults = ProductSettings();
+
+  /// True when Settings appearance is light mode.
+  bool get isLightAppearance =>
+      appearance.trim().toLowerCase() == 'light';
 
   ProductSettings copyWith({
     bool? runAtStartup,
@@ -73,6 +82,7 @@ class ProductSettings {
     bool? residualIpv6,
     String? entryCountry,
     bool? checkBreadcrumbs,
+    String? appearance,
   }) {
     return ProductSettings(
       runAtStartup: runAtStartup ?? this.runAtStartup,
@@ -88,6 +98,7 @@ class ProductSettings {
           ? normalizeEntryCountry(entryCountry)
           : this.entryCountry,
       checkBreadcrumbs: checkBreadcrumbs ?? this.checkBreadcrumbs,
+      appearance: appearance ?? this.appearance,
     );
   }
 
@@ -101,12 +112,14 @@ class ProductSettings {
         kKeyResidualIpv6: residualIpv6,
         kKeyEntryCountry: normalizeEntryCountry(entryCountry),
         kKeyCheckBreadcrumbs: checkBreadcrumbs,
+        kKeySuiteAppearance: appearance,
       };
 
   factory ProductSettings.fromJson(Map<String, dynamic>? data) {
     if (data == null) return defaults;
     // Residual IPv6: missing key → ON
     bool dualOn(Object? v) => v != false;
+    final rawAppearance = data[kKeySuiteAppearance]?.toString();
     return ProductSettings(
       runAtStartup: data[kKeyRunAtStartup] == true,
       autoconnectOnLaunch: data[kKeyAutoconnectOnLaunch] == true,
@@ -120,6 +133,9 @@ class ProductSettings {
         data[kKeyEntryCountry]?.toString(),
       ),
       checkBreadcrumbs: data[kKeyCheckBreadcrumbs] == true,
+      appearance: (rawAppearance ?? 'dark').trim().isEmpty
+          ? 'dark'
+          : rawAppearance!.trim().toLowerCase(),
     );
   }
 }
@@ -178,6 +194,7 @@ class SettingsStore {
     final ipv6 = await backend.getBool(kKeyResidualIpv6);
     final entry = await backend.getString(kKeyEntryCountry);
     final crumbs = await backend.getBool(kKeyCheckBreadcrumbs);
+    final appearance = await backend.getString(kKeySuiteAppearance);
     return ProductSettings(
       runAtStartup: run == true,
       autoconnectOnLaunch: auto == true,
@@ -189,6 +206,9 @@ class SettingsStore {
       residualIpv6: ipv6 != false,
       entryCountry: normalizeEntryCountry(entry),
       checkBreadcrumbs: crumbs == true,
+      appearance: (appearance == null || appearance.trim().isEmpty)
+          ? 'dark'
+          : appearance.trim().toLowerCase(),
     );
   }
 
@@ -209,6 +229,11 @@ class SettingsStore {
       normalizeEntryCountry(settings.entryCountry),
     );
     await backend.setBool(kKeyCheckBreadcrumbs, settings.checkBreadcrumbs);
+    final app = settings.appearance.trim().toLowerCase();
+    await backend.setString(
+      kKeySuiteAppearance,
+      app == 'light' ? 'light' : 'dark',
+    );
   }
 
   bool shouldAutoconnectOnLaunch(ProductSettings s) => s.autoconnectOnLaunch;

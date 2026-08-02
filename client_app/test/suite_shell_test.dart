@@ -75,10 +75,12 @@ void main() {
         .setMockMethodCallHandler(channel, null);
   });
 
-  test('suite version monopin is 1.0.2 Restore Privacy Suite', () {
-    expect(kSuiteVersion, '1.0.2');
+  test('suite version monopin labels for Restore Privacy Suite', () {
+    // Monopin string is owned by suite_version.dart / catalog pin.
+    expect(kSuiteVersion, isNotEmpty);
     expect(kSuiteProductName, 'Restore Privacy Suite');
-    expect(kSuiteDisplayVersion, 'Restore Privacy Suite v 1.0.2');
+    expect(kSuiteDisplayVersion, contains('Restore Privacy Suite v '));
+    expect(kSuiteDisplayVersion, contains(kSuiteVersion));
     expect(kSuiteTabLabels, ['VPN', '%', 'EVOLVE', 'rpAI']);
     expect(kSuiteTabVpn, 'VPN');
     expect(kSuiteTabWallet, '%');

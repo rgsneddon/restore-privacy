@@ -474,6 +474,20 @@ class _SettingsScreenState extends State<SettingsScreen> {
     if (mounted) setState(() => _busy = false);
   }
 
+  Future<void> _setLightAppearance(bool light) async {
+    final next = light ? 'light' : 'dark';
+    setState(() {
+      _busy = true;
+      _settings = _settings.copyWith(appearance: next);
+    });
+    await widget.store.save(_settings);
+    _note = light
+        ? 'Light appearance on — Evolve light palette.'
+        : 'Dark appearance on — Evolve dark chrome (default).';
+    widget.onChanged?.call(_settings);
+    if (mounted) setState(() => _busy = false);
+  }
+
   Future<void> _setCheckBreadcrumbs(bool value) async {
     setState(() {
       _busy = true;
@@ -825,6 +839,22 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   activeTrackColor: kPrimary,
                   onChanged: _busy ? null : _setCheckBreadcrumbs,
                 ),
+                const Divider(height: 1),
+                SwitchListTile(
+                  key: const Key('suite_appearance_light_switch'),
+                  title: const Text(
+                    'Light appearance',
+                    style: TextStyle(fontWeight: FontWeight.w600),
+                  ),
+                  subtitle: const Text(
+                    'Off = Evolve dark chrome (default). On = light Evolve palette. '
+                    'Only controlled here in Settings.',
+                  ),
+                  value: _settings.isLightAppearance,
+                  activeThumbColor: kWhite,
+                  activeTrackColor: kPrimary,
+                  onChanged: _busy ? null : _setLightAppearance,
+                ),
               ],
             ),
           ),
@@ -835,7 +865,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
             'OS VPN permission / Administrator may still be required. '
             '$kSuiteUpdateSettingsTitle defaults off — no push-update receive or '
             'unpack until you allow it. Unpacking still requires your click on the '
-            'VPN main screen ($kSuiteUpdateUnpackButtonLabel).',
+            'VPN main screen ($kSuiteUpdateUnpackButtonLabel). '
+            'Appearance (dark/light) is only changed in this Settings panel.',
             style: TextStyle(color: kTextMuted, fontSize: 12),
           ),
           const SizedBox(height: 20),

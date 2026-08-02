@@ -109,18 +109,19 @@ void main() {
         privacyTrafficShape: true,
         privacyOuterObfuscation: true,
         privacyMultihop: true,
-        entryCountry: 'US',
+        entryCountry: 'IS',
       ),
     );
     final loaded = await store.load();
     expect(loaded.privacyTrafficShape, isTrue);
     expect(loaded.privacyOuterObfuscation, isTrue);
     expect(loaded.privacyMultihop, isTrue);
-    expect(loaded.entryCountry, 'US');
+    // Catalog is IS/DE only (stale US normalizes to DE).
+    expect(loaded.entryCountry, 'IS');
     expect(shared[kKeyPrivacyTrafficShape], isTrue);
     expect(shared[kKeyPrivacyOuterObfuscation], isTrue);
     expect(shared[kKeyPrivacyMultihop], isTrue);
-    expect(shared[kKeyEntryCountry], 'US');
+    expect(shared[kKeyEntryCountry], 'IS');
   });
 
   test('shouldAutoconnect helpers', () {

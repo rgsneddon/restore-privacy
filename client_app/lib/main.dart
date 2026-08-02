@@ -94,6 +94,8 @@ class _RestorePrivacyAppState extends State<RestorePrivacyApp> {
   late SuitePartsState _parts;
   /// True after durable prefs (or forced test snapshot) have been applied.
   var _partsReady = false;
+  ThemeMode _themeMode = ThemeMode.dark;
+  SettingsStore? _appearanceStore;
 
   @override
   void initState() {
@@ -102,6 +104,30 @@ class _RestorePrivacyAppState extends State<RestorePrivacyApp> {
     // the test injects [initialParts] with preferInitialParts.
     _parts = widget.initialParts ?? SuitePartsState.allInstalled;
     _partsReady = widget.initialParts != null;
+    _bootAppearance();
+  }
+
+  Future<void> _bootAppearance() async {
+    try {
+      final store = widget.settingsStore ??
+          SettingsStore(await SharedPreferencesBackend.create());
+      final s = await store.load();
+      if (!mounted) return;
+      setState(() {
+        _appearanceStore = store;
+        _themeMode = suiteThemeModeFromAppearance(s.appearance);
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _themeMode = ThemeMode.dark);
+    }
+  }
+
+  void _onAppearanceChanged(ProductSettings next) {
+    if (!mounted) return;
+    setState(() {
+      _themeMode = suiteThemeModeFromAppearance(next.appearance);
+    });
   }
 
   void _onPartsChanged(SuitePartsState next) {
@@ -128,13 +154,14 @@ class _RestorePrivacyAppState extends State<RestorePrivacyApp> {
       partsStore: widget.partsStore,
       onPartsChanged: _onPartsChanged,
       vpnTab: TunnelHome(
-        settingsStore: widget.settingsStore,
+        settingsStore: widget.settingsStore ?? _appearanceStore,
         licenceGate: widget.licenceGate,
         vpnController: widget.vpnController,
         onQuitExit: widget.onQuitExit,
         partsStore: widget.partsStore,
         initialParts: _partsReady ? _parts : widget.initialParts,
         onPartsChanged: _onPartsChanged,
+        onSettingsChanged: _onAppearanceChanged,
       ),
       walletTab: widget.walletTab,
       evolveTab: widget.evolveTab,
@@ -143,18 +170,9 @@ class _RestorePrivacyAppState extends State<RestorePrivacyApp> {
     return MaterialApp(
       title: kSuiteProductName,
       debugShowCheckedModeBanner: false,
-      theme: ThemeData(
-        brightness: Brightness.light,
-        scaffoldBackgroundColor: kChromeBg,
-        fontFamily: 'Segoe UI',
-        colorScheme: const ColorScheme.light(
-          primary: kPrimary,
-          surface: kPanelBg,
-          onPrimary: kWhite,
-          onSurface: kText,
-        ),
-        useMaterial3: true,
-      ),
+      theme: buildSuiteThemeLight(),
+      darkTheme: buildSuiteThemeDark(),
+      themeMode: _themeMode,
       // All primary entry goes through licence unlock until entitled.
       home: widget.home ??
           AppEntryRoot(
@@ -181,6 +199,7 @@ class TunnelHome extends StatefulWidget {
     this.partsStore,
     this.initialParts,
     this.onPartsChanged,
+    this.onSettingsChanged,
   });
 
   /// Injectable store for tests; production loads SharedPreferences.
@@ -197,6 +216,10 @@ class TunnelHome extends StatefulWidget {
   final SuitePartsStore? partsStore;
   final SuitePartsState? initialParts;
   final ValueChanged<SuitePartsState>? onPartsChanged;
+
+  /// Notified when product settings change (e.g. appearance) so MaterialApp
+  /// can switch Evolve light/dark theme without restart.
+  final ValueChanged<ProductSettings>? onSettingsChanged;
 
   @override
   State<TunnelHome> createState() => _TunnelHomeState();
@@ -381,6 +404,7 @@ class _TunnelHomeState extends State<TunnelHome> with WidgetsBindingObserver {
     } else {
       _settings = loaded;
     }
+    widget.onSettingsChanged?.call(loaded);
     // Refresh payment if we already have a session id (post-pay recheck)
     final sid = await _licence!.paymentSessionId();
     if (sid.isNotEmpty) {
@@ -1157,6 +1181,7 @@ class _TunnelHomeState extends State<TunnelHome> with WidgetsBindingObserver {
             RptConfig.setRuntimeMultiHop(s.privacyMultihop);
             _vpn.settingsForUpdatePush = s;
             if (mounted) setState(() => _settings = s);
+            widget.onSettingsChanged?.call(s);
             // Keep native App Group aligned when Settings change outside Connect.
             unawaited(
               _vpn.syncProductSettingsToNative(
@@ -1173,6 +1198,7 @@ class _TunnelHomeState extends State<TunnelHome> with WidgetsBindingObserver {
     );
     if (updated != null && mounted) {
       setState(() => _settings = updated);
+      widget.onSettingsChanged?.call(updated);
     }
     if (mounted) {
       final s = await store.load();
@@ -1181,6 +1207,7 @@ class _TunnelHomeState extends State<TunnelHome> with WidgetsBindingObserver {
         _settings = s;
         _licenceAccepted = licOk;
       });
+      widget.onSettingsChanged?.call(s);
     }
   }
 

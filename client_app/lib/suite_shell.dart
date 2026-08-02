@@ -14,8 +14,10 @@ import 'theme.dart';
 
 /// Unified Restore Privacy Suite shell: **VPN** · **%** · **EVOLVE** · **rpAI**.
 ///
-/// Tab switch keeps the process alive (IndexedStack). All four tabs stay in the
-/// nav; uninstalled optional parts show a reinstall placeholder body.
+/// Horizontal [PageView] (reversed) so **left-to-right** swipe advances along
+/// the product order VPN → % → Evolve → rpAI; right-to-left walks back. End
+/// blocks at VPN and rpAI (no wrap). Bottom nav stays in sync with the pager.
+/// Uninstalled optional parts keep a reinstall placeholder body.
 class SuiteShell extends StatefulWidget {
   const SuiteShell({
     super.key,
@@ -69,6 +71,7 @@ class SuiteShellState extends State<SuiteShell> {
   late SuitePartsState _parts;
   SuitePartsStore? _store;
   var _loadingParts = true;
+  late final PageController _pageController;
 
   int get currentTabIndex => _index;
 
@@ -76,11 +79,26 @@ class SuiteShellState extends State<SuiteShell> {
 
   SuitePartsStore? get partsStore => _store;
 
+  /// Test / chrome access to the horizontal pager (touch swipe path).
+  PageController get pageController => _pageController;
+
   void selectTab(int index) {
     final n = visibleSuitePartIds(_parts).length;
     if (index < 0 || index >= n) return;
-    if (_index == index) return;
+    if (_index == index) {
+      // Still snap pager if desynced.
+      if (_pageController.hasClients &&
+          (_pageController.page?.round() ?? _index) != index) {
+        _pageController.jumpToPage(index);
+      }
+      return;
+    }
     setState(() => _index = index);
+    if (_pageController.hasClients) {
+      // jumpToPage keeps tests / programmatic select in sync without waiting
+      // for an animation; touch users still get fling physics on the pager.
+      _pageController.jumpToPage(index);
+    }
   }
 
   /// Apply new parts (e.g. after Settings) and clamp tab index.
@@ -92,11 +110,16 @@ class SuiteShellState extends State<SuiteShell> {
       if (notifyParent) widget.onPartsChanged?.call(next);
       return;
     }
+    final nextIndex = clampSuiteTabIndex(_index, next);
     setState(() {
       _parts = next;
-      _index = clampSuiteTabIndex(_index, _parts);
+      _index = nextIndex;
       _loadingParts = false;
     });
+    if (_pageController.hasClients &&
+        (_pageController.page?.round() ?? nextIndex) != nextIndex) {
+      _pageController.jumpToPage(nextIndex);
+    }
     if (notifyParent) widget.onPartsChanged?.call(next);
   }
 
@@ -133,7 +156,15 @@ class SuiteShellState extends State<SuiteShell> {
     super.initState();
     _parts = widget.initialParts ?? SuitePartsState.allInstalled;
     _index = clampSuiteTabIndex(widget.initialTabIndex, _parts);
+    // reverse:true → left-to-right finger motion advances VPN→%→Evolve→rpAI
+    _pageController = PageController(initialPage: _index);
     _bootParts();
+  }
+
+  @override
+  void dispose() {
+    _pageController.dispose();
+    super.dispose();
   }
 
   @override
@@ -215,8 +246,16 @@ class SuiteShellState extends State<SuiteShell> {
     }
   }
 
+  void _onPageChanged(int page) {
+    final next = clampSuiteTabIndex(page, _parts);
+    if (next == _index) return;
+    setState(() => _index = next);
+  }
+
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
     final visible = visibleSuitePartIds(_parts);
     final children = visible.map(_bodyForPart).toList(growable: false);
     final destinations = <NavigationDestination>[
@@ -232,19 +271,34 @@ class SuiteShellState extends State<SuiteShell> {
     final chromeLabel = suitePartLabel(visible[tabIndex]);
 
     return Scaffold(
-      backgroundColor: kChromeBg,
+      key: const Key('suite_shell_scaffold'),
+      backgroundColor: theme.scaffoldBackgroundColor,
       body: Column(
         children: [
           _SuiteChromeBar(tabLabel: chromeLabel),
           if (_loadingParts)
-            const LinearProgressIndicator(minHeight: 2)
+            LinearProgressIndicator(
+              minHeight: 2,
+              color: scheme.primary,
+              backgroundColor: scheme.surface,
+            )
           else
             const SizedBox(height: 0),
           Expanded(
-            child: IndexedStack(
-              index: tabIndex,
-              sizing: StackFit.expand,
-              children: children,
+            child: PageView(
+              key: const Key('suite_shell_page_view'),
+              // Product: left-to-right swipe advances VPN→%→Evolve→rpAI.
+              reverse: true,
+              controller: _pageController,
+              onPageChanged: _onPageChanged,
+              physics: const BouncingScrollPhysics(
+                parent: AlwaysScrollableScrollPhysics(),
+              ),
+              // Keep each suite surface mounted after first visit (VPN session).
+              children: [
+                for (final child in children)
+                  _SuiteKeepAlivePage(child: child),
+              ],
             ),
           ),
         ],
@@ -252,8 +306,8 @@ class SuiteShellState extends State<SuiteShell> {
       bottomNavigationBar: NavigationBar(
         selectedIndex: tabIndex,
         onDestinationSelected: selectTab,
-        backgroundColor: kPanelBg,
-        indicatorColor: kLightAccent,
+        backgroundColor: scheme.surface,
+        indicatorColor: scheme.primary.withValues(alpha: 0.28),
         labelBehavior: NavigationDestinationLabelBehavior.alwaysShow,
         destinations: destinations,
       ),
@@ -276,6 +330,28 @@ class SuiteShellState extends State<SuiteShell> {
   }
 }
 
+/// Keeps suite tab bodies alive once visited (residual VPN must not dispose).
+class _SuiteKeepAlivePage extends StatefulWidget {
+  const _SuiteKeepAlivePage({required this.child});
+
+  final Widget child;
+
+  @override
+  State<_SuiteKeepAlivePage> createState() => _SuiteKeepAlivePageState();
+}
+
+class _SuiteKeepAlivePageState extends State<_SuiteKeepAlivePage>
+    with AutomaticKeepAliveClientMixin {
+  @override
+  bool get wantKeepAlive => true;
+
+  @override
+  Widget build(BuildContext context) {
+    super.build(context);
+    return widget.child;
+  }
+}
+
 class _SuiteChromeBar extends StatelessWidget {
   const _SuiteChromeBar({required this.tabLabel});
 
@@ -283,8 +359,9 @@ class _SuiteChromeBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
     return Material(
-      color: kPrimaryDark,
+      color: scheme.primary,
       elevation: 1,
       child: SafeArea(
         bottom: false,
@@ -299,8 +376,8 @@ class _SuiteChromeBar extends StatelessWidget {
                   children: [
                     Text(
                       kSuiteProductName,
-                      style: const TextStyle(
-                        color: kWhite,
+                      style: TextStyle(
+                        color: scheme.onPrimary,
                         fontSize: 14,
                         fontWeight: FontWeight.w700,
                       ),
@@ -308,7 +385,7 @@ class _SuiteChromeBar extends StatelessWidget {
                     Text(
                       kSuiteDisplayVersion,
                       style: TextStyle(
-                        color: kWhite.withValues(alpha: 0.9),
+                        color: scheme.onPrimary.withValues(alpha: 0.9),
                         fontSize: 11,
                       ),
                     ),
@@ -319,13 +396,13 @@ class _SuiteChromeBar extends StatelessWidget {
                 padding:
                     const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                 decoration: BoxDecoration(
-                  color: kWhite.withValues(alpha: 0.15),
+                  color: scheme.onPrimary.withValues(alpha: 0.15),
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: Text(
                   tabLabel,
-                  style: const TextStyle(
-                    color: kWhite,
+                  style: TextStyle(
+                    color: scheme.onPrimary,
                     fontWeight: FontWeight.w600,
                     fontSize: 13,
                   ),

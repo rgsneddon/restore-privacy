@@ -297,3 +297,45 @@ int clampSuiteTabIndex(int index, SuitePartsState state) {
   if (index >= n) return n - 1;
   return index;
 }
+
+/// Ordered swipe destinations: **VPN → % → EVOLVE → rpAI** (end blocks).
+///
+/// [destinationCount] is the number of visible shell pages (normally 4).
+/// End blocks: cannot go before VPN (0) or past the last page (rpAI).
+int suiteSwipeNextIndex(int current, int destinationCount) {
+  if (destinationCount <= 0) return 0;
+  final c = current < 0 ? 0 : current;
+  if (c >= destinationCount - 1) return destinationCount - 1;
+  return c + 1;
+}
+
+/// Previous page toward VPN; stays at 0 (VPN end block).
+int suiteSwipePrevIndex(int current, int destinationCount) {
+  if (destinationCount <= 0) return 0;
+  final c = current < 0 ? 0 : current;
+  if (c <= 0) return 0;
+  if (c >= destinationCount) return destinationCount - 1;
+  return c - 1;
+}
+
+/// Map a completed horizontal swipe to the next index.
+///
+/// Product copy: **left-to-right** finger motion advances VPN→%→Evolve→rpAI;
+/// **right-to-left** walks back. Positive [dx] = left-to-right.
+int suiteIndexAfterHorizontalSwipe({
+  required int current,
+  required int destinationCount,
+  required double dx,
+  double threshold = 8.0,
+}) {
+  final n = destinationCount <= 0 ? 0 : destinationCount;
+  // Clamp with raw destination length (may be < 4 when tests pass a custom count).
+  final clamped = n <= 0
+      ? 0
+      : (current < 0
+          ? 0
+          : (current >= n ? n - 1 : current));
+  if (dx.abs() < threshold) return clamped;
+  if (dx > 0) return suiteSwipeNextIndex(clamped, n);
+  return suiteSwipePrevIndex(clamped, n);
+}
