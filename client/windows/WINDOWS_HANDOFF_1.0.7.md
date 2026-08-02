@@ -5,7 +5,7 @@
 Mac stages Suite **1.0.7** with native Flutter builds where the host allows:
 
 - **macOS**: Developer ID signed + notarized when notarytool succeeds  
-- **iOS**: Team Distribution sideload export  
+- **iOS**: Flutter release Runner.app zip (not Distribution IPA until ExportOptions export)  
 - **Android**: APK from `client_app`  
 - **Windows / Linux**: catalog **filename** monopin 1.0.7 may start as carry-forward from **1.0.6** until this Windows machine rebuilds and Authenticode-seals the PE  
 

@@ -2,7 +2,7 @@
 
 **Last updated:** 2 August 2026  
 **Product:** Restore Privacy Suite **v1.0.7** — residual Connect, Perccent wallet (%), Evolve analyser, rpAI (Ned), Backup recovery, and the public VPN APP Shop  
-**Current packages (catalog v1.0.7):** free Suite installers on [restoreprivacy.online](https://restoreprivacy.online/) (VPN APP Shop). Residual Connect needs a **KEYGEN** from `/pay` (monthly residual licence from **£3.00 GBP**; yearly residual plan **£30.00** remains available). **Linux**, **Android**, **macOS**, **iOS**, and **Windows** monopin **1.0.7** packages are fulfilled from the product host. **macOS** is **Developer ID** + notarized (Team **SFCBP95595**); **iOS** is **Apple Distribution** Team-signed sideload (same Team). Public GitHub Pages ship docs only — not operator admin.
+**Current packages (catalog v1.0.7):** free Suite installers on [restoreprivacy.online](https://restoreprivacy.online/) (VPN APP Shop). Residual Connect needs a **KEYGEN** from `/pay` (monthly residual licence from **£3.00 GBP**; yearly residual plan **£30.00** remains available). **Linux**, **Android**, **macOS**, **iOS**, and **Windows** monopin **1.0.7** packages are fulfilled from the product host. **macOS** is **Developer ID** + notarized (Team **SFCBP95595**). **iOS** ships as a Flutter release **Runner.app** zip for sideload/dev install (host app not Distribution-signed until a full IPA export with `ExportOptions.plist` lands). Public GitHub Pages ship docs only — not operator admin.
 
 ---
 

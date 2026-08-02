@@ -11,8 +11,13 @@ python3 scripts/sign_and_notarize_macos.py --app path/to/restore_privacy_client.
 Developer ID + notarize + staple. Team **SFCBP95595**.
 
 ## iOS
-Export Team Distribution IPA/sideload zip  
-`restore-privacy-client-1.0.7-ios.zip` with residual pins injected (no `.priv` in package).
+Catalog package is a Flutter release **Runner.app** zip  
+(`restore-privacy-client-1.0.7-ios.zip`) with residual pins injected (no `.priv`).
+The host `Runner.app` in this monopin is **not** Apple Distribution–signed
+(no top-level `_CodeSignature`; built with Flutter `--no-codesign` path).
+Full Distribution IPA needs `ios/ExportOptions.plist` + Xcode archive export —
+do that on a Mac with the Distribution identity before claiming Team-signed
+sideload for App Store–style install.
 
 ## Paid path
 Stage under `releases/1.0.7/` and `status_page/assets/1.0.7/`, then Helsinki upload  

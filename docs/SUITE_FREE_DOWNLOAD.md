@@ -1,6 +1,6 @@
 # Suite download (KEYGEN free trial required)
 
-Restore Privacy Suite **v1.0.6** installers are **not** anonymous freebies.
+Restore Privacy Suite **v1.0.7** installers are **not** anonymous freebies.
 You must start the catalog **KEYGEN** path first — monthly **£3.00** or yearly
 **£30.00** with the **3-day free trial** (no money taken until after the trial
 ends). Residual Connect also needs that KEYGEN after install.
@@ -23,7 +23,7 @@ Live gated route on the status host: `/suite/download?platform=…`
 **£3000 deposit** via `/pay/commercial-suite` (Service page) — not the KEYGEN
 subscription.
 
-**Catalog monopin:** `1.0.6` (`status_page/downloads.py` `RELEASE_VERSION`,
+**Catalog monopin:** `1.0.7` (`status_page/downloads.py` `RELEASE_VERSION`,
 `client/VERSION`).
 
 Open public website (no admin):
@@ -35,19 +35,19 @@ Open public website (no admin):
 
 | Platform | Filename |
 |----------|----------|
-| Windows | `restore-privacy-client-1.0.6-windows-x64-setup.exe` |
-| Android | `restore-privacy-client-1.0.6-android.apk` |
-| macOS | `restore-privacy-client-1.0.6-macos.zip` |
-| iOS | `restore-privacy-client-1.0.6-ios.zip` |
-| Linux | `restore-privacy-client-1.0.6-linux-x64.tar.gz` |
+| Windows | `restore-privacy-client-1.0.7-windows-x64-setup.exe` |
+| Android | `restore-privacy-client-1.0.7-android.apk` |
+| macOS | `restore-privacy-client-1.0.7-macos.zip` |
+| iOS | `restore-privacy-client-1.0.7-ios.zip` |
+| Linux | `restore-privacy-client-1.0.7-linux-x64.tar.gz` |
 
-Store path: `paid_assets/1.0.6/{filename}` on Helsinki `135.181.152.10`.
+Store path: `paid_assets/1.0.7/{filename}` on Helsinki `135.181.152.10`.
 
 ## Operators building packages
 
 ```bash
 # Suite client monopin (Darwin: Flutter android/macos/ios; win/linux carry-forward or native agent)
-python3 scripts/build_suite_1.0.6.py
+python3 scripts/build_suite_1.0.7.py
 
 # Companion brand packages
 python3 scripts/package_browser_rx.py
@@ -60,7 +60,7 @@ python3 scripts/package_node_operator_linux.py
 # Stage + Helsinki upload (SSH key required)
 export RPT_SSH_HOST=135.181.152.10 RPT_SSH_USER=root
 export RPT_SSH_KEY=~/.ssh/id_ed25519_restore_privacy_eu
-python3 scripts/host_paid_assets_vps.py --stage --upload --version 1.0.6 --force --install-serve
+python3 scripts/host_paid_assets_vps.py --stage --upload --version 1.0.7 --force --install-serve
 
 # Breadcrumbs vault (Apple + Windows handoff for builders)
 python3 scripts/breadcrumbs_vault.py stage
@@ -75,8 +75,8 @@ python3 scripts/build_public_pages.py
 
 Native Windows PE seal is built on a Windows machine. Full steps:
 
-- `client/windows/WINDOWS_HANDOFF_1.0.6.md`
-- `releases/1.0.6/WINDOWS_BREADCRUMBS.md`
+- `client/windows/WINDOWS_HANDOFF_1.0.7.md`
+- `releases/1.0.7/WINDOWS_BREADCRUMBS.md` (when present)
 - Vault: `dist/breadcrumbs/current/WINDOWS_HANDOFF.md`
 - Brand-wide large-drive mirror: `scripts/windows_brand_mirror.py`
   (`RPT_WINDOWS_DRIVE` or `--dest`; vault `WINDOWS_BRAND_CHECKLIST.md` +
@@ -85,7 +85,7 @@ Native Windows PE seal is built on a Windows machine. Full steps:
 Target PE:
 
 ```text
-restore-privacy-client-1.0.6-windows-x64-setup.exe
+restore-privacy-client-1.0.7-windows-x64-setup.exe
 ```
 
 Mirror monorepo + **all brand installers** onto the Windows larger drive before
@@ -102,7 +102,11 @@ python scripts\windows_brand_mirror.py apply --dest $env:RPT_WINDOWS_DRIVE --exe
 - Brand package delivery requires KEYGEN trial start / active entitlement first.
 - Connect requires a valid KEYGEN on the device after install.
 - Business-Class work starts only after the **£3000** commercial deposit.
-- macOS CFBundle / Windows embedded product version must match monopin **1.0.6**
+- macOS CFBundle / Windows embedded product version must match monopin **1.0.7**
   for an honest catalog seal (host scripts refuse mismatched macOS zips).
-- Carry-forward basenames may be used temporarily; replace with native rebuilds
-  before calling the seal final.
+- **macOS** in this monopin is Developer ID + notarized when sealed on Mac.
+- **iOS** package is a Flutter release `Runner.app` zip for sideload/dev install;
+  full **Apple Distribution** IPA export needs `ExportOptions.plist` and is a
+  separate Apple path (not claimed for the catalog zip until that export lands).
+- Carry-forward basenames (Windows/Linux PE) may be used temporarily; replace
+  with native rebuilds before calling the seal final.
