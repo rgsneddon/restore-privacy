@@ -3,24 +3,24 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import 'prefs_backend.dart';
 import 'settings_store.dart';
-import 'suite_evolve_tab.dart';
+import 'suite_family_host.dart';
 import 'suite_nav.dart';
 import 'suite_part_placeholder.dart';
 import 'suite_parts.dart';
 import 'suite_parts_store.dart';
 import 'suite_rpai_tab.dart';
 import 'suite_version.dart';
-import 'suite_wallet_tab.dart';
 
 /// Unified Restore Privacy Suite shell: flat main bottom bar.
 ///
 /// Destinations: **VPN** · promoted **%/Evolve** surfaces (Analysis / Wallet /
-/// Security / Voting / Credit as installed) · **rpAI**. Nested wallet/evolve
-/// bottom bars are off on the Suite embed path.
+/// Security / Voting / Credit as installed + entitled) · **rpAI**. Nested
+/// wallet/evolve bottom bars are off on the Suite embed path. Family pages share
+/// one [SuiteFamilyHost] bootstrap (not one provider tree per tab).
 ///
-/// Horizontal [PageView] uses natural orientation ([reverse] false): swipe
-/// toward higher indices with the usual right-to-left finger motion. End
-/// blocks at first and last destination (no wrap).
+/// Horizontal [PageView] uses natural orientation ([reverse] false). End blocks
+/// at first and last destination (no wrap). When only one destination is
+/// visible, the bottom [NavigationBar] is omitted (Material requires ≥2).
 class SuiteShell extends StatefulWidget {
   const SuiteShell({
     super.key,
@@ -35,32 +35,14 @@ class SuiteShell extends StatefulWidget {
     this.onPartsChanged,
   });
 
-  /// Residual VPN home (Connect / licence / settings) — required shipped surface.
   final Widget vpnTab;
-
-  /// Index into **visible** main destinations (0 = VPN always).
   final int initialTabIndex;
-
-  /// Injectable wallet body (tests); production uses [SuiteWalletTab].
   final Widget? walletTab;
-
-  /// Injectable evolve body (tests); production uses [SuiteEvolveTab].
   final Widget? evolveTab;
-
-  /// Injectable Ned / rpAI tab (tests); production uses [SuiteRpaiTab].
   final Widget? rpaiTab;
-
-  /// Durable optional-part install flags.
   final SuitePartsStore? partsStore;
-
-  /// Bootstrap / parent-synced parts snapshot. Durable prefs still load on
-  /// boot unless [preferInitialParts] is true (tests that force a snapshot).
   final SuitePartsState? initialParts;
-
-  /// When true, skip durable [partsStore] load and keep [initialParts].
   final bool preferInitialParts;
-
-  /// Notified when Settings (or shell) changes optional part install flags.
   final ValueChanged<SuitePartsState>? onPartsChanged;
 
   @override
@@ -75,16 +57,21 @@ class SuiteShellState extends State<SuiteShell> {
   var _loadingParts = true;
   late final PageController _pageController;
 
+  /// Evolve wallet app-access (drives Analysis/Voting visibility).
+  bool _hasAppAccess = true;
+
   int get currentTabIndex => _index;
 
   SuitePartsState get partsState => _parts;
 
   SuitePartsStore? get partsStore => _store;
 
-  /// Visible main-bar destinations for the current install flags.
-  List<SuiteNavDest> get destinations => suiteNavDestinations(_parts);
+  bool get hasAppAccess => _hasAppAccess;
 
-  /// Test / chrome access to the horizontal pager (touch swipe path).
+  /// Visible main-bar destinations for the current install + access flags.
+  List<SuiteNavDest> get destinations =>
+      suiteNavDestinations(_parts, hasAppAccess: _hasAppAccess);
+
   PageController get pageController => _pageController;
 
   void selectTab(int index) {
@@ -103,14 +90,17 @@ class SuiteShellState extends State<SuiteShell> {
     }
   }
 
-  /// Apply new parts (e.g. after Settings) and clamp tab index.
   void applyParts(SuitePartsState next, {bool notifyParent = false}) {
     if (!mounted) return;
     if (_parts == next && !_loadingParts) {
       if (notifyParent) widget.onPartsChanged?.call(next);
       return;
     }
-    final nextIndex = clampSuiteNavIndex(_index, next);
+    final nextIndex = clampSuiteNavIndex(
+      _index,
+      next,
+      hasAppAccess: _hasAppAccess,
+    );
     setState(() {
       _parts = next;
       _index = nextIndex;
@@ -155,8 +145,11 @@ class SuiteShellState extends State<SuiteShell> {
   void initState() {
     super.initState();
     _parts = widget.initialParts ?? SuitePartsState.allInstalled;
-    _index = clampSuiteNavIndex(widget.initialTabIndex, _parts);
-    // Natural PageView (reverse:false) — swipe inverted from prior product.
+    _index = clampSuiteNavIndex(
+      widget.initialTabIndex,
+      _parts,
+      hasAppAccess: _hasAppAccess,
+    );
     _pageController = PageController(initialPage: _index);
     _bootParts();
   }
@@ -189,7 +182,11 @@ class SuiteShellState extends State<SuiteShell> {
       setState(() {
         _store = store;
         _parts = widget.initialParts!;
-        _index = clampSuiteNavIndex(_index, _parts);
+        _index = clampSuiteNavIndex(
+          _index,
+          _parts,
+          hasAppAccess: _hasAppAccess,
+        );
         _loadingParts = false;
       });
       return;
@@ -199,7 +196,11 @@ class SuiteShellState extends State<SuiteShell> {
     setState(() {
       _store = store;
       _parts = loaded;
-      _index = clampSuiteNavIndex(_index, _parts);
+      _index = clampSuiteNavIndex(
+        _index,
+        _parts,
+        hasAppAccess: _hasAppAccess,
+      );
       _loadingParts = false;
     });
     widget.onPartsChanged?.call(loaded);
@@ -212,6 +213,35 @@ class SuiteShellState extends State<SuiteShell> {
     } catch (_) {
       return SuitePartsStore(MemorySettingsBackend());
     }
+  }
+
+  void _onHasAppAccessChanged(bool next) {
+    if (!mounted || next == _hasAppAccess) return;
+    final nextIndex = clampSuiteNavIndex(
+      _index,
+      _parts,
+      hasAppAccess: next,
+    );
+    setState(() {
+      _hasAppAccess = next;
+      _index = nextIndex;
+    });
+    if (_pageController.hasClients &&
+        (_pageController.page?.round() ?? nextIndex) != nextIndex) {
+      _pageController.jumpToPage(nextIndex);
+    }
+  }
+
+  bool get _hasFamilyInstall =>
+      suitePartShowsFullSurface(_parts, SuitePartId.wallet) ||
+      suitePartShowsFullSurface(_parts, SuitePartId.evolve);
+
+  /// Production family path (no test inject overrides).
+  bool get _useSharedFamilyHost {
+    if (widget.walletTab != null || widget.evolveTab != null) {
+      return false;
+    }
+    return _hasFamilyInstall;
   }
 
   Widget _bodyForDest(SuiteNavDest dest) {
@@ -229,45 +259,35 @@ class SuiteShellState extends State<SuiteShell> {
         );
       case SuiteNavDest.analysis:
       case SuiteNavDest.voting:
-        // Evolve-only surfaces — Suite main bar; no nested bottom bar.
-        if (widget.evolveTab != null) return widget.evolveTab!;
-        if (!suitePartShowsFullSurface(_parts, SuitePartId.evolve)) {
-          return SuitePartReinstallPlaceholder(
-            key: const Key('suite_part_placeholder_evolve'),
-            partId: SuitePartId.evolve,
-            onReinstall: () => reinstallPart(SuitePartId.evolve),
-          );
-        }
-        return SuiteEvolveTab(
-          key: ValueKey('suite_evolve_${dest.name}'),
-          showShellBottomBar: false,
-          shellTabIndex: suiteNavEvolveShellTabIndex(dest),
-        );
       case SuiteNavDest.wallet:
       case SuiteNavDest.security:
       case SuiteNavDest.credit:
-        // Shared % / Evolve family (one product link). Prefer wallet inject only
-        // when the wallet part is installed; else Evolve when installed.
+        // Test injects: one stub widget per dest (no multi-bootstrap).
+        if (widget.evolveTab != null &&
+            suitePartShowsFullSurface(_parts, SuitePartId.evolve) &&
+            (dest == SuiteNavDest.analysis ||
+                dest == SuiteNavDest.voting ||
+                !suitePartShowsFullSurface(_parts, SuitePartId.wallet))) {
+          return widget.evolveTab!;
+        }
         if (widget.walletTab != null &&
-            suitePartShowsFullSurface(_parts, SuitePartId.wallet)) {
+            suitePartShowsFullSurface(_parts, SuitePartId.wallet) &&
+            (dest == SuiteNavDest.wallet ||
+                dest == SuiteNavDest.security ||
+                dest == SuiteNavDest.credit)) {
           return widget.walletTab!;
         }
         if (widget.evolveTab != null &&
             suitePartShowsFullSurface(_parts, SuitePartId.evolve)) {
           return widget.evolveTab!;
         }
-        if (suitePartShowsFullSurface(_parts, SuitePartId.evolve)) {
-          return SuiteEvolveTab(
-            key: ValueKey('suite_family_${dest.name}'),
-            showShellBottomBar: false,
-            shellTabIndex: suiteNavEvolveShellTabIndex(dest),
-          );
-        }
-        if (suitePartShowsFullSurface(_parts, SuitePartId.wallet)) {
-          return SuiteWalletTab(
-            key: ValueKey('suite_wallet_${dest.name}'),
-            showShellBottomBar: false,
-            shellTabIndex: suiteNavWalletShellTabIndex(dest),
+        // Production: shared host provides providers; body only.
+        if (_useSharedFamilyHost) {
+          return SuiteFamilyBody(
+            key: ValueKey('family_body_${dest.name}'),
+            dest: dest,
+            parts: _parts,
+            hasAppAccess: _hasAppAccess,
           );
         }
         return SuitePartReinstallPlaceholder(
@@ -279,7 +299,11 @@ class SuiteShellState extends State<SuiteShell> {
   }
 
   void _onPageChanged(int page) {
-    final next = clampSuiteNavIndex(page, _parts);
+    final next = clampSuiteNavIndex(
+      page,
+      _parts,
+      hasAppAccess: _hasAppAccess,
+    );
     if (next == _index) return;
     setState(() => _index = next);
   }
@@ -299,9 +323,36 @@ class SuiteShellState extends State<SuiteShell> {
         ),
     ];
 
-    final tabIndex = clampSuiteNavIndex(_index, _parts);
+    final tabIndex = clampSuiteNavIndex(
+      _index,
+      _parts,
+      hasAppAccess: _hasAppAccess,
+    );
     final chromeLabel =
         dests.isEmpty ? kSuiteTabVpn : suiteNavLabel(dests[tabIndex]);
+
+    Widget pageView = PageView(
+      key: const Key('suite_shell_page_view'),
+      reverse: false,
+      controller: _pageController,
+      onPageChanged: _onPageChanged,
+      physics: const BouncingScrollPhysics(
+        parent: AlwaysScrollableScrollPhysics(),
+      ),
+      children: [
+        for (final child in children) _SuiteKeepAlivePage(child: child),
+      ],
+    );
+
+    // One family bootstrap for all promoted %/Evolve pages.
+    if (_useSharedFamilyHost) {
+      pageView = SuiteFamilyHost(
+        key: const Key('suite_family_host'),
+        parts: _parts,
+        onHasAppAccessChanged: _onHasAppAccessChanged,
+        child: pageView,
+      );
+    }
 
     return Scaffold(
       key: const Key('suite_shell_scaffold'),
@@ -317,33 +368,21 @@ class SuiteShellState extends State<SuiteShell> {
             )
           else
             const SizedBox(height: 0),
-          Expanded(
-            child: PageView(
-              key: const Key('suite_shell_page_view'),
-              // Reversed product swipe: natural pager (reverse:false).
-              reverse: false,
-              controller: _pageController,
-              onPageChanged: _onPageChanged,
-              physics: const BouncingScrollPhysics(
-                parent: AlwaysScrollableScrollPhysics(),
-              ),
-              children: [
-                for (final child in children)
-                  _SuiteKeepAlivePage(child: child),
-              ],
-            ),
-          ),
+          Expanded(child: pageView),
         ],
       ),
-      bottomNavigationBar: NavigationBar(
-        key: const Key('suite_shell_main_nav'),
-        selectedIndex: tabIndex.clamp(0, navDestinations.length - 1),
-        onDestinationSelected: selectTab,
-        backgroundColor: scheme.surface,
-        indicatorColor: scheme.primary.withValues(alpha: 0.28),
-        labelBehavior: NavigationDestinationLabelBehavior.alwaysShow,
-        destinations: navDestinations,
-      ),
+      // Material NavigationBar requires ≥2 destinations.
+      bottomNavigationBar: navDestinations.length >= 2
+          ? NavigationBar(
+              key: const Key('suite_shell_main_nav'),
+              selectedIndex: tabIndex.clamp(0, navDestinations.length - 1),
+              onDestinationSelected: selectTab,
+              backgroundColor: scheme.surface,
+              indicatorColor: scheme.primary.withValues(alpha: 0.28),
+              labelBehavior: NavigationDestinationLabelBehavior.alwaysShow,
+              destinations: navDestinations,
+            )
+          : null,
     );
   }
 
@@ -369,7 +408,6 @@ class SuiteShellState extends State<SuiteShell> {
   }
 }
 
-/// Keeps suite tab bodies alive once visited (residual VPN must not dispose).
 class _SuiteKeepAlivePage extends StatefulWidget {
   const _SuiteKeepAlivePage({required this.child});
 

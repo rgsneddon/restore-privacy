@@ -11,12 +11,12 @@ import 'suite_version.dart';
 /// One slot on the Suite main [NavigationBar] / [PageView].
 enum SuiteNavDest {
   vpn,
-  /// Evolve analysis (only when Evolve part is installed).
+  /// Evolve analysis (only when Evolve installed **and** hasAppAccess).
   analysis,
   /// Shared % / Evolve wallet surface (one link for both products).
   wallet,
   security,
-  /// Evolve FCG voting (only when Evolve part is installed).
+  /// Evolve FCG voting (only when Evolve installed **and** hasAppAccess).
   voting,
   credit,
   rpai,
@@ -30,7 +30,6 @@ String suiteNavLabel(SuiteNavDest dest) {
     case SuiteNavDest.analysis:
       return 'Analysis';
     case SuiteNavDest.wallet:
-      // Shared % / Evolve wallet surface (child label; not dual product slots).
       return 'Wallet';
     case SuiteNavDest.security:
       return 'Security';
@@ -58,24 +57,26 @@ bool suiteNavIsPercentEvolveFamily(SuiteNavDest dest) {
   }
 }
 
-/// Ordered main-bar destinations for the current install flags.
+/// Ordered main-bar destinations for install flags + Evolve app access.
 ///
 /// - VPN always first; rpAI last when installed.
 /// - % and Evolve are **one family**: no dual top-level "%" + "EVOLVE" slots.
-/// - Shared Wallet / Security / Credit appear once.
-/// - Analysis / Voting appear when Evolve is installed.
-/// - When neither wallet nor evolve is installed, family destinations are omitted
-///   (reinstall from Settings).
-List<SuiteNavDest> suiteNavDestinations(SuitePartsState parts) {
+/// - Analysis / Voting only when Evolve is installed **and** [hasAppAccess].
+/// - When neither wallet nor evolve is installed, family destinations omitted.
+/// - May return a single destination (VPN only) — shell must not assert ≥2.
+List<SuiteNavDest> suiteNavDestinations(
+  SuitePartsState parts, {
+  bool hasAppAccess = true,
+}) {
   final out = <SuiteNavDest>[SuiteNavDest.vpn];
   final family = parts.walletInstalled || parts.evolveInstalled;
   if (family) {
-    if (parts.evolveInstalled) {
+    if (parts.evolveInstalled && hasAppAccess) {
       out.add(SuiteNavDest.analysis);
     }
     out.add(SuiteNavDest.wallet);
     out.add(SuiteNavDest.security);
-    if (parts.evolveInstalled) {
+    if (parts.evolveInstalled && hasAppAccess) {
       out.add(SuiteNavDest.voting);
     }
     out.add(SuiteNavDest.credit);
@@ -87,8 +88,12 @@ List<SuiteNavDest> suiteNavDestinations(SuitePartsState parts) {
 }
 
 /// Clamp index into [suiteNavDestinations].
-int clampSuiteNavIndex(int index, SuitePartsState parts) {
-  final n = suiteNavDestinations(parts).length;
+int clampSuiteNavIndex(
+  int index,
+  SuitePartsState parts, {
+  bool hasAppAccess = true,
+}) {
+  final n = suiteNavDestinations(parts, hasAppAccess: hasAppAccess).length;
   if (n <= 0) return 0;
   if (index < 0) return 0;
   if (index >= n) return n - 1;
@@ -109,9 +114,8 @@ int? suiteNavWalletShellTabIndex(SuiteNavDest dest) {
   }
 }
 
-/// Map a family destination to evolve shell tab index when hasAppAccess
-/// (0 Analysis, 1 Wallet, 2 Security, 3 Voting, 4 Credit).
-int? suiteNavEvolveShellTabIndex(SuiteNavDest dest) {
+/// Full-access evolve shell: 0 Analysis, 1 Wallet, 2 Security, 3 Voting, 4 Credit.
+int? suiteNavEvolveFullShellTabIndex(SuiteNavDest dest) {
   switch (dest) {
     case SuiteNavDest.analysis:
       return 0;
@@ -140,4 +144,15 @@ int? suiteNavEvolveLimitedShellTabIndex(SuiteNavDest dest) {
     default:
       return null;
   }
+}
+
+/// Evolve shell tab index for [dest], respecting [hasAppAccess].
+int? suiteNavEvolveShellTabIndex(
+  SuiteNavDest dest, {
+  required bool hasAppAccess,
+}) {
+  if (hasAppAccess) {
+    return suiteNavEvolveFullShellTabIndex(dest);
+  }
+  return suiteNavEvolveLimitedShellTabIndex(dest);
 }

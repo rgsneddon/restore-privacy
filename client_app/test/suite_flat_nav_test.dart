@@ -3,6 +3,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import 'package:evolve/screens/evolve_shell_screen.dart';
+
 import 'package:restore_privacy_client/suite_nav.dart';
 import 'package:restore_privacy_client/suite_parts.dart';
 import 'package:restore_privacy_client/suite_shell.dart';
@@ -49,6 +51,59 @@ void main() {
       expect(
         suiteNavDestinations(parts).map(suiteNavLabel).toList(),
         ['VPN', 'rpAI'],
+      );
+    });
+
+    test('only VPN: single destination (shell omits NavigationBar)', () {
+      const parts = SuitePartsState(
+        walletInstalled: false,
+        evolveInstalled: false,
+        rpaiInstalled: false,
+      );
+      final d = suiteNavDestinations(parts);
+      expect(d, [SuiteNavDest.vpn]);
+      expect(d.length, 1);
+    });
+
+    test('!hasAppAccess hides Analysis/Voting', () {
+      final d = suiteNavDestinations(
+        SuitePartsState.allInstalled,
+        hasAppAccess: false,
+      );
+      final labels = d.map(suiteNavLabel).toList();
+      expect(labels, isNot(contains('Analysis')));
+      expect(labels, isNot(contains('Voting')));
+      expect(labels, containsAll(['VPN', 'Wallet', 'Security', 'Credit', 'rpAI']));
+    });
+
+    test('evolve shell index maps limited vs full access', () {
+      expect(
+        suiteNavEvolveShellTabIndex(SuiteNavDest.wallet, hasAppAccess: true),
+        1,
+      );
+      expect(
+        suiteNavEvolveShellTabIndex(SuiteNavDest.wallet, hasAppAccess: false),
+        0,
+      );
+      expect(
+        suiteNavEvolveShellTabIndex(SuiteNavDest.security, hasAppAccess: false),
+        1,
+      );
+      expect(
+        suiteNavEvolveShellTabIndex(SuiteNavDest.credit, hasAppAccess: false),
+        2,
+      );
+      expect(
+        suiteNavEvolveShellTabIndex(SuiteNavDest.analysis, hasAppAccess: false),
+        isNull,
+      );
+      expect(
+        suiteNavEvolveShellTabIndex(SuiteNavDest.voting, hasAppAccess: false),
+        isNull,
+      );
+      expect(
+        suiteNavEvolveShellTabIndex(SuiteNavDest.voting, hasAppAccess: true),
+        3,
       );
     });
   });
@@ -116,11 +171,13 @@ void main() {
     final pv = tester.widget<PageView>(find.byKey(const Key('suite_shell_page_view')));
     expect(pv.reverse, isFalse);
 
-    // Nested package bars must not appear on Suite embed path.
+    // Nested package bars must not appear on Suite embed path (inject stubs).
     expect(find.byKey(const Key('wallet_shell_embed_no_bottom_bar')), findsNothing);
     expect(find.byKey(const Key('evolve_shell_embed_no_bottom_bar')), findsNothing);
     // Only one NavigationBar — the Suite main bar.
     expect(find.byType(NavigationBar), findsOneWidget);
+    // Inject path does not mount shared family host (no multi-bootstrap host).
+    expect(find.byKey(const Key('suite_family_host')), findsNothing);
 
     final shell = tester.state<SuiteShellState>(find.byType(SuiteShell));
     final dests = shell.destinations;
@@ -135,10 +192,52 @@ void main() {
     await tester.pump();
     expect(find.text('EVOLVE_INJECT'), findsOneWidget);
 
-    // Select Wallet — inject wallet when provided for shared surface.
+    // Select Wallet — inject wallet when wallet part installed.
     final walletIdx = dests.indexOf(SuiteNavDest.wallet);
     shell.selectTab(walletIdx);
     await tester.pump();
     expect(find.text('WALLET_INJECT'), findsOneWidget);
+  });
+
+  testWidgets('only VPN: no NavigationBar assert (single destination)',
+      (tester) async {
+    await tester.pumpWidget(
+      MaterialApp(
+        home: SuiteShell(
+          preferInitialParts: true,
+          initialParts: const SuitePartsState(
+            walletInstalled: false,
+            evolveInstalled: false,
+            rpaiInstalled: false,
+          ),
+          vpnTab: const Scaffold(body: Text('VPN_ONLY')),
+        ),
+      ),
+    );
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 50));
+    expect(find.text('VPN_ONLY'), findsOneWidget);
+    expect(find.byKey(const Key('suite_shell_main_nav')), findsNothing);
+    expect(find.byType(NavigationBar), findsNothing);
+  });
+
+  test('EvolveShellScreen limited tabIndex 0 is Wallet body mapping', () {
+    // Documents package contract: limited stack index 0 = Wallet.
+    expect(
+      suiteNavEvolveShellTabIndex(SuiteNavDest.wallet, hasAppAccess: false),
+      0,
+    );
+    // Full-access index 0 = Analysis (different body).
+    expect(
+      suiteNavEvolveShellTabIndex(SuiteNavDest.analysis, hasAppAccess: true),
+      0,
+    );
+    // Real package constructor accepts tabIndex for Suite embed.
+    const shell = EvolveShellScreen(
+      showBottomBar: false,
+      tabIndex: 0,
+    );
+    expect(shell.showBottomBar, isFalse);
+    expect(shell.tabIndex, 0);
   });
 }
