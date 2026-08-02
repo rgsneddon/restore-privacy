@@ -43,8 +43,11 @@ class TestSuitePayHrefBuilders(unittest.TestCase):
             self.assertEqual(r["kind"], "suite_client")
             self.assertEqual(r["version"], RELEASE_VERSION)
             self.assertEqual(r["product"], "Restore Privacy Suite")
-            self.assertTrue(r["href"].startswith("/pay?product=suite"))
-            self.assertIn("platform=", r["href"])
+            # Map package rows free_direct (like FREE DOWNLOAD), not /pay
+            self.assertIn("/suite/download?", r["href"])
+            self.assertIn("free_direct=1", r["href"])
+            self.assertIn(f"platform={r['platform']}", r["href"])
+            self.assertNotIn("/pay", r["href"])
         kinds = {r["kind"] for r in rows}
         self.assertEqual(kinds, {"suite_client"})
         # No non-Suite products
@@ -96,9 +99,13 @@ class TestHomeAndMapRender(unittest.TestCase):
             map_html = render_downloads_map_page_html().decode("utf-8")
             self.assertIn("Restore Privacy Suite", map_html)
             self.assertIn(f"v{RELEASE_VERSION}", map_html)
-            self.assertIn("/pay?product=suite", map_html)
+            # Map package rows free_direct; KEYGEN /pay may still be mentioned in blurb only
             for plat in ("windows", "android", "macos", "ios", "linux"):
-                self.assertIn(suite_pay_href(plat).replace("&", "&amp;"), map_html)
+                self.assertIn(f"platform={plat}", map_html)
+                self.assertIn("free_direct=1", map_html)
+                self.assertIn("/suite/download?", map_html)
+            # Package row destinations are not /pay?product=suite&platform=
+            self.assertNotIn("/pay?product=suite&amp;platform=", map_html)
             # Map is Suite-only — no companion product sections
             self.assertNotIn("data-kind=\"browser\"", map_html)
             self.assertNotIn("data-kind=\"pens\"", map_html)

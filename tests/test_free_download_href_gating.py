@@ -91,12 +91,15 @@ class TestFreeDownloadHrefGating(unittest.TestCase):
             self.assertIn(f'data-platform="{plat}"', cta_p)
             self.assertNotIn('href="/pay', cta_p)
 
-        # Downloads map still carries Suite latest /pay platform rows
+        # Downloads map carries Suite free_direct platform rows
+        from downloads import suite_free_direct_download_href
+
         pkgs = render_free_packages_page_html().decode("utf-8")
         for plat in PLATFORMS:
-            href_html = suite_pay_href(plat).replace("&", "&amp;")
+            href_html = suite_free_direct_download_href(plat).replace("&", "&amp;")
             self.assertIn(href_html, pkgs)
             self.assertIn(f'data-platform="{plat}"', pkgs)
+            self.assertIn("free_direct=1", pkgs)
             m = re.search(
                 rf'href="{re.escape(href_html)}"[^>]*>([^<]+)',
                 pkgs,

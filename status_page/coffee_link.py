@@ -13,7 +13,7 @@ import os
 SITE_COPYRIGHT_TEXT = "© Raskul - all rights reserved"
 SITE_FOOTER_ID = "site-footer"
 SITE_FOOTER_MAP_ID = "site-footer-downloads-map"
-SITE_FOOTER_MAP_LABEL = "Downloadables Mapped Here"
+SITE_FOOTER_MAP_LABEL = "download map"
 # Path is the Downloads Map route (status host + public export).
 SITE_FOOTER_MAP_HREF = "/downloads-map"
 
@@ -54,7 +54,7 @@ def downloads_map_footer_label() -> str:
 
 
 def coffee_link_css() -> str:
-    """Footer: copyright left, Downloadables Mapped Here bottom-right."""
+    """Footer: copyright left, download map link bottom-right."""
     return """
     .coffee-footer, .site-footer {
       margin-top: auto;
@@ -113,7 +113,7 @@ def coffee_link_css() -> str:
 
 
 def render_site_copyright_footer_html() -> str:
-    """Public footer: © Raskul (left) + Downloadables Mapped Here (right)."""
+    """Public footer: © Raskul (left) + download map link (right)."""
     text = site_copyright_text()
     safe = (
         text.replace("&", "&amp;")

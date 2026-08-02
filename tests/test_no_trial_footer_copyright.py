@@ -83,7 +83,7 @@ class TestFooterCopyright(unittest.TestCase):
         frag = render_site_copyright_footer_html()
         self.assertIn(SITE_COPYRIGHT_TEXT, frag)
         self.assertIn('id="site-footer"', frag)
-        self.assertIn("Downloadables Mapped Here", frag)
+        self.assertIn("download map", frag)
         self.assertIn("site-footer-downloads-map", frag)
         self.assertIn("site-footer", public_page_close())
         self.assertNotIn("buymeacoffee.com", frag)
@@ -93,7 +93,7 @@ class TestFooterCopyright(unittest.TestCase):
         self.assertGreater(foot_at, 0)
         self.assertGreater(foot_at, page.find('id="downloads"'))
         self.assertIn(SITE_COPYRIGHT_TEXT, page)
-        self.assertIn("Downloadables Mapped Here", page)
+        self.assertIn("download map", page)
 
 
 if __name__ == "__main__":

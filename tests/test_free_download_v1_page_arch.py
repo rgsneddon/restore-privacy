@@ -94,8 +94,14 @@ class TestFreeDownloadV1CtaAndPage(unittest.TestCase):
         self.assertEqual(len(pkgs), 5)
         for p in pkgs:
             plat = p["platform"]
-            self.assertIn(suite_pay_href(plat).replace("&", "&amp;"), html)
+            from downloads import suite_free_direct_download_href
+
+            self.assertIn(
+                suite_free_direct_download_href(plat).replace("&", "&amp;"),
+                html,
+            )
             self.assertIn(f'data-platform="{plat}"', html)
+            self.assertIn("free_direct=1", html)
             self.assertIn(RELEASE_VERSION, p["filename"])
             self.assertEqual(p["kind"] if "kind" in p else "suite", p.get("kind", "suite") or "suite")
         # Suite-latest map only (no companion product kinds)

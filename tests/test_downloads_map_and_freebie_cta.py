@@ -92,10 +92,10 @@ class TestDownloadsMapPage(unittest.TestCase):
             available_downloads,
             list_downloads_map_rows,
             render_downloads_map_page_html,
-            suite_pay_href,
+            suite_free_direct_download_href,
         )
 
-        # Map is Suite latest clients only → /pay with platform
+        # Map is Suite latest clients only → free_direct download per platform
         rows = list_downloads_map_rows()
         self.assertEqual(len(rows), len(available_downloads()))
         self.assertEqual(len(rows), 5)
@@ -106,10 +106,11 @@ class TestDownloadsMapPage(unittest.TestCase):
         for r in rows:
             self.assertEqual(r["version"], RELEASE_VERSION)
             self.assertTrue(r.get("filename"))
-            self.assertTrue(str(r["href"]).startswith("/pay?product=suite"))
+            self.assertEqual(r["href"], suite_free_direct_download_href(r["platform"]))
+            self.assertIn("/suite/download?", r["href"])
+            self.assertIn("free_direct=1", r["href"])
             self.assertIn(f"platform={r['platform']}", r["href"])
-            self.assertEqual(r["href"], suite_pay_href(r["platform"]))
-            self.assertNotIn("/suite/download", r["href"])
+            self.assertNotIn("/pay", r["href"])
         # No companion product kinds
         blob = " ".join(r["product"] + r["kind"] + r["filename"] for r in rows).lower()
         for banned in ("pens", "tables", "slides", "rpos", "browser", "extension", "beam"):
@@ -119,9 +120,13 @@ class TestDownloadsMapPage(unittest.TestCase):
         self.assertIn("Downloads Map", page)
         self.assertIn("data-downloads-map-page", page)
         self.assertIn("windows", page.lower())
-        self.assertIn("/pay?product=suite", page)
+        self.assertIn("free_direct=1", page)
         for plat in ("windows", "android", "macos", "ios", "linux"):
-            self.assertIn(suite_pay_href(plat).replace("&", "&amp;"), page)
+            self.assertIn(
+                suite_free_direct_download_href(plat).replace("&", "&amp;"),
+                page,
+            )
+        self.assertNotIn("/pay?product=suite&amp;platform=", page)
         # Suite-only — no office pillars / companion products
         self.assertNotIn('data-kind="pens"', page)
         self.assertNotIn('data-kind="browser"', page)

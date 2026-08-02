@@ -266,10 +266,10 @@ def build_index() -> str:
       </ol>
     </section>
 
-    <footer class="site-foot">
-      <p class="copy">© Raskul - all rights reserved · {_esc(PUBLIC_BRAND_DISPLAY)}</p>
-      <a class="map-link" href="downloads-map.html">Downloadables Mapped Here</a>
-    </footer>
+{static_site_footer(
+        map_href="downloads-map.html",
+        copyright_text=f"© Raskul - all rights reserved · {PUBLIC_BRAND_DISPLAY}",
+    )}
   </div>
 </body>
 </html>
@@ -277,7 +277,7 @@ def build_index() -> str:
 
 
 def build_downloads_map() -> str:
-    """Static Downloads Map — Suite latest only; links → live /pay + platform."""
+    """Static Downloads Map — Suite latest only; links → live free_direct Suite download."""
     sys.path.insert(0, str(STATUS))
     from downloads import (  # noqa: E402
         RELEASE_VERSION,
@@ -296,8 +296,8 @@ def build_downloads_map() -> str:
             label = str(r.get("label") or r.get("filename") or "")
             plat = str(r.get("platform") or "")
             links.append(
-                f'<li><a href="{_esc(href)}" data-pay="1" data-platform="{_esc(plat)}" '
-                f'data-kind="suite_client">{_esc(label)}</a></li>'
+                f'<li><a href="{_esc(href)}" data-pay="0" data-platform="{_esc(plat)}" '
+                f'data-kind="suite_client" data-free-direct="1">{_esc(label)}</a></li>'
             )
         body = "\n        ".join(links)
         sections.append(
@@ -326,19 +326,28 @@ def build_downloads_map() -> str:
     <section class="panel" id="downloads-map-page" data-downloads-map-page="1">
       <h1>Downloads Map</h1>
       <p class="muted">Restore Privacy Suite latest clients only (monopin {RELEASE_VERSION}).
-        Each platform link opens the /pay flow on restoreprivacy.online so you can
-        confirm device and continue to Stripe. For an immediate free Suite download
-        matched to your device, use the home FREE DOWNLOAD button.</p>
+        Each platform link starts an immediate free Suite download on
+        restoreprivacy.online (same free path as the home FREE DOWNLOAD button).
+        KEYGEN residual licences remain on /pay.</p>
       {sections_html}
     </section>
-    <footer class="site-foot">
-      <p class="copy">© Raskul - all rights reserved</p>
-      <a class="map-link" href="index.html">Home</a>
-    </footer>
+{static_site_footer(map_href="downloads-map.html")}
   </div>
 </body>
 </html>
 """
+
+
+def static_site_footer(
+    *,
+    map_href: str = "downloads-map.html",
+    copyright_text: str = "© Raskul - all rights reserved",
+) -> str:
+    """Shared static footer: copyright left + download map link (right)."""
+    return f"""    <footer class="site-foot">
+      <p class="copy">{_esc(copyright_text)}</p>
+      <a class="map-link" href="{_esc(map_href)}" data-downloads-map-link="1">download map</a>
+    </footer>"""
 
 
 def build_simple_doc(title: str, body_html: str) -> str:
@@ -361,6 +370,7 @@ def build_simple_doc(title: str, body_html: str) -> str:
       <h1>{_esc(title)}</h1>
       <div class="doc-body">{body_html}</div>
     </section>
+{static_site_footer()}
   </div>
 </body>
 </html>

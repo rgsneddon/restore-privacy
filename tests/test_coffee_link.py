@@ -40,7 +40,7 @@ class TestCoffeeLinkBuilder(unittest.TestCase):
         self.assertIn("©", html)
         self.assertNotIn("(c)", html)
         self.assertIn('id="site-footer"', html)
-        self.assertIn("Downloadables Mapped Here", html)
+        self.assertIn("download map", html)
         self.assertIn("/downloads-map", html)
         self.assertNotIn("buymeacoffee.com", html)
         self.assertNotIn("bmc-tip-link", html)
@@ -63,7 +63,7 @@ class TestCoffeeLinkBuilder(unittest.TestCase):
         self.assertIn("Raskul", page)
         self.assertIn("all rights reserved", page)
         self.assertIn('id="site-footer"', page)
-        self.assertIn("Downloadables Mapped Here", page)
+        self.assertIn("download map", page)
         self.assertNotIn("fetch('/api/status'", page)
         self.assertNotIn("clients_connected", page)
         self.assertIn("RESTORE PRIVACY", page)
@@ -96,7 +96,7 @@ class TestCoffeeLinkHttp(unittest.TestCase):
                 self.assertNotIn("buymeacoffee.com", html)
                 self.assertIn("Raskul", html)
                 self.assertIn("Download", html)
-                self.assertIn("Downloadables Mapped Here", html)
+                self.assertIn("download map", html)
 
 
 if __name__ == "__main__":

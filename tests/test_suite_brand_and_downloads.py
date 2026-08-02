@@ -128,11 +128,17 @@ class TestSuiteDownloadsMonopinCurrent(unittest.TestCase):
         self.assertIn("suite-keygen-buy", suite)
         self.assertNotIn('id="suite-free-grid"', suite)
         self.assertNotIn("Device for KEYGEN", suite)
-        # Downloads map / free-packages: Suite latest → /pay only
+        # Downloads map / free-packages: Suite latest free_direct rows
+        from downloads import suite_free_direct_download_href
+
         free = render_free_packages_page_html(version=SUITE_PIN).decode("utf-8")
         for p in pkgs:
-            self.assertIn(suite_pay_href(p["platform"]).replace("&", "&amp;"), free)
+            self.assertIn(
+                suite_free_direct_download_href(p["platform"]).replace("&", "&amp;"),
+                free,
+            )
             self.assertIn(f'data-platform="{p["platform"]}"', free)
+            self.assertIn("free_direct=1", free)
         self.assertNotIn("0.5.", free)
         self.assertNotIn("0.4.", free)
 

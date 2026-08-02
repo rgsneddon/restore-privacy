@@ -1102,7 +1102,7 @@ DOWNLOADS_SECTION_ID = "downloads"
 # Full-width free-download face (operator asset freebie.jpg) → monopin platform or map
 FREE_PACKAGES_PATH = "/free-packages"
 DOWNLOADS_MAP_PATH = "/downloads-map"
-DOWNLOADS_MAP_LABEL = "Downloadables Mapped Here"
+DOWNLOADS_MAP_LABEL = "download map"
 FREEBIE_IMG_PATH = "/static/freebie.jpg"
 # Catalog monopin for links (face art no longer bakes a version string)
 FREE_DOWNLOAD_FACE_VERSION = RELEASE_VERSION
@@ -1584,10 +1584,11 @@ def downloads_map_page_css() -> str:
 def list_downloads_map_rows(
     *, version: str | None = None
 ) -> list[dict[str, str]]:
-    """Downloads Map rows: Restore Privacy Suite latest clients only → /pay.
+    """Downloads Map rows: Suite latest clients → free_direct download (like FREE DOWNLOAD).
 
     Each row is one Suite monopin platform at *version* (default RELEASE_VERSION).
-    Non-Suite products are not listed.
+    Non-Suite products are not listed. Package links use free_direct so selection
+    starts the installer immediately (same path as the homepage FREE DOWNLOAD CTA).
     """
     ver = (version or RELEASE_VERSION).strip() or RELEASE_VERSION
     rows: list[dict[str, str]] = []
@@ -1600,7 +1601,7 @@ def list_downloads_map_rows(
                 "kind": "suite_client",
                 "platform": plat,
                 "filename": fname,
-                "href": suite_pay_href(plat),
+                "href": suite_free_direct_download_href(plat),
                 "version": ver,
                 "label": f"{platform_face_title(plat)} — Suite v{ver}",
             }
@@ -1698,7 +1699,7 @@ def render_downloads_map_page_html(
             f'id="downloads-map-detect-hint" '
             f'data-detected-platform="{_esc_html(def_plat)}">'
             f"Detected your device as <strong>{_esc_html(face)}</strong> — "
-            f"Suite v{_esc_html(ver)} /pay link highlighted; all Suite platforms below.</p>"
+            f"Suite v{_esc_html(ver)} free download link highlighted; all Suite platforms below.</p>"
         )
         detect_main_attr = f' data-detected-platform="{_esc_html(def_plat)}"'
     else:
@@ -1737,11 +1738,10 @@ def render_downloads_map_page_html(
         <h1 id="downloads-map-heading">Downloads Map</h1>
         <p class="downloads-map-blurb free-packages-blurb" id="downloads-map-blurb">
           <strong>Restore Privacy Suite v{_esc_html(ver)}</strong> only — one link
-          per device platform (no companion products). Each link opens the
-          <a href="/pay?product=suite">/pay</a> flow (Stripe KEYGEN) so you can
-          confirm or change platform before checkout.
-          For an immediate free Suite download matched to this device, use the
-          home <strong>FREE DOWNLOAD</strong> button.
+          per device platform (no companion products). Each platform link starts an
+          immediate free Suite download for that device (same free path as the home
+          <strong>FREE DOWNLOAD</strong> button). KEYGEN residual licences remain on
+          <a href="/pay?product=suite">/pay</a>.
         </p>
         {detect_hint}
         {sections}

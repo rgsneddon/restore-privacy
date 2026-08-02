@@ -146,17 +146,21 @@ class TestDetectPlatformFromUserAgent(unittest.TestCase):
         self.assertNotIn('href="/pay', cta_snip)
 
     def test_free_packages_page_highlights_detected_os(self) -> None:
-        from downloads import render_free_packages_page_html, suite_free_download_href
-
-        from downloads import suite_pay_href
+        from downloads import (
+            render_free_packages_page_html,
+            suite_free_direct_download_href,
+            suite_pay_href,
+        )
 
         html = render_free_packages_page_html(default_platform="ios").decode("utf-8")
         self.assertIn('data-detected-platform="ios"', html)
         self.assertIn("Detected your device as <strong>iOS</strong>", html)
         self.assertIn("is-detected", html)
-        # Map Suite rows go to /pay (not ungated suite/download)
-        self.assertIn(suite_pay_href("ios").replace("&", "&amp;"), html)
-        self.assertNotIn(suite_free_download_href("ios"), html)
+        # Map Suite rows free_direct download (same as FREE DOWNLOAD), not /pay
+        direct = suite_free_direct_download_href("ios").replace("&", "&amp;")
+        self.assertIn(direct, html)
+        self.assertIn("free_direct=1", html)
+        self.assertNotIn(suite_pay_href("ios").replace("&", "&amp;"), html)
         self.assertIn('data-platform="ios"', html)
         self.assertIn('data-kind="suite_client"', html)
 
