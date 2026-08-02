@@ -6,7 +6,12 @@ secrets/
 !*.pub.example
 .env
 .env.*
+# Public residual monopin for macOS Debug inject (tracked); other secrets stay private
 client_app/**/secrets/
+!client_app/macos/Runner/secrets/
+!client_app/macos/Runner/secrets/*.pub
+# never track private keys under Runner secrets even if present
+client_app/macos/Runner/secrets/*.priv
 
 # Flutter build artifacts
 client_app/build/
@@ -64,3 +69,7 @@ product/.*.priv*
 stripe_email_domain_dns.local.json
 stripe_email_dns_report.json
 
+
+# macOS residual public monopin (never priv)
+!client_app/macos/Runner/secrets/
+!client_app/macos/Runner/secrets/*.pub
