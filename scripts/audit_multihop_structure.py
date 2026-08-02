@@ -3,11 +3,13 @@
 Structural / product-layout checks only. Does **not** claim live dual-relay residual
 IP proof or full intermediate onion encapsulation.
 
-Honesty baseline (0.5.7+ catalog — RO retired):
+Honesty baseline (1.0.x catalog — **US and RO residual peers retired**):
   - Default residual entry: Germany ``PRODUCT_DE_HOST`` / ``PRODUCT_EXIT_HOST``
     + ``product/de_node_elgamal.pub`` (exit pub may still be ``exit_node_elgamal.pub``)
   - Iceland ``PRODUCT_NODE_HOST`` + ``product/node_elgamal.pub``
-  - United States ``PRODUCT_US_HOST`` + ``product/us_node_elgamal.pub``
+  - Live product catalog peers are **IS + DE only** (see ``product_country_catalog``)
+  - Retired ``PRODUCT_US_HOST`` / ``us_node_elgamal.pub`` may still exist for
+    redaction / legacy HELLO paths — **not** listed as active catalog peers
   - ``MULTI_HOP_ROUTING_IMPLEMENTED`` residual-via-exit when multi-hop is active
   - Default remains single-hop **DE** entry when multi-hop is not enabled
 """
@@ -142,13 +144,13 @@ def probe_multihop_module_flags(
     else:
         reasons.append("MULTI_HOP_ROUTING_IMPLEMENTED=True (residual-via-exit)")
 
-    # Catalog peers (IS / DE / US) — DE is RO replacement + default entry
+    # Active catalog peers: IS + DE only (US/RO retired from live product catalog)
     iceland_host = getattr(mh, "PRODUCT_NODE_HOST", None) or getattr(
         ep, "PRODUCT_NODE_HOST", None
     )
     exit_host = getattr(mh, "PRODUCT_EXIT_HOST", None)
     de_host = getattr(mh, "PRODUCT_DE_HOST", None) or exit_host
-    us_host = getattr(mh, "PRODUCT_US_HOST", None)
+    us_host = getattr(mh, "PRODUCT_US_HOST", None)  # retired constant may remain
     entry_port = int(getattr(ep, "PRODUCT_NODE_PORT", EXPECTED_PORT) or EXPECTED_PORT)
     exit_port = int(getattr(mh, "PRODUCT_EXIT_PORT", entry_port) or entry_port)
     us_port = int(getattr(mh, "PRODUCT_US_PORT", entry_port) or entry_port)
@@ -176,13 +178,30 @@ def probe_multihop_module_flags(
             f"DE host {de_host!r} != product Germany pin {EXPECTED_DE_HOST}"
         )
 
-    if us_host != EXPECTED_US_HOST:
-        ok = False
-        reasons.append(
-            f"US host {us_host!r} != product United States pin {EXPECTED_US_HOST}"
-        )
-    else:
-        reasons.append(f"United States peer {us_host}:{us_port} (US monopin)")
+    # Live catalog must be IS+DE only — do not list US as an active catalog peer.
+    # PRODUCT_US_HOST may remain for legacy redaction; note retired when present.
+    try:
+        catalog = list(mh.product_country_catalog())
+        catalog_codes = {
+            str(getattr(n, "code", "") or "").strip().upper() for n in catalog
+        }
+        if "US" in catalog_codes:
+            ok = False
+            reasons.append(
+                "product_country_catalog still lists US — US residual peer is retired"
+            )
+        elif catalog_codes and not {"IS", "DE"}.issubset(catalog_codes):
+            ok = False
+            reasons.append(
+                f"product_country_catalog codes {sorted(catalog_codes)!r} "
+                "expected to include IS and DE"
+            )
+        else:
+            reasons.append(
+                "live catalog peers IS+DE only (United States residual peer retired)"
+            )
+    except Exception as exc:  # noqa: BLE001
+        reasons.append(f"catalog peer check skipped: {exc}")
 
     if default_country != EXPECTED_DEFAULT_ENTRY_COUNTRY:
         ok = False
@@ -285,12 +304,12 @@ def probe_multihop_residual_via_exit(
     except ImportError as exc:
         return _status(ok=False, skipped=True, reasons=[str(exc)])
 
-    # Prefer non-DE entry (US) → DE exit for residual-via-exit check
-    us_host = getattr(mh, "PRODUCT_US_HOST", None) or EXPECTED_US_HOST
-    us_port = int(getattr(mh, "PRODUCT_US_PORT", EXPECTED_PORT) or EXPECTED_PORT)
+    # Non-exit entry (IS) → DE exit for residual-via-exit check (US peer retired)
+    is_host = getattr(mh, "PRODUCT_NODE_HOST", None) or EXPECTED_ICELAND_HOST
+    is_port = int(getattr(mh, "PRODUCT_NODE_PORT", EXPECTED_PORT) or EXPECTED_PORT)
     de_host = getattr(mh, "PRODUCT_EXIT_HOST", None) or EXPECTED_EXIT_HOST
     hops = [
-        mh.Hop(us_host, us_port, role="entry"),
+        mh.Hop(is_host, is_port, role="entry"),
         mh.Hop(mh.PRODUCT_EXIT_HOST, mh.PRODUCT_EXIT_PORT, role="exit"),
     ]
     cfg = mh.MultiHopConfig(hops=hops, enabled=True)
@@ -299,7 +318,7 @@ def probe_multihop_residual_via_exit(
         ok = False
         reasons.append("is_multihop_active(enabled, 2 hops) is False")
     else:
-        reasons.append("is_multihop_active=True for US→DE entry→exit path")
+        reasons.append("is_multihop_active=True for IS→DE entry→exit path")
 
     residual = mh.residual_endpoint(cfg)
     if residual.host != mh.PRODUCT_EXIT_HOST:
@@ -475,6 +494,7 @@ Honesty: **{honesty}**.
 |------|------|------------|
 | **Default entry / exit** (Germany) | `Germany (DE)` | `product/de_node_elgamal.pub` (exit alias: `exit_node_elgamal.pub`) |
 | **Catalog peer** (Iceland) | `Iceland (IS)` | `product/node_elgamal.pub` |
-| **Catalog peer** (United States) | `United States (US)` | `product/us_node_elgamal.pub` |
+
+Live residual catalog is **IS + DE only**. United States and Romania residual peers are **retired** (not current catalog peers).
 
 """

@@ -155,15 +155,16 @@ Supported floor: **Ubuntu 20.04 LTS** and later.
 ### macOS
 
 1. Download **macOS** free from the Suite storefront.
-2. Unzip and open **`restore_privacy_client.app`**.
+2. Unzip and open **`restore_privacy_client.app`** (**Developer ID** signed and
+   notarized; Team **SFCBP95595**).
 3. Accept the licence, enter KEYGEN, press **Connect**, approve **VPN configuration**.
 4. Failsafe: **`Restore Internet.command`** in the package.
 
 ### iOS
 
 1. Download **iOS** free from the Suite storefront.
-2. Install **`Runner.app`** with device tooling; accept licence, enter KEYGEN,
-   grant **VPN** permission.
+2. Install **`Runner.app`** with device tooling (**Apple Distribution** Team-signed
+   sideload zip); accept licence, enter KEYGEN, grant **VPN** permission.
 3. Complete removal: follow **`Restore Internet.txt`**.
 
 ### Browser extension (Chromium MV3)

@@ -57,10 +57,20 @@ Before residual Connect unlocks, you **accept the end-user licence** on this dev
 
 Run at startup **off**, autoconnect **off**, residual VPN core available after KEYGEN unlock, residual **IPv4** on, residual **IPv6** toggleable, traffic shaping / outer obfuscation / multi-hop **off** by default (opt-in). Optional browser extension is browser-scoped only.
 
+Force-on for operators/tests (not opt-out of defaults): set **`RPT_TRAFFIC_SHAPE=1`** and/or **`RPT_OBFS=1`** (or use in-app Settings) to enable traffic shaping / outer obfuscation when you want them. Defaults stay **off** so residual paths stay lean.
+
+### Operational limits
+
+- Residual Connect is limited to devices with a valid **KEYGEN** entitlement (monthly or yearly residual licence).
+- Free Suite installers are fulfilled on the product host; residual unlock remains KEYGEN-bound and **time-limited** to the active subscription / trial period (not an unlimited free residual CDN).
+- Public node status stays **title-only** (no live client count).
+
 ---
 
 ## Your rights and contact
 
 You can export local connection logs, delete local wallet data, and stop using residual Connect by not renewing KEYGEN. For privacy questions: **rus@restoreprivacy.online**.
+
+Related: end-user **LICENSE**, product **README**, and the public security **AUDIT**.
 
 This policy describes product behaviour for catalog **v1.0.7**. It is not a substitute for formal legal advice.

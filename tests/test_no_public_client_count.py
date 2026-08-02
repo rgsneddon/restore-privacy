@@ -38,7 +38,7 @@ class TestStatusPageNoCount(unittest.TestCase):
             {"title": "RESTORE PRIVACY"}
         ).decode("utf-8")
         self.assertIn("RESTORE PRIVACY", html)
-        self.assertIn("Download client", html)
+        self.assertIn("Download Suite client", html)
         self.assertNotIn("Currently connected clients", html)
         self.assertNotIn("clients-connected", html)
         self.assertNotIn("clients_connected", html)

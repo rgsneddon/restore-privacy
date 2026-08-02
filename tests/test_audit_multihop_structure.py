@@ -115,8 +115,11 @@ class TestMultihopStructureProbes(unittest.TestCase):
         md = render_multihop_structure_markdown(agg)
         self.assertIn("Multihop node structure", md)
         self.assertIn("Multihop structure overall", md)
-        self.assertIn(EXPECTED_ENTRY_HOST, md)
-        self.assertIn(EXPECTED_EXIT_HOST, md)
+        # Public audit table uses country labels (no active US catalog peer)
+        self.assertIn("Iceland (IS)", md)
+        self.assertIn("Germany (DE)", md)
+        self.assertNotIn("Catalog peer** (United States)", md)
+        self.assertIn("retired", md.lower())
         self.assertIn("residual-via-exit", md.lower().replace(" ", "-") or md.lower())
         self.assertIn("**PASS**", md)
 
@@ -172,6 +175,20 @@ class TestMultihopStructureProbes(unittest.TestCase):
         self.assertIn("run_security_audit.py", text)
         self.assertIn("1d", text)
         self.assertIn('PERIOD="${PERIOD:-1d}"', text)
+
+
+
+    def test_render_excludes_us_as_active_catalog_peer(self):
+        """Shipped multihop audit table must not list US as live catalog peer."""
+        agg = run_all_multihop_structure_probes(repo_root=ROOT, install_root=ROOT)
+        md = render_multihop_structure_markdown(agg)
+        self.assertNotIn("| **Catalog peer** (United States)", md)
+        self.assertIn("| **Catalog peer** (Iceland)", md)
+        self.assertIn("Germany (DE)", md)
+        flags = (agg.get("probes") or {}).get("multihop_module_flags") or {}
+        joined = " ".join(flags.get("reasons") or [])
+        self.assertIn("retired", joined.lower())
+        self.assertNotIn("United States peer", joined)
 
 
 if __name__ == "__main__":
