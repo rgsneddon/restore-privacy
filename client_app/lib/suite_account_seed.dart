@@ -76,11 +76,61 @@ class SuiteSeedPublishedRecovery {
   final String? metaBlobB64;
 }
 
+/// Kind marker for composite transport (ledger envelope + sealed Suite meta).
+const String kSuiteSeedTransportKind = 'suite_seed_transport';
+
+/// Encode ledger envelope + optional sealed meta into one rendezvous string.
+///
+/// Production Perc rendezvous only stores a single `envelope` field. When meta
+/// is present we wrap both so clean-install KEYGEN/licence rehydrate survives
+/// process death (no SharedPreferences, no process-local memory).
+String encodeSuiteSeedTransport({
+  required String ledgerEnvelopeB64,
+  String? metaBlobB64,
+}) {
+  if (metaBlobB64 == null || metaBlobB64.isEmpty) {
+    return ledgerEnvelopeB64;
+  }
+  final payload = <String, dynamic>{
+    'v': 1,
+    'kind': kSuiteSeedTransportKind,
+    'ledger': ledgerEnvelopeB64,
+    'meta': metaBlobB64,
+  };
+  return base64Encode(utf8.encode(jsonEncode(payload)));
+}
+
+/// Decode composite transport or legacy raw ledger envelope.
+SuiteSeedPublishedRecovery decodeSuiteSeedTransport(String raw) {
+  if (raw.isEmpty) {
+    return const SuiteSeedPublishedRecovery(envelopeB64: '');
+  }
+  try {
+    final decoded = utf8.decode(base64Decode(raw));
+    final map = jsonDecode(decoded);
+    if (map is Map && map['kind'] == kSuiteSeedTransportKind) {
+      final ledger = (map['ledger'] as String? ?? '').trim();
+      if (ledger.isEmpty) {
+        throw FormatException('suite_seed_transport missing ledger');
+      }
+      final meta = map['meta'] as String?;
+      return SuiteSeedPublishedRecovery(
+        envelopeB64: ledger,
+        metaBlobB64: (meta != null && meta.isNotEmpty) ? meta : null,
+      );
+    }
+  } catch (_) {
+    // Not composite — treat as legacy ledger-only envelope.
+  }
+  return SuiteSeedPublishedRecovery(envelopeB64: raw);
+}
+
 /// Publish/fetch seed envelopes so clean-install words-only restore works.
 ///
-/// Production [publish] stores in-memory then best-effort pushes to Perc
-/// rendezvous (after live nodes are re-enabled). [fetch] checks inject →
-/// memory → network. Tests replace [publishHandler]/[fetchHandler].
+/// Production [publish] pushes a composite envelope (ledger + sealed meta) to
+/// Perc rendezvous. [fetch] checks inject → memory → network and unwraps meta.
+/// Tests may replace [publishHandler]/[fetchHandler]; production KEYGEN proof
+/// must use the default path (handlers null) with rendezvous test map / network.
 class SuiteSeedEnvelopeStore {
   SuiteSeedEnvelopeStore._();
 
@@ -99,6 +149,11 @@ class SuiteSeedEnvelopeStore {
     memory.clear();
     publishHandler = null;
     fetchHandler = null;
+  }
+
+  /// Drop process-local cache (simulates new install / new process).
+  static void clearMemoryForTest() {
+    memory.clear();
   }
 
   static Future<void> publish({
@@ -124,12 +179,16 @@ class SuiteSeedEnvelopeStore {
       await perc_hub.PercLedgerHub.instance.network
           .publishSeedRecoveryEnvelopes();
     } catch (_) {}
-    // Also put envelope by fingerprint on rendezvous API when URL is configured.
+    // Production transport: composite ledger+meta as single rendezvous envelope.
+    final transport = encodeSuiteSeedTransport(
+      ledgerEnvelopeB64: envelopeB64,
+      metaBlobB64: metaBlobB64,
+    );
     try {
       await const evolve_rendezvous.PercNetworkRendezvous()
           .publishSeedRecoveryEnvelope(
         fingerprint: fingerprint,
-        envelopeB64: envelopeB64,
+        envelopeB64: transport,
       );
     } catch (_) {}
   }
@@ -146,7 +205,7 @@ class SuiteSeedEnvelopeStore {
       final remote = await const evolve_rendezvous.PercNetworkRendezvous()
           .fetchSeedRecoveryEnvelope(fingerprint: fingerprint);
       if (remote != null && remote.isNotEmpty) {
-        return SuiteSeedPublishedRecovery(envelopeB64: remote);
+        return decodeSuiteSeedTransport(remote);
       }
     } catch (_) {}
     return null;

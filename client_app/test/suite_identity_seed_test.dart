@@ -1,6 +1,7 @@
 /// Suite unified identity + seed export/import + re-login after timeout.
 library;
 
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:evolve/perc/providers/perc_wallet_provider.dart' as evolve_wallet;
@@ -8,6 +9,8 @@ import 'package:evolve/perc/services/perc_ledger.dart' as evolve_ledger;
 import 'package:evolve/perc/services/perc_ledger_hub.dart' as evolve_hub;
 import 'package:evolve/perc/services/perc_network_coordinator.dart'
     as evolve_coord;
+import 'package:evolve/perc/services/perc_network_rendezvous.dart'
+    as evolve_rendezvous;
 import 'package:evolve/perc/services/perc_seed_recovery.dart';
 import 'package:evolve/perc/services/perc_wallet_store.dart' as evolve_store;
 import 'package:flutter/material.dart';
@@ -41,6 +44,7 @@ void main() {
     perc_hub.PercLedgerHub.resetForTest();
     evolve_hub.PercLedgerHub.resetForTest();
     SuiteSeedEnvelopeStore.resetForTest();
+    evolve_rendezvous.PercNetworkRendezvous.resetForTest();
     perc_coord.PercNetworkCoordinator.disableLiveNodesForTests = true;
     evolve_coord.PercNetworkCoordinator.disableLiveNodesForTests = true;
     perc_wallet.PercWalletProvider.sessionTimeoutEnabled = true;
@@ -67,6 +71,7 @@ void main() {
     perc_wallet.PercWalletProvider.sessionTimeoutEnabled = true;
     evolve_wallet.PercWalletProvider.sessionTimeoutEnabled = true;
     SuiteSeedEnvelopeStore.resetForTest();
+    evolve_rendezvous.PercNetworkRendezvous.resetForTest();
     perc_hub.PercLedgerHub.resetForTest();
     evolve_hub.PercLedgerHub.resetForTest();
   });
@@ -125,19 +130,14 @@ void main() {
 
   group('seed export + import restore', () {
     test(
-      'clean install: words-only restore via published envelope (no prefs inject)',
+      'clean install: words-only KEYGEN via default production store (no handlers)',
       () async {
-        // Simulate network rendezvous with a published map (not Suite prefs).
-        final published = <String, SuiteSeedPublishedRecovery>{};
-        SuiteSeedEnvelopeStore.publishHandler = (fp, recovery) async {
-          published[fp] = recovery;
-        };
-        SuiteSeedEnvelopeStore.fetchHandler =
-            (fp) async => published[fp];
+        // NO publishHandler/fetchHandler — production SuiteSeedEnvelopeStore path.
+        // PercNetworkRendezvous.testSeedRecoveries stages composite transport.
+        evolve_rendezvous.PercNetworkRendezvous.resetForTest();
 
         final exportPrefs = MemorySettingsBackend();
         final licenceExport = MemorySettingsBackend();
-        // Pre-seed licence/KEYGEN that must be sealed and restored.
         await licenceExport.setBool(kKeyLicenceAccepted, true);
         await licenceExport.setString(kKeyLicenceId, kCurrentLicenceId);
         await licenceExport.setString(kKeyPaymentStatus, kPaymentStatusActive);
@@ -162,20 +162,38 @@ void main() {
         );
 
         final fp = PercSeedRecovery.fingerprint(offeredWords);
-        expect(published.containsKey(fp), isTrue, reason: 'export must publish');
-        expect(published[fp]!.envelopeB64, isNotEmpty);
-        expect(published[fp]!.metaBlobB64, isNotNull);
+        // Production adapter must have staged composite transport on rendezvous.
+        final staged =
+            evolve_rendezvous.PercNetworkRendezvous.testSeedRecoveries[fp];
+        expect(staged, isNotNull, reason: 'default publish must hit rendezvous');
+        final decoded = decodeSuiteSeedTransport(staged!);
+        expect(decoded.envelopeB64, isNotEmpty);
+        expect(
+          decoded.metaBlobB64,
+          isNotNull,
+          reason: 'composite transport must carry sealed meta',
+        );
 
-        // True clean install: wipe ledger, hubs, and ALL suite prefs.
-        // Do NOT pass localEnvelopeB64; do NOT reuse exportPrefs.
+        // New process / clean install: wipe local Suite memory + ledger hubs +
+        // prefs. Hub resetForTest also clears rendezvous test maps — re-stage
+        // the published composite afterward (network survives app reinstall).
+        SuiteSeedEnvelopeStore.clearMemoryForTest();
+        expect(SuiteSeedEnvelopeStore.memory, isEmpty);
         perc_hub.PercLedgerHub.resetForTest();
         evolve_hub.PercLedgerHub.resetForTest();
         sharedJson.clear();
+        evolve_rendezvous.PercNetworkRendezvous.testSeedRecoveries[fp] =
+            staged;
+
         final cleanAccount = SuiteAccountStore(MemorySettingsBackend());
-        final cleanPrefs = MemorySettingsBackend(); // empty
-        final cleanLicence = MemorySettingsBackend(); // empty
+        final cleanPrefs = MemorySettingsBackend();
+        final cleanLicence = MemorySettingsBackend();
         expect(await cleanAccount.isRegistered(), isFalse);
         expect(await cleanLicence.getString(kKeyPaymentKeygen), isNull);
+
+        // Default production fetch (handlers still null).
+        expect(SuiteSeedEnvelopeStore.publishHandler, isNull);
+        expect(SuiteSeedEnvelopeStore.fetchHandler, isNull);
 
         final restored = await restoreSuiteIdentityFromSeed(
           words: offeredWords,
@@ -183,22 +201,45 @@ void main() {
           surfaces: surfaces,
           suitePrefsBackend: cleanPrefs,
           licenceBackend: cleanLicence,
-          // intentionally no localEnvelopeB64
         );
         expect(restored, 'seed_user');
         expect(await cleanAccount.isRegistered(), isTrue);
         expect(await cleanAccount.username(), 'seed_user');
         expect(lastEvolve.isLoggedIn, isTrue);
         expect(lastEvolve.loggedInUsername, 'seed_user');
-        // Sealed licence/KEYGEN rehydrated from published meta.
+        // KEYGEN/licence from composite meta via production fetch decode.
         expect(await cleanLicence.getBool(kKeyLicenceAccepted), isTrue);
-        expect(await cleanLicence.getString(kKeyPaymentStatus), kPaymentStatusActive);
+        expect(
+          await cleanLicence.getString(kKeyPaymentStatus),
+          kPaymentStatusActive,
+        );
         expect(
           await cleanLicence.getString(kKeyPaymentKeygen),
           'RPT-KEY-SEED-TEST-AAAA-BBBB',
         );
       },
     );
+
+    test('encode/decode suite seed transport preserves meta', () {
+      final ledger = base64Encode(utf8.encode('fake-ledger-envelope-bytes!!'));
+      final meta = sealSuiteSeedMeta(
+        words: PercSeedRecovery.generateMnemonic(),
+        username: 'u',
+        paymentKeygen: 'RPT-KEY-X',
+      );
+      final transport = encodeSuiteSeedTransport(
+        ledgerEnvelopeB64: ledger,
+        metaBlobB64: meta,
+      );
+      expect(transport, isNot(equals(ledger)));
+      final decoded = decodeSuiteSeedTransport(transport);
+      expect(decoded.envelopeB64, ledger);
+      expect(decoded.metaBlobB64, meta);
+      // Legacy raw envelope still works.
+      final legacy = decodeSuiteSeedTransport(ledger);
+      expect(legacy.envelopeB64, ledger);
+      expect(legacy.metaBlobB64, isNull);
+    });
 
     test('parseSuiteSeedPhrase validates 12 words', () {
       final words = PercSeedRecovery.generateMnemonic();
