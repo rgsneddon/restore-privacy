@@ -44,6 +44,8 @@ class TestSupportSmtpPath(unittest.TestCase):
         self.assertIn("status", ready)
         self.assertIn("email_flow_enabled", ready)
 
+        from support_tickets import build_support_requester_confirmation_email
+
         open_mail = build_support_email(
             ticket_id="RPS-001",
             email="user@example.com",
@@ -55,6 +57,20 @@ class TestSupportSmtpPath(unittest.TestCase):
         self.assertEqual(open_mail["to"], SUPPORT_INBOX)
         self.assertEqual(open_mail["reply_to"], "user@example.com")
         self.assertIn("RPS-001", open_mail["subject"])
+
+        confirm = build_support_requester_confirmation_email(
+            ticket_id="RPS-001",
+            email="user@example.com",
+            subject="Cannot connect",
+            message="Tunnel stays Connecting after keygen unlock path.",
+            platform="macos",
+            app_version="1.0.0",
+        )
+        self.assertEqual(confirm["to"], "user@example.com")
+        self.assertEqual(confirm["reply_to"], SUPPORT_INBOX)
+        self.assertIn("RPS-001", confirm["subject"])
+        self.assertIn("Tunnel stays Connecting", confirm["body"])
+        self.assertIn("We received your", confirm["body"])
 
         captured: list[dict] = []
 
@@ -125,6 +141,12 @@ class TestSupportSmtpPath(unittest.TestCase):
     def test_ticket_mail_sent_status_when_transport_ok(self) -> None:
         from support_tickets import create_support_ticket, get_support_ticket
 
+        captured: list[dict] = []
+
+        def transport(payload: dict) -> dict:
+            captured.append(dict(payload))
+            return {"ok": True, "error": None}
+
         with tempfile.TemporaryDirectory() as td:
             db = Path(td) / "support_tickets.sqlite"
             result = create_support_ticket(
@@ -132,13 +154,53 @@ class TestSupportSmtpPath(unittest.TestCase):
                 subject="Works when mail works",
                 message="Just confirming support path sends when SMTP is ok.",
                 path=db,
-                transport=lambda p: {"ok": True, "error": None},
+                transport=transport,
             )
             self.assertTrue(result["ok"])
             self.assertTrue(result.get("mail_sent"))
+            self.assertTrue(result.get("customer_mail_sent"))
             rec = get_support_ticket(result["ticket_id"], path=db)
             assert rec is not None
             self.assertEqual(rec["mail_status"], "sent")
+            self.assertIn("staff=ok", rec["mail_detail"])
+            self.assertIn("customer=ok", rec["mail_detail"])
+            # Staff notify + requester confirmation
+            self.assertEqual(len(captured), 2)
+            tos = {c["to"] for c in captured}
+            self.assertEqual(tos, {"rus@restoreprivacy.online", "ok@example.com"})
+            staff = next(c for c in captured if c["to"] == "rus@restoreprivacy.online")
+            cust = next(c for c in captured if c["to"] == "ok@example.com")
+            self.assertEqual(staff["reply_to"], "ok@example.com")
+            self.assertIn("RPT Support", staff["subject"])
+            self.assertIn("received your ticket", cust["subject"].lower())
+            self.assertIn("Just confirming support path", cust["body_text"])
+
+    def test_customer_confirm_fail_still_staff_sent(self) -> None:
+        """Staff notify can succeed while customer copy fails (partial mail_detail)."""
+        from support_tickets import create_support_ticket, get_support_ticket
+
+        def transport(payload: dict) -> dict:
+            if payload.get("to") == "user@example.com":
+                return {"ok": False, "error": "SMTPRecipientsRefused:test"}
+            return {"ok": True, "error": None}
+
+        with tempfile.TemporaryDirectory() as td:
+            db = Path(td) / "support_tickets.sqlite"
+            result = create_support_ticket(
+                email="user@example.com",
+                subject="Partial mail path",
+                message="Staff should get this even if my copy fails SMTP.",
+                path=db,
+                transport=transport,
+            )
+            self.assertTrue(result["ok"])
+            self.assertTrue(result.get("mail_sent"))  # staff ok
+            self.assertFalse(result.get("customer_mail_sent"))
+            rec = get_support_ticket(result["ticket_id"], path=db)
+            assert rec is not None
+            self.assertEqual(rec["mail_status"], "partial")
+            self.assertIn("staff=ok", rec["mail_detail"])
+            self.assertIn("customer=", rec["mail_detail"])
 
 
 class TestSupportTicketPure(unittest.TestCase):
@@ -215,9 +277,12 @@ class TestSupportTicketPure(unittest.TestCase):
                 send_mail=False,
             )
             self.assertEqual(second["ticket_id"], "RPS-002")
-        self.assertEqual(len(sent), 1)
+        # Staff notify + requester confirmation
+        self.assertEqual(len(sent), 2)
         self.assertEqual(sent[0]["to"], "rus@restoreprivacy.online")
         self.assertIn("RPS-001", sent[0]["subject"])
+        self.assertEqual(sent[1]["to"], "user@example.com")
+        self.assertIn("RPS-001", sent[1]["subject"])
 
     def test_render_page_has_form_and_action(self):
         from support_tickets import SUPPORT_PATH, render_support_page_html
@@ -231,6 +296,26 @@ class TestSupportTicketPure(unittest.TestCase):
         self.assertNotIn('name="keygen"', page)
         self.assertNotIn("support-keygen", page)
         self.assertIn("RPS-001", page)
+        self.assertIn("confirmation email", page.lower())
+
+        ok_page = render_support_page_html(
+            success_ticket_id="RPS-042",
+            mail_sent=True,
+            customer_mail_sent=True,
+        )
+        self.assertIn("RPS-042", ok_page)
+        self.assertIn("confirmation", ok_page.lower())
+        fail_page = render_support_page_html(
+            success_ticket_id="RPS-043",
+            mail_sent=False,
+        )
+        self.assertIn("could not send email", fail_page.lower())
+        partial = render_support_page_html(
+            success_ticket_id="RPS-044",
+            mail_sent=True,
+            customer_mail_sent=False,
+        )
+        self.assertIn("confirmation copy", partial.lower())
 
     def test_nav_includes_support(self):
         from public_chrome import public_nav_links_html

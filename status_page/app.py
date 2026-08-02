@@ -2589,6 +2589,7 @@ class Handler(BaseHTTPRequestHandler):
                 page = render_support_page_html(
                     success_ticket_id=str(result["ticket_id"]),
                     mail_sent=bool(result.get("mail_sent")),
+                    customer_mail_sent=bool(result.get("customer_mail_sent")),
                 )
             else:
                 page = render_support_page_html(

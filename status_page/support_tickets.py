@@ -201,6 +201,64 @@ def build_support_email(
         "body": body,
         "reply_to": email,
         "ticket_id": tid,
+        "kind": "staff_notify",
+    }
+
+
+def build_support_requester_confirmation_email(
+    *,
+    ticket_id: str,
+    email: str,
+    subject: str,
+    message: str,
+    platform: str = "",
+    app_version: str = "",
+    created_at: float | None = None,
+) -> dict[str, str]:
+    """Build confirmation mail **to the requester** with a copy of their ticket.
+
+    Pure helper (no SMTP). Sent on successful open alongside staff notify so
+    the customer keeps a reference and content copy in their inbox.
+    """
+    tid = (ticket_id or "").strip()
+    to = (email or "").strip()
+    sub = (subject or "").strip()
+    ts = time.strftime(
+        "%Y-%m-%d %H:%M:%S UTC",
+        time.gmtime(created_at if created_at is not None else time.time()),
+    )
+    lines = [
+        f"We received your Restore Privacy support ticket {tid}.",
+        "",
+        "This is a confirmation copy for your records. Our team was also notified.",
+        f"Created (UTC): {ts}",
+        f"Your email: {to}",
+        f"Subject: {sub}",
+        "",
+        "--- Your message ---",
+        message or "(empty)",
+        "",
+        "--- Optional context ---",
+        f"Platform: {platform or '(not given)'}",
+        f"App version: {app_version or '(not given)'}",
+        "",
+        "Quote this ticket reference if you write again:",
+        f"  {tid}",
+        "",
+        "Open a new ticket anytime at:",
+        "https://restoreprivacy.online/support",
+        "",
+        "— Restore Privacy Support",
+        f"{SUPPORT_INBOX}",
+        "https://restoreprivacy.online/",
+    ]
+    return {
+        "to": to,
+        "subject": f"[RPT Support {tid}] We received your ticket"[:200],
+        "body": "\n".join(lines),
+        "reply_to": SUPPORT_INBOX,
+        "ticket_id": tid,
+        "kind": "requester_confirmation",
     }
 
 
@@ -827,7 +885,7 @@ def create_support_ticket(
     row = persist_support_ticket(
         fields, ticket_id=tid, now=t, path=path, mail_status="pending"
     )
-    mail = build_support_email(
+    staff_mail = build_support_email(
         ticket_id=tid,
         email=fields["email"],
         subject=fields["subject"],
@@ -837,11 +895,45 @@ def create_support_ticket(
         keygen="",
         created_at=t,
     )
-    mail_result: dict[str, Any] = {"ok": True, "error": None, "skipped": True, "sent": False}
+    customer_mail = build_support_requester_confirmation_email(
+        ticket_id=tid,
+        email=fields["email"],
+        subject=fields["subject"],
+        message=fields["message"],
+        platform=fields["platform"],
+        app_version=fields["app_version"],
+        created_at=t,
+    )
+    staff_result: dict[str, Any] = {
+        "ok": True,
+        "error": None,
+        "skipped": True,
+        "sent": False,
+    }
+    customer_result: dict[str, Any] = {
+        "ok": True,
+        "error": None,
+        "skipped": True,
+        "sent": False,
+    }
     if send_mail:
-        mail_result = send_support_ticket_email(mail, transport=transport)
-        st = "sent" if mail_result.get("ok") else "failed"
-        detail = str(mail_result.get("error") or ("ok" if mail_result.get("ok") else "send_failed"))[:500]
+        # Staff notify first (ticket reaches support), then customer confirmation copy.
+        staff_result = send_support_ticket_email(staff_mail, transport=transport)
+        customer_result = send_support_ticket_email(
+            customer_mail, transport=transport
+        )
+        staff_ok = bool(staff_result.get("ok"))
+        customer_ok = bool(customer_result.get("ok"))
+        if staff_ok and customer_ok:
+            st = "sent"
+        elif staff_ok or customer_ok:
+            st = "partial"
+        else:
+            st = "failed"
+        detail = (
+            f"staff={'ok' if staff_ok else str(staff_result.get('error') or 'failed')};"
+            f"customer={'ok' if customer_ok else str(customer_result.get('error') or 'failed')}"
+        )[:500]
         update_ticket_mail_status(
             tid,
             mail_status=st,
@@ -850,13 +942,20 @@ def create_support_ticket(
         )
         row["mail_status"] = st
         row["mail_detail"] = detail
+    # Primary mail_sent: staff notified (team received ticket). Customer copy tracked separately.
+    staff_sent = bool(staff_result.get("ok") and send_mail)
+    customer_sent = bool(customer_result.get("ok") and send_mail)
     return {
         "ok": True,
         "ticket_id": tid,
         "error": "",
-        "mail": mail_result,
-        "mail_sent": bool(mail_result.get("ok") and send_mail),
-        "email_payload": mail,
+        "mail": staff_result,
+        "mail_staff": staff_result,
+        "mail_customer": customer_result,
+        "mail_sent": staff_sent,
+        "customer_mail_sent": customer_sent,
+        "email_payload": staff_mail,
+        "customer_email_payload": customer_mail,
         "record": row,
     }
 
@@ -866,6 +965,7 @@ def render_support_page_html(
     error: str = "",
     success_ticket_id: str = "",
     mail_sent: bool | None = None,
+    customer_mail_sent: bool | None = None,
     prefill: dict[str, str] | None = None,
 ) -> str:
     """Full HTML page for /support (public chrome + form)."""
@@ -892,17 +992,24 @@ def render_support_page_html(
     ok_html = ""
     if success_ticket_id:
         tid = html.escape(success_ticket_id)
-        # Honest mail line: ticket is always stored; SMTP may still fail
+        # Honest mail lines: ticket always stored; staff + customer SMTP may differ
         if mail_sent is False:
             mail_line = (
                 f"<p>Your ticket is saved. We could not send email right now "
                 f"(site SMTP). Quote <code>{tid}</code> if you write again to "
                 f"{html.escape(SUPPORT_INBOX)}.</p>"
             )
+        elif customer_mail_sent is False:
+            mail_line = (
+                f"<p>We notified the team at {html.escape(SUPPORT_INBOX)} via site SMTP. "
+                f"We could not email you a confirmation copy right now. "
+                f"Keep reference <code>{tid}</code>.</p>"
+            )
         else:
             mail_line = (
-                f"<p>We notified the team at {html.escape(SUPPORT_INBOX)} "
-                f"via site SMTP. Keep this reference if you write again.</p>"
+                f"<p>We notified the team at {html.escape(SUPPORT_INBOX)} via site SMTP "
+                f"and emailed you a confirmation with a copy of your ticket. "
+                f"Keep this reference if you write again.</p>"
             )
         ok_html = (
             f'<div class="support-ok" role="status" id="support-success">'
@@ -932,9 +1039,9 @@ def render_support_page_html(
   <p class="support-lead">
     Tell us what went wrong. We open a ticket and notify
     <strong>{html.escape(SUPPORT_INBOX)}</strong> using the same site SMTP
-    as fulfilment (Render <code>RPT_FULFILMENT_SMTP_*</code>). You get a short
-    reference (e.g. <code>RPS-001</code>) to quote later — the ticket is kept
-    even if mail briefly fails.
+    as fulfilment (Render <code>RPT_FULFILMENT_SMTP_*</code>). You also receive
+    a confirmation email with a copy of your message and a short reference
+    (e.g. <code>RPS-001</code>) — the ticket is kept even if mail briefly fails.
   </p>
   {ok_html}
   {err_html}
