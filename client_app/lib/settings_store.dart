@@ -24,7 +24,7 @@ const String kKeyEntryCountry = 'entry_country';
 ///
 /// Default **off**. When on, residual "Push update to clients" and Helsinki
 /// breadcrumbs may store a pending Suite package; the user still clicks
-/// unpack-and-relaunch on the VPN main screen.
+/// unpack-and-relaunch under Settings (Allow Suite self-update).
 const String kKeyCheckBreadcrumbs = 'check_breadcrumbs';
 /// Suite appearance: `dark` (default, Evolve look) or `light` — Settings only.
 const String kKeySuiteAppearance = 'suite_appearance';

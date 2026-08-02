@@ -10,6 +10,7 @@ import 'package:restore_privacy_client/entry_access.dart';
 import 'package:restore_privacy_client/licence_gate.dart';
 import 'package:restore_privacy_client/main.dart';
 import 'package:restore_privacy_client/prefs_backend.dart';
+import 'package:restore_privacy_client/settings_screen.dart';
 import 'package:restore_privacy_client/settings_store.dart';
 import 'package:restore_privacy_client/suite_update.dart';
 import 'package:restore_privacy_client/suite_update_panel.dart';
@@ -272,7 +273,7 @@ void main() {
       expect(find.textContaining('paywall'), findsNothing);
     });
 
-    testWidgets('entitled shell shows update explainer after KEYGEN unlock',
+    testWidgets('entitled VPN shell does not show update explainer',
         (tester) async {
       SharedPreferences.setMockInitialValues({});
       final gate = LicenceGate(MemoryLicenceBackend({}));
@@ -287,15 +288,47 @@ void main() {
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 50));
       expect(find.byKey(kEntryAccessScreenKey), findsNothing);
+      // Honesty panel moved to Settings under Allow Suite self-update.
+      expect(find.byKey(const Key(kSuiteUpdateExplainerMarker)), findsNothing);
+      expect(find.text(kSuiteUpdateExplainerHeading), findsNothing);
+    });
+
+    testWidgets(
+        'Settings self-update section shows explainer and gated unpack',
+        (tester) async {
+      SharedPreferences.setMockInitialValues({});
+      final store = SettingsStore(MemorySettingsBackend({}));
+      await tester.pumpWidget(
+        MaterialApp(
+          home: SettingsScreen(
+            store: store,
+            initial: ProductSettings.defaults,
+          ),
+        ),
+      );
+      // Settings kicks off node pings; avoid pumpAndSettle (pending timers).
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 50));
+      expect(
+        find.byKey(const Key(kSuiteUpdateSettingsSwitchMarker)),
+        findsOneWidget,
+      );
+      expect(find.text(kSuiteUpdateSettingsTitle), findsWidgets);
       expect(find.byKey(const Key(kSuiteUpdateExplainerMarker)), findsOneWidget);
       expect(find.text(kSuiteUpdateExplainerHeading), findsOneWidget);
       expect(find.textContaining('privacy is breached'), findsOneWidget);
       expect(find.textContaining('Settings of the VPN'), findsOneWidget);
-      expect(find.byKey(const Key(kSuiteUpdateUnpackButtonMarker)), findsOneWidget);
+      expect(
+        find.byKey(const Key(kSuiteUpdateUnpackButtonMarker)),
+        findsOneWidget,
+      );
       final btn = tester.widget<FilledButton>(
         find.byKey(const Key(kSuiteUpdateUnpackButtonMarker)),
       );
+      // Default opt-in off + no pending → unpack disabled.
       expect(btn.onPressed, isNull);
+      // Let Settings post-frame pings/usage settle so no pending timers remain.
+      await tester.pump(const Duration(seconds: 3));
     });
 
     testWidgets('honesty panel enables unpack when opt-in + pending', (tester) async {

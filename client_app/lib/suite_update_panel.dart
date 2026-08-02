@@ -1,4 +1,4 @@
-/// Post-KEYGEN VPN main-surface panel: Suite update honesty + unpack button.
+/// Settings self-update section: Suite update honesty + unpack button.
 library;
 
 import 'package:flutter/material.dart';
@@ -10,7 +10,7 @@ import 'suite_update.dart';
 import 'suite_version.dart';
 import 'theme.dart';
 
-/// Honesty explainer + optional unpack/relaunch control on the entitled VPN home.
+/// Honesty explainer + optional unpack/relaunch under Allow Suite self-update.
 class SuiteUpdateHonestyPanel extends StatefulWidget {
   const SuiteUpdateHonestyPanel({
     super.key,

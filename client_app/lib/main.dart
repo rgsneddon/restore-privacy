@@ -25,7 +25,7 @@ import 'suite_parts.dart';
 import 'suite_parts_store.dart';
 import 'suite_shell.dart';
 import 'suite_update.dart';
-import 'suite_update_panel.dart';
+
 import 'suite_version.dart';
 import 'theme.dart';
 import 'upgrade_banner.dart';
@@ -245,7 +245,7 @@ class _TunnelHomeState extends State<TunnelHome> with WidgetsBindingObserver {
   /// Guards double presentation of the keygen sheet (licence Accept + launch race).
   bool _keygenSheetOpen = false;
 
-  /// Bumps [SuiteUpdateHonestyPanel] when residual push stores a pending package.
+  /// Bumps when residual push stores a pending package (Settings panel reloads).
   int _suiteUpdateReloadToken = 0;
 
   @override
@@ -1172,6 +1172,7 @@ class _TunnelHomeState extends State<TunnelHome> with WidgetsBindingObserver {
           partsStore: partsStore,
           initialParts: widget.initialParts,
           onPartsChanged: widget.onPartsChanged,
+          suiteUpdateReloadToken: _suiteUpdateReloadToken,
           onLicenceChanged: (accepted) {
             if (mounted) setState(() => _licenceAccepted = accepted);
           },
@@ -1320,13 +1321,8 @@ class _TunnelHomeState extends State<TunnelHome> with WidgetsBindingObserver {
                 ],
               ),
               SizedBox(height: tight ? 8 : 14),
-              // Post-KEYGEN honesty: Suite self-update unpack/relaunch (VPN main).
-              // Always shown after entry unlock — not gated by layout height.
-              SuiteUpdateHonestyPanel(
-                settings: _settings,
-                compact: tight,
-                reloadToken: _suiteUpdateReloadToken,
-              ),
+              // Suite self-update honesty + unpack lives under Settings
+              // ("Allow Suite self-update"), not on VPN home.
               // Catalog monopin banner only when Suite self-update opt-in is on.
               if (!tight && _settings.checkBreadcrumbs)
                 UpgradeBanner(runningVersion: kSuiteVersion),

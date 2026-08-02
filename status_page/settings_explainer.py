@@ -202,9 +202,10 @@ def settings_parts_catalog() -> list[dict[str, str]]:
             "body": (
                 "When ON, this device may receive a pushed Suite package (operator "
                 "“Push update to clients” or breadcrumbs) and store it as pending. "
-                "You still must click “Unpack update and relaunch” on the VPN main "
-                "screen. That path is the one privacy breach in the Suite — leave OFF "
-                "if you prefer no self-update. Silent unpack never runs."
+                "You still must click “Unpack update and relaunch” under this "
+                "Allow Suite self-update section in Settings. That path is the one "
+                "privacy breach in the Suite — leave OFF if you prefer no self-update. "
+                "Silent unpack never runs."
             ),
         },
         {

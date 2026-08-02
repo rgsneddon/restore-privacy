@@ -1,9 +1,9 @@
 /// Suite self-update honesty path: push-receive, Settings opt-in, unpack + relaunch.
 ///
-/// After KEYGEN unlock, the VPN main surface explains that the Suite can update
-/// itself when required, that the user must click to unpack and relaunch, that
-/// this is the one privacy breach in the Suite, and that it can be switched off
-/// in VPN Settings. Never call the entry unlock a "paywall" here.
+/// After KEYGEN unlock, Settings (under “Allow Suite self-update”) explains that
+/// the Suite can update itself when required, that the user must click to unpack
+/// and relaunch, that this is the one privacy breach in the Suite, and that it
+/// can be switched off in VPN Settings. Never call the entry unlock a "paywall".
 library;
 
 import 'dart:convert';

@@ -19,6 +19,7 @@ import 'settings_store.dart';
 import 'suite_parts.dart';
 import 'suite_parts_store.dart';
 import 'suite_update.dart';
+import 'suite_update_panel.dart';
 import 'suite_usage.dart';
 import 'theme.dart';
 import 'transparency_copy.dart';
@@ -60,6 +61,7 @@ class SettingsScreen extends StatefulWidget {
     this.onPartsChanged,
     this.usageReporter,
     this.initialUsage,
+    this.suiteUpdateReloadToken = 0,
   });
 
   final SettingsStore store;
@@ -88,6 +90,9 @@ class SettingsScreen extends StatefulWidget {
 
   /// Optional initial usage snapshot (tests / prefetched).
   final SuiteUsageSnapshot? initialUsage;
+
+  /// Bump when residual push stores a pending package (reload honesty panel).
+  final int suiteUpdateReloadToken;
 
   @override
   State<SettingsScreen> createState() => _SettingsScreenState();
@@ -274,7 +279,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 
   Future<void> _refreshUsage() async {
-    if (_usageBusy) return;
+    if (_usageBusy || !mounted) return;
     setState(() => _usageBusy = true);
     try {
       final reporter = widget.usageReporter ?? SuiteUsageReporter();
@@ -511,7 +516,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
           _note =
               '$kSuiteUpdateSettingsTitle on — pending update v$ver '
               '(${store?['pending_update_url'] ?? ''}). '
-              'Use “$kSuiteUpdateUnpackButtonLabel” on the VPN screen.';
+              'Use “$kSuiteUpdateUnpackButtonLabel” below in this Settings section.';
         } else {
           _note =
               '$kSuiteUpdateSettingsTitle on — fetch/apply: '
@@ -636,7 +641,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 
   Future<void> _refreshPings() async {
-    if (_pingBusy) return;
+    if (_pingBusy || !mounted) return;
     setState(() {
       _pingBusy = true;
       _entryPing = '…';
@@ -840,6 +845,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   activeTrackColor: suitePrimaryOf(context),
                   onChanged: _busy ? null : _setCheckBreadcrumbs,
                 ),
+                // Honesty explainer + unpack/relaunch under self-update opt-in.
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(8, 0, 8, 8),
+                  child: SuiteUpdateHonestyPanel(
+                    settings: _settings,
+                    reloadToken: widget.suiteUpdateReloadToken,
+                  ),
+                ),
                 const Divider(height: 1),
                 SwitchListTile(
                   key: const Key('suite_appearance_light_switch'),
@@ -865,8 +878,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
             '(startup launches the app; autoconnect starts the VPN). '
             'OS VPN permission / Administrator may still be required. '
             '$kSuiteUpdateSettingsTitle defaults off — no push-update receive or '
-            'unpack until you allow it. Unpacking still requires your click on the '
-            'VPN main screen ($kSuiteUpdateUnpackButtonLabel). '
+            'unpack until you allow it. Unpacking still requires your click on '
+            '$kSuiteUpdateUnpackButtonLabel in this Settings self-update section. '
             'Appearance (dark/light) is only changed in this Settings panel.',
             style: TextStyle(color: suiteTextMutedOf(context), fontSize: 12),
           ),
