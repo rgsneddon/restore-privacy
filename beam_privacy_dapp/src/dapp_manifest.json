@@ -1,7 +1,7 @@
 {
   "name": "Restore Privacy Beam Dapp",
   "version": "0.1.0",
-  "suite_monopin": "1.0.5",
+  "suite_monopin": "1.0.6",
   "target": "Beam Privacy Suite",
   "visibility": "private",
   "products": [

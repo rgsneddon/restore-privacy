@@ -5,7 +5,7 @@ description: "Restore Privacy Suite — residual VPN, Perccent wallet (%), and E
 publish_to: 'none' # Remove this line if you wish to publish to pub.dev
 
 # Restore Privacy Suite v 1.0.4 monopin.
-version: 1.0.5+1
+version: 1.0.6+1
 
 environment:
   sdk: '>=3.2.0 <4.0.0'

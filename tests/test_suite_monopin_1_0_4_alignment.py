@@ -1,7 +1,7 @@
-"""Suite monopin 1.0.5 alignment + companion/dapp version retention.
+"""Suite monopin 1.0.6 alignment + companion/dapp version retention.
 
 Drives shipped pin sources and catalog helpers (not re-implementations).
-Fails if public/current surfaces still claim a pre-1.0.5 suite pin as current,
+Fails if public/current surfaces still claim a pre-1.0.6 suite pin as current,
 or if companion/dapp product versions were collapsed onto the suite monopin.
 """
 
@@ -15,7 +15,7 @@ import unittest
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-EXPECTED_SUITE = "1.0.5"
+EXPECTED_SUITE = "1.0.6"
 
 # Companion / dapp product lines keep their own pins (not suite monopin).
 RETAINED = {
@@ -70,10 +70,10 @@ class TestSuiteMonopin104Alignment(unittest.TestCase):
         self.assertEqual(manifest.get("version"), EXPECTED_SUITE)
         desc = str(manifest.get("description") or "")
         self.assertIn(EXPECTED_SUITE, desc)
-        self.assertNotRegex(desc, r"Suite\s+1\.0\.[123]\b")
+        self.assertNotRegex(desc, r"Suite\s+1\.0\.[1-5]\b")
         popup = (ROOT / "browser_extension" / "popup.html").read_text(encoding="utf-8")
         self.assertIn(f"Suite {EXPECTED_SUITE}", popup)
-        self.assertNotRegex(popup, r"Suite\s+1\.0\.[123]\b")
+        self.assertNotRegex(popup, r"Suite\s+1\.0\.[1-5]\b")
 
     def test_assure_current_packages_ok(self):
         result = self.d.assure_current_catalog_packages()
@@ -82,7 +82,7 @@ class TestSuiteMonopin104Alignment(unittest.TestCase):
         self.assertEqual(len(result["platforms"]), 5)
         for p in result["platforms"]:
             self.assertIn(EXPECTED_SUITE, p["filename"])
-            self.assertNotRegex(p["filename"], r"1\.0\.[123]-")
+            self.assertNotRegex(p["filename"], r"1\.0\.[1-5]-")
 
     def test_companion_product_versions_retained(self):
         rpos = _load_script("package_rpos", ROOT / "scripts" / "package_rpos.py")
@@ -137,9 +137,9 @@ class TestSuiteMonopin104Alignment(unittest.TestCase):
             ROOT / "public_site" / "downloads-map.html",
         ]
         stale = re.compile(
-            r"(?:Suite\s+v?\s*1\.0\.[123]\b|catalog\s+(?:\*\*)?v?1\.0\.[123]\b|"
-            r"monopin\s+(?:\*\*)?1\.0\.[123]\b|"
-            r"restore-privacy-client-1\.0\.[123]-)",
+            r"(?:Suite\s+v?\s*1\.0\.[1-5]\b|catalog\s+(?:\*\*)?v?1\.0\.[1-5]\b|"
+            r"monopin\s+(?:\*\*)?1\.0\.[1-5]\b|"
+            r"restore-privacy-client-1\.0\.[1-5]-)",
             re.I,
         )
         for p in paths:

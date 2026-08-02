@@ -23,9 +23,9 @@ def _suite_version() -> str:
             sys.path.insert(0, str(sys_path_status))
         from downloads import RELEASE_VERSION
 
-        return str(RELEASE_VERSION).strip() or "1.0.5"
+        return str(RELEASE_VERSION).strip() or "1.0.6"
     except Exception:
-        return "1.0.5"
+        return "1.0.6"
 
 
 def list_brand_installer_packages(
