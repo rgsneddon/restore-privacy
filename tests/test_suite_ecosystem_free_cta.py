@@ -74,8 +74,9 @@ class TestSuiteEcosystemNewLinks(unittest.TestCase):
         # rpOS expanded meaning via title and aria-label
         self.assertIn(f'title="{SUITE_RPOS_TITLE}"', html)
         self.assertIn(f'aria-label="{SUITE_RPOS_TITLE}"', html)
-        self.assertIn("Suite ecosystem", html)
-
+        self.assertIn("Suite ecosystem (wip)", html)
+        self.assertIn("(wip)", html)
+        self.assertIn("suite-product-submenu-wip", html)
 
 class TestSuiteEcosystemNeonUnderline(unittest.TestCase):
     """Menu items use neon-gradient underline, not filled pill/box chrome."""
@@ -94,6 +95,9 @@ class TestSuiteEcosystemNeonUnderline(unittest.TestCase):
         # Submenu anchors: transparent / no filled chip
         self.assertIn("background: transparent", css)
         self.assertIn("Neon-gradient underline", css)
+        # (wip) suffix stays lowercase under label uppercase transform
+        self.assertIn("suite-product-submenu-wip", css)
+        self.assertIn("text-transform: none", css)
         # Must not style suite-sub links as filled rounded pills
         # (old chrome used solid background + border-radius chips on anchors)
         block = re.search(

@@ -50,6 +50,8 @@ class TestSuiteBoxSubmenu(unittest.TestCase):
         self.assertIn("Perccent", sub)
         self.assertIn("explorer", sub.lower())
 
+        from downloads import SUITE_PRODUCT_SUBMENU_LABEL
+
         suite = render_suite_storefront_html()
         self.assertIn(SUITE_SUBMENU_ID, suite)
         self.assertIn(SUITE_PERC_EXPLORER_HREF, suite)
@@ -63,6 +65,20 @@ class TestSuiteBoxSubmenu(unittest.TestCase):
             suite,
         )
         self.assertIsNotNone(m, "submenu must be inside #suite-storefront")
+        # Title includes (wip); bare "Suite ecosystem" alone is not the label
+        self.assertEqual(SUITE_PRODUCT_SUBMENU_LABEL, "Suite ecosystem (wip)")
+        self.assertIn("(wip)", suite)
+        self.assertIn("suite-product-submenu-wip", suite)
+        # Bottom of box: KEYGEN + pay-hint before submenu in document order
+        i_buy = suite.index('id="suite-keygen-buy"')
+        i_hint = suite.index('id="suite-pay-hint"')
+        i_sub = suite.index('id="suite-product-submenu"')
+        self.assertLess(i_buy, i_hint)
+        self.assertLess(i_hint, i_sub)
+        # Submenu is the last major block before section close
+        after_sub = suite[i_sub:]
+        self.assertNotIn('id="suite-keygen-buy"', after_sub)
+        self.assertNotIn('id="suite-pay-hint"', after_sub)
 
     def test_suite_keygen_still_present_without_device_grid(self) -> None:
         from downloads import render_suite_storefront_html

@@ -1806,8 +1806,18 @@ def suite_product_submenu_links() -> list[tuple[str, str, str, str]]:
     ]
 
 
+# Suite ecosystem submenu title (display: SUITE ECOSYSTEM (wip) via CSS uppercase + wip span)
+SUITE_PRODUCT_SUBMENU_LABEL = "Suite ecosystem (wip)"
+SUITE_PRODUCT_SUBMENU_LABEL_HTML = (
+    'Suite ecosystem <span class="suite-product-submenu-wip">(wip)</span>'
+)
+
+
 def render_suite_product_submenu_html() -> str:
-    """Sub-menu: product family (rpOS / browser / VPN) + Perc / Evolve / wallet."""
+    """Sub-menu: product family (rpOS / browser / VPN) + Perc / Evolve / wallet.
+
+    Placed at the bottom of the Suite storefront box (after KEYGEN cart / pay-hint).
+    """
     items: list[str] = []
     for href, label, key, title in suite_product_submenu_links():
         external = href.startswith("http://") or href.startswith("https://")
@@ -1828,9 +1838,9 @@ def render_suite_product_submenu_html() -> str:
     return f"""
     <nav class="suite-product-submenu" id="{SUITE_SUBMENU_ID}"
          data-suite-product-submenu="1"
-         aria-label="Suite ecosystem — rpOS, Rx Privacy Browser, VPN, Perc, Evolve">
+         aria-label="{_esc_html(SUITE_PRODUCT_SUBMENU_LABEL)} — rpOS, Rx Privacy Browser, VPN, Perc, Evolve">
       <p class="suite-product-submenu-label" id="suite-product-submenu-label">
-        Suite ecosystem
+        {SUITE_PRODUCT_SUBMENU_LABEL_HTML}
       </p>
       {" ".join(items)}
     </nav>
@@ -1923,8 +1933,9 @@ def suite_storefront_css() -> str:
     }
     .suite-product-submenu {
       display: flex; flex-wrap: wrap; gap: 0.4rem; justify-content: center;
-      margin: 0.35rem auto 0.85rem; max-width: 36rem; padding: 0;
+      margin: 1rem auto 0; max-width: 36rem; padding: 0.75rem 0 0;
       list-style: none;
+      border-top: 1px solid rgba(174, 208, 234, 0.22);
     }
     /* Neon-gradient underline menu (not filled pill/box chips) */
     .suite-product-submenu a,
@@ -1957,6 +1968,11 @@ def suite_storefront_css() -> str:
     .suite-product-submenu-label {
       width: 100%; margin: 0 0 0.35rem; font-size: 0.72rem; font-weight: 700;
       letter-spacing: 0.06em; text-transform: uppercase; color: rgba(174,208,234,0.9);
+    }
+    /* Keep OBJECTIVE lowercase (wip) under label uppercase transform */
+    .suite-product-submenu-label .suite-product-submenu-wip {
+      text-transform: none;
+      letter-spacing: 0.04em;
     }
     /* Perccent explorer embed — forces connect on first homepage visit */
     .suite-perc-wallet-explorer {
@@ -2308,7 +2324,6 @@ def render_suite_storefront_html(
     <h2 id="suite-storefront-title">{SUITE_PRODUCT_TITLE}</h2>
     <span class="suite-version-badge" id="suite-version-badge">{SUITE_VERSION_LABEL}</span>
     <p class="suite-blurb" id="suite-blurb">{SUITE_PRODUCT_SUBTITLE}</p>
-{render_suite_product_submenu_html()}
     <div class="dl-buttons" id="suite-dl-buttons" data-buy-mode="suite-keygen"
          data-product="suite">
 {keygen_form}
@@ -2316,6 +2331,7 @@ def render_suite_storefront_html(
     <p class="suite-pay-hint" id="suite-pay-hint">
       {SUITE_PAY_HINT_HTML}
     </p>
+{render_suite_product_submenu_html()}
   </section>
 """
 
