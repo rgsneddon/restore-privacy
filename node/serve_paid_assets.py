@@ -298,10 +298,15 @@ class Handler(BaseHTTPRequestHandler):
         self.send_header("Content-Length", str(len(data)))
         self.send_header("Cache-Control", "no-store")
         self.end_headers()
+        if self._is_head():
+            return
         try:
             self.wfile.write(data)
         except (BrokenPipeError, ConnectionResetError, ConnectionAbortedError):
             return
+
+    def _is_head(self) -> bool:
+        return (getattr(self, "command", "GET") or "GET").upper() == "HEAD"
 
     def _send_file(self, fpath: Path, *, as_attachment: bool) -> None:
         ctype, _ = mimetypes.guess_type(str(fpath))
@@ -322,6 +327,8 @@ class Handler(BaseHTTPRequestHandler):
             )
         self.send_header("Cache-Control", "no-store")
         self.end_headers()
+        if self._is_head():
+            return
         try:
             # Larger chunks for multi-MB installers (browser←Helsinki path).
             with fpath.open("rb") as fh:
@@ -332,6 +339,14 @@ class Handler(BaseHTTPRequestHandler):
                     self.wfile.write(chunk)
         except (BrokenPipeError, ConnectionResetError, ConnectionAbortedError):
             return
+
+    def do_HEAD(self) -> None:  # noqa: N802
+        """HEAD mirrors GET auth + headers (Content-Length / Disposition per file).
+
+        Without this, every platform signed URL returned the same 501 so
+        probes looked identical across windows/android/macos/ios/linux.
+        """
+        self.do_GET()
 
     def do_GET(self) -> None:  # noqa: N802
         expected = _token()

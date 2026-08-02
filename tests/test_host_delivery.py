@@ -251,21 +251,28 @@ class TestHostDeliveryPure(unittest.TestCase):
         app_src = (ROOT / "status_page" / "app.py").read_text(encoding="utf-8")
         self.assertIn("host_delivery_plan", app_src)
         self.assertIn("helsinki_host", app_src)
-        # Host path before proxy
-        i_plan = app_src.find("host_delivery_plan")
-        i_open = app_src.find("open_release_asset(str(fname))")
-        self.assertGreater(i_plan, 0)
+        # Scope to paid /download route — free Suite path also calls open_release_asset
+        # earlier in the file, so a global find() is not meaningful.
+        i_dl = app_src.find('if path == "/download":')
+        self.assertGreater(i_dl, 0)
+        i_plan = app_src.find("host_delivery_plan", i_dl)
+        i_open = app_src.find("open_release_asset(str(fname))", i_dl)
+        self.assertGreater(i_plan, i_dl)
         self.assertGreater(i_open, i_plan)
         # Must not burn grant on 302 (thank-you iframe + manual share one token)
         host_block = app_src[i_plan:i_open]
         self.assertIn("probe=True", host_block)
         self.assertNotIn("consume_download_token(token)", host_block)
-        self.assertIn("Do not consume the grant on 302", app_src)
-        self.assertIn("no consume yet", host_block)
+        # Host 302 path must not consume; consume is only after full proxy stream.
+        self.assertIn("host 302 does not", app_src)
+        self.assertIn("Consume only after a successful full stream", app_src)
         serve = (ROOT / "node" / "serve_paid_assets.py").read_text(encoding="utf-8")
         self.assertIn("request_authorized", serve)
         self.assertIn("verify_delivery_signature", serve)
         self.assertIn("short-lived", serve.lower() or "signed query")
+        # HEAD must be implemented so platform probes are not all identical 501
+        self.assertIn("def do_HEAD", app_src)
+        self.assertIn("def do_HEAD", serve)
 
     def test_probe_failure_returns_none_plan(self) -> None:
         from host_delivery import host_delivery_plan, build_host_delivery_url

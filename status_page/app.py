@@ -787,6 +787,15 @@ class Handler(BaseHTTPRequestHandler):
             )
         apply_security_headers(self, allow_framing=allow_framing)
 
+    def _is_head(self) -> bool:
+        """True when handling HEAD (must not write a response body)."""
+        return (getattr(self, "command", "GET") or "GET").upper() == "HEAD"
+
+    def _write_body(self, data: bytes) -> None:
+        if self._is_head():
+            return
+        self.wfile.write(data)
+
     def _send(
         self,
         code: int,
@@ -805,7 +814,16 @@ class Handler(BaseHTTPRequestHandler):
             for k, v in extra_headers:
                 self.send_header(k, v)
         self.end_headers()
-        self.wfile.write(data)
+        self._write_body(data)
+
+    def do_HEAD(self) -> None:  # noqa: N802
+        """HEAD must match GET status/headers — platform Suite links must not all 501.
+
+        Link checkers and ``curl -I`` probe with HEAD. Without this, every
+        ``/suite/download?platform=…`` returned the same 501 Unsupported method
+        body so platform links looked identical.
+        """
+        self.do_GET()
 
     def _brand_package_gate(
         self,
@@ -1098,10 +1116,11 @@ class Handler(BaseHTTPRequestHandler):
                     self.send_header("Content-Length", str(length))
                 self._security_headers()
                 self.end_headers()
-                if hasattr(body_src, "read"):
-                    shutil.copyfileobj(body_src, self.wfile)  # type: ignore[arg-type]
-                else:
-                    self.wfile.write(body_src)  # type: ignore[arg-type]
+                if not self._is_head():
+                    if hasattr(body_src, "read"):
+                        shutil.copyfileobj(body_src, self.wfile)  # type: ignore[arg-type]
+                    else:
+                        self.wfile.write(body_src)  # type: ignore[arg-type]
             finally:
                 try:
                     if hasattr(body_src, "close"):
@@ -1165,10 +1184,11 @@ class Handler(BaseHTTPRequestHandler):
                     self.send_header("Content-Length", str(length))
                 self._security_headers()
                 self.end_headers()
-                if hasattr(body_src, "read"):
-                    shutil.copyfileobj(body_src, self.wfile)  # type: ignore[arg-type]
-                else:
-                    self.wfile.write(body_src)  # type: ignore[arg-type]
+                if not self._is_head():
+                    if hasattr(body_src, "read"):
+                        shutil.copyfileobj(body_src, self.wfile)  # type: ignore[arg-type]
+                    else:
+                        self.wfile.write(body_src)  # type: ignore[arg-type]
             finally:
                 try:
                     if hasattr(body_src, "close"):
@@ -1361,7 +1381,7 @@ class Handler(BaseHTTPRequestHandler):
             self.send_header("Cache-Control", "public, max-age=3600")
             self._security_headers()
             self.end_headers()
-            self.wfile.write(data)
+            self._write_body(data)
             return
         # Operator console scripts are never anonymous-public.
         # Use module-level is_authenticated only — a local import here would
@@ -1385,7 +1405,7 @@ class Handler(BaseHTTPRequestHandler):
             self.send_header("Cache-Control", cache)
             self._security_headers()
             self.end_headers()
-            self.wfile.write(data)
+            self._write_body(data)
             return
         if path in ("/api/status", "/status"):
             status = fetch_upstream_status()
@@ -1702,7 +1722,7 @@ class Handler(BaseHTTPRequestHandler):
             # Same-origin iframe on thank-you must be allowed to load this file.
             self._security_headers(allow_framing=True)
             self.end_headers()
-            self.wfile.write(body)
+            self._write_body(body)
             return
 
         # --- Paid download flow: site-hosted cart / Select your plan page ---
@@ -1880,6 +1900,14 @@ class Handler(BaseHTTPRequestHandler):
                 # Larger chunks + early flush so browsers show progress sooner
                 # (avoids feeling "stuck" on multi‑MB installers).
                 _chunk = 256 * 1024
+                if self._is_head():
+                    # Headers only — do not stream body or mark the grant used.
+                    try:
+                        if hasattr(body, "close"):
+                            body.close()
+                    except Exception:  # noqa: BLE001
+                        pass
+                    return
                 if isinstance(body, (bytes, bytearray)):
                     self.wfile.write(body)
                     try:
@@ -2372,7 +2400,7 @@ class Handler(BaseHTTPRequestHandler):
             self.send_header("Content-Length", str(len(body)))
             self.send_header("Cache-Control", "no-store")
             self.end_headers()
-            self.wfile.write(body)
+            self._write_body(body)
             return
         if path in ("/admin/fleet", "/admin/fleet/"):
             if not admin_enabled():
