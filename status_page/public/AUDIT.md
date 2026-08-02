@@ -7,7 +7,7 @@
 | **Public catalog version** | **1.0.7** |
 | **Default residual entry** | **Germany (DE)** (product default on all clients; RO monopin retired) |
 | **Live probe peer** | **Germany (DE):44044** (UDP); status UI TCP **8080** |
-| **Audit generated** | **2 August 2026** (`2026-08-02T15:22:20Z`) |
+| **Audit generated** | **2 August 2026** (`2026-08-02T15:31:21Z`) |
 | **Cadence** | Automated security pass (~**every 1 day** + **jitter** on privacy-hardened node timer) |
 | **Audit type** | Static suite + live node status probe + **per-installer AUDIT STATE** + **section B privacy probes** + **multihop node structure** |
 | **Auditor method** | `scripts/run_security_audit.py` — unittest privacy/security modules + TCP/HTTP/UDP probes + no-`.priv` scan + catalog package RAG + section B + multihop structure (no firewall scan) |
@@ -92,8 +92,8 @@ system capture) stays required. This table helps users set latency expectations.
 - **Live** RTT where probes succeeded from **this audit host** to product
   **entry** `Iceland (IS)` (Iceland)
   and **exit** `Germany (DE)` (Germany).
-- Entry probe: **51 ms** via `tcp` (shared base across rows).
-- Exit probe: **77 ms** via `tcp` (shared base for multi-hop rows).
+- Entry probe: **55 ms** via `tcp` (shared base across rows).
+- Exit probe: **71 ms** via `tcp` (shared base for multi-hop rows).
 - Live ms are from **this host's path**, not guaranteed London UK RTT.
 - Traffic shaping **feel** may add a small band on top of live base
   (+0–5 ms labeled); outer obfs ~0 ms RTT.
@@ -105,14 +105,14 @@ system capture) stays required. This table helps users set latency expectations.
 
 | Shape | Outer obfs | Multi-hop | UK→entry (live) | UK→exit (live) | AVG | RAG | Notes |
 |-------|------------|-----------|-------------------|------------------|-----|-----|-------|
-| on | on | on | 51–56 ms (live base + shape feel) | 77–82 ms (live base + shape feel) | 66.5 ms | 🟧 | residual dials exit when multi-hop on; shape on adds modest jitter/cover feel; outer obfs on (QUIC-mimic, ~0 ms RTT); entry RTT live probe this host; exit RTT live probe this host; AVG 66.5 ms → amber |
-| on | on | off | 51–56 ms (live base + shape feel) | n/a (multi-hop off) | 53.5 ms | 🟧 | single-hop residual → entry; shape on; outer obfs on (QUIC-mimic, ~0 ms RTT); entry RTT live probe this host; AVG 53.5 ms → amber |
-| on | off | on | 51–56 ms (live base + shape feel) | 77–82 ms (live base + shape feel) | 66.5 ms | 🟧 | residual dials exit when multi-hop on; shape on adds modest jitter/cover feel; outer obfs off (bare RPT, ~0 ms RTT); entry RTT live probe this host; exit RTT live probe this host; AVG 66.5 ms → amber |
-| on | off | off | 51–56 ms (live base + shape feel) | n/a (multi-hop off) | 53.5 ms | 🟧 | single-hop residual → entry; shape on; outer obfs off (bare RPT, ~0 ms RTT); entry RTT live probe this host; AVG 53.5 ms → amber |
-| off | on | on | 51 ms (live) | 77 ms (live) | 64 ms | 🟧 | residual dials exit when multi-hop on; shape off leaner; outer obfs on (QUIC-mimic, ~0 ms RTT); entry RTT live probe this host; exit RTT live probe this host; AVG 64.0 ms → amber |
-| off | on | off | 51 ms (live) | n/a (multi-hop off) | 51 ms | 🟧 | single-hop residual → entry; shape off (faster feel); outer obfs on (QUIC-mimic, ~0 ms RTT); entry RTT live probe this host; AVG 51.0 ms → amber |
-| off | off | on | 51 ms (live) | 77 ms (live) | 64 ms | 🟧 | residual dials exit when multi-hop on; shape off leaner; outer obfs off (bare RPT, ~0 ms RTT); entry RTT live probe this host; exit RTT live probe this host; AVG 64.0 ms → amber |
-| off | off | off | 51 ms (live) | n/a (multi-hop off) | 51 ms | 🟧 | single-hop residual → entry; shape off (faster feel); outer obfs off (bare RPT, ~0 ms RTT); entry RTT live probe this host; AVG 51.0 ms → amber |
+| on | on | on | 55–60 ms (live base + shape feel) | 71–76 ms (live base + shape feel) | 65.5 ms | 🟧 | residual dials exit when multi-hop on; shape on adds modest jitter/cover feel; outer obfs on (QUIC-mimic, ~0 ms RTT); entry RTT live probe this host; exit RTT live probe this host; AVG 65.5 ms → amber |
+| on | on | off | 55–60 ms (live base + shape feel) | n/a (multi-hop off) | 57.5 ms | 🟧 | single-hop residual → entry; shape on; outer obfs on (QUIC-mimic, ~0 ms RTT); entry RTT live probe this host; AVG 57.5 ms → amber |
+| on | off | on | 55–60 ms (live base + shape feel) | 71–76 ms (live base + shape feel) | 65.5 ms | 🟧 | residual dials exit when multi-hop on; shape on adds modest jitter/cover feel; outer obfs off (bare RPT, ~0 ms RTT); entry RTT live probe this host; exit RTT live probe this host; AVG 65.5 ms → amber |
+| on | off | off | 55–60 ms (live base + shape feel) | n/a (multi-hop off) | 57.5 ms | 🟧 | single-hop residual → entry; shape on; outer obfs off (bare RPT, ~0 ms RTT); entry RTT live probe this host; AVG 57.5 ms → amber |
+| off | on | on | 55 ms (live) | 71 ms (live) | 63 ms | 🟧 | residual dials exit when multi-hop on; shape off leaner; outer obfs on (QUIC-mimic, ~0 ms RTT); entry RTT live probe this host; exit RTT live probe this host; AVG 63.0 ms → amber |
+| off | on | off | 55 ms (live) | n/a (multi-hop off) | 55 ms | 🟧 | single-hop residual → entry; shape off (faster feel); outer obfs on (QUIC-mimic, ~0 ms RTT); entry RTT live probe this host; AVG 55.0 ms → amber |
+| off | off | on | 55 ms (live) | 71 ms (live) | 63 ms | 🟧 | residual dials exit when multi-hop on; shape off leaner; outer obfs off (bare RPT, ~0 ms RTT); entry RTT live probe this host; exit RTT live probe this host; AVG 63.0 ms → amber |
+| off | off | off | 55 ms (live) | n/a (multi-hop off) | 55 ms | 🟧 | single-hop residual → entry; shape off (faster feel); outer obfs off (bare RPT, ~0 ms RTT); entry RTT live probe this host; AVG 55.0 ms → amber |
 
 **Product defaults:** shape **off**, outer obfs **off**, multi-hop **off**
 (lean single-hop entry). Turn shape/obfs **on** for stronger residual defenses;
@@ -190,7 +190,7 @@ Schedule: **all active residual monopin peers** from the product catalog
 
 | Probe | Detail |
 |-------|--------|
-| Peer | VPN node |
+| Peer | Germany (DE) |
 | TCP status `:8080` | ok=True error=None |
 | HTTP `/status` | code=200 body={'title': 'RESTORE PRIVACY'} |
 | UDP residual `:44044` | sent=True error=None |
@@ -221,7 +221,7 @@ An **ISP** performing **traffic analysis** may still observe connection timing a
 
 | Severity | Finding | Status |
 |----------|---------|--------|
-| **Info** | Automated pass at `2026-08-02T15:22:20Z` | Recorded |
+| **Info** | Automated pass at `2026-08-02T15:31:21Z` | Recorded |
 | **High** | Public client count on status | Closed (title-only) |
 | **Medium** | Shared client priv in packages | Closed (no .priv hits) |
 | **Low** | Unit suite failure | OPEN — see suite log |
@@ -273,7 +273,7 @@ An **ISP** performing **traffic analysis** may still observe connection timing a
 
 ## 9. Conclusion
 
-Automated security audit at **2026-08-02T15:22:20Z** against node **Germany (DE)** and in-repo privacy gates. Public **SECURITY AUDIT** links must resolve on the **status host** (`/AUDIT.md` / `/audit.md`). Source repository is **private**; paid catalog installers are fulfilled on the status host only. Core privacy promises hold when the suite passes and status remains title-only.
+Automated security audit at **2026-08-02T15:31:21Z** against node **Germany (DE)** and in-repo privacy gates. Public **SECURITY AUDIT** links must resolve on the **status host** (`/AUDIT.md` / `/audit.md`). Source repository is **private**; paid catalog installers are fulfilled on the status host only. Core privacy promises hold when the suite passes and status remains title-only.
 
 Re-run: `python3 scripts/run_security_audit.py --write`
 
