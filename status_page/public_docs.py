@@ -14,6 +14,7 @@ Stable same-origin paths (no GitHub dependency for public readers):
 | ``/EVOLVE.md`` | Evolve docs (mirror of evolve repo README) |
 | ``/RPOS.md`` | rpOS docs (mirror of rgsneddon/rpOS README) |
 | ``/RX.md`` | Rx Privacy Browser docs (mirror of Rx-Privacy-Browser README) |
+| ``/CERBERUS.md`` | CERBERUS docs (mirror of rgsneddon/CERBERUS README) |
 """
 
 from __future__ import annotations
@@ -62,6 +63,13 @@ RX_README_GITHUB_URL = (
 RX_README_RAW_URL = (
     "https://raw.githubusercontent.com/rgsneddon/Rx-Privacy-Browser/"
     "master/README.md"
+)
+CERBERUS_DOCS_PATH = "/CERBERUS.md"
+CERBERUS_README_GITHUB_URL = (
+    "https://github.com/rgsneddon/CERBERUS/blob/main/README.md"
+)
+CERBERUS_README_RAW_URL = (
+    "https://raw.githubusercontent.com/rgsneddon/CERBERUS/main/README.md"
 )
 
 
@@ -163,6 +171,19 @@ PUBLIC_DOCS: tuple[PublicDoc, ...] = (
             "/rx-privacy-browser",
             "/docs/RX.md",
             "/docs/rx",
+        ),
+    ),
+    PublicDoc(
+        id="cerberus-docs",
+        path=CERBERUS_DOCS_PATH,
+        title="CERBERUS — residual fleet oracle",
+        filename="CERBERUS.md",
+        aliases=(
+            "/cerberus",
+            "/CERBERUS",
+            "/cerberus-docs",
+            "/docs/CERBERUS.md",
+            "/docs/cerberus",
         ),
     ),
 )

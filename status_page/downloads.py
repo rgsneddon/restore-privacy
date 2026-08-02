@@ -1165,6 +1165,14 @@ SUITE_RX_BROWSER_KEY = "rx-privacy-browser"
 SUITE_ECOSYSTEM_VPN_HREF = "/README.md"
 SUITE_ECOSYSTEM_VPN_LABEL = "VPN"
 SUITE_ECOSYSTEM_VPN_KEY = "suite-vpn"
+# Same-origin CERBERUS README (residual fleet oracle docs).
+SUITE_CERBERUS_HREF = "/CERBERUS.md"
+SUITE_CERBERUS_LABEL = "CERBERUS"
+SUITE_CERBERUS_KEY = "cerberus"
+SUITE_CERBERUS_TITLE = "CERBERUS — residual fleet oracle"
+SUITE_CERBERUS_README_GITHUB_HREF = (
+    "https://github.com/rgsneddon/CERBERUS/blob/main/README.md"
+)
 
 # Full business package / residual node host (commercial deposit path via Service).
 # Primary doc is status-host /NODE_OPERATOR.md (public pack), not Suite README.
@@ -1769,6 +1777,12 @@ def suite_product_submenu_links() -> list[tuple[str, str, str, str]]:
             "Restore Privacy residual VPN / Connect",
         ),
         (SUITE_PERC_EXPLORER_HREF, SUITE_PERC_EXPLORER_LABEL, "perc-explorer", ""),
+        (
+            SUITE_CERBERUS_HREF,
+            SUITE_CERBERUS_LABEL,
+            SUITE_CERBERUS_KEY,
+            SUITE_CERBERUS_TITLE,
+        ),
         (SUITE_EVOLVE_DOCS_HREF, SUITE_EVOLVE_DOCS_LABEL, "evolve-docs", ""),
         (
             SUITE_EVOLVE_WHITEPAPER_HREF,
