@@ -51,7 +51,7 @@ a valid KEYGEN.
 The app re-checks the status host (`/api/connect-entitlement`) on each Connect.
 Settings → Payment entitlement is a fallback unlock path.
 
-> **Payment for Connect, not for the installer:** residual Connect needs an active
+> **STRONG DISCLAIMER — PAYMENT REQUIRED AFTER TRIAL: residual Connect includes a free 3-day (72-hour) trial on this device (no card). After the trial ends, Connect needs a paid KEYGEN / active subscription. The free download is only the package.
 > KEYGEN while the subscription is valid. The free download is only the package.
 > Suite wallet/Evolve sign-up is optional and never gates Connect.
 
@@ -303,3 +303,5 @@ python3 scripts/package_restore_privacy_suite.py
 **Node wipe reinstall (sequential fleet):** [docs/NODE_WIPE_REINSTALL.md](docs/NODE_WIPE_REINSTALL.md)
 — weekly wipe is **one peer at a time** (IS → DE) with mandatory full selfhost
 reinstall; never concurrent multi-node wipe.
+
+If payment fails at any time after purchase, Connect is cancelled until successful payment is completed.

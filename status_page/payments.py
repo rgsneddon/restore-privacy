@@ -43,12 +43,14 @@ PRICE_YEARLY_FULL_LABEL = (
 YEARLY_DISCOUNT_PERCENT = int(
     round(100 * (1 - PRICE_YEARLY_PENCE / max(1, PRICE_YEARLY_FULL_PENCE)))
 )
-# Free trial on **all** catalog subscription options (monthly + yearly).
-# Applied on Checkout Session subscription_data (and desired catalog shape).
+# Free residual trial window (days) for product messaging; KEYGEN path is paid after.
+# Stripe Checkout may still attach trial_period_days on catalog prices where configured;
+# customer copy must not require card details before residual trial.
 CATALOG_TRIAL_PERIOD_DAYS = 3
-# Customer-facing trial copy (homepage, /pay, desired fields).
+# Customer-facing trial copy (homepage, /pay, desired fields) — residual first.
 CATALOG_TRIAL_COPY = (
-    f"{CATALOG_TRIAL_PERIOD_DAYS}-day free trial — no money is taken until after the trial ends"
+    f"Free {CATALOG_TRIAL_PERIOD_DAYS}-day (72-hour) residual trial without card; "
+    "after that a paid KEYGEN / active subscription is required"
 )
 # Operator: enable Stripe Dashboard Adaptive Pricing when presentment allows;
 # unsupported currencies → USD (see local_currency.stripe_presentment_or_usd).
@@ -3380,9 +3382,10 @@ def render_post_payment_thankyou_html(
     if sid:
         ent_block = f"""
   <p class="msg entitlement-note" id="connect-entitlement-note">
-    <strong>STRONG DISCLAIMER — PAYMENT REQUIRED FOR CONNECT:</strong>
-    payment session <code id="connect-session-id">{sid_esc}</code> is active.
-    If payment <strong>fails at any time</strong> (refund, dispute, failed charge),
+    <strong>STRONG DISCLAIMER — PAYMENT REQUIRED AFTER TRIAL:</strong>
+    free residual trial is 3 days (72 hours) without card; after that a KEYGEN is required.
+    Payment session <code id="connect-session-id">{sid_esc}</code> is active.
+    If payment <strong>fails at any time</strong> after purchase (refund, dispute, failed charge),
     the ability to <strong>Connect with the Restore Privacy app is cancelled</strong>
     for this purchase/install until you complete a successful payment again.
   </p>
@@ -5109,12 +5112,14 @@ def render_pay_plan_page_html(
              data-cart-step="plan" data-product="{_esc(pl)}">
       <h2 id="pay-plan-heading">Select your plan</h2>
       <p class="pay-plan-lead" id="pay-plan-lead">
-        Cart for a <strong>{_esc(product_label)}</strong> (one device).
-        Choose <strong>Monthly</strong> ({_esc(monthly_label)} for one month) or
-        <strong>Annual</strong> ({_esc(yearly_label)} for one year — save about {save_pct}% vs
-        12 × monthly). Every plan includes a <strong>{CATALOG_TRIAL_PERIOD_DAYS}-day free trial</strong>
-        — <strong>no money is taken until after the trial ends</strong>
-        (you add a card at checkout; the first charge is after the trial).
+        Cart for a <strong>{_esc(product_label)}</strong> (one device) —
+        buy a KEYGEN when you want residual Connect past the free trial.
+        Residual Connect includes a free <strong>{CATALOG_TRIAL_PERIOD_DAYS}-day
+        (72-hour) trial</strong> on this device (<strong>no card</strong>). After
+        that trial ends, a <strong>paid KEYGEN / active subscription</strong> is
+        required. Choose <strong>Monthly</strong> ({_esc(monthly_label)} for one
+        month) or <strong>Annual</strong> ({_esc(yearly_label)} for one year —
+        save about {save_pct}% vs 12 × monthly).
         Use the auto-renew control below to keep or stop billing after this period.
         Without renewal after the paid period, Connect expires and the client becomes
         unusable until you renew. You complete checkout securely on Stripe.

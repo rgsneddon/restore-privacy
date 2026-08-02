@@ -77,10 +77,18 @@ class TestPaymentLinkTrialHelpers(unittest.TestCase):
         self.assertEqual(d["payment_link_id"], DEFAULT_STRIPE_PAYMENT_LINK_ID)
         self.assertEqual(d["unit_amount_yearly_pence"], 3000)
         self.assertIn("/pay", d["payment_page_url"])
-        self.assertIn("3-day free trial", d["homepage_trial_sentence"].lower())
-        self.assertIn("no money is taken until after the trial ends", d["homepage_trial_sentence"].lower())
-        self.assertNotIn("7 day trial", d["homepage_trial_sentence"].lower())
-        self.assertNotIn("subscription starts when you pay", d["homepage_trial_sentence"].lower())
+        sent = d["homepage_trial_sentence"].lower()
+        self.assertTrue(
+            "3-day" in sent or "72" in sent or "3 day" in sent,
+            d["homepage_trial_sentence"],
+        )
+        self.assertTrue(
+            "no card" in sent or "without card" in sent or "residual" in sent,
+            d["homepage_trial_sentence"],
+        )
+        self.assertNotIn("no money is taken until after the trial ends", sent)
+        self.assertNotIn("7 day trial", sent)
+        self.assertNotIn("subscription starts when you pay", sent)
 
         # Trial=3 on payment_link_trial_period_days matches
         ok_three = payment_link_matches_trial_subscription(

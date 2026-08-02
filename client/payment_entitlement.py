@@ -101,20 +101,23 @@ CONNECT_BLOCKED_KEYGEN_MSG = (
 )
 
 # Strong disclaimer for README / portal / privacy / licence surfaces
+# Trial-first: free residual 72h, then paid KEYGEN/subscription (desktop + Flutter parity).
 PAYMENT_CONNECT_DISCLAIMER = (
-    "**STRONG DISCLAIMER — PAYMENT REQUIRED FOR CONNECT:** Access to Connect "
-    "and residual VPN use requires **successful payment**. If payment **fails "
-    "at any time** (failed checkout, failed charge, refund, dispute, or "
-    "revoked entitlement), the ability to **Connect with the Restore Privacy "
-    "app is cancelled** for that purchase/install until a successful payment "
-    "is completed."
+    "**STRONG DISCLAIMER — PAYMENT REQUIRED AFTER TRIAL:** Residual Connect "
+    "includes a free **3-day (72-hour)** trial on this device (**no card**). "
+    "After the trial ends, Connect needs a **paid KEYGEN / active subscription**. "
+    "If payment **fails at any time** after purchase (failed checkout, failed "
+    "charge, refund, dispute, or revoked entitlement), the ability to **Connect "
+    "with the Restore Privacy app is cancelled** for that purchase/install until "
+    "a successful payment is completed."
 )
 
 PAYMENT_CONNECT_DISCLAIMER_PLAIN = (
-    "STRONG DISCLAIMER — PAYMENT REQUIRED FOR CONNECT: Access to Connect and "
-    "residual VPN use requires successful payment. If payment fails at any "
-    "time (failed checkout, failed charge, refund, dispute, or revoked "
-    "entitlement), the ability to Connect with the Restore Privacy app is "
+    "STRONG DISCLAIMER — PAYMENT REQUIRED AFTER TRIAL: Residual Connect includes "
+    "a free 3-day (72-hour) trial on this device (no card). After the trial ends, "
+    "Connect needs a paid KEYGEN / active subscription. If payment fails at any "
+    "time after purchase (failed checkout, failed charge, refund, dispute, or "
+    "revoked entitlement), the ability to Connect with the Restore Privacy app is "
     "cancelled for that purchase/install until a successful payment is completed."
 )
 

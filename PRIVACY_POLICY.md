@@ -12,7 +12,7 @@ Restore Privacy Suite is one app shell with several surfaces:
 
 | Surface | Role |
 |---------|------|
-| **VPN (residual Connect)** | Encrypted residual tunnel to product nodes; unlock requires KEYGEN after licence acceptance |
+| **VPN (residual Connect)** | Encrypted residual tunnel; free 3-day (72h) device trial (no card), then paid KEYGEN after trial |
 | **Wallet (%)** | Perccent private wallet (local ledger; optional encrypted backup / seed) |
 | **Evolve** | Chronoflux analysis + parish voting when entitled |
 | **Backup** | Encrypted export/import and optional 12-word seed recovery for wallet/analyser identity |
@@ -27,7 +27,7 @@ Before residual VPN permissions, you create a **Suite account** (username/passwo
 
 ## Licence acceptance (your agreement)
 
-Before residual Connect unlocks, you **accept the end-user licence** on this device (local flag only). Acceptance is stored **on-device** — we do not auto-upload the licence text or acceptance prose to residual nodes or the CERBERUS/Helsinki oracle. After acceptance, enter the **KEYGEN** from your fulfilment email (or buy one at [restoreprivacy.online/pay](https://restoreprivacy.online/pay)). Download alone does not unlock residual VPN.
+Before residual Connect, you **accept the end-user licence** on this device (local flag only). Acceptance is stored **on-device** — we do not auto-upload the licence text or acceptance prose to residual nodes or the CERBERUS/Helsinki oracle. Residual Connect includes a free **3-day (72-hour)** trial (no card). After the trial ends, enter a **KEYGEN** from your fulfilment email (or buy one at [restoreprivacy.online/pay](https://restoreprivacy.online/pay)). **STRONG DISCLAIMER — PAYMENT REQUIRED AFTER TRIAL:** if payment fails at any time after purchase, Connect is cancelled until successful payment is completed.
 
 ---
 
@@ -66,7 +66,7 @@ Force-on for operators/tests (not opt-out of defaults): set **`RPT_TRAFFIC_SHAPE
 
 ### Operational limits
 
-- Residual Connect is limited to devices with a valid **KEYGEN** entitlement (monthly or yearly residual licence).
+- Residual Connect is limited to devices with an **active free residual trial** or a valid **KEYGEN** entitlement (monthly or yearly residual licence) after the trial.
 - Free Suite installers are fulfilled on the product host; residual unlock remains KEYGEN-bound and **time-limited** to the active subscription / trial period (not an unlimited free residual CDN).
 - Public node status stays **title-only** (no live client count).
 

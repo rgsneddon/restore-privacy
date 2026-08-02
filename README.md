@@ -51,9 +51,12 @@ a valid KEYGEN.
 The app re-checks the status host (`/api/connect-entitlement`) on each Connect.
 Settings → Payment entitlement is a fallback unlock path.
 
-> **Payment for Connect, not for the installer:** residual Connect needs an active
-> KEYGEN while the subscription is valid. The free download is only the package.
-> Suite wallet/Evolve sign-up is optional and never gates Connect.
+> **STRONG DISCLAIMER — PAYMENT REQUIRED AFTER TRIAL:** residual Connect includes a
+> free 3-day (72-hour) trial on this device (no card). After the trial ends, Connect
+> needs a paid KEYGEN / active subscription. If payment fails at any time after
+> purchase, Connect is cancelled until successful payment is completed. The free
+> download is only the package. Suite wallet/Evolve sign-up is optional and never
+> gates Connect.
 
 Operator / implementer detail:
 [docs/SUITE_ACCOUNT_AND_RPAI.md](docs/SUITE_ACCOUNT_AND_RPAI.md) ·

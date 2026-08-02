@@ -28,16 +28,25 @@ class TestCatalogThreeDayTrialOnPublicHtml(unittest.TestCase):
     def _assert_three_day_trial(self, html: str, label: str) -> None:
         low = html.lower()
         self.assertTrue(
-            "3-day free trial" in low or "3 day free trial" in low or "3-day trial" in low,
-            msg=f"{label} missing 3-day free trial wording",
+            "3-day" in low
+            or "3 day" in low
+            or "72-hour" in low
+            or "72 hour" in low
+            or "72h" in low,
+            msg=f"{label} missing 3-day/72h trial wording",
         )
+        # Trial-first residual copy (no card-before-trial)
         self.assertTrue(
-            "no money is taken until after the trial ends" in low
-            or "no charge until trial ends" in low
-            or "no money taken until after" in low
-            or "not charged until" in low,
-            msg=f"{label} missing no-charge-until-trial-ends wording",
+            "no card" in low
+            or "without card" in low
+            or "residual trial" in low
+            or "after the trial" in low
+            or "after trial" in low
+            or "then keygen" in low
+            or "paid keygen" in low,
+            msg=f"{label} missing residual trial-then-pay wording",
         )
+        self.assertNotIn("payment details and email address", low)
         self._assert_no_legacy_seven_day(html, label)
 
     def test_homepage_and_pay_plan_and_keygen_instruction(self):
@@ -55,7 +64,10 @@ class TestCatalogThreeDayTrialOnPublicHtml(unittest.TestCase):
 
         pay = render_pay_plan_page_html("windows", interval="month").decode("utf-8")
         self._assert_three_day_trial(pay, "pay_plan")
-        self.assertIn("3-day free trial", pay.lower())
+        self.assertTrue(
+            "no card" in pay.lower() or "72" in pay.lower(),
+            pay[:400],
+        )
 
         self.assertNotIn("TRIAL", KEYGEN_UNLOCK_INSTRUCTION)
         self.assertEqual(

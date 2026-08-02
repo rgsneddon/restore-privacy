@@ -32,14 +32,16 @@ INSTALL_HOWTO_BOX_ID = "install-run-howto-box"
 SUITE_GUIDE_INTRO_HEADING = "How to use Restore Privacy Suite"
 SUITE_GUIDE_INTRO_BODY = (
     "This guide walks you through the whole app in everyday language. "
-    "Download the Suite for free, unlock residual Connect with a KEYGEN when "
-    "you are ready, then use the three tabs — VPN, %, and EVOLVE — and the "
+    "Download the Suite for free. Residual Connect includes a free 3-day "
+    "(72-hour) trial on this device (no card). After the trial ends, enter a "
+    "KEYGEN to continue. Then use the three tabs — VPN, %, and EVOLVE — and the "
     "Settings that sit behind the gear on the VPN tab."
 )
 SUITE_GUIDE_INTRO_FOOT = (
     "Nothing here is an operator console. Installers are free; residual Connect "
-    "needs an active KEYGEN (monthly licence from £3). The unlock screen is only "
-    "your licence key — enter it when you are ready to Connect."
+    "has a free 3-day (72-hour) trial, then needs a paid KEYGEN / active "
+    "subscription (monthly from £3). The unlock screen is for your KEYGEN after "
+    "the trial — not for card details before you try residual Connect."
 )
 
 
@@ -61,20 +63,22 @@ def suite_howto_parts_catalog() -> list[dict[str, str]]:
     return [
         {
             "id": "suite-unlock",
-            "title": "Free install and KEYGEN unlock",
+            "title": "Free install, 3-day trial, then KEYGEN",
             "what": (
                 "You install Restore Privacy Suite without paying for the package. "
-                "Residual Connect (the VPN path that changes your public IP) waits "
-                "until you enter a KEYGEN from your fulfilment email."
+                "Residual Connect includes a free 3-day (72-hour) trial on this "
+                "device (no card). After the trial ends, enter a KEYGEN from your "
+                "fulfilment email to keep connecting."
             ),
             "how": (
                 "Download your platform build from the homepage free installer grid "
                 "(or /suite/download). Open the app, accept the end-user licence, "
-                "then enter the KEYGEN (RPT-KEY-…) on the unlock screen or under "
-                "Settings → Payment entitlement. A monthly licence starts at £3; "
-                "yearly residual plans remain on /pay if you prefer that option."
+                "use the free residual trial, then when it ends enter the KEYGEN "
+                "(RPT-KEY-…) on the unlock screen or under Settings → Payment "
+                "entitlement. A monthly licence starts at £3; yearly residual plans "
+                "remain on /pay if you prefer that option."
             ),
-            "default": "Download free; Connect needs KEYGEN",
+            "default": "Download free; 72h residual trial; then KEYGEN",
         },
         {
             "id": "suite-vpn",
@@ -498,11 +502,15 @@ def render_install_howto_box_html() -> str:
           macOS / iOS: follow the package notes (signed / sideload).</li>
         <li><strong>Accept the end-user licence</strong> on first use. Acceptance is local only —
           Connect stays blocked until you accept.</li>
-        <li><strong>Get a KEYGEN when you want residual Connect.</strong>
+        <li><strong>Free residual trial — 3 days (72 hours).</strong>
+          After first-run setup, residual Connect can run without a card or KEYGEN
+          for 72 hours on this device. No payment details are required to start
+          the trial.</li>
+        <li><strong>Get a KEYGEN when the trial ends</strong> (or anytime you prefer).
           Take a monthly licence from £3 on the site (or a yearly residual plan on
           <code>/pay</code>). Email delivers KEYGEN (<code>RPT-KEY-…</code>) after checkout.</li>
-        <li><strong>Enter the KEYGEN</strong> on the unlock screen (or Settings → Payment entitlement).
-          Download alone does not unlock residual VPN.</li>
+        <li><strong>Enter the KEYGEN</strong> on the unlock screen (or Settings → Payment entitlement)
+          after the free trial if you want to continue residual Connect.</li>
         <li><strong>Press Connect</strong> on the VPN tab. Approve elevation / VPN permission when asked
           so residual public IP uses the product path. Wait until status is honestly connected.</li>
         <li><strong>Optional Settings.</strong> Traffic shaping / outer obfuscation OFF feels

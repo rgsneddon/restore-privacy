@@ -466,7 +466,7 @@ class TestDocsAndPortalDisclaimer(unittest.TestCase):
 
         needles = (
             "STRONG DISCLAIMER",
-            "PAYMENT REQUIRED FOR CONNECT",
+            "PAYMENT REQUIRED AFTER TRIAL",
             "fails at any time",
             "Connect",
         )

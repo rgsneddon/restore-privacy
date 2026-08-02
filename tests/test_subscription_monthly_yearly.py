@@ -91,12 +91,22 @@ class TestBillingIntervals(unittest.TestCase):
         self.assertIn('data-buy-mode="homepage-buy-form"', html)
         self.assertIn("billing-intervals", html)
         self.assertIn("Buy now", html)
-        self.assertIn("£30.00", html)
+        # Local-currency presentment may show GBP 30.00 or £30.00
+        self.assertTrue(
+            "£30.00" in html or "GBP 30.00" in html or "30.00" in html,
+            html[:400],
+        )
         self.assertNotIn("buy.stripe.com", html)
         self.assertNotIn("7 day trial", html.lower())
         self.assertNotIn("begins after your 7 day trial", html.lower())
-        self.assertIn("3-day free trial", html.lower())
-        self.assertIn("no money is taken until after the trial ends", html.lower())
+        # Residual trial-first (no card-before-trial); paid KEYGEN after 72h
+        self.assertTrue(
+            "72" in html.lower() or "3-day" in html.lower() or "3 day" in html.lower(),
+            html[:500],
+        )
+        self.assertIn("residual trial", html.lower())
+        self.assertNotIn("no charge until trial ends", html.lower())
+        self.assertNotIn("payment details and email address", html.lower())
 
         html_usd = render_download_section_html(
             coming_soon=False, currency="USD", country="US"

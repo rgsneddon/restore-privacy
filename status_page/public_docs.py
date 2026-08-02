@@ -1228,12 +1228,12 @@ ol{{padding-left:1.25rem;color:var(--rb-muted)}}
 <section class="panel-card doc-body-panel" id="how-to-buy-panel">
 <h1 id="how-to-buy-heading">How to buy Restore Privacy</h1>
 <p class="muted">The Suite installers are <strong>free</strong> on the VPN APP Shop.
-Residual Connect needs a <strong>KEYGEN</strong> licence: start with the monthly
-path (from {_escape(PRICE_LABEL)}), or choose a residual client plan —
-<strong>Monthly VPN plan</strong> ({_escape(PRICE_LABEL)} / month GBP) or
-<strong>Yearly VPN plan</strong> ({_escape(PRICE_YEARLY_LABEL)} / year).
-Where a plan includes a <strong>3-day free trial</strong>,
-<strong>no money is taken until after the trial ends</strong>.</p>
+Residual Connect includes a free <strong>3-day (72-hour) trial</strong> on this
+device (<strong>no card</strong>). After the trial ends, residual Connect needs a
+<strong>paid KEYGEN / active subscription</strong>: monthly
+({_escape(PRICE_LABEL)} / month GBP) or yearly
+({_escape(PRICE_YEARLY_LABEL)} / year). You do not need payment details before
+the free residual trial.</p>
 
 <div class="card" id="how-to-buy-steps">
 <h2>Select your plan</h2>

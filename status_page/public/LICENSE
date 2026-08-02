@@ -130,11 +130,13 @@ product going forward.)
 -------------------------------------------------------------------------------
 6. PAYMENT, CONNECT, AND ENTITLEMENT (PRODUCT TERMS)
 
-  STRONG DISCLAIMER — PAYMENT REQUIRED FOR CONNECT: Access to Connect and
-  residual VPN use requires successful payment where the product so requires.
-  If payment fails at any time (failed checkout, failed charge, refund, dispute,
-  or revoked entitlement), the ability to Connect with the Restore Privacy app
-  is cancelled for that purchase/install until a successful payment is completed.
+  STRONG DISCLAIMER — PAYMENT REQUIRED AFTER TRIAL: Residual Connect includes a
+  free 3-day (72-hour) trial on this device (no card). After the trial ends,
+  Connect needs a paid KEYGEN / active subscription where the product so requires.
+  If payment fails at any time after purchase (failed checkout, failed charge,
+  refund, dispute, or revoked entitlement), the ability to Connect with the
+  Restore Privacy app is cancelled for that purchase/install until a successful
+  payment is completed.
 
   Catalog installers may include a “Restore Internet” failsafe that restores
   residual network settings and can erase product parts from the device. After a
@@ -148,10 +150,10 @@ product going forward.)
   does not create a warranty of re-download rights beyond the operator’s paid
   fulfilment process.
 
-  Product distribution: end-user installers for catalog v1.0.7 are fulfilled via the
+  Product distribution: end-user installers for catalog v1.0.8 are fulfilled via the
   public status host (restoreprivacy.online). Suite installers may be free to
-  download; residual Connect requires PAYMENT / KEYGEN entitlement (Stripe). The
-  operator source tree may be private.
+  download; residual Connect has a free 3-day (72-hour) device trial, then requires
+  a paid KEYGEN / active subscription (Stripe). The operator source tree may be private.
 
 -------------------------------------------------------------------------------
 7. ACCEPTANCE
