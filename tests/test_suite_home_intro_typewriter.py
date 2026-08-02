@@ -65,7 +65,7 @@ class TestSuiteIntroRenderer(unittest.TestCase):
         self.assertIn("residual VPN protection", html)
         self.assertIn("Evolve analysis engine", html)
         self.assertIn("fun rewards token wallet", html)
-        self.assertIn("conveient app", html)
+        self.assertIn("convenient app", html)
         self.assertIn("three days", html)
         self.assertIn("£3 per month", html)
         self.assertIn("£30 annually", html)

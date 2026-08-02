@@ -86,7 +86,7 @@ class TestPublicSiteCopyHuman(unittest.TestCase):
             msg=f"intro open clause missing residual VPN: {SUITE_HOME_INTRO_BODY!r}",
         )
         self.assertIn("fun rewards token wallet", SUITE_HOME_INTRO_BODY)
-        self.assertIn("conveient app", SUITE_HOME_INTRO_BODY)
+        self.assertIn("convenient app", SUITE_HOME_INTRO_BODY)
         self.assertIn("£3 per month", SUITE_HOME_INTRO_BODY)
         self.assertIn("£30 annually", SUITE_HOME_INTRO_BODY)
         self.assertIn("The Restore Privacy Suite", SUITE_HOME_INTRO_BODY)
