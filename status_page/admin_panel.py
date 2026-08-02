@@ -1549,11 +1549,12 @@ def render_processor_settings_html(
 
 
 def render_admin_suite_push_upload_html() -> str:
-    """Admin card: push full-brand installers to Helsinki with live progress.
+    """Admin UPLOADS card: Suite-only latest catalog packages + Helsinki + clients.
 
-    Inventory is brand-wide (Suite clients, browser/Rx, rpOS, Pens/Tables/Slides,
-    node-installer, node-operator). Table shows kind/status/progress bars and is
-    refreshed by ``/static/admin_suite_push.js`` while a push job runs.
+    Inventory is **Suite client packages only** (windows/android/macos/ios/linux)
+    at the current catalog monopin — not brand-wide (rpOS/browser/apps). Table
+    shows kind/status/progress bars and is refreshed by
+    ``/static/admin_suite_push.js`` while a Helsinki push job runs.
     """
     try:
         from admin_node_operator import get_operator_controller
@@ -1565,9 +1566,10 @@ def render_admin_suite_push_upload_html() -> str:
         ctrl = get_operator_controller()
         catalog_ver = ctrl.catalog_version_default()
         suite_label = ctrl.suite_product_label(catalog_ver)
-        inv = ctrl.list_local_packages(version=catalog_ver, brand_wide=True)
+        # UPLOADS: Suite five platforms only (latest catalog monopin).
+        inv = ctrl.list_local_packages(version=catalog_ver, brand_wide=False)
     except Exception:  # noqa: BLE001
-        catalog_ver = "1.0.4"
+        catalog_ver = "1.0.8"
         suite_label = f"Restore Privacy Suite v{catalog_ver}"
         inv = {
             "ok": False,
@@ -1627,25 +1629,28 @@ def render_admin_suite_push_upload_html() -> str:
         if pkg_rows
         else (
             '<tr id="admin-suite-packages-empty">'
-            '<td colspan="10">No brand packages in inventory</td></tr>'
+            '<td colspan="10">No Suite packages in inventory for this monopin</td></tr>'
         )
     )
     present_n = int(inv.get("present_count") or 0)
     staged_n = int(inv.get("staged_count") or 0)
     total_n = int(inv.get("total") or 0)
     kinds = inv.get("kinds") or []
-    kinds_s = ", ".join(str(k) for k in kinds) if kinds else "—"
+    kinds_s = ", ".join(str(k) for k in kinds) if kinds else "suite_client"
     return f"""
 <section class="card nested" id="admin-suite-push-upload"
          data-suite-push-upload="1" data-suite-version="{_escape(catalog_ver)}"
-         data-brand-wide="1" data-push-status-api="/admin/uploads/push-suite/status"
+         data-brand-wide="0" data-suite-only="1"
+         data-push-status-api="/admin/uploads/push-suite/status"
          data-push-job-api="/admin/uploads/push-suite">
   <h3 id="admin-suite-push-heading">Push Suite packages</h3>
   <p class="muted" id="admin-suite-push-blurb">
-    Stage and upload brand installers for <strong>{_escape(suite_label)}</strong>
-    to the Helsinki paid store. <strong>Tick only the packages this machine has</strong>
-    (Mac can omit Windows setup.exe; Windows can upload Windows-only). Unchecked
-    packages are skipped and never fail the job. Prefer <strong>Dry-run</strong> first.
+    Latest <strong>{_escape(suite_label)}</strong> client installers only
+    (windows · android · macos · ios · linux). Stage/upload selected packages to
+    the Helsinki paid store, and/or push an update directive to residual clients
+    that have <strong>CHECK BREADCRUMBS</strong> enabled. Unchecked packages are
+    skipped and never fail the Helsinki job. Prefer <strong>Dry-run</strong> first
+    for Helsinki.
   </p>
   <p id="admin-suite-push-inventory" data-suite-inventory="1">
     <span class="suite-badge" id="admin-suite-version-badge">{_escape(suite_label)}</span>
@@ -1664,7 +1669,7 @@ def render_admin_suite_push_upload_html() -> str:
   <table id="admin-suite-packages-table" data-suite-packages="1"
          data-suite-packages-progress="1" data-package-select="1">
     <thead><tr>
-      <th>Upload</th>
+      <th>Select</th>
       <th>Kind</th><th>Product</th><th>Platform</th><th>Filename</th>
       <th>Local</th><th>Staged</th><th>Size</th>
       <th>Status</th><th>Progress</th>
@@ -1675,7 +1680,7 @@ def render_admin_suite_push_upload_html() -> str:
   </table>
   <form method="post" action="/admin/uploads/push-suite"
         id="admin-suite-push-form" data-suite-push-form="1" data-async-push="1"
-        data-selective-packages="1">
+        data-selective-packages="1" data-helsinki-push="1">
     <input type="hidden" name="version" value="{_escape(catalog_ver)}" id="admin-suite-push-version"/>
     <input type="hidden" name="async" value="1" id="admin-suite-push-async"/>
     <label><input type="checkbox" name="stage" value="1" checked id="admin-suite-push-stage"/> Stage local assets</label>
@@ -1686,6 +1691,42 @@ def render_admin_suite_push_upload_html() -> str:
     <label><input type="checkbox" name="install_serve" value="1" id="admin-suite-push-install-serve"/> Restart store serve</label>
     <button type="submit" id="admin-suite-push-btn" class="primary-upload">
       Push selected packages to Helsinki
+    </button>
+  </form>
+  <hr style="border:0;border-top:1px solid var(--border,#333);margin:1rem 0"/>
+  <h4 id="admin-client-push-heading">Push selected updates to clients</h4>
+  <p class="muted" id="admin-client-push-blurb" data-client-push-blurb="1">
+    Enqueue a residual <strong>UPDATE_PUSH</strong> directive for monopin
+    <code>{_escape(catalog_ver)}</code> (selected platforms noted in the message).
+    Clients apply only when Settings has <strong>CHECK BREADCRUMBS</strong> on —
+    this never force-installs on opt-out devices.
+  </p>
+  <form method="post" action="/admin/uploads/push-clients"
+        id="admin-client-push-form" data-client-push-form="1" data-push-update="1">
+    <input type="hidden" name="version" value="{_escape(catalog_ver)}" id="admin-client-push-version"/>
+    <label class="field" for="admin-client-push-url">
+      <span class="field-label">Update URL</span>
+      <input type="text" id="admin-client-push-url" name="url"
+             value="https://restoreprivacy.online/#downloads"
+             placeholder="https://restoreprivacy.online/#downloads"
+             autocomplete="off"/>
+    </label>
+    <label class="field" for="admin-client-push-message">
+      <span class="field-label">Message (optional)</span>
+      <input type="text" id="admin-client-push-message" name="message"
+             placeholder="Suite {_escape(catalog_ver)} ready"
+             autocomplete="off"/>
+    </label>
+    <label class="field" for="admin-client-push-target">
+      <span class="field-label">Target client id (empty = broadcast / connected)</span>
+      <input type="text" id="admin-client-push-target" name="target_client_id"
+             autocomplete="off"/>
+    </label>
+    <p class="muted" id="admin-client-push-select-hint">
+      Uses the same package checkboxes above (Select present / none / all).
+    </p>
+    <button type="submit" id="admin-client-push-btn" class="primary-upload">
+      Push selected updates to clients
     </button>
   </form>
   <hr style="border:0;border-top:1px solid var(--border,#333);margin:1rem 0"/>
@@ -1715,9 +1756,13 @@ def render_admin_suite_push_upload_html() -> str:
 #admin-suite-push-upload .suite-badge{{
   display:inline-block;padding:0.2rem 0.55rem;border-radius:999px;
   background:rgba(13,148,136,0.18);border:1px solid #0d9488;font-weight:700;font-size:0.85rem}}
-#admin-suite-push-btn.primary-upload,#admin-path-upload-btn{{
+#admin-suite-push-btn.primary-upload,#admin-path-upload-btn,#admin-client-push-btn{{
   margin-top:0.5rem;padding:0.65rem 1.1rem;border:0;border-radius:8px;
   background:#0d9488;color:#fff;font-weight:700;cursor:pointer}}
+#admin-client-push-btn{{background:#1d6fd8}}
+#admin-client-push-form .field{{display:block;margin:0.4rem 0}}
+#admin-client-push-form input[type=text]{{
+  width:100%;max-width:28rem;box-sizing:border-box;padding:0.35rem 0.45rem}}
 #admin-suite-packages-table{{width:100%;border-collapse:collapse;font-size:0.78rem;margin:0.5rem 0}}
 #admin-suite-packages-table th,#admin-suite-packages-table td{{
   border:1px solid var(--border,#333);padding:0.3rem 0.4rem;text-align:left;vertical-align:middle}}
@@ -1749,9 +1794,12 @@ def render_admin_path_upload_html() -> str:
 
 
 def render_admin_uploads_page_html(*, message: str = "", error: str = "") -> bytes:
-    """Dedicated admin UPLOADS page: full-brand Helsinki package push.
+    """Dedicated admin UPLOADS page: Suite-only latest monopin + dual push.
 
-    Inventory is live brand_wide (Suite + rpOS + apps + extras from releases/).
+    Inventory is live **Suite client** packages only for the current catalog
+    pin (all five platforms). Admin can (a) push selected packages to Helsinki
+    paid_assets and (b) push selected update directives to residual clients
+    that have CHECK BREADCRUMBS enabled. File-path browse upload is retained.
     """
     flash = ""
     if (message or "").strip():
@@ -1765,13 +1813,15 @@ def render_admin_uploads_page_html(*, message: str = "", error: str = "") -> byt
             f"{_escape(error.strip())}</p>"
         )
     main = f"""
-<section class="card" id="admin-uploads" data-admin-uploads="1">
+<section class="card" id="admin-uploads" data-admin-uploads="1" data-suite-only="1">
   <h2 id="admin-uploads-heading">UPLOADS</h2>
   <p class="muted" id="admin-uploads-blurb">
-    Stage and push <strong>full brand</strong> installers from the monorepo
-    <code>releases/</code> tree (Suite clients, browser/Rx, rpOS, Pens · Tables · Slides,
-    node-installer, node-operator — every present package for the current catalog pin).
-    Inventory is read live on each page load (not a frozen snapshot).
+    Stage and push <strong>Restore Privacy Suite</strong> client installers only
+    (current catalog monopin — windows, android, macos, ios, linux) from
+    <code>releases/</code>. Select packages, then push to Helsinki and/or notify
+    residual clients with push-update enabled. Inventory is read live on each
+    page load (not a frozen snapshot). Brand-wide extras (rpOS, browser, apps)
+    are not listed here.
   </p>
   {flash}
   {render_admin_suite_push_upload_html()}

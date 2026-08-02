@@ -370,6 +370,72 @@ class NodeOperatorController:
     def client_pull_updates(self, client_id: str) -> list[dict[str, Any]]:
         return client_receive_update_directives(client_id, queue=self.updates)
 
+    def push_selected_suite_updates_to_clients(
+        self,
+        *,
+        version: str | None = None,
+        only_filenames: list[str] | set[str] | tuple[str, ...] | None = None,
+        url: str = "",
+        message: str = "",
+        target_client_id: str = "",
+    ) -> dict[str, Any]:
+        """UPLOADS path: push Suite monopin update directive to residual clients.
+
+        Enqueues via :meth:`push_update` (UPDATE_PUSH queue). Clients apply only
+        when Settings **CHECK BREADCRUMBS** (push-update) is enabled — this never
+        claims force-install for opt-out clients.
+
+        *only_filenames*: selected Suite catalog basenames (informational platforms
+        in the message). Empty selection still pushes the monopin version directive.
+        """
+        ver = (version or "").strip() or self.catalog_version_default()
+        inv = self.list_local_packages(version=ver, brand_wide=False)
+        known = {
+            str(p.get("filename") or ""): p
+            for p in (inv.get("packages") or [])
+            if p.get("filename")
+        }
+        sel = [
+            str(x).strip()
+            for x in (only_filenames or [])
+            if str(x).strip()
+        ]
+        unknown = [f for f in sel if f not in known]
+        platforms = [
+            str(known[f].get("platform") or "")
+            for f in sel
+            if f in known
+        ]
+        platforms = [p for p in platforms if p]
+        u = (url or "").strip() or "https://restoreprivacy.online/#downloads"
+        if not message.strip():
+            plat_s = ", ".join(platforms) if platforms else "all Suite platforms"
+            msg = (
+                f"Restore Privacy Suite v{ver} update available ({plat_s}). "
+                "Clients apply only when CHECK BREADCRUMBS is enabled."
+            )
+        else:
+            msg = message.strip()
+        r = self.push_update(
+            version=ver,
+            url=u,
+            message=msg,
+            target_client_id=(target_client_id or "").strip(),
+        )
+        return {
+            **r,
+            "suite": self.suite_product_label(ver),
+            "version": ver,
+            "only_filenames": list(sel),
+            "platforms": platforms,
+            "unknown_filenames": unknown,
+            "opt_in_only": True,
+            "client_gate": "CHECK BREADCRUMBS",
+            "force_install": False,
+            "url": u,
+            "message": msg,
+        }
+
     # --- residual HELLO to catalog peers (test path) ---------------------
 
     def connect_residual_peer(
@@ -784,9 +850,14 @@ class NodeOperatorController:
         stage_cb = progress_cb if (progress_cb and stage and not upload) else None
         upload_cb = progress_cb if (progress_cb and upload) else None
 
+        # Selective filenames always use brand stage/upload (supports only_filenames
+        # + progress_cb). Suite-only inventory still passes Suite basenames only.
+        use_selective = sel_list is not None
+        use_brand_path = bool(brand_wide) or use_selective
+
         if stage:
             try:
-                if brand_wide and hasattr(mod, "stage_brand_packages"):
+                if use_brand_path and hasattr(mod, "stage_brand_packages"):
                     staged_paths = mod.stage_brand_packages(
                         version=ver,
                         allow_missing=bool(allow_missing),
@@ -807,7 +878,7 @@ class NodeOperatorController:
 
         if upload:
             try:
-                if brand_wide and hasattr(mod, "upload_brand_packages"):
+                if use_brand_path and hasattr(mod, "upload_brand_packages"):
                     code = int(
                         mod.upload_brand_packages(
                             version=ver,

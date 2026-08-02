@@ -3564,6 +3564,8 @@ class Handler(BaseHTTPRequestHandler):
                     allow_missing=form.get("allow_missing") == "1",
                     install_serve=form.get("install_serve") == "1",
                     only_filenames=only if only else [],
+                    # UPLOADS: Suite client packages only (not full brand).
+                    brand_wide=False,
                 )
                 payload = json.dumps(started, separators=(",", ":")).encode("utf-8")
                 code = 200 if started.get("ok") else 400
@@ -3588,7 +3590,7 @@ class Handler(BaseHTTPRequestHandler):
                 force=form.get("force") == "1",
                 allow_missing=form.get("allow_missing") == "1",
                 install_serve=form.get("install_serve") == "1",
-                brand_wide=True,
+                brand_wide=False,
                 only_filenames=only if only else None,
             )
             if r.get("missing_ssh_keys") and r.get("redirect"):
@@ -3602,7 +3604,7 @@ class Handler(BaseHTTPRequestHandler):
                     path="/admin/uploads",
                 )
                 msg = (
-                    f"Pushed {r.get('suite')} brand present={r.get('present_count')}/"
+                    f"Pushed {r.get('suite')} Suite present={r.get('present_count')}/"
                     f"{r.get('total')} dry_run={r.get('dry_run')} "
                     f"upload_code={r.get('upload_code')} kinds={r.get('kinds')}"
                 )
@@ -3613,6 +3615,65 @@ class Handler(BaseHTTPRequestHandler):
                 )
             else:
                 err = str(r.get("error") or "suite push failed")
+                self._send(
+                    400,
+                    "text/html; charset=utf-8",
+                    render_admin_uploads_page_html(error=err),
+                )
+            return
+
+        if path in (
+            "/admin/uploads/push-clients",
+            "/admin/uploads/push-clients/",
+        ):
+            if not admin_enabled():
+                self._send(503, "text/plain; charset=utf-8", b"admin disabled")
+                return
+            if not is_authenticated(self.headers):
+                self._send(200, "text/html; charset=utf-8", render_login_html())
+                return
+            form = dict(urllib.parse.parse_qsl(body.decode("utf-8", "replace")))
+            multi = urllib.parse.parse_qs(body.decode("utf-8", "replace"))
+            from admin_node_operator import get_operator_controller
+            from admin_panel import render_admin_uploads_page_html
+
+            ctrl = get_operator_controller()
+            ver = (form.get("version") or "").strip() or ctrl.catalog_version_default()
+            only = [
+                str(x).strip()
+                for x in (multi.get("package") or multi.get("package[]") or [])
+                if str(x).strip()
+            ]
+            r = ctrl.push_selected_suite_updates_to_clients(
+                version=ver,
+                only_filenames=only if only else None,
+                url=(form.get("url") or "").strip(),
+                message=(form.get("message") or "").strip(),
+                target_client_id=(form.get("target_client_id") or "").strip(),
+            )
+            if r.get("ok"):
+                self._admin_chronoflux_ok(
+                    "push_suite_client_updates",
+                    label="Admin: Push Suite Client Updates",
+                    memo=(
+                        f"v={r.get('version')} platforms={r.get('platforms')} "
+                        f"count={r.get('count')} opt_in={r.get('client_gate')}"
+                    )[:200],
+                    path="/admin/uploads/push-clients",
+                )
+                msg = (
+                    f"Client update directive enqueued for {r.get('suite')} "
+                    f"v{r.get('version')} platforms={r.get('platforms') or 'all'} "
+                    f"delivered_to={r.get('delivered_to')} "
+                    f"(opt-in only: {r.get('client_gate')}; force_install=False)"
+                )
+                self._send(
+                    200,
+                    "text/html; charset=utf-8",
+                    render_admin_uploads_page_html(message=msg),
+                )
+            else:
+                err = str(r.get("error") or "client push failed")
                 self._send(
                     400,
                     "text/html; charset=utf-8",

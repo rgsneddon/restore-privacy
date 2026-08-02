@@ -170,8 +170,12 @@ def start_push_job(
     allow_missing: bool = False,
     install_serve: bool = False,
     only_filenames: list[str] | None = None,
+    brand_wide: bool = False,
 ) -> dict[str, Any]:
-    """Create job, start background brand push, return job id + initial snapshot.
+    """Create job, start background Suite (or brand) push, return job id + snapshot.
+
+    Default *brand_wide* is **False** (admin UPLOADS: Suite five platforms only).
+    Pass ``brand_wide=True`` for full brand inventory (rpOS/apps/extras).
 
     Live upload (upload and not dry_run) runs SSH preflight **before** starting
     the worker so missing keys return ``missing_ssh_keys`` + ``redirect``
@@ -180,7 +184,9 @@ def start_push_job(
     *only_filenames*: when provided, only those packages are staged/uploaded
     (admin per-package checkboxes). Unselected missing packages never fail.
     """
-    inv = controller.list_local_packages(version=version, brand_wide=True)
+    inv = controller.list_local_packages(
+        version=version, brand_wide=bool(brand_wide)
+    )
     if not inv.get("ok") and not inv.get("packages"):
         return {"ok": False, "error": inv.get("error") or "inventory failed"}
     sel = [str(x).strip() for x in (only_filenames or []) if str(x).strip()]
@@ -192,8 +198,8 @@ def start_push_job(
             "error": "Select at least one package checkbox to stage/upload.",
         }
     if only_filenames is None:
-        # API callers without selection: keep historical full-inventory behaviour
-        # but prefer present-only to avoid cross-OS false fails on stage.
+        # API callers without selection: prefer present-only to avoid cross-OS
+        # false fails on stage.
         sel = [
             str(p.get("filename") or "")
             for p in (inv.get("packages") or [])
@@ -209,6 +215,7 @@ def start_push_job(
         "force": force,
         "allow_missing": allow_missing,
         "install_serve": install_serve,
+        "brand_wide": bool(brand_wide),
         "only_filenames": list(sel) if sel else [],
     }
 
@@ -269,7 +276,7 @@ def start_push_job(
                 allow_missing=allow_missing,
                 install_serve=install_serve,
                 progress_cb=cb,
-                brand_wide=True,
+                brand_wide=bool(opts.get("brand_wide")),
                 only_filenames=opts.get("only_filenames") or None,
             )
             if result.get("missing_ssh_keys"):

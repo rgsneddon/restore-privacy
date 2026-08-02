@@ -1,20 +1,33 @@
-/* Admin Helsinki brand push: intercept form, poll job, refresh progress table. CSP: 'self'. */
+/* Admin UPLOADS Suite push: Helsinki job poll + client package selection. CSP: 'self'. */
 (function () {
   var root = document.getElementById("admin-suite-push-upload");
   if (!root) return;
   var form = document.getElementById("admin-suite-push-form");
+  var clientForm = document.getElementById("admin-client-push-form");
   var tbody = document.getElementById("admin-suite-packages-tbody");
   var table = document.getElementById("admin-suite-packages-table");
   var statusEl = document.getElementById("admin-suite-push-job-status");
   var btn = document.getElementById("admin-suite-push-btn");
   var jobApi =
-    root.getAttribute("data-push-job-api") || "/admin/processors/push-suite";
+    root.getAttribute("data-push-job-api") || "/admin/uploads/push-suite";
   var statusApi =
     root.getAttribute("data-push-status-api") ||
-    "/admin/processors/push-suite/status";
+    "/admin/uploads/push-suite/status";
   var pollMs = 600;
   var pollTimer = null;
   var activeJobId = null;
+
+  function selectedPackageBoxes() {
+    var selected = document.querySelectorAll(
+      'input.suite-pkg-checkbox[data-package-select="1"]:checked'
+    );
+    if (!selected.length) {
+      selected = document.querySelectorAll(
+        'input.suite-pkg-checkbox[form="admin-suite-push-form"]:checked'
+      );
+    }
+    return selected;
+  }
 
   function setStatus(text) {
     if (statusEl) statusEl.textContent = text || "";
@@ -185,21 +198,13 @@
     form.addEventListener("submit", function (ev) {
       if (!form.getAttribute("data-async-push")) return;
       ev.preventDefault();
-      var selected = form.querySelectorAll(
-        'input.suite-pkg-checkbox[data-package-select="1"]:checked'
-      );
-      // Also count checkboxes linked via form= attribute outside the form.
-      if (!selected.length) {
-        selected = document.querySelectorAll(
-          'input.suite-pkg-checkbox[form="admin-suite-push-form"]:checked'
-        );
-      }
+      var selected = selectedPackageBoxes();
       if (!selected.length) {
         setStatus("Select at least one package checkbox before pushing.");
         return;
       }
       if (btn) btn.disabled = true;
-      setStatus("Starting brand push for " + selected.length + " package(s)…");
+      setStatus("Starting Suite Helsinki push for " + selected.length + " package(s)…");
       if (table) table.setAttribute("data-push-running", "1");
       var fd = new FormData(form);
       fd.set("async", "1");
@@ -260,6 +265,28 @@
           setStatus("Could not start push: " + (err && err.message ? err.message : "error"));
           if (btn) btn.disabled = false;
         });
+    });
+  }
+
+  // Client UPDATE_PUSH form: inject selected package basenames (checkboxes belong
+  // to the Helsinki form via form=) so the server sees package= multi values.
+  if (clientForm) {
+    clientForm.addEventListener("submit", function () {
+      var old = clientForm.querySelectorAll(
+        'input[data-client-push-package="1"]'
+      );
+      old.forEach(function (el) {
+        if (el.parentNode) el.parentNode.removeChild(el);
+      });
+      selectedPackageBoxes().forEach(function (box) {
+        if (!box.value) return;
+        var hid = document.createElement("input");
+        hid.type = "hidden";
+        hid.name = "package";
+        hid.value = box.value;
+        hid.setAttribute("data-client-push-package", "1");
+        clientForm.appendChild(hid);
+      });
     });
   }
 })();
