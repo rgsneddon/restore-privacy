@@ -20,7 +20,7 @@ sys.path.insert(0, str(ROOT / "status_page"))
 
 
 class TestHomepageTrialSentence(unittest.TestCase):
-    def test_price_block_order(self):
+    def test_downloads_section_keeps_local_currency_no_explainer_boxes(self):
         from downloads import (
             ONLY_PRICE_BANNER,
             PACKAGE_IDENTITY,
@@ -34,125 +34,39 @@ class TestHomepageTrialSentence(unittest.TestCase):
         html = render_download_section_html(coming_soon=False)
         # Nested box inside #downloads
         self.assertIn('id="downloads"', html)
-        # Large white bold monthly callout under Download Suite client heading
         self.assertIn("Download Suite client v", html)
-        self.assertIn('id="dl-only-price"', html)
-        self.assertIn('class="dl-only-price"', html)
-        self.assertIn(ONLY_PRICE_BANNER, html)
-        self.assertIn("ONLY £3.00 per month", ONLY_PRICE_BANNER)
+        # Upper explainer boxes removed (only-price banner + navy price-box panel)
+        self.assertNotIn('id="dl-only-price"', html)
+        self.assertNotIn('id="dl-price-box"', html)
+        self.assertNotIn('id="dl-price"', html)
+        self.assertNotIn('id="dl-interval-note"', html)
+        self.assertNotIn(ONLY_PRICE_BANNER, html)
+        # Local-currency catalog line retained under title
+        self.assertIn('id="dl-local-price"', html)
+        low = html.lower()
         self.assertTrue(
-            "yearly" in ONLY_PRICE_BANNER.lower()
-            or "annual" in ONLY_PRICE_BANNER.lower()
+            "catalog price" in low or "local:" in low,
+            msg="expected GBP catalog price or Local: line from resolve_local_price_display",
         )
+        self.assertIn("we accept", low)
         heading_i = html.find("Download Suite client v")
-        banner_i = html.find('id="dl-only-price"')
-        box_start = html.find('id="dl-price-box"')
-        self.assertGreater(banner_i, heading_i)
-        self.assertGreater(box_start, banner_i)
-        self.assertIn('class="dl-price-box"', html)
-        self.assertIn('id="dl-price-box"', html)
-        price_start = html.find('id="dl-price"', box_start)
-        self.assertGreater(price_start, box_start)
-        # Extract the price paragraph content from the real renderer
-        p_open = html.find(">", price_start) + 1
-        p_close = html.find("</p>", p_open)
-        snippet = html[p_open:p_close]
-        sub_sentence = TRIAL_SUBSCRIPTION_SENTENCE
-        package = PACKAGE_IDENTITY
-        self.assertIn(f"{PRICE_LABEL} GBP", snippet)
-        self.assertIn(package, snippet)
-        self.assertIn("one device licence", snippet)
-        self.assertIn(sub_sentence, snippet)
-        self.assertTrue(
-            ("Monthly" in snippet and "Annual" in snippet)
-            or ("Monthly" in snippet and "Yearly" in snippet)
-            or "Monthly or Annual" in snippet
-            or "Monthly or Yearly" in snippet
-        )
-        self.assertIn("3-day free trial", snippet.lower())
-        self.assertIn("no money is taken until after the trial ends", snippet.lower())
-        self.assertNotIn("7 day trial", snippet.lower())  # legacy length banned
-        self.assertNotIn("7-day trial", snippet.lower())
-        self.assertTrue(
-            "Stripe" in snippet or "Buy now" in snippet or "secure" in snippet.lower()
-        )
-        self.assertIn("download starts automatically", snippet)
-        self.assertIn(
-            "licence key and download links are emailed to you separately",
-            snippet,
-        )
-        # Old keygen-email clause and 7-day trial copy must not remain
-        self.assertNotIn("keygen is emailed to you directly", snippet)
-        self.assertNotIn("keygen is emailed to you directly", html)
-        self.assertNotIn(
-            "Your monthly subscription (£3.00 per month) begins after your 7 day trial",
-            snippet,
-        )
-        self.assertNotIn(
-            "Your monthly subscription (£3.00 per month) begins after your 7 day trial",
-            html,
-        )
-        self.assertNotIn(
-            "your monthly subscription begins after your 7 day trial",
-            html.lower(),
-        )
-        # Old sole identity without subscription/licence language must not remain
-        self.assertNotEqual(
-            snippet.strip(),
-            f"{PRICE_LABEL} GBP per package — pay on Stripe, then download starts automatically",
-        )
-        # Order: price → package identity → subscription sentence → checkout → email clause
-        i_price = snippet.find(f"{PRICE_LABEL} GBP")
-        i_pkg = snippet.find(package)
-        i_sub = snippet.find(sub_sentence)
-        i_pay = snippet.find("checkout") if "checkout" in snippet else snippet.find("Stripe")
-        i_links = snippet.find(
-            "licence key and download links are emailed to you separately"
-        )
-        self.assertLess(i_price, i_pkg)
-        self.assertLess(i_pkg, i_sub)
-        self.assertLess(i_sub, i_pay)
-        self.assertLess(i_pay, i_links)
-        self.assertIn(PAY_AND_KEYGEN_CLAUSE, snippet)
-        # Box width ~2/3 + fluid narrow rule on real CSS from shipped download_css()
+        local_i = html.find('id="dl-local-price"')
+        form_i = html.find("dl-buy-form") if "dl-buy-form" in html else html.find("dl-buttons")
+        self.assertGreater(local_i, heading_i)
+        self.assertGreater(form_i, local_i)
+        # Buy form still present
+        self.assertIn("dl-buttons", html)
+        self.assertIn("/pay/checkout", html)
+        # Shipped constants still document trial/KEYGEN product copy
+        self.assertIn("3-day free trial", TRIAL_SUBSCRIPTION_SENTENCE.lower())
+        self.assertIn("one device licence", PACKAGE_IDENTITY)
+        self.assertIn("Stripe", PAY_AND_KEYGEN_CLAUSE)
+        self.assertIn(PRICE_LABEL, ONLY_PRICE_BANNER)  # constant still ships
+        # CSS for local-currency line remains; HTML must not mount the explainers
         css = download_css()
-        self.assertIn(".dl-price-box", css)
-        self.assertTrue(
-            "width: 66.67%" in css or "max-width: 66.67%" in css,
-            "price box must target ~2/3 width of downloads panel",
-        )
-        self.assertIn("max-width: 66.67%", css)
-        self.assertIn("@media (max-width: 640px)", css)
-        # Narrow viewport reflow to full panel width
-        self.assertRegex(
-            css,
-            r"@media \(max-width:\s*640px\)[\s\S]*?\.dl-price-box[\s\S]*?width:\s*100%",
-        )
-        # ONLY £3.00 banner: large, white, same sans-serif stack as page/dl-price
-        self.assertIn(".dl-only-price", css)
-        self.assertIn("#ffffff", css)
-        self.assertIn("font-size:", css)
-        self.assertRegex(css, r"\.dl-only-price[\s\S]*?color:\s*#ffffff")
-        self.assertNotRegex(css, r"\.dl-only-price[\s\S]*?color:\s*#22c55e")
-        # Must match primary UI stack (Segoe UI / system-ui) — not Georgia serif
-        self.assertRegex(
-            css,
-            r'\.dl-only-price[\s\S]*?font-family:\s*"Segoe UI",\s*system-ui',
-        )
-        self.assertNotRegex(
-            css,
-            r"\.dl-only-price[\s\S]*?font-family:[\s\S]*?Georgia",
-        )
-        self.assertRegex(
-            css,
-            r"\.dl-only-price[\s\S]*?font-size:\s*clamp\(",
-        )
-        # Nested GBP line is also white bold + same font family stack
-        self.assertRegex(css, r"\.dl-price[\s\S]*?color:\s*#ffffff")
-        self.assertRegex(
-            css,
-            r'\.dl-price[\s\S]*?font-family:\s*"Segoe UI",\s*system-ui',
-        )
+        self.assertIn(".dl-local-price", css)
+        self.assertNotIn("keygen is emailed to you directly", html)
+        self.assertNotIn("7 day trial", html.lower())
 
 
 class TestKeygenMintAndEmail(unittest.TestCase):

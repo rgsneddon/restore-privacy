@@ -116,6 +116,12 @@ class TestCatalogHtmlLocalCurrency(unittest.TestCase):
         self.assertIn("£3.00", html)
         self.assertIn("£30.00", html)
         self.assertIn("data-display-currency=\"EUR\"", html)
+        # Local line sits under title; upper explainer boxes gone
+        self.assertNotIn('id="dl-only-price"', html)
+        self.assertNotIn('id="dl-price-box"', html)
+        heading_i = html.find("Download Suite client v")
+        local_i = html.find('id="dl-local-price"')
+        self.assertGreater(local_i, heading_i)
         # Catalog embeds buy form (local amounts on plan radio labels)
         self.assertIn("/pay/checkout", html)
         self.assertIn("homepage-buy-form", html)

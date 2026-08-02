@@ -2379,35 +2379,23 @@ def render_download_section_html(
             f"(from {PRICE_LABEL} / {PRICE_YEARLY_LABEL} GBP) · {accept}"
         )
     if coming_soon:
-        price_line = (
-            f"{PRICE_LABEL} GBP · {PACKAGE_IDENTITY} — "
-            f"{TRIAL_SUBSCRIPTION_SENTENCE} — buy buttons coming soon"
-        )
         buttons_mode = ' data-buy-mode="coming-soon"'
     else:
-        price_line = (
-            f"{PRICE_LABEL} GBP · {PACKAGE_IDENTITY} — "
-            f"{TRIAL_SUBSCRIPTION_SENTENCE} — {PAY_AND_KEYGEN_CLAUSE}"
-        )
         buttons_mode = (
             ' data-buy-mode="homepage-buy-form" data-billing-intervals="month,year"'
             f' data-display-currency="{local.currency}"'
             f' data-stripe-presentment="{local.stripe_presentment_currency}"'
         )
-    # Order: title → price → form → note (world-flags strip removed from homepage).
+    # Order: title → local-currency line → form → platform note.
+    # Upper explainer boxes (only-price banner + price-box panel) removed.
     return f"""
   <section class="downloads panel-card" id="downloads"
     aria-label="Download Restore Privacy Suite client"
     data-product="suite" data-catalog-version="{RELEASE_VERSION}"
     data-price-currency="{local.currency}" data-accept-currency="{local.currency}">
     <h2>Download Suite client v{RELEASE_VERSION}</h2>
-    <p class="dl-only-price" id="dl-only-price">{ONLY_PRICE_BANNER}</p>
     <p class="dl-local-price" id="dl-local-price">{local_line}</p>
     <p class="dl-accept-currency" id="dl-accept-currency" hidden>{accept}</p>
-    <div class="dl-price-box" id="dl-price-box">
-      <p class="dl-price" id="dl-price">{price_line}</p>
-      <p class="dl-interval-note" id="dl-interval-note">{YEARLY_PLAN_NOTE}</p>
-    </div>
     <div class="dl-buttons" id="dl-buttons"{buttons_mode}>
 {buy_form}
     </div>

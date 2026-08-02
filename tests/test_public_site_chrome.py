@@ -355,9 +355,11 @@ class TestHomepageChrome(unittest.TestCase):
         self.assertNotIn('class="tagline"', brand_box)
         self.assertNotIn("lightweight vpn to restore", brand_box.lower())
         self.assertNotIn("your privacy is restored", brand_box.lower())
-        # Price white callouts present
-        self.assertIn('id="dl-only-price"', html)
-        self.assertIn("ONLY £3.00 per month", html)
+        # Local-currency catalog line present; upper explainer boxes removed
+        self.assertIn('id="dl-local-price"', html)
+        self.assertNotIn('id="dl-only-price"', html)
+        self.assertNotIn('id="dl-price-box"', html)
+        self.assertNotIn("ONLY £3.00 per month", html)
         # Admin shell markers must not leak into public homepage
         self.assertNotIn("admin-shell", html)
 

@@ -114,8 +114,10 @@ class TestSuiteBoxWorldFlags(unittest.TestCase):
         dl = render_download_section_html()
         self.assertIn('id="downloads"', dl)
         self.assertIn("Download Suite client", dl)
-        self.assertIn("dl-price-box", dl)
+        self.assertIn('id="dl-local-price"', dl)
         self.assertIn("dl-buy-form", dl)
+        self.assertNotIn('id="dl-price-box"', dl)
+        self.assertNotIn('id="dl-only-price"', dl)
         self.assertNotIn('id="suite-world-flags"', dl)
         self.assertNotIn("data-downloads-world-flags", dl)
         self.assertNotIn("data-suite-world-flags", dl)
@@ -139,8 +141,9 @@ class TestSuiteBoxWorldFlags(unittest.TestCase):
         dl_end = main.index("</section>", dl_at)
         dl_block = main[dl_at:dl_end]
         self.assertIn("Download Suite client", dl_block)
-        self.assertIn("dl-price-box", dl_block)
+        self.assertIn('id="dl-local-price"', dl_block)
         self.assertIn("dl-buttons", dl_block)
+        self.assertNotIn('id="dl-price-box"', dl_block)
         self.assertNotIn('id="suite-world-flags"', dl_block)
 
         # Flag assets still on disk / static resolver for other uses
