@@ -1,6 +1,6 @@
 /// Flat Suite main-bar destinations: VPN + promoted %/Evolve surfaces + rpAI.
 ///
-/// % and Evolve share one product family — their child tabs (Wallet / Security /
+/// % and Evolve share one product family — their child tabs (Wallet / Backup /
 /// Credit / Analysis / Voting) appear on the **main** bottom bar, not as nested
 /// bars inside embedded shells.
 library;
@@ -32,7 +32,8 @@ String suiteNavLabel(SuiteNavDest dest) {
     case SuiteNavDest.wallet:
       return 'Wallet';
     case SuiteNavDest.security:
-      return 'Security';
+      // User-facing product name; enum stays [SuiteNavDest.security] for stability.
+      return 'Backup';
     case SuiteNavDest.voting:
       return 'Voting';
     case SuiteNavDest.credit:

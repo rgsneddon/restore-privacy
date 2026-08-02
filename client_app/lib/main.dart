@@ -728,6 +728,23 @@ class _TunnelHomeState extends State<TunnelHome> with WidgetsBindingObserver {
                               FilledButton.styleFrom(backgroundColor: suitePrimaryOf(context)),
                           child: Text(busy ? 'Verifying…' : 'Unlock Connect'),
                         ),
+                        OutlinedButton(
+                          key: const Key('keygen_sheet_get_keygen'),
+                          onPressed: busy
+                              ? null
+                              : () async {
+                                  final uri = Uri.parse(shopPayUrl());
+                                  try {
+                                    await launchUrl(
+                                      uri,
+                                      mode: LaunchMode.externalApplication,
+                                    );
+                                  } catch (_) {
+                                    _append('Open ${shopPayUrl()} to get a keygen.');
+                                  }
+                                },
+                          child: const Text(kGetKeygenButtonLabel),
+                        ),
                         TextButton(
                           onPressed: busy
                               ? null

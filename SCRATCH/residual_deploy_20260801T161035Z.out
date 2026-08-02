@@ -1,0 +1,121 @@
+=== residual fleet deploy 20260801T161035Z ===
+commit=73d9d2c
+
+######## DEPLOY IS raskul@82.221.101.241 ########
+drwxr-xr-x 2 raskul raskul 4096 Aug  1 16:10 /tmp/rpt-node-deploy-raskul
+put cojoined_roles.py
+put oracle_master.py
+put server.py
+put ui.py
+put private_capacity.py
+put operator_admin.py
+put config.py
+put sessions.py
+put nolog.py
+put obfuscation.py
+put traffic_shape.py
+put pfs.py
+put aggregate_metrics.py
+put disk_encryption.py
+put ephemeral_node.py
+put key_backend.py
+put key_rotation.py
+put fleet_wipe.py
+put payment_entitlement_gate.py
+put client_priority.py
+put crypto_session.py
+put handshake.py
+put elgamal.py
+put pedersen.py
+put protocol.py
+put pq_hybrid.py
+put routing.py
+put rebuild_lock.py
+put udp_fast_path.py
+put update_push.py
+put wipe_preflight.py
+put wipe_status.py
+put __init__.py
+put __main__.py
+put install.sh
+put install_dns.sh
+put install_host_privacy.sh
+put install_disk_encryption.sh
+put install_zram_luks.sh
+put install_shutdown_wipe.sh
+put rpt_shutdown_wipe.sh
+put unbound-rpt.conf
+cojoined_roles=ok
+oracle_master=ok
+ui=ok
+server=ok
+active
+enabled
+{"title": "RESTORE PRIVACY"}
+cojoined_no_token_http=401
+{"error":"unauthorized"}
+cojoined_auth_http=200
+{"cojoined": true, "roles": {"vpn": {"role": "vpn", "label": "Residual VPN node", "ready": true, "running": true, "detail": "residual tunnel active", "started_unix": 1785600705, "last_heartbeat_unix": 1785600705, "stats": {}}, "rpai": {"role": "rpai", "label": "rpAI \u00b7 Ned helper", "ready": true, "running": true, "detail": "Ned co-located learning loop", "started_unix": 1785600705, "last_heartbeat_unix": 1785600705, "stats": {"learning_epochs_local": 1, "oracle_sync": true, "housework_pending": 0}}, "perccent": {"role": "perccent", "label": "Perccent blockchain seed", "ready": true, "running": true, "detail": "Perccent co-located seed heartbeat", "started_unix": 1785600705, "last_heartbeat_unix": 1785600705, "stats": {"seed_ticks": 1, "chain_sync": true}}}, "readiness": {"vpn": true, "rpai": true, "perccent": true}, "all_ready": true, "contact": {"host": "82.221.101.241", "port": 44044, "ui_port": 8080, "contact": "82.221.101.241:44044", "roles": ["vpn", "rpai", "perccent"], "role_labels": {"vpn": "Residual VPN node", "rpai": "rpAI \u00b7 Ned helper", "perccent": "Perccent blockchain seed"}, "hooks": {"vpn": {"path": "residual HELLO/session", "port": 44044}, "rpai": {"path": "/
+cojoin_roles ['perccent', 'rpai', 'vpn']
+######## IS DONE ########
+
+######## DEPLOY DE root@178.105.187.178 ########
+drwxr-xr-x 2 root root 4096 Aug  1 16:11 /tmp/rpt-node-deploy-root
+put cojoined_roles.py
+put oracle_master.py
+put server.py
+put ui.py
+put private_capacity.py
+put operator_admin.py
+put config.py
+put sessions.py
+put nolog.py
+put obfuscation.py
+put traffic_shape.py
+put pfs.py
+put aggregate_metrics.py
+put disk_encryption.py
+put ephemeral_node.py
+put key_backend.py
+put key_rotation.py
+put fleet_wipe.py
+put payment_entitlement_gate.py
+put client_priority.py
+put crypto_session.py
+put handshake.py
+put elgamal.py
+put pedersen.py
+put protocol.py
+put pq_hybrid.py
+put routing.py
+put rebuild_lock.py
+put udp_fast_path.py
+put update_push.py
+put wipe_preflight.py
+put wipe_status.py
+put __init__.py
+put __main__.py
+put install.sh
+put install_dns.sh
+put install_host_privacy.sh
+put install_disk_encryption.sh
+put install_zram_luks.sh
+put install_shutdown_wipe.sh
+put rpt_shutdown_wipe.sh
+put unbound-rpt.conf
+cojoined_roles=ok
+oracle_master=ok
+ui=ok
+server=ok
+active
+enabled
+{"title": "RESTORE PRIVACY"}
+cojoined_no_token_http=401
+{"error":"unauthorized"}
+cojoined_auth_http=200
+{"cojoined": true, "roles": {"vpn": {"role": "vpn", "label": "Residual VPN node", "ready": true, "running": true, "detail": "residual tunnel active", "started_unix": 1785600758, "last_heartbeat_unix": 1785600758, "stats": {}}, "rpai": {"role": "rpai", "label": "rpAI \u00b7 Ned helper", "ready": true, "running": true, "detail": "Ned co-located learning loop", "started_unix": 1785600758, "last_heartbeat_unix": 1785600758, "stats": {"learning_epochs_local": 1, "oracle_sync": true, "housework_pending": 0}}, "perccent": {"role": "perccent", "label": "Perccent blockchain seed", "ready": true, "running": true, "detail": "Perccent co-located seed heartbeat", "started_unix": 1785600758, "last_heartbeat_unix": 1785600758, "stats": {"seed_ticks": 1, "chain_sync": true}}}, "readiness": {"vpn": true, "rpai": true, "perccent": true}, "all_ready": true, "contact": {"host": "82.221.101.241", "port": 44044, "ui_port": 8080, "contact": "82.221.101.241:44044", "roles": ["vpn", "rpai", "perccent"], "role_labels": {"vpn": "Residual VPN node", "rpai": "rpAI \u00b7 Ned helper", "perccent": "Perccent blockchain seed"}, "hooks": {"vpn": {"path": "residual HELLO/session", "port": 44044}, "rpai": {"path": "/
+cojoin_roles ['perccent', 'rpai', 'vpn']
+######## DE DONE ########
+
+=== LOG /Users/russellsneddon/restore-privacy/SCRATCH/residual_deploy_20260801T161035Z.out ===
+DEPLOY_FLEET_COMPLETE

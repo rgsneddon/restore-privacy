@@ -41,7 +41,10 @@ const String kEntryAccessUnlockLabel = 'Unlock with keygen';
 const String kEntryAccessAcceptLicenceLabel = 'Accept end-user licence';
 const String kEntryAccessRenewLabel = 'Renew licence';
 const String kEntryAccessShopHint =
-    'Need a KEYGEN? Get one at restoreprivacy.online (monthly licence).';
+    'Need a KEYGEN? Get one at restoreprivacy.online/pay (monthly licence).';
+
+/// Finder key for the Get keygen control (opens public /pay).
+const Key kEntryAccessGetKeygenButtonKey = Key('entry_access_get_keygen_button');
 
 /// True when [copy] includes the shipped guidance phrases and omits forbidden wording.
 bool entryAccessCopyIsValid(String copy) {
@@ -323,7 +326,8 @@ class _EntryAccessScreenState extends State<EntryAccessScreen> {
   }
 
   Future<void> _openShop() async {
-    final uri = Uri.parse('https://restoreprivacy.online/#suite-storefront');
+    // Always send users to the pay page for a KEYGEN (not storefront-only).
+    final uri = Uri.parse(shopPayUrl());
     try {
       await launchUrl(uri, mode: LaunchMode.externalApplication);
     } catch (_) {}
@@ -463,15 +467,23 @@ class _EntryAccessScreenState extends State<EntryAccessScreen> {
                     ),
                   ),
                   const SizedBox(height: 12),
-                  TextButton(
+                  OutlinedButton(
+                    key: kEntryAccessGetKeygenButtonKey,
                     onPressed: _busy ? null : _openShop,
-                    child: Text(
-                      kEntryAccessShopHint,
-                      textAlign: TextAlign.center,
-                      style: TextStyle(
-                        color: kWhite.withValues(alpha: 0.8),
-                        fontSize: 12,
-                      ),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: kEntryAccessOrange,
+                      side: const BorderSide(color: kEntryAccessOrange),
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                    ),
+                    child: const Text(kGetKeygenButtonLabel),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    kEntryAccessShopHint,
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      color: kWhite.withValues(alpha: 0.8),
+                      fontSize: 12,
                     ),
                   ),
                   if (_statusLine.isNotEmpty) ...[

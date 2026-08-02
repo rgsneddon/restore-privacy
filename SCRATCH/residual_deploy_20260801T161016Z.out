@@ -1,0 +1,5 @@
+=== residual fleet deploy 20260801T161016Z ===
+commit=73d9d2c
+
+######## DEPLOY IS raskul@82.221.101.241 ########
+chmod: changing permissions of '/tmp/rpt-node-deploy': Operation not permitted

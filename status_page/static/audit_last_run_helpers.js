@@ -20,21 +20,50 @@
     function pad(n) {
       return n < 10 ? "0" + n : String(n);
     }
-    // UTC wall clock display (matches server: YYYY-MM-DD HH:MM:SS UTC)
-    return (
-      d.getUTCFullYear() +
-      "-" +
-      pad(d.getUTCMonth() + 1) +
-      "-" +
-      pad(d.getUTCDate()) +
-      " " +
-      pad(d.getUTCHours()) +
-      ":" +
-      pad(d.getUTCMinutes()) +
-      ":" +
-      pad(d.getUTCSeconds()) +
-      " UTC"
-    );
+    // Europe/London wall clock (GMT or BST) — matches Python audit_countdown
+    try {
+      var fmt = new Intl.DateTimeFormat("en-GB", {
+        timeZone: "Europe/London",
+        year: "numeric",
+        month: "2-digit",
+        day: "2-digit",
+        hour: "2-digit",
+        minute: "2-digit",
+        second: "2-digit",
+        hour12: false,
+        timeZoneName: "short",
+      });
+      var parts = fmt.formatToParts(d);
+      var map = {};
+      for (var i = 0; i < parts.length; i++) {
+        map[parts[i].type] = parts[i].value;
+      }
+      var y = map.year;
+      var mo = map.month;
+      var day = map.day;
+      var h = map.hour;
+      var mi = map.minute;
+      var se = map.second;
+      var zn = map.timeZoneName || "GMT";
+      if (zn === "GMT+1" || zn === "UTC+1") zn = "BST";
+      if (zn === "GMT+0" || zn === "UTC" || zn === "UTC+0") zn = "GMT";
+      return y + "-" + mo + "-" + day + " " + h + ":" + mi + ":" + se + " " + zn;
+    } catch (e) {
+      return (
+        d.getUTCFullYear() +
+        "-" +
+        pad(d.getUTCMonth() + 1) +
+        "-" +
+        pad(d.getUTCDate()) +
+        " " +
+        pad(d.getUTCHours()) +
+        ":" +
+        pad(d.getUTCMinutes()) +
+        ":" +
+        pad(d.getUTCSeconds()) +
+        " UTC"
+      );
+    }
   }
 
   /** Extract generated_at from security_audit_latest.json payload. */

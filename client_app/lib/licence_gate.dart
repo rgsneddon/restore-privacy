@@ -95,6 +95,20 @@ const String kKeygenUnlockInstruction =
 
 const String kDefaultPaymentStatusBaseUrl = 'https://restoreprivacy.online';
 
+/// Public shop pay path for buying a KEYGEN (monthly residual licence).
+const String kShopPayPath = '/pay';
+
+/// Absolute URL for the website pay page (KEYGEN purchase).
+String shopPayUrl({String? baseUrl}) {
+  final base = (baseUrl ?? kDefaultPaymentStatusBaseUrl)
+      .trim()
+      .replaceAll(RegExp(r'/+$'), '');
+  return '$base$kShopPayPath';
+}
+
+/// User-facing label for the Get keygen action on unlock / entry surfaces.
+const String kGetKeygenButtonLabel = 'Get keygen';
+
 /// Default monthly Stripe Payment Link (aligned with status_page.payments).
 const String kDefaultStripePaymentPageUrl =
     'https://buy.stripe.com/cNi7sM4uOeWQ9TBe0q7kc00';

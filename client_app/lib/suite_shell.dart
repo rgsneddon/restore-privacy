@@ -14,7 +14,7 @@ import 'suite_version.dart';
 /// Unified Restore Privacy Suite shell: flat main bottom bar.
 ///
 /// Destinations: **VPN** · promoted **%/Evolve** surfaces (Analysis / Wallet /
-/// Security / Voting / Credit as installed + entitled) · **rpAI**. Nested
+/// Backup / Voting / Credit as installed + entitled) · **rpAI**. Nested
 /// wallet/evolve bottom bars are off on the Suite embed path. Family pages share
 /// one [SuiteFamilyHost] bootstrap (not one provider tree per tab).
 ///
@@ -402,7 +402,10 @@ class SuiteShellState extends State<SuiteShell> {
             ? Icons.account_balance_wallet
             : Icons.account_balance_wallet_outlined;
       case SuiteNavDest.security:
-        return selected ? Icons.security : Icons.security_outlined;
+        // Backup/restore surface — not shield/security chrome.
+        return selected
+            ? Icons.settings_backup_restore
+            : Icons.backup_outlined;
       case SuiteNavDest.voting:
         return selected ? Icons.how_to_vote : Icons.how_to_vote_outlined;
       case SuiteNavDest.credit:

@@ -60,9 +60,15 @@ _DEFAULT_STATS: dict[str, Any] = {
     "oracle_findings": [],
     "oracle_housework": [],
     "ned_housework_done": [],
+    # Suite architecture learn map (VPN, wallet/Backup, Evolve, credit, rpAI)
+    "suite_architecture": {},
+    "suite_surfaces_learned": [],
+    "suite_surfaces_observed": 0,
+    "suite_surfaces_total": 7,
+    "ready_suite_architecture": False,
     "role_capabilities": {
         "vpn": "Residual HELLO/session, nolog, multi-hop structure",
-        "rpai": "Ned co-located learning + oracle housework",
+        "rpai": "Ned co-located learning + oracle housework + Suite surface map",
         "perccent": "Perccent seed heartbeat co-located with residual",
     },
     "updated_unix": 0,
@@ -110,11 +116,29 @@ def save_rps_stats(
     *,
     stats_path: Path | None = None,
 ) -> dict[str, Any]:
-    """Persist stats dict; returns written snapshot."""
+    """Persist stats dict; returns written snapshot.
+
+    Forbidden user-secret keys (connection logs, mnemonics, passphrases, backup
+    bytes, licence prose) are stripped before write — oracle/Ned never durably
+    store user data (CERBERUS privacy contract).
+    """
+    try:
+        from node.oracle_master import sanitize_stats_for_persist
+    except ImportError:  # pragma: no cover
+        import sys
+        from pathlib import Path as _P
+
+        root = _P(__file__).resolve().parents[1]
+        if str(root) not in sys.path:
+            sys.path.insert(0, str(root))
+        from node.oracle_master import sanitize_stats_for_persist
+
     out = dict(_DEFAULT_STATS)
-    out.update(stats or {})
+    out.update(sanitize_stats_for_persist(stats or {}))
     out["capability_tier"] = int(int(out.get("growth_score") or 0) // 10)
     out["updated_unix"] = int(time.time())
+    # Second strip after merge defaults (defensive)
+    out = sanitize_stats_for_persist(out)
     path = rps_stats_path(stats_path=stats_path)
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(out, indent=2) + "\n", encoding="utf-8")
@@ -341,18 +365,33 @@ def ned_growth_public_snapshot(stats: dict[str, Any] | None = None) -> dict[str,
         "ready_perccent": bool(s.get("ready_perccent")),
         "ready_oracle": bool(s.get("ready_oracle")),
         "ready_cojoined": bool(s.get("ready_cojoined")),
+        "ready_suite_architecture": bool(s.get("ready_suite_architecture")),
         "compute_score": int(s.get("compute_score") or 0),
+        "suite_surfaces_observed": int(s.get("suite_surfaces_observed") or 0),
+        "suite_surfaces_total": int(s.get("suite_surfaces_total") or 0),
+        "suite_surfaces_learned": list(s.get("suite_surfaces_learned") or []),
+        "suite_architecture": (
+            s.get("suite_architecture")
+            if isinstance(s.get("suite_architecture"), dict)
+            else {}
+        ),
         "growth_methods": [
             "chronoflux_confirmed_block",
             "node_heartbeat",
             "narrative_session",
             "oracle_learn",
+            "suite_architecture_surfaces",
         ],
     }
 
 
 def readiness_parameters(stats: dict[str, Any] | None = None) -> dict[str, bool]:
-    """Explicit readiness matrix for /admin/rps (all true when co-join healthy)."""
+    """Explicit co-join readiness matrix for /admin/rps (all true when stack healthy).
+
+    Suite architecture completeness lives on stats / public Ned snapshot as
+    ``ready_suite_architecture`` — it is intentionally NOT part of this matrix
+    so three-role residual readiness stays honest without inventing Suite UX map.
+    """
     s = stats if stats is not None else load_rps_stats()
     return {
         "ready_vpn": bool(s.get("ready_vpn")),
@@ -697,6 +736,12 @@ def render_admin_rps_stats_html(stats: dict[str, Any] | None = None) -> str:
         ("VPN capacity (fleet)", caps.get("vpn_capacity")),
         ("rpAI epochs (collated)", caps.get("rpai_epochs")),
         ("Perccent seed ticks", caps.get("perc_seed_ticks")),
+        ("Suite surfaces observed", s.get("suite_surfaces_observed")
+         or caps.get("suite_surfaces_observed")),
+        ("Suite surfaces total", s.get("suite_surfaces_total")
+         or caps.get("suite_surfaces_total")),
+        ("Suite surfaces learned", ", ".join(s.get("suite_surfaces_learned") or []) or "—"),
+        ("Suite architecture ready", yn(bool(s.get("ready_suite_architecture")))),
         ("Oracle satellites seen", s.get("oracle_satellites_seen")),
         ("Oracle satellites ready", s.get("oracle_satellites_ready")),
         ("Load balance", s.get("load_balance")),

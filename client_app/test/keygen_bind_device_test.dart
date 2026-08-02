@@ -46,6 +46,12 @@ void main() {
       decoded['device_pub'],
       '00112233445566778899aabbccddeeff00112233445566778899aabbccddeeff',
     );
+    // Minimal protocol body — no connection logs, seed, or backup material.
+    expect(decoded.keys.toSet(), {'session_id', 'device_pub'});
+    final blob = jsonEncode(decoded).toLowerCase();
+    expect(blob.contains('connection_log'), isFalse);
+    expect(blob.contains('mnemonic'), isFalse);
+    expect(blob.contains('passphrase'), isFalse);
     expect(await gate.paymentAllowsConnect(), isTrue);
   });
 

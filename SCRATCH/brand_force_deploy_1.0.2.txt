@@ -1,0 +1,357 @@
+=== STAGE brand 1.0.2 ===
+staged kind=suite_client platform=windows /Users/russellsneddon/restore-privacy/status_page/assets/1.0.2/restore-privacy-client-1.0.2-windows-x64-setup.exe (38631642 bytes)
+staged kind=suite_client platform=android /Users/russellsneddon/restore-privacy/status_page/assets/1.0.2/restore-privacy-client-1.0.2-android.apk (84688794 bytes)
+staged kind=suite_client platform=macos /Users/russellsneddon/restore-privacy/status_page/assets/1.0.2/restore-privacy-client-1.0.2-macos.zip (27207358 bytes)
+staged kind=suite_client platform=ios /Users/russellsneddon/restore-privacy/status_page/assets/1.0.2/restore-privacy-client-1.0.2-ios.zip (12558929 bytes)
+staged kind=suite_client platform=linux /Users/russellsneddon/restore-privacy/status_page/assets/1.0.2/restore-privacy-client-1.0.2-linux-x64.tar.gz (14636754 bytes)
+staged kind=browser platform=chromium /Users/russellsneddon/restore-privacy/status_page/assets/1.0.2/restore-privacy-browser-extension-1.0.2.zip (35540 bytes)
+staged kind=browser platform=default /Users/russellsneddon/restore-privacy/status_page/assets/1.0.2/restore-privacy-rx-browser-1.0.2.zip (35539 bytes)
+staged kind=browser platform=macos /Users/russellsneddon/restore-privacy/status_page/assets/1.0.2/restore-privacy-rx-browser-1.0.2-macos.zip (35705 bytes)
+staged kind=browser platform=windows /Users/russellsneddon/restore-privacy/status_page/assets/1.0.2/restore-privacy-rx-browser-1.0.2-windows.zip (35524 bytes)
+staged kind=browser platform=linux-x86_64 /Users/russellsneddon/restore-privacy/status_page/assets/1.0.2/restore-privacy-rx-browser-1.0.2-linux-x86_64.tar.gz (33767 bytes)
+staged kind=browser platform=linux-aarch64 /Users/russellsneddon/restore-privacy/status_page/assets/1.0.2/restore-privacy-rx-browser-1.0.2-linux-aarch64.tar.gz (33768 bytes)
+staged kind=browser platform=linux-x86_64-zip /Users/russellsneddon/restore-privacy/status_page/assets/1.0.2/restore-privacy-rx-browser-1.0.2-linux-x86_64.zip (35604 bytes)
+staged kind=browser platform=ios /Users/russellsneddon/restore-privacy/status_page/assets/1.0.2/restore-privacy-rx-browser-1.0.2-ios.zip (35363 bytes)
+staged kind=browser platform=android /Users/russellsneddon/restore-privacy/status_page/assets/1.0.2/restore-privacy-rx-browser-1.0.2-android.zip (35483 bytes)
+staged kind=rpos platform=windows /Users/russellsneddon/restore-privacy/status_page/assets/1.0.2/rpos-0.2.0-windows-x64.zip (68280 bytes)
+staged kind=rpos platform=macos /Users/russellsneddon/restore-privacy/status_page/assets/1.0.2/rpos-0.2.0-macos.zip (68140 bytes)
+staged kind=rpos platform=linux-x86_64 /Users/russellsneddon/restore-privacy/status_page/assets/1.0.2/rpos-0.2.0-linux-x86_64.tar.gz (50616 bytes)
+staged kind=rpos platform=linux-aarch64 /Users/russellsneddon/restore-privacy/status_page/assets/1.0.2/rpos-0.2.0-linux-aarch64.tar.gz (50611 bytes)
+staged kind=rpos_app platform=pens /Users/russellsneddon/restore-privacy/status_page/assets/1.0.2/pens-0.1.0-installer.zip (29965 bytes)
+staged kind=rpos_app platform=tables /Users/russellsneddon/restore-privacy/status_page/assets/1.0.2/tables-0.1.0-installer.zip (30057 bytes)
+staged kind=rpos_app platform=slides /Users/russellsneddon/restore-privacy/status_page/assets/1.0.2/slides-0.1.0-installer.zip (30056 bytes)
+staged kind=node_installer platform=linux /Users/russellsneddon/restore-privacy/status_page/assets/1.0.2/restore-privacy-node-installer-1.0.0-linux-x64.tar.gz (112101 bytes)
+staged kind=node_installer platform=macos /Users/russellsneddon/restore-privacy/status_page/assets/1.0.2/restore-privacy-node-installer-1.0.0-macos.zip (135672 bytes)
+staged kind=node_installer platform=windows /Users/russellsneddon/restore-privacy/status_page/assets/1.0.2/restore-privacy-node-installer-1.0.0-windows-x64.zip (135929 bytes)
+staged kind=node_installer platform=android /Users/russellsneddon/restore-privacy/status_page/assets/1.0.2/restore-privacy-node-installer-1.0.0-android.zip (115997 bytes)
+staged kind=node_installer platform=ios /Users/russellsneddon/restore-privacy/status_page/assets/1.0.2/restore-privacy-node-installer-1.0.0-ios.zip (115603 bytes)
+staged kind=node_operator platform=linux /Users/russellsneddon/restore-privacy/status_page/assets/1.0.2/restore-privacy-node-operator-1.0.0-linux-x64.tar.gz (14789049 bytes)
+staged kind=rpmail platform=windows /Users/russellsneddon/restore-privacy/status_page/assets/1.0.2/rpmail-0.1.0-windows.zip (14194 bytes)
+staged kind=rpmail platform=macos /Users/russellsneddon/restore-privacy/status_page/assets/1.0.2/rpmail-0.1.0-macos.zip (14194 bytes)
+staged kind=rpmail platform=linux-x86_64 /Users/russellsneddon/restore-privacy/status_page/assets/1.0.2/rpmail-0.1.0-linux-x86_64.tar.gz (10374 bytes)
+staged kind=rpmail platform=linux-aarch64 /Users/russellsneddon/restore-privacy/status_page/assets/1.0.2/rpmail-0.1.0-linux-aarch64.tar.gz (10384 bytes)
+staged kind=rpoffice platform=windows /Users/russellsneddon/restore-privacy/status_page/assets/1.0.2/rpoffice-0.1.0-windows.zip (13760 bytes)
+staged kind=rpoffice platform=macos /Users/russellsneddon/restore-privacy/status_page/assets/1.0.2/rpoffice-0.1.0-macos.zip (13760 bytes)
+staged kind=rpoffice platform=linux-x86_64 /Users/russellsneddon/restore-privacy/status_page/assets/1.0.2/rpoffice-0.1.0-linux-x86_64.tar.gz (9507 bytes)
+staged kind=rpoffice platform=linux-aarch64 /Users/russellsneddon/restore-privacy/status_page/assets/1.0.2/rpoffice-0.1.0-linux-aarch64.tar.gz (9506 bytes)
+staged_count=35
+=== UPLOAD brand 1.0.2 force=True ===
+brand upload plan: 35/35 files -> 135.181.152.10:/opt/restore-privacy/paid_assets/1.0.2/ (force=True allow_missing=False)
+  ready suite_client/windows: restore-privacy-client-1.0.2-windows-x64-setup.exe
+  ready suite_client/android: restore-privacy-client-1.0.2-android.apk
+  ready suite_client/macos: restore-privacy-client-1.0.2-macos.zip
+  ready suite_client/ios: restore-privacy-client-1.0.2-ios.zip
+  ready suite_client/linux: restore-privacy-client-1.0.2-linux-x64.tar.gz
+  ready browser/chromium: restore-privacy-browser-extension-1.0.2.zip
+  ready browser/default: restore-privacy-rx-browser-1.0.2.zip
+  ready browser/macos: restore-privacy-rx-browser-1.0.2-macos.zip
+  ready browser/windows: restore-privacy-rx-browser-1.0.2-windows.zip
+  ready browser/linux-x86_64: restore-privacy-rx-browser-1.0.2-linux-x86_64.tar.gz
+  ready browser/linux-aarch64: restore-privacy-rx-browser-1.0.2-linux-aarch64.tar.gz
+  ready browser/linux-x86_64-zip: restore-privacy-rx-browser-1.0.2-linux-x86_64.zip
+  ready browser/ios: restore-privacy-rx-browser-1.0.2-ios.zip
+  ready browser/android: restore-privacy-rx-browser-1.0.2-android.zip
+  ready rpos/windows: rpos-0.2.0-windows-x64.zip
+  ready rpos/macos: rpos-0.2.0-macos.zip
+  ready rpos/linux-x86_64: rpos-0.2.0-linux-x86_64.tar.gz
+  ready rpos/linux-aarch64: rpos-0.2.0-linux-aarch64.tar.gz
+  ready rpos_app/pens: pens-0.1.0-installer.zip
+  ready rpos_app/tables: tables-0.1.0-installer.zip
+  ready rpos_app/slides: slides-0.1.0-installer.zip
+  ready node_installer/linux: restore-privacy-node-installer-1.0.0-linux-x64.tar.gz
+  ready node_installer/macos: restore-privacy-node-installer-1.0.0-macos.zip
+  ready node_installer/windows: restore-privacy-node-installer-1.0.0-windows-x64.zip
+  ready node_installer/android: restore-privacy-node-installer-1.0.0-android.zip
+  ready node_installer/ios: restore-privacy-node-installer-1.0.0-ios.zip
+  ready node_operator/linux: restore-privacy-node-operator-1.0.0-linux-x64.tar.gz
+  ready rpmail/windows: rpmail-0.1.0-windows.zip
+  ready rpmail/macos: rpmail-0.1.0-macos.zip
+  ready rpmail/linux-x86_64: rpmail-0.1.0-linux-x86_64.tar.gz
+  ready rpmail/linux-aarch64: rpmail-0.1.0-linux-aarch64.tar.gz
+  ready rpoffice/windows: rpoffice-0.1.0-windows.zip
+  ready rpoffice/macos: rpoffice-0.1.0-macos.zip
+  ready rpoffice/linux-x86_64: rpoffice-0.1.0-linux-x86_64.tar.gz
+  ready rpoffice/linux-aarch64: rpoffice-0.1.0-linux-aarch64.tar.gz
+$ ssh root@135.181.152.10 sudo -n bash -lc 'mkdir -p /opt/restore-privacy/paid_assets/1.0.2 && chown -R root:root /opt/restore-privacy/paid_assets…
+upload kind=suite_client file=restore-privacy-client-1.0.2-windows-x64-setup.exe (38631642 bytes)
+  scp attempt 1: restore-privacy-client-1.0.2-windows-x64-setup.exe (38631642 bytes) -> root@135.181.152.10:/root/rpt-paid-upload-restore-privacy-client-1.0.2-windows-x64-setup.exe
+$ scp restore-privacy-client-1.0.2-windows-x64-setup.exe -> root@135.181.152.10:/root/rpt-paid-upload-restore-privacy-client-1.0.2-windows-x64-setup.exe
+$ ssh root@135.181.152.10 bash -lc 'set -e; test -f /root/rpt-paid-upload-restore-privacy-client-1.0.2-windows-x64-setup.exe; SZ=$(stat -c%s /root…
+size_ok=38631642
+$ ssh root@135.181.152.10 sudo -n bash -lc 'set -e; mkdir -p $(dirname /opt/restore-privacy/paid_assets/1.0.2/restore-privacy-client-1.0.2-windows…
+38631642
+  remote_ok restore-privacy-client-1.0.2-windows-x64-setup.exe bytes=38631642
+upload kind=suite_client file=restore-privacy-client-1.0.2-android.apk (84688794 bytes)
+  scp attempt 1: restore-privacy-client-1.0.2-android.apk (84688794 bytes) -> root@135.181.152.10:/root/rpt-paid-upload-restore-privacy-client-1.0.2-android.apk
+$ scp restore-privacy-client-1.0.2-android.apk -> root@135.181.152.10:/root/rpt-paid-upload-restore-privacy-client-1.0.2-android.apk
+$ ssh root@135.181.152.10 bash -lc 'set -e; test -f /root/rpt-paid-upload-restore-privacy-client-1.0.2-android.apk; SZ=$(stat -c%s /root/rpt-paid-…
+size_ok=84688794
+$ ssh root@135.181.152.10 sudo -n bash -lc 'set -e; mkdir -p $(dirname /opt/restore-privacy/paid_assets/1.0.2/restore-privacy-client-1.0.2-android…
+84688794
+  remote_ok restore-privacy-client-1.0.2-android.apk bytes=84688794
+upload kind=suite_client file=restore-privacy-client-1.0.2-macos.zip (27207358 bytes)
+  scp attempt 1: restore-privacy-client-1.0.2-macos.zip (27207358 bytes) -> root@135.181.152.10:/root/rpt-paid-upload-restore-privacy-client-1.0.2-macos.zip
+$ scp restore-privacy-client-1.0.2-macos.zip -> root@135.181.152.10:/root/rpt-paid-upload-restore-privacy-client-1.0.2-macos.zip
+$ ssh root@135.181.152.10 bash -lc 'set -e; test -f /root/rpt-paid-upload-restore-privacy-client-1.0.2-macos.zip; SZ=$(stat -c%s /root/rpt-paid-up…
+size_ok=27207358
+$ ssh root@135.181.152.10 sudo -n bash -lc 'set -e; mkdir -p $(dirname /opt/restore-privacy/paid_assets/1.0.2/restore-privacy-client-1.0.2-macos.z…
+27207358
+  remote_ok restore-privacy-client-1.0.2-macos.zip bytes=27207358
+upload kind=suite_client file=restore-privacy-client-1.0.2-ios.zip (12558929 bytes)
+  scp attempt 1: restore-privacy-client-1.0.2-ios.zip (12558929 bytes) -> root@135.181.152.10:/root/rpt-paid-upload-restore-privacy-client-1.0.2-ios.zip
+$ scp restore-privacy-client-1.0.2-ios.zip -> root@135.181.152.10:/root/rpt-paid-upload-restore-privacy-client-1.0.2-ios.zip
+$ ssh root@135.181.152.10 bash -lc 'set -e; test -f /root/rpt-paid-upload-restore-privacy-client-1.0.2-ios.zip; SZ=$(stat -c%s /root/rpt-paid-uplo…
+size_ok=12558929
+$ ssh root@135.181.152.10 sudo -n bash -lc 'set -e; mkdir -p $(dirname /opt/restore-privacy/paid_assets/1.0.2/restore-privacy-client-1.0.2-ios.zip…
+12558929
+  remote_ok restore-privacy-client-1.0.2-ios.zip bytes=12558929
+upload kind=suite_client file=restore-privacy-client-1.0.2-linux-x64.tar.gz (14636754 bytes)
+  scp attempt 1: restore-privacy-client-1.0.2-linux-x64.tar.gz (14636754 bytes) -> root@135.181.152.10:/root/rpt-paid-upload-restore-privacy-client-1.0.2-linux-x64.tar.gz
+$ scp restore-privacy-client-1.0.2-linux-x64.tar.gz -> root@135.181.152.10:/root/rpt-paid-upload-restore-privacy-client-1.0.2-linux-x64.tar.gz
+$ ssh root@135.181.152.10 bash -lc 'set -e; test -f /root/rpt-paid-upload-restore-privacy-client-1.0.2-linux-x64.tar.gz; SZ=$(stat -c%s /root/rpt-…
+size_ok=14636754
+$ ssh root@135.181.152.10 sudo -n bash -lc 'set -e; mkdir -p $(dirname /opt/restore-privacy/paid_assets/1.0.2/restore-privacy-client-1.0.2-linux-x…
+14636754
+  remote_ok restore-privacy-client-1.0.2-linux-x64.tar.gz bytes=14636754
+upload kind=browser file=restore-privacy-browser-extension-1.0.2.zip (35540 bytes)
+  scp attempt 1: restore-privacy-browser-extension-1.0.2.zip (35540 bytes) -> root@135.181.152.10:/root/rpt-paid-upload-restore-privacy-browser-extension-1.0.2.zip
+$ scp restore-privacy-browser-extension-1.0.2.zip -> root@135.181.152.10:/root/rpt-paid-upload-restore-privacy-browser-extension-1.0.2.zip
+$ ssh root@135.181.152.10 bash -lc 'set -e; test -f /root/rpt-paid-upload-restore-privacy-browser-extension-1.0.2.zip; SZ=$(stat -c%s /root/rpt-pa…
+size_ok=35540
+$ ssh root@135.181.152.10 sudo -n bash -lc 'set -e; mkdir -p $(dirname /opt/restore-privacy/paid_assets/1.0.2/restore-privacy-browser-extension-1.…
+35540
+  remote_ok restore-privacy-browser-extension-1.0.2.zip bytes=35540
+upload kind=browser file=restore-privacy-rx-browser-1.0.2.zip (35539 bytes)
+  scp attempt 1: restore-privacy-rx-browser-1.0.2.zip (35539 bytes) -> root@135.181.152.10:/root/rpt-paid-upload-restore-privacy-rx-browser-1.0.2.zip
+$ scp restore-privacy-rx-browser-1.0.2.zip -> root@135.181.152.10:/root/rpt-paid-upload-restore-privacy-rx-browser-1.0.2.zip
+$ ssh root@135.181.152.10 bash -lc 'set -e; test -f /root/rpt-paid-upload-restore-privacy-rx-browser-1.0.2.zip; SZ=$(stat -c%s /root/rpt-paid-uplo…
+size_ok=35539
+$ ssh root@135.181.152.10 sudo -n bash -lc 'set -e; mkdir -p $(dirname /opt/restore-privacy/paid_assets/1.0.2/restore-privacy-rx-browser-1.0.2.zip…
+35539
+  remote_ok restore-privacy-rx-browser-1.0.2.zip bytes=35539
+upload kind=browser file=restore-privacy-rx-browser-1.0.2-macos.zip (35705 bytes)
+  scp attempt 1: restore-privacy-rx-browser-1.0.2-macos.zip (35705 bytes) -> root@135.181.152.10:/root/rpt-paid-upload-restore-privacy-rx-browser-1.0.2-macos.zip
+$ scp restore-privacy-rx-browser-1.0.2-macos.zip -> root@135.181.152.10:/root/rpt-paid-upload-restore-privacy-rx-browser-1.0.2-macos.zip
+$ ssh root@135.181.152.10 bash -lc 'set -e; test -f /root/rpt-paid-upload-restore-privacy-rx-browser-1.0.2-macos.zip; SZ=$(stat -c%s /root/rpt-pai…
+size_ok=35705
+$ ssh root@135.181.152.10 sudo -n bash -lc 'set -e; mkdir -p $(dirname /opt/restore-privacy/paid_assets/1.0.2/restore-privacy-rx-browser-1.0.2-mac…
+35705
+  remote_ok restore-privacy-rx-browser-1.0.2-macos.zip bytes=35705
+upload kind=browser file=restore-privacy-rx-browser-1.0.2-windows.zip (35524 bytes)
+  scp attempt 1: restore-privacy-rx-browser-1.0.2-windows.zip (35524 bytes) -> root@135.181.152.10:/root/rpt-paid-upload-restore-privacy-rx-browser-1.0.2-windows.zip
+$ scp restore-privacy-rx-browser-1.0.2-windows.zip -> root@135.181.152.10:/root/rpt-paid-upload-restore-privacy-rx-browser-1.0.2-windows.zip
+$ ssh root@135.181.152.10 bash -lc 'set -e; test -f /root/rpt-paid-upload-restore-privacy-rx-browser-1.0.2-windows.zip; SZ=$(stat -c%s /root/rpt-p…
+size_ok=35524
+$ ssh root@135.181.152.10 sudo -n bash -lc 'set -e; mkdir -p $(dirname /opt/restore-privacy/paid_assets/1.0.2/restore-privacy-rx-browser-1.0.2-win…
+35524
+  remote_ok restore-privacy-rx-browser-1.0.2-windows.zip bytes=35524
+upload kind=browser file=restore-privacy-rx-browser-1.0.2-linux-x86_64.tar.gz (33767 bytes)
+  scp attempt 1: restore-privacy-rx-browser-1.0.2-linux-x86_64.tar.gz (33767 bytes) -> root@135.181.152.10:/root/rpt-paid-upload-restore-privacy-rx-browser-1.0.2-linux-x86_64.tar.gz
+$ scp restore-privacy-rx-browser-1.0.2-linux-x86_64.tar.gz -> root@135.181.152.10:/root/rpt-paid-upload-restore-privacy-rx-browser-1.0.2-linux-x86_64.tar.gz
+$ ssh root@135.181.152.10 bash -lc 'set -e; test -f /root/rpt-paid-upload-restore-privacy-rx-browser-1.0.2-linux-x86_64.tar.gz; SZ=$(stat -c%s /ro…
+size_ok=33767
+$ ssh root@135.181.152.10 sudo -n bash -lc 'set -e; mkdir -p $(dirname /opt/restore-privacy/paid_assets/1.0.2/restore-privacy-rx-browser-1.0.2-lin…
+33767
+  remote_ok restore-privacy-rx-browser-1.0.2-linux-x86_64.tar.gz bytes=33767
+upload kind=browser file=restore-privacy-rx-browser-1.0.2-linux-aarch64.tar.gz (33768 bytes)
+  scp attempt 1: restore-privacy-rx-browser-1.0.2-linux-aarch64.tar.gz (33768 bytes) -> root@135.181.152.10:/root/rpt-paid-upload-restore-privacy-rx-browser-1.0.2-linux-aarch64.tar.gz
+$ scp restore-privacy-rx-browser-1.0.2-linux-aarch64.tar.gz -> root@135.181.152.10:/root/rpt-paid-upload-restore-privacy-rx-browser-1.0.2-linux-aarch64.tar.gz
+$ ssh root@135.181.152.10 bash -lc 'set -e; test -f /root/rpt-paid-upload-restore-privacy-rx-browser-1.0.2-linux-aarch64.tar.gz; SZ=$(stat -c%s /r…
+size_ok=33768
+$ ssh root@135.181.152.10 sudo -n bash -lc 'set -e; mkdir -p $(dirname /opt/restore-privacy/paid_assets/1.0.2/restore-privacy-rx-browser-1.0.2-lin…
+33768
+  remote_ok restore-privacy-rx-browser-1.0.2-linux-aarch64.tar.gz bytes=33768
+upload kind=browser file=restore-privacy-rx-browser-1.0.2-linux-x86_64.zip (35604 bytes)
+  scp attempt 1: restore-privacy-rx-browser-1.0.2-linux-x86_64.zip (35604 bytes) -> root@135.181.152.10:/root/rpt-paid-upload-restore-privacy-rx-browser-1.0.2-linux-x86_64.zip
+$ scp restore-privacy-rx-browser-1.0.2-linux-x86_64.zip -> root@135.181.152.10:/root/rpt-paid-upload-restore-privacy-rx-browser-1.0.2-linux-x86_64.zip
+$ ssh root@135.181.152.10 bash -lc 'set -e; test -f /root/rpt-paid-upload-restore-privacy-rx-browser-1.0.2-linux-x86_64.zip; SZ=$(stat -c%s /root/…
+size_ok=35604
+$ ssh root@135.181.152.10 sudo -n bash -lc 'set -e; mkdir -p $(dirname /opt/restore-privacy/paid_assets/1.0.2/restore-privacy-rx-browser-1.0.2-lin…
+35604
+  remote_ok restore-privacy-rx-browser-1.0.2-linux-x86_64.zip bytes=35604
+upload kind=browser file=restore-privacy-rx-browser-1.0.2-ios.zip (35363 bytes)
+  scp attempt 1: restore-privacy-rx-browser-1.0.2-ios.zip (35363 bytes) -> root@135.181.152.10:/root/rpt-paid-upload-restore-privacy-rx-browser-1.0.2-ios.zip
+$ scp restore-privacy-rx-browser-1.0.2-ios.zip -> root@135.181.152.10:/root/rpt-paid-upload-restore-privacy-rx-browser-1.0.2-ios.zip
+$ ssh root@135.181.152.10 bash -lc 'set -e; test -f /root/rpt-paid-upload-restore-privacy-rx-browser-1.0.2-ios.zip; SZ=$(stat -c%s /root/rpt-paid-…
+size_ok=35363
+$ ssh root@135.181.152.10 sudo -n bash -lc 'set -e; mkdir -p $(dirname /opt/restore-privacy/paid_assets/1.0.2/restore-privacy-rx-browser-1.0.2-ios…
+35363
+  remote_ok restore-privacy-rx-browser-1.0.2-ios.zip bytes=35363
+upload kind=browser file=restore-privacy-rx-browser-1.0.2-android.zip (35483 bytes)
+  scp attempt 1: restore-privacy-rx-browser-1.0.2-android.zip (35483 bytes) -> root@135.181.152.10:/root/rpt-paid-upload-restore-privacy-rx-browser-1.0.2-android.zip
+$ scp restore-privacy-rx-browser-1.0.2-android.zip -> root@135.181.152.10:/root/rpt-paid-upload-restore-privacy-rx-browser-1.0.2-android.zip
+$ ssh root@135.181.152.10 bash -lc 'set -e; test -f /root/rpt-paid-upload-restore-privacy-rx-browser-1.0.2-android.zip; SZ=$(stat -c%s /root/rpt-p…
+size_ok=35483
+$ ssh root@135.181.152.10 sudo -n bash -lc 'set -e; mkdir -p $(dirname /opt/restore-privacy/paid_assets/1.0.2/restore-privacy-rx-browser-1.0.2-and…
+35483
+  remote_ok restore-privacy-rx-browser-1.0.2-android.zip bytes=35483
+upload kind=rpos file=rpos-0.2.0-windows-x64.zip (68280 bytes)
+  scp attempt 1: rpos-0.2.0-windows-x64.zip (68280 bytes) -> root@135.181.152.10:/root/rpt-paid-upload-rpos-0.2.0-windows-x64.zip
+$ scp rpos-0.2.0-windows-x64.zip -> root@135.181.152.10:/root/rpt-paid-upload-rpos-0.2.0-windows-x64.zip
+$ ssh root@135.181.152.10 bash -lc 'set -e; test -f /root/rpt-paid-upload-rpos-0.2.0-windows-x64.zip; SZ=$(stat -c%s /root/rpt-paid-upload-rpos-0.…
+size_ok=68280
+$ ssh root@135.181.152.10 sudo -n bash -lc 'set -e; mkdir -p $(dirname /opt/restore-privacy/paid_assets/1.0.2/rpos-0.2.0-windows-x64.zip); mv -f /…
+68280
+  remote_ok rpos-0.2.0-windows-x64.zip bytes=68280
+upload kind=rpos file=rpos-0.2.0-macos.zip (68140 bytes)
+  scp attempt 1: rpos-0.2.0-macos.zip (68140 bytes) -> root@135.181.152.10:/root/rpt-paid-upload-rpos-0.2.0-macos.zip
+$ scp rpos-0.2.0-macos.zip -> root@135.181.152.10:/root/rpt-paid-upload-rpos-0.2.0-macos.zip
+$ ssh root@135.181.152.10 bash -lc 'set -e; test -f /root/rpt-paid-upload-rpos-0.2.0-macos.zip; SZ=$(stat -c%s /root/rpt-paid-upload-rpos-0.2.0-ma…
+size_ok=68140
+$ ssh root@135.181.152.10 sudo -n bash -lc 'set -e; mkdir -p $(dirname /opt/restore-privacy/paid_assets/1.0.2/rpos-0.2.0-macos.zip); mv -f /root/r…
+68140
+  remote_ok rpos-0.2.0-macos.zip bytes=68140
+upload kind=rpos file=rpos-0.2.0-linux-x86_64.tar.gz (50616 bytes)
+  scp attempt 1: rpos-0.2.0-linux-x86_64.tar.gz (50616 bytes) -> root@135.181.152.10:/root/rpt-paid-upload-rpos-0.2.0-linux-x86_64.tar.gz
+$ scp rpos-0.2.0-linux-x86_64.tar.gz -> root@135.181.152.10:/root/rpt-paid-upload-rpos-0.2.0-linux-x86_64.tar.gz
+$ ssh root@135.181.152.10 bash -lc 'set -e; test -f /root/rpt-paid-upload-rpos-0.2.0-linux-x86_64.tar.gz; SZ=$(stat -c%s /root/rpt-paid-upload-rpo…
+size_ok=50616
+$ ssh root@135.181.152.10 sudo -n bash -lc 'set -e; mkdir -p $(dirname /opt/restore-privacy/paid_assets/1.0.2/rpos-0.2.0-linux-x86_64.tar.gz); mv …
+50616
+  remote_ok rpos-0.2.0-linux-x86_64.tar.gz bytes=50616
+upload kind=rpos file=rpos-0.2.0-linux-aarch64.tar.gz (50611 bytes)
+  scp attempt 1: rpos-0.2.0-linux-aarch64.tar.gz (50611 bytes) -> root@135.181.152.10:/root/rpt-paid-upload-rpos-0.2.0-linux-aarch64.tar.gz
+$ scp rpos-0.2.0-linux-aarch64.tar.gz -> root@135.181.152.10:/root/rpt-paid-upload-rpos-0.2.0-linux-aarch64.tar.gz
+$ ssh root@135.181.152.10 bash -lc 'set -e; test -f /root/rpt-paid-upload-rpos-0.2.0-linux-aarch64.tar.gz; SZ=$(stat -c%s /root/rpt-paid-upload-rp…
+size_ok=50611
+$ ssh root@135.181.152.10 sudo -n bash -lc 'set -e; mkdir -p $(dirname /opt/restore-privacy/paid_assets/1.0.2/rpos-0.2.0-linux-aarch64.tar.gz); mv…
+50611
+  remote_ok rpos-0.2.0-linux-aarch64.tar.gz bytes=50611
+upload kind=rpos_app file=pens-0.1.0-installer.zip (29965 bytes)
+  scp attempt 1: pens-0.1.0-installer.zip (29965 bytes) -> root@135.181.152.10:/root/rpt-paid-upload-pens-0.1.0-installer.zip
+$ scp pens-0.1.0-installer.zip -> root@135.181.152.10:/root/rpt-paid-upload-pens-0.1.0-installer.zip
+$ ssh root@135.181.152.10 bash -lc 'set -e; test -f /root/rpt-paid-upload-pens-0.1.0-installer.zip; SZ=$(stat -c%s /root/rpt-paid-upload-pens-0.1.…
+size_ok=29965
+$ ssh root@135.181.152.10 sudo -n bash -lc 'set -e; mkdir -p $(dirname /opt/restore-privacy/paid_assets/1.0.2/pens-0.1.0-installer.zip); mv -f /ro…
+29965
+  remote_ok pens-0.1.0-installer.zip bytes=29965
+upload kind=rpos_app file=tables-0.1.0-installer.zip (30057 bytes)
+  scp attempt 1: tables-0.1.0-installer.zip (30057 bytes) -> root@135.181.152.10:/root/rpt-paid-upload-tables-0.1.0-installer.zip
+$ scp tables-0.1.0-installer.zip -> root@135.181.152.10:/root/rpt-paid-upload-tables-0.1.0-installer.zip
+$ ssh root@135.181.152.10 bash -lc 'set -e; test -f /root/rpt-paid-upload-tables-0.1.0-installer.zip; SZ=$(stat -c%s /root/rpt-paid-upload-tables-…
+size_ok=30057
+$ ssh root@135.181.152.10 sudo -n bash -lc 'set -e; mkdir -p $(dirname /opt/restore-privacy/paid_assets/1.0.2/tables-0.1.0-installer.zip); mv -f /…
+30057
+  remote_ok tables-0.1.0-installer.zip bytes=30057
+upload kind=rpos_app file=slides-0.1.0-installer.zip (30056 bytes)
+  scp attempt 1: slides-0.1.0-installer.zip (30056 bytes) -> root@135.181.152.10:/root/rpt-paid-upload-slides-0.1.0-installer.zip
+$ scp slides-0.1.0-installer.zip -> root@135.181.152.10:/root/rpt-paid-upload-slides-0.1.0-installer.zip
+$ ssh root@135.181.152.10 bash -lc 'set -e; test -f /root/rpt-paid-upload-slides-0.1.0-installer.zip; SZ=$(stat -c%s /root/rpt-paid-upload-slides-…
+size_ok=30056
+$ ssh root@135.181.152.10 sudo -n bash -lc 'set -e; mkdir -p $(dirname /opt/restore-privacy/paid_assets/1.0.2/slides-0.1.0-installer.zip); mv -f /…
+30056
+  remote_ok slides-0.1.0-installer.zip bytes=30056
+upload kind=node_installer file=restore-privacy-node-installer-1.0.0-linux-x64.tar.gz (112101 bytes)
+  scp attempt 1: restore-privacy-node-installer-1.0.0-linux-x64.tar.gz (112101 bytes) -> root@135.181.152.10:/root/rpt-paid-upload-restore-privacy-node-installer-1.0.0-linux-x64.tar.gz
+$ scp restore-privacy-node-installer-1.0.0-linux-x64.tar.gz -> root@135.181.152.10:/root/rpt-paid-upload-restore-privacy-node-installer-1.0.0-linux-x64.tar.gz
+$ ssh root@135.181.152.10 bash -lc 'set -e; test -f /root/rpt-paid-upload-restore-privacy-node-installer-1.0.0-linux-x64.tar.gz; SZ=$(stat -c%s /r…
+size_ok=112101
+$ ssh root@135.181.152.10 sudo -n bash -lc 'set -e; mkdir -p $(dirname /opt/restore-privacy/paid_assets/1.0.2/restore-privacy-node-installer-1.0.0…
+112101
+  remote_ok restore-privacy-node-installer-1.0.0-linux-x64.tar.gz bytes=112101
+upload kind=node_installer file=restore-privacy-node-installer-1.0.0-macos.zip (135672 bytes)
+  scp attempt 1: restore-privacy-node-installer-1.0.0-macos.zip (135672 bytes) -> root@135.181.152.10:/root/rpt-paid-upload-restore-privacy-node-installer-1.0.0-macos.zip
+$ scp restore-privacy-node-installer-1.0.0-macos.zip -> root@135.181.152.10:/root/rpt-paid-upload-restore-privacy-node-installer-1.0.0-macos.zip
+$ ssh root@135.181.152.10 bash -lc 'set -e; test -f /root/rpt-paid-upload-restore-privacy-node-installer-1.0.0-macos.zip; SZ=$(stat -c%s /root/rpt…
+size_ok=135672
+$ ssh root@135.181.152.10 sudo -n bash -lc 'set -e; mkdir -p $(dirname /opt/restore-privacy/paid_assets/1.0.2/restore-privacy-node-installer-1.0.0…
+135672
+  remote_ok restore-privacy-node-installer-1.0.0-macos.zip bytes=135672
+upload kind=node_installer file=restore-privacy-node-installer-1.0.0-windows-x64.zip (135929 bytes)
+  scp attempt 1: restore-privacy-node-installer-1.0.0-windows-x64.zip (135929 bytes) -> root@135.181.152.10:/root/rpt-paid-upload-restore-privacy-node-installer-1.0.0-windows-x64.zip
+$ scp restore-privacy-node-installer-1.0.0-windows-x64.zip -> root@135.181.152.10:/root/rpt-paid-upload-restore-privacy-node-installer-1.0.0-windows-x64.zip
+$ ssh root@135.181.152.10 bash -lc 'set -e; test -f /root/rpt-paid-upload-restore-privacy-node-installer-1.0.0-windows-x64.zip; SZ=$(stat -c%s /ro…
+size_ok=135929
+$ ssh root@135.181.152.10 sudo -n bash -lc 'set -e; mkdir -p $(dirname /opt/restore-privacy/paid_assets/1.0.2/restore-privacy-node-installer-1.0.0…
+135929
+  remote_ok restore-privacy-node-installer-1.0.0-windows-x64.zip bytes=135929
+upload kind=node_installer file=restore-privacy-node-installer-1.0.0-android.zip (115997 bytes)
+  scp attempt 1: restore-privacy-node-installer-1.0.0-android.zip (115997 bytes) -> root@135.181.152.10:/root/rpt-paid-upload-restore-privacy-node-installer-1.0.0-android.zip
+$ scp restore-privacy-node-installer-1.0.0-android.zip -> root@135.181.152.10:/root/rpt-paid-upload-restore-privacy-node-installer-1.0.0-android.zip
+$ ssh root@135.181.152.10 bash -lc 'set -e; test -f /root/rpt-paid-upload-restore-privacy-node-installer-1.0.0-android.zip; SZ=$(stat -c%s /root/r…
+size_ok=115997
+$ ssh root@135.181.152.10 sudo -n bash -lc 'set -e; mkdir -p $(dirname /opt/restore-privacy/paid_assets/1.0.2/restore-privacy-node-installer-1.0.0…
+115997
+  remote_ok restore-privacy-node-installer-1.0.0-android.zip bytes=115997
+upload kind=node_installer file=restore-privacy-node-installer-1.0.0-ios.zip (115603 bytes)
+  scp attempt 1: restore-privacy-node-installer-1.0.0-ios.zip (115603 bytes) -> root@135.181.152.10:/root/rpt-paid-upload-restore-privacy-node-installer-1.0.0-ios.zip
+$ scp restore-privacy-node-installer-1.0.0-ios.zip -> root@135.181.152.10:/root/rpt-paid-upload-restore-privacy-node-installer-1.0.0-ios.zip
+$ ssh root@135.181.152.10 bash -lc 'set -e; test -f /root/rpt-paid-upload-restore-privacy-node-installer-1.0.0-ios.zip; SZ=$(stat -c%s /root/rpt-p…
+size_ok=115603
+$ ssh root@135.181.152.10 sudo -n bash -lc 'set -e; mkdir -p $(dirname /opt/restore-privacy/paid_assets/1.0.2/restore-privacy-node-installer-1.0.0…
+115603
+  remote_ok restore-privacy-node-installer-1.0.0-ios.zip bytes=115603
+upload kind=node_operator file=restore-privacy-node-operator-1.0.0-linux-x64.tar.gz (14789049 bytes)
+  scp attempt 1: restore-privacy-node-operator-1.0.0-linux-x64.tar.gz (14789049 bytes) -> root@135.181.152.10:/root/rpt-paid-upload-restore-privacy-node-operator-1.0.0-linux-x64.tar.gz
+$ scp restore-privacy-node-operator-1.0.0-linux-x64.tar.gz -> root@135.181.152.10:/root/rpt-paid-upload-restore-privacy-node-operator-1.0.0-linux-x64.tar.gz
+$ ssh root@135.181.152.10 bash -lc 'set -e; test -f /root/rpt-paid-upload-restore-privacy-node-operator-1.0.0-linux-x64.tar.gz; SZ=$(stat -c%s /ro…
+size_ok=14789049
+$ ssh root@135.181.152.10 sudo -n bash -lc 'set -e; mkdir -p $(dirname /opt/restore-privacy/paid_assets/1.0.2/restore-privacy-node-operator-1.0.0-…
+14789049
+  remote_ok restore-privacy-node-operator-1.0.0-linux-x64.tar.gz bytes=14789049
+upload kind=rpmail file=rpmail-0.1.0-windows.zip (14194 bytes)
+  scp attempt 1: rpmail-0.1.0-windows.zip (14194 bytes) -> root@135.181.152.10:/root/rpt-paid-upload-rpmail-0.1.0-windows.zip
+$ scp rpmail-0.1.0-windows.zip -> root@135.181.152.10:/root/rpt-paid-upload-rpmail-0.1.0-windows.zip
+$ ssh root@135.181.152.10 bash -lc 'set -e; test -f /root/rpt-paid-upload-rpmail-0.1.0-windows.zip; SZ=$(stat -c%s /root/rpt-paid-upload-rpmail-0.…
+size_ok=14194
+$ ssh root@135.181.152.10 sudo -n bash -lc 'set -e; mkdir -p $(dirname /opt/restore-privacy/paid_assets/1.0.2/rpmail-0.1.0-windows.zip); mv -f /ro…
+14194
+  remote_ok rpmail-0.1.0-windows.zip bytes=14194
+upload kind=rpmail file=rpmail-0.1.0-macos.zip (14194 bytes)
+  scp attempt 1: rpmail-0.1.0-macos.zip (14194 bytes) -> root@135.181.152.10:/root/rpt-paid-upload-rpmail-0.1.0-macos.zip
+$ scp rpmail-0.1.0-macos.zip -> root@135.181.152.10:/root/rpt-paid-upload-rpmail-0.1.0-macos.zip
+$ ssh root@135.181.152.10 bash -lc 'set -e; test -f /root/rpt-paid-upload-rpmail-0.1.0-macos.zip; SZ=$(stat -c%s /root/rpt-paid-upload-rpmail-0.1.…
+size_ok=14194
+$ ssh root@135.181.152.10 sudo -n bash -lc 'set -e; mkdir -p $(dirname /opt/restore-privacy/paid_assets/1.0.2/rpmail-0.1.0-macos.zip); mv -f /root…
+14194
+  remote_ok rpmail-0.1.0-macos.zip bytes=14194
+upload kind=rpmail file=rpmail-0.1.0-linux-x86_64.tar.gz (10374 bytes)
+  scp attempt 1: rpmail-0.1.0-linux-x86_64.tar.gz (10374 bytes) -> root@135.181.152.10:/root/rpt-paid-upload-rpmail-0.1.0-linux-x86_64.tar.gz
+$ scp rpmail-0.1.0-linux-x86_64.tar.gz -> root@135.181.152.10:/root/rpt-paid-upload-rpmail-0.1.0-linux-x86_64.tar.gz
+$ ssh root@135.181.152.10 bash -lc 'set -e; test -f /root/rpt-paid-upload-rpmail-0.1.0-linux-x86_64.tar.gz; SZ=$(stat -c%s /root/rpt-paid-upload-r…
+size_ok=10374
+$ ssh root@135.181.152.10 sudo -n bash -lc 'set -e; mkdir -p $(dirname /opt/restore-privacy/paid_assets/1.0.2/rpmail-0.1.0-linux-x86_64.tar.gz); m…
+10374
+  remote_ok rpmail-0.1.0-linux-x86_64.tar.gz bytes=10374
+upload kind=rpmail file=rpmail-0.1.0-linux-aarch64.tar.gz (10384 bytes)
+  scp attempt 1: rpmail-0.1.0-linux-aarch64.tar.gz (10384 bytes) -> root@135.181.152.10:/root/rpt-paid-upload-rpmail-0.1.0-linux-aarch64.tar.gz
+$ scp rpmail-0.1.0-linux-aarch64.tar.gz -> root@135.181.152.10:/root/rpt-paid-upload-rpmail-0.1.0-linux-aarch64.tar.gz
+$ ssh root@135.181.152.10 bash -lc 'set -e; test -f /root/rpt-paid-upload-rpmail-0.1.0-linux-aarch64.tar.gz; SZ=$(stat -c%s /root/rpt-paid-upload-…
+size_ok=10384
+$ ssh root@135.181.152.10 sudo -n bash -lc 'set -e; mkdir -p $(dirname /opt/restore-privacy/paid_assets/1.0.2/rpmail-0.1.0-linux-aarch64.tar.gz); …
+10384
+  remote_ok rpmail-0.1.0-linux-aarch64.tar.gz bytes=10384
+upload kind=rpoffice file=rpoffice-0.1.0-windows.zip (13760 bytes)
+  scp attempt 1: rpoffice-0.1.0-windows.zip (13760 bytes) -> root@135.181.152.10:/root/rpt-paid-upload-rpoffice-0.1.0-windows.zip
+$ scp rpoffice-0.1.0-windows.zip -> root@135.181.152.10:/root/rpt-paid-upload-rpoffice-0.1.0-windows.zip
+$ ssh root@135.181.152.10 bash -lc 'set -e; test -f /root/rpt-paid-upload-rpoffice-0.1.0-windows.zip; SZ=$(stat -c%s /root/rpt-paid-upload-rpoffic…
+size_ok=13760
+$ ssh root@135.181.152.10 sudo -n bash -lc 'set -e; mkdir -p $(dirname /opt/restore-privacy/paid_assets/1.0.2/rpoffice-0.1.0-windows.zip); mv -f /…
+13760
+  remote_ok rpoffice-0.1.0-windows.zip bytes=13760
+upload kind=rpoffice file=rpoffice-0.1.0-macos.zip (13760 bytes)
+  scp attempt 1: rpoffice-0.1.0-macos.zip (13760 bytes) -> root@135.181.152.10:/root/rpt-paid-upload-rpoffice-0.1.0-macos.zip
+$ scp rpoffice-0.1.0-macos.zip -> root@135.181.152.10:/root/rpt-paid-upload-rpoffice-0.1.0-macos.zip
+$ ssh root@135.181.152.10 bash -lc 'set -e; test -f /root/rpt-paid-upload-rpoffice-0.1.0-macos.zip; SZ=$(stat -c%s /root/rpt-paid-upload-rpoffice-…
+size_ok=13760
+$ ssh root@135.181.152.10 sudo -n bash -lc 'set -e; mkdir -p $(dirname /opt/restore-privacy/paid_assets/1.0.2/rpoffice-0.1.0-macos.zip); mv -f /ro…
+13760
+  remote_ok rpoffice-0.1.0-macos.zip bytes=13760
+upload kind=rpoffice file=rpoffice-0.1.0-linux-x86_64.tar.gz (9507 bytes)
+  scp attempt 1: rpoffice-0.1.0-linux-x86_64.tar.gz (9507 bytes) -> root@135.181.152.10:/root/rpt-paid-upload-rpoffice-0.1.0-linux-x86_64.tar.gz
+$ scp rpoffice-0.1.0-linux-x86_64.tar.gz -> root@135.181.152.10:/root/rpt-paid-upload-rpoffice-0.1.0-linux-x86_64.tar.gz
+$ ssh root@135.181.152.10 bash -lc 'set -e; test -f /root/rpt-paid-upload-rpoffice-0.1.0-linux-x86_64.tar.gz; SZ=$(stat -c%s /root/rpt-paid-upload…
+size_ok=9507
+$ ssh root@135.181.152.10 sudo -n bash -lc 'set -e; mkdir -p $(dirname /opt/restore-privacy/paid_assets/1.0.2/rpoffice-0.1.0-linux-x86_64.tar.gz);…
+9507
+  remote_ok rpoffice-0.1.0-linux-x86_64.tar.gz bytes=9507
+upload kind=rpoffice file=rpoffice-0.1.0-linux-aarch64.tar.gz (9506 bytes)
+  scp attempt 1: rpoffice-0.1.0-linux-aarch64.tar.gz (9506 bytes) -> root@135.181.152.10:/root/rpt-paid-upload-rpoffice-0.1.0-linux-aarch64.tar.gz
+$ scp rpoffice-0.1.0-linux-aarch64.tar.gz -> root@135.181.152.10:/root/rpt-paid-upload-rpoffice-0.1.0-linux-aarch64.tar.gz
+$ ssh root@135.181.152.10 bash -lc 'set -e; test -f /root/rpt-paid-upload-rpoffice-0.1.0-linux-aarch64.tar.gz; SZ=$(stat -c%s /root/rpt-paid-uploa…
+size_ok=9506
+$ ssh root@135.181.152.10 sudo -n bash -lc 'set -e; mkdir -p $(dirname /opt/restore-privacy/paid_assets/1.0.2/rpoffice-0.1.0-linux-aarch64.tar.gz)…
+9506
+  remote_ok rpoffice-0.1.0-linux-aarch64.tar.gz bytes=9506
+brand upload complete host=135.181.152.10 version=1.0.2
+upload_exit=0

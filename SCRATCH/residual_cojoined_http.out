@@ -1,0 +1,2 @@
+82.221.101.241 all_ready=True readiness={'vpn': True, 'rpai': True, 'perccent': True}
+178.105.187.178 all_ready=True readiness={'vpn': True, 'rpai': True, 'perccent': True}

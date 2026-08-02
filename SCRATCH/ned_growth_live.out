@@ -1,0 +1,30 @@
+{
+  "ok": true,
+  "ned": {
+    "product": "Ned \u00b7 rpAI \u00b7 Restore Privacy Helper",
+    "mission": "adaptive learning for the good of all humanity",
+    "nodes_online": 2,
+    "nodes_total_seen": 2,
+    "learning_epochs": 5,
+    "narrative_sessions": 0,
+    "chronoflux_blocks_grown": 0,
+    "last_chronoflux_height": -1,
+    "growth_score": 10,
+    "capability_tier": 1,
+    "last_chronoflux_label": "",
+    "updated_unix": 1785600794,
+    "ready_vpn": true,
+    "ready_rpai": true,
+    "ready_perccent": true,
+    "ready_oracle": true,
+    "ready_cojoined": true,
+    "compute_score": 28,
+    "growth_methods": [
+      "chronoflux_confirmed_block",
+      "node_heartbeat",
+      "narrative_session",
+      "oracle_learn"
+    ]
+  }
+}
+LIVE_NED_ALL_TRUE

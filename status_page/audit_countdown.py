@@ -301,14 +301,21 @@ def current_audit_rag_colour(
 
 
 def format_last_audit_run_display(iso_z: str | None) -> str:
-    """Human-readable last audit run for public UI (UTC)."""
+    """Human-readable last audit run for public UI (Europe/London — GMT or BST)."""
     if not iso_z:
         return "not available"
     dt = parse_audit_generated_at(str(iso_z))
     if dt is None:
         return str(iso_z)
-    # e.g. 2026-07-22 12:45:00 UTC
-    return dt.astimezone(timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC")
+    try:
+        from zoneinfo import ZoneInfo
+
+        local = dt.astimezone(ZoneInfo("Europe/London"))
+        # %Z → GMT or BST depending on UK summer time
+        return local.strftime("%Y-%m-%d %H:%M:%S %Z")
+    except Exception:
+        # Fallback if zoneinfo data unavailable
+        return dt.astimezone(timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC")
 
 
 def render_audit_countdown_html(

@@ -78,6 +78,11 @@ void main() {
   });
 
   group('suiteNavDestinations', () {
+    test('suiteNavLabel maps security dest to Backup (not Security)', () {
+      expect(suiteNavLabel(SuiteNavDest.security), 'Backup');
+      expect(suiteNavLabel(SuiteNavDest.security), isNot('Security'));
+    });
+
     test('all installed: VPN + family (no dual EVOLVE top-level) + rpAI', () {
       final d = suiteNavDestinations(SuitePartsState.allInstalled);
       final labels = d.map(suiteNavLabel).toList();
@@ -86,7 +91,8 @@ void main() {
       // Unified %/Evolve family — Wallet once, no separate EVOLVE product slot.
       expect(labels.where((l) => l == 'EVOLVE'), isEmpty);
       expect(labels.where((l) => l == '%'), isEmpty);
-      expect(labels, containsAll(['Analysis', 'Wallet', 'Security', 'Voting', 'Credit']));
+      expect(labels, containsAll(['Analysis', 'Wallet', 'Backup', 'Voting', 'Credit']));
+      expect(labels, isNot(contains('Security')));
       // % and Evolve share family — Analysis/Voting from evolve, Wallet shared.
       expect(d.where(suiteNavIsPercentEvolveFamily).length, greaterThanOrEqualTo(3));
     });
@@ -98,7 +104,7 @@ void main() {
         rpaiInstalled: true,
       );
       final labels = suiteNavDestinations(parts).map(suiteNavLabel).toList();
-      expect(labels, ['VPN', 'Wallet', 'Security', 'Credit', 'rpAI']);
+      expect(labels, ['VPN', 'Wallet', 'Backup', 'Credit', 'rpAI']);
       expect(labels, isNot(contains('Analysis')));
       expect(labels, isNot(contains('Voting')));
     });
@@ -134,7 +140,7 @@ void main() {
       final labels = d.map(suiteNavLabel).toList();
       expect(labels, isNot(contains('Analysis')));
       expect(labels, isNot(contains('Voting')));
-      expect(labels, containsAll(['VPN', 'Wallet', 'Security', 'Credit', 'rpAI']));
+      expect(labels, containsAll(['VPN', 'Wallet', 'Backup', 'Credit', 'rpAI']));
     });
 
     test('evolve shell index maps limited vs full access', () {
@@ -221,7 +227,7 @@ void main() {
     expect(find.text('VPN'), findsWidgets);
     expect(find.text('Wallet'), findsWidgets);
     expect(find.text('Analysis'), findsWidgets);
-    expect(find.text('Security'), findsWidgets);
+    expect(find.text('Backup'), findsWidgets);
     expect(find.text('Voting'), findsWidgets);
     expect(find.text('Credit'), findsWidgets);
     expect(find.text('rpAI'), findsWidgets);

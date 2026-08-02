@@ -35,10 +35,13 @@ class TestAuditLastRunPythonHelpers(unittest.TestCase):
         st = countdown_state(now=now, last_generated_at=last)
         self.assertTrue(st["available"])
         self.assertEqual(st["last_generated_at"], "2026-07-30T22:38:09Z")
-        self.assertEqual(
-            format_last_audit_run_display(st["last_generated_at"]),
-            "2026-07-30 22:38:09 UTC",
+        # UK local wall clock (Europe/London — GMT in winter, BST in summer)
+        disp = format_last_audit_run_display(st["last_generated_at"])
+        self.assertTrue(
+            disp.endswith(" GMT") or disp.endswith(" BST"),
+            f"expected UK zone abbr, got {disp!r}",
         )
+        self.assertRegex(disp, r"^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2} (GMT|BST)$")
         # Rolling past many periods still uses last from source
         now2 = last + timedelta(days=5, hours=1)
         nxt = next_audit_at_rolling(last, now=now2)
@@ -69,7 +72,8 @@ class TestAuditLastRunJsHelpers(unittest.TestCase):
         script = f"""
 const h = require({json.dumps(str(HELPERS_JS))});
 function assert(cond, msg) {{ if (!cond) {{ console.error(msg); process.exit(1); }} }}
-assert(h.formatLastAuditRunDisplay("2026-07-30T22:38:09Z") === "2026-07-30 22:38:09 UTC", "fmt");
+const fmt = h.formatLastAuditRunDisplay("2026-07-30T22:38:09Z");
+assert(/\\d{{4}}-\\d{{2}}-\\d{{2}} \\d{{2}}:\\d{{2}}:\\d{{2}} (GMT|BST)$/.test(fmt), "fmt UK " + fmt);
 assert(h.formatLastAuditRunDisplay("") === "not available", "empty");
 assert(h.generatedAtFromPayload({{ generated_at: "2026-08-01T01:02:03Z" }}) === "2026-08-01T01:02:03Z", "gen");
 assert(h.generatedAtFromPayload({{}}) === "", "no gen");
@@ -90,7 +94,7 @@ const el = {{
 }};
 assert(h.applyLastRunToTimeElement(el, "2026-08-01T01:02:03Z") === true, "applied");
 assert(el.datetime === "2026-08-01T01:02:03Z", "dt");
-assert(el.text === "2026-08-01 01:02:03 UTC", "text");
+assert(/GMT|BST/.test(el.text), "text UK zone " + el.text);
 assert(h.applyLastRunToTimeElement(el, "2026-08-01T01:02:03Z") === false, "no-op same");
 console.log("JS_HELPERS_OK");
 """
@@ -164,9 +168,10 @@ class TestAuditLastRunRefreshLogic(unittest.TestCase):
         )
         self.assertIsNone(decide(prev, payload_same))
         self.assertIsNone(decide(prev, payload_empty))
+        # Summer UK time: 06:00Z → 07:00 BST
         self.assertEqual(
             format_last_audit_run_display("2026-08-01T06:00:00Z"),
-            "2026-08-01 06:00:00 UTC",
+            "2026-08-01 07:00:00 BST",
         )
 
 

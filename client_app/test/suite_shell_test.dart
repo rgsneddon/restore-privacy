@@ -134,11 +134,23 @@ void main() {
     expect(find.text('VPN'), findsWidgets);
     expect(find.text('Wallet'), findsWidgets);
     expect(find.text('Analysis'), findsWidgets);
-    expect(find.text('Security'), findsWidgets);
+    expect(find.text('Backup'), findsWidgets);
     expect(find.text('Voting'), findsWidgets);
     expect(find.text('Credit'), findsWidgets);
     expect(find.text('rpAI'), findsWidgets);
     expect(find.text('EVOLVE'), findsNothing);
+
+    // Backup destination uses backup/restore icons (not shield/security).
+    final backupDest = tester
+        .widgetList<NavigationDestination>(find.byType(NavigationDestination))
+        .firstWhere((d) => d.label == 'Backup');
+    expect((backupDest.icon as Icon).icon, Icons.backup_outlined);
+    expect(
+      (backupDest.selectedIcon as Icon).icon,
+      Icons.settings_backup_restore,
+    );
+    expect((backupDest.icon as Icon).icon, isNot(Icons.security));
+    expect((backupDest.icon as Icon).icon, isNot(Icons.security_outlined));
 
     // Default tab = VPN primary surface.
     expect(find.text('VPN_SURFACE_CONNECT'), findsOneWidget);
