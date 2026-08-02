@@ -109,6 +109,128 @@ def is_loopback_host(host: str) -> bool:
     return False
 
 
+def localhost_probe_required() -> bool:
+    """True when node-timer policy forbids outbound residual peer probes."""
+    return os.environ.get("RPT_AUDIT_REQUIRE_LOCALHOST", "").strip().lower() in (
+        "1",
+        "true",
+        "yes",
+    )
+
+
+def active_residual_probe_schedule() -> list[dict[str, Any]]:
+    """Active residual monopin peers for live status probes.
+
+    Source of truth is the **product residual catalog** (same peers the Suite
+    client dials). Retired monopin IPs are not scheduled.
+
+    When ``RPT_AUDIT_REQUIRE_LOCALHOST=1`` (node timer), returns a single
+    loopback peer only — no outbound multi-node scan.
+    """
+    if localhost_probe_required():
+        return [
+            {
+                "host": "127.0.0.1",
+                "code": "LOCAL",
+                "label": "localhost (node timer)",
+                "udp_port": UDP_PORT,
+                "status_port": STATUS_PORT,
+            }
+        ]
+    peers: list[dict[str, Any]] = []
+    seen: set[str] = set()
+    try:
+        from client.residual_public import public_catalog_peers, public_label_for_host
+
+        for row in public_catalog_peers(admin=True):
+            host = str(row.get("host") or "").strip()
+            if not host or host in seen:
+                continue
+            seen.add(host)
+            code = str(row.get("code") or "").strip().upper()
+            label = str(row.get("label") or "").strip() or public_label_for_host(host)
+            peers.append(
+                {
+                    "host": host,
+                    "code": code,
+                    "label": label,
+                    "udp_port": int(row.get("port") or UDP_PORT),
+                    "status_port": STATUS_PORT,
+                }
+            )
+    except Exception:  # noqa: BLE001
+        peers = []
+    if not peers:
+        # Fail-safe: shipped IS + DE monopin (must stay aligned with multihop catalog).
+        for host, code, label in (
+            ("82.221.101.241", "IS", "Iceland (IS)"),
+            ("178.105.187.178", "DE", "Germany (DE)"),
+        ):
+            if host not in seen:
+                peers.append(
+                    {
+                        "host": host,
+                        "code": code,
+                        "label": label,
+                        "udp_port": UDP_PORT,
+                        "status_port": STATUS_PORT,
+                    }
+                )
+    return peers
+
+
+def probe_residual_peer(peer: dict[str, Any]) -> dict[str, Any]:
+    """Run TCP status, HTTP /status, and UDP residual probes for one peer."""
+    host = str(peer.get("host") or "").strip()
+    status_port = int(peer.get("status_port") or STATUS_PORT)
+    udp_port = int(peer.get("udp_port") or UDP_PORT)
+    tcp = probe_tcp(host, status_port)
+    http = probe_http_status(host, status_port)
+    udp = probe_udp_open(host, udp_port)
+    return {
+        "code": peer.get("code") or "",
+        "label": peer.get("label") or host or "VPN node",
+        "host": host,
+        "status_port": status_port,
+        "udp_port": udp_port,
+        "tcp_status": tcp,
+        "http_status": http,
+        "udp": udp,
+        "ok": bool(tcp.get("ok") and http.get("ok")),
+    }
+
+
+def probe_all_residual_nodes(
+    schedule: list[dict[str, Any]] | None = None,
+) -> list[dict[str, Any]]:
+    """Probe every peer in the residual schedule (or active catalog when None)."""
+    sched = list(schedule if schedule is not None else active_residual_probe_schedule())
+    return [probe_residual_peer(p) for p in sched]
+
+
+def primary_probe_from_live(
+    live: list[dict[str, Any]], *, preferred_host: str | None = None
+) -> dict[str, Any]:
+    """Pick primary peer results for backward-compat top-level tcp/http/udp fields."""
+    if not live:
+        host = (preferred_host or DEFAULT_HOST).strip() or "127.0.0.1"
+        return {
+            "host": host,
+            "tcp_status": probe_tcp(host, STATUS_PORT),
+            "http_status": probe_http_status(host, STATUS_PORT),
+            "udp": probe_udp_open(host, UDP_PORT),
+        }
+    pref = (preferred_host or DEFAULT_HOST).strip()
+    for row in live:
+        if str(row.get("host") or "").strip() == pref:
+            return row
+    # Prefer DE when present
+    for row in live:
+        if str(row.get("code") or "").upper() == "DE":
+            return row
+    return live[0]
+
+
 def require_localhost_probe_host(host: str | None = None) -> str:
     """Return host for probes; raise if localhost required and host is not loopback."""
     h = (host if host is not None else DEFAULT_HOST).strip() or "127.0.0.1"
@@ -199,11 +321,47 @@ def slim_results_for_public_json(results: dict) -> dict:
         if k.endswith("_tail") or k in ("stdout", "stderr", "output"):
             us.pop(k, None)
     slim["unit_suite"] = us
+    # Live multi-node probes: keep labels + outcomes; drop raw dial hosts.
+    public_live: list[dict[str, Any]] = []
+    for row in slim.get("live_node_probes") or []:
+        if not isinstance(row, dict):
+            continue
+        public_live.append(
+            {
+                "code": row.get("code"),
+                "label": row.get("label"),
+                "status_port": row.get("status_port"),
+                "udp_port": row.get("udp_port"),
+                "tcp_status": {
+                    "ok": (row.get("tcp_status") or {}).get("ok"),
+                    "error": (row.get("tcp_status") or {}).get("error"),
+                    "port": (row.get("tcp_status") or {}).get("port"),
+                },
+                "http_status": {
+                    "ok": (row.get("http_status") or {}).get("ok"),
+                    "status_code": (row.get("http_status") or {}).get("status_code"),
+                    "body": (row.get("http_status") or {}).get("body"),
+                    "error": (row.get("http_status") or {}).get("error"),
+                },
+                "udp": {
+                    "sent": (row.get("udp") or {}).get("sent"),
+                    "error": (row.get("udp") or {}).get("error"),
+                    "port": (row.get("udp") or {}).get("port"),
+                },
+                "ok": row.get("ok"),
+            }
+        )
+    slim["live_node_probes"] = public_live
+    # node_host may still be redacted to country label by redact_audit_value
     slim["privacy"] = {
         "redacted": True,
         "no_suite_tails": True,
         "no_network_exfil": True,
-        "note": "Audit artifacts are local-only; timer does not git-push or upload",
+        "multi_node_probes": True,
+        "note": (
+            "Audit artifacts written locally on --write; optional --publish / "
+            "RPT_AUDIT_PUBLISH pushes AUDIT + JSON to status-host deploy surface"
+        ),
     }
     return slim
 
@@ -1341,6 +1499,49 @@ Regenerated by `scripts/run_security_audit.py --write` (1-day timer).
 """
 
 
+def render_live_node_probe_table(results: dict) -> str:
+    """Markdown table of per-peer live probes (public country labels only)."""
+    live = results.get("live_node_probes") or []
+    if not live:
+        # Legacy single-host results
+        host = results.get("node_host") or DEFAULT_HOST
+        try:
+            from client.residual_public import public_label_for_host
+
+            label = public_label_for_host(str(host))
+        except Exception:  # noqa: BLE001
+            label = "VPN node"
+        tcp = results.get("tcp_status") or {}
+        http = results.get("http_status") or {}
+        udp = results.get("udp") or {}
+        live = [
+            {
+                "label": label,
+                "code": "",
+                "tcp_status": tcp,
+                "http_status": http,
+                "udp": udp,
+            }
+        ]
+    rows: list[str] = []
+    for row in live:
+        label = str(row.get("label") or row.get("code") or "VPN node")
+        tcp = row.get("tcp_status") or {}
+        http = row.get("http_status") or {}
+        udp = row.get("udp") or {}
+        body = http.get("body")
+        body_s = repr(body) if body is not None else "—"
+        rows.append(
+            f"| {label} | ok={tcp.get('ok')} err={tcp.get('error')} "
+            f"| code={http.get('status_code')} body={body_s} "
+            f"| sent={udp.get('sent')} err={udp.get('error')} |"
+        )
+    table = "\n".join(rows) if rows else "| — | — | — | — |"
+    return f"""| Peer | TCP `:{STATUS_PORT}` | HTTP `/status` | UDP `:{UDP_PORT}` |
+|------|----------------------|----------------|-------------------|
+{table}"""
+
+
 def build_markdown(results: dict) -> str:
     # Single source of truth for all last-run surfaces in this document.
     now = str(results.get("generated_at") or iso_z()).strip()
@@ -1355,6 +1556,13 @@ def build_markdown(results: dict) -> str:
     priv = results["no_priv"]
     pkg = results.get("package_rag") or evaluate_catalog_packages(catalog)
     package_section = render_package_rag_section(pkg)
+    live_probe_table = render_live_node_probe_table(results)
+    try:
+        from client.residual_public import public_label_for_host
+
+        primary_label = public_label_for_host(str(host))
+    except Exception:  # noqa: BLE001
+        primary_label = str(host)
     # Live KEYGEN GBP anchors from downloads (not a hard-coded retired monthly price)
     try:
         sys.path.insert(0, str(ROOT / "status_page"))
@@ -1510,13 +1718,21 @@ Latest automated security audit for production node **{host}** and the in-repo p
 
 ---
 
-## 3. Live node probe results
+## 3. Live residual node probe results
+
+Schedule: **all active residual monopin peers** from the product catalog
+(not a single default host only). Node-timer runs use **localhost only**.
+
+{live_probe_table}
+
+**Primary peer** (backward-compat summary — default residual entry / preferred host):
 
 | Probe | Detail |
 |-------|--------|
-| TCP `{host}:{STATUS_PORT}` | ok={tcp.get("ok")} error={tcp.get("error")} |
-| HTTP `http://{host}:{STATUS_PORT}/status` | code={http.get("status_code")} body={http.get("body")!r} |
-| UDP `{host}:{UDP_PORT}` | sent={udp.get("sent")} error={udp.get("error")} |
+| Peer | {primary_label} |
+| TCP status `:{STATUS_PORT}` | ok={tcp.get("ok")} error={tcp.get("error")} |
+| HTTP `/status` | code={http.get("status_code")} body={http.get("body")!r} |
+| UDP residual `:{UDP_PORT}` | sent={udp.get("sent")} error={udp.get("error")} |
 
 **Expectation:** `/status` returns title-only JSON (e.g. `{{"title":"RESTORE PRIVACY"}}`) — **never** a live client count.
 
@@ -1627,31 +1843,56 @@ Re-run: `python3 scripts/run_security_audit.py --write`
 
 
 def collect(node_only: bool = False) -> dict:
-    # Node timer forces localhost probes; laptop/CI may use product public host.
-    host = require_localhost_probe_host(DEFAULT_HOST)
+    """Collect unit suite + multi-node residual live probes + package RAG.
+
+    Live schedule is **all active residual monopin peers** from the product
+    catalog (IS + DE today), unless ``RPT_AUDIT_REQUIRE_LOCALHOST=1`` forces a
+    single loopback peer (privacy-hardened node timer).
+    """
+    schedule = active_residual_probe_schedule()
+    # Validate primary host against localhost policy (raises when misconfigured).
+    primary_host = require_localhost_probe_host(
+        schedule[0]["host"] if schedule and localhost_probe_required() else DEFAULT_HOST
+    )
     catalog = load_catalog_version()
-    http_status = probe_http_status(host, STATUS_PORT)
+    live_node_probes = probe_all_residual_nodes(schedule)
+    primary = primary_probe_from_live(live_node_probes, preferred_host=primary_host)
+    host = str(primary.get("host") or primary_host)
+    http_status = primary.get("http_status") or probe_http_status(host, STATUS_PORT)
+    tcp_status = primary.get("tcp_status") or probe_tcp(host, STATUS_PORT)
+    udp = primary.get("udp") or probe_udp_open(host, UDP_PORT)
     section_b = run_section_b_probes(http_status)
     multihop_structure = run_multihop_structure_probes()
+    # Public-safe schedule summary (labels only; hosts redacted later).
+    schedule_public = [
+        {
+            "code": p.get("code"),
+            "label": p.get("label"),
+            "status_port": p.get("status_port"),
+            "udp_port": p.get("udp_port"),
+        }
+        for p in schedule
+    ]
     results = {
         "generated_at": iso_z(),
         "node_host": host,
         "catalog_version": catalog,
+        "probe_schedule": schedule_public,
+        "live_node_probes": live_node_probes,
         "unit_suite": {"ran": False, "ok": True, "reason": "skipped"} if node_only else run_unit_suite(),
-        "tcp_status": probe_tcp(host, STATUS_PORT),
+        "tcp_status": tcp_status,
         "http_status": http_status,
-        "udp": probe_udp_open(host, UDP_PORT),
+        "udp": udp,
         "no_priv": check_no_priv_in_tree(),
         "package_rag": evaluate_catalog_packages(catalog),
         "section_b": section_b,
         "multihop_structure": multihop_structure,
         "audit_privacy": {
-            "localhost_required": os.environ.get("RPT_AUDIT_REQUIRE_LOCALHOST", "")
-            .strip()
-            .lower()
-            in ("1", "true", "yes"),
+            "localhost_required": localhost_probe_required(),
             "outbound_allowed": audit_outbound_allowed(),
             "probe_host_loopback": is_loopback_host(host),
+            "multi_node_schedule": not localhost_probe_required(),
+            "probe_peer_count": len(live_node_probes),
             "no_network_exfil": True,
             "section_b": True,
             "multihop_structure": True,
@@ -1700,7 +1941,6 @@ def write_outputs(results: dict, out_path: Path) -> None:
         except OSError:
             pass
     # VPN APP Shop copies for Render (rootDir=status_page) + public_docs host
-    # Local copies only — never git push / HTTP upload from this runner.
     for status_copy in (
         ROOT / "status_page" / "AUDIT.md",
         ROOT / "status_page" / "public" / "AUDIT.md",
@@ -1721,10 +1961,176 @@ def write_outputs(results: dict, out_path: Path) -> None:
         pass
 
 
+def publish_audit_artifacts(
+    *,
+    commit: bool = True,
+    push: bool = True,
+) -> dict[str, Any]:
+    """Publish local AUDIT mirrors + security_audit_latest.json to status host.
+
+    Status host (restoreprivacy.online) deploys from git ``status_page/``
+    (Render rootDir). This entry stages the written artifacts, commits when
+    dirty, and pushes to ``origin`` so the public page last-run advances.
+
+    Returns a result dict: ``ok``, ``steps``, ``error`` (honest failure, never
+    faked green). Set ``RPT_AUDIT_PUBLISH=0`` / ``--no-publish`` to skip.
+    """
+    out: dict[str, Any] = {"ok": False, "steps": [], "error": None, "published": False}
+    paths = [
+        ROOT / "AUDIT.md",
+        ROOT / "status_page" / "AUDIT.md",
+        ROOT / "status_page" / "public" / "AUDIT.md",
+        ROOT / "status_page" / "static" / "security_audit_latest.json",
+    ]
+    missing = [str(p) for p in paths if not p.is_file()]
+    if missing:
+        out["error"] = f"missing artifacts: {missing}"
+        out["steps"].append({"action": "check_paths", "ok": False, "missing": missing})
+        return out
+    out["steps"].append({"action": "check_paths", "ok": True})
+
+    # Optional SSH/rsync publish when RPT_AUDIT_STATUS_SSH is set (scp pair).
+    ssh_spec = (os.environ.get("RPT_AUDIT_STATUS_SSH") or "").strip()
+    remote_root = (
+        os.environ.get("RPT_AUDIT_STATUS_REMOTE_ROOT") or ""
+    ).strip() or "/opt/restore-privacy"
+    if ssh_spec:
+        key = (os.environ.get("RPT_SSH_KEY") or "").strip()
+        scp = ["scp", "-o", "BatchMode=yes", "-o", "ConnectTimeout=30"]
+        if key:
+            scp.extend(["-i", key])
+        else:
+            for name in (
+                "id_ed25519_restore_privacy_eu",
+                "id_ed25519_restore_privacy_vps",
+            ):
+                cand = Path.home() / ".ssh" / name
+                if cand.is_file():
+                    scp.extend(["-i", str(cand)])
+                    break
+        remote_json = f"{ssh_spec}:{remote_root}/status_page/static/security_audit_latest.json"
+        remote_audit = f"{ssh_spec}:{remote_root}/status_page/public/AUDIT.md"
+        json_path = ROOT / "status_page" / "static" / "security_audit_latest.json"
+        pub_audit = ROOT / "status_page" / "public" / "AUDIT.md"
+        r1 = subprocess.run(
+            scp + [str(json_path), remote_json],
+            capture_output=True,
+            text=True,
+        )
+        r2 = subprocess.run(
+            scp + [str(pub_audit), remote_audit],
+            capture_output=True,
+            text=True,
+        )
+        step = {
+            "action": "scp_status_host",
+            "ok": r1.returncode == 0 and r2.returncode == 0,
+            "remote": ssh_spec,
+            "stderr": (r1.stderr or "") + (r2.stderr or ""),
+        }
+        out["steps"].append(step)
+        if step["ok"]:
+            out["ok"] = True
+            out["published"] = True
+            return out
+        out["error"] = step["stderr"] or "scp failed"
+        # Fall through to git publish attempt
+
+    if not commit and not push:
+        out["error"] = out.get("error") or "publish skipped (no commit/push/ssh)"
+        return out
+
+    try:
+        add = subprocess.run(
+            ["git", "add", "--"] + [str(p.relative_to(ROOT)) for p in paths],
+            cwd=str(ROOT),
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        out["steps"].append(
+            {
+                "action": "git_add",
+                "ok": add.returncode == 0,
+                "stderr": add.stderr or "",
+            }
+        )
+        if add.returncode != 0:
+            out["error"] = add.stderr or "git add failed"
+            return out
+
+        # Only commit when there is a staged change
+        diff = subprocess.run(
+            ["git", "diff", "--cached", "--quiet"],
+            cwd=str(ROOT),
+            check=False,
+        )
+        if diff.returncode == 0:
+            out["steps"].append({"action": "git_commit", "ok": True, "note": "nothing to commit"})
+        elif commit:
+            msg = "Refresh security audit last-run (multi-node live probes)"
+            c = subprocess.run(
+                ["git", "commit", "-m", msg],
+                cwd=str(ROOT),
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+            out["steps"].append(
+                {
+                    "action": "git_commit",
+                    "ok": c.returncode == 0,
+                    "stderr": c.stderr or "",
+                    "stdout": (c.stdout or "")[:500],
+                }
+            )
+            if c.returncode != 0:
+                out["error"] = c.stderr or "git commit failed"
+                return out
+        if push:
+            p = subprocess.run(
+                ["git", "push", "origin", "HEAD"],
+                cwd=str(ROOT),
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+            out["steps"].append(
+                {
+                    "action": "git_push",
+                    "ok": p.returncode == 0,
+                    "stderr": p.stderr or "",
+                    "stdout": (p.stdout or "")[:500],
+                }
+            )
+            if p.returncode != 0:
+                out["error"] = p.stderr or "git push failed"
+                return out
+            out["ok"] = True
+            out["published"] = True
+            return out
+        out["ok"] = True
+        out["published"] = bool(commit)
+        return out
+    except FileNotFoundError as exc:
+        out["error"] = f"git not available: {exc}"
+        return out
+
+
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--node-only", action="store_true", help="Skip unittest suite")
     ap.add_argument("--write", action="store_true", help="Write AUDIT.md and mirrors")
+    ap.add_argument(
+        "--publish",
+        action="store_true",
+        help="After --write, publish AUDIT + JSON to status-host deploy surface (git push and/or RPT_AUDIT_STATUS_SSH)",
+    )
+    ap.add_argument(
+        "--no-publish",
+        action="store_true",
+        help="Force-skip publish even when RPT_AUDIT_PUBLISH=1",
+    )
     ap.add_argument(
         "--out",
         type=Path,
@@ -1741,6 +2147,23 @@ def main(argv: list[str] | None = None) -> int:
     if args.write:
         write_outputs(results, args.out.resolve())
         print(f"Wrote {args.out}", flush=True)
+        env_pub = os.environ.get("RPT_AUDIT_PUBLISH", "").strip().lower() in (
+            "1",
+            "true",
+            "yes",
+        )
+        do_publish = (args.publish or env_pub) and not args.no_publish
+        if do_publish:
+            pub = publish_audit_artifacts()
+            print(f"publish: {json.dumps(pub, default=str)}", flush=True)
+            if not pub.get("ok"):
+                print(
+                    f"publish failed (honest): {pub.get('error')}",
+                    file=sys.stderr,
+                )
+                # Non-zero only when explicitly --publish (env-only stays soft)
+                if args.publish:
+                    return 4
     if args.json or not args.write:
         # Never dump suite tails to stdout JSON either
         print(json.dumps(slim_results_for_public_json(results), indent=2, default=str))
