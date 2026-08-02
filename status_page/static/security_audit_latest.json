@@ -1,7 +1,73 @@
 {
-  "generated_at": "2026-08-02T14:47:31Z",
+  "generated_at": "2026-08-02T15:22:20Z",
   "node_host": "Germany (DE)",
   "catalog_version": "1.0.7",
+  "probe_schedule": [
+    {
+      "code": "IS",
+      "label": "Iceland (IS)",
+      "status_port": 8080,
+      "udp_port": 44044
+    },
+    {
+      "code": "DE",
+      "label": "Germany (DE)",
+      "status_port": 8080,
+      "udp_port": 44044
+    }
+  ],
+  "live_node_probes": [
+    {
+      "code": "IS",
+      "label": "Iceland (IS)",
+      "status_port": 8080,
+      "udp_port": 44044,
+      "tcp_status": {
+        "ok": true,
+        "error": null,
+        "port": 8080
+      },
+      "http_status": {
+        "ok": true,
+        "status_code": 200,
+        "body": {
+          "title": "RESTORE PRIVACY"
+        },
+        "error": null
+      },
+      "udp": {
+        "sent": true,
+        "error": null,
+        "port": 44044
+      },
+      "ok": true
+    },
+    {
+      "code": "DE",
+      "label": "Germany (DE)",
+      "status_port": 8080,
+      "udp_port": 44044,
+      "tcp_status": {
+        "ok": true,
+        "error": null,
+        "port": 8080
+      },
+      "http_status": {
+        "ok": true,
+        "status_code": 200,
+        "body": {
+          "title": "RESTORE PRIVACY"
+        },
+        "error": null
+      },
+      "udp": {
+        "sent": true,
+        "error": null,
+        "port": 44044
+      },
+      "ok": true
+    }
+  ],
   "unit_suite": {
     "ran": true,
     "ok": false,
@@ -130,13 +196,14 @@
         "platform": "ios",
         "label": "iOS",
         "filename": "restore-privacy-client-1.0.7-ios.zip",
-        "state": "Amber",
+        "state": "Green",
         "reasons": [
+          "node_elgamal.pub pin matches product monopin",
           "archive present (structural residual gates N/A in this pass)",
-          "node_elgamal.pub not found inside package (pin not verified)"
+          "exit_node_elgamal.pub present (multihop exit pin)"
         ],
         "path": "/Users/russellsneddon/restore-privacy/status_page/assets/1.0.7/restore-privacy-client-1.0.7-ios.zip",
-        "bytes": 13190699,
+        "bytes": 13194764,
         "relative_path": "1.0.7/restore-privacy-client-1.0.7-ios.zip",
         "search_roots": [
           "status_page/assets/1.0.7/",
@@ -173,7 +240,7 @@
     "staged_count": 5,
     "helsinki_remote_count": 0,
     "helsinki_paid_asset_base": "https://135.181.152.10.sslip.io/paid-assets",
-    "overall": "Amber",
+    "overall": "Green",
     "legend": {
       "Green": "Present (local monorepo/releases/paid_assets or Helsinki paid store), no *.priv when scanned, product node pub pin match when scanned, platform structural gate pass (Windows multihop markers when PE scanned)",
       "Amber": "Present but pin/structural check incomplete or soft warning",
@@ -353,6 +420,8 @@
     "localhost_required": false,
     "outbound_allowed": true,
     "probe_host_loopback": false,
+    "multi_node_schedule": true,
+    "probe_peer_count": 2,
     "no_network_exfil": true,
     "section_b": true,
     "multihop_structure": true,
@@ -363,6 +432,7 @@
     "redacted": true,
     "no_suite_tails": true,
     "no_network_exfil": true,
-    "note": "Audit artifacts are local-only; timer does not git-push or upload"
+    "multi_node_probes": true,
+    "note": "Audit artifacts written locally on --write; optional --publish / RPT_AUDIT_PUBLISH pushes AUDIT + JSON to status-host deploy surface"
   }
 }
