@@ -65,7 +65,6 @@ from downloads import (
     render_downloads_map_page_html,
     render_free_download_cta_html,
     render_free_packages_page_html,
-    render_node_preference_html,
     render_suite_storefront_html,
     suite_storefront_css,
     SUITE_FREE_DOWNLOAD_PATH,
@@ -668,8 +667,8 @@ def render_html(
         active="home",
         product_active="vpn",
     )
-    # Shop dual-row first (Suite + client downloads as halves), then full-width
-    # business package dotted box, then Node data clear timer.
+    # Shop dual-row first (Suite + client downloads as halves), then Node data
+    # clear timer. Full business package box is not mounted on the homepage.
     shop_row_html = f"""
     <div class="home-shop-row" id="home-shop-row" data-home-shop-row="1"
          data-layout="two-halves" aria-label="Suite and client downloads">
@@ -677,7 +676,6 @@ def render_html(
 {downloads_html}
     </div>
 """
-    business_package_html = render_node_preference_html(standalone=True)
     head_html = public_head_open(title=str(title), extra_css=page_css)
     # One-shot neon typewriter for Suite intro (welcome + closing lines)
     head_html = head_html.replace(
@@ -691,7 +689,6 @@ def render_html(
 {suite_intro_html}
 {free_cta_html}
 {shop_row_html}
-{business_package_html}
 {node_wipe_html}
     <section class="panel-card" id="audit-panel" aria-label="Security audit countdown" data-chrome="pro">
 {countdown_html}

@@ -258,8 +258,10 @@ class TestStorefrontCopyCompulsory(unittest.TestCase):
         self.assertIn("KEYGEN", suite)
         self.assertIn("trial", suite.lower())
         self.assertIn("3000", suite)  # business deposit mention in pay-hint
-        self.assertIn("data-keygen-gated", suite)
+        self.assertIn("suite-keygen-buy", suite)
+        self.assertIn("free trial", suite.lower())
 
+        # Pure helper still builds commercial deposit markup (not on homepage)
         home_biz = render_node_preference_html()
         self.assertIn("£3000", home_biz)
         self.assertIn("deposit", home_biz.lower())

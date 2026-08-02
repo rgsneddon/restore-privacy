@@ -126,7 +126,7 @@ class TestDownloadBoxNodeLinks(unittest.TestCase):
         dl = render_download_section_html()
         self.assertNotIn("download-node-preference", dl)
 
-        # Standalone fragment marks home-business-package (dotted transparent box).
+        # Pure helper still builds standalone markup when called (not mounted on home).
         stand = render_node_preference_html(standalone=True)
         self.assertIn("home-business-package", stand)
         self.assertIn('data-home-business-package="1"', stand)
@@ -134,50 +134,24 @@ class TestDownloadBoxNodeLinks(unittest.TestCase):
         self.assertIn("deposit", stand.lower())
         self.assertIn("3000", stand)
 
-        # Home page: shop row → business package → node wipe timer.
+        # Homepage: no Full business package box; shop row + node wipe remain.
         from app import render_html
-        from downloads import suite_storefront_css
 
         page = render_html({"title": "RESTORE PRIVACY"}).decode("utf-8")
         main_i = page.find('id="page-shell"')
         main = page[main_i:] if main_i >= 0 else page
+        self.assertIn('id="home-shop-row"', main)
+        self.assertIn("node-wipe", main)
+        self.assertNotIn(f'id="{NODE_PREFERENCE_SECTION_ID}"', main)
+        self.assertNotIn("data-home-business-package", main)
+        self.assertNotIn("Full business package?", main)
+        self.assertNotIn('id="download-node-preference"', main)
+        self.assertNotIn("node-pref-deposit-btn", main)
+        self.assertNotIn('data-business-package="1"', main)
+        # Shop row still precedes node wipe
         i_row = main.index('id="home-shop-row"')
-        i_biz = main.index(f'id="{NODE_PREFERENCE_SECTION_ID}"')
         i_nw = main.index("node-wipe")
-        self.assertLess(i_row, i_biz, "business package must follow shop row")
-        self.assertLess(i_biz, i_nw, "business package must sit above node wipe")
-        self.assertIn('data-home-business-package="1"', main)
-        self.assertIn("home-business-package", main)
-        # Dotted transparent style lives in suite_storefront_css (injected on home).
-        css = suite_storefront_css()
-        self.assertIn("border: 1px dashed", css)
-        self.assertIn("rgba(8, 18, 32, 0.18)", css)
-        self.assertIn(".download-node-preference.home-business-package", css)
-        self.assertIn("border: 1px dashed", page)
-        self.assertIn("rgba(8, 18, 32, 0.18)", page)
-
-        # Homepage/standalone box spans full content width (not narrow 42rem-only card).
-        self.assertRegex(
-            css,
-            r"\.download-node-preference\.home-business-package\s*\{[^}]*width:\s*100%",
-        )
-        self.assertRegex(
-            css,
-            r"\.download-node-preference\.home-business-package\s*\{[^}]*max-width:\s*100%",
-        )
-        # Base card may still use min(42rem, 100%); home override must not re-apply that cap.
-        home_rule = re.search(
-            r"\.download-node-preference\.home-business-package\s*\{([^}]*)\}",
-            css,
-            re.S,
-        )
-        self.assertIsNotNone(home_rule, "home-business-package CSS rule required")
-        assert home_rule is not None
-        home_body = home_rule.group(1)
-        home_compact = re.sub(r"\s+", "", home_body)
-        self.assertNotIn("42rem", home_body)
-        self.assertIn("width:100%", home_compact)
-        self.assertIn("max-width:100%", home_compact)
+        self.assertLess(i_row, i_nw)
 
     def test_suite_client_downloads_still_present(self) -> None:
         from downloads import (
