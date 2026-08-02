@@ -1,9 +1,10 @@
 /// Suite-wide recovery seed: export on first register, import on clean install.
 ///
-/// Wallet/analyser identity is restored via the shipped Perccent seed envelope
-/// path ([PercWalletProvider.recoverFromSeedPhrase]). Licence/KEYGEN are
-/// optionally rehydrated from a Suite-local sealed meta blob encrypted with
-/// seed-derived material when present (never invents a KEYGEN from the seed).
+/// Wallet/analyser identity is restored from an encrypted ledger envelope
+/// unlocked by the 12-word phrase. The envelope is published at export time
+/// (rendezvous / injectable store) so a **new install** can restore with words
+/// alone — SharedPreferences are not required. Licence/KEYGEN are optionally
+/// sealed alongside the envelope when present (never invented from the seed).
 library;
 
 import 'dart:convert';
@@ -13,6 +14,8 @@ import 'package:evolve/perc/providers/perc_wallet_provider.dart' as evolve_walle
 import 'package:evolve/perc/services/perc_ledger_hub.dart' as evolve_hub;
 import 'package:evolve/perc/services/perc_network_coordinator.dart'
     as evolve_coord;
+import 'package:evolve/perc/services/perc_network_rendezvous.dart'
+    as evolve_rendezvous;
 import 'package:evolve/perc/services/perc_seed_recovery.dart';
 import 'package:perccent_wallet/perc/providers/perc_wallet_provider.dart'
     as perc_wallet;
@@ -62,6 +65,94 @@ typedef SuiteSeedOfferFn = Future<SuiteSeedOfferResult> Function(
   Future<List<String>> Function() generate,
 );
 
+/// Published seed recovery payload (envelope + optional sealed Suite meta).
+class SuiteSeedPublishedRecovery {
+  const SuiteSeedPublishedRecovery({
+    required this.envelopeB64,
+    this.metaBlobB64,
+  });
+
+  final String envelopeB64;
+  final String? metaBlobB64;
+}
+
+/// Publish/fetch seed envelopes so clean-install words-only restore works.
+///
+/// Production [publish] stores in-memory then best-effort pushes to Perc
+/// rendezvous (after live nodes are re-enabled). [fetch] checks inject →
+/// memory → network. Tests replace [publishHandler]/[fetchHandler].
+class SuiteSeedEnvelopeStore {
+  SuiteSeedEnvelopeStore._();
+
+  static final Map<String, SuiteSeedPublishedRecovery> memory =
+      <String, SuiteSeedPublishedRecovery>{};
+
+  static Future<void> Function(
+    String fingerprint,
+    SuiteSeedPublishedRecovery recovery,
+  )? publishHandler;
+
+  static Future<SuiteSeedPublishedRecovery?> Function(String fingerprint)?
+      fetchHandler;
+
+  static void resetForTest() {
+    memory.clear();
+    publishHandler = null;
+    fetchHandler = null;
+  }
+
+  static Future<void> publish({
+    required String fingerprint,
+    required String envelopeB64,
+    String? metaBlobB64,
+  }) async {
+    final recovery = SuiteSeedPublishedRecovery(
+      envelopeB64: envelopeB64,
+      metaBlobB64: metaBlobB64,
+    );
+    memory[fingerprint] = recovery;
+    final handler = publishHandler;
+    if (handler != null) {
+      await handler(fingerprint, recovery);
+      return;
+    }
+    try {
+      await evolve_hub.PercLedgerHub.instance.network
+          .publishSeedRecoveryEnvelopes();
+    } catch (_) {}
+    try {
+      await perc_hub.PercLedgerHub.instance.network
+          .publishSeedRecoveryEnvelopes();
+    } catch (_) {}
+    // Also put envelope by fingerprint on rendezvous API when URL is configured.
+    try {
+      await const evolve_rendezvous.PercNetworkRendezvous()
+          .publishSeedRecoveryEnvelope(
+        fingerprint: fingerprint,
+        envelopeB64: envelopeB64,
+      );
+    } catch (_) {}
+  }
+
+  /// Resolve published envelope for [fingerprint] without Suite prefs.
+  static Future<SuiteSeedPublishedRecovery?> fetch(String fingerprint) async {
+    final handler = fetchHandler;
+    if (handler != null) {
+      return handler(fingerprint);
+    }
+    final local = memory[fingerprint];
+    if (local != null) return local;
+    try {
+      final remote = await const evolve_rendezvous.PercNetworkRendezvous()
+          .fetchSeedRecoveryEnvelope(fingerprint: fingerprint);
+      if (remote != null && remote.isNotEmpty) {
+        return SuiteSeedPublishedRecovery(envelopeB64: remote);
+      }
+    } catch (_) {}
+    return null;
+  }
+}
+
 /// Pure: normalize pasted seed text into 12 words.
 List<String> parseSuiteSeedPhrase(String raw) {
   final words = raw
@@ -102,8 +193,8 @@ String sealSuiteSeedMeta({
     if (paymentSessionId != null) 'payment_session_id': paymentSessionId,
   };
   final plain = utf8.encode(jsonEncode(payload));
-  // XOR with key material (sufficient for local sealed prefs; seed is secret).
-  final out = List<int>.generate(plain.length, (i) => plain[i] ^ key[i % key.length]);
+  final out =
+      List<int>.generate(plain.length, (i) => plain[i] ^ key[i % key.length]);
   return base64Encode(out);
 }
 
@@ -113,23 +204,17 @@ Map<String, dynamic> unsealSuiteSeedMeta({
 }) {
   final key = PercSeedRecovery.deriveKeyMaterial(words);
   final raw = base64Decode(blobB64);
-  final plain = List<int>.generate(raw.length, (i) => raw[i] ^ key[i % key.length]);
-  final map = jsonDecode(utf8.decode(plain)) as Map<String, dynamic>;
-  return map;
+  final plain =
+      List<int>.generate(raw.length, (i) => raw[i] ^ key[i % key.length]);
+  return jsonDecode(utf8.decode(plain)) as Map<String, dynamic>;
 }
 
-/// Persist seed backup envelope + optional meta after successful seed-enabled register.
-Future<void> persistSuiteSeedBackupArtifacts({
-  required SettingsBackend backend,
+/// Build sealed meta from current licence/suite backends (for publish + prefs).
+Future<String> buildSuiteSeedMetaBlob({
   required List<String> words,
   required String username,
-  required String envelopeB64,
   SettingsBackend? licenceBackend,
 }) async {
-  final fp = PercSeedRecovery.fingerprint(words);
-  await backend.setString(kKeySuiteSeedBackupEnvelope, envelopeB64);
-  await backend.setString(kKeySuiteSeedBackupFingerprint, fp);
-
   String? licenceId;
   bool? licenceAccepted;
   String? paymentStatus;
@@ -143,7 +228,7 @@ Future<void> persistSuiteSeedBackupArtifacts({
     paymentKeygen = await lic.getString(kKeyPaymentKeygen);
     paymentSessionId = await lic.getString(kKeyPaymentSessionId);
   }
-  final meta = sealSuiteSeedMeta(
+  return sealSuiteSeedMeta(
     words: words,
     username: username,
     licenceId: licenceId,
@@ -152,6 +237,26 @@ Future<void> persistSuiteSeedBackupArtifacts({
     paymentKeygen: paymentKeygen,
     paymentSessionId: paymentSessionId,
   );
+}
+
+/// Persist seed backup envelope + meta to local prefs (same-device convenience).
+Future<void> persistSuiteSeedBackupArtifacts({
+  required SettingsBackend backend,
+  required List<String> words,
+  required String username,
+  required String envelopeB64,
+  SettingsBackend? licenceBackend,
+  String? metaBlobB64,
+}) async {
+  final fp = PercSeedRecovery.fingerprint(words);
+  await backend.setString(kKeySuiteSeedBackupEnvelope, envelopeB64);
+  await backend.setString(kKeySuiteSeedBackupFingerprint, fp);
+  final meta = metaBlobB64 ??
+      await buildSuiteSeedMetaBlob(
+        words: words,
+        username: username,
+        licenceBackend: licenceBackend,
+      );
   await backend.setString(kKeySuiteSeedMetaBlob, meta);
 }
 
@@ -173,6 +278,8 @@ Future<void> applySuiteSeedMetaToStores({
     if (id != null && id.isNotEmpty) {
       await lic.setString(kKeyLicenceId, id);
     }
+    final at = DateTime.now().toUtc().millisecondsSinceEpoch.toString();
+    await lic.setString(kKeyLicenceAcceptedAt, at);
   }
   final status = meta['payment_status'] as String?;
   if (status != null && status.isNotEmpty) {
@@ -188,19 +295,53 @@ Future<void> applySuiteSeedMetaToStores({
   }
 }
 
-/// Restore wallet/analyser identity from seed; rehydrate Suite store (+ licence meta if sealed).
+/// Publish seed envelope after durable register (clean-install restore path).
 ///
-/// Prefers Suite-local sealed envelope (no network hang). Falls back to
-/// [PercWalletProvider.recoverFromSeedPhrase] (local catalog then rendezvous).
+/// Call with live nodes restored so rendezvous publish is not no-op'd.
+Future<void> publishSuiteSeedAfterExport({
+  required List<String> words,
+  required String username,
+  required String envelopeB64,
+  SettingsBackend? suitePrefsBackend,
+  SettingsBackend? licenceBackend,
+}) async {
+  final fp = PercSeedRecovery.fingerprint(words);
+  final meta = await buildSuiteSeedMetaBlob(
+    words: words,
+    username: username,
+    licenceBackend: licenceBackend,
+  );
+  if (suitePrefsBackend != null) {
+    await persistSuiteSeedBackupArtifacts(
+      backend: suitePrefsBackend,
+      words: words,
+      username: username,
+      envelopeB64: envelopeB64,
+      licenceBackend: licenceBackend,
+      metaBlobB64: meta,
+    );
+  }
+  await SuiteSeedEnvelopeStore.publish(
+    fingerprint: fp,
+    envelopeB64: envelopeB64,
+    metaBlobB64: meta,
+  );
+}
+
+/// Restore wallet/analyser identity from seed (words-only clean install OK).
 ///
-/// Returns restored username. Throws if phrase invalid or no recovery envelope.
+/// Resolution order for the ciphertext envelope:
+/// 1. [localEnvelopeB64] (tests only — production UI does not pass this)
+/// 2. Suite prefs on this device (same-device reinstall)
+/// 3. [SuiteSeedEnvelopeStore.fetch] (published rendezvous / test inject)
+/// 4. [PercWalletProvider.recoverFromSeedPhrase] network fallback
 Future<String> restoreSuiteIdentityFromSeed({
   required List<String> words,
   required SuiteAccountStore accountStore,
   SuiteAccountPackageSurfaces? surfaces,
   SettingsBackend? suitePrefsBackend,
   SettingsBackend? licenceBackend,
-  /// Test inject: pre-load catalog envelope into a fresh ledger.
+  @Deprecated('Tests only — production clean install must not rely on this')
   String? localEnvelopeB64,
 }) async {
   PercSeedRecovery.validateMnemonic(words);
@@ -211,16 +352,29 @@ Future<String> restoreSuiteIdentityFromSeed({
     perc_coord.PercNetworkCoordinator.disableLiveNodesForTests = true;
     evolve_coord.PercNetworkCoordinator.disableLiveNodesForTests = true;
 
-    final prefs = suitePrefsBackend;
+    final fp = PercSeedRecovery.fingerprint(words);
     String? envelope = localEnvelopeB64;
+    String? publishedMeta;
+
+    // Same-device prefs (optional — wiped on true clean install).
+    final prefs = suitePrefsBackend;
     if (envelope == null && prefs != null) {
       final fpStored = await prefs.getString(kKeySuiteSeedBackupFingerprint);
       final envStored = await prefs.getString(kKeySuiteSeedBackupEnvelope);
-      final fp = PercSeedRecovery.fingerprint(words);
       if (envStored != null &&
           envStored.isNotEmpty &&
           (fpStored == null || fpStored == fp)) {
         envelope = envStored;
+      }
+      publishedMeta = await prefs.getString(kKeySuiteSeedMetaBlob);
+    }
+
+    // Published envelope (rendezvous / inject) — the clean-install path.
+    if (envelope == null || envelope.isEmpty) {
+      final published = await SuiteSeedEnvelopeStore.fetch(fp);
+      if (published != null) {
+        envelope = published.envelopeB64;
+        publishedMeta ??= published.metaBlobB64;
       }
     }
 
@@ -229,7 +383,6 @@ Future<String> restoreSuiteIdentityFromSeed({
 
     String username;
     if (envelope != null && envelope.isNotEmpty) {
-      // Offline-honest path: decrypt Suite-sealed envelope (no network).
       final restored = PercSeedRecovery.decryptLedgerEnvelope(
         envelope: base64Decode(envelope),
         words: words,
@@ -248,6 +401,8 @@ Future<String> restoreSuiteIdentityFromSeed({
       );
       username = session;
     } else {
+      // Last resort: wallet recovery service (network rendezvous).
+      evolve_coord.PercNetworkCoordinator.disableLiveNodesForTests = false;
       await evolve.recoverFromSeedPhrase(words);
       username = (evolve.loggedInUsername ?? '').trim();
     }
@@ -255,36 +410,26 @@ Future<String> restoreSuiteIdentityFromSeed({
       throw StateError('Seed restore did not produce a logged-in wallet session');
     }
 
-    // Dual-surface: persist evolve ledger then re-open Perccent on shared store.
     await evolve_hub.PercLedgerHub.instance.persistLocal();
     final perc = s.createPercProvider();
     await perc.initialize();
     await s.reloadEvolveHub();
-    // Perccent package ledger type differs at compile-time; shared JSON file
-    // rehydrate is enough when stores point at the same on-disk ledger.
-    if (!perc.isLoggedIn || (perc.loggedInUsername ?? '').trim() != username) {
-      try {
-        await perc.login(username, ''); // may fail without password — ignore
-      } catch (_) {}
-    }
     await s.persistPercHub();
 
     await accountStore.markRegistered(username);
     SuiteAccountBus.instance.notifyRegistered(username);
 
-    if (prefs != null) {
-      final metaBlob = await prefs.getString(kKeySuiteSeedMetaBlob);
-      if (metaBlob != null && metaBlob.isNotEmpty) {
-        try {
-          final meta = unsealSuiteSeedMeta(words: words, blobB64: metaBlob);
-          await applySuiteSeedMetaToStores(
-            meta: meta,
-            accountStore: accountStore,
-            licenceBackend: licenceBackend,
-          );
-        } catch (_) {
-          // Meta optional — wallet identity already restored.
-        }
+    final metaBlob = publishedMeta;
+    if (metaBlob != null && metaBlob.isNotEmpty) {
+      try {
+        final meta = unsealSuiteSeedMeta(words: words, blobB64: metaBlob);
+        await applySuiteSeedMetaToStores(
+          meta: meta,
+          accountStore: accountStore,
+          licenceBackend: licenceBackend,
+        );
+      } catch (_) {
+        // Meta optional — wallet identity already restored.
       }
     }
     return username;

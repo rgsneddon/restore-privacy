@@ -40,6 +40,7 @@ void main() {
     sharedJson = <String, dynamic>{};
     perc_hub.PercLedgerHub.resetForTest();
     evolve_hub.PercLedgerHub.resetForTest();
+    SuiteSeedEnvelopeStore.resetForTest();
     perc_coord.PercNetworkCoordinator.disableLiveNodesForTests = true;
     evolve_coord.PercNetworkCoordinator.disableLiveNodesForTests = true;
     perc_wallet.PercWalletProvider.sessionTimeoutEnabled = true;
@@ -65,6 +66,7 @@ void main() {
   tearDown(() {
     perc_wallet.PercWalletProvider.sessionTimeoutEnabled = true;
     evolve_wallet.PercWalletProvider.sessionTimeoutEnabled = true;
+    SuiteSeedEnvelopeStore.resetForTest();
     perc_hub.PercLedgerHub.resetForTest();
     evolve_hub.PercLedgerHub.resetForTest();
   });
@@ -122,51 +124,81 @@ void main() {
   });
 
   group('seed export + import restore', () {
-    test('register with seed offer, import restores username', () async {
-      final prefs = MemorySettingsBackend();
-      final account = SuiteAccountStore(MemorySettingsBackend());
-      late List<String> offeredWords;
+    test(
+      'clean install: words-only restore via published envelope (no prefs inject)',
+      () async {
+        // Simulate network rendezvous with a published map (not Suite prefs).
+        final published = <String, SuiteSeedPublishedRecovery>{};
+        SuiteSeedEnvelopeStore.publishHandler = (fp, recovery) async {
+          published[fp] = recovery;
+        };
+        SuiteSeedEnvelopeStore.fetchHandler =
+            (fp) async => published[fp];
 
-      await applySuiteAccountToWalletAndEvolve(
-        username: 'seed_user',
-        password: 'password12345',
-        register: true,
-        surfaces: surfaces,
-        suitePrefsBackend: prefs,
-        seedOffer: (generate) async {
-          offeredWords = await generate();
-          expect(offeredWords.length, PercSeedRecovery.wordCount);
-          return SuiteSeedOfferResult.enable(offeredWords);
-        },
-      );
-      await account.markRegistered('seed_user');
-      expect(lastPerc.isLoggedIn, isTrue);
+        final exportPrefs = MemorySettingsBackend();
+        final licenceExport = MemorySettingsBackend();
+        // Pre-seed licence/KEYGEN that must be sealed and restored.
+        await licenceExport.setBool(kKeyLicenceAccepted, true);
+        await licenceExport.setString(kKeyLicenceId, kCurrentLicenceId);
+        await licenceExport.setString(kKeyPaymentStatus, kPaymentStatusActive);
+        await licenceExport.setString(
+          kKeyPaymentKeygen,
+          'RPT-KEY-SEED-TEST-AAAA-BBBB',
+        );
 
-      final env = suiteSeedEnvelopeB64FromPerc(lastPerc);
-      expect(env, isNotNull);
-      expect(env!.isNotEmpty, isTrue);
-      expect(await prefs.getString(kKeySuiteSeedBackupEnvelope), isNotNull);
+        late List<String> offeredWords;
+        await applySuiteAccountToWalletAndEvolve(
+          username: 'seed_user',
+          password: 'password12345',
+          register: true,
+          surfaces: surfaces,
+          suitePrefsBackend: exportPrefs,
+          licenceBackend: licenceExport,
+          seedOffer: (generate) async {
+            offeredWords = await generate();
+            expect(offeredWords.length, PercSeedRecovery.wordCount);
+            return SuiteSeedOfferResult.enable(offeredWords);
+          },
+        );
 
-      // Simulate clean install: wipe hubs + shared ledger + suite flags.
-      perc_hub.PercLedgerHub.resetForTest();
-      evolve_hub.PercLedgerHub.resetForTest();
-      sharedJson.clear();
-      final cleanAccount = SuiteAccountStore(MemorySettingsBackend());
-      expect(await cleanAccount.isRegistered(), isFalse);
+        final fp = PercSeedRecovery.fingerprint(offeredWords);
+        expect(published.containsKey(fp), isTrue, reason: 'export must publish');
+        expect(published[fp]!.envelopeB64, isNotEmpty);
+        expect(published[fp]!.metaBlobB64, isNotNull);
 
-      final restored = await restoreSuiteIdentityFromSeed(
-        words: offeredWords,
-        accountStore: cleanAccount,
-        surfaces: surfaces,
-        suitePrefsBackend: prefs,
-        localEnvelopeB64: env,
-      );
-      expect(restored, 'seed_user');
-      expect(await cleanAccount.isRegistered(), isTrue);
-      expect(await cleanAccount.username(), 'seed_user');
-      expect(lastEvolve.isLoggedIn, isTrue);
-      expect(lastEvolve.loggedInUsername, 'seed_user');
-    });
+        // True clean install: wipe ledger, hubs, and ALL suite prefs.
+        // Do NOT pass localEnvelopeB64; do NOT reuse exportPrefs.
+        perc_hub.PercLedgerHub.resetForTest();
+        evolve_hub.PercLedgerHub.resetForTest();
+        sharedJson.clear();
+        final cleanAccount = SuiteAccountStore(MemorySettingsBackend());
+        final cleanPrefs = MemorySettingsBackend(); // empty
+        final cleanLicence = MemorySettingsBackend(); // empty
+        expect(await cleanAccount.isRegistered(), isFalse);
+        expect(await cleanLicence.getString(kKeyPaymentKeygen), isNull);
+
+        final restored = await restoreSuiteIdentityFromSeed(
+          words: offeredWords,
+          accountStore: cleanAccount,
+          surfaces: surfaces,
+          suitePrefsBackend: cleanPrefs,
+          licenceBackend: cleanLicence,
+          // intentionally no localEnvelopeB64
+        );
+        expect(restored, 'seed_user');
+        expect(await cleanAccount.isRegistered(), isTrue);
+        expect(await cleanAccount.username(), 'seed_user');
+        expect(lastEvolve.isLoggedIn, isTrue);
+        expect(lastEvolve.loggedInUsername, 'seed_user');
+        // Sealed licence/KEYGEN rehydrated from published meta.
+        expect(await cleanLicence.getBool(kKeyLicenceAccepted), isTrue);
+        expect(await cleanLicence.getString(kKeyPaymentStatus), kPaymentStatusActive);
+        expect(
+          await cleanLicence.getString(kKeyPaymentKeygen),
+          'RPT-KEY-SEED-TEST-AAAA-BBBB',
+        );
+      },
+    );
 
     test('parseSuiteSeedPhrase validates 12 words', () {
       final words = PercSeedRecovery.generateMnemonic();
@@ -233,7 +265,13 @@ void main() {
       expect(src.contains('suite_account_toggle_restore'), isTrue);
       final applySrc = File('lib/suite_account_apply.dart').readAsStringSync();
       expect(applySrc.contains('refreshSeedRecoveryEnvelope'), isTrue);
+      expect(applySrc.contains('publishSuiteSeedAfterExport'), isTrue);
       expect(applySrc.contains('disableLiveNodesForTests = true'), isTrue);
+      final mainSrc = File('lib/main.dart').readAsStringSync();
+      expect(mainSrc.contains('licenceBackend: store.backend'), isTrue);
+      expect(mainSrc.contains('suitePrefsBackend: store.backend'), isTrue);
+      final rpaiSrc = File('lib/suite_rpai_tab.dart').readAsStringSync();
+      expect(rpaiSrc.contains('licenceBackend: prefsBackend'), isTrue);
     });
   });
 

@@ -785,9 +785,12 @@ class _TunnelHomeState extends State<TunnelHome> with WidgetsBindingObserver {
       return;
     }
     if (!mounted) return;
+    // Share Settings prefs for suite seed seal + licence/KEYGEN rehydrate.
     final outcome = await showSuiteAccountPrompt(
       context,
       store: account,
+      suitePrefsBackend: store.backend,
+      licenceBackend: store.backend,
     );
     if (!mounted) return;
     switch (outcome) {

@@ -126,10 +126,21 @@ class SuiteRpaiTabState extends State<SuiteRpaiTab> {
     if (store == null || !mounted) return;
     _setGuide(nedGuideBeginRegistering(_guide));
     setState(() => _busy = true);
+    // Same SharedPreferences backend as Suite account + licence keys when available.
+    SettingsBackend? prefsBackend;
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      prefsBackend = SharedPreferencesBackend(prefs);
+    } catch (_) {
+      prefsBackend = MemorySettingsBackend();
+    }
+    if (!mounted) return;
     final outcome = await showSuiteAccountPrompt(
       context,
       store: store,
       applyCredentials: widget.applyCredentials,
+      suitePrefsBackend: prefsBackend,
+      licenceBackend: prefsBackend,
     );
     if (!mounted) return;
     setState(() => _busy = false);

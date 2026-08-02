@@ -159,24 +159,32 @@ Future<void> applySuiteAccountToWalletAndEvolve({
       lastError: evolve.errorMessage,
     );
 
-    // Seal seed backup artifacts for clean-install import when seed was enabled.
+    // Seed export: publish envelope for clean-install words-only restore.
+    // Live nodes are restored in finally *before* publish so rendezvous is not no-op'd.
     final words = enabledSeedWords;
-    final prefs = suitePrefsBackend;
-    if (words != null && words.isNotEmpty && prefs != null) {
-      final env = suiteSeedEnvelopeB64FromPerc(perc) ??
-          suiteSeedEnvelopeB64FromWallet(evolve);
-      if (env != null && env.isNotEmpty) {
-        await persistSuiteSeedBackupArtifacts(
-          backend: prefs,
-          words: words,
-          username: u,
-          envelopeB64: env,
-          licenceBackend: licenceBackend,
-        );
-      }
-    }
+    final env = (words != null && words.isNotEmpty)
+        ? (suiteSeedEnvelopeB64FromPerc(perc) ??
+            suiteSeedEnvelopeB64FromWallet(evolve))
+        : null;
 
     SuiteAccountBus.instance.notifyRegistered(u);
+
+    // Restore live-node flags, then publish seed envelope (network + inject store).
+    perc_coord.PercNetworkCoordinator.disableLiveNodesForTests = prevPercLive;
+    evolve_coord.PercNetworkCoordinator.disableLiveNodesForTests =
+        prevEvolveLive;
+    if (words != null &&
+        words.isNotEmpty &&
+        env != null &&
+        env.isNotEmpty) {
+      await publishSuiteSeedAfterExport(
+        words: words,
+        username: u,
+        envelopeB64: env,
+        suitePrefsBackend: suitePrefsBackend,
+        licenceBackend: licenceBackend,
+      );
+    }
   } finally {
     perc_coord.PercNetworkCoordinator.disableLiveNodesForTests = prevPercLive;
     evolve_coord.PercNetworkCoordinator.disableLiveNodesForTests =
