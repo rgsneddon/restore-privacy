@@ -1,0 +1,135 @@
+=== monopin 1.1.0 ship evidence 2026-08-02T22:36:38Z ===
+--- Apple DevID / notarize ---
+client_app/build/macos/Build/Products/Debug/restore_privacy_client.app
+client_app/build/ios/iphoneos/Runner.app
+client_app/build/ios/Release-iphoneos/Runner.app
+=== APP path: /var/folders/qb/tz4y4zts04z4846pbq95l6kw0000gp/T/tmp.msQ37Rd7ag/restore_privacy_client.app ===
+Executable=/private/var/folders/qb/tz4y4zts04z4846pbq95l6kw0000gp/T/tmp.msQ37Rd7ag/restore_privacy_client.app/Contents/MacOS/restore_privacy_client
+Identifier=com.restoreprivacy.restorePrivacyClient
+Format=app bundle with Mach-O universal (x86_64 arm64)
+CodeDirectory v=20500 size=5907 flags=0x10000(runtime) hashes=173+7 location=embedded
+VersionPlatform=1
+VersionMin=720896
+VersionSDK=1705216
+Hash type=sha256 size=32
+CandidateCDHash sha256=08a4b9d32f92510b35074a0bb74fbed6602a8792
+CandidateCDHashFull sha256=08a4b9d32f92510b35074a0bb74fbed6602a8792ef0c7be3732f82c7b5fe35f6
+Hash choices=sha256
+CMSDigest=08a4b9d32f92510b35074a0bb74fbed6602a8792ef0c7be3732f82c7b5fe35f6
+CMSDigestType=2
+Executable Segment base=0
+Executable Segment limit=1130496
+Executable Segment flags=0x1
+Page size=16384
+CDHash=08a4b9d32f92510b35074a0bb74fbed6602a8792
+Signature size=8980
+Authority=Developer ID Application: Russell Sneddon (SFCBP95595)
+Authority=Developer ID Certification Authority
+Authority=Apple Root CA
+Timestamp=2 Aug 2026 at 23:25:23
+Notarization Ticket=stapled
+Info.plist entries=24
+TeamIdentifier=SFCBP95595
+Runtime Version=26.5.0
+Sealed Resources version=2 rules=13 files=25
+Internal requirements count=1 size=200
+=== spctl ===
+/var/folders/qb/tz4y4zts04z4846pbq95l6kw0000gp/T/tmp.msQ37Rd7ag/restore_privacy_client.app: accepted
+source=Notarized Developer ID
+origin=Developer ID Application: Russell Sneddon (SFCBP95595)
+=== stapler ===
+Processing: /var/folders/qb/tz4y4zts04z4846pbq95l6kw0000gp/T/tmp.msQ37Rd7ag/restore_privacy_client.app
+The validate action worked!
+--- Helsinki upload (tail) ---
+upload platform=ios file=restore-privacy-client-1.1.0-ios.zip (13223728 bytes)
+$ ssh root@135.181.152.10 sudo -n bash -lc 'if test -f /opt/restore-privacy/paid_assets/1.1.0/restore-privacy-client-1.1.0-ios.zip; then stat -c%s…
+MISSING
+  scp attempt 1: restore-privacy-client-1.1.0-ios.zip (13223728 bytes) -> root@135.181.152.10:/root/rpt-paid-upload-restore-privacy-client-1.1.0-ios.zip
+$ scp restore-privacy-client-1.1.0-ios.zip -> root@135.181.152.10:/root/rpt-paid-upload-restore-privacy-client-1.1.0-ios.zip
+$ ssh root@135.181.152.10 bash -lc 'set -e; test -f /root/rpt-paid-upload-restore-privacy-client-1.1.0-ios.zip; SZ=$(stat -c%s /root/rpt-paid-uplo…
+size_ok=13223728
+$ ssh root@135.181.152.10 sudo -n bash -lc 'set -e; mkdir -p $(dirname /opt/restore-privacy/paid_assets/1.1.0/restore-privacy-client-1.1.0-ios.zip…
+13223728
+  remote_ok restore-privacy-client-1.1.0-ios.zip bytes=13223728
+upload platform=linux file=restore-privacy-client-1.1.0-linux-x64.tar.gz (14636754 bytes)
+$ ssh root@135.181.152.10 sudo -n bash -lc 'if test -f /opt/restore-privacy/paid_assets/1.1.0/restore-privacy-client-1.1.0-linux-x64.tar.gz; then …
+MISSING
+  scp attempt 1: restore-privacy-client-1.1.0-linux-x64.tar.gz (14636754 bytes) -> root@135.181.152.10:/root/rpt-paid-upload-restore-privacy-client-1.1.0-linux-x64.tar.gz
+$ scp restore-privacy-client-1.1.0-linux-x64.tar.gz -> root@135.181.152.10:/root/rpt-paid-upload-restore-privacy-client-1.1.0-linux-x64.tar.gz
+$ ssh root@135.181.152.10 bash -lc 'set -e; test -f /root/rpt-paid-upload-restore-privacy-client-1.1.0-linux-x64.tar.gz; SZ=$(stat -c%s /root/rpt-…
+size_ok=14636754
+$ ssh root@135.181.152.10 sudo -n bash -lc 'set -e; mkdir -p $(dirname /opt/restore-privacy/paid_assets/1.1.0/restore-privacy-client-1.1.0-linux-x…
+14636754
+  remote_ok restore-privacy-client-1.1.0-linux-x64.tar.gz bytes=14636754
+$ ssh root@135.181.152.10 sudo -n bash -lc 'set -e; for d in /opt/restore-privacy/paid_assets/*; do [ -d "$d" ] || continue; bn=$(basename "$d"); …
+tidy_removed=1.0.9
+tidy_removed=1.0.9
+
+$ ssh root@135.181.152.10 sudo -n bash -lc 'set -e; U=/etc/systemd/system/rpt-paid-assets.service; test -f "$U" || { echo no_unit; exit 0; }; if g…
+active
+catalog_pin=1.1.0
+active
+catalog_pin=1.1.0
+upload complete host=135.181.152.10 version=1.1.0
+--- Breadcrumbs (tail) ---
+      "restore-privacy-node-operator-1.0.1-linux-x64.tar.gz",
+      "rpmail-0.1.1-windows.zip",
+      "rpmail-0.1.1-macos.zip",
+      "rpmail-0.1.1-linux-x86_64.tar.gz",
+      "rpmail-0.1.1-linux-aarch64.tar.gz",
+      "rpoffice-0.1.1-windows.zip",
+      "rpoffice-0.1.1-macos.zip",
+      "rpoffice-0.1.1-linux-x86_64.tar.gz",
+      "rpoffice-0.1.1-linux-aarch64.tar.gz"
+    ],
+    "operator_cli": "python scripts/windows_brand_mirror.py plan|apply --dest $RPT_WINDOWS_DRIVE"
+  },
+  "needs_any_apple_work": false,
+  "handoff_file": null,
+  "checklist": [
+    "BUILT (this build monopin 1.1.0): Windows setup.exe, Linux tar.gz, Android APK as restore-privacy-client-1.1.0-* (this host). Apple packages not sealed here \u2014 Mac rebuild/sign required.",
+    "UPDATE THESE DOCS to monopin 1.1.0: client_app/APPLE_HANDOFF_1.1.0.md, scripts/RELEASE_NOTES_1.1.0.md, PRIVACY_POLICY.md, AUDIT.md, status_page/settings_explainer.py (Settings guide), status_page/downloads.py RELEASE_VERSION, client/VERSION.",
+    "PUBLISH ALL to the version number of this build (1.1.0): stage/upload every platform package under paid_assets/1.1.0/ and status_page/assets/1.1.0/ (Windows + Linux + Android already built; macOS + iOS after native seal). No separate commit/version guess \u2014 use monopin 1.1.0 everywhere.",
+    "1. Fetch vault: breadcrumbs_vault.py check --fetch",
+    "2. If macos needs_work: flutter build macos + notarize per APPLE_HANDOFF",
+    "3. If ios needs_work: flutter build ios + Team-sign per APPLE_HANDOFF",
+    "4. Stage/upload paid assets for 1.1.0 (Helsinki), then re-publish breadcrumbs",
+    "5. Re-run check until needs_any_apple_work is false",
+    "6. Windows machine: set RPT_WINDOWS_DRIVE to the large drive; python scripts/windows_brand_mirror.py apply \u2014 monorepo + all brand installer slots (35 packages); then native PE seal + upload",
+    "7. Windows machine: open client/windows/WINDOWS_HANDOFF_1.1.0.md \u2014 full product map: first-run account\u2192seed\u2192licence before VPN; 72h KEYGEN-free trial then KEYGEN (Stripe trial_period_days=0); Suite VPN \u00b7 % \u00b7 Evolve \u00b7 Backup \u00b7 Credit \u00b7 rpAI/Ned; residual IS+DE; Ned/oracle/co-join; every /admin surface (UPLOADS, Node Operator, rpS, Link Generation, Licences, Fleet, Perc, Support, Accounting, Processors); brand companions rpOS/browser"
+  ]
+}
+{
+  "monopin": "1.1.0",
+  "macos_needs_work": false,
+  "ios_needs_work": false,
+  "needs_any_apple_work": false,
+  "macbook_actions": [
+    "none_apple_up_to_date"
+  ],
+  "up_to_date": true,
+  "source_of_truth": "helsinki_breadcrumbs_vault",
+  "github_breadcrumb_flow": "deprecated"
+}
+STATUS: Apple packages up to date for monopin
+--- sha256 catalog packages ---
+01284e258e15eb998d1dc647a002d820a45fa3341ff8671419fd983e43a84a51  status_page/assets/1.1.0/restore-privacy-client-1.1.0-android.apk
+27d726eb702ae8e2072c28f37f7f013e5846f3a755716c2791136d4f4159e95f  status_page/assets/1.1.0/restore-privacy-client-1.1.0-ios.zip
+d66e4b2c1facf4ca3ff067cb225562ace11f2f87d4bd599c2c68e30f55addb94  status_page/assets/1.1.0/restore-privacy-client-1.1.0-linux-x64.tar.gz
+822e80245103a685ec8161f895cb380594deef74132a5ba2e081c569dd84f55f  status_page/assets/1.1.0/restore-privacy-client-1.1.0-macos.zip
+3634e9751cb66669c1e4853114cfc76d36bd8d157e711e7c8fb6feb86d9823a9  status_page/assets/1.1.0/restore-privacy-client-1.1.0-windows-x64-setup.exe
+--- sizes ---
+total 701752
+drwxr-xr-x  13 russellsneddon  staff       416  2 Aug 23:27 .
+drwxr-xr-x   5 russellsneddon  staff       160  2 Aug 23:27 ..
+-rw-r--r--   1 russellsneddon  staff      2056  2 Aug 23:25 manifest.json
+-rw-r--r--   1 russellsneddon  staff  85339162  2 Aug 23:23 restore-privacy-client-1.1.0-android.apk
+-rw-r--r--   1 russellsneddon  staff  13223728  2 Aug 23:25 restore-privacy-client-1.1.0-ios.zip
+-rw-r--r--   1 russellsneddon  staff  14636754  1 Aug 16:50 restore-privacy-client-1.1.0-linux-x64.tar.gz
+-rw-r--r--   1 russellsneddon  staff  27807243  2 Aug 23:26 restore-privacy-client-1.1.0-macos.zip
+-rw-r--r--   1 russellsneddon  staff  38631642  1 Aug 01:51 restore-privacy-client-1.1.0-windows-x64-setup.exe
+-rw-r--r--   1 russellsneddon  staff  85339162  2 Aug 23:23 restore-privacy-suite-1.1.0-android.apk
+-rw-r--r--   1 russellsneddon  staff  13223728  2 Aug 23:25 restore-privacy-suite-1.1.0-ios.zip
+-rw-r--r--   1 russellsneddon  staff  14636754  1 Aug 16:50 restore-privacy-suite-1.1.0-linux-x64.tar.gz
+-rw-r--r--   1 russellsneddon  staff  27807243  2 Aug 23:27 restore-privacy-suite-1.1.0-macos.zip
+-rw-r--r--   1 russellsneddon  staff  38631642  1 Aug 01:51 restore-privacy-suite-1.1.0-windows-x64-setup.exe

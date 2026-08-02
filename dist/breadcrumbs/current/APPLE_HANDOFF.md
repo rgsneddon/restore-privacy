@@ -1,6 +1,6 @@
-# APPLE_HANDOFF_1.0.9.md missing in monorepo
+# APPLE_HANDOFF_1.1.0.md missing in monorepo
 
-Monopin 1.0.9. Create handoff then re-publish breadcrumbs.
+Monopin 1.1.0. Create handoff then re-publish breadcrumbs.
 
 ---
 
