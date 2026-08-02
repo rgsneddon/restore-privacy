@@ -18,8 +18,11 @@ PRODUCT = ROOT / "product"
 DE_HOST = "178.105.187.178"
 DE_PUB = "de_node_elgamal.pub"
 NODE_PUB = "node_elgamal.pub"
+EXIT_PUB = "exit_node_elgamal.pub"
+US_PUB = "us_node_elgamal.pub"  # retired — must not stage/inject
 FORBIDDEN = "node_elgamal.priv"
-PUBLICS = (NODE_PUB, DE_PUB, "exit_node_elgamal.pub", "us_node_elgamal.pub")
+# Live catalog residual public pins only (matches inject_apple_secrets.PUBLIC_PUBS).
+PUBLICS = (NODE_PUB, DE_PUB, EXIT_PUB)
 
 
 class TestMacosResidualPinPath(unittest.TestCase):
@@ -39,6 +42,11 @@ class TestMacosResidualPinPath(unittest.TestCase):
             self.assertTrue(p.is_file(), name)
             self.assertGreaterEqual(p.stat().st_size, 32, name)
         self.assertFalse((staged / FORBIDDEN).exists())
+        # Retired US monopin must not be staged as package material
+        self.assertFalse(
+            (staged / US_PUB).exists(),
+            f"retired {US_PUB} must not be in macos/Runner/secrets",
+        )
         # Match product DE pin bytes (no stale pin)
         self.assertEqual(
             (staged / DE_PUB).read_bytes(),
@@ -98,6 +106,10 @@ class TestMacosResidualPinPath(unittest.TestCase):
                 pin = dest / name
                 self.assertTrue(pin.is_file(), f"missing {name}\n{r.stdout}")
                 self.assertGreaterEqual(pin.stat().st_size, 32, name)
+            self.assertFalse(
+                (dest / US_PUB).exists(),
+                f"retired {US_PUB} must not be injected\n{r.stdout}",
+            )
             self.assertFalse((dest / FORBIDDEN).exists())
             self.assertFalse((dest / "client_ed25519.priv").exists())
             # DE pin matches product monopin (Connect default residual host)
@@ -105,8 +117,8 @@ class TestMacosResidualPinPath(unittest.TestCase):
                 (dest / DE_PUB).read_bytes(),
                 (PRODUCT / DE_PUB).read_bytes(),
             )
-            # PacketTunnel also receives DE pin
-            ape_pin = (
+            # PacketTunnel also receives DE pin; no US
+            ape_sec = (
                 app
                 / "Contents"
                 / "PlugIns"
@@ -114,9 +126,13 @@ class TestMacosResidualPinPath(unittest.TestCase):
                 / "Contents"
                 / "Resources"
                 / "secrets"
-                / DE_PUB
             )
+            ape_pin = ape_sec / DE_PUB
             self.assertTrue(ape_pin.is_file(), "PacketTunnel missing de pin")
+            self.assertFalse(
+                (ape_sec / US_PUB).exists(),
+                "PacketTunnel must not get retired US pin",
+            )
 
     def test_dart_and_swift_map_de_host_to_de_pub(self):
         dart = (
