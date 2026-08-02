@@ -1,0 +1,29 @@
+=== free suite 302 probe 2026-08-02T22:37:44Z ===
+windows: status=502 loc= hit_1.1.0=False
+android: status=502 loc= hit_1.1.0=False
+macos: status=502 loc= hit_1.1.0=False
+ios: status=502 loc= hit_1.1.0=False
+linux: status=502 loc= hit_1.1.0=False
+hit_count=0/5
+api/status err HTTP Error 502: Bad Gateway
+=== Helsinki paid_assets 1.1.0 probe 2026-08-02T22:38:00Z ===
+HEAD restore-privacy-client-1.1.0-windows-x64-setup.exe HTTP 404
+HEAD restore-privacy-client-1.1.0-android.apk HTTP 404
+HEAD restore-privacy-client-1.1.0-macos.zip HTTP 404
+HEAD restore-privacy-client-1.1.0-ios.zip HTTP 404
+HEAD restore-privacy-client-1.1.0-linux-x64.tar.gz HTTP 404
+=== free suite 302 after wait 2026-08-02T22:38:22Z ===
+windows: status=302 hit_1.1.0=True loc=https://135.181.152.10.sslip.io/paid-assets/1.1.0/restore-privacy-client-1.1.0-windows-x64-setup.exe?exp=1785711203&n=37ae0c2b2d06f7ef&sig=19afc804a8fba5a58261c5b78f40679836e15455637481635b9f0b352b85888a
+android: status=302 hit_1.1.0=True loc=https://135.181.152.10.sslip.io/paid-assets/1.1.0/restore-privacy-client-1.1.0-android.apk?exp=1785711204&n=82ae6dc97a7f8bc1&sig=5296a3daa53cf5083de07f77ee369cb5203238ad4e4f5e5935c5bedd9b4d2398
+macos: status=302 hit_1.1.0=True loc=https://135.181.152.10.sslip.io/paid-assets/1.1.0/restore-privacy-client-1.1.0-macos.zip?exp=1785711205&n=60f3dc375235b515&sig=7664ad1712a79ec21a3c904d00a7c0f0684ae09ebaf4ab55aafeb7297bb55a78
+ios: status=302 hit_1.1.0=True loc=https://135.181.152.10.sslip.io/paid-assets/1.1.0/restore-privacy-client-1.1.0-ios.zip?exp=1785711206&n=6f5d99e6bcbf0bda&sig=92c712412a5efd9d85d648f5c70ee9c9d15811f4424aa3d7d28e36d77b12f1fc
+linux: status=302 hit_1.1.0=True loc=https://135.181.152.10.sslip.io/paid-assets/1.1.0/restore-privacy-client-1.1.0-linux-x64.tar.gz?exp=1785711207&n=3c9c22a4f83376fa&sig=e85eeff5d896a503ba9bb2747d65b11374007eb7a7c2a445bf2479974051347b
+hit_count=5/5
+api/status 200 b'{"title": "RESTORE PRIVACY SUITE"}'
+=== signed URL range GET 2026-08-02T22:38:39Z ===
+windows: range_status=200 cl=38631642 cr= body0=b'MZ\x90\x00\x03\x00\x00\x00\x04\x00\x00\x00' expected_full=38631642
+android: range_status=200 cl=85339162 cr= body0=b'PK\x03\x04\x00\x00\x00\x00\x08\x00!\x08' expected_full=85339162
+macos: range_status=200 cl=27807243 cr= body0=b'PK\x03\x04\n\x00\x00\x00\x00\x00vM' expected_full=27807243
+ios: range_status=200 cl=13223728 cr= body0=b'PK\x03\x04\x14\x00\x00\x00\x08\x00Zz' expected_full=13223728
+linux: range_status=200 cl=14636754 cr= body0=b'\x1f\x8b\x08\x08#8lj\x02\xffre' expected_full=14636754
+PROBE_OK free suite 1.1.0 live 5/5 basenames + Helsinki signed delivery
