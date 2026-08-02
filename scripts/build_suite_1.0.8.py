@@ -202,11 +202,14 @@ def build_macos() -> Path | None:
 
 
 def inject_ios_residual_pubs(runner: Path) -> Path:
-    """Embed product residual **public** ElGamal pins into iOS Runner.app.
+    """Embed live residual **public** ElGamal pins into iOS Runner.app.
 
-    Fail-closed: requires ``node_elgamal.pub`` (entry pin). Uses the shipped
-    ``inject_apple_secrets`` path (host ``Runner.app/secrets/`` + PacketTunnel
-    ``.appex/secrets/``). Must run **before** final codesign and catalog zip.
+    Live catalog only: IS ``node_elgamal.pub``, DE ``de_node_elgamal.pub``,
+    multihop ``exit_node_elgamal.pub``. **Does not** inject retired
+    ``us_node_elgamal.pub``. Fail-closed if entry pin missing. Uses
+    ``inject_apple_secrets`` (host ``Runner.app/secrets/`` + PacketTunnel
+    ``.appex/secrets/``). Must run **before** final Distribution codesign
+    and catalog zip. (Developer ID + notarize are macOS-only — not iOS.)
     """
     if not runner.is_dir():
         raise FileNotFoundError(f"iOS Runner.app not found: {runner}")

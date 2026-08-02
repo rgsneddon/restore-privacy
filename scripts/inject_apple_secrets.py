@@ -1,11 +1,13 @@
 #!/usr/bin/env python3
 """Inject public node material into a macOS/iOS app bundle.
 
-Copies **public** ElGamal keys only:
+Copies **public** ElGamal keys only (live residual catalog):
   - ``node_elgamal.pub`` (Iceland residual)
   - ``de_node_elgamal.pub`` (Germany residual / default entry)
   - ``exit_node_elgamal.pub`` (multi-hop exit; DE pin material)
-  - ``us_node_elgamal.pub`` (United States residual)
+
+Does **not** inject ``us_node_elgamal.pub`` — United States residual is **retired**
+(not a live catalog peer; dials normalize US → DE).
 
 Never copies a shared ``client_ed25519.priv`` or ``node_elgamal.priv``.
 Per-device Ed25519 keys are generated on first run by the client.
@@ -16,6 +18,10 @@ Source search (first hit wins for each pub):
 Usage:
   python3 scripts/inject_apple_secrets.py --app path/to/restore_privacy_client.app
   python3 scripts/inject_apple_secrets.py --app path/to/Runner.app --ios
+
+Signing note: this inject path is used for **macOS** (Developer ID + notarytool)
+and **iOS** (Apple Distribution Team-signed Runner.app zip). Developer ID and
+notarization are **macOS Gatekeeper only** — they are not accepted for iOS.
 """
 
 from __future__ import annotations
@@ -31,8 +37,10 @@ CLIENT_PRIV = "client_ed25519.priv"
 NODE_PUB = "node_elgamal.pub"
 DE_PUB = "de_node_elgamal.pub"
 EXIT_PUB = "exit_node_elgamal.pub"
+# Retired monopin name kept for call-site greps / heal docs only — never inject.
 US_PUB = "us_node_elgamal.pub"
-PUBLIC_PUBS = (NODE_PUB, DE_PUB, EXIT_PUB, US_PUB)
+# Live catalog residual public pins only (IS + DE + exit alias). US retired.
+PUBLIC_PUBS = (NODE_PUB, DE_PUB, EXIT_PUB)
 FORBIDDEN = "node_elgamal.priv"
 
 
@@ -80,11 +88,16 @@ def _inject_into_secrets_dir(dest: Path, source: Path) -> None:
         if src is None:
             if name == NODE_PUB:
                 raise FileNotFoundError(f"missing required {NODE_PUB}")
-            print(f"warn: missing {name} (DE/US residual HELLO will fail closed)")
+            print(f"warn: missing {name} (DE residual HELLO will fail closed)")
             continue
         dst = dest / name
         shutil.copy2(src, dst)
         print(f"injected {name} -> {dst} ({dst.stat().st_size} bytes)")
+    # Drop retired US pin if a prior build left it in the bundle secrets dir.
+    retired_us = dest / US_PUB
+    if retired_us.is_file():
+        retired_us.unlink()
+        print(f"removed retired {US_PUB} from package")
     for leftover in list(dest.glob("*.priv")):
         leftover.unlink()
         print(f"removed priv from package: {leftover.name}")
@@ -101,11 +114,11 @@ def inject(app: Path, source: Path, ios: bool) -> Path:
         dest = app / "secrets"
     else:
         dest = app / "Contents" / "Resources" / "secrets"
-    # Catalog residual public keys (never private keys): IS + RO + US
+    # Live catalog residual public keys (never private keys): IS + DE + exit
     _inject_into_secrets_dir(dest, source)
 
     # Packet Tunnel extension has its own Bundle.main — inject there too so
-    # loadAdmissionMaterial candidates can see RO/US pins without relying solely
+    # loadAdmissionMaterial candidates can see DE/exit pins without relying solely
     # on host App Group pre-seed (still required for sandboxed NE).
     plugins_roots: list[Path] = []
     if ios:

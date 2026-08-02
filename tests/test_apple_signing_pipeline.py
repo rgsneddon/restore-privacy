@@ -132,3 +132,8 @@ class TestInjectAppleSecretsScript(unittest.TestCase):
             self.assertGreaterEqual(
                 (dest / "de_node_elgamal.pub").stat().st_size, 32
             )
+            # Retired US monopin must not ship in Apple secrets inject
+            self.assertFalse(
+                (dest / "us_node_elgamal.pub").exists(),
+                "us_node_elgamal.pub is retired — must not be injected",
+            )

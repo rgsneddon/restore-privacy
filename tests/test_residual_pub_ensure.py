@@ -22,10 +22,12 @@ from client.residual_pub_ensure import (  # noqa: E402
     residual_node_pub_name_for_host,
 )
 from client.multihop import (  # noqa: E402
+    COUNTRY_DE,
     COUNTRY_IS,
     COUNTRY_RO,
     COUNTRY_US,
     PRODUCT_COUNTRY_CATALOG,
+    PRODUCT_DE_HOST,
     PRODUCT_EXIT_HOST,
     PRODUCT_NODE_HOST,
     PRODUCT_US_HOST,
@@ -232,17 +234,18 @@ class TestPacketTunnelLayoutFixture(unittest.TestCase):
 
 
 class TestCatalogPubInventory(unittest.TestCase):
-    """Every catalog code → host → required pub covered by inject/gradle/product."""
+    """Every live catalog code → host → required pub covered by inject/gradle/product."""
 
     def test_catalog_to_pub_inventory(self):
+        # Live residual catalog is IS + DE only (US/RO retired).
         expected = {
             COUNTRY_IS: (PRODUCT_NODE_HOST, "node_elgamal.pub"),
-            COUNTRY_RO: (PRODUCT_EXIT_HOST, "exit_node_elgamal.pub"),
-            COUNTRY_US: (PRODUCT_US_HOST, "us_node_elgamal.pub"),
+            COUNTRY_DE: (PRODUCT_DE_HOST, "de_node_elgamal.pub"),
         }
         codes = {n.code for n in PRODUCT_COUNTRY_CATALOG}
-        self.assertEqual(codes, {"IS", "RO", "US"})
-        self.assertNotIn("DE", codes)
+        self.assertEqual(codes, {"IS", "DE"})
+        self.assertNotIn("US", codes)
+        self.assertNotIn("RO", codes)
         for n in PRODUCT_COUNTRY_CATALOG:
             host, pub = expected[n.code]
             self.assertEqual(n.host, host, n.code)
@@ -256,16 +259,21 @@ class TestCatalogPubInventory(unittest.TestCase):
         inject = (ROOT / "scripts" / "inject_apple_secrets.py").read_text(
             encoding="utf-8"
         )
-        self.assertIn("PUBLIC_PUBS = (NODE_PUB, EXIT_PUB, US_PUB)", inject)
-        self.assertNotIn("de_node_elgamal.pub", inject)
+        self.assertIn("PUBLIC_PUBS = (NODE_PUB, DE_PUB, EXIT_PUB)", inject)
+        self.assertIn("de_node_elgamal.pub", inject)
+        self.assertIn("exit_node_elgamal.pub", inject)
+        # Retired US must not be in the default inject tuple
+        self.assertNotIn("US_PUB)", inject)
+        self.assertNotIn(", US_PUB)", inject)
+        self.assertNotIn("US_PUB,", inject)
         gradle = (
             ROOT / "client_app" / "android" / "app" / "build.gradle.kts"
         ).read_text(encoding="utf-8")
         self.assertIn("node_elgamal.pub", gradle)
         self.assertIn("exit_node_elgamal.pub", gradle)
-        self.assertIn("us_node_elgamal.pub", gradle)
-        # Retired DE must not be injected into APK assets list
-        self.assertNotIn('"de_node_elgamal.pub"', gradle)
+        self.assertIn('"de_node_elgamal.pub"', gradle)
+        # Retired US must not be in APK assets inject list
+        self.assertNotIn('"us_node_elgamal.pub"', gradle)
 
         for rel in (
             "client_app/ios/NativePrep/RptSecrets.swift",
@@ -273,8 +281,9 @@ class TestCatalogPubInventory(unittest.TestCase):
         ):
             sw = (ROOT / rel).read_text(encoding="utf-8")
             self.assertIn("ensureResidualPubInWritableDir", sw, rel)
-            self.assertIn("usNodePubName", sw, rel)
-            self.assertIn("productUsHost", sw, rel)
+            # Stale US host may still map → DE pin for heal; catalog list is live-only
+            self.assertIn("catalogPublicPubNames", sw, rel)
+            self.assertIn("deNodePubName", sw, rel)
             e_i = sw.find("ensureResidualPubInWritableDir")
             self.assertIn(
                 "try ensureResidualPubInWritableDir",

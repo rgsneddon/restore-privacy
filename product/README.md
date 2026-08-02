@@ -29,10 +29,14 @@ Former Romania peer is **deprecated**; do not dial `185.146.232.107`.
 
 ## `us_node_elgamal.pub`
 
-Public ElGamal key for the **United States** residual peer (`5.161.242.85:44044`).
+**Retired** monopin for the former United States residual peer
+(`5.161.242.85:44044`). Kept under `product/` for historical heal/reference only.
+**Not** a live catalog peer; clients normalize US → DE. Apple inject
+(`scripts/inject_apple_secrets.py`) and Android `copyRptSecretsToAssets` **do not**
+embed this file into release packages.
 
 **Never** put `*.priv` keys in this directory. Privates live only on each node
 under `/opt/restore-privacy/secrets/`.
 
-Android release builds inject catalog pubs into APK assets via
+Android release builds inject live catalog pubs (IS/DE/exit) into APK assets via
 `copyRptSecretsToAssets` (prefers `product/`, then `secrets/`).
