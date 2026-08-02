@@ -50,6 +50,63 @@ import 'suite_nav.dart';
 import 'suite_parts.dart';
 import 'theme.dart';
 
+/// Cap for live package I/O so Suite never spins forever without Retry.
+const Duration kSuiteFamilyBootTimeout = Duration(seconds: 25);
+
+/// Package mode after a successful family boot.
+enum SuiteFamilyBootMode { none, evolve, walletOnly }
+
+/// Ready provider scope produced by live boot or a test [SuiteFamilyBootFn].
+class SuiteFamilyBootReady {
+  const SuiteFamilyBootReady.evolve({
+    required this.evolve,
+    required this.evolveWallet,
+    required this.fcg,
+    required this.evolveLocale,
+  })  : walletOnly = null,
+        walletLocale = null,
+        mode = SuiteFamilyBootMode.evolve;
+
+  const SuiteFamilyBootReady.walletOnly({
+    required this.walletOnly,
+    required this.walletLocale,
+  })  : evolve = null,
+        evolveWallet = null,
+        fcg = null,
+        evolveLocale = null,
+        mode = SuiteFamilyBootMode.walletOnly;
+
+  const SuiteFamilyBootReady.empty()
+      : evolve = null,
+        evolveWallet = null,
+        fcg = null,
+        evolveLocale = null,
+        walletOnly = null,
+        walletLocale = null,
+        mode = SuiteFamilyBootMode.none;
+
+  final SuiteFamilyBootMode mode;
+  final EvolveProvider? evolve;
+  final evolve_wallet.PercWalletProvider? evolveWallet;
+  final FcgVotingProvider? fcg;
+  final evolve_locale.LocaleProvider? evolveLocale;
+  final wallet_p.PercWalletProvider? walletOnly;
+  final wallet_locale.LocaleProvider? walletLocale;
+
+  bool get hasAppAccess {
+    switch (mode) {
+      case SuiteFamilyBootMode.evolve:
+        return evolveWallet?.hasAppAccess ?? true;
+      case SuiteFamilyBootMode.walletOnly:
+      case SuiteFamilyBootMode.none:
+        return true;
+    }
+  }
+}
+
+/// Optional test/prod override for family boot (skip live path_provider I/O).
+typedef SuiteFamilyBootFn = Future<SuiteFamilyBootReady> Function();
+
 /// Boots family providers once; exposes them via [MultiProvider] without Theme.
 class SuiteFamilyHost extends StatefulWidget {
   const SuiteFamilyHost({
@@ -57,6 +114,7 @@ class SuiteFamilyHost extends StatefulWidget {
     required this.parts,
     required this.child,
     this.onHasAppAccessChanged,
+    this.boot,
   });
 
   final SuitePartsState parts;
@@ -64,6 +122,9 @@ class SuiteFamilyHost extends StatefulWidget {
 
   /// Notified when Evolve wallet [hasAppAccess] changes (main-bar dest set).
   final ValueChanged<bool>? onHasAppAccessChanged;
+
+  /// When set, replaces live `_bootEvolve` / `_bootWalletOnly` (widget tests).
+  final SuiteFamilyBootFn? boot;
 
   @override
   State<SuiteFamilyHost> createState() => SuiteFamilyHostState();
@@ -81,8 +142,15 @@ class SuiteFamilyHostState extends State<SuiteFamilyHost> {
   bool _ready = false;
   Object? _error;
   bool _hasAppAccess = true;
+  int _bootGeneration = 0;
+  final List<Timer> _bootTimers = <Timer>[];
 
   bool get hasAppAccess => _hasAppAccess;
+
+  /// Exposed for tests that wait for production boot without soft-ifs.
+  bool get isReady => _ready;
+
+  Object? get bootError => _error;
 
   bool get useEvolvePackage =>
       suitePartShowsFullSurface(widget.parts, SuitePartId.evolve);
@@ -90,6 +158,17 @@ class SuiteFamilyHostState extends State<SuiteFamilyHost> {
   bool get useWalletOnlyPackage =>
       !useEvolvePackage &&
       suitePartShowsFullSurface(widget.parts, SuitePartId.wallet);
+
+  /// True under `flutter_test` (avoid live seed nodes; still use timeouts).
+  static bool get underFlutterTest {
+    try {
+      return WidgetsBinding.instance.runtimeType
+          .toString()
+          .contains('TestWidgetsFlutterBinding');
+    } catch (_) {
+      return false;
+    }
+  }
 
   @override
   void initState() {
@@ -102,16 +181,26 @@ class SuiteFamilyHostState extends State<SuiteFamilyHost> {
   void didUpdateWidget(covariant SuiteFamilyHost oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.parts.evolveInstalled != widget.parts.evolveInstalled ||
-        oldWidget.parts.walletInstalled != widget.parts.walletInstalled) {
+        oldWidget.parts.walletInstalled != widget.parts.walletInstalled ||
+        oldWidget.boot != widget.boot) {
       _boot();
     }
   }
 
   @override
   void dispose() {
+    _bootGeneration++;
+    _cancelBootTimers();
     SuiteAccountBus.instance.removeListener(_onSuiteAccountChanged);
     _evolveWallet?.removeListener(_onEvolveWalletChanged);
     super.dispose();
+  }
+
+  void _cancelBootTimers() {
+    for (final t in _bootTimers) {
+      t.cancel();
+    }
+    _bootTimers.clear();
   }
 
   void _onSuiteAccountChanged() {
@@ -138,26 +227,56 @@ class SuiteFamilyHostState extends State<SuiteFamilyHost> {
     } catch (_) {}
   }
 
+  /// Timeout that is cancelled on [dispose] (no pending-timer test flakes).
+  Future<T> _step<T>(String name, Future<T> future) {
+    final completer = Completer<T>();
+    late final Timer timer;
+    timer = Timer(kSuiteFamilyBootTimeout, () {
+      if (!completer.isCompleted) {
+        completer.completeError(
+          TimeoutException(
+            'Suite family boot timed out ($name)',
+            kSuiteFamilyBootTimeout,
+          ),
+          StackTrace.current,
+        );
+      }
+    });
+    _bootTimers.add(timer);
+    future.then((value) {
+      if (!completer.isCompleted) completer.complete(value);
+    }, onError: (Object e, StackTrace st) {
+      if (!completer.isCompleted) completer.completeError(e, st);
+    }).whenComplete(() {
+      timer.cancel();
+      _bootTimers.remove(timer);
+    });
+    return completer.future;
+  }
+
   Future<void> _boot() async {
+    final gen = ++_bootGeneration;
+    _cancelBootTimers();
     setState(() {
       _ready = false;
       _error = null;
     });
     try {
-      if (useEvolvePackage) {
-        await _bootEvolve();
+      final SuiteFamilyBootReady ready;
+      final inject = widget.boot;
+      if (inject != null) {
+        ready = await _step('inject_boot', inject());
+      } else if (useEvolvePackage) {
+        ready = await _bootEvolve();
       } else if (useWalletOnlyPackage) {
-        await _bootWalletOnly();
+        ready = await _bootWalletOnly();
       } else {
-        if (!mounted) return;
-        setState(() {
-          _ready = true;
-          _error = null;
-        });
-        return;
+        ready = const SuiteFamilyBootReady.empty();
       }
+      if (!mounted || gen != _bootGeneration) return;
+      _applyReady(ready);
     } catch (e) {
-      if (!mounted) return;
+      if (!mounted || gen != _bootGeneration) return;
       setState(() {
         _error = e;
         _ready = false;
@@ -165,28 +284,53 @@ class SuiteFamilyHostState extends State<SuiteFamilyHost> {
     }
   }
 
-  Future<void> _bootEvolve() async {
-    evolve_coord.PercNetworkCoordinator.disableLiveNodesForTests = false;
+  void _applyReady(SuiteFamilyBootReady ready) {
+    _evolveWallet?.removeListener(_onEvolveWalletChanged);
+    if (ready.evolveWallet != null) {
+      ready.evolveWallet!.addListener(_onEvolveWalletChanged);
+    }
+
+    setState(() {
+      _evolve = ready.evolve;
+      _evolveWallet = ready.evolveWallet;
+      _fcg = ready.fcg;
+      _evolveLocale = ready.evolveLocale;
+      _walletOnly = ready.walletOnly;
+      _walletLocale = ready.walletLocale;
+      _hasAppAccess = ready.hasAppAccess;
+      _ready = true;
+      _error = null;
+    });
+    widget.onHasAppAccessChanged?.call(_hasAppAccess);
+  }
+
+  Future<SuiteFamilyBootReady> _bootEvolve() async {
+    // Never hang widget tests on live seed/path_provider forever.
+    evolve_coord.PercNetworkCoordinator.disableLiveNodesForTests =
+        underFlutterTest;
     evolve_net.PercNetworkConfig.resetForTest();
-    await evolve_net.PercNetworkConfig.load();
+    await _step('network_config', evolve_net.PercNetworkConfig.load());
     try {
-      await OutcomeRegistry.ensureLoaded();
+      await _step('outcome_registry', OutcomeRegistry.ensureLoaded());
     } catch (_) {
       OutcomeRegistry.bundled();
     }
 
     final locale = evolve_locale.LocaleProvider();
-    await locale.initialize();
+    await _step('locale', locale.initialize());
     final evolve = EvolveProvider();
     final wallet = evolve_wallet.PercWalletProvider();
     final fcg = FcgVotingProvider();
 
     // Match prior AppBootstrap path: wallet session must initialize before shell.
-    await wallet.initialize();
-    await evolve.initialize();
-    await fcg.initialize();
+    await _step('wallet_initialize', wallet.initialize());
+    await _step('evolve_initialize', evolve.initialize());
+    await _step('fcg_initialize', fcg.initialize());
     try {
-      await evolve_hub.PercLedgerHub.instance.reloadFromStore();
+      await _step(
+        'ledger_reload',
+        evolve_hub.PercLedgerHub.instance.reloadFromStore(),
+      );
     } catch (_) {}
 
     evolve.setLocale(locale.config);
@@ -223,48 +367,34 @@ class SuiteFamilyHostState extends State<SuiteFamilyHost> {
           result: result,
         );
 
-    _evolveWallet?.removeListener(_onEvolveWalletChanged);
-    wallet.addListener(_onEvolveWalletChanged);
-
-    if (!mounted) return;
-    setState(() {
-      _evolve = evolve;
-      _evolveWallet = wallet;
-      _fcg = fcg;
-      _evolveLocale = locale;
-      _walletOnly = null;
-      _walletLocale = null;
-      _hasAppAccess = wallet.hasAppAccess;
-      _ready = true;
-      _error = null;
-    });
-    widget.onHasAppAccessChanged?.call(_hasAppAccess);
+    return SuiteFamilyBootReady.evolve(
+      evolve: evolve,
+      evolveWallet: wallet,
+      fcg: fcg,
+      evolveLocale: locale,
+    );
   }
 
-  Future<void> _bootWalletOnly() async {
-    wallet_coord.PercNetworkCoordinator.disableLiveNodesForTests = false;
+  Future<SuiteFamilyBootReady> _bootWalletOnly() async {
+    wallet_coord.PercNetworkCoordinator.disableLiveNodesForTests =
+        underFlutterTest;
     wallet_net.PercNetworkConfig.resetForTest();
-    await wallet_net.PercNetworkConfig.load();
+    await _step('wallet_network_config', wallet_net.PercNetworkConfig.load());
     final locale = wallet_locale.LocaleProvider();
-    await locale.initialize();
+    await _step('wallet_locale', locale.initialize());
     final wallet = wallet_p.PercWalletProvider();
-    await wallet.initialize();
+    await _step('wallet_only_initialize', wallet.initialize());
     try {
-      await wallet_hub.PercLedgerHub.instance.reloadFromStore();
+      await _step(
+        'wallet_ledger_reload',
+        wallet_hub.PercLedgerHub.instance.reloadFromStore(),
+      );
     } catch (_) {}
 
-    if (!mounted) return;
-    setState(() {
-      _walletOnly = wallet;
-      _walletLocale = locale;
-      _evolve = null;
-      _evolveWallet = null;
-      _fcg = null;
-      _evolveLocale = null;
-      _hasAppAccess = true;
-      _ready = true;
-      _error = null;
-    });
+    return SuiteFamilyBootReady.walletOnly(
+      walletOnly: wallet,
+      walletLocale: locale,
+    );
   }
 
   @override
@@ -314,6 +444,14 @@ class SuiteFamilyHostState extends State<SuiteFamilyHost> {
             value: _walletOnly!,
           ),
         ],
+        child: body,
+      );
+    }
+
+    // Ready marker for production-path widget tests (no soft-if on shells).
+    if (_ready && _error == null) {
+      body = KeyedSubtree(
+        key: const Key('suite_family_host_ready'),
         child: body,
       );
     }
@@ -380,6 +518,7 @@ class SuiteFamilyBody extends StatelessWidget {
               Text('${scope.error}', textAlign: TextAlign.center),
               const SizedBox(height: 12),
               FilledButton(
+                key: const Key('suite_family_boot_retry'),
                 onPressed: scope.onRetry,
                 child: const Text('Retry'),
               ),
@@ -390,7 +529,10 @@ class SuiteFamilyBody extends StatelessWidget {
     }
     if (scope != null && !scope.ready) {
       return Center(
-        child: CircularProgressIndicator(color: suitePrimaryOf(context)),
+        child: CircularProgressIndicator(
+          key: const Key('suite_family_boot_spinner'),
+          color: suitePrimaryOf(context),
+        ),
       );
     }
 

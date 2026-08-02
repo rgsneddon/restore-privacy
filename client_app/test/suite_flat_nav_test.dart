@@ -5,17 +5,76 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import 'package:evolve/fcg/providers/fcg_voting_provider.dart';
+import 'package:evolve/fcg/services/fcg_store_memory.dart';
+import 'package:evolve/perc/providers/perc_wallet_provider.dart' as evolve_wallet;
+import 'package:evolve/perc/services/perc_ledger_hub.dart' as evolve_hub;
+import 'package:evolve/perc/services/perc_network_coordinator.dart'
+    as evolve_coord;
+import 'package:evolve/perc/services/perc_wallet_store_memory.dart';
+import 'package:evolve/providers/evolve_provider.dart';
+import 'package:evolve/providers/locale_provider.dart' as evolve_locale;
 import 'package:evolve/screens/evolve_shell_screen.dart';
+import 'package:evolve/services/locale_store_memory.dart';
 
+import 'package:restore_privacy_client/suite_family_host.dart';
 import 'package:restore_privacy_client/suite_nav.dart';
 import 'package:restore_privacy_client/suite_parts.dart';
 import 'package:restore_privacy_client/suite_shell.dart';
+
+/// Deterministic SuiteFamilyHost boot: memory stores, no path_provider, full access.
+///
+/// Avoids [EvolveProvider.initialize] (Grok proxy timers) and stops inbound
+/// polling after register so widget tests do not leave pending Timers.
+Future<SuiteFamilyBootReady> suiteFamilyTestBoot() async {
+  evolve_coord.PercNetworkCoordinator.disableLiveNodesForTests = true;
+  evolve_wallet.PercWalletProvider.sessionTimeoutEnabled = false;
+  evolve_hub.PercLedgerHub.resetForTest();
+
+  // Defaults only — auto-detect can yield non-standard material locales (en_usa).
+  final locale = evolve_locale.LocaleProvider(
+    store: LocaleStoreMemory(),
+    autoDetectFromDevice: false,
+  );
+  await locale.initialize();
+  // Skip evolve.initialize() — it schedules Grok proxy timers under flutter_test.
+  final evolve = EvolveProvider();
+  final wallet = evolve_wallet.PercWalletProvider(store: PercWalletStoreMemory());
+  final fcg = FcgVotingProvider(store: FcgStoreMemory());
+
+  await wallet.initialize();
+  await fcg.initialize();
+
+  // Offline ledger login — full app access without wallet.register network burst
+  // (register schedules rendezvous retry timers that outlive widget tests).
+  await wallet.setupTreasuryPassword('password12345');
+  final ledger = evolve_hub.PercLedgerHub.instance.ledger;
+  ledger.register('suite_nav_user', 'password12345');
+  ledger.login('suite_nav_user', 'password12345');
+  // Full-access maps: Analysis=0, Wallet=1 (entitled evolve shell indices).
+  expect(wallet.hasAppAccess, isTrue);
+
+  evolve.setLocale(locale.config);
+  return SuiteFamilyBootReady.evolve(
+    evolve: evolve,
+    evolveWallet: wallet,
+    fcg: fcg,
+    evolveLocale: locale,
+  );
+}
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
   setUp(() {
     SharedPreferences.setMockInitialValues({});
+    evolve_coord.PercNetworkCoordinator.disableLiveNodesForTests = true;
+    evolve_wallet.PercWalletProvider.sessionTimeoutEnabled = false;
+  });
+
+  tearDown(() {
+    evolve_wallet.PercWalletProvider.sessionTimeoutEnabled = true;
+    evolve_hub.PercLedgerHub.resetForTest();
   });
 
   group('suiteNavDestinations', () {
@@ -246,12 +305,15 @@ void main() {
   testWidgets(
       'production SuiteFamilyHost path: single host, embed shells, no nested bar',
       (tester) async {
-    // No walletTab/evolveTab injects → _useSharedFamilyHost.
+    // No walletTab/evolveTab injects → real SuiteFamilyHost + SuiteFamilyBody.
+    // familyBoot injects ready providers (memory stores) so boot completes
+    // deterministically without hanging on path_provider.
     await tester.pumpWidget(
       MaterialApp(
         home: SuiteShell(
           preferInitialParts: true,
           initialParts: SuitePartsState.allInstalled,
+          familyBoot: suiteFamilyTestBoot,
           vpnTab: const Scaffold(
             key: Key('vpn_prod_surface'),
             body: Text('VPN_PROD'),
@@ -268,66 +330,99 @@ void main() {
     expect(find.text('VPN_PROD'), findsOneWidget);
     expect(find.byKey(const Key('suite_shell_main_nav')), findsOneWidget);
 
-    // Allow family boot (wallet.initialize + network config).
-    for (var i = 0; i < 50; i++) {
-      await tester.pump(const Duration(milliseconds: 100));
-      if (find
-          .byKey(const ValueKey('suite_family_evolve_0'))
-          .evaluate()
-          .isNotEmpty) {
+    // Wait for inject boot to finish (must not spin forever).
+    var hostReady = false;
+    for (var i = 0; i < 80; i++) {
+      await tester.pump(const Duration(milliseconds: 50));
+      if (find.byKey(const Key('suite_family_host_ready')).evaluate().isNotEmpty) {
+        hostReady = true;
         break;
       }
-      if (find.textContaining('Retry').evaluate().isNotEmpty) break;
+      if (find.byKey(const Key('suite_family_boot_retry')).evaluate().isNotEmpty) {
+        fail(
+          'SuiteFamilyHost boot failed to Retry UI (should complete via familyBoot)',
+        );
+      }
     }
+    expect(hostReady, isTrue, reason: 'familyBoot must reach ready state');
+    // Fail hard on spinner-forever.
+    expect(find.byKey(const Key('suite_family_boot_spinner')), findsNothing);
+
+    final hostState =
+        tester.state<SuiteFamilyHostState>(find.byType(SuiteFamilyHost));
+    expect(hostState.isReady, isTrue);
+    expect(hostState.bootError, isNull);
+    expect(hostState.hasAppAccess, isTrue);
 
     final shell = tester.state<SuiteShellState>(find.byType(SuiteShell));
     final dests = shell.destinations;
     expect(dests, contains(SuiteNavDest.analysis));
     expect(dests, contains(SuiteNavDest.wallet));
+    expect(shell.hasAppAccess, isTrue);
 
-    // Analysis → EvolveShellScreen embed (tabIndex 0 full access).
+    // PageView only builds the selected page — open Analysis so the
+    // production SuiteFamilyBody path mounts EvolveShellScreen.
     final analysisIdx = dests.indexOf(SuiteNavDest.analysis);
     shell.selectTab(analysisIdx);
     await tester.pump();
-    await tester.pump(const Duration(milliseconds: 200));
+    await tester.pump(const Duration(milliseconds: 100));
 
     // Still exactly one family host after navigation.
     expect(find.byKey(const Key('suite_family_host')), findsOneWidget);
 
-    // Real package shell, no nested bottom bar.
-    final evolveShells = find.byType(EvolveShellScreen);
-    if (evolveShells.evaluate().isNotEmpty) {
-      final es = tester.widget<EvolveShellScreen>(evolveShells.first);
-      expect(es.showBottomBar, isFalse);
-      expect(es.tabIndex, 0); // Analysis full-access index
-      expect(
-        find.byKey(const Key('evolve_shell_embed_no_bottom_bar')),
-        findsWidgets,
-      );
-    }
+    // Unconditional: real package shell, no nested bottom bar.
+    expect(find.byType(EvolveShellScreen), findsWidgets);
+    final evolveShells = tester
+        .widgetList<EvolveShellScreen>(find.byType(EvolveShellScreen))
+        .toList();
+    expect(evolveShells, isNotEmpty);
+    expect(evolveShells.every((s) => s.showBottomBar == false), isTrue);
+    expect(
+      evolveShells.any((s) => s.tabIndex == 0),
+      isTrue,
+      reason: 'Analysis full-access index 0 must be embedded',
+    );
+    expect(
+      find.byKey(const Key('evolve_shell_embed_no_bottom_bar')),
+      findsWidgets,
+    );
 
     // Wallet destination → full-access evolve index 1.
     final walletIdx = dests.indexOf(SuiteNavDest.wallet);
     shell.selectTab(walletIdx);
     await tester.pump();
-    await tester.pump(const Duration(milliseconds: 200));
-    if (find.byType(EvolveShellScreen).evaluate().isNotEmpty) {
-      final es = tester.widgetList<EvolveShellScreen>(
-        find.byType(EvolveShellScreen),
-      );
-      // Visible/keep-alive shells: at least one has tabIndex 1 for Wallet.
-      expect(es.any((w) => w.tabIndex == 1 && w.showBottomBar == false), isTrue);
-    }
+    await tester.pump(const Duration(milliseconds: 100));
+    final afterWallet = tester
+        .widgetList<EvolveShellScreen>(find.byType(EvolveShellScreen))
+        .toList();
+    expect(afterWallet, isNotEmpty);
+    expect(
+      afterWallet.any((w) => w.tabIndex == 1 && w.showBottomBar == false),
+      isTrue,
+      reason: 'Wallet full-access index 1 must be embedded without nested bar',
+    );
 
     // Only Suite main NavigationBar (no nested bars from package shells).
     expect(find.byType(NavigationBar), findsOneWidget);
+
+    // Wallet/Analysis bodies may start inbound burst + rendezvous retries
+    // (Future.delayed 250/500ms). Stop polling, dispose shell, drain fakes.
+    evolve_coord.PercNetworkCoordinator.instance.stopInboundPollingForTest();
+    evolve_hub.PercLedgerHub.resetForTest();
+    await tester.pumpWidget(const SizedBox.shrink());
+    for (var i = 0; i < 20; i++) {
+      await tester.pump(const Duration(milliseconds: 250));
+    }
   });
 
-  test('SuiteFamilyHost source: wallet.initialize awaited; Theme only on body',
-      () {
+  test('SuiteFamilyHost source: timeouts, boot seam, Theme only on body', () {
     // Structural proof against shipped suite_family_host.dart (cwd = client_app).
     final text = File('lib/suite_family_host.dart').readAsStringSync();
-    expect(text.contains('await wallet.initialize()'), isTrue);
+    expect(text.contains('kSuiteFamilyBootTimeout'), isTrue);
+    expect(text.contains('TimeoutException'), isTrue);
+    expect(text.contains('SuiteFamilyBootFn'), isTrue);
+    expect(text.contains('await wallet.initialize()') ||
+        text.contains('wallet.initialize()'), isTrue);
     // Host build (before SuiteFamilyBody) must not Theme-wrap the PageView child.
     final hostBuild = text.split('Widget build(BuildContext context)')[1];
     final hostSection = hostBuild.split('class SuiteFamilyBody')[0];
@@ -337,6 +432,7 @@ void main() {
     expect(bodySection.contains('Theme('), isTrue);
     expect(bodySection.contains('showBottomBar: false'), isTrue);
     expect(bodySection.contains('RegistrationSeedSetupDialogHost'), isTrue);
+    expect(bodySection.contains('suite_family_boot_retry'), isTrue);
   });
 }
 

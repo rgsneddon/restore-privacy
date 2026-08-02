@@ -33,6 +33,7 @@ class SuiteShell extends StatefulWidget {
     this.initialParts,
     this.preferInitialParts = false,
     this.onPartsChanged,
+    this.familyBoot,
   });
 
   final Widget vpnTab;
@@ -44,6 +45,9 @@ class SuiteShell extends StatefulWidget {
   final SuitePartsState? initialParts;
   final bool preferInitialParts;
   final ValueChanged<SuitePartsState>? onPartsChanged;
+
+  /// Test seam: inject ready %/Evolve providers (skips live path_provider boot).
+  final SuiteFamilyBootFn? familyBoot;
 
   @override
   State<SuiteShell> createState() => SuiteShellState();
@@ -350,6 +354,7 @@ class SuiteShellState extends State<SuiteShell> {
         key: const Key('suite_family_host'),
         parts: _parts,
         onHasAppAccessChanged: _onHasAppAccessChanged,
+        boot: widget.familyBoot,
         child: pageView,
       );
     }
